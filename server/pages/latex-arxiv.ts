@@ -97,7 +97,10 @@ export function usedFiles(doc: TexDoc, sources: TexSource[], bib: boolean): { fi
   for (const m of all().matchAll(/\\graphicspath\s*\{((?:\s*\{[^{}]*\})+)\s*\}/g)) for (const d of m[1].matchAll(/\{([^{}]*)\}/g)) dirs.push(d[1].trim().replace(/^\.\//, ''));
   const picNames = new Set(doc.pictures.map((p) => p.name));
   for (const m of all().matchAll(/\\includegraphics\*?\s*(?:\[[^\]]*\]\s*)?\{([^{}]+)\}/g)) {
-    const n = m[1].trim().replace(/^\.\//, '').replace(/^"(.*)"$/, '$1');
+    const n = m[1]
+      .trim()
+      .replace(/^\.\//, '')
+      .replace(/^"(.*)"$/, '$1');
     for (const d of dirs) for (const cand of [n, `${n}.png`, `${n}.jpg`, `${n}.jpeg`, `${n}.PNG`, `${n}.JPG`]) if (picNames.has(`${d}${cand}`)) pictures.add(`${d}${cand}`);
     // A PDF picture became a PNG of it when it came in.
     const png = `${stem(n)}.png`;
@@ -118,18 +121,7 @@ export function usedFiles(doc: TexDoc, sources: TexSource[], bib: boolean): { fi
       const ext = extOf(f.name);
       const base = stem(f.name);
       const named = (base.length >= 3 && new RegExp(`(^|[{\\s,/])${esc(base)}(\\.${esc(ext)})?([}\\s,]|$)`).test(text)) || text.includes(f.name);
-      const use =
-        ext === 'sty'
-          ? pkgs.has(base) || themes.has(base)
-          : ext === 'cls'
-            ? classes.has(base)
-            : ext === 'bib'
-              ? bib && bibs.has(f.name)
-              : ext === 'bst'
-                ? bib && styles.has(f.name)
-                : ext === 'bbl'
-                  ? false
-                  : named;
+      const use = ext === 'sty' ? pkgs.has(base) || themes.has(base) : ext === 'cls' ? classes.has(base) : ext === 'bib' ? bib && bibs.has(f.name) : ext === 'bst' ? bib && styles.has(f.name) : ext === 'bbl' ? false : named;
       if (!use) continue;
       files.add(f.name);
       texts.set(f.name, ['tex', 'ltx', 'sty', 'cls', 'tikz', 'pgf', 'cfg', 'def', 'clo'].includes(ext) ? cleanTex(f.text) : '');
@@ -352,7 +344,13 @@ const slug = (s: string) => (s.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$
  */
 export async function paperOnDisk(db: DB, doc: TexDoc, o: { page?: string; folder?: string; title: string; base?: string }): Promise<{ folder: string; pdf?: string }> {
   const r = await compileTex(db, doc, { base: o.base, folder: o.folder });
-  const id = o.page ? o.page.replace(/[^\w-]/g, '') : `file-${crypto.createHash('sha256').update(o.folder ?? '').digest('hex').slice(0, 12)}`;
+  const id = o.page
+    ? o.page.replace(/[^\w-]/g, '')
+    : `file-${crypto
+        .createHash('sha256')
+        .update(o.folder ?? '')
+        .digest('hex')
+        .slice(0, 12)}`;
   const dir = path.join(PAPERS, id);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });

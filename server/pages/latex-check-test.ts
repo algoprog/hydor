@@ -115,7 +115,10 @@ const applied = (text: string, f: CheckFinding, file: string) => {
   const n = r.entries.find((e) => e.key === 'nested')!;
   ok(bibField(n, 'title') === 'A title with {braces {inside} them} and {\\"o}', `a quoted value with braces (${bibField(n, 'title')})`);
   ok(bibField(n, 'journal') === 'Journal of Machine Learning Research', 'a macro defined with braces and spaces');
-  ok(r.problems.some((p) => /broken/.test(p.message)), 'a broken entry is said, and the next one is still read');
+  ok(
+    r.problems.some((p) => /broken/.test(p.message)),
+    'a broken entry is said, and the next one is still read',
+  );
   ok(bibAuthors(bibField(d, 'author')).families.join(',') === 'devlin,chang,lee,toutanova', 'family names from “Family, Given”');
   ok(bibAuthors('Ashish Vaswani and Noam Shazeer and others').families.join(',') === 'vaswani,shazeer' && bibAuthors('Ashish Vaswani and others').cut, '“Given Family” and “and others”');
   ok(bibAuthors('Kurt G{\\"o}del and Johannes van der Waals and John Smith Jr.').families.join(',') === 'godel,waals,smith', 'accents, particles and Jr.');
@@ -206,7 +209,13 @@ const applied = (text: string, f: CheckFinding, file: string) => {
   ok(c('GPT-2') === null && c('--') === null && c('N/A') === null && c('') === null, 'words, dashes and nothing are not numbers');
   ok(c('\\cellcolor{gray!20}0.7')?.value === 0.7 && c('\\multicolumn{1}{c}{0.25}')?.value === 0.25, 'colours and \\multicolumn around a number');
   ok(betterOf('Latency (ms)').better === 'min' && betterOf('nDCG@10').better === 'max' && betterOf('WER $\\downarrow$').better === 'min' && !betterOf('Avg.').sure, 'which way is better, by the header');
-  const t = tabularsIn(texSources(doc('\\documentclass{article}\\begin{document}\n\\begin{tabular}{l|cc}\n\\toprule\n& \\multicolumn{2}{c}{Scores} \\\\\nModel & P@10 & Loss \\\\\n\\midrule\nA & 0.5 & 1.2 \\\\ % a note: 0.9\nB & 0.6 & 1.1 \\\\\n\\bottomrule\n\\end{tabular}\n\\end{document}'))[0])[0];
+  const t = tabularsIn(
+    texSources(
+      doc(
+        '\\documentclass{article}\\begin{document}\n\\begin{tabular}{l|cc}\n\\toprule\n& \\multicolumn{2}{c}{Scores} \\\\\nModel & P@10 & Loss \\\\\n\\midrule\nA & 0.5 & 1.2 \\\\ % a note: 0.9\nB & 0.6 & 1.1 \\\\\n\\bottomrule\n\\end{tabular}\n\\end{document}',
+      ),
+    )[0],
+  )[0];
   const g = gridOf(t);
   ok(g.head === 2 && g.rows.length === 4 && /P@10/.test(g.header[1]) && /Scores/.test(g.header[2]), `header rows and each column's header words (${g.head}, ${JSON.stringify(g.header)})`);
   ok(g.rows[2].cells[1].n?.value === 0.5 && g.rows[3].cells[2].n?.value === 1.1, 'each row’s numbers, a comment in a cell left out');
@@ -269,7 +278,10 @@ const PAPER = (body: string, pre = '\\documentclass[11pt]{article}\n\\usepackage
   ok(kase?.fix && applied(d.main, kase, 'main.tex').includes('\\cite{lee2019}'), 'a key cited with other capitals, fixed to the entry’s');
   ok(has(st, 'refs:twice:p1:p2'), 'the same paper under two keys');
   ok(/journal, year/.test(has(st, 'refs:fields:p3')?.title ?? ''), `fields a @article needs (${has(st, 'refs:fields:p3')?.title})`);
-  ok(st.notes.some((n) => /could not be asked/.test(n)), 'services that could not be asked are said');
+  ok(
+    st.notes.some((n) => /could not be asked/.test(n)),
+    'services that could not be asked are said',
+  );
   ok(!has(st, 'refs:notfound:'), 'nothing is said not to exist when the services could not be asked');
 }
 {
@@ -332,7 +344,10 @@ const PAPER = (body: string, pre = '\\documentclass[11pt]{article}\n\\usepackage
   ok(stale?.level === 'must' && /0\.35 in the paper, 0\.36 now/.test(stale.detail ?? '') && stale.fix?.label === 'Update the table', `a table of Experiments' whose runs changed (${stale?.detail})`);
   ok(applied(d.main, stale!, 'main.tex').includes('B & \\textbf{0.36}$^\\dagger$') && applied(d.main, stale!, 'main.tex').includes('% hydor:table tmq3x9a1f2\n\\begin{tabular}'), 'Update the table puts in the new one, under its marker');
   const traced = st.findings.filter((f) => f.id.startsWith('numbers:traced:'));
-  ok(traced.length === 2 && traced.some((f) => /^3 of the 6 numbers/.test(f.title)) && traced.some((f) => /^0 of the 4 numbers/.test(f.title)) && traced.every((f) => f.level === 'info'), `numbers traced to runs, as the table rounds them and as percentages (${traced.map((f) => f.title)})`);
+  ok(
+    traced.length === 2 && traced.some((f) => /^3 of the 6 numbers/.test(f.title)) && traced.some((f) => /^0 of the 4 numbers/.test(f.title)) && traced.every((f) => f.level === 'info'),
+    `numbers traced to runs, as the table rounds them and as percentages (${traced.map((f) => f.title)})`,
+  );
   // A table as Experiments writes it (its marker, arrows in the header, mean ± std, bold, daggers): read as it is.
   const aTable = [
     '\\begin{table}[t]',
@@ -378,7 +393,19 @@ const PAPER = (body: string, pre = '\\documentclass[11pt]{article}\n\\usepackage
     // As the real fetch does: header values are bytes, not any character.
     for (const v of Object.values((init?.headers ?? {}) as Record<string, string>)) if (/[^\x00-\xff]/.test(v)) throw new TypeError('Cannot convert argument to a ByteString');
     if (url.startsWith('https://api.crossref.org/works/10.1000/known'))
-      return json({ message: { DOI: '10.1000/known', type: 'proceedings-article', title: ['A Known Paper'], author: [{ given: 'Ada', family: 'Lovelace' }, { given: 'Charles', family: 'Babbage' }], issued: { 'date-parts': [[2021]] }, 'container-title': ['Proceedings of SIGIR'] } });
+      return json({
+        message: {
+          DOI: '10.1000/known',
+          type: 'proceedings-article',
+          title: ['A Known Paper'],
+          author: [
+            { given: 'Ada', family: 'Lovelace' },
+            { given: 'Charles', family: 'Babbage' },
+          ],
+          issued: { 'date-parts': [[2021]] },
+          'container-title': ['Proceedings of SIGIR'],
+        },
+      });
     if (url.startsWith('https://api.crossref.org/works/10.1000/nowhere')) return json({ status: 'error' }, 404);
     if (url.startsWith('https://api.datacite.org/dois/10.1000/nowhere')) return json({ errors: [] }, 404);
     if (url.startsWith('https://doi.org/api/handles/10.1000/nowhere')) return json({ responseCode: 100 });
@@ -388,7 +415,22 @@ const PAPER = (body: string, pre = '\\documentclass[11pt]{article}\n\\usepackage
         { status: 200 },
       );
     if (url.includes('api.crossref.org/works?') && url.includes('filter=type'))
-      return json({ message: { items: [{ DOI: '10.5555/3295222.3295349', type: 'proceedings-article', title: ['Attention is All you Need'], author: [{ given: 'Ashish', family: 'Vaswani' }], issued: { 'date-parts': [[2017]] }, 'container-title': ['Advances in Neural Information Processing Systems'], page: '5998-6008', volume: '30' }] } });
+      return json({
+        message: {
+          items: [
+            {
+              DOI: '10.5555/3295222.3295349',
+              type: 'proceedings-article',
+              title: ['Attention is All you Need'],
+              author: [{ given: 'Ashish', family: 'Vaswani' }],
+              issued: { 'date-parts': [[2017]] },
+              'container-title': ['Advances in Neural Information Processing Systems'],
+              page: '5998-6008',
+              volume: '30',
+            },
+          ],
+        },
+      });
     if (url.includes('api.crossref.org/works?')) return json({ message: { items: [{ DOI: '10.9/other', type: 'journal-article', title: ['Something Else Entirely'], issued: { 'date-parts': [[1999]] } }] } });
     if (url.includes('api.openalex.org/works?')) return json({ results: [] });
     if (url.includes('dblp.org')) return new Response('<html>Are you human?</html>', { status: 200 });
@@ -411,12 +453,18 @@ const PAPER = (body: string, pre = '\\documentclass[11pt]{article}\n\\usepackage
   const pub = has(st, 'refs:published:vaswani2017');
   ok(pub && /Neural Information Processing Systems/.test(pub.title), `a preprint published since (${pub?.title})`);
   const pubBib = applied(bib, pub!, 'refs.bib');
-  ok(/@inproceedings\{vaswani2017,/.test(pubBib) && /booktitle\s*= \{Advances in Neural Information Processing Systems\}/.test(pubBib) && /pages\s*= \{5998--6008\}/.test(pubBib) && !/arXiv preprint/.test(pubBib.split('@misc{nodoi')[0]), 'and its published entry, the preprint’s fields gone, its title’s braces kept');
+  ok(
+    /@inproceedings\{vaswani2017,/.test(pubBib) && /booktitle\s*= \{Advances in Neural Information Processing Systems\}/.test(pubBib) && /pages\s*= \{5998--6008\}/.test(pubBib) && !/arXiv preprint/.test(pubBib.split('@misc{nodoi')[0]),
+    'and its published entry, the preprint’s fields gone, its title’s braces kept',
+  );
   ok(/\{\{Attention\} Is All You Need\}/.test(pubBib), 'the title as the user wrote it, with its braces');
   ok(has(st, 'refs:nodoi:nodoi')?.level === 'check' && /as far as the services know/.test(has(st, 'refs:nodoi:nodoi')!.title), 'a DOI no one knows, said carefully');
   ok(has(st, 'refs:notfound:ghost')?.level === 'check' && /may not exist/.test(has(st, 'refs:notfound:ghost')!.detail ?? ''), 'a paper found nowhere: it may not exist, check it');
   ok(has(st, 'refs:noarxiv:badid'), 'an arXiv id arXiv does not have');
-  ok(st.notes.some((n) => /DBLP/.test(n)), `DBLP’s check for people is said (${st.notes.join(' | ')})`);
+  ok(
+    st.notes.some((n) => /DBLP/.test(n)),
+    `DBLP’s check for people is said (${st.notes.join(' | ')})`,
+  );
   ok(asked.filter((u) => u.includes('export.arxiv.org')).length === 1, 'arXiv is asked for all its papers at once');
   // What was asked is kept: a second check asks the services nothing again.
   const before = asked.length;
@@ -426,13 +474,26 @@ const PAPER = (body: string, pre = '\\documentclass[11pt]{article}\n\\usepackage
   const lk = new Lookup({ db, fetch: canned });
   const r = await lk.byDoi('10.1000/known');
   ok(r?.year === 2021 && lk.requests === 0, 'a DOI answered from the cache');
-  ok(sameVenue('Proceedings of the 44th International ACM SIGIR Conference on Research and Development in Information Retrieval', 'SIGIR') === true && sameVenue('NeurIPS', 'ICML') === false && sameVenue('A', 'B') === null, 'venues by their acronyms and names');
+  ok(
+    sameVenue('Proceedings of the 44th International ACM SIGIR Conference on Research and Development in Information Retrieval', 'SIGIR') === true && sameVenue('NeurIPS', 'ICML') === false && sameVenue('A', 'B') === null,
+    'venues by their acronyms and names',
+  );
 }
 {
   // differences and entryFrom on their own.
   const bib = '@article{k, author = {Smith, John and Doe, Jane}, title = {On Things}, journal = {Journal of Things}, year = 2019}';
   const e = parseBibFile('r.bib', bib).entries[0];
-  const rec: PaperRecord = { source: 'crossref', title: 'On Things', names: [{ family: 'Smith', given: 'John' }, { family: 'Roe', given: 'Richard' }], year: 2019, venue: 'Journal of Things', kind: 'journal' };
+  const rec: PaperRecord = {
+    source: 'crossref',
+    title: 'On Things',
+    names: [
+      { family: 'Smith', given: 'John' },
+      { family: 'Roe', given: 'Richard' },
+    ],
+    year: 2019,
+    venue: 'Journal of Things',
+    kind: 'journal',
+  };
   const diffs = differences(e, rec);
   ok(diffs.length === 1 && /Doe/.test(diffs[0].text), `a name not among the authors (${diffs.map((x) => x.text)})`);
   ok(/author\s*= \{Smith, John and Roe, Richard\}/.test(entryFrom(bib, e, rec)), 'the entry made with the record’s authors');
@@ -534,18 +595,27 @@ const PAPER = (body: string, pre = '\\documentclass[11pt]{article}\n\\usepackage
   ok(usedFiles(d, texSources(d), true).files.has('refs.bib'), 'and its .bib when it is sent');
   const texts = new Map<string, string>([['main.tex', d.main], ...d.files.map((f) => [f.name, f.text] as [string, string])]);
   const flat = flattenTex(d, texts);
-  ok(flat.includes('Intro text. % note\n\\input{data.tikz}') === false && flat.includes('Intro text.') && flat.includes('\\clearpage\nResults.\n\\clearpage') && flat.includes('% a figure'), 'flattened: \\input in place, \\include between page breaks, in turn');
+  ok(
+    flat.includes('Intro text. % note\n\\input{data.tikz}') === false && flat.includes('Intro text.') && flat.includes('\\clearpage\nResults.\n\\clearpage') && flat.includes('% a figure'),
+    'flattened: \\input in place, \\include between page breaks, in turn',
+  );
   const { zip, report } = await arxivPackage(db, d, ARXIV_DEFAULTS, 'My Paper: Results');
   const names = report.files.map((f) => f.name).sort();
   ok(report.name === 'My-Paper-Results-arxiv.zip' && zip.length === report.bytes, `the package's name and size (${report.name})`);
   ok(!names.includes('old/draft.tex') && !names.includes('unused.sty') && !names.includes('figures/unused.png') && names.includes('figures/plot.png') && names.includes('helper.sty'), `only what it uses (${names})`);
   ok(report.removed.some((r) => /comments/.test(r)) && report.removed.some((r) => /old\/draft\.tex/.test(r)), `what was left out is said (${report.removed.join(' | ')})`);
-  ok(report.warnings.some((w) => /pick pdfLaTeX/.test(w)), 'what to pick on arXiv');
+  ok(
+    report.warnings.some((w) => /pick pdfLaTeX/.test(w)),
+    'what to pick on arXiv',
+  );
   if (tex) {
     ok(names.includes('main.bbl') && !names.includes('refs.bib') && !names.includes('plain.bst'), `the .bbl in, the .bib out (${names})`);
     ok(report.compiled.ok && report.compiled.pages >= 1, `the package typesets (${JSON.stringify(report.compiled.errors)})`);
     const r = (await req('POST', '/api/pages/tex/arxiv', { model: d, title: 'T', options: { strip: false, unused: false, bbl: false } })).json();
-    ok(r.files.some((f: { name: string }) => f.name === 'refs.bib') && r.files.some((f: { name: string }) => f.name === 'figures/my-plot.png') && r.renamed.some((x: string[]) => x[1] === 'figures/my-plot.png'), 'everything, with names without spaces');
+    ok(
+      r.files.some((f: { name: string }) => f.name === 'refs.bib') && r.files.some((f: { name: string }) => f.name === 'figures/my-plot.png') && r.renamed.some((x: string[]) => x[1] === 'figures/my-plot.png'),
+      'everything, with names without spaces',
+    );
     const dl = await req('GET', `/api/pages/tex/arxiv/${r.token}`);
     ok(dl.statusCode === 200 && dl.headers['content-type'] === 'application/zip' && dl.rawPayload.subarray(0, 2).toString() === 'PK', 'its download');
   } else console.log('(no pdfLaTeX here: the package was not typeset)');
