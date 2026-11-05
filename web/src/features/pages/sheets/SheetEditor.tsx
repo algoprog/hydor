@@ -272,7 +272,6 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   }, []);
   const narrow = width < 640 || layout === 'sheet';
   // The menus' names go in the title bar where there is room for them, as Google Docs has them; else one button holds them.
-  const menusInBar = !narrow && width >= 900;
 
   const h = hist.current;
   const dirty = !!bookRef.current && h.saved !== h.past.length;
@@ -1939,14 +1938,14 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     <div ref={root} className="flex h-full min-h-0 flex-col bg-bg" onFocusCapture={onFocusCapture}>
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          {lead}
-          {menusInBar && <MenuBar menus={menus} className="ml-3 shrink-0" />}
+          <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
+          {/* The menus beside the title, where the header has room for them; one button where it hasn't. */}
+          <MenuBar menus={menus} compact={narrow ? true : 'auto'} />
         </div>
         {tail}
       </div>
       {band}
       <Toolbar
-        menus={menusInBar ? undefined : menus}
         style={active?.s}
         readOnly={readOnly}
         canUndo={hist.current.past.length > 0 || !!edit}
