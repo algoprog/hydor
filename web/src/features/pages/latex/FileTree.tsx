@@ -133,7 +133,8 @@ export function FileTree({
   // The file in view brought into sight, its folders opened.
   useEffect(() => {
     const parts = current.split('/').slice(0, -1);
-    if (parts.length) setClosed((c) => (parts.some((_, i) => c.has(`${parts.slice(0, i + 1).join('/')}/`)) ? new Set([...c].filter((x) => !current.startsWith(x))) : c));
+    const holds = (x: string) => current.startsWith(x.replace(/^~/, ''));
+    if (parts.length) setClosed((c) => ([...c].some(holds) ? new Set([...c].filter((x) => !holds(x))) : c));
     requestAnimationFrame(() => root.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }));
   }, [current]);
 
@@ -181,10 +182,12 @@ export function FileTree({
       rows[Math.max(0, Math.min(rows.length - 1, at + (e.key === 'ArrowDown' ? 1 : -1)))]?.focus();
     } else if (e.key === 'ArrowRight' && folder) {
       e.preventDefault();
-      setClosed((c) => new Set([...c].filter((x) => x !== folder)));
+      const key = row.dataset.fold ?? folder;
+      setClosed((c) => new Set([...c].filter((x) => x !== key)));
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      if (folder && !closed.has(folder)) setClosed((c) => new Set([...c, folder]));
+      const key = row.dataset.fold ?? folder;
+      if (folder && key && !closed.has(key)) setClosed((c) => new Set([...c, key]));
       else {
         const up = folderOf((folder ?? row.dataset.name ?? '').replace(/\/$/, ''));
         rows.find((r) => r.dataset.folder === up)?.focus();
@@ -220,7 +223,9 @@ export function FileTree({
     list.map((n) => {
       const pad = { paddingLeft: 6 + depth * 14 };
       if (n.kind === 'folder') {
-        const open = !closed.has(n.name);
+        // A folder under Not used folds on its own, apart from the one of the same name above.
+        const key = faint ? `~${n.name}` : n.name;
+        const open = !closed.has(key);
         return (
           <div key={`d:${n.name}`} role="group">
             <button
@@ -230,10 +235,11 @@ export function FileTree({
               aria-level={depth + 1}
               data-row
               data-folder={n.name}
+              data-fold={key}
               draggable={!TOUCH && movable(n.name)}
               onDragStart={(e) => onDragStart(e, n.name)}
               {...dropZone(n.name)}
-              onClick={() => setClosed((c) => (open ? new Set([...c, n.name]) : new Set([...c].filter((x) => x !== n.name))))}
+              onClick={() => setClosed((c) => (open ? new Set([...c, key]) : new Set([...c].filter((x) => x !== key))))}
               onContextMenu={(e) => {
                 if (readOnly) return;
                 e.preventDefault();

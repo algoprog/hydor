@@ -331,7 +331,8 @@ function Crumb({ folder, topName, onGo, last, children }: { folder: LibFolder | 
 /** The way back from a folder: the place, then each folder to the one open (Thesis › Chapter drafts). */
 export function FolderCrumbs({ chain, space, topName, onGo }: { chain: LibFolder[]; space: SpaceView | null; topName: string; onGo: (folder: string | null) => void }) {
   return (
-    <nav aria-label="Folders" className="flex min-w-0 items-center gap-0.5 text-[17px] tracking-tight max-lg:text-[15px]">
+    // A line of its own where the find box would squeeze it (a phone, a narrow window).
+    <nav aria-label="Folders" className="flex min-w-0 items-center gap-0.5 text-[17px] tracking-tight max-lg:w-full max-lg:text-[15px]">
       <Crumb folder={null} topName={topName} onGo={() => onGo(null)} last={false}>
         {space ? <SpaceMark s={space} size={20} className="rounded-md" /> : <LibraryBig size={17} className="shrink-0" />}
         <span translate={space ? 'no' : undefined} className="truncate">
@@ -379,13 +380,16 @@ export function ImportFolderDialog({ open, onClose, space, folder, folderName }:
   const [details, setDetails] = useState(false);
   useEffect(() => {
     if (!open) return;
-    setPath('');
+    // From the home folder: its folders are the ones offered first.
+    setPath('~/');
     setWhere(space);
     setDone(null);
     setDetails(false);
   }, [open, space]);
+  // A folder of its own: not the whole home folder, nor the computer's root.
+  const picked = !/^(~|\/|~\/|[A-Za-z]:[\\/]?)$/.test(path.trim());
   const submit = async () => {
-    if (!path.trim() || busy) return;
+    if (!path.trim() || !picked || busy) return;
     setBusy(true);
     try {
       // Into the folder open, unless another project was picked.
@@ -428,7 +432,7 @@ export function ImportFolderDialog({ open, onClose, space, folder, folderName }:
             <Button variant="ghost" onClick={onClose}>
               Cancel
             </Button>
-            <Button variant="primary" icon={busy ? <Throbber className="h-3.5 w-3.5" /> : <FolderOpen size={14} />} disabled={busy || !path.trim()} onClick={() => void submit()}>
+            <Button variant="primary" icon={busy ? <Throbber className="h-3.5 w-3.5" /> : <FolderOpen size={14} />} disabled={busy || !path.trim() || !picked} onClick={() => void submit()}>
               {busy ? 'Importing…' : 'Import'}
             </Button>
           </>
@@ -482,7 +486,7 @@ export function ImportFolderDialog({ open, onClose, space, folder, folderName }:
           </p>
           <label className="block space-y-1.5">
             <span className="text-[12.5px] font-medium text-fg-2">The folder, on this computer</span>
-            <FolderPicker value={path} onChange={setPath} onPick={(p) => setPath(p)} autoFocus />
+            <FolderPicker value={path} onChange={setPath} onPick={(p) => setPath(p)} />
           </label>
           {folder && where === space ? (
             <p className="text-[12.5px] text-fg-3">
