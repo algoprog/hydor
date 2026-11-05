@@ -280,8 +280,9 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
 
   const save = async (): Promise<boolean> => {
     const e = engine.current;
-    if (!e || !onSave || saving || readOnly) return false;
-    const d = e.doc;
+    // Not while an agent's version shows (Ctrl+S would keep that, as far as it has come): there is nothing of yours to save then.
+    if (!e || !onSave || saving || readOnly || liveOn) return false;
+    const d = e.kept;
     setSaving(true);
     try {
       if (await onSave(d)) {
