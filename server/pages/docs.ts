@@ -330,6 +330,8 @@ function pageCss(doc: Doc, mode: 'viewer' | 'print' | 'still'): string {
     '.nd-sheet{position:relative}',
     `.nd-band{position:absolute;left:${m}mm;right:${m}mm;height:${m}mm;display:flex;align-items:center;font-family:${fontCss(doc.font)};font-size:${bandPt(doc)}pt;color:#5f6368;white-space:pre;overflow:hidden}`,
     '.nd-band.nd-head{top:0}.nd-band.nd-foot{bottom:0}.nd-band.nd-center{justify-content:center}.nd-band.nd-right{justify-content:flex-end}',
+    // A sheet's first block starts at the top of its words, as the editor's does, its header and footer before it or not.
+    '.nd-sheet>.nd-band+.nd-b,.nd-sheet>.nd-band+.nd-band+.nd-b{margin-top:0}',
   ];
   if (mode === 'print') return [...base, printCss(doc)].join('\n');
   if (mode === 'still') {
