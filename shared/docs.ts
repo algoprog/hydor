@@ -2414,7 +2414,9 @@ export function htmlBlocks(input: string | HNode[], o: HtmlOpts = {}): Raw[] {
 
   const image = (at: Record<string, string>, ctx: Ctx) => {
     const st = styleProps(at.style);
-    const w = Number(at.width) || parseFloat(st.width) || 0;
+    // A width in % is a share of the text's (as this app draws a picture); in pixels, of a page's 624.
+    const pct = /^\s*(\d+(?:\.\d+)?)%\s*$/.exec(st.width ?? '');
+    const w = pct ? 0 : Number(at.width) || parseFloat(st.width) || 0;
     const h = Number(at.height) || parseFloat(st.height) || 0;
     const alt = (at.alt ?? at.title ?? '').replace(/\s+/g, ' ').trim();
     // A small one among the words (an emoji, an icon) is its description, as is any picture in a table's cell.
@@ -2426,8 +2428,10 @@ export function htmlBlocks(input: string | HNode[], o: HtmlOpts = {}): Raw[] {
     if (!src) return;
     const props = cur?.props;
     flush();
-    out.push({ type: 'image', src, alt, w: w ? Math.min(1, w / 624) : 1, align: props?.align === 'right' ? 'right' : undefined });
+    out.push({ type: 'image', src, alt, w: pct ? Math.min(1, parseFloat(pct[1]) / 100) : w ? Math.min(1, w / 624) : 1, align: props?.align === 'right' ? 'right' : undefined });
   };
+  // A document's own page (its web page opened again) has its sheets one after another: each after the first starts a page.
+  let sheets = 0;
 
   const table = (el: Extract<HNode, object>, ctx: Ctx) => {
     flush();
@@ -2507,12 +2511,23 @@ export function htmlBlocks(input: string | HNode[], o: HtmlOpts = {}): Raw[] {
       }
       return;
     }
+    const st = styleProps(n.at.style);
+    // This app's own drawing first (its table of contents is a <nav>, which other pages' menus are).
+    if (!ctx.cell && !ctx.inItem && !RAW.has(tag) && !hiddenEl(n.at) && ours(n, st, ctx)) return;
     if (RAW.has(tag) || SKIP.has(tag) || hiddenEl(n.at)) {
       // A ticked box in a list item says whether it is done.
       return;
     }
-    const st = styleProps(n.at.style);
     if (/ignore/i.test(st['mso-list'] ?? '')) return;
+    // A figure's caption is its picture's.
+    if (tag === 'figcaption' && !ctx.cell) {
+      const last = out[out.length - 1];
+      const text = textOfNode(n).replace(/\s+/g, ' ').trim();
+      if (last?.type === 'image' && !last.caption && text && !cur?.runs.some((r) => r.t.trim())) {
+        last.caption = text;
+        return;
+      }
+    }
     if (tag === 'br') {
       if ('data-ph' in n.at) return;
       if (/always|page/.test(st['page-break-before'] ?? st['break-before'] ?? '')) {
@@ -2639,6 +2654,11 @@ export function htmlBlocks(input: string | HNode[], o: HtmlOpts = {}): Raw[] {
       if (style) p.style = style;
       else if (p.style === undefined && ctx.props().style) p.style = ctx.props().style;
       if (indent > 0 && p.type === 'p' && !style) p.lvl = Math.min(4, indent);
+      // This app's own paragraph (its page opened again): its own spacing and indent, as it wrote them.
+      if (/\bnd-b\b/.test(cls)) {
+        Object.assign(p, ourSpacing(st));
+        if (/\bnd-in\b/.test(cls) && Number(st['--lvl']) > 0) p.lvl = Math.min(4, Math.round(Number(st['--lvl'])));
+      }
       return p;
     };
     const explicit = tag === 'p' || /^h[1-6]$/.test(tag) || tag === 'pre';
@@ -2650,6 +2670,44 @@ export function htmlBlocks(input: string | HNode[], o: HtmlOpts = {}): Raw[] {
     const inner = kidsCtx({ pre: ctx.pre || tag === 'pre', props: mine, look: style === 'code' ? {} : own });
     for (const k of n.kids) walk(k, inner);
     flush();
+  };
+
+  /**
+   * What this app draws a document's blocks as (its own web page, opened again), read back as those blocks: true when
+   * `n` was one. Its sheets (each after the first a page break), list items, callouts and table of contents; the header
+   * and footer on each sheet are the document's, not its words.
+   */
+  const ours = (n: Extract<HNode, object>, st: Record<string, string>, ctx: Ctx): boolean => {
+    const cls = ` ${n.at.class ?? ''} `;
+    if (!cls.includes(' nd-')) return false;
+    if (cls.includes(' nd-band ')) return true;
+    if (cls.includes(' nd-sheet ')) {
+      flush();
+      if (sheets++) out.push({ type: 'pagebreak' });
+      for (const k of n.kids) walk(k, ctx);
+      flush();
+      return true;
+    }
+    if (n.tag === 'nav' && cls.includes(' nd-toc ')) {
+      flush();
+      out.push({ type: 'toc' });
+      return true;
+    }
+    const align = alignOf(st['text-align']);
+    const lvl = Math.min(4, Math.max(0, Math.round(Number(st['--lvl']) || 0)));
+    let p: Raw | null = null;
+    if (cls.includes(' nd-li ')) {
+      const list: ListKind = cls.includes(' nd-number ') ? 'number' : cls.includes(' nd-check ') ? 'check' : 'bullet';
+      p = { type: 'li', list, lvl, ...(list === 'check' && cls.includes(' nd-on ') ? { checked: true } : {}) };
+    } else if (cls.includes(' nd-callout ')) p = { type: 'p', style: 'callout', icon: n.at['data-icon'], tint: st['--tint'] };
+    if (!p) return false;
+    if (align) p.align = align;
+    Object.assign(p, ourSpacing(st));
+    start(p, true);
+    const props = p;
+    for (const k of n.kids) walk(k, { ...ctx, inItem: true, props: () => props });
+    flush();
+    return true;
   };
 
   const rootCtx: Ctx = { look: {}, pre: !!o.pre, props: () => ({ type: 'p' }), inItem: false, cell: false };
@@ -2768,6 +2826,18 @@ const TAG: Record<ParaStyle, string> = { normal: 'p', title: 'p', subtitle: 'p',
 
 /** A paragraph's own spacing as CSS. */
 const spacingCss = (b: Spacing) => [b.lh !== undefined ? `line-height:${cssLine(b.lh)}` : '', b.sb !== undefined ? `margin-top:${b.sb}pt` : '', b.sa !== undefined ? `margin-bottom:${b.sa}pt` : ''];
+
+/** A paragraph's own spacing read back from what spacingCss wrote (a document's own page opened again). */
+function ourSpacing(st: Record<string, string>): Spacing {
+  const out: Spacing = {};
+  if (/^\s*\d+(\.\d+)?\s*$/.test(st['line-height'] ?? '')) out.lh = Math.round((parseFloat(st['line-height']) / 1.15) * 100) / 100;
+  const pt = (v: string | undefined) => (v && /^\s*\d+(\.\d+)?pt\s*$/.test(v) ? parseFloat(v) : undefined);
+  const sb = pt(st['margin-top']);
+  const sa = pt(st['margin-bottom']);
+  if (sb !== undefined) out.sb = sb;
+  if (sa !== undefined) out.sa = sa;
+  return out;
+}
 
 /** A block as HTML: `label` is a list item's mark (listInfo). Every word escaped; looks only from checked values. */
 export function blockHtml(b: Block, label: string, o: DrawOpts): string {

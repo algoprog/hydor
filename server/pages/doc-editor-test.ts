@@ -383,6 +383,43 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
   ok(!losses.loses.length && !losses.cut, 'a file written here loses nothing coming back');
 }
 
+// ---- its own web page, opened again --------------------------------------------------------------------------------
+{
+  const d = normalizeDoc({
+    markdown: [
+      '# Plan {.title}',
+      '[TOC]',
+      '# One',
+      'Airy {line=1.5 before=12 after=0}',
+      'In a step {indent=1}',
+      '- Dig',
+      '  - Deeper',
+      '1. First',
+      '- [x] Done',
+      '- [ ] To do',
+      '> 🔥 Hot {.callout tint=#fce8e6}',
+      '![A box](data:image/png;base64,iVBORw0KGgo= "Its caption"){width=40%}',
+      '\\pagebreak',
+      'Second page.',
+    ].join('\n\n'),
+    header: 'ACME',
+    footer: { text: 'Page {page} of {pages}', align: 'center' },
+  });
+  const back = docFromFile(Buffer.from(docPage(db, d, 'Plan', 'viewer')), 'Plan.html');
+  const kinds = back.blocks.map((b) => `${b.type}${b.type === 'p' && b.style ? `:${b.style}` : ''}${b.type === 'li' ? `:${b.list}${b.lvl ? b.lvl : ''}${b.checked ? 'x' : ''}` : ''}`);
+  ok(
+    kinds.join(' ') === 'p:title toc p:h1 p p li:bullet li:bullet1 li:number li:checkx li:check p:callout image pagebreak p',
+    "a document's own web page opened again has its lists, checklists, callout, table of contents and page breaks",
+  );
+  ok(!back.blocks.some((b) => words(b).includes('ACME') || words(b).includes('Page 1')), 'and not its header and footer as words');
+  const airy = back.blocks.find((b) => words(b) === 'Airy') as ParaBlock;
+  ok(airy?.lh === 1.5 && airy.sb === 12 && airy.sa === 0 && (back.blocks.find((b) => words(b) === 'In a step') as ParaBlock)?.lvl === 1, 'nor its spacing and indents');
+  const call = back.blocks.find((b) => b.type === 'p' && b.style === 'callout') as ParaBlock;
+  ok(call?.icon === '🔥' && call.tint === '#fce8e6', "a callout keeps its emoji and tint");
+  const pic = back.blocks.find((b) => b.type === 'image');
+  ok(pic?.type === 'image' && pic.w === 0.4 && pic.caption === 'Its caption', 'a picture keeps its width and caption');
+}
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
