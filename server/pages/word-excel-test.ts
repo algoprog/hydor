@@ -13,7 +13,7 @@ import { canCapture, closeCapture, setCaptureIdle, withTab } from '../capture/in
 import { openDb } from '../db.ts';
 import { Zip } from '../documents/zip.ts';
 import { docFaces, docFromFile, docPage, docxOfDoc } from './docs.ts';
-import { fontInfo, fontKey, obfuscate, officeFont, ttfInfo, type EmbeddedFont } from './word-fonts.ts';
+import { fontInfo, fontKey, obfuscate, officeFont, ttfInfo, wordFonts, type EmbeddedFont } from './word-fonts.ts';
 import { wordPlaces } from './word-layout.ts';
 import { normalizeBook, type Workbook } from '../../shared/sheets.ts';
 import { importBook, xlsxOfBook } from './sheets.ts';
@@ -263,6 +263,50 @@ function misordered(xml: string): string | null {
     !xmlOf(offline, 'word/settings.xml').includes('embedTrueTypeFonts') && !new Zip(offline).names().some((n) => n.endsWith('.odttf')) && xmlOf(offline, 'word/fontTable.xml').includes('<w:font w:name="Inter"><w:altName w:val="Arial"/>'),
     'without its fonts at hand a file still names them, with their fallbacks',
   );
+}
+
+// ---- fonts fetched from Google ---------------------------------------------------------------------------------------
+{
+  // Google, stood in for: its stylesheet as it serves programs that are not browsers (a TrueType file a face), the files.
+  const realFetch = globalThis.fetch;
+  const asked: string[] = [];
+  const face = (w: number) => fakeTtf('Lora', { winAscent: 1206 + w, winDescent: 294, ascender: 1006, descender: -274 });
+  globalThis.fetch = (async (input: string | URL) => {
+    const url = String(input);
+    asked.push(url);
+    if (url.startsWith('https://fonts.googleapis.com/css2?family=Lora:')) {
+      const block = (style: string, weight: number) =>
+        `@font-face {\n  font-family: 'Lora';\n  font-style: ${style};\n  font-weight: ${weight};\n  font-stretch: normal;\n  src: url(https://fonts.gstatic.com/s/lora/v37/${style}${weight}.ttf) format('truetype');\n}\n`;
+      return new Response(block('normal', 400) + block('normal', 700) + block('italic', 400));
+    }
+    const m = /\/s\/lora\/v37\/(normal|italic)(\d+)\.ttf$/.exec(url);
+    if (m) return new Response(new Uint8Array(face(Number(m[2]))));
+    throw new TypeError('fetch failed');
+  }) as typeof fetch;
+  const got = await wordFonts([
+    { name: 'Lora', b: false, i: false },
+    { name: 'Lora', b: true, i: false },
+    { name: 'Lora', b: true, i: true },
+    { name: 'Arial', b: false, i: false },
+  ]);
+  const lora = got.get('Lora');
+  ok(
+    lora?.faces.regular?.equals(face(400)) && lora.faces.bold?.equals(face(700)) && !lora.faces.boldItalic && !lora.faces.italic && lora.info.family === 'Lora' && !got.has('Arial'),
+    "the faces a file uses of the app's fonts, from Google (a face it lacks left out); Office's own not fetched",
+    [...got.keys()],
+  );
+  const before = asked.length;
+  await wordFonts([{ name: 'Lora', b: false, i: false }]);
+  ok(asked.length === before, 'and kept: fetched once');
+  const t0 = Date.now();
+  const none = await wordFonts([
+    { name: 'Fraunces', b: false, i: false },
+    { name: 'Playfair Display', b: false, i: false },
+  ]);
+  const tried = asked.length - before;
+  await wordFonts([{ name: 'Merriweather', b: false, i: false }]);
+  ok(!none.size && tried === 1 && asked.length - before === 1 && Date.now() - t0 < 5000, 'Google out of reach: a file is made at once without them, and the next ones do not wait on it either', [tried, asked.length - before]);
+  globalThis.fetch = realFetch;
 }
 
 // ---- layout ------------------------------------------------------------------------------------------------------
