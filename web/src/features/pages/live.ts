@@ -12,6 +12,7 @@ import { DraftMemo, DRAFT_TOOLS, type DraftKind, type DraftTool, type Drafted } 
 import { draftDoc } from '@shared/draft-doc';
 import { draftDeck } from '@shared/draft-deck';
 import { draftBook } from '@shared/draft-book';
+import { draftTex } from '@shared/draft-tex';
 import { normalizeDoc } from '@shared/docs';
 import { normalizeDeck } from '@shared/slides';
 import { newBook } from '@shared/sheets';
@@ -34,6 +35,7 @@ const BUILD: Partial<Record<DraftKind, (base: any, p: ReturnType<typeof readPart
   doc: draftDoc,
   slides: draftDeck,
   sheet: draftBook,
+  tex: draftTex,
 };
 
 /** An empty one of a kind: the editor of a new one being written starts from it. */

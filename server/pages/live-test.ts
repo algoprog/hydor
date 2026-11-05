@@ -15,6 +15,9 @@ import { normalizeDeck, type Deck } from '../../shared/slides.ts';
 import { applyBookEdits } from '../../shared/sheet-edits.ts';
 import { draftBook } from '../../shared/draft-book.ts';
 import { normalizeBook } from '../../shared/sheets.ts';
+import { normalizeTex } from '../../shared/latex.ts';
+import { draftTex, linesOver } from '../../shared/draft-tex.ts';
+import { applyTexEdits } from '../../shared/tex-edits.ts';
 import { readPartial } from '../../shared/partial-json.ts';
 import type { Deps } from '../features/types.ts';
 import { draftsOf, draftsOfPage, endDrafts, feedDraft, settleDraft } from './drafts.ts';
@@ -286,6 +289,55 @@ const textOf = (d: Doc) => d.blocks.map(blockText).join('\n');
     ud.model.sheets[0].cells.B5?.v === 71 && ud.model.sheets[0].cells.B6?.v === 81 && ud.model.sheets[0].cells.B10?.v === base.sheets[0].cells.B10?.v && ud.mark?.kind === 'sheet',
     'an update being written shows on top of its sheet, the rest as it was',
   );
+}
+
+// ---- LaTeX: the version being written, and small changes ---------------------------------------------------------
+{
+  const paper = (k: number, n = 8) =>
+    ['\\documentclass{article}', '\\begin{document}', ...Array.from({ length: n }, (_, i) => [`\\section{Part ${i + 1}}`, '', para(i + k), '', `\\begin{equation} x_${i} = ${i + k} \\end{equation}`, '']).flat(), '\\end{document}'].join('\n');
+  const base = normalizeTex({ main: paper(1), files: [{ name: 'refs.bib', text: '@book{k, title = {T}}' }] });
+  const json = JSON.stringify({ id: '0123456789', source: paper(2) });
+  let fewest = Infinity;
+  let marked = 0;
+  let draws = 0;
+  for (let cut = 30; cut < json.length; cut += 157) {
+    const d = draftTex(base, readPartial(json.slice(0, cut)), new DraftMemo());
+    if (!d) continue;
+    draws++;
+    fewest = Math.min(fewest, d.model.main.split('\n').length);
+    if (d.mark?.kind === 'tex' && d.mark.file === 'main.tex') marked++;
+  }
+  ok(fewest >= base.main.split('\n').length - 1, 'a source written again keeps its length while it comes: the old rest after what has come');
+  ok(marked > draws * 0.8, 'the place the words have come to is marked');
+  const end = draftTex(base, readPartial(json), new DraftMemo())!;
+  ok(end.model.main === paper(2) && end.model.files[0].text === base.files[0].text && end.mark === null, 'written whole: the source the call says, its other files as they were');
+  ok(draftTex(null, readPartial('{"path":"/x/paper.tex","comments":[{"id":"c1","reply":"Do'), new DraftMemo()) === null, 'a call that answers a file’s comments shows no document');
+  const { text, at } = linesOver('one\ntwo is a longer line\nthree', 'one\ntwo is', true);
+  ok(text === 'one\ntwo is a longer line\nthree' && at === 'one\ntwo is'.length, 'a line written again as it was stays whole, the mark moving through it');
+  // Small changes.
+  const files = new Map([
+    ['main.tex', paper(1)],
+    ['refs.bib', '@book{k}'],
+  ]);
+  const run = (edits: unknown[]) => applyTexEdits(files, edits).files.get('main.tex')!;
+  const thrown = (edits: unknown[]) => {
+    try {
+      applyTexEdits(files, edits);
+      return '';
+    } catch (e) {
+      return (e as Error).message;
+    }
+  };
+  ok(run([{ section: 'Part 2', text: '\\section{Part 2}\nShort now.' }]).includes('\\section{Part 2}\nShort now.\n\n\\section{Part 3}'), 'a section written again, up to the next one of its level');
+  ok(!run([{ section: 'part 3', text: '' }]).includes('Part 3'), 'a section sent empty is taken out (its title in any case)');
+  ok(/Thanks\.\n\n\\end\{document\}$/.test(run([{ append: 'Thanks.' }])), 'append goes before \\end{document}');
+  const af = run([{ after: 'Part 1', text: '\\section{Between}' }]);
+  ok(af.indexOf('Between') > af.indexOf('Part 1') && af.indexOf('Between') < af.indexOf('Part 2'), 'after a section: at its end, before the next');
+  ok(applyTexEdits(files, [{ file: 'refs.bib', find: '@book{k}', replace: '@book{k, year = {2026}}' }]).files.get('refs.bib') === '@book{k, year = {2026}}', 'an edit in another file of it');
+  ok(/no section “Nope” in main\.tex/.test(thrown([{ before: 'Nope', text: 'x' }])) && /no file other\.tex/.test(thrown([{ file: 'other.tex', append: 'x' }])), 'what is not there says so');
+  const ej = JSON.stringify({ id: '0123456789', edits: [{ section: 'Part 4', text: '\\section{Part 4}\nBeing written again, these words' }] });
+  const de = draftTex(base, readPartial(ej.slice(0, -10)), new DraftMemo())!;
+  ok(de.model.main.includes('Being written again') && de.model.main.includes('Part 5') && de.mark?.kind === 'tex', 'a change being written shows in place, with the mark');
 }
 
 // ---- the server's drafts of a save -------------------------------------------------------------------------------

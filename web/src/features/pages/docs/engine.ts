@@ -8,6 +8,8 @@
 // stopped and done here. An equation among words is one thing to the caret, never words to type in. Undo and redo go
 // back and forth through the model's versions. In Suggesting, every edit goes through the model as a suggestion
 // (suggest.ts): the browser types nothing itself then, but for an input method's words, made a suggestion afterwards.
+// An agent's version being written shows in place of the document (preview), drawn only where it differs, the
+// document and its history kept underneath.
 import {
   asAccepted,
   blockHtml,

@@ -9,7 +9,8 @@
 // what to put there (Slash.tsx); Ctrl+F finds and Ctrl+H replaces (finding.ts); equations are written in a box with
 // their preview. The page around is told what an agent asked now would be about (the whole document, the section
 // the caret is in, the words picked). Changes stay unsaved until Save (Ctrl+S), as a page's do; the paper, margins,
-// font and size are under Page setup.
+// font and size are under Page setup. While an agent writes a new version (live.ts), it shows as it comes, read-only,
+// with the agent's caret where its words arrive, kept in view (AgentCaret.tsx).
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, FileCog, Link2, ListTree, MessageSquare, MessageSquarePlus, Sparkles, Unlink } from 'lucide-react';
 import { docHeadings, docWords, FONTS, MARGINS, PAPERS, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type TableBlock } from '@shared/docs';

@@ -8,7 +8,7 @@
 import { DOC_DEFAULTS, mdBlocks, normalizeBlocks, normalizeDoc, runsText, type Block, type Doc, type Run } from './docs.ts';
 import { applyDocEdits } from './doc-edits.ts';
 import { within, type PartialJson } from './partial-json.ts';
-import { alike, writingIn, type DraftMemo, type Drafted } from './page-drafts.ts';
+import { alike, inOrder, writingIn, type DraftMemo, type Drafted } from './page-drafts.ts';
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -81,17 +81,8 @@ const OPEN = 'nd-draft-open';
 export function overOld(old: Block[], keys: string[], blocks: Block[], writing: boolean, memo: DraftMemo): { blocks: Block[]; mark: { block: string; at: number } | null } {
   const done = writing ? blocks.slice(0, -1) : blocks;
   const open = writing ? (blocks[blocks.length - 1] ?? null) : null;
-  // The same blocks, in order: each takes the first old one like it after the last one taken (a short one only nearby).
-  const byKey = new Map<string, number[]>();
-  keys.forEach((k, i) => byKey.set(k, [...(byKey.get(k) ?? []), i]));
-  const match: number[] = new Array(done.length).fill(-1);
-  let last = -1;
-  done.forEach((b, j) => {
-    const i = byKey.get(contentKey(b))?.find((x) => x > last && (strong(b) || x - last <= 3));
-    if (i === undefined) return;
-    match[j] = i;
-    last = i;
-  });
+  // The same blocks, in order (a short one only nearby, one far ahead only where the next block confirms it).
+  const match = inOrder(keys, done.map(contentKey), done.map(strong));
   // Changed blocks between two of those stand in for the old ones there, one for one while their kinds agree; after
   // the last one, only while their words are alike too (more may be new, and the old ones still to come).
   let j = 0;

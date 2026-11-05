@@ -62,6 +62,42 @@ export class DraftMemo {
 /** Whether a call's text stopped inside a field (a field name, or a path into it). */
 export const writingIn = (open: JsonPath | null, field: string | number): boolean => !!open && open.length > 0 && open[0] === field;
 
+/**
+ * The new items written so far (`now`: their keys, `strong`: whether each has enough in it to be matched far from where
+ * it was) matched in order with the old ones (`was`): each takes the first old one like it after the last one taken.
+ * Nearby is taken at once; far ahead (content moved or taken out) only when the next strong one written matches right
+ * after it too, so one item that happens to read like another further on does not hide what is between. -1: unmatched.
+ */
+export function inOrder(was: string[], now: string[], strong: boolean[]): number[] {
+  const at = new Map<string, number[]>();
+  was.forEach((k, i) => at.set(k, [...(at.get(k) ?? []), i]));
+  const match: number[] = new Array(now.length).fill(-1);
+  let last = -1;
+  let lastJ = -1;
+  for (let j = 0; j < now.length; j++) {
+    const list = at.get(now[j]);
+    if (!list) continue;
+    const expect = last + (j - lastJ);
+    for (const i of list) {
+      if (i <= last) continue;
+      if (!strong[j] && i - last > 3) break;
+      let ok = Math.abs(i - expect) <= 2;
+      if (!ok) {
+        // Confirmed by the next strong item written, found right after it.
+        const n = now.findIndex((k, x) => x > j && strong[x]);
+        ok = n >= 0 && was.slice(i + 1, i + 1 + (n - j) + 3).includes(now[n]);
+      }
+      if (ok) {
+        match[j] = i;
+        last = i;
+        lastJ = j;
+      }
+      break;
+    }
+  }
+  return match;
+}
+
 /** Words that share at least half of the shorter one's words (a paragraph changed, rather than another one). */
 export function alike(a: string, b: string): boolean {
   const wa = a.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];

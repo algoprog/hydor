@@ -1,6 +1,7 @@
 // The slides in order, small: click one to edit it, drag one to move it, and each one's menu (copy it, skip it in
 // the slideshow, a new slide after it, delete it). Down the side on a wide screen, across under the slide on a
-// phone. Also the grid of every slide (slide sorter), and the layouts a new slide is made from.
+// phone; the slide on view stays in view here. Also the grid of every slide (slide sorter), and the layouts a new
+// slide is made from.
 import { memo, useEffect, useRef, useState } from 'react';
 import { closestCenter, DndContext, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { horizontalListSortingStrategy, rectSortingStrategy, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';

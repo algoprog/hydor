@@ -8,7 +8,8 @@
 // what cells take, with checkboxes, lists' coloured chips, stars and a calendar for dates; borders; merged cells; the
 // fill handle; hidden rows and columns; number formats with Excel's codes; charts on the grid's cells (of the cells
 // picked, or of several ranges picked with Ctrl+click); the data tools; notes; a row expanded into a card; zoom.
-// Changes stay unsaved until Save (Ctrl+S), as a page's do; Undo and Redo step through them.
+// Changes stay unsaved until Save (Ctrl+S), as a page's do; Undo and Redo step through them. While an agent writes a
+// new version (live.ts), it shows as it comes, read-only, the cell its words arrive in boxed and kept in view.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BetweenHorizontalStart, BetweenVerticalStart, ClipboardPaste, Copy, Eraser, EyeOff, Maximize2, MessageSquarePlus, Scissors, Sparkles, StickyNote, Trash2, ArrowDownAZ, ArrowDownZA, Eye } from 'lucide-react';
 import { newCommentId } from '@shared/comments';
