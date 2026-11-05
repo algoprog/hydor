@@ -34,6 +34,7 @@ import { config } from '../config.ts';
 import { resolvePath } from '../files.ts';
 import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
 import { setCaptureDb } from '../capture/index.ts';
+import { confidentialKey, confidentialRun } from '../confidential/index.ts';
 import { sessionSpace, spaceChoice } from '../spaces/choice.ts';
 import { allSpaces } from '../spaces/index.ts';
 import { draftsOf, endDrafts, feedDraft, type ToolStream } from './drafts.ts';
@@ -159,6 +160,9 @@ const SAVE_PAGE: RunTool = {
   },
 };
 
+/** What a confidential session saved stays out of reach of other sessions' agents (server/confidential). */
+const outOfReach = (ctx: RunCtx, p: { sessionKey?: string }) => !!p.sessionKey && p.sessionKey !== ctx.key && confidentialKey(ctx.deps.db, p.sessionKey) && !confidentialRun(ctx);
+
 const GET_PAGE: RunTool = {
   name: 'get_page',
   annotations: { readOnlyHint: true },
@@ -169,7 +173,7 @@ const GET_PAGE: RunTool = {
     const db = ctx.deps.db;
     const id = typeof a.id === 'string' ? a.id.trim() : '';
     if (!id) {
-      const list = listPages(db);
+      const list = listPages(db).filter((p) => !outOfReach(ctx, p));
       const names = new Map(allSpaces(db).map((x) => [x.id, x.name]));
       return list.length
         ? list
@@ -178,6 +182,7 @@ const GET_PAGE: RunTool = {
         : 'No saved pages yet.';
     }
     const p = mustPage(db, id);
+    if (outOfReach(ctx, p)) throw new HttpError(404, 'No saved page with that id');
     const k = kindOf(p.kind);
     if (k) {
       const by = p.by === 'edit' || p.by === 'made' ? ` It was last changed by the user in its editor: keep their changes.` : '';

@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { Check, ChevronRight, Cpu, Gauge, ShieldCheck } from 'lucide-react';
 import type { Agent, AgentCatalog, ModelOption, SessionPrefs } from '@shared/types';
 import { api } from '../lib/api';
+import { go } from '../lib/nav';
 import { agentName } from './AgentIcon';
 import { cx, OptionRow, Picker } from './ui';
 
@@ -101,11 +102,22 @@ function modelRows(c: Catalog): ModelRow[] {
   });
 }
 
-function ModelMenu({ agent, c, value, onPick }: { agent: Agent; c: Catalog | undefined; value?: string | null; onPick: (v: string | null) => void }) {
+function ModelMenu({ agent, c, value, onPick, localOnly, onClose }: { agent: Agent; c: Catalog | undefined; value?: string | null; onPick: (v: string | null) => void; localOnly?: boolean; onClose?: () => void }) {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   if (!c) return <div className="px-2.5 py-1.5 text-[12px] text-fg-3">Loading {agentName(agent)} models…</div>;
-  const rows = modelRows(c);
+  // A confidential session: only models on this computer or your network.
+  const rows = modelRows(c).filter((r) => !localOnly || r.opt.local);
+  if (localOnly && !rows.length)
+    return (
+      <div className="px-2.5 py-2 text-[12.5px] leading-snug text-fg-3">
+        No model on this computer yet.{' '}
+        <button type="button" className="font-medium text-accent hover:underline" onClick={() => (onClose?.(), go('/settings?s=models'))}>
+          Settings → Models
+        </button>{' '}
+        installs one.
+      </div>
+    );
   // The chosen model, with "default" read as the model it stands for.
   const chosen = findModel(c, value);
   const chosenModel = chosen?.value === 'default' ? findModel(c, chosen.resolved) : chosen;
@@ -162,6 +174,7 @@ export function ModelPicker({
   disabled,
   acp,
   label,
+  localOnly,
 }: {
   agent: Agent;
   value?: string | null;
@@ -171,6 +184,8 @@ export function ModelPicker({
   acp?: string;
   /** Named (the start page): "Model  Opus 5.5", the default read as the model it stands for. */
   label?: string;
+  /** Only the models on this computer or your network (a confidential session). */
+  localOnly?: boolean;
 }) {
   const c = useCatalog(agent, acp);
   if (agent === 'acp' && !c?.models.length) return null;
@@ -189,6 +204,8 @@ export function ModelPicker({
           agent={agent}
           c={c}
           value={value}
+          localOnly={localOnly}
+          onClose={close}
           onPick={(v) => {
             onChange(v);
             close();

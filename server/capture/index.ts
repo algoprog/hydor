@@ -41,6 +41,8 @@ export interface CaptureOpts {
   settleMs?: number;
   /** Refuse requests to this machine and private networks (for pages the app did not write). */
   blockPrivate?: boolean;
+  /** Refuse every request but the document itself: a confidential session's page, which may reach nowhere (server/confidential). */
+  offline?: boolean;
   /** A second picture of the same page, as it is (another size or format): Captured.alt. */
   alt?: { format: 'webp' | 'jpeg' | 'png'; quality?: number; outWidth?: number; fullPage?: boolean };
 }
@@ -159,7 +161,7 @@ export interface Tab {
   evaluate<T>(expression: string, timeoutMs?: number): Promise<T>;
 }
 
-type TabOpts = Pick<CaptureOpts, 'url' | 'html' | 'width' | 'height' | 'scale' | 'mobile' | 'settleMs' | 'blockPrivate'>;
+type TabOpts = Pick<CaptureOpts, 'url' | 'html' | 'width' | 'height' | 'scale' | 'mobile' | 'settleMs' | 'blockPrivate' | 'offline'>;
 
 /** Opens a page in a fresh context, waits for it to load and settle, and hands it to `job`; the context goes after. */
 async function inTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
@@ -173,7 +175,7 @@ async function inTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
     await s.send('Emulation.setDeviceMetricsOverride', { width: o.width, height: o.height, deviceScaleFactor: o.scale ?? 1, mobile: !!o.mobile });
     if (o.mobile) await s.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
     await s.send('Emulation.setScrollbarsHidden', { hidden: true }).catch(() => {});
-    if (o.html !== undefined || o.blockPrivate) {
+    if (o.html !== undefined || o.blockPrivate || o.offline) {
       const html = o.html;
       s.on('Fetch.requestPaused', (p) => {
         const id = p.requestId;
@@ -189,7 +191,7 @@ async function inTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
               body: Buffer.from(html, 'utf8').toString('base64'),
             })
             .catch(() => {});
-        } else if (o.blockPrivate && isPrivate(String(p.request?.url ?? ''))) void s.send('Fetch.failRequest', { requestId: id, errorReason: 'BlockedByClient' }).catch(() => {});
+        } else if (o.offline || (o.blockPrivate && isPrivate(String(p.request?.url ?? '')))) void s.send('Fetch.failRequest', { requestId: id, errorReason: 'BlockedByClient' }).catch(() => {});
         else void s.send('Fetch.continueRequest', { requestId: id }).catch(() => {});
       });
       await s.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });

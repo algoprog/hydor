@@ -55,13 +55,14 @@ Whether a session gets a new task folder by default depends on the assistant: mo
 - **Effort**: how hard the model thinks. **Default** uses the model's own, then the levels the model offers: **Low** (fast, light reasoning), **Medium** (balanced), **High** (deeper reasoning), **Xhigh** (extra-deep reasoning), **Max** (maximum reasoning), and on some models **Minimal**, **None** or **Ultra**. Not offered for Custom and other ACP agents, or for models without levels.
 - **Permissions**: what the agent may do without asking you first. Each agent has its own modes; see [What each permissions mode means](#what-each-permissions-mode-means). Shift+Tab in the message box moves to the next one.
 - **Account**: only once you have added another account for Claude Code or Codex in [Settings → Accounts](/settings?s=accounts&find=Your%20accounts). **Your sign-in** is the agent's own account; pick another to run this session as it. **Manage accounts** opens Settings.
+- **Confidential**, a switch with a lock ("Only models on this computer. Nothing leaves it."): for a paper you review, patient data or a client's code. **Agent** becomes **Custom** and **Model** the best model installed here. See [Keep a session confidential](#keep-a-session-confidential).
 - **Memory**: only while memory is on in Settings. **On** uses and adds to what agents remember; **Off for this session** starts fresh and keeps nothing from it. See [Memory](/guide/memory).
 - **Spending cap**: the most this session may spend, at API prices. Type an amount and press **Set**, or pick $1, $5, $10 or $25; **No cap** removes it. The session stops at the cap until you raise it. See [Usage, limits and costs](/guide/usage).
 - **Swarm**: **Off**, or **Swarm**: a lead agent splits the task into angles of attack and starts a member for each, with as many working at once as **Swarm size** allows ([Settings → Child sessions](/settings?s=children&find=Swarm%20size)). Members share what they find on a board and message each other. For hard problems; it costs several times what one agent does.
 - **Research**: **Off**, or **Deep research**: the agent plans the searches, sends researchers after each part, checks key claims against two sources and delivers a cited report. Set **Researchers at a time** (1 to 8), **Rounds** (1 to 5), **Searches in all** (10 to 500) and **The report** (**Page** or **Word**).
 - **Arena**: **Off**, or **Compare models**: the same message also goes to one or two more models you tick (a **Find a model** field helps in a long list), each in a session of its own in the same folder. You compare the answers and keep the best; the others are archived. In a git repository, turn on the folder menu's **New worktree** so each model works on its own copy.
 
-Swarm and deep research both lead child sessions, so turning one on turns the other off. Swarm, deep research and the arena are not kept for the next session, since they cost more; the research numbers and arena models you picked are kept in this browser for when you turn them on again. See [Deep research, second opinions and several agents](/guide/research).
+Swarm and deep research both lead child sessions, so turning one on turns the other off. **Confidential** turns Swarm, deep research and the arena off, and turning one of them on turns Confidential off. Swarm, deep research and the arena are not kept for the next session, since they cost more; the research numbers and arena models you picked are kept in this browser for when you turn them on again. See [Deep research, second opinions and several agents](/guide/research).
 
 ### What each permissions mode means
 
@@ -101,6 +102,26 @@ In every mode Custom asks you before risky commands. In Ask, Accept edits and Pl
 
 **Other ACP agents** offer their own modes, listed once the agent has run.
 
+### Keep a session confidential
+
+Some work must not leave your computer: a paper you were sent to review (most conferences and journals forbid giving a submission to an online AI), patient or client records, or a company's code you work on under agreement. A confidential session runs on a model on this computer, and nothing of it is sent anywhere.
+
+1. On the start page, open **Options** and turn on **Confidential** ("Only models on this computer. Nothing leaves it."). Its chip then reads "Confidential".
+2. **Agent** becomes **Custom** and **Model** the best model installed here; while it is on, their menus offer only those. If there is none yet, it says so: [Settings → Agents → Models](/settings?s=models) installs the ones suggested for this computer with one click.
+3. Write what you want, attach the paper or pick its folder, and press Enter. For example: "Review the attached submission as a NeurIPS reviewer: summary, strengths, weaknesses, questions for the authors and a score."
+
+Models on this computer are those of Ollama and vLLM here, and endpoints whose address is this computer or your private network: `localhost`, `127.0.0.1`, `::1`, `10.…`, `192.168.…`, `172.16.…` to `172.31.…`, or a name ending in `.local` (see [Connect Ollama, vLLM or another endpoint](/guide/agents-models#connect-ollama-vllm-or-another-endpoint)). Ollama's cloud models, whose names end in "cloud", run on ollama.com and don't count. The start page keeps the switch on for your next sessions until you turn it off.
+
+A confidential session has a lock beside its title, in its header and in the sidebar, and its message box has a calm green border; a line above the box says what that means until you close it. Click the lock for what is on and off.
+
+- **Off**: web search and web pages, the browser and your screen, connected apps and your keys, apps, publishing, scheduled tasks, making pictures, videos or sound, models elsewhere (deep research, swarm and the arena; a [second opinion](/guide/research) comes only from another maker's model on this computer), handing the conversation to another agent, saving anything to memory, and exporting a page as a file (export it yourself from the Library).
+- **Commands without network**: the agent's commands run cut off from the network, in every permissions mode, so nothing can be downloaded, installed from the internet, pushed or sent. Where that can't be done (a Mac, Windows, some containers), each command asks you first, whatever the mode, and the lock's note says so.
+- **Still on**: the files in the folder, documents (read on this computer), the Library, shared knowledge, your memory notes and profile (read, never added to), and child sessions, which are confidential too.
+- **Nothing sent out about it**: its title comes from the helper model when that runs on this computer, else from the first words of your message; notifications say only "A confidential session" and whether it finished, needs you or failed; there is no read-only link, no pull request from its menu, and no automation or app made from it; agents in other sessions and agents elsewhere can't read it; its replies show no pictures from the web, and the pages it shows load nothing from anywhere (so a chart that needs a library from the web won't draw); dictation works only with speech recognition on this computer ([Settings → Capabilities → Voice](/settings?s=voice)), and replies are read aloud only with a voice on your device.
+- **It stays confidential**: forks and **Edit from here** are confidential too, and it can't be turned off, so what was said stays where it is. For work that may leave the computer, start a new session.
+
+What it can't promise: Hydor checks where a model's server is, not what that server does, so an endpoint you set up on your network that passes requests on to an online service is online all the same. What you copy out of the session, or open or send from elsewhere yourself (a link in a reply, a page it made opened from the Library, a push from the Git page), is yours to watch, and so is what you read of it on another device: the app's pages travel to it as they always do (through your tunnel, if you use one).
+
 ### Attach files, point at files, use commands
 
 - **Attach files** (the **+** at the left of the box's bottom row), drop files on the message box, or paste pictures and files into it. A message carries up to 25 MB of files. Pictures (PNG, JPEG, GIF, WebP) go to the model as images, up to 8 a message; other files (up to 20) are saved on this computer and listed at the end of your message, so the agent opens them. Remove one with its × before sending. Files you have attached wait in the box until you send them, even while you go to another page (reloading the page clears them).
@@ -111,9 +132,9 @@ In every mode Custom asks you before risky commands. In Ask, Accept edits and Pl
 
 ### What the start page remembers
 
-The start page opens with what you picked last, on every device: the agent; for each agent its model, effort, permissions and account; the folder, new task folder or project; the worktree switch; the assistant; memory off; and the spending cap. Picking an agent brings back what you last used with it.
+The start page opens with what you picked last, on every device: the agent; for each agent its model, effort, permissions and account; the folder, new task folder or project; the worktree switch; the assistant; memory off; the spending cap; and Confidential. Picking an agent brings back what you last used with it.
 
-A link to the start page can fill it in, for example `/?prompt=Summarize%20my%20notes&agent=codex`; `model=` and `cwd=` (a folder's path) can be added. It only fills the box and the choices; it never starts anything by itself. Invisible characters are removed from a linked message, with a notice.
+A link to the start page can fill it in, for example `/?prompt=Summarize%20my%20notes&agent=codex`; `model=`, `cwd=` (a folder's path) and `confidential=1` (Confidential on) can be added. It only fills the box and the choices; it never starts anything by itself. Invisible characters are removed from a linked message, with a notice.
 
 What you write in the box waits there while you go to other pages: the message, the files you attach, the options for this task alone (**Swarm**, **Deep research**, **Arena**, **Guidelines** for this session) and the folder a link or **New agent session here** opened it in. The box empties when the session starts: while the agent gets going, the arrow on **Start** keeps going up; then the start page becomes the session, the box moving down to its place at the bottom and what you wrote moving up as your first message. The message and those options are kept in this browser, so they are still there after a reload; attached files are not.
 
@@ -123,7 +144,7 @@ What you write in the box waits there while you go to other pages: the message, 
 
 At the top of a session:
 
-- the agent's icon and the title (double-click it to rename);
+- the agent's icon and the title (double-click it to rename), and a lock for a [confidential session](#keep-a-session-confidential);
 - a status: **Working**, **Needs you**, **Ready**, **Starting**, **Stopping**, **Stopped**, or "Open in VS Code" for a session running elsewhere;
 - the folder (click it to browse it in Files), a pull request badge, the account when it runs as an added one, and on wider screens the git branch and the model;
 - one button for what you can do now: **Stop** while a turn runs, **Resume** when the agent is stopped, or **Continue here** for a Claude Code session open in VS Code or a terminal;
@@ -332,7 +353,7 @@ Pin, unpin, archive, unarchive and snooze show a notice with **Undo**, and Ctrl+
 
 ## Share a read-only link
 
-The session's menu (⋯) → **Share a read-only link** makes a link anyone can open without your password. They see the conversation as it happens (messages, the steps by name, file changes and pages the agent showed), not command output or the agent's thinking, and cannot type or change anything. Choose how long it works (**A day**, **A week**, **A month**, **Until turned off**) and press **Make a link**; the link shows once. The same dialog lists the links that work now, how often each was opened, and turns one off. See [Phones, other machines and sharing](/guide/devices).
+The session's menu (⋯) → **Share a read-only link** makes a link anyone can open without your password (not for a [confidential session](#keep-a-session-confidential)). They see the conversation as it happens (messages, the steps by name, file changes and pages the agent showed), not command output or the agent's thinking, and cannot type or change anything. Choose how long it works (**A day**, **A week**, **A month**, **Until turned off**) and press **Make a link**; the link shows once. The same dialog lists the links that work now, how often each was opened, and turns one off. See [Phones, other machines and sharing](/guide/devices).
 
 ## Work in a worktree
 
@@ -375,7 +396,7 @@ An agent can hand parts of a job to new sessions, with any agent and model, and 
 
 ## Everything in the session's menu
 
-The ⋯ button at the top right of a session opens its menu. Some items show only when they apply.
+The ⋯ button at the top right of a session opens its menu. Some items show only when they apply; a [confidential session](#keep-a-session-confidential)'s has no **Share a read-only link**, **Open a pull request**, **Open a browser**, **Connected accounts**, **Make this an automation** or **Save as an app**, and its memory stays off.
 
 - **Rename**: edit the title in place.
 - **Pin to the top** / **Unpin**.
@@ -417,4 +438,7 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
 - "Switch the session 'Data cleanup' to Accept edits and send it: carry on with the next file."
 - "What does the rotating ring on Stop mean?"
 - "Explain how a heat pump works, with a diagram of the cycle and a picture of one."
+- "Which of my models can run a confidential session, and which one would it use?"
+- "Start a confidential session in ~/reviews/4711 that reviews the paper there for ICLR."
+- "Why can't my confidential session search the web, and what still works in it?"
 - "Show why attention weights sum to 1, with the equations and a numerical example."

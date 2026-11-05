@@ -6,6 +6,7 @@
 //                          show_html, a page shown in the conversation.
 import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { isConfidential } from '../shared/confidential.ts';
 import type { Agent, SessionSummary, TimelineItem } from '../shared/types.ts';
 import { config } from './config.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
@@ -167,9 +168,10 @@ export function itemText(it: TimelineItem): string | null {
 }
 
 function sessionTools(sessions: SessionManager, publicUrl: (key: string) => string): Tool[] {
+  // Confidential sessions stay on this computer: other agents neither see nor reach them (server/confidential).
   const known = (key: unknown) => {
     const s = typeof key === 'string' ? sessions.summary(key) : null;
-    if (!s) throw new Error('No session with that key. list_sessions gives the keys.');
+    if (!s || isConfidential(s.extra)) throw new Error('No session with that key. list_sessions gives the keys.');
     return s;
   };
   return [
@@ -182,7 +184,7 @@ function sessionTools(sessions: SessionManager, publicUrl: (key: string) => stri
       },
       run: async (a) => {
         const q = String(a.query ?? '').toLowerCase();
-        const all = sessions.list({ limit: 400 }).sessions;
+        const all = sessions.list({ limit: 400 }).sessions.filter((s) => !isConfidential(s.extra));
         const hits = all
           .filter((s) => !q || s.title.toLowerCase().includes(q) || (s.cwd ?? '').toLowerCase().includes(q))
           .sort((x, y) => (y.updatedAt ?? 0) - (x.updatedAt ?? 0))
@@ -287,6 +289,14 @@ export function mcpRoutes(app: FastifyInstance, db: DB, sessions: SessionManager
 
 /** Pages may run scripts, open links, submit forms and show alerts, from their own opaque origin. */
 export const PAGE_CSP = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals; default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'";
+
+/**
+ * The frame of a confidential session's pages (server/confidential; /htmlframe?offline=1): their scripts and styles run,
+ * but nothing loads from anywhere, not even through this app (pictures, fonts and media from data: and blob: only), no
+ * form is sent and no window opens, so a page can't carry off what it shows. The app's own pages let a frame go nowhere else.
+ */
+export const OFFLINE_PAGE_CSP =
+  "sandbox allow-scripts allow-modals; default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' data: blob:; style-src 'unsafe-inline' data: blob:; img-src data: blob:; font-src data: blob:; media-src data: blob:; worker-src blob:; form-action 'none'; frame-ancestors 'self'";
 
 /**
  * The frame every page renders in (show_html, saved pages, a page's own address): sandboxed, its own

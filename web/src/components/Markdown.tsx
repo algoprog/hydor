@@ -246,6 +246,8 @@ export interface MdInfo {
   sessionKey?: string;
   /** The session's folder, for pictures given by a relative path. */
   cwd?: string;
+  /** A confidential session's reply: nothing loads from the web for it (pictures there are links), and its live blocks stay code. */
+  offline?: boolean;
 }
 export const MdCtx = createContext<MdInfo>({ src: '', streaming: false, rich: false });
 
@@ -281,7 +283,7 @@ function Pre({ node }: { node?: any }) {
   const lang = /language-([^\s]+)/.exec(cls)?.[1];
   const text = hastText(code);
   const kind = lang?.toLowerCase();
-  if (kind === 'mermaid' || (md.rich && kind === 'html' && String(code?.data?.meta ?? '').split(/\s+/).some((w) => LIVE.test(w)))) {
+  if (kind === 'mermaid' || (md.rich && !md.offline && kind === 'html' && String(code?.data?.meta ?? '').split(/\s+/).some((w) => LIVE.test(w)))) {
     const done = !md.streaming || fenceClosed(md.src, node?.position);
     return <Suspense fallback={<CodeBlock code={text} lang={lang} />}>{kind === 'mermaid' ? <MermaidBlock code={text} done={done} /> : <HtmlBlock code={text} done={done} />}</Suspense>;
   }
@@ -311,9 +313,10 @@ export function replyPicture(src: string, cwd?: string): string | null {
 
 /** A picture in an agent's reply: fitted to the reply, opened large on a click, and a link when it cannot load. */
 function ReplyPicture({ src, alt, title }: { src?: string; alt?: string; title?: string }) {
-  const { cwd } = useContext(MdCtx);
+  const { cwd, offline } = useContext(MdCtx);
   const from = String(src ?? '');
-  const url = useMemo(() => replyPicture(from, cwd), [from, cwd]);
+  // A confidential session's reply loads nothing from the web: such a picture is a link you may open.
+  const url = useMemo(() => (offline && /^https?:\/\//i.test(from.trim()) ? null : replyPicture(from, cwd)), [from, cwd, offline]);
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);
   if (!url || failed) {
@@ -548,6 +551,7 @@ export const Markdown = memo(function Markdown({
   rich,
   sessionKey,
   cwd,
+  offline,
 }: {
   text: string;
   className?: string;
@@ -570,13 +574,15 @@ export const Markdown = memo(function Markdown({
   sessionKey?: string;
   /** The session's folder: pictures given by a relative path are there. */
   cwd?: string;
+  /** A confidential session's reply: nothing from the web (pictures there are links), live blocks stay code. */
+  offline?: boolean;
 }) {
   const src = useMemo(() => {
     const t = normalizeMath(codexCitations(text), !notebook);
     return streaming ? holdOpenMaths(t) : t;
   }, [text, notebook, streaming]);
   useChemistry(src);
-  const info = useMemo<MdInfo>(() => ({ src, streaming: !!streaming, rich: !!rich, sessionKey, cwd }), [src, streaming, rich, sessionKey, cwd]);
+  const info = useMemo<MdInfo>(() => ({ src, streaming: !!streaming, rich: !!rich, sessionKey, cwd, offline }), [src, streaming, rich, sessionKey, cwd, offline]);
   const comps = useMemo<Components>(() => {
     const base: Components = {
       ...components,

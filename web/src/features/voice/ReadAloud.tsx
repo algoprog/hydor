@@ -7,8 +7,8 @@ import { cx, IconButton } from '../../components/ui';
 import { canSpeak } from './prefs';
 import { pauseReading, readAloud, resumeReading, stopReading, useReading } from './speech';
 
-/** Beside a reply's copy button. */
-export function ReadAloudButton({ id, text }: { id: string; text: string }) {
+/** Beside a reply's copy button. `local`: a confidential session's reply, read only with a voice on this device. */
+export function ReadAloudButton({ id, text, local }: { id: string; text: string; local?: boolean }) {
   const on = useReading((r) => r.id === id && r.status !== 'idle');
   if (!canSpeak()) return null;
   return (
@@ -17,7 +17,7 @@ export function ReadAloudButton({ id, text }: { id: string; text: string }) {
       title={on ? 'Stop reading' : 'Read aloud'}
       aria-label={on ? 'Stop reading' : 'Read aloud'}
       aria-pressed={on}
-      onClick={() => (on ? stopReading() : readAloud(id, text))}
+      onClick={() => (on ? stopReading() : readAloud(id, text, local))}
       className={cx('inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors hover:bg-bg-3 hover:text-fg', on ? 'text-accent' : 'text-fg-3')}
     >
       {on ? <Square size={10} fill="currentColor" strokeWidth={0} /> : <Volume2 size={13} />}

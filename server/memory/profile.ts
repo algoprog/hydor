@@ -104,15 +104,15 @@ const WHEN =
   'only when a message of theirs shows something lasting that will help every agent serve them better (their work or expertise, their setup and tools, how they like replies, what to avoid); most messages need no change';
 
 /** What an agent is told: the profile, or that there is none yet, and when to keep it current. */
-export function profileBlock(text: string | null | undefined): string {
+/** `readOnly`: a confidential session, which reads the profile and changes nothing in memory (server/confidential). */
+export function profileBlock(text: string | null | undefined, readOnly = false): string {
   if (!text?.trim()) return `# The user's profile\nNone yet. Start it with update_user_profile ${WHEN}.`;
   return [
     "# The user's profile",
     'Who the user is and how they like to work, kept across sessions by the agents here and by the user (Settings → Memory). Let it shape how you work with them and how you reply; their guidelines and what they say now come first.',
     '',
     text.trim(),
-    '',
-    `Keep it current with update_user_profile, ${WHEN}.`,
+    ...(readOnly ? [] : ['', `Keep it current with update_user_profile, ${WHEN}.`]),
   ].join('\n');
 }
 
@@ -193,7 +193,13 @@ export const profile: Feature = {
     return { instructions: [profileBlock(p?.text)] };
   },
   context(s, d) {
-    if (!memoryOn(d.db) || s.extra.memory === false) return null;
+    if (!memoryOn(d.db)) return null;
+    // A confidential session reads the profile, and changes nothing in memory.
+    if (s.extra.confidential === true) {
+      const text = userProfile(d.db)?.text;
+      return text?.trim() ? profileBlock(text, true) : null;
+    }
+    if (s.extra.memory === false) return null;
     return profileBlock(userProfile(d.db)?.text);
   },
 };

@@ -1018,9 +1018,11 @@ function EditFromHere({ item, initial, onDone }: { item: Extract<TimelineItem, {
 export const AssistantBlock = memo(function AssistantBlock({ item, note }: { item: Extract<TimelineItem, { kind: 'assistant' }>; note?: boolean }) {
   const { text, revealing } = useSmoothText(item.text, !!item.streaming);
   const { fork, sessionKey, cwd } = useContext(SessionCtx);
+  // A confidential session's replies are read aloud only with a voice on this device.
+  const confidential = useSessions((x) => (sessionKey ? x.byKey[sessionKey]?.extra?.confidential === true : false));
   return (
     <div data-seq={item.seq} data-text={item.id} data-quote className="tl-item group relative">
-      <ReplyMarkdown text={text} streaming={revealing} breaks sessionKey={sessionKey} cwd={cwd} className={cx(!note && item.phase === 'commentary' && '!text-fg-2')} />
+      <ReplyMarkdown text={text} streaming={revealing} breaks sessionKey={sessionKey} cwd={cwd} offline={confidential} className={cx(!note && item.phase === 'commentary' && '!text-fg-2')} />
       {!item.streaming && (
         <div className="absolute -top-1 -right-1 flex opacity-0 transition-opacity group-hover:opacity-100">
           {fork && item.entry && !note && (
@@ -1034,7 +1036,7 @@ export const AssistantBlock = memo(function AssistantBlock({ item, note }: { ite
               <GitFork size={13} />
             </button>
           )}
-          <ReadAloudButton id={item.id} text={spokenReply(item.text)} />
+          <ReadAloudButton id={item.id} text={spokenReply(item.text)} local={confidential} />
           <CopyButton text={item.text} label="Copy message" />
         </div>
       )}

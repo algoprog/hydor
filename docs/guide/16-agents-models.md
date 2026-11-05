@@ -33,6 +33,8 @@ The start page remembers what you picked, per agent, on every device: next time 
 
 An ACP agent other than Custom shows its **Model** and **Permissions** choices only after its first session: they list what the agent offered when it last ran.
 
+With **Options** → **Confidential** on, **Agent** is **Custom** and **Model** lists only the models on this computer or your private network, the best of them picked first: see [Keep a session confidential](/guide/sessions#keep-a-session-confidential).
+
 On a phone, each of these menus opens as a sheet from the bottom of the screen.
 
 ## Switch models in the middle of a session
@@ -46,7 +48,7 @@ Pick another model and the session carries on with it:
 - Custom uses it from its next step, even in the middle of a turn.
 - Another ACP agent switches if it offers a choice of models.
 
-The model menu only lists the session's own agent's models. To move a conversation to another agent, use the session's menu (⋯) → **Continue in Codex**, **Continue in Claude Code** or **Continue in Custom Agent** (from Claude Code and Codex sessions; Custom appears once it has a model). Your next message then starts a new session of that agent in the same folder, with the conversation so far. A stopped session picks up again on the model it last used, unless you pick another one before you send.
+The model menu only lists the session's own agent's models; a confidential session's, only those on this computer or your private network. To move a conversation to another agent, use the session's menu (⋯) → **Continue in Codex**, **Continue in Claude Code** or **Continue in Custom Agent** (from Claude Code and Codex sessions; Custom appears once it has a model). Your next message then starts a new session of that agent in the same folder, with the conversation so far. A stopped session picks up again on the model it last used, unless you pick another one before you send.
 
 ## Agent programs install and update themselves
 
@@ -349,6 +351,8 @@ Many programs and services answer the same way OpenAI's API does: LM Studio, lla
 2. Click **Add**.
 
 The endpoint shows with its address and how many models it offers. Its models appear in Custom's list as "model (name)". The × removes it. Adding another endpoint with the same name replaces the first.
+
+A [confidential session](/guide/sessions#keep-a-session-confidential) may use an endpoint whose address is this computer or your private network: `localhost`, `127.0.0.1`, `::1`, `10.…`, `192.168.…`, `172.16.…` to `172.31.…`, or a name ending in `.local`. Any other address counts as online, even one that leads to your own server: use its private address instead. The same goes for Ollama's address, and Ollama's cloud models (their names end in "cloud") always count as online.
 
 ### Hugging Face token
 
