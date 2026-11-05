@@ -178,7 +178,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           label: 'Zoom',
           icon: <ZoomIn size={14} />,
           items: [
-            { label: 'Fit', keys: 'Ctrl+Alt+0', checked: a.zoom === 'fit', also: 'zoom whole slide', run: () => a.setZoom('fit') },
+            { label: 'Fit the slide', keys: 'Ctrl+Alt+0', checked: a.zoom === 'fit', also: 'zoom whole', run: () => a.setZoom('fit') },
             ...ZOOMS.map((z) => ({ label: `${z * 100}%`, checked: a.zoom === z, also: 'zoom', run: () => a.setZoom(z) })),
             '-',
             { label: 'Zoom in', icon: <ZoomIn size={14} />, keys: 'Ctrl+Alt+=', run: () => a.zoomBy(1.25) },
@@ -222,7 +222,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           ],
         },
         {
-          label: 'Line',
+          label: 'Line or arrow',
           icon: <MoveRight size={14} />,
           disabled: ro,
           items: [
