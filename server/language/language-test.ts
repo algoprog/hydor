@@ -51,6 +51,13 @@ test('the translator: whole strings, patterns whose values move, spaces kept, un
   const v = translator({ 'Start an agent in any folder on {0}': '在{0}的任意文件夹中启动智能体', 'this machine': '这台机器' });
   assert.equal(v('Start an agent in any folder on this machine'), '在这台机器的任意文件夹中启动智能体');
   assert.equal(v('Start an agent in any folder on studio-box'), '在studio-box的任意文件夹中启动智能体');
+  // A value glued to letters ("12ms") is no piece of a word: "Forms" is not "For" + "ms", nor "Programs" "Progra" + "ms".
+  const g = translator({ '{0}ms': '{0}ms', For: '适用于', 'Step{0}done': 'Βήμα{0}έγινε' });
+  assert.equal(g('12ms'), '12ms');
+  assert.equal(g('Forms'), null);
+  assert.equal(g('Programs'), null);
+  assert.equal(g('Step 3 done'), 'Βήμα 3 έγινε');
+  assert.equal(g('Stepping done'), null);
 });
 
 test('the translator leaves what it has no entry for in English, whole, and takes lines and facts one by one', () => {
