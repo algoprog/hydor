@@ -125,8 +125,6 @@ const FUNCS = ['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'SUMIF', 'COUNTIF'
 export function sheetMenus(m: MenuCtx): MenuDef[] {
   const s = m.style;
   const ro = !!m.readOnly;
-  const rows = m.nRows === 1 ? 'row' : `${m.nRows} rows`;
-  const cols = m.nCols === 1 ? 'column' : `${m.nCols} columns`;
   const pasteSpecial: MenuEntry = !ro && {
     label: 'Paste special',
     icon: <ClipboardPaste size={14} />,
@@ -286,13 +284,13 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
             label: 'Rows and columns',
             also: 'hide show',
             items: [
-              { label: `Hide ${rows}`, run: () => m.hide('row') },
-              { label: `Hide ${cols}`, run: () => m.hide('col') },
+              { label: m.nRows === 1 ? 'Hide row' : `Hide ${m.nRows} rows`, run: () => m.hide('row') },
+              { label: m.nCols === 1 ? 'Hide column' : `Hide ${m.nCols} columns`, run: () => m.hide('col') },
               { label: 'Show all hidden rows', disabled: !m.hiddenRows, run: () => m.showAll('row') },
               { label: 'Show all hidden columns', disabled: !m.hiddenCols, run: () => m.showAll('col') },
               '-',
-              { label: `Delete ${rows}`, icon: <Trash2 size={14} />, run: () => m.remove('row') },
-              { label: `Delete ${cols}`, icon: <Trash2 size={14} />, run: () => m.remove('col') },
+              { label: m.nRows === 1 ? 'Delete row' : `Delete ${m.nRows} rows`, icon: <Trash2 size={14} />, run: () => m.remove('row') },
+              { label: m.nCols === 1 ? 'Delete column' : `Delete ${m.nCols} columns`, icon: <Trash2 size={14} />, run: () => m.remove('col') },
             ],
           },
           { label: 'Conditional formatting', icon: <Paintbrush size={14} />, also: 'colour scale data bars highlight rules', run: m.conditional },
