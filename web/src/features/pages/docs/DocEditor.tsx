@@ -14,6 +14,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, FileCog, Link2, ListTree, MessageSquare, MessageSquarePlus, Sparkles, Unlink } from 'lucide-react';
 import { docHeadings, docWords, FONTS, MARGINS, PAPERS, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type TableBlock } from '@shared/docs';
 import { newCommentId, openComments, type Comment } from '@shared/comments';
+import { changesOf, suggestionColor } from '@shared/doc-changes';
 import { post } from '../../../lib/api';
 import { mu } from '../../../lib/machine';
 import { toast, toastError, useUI } from '../../../lib/store';
@@ -31,7 +32,7 @@ import { MenuBar } from '../common/menus';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import { inputCls } from '../../../components/ui';
 import { BlockHandle } from './BlockHandle';
-import { CommentsColumn, CommentsPanel, type CommentActions, type Draft } from './CommentsView';
+import { CommentsColumn, CommentsPanel, type CommentActions, type Draft, type Extra } from './CommentsView';
 import { editorCss, paperPx, useDocFonts } from './css';
 import { BandsDialog, EquationBox, SpacingDialog, WordCountDialog, type Counts } from './Dialogs';
 import { DocEngine, type AtomClick, type SelState } from './engine';
@@ -41,6 +42,7 @@ import { fixDoc, runsBetween, sameDoc, type Pos } from './ops';
 import { GAP, Paging, type Layout } from './paging';
 import { Bands, Sheets } from './PaperSheets';
 import { Picked } from './Picture';
+import { SuggestionCard } from './Suggestions';
 import { slashAt, slashItems, slashLayout, slashMatches, SlashMenu } from './Slash';
 import { ColumnHandles, printDoc } from './TableTools';
 import { Toolbar } from './Toolbar';
@@ -124,6 +126,7 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+K', 'Link'],
       ['Ctrl+\\', 'Clear the formatting'],
       ['Ctrl+Alt+M', 'Comment'],
+      ['Ctrl+Alt+Shift+X', 'Suggesting, or editing again'],
     ],
   },
   {
@@ -180,6 +183,8 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   const [panel, setPanel] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [showResolved, setShowResolved] = useState(false);
+  // Editing (changes are made) or Suggesting (changes are suggested, as Google Docs' Suggesting and Word's Track changes).
+  const [mode, setMode] = useState<'edit' | 'suggest'>('edit');
   const [draft, setDraft] = useState<Draft | null>(null);
   const [tops, setTops] = useState<Map<string, number>>(new Map());
   const [eq, setEq] = useState<{ kind: 'block'; id: string; tex: string } | { kind: 'run'; at: Pos; tex: string } | { kind: 'new'; inline: boolean } | null>(null);
@@ -226,10 +231,12 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   const outlineW = wideOutline && outlineOpen ? 220 : 0;
   const comments: Comment[] = model?.comments ?? [];
   const shownComments = showResolved ? comments : openComments(comments);
+  // The suggested changes, each as it shows beside the page.
+  const changes = useMemo(() => (model?.suggestions?.length ? changesOf(model) : []), [model]);
   const ppx = model ? paperPx(model) : 794;
   // The comments beside the page where there is room for them, else in a panel.
   const columnFits = !phone && width - outlineW >= ppx * (typeof view.zoom === 'number' ? Math.min(1, view.zoom) : 1) + COLUMN + 24 + 48;
-  const column = columnFits && view.comments && (shownComments.length > 0 || !!draft);
+  const column = columnFits && view.comments && (shownComments.length > 0 || changes.length > 0 || !!draft);
   const panelW = !phone && panel && !columnFits ? 320 : 0;
   const room = width - outlineW - panelW - (column ? COLUMN + 24 : 0) - 48;
   // Fit the width: the paper as wide as there is room for; else as large as asked, or (no room for it) the words
@@ -319,6 +326,9 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   useEffect(() => {
     engine.current?.setReadOnly(!!readOnly);
   }, [readOnly]);
+  useEffect(() => {
+    engine.current?.setSuggesting(mode === 'suggest' && !readOnly ? { by: 'user' } : null);
+  }, [mode, readOnly, !!engine.current]);
   useEffect(() => {
     if (engine.current) engine.current.root.spellcheck = view.spell;
   }, [view.spell, !!engine.current]);
@@ -426,11 +436,12 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     setFloat(out.ask || out.link ? out : null);
   }, [st, tick]);
 
-  // The comment picked follows the caret into the words of one.
+  // The comment picked follows the caret into the words of one; a suggestion, into what it changes.
   useEffect(() => {
     if (st?.cm.length && !st.cm.includes(active ?? '')) setActive(st.cm.find((id) => comments.some((c) => c.id === id && (showResolved || !c.resolved))) ?? active);
+    else if (st?.sg.length && !st.sg.includes(active ?? '')) setActive(st.sg[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [st?.cm.join()]);
+  }, [st?.cm.join(), st?.sg.join()]);
 
   // Where each comment's words are down the page, for the column beside it.
   useLayoutEffect(() => {
@@ -444,9 +455,13 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
         const el = p.querySelector(`[data-cm~="${CSS.escape(c.id)}"]`);
         if (el) next.set(c.id, el.getBoundingClientRect().top - hr.top);
       }
+      for (const c of changes) {
+        const el = p.querySelector(`[data-s="${CSS.escape(c.id)}"]`);
+        if (el) next.set(c.id, el.getBoundingClientRect().top - hr.top);
+      }
       setTops((old) => (old.size === next.size && [...next].every(([k, v]) => Math.abs((old.get(k) ?? -1) - v) < 1) ? old : next));
     }
-  }, [model, tick, column, showResolved, active]);
+  }, [model, tick, column, showResolved, active, changes]);
 
   // "/" typed at a line's start, or after a space: its menu, narrowed as more is typed.
   useEffect(() => {
@@ -471,13 +486,17 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   const current = model && st ? sectionOf(model, st.index)?.id : undefined;
   const css = useMemo(() => (model ? editorCss(model, { narrow, hints: { title: tr('Title'), body: tr('Start writing') } }) : ''), [model?.page, model?.font, model?.size, narrow]);
   // The comments' marks: open ones in yellow, the one picked stronger; resolved ones not at all.
+  // The suggestions' marks in the colour of who suggested each, the one picked shaded.
   const marks = useMemo(
     () =>
-      comments
-        .filter((c) => !c.resolved || (showResolved && c.id === active))
-        .map((c) => `.nd-ed [data-cm~="${CSS.escape(c.id)}"]{background:${c.id === active ? 'rgba(251,188,4,.5)' : 'rgba(251,188,4,.22)'};border-bottom:2px solid rgba(251,188,4,.8)}`)
-        .join('\n'),
-    [comments, active, showResolved],
+      [
+        ...comments
+          .filter((c) => !c.resolved || (showResolved && c.id === active))
+          .map((c) => `.nd-ed [data-cm~="${CSS.escape(c.id)}"]{background:${c.id === active ? 'rgba(251,188,4,.5)' : 'rgba(251,188,4,.22)'};border-bottom:2px solid rgba(251,188,4,.8)}`),
+        ...(model?.suggestions ?? []).map((x) => `.nd-ed [data-s="${CSS.escape(x.id)}"]{--sc:${suggestionColor(x)}}`),
+        active && model?.suggestions?.some((x) => x.id === active) ? `.nd-ed :is(ins,del,span)[data-s="${CSS.escape(active)}"]{background:color-mix(in srgb,var(--sc) 14%,transparent)}` : '',
+      ].join('\n'),
+    [comments, active, showResolved, model?.suggestions],
   );
 
   if (!model) return <div className="flex h-full items-center justify-center text-fg-3">…</div>;
@@ -571,6 +590,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     if ((k === '/' || ev.code === 'Slash') && !ev.altKey && !ev.shiftKey) return setDialog('keys'), true;
     if (ev.code === 'KeyC' && ev.shiftKey && !ev.altKey) return openCount(), true;
     if (ev.code === 'KeyM' && ev.altKey && !ro) return startComment(), true;
+    if (ev.code === 'KeyX' && ev.altKey && ev.shiftKey && !ro) return setMode((m) => (m === 'suggest' ? 'edit' : 'suggest')), true;
     if (k === 'k' && !ev.shiftKey && !ev.altKey && !ro && engine.current?.root.contains(document.activeElement)) {
       setLinking({ url: stRef.current?.link ?? '', text: '' });
       return true;
@@ -797,6 +817,10 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           },
           painter: () => (e.paint ? e.stopPaint() : e.startPaint(false)),
           today,
+          mode,
+          setMode,
+          suggestions: changes.length,
+          resolveAll: (accept) => e.resolve(null, accept),
         })
       : [];
 
@@ -873,10 +897,39 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   const hoverT = hoverTable ? (model.blocks.find((b) => b.id === hoverTable && b.type === 'table') as TableBlock | undefined) : undefined;
   const caretT = st?.block?.type === 'table' ? st.block : undefined;
   const handlesFor = !readOnly && !narrow ? (caretT ?? hoverT) : undefined;
+  // Each suggested change's card, beside the page with the comments: Accept, Reject and replies.
+  const sgById = new Map((model.suggestions ?? []).map((x) => [x.id, x]));
+  const resolveOne = (id: string, accept: boolean) => {
+    e?.resolve(id, accept);
+    if (active === id) setActive(null);
+  };
+  const replyTo = (id: string, text: string) =>
+    e?.setSuggestions((model.suggestions ?? []).map((x) => (x.id === id ? { ...x, replies: [...(x.replies ?? []), { id: newCommentId(), by: 'user' as const, text, at: Date.now() }] } : x)));
+  const extra: Extra[] = changes.map((c) => ({
+    id: c.id,
+    top: tops.get(c.id),
+    node: (
+      <SuggestionCard
+        change={c}
+        sg={sgById.get(c.id)}
+        color={suggestionColor(sgById.get(c.id))}
+        active={active === c.id}
+        readOnly={readOnly}
+        onFocus={() => {
+          setActive(c.id);
+          e?.revealSuggestion(c.id);
+        }}
+        onAccept={() => resolveOne(c.id, true)}
+        onReject={() => resolveOne(c.id, false)}
+        onReply={(t) => replyTo(c.id, t)}
+      />
+    ),
+  }));
   const panelBody = (
     <CommentsPanel
       comments={shownComments}
       all={comments}
+      extra={extra}
       showResolved={showResolved}
       setShowResolved={setShowResolved}
       draft={draft}
@@ -897,7 +950,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           {/* The menus beside the title, where the header has room for them; one button where it hasn't. */}
           {st && e && <MenuBar menus={readOnly ? menus.filter((m) => m.label === 'View' || m.label === 'Tools') : menus} compact={phone ? true : 'auto'} className={phone ? 'shrink-0' : undefined} />}
         </div>
-        {(comments.length > 0 || panel) && (
+        {(comments.length > 0 || changes.length > 0 || panel) && (
           <button
             ref={commentsRef}
             type="button"
@@ -907,7 +960,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
             className={cx('flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-[12.5px] font-medium text-fg-2 hover:bg-bg-2 hover:text-fg', (columnFits ? view.comments : panel) && 'bg-bg-2 text-fg')}
           >
             <MessageSquare size={16} />
-            {openComments(comments).length > 0 && <span className="tabular-nums">{openComments(comments).length}</span>}
+            {openComments(comments).length + changes.length > 0 && <span className="tabular-nums">{openComments(comments).length + changes.length}</span>}
           </button>
         )}
         {/* On a phone the outline is in View: the header has no room for its button beside the title and the page's own. */}
@@ -932,7 +985,18 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
       {band}
       {st && e && !readOnly && (
         <div className="flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-panel px-2 [&::-webkit-scrollbar]:hidden">
-          <Toolbar engine={e} st={st} doc={model} linking={linking} setLinking={setLinking} linkRef={linkRef} onComment={startComment} slim={!phone && width < 820} />
+          <Toolbar
+            engine={e}
+            st={st}
+            doc={model}
+            linking={linking}
+            setLinking={setLinking}
+            linkRef={linkRef}
+            onComment={startComment}
+            slim={!phone && width < 820}
+            suggesting={mode === 'suggest'}
+            onSuggesting={(on) => setMode(on ? 'suggest' : 'edit')}
+          />
         </div>
       )}
       <div className="relative flex min-h-0 flex-1">
@@ -1041,6 +1105,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
                 <CommentsColumn
                   comments={shownComments}
                   tops={tops}
+                  extra={extra}
                   draft={draft}
                   onDraft={addDraft}
                   onCancelDraft={() => setDraft(null)}

@@ -11,7 +11,9 @@
 // highlights, sizes and fonts of words, a title and subtitle of their own, pictures aligned and captioned, tables'
 // columns' widths, filled and merged cells, line and paragraph spacing, callouts (shaded paragraphs), equations
 // (Word's own, OMML, where they convert), a table of contents Word fills in, a header and footer with the page's
-// number, comments with their replies (Word's own), and the document's own paper, margins, font and sizes.
+// number, comments with their replies (Word's own), suggested changes as tracked changes (words inserted and deleted,
+// formatting changed, paragraphs broken and joined, pictures and tables' rows added or taken out, each with who made it
+// and when), and the document's own paper, margins, font and sizes.
 import { withTab, type Tab } from '../capture/index.ts';
 import { scriptSafe } from './kit.ts';
 import { ommlOf } from './omml.ts';
@@ -41,7 +43,21 @@ export interface DocRun {
   math?: boolean;
   /** The comments on these words, by their ids (the file's `comments`). */
   cm?: string[];
+  /** A tracked change: these words inserted, or deleted. */
+  rev?: DocRev;
+  /** A tracked change of their formatting: who, when, and how they looked before. */
+  fmtRev?: { author: string; at: number; was: DocLookOf };
 }
+
+/** A tracked change: inserted or deleted, by whom (a name) and when (ms since 1970). */
+export interface DocRev {
+  kind: 'ins' | 'del';
+  author: string;
+  at: number;
+}
+
+/** How words looked, for a tracked change of their formatting. */
+export type DocLookOf = Pick<DocRun, 'b' | 'i' | 'u' | 's' | 'code' | 'sup' | 'sub' | 'color' | 'hl' | 'size' | 'font'>;
 
 type Jc = 'center' | 'right' | 'justify';
 
@@ -64,22 +80,23 @@ export interface DocCell {
   vm?: 'restart' | 'cont';
 }
 
-// `keep`: an empty one keeps its place (a document's empty lines; a page's are left out).
+// `keep`: an empty one keeps its place (a document's empty lines; a page's are left out). `mark`: a tracked change of
+// the paragraph's own mark, its end (inserted: the paragraph was broken there; deleted: it joins the next).
 export type DocBlock =
   /** `anchor`: a name a table of contents' line leads to. */
-  | { k: 'h'; lvl: 1 | 2 | 3 | 4 | 5 | 6; runs: DocRun[]; align?: Jc; keep?: boolean; space?: DocSpace; anchor?: string }
+  | { k: 'h'; lvl: 1 | 2 | 3 | 4 | 5 | 6; runs: DocRun[]; align?: Jc; keep?: boolean; space?: DocSpace; anchor?: string; mark?: DocRev }
   /** `style`: the document's title or subtitle; `indent`: steps of half an inch; `shade`: a callout's tint (`icon` its emoji). */
-  | { k: 'p'; runs: DocRun[]; align?: Jc; quote?: boolean; style?: 'title' | 'subtitle'; indent?: number; keep?: boolean; space?: DocSpace; shade?: string; icon?: string }
+  | { k: 'p'; runs: DocRun[]; align?: Jc; quote?: boolean; style?: 'title' | 'subtitle'; indent?: number; keep?: boolean; space?: DocSpace; shade?: string; icon?: string; mark?: DocRev }
   /** `list`: which list it belongs to (numbering restarts per list); `check`: a checklist's item (ticked: `checked`). */
-  | { k: 'li'; ordered: boolean; lvl: number; list: number; runs: DocRun[]; check?: boolean; checked?: boolean; align?: Jc; keep?: boolean; space?: DocSpace }
+  | { k: 'li'; ordered: boolean; lvl: number; list: number; runs: DocRun[]; check?: boolean; checked?: boolean; align?: Jc; keep?: boolean; space?: DocSpace; mark?: DocRev }
   | { k: 'pre'; text: string }
   | { k: 'hr' }
   /** A page break. */
   | { k: 'pb' }
-  /** `shot`: an index into shots; w and h in CSS pixels, as shown. */
-  | { k: 'img'; shot: number; w: number; h: number; alt?: string; align?: 'left' | 'center' | 'right'; caption?: string }
-  /** `cols`: the columns' widths, as shares of the table's. */
-  | { k: 'table'; rows: { cells: DocCell[] }[]; cols?: number[] }
+  /** `shot`: an index into shots; w and h in CSS pixels, as shown; `rev`: added or taken out as a tracked change. */
+  | { k: 'img'; shot: number; w: number; h: number; alt?: string; align?: 'left' | 'center' | 'right'; caption?: string; rev?: DocRev }
+  /** `cols`: the columns' widths, as shares of the table's; `rev`: every row added or taken out as a tracked change. */
+  | { k: 'table'; rows: { cells: DocCell[] }[]; cols?: number[]; rev?: DocRev }
   /** A table of contents: its lines as Word shows them until it fills it in (its headings' `anchor`s). */
   | { k: 'toc'; entries: { lvl: number; text: string; anchor: string }[] }
   /** An equation on a line of its own, in LaTeX. */
@@ -1249,12 +1266,27 @@ function cleanRuns(v: unknown): DocRun[] {
       const cm = r.cm.filter((x): x is string => typeof x === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(x)).slice(0, 20);
       if (cm.length) run.cm = cm;
     }
+    const rev = cleanRev(r.rev);
+    if (rev) run.rev = rev;
+    const f = obj(r.fmtRev);
+    if (typeof f.author === 'string' && typeof f.at === 'number') {
+      const was = cleanRuns([{ ...obj(f.was), t: 'x' }])[0] ?? { t: 'x' };
+      const { t: _t, br: _b, link: _l, math: _m, cm: _c, rev: _r, fmtRev: _f, ...look } = was;
+      run.fmtRev = { author: str(f.author, 80), at: f.at, was: look };
+    }
     out.push(run);
   }
   return out;
 }
 
 const hex = (v: unknown) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : undefined);
+
+/** A tracked change, checked: its kind, a name of one line, a time. */
+function cleanRev(v: unknown): DocRev | undefined {
+  const o = obj(v);
+  if ((o.kind !== 'ins' && o.kind !== 'del') || typeof o.author !== 'string' || typeof o.at !== 'number' || !Number.isFinite(o.at)) return undefined;
+  return { kind: o.kind, author: str(o.author, 80).replace(/\s+/g, ' ').trim() || 'You', at: o.at };
+}
 
 /** A paragraph's own spacing, each value within bounds. */
 function cleanSpace(v: unknown): DocSpace | undefined {
@@ -1290,6 +1322,7 @@ function cleanDoc(v: unknown): Extracted {
         const h: Extract<DocBlock, { k: 'h' }> = { k: 'h', lvl: int(b.lvl, 1, 6, 2) as 1 | 2 | 3 | 4 | 5 | 6, runs, ...(align ? { align } : {}) };
         if (space) h.space = space;
         if (typeof b.anchor === 'string' && /^_Toc\d{1,9}$/.test(b.anchor)) h.anchor = b.anchor;
+        if (cleanRev(b.mark)) h.mark = cleanRev(b.mark);
         blocks.push(h);
       } else if (b.k === 'li') {
         const li: Extract<DocBlock, { k: 'li' }> = { k: 'li', ordered: b.ordered === true, lvl: int(b.lvl, 0, 8, 0), list: int(b.list, 0, 1e9, 0), runs };
@@ -1299,6 +1332,7 @@ function cleanDoc(v: unknown): Extracted {
         }
         if (align) li.align = align;
         if (space) li.space = space;
+        if (cleanRev(b.mark)) li.mark = cleanRev(b.mark);
         blocks.push(li);
       } else {
         const p: Extract<DocBlock, { k: 'p' }> = { k: 'p', runs };
@@ -1313,6 +1347,7 @@ function cleanDoc(v: unknown): Extracted {
           p.shade = shade;
           if (typeof b.icon === 'string' && b.icon.length <= 16) p.icon = b.icon;
         }
+        if (cleanRev(b.mark)) p.mark = cleanRev(b.mark);
         blocks.push(p);
       }
     } else if (b.k === 'pb') blocks.push({ k: 'pb' });
@@ -1329,6 +1364,7 @@ function cleanDoc(v: unknown): Extracted {
       if (b.align === 'left' || b.align === 'center' || b.align === 'right') img.align = b.align;
       const caption = str(b.caption, 1000).replace(/\s+/g, ' ').trim();
       if (caption) img.caption = caption;
+      if (cleanRev(b.rev)) img.rev = cleanRev(b.rev);
       blocks.push(img);
     } else if (b.k === 'table') {
       const rows: Extract<DocBlock, { k: 'table' }>['rows'] = [];
@@ -1349,7 +1385,7 @@ function cleanDoc(v: unknown): Extracted {
         if (cells.length) rows.push({ cells });
       }
       const cols = Array.isArray(b.cols) && b.cols.every((w) => typeof w === 'number' && Number.isFinite(w) && w > 0) ? (b.cols as number[]).slice(0, 63) : undefined;
-      if (rows.length) blocks.push(cols ? { k: 'table', rows, cols } : { k: 'table', rows });
+      if (rows.length) blocks.push({ k: 'table', rows, ...(cols ? { cols } : {}), ...(cleanRev(b.rev) ? { rev: cleanRev(b.rev) } : {}) });
     } else if (b.k === 'toc') {
       const entries = (Array.isArray(b.entries) ? b.entries : []).slice(0, 2000).flatMap((x) => {
         const e = obj(x);
@@ -1521,7 +1557,30 @@ function contentTypes(pictures: Set<string>, parts: [string, string][] = []): st
   );
 }
 
+/** Tracked changes' ids, unique in the file (counted afresh for each file; Word's other notes are numbered below them). */
+let revs = 0;
+const when = (at: number) => new Date(at || Date.now()).toISOString().replace(/\.\d+Z$/, 'Z');
+/** A tracked change's attributes: its id, who made it, when. */
+const revAttrs = (author: string, at: number) => `w:id="${10000 + ++revs}" w:author="${esc(author)}" w:date="${when(at)}"`;
+/** A paragraph's own mark inserted or deleted, as the end of its properties says it. */
+export const markXml = (m: DocRev | undefined) => (m ? `<w:rPr><w:${m.kind} ${revAttrs(m.author, m.at)}/></w:rPr>` : '');
+/** Words inside a tracked change (inserted, deleted), around what Word writes for them. */
+export const revWrap = (rev: DocRev | undefined, xml: string) => (rev ? `<w:${rev.kind} ${revAttrs(rev.author, rev.at)}>${xml}</w:${rev.kind}>` : xml);
+
 function runXml(r: DocRun): string {
+  const p = rPrParts(r);
+  if (r.fmtRev) p.push(`<w:rPrChange ${revAttrs(r.fmtRev.author, r.fmtRev.at)}><w:rPr>${rPrParts({ t: '', ...r.fmtRev.was, ...(r.link ? { link: r.link } : {}) }).join('')}</w:rPr></w:rPrChange>`);
+  // Deleted words are deleted text, which Word shows struck until the change is accepted.
+  const tag = r.rev?.kind === 'del' ? 'w:delText' : 'w:t';
+  const text = r.t
+    .split(/(\t|\n)/)
+    .map((x) => (x === '\t' ? '<w:tab/>' : x === '\n' ? '<w:br/>' : x ? `<${tag} xml:space="preserve">${esc(x)}</${tag}>` : ''))
+    .join('');
+  return `<w:r>${p.length ? `<w:rPr>${p.join('')}</w:rPr>` : ''}${r.br ? '<w:br/>' : ''}${text}</w:r>`;
+}
+
+/** A run's properties, as Word lists them (in its schema's order). */
+function rPrParts(r: DocRun): string[] {
   const p: string[] = [];
   if (r.link) p.push('<w:rStyle w:val="Hyperlink"/>');
   else if (r.code) p.push('<w:rStyle w:val="InlineCode"/>');
@@ -1536,11 +1595,7 @@ function runXml(r: DocRun): string {
   if (r.hl) p.push(`<w:shd w:val="clear" w:color="auto" w:fill="${r.hl.slice(1).toUpperCase()}"/>`);
   if (r.sup) p.push('<w:vertAlign w:val="superscript"/>');
   else if (r.sub) p.push('<w:vertAlign w:val="subscript"/>');
-  const text = r.t
-    .split(/(\t|\n)/)
-    .map((x) => (x === '\t' ? '<w:tab/>' : x === '\n' ? '<w:br/>' : x ? `<w:t xml:space="preserve">${esc(x)}</w:t>` : ''))
-    .join('');
-  return `<w:r>${p.length ? `<w:rPr>${p.join('')}</w:rPr>` : ''}${r.br ? '<w:br/>' : ''}${text}</w:r>`;
+  return p;
 }
 
 const para = (pPr: string, inner: string) => `<w:p>${pPr ? `<w:pPr>${pPr}</w:pPr>` : ''}${inner}</w:p>`;
@@ -1558,6 +1613,7 @@ export function docxFile(
   o: { title: string; paper: 'a4' | 'letter'; margin?: number; look?: DocLook; titled?: boolean; header?: DocBand; footer?: DocBand; titlePage?: boolean; comments?: DocComment[] },
 ): Buffer {
   const d = cleanDoc(doc);
+  revs = 0;
   const page = o.paper === 'letter' ? { w: 12240, h: 15840 } : { w: 11906, h: 16838 };
   const margin = o.margin !== undefined && Number.isFinite(o.margin) ? Math.round(Math.min(60, Math.max(5, o.margin)) * 56.6929) : MARGIN;
   const look = o.look ?? {};
@@ -1614,8 +1670,8 @@ export function docxFile(
   const oneRun = (r: DocRun) => {
     const at = written++;
     const omml = r.math ? ommlOf(r.t) : null;
-    const body = r.math ? (omml ?? runXml({ t: r.t, i: true, font: 'Cambria Math' })) : runXml(r);
-    return cmMarks(r, at, 'first') + body + cmMarks(r, at, 'last');
+    const body = r.math ? (omml ?? runXml({ t: r.t, i: true, font: 'Cambria Math', rev: r.rev })) : runXml(r);
+    return cmMarks(r, at, 'first') + revWrap(r.rev, body) + cmMarks(r, at, 'last');
   };
   const runs = (list: DocRun[], bold = false) => {
     let out = '';
@@ -1677,12 +1733,15 @@ export function docxFile(
     const caption = b.caption ? para(`<w:pStyle w:val="Caption"/>${jc}`, runXml({ t: b.caption })) : '';
     return para(
       `<w:pStyle w:val="Picture"/>${caption ? '<w:keepNext/>' : ''}${jc}`,
-      `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${n}" name="Picture ${n}"${alt}/>` +
-        '<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
-        `<pic:pic><pic:nvPicPr><pic:cNvPr id="${n}" name="${name}"${alt}/><pic:cNvPicPr><a:picLocks noChangeAspect="1"/></pic:cNvPicPr></pic:nvPicPr>` +
-        `<pic:blipFill><a:blip r:embed="${id}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
-        `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>` +
-        '</a:graphicData></a:graphic></wp:inline></w:drawing></w:r>',
+      revWrap(
+        b.rev,
+        `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${n}" name="Picture ${n}"${alt}/>` +
+          '<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+          `<pic:pic><pic:nvPicPr><pic:cNvPr id="${n}" name="${name}"${alt}/><pic:cNvPicPr><a:picLocks noChangeAspect="1"/></pic:cNvPicPr></pic:nvPicPr>` +
+          `<pic:blipFill><a:blip r:embed="${id}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+          `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>` +
+          '</a:graphicData></a:graphic></wp:inline></w:drawing></w:r>',
+      ),
     ) + caption;
   };
 
@@ -1737,7 +1796,8 @@ export function docxFile(
         c += n;
       }
       for (; c < cols; c++) out += cellXml('', widths[c], 1, head);
-      return `<w:tr><w:trPr><w:cantSplit/>${head ? '<w:tblHeader/>' : ''}</w:trPr>${out}</w:tr>`;
+      const rowRev = b.rev ? `<w:${b.rev.kind} ${revAttrs(b.rev.author, b.rev.at)}/>` : '';
+      return `<w:tr><w:trPr><w:cantSplit/>${head ? '<w:tblHeader/>' : ''}${rowRev}</w:trPr>${out}</w:tr>`;
     });
     return (
       `<w:tbl><w:tblPr><w:tblStyle w:val="PageTable"/><w:tblW w:w="${textW}" w:type="dxa"/><w:tblBorders>${TABLE_BORDERS}</w:tblBorders><w:tblLayout w:type="fixed"/>` +
@@ -1775,19 +1835,19 @@ export function docxFile(
       // A table of contents' line leads to its heading's bookmark.
       const mark = b.anchor ? ++bookmarks : 0;
       const inner = mark ? `<w:bookmarkStart w:id="${mark}" w:name="${b.anchor}"/>${runs(b.runs)}<w:bookmarkEnd w:id="${mark}"/>` : runs(b.runs);
-      body.push(para(`<w:pStyle w:val="Heading${b.lvl}"/>${spaceXml(b.space)}${jcOf(b.align)}`, inner));
+      body.push(para(`<w:pStyle w:val="Heading${b.lvl}"/>${spaceXml(b.space)}${jcOf(b.align)}${markXml(b.mark)}`, inner));
     } else if (b.k === 'p' && b.shade) {
       // A callout: a shaded paragraph, its emoji first, its tint as a border all round that gives it room.
       const tint = b.shade.slice(1).toUpperCase();
       const frame = `<w:pBdr>${['top', 'left', 'bottom', 'right'].map((side) => border(side, 4, tint, 6)).join('')}</w:pBdr><w:shd w:val="clear" w:color="auto" w:fill="${tint}"/>`;
       const icon = b.icon ? runXml({ t: `${b.icon}  ` }) : '';
-      body.push(para(`${frame}${spaceXml(b.space ?? { before: 6, after: 10 })}<w:ind w:left="170" w:right="170"/>${jcOf(b.align)}`, icon + runs(b.runs)));
+      body.push(para(`${frame}${spaceXml(b.space ?? { before: 6, after: 10 })}<w:ind w:left="170" w:right="170"/>${jcOf(b.align)}${markXml(b.mark)}`, icon + runs(b.runs)));
     } else if (b.k === 'p') {
       const style = b.style === 'title' ? 'Title' : b.style === 'subtitle' ? 'Subtitle' : b.quote ? 'Quote' : '';
-      body.push(para(`${style ? `<w:pStyle w:val="${style}"/>` : ''}${spaceXml(b.space)}${b.indent ? `<w:ind w:left="${b.indent * 720}"/>` : ''}${jcOf(b.align)}`, runs(b.runs)));
+      body.push(para(`${style ? `<w:pStyle w:val="${style}"/>` : ''}${spaceXml(b.space)}${b.indent ? `<w:ind w:left="${b.indent * 720}"/>` : ''}${jcOf(b.align)}${markXml(b.mark)}`, runs(b.runs)));
     } else if (b.k === 'li' && b.check)
-      body.push(para(`<w:pStyle w:val="ListParagraph"/>${spaceXml(b.space)}<w:ind w:left="${720 + 360 * b.lvl}" w:hanging="360"/>${jcOf(b.align)}`, box(!!b.checked) + runs(b.runs)));
-    else if (b.k === 'li') body.push(para(`<w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="${b.lvl}"/><w:numId w:val="${b.ordered ? numOf(b.list) : 1}"/></w:numPr>${spaceXml(b.space)}${jcOf(b.align)}`, runs(b.runs)));
+      body.push(para(`<w:pStyle w:val="ListParagraph"/>${spaceXml(b.space)}<w:ind w:left="${720 + 360 * b.lvl}" w:hanging="360"/>${jcOf(b.align)}${markXml(b.mark)}`, box(!!b.checked) + runs(b.runs)));
+    else if (b.k === 'li') body.push(para(`<w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="${b.lvl}"/><w:numId w:val="${b.ordered ? numOf(b.list) : 1}"/></w:numPr>${spaceXml(b.space)}${jcOf(b.align)}${markXml(b.mark)}`, runs(b.runs)));
     else if (b.k === 'toc') {
       // A table of contents as Word keeps one: a field it fills in (with the pages) when it opens the file, and meanwhile
       // the headings, each a link to its own.
