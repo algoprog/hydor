@@ -270,6 +270,7 @@ function parse(state: EditorState, hooks: VisualHooks): Parsed {
   if (begin) {
     const last = lineAt(begin.index).number;
     for (let n = 1; n < last; n++) always.push(line('cm-tex-pre').range(doc.line(n).from));
+    always.push(mark('cm-tex-quiet').range(begin.index, body));
   }
 
   // Open environments: lists (for bullets and numbers) and floats (for their frame).
