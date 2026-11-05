@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { AppWindow, FileText, Globe, GlobeLock, NotebookText, Presentation, Sheet, Sigma, Sparkles, Upload } from 'lucide-react';
 import type { PageInfo, SiteInfo, SiteVisibility } from '@shared/pages';
 import { newDeck, THEMES, type Ratio } from '@shared/slides';
+import { texFromTemplate, texTemplate, type TexTemplateId } from '@shared/latex-templates';
 import { del, enc, patch, post } from '../../lib/api';
 import { ago, basename, tildify } from '../../lib/format';
 import { mu } from '../../lib/machine';
@@ -20,6 +21,7 @@ import { SiteLink, VISIBILITY } from './cards';
 import { usePagesStore } from './state';
 import { STARTERS } from './templates';
 import { SlideThumb } from './slides/Thumb';
+import { TexTemplatePicker } from './latex/TemplatePicker';
 
 const TONES = ['from-accent/25 to-accent/5 text-accent', 'from-info/25 to-info/5 text-info', 'from-ok/25 to-ok/5 text-ok', 'from-warn/25 to-warn/5 text-warn', 'from-claude/25 to-claude/5 text-claude', 'from-codex/25 to-codex/5 text-codex'];
 export const toneOf = (id: string) => TONES[parseInt(id.slice(0, 6), 16) % TONES.length];
@@ -198,6 +200,9 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
   const [title, setTitle] = useState(STARTERS[0].title);
   const [theme, setTheme] = useState(THEMES[0].id);
   const [ratio, setRatio] = useState<Ratio>('16:9');
+  // A LaTeX document's template, and the name it gives (the article keeps the usual one).
+  const [tpl, setTpl] = useState<TexTemplateId>('article');
+  const tplTitle = (id: TexTemplateId) => (id === 'article' ? NEW_TITLE.tex : (texTemplate(id)?.title ?? NEW_TITLE.tex));
   const [ask, setAsk] = useState('');
   const [busy, setBusy] = useState(false);
   // Where it goes: the space the Library shows now, or none; asked only when there are spaces.
@@ -208,11 +213,12 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
     setKind(startKind);
     setPick(STARTERS[0].id);
     setTitle(NEW_TITLE[startKind] || STARTERS[0].title);
+    setTpl('article');
     setAsk('');
     setWhere(space ?? null);
   }, [open, startKind, space]);
   const starter = STARTERS.find((s) => s.id === pick)!;
-  const defaultTitle = NEW_TITLE[kind] || starter.title;
+  const defaultTitle = kind === 'tex' ? tplTitle(tpl) : NEW_TITLE[kind] || starter.title;
   const make = async () => {
     setBusy(true);
     try {
@@ -222,7 +228,9 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
           ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind: 'slides', model: newDeck(t, theme, ratio), space: where })
           : kind === 'page'
             ? await post<{ page: PageInfo }>('/api/pages', { title: t, html: starter.html(t), space: where })
-            : await post<{ page: PageInfo }>('/api/pages', { title: t, kind, space: where });
+            : kind === 'tex'
+              ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind, model: texFromTemplate(tpl, t), space: where })
+              : await post<{ page: PageInfo }>('/api/pages', { title: t, kind, space: where });
       onClose();
       go(kind === 'page' ? `/pages/${r.page.id}?mode=${pick === 'blank' ? 'edit' : 'view'}` : `/pages/${r.page.id}`);
     } catch (e) {
@@ -353,6 +361,15 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
               ]}
             />
           </>
+        )}
+        {kind === 'tex' && (
+          <TexTemplatePicker
+            value={tpl}
+            onChange={(t) => {
+              if (title === defaultTitle || !title.trim()) setTitle(tplTitle(t.id));
+              setTpl(t.id);
+            }}
+          />
         )}
         <div className={cx('grid gap-3', !!spaces?.length && 'sm:grid-cols-[1fr_auto]')}>
           <label className="block min-w-0 space-y-1.5">
