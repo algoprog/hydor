@@ -360,7 +360,7 @@ export async function workLog(db: DB, a: { from?: unknown; to?: unknown; project
       metrics: r.metrics?.last ?? {},
       started: local(r.startedAt ?? r.createdAt, tz),
       ended: local(r.endedAt, tz),
-      link: `${base}/system/experiments?run=${encodeURIComponent(r.id)}`,
+      link: `${base}/system/experiments/${encodeURIComponent(r.id)}`,
     }));
 
   // ---- the Library: pages, documents, sheets, slides, LaTeX, notebooks, pictures and videos made or changed ----

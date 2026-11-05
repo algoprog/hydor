@@ -20,6 +20,7 @@ import { allSteps, checkFlow, cleanFlow, type CodeStep } from '../../shared/app-
 import { checkUi, cleanUi, missingIn, uiEngine } from '../../shared/app-ui.ts';
 import { TEMPLATES } from './templates.ts';
 import { AGREE } from './templates-lab.ts';
+import { LAB_VIEWS } from './views-lab.ts';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import { isActive } from '../../shared/apps.ts';
@@ -209,6 +210,7 @@ test('work_log: the commits of the repositories those sessions worked in (a work
   assert.match(log.commits[0].hash, /^[0-9a-f]{7,}$/);
   assert.deepEqual(log.runs.map((r) => r.id).sort(), ['e2', 'e3'], 'runs at work in the period, a running one too');
   assert.deepEqual(log.runs.find((r) => r.id === 'e2')!.metrics, { mrr10: 0.412 });
+  assert.equal(log.runs.find((r) => r.id === 'e2')!.link, 'https://lab.example/system/experiments/e2', 'its page in Experiments');
   assert.deepEqual(log.library.map((l) => [l.kind, l.title, l.changed]).sort(), [['document', 'Results so far', 'made'], ['picture', 'Loss curves', 'made']]);
   assert.equal(log.library.find((l) => l.title === 'Results so far')!.link, `https://lab.example/pages/${page.id}`);
   assert.deepEqual(log.read.map((r) => [r.title, r.authors, r.link]), [['Dense Passage Retrieval for Open-Domain Question Answering', 'Karpukhin, Oğuz', 'https://arxiv.org/abs/2004.04906']]);
@@ -260,7 +262,8 @@ test('the lab’s apps: each is there under its kind, its steps and flows check 
     const c = checkFlow(t);
     assert.deepEqual(c.errors, [], `${id}: its steps check out`);
     assert.deepEqual(c.warnings.filter((w) => !/, which is empty when /.test(w)), [], `${id}: nothing it uses is missing`);
-    assert.deepEqual(cleanUi(t.ui).errors, [], `${id}: its view`);
+    assert.deepEqual(cleanUi(LAB_VIEWS[id]).errors, [], `${id}: its view as written, nothing dropped when it is tidied`);
+    assert.deepEqual(Object.keys(t.ui!.widgets ?? {}), Object.keys(LAB_VIEWS[id].widgets ?? {}), `${id}: its widgets`);
     const v = checkUi(t);
     assert.deepEqual(v.errors, [], `${id}: its view against its answer`);
     assert.deepEqual(v.warnings, [], `${id}: its view, nothing that surprises`);
@@ -522,7 +525,7 @@ test('the views draw with a run’s values: the workbench’s next text with a b
   const ag = draw(t, 'agreement', records.slice(0, 2), { result, state: { agree: { n: 2, same: 1, po: 0.5, pe: 0.5, kappa: 0, level: 1 } } });
   assert.match(ag, /<b>50%<\/b><span>the same label, on 1 of 2 texts<\/span>/);
   assert.match(ag, /Cohen’s κ: poor/);
-  assert.match(ag, /<n-widget name="agreement" value="\[\{&quot;id&quot;:&quot;a&quot;/);
+  assert.match(ag, /<n-widget name="matrix" value="\[\{&quot;id&quot;:&quot;a&quot;/);
   const ex = draw(t, 'export', records.slice(0, 2), { result, state: { pub: { working: false, error: 'Annotation workbench needs a key first: Hugging Face token.' } } });
   assert.match(ex, /The 2 texts you have labelled/);
   assert.match(ex, /<span class="st err">Annotation workbench needs a key first/);
@@ -557,8 +560,8 @@ test('the views draw with a run’s values: the workbench’s next text with a b
   // Every name the run pages use is in their answers (or the form's).
   const answers: Record<string, Record<string, unknown>> = {
     'annotation-workbench': result,
-    'research-sprint': { question: 'Q', status: 'Done', hypotheses: [{ id: 'H1', hypothesis: 'h', verdict: 'Supported', mark: 'supported', evidence: 'e', confirm: 'c', refute: 'r' }], runs: [{ id: 'x1', name: 'n', condition: 'c', hypothesis: 'H1', status: 'done', value: 1 }], results: '| a |', report: 'R', notebook: '/pages/n', next: ['x'], branch: 'b', worktree: '/w', hours: 1 },
-    'sweep-planner': { best: 'lr=1', best_value: 1, best_run: 'a', summary: 'S', next: ['x'], mattered: [{ setting: 'lr', effect: 0.5, best: '1', means: 'm' }], points, runs: [{ id: 'a', settings: 'lr=1', value: 1, status: 'done', best: true }], count: 1, stopped: 0, group: 'g', hours: 1 },
+    'research-sprint': { question: 'Q', status: 'Done', hypotheses: [{ id: 'H1', hypothesis: 'h', verdict: 'Supported', mark: 'supported', evidence: 'e', confirm: 'c', refute: 'r' }], runs: [{ id: 'x1', name: 'n', condition: 'c', hypothesis: 'H1', status: 'done', value: 1 }], results: '| a |', results_page: '/system/experiments?table=t1', report: 'R', notebook: '/pages/n', next: ['x'], branch: 'b', worktree: '/w', hours: 1 },
+    'sweep-planner': { best: 'lr=1', best_value: 1, best_run: 'a', summary: 'S', next: ['x'], mattered: [{ setting: 'lr', effect: 0.5, best: '1', means: 'm' }], points, runs: [{ id: 'a', settings: 'lr=1', value: 1, status: 'done', best: true }], count: 1, stopped: 0, group: 'g', page: '/system/experiments?sweep=s', hours: 1 },
     'weekly-report': { ...report, from: '2026-11-02', to: '2026-11-06', markdown: 'M', subject: 'S', email: 'E' },
     'lab-notebook': { title: 'T', date: '2026-11-05', day: 'Thursday 5 November 2026', summary: 'S', tried: [], found: [], decided: [], open: [], links: [], link: 'L', kept: true },
   };
@@ -648,10 +651,10 @@ const fakes: Feature = {
       let combos: Record<string, unknown>[] = [{}];
       for (const k of keys) combos = combos.flatMap((c) => (a.params[k] as unknown[]).map((v) => ({ ...c, [k]: v })));
       const runs = combos.slice(0, Number(a.maxRuns) || combos.length).map((p) => newRun({ name: keys.map((k) => `${k}=${p[k]}`).join(' '), command: a.command, cwd: a.cwd, group: a.group, params: p as Record<string, string | number>, metrics: { last: { val_loss: lossOf(p) } } }));
-      return { sweep: 'sw1', runs: runs.map((r) => r.id) };
+      return { sweep: 'sw1', group: a.group, runs: runs.map((r) => r.id), page: '/system/experiments?sweep=sw1' };
     }),
-    tool('experiment_wait', (a) => ({ runs: exp.runs.filter((r) => (a.ids ?? []).includes(r.id)) })),
-    tool('experiment_table', () => ({ id: 't1', markdown: '| Condition | mrr10 |\n|---|---|\n| baseline | 0.310 |\n| curriculum | 0.340* |', latex: '', csv: '' })),
+    tool('experiment_wait', (a) => ({ ended: true, runs: exp.runs.filter((r) => (a.ids ?? []).includes(r.id)) })),
+    tool('experiment_table', () => ({ id: 't1', markdown: '| Condition | mrr10 |\n|---|---|\n| baseline | 0.310 |\n| curriculum | 0.340* |', latex: '', csv: '', page: '/system/experiments?table=t1' })),
     tool('save_doc', (a) => `Saved "${a.title}" (page pg123, version 1). It shows in the conversation and in the Library (http://test.local/pages/pg123).`),
   ],
 };
@@ -773,7 +776,9 @@ test('Research sprint and Sweep planner, whole runs with Experiments’ tools as
     ['cur-s1', '/w/retriever-sprint', `sprint-${s.id.slice(-10)}`, [`sprint:${s.id.slice(-10)}`, 'H1'], 'curriculum'],
   ]);
   const table = exp.calls.find(([n]) => n === 'experiment_table')![1];
-  assert.deepEqual([table.rows, table.columns, table.baseline, table.test], ['param:condition', [{ metric: 'mrr10', better: 'max' }], 'baseline', 'welch']);
+  assert.deepEqual([table.rows, table.columns, table.baseline, table.test], ['param:condition', [{ metric: 'mrr10', better: 'max' }], 'baseline', undefined], 'the test left to Experiments (paired over shared seeds)');
+  assert.deepEqual(exp.calls.find(([n]) => n === 'experiment_run')![1].better, { mrr10: 'max' }, 'each run knows which way is better');
+  assert.equal(sr.results_page, '/system/experiments?table=t1');
   assert.deepEqual(sr.hypotheses.map((h: any) => [h.id, h.mark]), [['H1', 'supported'], ['H2', 'unclear']]);
   assert.deepEqual(sr.runs.map((r: any) => [r.condition, r.value]), [['baseline', 0.31], ['curriculum', 0.34]]);
   assert.equal(sr.status, 'Done: 2 of 2 runs finished');
@@ -793,6 +798,7 @@ test('Research sprint and Sweep planner, whole runs with Experiments’ tools as
   assert.equal(wr.best, 'lr=0.0003, batch_size=16', 'the lowest loss of the four');
   assert.deepEqual(wr.mattered.map((m: any) => m.setting), ['lr', 'batch_size']);
   assert.equal(wr.summary, 'The learning rate mattered most.');
+  assert.equal(wr.page, '/system/experiments?sweep=sw1', 'the sweep’s page in Experiments');
   assert.ok(wr.points.length >= 8, 'a point for each run and setting');
 });
 

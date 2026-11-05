@@ -760,6 +760,7 @@ const SPRINT_RUNS: Step[] = [
           gpus: '{{job.gpus}}',
           seed: '{{job.seed}}',
           params: { condition: '{{job.condition}}', hypothesis: '{{job.hypothesis}}' },
+          better: '{{fit.directions}}',
           notify: { failed: true },
         },
         failed: 'skip',
@@ -797,7 +798,8 @@ return { ids, count: ids.length, refused };`,
     do: 'tool',
     tool: 'experiment_table',
     if: '{{started.ids}} is not empty',
-    with: { runs: '{{started.ids}}', rows: 'param:condition', columns: [{ metric: '{{fit.metric}}', better: '{{fit.better}}' }], baseline: '{{fit.baseline}}', test: 'welch', correction: 'holm', caption: '{{question}}' },
+    // The test left to Experiments: paired over the seeds the conditions share, else over examples or Welch's.
+    with: { runs: '{{started.ids}}', rows: 'param:condition', columns: [{ metric: '{{fit.metric}}', better: '{{fit.better}}' }], baseline: '{{fit.baseline}}', correction: 'holm', caption: '{{question}}' },
     failed: 'skip',
   },
   {
@@ -872,7 +874,7 @@ const budget = Math.max(0.5, Math.min(1000, Number(input.budget) || 8));
 const count = Math.max(1, Math.min(5, Math.round(Number(input.count) || 3)));
 const id = String(input.run || 'sprint').replace(/[^\w-]/g, '').slice(-10);
 const repo = String(input.repo || '').trim().replace(/\/+$/, '');
-return { budget, count, group: 'sprint-' + id, tag: 'sprint:' + id, wait: Math.min(720, Math.ceil(budget * 3 + 12)), readme: repo + '/README.md', repo };`,
+return { budget, count, group: 'sprint-' + id, tag: 'sprint:' + id, wait: Math.min(168, Math.ceil(budget * 3 + 12)), readme: repo + '/README.md', repo };`,
         outputs: [
           { id: 'budget', label: 'GPU hours', type: 'number' },
           { id: 'count', label: 'Hypotheses', type: 'number' },
@@ -1050,6 +1052,8 @@ return {
   lines: lines + (dropped.length ? '\n\nLeft out to stay within the budget: ' + dropped.join(', ') : ''),
   metric: String(input.metric || '').trim(),
   better: /min|low|less|small/.test(said) ? 'min' : 'max',
+  // As Experiments keeps it with each run, for a metric whose name does not say which way is better.
+  directions: String(input.metric || '').trim() ? { [String(input.metric).trim()]: /min|low|less|small/.test(said) ? 'min' : 'max' } : {},
   baseline: base,
 };`,
         outputs: [
@@ -1060,6 +1064,7 @@ return {
           { id: 'lines', label: 'In a list', type: 'text' },
           { id: 'metric', label: 'The metric', type: 'text' },
           { id: 'better', label: 'Which way is better', type: 'text' },
+          { id: 'directions', label: 'Which way is better, by metric', type: 'text' },
           { id: 'baseline', label: 'The baseline', type: 'text' },
         ],
         failed: 'agent',
@@ -1096,6 +1101,7 @@ return {
           branch: '{{build.branch}}',
           worktree: '{{build.worktree}}',
           planned: '{{fit.hours}}',
+          jobs: '{{fit.runs}}',
         },
         code:
           LIST +
@@ -1128,8 +1134,11 @@ const runs = recs.map((r) => {
   const p = obj(r.params);
   return { id: String(r.id || ''), name: String(r.name || ''), condition: String(p.condition || ''), hypothesis: String(p.hypothesis || ''), status: String(r.status || ''), value: valueOf(r) };
 });
+// GPU hours they took: each run's time on the GPUs it asked for.
+const gpusOf = {};
+for (const j of rows(input.jobs)) gpusOf[String(j.name)] = Number(j.gpus);
 let hours = 0;
-for (const r of recs) if (r.startedAt) hours += ((Number(r.endedAt) || Date.now()) - Number(r.startedAt)) / 3600000 * Math.max(1, Number(r.gpus) || 1);
+for (const r of recs) if (r.startedAt) hours += ((Number(r.endedAt) || Date.now()) - Number(r.startedAt)) / 3600000 * Math.max(1, Number(r.gpus) || gpusOf[String(r.name)] || 1);
 const ended = runs.length > 0 && runs.every((r) => ['done', 'failed', 'stopped', 'lost'].includes(r.status));
 const started = list(input.ids).length;
 const status = no
@@ -1146,6 +1155,7 @@ return {
   hypotheses,
   runs,
   results: String(table.markdown || ''),
+  results_page: String(table.page || (table.id ? '/system/experiments?table=' + encodeURIComponent(table.id) : '')),
   report: String(input.report || ''),
   notebook: String(input.notebook || ''),
   next: list(input.next).map(String),
@@ -1159,6 +1169,7 @@ return {
           { id: 'hypotheses', label: 'Hypotheses', type: 'table', columns: VERDICT_COLS },
           { id: 'runs', label: 'Runs', type: 'table', columns: SPRINT_RUN_COLS },
           { id: 'results', label: 'Results table', type: 'markdown' },
+          { id: 'results_page', label: 'The table in Experiments', type: 'text' },
           { id: 'report', label: 'Report', type: 'markdown' },
           { id: 'notebook', label: 'Notebook', type: 'text' },
           { id: 'next', label: 'What to try next', type: 'list' },
@@ -1175,6 +1186,7 @@ return {
       hypotheses: '{{wrap.hypotheses}}',
       runs: '{{wrap.runs}}',
       results: '{{wrap.results}}',
+      results_page: '{{wrap.results_page}}',
       report: '{{wrap.report}}',
       notebook: '{{wrap.notebook}}',
       next: '{{wrap.next}}',
@@ -1189,6 +1201,7 @@ return {
     { id: 'hypotheses', label: 'Hypotheses', type: 'table', required: true, columns: VERDICT_COLS },
     { id: 'runs', label: 'Runs', type: 'table', columns: SPRINT_RUN_COLS },
     { id: 'results', label: 'Results table', type: 'markdown' },
+    { id: 'results_page', label: 'The table in Experiments', type: 'text' },
     { id: 'report', label: 'Report', type: 'markdown' },
     { id: 'notebook', label: 'Notebook', type: 'text' },
     { id: 'next', label: 'What to try next', type: 'list' },
@@ -1262,7 +1275,7 @@ function budgetOf(text, hoursEach) {
   const b = String(text || '').toLowerCase();
   const n = Number((/\d+(\.\d+)?/.exec(b) || ['20'])[0]) || 20;
   const hours = /hour|gpu|\d\s*h\b/.test(b) && !/run/.test(b);
-  return { hours, n, most: Math.max(1, Math.min(500, Math.floor(hours ? n / Math.max(0.01, hoursEach) : n))) };
+  return { hours, n, most: Math.max(1, Math.min(200, Math.floor(hours ? n / Math.max(0.01, hoursEach) : n))) };
 }
 `;
 
@@ -1397,7 +1410,7 @@ const names = Object.keys(params);
 if (!names.length) throw new Error('Every setting was left out: keep at least one');
 let command = String(input.command || '').trim();
 for (const k of names) if (!command.includes('{' + k + '}')) command += ' --' + k.replace(/_/g, '-') + ' {' + k + '}';
-const most = Math.max(1, Number(input.most) || 20);
+const most = Math.max(1, Math.min(200, Number(input.most) || 20));
 const grid = names.reduce((n, k) => n * params[k].length, 1);
 const mode = grid <= most ? 'grid' : 'random';
 const runs = mode === 'grid' ? grid : most;
@@ -1405,7 +1418,7 @@ const better = input.better === 'Higher' ? 'max' : 'min';
 const steps = Math.max(0, Math.round(Number(input.steps) || 0));
 const early = input.early === 'No' || input.early === false ? null : steps ? { metric: String(input.metric), better, afterSteps: steps } : { metric: String(input.metric), better };
 const hours = Math.round(runs * (Number(input.each) || 1) * 10) / 10;
-return { params, mode, runs, command, gpus: Math.max(1, Number(input.gpus) || 1), group: 'sweep-' + String(input.run || 'x').replace(/[^\w-]/g, '').slice(-10), early, better, hours, wait: Math.min(720, Math.ceil(hours * 2 + 12)) };`,
+return { params, mode, runs, command, gpus: Math.max(1, Number(input.gpus) || 1), group: 'sweep-' + String(input.run || 'x').replace(/[^\w-]/g, '').slice(-10), early, better, hours, wait: Math.min(168, Math.ceil(hours * 2 + 12)) };`,
         outputs: [
           { id: 'params', label: 'Settings and values', type: 'text' },
           { id: 'mode', label: 'Grid or random', type: 'text' },
@@ -1456,10 +1469,11 @@ return { params, mode, runs, command, gpus: Math.max(1, Number(input.gpus) || 1)
 const d = Object.keys(obj(input.early)).length ? obj(input.early) : obj(input.all);
 const ids = list(d.runs).map((r) => String(r && typeof r === 'object' ? r.id : r)).filter(Boolean);
 if (!ids.length) throw new Error('The sweep started no runs' + (d.why ? ': ' + d.why : ''));
-return { ids, sweep: String(d.sweep || ''), count: ids.length };`,
+return { ids, sweep: String(d.sweep || ''), page: String(d.page || (d.sweep ? '/system/experiments?sweep=' + encodeURIComponent(d.sweep) : '')), count: ids.length };`,
         outputs: [
           { id: 'ids', label: 'Runs', type: 'list' },
           { id: 'sweep', label: 'The sweep', type: 'text' },
+          { id: 'page', label: 'Its page in Experiments', type: 'text' },
           { id: 'count', label: 'How many', type: 'number' },
         ],
         failed: 'agent',
@@ -1566,6 +1580,7 @@ How much each setting mattered (the share of the metric's spread its values acco
       count: '{{analyse.count}}',
       stopped: '{{analyse.stopped}}',
       group: '{{final.group}}',
+      page: '{{started.page}}',
       hours: '{{final.hours}}',
     },
   },
@@ -1581,6 +1596,7 @@ How much each setting mattered (the share of the metric's spread its values acco
     { id: 'count', label: 'Runs', type: 'number' },
     { id: 'stopped', label: 'Stopped early', type: 'number' },
     { id: 'group', label: 'Its experiment', type: 'text' },
+    { id: 'page', label: 'Its page in Experiments', type: 'text' },
     { id: 'hours', label: 'GPU hours planned', type: 'number' },
   ],
   examples: [
