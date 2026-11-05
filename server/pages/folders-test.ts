@@ -211,12 +211,14 @@ ok(!listFolders(db).find((f) => f.id === tf.id)?.space, 'a deleted project’s f
   fs.writeFileSync(path.join(D, 'thesis.tex'), '\\documentclass{book}\n\\begin{document}\n\\include{chapters/one}\n\\include{chapters/two}\n\\end{document}\n');
   fs.writeFileSync(path.join(D, 'chapters', 'one.tex'), 'One.\n');
   fs.writeFileSync(path.join(D, 'chapters', 'two.tex'), 'Two.\n');
+  fs.writeFileSync(path.join(D, 'chapters', 'diagram.eps'), '%!PS-Adobe-3.0 EPSF-3.0\n');
   for (let i = 0; i < 60; i++) fs.writeFileSync(path.join(D, 'attic', `a${String(i).padStart(2, '0')}.tex`), `Old ${i}.\n`);
   const r = (await req('POST', '/api/pages/import-folder', { path: D, space: null, folder: results.id })).json();
   ok(!r.folder && r.pages?.length === 1 && r.pages[0].kind === 'tex' && r.pages[0].folder === results.id && r.pages[0].space === lab.id, 'a LaTeX project comes in as one document, into the folder asked (and its project)');
   const doc = readTex(pageSource(db, r.pages[0].id)!.text);
   ok(doc.files.length === 50 && doc.files[0].name === 'chapters/one.tex' && doc.files[1].name === 'chapters/two.tex', 'past a document’s limits, the files it uses come first and stay');
   ok(r.notes.some((n: string) => n.includes('attic/a') && n.includes('left out')), 'and what did not fit is said');
+  ok(r.notes.some((n: string) => n.includes('chapters/diagram.eps') && n.includes('left out')), 'so is a picture of a kind TeX here cannot take');
   ok((await req('POST', '/api/pages/import-folder', { path: path.join(tmp, 'nowhere') })).statusCode === 404, 'a folder that is not there is said to be');
 }
 
