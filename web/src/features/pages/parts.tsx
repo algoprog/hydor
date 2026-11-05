@@ -1,6 +1,7 @@
 // The Library's shared parts: a page's picture (or its first letter until the picture is ready), and the dialogs
 // to rename a page, publish one (or a folder), and make a new page, deck, document, spreadsheet or LaTeX document
-// (from a starting point, a file, or by asking an agent), in a space or in none; and a published site's row.
+// (from a starting point, a file, or by asking an agent), in a space or in none, or upload files of yours into the
+// Library (each made what it is: uploads.ts); and a published site's row.
 import { useEffect, useState, type ReactNode } from 'react';
 import { AppWindow, FileText, Globe, GlobeLock, NotebookText, Presentation, Sheet, Sigma, Sparkles, Upload } from 'lucide-react';
 import type { PageInfo, SiteInfo, SiteVisibility } from '@shared/pages';
@@ -20,6 +21,7 @@ import { useSpaces } from '../spaces/state';
 import { SiteLink, VISIBILITY } from './cards';
 import { usePagesStore } from './state';
 import { STARTERS } from './templates';
+import { pickFiles } from './uploads';
 import { SlideThumb } from './slides/Thumb';
 import { TexTemplatePicker } from './latex/TemplatePicker';
 
@@ -273,6 +275,10 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
       width={600}
       footer={
         <>
+          {/* Files of yours instead, as many as you pick, each made what it is, in the project picked below. */}
+          <Button variant="ghost" icon={<Upload size={14} />} onClick={() => pickFiles(where, onClose)} title="Add files of yours: documents, spreadsheets, slides, pictures, videos and sounds" className="mr-auto">
+            Upload files
+          </Button>
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>

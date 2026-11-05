@@ -2,18 +2,21 @@
 // The list (beside the shared knowledge, on the page's second tab): a card for each space with what it holds and
 // New session, the folders worth a space of their own, and Group spaces together. A space's own page is SpacePage.
 // A group brings spaces together: its sessions work with all of them. Picked by name on the start page in place of
-// a folder.
-import { useState, type ReactNode } from 'react';
+// a folder. Files dropped on a space's card go into its Library (pages/uploads.ts: each made what it is, any other file
+// in its folder); dropped elsewhere on the list, nothing happens.
+import { useState, type DragEvent, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
 import { Boxes, Folder, Layers, LibraryBig, MessagesSquare, Plus, SquarePen, X } from 'lucide-react';
 import type { SpaceView } from '@shared/spaces';
 import { isGroup, spaceColor } from '@shared/spaces';
-import { Button, Throbber } from '../../components/ui';
+import { Button, cx, Throbber } from '../../components/ui';
 import { basename, tildify, timeAgo } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { useApp } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { PageHeader } from '../layout/PageHeader';
+import { addToLibrary, dragsFiles, droppedFiles, dropMoves } from '../pages/uploads';
+import { DropHint } from '../pages/UploadTray';
 import { memberNames, NewSpaceDialog, SpaceMark, SpacesTabs, startInSpace, useSpaceSuggestions } from './parts';
 import { SpacePage, type SpaceTab } from './SpacePage';
 import { useSpaces } from './state';
@@ -74,19 +77,48 @@ function holds(s: SpaceView): string {
   return parts.join(' · ');
 }
 
-/** A space's card: a band of its colour with its mark, its name and what it is about, what it holds, and New session. */
+/**
+ * A space's card: a band of its colour with its mark, its name and what it is about, what it holds, and New session.
+ * Files dropped on it go into its Library, and it says so while they are over it.
+ */
 function SpaceCard({ s, spaces }: { s: SpaceView; spaces: SpaceView[] }) {
   const home = useApp((x) => x.boot?.home);
   const c = spaceColor(s);
   const group = isGroup(s);
+  const [over, setOver] = useState(false);
+  const onDragOver = (e: DragEvent) => {
+    if (!dragsFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = dropMoves() ? 'move' : 'copy';
+    if (!over) setOver(true);
+  };
+  const onDrop = (e: DragEvent) => {
+    if (!dragsFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setOver(false);
+    void droppedFiles(e.dataTransfer).then((files) => addToLibrary(files, s.id));
+  };
   return (
     <div
       role="link"
       tabIndex={0}
       onClick={() => go(`/projects/${s.id}`)}
       onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && go(`/projects/${s.id}`)}
-      className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-line bg-panel text-left transition-colors outline-none hover:border-line-2 focus-visible:ring-2 focus-visible:ring-accent/40"
+      onDragOver={onDragOver}
+      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setOver(false)}
+      onDrop={onDrop}
+      className={cx(
+        'group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border bg-panel text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+        over ? 'border-accent ring-2 ring-accent/40' : 'border-line hover:border-line-2',
+      )}
     >
+      {over && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-accent/10 p-3">
+          <DropHint name={s.name} className="px-3.5 py-1.5 text-[13px]" />
+        </div>
+      )}
       <div className="relative h-14 w-full" style={{ background: wash(c) }}>
         {group && (
           <span className="absolute top-2.5 right-3 inline-flex items-center gap-1 rounded-full bg-panel/70 px-2 py-0.5 text-[11.5px] font-medium text-fg-2">
@@ -161,8 +193,14 @@ function List() {
     setFrom(undefined);
     setMade('space');
   };
+  // A file dropped beside the cards does nothing, rather than the browser opening it in the app's place.
+  const refuse = (e: DragEvent) => {
+    if (!dragsFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    if (e.type === 'dragover') e.dataTransfer.dropEffect = 'none';
+  };
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col" onDragOver={refuse} onDrop={refuse}>
       <PageHeader
         title="Projects"
         tip="spaces"
