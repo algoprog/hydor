@@ -17,7 +17,7 @@ import path from 'node:path';
 import { editorKindOf, type FileOpened, type FileSaved } from '../../shared/documents.ts';
 import { docSources } from '../../shared/docs.ts';
 import { cleanEngine, cleanTexName, extOf, normalizeTex, TEX_FILE_EXT, TEX_LIMITS, TEX_MAIN, uncommented, type TexDoc } from '../../shared/latex.ts';
-import { cellsFromRows, computeBook, detectSep, formatValue, normalizeBook, parseRef, type Cell, type Workbook } from '../../shared/sheets.ts';
+import { cellsFromRows, computeBook, detectSep, formatValue, normalizeBook, parseRef, refName, type Cell, type Workbook } from '../../shared/sheets.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { deletePath, resolvePath, trashCopy, writeFile } from '../files.ts';
@@ -221,6 +221,19 @@ export function delimitedFile(book: Workbook, original: Buffer | null, ext: stri
   const sheet = book.sheets[0];
   const now = byRow(sheet.cells);
   const calc = computeBook(book);
+  // What array formulas spilled goes in as the values it is, in the cells it fills (with their formula's look).
+  for (const { r, c, sp } of calc.spillsOf(0))
+    for (let i = 0; i < sp.h; i++)
+      for (let j = 0; j < sp.w; j++) {
+        const got = sp.d[i * sp.w + j];
+        if ((!i && !j) || got === null || holds(now.get(r + i)?.get(c + j))) continue;
+        // An error spilled (#N/A) is written as its code.
+        const v = typeof got === 'object' ? got.code : got;
+        let row = now.get(r + i);
+        if (!row) now.set(r + i, (row = new Map()));
+        const s = sheet.cells[refName(r, c)]?.s;
+        row.set(c + j, s ? { v, s } : { v });
+      }
   const keys = was.map((_, r) => rowKey(before.get(r)));
   const like = new Map<string, number[]>();
   keys.forEach((k, r) => k !== '[]' && (like.get(k) ?? like.set(k, []).get(k)!).push(r));

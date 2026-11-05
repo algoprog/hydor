@@ -16,6 +16,7 @@ import { accountingParts, adjustForDelete, adjustForInsert, bookText, cleanBorde
 import { allowed, CondFormats, filterHidden, hiddenRows, listOptions, Merges, Rules } from '../../shared/sheet-rules.ts';
 import { chartData, chartSvg } from '../../shared/sheet-chart.ts';
 import { bookForAgent, bookPage, csvOfBook, importBook, xlsxOfBook } from './sheets.ts';
+import { delimitedFile } from './filemodel.ts';
 import { Zip } from '../documents/zip.ts';
 import { pages } from './index.ts';
 
@@ -283,6 +284,9 @@ const sh = book.sheets[0];
   const csv = csvOfBook(b);
   ok(csv.split('\r\n')[0].includes('10,15') && csv.includes('Cy,Red,9'), 'a CSV has what spilled');
   ok(bookPage(b, 'A', 'viewer').includes('>35<'), 'and so does the workbook’s page');
+  const file = Buffer.from('Name,Score\nAnn,3\nBo,5\n');
+  const fromFile = normalizeBook({ sheets: [{ name: 'S', rows: [['Name', 'Score'], ['Ann', 3], ['Bo', 5]], cells: { D1: '=SEQUENCE(3)', E1: '=FILTER(A2:A3,B2:B3>4,"none")' } }] });
+  ok(delimitedFile(fromFile, file, 'csv').data.toString() === 'Name,Score,,1,Bo\nAnn,3,,2,\nBo,5,,3,\n', 'a CSV saved back from Files writes what spilled, in the cells it fills');
 }
 
 // ---- the workbook's own page --------------------------------------------------------------------------------------
