@@ -1,0 +1,151 @@
+// The characters the editors' picker offers (Insert → Special characters, an icon for a callout or a page): emoji in
+// their usual groups and the symbols people look for and can't type (arrows, maths, currencies, Greek letters,
+// punctuation, accented letters, shapes and signs, fractions and small numbers), each with the English words it is
+// found by. Each group is one string: entries split by "|", the character first and its words after a space.
+
+export interface CharGroup {
+  id: string;
+  label: string;
+  kind: 'emoji' | 'symbols';
+  /** A character that stands for the group on its tab. */
+  icon: string;
+  data: string;
+}
+
+export const CHAR_GROUPS: CharGroup[] = [
+  {
+    id: 'smileys',
+    label: 'Smileys',
+    kind: 'emoji',
+    icon: '😀',
+    data: '😀 grinning smile happy|😃 smiley happy|😄 smile laugh|😁 grin teeth|😆 laughing|😅 sweat smile relief|🤣 rolling floor laughing|😂 tears of joy laugh|🙂 slight smile|🙃 upside down|😉 wink|😊 blush smile|😇 halo angel innocent|🥰 hearts love|😍 heart eyes love|🤩 star struck|😘 kiss|😋 yum tasty|😛 tongue|😜 wink tongue|🤪 zany crazy|🤑 money|🤗 hug|🤭 hand over mouth|🤫 shush quiet|🤔 thinking|🤐 zipper mouth|🤨 raised eyebrow|😐 neutral|😑 expressionless|😶 no mouth|😏 smirk|😒 unamused|🙄 eye roll|😬 grimace|😌 relieved|😔 pensive|😪 sleepy|🤤 drool|😴 sleeping|😷 mask sick|🤒 thermometer ill|🤕 bandage hurt|🤢 nauseated|🤮 vomit|🥵 hot|🥶 cold freezing|🥴 woozy|😵 dizzy|🤯 mind blown exploding|🤠 cowboy|🥳 party celebrate|😎 cool sunglasses|🤓 nerd|🧐 monocle|😕 confused|😟 worried|🙁 frown|😮 open mouth surprised|😯 hushed|😲 astonished|😳 flushed|🥺 pleading|😦 frowning|😧 anguished|😨 fearful|😰 anxious sweat|😥 sad relieved|😢 crying tear|😭 sob loudly crying|😱 scream fear|😖 confounded|😣 persevere|😞 disappointed|😓 downcast sweat|😩 weary|😫 tired|🥱 yawn|😤 triumph steam|😡 pout angry|😠 angry|🤬 swearing cursing|😈 devil smiling|👿 imp|💀 skull dead|💩 poo|🤡 clown|👻 ghost|👽 alien|🤖 robot|😺 cat smile|❤️ red heart love|🧡 orange heart|💛 yellow heart|💚 green heart|💙 blue heart|💜 purple heart|🖤 black heart|🤍 white heart|💔 broken heart|💕 two hearts|💯 hundred points|💢 anger|💥 collision boom|💫 dizzy star|💦 sweat drops|💤 sleep zzz|💬 speech bubble|💭 thought bubble',
+  },
+  {
+    id: 'people',
+    label: 'People',
+    kind: 'emoji',
+    icon: '👋',
+    data: '👋 wave hello|🤚 raised back of hand|✋ raised hand stop|🖖 vulcan|👌 ok hand|🤌 pinched fingers|✌️ victory peace|🤞 crossed fingers luck|🤟 love you|🤘 rock horns|🤙 call me|👈 point left|👉 point right|👆 point up|👇 point down|☝️ index up|👍 thumbs up yes like|👎 thumbs down no|✊ raised fist|👊 punch fist bump|👏 clap applause|🙌 raising hands celebrate|👐 open hands|🤲 palms up|🤝 handshake deal|🙏 pray thanks please|✍️ writing|💅 nail polish|💪 muscle strong|🧠 brain think|👀 eyes look|👁️ eye|👂 ear listen|👃 nose|👄 mouth|👶 baby|🧒 child|👦 boy|👧 girl|🧑 person|👨 man|👩 woman|🧓 older person|👴 old man|👵 old woman|👮 police|🕵️ detective|💂 guard|👷 construction worker|🤴 prince|👸 princess|🧑‍💻 technologist coder|🧑‍🔬 scientist|🧑‍🎓 student graduate|🧑‍🏫 teacher|🧑‍⚕️ health worker doctor|🧑‍🍳 cook chef|🧑‍🚀 astronaut|🧑‍🎨 artist|🧑‍🌾 farmer|🧑‍🔧 mechanic|🧑‍💼 office worker|🦸 superhero|🧙 mage wizard|🧚 fairy|🧛 vampire|🧜 merperson|🧝 elf|🙋 raising hand|🙅 no gesture|🙆 ok gesture|🤷 shrug|🤦 facepalm|🙇 bow|🚶 walking|🏃 running|💃 dancing|🕺 man dancing|👯 dancers|🧘 yoga meditate|🛀 bath|👪 family|👫 couple|🗣️ speaking head|👤 silhouette|👥 people group',
+  },
+  {
+    id: 'nature',
+    label: 'Animals and nature',
+    kind: 'emoji',
+    icon: '🌿',
+    data: '🐶 dog puppy|🐱 cat kitten|🐭 mouse|🐹 hamster|🐰 rabbit bunny|🦊 fox|🐻 bear|🐼 panda|🐨 koala|🐯 tiger|🦁 lion|🐮 cow|🐷 pig|🐸 frog|🐵 monkey|🐔 chicken|🐧 penguin|🐦 bird|🐤 chick|🦆 duck|🦅 eagle|🦉 owl|🦇 bat|🐺 wolf|🐗 boar|🐴 horse|🦄 unicorn|🐝 bee honeybee|🐛 bug caterpillar|🦋 butterfly|🐌 snail|🐞 ladybug|🐜 ant|🕷️ spider|🐢 turtle|🐍 snake|🦎 lizard|🦖 dinosaur t-rex|🐙 octopus|🦑 squid|🦀 crab|🐠 tropical fish|🐟 fish|🐬 dolphin|🐳 whale|🦈 shark|🐊 crocodile|🐘 elephant|🦒 giraffe|🦓 zebra|🐪 camel|🦘 kangaroo|🐎 racehorse|🐑 sheep|🐐 goat|🦌 deer|🐕 dog|🐈 cat|🐓 rooster|🦚 peacock|🦜 parrot|🕊️ dove peace|🐇 rabbit|🐿️ chipmunk squirrel|🦔 hedgehog|🐾 paw prints|🌵 cactus|🎄 christmas tree|🌲 evergreen tree|🌳 tree|🌴 palm tree|🌱 seedling sprout|🌿 herb leaf|☘️ shamrock|🍀 four leaf clover luck|🍁 maple leaf autumn|🍂 fallen leaves|🍃 leaves wind|🍄 mushroom|🌾 rice sheaf|💐 bouquet flowers|🌷 tulip|🌹 rose|🥀 wilted flower|🌺 hibiscus|🌸 cherry blossom|🌼 blossom|🌻 sunflower|🌞 sun face|🌝 full moon face|🌛 moon|🌙 crescent moon|🌎 earth americas globe|🌍 earth europe africa|🌏 earth asia|🪐 planet saturn|💫 dizzy|⭐ star|🌟 glowing star|✨ sparkles|⚡ lightning bolt|☄️ comet|💥 boom|🔥 fire hot|🌪️ tornado|🌈 rainbow|☀️ sun sunny|🌤️ sun behind cloud|⛅ partly cloudy|☁️ cloud|🌧️ rain|⛈️ thunderstorm|🌩️ lightning|🌨️ snow cloud|❄️ snowflake|☃️ snowman|🌬️ wind face|💨 dash wind|💧 droplet water|🌊 wave ocean sea|🌫️ fog',
+  },
+  {
+    id: 'food',
+    label: 'Food and drink',
+    kind: 'emoji',
+    icon: '🍎',
+    data: '🍏 green apple|🍎 red apple|🍐 pear|🍊 orange tangerine|🍋 lemon|🍌 banana|🍉 watermelon|🍇 grapes|🍓 strawberry|🫐 blueberries|🍈 melon|🍒 cherries|🍑 peach|🥭 mango|🍍 pineapple|🥥 coconut|🥝 kiwi|🍅 tomato|🍆 aubergine eggplant|🥑 avocado|🥦 broccoli|🥬 leafy greens|🥒 cucumber|🌶️ hot pepper chili|🌽 corn|🥕 carrot|🧄 garlic|🧅 onion|🥔 potato|🍠 sweet potato|🥐 croissant|🥯 bagel|🍞 bread|🥖 baguette|🥨 pretzel|🧀 cheese|🥚 egg|🍳 cooking fried egg|🧈 butter|🥞 pancakes|🧇 waffle|🥓 bacon|🥩 steak meat|🍗 poultry leg chicken|🍖 meat on bone|🌭 hot dog|🍔 hamburger burger|🍟 fries|🍕 pizza|🥪 sandwich|🌮 taco|🌯 burrito|🥗 salad|🥘 paella pan|🍝 spaghetti pasta|🍜 ramen noodles|🍲 stew pot|🍛 curry rice|🍣 sushi|🍱 bento box|🥟 dumpling|🍤 fried shrimp|🍙 rice ball|🍚 cooked rice|🍥 fish cake|🥮 moon cake|🍢 oden|🍡 dango|🍧 shaved ice|🍨 ice cream|🍦 soft ice cream|🥧 pie|🧁 cupcake|🍰 cake shortcake|🎂 birthday cake|🍮 custard pudding|🍭 lollipop|🍬 candy sweet|🍫 chocolate|🍿 popcorn|🍩 doughnut|🍪 cookie|🌰 chestnut|🥜 peanuts|🍯 honey|🥛 milk|☕ coffee hot drink|🍵 tea|🧃 juice box|🥤 cup straw soda|🧋 bubble tea|🍶 sake|🍺 beer|🍻 cheers beers|🥂 clinking glasses champagne|🍷 wine|🥃 whisky tumbler|🍸 cocktail|🍹 tropical drink|🍾 champagne bottle|🧊 ice|🥄 spoon|🍴 fork knife|🍽️ plate cutlery|🥢 chopsticks|🧂 salt',
+  },
+  {
+    id: 'activities',
+    label: 'Activities',
+    kind: 'emoji',
+    icon: '⚽',
+    data: '⚽ football soccer|🏀 basketball|🏈 american football|⚾ baseball|🥎 softball|🎾 tennis|🏐 volleyball|🏉 rugby|🥏 frisbee|🎱 pool 8 ball|🏓 ping pong table tennis|🏸 badminton|🏒 ice hockey|🏑 field hockey|🏏 cricket|🥅 goal net|⛳ golf flag|🏹 bow arrow archery|🎣 fishing|🤿 diving mask|🥊 boxing glove|🥋 martial arts|🎽 running shirt|🛹 skateboard|🛼 roller skate|🛷 sled|⛸️ ice skate|🥌 curling|🎿 skis|⛷️ skier|🏂 snowboard|🏋️ weight lifting gym|🤸 cartwheel|⛹️ ball player|🤺 fencing|🤾 handball|🏌️ golfer|🏇 horse racing|🧗 climbing|🚴 cycling bike|🏊 swimming|🏄 surfing|🚣 rowing|🏆 trophy winner|🥇 gold medal first|🥈 silver medal second|🥉 bronze medal third|🏅 sports medal|🎖️ military medal|🎗️ reminder ribbon|🎫 ticket|🎟️ admission tickets|🎪 circus tent|🎭 performing arts theatre|🎨 art palette paint|🎬 clapper film movie|🎤 microphone sing|🎧 headphones music|🎼 musical score|🎹 piano keyboard|🥁 drum|🎷 saxophone|🎺 trumpet|🎸 guitar|🪕 banjo|🎻 violin|🎲 dice game|♟️ chess pawn|🎯 direct hit target dart|🎳 bowling|🎮 video game controller|🕹️ joystick|🧩 puzzle piece|🎰 slot machine|🎉 party popper celebrate tada|🎊 confetti ball|🎈 balloon|🎁 gift present|🎀 ribbon bow|🎃 jack o lantern halloween|🎆 fireworks|🎇 sparkler|🧨 firecracker|🎐 wind chime|🎏 carp streamer|🎎 dolls|🎑 moon viewing|🧧 red envelope',
+  },
+  {
+    id: 'travel',
+    label: 'Travel and places',
+    kind: 'emoji',
+    icon: '✈️',
+    data: '🚗 car|🚕 taxi|🚙 suv|🚌 bus|🚎 trolleybus|🏎️ racing car|🚓 police car|🚑 ambulance|🚒 fire engine|🚐 minibus van|🛻 pickup truck|🚚 delivery truck|🚛 lorry|🚜 tractor|🛵 scooter|🏍️ motorcycle|🚲 bicycle bike|🛴 kick scooter|🚨 siren light|🚔 oncoming police|🚍 oncoming bus|🚘 oncoming car|🚖 oncoming taxi|🚡 aerial tramway|🚠 cable car|🚟 suspension railway|🚃 railway car|🚋 tram car|🚞 mountain railway|🚝 monorail|🚄 high speed train|🚅 bullet train|🚈 light rail|🚂 locomotive steam train|🚆 train|🚇 metro subway|🚊 tram|🚉 station|✈️ airplane plane flight|🛫 departure|🛬 arrival|🛩️ small airplane|💺 seat|🛰️ satellite|🚀 rocket launch|🛸 flying saucer ufo|🚁 helicopter|🛶 canoe|⛵ sailboat|🚤 speedboat|🛥️ motor boat|🛳️ passenger ship|⛴️ ferry|🚢 ship|⚓ anchor|🚧 construction|⛽ fuel pump petrol gas|🚏 bus stop|🚦 traffic light|🗺️ world map|🗿 moai|🗽 statue of liberty|🗼 tokyo tower|🏰 castle|🏯 japanese castle|🏟️ stadium|🎡 ferris wheel|🎢 roller coaster|🎠 carousel|⛲ fountain|⛱️ beach umbrella|🏖️ beach|🏝️ island|🏜️ desert|🌋 volcano|⛰️ mountain|🏔️ snow mountain|🗻 mount fuji|🏕️ camping|⛺ tent|🏠 house home|🏡 house garden|🏘️ houses|🏚️ derelict house|🏗️ building construction|🏭 factory|🏢 office building|🏬 department store|🏣 post office|🏤 european post office|🏥 hospital|🏦 bank|🏨 hotel|🏪 convenience store|🏫 school|🏩 love hotel|💒 wedding|🏛️ classical building museum|⛪ church|🕌 mosque|🛕 hindu temple|🕍 synagogue|🕋 kaaba|⛩️ shrine|🌁 foggy|🌃 night stars|🏙️ cityscape city|🌄 sunrise mountains|🌅 sunrise|🌆 city dusk|🌇 sunset|🌉 bridge night|🌌 milky way galaxy|🎑 moon ceremony|🗾 map of japan|🧭 compass|⏱️ stopwatch|⏰ alarm clock|⌛ hourglass',
+  },
+  {
+    id: 'objects',
+    label: 'Objects',
+    kind: 'emoji',
+    icon: '💡',
+    data: '⌚ watch|📱 mobile phone|📲 phone arrow|💻 laptop computer|⌨️ keyboard|🖥️ desktop computer|🖨️ printer|🖱️ mouse computer|💽 minidisc|💾 floppy disk save|💿 cd disc|📀 dvd|📷 camera photo|📸 camera flash|📹 video camera|🎥 movie camera|📽️ film projector|📞 telephone receiver|☎️ telephone|📟 pager|📠 fax|📺 television tv|📻 radio|🎙️ studio microphone podcast|⏲️ timer|🕰️ mantelpiece clock|📡 satellite antenna|🔋 battery|🔌 plug electric|💡 light bulb idea|🔦 flashlight torch|🕯️ candle|🧯 fire extinguisher|💸 money wings|💵 dollar banknote|💶 euro banknote|💷 pound banknote|💴 yen banknote|💰 money bag|💳 credit card|💎 gem diamond|⚖️ balance scale law|🔧 wrench tool|🔨 hammer|⚒️ hammer pick|🛠️ tools|⛏️ pick|🔩 nut bolt|⚙️ gear settings|🧱 brick|⛓️ chains|🧲 magnet|🔫 water pistol|💣 bomb|🔪 kitchen knife|🗡️ dagger|⚔️ crossed swords|🛡️ shield|🔮 crystal ball|🧿 nazar amulet|💈 barber pole|⚗️ alembic chemistry|🔭 telescope astronomy|🔬 microscope science|🕳️ hole|💊 pill medicine|💉 syringe vaccine|🩸 blood drop|🧬 dna|🦠 microbe virus|🧫 petri dish|🧪 test tube|🌡️ thermometer|🧹 broom|🧺 basket|🧻 roll of paper|🚽 toilet|🚿 shower|🛁 bathtub|🧼 soap|🧽 sponge|🔑 key|🗝️ old key|🚪 door|🛋️ couch sofa|🛏️ bed|🧸 teddy bear|🖼️ framed picture|🛍️ shopping bags|🛒 shopping cart|🎁 wrapped gift|✉️ envelope email|📧 e-mail|📨 incoming envelope|📩 envelope arrow|📤 outbox|📥 inbox|📦 package box|🏷️ label tag|📪 mailbox closed|📬 mailbox open|📮 postbox|📜 scroll|📃 page curl|📄 page document|📑 bookmark tabs|📊 bar chart|📈 chart increasing up|📉 chart decreasing down|🗒️ spiral notepad|🗓️ spiral calendar|📆 tear-off calendar|📅 calendar date|🗑️ wastebasket trash|📇 card index|🗃️ card file box|🗳️ ballot box|🗄️ file cabinet|📋 clipboard|📁 file folder|📂 open folder|🗂️ card index dividers|🗞️ rolled newspaper|📰 newspaper news|📓 notebook|📔 notebook decorative|📒 ledger|📕 closed book red|📗 green book|📘 blue book|📙 orange book|📚 books library|📖 open book read|🔖 bookmark|🔗 link|📎 paperclip|🖇️ linked paperclips|📐 triangular ruler|📏 straight ruler|🧮 abacus|📌 pushpin pin|📍 round pushpin location|✂️ scissors|🖊️ pen|🖋️ fountain pen|✒️ black nib|🖌️ paintbrush|🖍️ crayon|📝 memo note|✏️ pencil|🔍 magnifying glass search|🔎 magnifying glass right|🔏 locked pen|🔐 locked key|🔒 locked|🔓 unlocked|🔔 bell notification|🔕 bell slash mute|📢 loudspeaker|📣 megaphone|🎵 musical note|🎶 musical notes|⏳ hourglass flowing|🧳 luggage|☂️ umbrella|👓 glasses|🕶️ sunglasses|👔 necktie|👕 t-shirt|👖 jeans|🧣 scarf|🧤 gloves|🧥 coat|👗 dress|👟 running shoe|👠 high heel|👑 crown|🎩 top hat|🎓 graduation cap|🧢 billed cap|⛑️ rescue helmet|💄 lipstick|💍 ring|👜 handbag|🎒 backpack school',
+  },
+  {
+    id: 'emoji-symbols',
+    label: 'Symbols',
+    kind: 'emoji',
+    icon: '✅',
+    data: '✅ check mark button done|☑️ check box|✔️ check mark|❌ cross mark no|❎ cross mark button|➕ plus|➖ minus|➗ divide|✖️ multiply|♾️ infinity|❓ question|❔ white question|❕ white exclamation|❗ exclamation|‼️ double exclamation|⁉️ exclamation question|⚠️ warning|🚫 prohibited no entry|⛔ no entry|📛 name badge|🔰 beginner|⭕ hollow red circle|🔴 red circle|🟠 orange circle|🟡 yellow circle|🟢 green circle|🔵 blue circle|🟣 purple circle|🟤 brown circle|⚫ black circle|⚪ white circle|🟥 red square|🟧 orange square|🟨 yellow square|🟩 green square|🟦 blue square|🟪 purple square|🟫 brown square|⬛ black square|⬜ white square|🔶 large orange diamond|🔷 large blue diamond|🔸 small orange diamond|🔹 small blue diamond|🔺 red triangle up|🔻 red triangle down|💠 diamond dot|🔘 radio button|🔳 white square button|🔲 black square button|🏁 chequered flag finish|🚩 triangular flag|🎌 crossed flags|🏴 black flag|🏳️ white flag|🏳️‍🌈 rainbow flag|♻️ recycling|✳️ eight spoked asterisk|❇️ sparkle|〽️ part alternation|©️ copyright|®️ registered|™️ trade mark|🔟 keycap ten|🔢 numbers 1234|🔤 abc letters|🆗 ok button|🆕 new button|🆓 free button|🆒 cool button|🆙 up button|🆘 sos|ℹ️ information|Ⓜ️ circled m|🅿️ parking|⬆️ up arrow|↗️ up right arrow|➡️ right arrow|↘️ down right arrow|⬇️ down arrow|↙️ down left arrow|⬅️ left arrow|↖️ up left arrow|↕️ up down arrow|↔️ left right arrow|↩️ return left|↪️ return right|⤴️ curving up|⤵️ curving down|🔃 clockwise arrows|🔄 anticlockwise arrows refresh|🔙 back arrow|🔚 end arrow|🔛 on arrow|🔜 soon arrow|🔝 top arrow|▶️ play|⏸️ pause|⏹️ stop|⏺️ record|⏭️ next track|⏮️ previous track|⏩ fast forward|⏪ rewind|🔀 shuffle|🔁 repeat|🔂 repeat single|🔼 up button|🔽 down button|♈ aries|♉ taurus|♊ gemini|♋ cancer|♌ leo|♍ virgo|♎ libra|♏ scorpio|♐ sagittarius|♑ capricorn|♒ aquarius|♓ pisces|⛎ ophiuchus|🔅 dim|🔆 bright|📶 signal bars|📳 vibration|📴 phone off|♀️ female|♂️ male|⚧️ transgender|⚕️ medical|⚜️ fleur-de-lis|🔱 trident|💲 dollar sign|💱 currency exchange|☮️ peace symbol|☯️ yin yang|✝️ cross|☪️ star crescent|🕉️ om|☸️ wheel of dharma|✡️ star of david|🔯 six pointed star|♠️ spade suit|♣️ club suit|♥️ heart suit|♦️ diamond suit|🃏 joker|🀄 mahjong|🎴 flower playing cards|🔇 muted speaker|🔈 speaker low|🔉 speaker medium|🔊 speaker loud|🕐 one oclock|🕒 three oclock|🕕 six oclock|🕘 nine oclock|🕛 twelve oclock',
+  },
+  {
+    id: 'arrows',
+    label: 'Arrows',
+    kind: 'symbols',
+    icon: '→',
+    data: '→ right arrow|← left arrow|↑ up arrow|↓ down arrow|↔ left right arrow|↕ up down arrow|↗ north east arrow|↘ south east arrow|↙ south west arrow|↖ north west arrow|⇒ double right arrow implies|⇐ double left arrow|⇑ double up arrow|⇓ double down arrow|⇔ double left right arrow if and only if iff|⇕ double up down arrow|⟶ long right arrow|⟵ long left arrow|⟷ long left right arrow|⟹ long double right arrow|⟸ long double left arrow|⟺ long double left right arrow|↦ maps to|↪ hook right arrow|↩ hook left arrow return|↺ anticlockwise open circle arrow|↻ clockwise open circle arrow|⇄ right over left arrows|⇆ left over right arrows|⇌ right left harpoons equilibrium|⇋ left right harpoons|⇀ right harpoon|↼ left harpoon|➜ heavy round tipped arrow|➔ heavy wide arrow|➤ arrowhead|➞ heavy triangle arrow|⤴ arrow curving up|⤵ arrow curving down|⇢ dashed right arrow|⇠ dashed left arrow|⇥ right arrow to bar tab|⇤ left arrow to bar|↵ down arrow corner left enter|⏎ return symbol|⬆ upwards black arrow|⬇ downwards black arrow|⬅ leftwards black arrow|➡ rightwards black arrow|▲ black up triangle|▼ black down triangle|◀ black left triangle|▶ black right triangle|△ white up triangle|▽ white down triangle|◁ white left triangle|▷ white right triangle|‹ single left angle quote|› single right angle quote|« left guillemet|» right guillemet',
+  },
+  {
+    id: 'maths',
+    label: 'Maths',
+    kind: 'symbols',
+    icon: '±',
+    data: '± plus minus|∓ minus plus|× times multiply|÷ divide division|· middle dot multiply|∙ bullet operator|− minus sign|⁄ fraction slash|≠ not equal|≈ approximately almost equal|≃ asymptotically equal|≅ congruent approximately equal|≡ identical to equivalent|≢ not identical|∼ tilde similar|∝ proportional to|≤ less than or equal|≥ greater than or equal|≪ much less than|≫ much greater than|≺ precedes|≻ succeeds|∞ infinity|√ square root|∛ cube root|∜ fourth root|∑ sum sigma|∏ product|∐ coproduct|∫ integral|∬ double integral|∭ triple integral|∮ contour integral|∂ partial derivative|∆ increment delta|∇ nabla del gradient|∈ element of in|∉ not element of|∋ contains as member|⊂ subset of|⊃ superset of|⊆ subset or equal|⊇ superset or equal|⊄ not subset|∪ union|∩ intersection|∅ empty set|∖ set minus|∀ for all|∃ there exists|∄ there does not exist|¬ not negation|∧ and logical|∨ or logical|⊕ circled plus xor|⊗ circled times tensor|⊥ perpendicular bottom|∥ parallel|∠ angle|∡ measured angle|° degree|′ prime minutes feet|″ double prime seconds inches|‰ per mille|‱ per ten thousand|℃ degree celsius|℉ degree fahrenheit|∘ ring operator compose|∗ asterisk operator|⋅ dot operator|… ellipsis|⋯ midline ellipsis|⋮ vertical ellipsis|∴ therefore|∵ because|ℕ natural numbers|ℤ integers|ℚ rational numbers|ℝ real numbers|ℂ complex numbers|ℏ h bar planck|ℓ script l|℘ weierstrass p|ℵ aleph|⌈ left ceiling|⌉ right ceiling|⌊ left floor|⌋ right floor|⟨ left angle bracket|⟩ right angle bracket|‖ double vertical line norm',
+  },
+  {
+    id: 'currency',
+    label: 'Currencies',
+    kind: 'symbols',
+    icon: '€',
+    data: '$ dollar|€ euro|£ pound sterling|¥ yen yuan|¢ cent|₹ indian rupee|₩ won korean|₽ ruble|₺ turkish lira|₪ shekel|₫ dong|฿ baht|₱ peso philippine|₦ naira|₴ hryvnia|₲ guarani|₡ colon|₵ cedi|₸ tenge|₮ tugrik|₭ kip|₼ manat|₾ lari|₿ bitcoin|¤ currency sign|₳ austral|₣ franc|₤ lira|₧ peseta|₨ rupee',
+  },
+  {
+    id: 'greek',
+    label: 'Greek letters',
+    kind: 'symbols',
+    icon: 'α',
+    data: 'α alpha|β beta|γ gamma|δ delta|ε epsilon|ζ zeta|η eta|θ theta|ι iota|κ kappa|λ lambda|μ mu micro|ν nu|ξ xi|ο omicron|π pi|ρ rho|σ sigma|ς final sigma|τ tau|υ upsilon|φ phi|χ chi|ψ psi|ω omega|ϑ theta symbol|ϕ phi symbol|ϵ lunate epsilon|ϖ pi symbol|ϱ rho symbol|Α capital alpha|Β capital beta|Γ capital gamma|Δ capital delta|Ε capital epsilon|Ζ capital zeta|Η capital eta|Θ capital theta|Ι capital iota|Κ capital kappa|Λ capital lambda|Μ capital mu|Ν capital nu|Ξ capital xi|Ο capital omicron|Π capital pi|Ρ capital rho|Σ capital sigma|Τ capital tau|Υ capital upsilon|Φ capital phi|Χ capital chi|Ψ capital psi|Ω capital omega ohm|ά alpha tonos|έ epsilon tonos|ή eta tonos|ί iota tonos|ό omicron tonos|ύ upsilon tonos|ώ omega tonos',
+  },
+  {
+    id: 'punctuation',
+    label: 'Punctuation',
+    kind: 'symbols',
+    icon: '—',
+    data: '— em dash|– en dash|‒ figure dash|― horizontal bar|‐ hyphen|‑ non-breaking hyphen|… ellipsis|• bullet|◦ white bullet|‣ triangular bullet|· middle dot|‘ left single quote|’ right single quote apostrophe|“ left double quote|” right double quote|‚ low single quote|„ low double quote|« left guillemet|» right guillemet|‹ single left guillemet|› single right guillemet|¡ inverted exclamation|¿ inverted question|§ section|¶ pilcrow paragraph|† dagger|‡ double dagger|※ reference mark|⁂ asterism|‖ double vertical line|¦ broken bar|© copyright|® registered|™ trade mark|℠ service mark|℗ sound recording copyright|№ numero number|℮ estimated|⁎ low asterisk|⁑ two asterisks|⸮ reversed question|‽ interrobang|⁇ double question|⁈ question exclamation|⁉ exclamation question|〃 ditto|「 left corner bracket|」 right corner bracket|『 left white corner bracket|』 right white corner bracket|【 left black lenticular bracket|】 right black lenticular bracket|、 ideographic comma|。 ideographic full stop',
+  },
+  {
+    id: 'letters',
+    label: 'Accented letters',
+    kind: 'symbols',
+    icon: 'é',
+    data: 'á a acute|à a grave|â a circumflex|ä a umlaut diaeresis|ã a tilde|å a ring|ā a macron|ą a ogonek|æ ae ligature|ç c cedilla|č c caron|ć c acute|ď d caron|ð eth|é e acute|è e grave|ê e circumflex|ë e umlaut diaeresis|ē e macron|ę e ogonek|ě e caron|ğ g breve|í i acute|ì i grave|î i circumflex|ï i umlaut diaeresis|ī i macron|ı dotless i|ł l stroke|ľ l caron|ñ n tilde|ń n acute|ň n caron|ó o acute|ò o grave|ô o circumflex|ö o umlaut diaeresis|õ o tilde|ø o stroke|ō o macron|ő o double acute|œ oe ligature|ř r caron|ś s acute|š s caron|ş s cedilla|ß sharp s eszett|ť t caron|þ thorn|ú u acute|ù u grave|û u circumflex|ü u umlaut diaeresis|ū u macron|ů u ring|ű u double acute|ý y acute|ÿ y umlaut diaeresis|ź z acute|ż z dot|ž z caron|Á capital a acute|À capital a grave|Â capital a circumflex|Ä capital a umlaut|Ã capital a tilde|Å capital a ring|Æ capital ae|Ç capital c cedilla|Č capital c caron|É capital e acute|È capital e grave|Ê capital e circumflex|Ë capital e umlaut|Í capital i acute|Î capital i circumflex|Ï capital i umlaut|İ capital i dot|Ł capital l stroke|Ñ capital n tilde|Ó capital o acute|Ô capital o circumflex|Ö capital o umlaut|Ø capital o stroke|Œ capital oe|Š capital s caron|Ş capital s cedilla|Ú capital u acute|Ü capital u umlaut|Ý capital y acute|Ž capital z caron',
+  },
+  {
+    id: 'shapes',
+    label: 'Shapes and signs',
+    kind: 'symbols',
+    icon: '★',
+    data: '★ black star|☆ white star|✦ black four pointed star|✧ white four pointed star|✶ six pointed star|✱ heavy asterisk|❖ diamond minus x|♠ spade|♣ club|♥ heart|♦ diamond|♤ white spade|♧ white club|♡ white heart|♢ white diamond|■ black square|□ white square|▪ small black square|▫ small white square|▬ black rectangle|▭ white rectangle|◆ black diamond|◇ white diamond|◈ diamond inside diamond|● black circle|○ white circle|◎ bullseye|◉ fisheye|◯ large circle|◐ circle left half black|◑ circle right half black|▲ black triangle|△ white triangle|✓ check mark tick|✔ heavy check mark|✗ ballot x|✘ heavy ballot x|☐ ballot box empty|☑ ballot box with check|☒ ballot box with x|♪ eighth note music|♫ beamed notes music|♩ quarter note|♬ beamed sixteenth notes|☀ sun|☁ cloud|☂ umbrella|☃ snowman|☎ telephone|✉ envelope|✂ scissors|✎ pencil|✏ pencil|✒ nib|⌘ command key place of interest|⌥ option key|⇧ shift key|⌃ control key|⌫ erase backspace|⌦ erase forward delete|⎋ escape|⏏ eject|⚠ warning|⚡ high voltage|☢ radioactive|☣ biohazard|♻ recycling|⚙ gear|⚓ anchor|⚖ scales|☯ yin yang|☮ peace|♀ female|♂ male|⚤ interlocked female male|☺ smiling face|☹ frowning face|☠ skull crossbones',
+  },
+  {
+    id: 'numbers',
+    label: 'Fractions and numbers',
+    kind: 'symbols',
+    icon: '½',
+    data: '½ one half|⅓ one third|⅔ two thirds|¼ one quarter|¾ three quarters|⅕ one fifth|⅖ two fifths|⅗ three fifths|⅘ four fifths|⅙ one sixth|⅚ five sixths|⅛ one eighth|⅜ three eighths|⅝ five eighths|⅞ seven eighths|⅐ one seventh|⅑ one ninth|⅒ one tenth|⁰ superscript zero|¹ superscript one|² superscript two squared|³ superscript three cubed|⁴ superscript four|⁵ superscript five|⁶ superscript six|⁷ superscript seven|⁸ superscript eight|⁹ superscript nine|⁺ superscript plus|⁻ superscript minus|⁼ superscript equals|⁽ superscript left parenthesis|⁾ superscript right parenthesis|ⁿ superscript n|ⁱ superscript i|₀ subscript zero|₁ subscript one|₂ subscript two|₃ subscript three|₄ subscript four|₅ subscript five|₆ subscript six|₇ subscript seven|₈ subscript eight|₉ subscript nine|₊ subscript plus|₋ subscript minus|₌ subscript equals|₍ subscript left parenthesis|₎ subscript right parenthesis|Ⅰ roman numeral one|Ⅱ roman numeral two|Ⅲ roman numeral three|Ⅳ roman numeral four|Ⅴ roman numeral five|Ⅵ roman numeral six|Ⅶ roman numeral seven|Ⅷ roman numeral eight|Ⅸ roman numeral nine|Ⅹ roman numeral ten|Ⅼ roman numeral fifty|Ⅽ roman numeral hundred|Ⅾ roman numeral five hundred|Ⅿ roman numeral thousand|① circled one|② circled two|③ circled three|④ circled four|⑤ circled five|⑥ circled six|⑦ circled seven|⑧ circled eight|⑨ circled nine|⑩ circled ten',
+  },
+];
+
+export interface CharEntry {
+  ch: string;
+  words: string;
+  group: string;
+}
+
+let parsed: CharEntry[] | null = null;
+
+/** Every character with its words and group, read once. */
+export function allChars(): CharEntry[] {
+  if (parsed) return parsed;
+  const out: CharEntry[] = [];
+  for (const g of CHAR_GROUPS) {
+    for (const item of g.data.split('|')) {
+      const sp = item.indexOf(' ');
+      const ch = sp < 0 ? item : item.slice(0, sp);
+      if (ch) out.push({ ch, words: sp < 0 ? '' : item.slice(sp + 1), group: g.id });
+    }
+  }
+  parsed = out;
+  return out;
+}
