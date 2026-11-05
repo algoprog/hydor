@@ -402,7 +402,7 @@ async function takePiece(body: Readable, file: string, offset: number, limit: nu
         if (got > limit + 8 * MB) break;
         continue;
       }
-      if (!out.write(chunk)) await new Promise((r) => out.once('drain', r));
+      if (!out.write(chunk)) await new Promise<void>((r) => out.once('drain', () => r()));
     }
   } finally {
     await new Promise<void>((r, j) => out.end((e?: Error | null) => (e ? j(e) : r())));
