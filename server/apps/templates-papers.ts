@@ -1411,7 +1411,7 @@ What the paper has, to tell what it already says: its sections are {{paper_read.
 Reviewer {{rv.name}}:
 {{rv.text}}`,
             outputs: [
-              { id: 'points', label: 'Points', type: 'table', required: true, columns: [{ id: 'point', label: 'Point', type: 'text' }, { id: 'quote', label: 'Their words', type: 'text' }, { id: 'kind', label: 'Kind', type: 'text' }, { id: 'severity', label: 'Severity', type: 'text' }] },
+              { id: 'points', label: 'Points raised', type: 'table', required: true, columns: [{ id: 'point', label: 'Point', type: 'text' }, { id: 'quote', label: 'Their words', type: 'text' }, { id: 'kind', label: 'Kind', type: 'text' }, { id: 'severity', label: 'Severity', type: 'text' }] },
             ],
           },
         ],
@@ -1435,7 +1435,7 @@ return { items, text, count: items.length };`,
         outputs: [
           {
             id: 'items',
-            label: 'Points',
+            label: 'Points raised',
             type: 'table',
             columns: [
               { id: 'id', label: 'Id', type: 'text' },
@@ -1622,7 +1622,7 @@ const by = (k) => points.filter((p) => p.kind === k).length;
 const summary = points.length + ' points from ' + per.length + ' reviewer' + (per.length === 1 ? '' : 's') + ': ' + [[by('Misread'), 'misread'], [by('Needs an experiment'), 'need an experiment'], [by('Needs words'), 'need words'], [by('Minor'), 'minor']].filter((x) => x[0]).map((x) => x[0] + ' ' + x[1]).join(', ') + '.';
 return { points: points.map(({ ids, experiment, change, ...p }) => p), experiments, changes, rebuttal, reviewers, summary, total, over: input.per === 'all' && n > 0 && total > n };`,
         outputs: [
-          { id: 'points', label: 'Points', type: 'table', columns: POINT_COLS },
+          { id: 'points', label: 'Points raised', type: 'table', columns: POINT_COLS },
           { id: 'experiments', label: 'Experiments to run', type: 'table', columns: TODO_COLS },
           { id: 'changes', label: 'Changes to make', type: 'table', columns: TODO_COLS },
           { id: 'rebuttal', label: 'The whole rebuttal', type: 'markdown' },
@@ -1630,7 +1630,7 @@ return { points: points.map(({ ids, experiment, change, ...p }) => p), experimen
             id: 'reviewers',
             label: 'Each reviewer’s reply',
             type: 'table',
-            columns: [{ id: 'reviewer', label: 'Reviewer', type: 'text' }, { id: 'points', label: 'Points', type: 'number' }, { id: 'length', label: 'Length', type: 'number' }, { id: 'limit', label: 'Limit', type: 'number' }, { id: 'over', label: 'Over the limit', type: 'yesno' }],
+            columns: [{ id: 'reviewer', label: 'Reviewer', type: 'text' }, { id: 'points', label: 'Points raised', type: 'number' }, { id: 'length', label: 'Length', type: 'number' }, { id: 'limit', label: 'Length limit', type: 'number' }, { id: 'over', label: 'Over the limit', type: 'yesno' }],
           },
           { id: 'summary', label: 'In short', type: 'text' },
           { id: 'total', label: 'Length in all', type: 'number' },
@@ -1661,7 +1661,7 @@ return { points: points.map(({ ids, experiment, change, ...p }) => p), experimen
       id: 'reviewers',
       label: 'Each reviewer’s reply',
       type: 'table',
-      columns: [{ id: 'reviewer', label: 'Reviewer', type: 'text' }, { id: 'points', label: 'Points', type: 'number' }, { id: 'length', label: 'Length', type: 'number' }, { id: 'limit', label: 'Limit', type: 'number' }, { id: 'over', label: 'Over the limit', type: 'yesno' }],
+      columns: [{ id: 'reviewer', label: 'Reviewer', type: 'text' }, { id: 'points', label: 'Points raised', type: 'number' }, { id: 'length', label: 'Length', type: 'number' }, { id: 'limit', label: 'Length limit', type: 'number' }, { id: 'over', label: 'Over the limit', type: 'yesno' }],
     },
     { id: 'total', label: 'Length in all', type: 'number' },
     { id: 'limit', label: 'The limit', type: 'text' },
@@ -1693,7 +1693,7 @@ const TALK_COLS: AnswerField['columns'] = [
   { id: 'n', label: 'Slide', type: 'number' },
   { id: 'title', label: 'Title', type: 'text' },
   { id: 'minutes', label: 'Minutes', type: 'number' },
-  { id: 'points', label: 'Points', type: 'text' },
+  { id: 'points', label: 'Points raised', type: 'text' },
   { id: 'figure', label: 'Figure', type: 'text' },
   { id: 'equation', label: 'Equation', type: 'text' },
   { id: 'notes', label: 'What to say', type: 'text' },
@@ -1786,7 +1786,7 @@ ${paperParts('paper_read')}`,
             columns: [
               { id: 'title', label: 'Title', type: 'text' },
               { id: 'minutes', label: 'Minutes', type: 'number' },
-              { id: 'points', label: 'Points', type: 'text' },
+              { id: 'points', label: 'Points raised', type: 'text' },
               { id: 'figure', label: 'Figure', type: 'text' },
               { id: 'equation', label: 'Equation', type: 'text' },
               { id: 'notes', label: 'What to say', type: 'text' },

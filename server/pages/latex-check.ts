@@ -77,7 +77,6 @@ let records: Records = { listRuns, recomputeTable };
 export function useRecords(r: Partial<Records>) {
   records = { ...records, ...r };
 }
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const clip = (s: string, n = 80) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 export interface CheckInput {
@@ -242,7 +241,7 @@ function checkReferences(c: Ctx): Bibs {
         id: `refs:uncited:${name}`,
         group: 'refs',
         level: 'info',
-        title: `${plural(never.length, 'entry', 'entries')} in ${name} ${never.length === 1 ? 'is' : 'are'} never cited`,
+        title: never.length === 1 ? `One entry in ${name} is never cited` : `${never.length} entries in ${name} are never cited`,
         detail: `They do not show in the references: ${never
           .slice(0, 25)
           .map((e) => e.key)
@@ -297,7 +296,7 @@ function checkReferences(c: Ctx): Bibs {
       group: 'refs',
       level: 'check',
       title: `“${e.key}” has no ${missing.join(', ')}`,
-      detail: `A @${e.type} entry needs ${missing.length === 1 ? 'it' : 'them'}: its reference shows without ${missing.length === 1 ? 'it' : 'them'}.`,
+      detail: missing.length === 1 ? `An entry of type ${'@' + e.type} needs it: its reference shows without it.` : `An entry of type ${'@' + e.type} needs them: its reference shows without them.`,
       ...place(doc, e.file, e.from, e.from + e.type.length + e.key.length + 2),
       ask: `The bibliography entry “${e.key}” (${e.file}, line ${e.line}) has no ${missing.join(', ')}: look the paper up and fill ${missing.length === 1 ? 'it' : 'them'} in.`,
     });
@@ -381,7 +380,7 @@ async function checkReferencesOnline(c: Ctx, bibs: Bibs, lookup: Lookup, progres
         id: `refs:published:${e.key}`,
         group: 'refs',
         level: 'check',
-        title: `“${e.key}” has been published since, in ${clip(pub.venue ?? 'a journal or proceedings', 90)}${pub.year ? ` (${pub.year})` : ''}`,
+        title: pub.venue ? `“${e.key}” has been published since, in ${clip(pub.venue, 90) + (pub.year ? ` (${pub.year})` : '')}` : pub.year ? `“${e.key}” has been published since, in ${pub.year}` : `“${e.key}” has been published since`,
         detail: 'It is cited as a preprint. Reviewers expect the published version where there is one.',
         ...head,
         fix: f,
@@ -459,7 +458,7 @@ async function checkReferencesOnline(c: Ctx, bibs: Bibs, lookup: Lookup, progres
       }
     }),
   );
-  if (late) c.note(`${plural(late, 'reference was', 'references were')} not looked up online: the check took its three minutes.`);
+  if (late) c.note(late === 1 ? 'One reference was not looked up online: the check took its three minutes.' : `${late} references were not looked up online: the check took its three minutes.`);
 }
 
 // ---- anonymity -------------------------------------------------------------------------------------------------------
@@ -694,7 +693,7 @@ function checkParts(c: Ctx) {
       id: 'parts:checklist-todo',
       group: 'parts',
       level: 'must',
-      title: `${plural(todo.length, 'question')} of the checklist ${todo.length === 1 ? 'is' : 'are'} still TODO`,
+      title: todo.length === 1 ? 'One question of the checklist is still TODO' : `${todo.length} questions of the checklist are still TODO`,
       detail: 'Each needs an answer (\\answerYes, \\answerNo or \\answerNA) and a line of justification.',
       ...place(doc, todo[0].s.name, todo[0].at, todo[0].at + 11),
       ask: 'Answer the checklist questions still marked \\answerTODO, each with a short justification, from what the paper says.',
@@ -916,7 +915,7 @@ function checkFormatText(c: Ctx) {
         id: `format:vspace:${s.name}`,
         group: 'format',
         level: 'check',
-        title: `${plural(neg.length, 'negative \\vspace', 'negative \\vspaces')} in ${s.name}`,
+        title: neg.length === 1 ? `A negative \\vspace in ${s.name}` : `${neg.length} negative \\vspaces in ${s.name}`,
         detail: `They pull text into the template's spaces (lines ${neg
           .slice(0, 6)
           .map((m) => lineOf(s.text, m.index!))
@@ -1006,7 +1005,7 @@ async function checkFormatPdf(c: Ctx, r: TexResult, set: (s: Partial<CheckState>
     }
     if (venue.totalMax && p.total > venue.totalMax) add({ id: 'format:total', group: 'format', level: 'must', title: `It has ${p.total} pages in all; ${venue.short} allows ${venue.totalMax}`, detail: venue.note, ...bibPlace(c) });
     const qq = (text.match(/\?\?/g) ?? []).length;
-    if (qq && !undefinedRefs.size) add({ id: 'format:qq', group: 'format', level: 'check', title: `“??” shows ${plural(qq, 'time')} in the PDF`, detail: 'An unresolved reference shows so: typeset again, or look for the \\ref.', ...topPlace(doc) });
+    if (qq && !undefinedRefs.size) add({ id: 'format:qq', group: 'format', level: 'check', title: qq === 1 ? '“??” shows once in the PDF' : `“??” shows ${qq} times in the PDF`, detail: 'An unresolved reference shows so: typeset again, or look for the \\ref.', ...topPlace(doc) });
   }
   if (fonts !== null) {
     const list = fontsOf(fonts);
@@ -1017,7 +1016,7 @@ async function checkFormatPdf(c: Ctx, r: TexResult, set: (s: Partial<CheckState>
         id: 'format:type3',
         group: 'format',
         level: venue.id === 'other' ? 'check' : 'must',
-        title: `${plural(t3.length, 'Type 3 font')} in the PDF`,
+        title: t3.length === 1 ? 'A Type 3 font in the PDF' : `${t3.length} Type 3 fonts in the PDF`,
         detail: `${t3.slice(0, 5).join(', ')}${t3.length > 5 ? '…' : ''}. Bitmap fonts look poor and are refused by IEEE’s and ACM’s checks. They come from figures saved as PDF by matplotlib (set pdf.fonttype to 42) or from \\usepackage[T1]{fontenc} without vector fonts (add \\usepackage{lmodern}).`,
         ...topPlace(doc),
         ask: 'The PDF has Type 3 (bitmap) fonts: find where they come from (figures saved by matplotlib without pdf.fonttype 42, or T1 fonts without lmodern or cm-super) and make every font Type 1 or TrueType.',
@@ -1027,7 +1026,7 @@ async function checkFormatPdf(c: Ctx, r: TexResult, set: (s: Partial<CheckState>
         id: 'format:embed',
         group: 'format',
         level: 'must',
-        title: `${plural(notEmb.length, 'font is', 'fonts are')} not embedded in the PDF`,
+        title: notEmb.length === 1 ? 'A font is not embedded in the PDF' : `${notEmb.length} fonts are not embedded in the PDF`,
         detail: `${notEmb.slice(0, 5).join(', ')}${notEmb.length > 5 ? '…' : ''}. Venues ask for every font embedded, so the paper prints the same everywhere; they usually come from a figure.`,
         ...topPlace(doc),
         ask: 'Some fonts are not embedded in the PDF: find the figures they come from and save those with their fonts embedded.',
@@ -1203,7 +1202,7 @@ async function checkMarked(c: Ctx, src: TexSource, t: Tabular) {
   });
   if (bRows.length > aRows.length) {
     count++;
-    changed.push(`its runs now give ${plural(bRows.length - aRows.length, 'more row')}`);
+    changed.push(bRows.length - aRows.length === 1 ? 'its runs now give one more row' : `its runs now give ${bRows.length - aRows.length} more rows`);
   }
   if (!count) return;
   const was = src.text.slice(t.from, t.to);
@@ -1212,7 +1211,7 @@ async function checkMarked(c: Ctx, src: TexSource, t: Tabular) {
     id: `numbers:stale:${t.marker}`,
     group: 'numbers',
     level: 'must',
-    title: `${plural(count, 'number', 'numbers')} in the table at line ${t.line} ${count === 1 ? 'is' : 'are'} not what its runs give now`,
+    title: count === 1 ? `A number in the table at line ${t.line} is not what its runs give now` : `${count} numbers in the table at line ${t.line} are not what its runs give now`,
     detail: `${changed.slice(0, 5).join('; ')}${changed.length > 5 ? '; …' : ''}. Experiments worked it out again from its runs (table ${t.marker}).`,
     ...place(c.doc, src.name, t.from, t.from + 20),
     fix: { label: 'Update the table', edits: [{ file: src.name, from: t.from, to: t.to, was, text: next }], shows: next },

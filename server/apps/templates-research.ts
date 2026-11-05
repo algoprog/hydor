@@ -381,7 +381,7 @@ const PAPER_FIELDS: Record<string, AnswerType> = {
 };
 
 const RADAR_PAPER_COLS: NonNullable<Draft['answer'][number]['columns']> = [
-  { id: 'key', label: 'Key', type: 'text' },
+  { id: 'key', label: 'Paper id', type: 'text' },
   { id: 'title', label: 'Title', type: 'text' },
   { id: 'authors', label: 'Authors', type: 'text' },
   { id: 'date', label: 'Date', type: 'date' },
@@ -635,7 +635,7 @@ return {
             label: 'New papers',
             type: 'table',
             columns: [
-              { id: 'key', label: 'Key', type: 'text' },
+              { id: 'key', label: 'Paper id', type: 'text' },
               { id: 'title', label: 'Title', type: 'text' },
               { id: 'authors', label: 'Authors', type: 'text' },
               { id: 'first', label: 'First author', type: 'text' },
@@ -649,7 +649,7 @@ return {
               { id: 'bibtex', label: 'BibTeX', type: 'text' },
             ],
           },
-          { id: 'ranking', label: 'To rank', type: 'table', columns: [{ id: 'id', label: 'Key', type: 'text' }, { id: 'text', label: 'Words', type: 'text' }] },
+          { id: 'ranking', label: 'To rank', type: 'table', columns: [{ id: 'id', label: 'Paper id', type: 'text' }, { id: 'text', label: 'Words', type: 'text' }] },
           { id: 'fetched', label: 'New papers found', type: 'number' },
           { id: 'seen', label: 'Looked at', type: 'list' },
           { id: 'topics', label: 'Topics', type: 'list' },
@@ -733,7 +733,7 @@ return { papers: papers, groups: groups, lines: lines2.join('\n\n'), count: pape
             type: 'table',
             columns: [
               { id: 'n', label: 'Number', type: 'number' },
-              { id: 'key', label: 'Key', type: 'text' },
+              { id: 'key', label: 'Paper id', type: 'text' },
               { id: 'title', label: 'Title', type: 'text' },
               { id: 'authors', label: 'Authors', type: 'text' },
               { id: 'date', label: 'Date', type: 'text' },
@@ -870,7 +870,7 @@ async function s2(path, title) {
 `;
 
 const CITE_COLS: NonNullable<Draft['answer'][number]['columns']> = [
-  { id: 'key', label: 'Key', type: 'text' },
+  { id: 'key', label: 'Paper id', type: 'text' },
   { id: 'mine', label: 'Your paper', type: 'text', description: 'Its key' },
   { id: 'title', label: 'Citing paper', type: 'text' },
   { id: 'authors', label: 'Its authors', type: 'text' },
@@ -886,7 +886,7 @@ const CITE_COLS: NonNullable<Draft['answer'][number]['columns']> = [
   { id: 'influential', label: 'Builds on it heavily', type: 'yesno' },
 ];
 const MY_PAPER_COLS: NonNullable<Draft['answer'][number]['columns']> = [
-  { id: 'key', label: 'Key', type: 'text' },
+  { id: 'key', label: 'Paper id', type: 'text' },
   { id: 'title', label: 'Your paper', type: 'text' },
   { id: 'year', label: 'Year', type: 'number' },
   { id: 'venue', label: 'Where', type: 'text' },
@@ -998,7 +998,7 @@ return { author: author, papers: chosen, all: papers.length, notes: notes.join('
             label: 'Your papers',
             type: 'table',
             columns: [
-              { id: 'key', label: 'Key', type: 'text' },
+              { id: 'key', label: 'Paper id', type: 'text' },
               { id: 'title', label: 'Title', type: 'text' },
               { id: 'year', label: 'Year', type: 'number' },
               { id: 'venue', label: 'Where', type: 'text' },
@@ -1097,7 +1097,7 @@ const linesOut = sortable.map((c, i) => (i + 1) + '. Citing: ' + c.title + (c.in
 sortable.forEach((c, i) => (c.n = i + 1));
 return { fresh: fresh, counts: counts, keep: keep, to_sort: linesOut.join('\n\n'), sorting: sortable.length, notes: notes.filter((x, i) => notes.indexOf(x) === i).join('. ') };`,
         outputs: [
-          { id: 'fresh', label: 'New citations', type: 'table', columns: [{ id: 'key', label: 'Key', type: 'text' }, { id: 'mine', label: 'Your paper', type: 'text' }, { id: 'title', label: 'Citing paper', type: 'text' }, { id: 'n', label: 'Number', type: 'number' }] },
+          { id: 'fresh', label: 'New citations', type: 'table', columns: [{ id: 'key', label: 'Paper id', type: 'text' }, { id: 'mine', label: 'Your paper', type: 'text' }, { id: 'title', label: 'Citing paper', type: 'text' }, { id: 'n', label: 'Number', type: 'number' }] },
           { id: 'counts', label: 'New for each paper', type: 'text' },
           { id: 'keep', label: 'Seen now', type: 'table', columns: [{ id: 'id', label: 'Your paper', type: 'text' }, { id: 'count', label: 'Citations seen', type: 'number' }] },
           { id: 'to_sort', label: 'The citing sentences', type: 'text' },
@@ -1244,7 +1244,7 @@ return {
 // ---- New-model watch ----------------------------------------------------------------------------------------------
 
 const MODEL_COLS: NonNullable<Draft['answer'][number]['columns']> = [
-  { id: 'id', label: 'Key', type: 'text' },
+  { id: 'id', label: 'Paper id', type: 'text' },
   { id: 'model', label: 'Model', type: 'text' },
   { id: 'maker', label: 'Made by', type: 'text' },
   { id: 'url', label: 'Its page', type: 'url' },
@@ -1754,7 +1754,7 @@ function inZone(at, zone) {
 `;
 
 const DEADLINE_COLS: NonNullable<Draft['answer'][number]['columns']> = [
-  { id: 'key', label: 'Key', type: 'text' },
+  { id: 'key', label: 'Paper id', type: 'text' },
   { id: 'venue', label: 'Venue', type: 'text' },
   { id: 'year', label: 'Year', type: 'number' },
   { id: 'kind', label: 'Kind', type: 'text', description: 'abstract, paper, supplementary, rebuttal, notification, camera-ready or other' },
@@ -1939,7 +1939,7 @@ deadlines.sort((a, b) => a.at - b.at);
 return { deadlines: deadlines, venues: venues, missing: missing, need: need, zone: zone, now: now, notes: notes.join('. ') };`,
         outputs: [
           { id: 'deadlines', label: 'Deadlines', type: 'table', columns: [{ id: 'venue', label: 'Venue', type: 'text' }, { id: 'label', label: 'What is due', type: 'text' }, { id: 'day', label: 'Your day', type: 'text' }, { id: 'time', label: 'Your time', type: 'text' }] },
-          { id: 'venues', label: 'Venues', type: 'table', columns: VENUE_COLS },
+          { id: 'venues', label: 'Conferences', type: 'table', columns: VENUE_COLS },
           { id: 'missing', label: 'Not in the lists', type: 'list' },
           { id: 'need', label: 'Calls to read', type: 'table', columns: [{ id: 'id', label: 'Conference', type: 'text' }, { id: 'venue', label: 'Venue', type: 'text' }, { id: 'link', label: 'Its site', type: 'text' }, { id: 'query', label: 'Search for its call', type: 'text' }] },
           { id: 'zone', label: 'Your time zone', type: 'text' },
@@ -2067,7 +2067,7 @@ return {
           { id: 'today', label: 'Checked', type: 'date' },
           { id: 'headline', label: 'Next', type: 'text' },
           { id: 'deadlines', label: 'Deadlines', type: 'table', columns: DEADLINE_COLS },
-          { id: 'venues', label: 'Venues', type: 'table', columns: VENUE_COLS },
+          { id: 'venues', label: 'Conferences', type: 'table', columns: VENUE_COLS },
           { id: 'missing', label: 'Not in the lists', type: 'list' },
           { id: 'reminded', label: 'Reminders sent', type: 'list' },
           { id: 'ahead', label: 'Deadlines ahead', type: 'number' },
@@ -2093,7 +2093,7 @@ return {
     { id: 'zone', label: 'Your time zone', type: 'text' },
     { id: 'today', label: 'Checked', type: 'date' },
     { id: 'deadlines', label: 'Deadlines', type: 'table', columns: DEADLINE_COLS },
-    { id: 'venues', label: 'Venues', type: 'table', columns: VENUE_COLS },
+    { id: 'venues', label: 'Conferences', type: 'table', columns: VENUE_COLS },
     { id: 'missing', label: 'Not in the lists', type: 'list' },
     { id: 'reminded', label: 'Reminders sent', type: 'list' },
     { id: 'ahead', label: 'Deadlines ahead', type: 'number' },
@@ -2282,7 +2282,7 @@ const n = Math.min(Number(input.room) || 0, input.first === true || input.first 
 const papers = order.slice(0, n).map((p, i) => Object.assign({ n: i + 1 }, p));
 return { papers: papers, count: papers.length, lines: papers.map((p) => p.n + '. ' + p.title + ' (' + [p.authors, p.venue, p.year].filter(Boolean).join(', ') + ')' + (p.seed ? ' [cites “' + p.seed + '”]' : '') + '\n' + String(p.abstract || '').slice(0, 800)).join('\n\n') };`,
             outputs: [
-              { id: 'papers', label: 'Papers', type: 'table', columns: [{ id: 'n', label: 'Number', type: 'number' }, { id: 'key', label: 'Key', type: 'text' }, { id: 'title', label: 'Title', type: 'text' }] },
+              { id: 'papers', label: 'Papers', type: 'table', columns: [{ id: 'n', label: 'Number', type: 'number' }, { id: 'key', label: 'Paper id', type: 'text' }, { id: 'title', label: 'Title', type: 'text' }] },
               { id: 'count', label: 'How many', type: 'number' },
               { id: 'lines', label: 'In a few lines each', type: 'text' },
             ],
@@ -2331,7 +2331,7 @@ for (const p of kept) if (themes.indexOf(p.theme) < 0) themes.push(p.theme);
 return { topic: input.topic, papers: kept, themes: themes, count: kept.length };`,
             outputs: [
               { id: 'topic', label: 'Topic', type: 'text' },
-              { id: 'papers', label: 'Papers kept', type: 'table', columns: [{ id: 'key', label: 'Key', type: 'text' }, { id: 'title', label: 'Title', type: 'text' }, { id: 'theme', label: 'Theme', type: 'text' }] },
+              { id: 'papers', label: 'Papers kept', type: 'table', columns: [{ id: 'key', label: 'Paper id', type: 'text' }, { id: 'title', label: 'Title', type: 'text' }, { id: 'theme', label: 'Theme', type: 'text' }] },
               { id: 'themes', label: 'Themes', type: 'list' },
               { id: 'count', label: 'How many', type: 'number' },
             ],
@@ -2592,8 +2592,8 @@ const found = await arxiv(q + ' AND ' + range, 150, 'This month’s papers on ' 
 const papers = found.map((p) => ({ key: paperKey(p), title: p.title, date: p.date, url: p.url, abstract: clip(p.abstract, 1200) }));
 return { papers: papers, ranking: papers.map((p) => ({ id: p.key, text: p.title + '\n' + p.abstract })), count: papers.length };`,
               outputs: [
-                { id: 'papers', label: 'This month’s papers', type: 'table', columns: [{ id: 'key', label: 'Key', type: 'text' }, { id: 'title', label: 'Title', type: 'text' }, { id: 'date', label: 'Date', type: 'text' }, { id: 'url', label: 'Link', type: 'text' }] },
-                { id: 'ranking', label: 'To rank', type: 'table', columns: [{ id: 'id', label: 'Key', type: 'text' }, { id: 'text', label: 'Words', type: 'text' }] },
+                { id: 'papers', label: 'This month’s papers', type: 'table', columns: [{ id: 'key', label: 'Paper id', type: 'text' }, { id: 'title', label: 'Title', type: 'text' }, { id: 'date', label: 'Date', type: 'text' }, { id: 'url', label: 'Link', type: 'text' }] },
+                { id: 'ranking', label: 'To rank', type: 'table', columns: [{ id: 'id', label: 'Paper id', type: 'text' }, { id: 'text', label: 'Words', type: 'text' }] },
                 { id: 'count', label: 'How many', type: 'number' },
               ],
               failed: 'agent',

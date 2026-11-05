@@ -794,7 +794,7 @@ const REBUTTAL: AppUi = {
   pages: [
     {
       id: 'points',
-      title: 'Points',
+      title: 'Points raised',
       blocks: [
         { element: 'rb-hero' },
         { element: 'rb-kinds' },
@@ -910,7 +910,7 @@ small { display: block; margin-top: 3px; color: var(--n-muted); font-size: 12.5p
     },
     'rb-lengths': {
       description: 'Each reviewer’s reply against the limit',
-      html: String.raw`<div class="wrap"><table class="lens"><thead><tr><th>Reply to</th><th class="num">Points</th><th class="num">Length</th><th class="num">Limit</th></tr></thead><tbody>{{#result.reviewers}}<tr class="{{#over}}over{{/over}}"><td>{{reviewer}}</td><td class="num">{{points}}</td><td class="num">{{length|number}}</td><td class="num">{{limit|number|or:—}}{{#over}} · over{{/over}}</td></tr>{{/result.reviewers}}</tbody></table></div>
+      html: String.raw`<div class="wrap"><table class="lens"><thead><tr><th>Reply to</th><th class="num">Points raised</th><th class="num">Length</th><th class="num">Length limit</th></tr></thead><tbody>{{#result.reviewers}}<tr class="{{#over}}over{{/over}}"><td>{{reviewer}}</td><td class="num">{{points}}</td><td class="num">{{length|number}}</td><td class="num">{{limit|number|or:—}}{{#over}} · over{{/over}}</td></tr>{{/result.reviewers}}</tbody></table></div>
 <p class="total">{{result.total|number}} {{result.unit}} in all · the limit: {{result.limit}}</p>`,
       css: String.raw`
 .wrap { overflow-x: auto; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); }
