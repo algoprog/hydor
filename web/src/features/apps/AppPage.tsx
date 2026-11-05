@@ -394,11 +394,13 @@ function UpdateButton({ id, own, home }: { id: string; own: OwnPage; home?: Home
   );
 }
 
-/** Its settings: Update every day (and when), then its form's answers, which each update takes. */
-function HomeSettingsPanel({ id, recipe, template, home, onSaved }: { id: string; recipe: AppDef | AppTemplate; template: boolean; home: HomeSettings; onSaved: (h: HomeSettings) => void }) {
+/** Its settings: Update every day (and when), then its form's answers, which each update takes, and the keys it uses (those it can do without too). */
+function HomeSettingsPanel({ id, recipe, template, home, onSaved, keys, onKeys }: { id: string; recipe: AppDef | AppTemplate; template: boolean; home: HomeSettings; onSaved: (h: HomeSettings) => void; keys?: KeyState[]; onKeys?: (keys: KeyState[]) => void }) {
   const [values, setValues] = useState<FormValues>(() => ({ ...initialValues(recipe.fields), ...home.inputs }));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [keyInput, setKeyInput] = useState<KeyInput>(emptyKeys);
+  const typed = Object.values(keyInput.values).some((v) => v.trim()) || keyInput.allow.length > 0;
   const changed = recipe.fields.some((f) => String(values[f.id] ?? '') !== String(home.inputs[f.id] ?? ''));
   const save = async (body: Record<string, unknown>) => {
     setSaving(true);
@@ -440,17 +442,32 @@ function HomeSettingsPanel({ id, recipe, template, home, onSaved }: { id: string
             onChange={(k, v) => (setValues((x) => ({ ...x, [k]: v })), errors[k] && setErrors((e) => ({ ...e, [k]: '' })))}
             onFile={() => {}}
           />
+          {keys && keys.length > 0 && <AppKeys keys={keys} input={keyInput} onChange={setKeyInput} disabled={saving} own={!template} className="mt-3 border-t border-line pt-3" />}
           <div className="mt-3 flex items-center justify-end gap-2">
             <span className="flex-1 text-[12px] leading-snug text-fg-3">Each update uses these.</span>
             <Button
               size="sm"
               variant="primary"
-              disabled={!changed || saving}
+              disabled={(!changed && !typed) || saving}
               onClick={async () => {
                 const errs = formErrors(fields, values, {});
                 setErrors(errs);
                 if (Object.keys(errs).length) return;
-                if (await save({ inputs: Object.fromEntries(fields.map((f) => [f.id, String(values[f.id] ?? '')])) })) toast('Saved', 'ok');
+                if (changed && !(await save({ inputs: Object.fromEntries(fields.map((f) => [f.id, String(values[f.id] ?? '')])) }))) return;
+                // The keys typed go to the vault, as on its form.
+                if (typed) {
+                  setSaving(true);
+                  try {
+                    const r = await post<{ secrets: KeyState[] }>(`/api/apps/${enc(id)}/secrets`, { values: keyInput.values, allow: keyInput.allow });
+                    setKeyInput(emptyKeys());
+                    onKeys?.(r.secrets);
+                  } catch (e) {
+                    return void toastError(e);
+                  } finally {
+                    setSaving(false);
+                  }
+                }
+                toast('Saved', 'ok');
               }}
             >
               Save
@@ -463,7 +480,7 @@ function HomeSettingsPanel({ id, recipe, template, home, onSaved }: { id: string
 }
 
 /** The settings button at the top of an app's own page, and their panel. */
-function HomeSettingsButton(props: { id: string; recipe: AppDef | AppTemplate; template: boolean; home: HomeSettings; onSaved: (h: HomeSettings) => void }) {
+function HomeSettingsButton(props: { id: string; recipe: AppDef | AppTemplate; template: boolean; home: HomeSettings; onSaved: (h: HomeSettings) => void; keys?: KeyState[]; onKeys?: (keys: KeyState[]) => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   return (
@@ -713,7 +730,7 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
             installed && (
               <>
                 {ownPage && <UpdateButton id={id} own={own} home={home} />}
-                {ownPage && home && <HomeSettingsButton id={id} recipe={recipe} template home={home} onSaved={setHome} />}
+                {ownPage && home && <HomeSettingsButton id={id} recipe={recipe} template home={home} onSaved={setHome} keys={d?.secrets} onKeys={(secrets) => setD((x) => (x ? { ...x, secrets } : x))} />}
                 {/* On its own page, Make it mine waits in the menu: Update and Settings are what it is for. */}
                 {!ownPage && (
                   <Button size="sm" icon={<Pencil size={14} />} onClick={() => go(`/apps/new?template=${enc(id.slice(4))}`)}>
@@ -739,7 +756,7 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
           ) : (
             <>
               {ownPage && <UpdateButton id={id} own={own} home={home} />}
-              {ownPage && home && <HomeSettingsButton id={id} recipe={recipe} template={false} home={home} onSaved={setHome} />}
+              {ownPage && home && <HomeSettingsButton id={id} recipe={recipe} template={false} home={home} onSaved={setHome} keys={d?.secrets} onKeys={(secrets) => setD((x) => (x ? { ...x, secrets } : x))} />}
               <Button size="sm" icon={<Pencil size={14} />} onClick={() => go(`${appPath(id)}/edit`)}>
                 Edit
               </Button>
