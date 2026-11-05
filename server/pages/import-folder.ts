@@ -5,6 +5,7 @@
 // each as Open a file brings one in, and its folders as folders in it (a LaTeX project among them as one document). A
 // folder that brings nothing in makes no folder. What is left out is said, file by file.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { FolderImport, FolderSkip } from '../../shared/pages.ts';
 import { uncommented } from '../../shared/latex.ts';
@@ -61,6 +62,7 @@ export async function importFolder(db: DB, dirIn: string, o: { space: string | n
   const dir = resolvePath(dirIn);
   const st = fs.statSync(dir, { throwIfNoEntry: false });
   if (!st?.isDirectory()) throw new HttpError(404, `There is no folder ${dir}`);
+  if (dir === os.homedir() || dir === path.parse(dir).root) throw new HttpError(400, 'Pick a folder of its own, not the whole home folder or the computer’s root');
   const top = placeFor(db, o.folder, o.space);
   const out: FolderImport = { pages: [], folders: 0, skipped: [], notes: [] };
   let listed = 0;
