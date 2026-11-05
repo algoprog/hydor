@@ -488,7 +488,7 @@ function Places({ place, onPlace, items, sites, chips, dropAt }: { place: Place;
 const PER_SECTION = 8;
 
 /** A space's things in Everything: its name and mark, how many, and See all. */
-function SpaceSection({ space, items, onAll }: { space: SpaceView | null; items: Item[]; onAll: () => void }) {
+function SpaceSection({ space, items, onAll, showFolder }: { space: SpaceView | null; items: Item[]; onAll: () => void; showFolder?: boolean }) {
   const more = items.length > PER_SECTION;
   return (
     <section>
@@ -506,7 +506,7 @@ function SpaceSection({ space, items, onAll }: { space: SpaceView | null; items:
           </Button>
         )}
       </div>
-      <Grid items={items.slice(0, PER_SECTION)} />
+      <Grid items={items.slice(0, PER_SECTION)} showFolder={showFolder} />
     </section>
   );
 }
@@ -756,7 +756,7 @@ export function Library() {
       return (
         <div className="space-y-9">
           {sections.map((s) => (
-            <SpaceSection key={s.space?.id ?? 'none'} space={s.space} items={s.items} onAll={() => toPlace(s.space ? { kind: 'space', id: s.space.id } : { kind: 'none' })} />
+            <SpaceSection key={s.space?.id ?? 'none'} space={s.space} items={s.items} showFolder={!!folders?.length} onAll={() => toPlace(s.space ? { kind: 'space', id: s.space.id } : { kind: 'none' })} />
           ))}
         </div>
       );

@@ -138,7 +138,9 @@ export function FileTree({
     requestAnimationFrame(() => root.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }));
   }, [current]);
 
-  const movable = (name: string) => !readOnly && (name.endsWith('/') || byName.get(name)?.where !== 'folder');
+  // What the document holds can move; a file TeX reads from the folder stays (and a folder of nothing else).
+  const movable = (name: string) =>
+    !readOnly && (name.endsWith('/') ? folders.includes(name) || entries.some((e) => e.name.startsWith(name) && e.where !== 'folder') : !!byName.get(name) && byName.get(name)!.where !== 'folder');
   const onDragStart = (e: DragEvent, name: string) => {
     if (!movable(name)) return e.preventDefault();
     e.dataTransfer.setData(DRAG, JSON.stringify([name]));
@@ -204,7 +206,7 @@ export function FileTree({
       on ? 'bg-accent-soft font-medium text-accent' : faint ? 'text-fg-3 hover:bg-bg-2 hover:text-fg-2' : 'text-fg-2 hover:bg-bg-2 hover:text-fg',
     );
   const more = (name: string) =>
-    !readOnly && (name.endsWith('/') || byName.get(name)?.where !== 'folder') ? (
+    movable(name) ? (
       <span
         role="button"
         tabIndex={-1}
@@ -241,7 +243,7 @@ export function FileTree({
               {...dropZone(n.name)}
               onClick={() => setClosed((c) => (open ? new Set([...c, key]) : new Set([...c].filter((x) => x !== key))))}
               onContextMenu={(e) => {
-                if (readOnly) return;
+                if (!movable(n.name)) return;
                 e.preventDefault();
                 setMenu({ name: n.name, el: e.currentTarget });
               }}

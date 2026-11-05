@@ -79,6 +79,7 @@ const usedOf = (u: ReturnType<typeof texUses>) => [...u.used.keys()];
     '\\end{verbatim}',
     '\\lstinputlisting[language=Python]{code/run.py}',
     '\\begin{tikzpicture}\\begin{axis}\\addplot table {data/results.dat};\\addplot table {x y \\\\ 1 2 \\\\};\\end{axis}\\end{tikzpicture}',
+    'Shown as it is: \\verb|\\input{inverb}| and \\verb*+50% \\input{inverb}+.',
     '\\input{nothere}',
     '\\bibliography{a, b}',
     '\\addbibresource{c.bib}',
@@ -95,6 +96,7 @@ const usedOf = (u: ReturnType<typeof texUses>) => [...u.used.keys()];
     'real.tex': 'Real.\n',
     'commented.tex': 'No.\n',
     'notreally.tex': 'No.\n',
+    'inverb.tex': 'No.\n',
     'after-the-end.tex': 'No.\n',
     'chapters/unread.tex': 'No.\n',
     'mystyle.sty': '\\RequirePackage{helper}\n\\newcommand{\\logo}{\\includegraphics{logo}}\n',
@@ -114,7 +116,7 @@ const usedOf = (u: ReturnType<typeof texUses>) => [...u.used.keys()];
   ok(has('parts/deep/x.tex'), '\\subimport reads from the folder of the file it is in');
   ok(!has('chapters/unread.tex'), 'nothing after \\endinput is read');
   ok(!has('commented.tex') && has('real.tex'), 'a comment is passed over, an escaped \\% is no comment');
-  ok(!has('notreally.tex'), 'verbatim text is passed over');
+  ok(!has('notreally.tex') && !has('inverb.tex'), 'verbatim text is passed over (\\verb|…| too, a % in it no comment)');
   ok(!has('after-the-end.tex'), 'nothing after \\end{document} is read');
   ok(has('chapters/loop.tex') && used.filter((n) => n === 'chapters/loop.tex').length === 1, 'a file reading itself is read once');
   ok(has('img/plot.png') && has('fig/photo.jpg'), '\\graphicspath{{fig/}{img/}} finds pictures in either folder, with the extension TeX tries');
@@ -126,7 +128,7 @@ const usedOf = (u: ReturnType<typeof texUses>) => [...u.used.keys()];
   ok(has('a.bib') && has('b.bib') && has('c.bib') && !has('unused.bib'), '\\bibliography{a, b} reads both, \\addbibresource its file');
   ok(has('code/run.py') && has('data/results.dat'), 'listings and pgfplots data are used');
   ok(!u.refs.some((r) => r.name.includes('1 2')), 'a table written inline is no file');
-  ok(u.missing.length === 1 && u.missing[0].name === 'nothere' && u.missing[0].line === 20, 'a chapter the project lacks is missing, with its line');
+  ok(u.missing.length === 1 && u.missing[0].name === 'nothere' && u.missing[0].line === 21, 'a chapter the project lacks is missing, with its line');
   ok(!has('stray.png') && texIsUsed(u, 'main.bbl') && !texIsUsed(u, 'stray.png'), 'a picture nothing shows is not used; the bibliography BibTeX made counts as used');
   ok(used.indexOf('chapters/intro.tex') < used.indexOf('chapters/loop.tex') && used.indexOf('chapters/loop.tex') < used.indexOf('chapters/one.tex'), 'files come in the order TeX reads them (a chapter’s own where it is read)');
 }
