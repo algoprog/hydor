@@ -18,7 +18,7 @@ export function SpacesTabs({ tab }: { tab: 'spaces' | 'shared' }) {
   return (
     <Tabs
       value={tab}
-      onChange={(t) => go(t === 'shared' ? '/knowledge' : '/spaces', true)}
+      onChange={(t) => go(t === 'shared' ? '/knowledge' : '/projects', true)}
       options={[
         { value: 'spaces', label: 'All projects' },
         { value: 'shared', label: 'Shared knowledge' },
@@ -99,7 +99,7 @@ export function useSpaceSuggestions(): [SpaceSuggestion[] | null, (folder: strin
   const [list, setList] = useState<SpaceSuggestion[] | null>(null);
   useEffect(() => {
     let alive = true;
-    api<{ folders: SpaceSuggestion[] }>('/api/spaces/suggestions').then(
+    api<{ folders: SpaceSuggestion[] }>('/api/projects/suggestions').then(
       (r) => alive && setList(r.folders),
       () => alive && setList((l) => l ?? []),
     );
@@ -109,7 +109,7 @@ export function useSpaceSuggestions(): [SpaceSuggestion[] | null, (folder: strin
   }, [spaces]);
   const hide = (folder: string) => {
     setList((l) => l?.filter((x) => x.path !== folder) ?? null);
-    post<{ folders: SpaceSuggestion[] }>('/api/spaces/suggestions/hide', { folder }).then((r) => setList(r.folders), toastError);
+    post<{ folders: SpaceSuggestion[] }>('/api/projects/suggestions/hide', { folder }).then((r) => setList(r.folders), toastError);
   };
   return [list, hide];
 }
@@ -260,7 +260,7 @@ export function NewSpaceDialog({ open, onClose, onMade, group, folder }: { open:
     if (!ready) return;
     setBusy(true);
     try {
-      const s = await post<Space>('/api/spaces', {
+      const s = await post<Space>('/api/projects', {
         name,
         description,
         instructions,

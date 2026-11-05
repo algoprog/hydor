@@ -18,7 +18,7 @@ The Skills page shows skills from five places, each marked on its row:
 - **Yours**: skills you wrote on this page, approved when an agent suggested them, or put in your skills folder yourself.
 - **From plugins**: the skills of the [plugins](/guide/plugins) you turned on. They come and go with their plugin.
 - **Claude Code and Codex**: the agents' own skills, in their own folders. Only that agent gets them.
-- **In projects**: a project's own skills, which only its sessions get. You change them on the project's **Skills** tab: see [Give a project skills of its own](/guide/spaces#give-a-project-skills-of-its-own).
+- **In projects**: a project's own skills, which only its sessions get. You change them on the project's **Skills** tab: see [Give a project skills of its own](/guide/projects#give-a-project-skills-of-its-own).
 
 The first three make up the skill library, which every agent the app starts gets. An assistant can also name skills it favors: when one of them fits the task, the agent loads it before it starts. See [Assistants](/guide/assistants).
 
@@ -33,7 +33,7 @@ Every session the app starts gets the skill library:
 
 Sessions started outside the app, in a terminal or in VS Code, don't see the library. Nothing of it is written into your Claude Code or Codex settings.
 
-A session in a project gets the project's own skills with the library's, each as the project switches it (see [Turn a skill on or off for this project](/guide/spaces#turn-a-skill-on-or-off-for-this-project)). A project's skill with the name of a library skill takes its place in that project's sessions.
+A session in a project gets the project's own skills with the library's, each as the project switches it (see [Turn a skill on or off for this project](/guide/projects#turn-a-skill-on-or-off-for-this-project)). A project's skill with the name of a library skill takes its place in that project's sessions.
 
 Your own skills come before the built-in ones: one of yours with the name of a built-in skill takes its place. A plugin's skill with a name the library already has is left out, and its plugin's page says which skill agents get instead.
 
@@ -76,7 +76,7 @@ Every skill of the library and of Claude Code and Codex has a switch at the end 
 - A library skill (built in, yours or a plugin's) turned off is left out for every agent, in every project that doesn't switch it on for itself.
 - Claude Code keeps its own choice in its settings, by the skill's name; Codex keeps it in its own configuration.
 
-The switches here are for every session. A project can switch any skill the other way for its own sessions, on its **Skills** tab: see [Turn a skill on or off for this project](/guide/spaces#turn-a-skill-on-or-off-for-this-project). Then the skill's row here says so: "Off in Thesis", or "On in 2 projects".
+The switches here are for every session. A project can switch any skill the other way for its own sessions, on its **Skills** tab: see [Turn a skill on or off for this project](/guide/projects#turn-a-skill-on-or-off-for-this-project). Then the skill's row here says so: "Off in Thesis", or "On in 2 projects".
 
 A project's own skills have no switch here: change them on the project's **Skills** tab.
 
@@ -216,7 +216,7 @@ Built-in skills can't be removed, but you can switch any of them off, or change 
 6. Under **Who gets it**, keep **Every agent**, or pick **Claude Code** or **Codex** for a skill only that agent gets.
 7. Click **Add skill**.
 
-A skill for every agent is saved in your skills folder (in the app's data folder, `~/.hydor/skills` unless your install keeps its data elsewhere) and shows under **Yours**. A Claude Code skill goes in `~/.claude/skills`, a Codex one in `~/.agents/skills`, which each reads in every folder. If a skill of that name is already there, the app says so and saves nothing. A skill for one project alone is written on that project's **Skills** tab: see [Give a project skills of its own](/guide/spaces#give-a-project-skills-of-its-own).
+A skill for every agent is saved in your skills folder (in the app's data folder, `~/.hydor/skills` unless your install keeps its data elsewhere) and shows under **Yours**. A Claude Code skill goes in `~/.claude/skills`, a Codex one in `~/.agents/skills`, which each reads in every folder. If a skill of that name is already there, the app says so and saves nothing. A skill for one project alone is written on that project's **Skills** tab: see [Give a project skills of its own](/guide/projects#give-a-project-skills-of-its-own).
 
 To change one of yours, open it and click **Change**: the same fields, saved with **Save**. Each change is kept in its history. You can also put skills in your skills folder yourself: one folder per skill, named in lowercase letters, digits and dashes, with its SKILL.md inside. They show under **Yours**.
 
@@ -254,7 +254,7 @@ Below that:
 - Its keywords for Custom, if it has any: "Custom brings it in when you say" and the words.
 - Warnings, if any (see [Warnings on the card](#warnings-on-the-card)).
 - The text, with a switch between **Text** (for a new skill) or **Changes** (for an improvement, line by line) and **Skill** (the guide as it reads), and how many lines it adds and removes.
-- In a project, **Keep it for**: **Every session** or the project's name (see [Skills agents propose in a project](/guide/spaces#skills-agents-propose-in-a-project)).
+- In a project, **Keep it for**: **Every session** or the project's name (see [Skills agents propose in a project](/guide/projects#skills-agents-propose-in-a-project)).
 
 ### Approve it
 

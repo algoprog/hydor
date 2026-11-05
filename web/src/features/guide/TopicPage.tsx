@@ -1,6 +1,6 @@
 // One topic of the guide: its icon, title and what it is about, a picture of that part of the app, then its
 // sections as a list to open one by one (all of them with Open all), the questions to ask an agent about it, and
-// the topics before and after. A link to a section (/guide/spaces#make-a-project, or one of its parts) opens it.
+// the topics before and after. A link to a section (/guide/projects#make-a-project, or one of its parts) opens it.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { ArrowLeft, ArrowRight, ChevronRight, Sparkles } from 'lucide-react';
 import { headingsOf, type GuideTopic } from '@shared/guide';

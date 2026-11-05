@@ -58,7 +58,7 @@ const LOOKS: Record<string, TopicLook> = {
   app: { icon: Palette, group: 'basics', blurb: 'A theme you like, your language, and new versions' },
   guidelines: { icon: ScrollText, group: 'yours', blurb: 'What every agent should know about you and your work' },
   assistants: { icon: WandSparkles, group: 'yours', blurb: 'Researcher, Writer and others for each kind of work' },
-  spaces: { icon: Boxes, group: 'yours', blurb: 'A project’s sessions, files and documents together' },
+  projects: { icon: Boxes, group: 'yours', blurb: 'A project’s sessions, files and documents together' },
   memory: { icon: Brain, group: 'yours', blurb: 'What agents remember about you and your projects' },
   skills: { icon: Sparkles, group: 'yours', blurb: 'Methods agents load when a task calls for one, and yours' },
   plugins: { icon: Blocks, group: 'yours', blurb: 'Skills, tools and files bundled for every agent' },

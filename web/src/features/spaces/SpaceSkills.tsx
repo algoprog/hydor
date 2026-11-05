@@ -8,9 +8,5 @@ import { SkillsSettings } from '../skillpack/SkillsPage';
 
 /** The Skills tab. */
 export function SpaceSkillsTab({ s }: { s: Space }) {
-  return (
-    <div className="mx-auto max-w-[880px]">
-      <SkillsSettings space={s} />
-    </div>
-  );
+  return <SkillsSettings space={s} />;
 }

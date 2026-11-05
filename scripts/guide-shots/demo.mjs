@@ -464,7 +464,7 @@ export async function seedApi(api, home, now, s) {
   for (let i = 0; i < 50 && (await api('GET', '/api/plugins')).installed.length < 2; i++) await new Promise((r) => setTimeout(r, 100));
   await api('POST', '/api/plugins/library-docs/disable').catch(() => {});
 
-  const space = async (b) => (await api('POST', '/api/spaces', b)).id ?? (await api('GET', '/api/spaces')).spaces.find((x) => x.name === b.name)?.id;
+  const space = async (b) => (await api('POST', '/api/projects', b)).id ?? (await api('GET', '/api/projects')).spaces.find((x) => x.name === b.name)?.id;
   const thesis = await space({ name: 'Thesis', color: 'violet', description: 'Chapter drafts, sources and the defense in March', instructions: 'Cite in APA 7. My advisor prefers short paragraphs and plain words.' });
   const garden = await space({ name: 'The garden', color: 'green', description: 'Beds, seeds and the greenhouse', instructions: 'We live in Portland, Maine (zone 5b). No chemical sprays.' });
   const taxes = await space({ name: 'Taxes 2026', color: 'amber', description: 'Receipts, forms and deadlines', instructions: 'Amounts in EUR. I am self-employed in Greece.' });

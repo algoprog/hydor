@@ -62,7 +62,7 @@ export function SkillDialog({ name, onClose, history, space, sessionKey, onChang
   const [tab, setTab] = useState<'skill' | 'history'>(history ? 'history' : 'skill');
   useEffect(() => {
     let alive = true;
-    api<SkillDoc>(space ? `/api/spaces/${enc(space)}/skills/${enc(name)}` : `/api/skillpack/skills/${enc(name)}${sessionKey ? `?key=${enc(sessionKey)}` : ''}`).then(
+    api<SkillDoc>(space ? `/api/projects/${enc(space)}/skills/${enc(name)}` : `/api/skillpack/skills/${enc(name)}${sessionKey ? `?key=${enc(sessionKey)}` : ''}`).then(
       (d) => alive && setDoc(d),
       (e: Error) => alive && setError(e.message),
     );
@@ -96,7 +96,7 @@ export function SkillDialog({ name, onClose, history, space, sessionKey, onChang
             </Button>
           )}
           {ofSpace && !onChange && (
-            <Button variant="ghost" onClick={() => (onClose(), go(`/spaces/${ofSpace.id}/skills`))}>
+            <Button variant="ghost" onClick={() => (onClose(), go(`/projects/${ofSpace.id}/skills`))}>
               The project’s skills
             </Button>
           )}

@@ -95,7 +95,7 @@ function MediaView({ id }: { id: string }) {
     if (!(await confirm({ title: `Delete “${m.title}”?`, body: 'It goes from your Library. The file it was saved from, if it is still there, stays.', confirm: 'Delete', danger: true }))) return;
     try {
       await del(`/api/media/${enc(m.id)}`);
-      go(m.space ? `/library?space=${m.space}&kind=${m.kind}` : `/library?kind=${m.kind}`);
+      go(m.space ? `/library?project=${m.space}&kind=${m.kind}` : `/library?kind=${m.kind}`);
     } catch (e) {
       toastError(e);
     }
@@ -111,7 +111,7 @@ function MediaView({ id }: { id: string }) {
       <header className="shrink-0 border-b border-line bg-bg pt-[var(--safe-top)]">
         <div className="flex h-14 items-center gap-2 px-3 sm:px-6">
           {!mobile && <NavButton />}
-          <IconButton label={back} onClick={() => go(m.space ? `/library?space=${m.space}&kind=${m.kind}` : `/library?kind=${m.kind}`)}>
+          <IconButton label={back} onClick={() => go(m.space ? `/library?project=${m.space}&kind=${m.kind}` : `/library?kind=${m.kind}`)}>
             <ArrowLeft size={18} />
           </IconButton>
           <div className="min-w-0 flex-1">

@@ -315,7 +315,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
                   icon={<Boxes size={14} />}
                   onClick={() => {
                     setFilterOpen(false);
-                    nav('/spaces');
+                    nav('/projects');
                   }}
                 >
                   Projects

@@ -20,7 +20,7 @@ The screen has two parts: the **sidebar** on the left, and the page you are on (
 - A machine switcher, only once you have added other machines in [Settings → Machines](/settings?s=machines). It names the machine you are looking at, and shows a dot when sessions on another machine need you. See [Phones, other machines and sharing](/guide/devices).
 - **New session** opens the [start page](#the-start-page).
 - **Search sessions** finds sessions by their title, their folder and the words said in them, archived sessions included. Escape clears it. On a computer, the **Ctrl+K** badge at the end of the field opens the search box instead (see [Search everything with Ctrl+K](#search-everything-with-ctrlk)).
-- The filter button at the end of that field (**Filter and group sessions**) narrows the list: **All agents**, **Claude Code** or **Codex**, and, once you have projects, **Every project** or one of your projects (up to eight are listed), with **Projects** to open the Projects page. The button takes the accent colour while a filter is on. Its last line, **Group by folder or project**, turns the groups for your projects and folders on or off (see [The session list](#the-session-list)). See [Projects and knowledge](/guide/spaces).
+- The filter button at the end of that field (**Filter and group sessions**) narrows the list: **All agents**, **Claude Code** or **Codex**, and, once you have projects, **Every project** or one of your projects (up to eight are listed), with **Projects** to open the Projects page. The button takes the accent colour while a filter is on. Its last line, **Group by folder or project**, turns the groups for your projects and folders on or off (see [The session list](#the-session-list)). See [Projects and knowledge](/guide/projects).
 
 ### The session list
 
@@ -72,7 +72,7 @@ Each session has a menu in the list: point at its row and click **⋯** at the e
 The bottom of the sidebar holds the app's tools, four to a row:
 
 - **Library**: small tools and pages agents made for you, the images and videos you kept, and what you published. See [Library: pages, images, videos and sites](/guide/library).
-- **Projects**: each project's sessions, documents and guidelines together, and the shared knowledge every session can search. See [Projects and knowledge](/guide/spaces).
+- **Projects**: each project's sessions, documents and guidelines together, and the shared knowledge every session can search. See [Projects and knowledge](/guide/projects).
 - **Apps**: tasks you run again and again: fill in a form, and an agent does the job. See [Apps](/guide/apps).
 - **Usage**: how much of each plan's limits you have used and when they reset, with **Activity** and **Arena** tabs. A thin bar under its icon shows how much is left across your paid subscriptions (or your free ones, when you have no paid ones), red when nothing is left; with no subscriptions there is no bar. See [Usage, limits and costs](/guide/usage).
 - **System**: this computer, with a tab for each of its tools: **Overview** (how it is doing, and what each tool holds now), **Files** (browse, open and edit files), **Git** (your repositories, their changes, branches and history), **Terminal** (shells that keep running when you leave the page), **Preview** (a web app's development server running here; only on this machine's own pages) and **Monitor** (processors, graphics cards, memory, disks and the busiest programs, live). See [System: files, Git, Terminal and Preview](/guide/files-git).

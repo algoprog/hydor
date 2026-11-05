@@ -45,33 +45,33 @@ const test = (name: string, fn: () => void | Promise<void>) => tests.push([name,
 
 test('a topic: its title, the paragraph under it, its sections with the ids the page gives their headings', () => {
   const t = parseTopic(
-    '04-spaces.md',
+    '04-projects.md',
     [
-      '# Spaces and knowledge',
+      '# Projects and knowledge',
       '',
-      'A space keeps a project together.',
+      'A project keeps a piece of work together.',
       'Its second line.',
       '',
       'More intro.',
       '',
-      '## Make a space',
+      '## Make a project',
       'Steps.',
       '### Pick a **folder**',
       'Where.',
-      '## What’s in a space?',
+      '## What’s in a project?',
       '```md',
       '## not a heading',
       '```',
-      '## Make a space',
+      '## Make a project',
       'Again.',
     ].join('\n'),
   );
-  assert.equal(t.id, 'spaces');
-  assert.equal(t.title, 'Spaces and knowledge');
-  assert.equal(t.summary, 'A space keeps a project together. Its second line.');
+  assert.equal(t.id, 'projects');
+  assert.equal(t.title, 'Projects and knowledge');
+  assert.equal(t.summary, 'A project keeps a piece of work together. Its second line.');
   assert.deepEqual(
     t.sections.map((s) => s.id),
-    ['make-a-space', 'whats-in-a-space', 'make-a-space-1'],
+    ['make-a-project', 'whats-in-a-project', 'make-a-project-1'],
   );
   assert.match(t.sections[0].text, /### Pick a \*\*folder\*\*\nWhere\./);
   assert.match(t.sections[1].text, /## not a heading/);
@@ -91,12 +91,12 @@ test('the guide: every topic has its title, a summary and sections; the API topi
     const ids = t.sections.map((s) => s.id);
     assert.equal(new Set(ids).size, ids.length, `${t.id}: section ids repeat`);
   }
-  for (const id of ['start', 'sessions', 'guidelines', 'spaces', 'ask-agents', 'settings', 'api']) assert.ok(byId.has(id), `a topic "${id}"`);
+  for (const id of ['start', 'sessions', 'guidelines', 'projects', 'ask-agents', 'settings', 'api']) assert.ok(byId.has(id), `a topic "${id}"`);
 });
 
 test('the guide’s links land: other topics and their sections, Settings sections, the app’s pages', () => {
   const sections = new Set(SECTIONS.map(([id]) => id));
-  const pages = /^\/(?:$|\?|s\/|guide|settings|spaces|knowledge|apps|pages|library|media|inbox|usage|stats|arena|system|files|search|git|terminal|preview|review\/)/;
+  const pages = /^\/(?:$|\?|s\/|guide|settings|projects|knowledge|apps|pages|library|media|inbox|usage|stats|arena|system|files|search|git|terminal|preview|review\/)/;
   const bad: string[] = [];
   for (const t of topics)
     for (const m of t.body.matchAll(/\]\((\/[^)\s]*)\)/g)) {
@@ -168,20 +168,20 @@ test('the guide covers the app: every API route is in the API topic, or one agen
 });
 
 test('a translation takes the English headings’ ids by their place; one out of step shows in English', () => {
-  const en = parseTopic('04-spaces.md', '# Spaces\n\nAbout spaces.\n\n## Make a space\nSteps.\n### Pick a folder\nWhere.\n## Delete a space\nGone.');
-  const zh = translatedTopic(en, '04-spaces.md', '# 空间\n\n关于空间。\n\n## 创建空间\n步骤。\n### 选择文件夹\n位置。\n## 删除空间\n没了。')!;
-  assert.equal(zh.title, '空间');
-  assert.equal(zh.summary, '关于空间。');
+  const en = parseTopic('04-projects.md', '# Projects\n\nAbout projects.\n\n## Make a project\nSteps.\n### Pick a folder\nWhere.\n## Delete a project\nGone.');
+  const zh = translatedTopic(en, '04-projects.md', '# 项目\n\n关于项目。\n\n## 创建项目\n步骤。\n### 选择文件夹\n位置。\n## 删除项目\n没了。')!;
+  assert.equal(zh.title, '项目');
+  assert.equal(zh.summary, '关于项目。');
   assert.deepEqual(
     zh.sections.map((x) => [x.id, x.title]),
     [
-      ['make-a-space', '创建空间'],
-      ['delete-a-space', '删除空间'],
+      ['make-a-project', '创建项目'],
+      ['delete-a-project', '删除项目'],
     ],
   );
-  assert.deepEqual(zh.anchors, ['make-a-space', 'pick-a-folder', 'delete-a-space']);
-  assert.equal(translatedTopic(en, '04-spaces.md', '# 空间\n\n关于。\n\n## 创建空间\n## 删除空间\n'), null, 'a heading missing');
-  assert.equal(translatedTopic(en, '04-spaces.md', '# 空间\n\n关于。\n\n## 创建空间\n## 选择文件夹\n## 删除空间\n'), null, 'a level changed');
+  assert.deepEqual(zh.anchors, ['make-a-project', 'pick-a-folder', 'delete-a-project']);
+  assert.equal(translatedTopic(en, '04-projects.md', '# 项目\n\n关于。\n\n## 创建项目\n## 删除项目\n'), null, 'a heading missing');
+  assert.equal(translatedTopic(en, '04-projects.md', '# 项目\n\n关于。\n\n## 创建项目\n## 选择文件夹\n## 删除项目\n'), null, 'a level changed');
 });
 
 /** A file's link addresses, in order. */
@@ -213,14 +213,14 @@ test('the translations: every topic but the API one, each with the English headi
       shown.map((t) => t.id),
       topics.map((t) => t.id),
     );
-    assert.notEqual(shown.find((t) => t.id === 'spaces')!.title, byId.get('spaces')!.title, `${lang}: the translated title shows`);
+    assert.notEqual(shown.find((t) => t.id === 'projects')!.title, byId.get('projects')!.title, `${lang}: the translated title shows`);
   }
 });
 
 test('finding sections by words: the one about it first', () => {
   const hits = findByWords('make a new project for my work', 5);
   assert.ok(hits.length, 'something found');
-  assert.equal(hits[0].topic.id, 'spaces');
+  assert.equal(hits[0].topic.id, 'projects');
   assert.equal(findByWords('the and of', 5).length, 0);
 });
 
@@ -228,10 +228,10 @@ test('finding sections by words: the one about it first', () => {
 
 test('rules: reading is free; changes ask; risky ones every time; some are never an agent’s', () => {
   const lv = (m: string, p: string) => ruleFor(m, p).level;
-  assert.equal(lv('GET', '/api/spaces'), 'free');
+  assert.equal(lv('GET', '/api/projects'), 'free');
   assert.equal(lv('PUT', '/api/search/settings'), 'confirm');
-  assert.equal(lv('POST', '/api/spaces'), 'confirm');
-  assert.equal(lv('DELETE', '/api/spaces/sp1'), 'always');
+  assert.equal(lv('POST', '/api/projects'), 'confirm');
+  assert.equal(lv('DELETE', '/api/projects/sp1'), 'always');
   assert.equal(lv('POST', '/api/skillpack/skills/x/remove'), 'always');
   assert.equal(lv('POST', '/api/setup/mcp'), 'always');
   assert.equal(lv('PUT', '/api/browser/settings'), 'always');
@@ -289,8 +289,8 @@ async function testApp() {
   let settings = { results: 10, meaning: false, name: 'x' };
   app.get('/api/search/settings', async () => settings);
   app.put('/api/search/settings', async (req) => (settings = { ...settings, ...(req.body as object) }));
-  app.post('/api/spaces', async (req) => ({ id: 'sp1', ...(req.body as object) }));
-  app.delete('/api/spaces/:id', async () => ({ ok: true }));
+  app.post('/api/projects', async (req) => ({ id: 'sp1', ...(req.body as object) }));
+  app.delete('/api/projects/:id', async () => ({ ok: true }));
   await app.ready();
   return app;
 }
@@ -347,7 +347,7 @@ test('app_api: “Allow for this session” lets later changes go without a card
   assert.equal(s.cards.length, 1);
   await appApi({ method: 'PUT', path: '/api/search/settings', body: { results: 6 } }, ctx);
   assert.equal(s.cards.length, 1, 'no second card');
-  const del = await appApi({ method: 'DELETE', path: '/api/spaces/sp1', summary: 'Delete the space “Old”' }, ctx);
+  const del = await appApi({ method: 'DELETE', path: '/api/projects/sp1', summary: 'Delete the project “Old”' }, ctx);
   assert.equal(s.cards.length, 2, 'deleting asks again');
   assert.equal(s.cards[1].card.options[0].label, 'Delete');
   assert.ok(!s.cards[1].card.options.some((o) => o.id === 'always'));
@@ -375,14 +375,14 @@ test('app_api: Plan mode only reads; full access asks nothing; Custom’s full a
   assert.match(r.text, /only reads/);
   assert.equal(plan.cards.length, 0);
   const full = session('bypassPermissions', () => null);
-  assert.match((await appApi({ method: 'DELETE', path: '/api/spaces/sp1' }, ctxOf(app, full))).text, /^200 OK/);
+  assert.match((await appApi({ method: 'DELETE', path: '/api/projects/sp1' }, ctxOf(app, full))).text, /^200 OK/);
   assert.equal(full.cards.length, 0);
   const codexFull = session('full', () => null);
   assert.match((await appApi({ method: 'PUT', path: '/api/search/settings', body: { results: 4 } }, ctxOf(app, codexFull, 'codex'))).text, /^200 OK/);
   const custom = session('full', () => ({ decision: 'accept' }));
   await appApi({ method: 'PUT', path: '/api/search/settings', body: { results: 7 } }, ctxOf(app, custom, 'acp', 'console'));
   assert.equal(custom.cards.length, 0);
-  await appApi({ method: 'DELETE', path: '/api/spaces/sp1' }, ctxOf(app, custom, 'acp', 'console'));
+  await appApi({ method: 'DELETE', path: '/api/projects/sp1' }, ctxOf(app, custom, 'acp', 'console'));
   assert.equal(custom.cards.length, 1);
   await app.close();
 });
@@ -394,7 +394,7 @@ test('app_api: a form on the card, filled in from the body; the user’s answers
   const r = await appApi(
     {
       method: 'POST',
-      path: '/api/spaces',
+      path: '/api/projects',
       body: { name: 'Thesis', color: 'blue', instructions: 'Cite in APA style.' },
       summary: 'Make the space “Thesis”',
       form: { fields: { name: { type: 'string', title: 'Name' }, color: { type: 'string', enum: ['blue', 'green'] } }, required: ['name'], message: 'Check the name.' },
@@ -430,7 +430,7 @@ test('app_api: never the user’s own things, nor raising a cap, nor changing pe
     ['POST', '/api/sessions/claude:own/config', { mode: 'bypassPermissions' }, /permissions are the user’s/],
     ['PATCH', '/api/sessions/claude:other/extra', { capUsd: 500 }, /Spending caps/],
     ['POST', '/api/sessions/claude:own/message', { text: 'hi' }, /That is this session/],
-    ['GET', 'https://evil.example/m/x/api/spaces', {}, /path:/],
+    ['GET', 'https://evil.example/m/x/api/projects', {}, /path:/],
   ] as const) {
     const r = await appApi({ method, path: p, body }, ctx);
     assert.equal(r.isError, true, `${method} ${p}`);
@@ -484,7 +484,7 @@ test('every agent hears of the tools, by name', async () => {
 });
 
 test('a question asked on Help: its agent answers it from the guide, knowing the topic being read', async () => {
-  const add = await guide.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: { help: 'spaces' } }, {} as Deps);
+  const add = await guide.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: { help: 'projects' } }, {} as Deps);
   assert.equal(add?.instructions?.length, 2);
   assert.equal(add!.instructions![0], GUIDE_INSTRUCTIONS);
   assert.match(add!.instructions![1], /Help page, while reading the guide's topic "Projects and knowledge"/);
@@ -506,7 +506,7 @@ test('the guide’s pictures: every one it shows is there; the light one when as
   const app = Fastify();
   guide.routes!({ app } as unknown as Deps);
   await app.ready();
-  for (const bad of ['..%2Fsecret.webp', 'Spaces.webp', 'spaces.gif', 'no-such-picture.webp'])
+  for (const bad of ['..%2Fsecret.webp', 'Projects.webp', 'projects.gif', 'no-such-picture.webp'])
     assert.equal((await app.inject({ method: 'GET', url: `/api/guide/images/${bad}` })).statusCode, 404, bad);
   const files = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
   const dark = files.find((f) => /^[a-z0-9-]+\.webp$/.test(f) && !f.endsWith('-light.webp') && files.includes(f.replace(/\.webp$/, '-light.webp')));

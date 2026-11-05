@@ -7819,7 +7819,7 @@
 "Space between the parts in it":"web/src/features/pages/studio/Inspector.tsx",
 "Space Grotesk":"web/src/features/pages/studio/fonts.ts",
 "Space inside the page's edges":"web/src/features/pages/studio/PagePanel.tsx",
-"space: a project’s id (GET /api/spaces lists them), or null for none":"server/spaces/choice.ts",
+"space: a project’s id (GET /api/projects lists them), or null for none":"server/spaces/choice.ts",
 "Spacing":"web/src/features/pages/studio/Inspector.tsx",
 "Span":"server/apps/templates-more.ts",
 "Speak a message instead of typing it":"shared/find-catalog.ts",

@@ -286,7 +286,7 @@ export function Places({
               after={after}
             />
           ))}
-          {spaces.length > 8 && <PlaceRow icon={<span className="text-[13px]">…</span>} label="All projects" onClick={() => go('/spaces')} />}
+          {spaces.length > 8 && <PlaceRow icon={<span className="text-[13px]">…</span>} label="All projects" onClick={() => go('/projects')} />}
         </>
       )}
       {lately.length > 0 && (

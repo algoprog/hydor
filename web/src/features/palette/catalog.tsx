@@ -140,7 +140,7 @@ export async function liveEntries(): Promise<Entry[]> {
     get<SkillLibrary>('/api/skillpack'),
     get<{ pages: PageInfo[] }>('/api/pages'),
     get<{ connections: ConnectionView[] }>('/api/connections'),
-    get<{ spaces: SpaceView[] }>('/api/spaces'),
+    get<{ spaces: SpaceView[] }>('/api/projects'),
     get<{ items: MediaItem[] }>('/api/media'),
     get<PluginList>('/api/plugins'),
   ]);
@@ -162,7 +162,7 @@ export async function liveEntries(): Promise<Entry[]> {
         ['Last active', s.lastAt ? timeAgo(s.lastAt) : ''],
       ],
       opens: 'Opens the project',
-      run: () => go(`/spaces/${encodeURIComponent(s.id)}`),
+      run: () => go(`/projects/${encodeURIComponent(s.id)}`),
     });
   for (const a of apps?.apps ?? [])
     out.push({ id: `app:${a.id}`, group: 'Apps', icon: <LayoutGrid size={15} />, title: a.name, keywords: 'template', text: a.description, where: 'Apps', body: a.description, opens: 'Opens the app', run: () => go(appPath(a.id)) });

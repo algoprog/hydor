@@ -65,13 +65,13 @@ function useDrag(onMove: (dy: number) => void) {
 }
 
 /** Each page shows at once, with no fade. A page is built afresh when you move to another one, but not when a
- * file or folder changes inside one or you switch its tabs (a space's, Usage's), so a tab shows at once with what
+ * file or folder changes inside one or you switch its tabs (a project's, Usage's), so a tab shows at once with what
  * the page already loaded. Memoized: the shell re-rendering (a panel or the drawer toggled) never re-renders the
  * page. */
 const Routes = memo(function Routes() {
   const [loc] = useLocation();
-  const space = /^\/spaces\/[^/]+/.exec(loc)?.[0];
-  const section = loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc.startsWith('/guide') ? '/guide' : (space ?? loc);
+  const project = /^\/projects\/[^/]+/.exec(loc)?.[0];
+  const section = loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc.startsWith('/guide') ? '/guide' : (project ?? loc);
   return (
     <div key={section} className="h-full">
       <Page />
@@ -110,6 +110,9 @@ function Page() {
     const agent = q.get('agent');
     return <SettingsPage section={isSettingsSection(s) ? s : null} cwd={q.get('cwd')} agent={agent === 'claude' || agent === 'codex' ? agent : null} />;
   }
+  // Projects' pages were at /spaces, and the Library's filter was ?space=: older links land in their place.
+  const moved = movedAddress(loc);
+  if (moved) return <Redirect to={moved} />;
   // The capabilities' own pages (registry.tsx).
   for (const f of features()) for (const r of f.routes ?? []) if (r.match(loc)) return <r.Page />;
   // Customize moved into Settings; old links still land in the right place.
@@ -125,6 +128,18 @@ function Page() {
 function Redirect({ to }: { to: string }) {
   useEffect(() => go(to, true), [to]);
   return null;
+}
+
+/** Where an older address goes now (until 5 November 2026 a project's page was /spaces/…, the Library's filter ?space=), or null. */
+function movedAddress(loc: string): string | null {
+  // As the address has them: wouter's own search comes unescaped.
+  const { search, hash } = window.location;
+  if (loc === '/spaces' || loc.startsWith('/spaces/')) return `/projects${loc.slice('/spaces'.length)}${search}${hash}`;
+  const q = new URLSearchParams(search);
+  if (loc !== '/library' || !q.has('space')) return null;
+  q.set('project', q.get('space')!);
+  q.delete('space');
+  return `/library?${q}${hash}`;
 }
 
 /** "(2) Hydor" while sessions wait for an approval or an answer. */

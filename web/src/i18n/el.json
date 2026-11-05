@@ -10486,7 +10486,7 @@
 "Pages, slides and documents agents save in this project’s sessions land here, and so does what you keep from them.":"Οι σελίδες, οι διαφάνειες και τα έγγραφα που αποθηκεύουν οι πράκτορες στις συνεδρίες αυτού του έργου έρχονται εδώ, όπως και ό,τι κρατάτε από αυτές.",
 "Pages, slides, documents, pictures and videos made in this project, or moved to it":"Σελίδες, διαφάνειες, έγγραφα, εικόνες και βίντεο που φτιάχτηκαν σε αυτό το έργο ή μετακινήθηκαν σε αυτό",
 "Send its new title, or the project to move it to (space: an id, or null)":"Στείλτε τον νέο τίτλο του ή το έργο όπου θα μετακινηθεί (space: ένα id ή null)",
-"space: a project’s id (GET /api/spaces lists them), or null for none":"space: το id ενός έργου (το GET /api/spaces τα απαριθμεί), ή null για κανένα",
+"space: a project’s id (GET /api/projects lists them), or null for none":"space: το id ενός έργου (το GET /api/projects τα απαριθμεί), ή null για κανένα",
 "projects projects workspace group sessions files documents knowledge memory guidelines instructions skills folder library overview":"έργα χώροι χώρος εργασίας ομάδα συνεδρίες αρχεία έγγραφα γνώσεις μνήμη οδηγίες δεξιότητες φάκελος βιβλιοθήκη επισκόπηση",
 "The project":"Το έργο",
 "Things you keep outside any project show here.":"Ό,τι κρατάτε έξω από κάθε έργο εμφανίζεται εδώ.",

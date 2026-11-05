@@ -43,7 +43,7 @@ Other ways in:
 
 - Click the folder under a session's title, or use the session's menu (⋯) → **Folder and code** → **Browse the folder**: Files opens at that folder.
 - A file an agent changed or handed you, or a link to a file in its reply, opens in a window over the conversation, so you keep your place. **Open in Files** moves it to the Files page; ✕ or Esc closes it (if you changed it without saving, it asks "Discard your changes?" first).
-- A project's **Files** tab shows the project's own folders (see [Projects and knowledge](/guide/spaces)).
+- A project's **Files** tab shows the project's own folders (see [Projects and knowledge](/guide/projects)).
 
 ## Places
 
@@ -170,7 +170,7 @@ A file downloads as itself. A folder, or several things picked together, downloa
 
 ## Add files to a project
 
-A project keeps a project's files in its folder, and can work with other folders of yours where they are (see [Projects and knowledge](/guide/spaces)). To add to one:
+A project keeps a project's files in its folder, and can work with other folders of yours where they are (see [Projects and knowledge](/guide/projects)). To add to one:
 
 1. Open the menu of a file or folder (or pick several), and click **Add to a project**.
 2. Pick the project, or **New project** to make one for them first.
@@ -332,7 +332,7 @@ The results come in two parts:
 
 Each result's **More** (⋯) has **Show in its folder**, **Start a session with it**, **Add to a project** and the rest of a file's menu.
 
-The search is in the page's address, so Back and a reload keep it. It skips files the folder's `.gitignore` leaves out and files over 4 MB. It stops at 50 matches in a file and 1,000 in all, or after 15 seconds, and shows the first 30 matching lines of each file. PDF, Word and other documents are found by their names, not the text inside them; for agents to search inside them, add them to [knowledge](/guide/spaces#shared-knowledge-documents-every-session-can-search).
+The search is in the page's address, so Back and a reload keep it. It skips files the folder's `.gitignore` leaves out and files over 4 MB. It stops at 50 matches in a file and 1,000 in all, or after 15 seconds, and shows the first 30 matching lines of each file. PDF, Word and other documents are found by their names, not the text inside them; for agents to search inside them, add them to [knowledge](/guide/projects#shared-knowledge-documents-every-session-can-search).
 
 ## Run a Jupyter notebook
 

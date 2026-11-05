@@ -10,7 +10,7 @@ export function go(path: string, replace = false) {
 
 /**
  * Follows a link to one of the app's own pages (the guide's, an agent's): `/settings?s=memory`, or
- * `/guide/spaces#make-a-project`, whose section the page then scrolls to (it hears `hydor:hash`).
+ * `/guide/projects#make-a-project`, whose section the page then scrolls to (it hears `hydor:hash`).
  */
 export function goApp(href: string) {
   go(href);

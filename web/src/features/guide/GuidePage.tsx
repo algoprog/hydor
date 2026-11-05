@@ -51,6 +51,8 @@ const RENAMED: Record<string, Record<string, string>> = {
 const MOVED: Record<string, { to: string; sections: Record<string, string> }> = {
   // Pages became the Library, with the images and videos kept there (2 November 2026); its sections kept their names.
   pages: { to: 'library', sections: {} },
+  // Projects were called spaces in their addresses until 5 November 2026; the sections kept their names.
+  spaces: { to: 'projects', sections: {} },
   // Templates became Apps (2 November 2026).
   templates: {
     to: 'apps',

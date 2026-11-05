@@ -285,9 +285,9 @@ test('places: each address as the search box lists it', () => {
   assert.equal(placeOf('/library', '', pages), 'go:library');
   assert.equal(placeOf('/pages/p1', '', pages), 'page:p1');
   assert.equal(placeOf('/media/0a1b2c3d4e', '', pages), 'media:0a1b2c3d4e');
-  assert.equal(placeOf('/spaces', '', pages), 'go:spaces');
-  assert.equal(placeOf('/spaces/sp1a2b', '', pages), 'space:sp1a2b');
-  assert.equal(placeOf('/spaces/sp1a2b/files', '', pages), 'space:sp1a2b', 'a space’s tab is the space');
+  assert.equal(placeOf('/projects', '', pages), 'go:spaces');
+  assert.equal(placeOf('/projects/sp1a2b', '', pages), 'space:sp1a2b');
+  assert.equal(placeOf('/projects/sp1a2b/files', '', pages), 'space:sp1a2b', 'a space’s tab is the space');
   assert.equal(placeOf('/files', '?place=trash', pages), 'go:files-trash');
   assert.equal(placeOf('/files', '?dir=%2Fhome%2Fa', pages), 'go:files');
   assert.equal(placeOf('/file', '?path=%2Fhome%2Fa.md&line=3', pages), 'f:/home/a.md');

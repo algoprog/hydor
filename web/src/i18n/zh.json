@@ -10444,7 +10444,7 @@
 "Pages, slides and documents agents save in this project’s sessions land here, and so does what you keep from them.":"智能体在这个项目的会话中保存的页面、幻灯片和文档会出现在这里，你从中保留的东西也会。",
 "Pages, slides, documents, pictures and videos made in this project, or moved to it":"在这个项目中做出的、或移到这里的页面、幻灯片、文档、图片和视频",
 "Send its new title, or the project to move it to (space: an id, or null)":"请发送它的新标题，或要移到的项目（space：一个 id，或 null）",
-"space: a project’s id (GET /api/spaces lists them), or null for none":"space：一个项目的 id（GET /api/spaces 会列出它们），或用 null 表示不放在项目中",
+"space: a project’s id (GET /api/projects lists them), or null for none":"space：一个项目的 id（GET /api/projects 会列出它们），或用 null 表示不放在项目中",
 "projects projects workspace group sessions files documents knowledge memory guidelines instructions skills folder library overview":"项目 项目 工作区 组合 会话 文件 文档 知识库 记忆 准则 说明 技能 文件夹 资料库 概览",
 "The project":"项目",
 "Things you keep outside any project show here.":"你保留在任何项目之外的东西会显示在这里。",
