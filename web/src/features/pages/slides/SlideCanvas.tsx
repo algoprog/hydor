@@ -12,7 +12,7 @@
 // while they are dragged without drawing the slide again. The marks of the slide's comments sit over it, at their
 // parts' corners (the editor's alone).
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { elbowPoints, everyEl, reconnect, scaleEls, SIDES, sidePoint, turnedBox, type Crop, type Deck, type El, type GroupEl, type ImageEl, type LineEl, type Para, type Stick, type TableEl, type TextProps } from '@shared/slides';
+import { elbowPoints, everyEl, reconnect, scaleEls, SIDES, sidePoint, turnedBox, type Crop, type Deck, type El, type GroupEl, type ImageEl, type LineEl, type Para, type Slide, type Stick, type TableEl, type TextProps } from '@shared/slides';
 import { MessageSquare } from 'lucide-react';
 import { cx } from '../../../components/ui';
 import { boxOf, heightOf, mergeAt, setEls, W } from './ops';
@@ -255,6 +255,8 @@ export const SlideCanvas = forwardRef<
     change: (next: Deck | ((d: Deck) => Deck), key?: string) => void;
     fonts: number;
     readOnly?: boolean;
+    /** An agent writing this slide (live.ts): the part its words are arriving in ('' for the slide as a whole), boxed in its colour. */
+    agent?: string | null;
     /** Right-click (or a long press) on a part or the slide. */
     onMenu?: (at: { x: number; y: number }, id: string | null) => void;
     /** An empty picture was double-clicked: put one in its place. */
@@ -300,6 +302,7 @@ export const SlideCanvas = forwardRef<
     change,
     fonts,
     readOnly,
+    agent,
     onMenu,
     onReplaceImage,
     onChartData,
@@ -1497,6 +1500,16 @@ export const SlideCanvas = forwardRef<
   // Snap lines go across the slide (in a turned group, well past its box).
   const span = straight ? { x0: -origin.x, x1: W - origin.x, y0: -origin.y, y1: H - origin.y } : { x0: -2000, x1: 3300, y0: -2000, y1: 3000 };
   const shownGuides = rulers ? { x: deck.guides?.x ?? [], y: deck.guides?.y ?? [] } : { x: [], y: [] };
+  // Where an agent's words are arriving: the part (the group it is in, for a part of a group), or the whole slide.
+  const agentBox = (sl: Slide | undefined, id: string) => {
+    const e = id && sl ? sl.els.find((x) => x.id === id || (x.type === 'group' && everyEl(x.els).some((y) => y.id === id))) : undefined;
+    const box = e && e.type !== 'line' ? { left: S(e.x) - 3, top: S(e.y) - 3, width: S(e.w) + 6, height: S(e.h) + 6, rotate: e.rot ? `${e.rot}deg` : undefined } : { left: 0, top: 0, width: stage.w, height: stage.h };
+    return (
+      <div aria-hidden className="pointer-events-none absolute z-[6] rounded-[3px] outline-2 outline-busy [outline-style:solid]" style={box}>
+        <span className="absolute bottom-full left-0 mb-0.5 rounded-[3px] bg-busy px-1 text-[10px] leading-[14px] font-semibold whitespace-nowrap text-bg">Agent</span>
+      </div>
+    );
+  };
   return (
     <div
       ref={wrap}
@@ -1577,6 +1590,7 @@ export const SlideCanvas = forwardRef<
               })()}
             </Nest>
           )}
+          {agent !== undefined && agent !== null && agentBox(slide, agent)}
           <div className="pointer-events-none absolute inset-0">
             <Nest frames={frames} k={k}>
               {!crop && picked.map((e) => outline(e, picked.length === 1))}

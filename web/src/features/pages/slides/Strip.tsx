@@ -1,7 +1,7 @@
 // The slides in order, small: click one to edit it, drag one to move it, and each one's menu (copy it, skip it in
 // the slideshow, a new slide after it, delete it). Down the side on a wide screen, across under the slide on a
 // phone. Also the grid of every slide (slide sorter), and the layouts a new slide is made from.
-import { useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { closestCenter, DndContext, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { horizontalListSortingStrategy, rectSortingStrategy, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -27,7 +27,7 @@ export function LayoutGrid({ deck, fonts, onPick }: { deck: Deck; fonts: number;
   );
 }
 
-function Item({
+function ItemInner({
   deck,
   index,
   current,
@@ -40,6 +40,8 @@ function Item({
   deck: Deck;
   index: number;
   current: boolean;
+  /** An agent's version is being written, the slide on view the one it is writing. */
+  live?: boolean;
   width: number;
   fonts: number;
   onPick: () => void;
@@ -49,9 +51,17 @@ function Item({
   const s = deck.slides[index];
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: s.id });
   const more = useRef<HTMLButtonElement>(null);
+  const box = useRef<HTMLDivElement | null>(null);
+  // The slide on view stays in view here (gone to with the keys, or the one an agent is writing).
+  useEffect(() => {
+    if (current) box.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [current]);
   return (
     <div
-      ref={setNodeRef}
+      ref={(el) => {
+        setNodeRef(el);
+        box.current = el;
+      }}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cx('group relative flex shrink-0 gap-1.5', horizontal ? 'flex-col items-start' : 'items-start', isDragging && 'z-10 opacity-80')}
     >
@@ -90,6 +100,25 @@ function Item({
     </div>
   );
 }
+
+/**
+ * One slide in the strip: drawn again only when its slide, its place or its look changes (a deck of forty being written
+ * by an agent changes one slide at a time). Its handlers only pick it or open its menu, through setters that stay.
+ */
+const Item = memo(
+  ItemInner,
+  (a, b) =>
+    // The slide an agent is writing, on view above: its small copy waits until it is finished (or another is on view).
+    (a.deck.slides[a.index] === b.deck.slides[b.index] || (!!b.live && b.current && a.current)) &&
+    a.index === b.index &&
+    a.current === b.current &&
+    a.width === b.width &&
+    a.fonts === b.fonts &&
+    a.horizontal === b.horizontal &&
+    a.deck.theme === b.deck.theme &&
+    a.deck.ratio === b.deck.ratio &&
+    a.deck.footer === b.deck.footer,
+);
 
 export interface StripActions {
   pick(i: number): void;
@@ -136,7 +165,7 @@ function SlideMenu({ deck, at, fonts, onClose, act }: { deck: Deck; at: { i: num
   );
 }
 
-export function Strip({ deck, cur, fonts, act, layout }: { deck: Deck; cur: number; fonts: number; act: StripActions; layout: 'side' | 'bottom' | 'grid' }) {
+export function Strip({ deck, cur, fonts, act, layout, live }: { deck: Deck; cur: number; fonts: number; act: StripActions; layout: 'side' | 'bottom' | 'grid'; live?: boolean }) {
   const [menu, setMenu] = useState<{ i: number; el: HTMLElement } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 280, tolerance: 8 } }));
   const ids = deck.slides.map((s) => s.id);
@@ -157,7 +186,7 @@ export function Strip({ deck, cur, fonts, act, layout }: { deck: Deck; cur: numb
           >
             {deck.slides.map((s, i) => (
               <div key={s.id} className={cx(layout === 'grid' && 'flex flex-col gap-1')}>
-                <Item deck={deck} index={i} current={i === cur} width={width} fonts={fonts} onPick={() => act.pick(i)} onMenu={(el) => setMenu({ i, el })} horizontal={horizontal || layout === 'grid'} />
+                <Item deck={deck} index={i} current={i === cur} live={live} width={width} fonts={fonts} onPick={() => act.pick(i)} onMenu={(el) => setMenu({ i, el })} horizontal={horizontal || layout === 'grid'} />
               </div>
             ))}
           </div>
