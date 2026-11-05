@@ -39,8 +39,9 @@ export async function loadTerms() {
   } catch {}
 }
 
+/** A new shell in `cwd`; without one, in the home folder (the server's default folder), whatever folder the Files page shows. */
 export async function newTerminal(cwd?: string) {
-  const t = await post<TerminalInfo>('/api/terminals', { cwd: cwd ?? useUI.getState().explorerRoot ?? useApp.getState().boot?.defaultCwd });
+  const t = await post<TerminalInfo>('/api/terminals', { cwd });
   useTerms.setState((s) => ({ list: [...s.list.filter((x) => x.id !== t.id), t], active: t.id }));
   return t;
 }

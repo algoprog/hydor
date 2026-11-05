@@ -10,7 +10,7 @@ for the service and the desktop apps; on Windows `%USERPROFILE%\.config\hydor.en
 | `HOST` | `127.0.0.1` (`0.0.0.0` in Docker) | Address to listen on |
 | `PORT` | `8790` | Port to listen on |
 | `DATA_DIR` | `~/.hydor` (`~/.web-agent` where an older install made it) | The app's own data (see below) |
-| `DEFAULT_CWD` | your home folder (`/workspace` in Docker) | Folder new sessions start in |
+| `DEFAULT_CWD` | your home folder (`/workspace` in Docker) | Folder new sessions and terminals start in |
 | `ALLOWED_ORIGINS` | none | Extra addresses the app is opened at, comma-separated, when a proxy changes the `Host` header |
 | `IDLE_STOP_HOURS` | `3` | Stop an agent process after this long without activity (`0`: never). History is kept, and it resumes on the next message |
 | `UPLOAD_KEEP_DAYS` | `14` | Delete the app's copies of attachments after this many days |
