@@ -388,12 +388,14 @@ test('New-model watch: the newest models, those old enough with downloads to loo
     (v.look as Record<string, unknown>[]).map((m) => [m.model, m.downloads]),
     [
       ['hindsight-ai/hs-rerank-1', 117822],
-      ['GTrush/Qwen3-VL-Reranker-8B-Q8_0-GGUF-llama_cpp', 375],
       ['pameydorke/arcanumchat-reranker-bge-reranker-v2-m3-v2', 58],
     ],
   );
-  assert.deepEqual((v.young as Record<string, unknown>[]).map((m) => m.model), ['HangGlidersRule/Darkstar-Nemotron-3.5-Rerank-8B-Base-ModelOpt-W4A4-NVFP4', 'liudev/novel-reranker-gpl-base-v1']);
-  assert.equal(v.young_count, 2);
+  assert.equal(v.copies, 3, 'copies in other formats are left out (the GGUF, the ONNX and the NVFP4 ones)');
+  const asked2 = await program('new-model-watch', 'list', { task: 'Rerankers (text-ranking)', words: 'gguf', downloads: '50', days: '7', today: '2026-11-05', kept: [] });
+  assert.ok((asked2.look as Record<string, unknown>[]).some((m) => /GGUF/.test(String(m.model))), 'unless your words ask for them');
+  assert.deepEqual((v.young as Record<string, unknown>[]).map((m) => m.model), ['liudev/novel-reranker-gpl-base-v1']);
+  assert.equal(v.young_count, 1);
   assert.equal(v.listed, 6);
   // Their pages and cards.
   routes = [
@@ -401,22 +403,22 @@ test('New-model watch: the newest models, those old enough with downloads to loo
     (u) => (u.host === 'huggingface.co' && u.pathname.endsWith('/raw/main/README.md') ? fixture('hf-readme.md') : null),
     (u) => (u.host === 'huggingface.co' && u.pathname.startsWith('/api/models/') ? JSON.stringify({ tags: ['gguf', 'license:apache-2.0'], cardData: { license: 'apache-2.0' } }) : null),
   ];
-  const c = await program('new-model-watch', 'cards', { look: v.look, licence: 'mit, apache-2.0', size: '500M' });
+  const c = await program('new-model-watch', 'cards', { look: [...(v.look as unknown[]), { model: 'GTrush/Qwen3-VL-Reranker-8B-Q8_0-GGUF-llama_cpp', created: '2026-10-29', downloads: 375, likes: 1 }], licence: 'mit, apache-2.0', size: '500M' });
   const models = c.models as Record<string, unknown>[];
   assert.deepEqual(
     models.map((m) => [m.model, m.licence, m.size, m.runnable, m.skip]),
     [
       ['hindsight-ai/hs-rerank-1', 'mit', 113.8, true, ''],
-      ['GTrush/Qwen3-VL-Reranker-8B-Q8_0-GGUF-llama_cpp', 'apache-2.0', null, false, ''],
       ['pameydorke/arcanumchat-reranker-bge-reranker-v2-m3-v2', 'apache-2.0', null, false, ''],
+      ['GTrush/Qwen3-VL-Reranker-8B-Q8_0-GGUF-llama_cpp', 'apache-2.0', null, false, ''],
     ],
   );
   assert.equal(c.count, 3);
   assert.match(String(c.lines), /^1\. hindsight-ai\/hs-rerank-1 \(113\.8M parameters\), from jhu-clsp\/mmBERT-small \(finetune\)\n# hs-rerank-1 hs-rerank-1 is a multilingual cross-encoder reranker built for \[Hindsight\]/);
   assert.ok(!/license: mit|!\[Hindsight\]/.test(String(c.lines)), 'without the card’s header and pictures');
-  const strict = await program('new-model-watch', 'cards', { look: v.look.slice(0, 1), licence: 'apache-2.0', size: '' });
+  const strict = await program('new-model-watch', 'cards', { look: (v.look as unknown[]).slice(0, 1), licence: 'apache-2.0', size: '' });
   assert.match(String((strict.models as Record<string, unknown>[])[0].skip), /^Its licence \(mit\) is not one of yours$/);
-  const small = await program('new-model-watch', 'cards', { look: v.look.slice(0, 1), licence: '', size: '100M' });
+  const small = await program('new-model-watch', 'cards', { look: (v.look as unknown[]).slice(0, 1), licence: '', size: '100M' });
   assert.equal((small.models as Record<string, unknown>[])[0].skip, 'Too big: 113.8M parameters');
 });
 
@@ -779,10 +781,39 @@ test('Paper radar, as it comes: you read, the papers found and ranked against yo
   assert.ok(steps.some((s) => s.id === 'liked' && s.status === 'done'));
 });
 
+// ---- the real services (LIVE=1) ----------------------------------------------------------------------------------
+
+if (LIVE)
+  test('LIVE: arXiv, OpenAlex, Semantic Scholar, Hugging Face and the deadline lists answer as the programs read them', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const from = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);
+    const radar = await program('paper-radar', 'search', { plan: { cats: ['cs.IR', 'cs.CL'], topics: ['dense retrieval'], people: ['Hamed Zamani'], count: 15, from, to: today, seen: [] }, guessed: [], guessedTopics: [] });
+    const items = radar.items as Record<string, string>[];
+    console.log(`  Paper radar: ${items.length} new papers (${radar.sources}); ${String(radar.notes) || 'all answered'}; e.g. “${items[0]?.title}” — ${items[0]?.authors}`);
+    assert.ok(items.length > 20 && items.every((p) => p.title && p.key && p.bibtex.startsWith('@')));
+    const who = await program('citation-alerts', 'who', { me: 'Chris Samarinas', papers: '' });
+    console.log(`  Citation alerts: ${(who.author as Record<string, unknown>).name} (${(who.author as Record<string, unknown>).source}), ${(who.papers as unknown[]).length} papers with citations; ${String(who.notes) || 'all answered'}`);
+    assert.ok((who.papers as unknown[]).length > 0);
+    const cites = await program('citation-alerts', 'cites', { papers: (who.papers as unknown[]).slice(0, 3), seen: [], today });
+    console.log(`  Citation alerts: ${(cites.fresh as unknown[]).length} new citations of the last month for the 3 most cited, ${cites.sorting} with a sentence; ${String(cites.notes) || 'all answered'}`);
+    const models = await program('new-model-watch', 'list', { task: 'Rerankers (text-ranking)', words: '', downloads: '50', days: '7', today, kept: [] });
+    console.log(`  New-model watch: ${models.listed} listed, ${(models.look as unknown[]).length} to look at (${(models.look as Record<string, unknown>[]).map((m) => m.model).join(', ')}), ${models.young_count} too new`);
+    assert.ok(Number(models.listed) > 100);
+    const cards = await program('new-model-watch', 'cards', { look: (models.look as unknown[]).slice(0, 2), licence: '', size: '' });
+    console.log(`  New-model watch: ${(cards.models as Record<string, unknown>[]).map((m) => `${m.model} (${m.licence || 'no licence'}, ${m.size ?? '?'}M)`).join('; ')}`);
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const dl = await program('deadline-radar', 'lists', { venues: 'SIGIR, ACL, EMNLP, NeurIPS, ICLR, KDD, The Web Conference, ECIR, CIKM, WSDM', calls: [], now: new Date().toISOString().slice(0, 16).replace('T', ' '), zone: 'UTC', today });
+    const ahead = (dl.deadlines as Record<string, unknown>[]).filter((d) => !d.past);
+    console.log(`  Deadline radar (${zone} here, UTC asked): ${ahead.length} ahead; missing: ${(dl.missing as string[]).join(', ') || 'none'}; next: ${ahead.slice(0, 4).map((d) => `${d.venue} ${d.year} ${d.label} ${d.day} ${d.time}`).join('; ')}`);
+    assert.ok(ahead.length > 3);
+    const month = await program('gap-finder', 'month', { area: 'conversational search', today });
+    console.log(`  Gap finder: ${month.count} papers on conversational search this month`);
+  });
+
 // ---- run ---------------------------------------------------------------------------------------------------------
 
-const only = LIVE ? tests.filter(([name]) => !/as it comes/.test(name)) : tests;
-if (LIVE) console.log('LIVE: the programs that fetch ask the real services (their checks on exact values may differ)');
+const only = LIVE ? tests.filter(([name]) => /^LIVE/.test(name)) : tests;
+if (LIVE) console.log('LIVE: the programs that fetch ask the real services');
 for (const [name, fn] of only) {
   try {
     await fn();
