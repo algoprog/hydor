@@ -369,7 +369,7 @@ The side panel's four tabs:
 
 **Presenter view** shows the slide, the next one (or that more is coming on this one), the speaker notes (bigger or smaller with − and +), a timer you can pause and restart, the time, and **Back** and **Next**. **Open the audience's window** opens the slideshow in a window of its own: drag it to the other screen or the projector and double-click it for full screen. It follows the presenter's view, and the presenter's view follows it; the laser, the pen and the captions show in it too.
 
-Slides also present from their own address on a phone or from a published link, and the **Web page** export plays them in any browser (equations need it to be online).
+Slides also present from their own address on a phone or from a published link, and the **Web page** export plays them in any browser; their equations draw everywhere, even without the internet.
 
 ## Documents
 

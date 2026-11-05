@@ -9,7 +9,7 @@
 // Web Animations API on the parts (or their paragraphs); a slide's build is its click groups, each started by a
 // click (the first may start by itself), the effects within one timed "with" or "after" the one before. Morph moves
 // the parts two slides share from where they were to where they are. Equations are drawn by KaTeX where it is (the
-// app gives its own; a deck's page loads it), else shown as their LaTeX. While presenting, a laser pointer, a pen
+// app gives its own; a deck's page has each drawn by the server's), else shown as their LaTeX. While presenting, a laser pointer, a pen
 // and live captions (the browser's speech recognition, where it has one) are on the keys L, P and C.
 import type { Anim, Deck, El, IconNode, Para, Run, Slide, TextProps, Theme } from './slides.ts';
 
@@ -101,6 +101,8 @@ export interface SlidesRuntime {
   morphPairs(a: Slide, b: Slide): [El, El][];
   /** A deck's page: draws the deck from its JSON in #n-deck, as a viewer, every slide to print, or its first slide still (its picture). */
   boot(cfg: { mode: 'viewer' | 'print' | 'still' }): void;
+  /** The equations the server drew into the page (#n-math: each formula's KaTeX, by its LaTeX), as what draws them; none without. */
+  maths(): KatexLike | undefined;
 }
 
 /** Names of fonts with their CSS families, which the runtime is given (it cannot import). */
@@ -2138,6 +2140,25 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
   };
 
   // ---- a deck's own page --------------------------------------------------------------------------------------------
+  /**
+   * The page's equations as the server drew them with its own KaTeX: what the server made of each formula (never the
+   * deck's own words) goes in as it is. A formula it did not draw shows as its LaTeX.
+   */
+  const maths = (): KatexLike | undefined => {
+    let drawn: Record<string, unknown> = {};
+    try {
+      drawn = JSON.parse(doc.getElementById('n-math')?.textContent ?? '{}') ?? {};
+    } catch {}
+    if (!drawn || typeof drawn !== 'object' || !Object.keys(drawn).length) return undefined;
+    return {
+      render(tex, into) {
+        const html = Object.prototype.hasOwnProperty.call(drawn, tex) ? drawn[tex] : undefined;
+        if (typeof html !== 'string') throw new Error('Not drawn');
+        into.innerHTML = html;
+      },
+    };
+  };
+
   const boot = (cfg: { mode: 'viewer' | 'print' | 'still' }) => {
     const data = doc.getElementById('n-deck');
     let deck: Deck;
@@ -2149,9 +2170,11 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     }
     style();
     const body = doc.body;
+    // Its equations, drawn by the server (an older page loaded KaTeX itself, which the runtime finds on the window).
+    const katex = maths();
     if (cfg.mode === 'still') {
       const first = Math.max(0, deck.slides.findIndex((x) => !x.hidden));
-      const one = slide(deck, first);
+      const one = slide(deck, first, { katex });
       body.style.margin = '0';
       body.appendChild(one);
       fit(one);
@@ -2162,7 +2185,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       return;
     }
     if (cfg.mode === 'print') {
-      print(body, deck);
+      print(body, deck, { katex });
       // Shown, not only in print: laid out, its words fitted, and its fonts and pictures loaded before it prints (hidden until
       // then, a PDF would have none of the equations, nor the stills of videos from the web).
       body.querySelector('.ns-print')?.classList.add('ns-onscreen');
@@ -2176,13 +2199,13 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     const wrap = el('div', 'ns-wrap');
     body.appendChild(wrap);
     if ((win as unknown as { hydor?: { fill?: boolean } }).hydor?.fill ?? win.parent === win) body.classList.add('ns-filled');
-    const s = show(wrap, deck, { mode: 'viewer', keys: true });
+    const s = show(wrap, deck, { mode: 'viewer', keys: true, katex });
     // Printing from the page: every slide, a page each.
     let printed = false;
     win.addEventListener('beforeprint', () => {
       if (printed) return;
       printed = true;
-      print(body, deck);
+      print(body, deck, { katex });
     });
     // In full screen the slideshow takes the whole screen, its controls on hover.
     doc.addEventListener('fullscreenchange', () => {
@@ -2204,5 +2227,5 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     });
   };
 
-  return { css, style, slide, part, words, fit, read, show, print, steps, morphPairs, boot };
+  return { css, style, slide, part, words, fit, read, show, print, steps, morphPairs, boot, maths };
 }

@@ -17,7 +17,7 @@ import { canCapture } from '../capture/index.ts';
 import { deckSources, deckText, fitGroup, footerOn, groupOf, isDeckText, normalizeDeck, scaleEls, turnedBox, ungroupEls, videoSrc, type Deck, type El, type GroupEl } from '../../shared/slides.ts';
 import { slidesRuntime } from '../../shared/slides-runtime.ts';
 import { pptxFile, type Picture } from './pptx.ts';
-import { deckPage, KATEX_VERSION, lucideIcon, RUNTIME_SRC } from './slides.ts';
+import { deckPage, lucideIcon, RUNTIME_SRC } from './slides.ts';
 import { pages } from './index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -436,12 +436,15 @@ const dot: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
 
 // ---- the deck's own page, and agents ------------------------------------------------------------------------------
 {
-  const withMath = normalizeDeck({ slides: [{ els: [{ type: 'math', tex: 'a^2' }] }] });
+  const withMath = normalizeDeck({ slides: [{ els: [{ type: 'math', tex: 'a^2' }, { type: 'math', tex: '\\mathbb{R}^n' }] }] });
   const page = deckPage(db, withMath, 'Maths');
-  ok(page.includes(`katex@${KATEX_VERSION}/dist/katex.min.js`) && page.indexOf('katex.min.js') < page.indexOf('id="n-deck"'), 'a deck with equations loads KaTeX before its slides are drawn');
-  ok(!deckPage(db, normalizeDeck({ slides: [{ layout: 'title', title: 'x' }] }), 'Plain').includes('katex.min.js'), 'a deck without them does not');
-  const katexPkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'node_modules/katex/package.json'), 'utf8')).version;
-  ok(katexPkg === KATEX_VERSION, 'the page’s KaTeX is the app’s own version');
+  ok(!/https?:\/\/[^"'\s]*katex/i.test(page) && !page.includes('katex.min.js'), 'a deck’s page loads no KaTeX from the web');
+  ok(page.includes('id="n-math"') && page.includes('class=\\"katex') && page.indexOf('id="n-math"') < page.indexOf('.boot('), 'its equations come drawn by the server’s own KaTeX, before its slides are drawn');
+  ok(
+    /@font-face\{[^}]*font-family:KaTeX_Main[^}]*url\(data:font\/woff2;base64,/.test(page) && /@font-face\{[^}]*font-family:KaTeX_AMS[^}]*url\(data:font\/woff2;base64,/.test(page) && !/@font-face\{[^}]*KaTeX_Fraktur/.test(page),
+    'with the fonts they use inside it, and only those',
+  );
+  ok(!deckPage(db, normalizeDeck({ slides: [{ layout: 'title', title: 'x' }] }), 'Plain').includes('id="n-math"'), 'a deck without them has none');
 
   const made = await run('save_slides', {
     title: 'Icons',
@@ -491,7 +494,7 @@ const dot: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
       'with a browser here, an icon’s PNG beside its SVG is a picture of it',
     );
     const x1 = slideXml(pptx.rawPayload, 1);
-    console.log(x1.includes('descr="\\sqrt{2}"') && !x1.includes('<a:t>\\sqrt{2}</a:t>') ? '(the equation went as a picture)' : '(the equation went as its LaTeX: KaTeX could not load here)');
+    ok(x1.includes('descr="\\sqrt{2}"') && !x1.includes('<a:t>\\sqrt{2}</a:t>'), 'with a browser here, an equation goes into PowerPoint as its picture, drawn by the server’s KaTeX');
     // The slides as pictures.
     const one = await req('GET', `/api/pages/${id}/export?format=png&slide=2`);
     const png = one.rawPayload;

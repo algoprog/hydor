@@ -5,18 +5,19 @@
 // through, or every slide on a page of its own to print.
 //
 // save_slides is how agents make and change decks; get_page gives a deck back as it is kept. An agent names an icon
-// and gets its lines from the app's copy of Lucide (where this install has one); a deck with equations gets KaTeX in
-// its own page, from the CDN its other libraries come from.
+// and gets its lines from the app's copy of Lucide (where this install has one); a video it adds gets its site's still
+// (video-still.ts). A deck's equations are drawn here by the server's own KaTeX (math.ts) and go into its page with
+// only the fonts they use, so they draw with no network.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { ASSET, deckFonts, deckOutline, deckSources, deckText, everyEl, FONT_TABLE, googleFamilies, iconNodes, isDeckText, mapSources, normalizeDeck, type Deck, type El, type IconNode, type VideoEl } from '../../shared/slides.ts';
 import { slidesRuntime } from '../../shared/slides-runtime.ts';
-import { LIB_CDN } from '../../shared/app-media.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { assetDataUrl, putAsset, takeIn } from './assets.ts';
 import { scriptSafe } from './kit.ts';
+import { katexStyle, texToHtml } from './math.ts';
 import { videoStillOf } from './video-still.ts';
 
 export { isDeckText };
@@ -206,15 +207,29 @@ export async function agentDeck(db: DB, input: unknown, cwd: string, prev?: stri
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-/** The KaTeX a deck's page draws its equations with (the app's own version, from the CDN). */
-export const KATEX_VERSION = '0.19.0';
-const KATEX_URL = `${LIB_CDN}katex@${KATEX_VERSION}/dist/`;
+/** JSON to put inside a page's <script>: nothing in it can end the script or break a line in it. */
+const scriptJson = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 
-/** Whether a deck has equations (its page then loads KaTeX). */
-export const deckHasMath = (d: Deck) => d.slides.some((s) => everyEl(s.els).some((e) => e.type === 'math'));
+/**
+ * A deck's equations drawn here by the server's own KaTeX (math.ts, as a document's are), each once by its LaTeX, and
+ * what a page needs to show them: the drawings (the runtime puts each in its place, never the deck's own words as
+ * markup) and KaTeX's stylesheet with only the fonts they use inside it. No network: offline, published or saved as a
+ * file, a deck's equations draw. Null for a deck without equations.
+ */
+export function deckMaths(d: Deck): { json: string; style: string } | null {
+  const tex = new Set<string>();
+  for (const s of d.slides) for (const e of everyEl(s.els)) if (e.type === 'math' && e.tex) tex.add(e.tex);
+  if (!tex.size) return null;
+  const drawn: Record<string, string> = {};
+  for (const t of tex) drawn[t] = texToHtml(t, true);
+  return { json: scriptJson(drawn), style: katexStyle(Object.values(drawn).join('')) };
+}
 
-/** KaTeX's stylesheet and script for a page's head. */
-export const KATEX_TAGS = `<link rel="stylesheet" href="${KATEX_URL}katex.min.css" crossorigin="anonymous"><script src="${KATEX_URL}katex.min.js" crossorigin="anonymous"></script>`;
+/** A page's head and body parts for a deck's equations ('' without any): the stylesheet, and the drawings as #n-math. */
+export function mathTags(d: Deck): { head: string; body: string } {
+  const m = deckMaths(d);
+  return m ? { head: `<style>${m.style}</style>`, body: `<script type="application/json" id="n-math">${m.json}</script>` } : { head: '', body: '' };
+}
 
 /** What every deck's page looks like around its slides: the app's colours in a frame, dark when it fills a window. */
 const PAGE_CSS = [
@@ -234,16 +249,17 @@ const PAGE_CSS = [
 export function deckPage(db: DB, deck: Deck, title: string, mode: 'viewer' | 'print' | 'still' = 'viewer'): string {
   const inside = mapSources(deck, (s) => (s.startsWith(ASSET) ? (assetDataUrl(db, s.slice(ASSET.length)) ?? '') : s));
   const fams = googleFamilies(deckFonts(deck));
-  const json = JSON.stringify(inside).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  const maths = mathTags(deck);
   return [
     '<!doctype html>',
     `<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>`,
     '<meta name="generator" content="Hydor slides">',
     fams ? `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?${esc(fams)}&amp;display=swap">` : '',
-    // Before the slides are drawn, so equations draw at once (offline they show as their LaTeX).
-    deckHasMath(deck) ? KATEX_TAGS : '',
+    maths.head,
     `<style>${PAGE_CSS}</style></head><body>`,
-    `<script type="application/json" id="n-deck">${json}</script>`,
+    `<script type="application/json" id="n-deck">${scriptJson(inside)}</script>`,
+    // Before the slides are drawn, so the equations draw with them.
+    maths.body,
     `<script>(${RUNTIME_SRC})(window, ${FONTS_JSON}).boot(${JSON.stringify({ mode })})</script>`,
     '</body></html>',
   ].join('\n');
