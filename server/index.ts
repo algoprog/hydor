@@ -1454,7 +1454,7 @@ function pushed(n: NotifyEvent) {
 }
 sessions.on('notify', (event: NotifyEvent) => {
   // A confidential session's notices say only that it finished, needs you or failed, without its words.
-  const n = privateNotice(db, event);
+  const n = privateNotice(db, event, appWords(db));
   broadcast({ t: 'notify', n });
   // A notification shows a title and a body: the session's name, then the status and the reply.
   const p = pushed(n);
