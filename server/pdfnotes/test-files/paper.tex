@@ -1,0 +1,44 @@
+% A short two-column paper for the PDF notes tests (pdfnotes-test.ts): a title, an abstract, text that runs in two
+% columns with words hyphenated at line ends, display equations and a figure. Typeset with pdflatex:
+%   pdflatex paper.tex
+\documentclass[10pt,twocolumn]{article}
+\usepackage[margin=0.8in]{geometry}
+\usepackage{amsmath}
+\pdfinfo{/Title (Sparse Retrieval with Learned Term Weights) /Author (Ana Costa)}
+\title{Sparse Retrieval with Learned Term Weights}
+\author{Ana Costa \and Jun Park}
+\date{}
+\begin{document}
+\maketitle
+\begin{abstract}
+We study sparse retrieval models that learn a weight for every term of a document. Our model keeps the inverted index of classic search engines while matching the effectiveness of dense retrievers on standard benchmarks.
+\end{abstract}
+
+\section{Introduction}
+Information retrieval systems answer a query with a ranked list of documents. Classic systems score documents with term statistics such as BM25, which needs no training data and runs fast on an inverted index. Neural retrievers instead encode queries and documents into dense vectors and compare them with a dot product.
+
+Dense retrievers need a nearest neighbour index and a great deal of memory. Sparse retrievers with learned weights keep the inverted index and its efficiency, and close most of the gap in effectiveness. This paper describes such a model and the conditions under which its improvements hold, together with an analysis of its failure modes on long and heterogeneous collections.
+
+\section{Method}
+Each term $t$ of a document $d$ receives a weight from a contextual encoder. The score of a document for a query $q$ is the sum of the weights of the terms they share:
+\begin{equation}
+s(q, d) = \sum_{t \in q \cap d} w_t(d) \cdot w_t(q).
+\end{equation}
+We train the encoder with a contrastive loss over one positive document and a set of negatives:
+\begin{equation}
+\mathcal{L} = -\log \frac{\exp s(q, d^+)}{\sum_{d'} \exp s(q, d')}.
+\end{equation}
+A regulariser keeps the representations sparse, so that the index stays small and queries stay fast.
+
+\begin{figure}[h]
+\centering
+\fbox{\parbox{0.8\columnwidth}{\centering\vspace{1.2em}Encoder, then term weights, then an inverted index\vspace{1.2em}}}
+\caption{The model: an encoder gives each term a weight, and the weights go into an inverted index.}
+\end{figure}
+
+\section{Experiments}
+We evaluate on three collections of news, scientific abstracts and web pages. Our model improves the mean reciprocal rank over BM25 by twelve points and matches a dense retriever of the same size, while answering queries four times faster on a single processor. Effectiveness drops on very long documents, where a few frequent terms dominate the weights; splitting documents into passages recovers most of the loss.
+
+\section{Conclusion}
+Learned term weights make sparse retrieval competitive with dense retrieval at a fraction of its cost. Future work will study multilingual collections and the interpretability of the weights the encoder assigns.
+\end{document}

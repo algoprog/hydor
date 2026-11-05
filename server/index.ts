@@ -49,6 +49,7 @@ import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAc
 import { devServerShot, listDevServers, livePreview, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
 import { moveFileComments } from './pages/filecomments.ts';
+import { movedPdfNotes } from './pdfnotes/index.ts';
 import * as setup from './setup.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
 import { onDesktop, tellDesktop } from './desktop.ts';
@@ -1032,8 +1033,9 @@ app.put('/api/fs/write', async (req) => {
 app.post('/api/fs/mkdir', async (req) => files.makeDir((req.body as any)?.path));
 app.post('/api/fs/rename', async (req) => {
   const r = await files.renamePath((req.body as any)?.from, (req.body as any)?.to);
-  // The comments the app keeps on LaTeX files go with them (and with a folder's files).
+  // The comments the app keeps on LaTeX files go with them (and with a folder's files), and the notes on PDFs.
   moveFileComments(db, files.resolvePath((req.body as any)?.from), r.path);
+  movedPdfNotes(db, files.resolvePath((req.body as any)?.from), r.path);
   return r;
 });
 app.post('/api/fs/delete', async (req) => files.deletePath((req.body as any)?.path, { forGood: (req.body as any)?.forGood === true }));
