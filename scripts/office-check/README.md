@@ -105,8 +105,9 @@ transitions, Chinese and Greek words) in a running copy of the app, and for each
    extensions inside `mc:AlternateContent` and `extLst` are left to the schemas' lax parts; check them by hand against
    [MS-PPTX] and [MS-ODRAWXML]);
 3. opens the .pptx in LibreOffice (in Docker, without the network) and prints its slides: once as it is, and once with
-   the fonts the file carries installed (taken out of its Embedded OpenType parts), which is how PowerPoint shows a file
-   whose embedded fonts it loads (LibreOffice 7.4 does not read fonts embedded in a .pptx itself);
+   the fonts the file carries installed (taken out of its Embedded OpenType parts, their MicroType Express undone by the
+   app's own decoder), which is how PowerPoint shows a file whose embedded fonts it loads (LibreOffice 7.4 does not read
+   fonts embedded in a .pptx itself);
 4. puts each slide's three pictures side by side with how much they differ, worst first, in `report.html`, and lists
    the fonts LibreOffice drew with.
 

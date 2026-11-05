@@ -22,7 +22,7 @@
 import type { Anim, ChartEl, Deck, El, GroupEl, IconEl, ImageEl, LayoutId, LineEl, MathEl, Para, Ratio, Run, Side, Slide, Stick, TableEl, TextEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
 import { everyEl, fontName, FONTS, footerOn, hexColor, LAYOUTS, layoutSlide, mixColor, plainText, slideH, VIDEO, videoStill } from '../../shared/slides.ts';
 import { coreXml, esc, relsXml, XML_HEAD, zipParts, type ZipPart } from './ooxml.ts';
-import { eotOf, fontAttrs } from './pptx-fonts.ts';
+import { eotCompressed, eotOf, fontAttrs, fontsSaid } from './pptx-fonts.ts';
 
 /** A picture ready for the file: PNG, JPEG or GIF bytes and its size in pixels. */
 export interface Picture {
@@ -44,6 +44,8 @@ export interface PptxOpts {
   video?: (src: string) => { data: Buffer; ext: string; mime: string } | null;
   /** The faces of the app's fonts the deck shows (pptx-fonts.ts deckFontFiles: TrueType files by "family|bold|italic"), carried inside the file. */
   fonts?: Map<string, Buffer>;
+  /** Told which faces went inside the file, and which of them compressed (pptx-fonts.ts fontsSaid). */
+  note?: (text: string) => void;
 }
 
 /** A dark 1×1 PNG: the still of a video that has none (PowerPoint shows its first frame once it plays). */
@@ -1477,6 +1479,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
     const eot = family ? eotOf(ttf) : null;
     if (eot) fonts.push({ family, slot: (b === '1' ? 1 : 0) + (i === '1' ? 2 : 0), name: `font${fonts.length + 1}.fntdata`, data: eot });
   }
+  if (fonts.length) o.note?.(fontsSaid(fonts.map((f) => ({ ...f, compressed: eotCompressed(f.data) }))));
 
   const types = [
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',

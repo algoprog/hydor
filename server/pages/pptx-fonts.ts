@@ -3,7 +3,9 @@
 // kept inside a file as Embedded OpenType: the TrueType file behind a header that says what it is ([MS-OE376] 15.2.12,
 // the W3C's EOT submission), one part per face (regular, bold, italic, bold italic), listed in the presentation's
 // embeddedFontLst. Only the faces the deck's words use go in, whole (so the deck stays editable in them), fetched from
-// Google as TrueType once and kept beside the web fonts (fonts.ts); offline, the file goes without them. What PowerPoint
+// Google as TrueType once and kept beside the web fonts (fonts.ts); offline, the file goes without them. Each goes in
+// compressed as PowerPoint writes its own (MicroType Express, pptx-mtx.ts) once it has been seen to come back the same,
+// else as it is. What PowerPoint
 // is told of every font besides its name (its PANOSE, pitch and family) lets a computer that cannot load it pick the
 // closest one it has: a sans for a sans, a serif for a serif, a fixed pitch for code.
 import crypto from 'node:crypto';
@@ -11,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { everyEl, FONTS, fontName, footerOn, type Deck } from '../../shared/slides.ts';
 import { config } from '../config.ts';
+import { fontOfMtx, mtxOf, sameFont } from './pptx-mtx.ts';
 
 type Kind = 'sans' | 'serif' | 'mono';
 
@@ -159,24 +162,76 @@ export function fontInfo(ttf: Buffer): { family: string; style: string; weight: 
   return { family: nameOf(ttf, t, 1), style: nameOf(ttf, t, 2), weight: ttf.readUInt16BE(os2[0] + 4), italic, embeddable };
 }
 
+/** EOT's flag for font data compressed as MicroType Express (TTEMBED_TTCOMPRESSED). */
+const COMPRESSED = 0x4;
+
+/** Whether an Embedded OpenType font's data went in compressed. */
+export const eotCompressed = (eot: Buffer) => eot.length >= 16 && !!(eot.readUInt32LE(12) & COMPRESSED);
+
+const MTX_DIR = () => path.join(config.dataDir, 'pages', 'fonts', 'mtx');
+const squeezes = new Map<string, Buffer | null>();
+
+/**
+ * A face as MicroType Express, once the font it turns back into has every glyph, metric and table of the face's own
+ * (sameFont); null when it does not, or cannot be made (it then goes in as it is). Made once a face and kept, by the
+ * face's own bytes (and checked again when read back).
+ */
+export function squeezed(ttf: Buffer): Buffer | null {
+  const key = crypto.createHash('sha256').update(ttf).digest('hex').slice(0, 32);
+  if (squeezes.has(key)) return squeezes.get(key)!;
+  const file = path.join(MTX_DIR(), `${key}.mtx`);
+  const comesBack = (mtx: Buffer) => {
+    try {
+      return sameFont(ttf, fontOfMtx(mtx)) === null;
+    } catch {
+      return false;
+    }
+  };
+  let got: Buffer | null = null;
+  try {
+    got = fs.readFileSync(file);
+  } catch {}
+  if (got && !comesBack(got)) got = null;
+  if (!got) {
+    try {
+      const made = mtxOf(ttf);
+      if (comesBack(made)) {
+        got = made;
+        try {
+          fs.mkdirSync(MTX_DIR(), { recursive: true, mode: 0o700 });
+          const tmp = `${file}.${process.pid}.tmp`;
+          fs.writeFileSync(tmp, made);
+          fs.renameSync(tmp, file);
+        } catch {}
+      }
+    } catch {}
+  }
+  if (squeezes.size >= 64) squeezes.delete(squeezes.keys().next().value!);
+  squeezes.set(key, got);
+  return got;
+}
+
 /**
  * A TrueType file as Embedded OpenType, as PowerPoint keeps a font in a file: version 0x00020002's header (the font's
  * PANOSE, weight, style, embedding rights, Unicode and code page ranges and names, little-endian), then the font
- * itself, neither compressed nor obscured. Null for what is not a font that may be embedded.
+ * compressed as PowerPoint compresses it (MicroType Express, flag 0x4) where it comes back the same, else as it is;
+ * never obscured. Null for what is not a font that may be embedded.
  */
-export function eotOf(ttf: Buffer): Buffer | null {
+export function eotOf(ttf: Buffer, opts: { compress?: boolean } = {}): Buffer | null {
   const t = tables(ttf);
   const os2 = t?.get('OS/2');
   const head = t?.get('head');
   const info = fontInfo(ttf);
   if (!t || !os2 || !head || !info?.embeddable || !info.family) return null;
   const o = os2[0];
-  // EOTSize and FontDataSize (filled in at the end), Version, Flags (0: whole, plain), the PANOSE, the charset
-  // (DEFAULT_CHARSET), italic, weight, fsType, the magic number, the Unicode and code page ranges, head's checksum
-  // adjustment; Reserved1–4 stay 0. 80 bytes: Padding1 comes with the family's name below.
+  const mtx = opts.compress === false ? null : squeezed(ttf);
+  const data = mtx ?? ttf;
+  // EOTSize and FontDataSize (filled in at the end), Version, Flags (compressed or not; whole, never obscured), the
+  // PANOSE, the charset (DEFAULT_CHARSET), italic, weight, fsType, the magic number, the Unicode and code page ranges,
+  // head's checksum adjustment; Reserved1–4 stay 0. 80 bytes: Padding1 comes with the family's name below.
   const fixed = Buffer.alloc(80);
   fixed.writeUInt32LE(0x00020002, 8);
-  fixed.writeUInt32LE(0, 12);
+  fixed.writeUInt32LE(mtx ? COMPRESSED : 0, 12);
   ttf.copy(fixed, 16, o + 32, o + 42);
   fixed.writeUInt8(1, 26);
   fixed.writeUInt8(info.italic ? 1 : 0, 27);
@@ -199,9 +254,24 @@ export function eotOf(ttf: Buffer): Buffer | null {
   const tail = Buffer.alloc(24);
   tail.writeUInt32LE(0x50475342, 4);
   const header = Buffer.concat([fixed, str(info.family), str(info.style), str(nameOf(ttf, t, 5)), str(nameOf(ttf, t, 4)), tail]);
-  header.writeUInt32LE(header.length + ttf.length, 0);
-  header.writeUInt32LE(ttf.length, 4);
-  return Buffer.concat([header, ttf]);
+  header.writeUInt32LE(header.length + data.length, 0);
+  header.writeUInt32LE(data.length, 4);
+  return Buffer.concat([header, data]);
+}
+
+/** Which faces went inside a file and how, said: "Fonts inside it: Inter (regular, bold), compressed as PowerPoint keeps them." */
+export function fontsSaid(faces: { family: string; slot: number; compressed: boolean }[]): string {
+  const SLOT = ['regular', 'bold', 'italic', 'bold italic'];
+  const list = (group: typeof faces) => {
+    const by = new Map<string, number[]>();
+    for (const f of group) by.set(f.family, [...(by.get(f.family) ?? []), f.slot]);
+    const named = (slots: number[]) => slots.sort((a, b) => a - b).map((x) => SLOT[x]);
+    return [...by].map(([family, slots]) => `${family} (${named(slots).join(', ')})`).join(', ');
+  };
+  const small = faces.filter((f) => f.compressed);
+  const whole = faces.filter((f) => !f.compressed);
+  if (!faces.length) return '';
+  return `Fonts inside it: ${[small.length ? `${list(small)}, compressed as PowerPoint keeps them` : '', whole.length ? `${list(whole)}, as they are (they did not compress)` : ''].filter(Boolean).join('; ')}.`;
 }
 
 // ---- the faces themselves, from Google --------------------------------------------------------------------------
@@ -272,5 +342,10 @@ export async function deckFontFiles(d: Deck): Promise<Map<string, Buffer>> {
   const missing = await take(deckFaces(d).slice(0, 24));
   const upright = missing.filter((f) => f.italic && !out.has(faceKey({ ...f, italic: false }))).map((f) => ({ ...f, italic: false }));
   if (upright.length) await take(upright);
+  // Each compressed now, a face at a time (the server answering others in between), for the file to take as made.
+  for (const ttf of out.values()) {
+    await new Promise((ok) => setImmediate(ok));
+    squeezed(ttf);
+  }
   return out;
 }

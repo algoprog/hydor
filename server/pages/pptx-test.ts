@@ -16,7 +16,8 @@ import { chartPlan, langOf, pptxFile, shapeOutline, type Picture } from './pptx.
 import { deckRenders } from './slides-render.ts';
 import { deckFromPptx } from './pptx-import.ts';
 import { zipParts } from './ooxml.ts';
-import { deckFaces, deckFontFiles, eotOf, faceFile, faceKey, fontAttrs, fontInfo } from './pptx-fonts.ts';
+import { deckFaces, deckFontFiles, eotCompressed, eotOf, faceFile, faceKey, fontAttrs, fontInfo, fontsSaid } from './pptx-fonts.ts';
+import { ctfOf, fontOfMtx, lzcomp, mtxOf, sameFont, unlzcomp } from './pptx-mtx.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -150,9 +151,30 @@ function powerpointFile(): Buffer {
 // ---- Embedded OpenType ------------------------------------------------------------------------------------------
 {
   const eot = eotOf(regular)!;
-  ok(eot && eot.readUInt32LE(0) === eot.length && eot.readUInt32LE(4) === regular.length && eot.readUInt32LE(8) === 0x00020002 && eot.readUInt32LE(12) === 0, 'a font is kept as Embedded OpenType 2.2: its sizes, whole and plain');
+  const size = eot.readUInt32LE(4);
+  const data = eot.subarray(eot.length - size);
+  ok(
+    eot && eot.readUInt32LE(0) === eot.length && eot.readUInt32LE(8) === 0x00020002 && eot.readUInt32LE(12) === 0x4 && eotCompressed(eot),
+    'a font is kept as Embedded OpenType 2.2: its sizes, compressed as PowerPoint keeps fonts (flag 0x4), not obscured',
+  );
   ok(eot.readUInt16LE(34) === 0x504c && eot.readUInt8(26) === 1 && eot.readUInt8(27) === 0 && eot.readUInt32LE(28) === 400, 'with the magic number, the default charset, upright, weight 400');
-  ok(eot.subarray(eot.length - regular.length).equals(regular), 'the font itself after the header, as it was');
+  ok(data[0] === 3 && data.readUIntBE(4, 3) > 10 && size < regular.length * 0.7, `the font itself after the header as MicroType Express, ${Math.round((100 * size) / regular.length)}% of its size`);
+  ok(sameFont(regular, fontOfMtx(data)) === null, 'which comes back as the same font');
+  const plain = eotOf(regular, { compress: false })!;
+  ok(plain.readUInt32LE(12) === 0 && !eotCompressed(plain) && plain.readUInt32LE(4) === regular.length && plain.subarray(plain.length - regular.length).equals(regular), 'or whole and plain, the font as it was');
+  // A face that cannot be compressed (no TrueType outlines here) goes in as it is.
+  const noGlyf = Buffer.from(regular);
+  for (let i = 0; i < noGlyf.readUInt16BE(4); i++) if (noGlyf.toString('latin1', 12 + i * 16, 16 + i * 16) === 'glyf') noGlyf.write('glyx', 12 + i * 16, 'latin1');
+  const fallback = eotOf(noGlyf)!;
+  ok(fallback && !eotCompressed(fallback) && fallback.subarray(fallback.length - noGlyf.length).equals(noGlyf), 'a face that does not compress goes in as it is');
+  // Kept once made, and made again when what was kept does not come back as the face.
+  const kept = path.join(process.env.DATA_DIR!, 'pages', 'fonts', 'mtx', `${crypto.createHash('sha256').update(regular).digest('hex').slice(0, 32)}.mtx`);
+  ok(fs.existsSync(kept) && fs.readFileSync(kept).equals(data), 'the compressed face is kept for the next file');
+  const keptBold = path.join(path.dirname(kept), `${crypto.createHash('sha256').update(bold).digest('hex').slice(0, 32)}.mtx`);
+  fs.mkdirSync(path.dirname(kept), { recursive: true });
+  fs.writeFileSync(keptBold, data);
+  const boldEot = eotOf(bold)!;
+  ok(eotCompressed(boldEot) && sameFont(bold, fontOfMtx(boldEot.subarray(boldEot.length - boldEot.readUInt32LE(4)))) === null, 'a kept file that is not the face is not used');
   // The names, each after its padding and size, in UTF-16LE.
   let at = 80;
   const names: string[] = [];
@@ -163,11 +185,141 @@ function powerpointFile(): Buffer {
     at += 4 + n;
   }
   ok(names[0] === 'KaTeX_Main' && names[1] === 'Regular' && names[2].startsWith('Version') && names[3] === 'KaTeX_Main-Regular', 'its family, style, version and full names');
-  ok(eot.readUInt16LE(at) === 0 && eot.readUInt16LE(at + 2) === 0 && eot.readUInt32LE(at + 4) === 0x50475342 && at + 24 === eot.length - regular.length, 'no root string (its checksum as the format makes it), no signature, no EUDC font');
+  ok(eot.readUInt16LE(at) === 0 && eot.readUInt16LE(at + 2) === 0 && eot.readUInt32LE(at + 4) === 0x50475342 && at + 24 === eot.length - size, 'no root string (its checksum as the format makes it), no signature, no EUDC font');
   ok(eotOf(bold)!.readUInt32LE(28) === 700 && eotOf(italic)!.readUInt8(27) === 1, 'a bold face says its weight, an italic one that it is italic');
   const restricted = withOs2(regular, 8, 0x0002);
   ok(eotOf(restricted) === null && fontInfo(restricted)?.embeddable === false, 'a font whose licence forbids embedding is not carried');
   ok(eotOf(Buffer.from('not a font at all, just words')) === null, 'nor what is not a font');
+}
+
+// ---- MicroType Express -------------------------------------------------------------------------------------------------
+/** A font's tables by tag. */
+function tableMap(font: Buffer): Map<string, Buffer> {
+  const t = new Map<string, Buffer>();
+  for (let i = 0; i < font.readUInt16BE(4); i++) {
+    const at = 12 + i * 16;
+    const off = font.readUInt32BE(at + 8);
+    t.set(font.toString('latin1', at, at + 4), font.subarray(off, off + font.readUInt32BE(at + 12)));
+  }
+  return t;
+}
+/** A font's glyphs, each as its bytes. */
+function glyphsOf(font: Buffer): Buffer[] {
+  const t = tableMap(font);
+  const long = t.get('head')!.readInt16BE(50) === 1;
+  const loca = t.get('loca')!;
+  const at = (i: number) => (long ? loca.readUInt32BE(4 * i) : loca.readUInt16BE(2 * i) * 2);
+  return Array.from({ length: t.get('maxp')!.readUInt16BE(4) }, (_, i) => t.get('glyf')!.subarray(at(i), at(i + 1)));
+}
+/** A font of `base`'s tables, some changed (null: left out), its glyf and loca made from `glyphs` (long offsets). */
+function fontWith(base: Buffer, glyphs: Buffer[] | null, swap: Record<string, Buffer | null> = {}): Buffer {
+  const t = tableMap(base);
+  const pad = (b: Buffer) => Buffer.concat([b, Buffer.alloc(((b.length + 3) & ~3) - b.length)]);
+  if (glyphs) {
+    const head = Buffer.from(t.get('head')!);
+    head.writeInt16BE(1, 50);
+    t.set('head', head);
+    const loca = Buffer.alloc(4 * (glyphs.length + 1));
+    let at = 0;
+    glyphs.forEach((g, i) => {
+      loca.writeUInt32BE(at, 4 * i);
+      at += pad(g).length;
+    });
+    loca.writeUInt32BE(at, 4 * glyphs.length);
+    t.set('loca', loca);
+    t.set('glyf', Buffer.concat(glyphs.map(pad)));
+  }
+  for (const [k, v] of Object.entries(swap)) v ? t.set(k, v) : t.delete(k);
+  const tags = [...t.keys()].sort();
+  const dir = Buffer.alloc(12 + 16 * tags.length);
+  dir.writeUInt32BE(0x00010000, 0);
+  dir.writeUInt16BE(tags.length, 4);
+  let off = dir.length;
+  const body = tags.map((tag, i) => {
+    const d = pad(t.get(tag)!);
+    dir.write(tag, 12 + 16 * i, 'latin1');
+    dir.writeUInt32BE(off, 12 + 16 * i + 8);
+    dir.writeUInt32BE(t.get(tag)!.length, 12 + 16 * i + 12);
+    off += d.length;
+    return d;
+  });
+  return Buffer.concat([dir, ...body]);
+}
+const words = (...v: number[]) => v.flatMap((x) => [(x >> 8) & 255, x & 255]);
+/** A simple glyph of contours of [x, y, on-curve] points (every step a word), its box given or its points'. */
+function simpleGlyph(contours: [number, number, boolean][][], box?: number[], code: number[] = []): Buffer {
+  const pts = contours.flat();
+  const b = box ?? [Math.min(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1])), Math.max(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1]))];
+  let end = -1;
+  const ends = contours.map((c) => (end += c.length));
+  const steps = (k: 0 | 1) => pts.flatMap((p, i) => words(p[k] - (i ? pts[i - 1][k] : 0)));
+  return Buffer.from([...words(contours.length, ...b, ...ends, code.length), ...code, ...pts.map((p) => (p[2] ? 1 : 0)), ...steps(0), ...steps(1)]);
+}
+{
+  // LZCOMP: what goes in comes out, whatever it is.
+  let seed = 7;
+  const rnd = (n: number, k: number) => Buffer.from(Array.from({ length: n }, () => ((seed = (seed * 1103515245 + 12345) >>> 0) >>> 16) % k));
+  const samples = [Buffer.alloc(0), Buffer.from([42]), Buffer.from('abcabcabcabcabcabc, abcabc!'), rnd(3000, 256), rnd(20000, 4), Buffer.alloc(100000), Buffer.concat([rnd(700, 256), Buffer.alloc(600), rnd(700, 256)]), regular];
+  ok(
+    samples.every((d) => unlzcomp(lzcomp(d)).equals(d)),
+    'LZCOMP gives back what it was given',
+  );
+  ok(lzcomp(Buffer.alloc(100000)).length < 2000 && lzcomp(regular).length < regular.length * 0.8, 'and makes it smaller where it repeats');
+  // The run-length step a decoder undoes (this encoder leaves it out): an escape byte, then the escape with a count and a byte.
+  const runs = lzcomp(Buffer.from([0x99, 1, 2, 0x99, 5, 7, 3, 0x99, 0]));
+  runs[0] |= 0x80;
+  ok(unlzcomp(runs).equals(Buffer.from([1, 2, 7, 7, 7, 7, 7, 3, 0x99])), 'and undoes a run-length step');
+
+  // Every KaTeX face comes back the same.
+  const faces = fs.readdirSync(KATEX).filter((f) => f.endsWith('.ttf'));
+  const bad = faces.filter((f) => {
+    const ttf = fs.readFileSync(path.join(KATEX, f));
+    return sameFont(ttf, fontOfMtx(mtxOf(ttf))) !== null;
+  });
+  ok(faces.length >= 19 && !bad.length, `all ${faces.length} of KaTeX’s fonts come back the same through MicroType Express${bad.length ? `: not ${bad.join(', ')}` : ''}`);
+
+  // A font with what those have none of: steps of every size the triplets have, a box its points do not make, composite
+  // glyphs (offsets in words, a scale, x and y scales, a 2×2, a program), a cvt with far jumps, device metrics.
+  const base = glyphsOf(regular);
+  const far: [number, number, boolean][] = [
+    [0, 0, true],
+    [0, 300, true],
+    [-1100, 300, false],
+    [-1095, 293, true],
+    [-1031, 357, false],
+    [-966, 358, true],
+    [-198, -410, true],
+    [571, -408, false],
+    [4666, -4503, true],
+    [8762, -4503, true],
+    [8762, -5783, false],
+    [28000, 20000, true],
+  ];
+  const glyphs = [...base];
+  glyphs[1] = simpleGlyph([far]);
+  glyphs[2] = simpleGlyph([far.slice(0, 5), far.slice(5)], [-2000, -6000, 30000, 25000], [0x40, 3, 1, 2, 3, 0x2b]);
+  glyphs[3] = Buffer.from([...words(-1, -10, -20, 300, 400), 0x00, 0x23, ...words(5, 100, -200), 0x01, 0x0a, ...words(6), 5, 0xfa, 0x20, 0x00, ...words(4), 0xb1, 0x01, 0x02, 0x2b]);
+  glyphs[4] = Buffer.from([...words(-1, 0, 0, 500, 500), 0x00, 0x62, ...words(5), 1, 2, 0x40, 0, 0x30, 0, 0x00, 0x82, ...words(6), 0, 0, 0x40, 0, 0, 0, 0, 0, 0x40, 0]);
+  glyphs[7] = Buffer.alloc(0);
+  const cvt = Buffer.from(words(0, 237, 238, 475, 2141, 2142, -2141, -2142, 32767, -32768, 1, -1, 0));
+  const odd = fontWith(regular, glyphs, { 'cvt ': cvt, hdmx: Buffer.from([0, 0, 0, 1, 0, 0, 0, 4]) });
+  const ctf = ctfOf(odd);
+  const ctfTables = tableMap(ctf.rest);
+  ok(ctfTables.has('loca') && ctfTables.get('loca')!.length === 0 && !ctfTables.has('hdmx') && ctf.push.length === 0, 'in Compact Table Format loca is empty, device metrics go, and every program stays whole in the instructions part');
+  const back = fontOfMtx(mtxOf(odd));
+  ok(sameFont(odd, back) === null && !tableMap(back).has('hdmx') && tableMap(back).get('cvt ')!.equals(cvt), 'such a font comes back the same (without its device metrics)');
+  const backGlyphs = glyphsOf(back);
+  const padded = (got: Buffer, want: Buffer) => got.subarray(0, want.length).equals(want) && got.subarray(want.length).every((x) => x === 0);
+  ok(padded(backGlyphs[3], glyphs[3]) && padded(backGlyphs[4], glyphs[4]) && backGlyphs[7].length === 0, 'its composite glyphs byte for byte, its empty one empty');
+  const mtx = mtxOf(odd);
+  const [at2, at3] = [mtx.readUIntBE(4, 3), mtx.readUIntBE(7, 3)];
+  ok(mtx[0] === 3 && at2 > 10 && at3 > at2 && at3 < mtx.length && mtx.readUIntBE(1, 3) >= ctf.rest.length + 7168, 'MicroType Express 3: its copy limit, then where its second and third parts start');
+  // And a font that differs is told apart.
+  const moved = [...glyphs];
+  moved[1] = simpleGlyph([far.map(([x, y, on], i) => [x, i === 6 ? y + 1 : y, on] as [number, number, boolean])]);
+  const hmtx = Buffer.from(tableMap(regular).get('hmtx')!);
+  hmtx[1] ^= 1;
+  ok(/outline differs/.test(sameFont(odd, fontWith(odd, moved)) ?? '') && sameFont(regular, fontWith(regular, null, { hmtx })) === 'hmtx differs' && sameFont(regular, bold) !== null, 'a point moved or a width changed is told apart');
 }
 
 // ---- the faces a deck uses ------------------------------------------------------------------------------------------
@@ -243,7 +395,18 @@ const deck = normalizeDeck({
     'each face a font part of its own, of the type PowerPoint keeps fonts in',
   );
   const f1 = new Zip(file).read('ppt/fonts/font1.fntdata')!;
-  ok(f1.readUInt16LE(34) === 0x504c && f1.subarray(f1.length - regular.length).equals(regular), 'as Embedded OpenType');
+  ok(f1.readUInt16LE(34) === 0x504c && eotCompressed(f1) && sameFont(regular, fontOfMtx(f1.subarray(f1.length - f1.readUInt32LE(4)))) === null, 'as Embedded OpenType, compressed');
+  const said: string[] = [];
+  pptxFile(deck, { title: 'T', picture: () => null, fonts, note: (t) => said.push(t) });
+  ok(said.length === 1 && said[0] === 'Fonts inside it: Inter (regular, bold, italic), compressed as PowerPoint keeps them.', `the export says which faces went in, compressed: ${said[0]}`);
+  ok(
+    fontsSaid([
+      { family: 'Inter', slot: 1, compressed: true },
+      { family: 'Lora', slot: 2, compressed: false },
+      { family: 'Inter', slot: 0, compressed: true },
+    ]) === 'Fonts inside it: Inter (regular, bold), compressed as PowerPoint keeps them; Lora (italic), as they are (they did not compress).',
+    'and which went in as they are',
+  );
   const bare = pptxFile(deck, { title: 'T', picture: () => null });
   ok(
     !part(bare, 'ppt/presentation.xml').includes('embeddedFont') && !part(bare, '[Content_Types].xml').includes('fntdata') && !new Zip(bare).names().some((n) => n.startsWith('ppt/fonts/')),

@@ -38,6 +38,8 @@ export interface ExportHelp {
   renders?: Map<string, Picture>;
   /** A document's fonts for its Word file, the faces it uses (word-fonts.ts). */
   wordFonts?: Map<string, EmbeddedFont>;
+  /** Something to say of the file made (which fonts went inside a PowerPoint file, and how). */
+  note?: (text: string) => void;
 }
 
 export interface KindDef {
@@ -94,7 +96,7 @@ KINDS.set('slides', {
       const deck = readDeck(text);
       // The faces of the app's fonts it shows go inside it (no Office computer has them; none offline).
       const fonts = await deckFontFiles(deck);
-      return pptxFile(deck, { title, picture: help.picture, scales: help.scales, renders: help.renders, video, fonts });
+      return pptxFile(deck, { title, picture: help.picture, scales: help.scales, renders: help.renders, video, fonts, note: help.note });
     },
     html: (db, text, title) => deckPage(db, readDeck(text), title, 'viewer', { videosInside: true }),
   },
