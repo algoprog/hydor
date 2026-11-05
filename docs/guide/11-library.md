@@ -82,6 +82,7 @@ Type **/** in an empty block, or after a space, and a list of blocks opens under
 - **Text**, **Heading 1** to **Heading 3**, **Bulleted list**, **Numbered list**, **To-do list**, **Toggle list** (a title that opens to show what is under it), **Quote**, **Callout** (an emoji and words on a tinted box: click the emoji to change it), **Divider** and **Code**.
 - **Table**, **Button**, **Two columns**, **Three columns**, **Card** and **Table of contents** (links to the page's headings, kept up to date as you change them).
 - **Picture** (from this device or a web address), **Video** (a YouTube or Vimeo address: the page shows its still, and a click plays it), **Maths** (LaTeX, drawn as you type it; change it later on the Part tab) and **Emoji** (picked by name, the ones you used lately first) open beside the caret.
+- **Link to a page**, or **@** as you write (at a block's start or after a space): the pages of your Library, the newest first. Type a few letters of a page's name to find it and press Enter: a link to it goes in, shown with the page's icon and name, and it keeps up when you rename the page. In **Use**, a click on it opens that page.
 
 Drop a picture from your computer onto the page, or paste one, and it lands where you dropped it (or after the block you are writing in), made small enough to live in the page.
 

@@ -8,7 +8,8 @@
 // Edit has an inspector with three tabs: Part (the part picked), Layers (the page's parts as a tree) and
 // Page (the whole page's look). Beside the page when there is room, else a drawer under it that folds. Words
 // are written in the page itself as in Notion (server/pages/writing.ts); what it asks for while you write (an
-// emoji, a picture, a video, maths, an icon, a cover) is chosen in the app, beside where it was asked.
+// emoji, a picture, a video, maths, an icon, a cover) is chosen in the app, beside where it was asked, and it is told
+// the Library's pages, for links to them ("@").
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronUp, Code2, Eye, Keyboard, Monitor, PenLine, Plus, Redo2, Smartphone, Tablet, Undo2 } from 'lucide-react';
 import { toast, toastError } from '../../../lib/store';
@@ -16,6 +17,7 @@ import { Button, cx, IconButton, MenuItem, Popover, Segmented, Throbber, useConf
 import type { EditorHandle } from '../../../lib/codemirror';
 import { DeviceStage, EditFrame, PageFrame, StreamFrame, withBase, type AppBridge, type Device, type EdAsk, type EdLayer, type EdPage, type EdSel, type EditHandle, type EdState, type Pick, type Store } from '../frame';
 import { ShortcutsDialog } from '../common/Shortcuts';
+import { usePagesStore } from '../state';
 import { AddPanel } from './AddPanel';
 import { editorLabels } from './blocks';
 import { InsertPopover, PAGE_SHORTCUTS } from './Inserts';
@@ -206,6 +208,17 @@ export function Studio({
   // Room for the three screen sizes as buttons; else one button with a menu.
   const roomy = useMediaQuery('(min-width: 1180px)');
   const labels = useMemo(() => editorLabels(), []);
+  // The Library's pages, for links to them ("@" in the page): the editor gets them as it starts and as they change.
+  const library = usePagesStore((s) => s.pages);
+  useEffect(() => {
+    if (!usePagesStore.getState().pages) usePagesStore.getState().loadPages().catch(() => {});
+  }, []);
+  const pageRefs = useMemo(() => (library ?? []).filter((p) => !p.app).map((p) => ({ id: p.id, title: p.title, kind: p.kind ?? 'page', icon: p.icon ?? '' })), [library]);
+  const pageRefsRef = useRef(pageRefs);
+  pageRefsRef.current = pageRefs;
+  useEffect(() => {
+    if (mode === 'edit') editRef.current?.cmd('pages', pageRefs);
+  }, [pageRefs, mode]);
   const [confirm, confirmNode] = useConfirm();
   const writing = !!draft && !draft.done;
   const html = pending ?? doc?.html ?? '';
@@ -416,6 +429,7 @@ export function Studio({
                 editRef.current?.cmd('ctx', { ...ctx, media });
                 editRef.current?.cmd('layers', tab === 'layers');
                 editRef.current?.cmd('caps', { ask: !!onAsk });
+                editRef.current?.cmd('pages', pageRefsRef.current);
                 if (clipboard) editRef.current?.cmd('clip', { html: clipboard.html });
               }}
               onLayers={setLayers}

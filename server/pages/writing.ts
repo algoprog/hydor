@@ -12,7 +12,8 @@
 // tick and toggles fold in Edit too, a table of contents keeps up with the headings, a page gets an icon and a cover,
 // pictures dropped or pasted in land where they fall (the app makes them small enough to live in the page), and code
 // blocks are coloured as their code is written (shared/code-colours.ts), with a language picked by the chip at their
-// corner or Auto; the colours are taken off again in the page given back, which keeps its code as plain text.
+// corner or Auto; the colours are taken off again in the page given back, which keeps its code as plain text. "@" (or
+// "/" → Link to a page) puts in a link to another of the Library's pages, whose list the app tells it, as a chip.
 //
 // What it adds to the page uses the kit's classes (shared/page-kit.ts), so it suits the page light or dark; what is
 // its own (hints in empty blocks, handles, menus) is drawn over the page or stripped before the page is given back.
@@ -1091,6 +1092,11 @@ export function writing(E: Core): Writing {
     left: '<path d="m15 6-6 6 6 6"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
     image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+    // a page of the Library, by its kind (for links to it)
+    page: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+    pagelink: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4"/><path d="M14 3v5h5V11"/><path d="M15 21l6-6"/><path d="M17 15h4v4"/>',
+    doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h6"/>',
+    slides: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4"/><path d="M8 20h8"/>',
   };
   const svg = (k: string, size = 16) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k] ?? ''}</svg>`;
   const glyph = (t: string) => `<span class="gl">${t}</span>`;
@@ -1608,6 +1614,7 @@ export function writing(E: Core): Writing {
       ['toc', 'sToc', 'Table of contents', 'toc outline headings contents', 'toc', ''],
       ['math', 'sMath', 'Maths', 'equation formula latex katex tex math', 'math', ''],
       ['emoji', 'sEmoji', 'Emoji', 'smiley icon face symbol', 'emoji', ''],
+      ['link', 'linkPage', 'Link to a page', 'mention page link reference library', 'pagelink', '@'],
     ] as const
   ).map(([id, key, en, also, icon, k]) => ({ id, label: L(key, en), en, also, icon, key: k }));
   let slash: { h: HTMLElement; node: Text; at: number; items: Item[]; i: number; misses: number; rows: number } | null = null;
@@ -1720,13 +1727,180 @@ export function writing(E: Core): Writing {
     if (!pressedOn(slEl)) return;
     const b = ((e.composedPath()[0] as HTMLElement).closest?.('[data-i]') as HTMLElement | null) ?? null;
     if (b && slash) pickItem(slash.items[Number(b.dataset.i)]);
+    else if (b && mention) pickPage(mention.items[Number(b.dataset.i)]);
   });
   slEl.addEventListener('pointermove', (e) => {
     const b = ((e.composedPath()[0] as HTMLElement).closest?.('[data-i]') as HTMLElement | null) ?? null;
-    if (!slash || !b || Number(b.dataset.i) === slash.i) return;
-    slash.i = Number(b.dataset.i);
+    const list = slash ?? mention;
+    if (!list || !b || Number(b.dataset.i) === list.i) return;
+    list.i = Number(b.dataset.i);
     for (const x of slEl.querySelectorAll('.row')) x.classList.toggle('on', (x as HTMLElement).dataset.i === b.dataset.i);
   });
+
+  // ---- "@" (or "/" → Link to a page): a link to another page of the Library ---------------------------------------------
+  /** The Library's pages, as the app tells them (their titles, kinds and icons), newest first. */
+  interface PageRef {
+    id: string;
+    title: string;
+    kind: string;
+    icon: string;
+  }
+  let pageList: PageRef[] = [];
+  let mention: { h: HTMLElement; node: Text; at: number; items: PageRef[]; i: number; misses: number } | null = null;
+  const plainWords = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[̀-ͯ]/g, '');
+  /** The pages whose titles have the words typed (those starting with them first, then the newest). */
+  const findPages = (q: string): PageRef[] => {
+    const words = plainWords(q).split(/\s+/).filter(Boolean);
+    return pageList
+      .map((p) => {
+        const t = plainWords(p.title);
+        const s = !words.every((w) => t.includes(w)) ? 0 : !words.length ? 1 : t.startsWith(words[0]) ? 3 : t.includes(` ${words[0]}`) ? 2 : 1;
+        return { p, s };
+      })
+      .filter((x) => x.s)
+      .sort((a, b) => b.s - a.s)
+      .slice(0, 8)
+      .map((x) => x.p);
+  };
+  const KIND_ICON: Record<string, string> = { page: 'page', doc: 'doc', slides: 'slides', sheet: 'table', tex: 'math', notebook: 'code' };
+  const mentionQuery = (): string | null => {
+    if (!mention) return null;
+    const r = caretIn(mention.h);
+    if (!r || r.startContainer !== mention.node || r.startOffset <= mention.at || mention.node.data[mention.at] !== '@') return null;
+    return mention.node.data.slice(mention.at + 1, r.startOffset);
+  };
+  const renderMention = () => {
+    const m = mention;
+    if (!m) {
+      if (!slash) slEl.style.display = 'none';
+      return;
+    }
+    const q = mentionQuery() ?? '';
+    const row = (p: PageRef, i: number) =>
+      `<button class="row${i === m.i ? ' on' : ''}" data-i="${i}" role="option" aria-selected="${i === m.i}"><span class="ri">${p.icon ? `<span style="font-size:15px;line-height:1">${esc(p.icon)}</span>` : svg(KIND_ICON[p.kind] ?? 'page')}</span><span class="rl">${esc(p.title)}</span></button>`;
+    slEl.innerHTML = `<div class="mh">${esc(L('linkPage', 'Link to a page'))}${q ? `<span class="q">@${esc(q)}</span>` : ''}</div>${
+      m.items.length ? m.items.map(row).join('') : `<div class="none">${esc(pageList.length ? L('noPages', 'No page by that name') : L('noPagesYet', 'No other pages yet'))}</div>`
+    }`;
+    slEl.style.display = 'flex';
+    slEl.style.minWidth = '280px';
+    const c = caretBox() ?? m.h.getBoundingClientRect();
+    placeAt(slEl, { left: c.left - 8, top: c.top, bottom: c.top + c.height });
+  };
+  const closeMention = () => {
+    if (!mention) return;
+    mention = null;
+    renderMention();
+  };
+  /** "@" typed at a block's start or after a space opens the Library's pages (not in code, nor in an address). */
+  const maybeMention = (h: HTMLElement) => {
+    const r = caretIn(h);
+    if (!r || r.startContainer.nodeType !== 3 || r.startOffset < 1) return;
+    const t = r.startContainer as Text;
+    if (t.data[r.startOffset - 1] !== '@') return;
+    const typed = head(h, r).toString();
+    if (typed.length > 1 && !/[\s ]/.test(typed.slice(-2, -1))) return;
+    const k = kindOf(unitOf(h));
+    if (!k || k === 'code' || t.parentElement?.closest('a')) return;
+    closeSlash();
+    closeMenu();
+    mention = { h, node: t, at: r.startOffset - 1, items: findPages(''), i: 0, misses: 0 };
+    renderMention();
+  };
+  const mentionInput = () => {
+    if (!mention) return;
+    const q = mentionQuery();
+    if (q === null || /^\s|\s\s$/.test(q) || q.length > 40) return closeMention();
+    const items = findPages(q);
+    mention.misses = items.length ? 0 : mention.misses + 1;
+    if (mention.misses > 3) return closeMention();
+    mention.items = items;
+    mention.i = 0;
+    renderMention();
+  };
+  const mentionKey = (e: KeyboardEvent): boolean => {
+    if (!mention) return false;
+    const n = mention.items.length;
+    if (e.key === 'Escape') {
+      closeMention();
+      return true;
+    }
+    if (!n) return false;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      mention.i = (mention.i + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
+      renderMention();
+      return true;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      pickPage(mention.items[mention.i]);
+      return true;
+    }
+    return false;
+  };
+  /** A link to a page as the page shows it: a chip with the page's icon (its emoji, or one of its kind) and its title. */
+  const pageChip = (p: PageRef) => {
+    const a = make('a', 'n-pagelink');
+    a.setAttribute('href', `/pages/${p.id}`);
+    a.setAttribute('data-page', p.id);
+    const ic = make('span', 'n-pagelink-icon');
+    ic.setAttribute('aria-hidden', 'true');
+    if (p.kind !== 'page') ic.setAttribute('data-kind', p.kind);
+    if (p.icon) ic.textContent = p.icon;
+    a.append(ic, p.title);
+    return a;
+  };
+  /** Words being written don't change a link's chip: it is one piece, deleted whole. */
+  const lockChips = (h: Element) => {
+    for (const a of h.querySelectorAll('a.n-pagelink')) (a.setAttribute('contenteditable', 'false'), a.setAttribute('data-n-ceoff', ''));
+  };
+  /** The "@…" typed goes, and the link to the page picked takes its place, the caret after it. */
+  const pickPage = (p: PageRef | undefined) => {
+    const m = mention;
+    if (!m || !p) return;
+    closeMention();
+    const h = m.h;
+    if (!m.node.isConnected || m.node.data[m.at] !== '@' || E.editing() !== h) return;
+    E.noteTyping();
+    const r = caretIn(h);
+    const end = r && r.startContainer === m.node ? r.startOffset : m.at + 1;
+    const x = doc.createRange();
+    x.setStart(m.node, m.at);
+    x.setEnd(m.node, Math.max(m.at + 1, Math.min(end, m.node.length)));
+    x.deleteContents();
+    const a = pageChip(p);
+    x.insertNode(a);
+    // A space after it (one that does not fold away at the end of the words), and the caret after that.
+    const sp = doc.createTextNode(' ');
+    a.after(sp);
+    trimEdge(a.previousSibling, true);
+    lockChips(h);
+    const c = doc.createRange();
+    c.setStart(sp, 1);
+    c.collapse(true);
+    getSelection()?.removeAllRanges();
+    getSelection()?.addRange(c);
+    hint(h);
+    E.redraw();
+  };
+  /** The list of pages from the app; the links already in the page take their pages' titles and icons as they are now. */
+  const setPages = (v: unknown) => {
+    pageList = (Array.isArray(v) ? v : [])
+      .filter((p): p is Record<string, unknown> => !!p && typeof p === 'object' && typeof p.id === 'string' && /^[\w-]{1,40}$/.test(p.id) && typeof p.title === 'string')
+      .slice(0, 2000)
+      .map((p) => ({ id: p.id as string, title: (p.title as string).slice(0, 200), kind: typeof p.kind === 'string' && /^\w{1,12}$/.test(p.kind) ? p.kind : 'page', icon: typeof p.icon === 'string' ? p.icon.slice(0, 16) : '' }));
+    const by = new Map(pageList.map((p) => [p.id, p]));
+    for (const a of doc.body.querySelectorAll('a.n-pagelink[data-page]')) {
+      const p = by.get(a.getAttribute('data-page') ?? '');
+      const ic = a.querySelector(':scope > .n-pagelink-icon');
+      const title = [...a.childNodes].filter((n) => n !== ic).map((n) => n.textContent).join('');
+      if (!p || (title === p.title && (ic?.textContent ?? '') === p.icon) || E.editing()?.contains(a)) continue;
+      a.replaceWith(pageChip(p));
+    }
+    if (mention) mentionInput();
+  };
   const TURNABLE = new Set(['p', 'h1', 'h2', 'h3', 'bullet', 'number', 'todo', 'toggle', 'quote', 'callout', 'code']);
   const pickItem = (it: Item | undefined) => {
     const s = slash;
@@ -1747,6 +1921,21 @@ export function writing(E: Core): Writing {
       const t = s.node;
       if (s.at > 0 && s.at === t.length && t.data[s.at - 1] === ' ') t.replaceData(s.at - 1, 1, '\u00a0');
     };
+    if (it.id === 'link') {
+      // The pages to link to, as "@" opens them: the "/…" typed goes, an "@" in its place (the caret where the "/" was:
+      // keeping a space before it moved the caret).
+      E.noteTyping();
+      dropTyped();
+      if (s.node.isConnected) {
+        const c = doc.createRange();
+        c.setStart(s.node, Math.min(s.at, s.node.length));
+        c.collapse(true);
+        getSelection()?.removeAllRanges();
+        getSelection()?.addRange(c);
+      }
+      doc.execCommand('insertText', false, '@');
+      return;
+    }
     if (it.id === 'emoji' || it.id === 'picture' || it.id === 'video' || it.id === 'math') {
       // Chosen in the app (its picker, or a small form there), and put in place when it comes back.
       E.noteTyping();
@@ -2297,7 +2486,7 @@ export function writing(E: Core): Writing {
     // Under the pointer (a phone has none: there, the bar of the block picked has the handle).
     const b = hoverBlock?.isConnected ? hoverBlock : null;
     handleBlock = b;
-    if (!b || dragging || slash) {
+    if (!b || dragging || slash || mention) {
       hd.style.display = 'none';
       return;
     }
@@ -2503,6 +2692,7 @@ export function writing(E: Core): Writing {
       if (fromUi(e)) return;
       if (menu && menuKey(e)) return stop(e);
       if (slash && slashKey(e)) return stop(e);
+      if (mention && mentionKey(e)) return stop(e);
       if (e.isComposing || e.keyCode === 229) return;
       const mod = isMod(e);
       const h = E.editing();
@@ -2591,6 +2781,7 @@ export function writing(E: Core): Writing {
       if (!h || !(e.target instanceof Node) || !(h === e.target || h.contains(e.target))) return;
       // Typing in a block keeps the list of blocks open while it filters; leaving it closes the list.
       if (slash && slash.h !== h) closeSlash();
+      if (mention && mention.h !== h) closeMention();
     },
     true,
   );
@@ -2609,17 +2800,19 @@ export function writing(E: Core): Writing {
       if (e.isComposing) return;
       if (isCode(h)) return paintWriting();
       if (slash) return slashInput();
+      if (mention) return mentionInput();
       if (!e.inputType?.startsWith('insertText') || !e.data) return;
       const ch = e.data.slice(-1);
       if (ch === '/') return maybeSlash(h);
+      if (ch === '@') return maybeMention(h);
       if ((ch === ' ' || ch === '\u00a0' || ch === '`' || ch === '-') && blockMarkdown(h)) return;
       if ('*_`~'.includes(ch)) inlineMarkdown(h);
     },
     true,
   );
   doc.addEventListener('selectionchange', () => {
-    if (!slash) return;
-    if (slashQuery() === null) closeSlash();
+    if (slash && slashQuery() === null) closeSlash();
+    if (mention && mentionQuery() === null) closeMention();
   });
   // Code typed with an input method: coloured once its words are in.
   addEventListener('compositionend', () => isCode(E.editing()) && paintWriting(), true);
@@ -2630,11 +2823,13 @@ export function writing(E: Core): Writing {
     resized = Date.now();
     if (menu) renderMenu();
     if (slash) renderSlash();
+    if (mention) renderMention();
   });
   addEventListener(
     'scroll',
     () => {
       if (slash) renderSlash();
+      if (mention) renderMention();
       if (menu && Date.now() - resized > 400) closeMenu();
     },
     true,
@@ -2744,6 +2939,7 @@ export function writing(E: Core): Writing {
       if (fromUi(e)) return;
       if (menu) closeMenu();
       if (slash) closeSlash();
+      if (mention) closeMention();
       // Words being written keep the browser's own selection by dragging; touch scrolls the page.
       if (e.button !== 0 || e.pointerType === 'touch' || E.editing()?.contains(e.target as Node)) return;
       const t = e.target as Element;
@@ -3098,6 +3294,9 @@ export function writing(E: Core): Writing {
         case 'code':
           inlineCode();
           return true;
+        case 'pages':
+          setPages(arg);
+          return true;
         case 'codeLang': {
           // A code block's language, from the Part tab ('' for Auto).
           const id = CC.langId(typeof arg === 'string' ? arg : '');
@@ -3170,10 +3369,12 @@ export function writing(E: Core): Writing {
     },
     started(h) {
       if (h.tagName === 'LI') for (const s of subLists(h)) (s.setAttribute('contenteditable', 'false'), s.setAttribute('data-n-ceoff', ''));
+      lockChips(h);
       hint(h);
     },
     finished(h) {
       closeSlash();
+      closeMention();
       dropSpacers(h);
       h.removeAttribute('data-n-ph');
       for (const s of h.querySelectorAll('[data-n-ceoff]')) (s.removeAttribute('contenteditable'), s.removeAttribute('data-n-ceoff'));
@@ -3195,6 +3396,7 @@ export function writing(E: Core): Writing {
       hoverBlock = null;
       closeMenu();
       closeSlash();
+      closeMention();
       paintAll();
     },
     clean(root) {

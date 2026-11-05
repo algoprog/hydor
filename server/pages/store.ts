@@ -55,10 +55,26 @@ export function initPages(db: DB) {
   if (!cols.includes('app')) db.exec('alter table pages add column app text');
   // The space it belongs to (shared/spaces.ts), or none: the Library shows each space's pages together.
   if (!cols.includes('space')) db.exec('alter table pages add column space text');
+  // A page's icon (the emoji the page editor puts at its top), for links to it in other pages: kept as each version is
+  // saved, and read once from the pages saved before ('' for none).
+  if (!cols.includes('icon')) {
+    db.exec('alter table pages add column icon text');
+    const set = db.prepare('update pages set icon = ? where id = ?');
+    const rows = db.prepare('select p.id, v.html from pages p join page_versions v on v.page_id = p.id and v.version = p.version where p.kind is null').all() as { id: string; html: string }[];
+    db.transaction(() => {
+      for (const r of rows) set.run(iconOf(r.html), r.id);
+    })();
+  }
   initAssets(db);
 }
 
 const newId = () => crypto.randomBytes(5).toString('hex');
+
+/** A page's icon: the emoji in its .n-icon (the page editor's), or ''. */
+export function iconOf(html: string): string {
+  const m = /<div[^>]*\bclass="[^"]*\bn-icon\b[^"]*"[^>]*>\s*([^<]{1,16}?)\s*<\/div>/.exec(html.slice(0, 200_000));
+  return m && !/[&<>"]/.test(m[1]) ? m[1] : '';
+}
 const nonce = () => crypto.randomBytes(9).toString('base64url');
 
 export function cleanTitle(t: unknown, fallback = 'Page'): string {
@@ -89,6 +105,7 @@ interface Row {
   kind: string | null;
   app: string | null;
   space: string | null;
+  icon: string | null;
   versions: number;
   bytes: number;
   by: PageVersion['by'] | null;
@@ -115,6 +132,7 @@ const toInfo = (r: Row): PageInfo => ({
   ...(kindOf(r.kind) ? { kind: r.kind as PageKind } : {}),
   ...(r.app ? { app: r.app } : {}),
   ...(r.space ? { space: r.space } : {}),
+  ...(r.icon ? { icon: r.icon } : {}),
 });
 
 /** The library's pages: a template's screens stay with their template. */
@@ -229,6 +247,7 @@ export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: P
       p.app ? null : (p.space ?? null),
     );
     db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by) values (?, 1, ?, ?, ?, ?, ?)').run(id, title, html, Buffer.byteLength(html), now, p.by);
+    if (kind === 'page') db.prepare('update pages set icon = ? where id = ?').run(iconOf(html), id);
     noteRefs(db, id, 1, sources);
   })();
   return pageInfo(db, id)!;
@@ -244,6 +263,7 @@ export function addVersion(db: DB, id: string, p: { title?: unknown; html?: unkn
     const next = ((db.prepare('select max(version) as v from page_versions where page_id = ?').get(id) as { v: number | null }).v ?? 0) + 1;
     db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by) values (?, ?, ?, ?, ?, ?, ?)').run(id, next, title, html, Buffer.byteLength(html), now, p.by);
     db.prepare('update pages set title = ?, version = ?, updated_at = ? where id = ?').run(title, next, now, id);
+    if (!cur.kind) db.prepare('update pages set icon = ? where id = ?').run(iconOf(html), id);
     noteRefs(db, id, next, sources);
     prune(db, id);
   })();

@@ -114,6 +114,12 @@ pre.n-code .n-cg{color:color-mix(in srgb,#d9534f 80%,currentColor)}
 pre.n-code .n-ci{background:color-mix(in srgb,#3f9f52 18%,transparent)}
 pre.n-code .n-cd{background:color-mix(in srgb,#d9534f 18%,transparent)}
 img.n-pic{display:block;max-width:100%;height:auto;margin:.8em 0;border-radius:calc(var(--n-radius,12px) * .6)}
+a.n-pagelink{padding:.05em .35em .1em;border-radius:.35em;background:color-mix(in srgb,currentColor 7%,transparent);color:inherit;font-weight:500;text-decoration:none;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+a.n-pagelink:hover{background:color-mix(in srgb,currentColor 13%,transparent)}
+.n-pagelink-icon{margin-right:.25em;font-weight:400}
+.n-pagelink-icon:empty::before{content:"";display:inline-block;width:.85em;height:1em;vertical-align:-.15em;background:currentColor;opacity:.6;-webkit-mask:var(--n-pl,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 3v5h5'/%3E%3C/svg%3E")) center/contain no-repeat;mask:var(--n-pl,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 3v5h5'/%3E%3C/svg%3E")) center/contain no-repeat}
+.n-pagelink-icon[data-kind=slides]{--n-pl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='4' width='18' height='12' rx='2'/%3E%3Cpath d='M12 16v4M8 20h8'/%3E%3C/svg%3E")}
+.n-pagelink-icon[data-kind=sheet]{--n-pl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Crect x='3' y='4' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M3 15h18M9 4v16'/%3E%3C/svg%3E")}
 .n-tc-grey{color:color-mix(in srgb,#787774 78%,currentColor)}
 .n-tc-brown{color:color-mix(in srgb,#9f6b53 78%,currentColor)}
 .n-tc-orange{color:color-mix(in srgb,#d9730d 78%,currentColor)}

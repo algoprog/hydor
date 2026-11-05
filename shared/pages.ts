@@ -40,6 +40,8 @@ export interface PageInfo {
   app?: string;
   /** The space it is in (the Library shows each space's together); none when unset. */
   space?: string;
+  /** A page of HTML's icon: the emoji the page editor puts at its top (links to it in other pages show it). */
+  icon?: string;
 }
 
 export interface PageVersion {
