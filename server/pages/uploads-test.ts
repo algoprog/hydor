@@ -5,8 +5,9 @@
 // limits, no room on the disk, a project that is not one, a place outside the folder); and the desktop app's moves by
 // path: on the same disk and to another (/dev/shm is one here), a page's original to the Trash and back with Put back,
 // one that loses something staying where it was, a failed import, a picture the Library had already, the folder a drop
-// emptied, and the places a file is never moved from (the app's data, a project's folder, the system's, a link).
-// Build and run with a scratch folder:
+// emptied, and the places a file is never moved from (the app's data, a project's folder, the system's, a link). And,
+// from a browser over a real connection, the slides editor's video pieces: one refused part-way is answered at once.
+// Build and run with a scratch folder (PLAYWRIGHT_BROWSERS_PATH for the browser):
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/uploads-test.ts
 //   DATA_DIR=/tmp/hydor-test-uploads node dist/dev/uploads-test.js
 import { execFileSync } from 'node:child_process';
@@ -16,6 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import Fastify from 'fastify';
+import { canCapture, closeCapture, withTab } from '../capture/index.ts';
 import { config } from '../config.ts';
 import { openDb } from '../db.ts';
 import type { Deps } from '../features/types.ts';
@@ -74,6 +76,8 @@ const deps = {
   publicBase: () => 'https://naget.example',
 } as unknown as Deps;
 pages.routes!(deps);
+// A page of this server's own, for a browser to send pieces from as the slides editor does (the last part).
+app.get('/pieces', async (_req, reply) => reply.type('text/html').send('<!doctype html><title>Pieces</title>'));
 await app.ready();
 // Titles and descriptions of pictures from their names: no model is asked.
 setCaptionChoice(db, { provider: 'endpoint' });
@@ -364,6 +368,42 @@ if (otherDisk && shm) {
   const f = json(await move({ path: pdf, space: thesis.id }));
   ok(f.as === 'file' && f.moved === true && !fs.existsSync(pdf) && fs.readFileSync(f.path).length === data.length + 4, 'another file from another disk moves into the project’s folder whole');
 }
+
+// ---- the slides editor's videos, from a browser over a real connection -------------------------------------------------
+
+if (canCapture()) {
+  // Refused part-way, a piece used to be answered only once the browser gave up sending it (a minute and more); refused
+  // before its bytes are read, it is answered as well. Each is sent as web/src/features/pages/slides/media.ts sends one.
+  await app.listen({ port: 0, host: '127.0.0.1' });
+  const port = (app.server.address() as { port: number }).port;
+  const said = await withTab({ url: `http://127.0.0.1:${port}/pieces`, width: 800, height: 600 }, (tab) =>
+    tab.evaluate<string[]>(
+      `(async () => {
+        const send = (url, mb) => new Promise((ok) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', url);
+          xhr.setRequestHeader('content-type', 'application/octet-stream');
+          xhr.timeout = 10000;
+          xhr.onload = () => { let b = {}; try { b = JSON.parse(xhr.responseText); } catch {} ok(xhr.status + ' ' + (b.error ?? b.received ?? '')); };
+          xhr.onerror = () => ok('the connection broke');
+          xhr.ontimeout = () => ok('no answer');
+          xhr.send(new Blob([new Uint8Array(mb * 1024 * 1024)]));
+        });
+        const out = [];
+        for (let i = 0; i < 3; i++) out.push(await send('/api/pages/videos?upload=browserpast' + i + '&offset=0&total=4194304', 6));
+        out.push(await send('/api/pages/videos?upload=browserstep1&offset=5242880&total=41943040', 20));
+        out.push(await send('/api/pages/videos?upload=browserbig1&offset=0&total=999999999', 20));
+        out.push(await send('/api/pages/videos?upload=browsergood1&offset=0&total=2097152', 1));
+        return out;
+      })()`,
+      120_000,
+    ),
+  );
+  ok(said.slice(0, 3).every((r) => r.startsWith('413 That piece is larger')), `a video's piece refused part-way is answered at once, every time (${said.slice(0, 3).join(' | ')})`);
+  ok(said[3]?.startsWith('409 The upload is out of step') && said[4]?.startsWith('413 That video is over'), `so is one refused before its bytes are read (${said[3]} | ${said[4]})`);
+  ok(said[5] === '200 1048576', 'and the next piece goes in');
+  closeCapture();
+} else console.log('(no browser here: a refused video piece over a real connection is not tested)');
 
 if (shm) fs.rmSync(shm, { recursive: true, force: true });
 fs.rmSync(tmp, { recursive: true, force: true });
