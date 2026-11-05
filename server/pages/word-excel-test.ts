@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { docCss, docFonts, normalizeDoc, type Block, type Doc, type ParaBlock, type Run, type TableBlock } from '../../shared/docs.ts';
+import { canCapture, closeCapture, setCaptureIdle, withTab } from '../capture/index.ts';
 import { openDb } from '../db.ts';
 import { Zip } from '../documents/zip.ts';
 import { docFaces, docFromFile, docPage, docxOfDoc } from './docs.ts';
@@ -606,6 +607,22 @@ function misordered(xml: string): string | null {
     docPage(db, d, 'T', 'print').includes('.nd-sheet>.nd-band+.nd-b,.nd-sheet>.nd-band+.nd-band+.nd-b{margin-top:0}') && docCss(d).includes('JetBrains Mono'),
     "a printed page's first block starts at the top of its words, a header or footer before it or not",
   );
+}
+
+// ---- the browser exports are made with ----------------------------------------------------------------------------
+if (canCapture()) {
+  // A job that starts as the last one's idle while runs out: the browser stays open for it (it was closed under it).
+  setCaptureIdle(400);
+  const html = '<!doctype html><p>x</p>';
+  await withTab({ html, width: 200, height: 100, settleMs: 0 }, async () => true);
+  await new Promise((r) => setTimeout(r, 300));
+  const got = await withTab({ html, width: 200, height: 100, settleMs: 0 }, async (tab) => {
+    await new Promise((r) => setTimeout(r, 500));
+    return tab.evaluate<number>('1 + 1');
+  }).catch((e: Error) => e.message);
+  ok(got === 2, 'a PDF or picture started just as the browser would close for being idle is made all the same', got);
+  setCaptureIdle(90_000);
+  closeCapture();
 }
 
 fs.rmSync(tmp, { recursive: true, force: true });
