@@ -137,6 +137,9 @@ export interface Code {
    * of the agent's is reported as typed, tracked or undone.
    */
   setLive: (text: string | null, at?: number, follow?: boolean) => void;
+  /** The line at the top of the view, and a line put there (the cursor and the focus left where they are). */
+  topLine: () => number;
+  showLine: (line: number) => void;
   goto: (line: number) => void;
   focus: () => void;
   destroy: () => void;
@@ -676,6 +679,11 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
           ...(follow && where !== null ? [EditorView.scrollIntoView(where, { y: 'nearest', yMargin: 96 })] : []),
         ],
       });
+    },
+    topLine: () => view.state.doc.lineAt(view.lineBlockAtHeight(view.scrollDOM.scrollTop).from).number,
+    showLine: (line) => {
+      const l = view.state.doc.line(Math.max(1, Math.min(line, view.state.doc.lines)));
+      view.dispatch({ effects: EditorView.scrollIntoView(l.from, { y: 'start' }) });
     },
     goto: (line) => handle.gotoLine(line),
     focus: () => view.focus(),
