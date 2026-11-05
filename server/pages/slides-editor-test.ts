@@ -504,6 +504,14 @@ const dot: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
   const plain = idOf((await run('save_page', { title: 'Not a deck', html: '<!doctype html><p>x</p>' })).text);
   ok((await req('GET', `/api/pages/${plain}/export?format=png`)).statusCode === 400, 'only slides export as pictures');
 
+  // A video's still, fetched on the server (YouTube's or Vimeo's) and kept as a picture.
+  ok((await req('POST', '/api/pages/video-still', { url: 'https://example.com/clip.mp4' })).statusCode === 400, 'the still of a video is fetched only for YouTube and Vimeo addresses');
+  const still = await req('POST', '/api/pages/video-still', { url: 'https://vimeo.com/76979871' });
+  if (still.statusCode === 200) {
+    const src = String(still.json().src);
+    ok(/^naget-asset:[a-f0-9]{16,64}$/.test(src) && (await req('GET', `/api/pages/assets/${src.slice(12)}`)).statusCode === 200, 'a Vimeo video’s still is kept as a picture');
+  } else console.log(`(Vimeo could not be reached here: ${still.statusCode})`);
+
   // A shape an agent adds with words has them in its middle (as PowerPoint's do); one it sends back keeps its look.
   const shapes = idOf(
     (await run('save_slides', { title: 'Shapes', slides: [{ els: [{ type: 'shape', shape: 'ellipse', text: 'Hub' }, { type: 'shape', text: 'Left', align: 'left', valign: 'top' }, { type: 'shape', shape: 'rect' }] }] })).text,

@@ -16,7 +16,8 @@
 //   POST /api/pages/:id/versions, GET /api/pages/:id/versions/:v, POST …/restore, POST /api/pages/:id/copy
 //   POST /api/pages/:id/storage, GET/DELETE /api/pages/:id/data, POST /api/pages/:id/link, GET /api/pages/:id/thumb
 //   GET/POST /api/pages/:id/comments (comments on a page's blocks: shared/page-comments.ts)
-//   POST /api/pages/file-edit, GET /api/pages/:id/export?format=, POST /api/pages/docs/print, POST /api/pages/assets, GET /api/pages/assets/:sha
+//   POST /api/pages/file-edit, GET /api/pages/:id/export?format=, POST /api/pages/docs/print, POST /api/pages/assets, GET /api/pages/assets/:sha,
+//   POST /api/pages/video-still
 //   GET/PUT /api/pages/file (a file of the computer's in an editor: filemodel.ts)
 //   GET/POST /api/pages/:id/notebook (where a notebook of the Library runs: notebooks.ts)
 //   GET /api/pages/picture?url=, GET /api/pages/fonts.css?f=, GET /api/pages/fonts/*
@@ -41,6 +42,8 @@ import { draftsOf, endDrafts, feedDraft, type ToolStream } from './drafts.ts';
 import { agentNotebook, dropWorkFolder, SAVE_NOTEBOOK_DESCRIPTION, SAVE_NOTEBOOK_SCHEMA, workFile, writeWorkFile } from './notebooks.ts';
 import { dropEdits, initEdits, noteEdit, noteFileEdit, takeEdits } from './edits.ts';
 import { getAsset, MAX_ASSET, putAsset, sweepAssets, takeIn } from './assets.ts';
+import { videoStillOf } from './video-still.ts';
+import { videoSrc } from '../../shared/slides.ts';
 import { exportPage, EXPORT_TYPES, type ExportFormat } from './export.ts';
 import { fontFile, fontsCss } from './fonts.ts';
 import { agentDoc, docPage, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
@@ -715,6 +718,14 @@ function routes(d: Deps) {
       return { src };
     }
     throw new HttpError(400, 'Send data (a data: address) or url');
+  });
+  /** A YouTube or Vimeo video's still, fetched here and kept as a picture (for a video put on a slide or a page): its source. */
+  app.post('/api/pages/video-still', async (req) => {
+    const url = B(req).url;
+    if (typeof url !== 'string' || !videoSrc(url)) throw new HttpError(400, 'url is the address of a video on YouTube or Vimeo');
+    const src = await videoStillOf(db, url);
+    if (!src) throw new HttpError(422, 'That video’s still could not be had: it may be private, or its site could not be reached');
+    return { src };
   });
   app.get('/api/pages/assets/:sha', async (req, reply) => {
     const a = getAsset(db, P(req).sha);

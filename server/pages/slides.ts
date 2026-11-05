@@ -10,13 +10,14 @@
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { ASSET, deckFonts, deckOutline, deckSources, deckText, everyEl, FONT_TABLE, googleFamilies, iconNodes, isDeckText, mapSources, normalizeDeck, type Deck, type IconNode } from '../../shared/slides.ts';
+import { ASSET, deckFonts, deckOutline, deckSources, deckText, everyEl, FONT_TABLE, googleFamilies, iconNodes, isDeckText, mapSources, normalizeDeck, type Deck, type El, type IconNode, type VideoEl } from '../../shared/slides.ts';
 import { slidesRuntime } from '../../shared/slides-runtime.ts';
 import { LIB_CDN } from '../../shared/app-media.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { assetDataUrl, putAsset, takeIn } from './assets.ts';
 import { scriptSafe } from './kit.ts';
+import { videoStillOf } from './video-still.ts';
 
 export { isDeckText };
 
@@ -151,6 +152,12 @@ function centreNewShapes(input: unknown, known: Set<string>): unknown {
   };
 }
 
+/** The deck with these videos' stills (by the video's id), in groups too. */
+function withPosters(d: Deck, posters: Map<string, string>): Deck {
+  const map = (els: El[]): El[] => els.map((e) => (e.type === 'group' ? { ...e, els: map(e.els) } : e.type === 'video' && posters.has(e.id) ? { ...e, poster: posters.get(e.id) } : e));
+  return { ...d, slides: d.slides.map((s) => ({ ...s, els: map(s.els) })) };
+}
+
 /**
  * A deck from an agent: checked as keepDeck does, its pictures taken in first (files of its session, data:
  * addresses, pictures on the web), its icons named looked up. `prev`, the kept text of the version it changes, tells
@@ -159,9 +166,10 @@ function centreNewShapes(input: unknown, known: Set<string>): unknown {
 export async function agentDeck(db: DB, input: unknown, cwd: string, prev?: string): Promise<{ deck: Deck; text: string; notes: string[] }> {
   let deck: Deck;
   const missing = new Set<string>();
+  const known = partIds(prev);
   try {
     // Any source may be a file of the session's: kept as written until it is taken in below.
-    deck = normalizeDeck(centreNewShapes(input, partIds(prev)), {
+    deck = normalizeDeck(centreNewShapes(input, known), {
       src: (s) => (s.length <= 4096 ? s : null),
       icon: (name) => {
         const got = lucideIcon(name);
@@ -182,6 +190,15 @@ export async function agentDeck(db: DB, input: unknown, cwd: string, prev?: stri
   const done = new Map<string, string>();
   for (const s of new Set(deckSources(deck))) done.set(s, await takeIn(db, s, { cwd, notes }));
   deck = mapSources(deck, (s) => done.get(s) ?? s);
+  // The videos it adds without a still get their site's, kept, as the editor's do (a few at a time, each bounded in time).
+  const stills = new Map<string, string>();
+  const want = deck.slides.flatMap((s) => everyEl(s.els)).filter((e) => e.type === 'video' && !e.poster && !known.has(e.id)) as VideoEl[];
+  for (let i = 0; i < Math.min(want.length, 24); i += 6)
+    await Promise.all(want.slice(i, Math.min(i + 6, 24)).map(async (v) => {
+      const got = await videoStillOf(db, v.src).catch(() => null);
+      if (got) stills.set(v.id, got);
+    }));
+  if (stills.size) deck = withPosters(deck, stills);
   const text = deckText(deck);
   if (Buffer.byteLength(text) > MAX_DECK) throw new Error(`The deck is over ${MAX_DECK / 1024 / 1024} MB without its pictures; make it smaller.`);
   return { deck, text, notes };
@@ -249,7 +266,7 @@ const SLIDES_HELP = [
   'Slides are 1280×720 px ("ratio": "4:3" makes them 1280×960); text sizes are px too (1 px = 0.75 pt: body 24–30, titles 44–60).',
   'Each slide comes from a layout with its words, from parts placed by position ("els"), or both ("extra": parts added to a layout). Layouts: title {title, subtitle}; content {title, text}; two {title, left, right, leftTitle, rightTitle}; section {title, subtitle}; image-right {title, text, image}; image {title, image, caption}; stats {title, stats: [{value, label}]}; cards {title, cards: [{title, text}]}; steps {title, steps: [{title, text}]}; quote {quote, by}; chart {title, chart: {kind, labels, series}}; table {title, table: [[header…], [row…]]}; title-only {title}; end {title, subtitle}; blank.',
   'Words (text, left, right, a part’s text): a line per paragraph, "- " for a bullet and "1. " for a number, two spaces before them a level deeper, **bold**, *italic*, [words](https://…); or an array of bullets (a nested array a level deeper).',
-  'Parts: {type, x, y, w, h, …}. text {text, size, color, font, bold, italic, align, valign: top|middle|bottom, fill, line, radius, role: title|subtitle|body|caption|quote|big}. shape {shape: rect|round|ellipse|triangle|rtriangle|diamond|pentagon|hexagon|octagon|star|arrow|larrow|uarrow|darrow|chevron|parallelogram|trapezoid|plus|heart|callout, fill ("none" for none), fill2 and angle for a gradient, line, lineW, shadow, and text like a text part, in its middle unless align or valign say otherwise}. image {src, fit: cover|contain|fill, radius, alt, crop: {l, t, r, b} (the share cut off each side, 0–0.95; the rest fills the box), adjust: {bright and contrast −100…100, sat 0…200 (100 as it is), gray: true, blur in px}}: src is a file of this session (a picture you made), a public https address, or a picture of the deck already (naget-asset:…). line {x, y to x+w, y+h; color, width, dash: solid|dash|dot, start and end: none|arrow|dot}. table {rows: [[…]], head, band, size, merges: [{r, c, rs, cs}] (cells merged from row r, column c, rs rows down, cs across), fills: {"row,col": colour}}. chart {kind: column|bar|line|area|pie|doughnut, labels, series: [{name, values}], legend, values, stacked}. icon {icon: a Lucide icon’s name ("rocket", "chart-line", "users", "shield-check", "lightbulb"), color, lineW (its lines’ width, 2 by default)}: square, 120×120 if no w and h. math {tex: an equation in LaTeX ("E = mc^2", "\\int_0^1 x^2\\,dx"), color, align: left|right}: drawn as large as its box allows, in the text colour. video {src: a YouTube or Vimeo address, start (seconds), autoplay, muted, loop, poster}: its still shows until it plays in the slideshow. group {els: [parts]}: parts that move as one; without x and y its parts are placed on the slide, with them its parts are placed from its top-left corner. Any part may have rot (degrees), opacity, link ("https://…", or "#3" for slide 3), name, key, and anim: its entrance ("fade", or {fx, on, dur, delay, dir}).',
+  'Parts: {type, x, y, w, h, …}. text {text, size, color, font, bold, italic, align, valign: top|middle|bottom, fill, line, radius, role: title|subtitle|body|caption|quote|big}. shape {shape: rect|round|ellipse|triangle|rtriangle|diamond|pentagon|hexagon|octagon|star|arrow|larrow|uarrow|darrow|chevron|parallelogram|trapezoid|plus|heart|callout, fill ("none" for none), fill2 and angle for a gradient, line, lineW, shadow, and text like a text part, in its middle unless align or valign say otherwise}. image {src, fit: cover|contain|fill, radius, alt, crop: {l, t, r, b} (the share cut off each side, 0–0.95; the rest fills the box), adjust: {bright and contrast −100…100, sat 0…200 (100 as it is), gray: true, blur in px}}: src is a file of this session (a picture you made), a public https address, or a picture of the deck already (naget-asset:…). line {x, y to x+w, y+h; color, width, dash: solid|dash|dot, start and end: none|arrow|dot}. table {rows: [[…]], head, band, size, merges: [{r, c, rs, cs}] (cells merged from row r, column c, rs rows down, cs across), fills: {"row,col": colour}}. chart {kind: column|bar|line|area|pie|doughnut, labels, series: [{name, values}], legend, values, stacked}. icon {icon: a Lucide icon’s name ("rocket", "chart-line", "users", "shield-check", "lightbulb"), color, lineW (its lines’ width, 2 by default)}: square, 120×120 if no w and h. math {tex: an equation in LaTeX ("E = mc^2", "\\int_0^1 x^2\\,dx"), color, align: left|right}: drawn as large as its box allows, in the text colour. video {src: a YouTube or Vimeo address, start (seconds), autoplay, muted, loop, poster}: its still (its site’s, fetched and kept, unless you give a poster) shows until it plays in the slideshow. group {els: [parts]}: parts that move as one; without x and y its parts are placed on the slide, with them its parts are placed from its top-left corner. Any part may have rot (degrees), opacity, link ("https://…", or "#3" for slide 3), name, key, and anim: its entrance ("fade", or {fx, on, dur, delay, dir}).',
   'Colours: the theme’s names, which follow it (accent, accentFg, fg, head, muted, bg, soft, c1 to c6), or #hex.',
   'A slide may also have notes (speaker notes: what to say), bg (a colour; {color, to, angle} for a gradient; {image, dim} for a picture), transition (none|fade|push|wipe|cover|zoom|split|morph, or {fx, dir, dur, auto: seconds to go on by itself}), hidden, nofooter (no footer or number on it), build: true (its bullets come one at a time), and anims: [{el: a part’s id, type: in|em|out, fx: appear|fade|fly|float|zoom|wipe|bounce for in and out, pulse|spin|grow|shake for em, on: click|with|after, dur and delay in ms, dir: left|right|up|down, byPara}]. Morph: the parts this slide shares with the one before glide from where they were (moving, growing, turning, recolouring) and the rest fade; a part matches one of the slide before with the same key (or whose id is its key), else the same name, else the same words or picture, so to morph, repeat the part on the next slide with "key" set to its id and change its x, y, w, h, rot or colour.',
   'The deck may have footer {num: true (each slide’s number), text, date: "today" or a date as written, skipTitle: true (not on the title slide)} and guides {x: [px], y: [px]} (the lines its parts are lined up on).',

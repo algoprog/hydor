@@ -71,6 +71,7 @@ import { ColorButton, Field, NumInput, Swatches, Tool } from './controls';
 import { addAnim, align, distribute, dropMergesPast, fillCells, heightOf, mergeAt, mergeCells, moveAnim, partName, pathTo, pickedOf, removeAnim, removeEls, restack, setAnim, setEls, setSlide, topOf, unmergeCell, W } from './ops';
 import type { CellSel } from './SlideCanvas';
 import { SlideThumb } from './Thumb';
+import { fetchVideoStill } from './media';
 
 export type InspectorTab = 'format' | 'animate' | 'slide' | 'theme';
 export const INSPECTOR_TABS: { value: InspectorTab; label: string }[] = [
@@ -869,14 +870,20 @@ function MathLook({ el, theme, set, focus }: { el: MathEl; theme: Theme; set: (p
 function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: string) => void }) {
   const [url, setUrl] = useState(el.src.includes('vimeo') ? `https://vimeo.com/${el.src.split('/').pop()}` : `https://www.youtube.com/watch?v=${el.src.split('/').pop()}`);
   const bad = !videoSrc(url);
+  // Another video, another still: the old one goes at once, the new one comes when the server has it (the last asked wins).
+  const asked = useRef('');
   return (
     <Section title="Video">
       <input
         value={url}
         onChange={(e) => {
-          setUrl(e.target.value);
-          const src = videoSrc(e.target.value);
-          if (src) set({ src, ...(videoStart(e.target.value) ? { start: videoStart(e.target.value) } : {}) } as Partial<El>, 'video');
+          const address = e.target.value;
+          setUrl(address);
+          const src = videoSrc(address);
+          if (!src || src === el.src) return;
+          set({ src, poster: undefined, ...(videoStart(address) ? { start: videoStart(address) } : {}) } as Partial<El>, 'video');
+          asked.current = src;
+          void fetchVideoStill(address).then((poster) => poster && asked.current === src && set({ poster } as Partial<El>, 'video'));
         }}
         onKeyDown={(e) => e.stopPropagation()}
         aria-label="The video’s address"
