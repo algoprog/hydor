@@ -544,16 +544,16 @@ New files git doesn't track yet are shown when they are small text files. Binary
 
 ## Use the terminal
 
-Click **System**, then **Terminal**, or go to [Terminal](/terminal): real shells on this computer. If none is open, one starts.
+Click **System**, then **Terminal**, or go to [Terminal](/terminal): real shells on this computer. If none is open, one starts in your home folder.
 
-- Each terminal is a tab, named after its folder and the program running in it. **New terminal** (+) opens another, in the Files page's root folder.
+- Each terminal is a tab, named after its folder and the program running in it. **New terminal** (+) opens another, also in your home folder.
 - Double-click a tab to rename it.
 - ✕ closes a terminal. If a program is still running in it, the app asks first, since closing ends the shell and everything it runs.
 - Links in the output open in a new tab.
 
 Terminals run in the app's own private tmux server, so they keep running when you leave the page, reload it or close the browser, and through restarts of the app: come back and they're as you left them.
 
-Other places open a new terminal in a folder: a row's menu on the Files page (**Open terminal here**), the editor (**Terminal in this folder**), a repository on the Git page (**Open a terminal here**) and the session's menu → **Folder and code** → **Open a terminal here**.
+To open one in another folder, start it from there: on the Files page, a folder's menu or **More** (⋯) for the folder you're in (**Open a terminal here**), the editor (**Terminal in this folder**), a repository on the Git page (**Open a terminal here**) and the session's menu → **Folder and code** → **Open a terminal here**.
 
 ### The terminal panel
 
