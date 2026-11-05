@@ -1,9 +1,10 @@
 // Script tests for the page editor (a page's Edit mode, editor.ts with writing.ts): writing as in Notion in a real
 // browser (Enter makes the next block, Backspace joins, Tab nests, Markdown as you type, "/" for blocks, Turn into,
-// colours, to-dos that tick, toggles, a table of contents, an icon and a cover, several blocks picked, undo by the
-// block), that nothing of the editor's own reaches the page it gives back, the kit's styles for the blocks, and that a
-// page made of them survives its exports (a web page, a PDF and a Word document when a browser is here). The browser
-// parts run when this computer has a Chromium (Settings → Browser, or Playwright's). Build and run with a scratch folder:
+// colours, to-dos that tick, toggles, a table of contents, an icon and a cover, pictures dropped or pasted in, blocks
+// dragged into a column, several blocks picked, undo by the block), that nothing of the editor's own reaches the page it
+// gives back, the kit's styles for the blocks, and that a page made of them survives its exports (a web page, a PDF and
+// a Word document when a browser is here). The browser parts run when this computer has a Chromium (Settings → Browser,
+// or Playwright's); ONLY=word runs those whose page has that word. Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/page-editor-test.ts
 //   DATA_DIR=/tmp/hydor-test-page-editor node dist/dev/page-editor-test.js
 import fs from 'node:fs';
