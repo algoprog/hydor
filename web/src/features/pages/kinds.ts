@@ -2,6 +2,7 @@
 // Studio): the model to edit, where it shows, how it saves, and what it tells the page around it (whether it has
 // unsaved changes, what an agent asked about it should be told it is about).
 import type { MutableRefObject, ReactNode } from 'react';
+import type { DraftMark } from '@shared/page-drafts';
 import { api } from '../../lib/api';
 
 /** An older version's model, to look at in its editor (`id` already encoded for an address). */
@@ -12,6 +13,18 @@ export interface AskScope {
   id: string;
   label: string;
   lead: string;
+}
+
+/** A new version an agent is writing, as far as its call has come (live.ts makes it), for the editor to show in its place. */
+export interface LiveDraft<M> {
+  /** The version being written: what the agent has written so far, then the rest as it was. */
+  model: M;
+  /** Where its words are arriving; null when none are (it is written whole, or the agent writes other parts of the call). */
+  mark: DraftMark | null;
+  /** The call is written whole: its version is being saved (a LaTeX document is typeset first). */
+  done: boolean;
+  /** Counts what was drawn of it. */
+  n: number;
 }
 
 export interface ModelDoc<M> {
@@ -43,6 +56,12 @@ export interface ModelEditorProps<M> {
   onScopes?: (scopes: AskScope[]) => void;
   /** Saves now, if there are changes (before an agent is asked about it): false when it did not. */
   saveNowRef?: MutableRefObject<(() => Promise<boolean>) | null>;
+  /**
+   * An agent writing a new version of it right now: shown in place of the version open, read-only, with where its words
+   * are arriving kept in view, until the saved version takes its place (or, the call failed, the version open shows
+   * again). Changes here not saved yet are left as they are: then it does not show.
+   */
+  live?: LiveDraft<M> | null;
   /**
    * A file of this computer's opened from Files rather than a page (the LaTeX editor uses it): the folder it is
    * typeset in, among its other files (none when TeX may not read it); its main file's own name, shown for main.tex;

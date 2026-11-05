@@ -44,17 +44,27 @@ interface DraftsState {
   byKey: Record<string, Record<string, PageDraft>>;
   /** Fetches a session's drafts whole (on opening it, or after a piece went missing). */
   load(key: string): Promise<void>;
+  /** Fetches the saves of a page being written now, from any session (its editor, opened mid-way). */
+  loadPage(pageId: string): Promise<void>;
 }
 
-export const useDrafts = create<DraftsState>((set, get) => ({
+/** Drafts fetched whole, each kept by its session (a newer one already here stays). */
+function keepWhole(list: PageDraft[], key?: string) {
+  const byKey = { ...useDrafts.getState().byKey };
+  for (const d of list) {
+    const k = d.key ?? key;
+    if (!k) continue;
+    const had = byKey[k]?.[d.id];
+    if (had && (had.seq ?? 0) > (d.seq ?? 0)) continue;
+    byKey[k] = { ...byKey[k], [d.id]: d };
+  }
+  useDrafts.setState({ byKey });
+}
+
+export const useDrafts = create<DraftsState>(() => ({
   byKey: {},
-  load: (key) =>
-    api<{ drafts: PageDraft[] }>(`/api/pages/drafts?key=${enc(key)}`).then((r) => {
-      const had = get().byKey[key] ?? {};
-      const next = { ...had };
-      for (const d of r.drafts) next[d.id] = d;
-      set({ byKey: { ...get().byKey, [key]: next } });
-    }),
+  load: (key) => api<{ drafts: PageDraft[] }>(`/api/pages/drafts?key=${enc(key)}`).then((r) => keepWhole(r.drafts, key)),
+  loadPage: (pageId) => api<{ drafts: PageDraft[] }>(`/api/pages/drafts?page=${enc(pageId)}`).then((r) => keepWhole(r.drafts)),
 }));
 
 /** Who should hear that a page started being written (the session on screen opens it beside). */
@@ -69,6 +79,8 @@ export function onDraftStart(fn: (key: string, d: PageDraft) => void): () => voi
 function takeDraft(key: string, e: Extract<PagesEvent, { what: 'draft' }>) {
   const s = useDrafts.getState();
   const had = s.byKey[key]?.[e.draft.id];
+  // Heard of already (this window watches both the session and the page it saves).
+  if (had && e.draft.seq !== undefined && had.seq !== undefined && e.draft.seq <= had.seq) return;
   if (e.from > 0 && (!had || had.text.length !== e.from)) {
     // A piece went missing: the whole draft again.
     s.load(key).catch(() => {});

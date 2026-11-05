@@ -281,23 +281,55 @@ export class DocEngine {
 
   setReadOnly(ro: boolean) {
     this.o.readOnly = ro;
-    this.root.contentEditable = ro ? 'false' : 'true';
+    // While an agent's version shows, nothing is typed into it.
+    const off = ro || !!this.own;
+    this.root.contentEditable = off ? 'false' : 'true';
     // Ctrl+B and Ctrl+K in the words are the document's (bold, a link), not the app's sidebar and search box.
-    if (ro) delete this.root.dataset.keys;
+    if (off) delete this.root.dataset.keys;
     else this.root.dataset.keys = 'b k';
   }
 
-  /** Another document (or another version): drawn anew, its history its own. */
-  load(doc: Doc) {
+  /**
+   * Another document (or another version): its history its own. Drawn anew; with `keep`, the blocks that hold what they
+   * held keep their elements (a version that changed a few blocks of a long document draws only those).
+   */
+  load(doc: Doc, keep = false) {
+    this.own = null;
     this.doc = ops.fixDoc(doc);
     this.past = [];
     this.future = [];
     this.last = null;
     this.pending = null;
     this.picked = null;
-    this.draw(true);
+    this.setReadOnly(!!this.o.readOnly);
+    this.draw(!keep, keep);
     this.sel = null;
     this.emitSoon();
+  }
+
+  /** The document itself while an agent's version shows in its place (preview). */
+  private own: Doc | null = null;
+  /** The document as it is, whatever shows: its own while an agent's version shows. */
+  get kept(): Doc {
+    return this.own ?? this.doc;
+  }
+
+  /**
+   * An agent's version as it is being written, shown in place of the document (null: the document again), read-only
+   * and drawn only where it differs; the document and its history stay as they are underneath.
+   */
+  preview(doc: Doc | null) {
+    if (doc) {
+      if (!this.own) this.own = this.doc;
+      this.doc = doc;
+    } else {
+      if (!this.own) return;
+      this.doc = this.own;
+      this.own = null;
+    }
+    this.picked = null;
+    this.setReadOnly(!!this.o.readOnly);
+    this.draw(false, true);
   }
 
   // ---- drawing --------------------------------------------------------------------------------------------
@@ -325,8 +357,11 @@ export class DocEngine {
     if (sel && document.activeElement === this.root) this.place(sel, false);
   }
 
-  /** The page made to show the model: blocks that changed drawn anew, the others left as they are. */
-  private draw(all = false) {
+  /**
+   * The page made to show the model: blocks that changed drawn anew, the others left as they are (`loose`: a block of
+   * another object that holds the same as the one drawn is left as it is too).
+   */
+  private draw(all = false, loose = false) {
     if (all) {
       this.els.clear();
       this.drawn.clear();
@@ -343,6 +378,8 @@ export class DocEngine {
     const mine = new Set<Node>();
     this.doc.blocks.forEach((b, i) => {
       let el = this.els.get(b.id);
+      const was = this.drawn.get(b.id);
+      if (loose && el && was && was !== b && !(tocChanged && b.type === 'toc') && JSON.stringify(was) === JSON.stringify(b)) this.drawn.set(b.id, b);
       if (!el || this.drawn.get(b.id) !== b || (tocChanged && b.type === 'toc')) {
         const made = this.make(b, labels[i]);
         el?.remove();
@@ -592,6 +629,8 @@ export class DocEngine {
    * shows it already), the selection set where the change leaves it.
    */
   private commit(doc: Doc, sel: Sel | null, o: { key?: string; draw?: boolean; pick?: string | null } = {}) {
+    // Nothing changes while an agent's version shows (a key or a menu would change that version, not the document).
+    if (this.own) return;
     const next = ops.fixDoc(doc);
     if (next === this.doc && o.pick === undefined) {
       if (sel) this.place(sel);
@@ -622,6 +661,7 @@ export class DocEngine {
   }
 
   undo() {
+    if (this.own) return;
     const e = this.past.pop();
     if (!e) return;
     this.future.push({ doc: this.doc, sel: this.sel });
@@ -635,6 +675,7 @@ export class DocEngine {
   }
 
   redo() {
+    if (this.own) return;
     const e = this.future.pop();
     if (!e) return;
     this.past.push({ doc: this.doc, sel: this.sel });

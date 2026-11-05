@@ -41,7 +41,7 @@ import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
 import { setCaptureDb } from '../capture/index.ts';
 import { sessionSpace, spaceChoice } from '../spaces/choice.ts';
 import { allSpaces } from '../spaces/index.ts';
-import { draftsOf, endDrafts, feedDraft, type ToolStream } from './drafts.ts';
+import { draftsOf, draftsOfPage, endDrafts, feedDraft, settleDraft, type ToolStream } from './drafts.ts';
 import { agentNotebook, dropWorkFolder, SAVE_NOTEBOOK_DESCRIPTION, SAVE_NOTEBOOK_SCHEMA, workFile, writeWorkFile } from './notebooks.ts';
 import { dropEdits, initEdits, noteEdit, noteFileEdit, takeEdits } from './edits.ts';
 import { getAsset, MAX_ASSET, putAsset, sweepAssets, takeIn } from './assets.ts';
@@ -248,8 +248,24 @@ function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknow
   const p = id ? addVersion(db, id, { title, model, by: 'agent' }) : createPage(db, { title, kind, model, by: 'agent', sessionKey: ctx.key, space: sessionSpace(db, ctx.key) });
   tell(ctx.deps, { what: 'pages' });
   refreshThumbs(ctx.deps, [p.id]);
+  // The draft the user watched while the call came in gives way to this version.
+  settleDraft(ctx.deps, ctx.key, mustKind(kind).tool, id, { saved: { pageId: p.id, version: p.version } });
   return p;
 }
+
+/** A save whose call the user watched come in (drafts.ts): when it fails, its draft goes and the page shows as it was. */
+const watched = (tool: RunTool): RunTool => ({
+  ...tool,
+  async run(a, ctx) {
+    try {
+      return await tool.run(a, ctx);
+    } catch (e) {
+      const id = typeof a.id === 'string' && a.id.trim() ? a.id.trim() : null;
+      settleDraft(ctx.deps, ctx.key, tool.name, id, { failed: true });
+      throw e;
+    }
+  },
+});
 
 const SAVE_SLIDES: RunTool = {
   name: 'save_slides',
@@ -313,6 +329,8 @@ const SAVE_LATEX: RunTool = {
     if (typeof a.path === 'string' && a.path.trim() && !(typeof a.id === 'string' && a.id.trim())) {
       const r = await agentFileComments(db, fromSession(ctx.cwd, a.path.trim()), a.comments);
       tell(ctx.deps, { what: 'file-comments', paths: r.paths });
+      // No page is saved: nothing to watch come in.
+      settleDraft(ctx.deps, ctx.key, 'save_latex', null, { failed: true });
       return r.text;
     }
     const id = changing(db, a, 'tex');
@@ -496,7 +514,11 @@ function routes(d: Deps) {
   });
   app.get('/api/pages/kept', async (req) => ({ items: keptIn(db, String((req.query as { key?: string }).key ?? '')) }));
   /** The pages an agent of this session is writing now, whole so far. */
-  app.get('/api/pages/drafts', async (req) => ({ drafts: draftsOf(String((req.query as { key?: string }).key ?? '')) }));
+  app.get('/api/pages/drafts', async (req) => {
+    const q = req.query as { key?: string; page?: string };
+    // A page's: the saves of it being written now, from any session (its editor, opened mid-way).
+    return { drafts: q.page ? draftsOfPage(String(q.page)) : draftsOf(String(q.key ?? '')) };
+  });
   /**
    * Keep: a page from the conversation (and what it stored meanwhile) goes into Pages; with `edited`, the
    * user's changed version goes on top of it (and the agent hears of it). Without `item`, a page the user
@@ -868,7 +890,7 @@ function routes(d: Deps) {
 export const pages: Feature = {
   id: 'pages',
   routes,
-  tools: () => [SHOW_HTML, SAVE_PAGE, SAVE_SLIDES, SAVE_DOC, SAVE_SHEET, SAVE_LATEX, SAVE_NOTEBOOK, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE],
+  tools: () => [SHOW_HTML, SAVE_PAGE, watched(SAVE_SLIDES), watched(SAVE_DOC), watched(SAVE_SHEET), watched(SAVE_LATEX), SAVE_NOTEBOOK, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE],
   spawn: (s, d) => {
     const ask = s.extra?.page ? askInstructions(d.db, s.extra.page) : null;
     return { instructions: ask ? [INSTRUCTIONS, ask] : [INSTRUCTIONS] };
