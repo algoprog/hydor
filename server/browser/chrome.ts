@@ -180,6 +180,11 @@ interface LaunchOpts {
   shell?: boolean;
   /** The port of the app's proxy every connection goes through (proxy.ts). */
   proxy?: number;
+  /**
+   * Words at their fonts' own widths: Chromium on Linux otherwise rounds each letter's advance to a whole pixel, so a
+   * PDF or picture made on a Linux server sets lines wider than the editor shows them on a Mac or Windows (or Word).
+   */
+  exactText?: boolean;
 }
 
 function args(o: LaunchOpts, sandbox: boolean): string[] {
@@ -205,6 +210,7 @@ function args(o: LaunchOpts, sandbox: boolean): string[] {
     ...(o.proxy ? proxyArgs(o.proxy) : []),
   ];
   if (o.headless || o.shell) a.push('--headless');
+  if (o.exactText) a.push('--font-render-hinting=none');
   if (!sandbox) a.push('--no-sandbox');
   a.push('about:blank');
   return a;
