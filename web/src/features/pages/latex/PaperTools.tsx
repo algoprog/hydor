@@ -181,7 +181,12 @@ function RequestDialog({ open, kind, onClose, start, onAsk }: { open: boolean; k
     ? [
         `Make this paper camera-ready${v.id === 'other' ? '' : ` for ${v.label}`}: ${v.final}.`,
         v.finalPages ? `The final version may have ${v.finalPages} pages${v.refsCount ? '' : ' before the references'}.` : '',
-        v.parts.some((p) => p.final) ? `Add what the final version needs: ${v.parts.filter((p) => p.final).map((p) => p.label).join(' and ')}.` : '',
+        v.parts.some((p) => p.final)
+          ? `Add what the final version needs: ${v.parts
+              .filter((p) => p.final)
+              .map((p) => p.label)
+              .join(' and ')}.`
+          : '',
         people.trim() ? `The authors, their affiliations and the acknowledgements: ${people.trim()}` : 'The authors and their affiliations may be in the source as comments; if they are not, ask me for them.',
         'Keep everything else as it is, typeset it, fix any errors, and tell me in a few lines what you changed.',
       ]
@@ -259,4 +264,3 @@ function RequestDialog({ open, kind, onClose, start, onAsk }: { open: boolean; k
     </Dialog>
   );
 }
-

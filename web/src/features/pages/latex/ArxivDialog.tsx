@@ -79,9 +79,7 @@ export function ArxivDialog({ page, version }: { page: string; version?: number 
     >
       {!made ? (
         <div className="space-y-3">
-          <p className="text-[13px] leading-relaxed text-fg-2">
-            A .zip of the {version ? `version ${version}` : 'saved version'} to upload to arXiv, which publishes the source as it is sent. It is typeset first, as arXiv would, to see it builds.
-          </p>
+          <p className="text-[13px] leading-relaxed text-fg-2">A .zip of the {version ? `version ${version}` : 'saved version'} to upload to arXiv, which publishes the source as it is sent. It is typeset first, as arXiv would, to see it builds.</p>
           <ul className="space-y-1">
             {ARXIV_OPTIONS.map((o) => (
               <li key={o.id}>

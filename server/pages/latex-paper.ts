@@ -212,7 +212,10 @@ export interface TexSource {
 
 /** A file of the document a command names: as named, or with .tex. */
 function fileNamed(doc: TexDoc, arg: string): string | null {
-  const n = arg.trim().replace(/^"(.*)"$/, '$1').replace(/^(\.\/)+/, '');
+  const n = arg
+    .trim()
+    .replace(/^"(.*)"$/, '$1')
+    .replace(/^(\.\/)+/, '');
   if (!n) return null;
   for (const cand of [n, `${n}.tex`]) if (doc.files.some((f) => f.name === cand && /\.(tex|ltx|tikz|pgf)$/i.test(f.name))) return cand;
   return null;
@@ -254,7 +257,15 @@ export function bibliographyOf(doc: TexDoc, sources: TexSource[]): { files: stri
   let biblatex = false;
   let inline = false;
   for (const s of sources) {
-    for (const m of s.clean.matchAll(/\\bibliography\s*\{([^{}]*)\}/g)) for (const p of m[1].split(',')) if (p.trim()) named.push(p.trim().replace(/^(\.\/)+/, '').replace(/(\.bib)?$/, '.bib'));
+    for (const m of s.clean.matchAll(/\\bibliography\s*\{([^{}]*)\}/g))
+      for (const p of m[1].split(','))
+        if (p.trim())
+          named.push(
+            p
+              .trim()
+              .replace(/^(\.\/)+/, '')
+              .replace(/(\.bib)?$/, '.bib'),
+          );
     for (const m of s.clean.matchAll(/\\addbibresource\s*(?:\[[^\]]*\])?\s*\{([^{}]*)\}/g)) if (m[1].trim()) named.push(m[1].trim().replace(/^(\.\/)+/, ''));
     if (/\\usepackage\s*(\[[^\]]*\])?\s*\{[^}]*\bbiblatex\b/.test(s.clean)) biblatex = true;
     if (/\\begin\s*\{thebibliography\}/.test(s.clean)) inline = true;
@@ -697,7 +708,8 @@ export interface CellNumber {
 }
 
 /** Spans of a cell whose text is not shown (\phantom's), or is a colour, a width or a count, not a value. */
-const NOT_VALUES = /\\(?:[hv]?phantom)\s*\{[^{}]*\}|\\(?:cellcolor|rowcolor|columncolor|color)\s*(?:\[[^\]]*\])?\s*\{[^{}]*\}|\\textcolor\s*(?:\[[^\]]*\])?\s*\{[^{}]*\}|\\multicolumn\s*\{[^{}]*\}\s*\{[^{}]*\}|\\multirow\s*\{[^{}]*\}\s*(?:\[[^\]]*\])?\s*\{[^{}]*\}|\\(?:hspace|vspace|rule|raisebox)\*?\s*\{[^{}]*\}|\\[A-Za-z@]+/g;
+const NOT_VALUES =
+  /\\(?:[hv]?phantom)\s*\{[^{}]*\}|\\(?:cellcolor|rowcolor|columncolor|color)\s*(?:\[[^\]]*\])?\s*\{[^{}]*\}|\\textcolor\s*(?:\[[^\]]*\])?\s*\{[^{}]*\}|\\multicolumn\s*\{[^{}]*\}\s*\{[^{}]*\}|\\multirow\s*\{[^{}]*\}\s*(?:\[[^\]]*\])?\s*\{[^{}]*\}|\\(?:hspace|vspace|rule|raisebox)\*?\s*\{[^{}]*\}|\\[A-Za-z@]+/g;
 
 /** The number a cell holds, when it holds one (a value, with a ± and marks perhaps), or null for words, a dash or nothing. */
 export function cellNumber(c: TabCell): CellNumber | null {
@@ -740,8 +752,13 @@ export function betterOf(header: string): Better {
   const h = header.toLowerCase();
   if (/↓|\\downarrow|lower (is )?better|\(lower\)/.test(h)) return { better: 'min', sure: true };
   if (/↑|\\uparrow|higher (is )?better|\(higher\)/.test(h)) return { better: 'max', sure: true };
-  if (/\b(loss|error|err|errors|wer|cer|ter|mae|mse|rmse|ppl|perplexity|latency|time|ms|sec|secs|seconds|minutes|hours|memory|mem|gb|mb|params?|parameters|flops|cost|fpr|fnr|eer|distance|regret|bpc|bpd|nll|fid|kid|size|mean rank|rank)\b/.test(h)) return { better: 'min', sure: true };
-  if (/\b(acc|accuracy|f1|f-1|f_1|f-score|fscore|precision|prec|p@\d+|recall|rec|r@\d+|ndcg|map|mrr|bleu|rouge|rouge-l|meteor|chrf|bertscore|auc|roc|ap|em|exact|exact match|score|success|win|win rate|hit|hits|hr|sr|iou|miou|dice|psnr|ssim|r2|corr|correlation|spearman|pearson|kendall|tau|throughput|speedup|coverage|bpref|p@k|r@k|ndcg@\d+|mrr@\d+|recall@\d+|hits@\d+)\b|@\d+/.test(h))
+  if (/\b(loss|error|err|errors|wer|cer|ter|mae|mse|rmse|ppl|perplexity|latency|time|ms|sec|secs|seconds|minutes|hours|memory|mem|gb|mb|params?|parameters|flops|cost|fpr|fnr|eer|distance|regret|bpc|bpd|nll|fid|kid|size|mean rank|rank)\b/.test(h))
+    return { better: 'min', sure: true };
+  if (
+    /\b(acc|accuracy|f1|f-1|f_1|f-score|fscore|precision|prec|p@\d+|recall|rec|r@\d+|ndcg|map|mrr|bleu|rouge|rouge-l|meteor|chrf|bertscore|auc|roc|ap|em|exact|exact match|score|success|win|win rate|hit|hits|hr|sr|iou|miou|dice|psnr|ssim|r2|corr|correlation|spearman|pearson|kendall|tau|throughput|speedup|coverage|bpref|p@k|r@k|ndcg@\d+|mrr@\d+|recall@\d+|hits@\d+)\b|@\d+/.test(
+      h,
+    )
+  )
     return { better: 'max', sure: true };
   return { better: 'max', sure: false };
 }
@@ -889,7 +906,13 @@ export function bibAuthors(field: string): { families: string[]; cut: boolean } 
       continue;
     }
     // "Given Family Jr." and "Family, Jr., Given" both keep the family name.
-    const fam = p.includes(',') ? p.split(',')[0] : p.replace(/[{}]/g, '').replace(/,?\s+(Jr\.?|Sr\.?|II|III|IV)$/, '').split(/\s+/).pop()!;
+    const fam = p.includes(',')
+      ? p.split(',')[0]
+      : p
+          .replace(/[{}]/g, '')
+          .replace(/,?\s+(Jr\.?|Sr\.?|II|III|IV)$/, '')
+          .split(/\s+/)
+          .pop()!;
     families.push(lastWord(fam));
   }
   return { families, cut };

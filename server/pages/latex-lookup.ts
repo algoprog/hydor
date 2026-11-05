@@ -280,8 +280,7 @@ export class Lookup {
     const hit = cacheGet<PaperRecord | { none: true }>(this.o.db, key);
     if (hit) return 'none' in hit.v ? null : hit.v;
     const first = pre.names[0] ? lastWord(pre.names[0].family) : '';
-    const same = (r: PaperRecord) =>
-      titleLikeness(r.title, pre.title) >= 0.9 && (!first || !r.names.length || r.names.some((n) => lastWord(n.family) === first)) && r.kind !== 'preprint' && !(r.doi && /^10\.48550\//i.test(r.doi));
+    const same = (r: PaperRecord) => titleLikeness(r.title, pre.title) >= 0.9 && (!first || !r.names.length || r.names.some((n) => lastWord(n.family) === first)) && r.kind !== 'preprint' && !(r.doi && /^10\.48550\//i.test(r.doi));
     let found: PaperRecord | null = null;
     let askedAll = true;
     // 1. What its authors told arXiv (a DOI of the published version).
@@ -303,11 +302,7 @@ export class Lookup {
     if (!found && s2 && !('none' in s2.v) && same({ ...s2.v, names: s2.v.names.length ? s2.v.names : pre.names })) found = s2.v;
     if (!found && pre.arxiv && !s2) {
       const headers: Record<string, string> = this.o.keys?.semanticscholar ? { 'x-api-key': this.o.keys.semanticscholar } : {};
-      const one = await this.json<S2Paper>(
-        'semanticscholar',
-        `https://api.semanticscholar.org/graph/v1/paper/arXiv:${encodeURIComponent(pre.arxiv)}?fields=title,year,venue,publicationVenue,journal,externalIds,authors,publicationTypes`,
-        headers,
-      );
+      const one = await this.json<S2Paper>('semanticscholar', `https://api.semanticscholar.org/graph/v1/paper/arXiv:${encodeURIComponent(pre.arxiv)}?fields=title,year,venue,publicationVenue,journal,externalIds,authors,publicationTypes`, headers);
       if (!one) askedAll = false;
       const r = one?.data ? s2Record(one.data) : null;
       if (r && r.kind !== 'preprint' && (r.venue || r.doi) && same({ ...r, names: r.names.length ? r.names : pre.names })) found = r;
@@ -457,7 +452,10 @@ function dataciteRecord(a: DataciteAttrs, doi: string): PaperRecord {
 
 /** The family and given names of "Given Family" (as arXiv and DBLP write them). */
 function splitName(full: string): { family: string; given?: string } {
-  const words = full.replace(/\s+\d{4}$/, '').trim().split(/\s+/);
+  const words = full
+    .replace(/\s+\d{4}$/, '')
+    .trim()
+    .split(/\s+/);
   if (words.length === 1) return { family: words[0] };
   return { family: words[words.length - 1], given: words.slice(0, -1).join(' ') };
 }
@@ -614,7 +612,11 @@ function dblpRecords(a: DblpAnswer | null | undefined): PaperRecord[] {
 export function entryDoi(e: BibItem): string | undefined {
   const raw = bibField(e, 'doi') || /doi\.org\/(10\.[^\s}]+)/i.exec(bibField(e, 'url'))?.[1] || '';
   const m = /(10\.\d{4,9}\/[^\s"<>{}]+)/.exec(raw.replace(/\\_/g, '_'));
-  return m ? decodeURIComponent(m[1]).replace(/[.,;)\]]+$/, '').toLowerCase() : undefined;
+  return m
+    ? decodeURIComponent(m[1])
+        .replace(/[.,;)\]]+$/, '')
+        .toLowerCase()
+    : undefined;
 }
 
 const ARXIV_ID = /(?:arxiv[:./\s]*(?:abs\/|pdf\/)?|^)(\d{4}\.\d{4,5}|[a-z-]+(?:\.[A-Z]{2})?\/\d{7})(v\d+)?/i;
@@ -674,7 +676,35 @@ const VENUE_ALIASES: [string, RegExp][] = [
   ['colm', /\bcolm\b|conference on language modeling/],
 ];
 
-const VENUE_STOP = new Set(['proceedings', 'proc', 'of', 'the', 'on', 'in', 'and', 'for', 'international', 'conference', 'annual', 'meeting', 'workshop', 'acm', 'ieee', 'symposium', 'volume', 'vol', 'part', 'st', 'nd', 'rd', 'th', 'joint', 'findings', 'companion', 'advances']);
+const VENUE_STOP = new Set([
+  'proceedings',
+  'proc',
+  'of',
+  'the',
+  'on',
+  'in',
+  'and',
+  'for',
+  'international',
+  'conference',
+  'annual',
+  'meeting',
+  'workshop',
+  'acm',
+  'ieee',
+  'symposium',
+  'volume',
+  'vol',
+  'part',
+  'st',
+  'nd',
+  'rd',
+  'th',
+  'joint',
+  'findings',
+  'companion',
+  'advances',
+]);
 
 /** Whether two names of venues name the same one; null when that cannot be told. */
 export function sameVenue(a: string, b: string): boolean | null {
@@ -726,7 +756,8 @@ export function differences(e: BibItem, r: PaperRecord): Difference[] {
     else if (mine.families[0] && theirs[0] && mine.families[0] !== theirs[0]) out.push({ field: 'authors', text: `${from} lists ${shown[0]} as its first author` });
   }
   const year = Number(/\d{4}/.exec(bibField(e, 'year') || bibField(e, 'date'))?.[0]);
-  if (year && (r.years ? year < r.years[0] || year > r.years[1] : r.year && year !== r.year)) out.push({ field: 'year', text: r.years && r.years[0] !== r.years[1] ? `it came out on arXiv in ${r.years[0]} (its latest version ${r.years[1]})` : `${from} has its year as ${r.year ?? r.years?.[0]}` });
+  if (year && (r.years ? year < r.years[0] || year > r.years[1] : r.year && year !== r.year))
+    out.push({ field: 'year', text: r.years && r.years[0] !== r.years[1] ? `it came out on arXiv in ${r.years[0]} (its latest version ${r.years[1]})` : `${from} has its year as ${r.year ?? r.years?.[0]}` });
   const venue = bibField(e, 'journal') || bibField(e, 'journaltitle') || bibField(e, 'booktitle');
   if (venue && r.venue && (r.kind === 'journal' || r.kind === 'conference') && !citedAsPreprint(e) && sameVenue(venue, r.venue) === false) out.push({ field: 'venue', text: `${from} has it in ${r.venue}` });
   return out;
@@ -782,8 +813,7 @@ export function entryFrom(text: string, e: BibItem, r: PaperRecord, published = 
   const taken = new Set(fields.map(([n]) => n));
   for (const f of e.fields) {
     if (taken.has(f.name)) continue;
-    if (published && (PREPRINT_ONLY.has(f.name) || ((f.name === 'journal' || f.name === 'note' || f.name === 'url') && /arxiv|preprint/i.test(f.value)) || f.name === 'booktitle' || f.name === 'journal'))
-      continue;
+    if (published && (PREPRINT_ONLY.has(f.name) || ((f.name === 'journal' || f.name === 'note' || f.name === 'url') && /arxiv|preprint/i.test(f.value)) || f.name === 'booktitle' || f.name === 'journal')) continue;
     fields.push([f.name, text.slice(f.from, f.to).trim()]);
   }
   const shown = fields.filter(([, val]) => val && val !== '{}');

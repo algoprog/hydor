@@ -312,8 +312,7 @@ export const VENUES: Venue[] = [
     ],
     call: 'https://iclr.cc/Conferences/2027/CallForPapers',
     kit: 'https://github.com/ICLR/Master-Template',
-    final:
-      'turn on the final version with \\iclrfinalcopy (uncomment it, before \\begin{document}) so the authors show and the line numbers go; put back the authors and affiliations; put back the acknowledgements',
+    final: 'turn on the final version with \\iclrfinalcopy (uncomment it, before \\begin{document}) so the authors show and the line numbers go; put back the authors and affiliations; put back the acknowledgements',
     note: 'Not counted: references, appendices, the ethics, reproducibility and AI use statements, and acknowledgements.',
   },
   {
@@ -329,8 +328,7 @@ export const VENUES: Venue[] = [
     parts: [ABSTRACT, { id: 'impact', label: 'an Impact Statement', heading: FREE.impact, level: 'must', why: 'ICML asks every paper for one (unnumbered), at the end before the references; it does not count toward the pages.' }],
     call: 'https://icml.cc/Conferences/2026/CallForPapers',
     kit: 'https://icml.cc/Conferences/2026/AuthorInstructions',
-    final:
-      'turn on the final version (\\usepackage[accepted]{icml…}) so the authors show; put back the authors and affiliations (\\icmlauthor, \\icmlaffiliation, \\icmlcorrespondingauthor); put back the acknowledgements; keep the Impact Statement',
+    final: 'turn on the final version (\\usepackage[accepted]{icml…}) so the authors show; put back the authors and affiliations (\\icmlauthor, \\icmlaffiliation, \\icmlcorrespondingauthor); put back the acknowledgements; keep the Impact Statement',
     note: 'Last year’s rules (this year’s call was not out yet). Not counted: references, the Impact Statement, acknowledgements and appendices.',
   },
   {
@@ -360,7 +358,8 @@ export const VENUES: Venue[] = [
     parts: [ABSTRACT, { id: 'index', label: 'Index Terms (the IEEEkeywords environment)', source: '\\\\begin\\s*\\{IEEEkeywords\\}', level: 'must', why: 'IEEE asks every article for them, as the last part of the abstract.' }],
     call: 'https://journals.ieeeauthorcenter.ieee.org/',
     kit: 'https://www.ieee.org/conferences/publishing/templates.html',
-    final: 'use IEEEtran in its journal mode (compsoc for the Computer Society’s journals); put the authors’ biographies and photos (IEEEbiography) at the end if the journal asks; follow the journal’s page limit; fill in the copyright notice IEEE sends',
+    final:
+      'use IEEEtran in its journal mode (compsoc for the Computer Society’s journals); put the authors’ biographies and photos (IEEEbiography) at the end if the journal asks; follow the journal’s page limit; fill in the copyright notice IEEE sends',
     note: 'Each journal sets its own limit (often 12 pages, references included). Most review single-blind: pick Other with Anonymous for one that does not.',
   },
   {

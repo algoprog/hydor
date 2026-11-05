@@ -258,7 +258,14 @@ function checkReferences(c: Ctx): Bibs {
     const ax = entryArxiv(e);
     const title = bibField(e, 'title');
     const fam = bibAuthors(bibField(e, 'author')).families[0] ?? '';
-    const ids = [doi && `doi:${doi}`, ax && `arxiv:${ax}`, title.length > 12 && `title:${texPlain(title).toLowerCase().replace(/[^a-z0-9]+/g, '')}:${fam}`].filter(Boolean) as string[];
+    const ids = [
+      doi && `doi:${doi}`,
+      ax && `arxiv:${ax}`,
+      title.length > 12 &&
+        `title:${texPlain(title)
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '')}:${fam}`,
+    ].filter(Boolean) as string[];
     for (const id of ids) {
       const other = seen.get(id);
       if (other && other.key !== e.key && !told.has(`${other.key}|${e.key}`)) {
@@ -351,7 +358,15 @@ async function checkReferencesOnline(c: Ctx, bibs: Bibs, lookup: Lookup, progres
         group: 'refs',
         level: 'check',
         title: `“${e.key}”: ${diffs[0].text}`,
-        detail: `${diffs.length > 1 ? `Also, ${diffs.slice(1).map((d) => d.text).join('; ')}. ` : ''}${f ? 'Fix puts in the entry as listed there, under the same key.' : ''}`.trim() || undefined,
+        detail:
+          `${
+            diffs.length > 1
+              ? `Also, ${diffs
+                  .slice(1)
+                  .map((d) => d.text)
+                  .join('; ')}. `
+              : ''
+          }${f ? 'Fix puts in the entry as listed there, under the same key.' : ''}`.trim() || undefined,
         ...head,
         fix: f,
         ask: f ? undefined : `Check the bibliography entry “${e.key}” (${e.file}, line ${e.line}) against the paper itself: ${diffs.map((d) => d.text).join('; ')}.`,
@@ -471,7 +486,14 @@ function checkAnonymity(c: Ctx, info: Record<string, string> | null) {
   const blocks = authorBlocks(main);
   const named = blocks.filter((b) => /^\\author/.test(main.clean.slice(b.from, b.to)));
   const names = named
-    .map((b) => texPlain(main.text.slice(b.from, b.to).replace(/^\\author\s*(\[[^\]]*\])?\s*\{/, '').replace(/\}$/, '')))
+    .map((b) =>
+      texPlain(
+        main.text
+          .slice(b.from, b.to)
+          .replace(/^\\author\s*(\[[^\]]*\])?\s*\{/, '')
+          .replace(/\}$/, ''),
+      ),
+    )
     .join(' ')
     .trim();
   const realNames = !!names && !/\banonymous\b|\banon\b|\bblind\b|\bwithheld\b/i.test(names);
@@ -523,7 +545,12 @@ function checkAnonymity(c: Ctx, info: Record<string, string> | null) {
       const url = m[0].replace(/[.,;:)\]]+$/, '');
       if (LINK_SAFE.test(url)) continue;
       // The words before it in its own sentence say whether it is the paper's own.
-      const before = (plain.slice(Math.max(0, m.index! - 220), m.index!).split(/[.!?]\s+|\n\s*\n/).pop() ?? '').toLowerCase();
+      const before = (
+        plain
+          .slice(Math.max(0, m.index! - 220), m.index!)
+          .split(/[.!?]\s+|\n\s*\n/)
+          .pop() ?? ''
+      ).toLowerCase();
       const own = /\b(our|code|available|release[sd]?|implementation|repository|project page|demo|models? (are|is) at)\b/.test(before);
       if (!(LINK_PERSONAL.test(url) || (LINK_REPO.test(url) && own))) continue;
       links++;
@@ -696,10 +723,21 @@ export function pagesOf(pdfText: string, o: { end?: string | null; refsCount?: b
   const total = pages.length;
   // Lines on several pages are running heads and feet ("Under review as a conference paper…"): not text above a heading.
   const seen = new Map<string, number>();
-  for (const pg of pages) for (const l of new Set(pg.split('\n').map((x) => x.trim()).filter(Boolean))) seen.set(l, (seen.get(l) ?? 0) + 1);
+  for (const pg of pages)
+    for (const l of new Set(
+      pg
+        .split('\n')
+        .map((x) => x.trim())
+        .filter(Boolean),
+    ))
+      seen.set(l, (seen.get(l) ?? 0) + 1);
   const running = (l: string) => (seen.get(l.trim()) ?? 0) > 1 && total > 1;
   const refs = /^(references|bibliography|works cited|literature cited|references and notes)$/i;
-  const words = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const words = (t: string) =>
+    t
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .trim();
   const endWords = o.end ? words(o.end) : '';
   /** The page a heading's line ends the count at: the page before, when nothing but a running head is above it. */
   const countAt = (p: number, lines: string[], i: number) => (lines.slice(0, i).filter((l) => !running(l) && l.trim().split(/\s+/).length >= 4).length === 0 && p > 0 ? p : p + 1);
@@ -839,8 +877,7 @@ function checkFormatText(c: Ctx) {
       });
     }
   }
-  if (todos > 15)
-    add({ id: 'format:todo-more', group: 'format', level: 'must', title: `${todos - 15} more TODO marks are left in`, detail: 'Search the source for TODO, XXX and \\todo.', ...topPlace(doc) });
+  if (todos > 15) add({ id: 'format:todo-more', group: 'format', level: 'must', title: `${todos - 15} more TODO marks are left in`, detail: 'Search the source for TODO, XXX and \\todo.', ...topPlace(doc) });
   // The template changed (as hints: some changes are allowed).
   if (!mode.template) return;
   const ownFonts = mode.template !== 'llncs';
@@ -935,7 +972,14 @@ async function checkFormatPdf(c: Ctx, r: TexResult, set: (s: Partial<CheckState>
     const m = /sticks out into the margin by (\d+)pt/.exec(w.message);
     if (!m || Number(m[1]) < 5 || !w.file || !w.line || texFileText(doc, w.file) === null) continue;
     if (++over > 8) break;
-    add({ id: `format:overfull:${w.file}:${short(`${w.line}:${m[1]}`)}`, group: 'format', level: 'check', title: `A line sticks out into the margin by ${m[1]}pt`, detail: 'Reviewers notice it in print. Rewording the line, or a hyphenation hint (\\-), mends it.', ...linePlace(doc, w.file, w.line) });
+    add({
+      id: `format:overfull:${w.file}:${short(`${w.line}:${m[1]}`)}`,
+      group: 'format',
+      level: 'check',
+      title: `A line sticks out into the margin by ${m[1]}pt`,
+      detail: 'Reviewers notice it in print. Rewording the line, or a hyphenation hint (\\-), mends it.',
+      ...linePlace(doc, w.file, w.line),
+    });
   }
   if (!r.pdf) return null;
   set({ stage: 'Reading the PDF' });
@@ -958,14 +1002,11 @@ async function checkFormatPdf(c: Ctx, r: TexResult, set: (s: Partial<CheckState>
     }
     if (venue.refsMax && p.refsAt !== undefined) {
       const refsPages = p.total - p.refsAt + 1;
-      if (refsPages > venue.refsMax)
-        add({ id: 'format:refspages', group: 'format', level: 'check', title: `The references take ${refsPages} pages; ${venue.short} allows ${venue.refsMax}`, detail: venue.note, ...bibPlace(c) });
+      if (refsPages > venue.refsMax) add({ id: 'format:refspages', group: 'format', level: 'check', title: `The references take ${refsPages} pages; ${venue.short} allows ${venue.refsMax}`, detail: venue.note, ...bibPlace(c) });
     }
-    if (venue.totalMax && p.total > venue.totalMax)
-      add({ id: 'format:total', group: 'format', level: 'must', title: `It has ${p.total} pages in all; ${venue.short} allows ${venue.totalMax}`, detail: venue.note, ...bibPlace(c) });
+    if (venue.totalMax && p.total > venue.totalMax) add({ id: 'format:total', group: 'format', level: 'must', title: `It has ${p.total} pages in all; ${venue.short} allows ${venue.totalMax}`, detail: venue.note, ...bibPlace(c) });
     const qq = (text.match(/\?\?/g) ?? []).length;
-    if (qq && !undefinedRefs.size)
-      add({ id: 'format:qq', group: 'format', level: 'check', title: `“??” shows ${plural(qq, 'time')} in the PDF`, detail: 'An unresolved reference shows so: typeset again, or look for the \\ref.', ...topPlace(doc) });
+    if (qq && !undefinedRefs.size) add({ id: 'format:qq', group: 'format', level: 'check', title: `“??” shows ${plural(qq, 'time')} in the PDF`, detail: 'An unresolved reference shows so: typeset again, or look for the \\ref.', ...topPlace(doc) });
   }
   if (fonts !== null) {
     const list = fontsOf(fonts);
@@ -1080,9 +1121,7 @@ function checkBold(c: Ctx, src: TexSource, t: Tabular) {
     for (const p of i.problems.filter((x) => x.wrong).slice(0, 2)) {
       const best = i.problems.find((x) => !x.wrong) ?? null;
       const row = data.find((r) => r.cells.some((x) => x.cell === best?.cell));
-      lines.push(
-        `in “${name(i.col)}”, ${p.n.value.toFixed(p.n.digits)} is bold, but ${best ? `${best.n.value.toFixed(best.n.digits)} (${clip(row?.label || 'another row', 30)})` : p.best} is ${i.better.better === 'max' ? 'higher' : 'lower'}`,
-      );
+      lines.push(`in “${name(i.col)}”, ${p.n.value.toFixed(p.n.digits)} is bold, but ${best ? `${best.n.value.toFixed(best.n.digits)} (${clip(row?.label || 'another row', 30)})` : p.best} is ${i.better.better === 'max' ? 'higher' : 'lower'}`);
     }
   for (const i of issues) if (!i.problems.some((x) => x.wrong)) lines.push(`in “${name(i.col)}”, the best value (${i.problems[0].best}) is not bold`);
   const unsure = issues.filter((i) => !i.better.sure).map((i) => name(i.col));
@@ -1289,8 +1328,20 @@ export async function runCheck(db: DB, input: CheckInput, st: CheckState, o: { s
   if (o.signal.aborted) return;
   if (bibs.cited.length) {
     set({ stage: 'Checking the references online', online: { done: 0, of: bibs.cited.length } });
-    const lookup = new Lookup({ db, fetch: o.fetch, signal: o.signal, keys: o.fetch ? {} : { openalex: serviceKey(db, 'OPENALEX_API_KEY', 'api.openalex.org'), semanticscholar: serviceKey(db, 'SEMANTIC_SCHOLAR_API_KEY', 'api.semanticscholar.org') } });
-    await checkReferencesOnline(c, bibs, lookup, (done, of) => set({ online: { done, of } }), o.signal, (id) => byId.get(id));
+    const lookup = new Lookup({
+      db,
+      fetch: o.fetch,
+      signal: o.signal,
+      keys: o.fetch ? {} : { openalex: serviceKey(db, 'OPENALEX_API_KEY', 'api.openalex.org'), semanticscholar: serviceKey(db, 'SEMANTIC_SCHOLAR_API_KEY', 'api.semanticscholar.org') },
+    });
+    await checkReferencesOnline(
+      c,
+      bibs,
+      lookup,
+      (done, of) => set({ online: { done, of } }),
+      o.signal,
+      (id) => byId.get(id),
+    );
     for (const n of lookup.notes) c.note(n);
   }
   set({ stage: undefined });

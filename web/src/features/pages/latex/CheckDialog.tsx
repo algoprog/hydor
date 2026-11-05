@@ -235,11 +235,7 @@ export function CheckDialog({
     toast(`${parts.join(', ')}${missed ? tr(` (${missed} could not be placed: their words changed)`) : ''}`, 'ok');
   };
 
-  const groups = useMemo(
-    () =>
-      CHECK_GROUPS.map((g) => ({ ...g, list: findings.filter((f) => f.group === g.id).sort((a, b) => ORDER[a.level] - ORDER[b.level]) })).filter((g) => g.list.length),
-    [findings],
-  );
+  const groups = useMemo(() => CHECK_GROUPS.map((g) => ({ ...g, list: findings.filter((f) => f.group === g.id).sort((a, b) => ORDER[a.level] - ORDER[b.level]) })).filter((g) => g.list.length), [findings]);
 
   const setOther = (o: OtherRules) => setVenue((x) => ({ ...x, other: { ...x.other, ...o } }));
 
@@ -274,15 +270,7 @@ export function CheckDialog({
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-fg-2">
               <label className="flex items-center gap-2">
                 Pages allowed before the references
-                <input
-                  type="number"
-                  min={1}
-                  max={99}
-                  value={venue.other?.pages ?? ''}
-                  onChange={(e) => setOther({ pages: e.target.value ? Number(e.target.value) : undefined })}
-                  placeholder="None"
-                  className={cx(inputCls, 'h-8 w-20 text-[13px]')}
-                />
+                <input type="number" min={1} max={99} value={venue.other?.pages ?? ''} onChange={(e) => setOther({ pages: e.target.value ? Number(e.target.value) : undefined })} placeholder="None" className={cx(inputCls, 'h-8 w-20 text-[13px]')} />
               </label>
               <label className="flex items-center gap-2">
                 <Switch label="Reviewed anonymously" on={!!venue.other?.anonymous} onChange={(on) => setOther({ anonymous: on })} />
@@ -307,8 +295,7 @@ export function CheckDialog({
 
         {!state && (
           <p className="rounded-xl bg-bg-2 px-3 py-2.5 text-[12.5px] leading-relaxed text-fg-2">
-            It typesets the paper, reads its PDF, and looks its references up in Crossref, arXiv, OpenAlex, Semantic Scholar and DBLP (only their titles, DOIs and ids are sent). Nothing in the paper
-            changes unless you press Fix.
+            It typesets the paper, reads its PDF, and looks its references up in Crossref, arXiv, OpenAlex, Semantic Scholar and DBLP (only their titles, DOIs and ids are sent). Nothing in the paper changes unless you press Fix.
           </p>
         )}
 
@@ -332,10 +319,7 @@ export function CheckDialog({
                     counts.must && tr(`${counts.must} to fix`),
                     counts.check && tr(`${counts.check} to check`),
                     counts.info && tr(`${counts.info} for your information`),
-                    state.pages &&
-                      (state.pages.limit !== undefined && state.pages.counted !== undefined
-                        ? tr(`${state.pages.counted} of ${state.pages.limit} pages`)
-                        : tr(`${state.pages.total} page${state.pages.total === 1 ? '' : 's'}`)),
+                    state.pages && (state.pages.limit !== undefined && state.pages.counted !== undefined ? tr(`${state.pages.counted} of ${state.pages.limit} pages`) : tr(`${state.pages.total} page${state.pages.total === 1 ? '' : 's'}`)),
                   ]
                     .filter(Boolean)
                     .join(' · ')}
