@@ -8,9 +8,10 @@
 // frame's edges and corners over the whole picture, drag the picture under it; Enter keeps it, Esc does not). The
 // rulers give guides: drag one out of a ruler, drag it back to take it away. The slide itself is drawn by the runtime
 // as it shows anywhere; this draws what is picked over it, and moves parts while they are dragged without drawing the
-// slide again.
+// slide again. The marks of the slide's comments sit over it, at their parts' corners (the editor's alone).
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { scaleEls, type Crop, type Deck, type El, type GroupEl, type ImageEl, type Para, type TableEl, type TextProps } from '@shared/slides';
+import { MessageSquare } from 'lucide-react';
 import { cx } from '../../../components/ui';
 import { boxOf, heightOf, mergeAt, setEls, W } from './ops';
 import { PICS, RT } from './rt';
@@ -45,6 +46,17 @@ export interface CellSel {
   c0: number;
   r1: number;
   c1: number;
+}
+
+/** The mark of a slide's open comments: at a part's top-right corner, or where a comment on the slide is (the slide's pixels). */
+export interface CommentPin {
+  key: string;
+  x: number;
+  y: number;
+  /** The comments it marks. */
+  ids: string[];
+  /** One of them is the one picked in the Comments tab. */
+  active: boolean;
 }
 
 export interface GridOpts {
@@ -266,6 +278,9 @@ export const SlideCanvas = forwardRef<
     marks?: FindMark[];
     cellSel?: CellSel | null;
     onCellSel?: (s: CellSel | null) => void;
+    /** The slide's comments' marks (the editor's alone: never drawn in the slideshow), and a click on one. */
+    pins?: CommentPin[];
+    onPin?: (ids: string[]) => void;
     children?: ReactNode;
   }
 >(function SlideCanvas(
@@ -297,6 +312,8 @@ export const SlideCanvas = forwardRef<
     marks,
     cellSel,
     onCellSel,
+    pins,
+    onPin,
     children,
   },
   handle,
@@ -613,8 +630,8 @@ export const SlideCanvas = forwardRef<
         e.preventDefault();
         paraOp((paras, picked) => paras.map((p, i) => (picked.includes(i) ? { ...p, lvl: Math.max(0, Math.min(4, (p.lvl ?? 0) + (e.shiftKey ? -1 : 1))) } : p)));
       }
-      // Ctrl+F and Ctrl+H find, from inside words too.
-      if (!((e.ctrlKey || e.metaKey) && /^[fhFH/]$/.test(e.key))) e.stopPropagation();
+      // Ctrl+F and Ctrl+H find, from inside words too, and Ctrl+Alt+M comments on them.
+      if (!((e.ctrlKey || e.metaKey) && (/^[fhFH/]$/.test(e.key) || (e.altKey && e.code === 'KeyM')))) e.stopPropagation();
     };
     // Pasted words come in plain: a deck's runs keep its own look.
     const onPaste = (e: ClipboardEvent) => {
@@ -1478,6 +1495,30 @@ export const SlideCanvas = forwardRef<
             </Nest>
           </div>
           {cropView()}
+          {pins?.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              title={p.ids.length === 1 ? 'A comment' : `${p.ids.length} comments`}
+              aria-label={p.ids.length === 1 ? 'A comment' : `${p.ids.length} comments`}
+              onPointerDown={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPin?.(p.ids);
+              }}
+              className={cx(
+                'absolute z-[5] flex h-6 min-w-6 -translate-y-full items-center justify-center gap-0.5 rounded-full px-1.5 text-[11px] font-semibold shadow-md tabular-nums pointer-coarse:h-8 pointer-coarse:min-w-8',
+                // Near the slide's right edge it opens to the left of its point, staying on the slide.
+                p.x > W - 64 ? '-translate-x-full rounded-br-[4px]' : 'rounded-bl-[4px]',
+                p.active ? 'bg-accent text-accent-fg ring-2 ring-accent/40' : 'border border-line bg-elevated text-fg-2 hover:text-fg',
+              )}
+              style={{ left: p.x > W - 64 ? S(p.x) + 2 : S(p.x) - 2, top: S(p.y) + 2 }}
+            >
+              <MessageSquare size={12} />
+              {p.ids.length > 1 && p.ids.length}
+            </button>
+          ))}
         </div>
         {cell && (
           <textarea

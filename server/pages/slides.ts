@@ -11,8 +11,9 @@
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { ASSET, deckFonts, deckOutline, deckSources, deckText, everyEl, FONT_TABLE, googleFamilies, iconNodes, isDeckText, mapSources, mapVideoSources, normalizeDeck, VIDEO, videoSrc, type Deck, type El, type IconNode, type VideoEl } from '../../shared/slides.ts';
+import { ASSET, deckFonts, deckOutline, deckSources, deckText, everyEl, FONT_TABLE, googleFamilies, iconNodes, isDeckText, mapSources, mapVideoSources, normalizeDeck, plainText, VIDEO, videoSrc, type Deck, type El, type IconNode, type SlideComment, type VideoEl } from '../../shared/slides.ts';
 import { slidesRuntime } from '../../shared/slides-runtime.ts';
+import { newCommentId } from '../../shared/comments.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { assetDataUrl, putAsset, takeIn } from './assets.ts';
@@ -166,6 +167,84 @@ function withVideoFiles(d: Deck, files: Map<string, { src: string; poster?: stri
   return { ...d, slides: d.slides.map((s) => ({ ...s, els: map(s.els) })) };
 }
 
+/**
+ * The comments of a deck an agent sends: those of the version it changes, on the same slides (by their ids) and parts
+ * as they were (a part gone, the comment is on its slide), then answered, resolved, reopened, deleted or added to as
+ * `ops` (save_slides' comments) says. A slide's own list of comments is not taken from the agent: comments change only
+ * so. What could not be done is said in `notes`.
+ */
+function carryComments(d: Deck, before: Deck | null, ops: unknown, notes: string[]): Deck {
+  const had = new Map<string, SlideComment[]>();
+  for (const s of before?.slides ?? []) if (s.comments?.length) had.set(s.id, s.comments.map((c) => ({ ...c, ...(c.replies ? { replies: [...c.replies] } : {}) })));
+  const partsOf = (i: number) => new Set(everyEl(d.slides[i].els).map((e) => e.id));
+  const lists = d.slides.map((s, i) => {
+    const parts = partsOf(i);
+    const list = (had.get(s.id) ?? []).map((c) => {
+      if (!c.el || parts.has(c.el)) return c;
+      const { el: _gone, ...rest } = c;
+      return rest;
+    });
+    had.delete(s.id);
+    return list;
+  });
+  const lost = [...had.values()].reduce((a, l) => a + l.length, 0);
+  if (lost) notes.push(`${lost} comment${lost === 1 ? '' : 's'} went with slides no longer in the deck (a slide keeps its comments while it keeps its id).`);
+  if (ops !== undefined && ops !== null) {
+    if (!Array.isArray(ops)) notes.push('comments must be a list of changes, such as [{"id": "c1", "reply": "…"}]: they were left as they were.');
+    else {
+      const now = Date.now();
+      const find = (id: string) => {
+        for (const [i, l] of lists.entries()) {
+          const k = l.findIndex((c) => c.id === id);
+          if (k >= 0) return { i, k };
+        }
+        return null;
+      };
+      for (const raw of ops.slice(0, 500)) {
+        const op = (raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>;
+        const id = typeof op.id === 'string' ? op.id.trim() : '';
+        const text = (k: string) => (typeof op[k] === 'string' ? (op[k] as string).trim().slice(0, 4000) : '');
+        const at = id ? find(id) : null;
+        if (at) {
+          const c = lists[at.i][at.k];
+          if (op.delete === true) {
+            lists[at.i].splice(at.k, 1);
+            continue;
+          }
+          if (text('reply')) c.replies = [...(c.replies ?? []), { id: `${c.id}r${(c.replies?.length ?? 0) + 1}${now.toString(36).slice(-3)}`, by: 'agent', text: text('reply'), at: now }];
+          if (op.resolve === true || op.resolved === true) c.resolved = true;
+          if (op.reopen === true || op.resolved === false) delete c.resolved;
+          if (!text('reply') && op.resolve === undefined && op.resolved === undefined && op.reopen === undefined && text('text')) notes.push(`Comment ${id} is there already: answer it with "reply", not "text".`);
+          continue;
+        }
+        if (op.delete === true || text('reply') || op.resolve !== undefined || op.reopen !== undefined) {
+          notes.push(`There is no comment ${id || '(no id)'} to change: get_page lists them.`);
+          continue;
+        }
+        const words = text('text');
+        if (!words) continue;
+        // A new one of the agent's: on a slide (by its number or its id), on one of its parts or the whole slide.
+        const i = typeof op.slide === 'number' ? Math.round(op.slide) - 1 : typeof op.slide === 'string' ? d.slides.findIndex((s) => s.id === op.slide) : -1;
+        if (i < 0 || i >= d.slides.length) {
+          notes.push(`The comment “${words.slice(0, 60)}” needs its slide ("slide": its number or its id): it was left out.`);
+          continue;
+        }
+        const c: SlideComment = { id: /^[A-Za-z0-9_-]{1,40}$/.test(id) ? id : newCommentId(), by: 'agent', text: words, at: now };
+        if (typeof op.el === 'string' && partsOf(i).has(op.el)) c.el = op.el;
+        else if (typeof op.el === 'string') notes.push(`Slide ${i + 1} has no part ${op.el}: comment “${words.slice(0, 40)}” is on the slide itself.`);
+        lists[i].push(c);
+      }
+    }
+  }
+  return {
+    ...d,
+    slides: d.slides.map((s, i) => {
+      const { comments: _c, ...rest } = s;
+      return lists[i].length ? { ...rest, comments: lists[i] } : rest;
+    }),
+  };
+}
+
 /** The deck with these videos' stills (by the video's id), in groups too. */
 function withPosters(d: Deck, posters: Map<string, string>): Deck {
   const map = (els: El[]): El[] => els.map((e) => (e.type === 'group' ? { ...e, els: map(e.els) } : e.type === 'video' && posters.has(e.id) ? { ...e, poster: posters.get(e.id) } : e));
@@ -231,6 +310,12 @@ export async function agentDeck(db: DB, input: unknown, cwd: string, prev?: stri
       if (got) stills.set(v.id, got);
     }));
   if (stills.size) deck = withPosters(deck, stills);
+  // Its comments: kept from the version it changes, changed as it says (checked once more, ids once each).
+  let before: Deck | null = null;
+  try {
+    before = prev ? readDeck(prev) : null;
+  } catch {}
+  deck = normalizeDeck(carryComments(deck, before, input && typeof input === 'object' ? (input as Record<string, unknown>).comments : undefined, notes));
   const text = deckText(deck);
   if (Buffer.byteLength(text) > MAX_DECK) throw new Error(`The deck is over ${MAX_DECK / 1024 / 1024} MB without its pictures; make it smaller.`);
   return { deck, text, notes };
@@ -315,7 +400,31 @@ export function deckForAgent(text: string): string {
   const body = text.length > 150_000 ? `${text.slice(0, 150_000)}\n… (cut: the deck is ${Math.round(text.length / 1024)} KB; keep the parts you did not read as they are by changing the deck slide by slide)` : text;
   const f = deck.footer;
   const foot = f ? `; on each slide${f.skipTitle ? ' but the title slide' : ''}: ${[f.num && 'its number', f.text && `"${f.text}"`, f.date && (f.date === 'today' ? "the day's date" : `the date "${f.date}"`)].filter(Boolean).join(', ')}` : '';
-  return `A slide deck of ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'} (${deck.ratio}, theme ${deck.theme.id ?? 'custom'}${foot}).\n\nOutline:\n${deckOutline(deck)}\n\nThe deck (send it back whole with save_slides and this id to change it; keep naget-asset: pictures, naget-video: videos and icons' paths as they are):\n${body}`;
+  return `A slide deck of ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'} (${deck.ratio}, theme ${deck.theme.id ?? 'custom'}${foot}).\n\nOutline:\n${deckOutline(deck)}\n\nThe deck (send it back whole with save_slides and this id to change it; keep naget-asset: pictures, naget-video: videos and icons' paths as they are):\n${body}${commentsForAgent(deck)}`;
+}
+
+/** The deck's comments, slide by slide, each on its part or slide, with how to answer them; '' when it has none. */
+function commentsForAgent(deck: Deck): string {
+  const all = deck.slides.flatMap((s, i) => (s.comments ?? []).map((c) => ({ c, s, i })));
+  if (!all.length) return '';
+  const open = all.filter((x) => !x.c.resolved).length;
+  const when = (at: number) => new Date(at).toISOString().slice(0, 16).replace('T', ' ');
+  const who = (by: string) => (by === 'agent' ? 'an agent' : 'the user');
+  const partOf = (s: Deck['slides'][number], id: string) => {
+    const e = everyEl(s.els).find((x) => x.id === id);
+    if (!e) return '';
+    const words = e.type === 'text' || e.type === 'shape' ? plainText(e.paras).replace(/\s+/g, ' ').trim().slice(0, 60) : e.type === 'chart' ? (e.title ?? '') : e.type === 'math' ? e.tex.slice(0, 60) : '';
+    return `, on its part ${id} (${e.name ? `“${e.name}”, ` : ''}${e.type}${words ? `: “${words}”` : ''})`;
+  };
+  const lines = all.map(({ c, s, i }) => {
+    const replies = (c.replies ?? []).map((r) => `\n    reply by ${who(r.by)}, ${when(r.at)}: “${r.text}”`).join('');
+    return `- ${c.id} (${c.resolved ? 'resolved' : 'open'}) on slide ${i + 1} [${s.id}]${c.el ? partOf(s, c.el) : ''}, by ${who(c.by)}, ${when(c.at)} UTC: “${c.text}”${replies}`;
+  });
+  return [
+    `\n\nComments (${open} open, ${all.length - open} resolved):`,
+    ...lines,
+    'To answer them, save_slides with this id and comments: [{"id": "<id>", "reply": "what you did or say"}], adding "resolve": true once one is dealt with ("reopen": true opens it again, "delete": true takes it out); make the change a comment asks for in the slides too. Add one of your own with {"slide": <its number or id>, "el": "<a part’s id, or leave it out for the whole slide>", "text": "…"}. Comments you do not mention stay as they are (the slides’ own "comments" lists are kept from this version, whatever you send in them).',
+  ].join('\n');
 }
 
 const SLIDES_HELP = [
@@ -330,6 +439,7 @@ const SLIDES_HELP = [
   'theme: a preset (paper, midnight, ember, forest, ocean, noir, blossom, slate) or {id, bg, fg, head, muted, accent, accentFg, soft, colors: [6], font, headFont}; fonts: Inter, Roboto, Open Sans, Lato, Montserrat, Poppins, Nunito, DM Sans, Work Sans, Space Grotesk, IBM Plex Sans, Outfit, Playfair Display, Merriweather, Lora, Fraunces, DM Serif Display, Source Serif 4, JetBrains Mono, Arial, Georgia.',
   'Good slides: one idea each, a title that says the point, a few short bullets, numbers as charts or big numbers, pictures where they help, and what to say in the notes.',
   'To change a deck, get_page with its id gives it whole (each slide and part with its id); send the whole deck back with the same id: a new version, the older ones restorable. Keep what the user changed.',
+  'Comments: get_page lists the comments people left on slides and their parts (and their ids). Answer with comments: [{"id": "c1", "reply": "…", "resolve": true}] beside the slides (and make the change asked for); {"id", "reopen": true} reopens one, {"id", "delete": true} takes it out; {"slide": 3, "el": "<a part’s id, or none for the whole slide>", "text": "…"} adds one of yours. Comments you do not mention stay as they are; keep each slide’s id so its comments stay with it.',
 ].join(' ');
 
 export const SAVE_SLIDES_DESCRIPTION = SLIDES_HELP;
@@ -344,6 +454,11 @@ export const SAVE_SLIDES_SCHEMA = {
     slides: { type: 'array', items: { type: 'object' }, description: 'The slides, in order.' },
     footer: { type: 'object', description: 'What the foot of each slide shows: {num, text, date, skipTitle}.' },
     guides: { type: 'object', description: 'The guides parts line up on: {x: [px], y: [px]}.' },
+    comments: {
+      type: 'array',
+      items: { type: 'object' },
+      description: 'Changes to the comments: {"id": "c1", "reply": "…"}, {"id": "c1", "resolve": true}, {"id": "c1", "reopen": true}, {"id": "c1", "delete": true}, or a new one: {"slide": 3, "el": "<a part’s id, optional>", "text": "…"}.',
+    },
   },
   required: ['title', 'slides'],
 };

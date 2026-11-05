@@ -4,7 +4,8 @@
 // adjusted), lines and arrows, tables, charts, icons, equations (LaTeX), videos, and groups of parts that move as
 // one. Each slide has its background, its order of animations (a part comes in, is stressed or goes out: on a
 // click, with the one before or after it), its transition from the slide before (Morph glides the parts two slides
-// share into place), and speaker notes. The deck's theme names the colours and fonts parts refer to ("accent",
+// share into place), speaker notes, and the comments people and agents leave on it or its parts (with replies,
+// resolved or not). The deck's theme names the colours and fonts parts refer to ("accent",
 // "head"), so a new theme recolours it all; the deck may number its slides and give them a footer, and keeps the
 // guides its slides are lined up on.
 //
@@ -12,6 +13,10 @@
 // with its title and bullets, text as a string with "- " bullets and **bold**), and returns the full model,
 // every value checked: the editor shows decks inside the app itself, so nothing in a deck may be markup, a
 // script or a style rule; colours, fonts and addresses are each of a known form.
+
+import { cleanComment, COMMENT_LIMITS, newCommentId, type Comment } from './comments.ts';
+
+export type { Comment };
 
 export const SLIDE_W = 1280;
 export type Ratio = '16:9' | '4:3';
@@ -377,6 +382,15 @@ export interface Slide {
   layout?: LayoutId;
   /** The deck's footer and slide number left off this slide. */
   nofooter?: boolean;
+  /** Comments on the slide or on parts of it (shown only in the editor, never in the slideshow). */
+  comments?: SlideComment[];
+}
+
+/** A comment on a slide: on one of its parts (`el`), or on the slide itself, its mark at `x`, `y` (the slide's pixels). */
+export interface SlideComment extends Comment {
+  el?: string;
+  x?: number;
+  y?: number;
 }
 
 /** What the foot of every slide shows. */
@@ -1574,7 +1588,30 @@ function transition(v: unknown): Transition | undefined {
   return t;
 }
 
-function slide(v: unknown, used: Set<string>, ratio: Ratio, o: NormalizeOpts): Slide | null {
+/**
+ * A slide's comments, each checked as comments are (comments.ts): on one of its parts (by an id it has), or on the slide,
+ * its mark where it said (on the slide, else near its top-right corner). Ids are kept once across the deck (`seen`).
+ */
+function slideComments(v: unknown, parts: Set<string>, H: number, seen: Set<string>): SlideComment[] {
+  if (!Array.isArray(v)) return [];
+  const out: SlideComment[] = [];
+  for (const raw of v.slice(0, COMMENT_LIMITS.comments)) {
+    const c: SlideComment | null = cleanComment(raw);
+    if (!c) continue;
+    while (seen.has(c.id)) c.id = newCommentId();
+    seen.add(c.id);
+    const r = raw as Obj;
+    if (typeof r.el === 'string' && parts.has(r.el)) c.el = r.el;
+    else if (r.x !== undefined || r.y !== undefined) {
+      c.x = Math.round(num(r.x, 0, SLIDE_W, SLIDE_W - 40));
+      c.y = Math.round(num(r.y, 0, H, 40));
+    }
+    out.push(c);
+  }
+  return out;
+}
+
+function slide(v: unknown, used: Set<string>, ratio: Ratio, o: NormalizeOpts, cids: Set<string> = new Set()): Slide | null {
   if (!isObj(v)) return null;
   const H = slideH(ratio);
   let s: Slide;
@@ -1622,6 +1659,8 @@ function slide(v: unknown, used: Set<string>, ratio: Ratio, o: NormalizeOpts): S
   if (notes) s.notes = notes;
   if (v.hidden === true) s.hidden = true;
   if (v.nofooter === true) s.nofooter = true;
+  const comments = slideComments(v.comments, new Set(everyEl(els).map((e) => e.id)), H, cids);
+  if (comments.length) s.comments = comments;
   return s;
 }
 
@@ -1692,9 +1731,10 @@ export function normalizeDeck(input: unknown, o: NormalizeOpts = {}): Deck {
   if (!isObj(v) || !Array.isArray(v.slides)) throw new Error('A deck needs slides: an array.');
   const ratio = pick(v.ratio, ['16:9', '4:3'] as const, '16:9');
   const used = new Set<string>();
+  const cids = new Set<string>();
   const slides = v.slides
     .slice(0, SLIDE_LIMITS.slides)
-    .map((s) => slide(s, used, ratio, o))
+    .map((s) => slide(s, used, ratio, o, cids))
     .filter((s): s is Slide => !!s);
   if (!slides.length) slides.push({ ...layoutSlide('title', {}, ratio) });
   const d: Deck = { v: 1, ratio, theme: theme(v.theme, THEMES[0]), slides };
@@ -1783,7 +1823,8 @@ export function deckOutline(d: Deck): string {
     .map((s, i) => {
       const kinds = s.els.map((e) => (e.type === 'shape' ? `shape:${e.shape}` : e.type === 'group' ? `group of ${e.els.length}` : e.type));
       const what = [...new Set(kinds)].map((k) => `${kinds.filter((x) => x === k).length}× ${k}`).join(', ');
-      return `${i + 1}. ${slideTitle(s) || '(no title)'} [${s.id}]${s.hidden ? ' (hidden)' : ''}: ${what || 'empty'}${s.anims?.length ? `, ${s.anims.length} animation${s.anims.length === 1 ? '' : 's'}` : ''}${s.notes ? ', notes' : ''}`;
+      const open = (s.comments ?? []).filter((c) => !c.resolved).length;
+      return `${i + 1}. ${slideTitle(s) || '(no title)'} [${s.id}]${s.hidden ? ' (hidden)' : ''}: ${what || 'empty'}${s.anims?.length ? `, ${s.anims.length} animation${s.anims.length === 1 ? '' : 's'}` : ''}${s.notes ? ', notes' : ''}${open ? `, ${open} open comment${open === 1 ? '' : 's'}` : ''}`;
     })
     .join('\n');
 }

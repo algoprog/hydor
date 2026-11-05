@@ -18,6 +18,8 @@ import {
   Image as ImageIcon,
   LayoutTemplate,
   Link2,
+  MessageSquare,
+  MessageSquarePlus,
   Minus,
   MonitorPlay,
   MoveRight,
@@ -37,7 +39,7 @@ import {
   Undo2,
   Ungroup,
 } from 'lucide-react';
-import { newId, slideTitle, SHAPES, videoSrc, videoStart, type Deck, type El, type ImageEl, type LayoutId, type TextEl } from '@shared/slides';
+import { newId, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type Deck, type El, type ImageEl, type LayoutId, type TextEl } from '@shared/slides';
 import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
 import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, useConfirm } from '../../../components/ui';
@@ -54,6 +56,7 @@ import {
   copies,
   distribute,
   duplicateSlides,
+  findEl,
   groupEls,
   HISTORY_MAX,
   image,
@@ -71,6 +74,7 @@ import {
   shape,
   table,
   textBox,
+  topOf,
   ungroup,
   withLook,
   W,
@@ -83,7 +87,7 @@ import { tr } from '../../../i18n/runtime';
 import { Presenter, Slideshow } from './Present';
 import { choosePicture as chooseFile, uploadPicture as upload } from '../pictures';
 import { useDeckFonts } from './rt';
-import { SlideCanvas, type CanvasHandle, type CellSel, type FindMark, type GridOpts } from './SlideCanvas';
+import { SlideCanvas, type CanvasHandle, type CellSel, type CommentPin, type FindMark, type GridOpts } from './SlideCanvas';
 import { LayoutGrid, Strip } from './Strip';
 import { textActions, TextBar } from './TextBar';
 import { slidesMenus } from './SlidesMenus';
@@ -93,6 +97,7 @@ import { NotesField } from './Notes';
 import { findInDeck, replaceAllInDeck, replaceHit } from './find';
 import { exportFile } from '../exportFile';
 import { chooseVideo, fetchVideoStill, firstFrame, isVideoFile, uploadVideo } from './media';
+import { SlideComments } from './SlideComments';
 
 export type SlidesDoc = ModelDoc<Deck>;
 
@@ -151,6 +156,7 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+↑ / Ctrl+↓', 'Bring forward, send backward'],
       ['Ctrl+Shift+↑ / Ctrl+Shift+↓', 'Bring to front, send to back'],
       ['Ctrl+Shift+C / Ctrl+Shift+V', 'Copy the look, paste the look'],
+      ['Ctrl+Alt+M', 'A comment on it (or on the slide)'],
       ['Alt', 'While dragging: no snapping'],
       ['Shift', 'While dragging: straight across or down; while sizing: keep or lose its shape'],
     ],
@@ -245,6 +251,9 @@ export function SlidesEditor({
   const [videoUrl, setVideoUrl] = useState('');
   /** A video from this device on its way to the app: how much of it went (0–1), shown over the slide. */
   const [sending, setSending] = useState<number | null>(null);
+  /** A comment being written (on a part of the slide, or the slide), and the thread picked in the Comments tab. */
+  const [adding, setAdding] = useState<{ el?: string } | null>(null);
+  const [activeComment, setActiveComment] = useState<string | null>(null);
   const [footerOpen, setFooterOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [cellSel, setCellSel] = useState<CellSel | null>(null);
@@ -650,6 +659,16 @@ export function SlidesEditor({
     });
   };
 
+  // ---- comments ----------------------------------------------------------------------------------------------
+  /** Comment: on the part picked (one), else on the slide, in the Comments tab. */
+  const startComment = () => {
+    if (readOnly || !slide) return;
+    canvas.current?.stopEditing();
+    setAdding(picked.length === 1 ? { el: picked[0].id } : {});
+    setTab('comments' as InspectorTab);
+    if (!wide) setDrawer('open');
+  };
+
   // ---- keys ---------------------------------------------------------------------------------------------------
   const keys = useRef<(e: KeyboardEvent) => void>(() => {});
   const layered = useRef(false);
@@ -676,6 +695,11 @@ export function SlidesEditor({
     if (mod && (e.key === '/' || e.code === 'Slash') && !e.altKey) {
       e.preventDefault();
       setKeysOpen(true);
+      return;
+    }
+    if (mod && e.altKey && !e.shiftKey && e.code === 'KeyM' && !readOnly) {
+      e.preventDefault();
+      startComment();
       return;
     }
     if (typing) return;
@@ -882,6 +906,20 @@ export function SlidesEditor({
     if (!wide) setDrawer('open');
   };
   const one = picked.length === 1 ? picked[0] : null;
+  const openComments = deck.slides.reduce((a, s) => a + (s.comments ?? []).filter((c) => !c.resolved).length, 0);
+  // The marks of the slide's open comments: one at the corner of each part with some, one where each of the slide's own is.
+  const pins: CommentPin[] = [];
+  for (const c of slide.comments ?? []) {
+    if (c.resolved) continue;
+    const part = c.el ? findEl(slide.els, c.el) : undefined;
+    const b = part ? turnedBox(onSlide(slide, part)) : null;
+    const at = b ? { x: b.x + b.w, y: b.y } : { x: c.x ?? W - 40, y: c.y ?? 40 };
+    const key = part ? `el:${part.id}` : `at:${Math.round(at.x)},${Math.round(at.y)}`;
+    const pin = pins.find((p) => p.key === key);
+    if (pin) pin.ids.push(c.id);
+    else pins.push({ key, x: at.x, y: at.y, ids: [c.id], active: false });
+  }
+  for (const p of pins) p.active = !!activeComment && p.ids.includes(activeComment);
   const menus = slidesMenus({
     readOnly,
     wide,
@@ -941,6 +979,7 @@ export function SlidesEditor({
     video: () => setVideoAsk(true),
     videoFile: () => void pickVideoFile(),
     footer: () => setFooterOpen(true),
+    comment: startComment,
     crop: () => one && crop(one.id),
     resetPicture: () => one && change((d) => setEls(d, index, [one.id], (e) => ({ ...e, crop: undefined, adjust: undefined }) as El)),
     editTex: () => {
@@ -1066,6 +1105,11 @@ export function SlidesEditor({
           marks={marks}
           cellSel={cellSel}
           onCellSel={setCellSel}
+          pins={pins}
+          onPin={(ids) => {
+            setActiveComment(ids[0]);
+            openPanel('comments' as InspectorTab);
+          }}
         />
         {zoom !== 'fit' && (
           <button
@@ -1147,24 +1191,61 @@ export function SlidesEditor({
   );
 
   const tabs = (
-    <div role="tablist" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
-      {[...INSPECTOR_TABS, ...(wide ? [] : [{ value: 'notes' as const, label: 'Notes' }])].map((t) => (
+    <div role="tablist" className="flex min-w-0 flex-1 items-center overflow-x-auto [&::-webkit-scrollbar]:hidden">
+      {[...INSPECTOR_TABS, ...(wide ? [] : [{ value: 'notes' as const, label: 'Notes' }]), { value: 'comments' as const, label: 'Comments' }].map((t) => (
         <button
           key={t.value}
           type="button"
           role="tab"
           aria-selected={tab === t.value}
+          // The comments' tab is its mark and how many are open: the row keeps to its width.
+          title={t.value === 'comments' ? 'Comments' : undefined}
+          aria-label={t.value === 'comments' ? 'Comments' : undefined}
           onClick={() => {
             setTab(t.value as InspectorTab);
             if (!wide) setDrawer('open');
           }}
-          className={cx('relative h-10 shrink-0 px-2.5 text-[13px] font-medium transition-colors', tab === t.value ? 'text-fg' : 'text-fg-3 hover:text-fg-2')}
+          className={cx('relative flex h-10 shrink-0 items-center px-1.5 text-[13px] font-medium transition-colors', tab === t.value ? 'text-fg' : 'text-fg-3 hover:text-fg-2')}
         >
-          {t.label}
-          {tab === t.value && (wide || drawer === 'open') && <span className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-fg" />}
+          {t.value === 'comments' ? (
+            <span className="relative flex px-0.5">
+              <MessageSquare size={16} />
+              {openComments > 0 && (
+                <span className="absolute -top-1.5 left-2.5 min-w-4 rounded-full bg-accent px-1 text-center text-[10px] leading-[15px] font-semibold text-accent-fg tabular-nums">{openComments}</span>
+              )}
+            </span>
+          ) : (
+            t.label
+          )}
+          {tab === t.value && (wide || drawer === 'open') && <span className="absolute inset-x-1.5 -bottom-px h-[2px] rounded-full bg-fg" />}
         </button>
       ))}
     </div>
+  );
+
+  const commentsPanel = (
+    <SlideComments
+      deck={deck}
+      index={index}
+      readOnly={readOnly}
+      adding={adding}
+      onAdd={startComment}
+      onAdded={(id) => {
+        setAdding(null);
+        setActiveComment(id);
+      }}
+      change={change}
+      active={activeComment}
+      onActive={setActiveComment}
+      onGo={(i, el) => {
+        canvas.current?.stopEditing();
+        setCur(i);
+        setView('edit');
+        // A part in a group: the group is what is picked on the slide.
+        setSel(el ? [topOf(deck.slides[i], el)?.id ?? el] : []);
+      }}
+      onAsk={onAsk}
+    />
   );
 
   const notesPanel = <NotesField value={slide.notes ?? ''} readOnly={readOnly} marks={noteMarks} onChange={(v) => change((d) => setSlide(d, index, (s) => ({ ...s, notes: v || undefined })), `notes:${slide.id}`)} className="h-full min-h-[120px]" />;
@@ -1251,7 +1332,7 @@ export function SlidesEditor({
                     </IconButton>
                   )}
                 </div>
-                {(wide || drawer === 'open') && <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{(tab as string) === 'notes' ? notesPanel : inspector}</div>}
+                {(wide || drawer === 'open') && <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{(tab as string) === 'notes' ? notesPanel : (tab as string) === 'comments' ? commentsPanel : inspector}</div>}
               </aside>
             )}
           </>
@@ -1361,6 +1442,11 @@ export function SlidesEditor({
             <MenuItem icon={<Paintbrush size={14} />} disabled={!one} onClick={() => (setMenu(null), startPainter(false))}>
               Format painter
             </MenuItem>
+            {picked.length === 1 && (
+              <MenuItem icon={<MessageSquarePlus size={14} />} hint={keyLabel('Ctrl+Alt+M')} onClick={() => (setMenu(null), startComment())}>
+                Comment
+              </MenuItem>
+            )}
             {onAsk && picked.length === 1 && (
               <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(`On slide ${index + 1}, the ${partName(picked[0]).replace(/^(\w)/, (c) => c.toLowerCase())}: `))}>
                 Ask the agent about it
@@ -1377,6 +1463,11 @@ export function SlidesEditor({
             {!readOnly && (
               <MenuItem icon={<LayoutTemplate size={14} />} onClick={() => setMenu('slide')}>
                 A new slide
+              </MenuItem>
+            )}
+            {!readOnly && (
+              <MenuItem icon={<MessageSquarePlus size={14} />} hint={keyLabel('Ctrl+Alt+M')} onClick={() => (setMenu(null), startComment())}>
+                Comment
               </MenuItem>
             )}
             {onAsk && (

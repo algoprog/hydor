@@ -1,5 +1,5 @@
 // The slides editor's menus, as Google Slides and PowerPoint have them: Edit, View (zoom, the grid, the rulers and
-// guides), Insert (every kind of part, the footer), Format (the words' look, the format painter, a picture's crop),
+// guides), Insert (every kind of part, a comment, the footer), Format (the words' look, the format painter, a picture's crop),
 // Arrange (groups, the stacking order, lining up, turning), Slide, and Tools. Each action with its keys; what does not
 // apply to what is picked is greyed. Search the menus (Alt+/) finds any of them.
 import {
@@ -34,6 +34,7 @@ import {
   List,
   ListOrdered,
   Lock,
+  MessageSquarePlus,
   MonitorPlay,
   MoveRight,
   Paintbrush,
@@ -121,6 +122,8 @@ export interface MenuArgs {
   /** A video from this device. */
   videoFile(): void;
   footer(): void;
+  /** A comment on what is picked, or on the slide. */
+  comment(): void;
   crop(): void;
   resetPicture(): void;
   editTex(): void;
@@ -248,6 +251,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           ],
         },
         '-',
+        { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'comment note review feedback', disabled: ro, run: a.comment },
         { label: 'Slide numbers and footer', also: 'footer page number date', disabled: ro, run: a.footer },
       ],
     },

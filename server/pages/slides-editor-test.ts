@@ -497,6 +497,71 @@ const dot: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
   ok(!getVideo(db, sha), 'a video nothing shows goes after a day');
 }
 
+// ---- comments on slides ------------------------------------------------------------------------------------------
+{
+  const d = normalizeDeck({
+    slides: [
+      {
+        id: 's1',
+        els: [{ id: 'box', type: 'shape', text: 'Hub', x: 100, y: 100, w: 200, h: 100, fill: 'accent', color: 'accentFg' }],
+        comments: [
+          { id: 'c1', by: 'user', text: 'Bigger, please', at: 1700000000000, el: 'box', replies: [{ by: 'agent', text: 'Done', at: 1700000001000 }] },
+          { id: 'c2', text: 'On the slide', x: 9000, y: 30 },
+          { id: 'c3', text: 'On a part that is not here', el: 'nope' },
+          { id: 'c4', text: '   ' },
+          { id: 'c5', text: '<script>alert(1)</script>', by: 'robot', resolved: true },
+        ],
+      },
+      { id: 's2', els: [], comments: [{ id: 'c1', text: 'Same id on another slide' }] },
+    ],
+  });
+  const [c1, c2, c3, c5] = d.slides[0].comments ?? [];
+  ok(c1.el === 'box' && c1.replies?.[0].by === 'agent' && c1.replies[0].text === 'Done', 'a comment is on a part of its slide, with its replies');
+  ok(c2.el === undefined && c2.x === 1280 && c2.y === 30 && c3.el === undefined, 'or on the slide, its mark on the slide; a part not there leaves it on the slide');
+  ok(d.slides[0].comments?.length === 4 && c5.by === 'user' && c5.resolved === true && c5.text === '<script>alert(1)</script>', 'an empty one is left out; words stay words, its writer the user or an agent');
+  ok(d.slides[1].comments?.[0].id !== 'c1', 'a comment’s id is the deck’s once');
+  ok(JSON.stringify(normalizeDeck(JSON.parse(deckText(d)))) === JSON.stringify(d), 'a deck with comments reads back the same');
+  // Agents answer, resolve and add; the user's stay as they were.
+  const made = idOf((await run('save_slides', { title: 'Reviewed', slides: d.slides })).text);
+  const kept = (await req('GET', `/api/pages/${made}`)).json().model as Deck;
+  ok(!kept.slides[0].comments?.length, 'an agent’s own list of comments in a new deck is not taken');
+  await req('POST', `/api/pages/${made}/versions`, { model: d });
+  const got = (await run('get_page', { id: made })).text ?? '';
+  ok(got.includes('Comments (4 open, 1 resolved)') && got.includes('c1 (open) on slide 1 [s1], on its part box') && got.includes('“Bigger, please”') && got.includes('reply by an agent'), 'get_page lists the comments, each on its slide and part');
+  const sent = (await req('GET', `/api/pages/${made}`)).json().model as Deck;
+  const answered = await run('save_slides', {
+    id: made,
+    title: 'Reviewed',
+    // The deck sent back with a slide's comments changed by hand: not taken.
+    slides: [{ ...sent.slides[0], comments: [] }, sent.slides[1]],
+    comments: [
+      { id: 'c1', reply: 'Made it twice as large', resolve: true },
+      { id: 'c2', delete: true },
+      { slide: 2, text: 'Is this slide needed?' },
+      { slide: 's1', el: 'box', text: 'The colour is new' },
+      { slide: 1, el: 'ghost', text: 'Nowhere' },
+      { id: 'zzz', reply: 'Nothing to answer' },
+      { text: 'No slide' },
+    ],
+  });
+  const after = (await req('GET', `/api/pages/${made}`)).json().model as Deck;
+  const a1 = after.slides[0].comments ?? [];
+  ok(a1.find((c) => c.id === 'c1')?.resolved === true && a1.find((c) => c.id === 'c1')?.replies?.at(-1)?.text === 'Made it twice as large' && !a1.some((c) => c.id === 'c2'), 'an agent replies, resolves and deletes comments by their ids');
+  ok(a1.some((c) => c.by === 'agent' && c.el === 'box' && c.text === 'The colour is new') && after.slides[1].comments?.some((c) => c.by === 'agent' && c.text === 'Is this slide needed?'), 'and adds its own, on a slide or a part of it');
+  ok(a1.some((c) => c.text === 'Nowhere' && !c.el) && a1.some((c) => c.id === 'c3'), 'one on a part that is not there is on its slide; the others stay as they were');
+  ok(!!answered.text?.includes('no comment zzz') && answered.text.includes('needs its slide') && answered.text.includes('has no part ghost'), 'what could not be done is said');
+  // In PowerPoint: the open ones, as its comments, replies threaded.
+  const z = new Zip(pptxFile(after, { title: 'T', picture: () => null }));
+  const authors = z.read('ppt/commentAuthors.xml')?.toString() ?? '';
+  const cm = z.read('ppt/comments/comment1.xml')?.toString() ?? '';
+  ok(/<p:cmAuthor id="0" name="You" initials="Y" lastIdx="\d+"/.test(authors) && authors.includes('name="Agent"'), 'PowerPoint’s comments: by You or the Agent');
+  ok(cm.includes('<p:text>The colour is new</p:text>') && cm.includes('&lt;script&gt;') === false && !cm.includes('Made it twice as large'), 'the open ones, not the resolved');
+  ok((z.read('ppt/slides/_rels/slide1.xml.rels')?.toString() ?? '').includes('relationships/comments') && (z.read('[Content_Types].xml')?.toString() ?? '').includes('presentationml.comments+xml'), 'each slide’s comments linked as PowerPoint links them');
+  const threaded = normalizeDeck({ slides: [{ els: [], comments: [{ id: 'q', text: 'Why?', replies: [{ by: 'agent', text: 'Because' }] }] }] });
+  const cq = new Zip(pptxFile(threaded, { title: 'T', picture: () => null })).read('ppt/comments/comment1.xml')?.toString() ?? '';
+  ok(/<p:cm authorId="1"[^>]*><p:pos [^>]*\/><p:text>Because<\/p:text><p:extLst><p:ext uri="\{C676402C-5697-4E1C-873F-D02D1690AC5C\}"><p15:threadingInfo [^>]*><p15:parentCm authorId="0" idx="1"\/>/.test(cq), 'a reply is threaded to its comment');
+}
+
 // ---- the deck's own page, and agents ------------------------------------------------------------------------------
 {
   const withMath = normalizeDeck({ slides: [{ els: [{ type: 'math', tex: 'a^2' }, { type: 'math', tex: '\\mathbb{R}^n' }] }] });
