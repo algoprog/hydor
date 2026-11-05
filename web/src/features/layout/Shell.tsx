@@ -5,7 +5,7 @@ import { useSessions, useUI } from '../../lib/store';
 import { cx, useIsMobile, useMediaQuery } from '../../components/ui';
 import { FilesPage } from '../files/FilesPage';
 import { QuickOpen } from '../files/FileSearch';
-import { UploadsPanel } from '../files/Uploads';
+import { UploadTrays } from '../pages/UploadTray';
 import { FilePeek } from '../files/FilePeek';
 import { GitPage } from '../git/GitPage';
 import { HomePage } from '../home/HomePage';
@@ -255,7 +255,7 @@ export function Shell() {
           <Routes />
         </div>
         <MobileDrawer />
-        <UploadsPanel />
+        <UploadTrays />
         <QuickOpen />
         <CommandPalette />
         <CountVisits />
@@ -291,7 +291,7 @@ export function Shell() {
           </>
         )}
       </main>
-      <UploadsPanel />
+      <UploadTrays />
       <QuickOpen />
       <CommandPalette />
       <CountVisits />

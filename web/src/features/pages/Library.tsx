@@ -4,9 +4,12 @@
 // screen the places are a list beside it: Everything (each space's things together, under its name), each space,
 // Not in a space, and Published (the sites published from pages or a project's build); on a phone, a row of chips.
 // Kinds filter what a place shows, a box finds things by name, and each card's More moves it to another space.
+// Files dropped anywhere on it (folders too) are added as what they are (uploads.ts): onto a project in the list of
+// places, into that project; elsewhere, into the place open (none on Everything); a line says where while they are
+// dragged. Upload files, beside a project's name (and in New), picks them on a device without a mouse.
 // Addresses: /library?project=<id>|none, &kind=<kind> (image, video and audio each, media pictures and videos both:
 // the old Media tab's ?tab=media too), ?tab=published; ?new=page|slides|doc|sheet|tex|notebook opens New with that kind.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
 import {
   AppWindow,
@@ -59,6 +62,8 @@ import { exportFile, type ExportFormat } from './exportFile';
 import { EXPORTS } from './exports';
 import { NewPageDialog, PublishDialog, RenameDialog, SiteRow, Thumb, type NewKind } from './parts';
 import { usePagesStore } from './state';
+import { addToLibrary, dragsFiles, droppedFiles, dropMoves, pickFiles } from './uploads';
+import { DropHint } from './UploadTray';
 
 // ---- what the Library holds ----------------------------------------------------------------------------
 
@@ -336,17 +341,22 @@ function addressOf(place: Place, show: Show): string {
 
 const samePlace = (a: Place, b: Place) => a.kind === b.kind && (a.kind !== 'space' || a.id === (b as { id: string }).id);
 
-/** One place in the list beside the Library (or a chip of the row over it, on a phone). */
-function PlaceButton({ on, icon, label, count, onClick, chip, mine }: { on: boolean; icon: ReactNode; label: string; count?: number; onClick: () => void; chip?: boolean; mine?: boolean }) {
+/** Where files dropped on a place go: a project's id, or '' for none; and the place's own key while they are over it. */
+type DropOn = { space: string; at: string; over: boolean };
+
+/** One place in the list beside the Library (or a chip of the row over it, on a phone); files dropped on it go in its project. */
+function PlaceButton({ on, icon, label, count, onClick, chip, mine, drop }: { on: boolean; icon: ReactNode; label: string; count?: number; onClick: () => void; chip?: boolean; mine?: boolean; drop?: DropOn }) {
+  const dropAttrs = drop ? { 'data-drop': drop.space, 'data-drop-at': drop.at } : {};
   if (chip)
     return (
       <button
         type="button"
         onClick={onClick}
         aria-pressed={on}
+        {...dropAttrs}
         className={cx(
           'flex h-8 shrink-0 items-center gap-1.5 rounded-full border pr-3 pl-2 text-[13px] transition-colors',
-          on ? 'border-fg bg-fg text-bg' : 'border-line bg-panel text-fg-2 hover:border-line-2 hover:text-fg',
+          drop?.over ? 'border-accent bg-accent/15 text-fg' : on ? 'border-fg bg-fg text-bg' : 'border-line bg-panel text-fg-2 hover:border-line-2 hover:text-fg',
         )}
       >
         {icon}
@@ -361,7 +371,11 @@ function PlaceButton({ on, icon, label, count, onClick, chip, mine }: { on: bool
       type="button"
       onClick={onClick}
       aria-current={on ? 'true' : undefined}
-      className={cx('flex h-9 w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] transition-colors', on ? 'bg-bg-2 font-medium text-fg' : 'text-fg-2 hover:bg-bg-1 hover:text-fg')}
+      {...dropAttrs}
+      className={cx(
+        'flex h-9 w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] transition-colors',
+        drop?.over ? 'bg-accent/15 text-fg outline-1 -outline-offset-1 outline-accent/70' : on ? 'bg-bg-2 font-medium text-fg' : 'text-fg-2 hover:bg-bg-1 hover:text-fg',
+      )}
     >
       <span className="flex w-5 shrink-0 justify-center">{icon}</span>
       <span translate={mine ? 'no' : undefined} className="min-w-0 flex-1 truncate">
@@ -372,22 +386,34 @@ function PlaceButton({ on, icon, label, count, onClick, chip, mine }: { on: bool
   );
 }
 
-function Places({ place, onPlace, items, sites, chips }: { place: Place; onPlace: (p: Place) => void; items: Item[]; sites: SiteInfo[] | null; chips?: boolean }) {
+function Places({ place, onPlace, items, sites, chips, dropAt }: { place: Place; onPlace: (p: Place) => void; items: Item[]; sites: SiteInfo[] | null; chips?: boolean; dropAt?: string }) {
   const spaces = useSpaces() ?? [];
   const count = (id: string | null) => items.filter((it) => (it.space ?? null) === id).length;
   const none = count(null);
+  // Files dropped on a project go in it; on Everything, Not in a project or Published, in none.
+  const drop = (space: string, at: string): DropOn => ({ space, at, over: dropAt === at });
   const list = (
     <>
-      <PlaceButton chip={chips} on={place.kind === 'all'} icon={<LibraryBig size={15} className={chips ? undefined : 'text-fg-3'} />} label="Everything" count={items.length} onClick={() => onPlace({ kind: 'all' })} />
+      <PlaceButton chip={chips} on={place.kind === 'all'} icon={<LibraryBig size={15} className={chips ? undefined : 'text-fg-3'} />} label="Everything" count={items.length} onClick={() => onPlace({ kind: 'all' })} drop={drop('', 'all')} />
       {spaces.length > 0 && !chips && <div className="px-2.5 pt-4 pb-1 text-[11.5px] font-medium tracking-wide text-fg-3 uppercase">Projects</div>}
       {spaces.map((s) => (
-        <PlaceButton key={s.id} chip={chips} mine on={place.kind === 'space' && place.id === s.id} icon={<SpaceMark s={s} size={chips ? 16 : 18} />} label={s.name} count={count(s.id)} onClick={() => onPlace({ kind: 'space', id: s.id })} />
+        <PlaceButton
+          key={s.id}
+          chip={chips}
+          mine
+          on={place.kind === 'space' && place.id === s.id}
+          icon={<SpaceMark s={s} size={chips ? 16 : 18} />}
+          label={s.name}
+          count={count(s.id)}
+          onClick={() => onPlace({ kind: 'space', id: s.id })}
+          drop={drop(s.id, `space:${s.id}`)}
+        />
       ))}
       {spaces.length > 0 && (none > 0 || place.kind === 'none') && (
-        <PlaceButton chip={chips} on={place.kind === 'none'} icon={<Layers size={15} className={chips ? undefined : 'text-fg-3'} />} label="Not in a project" count={none} onClick={() => onPlace({ kind: 'none' })} />
+        <PlaceButton chip={chips} on={place.kind === 'none'} icon={<Layers size={15} className={chips ? undefined : 'text-fg-3'} />} label="Not in a project" count={none} onClick={() => onPlace({ kind: 'none' })} drop={drop('', 'none')} />
       )}
       {!chips && <div className="mx-2.5 my-3 border-t border-line" />}
-      <PlaceButton chip={chips} on={place.kind === 'published'} icon={<Globe size={15} className={chips ? undefined : 'text-fg-3'} />} label="Published" count={sites?.length ?? undefined} onClick={() => onPlace({ kind: 'published' })} />
+      <PlaceButton chip={chips} on={place.kind === 'published'} icon={<Globe size={15} className={chips ? undefined : 'text-fg-3'} />} label="Published" count={sites?.length ?? undefined} onClick={() => onPlace({ kind: 'published' })} drop={drop('', 'published')} />
     </>
   );
   if (chips) return <div className="-mx-3 mb-3 flex gap-1.5 overflow-x-auto px-3 pb-1 [&::-webkit-scrollbar]:hidden">{list}</div>;
@@ -504,6 +530,30 @@ export function Library() {
   };
   const space = place.kind === 'space' ? (spaces?.find((s) => s.id === place.id) ?? null) : null;
 
+  // Files dragged over the Library: where they would go (a place of the list under them, else the place open) and
+  // what it says; dropped, each goes on its way into the Library.
+  const [over, setOver] = useState<{ space: string | null; at: string } | null>(null);
+  const dropTarget = (el: EventTarget | null) => {
+    const t = (el as HTMLElement | null)?.closest?.<HTMLElement>('[data-drop]');
+    return t ? { space: t.dataset.drop || null, at: t.dataset.dropAt ?? '' } : { space: space?.id ?? null, at: 'main' };
+  };
+  const onDragOver = (e: DragEvent) => {
+    if (!dragsFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = dropMoves() ? 'move' : 'copy';
+    const t = dropTarget(e.target);
+    if (over?.space !== t.space || over?.at !== t.at) setOver(t);
+  };
+  const onDragLeave = (e: DragEvent) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setOver(null);
+  const onDrop = (e: DragEvent) => {
+    if (!dragsFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    const t = dropTarget(e.target);
+    setOver(null);
+    void droppedFiles(e.dataTransfer).then((files) => addToLibrary(files, t.space));
+  };
+  const overName = over?.space ? spaces?.find((s) => s.id === over.space)?.name : undefined;
+
   // What the place holds, then what the kind and the words keep of it.
   const here = useMemo(() => (items ?? []).filter((it) => place.kind === 'all' || (place.kind === 'none' ? !it.space : place.kind === 'space' && it.space === place.id)), [items, search]);
   const kinds = useMemo(() => SHOWS.filter((s) => s.value === 'all' || here.some((it) => s.has(it.kind))), [here]);
@@ -546,6 +596,7 @@ export function Library() {
             Pages and small tools agents make for you, slides, documents and spreadsheets, and the pictures, videos and sounds you keep land here, sorted by project. Ask an agent for a tracker, a
             calculator or a deck, or make one here.
           </span>
+          <span className="mt-2 block">Drop files here to add them: documents, spreadsheets, slides, pictures, videos and sounds.</span>
           <span className="mt-3 inline-flex gap-2">
             <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setMaking('page')}>
               New page
@@ -559,10 +610,13 @@ export function Library() {
     if (!here.length)
       return space ? (
         <Empty icon={<SpaceMark s={space} size={22} />} title={tr(`Nothing in ${space.name} yet`)}>
-          <span className="block">What agents save in this project’s sessions lands here. To bring in something you have, use its More → Move to a project.</span>
+          <span className="block">What agents save in this project’s sessions lands here. Drop files here to add them; to bring in something of the Library, use its More → Move to a project.</span>
           <span className="mt-3 inline-flex gap-2">
             <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMaking('page')}>
               New page here
+            </Button>
+            <Button size="sm" variant="ghost" icon={<Upload size={14} />} onClick={() => pickFiles(space.id)}>
+              Upload files
             </Button>
           </span>
         </Empty>
@@ -585,7 +639,7 @@ export function Library() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
       <PageHeader
         title="Library"
         tip="library"
@@ -600,15 +654,15 @@ export function Library() {
           )
         }
       />
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
         {wide && items && (
           <aside className="w-[232px] shrink-0 overflow-y-auto border-r border-line px-3 py-4">
-            <Places place={place} onPlace={toPlace} items={items} sites={sites} />
+            <Places place={place} onPlace={toPlace} items={items} sites={sites} dropAt={over?.at} />
           </aside>
         )}
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <div className={cx('min-h-0 min-w-0 flex-1 overflow-y-auto', over?.at === 'main' && 'bg-accent/6 outline-2 -outline-offset-4 outline-accent/50 outline-dashed')}>
           <div className="mx-auto max-w-[1180px] px-3 py-4 sm:px-6 sm:py-5">
-            {!wide && items && <Places chips place={place} onPlace={toPlace} items={items} sites={sites} />}
+            {!wide && items && <Places chips place={place} onPlace={toPlace} items={items} sites={sites} dropAt={over?.at} />}
             {place.kind !== 'published' && !!here.length && (
               <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2.5">
                 {wide && (
@@ -620,12 +674,18 @@ export function Library() {
                   </h2>
                 )}
                 {space && wide && (
-                  <button type="button" onClick={() => go(`/projects/${space.id}`)} className="text-[12.5px] font-medium text-fg-3 hover:text-fg">
-                    Open the project
-                  </button>
+                  <>
+                    <button type="button" onClick={() => go(`/projects/${space.id}`)} className="text-[12.5px] font-medium text-fg-3 hover:text-fg">
+                      Open the project
+                    </button>
+                    <button type="button" onClick={() => pickFiles(space.id)} className="flex items-center gap-1 text-[12.5px] font-medium text-fg-3 hover:text-fg">
+                      <Upload size={13} />
+                      Upload files
+                    </button>
+                  </>
                 )}
                 <span className="flex-1 max-lg:hidden" />
-                <label className="flex h-8.5 min-w-0 flex-1 items-center gap-2 rounded-xl border border-line bg-bg-1 px-2.5 lg:max-w-[280px]">
+                <label className="flex h-8.5 min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-line bg-bg-1 px-2.5 lg:max-w-[280px]">
                   <Search size={14} className="shrink-0 text-fg-3" />
                   <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find by name" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-3" />
                   {find && (
@@ -634,6 +694,11 @@ export function Library() {
                     </button>
                   )}
                 </label>
+                {space && !wide && (
+                  <IconButton label="Upload files" onClick={() => pickFiles(space.id)}>
+                    <Upload size={16} />
+                  </IconButton>
+                )}
                 <Button ref={sortRef} size="sm" variant="ghost" icon={<ArrowDownUp size={13} />} onClick={() => setSortMenu((x) => !x)}>
                   <span className="max-sm:hidden">{SORTS.find((x) => x.value === sort)!.label}</span>
                 </Button>
@@ -667,6 +732,11 @@ export function Library() {
             {body()}
           </div>
         </div>
+        {over && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 flex justify-center px-4">
+            <DropHint name={overName} />
+          </div>
+        )}
       </div>
       <PublishDialog open={publish} onClose={() => setPublish(false)} />
       <NewPageDialog open={!!making} kind={making ?? 'page'} space={space?.id ?? null} onClose={() => setMaking(null)} />
@@ -676,22 +746,40 @@ export function Library() {
 
 // ---- a space's own Library -------------------------------------------------------------------------------------
 
-/** What a space holds in the Library, for its own page: the last changed first, with New (made in the space). */
 /**
  * What a space holds in the Library (its page's Overview and Library tab): the cards, the last changed first, or with
- * nothing yet what will be here and New page and New slides. `framed`: false inside a card of its own.
+ * nothing yet what will be here and New page and New slides. `framed`: false inside a card of its own. Files dropped on
+ * it go into the space's Library, as on the Library's own page.
  */
 export function SpaceLibrary({ space, limit, framed = true }: { space: SpaceView; limit?: number; framed?: boolean }) {
   const items = useItems();
   const [making, setMaking] = useState<NewKind | null>(null);
+  const [over, setOver] = useState(false);
   useEffect(() => {
     if (!usePagesStore.getState().pages) usePagesStore.getState().loadPages().catch(toastError);
     useMedia.getState().ensure();
   }, []);
   const mine = (items ?? []).filter((it) => it.space === space.id);
   const shown = limit ? mine.slice(0, limit) : mine;
+  const onDragOver = (e: DragEvent) => {
+    if (!dragsFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = dropMoves() ? 'move' : 'copy';
+    if (!over) setOver(true);
+  };
+  const onDrop = (e: DragEvent) => {
+    if (!dragsFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    setOver(false);
+    void droppedFiles(e.dataTransfer).then((files) => addToLibrary(files, space.id));
+  };
   return (
-    <>
+    <div
+      onDragOver={onDragOver}
+      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setOver(false)}
+      onDrop={onDrop}
+      className={cx('relative', over && 'rounded-2xl bg-accent/6 outline-2 outline-offset-4 outline-accent/50 outline-dashed')}
+    >
       {!items ? (
         <div className="flex justify-center py-6 text-fg-3">
           <Throbber size={22} />
@@ -702,7 +790,7 @@ export function SpaceLibrary({ space, limit, framed = true }: { space: SpaceView
             <LibraryBig size={19} />
           </span>
           <span className="mt-3 block text-[14px] font-semibold text-fg">Nothing here yet</span>
-          <span className="mt-1 block max-w-[440px]">Pages, slides and documents agents save in this project’s sessions land here, and so does what you keep from them.</span>
+          <span className="mt-1 block max-w-[440px]">Pages, slides and documents agents save in this project’s sessions land here, and so does what you keep from them. Drop files here to add them.</span>
           <span className="mt-4 flex justify-center gap-2">
             <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMaking('page')}>
               New page
@@ -724,7 +812,12 @@ export function SpaceLibrary({ space, limit, framed = true }: { space: SpaceView
         </div>
       )}
       <NewPageDialog open={!!making} kind={making ?? 'page'} space={space.id} onClose={() => setMaking(null)} />
-    </>
+      {over && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-4">
+          <DropHint name={space.name} />
+        </div>
+      )}
+    </div>
   );
 }
 
