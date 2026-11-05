@@ -9,7 +9,7 @@ Everything the app's pages do goes through its HTTP API, and agents use the same
 - To have the user fill in or check details on that card, give `form`: fields as a JSON schema's properties (`type`, `title`, `description`, `enum`, `default`, `format`…), each named by its address in `body` (`name`, `settings.results`), filled in from `body`; the user's answers go into `body` before the call.
 - Read the current state before changing it: most settings are read with `GET` at the same address their `PUT` or `PATCH` writes.
 - In Plan mode (and Codex's Read only) an agent only reads. With Claude Code's Bypass or Codex's Full access no card shows; Custom's Full access asks only for the changes that ask every time.
-- Never through app_api: the password and signing in, keys' values (ask with request_secret), making access tokens and API keys, answering approval cards and the cards that ask the user to decide, a session's permissions and spending cap, files, terminals, notebooks and git (agents use their own tools), the live browser (the browser tools), the Mac's screen, mouse and keyboard and macOS's permissions for them (the computer tools; the user allows those in Settings).
+- Never through app_api: the password and signing in, keys' values (ask with request_secret), a signature's picture or any change to one (ask_signature and place_signature), making access tokens and API keys, answering approval cards and the cards that ask the user to decide, a session's permissions and spending cap, files, terminals, notebooks and git (agents use their own tools), the live browser (the browser tools), the Mac's screen, mouse and keyboard and macOS's permissions for them (the computer tools; the user allows those in Settings).
 - Links for the user: the app's address plus the page: `/s/<session key>`, `/projects/<id>`, `/apps/<id>`, `/pages/<id>`, `/settings?s=<section>`, `/guide/<topic>#<section>`.
 
 ## Settings kept on each device
@@ -552,6 +552,11 @@ Agents in a conversation also have their own tools for this: schedule_task and u
 - `DELETE /api/connections/secrets/:name` — deletes a key for good (exact NAME). Returns: `{ ok: true }`.
 - Agents ask for a key with their own `request_secret` tool: the user pastes it into a card. They use a key with `http_request` (`auth: NAME`). They never set or see a value.
 
+## Signatures (Settings → App → Signatures)
+
+- `GET /api/signatures` — the user's saved signatures (a signature, initials), by name; never their pictures. Returns: `{ signatures: [{ id, name, kind: 'signature'|'initials', width, height — its picture's size in pixels, createdAt, updatedAt, usedAt? — when it was last placed, until? — kept only until then (one the user gave for a day) }] }`.
+- Agents ask the user to draw one with their own `ask_signature` tool (a card with a pad; the agent hears only its name) and place one by name with `place_signature` (a Word file, a PDF, a PNG picture or a document of the Library; the user allows each placement on a card). A signature's picture, and every change to one, are the user's alone (see Not for agents). A placed signature is a picture of one, not a cryptographic digital signature.
+
 ## MCP servers (Claude Code and Codex)
 
 - `GET /api/setup/mcp` — Claude Code's servers (all folders, this folder only, and the folder's `.mcp.json`) and Codex's servers. Query: `{ cwd?: string — an existing folder, default home }`. Env and header values are never returned, only their names. Returns: `{ servers: [{ agent: 'claude'|'codex', name, scope: 'user'|'local'|'project', transport: 'stdio'|'http'|'sse', command?, args?, url?, envKeys?, headerKeys?, bearerEnv?, enabled? — Codex only }] }`.
@@ -781,6 +786,10 @@ These routes serve the app’s own pages, need the user’s browser, or are the 
 - `GET /api/automations/proposals/:id`, `POST /api/automations/proposals/:id/confirm`, `POST /api/automations/proposals/:id/decline` — the card for a task an agent proposed with schedule_task or update_task: only the user answers it, and the agent hears the answer as a message.
 - `POST /api/connections/secrets`, `PATCH /api/connections/secrets/:name` — these set a key's value, hosts, whether commands may use it, or how it is sent. Agents never set a key's value or where it may go: the user does, in Settings → Connections → Keys or on the key card.
 - `POST /api/connections/:id` with `key` or a secret field — this sets a key's value.
+- `GET /api/signatures/:id/image` — a saved signature's picture (raw PNG), for the app's own pages: agents never see it.
+- `POST /api/signatures`, `PATCH /api/signatures/:id`, `DELETE /api/signatures/:id` — keep a signature drawn, typed or uploaded on the pad (Body: `{ name: string, kind: 'signature'|'initials', image: string — a base64 PNG with a see-through background, keep?: false — kept for a day }`), rename it, draw it again (`image`), keep one given for a day for good (`keep: true`), or delete it: the user's own, in Settings → App → Signatures, the documents editor and the cards. Agents ask for one with ask_signature.
+- `POST /api/signatures/:id/asset` — puts a saved signature into a document of the Library as one of its pictures (the editor's **Insert → Signature**). Returns: `{ src: "naget-asset:<sha>", width, height }`. Agents place one with place_signature, which the user allows on a card.
+- `GET /api/signatures/previews/:token` — a page as an agent would sign it, for the card that asks the user (raw PNG).
 - `POST /api/connections/requests/:id` — the user's answer to a key or sign-in card; it carries the values.
 - `POST /api/connections/requests/:id/dismiss` — the user's "Not now" on another session's card, which tells that session's agent.
 - `POST /api/connections/:id/oauth`, `GET /api/connections/flows/:flow` — a browser sign-in; it needs the user's browser.
