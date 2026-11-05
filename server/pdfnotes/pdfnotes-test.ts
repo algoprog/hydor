@@ -25,6 +25,7 @@ import { ruleFor } from '../guide/api.ts';
 import { progress } from '../knowledge/indexer.ts';
 import { searchKnowledge } from '../knowledge/search.ts';
 import { docsOf, filesDir } from '../knowledge/store.ts';
+import { fileAskInstructions } from '../fileask/index.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import { createSpace } from '../spaces/index.ts';
 import { hasOurs, withoutOurs, writeHighlights } from './annots.ts';
@@ -431,6 +432,11 @@ const annotsOf = (data: Buffer) => {
   await assert.rejects(NOTES_TOOL.run({ path: 'nothing.pdf' }, ctx), /No such file/);
   assert.ok(pdfNotes.tools!(ctx).some((t) => t.name === 'pdf_notes'), 'offered once there are notes');
   assert.match(String((await pdfNotes.spawn!({ extra: {} } as never, { db } as unknown as Deps))?.instructions?.[0]), /pdf_notes lists/);
+  // Asked from a PDF in Files: the agent knows to read it, that a quote or a picture is a part of it, and where the notes are.
+  const asked = fileAskInstructions(file)!;
+  assert.match(asked, /read it with read_document/);
+  assert.match(asked, /picture of a part of a page/);
+  assert.match(asked, /pdf_notes/);
 }
 
 // The words found by meaning in the info: a PDF without a Title is named by its largest words.
