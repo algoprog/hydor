@@ -15,6 +15,8 @@
 // of the cells (rows a filter hides, the look conditional formatting gives) is worked out in sheet-rules.ts. Nothing
 // here needs Node or a browser.
 
+import { cleanComment, newCommentId, type Comment } from './comments.ts';
+
 export const SHEET_LIMITS = { sheets: 50, cells: 200_000, rows: 20_000, cols: 500, text: 32_767, formula: 8_192, name: 31, note: 4_000, merges: 5_000, rules: 100, charts: 20, options: 500 };
 
 /** A column's width and a row's height in the editor (px) when none is set. */
@@ -281,6 +283,11 @@ export interface SheetBoard {
   open?: boolean;
 }
 
+/** A comment on a cell, as Sheets and Excel have them beside notes: a thread (who wrote it, replies, resolved) on the cell it is on. */
+export interface SheetComment extends Comment {
+  cell: string;
+}
+
 export interface Sheet {
   id: string;
   name: string;
@@ -299,6 +306,8 @@ export interface Sheet {
   validation?: Validation[];
   charts?: SheetChart[];
   board?: SheetBoard;
+  /** Comments' threads, one a cell, in the cells' order. */
+  comments?: SheetComment[];
 }
 
 export interface Workbook {
@@ -1716,7 +1725,30 @@ function cleanBoard(v: unknown, cells: Map<number, Cell>): SheetBoard | undefine
   return out;
 }
 
-function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], budget: Budget): Sheet | null {
+/**
+ * A sheet's comments as kept: each checked (plain words, within the limits) on a cell within the sheet's, one thread a
+ * cell (a second on the same cell joins the first as replies, nothing lost), ids not twice in the workbook (`ids`).
+ */
+export function cleanSheetComments(v: unknown, ids: Set<string> = new Set()): SheetComment[] {
+  if (!Array.isArray(v)) return [];
+  const byCell = new Map<number, SheetComment>();
+  for (const x of v.slice(0, 1000)) {
+    if (!isObj(x) || typeof x.cell !== 'string') continue;
+    const p = parseRef(x.cell.replace(/\$/g, '').trim().toUpperCase());
+    const c = cleanComment(x);
+    if (!p || !c || p.r >= SHEET_LIMITS.rows || p.c >= SHEET_LIMITS.cols) continue;
+    while (ids.has(c.id)) c.id = newCommentId();
+    ids.add(c.id);
+    const k = pack(p.r, p.c);
+    const had = byCell.get(k);
+    if (!had) byCell.set(k, { ...c, cell: refName(p.r, p.c) });
+    else had.replies = [...(had.replies ?? []), { id: c.id, by: c.by, text: c.text, at: c.at }, ...(c.replies ?? [])].slice(0, 50);
+    if (byCell.size >= 500) break;
+  }
+  return [...byCell.entries()].sort((a, b) => a[0] - b[0]).map(([, c]) => c);
+}
+
+function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], budget: Budget, commentIds: Set<string>): Sheet | null {
   if (Array.isArray(raw)) raw = { rows: raw };
   if (!isObj(raw)) return null;
   let id = typeof raw.id === 'string' && /^[A-Za-z0-9_-]{1,24}$/.test(raw.id) ? raw.id : newId();
@@ -1921,6 +1953,8 @@ function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], bud
   if (charts.length) sheet.charts = charts;
   const board = cleanBoard(pick('board', 'kanban'), cells);
   if (board) sheet.board = board;
+  const comments = cleanSheetComments(pick('comments'), commentIds);
+  if (comments.length) sheet.comments = comments;
   // Cells in reading order: row by row, left to right.
   const out: Record<string, Cell> = {};
   for (const k of [...cells.keys()].sort((a, b) => a - b)) out[refName(unpackR(k), unpackC(k))] = cells.get(k)!;
@@ -1945,9 +1979,10 @@ export function normalizeBook(input: unknown, o: NormalizeOptions = {}): Workboo
   const ids = new Set<string>();
   const names: string[] = [];
   const budget: Budget = { cells: SHEET_LIMITS.cells, cut: { cells: 0, rows: 0, cols: 0 } };
+  const commentIds = new Set<string>();
   const sheets = list
     .slice(0, SHEET_LIMITS.sheets)
-    .map((s, i) => sheetOf(s, i, ids, names, budget))
+    .map((s, i) => sheetOf(s, i, ids, names, budget, commentIds))
     .filter((s): s is Sheet => !!s);
   if (!sheets.length) sheets.push({ id: newId(), name: 'Sheet 1', cells: {} });
   const { cells, rows, cols } = budget.cut;
@@ -1979,6 +2014,7 @@ export function bookText(b: Workbook): string {
     if (sh.validation?.length) head.validation = sh.validation;
     if (sh.charts?.length) head.charts = sh.charts;
     if (sh.board) head.board = sh.board;
+    if (sh.comments?.length) head.comments = sh.comments;
     out.push(` ${JSON.stringify(head).slice(0, -1)},"cells":{`);
     const byRow = new Map<number, string[]>();
     const keys = Object.keys(sh.cells)
@@ -2464,7 +2500,7 @@ function moveSizes<T>(m: Record<number, T> | undefined, f: (i: number) => number
  * (null: it went); `corner` moves a chart's corners (on the sheet whose rows or columns went in or out).
  */
 function mapSheetRefs(sh: Sheet, f: (text: string) => string, col?: (c: number) => number | null, corner?: (k: ChartCorner) => ChartCorner): Sheet {
-  if (!sh.merges && !sh.filter && !sh.conditional && !sh.validation && !sh.charts && !sh.board) return sh;
+  if (!sh.merges && !sh.filter && !sh.conditional && !sh.validation && !sh.charts && !sh.board && !sh.comments) return sh;
   const out: Sheet = { ...sh };
   const formula = (t: string | undefined) => (t?.startsWith('=') ? `=${f(t.slice(1))}` : t);
   const broken = (t: string | undefined) => !!t && t.includes('#REF!');
@@ -2538,6 +2574,15 @@ function mapSheetRefs(sh: Sheet, f: (text: string) => string, col?: (c: number) 
     });
     if (list.length) out.charts = list;
     else delete out.charts;
+  }
+  if (sh.comments) {
+    // A comment follows its cell; one whose cell was taken out goes with it.
+    const list = sh.comments.flatMap((c) => {
+      const cell = f(c.cell);
+      return broken(cell) || !parseRef(cell) ? [] : [{ ...c, cell }];
+    });
+    if (list.length) out.comments = list;
+    else delete out.comments;
   }
   if (sh.board) {
     // The board's table and columns follow; with its header or its column to group by gone, it goes.
@@ -5171,6 +5216,7 @@ export function bookOutline(b: Workbook, calc: Calc = computeBook(b), rows = 4):
       const lines = [`${head}: A1:${refName(e.rows - 1, e.cols - 1)}, ${size}${frozen ? `, frozen: ${frozen}` : ''}`];
       // What else it has, in a line: a filter, rules, charts, merges, notes, hidden rows and columns.
       const notes = names.filter((k) => sh.cells[k].note).length;
+      const open = (sh.comments ?? []).filter((c) => !c.resolved).length;
       const hiddenR = Object.values(sh.rows ?? {}).filter((x) => x.hidden).length;
       const hiddenC = Object.values(sh.cols ?? {}).filter((x) => x.hidden).length;
       const more = [
@@ -5181,6 +5227,7 @@ export function bookOutline(b: Workbook, calc: Calc = computeBook(b), rows = 4):
         sh.merges?.length ? `merged: ${sh.merges.slice(0, 6).join(', ')}${sh.merges.length > 6 ? '…' : ''}` : '',
         sh.board ? `a Kanban board of the table at ${sh.board.at} grouped by column ${sh.board.by}${sh.board.open ? ', which the sheet opens on' : ''}` : '',
         notes ? n(notes, 'note') : '',
+        sh.comments?.length ? `${n(sh.comments.length, 'comment')} (${open} open)` : '',
         hiddenR ? n(hiddenR, 'hidden row') : '',
         hiddenC ? n(hiddenC, 'hidden column') : '',
       ].filter(Boolean);

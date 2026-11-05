@@ -45,7 +45,7 @@ export const rectOf = (s: Sel): Rect => ({ r1: Math.min(s.ar, s.fr), c1: Math.mi
 export const single = (s: Sel) => s.ar === s.fr && s.ac === s.fc;
 export const rectSel = (x: Rect, r = x.r1, c = x.c1): Sel => ({ r, c, ar: x.r1, ac: x.c1, fr: x.r2, fc: x.c2 });
 
-/** A sheet's parts besides its cells: sizes and hidden rows, frozen panes, merges, the filter, rules, charts and its board. */
+/** A sheet's parts besides its cells: sizes and hidden rows, frozen panes, merges, the filter, rules, charts, its board and comments. */
 export interface Meta {
   cols?: Sheet['cols'];
   rows?: Sheet['rows'];
@@ -56,8 +56,9 @@ export interface Meta {
   validation?: Sheet['validation'];
   charts?: Sheet['charts'];
   board?: Sheet['board'];
+  comments?: Sheet['comments'];
 }
-const META_KEYS = ['cols', 'rows', 'freeze', 'merges', 'filter', 'conditional', 'validation', 'charts', 'board'] as const;
+const META_KEYS = ['cols', 'rows', 'freeze', 'merges', 'filter', 'conditional', 'validation', 'charts', 'board', 'comments'] as const;
 
 export type Patch = (
   | { k: 'cells'; sheet: string; before: Record<string, Cell | null>; after: Record<string, Cell | null> }
@@ -90,7 +91,18 @@ export function cellsPatch(book: Workbook, si: number, after: Record<string, Cel
   return n ? { k: 'cells', sheet: sh.id, before, after: next } : null;
 }
 
-export const metaOf = (sh: Sheet): Meta => ({ cols: sh.cols, rows: sh.rows, freeze: sh.freeze, merges: sh.merges, filter: sh.filter, conditional: sh.conditional, validation: sh.validation, charts: sh.charts, board: sh.board });
+export const metaOf = (sh: Sheet): Meta => ({
+  cols: sh.cols,
+  rows: sh.rows,
+  freeze: sh.freeze,
+  merges: sh.merges,
+  filter: sh.filter,
+  conditional: sh.conditional,
+  validation: sh.validation,
+  charts: sh.charts,
+  board: sh.board,
+  comments: sh.comments,
+});
 
 function setMeta(sh: Sheet, m: Meta) {
   for (const k of META_KEYS) {
@@ -398,8 +410,8 @@ export function hasHeader(sh: Sheet, calc: Calc, si: number, x: Rect): boolean {
   return false;
 }
 
-/** The rows of a block sorted by one column's values: whole rows move (their formulas along with them). */
-export function sortChanges(sh: Sheet, calc: Calc, si: number, x: Rect, col: number, asc: boolean): Record<string, Cell | null> {
+/** The rows of a block sorted by one column's values: whole rows move (their formulas along with them); `moved`: where each row went. */
+export function sortChanges(sh: Sheet, calc: Calc, si: number, x: Rect, col: number, asc: boolean, moved?: Map<number, number>): Record<string, Cell | null> {
   const rows: { r: number; key: Scalar; cells: (Cell | undefined)[] }[] = [];
   for (let r = x.r1; r <= x.r2; r++) {
     const cells: (Cell | undefined)[] = [];
@@ -416,6 +428,7 @@ export function sortChanges(sh: Sheet, calc: Calc, si: number, x: Rect, col: num
   const out: Record<string, Cell | null> = {};
   sorted.forEach((row, i) => {
     const r = x.r1 + i;
+    moved?.set(row.r, r);
     row.cells.forEach((cell, j) => {
       const c = x.c1 + j;
       if (!cell) out[refName(r, c)] = null;
@@ -423,6 +436,22 @@ export function sortChanges(sh: Sheet, calc: Calc, si: number, x: Rect, col: num
     });
   });
   return out;
+}
+
+/** A sheet's comments after the rows of a block were sorted (`moved`: where each row went), each with its cell's row; null when none moved. */
+export function commentsMoved(sh: Sheet, x: Rect, moved: Map<number, number>): Patch | null {
+  if (!sh.comments?.length) return null;
+  let any = false;
+  const comments = sh.comments
+    .map((cm) => {
+      const p = parseRef(cm.cell);
+      const to = p && p.c >= x.c1 && p.c <= x.c2 ? moved.get(p.r) : undefined;
+      if (!p || to === undefined || to === p.r) return cm;
+      any = true;
+      return { ...cm, cell: refName(to, p.c) };
+    })
+    .sort((a, b) => (parseRef(a.cell)!.r - parseRef(b.cell)!.r) * MAX_COLS + parseRef(a.cell)!.c - parseRef(b.cell)!.c);
+  return any ? metaPatch(sh, { comments }) : null;
 }
 
 // ---- rows and columns ------------------------------------------------------------------------------------------------

@@ -302,7 +302,7 @@ export function trimChanges(sh: Sheet, calc: Calc, si: number, x: Rect): { chang
 }
 
 /** The rows of a block sorted by several columns in turn, each A to Z or Z to A: whole rows move (their formulas along). */
-export function sortByKeys(sh: Sheet, calc: Calc, si: number, x: Rect, keys: { c: number; asc: boolean }[]): Record<string, Cell | null> {
+export function sortByKeys(sh: Sheet, calc: Calc, si: number, x: Rect, keys: { c: number; asc: boolean }[], moved?: Map<number, number>): Record<string, Cell | null> {
   const rows: { r: number; vals: Scalar[]; cells: (Cell | undefined)[] }[] = [];
   for (let r = x.r1; r <= x.r2; r++) {
     const cells: (Cell | undefined)[] = [];
@@ -333,6 +333,8 @@ export function sortByKeys(sh: Sheet, calc: Calc, si: number, x: Rect, keys: { c
   const out: Record<string, Cell | null> = {};
   sorted.forEach((row, i) => {
     const r = x.r1 + i;
+    // Where each row went (its comments go along).
+    moved?.set(row.r, r);
     row.cells.forEach((cell, j) => {
       out[refName(r, x.c1 + j)] = !cell ? null : cell.f !== undefined ? { ...cell, f: shiftFormula(cell.f, r - row.r, 0) } : cell;
     });
