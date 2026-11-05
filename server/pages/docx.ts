@@ -10,14 +10,20 @@
 // docxFile also writes the documents of Pages (docs.ts gives it their blocks): those add page breaks, checklists,
 // highlights, sizes and fonts of words, a title and subtitle of their own, pictures aligned and captioned, tables'
 // columns' widths, filled and merged cells, line and paragraph spacing, callouts (shaded paragraphs), equations
-// (Word's own, OMML, where they convert), a table of contents Word fills in, a header and footer with the page's
-// number, comments with their replies (Word's own), suggested changes as tracked changes (words inserted and deleted,
-// formatting changed, paragraphs broken and joined, pictures and tables' rows added or taken out, each with who made it
-// and when), and the document's own paper, margins, font and sizes.
+// (Word's own, OMML, where they convert), a table of contents, a header and footer with the page's number, comments
+// with their replies (Word's own), suggested changes as tracked changes (words inserted and deleted, formatting
+// changed, paragraphs broken and joined, pictures and tables' rows added or taken out, each with who made it and when),
+// and the document's own paper, margins, font and sizes. A document is laid out as the editor draws it, so Word's
+// pages come out as the editor's (word-layout.ts): its styles' sizes, colours and spacing, lines in points, lists'
+// indents, the boxes of quotes, code and callouts, tables' padding and borders, a header and footer in the middle of
+// the margins; and its fonts go inside the file (word-fonts.ts), as Word embeds them, with Word's fallbacks for each.
+import { MONO_FONT as CODE_FONT, STYLES, type ParaStyle } from '../../shared/docs.ts';
 import { withTab, type Tab } from '../capture/index.ts';
 import { scriptSafe } from './kit.ts';
 import { ommlOf } from './omml.ts';
 import { XML_HEAD, coreXml, esc, imageSize, relsXml, zipParts, type ZipPart } from './ooxml.ts';
+import { altNameOf, fontInfo, fontKey, obfuscate, wordLine, type EmbeddedFont } from './word-fonts.ts';
+import { CAPTION, CELL, LIST_TEXT, STEP, TOC_PAD, wordLineOf, type WordLine } from './word-layout.ts';
 
 export interface DocRun {
   t: string;
@@ -61,9 +67,10 @@ export type DocLookOf = Pick<DocRun, 'b' | 'i' | 'u' | 's' | 'code' | 'sup' | 's
 
 type Jc = 'center' | 'right' | 'justify';
 
-/** A paragraph's own spacing: lines, and points before and after. */
+/** A paragraph's spacing: its lines (a multiple of the font's own line, or with `rule` points), and points before and after. */
 export interface DocSpace {
   line?: number;
+  rule?: 'atLeast' | 'exact';
   before?: number;
   after?: number;
 }
@@ -89,18 +96,21 @@ export type DocBlock =
   | { k: 'p'; runs: DocRun[]; align?: Jc; quote?: boolean; style?: 'title' | 'subtitle'; indent?: number; keep?: boolean; space?: DocSpace; shade?: string; icon?: string; mark?: DocRev }
   /** `list`: which list it belongs to (numbering restarts per list); `check`: a checklist's item (ticked: `checked`). */
   | { k: 'li'; ordered: boolean; lvl: number; list: number; runs: DocRun[]; check?: boolean; checked?: boolean; align?: Jc; keep?: boolean; space?: DocSpace; mark?: DocRev }
-  | { k: 'pre'; text: string }
-  | { k: 'hr' }
+  | { k: 'pre'; text: string; space?: DocSpace }
+  | { k: 'hr'; space?: DocSpace }
   /** A page break. */
   | { k: 'pb' }
-  /** `shot`: an index into shots; w and h in CSS pixels, as shown; `rev`: added or taken out as a tracked change. */
-  | { k: 'img'; shot: number; w: number; h: number; alt?: string; align?: 'left' | 'center' | 'right'; caption?: string; rev?: DocRev }
-  /** `cols`: the columns' widths, as shares of the table's; `rev`: every row added or taken out as a tracked change. */
-  | { k: 'table'; rows: { cells: DocCell[] }[]; cols?: number[]; rev?: DocRev }
+  /**
+   * `shot`: an index into shots; w and h in CSS pixels, as shown (`share`: its width as a share of the text's, for a
+   * document's); `rev`: added or taken out as a tracked change; `space`: before it and after it (or its caption).
+   */
+  | { k: 'img'; shot: number; w: number; h: number; share?: number; alt?: string; align?: 'left' | 'center' | 'right'; caption?: string; rev?: DocRev; space?: DocSpace }
+  /** `cols`: the columns' widths, as shares of the table's; `rev`: every row added or taken out as a tracked change; `sep`: points between it and a table right before it. */
+  | { k: 'table'; rows: { cells: DocCell[] }[]; cols?: number[]; rev?: DocRev; sep?: number }
   /** A table of contents: its lines as Word shows them until it fills it in (its headings' `anchor`s). */
-  | { k: 'toc'; entries: { lvl: number; text: string; anchor: string }[] }
+  | { k: 'toc'; entries: { lvl: number; text: string; anchor: string }[]; space?: DocSpace }
   /** An equation on a line of its own, in LaTeX. */
-  | { k: 'math'; tex: string };
+  | { k: 'math'; tex: string; space?: DocSpace };
 
 /** A header or footer of a document's pages: {page} and {pages} in its words are the page's number and how many. */
 export interface DocBand {
@@ -130,6 +140,12 @@ export interface DocLook {
   line?: number;
   /** Space after a paragraph. */
   after?: number;
+  /**
+   * A document of the editor's: its styles, lists, tables, quotes, code, callouts, captions, contents and header and
+   * footer as the editor draws them (word-layout.ts), the blocks' spacing given with them. `cjk`: it has Chinese,
+   * Japanese or Korean words (given an East Asian font).
+   */
+  editor?: { cjk?: boolean };
 }
 
 export interface Extracted {
@@ -1288,15 +1304,19 @@ function cleanRev(v: unknown): DocRev | undefined {
   return { kind: o.kind, author: str(o.author, 80).replace(/\s+/g, ' ').trim() || 'You', at: o.at };
 }
 
-/** A paragraph's own spacing, each value within bounds. */
+/** A paragraph's own spacing, each value within bounds (lines in points up to 1000 with a rule, else up to five times the font's). */
 function cleanSpace(v: unknown): DocSpace | undefined {
   const o = obj(v);
   const n = (x: unknown, lo: number, hi: number) => (typeof x === 'number' && Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : undefined);
   const sp: DocSpace = {};
-  const line = n(o.line, 0.5, 5);
-  const before = n(o.before, 0, 200);
-  const after = n(o.after, 0, 200);
-  if (line !== undefined) sp.line = line;
+  const rule = o.rule === 'atLeast' || o.rule === 'exact' ? o.rule : undefined;
+  const line = rule ? n(o.line, 1, 1000) : n(o.line, 0.5, 5);
+  const before = n(o.before, 0, 400);
+  const after = n(o.after, 0, 400);
+  if (line !== undefined) {
+    sp.line = line;
+    if (rule) sp.rule = rule;
+  }
   if (before !== undefined) sp.before = before;
   if (after !== undefined) sp.after = after;
   return Object.keys(sp).length ? sp : undefined;
@@ -1353,12 +1373,18 @@ function cleanDoc(v: unknown): Extracted {
     } else if (b.k === 'pb') blocks.push({ k: 'pb' });
     else if (b.k === 'pre') {
       const text = str(b.text, 200_000);
-      if (text.trim()) blocks.push({ k: 'pre', text });
-    } else if (b.k === 'hr') blocks.push({ k: 'hr' });
-    else if (b.k === 'img') {
+      const space = cleanSpace(b.space);
+      if (text.trim()) blocks.push({ k: 'pre', text, ...(space ? { space } : {}) });
+    } else if (b.k === 'hr') {
+      const space = cleanSpace(b.space);
+      blocks.push({ k: 'hr', ...(space ? { space } : {}) });
+    } else if (b.k === 'img') {
       const shot = typeof b.shot === 'number' && Number.isInteger(b.shot) && b.shot >= 0 && b.shot < shots.length ? b.shot : -1;
       if (shot < 0) continue;
       const img: Extract<DocBlock, { k: 'img' }> = { k: 'img', shot, w: int(b.w, 1, 4000, shots[shot].w), h: int(b.h, 1, 8000, shots[shot].h) };
+      if (typeof b.share === 'number' && Number.isFinite(b.share) && b.share > 0 && b.share <= 1) img.share = b.share;
+      const space = cleanSpace(b.space);
+      if (space) img.space = space;
       const alt = str(b.alt, 500).replace(/\s+/g, ' ').trim();
       if (alt) img.alt = alt;
       if (b.align === 'left' || b.align === 'center' || b.align === 'right') img.align = b.align;
@@ -1385,17 +1411,20 @@ function cleanDoc(v: unknown): Extracted {
         if (cells.length) rows.push({ cells });
       }
       const cols = Array.isArray(b.cols) && b.cols.every((w) => typeof w === 'number' && Number.isFinite(w) && w > 0) ? (b.cols as number[]).slice(0, 63) : undefined;
-      if (rows.length) blocks.push({ k: 'table', rows, ...(cols ? { cols } : {}), ...(cleanRev(b.rev) ? { rev: cleanRev(b.rev) } : {}) });
+      const sep = typeof b.sep === 'number' && Number.isFinite(b.sep) ? Math.min(400, Math.max(0, b.sep)) : undefined;
+      if (rows.length) blocks.push({ k: 'table', rows, ...(cols ? { cols } : {}), ...(cleanRev(b.rev) ? { rev: cleanRev(b.rev) } : {}), ...(sep !== undefined ? { sep } : {}) });
     } else if (b.k === 'toc') {
       const entries = (Array.isArray(b.entries) ? b.entries : []).slice(0, 2000).flatMap((x) => {
         const e = obj(x);
         const text = str(e.text, 500).replace(/\s+/g, ' ').trim();
         return text && typeof e.anchor === 'string' && /^_Toc\d{1,9}$/.test(e.anchor) ? [{ lvl: int(e.lvl, 1, 9, 1), text, anchor: e.anchor }] : [];
       });
-      blocks.push({ k: 'toc', entries });
+      const space = cleanSpace(b.space);
+      blocks.push({ k: 'toc', entries, ...(space ? { space } : {}) });
     } else if (b.k === 'math') {
       const tex = str(b.tex, 20_000).trim();
-      if (tex) blocks.push({ k: 'math', tex });
+      const space = cleanSpace(b.space);
+      if (tex) blocks.push({ k: 'math', tex, ...(space ? { space } : {}) });
     }
   }
   return { title: str(d.title, 300), lang: str(d.lang, 35), blocks, shots };
@@ -1414,8 +1443,53 @@ const MONO_FONT = 'Consolas';
 const LINE_COLOR = 'D1D5DB';
 const HEAD_FILL = 'F3F4F6';
 
-const fonts = (f: string) => `<w:rFonts w:ascii="${f}" w:hAnsi="${f}" w:eastAsia="${f}" w:cs="${f}"/>`;
+const fonts = (f: string) => (editor ? `<w:rFonts w:ascii="${f}" w:hAnsi="${f}" w:cs="${f}"/>` : `<w:rFonts w:ascii="${f}" w:hAnsi="${f}" w:eastAsia="${f}" w:cs="${f}"/>`);
 const size = (halfPt: number) => `<w:sz w:val="${halfPt}"/><w:szCs w:val="${halfPt}"/>`;
+/** Twips (twentieths of a point) of points. */
+const tw = (pt: number) => Math.max(0, Math.round(pt * 20));
+/** Word's spacing of a paragraph: points before and after, and its lines (points with a rule, else a multiple of the font's line). */
+const spacingOf = (before: number | undefined, after: number | undefined, l?: { line: number; rule?: 'atLeast' | 'exact' }) => {
+  const a = [
+    before !== undefined ? `w:before="${tw(before)}"` : '',
+    after !== undefined ? `w:after="${tw(after)}"` : '',
+    l ? (l.rule ? `w:line="${Math.max(20, tw(l.line))}" w:lineRule="${l.rule}"` : `w:line="${Math.max(24, Math.round(l.line * 240))}" w:lineRule="auto"`) : '',
+  ].filter(Boolean);
+  return a.length ? `<w:spacing ${a.join(' ')}/>` : '';
+};
+
+/** A paragraph's properties in the order Word's schema has them (it refuses a file with them in another). */
+function pPrXml(p: {
+  style?: string;
+  keepNext?: boolean;
+  keepLines?: boolean;
+  pageBreak?: boolean;
+  numPr?: string;
+  pBdr?: string;
+  shd?: string;
+  tabs?: string;
+  spacing?: string;
+  ind?: string;
+  jc?: string;
+  rPr?: string;
+}): string {
+  return [
+    p.style ? `<w:pStyle w:val="${p.style}"/>` : '',
+    p.keepNext ? '<w:keepNext/>' : '',
+    p.keepLines ? '<w:keepLines/>' : '',
+    p.pageBreak ? '<w:pageBreakBefore/>' : '',
+    p.numPr ?? '',
+    p.pBdr ? `<w:pBdr>${p.pBdr}</w:pBdr>` : '',
+    p.shd ?? '',
+    p.tabs ?? '',
+    p.spacing ?? '',
+    p.ind ?? '',
+    p.jc ?? '',
+    p.rPr ?? '',
+  ].join('');
+}
+
+/** Writing a document of the editor's (DocLook.editor): runs' fonts leave East Asian words to the document's East Asian font, and say their languages. Set for each file. */
+let editor = false;
 const border = (side: string, sz: number, color: string, space = 0) => `<w:${side} w:val="single" w:sz="${sz}" w:space="${space}" w:color="${color}"/>`;
 const TABLE_BORDERS = ['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map((s) => border(s, 4, LINE_COLOR)).join('');
 const CELL_MARGINS = '<w:top w:w="57" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:bottom w:w="57" w:type="dxa"/><w:right w:w="108" w:type="dxa"/>';
@@ -1506,14 +1580,185 @@ function stylesXml(lang: string, look: DocLook = {}): string {
   );
 }
 
+// A document's look in Word as the editor draws it (shared/docs.ts docCss): its colours, and its styles' sizes, spacing
+// and boxes from STYLES and word-layout.ts.
+const ED = { ink: '1F2328', muted: '5F6368', h4: '3C4043', rule: 'C8CCD1', cell: 'D0D7DE', head: 'F3F5F7', codeBg: 'F6F8FA', codeLine: 'E5E9EE', inlineBg: 'F1F3F5', link: '1A5FD8', done: '80868B', check: '1A73E8' };
+/** The font a document's code is in (embedded with it when Google's is at hand; else Office's closest). */
+export const MONO_DOC = CODE_FONT;
+/** Chinese, Japanese and Korean words: Office's font for them (the editor shows them in the computer's own). */
+export const EAST_ASIAN = 'Microsoft YaHei';
+
+/** The geometry of a document's boxes in Word, in points, for its size `S` (the editor's ems). */
+export function editorBoxes(S: number) {
+  const code = S * STYLES.code.k;
+  return {
+    quote: { border: 2.25, space: Math.round(0.9 * S), indent: 2.25 + Math.round(0.9 * S) },
+    code: { size: code, v: Math.min(31, Math.round(0.7 * code)), h: Math.min(31, Math.round(0.9 * code)) },
+    // A callout's tint fills a box with its emoji .8em in and its words 2.8em in, 1em from its right and .75em from its top and bottom.
+    callout: { v: Math.min(31, Math.round(0.75 * S)), l: Math.min(31, Math.max(0, Math.round(0.8 * S - 0.5))), r: Math.min(31, Math.max(0, Math.round(S - 0.5))), text: 2.8 * S, icon: 0.8 * S },
+    list: { text: LIST_TEXT * S, bullet: 0.55 * S },
+    band: { size: Math.round(S * 0.82 * 2) / 2, line: Math.round(S * 0.82 * 1.2 * 10) / 10 },
+  };
+}
+
+type Space = { before: number; after: number; line: WordLine };
+
+/** Each style's spacing in a document (points; lines in points or as a multiple), as the editor spaces a block of it after a paragraph. */
+function editorStyleSpace(look: DocLook): Record<string, Space> {
+  const S = look.size ?? 11;
+  const F = look.font ?? 'Arial';
+  // A style's lines: the editor's height, at least or exactly as Word's own line for the font compares.
+  const lines = (h: number, size: number, font = F) => wordLineOf(h, wordLine(font) * size, false);
+  const st = (k: ParaStyle): Space => {
+    const v = STYLES[k];
+    const sz = S * v.k;
+    return { before: v.before * sz, after: v.after * sz, line: lines(v.lh * sz, sz, k === 'code' ? MONO_DOC : F) };
+  };
+  const normal = st('normal');
+  const capSize = S * CAPTION.k;
+  // A table of contents' lines are padded above and below, which does not collapse: each line's space before is both.
+  const toc = { before: 2 * TOC_PAD * S, after: 0, line: normal.line };
+  const band = { before: 0, after: 0, line: { line: editorBoxes(S).band.line, rule: 'exact' as const } };
+  return {
+    Normal: normal,
+    Title: st('title'),
+    Subtitle: st('subtitle'),
+    Heading1: st('h1'),
+    Heading2: st('h2'),
+    Heading3: st('h3'),
+    Heading4: st('h4'),
+    Heading5: st('h4'),
+    Heading6: st('h4'),
+    Quote: st('quote'),
+    Code: st('code'),
+    ListParagraph: { before: 0, after: 0.25 * S, line: normal.line },
+    TableText: { before: 0, after: 0, line: lines(CELL.line * S, S) },
+    Picture: { before: 0.4 * S, after: 0.9 * S, line: { line: 1 } },
+    Caption: { before: CAPTION.before * capSize, after: 0.9 * S, line: lines(CAPTION.line * capSize, capSize) },
+    TOC1: toc,
+    TOC2: toc,
+    TOC3: toc,
+    Header: band,
+    Footer: band,
+  };
+}
+
+/** A paragraph's spacing as Word says it, leaving out what its style says already. */
+function spacingVs(sp: DocSpace | undefined, style: Space | undefined): string {
+  if (!sp) return '';
+  if (!style) return spacingOf(sp.before, sp.after, sp.line !== undefined ? { line: sp.line, rule: sp.rule } : undefined);
+  const same = (a: number | undefined, b: number) => a === undefined || Math.abs(a - b) < 0.03;
+  const lineSame = sp.line === undefined || (sp.rule === style.line.rule && Math.abs(sp.line - style.line.line) < (sp.rule ? 0.03 : 0.002));
+  return spacingOf(same(sp.before, style.before) ? undefined : sp.before, same(sp.after, style.after) ? undefined : sp.after, lineSame ? undefined : { line: sp.line!, rule: sp.rule });
+}
+
+/** A document's styles as the editor draws them: its font, sizes, colours, each style's spacing and lines in points, and the boxes of quotes and code. */
+function editorStylesXml(look: DocLook, cjk: boolean): string {
+  const S = look.size ?? 11;
+  const F = look.font ?? 'Arial';
+  const half = (pt: number) => Math.max(2, Math.round(pt * 2));
+  const box = editorBoxes(S);
+  const space = editorStyleSpace(look);
+  const spOf = (id: string) => spacingOf(space[id].before, space[id].after, space[id].line);
+  const st = (k: Exclude<ParaStyle, 'normal' | 'callout'>) => ({ sz: S * STYLES[k].k, spacing: spOf(k === 'title' ? 'Title' : k === 'subtitle' ? 'Subtitle' : k === 'quote' ? 'Quote' : k === 'code' ? 'Code' : `Heading${k.slice(1)}`) });
+  const heading = (n: number, k: 'h1' | 'h2' | 'h3' | 'h4') => {
+    const { sz, spacing } = st(k);
+    return paraStyle(`Heading${n}`, `heading ${n}`, pPrXml({ keepNext: true, keepLines: true, spacing }) + `<w:outlineLvl w:val="${n - 1}"/>`, `<w:b/><w:bCs/><w:color w:val="${k === 'h4' ? ED.h4 : ED.ink}"/>${size(half(sz))}`, 9);
+  };
+  const title = st('title');
+  const subtitle = st('subtitle');
+  const quote = st('quote');
+  const code = st('code');
+  const capSize = S * CAPTION.k;
+  const wide = Math.round(-0.01 * title.sz * 20);
+  return (
+    `${XML_HEAD}<w:styles xmlns:w="${W_NS}" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14">` +
+    `<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${esc(F)}" w:hAnsi="${esc(F)}" w:cs="${esc(F)}"${cjk ? ` w:eastAsia="${EAST_ASIAN}"` : ''}/><w:color w:val="${ED.ink}"/><w:kern w:val="2"/>${size(half(S))}` +
+    '<w14:ligatures w14:val="standardContextual"/></w:rPr></w:rPrDefault>' +
+    `<w:pPrDefault><w:pPr><w:widowControl/>${spOf('Normal')}</w:pPr></w:pPrDefault></w:docDefaults>` +
+    `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>` +
+    `<w:style w:type="character" w:default="1" w:styleId="DefaultParagraphFont"><w:name w:val="Default Paragraph Font"/><w:uiPriority w:val="1"/><w:semiHidden/><w:unhideWhenUsed/></w:style>` +
+    `<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:uiPriority w:val="99"/><w:semiHidden/><w:unhideWhenUsed/>` +
+    `<w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/>` +
+    `<w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style>` +
+    `<w:style w:type="numbering" w:default="1" w:styleId="NoList"><w:name w:val="No List"/><w:uiPriority w:val="99"/><w:semiHidden/><w:unhideWhenUsed/></w:style>` +
+    paraStyle('Title', 'Title', pPrXml({ keepNext: true, keepLines: true, spacing: title.spacing }), `<w:spacing w:val="${wide}"/>${size(half(title.sz))}`) +
+    paraStyle('Subtitle', 'Subtitle', pPrXml({ keepNext: true, keepLines: true, spacing: subtitle.spacing }), `<w:color w:val="${ED.muted}"/>${size(half(subtitle.sz))}`, 11) +
+    heading(1, 'h1') +
+    heading(2, 'h2') +
+    heading(3, 'h3') +
+    heading(4, 'h4') +
+    heading(5, 'h4') +
+    heading(6, 'h4') +
+    paraStyle(
+      'Quote',
+      'Quote',
+      pPrXml({ pBdr: border('left', 18, ED.cell, box.quote.space), spacing: quote.spacing, ind: `<w:ind w:left="${tw(box.quote.indent)}" w:right="0"/>` }),
+      `<w:i/><w:iCs/><w:color w:val="${ED.h4}"/>`,
+      29,
+    ) +
+    paraStyle(
+      'Code',
+      'Code',
+      pPrXml({
+        keepLines: true,
+        pBdr: ['top', 'left', 'bottom', 'right'].map((s) => border(s, 6, ED.codeLine, s === 'top' || s === 'bottom' ? box.code.v : box.code.h)).join(''),
+        shd: `<w:shd w:val="clear" w:color="auto" w:fill="${ED.codeBg}"/>`,
+        spacing: code.spacing,
+        ind: `<w:ind w:left="${tw(box.code.h + 0.75)}" w:right="${tw(box.code.h + 0.75)}"/>`,
+      }),
+      `${fonts(MONO_DOC)}${size(half(code.sz))}`,
+    ) +
+    paraStyle('ListParagraph', 'List Paragraph', spacingOf(0, space.ListParagraph.after), '', 34) +
+    paraStyle('TableText', 'Table Text', spOf('TableText'), '') +
+    paraStyle('Picture', 'Picture', spOf('Picture'), size(2)) +
+    paraStyle('Caption', 'caption', spOf('Caption'), `<w:color w:val="${ED.muted}"/>${size(half(capSize))}`, 35) +
+    [1, 2, 3]
+      .map((n) =>
+        paraStyle(
+          `TOC${n}`,
+          `toc ${n}`,
+          pPrXml({ spacing: spOf(`TOC${n}`), ind: n > 1 ? `<w:ind w:left="${tw((n - 1) * 1.4 * S)}"/>` : '' }),
+          n === 1 ? '<w:b/><w:bCs/>' : n === 3 ? `<w:color w:val="${ED.h4}"/>` : '',
+          39,
+        ),
+      )
+      .join('') +
+    paraStyle('Header', 'header', spOf('Header'), `<w:color w:val="${ED.muted}"/>${size(half(box.band.size))}`, 99) +
+    paraStyle('Footer', 'footer', spOf('Footer'), `<w:color w:val="${ED.muted}"/>${size(half(box.band.size))}`, 99) +
+    paraStyle('CommentText', 'annotation text', '<w:spacing w:after="0" w:line="240" w:lineRule="auto"/>', size(20), 99) +
+    `<w:style w:type="character" w:styleId="CommentReference"><w:name w:val="annotation reference"/><w:basedOn w:val="DefaultParagraphFont"/><w:uiPriority w:val="99"/><w:rPr>${size(16)}</w:rPr></w:style>` +
+    `<w:style w:type="character" w:styleId="InlineCode"><w:name w:val="Inline Code"/><w:basedOn w:val="DefaultParagraphFont"/><w:uiPriority w:val="1"/><w:qFormat/>` +
+    `<w:rPr>${fonts(MONO_DOC)}${size(half(S * 0.9))}<w:shd w:val="clear" w:color="auto" w:fill="${ED.inlineBg}"/></w:rPr></w:style>` +
+    `<w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:basedOn w:val="DefaultParagraphFont"/><w:uiPriority w:val="99"/><w:unhideWhenUsed/>` +
+    `<w:rPr><w:color w:val="${ED.link}"/><w:u w:val="single"/></w:rPr></w:style>` +
+    `<w:style w:type="character" w:styleId="${DONE_STYLE}"><w:name w:val="Done item"/><w:basedOn w:val="DefaultParagraphFont"/><w:uiPriority w:val="1"/>` +
+    `<w:rPr><w:strike/><w:color w:val="${ED.done}"/></w:rPr></w:style>` +
+    `<w:style w:type="table" w:styleId="PageTable"><w:name w:val="Page Table"/><w:basedOn w:val="TableNormal"/><w:uiPriority w:val="59"/>` +
+    `<w:tblPr><w:tblBorders>${editorTableBorders}</w:tblBorders><w:tblCellMar>${editorCellMargins(S)}</w:tblCellMar></w:tblPr>` +
+    `<w:tblStylePr w:type="firstRow"><w:rPr><w:b/><w:bCs/></w:rPr><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="${ED.head}"/></w:tcPr></w:tblStylePr></w:style>` +
+    `</w:styles>`
+  );
+}
+
+/** The character style of a checklist's ticked item's words: struck through and grey, as the editor shows them (not the words' own look). */
+export const DONE_STYLE = 'DoneItem';
+const editorTableBorders = ['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map((s) => border(s, 6, ED.cell)).join('');
+const editorCellMargins = (S: number) => `<w:top w:w="${tw(CELL.v * S)}" w:type="dxa"/><w:left w:w="${tw(CELL.h * S)}" w:type="dxa"/><w:bottom w:w="${tw(CELL.v * S)}" w:type="dxa"/><w:right w:w="${tw(CELL.h * S)}" w:type="dxa"/>`;
+
 /** One list of bullets for every bulleted list, and a numbering of its own for each numbered list (so each starts at 1). */
-function numberingXml(numbered: number): string {
+function numberingXml(numbered: number, S?: number): string {
+  // A document's (size S): each level a step (36pt) further in, its words 1.6em after the mark's place, a number at
+  // that place, a bullet centred in its first .55em each side, as the editor draws them; a page's: Word's usual.
   const levels = (fmt: (i: number) => [string, string]) =>
     Array.from({ length: 9 }, (_, i) => {
       const [kind, text] = fmt(i);
+      const box = S ? editorBoxes(S).list : null;
+      const bullet = kind === 'bullet';
+      const ind = box ? `<w:ind w:left="${tw(STEP * i + box.text)}" w:hanging="${tw(bullet ? box.text - box.bullet : box.text)}"/>` : `<w:ind w:left="${720 + 360 * i}" w:hanging="360"/>`;
       return (
-        `<w:lvl w:ilvl="${i}"><w:start w:val="1"/><w:numFmt w:val="${kind}"/><w:lvlText w:val="${text}"/><w:lvlJc w:val="left"/>` +
-        `<w:pPr><w:ind w:left="${720 + 360 * i}" w:hanging="360"/></w:pPr></w:lvl>`
+        `<w:lvl w:ilvl="${i}"><w:start w:val="1"/><w:numFmt w:val="${kind}"/><w:lvlText w:val="${text}"/><w:lvlJc w:val="${box && bullet ? 'center' : 'left'}"/>` +
+        `<w:pPr>${ind}</w:pPr></w:lvl>`
       );
     }).join('');
   const nsid = (k: number) => (0x4e410000 + k).toString(16).toUpperCase();
@@ -1532,20 +1777,65 @@ function numberingXml(numbered: number): string {
   return `${XML_HEAD}<w:numbering xmlns:w="${W_NS}">${out}</w:numbering>`;
 }
 
-const SETTINGS_XML =
-  `${XML_HEAD}<w:settings xmlns:w="${W_NS}"><w:zoom w:percent="100"/><w:defaultTabStop w:val="720"/><w:characterSpacingControl w:val="doNotCompress"/>` +
+/** settings.xml: Word 2013's layout; `embedded`, the file carries fonts Word is to use. */
+const settingsXml = (embedded = false) =>
+  `${XML_HEAD}<w:settings xmlns:w="${W_NS}"><w:zoom w:percent="100"/>${embedded ? '<w:embedTrueTypeFonts/>' : ''}<w:defaultTabStop w:val="720"/><w:characterSpacingControl w:val="doNotCompress"/>` +
   '<w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>';
+
+/**
+ * fontTable.xml: each font the file names, with what Word needs to find the closest one it has (PANOSE, family, pitch,
+ * coverage, an Office font as its other name), and the faces the file carries of it (obfuscated, each with its key),
+ * as parts of their own with the table's relationships to them.
+ */
+function fontTableXml(names: Iterable<string>, embedded: Map<string, EmbeddedFont>): { xml: string; rels: string | null; parts: ZipPart[] } {
+  const rels: [string, string, string][] = [];
+  const parts: ZipPart[] = [];
+  const entries: string[] = [];
+  for (const name of new Set(names)) {
+    const emb = embedded.get(name);
+    const info = emb?.info ?? fontInfo(name);
+    const alt = altNameOf(name);
+    let faces = '';
+    if (emb)
+      for (const [slot, tag] of [
+        ['regular', 'embedRegular'],
+        ['bold', 'embedBold'],
+        ['italic', 'embedItalic'],
+        ['boldItalic', 'embedBoldItalic'],
+      ] as const) {
+        const data = emb.faces[slot];
+        if (!data) continue;
+        const key = fontKey();
+        const id = `rId${rels.length + 1}`;
+        const file = `font${parts.length + 1}.odttf`;
+        rels.push([id, 'font', `fonts/${file}`]);
+        parts.push({ name: `word/fonts/${file}`, data: obfuscate(data, key) });
+        faces += `<w:${tag} r:id="${id}" w:fontKey="${key}"/>`;
+      }
+    const sig = info.sig ? `<w:sig w:usb0="${info.sig[0]}" w:usb1="${info.sig[1]}" w:usb2="${info.sig[2]}" w:usb3="${info.sig[3]}" w:csb0="${info.sig[4]}" w:csb1="${info.sig[5]}"/>` : '';
+    entries.push(
+      `<w:font w:name="${esc(name)}">${alt ? `<w:altName w:val="${esc(alt)}"/>` : ''}${info.panose ? `<w:panose1 w:val="${info.panose}"/>` : ''}<w:charset w:val="${info.charset}"/>` +
+        `<w:family w:val="${info.family2}"/><w:pitch w:val="${info.pitch}"/>${sig}${faces}</w:font>`,
+    );
+  }
+  return {
+    xml: `${XML_HEAD}<w:fonts xmlns:w="${W_NS}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${entries.join('')}</w:fonts>`,
+    rels: rels.length ? relsXml(rels) : null,
+    parts,
+  };
+}
 const APP_XML =
   `${XML_HEAD}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">` +
   '<Application>Hydor</Application><DocSecurity>0</DocSecurity></Properties>';
 
-function contentTypes(pictures: Set<string>, parts: [string, string][] = []): string {
+function contentTypes(pictures: Set<string>, parts: [string, string][] = [], fonts = false): string {
   const ov = (part: string, type: string) => `<Override PartName="${part}" ContentType="${type}"/>`;
   const ml = 'application/vnd.openxmlformats-officedocument.wordprocessingml';
   return (
     `${XML_HEAD}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
     [...pictures].map((e) => `<Default Extension="${e}" ContentType="image/${e}"/>`).join('') +
+    (fonts ? '<Default Extension="odttf" ContentType="application/vnd.openxmlformats-officedocument.obfuscatedFont"/>' : '') +
     parts.map(([part, kind]) => ov(part, `${ml}.${kind}+xml`)).join('') +
     ov('/word/document.xml', `${ml}.document.main+xml`) +
     ov('/word/styles.xml', `${ml}.styles+xml`) +
@@ -1567,8 +1857,10 @@ export const markXml = (m: DocRev | undefined) => (m ? `<w:rPr><w:${m.kind} ${re
 /** Words inside a tracked change (inserted, deleted), around what Word writes for them. */
 export const revWrap = (rev: DocRev | undefined, xml: string) => (rev ? `<w:${rev.kind} ${revAttrs(rev.author, rev.at)}>${xml}</w:${rev.kind}>` : xml);
 
-function runXml(r: DocRun): string {
+/** A run as Word's; `cs`: a character style for it when it has none of its own (a link's, code's). */
+function runXml(r: DocRun, cs?: string): string {
   const p = rPrParts(r);
+  if (cs && !r.link && !r.code) p.unshift(`<w:rStyle w:val="${cs}"/>`);
   if (r.fmtRev) p.push(`<w:rPrChange ${revAttrs(r.fmtRev.author, r.fmtRev.at)}><w:rPr>${rPrParts({ t: '', ...r.fmtRev.was, ...(r.link ? { link: r.link } : {}) }).join('')}</w:rPr></w:rPrChange>`);
   // Deleted words are deleted text, which Word shows struck until the change is accepted.
   const tag = r.rev?.kind === 'del' ? 'w:delText' : 'w:t';
@@ -1579,13 +1871,26 @@ function runXml(r: DocRun): string {
   return `<w:r>${p.length ? `<w:rPr>${p.join('')}</w:rPr>` : ''}${r.br ? '<w:br/>' : ''}${text}</w:r>`;
 }
 
+/** The fonts a document's file names (its font table lists them). */
+const namedFonts = new Set<string>();
+
+/** The languages of a run's words, as Word's proofing and line breaking want them: Greek, and Chinese, Japanese or Korean. */
+function langOf(t: string): string {
+  const greek = /[Ͱ-Ͽἀ-῿]/.test(t);
+  const ea = /[぀-ヿ]/.test(t) ? 'ja-JP' : /[가-힯ᄀ-ᇿ]/.test(t) ? 'ko-KR' : /[㐀-鿿豈-﫿　-〿＀-￯]/.test(t) ? 'zh-CN' : '';
+  return greek || ea ? `<w:lang${greek ? ' w:val="el-GR"' : ''}${ea ? ` w:eastAsia="${ea}"` : ''}/>` : '';
+}
+
 /** A run's properties, as Word lists them (in its schema's order). */
 function rPrParts(r: DocRun): string[] {
   const p: string[] = [];
+  const mono = editor ? MONO_DOC : MONO_FONT;
   if (r.link) p.push('<w:rStyle w:val="Hyperlink"/>');
   else if (r.code) p.push('<w:rStyle w:val="InlineCode"/>');
-  if (r.link && r.code) p.push(fonts(MONO_FONT));
+  if (r.link && r.code) p.push(fonts(mono));
   else if (r.font && !r.code) p.push(fonts(esc(r.font)));
+  if (r.code) namedFonts.add(mono);
+  else if (r.font) namedFonts.add(r.font);
   if (r.b) p.push('<w:b/><w:bCs/>');
   if (r.i) p.push('<w:i/><w:iCs/>');
   if (r.s) p.push('<w:strike/>');
@@ -1595,29 +1900,37 @@ function rPrParts(r: DocRun): string[] {
   if (r.hl) p.push(`<w:shd w:val="clear" w:color="auto" w:fill="${r.hl.slice(1).toUpperCase()}"/>`);
   if (r.sup) p.push('<w:vertAlign w:val="superscript"/>');
   else if (r.sub) p.push('<w:vertAlign w:val="subscript"/>');
-  return p;
+  if (editor) p.push(langOf(r.t));
+  return p.filter(Boolean);
 }
 
 const para = (pPr: string, inner: string) => `<w:p>${pPr ? `<w:pPr>${pPr}</w:pPr>` : ''}${inner}</w:p>`;
 const plain = (runs: DocRun[]) => runs.map((r) => (r.br ? '\n' : '') + r.t).join('');
 const JC = { center: 'center', right: 'right', justify: 'both' } as const;
 
-/** The .docx file from what the extractor found and the pictures (PNG buffers, by shot index; null when one could not be taken). */
 /**
  * The .docx file from what the extractor found and the pictures (PNG buffers, by shot index; null when one could not
- * be taken). A document of Pages gives its `margin` (mm), its `look`, and `titled: false` (its title is its own).
+ * be taken). A document of Pages gives its `margin` (mm), its `look` (with `editor`: laid out as the editor draws it,
+ * its blocks' spacing given), `titled: false` (its title is its own), and `fonts`: the faces of its fonts to embed.
  */
 export function docxFile(
   doc: Extracted,
   pictures: (Buffer | null)[],
-  o: { title: string; paper: 'a4' | 'letter'; margin?: number; look?: DocLook; titled?: boolean; header?: DocBand; footer?: DocBand; titlePage?: boolean; comments?: DocComment[] },
+  o: { title: string; paper: 'a4' | 'letter'; margin?: number; look?: DocLook; titled?: boolean; header?: DocBand; footer?: DocBand; titlePage?: boolean; comments?: DocComment[]; fonts?: Map<string, EmbeddedFont> },
 ): Buffer {
   const d = cleanDoc(doc);
   revs = 0;
-  const page = o.paper === 'letter' ? { w: 12240, h: 15840 } : { w: 11906, h: 16838 };
-  const margin = o.margin !== undefined && Number.isFinite(o.margin) ? Math.round(Math.min(60, Math.max(5, o.margin)) * 56.6929) : MARGIN;
   const look = o.look ?? {};
   if (look.font && !/^[A-Za-z0-9][A-Za-z0-9 -]{0,39}$/.test(look.font)) delete look.font;
+  editor = !!look.editor;
+  namedFonts.clear();
+  const S = look.size && Number.isFinite(look.size) ? Math.min(400, Math.max(1, look.size)) : 11;
+  const half = (pt: number) => Math.max(2, Math.round(pt * 2));
+  const ed = editor ? editorBoxes(S) : null;
+  const cjk = !!look.editor?.cjk;
+  if (editor) namedFonts.add(look.font ?? 'Arial');
+  const page = o.paper === 'letter' ? { w: 12240, h: 15840 } : { w: 11906, h: 16838 };
+  const margin = o.margin !== undefined && Number.isFinite(o.margin) ? Math.round(Math.min(60, Math.max(5, o.margin)) * 56.6929) : MARGIN;
   const textW = page.w - 2 * margin;
   const maxW = textW * EMU_TWIP;
   // A picture and the line it sits on fit on one page.
@@ -1666,36 +1979,36 @@ export function docxFile(
       .flatMap((id) => (cmSpan.get(id)?.[edge] === at ? (cmNum.get(id) ?? []) : []))
       .map((n) => (edge === 'first' ? `<w:commentRangeStart w:id="${n}"/>` : `<w:commentRangeEnd w:id="${n}"/><w:r><w:rPr><w:rStyle w:val="CommentReference"/></w:rPr><w:commentReference w:id="${n}"/></w:r>`))
       .join('');
+  /** An equation's runs at a size (a document's maths is drawn larger than its words, as the editor's is). */
+  const mathSized = (omml: string, pt: number) => (editor ? omml.replace(/<m:r>(<m:rPr>[\s\S]*?<\/m:rPr>)?/g, (m) => `${m}<w:rPr>${size(half(pt))}</w:rPr>`) : omml);
   /** A run as Word's: maths as an equation (or, where it does not convert, its LaTeX in a maths font), the comments on it marked around it. */
-  const oneRun = (r: DocRun) => {
+  const oneRun = (r: DocRun, base: number, done?: boolean) => {
     const at = written++;
+    if (r.math) namedFonts.add('Cambria Math');
     const omml = r.math ? ommlOf(r.t) : null;
-    const body = r.math ? (omml ?? runXml({ t: r.t, i: true, font: 'Cambria Math', rev: r.rev })) : runXml(r);
+    const body = r.math ? (omml ? mathSized(omml, (r.size ?? base) * 1.1) : runXml({ t: r.t, i: true, font: 'Cambria Math', rev: r.rev })) : runXml(r, done ? DONE_STYLE : undefined);
     return cmMarks(r, at, 'first') + revWrap(r.rev, body) + cmMarks(r, at, 'last');
   };
-  const runs = (list: DocRun[], bold = false) => {
+  const runs = (list: DocRun[], bold = false, base = S, done = false) => {
     let out = '';
-    for (let i = 0; i < list.length;) {
+    for (let i = 0; i < list.length; ) {
       const link = list[i].link;
       if (!link) {
-        out += oneRun(bold ? { ...list[i], b: true } : list[i]);
+        out += oneRun(bold ? { ...list[i], b: true } : list[i], base, done);
         i++;
         continue;
       }
       let inner = '';
-      for (; i < list.length && list[i].link === link; i++) inner += oneRun(bold ? { ...list[i], b: true } : list[i]);
+      for (; i < list.length && list[i].link === link; i++) inner += oneRun(bold ? { ...list[i], b: true } : list[i], base, done);
       let id = linkIds.get(link);
       if (!id) linkIds.set(link, (id = rel('hyperlink', link, true)));
       out += `<w:hyperlink r:id="${id}" w:history="1">${inner}</w:hyperlink>`;
     }
     return out;
   };
-  /** A paragraph's own spacing, as Word says it (twips; lines in 240ths). */
-  const spaceXml = (sp: DocSpace | undefined) => {
-    if (!sp) return '';
-    const a = [sp.before !== undefined ? `w:before="${Math.round(sp.before * 20)}"` : '', sp.after !== undefined ? `w:after="${Math.round(sp.after * 20)}"` : '', sp.line !== undefined ? `w:line="${Math.round(sp.line * 240)}" w:lineRule="auto"` : ''].filter(Boolean);
-    return a.length ? `<w:spacing ${a.join(' ')}/>` : '';
-  };
+  /** A paragraph's spacing, as Word says it (twips; lines in 240ths, or twips with their rule): a document's, what its style (`style`) does not say already. */
+  const styleSpace = editor ? editorStyleSpace(look) : null;
+  const spaceXml = (sp: DocSpace | undefined, style = 'Normal') => spacingVs(sp, styleSpace?.[style]);
   let bookmarks = 0;
 
   // Each numbered list its own numbering (numIds from 2; 1 is the bullets), up to a thousand of them.
@@ -1711,44 +2024,49 @@ export function docxFile(
 
   const media: ZipPart[] = [];
   const kinds = new Set<string>();
-  const picture = (b: Extract<DocBlock, { k: 'img' }>): string => {
+  const picture = (b: Extract<DocBlock, { k: 'img' }>, pageBreak: boolean): string => {
     const buf = pictures[b.shot];
     const info = buf ? imageSize(buf) : null;
-    if (!buf || !info || !info.w || !info.h || (info.type !== 'png' && info.type !== 'jpeg' && info.type !== 'gif')) return b.alt ? para('', runXml({ t: b.alt, i: true })) : '';
+    if (!buf || !info || !info.w || !info.h || (info.type !== 'png' && info.type !== 'jpeg' && info.type !== 'gif')) return b.alt ? para(pPrXml({ pageBreak }), runXml({ t: b.alt, i: true })) : '';
     const n = media.length + 1;
     const name = `image${n}.${info.type}`;
     media.push({ name: `word/media/${name}`, data: buf });
     kinds.add(info.type);
     const id = rel('image', `media/${name}`);
-    // Its size on the page as it showed, smaller to fit the text's width and the page's height; its proportions from the picture.
+    // Its size on the page as it showed (a document's: its share of the text's width), smaller to fit the text's width
+    // and the page's height; its proportions from the picture.
     const ratio = info.h / info.w;
-    let cx = Math.min(Math.round(b.w * EMU_PX), maxW);
+    let cx = Math.min(b.share ? Math.round(b.share * maxW) : Math.round(b.w * EMU_PX), maxW);
     let cy = Math.round(cx * ratio);
     if (cy > maxH) {
       cy = maxH;
       cx = Math.round(cy / ratio);
     }
     const alt = b.alt ? ` descr="${esc(b.alt)}"` : '';
-    const jc = b.align === 'center' || b.align === 'right' ? `<w:jc w:val="${b.align}"/>` : '';
-    const caption = b.caption ? para(`<w:pStyle w:val="Caption"/>${jc}`, runXml({ t: b.caption })) : '';
-    return para(
-      `<w:pStyle w:val="Picture"/>${caption ? '<w:keepNext/>' : ''}${jc}`,
-      revWrap(
-        b.rev,
-        `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${n}" name="Picture ${n}"${alt}/>` +
-          '<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
-          `<pic:pic><pic:nvPicPr><pic:cNvPr id="${n}" name="${name}"${alt}/><pic:cNvPicPr><a:picLocks noChangeAspect="1"/></pic:cNvPicPr></pic:nvPicPr>` +
-          `<pic:blipFill><a:blip r:embed="${id}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
-          `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>` +
-          '</a:graphicData></a:graphic></wp:inline></w:drawing></w:r>',
-      ),
-    ) + caption;
+    // A document's picture says left too (its file read back knows it from one that says nothing, which is centred).
+    const jc = b.align === 'center' || b.align === 'right' || (editor && b.align === 'left') ? `<w:jc w:val="${b.align}"/>` : '';
+    const sp = b.space;
+    const caption = b.caption ? para(pPrXml({ style: 'Caption', spacing: editor ? spaceXml({ after: sp?.after }, 'Caption') : '', jc }), runXml({ t: b.caption })) : '';
+    return (
+      para(
+        pPrXml({ style: 'Picture', keepNext: !!caption, pageBreak, spacing: editor ? spaceXml({ before: sp?.before, after: caption ? 0 : sp?.after }, 'Picture') : '', jc }),
+        revWrap(
+          b.rev,
+          `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${n}" name="Picture ${n}"${alt}/>` +
+            '<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+            `<pic:pic><pic:nvPicPr><pic:cNvPr id="${n}" name="${name}"${alt}/><pic:cNvPicPr><a:picLocks noChangeAspect="1"/></pic:cNvPicPr></pic:nvPicPr>` +
+            `<pic:blipFill><a:blip r:embed="${id}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+            `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>` +
+            '</a:graphicData></a:graphic></wp:inline></w:drawing></w:r>',
+        ),
+      ) + caption
+    );
   };
 
   const table = (b: Extract<DocBlock, { k: 'table' }>): string => {
     const span = (c: { span?: number }) => c.span ?? 1;
     const cols = Math.min(63, Math.max(1, ...b.rows.map((r) => r.cells.reduce((n, c) => n + span(c), 0))));
-    // Columns as wide as their longest line asks, within limits, over the text's width.
+    // A document's columns as it sets them (equal when it does not); a page's as wide as their longest line asks, within limits.
     const want = new Array<number>(cols).fill(0);
     for (const r of b.rows) {
       let c = 0;
@@ -1763,24 +2081,27 @@ export function docxFile(
         c += span(cell);
       }
     }
-    const weights = b.cols && b.cols.length === cols ? b.cols : want.map((w) => Math.min(Math.max(w, 4), 48));
+    const weights = b.cols && b.cols.length === cols ? b.cols : editor ? want.map(() => 1) : want.map((w) => Math.min(Math.max(w, 4), 48));
     const total = weights.reduce((a, w) => a + w, 0);
-    const widths = weights.map((w) => Math.floor((textW * w) / total));
+    const widths = weights.map((w) => Math.round((textW * w) / total));
     widths[cols - 1] += textW - widths.reduce((a, w) => a + w, 0);
     // Rows of headings at the top repeat on each page.
     let heads = 0;
     while (heads < b.rows.length && b.rows[heads].cells.every((c) => c.head)) heads++;
     if (heads === b.rows.length) heads = 0;
-    const cellXml = (runsXml: string, w: number, n: number, head: boolean, cell?: DocCell) => {
-      const fill = cell?.fill ? cell.fill.slice(1).toUpperCase() : head ? HEAD_FILL : '';
+    const headFill = editor ? ED.head : HEAD_FILL;
+    const cellXml = (runsXml: string, w: number, n: number, head: boolean, cell: DocCell | undefined, keep: boolean) => {
+      const fill = cell?.fill ? cell.fill.slice(1).toUpperCase() : head ? headFill : '';
       const vm = cell?.vm === 'restart' ? '<w:vMerge w:val="restart"/>' : cell?.vm === 'cont' ? '<w:vMerge/>' : '';
       return (
         `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${n > 1 ? `<w:gridSpan w:val="${n}"/>` : ''}${vm}${fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>` : ''}${cell?.va ? `<w:vAlign w:val="${cell.va}"/>` : ''}</w:tcPr>` +
-        `${para(`<w:pStyle w:val="TableText"/>${cell?.align ? `<w:jc w:val="${JC[cell.align]}"/>` : ''}`, runsXml)}</w:tc>`
+        `${para(pPrXml({ style: 'TableText', keepNext: keep, jc: cell?.align ? `<w:jc w:val="${JC[cell.align]}"/>` : '' }), runsXml)}</w:tc>`
       );
     };
     const rowsXml = b.rows.map((r, ri) => {
       const head = ri < heads;
+      // A document's rows a cell is merged down over stay together on a page (as the editor keeps them), held to the next.
+      const keep = editor && !!b.rows[ri + 1]?.cells.some((c) => c.vm === 'cont');
       let c = 0;
       let out = '';
       for (const cell of r.cells) {
@@ -1792,16 +2113,17 @@ export function docxFile(
           n,
           head,
           cell,
+          keep,
         );
         c += n;
       }
-      for (; c < cols; c++) out += cellXml('', widths[c], 1, head);
+      for (; c < cols; c++) out += cellXml('', widths[c], 1, head, undefined, keep);
       const rowRev = b.rev ? `<w:${b.rev.kind} ${revAttrs(b.rev.author, b.rev.at)}/>` : '';
       return `<w:tr><w:trPr><w:cantSplit/>${head ? '<w:tblHeader/>' : ''}${rowRev}</w:trPr>${out}</w:tr>`;
     });
     return (
-      `<w:tbl><w:tblPr><w:tblStyle w:val="PageTable"/><w:tblW w:w="${textW}" w:type="dxa"/><w:tblBorders>${TABLE_BORDERS}</w:tblBorders><w:tblLayout w:type="fixed"/>` +
-      `<w:tblCellMar>${CELL_MARGINS}</w:tblCellMar>` +
+      `<w:tbl><w:tblPr><w:tblStyle w:val="PageTable"/><w:tblW w:w="${textW}" w:type="dxa"/><w:tblBorders>${editor ? editorTableBorders : TABLE_BORDERS}</w:tblBorders><w:tblLayout w:type="fixed"/>` +
+      `<w:tblCellMar>${editor ? editorCellMargins(S) : CELL_MARGINS}</w:tblCellMar>` +
       `<w:tblLook w:val="04A0" w:firstRow="${heads ? 1 : 0}" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="1" w:noVBand="1"/></w:tblPr>` +
       `<w:tblGrid>${widths.map((w) => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>${rowsXml.join('')}</w:tbl>`
     );
@@ -1824,18 +2146,58 @@ export function docxFile(
   const named = d.blocks.slice(0, 8).some((b) => b.k === 'h' && says(plain(b.runs)));
   if (title && !named && o.titled !== false) body.push(para('<w:pStyle w:val="Title"/>', runXml({ t: title })));
 
-  // A checklist's box, as Word 2010 and later tick it (others show the box as it is drawn).
+  // A checklist's box, as Word 2010 and later tick it (others show the box as it is drawn): a document's as the editor
+  // draws it, a grey box, blue and ticked when done.
   let boxes = 0;
-  const box = (on: boolean) =>
-    `<w:sdt><w:sdtPr><w:id w:val="${4000 + ++boxes}"/><w14:checkbox><w14:checked w14:val="${on ? 1 : 0}"/><w14:checkedState w14:val="2612" w14:font="MS Gothic"/><w14:uncheckedState w14:val="2610" w14:font="MS Gothic"/></w14:checkbox></w:sdtPr>` +
-    `<w:sdtContent><w:r><w:rPr><w:rFonts w:ascii="MS Gothic" w:eastAsia="MS Gothic" w:hAnsi="MS Gothic" w:hint="eastAsia"/></w:rPr><w:t>${on ? '☒' : '☐'}</w:t></w:r></w:sdtContent></w:sdt><w:r><w:tab/></w:r>`;
+  const box = (on: boolean) => {
+    const [font, sym, symOff, glyph] = editor ? ['Segoe UI Symbol', '2611', '2610', on ? '☑' : '☐'] : ['MS Gothic', '2612', '2610', on ? '☒' : '☐'];
+    namedFonts.add(font);
+    const look = editor ? `<w:rFonts w:ascii="${font}" w:hAnsi="${font}" w:eastAsia="${font}" w:cs="${font}"/><w:color w:val="${on ? ED.check : ED.done}"/>` : `<w:rFonts w:ascii="${font}" w:eastAsia="${font}" w:hAnsi="${font}" w:hint="eastAsia"/>`;
+    return (
+      `<w:sdt><w:sdtPr><w:id w:val="${4000 + ++boxes}"/><w14:checkbox><w14:checked w14:val="${on ? 1 : 0}"/><w14:checkedState w14:val="${sym}" w14:font="${font}"/><w14:uncheckedState w14:val="${symOff}" w14:font="${font}"/></w14:checkbox></w:sdtPr>` +
+      `<w:sdtContent><w:r><w:rPr>${look}</w:rPr><w:t>${glyph}</w:t></w:r></w:sdtContent></w:sdt><w:r><w:tab/></w:r>`
+    );
+  };
   const jcOf = (a: Jc | undefined) => (a ? `<w:jc w:val="${JC[a]}"/>` : '');
+  // A tiny paragraph: between two tables (which would join into one), after a table that ends a document, or holding a
+  // page break before a table; its own height a point.
+  const tiny = (o: { before?: number; pageBreak?: boolean; br?: boolean } = {}) =>
+    `<w:p><w:pPr>${pPrXml({ pageBreak: o.pageBreak, spacing: spacingOf(o.before ?? 0, 0, { line: 1, rule: 'exact' }), rPr: `<w:rPr>${size(2)}</w:rPr>` })}</w:pPr>${o.br ? `<w:r><w:rPr>${size(2)}</w:rPr><w:br w:type="page"/></w:r>` : ''}</w:p>`;
+  // A document's page break: the next paragraph starts a page (a table's: a paragraph before it breaks the page).
+  let breakNext = false;
   d.blocks.forEach((b, i) => {
+    const pageBreak = editor && breakNext && b.k !== 'table' && b.k !== 'pb';
+    if (pageBreak) breakNext = false;
     if (b.k === 'h') {
       // A table of contents' line leads to its heading's bookmark.
       const mark = b.anchor ? ++bookmarks : 0;
-      const inner = mark ? `<w:bookmarkStart w:id="${mark}" w:name="${b.anchor}"/>${runs(b.runs)}<w:bookmarkEnd w:id="${mark}"/>` : runs(b.runs);
-      body.push(para(`<w:pStyle w:val="Heading${b.lvl}"/>${spaceXml(b.space)}${jcOf(b.align)}${markXml(b.mark)}`, inner));
+      const words = runs(b.runs, false, look.heads?.[b.lvl - 1] ?? S);
+      const inner = mark ? `<w:bookmarkStart w:id="${mark}" w:name="${b.anchor}"/>${words}<w:bookmarkEnd w:id="${mark}"/>` : words;
+      body.push(para(pPrXml({ style: `Heading${b.lvl}`, pageBreak, spacing: spaceXml(b.space, `Heading${b.lvl}`), jc: jcOf(b.align), rPr: markXml(b.mark) }), inner));
+    } else if (b.k === 'p' && b.shade && ed) {
+      // A callout as the editor draws it: its tint filling a box (a border of its own colour all round gives it room),
+      // its emoji .8em in, its words 2.8em in on every line (a hanging indent), kept on one page where it fits.
+      const tint = b.shade.slice(1).toUpperCase();
+      const c = ed.callout;
+      const x0 = (b.indent ?? 0) * STEP;
+      const frame = border('top', 4, tint, c.v) + border('left', 4, tint, c.l) + border('bottom', 4, tint, c.v) + border('right', 4, tint, c.r);
+      namedFonts.add('Segoe UI Emoji');
+      const icon = b.icon ? `<w:r><w:rPr><w:rFonts w:ascii="Segoe UI Emoji" w:hAnsi="Segoe UI Emoji" w:eastAsia="Segoe UI Emoji" w:cs="Segoe UI Emoji"/>${size(half(S * 1.05))}</w:rPr><w:t>${esc(b.icon)}</w:t></w:r><w:r><w:tab/></w:r>` : '';
+      body.push(
+        para(
+          pPrXml({
+            keepLines: true,
+            pageBreak,
+            pBdr: frame,
+            shd: `<w:shd w:val="clear" w:color="auto" w:fill="${tint}"/>`,
+            spacing: spaceXml(b.space),
+            ind: `<w:ind w:left="${tw(x0 + c.text)}" w:right="${tw(c.r + 0.5)}" w:hanging="${tw(c.text - c.icon)}"/>`,
+            jc: jcOf(b.align),
+            rPr: markXml(b.mark),
+          }),
+          icon + runs(b.runs),
+        ),
+      );
     } else if (b.k === 'p' && b.shade) {
       // A callout: a shaded paragraph, its emoji first, its tint as a border all round that gives it room.
       const tint = b.shade.slice(1).toUpperCase();
@@ -1844,47 +2206,78 @@ export function docxFile(
       body.push(para(`${frame}${spaceXml(b.space ?? { before: 6, after: 10 })}<w:ind w:left="170" w:right="170"/>${jcOf(b.align)}${markXml(b.mark)}`, icon + runs(b.runs)));
     } else if (b.k === 'p') {
       const style = b.style === 'title' ? 'Title' : b.style === 'subtitle' ? 'Subtitle' : b.quote ? 'Quote' : '';
-      body.push(para(`${style ? `<w:pStyle w:val="${style}"/>` : ''}${spaceXml(b.space)}${b.indent ? `<w:ind w:left="${b.indent * 720}"/>` : ''}${jcOf(b.align)}${markXml(b.mark)}`, runs(b.runs)));
-    } else if (b.k === 'li' && b.check)
-      body.push(para(`<w:pStyle w:val="ListParagraph"/>${spaceXml(b.space)}<w:ind w:left="${720 + 360 * b.lvl}" w:hanging="360"/>${jcOf(b.align)}${markXml(b.mark)}`, box(!!b.checked) + runs(b.runs)));
-    else if (b.k === 'li') body.push(para(`<w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="${b.lvl}"/><w:numId w:val="${b.ordered ? numOf(b.list) : 1}"/></w:numPr>${spaceXml(b.space)}${jcOf(b.align)}${markXml(b.mark)}`, runs(b.runs)));
+      // Indented a step (36pt) a level; a quote's own room for its line on the left kept.
+      const left = b.indent ? b.indent * STEP + (b.quote && ed ? ed.quote.indent : 0) : 0;
+      body.push(para(pPrXml({ style, pageBreak, spacing: spaceXml(b.space, style || 'Normal'), ind: left ? `<w:ind w:left="${tw(left)}"/>` : '', jc: jcOf(b.align), rPr: markXml(b.mark) }), runs(b.runs)));
+    } else if (b.k === 'li' && b.check) {
+      const ind = ed ? `<w:ind w:left="${tw(STEP * b.lvl + ed.list.text)}" w:hanging="${tw(ed.list.text)}"/>` : `<w:ind w:left="${720 + 360 * b.lvl}" w:hanging="360"/>`;
+      body.push(para(pPrXml({ style: 'ListParagraph', pageBreak, spacing: spaceXml(b.space, 'ListParagraph'), ind, jc: jcOf(b.align), rPr: markXml(b.mark) }), box(!!b.checked) + runs(b.runs, false, S, editor && !!b.checked)));
+    } else if (b.k === 'li')
+      body.push(
+        para(
+          pPrXml({ style: 'ListParagraph', pageBreak, numPr: `<w:numPr><w:ilvl w:val="${b.lvl}"/><w:numId w:val="${b.ordered ? numOf(b.list) : 1}"/></w:numPr>`, spacing: spaceXml(b.space, 'ListParagraph'), jc: jcOf(b.align), rPr: markXml(b.mark) }),
+          runs(b.runs),
+        ),
+      );
     else if (b.k === 'toc') {
-      // A table of contents as Word keeps one: a field it fills in (with the pages) when it opens the file, and meanwhile
-      // the headings, each a link to its own.
-      const begin = '<w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r><w:r><w:instrText xml:space="preserve"> TOC \\o "1-3" \\h \\z \\u </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>';
+      // A table of contents as Word keeps one: a field it fills in again when asked, and meanwhile the headings, each a
+      // link to its own. A document's lists its headings without page numbers, as the editor does (\n), and is shown as
+      // it is when the file opens; a page's asks Word to fill it in with the pages.
+      const begin = editor
+        ? '<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> TOC \\o "1-3" \\h \\z \\u \\n "1-3" </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+        : '<w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r><w:r><w:instrText xml:space="preserve"> TOC \\o "1-3" \\h \\z \\u </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>';
       const end = '<w:r><w:fldChar w:fldCharType="end"/></w:r>';
-      const tabs = `<w:tabs><w:tab w:val="right" w:leader="dot" w:pos="${textW}"/></w:tabs>`;
-      if (!b.entries.length) body.push(para('<w:pStyle w:val="TOC1"/>', begin + end));
+      const tabs = editor ? '' : `<w:tabs><w:tab w:val="right" w:leader="dot" w:pos="${textW}"/></w:tabs>`;
+      // Its first line's space before and last line's after hold the contents' own (with their lines' padding).
+      const sp = (k: number) => (editor && b.space ? spaceXml({ ...(k === 0 ? { before: b.space.before } : {}), ...(k === b.entries.length - 1 ? { after: b.space.after } : {}) }, 'TOC1') : '');
+      if (!b.entries.length) body.push(para(pPrXml({ style: 'TOC1', pageBreak, spacing: editor ? spaceXml(b.space, 'TOC1') : '' }), begin + end));
       b.entries.forEach((e, k) => {
         const link = `<w:hyperlink w:anchor="${e.anchor}" w:history="1">${runXml({ t: e.text })}</w:hyperlink>`;
-        body.push(para(`<w:pStyle w:val="TOC${Math.min(3, e.lvl)}"/>${tabs}`, (k === 0 ? begin : '') + link + (k === b.entries.length - 1 ? end : '')));
+        body.push(para(pPrXml({ style: `TOC${Math.min(3, e.lvl)}`, pageBreak: pageBreak && k === 0, tabs, spacing: sp(k) }), (k === 0 ? begin : '') + link + (k === b.entries.length - 1 ? end : '')));
       });
     } else if (b.k === 'math') {
       const omml = ommlOf(b.tex);
-      body.push(omml ? para('<w:jc w:val="center"/>', `<m:oMathPara>${omml}</m:oMathPara>`) : para('<w:jc w:val="center"/>', runXml({ t: b.tex, i: true, font: 'Cambria Math' })));
-    }
-    else if (b.k === 'pb') body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
-    else if (b.k === 'pre')
+      namedFonts.add('Cambria Math');
+      const pPr = pPrXml({ keepLines: true, pageBreak, spacing: editor ? spaceXml(b.space) : '', jc: '<w:jc w:val="center"/>' });
+      body.push(omml ? para(pPr, `<m:oMathPara>${mathSized(omml, S * 1.21)}</m:oMathPara>`) : para(pPr, runXml({ t: b.tex, i: true, font: 'Cambria Math' })));
+    } else if (b.k === 'pb') {
+      if (editor) breakNext = true;
+      else body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
+    } else if (b.k === 'pre') {
+      if (editor) namedFonts.add(MONO_DOC);
       body.push(
         para(
-          '<w:pStyle w:val="Code"/>',
+          pPrXml({ style: 'Code', pageBreak, spacing: editor ? spaceXml(b.space, 'Code') : '' }),
           b.text
             .split('\n')
             .map((line, j) => runXml({ t: line, br: j > 0 }))
             .join(''),
         ),
       );
-    else if (b.k === 'hr') body.push(para(`<w:pBdr>${border('bottom', 6, LINE_COLOR, 1)}</w:pBdr><w:spacing w:before="60" w:after="200"/>`, ''));
-    else if (b.k === 'img') body.push(picture(b));
+    } else if (b.k === 'hr') {
+      // A line across: a document's as the editor draws it (half an em above and below it, then its space), a thin
+      // paragraph with its border under it.
+      if (editor) body.push(para(pPrXml({ pageBreak, pBdr: border('bottom', 6, ED.rule, 0), spacing: spacingOf(b.space?.before ?? 0.5 * S, b.space?.after ?? 1.1 * S, { line: 1, rule: 'exact' }), rPr: `<w:rPr>${size(2)}</w:rPr>` }), ''));
+      else body.push(para(`<w:pBdr>${border('bottom', 6, LINE_COLOR, 1)}</w:pBdr><w:spacing w:before="60" w:after="200"/>`, ''));
+    } else if (b.k === 'img') body.push(picture(b, pageBreak));
     else if (b.k === 'table') {
+      if (editor && breakNext) {
+        body.push(tiny({ br: true }));
+        breakNext = false;
+      } else if (editor && d.blocks[i - 1]?.k === 'table') body.push(tiny({ before: Math.max(0, (b.sep ?? 0) - 1) }));
       body.push(table(b));
-      // Two tables in a row would join into one; a document does not end with one.
-      if (i === d.blocks.length - 1 || d.blocks[i + 1].k === 'table') body.push('<w:p/>');
+      // Two tables in a row would join into one (a document's: its next table puts the paragraph between them); a
+      // document does not end with one.
+      if (i === d.blocks.length - 1) body.push(editor ? tiny() : '<w:p/>');
+      else if (!editor && d.blocks[i + 1].k === 'table') body.push('<w:p/>');
     }
   });
+  // A page break that ends the document: an empty page after it, as the editor shows.
+  if (breakNext) body.push(tiny({ pageBreak: true }));
   if (!body.length) body.push('<w:p/>');
 
-  // The header and footer, each a part of its own (an empty one for a title page).
+  // The header and footer, each a part of its own (an empty one for a title page). A document's sit in the middle of
+  // its margins, as the editor and its PDF draw them.
   const extra: ZipPart[] = [];
   const types: [string, string][] = [];
   let refs = '';
@@ -1903,8 +2296,9 @@ export function docxFile(
   if (o.footer) band('footer', o.footer, 'default');
   if (o.titlePage && o.footer) band('footer', undefined, 'first');
   const titlePg = o.titlePage && (o.header || o.footer) ? '<w:titlePg/>' : '';
+  const bandAt = ed ? Math.max(0, Math.round((margin - tw(ed.band.line)) / 2)) : 567;
   const sect =
-    `<w:sectPr>${refs}<w:pgSz w:w="${page.w}" w:h="${page.h}"/><w:pgMar w:top="${margin}" w:right="${margin}" w:bottom="${margin}" w:left="${margin}" w:header="567" w:footer="567" w:gutter="0"/>` +
+    `<w:sectPr>${refs}<w:pgSz w:w="${page.w}" w:h="${page.h}"/><w:pgMar w:top="${margin}" w:right="${margin}" w:bottom="${margin}" w:left="${margin}" w:header="${bandAt}" w:footer="${bandAt}" w:gutter="0"/>` +
     `<w:cols w:space="708"/>${titlePg}<w:docGrid w:linePitch="360"/></w:sectPr>`;
   // Comments, Word's way: each a comment of its own, its replies after it (commentsExtended says whose reply each
   // is, and which threads were resolved).
@@ -1940,6 +2334,17 @@ export function docxFile(
     rel('comments', 'comments.xml');
     rel('http://schemas.microsoft.com/office/2011/relationships/commentsExtended', 'commentsExtended.xml');
   }
+  // A document's fonts: each named in the font table with Word's fallbacks, the faces it uses embedded where they are at hand.
+  let fontsUsed = false;
+  if (editor) {
+    if (cjk) namedFonts.add(EAST_ASIAN);
+    const table = fontTableXml(namedFonts, o.fonts ?? new Map());
+    extra.push({ name: 'word/fontTable.xml', data: table.xml }, ...table.parts);
+    if (table.rels) extra.push({ name: 'word/_rels/fontTable.xml.rels', data: table.rels });
+    types.push(['/word/fontTable.xml', 'fontTable']);
+    rel('fontTable', 'fontTable.xml');
+    fontsUsed = table.parts.length > 0;
+  }
   const document =
     `${XML_HEAD}<w:document xmlns:w="${W_NS}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ` +
     'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
@@ -1948,7 +2353,7 @@ export function docxFile(
     `xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14"><w:body>${body.join('')}${sect}</w:body></w:document>`;
 
   return zipParts([
-    { name: '[Content_Types].xml', data: contentTypes(kinds, types) },
+    { name: '[Content_Types].xml', data: contentTypes(kinds, types, fontsUsed) },
     {
       name: '_rels/.rels',
       data: relsXml([
@@ -1961,9 +2366,9 @@ export function docxFile(
     { name: 'docProps/app.xml', data: APP_XML },
     { name: 'word/document.xml', data: document },
     { name: 'word/_rels/document.xml.rels', data: relsXml(rels) },
-    { name: 'word/styles.xml', data: stylesXml(d.lang, look) },
-    { name: 'word/numbering.xml', data: numberingXml(Math.min(numIds.size, 1000)) },
-    { name: 'word/settings.xml', data: SETTINGS_XML },
+    { name: 'word/styles.xml', data: editor ? editorStylesXml(look, cjk) : stylesXml(d.lang, look) },
+    { name: 'word/numbering.xml', data: numberingXml(Math.min(numIds.size, 1000), editor ? S : undefined) },
+    { name: 'word/settings.xml', data: settingsXml(fontsUsed) },
     ...extra,
     ...media,
   ]);

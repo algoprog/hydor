@@ -348,7 +348,8 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
   const file = docxOfDoc(db, withCm, 'Report');
   const zip = new Zip(file);
   const xml = zip.text('word/document.xml') ?? '';
-  ok(/<w:spacing w:before="240" w:after="0" w:line="480" w:lineRule="auto"\/>/.test(xml), "spacing goes to Word as the paragraph's own");
+  // Two lines of 11pt Arial as the editor draws them (2 × 1.15 × 11pt), at least: Word's own line for Arial is no taller.
+  ok(/<w:spacing w:before="240" w:after="0" w:line="506" w:lineRule="atLeast"\/>/.test(xml), "spacing goes to Word as the paragraph's own, its lines in points");
   ok(xml.includes('w:fill="FCE8E6"') && xml.includes('🔥'), 'a callout is a shaded paragraph with its emoji');
   ok(xml.includes('TOC \\o "1-3"') && /w:anchor="_Toc1"/.test(xml) && /<w:bookmarkStart w:id="\d+" w:name="_Toc1"\/>/.test(xml), 'a table of contents is a field Word fills in, its lines leading to bookmarks');
   ok(xml.includes('<m:oMathPara><m:oMath><m:f>') && xml.includes('<m:oMath>'), "equations are Word's own");

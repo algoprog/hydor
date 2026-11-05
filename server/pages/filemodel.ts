@@ -24,12 +24,13 @@ import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { deletePath, resolvePath, trashCopy, writeFile } from '../files.ts';
 import { getAsset } from './assets.ts';
-import { docFromFile, docxOfDoc, keepDoc, readDoc, wordLosses } from './docs.ts';
+import { docFaces, docFromFile, docxOfDoc, keepDoc, readDoc, wordLosses } from './docs.ts';
 import { projectComments, saveProjectComments } from './filecomments.ts';
 import { pictureFor } from './export.ts';
 import { texCommentOps, texCommentsForAgent, texFolderOk, textOf } from './latex.ts';
 import type { Picture } from './pptx.ts';
 import { decodeText, importBook, keepBook, readBook, xlsxOfBook } from './sheets.ts';
+import { wordFonts } from './word-fonts.ts';
 
 /** The largest file opened in an editor (each editor's model has limits of its own besides). */
 const MAX_FILE = 60 * 1024 * 1024;
@@ -89,7 +90,8 @@ export async function saveFile(db: DB, b: Obj): Promise<FileSaved> {
     const { doc, text } = keepDoc(db, b.model);
     const pics = new Map<string, Picture | null>();
     for (const s of new Set(docSources(doc))) pics.set(s, await pictureFor(db, s));
-    data = docxOfDoc(db, readDoc(text), title, (s) => pics.get(s) ?? null);
+    const kept = readDoc(text);
+    data = docxOfDoc(db, kept, title, (s) => pics.get(s) ?? null, await wordFonts(docFaces(kept)));
   } else {
     const book = readBook(keepBook(b.model).text);
     if (ext === 'xlsx') data = xlsxOfBook(book, title);

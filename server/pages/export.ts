@@ -13,6 +13,7 @@ import { canCapture, printPdf, withTab } from '../capture/index.ts';
 import type { DB } from '../db.ts';
 import { fetchPage } from '../web/fetch.ts';
 import { getAsset, pictureType } from './assets.ts';
+import { docFaces, readDoc } from './docs.ts';
 import { docxOfPage } from './docx.ts';
 import { injectHead, kitHead } from './kit.ts';
 import { imageSize, zipParts } from './ooxml.ts';
@@ -21,6 +22,7 @@ import { mustKind, type ExportFormat, type ExportHelp, type KindDef } from './ki
 import { readDeck } from './slides.ts';
 import { deckPictures, deckRenders } from './slides-render.ts';
 import { mustPage, pageSource, storageMap } from './store.ts';
+import { wordFonts } from './word-fonts.ts';
 
 export type { ExportFormat };
 
@@ -174,12 +176,14 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
       for (const s of new Set(k.sources(src.text))) pics.set(s, await pictureFor(db, s));
     }
     let renders: ExportHelp['renders'];
+    // A document's fonts go inside its Word file (the faces it uses, from Google once).
+    const wordFontsOf = o.format === 'docx' && src.kind === 'doc' ? await wordFonts(docFaces(readDoc(src.text))) : undefined;
     if (o.format === 'pptx') {
       scales = await fitScales(db, k, src.text, title);
       // A deck's icons and equations, as pictures for PowerPoint.
       if (src.kind === 'slides') renders = await deckRenders(readDeck(src.text));
     }
-    return out(await make(db, src.text, title, { picture: (s) => pics.get(s) ?? null, scales, renders }), o.format);
+    return out(await make(db, src.text, title, { picture: (s) => pics.get(s) ?? null, scales, renders, wordFonts: wordFontsOf }), o.format);
   }
 
   if (o.format === 'html') return out(pageFileHtml(src.text), 'html');
