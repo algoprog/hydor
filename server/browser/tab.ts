@@ -476,9 +476,9 @@ export class Tab {
     return { error: 'it is not visible (zero size or off screen)' };
   }
 
-  /** Scrolls an element into view and finds the point to click it, checking nothing covers it. */
-  async point(ref: ElRef): Promise<Point> {
-    const r = await this.rectOf(ref, true);
+  /** Scrolls an element into view (unless it was just now) and finds the point to click it, checking nothing covers it. */
+  async point(ref: ElRef, scroll = true): Promise<Point> {
+    const r = await this.rectOf(ref, scroll);
     if ('error' in r) return r;
     const p = { x: r.x + r.w / 2, y: r.y + r.h / 2 };
     // Something else on top (a cookie banner, a dialog) would take the click.

@@ -147,7 +147,7 @@ async function aimAt(b: SessionBrowser, t: Tab, ref: ElRef, act: PointerAct, mar
   const p = await t.point(ref);
   if ('error' in p) return p;
   if (!(await aim(b, t, { ...p, act }, marks)).glide) return p;
-  const now = await t.point(ref);
+  const now = await t.point(ref, false);
   if ('error' in now || Math.hypot(now.x - p.x, now.y - p.y) <= 2) return now;
   marks.pop();
   await aim(b, t, { ...now, act }, marks);
