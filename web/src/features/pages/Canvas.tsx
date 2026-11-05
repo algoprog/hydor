@@ -158,7 +158,7 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
   // The saved page it is (save_page's, a kept one, or one opened by id). A document, deck, spreadsheet or LaTeX being
   // saved shows the version it changes while its call comes in (the version being written over it: live.ts).
   const modelSave = !!item && /__save_(?:doc|slides|sheet|latex)$/.test(item.tool.name);
-  const pageId = target.kind === 'page' ? target.id : kind === 'save_page' ? (modelSave && item ? savedPageOf(item.tool) : savedRef(item?.tool.output)?.id) : kind === 'show_html' ? kept : undefined;
+  const pageId = target.kind === 'page' ? target.id : kind === 'save_page' ? (modelSave && item ? (savedPageOf(item.tool) ?? draft?.pageId) : savedRef(item?.tool.output)?.id) : kind === 'show_html' ? kept : undefined;
   const loadPage = () => {
     if (!pageId) return;
     api<{ page: PageInfo; html?: string; model?: unknown }>(`/api/pages/${enc(pageId)}`)
@@ -281,8 +281,10 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
   // A document, deck, spreadsheet or LaTeX document being saved: the version being written, over the one it changes
   // (none for a new one, whose editor starts empty).
   const saving = draftKind(draft);
-  const changing = target.kind === 'page' || typeof (item?.tool.input as { id?: unknown } | undefined)?.id === 'string';
-  const fresh = !!saving && !changing && !loaded;
+  const changing = target.kind === 'page' || (!!draft?.pageId && !draft.saved) || typeof (item?.tool.input as { id?: unknown } | undefined)?.id === 'string';
+  // A new one's editor once the call says more than a title (before that, an id may still come: the page it changes).
+  const begun = !!draft && (draft.done || /"(?!(?:id|title)")\w+"\s*:/.test(draft.text));
+  const fresh = !!saving && !changing && !loaded && begun;
   const liveKind = loaded?.kind && loaded.kind !== 'notebook' ? loaded.kind : fresh ? saving : null;
   const live = useLiveDraft(liveKind, fresh ? null : loaded?.model?.model, fresh ? undefined : loaded?.version, draft);
   useEffect(() => {

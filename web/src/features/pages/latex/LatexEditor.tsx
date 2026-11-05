@@ -528,10 +528,15 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       setFile(mark.file);
     }
   }, [mark?.file]);
+  // The version it was shown over: when another comes in its place (the agent's, saved), the files mount again with it,
+  // the agent's text shown until then (not the old one for a moment).
+  const liveOver = useRef<string | undefined>(undefined);
   useEffect(() => {
+    if (liveTex) liveOver.current = doc?.key;
+    const saved = !liveTex && liveOver.current !== undefined && liveOver.current !== doc?.key;
     for (const [name, c] of codes.current) {
-      if (!liveTex) c.setLive(null);
-      else c.setLive(textIn(liveTex, name), mark?.file === name ? mark.at : undefined, !ownScroll());
+      if (liveTex) c.setLive(textIn(liveTex, name), mark?.file === name ? mark.at : undefined, !ownScroll());
+      else if (!saved) c.setLive(null);
     }
   }, [liveTex, made, epoch]);
   useEffect(() => {

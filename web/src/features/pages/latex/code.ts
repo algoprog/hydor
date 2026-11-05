@@ -323,8 +323,9 @@ function differs(a: string, b: string): { from: number; to: number; insert: stri
 
 export async function mountCode(parent: HTMLElement, o: { text: string; name: string; dark: boolean; phone: boolean; readOnly?: boolean; visual?: boolean; spell?: boolean; hooks: CodeHooks }): Promise<Code> {
   const hooks = o.hooks;
-  // The file's own text while an agent's version shows in its place (setLive), else null.
-  let own: string | null = null;
+  // The file as it was while an agent's version shows in its place (setLive), else null: brought back whole when that
+  // version is not kept (its comments' places, tracked changes and undo with it, which the agent's text would move).
+  let own: EditorState | null = null;
   const handle = await createEditor(parent, { doc: o.text, path: pathFor(o.name), dark: o.dark, wrap: true, phone: o.phone, readOnly: o.readOnly, onChange: (d) => own === null && hooks.onChange(d), onSave: () => hooks.onSave() });
   const view = handle.view;
   const tex = isTex(o.name);
@@ -662,12 +663,14 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
       const quiet = [Transaction.addToHistory.of(false), untracked.of(true), loaded.of(true)];
       if (text === null) {
         if (own === null) return;
-        const d = differs(view.state.doc.toString(), own);
-        view.dispatch({ changes: d ?? [], annotations: quiet, effects: [agentAt.of(null), liveC.reconfigure([])] });
+        const was = own;
+        const line = view.state.doc.lineAt(view.lineBlockAtHeight(view.scrollDOM.scrollTop).from).number;
         own = null;
+        view.setState(was);
+        view.dispatch({ effects: EditorView.scrollIntoView(was.doc.line(Math.min(line, was.doc.lines)).from, { y: 'start' }) });
         return;
       }
-      if (own === null) own = view.state.doc.toString();
+      if (own === null) own = view.state;
       const d = differs(view.state.doc.toString(), text);
       const where = at !== undefined && at >= 0 ? Math.min(at, text.length) : null;
       view.dispatch({

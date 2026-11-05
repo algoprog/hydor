@@ -231,9 +231,13 @@ export function SlidesEditor({
     setDeck(n);
   };
   const [saved, setSaved] = useState<Deck | null>(doc?.model ?? null);
+  const [editing, setEditing] = useState<string | null>(null);
+  /** A comment being written (on a part of the slide, or the slide). */
+  const [adding, setAdding] = useState<{ el?: string } | null>(null);
   // An agent's version being written shows in place of the deck (read-only, the slide being written in view), unless
-  // there are changes here not saved: those are left as they are. The deck itself stays as it is underneath.
-  const liveDeck = agent && !(!!own && own !== saved) ? agent.model : null;
+  // there are changes here not saved: those are left as they are. Words being typed here (in a text box or a comment)
+  // hold it back until they are done. The deck itself stays as it is underneath.
+  const liveDeck = agent && !editing && !adding && !(!!own && own !== saved) ? agent.model : null;
   const liveOn = !!liveDeck;
   const deck = liveDeck ?? own;
   const readOnly = !!readOnlyProp || liveOn;
@@ -241,7 +245,6 @@ export function SlidesEditor({
   const [cur, setCur] = useState(0);
   const [sel, setSel] = useState<string[]>([]);
   const [scope, setScope] = useState<string[]>([]);
-  const [editing, setEditing] = useState<string | null>(null);
   const [tab, setTab] = useState<InspectorTab>('format');
   const [view, setView] = useState<'edit' | 'grid'>('edit');
   const [present, setPresent] = useState<{ from: number; presenter: boolean } | null>(startPresent ? { from: 0, presenter: false } : null);
@@ -262,8 +265,7 @@ export function SlidesEditor({
   const [videoUrl, setVideoUrl] = useState('');
   /** A video from this device on its way to the app: how much of it went (0–1), shown over the slide. */
   const [sending, setSending] = useState<number | null>(null);
-  /** A comment being written (on a part of the slide, or the slide), and the thread picked in the Comments tab. */
-  const [adding, setAdding] = useState<{ el?: string } | null>(null);
+  /** The thread picked in the Comments tab. */
   const [activeComment, setActiveComment] = useState<string | null>(null);
   const [footerOpen, setFooterOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
@@ -304,8 +306,9 @@ export function SlidesEditor({
     localStorage.setItem(RULERS_KEY, on ? '1' : '0');
   };
 
-  // Another deck, or the agent's new version while nothing was changed here: start from it.
-  useEffect(() => {
+  // Another deck, or the agent's new version while nothing was changed here: start from it (before it is drawn, so the
+  // one it replaces never shows again for a moment).
+  useLayoutEffect(() => {
     if (!doc) return;
     if (dirtyRef.current) return;
     setD(doc.model);
@@ -332,9 +335,7 @@ export function SlidesEditor({
     setCur(mark.slide);
   }, [mark?.slide, agent?.n]);
   useEffect(() => {
-    if (!liveOn) return;
-    canvas.current?.stopEditing();
-    setSel([]);
+    if (liveOn) setSel([]);
   }, [liveOn]);
   // Another slide: out of any group, no cells or crop.
   useEffect(() => {
