@@ -237,7 +237,7 @@ export function FolderTile({ folder, count, folders, topName, onOpen }: { folder
     try {
       await patch(`/api/pages/folders/${enc(folder.id)}`, { space });
       const name = spaces?.find((s) => s.id === space)?.name;
-      toast(name ? tr(`Moved to ${name}, with what is in it`) : 'Moved out of its project, with what is in it', 'ok');
+      toast(name ? tr(`Moved to “${name}”, with what is in it`) : 'Moved out of its project, with what is in it', 'ok');
     } catch (e) {
       toastError(e);
     }
