@@ -8,13 +8,14 @@
 // line. Visual mode (visual.ts) shows the source as a document, and Check spelling has the browser check its words
 // (spell.ts). The typesetting's errors and warnings are marked at their lines, and what is sure to fail
 // (a \begin without its \end, a brace or a $ left open: shared/latex-check.ts) where it is, a moment after typing.
+// While an agent writes a new version of the file, that shows in its place read-only, with the agent's caret (setLive).
 import { autocompletion, closeCompletion, completionStatus, snippet, startCompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
 import { redo, selectAll, toggleComment, undo } from '@codemirror/commands';
 import { foldAll, indentUnit, unfoldAll } from '@codemirror/language';
 import { gotoLine } from '@codemirror/search';
 import { lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint';
-import { Compartment, EditorSelection, EditorState, Prec, StateEffect, StateField } from '@codemirror/state';
-import { Decoration, EditorView, keymap, type DecorationSet } from '@codemirror/view';
+import { Compartment, EditorSelection, EditorState, Prec, StateEffect, StateField, Transaction } from '@codemirror/state';
+import { Decoration, EditorView, keymap, WidgetType, type DecorationSet } from '@codemirror/view';
 import { texCheck } from '@shared/latex-check';
 import { tr } from '../../../i18n/runtime';
 import { createEditor, type EditorHandle } from '../../../lib/codemirror';
@@ -23,7 +24,7 @@ import { texFolding } from './fold';
 import { mathPreview } from './mathpreview';
 import { braced, inMathAt } from './scan';
 import { spellCheck } from './spell';
-import { acceptTracked, loaded, loadTracked, pickTracked, rejectTracked, trackChanges, trackedNow, trackField, type Tracked } from './track';
+import { acceptTracked, loaded, loadTracked, pickTracked, rejectTracked, trackChanges, trackedNow, trackField, untracked, type Tracked } from './track';
 import { visualMode } from './visual';
 
 /** What the document offers to complete with. */
@@ -130,6 +131,12 @@ export interface Code {
   pickChange: (id: string | null) => void;
   foldAll: () => void;
   unfoldAll: () => void;
+  /**
+   * An agent's version of the file shown in place of its text (live.ts), read-only, a caret where its words arrive at
+   * `at` (kept in view when `follow`); null: the file's own text again. The text underneath stays as it was: nothing
+   * of the agent's is reported as typed, tracked or undone.
+   */
+  setLive: (text: string | null, at?: number, follow?: boolean) => void;
   goto: (line: number) => void;
   focus: () => void;
   destroy: () => void;
@@ -250,13 +257,77 @@ const phoneList = [
 /** The commands Clear formatting takes away. */
 const FORMATS = /\\(textbf|textit|textsl|emph|underline|uline|texttt|textsc|textsf|textrm|textsuperscript|textsubscript|textnormal)\s*\{/g;
 
+// ---- an agent writing the file -------------------------------------------------------------------------------------
+
+/** Where an agent's words are arriving (null: none). */
+const agentAt = StateEffect.define<number | null>();
+
+class AgentCaret extends WidgetType {
+  toDOM() {
+    const s = document.createElement('span');
+    s.className = 'cm-agent';
+    s.setAttribute('aria-hidden', 'true');
+    const flag = document.createElement('span');
+    flag.className = 'cm-agent-flag';
+    flag.textContent = tr('Agent');
+    s.appendChild(flag);
+    return s;
+  }
+  eq() {
+    return true;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
+
+const agentField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, t) {
+    for (const e of t.effects) if (e.is(agentAt)) return e.value === null ? Decoration.none : Decoration.set([Decoration.widget({ widget: new AgentCaret(), side: 1 }).range(Math.min(e.value, t.state.doc.length))]);
+    return deco.map(t.changes);
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+// The app's busy colour, as an agent at work shows elsewhere; a flag with its name over the caret, as a collaborator's.
+const agentTheme = EditorView.baseTheme({
+  '.cm-agent': { position: 'relative', borderLeft: '2px solid var(--busy)', marginLeft: '-1px', marginRight: '-1px' },
+  '.cm-agent-flag': {
+    position: 'absolute',
+    bottom: '100%',
+    left: '-2px',
+    background: 'var(--busy)',
+    color: 'var(--bg)',
+    font: '600 10px/14px system-ui, sans-serif',
+    padding: '0 4px',
+    borderRadius: '3px',
+    whiteSpace: 'nowrap',
+    pointerEvents: 'none',
+  },
+});
+
+/** The part of `a` that differs from `b`: what goes in its place (null: the same). */
+function differs(a: string, b: string): { from: number; to: number; insert: string } | null {
+  if (a === b) return null;
+  let i = 0;
+  const n = Math.min(a.length, b.length);
+  while (i < n && a.charCodeAt(i) === b.charCodeAt(i)) i++;
+  let j = 0;
+  while (j < n - i && a.charCodeAt(a.length - 1 - j) === b.charCodeAt(b.length - 1 - j)) j++;
+  return { from: i, to: a.length - j, insert: b.slice(i, b.length - j) };
+}
+
 export async function mountCode(parent: HTMLElement, o: { text: string; name: string; dark: boolean; phone: boolean; readOnly?: boolean; visual?: boolean; spell?: boolean; hooks: CodeHooks }): Promise<Code> {
   const hooks = o.hooks;
-  const handle = await createEditor(parent, { doc: o.text, path: pathFor(o.name), dark: o.dark, wrap: true, phone: o.phone, readOnly: o.readOnly, onChange: (d) => hooks.onChange(d), onSave: () => hooks.onSave() });
+  // The file's own text while an agent's version shows in its place (setLive), else null.
+  let own: string | null = null;
+  const handle = await createEditor(parent, { doc: o.text, path: pathFor(o.name), dark: o.dark, wrap: true, phone: o.phone, readOnly: o.readOnly, onChange: (d) => own === null && hooks.onChange(d), onSave: () => hooks.onSave() });
   const view = handle.view;
   const tex = isTex(o.name);
   const visualC = new Compartment();
   const spellC = new Compartment();
+  const liveC = new Compartment();
   const track = trackChanges();
   const visualExt = () => visualMode({ macros: hooks.macros, picture: hooks.picture });
 
@@ -446,7 +517,12 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     tex ? [texFolding, mathPreview(hooks.macros)] : [],
     visualC.of(o.visual && tex ? visualExt() : []),
     spellC.of(o.spell ? spellCheck : []),
+    liveC.of([]),
+    agentField,
+    agentTheme,
     EditorView.updateListener.of((u) => {
+      // An agent's version on show moves nothing of the file's own (its comments, its problems).
+      if (own !== null) return;
       if (u.docChanged) {
         const list = u.state.field(commentField).list;
         if (list.length) hooks.onCommentsMoved(list);
@@ -578,6 +654,28 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     unfoldAll: () => {
       unfoldAll(view);
       view.focus();
+    },
+    setLive: (text, at, follow) => {
+      const quiet = [Transaction.addToHistory.of(false), untracked.of(true), loaded.of(true)];
+      if (text === null) {
+        if (own === null) return;
+        const d = differs(view.state.doc.toString(), own);
+        view.dispatch({ changes: d ?? [], annotations: quiet, effects: [agentAt.of(null), liveC.reconfigure([])] });
+        own = null;
+        return;
+      }
+      if (own === null) own = view.state.doc.toString();
+      const d = differs(view.state.doc.toString(), text);
+      const where = at !== undefined && at >= 0 ? Math.min(at, text.length) : null;
+      view.dispatch({
+        changes: d ?? [],
+        annotations: quiet,
+        effects: [
+          liveC.reconfigure([EditorState.readOnly.of(true), EditorView.editable.of(false)]),
+          agentAt.of(where),
+          ...(follow && where !== null ? [EditorView.scrollIntoView(where, { y: 'nearest', yMargin: 96 })] : []),
+        ],
+      });
     },
     goto: (line) => handle.gotoLine(line),
     focus: () => view.focus(),

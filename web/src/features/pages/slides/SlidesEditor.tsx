@@ -5,7 +5,8 @@
 // charts, the format painter, how words look); a side panel for the part picked, the animations, the slide and the
 // theme (Inspector); speaker notes under the slide; Find and replace across the slides and notes; every slide at once
 // (Grid); and Present: the slideshow, or the presenter's view with the audience's window. Changes stay unsaved until
-// Save (Ctrl+S), as a page's do; Undo and Redo go back and forth.
+// Save (Ctrl+S), as a page's do; Undo and Redo go back and forth. While an agent writes a new version (live.ts), it
+// shows as it comes, read-only: the slide being written on view, a box round the part its words arrive in.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ChevronDown,

@@ -9,6 +9,8 @@
 // arXiv id or title, folding, spelling, a word count, versions compared, the pages presented. An outline goes to a
 // section, a double click on a page goes to its source and Show in the PDF the other way. On a phone, Source and
 // Preview are two tabs and the menus are behind one button. Changes stay unsaved until Save (Ctrl+S), as a page's do.
+// While an agent writes a new version (live.ts), its source shows as it comes, read-only, with the agent's caret where
+// its words arrive (the file it writes brought into view); it is typeset once it is saved.
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
@@ -91,6 +93,7 @@ import { FindBar, useFind } from '../common/FindBar';
 import { MenuBar, type MenuDef, type MenuEntry } from '../common/menus';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
+import { useOwnScroll } from '../live';
 import { addFileFromDevice, addPicture, assetUrl, chooseFiles, FILE_ACCEPT, freeName, pdfUrl, PICTURE_ACCEPT, placeOf, texSetup, typeset } from './api';
 import { ChangesList } from './ChangesList';
 import { mountCode, type Code } from './code';
@@ -243,7 +246,7 @@ function scopesFor(file: string, cursor: Cursor, heading: TexHeading | null): As
   return out;
 }
 
-export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, file: onDisk }: ModelEditorProps<TexDoc>) {
+export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, file: onDisk, live: agent }: ModelEditorProps<TexDoc>) {
   const [model, setModel] = useState<TexDoc | null>(doc?.model ?? null);
   // The model as the latest change left it (changes made before it is drawn again build on it).
   const live = useRef<TexDoc | null>(model);
@@ -336,7 +339,12 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   }, [!model]);
   const wide = width >= 900 && layout !== 'sheet';
   const roomy = width >= 640;
-  const dirty = !!model && model !== saved && !readOnly;
+  const dirty = !!model && model !== saved && !readOnlyProp;
+  // An agent's version being written shows in place of the source (read-only, its words arriving where its caret is;
+  // typeset once it is saved), unless there are changes here not saved: those are left as they are.
+  const liveTex = agent && !dirty ? agent.model : null;
+  const liveOn = !!liveTex;
+  const readOnly = !!readOnlyProp || liveOn;
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
   useEffect(() => {
@@ -443,7 +451,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         name,
         dark: isDark(),
         phone: matchMedia('(pointer: coarse)').matches,
-        readOnly,
+        // Its own setting: an agent's version shows read-only by itself (setLive), and the file is editable after.
+        readOnly: !!readOnlyProp,
         hooks: {
           onChange: (text) => change((d) => withText(d, name, text)),
           onSave: () => void saveRef.current(),
@@ -498,6 +507,24 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   });
   const epochRef = useRef(epoch);
   epochRef.current = epoch;
+
+  // The agent's version as it comes, in each file open (its caret in the file being written, brought into view unless
+  // a file was picked or the source scrolled here lately); each file's own text again once it is saved, or failed.
+  const pickedAt = useRef(0);
+  const ownScroll = useOwnScroll(root);
+  const mark = liveOn && agent?.mark?.kind === 'tex' ? agent.mark : null;
+  useEffect(() => {
+    if (mark && mark.file !== file && performance.now() - pickedAt.current > 4000 && (mark.file === TEX_MAIN || model?.files.some((f) => f.name === mark.file))) {
+      if (!opened.includes(mark.file)) setOpened((o) => [...o, mark.file]);
+      setFile(mark.file);
+    }
+  }, [mark?.file]);
+  useEffect(() => {
+    for (const [name, c] of codes.current) {
+      if (!liveTex) c.setLive(null);
+      else c.setLive(textIn(liveTex, name), mark?.file === name ? mark.at : undefined, !ownScroll());
+    }
+  }, [liveTex, made, epoch]);
   useEffect(() => {
     const mo = new MutationObserver(() => {
       for (const c of codes.current.values()) c.handle.setDark(isDark());
@@ -508,6 +535,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   }, []);
 
   const open = (name: string) => {
+    pickedAt.current = performance.now();
     if (name !== PICTURES) {
       if (!opened.includes(name)) setOpened((o) => [...o, name]);
       if (/\.(tex|ltx)$/i.test(name)) lastTex.current = name;
@@ -1553,7 +1581,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
       },
   ] as (RowTool | false)[]).filter((t): t is RowTool => !!t);
   const toolbar = (
-    <div className="flex h-11 shrink-0 items-center border-b border-line bg-panel px-2">
+    // While an agent's version shows, the toolbar stays where it is, out of use.
+    <div inert={liveOn} className={cx('flex h-11 shrink-0 items-center border-b border-line bg-panel px-2', liveOn && 'opacity-45')}>
       <ToolRow tools={tools} className="flex-1" />
     </div>
   );

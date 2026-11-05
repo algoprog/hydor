@@ -10,7 +10,7 @@
 // rulers give guides: drag one out of a ruler, drag it back to take it away; zoomed in, they stay at the view's edges.
 // The slide itself is drawn by the runtime as it shows anywhere; this draws what is picked over it, and moves parts
 // while they are dragged without drawing the slide again. The marks of the slide's comments sit over it, at their
-// parts' corners (the editor's alone).
+// parts' corners (the editor's alone), and, while an agent writes the slide, a box round the part its words arrive in.
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { elbowPoints, everyEl, reconnect, scaleEls, SIDES, sidePoint, turnedBox, type Crop, type Deck, type El, type GroupEl, type ImageEl, type LineEl, type Para, type Slide, type Stick, type TableEl, type TextProps } from '@shared/slides';
 import { MessageSquare } from 'lucide-react';
