@@ -2,9 +2,11 @@
 // on each, who made it and when. This branch's history or every branch's; a search finds commits by words in
 // their message, their author or their hash; more load on asking. A commit opens beside the list (on its own
 // page on a phone): its whole message, author, date and hash, the files it changed with their diffs, and what
-// can be done with it: explain it, revert it, start a branch or a tag there, or undo it while no remote has it.
+// can be done with it: explain it, revert it, start a branch or a tag there, undo it while no remote has it, or
+// find what broke something since it (Find what broke it, also beside the search).
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Copy, Ellipsis, GitBranchPlus, GitCommitHorizontal, History, RotateCcw, Search, Sparkles, Tag, Undo2, X } from 'lucide-react';
+import { useSearch } from 'wouter';
+import { ChevronDown, Copy, Ellipsis, GitBranchPlus, GitCommitHorizontal, History, RotateCcw, Search, SearchCode, Sparkles, Tag, Undo2, X } from 'lucide-react';
 import type { GitActionResult, GitCommitDetail, GitLogCommit } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
@@ -16,6 +18,7 @@ import { switchTo } from './BranchSwitcher';
 import { GraphCell, layout } from './graph';
 import type { RepoCtx } from './RepoView';
 import { askAgent, BackBar, ChangedFiles, copyText, DiffLayoutSwitch, filesN, NameDialog, RefChip, short, SPLIT_MIN, useDiffLayout, usePref, useWidth } from './parts';
+import { BisectDialog } from './BisectDialog';
 
 type Scope = 'branch' | 'all';
 const PAGE = 100;
@@ -71,11 +74,21 @@ export function HistoryTab({ ctx }: { ctx: RepoCtx }) {
   const local = useMemo(() => new Set(repo.toPush.map((c) => c.hash)), [repo.toPush]);
   const shown = sel.c ?? (wide ? list[0]?.hash : null);
   const stale = !!data && data.key !== key;
+  // Find what broke it: from a commit (where it last worked), from the button beside the search, or from the search box (?bisect=1).
+  const [bisect, setBisect] = useState<{ good?: string } | null>(null);
+  const asked = new URLSearchParams(useSearch()).has('bisect');
+  useEffect(() => {
+    if (!asked) return;
+    setBisect({});
+    open({});
+  }, [asked]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bisectDialog = <BisectDialog repo={repo} open={!!bisect} good={bisect?.good} onClose={() => setBisect(null)} />;
 
   if (!wide && sel.c)
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <CommitView ctx={ctx} hash={sel.c} onBack={() => open({ c: null })} />
+        <CommitView ctx={ctx} hash={sel.c} onBack={() => open({ c: null })} onBisect={(good) => setBisect({ good })} />
+        {bisectDialog}
       </div>
     );
 
@@ -118,6 +131,9 @@ export function HistoryTab({ ctx }: { ctx: RepoCtx }) {
             All branches
           </MenuItem>
         </Popover>
+        <IconButton label="Find what broke it" onClick={() => setBisect({})} className="max-md:size-10">
+          <SearchCode size={15} />
+        </IconButton>
       </div>
       <div className={cx('@container min-h-0 flex-1 overflow-y-auto', stale && 'opacity-60')}>
         {!data ? (
@@ -149,11 +165,18 @@ export function HistoryTab({ ctx }: { ctx: RepoCtx }) {
       </div>
     </div>
   );
-  if (!wide) return listPane;
+  if (!wide)
+    return (
+      <>
+        {listPane}
+        {bisectDialog}
+      </>
+    );
   return (
     <div className="flex h-full min-h-0">
       <div className="w-[46%] max-w-[600px] min-w-[300px] shrink-0 border-r border-line">{listPane}</div>
-      <div className="flex min-w-0 flex-1 flex-col">{shown ? <CommitView key={shown} ctx={ctx} hash={shown} /> : null}</div>
+      <div className="flex min-w-0 flex-1 flex-col">{shown ? <CommitView key={shown} ctx={ctx} hash={shown} onBisect={(good) => setBisect({ good })} /> : null}</div>
+      {bisectDialog}
     </div>
   );
 }
@@ -226,7 +249,7 @@ const CommitRow = memo(function CommitRow({
 });
 
 /** A commit: its message, who and when, its hash, the files it changed, and what can be done with it. */
-function CommitView({ ctx, hash, onBack }: { ctx: RepoCtx; hash: string; onBack?: () => void }) {
+function CommitView({ ctx, hash, onBack, onBisect }: { ctx: RepoCtx; hash: string; onBack?: () => void; onBisect: (good: string) => void }) {
   const { repo, apply, confirm, wide, open } = ctx;
   const [d, setD] = useState<GitCommitDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -323,6 +346,9 @@ function CommitView({ ctx, hash, onBack }: { ctx: RepoCtx; hash: string; onBack?
               </MenuItem>
               <MenuItem icon={<Copy size={14} />} onClick={() => (close(), copyText(d.hash, 'Copied the hash'))}>
                 Copy hash
+              </MenuItem>
+              <MenuItem icon={<SearchCode size={14} />} onClick={() => (close(), onBisect(d.refs.find((r) => r.kind === 'tag')?.name ?? d.hash.slice(0, 10)))}>
+                Find what broke it
               </MenuItem>
               <MenuSep />
               <MenuItem icon={<GitBranchPlus size={14} />} onClick={() => (close(), setDialog('branch'))}>
