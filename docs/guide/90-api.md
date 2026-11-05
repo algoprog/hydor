@@ -287,7 +287,7 @@ Agents see the computer's screen and use its mouse and keyboard with their own t
 
 ## Documents
 
-- None for agents: every `/api/documents*` route serves the file viewer's previews (see Not for agents). Agents read documents with their own document tool, and make them with the app's document skills.
+- None for agents: every `/api/documents*` route serves the file viewer's previews, and every `/api/pdf/*` route Files' Fill & sign (see Not for agents). Agents read documents with their own document tool, make them with the app's document skills, and see, fill in, write on and change PDFs with their own PDF tools (pdf_look, pdf_form, pdf_fill, pdf_write, pdf_pages).
 
 ## Images, videos and audio
 
@@ -763,6 +763,9 @@ These routes serve the app’s own pages, need the user’s browser, or are the 
 - `GET /api/documents/preview?path=` — reads a file's contents for the file viewer.
 - `POST /api/documents/pages` — has LibreOffice lay an Office file out as pages for the viewer.
 - `GET /api/documents/pages.pdf` — sends that PDF file itself (raw file).
+- `GET /api/pdf/info?path=` — a PDF's pages, form fields (each with its kind, value, choices, the words printed beside it and its boxes) and protections, for Files' **Fill & sign**. Agents use pdf_form and pdf_look.
+- `GET /api/pdf/page?path=&page=&width=&fields=0` — a page of a PDF as a picture (raw PNG), without its form's fields with `fields=0` (Fill & sign draws its own over it).
+- `POST /api/pdf/save` — Fill & sign's **Save**: the fields filled and what was placed on the pages (text, ticks, crosses, signatures), written as a copy beside the file or over it (its old version to the Trash). Agents use pdf_fill and pdf_write, and their signature tool.
 - `GET /api/pages/:id/export` — sends a page, deck, document, spreadsheet, LaTeX document or notebook as a file itself (PDF, Word, PowerPoint, Excel, CSV, Markdown, LaTeX, a notebook (.ipynb), a Python script (.py) or a web page; the **Export** menu), or a deck's slides as pictures (`format=png`: a zip of the slides the slideshow shows, or with `slide=<number>` that slide alone as a PNG). Agents make the file with their export_page tool, which writes it where they can hand it over with present_files.
 - `POST /api/pages/docs/print` — a document as it prints, changes not yet saved included (the editor's **Tools → Print**). Body: `{ model: object — the document, as save_doc takes it, title: string — its name }`. Returns: `{ html }`, its pages with their header, footer and page numbers.
 - `GET /api/pages/assets/:sha`, `GET /api/pages/picture`, `GET /api/pages/fonts.css`, `GET /api/pages/fonts/*` — the pictures and Google fonts the slides and document editors show, and the pictures from the web in agents' replies (`/api/pages/picture?url=`: fetched by this server, public addresses only, and remembered for a while), served as they are (raw files).
