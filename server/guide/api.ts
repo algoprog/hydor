@@ -34,6 +34,9 @@ const RULES: Rule[] = [
   ['W', /^\/api\/(access-tokens|mcp\/tokens)$/, 'refuse', 'Tokens are made by the user in Settings, so their value never passes through an agent. Tell them where: Settings → App → Machines (access from other machines) or Connect other agents.'],
   ['POST', /^\/api\/apps\/[^/]+\/keys$/, 'refuse', 'An app’s API keys are made by the user, on its Share tab.'],
   ['POST|PATCH', /^\/api\/connections\/secrets/, 'refuse', 'A key’s value never passes through an agent: ask for it with request_secret, and the user enters it in a card.'],
+  // A signature is the user's own: agents list them by name, and place one with place_signature, which the user allows on a card.
+  ['*', /^\/api\/signatures\/./, 'refuse', 'A signature is the user’s own: you never see its picture, and only the user changes or deletes one (Settings → App → Signatures). Ask them to draw one with ask_signature, and place one by name with place_signature (they allow each placement on a card).'],
+  ['W', /^\/api\/signatures$/, 'refuse', 'Only the user draws their signature: ask for one with ask_signature, which shows them a card to draw it on.'],
   ['POST', /^\/api\/apps\/[^/]+\/secrets$/, 'refuse', 'A key’s value never passes through an agent: the user gives the keys an app needs on its page, its install card, or its card in a session (use_app shows it).'],
   ['*', /^\/api\/accounts\/[^/]+\/(login|logout)/, 'refuse', 'Signing in and out of an agent’s account is the user’s to do, in Settings → Agents → Accounts.'],
   ['W', /^\/api\/budget\//, 'refuse', 'Spending caps are the user’s to set: the session’s menu → Spending cap, or Options on the start page.'],
