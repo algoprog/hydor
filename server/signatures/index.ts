@@ -7,9 +7,12 @@
 //   GET /api/signatures                 the saved signatures (names, kinds and sizes; never their pictures)
 //   GET /api/signatures/:id/image       one's picture (PNG, see-through), for the app's own pages
 //   POST /api/signatures                keeps a new one; PATCH /api/signatures/:id changes one; DELETE removes it
+//   POST /api/signatures/:id/asset      one put into a document of the Library: kept as one of its pictures
 import { HttpError } from '../auth.ts';
 import type { Deps, Feature } from '../features/types.ts';
-import { addSignature, changeSignature, deleteSignature, findSignature, listSignatures, pictureBytes, signatureImage, signatureTables } from './store.ts';
+import { ASSET } from '../../shared/docs.ts';
+import { putAsset } from '../pages/assets.ts';
+import { addSignature, changeSignature, deleteSignature, findSignature, listSignatures, pictureBytes, signatureImage, signatureTables, touchSignature } from './store.ts';
 import { SIGNATURE_FOR_NOW_MS } from '../../shared/signatures.ts';
 
 /** Pictures come as base64 in JSON: a little over 4 MB of PNG. */
@@ -50,6 +53,15 @@ function routes(d: Deps) {
     const s = changeSignature(db, own(P(req).id).id, { name: b.name, kind: b.kind, png: b.image === undefined ? undefined : pictureBytes(b.image), keep: b.keep === true });
     changed();
     return { signature: s };
+  });
+  // Into a document of the Library (Insert → Signature): kept as one of its pictures, which the document shows from then on.
+  app.post('/api/signatures/:id/asset', async (req) => {
+    const pic = await signatureImage(db, own(P(req).id).id);
+    if (!pic) throw new HttpError(404, 'There is no such signature');
+    const src = `${ASSET}${putAsset(db, pic.png)}`;
+    touchSignature(db, pic.signature.id);
+    changed();
+    return { src, width: pic.width, height: pic.height };
   });
   app.delete('/api/signatures/:id', async (req) => {
     deleteSignature(db, own(P(req).id).id);
