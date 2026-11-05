@@ -1,10 +1,12 @@
 // The spreadsheet editor's tools as plain functions, each giving the changes it makes (ops.ts turns them into a
 // patch, one step of Undo): borders over a selection, merging cells, hiding and showing rows and columns, Paste
 // special (values, formats or formulas only, or turned on its side), the data tools (remove duplicates, split text to
-// columns, trim spaces), sorting by several columns, and finding words in the cells and putting others in their place.
+// columns, trim spaces, a summary of a table as a sheet of formulas), sorting by several columns, and finding words in
+// the cells and putting others in their place.
 import { findIn, replaceAllIn, replacementOf, type FindOptions, type Match } from '../common/find';
-import { formatValue, inputText, parseInput, rangeName, refName, shiftFormula, typedCell, type Calc, type Cell, type Rect, type Scalar, type Sheet, type Workbook } from '@shared/sheets';
+import { colName, formatValue, inputText, parseInput, quoteSheet, rangeName, refName, shiftFormula, typedCell, type Calc, type Cell, type Rect, type Scalar, type Sheet, type Workbook } from '@shared/sheets';
 import { Merges } from '@shared/sheet-rules';
+import { tr } from '../../../i18n/runtime';
 import { cellsIn, holds, tidyCell, withStyle, type Clip } from './ops';
 
 // ---- borders ------------------------------------------------------------------------------------------------------
@@ -336,6 +338,100 @@ export function sortByKeys(sh: Sheet, calc: Calc, si: number, x: Rect, keys: { c
     });
   });
   return out;
+}
+
+// ---- summarize by ---------------------------------------------------------------------------------------------------------
+
+export type SummaryFn = 'sum' | 'count' | 'average' | 'min' | 'max';
+const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const SUMMARY_FNS: Record<SummaryFn, { ifs: string; whole: string }> = {
+  sum: { ifs: 'SUMIFS', whole: 'SUM' },
+  count: { ifs: 'COUNTIFS', whole: 'COUNTA' },
+  average: { ifs: 'AVERAGEIFS', whole: 'AVERAGE' },
+  min: { ifs: 'MINIFS', whole: 'MIN' },
+  max: { ifs: 'MAXIFS', whole: 'MAX' },
+};
+
+/**
+ * A summary of a table, as a pivot table gives one but made of formulas that keep up with the table: a row for each
+ * value of one column (and a column for each value of another, when asked), each value column summed, counted,
+ * averaged or its lowest or highest, and a total. The table's first row is its header; its columns are read whole when
+ * it starts at the sheet's top, so rows added under it count too.
+ */
+export function summarySheet(sh: Sheet, calc: Calc, si: number, x: Rect, by: number, across: number | null, values: { c: number; fn: SummaryFn }[], name: string): Sheet {
+  const cells: Record<string, Cell> = {};
+  const head = (c: number) => formatValue(calc.value(si, x.r1, c), sh.cells[refName(x.r1, c)]?.s) || colName(c);
+  const whole = x.r1 === 0;
+  const ref = (c: number) => `${quoteSheet(sh.name)}!$${colName(c)}${whole ? '' : `$${x.r1 + 2}`}:$${colName(c)}${whole ? '' : `$${x.r2 + 1}`}`;
+  // The values a column has, once each, in order: numbers by size, words A to Z.
+  const distinct = (c: number) => {
+    const seen = new Map<string, Scalar>();
+    for (let r = x.r1 + 1; r <= x.r2; r++) {
+      const v = calc.value(si, r, c);
+      if (v === null || v === '' || typeof v === 'object') continue;
+      const k = typeof v === 'string' ? v.trim().toLowerCase() : `${typeof v}:${v}`;
+      if (!seen.has(k)) seen.set(k, typeof v === 'string' ? v.trim() : v);
+    }
+    const list = [...seen.values()];
+    // Months and weekdays go in the calendar's order; other words A to Z, numbers by size.
+    const cycle = [MONTHS, DAYS].find((names) => list.length > 1 && list.every((v) => typeof v === 'string' && names.some((n) => n.startsWith(v.toLowerCase()) && v.length >= 3)));
+    const at = (v: Scalar) => cycle!.findIndex((n) => n.startsWith(String(v).toLowerCase()));
+    return list.sort((a, b) => (cycle ? at(a) - at(b) : typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' })));
+  };
+  const keys = distinct(by).slice(0, 2000);
+  const cols = across !== null ? distinct(across).slice(0, 200) : [];
+  // Its headers in the language the app is read in (they are the sheet's words from then on).
+  const title = (fn: SummaryFn, of: string) => ({ sum: tr(`Sum of ${of}`), count: tr(`Count of ${of}`), average: tr(`Average of ${of}`), min: tr(`Lowest of ${of}`), max: tr(`Highest of ${of}`) })[fn];
+  const bold = { b: true };
+  const put = (r: number, c: number, cell: Cell) => (cells[refName(r, c)] = cell);
+  const lit = (v: Scalar) => (typeof v === 'number' || typeof v === 'boolean' ? { v } : { v: String(v) });
+  const fmtOf = (c: number) => {
+    const s = sh.cells[refName(x.r1 + 1, c)]?.s;
+    return s?.fmt || s?.code ? { ...(s.fmt ? { fmt: s.fmt } : {}), ...(s.dp !== undefined ? { dp: s.dp } : {}), ...(s.cur ? { cur: s.cur } : {}), ...(s.code ? { code: s.code } : {}) } : undefined;
+  };
+  put(0, 0, { v: head(by), s: bold });
+  const n = keys.length;
+  if (across === null) {
+    values.forEach((v, j) => put(0, 1 + j, { v: title(v.fn, head(v.c)), s: bold }));
+    keys.forEach((k, i) => {
+      put(1 + i, 0, lit(k));
+      values.forEach((v, j) => {
+        const f = SUMMARY_FNS[v.fn];
+        const body = v.fn === 'count' ? `${f.ifs}(${ref(by)},$A${i + 2})` : `${f.ifs}(${ref(v.c)},${ref(by)},$A${i + 2})`;
+        put(1 + i, 1 + j, { f: body, ...(v.fn !== 'count' && fmtOf(v.c) ? { s: fmtOf(v.c) } : {}) });
+      });
+    });
+    put(n + 1, 0, { v: tr('Total'), s: bold });
+    values.forEach((v, j) => {
+      const col = colName(1 + j);
+      const body = v.fn === 'sum' || v.fn === 'count' ? `SUM(${col}2:${col}${n + 1})` : `${SUMMARY_FNS[v.fn].whole}(${ref(v.c)})`;
+      put(n + 1, 1 + j, { f: body, s: { ...bold, ...(v.fn !== 'count' ? (fmtOf(v.c) ?? {}) : {}) } });
+    });
+  } else {
+    // A cross table: the first value's summary for each pair of the two columns' values.
+    const v = values[0];
+    const f = SUMMARY_FNS[v.fn];
+    cols.forEach((k, j) => put(0, 1 + j, { ...lit(k), s: bold }));
+    put(0, cols.length + 1, { v: tr('Total'), s: bold });
+    keys.forEach((k, i) => {
+      put(1 + i, 0, lit(k));
+      cols.forEach((_, j) => {
+        const cc = colName(1 + j);
+        const body = v.fn === 'count' ? `${f.ifs}(${ref(by)},$A${i + 2},${ref(across)},${cc}$1)` : `${f.ifs}(${ref(v.c)},${ref(by)},$A${i + 2},${ref(across)},${cc}$1)`;
+        put(1 + i, 1 + j, { f: body, ...(v.fn !== 'count' && fmtOf(v.c) ? { s: fmtOf(v.c) } : {}) });
+      });
+      const body = v.fn === 'count' ? `${f.ifs}(${ref(by)},$A${i + 2})` : `${f.ifs}(${ref(v.c)},${ref(by)},$A${i + 2})`;
+      put(1 + i, cols.length + 1, { f: body, s: { ...bold, ...(v.fn !== 'count' ? (fmtOf(v.c) ?? {}) : {}) } });
+    });
+    put(n + 1, 0, { v: tr('Total'), s: bold });
+    for (let j = 0; j <= cols.length; j++) {
+      const col = colName(1 + j);
+      const body = v.fn === 'sum' || v.fn === 'count' ? `SUM(${col}2:${col}${n + 1})` : j === cols.length ? `${f.whole}(${ref(v.c)})` : `${f.ifs}(${ref(v.c)},${ref(across)},${col}$1)`;
+      put(n + 1, 1 + j, { f: body, s: { ...bold, ...(v.fn !== 'count' ? (fmtOf(v.c) ?? {}) : {}) } });
+    }
+  }
+  return { id: '', name, cells, freeze: { rows: 1 }, cols: { 0: { w: 160 } } };
 }
 
 // ---- find and replace ---------------------------------------------------------------------------------------------------

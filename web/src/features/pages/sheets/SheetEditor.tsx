@@ -65,7 +65,7 @@ import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
 import { ChartLayer, ChartPanel } from './Charts';
 import { CondPanel } from './CondPanel';
-import { DupDialog, FormatDialog, SortDialog, SplitDialog, type ColChoice } from './Dialogs';
+import { DupDialog, FormatDialog, SortDialog, SplitDialog, SummaryDialog, type ColChoice } from './Dialogs';
 import { fillDownTo, fillSeries } from './fill';
 import { FilterMenu } from './FilterMenu';
 import { FormulaBar, formulaHelp } from './FormulaBar';
@@ -114,7 +114,26 @@ import { DatePicker, ListPicker } from './Panel';
 import { RowCard } from './RowCard';
 import { SheetTabs } from './Tabs';
 import { Toolbar } from './Toolbar';
-import { borderChanges, findCells, guessSeparator, hiddenRun, hiddenSet, mergeResult, pasteSpecial, pasteTextValues, removeDuplicates, replacedCell, sortByKeys, splitColumn, trimChanges, type BorderWhere, type FindHow, type PasteHow } from './tools';
+import {
+  borderChanges,
+  findCells,
+  guessSeparator,
+  hiddenRun,
+  hiddenSet,
+  mergeResult,
+  pasteSpecial,
+  pasteTextValues,
+  removeDuplicates,
+  replacedCell,
+  sortByKeys,
+  splitColumn,
+  summarySheet,
+  trimChanges,
+  type BorderWhere,
+  type FindHow,
+  type PasteHow,
+  type SummaryFn,
+} from './tools';
 import { CHIP_COLORS, ValidPanel } from './ValidPanel';
 
 /** Cells copied or cut, to paste in this or another spreadsheet while the app is open (their formulas and looks). */
@@ -186,7 +205,7 @@ function codeDecimals(code: string, d: 1 | -1): string {
 const clone = (b: Workbook): Workbook => structuredClone(b);
 
 type PanelState = { kind: 'cf' } | { kind: 'dv'; start?: Validation } | { kind: 'chart'; id: string } | null;
-type DialogState = 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | null;
+type DialogState = 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | 'summary' | null;
 type PickState = { kind: 'list' | 'date' | 'note' | 'chars'; r: number; c: number; at: DOMRect } | null;
 
 export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef }: ModelEditorProps<Workbook>) {
@@ -1292,6 +1311,13 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     for (let r = x.r1; r <= Math.min(x.r2, x.r1 + 200, calc.extent(sheetIx).rows - 1); r++) texts.push(formatValue(calc.value(sheetIx, r, x.c1)));
     return guessSeparator(texts);
   };
+  /** Data → Summarize by: the table's summary on a sheet of its own, after this one. */
+  const summarize = (by: number, across: number | null, values: { c: number; fn: SummaryFn }[]) => {
+    if (!book || !sheet || !calc || !toolBlock) return;
+    if (toolBlock.r2 <= toolBlock.r1) return void toast(tr('Pick a table with a header row and rows under it.'));
+    const made = summarySheet(sheet, calc, sheetIx, toolBlock, by, across, values, tr(`Summary of ${sheet.name}`).slice(0, 31));
+    addSheet({ ...made, id: newId() });
+  };
   const trim = () => {
     if (!book || !sheet || !calc) return;
     const got = trimChanges(sheet, calc, sheetIx, single(sel) ? blockOf() : x);
@@ -1778,6 +1804,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     toggleFilter,
     validation: () => setPanel({ kind: 'dv' }),
     dups: () => openTool('dups'),
+    summary: () => openTool('summary'),
     split: () => setDialog('split'),
     trim,
     shortcuts: () => setDialog('shortcuts'),
@@ -2282,6 +2309,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       )}
       {dialog === 'sort' && toolBlock && <SortDialog cols={colChoices(toolBlock, header)} header={header} onHeader={setHeader} onSort={sortRangeBy} onClose={() => setDialog(null)} />}
       {dialog === 'dups' && toolBlock && <DupDialog cols={colChoices(toolBlock, header)} header={header} onHeader={setHeader} onRemove={removeDups} onClose={() => setDialog(null)} />}
+      {dialog === 'summary' && toolBlock && <SummaryDialog cols={colChoices(toolBlock, true)} onMake={summarize} onClose={() => setDialog(null)} />}
       {dialog === 'split' && <SplitDialog guess={splitGuess()} onSplit={(sp) => void splitText(sp)} onClose={() => setDialog(null)} />}
       {dialog === 'format' && <FormatDialog code={active?.s?.code ?? ''} sample={calc.value(sheetIx, sel.r, sel.c)} style={active?.s} onApply={(c) => setCode(c)} onClose={() => setDialog(null)} />}
       <ShortcutsDialog open={dialog === 'shortcuts'} onClose={() => setDialog(null)} groups={shortcutGroups} />
