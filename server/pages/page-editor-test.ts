@@ -359,6 +359,23 @@ if (canCapture()) {
     ok((await shape(d)).startsWith('p.n-hl-yellow:Two!|p:One'), 'Ctrl+Shift+↑ moves it up');
   });
 
+  // ---- Turn into, with what is inside --------------------------------------------------------------------------------------------
+  await drive('<details class="n-toggle" open><summary id="s">Tips</summary><p>Inside one</p><p>Inside two</p></details><ul><li id="p">Parent<ul><li>Child</li></ul></li><li>Next</li></ul><blockquote id="q">Quoted</blockquote>', async (d) => {
+    await d.write('#s');
+    await d.cmd('turn', 'p');
+    same(await shape(d), 'p:Tips|p:Inside one|p:Inside two|ul>li:Parent|ul>li>ul>li:Child|ul>li:Next|blockquote:Quoted', 'a toggle turned into text keeps what it folded, after it');
+    // (its own words' start: its end is its nested items')
+    await d.write('#p', 'start');
+    await d.cmd('turn', 'h2');
+    same(await shape(d), 'p:Tips|p:Inside one|p:Inside two|h2:Parent|ul>li:Child|ul>li:Next|blockquote:Quoted', 'an item with items in it turned into a heading leaves them a list after it');
+    await d.write('#q');
+    await d.cmd('turn', 'todo');
+    same((await shape(d)).split('|').slice(-1)[0], 'ul.todo>li[ ]:Quoted', 'a quote turned into a to-do');
+    await d.press('Escape');
+    const out = await d.html();
+    same(/<li id="q"><input type="checkbox"><span>Quoted<\/span><\/li>/.test(out), true, 'as the kit’s to-do, keeping its name (id)');
+  });
+
   // ---- undo, a step per block ------------------------------------------------------------------------------------------------
   await drive('<p id="a">Alpha</p>', async (d) => {
     await d.write('#a');
