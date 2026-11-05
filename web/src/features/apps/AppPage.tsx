@@ -404,13 +404,21 @@ function daysChoice(days?: number[]): string {
   return days.length === 1 ? String(days[0]) : 'other';
 }
 
-/** When it updates by itself, in a line: "A new one every Friday at 16:00". */
-function whenLine(daily: HomeSettings['daily']): string {
+/** When it updates by itself, in a line: "A new one every Friday at 16:00" (with `listed`, that Scheduled tasks lists it too). Whole sentences, each one to translate. */
+function whenLine(daily: HomeSettings['daily'], listed = false): string {
   const c = daysChoice(daily.days);
+  const days = c === 'other' ? daily.days!.map(dayName).join(', ') : '';
+  const day = c === 'all' || c === 'weekdays' || c === 'other' ? '' : dayName(Number(c));
+  if (listed) {
+    if (c === 'all') return `A new one at ${daily.time} each day; it shows in Scheduled tasks too.`;
+    if (c === 'weekdays') return `A new one at ${daily.time} on weekdays; it shows in Scheduled tasks too.`;
+    if (c === 'other') return `A new one at ${daily.time} on ${days}; it shows in Scheduled tasks too.`;
+    return `A new one every ${day} at ${daily.time}; it shows in Scheduled tasks too.`;
+  }
   if (c === 'all') return `A new one at ${daily.time} each day`;
   if (c === 'weekdays') return `A new one at ${daily.time} on weekdays`;
-  if (c === 'other') return `A new one at ${daily.time} on ${daily.days!.map(dayName).join(', ')}`;
-  return `A new one every ${dayName(Number(c))} at ${daily.time}`;
+  if (c === 'other') return `A new one at ${daily.time} on ${days}`;
+  return `A new one every ${day} at ${daily.time}`;
 }
 
 /** A field as the others, sized by the row it is in (inputCls fills its line). */
@@ -470,7 +478,7 @@ function HomeSettingsPanel({ id, recipe, template, home, onSaved }: { id: string
       <div className="flex items-start gap-3 px-2 py-2">
         <div className="min-w-0 flex-1">
           <div className="text-[13.5px] font-medium">Update automatically</div>
-          <div className="mt-0.5 text-[12px] leading-snug text-fg-3">{home.daily.on ? `${whenLine(home.daily)}; it shows in Scheduled tasks too.` : 'Off: it changes only when you press Update.'}</div>
+          <div className="mt-0.5 text-[12px] leading-snug text-fg-3">{home.daily.on ? whenLine(home.daily, true) : 'Off: it changes only when you press Update.'}</div>
         </div>
         <Switch label="Update automatically" on={home.daily.on} disabled={saving} onChange={(on) => void save({ daily: { on } })} />
       </div>
