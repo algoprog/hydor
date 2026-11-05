@@ -1,9 +1,9 @@
-// What the pages know of swarms: each one's board, loaded when shown and kept up to date by the server's
-// events, and the swarm's size from Settings → Child sessions (for the start page).
+// What the pages know of swarms: each one's board (and a campaign's parts), loaded when shown and kept up to
+// date by the server's events, and the swarm's size from Settings → Child sessions (for the start page).
 import { useEffect } from 'react';
 import { create } from 'zustand';
 import type { ChildSettings } from '@shared/children';
-import type { SwarmBoard, SwarmPost } from '@shared/swarm';
+import { campaignParts, type SwarmBoard, type SwarmPost } from '@shared/swarm';
 import { api, enc, put } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
 import { toastError } from '../../lib/store';
@@ -21,7 +21,9 @@ function listen() {
     useBoards.setState((s) => {
       const b = s.byKey[key];
       if (!b) return s;
-      if (d.post && !b.posts.some((p) => p.id === d.post!.id)) return { byKey: { ...s.byKey, [key]: { ...b, posts: [...b.posts, d.post].slice(-300) } } };
+      // A campaign's parts take each post in as the server reads them all.
+      if (d.post && !b.posts.some((p) => p.id === d.post!.id))
+        return { byKey: { ...s.byKey, [key]: { ...b, posts: [...b.posts, d.post].slice(-300), ...(b.mode === 'campaign' ? { parts: campaignParts([d.post], b.parts ?? []) } : {}) } } };
       if (d.stopped?.length) return { byKey: { ...s.byKey, [key]: { ...b, stopped: [...new Set([...b.stopped, ...d.stopped])] } } };
       return s;
     });
