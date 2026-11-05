@@ -30,6 +30,8 @@ export interface PageInfo {
   sessionKey?: string;
   /** Who made the current version. */
   by?: PageVersion['by'];
+  /** Someone the project is shared with made it (their name). */
+  who?: string;
   /** Its picture in Pages is ready (GET /api/pages/:id/thumb?v=<thumb>). */
   thumb?: string;
   /** Published at a link. */
@@ -49,6 +51,8 @@ export interface PageVersion {
   createdAt: number;
   /** agent: save_page; user: Keep; restore: an older version brought back; edit: changed by the user in the editor; made: a page the user made. */
   by: 'agent' | 'user' | 'restore' | 'edit' | 'made';
+  /** Changed (or commented on) by someone the project is shared with, through their link: their name. */
+  who?: string;
 }
 
 /** One of a page's stored values (window.hydor.storage), as the Data view lists them. */

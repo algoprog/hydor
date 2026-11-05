@@ -12,8 +12,16 @@ export const machineBase = machineId ? `/m/${machineId}` : '';
 /** Calls this server answers itself, whichever machine the page shows: sign-in, the machines, push, themes, the tour and its tips, the sidebar's tools. */
 const OWN = /^\/api\/(auth\/|machines\b|push\b|themes\b|tour\b|tips\b|sidebar\b)/;
 
+/**
+ * A project shared with someone, opened at their link (/p/<token>, server/spaces/portal.ts): the Library's editors and
+ * viewers there ask the link's own routes for what they ask of /api/pages/…, which answer for that project alone; any
+ * other call of the app's API goes nowhere from there.
+ */
+export const portalToken: string | null = /^(?:\/m\/[a-z0-9-]{1,40})?\/p\/([A-Za-z0-9_-]{32})\/?$/.exec(location.pathname)?.[1] ?? null;
+
 /** A URL on the server of the machine this page shows. */
 export function mu(path: string): string {
+  if (portalToken && path.startsWith('/api/')) return `${machineBase}/p-api/${portalToken}/${path.startsWith('/api/pages/') ? path.slice('/api/'.length) : `none/${path.slice('/api/'.length)}`}`;
   return machineBase && !OWN.test(path) ? machineBase + path : path;
 }
 

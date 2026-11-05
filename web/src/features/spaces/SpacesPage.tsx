@@ -1,11 +1,11 @@
 // Spaces: each project's sessions, files, documents, Library, memory, guidelines, skills and assistant together.
-// The list (beside the shared knowledge, on the page's second tab): a card for each space with what it holds and
-// New session, the folders worth a space of their own, and Group spaces together. A space's own page is SpacePage.
+// The list (beside the shared knowledge, on the page's second tab): a card for each space with what it holds,
+// New session and its menu (as on its page), the folders worth a space of their own, and Group spaces together. A space's own page is SpacePage.
 // A group brings spaces together: its sessions work with all of them. Picked by name on the start page in place of
 // a folder.
 import { useState, type ReactNode } from 'react';
-import { useLocation } from 'wouter';
-import { Boxes, Folder, Layers, LibraryBig, MessagesSquare, Plus, SquarePen, X } from 'lucide-react';
+import { useLocation, useSearch } from 'wouter';
+import { Boxes, Folder, Layers, LibraryBig, MessagesSquare, Plus, SquarePen, UserPlus, X } from 'lucide-react';
 import type { SpaceView } from '@shared/spaces';
 import { isGroup, spaceColor } from '@shared/spaces';
 import { Button, Throbber } from '../../components/ui';
@@ -15,7 +15,8 @@ import { useApp } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { PageHeader } from '../layout/PageHeader';
 import { memberNames, NewSpaceDialog, SpaceMark, SpacesTabs, startInSpace, useSpaceSuggestions } from './parts';
-import { SpacePage, type SpaceTab } from './SpacePage';
+import { ShareDialogHost } from './ShareDialog';
+import { SpaceMenu, SpacePage, type SpaceTab } from './SpacePage';
 import { useSpaces } from './state';
 
 const plural = (n: number, one: string, many: string) => tr(`${n} ${n === 1 ? one : many}`);
@@ -88,11 +89,17 @@ function SpaceCard({ s, spaces }: { s: SpaceView; spaces: SpaceView[] }) {
       className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-line bg-panel text-left transition-colors outline-none hover:border-line-2 focus-visible:ring-2 focus-visible:ring-accent/40"
     >
       <div className="relative h-14 w-full" style={{ background: wash(c) }}>
-        {group && (
-          <span className="absolute top-2.5 right-3 inline-flex items-center gap-1 rounded-full bg-panel/70 px-2 py-0.5 text-[11.5px] font-medium text-fg-2">
-            <Layers size={11} /> Group
+        <div className="absolute top-1.5 right-1.5 flex items-center gap-1.5">
+          {group && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-panel/70 px-2 py-0.5 text-[11.5px] font-medium text-fg-2">
+              <Layers size={11} /> Group
+            </span>
+          )}
+          {/* Its menu, as on its page (share it with people…): a click in it is not a click on the card. */}
+          <span className="contents" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+            <SpaceMenu s={s} />
           </span>
-        )}
+        </div>
         <span className="absolute -bottom-5 left-4 rounded-[13px] bg-panel p-[3px]">
           <SpaceMark s={s} size={40} className="rounded-[10px]" />
         </span>
@@ -153,6 +160,8 @@ function Intro({ onMake }: { onMake: () => void }) {
 
 function List() {
   const spaces = useSpaces();
+  // Come to share a project (the search box's Share a project with people): which menu does it.
+  const sharing = new URLSearchParams(useSearch()).get('share') === '1';
   const [made, setMade] = useState<false | 'space' | 'group'>(false);
   // A suggested folder the new space starts with.
   const [from, setFrom] = useState<string | undefined>();
@@ -185,6 +194,17 @@ function List() {
             <Intro onMake={make} />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {sharing && (
+                <div className="flex items-center gap-2.5 rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[13px] text-fg-2 sm:col-span-2 xl:col-span-3">
+                  <UserPlus size={15} className="shrink-0 text-accent" />
+                  <span className="min-w-0 flex-1">
+                    To share a project, open its <span className="font-medium text-fg">More</span> (⋯) and pick <span className="font-medium text-fg">Share with people</span>.
+                  </span>
+                  <button type="button" aria-label="Close" onClick={() => go('/projects', true)} className="shrink-0 rounded p-1 text-fg-3 hover:bg-bg-3 hover:text-fg">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
               {spaces.map((s) => (
                 <SpaceCard key={s.id} s={s} spaces={spaces} />
               ))}
@@ -214,6 +234,7 @@ function List() {
         </div>
       </div>
       <NewSpaceDialog open={!!made} group={made === 'group'} folder={made === 'space' ? from : undefined} onClose={() => setMade(false)} onMade={(s) => go(`/projects/${s.id}`)} />
+      <ShareDialogHost />
     </div>
   );
 }

@@ -60,6 +60,7 @@ const RULES: Rule[] = [
   ['POST', /^\/api\/sessions$/, 'always', 'This starts a new session.'],
   ['W', /^\/api\/sessions\/[^/]+\/(message|handoff|fork|rewind|guest-links|pr|worktree|start|compact|goal)/, 'always'],
   ['W', /^\/api\/(preview\/link|pages\/[^/]+\/link)$/, 'always', 'Anyone with the link can open it.'],
+  ['W', /^\/api\/projects\/[^/]+\/shares(\/|$)/, 'always', 'Whoever has a project’s link sees its documents, sessions, runs and reading list, and may comment on (or change) its documents.'],
   ['W', /^\/api\/(tasks|apps\/[^/]+\/(runs|batches)|apps\/runs\/[^/]+\/ask|apps\/[^/]+\/run|automations\/(test-run|runs\/[^/]+\/rerun)|opinion\/[^/]+|arena\/[^/]+\/winner)(\/|$)/, 'always', 'This starts agent work that may cost.'],
   // Every other change: the user's OK, once or for the rest of the session.
   ['W', /./, 'confirm'],

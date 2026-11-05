@@ -45,7 +45,7 @@ import {
   type TexComment,
   type TexSetup,
 } from '../../shared/latex.ts';
-import { newCommentId } from '../../shared/comments.ts';
+import { authorForAgent, newCommentId, peopleNote } from '../../shared/comments.ts';
 import { TEX_ASKED } from '../../shared/latex-catalog.ts';
 import { texCount, totalWords } from '../../shared/latex-count.ts';
 import { TEX_TEMPLATES, texFromTemplate, texTemplate } from '../../shared/latex-templates.ts';
@@ -1741,14 +1741,15 @@ export function texForAgent(text: string): string {
   if (cs.length) {
     const open = cs.filter((c) => !c.resolved);
     const lineOf = (c: TexComment) => (texFileTextOf(d, c.file) ?? '').slice(0, c.from).split('\n').length;
-    const who = (by: string) => (by === 'agent' ? 'an agent' : 'the user');
     out.push(
       `\nComments: ${open.length} open${cs.length > open.length ? `, ${cs.length - open.length} resolved` : ''}. Answer one with save_latex's comments: [{"id", "reply": "…"}], resolve it with {"id", "resolve": true} once done, or add one with {"file", "quote": the words it is on, "text"}.`,
     );
     for (const c of [...open, ...cs.filter((x) => x.resolved)].slice(0, 60))
       out.push(
-        `- ${c.id}${c.resolved ? ' (resolved)' : ''} on ${c.file}:${lineOf(c)}${c.quote ? ` “${c.quote.slice(0, 120)}”` : ''}, by ${who(c.by)}: ${c.text.slice(0, 600)}${(c.replies ?? []).map((r) => `\n  - ${who(r.by)}: ${r.text.slice(0, 400)}`).join('')}`,
+        `- ${c.id}${c.resolved ? ' (resolved)' : ''} on ${c.file}:${lineOf(c)}${c.quote ? ` “${c.quote.slice(0, 120)}”` : ''}, by ${authorForAgent(c)}: ${c.text.slice(0, 600)}${(c.replies ?? []).map((r) => `\n  - ${authorForAgent(r)}: ${r.text.slice(0, 400)}`).join('')}`,
       );
+    const note = peopleNote(cs);
+    if (note) out.push(note);
   }
   const c = texCount(d);
   const n1 = (x: number, one: string, many = `${one}s`) => `${x.toLocaleString('en')} ${x === 1 ? one : many}`;
@@ -1873,7 +1874,7 @@ export async function texSetup(): Promise<TexSetup> {
 }
 
 /** A typesetting as the editor gets it: everything but the PDF itself. */
-const forEditor = (r: TexResult): TexCompiled => ({
+export const forEditor = (r: TexResult): TexCompiled => ({
   key: r.key,
   ok: r.ok,
   pdf: !!r.pdf,
@@ -1887,6 +1888,14 @@ const forEditor = (r: TexResult): TexCompiled => ({
   ms: r.ms,
   sandboxed: r.sandboxed,
 });
+
+/** A typesetting's PDF file, by its key (null when there is none kept). */
+export function texPdfFile(key: string): string | null {
+  const k = keptResult(key);
+  if (!k?.pdf) return null;
+  touch(path.join(ROOT, key));
+  return path.join(ROOT, key, 'main.pdf');
+}
 
 /**
  * The editor's live preview, signed in:
