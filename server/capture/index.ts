@@ -88,7 +88,7 @@ async function browser(): Promise<Cdp> {
     if (!chrome) throw new Error('There is no Chromium on this computer to take the picture with: Settings → Browser can download one.');
     fs.mkdirSync(DIR, { recursive: true, mode: 0o700 });
     reap();
-    const l = await launchChrome(chrome, { userDataDir: PROFILE, headless: true });
+    const l = await launchChrome(chrome, { userDataDir: PROFILE, headless: true, exactText: true });
     proc = l.proc;
     if (l.proc.pid) fs.writeFileSync(PID, String(l.proc.pid));
     l.proc.on('exit', () => {
