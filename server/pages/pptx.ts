@@ -136,7 +136,8 @@ interface Ctx {
   o: PptxOpts;
   rels: Rels;
   media: { add(p: { data: Buffer; ext: string }): string };
-  charts: { add(xml: string): string };
+  /** A chart part (made with its workbook's relationship id) and its workbook: the chart's relationship id. */
+  charts: { add(xml: (book: string) => string, book: Buffer): string };
   /** The deck's videos in the file: each one's name in ppt/media. */
   movies: { add(v: { data: Buffer; ext: string }): string };
   /** The videos of the slide being written that PowerPoint plays (their shapes' ids), for its timing. */
@@ -254,8 +255,8 @@ function paraXml(c: Ctx, p: Para, e: TextProps, k: number, last: boolean, opacit
   return `<a:p><a:pPr marL="${marL}" indent="${indent}" algn="${algn}"${lvl ? ` lvl="${lvl}"` : ''}>${lnSpc}<a:spcBef><a:spcPts val="0"/></a:spcBef>${gap}${bu}</a:pPr>${runs}${end}</a:p>`;
 }
 
-function txBody(c: Ctx, e: TextProps & { id: string }, opacity: number, tag = 'p:txBody'): string {
-  const pad = emu(e.pad ?? 10);
+function txBody(c: Ctx, e: TextProps & { id: string }, opacity: number, tag = 'p:txBody', inset = 0): string {
+  const pad = emu(Math.max(0, (e.pad ?? 10) - inset));
   const anchor = e.valign === 'middle' ? 'ctr' : e.valign === 'bottom' ? 'b' : 't';
   const k = c.o.scales?.get(e.id) ?? 1;
   // The fitting is in fontScale (the sizes themselves stay the deck's); what it does not scale is written at the size shown.
@@ -270,12 +271,126 @@ function txBody(c: Ctx, e: TextProps & { id: string }, opacity: number, tag = 'p
 const xfrm = (x: number, y: number, w: number, h: number, rot?: number, flip = '') =>
   `<a:xfrm${rot ? ` rot="${Math.round((((rot % 360) + 360) % 360) * 60000)}"` : ''}${flip}><a:off x="${emu(x)}" y="${emu(y)}"/><a:ext cx="${emu(Math.max(0, w))}" cy="${emu(Math.max(0, h))}"/></a:xfrm>`;
 
-const SHADOW = '<a:effectLst><a:outerShdw blurRad="266700" dist="76200" dir="5400000" algn="t" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="24000"/></a:srgbClr></a:outerShdw></a:effectLst>';
+/** A shadow below a part as the app casts it (CSS: its offset down, its blur, how dark): the same blur radius in PowerPoint. */
+const shadowXml = (down: number, blur: number, alpha: number) =>
+  `<a:effectLst><a:outerShdw blurRad="${emu(blur)}" dist="${emu(down)}" dir="5400000" algn="t" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="${Math.round(alpha * 100000)}"/></a:srgbClr></a:outerShdw></a:effectLst>`;
+/** Boxes, rounded boxes and ovals cast the app's box-shadow; other shapes its drop-shadow; pictures theirs. */
+const BOX_SHADOW = shadowXml(10, 28, 0.22);
+const SHAPE_SHADOW = shadowXml(8, 16, 0.22);
+const PICTURE_SHADOW = shadowXml(10, 18, 0.25);
+
+/** Dashes as the app draws them: three widths on, two off; dots a width on, a width off. */
+const DASHES = { dash: '<a:custDash><a:ds d="300000" sp="200000"/></a:custDash>', dot: '<a:custDash><a:ds d="100000" sp="100000"/></a:custDash>' };
 
 function lnXml(color: string | undefined, w: number | undefined, dash: string | undefined, t: Theme, opacity: number): string {
   if (!color) return '<a:ln><a:noFill/></a:ln>';
-  const d = dash === 'dash' ? '<a:prstDash val="dash"/>' : dash === 'dot' ? '<a:prstDash val="sysDot"/>' : '';
+  const d = dash === 'dash' ? DASHES.dash : dash === 'dot' ? DASHES.dot : '';
   return `<a:ln w="${emu(w ?? 2)}">${fillXml(color, t, opacity)}${d}</a:ln>`;
+}
+
+// ---- shapes' outlines -------------------------------------------------------------------------------------
+
+type Cmd = ['M' | 'L', number, number] | ['C', number, number, number, number, number, number] | ['Q', number, number, number, number] | ['Z'];
+
+/** A shape's outline as the app draws it (shared/slides-runtime.ts shapePath: the same points), in its own pixels. */
+export function shapeOutline(kind: string, w: number, h: number): Cmd[] {
+  const ss = Math.min(w, h);
+  const poly = (pts: number[][]): Cmd[] => [['M', pts[0][0], pts[0][1]], ...pts.slice(1).map((p): Cmd => ['L', p[0], p[1]]), ['Z']];
+  switch (kind) {
+    case 'triangle':
+      return poly([[w / 2, 0], [w, h], [0, h]]);
+    case 'rtriangle':
+      return poly([[0, 0], [w, h], [0, h]]);
+    case 'diamond':
+      return poly([[w / 2, 0], [w, h / 2], [w / 2, h], [0, h / 2]]);
+    case 'pentagon':
+      return poly([[w / 2, 0], [w, h * 0.38], [w * 0.81, h], [w * 0.19, h], [0, h * 0.38]]);
+    case 'hexagon': {
+      const a = ss * 0.25;
+      return poly([[0, h / 2], [a, 0], [w - a, 0], [w, h / 2], [w - a, h], [a, h]]);
+    }
+    case 'octagon': {
+      const c = ss * 0.29;
+      return poly([[c, 0], [w - c, 0], [w, c], [w, h - c], [w - c, h], [c, h], [0, h - c], [0, c]]);
+    }
+    case 'star':
+      return poly(Array.from({ length: 10 }, (_, i) => {
+        const r = i % 2 ? 0.382 : 1;
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        return [w / 2 + (w / 2) * r * Math.cos(a), h * 0.525 + h * 0.525 * r * Math.sin(a)];
+      }));
+    case 'arrow': {
+      const hl = Math.min(w, ss * 0.5);
+      return poly([[0, h * 0.25], [w - hl, h * 0.25], [w - hl, 0], [w, h / 2], [w - hl, h], [w - hl, h * 0.75], [0, h * 0.75]]);
+    }
+    case 'larrow': {
+      const hl = Math.min(w, ss * 0.5);
+      return poly([[w, h * 0.25], [hl, h * 0.25], [hl, 0], [0, h / 2], [hl, h], [hl, h * 0.75], [w, h * 0.75]]);
+    }
+    case 'uarrow': {
+      const hl = Math.min(h, ss * 0.5);
+      return poly([[w * 0.25, h], [w * 0.25, hl], [0, hl], [w / 2, 0], [w, hl], [w * 0.75, hl], [w * 0.75, h]]);
+    }
+    case 'darrow': {
+      const hl = Math.min(h, ss * 0.5);
+      return poly([[w * 0.25, 0], [w * 0.75, 0], [w * 0.75, h - hl], [w, h - hl], [w / 2, h], [0, h - hl], [w * 0.25, h - hl]]);
+    }
+    case 'chevron': {
+      const d = Math.min(w / 2, ss * 0.5);
+      return poly([[0, 0], [w - d, 0], [w, h / 2], [w - d, h], [0, h], [d, h / 2]]);
+    }
+    case 'parallelogram': {
+      const o = ss * 0.25;
+      return poly([[o, 0], [w, 0], [w - o, h], [0, h]]);
+    }
+    case 'trapezoid': {
+      const o = ss * 0.25;
+      return poly([[0, h], [o, 0], [w - o, 0], [w, h]]);
+    }
+    case 'plus': {
+      const c = ss * 0.25;
+      return poly([[c, 0], [w - c, 0], [w - c, c], [w, c], [w, h - c], [w - c, h - c], [w - c, h], [c, h], [c, h - c], [0, h - c], [0, c], [c, c]]);
+    }
+    case 'heart':
+      return [
+        ['M', w / 2, h * 0.25],
+        ['C', w * 0.45, h * 0.05, w * 0.05, h * 0.02, w * 0.02, h * 0.32],
+        ['C', 0, h * 0.55, w * 0.3, h * 0.72, w / 2, h],
+        ['C', w * 0.7, h * 0.72, w, h * 0.55, w * 0.98, h * 0.32],
+        ['C', w * 0.95, h * 0.02, w * 0.55, h * 0.05, w / 2, h * 0.25],
+        ['Z'],
+      ];
+    case 'callout': {
+      const r = ss * 0.1;
+      const b = h * 0.82;
+      return [['M', r, 0], ['L', w - r, 0], ['Q', w, 0, w, r], ['L', w, b - r], ['Q', w, b, w - r, b], ['L', w * 0.33, b], ['L', w * 0.2, h], ['L', w * 0.17, b], ['L', r, b], ['Q', 0, b, 0, b - r], ['L', 0, r], ['Q', 0, 0, r, 0], ['Z']];
+    }
+    case 'ellipse': {
+      // Four quarter curves (a circle's bezier, 0.5523 of the radius out).
+      const k = 0.5523;
+      const [rx, ry] = [w / 2, h / 2];
+      return [['M', 0, ry], ['C', 0, ry - ry * k, rx - rx * k, 0, rx, 0], ['C', rx + rx * k, 0, w, ry - ry * k, w, ry], ['C', w, ry + ry * k, rx + rx * k, h, rx, h], ['C', rx - rx * k, h, 0, ry + ry * k, 0, ry], ['Z']];
+    }
+  }
+  return poly([[0, 0], [w, 0], [w, h], [0, h]]);
+}
+
+/**
+ * Whether a shape goes as its own outline rather than PowerPoint's shape of that name: the heart and the callout, which
+ * PowerPoint draws otherwise, and any shape but a box with words in it (the app's words take the whole box; PowerPoint's
+ * shapes keep their words to a smaller box inside).
+ */
+const ownOutline = (e: El) => e.type === 'shape' && e.shape !== 'rect' && e.shape !== 'round' && (e.shape === 'heart' || e.shape === 'callout' || e.paras.some((p) => p.runs.some((r) => r.t)));
+
+/** A shape's own outline as DrawingML's custom geometry: its path in EMU, its words' box the whole box, joined at its sides' middles as a box is. */
+function custGeomXml(kind: string, w: number, h: number): string {
+  const n = (v: number) => Math.round(v * E);
+  const pt = (x: number, y: number) => `<a:pt x="${n(x)}" y="${n(y)}"/>`;
+  const path = shapeOutline(kind, Math.max(1, Math.abs(w)), Math.max(1, Math.abs(h)))
+    .map((c) => (c[0] === 'M' ? `<a:moveTo>${pt(c[1], c[2])}</a:moveTo>` : c[0] === 'L' ? `<a:lnTo>${pt(c[1], c[2])}</a:lnTo>` : c[0] === 'C' ? `<a:cubicBezTo>${pt(c[1], c[2])}${pt(c[3], c[4])}${pt(c[5], c[6])}</a:cubicBezTo>` : c[0] === 'Q' ? `<a:quadBezTo>${pt(c[1], c[2])}${pt(c[3], c[4])}</a:quadBezTo>` : '<a:close/>'))
+    .join('');
+  const sites = '<a:cxnLst><a:cxn ang="16200000"><a:pos x="hc" y="t"/></a:cxn><a:cxn ang="10800000"><a:pos x="l" y="vc"/></a:cxn><a:cxn ang="5400000"><a:pos x="hc" y="b"/></a:cxn><a:cxn ang="0"><a:pos x="r" y="vc"/></a:cxn></a:cxnLst>';
+  return `<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/>${sites}<a:rect l="l" t="t" r="r" b="b"/><a:pathLst><a:path w="${n(Math.max(1, Math.abs(w)))}" h="${n(Math.max(1, Math.abs(h)))}">${path}</a:path></a:pathLst></a:custGeom>`;
 }
 
 function nvPr(c: Ctx, e: El, kind: string, href?: string): { id: number; cNvPr: string } {
@@ -297,51 +412,53 @@ function boxXml(c: Ctx, e: Extract<El, { type: 'text' | 'shape' }>): string {
   const { cNvPr } = nvPr(c, e, isTitle ? 'Title' : e.type === 'shape' ? 'Shape' : 'Text');
   let prst = PRST[kind] ?? 'rect';
   let av = '<a:avLst/>';
+  // A rounded box's words keep the app's room: PowerPoint keeps them 0.29 of the corner's radius further in.
+  let inset = 0;
   if (kind === 'round' || (kind === 'rect' && e.radius)) {
     prst = 'roundRect';
-    const r = e.radius ?? Math.min(e.w, e.h) * 0.16;
+    const r = Math.min(e.radius ?? Math.min(e.w, e.h) * 0.16, Math.min(e.w, e.h) / 2);
     av = `<a:avLst><a:gd name="adj" fmla="val ${Math.round(Math.min(50000, (r / Math.max(1, Math.min(e.w, e.h))) * 100000))}"/></a:avLst>`;
-  }
+    inset = r * 0.29289;
+  } else if (kind === 'star') av = '<a:avLst><a:gd name="adj" fmla="val 19098"/><a:gd name="hf" fmla="val 100000"/><a:gd name="vf" fmla="val 105000"/></a:avLst>';
+  const own = ownOutline(e);
+  const geom = own ? custGeomXml(kind, e.w, e.h) : `<a:prstGeom prst="${prst}">${av}</a:prstGeom>`;
+  // A box's gradient runs at its angle; a drawn shape's is stretched with it (SVG's bounding box), as the app draws them.
+  const boxy = kind === 'rect' || kind === 'round' || kind === 'ellipse';
   const fill =
     e.fill && e.fill2 && e.fill !== 'transparent'
-      ? `<a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0">${clr(e.fill, t, '#ffffff', op)}</a:gs><a:gs pos="100000">${clr(e.fill2, t, '#ffffff', op)}</a:gs></a:gsLst><a:lin ang="${linAng(e.angle ?? 180)}" scaled="0"/></a:gradFill>`
+      ? `<a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0">${clr(e.fill, t, '#ffffff', op)}</a:gs><a:gs pos="100000">${clr(e.fill2, t, '#ffffff', op)}</a:gs></a:gsLst><a:lin ang="${linAng(e.angle ?? 180)}" scaled="${boxy ? 0 : 1}"/></a:gradFill>`
       : fillXml(e.fill, t, op);
   const nv = isTitle
     ? `<p:nvSpPr>${cNvPr}<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>`
     : `<p:nvSpPr>${cNvPr}<p:cNvSpPr${e.type === 'text' ? ' txBox="1"' : ''}/><p:nvPr/></p:nvSpPr>`;
-  return `<p:sp>${nv}<p:spPr>${xfrm(e.x, e.y, e.w, e.h, e.rot)}<a:prstGeom prst="${prst}">${av}</a:prstGeom>${fill}${lnXml(e.line, e.lineW, e.dash, t, op)}${e.shadow ? SHADOW : ''}</p:spPr>${txBody(c, e, op)}</p:sp>`;
+  return `<p:sp>${nv}<p:spPr>${xfrm(e.x, e.y, e.w, e.h, e.rot)}${geom}${fill}${lnXml(e.line, e.lineW, e.dash, t, op)}${e.shadow ? (boxy ? BOX_SHADOW : SHAPE_SHADOW) : ''}</p:spPr>${txBody(c, e, op, 'p:txBody', inset)}</p:sp>`;
 }
 
 function imageXml(c: Ctx, e: ImageEl, href?: string): string {
-  const pic = e.src ? c.o.picture(e.src) : null;
+  // A picture whose colours were changed goes changed, as the editor shows it (slides-render.ts), where a browser made it.
+  const baked = c.o.renders?.get(`adjust:${e.id}`);
+  const pic = baked ?? (e.src ? c.o.picture(e.src) : null);
   if (!pic) return '';
   const rid = c.media.add(pic);
   const { cNvPr } = nvPr(c, e, 'Picture', href);
-  let { x, y, w, h } = e;
+  const { x, y, w, h } = e;
   let crop = '';
   const fit = e.fit ?? 'cover';
   const v = (f: number) => Math.round(Math.max(0, f) * 100000);
   if (e.crop) crop = `<a:srcRect l="${v(e.crop.l)}" t="${v(e.crop.t)}" r="${v(e.crop.r)}" b="${v(e.crop.b)}"/>`;
   else if (pic.w > 0 && pic.h > 0) {
-    if (fit === 'cover') {
-      const k = Math.max(w / pic.w, h / pic.h);
-      const cw = (pic.w - w / k) / 2 / pic.w;
-      const ch = (pic.h - h / k) / 2 / pic.h;
-      const v = (f: number) => Math.round(Math.max(0, f) * 100000);
-      if (cw > 0.0005 || ch > 0.0005) crop = `<a:srcRect l="${v(cw)}" t="${v(ch)}" r="${v(cw)}" b="${v(ch)}"/>`;
-    } else if (fit === 'contain') {
-      const k = Math.min(w / pic.w, h / pic.h);
-      const nw = pic.w * k;
-      const nh = pic.h * k;
-      x += (w - nw) / 2;
-      y += (h - nh) / 2;
-      w = nw;
-      h = nh;
-    }
+    // Cover: cut what is outside the box. Contain: the box keeps its size (and its outline), the picture inside it with
+    // empty margins, as PowerPoint's own Crop → Fit writes it (a crop by less than nothing).
+    const k = fit === 'cover' ? Math.max(w / pic.w, h / pic.h) : Math.min(w / pic.w, h / pic.h);
+    const cw = (pic.w - w / k) / 2 / pic.w;
+    const ch = (pic.h - h / k) / 2 / pic.h;
+    const n = (f: number) => Math.round(f * 100000);
+    if (fit === 'cover' && (cw > 0.0005 || ch > 0.0005)) crop = `<a:srcRect l="${v(cw)}" t="${v(ch)}" r="${v(cw)}" b="${v(ch)}"/>`;
+    else if (fit === 'contain' && (cw < -0.0005 || ch < -0.0005)) crop = `<a:srcRect l="${n(cw)}" t="${n(ch)}" r="${n(cw)}" b="${n(ch)}"/>`;
   }
   const op = e.opacity ?? 1;
-  const a = e.adjust;
-  // The picture's colours as DrawingML's own picture effects.
+  const a = baked ? undefined : e.adjust;
+  // The picture's colours as DrawingML's own picture effects (where they are not in its pixels already).
   const alpha = [
     op < 1 ? `<a:alphaModFix amt="${Math.round(op * 100000)}"/>` : '',
     a?.gray ? '<a:grayscl/>' : '',
@@ -351,7 +468,7 @@ function imageXml(c: Ctx, e: ImageEl, href?: string): string {
   ].join('');
   const flip = `${e.flipH ? ' flipH="1"' : ''}${e.flipV ? ' flipV="1"' : ''}`;
   const geom = e.radius ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.round(Math.min(50000, (e.radius / Math.max(1, Math.min(w, h))) * 100000))}"/></a:avLst></a:prstGeom>` : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
-  return `<p:pic><p:nvPicPr>${cNvPr}<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${rid}">${alpha}</a:blip>${crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(x, y, w, h, e.rot, flip)}${geom}${e.line ? lnXml(e.line, e.lineW, undefined, c.t, op) : ''}${e.shadow ? SHADOW : ''}</p:spPr></p:pic>`;
+  return `<p:pic><p:nvPicPr>${cNvPr}<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${rid}">${alpha}</a:blip>${crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(x, y, w, h, e.rot, flip)}${geom}${e.line ? lnXml(e.line, e.lineW, undefined, c.t, op) : ''}${e.shadow ? PICTURE_SHADOW : ''}</p:spPr></p:pic>`;
 }
 
 /** The connection site PowerPoint knows a side's middle by, for the shapes whose sites are certain; null for others (the end then stays where it is, not stuck, in the file). */
@@ -359,7 +476,7 @@ function siteOf(e: El | undefined, at: Side): number | null {
   if (!e) return null;
   // A flipped picture's sides are swapped in its own frame.
   const side: Side = e.type === 'image' && e.flipH && (at === 'l' || at === 'r') ? (at === 'l' ? 'r' : 'l') : e.type === 'image' && e.flipV && (at === 't' || at === 'b') ? (at === 't' ? 'b' : 't') : at;
-  if (e.type === 'text' || e.type === 'image' || e.type === 'icon' || (e.type === 'shape' && (e.shape === 'rect' || e.shape === 'round' || e.shape === 'diamond'))) return { t: 0, l: 1, b: 2, r: 3 }[side];
+  if (e.type === 'text' || e.type === 'image' || e.type === 'icon' || (e.type === 'shape' && (e.shape === 'rect' || e.shape === 'round' || e.shape === 'diamond' || ownOutline(e)))) return { t: 0, l: 1, b: 2, r: 3 }[side];
   if (e.type === 'shape' && e.shape === 'ellipse') return { t: 0, l: 2, b: 4, r: 6 }[side];
   return null;
 }
@@ -375,8 +492,19 @@ function lineXml(c: Ctx, e: LineEl): string {
   const x = Math.min(e.x, e.x + e.w);
   const y = Math.min(e.y, e.y + e.h);
   const flips = (h: boolean, v: boolean) => `${h ? ' flipH="1"' : ''}${v ? ' flipV="1"' : ''}`;
-  const cap = (k: string | undefined, tag: string) => (k === 'arrow' ? `<a:${tag} type="triangle" w="med" len="med"/>` : k === 'dot' ? `<a:${tag} type="oval" w="med" len="med"/>` : '');
-  const d = e.dash === 'dash' ? '<a:prstDash val="dash"/>' : e.dash === 'dot' ? '<a:prstDash val="sysDot"/>' : '';
+  // Its ends as large as the app draws them, in PowerPoint's sizes (2, 3 or 5 times the line's width): an arrow's head
+  // is 3.2 widths and 4 px long, a dot 3.2 widths and 2 px across.
+  const size = (px: number) => {
+    const k = px / Math.max(0.5, e.width);
+    return k >= 4 ? 'lg' : k >= 2.5 ? 'med' : 'sm';
+  };
+  const cap = (k: string | undefined, tag: string) => {
+    if (k === 'arrow') return `<a:${tag} type="triangle" w="${size(e.width * 3.2 + 4)}" len="${size(e.width * 3.2 + 4)}"/>`;
+    if (k === 'dot') return `<a:${tag} type="oval" w="${size(e.width * 3.2 + 2)}" len="${size(e.width * 3.2 + 2)}"/>`;
+    return '';
+  };
+  // The app's dashes (three widths on, two off) and dots (round, two widths apart).
+  const d = e.dash === 'dash' ? DASHES.dash : e.dash === 'dot' ? '<a:custDash><a:ds d="1000" sp="200000"/></a:custDash>' : '';
   const ln = `<a:ln w="${emu(e.width)}"${e.dash === 'dot' ? ' cap="rnd"' : ''}>${fillXml(e.color ?? 'fg', c.t, e.opacity ?? 1)}${d}${cap(e.start, 'headEnd')}${cap(e.end, 'tailEnd')}</a:ln>`;
   let box = xfrm(x, y, Math.abs(e.w), Math.abs(e.h), undefined, flips(e.w < 0, e.h < 0));
   let prst = connector ? 'straightConnector1' : 'line';
@@ -589,24 +717,119 @@ const col = (i: number) => {
   return s;
 };
 
-function chartXml(e: ChartEl, t: Theme): string {
+/**
+ * Where the app draws a chart's parts (shared/slides-runtime.ts chart(), the same sums): the title above, the legend's
+ * rows below, and the plot between, with its value axis's ticks (a round step, from lo to hi) and the room their labels
+ * take; a pie's circle. In the chart's own pixels.
+ */
+export function chartPlan(e: ChartEl) {
+  const w = Math.max(10, Math.abs(e.w));
+  const h = Math.max(10, Math.abs(e.h));
+  const fs = e.size;
+  const pie = e.kind === 'pie' || e.kind === 'doughnut';
+  const series = pie ? e.series.slice(0, 1) : e.series;
+  let top = 4;
+  let bottom = h - 4;
+  if (e.title) top += fs * 1.8;
+  const names = pie ? e.labels : series.map((s) => s.name);
+  const legend = !!e.legend && names.length > 0 && (pie || series.length > 1 || !!series[0]?.name);
+  let legendRows = 0;
+  if (legend) {
+    let rowW = 0;
+    legendRows = 1;
+    let inRow = 0;
+    for (const name of names) {
+      const iw = fs * 1.4 + name.length * fs * 0.56 + fs;
+      if (rowW + iw > w && inRow) {
+        legendRows++;
+        rowW = 0;
+        inRow = 0;
+      }
+      rowW += iw;
+      inRow++;
+    }
+    bottom -= legendRows * fs * 1.5 + fs * 0.4;
+  }
+  if (pie) {
+    const r = Math.max(4, Math.min(w, bottom - top) / 2 - 4);
+    return { w, h, pie, legend, legendRows, r, cx: w / 2, cy: top + (bottom - top) / 2, plot: { x: w / 2 - r, y: top + (bottom - top) / 2 - r, w: 2 * r, h: 2 * r }, lo: 0, hi: 0, step: 0 };
+  }
+  let max = 0;
+  let min = 0;
+  for (let i = 0; i < e.labels.length; i++) {
+    if (e.stacked) {
+      let pos = 0;
+      let neg = 0;
+      for (const s of series) {
+        const v = Number.isFinite(s.values[i]) ? s.values[i] : 0;
+        if (v >= 0) pos += v;
+        else neg += v;
+      }
+      max = Math.max(max, pos);
+      min = Math.min(min, neg);
+    } else
+      for (const s of series) {
+        const v = Number.isFinite(s.values[i]) ? s.values[i] : 0;
+        max = Math.max(max, v);
+        min = Math.min(min, v);
+      }
+  }
+  const nice = (m: number) => {
+    if (m <= 0) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(m)));
+    const f = m / p;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+  };
+  const span = nice(Math.max(max, -min) || 1);
+  const step = span / (span / (max - min || span) > 2 ? 2 : 4) || 1;
+  const hi = Math.ceil(max / step) * step || step;
+  const lo = Math.floor(min / step) * step;
+  const ticks: number[] = [];
+  for (let v = lo; v <= hi + step / 2 && ticks.length < 12; v += step) ticks.push(Math.round(v * 1e6) / 1e6);
+  const short = (v: number) => {
+    const a = Math.abs(v);
+    const r = (x: number) => String(Math.round(x * 10) / 10);
+    return a >= 1e9 ? `${r(v / 1e9)}B` : a >= 1e6 ? `${r(v / 1e6)}M` : a >= 1e4 ? `${r(v / 1e3)}k` : String(Math.round(v * 100) / 100);
+  };
+  const horiz = e.kind === 'bar';
+  const valW = Math.max(...ticks.map((v) => short(v).length)) * fs * 0.6 + fs * 0.6;
+  const catW = horiz ? Math.min(w * 0.35, Math.max(...e.labels.map((l) => l.length), 1) * fs * 0.56 + fs * 0.6) : 0;
+  const left = horiz ? catW : valW;
+  const plotTop = top + fs * 0.6;
+  const plotBottom = bottom - (horiz ? fs * 1.6 : fs * 1.8);
+  const right = w - fs * 0.6;
+  return { w, h, pie, legend, legendRows, r: 0, cx: 0, cy: 0, plot: { x: left, y: plotTop, w: Math.max(1, right - left), h: Math.max(1, plotBottom - plotTop) }, lo, hi: Math.round(hi * 1e6) / 1e6, step: Math.round(step * 1e6) / 1e6 };
+}
+
+/**
+ * A chart as PowerPoint draws its own, laid out where the app draws it: its plot pinned to the app's (a manual layout),
+ * its value axis on the app's ticks, its bars as wide, its markers as large, its labels where the app writes them, its
+ * numbers cached in it and in the workbook beside it (`book`: its relationship, so PowerPoint's Edit Data opens them).
+ */
+function chartXml(e: ChartEl, t: Theme, book?: string): string {
   const C = 'xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
   const ink = hexColor(e.color ?? 'muted', t).hex;
   const fonts = fontsXml(fontName(e.font, t));
-  const txPr = (size: number, bold = false, color = ink) =>
-    `<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${sz(size)}" b="${bold ? 1 : 0}" kern="100"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill>${fonts}</a:defRPr></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr>`;
+  const txPr = (size: number, bold = false, color = ink, flat = false) =>
+    `<c:txPr><a:bodyPr${flat ? ' rot="0" vert="horz"' : ''}/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${sz(size)}" b="${bold ? 1 : 0}" kern="100"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill>${fonts}</a:defRPr></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr>`;
+  const plan = chartPlan(e);
   const labels = e.labels;
   const n = labels.length;
-  const pie = e.kind === 'pie' || e.kind === 'doughnut';
+  const pie = plan.pie;
   const series = pie ? e.series.slice(0, 1) : e.series;
   const colorOf = (i: number, s?: { color?: string }) => hexColor(s?.color ?? `c${(i % 6) + 1}`, t).hex;
   const cat = `<c:cat><c:strRef><c:f>Sheet1!$A$2:$A$${n + 1}</c:f><c:strCache><c:ptCount val="${n}"/>${labels.map((l, i) => `<c:pt idx="${i}"><c:v>${esc(l)}</c:v></c:pt>`).join('')}</c:strCache></c:strRef></c:cat>`;
   const val = (s: ChartEl['series'][number], si: number) =>
     `<c:val><c:numRef><c:f>Sheet1!$${col(si + 1)}$2:$${col(si + 1)}$${n + 1}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${n}"/>${labels.map((_, i) => `<c:pt idx="${i}"><c:v>${Number.isFinite(s.values[i]) ? s.values[i] : 0}</c:v></c:pt>`).join('')}</c:numCache></c:numRef></c:val>`;
   const tx = (s: ChartEl['series'][number], si: number) => `<c:tx><c:strRef><c:f>Sheet1!$${col(si + 1)}$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>${esc(s.name)}</c:v></c:pt></c:strCache></c:strRef></c:tx>`;
+  // Values written where the app writes them (PowerPoint takes no position at all for areas and doughnuts).
+  const pos = e.kind === 'pie' ? 'ctr' : e.kind === 'line' ? 't' : e.kind === 'column' || e.kind === 'bar' ? (e.stacked ? 'inEnd' : 'outEnd') : '';
   const dLbls = (pct: boolean) =>
-    `<c:dLbls><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>${txPr(e.size * 0.9, pct, pct ? 'FFFFFF' : hexColor('fg', t).hex)}<c:showLegendKey val="0"/><c:showVal val="${pct ? 0 : 1}"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="${pct ? 1 : 0}"/><c:showBubbleSize val="0"/></c:dLbls>`;
+    `<c:dLbls>${pct ? '<c:numFmt formatCode="0%" sourceLinked="0"/>' : ''}<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>${txPr(e.size, pct, pct ? 'FFFFFF' : hexColor('fg', t).hex)}${pos ? `<c:dLblPos val="${pos}"/>` : ''}<c:showLegendKey val="0"/><c:showVal val="${pct ? 0 : 1}"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="${pct ? 1 : 0}"/><c:showBubbleSize val="0"/></c:dLbls>`;
   const solid = (hex: string) => `<c:spPr><a:solidFill><a:srgbClr val="${hex}"/></a:solidFill></c:spPr>`;
+  const f = (v: number) => Math.round(v * 10000) / 10000;
+  // The plot's inner box, where the app draws it.
+  const layout = `<c:layout><c:manualLayout><c:layoutTarget val="inner"/><c:xMode val="edge"/><c:yMode val="edge"/><c:x val="${f(plan.plot.x / plan.w)}"/><c:y val="${f(plan.plot.y / plan.h)}"/><c:w val="${f(plan.plot.w / plan.w)}"/><c:h val="${f(plan.plot.h / plan.h)}"/></c:manualLayout></c:layout>`;
   let plot = '';
   if (pie) {
     const s = series[0] ?? { name: 'Series 1', values: [] };
@@ -617,13 +840,19 @@ function chartXml(e: ChartEl, t: Theme): string {
     const axes = '<c:axId val="51600001"/><c:axId val="51600002"/>';
     const horiz = e.kind === 'bar';
     if (e.kind === 'column' || e.kind === 'bar') {
+      // The app's bars fill 72% of their band, side by side 2 px apart (or stacked).
+      const each = (0.72 * (horiz ? plan.plot.h : plan.plot.w)) / Math.max(1, n) / (e.stacked ? 1 : Math.max(1, series.length));
+      const gap = Math.round(Math.min(500, (0.28 / 0.72) * 100 * (e.stacked ? 1 : Math.max(1, series.length))));
+      const overlap = e.stacked ? 100 : Math.max(-100, Math.round((-2 / Math.max(2, each)) * 100));
       const sers = series.map((s, si) => `<c:ser><c:idx val="${si}"/><c:order val="${si}"/>${tx(s, si)}${solid(colorOf(si, s))}<c:invertIfNegative val="0"/>${e.values ? dLbls(false) : ''}${cat}${val(s, si)}</c:ser>`).join('');
-      plot = `<c:barChart><c:barDir val="${horiz ? 'bar' : 'col'}"/><c:grouping val="${e.stacked ? 'stacked' : 'clustered'}"/><c:varyColors val="0"/>${sers}<c:gapWidth val="60"/>${e.stacked ? '<c:overlap val="100"/>' : '<c:overlap val="-8"/>'}${axes}</c:barChart>`;
+      plot = `<c:barChart><c:barDir val="${horiz ? 'bar' : 'col'}"/><c:grouping val="${e.stacked ? 'stacked' : 'clustered'}"/><c:varyColors val="0"/>${sers}<c:gapWidth val="${gap}"/><c:overlap val="${overlap}"/>${axes}</c:barChart>`;
     } else if (e.kind === 'line') {
+      // Its markers as large as the app's dots (their size in points).
+      const mark = Math.max(2, Math.min(72, Math.round(2 * Math.max(3, e.size / 4.5) * 0.75)));
       const sers = series
         .map((s, si) => {
           const hex = colorOf(si, s);
-          return `<c:ser><c:idx val="${si}"/><c:order val="${si}"/>${tx(s, si)}<c:spPr><a:ln w="${emu(Math.max(2, e.size / 6))}" cap="rnd"><a:solidFill><a:srgbClr val="${hex}"/></a:solidFill><a:round/></a:ln></c:spPr><c:marker><c:symbol val="circle"/><c:size val="6"/><c:spPr><a:solidFill><a:srgbClr val="${hex}"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr></c:marker>${e.values ? dLbls(false) : ''}${cat}${val(s, si)}<c:smooth val="0"/></c:ser>`;
+          return `<c:ser><c:idx val="${si}"/><c:order val="${si}"/>${tx(s, si)}<c:spPr><a:ln w="${emu(Math.max(2, e.size / 6))}" cap="rnd"><a:solidFill><a:srgbClr val="${hex}"/></a:solidFill><a:round/></a:ln></c:spPr><c:marker><c:symbol val="circle"/><c:size val="${mark}"/><c:spPr><a:solidFill><a:srgbClr val="${hex}"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr></c:marker>${e.values ? dLbls(false) : ''}${cat}${val(s, si)}<c:smooth val="0"/></c:ser>`;
         })
         .join('');
       plot = `<c:lineChart><c:grouping val="${e.stacked ? 'stacked' : 'standard'}"/><c:varyColors val="0"/>${sers}<c:marker val="1"/>${axes}</c:lineChart>`;
@@ -631,25 +860,52 @@ function chartXml(e: ChartEl, t: Theme): string {
       const sers = series
         .map((s, si) => {
           const hex = colorOf(si, s);
-          return `<c:ser><c:idx val="${si}"/><c:order val="${si}"/>${tx(s, si)}<c:spPr><a:solidFill><a:srgbClr val="${hex}"><a:alpha val="${e.stacked ? 85000 : 35000}"/></a:srgbClr></a:solidFill><a:ln w="${emu(Math.max(2, e.size / 6))}"><a:solidFill><a:srgbClr val="${hex}"/></a:solidFill></a:ln></c:spPr>${e.values ? dLbls(false) : ''}${cat}${val(s, si)}</c:ser>`;
+          return `<c:ser><c:idx val="${si}"/><c:order val="${si}"/>${tx(s, si)}<c:spPr><a:solidFill><a:srgbClr val="${hex}"><a:alpha val="${e.stacked ? 85000 : 28000}"/></a:srgbClr></a:solidFill><a:ln w="${emu(Math.max(2, e.size / 6))}"><a:solidFill><a:srgbClr val="${hex}"/></a:solidFill></a:ln></c:spPr>${e.values ? dLbls(false) : ''}${cat}${val(s, si)}</c:ser>`;
         })
         .join('');
       plot = `<c:areaChart><c:grouping val="${e.stacked ? 'stacked' : 'standard'}"/><c:varyColors val="0"/>${sers}${axes}</c:areaChart>`;
     }
-    const grid = e.grid ? `<c:majorGridlines><c:spPr><a:ln w="9525"><a:solidFill><a:srgbClr val="${hexColor('fg', t).hex}"><a:alpha val="14000"/></a:srgbClr></a:solidFill></a:ln></c:spPr></c:majorGridlines>` : '';
-    const axisLine = `<c:spPr><a:ln w="9525"><a:solidFill><a:srgbClr val="${hexColor('fg', t).hex}"><a:alpha val="35000"/></a:srgbClr></a:solidFill></a:ln></c:spPr>`;
-    plot += `<c:catAx><c:axId val="51600001"/><c:scaling><c:orientation val="${horiz ? 'maxMin' : 'minMax'}"/></c:scaling><c:delete val="0"/><c:axPos val="${horiz ? 'l' : 'b'}"/><c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="low"/>${axisLine}${txPr(e.size)}<c:crossAx val="51600002"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`;
-    plot += `<c:valAx><c:axId val="51600002"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${horiz ? 'b' : 'l'}"/>${grid}<c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:spPr><a:ln><a:noFill/></a:ln></c:spPr>${txPr(e.size)}<c:crossAx val="51600001"/><c:crosses val="${horiz ? 'max' : 'autoZero'}"/><c:crossBetween val="between"/></c:valAx>`;
+    const fg = hexColor('fg', t).hex;
+    const grid = e.grid ? `<c:majorGridlines><c:spPr><a:ln w="9525"><a:solidFill><a:srgbClr val="${fg}"><a:alpha val="12000"/></a:srgbClr></a:solidFill></a:ln></c:spPr></c:majorGridlines>` : '';
+    const axisLine = `<c:spPr><a:ln w="9525"><a:solidFill><a:srgbClr val="${fg}"><a:alpha val="35000"/></a:srgbClr></a:solidFill></a:ln></c:spPr>`;
+    plot += `<c:catAx><c:axId val="51600001"/><c:scaling><c:orientation val="${horiz ? 'maxMin' : 'minMax'}"/></c:scaling><c:delete val="0"/><c:axPos val="${horiz ? 'l' : 'b'}"/><c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="low"/>${axisLine}${txPr(e.size, false, ink, true)}<c:crossAx val="51600002"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:tickLblSkip val="1"/><c:noMultiLvlLbl val="0"/></c:catAx>`;
+    plot += `<c:valAx><c:axId val="51600002"/><c:scaling><c:orientation val="minMax"/><c:max val="${plan.hi}"/><c:min val="${plan.lo}"/></c:scaling><c:delete val="0"/><c:axPos val="${horiz ? 'b' : 'l'}"/>${grid}<c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:spPr><a:ln><a:noFill/></a:ln></c:spPr>${txPr(e.size)}<c:crossAx val="51600001"/><c:crosses val="${horiz ? 'max' : 'autoZero'}"/><c:crossBetween val="between"/><c:majorUnit val="${plan.step}"/></c:valAx>`;
   }
+  // The title centred at the top, where the app writes it (its width as the font's letters are wide on average).
+  const tw = Math.min(plan.w, e.title ? e.title.length * e.size * 1.2 * 0.6 : 0);
+  const titleAt = `<c:layout><c:manualLayout><c:xMode val="edge"/><c:yMode val="edge"/><c:x val="${f(Math.max(0, (plan.w - tw) / 2 - e.size * 0.3) / plan.w)}"/><c:y val="0"/></c:manualLayout></c:layout>`;
   const title = e.title
-    ? `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${sz(e.size * 1.2)}" b="1"/></a:pPr><a:r><a:rPr ${langAttrs(e.title)} sz="${sz(e.size * 1.2)}" b="1" kern="100"><a:solidFill><a:srgbClr val="${hexColor('head', t).hex}"/></a:solidFill>${fonts}</a:rPr><a:t>${esc(e.title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/>`
+    ? `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${sz(e.size * 1.2)}" b="1"/></a:pPr><a:r><a:rPr ${langAttrs(e.title)} sz="${sz(e.size * 1.2)}" b="1" kern="100"><a:solidFill><a:srgbClr val="${hexColor('head', t).hex}"/></a:solidFill>${fonts}</a:rPr><a:t>${esc(e.title)}</a:t></a:r></a:p></c:rich></c:tx>${titleAt}<c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/>`
     : '<c:autoTitleDeleted val="1"/>';
-  const legend = e.legend && (pie || series.length > 1 || !!series[0]?.name) ? `<c:legend><c:legendPos val="b"/><c:overlay val="0"/>${txPr(e.size)}</c:legend>` : '';
-  return `${XML_HEAD}<c:chartSpace ${C}><c:roundedCorners val="0"/><c:chart>${title}<c:plotArea><c:layout/>${plot}</c:plotArea>${legend}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>${txPr(e.size)}</c:chartSpace>`;
+  const legend = plan.legend ? `<c:legend><c:legendPos val="b"/><c:overlay val="0"/>${txPr(e.size)}</c:legend>` : '';
+  const data = book ? `<c:externalData r:id="${book}"><c:autoUpdate val="0"/></c:externalData>` : '';
+  return `${XML_HEAD}<c:chartSpace ${C}><c:date1904 val="0"/><c:lang val="en-US"/><c:roundedCorners val="0"/><c:chart>${title}<c:plotArea>${layout}${plot}</c:plotArea>${legend}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>${txPr(e.size)}${data}</c:chartSpace>`;
+}
+
+/** A chart's numbers as the workbook PowerPoint keeps beside it (Sheet1: its labels down column A, a column per series), for Edit Data. */
+export function chartBook(e: ChartEl): Buffer {
+  const pie = e.kind === 'pie' || e.kind === 'doughnut';
+  const series = pie ? e.series.slice(0, 1) : e.series;
+  const str = (ref: string, v: string) => `<c r="${ref}" t="inlineStr"><is><t>${esc(v)}</t></is></c>`;
+  const rows = [`<row r="1">${series.map((s, si) => str(`${col(si + 1)}1`, s.name)).join('')}</row>`];
+  e.labels.forEach((l, i) => {
+    rows.push(`<row r="${i + 2}">${str(`A${i + 2}`, l)}${series.map((s, si) => `<c r="${col(si + 1)}${i + 2}"><v>${Number.isFinite(s.values[i]) ? s.values[i] : 0}</v></c>`).join('')}</row>`);
+  });
+  const SML = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+  return zipParts([
+    {
+      name: '[Content_Types].xml',
+      data: `${XML_HEAD}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`,
+    },
+    { name: '_rels/.rels', data: relsXml([['rId1', 'officeDocument', 'xl/workbook.xml']]) },
+    { name: 'xl/workbook.xml', data: `${XML_HEAD}<workbook xmlns="${SML}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>` },
+    { name: 'xl/_rels/workbook.xml.rels', data: relsXml([['rId1', 'worksheet', 'worksheets/sheet1.xml']]) },
+    { name: 'xl/worksheets/sheet1.xml', data: `${XML_HEAD}<worksheet xmlns="${SML}"><sheetData>${rows.join('')}</sheetData></worksheet>` },
+  ]);
 }
 
 function chartFrame(c: Ctx, e: ChartEl): string {
-  const rid = c.charts.add(chartXml(e, c.t));
+  const rid = c.charts.add((book) => chartXml(e, c.t, book), chartBook(e));
   const { cNvPr } = nvPr(c, e, 'Chart');
   return `<p:graphicFrame><p:nvGraphicFramePr>${cNvPr}<p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="${emu(e.x)}" y="${emu(e.y)}"/><a:ext cx="${emu(e.w)}" cy="${emu(e.h)}"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="${rid}"/></a:graphicData></a:graphic></p:graphicFrame>`;
 }
@@ -1004,7 +1260,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
   const media: { name: string; key: Buffer }[] = [];
   const movies: { name: string; key: Buffer }[] = [];
   let chartN = 0;
-  const charts: { name: string; xml: string }[] = [];
+  const charts: { name: string; xml: string; book: Buffer }[] = [];
   const hasNotes = deck.slides.some((s) => s.notes);
   const morph = morphNames(deck);
   // Comments: each author's count across the deck, and each slide's comments file.
@@ -1028,9 +1284,10 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
         },
       },
       charts: {
-        add(xml) {
+        add(xml, book) {
           const name = `chart${++chartN}.xml`;
-          charts.push({ name, xml });
+          // Its workbook is its only relationship.
+          charts.push({ name, xml: xml('rId1'), book });
           return rels.add('chart', `../charts/${name}`);
         },
       },
@@ -1082,6 +1339,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
     '<Default Extension="mov" ContentType="video/quicktime"/>',
     '<Default Extension="webm" ContentType="video/webm"/>',
     ...(fonts.length ? ['<Default Extension="fntdata" ContentType="application/x-fontdata"/>'] : []),
+    ...(charts.length ? ['<Default Extension="xlsx" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/>'] : []),
     '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>',
     '<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>',
     '<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>',
@@ -1181,7 +1439,11 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
     parts.push({ name: 'ppt/notesMasters/_rels/notesMaster1.xml.rels', data: relsXml([['rId1', 'theme', '../theme/theme2.xml']]) });
     parts.push({ name: 'ppt/theme/theme2.xml', data: themeXml('Office', null) });
   }
-  for (const c of charts) parts.push({ name: `ppt/charts/${c.name}`, data: c.xml });
+  for (const [i, c] of charts.entries()) {
+    parts.push({ name: `ppt/charts/${c.name}`, data: c.xml });
+    parts.push({ name: `ppt/charts/_rels/${c.name}.rels`, data: relsXml([['rId1', 'package', `../embeddings/Microsoft_Excel_Worksheet${i + 1}.xlsx`]]) });
+    parts.push({ name: `ppt/embeddings/Microsoft_Excel_Worksheet${i + 1}.xlsx`, data: c.book });
+  }
   if (hasComments) {
     parts.push({
       name: 'ppt/commentAuthors.xml',
