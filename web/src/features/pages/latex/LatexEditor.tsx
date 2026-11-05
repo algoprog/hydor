@@ -92,7 +92,7 @@ import { Preview, type Flash } from './Preview';
 import { ReferencesDialog } from './References';
 import { texMacros } from './scan';
 import { docWords, makeSnippet, SAMPLE_BIB, withBibliography, withPackages, type SnipId } from './snippets';
-import { rememberSymbol, SymbolsPanel } from './Symbols';
+import { rememberSymbol, SymbolsPanel } from './SymbolsPanel';
 import { symInsert, type Sym } from './symbols';
 import { TableEditor } from './TableEditor';
 import { MAX_VISUAL } from './visual';
