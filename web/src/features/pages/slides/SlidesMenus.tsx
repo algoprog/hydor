@@ -290,7 +290,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
     {
       label: 'Arrange',
       items: [
-        { label: 'Group', icon: <Group size={14} />, keys: 'Ctrl+G', disabled: ro || !many, run: a.group },
+        { label: 'Group them', icon: <Group size={14} />, keys: 'Ctrl+G', disabled: ro || !many, run: a.group },
         { label: 'Ungroup', icon: <Ungroup size={14} />, keys: 'Ctrl+Shift+G', disabled: ro || !(one?.type === 'group'), run: a.ungroup },
         '-',
         { label: 'Bring to front', icon: <ArrowUpToLine size={14} />, keys: 'Ctrl+Shift+↑', disabled: ro || !n, run: () => a.restack('front') },
