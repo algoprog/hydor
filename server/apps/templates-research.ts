@@ -15,10 +15,14 @@
 //
 // The programs are JavaScript as the code steps show them: String.raw keeps their backslashes as written, so none of
 // them uses a backtick or a template literal.
-import type { AppTemplate } from '../../shared/apps.ts';
+import type { AnswerField, AnswerType, AppTemplate } from '../../shared/apps.ts';
 import type { AppSecret } from '../../shared/app-secrets.ts';
+import { labelOf } from '../../shared/app-manifest.ts';
 
 type Draft = Omit<AppTemplate, 'agent' | 'tools' | 'limits'>;
+
+/** A collection's fields from their names and kinds ({ title: 'text', keys: 'list' }). */
+const fieldsOf = (kinds: Record<string, AnswerType>): AnswerField[] => Object.entries(kinds).map(([id, type]) => ({ id, label: labelOf(id), type }));
 
 /** Who is calling, for the services that ask (arXiv, OpenAlex, Semantic Scholar, GitHub). */
 const UA = 'Hydor (+https://github.com/algoprog/hydor)';
@@ -362,8 +366,8 @@ function categoryOf(s) {
 }
 `;
 
-/** The marks on papers, the papers saved, and the papers seen: what Paper radar keeps. */
-const PAPER_FIELDS = {
+/** A paper saved: what Paper radar keeps of it. */
+const PAPER_FIELDS: Record<string, AnswerType> = {
   key: 'text',
   title: 'text',
   authors: 'text',
@@ -417,9 +421,9 @@ const PAPER_RADAR: Draft = {
   ],
   prompt: '',
   data: {
-    saved: { fields: PAPER_FIELDS, description: 'The papers you saved: what the ranking leans toward' },
-    marks: { fields: { key: 'text', mark: 'text', title: 'text', abstract: 'text' }, description: 'Your latest marks on papers (saved, or not for you), by the paper’s key' },
-    seen: { fields: { day: 'date', keys: 'list' }, description: 'The papers each update looked at, so none comes again' },
+    saved: { fields: fieldsOf(PAPER_FIELDS), description: 'The papers you saved: what the ranking leans toward' },
+    marks: { fields: fieldsOf({ key: 'text', mark: 'text', title: 'text', abstract: 'text' }), description: 'Your latest marks on papers (saved, or not for you), by the paper’s key' },
+    seen: { fields: fieldsOf({ day: 'date', keys: 'list' }), description: 'The papers each update looked at, so none comes again' },
   },
   secrets: [OPENALEX_KEY],
   flow: {
@@ -905,7 +909,7 @@ const CITATION_ALERTS: Draft = {
   ],
   prompt: '',
   data: {
-    cited: { fields: { title: 'text', citing: 'list', count: 'number' }, description: 'Each of your papers, by its key, with the papers seen citing it' },
+    cited: { fields: fieldsOf({ title: 'text', citing: 'list', count: 'number' }), description: 'Each of your papers, by its key, with the papers seen citing it' },
   },
   secrets: [S2_KEY, OPENALEX_KEY],
   flow: {
@@ -1287,7 +1291,7 @@ const NEW_MODEL_WATCH: Draft = {
   prompt: '',
   data: {
     models: {
-      fields: { model: 'text', state: 'text', created: 'text', downloads: 'number', likes: 'number', size: 'number', licence: 'text', what: 'text', run: 'text', score: 'number', note: 'text', checked: 'date' },
+      fields: fieldsOf({ model: 'text', state: 'text', created: 'text', downloads: 'number', likes: 'number', size: 'number', licence: 'text', what: 'text', run: 'text', score: 'number', note: 'text', checked: 'date' }),
       description: 'The models it has looked at closely, by their key: what it found, and their evaluation',
     },
   },
@@ -1460,13 +1464,17 @@ const idOf = (name) => name.replace(/[^\w-]/g, '_').slice(0, 52) + '-' + (functi
   for (let i = 0; i < name.length; i++) h = ((h * 33) ^ name.charCodeAt(i)) >>> 0;
   return h.toString(36).slice(0, 6);
 })();
-// Your metric among a run's (any case, with or without its @k).
+// Your metric among a run's (its last value; any case, with or without its @k).
 const scoreOf = (metrics) => {
   if (!metrics || typeof metrics !== 'object' || !metric) return null;
   const want = metric.toLowerCase().replace(/[^a-z0-9@]/g, '');
-  const k = Object.keys(metrics).find((x) => x.toLowerCase().replace(/[^a-z0-9@]/g, '') === want);
-  const v = k ? Number(metrics[k]) : NaN;
-  return isFinite(v) ? v : null;
+  for (const m of [metrics.last, metrics.best, metrics]) {
+    if (!m || typeof m !== 'object') continue;
+    const k = Object.keys(m).find((x) => x.toLowerCase().replace(/[^a-z0-9@]/g, '') === want);
+    const v = k ? Number(m[k]) : NaN;
+    if (isFinite(v)) return v;
+  }
+  return null;
 };
 const beats = (s) => s !== null && best !== null && isFinite(best) && (higher ? s > best : s < best);
 const changed = [];
@@ -1479,7 +1487,9 @@ for (const m of rows(input.models)) {
   else if (m.runnable === false) [rec.state, rec.note] = ['not run', 'Its weights are for llama.cpp or ONNX only'];
   else {
     try {
-      const job = await ctx.tool('experiment_run', { command: command.split('{model}').join(m.model), cwd: String(input.folder || '').trim() || undefined, name: 'Evaluate ' + m.model, group: 'New-model watch', gpus: 1, tags: ['new-model-watch'], notify: metric && best !== null && isFinite(best) ? { when: { metric: metric, op: higher ? '>' : '<', value: best } } : { done: true } }, { title: 'Evaluate ' + m.model });
+      // You hear of it only when it beats your best (not when each run ends): Experiments tells you then.
+      const notify = Object.assign({ done: false, failed: false }, metric && best !== null && isFinite(best) ? { when: { metric: metric, op: higher ? '>' : '<', value: best } } : {});
+      const job = await ctx.tool('experiment_run', Object.assign({ command: command.split('{model}').join(m.model), cwd: String(input.folder || '').trim() || undefined, name: 'Evaluate ' + m.model, group: 'New-model watch', gpus: 1, tags: ['new-model-watch'], notify: notify }, metric ? { better: { [metric]: higher ? 'max' : 'min' } } : {}), { title: 'Evaluate ' + m.model });
       const j = job && job.data && typeof job.data === 'object' ? job.data : job || {};
       rec.run = String(j.id || '');
       rec.state = rec.run ? 'evaluating' : 'not run';
@@ -1784,8 +1794,8 @@ const DEADLINE_RADAR: Draft = {
   ],
   prompt: '',
   data: {
-    sent: { fields: { venue: 'text', sent: 'list' }, description: 'Reminders sent, by deadline: the days before it they went' },
-    calls: { fields: { pages: 'text', template: 'text', cfp: 'text', checked: 'date' }, description: 'What each conference’s call for papers says: its page limit and template' },
+    sent: { fields: fieldsOf({ venue: 'text', sent: 'list' }), description: 'Reminders sent, by deadline: the days before it they went' },
+    calls: { fields: fieldsOf({ pages: 'text', template: 'text', cfp: 'text', checked: 'date' }), description: 'What each conference’s call for papers says: its page limit and template' },
   },
   flow: {
     steps: [
@@ -2113,11 +2123,11 @@ const LIVING_RELATED_WORK: Draft = {
   prompt: '',
   data: {
     papers: {
-      fields: { topic: 'text', key: 'text', title: 'text', authors: 'text', year: 'number', venue: 'text', url: 'text', abstract: 'text', summary: 'text', relation: 'text', theme: 'text', added: 'date', citekey: 'text', bibtex: 'text', hidden: 'yesno' },
+      fields: fieldsOf({ topic: 'text', key: 'text', title: 'text', authors: 'text', year: 'number', venue: 'text', url: 'text', abstract: 'text', summary: 'text', relation: 'text', theme: 'text', added: 'date', citekey: 'text', bibtex: 'text', hidden: 'yesno' }),
       description: 'The papers of each topic, with what each says and how it relates',
     },
-    seeds: { fields: { line: 'text', title: 'text', s2: 'text', oa: 'text', year: 'number' }, description: 'The seed papers, found once' },
-    topics: { fields: { topic: 'text', themes: 'list', updated: 'date' }, description: 'Each topic’s themes, in order' },
+    seeds: { fields: fieldsOf({ line: 'text', title: 'text', s2: 'text', oa: 'text', year: 'number' }), description: 'The seed papers, found once' },
+    topics: { fields: fieldsOf({ topic: 'text', themes: 'list', updated: 'date' }), description: 'Each topic’s themes, in order' },
   },
   secrets: [S2_KEY, OPENALEX_KEY],
   flow: {
