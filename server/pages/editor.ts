@@ -1661,9 +1661,9 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
       case 'page':
         return tellPage();
       case 'undo':
-        return step(true);
+        return undoTyping();
       case 'redo':
-        return step(false);
+        return redoTyping();
       default:
         return;
     }
