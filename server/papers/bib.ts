@@ -45,8 +45,8 @@ export function statusOf(v: unknown): string {
     .toLowerCase()
     .replace(/[^a-z]/g, '');
   if (!s) return '';
-  if (/^(read|done|finished|haveread)$/.test(s)) return 'Read';
-  if (/^(reading|inprogress|started|current)$/.test(s)) return 'Reading';
+  if (/^(read|done|donereading|finished|haveread)$/.test(s)) return 'Read';
+  if (/^(reading|readingnow|inprogress|started|current)$/.test(s)) return 'Reading';
   if (/^(toread|unread|later|queued|new|todo)$/.test(s)) return 'To read';
   return '';
 }

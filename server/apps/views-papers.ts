@@ -101,8 +101,8 @@ const READING_LIST: AppUi = {
   <p class="sub">{{^.}}Add a paper by its DOI, arXiv id, link or title, import a .bib, or sync with Zotero.{{/.}}{{#.|count}}Search them, mark what you have read, and pick some for a literature matrix.{{/.}}</p>
   <div class="stats">
     <button type="button" class="stat" data-event="status" data-status="To read"><b>{{.|where:status=To read|count}}</b><span>to read</span></button>
-    <button type="button" class="stat" data-event="status" data-status="Reading"><b>{{.|where:status=Reading|count}}</b><span>reading</span></button>
-    <button type="button" class="stat" data-event="status" data-status="Read"><b>{{.|where:status=Read|count}}</b><span>read</span></button>
+    <button type="button" class="stat" data-event="status" data-status="Reading"><b>{{.|where:status=Reading|count}}</b><span>reading now</span></button>
+    <button type="button" class="stat" data-event="status" data-status="Read"><b>{{.|where:status=Read|count}}</b><span>done reading</span></button>
     <div class="stat"><b>{{.|unique:project|count}}</b><span>projects</span></div>
   </div>
 </header>`,
@@ -132,8 +132,8 @@ button.stat:hover { border-color: var(--n-accent); }
   <div class="chips" role="group" aria-label="Status">
     {{#state.status}}<button type="button" class="chip" data-event="status" data-status="">All</button>{{/state.status}}{{^state.status}}<span class="chip on">All</span>{{/state.status}}
     <button type="button" class="chip{{#state.status|is:To read}} on{{/state.status}}" data-event="status" data-status="To read">To read</button>
-    <button type="button" class="chip{{#state.status|is:Reading}} on{{/state.status}}" data-event="status" data-status="Reading">Reading</button>
-    <button type="button" class="chip{{#state.status|is:Read}} on{{/state.status}}" data-event="status" data-status="Read">Read</button>
+    <button type="button" class="chip{{#state.status|is:Reading}} on{{/state.status}}" data-event="status" data-status="Reading">Reading now</button>
+    <button type="button" class="chip{{#state.status|is:Read}} on{{/state.status}}" data-event="status" data-status="Read">Done reading</button>
     {{#state.tag}}<span class="chip on">#{{state.tag}}<button type="button" class="off" data-event="tag" data-tag="" aria-label="Every tag">✕</button></span>{{/state.tag}}
     {{#state.project}}<span class="chip on">{{state.project_name|or:$state.project}}<button type="button" class="off" data-event="project" data-project="" data-name="" aria-label="Every project">✕</button></span>{{/state.project}}
   </div>
@@ -173,7 +173,7 @@ button.stat:hover { border-color: var(--n-accent); }
   <label class="wide"><span>The paper</span><input name="paper" required placeholder="A DOI, an arXiv id, a link or its title"></label>
   <label><span>Project</span><input name="project" value="{{state.project_name}}" placeholder="e.g. Dense retrieval survey"></label>
   <label><span>Tags</span><input name="tags" value="{{state.tag}}" placeholder="Between commas"></label>
-  <label><span>Status</span><select name="status"><option>To read</option><option>Reading</option><option>Read</option></select></label>
+  <label><span>Status</span><select name="status"><option>To read</option><option>Reading now</option><option>Done reading</option></select></label>
   <div class="foot">
     <span class="said">{{#state.added.working}}<span class="busy">Looking it up…</span>{{/state.added.working}}{{^state.added.working}}{{#state.added.result.title}}<span class="ok">✓ {{#state.added.result.added}}Added{{/state.added.result.added}}{{^state.added.result.added}}In your list already{{/state.added.result.added}}: {{state.added.result.title|short:90}}</span>{{/state.added.result.title}}{{#state.added.error}}<span class="err">{{state.added.error}}</span>{{/state.added.error}}{{/state.added.working}}</span>
     <button type="submit" class="n-btn n-primary">Add it</button>
@@ -241,8 +241,8 @@ button.stat:hover { border-color: var(--n-accent); }
   </div>
   <div class="seg" role="group" aria-label="Status">
     <button type="button" class="{{#status|is:To read}}on{{/status}}" data-event="to_read">To read</button>
-    <button type="button" class="{{#status|is:Reading}}on{{/status}}" data-event="reading">Reading</button>
-    <button type="button" class="{{#status|is:Read}}on{{/status}}" data-event="read">Read</button>
+    <button type="button" class="{{#status|is:Reading}}on{{/status}}" data-event="reading">Reading now</button>
+    <button type="button" class="{{#status|is:Read}}on{{/status}}" data-event="read">Done reading</button>
   </div>
 </article>`,
       css:
@@ -280,8 +280,8 @@ button.stat:hover { border-color: var(--n-accent); }
   </div>
   <div class="seg" role="group" aria-label="Status">
     <button type="button" class="{{#status|is:To read}}on{{/status}}" data-event="to_read">To read</button>
-    <button type="button" class="{{#status|is:Reading}}on{{/status}}" data-event="reading">Reading</button>
-    <button type="button" class="{{#status|is:Read}}on{{/status}}" data-event="read">Read</button>
+    <button type="button" class="{{#status|is:Reading}}on{{/status}}" data-event="reading">Reading now</button>
+    <button type="button" class="{{#status|is:Read}}on{{/status}}" data-event="read">Done reading</button>
   </div>
   {{#abstract}}<section><h3>Abstract</h3><p class="abs">{{abstract}}</p></section>{{/abstract}}
   <section>

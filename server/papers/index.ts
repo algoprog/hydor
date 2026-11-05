@@ -19,7 +19,7 @@ import { templateById } from '../apps/templates.ts';
 import type { DB } from '../db.ts';
 import { allSpaces } from '../spaces/index.ts';
 import { userTimezone } from '../userPrefs.ts';
-import { readBib, tagsOf, writeBib } from './bib.ts';
+import { readBib, statusOf, tagsOf, writeBib } from './bib.ts';
 import { appList, findPapers, keepPapers, READING_LIST, tidyProjects, type PaperList, type ProjectOf } from './list.ts';
 import { readPaper } from './resolve.ts';
 import { syncZotero, vaultSender, type ZoteroSend } from './zotero.ts';
@@ -131,7 +131,7 @@ export const READING_LIST_TOOL: RunTool = {
   },
   async run(a, ctx) {
     const op = str(a.op, 20) || 'find';
-    const q = { status: str(a.status, 40), tag: str(a.tag, 60), project: str(a.project, 300), search: str(a.search, 300), ids: Array.isArray(a.ids) ? a.ids.map(String) : undefined, limit: Number(a.limit) || undefined };
+    const q = { status: statusOf(a.status) || str(a.status, 40), tag: str(a.tag, 60), project: str(a.project, 300), search: str(a.search, 300), ids: Array.isArray(a.ids) ? a.ids.map(String) : undefined, limit: Number(a.limit) || undefined };
     const projectOf = projectsOf(ctx.deps.db);
     if (op === 'find') {
       const list = listFor(ctx, true);
@@ -142,7 +142,7 @@ export const READING_LIST_TOOL: RunTool = {
     const list = listFor(ctx);
     // Projects named by their words (a paper's page, an agent) become the projects' ids, and names follow renamed ones.
     tidyProjects(list, projectOf);
-    const keepOpts = { today: today(ctx), status: str(a.status, 40) || undefined, project: str(a.project, 300) || undefined, tags: tagsOf(a.tags), projectOf };
+    const keepOpts = { today: today(ctx), status: statusOf(a.status) || undefined, project: str(a.project, 300) || undefined, tags: tagsOf(a.tags), projectOf };
     if (op === 'keep') {
       const incoming = (Array.isArray(a.papers) ? a.papers : a.papers && typeof a.papers === 'object' ? [a.papers] : []).filter((x: unknown) => x && typeof x === 'object');
       if (!incoming.length) throw new Error('keep: give the papers ({ title, … } each).');
