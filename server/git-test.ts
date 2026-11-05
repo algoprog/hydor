@@ -3,7 +3,9 @@
 // send up, and the two ways to put diverged branches together), merges and rebases that stop on conflicts
 // (continued once settled, or stopped), the history with parents, branches and tags and its search, branches
 // (rename, merge, compare, what deleting one loses), revert and undo, stashes, putting back one part of a
-// file's changes, ignoring a file, and which addresses a clone takes. Build and run:
+// file's changes, ignoring a file, and which addresses a clone takes. Then Find what broke it: the tags and
+// names it offers, the request it starts a session with, and its method (a check script that exits 0, 1 or 125,
+// and git bisect run in a worktree of its own) finding a commit planted to break something. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/git-test.ts && DATA_DIR=/tmp/hydor-test-git node dist/dev/git-test.js
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -13,6 +15,7 @@ import path from 'node:path';
 import { config } from './config.ts';
 import { openDb } from './db.ts';
 import { cloneName, cloneUrlOk, GitRepos, parseRefs, redactUrl } from './git.ts';
+import { bisectRequest } from '../shared/engineering.ts';
 
 if (!config.dataDir.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so the test touches no real data.');
@@ -483,6 +486,113 @@ await test('remotes: add one, by a name and an address a clone would take', asyn
     ],
   );
   assert.equal(r.repo.remote, 'origin', 'origin stays the one to sync with');
+});
+
+// ---- Find what broke it ------------------------------------------------------------------------------------
+
+// A small calculator whose sum went wrong in one commit, between a release that worked and today; one commit in
+// between cannot be tested (its build is broken).
+const calc = path.join(tmp, 'calc');
+fs.mkdirSync(calc);
+sh(calc, 'init', '-q', '-b', 'main');
+local(calc);
+// A day apart each, as real history is (tags list by their commits' dates).
+let day = 0;
+const commitAll = (msg: string) => {
+  const date = `2026-10-${String(++day).padStart(2, '0')}T12:00:00Z`;
+  sh(calc, 'add', '-A');
+  execFileSync('git', ['commit', '-q', '-m', msg], { cwd: calc, env: { ...env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date }, stdio: 'ignore' });
+  return sh(calc, 'rev-parse', 'HEAD');
+};
+w(path.join(calc, 'calc.sh'), '#!/bin/sh\necho $(( $1 + $2 ))\n');
+commitAll('Add the calculator');
+sh(calc, 'tag', 'v1.0');
+w(path.join(calc, 'README.md'), '# Calc\n\nAdds two numbers.\n');
+commitAll('Say what it does');
+sh(calc, 'tag', '-a', 'v1.1', '-m', 'Docs');
+w(path.join(calc, 'calc.sh'), '#!/bin/sh\n# Empty arguments count as nought.\necho $(( ${1:-0} - ${2:-0} ))\n');
+const culprit = commitAll('Accept empty arguments');
+w(path.join(calc, 'NOTES.md'), 'Ideas.\n');
+commitAll('Ideas for later');
+w(path.join(calc, 'BROKEN_BUILD'), 'half moved\n');
+commitAll('Start moving to bin/');
+fs.rmSync(path.join(calc, 'BROKEN_BUILD'));
+commitAll('Finish moving');
+w(path.join(calc, 'NOTES.md'), 'Ideas.\nMore ideas.\n');
+commitAll('More ideas');
+// Exits 0 when the sum is right, 1 when it is wrong, 125 when this commit cannot be tested: kept outside the repository.
+const check = path.join(tmp, 'check-sum.sh');
+w(check, '#!/bin/sh\n[ -f BROKEN_BUILD ] && exit 125\nout=$(sh ./calc.sh 2 3 2>/dev/null) || exit 125\n[ "$out" = "5" ] && exit 0\necho "2 + 3 gave $out"\nexit 1\n');
+
+await test('find what broke it: the tags to pick from, newest first, and what a name stands for', async () => {
+  await repos.add(calc);
+  const { tags } = await repos.tags(calc);
+  assert.deepEqual(
+    tags.map((t) => [t.name, t.subject]),
+    [
+      ['v1.1', 'Say what it does'],
+      ['v1.0', 'Add the calculator'],
+    ],
+  );
+  assert.equal(tags[1].hash, sh(calc, 'rev-parse', 'v1.0^{commit}'));
+  assert.equal((await repos.resolve(calc, 'v1.1'))?.subject, 'Say what it does', 'an annotated tag stands for its commit');
+  assert.equal((await repos.resolve(calc, 'HEAD~4'))?.hash, culprit);
+  assert.equal((await repos.resolve(calc, culprit.slice(0, 7)))?.subject, 'Accept empty arguments');
+  assert.equal(await repos.resolve(calc, 'v9'), null);
+  assert.equal(await repos.resolve(calc, '--output=/tmp/x'), null);
+  assert.equal(await repos.resolve(calc, ''), null);
+  await assert.rejects(repos.tags(path.join(tmp, 'nowhere')), /Not a repository/);
+});
+
+await test('find what broke it: the request names both ends, what is broken and the method, with or without a command', () => {
+  const r = bisectRequest({ good: 'v1.0', goodAt: sh(calc, 'rev-parse', 'v1.0'), bad: 'HEAD', badAt: sh(calc, 'rev-parse', 'HEAD'), broken: 'Two plus three is not five any more.' });
+  assert.match(r, /^Find the commit that broke this: Two plus three is not five any more\.\n/);
+  assert.match(r, new RegExp(`It worked at v1\\.0 \\(${sh(calc, 'rev-parse', '--short=7', 'v1.0')}\\) and is broken at HEAD \\(${sh(calc, 'rev-parse', '--short=7', 'HEAD')}\\)\\.`));
+  assert.match(r, /as the git-bisect skill says: load it first/);
+  assert.match(r, /Write a small check script for it: exit 0 when it works, 1 when it is broken, 125 when a commit cannot be tested\./);
+  assert.match(r, /Try the check on both ends first/);
+  assert.match(r, /git bisect run/);
+  assert.match(r, /Finish with git bisect reset\./);
+  assert.match(r, /leave it in place/);
+  const withCheck = bisectRequest({ good: culprit, goodAt: culprit, bad: 'main', broken: 'Wrong sums', check: 'sh ./calc.sh 2 3 | grep -qx 5' });
+  assert.match(withCheck, new RegExp(`It worked at ${culprit} and is broken at main\\.`), 'a hash is not named twice');
+  assert.match(withCheck, /How to check: `sh \.\/calc\.sh 2 3 \| grep -qx 5` \(it fails while it is broken\)\./);
+  assert.doesNotMatch(withCheck, /Write a small check script/);
+});
+
+await test('find what broke it: the method finds the planted commit in a worktree of its own, past one it cannot test', async () => {
+  const head = sh(calc, 'rev-parse', 'HEAD');
+  const wt = path.join(tmp, 'calc-bisect');
+  sh(calc, 'worktree', 'add', '-q', '-b', 'agent/find-what-broke-sum-1a2b', wt, 'main');
+  const run = (ref: string) => {
+    sh(wt, 'checkout', '-q', ref);
+    try {
+      execFileSync('sh', [check], { cwd: wt, stdio: 'ignore' });
+      return 0;
+    } catch (e) {
+      return (e as { status: number }).status;
+    }
+  };
+  // The check on both ends first: it passes where it worked, fails where it is broken.
+  assert.equal(run('v1.0'), 0);
+  assert.equal(run(head), 1);
+  assert.equal(run(`${culprit}~0`), 1);
+  sh(wt, 'checkout', '-q', 'agent/find-what-broke-sum-1a2b');
+  sh(wt, 'bisect', 'start', head, 'v1.0');
+  const out = execFileSync('git', ['bisect', 'run', 'sh', check], { cwd: wt, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  assert.match(out, new RegExp(`^${culprit} is the first bad commit`, 'm'));
+  assert.match(out, /Accept empty arguments/);
+  // Only the worktree was bisecting: the user's own checkout stayed where it was.
+  assert.equal(sh(calc, 'rev-parse', 'HEAD'), head);
+  assert.equal(sh(calc, 'status', '--porcelain'), '');
+  sh(wt, 'bisect', 'reset');
+  assert.equal(sh(wt, 'branch', '--show-current'), 'agent/find-what-broke-sum-1a2b');
+  // What broke it, from the commit's own change.
+  assert.match(sh(calc, 'show', '--format=', culprit, '--', 'calc.sh'), /^\+echo \$\(\( \$\{1:-0\} - \$\{2:-0\} \)\)$/m);
+  sh(calc, 'worktree', 'remove', wt);
+  sh(calc, 'branch', '-D', 'agent/find-what-broke-sum-1a2b');
+  assert.ok(!fs.existsSync(wt));
+  repos.remove(calc);
 });
 
 repos.remove(a);

@@ -356,7 +356,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   const modeOn = cat && mode && mode !== cat.defaultMode ? (cat.modes.find((m) => m.value === mode)?.label ?? null) : null;
   const acctOn = acct ? (accounts.find((a) => a.id === acct)?.name ?? null) : null;
   const capOn = typeof extra.capUsd === 'number' ? usd(extra.capUsd) : null;
-  const changed = [confidential ? 'Confidential' : null, extra.swarm === true ? 'Swarm' : null, extra.research ? 'Deep research' : null, arenaOf(extra) ? 'Arena' : null, effortOn && `${effortOn} effort`, modeOn, acctOn, extra.memory === false ? 'No memory' : null, capOn && `${capOn} cap`].filter((x): x is string => !!x);
+  const changed = [confidential ? 'Confidential' : null, extra.swarm === true ? 'Swarm' : extra.swarm === 'campaign' ? 'Campaign' : null, extra.research ? 'Deep research' : null, arenaOf(extra) ? 'Arena' : null, effortOn && `${effortOn} effort`, modeOn, acctOn, extra.memory === false ? 'No memory' : null, capOn && `${capOn} cap`].filter((x): x is string => !!x);
   const modeNow = cat?.modes.find((m) => m.value === (mode ?? cat.defaultMode))?.label;
   // Whole lines where a word is a setting's state ("Memory: on"), so each translates as one.
   const optionsTitle = [
@@ -366,7 +366,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     acctOn && `Account: ${acctOn}`,
     extra.memory === false ? 'Memory: off' : 'Memory: on',
     capOn ? `Spending cap: ${capOn}` : 'Spending cap: none',
-    extra.swarm === true ? 'Swarm: on' : 'Swarm: off',
+    extra.swarm === true ? 'Swarm: on' : extra.swarm === 'campaign' ? 'Swarm: campaign' : 'Swarm: off',
     extra.research ? 'Deep research: on' : 'Deep research: off',
     arenaOf(extra) ? 'Arena: on' : 'Arena: off',
   ]

@@ -188,6 +188,11 @@ The app comes with these skills, in the groups the page shows them in. Open any 
 - **security-check**: a practical security review: secrets, injections, who may do what, outdated packages, each problem reported by how serious it is.
 - **performance**: making software faster by measuring first, finding the biggest cost, fixing it and measuring again.
 - **mcp-servers**: building an MCP server so agents get new tools, designing its tools well, testing it, and adding it to an agent.
+- **ci-doctor**: a failed CI run (GitHub Actions, GitLab CI, Buildkite, CircleCI): the first real error in the logs, flaky or real by the evidence, reproduced in a worktree, then re-run once, fixed in a draft pull request or reported, as allowed.
+- **issue-triage**: a new issue labelled with the project's own labels, duplicates found in several wordings (and how sure), a kind request for what the report lacks, and a small fix tried as a draft pull request.
+- **dependency-upgrades**: what is outdated and which dependencies have security advisories, upgraded by risk (security fixes, patch, minor, majors apart) in worktrees with the tests run and the release notes read, one pull request per group.
+- **incident-response**: an alert or outage: you are told at once, then a timeline of errors, deploys and changes, the likely cause with its evidence, a rollback proposed and asked first, and a blameless postmortem afterwards.
+- **git-bisect**: finding the commit that broke something with a check script and git bisect run in a worktree of its own, and why it broke things (see [Find what broke it](/guide/engineering#find-what-broke-it)).
 
 **AI models**
 

@@ -78,9 +78,9 @@ function ChildSettingsBody() {
       </Section>
       <Section
         title="Swarm"
-        sub="Turn on Swarm under Options when you start a session, and a lead agent sets a team on a hard problem, each member from its own angle. They share a board, message each other, and the lead checks the answer."
+        sub="Turn on Swarm under Options when you start a session, and a lead agent sets a team on a hard problem, each member from its own angle: they share a board, message each other, and the lead checks the answer. Or pick Campaign there for one big change in many parts, each member in a worktree of its own."
       >
-        <Setting label="Swarm size" hint="Members working at once in one swarm. Each costs about what one agent does; the lead starts more as some finish.">
+        <Setting label="Swarm size" hint="Members working at once in one swarm or campaign. Each costs about what one agent does; the lead starts more as some finish.">
           {st && <Stepper value={st.swarmSize} max={SWARM_SIZE_LIMIT} onChange={(n) => saveChildSettings({ swarmSize: n })} />}
         </Setting>
       </Section>
