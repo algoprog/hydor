@@ -15,12 +15,11 @@
 //
 //   GET  /p-api/:token                      the project: its documents, sessions, runs and reading list (?visit=1 counts a visit)
 //   GET  /p-api/:token/items/:id            a document: its own page to read (or its model, to edit) and its comments
-//   GET  /p-api/:token/items/:id/thumb      its picture
 //   POST /p-api/:token/items/:id/storage    a page's stored data, to read (get, keys)
 //   POST /p-api/:token/items/:id/comments   { text, quote? } a comment; { id, reply }; { id, resolved }; one's own: { id, text }, { id, delete: true }
 //   POST /p-api/:token/items/:id/versions   Edit documents: { model, base, force? } a new version
 //   GET  /p-api/:token/sessions/:key        a session as a read-only link shows it (?from=: from that item on)
-//   GET  /p-api/:token/pages/assets/:sha, POST /p-api/:token/pages/assets, GET /p-api/:token/pages/:id/export,
+//   GET  /p-api/:token/pages/:id/thumb, GET /p-api/:token/pages/assets/:sha, POST /p-api/:token/pages/assets, GET /p-api/:token/pages/:id/export,
 //   GET  /p-api/:token/pages/tex/setup, POST …/tex/compile, GET …/tex/:key/(pdf|sync|place|:page)   the editors' own calls
 import fs from 'node:fs';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -433,7 +432,7 @@ export function portalRoutes(d: Deps) {
     return { page: itemView(page), editable: false, html, ...(comments ? { comments } : {}) };
   });
 
-  app.get('/p-api/:token/items/:id/thumb', async (req, reply) => {
+  app.get('/p-api/:token/pages/:id/thumb', async (req, reply) => {
     const p = person(req);
     const page = itemOf(db, p, P(req).id);
     const f = thumbFile(db, page.id);
@@ -482,7 +481,7 @@ export function portalRoutes(d: Deps) {
     if (!b.model || typeof b.model !== 'object') throw new HttpError(400, 'Send the document’s model');
     take(p, 'save', 240, 'That is a lot of saves in an hour.');
     const base = Number(b.base);
-    let model = b.model;
+    let model: unknown = b.model;
     if (Number.isInteger(base) && base > 0 && base !== page.version) {
       // Only people's comments came meanwhile: they join this save.
       const c = carryComments(db, page.id, base, model);

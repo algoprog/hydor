@@ -1,10 +1,11 @@
-// A comment as the editors show it, beside a document's page or in a list of comments: who wrote it (you, or an
-// agent), how long ago, what it says and the replies under it, with Reply, Resolve (or Reopen), and in its menu Edit
-// and Delete. CommentBox is the field a new comment or a reply is written in: Ctrl+Enter sends it, Esc drops it.
-// What people and agents wrote is shown as written, never translated.
+// A comment as the editors show it, beside a document's page or in a list of comments: who wrote it (you, an agent,
+// or someone a project is shared with, by name), how long ago, what it says and the replies under it, with Reply,
+// Resolve (or Reopen), and in its menu Edit and Delete. CommentBox is the field a new comment or a reply is written in:
+// Ctrl+Enter sends it, Esc drops it. What people and agents wrote is shown as written, never translated.
 import { useEffect, useRef, useState } from 'react';
 import { Bot, Check, MoreHorizontal, Pencil, RotateCcw, Trash2, User } from 'lucide-react';
-import type { Comment } from '@shared/comments';
+import type { Comment, CommentReply } from '@shared/comments';
+import { initials } from '@shared/share';
 import { Button, cx, IconButton, MenuItem, Popover } from '../../../components/ui';
 import { LOCALE } from '../../../i18n/locale';
 
@@ -19,11 +20,29 @@ function ago(at: number): string {
   return d.toLocaleDateString(LOCALE, d.getFullYear() === now.getFullYear() ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function Who({ by }: { by: 'user' | 'agent' }) {
+/** Who "you" are where comments show: the app's owner, or (in a shared project's portal, which sets it) that person's share. */
+let me: string | null = null;
+export const setCommentMe = (id: string | null) => void (me = id);
+
+/** Whether you wrote it: the owner's own, or in a shared project's portal, that person's. */
+export const isMine = (c: Pick<Comment, 'by' | 'who'>) => c.by === 'user' || (c.by === 'person' && !!me && c.who === me);
+
+function Who({ c }: { c: Pick<CommentReply, 'by' | 'name' | 'who'> }) {
+  const person = c.by === 'person' && !isMine(c);
   return (
-    <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-fg">
-      <span className={cx('flex h-5 w-5 items-center justify-center rounded-full', by === 'agent' ? 'bg-accent-soft text-accent' : 'bg-bg-3 text-fg-2')}>{by === 'agent' ? <Bot size={12} /> : <User size={12} />}</span>
-      {by === 'agent' ? 'Agent' : 'You'}
+    <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium text-fg">
+      <span className={cx('flex h-5 w-5 shrink-0 items-center justify-center rounded-full', c.by === 'agent' ? 'bg-accent-soft text-accent' : person ? 'bg-info/15 text-[9.5px] font-semibold text-info' : 'bg-bg-3 text-fg-2')}>
+        {c.by === 'agent' ? <Bot size={12} /> : person ? initials(c.name ?? '?') : <User size={12} />}
+      </span>
+      {c.by === 'agent' ? (
+        'Agent'
+      ) : person ? (
+        <span translate="no" className="truncate">
+          {c.name}
+        </span>
+      ) : (
+        'You'
+      )}
     </span>
   );
 }
@@ -115,13 +134,16 @@ export function CommentThread({
   onReply: (text: string) => void;
   onResolve: (resolved: boolean) => void;
   onEdit?: (text: string) => void;
-  onDelete: () => void;
+  /** Left out where it may not be deleted (someone else's, in a shared project's portal). */
+  onDelete?: () => void;
   readOnly?: boolean;
   className?: string;
 }) {
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
   const [replying, setReplying] = useState(false);
+  // In a shared project's portal, only your own comments can be deleted (the owner's app deletes any).
+  const deletable = !!onDelete && (!me || isMine(c));
   const more = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!active) setReplying(false);
@@ -132,7 +154,7 @@ export function CommentThread({
       className={cx('rounded-xl border bg-elevated p-2.5 text-[13px] transition-shadow', active ? 'border-accent/60 shadow-lg' : 'border-line hover:border-line-2', c.resolved && 'opacity-70', onFocus && 'cursor-pointer', className)}
     >
       <div className="flex items-center gap-2">
-        <Who by={c.by} />
+        <Who c={c} />
         <span className="text-[11.5px] text-fg-3">{ago(c.at)}</span>
         <span className="flex-1" />
         {!readOnly && (
@@ -147,19 +169,21 @@ export function CommentThread({
             >
               {c.resolved ? <RotateCcw size={14} /> : <Check size={15} />}
             </IconButton>
-            <IconButton
-              ref={more}
-              label="More"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenu((m) => !m);
-              }}
-            >
-              <MoreHorizontal size={15} />
-            </IconButton>
+            {((onEdit && isMine(c)) || deletable) && (
+              <IconButton
+                ref={more}
+                label="More"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenu((m) => !m);
+                }}
+              >
+                <MoreHorizontal size={15} />
+              </IconButton>
+            )}
             <Popover anchor={more} open={menu} onClose={() => setMenu(false)} align="end" width={180} title="Comment">
-              {onEdit && c.by === 'user' && (
+              {onEdit && isMine(c) && (
                 <MenuItem
                   icon={<Pencil size={14} />}
                   onClick={() => {
@@ -170,16 +194,18 @@ export function CommentThread({
                   Edit
                 </MenuItem>
               )}
-              <MenuItem
-                icon={<Trash2 size={14} />}
-                danger
-                onClick={() => {
-                  setMenu(false);
-                  onDelete();
-                }}
-              >
-                Delete
-              </MenuItem>
+              {deletable && (
+                <MenuItem
+                  icon={<Trash2 size={14} />}
+                  danger
+                  onClick={() => {
+                    setMenu(false);
+                    onDelete?.();
+                  }}
+                >
+                  Delete
+                </MenuItem>
+              )}
             </Popover>
           </>
         )}
@@ -210,7 +236,7 @@ export function CommentThread({
       {c.replies?.map((r) => (
         <div key={r.id} className="mt-2.5 border-t border-line/70 pt-2">
           <div className="flex items-center gap-2">
-            <Who by={r.by} />
+            <Who c={r} />
             <span className="text-[11.5px] text-fg-3">{ago(r.at)}</span>
           </div>
           <div translate="no" className="mt-1 whitespace-pre-wrap break-words text-fg">
