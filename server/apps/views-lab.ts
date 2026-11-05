@@ -149,6 +149,7 @@ const ANNOTATE_UI: AppUi = {
 .chips { margin-top: 12px; }
 kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 5px; background: var(--n-soft); color: var(--n-muted); font: 600 11.5px var(--n-mono); }
 .guide { margin-top: 12px; font-size: 14px; }
+@media (max-width: 520px) { .hero { padding: 14px 16px; } .hero h1 { font-size: 19px !important; } .chips { display: none; } .guide { margin-top: 6px; } }
 .guide summary { color: var(--n-accent); cursor: pointer; }
 .md { margin-top: 8px; padding: 10px 14px; border-left: 3px solid var(--n-line); color: var(--n-fg); line-height: 1.55; }
 .md > :first-child { margin-top: 0; } .md > :last-child { margin-bottom: 0; }
@@ -238,7 +239,7 @@ kbd { display: inline-grid; place-items: center; flex: none; min-width: 24px; he
     <div class="stat"><b>{{state.agree.pe|percent|or:—}}</b><span>what chance alone would give</span></div>
   </div>
   <h3 class="sub">Your labels down the side, the model’s across the top</h3>
-  <n-widget name="agreement" value="{{.|json}}" labels="{{result.labels|json}}"></n-widget>
+  <n-widget name="matrix" value="{{.|json}}" labels="{{result.labels|json}}"></n-widget>
   <p class="note">The same label counts the texts you both labelled alike. Cohen’s κ is that agreement beyond what chance alone would give, from how often each of you gave each label: 1 is perfect agreement, 0 no better than chance; above 0.6 is usually taken as substantial, above 0.8 as almost perfect. Texts the model gave no label are left out.</p>
 </div>`,
       css:
@@ -294,7 +295,7 @@ kbd { display: inline-grid; place-items: center; flex: none; min-width: 24px; he
   },
   widgets: {
     keys: { code: KEYS_WIDGET, height: '0px', description: 'Keys for labelling: 1 to 9 press a label’s button, S skips, Z changes the last one, N writes a note' },
-    agreement: { code: AGREEMENT_WIDGET, css: AGREEMENT_WIDGET_CSS, height: '120px', description: 'The confusion matrix of your labels against the model’s, with the agreement worked out for the page' },
+    matrix: { code: AGREEMENT_WIDGET, css: AGREEMENT_WIDGET_CSS, height: '120px', description: 'The confusion matrix of your labels against the model’s, with the agreement worked out for the page' },
   },
   events: {
     label: [{ do: 'data', op: 'update', collection: 'items', id: '{{event.id}}', record: { label: '{{event.label}}', done: true, agree: '{{event.label|is:$event.model}}' } }],
@@ -332,7 +333,7 @@ const SPRINT_UI: AppUi = {
       title: 'Runs',
       if: 'result.runs',
       blocks: [
-        { title: 'Each condition against the baseline', text: '{{result.results}}', if: 'result.results' },
+        { element: 'sprint-results', if: 'result.results' },
         {
           title: 'Its runs',
           element: 'table',
@@ -403,6 +404,19 @@ code { padding: 1px 6px; border-radius: 6px; background: var(--n-soft); font: 12
 .crit b { color: var(--n-fg); font-weight: 600; }
 `,
     },
+    'sprint-results': {
+      description: 'The results table, each condition against the baseline with significance, and a way to it in Experiments',
+      html: String.raw`<section class="res">
+  <div class="top"><h2>Each condition against the baseline</h2>{{#result.results_page}}<button type="button" class="n-btn" data-event="open_table">Open it in Experiments</button>{{/result.results_page}}</div>
+  <div class="md">{{result.results|markdown}}</div>
+</section>`,
+      css: String.raw`
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 8px; }
+h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.md { overflow-x: auto; font-size: 14.5px; }
+.md table { width: 100%; border-collapse: collapse; } .md th, .md td { padding: 8px 10px; border-bottom: 1px solid var(--n-line); text-align: left; font-variant-numeric: tabular-nums; } .md th { color: var(--n-muted); font-weight: 500; }
+`,
+    },
     'sprint-report': {
       description: 'The report to read and copy, its notebook, and what to try next',
       html: String.raw`<article class="doc">
@@ -426,6 +440,7 @@ code { padding: 1px 6px; border-radius: 6px; background: var(--n-soft); font: 12
     },
   },
   events: {
+    open_table: [{ do: 'open', url: '{{result.results_page}}' }],
     open_notebook: [{ do: 'open', url: '{{result.notebook}}' }],
     copy_report: [{ do: 'copy', text: '{{result.report}}' }],
   },
@@ -475,7 +490,7 @@ const SWEEP_UI: AppUi = {
     'sweep-hero': {
       description: 'The best settings and their metric, and the sweep in numbers',
       html: String.raw`<header class="hero">
-  <p class="kicker">The best run · {{inputs.metric}}, {{#inputs.better|is:Higher}}higher is better{{/inputs.better}}{{^inputs.better|is:Higher}}lower is better{{/inputs.better}}</p>
+  <p class="kicker">The best run · <span class="k">{{inputs.metric}}</span>, {{#inputs.better|is:Higher}}higher is better{{/inputs.better}}{{^inputs.better|is:Higher}}lower is better{{/inputs.better}}</p>
   <h1><span class="v">{{result.best_value|number}}</span> {{result.best}}</h1>
   <div class="stats">
     <div class="stat"><b>{{result.count}}</b><span>runs</span></div>
@@ -483,12 +498,15 @@ const SWEEP_UI: AppUi = {
     <div class="stat"><b>{{result.mattered|count}}</b><span>settings</span></div>
     <div class="stat"><b>{{result.hours|number|or:0}}</b><span>GPU hours planned</span></div>
   </div>
+  {{#result.page}}<p class="go"><button type="button" class="n-btn" data-event="open_sweep">Open the sweep in Experiments</button></p>{{/result.page}}
 </header>`,
       css:
         HERO_CSS +
         STATS_CSS +
         String.raw`
 h1 { overflow-wrap: anywhere; }
+.kicker .k { font-family: var(--n-mono); text-transform: none; letter-spacing: 0; }
+.go { margin: 14px 0 0; }
 .v { padding: 0 8px; border-radius: 8px; background: var(--n-accent-soft); color: var(--n-accent); font-variant-numeric: tabular-nums; }
 `,
     },
@@ -525,6 +543,7 @@ h3 span:last-child { color: var(--n-muted); font-size: 12.5px; font-weight: 400;
 `,
     },
   },
+  events: { open_sweep: [{ do: 'open', url: '{{result.page}}' }] },
 };
 
 // ---- Weekly progress report ------------------------------------------------------------------------------------------
