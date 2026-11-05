@@ -71,7 +71,7 @@ The apps for everyday things are smaller and quicker: they get real data from fr
 - **A topic as a timeline**: any topic as a timeline, read from Wikipedia: its key moments with dates (up to thirty **In depth**), its eras and the story in short. Its view has **The timeline** (show one strand; **Quiz me on it** starts a quiz on the topic) and **On a chart** (the moments by year, the turning points bigger, and the eras).
 - **Explore a place**: what is around any place, on a map: sights, museums, parks and landmarks with a picture and a line each, the best for you picked out and put in walking order. Its view has **The walk** (the stops numbered and joined on the map, each to mark seen; **The weather there**) and **Everything around** (show one kind).
 
-<!-- Lead: a line introducing the apps for research and the lab. -->
+The apps for research and the lab keep up with your field, read and check papers, and look after your experiments and reports. Several open on their own page and can update by themselves, as Explore does; the [Research](/guide/researchers) topic tells how they fit together.
 
 <!-- B1: one bullet per app (Paper radar, Citation alerts, New-model watch, Deadline radar, Living related work, Gap finder), as the bullets above. -->
 
