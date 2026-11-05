@@ -3,6 +3,22 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.28.1 · 5 November 2026
+
+Updates of the desktop apps no longer give up on a slow or interrupted download, and on a Mac they keep the
+permissions you gave Hydor.
+
+- **A download that breaks off carries on**: when your computer goes to sleep, or the connection drops or goes quiet
+  for a minute, the new version's download picks up where it stopped as soon as it can, instead of failing after half
+  an hour and starting again from nothing 4 hours later. If it still gets no further after a couple of minutes, it
+  keeps what it has and tries again an hour later.
+- When an update fails, Settings → General says why in plain words: how far the download got, that GitHub did not
+  answer, or that it could not be reached, rather than "The operation was aborted due to timeout".
+- **The Mac app keeps its permissions when it updates**: Accessibility and Screen Recording, which computer use needs,
+  carry over to each new version, so you no longer have to give them again after every update. Coming from an earlier
+  version, give them once more: macOS still lists the old Hydor as switched on, and **Allow…** in Settings → Computer
+  use now clears that old switch, so macOS asks again and you turn Hydor on.
+
 ## 0.28.0 · 4 November 2026
 
 Computer use on Windows and Linux too, a glow around the screen while an agent is at it, and Esc to stop it.
