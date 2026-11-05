@@ -85,6 +85,7 @@ import { setModelsHere } from './models.ts';
 import { hasMedia, mediaRoutes, putAsset, takeInAnswer } from './media.ts';
 import { saveAppSecrets, secretsOf } from './secrets.ts';
 import { dropDaily, homeOf, saveHome } from './home.ts';
+import { WORK_LOG } from './worklog.ts';
 
 const keyLimiter = new Limiter();
 /** The largest request that installs an app: its file, as base64. */
@@ -1176,8 +1177,8 @@ export const apps: Feature = {
   tools(ctx) {
     // A template's run gets what it hands in with and what it keeps; any other session what templates are built with.
     if (runOfCtx(ctx)) return [submitTool(ctx), dataTool(ctx), flowTool(ctx)].filter((t): t is RunTool => !!t);
-    // Any other session: what apps are built with, and the user's apps to run for them.
-    return [...builderTools(ctx, { problemsOf: (raw) => problemsOf(ctx.deps.db, raw), prepare }), findAppsTool(ctx), useAppTool(ctx)].filter((t): t is RunTool => !!t);
+    // Any other session: what apps are built with, and the user's apps to run for them; a step also what the user did (work_log).
+    return [...builderTools(ctx, { problemsOf: (raw) => problemsOf(ctx.deps.db, raw), prepare }), findAppsTool(ctx), useAppTool(ctx), ctx.step ? WORK_LOG : null].filter((t): t is RunTool => !!t);
   },
   /** An app's run gets the tools its app allows; a public run only the answer and, if allowed, the web. */
   allowTool(name, ctx) {
