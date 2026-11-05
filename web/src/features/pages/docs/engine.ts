@@ -1407,6 +1407,13 @@ export class DocEngine {
     this.commit(ops.setBox(this.doc, at.b, at.c, next), { a: end, f: end });
   }
 
+  /** A block moved before the block now at `to` (dragged by its handle). */
+  moveBlock(id: string, to: number) {
+    this.before = this.sel;
+    this.setPicked(null);
+    this.apply(ops.moveBlock(this.doc, id, to));
+  }
+
   /** A table of contents at the caret. */
   insertToc() {
     this.insert([{ id: ops.freshId(this.doc), type: 'toc' }]);

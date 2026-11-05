@@ -30,6 +30,7 @@ import { loadKatex, texHtmlNow } from '../common/katex';
 import { MenuBar } from '../common/menus';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import { inputCls } from '../../../components/ui';
+import { BlockHandle } from './BlockHandle';
 import { CommentsColumn, CommentsPanel, type CommentActions, type Draft } from './CommentsView';
 import { editorCss, paperPx, useDocFonts } from './css';
 import { BandsDialog, EquationBox, SpacingDialog, WordCountDialog, type Counts } from './Dialogs';
@@ -950,10 +951,11 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
                   </button>
                 );
               })}
-              {st?.picked && e && st.picked.type !== 'toc' && st.picked.type !== 'math' && (
+              {st?.picked && e && st.picked.type !== 'math' && (
                 <Picked engine={e} block={st.picked} host={host} tick={tick} readOnly={readOnly} onReplace={(id) => void replacePicture(id)} onAsk={onAsk ? askPicture : undefined} />
               )}
               {handlesFor && e && <ColumnHandles engine={e} table={handlesFor} host={host} tick={`${tick}:${model.blocks.length}`} />}
+              {e && !readOnly && !narrow && <BlockHandle engine={e} host={host} paper={paper} tick={model.blocks} />}
               {found.boxes.map((b, k) => (
                 <span key={k} className="pointer-events-none absolute rounded-[2px]" style={{ left: b.x, top: b.y, width: b.w, height: b.h, background: b.now ? 'rgba(255,150,50,.55)' : 'rgba(255,213,79,.45)' }} />
               ))}

@@ -3,24 +3,7 @@
 // break, a table of contents, today's date), narrowed as more is typed. The arrow keys and Enter pick, Esc or a space
 // closes it; what was typed from the "/" goes when something is picked. The editor keeps where the "/" is and the keys.
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import {
-  CalendarDays,
-  Code2,
-  Heading1,
-  Heading2,
-  Heading3,
-  Image as ImageIcon,
-  Lightbulb,
-  List,
-  ListChecks,
-  ListOrdered,
-  Minus,
-  Quote,
-  SeparatorHorizontal,
-  Sigma,
-  Table2,
-  TableOfContents,
-} from 'lucide-react';
+import { CalendarDays, Code2, Heading1, Heading2, Heading3, Image as ImageIcon, Lightbulb, List, ListChecks, ListOrdered, Minus, Quote, SeparatorHorizontal, Sigma, Table2, TableOfContents } from 'lucide-react';
 import { cx } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
 import type { DocEngine } from './engine';
@@ -59,7 +42,15 @@ export function slashItems(e: DocEngine, more: { picture: () => void; equation: 
 export function slashMatches(items: SlashItem[], q: string): SlashItem[] {
   const k = q.toLowerCase();
   if (!k) return items;
-  return items.filter((it) => [it.label, tr(it.label), it.also].some((w) => w.toLowerCase().split(/\s+/).some((x) => x.startsWith(k)) || w.toLowerCase().startsWith(k)));
+  return items.filter((it) =>
+    [it.label, tr(it.label), it.also].some(
+      (w) =>
+        w
+          .toLowerCase()
+          .split(/\s+/)
+          .some((x) => x.startsWith(k)) || w.toLowerCase().startsWith(k),
+    ),
+  );
 }
 
 /** Where a "/" command is being typed: the "/" itself, and the words after it. */
