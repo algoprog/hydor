@@ -23,7 +23,7 @@ import { exportFile } from './exportFile';
 import { EXPORTS } from './exports';
 import { EDITORS } from './editors';
 import type { ModelDoc } from './kinds';
-import { draftKind, emptyModel, useLiveDraft, usePageDraft } from './live';
+import { draftKind, useEmptyModel, useLiveDraft, usePageDraft } from './live';
 import type { Deck } from '@shared/slides';
 import { usePicks } from '../session/HtmlPage';
 import { ReviewPane, shotsOfTurn } from '../shots/Review';
@@ -433,7 +433,8 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
 
   const Editor = loaded?.kind ? EDITORS[loaded.kind] : fresh && saving ? EDITORS[saving] : undefined;
   // A new one being written: its editor, empty until the first words come (the same editor then shows it saved).
-  const freshDoc = useMemo(() => (fresh && saving && draft ? { key: `draft:${draft.id}`, title: draft.title ?? title, model: emptyModel(saving) } : null), [fresh, saving, draft?.id]);
+  const empty = useEmptyModel(fresh ? saving : null);
+  const freshDoc = useMemo(() => (fresh && saving && draft && empty ? { key: `draft:${draft.id}`, title: draft.title ?? title, model: empty } : null), [fresh, saving, draft?.id, empty]);
   if (Editor && ((loaded?.kind && loaded.model && loaded.saveModel) || freshDoc)) {
     const saveModel = loaded?.saveModel;
     return (
