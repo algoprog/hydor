@@ -68,12 +68,12 @@ Easy means: the cause is clear from the report and the code; the change is small
 files); a test can show it; and it needs no design decision. A typo, a wrong message, a missed edge case with a
 clear expected result. Anything else: leave it, and say in your report why it is not easy.
 
-1. A worktree from the default branch: `git fetch origin && git worktree add -b fix/<n>-<short-name> ../issue-<n> origin/<default>`.
+1. A worktree from the default branch, in a temporary folder: `git fetch origin && git worktree add -b fix/<n>-<short-name> /tmp/issue-<n> origin/<default>`.
 2. A test that fails for the reported reason first, then the fix; run the suite around it and the linters.
 3. Commit with the project's message style, push your branch, open a draft pull request:
    `gh pr create --draft --title "..." --body-file pr.md`, the body saying what was wrong, the fix, how you
    checked it, and "Fixes #<n>".
-4. `git worktree remove ../issue-<n>`.
+4. `git worktree remove /tmp/issue-<n>`.
 
 ## 7. Report
 

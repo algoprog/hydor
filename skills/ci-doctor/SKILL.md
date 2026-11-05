@@ -57,12 +57,12 @@ Say how sure you are, and why.
 
 ## 4. Reproduce it in a worktree
 
-Never in the user's own checkout:
+Never in the user's own checkout, and in a temporary folder rather than beside it:
 
 ```bash
 git fetch origin <branch>
-git worktree add --detach ../ci-<run id> <sha>
-cd ../ci-<run id>
+git worktree add --detach /tmp/ci-<run id> <sha>
+cd /tmp/ci-<run id>
 ```
 
 Run what the CI runs: read its configuration (`.github/workflows/*.yml`, `.gitlab-ci.yml`,
@@ -98,7 +98,7 @@ draft pull request that says so).
 - Your reply, in a few lines: what failed (the job and test), flaky or real and the evidence, what you did (the new
   attempt's link, the pull request's), and what you suggest.
 - Add to your task notes: the failure, the verdict, flaky tests seen and how often.
-- Clean up: `git worktree remove ../ci-<run id>`, and local branches that hold nothing.
+- Clean up: `git worktree remove /tmp/ci-<run id>`, and local branches that hold nothing.
 
 ## Pitfalls
 

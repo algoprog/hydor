@@ -30,12 +30,12 @@ If the request is vague and you can ask, ask; otherwise make it concrete yoursel
 
 Bisecting checks out commit after commit, so never do it in the user's checkout. A session started from Git's
 **Find what broke it** already runs in a worktree of its own. Otherwise make one:
-`git worktree add --detach ../bisect-<short-name> <bad>`. Bisect state belongs to the worktree: the user's own
+`git worktree add --detach /tmp/bisect-<short-name>/worktree <bad>`. Bisect state belongs to the worktree: the user's own
 checkout and branches stay as they are.
 
 ## 4. The check script
 
-Keep it outside the repository (checkouts would change it), say `/tmp/bisect-<short-name>/check.sh`:
+Keep it outside the repository and its worktree (checkouts would change it), say `/tmp/bisect-<short-name>/check.sh`:
 
 ```sh
 #!/bin/sh
@@ -92,7 +92,7 @@ candidates ("The first bad commit could be any of"): look at each. For a long hi
 ## 8. Clean up and report
 
 - `git bisect reset`, always, even when it went wrong.
-- Remove a worktree you made (`git worktree remove ../bisect-<short-name>`) unless asked to keep it; leave the
+- Remove a worktree you made (`git worktree remove /tmp/bisect-<short-name>/worktree`) unless asked to keep it; leave the
   session's own (the user removes it with the session). Delete the scratch folder.
 - Report: the first bad commit (hash, subject, author, date, and its link on GitHub or GitLab when there is one),
   what in it broke what and why, the evidence (the check at both ends, the revert test), the fix you suggest, and

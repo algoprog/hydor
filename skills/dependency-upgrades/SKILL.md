@@ -60,8 +60,8 @@ what was held back for a reason that still holds.
 
 ```bash
 git fetch origin
-git worktree add -b deps/<group>-<yyyy-mm-dd> ../deps-<group> origin/<default>
-cd ../deps-<group>
+git worktree add -b deps/<group>-<yyyy-mm-dd> /tmp/deps-<group> origin/<default>
+cd /tmp/deps-<group>
 ```
 
 - Upgrade with the tool, never by editing a lock file: `npm install pkg@1.4.2`, `npm update` (within ranges),
@@ -85,7 +85,7 @@ If you may open pull requests: commit (manifest and lock file together), push th
 - What you ran (install, build, tests) and how it went; what to watch after merging.
 
 If you may not: push nothing; report each group's upgrades, what you checked and the commands that apply it.
-Either way, remove the worktrees (`git worktree remove ../deps-<group>`) and update your task notes: pull
+Either way, remove the worktrees (`git worktree remove /tmp/deps-<group>`) and update your task notes: pull
 requests open, upgrades held back and why, advisories without a fix yet.
 
 ## Pitfalls
