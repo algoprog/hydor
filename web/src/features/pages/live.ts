@@ -7,16 +7,7 @@
 // arrive in view without taking the page from a reader who scrolled away.
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { PageDraft } from '@shared/pages';
-import { readPartial } from '@shared/partial-json';
 import { DraftMemo, DRAFT_TOOLS, type DraftKind, type DraftTool, type Drafted } from '@shared/page-drafts';
-import { draftDoc } from '@shared/draft-doc';
-import { draftDeck } from '@shared/draft-deck';
-import { draftBook } from '@shared/draft-book';
-import { draftTex } from '@shared/draft-tex';
-import { normalizeDoc } from '@shared/docs';
-import { normalizeDeck } from '@shared/slides';
-import { newBook } from '@shared/sheets';
-import { normalizeTex } from '@shared/latex';
 import { live as socket } from '../../lib/ws';
 import type { LiveDraft } from './kinds';
 import { useDrafts } from './state';
@@ -30,20 +21,19 @@ export const isDraftTool = (t: string): t is DraftTool => Object.prototype.hasOw
 /** The kind of page a draft saves; null for a page of HTML or a file. */
 export const draftKind = (d: PageDraft | null | undefined): DraftKind | null => (d && isDraftTool(d.tool) ? DRAFT_TOOLS[d.tool] : null);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const BUILD: Partial<Record<DraftKind, (base: any, p: ReturnType<typeof readPartial>, memo: DraftMemo) => Drafted<any> | null>> = {
-  doc: draftDoc,
-  slides: draftDeck,
-  sheet: draftBook,
-  tex: draftTex,
-};
+// The builders (and the models they read) load the first time they are needed: live-build.ts.
+type Build = typeof import('./live-build');
+let built: Build | null = null;
+let building: Promise<Build> | null = null;
+const loadBuild = () => (building ??= import('./live-build').then((m) => (built = m)));
 
-/** An empty one of a kind: the editor of a new one being written starts from it. */
-export function emptyModel(kind: DraftKind): unknown {
-  if (kind === 'doc') return normalizeDoc({ markdown: '' });
-  if (kind === 'slides') return normalizeDeck({ slides: [{ layout: 'blank' }] });
-  if (kind === 'sheet') return newBook();
-  return normalizeTex({ main: '' });
+/** An empty one of a kind, for a new one's editor to start from: null until the builders have loaded. */
+export function useEmptyModel(kind: DraftKind | null): unknown {
+  const [, loaded] = useState(0);
+  useEffect(() => {
+    if (kind && !built) void loadBuild().then(() => loaded((n) => n + 1));
+  }, [kind]);
+  return useMemo(() => (kind && built ? built.emptyModel(kind) : null), [kind, !!built]);
 }
 
 /**
@@ -82,7 +72,6 @@ export function useLiveDraft<M>(kind: DraftKind | null | undefined, base: M | nu
     !!draft &&
     !!kind &&
     draftKind(draft) === kind &&
-    !!BUILD[kind] &&
     !draft.failed &&
     !(draft.saved && version !== undefined && version >= draft.saved.version) &&
     !(draft.done && !draft.saved && version !== undefined && seen.current?.version !== undefined && version > seen.current.version) &&
@@ -103,12 +92,14 @@ export function useLiveDraft<M>(kind: DraftKind | null | undefined, base: M | nu
     }
     const build = () => {
       timer.current = 0;
+      // The first time: once the builders are here.
+      if (!built) return void loadBuild().then(build);
       last.current = performance.now();
       const { draft: d, base: b, kind: k, memo: m } = now.current;
       if (!d || !k) return;
       let r: Drafted<M> | null = null;
       try {
-        r = BUILD[k]!(b ?? null, readPartial(d.text), m);
+        r = built.buildDraft(k, b ?? null, d.text, m);
       } catch {
         // What cannot be shown yet waits for the next pieces.
         return;

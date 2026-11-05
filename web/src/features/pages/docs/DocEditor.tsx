@@ -431,12 +431,18 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     return () => window.removeEventListener('keydown', on);
   });
 
-  // The words it has, a moment after each change.
+  // The words it has, a moment after each change; while an agent writes, those shown, counted once a second at most.
+  const wordsAt = useRef(0);
   useEffect(() => {
-    if (!model) return;
-    const t = setTimeout(() => setWords(docWords(model)), 400);
+    const d = shownDoc;
+    if (!d) return;
+    const wait = liveOn ? Math.max(0, 1000 - (performance.now() - wordsAt.current)) : 400;
+    const t = setTimeout(() => {
+      wordsAt.current = performance.now();
+      setWords(docWords(d));
+    }, wait);
     return () => clearTimeout(t);
-  }, [model]);
+  }, [shownDoc]);
 
   // What an agent asked now would be about, told as the caret moves.
   const lastScopes = useRef('');
