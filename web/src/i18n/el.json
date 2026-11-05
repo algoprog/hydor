@@ -13403,5 +13403,7 @@
 "This database is full: some of the change could not be kept.":"Αυτή η βάση δεδομένων είναι γεμάτη: μέρος της αλλαγής δεν κρατήθηκε.",
 "To change a database, save_page with this id and databases: {\"<name>\": {\"add\": [{\"<column>\": value, …}], \"update\": [{\"id\": \"<row id>\", \"<column>\": value}], \"remove\": [\"<row id>\"]}} (also \"rows\" to set all of them, \"cols\" for the columns, \"title\"); values by column name: text, a number, an option’s name (new names become options), a list of names for multi-select, \"YYYY-MM-DD\" for a date, true for a ticked checkbox, an address for a link.":"To change a database, save_page with this id and databases: {\"<name>\": {\"add\": [{\"<column>\": value, …}], \"update\": [{\"id\": \"<row id>\", \"<column>\": value}], \"remove\": [\"<row id>\"]}} (also \"rows\" to set all of them, \"cols\" for the columns, \"title\"); values by column name: text, a number, an option’s name (new names become options), a list of names for multi-select, \"YYYY-MM-DD\" for a date, true for a ticked checkbox, an address for a link.",
 "To do":"Προς υλοποίηση",
-"Untitled database":"Βάση δεδομένων χωρίς τίτλο"
+"Untitled database":"Βάση δεδομένων χωρίς τίτλο",
+"contains":"περιέχει",
+"has":"έχει"
 }
