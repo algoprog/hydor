@@ -383,6 +383,26 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
   ok(!losses.loses.length && !losses.cut, 'a file written here loses nothing coming back');
 }
 
+// ---- comments' authors ------------------------------------------------------------------------------------------------
+{
+  const d = normalizeDoc({
+    blocks: [{ p: [{ t: 'Budget ', cm: ['m1'] }, { t: 'and plan.' }] }],
+    comments: [
+      { id: 'm1', by: 'user', author: '  Maria   Lopez ', text: 'Too high?', at: 1_700_000_000_000, replies: [{ id: 'm1r', by: 'user', author: 'Jun Park', text: 'Agreed.', at: 1_700_000_100_000 }, { id: 'm1s', by: 'user', text: 'Cut it.', at: 1_700_000_200_000 }] },
+      { id: 'm2', by: 'user', author: 'You', text: 'Mine.', at: 1_700_000_300_000 },
+    ],
+  });
+  ok(d.comments?.[0].author === 'Maria Lopez' && d.comments[0].replies?.[0].author === 'Jun Park' && !d.comments[0].replies?.[1].author, 'a comment and its replies keep who wrote them, by name');
+  ok(!d.comments?.[1].author, 'the names that stand for you and an agent are no names of their own');
+  const file = docxOfDoc(db, d, 'Budget');
+  const cx = new Zip(file).text('word/comments.xml') ?? '';
+  ok(cx.includes('w:author="Maria Lopez"') && cx.includes('w:initials="ML"') && cx.includes('w:author="Jun Park"') && cx.includes('w:author="You" w:date="') && cx.includes('w:initials="Y"'), 'a Word file carries their names and initials');
+  const back = docFromFile(file, 'Budget.docx');
+  const m = back.comments?.find((c) => c.text === 'Too high?');
+  ok(m?.author === 'Maria Lopez' && m.replies?.[0].author === 'Jun Park' && !m.replies?.[1].author && !back.comments?.find((c) => c.text === 'Mine.')?.author, 'and they come back from Word, yours as yours');
+  ok(docForAgent(docText(d)).includes('“Maria Lopez”, 2023-11-14') && docForAgent(docText(d)).includes('↳ “Jun Park”'), 'get_page names them');
+}
+
 // ---- its own web page, opened again --------------------------------------------------------------------------------
 {
   const d = normalizeDoc({

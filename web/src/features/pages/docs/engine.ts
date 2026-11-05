@@ -654,7 +654,13 @@ export class DocEngine {
     if (t === 'insertText' || t === 'insertReplacementText') {
       const data = e.data ?? e.dataTransfer?.getData('text/plain') ?? '';
       if (collapsed && t === 'insertText' && data === ' ' && this.shortcut(s)) return e.preventDefault();
-      if (oneBox && !(collapsed && this.pending && t === 'insertText')) return;
+      // At the end of a comment's words (or a link), the browser would type into them and stretch the comment: the
+      // words go in here instead, as lookAt says they look.
+      const boxRuns = ops.boxRuns(this.doc, s.b, s.c) ?? [];
+      const before = collapsed ? ops.runAt(boxRuns, s.o) : undefined;
+      const want = collapsed ? ops.lookAt(boxRuns, s.o) : null;
+      const edge = !!before && !!want && !before.math && ((before.cm?.join() ?? '') !== (want.cm?.join() ?? '') || (before.link ?? '') !== (want.link ?? ''));
+      if (oneBox && !edge && !(collapsed && this.pending && t === 'insertText')) return;
       e.preventDefault();
       const look = this.pending ?? ops.lookAt(ops.boxRuns(this.doc, s.b, s.c) ?? [], collapsed ? s.o : s.o + 1);
       const cut = ops.deleteRange(this.doc, s, en);

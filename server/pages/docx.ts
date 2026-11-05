@@ -91,14 +91,15 @@ export interface DocBand {
   align?: 'center' | 'right';
 }
 
-/** A comment for the file: who wrote it, when, what it says, its replies, whether it was resolved. */
+/** A comment for the file: who wrote it (by name, when it is someone other than you or an agent), when, what it says, its replies, whether it was resolved. */
 export interface DocComment {
   id: string;
   by: 'user' | 'agent';
+  author?: string;
   text: string;
   at: number;
   resolved?: boolean;
-  replies?: { by: 'user' | 'agent'; text: string; at: number }[];
+  replies?: { by: 'user' | 'agent'; author?: string; text: string; at: number }[];
 }
 
 /** How a document of Pages looks (its own font and sizes, in points; line spacing as a multiple). */
@@ -1856,16 +1857,17 @@ export function docxFile(
     for (const c of comments) {
       const nums = cmNum.get(c.id)!;
       const parent = (++para14).toString(16).toUpperCase();
-      const one = (n: number, by: 'user' | 'agent', text: string, at: number, pid: string) => {
+      const one = (n: number, by: 'user' | 'agent', author: string | undefined, text: string, at: number, pid: string) => {
         const lines = text.split('\n');
         const ps = lines.map((l, k) => `<w:p${k === lines.length - 1 ? ` w14:paraId="${pid}" w14:textId="77777777"` : ''}><w:pPr><w:pStyle w:val="CommentText"/></w:pPr>${k === 0 ? '<w:r><w:rPr><w:rStyle w:val="CommentReference"/></w:rPr><w:annotationRef/></w:r>' : ''}${runXml({ t: l })}</w:p>`);
-        items.push(`<w:comment w:id="${n}" w:author="${by === 'agent' ? 'Agent' : 'You'}" w:date="${when(at)}" w:initials="${by === 'agent' ? 'A' : 'Y'}">${ps.join('')}</w:comment>`);
+        const who = authorOf(by, author);
+        items.push(`<w:comment w:id="${n}" w:author="${esc(who.name)}" w:date="${when(at)}" w:initials="${esc(who.initials)}">${ps.join('')}</w:comment>`);
       };
-      one(nums[0], c.by, c.text, c.at, parent);
+      one(nums[0], c.by, c.author, c.text, c.at, parent);
       ex.push(`<w15:commentEx w15:paraId="${parent}" w15:done="${c.resolved ? 1 : 0}"/>`);
       (c.replies ?? []).forEach((r, k) => {
         const pid = (++para14).toString(16).toUpperCase();
-        one(nums[k + 1], r.by, r.text, r.at, pid);
+        one(nums[k + 1], r.by, r.author, r.text, r.at, pid);
         ex.push(`<w15:commentEx w15:paraId="${pid}" w15:paraIdParent="${parent}" w15:done="${c.resolved ? 1 : 0}"/>`);
       });
     }
@@ -1905,6 +1907,14 @@ export function docxFile(
     ...extra,
     ...media,
   ]);
+}
+
+/** Who wrote a comment or a change, as Word names them: their name (You and Agent for you and an agent) and initials. */
+export function authorOf(by: 'user' | 'agent', author?: string): { name: string; initials: string } {
+  const name = (author ?? '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80) || (by === 'agent' ? 'Agent' : 'You');
+  const words = name.split(' ').filter(Boolean);
+  const initials = (words.length > 1 ? [...words[0]][0] + [...words[words.length - 1]][0] : [...name].slice(0, 2).join('')).toUpperCase();
+  return { name, initials: author ? initials : by === 'agent' ? 'A' : 'Y' };
 }
 
 /** A header's or footer's words, with Word's page number and count where they say {page} and {pages}. */
