@@ -147,7 +147,16 @@ On a phone, tap the panel to open the browser full screen; the × closes it.
 
 The live view is a picture of the page, sent several times a second while you watch. It says "Connecting to the browser…" until the first one comes.
 
-Each step the agent takes in the browser also shows in the conversation, among its other steps, as a line (“Opened github.com”, “Clicked [12] button "Sign in"”, “Asked you: Log in to GitHub”) with a small picture of the page after it. Click the line to see the picture larger and the agent's full answer. The app keeps the pictures of each session's last 400 steps; those of sessions untouched for a month go.
+### See where the agent points
+
+The browser runs out of sight, so the live view draws the agent's pointer for you: a large arrow in the app's colour, with a soft halo and an **Agent** tag beside it.
+
+- Before the agent clicks, types or scrolls, its pointer glides from where it was to that place, in about a third of a second, so your eye can follow it. While you watch, the agent waits for it; when nobody watches the browser, it doesn't wait.
+- Where it clicks, a ring spreads (two for a double click). The field it types into, or the list it chooses from, gets an outline for a moment. A scroll shows its way with arrows beside the pointer, and the keys it presses (Enter, Tab, Ctrl+A) show beside the tag.
+- The pointer stays where the agent last acted. On the small picture of the folded panel, it shows as a small arrow.
+- While you drive, the agent's pointer goes from the live view: yours is the only one. It comes back when you hand the browser back.
+
+Each step the agent takes in the browser also shows in the conversation, among its other steps, as a line (“Opened github.com”, “Clicked [12] button "Sign in"”, “Asked you: Log in to GitHub”) with a small picture of the page after it. Click the line to see the picture larger and the agent's full answer. On the larger picture, a ring marks where the step clicked and a dashed outline the field it typed into, numbered when the step did several things. The app keeps the pictures of each session's last 400 steps; those of sessions untouched for a month go.
 
 ## Take over to log in, solve a check or pay
 
@@ -299,7 +308,17 @@ The first time an agent in a session wants the computer, a card in the conversat
 
 While an agent works, a glow lines the edges of your screen, on every display, and a note at the bottom says "An agent is using your Mac" (your PC, your computer) and "Press Esc to stop". Clicks go through it, and it never takes the keyboard. It is for you only: the agent's screenshots never show it (it is hidden for the moment a screenshot takes, and comes back). On Linux it needs a desktop that composites its windows, as GNOME, KDE, Xfce, Cinnamon and MATE do; without one there is no glow, and the tray icon still says an agent is at work.
 
-Each step shows in the conversation as a line with a small picture of the screen after it: click the picture to see it large, and the line for the agent's full answer. The app keeps the pictures of each session's last 200 steps; those of sessions untouched for a month go.
+### See where the agent points on your screen
+
+The agent moves your own mouse pointer, which is small and easy to lose. So while it works, a large ring with a soft halo, in the glow's colours, circles the pointer, with an **Agent** tag beside it:
+
+- the pointer glides to each place in a quarter of a second instead of jumping there, and the ring goes with it, so your eye can follow;
+- where it clicks, a ripple spreads (a dashed one for a right click, two for a double click), and while it holds the button down (a drag), the ring tightens and follows the drag;
+- the words it types, and the keys it presses (Ctrl+S, Enter), show beside the tag for a moment, and a scroll shows its way with arrows.
+
+The ring is part of the glow: clicks go through it, it never takes the keyboard, the agent's screenshots never show it, and on Linux it needs a desktop that composites its windows.
+
+Each step shows in the conversation as a line with a small picture of the screen after it: click the picture to see it large, and the line for the agent's full answer. Opened, the picture marks where the step acted: a ring where it clicked (two for a double click, dashed for a right click), a line along a drag, an arrow where it scrolled, numbered when the step did several things. The app keeps the pictures of each session's last 200 steps; those of sessions untouched for a month go.
 
 Agents are told to look before they act, to use the browser for websites, and never to type passwords, card numbers or codes, pay, buy or send money: for those they stop and ask you to do it yourself. One session uses the computer at a time.
 
@@ -321,5 +340,6 @@ Stopping ends what the agent is doing and takes back every session's allowance: 
 - "Never let the browser open facebook.com or tiktok.com."
 - "Show the browser in a window on this computer, and turn its screenshots off."
 - "Make a browser profile called Shopping." (Logging in to sites in it is yours to do, in Settings → Browser.)
+- "Fill in the library card form at riverside.example.org for me; I'll watch." (its pointer shows in the live view where it clicks and types)
 - "Open Notes on my Mac and start a note with today's shopping list."
-- "Open Notepad and write down today's shopping list." (on Windows; the glow around the screen shows while it works, and Esc stops it)
+- "Open Notepad and write down today's shopping list." (on Windows; the glow around the screen shows while it works, its ring shows where it points, and Esc stops it)
