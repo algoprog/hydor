@@ -39,7 +39,7 @@ import { useDocFind } from './finding';
 import { docMenus, PAGE_NUMBERS, type Zoom } from './menu';
 import { fixDoc, runsBetween, sameDoc, type Pos } from './ops';
 import { Picked } from './Picture';
-import { slashAt, slashItems, slashMatches, SlashMenu } from './Slash';
+import { slashAt, slashItems, slashLayout, slashMatches, SlashMenu } from './Slash';
 import { ColumnHandles, printDoc } from './TableTools';
 import { Toolbar } from './Toolbar';
 
@@ -452,7 +452,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     const r = slash ? engine.current?.caretRect() : null;
     const h = host.current?.getBoundingClientRect();
     if (!r || !h) return setSlashPos(null);
-    setSlashPos({ x: Math.max(4, Math.min(r.left - h.left, h.width - 244)), top: r.top - h.top, bottom: r.bottom - h.top });
+    setSlashPos({ x: Math.max(4, Math.min(r.left - h.left, h.width - slashBox.width - 4)), top: r.top - h.top, bottom: r.bottom - h.top });
   }, [slash?.key, slash?.query, tick]);
 
   const found = useDocFind(engine.current, model, find, host.current, tick);
@@ -474,6 +474,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   const e = engine.current;
   const slashList = e && slash ? slashMatches(slashItems(e, { picture: () => void pickPicture(), equation: () => openEquation(false), today: () => today() }), slash.query) : [];
   const slashOpen = !!slash && slashList.length > 0 && !!slashPos;
+  const slashBox = slashLayout(slashList.length, (host.current?.clientWidth ?? width) - 8);
 
   /** A place over the page for a box to open by (the caret, or a block). */
   const spotAt = (r: DOMRect | null | undefined) => {
@@ -503,6 +504,13 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
         ev.preventDefault();
         const n = slashList.length;
         setSlash({ ...slash, index: (slash.index + (ev.key === 'ArrowDown' ? 1 : n - 1)) % n });
+        return true;
+      }
+      // Across the two columns.
+      if ((ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') && slashBox.rows < slashList.length) {
+        ev.preventDefault();
+        const j = slash.index + (ev.key === 'ArrowRight' ? slashBox.rows : -slashBox.rows);
+        if (j >= 0 && j < slashList.length) setSlash({ ...slash, index: j });
         return true;
       }
       if (ev.key === 'Enter' || ev.key === 'Tab') {
@@ -1031,6 +1039,8 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
                   index={Math.min(slash!.index, slashList.length - 1)}
                   at={slashPos}
                   bound={scroller.current?.getBoundingClientRect().bottom ?? window.innerHeight}
+                  rows={slashBox.rows}
+                  width={slashBox.width}
                   onPick={pickSlash}
                   onHover={(k) => setSlash((s) => (s ? { ...s, index: k } : s))}
                 />
