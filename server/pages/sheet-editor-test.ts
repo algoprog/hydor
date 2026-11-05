@@ -237,6 +237,29 @@ const sh = book.sheets[0];
   ok(page.includes(`left:${42 + 500}px;top:${22 + 24}px;width:${6 * 100}px;height:${11 * 24}px`) && page.includes('not as long as each other'), 'the page draws each chart between its cells, and says why one cannot draw');
 }
 
+// ---- the Kanban board, kept with the sheet ----------------------------------------------------------------------------
+{
+  const kb = normalizeBook({
+    sheets: [
+      {
+        name: 'K',
+        rows: [['Task', 'Id', 'Hours', 'Status'], ['Plan', 1, 4, 'Open'], ['Build', 2, 12, 'Doing']],
+        validation: [{ range: 'D2:D20', list: ['Open', 'Doing', 'Done'] }],
+        board: { by: 'Status', fields: ['Hours', 'Id', 'Nope', 'D'], lanes: ['Done', 'Open', 'done', ''], open: true },
+      },
+      { name: 'L', rows: [['x']], board: { by: 'Nothing' } },
+    ],
+  });
+  const bd = kb.sheets[0].board;
+  ok(JSON.stringify(bd) === JSON.stringify({ at: 'A1', by: 'D', fields: ['B', 'C'], lanes: ['Done', 'Open'], open: true }) && !kb.sheets[1].board, 'a board: its column and fields by header (Id is a header before it is a column), lanes once each, opening on it; none without a column');
+  ok(JSON.stringify(normalizeBook(JSON.parse(bookText(kb))).sheets[0].board) === JSON.stringify(bd), 'kept and read back as it was');
+  const moved = adjustForInsert(kb, kb.sheets[0].id, 'col', 1, 1).sheets[0].board;
+  const rowsIn = adjustForInsert(kb, kb.sheets[0].id, 'row', 0, 2).sheets[0].board;
+  ok(moved?.by === 'E' && moved.fields?.join() === 'C,D' && rowsIn?.at === 'A3', 'columns put in move its columns, rows its table');
+  ok(!adjustForDelete(kb, kb.sheets[0].id, 'col', 3, 1).sheets[0].board && JSON.stringify(adjustForDelete(kb, kb.sheets[0].id, 'col', 1, 1).sheets[0].board?.fields) === '["B"]', 'the column it groups by taken out takes it; a field’s column taken out, the field');
+  ok(bookForAgent(bookText(kb)).includes('a Kanban board of the table at A1 grouped by column D, which the sheet opens on'), 'get_page says it has a board');
+}
+
 // ---- Excel files: written and read back ---------------------------------------------------------------------------
 {
   const calc = computeBook(book);

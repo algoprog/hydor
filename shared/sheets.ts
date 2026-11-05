@@ -268,6 +268,19 @@ export interface SheetChart {
   to: ChartCorner;
 }
 
+/**
+ * A sheet's Kanban board, kept with it: the table it shows (by its header row's first cell), the column it groups by
+ * and the columns its cards show (by letter; none said: the first few), the order of its lanes (the options' values;
+ * the others after them), and whether the sheet opens on it.
+ */
+export interface SheetBoard {
+  at: string;
+  by: string;
+  fields?: string[];
+  lanes?: string[];
+  open?: boolean;
+}
+
 export interface Sheet {
   id: string;
   name: string;
@@ -285,6 +298,7 @@ export interface Sheet {
   conditional?: CondRule[];
   validation?: Validation[];
   charts?: SheetChart[];
+  board?: SheetBoard;
 }
 
 export interface Workbook {
@@ -1659,6 +1673,49 @@ function cleanCharts(v: unknown, g: SheetSizes): SheetChart[] {
   return out;
 }
 
+/**
+ * A board as kept: its table's first cell, the column it groups by and those its cards show, each named by its letters
+ * or by its header's words in the table's first row (the words first: "Id" is a header before it is column ID), its
+ * lanes' order and whether the sheet opens on it; undefined without a column to group by.
+ */
+function cleanBoard(v: unknown, cells: Map<number, Cell>): SheetBoard | undefined {
+  if (!isObj(v)) return undefined;
+  const p = typeof v.at === 'string' ? parseRef(v.at.replace(/\$/g, '').trim().toUpperCase()) : null;
+  const at = p && p.r < SHEET_LIMITS.rows && p.c < SHEET_LIMITS.cols ? p : { r: 0, c: 0 };
+  const heads = new Map<string, number>();
+  for (let c = at.c; c < SHEET_LIMITS.cols && c < at.c + 200; c++) {
+    const h = cells.get(pack(at.r, c))?.v;
+    if (typeof h === 'string' && h.trim() && !heads.has(h.trim().toLowerCase())) heads.set(h.trim().toLowerCase(), c);
+  }
+  const colOf = (x: unknown): number | null => {
+    if (typeof x !== 'string' || !x.trim()) return null;
+    const byHead = heads.get(x.trim().toLowerCase());
+    if (byHead !== undefined) return byHead;
+    const c = /^[A-Za-z]{1,3}$/.test(x.trim()) ? colIndex(x.trim().toUpperCase()) : -1;
+    return c >= at.c && c < SHEET_LIMITS.cols ? c : null;
+  };
+  const by = colOf(v.by ?? v.group ?? v.groupBy);
+  if (by === null) return undefined;
+  const out: SheetBoard = { at: refName(at.r, at.c), by: colName(by) };
+  if (Array.isArray(v.fields)) {
+    const cols = [...new Set(v.fields.slice(0, 50).map(colOf).filter((c): c is number => c !== null && c !== by))].sort((a, b) => a - b);
+    out.fields = cols.map(colName);
+  }
+  if (Array.isArray(v.lanes)) {
+    const seen = new Set<string>();
+    const lanes: string[] = [];
+    for (const x of v.lanes.slice(0, 100)) {
+      const t = typeof x === 'string' || typeof x === 'number' ? cleanText(String(x)).trim().slice(0, 255) : '';
+      if (!t || seen.has(t.toLowerCase())) continue;
+      seen.add(t.toLowerCase());
+      lanes.push(t);
+    }
+    if (lanes.length) out.lanes = lanes;
+  }
+  if (v.open === true) out.open = true;
+  return out;
+}
+
 function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], budget: Budget): Sheet | null {
   if (Array.isArray(raw)) raw = { rows: raw };
   if (!isObj(raw)) return null;
@@ -1862,6 +1919,8 @@ function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], bud
   // Charts placed in px before were drawn with hidden rows and columns folded away: their corners are found so too.
   const charts = cleanCharts(pick('charts'), sheetSizes(sheet));
   if (charts.length) sheet.charts = charts;
+  const board = cleanBoard(pick('board', 'kanban'), cells);
+  if (board) sheet.board = board;
   // Cells in reading order: row by row, left to right.
   const out: Record<string, Cell> = {};
   for (const k of [...cells.keys()].sort((a, b) => a - b)) out[refName(unpackR(k), unpackC(k))] = cells.get(k)!;
@@ -1919,6 +1978,7 @@ export function bookText(b: Workbook): string {
     if (sh.conditional?.length) head.conditional = sh.conditional;
     if (sh.validation?.length) head.validation = sh.validation;
     if (sh.charts?.length) head.charts = sh.charts;
+    if (sh.board) head.board = sh.board;
     out.push(` ${JSON.stringify(head).slice(0, -1)},"cells":{`);
     const byRow = new Map<number, string[]>();
     const keys = Object.keys(sh.cells)
@@ -2404,7 +2464,7 @@ function moveSizes<T>(m: Record<number, T> | undefined, f: (i: number) => number
  * (null: it went); `corner` moves a chart's corners (on the sheet whose rows or columns went in or out).
  */
 function mapSheetRefs(sh: Sheet, f: (text: string) => string, col?: (c: number) => number | null, corner?: (k: ChartCorner) => ChartCorner): Sheet {
-  if (!sh.merges && !sh.filter && !sh.conditional && !sh.validation && !sh.charts) return sh;
+  if (!sh.merges && !sh.filter && !sh.conditional && !sh.validation && !sh.charts && !sh.board) return sh;
   const out: Sheet = { ...sh };
   const formula = (t: string | undefined) => (t?.startsWith('=') ? `=${f(t.slice(1))}` : t);
   const broken = (t: string | undefined) => !!t && t.includes('#REF!');
@@ -2478,6 +2538,21 @@ function mapSheetRefs(sh: Sheet, f: (text: string) => string, col?: (c: number) 
     });
     if (list.length) out.charts = list;
     else delete out.charts;
+  }
+  if (sh.board) {
+    // The board's table and columns follow; with its header or its column to group by gone, it goes.
+    const at = f(sh.board.at);
+    const by = col ? col(colIndex(sh.board.by)) : colIndex(sh.board.by);
+    if (broken(at) || !parseRef(at) || by === null) delete out.board;
+    else {
+      const next: SheetBoard = { ...sh.board, at, by: colName(by) };
+      if (sh.board.fields && col)
+        next.fields = sh.board.fields.flatMap((k) => {
+          const c = col(colIndex(k));
+          return c === null ? [] : [colName(c)];
+        });
+      out.board = next;
+    }
   }
   return out;
 }
@@ -5104,6 +5179,7 @@ export function bookOutline(b: Workbook, calc: Calc = computeBook(b), rows = 4):
         sh.validation?.length ? `${sh.validation.length} rule${sh.validation.length === 1 ? '' : 's'} for what cells take` : '',
         sh.charts?.length ? `${n(sh.charts.length, 'chart')} (${sh.charts.slice(0, 6).map((c) => `${c.kind} of ${c.range} on ${c.from.cell}:${c.to.cell}`).join(', ')}${sh.charts.length > 6 ? '…' : ''})` : '',
         sh.merges?.length ? `merged: ${sh.merges.slice(0, 6).join(', ')}${sh.merges.length > 6 ? '…' : ''}` : '',
+        sh.board ? `a Kanban board of the table at ${sh.board.at} grouped by column ${sh.board.by}${sh.board.open ? ', which the sheet opens on' : ''}` : '',
         notes ? n(notes, 'note') : '',
         hiddenR ? n(hiddenR, 'hidden row') : '',
         hiddenC ? n(hiddenC, 'hidden column') : '',
