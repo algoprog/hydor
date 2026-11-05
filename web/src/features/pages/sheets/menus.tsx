@@ -109,6 +109,7 @@ export interface MenuCtx {
   toggleFilter(): void;
   validation(): void;
   dups(): void;
+  summary(): void;
   split(): void;
   trim(): void;
   shortcuts(): void;
@@ -308,6 +309,7 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
           { label: 'Remove duplicates', also: 'unique', run: m.dups },
           { label: 'Split text to columns', icon: <Split size={14} />, also: 'separate comma', run: m.split },
           { label: 'Trim spaces', also: 'whitespace', run: m.trim },
+          { label: 'Summarize by', icon: <Sigma size={14} />, also: 'pivot table group totals', run: m.summary },
         ],
   };
   const tools: MenuDef = {

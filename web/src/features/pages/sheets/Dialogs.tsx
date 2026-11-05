@@ -1,9 +1,11 @@
 // The spreadsheet editor's dialogs: Sort range (by several columns in turn, with a header row or not), Remove
-// duplicates (by the columns chosen), Split text to columns (by a separator found or chosen), and Custom number
-// format (an Excel code, with a preview of the cell picked and codes to start from).
+// duplicates (by the columns chosen), Split text to columns (by a separator found or chosen), Summarize by (a table's
+// summary as a sheet of formulas, as a pivot table gives one), and Custom number format (an Excel code, with a
+// preview of the cell picked and codes to start from).
 import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { formatValue, type CellStyle, type Scalar } from '@shared/sheets';
+import type { SummaryFn } from './tools';
 import { Button, cx, Dialog, IconButton, Segmented } from '../../../components/ui';
 import { smallInput } from './Panel';
 
@@ -242,6 +244,92 @@ export function FormatDialog({ code, sample, style, onApply, onClose }: { code: 
         ))}
       </div>
       <p className="mt-3 text-[12px] leading-relaxed text-fg-3">0 and # are digits, “,” groups thousands, % multiplies by 100, ; separates positive, negative and zero numbers, [Red] colours them, and dates use d, m, y, h, s.</p>
+    </Dialog>
+  );
+}
+
+const SUMMARY_FNS: [SummaryFn, string][] = [
+  ['sum', 'Sum'],
+  ['count', 'Count'],
+  ['average', 'Average'],
+  ['min', 'Lowest'],
+  ['max', 'Highest'],
+];
+
+export function SummaryDialog({ cols, onMake, onClose }: { cols: ColChoice[]; onMake: (by: number, across: number | null, values: { c: number; fn: SummaryFn }[]) => void; onClose: () => void }) {
+  const [by, setBy] = useState(cols[0]?.c ?? 0);
+  const [across, setAcross] = useState<number | null>(null);
+  const [values, setValues] = useState<{ c: number; fn: SummaryFn }[]>([{ c: cols[cols.length - 1]?.c ?? 0, fn: 'sum' }]);
+  const col = (value: number, on: (c: number) => void, label: string) => (
+    <select value={value} onChange={(e) => on(Number(e.target.value))} aria-label={label} translate="no" className={cx(smallInput, 'min-w-0 flex-1')}>
+      {cols.map((c) => (
+        <option key={c.c} value={c.c}>
+          {c.name}
+        </option>
+      ))}
+    </select>
+  );
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      width={480}
+      title="Summarize by"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" disabled={!values.length} onClick={() => (onMake(by, across, across === null ? values : values.slice(0, 1)), onClose())}>
+            Make the summary
+          </Button>
+        </>
+      }
+    >
+      <p className="mb-3 text-[13px] leading-relaxed text-fg-2">A new sheet sums up the table, as a pivot table does, with formulas that keep up as its cells change.</p>
+      <div className="flex flex-col gap-2.5">
+        <label className="flex items-center gap-2 text-[13px]">
+          <span className="w-[86px] shrink-0 text-fg-3">Rows</span>
+          {col(by, setBy, 'Rows')}
+        </label>
+        <label className="flex items-center gap-2 text-[13px]">
+          <span className="w-[86px] shrink-0 text-fg-3">Columns</span>
+          <select value={across ?? ''} onChange={(e) => setAcross(e.target.value === '' ? null : Number(e.target.value))} aria-label="Columns" translate="no" className={cx(smallInput, 'min-w-0 flex-1')}>
+            <option value="">None</option>
+            {cols.map((c) => (
+              <option key={c.c} value={c.c}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {values.map((v, i) => (
+          <div key={i} className="flex items-center gap-2 text-[13px]">
+            <span className="w-[86px] shrink-0 text-fg-3">{i === 0 ? 'Values' : ''}</span>
+            <select value={v.fn} onChange={(e) => setValues(values.map((x, j) => (j === i ? { ...x, fn: e.target.value as SummaryFn } : x)))} aria-label="Summed up as" className={cx(smallInput, 'w-[110px] shrink-0')}>
+              {SUMMARY_FNS.map(([k, label]) => (
+                <option key={k} value={k}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            {col(v.c, (c) => setValues(values.map((x, j) => (j === i ? { ...x, c } : x))), 'Value column')}
+            {values.length > 1 ? (
+              <IconButton label="Remove this value" size="sm" onClick={() => setValues(values.filter((_, j) => j !== i))}>
+                <X size={14} />
+              </IconButton>
+            ) : (
+              <span className="w-7 shrink-0" />
+            )}
+          </div>
+        ))}
+      </div>
+      {across === null && values.length < 6 && (
+        <Button size="sm" variant="ghost" icon={<Plus size={14} />} className="mt-2 ml-[94px]" onClick={() => setValues([...values, { c: cols[cols.length - 1]?.c ?? 0, fn: 'count' }])}>
+          Add a value
+        </Button>
+      )}
+      {across !== null && <p className="mt-2 text-[12px] text-fg-3">With columns too, the first value is summed up for each pair.</p>}
     </Dialog>
   );
 }
