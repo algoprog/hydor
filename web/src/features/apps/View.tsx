@@ -1,6 +1,6 @@
 // An app's view in a page (shared/app-ui.ts): its pages drawn in the sandboxed frame with a run's answer (or, on
 // the app's own page, what it keeps and its latest run), and what its events ask of the app done here: find and
-// change its records, keep a tick, ask the run's agent, run one of its flows, run it again with changed answers,
+// change its records (a ready-made app's too), download them, keep a tick, ask the run's agent, run one of its flows, run it again with changed answers,
 // start another app, copy, open an address, say something. Only what `can` allows: a public page's view does
 // nothing that reaches the app. A ready-made app's view is put in the app's language first.
 import { useMemo, useState } from 'react';
@@ -11,6 +11,7 @@ import { openLightbox, openVideo } from '../../components/Lightbox';
 import type { AnswerField, AppRun } from '@shared/apps';
 import type { AppInfo } from '@shared/app-manifest';
 import { api, enc, post, put } from '../../lib/api';
+import { mu } from '../../lib/machine';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
@@ -82,7 +83,8 @@ export function AppView({
   const def = useMemo(() => (translate ? translateUi(ui, tr) : ui), [ui, translate]);
   const html = useMemo(() => shell(name, lang), [name, lang]);
   const store = useMemo(() => memoryStore(), []);
-  const saved = !appId.startsWith('tpl:') && appId !== 'test' && !publicView;
+  // An app that keeps records: yours, or a ready-made one (its records kept under its "tpl:" id); not a try of changes, nor a public page.
+  const saved = appId !== 'test' && !publicView;
   // What changes while it is on screen: its run's status and answer (compared by what they hold, not by each new copy).
   const runKey = run ? JSON.stringify([run.id, run.status, run.result ?? null, run.inputs]) : '';
   const lastKey = last ? JSON.stringify([last.id, last.status, last.result ?? null]) : '';
@@ -165,7 +167,13 @@ export function AppView({
         }
         case 'open': {
           const url = text(a.url, 2000).trim();
-          if (url.startsWith('/') && !url.startsWith('//')) go(url);
+          // A download of what this app keeps (its records as CSV or JSON lines): from here, where the sign-in goes with it.
+          if (saved && [`/api/apps/${enc(appId)}/data/`, `/api/apps/${appId}/data/`].some((p) => url.startsWith(p)) && /[?&]format=(csv|jsonl)(&|$)/.test(url)) {
+            const link = Object.assign(document.createElement('a'), { href: mu(url), download: '' });
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+          } else if (url.startsWith('/') && !url.startsWith('//')) go(url);
           else if (/^https?:\/\//i.test(url)) window.open(url, '_blank', 'noopener,noreferrer');
           else throw new Error(tr('That is not an address to open'));
           return null;
