@@ -59,7 +59,7 @@ export function VersionsDialog({ open, pageId, onClose, onPick }: { open: boolea
                 </span>
                 <span className="block truncate text-[11.5px] text-fg-3">
                   {ago(v.createdAt)} · {BY[v.by] ?? v.by}
-                  {v.steps ? ` · ${v.steps} saves in a row` : ''}
+                  {v.steps ? ` · ${v.steps} saves` : ''}
                 </span>
               </span>
             </button>

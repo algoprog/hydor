@@ -88,12 +88,24 @@ export function shownStore(itemId: string) {
 
 // ---- opening it by itself -------------------------------------------------------------------------------
 
-onDraftStart((key) => {
+onDraftStart((key, started) => {
   const c = useCanvas.getState();
   if (!c.auto || !matchMedia(CANVAS_MEDIA).matches || !onScreen(key)) return;
   const cur = c.open[key];
   // A page already open with unsaved changes stays.
   if (cur && dirty.has(key)) return;
+  // Another save of the page shown here (an agent working in steps): it shows there as it comes, the panel as it is. Its
+  // page is known once its id has come (the first piece, mostly): until then, a moment's wait.
+  if (draftKind(started)) {
+    const decide = () => {
+      const now = useDrafts.getState().byKey[key]?.[started.id];
+      if (!now || now.done || dirty.has(key)) return;
+      if (now.pageId && shownPage.get(key) === now.pageId && useCanvas.getState().open[key]) return;
+      if (!now.pageId && Date.now() - now.startedAt < 600) return void setTimeout(decide, 150);
+      useCanvas.getState().show(key, { kind: 'item', id: now.id });
+    };
+    return decide();
+  }
   const d = useDrafts.getState().byKey[key];
   const id = d ? Object.values(d).filter((x) => !x.done).sort((a, b) => b.startedAt - a.startedAt)[0]?.id : undefined;
   if (id) c.show(key, { kind: 'item', id });
@@ -101,6 +113,8 @@ onDraftStart((key) => {
 
 /** Sessions whose panel holds changes not saved yet. */
 const dirty = new Set<string>();
+/** The saved page each session's panel shows now. */
+const shownPage = new Map<string, string>();
 
 /** Opens a page call beside the conversation, when the screen is wide enough; false when it is not. */
 export function showBeside(key: string, t: CanvasTarget): boolean {
@@ -255,8 +269,12 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
 export function SessionPage({ sessionKey: key, target, layout, onClose }: { sessionKey: string; target: CanvasTarget; layout: 'panel' | 'sheet' | 'page'; onClose: () => void }) {
   const items = usePageItems(key);
   const item = target.kind === 'item' ? items.find((i) => i.id === target.id) : undefined;
-  // The call's own draft; for a saved page opened here, the newest save of it being written (from any session).
-  const draft = usePageDraft(target.kind === 'page' ? target.id : undefined, target.kind === 'item' ? { sessionKey: key, item: target.id } : { watch: true });
+  // The call's own draft; for a saved page shown here, the newest save of it being written (from any session: an agent
+  // working in steps saves it again and again, each shown here as it comes).
+  const own = usePageDraft(undefined, target.kind === 'item' ? { sessionKey: key, item: target.id } : {});
+  const itemPage = item && /__save_(?:doc|slides|sheet|latex)$/.test(item.tool.name) ? savedPageOf(item.tool) : undefined;
+  const newest = usePageDraft(target.kind === 'page' ? target.id : itemPage, { watch: true });
+  const draft = newest && (!own || newest.startedAt >= own.startedAt) ? newest : own;
   const callKind = draft && !draftKind(draft) ? draft.tool : null;
   const kind: PageCall | null = target.kind === 'page' ? 'save_page' : (pageCall(item?.tool) ?? (draft ? (draftKind(draft) ? 'save_page' : (callKind as PageCall)) : null));
   const { loaded, error } = useLoaded(key, target, item, kind);
@@ -267,6 +285,12 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
   const fresh = !!saving && !changing && !loaded;
   const liveKind = loaded?.kind && loaded.kind !== 'notebook' ? loaded.kind : fresh ? saving : null;
   const live = useLiveDraft(liveKind, fresh ? null : loaded?.model?.model, fresh ? undefined : loaded?.version, draft);
+  useEffect(() => {
+    const id = loaded?.pageId;
+    if (!id) return;
+    shownPage.set(key, id);
+    return () => void (shownPage.get(key) === id && shownPage.delete(key));
+  }, [key, loaded?.pageId]);
   // The pages to switch to, newest first: a page saved several times once, at its newest save that saved it.
   const picks = useMemo(() => {
     const newest = items.slice().reverse();

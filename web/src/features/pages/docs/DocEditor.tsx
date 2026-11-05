@@ -388,12 +388,15 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc?.key]);
 
-  // The agent's version as it comes, drawn where it changed (the document's own again once it is saved, or failed).
+  // The agent's version as it comes, drawn where it changed (the document's own again once it is saved, or failed);
+  // its caret placed once it is drawn.
+  const [drawnLive, setDrawnLive] = useState(0);
   useEffect(() => {
     const e = engine.current;
     if (!e) return;
     e.preview(liveDoc);
     paging.current?.changed(e.doc);
+    if (liveDoc) setDrawnLive((n) => n + 1);
   }, [liveDoc, !!engine.current]);
 
   // An older version opened from the Library's Versions (its key ends in :v<n>): shown with what changed since it, the
@@ -1116,7 +1119,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
               )}
               {handlesFor && e && <ColumnHandles engine={e} table={handlesFor} host={host} tick={`${tick}:${model.blocks.length}`} />}
               {e && !readOnly && !liveOn && !narrow && <BlockHandle engine={e} host={host} paper={paper} tick={model.blocks} />}
-              {liveOn && e && <AgentCaret engine={e} mark={live!.mark} host={host} scroller={scroller} tick={`${live!.n}:${pageLayout?.n ?? 0}:${zoom}:${narrow}`} />}
+              {liveOn && e && <AgentCaret engine={e} mark={live!.mark} host={host} scroller={scroller} tick={`${drawnLive}:${pageLayout?.n ?? 0}:${zoom}:${narrow}`} />}
               {found.boxes.map((b, k) => (
                 <span key={k} className="pointer-events-none absolute rounded-[2px]" style={{ left: b.x, top: b.y, width: b.w, height: b.h, background: b.now ? 'rgba(255,150,50,.55)' : 'rgba(255,213,79,.45)' }} />
               ))}

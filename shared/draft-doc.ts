@@ -163,6 +163,8 @@ export function draftDoc(base: Doc | null, p: PartialJson, memo: DraftMemo): Dra
     // The block the change being written has come to: the last of those its Markdown so far makes.
     const upTo = normalizeBlocks(mdBlocks(tidyEnd(done.markdown.slice(0, done.at))));
     const i = Math.min(upTo.length, r.blocks.length) - 1;
+    // A block being written that is not one of the version's keeps one id from draw to draw (an editor redraws it in place).
+    if (i >= 0 && !base.blocks.includes(r.blocks[i])) r.blocks[i] = { ...r.blocks[i], id: OPEN } as Block;
     const b = i >= 0 ? r.blocks[i] : null;
     const words = i >= 0 && (upTo[i].type === 'p' || upTo[i].type === 'li') ? runsText((upTo[i] as { runs: Run[] }).runs).length : -1;
     return keep(r.blocks, b ? { kind: 'doc', block: b.id, at: words } : null);

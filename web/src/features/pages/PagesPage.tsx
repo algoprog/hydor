@@ -548,7 +548,7 @@ function PageView({ id }: { id: string }) {
                     <span className="block truncate text-[13px] text-fg">{v.version === data.page.version ? 'The latest' : v.title}</span>
                     <span className="block truncate text-[11.5px] text-fg-3">
                       {ago(v.createdAt)} · {BY[v.by] ?? v.by}
-                      {v.steps ? ` · ${v.steps} saves in a row` : ''} · {bytes(v.bytes)}
+                      {v.steps ? ` · ${v.steps} saves` : ''} · {bytes(v.bytes)}
                     </span>
                   </span>
                 </button>
