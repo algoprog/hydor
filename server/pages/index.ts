@@ -144,6 +144,7 @@ const SAVE_PAGE: RunTool = {
       id: { type: 'string', description: 'A saved page’s id, to save a new version of it.' },
       title: { type: 'string', description: 'The page’s name in the Library and on a home screen: "Workout log".' },
       html: { type: 'string', description: 'The whole page, <!doctype html> included.' },
+      project: { type: 'string', description: 'The project (by its name) to keep it in; left out, this session’s project.' },
     },
     required: ['title', 'html'],
   },
@@ -202,15 +203,22 @@ function changing(db: Deps['db'], a: Record<string, unknown>, kind: PageKind): s
 }
 
 /**
- * Whose a new page is: an agent's goes with its session (and the session's project); an app's step has no session, so
- * it goes in the project the step names (by its name or id), or in none.
+ * Whose a new page is, and which project it goes in: the project named (by its name or id) when there is one; else an
+ * agent's goes in its session's project, and an app's step (which has no session) in none.
  */
 function madeBy(ctx: RunCtx, project: unknown): { sessionKey?: string; space: string | null } {
-  if (!ctx.step) return { sessionKey: ctx.key, space: sessionSpace(ctx.deps.db, ctx.key) };
   const s = typeof project === 'string' ? project.trim().toLowerCase() : '';
   const all = s ? allSpaces(ctx.deps.db) : [];
-  return { space: (all.find((x) => x.id.toLowerCase() === s) ?? all.find((x) => x.name.trim().toLowerCase() === s))?.id ?? null };
+  const named = (all.find((x) => x.id.toLowerCase() === s) ?? all.find((x) => x.name.trim().toLowerCase() === s))?.id ?? null;
+  if (!ctx.step) return { sessionKey: ctx.key, space: named ?? sessionSpace(ctx.deps.db, ctx.key) };
+  return { space: named };
 }
+
+/** A save's input with the project to keep it in, by its name. */
+const withProject = (schema: { properties: Record<string, unknown> } & Record<string, unknown>) => ({
+  ...schema,
+  properties: { ...schema.properties, project: { type: 'string', description: 'The project (by its name) to keep it in; left out, this session’s project.' } },
+});
 
 /** Keeps what an agent (or an app's step) made: a new version of the page it named, or a new page of its own. */
 function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknown, model: unknown, project?: unknown) {
@@ -224,7 +232,7 @@ function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknow
 const SAVE_SLIDES: RunTool = {
   name: 'save_slides',
   description: SAVE_SLIDES_DESCRIPTION,
-  inputSchema: SAVE_SLIDES_SCHEMA,
+  inputSchema: withProject(SAVE_SLIDES_SCHEMA),
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'slides');
     const { deck, notes } = await agentDeck(ctx.deps.db, { ratio: a.ratio, theme: a.theme, slides: a.slides, footer: a.footer, guides: a.guides }, ctx.cwd);
@@ -240,7 +248,7 @@ const SAVE_SLIDES: RunTool = {
 const SAVE_DOC: RunTool = {
   name: 'save_doc',
   description: SAVE_DOC_DESCRIPTION,
-  inputSchema: SAVE_DOC_SCHEMA,
+  inputSchema: withProject(SAVE_DOC_SCHEMA),
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'doc');
     const { id: _id, title: _title, project: _project, ...rest } = a;
@@ -257,7 +265,7 @@ const SAVE_DOC: RunTool = {
 const SAVE_SHEET: RunTool = {
   name: 'save_sheet',
   description: SAVE_SHEET_DESCRIPTION,
-  inputSchema: SAVE_SHEET_SCHEMA,
+  inputSchema: withProject(SAVE_SHEET_SCHEMA),
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'sheet');
     const { id: _id, title: _title, project: _project, ...rest } = a;
@@ -274,7 +282,7 @@ const SAVE_SHEET: RunTool = {
 const SAVE_LATEX: RunTool = {
   name: 'save_latex',
   description: SAVE_LATEX_DESCRIPTION,
-  inputSchema: SAVE_LATEX_SCHEMA,
+  inputSchema: withProject(SAVE_LATEX_SCHEMA),
   async run(a, ctx) {
     const db = ctx.deps.db;
     const id = changing(db, a, 'tex');

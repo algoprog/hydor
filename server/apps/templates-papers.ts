@@ -1895,7 +1895,7 @@ const FIGURE_COLS: AnswerField['columns'] = [
 const FIGURE_VENUES: Record<string, { one: number; two: number; font: string }> = {
   'ACL, EMNLP, NAACL': { one: 3.03, two: 6.3, font: 'Times' },
   'ACM (SIGIR, KDD, CIKM, WSDM, TheWebConf)': { one: 3.33, two: 7.0, font: 'Linux Libertine' },
-  IEEE: { one: 3.5, two: 7.16, font: 'Times' },
+  IEEE: { one: 3.49, two: 7.14, font: 'Times' },
   ICML: { one: 3.25, two: 6.75, font: 'Times' },
   'NeurIPS, ICLR': { one: 5.5, two: 5.5, font: 'Times' },
   'Springer LNCS': { one: 4.8, two: 4.8, font: 'Computer Modern' },
