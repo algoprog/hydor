@@ -10,6 +10,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import Fastify from 'fastify';
+import { openDb } from '../db.ts';
+import type { Deps } from '../features/types.ts';
+import { pages } from './index.ts';
 import { texMask, texMoveFiles, texTree, texUses, texDocUses, texIsUsed, type TexTreeNode } from '../../shared/latex-files.ts';
 import { normalizeTex, TEX_MAIN, type TexDoc } from '../../shared/latex.ts';
 
@@ -17,6 +21,24 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
   process.exit(2);
 }
+
+const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-tex-files-test-')));
+const db = openDb(path.join(tmp, 'test.db'));
+const app = Fastify({ bodyLimit: 40 * 1024 * 1024 });
+app.removeContentTypeParser('application/json');
+app.addContentTypeParser('application/json', { parseAs: 'string' }, (_r, b, done) => {
+  try {
+    done(null, String(b).trim() ? JSON.parse(String(b)) : {});
+  } catch (e) {
+    done(e as Error, undefined);
+  }
+});
+app.setErrorHandler((err: Error & { status?: number; statusCode?: number }, _req, reply) => reply.code(err.status ?? err.statusCode ?? 500).send({ error: err.message }));
+const deps = { app, db, sessions: { deliverOrQueue: async () => {} }, broadcast: () => {}, toSubscribers() {}, publicBase: () => 'https://naget.example' } as unknown as Deps;
+pages.routes!(deps);
+await app.ready();
+const req = (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, body?: unknown) =>
+  app.inject({ method, url, payload: body === undefined ? undefined : JSON.stringify(body), headers: { 'content-type': 'application/json', host: 'app.test' } });
 
 let failed = 0;
 let passed = 0;
@@ -175,5 +197,62 @@ const usedOf = (u: ReturnType<typeof texUses>) => [...u.used.keys()];
   ok(u.missing.length === 0, 'after the move, every reference finds its file');
 }
 
+// ---- a project on disk: what the editor holds, what TeX takes from the folder, the document a chapter is of -------------
+{
+  const P = path.join(tmp, 'thesis');
+  const put = (rel: string, data: string | Buffer) => {
+    fs.mkdirSync(path.dirname(path.join(P, rel)), { recursive: true });
+    fs.writeFileSync(path.join(P, rel), data);
+  };
+  put(
+    'main.tex',
+    [
+      '\\documentclass{book}',
+      '\\usepackage{mystyle}',
+      '\\begin{document}',
+      '\\input{chapters/ch1}',
+      '\\include{chapters/ch2}',
+      '\\subfile{chapters/sub}',
+      '\\input{parts/a/deep}',
+      '\\includegraphics{figures/plot}',
+      '\\begin{tikzpicture}\\begin{axis}\\addplot table {data/r.dat};\\end{axis}\\end{tikzpicture}',
+      '\\bibliography{refs}',
+      '\\end{document}',
+      '',
+    ].join('\n'),
+  );
+  put('chapters/ch1.tex', 'One \\includegraphics{figures/cat.png}\n');
+  put('chapters/ch2.tex', 'Two.\n');
+  put('chapters/sub.tex', '\\documentclass[../main.tex]{subfiles}\n\\begin{document}\nA subfile.\n\\end{document}\n');
+  put('chapters/note.tex', '% !TEX root = ../main.tex\nA note nothing reads.\n');
+  put('parts/a/deep.tex', 'Deep down.\n');
+  put('mystyle.sty', '\\ProvidesPackage{mystyle}\n\\RequirePackage{graphicx}\n');
+  put('refs.bib', '@misc{k, title={T}}\n');
+  put('old.tex', 'An old draft.\n');
+  put('data/r.dat', 'x y\n1 2\n');
+  put('figures/plot.pdf', '%PDF-1.4 a picture\n');
+  put('figures/cat.png', Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'));
+  put('figures/unused.png', Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'));
+  const open = async (rel: string) => (await req('GET', `/api/pages/file?path=${encodeURIComponent(path.join(P, rel))}`)).json();
+  const t = await open('chapters/ch1.tex');
+  const names = (t.model?.files ?? []).map((f: { name: string }) => f.name);
+  ok(t.tex?.main === 'main.tex' && t.tex.open === 'chapters/ch1.tex', 'a chapter opens its document, on the chapter');
+  ok(JSON.stringify(names) === JSON.stringify(['chapters/ch1.tex', 'chapters/ch2.tex', 'chapters/sub.tex', 'parts/a/deep.tex', 'refs.bib']), `the editor holds the sources and the bibliography it uses, in the order TeX reads them (${names.join(', ')})`);
+  const uses = new Map((t.tex?.uses ?? []).map((u: { name: string; kind: string; size: number }) => [u.name, u]));
+  ok(uses.get('mystyle.sty')?.kind === 'style' && uses.get('figures/plot.pdf')?.kind === 'picture' && uses.has('figures/cat.png') && uses.get('data/r.dat')?.kind === 'data', 'what TeX takes from the folder is listed, with its kind');
+  ok(uses.get('data/r.dat')?.size === 8, 'and its size');
+  ok(!uses.has('old.tex') && !uses.has('figures/unused.png') && !names.includes('old.tex'), 'what the document does not use is neither in the editor nor listed');
+  const sub = await open('chapters/sub.tex');
+  ok(sub.tex?.main === 'main.tex' && sub.tex.open === 'chapters/sub.tex', 'a subfile opens the document it names, on itself');
+  const note = await open('chapters/note.tex');
+  ok(note.tex?.main === 'main.tex', 'a part that names its root (% !TEX root) opens that document');
+  const deep = await open('parts/a/deep.tex');
+  ok(deep.tex?.main === 'main.tex' && deep.tex.open === 'parts/a/deep.tex', 'a chapter two folders down finds its document');
+  const agentView = await req('GET', '/api/pages/file?path=' + encodeURIComponent(path.join(P, 'main.tex')));
+  ok(agentView.statusCode === 200, 'the document itself opens');
+}
+
+await app.close();
+fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -1,6 +1,7 @@
 // A document read for a person or an agent (Word, Excel, PowerPoint, OpenDocument, EPUB, CSV): its
 // content as blocks, sheets as cells and slides with their notes. The server reads it
 // (server/documents), agents get it as Markdown-ish text, the file viewer shows it as a preview.
+import type { TexFileKind } from './latex-files.ts';
 
 /** A run of text, bold or italic, or a link. */
 export interface Span {
@@ -92,9 +93,11 @@ export interface FileOpened {
    * model's name of the file opened ("main.tex" for the main file), the times of the project's files by their path in
    * the folder (sent back when it is saved), and whether it is typeset among the folder's files. Its comments, which
    * the app keeps by each file's path, are in the model; saving sends back those it opened with (`comments`), so
-   * what an agent did meanwhile is merged in.
+   * what an agent did meanwhile is merged in. `uses`: the other files of the folder the document uses, which the editor
+   * does not hold and TeX takes from the folder as they are (pictures, styles and classes, data; sources past the
+   * document's limits), by their path in the folder, for the editor's files tree.
    */
-  tex?: { folder: string; main: string; open: string; files: Record<string, number>; inFolder: boolean };
+  tex?: { folder: string; main: string; open: string; files: Record<string, number>; inFolder: boolean; uses?: { name: string; kind: TexFileKind; size: number }[] };
 }
 
 /** What saving it gives back (PUT /api/pages/file). */
