@@ -1,13 +1,25 @@
 // A LaTeX document's source in CodeMirror: the app's own editor (lib/codemirror: its colours, keys, find bar), with
-// what writing LaTeX wants on top. Ctrl+Enter typesets, Ctrl+B and Ctrl+I make the words picked bold or italic,
-// \ref, \cite, \includegraphics and \input complete from the document's own labels, bibliography, pictures and files,
-// the typesetting's errors and warnings are marked at their lines, and snippets leave places to fill in (Tab goes on
-// to the next).
+// what writing LaTeX wants on top. Ctrl+Enter typesets; Ctrl+B and Ctrl+I make the words picked bold or italic (and
+// plain again), Ctrl+/ comments lines out and back. Typing \ offers commands, \begin{ environments (the \end goes in
+// too, as it does when Enter follows a \begin{…} typed by hand), \usepackage{ packages, and \ref, \cite,
+// \includegraphics and \input the document's own labels, bibliography, pictures and files; brackets and $ close
+// themselves. Environments, sections, the preamble and { groups fold. The formula the cursor is in shows drawn in a
+// card by its line. Visual mode (visual.ts) shows the source as a document, and Check spelling has the browser check
+// its words (spell.ts). The typesetting's errors and warnings are marked at their lines.
 import { snippet, startCompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
+import { redo, selectAll, toggleComment, undo } from '@codemirror/commands';
+import { foldAll, indentUnit, unfoldAll } from '@codemirror/language';
+import { gotoLine } from '@codemirror/search';
 import { lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint';
-import { EditorSelection, EditorState, Prec, StateEffect } from '@codemirror/state';
+import { Compartment, EditorSelection, EditorState, Prec, StateEffect } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 import { createEditor, type EditorHandle } from '../../../lib/codemirror';
+import { commandSource, environmentSource, packageSource, type DocDefs } from './complete';
+import { texFolding } from './fold';
+import { mathPreview } from './mathpreview';
+import { braced, inMathAt } from './scan';
+import { spellCheck } from './spell';
+import { visualMode } from './visual';
 
 /** What the document offers to complete with. */
 export interface Words {
@@ -24,6 +36,14 @@ export interface CodeHooks {
   /** The cursor moved or the text changed: the line it is on, and the lines picked (none when nothing is). */
   onCursor: (c: { line: number; from: number; to: number; picked: boolean }) => void;
   words: () => Words;
+  /** The packages, class and definitions of the document, for completions. */
+  defs: () => DocDefs;
+  /** The classes and packages this TeX has ("amsmath.sty"), when known. */
+  installed: () => Set<string> | null;
+  /** The document's macros, for KaTeX. */
+  macros: () => Record<string, string>;
+  /** A picture's address by the name \includegraphics gives it, or null. */
+  picture: (name: string) => string | null;
 }
 
 export interface Issue {
@@ -41,10 +61,36 @@ export interface Code {
   insert: (template: string, block?: boolean) => void;
   /** The words picked put between `before` and `after` (or `placeholder` there, picked, to type over). */
   wrap: (before: string, after: string, placeholder: string) => void;
+  /** \cmd{…} round the words picked, or taken away when they are in one already (Ctrl+B for \textbf). */
+  toggle: (cmd: string, placeholder: string) => void;
+  /** The formatting commands (\textbf, \emph…) taken out of what is picked, their words kept. */
+  clearFormat: () => void;
   /** The lines picked, from and to (1-based), and their text. */
   picked: () => { from: number; to: number; text: string; empty: boolean };
   /** Text put in place of what is picked (a list of the lines picked, say), the cursor after it. */
   replacePicked: (text: string) => void;
+  /** Plain text in place of what is picked, the cursor after it. */
+  insertText: (text: string) => void;
+  /** Plain text on lines of its own at the cursor, the cursor after it. */
+  insertBlock: (text: string) => void;
+  /** Lines commented out with %, or back in (Ctrl+/). */
+  comment: () => void;
+  undo: () => void;
+  redo: () => void;
+  /** Go to line: CodeMirror's own small box. */
+  gotoLine: () => void;
+  selectAll: () => void;
+  /** Whether the cursor is in maths. */
+  inMath: () => boolean;
+  /** The text, and where the cursor is in it. */
+  text: () => string;
+  cursor: () => number;
+  /** A part of the text changed (undone as one), the cursor after it. */
+  replaceRange: (from: number, to: number, text: string) => void;
+  setVisual: (on: boolean) => void;
+  setSpell: (on: boolean) => void;
+  foldAll: () => void;
+  unfoldAll: () => void;
   goto: (line: number) => void;
   focus: () => void;
   destroy: () => void;
@@ -52,6 +98,7 @@ export interface Code {
 
 /** The language a file is shown in: LaTeX for TeX's own files (and a bibliography), plain text for data. */
 const pathFor = (name: string) => (/\.(tex|ltx|sty|cls|clo|def|fd|cfg|bbl|bib|tikz|pgf)$/i.test(name) ? 'source.tex' : name);
+const isTex = (name: string) => /\.(tex|ltx|sty|cls)$/i.test(name);
 
 /** Completions inside \cite{…}, \ref{…}, \includegraphics{…} and \input{…}: what the document has of each. */
 function completer(words: () => Words) {
@@ -78,10 +125,17 @@ function completer(words: () => Words) {
   };
 }
 
-export async function mountCode(parent: HTMLElement, o: { text: string; name: string; dark: boolean; phone: boolean; readOnly?: boolean; hooks: CodeHooks }): Promise<Code> {
+/** The commands Clear formatting takes away. */
+const FORMATS = /\\(textbf|textit|textsl|emph|underline|uline|texttt|textsc|textsf|textrm|textsuperscript|textsubscript|textnormal)\s*\{/g;
+
+export async function mountCode(parent: HTMLElement, o: { text: string; name: string; dark: boolean; phone: boolean; readOnly?: boolean; visual?: boolean; spell?: boolean; hooks: CodeHooks }): Promise<Code> {
   const hooks = o.hooks;
   const handle = await createEditor(parent, { doc: o.text, path: pathFor(o.name), dark: o.dark, wrap: true, phone: o.phone, readOnly: o.readOnly, onChange: (d) => hooks.onChange(d), onSave: () => hooks.onSave() });
   const view = handle.view;
+  const tex = isTex(o.name);
+  const visualC = new Compartment();
+  const spellC = new Compartment();
+  const visualExt = () => visualMode({ macros: hooks.macros, picture: hooks.picture });
 
   const picked = () => {
     const r = view.state.selection.main;
@@ -105,16 +159,122 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     view.focus();
   };
 
+  const toggle = (cmd: string, placeholder: string) => {
+    if (o.readOnly) return;
+    const st = view.state;
+    const r = st.selection.main;
+    const open = `\\${cmd}{`;
+    const done = (spec: Parameters<EditorView['dispatch']>[0]) => {
+      view.dispatch(spec);
+      view.focus();
+    };
+    // The words picked are all that a \cmd{…} holds: the command goes.
+    if (!r.empty && st.sliceDoc(r.from - open.length, r.from) === open && st.sliceDoc(r.to, r.to + 1) === '}') {
+      return done({
+        changes: [
+          { from: r.from - open.length, to: r.from },
+          { from: r.to, to: r.to + 1 },
+        ],
+        selection: EditorSelection.range(r.from - open.length, r.to - open.length),
+        userEvent: 'input',
+      });
+    }
+    // What is picked is a \cmd{…}, whole.
+    const sel = st.sliceDoc(r.from, r.to);
+    if (sel.startsWith(open) && braced(sel, open.length - 1)?.end === sel.length) {
+      const inner = sel.slice(open.length, -1);
+      return done({ changes: { from: r.from, to: r.to, insert: inner }, selection: EditorSelection.range(r.from, r.from + inner.length), userEvent: 'input' });
+    }
+    // Nothing picked, in a \cmd{…}: the command goes, the cursor stays by the same letter.
+    if (r.empty) {
+      const back = Math.max(0, r.head - 3000);
+      const text = st.sliceDoc(back, Math.min(st.doc.length, r.head + 3000));
+      const at = r.head - back;
+      let best: { s: number; e: number } | null = null;
+      for (let i = text.lastIndexOf(open, at - 1); i >= 0; i = i > 0 ? text.lastIndexOf(open, i - 1) : -1) {
+        const g = braced(text, i + open.length - 1);
+        if (g && g.end > at && i + open.length <= at) {
+          best = { s: i, e: g.end };
+          break;
+        }
+      }
+      if (best) {
+        const s = back + best.s;
+        const e = back + best.e;
+        return done({
+          changes: [
+            { from: s, to: s + open.length },
+            { from: e - 1, to: e },
+          ],
+          selection: { anchor: r.head - open.length },
+          userEvent: 'input',
+        });
+      }
+    }
+    wrap(open, '}', placeholder);
+  };
+
+  const clearFormat = () => {
+    if (o.readOnly) return;
+    const r = view.state.selection.main;
+    if (r.empty) return;
+    let t = view.state.sliceDoc(r.from, r.to);
+    for (let guard = 0; guard < 200; guard++) {
+      FORMATS.lastIndex = 0;
+      const m = FORMATS.exec(t);
+      if (!m) break;
+      const g = braced(t, m.index + m[0].length - 1);
+      if (!g) break;
+      t = t.slice(0, m.index) + g.text + t.slice(g.end);
+    }
+    view.dispatch({ changes: { from: r.from, to: r.to, insert: t }, selection: EditorSelection.range(r.from, r.from + t.length), userEvent: 'input' });
+    view.focus();
+  };
+
+  /** Enter after a \begin{…} typed by hand: its \end{…} goes in under it (an item too, for a list), when it has none. */
+  const autoEnd = (v: EditorView) => {
+    const st = v.state;
+    const r = st.selection.main;
+    if (!r.empty || o.readOnly) return false;
+    const line = st.doc.lineAt(r.head);
+    const before = line.text.slice(0, r.head - line.from);
+    if (line.text.slice(r.head - line.from).trim()) return false;
+    const m = /\\begin\s*\{([A-Za-z@*]+)\}(?:\s*\[[^\]]*\])?(?:\s*\{[^{}]*\})*\s*$/.exec(before);
+    if (!m) return false;
+    const env = m[1];
+    const esc = env.replace('*', '\\*');
+    const all = st.doc.toString();
+    const opened = all.match(new RegExp(`\\\\begin\\s*\\{${esc}\\}`, 'g'))?.length ?? 0;
+    const closed = all.match(new RegExp(`\\\\end\\s*\\{${esc}\\}`, 'g'))?.length ?? 0;
+    if (opened <= closed) return false;
+    const indent = /^\s*/.exec(line.text)![0];
+    const unit = st.facet(indentUnit);
+    const first = `${indent}${unit}${env === 'itemize' || env === 'enumerate' ? '\\item ' : ''}`;
+    v.dispatch({ changes: { from: r.head, insert: `\n${first}\n${indent}\\end{${env}}` }, selection: { anchor: r.head + 1 + first.length }, scrollIntoView: true, userEvent: 'input' });
+    return true;
+  };
+
+  const languageData = [
+    { autocomplete: completer(hooks.words) },
+    ...(tex ? [{ autocomplete: commandSource(hooks.defs) }, { autocomplete: environmentSource(hooks.defs) }, { autocomplete: packageSource(hooks.installed) }] : []),
+    // $ pairs up as brackets do; quotes do not (an apostrophe is a letter here).
+    { closeBrackets: { brackets: ['(', '[', '{', '$'], before: ')]}:;>$' } },
+  ];
   const extra = [
     Prec.highest(
       keymap.of([
         { key: 'Mod-Enter', preventDefault: true, run: () => (hooks.onCompile(), true) },
-        { key: 'Mod-b', preventDefault: true, run: () => (wrap('\\textbf{', '}', 'bold'), true) },
-        { key: 'Mod-i', preventDefault: true, run: () => (wrap('\\emph{', '}', 'italic'), true) },
+        { key: 'Mod-b', preventDefault: true, run: () => (toggle('textbf', 'bold'), true) },
+        { key: 'Mod-i', preventDefault: true, run: () => (toggle('textit', 'italic'), true) },
+        ...(tex ? [{ key: 'Enter', run: autoEnd }] : []),
       ]),
     ),
-    EditorState.languageData.of(() => [{ autocomplete: completer(hooks.words) }]),
+    // Made once: completions are told apart by their source, so a new one each time would never show.
+    EditorState.languageData.of(() => languageData),
     lintGutter(),
+    tex ? [texFolding, mathPreview(hooks.macros)] : [],
+    visualC.of(o.visual && tex ? visualExt() : []),
+    spellC.of(o.spell ? spellCheck : []),
     EditorView.updateListener.of((u) => {
       if (!u.selectionSet && !u.docChanged) return;
       const p = picked();
@@ -139,7 +299,7 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     insert: (template, block) => {
       if (o.readOnly) return;
       const r = view.state.selection.main;
-      let from = r.from;
+      const from = r.from;
       let to = r.to;
       let t = template;
       if (block) {
@@ -155,6 +315,8 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
       if (/\\(cite|ref|eqref)\{\$\{/.test(template)) startCompletion(view);
     },
     wrap,
+    toggle,
+    clearFormat,
     picked,
     replacePicked: (text) => {
       if (o.readOnly) return;
@@ -162,6 +324,62 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
       const a = view.state.doc.lineAt(r.from);
       const b = view.state.doc.lineAt(r.to > r.from && view.state.doc.lineAt(r.to).from === r.to ? r.to - 1 : r.to);
       view.dispatch({ changes: { from: a.from, to: b.to, insert: text }, selection: { anchor: a.from + text.length }, scrollIntoView: true, userEvent: 'input' });
+      view.focus();
+    },
+    insertText: (text) => {
+      if (o.readOnly) return;
+      const r = view.state.selection.main;
+      view.dispatch({ changes: { from: r.from, to: r.to, insert: text }, selection: { anchor: r.from + text.length }, scrollIntoView: true, userEvent: 'input' });
+      view.focus();
+    },
+    insertBlock: (text) => {
+      if (o.readOnly) return;
+      const r = view.state.selection.main;
+      const a = view.state.doc.lineAt(r.from);
+      const b = view.state.doc.lineAt(r.to);
+      const pre = view.state.sliceDoc(a.from, r.from).trim() ? '\n' : '';
+      const post = view.state.sliceDoc(r.to, b.to).trim() ? '\n' : '';
+      const from = pre ? r.from : a.from;
+      const to = post ? r.to : b.to;
+      const insert = `${pre}${text}${post}`;
+      view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + pre.length + text.length }, scrollIntoView: true, userEvent: 'input' });
+      view.focus();
+    },
+    comment: () => {
+      if (!o.readOnly) toggleComment(view);
+      view.focus();
+    },
+    undo: () => {
+      undo(view);
+      view.focus();
+    },
+    redo: () => {
+      redo(view);
+      view.focus();
+    },
+    gotoLine: () => {
+      gotoLine(view);
+    },
+    selectAll: () => {
+      selectAll(view);
+      view.focus();
+    },
+    inMath: () => inMathAt(view.state, view.state.selection.main.head),
+    text: () => view.state.doc.toString(),
+    cursor: () => view.state.selection.main.head,
+    replaceRange: (from, to, text) => {
+      if (o.readOnly) return;
+      view.dispatch({ changes: { from, to, insert: text }, selection: { anchor: from + text.length }, scrollIntoView: true, userEvent: 'input' });
+      view.focus();
+    },
+    setVisual: (on) => view.dispatch({ effects: visualC.reconfigure(on && tex ? visualExt() : []) }),
+    setSpell: (on) => view.dispatch({ effects: spellC.reconfigure(on ? spellCheck : []) }),
+    foldAll: () => {
+      foldAll(view);
+      view.focus();
+    },
+    unfoldAll: () => {
+      unfoldAll(view);
       view.focus();
     },
     goto: (line) => handle.gotoLine(line),

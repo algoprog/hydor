@@ -6,16 +6,7 @@
 // TeX, under a key made as people make them ("knuth1984literate").
 import { HttpError } from '../auth.ts';
 import { assertPublic } from '../web/fetch.ts';
-import { bibInfo, bibKeyFor, bibText, cleanBibEntry, parseBibEntry, type BibEntry } from '../../shared/latex-bib.ts';
-
-export interface RefEntry {
-  key: string;
-  bibtex: string;
-  title: string;
-  authors: string;
-  year: string;
-  venue: string;
-}
+import { bibInfo, bibKeyFor, bibText, cleanBibEntry, parseBibEntry, type BibEntry, type TexReference as RefEntry } from '../../shared/latex-bib.ts';
 
 const UA = 'Hydor/1 (LaTeX references; https://hydor.app)';
 const TIMEOUT = 12_000;

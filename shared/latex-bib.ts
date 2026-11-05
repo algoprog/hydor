@@ -24,6 +24,16 @@ export interface BibInfo {
 
 export const BIB_LIMITS = { entry: 20_000, value: 4000 };
 
+/** A reference found on the web (POST /api/pages/tex/reference), ready to go into a .bib. */
+export interface TexReference {
+  key: string;
+  bibtex: string;
+  title: string;
+  authors: string;
+  year: string;
+  venue: string;
+}
+
 /** A value's text from s[i] on: {braced}, "quoted" or bare (a number or a macro), and where it ends. */
 function valueAt(s: string, i: number): { value: string; end: number } | null {
   let j = i;
