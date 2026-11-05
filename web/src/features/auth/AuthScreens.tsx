@@ -19,7 +19,7 @@ function Shell({ title, sub, leaving, children }: { title: string; sub: ReactNod
           <div>
             <h1 className="sr-only">{title}</h1>
             <div className="flex justify-center text-fg" style={n(3)}>
-              <Wordmark height={28} />
+              <Wordmark height={28} landing />
             </div>
             <p className="mt-4 text-[14px] text-fg-3" style={n(4)}>
               {sub}

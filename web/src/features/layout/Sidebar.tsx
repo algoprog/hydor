@@ -226,7 +226,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
     >
       <div data-tour="sidebar-top" className="flex h-14 shrink-0 items-center gap-2.5 px-4">
         <span className="flex min-w-0 flex-1 items-center text-fg">
-          <Wordmark height={16} tide />
+          <Wordmark height={16} tide landing />
         </span>
         {!connected && (
           <span title="Reconnecting…" className="text-warn">
