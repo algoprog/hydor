@@ -219,7 +219,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   const ppx = model ? paperPx(model) : 794;
   // The comments beside the page where there is room for them, else in a panel.
   const columnFits = !phone && width - outlineW >= ppx * (typeof view.zoom === 'number' ? Math.min(1, view.zoom) : 1) + COLUMN + 24 + 48;
-  const column = columnFits && view.comments && (comments.length > 0 || !!draft);
+  const column = columnFits && view.comments && (shownComments.length > 0 || !!draft);
   const panelW = !phone && panel && !columnFits ? 320 : 0;
   const room = width - outlineW - panelW - (column ? COLUMN + 24 : 0) - 48;
   // Fit the width: the paper as wide as there is room for; else as large as asked, or (no room for it) the words
