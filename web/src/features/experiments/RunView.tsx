@@ -290,7 +290,8 @@ export function RunView({ id, machine, onClose, onAgain, wide }: { id: string; m
             <p className="text-[12.5px] text-fg-3">
               {[
                 machine ? r.machine?.name : null,
-                r.host,
+                // Where it ran: another machine or a cluster by its name, this computer in those words.
+                machine || r.where?.startsWith('c:') || r.where?.startsWith('m:') ? r.host : 'This computer',
                 r.gpuIds?.length ? `GPU ${r.gpuIds.join(', ')}` : r.gpus ? null : 'no GPU',
                 r.startedAt ? `started ${when(r.startedAt)}` : `added ${when(r.createdAt)}`,
                 r.group ? `experiment ${r.group}` : null,

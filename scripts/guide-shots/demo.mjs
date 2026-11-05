@@ -516,7 +516,7 @@ export async function seedApi(api, home, now, s) {
     ['BM25 + dense, hard negatives', 75],
   ])
     for (const seed of [1, 2, 3])
-      await api('POST', '/api/experiments/jobs', { name: `${group.split(', ')[1]} · seed ${seed}`, group, command: train(base, seed), cwd: retriever, gpus: 0, seed, params: { negatives: group.split(', ')[1], lr: '2e-5', seed } }).catch((e) => console.warn(`  experiments: ${e.message}`));
+      await api('POST', '/api/experiments/jobs', { name: `${group.split(', ')[1]} · seed ${seed}`, group, command: train(base, seed), cwd: retriever, gpus: 0, seed, params: { negatives: group.split(', ')[1], lr: '2e-5', seed }, notify: { done: false, failed: false } }).catch((e) => console.warn(`  experiments: ${e.message}`));
   for (const t of tasks) {
     if (!away(t.h)) continue;
     await api('POST', '/api/tasks', {

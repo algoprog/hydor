@@ -98,7 +98,7 @@ const READING_LIST: AppUi = {
       html: String.raw`<header class="hero">
   <p class="kicker">Reading list{{#state.project}} · {{state.project_name|or:$state.project}}{{/state.project}}</p>
   <h1>{{#.|count|is:1}}One paper{{/.}}{{^.|count|is:1}}{{.|count|number}} papers{{/.}}</h1>
-  <p class="sub">{{^.}}Add a paper by its DOI, arXiv id, link or title, import a .bib, or sync with Zotero.{{/.}}{{#.}}Search them, mark what you have read, and pick some for a literature matrix.{{/.}}</p>
+  <p class="sub">{{^.}}Add a paper by its DOI, arXiv id, link or title, import a .bib, or sync with Zotero.{{/.}}{{#.|count}}Search them, mark what you have read, and pick some for a literature matrix.{{/.}}</p>
   <div class="stats">
     <button type="button" class="stat" data-event="status" data-status="To read"><b>{{.|where:status=To read|count}}</b><span>to read</span></button>
     <button type="button" class="stat" data-event="status" data-status="Reading"><b>{{.|where:status=Reading|count}}</b><span>reading</span></button>
@@ -237,7 +237,7 @@ button.stat:hover { border-color: var(--n-accent); }
   <div class="body">
     <button type="button" class="t" data-event="open_paper">{{title}}</button>
     <p class="meta">{{authors|short:110}}{{#venue}} · {{venue}}{{/venue}}{{#year}} · {{year}}{{/year}}</p>
-    <p class="tags">{{#project}}<button type="button" class="proj" data-event="project" data-project="{{project}}" data-name="{{project_name|or:$project}}">{{project_name|or:$project}}</button>{{/project}}{{#tags}}<button type="button" class="tag" data-event="tag" data-tag="{{.}}">#{{.}}</button>{{/tags}}</p>
+    <p class="tags">{{#project_name}}<button type="button" class="proj" data-event="project" data-project="{{project}}" data-name="{{project_name}}">{{project_name}}</button>{{/project_name}}{{#tags}}<button type="button" class="tag" data-event="tag" data-tag="{{.}}">#{{.}}</button>{{/tags}}</p>
   </div>
   <div class="seg" role="group" aria-label="Status">
     <button type="button" class="{{#status|is:To read}}on{{/status}}" data-event="to_read">To read</button>
