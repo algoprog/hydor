@@ -1,7 +1,8 @@
 // Presenting a deck: the slideshow over everything, full screen where the device allows (click, the arrow keys,
-// Space or a swipe go on; B or W blank the screen; G shows every slide; a number and Enter go to that slide;
-// Escape ends it). The presenter's view: the slide, the next one, the speaker notes and a timer, with a second
-// window for the audience (on another screen or a projector) that follows it, and that it follows in turn.
+// Space or a swipe go on; B or W blank the screen; G shows every slide; a number and Enter go to that slide; L a
+// laser pointer, P a pen, E erases its lines, C live captions; Escape ends it). The presenter's view: the slide, the
+// next one, the speaker notes and a timer, with a second window for the audience (on another screen or a projector)
+// that follows it, and that it follows in turn; the presenter's laser, pen and captions show in it too.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Minus, MonitorUp, Pause, Play, Plus, RotateCcw, X } from 'lucide-react';
@@ -9,7 +10,7 @@ import type { Deck } from '@shared/slides';
 import { api, enc } from '../../../lib/api';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../../components/ui';
-import type { Show } from '@shared/slides-runtime';
+import type { Marks, Show } from '@shared/slides-runtime';
 import { PICS, RT, useDeckFonts } from './rt';
 import { SlideThumb } from './Thumb';
 
@@ -21,6 +22,12 @@ const words = () => ({
   full: tr('Full screen'),
   exit: tr('End the slideshow'),
   end: tr('The end of the slideshow. Click to leave.'),
+  laser: tr('Laser pointer (L)'),
+  pen: tr('Pen (P)'),
+  erase: tr('Erase the drawings (E)'),
+  captions: tr('Live captions (C)'),
+  noCaptions: tr('Live captions need a browser that turns speech into words, such as Chrome.'),
+  listening: tr('Listening…'),
 });
 
 /** The slideshow over everything, from slide `from`. */
@@ -49,7 +56,7 @@ export function Slideshow({ deck, from, onClose }: { deck: Deck; from: number; o
   return createPortal(<div ref={host} className="fixed inset-0 z-[90] bg-black" />, document.body);
 }
 
-type Msg = { t: 'hello' } | { t: 'deck'; deck: Deck; i: number; step: number } | { t: 'go'; i: number; step: number } | { t: 'moved'; i: number; step: number } | { t: 'bye' };
+type Msg = { t: 'hello' } | { t: 'deck'; deck: Deck; i: number; step: number } | { t: 'go'; i: number; step: number } | { t: 'moved'; i: number; step: number } | { t: 'marks'; m: Marks } | { t: 'bye' };
 
 const channelOf = (id: string) => `naget-show:${id}`;
 
@@ -96,6 +103,8 @@ export function Presenter({ deck, from, pageId, onClose }: { deck: Deck; from: n
         setAt(now);
         bc.postMessage({ t: 'go', i, step } satisfies Msg);
       },
+      // The laser, the pen's lines and the captions show in the audience's window too.
+      onMarks: (m) => bc.postMessage({ t: 'marks', m } satisfies Msg),
       words: words(),
       ...PICS,
     });
@@ -218,7 +227,10 @@ export function AudienceView({ id }: { id: string }) {
   const [start, setStart] = useState({ i: 0, step: 0 });
   const [ended, setEnded] = useState(false);
   const bc = useMemo(() => new BroadcastChannel(channelOf(id)), [id]);
-  useDeckFonts(deck);
+  // Drawn again once KaTeX is there, for a deck with equations, where it was.
+  const katex = useDeckFonts(deck) >= 0 && !!PICS.katex;
+  const pos = useRef(start);
+  pos.current = pos.current.i || pos.current.step ? pos.current : start;
   useEffect(() => {
     let alive = true;
     bc.onmessage = (e: MessageEvent<Msg>) => {
@@ -248,11 +260,12 @@ export function AudienceView({ id }: { id: string }) {
     let echo = false;
     const s = RT.show(el, deck, {
       mode: 'full',
-      at: start.i,
-      step: start.step,
+      at: pos.current.i,
+      step: pos.current.step,
       keys: true,
       onExit: () => void document.exitFullscreen?.().catch(() => {}),
       onMove: (i, step) => {
+        pos.current = { i, step };
         if (!echo) bc.postMessage({ t: 'moved', i, step } satisfies Msg);
       },
       words: words(),
@@ -268,14 +281,14 @@ export function AudienceView({ id }: { id: string }) {
         echo = true;
         s.go(m.i, m.step);
         echo = false;
-      }
+      } else if (m.t === 'marks') s.marks(m.m);
     };
     return () => {
       bc.onmessage = prev;
       s.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deck]);
+  }, [deck, katex]);
   return createPortal(
     <div className="fixed inset-0 z-[90] bg-black" onDoubleClick={() => void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.())}>
       <div ref={host} className="absolute inset-0" />

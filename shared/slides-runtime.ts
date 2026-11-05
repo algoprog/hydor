@@ -167,6 +167,8 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     '.ns-bgimg,.ns-dim{position:absolute;inset:0;background-size:cover;background-position:center;pointer-events:none}',
     '.ns-dim{background:#000}',
     '.ns-el{position:absolute;transform-origin:center}',
+    // A group is its parts: the space between them is not it.
+    '.ns-el[data-type=group]{pointer-events:none}.ns-el[data-type=group]>.ns-el:not([data-type=group]){pointer-events:auto}',
     '.ns-fill,.ns-shape{position:absolute;inset:0;pointer-events:none}',
     '.ns-shape{overflow:visible;width:100%;height:100%}',
     '.ns-txt{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;overflow-wrap:break-word;word-break:normal;counter-reset:ns0 ns1 ns2 ns3 ns4;outline:none}',
@@ -1617,6 +1619,8 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
         const ghost = na.cloneNode(true) as HTMLElement;
         nb.before(ghost);
         ghosts.push(ghost);
+        // It moves on as the ghost: none of it stays behind on the old slide.
+        na.style.visibility = 'hidden';
         made.push(ghost.animate([{ translate: '0px 0px', rotate: `${ga.r}deg`, scale: '1 1' }, as(gb, ga)], opts));
         made.push(nb.animate([{ ...as(ga, gb), opacity: 0 }, { translate: '0px 0px', rotate: `${gb.r}deg`, scale: '1 1', opacity: own(nb) }], opts));
       }

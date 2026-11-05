@@ -1,17 +1,23 @@
-// What the slides editor does to a deck, each as a new deck (the old one stays for Undo): parts added, changed,
-// moved, lined up and stacked; slides added from a layout, copied, moved and removed; animations in their order.
+// What the slides editor does to a deck, each as a new deck (the old one stays for Undo): parts added, changed
+// (in groups too), moved, lined up and stacked, grouped and ungrouped; slides added from a layout, copied, moved and
+// removed; animations in their order; a part's look copied onto others (the format painter); table cells merged.
 import {
+  fitGroup,
+  groupOf,
   layoutSlide,
   newId,
   SLIDE_W,
   slideH,
+  ungroupEls,
   type Anim,
   type ChartEl,
   type Deck,
   type El,
+  type GroupEl,
   type ImageEl,
   type LayoutId,
   type LineEl,
+  type Merge,
   type Para,
   type ShapeEl,
   type ShapeKind,
@@ -31,15 +37,68 @@ export function boxOf(e: El): { x: number; y: number; w: number; h: number } {
 
 export const setSlide = (d: Deck, i: number, f: (s: Slide) => Slide): Deck => ({ ...d, slides: d.slides.map((s, k) => (k === i ? f(s) : s)) });
 
-export const setEls = (d: Deck, i: number, ids: string[], f: (e: El) => El): Deck => setSlide(d, i, (s) => ({ ...s, els: s.els.map((e) => (ids.includes(e.id) ? f(e) : e)) }));
+/** Parts changed by `f` wherever they are, in groups too; a group whose parts changed is fitted round them again. */
+function mapDeep(els: El[], ids: string[], f: (e: El) => El): El[] {
+  let changed = false;
+  const out = els.map((e) => {
+    if (ids.includes(e.id)) {
+      changed = true;
+      return f(e);
+    }
+    if (e.type === 'group') {
+      const inner = mapDeep(e.els, ids, f);
+      if (inner !== e.els) {
+        changed = true;
+        return fitGroup({ ...e, els: inner });
+      }
+    }
+    return e;
+  });
+  return changed ? out : els;
+}
+
+export const setEls = (d: Deck, i: number, ids: string[], f: (e: El) => El): Deck => setSlide(d, i, (s) => ({ ...s, els: mapDeep(s.els, ids, f) }));
+
+/** A part of a slide by its id, wherever it is. */
+export function findEl(els: El[], id: string): El | undefined {
+  for (const e of els) {
+    if (e.id === id) return e;
+    if (e.type === 'group') {
+      const got = findEl(e.els, id);
+      if (got) return got;
+    }
+  }
+  return undefined;
+}
+
+/** The groups a part is in, the outermost first ([] for one on the slide itself; null when it is not there). */
+export function pathTo(els: El[], id: string, path: GroupEl[] = []): GroupEl[] | null {
+  for (const e of els) {
+    if (e.id === id) return path;
+    if (e.type === 'group') {
+      const got = pathTo(e.els, id, [...path, e]);
+      if (got) return got;
+    }
+  }
+  return null;
+}
+
+/** The parts picked, wherever they are. */
+export const pickedOf = (s: Slide | undefined, sel: string[]): El[] => (s ? sel.map((id) => findEl(s.els, id)).filter((e): e is El => !!e) : []);
+
+/** A copy of a part with new ids (its group's parts' too), keeping what Morph knows it by. */
+function renew(e: El): El {
+  const c = { ...e, id: newId(), key: e.key ?? e.id } as El;
+  return c.type === 'group' ? { ...c, els: c.els.map(renew) } : c;
+}
 
 /** Every part of the deck has a new id (copies of slides and parts), its animations following. */
 function fresh(s: Slide): Slide {
   const ids = new Map<string, string>();
   const els = s.els.map((e) => {
-    const id = newId();
-    ids.set(e.id, id);
-    return { ...e, id };
+    const c = renew(e);
+    ids.set(e.id, c.id);
+    return c;
   });
   return { ...s, id: newId(), els, anims: s.anims?.filter((a) => ids.has(a.el)).map((a) => ({ ...a, id: newId(), el: ids.get(a.el)! })) };
 }
@@ -136,20 +195,102 @@ export function addEls(d: Deck, i: number, els: El[]): Deck {
   return setSlide(d, i, (s) => ({ ...s, els: [...s.els, ...els] }));
 }
 
+/** Parts removed wherever they are; a group left empty goes too, one left with parts is fitted round them. */
+function dropDeep(els: El[], ids: string[]): El[] {
+  const out: El[] = [];
+  for (const e of els) {
+    if (ids.includes(e.id)) continue;
+    if (e.type === 'group') {
+      const inner = dropDeep(e.els, ids);
+      if (!inner.length) continue;
+      out.push(inner.length === e.els.length && inner.every((x, k) => x === e.els[k]) ? e : fitGroup({ ...e, els: inner }));
+    } else out.push(e);
+  }
+  return out;
+}
+
 export function removeEls(d: Deck, i: number, ids: string[]): Deck {
   return setSlide(d, i, (s) => {
-    const anims = s.anims?.filter((a) => !ids.includes(a.el));
-    return { ...s, els: s.els.filter((e) => !ids.includes(e.id)), ...(anims ? { anims } : {}) };
+    const els = dropDeep(s.els, ids);
+    const left = new Set(els.map((e) => e.id));
+    const anims = s.anims?.filter((a) => left.has(a.el));
+    return { ...s, els, ...(anims ? { anims } : {}) };
   });
 }
 
 /** Copies of parts, a little down and to the right of where they were (or where `at` puts them). */
 export function copies(els: El[], shift = 24): El[] {
-  return els.map((e) => ({ ...e, id: newId(), x: e.x + shift, y: e.y + shift }));
+  return els.map((e) => {
+    const c = renew(e);
+    return { ...c, x: c.x + shift, y: c.y + shift };
+  });
 }
 
-/** Parts moved in the stacking order: to the front or back, or one step. */
+/** The parts' own list that holds every one of `ids` (the slide's, or a group's), with the group it is in. */
+function levelOf(els: El[], ids: string[], group: GroupEl | null = null): { els: El[]; group: GroupEl | null } | null {
+  if (ids.every((id) => els.some((e) => e.id === id))) return { els, group };
+  for (const e of els) if (e.type === 'group') {
+    const got = levelOf(e.els, ids, e);
+    if (got) return got;
+  }
+  return null;
+}
+
+/** A level's list of parts replaced: the slide's own, or a group's (then fitted round them). */
+function setLevel(d: Deck, i: number, group: GroupEl | null, els: El[], anims?: (a: Anim[]) => Anim[]): Deck {
+  return setSlide(d, i, (s) => {
+    if (!group) {
+      const next = anims ? anims(s.anims ?? []) : s.anims;
+      const { anims: _a, ...rest } = s;
+      return next?.length ? { ...rest, els, anims: next } : { ...rest, els };
+    }
+    return { ...s, els: mapDeep(s.els, [group.id], (g) => fitGroup({ ...(g as GroupEl), els })) };
+  });
+}
+
+/**
+ * Two or more parts (side by side in the same list) made into a group, where the topmost of them was. Their
+ * animations go to the group: the first that brings them in, stresses them and takes them out.
+ */
+export function groupEls(d: Deck, i: number, ids: string[]): { deck: Deck; id: string } | null {
+  const lv = levelOf(d.slides[i].els, ids);
+  if (!lv || ids.length < 2) return null;
+  const picked = lv.els.filter((e) => ids.includes(e.id));
+  const id = newId();
+  const g = groupOf(picked, id);
+  const top = Math.max(...picked.map((e) => lv.els.indexOf(e)));
+  const els: El[] = [];
+  lv.els.forEach((e, k) => {
+    if (!ids.includes(e.id)) els.push(e);
+    else if (k === top) els.push(g);
+  });
+  const deck = setLevel(d, i, lv.group, els, (anims) => {
+    const seen = new Set<string>();
+    return anims.flatMap((a) => {
+      if (!ids.includes(a.el)) return [a];
+      if (seen.has(a.type)) return [];
+      seen.add(a.type);
+      return [{ ...a, el: id, byPara: undefined }];
+    });
+  });
+  return { deck, id };
+}
+
+/** A group's parts back in its place, where they show; its animations go to its parts, which then move together. */
+export function ungroup(d: Deck, i: number, id: string): { deck: Deck; ids: string[] } | null {
+  const lv = levelOf(d.slides[i].els, [id]);
+  const g = lv?.els.find((e) => e.id === id);
+  if (!lv || !g || g.type !== 'group') return null;
+  const parts = ungroupEls(g);
+  const els = lv.els.flatMap((e) => (e.id === id ? parts : [e]));
+  const deck = setLevel(d, i, lv.group, els, (anims) => anims.flatMap((a) => (a.el !== id ? [a] : parts.map((p, k) => ({ ...a, id: k ? newId() : a.id, el: p.id, on: k ? ('with' as const) : a.on, delay: k ? 0 : a.delay })))));
+  return { deck, ids: parts.map((p) => p.id) };
+}
+
+/** Parts moved in the stacking order: to the front or back, or one step (in their group, for parts of one). */
 export function restack(d: Deck, i: number, ids: string[], how: 'front' | 'back' | 'forward' | 'backward'): Deck {
+  const lv = levelOf(d.slides[i].els, ids);
+  if (lv?.group) return setLevel(d, i, lv.group, restack({ ...d, slides: [{ id: 'x', els: lv.els }] }, 0, ids, how).slides[0].els);
   return setSlide(d, i, (s) => {
     const els = [...s.els];
     const picked = els.filter((e) => ids.includes(e.id));
@@ -173,12 +314,16 @@ export type AlignHow = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'
 /** Parts lined up with each other (two or more), or with the slide (one). */
 export function align(d: Deck, i: number, ids: string[], how: AlignHow): Deck {
   const s = d.slides[i];
-  const picked = s.els.filter((e) => ids.includes(e.id));
+  const lv = levelOf(s.els, ids);
+  const picked = (lv?.els ?? s.els).filter((e) => ids.includes(e.id));
   if (!picked.length) return d;
   const boxes = picked.map(boxOf);
+  // One part lines up with the slide, or with its group when it is in one.
   const area =
     picked.length === 1
-      ? { x: 0, y: 0, w: W, h: heightOf(d) }
+      ? lv?.group
+        ? { x: 0, y: 0, w: lv.group.w, h: lv.group.h }
+        : { x: 0, y: 0, w: W, h: heightOf(d) }
       : (() => {
           const x = Math.min(...boxes.map((b) => b.x));
           const y = Math.min(...boxes.map((b) => b.y));
@@ -201,7 +346,7 @@ export function align(d: Deck, i: number, ids: string[], how: AlignHow): Deck {
 /** Three or more parts spread evenly across or down. */
 export function distribute(d: Deck, i: number, ids: string[], axis: 'h' | 'v'): Deck {
   const s = d.slides[i];
-  const picked = s.els.filter((e) => ids.includes(e.id)).map((e) => ({ e, b: boxOf(e) }));
+  const picked = (levelOf(s.els, ids)?.els ?? s.els).filter((e) => ids.includes(e.id)).map((e) => ({ e, b: boxOf(e) }));
   if (picked.length < 3) return d;
   const key = axis === 'h' ? 'x' : 'y';
   const size = axis === 'h' ? 'w' : 'h';
@@ -276,6 +421,141 @@ export function moveAnim(d: Deck, i: number, id: string, by: -1 | 1): Deck {
     [list[k], list[j]] = [list[j], list[k]];
     return { ...s, anims: list };
   });
+}
+
+// ---- the format painter ---------------------------------------------------------------------------------
+
+/** What makes up a part's look, by kind: its fill and border, its words' look, a line's ends, an icon's colour. */
+const LOOKS: Record<El['type'], string[]> = {
+  text: ['fill', 'fill2', 'angle', 'line', 'lineW', 'dash', 'radius', 'shadow', 'opacity', 'font', 'size', 'color', 'bold', 'italic', 'align', 'valign', 'lh', 'gap', 'ls', 'pad'],
+  shape: ['fill', 'fill2', 'angle', 'line', 'lineW', 'dash', 'radius', 'shadow', 'opacity', 'font', 'size', 'color', 'bold', 'italic', 'align', 'valign', 'lh', 'gap', 'ls', 'pad'],
+  image: ['radius', 'line', 'lineW', 'shadow', 'opacity', 'adjust'],
+  line: ['color', 'width', 'dash', 'start', 'end', 'opacity'],
+  icon: ['color', 'lineW', 'opacity'],
+  math: ['color', 'opacity'],
+  video: ['radius', 'opacity'],
+  table: ['size', 'color', 'font', 'fill', 'headColor', 'line', 'head', 'band', 'opacity'],
+  chart: ['size', 'color', 'font', 'opacity'],
+  group: ['opacity'],
+};
+
+export interface Look {
+  type: El['type'];
+  props: Record<string, unknown>;
+  /** How the words look where they start (their own bold, colour, font…), for text. */
+  words?: Partial<Para['runs'][number]>;
+}
+
+/** A part's look, to put on others. */
+export function lookOf(e: El): Look {
+  const props: Record<string, unknown> = {};
+  for (const k of LOOKS[e.type]) props[k] = (e as unknown as Record<string, unknown>)[k];
+  if (e.type === 'text' || e.type === 'shape') {
+    const r = e.paras.flatMap((p) => p.runs).find((x) => x.t);
+    if (r) {
+      // The words' own look, where they have one, is what shows.
+      if (r.font) props.font = r.font;
+      if (r.size) props.size = r.size;
+      if (r.color) props.color = r.color;
+      if (r.b !== undefined) props.bold = r.b || undefined;
+      if (r.i !== undefined) props.italic = r.i || undefined;
+      return { type: e.type, props, words: { u: r.u, s: r.s, hl: r.hl } };
+    }
+  }
+  return { type: e.type, props };
+}
+
+/** A look put on a part: what the two kinds share (a colour is a colour, a line's or an icon's); on a group, on each of its parts. */
+export function withLook(e: El, look: Look): El {
+  if (e.type === 'group' && look.type !== 'group') return { ...e, els: e.els.map((x) => withLook(x, look)) };
+  const mine = LOOKS[e.type];
+  const theirs = LOOKS[look.type];
+  const alias: Record<string, string> = e.type === look.type ? {} : { color: 'color', lineW: e.type === 'line' ? 'width' : 'lineW', width: e.type === 'icon' ? 'lineW' : 'width' };
+  const out = { ...e } as Record<string, unknown>;
+  for (const k of theirs) {
+    const to = mine.includes(k) ? k : alias[k] && mine.includes(alias[k]) ? alias[k] : null;
+    if (!to) continue;
+    const v = look.props[k];
+    if (v === undefined) delete out[to];
+    else out[to] = v;
+  }
+  if ((e.type === 'text' || e.type === 'shape') && (look.type === 'text' || look.type === 'shape')) {
+    const w = look.words ?? {};
+    out.paras = e.paras.map((p) => ({
+      ...p,
+      runs: p.runs.map((r) => {
+        const { font: _f, size: _s, color: _c, b: _b, i: _i, u: _u, s: _st, hl: _h, ...rest } = r;
+        return { ...rest, ...(w.u ? { u: true } : {}), ...(w.s ? { s: true } : {}), ...(w.hl ? { hl: w.hl } : {}) };
+      }),
+    }));
+  }
+  return out as unknown as El;
+}
+
+// ---- tables -------------------------------------------------------------------------------------------------
+
+/** The merged block a cell is in, if it is in one. */
+export const mergeAt = (t: TableEl, r: number, c: number): Merge | undefined => t.merges?.find((m) => r >= m.r && r < m.r + m.rs && c >= m.c && c < m.c + m.cs);
+
+/** A block of cells merged into one: their words together in its first cell, merges it covers undone. */
+export function mergeCells(t: TableEl, r0: number, c0: number, r1: number, c1: number): TableEl {
+  let [ra, rb, ca, cb] = [Math.min(r0, r1), Math.max(r0, r1), Math.min(c0, c1), Math.max(c0, c1)];
+  // A merged block it touches becomes part of it.
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const m of t.merges ?? []) {
+      const meets = m.r <= rb && m.r + m.rs - 1 >= ra && m.c <= cb && m.c + m.cs - 1 >= ca;
+      if (!meets) continue;
+      const nr = [Math.min(ra, m.r), Math.max(rb, m.r + m.rs - 1), Math.min(ca, m.c), Math.max(cb, m.c + m.cs - 1)] as const;
+      if (nr[0] !== ra || nr[1] !== rb || nr[2] !== ca || nr[3] !== cb) {
+        [ra, rb, ca, cb] = nr;
+        grew = true;
+      }
+    }
+  }
+  if (ra === rb && ca === cb) return t;
+  const words: string[] = [];
+  const rows = t.rows.map((row, r) =>
+    row.map((v, c) => {
+      if (r < ra || r > rb || c < ca || c > cb) return v;
+      if (v.trim()) words.push(v);
+      return '';
+    }),
+  );
+  rows[ra][ca] = words.join('\n');
+  const merges = (t.merges ?? []).filter((m) => !(m.r <= rb && m.r + m.rs - 1 >= ra && m.c <= cb && m.c + m.cs - 1 >= ca));
+  return { ...t, rows, merges: [...merges, { r: ra, c: ca, rs: rb - ra + 1, cs: cb - ca + 1 }] };
+}
+
+/** The merged block a cell is in, split back into its cells. */
+export function unmergeCell(t: TableEl, r: number, c: number): TableEl {
+  const m = mergeAt(t, r, c);
+  if (!m) return t;
+  const merges = (t.merges ?? []).filter((x) => x !== m);
+  const { merges: _m, ...rest } = t;
+  return merges.length ? { ...rest, merges } : rest;
+}
+
+/** A block of cells given a fill of their own (none: back to the table's). */
+export function fillCells(t: TableEl, r0: number, c0: number, r1: number, c1: number, fill: string | undefined): TableEl {
+  const fills = { ...(t.fills ?? {}) };
+  for (let r = Math.min(r0, r1); r <= Math.max(r0, r1); r++)
+    for (let c = Math.min(c0, c1); c <= Math.max(c0, c1); c++) {
+      if (fill) fills[`${r},${c}`] = fill;
+      else delete fills[`${r},${c}`];
+    }
+  const { fills: _f, ...rest } = t;
+  return Object.keys(fills).length ? { ...rest, fills } : rest;
+}
+
+/** Rows or columns removed from a table: merges and fills that were in them go, those after move up or left. */
+export function dropMergesPast(t: TableEl): TableEl {
+  const rows = t.rows.length;
+  const cols = Math.max(1, ...t.rows.map((r) => r.length));
+  const merges = (t.merges ?? []).filter((m) => m.r + m.rs <= rows && m.c + m.cs <= cols);
+  const fills = Object.fromEntries(Object.entries(t.fills ?? {}).filter(([k]) => Number(k.split(',')[0]) < rows && Number(k.split(',')[1]) < cols));
+  const { merges: _m, fills: _f, ...rest } = t;
+  return { ...rest, ...(merges.length ? { merges } : {}), ...(Object.keys(fills).length ? { fills } : {}) };
 }
 
 /** What a part is called in the editor: its name, else its kind and first words. */

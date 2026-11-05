@@ -1,5 +1,5 @@
 // A slide drawn small: the slide at its full size, scaled to the width it is given. Drawn again only when the slide,
-// the theme or the fonts change.
+// the theme, the footer, its place in the deck (its number) or the fonts change.
 import { memo, useLayoutEffect, useRef } from 'react';
 import type { Deck, Slide, Theme } from '@shared/slides';
 import { cx } from '../../../components/ui';
@@ -27,4 +27,7 @@ function ThumbInner({ deck, index, width, className, edit }: { deck: Deck; index
 }
 
 /** One slide, small. */
-export const SlideThumb = memo(ThumbInner, (a, b) => a.slide === b.slide && a.theme === b.theme && a.width === b.width && a.fonts === b.fonts && a.deck.ratio === b.deck.ratio && a.className === b.className);
+export const SlideThumb = memo(
+  ThumbInner,
+  (a, b) => a.slide === b.slide && a.theme === b.theme && a.width === b.width && a.fonts === b.fonts && a.deck.ratio === b.deck.ratio && a.deck.footer === b.deck.footer && (!a.deck.footer || a.index === b.index) && a.className === b.className,
+);
