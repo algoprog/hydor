@@ -1,26 +1,41 @@
-// Ready-made automations: each a short form (a time, a topic, an address) that becomes a task.
-import { BellRing, CalendarCheck, FileStack, FolderInput, GitPullRequest, Globe, HardDrive, HeartPulse, Inbox, Newspaper, Rocket, Sunrise, Tag, type LucideIcon } from 'lucide-react';
+// Ready-made automations: each a short form (a time, a topic, an address) that becomes a task. They come in
+// groups: everyday ones, watchers, and engineering (whose tasks are made in shared/engineering.ts, with the
+// webhook filters and the skills their agents follow).
+import { BellRing, CalendarCheck, FileStack, FolderInput, GitPullRequest, Globe, HardDrive, HeartPulse, Inbox, Newspaper, Rocket, Siren, Sprout, Stethoscope, Sunrise, Tag, Tags, type LucideIcon } from 'lucide-react';
 import type { TaskDraft, TaskSchedule } from '@shared/automations';
+import { ALERT_SOURCES, ALERTS, CI, CI_SERVICES, ciDoctorTask, dependencyTask, incidentTask, issueTriageTask } from '@shared/engineering';
 
 export interface TemplateField {
   id: string;
   label: string;
-  kind: 'text' | 'url' | 'time' | 'days' | 'weekday' | 'folder' | 'number' | 'long';
+  /** choice: one of `options`; yesno: a switch, "yes" when on. */
+  kind: 'text' | 'url' | 'time' | 'days' | 'weekday' | 'folder' | 'number' | 'long' | 'choice' | 'yesno';
   placeholder?: string;
   default?: string;
   hint?: string;
   optional?: boolean;
+  options?: { value: string; label: string }[];
 }
+
+export type TemplateGroup = 'everyday' | 'watch' | 'engineering';
+
+/** The examples' groups, in the order they show. */
+export const GROUPS: { id: TemplateGroup; title: string }[] = [
+  { id: 'everyday', title: 'Everyday' },
+  { id: 'watch', title: 'Watch' },
+  { id: 'engineering', title: 'Engineering' },
+];
 
 export interface Template {
   id: string;
+  group: TemplateGroup;
   icon: LucideIcon;
   title: string;
   blurb: string;
   fields: TemplateField[];
   /** A connection it needs (Apps → Connected apps). */
   needs?: string;
-  build(v: Record<string, string>): Pick<TaskDraft, 'name' | 'prompt' | 'schedule'> & Partial<Pick<TaskDraft, 'cwd'>>;
+  build(v: Record<string, string>): Pick<TaskDraft, 'name' | 'prompt' | 'schedule'> & Partial<Pick<TaskDraft, 'cwd' | 'origin'>>;
 }
 
 /** "Every day", "Weekdays", "Weekends" as days. */
@@ -39,10 +54,13 @@ const host = (url: string) => {
 const time = (d: string): TemplateField => ({ id: 'time', label: 'At', kind: 'time', default: d });
 const days = (d = 'weekdays'): TemplateField => ({ id: 'days', label: 'On', kind: 'days', default: d });
 const every = (d: string): TemplateField => ({ id: 'minutes', label: 'Check every (minutes)', kind: 'number', default: d });
+const repoFolder: TemplateField = { id: 'folder', label: 'Repository folder', kind: 'folder' };
+const may = (id: string, label: string, on = true): TemplateField => ({ id, label, kind: 'yesno', default: on ? 'yes' : '' });
 
 export const TEMPLATES: Template[] = [
   {
     id: 'morning-brief',
+    group: 'everyday',
     icon: Sunrise,
     title: 'Morning brief',
     blurb: 'The weather, news on what you follow, and your day, each morning.',
@@ -63,6 +81,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'topic-news',
+    group: 'everyday',
     icon: Newspaper,
     title: 'News on a topic',
     blurb: 'What is genuinely new about a subject, with sources; quiet when nothing is.',
@@ -75,6 +94,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'price-watch',
+    group: 'watch',
     icon: Tag,
     title: 'Price watch',
     blurb: 'Tells you when a product’s price changes, or drops below your target.',
@@ -92,6 +112,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'page-change',
+    group: 'watch',
     icon: Globe,
     title: 'Page change alert',
     blurb: 'When a page (or part of it) changes, what changed and whether it matters.',
@@ -104,6 +125,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'weekly-folder',
+    group: 'everyday',
     icon: FileStack,
     title: 'Weekly report from a folder',
     blurb: 'Every week, what changed in a folder or repository and what looks unfinished.',
@@ -118,6 +140,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'inbox-digest',
+    group: 'everyday',
     icon: Inbox,
     title: 'Inbox digest',
     blurb: 'What came in, the messages that need you first. Reads only.',
@@ -132,6 +155,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'habit',
+    group: 'everyday',
     icon: CalendarCheck,
     title: 'Habit check-in',
     blurb: 'A friendly daily question about a habit, keeping your streak.',
@@ -144,6 +168,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'releases',
+    group: 'watch',
     icon: Rocket,
     title: 'New releases',
     blurb: 'A repository’s new releases, summarized with what could break.',
@@ -156,6 +181,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'site-up',
+    group: 'watch',
     icon: HeartPulse,
     title: 'Site up check',
     blurb: 'Looks into it when a site goes down, and tells you when it is back.',
@@ -168,6 +194,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'disk-space',
+    group: 'watch',
     icon: HardDrive,
     title: 'Disk space alert',
     blurb: 'When a disk fills past a mark, what takes the space. Deletes nothing.',
@@ -184,6 +211,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'pr-review',
+    group: 'engineering',
     icon: GitPullRequest,
     title: 'Review new pull requests',
     blurb: 'GitHub or Gitea calls it for each new pull request; the agent reviews it.',
@@ -197,7 +225,54 @@ export const TEMPLATES: Template[] = [
     }),
   },
   {
+    id: 'ci-doctor',
+    group: 'engineering',
+    icon: Stethoscope,
+    title: 'CI doctor',
+    blurb: 'A failed CI run wakes an agent: it reads the logs, tells flaky from real, re-runs or fixes it, and sums it up.',
+    fields: [
+      repoFolder,
+      { id: 'ci', label: 'CI', kind: 'choice', default: 'github', options: CI_SERVICES.map((c) => ({ value: c, label: CI[c].label })) },
+      may('rerun', 'Re-run jobs that look flaky'),
+      may('pr', 'Open a draft pull request with a fix'),
+      may('comment', 'Comment on the commit or pull request', false),
+    ],
+    build: (v) => ciDoctorTask(v),
+  },
+  {
+    id: 'issue-triage',
+    group: 'engineering',
+    icon: Tags,
+    title: 'Issue triage',
+    blurb: 'Each new issue labelled, duplicates found by meaning, what is missing asked for, easy ones tried as draft pull requests.',
+    fields: [repoFolder, may('label', 'Label it'), may('comment', 'Comment on it'), may('fix', 'Try easy ones as draft pull requests')],
+    build: (v) => issueTriageTask(v),
+  },
+  {
+    id: 'dependencies',
+    group: 'engineering',
+    icon: Sprout,
+    title: 'Dependency gardener',
+    blurb: 'Weekly upgrades in a worktree with the tests run: security fixes first, one pull request per level of risk.',
+    fields: [repoFolder, { id: 'day', label: 'On', kind: 'weekday', default: '1' }, time('09:00'), may('pr', 'Open pull requests')],
+    build: (v) => dependencyTask(v),
+  },
+  {
+    id: 'incident',
+    group: 'engineering',
+    icon: Siren,
+    title: 'Incident first responder',
+    blurb: 'An alert wakes an agent: errors, deploys and changes in one timeline, a likely cause, a rollback to approve.',
+    fields: [
+      { id: 'folder', label: 'The service’s repository folder', kind: 'folder' },
+      { id: 'source', label: 'Alerts come from', kind: 'choice', default: 'sentry', options: ALERT_SOURCES.map((a) => ({ value: a, label: ALERTS[a].label })) },
+      { id: 'rollback', label: 'How to roll back', kind: 'text', optional: true, placeholder: 'kubectl rollout undo deployment/web', hint: 'A command it may run once you say yes on a card. Left empty, it asks you how.' },
+    ],
+    build: (v) => incidentTask(v),
+  },
+  {
     id: 'new-files',
+    group: 'watch',
     icon: FolderInput,
     title: 'New files in a folder',
     blurb: 'When files land in a folder (downloads, scans), the agent looks at them.',
@@ -211,6 +286,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'reminder',
+    group: 'everyday',
     icon: BellRing,
     title: 'Reminder',
     blurb: 'A nudge at a set time, once or on repeat.',
