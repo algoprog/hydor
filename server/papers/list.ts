@@ -76,7 +76,7 @@ export function appList(db: DB, app: string, data: Record<string, DataCollection
     app,
     folder: o.folder,
     names: !fields || fields.has('project_name'),
-    all: () => allRecords(db, app, 'papers') as PaperRow[],
+    all: () => allRecords(db, app, 'papers') as unknown as PaperRow[],
     add(p) {
       const r = addRecord(db, app, data, 'papers', own(p as unknown as Record<string, unknown>)) as DataRecord & Paper;
       o.changed?.('papers');

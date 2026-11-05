@@ -60,7 +60,7 @@ export function paperOfZotero(it: ZoteroItem): Paper | null {
   return tidyPaper({
     title: d.title,
     authors: names.join(', '),
-    year: /\d{4}/.exec(String(d.date ?? ''))?.[0] ?? '',
+    year: Number(/\d{4}/.exec(String(d.date ?? ''))?.[0]) || null,
     venue: String(venue),
     doi: doiIn(String(d.DOI ?? '')) || doiIn(/DOI:\s*(\S+)/i.exec(extra)?.[1] ?? ''),
     arxiv,

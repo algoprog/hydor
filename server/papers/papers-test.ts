@@ -362,7 +362,7 @@ test('papers: the same one told apart (DOI, arXiv id, Zotero key, title and year
   assert.deepEqual(mergePaper(kept, { title: 'X', status: 'To read', notes: 'Theirs', tags: ['b'], venue: 'SIGIR' }), { venue: 'SIGIR', tags: ['a', 'b'] });
   assert.equal(mergePaper(kept, { title: 'X', tags: ['a'] }), null, 'nothing new: nothing changes');
   assert.deepEqual(mergePaper({ title: 'Old', venue: 'arXiv' }, { title: 'New', venue: 'SIGIR' }, { metadata: true }), { title: 'New', venue: 'SIGIR' }, 'a newer record changes the record');
-  const t = tidyPaper({ title: '  A  paper ', year: '2020a', doi: 'https://doi.org/10.1145/x', arxiv: 'arXiv:2004.04906v3', status: 'reading', zotero_key: 'bad', url: 'nope' });
+  const t = tidyPaper({ title: '  A  paper ', year: '2020a' as unknown as number, doi: 'https://doi.org/10.1145/x', arxiv: 'arXiv:2004.04906v3', status: 'reading', zotero_key: 'bad', url: 'nope' });
   assert.deepEqual(t, { title: 'A paper', year: 2020, doi: '10.1145/x', arxiv: '2004.04906', url: 'https://doi.org/10.1145/x', status: 'Reading' });
   const bib = writeBib([{ title: 'A', authors: 'Jane Doe', year: 2020, bibtex: '@misc{doe2020a, title={A}}' }, { title: 'B', authors: 'Jane Doe', year: 2020, bibtex: '@misc{doe2020a, title={B}}' }, { title: 'Made here', authors: 'Ann Lee', year: 2024 }]);
   assert.deepEqual([...bib.matchAll(/^@\w+\{([^,]+),/gm)].map((m) => m[1]), ['doe2020a', 'doe2020a2', 'lee2024made']);
@@ -434,7 +434,7 @@ function fakeZotero() {
     deleted: [] as string[],
     calls: [] as { method: string; url: string; headers: Record<string, string>; body?: string }[],
   };
-  const send: ZoteroSend = async (c) => {
+  const send: ZoteroSend = async (c): Promise<{ status: number; headers: Record<string, string>; body: string }> => {
     z.calls.push(c);
     assert.equal(c.headers['Zotero-API-Version'], '3');
     const u = new URL(c.url);
@@ -820,11 +820,12 @@ test('Literature matrix: papers given and from the reading list (by ids) read, e
   const listed = (await http.inject({ method: 'GET', url: '/api/apps/tpl:reading-list/data/papers?q=ColBERT' })).json().records;
   assert.equal(listed.length, 1);
   const m = await run('literature-matrix', { papers: `1706.03762\nNo Such Paper At All\nreading list: ${JSON.stringify({ [listed[0].id]: true })}`, columns: 'Task\nResults', project: 'Survey' });
-  assert.equal(m.result!.papers.length, 3);
-  assert.deepEqual(m.result!.papers.map((p: any) => p.read), [true, false, true]);
-  assert.equal(m.result!.cells.length, 4, 'a cell for each column of each paper read');
-  assert.deepEqual(m.result!.cells[0], { n: 1, column: 'Task', answer: 'Task of it', where: 'p. 1' });
-  assert.match(m.result!.unread[0], /^No Such Paper At All: No paper/);
+  const res = m.result as Record<string, any>;
+  assert.equal(res.papers.length, 3);
+  assert.deepEqual(res.papers.map((p: any) => p.read), [true, false, true]);
+  assert.equal(res.cells.length, 4, 'a cell for each column of each paper read');
+  assert.deepEqual(res.cells[0], { n: 1, column: 'Task', answer: 'Task of it', where: 'p. 1' });
+  assert.match(res.unread[0], /^No Such Paper At All: No paper/);
   assert.equal(m.result!.sheet, 'sheet42');
   assert.equal(sheetsSaved[0].project, 'Survey');
   assert.match(String(m.result!.synthesis), /agree/);

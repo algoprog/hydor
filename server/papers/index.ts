@@ -69,7 +69,7 @@ const today = (ctx: RunCtx) => momentOf(userTimezone(ctx.deps.db)).today;
 const str = (v: unknown, max = 2000) => (typeof v === 'string' || typeof v === 'number' ? String(v).trim().slice(0, max) : '');
 
 /** The papers' fields an answer shows (their BibTeX and abstract left out: long, and asked for when wanted). */
-const brief = (p: Record<string, unknown>, full = false) =>
+const brief = (p: object, full = false) =>
   Object.fromEntries(Object.entries(p).filter(([k, v]) => v !== null && v !== undefined && v !== '' && (full || (k !== 'bibtex' && k !== 'abstract' && k !== 'createdAt' && k !== 'updatedAt'))));
 
 export const READ_PAPER: RunTool = {
