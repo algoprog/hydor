@@ -43,7 +43,7 @@ const ALIGNS = [
 ] as const;
 
 /** A colour from a few, any other, or none ("Automatic" for words, "None" for a highlight). */
-function ColorPick({ label, icon, value, colors, none, onPick }: { label: string; icon: ReactNode; value: string | undefined; colors: string[]; none: string; onPick: (c: string | undefined) => void }) {
+function ColorPick({ label, icon, value, colors, none, onPick, onClosed }: { label: string; icon: ReactNode; value: string | undefined; colors: string[]; none: string; onPick: (c: string | undefined) => void; onClosed?: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
   return (
@@ -60,7 +60,7 @@ function ColorPick({ label, icon, value, colors, none, onPick }: { label: string
         {icon}
         <span className="h-[3px] w-4 rounded-full border border-line-2" style={{ background: value ?? 'transparent' }} />
       </button>
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={212} title={label}>
+      <Popover anchor={ref} open={open} onClose={() => (setOpen(false), onClosed?.())} width={212} title={label}>
         <div className="p-2" onMouseDown={(e) => e.target instanceof HTMLInputElement || e.preventDefault()}>
           <button
             type="button"
@@ -165,8 +165,8 @@ export function Toolbar({
       <Tool label="Underline (Ctrl+U)" on={st.on.u} onClick={() => engine.toggle('u')}>
         <Underline size={15} />
       </Tool>
-      <ColorPick label="Text colour" icon={<Baseline size={14} />} value={st.look.color} colors={TEXT_COLORS} none="Automatic" onPick={(c) => engine.value('color', c)} />
-      <ColorPick label="Highlight" icon={<Highlighter size={14} />} value={st.look.hl} colors={HL_COLORS} none="None" onPick={(c) => engine.value('hl', c)} />
+      <ColorPick label="Text colour" icon={<Baseline size={14} />} value={st.look.color} colors={TEXT_COLORS} none="Automatic" onPick={(c) => engine.value('color', c)} onClosed={() => engine.refocusSoon()} />
+      <ColorPick label="Highlight" icon={<Highlighter size={14} />} value={st.look.hl} colors={HL_COLORS} none="None" onPick={(c) => engine.value('hl', c)} onClosed={() => engine.refocusSoon()} />
       <button
         ref={linkRef}
         type="button"
@@ -232,14 +232,14 @@ export function Toolbar({
           <ChevronDown size={12} className="-ml-0.5 text-fg-3" />
         </Button>
       )}
-      <Popover anchor={alignRef} open={menu === 'align'} onClose={() => setMenu(null)} width={230}>
+      <Popover anchor={alignRef} open={menu === 'align'} onClose={() => (setMenu(null), engine.refocusSoon())} width={230}>
         {ALIGNS.map((a) => (
           <MenuItem key={a.value} icon={<a.icon size={14} />} hint={a.keys} checked={st.align === a.value} onClick={act(() => engine.align(a.value))}>
             {a.label}
           </MenuItem>
         ))}
       </Popover>
-      <Popover anchor={tableRef} open={menu === 'table' && !!t} onClose={() => setMenu(null)} width={250} title="Table">
+      <Popover anchor={tableRef} open={menu === 'table' && !!t} onClose={() => (setMenu(null), engine.refocusSoon())} width={250} title="Table">
         <MenuItem onClick={() => (setMenu(null), engine.table('rowAbove'))}>Insert a row above</MenuItem>
         <MenuItem onClick={() => (setMenu(null), engine.table('rowBelow'))}>Insert a row below</MenuItem>
         <MenuItem onClick={() => (setMenu(null), engine.table('colLeft'))}>Insert a column on the left</MenuItem>
@@ -261,7 +261,7 @@ export function Toolbar({
           Delete the table
         </MenuItem>
       </Popover>
-      <Popover anchor={linkRef} open={!!linking} onClose={() => setLinking(null)} width={300} title="Link">
+      <Popover anchor={linkRef} open={!!linking} onClose={() => (setLinking(null), engine.refocusSoon())} width={300} title="Link">
         {linking && (
           <form
             className="space-y-2 p-2"

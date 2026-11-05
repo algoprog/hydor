@@ -16,10 +16,10 @@ import { docHeadings, docWords, FONTS, MARGINS, PAPERS, sectionOf, wordCount, wo
 import { newCommentId, openComments, type Comment } from '@shared/comments';
 import { post } from '../../../lib/api';
 import { mu } from '../../../lib/machine';
-import { toast, toastError } from '../../../lib/store';
+import { toast, toastError, useUI } from '../../../lib/store';
 import { tr } from '../../../i18n/runtime';
 import { LOCALE } from '../../../i18n/locale';
-import { Button, cx, IconButton, Popover, Segmented, useConfirm } from '../../../components/ui';
+import { Button, cx, IconButton, Popover, Segmented, useConfirm, useMediaQuery } from '../../../components/ui';
 import type { AskScope, ModelEditorProps } from '../kinds';
 import { choosePicture, pictureFromUrl, uploadPicture } from '../pictures';
 import { NumInput } from '../slides/controls';
@@ -200,6 +200,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   const outlineRef = useRef<HTMLButtonElement>(null);
   const commentsRef = useRef<HTMLButtonElement>(null);
   const spotRef = useRef<HTMLDivElement>(null);
+  const askChip = useRef<HTMLDivElement>(null);
   const dismissed = useRef('');
   const fonts = useDocFonts(model);
 
@@ -212,6 +213,11 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     return () => ro.disconnect();
   }, []);
   const phone = layout === 'sheet' || width < 640;
+  // The app's ? sits in the window's bottom right corner while its sidebar is hidden (Shell's HelpButton): the save
+  // bar's buttons and the word count keep clear of it.
+  const helpShown = useUI((s) => !s.sideOpen && !s.panelOpen);
+  const roomy = useMediaQuery('(min-width: 900px)');
+  const corner = helpShown && roomy && !phone;
   const wideOutline = width >= 1100 && layout !== 'sheet';
   const outlineW = wideOutline && outlineOpen ? 220 : 0;
   const comments: Comment[] = model?.comments ?? [];
@@ -378,7 +384,9 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     const s = window.getSelection();
     if ((onAsk || !readOnly) && !st.collapsed && st.text.trim() && s?.rangeCount && paper.current?.contains(s.anchorNode)) {
       const r = s.getRangeAt(0).getBoundingClientRect();
-      if (r.width || r.height) out.ask = { x: Math.min(Math.max(r.left - hr.left + r.width / 2, 110), hr.width - 110), y: phone ? r.bottom - hr.top + 10 : r.top - hr.top - 8 };
+      // Centred over the words, as far in as its own width needs (it is cut off at the page's edge otherwise).
+      const half = (askChip.current?.offsetWidth ?? 260) / 2 + 4;
+      if (r.width || r.height) out.ask = { x: Math.min(Math.max(r.left - hr.left + r.width / 2, half), hr.width - half), y: phone ? r.bottom - hr.top + 10 : r.top - hr.top - 8 };
     }
     if (st.collapsed && st.link && !readOnly) {
       const a = engine.current?.linkElement();
@@ -668,7 +676,8 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   };
   function startComment() {
     const en = engine.current;
-    const s = stRef.current;
+    // The selection as it is now: the state the page was told of lags a frame behind keys (Shift+→, then Ctrl+Alt+M).
+    const s = en?.state();
     if (!en || readOnlyRef.current || !s) return;
     if (s.collapsed || !s.text.trim()) return void toast(tr('Pick the words to comment on first.'));
     const r = en.caretRect();
@@ -706,7 +715,11 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           st,
           doc: model,
           outline: wideOutline ? outlineOpen : menu === 'outline',
-          toggleOutline: () => (wideOutline ? setOutlineOpen((o) => !o) : setMenu(menu === 'outline' ? null : 'outline')),
+          toggleOutline: () => {
+            if (wideOutline) return setOutlineOpen((o) => !o);
+            if (phone) spotAt(host.current?.getBoundingClientRect());
+            setMenu(menu === 'outline' ? null : 'outline');
+          },
           zoom: view.zoom,
           setZoom: (z) => setPrefs({ zoom: z }),
           spell: view.spell,
@@ -867,7 +880,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
           {/* The menus beside the title, where the header has room for them; one button where it hasn't. */}
-          {st && e && <MenuBar menus={readOnly ? menus.filter((m) => m.label === 'View' || m.label === 'Tools') : menus} compact={phone ? true : 'auto'} />}
+          {st && e && <MenuBar menus={readOnly ? menus.filter((m) => m.label === 'View' || m.label === 'Tools') : menus} compact={phone ? true : 'auto'} className={phone ? 'shrink-0' : undefined} />}
         </div>
         {(comments.length > 0 || panel) && (
           <button
@@ -882,14 +895,17 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
             {openComments(comments).length > 0 && <span className="tabular-nums">{openComments(comments).length}</span>}
           </button>
         )}
-        <IconButton
-          ref={outlineRef}
-          label={wideOutline ? (outlineOpen ? 'Hide the outline' : 'Show the outline') : 'Outline'}
-          active={wideOutline ? outlineOpen : menu === 'outline'}
-          onClick={() => (wideOutline ? setOutlineOpen((o) => !o) : setMenu(menu === 'outline' ? null : 'outline'))}
-        >
-          <ListTree size={16} />
-        </IconButton>
+        {/* On a phone the outline is in View: the header has no room for its button beside the title and the page's own. */}
+        {!phone && (
+          <IconButton
+            ref={outlineRef}
+            label={wideOutline ? (outlineOpen ? 'Hide the outline' : 'Show the outline') : 'Outline'}
+            active={wideOutline ? outlineOpen : menu === 'outline'}
+            onClick={() => (wideOutline ? setOutlineOpen((o) => !o) : setMenu(menu === 'outline' ? null : 'outline'))}
+          >
+            <ListTree size={16} />
+          </IconButton>
+        )}
         {/* On a phone, Page setup is in the Format menu: the title keeps its room. */}
         {!readOnly && !phone && (
           <IconButton ref={pageRef} label="Page setup" active={menu === 'page'} onClick={() => setMenu(menu === 'page' ? null : 'page')}>
@@ -960,6 +976,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
               ))}
               {float?.ask && (
                 <div
+                  ref={askChip}
                   data-keeps-editing
                   onMouseDown={(ev) => ev.preventDefault()}
                   className="absolute z-20 flex h-8 items-center overflow-hidden rounded-full border border-line bg-elevated text-[12.5px] font-medium text-fg shadow-lg"
@@ -1062,14 +1079,14 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
             onClick={openCount}
             title="Word count"
             className="absolute right-3 bottom-1.5 rounded-md bg-bg/80 px-1.5 text-[11px] text-fg-3 tabular-nums hover:text-fg"
-            style={{ right: panelW ? panelW + 12 : 12 }}
+            style={{ right: panelW ? panelW + 12 : corner ? 64 : 12 }}
           >
             {`${words.toLocaleString(LOCALE)} word${words === 1 ? '' : 's'}`}
           </button>
         )}
       </div>
       {dirty && !readOnly && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-panel px-3 py-2 pb-[max(8px,var(--safe-bottom))]">
+        <div className={cx('flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-panel px-3 py-2 pb-[max(8px,var(--safe-bottom))]', corner && 'pr-16')}>
           <span className="min-w-0 flex-1 text-[12.5px] text-fg-2">
             <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-warn align-middle" />
             Not saved yet{savedNote ? <span className="text-fg-3"> · {savedNote}</span> : null}
@@ -1082,13 +1099,13 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           </Button>
         </div>
       )}
-      <Popover anchor={phone ? spotRef : pageRef} open={menu === 'page'} onClose={() => setMenu(null)} align="end" width={300} title="Page setup">
+      <Popover anchor={phone ? spotRef : pageRef} open={menu === 'page'} onClose={() => (setMenu(null), e?.refocusSoon())} align="end" width={300} title="Page setup">
         {pageSetup}
       </Popover>
-      <Popover anchor={outlineRef} open={menu === 'outline' && !wideOutline} onClose={() => setMenu(null)} align="end" width={280} title="Outline">
+      <Popover anchor={phone ? spotRef : outlineRef} open={menu === 'outline' && !wideOutline} onClose={() => (setMenu(null), e?.refocusSoon())} align="end" width={280} title="Outline">
         <div className="max-h-[min(60vh,440px)] overflow-y-auto">{outline}</div>
       </Popover>
-      <Popover anchor={linkRef} open={menu === 'url'} onClose={() => setMenu(null)} width={300} title="A picture from the web">
+      <Popover anchor={linkRef} open={menu === 'url'} onClose={() => (setMenu(null), e?.refocusSoon())} width={300} title="A picture from the web">
         <form
           className="space-y-2 p-2"
           onSubmit={(ev) => {
@@ -1108,12 +1125,12 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           </div>
         </form>
       </Popover>
-      <Popover anchor={spotRef} open={!!eq} onClose={() => setEq(null)} width={360} title="Equation">
+      <Popover anchor={spotRef} open={!!eq} onClose={() => (setEq(null), e?.refocusSoon())} width={360} title="Equation">
         {eq && (
           <EquationBox
             initial={eq.kind === 'new' ? '' : eq.tex}
             display={eq.kind === 'block' || (eq.kind === 'new' && !eq.inline)}
-            onCancel={() => setEq(null)}
+            onCancel={() => (setEq(null), e?.refocusSoon())}
             onRemove={eq.kind === 'block' ? () => (e?.setMath(eq.id, ''), setEq(null)) : eq.kind === 'run' ? () => (e?.setMathRun(eq.at, ''), setEq(null)) : undefined}
             onDone={(tex) => {
               if (!e || !tex.trim()) return setEq(null);
@@ -1125,12 +1142,13 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
                 e.setPicked(null);
               }
               setEq(null);
+              e?.refocusSoon();
               void loadKatex().then(() => setMath((m) => m || 1));
             }}
           />
         )}
       </Popover>
-      <Popover anchor={spotRef} open={!!chars} onClose={() => setChars(null)} width={340} title={chars?.kind === 'icon' ? 'The callout’s emoji' : 'Special characters'}>
+      <Popover anchor={spotRef} open={!!chars} onClose={() => (setChars(null), e?.refocusSoon())} width={340} title={chars?.kind === 'icon' ? 'The callout’s emoji' : 'Special characters'}>
         {chars && (
           <CharPicker
             kinds={chars.kind === 'icon' ? ['emoji'] : undefined}
@@ -1138,14 +1156,15 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
               if (chars.kind === 'icon') e?.callout(chars.id, { icon: ch });
               else e?.typeText(ch);
               setChars(null);
+              e?.refocusSoon();
             }}
           />
         )}
       </Popover>
-      <WordCountDialog open={dialog === 'count'} onClose={() => setDialog(null)} counts={counts} picked={counts.picked} showCount={view.count} setShowCount={(on) => setPrefs({ count: on })} />
-      <SpacingDialog open={dialog === 'spacing'} onClose={() => setDialog(null)} value={{ lh: sp?.lh, sb: sp?.sb, sa: sp?.sa }} onApply={(v) => e?.spacing(v)} />
-      <BandsDialog open={dialog === 'bands'} onClose={() => setDialog(null)} header={model.header} footer={model.footer} titlePage={model.titlePage} onApply={(v) => e?.setBands(v)} />
-      <ShortcutsDialog open={dialog === 'keys'} onClose={() => setDialog(null)} groups={SHORTCUTS} />
+      <WordCountDialog open={dialog === 'count'} onClose={() => (setDialog(null), e?.refocusSoon())} counts={counts} picked={counts.picked} showCount={view.count} setShowCount={(on) => setPrefs({ count: on })} />
+      <SpacingDialog open={dialog === 'spacing'} onClose={() => (setDialog(null), e?.refocusSoon())} value={{ lh: sp?.lh, sb: sp?.sb, sa: sp?.sa }} onApply={(v) => e?.spacing(v)} />
+      <BandsDialog open={dialog === 'bands'} onClose={() => (setDialog(null), e?.refocusSoon())} header={model.header} footer={model.footer} titlePage={model.titlePage} onApply={(v) => e?.setBands(v)} />
+      <ShortcutsDialog open={dialog === 'keys'} onClose={() => (setDialog(null), e?.refocusSoon())} groups={SHORTCUTS} />
       {confirmNode}
     </div>
   );

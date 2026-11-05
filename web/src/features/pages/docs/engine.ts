@@ -452,6 +452,24 @@ export class DocEngine {
     if (scroll) this.reveal();
   }
 
+  /** The focus back in the page, the caret where it last was (after a bar or a box over the page closes). */
+  focus() {
+    if (this.o.readOnly) return;
+    if (this.picked) return this.root.focus({ preventScroll: true });
+    this.place(this.sel ?? { a: ops.firstPos(this.doc), f: ops.firstPos(this.doc) }, false);
+  }
+
+  /**
+   * The focus back in the page once a box over it has closed, unless it went somewhere already (a click in the words, a
+   * field): without it, keys after a caption or an equation went nowhere.
+   */
+  refocusSoon() {
+    requestAnimationFrame(() => {
+      const a = document.activeElement;
+      if (!a || a === document.body) this.focus();
+    });
+  }
+
   /** The caret brought into view, if it is out of it. */
   private reveal() {
     const s = window.getSelection();
@@ -795,6 +813,11 @@ export class DocEngine {
       if (mod && (k === 'z' || k === 'y')) {
         e.preventDefault();
         return k === 'y' || e.shiftKey ? this.redo() : this.undo();
+      }
+      // Select all picks the words, not the picture any more (else typing went nowhere and Delete took only it).
+      if (mod && k === 'a' && !e.shiftKey && !e.altKey) {
+        this.setPicked(null);
+        return;
       }
       if (!mod && e.key.length === 1) e.preventDefault();
       return;
