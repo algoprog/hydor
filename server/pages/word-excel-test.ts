@@ -14,6 +14,9 @@ import { Zip } from '../documents/zip.ts';
 import { docFaces, docFromFile, docPage, docxOfDoc } from './docs.ts';
 import { fontInfo, fontKey, obfuscate, officeFont, ttfInfo, type EmbeddedFont } from './word-fonts.ts';
 import { wordPlaces } from './word-layout.ts';
+import { normalizeBook, type Workbook } from '../../shared/sheets.ts';
+import { importBook, xlsxOfBook } from './sheets.ts';
+import { zipParts } from './ooxml.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -486,6 +489,113 @@ function misordered(xml: string): string | null {
   const { zipParts } = await import('./ooxml.ts');
   const f = docFromFile(zipParts(parts), 'F.docx').blocks[0] as ParaBlock;
   ok(f.sa === 8 && f.lh === 1.15 && f.runs[0].code, "Word's own spacing comes in as Word shows it (1.08 of Calibri's line is 1.15 of the editor's), Consolas as code", f);
+}
+
+// ---- Excel -----------------------------------------------------------------------------------------------------------
+{
+  const book = normalizeBook({
+    sheets: [
+      {
+        name: 'Plan',
+        header: true,
+        rows: [
+          ['Task', 'Owner', 'Status', 'Due', 'Score'],
+          ['Beds', 'Ana', 'Open', '2026-04-02', 3.5e-4],
+          ['Soil', 'Ben', 'Done', '2026-03-20', 12],
+          ['  spaced  ', 'Cy', 'Doing', '2026-05-01', 7],
+        ],
+        widths: { A: 100, B: 64, C: 240 },
+        heights: { '1': 30 },
+        styles: { A1: { wrap: true }, B2: { valign: 'bottom' }, C2: { valign: 'top' }, E2: { fmt: 'scientific' } },
+        validation: [{ range: 'C2:C9', list: ['Open', { v: 'Doing', color: '#fde293' }, { v: 'Done', color: '#ceead6' }] }],
+        conditional: [
+          { range: 'D2:D9', when: { op: 'before', a: '2026-04-01' }, style: { s: true } },
+          { range: 'D2:D9', when: { op: 'after', a: 'today' }, style: { b: true } },
+          { range: 'D2:D9', when: { op: 'dateIs', a: '2026-05-01' }, style: { i: true } },
+          { range: 'D2:D9', when: { op: 'dateIs', a: 'year' }, style: { u: true } },
+        ],
+        notes: { B3: 'Line one\nline two' },
+      },
+      {
+        name: 'Wide',
+        rows: [Array.from({ length: 12 }, (_, c) => `C${c}`), Array.from({ length: 12 }, (_, c) => c)],
+        widths: Object.fromEntries(Array.from({ length: 12 }, (_, c) => [String.fromCharCode(65 + c), 100])),
+        charts: [
+          { kind: 'scatter', range: 'A1:B2', at: 'A4:F18', colors: ['#c5221f'] },
+          { kind: 'column', range: 'A1:C2', at: 'G4:L18' },
+        ],
+      },
+    ],
+  });
+  const file = xlsxOfBook(book, 'Plan');
+  const z = new Zip(file);
+  const styles = z.text('xl/styles.xml') ?? '';
+  const s1 = z.text('xl/worksheets/sheet1.xml') ?? '';
+  const s2 = z.text('xl/worksheets/sheet2.xml') ?? '';
+  ok(styles.includes('<fonts count=') && styles.includes('<font><sz val="10"/><name val="Arial"/><family val="2"/></font>'), "cells are in Arial at 10pt, the Office font closest to the editor's (Inter, 10pt)", styles.slice(0, 400));
+  ok(
+    styles.includes('<cellXfs count=') && /<cellXfs count="\d+"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"\/><\/xf>/.test(styles),
+    'words sit in the middle of their rows, as in the editor',
+  );
+  ok(/<alignment vertical="top" wrapText="1"\/>/.test(styles) && /<alignment vertical="bottom"\/>/.test(styles), 'wrapped words from the top, and a cell that says so at the bottom');
+  // 64 and 240 px, and the default 100 px (A, written as the sheet's default width).
+  ok(
+    s1.includes('<col min="2" max="2" width="9.07421875" customWidth="1"/><col min="3" max="3" width="34.21875" customWidth="1"/>') && !s1.includes('<col min="1"'),
+    "columns' widths as Excel turns them back into the editor's pixels (its padding counted)",
+    /<cols>[\s\S]*?<\/cols>/.exec(s1)?.[0],
+  );
+  ok(s1.includes('<sheetFormatPr defaultColWidth="14.21875" defaultRowHeight="18" customHeight="1"/>') && s1.includes('<row r="1" ht="22.5" customHeight="1">'), "rows as tall as the editor's (24px) unless they say");
+  ok(
+    s1.includes(
+      '<printOptions gridLines="1"/><pageMargins left="0.4724" right="0.4724" top="0.4724" bottom="0.4724" header="0.2" footer="0.2"/><pageSetup orientation="portrait"/><headerFooter><oddHeader>&amp;L&amp;&quot;-,Bold&quot;&amp;12&amp;A</oddHeader></headerFooter>',
+    ),
+    'printed as the app prints it: its cells’ lines, 12mm margins, its name on top',
+    /<printOptions[\s\S]*?<\/headerFooter>/.exec(s1)?.[0],
+  );
+  ok(
+    s2.includes('<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>') && s2.startsWith('<?xml') && s2.includes('<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension') && !s2.includes('gridLines'),
+    'a sheet wider than a page across, made smaller to fit; no lines across the empty cells its charts stand on',
+  );
+  ok((z.text('xl/workbook.xml') ?? '').includes('<definedName name="_xlnm.Print_Titles" localSheetId="0">Plan!$1:$1</definedName>'), 'its header row repeated on each printed page');
+  ok(
+    (z.text('xl/sharedStrings.xml') ?? '').includes('<t xml:space="preserve">  spaced  </t>') && !(z.text('xl/comments1.xml') ?? '').includes('xml:space'),
+    'only words with spaces at their ends are marked to keep them (ECMA-376’s schema has no such mark there)',
+  );
+  const cf = s1.match(/<conditionalFormatting[\s\S]*?<\/conditionalFormatting>/g) ?? [];
+  ok(
+    cf.length === 6 && cf[4].includes('sqref="C2:C9"') && cf[4].includes('<formula>&quot;Doing&quot;</formula>') && cf[5].includes('<formula>&quot;Done&quot;</formula>'),
+    "a list's coloured options shown by conditional formatting, after the sheet's own rules",
+    cf.slice(4),
+  );
+  const chart = z.text('xl/charts/chart1.xml') ?? '';
+  ok(
+    chart.includes('<c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln w="9525">') && chart.includes('<a:latin typeface="Arial"/>') && chart.includes('<c:roundedCorners val="1"/>'),
+    'charts on a white card with rounded corners, their words in Arial, as the editor draws them',
+  );
+
+  const back = importBook(file, 'Plan.xlsx');
+  const b = back.book.sheets[0];
+  ok(back.loses?.length === 0, 'read back, nothing is said to be lost (the app makes its print settings again)', back.loses);
+  ok(!b.cols?.[0] && b.cols?.[1]?.w === 64 && b.cols?.[2]?.w === 240 && b.rows?.[0]?.h === 30, 'widths and heights come back as they were', [b.cols, b.rows]);
+  ok(b.cells.B2.s?.valign === 'bottom' && b.cells.C2.s?.valign === 'top' && !b.cells.A1.s?.valign && b.cells.A1.s?.wrap && !b.cells.A2.s, "words' places up and down come back, the editor's own as none", [b.cells.A1.s, b.cells.B2.s, b.cells.C2.s]);
+  ok(b.cells.E2.s?.fmt === 'scientific', "Excel's own scientific format (its number 11) comes back as one");
+  ok(
+    JSON.stringify(b.conditional?.map((r) => r.when)) === JSON.stringify(book.sheets[0].conditional?.map((r) => r.when)),
+    'date rules come back as the rules they were, not formulas',
+    b.conditional?.map((r) => r.when),
+  );
+  ok(b.validation?.[0]?.options?.[1]?.color === '#fde293' && b.conditional?.length === 4, "the list keeps its colours, and their conditional formatting is the list's, not the sheet's");
+  const c = back.book.sheets[1].charts ?? [];
+  ok(c[0]?.colors?.[0] === '#c5221f' && c.every((x) => x.labels === undefined && x.names === undefined && x.legend === undefined), 'charts come back as kept: a scatter’s colour, and nothing the app takes for them anyway', c);
+  const same = (x: Workbook) => JSON.stringify(x, (k, v) => (k === 'id' ? undefined : v));
+  ok(same(back.book) === same(book), 'the whole workbook comes back from Excel as it was');
+
+  // Another program's file: Excel's own widths (9.140625 is its 64px default), its default alignment, a print area.
+  const sheet = s1.replace(/<cols>[\s\S]*?<\/cols>/, '<cols><col min="1" max="1" width="9.140625" customWidth="1"/></cols>');
+  const wb = (z.text('xl/workbook.xml') ?? '').replace('</definedNames>', '<definedName name="_xlnm.Print_Area" localSheetId="0">Plan!$A$1:$E$4</definedName></definedNames>');
+  const parts = z.names().map((n) => ({ name: n, data: n === 'xl/worksheets/sheet1.xml' ? Buffer.from(sheet) : n === 'xl/workbook.xml' ? Buffer.from(wb) : z.read(n)! }));
+  const other = importBook(zipParts(parts), 'Other.xlsx');
+  ok(other.book.sheets[0].cols?.[0]?.w === 64 && other.loses?.includes('print'), "Excel's widths read as the pixels Excel shows; a print area is said to be lost", [other.book.sheets[0].cols, other.loses]);
 }
 
 // ---- the editor's page and PDF ------------------------------------------------------------------------------------
