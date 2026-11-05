@@ -83,16 +83,18 @@ export const appsFeature: WebFeature = {
   // A template an agent builds, beside its conversation while it is new.
   sessionSide: { useOpen: useAppSideOpen, close: closeAppSide, Panel: AppSide },
   sessionPane: { label: 'Result', icon: <ClipboardCheck size={13} />, match: (s) => !!runOfSession(s), placeholder: 'Ask for a change to the result…', Body: AppSessionPane },
-  SessionMenu: ({ s, close }) => (
-    <MenuItem
-      icon={<LayoutGrid size={15} />}
-      onClick={() => {
-        close();
-        go(`/apps/new?from=${enc(s.key)}`);
-      }}
-    >
-      Save as an app
-    </MenuItem>
-  ),
+  // Not for a confidential session, whose words stay on this computer.
+  SessionMenu: ({ s, close }) =>
+    s.extra?.confidential ? null : (
+      <MenuItem
+        icon={<LayoutGrid size={15} />}
+        onClick={() => {
+          close();
+          go(`/apps/new?from=${enc(s.key)}`);
+        }}
+      >
+        Save as an app
+      </MenuItem>
+    ),
   sessionMenuPart: 'more',
 };
