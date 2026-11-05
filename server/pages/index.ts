@@ -27,6 +27,7 @@
 //   GET /pg/:token (the page's own address), /pg/:token/html, /pg/:token/manifest.webmanifest, POST /pg/:token/storage,
 //   GET /pg/video/:sha/:sig (a deck's video, its signed address the permission)
 //   GET /site/:token/* (published sites, sandboxed)
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { isAbsPath } from '../platform.ts';
 import os from 'node:os';
@@ -249,8 +250,11 @@ function changing(db: Deps['db'], a: Record<string, unknown>, kind: PageKind): s
   return id;
 }
 
-/** When each session last had a message from the user (since the server started): its agent's saves after it are one turn's. */
-const lastAsked = new Map<string, number>();
+/**
+ * Each session's turn now: made anew with each message of its user (since the server started; none after a restart, so
+ * nothing is folded then). Its agent's saves of a page in one turn are kept as one version (store.ts addVersion).
+ */
+const turns = new Map<string, string>();
 
 /**
  * Keeps what an agent made: a new version of the page it named, or a new page of its session. Its saves of a page in a
@@ -258,11 +262,11 @@ const lastAsked = new Map<string, number>();
  */
 function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknown, model: unknown) {
   const db = ctx.deps.db;
-  const since = lastAsked.get(ctx.key);
+  const turn = turns.get(ctx.key);
   let folded: number | undefined;
   const p = id
-    ? addVersion(db, id, { title, model, by: 'agent', session: ctx.key, fold: since !== undefined ? { since } : undefined, onFold: (v) => (folded = v) })
-    : createPage(db, { title, kind, model, by: 'agent', sessionKey: ctx.key, space: sessionSpace(db, ctx.key), session: ctx.key });
+    ? addVersion(db, id, { title, model, by: 'agent', turn, onFold: (v) => (folded = v) })
+    : createPage(db, { title, kind, model, by: 'agent', sessionKey: ctx.key, space: sessionSpace(db, ctx.key), turn });
   tell(ctx.deps, { what: 'pages' });
   refreshThumbs(ctx.deps, [p.id]);
   // The draft the user watched while the call came in gives way to this version.
@@ -958,7 +962,7 @@ export const pages: Feature = {
   },
   // The pages the user changed in the editor, with their next message (which starts a new turn of saves).
   beforeMessage: (key, d) => {
-    lastAsked.set(key, Date.now());
+    turns.set(key, `${key}#${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`);
     return takeEdits(d.db, key);
   },
   start(d) {
