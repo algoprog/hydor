@@ -332,8 +332,10 @@ function texts(v: unknown, max: number): string[] {
     }
     if (typeof list === 'string') list = s.split('\n');
   }
+  // A record (a paper kept) by its title and what it says.
+  const said = (o: Record<string, unknown>) => [o.title, o.text ?? o.abstract ?? o.summary ?? o.tldr].filter((y) => typeof y === 'string' && y.trim()).join('\n');
   return (Array.isArray(list) ? list : [])
-    .map((x) => (typeof x === 'string' ? x : x && typeof x === 'object' ? [(x as Record<string, unknown>).title, (x as Record<string, unknown>).text].filter(Boolean).join('\n') : ''))
+    .map((x) => (typeof x === 'string' ? x : x && typeof x === 'object' ? said(x as Record<string, unknown>) : ''))
     .map((x) => String(x).trim())
     .filter(Boolean)
     .slice(0, max);
