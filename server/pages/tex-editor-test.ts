@@ -1,8 +1,8 @@
 // Script tests for the LaTeX editor's newer parts: the templates (each one typesets when TeX is here, made from the
 // Library's New or by save_latex's template), what the setup says this TeX has, the word count (as texcount counts),
 // the table editor's grid read from a tabular and written back, BibTeX entries (read, keyed, made safe, added to a
-// .bib), the reference finder's reading of what was asked (and, with TEX_REFS_LIVE=1, real lookups on the web), and
-// what get_page tells an agent. Through the routes, with a stand-in for the session manager. Build and run with a
+// .bib), the reference finder's reading of what was asked (and, with TEX_REFS_LIVE=1, real lookups on the web), the
+// quick checks before typesetting, and what get_page tells an agent. Through the routes, with a stand-in for the session manager. Build and run with a
 // scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/tex-editor-test.ts
 //   DATA_DIR=/tmp/hydor-test-tex-editor node dist/dev/tex-editor-test.js
@@ -14,6 +14,7 @@ import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { TEX_ASKED } from '../../shared/latex-catalog.ts';
 import { addBibEntry, bibInfo, bibKeyFor, bibKeys, bibText, cleanBibEntry, parseBibEntry, uniqueKey } from '../../shared/latex-bib.ts';
+import { texCheck } from '../../shared/latex-check.ts';
 import { texCount, texCountText, totalWords } from '../../shared/latex-count.ts';
 import { blankTable, cellTex, cellText, tableAt, tableTex } from '../../shared/latex-table.ts';
 import { TEX_TEMPLATES, texFromTemplate } from '../../shared/latex-templates.ts';
@@ -312,6 +313,37 @@ code words not counted
     ok(s.entries?.length > 1 && s.entries.some((x: { title: string }) => x.title === 'Deep learning'), 'words find papers in Crossref and arXiv (live)');
     ok((await req('POST', '/api/pages/tex/reference', { query: '10.9999/no-such-thing-at-all-xyz' })).statusCode === 404, 'a DOI that is no paper is said to be none (live)');
   }
+}
+
+// ---- quick checks before typesetting ----------------------------------------------------------------------------------
+{
+  const t = [
+    '\\documentclass{article}',
+    '\\begin{document}',
+    'Price \\$5 and $x^2$ and \\{ok\\}. % $ in a comment {',
+    '\\begin{itemize}',
+    '  \\item one',
+    '\\end{enumerate}',
+    'Text $ left open',
+    '',
+    '\\[ a \\]',
+    '\\verb|}{$| fine',
+    '\\begin{verbatim}',
+    '} { $ \\begin{x}',
+    '\\end{verbatim}',
+    'One } too many.',
+    '\\end{document}',
+  ].join('\n');
+  const found = texCheck(t);
+  const at = (m: string) => found.find((x) => x.message.includes(m));
+  ok(at('\\end{enumerate} has no \\begin{enumerate}') && t.slice(at('has no \\begin')!.from, at('has no \\begin')!.to) === '\\end{enumerate}', 'an \\end without its \\begin is found where it is');
+  ok(at('\\begin{itemize} is not ended'), 'and a \\begin left open');
+  ok(at('This $ is not closed before the paragraph ends'), 'a $ left open at a paragraph’s end');
+  ok(at('This } has no {') && t.slice(at('This }')!.from, at('This }')!.to) === '}', 'a } with no { before it');
+  ok(found.length === 4, `escaped characters, comments, \\verb and verbatim are passed over (${found.map((x) => x.message).join('; ')})`);
+  ok(texCheck('\\begin{document}\n$a$ \\(b\\) \\[c\\] $$d$$ {e} \\begin{x}\\end{x}\n\\end{document}').length === 0, 'a sound file has nothing to say');
+  ok(texCheck('\\(a').some((x) => x.message.includes('has no')) && texCheck('{a').some((x) => x.message.includes('never closed')), 'maths and braces never closed');
+  for (const tpl of TEX_TEMPLATES) ok(texCheck(texFromTemplate(tpl.id, 'T').main).length === 0, `the ${tpl.id} template passes the quick checks`);
 }
 
 // ---- what an agent is told ---------------------------------------------------------------------------------------------
