@@ -55,7 +55,8 @@ function describe(step: StepInfo): string {
   return lines.join('\n');
 }
 
-export async function reviewStep(db: DB, sessions: SessionManager, key: string, cwd: string, step: StepInfo): Promise<{ decision: 'allow' | 'ask' | 'deny'; reason: string }> {
+/** `model`: one of Custom's models in place of the helper (a confidential session's checks stay on this computer). */
+export async function reviewStep(db: DB, sessions: SessionManager, key: string, cwd: string, step: StepInfo, model?: string): Promise<{ decision: 'allow' | 'ask' | 'deny'; reason: string }> {
   try {
     const msgs = await asked(sessions, key);
     const goal = goalObjective(key);
@@ -68,7 +69,7 @@ export async function reviewStep(db: DB, sessions: SessionManager, key: string, 
     ]
       .filter(Boolean)
       .join('\n\n');
-    const v = await helperJson<{ decision?: string; reason?: string }>(db, { system: SYSTEM, prompt, timeoutMs: 40_000, maxTokens: 300 }, 'a decision');
+    const v = await helperJson<{ decision?: string; reason?: string }>(db, { system: SYSTEM, prompt, timeoutMs: model ? 90_000 : 40_000, maxTokens: 300, ...(model ? { model } : {}) }, 'a decision');
     const decision = v.decision === 'allow' || v.decision === 'deny' ? v.decision : 'ask';
     const reason = String(v.reason ?? '').replace(/\s+/g, ' ').trim().slice(0, 160) || (decision === 'allow' ? 'routine' : 'not clearly what you asked for');
     return { decision, reason };

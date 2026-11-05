@@ -23,6 +23,8 @@ export interface SessionExtra {
   space?: string;
   /** Agent Guidelines for this session alone (shared/guidelines.ts). */
   guidelines?: string;
+  /** Confidential: models on this computer only, nothing sent out, commands without network (shared/confidential.ts). Set when it starts, never removed. */
+  confidential?: true;
   /** Any other capability's settings, under its own name. */
   [field: string]: unknown;
 }

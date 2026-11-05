@@ -2,8 +2,11 @@
 // and can be turned off; only its hash is kept. Guests see the conversation, the steps by name, file
 // changes and pages the agent showed; not command output, tool input or the agent's thinking.
 import crypto from 'node:crypto';
+import { isConfidential } from '../shared/confidential.ts';
 import type { TimelineItem } from '../shared/types.ts';
+import { HttpError } from './auth.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
+import { sessionExtra } from './sessionExtra.ts';
 
 interface GuestLink {
   id: string;
@@ -40,6 +43,8 @@ function save(db: DB, list: GuestLink[]) {
 }
 
 export function createGuestLink(db: DB, key: string, days: number | null): { id: string; token: string } {
+  // A confidential session stays on this computer: no link opens it from elsewhere.
+  if (isConfidential(sessionExtra(db, key))) throw new HttpError(409, 'A confidential session can’t be shared: what was said in it stays on this computer.');
   const token = crypto.randomBytes(18).toString('base64url');
   const l: GuestLink = { id: crypto.randomBytes(4).toString('hex'), hash: hashOf(token), key, createdAt: Date.now(), views: 0, expiresAt: days ? Date.now() + days * 86_400_000 : undefined };
   save(db, [...all(db), l]);

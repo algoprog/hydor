@@ -48,7 +48,13 @@ async function show(url: string, name: string): Promise<Shown> {
   }
 }
 
-export async function models(url: string): Promise<(ModelEntry & { sizeBytes: number })[]> {
+/**
+ * Ollama's cloud models (gpt-oss:120b-cloud…) are listed like the others but run on ollama.com: its list says
+ * where (remote_host), and their names end in "cloud".
+ */
+export const isCloudModel = (m: { name?: unknown; remote_host?: unknown; remote_model?: unknown }) => !!m.remote_host || !!m.remote_model || /(^|[:-])cloud$/i.test(String(m.name ?? ''));
+
+export async function models(url: string): Promise<(ModelEntry & { sizeBytes: number; remote?: boolean })[]> {
   const r = await call(url, '/api/tags');
   const d: any = await r.json();
   return Promise.all(
@@ -63,6 +69,7 @@ export async function models(url: string): Promise<(ModelEntry & { sizeBytes: nu
         tools: s.tools ? ('native' as const) : ('text' as const),
         sizeBytes: Number(m.size ?? 0),
         detail: [m.details?.parameter_size, m.details?.quantization_level].filter(Boolean).join(' · ') || undefined,
+        ...(isCloudModel(m) ? { remote: true } : {}),
       };
     }),
   );
