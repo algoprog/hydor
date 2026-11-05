@@ -6,7 +6,7 @@
 //
 // save_doc is how agents make and change documents; get_page gives one back as Markdown, which says all a
 // document holds but its blocks' ids (carried over from the version it changes when it comes back).
-import { newCommentId } from '../../shared/comments.ts';
+import { authorForAgent, newCommentId, peopleNote } from '../../shared/comments.ts';
 import {
   ASSET,
   blockHtml,
@@ -193,7 +193,7 @@ function commentOps(list: Comment[], ops: unknown, notes: string[]): { list: Com
  * New comments put on the words they name (where the document has no marks for them yet: the first place those
  * words are), and each comment's quote made from the words it is on; a new one on no words is said.
  */
-function anchorComments(doc: Doc, on: Map<string, string>, notes: string[]): Doc {
+export function anchorComments(doc: Doc, on: Map<string, string>, notes: string[]): Doc {
   if (!doc.comments?.length) return doc;
   const marked = new Set<string>();
   const each = (f: (runs: Run[]) => Run[]) =>
@@ -408,16 +408,16 @@ function commentsForAgent(doc: Doc): string[] {
   const list = doc.comments ?? [];
   if (!list.length) return [];
   const open = list.filter((c) => !c.resolved).length;
-  const who = (by: 'user' | 'agent') => (by === 'agent' ? 'an agent' : 'the user');
   return [
     '',
     `Comments (${open} open, ${list.length - open} resolved), each on the words marked with its id above:`,
     ...list.flatMap((c) => [
-      `- ${c.id} · ${c.resolved ? 'resolved' : 'open'}${c.quote ? ` · on “${c.quote.slice(0, 160)}”` : ''} · ${who(c.by)}, ${when(c.at)} UTC: ${c.text.replace(/\n/g, ' / ')}`,
-      ...(c.replies ?? []).map((r) => `    ↳ ${who(r.by)}, ${when(r.at)} UTC: ${r.text.replace(/\n/g, ' / ')}`),
+      `- ${c.id} · ${c.resolved ? 'resolved' : 'open'}${c.quote ? ` · on “${c.quote.slice(0, 160)}”` : ''} · ${authorForAgent(c)}, ${when(c.at)} UTC: ${c.text.replace(/\n/g, ' / ')}`,
+      ...(c.replies ?? []).map((r) => `    ↳ ${authorForAgent(r)}, ${when(r.at)} UTC: ${r.text.replace(/\n/g, ' / ')}`),
     ]),
     '',
     'To answer them, save_doc with this id and comments: [{"id": "<id>", "reply": "what you did or say"}], adding "resolve": true once a comment is dealt with (or "reopen": true). Make the change a comment asks for in the markdown too. Add a comment of your own with <span data-comment="new1">the words</span> in the markdown and {"id": "new1", "text": "…"} in comments.',
+    ...(peopleNote(list) ? [peopleNote(list)!] : []),
   ];
 }
 
@@ -567,7 +567,7 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
     header: doc.header,
     footer: doc.footer,
     titlePage: doc.titlePage,
-    comments: doc.comments?.map((c) => ({ id: c.id, by: c.by, text: c.text, at: c.at, resolved: c.resolved, replies: c.replies?.map((r) => ({ by: r.by, text: r.text, at: r.at })) })),
+    comments: doc.comments?.map((c) => ({ id: c.id, by: c.by, name: c.name, text: c.text, at: c.at, resolved: c.resolved, replies: c.replies?.map((r) => ({ by: r.by, name: r.name, text: r.text, at: r.at })) })),
   });
 }
 

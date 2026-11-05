@@ -94,11 +94,13 @@ export interface DocBand {
 /** A comment for the file: who wrote it, when, what it says, its replies, whether it was resolved. */
 export interface DocComment {
   id: string;
-  by: 'user' | 'agent';
+  by: 'user' | 'agent' | 'person';
+  /** A person's name (someone the project is shared with). */
+  name?: string;
   text: string;
   at: number;
   resolved?: boolean;
-  replies?: { by: 'user' | 'agent'; text: string; at: number }[];
+  replies?: { by: 'user' | 'agent' | 'person'; name?: string; text: string; at: number }[];
 }
 
 /** How a document of Pages looks (its own font and sizes, in points; line spacing as a multiple). */
@@ -1856,16 +1858,19 @@ export function docxFile(
     for (const c of comments) {
       const nums = cmNum.get(c.id)!;
       const parent = (++para14).toString(16).toUpperCase();
-      const one = (n: number, by: 'user' | 'agent', text: string, at: number, pid: string) => {
+      const one = (n: number, w: { by: DocComment['by']; name?: string }, text: string, at: number, pid: string) => {
         const lines = text.split('\n');
         const ps = lines.map((l, k) => `<w:p${k === lines.length - 1 ? ` w14:paraId="${pid}" w14:textId="77777777"` : ''}><w:pPr><w:pStyle w:val="CommentText"/></w:pPr>${k === 0 ? '<w:r><w:rPr><w:rStyle w:val="CommentReference"/></w:rPr><w:annotationRef/></w:r>' : ''}${runXml({ t: l })}</w:p>`);
-        items.push(`<w:comment w:id="${n}" w:author="${by === 'agent' ? 'Agent' : 'You'}" w:date="${when(at)}" w:initials="${by === 'agent' ? 'A' : 'Y'}">${ps.join('')}</w:comment>`);
+        // Someone the project is shared with, by their name and its first letters.
+        const author = w.by === 'agent' ? 'Agent' : w.by === 'person' && w.name ? w.name : 'You';
+        const initials = w.by === 'person' && w.name ? w.name.split(/\s+/).map((x) => [...x][0] ?? '').join('').slice(0, 3).toUpperCase() : author[0];
+        items.push(`<w:comment w:id="${n}" w:author="${esc(author)}" w:date="${when(at)}" w:initials="${esc(initials)}">${ps.join('')}</w:comment>`);
       };
-      one(nums[0], c.by, c.text, c.at, parent);
+      one(nums[0], c, c.text, c.at, parent);
       ex.push(`<w15:commentEx w15:paraId="${parent}" w15:done="${c.resolved ? 1 : 0}"/>`);
       (c.replies ?? []).forEach((r, k) => {
         const pid = (++para14).toString(16).toUpperCase();
-        one(nums[k + 1], r.by, r.text, r.at, pid);
+        one(nums[k + 1], r, r.text, r.at, pid);
         ex.push(`<w15:commentEx w15:paraId="${pid}" w15:paraIdParent="${parent}" w15:done="${c.resolved ? 1 : 0}"/>`);
       });
     }

@@ -1773,6 +1773,8 @@ app.register(async (scope) => {
   // Signed links to files (HTML previews) and read-only session links: the machine checks them, as it does for itself.
   scope.get('/m/:id/view/*', { compress: false }, (req, reply) => machines.forward(req, reply, (req.params as { id: string }).id, rest(req)));
   scope.get('/m/:id/guest-api/:token', { compress: false }, (req, reply) => machines.forward(req, reply, (req.params as { id: string }).id, rest(req)));
+  // A project shared from that machine (its people's own links): the machine checks the token.
+  scope.route({ method: ['GET', 'HEAD', 'POST'], url: '/m/:id/p-api/*', compress: false, handler: (req, reply) => machines.forward(req, reply, (req.params as { id: string }).id, rest(req)) });
   scope.get('/m/:id/ws', { websocket: true }, (ws: WebSocket, req) => machines.relay(ws, (req.params as { id: string }).id, rest(req)));
   scope.get('/m/:id/ws/term/:tid', { websocket: true }, (ws: WebSocket, req) => machines.relay(ws, (req.params as { id: string }).id, rest(req)));
 });

@@ -37,6 +37,7 @@ import { setCaptureDb } from '../capture/index.ts';
 import { confidentialKey, confidentialRun } from '../confidential/index.ts';
 import { sessionSpace, spaceChoice } from '../spaces/choice.ts';
 import { allSpaces } from '../spaces/index.ts';
+import { carryComments } from '../spaces/share.ts';
 import { draftsOf, endDrafts, feedDraft, type ToolStream } from './drafts.ts';
 import { agentNotebook, dropWorkFolder, SAVE_NOTEBOOK_DESCRIPTION, SAVE_NOTEBOOK_SCHEMA, workFile, writeWorkFile } from './notebooks.ts';
 import { dropEdits, initEdits, noteEdit, noteFileEdit, takeEdits } from './edits.ts';
@@ -185,12 +186,12 @@ const GET_PAGE: RunTool = {
     if (outOfReach(ctx, p)) throw new HttpError(404, 'No saved page with that id');
     const k = kindOf(p.kind);
     if (k) {
-      const by = p.by === 'edit' || p.by === 'made' ? ` It was last changed by the user in its editor: keep their changes.` : '';
+      const by = p.who ? ` It was last changed by ${p.who}, someone the user shared the project with: keep their changes.` : p.by === 'edit' || p.by === 'made' ? ` It was last changed by the user in its editor: keep their changes.` : '';
       return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${by} ${k.forAgent(pageSource(db, id)!.text)}`;
     }
     const html = (await pageHtml(db, id))!.html;
     const data = storageText(db, id);
-    const by = p.by === 'edit' || p.by === 'made' ? ' It was last changed by the user in the page editor: keep their changes.' : '';
+    const by = p.who ? ` It was last changed by ${p.who}, someone the user shared the project with: keep their changes.` : p.by === 'edit' || p.by === 'made' ? ' It was last changed by the user in the page editor: keep their changes.' : '';
     // Agents' tool output is cut further on anyway: say so here rather than lose the end unnoticed.
     const cut = html.length > 100_000 ? `${html.slice(0, 100_000)}\n… (cut: the page is ${Math.round(html.length / 1024)} KB; write the whole page anew to change it)` : html;
     return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${by}\n\n${data ? `Stored data:\n${data}\n\n` : 'It stores no data yet.\n\n'}HTML:\n${cut}`;
@@ -559,8 +560,15 @@ function routes(d: Deps) {
     const id = P(req).id;
     const cur = mustPage(db, id);
     const base = Number(b.base);
-    if (Number.isInteger(base) && base > 0 && base !== cur.version && b.force !== true) throw new HttpError(409, `Version ${cur.version} was saved after the one you changed (${base}).`);
-    const page = addVersion(db, id, { title: b.title, html: b.html, model: b.model, by: 'edit' });
+    let model = b.model;
+    if (Number.isInteger(base) && base > 0 && base !== cur.version) {
+      // Comments people wrote meanwhile through a shared project's links join this save (server/spaces/share.ts); only
+      // when something else changed is it refused, unless `force`.
+      const carried = model !== undefined ? carryComments(db, id, base, model) : { model, onlyComments: false };
+      model = carried.model;
+      if (!carried.onlyComments && b.force !== true) throw new HttpError(409, `Version ${cur.version} was saved after the one you changed (${base}).`);
+    }
+    const page = addVersion(db, id, { title: b.title, html: b.html, model, by: 'edit' });
     noteEdit(db, [key(b.sessionKey), cur.sessionKey], id, Number.isInteger(base) && base > 0 ? base : cur.version, page.version);
     changed(id);
     return { page };

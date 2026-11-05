@@ -55,6 +55,8 @@ export function initPages(db: DB) {
   if (!cols.includes('app')) db.exec('alter table pages add column app text');
   // The space it belongs to (shared/spaces.ts), or none: the Library shows each space's pages together.
   if (!cols.includes('space')) db.exec('alter table pages add column space text');
+  // Who made a version, when it was someone the project is shared with (server/spaces/share.ts): their name.
+  if (!(db.prepare('pragma table_info(page_versions)').all() as { name: string }[]).some((c) => c.name === 'who')) db.exec('alter table page_versions add column who text');
   initAssets(db);
 }
 
@@ -92,12 +94,14 @@ interface Row {
   versions: number;
   bytes: number;
   by: PageVersion['by'] | null;
+  who: string | null;
   storage: number;
 }
 
 const SELECT = `select p.*, (select count(*) from page_versions v where v.page_id = p.id) as versions,
   (select bytes from page_versions v where v.page_id = p.id and v.version = p.version) as bytes,
   (select by from page_versions v where v.page_id = p.id and v.version = p.version) as by,
+  (select who from page_versions v where v.page_id = p.id and v.version = p.version) as who,
   (select coalesce(sum(bytes), 0) from page_storage s where s.page_id = p.id) as storage from pages p`;
 
 const toInfo = (r: Row): PageInfo => ({
@@ -111,6 +115,7 @@ const toInfo = (r: Row): PageInfo => ({
   updatedAt: r.updated_at,
   sessionKey: r.session_key ?? undefined,
   by: r.by ?? undefined,
+  ...(r.who ? { who: r.who } : {}),
   thumb: r.thumb ?? undefined,
   ...(kindOf(r.kind) ? { kind: r.kind as PageKind } : {}),
   ...(r.app ? { app: r.app } : {}),
@@ -139,9 +144,9 @@ export function mustPage(db: DB, id: string): PageInfo {
 }
 
 export function versionsOf(db: DB, id: string): PageVersion[] {
-  return (db.prepare('select version, title, bytes, created_at, by from page_versions where page_id = ? order by version desc').all(id) as { version: number; title: string; bytes: number; created_at: number; by: PageVersion['by'] }[]).map(
-    (v) => ({ version: v.version, title: v.title, bytes: v.bytes, createdAt: v.created_at, by: v.by }),
-  );
+  return (
+    db.prepare('select version, title, bytes, created_at, by, who from page_versions where page_id = ? order by version desc').all(id) as { version: number; title: string; bytes: number; created_at: number; by: PageVersion['by']; who: string | null }[]
+  ).map((v) => ({ version: v.version, title: v.title, bytes: v.bytes, createdAt: v.created_at, by: v.by, ...(v.who ? { who: v.who } : {}) }));
 }
 
 /** A version as it is kept: a page's HTML, or another kind's text (the current version when `version` is left out). */
@@ -234,15 +239,15 @@ export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: P
   return pageInfo(db, id)!;
 }
 
-/** A new version of a page: it becomes the current one, and its title the page's. */
-export function addVersion(db: DB, id: string, p: { title?: unknown; html?: unknown; model?: unknown; by: PageVersion['by'] }): PageInfo {
+/** A new version of a page: it becomes the current one, and its title the page's. `who`: someone the project is shared with made it. */
+export function addVersion(db: DB, id: string, p: { title?: unknown; html?: unknown; model?: unknown; by: PageVersion['by']; who?: string }): PageInfo {
   const cur = mustPage(db, id);
   const { text: html, sources } = contentOf(db, cur.kind ?? 'page', p);
   const title = p.title === undefined || p.title === null || !String(p.title).trim() ? cur.title : cleanTitle(p.title);
   const now = Date.now();
   db.transaction(() => {
     const next = ((db.prepare('select max(version) as v from page_versions where page_id = ?').get(id) as { v: number | null }).v ?? 0) + 1;
-    db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by) values (?, ?, ?, ?, ?, ?, ?)').run(id, next, title, html, Buffer.byteLength(html), now, p.by);
+    db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by, who) values (?, ?, ?, ?, ?, ?, ?, ?)').run(id, next, title, html, Buffer.byteLength(html), now, p.by, p.who ?? null);
     db.prepare('update pages set title = ?, version = ?, updated_at = ? where id = ?').run(title, next, now, id);
     noteRefs(db, id, next, sources);
     prune(db, id);
