@@ -1,10 +1,35 @@
-// What the Insert menu puts at the cursor: LaTeX for a section, a list, a figure, a table, an equation, a citation…
+// What the Insert menu puts at the cursor: LaTeX for a heading, a list, a figure, a table, an equation, a citation,
+// a cross-reference, a quotation, a table of contents…
 // Each is a CodeMirror snippet with places to fill in (${…}; Tab goes to the next), made around what is picked when
 // something is: the words as a section's title, the lines as a list's items. Some need a package, which the preamble
 // gets when it lacks it.
 import type { TexDoc } from '@shared/latex';
 
-export type SnipId = 'section' | 'subsection' | 'bold' | 'italic' | 'itemize' | 'enumerate' | 'figure' | 'table' | 'equation' | 'align' | 'cite' | 'footnote' | 'link';
+export type SnipId =
+  | 'part'
+  | 'chapter'
+  | 'section'
+  | 'subsection'
+  | 'subsubsection'
+  | 'paragraph'
+  | 'bold'
+  | 'italic'
+  | 'itemize'
+  | 'enumerate'
+  | 'description'
+  | 'figure'
+  | 'table'
+  | 'equation'
+  | 'align'
+  | 'cite'
+  | 'ref'
+  | 'footnote'
+  | 'link'
+  | 'toc'
+  | 'quote'
+  | 'verbatim'
+  | 'newpage'
+  | 'proof';
 
 export interface Snip {
   id: SnipId;
@@ -69,9 +94,29 @@ export function makeSnippet(id: SnipId, picked: string, o: { picture?: string; k
     .map((l) => l.trim())
     .filter(Boolean);
   switch (id) {
+    case 'part':
+    case 'chapter':
     case 'section':
     case 'subsection':
+    case 'subsubsection':
+    case 'paragraph':
       return { template: `\\${id}{${one ? lit(one) : field('Title')}}`, block: true };
+    case 'description': {
+      const items = lines.length ? lines.map((l) => `  \\item[${lit(l.replace(/^([-*•]|\d+[.)])\s+/, ''))}] ${field('')}`) : [`  \\item[${field('Term')}] ${field('What it means')}`];
+      return { template: ['\\begin{description}', ...items, '\\end{description}'].join('\n'), block: true };
+    }
+    case 'ref':
+      return { template: `~\\ref{${field('')}}`, block: false };
+    case 'toc':
+      return { template: '\\tableofcontents', block: true };
+    case 'quote':
+      return { template: ['\\begin{quote}', `  ${one ? lit(one) : field('The quotation')}`, '\\end{quote}'].join('\n'), block: true };
+    case 'verbatim':
+      return { template: ['\\begin{verbatim}', picked ? lit(picked) : field('Text exactly as typed'), '\\end{verbatim}'].join('\n'), block: true };
+    case 'newpage':
+      return { template: '\\newpage', block: true };
+    case 'proof':
+      return { template: ['\\begin{proof}', `  ${field('')}`, '\\end{proof}'].join('\n'), block: true, needs: ['amsthm'] };
     case 'bold':
     case 'italic':
       return { template: '', block: false };

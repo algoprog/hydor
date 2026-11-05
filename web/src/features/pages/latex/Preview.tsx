@@ -2,14 +2,17 @@
 // one under the other, the scroll kept where it was as the document is typeset again. While it typesets, the pages
 // on screen stay, with a quiet "Typesetting…"; the new ones take their place once those in view have loaded, so
 // nothing blinks. When the latest changes do not typeset, the last pages stay with a line saying so. A double click
-// on a page goes to its source (SyncTeX); a line of the source shown in the pages is marked for a moment. Without
-// TeX here, a note says what to install; without poppler, the PDF shows in the browser's own viewer.
+// on a page goes to its source (SyncTeX); a line of the source shown in the pages is marked for a moment. The page box
+// says which page is in view and goes to the one typed; Dark pages shows them light on dark in the dark theme; the
+// pages can be presented one at a time over the whole screen (Present.tsx). Without TeX here, a note says what to
+// install; without poppler, the PDF shows in the browser's own viewer.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ExternalLink, Minus, MoveHorizontal, Plus, TriangleAlert } from 'lucide-react';
+import { ExternalLink, Minus, MoveHorizontal, Plus, Presentation, TriangleAlert } from 'lucide-react';
 import type { TexCompiled, TexSetup } from '@shared/latex';
 import { Button, cx, IconButton, Throbber } from '../../../components/ui';
 import { toastError } from '../../../lib/store';
 import { pageUrl, pdfUrl, sourceAt } from './api';
+import { Present } from './Present';
 
 const ZOOMS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 3];
 const PAD = 16;
@@ -33,6 +36,8 @@ export function Preview({
   flash,
   onSource,
   onProblems,
+  darkPages,
+  presentAsk,
   className,
 }: {
   /** The latest typesetting (with pages or not). */
@@ -44,6 +49,10 @@ export function Preview({
   onSource?: (file: string, line: number) => void;
   /** Shows the errors and warnings. */
   onProblems?: () => void;
+  /** The pages shown light on dark (the dark theme's Dark pages). */
+  darkPages?: boolean;
+  /** Changes when the pages are to be presented over the whole screen (View → Present the pages). */
+  presentAsk?: number;
   className?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -52,6 +61,10 @@ export function Preview({
   // The typesetting whose pages are on screen.
   const [shown, setShown] = useState<TexCompiled | null>(result?.pdf ? result : null);
   const [mark, setMark] = useState<Flash | null>(null);
+  // The page in view (from 1), and what the page box holds while it is typed in.
+  const [page, setPage] = useState(1);
+  const [typed, setTyped] = useState<string | null>(null);
+  const [presenting, setPresenting] = useState<number | null>(null);
   const dpr = typeof window === 'undefined' ? 1 : Math.min(3, window.devicePixelRatio || 1);
 
   useLayoutEffect(() => {
@@ -122,6 +135,44 @@ export function Preview({
     ratio.current = 0;
   }, [zoom]);
 
+  /** Where page n starts, down the pages. */
+  const topOf = (r: TexCompiled, n: number) => {
+    let y = PAD;
+    for (let i = 0; i < n - 1 && i < r.pages; i++) y += heightOf(r, i) + GAP;
+    return y;
+  };
+  // The page in view: the one a third of the way down the pane.
+  useEffect(() => {
+    const el = box.current;
+    if (!el || !shown) return;
+    const on = () => {
+      const at = el.scrollTop + el.clientHeight / 3;
+      let y = PAD;
+      let n = 1;
+      for (let i = 0; i < shown.pages; i++) {
+        y += heightOf(shown, i) + GAP;
+        if (y > at) break;
+        n = Math.min(shown.pages, i + 2);
+      }
+      setPage(n);
+    };
+    on();
+    el.addEventListener('scroll', on, { passive: true });
+    return () => el.removeEventListener('scroll', on);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown, pageW]);
+  const goPage = (n: number) => {
+    const el = box.current;
+    if (!el || !shown) return;
+    const p = Math.min(shown.pages, Math.max(1, Math.round(n)));
+    el.scrollTo({ top: topOf(shown, p) - PAD / 2 });
+    setPage(p);
+  };
+  useEffect(() => {
+    if (presentAsk && shown?.pdf) setPresenting(page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presentAsk]);
+
   // A line of the source, shown in the pages: scrolled to, and marked for a moment.
   useEffect(() => {
     if (!flash || !shown || flash.page > shown.pages) return;
@@ -164,6 +215,31 @@ export function Preview({
           <span className="truncate">{`${shown.pages} page${shown.pages === 1 ? '' : 's'} typeset`}</span>
         ) : null}
       </span>
+      {shown && setup?.pictures !== false && shown.pages > 1 && (
+        <span className="flex shrink-0 items-center gap-1 text-[12px] text-fg-3 tabular-nums">
+          <input
+            value={typed ?? String(page)}
+            onChange={(e) => setTyped(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            onFocus={(e) => e.target.select()}
+            onBlur={() => {
+              if (typed) goPage(Number(typed));
+              setTyped(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+              if (e.key === 'Escape') {
+                setTyped(null);
+                e.currentTarget.blur();
+              }
+            }}
+            inputMode="numeric"
+            aria-label="Go to page"
+            title="Go to page"
+            className="h-6.5 w-9 rounded-md border border-line bg-bg px-1 text-center text-[12px] text-fg outline-none focus:border-accent"
+          />
+          <span>{`/ ${shown.pages}`}</span>
+        </span>
+      )}
       {shown && setup?.pictures !== false && (
         <>
           <IconButton label="Zoom out" size="sm" disabled={zi === 0} onClick={() => setZ(ZOOMS[Math.max(0, (zi < 0 ? ZOOMS.findIndex((z) => z > zoom) : zi) - 1)])}>
@@ -181,6 +257,11 @@ export function Preview({
             <Plus size={14} />
           </IconButton>
         </>
+      )}
+      {shown && setup?.pictures !== false && (
+        <IconButton label="Present the pages" size="sm" onClick={() => setPresenting(page)}>
+          <Presentation size={14} />
+        </IconButton>
       )}
       {shown && (
         <a href={pdfUrl(shown.key)} target="_blank" rel="noreferrer" title="Open the PDF" aria-label="Open the PDF" className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg">
@@ -215,10 +296,18 @@ export function Preview({
             <div
               key={n}
               onDoubleClick={(e) => void toSource(e, shown, n)}
-              className="relative shrink-0 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.04)]"
+              className={cx('relative shrink-0 shadow-[0_1px_3px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.04)]', darkPages ? 'bg-[#1b1b1d]' : 'bg-white')}
               style={{ width: pageW, height: h }}
             >
-              <img src={pageUrl(shown.key, n, picW)} alt={`Page ${n}`} loading={n <= 2 ? 'eager' : 'lazy'} draggable={false} className="absolute inset-0 h-full w-full select-none" />
+              <img
+                src={pageUrl(shown.key, n, picW)}
+                alt={`Page ${n}`}
+                loading={n <= 2 ? 'eager' : 'lazy'}
+                draggable={false}
+                className="absolute inset-0 h-full w-full select-none"
+                // Light on dark: the page's white made near black, its colours turned back to their own hues.
+                style={darkPages ? { filter: 'invert(0.89) hue-rotate(180deg)' } : undefined}
+              />
               {m && <div className="pointer-events-none absolute rounded-sm bg-accent/25 ring-2 ring-accent/60" style={{ left: m.x * k - 4, top: m.y * k - 3, width: Math.max(24, m.w * k) + 8, height: Math.max(10, m.h * k) + 6 }} />}
             </div>
           );
@@ -268,6 +357,7 @@ export function Preview({
       <div ref={box} className="relative min-h-0 flex-1 overflow-auto overscroll-contain">
         {body}
       </div>
+      {presenting !== null && shown && <Present result={shown} start={presenting} onClose={() => setPresenting(null)} />}
     </div>
   );
 }

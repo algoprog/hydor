@@ -1,6 +1,6 @@
-// The LaTeX packages the editor offers as you type \usepackage{, each with what it is for in a few plain words, and
-// the classes and packages the server asks its TeX about (TEX_ASKED: those, and what the templates need), so the
-// editor can say which ones this computer lacks before TeX does.
+// The LaTeX packages the editor offers as you type \usepackage{ and the classes it offers for \documentclass{, each
+// with what it is for in a few plain words, and the files the server asks its TeX about (TEX_ASKED: those, and what
+// the templates need), so the editor can say which ones this computer lacks before TeX does.
 import { TEMPLATE_NEEDS } from './latex-templates.ts';
 
 /** Common packages: name, and what it is for. */
@@ -84,5 +84,27 @@ export const TEX_PACKAGES: [name: string, what: string][] = [
   ['xspace', 'A space after a command when one is wanted'],
 ];
 
-/** The files the server asks its TeX about: the packages above, and the templates' classes and packages. */
-export const TEX_ASKED = [...new Set([...TEX_PACKAGES.map(([n]) => `${n}.sty`), ...TEMPLATE_NEEDS])];
+/** Classes \documentclass{ offers. */
+export const TEX_CLASSES: [name: string, what: string][] = [
+  ['article', 'Articles, papers, short reports'],
+  ['report', 'Longer reports, with chapters'],
+  ['book', 'Books and theses'],
+  ['letter', 'Letters'],
+  ['beamer', 'Slides'],
+  ['memoir', 'Books, with many options'],
+  ['scrartcl', 'KOMA-Script articles'],
+  ['scrreprt', 'KOMA-Script reports'],
+  ['amsart', "The American Mathematical Society's articles"],
+  ['moderncv', 'CVs and résumés'],
+  ['tikzposter', 'Posters'],
+  ['exam', 'Exams and problem sets'],
+  ['standalone', 'A drawing or formula alone, cropped'],
+  ['IEEEtran', 'IEEE papers'],
+  ['llncs', "Springer's LNCS papers"],
+  ['acmart', 'ACM papers'],
+  ['elsarticle', 'Elsevier papers'],
+  ['revtex4-2', 'APS and AIP physics papers'],
+];
+
+/** The files the server asks its TeX about: the packages and classes above, and what the templates need. */
+export const TEX_ASKED = [...new Set([...TEX_PACKAGES.map(([n]) => `${n}.sty`), ...TEX_CLASSES.map(([n]) => `${n}.cls`), ...TEMPLATE_NEEDS])];

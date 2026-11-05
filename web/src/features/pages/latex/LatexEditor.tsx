@@ -1,41 +1,58 @@
 // A LaTeX document to write and typeset, as in Overleaf: its source beside its typeset pages. The source is in
 // CodeMirror, a tab per file (main.tex, a bibliography, chapters; add, rename and delete them), with its pictures in
-// a tab of their own (add them from the device or drop them in; each with the name \includegraphics gives it). It is
+// a tab of their own (add them from the device or drop them in; each with the name \includegraphics gives it), shown
+// as code or, in Visual mode, as a document while you type (headings, bold words, maths drawn, pictures, lists). It is
 // typeset on this computer as you type (a moment after you stop; Ctrl+Enter at once, and that can be the only way),
 // with the engine picked (pdfLaTeX, XeLaTeX, LuaLaTeX); its errors and warnings show under the source, each going to
-// its line, with TeX's log a click away. An Insert menu puts snippets at the cursor, an outline goes to a section, a
-// double click on a page goes to its source and Show in the PDF the other way. On a phone, Source and Preview are
-// two tabs. Changes stay unsaved until Save (Ctrl+S), as a page's do.
-import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+// its line, with TeX's log a click away. The menus (Edit, Insert, Format, View, Tools, and Search the menus) hold what
+// it can do: headings, lists, figures, tables made in a grid, equations, symbols, references found on the web by DOI,
+// arXiv id or title, folding, spelling, a word count, versions compared, the pages presented. An outline goes to a
+// section, a double click on a page goes to its source and Show in the PDF the other way. On a phone, Source and
+// Preview are two tabs and the menus are behind one button. Changes stay unsaved until Save (Ctrl+S), as a page's do.
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  Bold,
   BookOpen,
+  BookPlus,
+  Bold,
   ChevronDown,
   Copy,
   ExternalLink,
   FilePlus,
   FileUp,
+  FoldVertical,
   Footprints,
-  Heading1,
-  Heading2,
+  Heading,
+  History,
   Image as ImageIcon,
   ImagePlus,
   Italic,
+  Keyboard,
   Link2,
   List,
   ListOrdered,
   ListTree,
   LocateFixed,
+  Moon,
+  Omega,
   Pencil,
   Play,
   Plus,
+  Presentation,
+  Quote,
+  Redo2,
+  RemoveFormatting,
   ScrollText,
   Search,
   Sigma,
   Sparkles,
+  SpellCheck,
   SquareFunction,
   Table2,
   Trash2,
+  Underline,
+  Undo2,
+  UnfoldVertical,
+  WholeWord,
 } from 'lucide-react';
 import {
   cleanTexName,
@@ -51,38 +68,94 @@ import {
   type TexIssue,
   type TexSetup,
 } from '@shared/latex';
+import { addBibEntry } from '@shared/latex-bib';
+import { blankTable, tableAt, tableTex, type TexTable } from '@shared/latex-table';
+import type { TexReference } from '@shared/latex-bib';
 import { Button, cx, Dialog, IconButton, MenuItem, MenuSep, Popover, Segmented, Throbber, useConfirm } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
 import { toast, toastError } from '../../../lib/store';
+import { MenuBar, type MenuDef, type MenuEntry } from '../common/menus';
+import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
 import { addFileFromDevice, addPicture, assetUrl, chooseFiles, FILE_ACCEPT, freeName, pdfUrl, PICTURE_ACCEPT, placeOf, texSetup, typeset } from './api';
 import { mountCode, type Code } from './code';
+import { CompareDialog } from './Compare';
+import { docDefs, type DocDefs } from './complete';
 import { NameDialog, OutlineList, Problems, where } from './parts';
 import { Preview, type Flash } from './Preview';
-import { docWords, makeSnippet, SAMPLE_BIB, SNIPPETS, withBibliography, withPackages, type SnipId } from './snippets';
+import { ReferencesDialog } from './References';
+import { texMacros } from './scan';
+import { docWords, makeSnippet, SAMPLE_BIB, withBibliography, withPackages, type SnipId } from './snippets';
+import { rememberSymbol, SymbolsPanel } from './Symbols';
+import { symInsert, type Sym } from './symbols';
+import { TableEditor } from './TableEditor';
+import { MAX_VISUAL } from './visual';
+import { WordCountDialog } from './WordCount';
 
 const AUTO_KEY = 'wa.tex.auto';
 const OUTLINE_KEY = 'wa.tex.outline';
+const MODE_KEY = 'wa.tex.mode';
+const SPELL_KEY = 'wa.tex.spell';
+const DARK_PAGES_KEY = 'wa.tex.darkpages';
 /** The Pictures tab, among the files'. */
 const PICTURES = '#pictures';
 
 const isDark = () => document.documentElement.classList.contains('dark');
 
-const SNIP_ICONS: Record<SnipId, ReactNode> = {
-  section: <Heading1 size={14} />,
-  subsection: <Heading2 size={14} />,
-  bold: <Bold size={14} />,
-  italic: <Italic size={14} />,
-  itemize: <List size={14} />,
-  enumerate: <ListOrdered size={14} />,
-  figure: <ImageIcon size={14} />,
-  table: <Table2 size={14} />,
-  equation: <Sigma size={14} />,
-  align: <SquareFunction size={14} />,
-  cite: <BookOpen size={14} />,
-  footnote: <Footprints size={14} />,
-  link: <Link2 size={14} />,
-};
+const NO_DEFS: DocDefs = { packages: new Set(), commands: [], environments: [] };
+const EMPTY_TABLE = blankTable();
+
+/** The keyboard shortcuts dialog's lists. */
+const SHORTCUTS: ShortcutGroup[] = [
+  {
+    title: 'Typesetting',
+    items: [
+      ['Ctrl+Enter', 'Recompile now'],
+      ['Ctrl+S', 'Save'],
+    ],
+  },
+  {
+    title: 'Writing',
+    items: [
+      ['Ctrl+B', 'Bold, or plain again'],
+      ['Ctrl+I', 'Italic, or plain again'],
+      ['Ctrl+/', 'Comment lines out, or back in'],
+      ['Ctrl+Space', 'Show what can be typed here'],
+      ['Tab', 'The next place to fill in'],
+      ['Enter', 'After a \\begin{…}: its \\end{…} goes in too'],
+    ],
+  },
+  {
+    title: 'Editing',
+    items: [
+      ['Ctrl+Z', 'Undo'],
+      ['Ctrl+Shift+Z / Ctrl+Y', 'Redo'],
+      ['Ctrl+F', 'Find and replace'],
+      ['Ctrl+D', 'Pick the next of the same words too'],
+      ['Alt+↑ / Alt+↓', 'Move the lines up or down'],
+      ['Ctrl+Shift+K', 'Delete the line'],
+      ['Ctrl+] / Ctrl+[', 'Indent more or less'],
+      ['Ctrl+Alt+G', 'Go to a line'],
+    ],
+  },
+  {
+    title: 'Folding',
+    items: [
+      ['Ctrl+Shift+[', 'Fold here'],
+      ['Ctrl+Shift+]', 'Unfold here'],
+      ['Ctrl+Alt+[', 'Fold all'],
+      ['Ctrl+Alt+]', 'Unfold all'],
+    ],
+  },
+  {
+    title: 'Menus and pages',
+    items: [
+      ['Alt+/', 'Search the menus'],
+      ['→ / ←', 'Presenting the pages: the next or the one before'],
+      ['Esc', 'Presenting the pages: stop'],
+    ],
+  },
+];
 
 /** A file's text in the model (main.tex included). */
 const textIn = (d: TexDoc, name: string) => (name === TEX_MAIN ? d.main : (d.files.find((f) => f.name === name)?.text ?? ''));
@@ -149,7 +222,7 @@ function scopesFor(file: string, cursor: Cursor, heading: TexHeading | null): As
   return out;
 }
 
-export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, file: onDisk }: ModelEditorProps<TexDoc>) {
+export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, file: onDisk }: ModelEditorProps<TexDoc>) {
   const [model, setModel] = useState<TexDoc | null>(doc?.model ?? null);
   // The model as the latest change left it (changes made before it is drawn again build on it).
   const live = useRef<TexDoc | null>(model);
@@ -177,7 +250,20 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const [outlineOpen, setOutlineOpen] = useState(() => localStorage.getItem(OUTLINE_KEY) === '1');
   const [problemsOpen, setProblemsOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
-  const [menu, setMenu] = useState<'insert' | 'engine' | 'compile' | 'add' | 'file' | 'outline' | null>(null);
+  const [menu, setMenu] = useState<'engine' | 'compile' | 'add' | 'file' | 'outline' | 'symbols' | null>(null);
+  // Code or Visual, Check spelling, Dark pages: remembered on this device.
+  const [mode, setMode] = useState<'code' | 'visual'>(() => (localStorage.getItem(MODE_KEY) === 'visual' ? 'visual' : 'code'));
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const [spell, setSpell] = useState(() => localStorage.getItem(SPELL_KEY) === '1');
+  const spellRef = useRef(spell);
+  spellRef.current = spell;
+  const [darkPages, setDarkPages] = useState(() => localStorage.getItem(DARK_PAGES_KEY) === '1');
+  const [dark, setDark] = useState(isDark);
+  const [presentAsk, setPresentAsk] = useState(0);
+  const [dialog, setDialog] = useState<'refs' | 'count' | 'compare' | 'keys' | null>(null);
+  /** The table editor: the table, and where it was read from when it is one of the document's. */
+  const [tableAsk, setTableAsk] = useState<{ table: TexTable; at: { file: string; from: number; to: number } | null } | null>(null);
   const [naming, setNaming] = useState<{ kind: 'new' | 'rename-file' | 'rename-picture'; from?: string } | null>(null);
   const [cursor, setCursor] = useState<Cursor>(START);
   // Where the cursor is in each file (the scopes follow the file in view).
@@ -199,7 +285,14 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   /** What to do once a file's editor is there (an insertion asked for before it was). */
   const afterMount = useRef(new Map<string, (c: Code) => void>());
   const lastTex = useRef(TEX_MAIN);
-  const anchors = { insert: useRef<HTMLButtonElement>(null), engine: useRef<HTMLButtonElement>(null), compile: useRef<HTMLButtonElement>(null), add: useRef<HTMLButtonElement>(null), file: useRef<HTMLButtonElement>(null), outline: useRef<HTMLButtonElement>(null) };
+  const anchors = {
+    engine: useRef<HTMLButtonElement>(null),
+    compile: useRef<HTMLButtonElement>(null),
+    add: useRef<HTMLButtonElement>(null),
+    file: useRef<HTMLButtonElement>(null),
+    outline: useRef<HTMLButtonElement>(null),
+    symbols: useRef<HTMLButtonElement>(null),
+  };
 
   useLayoutEffect(() => {
     const el = root.current;
@@ -224,6 +317,17 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     localStorage.setItem(OUTLINE_KEY, outlineOpen ? '1' : '0');
   }, [outlineOpen]);
   useEffect(() => {
+    localStorage.setItem(MODE_KEY, mode);
+    for (const c of codes.current.values()) c.setVisual(mode === 'visual');
+  }, [mode]);
+  useEffect(() => {
+    localStorage.setItem(SPELL_KEY, spell ? '1' : '0');
+    for (const c of codes.current.values()) c.setSpell(spell);
+  }, [spell]);
+  useEffect(() => {
+    localStorage.setItem(DARK_PAGES_KEY, darkPages ? '1' : '0');
+  }, [darkPages]);
+  useEffect(() => {
     texSetup().then(setSetup, () => {});
   }, []);
 
@@ -244,6 +348,29 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     if (!d || readOnly) return;
     const n = f(d);
     if (n !== d) setM(n);
+  };
+
+  // ---- what the editors ask of the document (worked out once a change) -------------------------------------------
+  const defsCache = useRef<{ d: TexDoc | null; defs: DocDefs; macros: Record<string, string> }>({ d: null, defs: NO_DEFS, macros: {} });
+  const known = () => {
+    const d = live.current;
+    if (d && defsCache.current.d !== d) {
+      const texts = [{ name: TEX_MAIN, text: d.main }, ...d.files];
+      defsCache.current = { d, defs: docDefs(texts), macros: texMacros(texts.filter((f) => /\.(tex|ltx|sty|cls)$/i.test(f.name)).map((f) => f.text)) };
+    }
+    return defsCache.current;
+  };
+  const defsOf = () => known().defs;
+  const macrosOf = () => known().macros;
+  const installedRef = useRef<Set<string> | null>(null);
+  installedRef.current = useMemo(() => (setup?.installed ? new Set(setup.installed) : null), [setup]);
+  /** A picture of the document by the name \includegraphics gives it (its extension may be left out). */
+  const pictureOf = (name: string): string | null => {
+    const pics = live.current?.pictures ?? [];
+    const n = name.trim().replace(/^\.\//, '');
+    const p = pics.find((x) => x.name === n) ?? pics.find((x) => x.name.replace(/\.(png|jpe?g)$/i, '') === n.replace(/\.(png|jpe?g|pdf)$/i, ''));
+    if (!p) return null;
+    return p.src.startsWith('naget-asset:') ? assetUrl(p.src) : p.src.startsWith('data:image/') ? p.src : null;
   };
 
   // ---- the files' editors ---------------------------------------------------------------------------------------
@@ -294,7 +421,13 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
             if (fileRef.current === name) setCursor(c);
           },
           words: () => docWords(live.current ?? doc!.model),
+          defs: defsOf,
+          installed: () => installedRef.current,
+          macros: macrosOf,
+          picture: pictureOf,
         },
+        visual: modeRef.current === 'visual',
+        spell: spellRef.current,
       }).then((c) => {
         mounting.current.delete(name);
         if (at !== epochRef.current || !hosts.current.get(name)?.isConnected) return c.destroy();
@@ -312,6 +445,7 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   useEffect(() => {
     const mo = new MutationObserver(() => {
       for (const c of codes.current.values()) c.handle.setDark(isDark());
+      setDark(isDark());
     });
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => mo.disconnect();
@@ -531,17 +665,130 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       }
     }
     withCode(name, (c) => {
-      if (id === 'bold') return c.wrap('\\textbf{', '}', 'bold');
-      if (id === 'italic') return c.wrap('\\emph{', '}', 'italic');
+      if (id === 'bold') return c.toggle('textbf', 'bold');
+      if (id === 'italic') return c.toggle('textit', 'italic');
       const p = c.picked();
       const made = makeSnippet(id, p.empty ? '' : p.text, { picture, key, labels: docWords(live.current ?? model!).labels });
       if (made.needs) editFile(TEX_MAIN, (t) => withPackages(t, made.needs!));
-      if (made.block && !p.empty && (id === 'itemize' || id === 'enumerate' || id === 'align')) {
+      if (made.block && !p.empty && (id === 'itemize' || id === 'enumerate' || id === 'description' || id === 'align')) {
         // The lines picked become the list's items: the whole lines go.
         c.replacePicked('');
       }
       c.insert(made.template, made.block);
     });
+  };
+
+  /** The words picked (or a placeholder) made into something by the code (a format, a size): in the file in view. */
+  const onCode = (f: (c: Code) => void, needs?: string[]) => {
+    setMenu(null);
+    if (readOnly || !live.current) return;
+    if (needs) editFile(TEX_MAIN, (t) => withPackages(t, needs));
+    withCode(target(), f);
+  };
+
+  /** A symbol at the cursor: in $…$ when the cursor is not in maths; its package loaded. The panel stays, for the next. */
+  const insertSymbol = (s: Sym) => {
+    if (readOnly || !live.current) return;
+    rememberSymbol(s);
+    if (s[2] && !defsOf().packages.has(s[2])) editFile(TEX_MAIN, (t) => withPackages(t, [s[2]!]));
+    const put = (c: Code) => {
+      const t = symInsert(s);
+      c.insert(c.inMath() ? t : `$${t}$`);
+    };
+    // In the file in view, the panel stays open; another file is opened for it.
+    const name = target();
+    const c = codes.current.get(name);
+    if (c && name === file) put(c);
+    else withCode(name, put);
+  };
+
+  /** The table editor: for a new table, or the one the cursor is in (`edit`). */
+  const openTable = (edit: boolean) => {
+    setMenu(null);
+    if (readOnly) return;
+    const name = target();
+    const c = codes.current.get(name);
+    if (edit && c) {
+      const found = tableAt(c.text(), c.cursor());
+      if ('why' in found) return toast(found.why);
+      return setTableAsk({ table: found.table, at: { file: name, from: found.from, to: found.to } });
+    }
+    setTableAsk({ table: blankTable(), at: null });
+  };
+  const tableDone = (t: TexTable) => {
+    const ask = tableAsk;
+    setTableAsk(null);
+    if (!ask) return;
+    if (ask.at) {
+      const at = ask.at;
+      withCode(at.file, (c) => {
+        const text = c.text();
+        const line = text.lastIndexOf('\n', at.from - 1) + 1;
+        const indent = /^[ \t]*/.exec(text.slice(line))![0];
+        const made = tableTex(t, indent);
+        if (made.needs.length) editFile(TEX_MAIN, (x) => withPackages(x, made.needs));
+        c.replaceRange(at.from, at.to, made.text.slice(indent.length));
+      });
+    } else
+      onCode((c) => {
+        const made = tableTex(t);
+        if (made.needs.length) editFile(TEX_MAIN, (x) => withPackages(x, made.needs));
+        c.insertBlock(made.text);
+      });
+  };
+  /** Whether the cursor is in a table the grid can read (for Edit this table). */
+  const inTable = useMemo(() => {
+    const c = codes.current.get(file);
+    if (!c || !/\.(tex|ltx)$/i.test(file)) return false;
+    const text = c.text();
+    return text.includes('tabular') && 'table' in tableAt(text, c.cursor());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file, cursor, model]);
+
+  // ---- references --------------------------------------------------------------------------------------------------------
+  /** The bibliography references go in: the one in view, the one the document names, its first, or a new refs.bib. */
+  const bibTarget = (): { name: string; fresh: boolean } => {
+    const d = live.current;
+    if (!d) return { name: 'refs.bib', fresh: true };
+    if (file.endsWith('.bib') && d.files.some((f) => f.name === file)) return { name: file, fresh: false };
+    for (const t of [d.main, ...d.files.filter((f) => /\.(tex|ltx)$/i.test(f.name)).map((f) => f.text)])
+      for (const m of t.matchAll(/\\(?:bibliography|addbibresource)\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}/g))
+        for (const part of m[1].split(',')) {
+          const n = part.trim().replace(/^\.\//, '');
+          const name = n.endsWith('.bib') ? n : `${n}.bib`;
+          if (d.files.some((f) => f.name === name)) return { name, fresh: false };
+        }
+    const any = d.files.find((f) => f.name.endsWith('.bib'));
+    return any ? { name: any.name, fresh: false } : { name: freeName('refs.bib', allNames()), fresh: true };
+  };
+  const [refsTarget, setRefsTarget] = useState<{ name: string; fresh: boolean; cite: boolean }>({ name: 'refs.bib', fresh: true, cite: true });
+  const openRefs = () => {
+    setMenu(null);
+    if (readOnly) return;
+    setRefsTarget({ ...bibTarget(), cite: !file.endsWith('.bib') });
+    setDialog('refs');
+  };
+  const addReference = (e: TexReference, cite: boolean) => {
+    const t = bibTarget();
+    if (t.fresh) {
+      change((d) => ({ ...d, files: [...d.files, { name: t.name, text: '' }] }));
+      editFile(TEX_MAIN, (x) => withBibliography(x, t.name));
+    }
+    let key = '';
+    editFile(t.name, (text) => {
+      const r = addBibEntry(text, e.bibtex);
+      key = r.key;
+      return r.text;
+    });
+    if (!key) return toast('That entry could not be read');
+    setRefsTarget((x) => ({ ...x, name: t.name, fresh: false }));
+    if (cite) {
+      withCode(target(), (c) => {
+        const before = c.text().slice(Math.max(0, c.cursor() - 1), c.cursor());
+        c.insertText(`${before && !/\s|\{|~/.test(before) ? '~' : ''}\\cite{${key}}`);
+      });
+      toast(`Cited ${key}, added to ${t.name}`, 'ok');
+    } else toast(`Added ${key} to ${t.name}`, 'ok');
   };
 
   // ---- files and pictures ----------------------------------------------------------------------------------------------
@@ -648,6 +895,198 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   );
   const sep = <span className="mx-1 h-5 w-px shrink-0 bg-line" />;
   const code = codes.current.get(file);
+
+  const showInPdf = async () => {
+    const r = resultRef.current;
+    if (!r?.pdf || file === PICTURES) return;
+    try {
+      const at = await placeOf(r.key, file, cursor.line);
+      if (!at) return toast('That line has nothing on the pages');
+      if (!wide) setPane('preview');
+      setFlash({ ...at, n: Date.now() });
+    } catch (e) {
+      toastError(e);
+    }
+  };
+  const pickEngine = (id: TexEngine) => {
+    setMenu(null);
+    const why = setup?.notes[id];
+    if (why && id !== engine) toast(why);
+    if (id === engine) return;
+    quick.current = true;
+    change((d) => ({ ...d, engine: id }));
+  };
+  const openPdf = () => {
+    setMenu(null);
+    if (result?.pdf) window.open(pdfUrl(result.key), '_blank', 'noreferrer');
+  };
+  const switchMode = (m: 'code' | 'visual') => {
+    setMode(m);
+    const c = codes.current.get(file);
+    if (m === 'visual' && c && c.text().length > MAX_VISUAL) toast('This file is too long for Visual: it shows as code');
+    c?.focus();
+  };
+  /** The lines picked put in an environment (center, flushleft…), or an empty one at the cursor. */
+  const inEnv = (env: string) =>
+    onCode((c) => {
+      const p = c.picked();
+      if (p.empty) return c.insert(`\\begin{${env}}\n  \${}\n\\end{${env}}`, true);
+      const d = c.view.state.doc;
+      const lines = Array.from({ length: p.to - p.from + 1 }, (_, i) => d.line(p.from + i).text).join('\n');
+      c.replacePicked(`\\begin{${env}}\n${lines}\n\\end{${env}}`);
+    });
+  const fmt = (cmd: string) => () => onCode((c) => c.toggle(cmd, 'words'));
+  const canCompare = !onDisk && !!pageId;
+
+  const menus: MenuDef[] = [
+    {
+      label: 'Edit',
+      items: [
+        { label: 'Undo', icon: <Undo2 size={14} />, keys: 'Ctrl+Z', disabled: !code || readOnly, run: () => code?.undo() },
+        { label: 'Redo', icon: <Redo2 size={14} />, keys: 'Ctrl+Shift+Z', disabled: !code || readOnly, run: () => code?.redo() },
+        '-',
+        { label: 'Find and replace', icon: <Search size={14} />, keys: 'Ctrl+F', also: 'search', disabled: !code, run: () => code?.handle.find() },
+        { label: 'Go to line', keys: 'Ctrl+Alt+G', disabled: !code, run: () => code?.gotoLine() },
+        { label: 'Select all', keys: 'Ctrl+A', disabled: !code, run: () => code?.selectAll() },
+        '-',
+        { label: 'Comment or uncomment', keys: 'Ctrl+/', also: 'percent', disabled: !code || readOnly, run: () => code?.comment() },
+      ],
+    },
+    {
+      label: 'Insert',
+      items: readOnly
+        ? [{ label: 'An older version cannot be changed', disabled: true }]
+        : [
+            {
+              label: 'Heading',
+              icon: <Heading size={14} />,
+              items: [
+                { label: 'Part', run: () => void insert('part') },
+                { label: 'Chapter', run: () => void insert('chapter') },
+                { label: 'Section heading', run: () => void insert('section') },
+                { label: 'Subsection heading', run: () => void insert('subsection') },
+                { label: 'Subsubsection heading', run: () => void insert('subsubsection') },
+                { label: 'Paragraph heading', run: () => void insert('paragraph') },
+              ],
+            },
+            { label: 'Bulleted list', icon: <List size={14} />, also: 'itemize', run: () => void insert('itemize') },
+            { label: 'Numbered list', icon: <ListOrdered size={14} />, also: 'enumerate', run: () => void insert('enumerate') },
+            '-',
+            { label: 'Table', icon: <Table2 size={14} />, also: 'tabular grid', run: () => openTable(false) },
+            inTable && { label: 'Edit this table', icon: <Table2 size={14} />, also: 'tabular grid', run: () => openTable(true) },
+            { label: 'Figure with a picture', icon: <ImageIcon size={14} />, also: 'includegraphics image', run: () => void insert('figure') },
+            '-',
+            { label: 'Equation', icon: <Sigma size={14} />, also: 'maths formula', run: () => void insert('equation') },
+            { label: 'Aligned equations', icon: <SquareFunction size={14} />, also: 'align maths', run: () => void insert('align') },
+            { label: 'Symbol', icon: <Omega size={14} />, also: 'greek maths character arrow', run: () => setMenu('symbols') },
+            '-',
+            { label: 'Reference', icon: <BookPlus size={14} />, also: 'doi arxiv bibliography bibtex crossref paper', run: openRefs },
+            { label: 'Citation', icon: <BookOpen size={14} />, also: 'cite', run: () => void insert('cite') },
+            { label: 'Cross-reference', icon: <LocateFixed size={14} />, also: 'ref label', run: () => void insert('ref') },
+            { label: 'Footnote', icon: <Footprints size={14} />, run: () => void insert('footnote') },
+            {
+              label: 'More',
+              items: [
+                { label: 'Link', icon: <Link2 size={14} />, also: 'url href', run: () => void insert('link') },
+                { label: 'Description list', also: 'description', run: () => void insert('description') },
+                { label: 'Quotation', icon: <Quote size={14} />, run: () => void insert('quote') },
+                { label: 'Text exactly as typed', also: 'verbatim code', run: () => void insert('verbatim') },
+                { label: 'Proof', also: 'amsthm', run: () => void insert('proof') },
+                { label: 'Table of contents', also: 'toc', run: () => void insert('toc') },
+                { label: 'Page break', also: 'new page', run: () => void insert('newpage') },
+              ],
+            },
+          ],
+    },
+    {
+      label: 'Format',
+      items: [
+        { label: 'Bold', icon: <Bold size={14} />, keys: 'Ctrl+B', disabled: readOnly, run: fmt('textbf') },
+        { label: 'Italic', icon: <Italic size={14} />, keys: 'Ctrl+I', disabled: readOnly, run: fmt('textit') },
+        { label: 'Emphasis', disabled: readOnly, also: 'emph', run: fmt('emph') },
+        { label: 'Underline', icon: <Underline size={14} />, disabled: readOnly, run: fmt('underline') },
+        { label: 'Typewriter', disabled: readOnly, also: 'monospace texttt', run: fmt('texttt') },
+        { label: 'Small capitals', disabled: readOnly, also: 'textsc', run: fmt('textsc') },
+        { label: 'Superscript', disabled: readOnly, run: fmt('textsuperscript') },
+        { label: 'Subscript', disabled: readOnly, run: fmt('textsubscript') },
+        '-',
+        {
+          label: 'Text size',
+          disabled: readOnly,
+          items: (
+            [
+              ['Tiny', 'tiny'],
+              ['Small', 'small'],
+              ['Large', 'large'],
+              ['Larger', 'Large'],
+              ['Largest', 'LARGE'],
+              ['Huge', 'huge'],
+            ] as const
+          ).map(([label, cmd]) => ({ label, run: () => onCode((c) => c.wrap(`{\\${cmd} `, '}', 'words')) })),
+        },
+        {
+          label: 'Alignment',
+          disabled: readOnly,
+          items: [
+            { label: 'Centred', run: () => inEnv('center') },
+            { label: 'Aligned left', run: () => inEnv('flushleft') },
+            { label: 'Aligned right', run: () => inEnv('flushright') },
+          ],
+        },
+        {
+          label: 'Text colour',
+          disabled: readOnly,
+          also: 'color xcolor',
+          items: (
+            [
+              ['Red', 'red'],
+              ['Blue', 'blue'],
+              ['Green', 'green!50!black'],
+              ['Orange', 'orange'],
+              ['Grey', 'gray'],
+            ] as const
+          ).map(([label, colour]) => ({ label, run: () => onCode((c) => c.wrap(`\\textcolor{${colour}}{`, '}', 'words'), ['xcolor']) })),
+        },
+        '-',
+        { label: 'Comment or uncomment', keys: 'Ctrl+/', disabled: !code || readOnly, run: () => code?.comment() },
+        { label: 'Clear formatting', icon: <RemoveFormatting size={14} />, disabled: readOnly, run: () => onCode((c) => c.clearFormat()) },
+      ],
+    },
+    {
+      label: 'View',
+      items: [
+        { label: 'Code', checked: mode === 'code', also: 'source', run: () => switchMode('code') },
+        { label: 'Visual', checked: mode === 'visual', also: 'visual editor rich text', run: () => switchMode('visual') },
+        '-',
+        { label: 'Outline', icon: <ListTree size={14} />, checked: wide ? outlineOpen : undefined, also: 'sections headings', run: () => (wide ? setOutlineOpen((o) => !o) : setMenu('outline')) },
+        { label: 'Check spelling', icon: <SpellCheck size={14} />, checked: spell, also: 'spell', run: () => setSpell((x) => !x) },
+        { label: 'Fold all', icon: <FoldVertical size={14} />, keys: 'Ctrl+Alt+[', disabled: !code, also: 'collapse', run: () => code?.foldAll() },
+        { label: 'Unfold all', icon: <UnfoldVertical size={14} />, keys: 'Ctrl+Alt+]', disabled: !code, also: 'expand', run: () => code?.unfoldAll() },
+        '-',
+        setup?.sync !== false && { label: 'Show this line in the PDF', icon: <LocateFixed size={14} />, disabled: !result?.pdf || file === PICTURES, also: 'synctex', run: () => void showInPdf() },
+        { label: 'Dark pages', icon: <Moon size={14} />, checked: darkPages && dark, disabled: !dark, also: 'night invert', run: () => setDarkPages((x) => !x) },
+        { label: 'Present the pages', icon: <Presentation size={14} />, disabled: !result?.pdf, also: 'full screen slides', run: () => setPresentAsk((n) => n + 1) },
+      ],
+    },
+    {
+      label: 'Tools',
+      items: [
+        { label: 'Recompile now', icon: <Play size={14} />, keys: 'Ctrl+Enter', also: 'typeset compile', run: () => void run(true) },
+        { label: 'Recompile as you type', checked: auto, also: 'auto compile', run: () => setAuto((a) => !a) },
+        { label: 'Typeset with', also: 'engine', disabled: readOnly, items: TEX_ENGINES.map((x) => ({ label: x.label, checked: engine === x.id, run: () => pickEngine(x.id) })) },
+        '-',
+        { label: 'Word count', icon: <WholeWord size={14} />, also: 'words texcount', run: () => setDialog('count') },
+        canCompare && { label: 'Compare versions', icon: <History size={14} />, also: 'diff history changes', run: () => setDialog('compare') },
+        '-',
+        { label: 'Show the log', icon: <ScrollText size={14} />, disabled: !result?.log, run: () => setLogOpen(true) },
+        { label: 'Open the PDF', icon: <ExternalLink size={14} />, disabled: !result?.pdf, run: openPdf },
+        !!onAsk && !readOnly && !!result?.errors.length && { label: 'Ask the agent to fix them', icon: <Sparkles size={14} />, also: 'errors', run: askFix },
+        '-',
+        { label: 'Keyboard shortcuts', icon: <Keyboard size={14} />, also: 'keys', run: () => setDialog('keys') },
+      ] as MenuEntry[],
+    },
+  ];
+
   const toolbar = (
     <div className="flex h-11 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-line bg-panel px-2 [&::-webkit-scrollbar]:hidden">
       {!wide && (
@@ -657,19 +1096,30 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
           {sep}
         </>
       )}
+      <MenuBar menus={menus} compact={!roomy} className="shrink-0" />
+      {sep}
+      <div className="shrink-0">
+        <Segmented
+          size="sm"
+          value={mode}
+          onChange={switchMode}
+          options={[
+            { value: 'code', label: 'Code' },
+            { value: 'visual', label: 'Visual' },
+          ]}
+        />
+      </div>
       {!readOnly && (
         <>
-          <Button ref={anchors.insert} size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMenu(menu === 'insert' ? null : 'insert')} className={cx('shrink-0', menu === 'insert' && 'bg-bg-3')}>
-            Insert
-          </Button>
+          {sep}
           <IconButton label="Bold (Ctrl+B)" size="sm" onClick={() => void insert('bold')}>
             <Bold size={15} />
           </IconButton>
           <IconButton label="Italic (Ctrl+I)" size="sm" onClick={() => void insert('italic')}>
             <Italic size={15} />
           </IconButton>
-          <IconButton label="Section heading" size="sm" onClick={() => void insert('section')}>
-            <Heading1 size={15} />
+          <IconButton ref={anchors.symbols} label="Symbols" size="sm" active={menu === 'symbols'} onClick={() => setMenu(menu === 'symbols' ? null : 'symbols')}>
+            <Omega size={15} />
           </IconButton>
           <IconButton label="Equation" size="sm" onClick={() => void insert('equation')}>
             <Sigma size={15} />
@@ -677,9 +1127,9 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
           <IconButton label="Figure with a picture" size="sm" onClick={() => void insert('figure')}>
             <ImagePlus size={15} />
           </IconButton>
-          {sep}
         </>
       )}
+      {sep}
       <IconButton
         ref={anchors.outline}
         label="Outline"
@@ -693,23 +1143,7 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         <Search size={15} />
       </IconButton>
       {setup?.sync !== false && (
-        <IconButton
-          label="Show this line in the PDF"
-          size="sm"
-          disabled={!result?.pdf || file === PICTURES}
-          onClick={async () => {
-            const r = resultRef.current;
-            if (!r?.pdf) return;
-            try {
-              const at = await placeOf(r.key, file, cursor.line);
-              if (!at) return toast('That line has nothing on the pages');
-              if (!wide) setPane('preview');
-              setFlash({ ...at, n: Date.now() });
-            } catch (e) {
-              toastError(e);
-            }
-          }}
-        >
+        <IconButton label="Show this line in the PDF" size="sm" disabled={!result?.pdf || file === PICTURES} onClick={() => void showInPdf()}>
           <LocateFixed size={15} />
         </IconButton>
       )}
@@ -829,6 +1263,13 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const source = (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {fileTabs}
+      {file.endsWith('.bib') && !readOnly && (
+        <div className="flex h-9 shrink-0 items-center border-b border-line bg-bg px-1.5">
+          <Button size="sm" variant="ghost" icon={<BookPlus size={14} />} className="h-7 min-w-0 px-2 text-[12.5px]" onClick={openRefs}>
+            <span className="truncate">Find a reference by DOI, arXiv id or title</span>
+          </Button>
+        </div>
+      )}
       <div className="relative min-h-0 flex-1">
         {opened.map((n) => (
           <div
@@ -870,6 +1311,8 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         setProblemsOpen(true);
         setPane('source');
       }}
+      darkPages={darkPages && dark}
+      presentAsk={presentAsk}
     />
   );
 
@@ -890,7 +1333,7 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
             value={pane}
             onChange={setPane}
             options={[
-              { value: 'source', label: 'Code' },
+              { value: 'source', label: 'Source' },
               { value: 'preview', label: 'Preview' },
             ]}
           />
@@ -941,28 +1384,14 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         </div>
       )}
 
-      <Popover anchor={anchors.insert} open={menu === 'insert'} onClose={() => setMenu(null)} width={260} title="Insert">
-        {SNIPPETS.map((s) => (
-          <MenuItem key={s.id} icon={SNIP_ICONS[s.id]} hint={<span className="font-mono">{s.hint}</span>} onClick={() => void insert(s.id)}>
-            {s.label}
-          </MenuItem>
-        ))}
+      <Popover anchor={anchors.symbols} open={menu === 'symbols'} onClose={() => setMenu(null)} width={340} title="Symbols">
+        <SymbolsPanel onPick={insertSymbol} />
       </Popover>
       <Popover anchor={anchors.engine} open={menu === 'engine'} onClose={() => setMenu(null)} width={300} title="Typeset with">
         {TEX_ENGINES.map((x) => {
           const why = setup?.notes[x.id];
           return (
-            <MenuItem
-              key={x.id}
-              checked={engine === x.id}
-              onClick={() => {
-                setMenu(null);
-                if (why && x.id !== engine) toast(why);
-                if (x.id === engine) return;
-                quick.current = true;
-                change((d) => ({ ...d, engine: x.id as TexEngine }));
-              }}
-            >
+            <MenuItem key={x.id} checked={engine === x.id} onClick={() => pickEngine(x.id)}>
               <span className={cx(why && 'text-fg-3')}>{x.label}</span>
               <span className="ml-2 text-[12px] text-fg-3">{why ? 'not on this computer' : x.hint}</span>
             </MenuItem>
@@ -980,14 +1409,7 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         <MenuItem icon={<ScrollText size={14} />} disabled={!result?.log} onClick={() => (setMenu(null), setLogOpen(true))}>
           Show the log
         </MenuItem>
-        <MenuItem
-          icon={<ExternalLink size={14} />}
-          disabled={!result?.pdf}
-          onClick={() => {
-            setMenu(null);
-            if (result?.pdf) window.open(pdfUrl(result.key), '_blank', 'noreferrer');
-          }}
-        >
+        <MenuItem icon={<ExternalLink size={14} />} disabled={!result?.pdf} onClick={openPdf}>
           Open the PDF
         </MenuItem>
       </Popover>
@@ -1097,6 +1519,26 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
           {result?.log || '—'}
         </pre>
       </Dialog>
+      <TableEditor open={!!tableAsk} initial={tableAsk?.table ?? EMPTY_TABLE} editing={!!tableAsk?.at} onClose={() => setTableAsk(null)} onDone={tableDone} />
+      <ReferencesDialog open={dialog === 'refs'} onClose={() => setDialog(null)} onPick={addReference} bib={refsTarget.name} fresh={refsTarget.fresh} canCite={refsTarget.cite} />
+      <WordCountDialog open={dialog === 'count'} onClose={() => setDialog(null)} doc={model} file={file === PICTURES ? TEX_MAIN : file} label={label} />
+      {canCompare && dialog === 'compare' && (
+        <CompareDialog
+          open
+          onClose={() => setDialog(null)}
+          pageId={pageId}
+          current={model}
+          dirty={dirty}
+          readOnly={readOnly}
+          label={label}
+          onRestore={(name, text, version) => {
+            if (name === TEX_MAIN || live.current?.files.some((f) => f.name === name)) editFile(name, () => text);
+            else change((d) => ({ ...d, files: [...d.files, { name, text }] }));
+            toast(`${label(name)} is as it was in version ${version} (not saved yet)`, 'ok');
+          }}
+        />
+      )}
+      <ShortcutsDialog open={dialog === 'keys'} onClose={() => setDialog(null)} groups={SHORTCUTS} />
       {confirmNode}
     </div>
   );

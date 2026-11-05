@@ -1,7 +1,9 @@
 // The LaTeX editor's calls: typesetting the document as it is in the editor (saved or not), what this computer has
-// for LaTeX, the addresses of a typesetting's pages and PDF, SyncTeX both ways, and pictures and files added from
-// the device (a picture LaTeX cannot take, a GIF, WebP or SVG, becomes a PNG first; a PDF becomes one on the server).
+// for LaTeX, references found on the web, the addresses of a typesetting's pages and PDF, SyncTeX both ways, and
+// pictures and files added from the device (a picture LaTeX cannot take, a GIF, WebP or SVG, becomes a PNG first; a
+// PDF becomes one on the server).
 import { cleanTexName, extOf, TEX_FILE_EXT, type TexCompiled, type TexDoc, type TexSetup } from '@shared/latex';
+import type { TexReference } from '@shared/latex-bib';
 import { api, enc, post } from '../../../lib/api';
 import { mu } from '../../../lib/machine';
 import { uploadPicture } from '../pictures';
@@ -19,6 +21,9 @@ export function texSetup(): Promise<TexSetup> {
   });
   return setupOnce;
 }
+
+/** References on the web for a DOI, an arXiv paper, or words of a title or its authors. */
+export const findReferences = (query: string) => post<{ kind: 'doi' | 'arxiv' | 'search'; entries: TexReference[] }>('/api/pages/tex/reference', { query });
 
 export const pageUrl = (key: string, page: number, width: number) => mu(`/api/pages/tex/${key}/${page}?w=${width}`);
 export const pdfUrl = (key: string) => mu(`/api/pages/tex/${key}/pdf`);
