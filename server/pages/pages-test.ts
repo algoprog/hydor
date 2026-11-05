@@ -695,7 +695,7 @@ let privPath = '';
   const docx = path.join(dir, 'letter.docx');
   fs.writeFileSync(docx, word);
   const d = (await openOf(docx)).json();
-  ok(d.kind === 'doc' && d.loses?.includes('headers') && d.loses.includes('footnotes') && !d.cut, 'a Word file opens in the document editor, with what saving would lose');
+  ok(d.kind === 'doc' && d.loses?.includes('footnotes') && !d.loses.includes('headers') && d.model?.header?.text === 'ACME Corp' && !d.cut, 'a Word file opens in the document editor, with what saving would lose (its header comes in)');
   ok(d.model?.blocks?.some((b: { runs?: { t: string }[] }) => b.runs?.some((r) => r.t.includes('Dear Sam'))), 'with its words');
   d.model.blocks.push({ type: 'p', runs: [{ t: 'Added in Files.' }] });
   const saved = (await req('PUT', '/api/pages/file', { path: docx, model: d.model, mtime: d.mtime, backup: true })).json();

@@ -6,12 +6,21 @@
 //
 // save_doc is how agents make and change documents; get_page gives one back as Markdown, which says all a
 // document holds but its blocks' ids (carried over from the version it changes when it comes back).
+import { newCommentId } from '../../shared/comments.ts';
 import {
   ASSET,
   blockHtml,
+  CALLOUT,
+  leadingIcon,
+  withComments,
+  type Block,
+  type Comment,
+  fixMerges,
   fontCss,
   tocEntries,
   type Band,
+  type Spacing,
+  type TableBlock,
   carryIds,
   docCss,
   docFonts,
@@ -45,8 +54,9 @@ import { rels } from '../documents/ooxml.ts';
 import { all, att, isEl, kid, kids, parseXml, patt, path as xpath, type El } from '../documents/xml.ts';
 import { Zip } from '../documents/zip.ts';
 import { assetDataUrl, getAsset, pictureType, putAsset, takeIn } from './assets.ts';
-import { docxFile, type DocBlock as WordBlock, type DocLook, type DocRun as WordRun } from './docx.ts';
+import { docxFile, type DocBlock as WordBlock, type DocCell, type DocLook, type DocRun as WordRun, type DocSpace } from './docx.ts';
 import { katexStyle, texToHtml } from './math.ts';
+import { texOfOmml } from './omml.ts';
 import { imageSize } from './ooxml.ts';
 import type { Picture } from './pptx.ts';
 
@@ -101,14 +111,32 @@ export async function agentDoc(db: DB, input: unknown, cwd: string, prev?: strin
     } catch {}
   }
   const page = { ...(base?.page ?? {}), ...(typeof v.page === 'string' ? { size: v.page } : v.page && typeof v.page === 'object' ? (v.page as object) : {}) };
+  const notes: string[] = [];
+  // Its header, footer and title page as they were, unless they are said; its comments as they were, answered,
+  // resolved or added to as `comments` says.
+  const given = (k: string) => Object.prototype.hasOwnProperty.call(v, k);
+  const comments = commentOps(base?.comments ?? [], v.comments, notes);
   let doc: Doc;
   try {
     // Any source may be a file of the session's: kept as written until it is taken in below.
-    doc = normalizeDoc({ markdown: v.markdown, blocks: v.blocks, page, font: v.font ?? base?.font, size: v.size ?? base?.size }, { src: (s) => (s.length <= 4096 ? s : null) });
+    doc = normalizeDoc(
+      {
+        markdown: v.markdown,
+        blocks: v.blocks,
+        page,
+        font: v.font ?? base?.font,
+        size: v.size ?? base?.size,
+        header: given('header') ? v.header : base?.header,
+        footer: given('footer') ? v.footer : base?.footer,
+        titlePage: given('titlePage') ? v.titlePage : base?.titlePage,
+        comments: comments.list,
+      },
+      { src: (s) => (s.length <= 4096 ? s : null) },
+    );
   } catch (e) {
     throw new Error(`${(e as Error).message} See save_doc’s description for the document’s shape.`);
   }
-  const notes: string[] = [];
+  doc = anchorComments(doc, comments.on, notes);
   const done = new Map<string, string>();
   for (const s of new Set(docSources(doc))) done.set(s, await takeIn(db, s, { cwd, notes }));
   doc = notEmpty(mapDocSources(doc, (s) => done.get(s) ?? s));
@@ -116,6 +144,104 @@ export async function agentDoc(db: DB, input: unknown, cwd: string, prev?: strin
   const text = docText(doc);
   if (Buffer.byteLength(text) > MAX_DOC) throw new Error(`The document is over ${MAX_DOC / 1024 / 1024} MB without its pictures; make it smaller.`);
   return { doc, text, notes };
+}
+
+/**
+ * Comments after an agent's changes (`ops`, save_doc's comments): {id, reply} answers one, {id, resolve: true} or
+ * {id, reopen: true} resolves or reopens it, {id, delete: true} takes it out, and {id, text} with a new id adds one of
+ * the agent's (on the words marked <span data-comment="id">, or on the words `on`). What it could not do is said in
+ * `notes`; the words new comments are on, by their ids, in `on`.
+ */
+function commentOps(list: Comment[], ops: unknown, notes: string[]): { list: Comment[]; on: Map<string, string> } {
+  const out: Comment[] = list.map((c) => (c.replies ? { ...c, replies: [...c.replies] } : { ...c }));
+  const on = new Map<string, string>();
+  if (ops === undefined || ops === null) return { list: out, on };
+  if (!Array.isArray(ops)) {
+    notes.push('comments must be a list of changes, such as [{"id": "c1", "reply": "…"}]: they were left as they were.');
+    return { list: out, on };
+  }
+  const now = Date.now();
+  for (const raw of ops.slice(0, 500)) {
+    const op = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+    const id = typeof op.id === 'string' ? op.id.trim() : '';
+    const c = out.find((x) => x.id === id);
+    const text = (k: string) => (typeof op[k] === 'string' ? (op[k] as string).trim().slice(0, 4000) : '');
+    if (c) {
+      if (op.delete === true) out.splice(out.indexOf(c), 1);
+      else {
+        if (text('reply')) (c.replies ??= []).push({ id: `${c.id}r${(c.replies?.length ?? 0) + 1}${now.toString(36).slice(-3)}`, by: 'agent', text: text('reply'), at: now });
+        if (op.resolve === true || op.resolved === true) c.resolved = true;
+        if (op.reopen === true || op.resolved === false) delete c.resolved;
+        if (!text('reply') && op.resolve === undefined && op.resolved === undefined && op.reopen === undefined && text('text')) notes.push(`Comment ${id} is the user’s: answer it with "reply", not "text".`);
+      }
+      continue;
+    }
+    if (op.delete === true || text('reply') || op.resolve !== undefined || op.reopen !== undefined) {
+      notes.push(`There is no comment ${id || '(no id)'} to change: get_page lists them.`);
+      continue;
+    }
+    const words = text('text');
+    if (!words) continue;
+    const nid = /^[A-Za-z0-9_-]{1,40}$/.test(id) ? id : newCommentId();
+    out.push({ id: nid, by: 'agent', text: words, at: now });
+    if (text('on')) on.set(nid, text('on'));
+  }
+  return { list: out, on };
+}
+
+/**
+ * New comments put on the words they name (where the document has no marks for them yet: the first place those
+ * words are), and each comment's quote made from the words it is on; a new one on no words is said.
+ */
+function anchorComments(doc: Doc, on: Map<string, string>, notes: string[]): Doc {
+  if (!doc.comments?.length) return doc;
+  const marked = new Set<string>();
+  const each = (f: (runs: Run[]) => Run[]) =>
+    doc.blocks.map((b): Block => {
+      if (b.type === 'p' || b.type === 'li') return { ...b, runs: f(b.runs) };
+      if (b.type === 'table') return { ...b, rows: b.rows.map((r) => r.map((c) => ({ ...c, runs: f(c.runs) }))) };
+      return b;
+    });
+  each((runs) => {
+    for (const r of runs) for (const id of r.cm ?? []) marked.add(id);
+    return runs;
+  });
+  let blocks = doc.blocks;
+  for (const [id, words] of on) {
+    if (marked.has(id)) continue;
+    let done = false;
+    blocks = each((runs) => {
+      if (done) return runs;
+      const text = runs.map((r) => (r.math ? '\u2063'.repeat(r.t.length) : r.t)).join('');
+      const at = text.indexOf(words);
+      if (at < 0) return runs;
+      done = true;
+      const out: Run[] = [];
+      let o = 0;
+      for (const r of runs) {
+        const a = Math.max(at, o);
+        const z = Math.min(at + words.length, o + r.t.length);
+        if (z <= a || r.math) out.push(z > a && r.math ? { ...r, cm: [...(r.cm ?? []), id] } : r);
+        else {
+          if (a > o) out.push({ ...r, t: r.t.slice(0, a - o) });
+          out.push({ ...r, t: r.t.slice(a - o, z - o), cm: [...(r.cm ?? []), id] });
+          if (z < o + r.t.length) out.push({ ...r, t: r.t.slice(z - o) });
+        }
+        o += r.t.length;
+      }
+      return mergeRuns(out);
+    });
+    doc = { ...doc, blocks };
+    if (done) marked.add(id);
+    else notes.push(`The words of comment ${id} (“${words.slice(0, 60)}”) are not in the document: it is kept, on no words.`);
+  }
+  // Each comment's quote: the words it is on now.
+  const quotes = new Map<string, string>();
+  each((runs) => {
+    for (const r of runs) for (const id of r.cm ?? []) quotes.set(id, `${quotes.get(id) ?? ''}${r.math ? '…' : r.t}`);
+    return runs;
+  });
+  return withComments(doc, (doc.comments ?? []).map((c) => (quotes.get(c.id)?.trim() ? { ...c, quote: quotes.get(c.id)!.replace(/\s+/g, ' ').trim().slice(0, 500) } : c)));
 }
 
 // ---- its own page -------------------------------------------------------------------------------------------
@@ -253,22 +379,46 @@ export function docPage(db: DB, doc: Doc, title: string, mode: 'viewer' | 'print
 /** What get_page tells an agent of a document: its outline, then the document as Markdown, and how to change it. */
 export function docForAgent(text: string): string {
   const doc = readDoc(text);
-  const md = docMarkdown(doc);
+  const md = docMarkdown(doc, { comments: true });
   const body =
     md.length > 200_000
       ? `${md.slice(0, 200_000)}\n… (cut here: the document is ${Math.round(md.length / 1024)} KB as Markdown. Sending it back whole would lose what you did not read: tell the user, and change it only if they want the rest rewritten.)`
       : md;
   const paper = PAPERS[doc.page.size].label;
+  const bands = [doc.header ? `Header: “${doc.header.text}”${doc.header.align ? ` (${doc.header.align})` : ''}.` : '', doc.footer ? `Footer: “${doc.footer.text}”${doc.footer.align ? ` (${doc.footer.align})` : ''}.` : '', doc.titlePage ? 'The first page is a title page, without them.' : '']
+    .filter(Boolean)
+    .join(' ');
   return [
-    `A document of about ${docWords(doc)} words, ${doc.blocks.length} block${doc.blocks.length === 1 ? '' : 's'} (${paper} paper, ${doc.page.margin} mm margins; ${doc.font} ${doc.size} pt).`,
+    `A document of about ${docWords(doc)} words, ${doc.blocks.length} block${doc.blocks.length === 1 ? '' : 's'} (${paper} paper, ${doc.page.margin} mm margins; ${doc.font} ${doc.size} pt).${bands ? ` ${bands}` : ''}`,
     '',
     'Outline:',
     docOutline(doc),
     '',
-    'The document as Markdown. To change it, send it back whole with save_doc and this id (markdown; page, font and size only to change them). Keep what you do not mean to change as it is: the attributes in braces ({.title}, {.center}…), <u>, <span style>, ==highlights==, and the pictures’ naget-asset: sources.',
+    'The document as Markdown. To change it, send it back whole with save_doc and this id (markdown; page, font, size, header and footer only to change them). Keep what you do not mean to change as it is: the attributes in braces ({.title}, {.center}, {line=1.5}…), <u>, <span style>, ==highlights==, $maths$, the comments’ <span data-comment> marks, and the pictures’ naget-asset: sources.',
     '',
     body,
+    ...commentsForAgent(doc),
   ].join('\n');
+}
+
+const when = (at: number) => new Date(at).toISOString().slice(0, 16).replace('T', ' ');
+
+/** The comments' threads, after the document, and how to answer them. */
+function commentsForAgent(doc: Doc): string[] {
+  const list = doc.comments ?? [];
+  if (!list.length) return [];
+  const open = list.filter((c) => !c.resolved).length;
+  const who = (by: 'user' | 'agent') => (by === 'agent' ? 'an agent' : 'the user');
+  return [
+    '',
+    `Comments (${open} open, ${list.length - open} resolved), each on the words marked with its id above:`,
+    ...list.flatMap((c) => [
+      `- ${c.id} · ${c.resolved ? 'resolved' : 'open'}${c.quote ? ` · on “${c.quote.slice(0, 160)}”` : ''} · ${who(c.by)}, ${when(c.at)} UTC: ${c.text.replace(/\n/g, ' / ')}`,
+      ...(c.replies ?? []).map((r) => `    ↳ ${who(r.by)}, ${when(r.at)} UTC: ${r.text.replace(/\n/g, ' / ')}`),
+    ]),
+    '',
+    'To answer them, save_doc with this id and comments: [{"id": "<id>", "reply": "what you did or say"}], adding "resolve": true once a comment is dealt with (or "reopen": true). Make the change a comment asks for in the markdown too. Add a comment of your own with <span data-comment="new1">the words</span> in the markdown and {"id": "new1", "text": "…"} in comments.',
+  ];
 }
 
 // ---- Word ---------------------------------------------------------------------------------------------------------
@@ -278,14 +428,47 @@ const PX_PER_TEXT = (doc: Doc) => (PAPERS[doc.page.size].w - 2 * doc.page.margin
 
 const wordRun = (r: Run): WordRun => {
   const w: WordRun = { t: r.t };
-  for (const k of ['b', 'i', 'u', 's', 'code', 'sup', 'sub'] as const) if (r[k]) w[k] = true;
+  for (const k of ['b', 'i', 'u', 's', 'code', 'sup', 'sub', 'math'] as const) if (r[k]) w[k] = true;
   if (r.color) w.color = r.color;
   if (r.hl) w.hl = r.hl;
   if (r.size) w.size = r.size;
   if (r.font) w.font = r.font;
   if (r.link) w.link = r.link;
+  if (r.cm) w.cm = r.cm;
   return w;
 };
+
+/** A paragraph's own spacing for Word. */
+const wordSpace = (b: Spacing): DocSpace | undefined =>
+  b.lh === undefined && b.sb === undefined && b.sa === undefined ? undefined : { ...(b.lh !== undefined ? { line: b.lh } : {}), ...(b.sb !== undefined ? { before: b.sb } : {}), ...(b.sa !== undefined ? { after: b.sa } : {}) };
+
+/** A table's rows for Word: a cell merged across columns spans them, one merged down starts a run of cells Word joins. */
+function wordRows(t: TableBlock): { cells: DocCell[] }[] {
+  const under = fixMerges(t.rows.map((r) => r.map((c) => ({ ...c }))));
+  return t.rows.map((r, ri) => {
+    const cells: DocCell[] = [];
+    r.forEach((c, ci) => {
+      const u = under[ri][ci];
+      if (u) {
+        // Under a cell merged down: one cell in its place, joined to it, as wide as it.
+        if (u[0] < ri && u[1] === ci) {
+          const top = t.rows[u[0]][u[1]];
+          cells.push({ runs: [], vm: 'cont', ...(top.cs ? { span: top.cs } : {}), ...(top.fill ? { fill: top.fill } : {}), ...(t.head && ri === 0 ? { head: true } : {}) });
+        }
+        return;
+      }
+      const cell: DocCell = { runs: c.runs.map(wordRun) };
+      if (t.head && ri === 0) cell.head = true;
+      if (c.align && JC[c.align]) cell.align = JC[c.align];
+      if (c.fill) cell.fill = c.fill;
+      if (c.va) cell.va = c.va === 'middle' ? 'center' : 'bottom';
+      if (c.cs) cell.span = c.cs;
+      if (c.rs) cell.vm = 'restart';
+      cells.push(cell);
+    });
+    return { cells };
+  });
+}
 
 /** A picture of the kept ones as Word takes it (PNG, JPEG, GIF); null for another kind (SVG, WebP) or none. */
 function keptPicture(db: DB, src: string): Picture | null {
@@ -309,13 +492,17 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
   const blocks: WordBlock[] = [];
   const pictures: Buffer[] = [];
   const textPx = PX_PER_TEXT(doc);
+  // The headings a table of contents lists, each with a bookmark its line leads to.
+  const toc = doc.blocks.some((b) => b.type === 'toc') ? tocEntries(doc) : [];
+  const anchors = new Map(toc.map((e, k) => [e.id, `_Toc${k + 1}`]));
   doc.blocks.forEach((b, i) => {
     if (b.type === 'p') {
       const runs = b.runs.map(wordRun);
       const align = b.align ? JC[b.align] : undefined;
       const style = b.style ?? 'normal';
       const lvl = headingLevel(style);
-      if (lvl) blocks.push({ k: 'h', lvl: lvl as 1 | 2 | 3 | 4, runs, keep: true, ...(align ? { align } : {}) });
+      const space = wordSpace(b);
+      if (lvl) blocks.push({ k: 'h', lvl: lvl as 1 | 2 | 3 | 4, runs, keep: true, ...(align ? { align } : {}), ...(space ? { space } : {}), ...(anchors.has(b.id) ? { anchor: anchors.get(b.id) } : {}) });
       else if (style === 'code') blocks.push({ k: 'pre', text: b.runs.map((r) => r.t).join('') || ' ' });
       else
         blocks.push({
@@ -325,10 +512,13 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
           ...(align ? { align } : {}),
           ...(style === 'quote' ? { quote: true } : {}),
           ...(style === 'title' || style === 'subtitle' ? { style } : {}),
+          ...(style === 'callout' ? { shade: b.tint ?? CALLOUT.tint, icon: b.icon ?? CALLOUT.icon } : {}),
           ...(b.lvl ? { indent: b.lvl } : {}),
+          ...(space ? { space } : {}),
         });
     } else if (b.type === 'li') {
       const align = b.align ? JC[b.align] : undefined;
+      const space = wordSpace(b);
       blocks.push({
         k: 'li',
         ordered: b.list === 'number',
@@ -338,13 +528,14 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
         keep: true,
         ...(b.list === 'check' ? { check: true, ...(b.checked ? { checked: true } : {}) } : {}),
         ...(align ? { align } : {}),
+        ...(space ? { space } : {}),
       });
     } else if (b.type === 'table') {
-      blocks.push({
-        k: 'table',
-        rows: b.rows.map((r, ri) => ({ cells: r.map((c) => ({ runs: c.runs.map(wordRun), ...(b.head && ri === 0 ? { head: true } : {}), ...(c.align && JC[c.align] ? { align: JC[c.align] } : {}) })) })),
-        ...(b.cols ? { cols: b.cols } : {}),
-      });
+      blocks.push({ k: 'table', rows: wordRows(b), ...(b.cols ? { cols: b.cols } : {}) });
+    } else if (b.type === 'toc') {
+      blocks.push({ k: 'toc', entries: toc.map((e) => ({ lvl: e.level, text: e.text, anchor: anchors.get(e.id)! })) });
+    } else if (b.type === 'math') {
+      blocks.push({ k: 'math', tex: b.tex });
     } else if (b.type === 'image') {
       const pic = picture?.(b.src) ?? keptPicture(db, b.src);
       if (!pic || pic.ext === 'webp') {
@@ -367,11 +558,17 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
     line: Math.round((STYLES.normal.lh / 1.15) * 100) / 100,
     after: Math.round(doc.size * STYLES.normal.after * 2) / 2,
   };
-  return docxFile(
-    { title, lang: '', blocks, shots: pictures.map(() => ({ x: 0, y: 0, w: 1, h: 1 })) },
-    pictures,
-    { title, paper: doc.page.size, margin: doc.page.margin, look, titled: false },
-  );
+  return docxFile({ title, lang: '', blocks, shots: pictures.map(() => ({ x: 0, y: 0, w: 1, h: 1 })) }, pictures, {
+    title,
+    paper: doc.page.size,
+    margin: doc.page.margin,
+    look,
+    titled: false,
+    header: doc.header,
+    footer: doc.footer,
+    titlePage: doc.titlePage,
+    comments: doc.comments?.map((c) => ({ id: c.id, by: c.by, text: c.text, at: c.at, resolved: c.resolved, replies: c.replies?.map((r) => ({ by: r.by, text: r.text, at: r.at })) })),
+  });
 }
 
 // ---- made from a file ---------------------------------------------------------------------------------------------
@@ -460,6 +657,11 @@ interface WCtx {
   size: number;
   textEmu: number;
   pics: number;
+  /** The comments whose words are being read (Word's ids), and each one's id here (a reply's: its thread's). */
+  openCm: Set<string>;
+  cmIds: Map<string, string>;
+  /** Inside a table of contents Word keeps as a field: how deep in fields, while its lines are skipped. */
+  toc: number;
 }
 
 /** A style and those it is based on. */
@@ -589,11 +791,18 @@ interface PCollect {
   field?: { instr: string; result: boolean; link?: string };
 }
 
+/** The comments on the words being read, by their ids here. */
+function openComments(ctx: WCtx): string[] | undefined {
+  const ids = [...new Set([...ctx.openCm].flatMap((w) => (ctx.cmIds.has(w) ? [ctx.cmIds.get(w)!] : [])))];
+  return ids.length ? ids : undefined;
+}
+
 function runContent(ctx: WCtx, r: El, look: Look, c: PCollect, align: Align | undefined) {
   const add = (t: string) => {
     if (!t) return;
     const link = c.field?.result ? (c.field.link ?? c.link) : c.link;
-    c.runs.push({ t, ...look, ...(link ? { link } : {}) });
+    const cm = openComments(ctx);
+    c.runs.push({ t, ...look, ...(link ? { link } : {}), ...(cm ? { cm } : {}) });
   };
   for (const x of r.c) {
     if (!isEl(x)) continue;
@@ -706,6 +915,20 @@ function inline(ctx: WCtx, el: El, c: PCollect, align: Align | undefined) {
       case 'bdo':
         inline(ctx, x, c, align);
         break;
+      case 'commentRangeStart':
+        ctx.openCm.add(att(x, 'id') ?? '');
+        break;
+      case 'commentRangeEnd':
+        ctx.openCm.delete(att(x, 'id') ?? '');
+        break;
+      case 'oMath':
+      case 'oMathPara': {
+        // Word's equations among the words: their LaTeX.
+        const tex = texOfOmml(x);
+        const cm = openComments(ctx);
+        if (tex) c.runs.push({ t: tex, math: true, ...(cm ? { cm } : {}) });
+        break;
+      }
       case 'AlternateContent': {
         const ch = kid(x, 'Choice') ?? kid(x, 'Fallback');
         if (ch) inline(ctx, ch, c, align);
@@ -715,10 +938,45 @@ function inline(ctx: WCtx, el: El, c: PCollect, align: Align | undefined) {
   }
 }
 
+/** How deep in fields a paragraph leaves Word's reader (fields it opens, less those it closes). */
+const fieldDepth = (p: El) => all(p, 'fldChar').reduce((n, f) => n + (att(f, 'fldCharType') === 'begin' ? 1 : att(f, 'fldCharType') === 'end' ? -1 : 0), 0);
+
+/** A paragraph's own spacing as a document keeps it (lines, and points before and after). */
+function wordSpacing(pPr: El | undefined): Spacing {
+  const sp = kid(pPr, 'spacing');
+  const out: Spacing = {};
+  if (!sp) return out;
+  const before = att(sp, 'before');
+  const after = att(sp, 'after');
+  const line = att(sp, 'line');
+  const rule = att(sp, 'lineRule') ?? 'auto';
+  if (before !== undefined && /^\d+$/.test(before) && att(sp, 'beforeAutospacing') !== '1') out.sb = Math.min(200, Math.round((Number(before) / 20) * 2) / 2);
+  if (after !== undefined && /^\d+$/.test(after) && att(sp, 'afterAutospacing') !== '1') out.sa = Math.min(200, Math.round((Number(after) / 20) * 2) / 2);
+  if (line !== undefined && /^\d+$/.test(line) && rule === 'auto') out.lh = Math.min(5, Math.max(0.5, Math.round((Number(line) / 240) * 100) / 100));
+  return out;
+}
+
 function wordParagraph(ctx: WCtx, p: El, out: Record<string, unknown>[], depth: number) {
   const pPr = kid(p, 'pPr');
+  // A table of contents Word keeps as a field: one of ours in its place, its lines (Word's last filling in) left out.
+  if (ctx.toc > 0) {
+    ctx.toc = Math.max(0, ctx.toc + fieldDepth(p));
+    return;
+  }
+  if (all(p, 'instrText').some((t) => /^\s*TOC\b/.test(t.c.map((y) => (typeof y === 'string' ? y : '')).join('')))) {
+    out.push({ type: 'toc' });
+    ctx.toc = Math.max(0, fieldDepth(p));
+    return;
+  }
   const k = pKind(ctx, pPr);
   if (kid(pPr, 'pageBreakBefore') && on(kid(pPr, 'pageBreakBefore')) && out.length) out.push({ type: 'pagebreak' });
+  // An equation on a line of its own.
+  const mathPara = kid(p, 'oMathPara');
+  if (mathPara && !kids(p, 'r').some((r) => all(r, 't').some((t) => t.c.some((y) => typeof y === 'string' && y.trim())))) {
+    const tex = texOfOmml(mathPara);
+    if (tex) out.push({ type: 'math', tex });
+    return;
+  }
   const c: PCollect = { runs: [], after: [], breaks: [] };
   inline(ctx, p, c, k.align);
   let runs = mergeRuns(c.runs);
@@ -738,9 +996,14 @@ function wordParagraph(ctx: WCtx, p: El, out: Record<string, unknown>[], depth: 
   }
   // A checklist's item is indented by its level (as docx.ts writes them: half an inch, and a quarter more a level).
   const checkLvl = Math.min(4, Math.max(0, Math.round((k.left - 720) / 360)));
+  const space = wordSpacing(pPr);
+  // A shaded paragraph that starts with an emoji is a callout (as this app writes one).
+  const shade = att(kid(pPr, 'shd'), 'fill');
+  const lead = shade && /^[0-9a-f]{6}$/i.test(shade) && !/^ffffff$/i.test(shade) ? leadingIcon(runs[0]?.t ?? '') : null;
   const block = (rs: Run[]): Record<string, unknown> => {
-    if (c.check || k.list) return { type: 'li', list: c.check ? 'check' : k.list!.kind, lvl: k.list?.lvl ?? checkLvl, ...(c.checked ? { checked: true } : {}), ...(k.align ? { align: k.align } : {}), runs: rs };
-    const b: Record<string, unknown> = { type: 'p', runs: k.style === 'code' ? [{ t: rs.map((r) => r.t).join('') }] : rs };
+    if (c.check || k.list) return { type: 'li', list: c.check ? 'check' : k.list!.kind, lvl: k.list?.lvl ?? checkLvl, ...(c.checked ? { checked: true } : {}), ...(k.align ? { align: k.align } : {}), ...space, runs: rs };
+    if (lead && k.style === 'normal') return { type: 'p', style: 'callout', icon: lead.icon, tint: `#${shade!.toLowerCase()}`, ...(k.align ? { align: k.align } : {}), runs: mergeRuns([{ ...rs[0], t: lead.rest }, ...rs.slice(1)]) };
+    const b: Record<string, unknown> = { type: 'p', runs: k.style === 'code' ? [{ t: rs.map((r) => r.t).join('') }] : rs, ...space };
     if (k.style !== 'normal') b.style = k.style;
     if (k.align) b.align = k.align;
     if (k.lvl) b.lvl = k.lvl;
@@ -771,13 +1034,16 @@ function wordParagraph(ctx: WCtx, p: El, out: Record<string, unknown>[], depth: 
 function wordTable(ctx: WCtx, tbl: El, out: Record<string, unknown>[], depth: number) {
   const rowsOf = (el: El): El[] => kids(el).flatMap((x) => (x.n === 'tr' ? [x] : x.n === 'sdt' || x.n === 'sdtContent' || x.n === 'customXml' ? rowsOf(x) : []));
   const cellsOf = (el: El): El[] => kids(el).flatMap((x) => (x.n === 'tc' ? [x] : x.n === 'sdt' || x.n === 'sdtContent' || x.n === 'customXml' ? cellsOf(x) : []));
-  const rows: { runs: Run[]; align?: Align }[][] = [];
+  type WCell = { runs: Run[]; align?: Align; fill?: string; va?: 'middle' | 'bottom'; rs?: number; cs?: number };
+  const rows: WCell[][] = [];
   let head = false;
+  // Each column's cell merged down that is still open (by where it is), for the cells under it.
+  const down = new Map<number, WCell>();
   rowsOf(tbl)
     .slice(0, DOC_LIMITS.rows)
     .forEach((tr, ri) => {
       if (ri === 0 && on(xpath(tr, 'trPr', 'tblHeader'))) head = true;
-      const row: { runs: Run[]; align?: Align }[] = [];
+      const row: WCell[] = [];
       for (const tc of cellsOf(tr)) {
         if (row.length >= DOC_LIMITS.cols) break;
         const inner: Record<string, unknown>[] = [];
@@ -793,8 +1059,21 @@ function wordTable(ctx: WCtx, tbl: El, out: Record<string, unknown>[], depth: nu
         }
         const merged = att(xpath(tc, 'tcPr', 'vMerge'), 'val');
         const cont = !!xpath(tc, 'tcPr', 'vMerge') && merged !== 'restart';
-        row.push({ runs: cont ? [] : mergeRuns(runs), ...(align && align !== 'left' && !cont ? { align } : {}) });
-        for (let s = Number(att(xpath(tc, 'tcPr', 'gridSpan'), 'val')) || 1; s > 1 && row.length < DOC_LIMITS.cols; s--) row.push({ runs: [] });
+        const span = Math.max(1, Math.min(DOC_LIMITS.cols - row.length, Number(att(xpath(tc, 'tcPr', 'gridSpan'), 'val')) || 1));
+        const at = row.length;
+        const cell: WCell = { runs: cont ? [] : mergeRuns(runs), ...(align && align !== 'left' && !cont ? { align } : {}) };
+        const fill = att(xpath(tc, 'tcPr', 'shd'), 'fill');
+        if (fill && /^[0-9a-f]{6}$/i.test(fill) && !/^ffffff$/i.test(fill) && !cont) cell.fill = `#${fill.toLowerCase()}`;
+        const va = att(xpath(tc, 'tcPr', 'vAlign'), 'val');
+        if ((va === 'center' || va === 'bottom') && !cont) cell.va = va === 'center' ? 'middle' : 'bottom';
+        if (span > 1 && !cont) cell.cs = span;
+        // Merged down: the cell it starts grows a row for each cell under it Word joins to it.
+        const top = down.get(at);
+        if (cont && top) top.rs = (top.rs ?? 1) + 1;
+        else if (merged === 'restart') down.set(at, cell);
+        else down.delete(at);
+        row.push(cell);
+        for (let s = span; s > 1 && row.length < DOC_LIMITS.cols; s--) row.push({ runs: [] });
       }
       if (row.length) rows.push(row);
     });
@@ -825,9 +1104,22 @@ function wordBody(ctx: WCtx, el: El, out: Record<string, unknown>[], depth: numb
           for (const r of t?.rows ?? []) out.push({ type: 'p', runs: mergeRuns(r.flatMap((c, i) => (i ? [{ t: '\t' }, ...c.runs] : c.runs))) });
         } else wordTable(ctx, x, out, depth);
         break;
-      case 'sdt':
+      case 'sdt': {
+        // Word's own table of contents (a block it made): its heading kept, its lines one of ours.
+        if (/table of contents/i.test(att(all(kid(x, 'sdtPr'), 'docPartGallery')[0], 'val') ?? '') && depth === 0) {
+          const inner: Record<string, unknown>[] = [];
+          const was = ctx.toc;
+          wordBody({ ...ctx, toc: 0 }, kid(x, 'sdtContent') ?? x, inner, depth);
+          ctx.toc = was;
+          // Its own heading ("Contents"), in bold words rather than a heading of the document's.
+          const until = inner.findIndex((b) => b.type === 'toc');
+          const heads = inner.slice(0, Math.max(0, until)).filter((b) => b.type === 'p' && Array.isArray(b.runs));
+          out.push(...heads.slice(0, 1).map((b) => ({ type: 'p', runs: (b.runs as Run[]).map((r) => ({ ...r, b: true })) })), { type: 'toc' });
+          break;
+        }
         wordBody(ctx, kid(x, 'sdtContent') ?? x, out, depth);
         break;
+      }
       case 'customXml':
       case 'ins':
       case 'moveTo':
@@ -921,7 +1213,8 @@ function wordDoc(buf: Buffer): Doc {
   const defaults = all(sroot, 'rPrDefault')[0];
   const normal = [...styles.entries()].find(([id, s]) => id === 'Normal' || s.name.toLowerCase() === 'normal')?.[1];
   const defLook: Look = {};
-  const ctx: WCtx = { zip, rels: r, styles, nums, theme, font: 'Arial', size: 11, textEmu: Math.max(1, pw - left - right) * 635, pics: 0 };
+  const ctx: WCtx = { zip, rels: r, styles, nums, theme, font: 'Arial', size: 11, textEmu: Math.max(1, pw - left - right) * 635, pics: 0, openCm: new Set(), cmIds: new Map(), toc: 0 };
+  const comments = wordComments(zip, part('comments'), part('commentsExtended'), ctx.cmIds);
   rLook(ctx, kid(defaults, 'rPr'), defLook);
   rLook(ctx, normal?.rPr, defLook);
   const font = defLook.font && FONTS.some((f) => f.name.toLowerCase() === defLook.font!.toLowerCase()) ? FONTS.find((f) => f.name.toLowerCase() === defLook.font!.toLowerCase())!.name : (defLook.font ?? 'Arial');
@@ -933,7 +1226,112 @@ function wordDoc(buf: Buffer): Doc {
   // A document's last empty paragraphs are left out.
   while (out.length > 1 && out[out.length - 1].type === 'p' && !(out[out.length - 1].runs as Run[]).some((x) => x.t.trim())) out.pop();
   if (out[out.length - 1]?.type === 'pagebreak') out.pop();
-  return normalizeDoc({ page: { size: letter ? 'letter' : 'a4', margin }, font, size: ctx.size, blocks: out });
+  // Its header and footer: the ones on most of its pages, as words (and the page's number where Word puts it).
+  const bandOfPart = (kind: 'header' | 'footer') => {
+    const ref = kids(sect, `${kind}Reference`).find((x) => (att(x, 'type') ?? 'default') === 'default');
+    // A file that names no section's: its only one.
+    const target = ref ? r.get(patt(ref, 'id') ?? att(ref, 'id') ?? '')?.target : [...r.values()].find((x) => x.type === kind)?.target;
+    const x = target ? zip.text(target) : null;
+    return x ? wordBand(parseXml(x).root) : undefined;
+  };
+  const header = bandOfPart('header');
+  const footer = bandOfPart('footer');
+  const doc = normalizeDoc({ page: { size: letter ? 'letter' : 'a4', margin }, font, size: ctx.size, blocks: out, header, footer, titlePage: !!kid(sect, 'titlePg') && on(kid(sect, 'titlePg')), comments });
+  // Each comment's quote: the words it is on, as they read.
+  if (!doc.comments?.length) return doc;
+  const quotes = new Map<string, string>();
+  const take = (runs: Run[]) => {
+    for (const x of runs) for (const id of x.cm ?? []) quotes.set(id, `${quotes.get(id) ?? ''}${x.math ? '…' : x.t}`);
+  };
+  for (const b of doc.blocks) {
+    if (b.type === 'p' || b.type === 'li') take(b.runs);
+    else if (b.type === 'table') for (const row of b.rows) for (const c of row) take(c.runs);
+  }
+  return { ...doc, comments: doc.comments.map((c) => (quotes.get(c.id)?.trim() ? { ...c, quote: quotes.get(c.id)!.replace(/\s+/g, ' ').trim().slice(0, 500) } : c)) };
+}
+
+/** A header's or footer's words, from its part: its paragraphs' words on one line, {page} and {pages} for Word's fields. */
+function wordBand(root: El): Band | undefined {
+  let text = '';
+  let align: Band['align'];
+  for (const p of all(root, 'p')) {
+    const jc = att(kid(kid(p, 'pPr'), 'jc'), 'val');
+    if (!align && (jc === 'center' || jc === 'right' || jc === 'end')) align = jc === 'center' ? 'center' : 'right';
+    let field: string | null = null;
+    let line = '';
+    const walk = (el: El) => {
+      for (const x of el.c) {
+        if (!isEl(x)) continue;
+        if (x.n === 'fldSimple') {
+          const instr = att(x, 'instr') ?? '';
+          line += /\bNUMPAGES\b/.test(instr) ? '{pages}' : /\bPAGE\b/.test(instr) ? '{page}' : '';
+          continue;
+        }
+        if (x.n === 'fldChar') {
+          const t = att(x, 'fldCharType');
+          if (t === 'begin') field = '';
+          else if (t === 'separate' && field !== null) {
+            line += /\bNUMPAGES\b/.test(field) ? '{pages}' : /\bPAGE\b/.test(field) ? '{page}' : '';
+            field = 'result';
+          } else if (t === 'end') field = null;
+          continue;
+        }
+        if (x.n === 'instrText' && field !== null && field !== 'result') field += x.c.map((y) => (typeof y === 'string' ? y : '')).join('');
+        else if (x.n === 't' && field === null) line += x.c.map((y) => (typeof y === 'string' ? y : '')).join('');
+        else if (x.n === 'tab' && field === null) line += '   ';
+        else walk(x);
+      }
+    };
+    walk(p);
+    if (line.trim()) text += `${text ? ' ' : ''}${line.trim()}`;
+  }
+  return text.trim() ? { text: text.trim().slice(0, DOC_LIMITS.band), ...(align ? { align } : {}) } : undefined;
+}
+
+/** A Word file's comments (and their replies, and whether each was resolved), by their ids here; Word's ids to ours in `ids`. */
+function wordComments(zip: Zip, part: string | undefined, extended: string | undefined, ids: Map<string, string>): Comment[] {
+  const x = part ? zip.text(part) : null;
+  if (!x) return [];
+  // commentsExtended: whose reply each is (by its last paragraph's id), and whether its thread is done.
+  const parentOf = new Map<string, string>();
+  const done = new Set<string>();
+  const ex = extended ? zip.text(extended) : null;
+  if (ex)
+    for (const e of all(parseXml(ex).root, 'commentEx')) {
+      const pid = att(e, 'paraId');
+      if (!pid) continue;
+      const parent = att(e, 'paraIdParent');
+      if (parent) parentOf.set(pid, parent);
+      if (att(e, 'done') === '1') done.add(pid);
+    }
+  const out: Comment[] = [];
+  const byPara = new Map<string, Comment>();
+  for (const c of all(parseXml(x).root, 'comment')) {
+    const wid = att(c, 'id') ?? '';
+    const ps = kids(c, 'p');
+    const text = ps
+      .map((p) => all(p, 't').map((t) => t.c.map((y) => (typeof y === 'string' ? y : '')).join('')).join(''))
+      .join('\n')
+      .trim();
+    const pid = att(ps[ps.length - 1], 'paraId') ?? '';
+    const at = Date.parse(att(c, 'date') ?? '') || Date.now();
+    const by = /^agent$/i.test(att(c, 'author') ?? '') ? 'agent' : 'user';
+    const parent = pid ? byPara.get(parentOf.get(pid) ?? '') : undefined;
+    if (parent) {
+      // A reply: its words join its thread's, and its marks are its thread's.
+      if (text) (parent.replies ??= []).push({ id: `r${out.length}${parent.replies?.length ?? 0}`, by, text, at });
+      ids.set(wid, parent.id);
+      continue;
+    }
+    if (!text) continue;
+    const id = `w${wid.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 30) || out.length}`;
+    const k: Comment = { id, by, text, at };
+    if (done.has(pid)) k.resolved = true;
+    ids.set(wid, id);
+    if (pid) byPara.set(pid, k);
+    out.push(k);
+  }
+  return out;
 }
 
 /** The characters of a document's words (its paragraphs, items, tables' cells and captions). */
@@ -949,11 +1347,12 @@ function docChars(d: Doc): number {
 
 /**
  * What of a Word file a document here does not hold, so that the document editor saving over it would lose it (keys
- * Files words for the person: "headers" for headers and footers, "footnotes", "comments", "changes" for tracked
- * changes, which come in as they read, "equations", "charts", "diagrams" for SmartArt, "objects" for embedded files,
- * "boxes" for text boxes, whose words come in after their paragraph, "columns", "toc" for a table of contents that
- * updates, "layout" for pages laid out apart, such as a landscape section); and `cut`, whether `doc`, read from it,
- * came in short of its words (a document longer than one here may be).
+ * Files words for the person: "headers" for headers and footers with more than a line of words (pictures, tables,
+ * other ones on even pages), "footnotes", "changes" for tracked changes, which come in as they read, "charts",
+ * "diagrams" for SmartArt, "objects" for embedded files, "boxes" for text boxes, whose words come in after their
+ * paragraph, "columns", "layout" for pages laid out apart, such as a landscape section); and `cut`, whether `doc`,
+ * read from it, came in short of its words (a document longer than one here may be). Comments, equations and a
+ * table of contents come in as the document's own.
  */
 export function wordLosses(buf: Buffer, doc: Doc): { loses: string[]; cut: boolean } {
   const zip = new Zip(buf);
@@ -963,17 +1362,16 @@ export function wordLosses(buf: Buffer, doc: Doc): { loses: string[]; cut: boole
   const r = [...rels(zip, main).values()];
   const loses = new Set<string>();
   const words = /<w:t(?:\s[^>]*)?>[^<]*\S/;
-  if (r.some((x) => (x.type === 'header' || x.type === 'footer') && words.test(zip.text(x.target) ?? ''))) loses.add('headers');
+  // A header or footer is kept as a line of words: one with a picture or a table, or one only on even pages, is not.
+  const bands = r.filter((x) => x.type === 'header' || x.type === 'footer').map((x) => zip.text(x.target) ?? '');
+  if (bands.some((x) => words.test(x) && /<w:(?:drawing|pict|tbl)[\s>]/.test(x)) || /<w:(?:header|footer)Reference\s[^>]*w:type="even"/.test(xml)) loses.add('headers');
   if (/<w:(?:footnote|endnote)Reference[\s/>]/.test(xml)) loses.add('footnotes');
-  if (/<w:comment(?:Reference|RangeStart)[\s/>]/.test(xml)) loses.add('comments');
   if (/<w:(?:ins|del|moveFrom|moveTo)\s[^>]*w:author=/.test(xml)) loses.add('changes');
-  if (/<m:oMath[\s>]/.test(xml)) loses.add('equations');
   if (r.some((x) => x.type === 'chart') || /<c:chart[\s/>]/.test(xml)) loses.add('charts');
   if (r.some((x) => x.type === 'diagramData')) loses.add('diagrams');
   if (r.some((x) => x.type === 'oleObject' || x.type === 'package') || /<o:OLEObject[\s/>]/.test(xml)) loses.add('objects');
   if (/<w:txbxContent[\s>]/.test(xml)) loses.add('boxes');
   if (/<w:cols\s[^>]*w:num="(?:[2-9]|\d{2,})"/.test(xml)) loses.add('columns');
-  if (/<w:instrText(?:\s[^>]*)?>\s*TOC\b|w:instr="\s*TOC\b/.test(xml)) loses.add('toc');
   const sizes = new Set([...xml.matchAll(/<w:pgSz\s[^>]*?\/>/g)].map((m) => m[0].replace(/\s+w:code="[^"]*"/, '')));
   if (sizes.size > 1 || /<w:pgSz\s[^>]*w:orient="landscape"/.test(xml)) loses.add('layout');
   // Its words, against the document's: a text box's other drawing (Fallback) holds its words twice, and is not read.
@@ -991,6 +1389,9 @@ const DOC_HELP = [
   'Pictures: ![what it shows](src "its caption"){width=50% .left} on a line of their own (centred, the text’s width, unless said); src is a file of this session (a picture you made), a public https address, or a picture the document has already (naget-asset:…).',
   'Instead of markdown you may give blocks: [{"title": "…"}, {"h1": "…"}, {"p": "…"}, {"bullet": "…", "lvl": 1}, {"number": "…"}, {"check": "…", "checked": true}, {"bullets": ["…", ["a level deeper"]]}, {"quote": "…"}, {"code": "…"}, {"table": [["Head", "Head"], ["a", "b"]], "head": true}, {"image": "src", "caption": "…", "width": 0.5}, {"hr": true}, {"pagebreak": true}]; their words are markdown too.',
   'page: {"size": "a4" or "letter", "margin": millimetres} (A4 and 25.4 mm unless said); font: the body text’s (Arial unless said; others: Georgia, Times New Roman, Inter, Roboto, Open Sans, Lato, Merriweather, Lora, Source Serif 4…); size: the body text’s in points (11). Headings and the title are sized from it.',
+  'More in markdown: > 💡 words {.callout} is a callout, a tinted box with its emoji (tint=#e8f0fe for another tint; GitHub’s > [!NOTE], [!TIP], [!WARNING] work too); {line=1.5 before=12 after=6} at a paragraph’s end sets its line spacing (in lines) and the space before and after it (in points); $$ on lines of their own around LaTeX is an equation, and $x^2$ is maths among words (write a dollar sign as \\$); [TOC] alone on a line is a table of contents, made from the headings and kept up to date. A table with merged or shaded cells is written as HTML: <table><tr><td colspan="2" rowspan="2" style="background-color:#e8f0fe; vertical-align:middle">…</td></tr></table>.',
+  'header and footer: a line of words on every page’s top and bottom margin, {page} and {pages} for the page’s number and how many there are: "footer": {"text": "Page {page} of {pages}", "align": "center"} (align left unless said); "titlePage": true leaves them off the first page. Left out, they stay as they were; "" removes one.',
+  'Comments: get_page lists the user’s comments after the document, each on the words marked <span data-comment="id">. Answer with comments: [{"id": "c1", "reply": "…", "resolve": true}] beside the document (make the change asked for, too); {"id": "c1", "reopen": true} reopens one, {"id": "c1", "delete": true} takes it out. To add one of your own, mark its words <span data-comment="new1">…</span> and add {"id": "new1", "text": "…"}. Comments you do not mention stay as they are; keep their marks where they are.',
   'Good documents start with a title, have short headings that say what follows, short paragraphs, lists for steps and options, and tables for what is compared.',
   'To change a document, get_page with its id gives it as markdown; send the whole document back with save_doc and the same id: a new version, the older ones restorable. Keep what the user changed, and what you were not asked to change, as it is.',
 ].join(' ');
@@ -1007,6 +1408,14 @@ export const SAVE_DOC_SCHEMA = {
     page: { description: '{"size": "a4" | "letter", "margin": mm}, or "a4" or "letter".', anyOf: [{ type: 'string' }, { type: 'object' }] },
     font: { type: 'string', description: 'The body text’s font: "Arial", "Georgia"…' },
     size: { type: 'number', description: 'The body text’s size in points: 11.' },
+    header: { description: 'Words on every page’s top margin ({page}, {pages} for page numbers): a string, or {"text": "…", "align": "left" | "center" | "right"}; "" removes it.', anyOf: [{ type: 'string' }, { type: 'object' }] },
+    footer: { description: 'Words on every page’s bottom margin, as header: {"text": "Page {page} of {pages}", "align": "center"}.', anyOf: [{ type: 'string' }, { type: 'object' }] },
+    titlePage: { type: 'boolean', description: 'true: no header or footer on the first page.' },
+    comments: {
+      type: 'array',
+      items: { type: 'object' },
+      description: 'Changes to the comments: {"id": "c1", "reply": "…"}, {"id": "c1", "resolve": true}, {"id": "c1", "reopen": true}, {"id": "c1", "delete": true}, or a new one: {"id": "new1", "text": "…"} on the words marked <span data-comment="new1">.',
+    },
   },
   required: ['title'],
 };
