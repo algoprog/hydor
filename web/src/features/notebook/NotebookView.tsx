@@ -1,8 +1,10 @@
 // A Jupyter notebook: its cells and outputs, edited here and run in a kernel on this machine.
 // Code shows highlighted until clicked, then a cell editor takes over; keys follow Jupyter's
 // (Shift+Enter runs and moves on; outside an editor, A/B add cells, DD deletes, M/Y switch type).
-import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { ArrowLeft, Braces, Check, ChevronDown, ChevronUp, Download, Eraser, FastForward, MoreHorizontal, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from 'lucide-react';
+// A file of this computer opens here from Files; a notebook of the Library opens here too (`library`), kept as
+// versions by the Library and run in a folder of its own.
+import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
+import { ArrowLeft, Braces, Check, ChevronDown, ChevronUp, Download, Eraser, FastForward, MoreHorizontal, Pencil, Play, Plus, Power, RotateCw, Save, Sparkles, Square, Trash2 } from 'lucide-react';
 import type { KernelEnv, KernelInfo, KernelStatus } from '@shared/types';
 import { api, ApiError, enc, put } from '../../lib/api';
 import type { CellEditorHandle } from '../../lib/codemirror';
@@ -16,11 +18,45 @@ import { fromCodePoints, kernelApi, toCodePoints, useKernel } from './kernel';
 import { initialDoc, isDirty, newCell, parseNotebook, reduce, serializeNotebook, type Cell, type CellRunView, type CellType } from './model';
 import { Outputs } from './Outputs';
 import { mu } from '../../lib/machine';
+import { tr } from '../../i18n/runtime';
 
 // Markdown cells may carry HTML (centred titles, sized images); it is kept, minus anything that runs.
 const MD_PLUGINS = MD_HTML;
 
 type Caret = number | 'start' | 'end';
+
+/** What an agent asked from the Library is about ("In cell 3 (code): "). */
+export interface NotebookScope {
+  id: string;
+  label: string;
+  lead: string;
+}
+
+/** A notebook of the Library: its kept version, how it saves, and the Library's own parts of its bar. */
+export interface LibraryNotebook {
+  /** The notebook as kept; `key` changes with each version. */
+  doc: { key: string; model: unknown } | null;
+  /** When the version shown was saved: a kernel's runs that ended after it bring their outputs. */
+  savedAt: number;
+  /** An older version on view: nothing changes, nothing runs. */
+  readOnly?: boolean;
+  onSave?: (model: unknown) => Promise<boolean>;
+  /** Writes the notebook where its kernel runs, before a kernel starts. */
+  prepare: () => Promise<void>;
+  lead?: ReactNode;
+  tail?: ReactNode;
+  band?: ReactNode;
+  savedNote?: string;
+  onAsk?: (text: string) => void;
+  onScopes?: (scopes: NotebookScope[]) => void;
+  saveNowRef?: MutableRefObject<(() => Promise<boolean>) | null>;
+}
+
+/** The words that start a request about a cell, and its name on the Ask panel's chip. */
+function cellScope(c: Cell, i: number): NotebookScope {
+  const kind = c.type === 'markdown' ? 'text' : c.type;
+  return { id: 'cell', label: tr(`Cell ${i + 1}`), lead: `In cell ${i + 1} (${kind}): ` };
+}
 
 interface FileData {
   size: number;
@@ -189,9 +225,12 @@ interface CellProps {
   mobile: boolean;
   actions: CellActions;
   complete: Complete;
+  /** An older version, or a notebook that cannot change: no tools, no runs. */
+  readOnly?: boolean;
+  onAsk?: (id: string) => void;
 }
 
-const CellView = memo(function CellView({ cell, index, last, active, editing, caret, lang, dark, dir, mobile, actions, complete }: CellProps) {
+const CellView = memo(function CellView({ cell, index, last, active, editing, caret, lang, dark, dir, mobile, actions, complete, readOnly, onAsk }: CellProps) {
   const code = cell.type === 'code';
   const run = cell.run;
   const busy = run?.state === 'queued' || run?.state === 'running';
@@ -207,18 +246,18 @@ const CellView = memo(function CellView({ cell, index, last, active, editing, ca
     );
   } else if (cell.type === 'markdown') {
     body = (
-      <div onDoubleClick={() => actions.startEdit(cell.id, 'end')} className="nb-md min-h-7 px-3 py-0.5">
+      <div onDoubleClick={() => readOnly || actions.startEdit(cell.id, 'end')} className="nb-md min-h-7 px-3 py-0.5">
         {cell.source.trim() ? (
           <Markdown text={cell.source} notebook resolveImage={resolveImage} rehypeExtra={MD_PLUGINS} />
         ) : (
-          <span className="text-[13px] text-fg-3 italic">Empty text cell. Double-click to write.</span>
+          <span className="text-[13px] text-fg-3 italic">{readOnly ? 'Empty text cell.' : 'Empty text cell. Double-click to write.'}</span>
         )}
       </div>
     );
   } else {
     body = (
       <div className={box}>
-        <StaticCode code={cell.source} lang={code ? lang : 'text'} onPick={(at) => actions.startEdit(cell.id, at ?? 'end')} />
+        <StaticCode code={cell.source} lang={code ? lang : 'text'} onPick={(at) => readOnly || actions.startEdit(cell.id, at ?? 'end')} />
       </div>
     );
   }
@@ -237,7 +276,7 @@ const CellView = memo(function CellView({ cell, index, last, active, editing, ca
               <span className={cx('tnum transition-opacity', busy && 'animate-pulse text-busy', !mobile && 'group-hover/cell:opacity-0', active && !mobile && 'opacity-0')}>
                 [{busy ? '*' : (cell.count ?? ' ')}]
               </span>
-              {!mobile && (
+              {!mobile && !readOnly && (
                 <button
                   type="button"
                   title={busy ? 'Interrupt the kernel' : 'Run (Ctrl+Enter)'}
@@ -260,6 +299,7 @@ const CellView = memo(function CellView({ cell, index, last, active, editing, ca
         {body}
         {code && <Outputs outputs={cell.outputs} run={run} onInput={(v) => actions.input(cell.id, v)} />}
       </div>
+      {!readOnly && (
       <div
         onMouseDown={(e) => e.stopPropagation()}
         className={cx(
@@ -303,7 +343,13 @@ const CellView = memo(function CellView({ cell, index, last, active, editing, ca
         <IconButton label="Delete the cell" size="sm" onClick={() => actions.remove(cell.id)}>
           <Trash2 size={13} />
         </IconButton>
+        {onAsk && (
+          <IconButton label="Ask an agent about this cell" size="sm" onClick={() => onAsk(cell.id)}>
+            <Sparkles size={13} className="text-accent" />
+          </IconButton>
+        )}
       </div>
+      )}
     </div>
   );
 });
@@ -504,8 +550,28 @@ function KernelPicker({
   );
 }
 
-/** `embedded`: in a dialog over another page, so there is no Back button (the dialog closes instead); `onDirty` tells it of unsaved changes. */
-export default function NotebookView({ path, onSource, embedded, onDirty }: { path: string; onSource: () => void; embedded?: boolean; onDirty?: (dirty: boolean) => void }) {
+/**
+ * `embedded`: in a dialog over another page, so there is no Back button (the dialog closes instead); `onDirty` tells it of
+ * unsaved changes. From Files, `fileActions` end its bar (Ask an agent about the file) and `saveFirst` saves before an
+ * agent is asked. `library`: a notebook of the Library rather than a file (`path` is then the file its kernel runs from).
+ */
+export default function NotebookView({
+  path,
+  onSource,
+  embedded,
+  onDirty,
+  fileActions,
+  saveFirst,
+  library,
+}: {
+  path: string;
+  onSource?: () => void;
+  embedded?: boolean;
+  onDirty?: (dirty: boolean) => void;
+  fileActions?: ReactNode;
+  saveFirst?: MutableRefObject<(() => Promise<boolean>) | null>;
+  library?: LibraryNotebook;
+}) {
   const home = useApp((s) => s.boot?.home);
   const mobile = useIsMobile();
   const dark = useDark();
@@ -529,7 +595,16 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
   const removed = useRef<{ cell: Cell; at: number } | null>(null);
   const savingRef = useRef(false);
   const [confirm, confirmNode] = useConfirm();
-  const { kernel, setKernel } = useKernel(path, dispatch, () => mtime.current);
+  const readOnly = !!library?.readOnly;
+  const readOnlyRef = useRef(readOnly);
+  readOnlyRef.current = readOnly;
+  const lib = useRef(library);
+  lib.current = library;
+  // Runs that ended after the notebook was saved bring their outputs: after the file changed, or after the Library's
+  // version was saved (when the page opened) or shown (a newer version since, already with what ran before it).
+  const reloadedAt = useRef(0);
+  const since = () => (lib.current ? Math.max(lib.current.savedAt, reloadedAt.current) : mtime.current);
+  const { kernel, setKernel } = useKernel(path, dispatch, since);
   const dirty = isDirty(doc);
   useEffect(() => onDirty?.(dirty), [dirty, onDirty]);
   const dir = dirname(path);
@@ -539,7 +614,24 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
   const S = useRef({ doc, active, editing, kernel });
   S.current = { doc, active, editing, kernel };
 
+  /** The Library's kept version, as the notebook to show. */
+  const loadModel = useCallback((model: unknown) => {
+    try {
+      const parsed = parseNotebook(JSON.stringify(model ?? {}));
+      latest.current.clear();
+      dispatch({ type: 'load', nb: parsed });
+      setError('');
+      setLoads((n) => n + 1);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }, []);
+
   const load = useCallback(async () => {
+    if (lib.current) {
+      if (lib.current.doc) loadModel(lib.current.doc.model);
+      return;
+    }
     try {
       const f = await api<FileData>(`/api/fs/read?path=${enc(path)}`);
       if (f.tooLarge) throw new Error(`This notebook is too large to open here (${bytes(f.size)})`);
@@ -554,7 +646,7 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [path]);
+  }, [path, loadModel]);
 
   useEffect(() => {
     setActive(null);
@@ -562,31 +654,51 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
     load();
   }, [load]);
 
+  // Another version of the Library's notebook (an agent's, or this page's own save): shown, unless changes here are unsaved.
+  const docKey = library?.doc?.key;
+  const firstKey = useRef(docKey);
+  useEffect(() => {
+    if (!lib.current?.doc || docKey === firstKey.current) return;
+    firstKey.current = undefined;
+    if (isDirty(S.current.doc)) return;
+    reloadedAt.current = Date.now();
+    loadModel(lib.current.doc.model);
+  }, [docKey, loadModel]);
+
   // Outputs of runs the page missed (it was closed, or the file was just reloaded).
   useEffect(() => {
     const id = kernel?.id;
     if (!id || !loads) return;
     kernelApi
       .snapshot(id)
-      .then((s) => dispatch({ type: 'kernel', op: { op: 'snapshot', ...s }, since: mtime.current }))
+      .then((s) => dispatch({ type: 'kernel', op: { op: 'snapshot', ...s }, since: since() }))
       .catch(() => {});
   }, [kernel?.id, loads]);
 
   const save = useCallback(
-    async (force = false) => {
+    async (force = false): Promise<boolean> => {
       const d = S.current.doc;
-      if (!d.nb || savingRef.current) return;
+      const l = lib.current;
+      if (!d.nb || savingRef.current || readOnlyRef.current || (l && !l.onSave)) return false;
       savingRef.current = true;
       setSaving(true);
       try {
+        if (l) {
+          // The Library keeps it as a new version; its page then shows that version.
+          if (!(await l.onSave!(JSON.parse(serializeNotebook(d.nb))))) return false;
+          dispatch({ type: 'saved', cells: d.nb.cells });
+          return true;
+        }
         const r = await put<{ mtime: number }>('/api/fs/write', { path, content: serializeNotebook(d.nb), expectedMtime: force ? undefined : mtime.current });
         mtime.current = r.mtime;
         dispatch({ type: 'saved', cells: d.nb.cells });
         setChangedOnDisk(false);
         toast(`Saved ${basename(path)}`, 'ok');
+        return true;
       } catch (e) {
         if (e instanceof ApiError && e.status === 409) setChangedOnDisk(true);
         else toastError(e);
+        return false;
       } finally {
         savingRef.current = false;
         setSaving(false);
@@ -594,11 +706,17 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
     },
     [path],
   );
+  // Saved before an agent is asked about it (Files' Ask, the Library's Ask), so it works on what is shown.
+  const saveNow = useCallback(() => (isDirty(S.current.doc) ? save() : Promise.resolve(true)), [save]);
+  if (saveFirst) saveFirst.current = saveNow;
+  if (library?.saveNowRef) library.saveNowRef.current = saveNow;
+  const discard = () => lib.current?.doc && loadModel(lib.current.doc.model);
   const saveRef = useRef(save);
   saveRef.current = save;
 
-  // Edits by agents or terminals: reload when nothing here is unsaved, otherwise ask.
+  // Edits by agents or terminals: reload when nothing here is unsaved, otherwise ask. (The Library's pages hear of new versions.)
   useEffect(() => {
+    if (lib.current) return;
     const t = setInterval(async () => {
       if (document.visibilityState !== 'visible' || savingRef.current) return;
       try {
@@ -636,6 +754,7 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
     async (env?: string): Promise<KernelInfo | null> => {
       setStarting(true);
       try {
+        if (lib.current) await lib.current.prepare();
         const k = await kernelApi.start(path, env);
         setKernel(k);
         return k;
@@ -734,15 +853,18 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
         if (!keepFocus) focusList();
       },
       startEdit(id, at) {
+        if (readOnlyRef.current) return;
         setActive(id);
         setCaret(at);
         setEditing(id);
       },
       edit(id, source) {
+        if (readOnlyRef.current) return;
         latest.current.set(id, source);
         dispatch({ type: 'edit', id, source });
       },
       run(id, how) {
+        if (readOnlyRef.current) return;
         const all = cells();
         const i = all.findIndex((c) => c.id === id);
         const cell = all[i];
@@ -780,6 +902,7 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
         return true;
       },
       insert(at, type, edit = false) {
+        if (readOnlyRef.current) return;
         const c = newCell(type);
         dispatch({ type: 'insert', at, cell: c });
         setActive(c.id);
@@ -791,6 +914,7 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
         reveal(c.id);
       },
       remove(id) {
+        if (readOnlyRef.current) return;
         const all = cells();
         const i = all.findIndex((c) => c.id === id);
         if (i < 0) return;
@@ -802,10 +926,12 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
         focusList();
       },
       move(id, by) {
+        if (readOnlyRef.current) return;
         dispatch({ type: 'move', id, by });
         reveal(id);
       },
       retype(id, to) {
+        if (readOnlyRef.current) return;
         dispatch({ type: 'retype', id, to });
       },
       input(id, value) {
@@ -836,6 +962,7 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
     if (!id) return;
     const i = all.findIndex((c) => c.id === id);
     const mod = e.metaKey || e.ctrlKey;
+    if (readOnlyRef.current && !['ArrowUp', 'ArrowDown', 'k', 'j'].includes(e.key)) return;
     const twice = (key: string) => {
       const now = Date.now();
       const hit = lastKey.current.key === key && now - lastKey.current.at < 600;
@@ -873,9 +1000,27 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
     if (handled) e.preventDefault();
   };
 
+  // What an agent asked from the Library now would be about: the whole notebook, or the cell picked.
+  const scopeKey = useRef('');
+  useEffect(() => {
+    const tell = lib.current?.onScopes;
+    if (!tell || !nb) return;
+    const i = nb.cells.findIndex((c) => c.id === active);
+    const out: NotebookScope[] = [{ id: 'notebook', label: tr('The whole notebook'), lead: '' }, ...(i >= 0 ? [cellScope(nb.cells[i], i)] : [])];
+    const key = JSON.stringify(out);
+    if (key === scopeKey.current) return;
+    scopeKey.current = key;
+    tell(out);
+  }, [active, nb?.cells]);
+  const askCell = useCallback((id: string) => {
+    const all = S.current.doc.nb?.cells ?? [];
+    const i = all.findIndex((c) => c.id === id);
+    if (i >= 0) lib.current?.onAsk?.(cellScope(all[i], i).lead);
+  }, []);
+
   const toSource = async () => {
     if (dirty && !(await confirm({ title: 'Leave unsaved changes?', body: 'The file view shows the notebook as saved; changes made here are dropped.', confirm: 'Discard', danger: true }))) return;
-    onSource();
+    onSource?.();
   };
   const runAll = () => {
     setEditing(null);
@@ -885,9 +1030,75 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
   const download = () => (location.href = mu(`/api/fs/raw?path=${enc(path)}&download=1`));
   const busy = kernel?.status === 'busy';
   const crumbs = tildify(path, home).split(isWinPath(path) ? /[\\/]/ : '/');
+  const kernelControls = (
+    <>
+      <KernelPicker
+        path={path}
+        kernel={kernel}
+        starting={starting}
+        open={pickerOpen}
+        setOpen={setPickerOpen}
+        onPick={pickEnv}
+        onInterrupt={interrupt}
+        onRestart={() => restart()}
+        onShutdown={shutdown}
+      />
+      <IconButton label="Run all cells" size="sm" onClick={runAll} disabled={!nb}>
+        <FastForward size={14} />
+      </IconButton>
+      <IconButton label="Interrupt (I, I)" size="sm" onClick={interrupt} disabled={!busy}>
+        <Square size={12} />
+      </IconButton>
+    </>
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {library ? (
+        <>
+          <div className="flex min-h-12 shrink-0 items-center gap-1 border-b border-line px-2 py-1.5">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              {library.lead}
+              {dirty && !readOnly && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" title="Unsaved changes" />}
+            </div>
+            {!readOnly && !mobile && (
+              <>
+                {kernelControls}
+                <IconButton label="Restart the kernel (0, 0)" size="sm" onClick={() => restart()} disabled={!kernel}>
+                  <RotateCw size={14} />
+                </IconButton>
+                <IconButton label="Clear all outputs" size="sm" onClick={clearAll} disabled={!nb}>
+                  <Eraser size={14} />
+                </IconButton>
+                <span className="mx-1 h-5 w-px shrink-0 bg-line" />
+              </>
+            )}
+            {library.tail}
+          </div>
+          {library.band}
+          {/* On a phone the kernel's controls have a row of their own, so the bar keeps the notebook's name. */}
+          {!readOnly && mobile && (
+            <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line px-2">
+              {kernelControls}
+              <span className="flex-1" />
+              <IconButton ref={moreRef} label="More" size="sm" onClick={() => setMoreOpen((o) => !o)}>
+                <MoreHorizontal size={15} />
+              </IconButton>
+              <Popover anchor={moreRef} open={moreOpen} onClose={() => setMoreOpen(false)} align="end" width={230}>
+                <MenuItem icon={<RotateCw size={14} />} disabled={!kernel} onClick={() => (setMoreOpen(false), restart())}>
+                  Restart the kernel
+                </MenuItem>
+                <MenuItem icon={<FastForward size={14} />} disabled={!kernel} onClick={() => (setMoreOpen(false), restart(true))}>
+                  Restart and run all
+                </MenuItem>
+                <MenuItem icon={<Eraser size={14} />} onClick={() => (setMoreOpen(false), clearAll())}>
+                  Clear all outputs
+                </MenuItem>
+              </Popover>
+            </div>
+          )}
+        </>
+      ) : (
       <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line px-2 sm:px-3">
         {mobile && !embedded && (
           <IconButton label="Back" onClick={() => history.back()}>
@@ -903,23 +1114,7 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
           ))}
           {dirty && <span className="ml-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" title="Unsaved changes" />}
         </div>
-        <KernelPicker
-          path={path}
-          kernel={kernel}
-          starting={starting}
-          open={pickerOpen}
-          setOpen={setPickerOpen}
-          onPick={pickEnv}
-          onInterrupt={interrupt}
-          onRestart={() => restart()}
-          onShutdown={shutdown}
-        />
-        <IconButton label="Run all cells" size="sm" onClick={runAll} disabled={!nb}>
-          <FastForward size={14} />
-        </IconButton>
-        <IconButton label="Interrupt (I, I)" size="sm" onClick={interrupt} disabled={!busy}>
-          <Square size={12} />
-        </IconButton>
+        {kernelControls}
         {!mobile ? (
           <>
             <IconButton label="Restart the kernel (0, 0)" size="sm" onClick={() => restart()} disabled={!kernel}>
@@ -928,9 +1123,11 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
             <IconButton label="Clear all outputs" size="sm" onClick={clearAll} disabled={!nb}>
               <Eraser size={14} />
             </IconButton>
-            <IconButton label="View the notebook file (JSON)" size="sm" onClick={toSource}>
-              <Braces size={14} />
-            </IconButton>
+            {onSource && (
+              <IconButton label="View the notebook file (JSON)" size="sm" onClick={toSource}>
+                <Braces size={14} />
+              </IconButton>
+            )}
             <IconButton label="Download" size="sm" onClick={download}>
               <Download size={14} />
             </IconButton>
@@ -951,19 +1148,23 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
                 Clear all outputs
               </MenuItem>
               <MenuSep />
-              <MenuItem icon={<Braces size={14} />} onClick={() => (setMoreOpen(false), toSource())}>
-                View the file (JSON)
-              </MenuItem>
+              {onSource && (
+                <MenuItem icon={<Braces size={14} />} onClick={() => (setMoreOpen(false), toSource())}>
+                  View the file (JSON)
+                </MenuItem>
+              )}
               <MenuItem icon={<Download size={14} />} onClick={() => (setMoreOpen(false), download())}>
                 Download
               </MenuItem>
             </Popover>
           </>
         )}
+        {fileActions}
         <Button size="sm" variant={dirty ? 'primary' : 'ghost'} icon={<Save size={13} />} disabled={!dirty || saving} onClick={() => save()} className="ml-1">
           <span className="hidden sm:inline">{saving ? 'Saving' : 'Save'}</span>
         </Button>
       </div>
+      )}
       {changedOnDisk && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-warn/40 bg-warn/10 px-3 py-1.5 text-[12.5px]">
           <span className="flex-1">The notebook changed on disk since it was opened.</span>
@@ -975,7 +1176,7 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
           </Button>
         </div>
       )}
-      {kernel?.status === 'dead' && (
+      {kernel?.status === 'dead' && !readOnly && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-err/30 bg-err/5 px-3 py-1.5 text-[12.5px]">
           <span className="min-w-0 flex-1 break-words">{kernel.error || 'The kernel stopped.'}</span>
           <Button size="sm" variant="ghost" icon={<RotateCw size={13} />} onClick={() => startKernel(kernel.env)}>
@@ -987,11 +1188,13 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
         {error ? (
           <Empty title="Could not open the notebook">
             {error}
-            <div className="mt-3">
-              <Button size="sm" onClick={onSource}>
-                View the file
-              </Button>
-            </div>
+            {onSource && (
+              <div className="mt-3">
+                <Button size="sm" onClick={onSource}>
+                  View the file
+                </Button>
+              </div>
+            )}
           </Empty>
         ) : !nb ? (
           <div className="flex h-full items-center justify-center text-fg-3">
@@ -1001,7 +1204,7 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
           <div className="mx-auto max-w-[1000px] px-1 pt-4 pb-24 sm:px-4">
             {nb.cells.map((c, i) => (
               <div key={c.id}>
-                {i > 0 && !mobile && <InsertZone at={i} actions={actions} />}
+                {i > 0 && !mobile && !readOnly && <InsertZone at={i} actions={actions} />}
                 <CellView
                   cell={c}
                   index={i}
@@ -1015,10 +1218,12 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
                   mobile={mobile}
                   actions={actions}
                   complete={complete}
+                  readOnly={readOnly}
+                  onAsk={library?.onAsk && !readOnly ? askCell : undefined}
                 />
               </div>
             ))}
-            <div className="flex justify-center gap-2 pt-4">
+            <div className={cx('flex justify-center gap-2 pt-4', readOnly && 'hidden')}>
               <Button size="sm" variant="ghost" icon={<Plus size={14} />} onClick={() => actions.insert(nb.cells.length, 'code', true)}>
                 Code
               </Button>
@@ -1029,6 +1234,20 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
           </div>
         )}
       </div>
+      {library && dirty && !readOnly && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-panel px-3 py-2 pb-[max(8px,var(--safe-bottom))]">
+          <span className="min-w-0 flex-1 text-[12.5px] text-fg-2">
+            <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-warn align-middle" />
+            Not saved yet{library.savedNote ? <span className="text-fg-3"> · {library.savedNote}</span> : null}
+          </span>
+          <Button size="sm" variant="ghost" onClick={discard} disabled={saving}>
+            Discard
+          </Button>
+          <Button size="sm" variant="primary" onClick={() => void save()} disabled={saving || !library.onSave}>
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+      )}
       {confirmNode}
     </div>
   );

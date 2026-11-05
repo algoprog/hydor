@@ -14,13 +14,13 @@ data="${HYDOR_DATA_DIR:-${DATA_DIR:-}}"
 if [ -z "$data" ]; then
   if [ ! -d "$HOME/.hydor" ] && [ -d "$HOME/.web-agent" ]; then data="$HOME/.web-agent"; else data="$HOME/.hydor"; fi
 fi
-venv="$data/notebooks/venv"
+venv="$data/notebook-tools/venv"
 py="$venv/bin/python"
 
 if [ ! -x "$py" ] || [ "$(cat "$venv/.packages" 2>/dev/null)" != "$PKGS" ]; then
-  mkdir -p "$data/notebooks"
+  mkdir -p "$data/notebook-tools"
   # One setup at a time (several agents may start at once).
-  lock="$data/notebooks/.setup-lock"
+  lock="$data/notebook-tools/.setup-lock"
   for _ in $(seq 1 600); do mkdir "$lock" 2>/dev/null && break; sleep 1; done
   trap 'rmdir "$lock" 2>/dev/null || true' EXIT
   if [ ! -x "$py" ] || [ "$(cat "$venv/.packages" 2>/dev/null)" != "$PKGS" ]; then

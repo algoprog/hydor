@@ -2,7 +2,7 @@
 // to rename a page, publish one (or a folder), and make a new page, deck, document, spreadsheet or LaTeX document
 // (from a starting point, a file, or by asking an agent), in a space or in none; and a published site's row.
 import { useEffect, useState, type ReactNode } from 'react';
-import { AppWindow, FileText, Globe, GlobeLock, Presentation, Sheet, Sigma, Sparkles, Upload } from 'lucide-react';
+import { AppWindow, FileText, Globe, GlobeLock, NotebookText, Presentation, Sheet, Sigma, Sparkles, Upload } from 'lucide-react';
 import type { PageInfo, SiteInfo, SiteVisibility } from '@shared/pages';
 import { newDeck, THEMES, type Ratio } from '@shared/slides';
 import { del, enc, patch, post } from '../../lib/api';
@@ -163,22 +163,24 @@ export function PublishDialog({ page, open, onClose }: { page?: { id: string; ti
   );
 }
 
-export type NewKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex';
-const NEW_TITLE: Record<NewKind, string> = { page: '', slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', tex: 'LaTeX document' };
+export type NewKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
+const NEW_TITLE: Record<NewKind, string> = { page: '', slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', tex: 'LaTeX document', notebook: 'Notebook' };
 const ASK_FOR: Record<NewKind, string> = {
   page: 'Make me a page and keep it in my Library: ',
   slides: 'Make me slides and keep them in my Library: ',
   doc: 'Write me a document and keep it in my Library: ',
   sheet: 'Make me a spreadsheet and keep it in my Library: ',
   tex: 'Write me a LaTeX document and keep it in my Library: ',
+  notebook: 'Make me a Jupyter notebook, run it, and keep it in my Library: ',
 };
-const OPENS: Partial<Record<NewKind, string>> = { doc: '.docx,.docm,.dotx,.md,.markdown,.txt,.html,.htm', sheet: '.xlsx,.ods,.csv,.tsv', tex: '.tex,.ltx,.zip' };
+const OPENS: Partial<Record<NewKind, string>> = { doc: '.docx,.docm,.dotx,.md,.markdown,.txt,.html,.htm', sheet: '.xlsx,.ods,.csv,.tsv', tex: '.tex,.ltx,.zip', notebook: '.ipynb' };
 const KIND_TILES: { value: NewKind; label: string; icon: ReactNode }[] = [
   { value: 'page', label: 'A page', icon: <AppWindow size={16} /> },
   { value: 'slides', label: 'Slides', icon: <Presentation size={16} /> },
   { value: 'doc', label: 'Document', icon: <FileText size={16} /> },
   { value: 'sheet', label: 'Spreadsheet', icon: <Sheet size={16} /> },
   { value: 'tex', label: 'LaTeX', icon: <Sigma size={16} /> },
+  { value: 'notebook', label: 'Notebook', icon: <NotebookText size={16} /> },
 ];
 
 /** A file's bytes as base64, for the import. */
@@ -259,8 +261,8 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
     <Dialog
       open={open}
       onClose={onClose}
-      title={kind === 'slides' ? 'New slides' : kind === 'doc' ? 'A new document' : kind === 'sheet' ? 'A new spreadsheet' : kind === 'tex' ? 'A new LaTeX document' : 'A new page'}
-      width={560}
+      title={kind === 'slides' ? 'New slides' : kind === 'doc' ? 'A new document' : kind === 'sheet' ? 'A new spreadsheet' : kind === 'tex' ? 'A new LaTeX document' : kind === 'notebook' ? 'A new notebook' : 'A new page'}
+      width={600}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -273,7 +275,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
       }
     >
       <div className="space-y-4 text-[13.5px]">
-        <div className="grid grid-cols-5 gap-1.5 max-sm:grid-cols-3" role="radiogroup" aria-label="What to make">
+        <div className="grid grid-cols-6 gap-1.5 max-sm:grid-cols-3" role="radiogroup" aria-label="What to make">
           {KIND_TILES.map((t) => (
             <button
               key={t.value}
@@ -291,17 +293,19 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
             </button>
           ))}
         </div>
-        {kind === 'doc' || kind === 'sheet' || kind === 'tex' ? (
+        {kind === 'doc' || kind === 'sheet' || kind === 'tex' || kind === 'notebook' ? (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-bg-1 px-3 py-2.5">
             <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-fg-2">
               {kind === 'doc'
                 ? 'A document to write and edit as in Word or Google Docs, and save as a Word file, a PDF or Markdown.'
                 : kind === 'sheet'
                   ? 'A spreadsheet with formulas, as in Excel or Google Sheets, to save as an Excel file, a CSV or a PDF.'
-                  : 'LaTeX source beside its typeset pages, as in Overleaf, to save as a PDF or the .tex project.'}
+                  : kind === 'notebook'
+                    ? 'A Jupyter notebook: text and code cells you run here, with their outputs, to save as an .ipynb file, a Python script or a PDF.'
+                    : 'LaTeX source beside its typeset pages, as in Overleaf, to save as a PDF or the .tex project.'}
             </span>
             <Button size="sm" variant="secondary" icon={<Upload size={14} />} disabled={busy} onClick={openFile}>
-              {kind === 'doc' ? 'Open a Word or text file' : kind === 'sheet' ? 'Open an Excel or CSV file' : 'Open a .tex or .zip file'}
+              {kind === 'doc' ? 'Open a Word or text file' : kind === 'sheet' ? 'Open an Excel or CSV file' : kind === 'notebook' ? 'Open a notebook (.ipynb)' : 'Open a .tex or .zip file'}
             </Button>
           </div>
         ) : kind === 'page' ? (
@@ -392,7 +396,9 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
                       ? 'A monthly budget for two'
                       : kind === 'tex'
                         ? 'A two-page paper on my results, with equations'
-                        : 'A packing list for a week of hiking'
+                        : kind === 'notebook'
+                          ? 'A notebook that charts my monthly spending from a CSV'
+                          : 'A packing list for a week of hiking'
               }
               className={cx(inputCls, 'min-w-0 flex-1')}
             />

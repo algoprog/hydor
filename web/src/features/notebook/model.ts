@@ -3,7 +3,7 @@
 // keys, one-space indent, multi-line strings as line lists) and carries over the fields this page
 // does not edit, so a save changes only what changed.
 import type { CellRun, KernelOp, NbOutput, RunState } from '@shared/types';
-import { appendOutput } from '@shared/notebook';
+import { appendOutput, CELL_ID, joinLines, newCellId, notebookText, PYTHON_NOTEBOOK } from '@shared/notebook';
 
 type Json = Record<string, any>;
 
@@ -39,32 +39,9 @@ export interface Notebook {
   rest: Json;
 }
 
-const CELL_ID = /^[A-Za-z0-9_-]{1,64}$/;
-
-export function newCellId(): string {
-  const b = new Uint8Array(4);
-  crypto.getRandomValues(b);
-  return [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
-}
+export { newCellId };
 
 export const newCell = (type: CellType): Cell => ({ id: newCellId(), type, source: '', outputs: [], count: null, raw: { metadata: {} } });
-
-const joinLines = (v: unknown): string => (Array.isArray(v) ? v.map(String).join('') : typeof v === 'string' ? v : '');
-
-/** Python's str.splitlines(keepends=True), which nbformat uses for multi-line strings. */
-export function splitLines(s: string): string[] {
-  const out: string[] = [];
-  const re = /\r\n|[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]/g;
-  let at = 0;
-  for (let m: RegExpExecArray | null; (m = re.exec(s)); ) {
-    out.push(s.slice(at, re.lastIndex));
-    at = re.lastIndex;
-  }
-  if (at < s.length) out.push(s.slice(at));
-  return out;
-}
-
-const splitMime = (mime: string) => mime.startsWith('text/') || mime === 'application/javascript' || mime === 'image/svg+xml';
 
 function readOutput(o: Json): NbOutput {
   const out = { ...o } as NbOutput;
@@ -73,19 +50,11 @@ function readOutput(o: Json): NbOutput {
   return out;
 }
 
-function writeOutput(o: NbOutput): Json {
-  const { transient: _transient, ...out } = o as Json;
-  if (out.output_type === 'stream') out.text = splitLines(out.text ?? '');
-  if (out.data) out.data = Object.fromEntries(Object.entries(out.data as Json).map(([k, v]) => [k, typeof v === 'string' && splitMime(k) ? splitLines(v) : v]));
-  if (out.output_type === 'display_data' || out.output_type === 'execute_result') out.metadata ??= {};
-  return out;
-}
-
 /** A new notebook: one empty code cell, in Python until a kernel says otherwise. */
 export function emptyNotebook(): Notebook {
   return {
     cells: [newCell('code')],
-    metadata: { kernelspec: { display_name: 'Python 3 (ipykernel)', language: 'python', name: 'python3' }, language_info: { name: 'python' } },
+    metadata: structuredClone(PYTHON_NOTEBOOK),
     minor: 5,
     rest: {},
   };
@@ -123,18 +92,12 @@ export function parseNotebook(text: string): Notebook {
   };
 }
 
-function sortKeys(v: unknown): unknown {
-  if (Array.isArray(v)) return v.map(sortKeys);
-  if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys((v as Json)[k])]));
-  return v;
-}
-
-/** The notebook as nbformat writes it. Cell ids need format 4.5, so older notebooks are upgraded. */
+/** The notebook as nbformat writes it (shared/notebook.ts). Cell ids need format 4.5, so older notebooks are upgraded. */
 export function serializeNotebook(nb: Notebook): string {
   const cells = nb.cells.map((c) => {
-    const out: Json = { ...c.raw, id: c.id, cell_type: c.type, metadata: c.raw.metadata ?? {}, source: splitLines(c.source) };
+    const out: Json = { ...c.raw, id: c.id, cell_type: c.type, metadata: c.raw.metadata ?? {}, source: c.source };
     if (c.type === 'code') {
-      out.outputs = c.outputs.map(writeOutput);
+      out.outputs = c.outputs;
       out.execution_count = c.count ?? null;
       delete out.attachments;
     } else {
@@ -143,7 +106,7 @@ export function serializeNotebook(nb: Notebook): string {
     }
     return out;
   });
-  return JSON.stringify(sortKeys({ ...nb.rest, cells, metadata: nb.metadata, nbformat: 4, nbformat_minor: Math.max(nb.minor, 5) }), null, 1) + '\n';
+  return notebookText({ ...nb.rest, cells, metadata: nb.metadata, nbformat: 4, nbformat_minor: Math.max(nb.minor, 5) });
 }
 
 // ---- edits -------------------------------------------------------------------------------------

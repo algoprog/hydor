@@ -30,8 +30,8 @@ for the service and the desktop apps; on Windows `%USERPROFILE%\.config\hydor.en
 
 In `DATA_DIR`: the password hash (`auth.json`), the session index and search database (`hydor.db`; `naget-agent.db` or `web-agent.db` in older installs),
 the agents' programs the app installed (`clients/`), logs of running agents (`runs/`), attachments waiting to be sent (`uploads/`), files deleted in the file
-browser (`trash/`), the Library's images, videos and sounds with their stills and frames (`media/`), notebook kernels and the
-terminal server, and, once search by meaning is turned on in
+browser (`trash/`), the Library's images, videos and sounds with their stills and frames (`media/`), the folders the Library's
+notebooks run in (`notebooks/`), notebook kernels and the terminal server, and, once search by meaning is turned on in
 Settings → Memory, its private Python environment (`memory/venv`). Its model goes to Hugging Face's cache
 (`~/.cache/huggingface`, or `memory/hf` in Docker). Conversations themselves stay where the agents
 write them (`~/.claude/projects`, `~/.codex/sessions`); the app only reads them.

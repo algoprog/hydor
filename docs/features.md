@@ -125,7 +125,8 @@ agents that speak ACP and take MCP servers.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the
   app's document skills; the file viewer previews them, and finished files show as cards to open or download.
   Agents make Jupyter notebooks too (the notebooks skill: sections with text, a run from the top before handing one
-  over, an environment beside it to run it in), and a notebook's card opens it in the notebook page.
+  over, an environment beside it to run it in): kept in the Library with save_notebook, or handed over as a file
+  whose card opens it in the notebook page.
 - **Images, videos and audio**: agents make pictures (or change yours), short videos (from words, from a picture
   to start or end on, or by changing a video) and sound with OpenRouter's image, video and audio models, the ones
   picked in Settings → Images, video and audio or one you name. The app's choices are ByteDance's Seedream 5.0 for
@@ -312,7 +313,11 @@ agents that speak ACP and take MCP servers.
   type, beside the pages: errors and warnings at their lines, the log, an outline, snippets, completion of
   citations, labels and pictures, and a jump between a place on a page and its line. TeX runs in a folder of its
   own, with no shell escape and, where bubblewrap is installed, in its sandbox. They export as the PDF, the main
-  .tex file or the whole project as a .zip.
+  .tex file or the whole project as a .zip. Jupyter notebooks (save_notebook, from an .ipynb an agent wrote and ran,
+  or opened from one) show in the notebook page's own view, with their outputs: cells edited and run in a kernel of
+  the Python environment picked, in a folder of their own in the app's data folder, Ask on the whole notebook or a
+  cell, and versions with their outputs; they export as the .ipynb, a Python script with # %% cells, a PDF or a web
+  page.
 - **Skills**: every skill agents can use on one page (Settings → Skills), grouped by what it is for: more than
   sixty that come with the app for every agent (ways of working, writing, documents, research and the web,
   planning, data, design and pictures, coding, AI models, this app), yours, those your plugins bring, Claude
@@ -451,8 +456,9 @@ programs shows each program's version and what is out, with Check now, Update no
   brings the chapters and bibliography it reads and typesets among its folder's pictures (read only to TeX),
   writing only the files that changed; a Word or Excel file says first what the editor doesn't keep (headers and
   footers, comments, charts…), offers to save a copy instead, and its first save keeps the old file in the trash.
-  Jupyter notebooks open and run; New → New notebook starts one (an empty .ipynb opens as a new notebook too), and
-  saved outputs show as Jupyter shows them, a progress bar at its last state. Videos play in the app's own player (seek with a
+  Jupyter notebooks open and run, with Ask beside them as for other files; New → New notebook starts one (an empty
+  .ipynb opens as a new notebook too), saved outputs show as Jupyter shows them, a progress bar at its last state,
+  and Jupyter kernels registered from a virtual environment are offered as environments to run in. Videos play in the app's own player (seek with a
   preview of the time, speed, loop, picture in picture, full screen, keyboard shortcuts, double-tap to skip on a
   phone), streamed in parts so they start at once and seek anywhere.
 - Git: your repositories (those sessions worked in, and any you add: a folder on this computer, which can start

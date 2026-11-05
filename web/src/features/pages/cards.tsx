@@ -2,7 +2,7 @@
 // itself, working (its storage is the page's own), with Open for Pages. publish_site: a card that
 // needs the user, private or public link, Publish or Not now; then the link, or what happened.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AppWindow, ChevronRight, Expand, ExternalLink, FileText, Globe, GlobeLock, PenLine, Presentation, Sheet, Sigma } from 'lucide-react';
+import { AppWindow, ChevronRight, Expand, ExternalLink, FileText, Globe, GlobeLock, NotebookText, PenLine, Presentation, Sheet, Sigma } from 'lucide-react';
 import type { PublishRequest, SiteVisibility } from '@shared/pages';
 import type { ToolInfo, ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
@@ -143,11 +143,11 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
   const writing = !ref && item.tool.status !== 'error' && (!draft || !draft.done || running);
   const title = info?.title ?? (page && page !== 'gone' ? page.title : undefined) ?? draft?.title ?? 'Page';
 
-  const kind = /save_slides$/.test(item.tool.name) ? 'slides' : /save_doc$/.test(item.tool.name) ? 'doc' : /save_sheet$/.test(item.tool.name) ? 'sheet' : /save_latex$/.test(item.tool.name) ? 'tex' : null;
+  const kind = /save_slides$/.test(item.tool.name) ? 'slides' : /save_doc$/.test(item.tool.name) ? 'doc' : /save_sheet$/.test(item.tool.name) ? 'sheet' : /save_latex$/.test(item.tool.name) ? 'tex' : /save_notebook$/.test(item.tool.name) ? 'notebook' : null;
   const deck = kind !== null;
   // A deck stands whole: its slide is as tall as the card's width makes it (16:9), its buttons under it.
   const max = kind === 'slides' ? Math.max(fit, 900) : fit;
-  const noun = kind === 'slides' ? 'the slides' : kind === 'doc' ? 'the document' : kind === 'sheet' ? 'the spreadsheet' : kind === 'tex' ? 'the LaTeX document' : 'the page';
+  const noun = kind === 'slides' ? 'the slides' : kind === 'doc' ? 'the document' : kind === 'sheet' ? 'the spreadsheet' : kind === 'tex' ? 'the LaTeX document' : kind === 'notebook' ? 'the notebook' : 'the page';
   const status = saving ? ' · saving a new version…' : ref && !current ? ' · a newer one is there' : '';
   if (item.tool.status === 'error') return <Note>{`Could not save ${noun}`}: {failure(item)}</Note>;
   if (wide && besideOpen) {
@@ -168,7 +168,7 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
   if (writing && deck)
     return (
       <Note>
-        <Throbber /> {kind === 'slides' ? 'Making the slides…' : kind === 'doc' ? 'Writing the document…' : kind === 'tex' ? 'Writing and typesetting the LaTeX…' : 'Making the spreadsheet…'}
+        <Throbber /> {kind === 'slides' ? 'Making the slides…' : kind === 'doc' ? 'Writing the document…' : kind === 'tex' ? 'Writing and typesetting the LaTeX…' : kind === 'notebook' ? 'Keeping the notebook…' : 'Making the spreadsheet…'}
       </Note>
     );
   if (writing)
@@ -204,7 +204,7 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
       <div className="flex items-center gap-3 py-2.5 pr-2 pl-2.5">
         <button type="button" onClick={open} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <Tile>
-            {kind === 'slides' ? <Presentation size={19} strokeWidth={1.8} /> : kind === 'doc' ? <FileText size={19} strokeWidth={1.8} /> : kind === 'sheet' ? <Sheet size={19} strokeWidth={1.8} /> : kind === 'tex' ? <Sigma size={19} strokeWidth={1.8} /> : <AppWindow size={19} strokeWidth={1.8} />}
+            {kind === 'slides' ? <Presentation size={19} strokeWidth={1.8} /> : kind === 'doc' ? <FileText size={19} strokeWidth={1.8} /> : kind === 'sheet' ? <Sheet size={19} strokeWidth={1.8} /> : kind === 'tex' ? <Sigma size={19} strokeWidth={1.8} /> : kind === 'notebook' ? <NotebookText size={19} strokeWidth={1.8} /> : <AppWindow size={19} strokeWidth={1.8} />}
           </Tile>
           <span className="min-w-0 flex-1">
             <span translate="no" className="block truncate text-[13.5px] leading-5 font-medium text-fg">
@@ -213,7 +213,7 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
             <span className="flex min-w-0 items-center gap-1.5 text-[12px] leading-4 text-fg-3">
               {saving && <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" />}
               <span className="min-w-0 truncate">
-                {kind === 'slides' ? 'Slides in the Library' : kind === 'doc' ? 'A document in the Library' : kind === 'sheet' ? 'A spreadsheet in the Library' : kind === 'tex' ? 'LaTeX in the Library' : 'Saved in the Library'} · version {ref.version}
+                {kind === 'slides' ? 'Slides in the Library' : kind === 'doc' ? 'A document in the Library' : kind === 'sheet' ? 'A spreadsheet in the Library' : kind === 'tex' ? 'LaTeX in the Library' : kind === 'notebook' ? 'A notebook in the Library' : 'Saved in the Library'} · version {ref.version}
                 {status}
               </span>
             </span>

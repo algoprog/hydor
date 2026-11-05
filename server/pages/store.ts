@@ -205,7 +205,7 @@ const safeJson = (s: string) => {
   }
 };
 
-const DEFAULT_TITLE: Record<string, string> = { slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet' };
+const DEFAULT_TITLE: Record<string, string> = { slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', notebook: 'Notebook' };
 
 export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: PageKind; model?: unknown; by: PageVersion['by']; sessionKey?: string; sourceItem?: string; app?: string; space?: string | null }): PageInfo {
   const kind = p.kind ?? 'page';

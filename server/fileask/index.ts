@@ -6,7 +6,7 @@ import type { Feature } from '../features/types.ts';
 const BY_KIND: Record<string, string> = {
   docx: 'It is a Word document: change it with a script that keeps what you do not change (python-docx, say), not by rewriting it from scratch.',
   xlsx: 'It is an Excel workbook: change it with a script that keeps the rest as it is (openpyxl, say), and keep formulas as formulas.',
-  ipynb: 'It is a Jupyter notebook: keep it valid notebook JSON, and its outputs unless the change is to them.',
+  ipynb: 'It is a Jupyter notebook: change its cells with your notebook-editing tool (NotebookEdit) or nbformat rather than rewriting its JSON, keep the cell ids and the outputs of cells you do not change, and remember that a cell you change has no output until it runs again ("cell 3" is the third, as the notebook page numbers them).',
 };
 
 /** What the agent is told of the file it was asked about. */

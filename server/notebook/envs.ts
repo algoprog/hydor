@@ -154,8 +154,13 @@ export async function findEnvs(notebook?: string): Promise<Found[]> {
     }),
   );
 
-  // Registered kernels, except the Python ones that are the environments above.
-  const pythons = new Set(found.map((f) => real(f.python!)));
+  // Registered kernels, except the Python ones that are the environments above. A virtual environment's python is a
+  // link to the interpreter it was made from, so it is told apart by its own folder, not by the file it links to.
+  const envOf = (python: string) => {
+    const prefix = path.dirname(path.dirname(python));
+    return isFile(path.join(prefix, 'pyvenv.cfg')) ? prefix : real(python);
+  };
+  const pythons = new Set(found.map((f) => envOf(f.python!)));
   const specRoots = [path.join(HOME, '.local/share/jupyter/kernels'), '/usr/local/share/jupyter/kernels', '/usr/share/jupyter/kernels', ...found.map((f) => path.join(f.prefix!, 'share/jupyter/kernels'))];
   for (const root of specRoots) {
     for (const name of list(root)) {
@@ -163,7 +168,7 @@ export async function findEnvs(notebook?: string): Promise<Found[]> {
       const spec = readJson(path.join(specDir, 'kernel.json'));
       if (!Array.isArray(spec?.argv) || !spec.argv.length || found.some((f) => f.specDir === specDir)) continue;
       const argv0 = String(spec.argv[0]);
-      if (spec.argv.some((a: unknown) => /ipykernel/.test(String(a))) && (pythons.has(real(argv0)) || /^python3?$/.test(argv0))) continue;
+      if (spec.argv.some((a: unknown) => /ipykernel/.test(String(a))) && (pythons.has(envOf(argv0)) || /^python3?$/.test(argv0))) continue;
       const exe = argv0.includes('/') ? argv0 : onPath(argv0);
       found.push({
         spec,

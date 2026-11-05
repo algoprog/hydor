@@ -34,8 +34,8 @@ export interface PageInfo {
   thumb?: string;
   /** Published at a link. */
   published?: boolean;
-  /** Another kind than a page of HTML: slides (shared/slides.ts), a document (shared/docs.ts), a spreadsheet (shared/sheets.ts), LaTeX (shared/latex.ts). */
-  kind?: 'slides' | 'doc' | 'sheet' | 'tex';
+  /** Another kind than a page of HTML: slides (shared/slides.ts), a document (shared/docs.ts), a spreadsheet (shared/sheets.ts), LaTeX (shared/latex.ts), a Jupyter notebook (shared/notebook.ts). */
+  kind?: 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
   /** A template's screen: the template it belongs to (it is not in the library). */
   app?: string;
   /** The space it is in (the Library shows each space's together); none when unset. */

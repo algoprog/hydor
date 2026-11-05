@@ -1,4 +1,4 @@
-// The kinds of page Pages keeps besides pages of HTML: slide decks, documents, spreadsheets and LaTeX. Each keeps a
+// The kinds of page Pages keeps besides pages of HTML: slide decks, documents, spreadsheets, LaTeX and notebooks. Each keeps a
 // model as text (a line per part, so two versions read as a diff of lines), checked as it comes in, and knows
 // how to make its own page from it (a viewer, every page to print, or a still picture), what an agent is told
 // of it, which files it exports as, and which files it can be made from.
@@ -14,10 +14,11 @@ import { importTex, keepTex, MAX_TEX, readTex, TEX_OPENS, texForAgent, texPage, 
 import { pptxFile, type Picture } from './pptx.ts';
 import { bookForAgent, bookPage, csvOfBook, importBook, keepBook, MAX_BOOK, readBook, xlsxOfBook } from './sheets.ts';
 import { deckForAgent, deckPage, keepDeck, MAX_DECK, readDeck } from './slides.ts';
+import { freshNotebook, keepNotebook, MAX_NOTEBOOK, notebookForAgent, notebookFromFile, notebookPage, notebookScript, readNotebook } from './notebooks.ts';
 
-export type PageKind = 'slides' | 'doc' | 'sheet' | 'tex';
+export type PageKind = 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
 export type PageMode = 'viewer' | 'print' | 'still';
-export type ExportFormat = 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'tex' | 'zip' | 'html';
+export type ExportFormat = 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py';
 
 /** A file opened as a page of a kind: its model, and what was left out of it (said to the person who opened it). */
 export interface FromFile {
@@ -151,13 +152,32 @@ KINDS.set('tex', {
   opens: TEX_OPENS,
 });
 
+KINDS.set('notebook', {
+  noun: 'notebook',
+  tool: 'save_notebook',
+  max: MAX_NOTEBOOK,
+  keep: (_db, input) => ({ text: keepNotebook(input).text, sources: [] }),
+  read: readNotebook,
+  page: (_db, text, title, mode) => notebookPage(text, title, mode),
+  forAgent: notebookForAgent,
+  sources: () => [],
+  files: {
+    ipynb: (_db, text) => text,
+    py: (_db, text) => notebookScript(text),
+  },
+  still: () => ({ width: 1280, height: 800 }),
+  fresh: (title) => freshNotebook(title),
+  fromFile: (buf) => ({ model: notebookFromFile(buf) }),
+  opens: /\.ipynb$/i,
+});
+
 export function kindOf(k: string | null | undefined): KindDef | null {
   return k ? (KINDS.get(k as PageKind) ?? null) : null;
 }
 
 export function mustKind(k: string): KindDef {
   const d = kindOf(k);
-  if (!d) throw new HttpError(400, `Pages has no kind “${k}”: slides, doc, sheet or tex`);
+  if (!d) throw new HttpError(400, `Pages has no kind “${k}”: slides, doc, sheet, tex or notebook`);
   return d;
 }
 
