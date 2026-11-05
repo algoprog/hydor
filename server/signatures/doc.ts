@@ -65,7 +65,7 @@ export function placeInDoc(doc: Doc, src: string, spot: DocSpot, o: { widthMm: n
   const textMm = Math.max(20, paper.w - 2 * doc.page.margin);
   const img: ImageBlock = { id: newId(), type: 'image', src, w: Math.min(1, Math.max(0.05, Math.round((o.widthMm / textMm) * 1000) / 1000)), align: 'left', alt: o.alt };
   const blocks = doc.blocks.slice();
-  const words = spot.placeholder ?? spot.after;
+  const words = spot.placeholder || spot.after;
   if (!words) {
     const last = [...blocks].reverse().find((b) => b.type === 'p' || b.type === 'li');
     blocks.push(img);

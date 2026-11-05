@@ -31,6 +31,7 @@ import { pagesFeature } from './pages/feature';
 import { researchFeature } from './research/feature';
 import { searchFeature } from './search/feature';
 import { shotsFeature } from './shots/feature';
+import { signaturesFeature } from './signatures/feature';
 import { skillpackFeature } from './skillpack/feature';
 import { spacesFeature } from './spaces/feature';
 import { swarmFeature } from './swarm/feature';
@@ -130,6 +131,7 @@ export const features = (): WebFeature[] =>
     arenaFeature,
     commitsFeature,
     documentsFeature,
+    signaturesFeature,
     imagesFeature,
     mediaFeature,
     connectionsFeature,

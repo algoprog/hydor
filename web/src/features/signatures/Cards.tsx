@@ -120,7 +120,7 @@ function spotWords(s: PlaceSpot, page?: number, pages?: number): ReactNode {
     s.kind === 'end' ? (
       'At the end of the document'
     ) : s.kind === 'cell' ? (
-      `In table ${s.table}, row ${s.row}, column ${s.column}`
+      `Table ${s.table}, row ${s.row}, column ${s.column}`
     ) : s.kind === 'point' ? (
       `${Math.round(s.x * 100)}% across and ${Math.round(s.y * 100)}% down`
     ) : (
