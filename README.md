@@ -8,7 +8,7 @@
 <p align="center"><i>ὕδωρ, "water" in ancient Greek: it takes the shape of whatever holds it.</i></p>
 
 <p align="center">
-  Run <b>Claude Code</b>, <b>Codex</b> or <b>any model</b> on your own computer, and use them from any device.
+  Run <b>Claude Code</b>, <b>Codex</b> or <b>any model</b> on your own computer with a unified memory layer, and use them from any device.
 </p>
 
 <p align="center"><a href="https://hydor.app"><b>hydor.app</b></a></p>
