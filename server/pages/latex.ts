@@ -61,6 +61,7 @@ import { Zip } from '../documents/zip.ts';
 import { getAsset, putAsset, takeIn } from './assets.ts';
 import { findReferences } from './latex-refs.ts';
 import { zipParts } from './ooxml.ts';
+import { TEX_EDITS_HELP } from '../../shared/tex-edits.ts';
 
 export { isTexText } from '../../shared/latex.ts';
 
@@ -1878,7 +1879,8 @@ const LATEX_HELP = [
   'pictures: what \\includegraphics shows, each by the name it uses: [{"name": "figures/plot.png", "src": "plots/plot.png"}] with src a PNG or JPEG file of this session, a public https address, or a picture of the document already (naget-asset:…); a path alone is its own name. A PDF picture becomes a PNG of it.',
   'engine: pdflatex (the default), xelatex (Unicode text and this computer’s fonts with fontspec: Greek, Chinese and other scripts), or lualatex. Packages: those of a standard TeX Live (amsmath, graphicx, hyperref, geometry, tikz, pgfplots, booktabs, beamer, natbib…); for a bibliography, a .bib file with \\bibliography and BibTeX (biblatex and biber may be missing). Nothing that runs programs (minted, svg, shell escape): it is turned off.',
   'The answer says whether it typeset, with each error’s file, line and what it most likely means: fix them and save again with the same id.',
-  'To change a document: get_page with its id gives every file; send save_latex with that id and only what changes (source for main.tex, files to add or replace, an empty text or remove: [names] to take one out, pictures to add); what you leave out stays as it is. Each save is a new version, the older ones restorable. Keep what the user changed.',
+  'To change a document: get_page with its id gives every file; send save_latex with that id and only what changes (source for main.tex, files to add or replace, an empty text or remove: [names] to take one out, pictures to add, or edits for small changes in them); what you leave out stays as it is. Each save is a new version, the older ones restorable. Keep what the user changed.',
+  TEX_EDITS_HELP,
 ].join(' ');
 
 export const SAVE_LATEX_DESCRIPTION = LATEX_HELP;
@@ -1910,6 +1912,12 @@ export const SAVE_LATEX_SCHEMA = {
     changes: {
       description: 'Accept or reject tracked changes (get_page lists them): [{"id", "accept": true}] or [{"id", "reject": true}], or "accept all" / "reject all".',
       anyOf: [{ type: 'array', items: { type: 'object' } }, { type: 'string' }],
+    },
+    edits: {
+      type: 'array',
+      items: { type: 'object' },
+      description:
+        'With id, instead of source: changes made in order in its files as get_page gives them (main.tex unless "file" says another): {"find": "…", "replace": "…", "all"?: true}, {"section": "a section’s title", "text": "…"}, {"after": "…", "text": "…"}, {"before": "…", "text": "…"}, {"append": "text before \\end{document}"}.',
     },
     template: {
       type: 'string',

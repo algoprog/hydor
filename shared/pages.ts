@@ -51,6 +51,8 @@ export interface PageVersion {
   createdAt: number;
   /** agent: save_page; user: Keep; restore: an older version brought back; edit: changed by the user in the editor; made: a page the user made. */
   by: 'agent' | 'user' | 'restore' | 'edit' | 'made';
+  /** An agent's saves in a row kept as this one version (left out for one). */
+  steps?: number;
 }
 
 /** One of a page's stored values (window.hydor.storage), as the Data view lists them. */

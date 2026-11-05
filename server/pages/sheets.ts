@@ -75,6 +75,7 @@ import { coreXml, esc as xesc, relsXml, XML_HEAD, zipParts } from './ooxml.ts';
 import { chartXml, commentsXml, condXml, drawingXml, Dxfs, filterXml, isListColor, isListsSheet, listFromSheet, listsSheet, mergesXml, namedAuthors, personsXml, readCharts, readConditional, readDxfs, readFilter, readNotes, readPersons, readThreaded, readValidation, validationXml } from './sheet-parts.ts';
 import { joinRects, odfFormula, odfText, odsCondStyles, odsConditional, odsNote, odsValidations } from './sheet-ods.ts';
 import { officeFont } from './word-fonts.ts';
+import { SHEET_EDITS_HELP } from '../../shared/sheet-edits.ts';
 
 export { isBookText } from '../../shared/sheets.ts';
 
@@ -324,7 +325,7 @@ export function bookForAgent(text: string): string {
       return why.length ? ['', `Charts that cannot draw: ${why.join('; ')}`] : [];
     })(),
     '',
-    'The workbook as it is kept: each sheet with its id, name, cells by name (v: a value, f: a formula without "=", s: its style, note: its note), cols and rows (widths and heights in px, hidden, by index from 0), freeze, merges, filter, conditional (formatting), validation (what cells take: lists, checkboxes, ratings…), charts (each with from and to: the cells its corners are on, and dx and dy, px into them) and board (its Kanban board: the table’s first cell, the column it groups by and those its cards show, by letter, its lanes’ order, whether the sheet opens on it). To change it, send the whole workbook back with save_sheet and this id, each sheet with its id and the parts you keep; cells you leave out are emptied.',
+    'The workbook as it is kept: each sheet with its id, name, cells by name (v: a value, f: a formula without "=", s: its style, note: its note), cols and rows (widths and heights in px, hidden, by index from 0), freeze, merges, filter, conditional (formatting), validation (what cells take: lists, checkboxes, ratings…), charts (each with from and to: the cells its corners are on, and dx and dy, px into them) and board (its Kanban board: the table’s first cell, the column it groups by and those its cards show, by letter, its lanes’ order, whether the sheet opens on it). To change it, send the whole workbook back with save_sheet and this id, each sheet with its id and the parts you keep (cells you leave out are emptied), or only the cells that change with update (the rest stays).',
     body + cut,
   ].join('\n');
 }
@@ -358,7 +359,8 @@ const SHEET_HELP = [
   'Comments: the user’s and agents’ threads on cells (beside notes), which get_page lists with their ids. Answer them with comments at the top: [{ "id": "c1", "reply": "Done: the totals are formulas now", "resolve": true }] (reply, resolve or reopen, delete), and add one of your own with { "sheet": "Budget", "cell": "B3", "text": "Is this the right rate?" }; comments inside the sheets you send are left as they were.',
   'A sheet may come from a file of this session instead: file: "data.csv" (CSV, TSV, .xlsx or .ods; from the session’s folder, ~ or absolute; sheet: which of an Excel file’s sheets), with rows, cells and formats given too going on top. file beside title (no sheets) makes the whole workbook from an .xlsx or .ods file.',
   'At most 50 sheets, 200,000 cells, 20,000 rows and 500 columns a sheet. Good sheets have a header row, one kind of value per column, and totals as formulas (=SUM(B2:B20)) rather than typed numbers, so they stay right when the user changes one.',
-  'To change a spreadsheet, get_page with its id gives it whole (each sheet with its id and cells, and what its formulas give); send the whole workbook back with the same id: a new version, the older ones restorable. Keep what the user changed.',
+  'To change a spreadsheet, get_page with its id gives it whole (each sheet with its id and cells, and what its formulas give); send the whole workbook back with the same id, or only the cells that change with update: a new version, the older ones restorable. Keep what the user changed.',
+  SHEET_EDITS_HELP,
 ].join(' ');
 
 export const SAVE_SHEET_DESCRIPTION = SHEET_HELP;
@@ -370,6 +372,11 @@ export const SAVE_SHEET_SCHEMA = {
     title: { type: 'string', description: 'Its name in the Library: "2027 budget".' },
     sheets: { type: 'array', items: { type: 'object' }, description: 'The sheets, in order: { name, rows, cells, header, formats, widths, heights, freeze, styles, merges, hidden, notes, filter, conditional, validation, charts, board, file }.' },
     file: { type: 'string', description: 'Instead of sheets: an .xlsx, .ods or .csv file of this session to make the whole workbook from.' },
+    update: {
+      type: 'array',
+      items: { type: 'object' },
+      description: 'With id, instead of sheets: changes on top of the sheets they name, each {"sheet": its name or id (the first when left out), "cells": {"B7": 1250}, or "rows" from "start", and any other field of a sheet}; a value null empties a cell.',
+    },
     comments: { type: 'array', items: { type: 'object' }, description: 'Changes to its comments: { id, reply, resolve, reopen, delete } for one get_page lists, { sheet, cell, text } for a new one of yours.' },
   },
   required: ['title'],
