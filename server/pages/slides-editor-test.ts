@@ -503,6 +503,25 @@ const dot: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
   } else ok((await req('GET', `/api/pages/${id}/export?format=png`)).statusCode === 503, 'without a browser, pictures of slides say what they need');
   const plain = idOf((await run('save_page', { title: 'Not a deck', html: '<!doctype html><p>x</p>' })).text);
   ok((await req('GET', `/api/pages/${plain}/export?format=png`)).statusCode === 400, 'only slides export as pictures');
+
+  // A shape an agent adds with words has them in its middle (as PowerPoint's do); one it sends back keeps its look.
+  const shapes = idOf(
+    (await run('save_slides', { title: 'Shapes', slides: [{ els: [{ type: 'shape', shape: 'ellipse', text: 'Hub' }, { type: 'shape', text: 'Left', align: 'left', valign: 'top' }, { type: 'shape', shape: 'rect' }] }] })).text,
+  );
+  const sd = (await req('GET', `/api/pages/${shapes}`)).json().model as Deck;
+  const [hub, left, bare] = sd.slides[0].els as Extract<El, { type: 'shape' }>[];
+  ok(hub.align === 'center' && hub.valign === 'middle', 'a shape an agent adds with words has them in its middle');
+  ok(left.align === 'left' && left.valign === 'top' && bare.align === undefined, 'unless it says where; a shape without words gains nothing');
+  await run('save_slides', { id: shapes, title: 'Shapes', slides: [{ ...sd.slides[0], els: [{ ...hub, align: undefined, valign: undefined }, left, bare] }] });
+  const sd2 = (await req('GET', `/api/pages/${shapes}`)).json().model as Deck;
+  ok(sd2.slides[0].els[0].type === 'shape' && sd2.slides[0].els[0].align === undefined, 'a shape sent back by its id keeps its look (an older one’s words stay where they were)');
+
+  // Words made smaller to fit, as the printed page fits them, go into PowerPoint (the page must lay its slides out to tell).
+  if (canCapture()) {
+    const long = idOf((await run('save_slides', { title: 'Long', slides: [{ els: [{ id: 'crowd', type: 'text', x: 80, y: 80, w: 300, h: 80, size: 40, fit: 'shrink', text: 'Far too many words for so small a box, which has to make them smaller to fit' }] }] })).text);
+    const px = await req('GET', `/api/pages/${long}/export?format=pptx`);
+    ok(/<a:normAutofit fontScale="\d+"\/>/.test(slideXml(px.rawPayload, 1)), 'with a browser here, words made smaller to fit go into PowerPoint that much smaller');
+  }
 }
 
 await app.close();

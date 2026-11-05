@@ -320,6 +320,8 @@ export function SlidesEditor({
     });
     setD(n);
   };
+  /** What is picked, less the parts the deck no longer has on this slide (an Undo took them away). */
+  const keepPicked = (d: Deck) => setSel((s) => s.filter((id) => pickedOf(d.slides[Math.min(cur, d.slides.length - 1)], [id]).length));
   const undo = () => {
     // Words being changed in place are kept first; the next Undo takes them back.
     if (editing) return canvas.current?.stopEditing();
@@ -327,6 +329,7 @@ export function SlidesEditor({
     if (!hist.past.length || !d) return;
     setHist({ past: hist.past.slice(0, -1), future: [d, ...hist.future] });
     setD(hist.past[hist.past.length - 1]);
+    keepPicked(hist.past[hist.past.length - 1]);
   };
   const redo = () => {
     const d = live.current;
@@ -334,6 +337,7 @@ export function SlidesEditor({
     const [next, ...rest] = hist.future;
     setHist({ past: [...hist.past, d], future: rest });
     setD(next);
+    keepPicked(next);
   };
 
   const save = async (): Promise<boolean> => {
@@ -612,6 +616,7 @@ export function SlidesEditor({
 
   // ---- keys ---------------------------------------------------------------------------------------------------
   const keys = useRef<(e: KeyboardEvent) => void>(() => {});
+  const layered = useRef(false);
   keys.current = (e: KeyboardEvent) => {
     if (!deck || present) return;
     const t = e.target as HTMLElement | null;
@@ -623,6 +628,9 @@ export function SlidesEditor({
       void save();
       return;
     }
+    // A menu or a popover open over the editor (opened with the mouse, the focus still here) takes the keys: Esc closes
+    // it alone, and the arrows do not move what is picked behind it.
+    if (layered.current) return;
     // Find, replace and the shortcuts, from the words being changed too.
     if (mod && !e.altKey && (k === 'f' || k === 'h') && (!typing || t?.isContentEditable)) {
       e.preventDefault();
@@ -736,14 +744,23 @@ export function SlidesEditor({
     if (e.key === 'PageUp') setCur((c) => Math.max(0, c - 1));
   };
   useEffect(() => {
+    // Whether a menu or popover was open as the key came, noted before anything handles it: by the time the editor
+    // hears of the key, Escape has closed it already.
+    const mark = () => {
+      layered.current = !!document.querySelector('body > [role=dialog]');
+    };
     const on = (e: KeyboardEvent) => {
       // Keys belong to this editor while it holds the focus (or nothing else does).
       const a = document.activeElement;
       if (a && a !== document.body && !root.current?.contains(a)) return;
       keys.current(e);
     };
+    window.addEventListener('keydown', mark, true);
     window.addEventListener('keydown', on);
-    return () => window.removeEventListener('keydown', on);
+    return () => {
+      window.removeEventListener('keydown', mark, true);
+      window.removeEventListener('keydown', on);
+    };
   }, []);
   // Pictures pasted or dropped become parts of the slide.
   useEffect(() => {
