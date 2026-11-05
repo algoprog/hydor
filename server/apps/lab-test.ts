@@ -17,7 +17,7 @@ import type { RunRecord } from '../../shared/experiments.ts';
 import type { AppTemplate } from '../../shared/apps.ts';
 import { cleanRecipe } from '../../shared/apps.ts';
 import { allSteps, checkFlow, cleanFlow, type CodeStep } from '../../shared/app-manifest.ts';
-import { checkUi, cleanUi } from '../../shared/app-ui.ts';
+import { checkUi, cleanUi, missingIn, uiEngine } from '../../shared/app-ui.ts';
 import { TEMPLATES } from './templates.ts';
 import { AGREE } from './templates-lab.ts';
 import Fastify from 'fastify';
@@ -92,7 +92,8 @@ const commit = (msg: string, at: number, who?: string) => {
 };
 commit('Start the retriever', now - 20 * DAY);
 commit('Add hard negatives to training', now - 2 * DAY);
-commit('Fix the eval script', now - 1 * DAY - HOUR);
+// More than a day apart from the commit before, so the two are never on one day, whatever the hour.
+commit('Fix the eval script', now - DAY + HOUR);
 commit('A colleague’s change', now - 1 * DAY, 'Bo <bo@example.com>');
 const worktree = path.join(tmp, 'retriever-sprint');
 git(repo, ['worktree', 'add', '-q', '-b', 'sprint/curriculum', worktree]);
@@ -149,8 +150,8 @@ chunk('claude:vscode1', 'file', path.join(repo, 'mine.py'), now - 2 * DAY - HOUR
 chunk('claude:vscode1', 'file', path.join(repo, 'old.py'), now - 12 * DAY);
 session({ key: 'claude:sprint', title: 'Curriculum on long queries', cwd: worktree, from: now - 4 * HOUR, to: now - 3 * HOUR, source: 'cli', app: true });
 session({ key: 'acp:here1', agent: 'acp', title: 'Draft the related work', cwd: path.join(tmp, 'thesis'), from: now - DAY, to: now - DAY + HOUR, app: true, indexed: false, extra: { space: 'sp-other' } });
-session({ key: 'claude:task1', title: 'Morning brief · Nov 4, 07:00', cwd: tmp, from: now - DAY - 5 * HOUR, to: now - DAY - 5 * HOUR + 600_000, app: true, extra: { automations: { task: 't1', run: 'r1' } } });
-db.prepare("insert into task_runs (id, task_id, trigger, started_at, status, outcome, summary, key) values ('r1', 't1', 'schedule', ?, 'done', 'done', 'Two meetings and rain later', 'claude:task1')").run(now - DAY - 5 * HOUR);
+session({ key: 'claude:task1', title: 'Morning brief · Nov 4, 07:00', cwd: tmp, from: now - DAY + HOUR, to: now - DAY + HOUR + 600_000, app: true, extra: { automations: { task: 't1', run: 'r1' } } });
+db.prepare("insert into task_runs (id, task_id, trigger, started_at, status, outcome, summary, key) values ('r1', 't1', 'schedule', ?, 'done', 'done', 'Two meetings and rain later', 'claude:task1')").run(now - DAY + HOUR);
 // Left out: memory off, Confidential, a child session, a subagent's transcript, an app run nobody watched, work done before the period only.
 session({ key: 'claude:nomemory', title: 'Private thing', cwd: tmp, from: now - DAY, to: now - DAY, app: true, extra: { memory: false } });
 session({ key: 'claude:secret', title: 'Grant review', cwd: tmp, from: now - DAY, to: now - DAY, app: true, extra: { confidential: true } });
@@ -488,6 +489,80 @@ test('Weekly progress report: the week’s dates (across a month and a year), it
   assert.match(e.text, /^## Thursday 5 November 2026: Hard negatives help\n\nRetrained\.\n\n### Tried\n- BM25 negatives\n\n### Found\n- 0\.412 MRR@10\n\n### Open questions\n- Long queries\?\n\n### Links\n- /);
   const said = await runCode(codeOf(n, 'say'), { day: { date: '2026-11-05', name: 'Thursday 5 November 2026' }, entry: '', kept: '' });
   assert.deepEqual([said.kept, said.title], [false, 'Nothing on Thursday 5 November 2026']);
+});
+
+test('the views draw with a run’s values: the workbench’s next text with a button and a key for each label, and the last one beside the model’s; a chart for each setting; a report; an entry; no name a run page uses is missing', () => {
+  const E = uiEngine();
+  const draw = (t: AppTemplate, el: string, v: unknown, root: Record<string, unknown> = {}) =>
+    E.render(t.ui!.elements![el].html, { root: { result: {}, inputs: {}, run: { id: 'r1' }, app: { id: `tpl:${t.id}` }, last: {}, state: {}, page: {}, data: {}, event: {}, today: '2026-11-05', now: '', ...root }, stack: v === undefined ? [] : [{ v, item: true }], lang: 'en' });
+  const t = tpl('annotation-workbench');
+  const result = { name: '3 texts from texts pasted', source: 'texts pasted', labels: ['positive', 'negative'], guidelines: 'Be **fair**', count: 3, total: 3, column: 'text', model_counts: [] };
+  const records = [
+    { id: 'a', n: 1, order: 1, text: 'Loved it', model: 'positive', reason: 'Praise', done: true, label: 'positive', agree: true, updatedAt: 2 },
+    { id: 'b', n: 2, order: 2, text: 'Dull & long', model: 'positive', reason: 'Too kind', done: true, label: 'negative', agree: false, updatedAt: 3 },
+    { id: 'c', n: 3, order: 3, ref: 'line 3', text: 'Next one <b>', model: 'negative', reason: 'Secret', done: false },
+  ];
+  const wb = draw(t, 'workbench', records, { result });
+  assert.match(wb, /width: calc\(2 \/ 3 \* 100%\)/, 'the bar');
+  assert.match(wb, /<b>2<\/b> of 3 labelled · you and the model agreed on <b>1<\/b>/);
+  assert.match(wb, /class="last differ">[\s\S]*Text 2[\s\S]*You: <b>negative<\/b>[\s\S]*The model: <b>positive<\/b>[\s\S]*“Too kind”/, 'the last one labelled, beside the model’s');
+  const next = wb.slice(wb.indexOf('<article class="item">'));
+  assert.match(next, /Text 3 · line 3/);
+  assert.match(next, /Next one &lt;b&gt;/, 'what it shows is escaped');
+  assert.match(next, /data-event="label" data-id="c" data-label="positive" data-model="negative" data-hotkey="1"><kbd>1<\/kbd><span>positive<\/span>/);
+  assert.match(next, /data-hotkey="2"><kbd>2<\/kbd><span>negative<\/span>/);
+  assert.doesNotMatch(next, /Secret|The model:/, 'the model’s label and reason stay hidden until you give yours');
+  assert.match(next, /data-event="skip" data-id="c" data-order="3" data-hotkey="skip"/);
+  assert.match(next, /Keys 1 to 2 label it/);
+  assert.match(wb, /^<n-widget name="keys"><\/n-widget>/, 'the keys first, where they stay');
+  const all = draw(t, 'workbench', records.map((r) => ({ ...r, done: true, label: 'positive' })), { result });
+  assert.match(all, /All 3 are labelled\./);
+  assert.doesNotMatch(all, /class="item"/);
+  assert.match(draw(t, 'set-head', undefined, { result }), /<kbd>1<\/kbd>positive<\/span><span class="chip"><kbd>2<\/kbd>negative[\s\S]*<strong>fair<\/strong>/);
+  const ag = draw(t, 'agreement', records.slice(0, 2), { result, state: { agree: { n: 2, same: 1, po: 0.5, pe: 0.5, kappa: 0, level: 1 } } });
+  assert.match(ag, /<b>50%<\/b><span>the same label, on 1 of 2 texts<\/span>/);
+  assert.match(ag, /Cohen’s κ: poor/);
+  assert.match(ag, /<n-widget name="agreement" value="\[\{&quot;id&quot;:&quot;a&quot;/);
+  const ex = draw(t, 'export', records.slice(0, 2), { result, state: { pub: { working: false, error: 'Annotation workbench needs a key first: Hugging Face token.' } } });
+  assert.match(ex, /The 2 texts you have labelled/);
+  assert.match(ex, /<span class="st err">Annotation workbench needs a key first/);
+  // The download link, as the view's event fills it: this app's records of this set, as CSV.
+  const url = E.fill(t.ui!.events!.csv[0].url!, { root: { run: { id: 'r 1' }, app: { id: 'tpl:annotation-workbench' } }, stack: [] });
+  assert.equal(url, '/api/apps/tpl%3Aannotation-workbench/data/items?where=%7B%22sample%22%3A%22r%201%22%2C%22done%22%3Atrue%7D&sort=n&format=csv&fields=n,ref,text,label,model,reason,agree,notes&name=labels-r%201');
+  assert.deepEqual(JSON.parse(decodeURIComponent(/where=([^&]+)/.exec(url)![1])), { sample: 'r 1', done: true });
+  // The sweep: a box chart for each setting, from its own points only.
+  const sw = tpl('sweep-planner');
+  const points = [{ setting: 'lr', value: '0.001', metric: 1, run: 'a' }, { setting: 'bs', value: '16', metric: 1, run: 'a' }];
+  const plot = E.render(sw.ui!.elements!['setting-plot'].html, { root: { result: { points }, inputs: { metric: 'val_loss' } }, stack: [{ v: { setting: 'lr', effect: 0.9, best: '0.001' }, item: true }], lang: 'en' });
+  assert.match(plot, /value="\[\{&quot;setting&quot;:&quot;lr&quot;,&quot;value&quot;:&quot;0\.001&quot;,&quot;metric&quot;:1,&quot;run&quot;:&quot;a&quot;\}\]"/);
+  assert.match(plot, /explains 90% of the spread · best at 0\.001/);
+  assert.match(E.render(sw.ui!.elements!.mattered.html, { root: {}, stack: [{ v: { setting: 'lr', effect: 0.825, best: '0.001', means: 'x' }, item: true }], lang: 'en' }), /style="width: 82\.5%"/);
+  // The weekly report and a notebook entry, from their answers.
+  const w = tpl('weekly-report');
+  const report = { title: 'Hard negatives help', week: '2–6 November 2026', audience: 'Your team', summary: 'Good week.', done: ['A', 'B'], results: [], problems: ['Slow GPUs'], next: ['C'], questions: [], stats: [{ what: 'Sessions', count: 4 }, { what: 'Commits', count: 3 }] };
+  const head = draw(w, 'report-head', report);
+  assert.match(head, /Weekly report · 2–6 November 2026 · for your team/);
+  assert.match(head, /<span><b>4<\/b> sessions<\/span><span><b>3<\/b> commits<\/span>/);
+  const body = draw(w, 'report-body', report);
+  assert.match(body, /<h3>Done<\/h3><ul><li>A<\/li><li>B<\/li><\/ul>/);
+  assert.match(body, /class="warn"><h3>Problems and blockers<\/h3>/);
+  assert.doesNotMatch(body, /Results|Questions/, 'empty parts left out');
+  const n = tpl('lab-notebook');
+  const entry = draw(n, 'entry', { date: '2026-11-05', title: 'Hard negatives help', summary: 'S', tried: ['T'], found: [], decided: ['D'], open: [], links: [{ kind: 'session', title: 'Hard negatives', url: '/s/x' }, { kind: 'commit', title: 'Fix · retriever abc', url: '' }], link: 'https://lab.example/apps/runs/r1' });
+  assert.match(entry, /<time class="date" datetime="2026-11-05"><b>5<\/b><span>Nov 2026<\/span><\/time>/);
+  assert.match(entry, /<p class="wd">Thursday<\/p><h2>Hard negatives help<\/h2>/);
+  assert.match(entry, /<a href="\/s\/x" class="lk session" data-event="go" data-url="\/s\/x">Hard negatives<\/a><span class="lk commit">Fix · retriever abc<\/span>/);
+  assert.match(entry, /data-event="copy_link">Copy its link/);
+  assert.doesNotMatch(entry, /<h3>Found<\/h3>/);
+  // Every name the run pages use is in their answers (or the form's).
+  const answers: Record<string, Record<string, unknown>> = {
+    'annotation-workbench': result,
+    'research-sprint': { question: 'Q', status: 'Done', hypotheses: [{ id: 'H1', hypothesis: 'h', verdict: 'Supported', mark: 'supported', evidence: 'e', confirm: 'c', refute: 'r' }], runs: [{ id: 'x1', name: 'n', condition: 'c', hypothesis: 'H1', status: 'done', value: 1 }], results: '| a |', report: 'R', notebook: '/pages/n', next: ['x'], branch: 'b', worktree: '/w', hours: 1 },
+    'sweep-planner': { best: 'lr=1', best_value: 1, best_run: 'a', summary: 'S', next: ['x'], mattered: [{ setting: 'lr', effect: 0.5, best: '1', means: 'm' }], points, runs: [{ id: 'a', settings: 'lr=1', value: 1, status: 'done', best: true }], count: 1, stopped: 0, group: 'g', hours: 1 },
+    'weekly-report': { ...report, from: '2026-11-02', to: '2026-11-06', markdown: 'M', subject: 'S', email: 'E' },
+    'lab-notebook': { title: 'T', date: '2026-11-05', day: 'Thursday 5 November 2026', summary: 'S', tried: [], found: [], decided: [], open: [], links: [], link: 'L', kept: true },
+  };
+  for (const id of LAB_IDS) assert.deepEqual(missingIn(tpl(id).ui!, { result: answers[id], inputs: Object.fromEntries(tpl(id).fields.map((f) => [f.id, f.default ?? 'x'])) }), [], `${id}: its run pages`);
 });
 
 // ---- whole runs, with stand-ins: agent sessions, a model, Experiments' tools ------------------------------------------
