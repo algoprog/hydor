@@ -1751,7 +1751,7 @@ return { from: day(from), to: day(t), week: name(from, t), next_from: day(monday
           String.raw`// The week's log for the writer, its numbers, and who reads the report, in words the writer can use.
 const d = digestOf(obj(input.log), 18000);
 const readers = { 'Your advisor': 'their advisor', 'Your team': 'their team, as a stand-up update: short lines, no background', 'A manager': 'their manager: outcomes, risks and dates, few technical details' };
-return { text: d.text, stats: d.stats, empty: d.count === 0, count: d.count, cost: d.cost, notes: d.notes, reader: readers[input.audience] || 'their advisor' };`,
+return { text: d.text, stats: d.stats, empty: d.count === 0, count: d.count, cost: d.cost, notes: d.notes, audience: String(input.audience || 'Your advisor'), reader: readers[input.audience] || 'their advisor' };`,
         outputs: [
           { id: 'text', label: 'The week’s log', type: 'markdown' },
           { id: 'stats', label: 'In numbers', type: 'table', columns: STAT_COLS },
@@ -1759,6 +1759,7 @@ return { text: d.text, stats: d.stats, empty: d.count === 0, count: d.count, cos
           { id: 'count', label: 'Things logged', type: 'number' },
           { id: 'cost', label: 'What agents cost', type: 'number' },
           { id: 'notes', label: 'Notes', type: 'text' },
+          { id: 'audience', label: 'Who it is for', type: 'text' },
           { id: 'reader', label: 'Who reads it', type: 'text' },
         ],
         failed: 'agent',
@@ -1831,7 +1832,7 @@ return { title, summary, done, results, problems, next, questions, markdown, sub
       week: '{{week.week}}',
       from: '{{week.from}}',
       to: '{{week.to}}',
-      audience: '{{digest.reader}}',
+      audience: '{{digest.audience}}',
       summary: '{{compose.summary}}',
       done: '{{compose.done}}',
       results: '{{compose.results}}',
