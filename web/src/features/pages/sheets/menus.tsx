@@ -27,6 +27,7 @@ import {
   Split,
   SquareCheck,
   SquareChevronDown,
+  SquareKanban,
   Star,
   StickyNote,
   TableCellsMerge,
@@ -114,6 +115,9 @@ export interface MenuCtx {
   trim(): void;
   shortcuts(): void;
   expand(): void;
+  /** The rows as a Kanban board, grouped by a dropdown column. */
+  board: boolean;
+  toggleBoard(): void;
 }
 
 const FUNCS = ['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'SUMIF', 'COUNTIF', 'VLOOKUP', 'XLOOKUP', 'ROUND', 'CONCAT', 'TODAY'];
@@ -173,6 +177,7 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
         items: ZOOMS.map((z) => ({ label: `${z}%`, checked: Math.round(m.zoom * 100) === z, run: () => m.setZoom(z / 100) })),
       },
       { label: 'Show formulas', icon: <Sigma size={14} />, keys: 'Ctrl+`', checked: m.formulas, run: () => m.setFormulas(!m.formulas) },
+      { label: 'Kanban board', icon: <SquareKanban size={14} />, also: 'cards lanes group by status', checked: m.board, run: m.toggleBoard },
       '-',
       m.hiddenRows && { label: 'Show all hidden rows', icon: <Eye size={14} />, run: () => m.showAll('row') },
       m.hiddenCols && { label: 'Show all hidden columns', icon: <Eye size={14} />, run: () => m.showAll('col') },

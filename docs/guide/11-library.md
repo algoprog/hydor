@@ -399,9 +399,11 @@ With several numbers picked, the bar at the bottom shows their **Sum**, **Averag
 
 **Insert → Chart** draws the cells picked (or the table around the cell picked) as a chart beside them, floating over the grid: a column, bar, line, area, pie, doughnut or scatter chart. Click it to pick it, drag it to move it, drag its handles to size it, press Delete to remove it, and double-click it for its panel: its **Kind**, its **Data range**, series **In columns** or **In rows**, the first row and column as names and labels, **Stacked**, its **Title**, the **Axis titles**, the **Legend** and the **Colours**. It follows the cells as they change, leaves out the rows a filter hides, and shows in the workbook's page, its PDF and its Excel file as a chart of Excel's own.
 
-### Rows as cards
+### Rows as cards and a Kanban board
 
 The button on a row's number (or Space on a row picked with Shift+Space, or right-click → **Expand row**, or **Tools → Expand row**) opens the row as a card, as Airtable opens a record: its cells under their column's headers, to read and change, checkboxes, dropdowns and stars as the grid has them; the arrows at its top go to the row before and after.
+
+**View → Kanban board** shows a table with a dropdown column as a board: a column of cards for each of its options (and one for rows without one), each card a row, its first cell as its title and a few others under it. Drag a card to another column to change its row's option, click it to open the row as a card, and **Add a row** to put a new one under the table. **Group by** picks another dropdown column; the × goes back to the grid.
 
 An Excel file you open or save keeps all of this: its filters, conditional formatting, dropdowns, checkboxes and other rules, merged cells, hidden rows and columns, borders, number formats, notes (as comments) and charts. The workbook's own page and its PDF show them too.
 
