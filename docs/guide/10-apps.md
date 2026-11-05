@@ -77,7 +77,13 @@ The apps for everyday things are smaller and quicker: they get real data from fr
 
 <!-- end: apps-b1 -->
 
-<!-- B2: one bullet per app (Reading list, Literature matrix, Reproduce a paper, Reviewer simulator, Rebuttal workbench, Paper to talk, poster and thread, Figure doctor). -->
+- **Reading list**: your papers by project, each with its PDF, BibTeX, tags, status and notes, kept in step with Zotero. It opens on your papers: **+ Add** looks one up by its DOI, arXiv id, link or title and fills it in (one you have already is completed, not added again); search them, show one status, tag or project, and mark each **To read**, **Reading** or **Read**. A paper's own page has its links, notes and BibTeX, and **Reproduce it**; **By project** counts each project's papers. **More** has **Import a .bib**, **Export a .bib** and **Sync with Zotero** (its key asked for the first time), and ticked papers make a **Literature matrix**. See [Read and organise papers](/guide/researchers#read-and-organise-papers).
+- **Literature matrix**: papers read side by side into a spreadsheet: a row for each, a column for each thing you compare (task, data, method, metrics, results and limits unless you change them), each cell with the page it comes from. Give the papers one a line, or "my reading list" with a tag, a project or a status. It reads three at a time and keeps the matrix in your Library. Its view has **The matrix** (**Open in the Library**, **Copy as a table**, the papers it could not read and why, and **Another column**), **Papers** and **Across the papers**.
+- **Reproduce a paper**: a paper's code run to check its numbers: it finds the code (in the paper, or on GitHub and the web), builds a clean environment, gets the data and checkpoints, runs a small slice first and then the real run (a long one in [Experiments](/guide/experiments), waited for), within the limits you give, and compares each number with the paper's. Its view has **Did it reproduce?** (the paper's numbers beside ours, **Open the folder**, **Try again**), **What it took** and **Report**.
+- **Reviewer simulator**: your draft reviewed on the venue's own form and scores (ACL Rolling Review, SIGIR, NeurIPS, ICLR, ICML, KDD, CIKM, WSDM, TheWebConf or a journal), by up to five reviewers, each from an angle of their own, with an area chair's meta-review. Its view has **The reviews**, **Meta-review** (with what could sink it, the most dangerous first), **Baselines and ablations** reviewers will ask for, and **Before you submit** (a list to tick off, and **Answer these reviews**, which starts the Rebuttal workbench). See [Review, answer and present your paper](/guide/researchers#review-answer-and-present-your-paper).
+- **Rebuttal workbench**: the reviews' points grouped across reviewers and sorted (misread, needs an experiment, needs words, minor), a reply drafted to each within the venue's limit, in the tone you pick, with placeholders where a new result is needed. Its view has **Points** (each with its draft, its length against its share, and **Copy**), **To do** (the experiments and changes to tick off) and **Whole rebuttal** (with **Copy the whole rebuttal**).
+- **Paper to talk, poster and thread**: from your paper, the ones you pick of: timed slides with its real figures and equations and what to say, an A0 poster (a LaTeX document), a thread for X and Bluesky and a post for LinkedIn, and a project page, kept in your Library in the project you name. Its view has **What was made** (each with **Open it**), **The talk** (its slides as one strip of minutes) and **Thread** (each platform's posts to copy).
+- **Figure doctor**: your plotting scripts made fit for the paper: the column's width for the venue's template, the paper's font, colours colour-blind readers tell apart, vector PDFs with their fonts embedded (none of Type 3), and one style file for all, the originals kept beside them. Its view has **Before and after**, **Style file** (with **Copy it**) and **What changed**.
 
 <!-- end: apps-b2 -->
 
@@ -114,6 +120,8 @@ To have it back, click its card there. A card shows what it is before anything c
 
 If something is missing, the page says "Fill in the questions marked first" and names the problem under each question ("Needed", "A number, please", "Choose a file").
 
+A link can fill in the form for you: an app's address with `?in.`, a question's name, `=` and the answer opens its page with that answer in its form, ready to change: nothing runs until you press **Run**. [This one](/apps/t/reproduce-paper?in.paper=2104.08663) opens Reproduce a paper with a paper filled in; more answers follow with `&in.` (files never). Agents give you such links, and so do buttons in views (a paper's **Reproduce it** in the Reading list). An app that opens on a page of its own opens on its form then.
+
 ### The kinds of questions
 
 - **Short text** and **Long text**: a line, or a box that grows as you type.
@@ -147,6 +155,7 @@ Some apps work with a service that wants a key: an API key or a token (a weather
 - On the app's page, **A key it needs** (or **Keys it needs**) under the form lists each one: what it is, its name in the vault, a line on how to get it, a box to paste it into, and **Get one**, which opens the page where you get it. Press **Run**: the key goes to the vault first, then the run starts. A key the vault has already shows as **Saved**, with its last characters and **Change**; one the app can do without is marked **optional**.
 - When you install an app from a file, its card asks for its keys too: give them then, or at its first run.
 - When an agent runs it for you in a session, its card there asks for a key it lacks; the key goes straight to the vault, never into the conversation.
+- A key that only one part of an app needs (the Reading list's Zotero key, for **Sync with Zotero**) is not asked for on its form: its page asks for it the first time you use that part.
 
 A run without a key it needs doesn't start: on its form you are asked for it ("Needed to run it"); from the API, a schedule or rows of a CSV, the run is refused and says which key to add (on its page, or in **Apps → Connected apps → Keys** under that name). When a key you saved already may not go to a site the app sends it to, its row says so, with **Allow it**.
 
@@ -464,7 +473,7 @@ The kinds of steps:
 
 - **Ask an agent**: a session works on its part with its tools and hands in what it found. Each has a session of its own, which you can open from the run's page.
 - **Ask a model**: one quick answer from a model, with no tools: sort, pull out, sum up. It costs little, and nothing with a model on this computer.
-- **Use a tool**: one of Hydor's own tools with set inputs: search the web, read a page, find a picture (and a video) of each thing in a list, call an address with a saved key, read a document, make a picture, or send you a notification. Pictures found that way go in an answer's picture column, and videos (YouTube or Vimeo links) play in a view's video element.
+- **Use a tool**: one of Hydor's own tools with set inputs: search the web, read a page, find a picture (and a video) of each thing in a list, call an address with a saved key, read a document, make a picture, send you a notification, or keep what it made in your Library (slides, a document, a spreadsheet, a LaTeX document or a page, in the project it names). For papers: find and read one (from an open copy, with its record and BibTeX), keep a reading list, and sync it with Zotero. Pictures found that way go in an answer's picture column, and videos (YouTube or Vimeo links) play in a view's video element.
 - **Decide**: one way or the other, by a rule ("the price is under 100") or by a question in words that the helper model answers.
 - **Repeat**: its steps once for each item of a list (a few at a time, if you like), or again until something holds.
 - **At the same time**: branches that run side by side; the flow goes on when they have all ended.
@@ -490,6 +499,8 @@ Agents that build an app see the same, with the steps to try.
 
 An app can keep data between its runs: lists of records, like the links of a reading list or the clients of a small CRM. Its steps add, find and change them, and so do its agents, with a tool of their own. A list can say what each record holds (a title, a score, a date…), and the app then checks what goes in. In **Edit**, **What it keeps** lists them: **Add a list**, then give it a name and, if you like, the fields its records hold (without fields, any record goes in).
 
+Ready-made apps keep records too: the [Reading list](/guide/researchers#reading-list) keeps your papers, which its page shows and changes, and which other apps read (the Literature matrix takes "my reading list").
+
 Steps and agents can also search the records for a question, the way your knowledge bases are searched: by their words, and by what they mean when [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) is on, best first. A step can search your knowledge bases and memory notes too, with the knowledge_search and recall tools.
 
 What an app keeps stays with it until you delete the app. Runs from its public page never reach it.
@@ -514,7 +525,7 @@ In an app's **Edit**, the **Design** tab shows its view with its latest run's an
 - **Change it as code**: the view as JSON, its pages, elements (HTML with values such as `{{result.days}}`, and CSS) and events, as the guide's API topic describes them ([Apps: views](/guide/api#apps-views)); the preview follows what you type.
 - **Remove its view**: its answer shows as a plain card again once you save.
 
-A view's events can go to a page (with the item clicked), tick something off or set a filter (kept with the run when it says so), copy, open an address, ask the run's agent for a change (an app without steps), run one of its other flows, run it again with some answers changed, start another app, and add, change or remove a record it keeps. Pages marked for the app's own page show there in place of its form, with what it keeps and its latest run. Such a page has **Update** at its top, which runs the app now, and **Settings** beside it: the answers of its form, kept for those runs, and **Update every day**, as [Explore](#explore) has. A view is part of the app: it has versions with it, travels in its file, and its elements are files of its own in its folder (ui/).
+A view's events can go to a page (with the item clicked), tick something off or set a filter (kept with the run when it says so), copy, open an address, ask the run's agent for a change (an app without steps), run one of its other flows, run it again with some answers changed, start another app, and add, change or remove a record it keeps. Pages marked for the app's own page show there in place of its form, with what it keeps and its latest run. Such a page has **Update** at its top, which runs the app now, and **Settings** beside it: the answers of its form, kept for those runs, and **Update every day**, as [Explore](#explore) has. An app whose form needs a new answer each time (the Reading list needs a paper) has neither: its page is where you work with what it keeps, and its buttons run its form. A view is part of the app: it has versions with it, travels in its file, and its elements are files of its own in its folder (ui/).
 
 Besides its own elements, a view has built-in ones: text, lists to tick off, tables and bar charts, and these for media:
 
