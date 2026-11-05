@@ -2,7 +2,9 @@
 // which hands it what it needs (`Core`) and asks it to draw, act and clean up (`Writing`). Words flow from block to
 // block: Enter makes the next block of the right kind (and leaves a list from an empty item), Backspace at a block's
 // start joins it to the block before, the arrows go on into the block above or below, Tab and Shift+Tab nest and
-// un-nest a list's items. Markdown works as you type ("# ", "- ", "1. ", "[] ", "> ", "```", "---", **bold**,
+// un-nest a list's items (and Tab puts a block under the list before it). An item under another turned into a
+// paragraph, a heading, a quote… keeps its place there, held by its item (li.n-block), with the items under it, as
+// Notion keeps a block under its parent. Markdown works as you type ("# ", "- ", "1. ", "[] ", "> ", "```", "---", **bold**,
 // *italic*, `code`, ~~struck~~). "/" lists the blocks to add, filtered as you type. Beside the block under the
 // pointer sit a + (adds a block under it) and a ⋮⋮ (drag it elsewhere, or click it for its menu: Turn into, Colour,
 // Duplicate, Move, Copy, Delete, Ask the agent). Shift+click or a drag down the margin picks several blocks. To-dos
@@ -113,8 +115,22 @@ export function writing(E: Core): Writing {
 
   // ---- what blocks are -------------------------------------------------------------------------------------------
   const isList = (x: Element | null | undefined): x is HTMLElement => !!x && (x.tagName === 'UL' || x.tagName === 'OL');
+  /**
+   * A block under a list's item keeps its place there, as Notion keeps a block under its parent: an item of the list
+   * holds it (li.n-block, no marker of its own), with the items under it after it. The block it holds, or null.
+   */
+  const blockIn = (li: Element | null | undefined): HTMLElement | null => {
+    if (!li || li.tagName !== 'LI' || !li.classList.contains('n-block')) return null;
+    const b = li.firstElementChild;
+    return b && !isList(b) ? (b as HTMLElement) : null;
+  };
+  /** The item that holds a block, if one does. */
+  const holderOf = (b: Element) => {
+    const p = b.parentElement;
+    return p && blockIn(p) === b ? (p as HTMLElement) : null;
+  };
   const boxOf = (li: Element) => li.querySelector<HTMLInputElement>(':scope > input[type=checkbox]');
-  const isTodo = (li: Element) => li.tagName === 'LI' && (!!li.parentElement?.classList.contains('n-todo') || !!boxOf(li));
+  const isTodo = (li: Element) => li.tagName === 'LI' && !li.classList.contains('n-block') && (!!li.parentElement?.classList.contains('n-todo') || !!boxOf(li));
   const subLists = (h: Element) => (h.tagName === 'LI' ? [...h.children].filter(isList) : []);
   /** A to-do's words (the span after its box), made when it has none yet: an agent's to-do may have its words loose. */
   const todoWords = (li: Element, mk: boolean): HTMLElement | null => {
@@ -139,17 +155,20 @@ export function writing(E: Core): Writing {
     c.append(d);
     return d;
   };
-  /** The block some words belong to: a to-do's item, a callout, a toggle; else the words' own element. */
+  /** The block some words belong to: a to-do's item, a callout, a toggle (and the item that holds it, if one does); else the words' own element. */
   const unitOf = (h: Element): Element => {
     const p = h.parentElement;
+    let u = h;
     if (!p) return h;
-    if (h.tagName === 'SPAN' && p.tagName === 'LI' && isTodo(p) && todoWords(p, false) === h) return p;
-    if (h.classList.contains('n-callout-text') && p.classList.contains('n-callout')) return p;
-    if (h.tagName === 'SUMMARY' && p.tagName === 'DETAILS') return p;
-    return h;
+    if (h.tagName === 'SPAN' && p.tagName === 'LI' && isTodo(p) && todoWords(p, false) === h) u = p;
+    else if (h.classList.contains('n-callout-text') && p.classList.contains('n-callout')) u = p;
+    else if (h.tagName === 'SUMMARY' && p.tagName === 'DETAILS') u = p;
+    return holderOf(u) ?? u;
   };
   const kindOf = (u: Element | null | undefined): Kind | null => {
     if (!u) return null;
+    const held = blockIn(u);
+    if (held) return kindOf(held);
     const t = u.tagName;
     if (/^H[1-6]$/.test(t)) return t.toLowerCase() as Kind;
     if (t === 'P') return 'p';
@@ -162,6 +181,8 @@ export function writing(E: Core): Writing {
   };
   /** Where a block's words are written (made when `mk` and it has none yet), or null when there are none to write. */
   const hostOf = (u: Element, mk = false): HTMLElement | null => {
+    const held = blockIn(u);
+    if (held) return hostOf(held, mk);
     let h: HTMLElement | null = null;
     if (u.tagName === 'LI' && isTodo(u)) h = todoWords(u, mk);
     else if (u.classList.contains('n-callout')) h = calloutWords(u, mk);
@@ -408,6 +429,25 @@ export function writing(E: Core): Writing {
     while (nested(li)) outdent(li);
     split(li);
   };
+  /** A block put in a list beside its items: an item of its own holds it. */
+  const holdIn = (b: Element): HTMLElement => {
+    const li = make('li', 'n-block');
+    b.replaceWith(li);
+    li.append(b);
+    return li;
+  };
+  /** A held block at the list's top level leaves it, where it was (the list splits there), the items under it after it. */
+  const unhold = (li: HTMLElement) => {
+    const b = blockIn(li);
+    if (!b) return;
+    split(li);
+    li.replaceWith(b, ...subLists(li));
+  };
+  /** Shift+Tab, Backspace at its start, Enter in it empty: a held block goes up a level, and out of the list from its top. */
+  const lift = (li: HTMLElement) => {
+    if (nested(li)) outdent(li);
+    if (!nested(li)) unhold(li);
+  };
   /** Makes an item the only one of a list of its own, where it is. */
   const isolate = (li: Element): HTMLElement => {
     const list = li.parentElement as HTMLElement;
@@ -471,10 +511,11 @@ export function writing(E: Core): Writing {
     const h = hostOf(u, true);
     if (!from || !h) return null;
     if (from === kind) return h;
+    const held = blockIn(u);
     let words = takeAll(h);
     if (from === 'code' && kind !== 'code') words = textFrag(plainOf(words));
     const { unit: nu, host: nh } = newUnit(kind, words);
-    copyLook(u, nu, true);
+    copyLook(held ?? u, nu, true);
     const lk = LISTK[kind];
     if (u.tagName === 'LI') {
       const checked = kind === 'todo' && from === 'todo' ? boxOf(u)?.hasAttribute('checked') : false;
@@ -485,6 +526,19 @@ export function writing(E: Core): Writing {
         for (const s of subs) nu.append(s);
         if (checked) boxOf(nu)?.setAttribute('checked', '');
         merge(retype(list, lk[0], lk[1]));
+      } else if (held) {
+        // A block an item holds, turned into another: in its place there (what a toggle folded, after it).
+        held.replaceWith(nu);
+        if (held.tagName === 'DETAILS') nu.after(...[...held.children].filter((c) => c.tagName !== 'SUMMARY'));
+      } else if (nested(u)) {
+        // An item under another, turned into a block, keeps its place there, and the items under it stay under it: the
+        // item holds the block now, with no marker of its own (its look and colours go to the block).
+        boxOf(u)?.remove();
+        todoWords(u, false)?.remove();
+        nu.removeAttribute('id');
+        u.removeAttribute('style');
+        u.className = 'n-block';
+        u.prepend(nu);
       } else {
         // Up to the top first: on the way the items after it go inside it, so its lists are read after.
         toTop(u);
@@ -506,14 +560,18 @@ export function writing(E: Core): Writing {
     return nh;
   };
   /**
-   * Puts a new block after a block: an item stays in its list (or one of its own kind there), anything else goes after
-   * the list it would be in. `kind`: what the new block is (an item not yet in a list can't say which list it is for).
+   * Puts a new block after a block: an item stays in its list (or one of its own kind there); anything else, after an
+   * item under another, stays at that level (held), else goes after the list it would be in. `kind`: what the new block
+   * is (an item not yet in a list can't say which list it is for).
    */
   const putAfter = (nu: HTMLElement, u: Element, kind: Kind = kindOf(nu) ?? 'p') => {
     const lk = LISTK[kind];
     if (u.tagName === 'LI') {
       u.after(nu);
-      if (nu.tagName !== 'LI') {
+      if (nu.tagName !== 'LI' && nested(u)) {
+        // Under an item, at the level of the one it follows: an item of its own holds it.
+        holdIn(nu);
+      } else if (nu.tagName !== 'LI') {
         // Out of the list, splitting it there: by way of an item that goes up to the top, then makes room.
         const tmp = make('li');
         nu.replaceWith(tmp);
@@ -681,15 +739,20 @@ export function writing(E: Core): Writing {
     if (!k || k === 'code') return false;
     dropSelected(h);
     const empty = emptyHost(h);
-    if (isListKind(k) && empty) {
-      // An empty item leaves the list (or goes up a level).
-      E.change(() => (nested(u) ? (outdent(u), writeIn(h)) : writeIn(turnInto(u, 'p'))));
+    // A block an item holds: the item is what comes and goes (its block's own element, for a toggle's inside).
+    const held = blockIn(u);
+    const blk = held ?? u;
+    if ((isListKind(k) || held) && empty) {
+      // An empty item leaves the list (or goes up a level); so does an empty block an item holds.
+      E.change(() => (held ? (lift(u as HTMLElement), writeIn(h)) : nested(u) ? (outdent(u), writeIn(h)) : writeIn(turnInto(u, 'p'))));
       return true;
     }
     if (!empty && atStart(h)) {
       // At a block's start: an empty block before it, the caret staying.
       E.change(() => {
-        u.before(newUnit(isListKind(k) ? k : 'p').unit);
+        const nb = newUnit(isListKind(k) ? k : 'p').unit;
+        u.before(nb);
+        if (held) holdIn(nb);
         return writeIn(h);
       });
       return true;
@@ -699,13 +762,15 @@ export function writing(E: Core): Writing {
       const words = end ? null : takeTail(h);
       const nk: Kind = isListKind(k) ? k : (isHeading(k) || k === 'quote') && !end ? k : 'p';
       const { unit: nu, host: nh } = newUnit(nk, words);
-      if (!end && nk === k) copyLook(u, nu, false);
+      if (!end && nk === k) copyLook(blk, nu, false);
       if (k === 'toggle') {
-        (u as HTMLDetailsElement).open = true;
+        (blk as HTMLDetailsElement).open = true;
         h.after(nu);
       } else {
         u.after(nu);
-        if (u.tagName === 'LI' && nu.tagName === 'LI') for (const s of subLists(u)) nu.append(s);
+        // The items under it go with the new one, which comes right under its words.
+        const into = held ? holdIn(nu) : nu;
+        if (u.tagName === 'LI' && into.tagName === 'LI') for (const s of subLists(u)) into.append(s);
       }
       fillEmpty(h);
       return writeIn(nh);
@@ -717,10 +782,12 @@ export function writing(E: Core): Writing {
     const u = unitOf(h);
     const k = kindOf(u);
     const off = E.offset(h) ?? 0;
+    const blk = blockIn(u) ?? u;
     if (k === 'code') {
       E.change(() => {
         const { unit, host } = newUnit('p');
         u.after(unit);
+        if (blk !== u) holdIn(unit);
         return writeIn(host);
       });
       return true;
@@ -728,7 +795,7 @@ export function writing(E: Core): Writing {
     if (k === 'todo' || k === 'toggle') {
       E.change(() => {
         if (k === 'todo') tick(u);
-        else (u as HTMLDetailsElement).open = !(u as HTMLDetailsElement).open;
+        else (blk as HTMLDetailsElement).open = !(blk as HTMLDetailsElement).open;
         return writeIn(h, { off });
       });
       return true;
@@ -747,6 +814,11 @@ export function writing(E: Core): Writing {
     }
     if (k === 'quote' || k === 'callout' || k === 'toggle' || k === 'code') {
       E.change(() => writeIn(turnInto(u, 'p')));
+      return true;
+    }
+    if (blockIn(u)) {
+      // A block an item holds goes up a level first (out of the list from its top), as an item does.
+      E.change(() => (lift(u as HTMLElement), writeIn(h)));
       return true;
     }
     if (emptyHost(h)) {
@@ -813,9 +885,20 @@ export function writing(E: Core): Writing {
   const tab = (e: KeyboardEvent, h: HTMLElement): boolean => {
     const u = unitOf(h);
     const k = kindOf(u);
-    if (isListKind(k)) {
-      const off = E.offset(h) ?? 0;
-      E.change(() => ((e.shiftKey ? outdent(u) : indent(u)) ? writeIn(h, { off }) : null));
+    const off = E.offset(h) ?? 0;
+    if (isListKind(k) || blockIn(u)) {
+      E.change(() => ((e.shiftKey ? (blockIn(u) ? (lift(u as HTMLElement), true) : outdent(u)) : indent(u)) ? writeIn(h, { off }) : null));
+      return true;
+    }
+    // A block right after a list goes under its last item (as Notion nests a block under the one before it).
+    const before = prevSib(u);
+    if (!e.shiftKey && k && k !== 'code' && isList(before) && before.lastElementChild?.tagName === 'LI') {
+      E.change(() => {
+        const li = holdIn(u);
+        before.append(li);
+        indent(li);
+        return writeIn(h, { off });
+      });
       return true;
     }
     if (k === 'code') {
@@ -868,9 +951,14 @@ export function writing(E: Core): Writing {
         takeAll(h);
         if (whole === '```') return writeIn(turnInto(u, 'code'));
         const hr = make('hr');
-        u.replaceWith(hr);
+        const blk = blockIn(u) ?? u;
+        blk.replaceWith(hr);
         const { unit, host } = newUnit('p');
-        hr.after(unit);
+        // (in a list, the line across stays held where the block was, and the next words get an item of their own)
+        if (blk !== u) {
+          u.after(unit);
+          holdIn(unit);
+        } else hr.after(unit);
         return writeIn(host);
       });
       return true;
@@ -1664,11 +1752,15 @@ export function writing(E: Core): Writing {
       return el;
     };
     const textAfter = (el: Element): Next => {
-      const n = nextSib(el);
+      // (after a block an item holds, in an item of its own at that level)
+      const hl = holderOf(el);
+      const at = hl ?? el;
+      const n = nextSib(at);
       const h = n ? firstHostIn(n) : null;
       if (h && emptyHost(h)) return writeIn(h);
       const { unit, host } = newUnit('p');
-      el.after(unit);
+      at.after(unit);
+      if (hl) holdIn(unit);
       return writeIn(host);
     };
     switch (id) {
@@ -2032,8 +2124,13 @@ export function writing(E: Core): Writing {
     const out: Element[] = [];
     let run: HTMLElement | null = null;
     for (const b of all) {
-      if (b.tagName !== 'LI') {
-        out.push(b);
+      const held = blockIn(b);
+      if (b.tagName !== 'LI' || held) {
+        // (a block an item held comes out as the block, the items under it after it)
+        if (held) {
+          out.push(held, ...subLists(b));
+          b.remove();
+        } else out.push(b);
         run = null;
         continue;
       }
@@ -2069,7 +2166,7 @@ export function writing(E: Core): Writing {
       for (const l of oldLists) if (!l.children.length) l.remove();
       for (const n of nodes) if (isList(n) && n.isConnected) merge(n);
       picked = [];
-      return { pick: all[0] };
+      return { pick: all[0].isConnected ? all[0] : nodes[0] };
     });
   };
   const firstLineBox = (b: Element): DOMRect => {
@@ -2096,7 +2193,7 @@ export function writing(E: Core): Writing {
     }
     hd.style.display = 'flex';
     const first = firstLineBox(b);
-    const marker = b.tagName === 'LI' ? 20 : 0;
+    const marker = b.tagName === 'LI' && !blockIn(b) ? 20 : 0;
     // Side by side where the margin has room; one over the other in a narrow one (a page's usual 20 pixels).
     hd.classList.remove('col');
     let w = hd.offsetWidth;
@@ -2175,8 +2272,10 @@ export function writing(E: Core): Writing {
         const last = lastBlock(f);
         if (last) last.after(unit);
         else f.append(unit);
-      } else if (above) b.before(unit);
-      else putAfter(unit, b, kind);
+      } else if (above) {
+        b.before(unit);
+        if (b.tagName === 'LI' && unit.tagName !== 'LI') holdIn(unit);
+      } else putAfter(unit, b, kind);
       return writeIn(host);
     });
     if (E.editing()) doc.execCommand('insertText', false, '/');

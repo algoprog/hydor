@@ -6,8 +6,9 @@
 // as a file takes it along.
 //
 // It also styles the blocks the page editor writes as Notion does (to-dos, toggles, callouts, columns, a table of
-// contents, a cover and an icon, a video's still, maths, colours of words and of blocks): in a page with the kit's
-// look they take its colours; in a page of its own look, shades of its own text colour, so they suit it light or dark.
+// contents, a cover and an icon, a video's still, maths, colours of words and of blocks, a block kept under a list's
+// item): in a page with the kit's look they take its colours; in a page of its own look, shades of its own text colour,
+// so they suit it light or dark.
 
 /** The ready-made classes and their colours. Light by default; body.n-page follows the app's dark theme. */
 export const KIT_CSS = `
@@ -70,6 +71,8 @@ html[data-n-theme=dark]:has(>body.n-page){color-scheme:dark}
 .n-todo li>span{flex:1;min-width:0}
 .n-todo li>input:checked+span{text-decoration:line-through;opacity:.6}
 .n-todo li>ul,.n-todo li>ol{flex-basis:100%;margin:0;padding-left:1.6em}
+li.n-block{display:block;list-style:none}
+li.n-block>:not(ul,ol){margin-top:.1em;margin-bottom:.1em}
 .n-toggle{margin:.3em 0}
 .n-toggle>summary{cursor:pointer;padding:.1em 0}
 .n-toggle>summary::marker{color:color-mix(in srgb,currentColor 55%,transparent)}
