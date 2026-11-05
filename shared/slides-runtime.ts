@@ -227,7 +227,8 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     '.ns-gridon .ns-grid{display:grid}.ns-viewer.ns-gridon .ns-stage{display:none}',
     '.ns-thumb{position:relative;overflow:hidden;border-radius:8px;cursor:pointer;box-shadow:0 0 0 1px rgba(127,127,127,.35);background:#000}',
     '.ns-thumb.ns-cur{box-shadow:0 0 0 3px var(--n-accent,#2f6fec)}',
-    '.ns-thumb span{position:absolute;left:6px;bottom:4px;font-size:12px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8)}',
+    // The thumbnail's own number, not the spans of the slide drawn in it (its words, its equations).
+    '.ns-thumb>span{position:absolute;left:6px;bottom:4px;font-size:12px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8)}',
     '.ns-end{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000;color:rgba(255,255,255,.75);font-size:15px;z-index:3}',
     // The presenter's tools: the laser, the pen's lines, the captions, and their buttons.
     '.ns-ink{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}',
@@ -243,6 +244,8 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     '.ns-pen.ns-on{box-shadow:0 0 0 2px #fff}',
     // Printing: a page per slide.
     '.ns-print{display:none}',
+    // A page made only to be printed (a PDF, the slides' pictures) shows its slides on the screen too.
+    '.ns-print.ns-onscreen{display:block}',
     '@media print{.ns-printing>*:not(.ns-print){display:none!important}.ns-print{display:block!important}.ns-pg{break-after:page;page-break-after:always;overflow:hidden;position:relative}.ns-pg:last-child{break-after:auto;page-break-after:auto}}',
     '@media (prefers-reduced-motion:reduce){.ns-full .ns-bar{transition:none}}',
   ].join('\n');
@@ -2160,6 +2163,10 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     }
     if (cfg.mode === 'print') {
       print(body, deck);
+      // Shown, not only in print: laid out, its words fitted, and its fonts and pictures loaded before it prints (hidden until
+      // then, a PDF would have none of the equations, nor the stills of videos from the web).
+      body.querySelector('.ns-print')?.classList.add('ns-onscreen');
+      fit(body);
       doc.fonts?.ready.then(() => {
         fitCache.clear();
         fit(body);
