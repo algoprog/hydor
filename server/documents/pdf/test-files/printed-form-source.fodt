@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A form only printed (labels and lines; its controls are not exported as fields by LibreOffice 7.4), with Greek, for the PDF tests (pdf-test.ts): LibreOffice converting it to PDF headless makes printed-form.pdf. -->
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.2" office:mimetype="application/vnd.oasis.opendocument.text">
+ <office:automatic-styles><style:style style:name="gr1" style:family="graphic"><style:graphic-properties style:vertical-pos="top" style:vertical-rel="baseline"/></style:style></office:automatic-styles>
+ <office:body>
+  <office:text>
+   <office:forms form:automatic-focus="false" form:apply-design-mode="false">
+    <form:form form:control-implementation="ooo:com.sun.star.form.component.Form" form:name="Standard">
+     <form:text form:control-implementation="ooo:com.sun.star.form.component.TextField" form:name="FullName" xml:id="c1" form:id="c1"/>
+     <form:text form:control-implementation="ooo:com.sun.star.form.component.TextField" form:name="Πόλη" xml:id="c2" form:id="c2"/>
+     <form:textarea form:control-implementation="ooo:com.sun.star.form.component.TextField" form:name="Address" xml:id="c3" form:id="c3"/>
+     <form:checkbox form:control-implementation="ooo:com.sun.star.form.component.CheckBox" form:name="Subscribe" xml:id="c4" form:id="c4" form:label="Send me news" form:current-state="unchecked"/>
+     <form:radio form:control-implementation="ooo:com.sun.star.form.component.RadioButton" form:name="Plan" xml:id="c5" form:id="c5" form:label="Basic" form:value="basic"/>
+     <form:radio form:control-implementation="ooo:com.sun.star.form.component.RadioButton" form:name="Plan" xml:id="c6" form:id="c6" form:label="Pro" form:value="pro"/>
+     <form:listbox form:control-implementation="ooo:com.sun.star.form.component.ListBox" form:name="Languages" xml:id="c7" form:id="c7" form:size="3" form:multiple="true"><form:option form:label="English"/><form:option form:label="Ελληνικά"/><form:option form:label="中文"/></form:listbox>
+     <form:combobox form:control-implementation="ooo:com.sun.star.form.component.ComboBox" form:name="Country" xml:id="c8" form:id="c8" form:dropdown="true"><form:item form:label="Greece"/><form:item form:label="Cyprus"/><form:item form:label="Portugal"/></form:combobox>
+     <form:listbox form:control-implementation="ooo:com.sun.star.form.component.ListBox" form:name="Size" xml:id="c9" form:id="c9" form:dropdown="true"><form:option form:label="Small"/><form:option form:label="Medium"/><form:option form:label="Large"/></form:listbox>
+    </form:form>
+   </office:forms>
+   <text:p>Application form / Αίτηση</text:p>
+   <text:p>Full name: <draw:control draw:z-index="1" draw:name="Control 1" draw:style-name="gr1" draw:control="c1" svg:width="7cm" svg:height="0.7cm" text:anchor-type="as-char"/></text:p>
+   <text:p>Πόλη (city): <draw:control draw:z-index="2" draw:name="Control 2" draw:style-name="gr1" draw:control="c2" svg:width="5cm" svg:height="0.7cm" text:anchor-type="as-char"/></text:p>
+   <text:p>Address: <draw:control draw:z-index="3" draw:name="Control 3" draw:style-name="gr1" draw:control="c3" svg:width="9cm" svg:height="2cm" text:anchor-type="as-char"/></text:p>
+   <text:p><draw:control draw:z-index="4" draw:name="Control 4" draw:style-name="gr1" draw:control="c4" svg:width="5cm" svg:height="0.6cm" text:anchor-type="as-char"/></text:p>
+   <text:p>Plan: <draw:control draw:z-index="5" draw:name="Control 5" draw:style-name="gr1" draw:control="c5" svg:width="3cm" svg:height="0.6cm" text:anchor-type="as-char"/> <draw:control draw:z-index="6" draw:name="Control 6" draw:style-name="gr1" draw:control="c6" svg:width="3cm" svg:height="0.6cm" text:anchor-type="as-char"/></text:p>
+   <text:p>Languages: <draw:control draw:z-index="7" draw:name="Control 7" draw:style-name="gr1" draw:control="c7" svg:width="4cm" svg:height="1.8cm" text:anchor-type="as-char"/></text:p>
+   <text:p>Country: <draw:control draw:z-index="8" draw:name="Control 8" draw:style-name="gr1" draw:control="c8" svg:width="4cm" svg:height="0.7cm" text:anchor-type="as-char"/> Size: <draw:control draw:z-index="9" draw:name="Control 9" draw:style-name="gr1" draw:control="c9" svg:width="3cm" svg:height="0.7cm" text:anchor-type="as-char"/></text:p>
+   <text:p>Signature: ______________________   Date: ____________</text:p>
+  </office:text>
+ </office:body>
+</office:document>
