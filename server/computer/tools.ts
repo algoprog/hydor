@@ -2,21 +2,31 @@
 // (the main display as a picture, about 1280 pixels wide) and computer_act (Anthropic's computer tool's actions, one
 // or up to 10 in steps, then a screenshot). Each call asks access.ts first (on, macOS's permissions, nothing in the way
 // on this system, the user's yes for the session, nobody else at the computer), runs one at a time, and saves the
-// screen for its row in the conversation. Keys are the system's (cmd on a Mac, ctrl and win elsewhere); the app's Esc,
-// which stops the agent, is let go while the agent itself presses Escape.
+// screen for its row in the conversation, with where the actions were on it. While the driver acts, the desktop app's
+// overlay shows the agent's pointer over the real one (the pointer glides to each place; a ripple on each click, the
+// keys and words beside it). Keys are the system's (cmd on a Mac, ctrl and win elsewhere); the app's Esc, which stops
+// the agent, is let go while the agent itself presses Escape.
 import type { ComputerSystem } from '../../shared/computer.ts';
+import { tellDesktop } from '../desktop.ts';
 import type { RunCtx, RunTool, ToolOutput } from '../features/types.ts';
 import { actionSignal, exclusive, hooks, markActive, mayUse, thisHere, wasStopped } from './access.ts';
 import { withoutEsc } from './glow.ts';
 import type { Machine, Shot } from './machine.ts';
-import { ACTION_NAMES, describe, KEYMAPS, opsFor, parseInput, pressesEscape, toPicture, type Action, type Geometry } from './plan.ts';
+import { ACTION_NAMES, describe, KEYMAPS, marksFor, opsFor, parseInput, pressesEscape, showFor, toPicture, type Action, type Geometry, type Show } from './plan.ts';
 import { nextStep, saveStep } from './steps.ts';
 
 /** What runs on the computer, the system's machine unless the tests put stand-ins here. */
 export const machine: Pick<Machine, 'drive' | 'screenshot' | 'openApp'> = {
-  drive: (ops, signal) => hooks.machine().drive(ops, signal),
+  drive: (ops, signal, started) => hooks.machine().drive(ops, signal, started),
   screenshot: (signal) => hooks.machine().screenshot(signal),
   openApp: (name, signal) => hooks.machine().openApp(name, signal),
+};
+
+/** The agent's pointer in the desktop app's overlay (desktop/glow.cjs): its timeline, sent as the driver starts; tests listen here. */
+export const overlay = {
+  show: (steps: Show[]) => {
+    if (steps.length) tellDesktop({ type: 'pointer', steps });
+  },
 };
 
 const systemHere = (): ComputerSystem => hooks.system() ?? 'mac';
@@ -86,6 +96,9 @@ async function act(ctx: RunCtx, input: Record<string, unknown>): Promise<ToolOut
   markActive(ctx.key, titleOf(ctx));
   const run = actionSignal(ctx.key, ctx.signal);
   const lines: string[] = [];
+  // The screenshot the actions' coordinates are pixels of, and what was done, for the marks on the picture after.
+  const before = geos.get(ctx.key);
+  const done: Action[] = [];
   try {
     await exclusive(async () => {
       // The actions in runs of the driver's steps; apps opened, and the agent's own Escape, between them.
@@ -93,12 +106,14 @@ async function act(ctx: RunCtx, input: Record<string, unknown>): Promise<ToolOut
       const flush = async () => {
         if (!batch.length) return;
         const geo = geos.get(ctx.key);
-        const out = await machine.drive(opsFor(batch, geo), run.signal);
+        const shown = showFor(batch, geo);
+        const out = await machine.drive(opsFor(batch, geo), run.signal, () => overlay.show(shown));
         let k = 0;
         for (const a of batch) {
           const pos = a.do === 'cursor' ? out.positions?.[k++] : undefined;
           lines.push(describe(a, { pos: pos ? (geo ? toPicture(pos, geo) : null) : undefined, pasted: a.do === 'type' && out.typed === 'paste' }));
         }
+        done.push(...batch);
         batch = [];
       };
       for (const a of parsed.actions) {
@@ -125,7 +140,7 @@ async function act(ctx: RunCtx, input: Record<string, unknown>): Promise<ToolOut
       geos.set(ctx.key, shot.geo);
     }
     const n = nextStep(ctx.key);
-    if (shot) saveStep(ctx.key, n, shot.jpeg);
+    if (shot) saveStep(ctx.key, n, shot.jpeg, marksFor(done, before, shot.geo));
     const text = [`Computer step ${n}:`, ...lines.map((l, i) => `${i + 1}. ${l}.`), shot ? screenLine(shot) : 'No screenshot after it (screenshot: false).'].join('\n');
     return { text, ...(shot ? { images: [{ data: shot.jpeg.toString('base64'), mimeType: 'image/jpeg' }] } : {}) };
   } catch (e) {

@@ -21,13 +21,13 @@ process.env.HYDOR_COMPUTER_SETTLE_MS = '1';
 fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true });
 fs.mkdirSync(process.env.DATA_DIR, { recursive: true });
 
-const { FLAGS, LINUX_KEYS, WINDOWS_KEYS, describe, fitSize, jpegSize, opsFor, parseInput, parseKeys, pngSize, pressesEscape, toPicture, toScreen } = await import('./plan.ts');
+const { FLAGS, GLIDE_MS, LINUX_KEYS, WINDOWS_KEYS, describe, fitSize, jpegSize, marksFor, opsFor, parseInput, parseKeys, pngSize, pressesEscape, showFor, toPicture, toScreen } = await import('./plan.ts');
 const { Helper } = await import('./helper.ts');
 const { execArgs, findEntry, wayland } = await import('./linux.ts');
 const { DRIVER } = await import('./driver.ts');
 const access = await import('./access.ts');
-const { computerTools, machine } = await import('./tools.ts');
-const { stepFile } = await import('./steps.ts');
+const { computerTools, machine, overlay } = await import('./tools.ts');
+const { readMarks, stepFile } = await import('./steps.ts');
 const { computer } = await import('./index.ts');
 const { openDb } = await import('../db.ts');
 
@@ -146,10 +146,13 @@ test('the driver’s steps: points on the screen, scroll deltas, keys or typed c
   );
   assert.ok('actions' in p);
   assert.deepEqual(opsFor(p.actions, GEO), [
+    { op: 'glide', x: 720, y: 450, ms: GLIDE_MS },
     { op: 'click', x: 720, y: 450, button: 1, count: 1, mods: [55], flags: FLAGS.cmd },
     { op: 'sleep', ms: 120 },
+    { op: 'glide', x: 0, y: 0, ms: GLIDE_MS },
     { op: 'scroll', x: 0, y: 0, dy: -50, dx: 0, n: 2 },
     { op: 'sleep', ms: 120 },
+    { op: 'glide', x: 0, y: 0, ms: GLIDE_MS },
     { op: 'drag', x1: 0, y1: 0, x2: 144, y2: 90 },
     { op: 'sleep', ms: 120 },
     { op: 'key', code: 9, mods: [55], flags: FLAGS.cmd },
@@ -164,6 +167,66 @@ test('the driver’s steps: points on the screen, scroll deltas, keys or typed c
   assert.equal(describe(p.actions[1]), 'Scrolled down 2 notches at (0, 0)');
   assert.equal(describe(p.actions[5], { pos: [12, 34] }), 'The pointer is at (12, 34)');
   assert.equal(describe({ do: 'type', text: 'hi' }, { pasted: true }), 'Typed “hi”, pasted from the clipboard (typing it was not possible here; the clipboard was put back)');
+});
+
+test('the overlay’s timeline: the pointer glides to each place first, then does what it does there, timed by the drivers’ own pauses', () => {
+  const p = parseInput(
+    {
+      steps: [
+        { action: 'left_click', coordinate: [640, 400] },
+        { action: 'type', text: 'hi' },
+        { action: 'key', text: 'cmd+s' },
+        { action: 'left_click_drag', start_coordinate: [0, 0], coordinate: [128, 80] },
+        { action: 'scroll', coordinate: [640, 400], scroll_direction: 'down', scroll_amount: 2 },
+        { action: 'right_click' },
+      ],
+    },
+    GEO,
+  );
+  assert.ok('actions' in p);
+  const shown = showFor(p.actions, GEO);
+  assert.deepEqual(shown.slice(0, 4), [
+    { at: 0, act: 'move', x: 720, y: 450, ms: GLIDE_MS },
+    { at: GLIDE_MS + 50, act: 'click', x: 720, y: 450 },
+    { at: GLIDE_MS + 70 + 120, act: 'type', text: 'hi' },
+    { at: GLIDE_MS + 70 + 120 + 16 + 120, act: 'key', keys: 'cmd+s' },
+  ]);
+  const drag = shown.find((s) => s.act === 'drag')!;
+  assert.deepEqual({ ...drag, at: undefined }, { at: undefined, act: 'drag', x: 144, y: 90, ms: 192 }, 'a drag goes along its way after the glide to its start');
+  assert.ok(drag.at > shown[3].at + GLIDE_MS, 'after the glide to where it starts');
+  const scroll = shown.filter((s) => s.at > drag.at);
+  assert.deepEqual(scroll.map((s) => s.act), ['move', 'scroll', 'right']);
+  assert.equal(scroll[1].dir, 'down');
+  assert.equal(scroll[2].x, undefined, 'a click where the pointer is has no place of its own');
+  for (let i = 1; i < shown.length; i++) assert.ok(shown[i].at >= shown[i - 1].at, 'in order');
+  const long = showFor([{ do: 'type', text: 'x'.repeat(200) }], GEO);
+  assert.equal(long[0].text!.length, 80, 'long text is cut short for the overlay');
+});
+
+test('marks: where the actions were, as fractions of the picture after them (the display it shows)', () => {
+  const p = parseInput(
+    {
+      steps: [
+        { action: 'left_click', coordinate: [640, 400] },
+        { action: 'double_click', coordinate: [128, 80] },
+        { action: 'type', text: 'hi' },
+        { action: 'left_click_drag', start_coordinate: [0, 0], coordinate: [128, 80] },
+        { action: 'scroll', coordinate: [1279, 799], scroll_direction: 'up' },
+        { action: 'left_click' },
+      ],
+    },
+    GEO,
+  );
+  assert.ok('actions' in p);
+  assert.deepEqual(marksFor(p.actions, GEO, GEO), [
+    { x: 0.5, y: 0.5, act: 'click' },
+    { x: 0.1, y: 0.1, act: 'double' },
+    { x: 0.1, y: 0.1, act: 'drag', from: { x: 0, y: 0 } },
+    { x: 0.9992, y: 0.9988, act: 'scroll', dir: 'up' },
+  ]);
+  // The picture after shows a larger display (scaled differently): the same places, other fractions.
+  assert.deepEqual(marksFor(p.actions.slice(0, 1), GEO, { ...GEO, w: 2880, h: 1800 }), [{ x: 0.25, y: 0.25, act: 'click' }]);
+  assert.deepEqual(marksFor(p.actions, undefined, GEO), [], 'no screenshot before, no places');
 });
 
 test('picture sizes: a PNG’s from its header, a JPEG’s from its frame', () => {
@@ -182,7 +245,7 @@ test('picture sizes: a PNG’s from its header, a JPEG’s from its frame', () =
 // ---- the driver, with stand-ins for macOS's bridge ----
 
 /** Runs the driver as osascript would, with $ and ObjC standing in for macOS; returns what it posted and answered. */
-function runDriver(ops: unknown[], o: { unicode?: boolean } = {}) {
+function runDriver(ops: unknown[], o: { unicode?: boolean; held?: boolean } = {}) {
   const posted: Record<string, unknown>[] = [];
   const clipboard: string[] = [];
   const ev = (x: Record<string, unknown>) => ({ fields: {}, flags: 0, ...x });
@@ -202,6 +265,7 @@ function runDriver(ops: unknown[], o: { unicode?: boolean } = {}) {
     CGPointMake: (x: number, y: number) => ({ x, y }),
     CGEventCreate: () => ({}),
     CGEventGetLocation: () => ({ x: 10, y: 20 }),
+    CGEventSourceButtonState: () => !!o.held,
     CGEventCreateMouseEvent: (_s: unknown, type: number, p: { x: number; y: number }, button: number) => ev({ kind: 'mouse', type, x: p.x, y: p.y, button }),
     CGEventCreateKeyboardEvent: (_s: unknown, code: number, down: boolean) => ev({ kind: 'key', code, down }),
     CGEventCreateScrollWheelEvent: (_s: unknown, units: number, count: number, dy: number) => ev({ kind: 'scroll', units, count, dy }),
@@ -261,6 +325,20 @@ test('the driver script: clicks with their count, combinations with their modifi
   assert.deepEqual(out.positions, [{ x: 10, y: 20 }]);
 });
 
+test('the driver script glides the pointer in small steps, eased, to the very point (drags while a button is held)', () => {
+  const { posted, out } = runDriver([{ op: 'glide', x: 110, y: 220, ms: 96 }]);
+  assert.equal(out.done, 1);
+  assert.equal(posted.length, 6, 'about one step every 16 ms');
+  assert.ok(posted.every((e) => e.kind === 'mouse' && e.type === 5), 'pointer moves');
+  assert.deepEqual([posted.at(-1)!.x, posted.at(-1)!.y], [110, 220], 'it ends on the point');
+  const xs = posted.map((e) => e.x as number);
+  assert.ok(xs.every((x, i) => i === 0 || x > xs[i - 1]), 'always onward');
+  assert.ok((xs[1] as number) - xs[0] < xs[3] - xs[2], 'slow at first, faster midway');
+  assert.equal(runDriver([{ op: 'glide', x: 11, y: 21, ms: 240 }]).posted.length, 1, 'already there: one move');
+  const held = runDriver([{ op: 'glide', x: 110, y: 220, ms: 64 }], { held: true }).posted;
+  assert.ok(held.length === 4 && held.every((e) => e.type === 6), 'a held button makes them drags');
+});
+
 test('the driver script types any character on key events, and pastes (clipboard put back) where that is not possible', () => {
   const typed = runDriver([{ op: 'type', text: 'Γεια 😀\nok' }]);
   assert.equal(typed.out.typed, 'array');
@@ -293,10 +371,13 @@ const deps = {
 } as never;
 const ctxOf = (key: string) => ({ runId: `run-${key}`, key, agent: 'claude' as const, cwd: '/tmp', deps });
 const drives: unknown[][] = [];
-machine.drive = async (ops) => {
+machine.drive = async (ops, _signal, started) => {
   drives.push(ops);
+  started?.();
   return { done: ops.length, positions: ops.filter((o) => o.op === 'pos').map(() => ({ x: 720, y: 450 })) };
 };
+const shows: { act: string }[][] = [];
+overlay.show = (steps) => void shows.push(steps);
 machine.screenshot = async () => ({ jpeg: Buffer.from('JPEG'), geo: GEO, app: 'Finder', pos: { x: 720, y: 450 }, displays: 1 });
 machine.openApp = async () => {};
 access.setComputerDeps(deps);
@@ -364,7 +445,10 @@ test('the first use in a session asks on a card; no is respected; yes holds for 
   assert.equal(cards.length, n, 'no second card');
   assert.match(act.text, new RegExp(`^Computer step ${step + 1}:\\n1`));
   assert.match(act.text, /:\n1\. Clicked at \(640, 400\)\.\n2\. Typed “hi”\.\n3\. The pointer is at \(640, 400\)\./);
-  assert.deepEqual((drives.at(-1) as { op: string; x?: number }[])[0], { op: 'click', x: 720, y: 450, button: 0, count: 1, mods: [], flags: 0 }, 'the click lands on the point under the pixel');
+  assert.deepEqual((drives.at(-1) as { op: string; x?: number }[]).slice(0, 2), [{ op: 'glide', x: 720, y: 450, ms: GLIDE_MS }, { op: 'click', x: 720, y: 450, button: 0, count: 1, mods: [], flags: 0 }], 'the pointer glides there, and the click lands on the point under the pixel');
+  assert.deepEqual(shows.at(-1)?.map((s) => s.act), ['move', 'click', 'type'], 'the overlay hears, as the driver starts, where the pointer goes and what it does');
+  assert.deepEqual(readMarks(stepFile('a', step + 1, 'json')), [{ x: 0.5, y: 0.5, act: 'click' }], 'the picture after is marked where the click landed');
+  assert.deepEqual(readMarks(stepFile('a', step, 'json')), [], 'a look at the screen marks nothing');
   assert.deepEqual(access.activeView()?.key, 'a', 'the session is at the Mac');
   assert.ok(events.some((e) => (e as { data?: { active?: { key: string } } }).data?.active?.key === 'a'), 'the pages hear of it');
 });
@@ -409,7 +493,7 @@ test('Esc is let go while the agent presses it: its Escape goes alone, between t
   assert.equal(r.isError, undefined, r.text);
   assert.deepEqual(
     drives.map((ops) => (ops as { op: string }[]).map((o) => o.op)),
-    [['click'], ['key'], ['type']],
+    [['glide', 'click'], ['key'], ['type']],
     'three runs of the driver: before, the Escape, after',
   );
   assert.match(r.text, /2\. Pressed escape\./);

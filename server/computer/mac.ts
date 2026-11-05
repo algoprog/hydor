@@ -25,9 +25,11 @@ function exec(cmd: string, args: string[], timeout: number, signal?: AbortSignal
   });
 }
 
-/** Runs the driver's steps. */
-export async function drive(ops: Op[], signal?: AbortSignal): Promise<DriverOut> {
-  const out = await exec('/usr/bin/osascript', ['-l', 'JavaScript', '-e', DRIVER, JSON.stringify(ops)], driverTimeout(ops), signal);
+/** Runs the driver's steps (`started` as osascript is started: its first step follows a moment later). */
+export async function drive(ops: Op[], signal?: AbortSignal, started?: () => void): Promise<DriverOut> {
+  const run = exec('/usr/bin/osascript', ['-l', 'JavaScript', '-e', DRIVER, JSON.stringify(ops)], driverTimeout(ops), signal);
+  started?.();
+  const out = await run;
   try {
     return JSON.parse(out.trim() || '{}');
   } catch {

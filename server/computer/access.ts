@@ -6,6 +6,7 @@
 // app's menu bar or tray says so, and so do the pages.
 import crypto from 'node:crypto';
 import {
+  AGENT_TAG,
   COMPUTER_ALLOW,
   COMPUTER_DENY,
   COMPUTER_WORDS,
@@ -101,7 +102,7 @@ function announce() {
   const tr = deps ? appWords(deps.db) : (s: string) => s;
   tellDesktop(
     active
-      ? { type: 'computer', active: true, title: active.title, using: tr(wordsHere().using), esc: tr(PRESS_ESC), glow: hooks.machine().glow?.() ?? true }
+      ? { type: 'computer', active: true, title: active.title, using: tr(wordsHere().using), esc: tr(PRESS_ESC), agent: tr(AGENT_TAG), glow: hooks.machine().glow?.() ?? true }
       : { type: 'computer', active: false },
   );
   deps?.broadcast({ t: 'feature', id: 'computer', data: { type: 'active', active: activeView() } satisfies ComputerEvent });

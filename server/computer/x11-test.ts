@@ -1,6 +1,6 @@
 // Computer use on Linux, for real: the X11 helper (x11-helper.py) against a test window on an X display, which says
 // what it gets (keys as the keyboard is laid out at that moment, clicks, the wheel, drags). Checks the pointer goes
-// where asked, clicks with modifiers held, scrolling, dragging, typing any character on any layout (spare keys lent
+// where asked (gliding there in small steps, so the eye can follow), clicks with modifiers held, scrolling, dragging, typing any character on any layout (spare keys lent
 // for the rest), named keys, a key the keyboard lacks, and opening an app by its .desktop entry. Needs python3,
 // libXtst and an X display: the one in DISPLAY, else an Xvfb it starts (the desktop workflow installs xvfb). The
 // screenshot is the desktop app's (Electron), not tried here. Build and run:
@@ -64,7 +64,7 @@ X.XSelectInput.argtypes = [V, c_ulong, c_long]; X.XMapRaised.argtypes = [V, c_ul
 X.XNextEvent.argtypes = [V, POINTER(Event)]; X.XLookupString.argtypes = [POINTER(Key), c_char_p, c_int, POINTER(c_ulong), V]
 X.XRefreshKeyboardMapping.argtypes = [V]; X.XSync.argtypes = [V, c_int]
 d = X.XOpenDisplay(None); w = X.XCreateSimpleWindow(d, X.XDefaultRootWindow(d), 100, 100, 800, 600, 0, 0, 0xFFFFFF)
-X.XSelectInput(d, w, 1 | 4 | 8192 | 131072); X.XMapRaised(d, w); X.XSync(d, 0); X.XSetInputFocus(d, w, 2, 0); X.XSync(d, 0)
+X.XSelectInput(d, w, 1 | 4 | 64 | 8192 | 131072); X.XMapRaised(d, w); X.XSync(d, 0); X.XSetInputFocus(d, w, 2, 0); X.XSync(d, 0)
 print(json.dumps({"ready": True}), flush=True)
 ev = Event(); buf = create_string_buffer(64); ks = c_ulong()
 while True:
@@ -108,6 +108,27 @@ test('the pointer goes where asked, and is read back', async () => {
   const out = await drive([{ op: 'move', x: 500.4, y: 400.6 }, { op: 'pos' }, { op: 'info' }]);
   assert.deepEqual(out.positions, [{ x: 500, y: 401 }]);
   assert.ok(out.info?.display && out.info.display.w > 0 && out.info.display.h > 0, JSON.stringify(out.info));
+});
+
+test('the pointer glides to a place in small steps, eased, over about a quarter of a second, and ends on it', async () => {
+  await drive([{ op: 'move', x: 300, y: 300 }]);
+  await settle();
+  got.length = 0;
+  const t0 = Date.now();
+  const out = await drive([{ op: 'glide', x: 700, y: 500, ms: 240 }, { op: 'pos' }]);
+  const took = Date.now() - t0;
+  await settle();
+  assert.deepEqual(out.positions, [{ x: 700, y: 500 }]);
+  const moves = got.filter((e) => e.motion).map((e) => [e.x, e.y] as [number, number]);
+  assert.ok(moves.length >= 8, `${moves.length} moves: a glide, not a jump`);
+  assert.deepEqual(moves.at(-1), [700, 500]);
+  assert.ok(moves.every(([x], i) => i === 0 || x >= moves[i - 1][0]), 'always onward');
+  assert.ok(moves.some(([x]) => x > 400 && x < 600), 'through the middle of the way');
+  assert.ok(took >= 200 && took < 1500, `took ${took} ms`);
+  got.length = 0;
+  await drive([{ op: 'glide', x: 701, y: 500, ms: 240 }]);
+  await settle();
+  assert.ok(got.filter((e) => e.motion).length <= 1, 'already there: no glide');
 });
 
 test('clicks: left, right, a double click holding ctrl', async () => {
