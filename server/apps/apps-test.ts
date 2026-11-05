@@ -197,9 +197,9 @@ test('form: defaults, numbers, dates, choices, yes/no and what to fix', () => {
 /** The ten ready-made tasks of before the apps for everyday things (templates-more.ts), each made of several kinds of step. */
 const FIRST_TEN = ['deep-research', 'trip-planner', 'compare-products', 'document-qa', 'meeting-actions', 'cover-letter', 'lesson-plan', 'news-digest', 'explain-contract', 'small-web-app'];
 
-test('templates: thirty-two tasks in steps, each checking out as a save checks it, using its needed fields, giving every answer field it needs, asking a person only when someone is there, its programs readable; five blocks, whose steps check out and use theirs', async () => {
+test('templates: thirty-eight tasks in steps, each checking out as a save checks it, using its needed fields, giving every answer field it needs, asking a person only when someone is there, its programs readable; five blocks, whose steps check out and use theirs', async () => {
   const tasks = TEMPLATES.filter((t) => !t.block);
-  assert.equal(tasks.length, 32);
+  assert.equal(tasks.length, 38);
   assert.deepEqual(tasks.slice(0, 10).map((t) => t.id), FIRST_TEN, 'the first ten keep their place');
   const blocks = TEMPLATES.filter((t) => t.block);
   assert.equal(blocks.length, 5);

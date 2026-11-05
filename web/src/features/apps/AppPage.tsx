@@ -453,11 +453,13 @@ function WhenRow({ daily, disabled, onChange }: { daily: HomeSettings['daily']; 
   );
 }
 
-/** Its settings: Update automatically (on which days, and when), then its form's answers, which each update takes. */
-function HomeSettingsPanel({ id, recipe, template, home, onSaved }: { id: string; recipe: AppDef | AppTemplate; template: boolean; home: HomeSettings; onSaved: (h: HomeSettings) => void }) {
+/** Its settings: Update automatically (on which days, and when), then its form's answers, which each update takes, and the keys it uses (those it can do without too). */
+function HomeSettingsPanel({ id, recipe, template, home, onSaved, keys, onKeys }: { id: string; recipe: AppDef | AppTemplate; template: boolean; home: HomeSettings; onSaved: (h: HomeSettings) => void; keys?: KeyState[]; onKeys?: (keys: KeyState[]) => void }) {
   const [values, setValues] = useState<FormValues>(() => ({ ...initialValues(recipe.fields), ...home.inputs }));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [keyInput, setKeyInput] = useState<KeyInput>(emptyKeys);
+  const typed = Object.values(keyInput.values).some((v) => v.trim()) || keyInput.allow.length > 0;
   const changed = recipe.fields.some((f) => String(values[f.id] ?? '') !== String(home.inputs[f.id] ?? ''));
   const save = async (body: Record<string, unknown>) => {
     setSaving(true);
@@ -498,17 +500,32 @@ function HomeSettingsPanel({ id, recipe, template, home, onSaved }: { id: string
             onChange={(k, v) => (setValues((x) => ({ ...x, [k]: v })), errors[k] && setErrors((e) => ({ ...e, [k]: '' })))}
             onFile={() => {}}
           />
+          {keys && keys.length > 0 && <AppKeys keys={keys} input={keyInput} onChange={setKeyInput} disabled={saving} own={!template} className="mt-3 border-t border-line pt-3" />}
           <div className="mt-3 flex items-center justify-end gap-2">
             <span className="flex-1 text-[12px] leading-snug text-fg-3">Each update uses these.</span>
             <Button
               size="sm"
               variant="primary"
-              disabled={!changed || saving}
+              disabled={(!changed && !typed) || saving}
               onClick={async () => {
                 const errs = formErrors(fields, values, {});
                 setErrors(errs);
                 if (Object.keys(errs).length) return;
-                if (await save({ inputs: Object.fromEntries(fields.map((f) => [f.id, String(values[f.id] ?? '')])) })) toast('Saved', 'ok');
+                if (changed && !(await save({ inputs: Object.fromEntries(fields.map((f) => [f.id, String(values[f.id] ?? '')])) }))) return;
+                // The keys typed go to the vault, as on its form.
+                if (typed) {
+                  setSaving(true);
+                  try {
+                    const r = await post<{ secrets: KeyState[] }>(`/api/apps/${enc(id)}/secrets`, { values: keyInput.values, allow: keyInput.allow });
+                    setKeyInput(emptyKeys());
+                    onKeys?.(r.secrets);
+                  } catch (e) {
+                    return void toastError(e);
+                  } finally {
+                    setSaving(false);
+                  }
+                }
+                toast('Saved', 'ok');
               }}
             >
               Save
@@ -521,7 +538,7 @@ function HomeSettingsPanel({ id, recipe, template, home, onSaved }: { id: string
 }
 
 /** The settings button at the top of an app's own page, and their panel. */
-function HomeSettingsButton(props: { id: string; recipe: AppDef | AppTemplate; template: boolean; home: HomeSettings; onSaved: (h: HomeSettings) => void }) {
+function HomeSettingsButton(props: { id: string; recipe: AppDef | AppTemplate; template: boolean; home: HomeSettings; onSaved: (h: HomeSettings) => void; keys?: KeyState[]; onKeys?: (keys: KeyState[]) => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   return (
@@ -555,6 +572,26 @@ function firstLine(recipe: AppDef | AppTemplate, r: AppRun): string {
 function HomeView({ id, recipe, template, view, home, own, onHome }: { id: string; recipe: AppDef | AppTemplate; template: boolean; view?: Record<string, unknown>; home?: HomeSettings; own: OwnPage; onHome: (h: HomeSettings) => void }) {
   const info = useMemo(() => appInfo(id, recipe), [id, recipe]);
   const [starting, setStarting] = useState(false);
+  // Before the first one: the questions it cannot do without that its settings leave empty (your venues, your name), asked here.
+  const needs = recipe.fields.filter((f) => f.required && f.type !== 'file' && !String(home?.inputs[f.id] ?? '').trim());
+  const [values, setValues] = useState<FormValues>(() => initialValues(needs));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const first = async () => {
+    let settings = home;
+    if (needs.length) {
+      const errs = formErrors(needs, values, {});
+      setErrors(errs);
+      if (Object.keys(errs).length) return;
+      try {
+        settings = (await put<{ home: HomeSettings }>(`/api/apps/${enc(id)}/home`, { inputs: Object.fromEntries(needs.map((f) => [f.id, String(values[f.id] ?? '')])) })).home;
+        onHome(settings);
+      } catch (e) {
+        return toastError(e);
+      }
+    }
+    setStarting(true);
+    await runFromPage(id, settings, own.reload).finally(() => setStarting(false));
+  };
   if (own.last === undefined)
     return (
       <div className="flex justify-center py-20 text-fg-3">
@@ -600,7 +637,12 @@ function HomeView({ id, recipe, template, view, home, own, onHome }: { id: strin
             <p className="mt-1.5 text-[14.5px] leading-relaxed text-fg-2" translate={template ? undefined : 'no'}>
               {recipe.description}
             </p>
-            <Button variant="primary" icon={starting ? <Throbber /> : <Play size={14} fill="currentColor" />} disabled={starting} className="mt-6 h-10 px-5" onClick={() => (setStarting(true), void runFromPage(id, home, own.reload).finally(() => setStarting(false)))}>
+            {needs.length > 0 && (
+              <div className="mt-6 w-full rounded-2xl border border-line bg-panel px-5 py-4 text-left">
+                <AppForm fields={needs} values={values} files={{}} errors={errors} disabled={starting} onChange={(k, v) => (setValues((x) => ({ ...x, [k]: v })), errors[k] && setErrors((e) => ({ ...e, [k]: '' })))} onFile={() => {}} />
+              </div>
+            )}
+            <Button variant="primary" icon={starting ? <Throbber /> : <Play size={14} fill="currentColor" />} disabled={starting} className="mt-6 h-10 px-5" onClick={() => void first()}>
               Make the first one
             </Button>
             {home && (
@@ -771,7 +813,7 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
             installed && (
               <>
                 {ownPage && <UpdateButton id={id} own={own} home={home} />}
-                {ownPage && home && <HomeSettingsButton id={id} recipe={recipe} template home={home} onSaved={setHome} />}
+                {ownPage && home && <HomeSettingsButton id={id} recipe={recipe} template home={home} onSaved={setHome} keys={d?.secrets} onKeys={(secrets) => setD((x) => (x ? { ...x, secrets } : x))} />}
                 {/* On its own page, Make it mine waits in the menu: Update and Settings are what it is for. */}
                 {!ownPage && (
                   <Button size="sm" icon={<Pencil size={14} />} onClick={() => go(`/apps/new?template=${enc(id.slice(4))}`)}>
@@ -797,7 +839,7 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
           ) : (
             <>
               {ownPage && <UpdateButton id={id} own={own} home={home} />}
-              {ownPage && home && <HomeSettingsButton id={id} recipe={recipe} template={false} home={home} onSaved={setHome} />}
+              {ownPage && home && <HomeSettingsButton id={id} recipe={recipe} template={false} home={home} onSaved={setHome} keys={d?.secrets} onKeys={(secrets) => setD((x) => (x ? { ...x, secrets } : x))} />}
               <Button size="sm" icon={<Pencil size={14} />} onClick={() => go(`${appPath(id)}/edit`)}>
                 Edit
               </Button>
