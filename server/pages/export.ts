@@ -2,7 +2,8 @@
 // document (docx.ts reads what it shows into paragraphs, lists, tables and pictures); the other kinds (kinds.ts)
 // as their own files, made from the model itself (a deck as PowerPoint, a document as Word or Markdown, a
 // spreadsheet as Excel or CSV, a notebook as its .ipynb or a Python script), and as a PDF printed from their own page; any of them as a web page that works on
-// its own. PDFs, and a page's Word document, need the browser pictures are taken with (Settings → Browser).
+// its own; a deck's slides as pictures (PNG). PDFs, pictures, and a page's Word document, need the browser pictures
+// are taken with (Settings → Browser).
 import { STORAGE_LIMITS } from '../../shared/pages.ts';
 import { KIT_CSS } from '../../shared/page-kit.ts';
 import { ASSET } from '../../shared/slides.ts';
@@ -13,11 +14,11 @@ import { fetchPage } from '../web/fetch.ts';
 import { getAsset, pictureType } from './assets.ts';
 import { docxOfPage } from './docx.ts';
 import { injectHead, kitHead } from './kit.ts';
-import { imageSize } from './ooxml.ts';
+import { imageSize, zipParts } from './ooxml.ts';
 import type { Picture } from './pptx.ts';
 import { mustKind, type ExportFormat, type ExportHelp, type KindDef } from './kinds.ts';
 import { readDeck } from './slides.ts';
-import { deckRenders } from './slides-render.ts';
+import { deckPictures, deckRenders } from './slides-render.ts';
 import { mustPage, pageSource, storageMap } from './store.ts';
 
 export type { ExportFormat };
@@ -34,6 +35,7 @@ export const EXPORT_TYPES: Record<ExportFormat, string> = {
   html: 'text/html; charset=utf-8',
   ipynb: 'application/x-ipynb+json',
   py: 'text/x-python; charset=utf-8',
+  png: 'image/png',
 };
 
 export type Paper = 'a4' | 'letter';
@@ -126,13 +128,24 @@ async function fitScales(db: DB, k: KindDef, text: string, title: string): Promi
 export const formatsOf = (k: KindDef): ExportFormat[] => [...new Set([...(Object.keys(k.files) as ExportFormat[]), 'pdf', 'html'] as ExportFormat[])];
 
 /** A page, deck, document or spreadsheet (its current version, or `version`) as a file. */
-export async function exportPage(db: DB, id: string, o: { format: ExportFormat; version?: number; paper?: Paper }): Promise<{ data: Buffer; type: string; name: string }> {
+export async function exportPage(db: DB, id: string, o: { format: ExportFormat; version?: number; paper?: Paper; slide?: number }): Promise<{ data: Buffer; type: string; name: string }> {
   mustPage(db, id);
   const src = pageSource(db, id, Number.isInteger(o.version) && o.version! > 0 ? o.version : undefined);
   if (!src) throw new HttpError(404, 'That version is no longer kept');
   const title = src.title;
   const out = (data: Buffer | string, ext: string) => ({ data: Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8'), type: EXPORT_TYPES[o.format], name: fileName(title, ext) });
   const paper = PAPER[o.paper ?? 'a4'];
+
+  // A deck's slides as pictures: one (by its number), or every one the slideshow shows, in a zip.
+  if (o.format === 'png') {
+    if (src.kind !== 'slides') throw new HttpError(400, 'Only slides export as pictures');
+    if (!canCapture()) throw noBrowser();
+    const one = Number.isInteger(o.slide) && o.slide! > 0 ? o.slide : undefined;
+    const pics = await deckPictures(db, readDeck(src.text), title, one);
+    if (!pics.length) throw new HttpError(one ? 404 : 400, one ? 'No such slide' : 'The deck has no slides to show');
+    if (one) return { data: pics[0].data, type: 'image/png', name: fileName(`${title} ${one}`, 'png') };
+    return { data: zipParts(pics.map((p) => ({ name: `slide-${String(p.n).padStart(2, '0')}.png`, data: p.data }))), type: EXPORT_TYPES.zip, name: fileName(`${title} slides`, 'zip') };
+  }
 
   if (src.kind !== 'page') {
     const k = mustKind(src.kind);

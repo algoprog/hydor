@@ -300,7 +300,7 @@ const EXPORT_PAGE: RunTool = {
   name: 'export_page',
   description: [
     'Save a page, slide deck, document, spreadsheet, LaTeX document or notebook of the user’s Library as a file, to hand over with present_files: a page as a PDF or a Word document (docx),',
-    'a deck as PowerPoint (pptx) or a PDF (a slide a page), a document as Word (docx), PDF or Markdown (md), a spreadsheet as Excel (xlsx), CSV (its first sheet) or PDF,',
+    'a deck as PowerPoint (pptx), a PDF (a slide a page) or its slides as pictures (png: a zip of them, or one slide with slide), a document as Word (docx), PDF or Markdown (md), a spreadsheet as Excel (xlsx), CSV (its first sheet) or PDF,',
     'a LaTeX document as its typeset PDF, its main source (tex) or the whole project (zip), a notebook as its .ipynb file (ipynb), a Python script of its cells (py) or a PDF; any of them as a web page (html) that works on its own.',
     'The file goes in this session’s folder unless you give a path.',
   ].join(' '),
@@ -308,7 +308,8 @@ const EXPORT_PAGE: RunTool = {
     type: 'object',
     properties: {
       id: { type: 'string', description: 'The page’s or deck’s id (get_page lists them).' },
-      format: { type: 'string', enum: ['pdf', 'docx', 'pptx', 'xlsx', 'csv', 'md', 'tex', 'zip', 'html', 'ipynb', 'py'] },
+      format: { type: 'string', enum: ['pdf', 'docx', 'pptx', 'xlsx', 'csv', 'md', 'tex', 'zip', 'html', 'ipynb', 'py', 'png'] },
+      slide: { type: 'number', description: 'With png: that slide alone (from 1), as a picture.' },
       path: { type: 'string', description: 'Where to write it: a file name or a path, from the session’s folder or absolute.' },
     },
     required: ['id', 'format'],
@@ -316,7 +317,7 @@ const EXPORT_PAGE: RunTool = {
   async run(a, ctx) {
     const format = String(a.format) as ExportFormat;
     if (!EXPORT_TYPES[format]) throw new Error(`format is one of ${Object.keys(EXPORT_TYPES).join(', ')}.`);
-    const f = await exportPage(ctx.deps.db, String(a.id ?? ''), { format });
+    const f = await exportPage(ctx.deps.db, String(a.id ?? ''), { format, slide: Number(a.slide) || undefined });
     const dest = typeof a.path === 'string' && a.path.trim() ? fromSession(ctx.cwd, a.path.trim()) : path.join(ctx.cwd || config.defaultCwd, f.name);
     const file = fs.existsSync(dest) && fs.statSync(dest).isDirectory() ? path.join(dest, f.name) : dest;
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -613,10 +614,10 @@ function routes(d: Deps) {
   app.post('/api/pages/:id/link', async (req) => ({ link: `/pg/${resetPageLink(db, P(req).id)}` }));
   /** The page as a file: a PDF, a Word document or (a deck) a PowerPoint file, or a web page that works on its own. */
   app.get('/api/pages/:id/export', async (req, reply) => {
-    const q = req.query as { format?: string; v?: string; paper?: string };
+    const q = req.query as { format?: string; v?: string; paper?: string; slide?: string };
     const format = String(q.format ?? '') as ExportFormat;
     if (!EXPORT_TYPES[format]) throw new HttpError(400, `format is one of ${Object.keys(EXPORT_TYPES).join(', ')}`);
-    const f = await exportPage(db, P(req).id, { format, version: q.v ? Number(q.v) : undefined, paper: q.paper === 'letter' ? 'letter' : 'a4' });
+    const f = await exportPage(db, P(req).id, { format, version: q.v ? Number(q.v) : undefined, paper: q.paper === 'letter' ? 'letter' : 'a4', slide: q.slide ? Number(q.slide) : undefined });
     return reply
       .header('Cache-Control', 'no-store')
       .header('Content-Disposition', `attachment; filename="${f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(f.name)}`)

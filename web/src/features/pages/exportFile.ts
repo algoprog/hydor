@@ -1,13 +1,13 @@
-// A page or a deck as a file, downloaded: a PDF, a Word document, a PowerPoint deck or a web page, made by the
-// server (GET /api/pages/:id/export). Paper is Letter where people use it, else A4. Without the browser the server
-// makes PDFs with, a deck still prints from here: every slide on a page, through the device's own Print.
+// A page or a deck as a file, downloaded: a PDF, a Word document, a PowerPoint deck, a deck's slides as pictures or a
+// web page, made by the server (GET /api/pages/:id/export). Paper is Letter where people use it, else A4. Without the
+// browser the server makes PDFs with, a deck still prints from here: every slide on a page, through the device's own Print.
 import type { Deck } from '@shared/slides';
 import { ApiError, enc } from '../../lib/api';
 import { mu } from '../../lib/machine';
 import { toast } from '../../lib/store';
 import { PICS, RT } from './slides/rt';
 
-export type ExportFormat = 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py';
+export type ExportFormat = 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png';
 
 const LETTER = /^(en-US|en-CA|es-US|es-MX|fr-CA|en-PH|es-CO|es-CL|es-VE|es-GT|es-CR|es-PA)$/i;
 
@@ -51,13 +51,26 @@ export function printDeck(deck: Deck) {
   void document.fonts.ready.then(() => setTimeout(() => window.print(), 250));
 }
 
-const WHAT: Record<ExportFormat, string> = { pdf: 'the PDF', docx: 'the Word document', pptx: 'the PowerPoint file', xlsx: 'the Excel file', csv: 'the CSV file', md: 'the Markdown file', tex: 'the LaTeX file', zip: 'the LaTeX project', html: 'the web page', ipynb: 'the notebook', py: 'the Python script' };
+const WHAT: Record<ExportFormat, string> = {
+  pdf: 'the PDF',
+  docx: 'the Word document',
+  pptx: 'the PowerPoint file',
+  xlsx: 'the Excel file',
+  csv: 'the CSV file',
+  md: 'the Markdown file',
+  tex: 'the LaTeX file',
+  zip: 'the LaTeX project',
+  html: 'the web page',
+  ipynb: 'the notebook',
+  py: 'the Python script',
+  png: 'the pictures',
+};
 
 /** Downloads the page (or its version `version`) as a file; a deck's PDF prints here when the server cannot make it. */
-export async function exportFile(id: string, format: ExportFormat, o: { version?: number; deck?: Deck } = {}) {
+export async function exportFile(id: string, format: ExportFormat, o: { version?: number; deck?: Deck; slide?: number } = {}) {
   const paper = LETTER.test(navigator.language) ? 'letter' : 'a4';
-  if (format !== 'html' && format !== 'csv' && format !== 'md' && format !== 'tex' && format !== 'ipynb' && format !== 'py') toast(`Making ${WHAT[format]}…`);
-  const res = await fetch(mu(`/api/pages/${enc(id)}/export?format=${format}&paper=${paper}${o.version ? `&v=${o.version}` : ''}`), { credentials: 'same-origin' });
+  if (format !== 'html' && format !== 'csv' && format !== 'md' && format !== 'tex' && format !== 'ipynb' && format !== 'py') toast(o.slide ? 'Making the picture…' : `Making ${WHAT[format]}…`);
+  const res = await fetch(mu(`/api/pages/${enc(id)}/export?format=${format}&paper=${paper}${o.version ? `&v=${o.version}` : ''}${o.slide ? `&slide=${o.slide}` : ''}`), { credentials: 'same-origin' });
   if (!res.ok) {
     const j = (await res.json().catch(() => null)) as { error?: string } | null;
     if (res.status === 503 && format === 'pdf' && o.deck) {

@@ -24,6 +24,7 @@ import {
   Eye,
   Grid3x3,
   Group,
+  ImageDown,
   Image as ImageIcon,
   IndentDecrease,
   IndentIncrease,
@@ -135,6 +136,8 @@ export interface MenuArgs {
   deleteSlide(): void;
   skipSlide(): void;
   openTab(t: 'slide' | 'animate' | 'theme'): void;
+  /** This slide as a picture (PNG). */
+  slidePicture?: () => void;
   present(from: 'start' | 'here' | 'presenter'): void;
   shortcuts(): void;
   ask?: () => void;
@@ -341,6 +344,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         { label: 'Theme', disabled: ro, also: 'colours fonts look', run: () => a.openTab('theme') },
         '-',
         { label: 'Slide numbers and footer', also: 'footer page number date', disabled: ro, run: a.footer },
+        a.slidePicture && { label: 'Save this slide as a picture', icon: <ImageDown size={14} />, also: 'png image export download screenshot', run: a.slidePicture },
         '-',
         { label: 'Present from this slide', icon: <Play size={14} />, keys: 'Shift+F5', run: () => a.present('here') },
         { label: 'Present from the beginning', icon: <Play size={14} />, keys: 'F5', run: () => a.present('start') },

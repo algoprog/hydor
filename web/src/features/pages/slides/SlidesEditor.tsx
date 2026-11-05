@@ -59,6 +59,7 @@ import {
   line,
   lookOf,
   moveSlide,
+  onSlide,
   partName,
   pickedOf,
   removeEls,
@@ -89,6 +90,7 @@ import { IconPicker, type IconDef } from './IconPicker';
 import { FooterDialog } from './FooterDialog';
 import { NotesField } from './Notes';
 import { findInDeck, replaceAllInDeck, replaceHit } from './find';
+import { exportFile } from '../exportFile';
 
 export type SlidesDoc = ModelDoc<Deck>;
 
@@ -511,8 +513,9 @@ export function SlidesEditor({
   // ---- copy and paste ---------------------------------------------------------------------------------------
   const picked = pickedOf(slide, sel);
   const copy = () => {
-    if (!picked.length) return;
-    clip = picked.map((e) => ({ ...e }));
+    if (!picked.length || !slide) return;
+    // A part of a group goes as it shows on the slide.
+    clip = picked.map((e) => onSlide(slide, e));
     toast(picked.length === 1 ? 'Copied' : `${picked.length} parts copied`, 'ok');
   };
   const cut = () => {
@@ -900,6 +903,14 @@ export function SlidesEditor({
     deleteSlide: () => stripAct.remove(index),
     skipSlide: () => stripAct.toggleHidden(index),
     openTab: (t) => openPanel(t),
+    // Exports are made from what is saved: changes are saved first.
+    slidePicture: readOnly
+      ? undefined
+      : () =>
+          void (async () => {
+            if (dirtyRef.current && !(await saveNow.current())) return;
+            await exportFile(pageId, 'png', { slide: index + 1 });
+          })().catch(toastError),
     present: (from) => setPresent({ from: from === 'start' ? 0 : index, presenter: from === 'presenter' }),
     shortcuts: () => setKeysOpen(true),
     ask: onAsk ? () => onAsk(`On slide ${index + 1}${slideTitle(slide) ? ` (“${slideTitle(slide)}”)` : ''}: `) : undefined,

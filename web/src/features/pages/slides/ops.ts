@@ -86,6 +86,17 @@ export function pathTo(els: El[], id: string, path: GroupEl[] = []): GroupEl[] |
 /** The parts picked, wherever they are. */
 export const pickedOf = (s: Slide | undefined, sel: string[]): El[] => (s ? sel.map((id) => findEl(s.els, id)).filter((e): e is El => !!e) : []);
 
+/** A part as it is on the slide: one in a group placed where it shows, turned with its groups. */
+export function onSlide(s: Slide, e: El): El {
+  const path = pathTo(s.els, e.id) ?? [];
+  let out = e;
+  for (let i = path.length - 1; i >= 0; i--) out = ungroupEls({ ...path[i], els: [out] })[0];
+  return out;
+}
+
+/** The part of the slide itself a part is in (itself, or the outermost group around it). */
+export const topOf = (s: Slide, id: string): El | undefined => pathTo(s.els, id)?.[0] ?? s.els.find((e) => e.id === id);
+
 /** A copy of a part with new ids (its group's parts' too), keeping what Morph knows it by. */
 function renew(e: El): El {
   const c = { ...e, id: newId(), key: e.key ?? e.id } as El;
