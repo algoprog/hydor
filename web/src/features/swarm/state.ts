@@ -22,8 +22,7 @@ function listen() {
       const b = s.byKey[key];
       if (!b) return s;
       // A campaign's parts take each post in as the server reads them all.
-      if (d.post && !b.posts.some((p) => p.id === d.post!.id))
-        return { byKey: { ...s.byKey, [key]: { ...b, posts: [...b.posts, d.post].slice(-300), ...(b.mode === 'campaign' ? { parts: campaignParts([d.post], b.parts ?? []) } : {}) } } };
+      if (d.post && !b.posts.some((p) => p.id === d.post!.id)) return { byKey: { ...s.byKey, [key]: { ...b, posts: [...b.posts, d.post].slice(-300), ...(b.mode === 'campaign' ? { parts: campaignParts([d.post], b.parts ?? []) } : {}) } } };
       if (d.stopped?.length) return { byKey: { ...s.byKey, [key]: { ...b, stopped: [...new Set([...b.stopped, ...d.stopped])] } } };
       return s;
     });

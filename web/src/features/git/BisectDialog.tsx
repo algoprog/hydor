@@ -159,9 +159,7 @@ export function BisectDialog({ repo, open, good: from, onClose }: { repo: GitRep
         </>
       }
     >
-      <p className="mb-3 text-[13px] leading-relaxed text-fg-3">
-        An agent tries the commits between the two, in a worktree of its own (git bisect), and names the first one that broke it, with why. Your own copy stays as it is.
-      </p>
+      <p className="mb-3 text-[13px] leading-relaxed text-fg-3">An agent tries the commits between the two, in a worktree of its own (git bisect), and names the first one that broke it, with why. Your own copy stays as it is.</p>
       <div className="space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Worked at">
@@ -182,13 +180,7 @@ export function BisectDialog({ repo, open, good: from, onClose }: { repo: GitRep
         </div>
         {same && <p className="text-[12px] text-err">Both are the same commit: pick where it last worked.</p>}
         <Field label="What is broken">
-          <textarea
-            value={broken}
-            onChange={(e) => setBroken(e.target.value)}
-            rows={3}
-            placeholder="Exporting a document with pictures to PDF fails with “image too large”"
-            className={cx(inputCls, 'h-auto py-1.5 text-[13.5px] leading-relaxed')}
-          />
+          <textarea value={broken} onChange={(e) => setBroken(e.target.value)} rows={3} placeholder="Exporting a document with pictures to PDF fails with “image too large”" className={cx(inputCls, 'h-auto py-1.5 text-[13.5px] leading-relaxed')} />
         </Field>
         <Field label="How to check (optional)" hint="A command that fails while it is broken. Without one, the agent writes a check of its own.">
           <input value={check} onChange={(e) => setCheck(e.target.value)} placeholder="npm test -- export" spellCheck={false} autoComplete="off" className={cx(small, 'font-mono')} />

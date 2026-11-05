@@ -22,13 +22,11 @@ const joined = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? '') : `${xs.slice(0,
 function allowed(rules: [boolean, string][], never: string): string {
   const may = rules.filter(([ok]) => ok).map(([, what]) => what);
   const not = rules.filter(([ok]) => !ok).map(([, what]) => what);
-  return [
-    may.length ? `You may: ${joined(may)}.` : '',
-    not.length ? `You may not: ${joined(not)}. Say in your report what you would have done instead.` : '',
-    `Never ${never}.`,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  // Under a prompt key, as all words for the agent here: the pages' translations leave those out (scripts/i18n-extract.mjs).
+  const said = {
+    prompt: [may.length ? `You may: ${joined(may)}.` : '', not.length ? `You may not: ${joined(not)}. Say in your report what you would have done instead.` : '', `Never ${never}.`],
+  };
+  return said.prompt.filter(Boolean).join('\n');
 }
 
 // ---- CI doctor --------------------------------------------------------------------------------------------
@@ -41,10 +39,8 @@ interface Ci {
   filter: PayloadFilter;
   /** Where the task's address goes. */
   where: string;
-  /** The run's essentials, as the service sends them. */
-  facts: [string, string][];
-  /** How the agent reads the failed jobs' logs. */
-  logs: string;
+  /** For the run's prompt: the run's essentials as the service sends them, and how the agent reads the failed jobs' logs. */
+  prompt: { facts: [string, string][]; logs: string };
 }
 
 export const CI: Record<CiService, Ci> = {
@@ -52,68 +48,76 @@ export const CI: Record<CiService, Ci> = {
     label: 'GitHub Actions',
     filter: { path: 'body.workflow_run.conclusion', value: 'failure' },
     where: 'In the repository on GitHub: Settings → Webhooks → Add webhook. Paste the task’s address as the Payload URL, pick application/json, and under “Let me select individual events” tick only Workflow runs.',
-    facts: [
-      ['Workflow', 'body.workflow_run.name'],
-      ['Run', 'body.workflow_run.html_url'],
-      ['Run id', 'body.workflow_run.id'],
-      ['Attempt', 'body.workflow_run.run_attempt'],
-      ['Branch', 'body.workflow_run.head_branch'],
-      ['Commit', 'body.workflow_run.head_sha'],
-      ['Commit message', 'body.workflow_run.head_commit.message'],
-      ['Started by', 'body.workflow_run.event'],
-      ['Pull requests', 'body.workflow_run.pull_requests'],
-      ['Repository', 'body.repository.full_name'],
-    ],
-    logs: 'gh run view <run id> --log-failed',
+    prompt: {
+      facts: [
+        ['Workflow', 'body.workflow_run.name'],
+        ['Run', 'body.workflow_run.html_url'],
+        ['Run id', 'body.workflow_run.id'],
+        ['Attempt', 'body.workflow_run.run_attempt'],
+        ['Branch', 'body.workflow_run.head_branch'],
+        ['Commit', 'body.workflow_run.head_sha'],
+        ['Commit message', 'body.workflow_run.head_commit.message'],
+        ['Started by', 'body.workflow_run.event'],
+        ['Pull requests', 'body.workflow_run.pull_requests'],
+        ['Repository', 'body.repository.full_name'],
+      ],
+      logs: 'gh run view <run id> --log-failed',
+    },
   },
   gitlab: {
     label: 'GitLab CI',
     filter: { path: 'body.object_attributes.status', value: 'failed' },
     where: 'In the project on GitLab: Settings → Webhooks → Add new webhook. Paste the task’s address as the URL and tick only Pipeline events.',
-    facts: [
-      ['Pipeline', 'body.object_attributes.url'],
-      ['Pipeline id', 'body.object_attributes.id'],
-      ['Branch or tag', 'body.object_attributes.ref'],
-      ['Commit', 'body.object_attributes.sha'],
-      ['Commit message', 'body.commit.message'],
-      ['Started by', 'body.object_attributes.source'],
-      ['Merge request', 'body.merge_request.url'],
-      ['Project', 'body.project.path_with_namespace'],
-      ['Jobs', 'body.builds'],
-    ],
-    logs: 'glab ci trace <job id>, or the API’s jobs/<job id>/trace',
+    prompt: {
+      facts: [
+        ['Pipeline', 'body.object_attributes.url'],
+        ['Pipeline id', 'body.object_attributes.id'],
+        ['Branch or tag', 'body.object_attributes.ref'],
+        ['Commit', 'body.object_attributes.sha'],
+        ['Commit message', 'body.commit.message'],
+        ['Started by', 'body.object_attributes.source'],
+        ['Merge request', 'body.merge_request.url'],
+        ['Project', 'body.project.path_with_namespace'],
+        ['Jobs', 'body.builds'],
+      ],
+      logs: 'glab ci trace <job id>, or the API’s jobs/<job id>/trace',
+    },
   },
   buildkite: {
     label: 'Buildkite',
     filter: { path: 'body.build.state', value: 'failed' },
     where: 'In Buildkite: Settings → Notification Services → Add on Webhook. Paste the task’s address as the Webhook URL, tick the event build.finished, and pick the pipelines.',
-    facts: [
-      ['Pipeline', 'body.pipeline.slug'],
-      ['Build', 'body.build.web_url'],
-      ['Build in the API', 'body.build.url'],
-      ['Build number', 'body.build.number'],
-      ['Branch', 'body.build.branch'],
-      ['Commit', 'body.build.commit'],
-      ['Commit message', 'body.build.message'],
-      ['Pull request', 'body.build.pull_request'],
-    ],
-    logs: 'the Buildkite connected app’s tools, or its REST API’s job logs with a key from the vault',
+    prompt: {
+      facts: [
+        ['Pipeline', 'body.pipeline.slug'],
+        ['Build', 'body.build.web_url'],
+        ['Build in the API', 'body.build.url'],
+        ['Build number', 'body.build.number'],
+        ['Branch', 'body.build.branch'],
+        ['Commit', 'body.build.commit'],
+        ['Commit message', 'body.build.message'],
+        ['Pull request', 'body.build.pull_request'],
+      ],
+      logs: 'the Buildkite connected app’s tools, or its REST API’s job logs with a key from the vault',
+    },
   },
   circleci: {
     label: 'CircleCI',
     filter: { path: 'body.workflow.status', value: 'failed' },
     where: 'In CircleCI: the project’s Project Settings → Webhooks → Add Webhook. Paste the task’s address as the Receiver URL and tick Workflow Completed.',
-    facts: [
-      ['Workflow', 'body.workflow.name'],
-      ['Workflow page', 'body.workflow.url'],
-      ['Workflow id', 'body.workflow.id'],
-      ['Pipeline number', 'body.pipeline.number'],
-      ['Branch', 'body.pipeline.vcs.branch'],
-      ['Commit', 'body.pipeline.vcs.revision'],
-      ['Commit message', 'body.pipeline.vcs.commit.subject'],
-      ['Project', 'body.project.slug'],
-    ],
-    logs: 'the CircleCI connected app’s tools, or its API (v2) with a key from the vault',
+    prompt: {
+      facts: [
+        ['Workflow', 'body.workflow.name'],
+        ['Workflow page', 'body.workflow.url'],
+        ['Workflow id', 'body.workflow.id'],
+        ['Pipeline number', 'body.pipeline.number'],
+        ['Branch', 'body.pipeline.vcs.branch'],
+        ['Commit', 'body.pipeline.vcs.revision'],
+        ['Commit message', 'body.pipeline.vcs.commit.subject'],
+        ['Project', 'body.project.slug'],
+      ],
+      logs: 'the CircleCI connected app’s tools, or its API (v2) with a key from the vault',
+    },
   },
 };
 
@@ -137,9 +141,9 @@ export function ciDoctorTask(v: { folder?: string; ci?: string; rerun?: string; 
       `A ${ci.label} run failed for the repository in this folder. Find out why and deal with it as the ci-doctor skill says: load it first.`,
       '',
       `The run, as ${ci.label} sent it:`,
-      factLines(ci.facts),
+      factLines(ci.prompt.facts),
       '',
-      `Read the failed jobs’ logs (${ci.logs}) and find the first real error; look at the same job’s recent runs to tell a flaky failure from a real one; reproduce it in a new worktree (git worktree add), never in this folder’s own checkout.`,
+      `Read the failed jobs’ logs (${ci.prompt.logs}) and find the first real error; look at the same job’s recent runs to tell a flaky failure from a real one; reproduce it in a new worktree (git worktree add), never in this folder’s own checkout.`,
       allowed(
         [
           [yes(v.rerun), 're-run the failed jobs, once, when the failure looks flaky'],
@@ -333,16 +337,18 @@ const named = (ref: string, at?: string) => (at && !ref.toLowerCase().startsWith
 export function bisectRequest(a: BisectAsk): string {
   const broken = a.broken.trim().replace(/\s+$/, '');
   const check = a.check?.trim();
-  return [
-    `Find the commit that broke this: ${broken}`,
-    '',
-    `It worked at ${named(a.good.trim(), a.goodAt)} and is broken at ${named(a.bad.trim() || 'HEAD', a.badAt)}. Find the first bad commit with git bisect, as the git-bisect skill says: load it first.`,
-    check
-      ? `- How to check: \`${check}\` (it fails while it is broken). Build the check script around it.`
-      : '- Write a small check script for it: exit 0 when it works, 1 when it is broken, 125 when a commit cannot be tested.',
-    '- Try the check on both ends first: it must pass where it worked and fail where it is broken, or say why it does not.',
-    '- Run git bisect run with it here, in this worktree of your own; keep the script outside the repository.',
-    '- Then name the first bad commit, show what in its change broke it and why, and suggest a fix. Change nothing on the user’s branches.',
-    '- Finish with git bisect reset. This worktree is the session’s: leave it in place (the user removes it with the session), and remove any other worktree you made unless asked to keep it.',
-  ].join('\n');
+  // Under a prompt key: words for the agent, which the pages' translations leave out (scripts/i18n-extract.mjs).
+  const ask = {
+    prompt: [
+      `Find the commit that broke this: ${broken}`,
+      '',
+      `It worked at ${named(a.good.trim(), a.goodAt)} and is broken at ${named(a.bad.trim() || 'HEAD', a.badAt)}. Find the first bad commit with git bisect, as the git-bisect skill says: load it first.`,
+      check ? `- How to check: \`${check}\` (it fails while it is broken). Build the check script around it.` : '- Write a small check script for it: exit 0 when it works, 1 when it is broken, 125 when a commit cannot be tested.',
+      '- Try the check on both ends first: it must pass where it worked and fail where it is broken, or say why it does not.',
+      '- Run git bisect run with it here, in this worktree of your own; keep the script outside the repository.',
+      '- Then name the first bad commit, show what in its change broke it and why, and suggest a fix. Change nothing on the user’s branches.',
+      '- Finish with git bisect reset. This worktree is the session’s: leave it in place (the user removes it with the session), and remove any other worktree you made unless asked to keep it.',
+    ],
+  };
+  return ask.prompt.join('\n');
 }
