@@ -304,6 +304,12 @@ const sh = book.sheets[0];
   const plain = zipParts(z.names().filter((n) => !n.includes('threadedComment') && !n.includes('persons')).map((name) => ({ name, data: z.read(name)! })));
   const pc = importBook(plain, 'P.xlsx').book.sheets[0].comments ?? [];
   ok(pc.length === 1 && pc[0].text === 'Is this per month?' && pc[0].replies?.map((r) => r.text).join('|') === 'Yes, monthly.|And the deposit?', 'a plain copy alone comes back as its thread');
+  // Someone named (a comment from another person's Excel file) keeps their name both ways, their words as written.
+  const nb = normalizeBook({ sheets: [{ name: 'N', rows: [['a']], comments: [{ id: 'n1', cell: 'A1', text: 'Check this', by: 'user', author: 'Maria Lopez', at, replies: [{ id: 'n1r', by: 'user', author: 'Sam Lee', text: 'Done', at: at + 1 }, { id: 'n1s', by: 'agent', text: 'Noted', at: at + 2 }] }] }] });
+  const nz = new Zip(xlsxOfBook(nb, 'N'));
+  ok((nz.text('xl/persons/person.xml') ?? '').includes('displayName="Maria Lopez"') && (nz.text('xl/persons/person.xml') ?? '').includes('displayName="Sam Lee"'), 'named authors are people of the Excel file');
+  const nr = importBook(xlsxOfBook(nb, 'N'), 'N.xlsx').book.sheets[0].comments ?? [];
+  ok(nr[0]?.author === 'Maria Lopez' && nr[0].text === 'Check this' && nr[0].replies?.[0].author === 'Sam Lee' && nr[0].replies[0].text === 'Done' && nr[0].replies[1].by === 'agent' && !nr[0].replies[1].author, 'read back: each keeps their name, their words without it');
 }
 
 // ---- Excel files: written and read back ---------------------------------------------------------------------------
