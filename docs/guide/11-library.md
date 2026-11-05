@@ -468,7 +468,7 @@ A LaTeX document is its source (the main file, main.tex, and any others it reads
 - **Typesetting**: the pages follow what you type, a moment after you stop. **Recompile** (Ctrl+Enter) typesets at once, and its arrow has **Recompile as you type** (to turn that off), **Show the log** and **Open the PDF**. The engine at the top is **pdfLaTeX** (the usual one), **XeLaTeX** (any language, and this computer's fonts) or **LuaLaTeX**. The pages zoom in and out and **Fit the width**; the page box above them says which page is in view and goes to the one you type; **Present the pages** is beside it. Double-click a place on a page to go to its line in the source.
 - **Errors and warnings** show under the source and beside their lines: click one to go to it, or **Ask the agent to fix them**. **Log** shows all that TeX said.
 
-On a phone, **Source** and **Preview** are two tabs. Changes stay unsaved until **Save** (Ctrl+S) in the bar at the bottom, and each save is a version.
+On a phone, **LaTeX source** and **Preview** are two tabs. Changes stay unsaved until **Save** (Ctrl+S) in the bar at the bottom, and each save is a version.
 
 LaTeX has to be installed on the computer the app runs on (TeX Live). Without it a LaTeX document is still kept and edited, not typeset, and the editor says what to install. TeX works in a folder of its own: a document cannot read or change other files or run programs, and where bubblewrap is installed, TeX runs in its sandbox too (LuaLaTeX only runs there).
 
