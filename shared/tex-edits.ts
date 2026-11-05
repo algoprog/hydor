@@ -1,8 +1,9 @@
 // Small changes to a LaTeX document that an agent makes without sending a whole file (save_latex's edits), in a file of
 // it (main.tex unless said): words found and replaced, a section written again or taken out (its \section, \chapter…
-// command and what follows it, up to the next one of its level or a higher one, or \end{document}), words put after a
-// section or before it, and words added at the end (before \end{document}). The server makes them on the version's
-// files, then saves as it saves files sent back; a draft makes them as the call comes in (page-drafts.ts).
+// command and what follows it, up to the next one of its level or a higher one, or the bibliography, \appendix or
+// \end{document}, which stay), words put after a section or before it, and words added at the end (before
+// \end{document}). The server makes them on the version's files, then saves as it saves files sent back; a draft makes
+// them as the call comes in (page-drafts.ts).
 import type { JsonPath } from './partial-json.ts';
 
 type Obj = Record<string, unknown>;
@@ -48,7 +49,24 @@ function heads(text: string): Head[] {
   return out;
 }
 
-/** Where a section is in a file's text, from its command to the next one of its level or an outer one (or \end{document}). */
+/**
+ * Where the body of a document's text ends after `from`: its bibliography, \appendix, back matter or \end{document} (not
+ * in % comments); the text's end when it has none.
+ */
+function bodyEnd(text: string, from: number): number {
+  const re = /\\(?:end\{document\}|appendix\b|backmatter\b|bibliography(?:style)?\s*\{|printbibliography\b|begin\{thebibliography\})/g;
+  re.lastIndex = from;
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    const lineStart = text.lastIndexOf('\n', m.index) + 1;
+    if (!/(^|[^\\])%/.test(text.slice(lineStart, m.index))) return m.index;
+  }
+  return text.length;
+}
+
+/**
+ * Where a section is in a file's text, from its command to the next one of its level or an outer one, or where the
+ * body ends (the bibliography, \appendix or \end{document}: a section rewritten keeps them).
+ */
 function sectionOf(text: string, title: string): { from: number; to: number } | string {
   const all = heads(text);
   const want = plain(title.replace(/^\s*\\[a-z]+\*?\s*\{([\s\S]*)\}\s*$/, '$1'));
@@ -63,8 +81,7 @@ function sectionOf(text: string, title: string): { from: number; to: number } | 
   }
   const h = hits[0];
   const next = all.find((x) => x.at > h.at && x.level <= h.level);
-  const end = text.indexOf('\\end{document}', h.at);
-  const to = Math.min(next ? next.at : text.length, end >= 0 ? end : text.length);
+  const to = Math.min(next ? next.at : text.length, bodyEnd(text, h.at + 1));
   return { from: h.at, to };
 }
 
@@ -178,4 +195,4 @@ export function applyTexEdits(files: Map<string, string>, edits: unknown[], o: {
 
 /** For the agent: what save_latex's edits are and how to write them. */
 export const TEX_EDITS_HELP =
-  'To change part of a saved document without sending whole files, give its id and edits, made in order on its files as get_page gives them (main.tex unless "file" says another): {"find": "text as it is", "replace": "new text"} ("all": true for every time it appears; else it must appear once), {"section": "a section’s title", "text": "the section written again, its \\\\section{…} too"} ("" takes it out: up to the next section of its level or a higher one), {"after": "a section’s title", "text": "…"} (at its end) or {"before": "…", "text": "…"}, and {"append": "text at the end, before \\\\end{document}"}. The user watches each save come in: write a long document in steps, a section or a few at a time, rather than in one long call.';
+  'To change part of a saved document without sending whole files, give its id and edits, made in order on its files as get_page gives them (main.tex unless "file" says another): {"find": "text as it is", "replace": "new text"} ("all": true for every time it appears; else it must appear once), {"section": "a section’s title", "text": "the section written again, its \\\\section{…} too"} ("" takes it out: up to the next section of its level or a higher one, or the bibliography, \\appendix or \\end{document}, which stay), {"after": "a section’s title", "text": "…"} (at its end) or {"before": "…", "text": "…"}, and {"append": "text at the end, before \\\\end{document}"}. The user watches each save come in: write a long document in steps, a section or a few at a time, rather than in one long call.';

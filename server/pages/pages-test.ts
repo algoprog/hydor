@@ -351,6 +351,10 @@ let privPath = '';
   r = await run('save_latex', { id: tex, edits: [{ append: 'Thanks.' }], files: [{ name: 'refs.bib', text: '@book{k, title = {T}}' }] });
   const both = (await req('GET', `/api/pages/${tex}`)).json().model;
   ok(!r.error && both.main.includes('Thanks.') && both.files.some((f: { name: string }) => f.name === 'refs.bib'), 'edits and files sent with them (as a list) both count');
+  const cited = idOf((await run('save_latex', { title: 'Cited', source: '\\documentclass{article}\n\\begin{document}\n\\section{Intro}\nHi.\n\n\\section{Conclusion}\nOld end.\n\n\\bibliographystyle{plain}\n\\bibliography{refs}\n\\end{document}\n' })).text);
+  r = await run('save_latex', { id: cited, edits: [{ section: 'Conclusion', text: '\\section{Conclusion}\nNew end.' }, { after: 'Conclusion', text: 'Last words.' }] });
+  const end = (await req('GET', `/api/pages/${cited}`)).json().model.main as string;
+  ok(!r.error && end.includes('New end.') && !end.includes('Old end.') && end.includes('\\bibliography{refs}') && end.indexOf('Last words.') < end.indexOf('\\bibliographystyle'), 'the last section ends where the bibliography starts: written again or added to, the references stay');
 }
 
 // ---- the user changes a page; the agent hears of it -------------------------------------------------------
