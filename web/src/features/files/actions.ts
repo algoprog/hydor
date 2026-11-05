@@ -1,6 +1,7 @@
 // What can be done with files and folders, on the Files page and wherever else they show (a file's window
 // over a session, an agent's file cards): add them to a space (a file copied into its folder, a folder joining
-// those it works with), start a session with them, move or copy them into a folder, duplicate or rename one,
+// those it works with), keep a notebook, a document, a spreadsheet or a LaTeX file in the Library (its own copy, in
+// the editor of its kind), start a session with them, move or copy them into a folder, duplicate or rename one,
 // download (a folder, or several, as one .zip), copy their paths, and delete them (to the trash, with Undo;
 // something on another disk is deleted for good only once you say so). Moving rows by dragging them is here too.
 import type { DragEvent } from 'react';
@@ -85,6 +86,24 @@ export async function addToSpace(items: Item[], space: Pick<Space, 'id' | 'name'
 }
 
 /** The start page, with them in its message box: the new session gets them with its first message. */
+/**
+ * The files the Library keeps a copy of, in its editor of their kind: Jupyter notebooks, Word and Markdown documents,
+ * spreadsheets (Excel, OpenDocument, CSV, TSV) and LaTeX files. An HTML file stays a file (it opens as a page beside
+ * a conversation); a .zip is not taken for a LaTeX project.
+ */
+export const LIBRARY_FILE = /\.(ipynb|docx|docm|dotx|md|markdown|txt|xlsx|ods|csv|tsv|tex|ltx)$/i;
+
+/** Keeps a copy of a file in the Library, in the project picked (null: none; left out: the session's), and offers to open it. */
+export async function saveToLibrary(item: Item, sessionKey?: string, space?: string | null) {
+  try {
+    const r = await post<{ page: { id: string; title: string }; notes?: string[] }>('/api/pages/import', { path: item.path, ...(sessionKey ? { sessionKey } : {}), ...(space !== undefined ? { space } : {}) });
+    done(`Saved to the Library: “${r.page.title}”`, { label: 'Open', run: () => go(`/pages/${r.page.id}`) });
+    for (const n of r.notes ?? []) toast(n);
+  } catch (e) {
+    toastError(e);
+  }
+}
+
 export function startSession(items: Item[]) {
   startSessionWith(items.slice(0, 20).map((i) => ({ path: i.path, size: i.dir ? undefined : i.size, dir: i.dir })));
 }

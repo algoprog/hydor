@@ -658,6 +658,20 @@ let privPath = '';
   ok(!fs.existsSync(path.dirname(where.path)), 'its folder goes with it');
 }
 
+// ---- Save to Library: a file of this computer's kept in the Library by its path ------------------------------------
+{
+  const nb = path.join(tmp, 'kept.ipynb');
+  fs.writeFileSync(nb, JSON.stringify({ cells: [{ cell_type: 'code', id: 'a', execution_count: null, metadata: {}, source: 'print(1)', outputs: [] }], metadata: {}, nbformat: 4, nbformat_minor: 5 }));
+  const md = path.join(tmp, 'kept notes.md');
+  fs.writeFileSync(md, '# Kept\n\nWords.\n');
+  const a = (await req('POST', '/api/pages/import', { path: nb, sessionKey: 'claude:s1' })).json();
+  ok(a.page?.kind === 'notebook' && a.page.title === 'kept', 'Save to Library keeps a notebook an agent handed over as a notebook of the Library, by its path');
+  const b = (await req('POST', '/api/pages/import', { path: md, space: null })).json();
+  ok(b.page?.kind === 'doc' && b.page.title === 'kept notes' && !b.page.space, 'and a Markdown file as a document, in no project when none is picked');
+  ok((await req('POST', '/api/pages/import', { path: path.join(tmp, 'not-there.ipynb') })).statusCode === 404, 'a path with no file there says so');
+  ok((await req('POST', '/api/pages/import', { path: path.join(tmp, 'song.mp3') })).statusCode === 400, 'a file of a kind the Library does not keep is refused');
+}
+
 // ---- files of this computer in the editors (Files), saved back to them -----------------------------------------
 {
   const dir = path.join(tmp, 'files');

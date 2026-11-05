@@ -126,7 +126,8 @@ agents that speak ACP and take MCP servers.
   app's document skills; the file viewer previews them, and finished files show as cards to open or download.
   Agents make Jupyter notebooks too (the notebooks skill: sections with text, a run from the top before handing one
   over, an environment beside it to run it in): kept in the Library with save_notebook, or handed over as a file
-  whose card opens it in the notebook page.
+  whose card opens it in the notebook page. A card's Save to Library keeps a copy of a notebook, a document, a
+  spreadsheet or a LaTeX file in the Library, in the project you pick.
 - **Images, videos and audio**: agents make pictures (or change yours), short videos (from words, from a picture
   to start or end on, or by changing a video) and sound with OpenRouter's image, video and audio models, the ones
   picked in Settings → Images, video and audio or one you name. The app's choices are ByteDance's Seedream 5.0 for

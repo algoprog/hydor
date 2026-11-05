@@ -1,6 +1,7 @@
 // The files an agent handed over (present_files), as cards with its reply: an icon by type (a
 // thumbnail for pictures), the name, what it is and its size, the agent's caption, then Open (the
-// app's file viewer, which previews documents), Download and ⋯ (a session with it, a space, Files).
+// app's file viewer, which previews documents), Download and ⋯ (a session with it, a space, the Library for a notebook,
+// a document, a spreadsheet or a LaTeX file, Files).
 import { useEffect, useState } from 'react';
 import { Download, FileQuestion } from 'lucide-react';
 import { kindLabel, docKind } from '@shared/documents';
@@ -44,7 +45,7 @@ export const download = (path: string) => {
 
 type Stat = { exists: boolean; size?: number } | undefined;
 
-function FileCard({ card, stat }: { card: Card; stat: Stat }) {
+function FileCard({ card, stat, sessionKey }: { card: Card; stat: Stat; sessionKey: string }) {
   const name = basename(card.path);
   const gone = stat && !stat.exists;
   const image = docKind(card.path) === 'image' && !gone;
@@ -83,7 +84,7 @@ function FileCard({ card, stat }: { card: Card; stat: Stat }) {
           <IconButton label={`Download ${name}`} onClick={() => download(card.path)}>
             <Download size={16} />
           </IconButton>
-          <FileMore path={card.path} size={stat?.size} />
+          <FileMore path={card.path} size={stat?.size} sessionKey={sessionKey} />
         </div>
       )}
     </div>
@@ -118,7 +119,7 @@ export function FileCards({ item, sessionKey }: { item: ToolItem; sessionKey: st
   return (
     <div data-tip="files-made" className={cx('tl-item my-1.5 grid gap-2', cards.length > 1 ? 'sm:grid-cols-2' : 'sm:max-w-[30rem]')}>
       {cards.map((c) => (
-        <FileCard key={c.path} card={c} stat={done ? stats[c.path] : undefined} />
+        <FileCard key={c.path} card={c} stat={done ? stats[c.path] : undefined} sessionKey={sessionKey} />
       ))}
     </div>
   );
