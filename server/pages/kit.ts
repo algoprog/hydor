@@ -2,7 +2,8 @@
 // classes (options, picture cards, compare tables, pros and cons, buttons, fields) and the bridge
 // script. The bridge reports the page's height, sends the user's choices and form answers to the app
 // (and a video's still, which the app plays over the page), and gives saved pages window.hydor.storage;
-// it talks to the app only by postMessage, each message
+// it opens a link to another site in a tab of its own and one to another of the Library's pages in the app,
+// and fills a table of contents an agent left empty. It talks to the app only by postMessage, each message
 // carrying the number the app gave this page. Both go in right after the page's doctype, before its
 // own styles and scripts, so its CSS wins and its scripts find window.hydor (and window.naget, its name before) from their first line.
 //
@@ -98,6 +99,8 @@ export interface BridgeCfg {
   fill?: boolean;
   /** The app plays a video's still (a.n-video) over the page: its player cannot run in the sandbox. */
   play?: boolean;
+  /** The app opens a link to another of its pages (a.n-pagelink, or /pages/<id>) in its own place; without it, in a tab of its own. */
+  open?: boolean;
 }
 
 /**
@@ -275,6 +278,66 @@ function bridge(cfg: BridgeCfg) {
       e.preventDefault();
       post({ type: 'wa-video', src: (a.getAttribute('data-video') ?? '').slice(0, 300), title: (a.getAttribute('title') ?? '').slice(0, 200) });
     });
+  // Links, once the page's own scripts had their say: one to another site opens in a tab of its own (followed in the
+  // frame, it would take the page's place there, or show an error where the site may not be framed); one to another of
+  // the Library's pages (the page editor's a.n-pagelink, or /pages/<id>) opens that page in the app.
+  addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = (e.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+    if (!a || a.hasAttribute('download')) return;
+    const target = (a.getAttribute('target') ?? '').toLowerCase();
+    if (target && !/^_(self|top|parent)$/.test(target)) return;
+    let u: URL;
+    try {
+      u = new URL(a.href, location.href);
+    } catch {
+      return;
+    }
+    const here = new URL(location.href);
+    const page = a.getAttribute('data-page') ?? (u.origin === here.origin ? (/^\/pages\/([\w-]{1,40})\/?$/.exec(u.pathname)?.[1] ?? null) : null);
+    if (page && /^[\w-]{1,40}$/.test(page)) {
+      e.preventDefault();
+      if (cfg.open && P) post({ type: 'wa-open-page', id: page });
+      else window.open(`${here.origin}/pages/${page}`, '_blank', 'noopener');
+      return;
+    }
+    if (!/^https?:$/.test(u.protocol) || u.origin === here.origin) return;
+    e.preventDefault();
+    window.open(u.href, '_blank', 'noopener');
+  });
+  // A table of contents (the page editor's nav.n-toc) an agent left empty: the page's headings, linked.
+  const toc = () => {
+    for (const nav of document.querySelectorAll('nav.n-toc')) {
+      if (nav.children.length) continue;
+      const heads = [...document.querySelectorAll('h1,h2,h3')].filter((h) => !h.closest('.n-toc') && (h.textContent ?? '').trim());
+      if (!heads.length) continue;
+      const top = Math.min(...heads.map((h) => Number(h.tagName[1])));
+      const used = new Set([...document.querySelectorAll('[id]')].map((x) => x.id));
+      for (const h of heads) {
+        if (!h.id) {
+          const base =
+            (h.textContent ?? '')
+              .toLowerCase()
+              .normalize('NFKD')
+              .replace(/[̀-ͯ]/g, '')
+              .replace(/[^\p{L}\p{N}]+/gu, '-')
+              .replace(/^-+|-+$/g, '')
+              .slice(0, 60) || 'section';
+          let id = base;
+          for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+          h.id = id;
+          used.add(id);
+        }
+        const link = document.createElement('a');
+        link.className = `n-toc-${Number(h.tagName[1]) - top + 1}`;
+        link.setAttribute('href', `#${h.id}`);
+        link.textContent = (h.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+        nav.append(link);
+      }
+    }
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', toc);
+  else toc();
   // Choices that are not buttons or links can be reached and picked from the keyboard too.
   const arm = () => {
     for (const x of document.querySelectorAll('[data-choice]')) {
@@ -954,7 +1017,7 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: str
       head = `<style id="n-kit" data-n-own>${kit}</style><style id="n-theme" data-n-own>${themeText(d.css)}</style><script data-n-own>(${schemeSrc})(${js(cfg.theme)})</script><script data-n-own>(${editorSrc})(${js(cfg)})</script>`;
       html = (m ? m[0] : '') + doc.documentElement.outerHTML;
     } else {
-      const cfg = { n: nonce(d.n), theme: theme(d.theme), max: { key: num(d.max?.key, 200), value: num(d.max?.value, 524288) }, fill: d.fill === true, play: d.play === true };
+      const cfg = { n: nonce(d.n), theme: theme(d.theme), max: { key: num(d.max?.key, 200), value: num(d.max?.value, 524288) }, fill: d.fill === true, play: d.play === true, open: d.open === true };
       // A template's screen: its app's flows and data (no more than its parent sent, and not too much of it).
       const app = d.app && typeof d.app === 'object' && JSON.stringify(d.app).length < 400_000 ? { n: cfg.n, info: d.app.info, labels: d.app.labels } : null;
       // An app's view: drawn by the view's kit, with the template engine, from the view and its values its parent sent.

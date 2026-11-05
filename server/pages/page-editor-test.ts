@@ -18,6 +18,7 @@ import { KIT_CSS } from '../../shared/page-kit.ts';
 import { extractText } from '../documents/extract.ts';
 import { EDITOR_SRC } from './editor.ts';
 import { pages } from './index.ts';
+import { injectHead, kitHead } from './kit.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -601,6 +602,54 @@ if (canCapture()) {
     await d.cmd('fill', { id: askV.id, href: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', play: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', thumb: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', title: 'A song' });
     ok((await d.js<string>('const v = document.querySelector("a.n-video"); return v ? v.getAttribute("data-video") : ""')) === 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', 'a video goes in as its still, linked to it');
   });
+
+  // ---- what the second round found: an empty table of contents, Save from the first letter, code from an empty block -------
+  await drive('<h1 id="t">Plan</h1><nav class="n-toc"></nav><h2>Days</h2><p id="a">Words</p>', async (d) => {
+    same(await d.js<number>('return document.querySelectorAll("nav.n-toc a").length'), 2, 'a table of contents an agent left empty is filled as the editor starts');
+    same((await d.msgs('wa-ed-state')).some((m) => m.dirty), false, 'and that is no change of the user’s');
+    await d.write('#a');
+    await d.type(' more');
+    same((await d.msgs('wa-ed-state')).at(-1)?.dirty, true, 'the first letter typed shows the page changed, before its block is left');
+    for (let i = 0; i < 5; i++) await d.press('Backspace');
+    await d.press('Escape');
+    same((await d.msgs('wa-ed-state')).at(-1)?.dirty, false, 'words typed and taken back leave it unchanged');
+    await d.write('#a');
+    await d.press('Enter');
+    await d.type('/code');
+    await d.press('Enter');
+    await d.type('x = 1');
+    await d.press('Enter');
+    await d.type('y');
+    await d.press('Escape');
+    same(JSON.stringify(await d.js<string>('return document.querySelector("pre").textContent')), JSON.stringify('x = 1\ny'), 'a code block made from an empty paragraph holds its code and no stray line');
+  });
+
+  // ---- a page in Use (the kit's bridge): links, and a table of contents left empty -------------------------------------------------
+  {
+    const body =
+      '<a id="out" href="https://example.com/x">Out</a> <a id="pg" class="n-pagelink" data-page="abc123" href="/pages/abc123">A page</a> <a id="in" href="#days">In</a> <a id="own" href="https://example.com/y" onclick="event.preventDefault()">Own</a><nav class="n-toc"></nav><h2>Days</h2><h3>Monday</h3>';
+    const html = injectHead(`<!doctype html><html><head><title>Use</title></head><body>${body}</body></html>`, kitHead({ n: 't', theme: 'light', max: { key: 200, value: 1000 } }));
+    await withTab({ html, width: 700, height: 500, settleMs: 150 }, async (tab) => {
+      const js = <T>(code: string) => tab.evaluate<T>(`(() => { ${code} })()`);
+      await js('window.__opened = []; window.open = function (u) { window.__opened.push(String(u)); return null; }; return 1;');
+      const click = async (sel: string) => {
+        const r = await js<{ x: number; y: number }>(`const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: b.left + 4, y: b.top + b.height / 2 };`);
+        for (const type of ['mousePressed', 'mouseReleased'] as const) await tab.s.send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: 'left', clickCount: 1 });
+        await sleep(80);
+      };
+      const at = await js<string>('return location.href');
+      await click('#out');
+      await click('#pg');
+      await click('#own');
+      await click('#in');
+      const opened = await js<string[]>('return window.__opened');
+      same(opened[0], 'https://example.com/x', 'a link to another site opens in a tab of its own');
+      ok(/\/pages\/abc123$/.test(opened[1] ?? ''), `a link to a page of the Library opens that page (in a tab, where no app is around it) (${opened[1]})`);
+      same(opened.length, 2, 'a link the page’s own script took care of is left to it');
+      same(await js<string>('return location.href.split("#")[0]'), at.split('#')[0], 'and the page stays where it is');
+      same(await js<string>('return [...document.querySelectorAll("nav.n-toc a")].map(a => a.getAttribute("href") + " " + a.className).join(",")'), '#days n-toc-1,#monday n-toc-2', 'a table of contents left empty shows the page’s headings');
+    });
+  }
   closeCapture();
 } else console.log('(no Chromium here: the editor’s browser tests were skipped)');
 

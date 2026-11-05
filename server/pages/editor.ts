@@ -1123,6 +1123,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
   // ---- the words being written: a step to undo for each change of a block, and the last few words typed -----
   /** Whether what was written since writing began has a step to undo yet. */
   let editPushed = false;
+  /** Whether the page had changes before writing in this block began (words typed and taken back leave it so). */
+  let dirtyBefore = false;
   const typing: { h: string; o: number }[] = [];
   const typingRedo: { h: string; o: number }[] = [];
   let lastTyped = 0;
@@ -1133,6 +1135,11 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     if (!editPushed) {
       remember();
       editPushed = true;
+      // The app shows Save from the first letter typed (and asks before the page is left), not only once the block is left.
+      if (!dirty) {
+        dirty = true;
+        state();
+      }
     }
     const now = Date.now();
     const top = typing[typing.length - 1];
@@ -1245,6 +1252,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     sel = el;
     editing = el as HTMLElement;
     editPushed = false;
+    dirtyBefore = dirty;
     typing.length = 0;
     typingRedo.length = 0;
     editing.setAttribute('contenteditable', 'true');
@@ -1272,9 +1280,12 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     typingRedo.length = 0;
     const was = editPushed;
     editPushed = false;
-    // Typed and taken back again: no step to keep.
-    if (was && same && !quiet) undo.pop();
-    else if (was && !quiet) changed();
+    // Typed and taken back again: no step to keep, and the page is as changed as it was before.
+    if (was && same && !quiet) {
+      undo.pop();
+      dirty = dirtyBefore;
+      state();
+    } else if (was && !quiet) changed();
     else state();
     getSelection()?.removeAllRanges();
     queueMicrotask(() => sayEditing(!!editing));
@@ -1895,7 +1906,22 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     redraw();
   });
   addEventListener('scroll', redraw, true);
-  addEventListener('resize', redraw);
+  // The frame grew or shrank (on a phone, the drawer under it opened as a part was picked): the part picked, or the words
+  // being written, stay in sight rather than ending up under the frame's new edge.
+  let resizeTimer = 0;
+  addEventListener('resize', () => {
+    redraw();
+    clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(() => {
+      const el = editing ?? sel;
+      if (!el || el === document.body || !el.isConnected) return;
+      const s = editing ? getSelection() : null;
+      const at = s && s.rangeCount ? s.getRangeAt(0).getBoundingClientRect() : null;
+      const r = at && (at.height || at.width) ? at : el.getBoundingClientRect();
+      if (r.bottom > innerHeight) scrollBy(0, Math.min(r.bottom - innerHeight + 16, r.top - 16));
+      else if (r.top < 0) scrollBy(0, r.top - 16);
+    }, 60);
+  });
   // The page grows or shrinks by itself too (a stylesheet or a picture that loads): what is drawn over it follows.
   new ResizeObserver(redraw).observe(root);
   document.addEventListener('selectionchange', () => editing && redraw());
@@ -2082,6 +2108,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     readCss();
     writeForced();
     document.head.appendChild(forced);
+    W.ready();
     select(null);
     state();
     send({ type: 'wa-ed-ready', colors: palette(), bg: canvasBg() });

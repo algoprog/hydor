@@ -67,6 +67,8 @@ export interface Core {
 /** What the writing does for the editor. */
 export interface Writing {
   draw(): void;
+  /** The page is in place: what follows it (a table of contents an agent left empty) is brought up to date, not counted as a change. */
+  ready(): void;
   act(a: string, arg: any): boolean;
   started(h: HTMLElement): void;
   finished(h: HTMLElement): void;
@@ -89,6 +91,7 @@ export function writing(E: Core): Writing {
     e.stopImmediatePropagation();
   };
   const isMod = (e: KeyboardEvent | MouseEvent) => e.metaKey || e.ctrlKey;
+  const coarse = matchMedia('(pointer: coarse)').matches;
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = ''): HTMLElementTagNameMap[K] => {
     const x = doc.createElement(tag);
@@ -304,7 +307,8 @@ export function writing(E: Core): Writing {
       }
       case 'code': {
         const pre = make('pre', 'n-code');
-        const text = words ? plainOf(words) : '';
+        // (the line break a browser keeps at the end of a block's words is no line of code)
+        const text = words ? plainOf(words).replace(/\n$/, '') : '';
         if (text) pre.append(text);
         else pre.append(make('br'));
         return { unit: pre, host: pre };
@@ -1006,6 +1010,8 @@ export function writing(E: Core): Writing {
     .hd.col .hb{width:18px;height:22px}
     .end{position:fixed;display:none;pointer-events:auto;width:26px;height:26px;border:1px dashed ${line}}
     .menu,.sl{position:fixed;display:none;flex-direction:column;pointer-events:auto;box-sizing:border-box;min-width:232px;max-width:calc(100vw - 12px);padding:4px;border-radius:12px;background:${panel};border:1px solid ${line};box-shadow:0 10px 32px rgba(0,0,0,${dark ? '.45' : '.18'});font:13px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;color:${ink};overflow-y:auto;overscroll-behavior:contain}
+    :is(.menu,.sl)>*{flex:none}
+    .mh .q{margin-left:6px;font:500 11.5px ui-monospace,monospace;color:${ink}}
     :is(.menu,.sl) .row{all:unset;display:flex;align-items:center;gap:9px;height:30px;padding:0 9px;border-radius:7px;cursor:pointer;white-space:nowrap;box-sizing:border-box;min-width:0}
     :is(.menu,.sl) .row.on{background:${hover}}
     :is(.menu,.sl) .row.danger{color:${dark ? '#f28b8b' : '#bd2525'}}
@@ -1031,7 +1037,7 @@ export function writing(E: Core): Writing {
     .offer button:hover{background:${hover};color:${ink}}
     .cv button{background:${panel};color:${ink};border:1px solid ${line};box-shadow:0 2px 8px rgba(0,0,0,.15)}
     .cv button:hover{background:${hover}}
-    @media (pointer:coarse){.offer button{height:32px;font-size:13px}.hb,.hd.col .hb{width:32px;height:34px}.end{width:34px;height:34px}:is(.menu,.sl) .row{height:40px}.sw{grid-template-columns:repeat(10,28px)}.sw button{width:28px;height:28px}.offer button,.cv button{height:34px}}
+    @media (pointer:coarse){.offer button{height:32px;font-size:13px}.hb,.hd.col .hb{width:32px;height:34px}.end{width:34px;height:34px}:is(.menu,.sl) .row{height:40px}.rk{display:none}.sw{grid-template-columns:repeat(10,28px)}.sw button{width:28px;height:28px}.offer button,.cv button{height:34px}}
   </style>
   <div class="hd"><button class="hb add" title="${esc(L('addBelow', 'Add a block below (Alt: above)'))}">${svg('plus')}</button><button class="hb grip" title="${esc(L('gripTip', 'Drag to move it, click for its menu'))}">${svg('grip')}</button></div>
   <button class="end" title="${esc(L('addEnd', 'Add a block at the end'))}">${svg('plus', 15)}</button>
@@ -1057,9 +1063,24 @@ export function writing(E: Core): Writing {
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       if (!E.editing()) window.focus();
+      pressedIn = el;
     });
+  /**
+   * Where the last press began: a menu acts on a click only when the press was on it. A tap on a phone ends in a click
+   * where the finger was, which could otherwise land on the menu it just opened (over the handle, where room is short).
+   */
+  let pressedIn: HTMLElement | null = null;
+  addEventListener('pointerdown', (e) => !(e.composedPath() as Element[]).some((x) => x === menuEl || x === slEl) && (pressedIn = null), true);
+  const pressedOn = (el: HTMLElement) => {
+    const was = pressedIn === el;
+    pressedIn = null;
+    return was;
+  };
 
-  /** Places a floating part beside a rectangle: under it, else over it, inside the window. */
+  /**
+   * Places a floating part beside a rectangle: under it, else over it; with room on neither side, the whole of it in
+   * the window, over the line it was opened from (a list cut to the room left would hide some of what it offers).
+   */
   const placeAt = (el: HTMLElement, r: { left: number; top: number; bottom: number }, gap = 4) => {
     el.style.maxHeight = '';
     const w = el.offsetWidth;
@@ -1067,16 +1088,18 @@ export function writing(E: Core): Writing {
     const below = innerHeight - r.bottom - gap - 6;
     const above = r.top - gap - 6;
     let top: number;
-    if (h <= below || below >= above) {
-      top = r.bottom + gap;
-      if (h > below) el.style.maxHeight = `${Math.max(120, below)}px`;
-    } else {
-      top = Math.max(6, r.top - gap - Math.min(h, above));
-      if (h > above) el.style.maxHeight = `${Math.max(120, above)}px`;
+    if (h <= below) top = r.bottom + gap;
+    else if (h <= above) top = r.top - gap - h;
+    else {
+      const room = innerHeight - 12;
+      if (h > room) el.style.maxHeight = `${room}px`;
+      top = Math.max(6, Math.min(below >= above ? r.bottom + gap : r.top - gap - h, innerHeight - Math.min(h, room) - 6));
     }
     el.style.top = `${top}px`;
     el.style.left = `${Math.max(6, Math.min(r.left, innerWidth - w - 6))}px`;
   };
+  /** How much room a list has under a rectangle and over it. */
+  const roomAt = (r: { top: number; bottom: number }, gap = 4) => Math.max(innerHeight - r.bottom - gap - 6, r.top - gap - 6);
   const rectJson = (r: DOMRect | null) => (r ? { x: r.left, y: r.top, w: r.width, h: r.height } : null);
 
   // ---- the blocks in the page, for handles, dragging and picking ---------------------------------------------------
@@ -1370,14 +1393,18 @@ export function writing(E: Core): Writing {
     closeSlash();
     menu = { blocks, view: v, i: v === 'main' ? -1 : 0, at };
     renderMenu();
+    // On a phone the app folds the drawer under the page meanwhile, so the menu has the page's height to show in.
+    E.send({ type: 'wa-ed-menu', on: true });
   };
   const closeMenu = () => {
     if (!menu) return;
     menu = null;
     renderMenu();
     E.redraw();
+    E.send({ type: 'wa-ed-menu', on: false });
   };
   menuEl.addEventListener('click', (e) => {
+    if (!pressedOn(menuEl)) return;
     const t = e.composedPath()[0] as Element;
     const sw = (t as HTMLElement).closest?.('[data-sw]') as HTMLElement | null;
     if (sw && menu) {
@@ -1486,17 +1513,23 @@ export function writing(E: Core): Writing {
       return;
     }
     const items = slash.items;
-    const two = items.length >= 10 && innerWidth >= 460;
-    slash.rows = two ? Math.ceil(items.length / 2) : items.length;
+    const c = caretBox() ?? slash.h.getBoundingClientRect();
+    const at = { left: c.left - 8, top: c.top, bottom: c.top + c.height };
+    // As many columns as it takes for the whole list to fit beside the caret (three where the page is wide enough).
+    const fits = (cols: number) => Math.ceil(items.length / cols) * (coarse ? 40 : 30) + 38 <= roomAt(at);
+    let cols = items.length >= 10 && innerWidth >= 460 ? 2 : 1;
+    if (cols === 1 && items.length > 6 && innerWidth >= 460 && !fits(1)) cols = 2;
+    if (cols === 2 && innerWidth >= 640 && !fits(2)) cols = 3;
+    slash.rows = Math.ceil(items.length / cols);
     const row = (it: Item, i: number) =>
-      `<button class="row${i === slash!.i ? ' on' : ''}" data-i="${i}" role="option" aria-selected="${i === slash!.i}"><span class="ri">${/^H[1-6]$/.test(it.icon) ? glyph(it.icon) : svg(it.icon)}</span><span class="rl">${esc(it.label)}</span>${it.key && !two ? `<span class="rk">${esc(it.key)}</span>` : ''}</button>`;
+      `<button class="row${i === slash!.i ? ' on' : ''}" data-i="${i}" role="option" aria-selected="${i === slash!.i}"><span class="ri">${/^H[1-6]$/.test(it.icon) ? glyph(it.icon) : svg(it.icon)}</span><span class="rl">${esc(it.label)}</span>${it.key && cols === 1 ? `<span class="rk">${esc(it.key)}</span>` : ''}</button>`;
+    const q = slashQuery();
     slEl.innerHTML = items.length
-      ? `<div class="mh">${esc(L('blocks', 'Blocks'))}</div><div class="sg" style="grid-template-rows:repeat(${slash.rows},auto)${two ? ';grid-template-columns:1fr 1fr' : ''}">${items.map(row).join('')}</div>`
+      ? `<div class="mh">${esc(L('blocks', 'Blocks'))}${q ? `<span class="q">/${esc(q)}</span>` : ''}</div><div class="sg" style="grid-template-rows:repeat(${slash.rows},auto);grid-template-columns:repeat(${cols},1fr)">${items.map(row).join('')}</div>`
       : `<div class="none">${esc(L('noBlocks', 'No block by that name'))}</div>`;
     slEl.style.display = 'flex';
-    slEl.style.minWidth = two ? '400px' : '';
-    const c = caretBox() ?? slash.h.getBoundingClientRect();
-    placeAt(slEl, { left: c.left - 8, top: c.top, bottom: c.top + c.height });
+    slEl.style.minWidth = cols === 3 ? '600px' : cols === 2 ? '400px' : '';
+    placeAt(slEl, at);
     slEl.querySelector('.row.on')?.scrollIntoView({ block: 'nearest' });
   };
   const openSlash = (h: HTMLElement, node: Text, at: number) => {
@@ -1566,6 +1599,7 @@ export function writing(E: Core): Writing {
     return false;
   };
   slEl.addEventListener('click', (e) => {
+    if (!pressedOn(slEl)) return;
     const b = ((e.composedPath()[0] as HTMLElement).closest?.('[data-i]') as HTMLElement | null) ?? null;
     if (b && slash) pickItem(slash.items[Number(b.dataset.i)]);
   });
@@ -2365,12 +2399,19 @@ export function writing(E: Core): Writing {
     if (!slash) return;
     if (slashQuery() === null) closeSlash();
   });
-  // The page scrolled: the list of blocks stays by the caret, a block's menu closes (its block moved away).
+  // The page scrolled: the list of blocks stays by the caret, a block's menu closes (its block moved away). The frame
+  // growing (a phone's drawer folding as the menu opens) scrolls a page at its end too: the menu stays, placed again.
+  let resized = 0;
+  addEventListener('resize', () => {
+    resized = Date.now();
+    if (menu) renderMenu();
+    if (slash) renderSlash();
+  });
   addEventListener(
     'scroll',
     () => {
       if (slash) renderSlash();
-      if (menu) closeMenu();
+      if (menu && Date.now() - resized > 400) closeMenu();
     },
     true,
   );
@@ -2733,6 +2774,9 @@ export function writing(E: Core): Writing {
   return {
     css: `[data-n-ph]::before{content:attr(data-n-ph);float:left;height:0;pointer-events:none;opacity:.4;white-space:nowrap}nav.n-toc:empty::before{content:"${L('tocEmpty', 'The headings of the page show here').replace(/["\\\n<]/g, '')}";opacity:.45}iframe{pointer-events:none}`,
     draw,
+    ready() {
+      refreshToc();
+    },
     act(a: string, arg: any): boolean {
       switch (a) {
         case 'turn': {
