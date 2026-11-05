@@ -9,6 +9,7 @@
 // what it asks for (an emoji, a picture, maths…) is chosen in the app and sent back to it.
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { KIT_CSS } from '@shared/page-kit';
+import { codeColoursScript } from '@shared/code-colours';
 import { STORAGE_LIMITS } from '@shared/pages';
 import type { AppRun } from '@shared/apps';
 import type { AppInfo } from '@shared/app-manifest';
@@ -359,10 +360,10 @@ function useThemeChange(f: () => void) {
 
 /**
  * A page as a file to keep: with the kit's stylesheet, so its ready-made classes and colours work wherever it is
- * opened, light or dark as that device is.
+ * opened, light or dark as that device is, and the script that colours its code blocks.
  */
 export function pageFile(html: string): string {
-  const head = `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>`;
+  const head = `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${/\bn-code\b/.test(html) ? codeColoursScript() : ''}`;
   const d = /^(?:\s|<!--[\s\S]*?-->)*<!doctype[^>]*>/i.exec(html);
   return d ? d[0] + head + html.slice(d[0].length) : head + html;
 }
@@ -672,6 +673,9 @@ export interface EdSel {
   /** Its block's text colour and background, by name (the kit's .n-tc-… and .n-hl-…). */
   colour?: string;
   fill?: string;
+  /** A code block: its language ('' for Auto, shared/code-colours.ts), and the one its code looks like. */
+  lang?: string;
+  langAuto?: string;
 }
 
 /** A part in the editor's Layers: where it is, its name, its tag, a few of its words, the parts in it. */

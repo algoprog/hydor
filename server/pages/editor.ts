@@ -18,6 +18,7 @@
 //
 // Like the kit's bridge, the function below runs in the browser: its source is sent as text, so it uses
 // only its argument and the browser's own globals.
+import { codeColours, type CodeColours } from '../../shared/code-colours.ts';
 import { writing, type At, type Core, type Next, type Writing } from './writing.ts';
 
 export interface EditorCfg {
@@ -29,7 +30,7 @@ export interface EditorCfg {
   labels: Record<string, string>;
 }
 
-function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
+function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: () => CodeColours) {
   const P = window.parent;
   const L = (k: string, fallback: string) => (typeof cfg.labels?.[k] === 'string' ? cfg.labels[k] : fallback);
   const send = (m: Record<string, unknown>) => {
@@ -1045,7 +1046,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
   /** The page's body as it is kept: without the editor's marks on the words being written. */
   const cleanBody = (): string => {
     const b = document.body;
-    if (!editing && !b.querySelector('[data-n-ph],[data-n-ceoff],[data-n-hovering],[data-n-ce]')) return b.outerHTML;
+    if (!editing && !b.querySelector('[data-n-ph],[data-n-ceoff],[data-n-hovering],[data-n-ce],pre.n-code > *')) return b.outerHTML;
     const c = b.cloneNode(true) as HTMLElement;
     for (const x of c.querySelectorAll('[data-n-ce]')) {
       x.removeAttribute('data-n-ce');
@@ -1844,6 +1845,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
       send({ type: 'wa-ed-copied', html, name });
     },
     canAsk: () => canAskAgent,
+    code: codeColours(),
   };
   // A paste event (Ctrl+V of the part copied waits for it, below): any one, a picture's too, which writing.ts takes.
   let pasteTimer = 0;
@@ -1853,6 +1855,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
 
   // ---- the page's own events: held, except while words are being changed -----------------------------------
   const fromUi = (e: Event) => e.composedPath().includes(host);
+  /** The part a press is on: a code block for a word its colours wrap (writing.ts colours code as it shows). */
+  const partAt = (t: Element) => (t.closest?.('pre.n-code') as Element | null) ?? t;
   const inEditing = (e: Event) => !!editing && e.target instanceof Node && editing.contains(e.target);
   const hold = (e: Event) => {
     if (fromUi(e) || inEditing(e)) return;
@@ -1874,7 +1878,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     (e) => {
       if (fromUi(e) || inEditing(e)) return;
       hold(e);
-      const t = e.target as Element;
+      const t = partAt(e.target as Element);
       // A second click (or tap) on the picked part changes its words: phones have no double tap here.
       if (t === sel && wordy(t)) return startEditing(t, { x: e.clientX, y: e.clientY });
       select(t);
@@ -1886,7 +1890,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     (e) => {
       if (fromUi(e) || inEditing(e)) return;
       hold(e);
-      startEditing(e.target as Element, { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY });
+      startEditing(partAt(e.target as Element), { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY });
     },
     true,
   );
@@ -1895,7 +1899,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     'pointermove',
     (e) => {
       if (e.pointerType === 'touch' || dragging) return;
-      const t = fromUi(e) ? null : (e.target as Element);
+      const t = fromUi(e) ? null : partAt(e.target as Element);
       if (t !== hover) {
         hover = t && t !== root ? t : null;
         redraw();
@@ -2123,5 +2127,5 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
 /** Puts `function`s' sources in a <script> safely (kit.ts's rules). */
 const scriptSafe = (src: string) => src.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 
-/** The editor, with the writing it hands its insides to (both run in the page, as one script). */
-export const EDITOR_SRC = scriptSafe(`(cfg) => (${editor.toString()})(cfg, ${writing.toString()})`);
+/** The editor, with the writing it hands its insides to and the code blocks' colours (all run in the page, as one script). */
+export const EDITOR_SRC = scriptSafe(`(cfg) => (${editor.toString()})(cfg, ${writing.toString()}, ${codeColours.toString()})`);

@@ -10,7 +10,9 @@
 // Duplicate, Move, Copy, Delete, Ask the agent). Shift+click, or a drag from beside the blocks (either margin, a gap,
 // beside a block's words, the +) as Notion's drag-select, picks several blocks, a list's items one by one. To-dos
 // tick and toggles fold in Edit too, a table of contents keeps up with the headings, a page gets an icon and a cover,
-// and pictures dropped or pasted in land where they fall (the app makes them small enough to live in the page).
+// pictures dropped or pasted in land where they fall (the app makes them small enough to live in the page), and code
+// blocks are coloured as their code is written (shared/code-colours.ts), with a language picked by the chip at their
+// corner or Auto; the colours are taken off again in the page given back, which keeps its code as plain text.
 //
 // What it adds to the page uses the kit's classes (shared/page-kit.ts), so it suits the page light or dark; what is
 // its own (hints in empty blocks, handles, menus) is drawn over the page or stripped before the page is given back.
@@ -18,6 +20,8 @@
 //
 // Like the editor, the function runs in the browser: its source is sent as text, so it uses only its argument and
 // the browser's own globals.
+
+import type { CodeColours } from '../../shared/code-colours.ts';
 
 /** What a block is, for writing in it. */
 export type Kind = 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'bullet' | 'number' | 'todo' | 'quote' | 'code' | 'toggle' | 'callout';
@@ -65,6 +69,8 @@ export interface Core {
   length: (h: Element) => number;
   copy: (html: string, name: string) => void;
   canAsk: () => boolean;
+  /** The code blocks' colours (shared/code-colours.ts). */
+  code: CodeColours;
 }
 
 /** What the writing does for the editor. */
@@ -1126,12 +1132,15 @@ export function writing(E: Core): Writing {
     .offer button:hover{background:${hover};color:${ink}}
     .cv button{background:${panel};color:${ink};border:1px solid ${line};box-shadow:0 2px 8px rgba(0,0,0,.15)}
     .cv button:hover{background:${hover}}
-    @media (pointer:coarse){.offer button{height:32px;font-size:13px}.hb,.hd.col .hb{width:32px;height:34px}.end{width:34px;height:34px}:is(.menu,.sl) .row{height:40px}.rk{display:none}.sw{grid-template-columns:repeat(10,28px)}.sw button{width:28px;height:28px}.offer button,.cv button{height:34px}}
+    .cl{all:unset;position:fixed;display:none;align-items:center;gap:2px;height:22px;padding:0 5px 0 8px;border-radius:6px;background:${panel};border:1px solid ${line};color:${muted};font:500 11.5px system-ui,-apple-system,sans-serif;cursor:pointer;pointer-events:auto;box-sizing:border-box;white-space:nowrap}
+    .cl:hover{color:${ink};background:${hover}}
+    @media (pointer:coarse){.offer button{height:32px;font-size:13px}.hb,.hd.col .hb{width:32px;height:34px}.end{width:34px;height:34px}:is(.menu,.sl) .row{height:40px}.rk{display:none}.cl{height:30px}.sw{grid-template-columns:repeat(10,28px)}.sw button{width:28px;height:28px}.offer button,.cv button{height:34px}}
   </style>
   <div class="hd"><button class="hb add" title="${esc(L('addBelow', 'Add a block below (Alt: above)'))}">${svg('plus')}</button><button class="hb grip" title="${esc(L('gripTip', 'Drag to move it, click for its menu'))}">${svg('grip')}</button></div>
   <button class="end" title="${esc(L('addEnd', 'Add a block at the end'))}">${svg('plus', 15)}</button>
   <div class="offer"><button data-o="icon">${svg('emoji', 14)}${esc(L('addIcon', 'Add an icon'))}</button><button data-o="cover">${svg('image', 14)}${esc(L('addCover', 'Add a cover'))}</button></div>
   <div class="cv"><button data-o="cover">${esc(L('changeCover', 'Change cover'))}</button><button data-o="nocover">${esc(L('removeCover', 'Remove'))}</button></div>
+  <button class="cl" title="${esc(L('language', 'Language'))}"></button>
   <div class="boxes"></div><div class="band"></div><div class="dl"></div>
   <div class="menu" role="menu"></div>
   <div class="sl" role="listbox"></div>`;
@@ -1141,6 +1150,7 @@ export function writing(E: Core): Writing {
   const endBtn = $('.end');
   const offer = $('.offer');
   const cv = $('.cv');
+  const langChip = $('.cl');
   const boxes = $('.boxes');
   const bandEl = $('.band');
   const dl = $('.dl');
@@ -1148,7 +1158,7 @@ export function writing(E: Core): Writing {
   const slEl = $('.sl');
   // The parts drawn over the page keep the words' selection: they take no focus. The page takes the keys, though
   // (a menu opened from a handle answers the arrows).
-  for (const el of [hd, endBtn, offer, cv, menuEl, slEl])
+  for (const el of [hd, endBtn, offer, cv, langChip, menuEl, slEl])
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       if (!E.editing()) window.focus();
@@ -1393,8 +1403,9 @@ export function writing(E: Core): Writing {
   };
 
   // ---- the block menu (the ⋮⋮, Ctrl+/) ------------------------------------------------------------------------------
-  type Row = { icon: string; label: string; keys?: string; run?: () => void; to?: 'turn' | 'colour'; danger?: boolean; on?: boolean; off?: boolean } | '-' | { head: string };
-  let menu: { blocks: Element[]; view: 'main' | 'turn' | 'colour'; i: number; at: { left: number; top: number; bottom: number } } | null = null;
+  type View = 'main' | 'turn' | 'colour' | 'lang';
+  type Row = { icon: string; label: string; keys?: string; run?: () => void; to?: Exclude<View, 'main'>; danger?: boolean; on?: boolean; off?: boolean } | '-' | { head: string };
+  let menu: { blocks: Element[]; view: View; i: number; at: { left: number; top: number; bottom: number } } | null = null;
   const TURNS: [Kind, string, string, string][] = [
     ['p', 'text', 'Text', 'text'],
     ['h1', 'h1', 'Heading 1', 'H1'],
@@ -1430,10 +1441,23 @@ export function writing(E: Core): Writing {
       ];
     }
     if (menu.view === 'colour') return [{ icon: svg('left'), label: L('colour', 'Colour'), run: () => view('main') }];
+    if (menu.view === 'lang') {
+      // A code block's language: Auto (and what its code looks like), or one of them.
+      const pre = codeOf(list[0]);
+      const cur = pre ? CC.langId(pre.getAttribute('data-lang') ?? '') : '';
+      const seen = pre ? CC.detect(CC.textOf(pre)) : '';
+      return [
+        { icon: svg('left'), label: L('language', 'Language'), run: () => view('main') },
+        '-',
+        { icon: svg('code'), label: seen ? `${L('langAuto', 'Auto')} · ${langName(seen)}` : L('langAuto', 'Auto'), on: !cur, run: () => (closeMenu(), setLang(list, '')) },
+        ...CC.langs.map(([id]): Row => ({ icon: '', label: langName(id), on: cur === id, run: () => (closeMenu(), setLang(list, id)) })),
+      ];
+    }
     const n = list.length;
     return [
       { head: n > 1 ? L('nBlocks', '{n} blocks').replace('{n}', String(n)) : E.nameOf(list[0]) },
       ...(texty ? [{ icon: svg('turn'), label: L('turnInto', 'Turn into'), to: 'turn' as const, keys: 'Ctrl+/' }] : []),
+      ...(n === 1 && codeOf(list[0]) ? [{ icon: svg('code'), label: L('language', 'Language'), to: 'lang' as const }] : []),
       { icon: svg('colour'), label: L('colour', 'Colour'), to: 'colour' },
       '-',
       ...(n === 1 ? [{ icon: svg('plus'), label: L('addBelowShort', 'Add a block below'), run: () => (closeMenu(), addBlock(list[0], false)) }] : []),
@@ -1446,7 +1470,7 @@ export function writing(E: Core): Writing {
     ];
   };
   const pressable = (r: Row): r is Exclude<Row, '-' | { head: string }> => r !== '-' && !('head' in r) && !r.off;
-  const view = (v: 'main' | 'turn' | 'colour') => {
+  const view = (v: View) => {
     if (!menu) return;
     menu.view = v;
     menu.i = v === 'main' ? -1 : 0;
@@ -1458,14 +1482,19 @@ export function writing(E: Core): Writing {
       return;
     }
     const rows = menuRows();
-    let html = rows
-      .map((r, i) => {
-        if (r === '-') return '<div class="ms"></div>';
-        if ('head' in r) return `<div class="mh">${esc(r.head)}</div>`;
-        const tail = r.to ? svg('right', 14) : r.on ? svg('check', 14) : '';
-        return `<button class="row${r.danger ? ' danger' : ''}${i === menu!.i ? ' on' : ''}" data-i="${i}" role="menuitem"${r.off ? ' aria-disabled="true"' : ''}><span class="ri">${r.icon}</span><span class="rl">${esc(r.label)}</span>${r.keys ? `<span class="rk">${esc(keyText(r.keys))}</span>` : ''}${tail ? `<span class="ri">${tail}</span>` : ''}</button>`;
-      })
-      .join('');
+    const row = (r: Row, i: number) => {
+      if (r === '-') return '<div class="ms"></div>';
+      if ('head' in r) return `<div class="mh">${esc(r.head)}</div>`;
+      const tail = r.to ? svg('right', 14) : r.on ? svg('check', 14) : '';
+      return `<button class="row${r.danger ? ' danger' : ''}${i === menu!.i ? ' on' : ''}" data-i="${i}" role="menuitem"${r.off ? ' aria-disabled="true"' : ''}><span class="ri">${r.icon}</span><span class="rl">${esc(r.label)}</span>${r.keys ? `<span class="rk">${esc(keyText(r.keys))}</span>` : ''}${tail ? `<span class="ri">${tail}</span>` : ''}</button>`;
+    };
+    let html: string;
+    if (menu.view === 'lang') {
+      // The languages in columns (two, or three where there is room), so the list fits without scrolling.
+      const cols = innerWidth >= 640 ? 3 : innerWidth >= 340 ? 2 : 1;
+      const langs = rows.slice(2);
+      html = `${rows.slice(0, 2).map(row).join('')}<div class="sg" style="grid-template-rows:repeat(${Math.ceil(langs.length / cols)},auto);grid-template-columns:repeat(${cols},1fr)">${langs.map((r, i) => row(r, i + 2)).join('')}</div>`;
+    } else html = rows.map(row).join('');
     if (menu.view === 'colour') {
       const one = menu.blocks.length === 1 ? menu.blocks[0] : null;
       const tc = one ? colourOf(one, 'tc') : undefined;
@@ -1478,7 +1507,7 @@ export function writing(E: Core): Writing {
     menuEl.style.display = 'flex';
     placeAt(menuEl, menu.at);
   };
-  const openMenu = (blocks: Element[], at: { left: number; top: number; bottom: number }, v: 'main' | 'turn' | 'colour' = 'main') => {
+  const openMenu = (blocks: Element[], at: { left: number; top: number; bottom: number }, v: View = 'main') => {
     closeSlash();
     menu = { blocks, view: v, i: v === 'main' ? -1 : 0, at };
     renderMenu();
@@ -2077,6 +2106,91 @@ export function writing(E: Core): Writing {
     }
   };
 
+  // ---- code blocks: their colours, and their language ------------------------------------------------------------------
+  const CC = E.code;
+  const isCode = (x: Element | null | undefined): x is HTMLElement => !!x && x.tagName === 'PRE' && x.classList.contains('n-code');
+  /** A block's code block (or the one an item holds), if it is one. */
+  const codeOf = (b: Element | null | undefined): HTMLElement | null => {
+    const x = b ? (blockIn(b) ?? b) : null;
+    return isCode(x) ? x : null;
+  };
+  /** What each code block was last coloured for (its language and code): coloured again only when they change. */
+  const painted = new WeakMap<Element, string>();
+  const paintCode = (pre: HTMLElement) => {
+    const sign = `${pre.getAttribute('data-lang') ?? ''}\u0000${CC.textOf(pre)}`;
+    if (painted.get(pre) === sign) return;
+    CC.paint(pre);
+    painted.set(pre, sign);
+  };
+  /** Every code block's colours, but the one being written in (which keeps up as it is typed). */
+  const paintAll = () => {
+    const w = E.editing();
+    for (const pre of doc.body.querySelectorAll<HTMLElement>('pre.n-code')) if (pre !== w) paintCode(pre);
+  };
+  // As code is typed, its colours follow a moment later, the caret where it was.
+  let livePaint = 0;
+  const paintWriting = () => {
+    cancelAnimationFrame(livePaint);
+    livePaint = requestAnimationFrame(() => {
+      const h = E.editing();
+      if (!isCode(h)) return;
+      const off = E.offset(h);
+      painted.delete(h);
+      paintCode(h);
+      if (off !== null) E.write(h, { off });
+    });
+  };
+  const langName = (id: string) => (id === 'plain' ? L('langPlain', 'Plain text') : (CC.langs.find(([x]) => x === id)?.[1] ?? id));
+  /** What the language chip says: the block's language, or Auto and the one its code looks like. */
+  const langWords = (pre: Element) => {
+    const id = CC.langId(pre.getAttribute('data-lang') ?? '');
+    if (id) return langName(id);
+    const seen = CC.detect(CC.textOf(pre));
+    return seen ? `${L('langAuto', 'Auto')} · ${langName(seen)}` : L('langAuto', 'Auto');
+  };
+  /** The code blocks' language ('' for Auto): their colours change with it. */
+  const setLang = (list: Element[], id: string) => {
+    const pres = list.map(codeOf).filter((x): x is HTMLElement => !!x);
+    if (!pres.length) return;
+    const back = stay();
+    E.change(() => {
+      for (const pre of pres) {
+        if (id) pre.setAttribute('data-lang', id);
+        else pre.removeAttribute('data-lang');
+        painted.delete(pre);
+        paintCode(pre);
+      }
+      return back(list);
+    });
+  };
+  /** The code block the language chip is for: the one written in, picked, or under the pointer. */
+  let chipFor: HTMLElement | null = null;
+  const drawLang = () => {
+    const w = E.editing();
+    const s = E.sel();
+    const pre = (isCode(w) ? w : null) ?? (s ? codeOf(unitOf(s)) : null) ?? (picked.length ? null : hoverBlock ? codeOf(hoverBlock) : null);
+    chipFor = pre;
+    const r = pre?.getBoundingClientRect();
+    if (!pre || !r || dragging || menu || r.bottom < 24 || r.top > innerHeight - 24) {
+      langChip.style.display = 'none';
+      return;
+    }
+    langChip.innerHTML = `${esc(langWords(pre))}${svg('down', 12)}`;
+    langChip.style.display = 'flex';
+    langChip.style.left = `${Math.max(2, r.right - langChip.offsetWidth - 6)}px`;
+    langChip.style.top = `${Math.max(2, r.top + 6)}px`;
+  };
+  langChip.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const pre = chipFor;
+    if (!pre) return;
+    const u = holderOf(pre) ?? pre;
+    const r = langChip.getBoundingClientRect();
+    if (!E.editing() && E.sel() !== u && E.sel() !== pre) E.select(pre);
+    openMenu([u], { left: r.left, top: r.top, bottom: r.bottom }, 'lang');
+  });
+
   // ---- handles beside the block under the pointer, and dragging it ---------------------------------------------------
   let hoverBlock: Element | null = null;
   let handleBlock: Element | null = null;
@@ -2375,6 +2489,7 @@ export function writing(E: Core): Writing {
     drawOffer();
     drawEnd();
     drawPicked();
+    drawLang();
     if (menu) {
       if (menu.blocks.some((b) => !b.isConnected)) closeMenu();
     }
@@ -2492,6 +2607,7 @@ export function writing(E: Core): Writing {
         tocTimer = window.setTimeout(refreshToc, 250);
       }
       if (e.isComposing) return;
+      if (isCode(h)) return paintWriting();
       if (slash) return slashInput();
       if (!e.inputType?.startsWith('insertText') || !e.data) return;
       const ch = e.data.slice(-1);
@@ -2505,6 +2621,8 @@ export function writing(E: Core): Writing {
     if (!slash) return;
     if (slashQuery() === null) closeSlash();
   });
+  // Code typed with an input method: coloured once its words are in.
+  addEventListener('compositionend', () => isCode(E.editing()) && paintWriting(), true);
   // The page scrolled: the list of blocks stays by the caret, a block's menu closes (its block moved away). The frame
   // growing (a phone's drawer folding as the menu opens) scrolls a page at its end too: the menu stays, placed again.
   let resized = 0;
@@ -2953,6 +3071,7 @@ export function writing(E: Core): Writing {
     draw,
     ready() {
       refreshToc();
+      paintAll();
     },
     act(a: string, arg: any): boolean {
       switch (a) {
@@ -2979,6 +3098,25 @@ export function writing(E: Core): Writing {
         case 'code':
           inlineCode();
           return true;
+        case 'codeLang': {
+          // A code block's language, from the Part tab ('' for Auto).
+          const id = CC.langId(typeof arg === 'string' ? arg : '');
+          const list = blocksNow().filter((b) => codeOf(b));
+          if (list.length) setLang(list, id);
+          return true;
+        }
+        case 'words': {
+          // A code block's code, changed on the Part tab (its colours are only spans, which the editor's own way would refuse).
+          const pre = codeOf(E.sel() ? unitOf(E.sel()!) : null);
+          if (!pre) return false;
+          E.change(() => {
+            pre.textContent = String(arg ?? '').slice(0, 200_000);
+            painted.delete(pre);
+            paintCode(pre);
+            return true;
+          });
+          return true;
+        }
         case 'menu': {
           const list = blocksNow();
           const r = arg?.at;
@@ -3039,11 +3177,11 @@ export function writing(E: Core): Writing {
       dropSpacers(h);
       h.removeAttribute('data-n-ph');
       for (const s of h.querySelectorAll('[data-n-ceoff]')) (s.removeAttribute('contenteditable'), s.removeAttribute('data-n-ceoff'));
-      // Code keeps its lines as new-line characters (a browser writes line breaks), so it reads the same anywhere.
-      if (kindOf(unitOf(h)) === 'code') {
-        const brs = [...h.querySelectorAll('br')];
-        brs.forEach((b, i) => (i === brs.length - 1 && b === fillerBr(h) && brs.length > 1 ? b.remove() : b.replaceWith('\n')));
-        h.normalize();
+      // Code keeps its lines as new-line characters (a browser writes line breaks), so it reads the same anywhere;
+      // its colours are put on again from them.
+      if (isCode(h)) {
+        painted.delete(h);
+        paintCode(h);
       }
       // A block of words keeps a line when it is empty; a lone line break a browser leaves in another part is not the user's.
       if (kindOf(unitOf(h))) fillEmpty(h);
@@ -3057,8 +3195,11 @@ export function writing(E: Core): Writing {
       hoverBlock = null;
       closeMenu();
       closeSlash();
+      paintAll();
     },
     clean(root) {
+      // Code is kept as plain text: its colours are put on as it shows.
+      for (const pre of root.querySelectorAll('pre.n-code')) CC.unpaint(pre);
       for (const x of root.querySelectorAll('[data-n-ph]')) x.removeAttribute('data-n-ph');
       for (const x of root.querySelectorAll('[data-n-ceoff]')) (x.removeAttribute('contenteditable'), x.removeAttribute('data-n-ceoff'));
       for (const x of root.querySelectorAll('[data-n-sign]')) x.removeAttribute('data-n-sign');
@@ -3070,12 +3211,16 @@ export function writing(E: Core): Writing {
     },
     changed() {
       refreshToc();
+      paintAll();
     },
     info(el) {
       const u = unitOf(el);
       const k = kindOf(u) ?? kindOf(el);
+      const pre = codeOf(u) ?? codeOf(el);
       return {
         kind: k ?? undefined,
+        // A code block: its code (for the Part tab), its language ('' for Auto) and the one its code looks like.
+        ...(pre ? { words: CC.textOf(pre), lang: CC.langId(pre.getAttribute('data-lang') ?? ''), langAuto: CC.detect(CC.textOf(pre)) } : {}),
         multi: picked.length > 1 ? picked.length : undefined,
         tex: el.classList.contains('n-math') ? (el.getAttribute('data-tex') ?? '') : undefined,
         colour: colourOf(u, 'tc') ?? undefined,

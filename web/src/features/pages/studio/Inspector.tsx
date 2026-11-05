@@ -1,5 +1,5 @@
 // The visual editor's Part tab: the part picked in the page. At its top, what it does (ask an agent about
-// it, copy, paste, wrap). Then its words, the kind of block it is (Turn into), its address, picture or maths;
+// it, copy, paste, wrap). Then its words, the kind of block it is (Turn into), a code block's language, its address, picture or maths;
 // where changes go: this part alone or every part of its kind or class, as it is or under the pointer, and
 // (with a tablet or phone picked above the page) at that size and smaller; and its look in groups that fold.
 // The ones most people use stay open (text, fill and border), with the commonest choices first; space, size,
@@ -8,6 +8,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ClipboardPaste, Copy, ImageUp, Italic, MessageSquarePlus, MoreHorizontal, Strikethrough, Type, Underline } from 'lucide-react';
 import { Button, cx, IconButton, MenuItem, MenuSep, Popover, Switch } from '../../../components/ui';
+import { codeColours } from '@shared/code-colours';
 import type { EdSel } from '../frame';
 import { loadKatex, texHtml } from '../common/katex';
 import { BoxModel, Choice, ColorField, Group, hexOf, NumField, Row, Select, splitNum, Typed } from './fields';
@@ -93,6 +94,8 @@ const KINDS = [
   { value: 'callout', label: 'Callout' },
   { value: 'code', label: 'Code' },
 ];
+/** The languages a code block can say it is in (its colours follow): names of their own, but Plain text. */
+const CODE_LANGS = codeColours().langs.map(([value, label]) => ({ value, label: value === 'plain' ? 'Plain text' : label }));
 export const WEIGHTS = [
   { value: '300', label: 'Light (300)' },
   { value: '400', label: 'Regular (400)' },
@@ -254,6 +257,16 @@ export function PartPanel({
           {sel.kind && (
             <Row label="Kind" hint="Turn it into another kind of block, keeping its words (Ctrl+/ while writing)">
               <Select value={sel.kind} options={KINDS} onChange={(v) => cmd('turn', v)} title="Turn into" />
+            </Row>
+          )}
+          {sel.kind === 'code' && sel.lang !== undefined && (
+            <Row label="Language" hint="Its code is coloured as this language's; Auto tells it from the code">
+              <Select
+                value={sel.lang}
+                options={[{ value: '', label: sel.langAuto ? `Auto · ${CODE_LANGS.find((l) => l.value === sel.langAuto)?.label ?? sel.langAuto}` : 'Auto' }, ...CODE_LANGS]}
+                onChange={(v) => cmd('codeLang', v)}
+                title="Language"
+              />
             </Row>
           )}
           {sel.tex !== undefined && (

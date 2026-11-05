@@ -7,8 +7,8 @@
 //
 // It also styles the blocks the page editor writes as Notion does (to-dos, toggles, callouts, columns, a table of
 // contents, a cover and an icon, a video's still, maths, colours of words and of blocks, a block kept under a list's
-// item): in a page with the kit's look they take its colours; in a page of its own look, shades of its own text colour,
-// so they suit it light or dark.
+// item, the colours of code): in a page with the kit's look they take its colours; in a page of its own look, shades of
+// its own text colour, so they suit it light or dark.
 
 /** The ready-made classes and their colours. Light by default; body.n-page follows the app's dark theme. */
 export const KIT_CSS = `
@@ -103,6 +103,16 @@ li.n-block>:not(ul,ol){margin-top:.1em;margin-bottom:.1em}
 .n-page .n-tbl th{background:var(--n-soft)}
 pre.n-code{padding:.85em 1em;border-radius:var(--n-radius,12px);background:color-mix(in srgb,currentColor 7%,transparent);overflow-x:auto;font-size:.88em;line-height:1.55;white-space:pre}
 :where(.n-page) pre.n-code{background:var(--n-soft)}
+pre.n-code .n-ck{color:color-mix(in srgb,#b259d0 80%,currentColor)}
+pre.n-code .n-cs{color:color-mix(in srgb,#3f9f52 80%,currentColor)}
+pre.n-code :is(.n-cn,.n-cv){color:color-mix(in srgb,#d4782f 82%,currentColor)}
+pre.n-code .n-cc{color:color-mix(in srgb,currentColor 55%,transparent);font-style:italic}
+pre.n-code .n-cf{color:color-mix(in srgb,#3d7fe0 80%,currentColor)}
+pre.n-code .n-ct{color:color-mix(in srgb,#c99a1e 80%,currentColor)}
+pre.n-code .n-ca{color:color-mix(in srgb,#2c9fa8 80%,currentColor)}
+pre.n-code .n-cg{color:color-mix(in srgb,#d9534f 80%,currentColor)}
+pre.n-code .n-ci{background:color-mix(in srgb,#3f9f52 18%,transparent)}
+pre.n-code .n-cd{background:color-mix(in srgb,#d9534f 18%,transparent)}
 img.n-pic{display:block;max-width:100%;height:auto;margin:.8em 0;border-radius:calc(var(--n-radius,12px) * .6)}
 .n-tc-grey{color:color-mix(in srgb,#787774 78%,currentColor)}
 .n-tc-brown{color:color-mix(in srgb,#9f6b53 78%,currentColor)}

@@ -1,9 +1,10 @@
 // Script tests for the page editor (a page's Edit mode, editor.ts with writing.ts): writing as in Notion in a real
 // browser (Enter makes the next block, Backspace joins, Tab nests, Markdown as you type, "/" for blocks, Turn into,
 // colours, to-dos that tick, toggles, a table of contents, an icon and a cover, pictures dropped or pasted in, blocks
-// dragged into a column, several blocks picked, undo by the block, nested items that keep their place, Save from the
-// first letter), that nothing of the editor's own reaches the page it gives back, the kit's styles for the blocks, a page
-// in Use (links, a table of contents left empty), and that a page made of them survives its exports (a web page, a PDF and
+// dragged into a column, several blocks picked or picked with a drag, undo by the block, nested items that keep their
+// place, code coloured as it is written with a language to pick, Save from the first letter), that nothing of the
+// editor's own reaches the page it gives back, the kit's styles for the blocks, the code's colours, a page in Use (links,
+// a table of contents left empty, coloured code), and that a page made of them survives its exports (a web page, a PDF and
 // a Word document when a browser is here). The browser parts run when this computer has a Chromium (Settings → Browser,
 // or Playwright's); ONLY=word runs those whose page has that word. Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/page-editor-test.ts
@@ -16,6 +17,7 @@ import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { canCapture, closeCapture, withTab, type Tab } from '../capture/index.ts';
 import { KIT_CSS } from '../../shared/page-kit.ts';
+import { CODE_COLOURS_SRC, codeColours } from '../../shared/code-colours.ts';
 import { extractText } from '../documents/extract.ts';
 import { EDITOR_SRC } from './editor.ts';
 import { pages } from './index.ts';
@@ -50,6 +52,25 @@ try {
   compiles = false;
 }
 ok(compiles, 'the editor’s script (with the writing) is one function the page can run');
+
+// ---- code blocks' colours (shared/code-colours.ts) -----------------------------------------------------------------------
+{
+  const C = codeColours();
+  const kinds = (code: string, lang: string) =>
+    C.tokens(code, lang)
+      .filter(([c]) => c)
+      .map(([c, t]) => `${c}:${t}`)
+      .join(' ');
+  same(kinds('def add(a, b):\n    return a + 1  # sum', 'python'), 'k:def f:add k:return n:1 c:# sum', 'Python’s keywords, names, numbers and comments are told apart');
+  same(kinds('<a href="x">Hi &amp; bye</a>', 'html'), 'g:a a:href s:"x" v:&amp; g:a', 'HTML’s tags, attributes and their values');
+  same(kinds('.card:hover { color: #fff; }', 'css'), 't:.card k::hover a:color n:#fff', 'CSS’s selectors, properties and values');
+  same(kinds('{"a": [1, true]}', 'json'), 'a:"a" n:1 v:true', 'JSON’s keys and values');
+  same(kinds("SELECT name FROM users WHERE id = 3 -- one", 'sql'), 'k:SELECT k:FROM k:WHERE n:3 c:-- one', 'SQL’s words in any case');
+  same([C.detect('import os\ndef f():\n    print(None)'), C.detect('const x = () => 1;\nconsole.log(x)'), C.detect('{"a": 1}'), C.detect('SELECT * FROM t WHERE a = 1'), C.detect('hello there')].join(','), 'python,js,json,sql,', 'a block’s language is told from its code (none, from plain words)');
+  same([C.langId('py'), C.langId('TypeScript'), C.langId('sh'), C.langId('klingon')].join(','), 'python,ts,bash,', 'a language is known by its usual names');
+  ok(!/<\/script/i.test(CODE_COLOURS_SRC) && !/<!--/.test(CODE_COLOURS_SRC), 'the colours’ script can go in a <script> as it is');
+  ok(KIT_CSS.includes('pre.n-code .n-ck{'), 'the kit colours the code’s words');
+}
 
 // ---- the editor in a browser --------------------------------------------------------------------------------------
 const LABELS = { phText: 'Type ‘/’ for commands' };
@@ -604,6 +625,33 @@ if (canCapture()) {
     ok((await d.js<string>('const v = document.querySelector("a.n-video"); return v ? v.getAttribute("data-video") : ""')) === 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', 'a video goes in as its still, linked to it');
   });
 
+  // ---- code blocks: coloured as they show and as they are written, a language to pick, plain code in the page kept --------
+  await drive('<p id="a">Before</p><pre class="n-code" id="c">const x = 1; // one\nfunction f(a) { return "s"; }</pre><p id="z">After</p>', async (d) => {
+    same(
+      await d.js<string>('return [...document.querySelectorAll("#c span")].map(s => s.className + ":" + s.textContent).join(" ")'),
+      'n-ck:const n-cn:1 n-cc:// one n-ck:function n-cf:f n-ck:return n-cs:"s"',
+      'a code block shows its code coloured, the language told from the code',
+    );
+    await d.click('#c');
+    same((await d.msgs('wa-ed-sel')).at(-1)?.sel?.tag, 'pre', 'a click on a coloured word picks the code block, not the word');
+    same((await d.msgs('wa-ed-sel')).at(-1)?.sel?.langAuto, 'js', 'the Part tab is told the language its code looks like');
+    await d.cmd('codeLang', 'python');
+    same(await d.js<string>('return document.querySelector("#c").getAttribute("data-lang")'), 'python', 'a language picked is kept with the block');
+    same(await d.js<string>('return [...document.querySelectorAll("#c .n-ck")].map(s => s.textContent).join(",")'), 'return', 'and its code is coloured as that language');
+    await d.write('#c');
+    await d.press('Enter');
+    await d.type('def g(): pass');
+    await sleep(80);
+    same(await d.js<string>('return [...document.querySelectorAll("#c .n-ck")].map(s => s.textContent).join(",")'), 'return,def,pass', 'code typed is coloured as it is written');
+    await d.type('!');
+    ok((await d.js<string>('return document.querySelector("#c").textContent')).endsWith('def g(): pass!'), 'with the caret where it was');
+    await d.press('Escape');
+    const out = await d.html();
+    ok(out.includes('<pre class="n-code" id="c" data-lang="python">const x = 1; // one\nfunction f(a) { return "s"; }\ndef g(): pass!</pre>'), 'the page given back keeps its code as plain text, and its language');
+    await d.cmd('codeLang', '');
+    same(await d.js<string>('return document.querySelector("#c").hasAttribute("data-lang")'), false, 'Auto takes the language off');
+  });
+
   // ---- picking blocks with a drag: from beside a block's words, from the left margin, item by item, from the + ---------------
   await drive('<h1 id="t">Pick</h1><p id="a">Short</p><p id="b">Also short</p><ul><li id="i1">One<ul><li id="i2">Two</li></ul></li><li id="i3">Three</li></ul><p id="z">Last</p>', async (d) => {
     const s = d.tab.s;
@@ -708,7 +756,7 @@ if (canCapture()) {
   // ---- a page in Use (the kit's bridge): links, and a table of contents left empty -------------------------------------------------
   {
     const body =
-      '<a id="out" href="https://example.com/x">Out</a> <a id="pg" class="n-pagelink" data-page="abc123" href="/pages/abc123">A page</a> <a id="in" href="#days">In</a> <a id="own" href="https://example.com/y" onclick="event.preventDefault()">Own</a><nav class="n-toc"></nav><h2>Days</h2><h3>Monday</h3>';
+      '<a id="out" href="https://example.com/x">Out</a> <a id="pg" class="n-pagelink" data-page="abc123" href="/pages/abc123">A page</a> <a id="in" href="#days">In</a> <a id="own" href="https://example.com/y" onclick="event.preventDefault()">Own</a><nav class="n-toc"></nav><h2>Days</h2><h3>Monday</h3><pre class="n-code" data-lang="js">let a = 1;</pre>';
     const html = injectHead(`<!doctype html><html><head><title>Use</title></head><body>${body}</body></html>`, kitHead({ n: 't', theme: 'light', max: { key: 200, value: 1000 } }));
     await withTab({ html, width: 700, height: 500, settleMs: 150 }, async (tab) => {
       const js = <T>(code: string) => tab.evaluate<T>(`(() => { ${code} })()`);
@@ -729,6 +777,7 @@ if (canCapture()) {
       same(opened.length, 2, 'a link the page’s own script took care of is left to it');
       same(await js<string>('return location.href.split("#")[0]'), at.split('#')[0], 'and the page stays where it is');
       same(await js<string>('return [...document.querySelectorAll("nav.n-toc a")].map(a => a.getAttribute("href") + " " + a.className).join(",")'), '#days n-toc-1,#monday n-toc-2', 'a table of contents left empty shows the page’s headings');
+      same(await js<string>('return [...document.querySelectorAll("pre.n-code span")].map(s => s.className + ":" + s.textContent).join(" ")'), 'n-ck:let n-cn:1', 'a code block shows its code coloured, as in Edit');
     });
   }
   closeCapture();
