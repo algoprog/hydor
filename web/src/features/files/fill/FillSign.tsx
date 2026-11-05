@@ -456,7 +456,7 @@ function PageView({
       className="relative shrink-0 overflow-hidden bg-white shadow-[0_1px_4px_rgba(0,0,0,0.25)]"
       style={{ width, height }}
       onClick={(e) => {
-        if (!(e.target as HTMLElement).hasAttribute('data-paper')) return;
+        if (!(e.target as HTMLElement).hasAttribute('data-paper') || Date.now() - dragEnded < 400) return;
         const r = e.currentTarget.getBoundingClientRect();
         onPlace(n, (e.clientX - r.left) / k, (e.clientY - r.top) / k);
       }}
@@ -671,6 +671,9 @@ function FieldBox({ f, w, k, value, onChange, onSign }: { f: Field; w: Widget; k
   }
 }
 
+/** When a drag last ended: the click the browser sends after it is no click on the page. */
+let dragEnded = 0;
+
 /** Moves (or sizes) a mark with the pointer, kept on its page; sizing keeps a picture's shape. */
 function dragMark(e: React.PointerEvent, m: Mark, k: number, page: { width: number; height: number }, mode: 'move' | 'size', update: (id: string, p: Partial<Mark>) => void, box?: { w: number; h: number }) {
   e.preventDefault();
@@ -689,7 +692,8 @@ function dragMark(e: React.PointerEvent, m: Mark, k: number, page: { width: numb
       update(m.id, { w, h: (w * o.h) / Math.max(1, o.w) });
     }
   };
-  const up = () => {
+  const up = (ev: PointerEvent) => {
+    if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 3) dragEnded = Date.now();
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
     window.removeEventListener('pointercancel', up);
