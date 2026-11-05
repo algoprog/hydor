@@ -249,7 +249,8 @@ const SAVE_SLIDES: RunTool = {
   inputSchema: SAVE_SLIDES_SCHEMA,
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'slides');
-    const { deck, notes } = await agentDeck(ctx.deps.db, { ratio: a.ratio, theme: a.theme, slides: a.slides, footer: a.footer, guides: a.guides }, ctx.cwd);
+    // The version it changes: the parts it sends back as they were keep their look.
+    const { deck, notes } = await agentDeck(ctx.deps.db, { ratio: a.ratio, theme: a.theme, slides: a.slides, footer: a.footer, guides: a.guides }, ctx.cwd, id ? pageSource(ctx.deps.db, id)?.text : undefined);
     const p = keepModel(ctx, id, 'slides', a.title, deck);
     const n = deck.slides.length;
     return [

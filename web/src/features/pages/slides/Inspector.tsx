@@ -688,22 +688,26 @@ function ChartLook({ el, theme, set }: { el: ChartEl; theme: Theme; set: (patch:
               <tr>
                 <th className="w-[38%]" />
                 {series.map((s, si) => (
-                  <th key={si} className="min-w-[72px]">
-                    <div className="flex items-center gap-0.5">
-                      {!pie && <ColorButton value={s.color ?? `c${(si % 6) + 1}`} theme={theme} onChange={(color) => set({ series: el.series.map((x, k) => (k === si ? { ...x, color } : x)) })} label="Its colour" className="h-7 min-w-6 px-0.5" />}
-                      <input
-                        value={s.name}
-                        aria-label="The series’ name"
-                        onChange={(e) => set({ series: el.series.map((x, k) => (k === si ? { ...x, name: e.target.value } : x)) }, `chart:name:${si}`)}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        className={cx(cell, 'font-medium')}
-                      />
-                      {!pie && el.series.length > 1 && (
-                        <button type="button" title="Remove this series" aria-label="Remove this series" onClick={() => set({ series: el.series.filter((_, k) => k !== si) })} className="text-fg-3 hover:text-err">
-                          <X size={12} />
-                        </button>
-                      )}
-                    </div>
+                  <th key={si} className="min-w-[72px] align-bottom font-normal">
+                    {/* Its colour and Remove over its name, which has the column's whole width. */}
+                    {!pie && (
+                      <div className="flex items-center justify-between gap-0.5">
+                        <ColorButton value={s.color ?? `c${(si % 6) + 1}`} theme={theme} onChange={(color) => set({ series: el.series.map((x, k) => (k === si ? { ...x, color } : x)) })} label="Its colour" className="h-6 min-w-6 px-0.5" />
+                        {el.series.length > 1 && (
+                          <button type="button" title="Remove this series" aria-label="Remove this series" onClick={() => set({ series: el.series.filter((_, k) => k !== si) })} className="grid h-6 w-6 place-items-center text-fg-3 hover:text-err">
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <input
+                      value={s.name}
+                      aria-label="The series’ name"
+                      onChange={(e) => set({ series: el.series.map((x, k) => (k === si ? { ...x, name: e.target.value } : x)) }, `chart:name:${si}`)}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      translate="no"
+                      className={cx(cell, 'font-medium')}
+                    />
                   </th>
                 ))}
               </tr>
