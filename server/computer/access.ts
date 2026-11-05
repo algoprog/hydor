@@ -201,7 +201,7 @@ export async function mayUse(ctx: RunCtx, need: { see: boolean; act: boolean }):
     if (!p) return 'The Mac app did not say what macOS allows Hydor to do. Ask the user to check Settings → Capabilities → Computer use.';
     const missing = [need.act && !p.accessibility ? 'Accessibility (to use the mouse and keyboard)' : '', need.see && p.screen !== 'granted' ? 'Screen Recording (to see the screen)' : ''].filter(Boolean);
     if (missing.length)
-      return `macOS does not allow Hydor ${missing.join(' or ')} yet. Ask the user to allow it: Settings → Capabilities → Computer use has the buttons (then macOS's System Settings → Privacy & Security). Then try again.`;
+      return `macOS does not allow Hydor ${missing.join(' or ')} yet. Ask the user to allow it: Settings → Capabilities → Computer use has the buttons (then macOS's System Settings → Privacy & Security). If Hydor already shows as on there, that switch is from an earlier version of the app: the button clears it, and they turn Hydor on again. Then try again.`;
   }
   const problem = await hooks.problem();
   if (problem) return `Computer use cannot work on ${thisHere()} now: ${problem} Tell the user.`;

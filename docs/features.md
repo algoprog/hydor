@@ -503,11 +503,12 @@ programs shows each program's version and what is out, with Check now, Update no
   Linux), in a window of its own, in the menu bar (the notification area, the system tray) when the window is closed,
   opening at login. They show notifications themselves, find your programs through your login shell's PATH (on
   Windows, your own environment), and update themselves release by release: they look every 4 hours, download and
-  check a new build as soon as it is out, say so (a notification, and a note in every open page that counts down a
-  minute, with Restart now and Later, which puts it off for 4 hours; Restart to Update in the icon's menu), and swap
-  it in with agents carrying on. A Mac app and an AppImage go back to the version before if the new one does not
-  start; on Windows the new version's installer runs without its window; the .deb installs once you give your
-  password.
+  check a new build as soon as it is out (a download that breaks off, as when the computer sleeps, carries on from where
+  it stopped, and one that gets nowhere tries again an hour later), say so (a notification, and a note in every open
+  page that counts down a minute, with Restart now and Later, which puts it off for 4 hours; Restart to Update in the
+  icon's menu), and swap it in with agents carrying on. A Mac app and an AppImage go back to the version before if the
+  new one does not start; on Windows the new version's installer runs without its window; the .deb installs once you
+  give your password.
 - On Windows the server runs as it does elsewhere: agents' commands in Git for Windows' bash, terminals the app keeps
   itself (Windows has no tmux), and each version run from a copy of its own so agents carry on through updates.
 - While the app loads, in a browser or while a desktop app starts, its logo shows, HYDΩR with water rising in the Ω
@@ -517,7 +518,7 @@ programs shows each program's version and what is out, with Check now, Update no
   display at about 1280 pixels, clicks, drags, scrolls, typing in any language and on any keyboard layout, keys and
   shortcuts, opening apps by name: from the Start menu on Windows, by their desktop entries on Linux), beside the
   browser, which stays the way for websites. On a Mac, Settings asks macOS for its Accessibility and Screen Recording
-  permissions; on Linux it says what is in the way (a Wayland desktop, a library missing). Each session asks on a
+  permissions, which carry over when the app updates (every version is signed with the same certificate); on Linux it says what is in the way (a Wayland desktop, a library missing). Each session asks on a
   card before its agent starts; one session at a time. While an agent works, a glow in the app's water colours lines
   every display's edges, with a note at the bottom ("An agent is using your Mac · Press Esc to stop"); clicks go
   through it, and the agent's screenshots never show it (it is hidden for the moment a screenshot is taken). Esc stops the agent (⌘⇧Esc too on a Mac), as do Stop in the menu bar or tray,

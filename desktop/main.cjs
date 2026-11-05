@@ -587,6 +587,24 @@ const PANES = {
   screen: 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
 };
 
+/** macOS's names for those permissions, for tccutil. */
+const TCC = { accessibility: 'Accessibility', screen: 'ScreenCapture' };
+const cleared = new Set();
+
+/**
+ * A switch left on in System Settings for an earlier version of the app, which macOS does not count for this one (each
+ * update did that while the app was signed ad hoc; Hydor's own certificate keeps them since): cleared once a run,
+ * before asking, so macOS asks again and the switch it lists is this version's. Not while developing, where the app is
+ * Electron's.
+ */
+function clearStale(which) {
+  if (!PACKAGED || cleared.has(which)) return;
+  cleared.add(which);
+  try {
+    execFileSync('/usr/bin/tccutil', ['reset', TCC[which], 'com.hydor.app'], { stdio: 'ignore', timeout: 10_000 });
+  } catch {}
+}
+
 /** What macOS lets this app (and the programs its server starts) do: use the mouse and keyboard, see the screen. */
 function permissions() {
   let screen = 'unknown';
@@ -617,11 +635,15 @@ async function answer(m) {
     if (m.what === 'permissions') return reply(permissions());
     if (m.what === 'request' && m.which === 'accessibility') {
       // macOS asks once ("Hydor would like to control this computer"); its settings list the app from then on.
-      if (!systemPreferences.isTrustedAccessibilityClient(true)) await shell.openExternal(PANES.accessibility);
+      if (!systemPreferences.isTrustedAccessibilityClient(false)) {
+        clearStale('accessibility');
+        if (!systemPreferences.isTrustedAccessibilityClient(true)) await shell.openExternal(PANES.accessibility);
+      }
       return reply(permissions());
     }
     if (m.what === 'request' && m.which === 'screen') {
       if (permissions().screen !== 'granted') {
+        clearStale('screen');
         // Looking at the screen once makes macOS ask, and list the app under Screen Recording.
         await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1, height: 1 } }).catch(() => {});
         await shell.openExternal(PANES.screen);

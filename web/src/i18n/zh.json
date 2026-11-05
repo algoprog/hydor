@@ -11004,5 +11004,14 @@
 "You stopped the agent using your computer. Let it go on?":"你让智能体停止使用你的电脑。要让它继续吗？",
 "You stopped the agent using your PC. Let it go on?":"你让智能体停止使用你的电脑。要让它继续吗？",
 "Agents see the screen and use the mouse and keyboard, in any app (for websites they keep to the browser). Each session asks you first":"智能体能看到屏幕，并在任何应用中使用鼠标和键盘（网站的事它们仍交给浏览器）。每个会话都会先问你",
-"Agents see the screen and use the mouse and keyboard, in any app (for websites they keep to the browser). Each session asks you first.":"智能体能看到屏幕，并在任何应用中使用鼠标和键盘（网站的事它们仍交给浏览器）。每个会话都会先问你。"
+"Agents see the screen and use the mouse and keyboard, in any app (for websites they keep to the browser). Each session asks you first.":"智能体能看到屏幕，并在任何应用中使用鼠标和键盘（网站的事它们仍交给浏览器）。每个会话都会先问你。",
+"{0} did not answer in time":"{0} 没有及时回应",
+"could not reach {0}":"无法连接到 {0}",
+"could not reach {0} ({1})":"无法连接到 {0}（{1}）",
+"GitHub answered {0}":"GitHub 返回了 {0}",
+"the connection broke off":"连接中断了",
+"the connection went quiet":"连接没有数据了",
+"the download stopped at {0} of {1} MB ({2}); the next try carries on from there":"下载停在了 {1} MB 中的 {0} MB（{2}）；下次尝试会从那里接着下载",
+"the file ended early":"文件提前结束了",
+"the server sent another part of the file":"服务器发来了文件的另一部分"
 }

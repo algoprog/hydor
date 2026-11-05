@@ -151,6 +151,8 @@ When the minute is up, the app restarts into the new version: running agents car
 
 With **Update automatically** off, nothing downloads by itself: **About** says "Version … is out", and **Update now** downloads it, checks it and opens it in place of the one you run ("Downloading the new version…", then "Opening the new version, this page reconnects by itself…").
 
+A download that breaks off carries on from where it stopped: when the computer goes to sleep, or the connection drops or goes quiet for a minute, it picks up again as soon as it can. If it still gets no further after a couple of minutes, it keeps what it has, the line under **About** says how far it got, and it tries again an hour later, carrying on from there; so does **Update now**.
+
 On Windows, the new version's installer runs without its window, installs over the app and opens it again. The Linux .deb asks for your password to install: a version that downloaded by itself waits, and **Restart to Update** (or **Restart now**) asks for the password and opens the new version.
 
 If the new version of the Mac app or an AppImage does not start, the version before comes back by itself and the line under **About** says why; that version then installs only when you press **Update now**. The Mac app can update itself only from the Applications folder (or another folder you can write to): opened from the disk image, it says to move it there. An AppImage likewise needs a folder you can write to, such as your home folder.

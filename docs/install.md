@@ -47,8 +47,9 @@ when this computer starts**).
 - Computer use: agents can see your Mac's screen and use its mouse and keyboard, once you turn it on in Settings →
   Computer use and give Hydor macOS's Accessibility and Screen Recording permissions (its **Allow…** buttons
   ask). Each session asks you first; a glow lines the screen while an agent works, and **Esc** (or **Stop** in the
-  menu bar, or ⌘⇧Esc) stops it. Builds not signed with a Developer
-  ID may need the permissions given again after an update (macOS ties them to the app's signature).
+  menu bar, or ⌘⇧Esc) stops it. The permissions carry over when the app updates: macOS ties them to the app's
+  signature, and every version since 0.28.1 is signed with the same certificate. Coming from an earlier version, give
+  them once more: **Allow…** clears the old switch first.
 - Not in the Mac app yet: **Run code** steps in apps and the agent sandbox need Linux's bubblewrap.
 
 Opened from the disk image or the Downloads folder, the app offers to move itself to Applications, where it can
@@ -240,7 +241,9 @@ node dist/server/cli.js app import reading-list.hydor-app   # says what it will 
 
 The desktop apps update by release: a minute after one opens and then every 4 hours it looks at the newest release
 on GitHub, and when it is newer, it downloads the build for your system at once and checks it against the release's
-checksum (and, for a signed Mac app, that the same developer signed it). Then it says so, with a notification and a
+checksum (and, for a signed Mac app, that the same developer signed it). A download that breaks off (the computer
+asleep, the connection dropped or quiet for a minute) carries on from where it stopped; one that gets no further for a
+couple of minutes keeps what it has and tries again an hour later. Then it says so, with a notification and a
 note in every open page that counts down a minute (**Restart now**, **Later**), and opens the new version in place of
 the one you run. **Later** puts it off for 4 hours; **Restart to Update** in the menu of its icon (the menu bar, the
 notification area, the tray) installs it whenever you like. Running agents carry on. With **Update automatically** off

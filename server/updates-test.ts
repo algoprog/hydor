@@ -5,13 +5,18 @@
 // Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/updates-test.ts && DATA_DIR=/tmp/hydor-test-updates node dist/dev/updates-test.js
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import http from 'node:http';
+import net from 'node:net';
+import path from 'node:path';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
   process.exit(2);
 }
 
-const { APP_EVERY, LATER, NOTICE, RETRY, appDownloadDue, appInstallTimes, autoUpdateDue, checkTimes, readyView } = await import('./updates.ts');
+const { APP_EVERY, LATER, NOTICE, RETRY, STALL, WAITS, appDownloadDue, appInstallTimes, autoUpdateDue, checkTimes, download, readyView } = await import('./updates.ts');
 
 const HOUR = 3600_000;
 const NOW = Date.UTC(2026, 10, 3, 12);
@@ -75,6 +80,111 @@ test('how often each kind looks: the Mac app soon after it starts and every 4 ho
   assert.deepEqual(checkTimes('app', true), { first: 60_000, every: 4 * HOUR });
   assert.deepEqual(checkTimes('git', true), { first: 3 * 60_000, every: 24 * HOUR });
 });
+
+// ---- downloads: a server that breaks off, goes quiet, sends the whole file again, refuses, or is not there ----
+const FILE = Buffer.from(Array.from({ length: 3_000_000 }, (_, i) => (i * 7) % 251));
+const sha = (b: Buffer) => createHash('sha512').update(b).digest('base64');
+const WANT = { size: FILE.length, sha512: sha(FILE) };
+/** What the next requests get: a third of the file and then the connection cut, or gone quiet; the connection reset at once; the whole file whatever the range; a 404. Then the file as asked. */
+let plan: ('cut' | 'quiet' | 'reset' | 'whole' | 'missing')[] = [];
+/** Each request's range. */
+const asked: (string | undefined)[] = [];
+const server = http.createServer((req, res) => {
+  asked.push(req.headers.range);
+  const how = plan.shift();
+  if (how === 'missing') return void res.writeHead(404).end();
+  if (how === 'reset') return void req.socket.destroy();
+  const from = how === 'whole' ? 0 : Number(/^bytes=(\d+)-$/.exec(req.headers.range ?? '')?.[1] ?? 0);
+  if (from >= FILE.length) return void res.writeHead(416, { 'content-range': `bytes */${FILE.length}` }).end();
+  const body = FILE.subarray(from);
+  res.writeHead(from ? 206 : 200, { 'content-length': body.length, ...(from ? { 'content-range': `bytes ${from}-${FILE.length - 1}/${FILE.length}` } : {}) });
+  if (!how || how === 'whole') return void res.end(body);
+  res.write(body.subarray(0, 1_000_000));
+  if (how === 'cut') setTimeout(() => req.socket.destroy(), 100);
+});
+await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+const url = `http://127.0.0.1:${(server.address() as net.AddressInfo).port}/Hydor.zip`;
+const dir = path.join(process.env.DATA_DIR!, 'downloads');
+fs.rmSync(dir, { recursive: true, force: true });
+fs.mkdirSync(dir, { recursive: true });
+const at = (name: string) => path.join(dir, name);
+const got = (file: string) => fs.existsSync(file) && sha(fs.readFileSync(file)) === WANT.sha512 && !fs.existsSync(`${file}.part`);
+const quick = { stall: 2000, waits: [20, 20] };
+const atest = async (name: string, fn: () => Promise<void>) => {
+  plan = [];
+  asked.length = 0;
+  await fn();
+  passed++;
+  console.log(`  ok  ${name}`);
+};
+
+test('a download goes on while bytes come, drops a try after a minute without any, and waits a little longer each time one gets no further', () => {
+  assert.equal(STALL, 60_000);
+  assert.deepEqual(WAITS, [3_000, 10_000, 30_000, 60_000]);
+});
+
+await atest('a download that breaks off carries on from its last byte', async () => {
+  plan = ['cut'];
+  await download(url, at('cut.zip'), WANT, quick);
+  assert.ok(got(at('cut.zip')), 'the whole file, checked');
+  assert.equal(asked.length, 2);
+  assert.equal(asked[0], undefined, 'the first try asks for all of it');
+  assert.match(asked[1] ?? '', /^bytes=[1-9]\d*-$/, 'the second from where the first stopped');
+});
+
+await atest('one that goes quiet is dropped after the stall, and the next try carries on', async () => {
+  plan = ['quiet'];
+  const t = Date.now();
+  await download(url, at('quiet.zip'), WANT, { ...quick, stall: 300 });
+  assert.ok(got(at('quiet.zip')));
+  assert.ok(Date.now() - t >= 300, 'it waited out the stall');
+  assert.match(asked[1] ?? '', /^bytes=[1-9]\d*-$/);
+});
+
+await atest('tries that get no further wait and try again; when they run out, what it got stays for the next download', async () => {
+  plan = ['cut', 'reset', 'reset', 'reset'];
+  await assert.rejects(download(url, at('stops.zip'), WANT, quick), /^Error: the download stopped at \d of 3 MB \(the connection broke off\); the next try carries on from there$/);
+  assert.equal(asked.length, 4, 'one that got somewhere, then three that did not: the first and the two waits');
+  const kept = fs.statSync(at('stops.zip.part')).size;
+  assert.ok(kept > 0 && kept < FILE.length, `part of it is kept (${kept} bytes)`);
+  asked.length = 0;
+  await download(url, at('stops.zip'), WANT, quick);
+  assert.equal(asked[0], `bytes=${kept}-`, 'the next download carries on from it');
+  assert.ok(got(at('stops.zip')));
+});
+
+await atest('a server that sends the whole file again, whatever the range, has it start over', async () => {
+  fs.writeFileSync(at('whole.zip.part'), Buffer.alloc(500_000, 9));
+  plan = ['whole'];
+  await download(url, at('whole.zip'), WANT, quick);
+  assert.equal(asked[0], 'bytes=500000-');
+  assert.ok(got(at('whole.zip')), 'the part it had is written over');
+});
+
+await atest('a download that is not the build the release names is refused, and nothing of it kept', async () => {
+  await assert.rejects(download(url, at('other.zip'), { ...WANT, sha512: sha(Buffer.from('another build')) }, quick), /checksum differs/);
+  assert.ok(!fs.existsSync(at('other.zip')) && !fs.existsSync(at('other.zip.part')));
+  await assert.rejects(download(url, at('longer.zip'), { ...WANT, size: FILE.length + 10 }, quick), /checksum differs/, 'a file shorter than the release says');
+  assert.ok(!fs.existsSync(at('longer.zip.part')));
+});
+
+await atest('a refusal (404) fails at once, without trying again', async () => {
+  plan = ['missing'];
+  await assert.rejects(download(url, at('missing.zip'), WANT, quick), /^Error: the download failed \(404\)$/);
+  assert.equal(asked.length, 1);
+});
+
+await atest('with nothing there, it says it could not reach it', async () => {
+  const closed = net.createServer();
+  await new Promise<void>((r) => closed.listen(0, '127.0.0.1', r));
+  const port = (closed.address() as net.AddressInfo).port;
+  await new Promise((r) => closed.close(r));
+  await assert.rejects(download(`http://127.0.0.1:${port}/Hydor.zip`, at('nothing.zip'), WANT, quick), new RegExp(`^Error: could not reach 127\\.0\\.0\\.1:${port} \\(ECONNREFUSED\\)$`));
+});
+
+server.closeAllConnections();
+server.close();
+fs.rmSync(dir, { recursive: true, force: true });
 
 console.log(`${passed} passed`);
 process.exit(0);
