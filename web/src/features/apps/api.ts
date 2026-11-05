@@ -32,7 +32,8 @@ export interface AppKey {
 /** An app that opens on its own page: the answers it runs with from there, and whether (and when) it updates every day. */
 export interface HomeSettings {
   inputs: Record<string, string>;
-  daily: { on: boolean; time: string };
+  /** Update automatically: on or off, the time, and the days of the week (0 is Sunday; unset: every day). */
+  daily: { on: boolean; time: string; days?: number[] };
 }
 
 export interface AppDetail {

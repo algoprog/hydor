@@ -383,8 +383,9 @@ function routes(d: Deps) {
   });
 
   /**
-   * An app that opens on its own page: the answers it runs with from there (its settings) and Update every day (a
-   * scheduled task at a time). Body: { inputs?: { question: answer }, daily?: { on, time: "HH:MM" } }. Gives its settings now.
+   * An app that opens on its own page: the answers it runs with from there (its settings) and Update automatically (a
+   * scheduled task at a time, every day or on some days). Body: { inputs?: { question: answer }, daily?: { on, time:
+   * "HH:MM", days: [0–6] | null } }. Gives its settings now.
    */
   app.put('/api/apps/:id/home', async (req) => {
     const { app: a, template } = recipeOf(db, P(req).id);
