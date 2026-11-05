@@ -146,7 +146,9 @@ export async function stopLocal(id: string, folder: string, graceMs = 10_000): P
   later(graceMs, () => sig('SIGTERM'));
   later(2 * graceMs, () => {
     sig('SIGKILL');
-    void tmuxThere().then((t) => t && tmux(['kill-session', '-t', `=${session(id)}`]));
+    void tmuxThere().then((t) => {
+      if (t) void tmux(['kill-session', '-t', `=${session(id)}`]);
+    });
   });
 }
 
