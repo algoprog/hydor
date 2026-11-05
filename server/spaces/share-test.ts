@@ -73,6 +73,9 @@ session('claude:s1', thesis.id, 'Write chapter 3', [
 ]);
 session('claude:s2', thesis.id, 'My private notes', [{ kind: 'user', id: 'u2', seq: 0, ts: at, text: 'Diary' }], { confidential: true });
 session('claude:s3', taxes.id, 'Tax return', [{ kind: 'user', id: 'u3', seq: 0, ts: at, text: 'My income is…' }]);
+// Kept Confidential in its stored settings alone (the summary the app has does not say so yet).
+session('claude:s4', thesis.id, 'Health notes', [{ kind: 'user', id: 'u4', seq: 0, ts: at, text: 'My diagnosis' }]);
+setSessionExtra(db, 'claude:s4', { confidential: true });
 
 const notices: any[] = [];
 const events: any[] = [];
@@ -304,6 +307,7 @@ const text = JSON.stringify(sv);
 ok(r.statusCode === 200 && sv.title === 'Write chapter 3' && sv.items.some((x) => x.kind === 'assistant'), 'a session of the project opens');
 ok(!text.includes('Secret plan') && !text.includes('BEGIN KEY') && !text.includes('id_rsa') && !text.includes('likes cats') && !text.includes('$4.20') && !text.includes('/home/owner') && !text.includes('costUsd'), 'never thinking, command output or input, the harness’s notes, or what it cost');
 ok((await req('GET', `${M}/sessions/claude:s2`)).statusCode === 404, 'not a Confidential session');
+ok((await req('GET', `${M}/sessions/claude:s4`)).statusCode === 404 && !JSON.stringify((await req('GET', M)).json()).includes('Health notes'), 'nor one its stored settings keep Confidential, nor a word of it');
 ok((await req('GET', `${M}/sessions/claude:s3`)).statusCode === 404, 'not another project’s session');
 
 // ---- pictures, and what else a link might be asked for --------------------------------------------------------------------------------

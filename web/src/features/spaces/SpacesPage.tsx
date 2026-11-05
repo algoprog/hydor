@@ -89,11 +89,17 @@ function SpaceCard({ s, spaces }: { s: SpaceView; spaces: SpaceView[] }) {
       className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-line bg-panel text-left transition-colors outline-none hover:border-line-2 focus-visible:ring-2 focus-visible:ring-accent/40"
     >
       <div className="relative h-14 w-full" style={{ background: wash(c) }}>
-        {group && (
-          <span className="absolute top-2.5 right-3 inline-flex items-center gap-1 rounded-full bg-panel/70 px-2 py-0.5 text-[11.5px] font-medium text-fg-2">
-            <Layers size={11} /> Group
+        <div className="absolute top-1.5 right-1.5 flex items-center gap-1.5">
+          {group && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-panel/70 px-2 py-0.5 text-[11.5px] font-medium text-fg-2">
+              <Layers size={11} /> Group
+            </span>
+          )}
+          {/* Its menu, as on its page (share it with people…): a click in it is not a click on the card. */}
+          <span className="contents" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+            <SpaceMenu s={s} />
           </span>
-        )}
+        </div>
         <span className="absolute -bottom-5 left-4 rounded-[13px] bg-panel p-[3px]">
           <SpaceMark s={s} size={40} className="rounded-[10px]" />
         </span>
@@ -108,10 +114,6 @@ function SpaceCard({ s, spaces }: { s: SpaceView; spaces: SpaceView[] }) {
         <div className="mt-3 text-[12.5px] text-fg-2">{holds(s)}</div>
         <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
           <span className="min-w-0 flex-1 truncate text-[12px] text-fg-3">{s.lastAt ? tr(`Last at work ${timeAgo(s.lastAt)} ago`) : 'No sessions yet'}</span>
-          {/* Its menu, as on its page (share it with people…): a click in it is not a click on the card. */}
-          <span className="contents" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-            <SpaceMenu s={s} />
-          </span>
           <Button
             size="sm"
             variant="secondary"

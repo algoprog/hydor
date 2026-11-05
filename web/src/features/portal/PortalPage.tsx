@@ -13,7 +13,7 @@ import { spaceColor } from '@shared/spaces';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Logo } from '../../components/Logo';
 import { Toasts } from '../../components/Toasts';
-import { cx, Empty, MenuItem, MenuLabel, MenuSep, Popover, Tabs, Throbber, useMediaQuery } from '../../components/ui';
+import { cx, Empty, MenuItem, MenuLabel, MenuSep, Popover, SheetsOnPhone, Tabs, Throbber, useMediaQuery } from '../../components/ui';
 import { currentLang, KEY as LANG_KEY, LOCALE } from '../../i18n/locale';
 import { tr } from '../../i18n/runtime';
 import { ago, duration, timeAgo } from '../../lib/format';
@@ -205,8 +205,9 @@ function Me({ v }: { v: PortalView }) {
     localStorage.setItem(LANG_KEY, l);
     location.reload();
   };
+  // On a phone, a sheet from the bottom, under their name (the top shows only their initials there).
   return (
-    <>
+    <SheetsOnPhone.Provider value>
       <button
         ref={ref}
         type="button"
@@ -253,7 +254,7 @@ function Me({ v }: { v: PortalView }) {
           Like this device
         </MenuItem>
       </Popover>
-    </>
+    </SheetsOnPhone.Provider>
   );
 }
 
