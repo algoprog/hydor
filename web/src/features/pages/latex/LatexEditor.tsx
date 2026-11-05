@@ -9,6 +9,9 @@
 // arXiv id or title, folding, spelling, a word count, versions compared, the pages presented. An outline goes to a
 // section, a double click on a page goes to its source and Show in the PDF the other way. On a phone, Source and
 // Preview are two tabs and the menus are behind one button. Changes stay unsaved until Save (Ctrl+S), as a page's do.
+// A document of more than one file has its files as a tree on the left (FileTree.tsx; View → Files, remembered on this
+// device; a sheet on a phone), beside the Outline in the same panel: the tab row then lists the files you have open,
+// each closable, and a picture or a file TeX takes from the folder opens in the source's place to look at.
 // While an agent writes a new version (live.ts), its source shows as it comes, read-only, with the agent's caret where
 // its words arrive (the file it writes brought into view); it is typeset once it is saved.
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -21,9 +24,8 @@ import {
   Copy,
   ExternalLink,
   FilePen,
-  FilePlus,
-  FileUp,
   FoldVertical,
+  FolderTree,
   Footprints,
   Heading,
   History,
@@ -42,7 +44,6 @@ import {
   Omega,
   Pencil,
   Play,
-  Plus,
   Presentation,
   Quote,
   Redo2,
@@ -62,7 +63,6 @@ import {
   X,
 } from 'lucide-react';
 import {
-  cleanTexChanges,
   cleanTexComments,
   cleanTexName,
   engineLabel,
@@ -82,6 +82,7 @@ import {
   type TexSetup,
 } from '@shared/latex';
 import { newCommentId } from '@shared/comments';
+import { texDocUses, texFileKind, texIsUsed, texMoveFiles, type TexUses } from '@shared/latex-files';
 import { addBibEntry } from '@shared/latex-bib';
 import { blankTable, tableAt, tableTex, type TexTable } from '@shared/latex-table';
 import type { TexReference } from '@shared/latex-bib';
@@ -94,11 +95,13 @@ import { MenuBar, type MenuDef, type MenuEntry } from '../common/menus';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
 import { useOwnScroll } from '../live';
+import { mu } from '../../../lib/machine';
 import { addFileFromDevice, addPicture, assetUrl, chooseFiles, FILE_ACCEPT, freeName, pdfUrl, PICTURE_ACCEPT, placeOf, texSetup, typeset } from './api';
 import { ChangesList } from './ChangesList';
 import { mountCode, type Code } from './code';
 import { CommentsPanel, type CommentDraft } from './CommentsPanel';
 import { CompareDialog } from './Compare';
+import { FileTree, FileView, kindIcon, NewButton, type TreeActions, type TreeEntry } from './FileTree';
 import { docDefs, type DocDefs } from './complete';
 import { NameDialog, OutlineList, Problems, where } from './parts';
 import { paperItems, PaperTools, type PaperAsk } from './PaperTools';
@@ -114,13 +117,24 @@ import { MAX_VISUAL } from './visual';
 import { WordCountDialog } from './WordCount';
 
 const AUTO_KEY = 'wa.tex.auto';
+/** The left panel: Files or Outline, or none ('none'); not set: the files of a document of more than one, else none. */
+const PANEL_KEY = 'wa.tex.panel';
+/** Before the panel had Files: whether the Outline showed. */
 const OUTLINE_KEY = 'wa.tex.outline';
 const MODE_KEY = 'wa.tex.mode';
 const SPELL_KEY = 'wa.tex.spell';
 const DARK_PAGES_KEY = 'wa.tex.darkpages';
 const COMMENTS_KEY = 'wa.tex.comments';
-/** The Pictures tab, among the files'. */
+/** The Pictures tab, among the files' (a document of one file). */
 const PICTURES = '#pictures';
+/** A picture of the document, and a file TeX takes from the folder, open to look at: views, not files' editors. */
+const PIC = '#pic:';
+const DISK = '#disk:';
+/** A view in the source's place that is no file's text: the Pictures tab, a picture, a file of the folder. */
+const isView = (k: string) => k.startsWith('#');
+/** The file a view shows (a file's own name for a file). */
+const viewName = (k: string) => (k.startsWith(PIC) ? k.slice(PIC.length) : k.startsWith(DISK) ? k.slice(DISK.length) : k);
+const NO_USES: NonNullable<NonNullable<ModelEditorProps<TexDoc>['file']>['uses']> = [];
 
 const isDark = () => document.documentElement.classList.contains('dark');
 
@@ -195,23 +209,6 @@ function withText(d: TexDoc, name: string, text: string): TexDoc {
   return { ...d, files };
 }
 
-/** References to `from` in the document's TeX (\includegraphics, \input, \include, \bibliography) made to name `to`. */
-function renameRefs(d: TexDoc, from: string, to: string): TexDoc {
-  const stem = (n: string) => n.replace(/\.(tex|bib)$/i, '');
-  const fix = (t: string) =>
-    t.replace(/(\\(?:includegraphics\*?|input|include|subfile|bibliography)\s*(?:\[[^\]]*\]\s*)?\{)([^{}]*)(\})/g, (all, a: string, arg: string, b: string) => {
-      const parts = arg.split(',').map((p) => {
-        const n = p.trim().replace(/^\.\//, '');
-        if (n === from) return p.replace(n, to);
-        if (n === stem(from) && stem(from) !== from) return p.replace(n, stem(to));
-        return p;
-      });
-      const next = parts.join(',');
-      return next === arg ? all : `${a}${next}${b}`;
-    });
-  return { ...d, main: fix(d.main), files: d.files.map((f) => (/\.(tex|ltx)$/i.test(f.name) ? { ...f, text: fix(f.text) } : f)) };
-}
-
 /** The smallest change that turns `a` into `b` (so the cursor and what is picked stay where they were). */
 function diff(a: string, b: string) {
   let s = 0;
@@ -234,7 +231,7 @@ const START: Cursor = { line: 1, from: 1, to: 1, picked: false };
 /** What an agent asked now could be about: the whole document, the file, the section the cursor is in, the lines picked. */
 function scopesFor(file: string, cursor: Cursor, heading: TexHeading | null): AskScope[] {
   const out: AskScope[] = [{ id: 'doc', label: tr('The whole document'), lead: '' }];
-  if (file === PICTURES) return out;
+  if (isView(file)) return out;
   if (file !== TEX_MAIN) out.push({ id: 'file', label: `${tr('This file')}: ${file}`, lead: `In ${file}: ` });
   if (heading) {
     const t = heading.title.length > 40 ? `${heading.title.slice(0, 39)}…` : heading.title;
@@ -272,10 +269,19 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   const [auto, setAuto] = useState(() => localStorage.getItem(AUTO_KEY) !== '0');
   const [setup, setSetup] = useState<TexSetup | null>(null);
   const [pane, setPane] = useState<'source' | 'preview'>('source');
-  const [outlineOpen, setOutlineOpen] = useState(() => localStorage.getItem(OUTLINE_KEY) === '1');
+  // The left panel, Files or Outline: as last chosen on this device; never chosen, the files of a document of more than one.
+  const [panelPick, setPanelPick] = useState<'files' | 'outline' | 'none' | null>(() => {
+    const p = localStorage.getItem(PANEL_KEY);
+    return p === 'files' || p === 'outline' || p === 'none' ? p : null;
+  });
+  const diskUses = onDisk?.uses ?? NO_USES;
+  // The tree on a phone or in a narrow window: a sheet from the bottom.
+  const [filesSheet, setFilesSheet] = useState(false);
+  // Folders made here that nothing is in yet (a folder is there while something is in it).
+  const [madeFolders, setMadeFolders] = useState<string[]>([]);
   const [problemsOpen, setProblemsOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
-  const [menu, setMenu] = useState<'engine' | 'compile' | 'add' | 'file' | 'outline' | 'symbols' | null>(null);
+  const [menu, setMenu] = useState<'engine' | 'compile' | 'file' | 'outline' | 'symbols' | null>(null);
   // Code or Visual, Check spelling, Dark pages: remembered on this device.
   const [mode, setMode] = useState<'code' | 'visual'>(() => (localStorage.getItem(MODE_KEY) === 'visual' ? 'visual' : 'code'));
   const modeRef = useRef(mode);
@@ -302,7 +308,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   const findFrom = useRef<number | null>(null);
   /** The table editor: the table, and where it was read from when it is one of the document's. */
   const [tableAsk, setTableAsk] = useState<{ table: TexTable; at: { file: string; from: number; to: number } | null } | null>(null);
-  const [naming, setNaming] = useState<{ kind: 'new' | 'rename-file' | 'rename-picture'; from?: string } | null>(null);
+  const [naming, setNaming] = useState<{ kind: 'new' | 'new-folder' | 'rename-file' | 'rename-picture' | 'rename-folder'; from?: string; folder?: string } | null>(null);
   const [cursor, setCursor] = useState<Cursor>(START);
   // Where the cursor is in each file (the scopes follow the file in view).
   const cursors = useRef(new Map<string, Cursor>());
@@ -326,7 +332,6 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   const anchors = {
     engine: useRef<HTMLButtonElement>(null),
     compile: useRef<HTMLButtonElement>(null),
-    add: useRef<HTMLButtonElement>(null),
     file: useRef<HTMLButtonElement>(null),
     outline: useRef<HTMLButtonElement>(null),
     symbols: useRef<HTMLButtonElement>(null),
@@ -356,9 +361,16 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   useEffect(() => {
     localStorage.setItem(AUTO_KEY, auto ? '1' : '0');
   }, [auto]);
-  useEffect(() => {
-    localStorage.setItem(OUTLINE_KEY, outlineOpen ? '1' : '0');
-  }, [outlineOpen]);
+  // A document of more than one file (pictures, and the files TeX takes from the folder, count): its files show as a tree.
+  const multi = !!model && model.files.length + model.pictures.length + diskUses.length + madeFolders.length > 0;
+  const panel: 'files' | 'outline' | null = panelPick === 'none' ? null : (panelPick ?? (multi ? 'files' : localStorage.getItem(OUTLINE_KEY) === '1' ? 'outline' : null));
+  const showPanel = (p: 'files' | 'outline' | null) => {
+    setPanelPick(p ?? 'none');
+    localStorage.setItem(PANEL_KEY, p ?? 'none');
+  };
+  const togglePanel = (p: 'files' | 'outline') => showPanel(panel === p ? null : p);
+  /** The tree is in view beside the source: the tab row then lists only the files open. */
+  const treeShown = wide && panel === 'files';
   useEffect(() => {
     localStorage.setItem(MODE_KEY, mode);
     for (const c of codes.current.values()) c.setVisual(mode === 'visual');
@@ -374,6 +386,9 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     texSetup().then(setSetup, () => {});
   }, []);
 
+  /** Whether a document still has what a tab shows: a file, a picture, a file of the folder, the Pictures tab. */
+  const has = (d: TexDoc, k: string) =>
+    k === PICTURES || k === TEX_MAIN || (k.startsWith(PIC) ? d.pictures.some((p) => p.name === viewName(k)) : k.startsWith(DISK) ? diskUses.some((u) => u.name === viewName(k)) : d.files.some((f) => f.name === k));
   // Another document, or the agent's new version while nothing was changed here: start from it (the file in view at the
   // same place, as the agent's version being written was read).
   const keepPlace = useRef<{ file: string; line: number } | null>(null);
@@ -384,7 +399,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     setM(doc.model);
     setSaved(doc.model);
     setEpoch((e) => e + 1);
-    const keep = file === PICTURES || file === TEX_MAIN || doc.model.files.some((f) => f.name === file) ? file : TEX_MAIN;
+    const keep = has(doc.model, file) ? file : TEX_MAIN;
     setFile(keep);
     setOpened([keep === PICTURES ? TEX_MAIN : keep]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -443,7 +458,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
 
   // Each file opened gets its editor once its place is on the page.
   useEffect(() => {
-    for (const name of opened) {
+    for (const name of opened.filter((n) => !isView(n))) {
       const host = hosts.current.get(name);
       const had = codes.current.get(name);
       if (had && host && !host.contains(had.view.dom)) {
@@ -559,7 +574,28 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     }
     setFile(name);
     setMenu(null);
+    setFilesSheet(false);
     if (!wide) setPane('source');
+  };
+  /** A file of the tree opened: a file's text in its editor, a picture or a file of the folder to look at. */
+  const openEntry = (name: string) => {
+    const d = live.current;
+    if (!d) return;
+    if (name === TEX_MAIN || d.files.some((f) => f.name === name)) open(name);
+    else if (d.pictures.some((p) => p.name === name)) open(PIC + name);
+    else if (diskUses.some((u) => u.name === name)) open(DISK + name);
+  };
+  /** A tab closed (its file's editor with it); the one beside it shows when it was in view. The last one stays. */
+  const closeTab = (k: string) => {
+    const i = opened.indexOf(k);
+    const rest = opened.filter((x) => x !== k);
+    if (i < 0 || !rest.length) return;
+    if (!isView(k)) {
+      codes.current.get(k)?.destroy();
+      codes.current.delete(k);
+    }
+    setOpened(rest);
+    if (file === k) setFile(rest[Math.min(i, rest.length - 1)]);
   };
   /** A file's editor, shown, once it is there: in a moment, or when it comes. */
   const withCode = (name: string, f: (c: Code) => void) => {
@@ -660,7 +696,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     if (!(await confirm({ title: 'Discard your changes?', body: 'The document goes back to how it was saved.', confirm: 'Discard', danger: true }))) return;
     setM(saved);
     setEpoch((e) => e + 1);
-    const keep = file === PICTURES || file === TEX_MAIN || saved?.files.some((f) => f.name === file) ? file : TEX_MAIN;
+    const keep = saved && has(saved, file) ? file : TEX_MAIN;
     setFile(keep);
     setOpened([keep === PICTURES ? TEX_MAIN : keep]);
   };
@@ -688,7 +724,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   }, []);
 
   // ---- find and replace ---------------------------------------------------------------------------------------------------
-  const codeInView = () => (file === PICTURES ? null : (codes.current.get(file) ?? null));
+  const codeInView = () => (isView(file) ? null : (codes.current.get(file) ?? null));
   // The words, the switches or the file changed: the matches again, and the first one from the cursor on is gone to.
   useEffect(() => {
     const c = codeInView();
@@ -778,7 +814,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   /** A comment on the words picked (or the line the cursor is on), written in the panel. */
   const addComment = () => {
     setMenu(null);
-    if (readOnly || file === PICTURES) return;
+    if (readOnly || isView(file)) return;
     const c = codes.current.get(file);
     if (!c) return;
     let { from, to } = c.picked();
@@ -914,7 +950,40 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   // ---- what an agent is asked about ------------------------------------------------------------------------------------
   const settled = useDeferredValue(model);
   const outline = useMemo(() => (settled ? texOutline(settled) : []), [settled]);
-  const heading = file === PICTURES ? null : headingAt(outline, file, cursor.line);
+
+  // ---- the files tree: what the document uses, as TeX reads it (shared/latex-files.ts) ----------------------------------
+  const usesCache = useRef<NonNullable<Parameters<typeof texDocUses>[1]>['cache']>(new Map());
+  const uses: TexUses | null = useMemo(
+    () => (settled ? texDocUses(settled, { others: diskUses.map((u) => u.name), alias: onDisk?.main, cache: usesCache.current }) : null),
+    [settled, diskUses, onDisk?.main],
+  );
+  // A file of this computer's document: the files it came with were found used from the folder, also through what is
+  // read only there (a style that reads a chapter), which this reading cannot see.
+  const cameWith = useMemo(() => new Set(onDisk ? (doc?.model.files ?? []).map((f) => f.name) : []), [doc?.key]);
+  const entries = useMemo((): TreeEntry[] => {
+    if (!model) return [];
+    const used = (n: string) => !uses || texIsUsed(uses, n) || cameWith.has(n);
+    const own = new Set([...model.files.map((f) => f.name), ...model.pictures.map((p) => p.name)]);
+    return [
+      ...model.files.map((f): TreeEntry => ({ name: f.name, kind: texFileKind(f.name), where: 'text', used: used(f.name) })),
+      ...model.pictures.map((p): TreeEntry => ({ name: p.name, kind: 'picture', where: 'picture', used: used(p.name) })),
+      // What TeX takes from the folder was found used when the file was opened (also through its styles, which are not read here).
+      ...diskUses.filter((u) => !own.has(u.name)).map((u): TreeEntry => ({ name: u.name, kind: u.kind, where: 'folder', used: true, size: u.size })),
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model?.files, model?.pictures, uses, diskUses, cameWith]);
+  const readingOrder = useMemo(() => (uses ? [...uses.used.keys()] : []), [uses]);
+  // A picture or a file of the folder in view that the document no longer has: its main file in its place.
+  useEffect(() => {
+    if (!model || !(file.startsWith(PIC) || file.startsWith(DISK)) || has(model, file)) return;
+    setOpened((o) => {
+      const left = o.filter((k) => has(model, k));
+      return left.length ? left : [TEX_MAIN];
+    });
+    setFile(TEX_MAIN);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model?.pictures, diskUses, file]);
+  const heading = isView(file) ? null : headingAt(outline, file, cursor.line);
   const scopes = useMemo(() => scopesFor(file, cursor, heading), [file, cursor, heading]);
   const scopesKey = JSON.stringify(scopes);
   useEffect(() => {
@@ -936,35 +1005,46 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   };
 
   // ---- inserting --------------------------------------------------------------------------------------------------------
-  const target = () => (file !== PICTURES && /\.(tex|ltx|sty|cls)$/i.test(file) ? file : lastTex.current);
-  const pictureNames = () => live.current?.pictures.map((p) => p.name) ?? [];
-  const allNames = () => (live.current ? [TEX_MAIN, ...live.current.files.map((f) => f.name), ...live.current.pictures.map((p) => p.name)] : []);
+  const target = () => (!isView(file) && /\.(tex|ltx|sty|cls)$/i.test(file) ? file : lastTex.current);
+  /** Every name the project has (the files TeX takes from the folder too): a new file may have none of them. */
+  const allNames = () => (live.current ? [TEX_MAIN, ...live.current.files.map((f) => f.name), ...live.current.pictures.map((p) => p.name), ...diskUses.map((u) => u.name)] : []);
+  /** A name in a folder ("figures/" + "plot.png"), another number when one there has it; null when it would be too long or deep. */
+  const nameIn = (folder: string, name: string, kind: 'file' | 'picture', taken: string[]): string | null => {
+    const n = folder ? freeName(folder + name, taken) : name;
+    if (cleanTexName(n, kind) === n) return n;
+    toast(`${n} is too long or too deep in folders for a document`);
+    return null;
+  };
 
-  const addPictures = async (list: File[]): Promise<string[]> => {
+  const addPictures = async (list: File[], folder = ''): Promise<string[]> => {
     const added: string[] = [];
     for (const f of list) {
       try {
         const p = await addPicture(f, [...allNames(), ...added]);
-        change((d) => ({ ...d, pictures: [...d.pictures, p] }));
-        added.push(p.name);
+        const name = nameIn(folder, p.name, 'picture', [...allNames(), ...added]);
+        if (!name) continue;
+        change((d) => ({ ...d, pictures: [...d.pictures, { ...p, name }] }));
+        added.push(name);
       } catch (e) {
         toastError(e);
       }
     }
     return added;
   };
-  const choosePictures = async () => {
+  const choosePictures = async (folder = '') => {
     setMenu(null);
     const files = await chooseFiles(PICTURE_ACCEPT);
     if (files.length) toast(files.length === 1 ? 'Adding the picture…' : `Adding ${files.length} pictures…`);
-    return addPictures(files);
+    return addPictures(files, folder);
   };
-  const addFiles = async (list: File[]) => {
+  const addFiles = async (list: File[], folder = '') => {
     for (const f of list) {
       try {
         const x = await addFileFromDevice(f, allNames());
-        change((d) => ({ ...d, files: [...d.files, x] }));
-        open(x.name);
+        const name = nameIn(folder, x.name, 'file', allNames());
+        if (!name) continue;
+        change((d) => ({ ...d, files: [...d.files, { ...x, name }] }));
+        open(name);
       } catch (e) {
         toastError(e);
       }
@@ -1131,27 +1211,68 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     const clean = cleanTexName(name, kind);
     if (!clean) return kind === 'file' ? 'Letters, digits, - _ . and / between folders, and an extension LaTeX reads (.tex, .bib, .sty…)' : 'Letters, digits, - _ . and / between folders, ending in .png or .jpg';
     if (clean === TEX_MAIN || allNames().some((n) => n.toLowerCase() === clean.toLowerCase() && n !== from)) return 'The document has a file of that name';
+    if (allNames().some((n) => n.toLowerCase().startsWith(`${clean.toLowerCase()}/`))) return 'There is a folder of that name';
     return null;
   };
-  const renameFile = (from: string, to: string) => {
-    codes.current.get(from)?.destroy();
-    codes.current.delete(from);
-    // The editors of the files whose references change start again from their new text.
-    for (const [n, c] of codes.current)
-      if (n !== from) {
-        c.destroy();
-        codes.current.delete(n);
-      }
-    // Its comments and tracked changes go with it, each placed again on its words (the references renamed may have moved them).
-    change((d) => {
-      const n = renameRefs({ ...d, files: d.files.map((f) => (f.name === from ? { ...f, name: to } : f)) }, from, to);
-      const comments = n.comments?.length ? cleanTexComments(n.comments.map((c) => (c.file === from ? { ...c, file: to } : c)), n) : n.comments;
-      const changes = n.changes?.length ? cleanTexChanges(n.changes.map((c) => (c.file === from ? { ...c, file: to } : c)), n) : n.changes;
-      return { ...n, comments: comments?.length ? comments : undefined, changes: changes?.length ? changes : undefined };
-    });
-    setOpened((o) => o.map((n) => (n === from ? to : n)));
-    if (file === from) setFile(to);
-    if (lastTex.current === from) lastTex.current = to;
+  /** A folder's path as typed ("chapters", "parts/one/"), with its slash; what is wrong with it, or null. `from`: the folder renamed. */
+  const folderOfName = (raw: string) => `${raw.trim().replace(/\\/g, '/').replace(/^(\.\/)+/, '').replace(/\/+$/, '')}/`;
+  const folderProblem = (raw: string, from?: string): string | null => {
+    const path = folderOfName(raw);
+    const probe = `${path}x.tex`;
+    if (path === '/' || cleanTexName(probe, 'file') !== probe) return 'Letters, digits, - _ . and / between folders';
+    if (from && path === from) return null;
+    if (from && path.startsWith(from)) return 'A folder cannot go inside itself';
+    const low = path.toLowerCase();
+    if (allNames().some((n) => `${n.toLowerCase()}/` === low)) return 'The document has a file of that name';
+    if (allNames().some((n) => n.toLowerCase().startsWith(low)) || madeFolders.some((m) => m.toLowerCase() === low)) return 'There is a folder of that name';
+    return null;
+  };
+  /**
+   * Files, pictures and folders renamed or moved (from → to): the references to them follow them (shared/latex-files.ts),
+   * and their comments and tracked changes go with them. The editors of the files whose text changes start again from it.
+   */
+  const moveFiles = (moves: [string, string][]) => {
+    const map = new Map(moves.filter(([a, b]) => a !== b));
+    if (!map.size || readOnly) return;
+    for (const c of codes.current.values()) c.destroy();
+    codes.current.clear();
+    change((d) => texMoveFiles(d, [...map]));
+    const key = (k: string) => (k.startsWith(PIC) ? PIC + (map.get(viewName(k)) ?? viewName(k)) : isView(k) ? k : (map.get(k) ?? k));
+    setOpened((o) => o.map(key));
+    setFile((f) => key(f));
+    if (map.has(lastTex.current)) lastTex.current = map.get(lastTex.current)!;
+  };
+  const renameFile = (from: string, to: string) => moveFiles([[from, to]]);
+  const renamePicture = (from: string, to: string) => moveFiles([[from, to]]);
+  /** What a folder holds: the files and pictures under it. */
+  const inFolder = (path: string) => {
+    const d = live.current;
+    return d ? [...d.files.map((f) => f.name), ...d.pictures.map((p) => p.name)].filter((n) => n.startsWith(path)) : [];
+  };
+  const renameFolder = (from: string, to: string) => {
+    const moves = inFolder(from).map((n): [string, string] => [n, to + n.slice(from.length)]);
+    const bad = moves.find(([n, t]) => cleanTexName(t, live.current?.pictures.some((p) => p.name === n) ? 'picture' : 'file') !== t);
+    if (bad) return toast(`${bad[1]} would be too long or too deep in folders for a document`);
+    setMadeFolders((m) => m.map((x) => (x.startsWith(from) ? to + x.slice(from.length) : x)));
+    moveFiles(moves);
+  };
+  /** Files and folders dragged into a folder ("" the top): each by its own name there; one whose name is taken there stays. */
+  const moveInto = (names: string[], folder: string) => {
+    const d = live.current;
+    if (!d || readOnly) return;
+    const moves: [string, string][] = [];
+    for (const n of names) {
+      if (n.endsWith('/')) {
+        const to = `${folder}${n.slice(0, -1).split('/').pop()}/`;
+        moves.push(...inFolder(n).map((x): [string, string] => [x, to + x.slice(n.length)]));
+        setMadeFolders((m) => m.map((x) => (x.startsWith(n) ? to + x.slice(n.length) : x)));
+      } else moves.push([n, folder + n.split('/').pop()]);
+    }
+    const leaving = new Set(moves.map(([a]) => a));
+    const taken = new Set(allNames().filter((x) => !leaving.has(x)).map((x) => x.toLowerCase()));
+    const fine = moves.filter(([a, t]) => !taken.has(t.toLowerCase()) && cleanTexName(t, d.pictures.some((p) => p.name === a) ? 'picture' : 'file') === t);
+    if (fine.length < moves.length) toast(fine.length ? 'Some were not moved: a file of their name is there, or the folders would go too deep' : 'Not moved: a file of that name is there, or the folders would go too deep');
+    moveFiles(fine);
   };
   const deleteFile = async (name: string) => {
     setMenu(null);
@@ -1163,14 +1284,44 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     if (lastTex.current === name) lastTex.current = TEX_MAIN;
     change((d) => ({ ...d, files: d.files.filter((f) => f.name !== name) }));
   };
-  const renamePicture = (from: string, to: string) => {
-    for (const c of codes.current.values()) c.destroy();
-    codes.current.clear();
-    change((d) => renameRefs({ ...d, pictures: d.pictures.map((p) => (p.name === from ? { ...p, name: to } : p)) }, from, to));
-  };
   const removePicture = async (name: string) => {
     if (!(await confirm({ title: `Remove ${name}?`, body: 'The document no longer has it; where \\includegraphics names it, typesetting says so.', confirm: 'Remove', danger: true }))) return;
+    setOpened((o) => o.filter((n) => n !== PIC + name));
+    if (file === PIC + name) setFile(TEX_MAIN);
     change((d) => ({ ...d, pictures: d.pictures.filter((p) => p.name !== name) }));
+  };
+  /** A folder deleted, with the files and pictures in it (an older version still has them). */
+  const deleteFolder = async (path: string) => {
+    const gone = inFolder(path);
+    if (gone.length) {
+      const n = gone.length;
+      if (!(await confirm({ title: `Delete the folder ${path.slice(0, -1)}?`, body: `Its ${n === 1 ? 'file goes' : `${n} files go`} from the document (an older version still has ${n === 1 ? 'it' : 'them'}).`, confirm: 'Delete', danger: true }))) return;
+    }
+    const doomed = new Set(gone);
+    for (const n of gone) {
+      codes.current.get(n)?.destroy();
+      codes.current.delete(n);
+    }
+    setOpened((o) => {
+      const left = o.filter((k) => !doomed.has(viewName(k)));
+      return left.length ? left : [TEX_MAIN];
+    });
+    if (doomed.has(viewName(file))) setFile(TEX_MAIN);
+    if (doomed.has(lastTex.current)) lastTex.current = TEX_MAIN;
+    setMadeFolders((m) => m.filter((x) => !x.startsWith(path)));
+    change((d) => ({ ...d, files: d.files.filter((f) => !doomed.has(f.name)), pictures: d.pictures.filter((p) => !doomed.has(p.name)) }));
+  };
+  /** New things from the tree's + or a folder's ⋯, into `folder` ("" the top). */
+  const onNew: TreeActions['onNew'] = (what, folder) => {
+    if (readOnly) return;
+    if (what === 'file') setNaming({ kind: 'new', folder });
+    else if (what === 'folder') setNaming({ kind: 'new-folder', folder });
+    else if (what === 'device') void chooseFiles(FILE_ACCEPT).then((l) => addFiles(l, folder));
+    else
+      void choosePictures(folder).then((added) => {
+        // Shown where they are, to put in a figure.
+        if (added[0]) open(PIC + added[0]);
+      });
   };
 
   // Files dropped in: pictures (and a figure for each where the cursor is, when dropped on the source), other files as files.
@@ -1183,8 +1334,27 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     const onCode = !!(e.target as HTMLElement).closest?.('.cm-editor');
     const added = await addPictures(pics);
     if (onCode) for (const p of added) await insert('figure', { picture: p });
-    if (added.length && !onCode) toast(added.length === 1 ? `${added[0]} added under Pictures` : `${added.length} pictures added`, 'ok');
+    if (added.length && !onCode) toast(added.length === 1 ? (multi ? `${added[0]} added` : `${added[0]} added under Pictures`) : `${added.length} pictures added`, 'ok');
     await addFiles(texts);
+  };
+  /** Files from the device dropped on a folder of the tree: pictures and files into it. */
+  const dropInto = async (list: File[], folder: string) => {
+    if (readOnly) return;
+    const pics = list.filter((f) => f.type.startsWith('image/') || /\.pdf$/i.test(f.name));
+    const added = await addPictures(pics, folder);
+    if (added.length) toast(added.length === 1 ? `${added[0]} added` : `${added.length} pictures added`, 'ok');
+    await addFiles(
+      list.filter((f) => !pics.includes(f)),
+      folder,
+    );
+  };
+  const treeActions: TreeActions = {
+    onOpen: openEntry,
+    onNew,
+    onRename: (n) => setNaming({ kind: n.endsWith('/') ? 'rename-folder' : live.current?.pictures.some((p) => p.name === n) ? 'rename-picture' : 'rename-file', from: n }),
+    onDelete: (n) => void (n.endsWith('/') ? deleteFolder(n) : live.current?.pictures.some((p) => p.name === n) ? removePicture(n) : deleteFile(n)),
+    onMove: moveInto,
+    onDropFiles: (list, folder) => void dropInto(list, folder),
   };
 
   // ---- the layout ---------------------------------------------------------------------------------------------------------
@@ -1238,7 +1408,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
 
   const showInPdf = async () => {
     const r = resultRef.current;
-    if (!r?.pdf || file === PICTURES) return;
+    if (!r?.pdf || isView(file)) return;
     try {
       const at = await placeOf(r.key, file, cursor.line);
       if (!at) return toast('That line has nothing on the pages');
@@ -1325,7 +1495,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
             { label: 'Reference from the web', icon: <BookPlus size={14} />, also: 'doi arxiv bibliography bibtex crossref paper', run: openRefs },
             { label: 'Citation', icon: <BookOpen size={14} />, also: 'cite', run: () => void insert('cite') },
             { label: 'Cross-reference', icon: <LocateFixed size={14} />, also: 'ref label', run: () => void insert('ref') },
-            canComment && { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'note review', disabled: file === PICTURES, run: addComment },
+            canComment && { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'note review', disabled: isView(file), run: addComment },
             {
               label: 'More',
               items: [
@@ -1401,13 +1571,14 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         { label: 'Code', checked: mode === 'code', also: 'source', run: () => switchMode('code') },
         { label: 'Visual', checked: mode === 'visual', also: 'visual editor rich text', run: () => switchMode('visual') },
         '-',
-        { label: 'Outline', icon: <ListTree size={14} />, checked: wide ? outlineOpen : undefined, also: 'sections headings', run: () => (wide ? setOutlineOpen((o) => !o) : setMenu('outline')) },
+        { label: 'Files', icon: <FolderTree size={14} />, checked: wide ? panel === 'files' : undefined, also: 'tree project folders chapters pictures', run: () => (wide ? togglePanel('files') : setFilesSheet(true)) },
+        { label: 'Outline', icon: <ListTree size={14} />, checked: wide ? panel === 'outline' : undefined, also: 'sections headings', run: () => (wide ? togglePanel('outline') : setMenu('outline')) },
         canComment && { label: 'Comments', icon: <MessageSquare size={14} />, checked: commentsOpen, also: 'review notes', run: () => setCommentsOpen((x) => !x) },
         { label: 'Check spelling', icon: <SpellCheck size={14} />, checked: spell, also: 'spell', run: () => setSpell((x) => !x) },
         { label: 'Fold all', icon: <FoldVertical size={14} />, keys: 'Ctrl+Alt+[', disabled: !code, also: 'collapse', run: () => code?.foldAll() },
         { label: 'Unfold all', icon: <UnfoldVertical size={14} />, keys: 'Ctrl+Alt+]', disabled: !code, also: 'expand', run: () => code?.unfoldAll() },
         '-',
-        setup?.sync !== false && { label: 'Show this line in the PDF', icon: <LocateFixed size={14} />, disabled: !result?.pdf || file === PICTURES, also: 'synctex', run: () => void showInPdf() },
+        setup?.sync !== false && { label: 'Show this line in the PDF', icon: <LocateFixed size={14} />, disabled: !result?.pdf || isView(file), also: 'synctex', run: () => void showInPdf() },
         { label: 'Dark pages', icon: <Moon size={14} />, checked: darkPages && dark, disabled: !dark, also: 'night invert', run: () => setDarkPages((x) => !x) },
         { label: 'Present the pages', icon: <Presentation size={14} />, disabled: !result?.pdf, also: 'full screen slides', run: () => setPresentAsk((n) => n + 1) },
       ],
@@ -1441,7 +1612,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   // The toolbar: what fits the row, the most used first (the rest folds away, all of it in the menus too). Where the
   // source and the pages do not fit side by side, the row starts with the switch between them and Recompile; over
   // the pages it holds only those.
-  const askLabel = cursor.picked && file !== PICTURES ? 'Ask the agent about these lines' : 'Ask the agent';
+  const askLabel = cursor.picked && !isView(file) ? 'Ask the agent about these lines' : 'Ask the agent';
   const overPages = !wide && pane === 'preview';
   const tools: RowTool[] = ([
     !wide && {
@@ -1542,8 +1713,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
           ref={anchors.outline}
           label="Outline"
           size="sm"
-          active={wide ? outlineOpen : menu === 'outline'}
-          onClick={() => (wide ? setOutlineOpen((o) => !o) : setMenu(menu === 'outline' ? null : 'outline'))}
+          active={wide ? panel === 'outline' : menu === 'outline'}
+          onClick={() => (wide ? togglePanel('outline') : setMenu(menu === 'outline' ? null : 'outline'))}
         >
           <ListTree size={15} />
         </IconButton>
@@ -1577,7 +1748,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         rank: 13,
         group: 'view',
         node: (
-          <IconButton label="Show this line in the PDF" size="sm" disabled={!result?.pdf || file === PICTURES} onClick={() => void showInPdf()}>
+          <IconButton label="Show this line in the PDF" size="sm" disabled={!result?.pdf || isView(file)} onClick={() => void showInPdf()}>
             <LocateFixed size={15} />
           </IconButton>
         ),
@@ -1608,7 +1779,37 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
 
   const tabCls = (on: boolean) =>
     cx('relative flex h-9 shrink-0 items-center gap-1 px-2.5 text-[12.5px] transition-colors', on ? 'font-medium text-fg' : 'text-fg-3 hover:text-fg-2');
-  const fileTabs = (
+  /** A tab's name: its file's own name, with its folders when another tab open has the same name. */
+  const tabName = (k: string) => {
+    const full = isView(k) ? viewName(k) : label(k);
+    const base = full.split('/').pop()!;
+    return opened.some((o) => o !== k && (isView(o) ? viewName(o) : label(o)).split('/').pop() === base) ? full : base;
+  };
+  // A document of more than one file: the files open, each closable (the tree has them all), and Files where it is not in view.
+  const fileTabs = multi ? (
+    <div role="tablist" className="flex h-9 shrink-0 items-center overflow-x-auto border-b border-line bg-bg px-1 [&::-webkit-scrollbar]:hidden">
+      {!treeShown && (
+        <Button size="sm" variant="ghost" icon={<FolderTree size={14} />} onClick={() => (wide ? showPanel('files') : setFilesSheet(true))} className="mr-0.5 h-7 shrink-0 px-2 text-[12.5px]">
+          Files
+        </Button>
+      )}
+      {opened.map((k) => (
+        <div key={k} className="group/tab flex shrink-0 items-center">
+          <button type="button" role="tab" aria-selected={file === k} onClick={() => open(k)} title={isView(k) ? viewName(k) : label(k)} className={tabCls(file === k)} translate="no">
+            {isView(k) && <span className="text-fg-3">{kindIcon(texFileKind(viewName(k)), 13)}</span>}
+            {tabName(k)}
+            {file === k && <span className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-fg" />}
+          </button>
+          {opened.length > 1 && (
+            <IconButton label="Close" size="sm" onClick={() => closeTab(k)} className={cx('-ml-1.5 h-6 w-6', file === k ? '' : 'opacity-0 group-hover/tab:opacity-100 focus-visible:opacity-100 pointer-coarse:hidden')}>
+              <X size={12} />
+            </IconButton>
+          )}
+        </div>
+      ))}
+      {!treeShown && !readOnly && <NewButton onNew={onNew} className="ml-0.5" />}
+    </div>
+  ) : (
     <div role="tablist" className="flex h-9 shrink-0 items-center overflow-x-auto border-b border-line bg-bg px-1 [&::-webkit-scrollbar]:hidden">
       {[TEX_MAIN, ...model.files.map((f) => f.name)].map((n) => (
         <div key={n} className="flex shrink-0 items-center">
@@ -1629,12 +1830,35 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         {model.pictures.length > 0 && <span className="rounded bg-bg-2 px-1 text-[11px] font-normal text-fg-3 tabular-nums">{model.pictures.length}</span>}
         {file === PICTURES && <span className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-fg" />}
       </button>
-      {!readOnly && (
-        <IconButton ref={anchors.add} label="Add a file or a picture" size="sm" active={menu === 'add'} onClick={() => setMenu(menu === 'add' ? null : 'add')} className="ml-0.5">
-          <Plus size={14} />
-        </IconButton>
-      )}
+      {!readOnly && <NewButton onNew={onNew} className="ml-0.5" />}
     </div>
+  );
+
+  // A picture or a file of the folder, in the source's place.
+  const viewed = isView(file) && file !== PICTURES ? (entries.find((e) => e.name === viewName(file)) ?? null) : null;
+  const dir = onDisk?.dir ?? onDisk?.folder;
+  const fromDir = (n: string) => (dir ? `${dir}/${n}` : undefined);
+  const pictureUrl = (n: string) => {
+    const p = model.pictures.find((x) => x.name === n);
+    return p ? (p.src.startsWith('naget-asset:') ? assetUrl(p.src) : p.src) : undefined;
+  };
+  const fileView = viewed && (
+    <FileView
+      key={viewed.name}
+      entry={viewed}
+      url={viewed.where === 'picture' ? pictureUrl(viewed.name) : viewed.kind === 'picture' && fromDir(viewed.name) ? mu(`/api/fs/raw?path=${encodeURIComponent(fromDir(viewed.name)!)}`) : undefined}
+      textPath={viewed.where === 'folder' && viewed.kind !== 'picture' ? fromDir(viewed.name) : undefined}
+      usedAt={uses?.used.get(viewed.name)}
+      label={label}
+      readOnly={readOnly}
+      onGo={goTo}
+      onInsert={() => void insert('figure', { picture: viewed.name })}
+      onRename={() => setNaming({ kind: 'rename-picture', from: viewed.name })}
+      onRemove={() => void removePicture(viewed.name)}
+    />
+  );
+  const tree = (className?: string) => (
+    <FileTree entries={entries} main={label(TEX_MAIN)} order={readingOrder} folders={madeFolders} current={file === PICTURES ? '' : viewName(file)} readOnly={readOnly} actions={treeActions} className={className} />
   );
 
   const pictures = (
@@ -1720,7 +1944,9 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       )}
       <div className="flex min-h-0 flex-1">
         <div className="relative min-h-0 min-w-0 flex-1">
-          {opened.map((n) => (
+          {opened
+            .filter((n) => !isView(n))
+            .map((n) => (
             <div
               key={`${epoch}:${n}`}
               ref={(el) => {
@@ -1732,14 +1958,15 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
             />
           ))}
           {file === PICTURES && <div className="absolute inset-0 flex flex-col bg-bg">{pictures}</div>}
-          {find.open && file !== PICTURES && (
+          {fileView && <div className="absolute inset-0 flex flex-col bg-bg">{fileView}</div>}
+          {find.open && !isView(file) && (
             <div className="absolute top-2 right-3 z-20 w-[min(440px,calc(100%-24px))]">
               <FindBar find={find} count={found.list.length} index={found.current} onNext={() => findGo(1)} onPrev={() => findGo(-1)} onReplace={readOnly ? undefined : replaceOne} onReplaceAll={readOnly ? undefined : replaceAll} />
             </div>
           )}
         </div>
         {/* Comments beside the source where there is room (a sheet on a phone, below). */}
-        {canComment && commentsOpen && roomy && file !== PICTURES && commentsPanel('w-64 shrink-0 border-l border-line bg-panel')}
+        {canComment && commentsOpen && roomy && !isView(file) && commentsPanel('w-64 shrink-0 border-l border-line bg-panel')}
       </div>
       <Problems
         result={result}
@@ -1773,7 +2000,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     />
   );
 
-  const fileMenuName = file !== PICTURES && file !== TEX_MAIN ? file : null;
+  const fileMenuName = !isView(file) && file !== TEX_MAIN ? file : null;
 
   return (
     <div
@@ -1796,10 +2023,36 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       {band}
       {toolbar}
       <div className="relative flex min-h-0 flex-1">
-        {wide && outlineOpen && (
-          <aside className="w-56 shrink-0 overflow-y-auto overscroll-contain border-r border-line bg-panel">
-            <div className="px-3 pt-2.5 pb-1 text-[11.5px] font-medium text-fg-3">Outline</div>
-            <OutlineList outline={outline} current={heading} onGo={(h) => goTo(h.file, h.line)} />
+        {/* One panel on the left: the files tree or the outline, a tab each. */}
+        {wide && panel && (
+          <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-panel">
+            <div className="flex h-9 shrink-0 items-center gap-0.5 border-b border-line pr-1 pl-1.5">
+              <button
+                type="button"
+                aria-pressed={panel === 'files'}
+                onClick={() => showPanel('files')}
+                className={cx('h-7 rounded-md px-2 text-[12.5px] transition-colors', panel === 'files' ? 'bg-bg-2 font-medium text-fg' : 'text-fg-3 hover:text-fg-2')}
+              >
+                Files
+              </button>
+              <button
+                type="button"
+                aria-pressed={panel === 'outline'}
+                onClick={() => showPanel('outline')}
+                className={cx('h-7 rounded-md px-2 text-[12.5px] transition-colors', panel === 'outline' ? 'bg-bg-2 font-medium text-fg' : 'text-fg-3 hover:text-fg-2')}
+              >
+                Outline
+              </button>
+              <span className="flex-1" />
+              {panel === 'files' && !readOnly && <NewButton onNew={onNew} />}
+            </div>
+            {panel === 'files' ? (
+              tree('min-h-0 flex-1')
+            ) : (
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                <OutlineList outline={outline} current={heading} onGo={(h) => goTo(h.file, h.line)} />
+              </div>
+            )}
           </aside>
         )}
         {/* Both stay (each keeps its place, its editors and its pictures); on a phone, one shows at a time. */}
@@ -1864,29 +2117,6 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
           Open the PDF
         </MenuItem>
       </Popover>
-      <Popover anchor={anchors.add} open={menu === 'add'} onClose={() => setMenu(null)} width={240} title="Add">
-        <MenuItem icon={<FilePlus size={14} />} onClick={() => (setMenu(null), setNaming({ kind: 'new' }))}>
-          A new file
-        </MenuItem>
-        <MenuItem
-          icon={<FileUp size={14} />}
-          onClick={() => {
-            setMenu(null);
-            void chooseFiles(FILE_ACCEPT).then(addFiles);
-          }}
-        >
-          A file from this device
-        </MenuItem>
-        <MenuItem
-          icon={<ImagePlus size={14} />}
-          onClick={() => {
-            setFile(PICTURES);
-            void choosePictures();
-          }}
-        >
-          A picture
-        </MenuItem>
-      </Popover>
       <Popover anchor={anchors.file} open={menu === 'file' && !!fileMenuName} onClose={() => setMenu(null)} width={200}>
         <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(null), setNaming({ kind: 'rename-file', from: fileMenuName! }))}>
           Rename
@@ -1902,7 +2132,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       <NameDialog
         open={naming?.kind === 'new'}
         title="A new file"
-        initial={freeName('chapter.tex', allNames())}
+        initial={freeName(`${naming?.folder ?? ''}chapter.tex`, allNames())}
         hint="A chapter (.tex, read with \input), a bibliography (.bib), a style (.sty)…; folders with /: chapters/intro.tex."
         check={(n) => nameProblem(n, 'file')}
         onClose={() => setNaming(null)}
@@ -1915,10 +2145,38 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         }}
       />
       <NameDialog
+        open={naming?.kind === 'new-folder'}
+        title="A new folder"
+        initial={naming?.folder ?? ''}
+        hint="Folders inside it with /: figures/plots. It is kept once something is in it."
+        check={(n) => folderProblem(n)}
+        onClose={() => setNaming(null)}
+        onDone={(n) => {
+          setNaming(null);
+          const path = folderOfName(n);
+          setMadeFolders((m) => [...m, path]);
+          if (!wide) setFilesSheet(true);
+        }}
+      />
+      <NameDialog
+        open={naming?.kind === 'rename-folder'}
+        title="Rename the folder"
+        initial={naming?.from?.replace(/\/$/, '') ?? ''}
+        hint="The files in it keep their names. Where the document names them (\input, \includegraphics…), their new place goes too."
+        check={(n) => folderProblem(n, naming?.from)}
+        onClose={() => setNaming(null)}
+        onDone={(n) => {
+          const from = naming!.from!;
+          setNaming(null);
+          const to = folderOfName(n);
+          if (to !== from) renameFolder(from, to);
+        }}
+      />
+      <NameDialog
         open={naming?.kind === 'rename-file'}
         title="Rename the file"
         initial={naming?.from ?? ''}
-        hint="Where the document names it (\input, \include, \bibliography), the new name goes too."
+        hint="Where the document names it (\input, \include, \bibliography), the new name goes too. A folder with /: chapters/intro.tex."
         check={(n) => nameProblem(n, 'file', naming?.from)}
         onClose={() => setNaming(null)}
         onDone={(n) => {
@@ -1973,7 +2231,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       </Dialog>
       <TableEditor open={!!tableAsk} initial={tableAsk?.table ?? EMPTY_TABLE} editing={!!tableAsk?.at} onClose={() => setTableAsk(null)} onDone={tableDone} />
       <ReferencesDialog open={dialog === 'refs'} onClose={() => setDialog(null)} onPick={addReference} bib={refsTarget.name} fresh={refsTarget.fresh} canCite={refsTarget.cite} />
-      <WordCountDialog open={dialog === 'count'} onClose={() => setDialog(null)} doc={model} file={file === PICTURES ? TEX_MAIN : file} label={label} />
+      <WordCountDialog open={dialog === 'count'} onClose={() => setDialog(null)} doc={model} file={isView(file) ? TEX_MAIN : file} label={label} />
       {canCompare && dialog === 'compare' && (
         <CompareDialog
           open
@@ -2010,7 +2268,20 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         showComments={() => setCommentsOpen(true)}
       />
       <Dialog
-        open={canComment && commentsOpen && !roomy && file !== PICTURES}
+        open={filesSheet && !treeShown}
+        onClose={() => setFilesSheet(false)}
+        title={
+          <span className="flex items-center gap-2">
+            Files
+            {!readOnly && <NewButton onNew={onNew} />}
+          </span>
+        }
+        width={520}
+      >
+        {tree('-mx-3 max-h-[70dvh]')}
+      </Dialog>
+      <Dialog
+        open={canComment && commentsOpen && !roomy && !isView(file)}
         onClose={() => {
           setCommentsOpen(false);
           setDraft(null);

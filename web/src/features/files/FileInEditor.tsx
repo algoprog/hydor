@@ -473,7 +473,7 @@ export function FileInEditor({
           band={band}
           onDirty={setDirty}
           saveNowRef={saveNow}
-          file={opened.tex && { folder: opened.tex.inFolder ? opened.tex.folder : undefined, main: opened.tex.main, open: opened.tex.open, comments: incoming }}
+          file={opened.tex && { folder: opened.tex.inFolder ? opened.tex.folder : undefined, main: opened.tex.main, open: opened.tex.open, comments: incoming, dir: opened.tex.folder, uses: opened.tex.uses }}
         />
       ) : (
         <div className="flex h-full items-center justify-center text-fg-3">
