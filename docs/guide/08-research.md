@@ -1,6 +1,6 @@
 # Deep research, second opinions and several agents
 
-When one agent working alone is not enough, the app can put several on the job: a deep research that sends researchers after every part of a question and hands back a cited report, child sessions that take parts of a task off an agent's hands, and a swarm that attacks a hard problem from several angles at once. You can also have another company's model check a turn's work, send one prompt to several models and keep the best answer, and cap what a session may spend so none of this runs away with your money.
+When one agent working alone is not enough, the app can put several on the job: a deep research that sends researchers after every part of a question and hands back a cited report, child sessions that take parts of a task off an agent's hands, a swarm that attacks a hard problem from several angles at once, and a campaign that makes one big change in many parts. You can also have another company's model check a turn's work, send one prompt to several models and keep the best answer, and cap what a session may spend so none of this runs away with your money.
 
 ![Deep research on the start page: researchers at a time, rounds, searches in all, and the report](images/research.webp)
 
@@ -19,7 +19,7 @@ The Research row now reads "Deep · 60 searches" (your search budget), and the O
 
 On a phone, Options opens as a sheet from the bottom of the screen, and Research opens over it.
 
-A deep research and a swarm both work through a team of child sessions, so you get one or the other: turning one on turns the other off.
+A deep research and a swarm (or a campaign) all work through a team of child sessions, so you get one or the other: turning one on turns the other off.
 
 A scheduled task can run a deep research each time it runs: its editor has the same **Research** setting ([Scheduled tasks](/guide/tasks)).
 
@@ -141,7 +141,13 @@ The lead's session has a bar above the message box: **Swarm** · "choosing its a
 
 ### Set the swarm size
 
-In [Settings → Capabilities → Child sessions](/settings?s=children), **Swarm size** ([go there](/settings?s=children&find=Swarm%20size)) sets how many members of one swarm work at once: from 1 to 16, 5 to start. Each member costs about what one agent does; the lead starts more as some finish.
+In [Settings → Capabilities → Child sessions](/settings?s=children), **Swarm size** ([go there](/settings?s=children&find=Swarm%20size)) sets how many members of one swarm or campaign work at once: from 1 to 16, 5 to start. Each member costs about what one agent does; the lead starts more as some finish.
+
+## Make one big change with a campaign
+
+A campaign is the other kind of swarm, for one big change across a codebase rather than one hard problem: a migration, a framework upgrade, a rename everywhere. Pick it in the same place, **Options** → **Swarm** → **Campaign** ("One big change in many parts, each in a worktree"), in a folder that is a git repository. The Swarm row then reads "Campaign · 5 at once".
+
+The lead splits the change into parts (packages, modules, folders) and posts them as its plan. A member makes each part on a branch of its own in a new worktree, at most your swarm size at once, runs its checks and posts the part as done or failed; a failed part gets one more try. The lead merges the finished parts one at a time with the checks run after each (or opens a pull request for each, if you asked for that), and reports what changed and what failed. Its bar reads "Campaign · 12 of 40 parts done · 2 failed", and its board shows the parts and how each stands beside the posts. See [Campaigns: a big change in many parts](/guide/engineering#campaigns-a-big-change-in-many-parts).
 
 ## Get a second opinion on a turn
 
