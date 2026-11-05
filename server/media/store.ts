@@ -1,7 +1,8 @@
 // The Library's images, videos and audio: a row each in SQLite (its title and description, what it was made from
-// and with, its size and length, a sound's shape and words), and its file copied into the app's data folder
-// (media/<id>.<ext>), with a still to show it by (<id>.still.jpg) and, for a video, its frames on one picture
-// (<id>.frames.jpg). The copy stays when the session's folder is cleaned up or the original is moved.
+// and with, its size and length, a sound's shape and words, the hash of its bytes), and its file copied into the app's
+// data folder (media/<id>.<ext>; moved there instead for a file the desktop app drops, or an upload), with a still to
+// show it by (<id>.still.jpg) and, for a video, its frames on one picture (<id>.frames.jpg). The copy stays when the
+// session's folder is cleaned up or the original is moved. The same bytes are kept once (keptWithBytes).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,6 +10,7 @@ import type { CaptionStatus, MediaItem, MediaKind } from '../../shared/media.ts'
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
+import { fileHash, moveWhole } from '../filemove.ts';
 
 export const MEDIA_DIR = path.join(config.dataDir, 'media');
 const MAX_ITEMS = 5000;
@@ -47,6 +49,9 @@ export function initMedia(db: DB) {
   if (!cols.includes('space')) db.exec('alter table media add column space text');
   if (!cols.includes('peaks')) db.exec('alter table media add column peaks text');
   if (!cols.includes('lyrics')) db.exec('alter table media add column lyrics text');
+  // The SHA-256 of its bytes, to keep the same file once (items kept before have none until one of their size comes).
+  if (!cols.includes('sha')) db.exec('alter table media add column sha text');
+  db.exec('create index if not exists media_bytes on media(bytes)');
 }
 
 interface Row {
@@ -70,6 +75,7 @@ interface Row {
   space: string | null;
   peaks: string | null;
   lyrics: string | null;
+  sha: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -134,6 +140,25 @@ export function savedFrom(db: DB, source: string, bytes: number): MediaItem | nu
   return r ? toItem(r) : null;
 }
 
+/**
+ * The item whose file has these bytes (the same size, the same SHA-256), when one is kept: an older item of that size,
+ * kept before items had their hash, has its file's taken now, once.
+ */
+export async function keptWithBytes(db: DB, sha: string, bytes: number): Promise<MediaItem | null> {
+  initMedia(db);
+  const rows = db.prepare('select * from media where bytes = ? order by created_at').all(bytes) as Row[];
+  for (const r of rows) {
+    let s = r.sha;
+    if (!s) {
+      s = await fileHash(path.join(MEDIA_DIR, r.file)).catch(() => null);
+      if (!s) continue;
+      db.prepare('update media set sha = ? where id = ?').run(s, r.id);
+    }
+    if (s === sha) return toItem(r);
+  }
+  return null;
+}
+
 /** The files of an item: the copy, its still and its frames. */
 export const filesOf = (m: Pick<MediaItem, 'id' | 'file'>) => ({ file: m.file, still: path.join(MEDIA_DIR, `${m.id}.still.jpg`), frames: path.join(MEDIA_DIR, `${m.id}.frames.jpg`) });
 
@@ -146,8 +171,14 @@ export const cleanText = (t: unknown, max: number) =>
 
 export interface NewMedia {
   kind: MediaKind;
-  /** The file to copy in. */
+  /** The file to copy in (or move in, with `move`). */
   from: string;
+  /** Moved into the Library's folder rather than copied: it leaves where it was (a file the desktop app drops, an upload). */
+  move?: boolean;
+  /** What it was saved from, when that is not `from`: an upload's file name, or where a moved file was. */
+  source?: string;
+  /** The SHA-256 of its bytes. */
+  sha?: string;
   ext: string;
   mime: string;
   bytes: number;
@@ -166,7 +197,7 @@ export interface NewMedia {
   space?: string | null;
 }
 
-/** Copies the file in and adds its row, its title and description to be written (caption "pending"). */
+/** Copies (or moves) the file in and adds its row, its title and description to be written (caption "pending"). */
 export async function addMedia(db: DB, n: NewMedia): Promise<MediaItem> {
   initMedia(db);
   const count = (db.prepare('select count(*) as n from media').get() as { n: number }).n;
@@ -174,11 +205,12 @@ export async function addMedia(db: DB, n: NewMedia): Promise<MediaItem> {
   await fs.promises.mkdir(MEDIA_DIR, { recursive: true, mode: 0o700 });
   const id = crypto.randomBytes(5).toString('hex');
   const name = `${id}.${n.ext}`;
-  await fs.promises.copyFile(n.from, path.join(MEDIA_DIR, name), fs.constants.COPYFILE_EXCL);
+  if (n.move) await moveWhole(n.from, path.join(MEDIA_DIR, name));
+  else await fs.promises.copyFile(n.from, path.join(MEDIA_DIR, name), fs.constants.COPYFILE_EXCL);
   const now = Date.now();
   db.prepare(
-    `insert into media (id, kind, title, description, file, mime, bytes, width, height, duration, peaks, lyrics, prompt, model, session_key, source, caption, space, created_at, updated_at)
-     values (@id, @kind, @title, @description, @file, @mime, @bytes, @width, @height, @duration, @peaks, @lyrics, @prompt, @model, @session, @source, 'pending', @space, @now, @now)`,
+    `insert into media (id, kind, title, description, file, mime, bytes, width, height, duration, peaks, lyrics, prompt, model, session_key, source, caption, space, sha, created_at, updated_at)
+     values (@id, @kind, @title, @description, @file, @mime, @bytes, @width, @height, @duration, @peaks, @lyrics, @prompt, @model, @session, @source, 'pending', @space, @sha, @now, @now)`,
   ).run({
     id,
     kind: n.kind,
@@ -195,8 +227,9 @@ export async function addMedia(db: DB, n: NewMedia): Promise<MediaItem> {
     prompt: n.prompt ? cleanText(n.prompt, 4000) : null,
     model: n.model ? cleanText(n.model, 120) : null,
     session: n.sessionKey ?? null,
-    source: n.from,
+    source: n.source ?? n.from,
     space: n.space ?? null,
+    sha: n.sha ?? null,
     now,
   });
   return getMedia(db, id)!;
