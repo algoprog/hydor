@@ -1,8 +1,9 @@
 // What the Insert menu puts at the cursor: LaTeX for a heading, a list, a figure, a table, an equation, a citation,
 // a cross-reference, a quotation, a table of contents…
 // Each is a CodeMirror snippet with places to fill in (${…}; Tab goes to the next), made around what is picked when
-// something is: the words as a section's title, the lines as a list's items. Some need a package, which the preamble
-// gets when it lacks it.
+// something is: the words as a section's title or a figure's caption, the lines as a list's items, a quotation's or a
+// proof's lines. What is picked is never lost: what does not take it in goes after it. Some need a package, which the
+// preamble gets when it lacks it.
 import type { TexDoc } from '@shared/latex';
 
 export type SnipId =
@@ -73,15 +74,18 @@ export interface Made {
   template: string;
   /** On lines of its own. */
   block: boolean;
+  /** It holds the lines picked, whole: it goes in their place. */
+  lines?: boolean;
   /** Packages the preamble must load. */
   needs?: string[];
 }
 
 /**
  * The snippet for `id`, made around `picked` (the text picked, '' when none). `picture`: the name of the picture a
- * figure shows; `key`: a bibliography entry to cite.
+ * figure shows; `key`: a bibliography entry to cite; `prev`: the character before the cursor (a citation after a
+ * space needs no ~ of its own).
  */
-export function makeSnippet(id: SnipId, picked: string, o: { picture?: string; key?: string; labels?: string[] } = {}): Made {
+export function makeSnippet(id: SnipId, picked: string, o: { picture?: string; key?: string; labels?: string[]; prev?: string } = {}): Made {
   // A label the document has not used yet: fig:plot, else fig:plot-2…
   const free = (base: string) => {
     const taken = new Set(o.labels ?? []);
@@ -93,6 +97,11 @@ export function makeSnippet(id: SnipId, picked: string, o: { picture?: string; k
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
+  // Several lines picked, kept as they are, indented by `pad`.
+  const many = !one && lines.length > 0;
+  const kept = (pad: string) => lines.map((l) => `${pad}${lit(l)}`);
+  // A citation or a reference right after a word is tied to it (~); after a space or a bracket it needs no tie.
+  const tie = !o.prev || /[\s{(~[]/.test(o.prev) ? '' : '~';
   switch (id) {
     case 'part':
     case 'chapter':
@@ -100,22 +109,26 @@ export function makeSnippet(id: SnipId, picked: string, o: { picture?: string; k
     case 'subsection':
     case 'subsubsection':
     case 'paragraph':
+      // A line picked is the title; several lines come after a heading to name.
+      if (many) return { template: [`\\${id}{${field('Title')}}`, ...kept('')].join('\n'), block: true, lines: true };
       return { template: `\\${id}{${one ? lit(one) : field('Title')}}`, block: true };
     case 'description': {
       const items = lines.length ? lines.map((l) => `  \\item[${lit(l.replace(/^([-*•]|\d+[.)])\s+/, ''))}] ${field('')}`) : [`  \\item[${field('Term')}] ${field('What it means')}`];
-      return { template: ['\\begin{description}', ...items, '\\end{description}'].join('\n'), block: true };
+      return { template: ['\\begin{description}', ...items, '\\end{description}'].join('\n'), block: true, lines: lines.length > 0 };
     }
     case 'ref':
-      return { template: `~\\ref{${field('')}}`, block: false };
+      return { template: `${tie}\\ref{${field('')}}`, block: false };
     case 'toc':
       return { template: '\\tableofcontents', block: true };
     case 'quote':
+      if (many) return { template: ['\\begin{quote}', ...kept('  '), '\\end{quote}'].join('\n'), block: true, lines: true };
       return { template: ['\\begin{quote}', `  ${one ? lit(one) : field('The quotation')}`, '\\end{quote}'].join('\n'), block: true };
     case 'verbatim':
       return { template: ['\\begin{verbatim}', picked ? lit(picked) : field('Text exactly as typed'), '\\end{verbatim}'].join('\n'), block: true };
     case 'newpage':
       return { template: '\\newpage', block: true };
     case 'proof':
+      if (one || many) return { template: ['\\begin{proof}', ...kept('  '), '\\end{proof}'].join('\n'), block: true, lines: !one, needs: ['amsthm'] };
       return { template: ['\\begin{proof}', `  ${field('')}`, '\\end{proof}'].join('\n'), block: true, needs: ['amsthm'] };
     case 'bold':
     case 'italic':
@@ -123,17 +136,18 @@ export function makeSnippet(id: SnipId, picked: string, o: { picture?: string; k
     case 'itemize':
     case 'enumerate': {
       const items = lines.length ? lines.map((l) => `  \\item ${lit(l.replace(/^([-*•]|\d+[.)])\s+/, ''))}`) : [`  \\item ${field('First')}`, `  \\item ${field('Second')}`];
-      return { template: [`\\begin{${id}}`, ...items, `\\end{${id}}`].join('\n'), block: true };
+      return { template: [`\\begin{${id}}`, ...items, `\\end{${id}}`].join('\n'), block: true, lines: lines.length > 0 };
     }
     case 'figure': {
       const name = o.picture ?? 'figures/picture.png';
-      const caption = name.replace(/^.*\//, '').replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
+      // The words picked are its caption; else the picture's name says it.
+      const caption = one || name.replace(/^.*\//, '').replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
       return {
         template: [
           '\\begin{figure}[htbp]',
           '  \\centering',
           `  \\includegraphics[width=${field('0.8')}\\linewidth]{${lit(name)}}`,
-          `  \\caption{${field(caption.charAt(0).toUpperCase() + caption.slice(1))}}`,
+          `  \\caption{${one ? lit(one) : field(caption.charAt(0).toUpperCase() + caption.slice(1))}}`,
           `  \\label{${lit(free(`fig:${labelOf(caption)}`))}}`,
           '\\end{figure}',
         ].join('\n'),
@@ -161,19 +175,21 @@ export function makeSnippet(id: SnipId, picked: string, o: { picture?: string; k
         block: true,
       };
     case 'equation':
+      if (many) return { template: ['\\begin{equation}', ...kept('  '), `  \\label{eq:${field('label')}}`, '\\end{equation}'].join('\n'), block: true, lines: true, needs: ['amsmath'] };
       return { template: ['\\begin{equation}', `  ${one ? lit(one) : field('E = mc^2')}`, `  \\label{eq:${field('label')}}`, '\\end{equation}'].join('\n'), block: true, needs: ['amsmath'] };
     case 'align':
       return {
         template: ['\\begin{align}', ...(lines.length ? lines.map((l, i) => `  ${lit(l)}${i < lines.length - 1 ? ' \\\\' : ''}`) : [`  ${field('a')} &= b + c \\\\`, '  d &= e - f']), '\\end{align}'].join('\n'),
         block: true,
+        lines: lines.length > 0,
         needs: ['amsmath'],
       };
     case 'cite':
-      return { template: `~\\cite{${field(o.key ?? 'key')}}`, block: false };
+      return { template: `${tie}\\cite{${field(o.key ?? 'key')}}`, block: false };
     case 'footnote':
-      return { template: `\\footnote{${one ? lit(one) : field('A note')}}`, block: false };
+      return { template: `\\footnote{${one ? lit(one) : many ? lines.map(lit).join('\n') : field('A note')}}`, block: false };
     case 'link':
-      return { template: `\\href{${field('https://')}}{${one ? lit(one) : field('the words to click')}}`, block: false, needs: ['hyperref'] };
+      return { template: `\\href{${field('https://')}}{${one ? lit(one) : many ? lines.map(lit).join(' ') : field('the words to click')}}`, block: false, needs: ['hyperref'] };
   }
 }
 
