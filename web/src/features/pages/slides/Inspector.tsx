@@ -68,7 +68,7 @@ import { Button, cx, Switch } from '../../../components/ui';
 import { useTexHtml } from '../common/katex';
 import { Choice, Select } from '../studio/fields';
 import { ColorButton, Field, NumInput, Swatches, Tool } from './controls';
-import { addAnim, align, distribute, dropMergesPast, fillCells, heightOf, mergeAt, mergeCells, moveAnim, partName, pathTo, pickedOf, removeAnim, removeEls, restack, setAnim, setEls, setSlide, topOf, unmergeCell, W } from './ops';
+import { addAnim, align, distribute, dropMergesPast, fillCells, heightOf, mergeAt, mergeCells, moveAnim, onSlide, partName, pathTo, pickedOf, removeAnim, removeEls, restack, setAnim, setEls, setSlide, topOf, unmergeCell, W } from './ops';
 import type { CellSel } from './SlideCanvas';
 import { SlideThumb } from './Thumb';
 import { fetchVideoStill } from './media';
@@ -273,33 +273,55 @@ function Arrange({ deck, index, ids, change }: { deck: Deck; index: number; ids:
   );
 }
 
-function Place({ el, set, H }: { el: El; set: (patch: Partial<El>, key?: string) => void; H: number }) {
-  if (el.type === 'line') {
+/**
+ * A part's place and size, as it is on the slide: a part in a group shows where it is on the slide (its groups' places
+ * and turns added), and a place or turn typed there is taken back through them, so the part goes there on the slide.
+ */
+function Place({ el, slide, set, H }: { el: El; slide: Slide; set: (patch: Partial<El>, key?: string) => void; H: number }) {
+  const groups = pathTo(slide.els, el.id) ?? [];
+  const shown = groups.length ? onSlide(slide, el) : el;
+  // The groups' turns add up: a step on the slide is that much less turned in the part's own group.
+  const turn = groups.reduce((a, g) => a + (g.rot ?? 0), 0);
+  const back = (dx: number, dy: number) => {
+    const a = (-turn * Math.PI) / 180;
+    return [dx * Math.cos(a) - dy * Math.sin(a), dx * Math.sin(a) + dy * Math.cos(a)];
+  };
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  if (el.type === 'line' && shown.type === 'line') {
+    // Its start moved (its end stays), or its end.
+    const moveEnd = (which: 'from' | 'to', x: number, y: number) => {
+      const [lx, ly] = back(x - (which === 'from' ? shown.x : shown.x + shown.w), y - (which === 'from' ? shown.y : shown.y + shown.h));
+      set(which === 'from' ? { x: r2(el.x + lx), y: r2(el.y + ly), w: r2(el.w - lx), h: r2(el.h - ly) } : { w: r2(el.w + lx), h: r2(el.h + ly) }, 'place');
+    };
     return (
       <Section title="Place">
         <Field label="From">
-          <NumInput label="X" value={el.x} onChange={(x) => set({ w: el.w + (el.x - x), x }, 'place')} unit="x" />
-          <NumInput label="Y" value={el.y} onChange={(y) => set({ h: el.h + (el.y - y), y }, 'place')} unit="y" />
+          <NumInput label="X" value={r2(shown.x)} onChange={(x) => moveEnd('from', x, shown.y)} unit="x" />
+          <NumInput label="Y" value={r2(shown.y)} onChange={(y) => moveEnd('from', shown.x, y)} unit="y" />
         </Field>
         <Field label="To">
-          <NumInput label="X" value={el.x + el.w} onChange={(x) => set({ w: x - el.x }, 'place')} unit="x" />
-          <NumInput label="Y" value={el.y + el.h} onChange={(y) => set({ h: y - el.y }, 'place')} unit="y" />
+          <NumInput label="X" value={r2(shown.x + shown.w)} onChange={(x) => moveEnd('to', x, shown.y + shown.h)} unit="x" />
+          <NumInput label="Y" value={r2(shown.y + shown.h)} onChange={(y) => moveEnd('to', shown.x + shown.w, y)} unit="y" />
         </Field>
       </Section>
     );
   }
+  const moveTo = (x: number, y: number) => {
+    const [lx, ly] = back(x - shown.x, y - shown.y);
+    set({ x: r2(el.x + lx), y: r2(el.y + ly) }, 'place');
+  };
   return (
     <Section title="Place and size">
       <Field label="Position">
-        <NumInput label="From the left" value={el.x} onChange={(x) => set({ x }, 'place')} min={-W} max={W * 2} unit="x" />
-        <NumInput label="From the top" value={el.y} onChange={(y) => set({ y }, 'place')} min={-H} max={H * 2} unit="y" />
+        <NumInput label="From the left" value={r2(shown.x)} onChange={(x) => moveTo(x, shown.y)} min={-W} max={W * 2} unit="x" />
+        <NumInput label="From the top" value={r2(shown.y)} onChange={(y) => moveTo(shown.x, y)} min={-H} max={H * 2} unit="y" />
       </Field>
       <Field label="Size">
         <NumInput label="Width" value={el.w} onChange={(w) => set({ w }, 'place')} min={4} max={W * 3} unit="w" />
         <NumInput label="Height" value={el.h} onChange={(h) => set({ h }, 'place')} min={4} max={H * 3} unit="h" />
       </Field>
       <Field label="Turn">
-        <NumInput label="Degrees" value={el.rot ?? 0} onChange={(rot) => set({ rot: ((rot % 360) + 360) % 360 || undefined }, 'place')} min={-360} max={360} unit="°" />
+        <NumInput label="Degrees" value={r2(((((shown.rot ?? 0) % 360) + 360) % 360))} onChange={(rot) => set({ rot: ((((rot - turn) % 360) + 360) % 360) || undefined }, 'place')} min={-360} max={360} unit="°" />
         <NumInput label="See-through (%)" value={Math.round((1 - (el.opacity ?? 1)) * 100)} onChange={(v) => set({ opacity: v > 0 ? Math.max(0, 1 - v / 100) : undefined }, 'place')} min={0} max={100} unit="%" />
       </Field>
     </Section>
@@ -1021,7 +1043,7 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cro
       {el.type === 'icon' && <IconLook el={el} theme={deck.theme} set={set} onIcon={onIcon} />}
       {el.type === 'math' && <MathLook el={el} theme={deck.theme} set={set} focus={texFocus} />}
       {el.type === 'video' && <VideoLook key={el.id} el={el} set={set} />}
-      <Place el={el} set={set} H={H} />
+      <Place el={el} slide={slide} set={set} H={H} />
       <Arrange deck={deck} index={index} ids={[el.id]} change={change} />
       <Section title="Link">
         <input
