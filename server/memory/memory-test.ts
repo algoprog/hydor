@@ -28,6 +28,8 @@ import * as store from './store.ts';
 import { applyTidy, endOfDay, nearGroups, PLACE_SHARE, tidy, tidyDue, topicGroups, undoTidy, type Ask } from './tidy.ts';
 import { memoryTools } from './tools.ts';
 import * as vec from './vectors.ts';
+import { defaultInterests, rankByInterest, RANK_BY_INTEREST, tokens } from './interest.ts';
+import { createSpace } from '../spaces/index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -845,6 +847,129 @@ test('user_profile: only an app step has it; the profile, notes about the user a
   assert.equal(out.count, 4);
   assert.equal(JSON.parse(String(await tool.run({ sessions: 2, notes: 0 }, step))).sessions.length, 2, 'as many as asked');
   assert.deepEqual(JSON.parse(String(await tool.run({ sessions: 2, notes: 0 }, step))).notes, []);
+  // Their projects: the one at work most lately first, with its description and its sessions' titles (memory off left out).
+  try {
+    db.exec('delete from spaces');
+  } catch {}
+  const quiet = createSpace(db, { name: 'Thesis', description: 'Chapters on query performance prediction', folder: tmp });
+  const busy = createSpace(db, { name: 'Hydor', description: 'A self-hosted home for AI agents', folder: tmp });
+  const later = Date.now() + 60_000;
+  app.run('acp:p1', 'acp', 'Fix the dense retrieval eval', 0, JSON.stringify({ space: busy.id }), later, later);
+  app.run('acp:p2', 'acp', 'Secret plans', 0, JSON.stringify({ space: busy.id, memory: false }), later + 1000, later + 1000);
+  app.run('acp:p3', 'acp', 'Rerankers for long documents', 0, JSON.stringify({ space: busy.id }), later + 2000, later + 2000);
+  const withProjects = JSON.parse(String(await tool.run({ sessions: 1, notes: 0 }, step)));
+  assert.deepEqual(withProjects.projects, [
+    { name: 'Hydor', about: 'A self-hosted home for AI agents', recent: ['Rerankers for long documents', 'Fix the dense retrieval eval'] },
+    { name: 'Thesis', about: 'Chapters on query performance prediction', recent: [] },
+  ]);
+  void quiet;
+});
+
+test('rank_by_interest: by words, best first, each with what it fits; what was liked pulls, what was disliked pushes away; only steps have it, memory off too', async () => {
+  const items = [
+    { id: 'seg', text: 'Image segmentation with diffusion models for medical scans' },
+    { id: 'dense', text: 'Dense retrieval for long documents: chunking passages and late interaction' },
+    { id: 'qe', text: 'Query expansion with large language models for sparse retrieval' },
+    { id: 'rec', text: 'Large language models as recommenders: sequential recommendation with prompts' },
+    { id: 'mol', text: 'Graph neural networks for molecules and protein structure' },
+  ];
+  assert.deepEqual(tokens('The Papers propose Dense-Retrieval models in 2024'), ['dense', 'retrieval', 'model']);
+  const interests = [
+    { text: 'dense retrieval for long documents', label: '“dense retrieval”', weight: 1 },
+    { text: 'query expansion', label: '“query expansion”', weight: 1 },
+  ];
+  let r = await rankByInterest(db, { items, interests, given: true });
+  assert.equal(r.by, 'words');
+  assert.deepEqual(r.ranked.slice(0, 2).map((x) => x.id).sort(), ['dense', 'qe']);
+  const dense = r.ranked.find((x) => x.id === 'dense')!;
+  assert.equal(dense.interest, 0);
+  assert.equal(r.ranked.find((x) => x.id === 'qe')!.interest, 1);
+  assert.match(dense.why, /^“dense retrieval” \(/);
+  assert.ok(dense.score > 0.5 && dense.score <= 1, `a good match scores high (${dense.score})`);
+  assert.equal(r.ranked.find((x) => x.id === 'seg')!.score, 0, 'nothing in common: 0');
+  assert.equal(r.ranked.find((x) => x.id === 'seg')!.why, '');
+  // Liked: a paper on graph neural networks makes the like of it rise, as an interest of its own.
+  r = await rankByInterest(db, { items, interests, liked: ['Message passing graph neural networks for molecules'], given: true });
+  assert.ok(r.ranked.findIndex((x) => x.id === 'mol') < r.ranked.findIndex((x) => x.id === 'rec'), 'the liked kind rises');
+  assert.match(r.ranked.find((x) => x.id === 'mol')!.why, /^like “Message passing graph/);
+  assert.equal(r.ranked.find((x) => x.id === 'mol')!.interest, undefined, 'it fits a liked text, not an interest');
+  // Disliked: language models as recommenders, which also expand queries: the recommender goes down, below the expansion.
+  const llm = [{ text: 'large language models', label: '“LLMs”', weight: 1 }];
+  r = await rankByInterest(db, { items, interests: llm, given: true });
+  const before = r.ranked.find((x) => x.id === 'rec')!.score;
+  assert.ok(before > 0);
+  r = await rankByInterest(db, { items, interests: llm, disliked: ['Sequential recommendation with prompts for recommenders'], given: true });
+  assert.ok(r.ranked.find((x) => x.id === 'rec')!.score < before, 'what is like the disliked goes down');
+  assert.deepEqual(r.ranked.slice(0, 1).map((x) => x.id), ['qe']);
+  // At most limit; nothing to go by: as they came.
+  assert.equal((await rankByInterest(db, { items, interests, limit: 2, given: true })).ranked.length, 2);
+  const none = await rankByInterest(db, { items, interests: [] });
+  assert.equal(none.by, 'none');
+  assert.deepEqual(none.ranked.map((x) => x.id), items.map((x) => x.id));
+  // The tool: a step's alone (memory off too), giving JSON; text from a title and an abstract.
+  const deps = { db, broadcast() {} } as unknown as RunCtx['deps'];
+  const agent: RunCtx = { runId: 'r5', key: 'claude:asker2', agent: 'claude', cwd: plain, deps };
+  assert.ok(!memoryTools(agent).some((t) => t.name === 'rank_by_interest'), 'agents in sessions do not get it');
+  const step: RunCtx = { runId: 'flow-r6', key: 'acp:flow-r6', agent: 'acp', cwd: plain, deps, step: true };
+  assert.ok(memoryTools(step).some((t) => t.name === 'rank_by_interest'));
+  store.setEnabled(db, false);
+  assert.deepEqual(memoryTools(step).map((t) => t.name), ['rank_by_interest'], 'with memory off, a step still ranks');
+  store.setEnabled(db, true);
+  const out = JSON.parse(String(await RANK_BY_INTEREST.run({ items: [{ id: 'a', title: 'Sparse retrieval', abstract: 'Query expansion for BM25' }, { id: 'b', text: 'Protein folding' }], interests: ['query expansion'] }, step)));
+  assert.deepEqual(out.map((x: { id: string }) => x.id), ['a', 'b']);
+  assert.equal(out[0].interest, 0);
+  await assert.rejects(Promise.resolve(RANK_BY_INTEREST.run({ items: [] }, step)), /items: a list/);
+});
+
+test('rank_by_interest: by meaning when the model answers; without interests, the profile, the projects and the latest sessions, memory off the projects alone', async () => {
+  useFakeEmbedder();
+  const items = [
+    { id: 'short', text: 'Concise answers from assistants' },
+    { id: 'city', text: 'Housing prices in Berlin' },
+  ];
+  // "brief replies" and "concise answers" are the same concepts to the made-up embedder: no word in common, the same meaning.
+  const r = await rankByInterest(db, { items, interests: [{ text: 'brief replies', label: '“brief replies”', weight: 1 }], given: true });
+  assert.equal(r.by, 'meaning');
+  assert.equal(r.ranked[0].id, 'short');
+  assert.ok(r.ranked[0].score > 0.5 && r.ranked[1].score < 0.3, `${r.ranked[0].score} and ${r.ranked[1].score}`);
+  // Disliked by meaning: something like it goes down.
+  const d = await rankByInterest(db, { items, interests: [{ text: 'brief replies and paris', label: 'x', weight: 1 }], disliked: ['Rents in Paris'], given: true });
+  const plainD = await rankByInterest(db, { items, interests: [{ text: 'brief replies and paris', label: 'x', weight: 1 }], given: true });
+  assert.ok(d.ranked.find((x) => x.id === 'city')!.score < plainD.ranked.find((x) => x.id === 'city')!.score);
+  setEmbedderForTests(null);
+  // What Hydor knows, when the step names nothing.
+  try {
+    db.exec('delete from spaces');
+  } catch {}
+  db.prepare('delete from sessions').run();
+  db.prepare('delete from app_sessions').run();
+  saveProfile(db, '# About me\n- Researches dense retrieval and rerankers.\nLikes hiking.', { source: 'user' });
+  createSpace(db, { name: 'Hydor', description: 'A self-hosted home for AI agents', folder: tmp });
+  db.prepare('insert into app_sessions (key, agent, title, archived, extra, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)').run('acp:s1', 'acp', 'Plan a trip to Lisbon', 0, null, Date.now(), Date.now());
+  const all = defaultInterests(db, true);
+  assert.deepEqual(
+    all.map((x) => [x.label, x.text, x.weight]),
+    [
+      ['your profile', 'Researches dense retrieval and rerankers.', 1],
+      ['your project “Hydor”', 'Hydor. A self-hosted home for AI agents', 1],
+      ['your session “Plan a trip to Lisbon”', 'Plan a trip to Lisbon', 0.8],
+    ],
+  );
+  assert.deepEqual(
+    defaultInterests(db, false).map((x) => x.label),
+    ['your project “Hydor”'],
+    'memory off: the projects alone',
+  );
+  const deps = { db, broadcast() {} } as unknown as RunCtx['deps'];
+  const step: RunCtx = { runId: 'flow-r7', key: 'acp:flow-r7', agent: 'acp', cwd: plain, deps, step: true };
+  const out = JSON.parse(
+    String(
+      await RANK_BY_INTEREST.run({ items: [{ id: 'trip', text: 'Lisbon trip guide' }, { id: 'agents', text: 'Self-hosted AI agents at home' }, { id: 'rerank', text: 'Research on rerankers for dense retrieval' }, { id: 'none', text: 'Knitting patterns' }] }, step),
+    ),
+  );
+  assert.deepEqual(out.map((x: { id: string }) => x.id), ['rerank', 'agents', 'trip', 'none']);
+  assert.match(out[1].why, /^your project “Hydor”/);
+  assert.ok(!('interest' in out[0]), 'no interests given: none to point at');
 });
 
 // ---- run ---------------------------------------------------------------------------------------------

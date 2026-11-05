@@ -16,6 +16,7 @@ import { addEntry, cleanText, deleteEntry, entries, markUsed, memoryOn, placesOf
 import { endOfDay } from './tidy.ts';
 import { nearest, setVectors } from './vectors.ts';
 import { USER_PROFILE } from './about-user.ts';
+import { RANK_BY_INTEREST } from './interest.ts';
 
 const SCOPES = ['global', 'repo', 'session'];
 const WHERE: Record<MemoryScope, string> = { global: 'about the user', repo: 'this project', session: 'this session' };
@@ -269,8 +270,12 @@ const READ: RunTool = {
   },
 };
 
-/** The tools for one run: none when memory is off for its session (a confidential one only reads); an app's steps have user_profile too. */
+/**
+ * The tools for one run: none when memory is off for its session (a confidential one only reads); an app's steps have
+ * user_profile and rank_by_interest too, and rank_by_interest even with memory off (it then goes by what the step gives
+ * and the user's projects alone).
+ */
 export function memoryTools(ctx: RunCtx): RunTool[] {
-  if (!sessionMemoryOn(ctx.deps.db, ctx.key)) return readsOnly(ctx) ? [RECALL, SEARCH, READ] : [];
-  return ctx.step ? [REMEMBER, FORGET, RECALL, SEARCH, READ, USER_PROFILE] : [REMEMBER, FORGET, RECALL, SEARCH, READ];
+  if (!sessionMemoryOn(ctx.deps.db, ctx.key)) return ctx.step ? [RANK_BY_INTEREST] : readsOnly(ctx) ? [RECALL, SEARCH, READ] : [];
+  return ctx.step ? [REMEMBER, FORGET, RECALL, SEARCH, READ, USER_PROFILE, RANK_BY_INTEREST] : [REMEMBER, FORGET, RECALL, SEARCH, READ];
 }

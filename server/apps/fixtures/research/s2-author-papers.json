@@ -1,0 +1,88 @@
+{
+ "offset": 0,
+ "data": [
+  {
+   "paperId": "8f3400c4c5c3976fdeb5111e807299b6d50bca80",
+   "externalIds": {
+    "ArXiv": "2602.23440",
+    "DBLP": "journals/corr/abs-2602-23440",
+    "DOI": "10.48550/arXiv.2602.23440",
+    "CorpusId": 286171269
+   },
+   "title": "Truncated Step-Level Sampling with Process Rewards for Retrieval-Augmented Reasoning",
+   "venue": "arXiv.org",
+   "year": 2026,
+   "citationCount": 3,
+   "publicationDate": "2026-02-26"
+  },
+  {
+   "paperId": "bb0ca6d0ba362a7102faab84e556160fd0b7a488",
+   "externalIds": {
+    "DBLP": "conf/ictir/SalemiSZ26",
+    "DOI": "10.1145/3805713.3820415",
+    "CorpusId": 290191009
+   },
+   "title": "Plan-and-Refine in RAG: Generating Diverse and Comprehensive Responses through Global Exploration and Local Exploitation",
+   "venue": "International Conference on the Theory of Information Retrieval",
+   "year": 2026,
+   "citationCount": 1,
+   "publicationDate": "2026-07-24"
+  },
+  {
+   "paperId": "0b33deabc9c3b272ec38961663ac3ba4422d6635",
+   "externalIds": {
+    "DBLP": "conf/ictir/SamarinasZ25",
+    "ArXiv": "2504.03947",
+    "DOI": "10.1145/3731120.3744613",
+    "CorpusId": 277621783
+   },
+   "title": "Distillation and Refinement of Reasoning in Small Language Models for Document Re-ranking",
+   "venue": "International Conference on the Theory of Information Retrieval",
+   "year": 2025,
+   "citationCount": 11,
+   "publicationDate": "2025-04-04"
+  },
+  {
+   "paperId": "aa25974e22c578711f33abf0ac7253f68b4c55fd",
+   "externalIds": {
+    "DBLP": "journals/corr/abs-2504-07794",
+    "ArXiv": "2504.07794",
+    "DOI": "10.48550/arXiv.2504.07794",
+    "CorpusId": 277667139
+   },
+   "title": "Plan-and-Refine: Diverse and Comprehensive Retrieval-Augmented Generation",
+   "venue": "arXiv.org",
+   "year": 2025,
+   "citationCount": 1,
+   "publicationDate": "2025-04-10"
+  },
+  {
+   "paperId": "fee3ddc71c35fdfc6580f793834fa3919f69df57",
+   "externalIds": {
+    "DBLP": "conf/acl/SamarinasKSKZ25",
+    "ArXiv": "2501.03545",
+    "DOI": "10.48550/arXiv.2501.03545",
+    "CorpusId": 275342326
+   },
+   "title": "Beyond Factual Accuracy: Evaluating Coverage of Diverse Factual Information in Long-form Text Generation",
+   "venue": "Annual Meeting of the Association for Computational Linguistics",
+   "year": 2025,
+   "citationCount": 23,
+   "publicationDate": "2025-01-07"
+  },
+  {
+   "paperId": "7a18e2b0343fe30b6e0d6a4106aebf1157004b14",
+   "externalIds": {
+    "DBLP": "journals/corr/abs-2405-06460",
+    "ArXiv": "2405.06460",
+    "DOI": "10.1145/3626772.3657869",
+    "CorpusId": 269740786
+   },
+   "title": "ProCIS: A Benchmark for Proactive Retrieval in Conversations",
+   "venue": "Annual International ACM SIGIR Conference on Research and Development in Information Retrieval",
+   "year": 2024,
+   "citationCount": 20,
+   "publicationDate": "2024-05-10"
+  }
+ ]
+}
