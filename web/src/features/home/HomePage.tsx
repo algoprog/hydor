@@ -6,6 +6,7 @@ import type { Agent, StartRun, StartSettings } from '@shared/types';
 import type { SessionExtra } from '@shared/features';
 import { usd } from '@shared/budget';
 import { arenaOf } from '@shared/arena';
+import { isConfidential } from '@shared/confidential';
 import { api, post } from '../../lib/api';
 import { activityOf } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
@@ -34,10 +35,14 @@ import { NewSpaceDialog } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
 import type { Space } from '@shared/spaces';
 import { doneStartFiles, waitingStartFiles } from '../../lib/startFiles';
+import { useConfidentialInfo } from '../confidential/state';
+
+/** Custom, the app's own agent (its ACP id is still "console"): the one a confidential session runs on. */
+const CUSTOM = 'console';
 
 /** Starts a session: pick the agent and folder, type the task, press Enter. */
-/** A prompt link (/?prompt=…&agent=…&model=…&cwd=…) fills the box; it never starts anything by itself. */
-function fromLink(search: string): { prompt?: string; agent?: Agent; model?: string; assistant?: string; stripped: boolean } {
+/** A prompt link (/?prompt=…&agent=…&model=…&cwd=…&confidential=1) fills the box; it never starts anything by itself. */
+function fromLink(search: string): { prompt?: string; agent?: Agent; model?: string; assistant?: string; confidential?: boolean; stripped: boolean } {
   const q = new URLSearchParams(search);
   const raw = q.get('prompt') ?? undefined;
   // Zero-width and direction-control characters can hide text from you but not from the agent.
@@ -45,11 +50,18 @@ function fromLink(search: string): { prompt?: string; agent?: Agent; model?: str
   const agent = q.get('agent');
   // An assistant to start as, by its id (the App builder, for Describe it on the New template page).
   const assistant = q.get('assistant');
-  return { prompt, agent: agent === 'claude' || agent === 'codex' ? agent : undefined, model: q.get('model') ?? undefined, ...(assistant && /^[\w-]{1,80}$/.test(assistant) ? { assistant } : {}), stripped: !!raw && raw !== prompt };
+  return {
+    prompt,
+    agent: agent === 'claude' || agent === 'codex' ? agent : undefined,
+    model: q.get('model') ?? undefined,
+    ...(assistant && /^[\w-]{1,80}$/.test(assistant) ? { assistant } : {}),
+    ...(q.get('confidential') === '1' ? { confidential: true } : {}),
+    stripped: !!raw && raw !== prompt,
+  };
 }
 
 /** The start options kept as picks for next time (lib/start.ts); the others are this task's alone, kept with what is written. */
-const PICKS = new Set(['assistant', 'connections', 'memory', 'capUsd', 'space']);
+const PICKS = new Set(['assistant', 'connections', 'memory', 'capUsd', 'space', 'confidential']);
 const ownOptions = (x: SessionExtra): SessionExtra => Object.fromEntries(Object.entries(x).filter(([k]) => !PICKS.has(k)));
 
 /** The folder picked last, as one value: its path, a new task folder, the space. */
@@ -110,6 +122,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     ...draft?.extra,
     ...(saved.memory === false ? { memory: false } : {}),
     ...(saved.capUsd ? { capUsd: saved.capUsd } : {}),
+    ...(saved.confidential || link?.confidential ? { confidential: true as const } : {}),
     // The space picked last, while the folder is still its own.
     ...(saved.space && !linkCwd ? { space: saved.space } : {}),
     ...(link?.assistant ? { assistant: link.assistant } : {}),
@@ -206,6 +219,19 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     setMode(md && (!cat || cat.modes.some((x) => x.value === md)) ? md : cat?.defaultMode || null);
     setAccount((r.account !== undefined ? r.account : p.account) ?? '');
   }, [agent, acpId, cat]);
+  // Confidential: Custom, with the best model on this computer (or the one picked, when it is one of them).
+  const confidential = isConfidential(extra);
+  const local = useConfidentialInfo();
+  useEffect(() => {
+    if (confidential && !(agent === 'acp' && acpId === CUSTOM)) chooseAgent('acp', CUSTOM);
+  }, [confidential, agent, acpId]);
+  useEffect(() => {
+    if (!confidential || agent !== 'acp' || acpId !== CUSTOM || !cat || !local) return;
+    const here = new Set(cat.models.filter((m) => m.local).map((m) => m.value));
+    if (model && here.has(model)) return;
+    const best = local.models.find((id) => here.has(id));
+    if (best) (setModel(best), keepRun({ model: best }));
+  }, [confidential, agent, acpId, cat, local, model]);
   // Picking an assistant sets the agent, model and mode it suggests (after the above, which it overrides).
   const pendingAcp = useRef<string | null>(null);
   useAssistantDefaults(typeof extra.assistant === 'string' ? extra.assistant : undefined, {
@@ -247,7 +273,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   // The session's page opens at once, with your message, while the server starts the agent (lib/starting.ts).
   const starting = useRef(false);
   const start = () => {
-    if (starting.current || !cwd) return;
+    if (starting.current || !cwd || (confidential && local && !local.models.length)) return;
     starting.current = true;
     // Kept as it was used, the whole of it, for the next start.
     saveStart(
@@ -261,6 +287,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
         worktree,
         memory: extra.memory === false ? false : null,
         capUsd: typeof extra.capUsd === 'number' ? extra.capUsd : null,
+        confidential: confidential ? true : null,
       },
       true,
     );
@@ -307,12 +334,15 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     saveStart({ cwd: sp.folder, task: false, space: sp.id, ...(sp.assistant ? { assistant: sp.assistant } : {}) });
   };
 
-  // A capability's start option changed (the assistant, memory, a spending cap): kept for next time.
-  const onExtra = (p: Partial<SessionExtra>) => {
+  // A capability's start option changed (the assistant, memory, a spending cap, Confidential): kept for next time.
+  const onExtra = (o: Partial<SessionExtra>) => {
     const before = extra.assistant;
+    // Swarm, deep research and the arena reach the web or other models: turning one on turns Confidential off.
+    const p = (o.swarm || o.research || arenaOf(o as SessionExtra)) && confidential ? { ...o, confidential: undefined } : o;
     setExtra((x) => ({ ...x, ...p }));
     if ('memory' in p) saveStart({ memory: p.memory === false ? false : null });
     if ('capUsd' in p) saveStart({ capUsd: typeof p.capUsd === 'number' ? p.capUsd : null });
+    if ('confidential' in p) saveStart({ confidential: p.confidential ? true : null });
     // The assistant picked (not the one the page opened with): its kind of folder too, unless one was picked here.
     if (typeof p.assistant === 'string' && before !== undefined && p.assistant !== before) {
       saveStart({ assistant: p.assistant });
@@ -326,10 +356,11 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   const modeOn = cat && mode && mode !== cat.defaultMode ? (cat.modes.find((m) => m.value === mode)?.label ?? null) : null;
   const acctOn = acct ? (accounts.find((a) => a.id === acct)?.name ?? null) : null;
   const capOn = typeof extra.capUsd === 'number' ? usd(extra.capUsd) : null;
-  const changed = [extra.swarm === true ? 'Swarm' : null, extra.research ? 'Deep research' : null, arenaOf(extra) ? 'Arena' : null, effortOn && `${effortOn} effort`, modeOn, acctOn, extra.memory === false ? 'No memory' : null, capOn && `${capOn} cap`].filter((x): x is string => !!x);
+  const changed = [confidential ? 'Confidential' : null, extra.swarm === true ? 'Swarm' : null, extra.research ? 'Deep research' : null, arenaOf(extra) ? 'Arena' : null, effortOn && `${effortOn} effort`, modeOn, acctOn, extra.memory === false ? 'No memory' : null, capOn && `${capOn} cap`].filter((x): x is string => !!x);
   const modeNow = cat?.modes.find((m) => m.value === (mode ?? cat.defaultMode))?.label;
   // Whole lines where a word is a setting's state ("Memory: on"), so each translates as one.
   const optionsTitle = [
+    confidential ? 'Confidential: on' : 'Confidential: off',
     agent !== 'acp' && (effortOn ? `Effort: ${effortOn}` : 'Effort: default'),
     modeNow && `Permissions: ${modeNow}`,
     acctOn && `Account: ${acctOn}`,
@@ -342,7 +373,8 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     .filter(Boolean)
     .join('\n');
 
-  const ready = !!cwd;
+  // Confidential with no model on this computer can't start: its option says how to get one.
+  const ready = !!cwd && !(confidential && local && !local.models.length);
   const iconBtn = 'shrink-0 rounded-lg p-2 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg';
   return (
     <div>
@@ -350,7 +382,11 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
       <LimitBanner agent={agent} account={acct} className="mb-3" />
       <div
         data-tour="composer"
-        className="relative rounded-[22px] border border-line-2 bg-panel shadow-[0_8px_30px_rgba(0,0,0,0.10)] transition-colors focus-within:border-accent/50"
+        className={cx(
+          'relative rounded-[22px] border bg-panel shadow-[0_8px_30px_rgba(0,0,0,0.10)] transition-colors',
+          // Confidential: a calm tint, as in its session.
+          confidential ? 'border-ok/45 focus-within:border-ok/70' : 'border-line-2 focus-within:border-accent/50',
+        )}
         onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
         onDrop={(e) => {
           if (!e.dataTransfer.files.length) return;
@@ -417,7 +453,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
               <MonitorUp size={17} />
             </button>
           )}
-          <FeatureComposerButtons insert={insertText} />
+          <FeatureComposerButtons insert={insertText} confidential={confidential} />
           <input
             ref={fileRef}
             type="file"
@@ -451,8 +487,8 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
         <SettingLayout.Provider value="bare">
           <SheetsOnPhone.Provider value>
             <div data-tour="start-bar" className="flex flex-wrap items-center gap-0.5 rounded-b-[21px] border-t border-line bg-bg-1/70 px-2 py-1.5">
-              <AgentPicker label="Agent" agent={agent} acpId={acpId} acpList={acpList ?? []} onPick={chooseAgent} />
-              <ModelPicker label="Model" agent={agent} acp={acpId ?? undefined} value={model} onChange={(v) => (setModel(v), keepRun({ model: v }))} />
+              <AgentPicker label="Agent" agent={agent} acpId={acpId} acpList={acpList ?? []} onPick={chooseAgent} localOnly={confidential} />
+              <ModelPicker label="Model" agent={agent} acp={acpId ?? undefined} value={model} onChange={(v) => (setModel(v), keepRun({ model: v }))} localOnly={confidential} />
               <WorkFolderChip
                 value={cwd}
                 task={task}

@@ -23,6 +23,7 @@ import { PrBadge, PullRequestDialog } from './PullRequest';
 import { SessionMenu } from './SessionMenu';
 import { FindBar } from './FindBar';
 import { FeatureDock, sessionPaneOf, useSessionSide, type SessionPane } from '../registry';
+import { ConfidentialLock } from '../confidential/feature';
 import { useSessionShow, type SessionShow } from './show';
 import { LOCALE } from '../../i18n/locale';
 import { startedIn } from '../../lib/origin';
@@ -118,6 +119,7 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
                 {s.title}
               </button>
             )}
+            <ConfidentialLock s={s} />
           </div>
           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-3">
             <StatusPill s={s} />
