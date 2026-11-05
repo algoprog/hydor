@@ -166,7 +166,7 @@ function startTool(d: Deps, max: number): RunTool {
           description: models.length ? `For custom, one of: ${models.map((m) => m.id).join(', ')}. For claude or codex, a model name (default: the agent’s own).` : 'For claude or codex, a model name (default: the agent’s own).',
         },
         cwd: { type: 'string', description: 'The folder to work in (default: yours).' },
-        worktree: { type: 'boolean', description: 'Work on a branch of its own in a new worktree of the folder’s git repository, so its changes do not mix with others’.' },
+        worktree: { type: 'boolean', description: 'Work on a branch of its own in a new worktree of the folder’s git repository, so its changes do not mix with others’ (a campaign’s members always do).' },
         title: { type: 'string', description: 'A short name for it, shown to the user.' },
       },
       required: ['brief'],
