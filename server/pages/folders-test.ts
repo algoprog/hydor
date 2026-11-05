@@ -178,6 +178,7 @@ ok(!listFolders(db).find((f) => f.id === tf.id)?.space, 'a deleted project’s f
   put('analysis.ipynb', JSON.stringify({ cells: [{ cell_type: 'code', id: 'a', execution_count: null, metadata: {}, source: 'print(1)', outputs: [] }], metadata: {}, nbformat: 4, nbformat_minor: 5 }));
   put('photo.png', PNG);
   put('talk.pptx', 'not really');
+  put('old.ppt', 'PowerPoint 97');
   put('chapter.tex', 'Only a part of a document.\n');
   put('days/monday.txt', 'Rain.\n');
   put('days/empty/.keep', '');
@@ -191,7 +192,7 @@ ok(!listFolders(db).find((f) => f.id === tf.id)?.space, 'a deleted project’s f
   const titles = (r.pages ?? []).map((x: { title: string }) => x.title).sort();
   ok(JSON.stringify(titles) === JSON.stringify(['analysis', 'counts', 'monday', 'notes', 'paper']), `its documents, spreadsheets, notebooks and LaTeX come in (${titles.join(', ')})`);
   const why = new Map((r.skipped ?? []).map((s: { path: string; why: string }) => [s.path, s.why]));
-  ok(why.get('photo.png') === 'picture' && why.get('talk.pptx') === 'slides' && why.get('chapter.tex') === 'part', 'what is left out is said, with why');
+  ok(why.get('photo.png') === 'picture' && why.get('talk.pptx') === 'unreadable' && why.get('old.ppt') === 'slides' && why.get('chapter.tex') === 'part', 'what is left out is said, with why (a PowerPoint file comes in as slides; this one is not one, and a .ppt is left out)');
   ok(!(r.pages ?? []).some((x: { title: string }) => x.title === 'secret'), 'hidden folders are passed over');
   ok(r.folders === 2, 'its folder with something in it is a folder too; an empty one is not made');
   const monday = r.pages.find((x: { title: string }) => x.title === 'monday');
