@@ -60,6 +60,8 @@ const RULES: Rule[] = [
   ['W', /^\/api\/sessions\/[^/]+\/(message|handoff|fork|rewind|guest-links|pr|worktree|start|compact|goal)/, 'always'],
   ['W', /^\/api\/(preview\/link|pages\/[^/]+\/link)$/, 'always', 'Anyone with the link can open it.'],
   ['W', /^\/api\/(tasks|apps\/[^/]+\/(runs|batches)|apps\/runs\/[^/]+\/ask|apps\/[^/]+\/run|automations\/(test-run|runs\/[^/]+\/rerun)|opinion\/[^/]+|arena\/[^/]+\/winner)(\/|$)/, 'always', 'This starts agent work that may cost.'],
+  ['POST', /^\/api\/experiments\/(jobs|sweeps|runs\/[^/]+\/again)$/, 'always', 'This starts jobs on this computer (its GPUs), another machine or a cluster. Agents in sessions use experiment_run and experiment_sweep.'],
+  ['POST', /^\/api\/experiments\/(tables\/preview|clusters\/check)$/, 'free'],
   // Every other change: the user's OK, once or for the rest of the session.
   ['W', /./, 'confirm'],
   ['GET', /./, 'free'],
