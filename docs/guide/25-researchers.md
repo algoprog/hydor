@@ -1,6 +1,6 @@
 # Research: papers, writing and the lab
 
-Hydor helps with the work around research: keeping up with your field, reading and organising papers, checking a paper before it goes out, answering reviews and presenting your work, and running your lab's experiments and reports. Most of it comes as ready-made apps, under **Research**, **Writing**, **Lab** and **Work** on the [Apps](/apps) page, which agents also run for you in any session when you ask in your own words. The checks for a paper sit in the [LaTeX editor](/guide/library), and the jobs you train and evaluate have a place of their own, [System → Experiments](/guide/experiments). Reviewing someone else's submission? Start a [confidential session](/guide/sessions#keep-a-session-confidential): only models on this computer, and nothing leaves it.
+Hydor helps with the work around research: keeping up with your field, reading and organising papers, checking a paper before it goes out, answering reviews and presenting your work, and your lab's experiments and reports. Most of it comes as ready-made apps under **Research**, **Writing**, **Lab** and **Work** on the [Apps](/apps) page, which agents also run for you when you ask; the checks for a paper are in the [LaTeX editor](/guide/library), and your training runs in [System → Experiments](/guide/experiments). Reviewing someone else's submission? Use a [confidential session](/guide/sessions#keep-a-session-confidential).
 
 ![The apps for research on the Apps page](images/researchers.webp)
 
