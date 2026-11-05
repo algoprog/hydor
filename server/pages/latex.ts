@@ -27,6 +27,8 @@ import {
   cleanEngine,
   cleanTexName,
   engineLabel,
+  newChangeId,
+  texChangeOps,
   extOf,
   guessEngine,
   normalizeTex,
@@ -42,11 +44,13 @@ import {
   type TexEngine,
   type TexIssue,
   type TexPicture,
+  type TexChange,
   type TexComment,
   type TexSetup,
 } from '../../shared/latex.ts';
 import { newCommentId } from '../../shared/comments.ts';
 import { TEX_ASKED } from '../../shared/latex-catalog.ts';
+import { diffWords } from '../../shared/latex-diff.ts';
 import { texCount, totalWords } from '../../shared/latex-count.ts';
 import { TEMPLATE_NEEDS, TEX_TEMPLATES, texFromTemplate, texTemplate } from '../../shared/latex-templates.ts';
 import { HttpError } from '../auth.ts';
@@ -285,6 +289,23 @@ export async function agentTex(db: DB, input: unknown, cwd: string, prev?: TexDo
   // Comments: the version's own, answered, resolved or added to.
   const comments = texCommentOps(prev?.comments ?? [], v.comments, (file) => (file === TEX_MAIN ? main : (files.get(file) ?? null)), notes);
 
+  // Track changes: as the agent sets it, else as the document had it. While it is on, what the agent changed in the
+  // document's files is marked as its own changes, word by word, beside those waiting already (a new file is simply
+  // there); those waiting are found again on their words.
+  const track = typeof v.track === 'boolean' ? v.track : !!prev?.track;
+  const changes: unknown[] = [...(prev?.changes ?? [])];
+  if (track && prev && main !== null) {
+    const now = Date.now();
+    const pairs: [string, string | undefined, string][] = [[TEX_MAIN, prev.main, main], ...[...files].map(([name, text]): [string, string | undefined, string] => [name, prev.files.find((f) => f.name === name)?.text, text])];
+    for (const [file, was, is] of pairs) {
+      if (was === undefined || was === is) continue;
+      for (const h of diffWords(was, is)) {
+        if (h.del) changes.push({ id: newChangeId(), kind: 'del', file, from: h.at, to: h.at, text: h.del, by: 'agent', at: now });
+        if (h.ins) changes.push({ id: newChangeId(), kind: 'ins', file, from: h.at, to: h.at + h.ins.length, text: h.ins, by: 'agent', at: now });
+      }
+    }
+  }
+
   let doc: TexDoc;
   try {
     if (main === null) throw new Error('A LaTeX document needs its main file: source, the whole text of main.tex (\\documentclass{…} … \\end{document}).');
@@ -294,10 +315,14 @@ export async function agentTex(db: DB, input: unknown, cwd: string, prev?: TexDo
       files: [...files].map(([name, text]) => ({ name, text })),
       pictures: [...pictures].map(([name, src]) => ({ name, src })),
       comments,
+      track,
+      changes,
     });
   } catch (e) {
     throw new Error(`${(e as Error).message} See save_latex's description for the document's shape.`);
   }
+  // Tracked changes accepted or rejected (after what the agent sent: its text has them as accepted).
+  if (v.changes != null) doc = texChangeOps(doc, v.changes, notes);
   const text = texText(doc);
   if (Buffer.byteLength(text) > MAX_TEX) throw new Error(`The document is over ${Math.round(MAX_TEX / 1024 / 1024)} MB without its pictures; make it smaller.`);
   return { doc, text, notes };
@@ -1789,6 +1814,18 @@ export function texCommentsForAgent(d: TexDoc, how: string, name: (file: string)
   return out.join('\n');
 }
 
+/** A document's tracked changes for an agent: whether Track changes is on, each change waiting (what, where, who), and how to decide them. */
+export function texChangesForAgent(d: TexDoc): string {
+  const cs = d.changes ?? [];
+  const lineOf = (c: TexChange) => (texFileTextOf(d, c.file) ?? '').slice(0, c.from).split('\n').length;
+  const out = [
+    `Track changes: ${d.track ? 'on (what the user types and deletes is marked, and so is what you change when you save)' : 'off'}. ${cs.length ? `${cs.length} tracked change${cs.length === 1 ? '' : 's'} to accept or reject` : 'No tracked changes waiting'}; the files below read as if all were accepted. Decide them with save_latex’s changes: [{"id", "accept": true}] or [{"id", "reject": true}] (rejecting words put in takes them out, rejecting words taken out puts them back), or "accept all" / "reject all"; track: true or false switches it.`,
+  ];
+  for (const c of cs.slice(0, 80)) out.push(`- ${c.id}: ${c.kind === 'ins' ? 'put in' : 'taken out'} by ${c.by === 'agent' ? 'an agent' : 'the user'} in ${c.file}:${lineOf(c)}: “${c.text.slice(0, 200)}${c.text.length > 200 ? '…' : ''}”`);
+  if (cs.length > 80) out.push(`- … and ${cs.length - 80} more`);
+  return out.join('\n');
+}
+
 /** What get_page tells an agent of a LaTeX document: its outline, its files, and how it last typeset. */
 export function texForAgent(text: string): string {
   const d = readTex(text);
@@ -1800,6 +1837,7 @@ export function texForAgent(text: string): string {
   const outline = texOutline(d);
   const top = Math.min(...outline.map((h) => h.level));
   if (outline.length) out.push(`\nOutline:\n${outline.slice(0, 200).map((h) => `${'  '.repeat(h.level - top)}- ${h.title} (${h.file}:${h.line})`).join('\n')}`);
+  if (d.track || d.changes?.length) out.push(`\n${texChangesForAgent(d)}`);
   if (d.comments?.length) out.push(`\n${texCommentsForAgent(d, 'save_latex’s comments')}`);
   const c = texCount(d);
   const n1 = (x: number, one: string, many = `${one}s`) => `${x.toLocaleString('en')} ${x === 1 ? one : many}`;
@@ -1834,6 +1872,7 @@ export function texForAgent(text: string): string {
 const LATEX_HELP = [
   'Make or change a LaTeX document, kept in the user’s Library: a paper, a thesis, a CV, a letter, a report, math-heavy notes, a beamer talk, anything the user wants typeset with LaTeX. It shows in the conversation and in the Library as its typeset pages; there the user edits the source beside its PDF (typeset again as they type) and downloads the PDF, main.tex or the whole project as a .zip. Use it rather than writing .tex files when the user asks for LaTeX, unless they want the files in a folder of theirs.',
   'source: the whole of main.tex, from \\documentclass to \\end{document}. files: the other files it reads, by the names it gives them ({"refs.bib": "…", "chapters/intro.tex": "…"}, or [{name, text}], or {name, path} for a file of this session); names are letters, digits, - _ . and / between folders. Or folder: a LaTeX project folder of this session, taken in whole.',
+  'Track changes (track: true or false): while it is on, what the user types and deletes is marked, and what you change when you save is marked as yours, word by word, for the user to accept or reject; get_page lists the changes waiting (the files read as if all were accepted), and changes: [{"id", "accept": true}] or [{"id", "reject": true}], or "accept all" / "reject all", decides them.',
   'comments: the user’s comments on words of the document (get_page lists them, with their ids): answer with [{"id": "…", "reply": "…"}], resolve with {"id", "resolve": true} once you did what it asks, or add your own with {"file": "main.tex", "quote": the exact words it is on, "text": "…"}; what you leave out stays as it is. A LaTeX file of this computer (opened from Files) has comments too, which the app keeps beside it: get_page with its path lists them, and save_latex with path (instead of id and title) and comments answers them; change the file itself with your own tools.',
   'Or, for a new document, template: article, report, book (a book or thesis: chapters, theorems, a bibliography), letter, beamer (slides), cv (moderncv), homework (problems and solutions), paper (two columns, as for a conference), ieee (IEEEtran, as IEEE conferences ask), acm (acmart, sigconf), lncs (Springer’s llncs) or poster (tikzposter): a whole project that typesets, with the title in it, to change with source and files in the same call or in later saves (get_page shows it). ieee, acm and lncs need TeX Live’s publishers’ classes (texlive-publishers): if this computer lacks one, the save says what to install.',
   'pictures: what \\includegraphics shows, each by the name it uses: [{"name": "figures/plot.png", "src": "plots/plot.png"}] with src a PNG or JPEG file of this session, a public https address, or a picture of the document already (naget-asset:…); a path alone is its own name. A PDF picture becomes a PNG of it.',
@@ -1867,6 +1906,11 @@ export const SAVE_LATEX_SCHEMA = {
       description: 'Answer, resolve or add comments: [{"id", "reply"?, "resolve"?: true}] for one get_page lists, or [{"file"?, "quote": the words it is on, "text"}] for a new one.',
     },
     path: { type: 'string', description: 'Instead of id and title: a .tex file of this computer, whose comments (kept by the app) change; the file itself is not written.' },
+    track: { type: 'boolean', description: 'Track changes on or off: while on, the user’s edits and yours are marked, to accept or reject.' },
+    changes: {
+      description: 'Accept or reject tracked changes (get_page lists them): [{"id", "accept": true}] or [{"id", "reject": true}], or "accept all" / "reject all".',
+      anyOf: [{ type: 'array', items: { type: 'object' } }, { type: 'string' }],
+    },
     template: {
       type: 'string',
       enum: TEX_TEMPLATES.map((t) => t.id),

@@ -4,7 +4,8 @@
 // .bib), the reference finder's reading of what was asked (and, with TEX_REFS_LIVE=1, real lookups on the web), the
 // quick checks before typesetting, comments on a document's words (kept, found again when the text moves, answered
 // by agents) and on a file's of this computer (kept by the app by its path, merged with an agent's answers, moved
-// along with the file), and what get_page tells an agent. Through the routes, with a stand-in for the session
+// along with the file), tracked changes (kept, found again, accepted and rejected; an agent's saves marked while it is
+// on), and what get_page tells an agent. Through the routes, with a stand-in for the session
 // manager. Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/tex-editor-test.ts
 //   DATA_DIR=/tmp/hydor-test-tex-editor node dist/dev/tex-editor-test.js
@@ -20,7 +21,8 @@ import { texCheck } from '../../shared/latex-check.ts';
 import { texCount, texCountText, totalWords } from '../../shared/latex-count.ts';
 import { blankTable, cellTex, cellText, tableAt, tableTex } from '../../shared/latex-table.ts';
 import { TEMPLATE_NEEDS, TEX_TEMPLATES, texFromTemplate, texTemplate } from '../../shared/latex-templates.ts';
-import { mergeTexComments, newTex, normalizeTex, parseTexText, texText } from '../../shared/latex.ts';
+import { diffWords } from '../../shared/latex-diff.ts';
+import { editText, mergeTexComments, newTex, normalizeTex, parseTexText, texChangeOps, texText, type TexChange } from '../../shared/latex.ts';
 import { fileComments, moveFileComments } from './filecomments.ts';
 import { refQuery } from './latex-refs.ts';
 import { pages } from './index.ts';
@@ -496,6 +498,73 @@ code words not counted
   moveFileComments(db, path.join(moved, 'results.tex'), path.join(moved, 'findings.tex'));
   ok(fileComments(db, path.join(moved, 'findings.tex'))[0]?.id === 'fc2', 'and a file renamed, its own');
   ok(String(tools.get_page.description).includes('path') && String(tools.save_latex.description).includes('save_latex with path'), 'agents are told how to read and answer a file’s comments');
+}
+
+// ---- tracked changes ----------------------------------------------------------------------------------------------------
+{
+  const main = doc('Heat flows from hot to cold.\nThe rod is long.\n%%%% naget-changes\nEnd.');
+  const at = (w: string) => main.indexOf(w);
+  const d = normalizeTex({
+    main,
+    track: true,
+    changes: [
+      { id: 't1', kind: 'ins', file: 'main.tex', from: at('hot'), to: at('hot') + 3, text: 'hot', by: 'user', at: 5 },
+      { id: 't2', kind: 'del', file: 'main.tex', from: at(' long'), to: at(' long'), text: ' very', by: 'agent', at: 6 },
+      { id: 't3', kind: 'ins', file: 'gone.tex', from: 0, to: 1, text: 'x' },
+      { id: 't4', kind: 'nonsense', file: 'main.tex', from: 0, to: 1 },
+      { kind: 'del', file: 'main.tex', from: 3, to: 3, text: '' },
+    ],
+  });
+  ok(d.track === true && d.changes?.length === 2 && d.changes[0].id === 't1' && d.changes[1].before?.endsWith('The rod is'), 'tracked changes are kept, checked: on a file the document has, with something in them, the place before words taken out');
+  const kept = texText(d);
+  ok(JSON.stringify(normalizeTex(parseTexText(kept))) === JSON.stringify(d), 'they keep as text with the switch, and read back');
+  ok(kept.includes('\n!%%%% naget-changes\n') && parseTexText(kept).main === main, 'a line of a file that reads like their marker is kept as itself');
+  const shifted = normalizeTex({ ...d, main: main.replace('Heat flows', 'Heat always flows') });
+  ok(shifted.main.slice(shifted.changes![0].from, shifted.changes![0].to) === 'hot' && shifted.main.slice(shifted.changes![1].from - 10, shifted.changes![1].from) === 'The rod is', 'text changed elsewhere: each is found again on its words');
+  ok(normalizeTex({ ...d, main: main.replace('hot', 'warm') }).changes?.every((c) => c.id !== 't1'), 'words put in that are gone are no change any more');
+  // Accept and reject.
+  const acc = texChangeOps(d, [{ id: 't1', accept: true }]);
+  ok(acc.main === d.main && acc.changes?.length === 1 && acc.changes[0].id === 't2', 'accepting keeps the text and forgets the change');
+  const rejIns = texChangeOps(d, [{ id: 't1', reject: true }]);
+  ok(rejIns.main.includes('from  to cold') && rejIns.changes?.[0].id === 't2' && rejIns.main.slice(rejIns.changes[0].from - 10, rejIns.changes[0].from) === 'The rod is', 'rejecting words put in takes them out; the others stay on their words');
+  const rejDel = texChangeOps(d, [{ id: 't2', reject: true }]);
+  ok(rejDel.main.includes('The rod is very long.') && rejDel.changes?.[0].id === 't1' && rejDel.main.slice(rejDel.changes[0].from, rejDel.changes[0].to) === 'hot', 'rejecting words taken out puts them back');
+  ok(!texChangeOps(d, 'accept all').changes && texChangeOps(d, 'accept all').main === d.main, 'accept all');
+  const all = texChangeOps(d, { all: 'reject' });
+  ok(!all.changes && all.main.includes('from  to cold') && all.main.includes('is very long'), 'reject all');
+  const notes: string[] = [];
+  texChangeOps(d, [{ id: 'nope', accept: true }], notes);
+  ok(/no tracked change nope/.test(notes.join()), 'a change that is not there is said');
+  const e = editText('abcdef', [
+    { from: 1, to: 3, insert: '' },
+    { from: 4, to: 4, insert: 'XY' },
+  ]);
+  ok(e.text === 'adXYef' && e.map(5, 1) === 5 && e.map(4, -1) === 2 && e.map(4, 1) === 4 && e.map(2, 1) === 1, 'edits at once, and where places go');
+
+  // Agents: the switch, their saves marked word by word, deciding the changes.
+  const made = await run('save_latex', { title: 'Tracked', source: doc('We study how heat flows along a thin rod.\nIt is copper.') });
+  const id = idOf(made.text);
+  await run('save_latex', { id, track: true });
+  const on = (await req('GET', `/api/pages/${id}`)).json().model;
+  ok(on.track === true && !on.changes, 'an agent switches Track changes on');
+  await run('save_latex', { id, source: on.main.replace('a thin rod', 'a long rod').replace('It is copper.', 'It is made of copper.') });
+  const v3 = (await req('GET', `/api/pages/${id}`)).json().model;
+  const kinds = (v3.changes ?? []).map((c: TexChange) => `${c.kind}:${c.text.trim()}:${c.by}`);
+  ok(kinds.includes('del:thin:agent') && kinds.includes('ins:long:agent') && kinds.includes('ins:made of:agent') && v3.main.includes('a long rod'), `while it is on, an agent's save is marked as its changes, word by word (${kinds.join(', ')})`);
+  const told = (await run('get_page', { id })).text ?? '';
+  ok(/Track changes: on/.test(told) && /3 tracked changes/.test(told) && /taken out by an agent in main\.tex:3: “thin”/.test(told), 'get_page lists them, where they are and who made them');
+  const thin = v3.changes.find((c: TexChange) => c.text === 'thin');
+  const long = v3.changes.find((c: TexChange) => c.text === 'long');
+  await run('save_latex', { id, changes: [{ id: thin.id, reject: true }, { id: long.id, reject: true }] });
+  const v4 = (await req('GET', `/api/pages/${id}`)).json().model;
+  ok(v4.main.includes('a thin rod') && v4.changes?.length === 1 && v4.changes[0].text.trim() === 'made of', 'an agent rejects changes: the text comes back');
+  await run('save_latex', { id, changes: 'accept all', track: false });
+  const v5 = (await req('GET', `/api/pages/${id}`)).json().model;
+  ok(!v5.changes && !v5.track && v5.main.includes('made of copper'), 'and accepts the rest, and switches it off');
+  await run('save_latex', { id, source: v5.main.replace('copper', 'steel') });
+  ok(!(await req('GET', `/api/pages/${id}`)).json().model.changes, 'with it off, an agent’s save is not marked');
+  ok(JSON.stringify(tools.save_latex.inputSchema).includes('"track"') && String(tools.save_latex.description).includes('Track changes'), 'save_latex tells agents of Track changes');
+  ok(diffWords('the red car', 'the blue truck')[0]?.del === 'red car' && diffWords('Intro', 'Introduction')[0]?.ins === 'Introduction', 'changes are whole words');
 }
 
 // ---- what an agent is told ---------------------------------------------------------------------------------------------

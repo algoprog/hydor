@@ -1,8 +1,9 @@
 // The LaTeX editor's comments, beside the source (in a sheet on a phone): those on the file in view, in the order
 // their words come, each with its replies, Reply, Resolve and its menu (Edit, Delete); a new one written at the top,
-// on the words picked; the other files' comments a click away, and the resolved ones under a switch. Agents read the
-// comments with get_page and answer or resolve them when they save the document.
-import { useState } from 'react';
+// on the words picked; the other files' comments a click away, and the resolved ones under a switch. The tracked
+// changes to review come above them (`review`). Agents read the comments with get_page and answer or resolve them
+// when they save the document.
+import { useState, type ReactNode } from 'react';
 import { MessageSquarePlus } from 'lucide-react';
 import type { TexComment } from '@shared/latex';
 import { cx, IconButton } from '../../../components/ui';
@@ -31,6 +32,7 @@ export function CommentsPanel({
   onEdit,
   onDelete,
   onOpenFile,
+  review,
   className,
 }: {
   comments: TexComment[];
@@ -52,6 +54,8 @@ export function CommentsPanel({
   onEdit: (id: string, text: string) => void;
   onDelete: (id: string) => void;
   onOpenFile: (name: string) => void;
+  /** The tracked changes, above the comments. */
+  review?: ReactNode;
   className?: string;
 }) {
   const [resolved, setResolved] = useState(false);
@@ -84,6 +88,7 @@ export function CommentsPanel({
         )}
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-2">
+        {review}
         {draft && draft.file === file && (
           <div className="rounded-xl border border-accent/60 bg-elevated p-2.5">
             {draft.quote && (

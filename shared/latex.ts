@@ -7,8 +7,9 @@
 // files as an object of name → text), and returns the model with every name and size checked: the files are written
 // into a folder for TeX to read, so a name is a plain path inside it (no "..", no absolute path, no hidden file, a
 // known extension). texText keeps a model as text that is the source itself, line by line, each other file after a
-// marker line, so two versions diff as the source does; its comments (on words of a file, with replies) come last,
-// one to a line.
+// marker line, so two versions diff as the source does; its tracked changes (Track changes: words put in and taken
+// out, by whom and when) and its comments (on words of a file, with replies) come last, one to a line. The text is
+// always as if every tracked change were accepted; rejecting one puts the text back (texChangeOps).
 
 import { cleanComment, COMMENT_LIMITS, newCommentId, type Comment } from './comments.ts';
 
@@ -45,7 +46,32 @@ export interface TexDoc {
   pictures: TexPicture[];
   /** Comments on words of its files (none: left out). */
   comments?: TexComment[];
+  /** Track changes is on: what is typed and deleted is marked, to accept or reject (off: left out). */
+  track?: boolean;
+  /** The tracked changes not accepted or rejected yet (none: left out). */
+  changes?: TexChange[];
 }
+
+/**
+ * A tracked change: words put in, which are in the text at [from, to) of their file (`text`: those words, to find them
+ * again when the text changed elsewhere), or words taken out, which are no longer in the text (`text`: what they were,
+ * at `from`, where `to` is too; `before`: the few characters before them, to find the place again). Who made it, when.
+ */
+export interface TexChange {
+  id: string;
+  kind: 'ins' | 'del';
+  file: string;
+  from: number;
+  to: number;
+  text: string;
+  before?: string;
+  by: 'user' | 'agent';
+  at: number;
+}
+
+export const TEX_CHANGE_LIMITS = { changes: 2000, text: 200_000, before: 40 };
+
+export const newChangeId = () => `t${Math.random().toString(36).slice(2, 10).padEnd(8, '0')}`;
 
 /** A comment on words of one of the document's files: where they are ([from, to) in its text), and what they were (quote). */
 export interface TexComment extends Comment {
@@ -318,7 +344,135 @@ export function normalizeTex(input: unknown, o: TexNormalizeOpts = {}): TexDoc {
   const doc: TexDoc = { v: 1, engine, main, files, pictures };
   const comments = cleanTexComments(v.comments, doc);
   if (comments.length) doc.comments = comments;
+  if (v.track === true) doc.track = true;
+  const changes = cleanTexChanges(v.changes, doc);
+  if (changes.length) doc.changes = changes;
   return doc;
+}
+
+/** The nearest place `s` is in `text` to `near`, or -1. */
+function nearest(text: string, s: string, near: number): number {
+  let best = -1;
+  for (let at = text.indexOf(s); at >= 0 && at < text.length; at = text.indexOf(s, at + 1)) if (best < 0 || Math.abs(at - near) < Math.abs(best - near)) best = at;
+  return best;
+}
+
+/**
+ * Tracked changes checked as a document keeps them: each on a file it has, inside its text, words put in still there
+ * (found again by their words when the text changed elsewhere, else gone: nothing is left to accept or reject), words
+ * taken out at their place (found again by the characters before them). In the order they come in the files.
+ */
+export function cleanTexChanges(v: unknown, d: TexDoc): TexChange[] {
+  if (!Array.isArray(v)) return [];
+  const out: TexChange[] = [];
+  const seen = new Set<string>();
+  for (const raw of v) {
+    if (out.length >= TEX_CHANGE_LIMITS.changes || !isObj(raw)) continue;
+    const kind = raw.kind === 'ins' || raw.kind === 'del' ? raw.kind : null;
+    const file = typeof raw.file === 'string' ? raw.file : TEX_MAIN;
+    const text = texFileText(d, file);
+    if (!kind || text === null) continue;
+    const id = typeof raw.id === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(raw.id) && !seen.has(raw.id) ? raw.id : newChangeId();
+    seen.add(id);
+    const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? Math.max(0, Math.min(text.length, Math.round(x))) : 0);
+    const by = raw.by === 'agent' ? 'agent' : 'user';
+    const at = typeof raw.at === 'number' && Number.isFinite(raw.at) && raw.at > 0 && raw.at < 1e14 ? Math.round(raw.at) : Date.now();
+    const words = cleanText(raw.text).slice(0, TEX_CHANGE_LIMITS.text);
+    let from = num(raw.from);
+    if (kind === 'ins') {
+      let to = Math.max(from, num(raw.to));
+      if (words && text.slice(from, to) !== words) {
+        const found = nearest(text, words, from);
+        if (found < 0) continue;
+        from = found;
+        to = found + words.length;
+      }
+      if (to > from) out.push({ id, kind, file, from, to, text: text.slice(from, to), by, at });
+    } else {
+      if (!words) continue;
+      const before = typeof raw.before === 'string' ? cleanText(raw.before).slice(-TEX_CHANGE_LIMITS.before) : '';
+      // The characters before it, fewer and fewer of them, the nearest place they are (text changed just before it too).
+      if (before && text.slice(Math.max(0, from - before.length), from) !== before)
+        for (const n of [before.length, 20, 10]) {
+          const s = before.slice(-n);
+          if (s.length < Math.min(n, before.length)) continue;
+          const found = nearest(text, s, from - s.length);
+          if (found >= 0) {
+            from = found + s.length;
+            break;
+          }
+        }
+      out.push({ id, kind, file, from, to: from, text: words, before: text.slice(Math.max(0, from - TEX_CHANGE_LIMITS.before), from) || undefined, by, at });
+    }
+  }
+  const order = [TEX_MAIN, ...d.files.map((f) => f.name)];
+  return out.sort((a, b) => order.indexOf(a.file) - order.indexOf(b.file) || a.from - b.from || (a.kind === b.kind ? 0 : a.kind === 'del' ? -1 : 1));
+}
+
+/** Edits of a text at once (each [from, to) of the text as it was, given `insert`), and where a place of it goes. */
+export function editText(text: string, edits: { from: number; to: number; insert: string }[]): { text: string; map: (pos: number, assoc: -1 | 1) => number } {
+  const es = [...edits].sort((a, b) => a.from - b.from || a.to - b.to);
+  let out = '';
+  let last = 0;
+  for (const e of es) {
+    out += text.slice(last, Math.max(last, e.from)) + e.insert;
+    last = Math.max(last, e.to);
+  }
+  out += text.slice(last);
+  const map = (pos: number, assoc: -1 | 1) => {
+    let delta = 0;
+    for (const e of es) {
+      if (e.to < pos || (e.to === pos && (e.from < pos || assoc > 0))) delta += e.insert.length - (e.to - e.from);
+      else if (e.from < pos && pos < e.to) return e.from + delta + (assoc > 0 ? e.insert.length : 0);
+      else break;
+    }
+    return pos + delta;
+  };
+  return { text: out, map };
+}
+
+/**
+ * Tracked changes accepted or rejected: [{id, accept: true}] or [{id, reject: true}], or "accept all" / "reject all"
+ * (also as {all: "accept"}). Accepting one keeps the text as it is and forgets the change; rejecting words put in takes
+ * them out, rejecting words taken out puts them back. The others stay on their words. What could not be done is said
+ * in `notes`.
+ */
+export function texChangeOps(d: TexDoc, ops: unknown, notes: string[] = []): TexDoc {
+  const list = d.changes ?? [];
+  if (!list.length || ops == null) return d;
+  const all = (x: unknown) => (typeof x === 'string' ? x.trim().toLowerCase() : isObj(x) && typeof x.all === 'string' ? x.all.trim().toLowerCase() : '');
+  const accept = new Set<string>();
+  const reject = new Set<string>();
+  for (const op of Array.isArray(ops) ? ops : [ops]) {
+    const a = all(op).replace(/\s*all$/, '');
+    if (a === 'accept' || a === 'reject') for (const c of list) (a === 'accept' ? accept : reject).add(c.id);
+    else if (isObj(op) && typeof op.id === 'string') {
+      if (!list.some((c) => c.id === op.id)) notes.push(`There is no tracked change ${op.id}: get_page lists them.`);
+      else if (op.reject === true) reject.add(op.id);
+      else if (op.accept === true) accept.add(op.id);
+    }
+  }
+  if (!accept.size && !reject.size) return d;
+  const left = list.filter((c) => !accept.has(c.id) && !reject.has(c.id));
+  const next: TexDoc = { ...d, files: d.files.slice() };
+  const changes: TexChange[] = [];
+  for (const name of [TEX_MAIN, ...d.files.map((f) => f.name)]) {
+    const text = texFileText(d, name) ?? '';
+    const edits = list.filter((c) => c.file === name && reject.has(c.id)).map((c) => (c.kind === 'ins' ? { from: c.from, to: c.to, insert: '' } : { from: c.from, to: c.from, insert: c.text }));
+    const e = editText(text, edits);
+    if (edits.length) {
+      if (name === TEX_MAIN) next.main = e.text;
+      else next.files = next.files.map((f) => (f.name === name ? { ...f, text: e.text } : f));
+    }
+    for (const c of left.filter((x) => x.file === name)) {
+      const from = e.map(c.from, c.kind === 'ins' ? 1 : -1);
+      changes.push(c.kind === 'ins' ? { ...c, from, to: Math.max(from, e.map(c.to, -1)) } : { ...c, from, to: from });
+    }
+  }
+  const kept = cleanTexChanges(changes, next);
+  if (kept.length) next.changes = kept;
+  else delete next.changes;
+  return next;
 }
 
 /**
@@ -386,12 +540,14 @@ export function mergeTexComments(base: TexComment[], mine: TexComment[], theirs:
 
 const HEAD = '%% naget-latex ';
 const MARK = '%%%% file: ';
-/** After the files: the comments, one JSON a line. */
+/** After the files: the tracked changes, one JSON a line. */
+const CHANGES = '%%%% naget-changes';
+/** After them: the comments, one JSON a line. */
 const COMMENTS = '%%%% naget-comments';
 /** A line of a file that would read as a marker gets a "!" in front (and one that has some already, one more). */
-const MARKISH = /^!*%%%% (file: |naget-comments$)/;
+const MARKISH = /^!*%%%% (file: |naget-comments$|naget-changes$)/;
 const escLine = (l: string) => (MARKISH.test(l) ? `!${l}` : l);
-const unescLine = (l: string) => (/^!+%%%% (file: |naget-comments$)/.test(l) ? l.slice(1) : l);
+const unescLine = (l: string) => (/^!+%%%% (file: |naget-comments$|naget-changes$)/.test(l) ? l.slice(1) : l);
 
 /** Whether stored page text is a LaTeX document's. */
 export const isTexText = (s: string) => s.startsWith(HEAD);
@@ -401,11 +557,15 @@ export const isTexText = (s: string) => s.startsWith(HEAD);
  * other file after a line "%%%% file: <name>". parseTexText reads it back exactly.
  */
 export function texText(d: TexDoc): string {
-  const out = [HEAD + JSON.stringify({ v: 1, engine: d.engine, pictures: d.pictures })];
+  const out = [HEAD + JSON.stringify({ v: 1, engine: d.engine, pictures: d.pictures, ...(d.track ? { track: true } : {}) })];
   for (const l of d.main.split('\n')) out.push(escLine(l));
   for (const f of d.files) {
     out.push(MARK + f.name);
     for (const l of f.text.split('\n')) out.push(escLine(l));
+  }
+  if (d.changes?.length) {
+    out.push(CHANGES);
+    for (const c of d.changes) out.push(JSON.stringify(c));
   }
   if (d.comments?.length) {
     out.push(COMMENTS);
@@ -418,7 +578,7 @@ export function texText(d: TexDoc): string {
 export function parseTexText(s: string): TexDoc {
   const all = s.split('\n');
   if (!all[0].startsWith(HEAD)) throw new Error('This is not a LaTeX document’s text');
-  const meta = JSON.parse(all[0].slice(HEAD.length)) as { engine?: unknown; pictures?: unknown };
+  const meta = JSON.parse(all[0].slice(HEAD.length)) as { engine?: unknown; pictures?: unknown; track?: unknown };
   let main = '';
   const files: TexFile[] = [];
   let name: string | null = null;
@@ -429,8 +589,23 @@ export function parseTexText(s: string): TexDoc {
     else files.push({ name, text });
   };
   const comments: unknown[] = [];
+  const changes: unknown[] = [];
+  // Whether the last file is in already (the files end where the tracked changes start).
+  let flushed = false;
   for (let i = 1; i < all.length; i++) {
     const l = all[i];
+    if (l === CHANGES) {
+      // The tracked changes, one to a line, to the comments (or the end).
+      flush();
+      flushed = true;
+      for (i++; i < all.length && all[i] !== COMMENTS; i++) {
+        try {
+          changes.push(JSON.parse(all[i]));
+        } catch {}
+      }
+      i--;
+      continue;
+    }
     if (l === COMMENTS) {
       // The comments, one to a line, to the end.
       for (const c of all.slice(i + 1)) {
@@ -446,10 +621,12 @@ export function parseTexText(s: string): TexDoc {
       cur = [];
     } else cur.push(unescLine(l));
   }
-  flush();
+  if (!flushed) flush();
   const pictures = Array.isArray(meta.pictures) ? (meta.pictures as TexPicture[]).filter((p) => isObj(p) && typeof p.name === 'string' && typeof p.src === 'string') : [];
   const d: TexDoc = { v: 1, engine: cleanEngine(meta.engine) ?? 'pdflatex', main, files, pictures };
   if (comments.length) d.comments = comments as TexComment[];
+  if (meta.track === true) d.track = true;
+  if (changes.length) d.changes = changes as TexChange[];
   return d;
 }
 

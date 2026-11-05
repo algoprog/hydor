@@ -23,6 +23,7 @@ import { texFolding } from './fold';
 import { mathPreview } from './mathpreview';
 import { braced, inMathAt } from './scan';
 import { spellCheck } from './spell';
+import { acceptTracked, loaded, loadTracked, pickTracked, rejectTracked, trackChanges, trackedNow, trackField, type Tracked } from './track';
 import { visualMode } from './visual';
 
 /** What the document offers to complete with. */
@@ -54,6 +55,8 @@ export interface CodeHooks {
   onCommentsMoved: (list: CommentRange[]) => void;
   /** Ctrl+Alt+M: a comment on the words picked. */
   onComment: () => void;
+  /** The tracked changes moved or changed (an edit recorded, one accepted or rejected, Undo): the file's, as they are now. */
+  onTracked: (list: Tracked[]) => void;
 }
 
 /** Where a comment's words are in the file; `active`: the one picked. */
@@ -116,6 +119,15 @@ export interface Code {
   replaceQuiet: (from: number, to: number, text: string) => void;
   setVisual: (on: boolean) => void;
   setSpell: (on: boolean) => void;
+  /** Track changes on or off: while on, what is typed and deleted is marked. */
+  setTrack: (on: boolean) => void;
+  /** The file's tracked changes, as the document has them (when its editor starts). */
+  setTracked: (list: Tracked[]) => void;
+  /** Accepts or rejects tracked changes of the file, as one step Undo takes back. */
+  acceptChanges: (ids: string[]) => void;
+  rejectChanges: (ids: string[]) => void;
+  /** A tracked change picked (marked apart, and scrolled to); null: none. */
+  pickChange: (id: string | null) => void;
   foldAll: () => void;
   unfoldAll: () => void;
   goto: (line: number) => void;
@@ -245,6 +257,7 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
   const tex = isTex(o.name);
   const visualC = new Compartment();
   const spellC = new Compartment();
+  const track = trackChanges();
   const visualExt = () => visualMode({ macros: hooks.macros, picture: hooks.picture });
 
   const picked = () => {
@@ -429,6 +442,7 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     foundField,
     commentField,
     commentTheme,
+    track.extension,
     tex ? [texFolding, mathPreview(hooks.macros)] : [],
     visualC.of(o.visual && tex ? visualExt() : []),
     spellC.of(o.spell ? spellCheck : []),
@@ -437,6 +451,9 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
         const list = u.state.field(commentField).list;
         if (list.length) hooks.onCommentsMoved(list);
       }
+      // (The state before the extension was added has no changes at all.)
+      const was = u.startState.field(trackField, false);
+      if (was !== undefined && was !== u.state.field(trackField) && !u.transactions.some((t) => t.annotation(loaded))) hooks.onTracked(trackedNow(u.state));
       if (u.docChanged && tex) {
         clearTimeout(checkTimer);
         checkTimer = setTimeout(showIssues, 700);
@@ -543,6 +560,17 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     },
     setVisual: (on) => view.dispatch({ effects: visualC.reconfigure(on && tex ? visualExt() : []) }),
     setSpell: (on) => view.dispatch({ effects: spellC.reconfigure(on ? spellCheck : []) }),
+    setTrack: (on) => track.on(view, on),
+    setTracked: (list) => loadTracked(view, list),
+    acceptChanges: (ids) => acceptTracked(view, ids),
+    rejectChanges: (ids) => {
+      if (!o.readOnly) rejectTracked(view, ids);
+    },
+    pickChange: (id) => {
+      pickTracked(view, id);
+      const c = id ? view.state.field(trackField).find((x) => x.id === id) : null;
+      if (c) view.dispatch({ selection: EditorSelection.range(c.from, c.to), effects: EditorView.scrollIntoView(c.from, { y: 'center' }) });
+    },
     foldAll: () => {
       foldAll(view);
       view.focus();
