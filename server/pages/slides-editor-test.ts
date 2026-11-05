@@ -690,7 +690,7 @@ const dot: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
   ok(got.includes('its number') && got.includes('"Q3"') && got.includes('group of 2') && got.includes('"paths"'), 'get_page tells of the footer, the groups and the icons’ lines');
   const help = String(tools.save_slides.description);
   ok(
-    ['icon {icon:', 'math {tex:', 'video {src:', 'group {els:', 'crop:', 'adjust:', 'merges:', 'morph', 'footer {num:', 'guides {x:', 'key'].every((w) => help.includes(w)),
+    ['icon {icon:', 'math {tex:', 'video {src:', 'group {els:', 'crop:', 'adjust:', 'merges:', 'morph', 'footer {num:', 'guides {x:', 'key', 'POST /api/pages/import'].every((w) => help.includes(w)),
     'save_slides tells agents of the new parts and settings',
   );
   const schema = tools.save_slides.inputSchema as { properties: Record<string, unknown> };
