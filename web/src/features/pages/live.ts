@@ -3,13 +3,15 @@
 // session's panel, the call itself; in the page's own editor, any session's save of it, heard of through page:<id>),
 // reads what has come so far at a steady pace (a few times a second, however fast the pieces come) and makes the
 // version being written over the one shown (shared/page-drafts.ts), for the editor to show until the saved version
-// takes its place, or (the call failed or stopped) the version shown is back.
-import { useEffect, useMemo, useRef, useState } from 'react';
+// takes its place, or (the call failed or stopped) the version shown is back. Also how an editor keeps where the words
+// arrive in view without taking the page from a reader who scrolled away.
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { PageDraft } from '@shared/pages';
 import { readPartial } from '@shared/partial-json';
 import { DraftMemo, DRAFT_TOOLS, type DraftKind, type DraftTool, type Drafted } from '@shared/page-drafts';
 import { draftDoc } from '@shared/draft-doc';
 import { draftDeck } from '@shared/draft-deck';
+import { draftBook } from '@shared/draft-book';
 import { normalizeDoc } from '@shared/docs';
 import { normalizeDeck } from '@shared/slides';
 import { newBook } from '@shared/sheets';
@@ -31,6 +33,7 @@ export const draftKind = (d: PageDraft | null | undefined): DraftKind | null => 
 const BUILD: Partial<Record<DraftKind, (base: any, p: ReturnType<typeof readPartial>, memo: DraftMemo) => Drafted<any> | null>> = {
   doc: draftDoc,
   slides: draftDeck,
+  sheet: draftBook,
 };
 
 /** An empty one of a kind: the editor of a new one being written starts from it. */
@@ -118,4 +121,42 @@ export function useLiveDraft<M>(kind: DraftKind | null | undefined, base: M | nu
   useEffect(() => () => window.clearTimeout(timer.current), []);
   // Another draft's drawing never shows for this one, even for a moment.
   return on && out?.id === draft?.id ? out.live : null;
+}
+
+// ---- keeping where the words arrive in view ------------------------------------------------------------------------
+
+/** How long the reader's own scrolling holds the page where they put it. */
+const HOLD_MS = 4000;
+
+/** The reader scrolled (wheel, touch, keys, the scroll bar) this recently: the page is theirs. */
+export function useOwnScroll(scroller: RefObject<HTMLElement | null>): () => boolean {
+  const at = useRef(0);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const mine = () => void (at.current = performance.now());
+    const key = (e: KeyboardEvent) => ['PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', ' '].includes(e.key) && mine();
+    // A press on the scroller itself (not on what it holds) is its scroll bar.
+    const down = (e: PointerEvent) => e.target === el && mine();
+    el.addEventListener('wheel', mine, { passive: true });
+    el.addEventListener('touchmove', mine, { passive: true });
+    el.addEventListener('keydown', key);
+    el.addEventListener('pointerdown', down);
+    return () => {
+      el.removeEventListener('wheel', mine);
+      el.removeEventListener('touchmove', mine);
+      el.removeEventListener('keydown', key);
+      el.removeEventListener('pointerdown', down);
+    };
+  }, [scroller]);
+  return () => performance.now() - at.current < HOLD_MS;
+}
+
+/** Scrolls `sc` (at once) so a box of the page (in the window's coordinates) is well in view, unless it is already. */
+export function keepInView(sc: HTMLElement, top: number, bottom: number) {
+  const box = sc.getBoundingClientRect();
+  const margin = Math.min(96, box.height / 5);
+  if (top >= box.top + margin && bottom <= box.bottom - margin) return;
+  // Into the lower middle: what was just written above it, room for what comes below.
+  sc.scrollTop += top - (box.top + box.height * 0.55);
 }

@@ -70,6 +70,7 @@ import { CharPicker } from '../common/CharPicker';
 import { FindBar, useFind } from '../common/FindBar';
 import { isMod } from '../common/keys';
 import { MenuBar } from '../common/menus';
+import { useOwnScroll } from '../live';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
 import { Board } from './Board';
@@ -80,7 +81,7 @@ import { DupDialog, FormatDialog, SortDialog, SplitDialog, SummaryDialog, type C
 import { fillDownTo, fillSeries } from './fill';
 import { FilterMenu } from './FilterMenu';
 import { FormulaBar, formulaHelp } from './FormulaBar';
-import { fontPx, Grid, textWidth, type Edit, type GridHandle, type GridView, type RefBox, type Smart } from './Grid';
+import { fontPx, Grid, textWidth, type Edit, type GridGeo, type GridHandle, type GridView, type RefBox, type Smart } from './Grid';
 import { sheetMenus, type MenuCtx } from './menus';
 import {
   applyPatch,
@@ -220,7 +221,18 @@ type PanelState = { kind: 'cf' } | { kind: 'dv'; start?: Validation } | { kind: 
 type DialogState = 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | 'summary' | null;
 type PickState = { kind: 'list' | 'date' | 'note' | 'chars'; r: number; c: number; at: DOMRect } | null;
 
-export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef }: ModelEditorProps<Workbook>) {
+/** Where an agent's words are arriving: its cell, boxed in the app's busy colour with a small flag (as a collaborator's in Google Sheets). */
+function AgentCell({ geo, r, c }: { geo: GridGeo; r: number; c: number }) {
+  if (r + 1 >= geo.rowOff.length || c + 1 >= geo.colOff.length) return null;
+  const box = { left: geo.colOff[c] - 1, top: geo.rowOff[r] - 1, width: geo.colOff[c + 1] - geo.colOff[c] + 2, height: geo.rowOff[r + 1] - geo.rowOff[r] + 2 };
+  return (
+    <div aria-hidden className="pointer-events-none absolute z-[2] outline-2 outline-busy [outline-style:solid]" style={box}>
+      <span className="absolute bottom-full left-0 mb-px rounded-[3px] bg-busy px-1 text-[10px] leading-[14px] font-semibold whitespace-nowrap text-bg">Agent</span>
+    </div>
+  );
+}
+
+export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, live: agent }: ModelEditorProps<Workbook>) {
   const root = useRef<HTMLDivElement>(null);
   const grid = useRef<GridHandle>(null);
   const barRef = useRef<HTMLTextAreaElement>(null);
@@ -311,11 +323,30 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc?.key]);
 
-  const book = bookRef.current;
-  const calc = calcRef.current;
+  // An agent's version being written shows in place of the workbook (read-only, the cell being written in view, its
+  // formulas worked out as it comes), unless there are changes here not saved: those are left as they are.
+  const liveBook = agent && !dirty ? agent.model : null;
+  const liveOn = !!liveBook;
+  const readOnly = !!readOnlyProp || liveOn;
+  const liveCalc = useMemo(() => (liveBook ? computeBook(liveBook) : null), [liveBook]);
+  const book = liveBook ?? bookRef.current;
+  const calc = liveCalc ?? calcRef.current;
+  // What draws the cells again: each change here, or each draw of the agent's version.
+  const shownRev = liveOn ? -agent!.n : rev;
   const sheetIx = book ? Math.min(si, book.sheets.length - 1) : 0;
   const sheet: Sheet | undefined = book?.sheets[sheetIx];
   const size = useMemo(() => (calc ? gridSize(calc, sheetIx, sheet) : { rows: 1000, cols: 26 }), [calc, sheetIx, rev, sheet]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The sheet and the cell being written stay in view, unless a sheet was picked or the cells scrolled here lately.
+  const pickedAt = useRef(0);
+  const ownScroll = useOwnScroll(root);
+  const mark = liveOn && agent?.mark?.kind === 'sheet' ? agent.mark : null;
+  const markAt = mark ? parseRef(mark.cell) : null;
+  useEffect(() => {
+    if (!mark || !liveBook || performance.now() - pickedAt.current < 4000) return;
+    const i = liveBook.sheets.findIndex((x) => x.id === mark.sheet);
+    if (i >= 0 && i !== sheetIx) setSi(i);
+    else if (markAt && !ownScroll()) grid.current?.reveal(markAt.r, markAt.c);
+  }, [mark?.sheet, mark?.cell, agent?.n]);
   const x = rectOf(sel);
 
   // What the sheet's rules make of it, worked out once per change.
@@ -496,6 +527,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const picked = (): Rect[] => [...moreRef.current, rectOf(selRef.current)];
   const pickSheet = (i: number) => {
     if (!book || i === sheetIx) return;
+    pickedAt.current = performance.now();
     if (moreRef.current.length) setMore([]);
     if (editRef.current) commitEdit(null);
     if (editRef.current) setEdit(null);
@@ -2100,25 +2132,28 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         {tail}
       </div>
       {band}
-      <Toolbar
-        style={active?.s}
-        readOnly={readOnly}
-        canUndo={hist.current.past.length > 0 || !!edit}
-        canRedo={hist.current.future.length > 0}
-        narrow={narrow}
-        merged={merged}
-        filtered={!!sheet.filter}
-        line={line}
-        onLine={setLine}
-        onUndo={undo}
-        onRedo={redo}
-        onStyle={setStyle}
-        onFormat={setFormat}
-        onDecimals={stepDecimals}
-        onBorders={borders}
-        onMerge={(h2) => void merge(h2)}
-        onFilter={toggleFilter}
-      />
+      {/* While an agent's version shows, the toolbar stays where it is, out of use. */}
+      <div inert={liveOn} className={cx('shrink-0', liveOn && 'opacity-45')}>
+        <Toolbar
+          style={active?.s}
+          readOnly={!!readOnlyProp}
+          canUndo={hist.current.past.length > 0 || !!edit}
+          canRedo={hist.current.future.length > 0}
+          narrow={narrow}
+          merged={merged}
+          filtered={!!sheet.filter}
+          line={line}
+          onLine={setLine}
+          onUndo={undo}
+          onRedo={redo}
+          onStyle={setStyle}
+          onFormat={setFormat}
+          onDecimals={stepDecimals}
+          onBorders={borders}
+          onMerge={(h2) => void merge(h2)}
+          onFilter={toggleFilter}
+        />
+      </div>
       {!board && (
         <FormulaBar
           name={rectLabel(x, size.rows, size.cols) === 'the whole sheet' ? `${refName(0, 0)}:${refName(size.rows - 1, size.cols - 1)}` : rectLabel(x, size.rows, size.cols)}
@@ -2144,7 +2179,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
             sheet={sheet}
             si={sheetIx}
             calc={calc}
-            rev={rev}
+            rev={shownRev}
             rules={view.rules}
             block={boardBlock}
             hidden={view.hidR}
@@ -2167,7 +2202,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
             sheet={sheet}
             si={sheetIx}
             calc={calc}
-            rev={rev}
+            rev={shownRev}
             rows={size.rows}
             cols={size.cols}
             sel={sel}
@@ -2180,24 +2215,29 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
             formulas={formulas}
             more={more}
             overlay={
-              sheet.charts?.length
+              sheet.charts?.length || (markAt && mark?.sheet === sheet.id)
                 ? (geo) => (
-                    <ChartLayer
-                      book={book}
-                      calc={calc}
-                      si={sheetIx}
-                      charts={sheet.charts!}
-                      rev={rev}
-                      geo={geo}
-                      picked={chartSel}
-                      readOnly={readOnly}
-                      onPick={(id) => {
-                        setChartSel(id);
-                        grid.current?.focus();
-                      }}
-                      onChange={(c) => updateChart(c)}
-                      onOpen={(id) => !readOnly && setPanel({ kind: 'chart', id })}
-                    />
+                    <>
+                      {markAt && mark?.sheet === sheet.id && <AgentCell geo={geo} r={markAt.r} c={markAt.c} />}
+                      {!!sheet.charts?.length && (
+                        <ChartLayer
+                          book={book}
+                          calc={calc}
+                          si={sheetIx}
+                          charts={sheet.charts}
+                          rev={shownRev}
+                          geo={geo}
+                          picked={chartSel}
+                          readOnly={readOnly}
+                          onPick={(id) => {
+                            setChartSel(id);
+                            grid.current?.focus();
+                          }}
+                          onChange={(c) => updateChart(c)}
+                          onOpen={(id) => !readOnly && setPanel({ kind: 'chart', id })}
+                        />
+                      )}
+                    </>
                   )
                 : undefined
             }

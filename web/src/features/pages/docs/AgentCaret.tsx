@@ -1,45 +1,10 @@
 // Where an agent's words are arriving in a document it is writing a new version of (live.ts): a caret of the app's
 // "busy" colour with a small flag, as a collaborator's cursor shows in Google Docs, at the place its mark names. The
 // document scrolls to keep it in view as it moves, unless the reader scrolled themselves in the last few seconds.
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useLayoutEffect, useState, type RefObject } from 'react';
 import type { DraftMark } from '@shared/page-drafts';
+import { keepInView, useOwnScroll } from '../live';
 import type { DocEngine } from './engine';
-
-/** How long the reader's own scrolling holds the page where they put it. */
-const HOLD_MS = 4000;
-
-/** The reader scrolled (wheel, touch, keys, the scroll bar) this recently: the page is theirs. */
-export function useOwnScroll(scroller: RefObject<HTMLElement | null>): () => boolean {
-  const at = useRef(0);
-  useEffect(() => {
-    const el = scroller.current;
-    if (!el) return;
-    const mine = () => void (at.current = performance.now());
-    const key = (e: KeyboardEvent) => ['PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', ' '].includes(e.key) && mine();
-    // A press on the scroller itself (not on what it holds) is its scroll bar.
-    const down = (e: PointerEvent) => e.target === el && mine();
-    el.addEventListener('wheel', mine, { passive: true });
-    el.addEventListener('touchmove', mine, { passive: true });
-    el.addEventListener('keydown', key);
-    el.addEventListener('pointerdown', down);
-    return () => {
-      el.removeEventListener('wheel', mine);
-      el.removeEventListener('touchmove', mine);
-      el.removeEventListener('keydown', key);
-      el.removeEventListener('pointerdown', down);
-    };
-  }, [scroller]);
-  return () => performance.now() - at.current < HOLD_MS;
-}
-
-/** Scrolls `sc` (at once) so a box of the page (in the window's coordinates) is well in view, unless it is already. */
-export function keepInView(sc: HTMLElement, top: number, bottom: number) {
-  const box = sc.getBoundingClientRect();
-  const margin = Math.min(96, box.height / 5);
-  if (top >= box.top + margin && bottom <= box.bottom - margin) return;
-  // Into the lower middle: what was just written above it, room for what comes below.
-  sc.scrollTop += top - (box.top + box.height * 0.55);
-}
 
 export function AgentCaret({ engine, mark, host, scroller, tick }: { engine: DocEngine; mark: DraftMark | null; host: RefObject<HTMLDivElement | null>; scroller: RefObject<HTMLDivElement | null>; tick: string }) {
   const [at, setAt] = useState<{ x: number; y: number; h: number; block: boolean } | null>(null);
