@@ -293,6 +293,10 @@ export function partName(e: El): string {
   if (e.type === 'image') return e.alt ? `Picture: ${e.alt.slice(0, 28)}` : 'Picture';
   if (e.type === 'chart') return e.title ? `Chart: ${e.title.slice(0, 28)}` : 'Chart';
   if (e.type === 'table') return 'Table';
+  if (e.type === 'icon') return `Icon: ${e.icon.replace(/-/g, ' ')}`;
+  if (e.type === 'math') return `Equation: ${e.tex.length > 24 ? `${e.tex.slice(0, 23)}…` : e.tex}`;
+  if (e.type === 'video') return 'Video';
+  if (e.type === 'group') return `Group of ${e.els.length}`;
   return e.end === 'arrow' || e.start === 'arrow' ? 'Arrow' : 'Straight line';
 }
 

@@ -1,13 +1,16 @@
 // A slide deck as a PowerPoint file (.pptx), written from the deck itself: each part a shape of its own that
 // stays editable in PowerPoint, Keynote, Google Slides and LibreOffice. Text boxes and shapes with their words
-// (paragraphs, bullets and numbers, runs' bold, colours, fonts and links), pictures (cropped as they show),
-// lines and arrows, tables, and charts as real charts with their numbers; the slide's background, its title as
-// the slide's title, speaker notes, the transition and the animations in their order (on a click, with or after
-// the one before, a paragraph at a time). The theme's colours and fonts become the file's theme.
+// (paragraphs, bullets and numbers, runs' bold, colours, fonts and links), pictures (cropped as they show, their
+// colours adjusted), lines and arrows, tables (merged cells, cells' fills), charts as real charts with their numbers,
+// groups as groups, icons as pictures that stay sharp (SVG, with a PNG beside it for older programs), equations as
+// pictures (their LaTeX as words where no picture could be made), videos as their still linked to the video; the
+// slide's background, its title as the slide's title, the footer and slide number as fields, speaker notes, the
+// transition (Morph as PowerPoint's own, a fade where it has none) and the animations in their order (on a click,
+// with or after the one before, a paragraph at a time). The theme's colours and fonts become the file's theme.
 //
 // A slide is 1280 px wide: 1 px is 9525 EMU (12192000 across, PowerPoint's widescreen) and a font's px is 0.75 pt.
-import type { Anim, ChartEl, Deck, El, ImageEl, LineEl, Para, Run, Slide, TableEl, TextProps, Theme } from '../../shared/slides.ts';
-import { fontName, FONTS, hexColor, mixColor, plainText, slideH } from '../../shared/slides.ts';
+import type { Anim, ChartEl, Deck, El, GroupEl, IconEl, ImageEl, LineEl, MathEl, Para, Run, Slide, TableEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
+import { fontName, FONTS, hexColor, mixColor, plainText, slideH, videoStill } from '../../shared/slides.ts';
 import { coreXml, esc, relsXml, XML_HEAD, zipParts, type ZipPart } from './ooxml.ts';
 
 /** A picture ready for the file: PNG, JPEG or GIF bytes and its size in pixels. */
@@ -24,7 +27,29 @@ export interface PptxOpts {
   picture: (src: string) => Picture | null;
   /** How much text boxes were made smaller to fit (by part id), as the app showed them. */
   scales?: Map<string, number>;
+  /** Pictures made of parts in a browser: "icon:<id>" (its PNG beside its SVG), "math:<id>" (an equation). */
+  renders?: Map<string, Picture>;
 }
+
+/** A 1×1 clear PNG: what an icon falls back on where no PNG of it could be made (programs that read SVG show that). */
+const CLEAR_PNG: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==', 'base64'), ext: 'png', w: 1, h: 1 };
+
+/** An icon as an SVG file, in its colour and line width, as large as its box. */
+export function iconSvgText(e: IconEl, t: Theme): string {
+  const { hex, alpha } = hexColor(e.color ?? 'accent', t);
+  const attrs = (a: Record<string, string | number>) =>
+    Object.entries(a)
+      .map(([k, v]) => `${k}="${esc(String(v))}"`)
+      .join(' ');
+  const nodes = e.paths.map(([tag, a]) => `<${tag} ${attrs(a)}/>`).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.max(1, Math.round(Math.abs(e.w)))}" height="${Math.max(1, Math.round(Math.abs(e.h)))}" viewBox="0 0 24 24" fill="none" stroke="#${hex}"${alpha < 1 ? ` stroke-opacity="${Math.round(alpha * 1000) / 1000}"` : ''} stroke-width="${e.lineW ?? 2}" stroke-linecap="round" stroke-linejoin="round">${nodes}</svg>`;
+}
+
+/** A video's own page on its site, for its still's link. */
+const videoPage = (src: string) => {
+  const id = src.split('/').pop() ?? '';
+  return src.includes('vimeo') ? `https://vimeo.com/${id}` : `https://www.youtube.com/watch?v=${id}`;
+};
 
 const NS = 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
 const E = 9525;
@@ -90,13 +115,19 @@ interface Ctx {
   t: Theme;
   o: PptxOpts;
   rels: Rels;
-  media: { add(p: Picture): string };
+  media: { add(p: { data: Buffer; ext: string }): string };
   charts: { add(xml: string): string };
   /** Slide files by the deck's slide number, for links between slides. */
   slideFile: (n: number) => string | null;
   ids: Map<string, number>;
   next: number;
   titled: boolean;
+  /** The slide's number (from 1). */
+  n: number;
+  /** How deep in groups the part being written is (a title placeholder cannot be in one). */
+  depth: number;
+  /** Names that tie parts to their match on the next or last slide for PowerPoint's Morph ("!!…"). */
+  morph: Map<string, string>;
 }
 
 function link(c: Ctx, href: string | undefined, tag: 'hlinkClick' = 'hlinkClick'): string {
@@ -180,12 +211,13 @@ function lnXml(color: string | undefined, w: number | undefined, dash: string | 
   return `<a:ln w="${emu(w ?? 2)}">${fillXml(color, t, opacity)}${d}</a:ln>`;
 }
 
-function nvPr(c: Ctx, e: El, kind: string): { id: number; cNvPr: string } {
+function nvPr(c: Ctx, e: El, kind: string, href?: string): { id: number; cNvPr: string } {
   const id = c.next++;
   c.ids.set(e.id, id);
-  const name = e.name ?? `${kind} ${id - 1}`;
-  const descr = e.type === 'image' && e.alt ? ` descr="${esc(e.alt)}"` : '';
-  const hl = link(c, e.link);
+  const name = c.morph.get(e.id) ?? e.name ?? `${kind} ${id - 1}`;
+  const alt = e.type === 'image' ? e.alt : e.type === 'math' ? e.tex : e.type === 'icon' ? e.icon.replace(/-/g, ' ') : undefined;
+  const descr = alt ? ` descr="${esc(alt)}"` : '';
+  const hl = link(c, href ?? e.link);
   return { id, cNvPr: hl ? `<p:cNvPr id="${id}" name="${esc(name)}"${descr}>${hl}</p:cNvPr>` : `<p:cNvPr id="${id}" name="${esc(name)}"${descr}/>` };
 }
 
@@ -193,7 +225,7 @@ function boxXml(c: Ctx, e: Extract<El, { type: 'text' | 'shape' }>): string {
   const t = c.t;
   const kind = e.type === 'shape' ? e.shape : 'rect';
   const op = e.opacity ?? 1;
-  const isTitle = e.type === 'text' && e.role === 'title' && !c.titled;
+  const isTitle = e.type === 'text' && e.role === 'title' && !c.titled && !c.depth;
   if (isTitle) c.titled = true;
   const { cNvPr } = nvPr(c, e, isTitle ? 'Title' : e.type === 'shape' ? 'Shape' : 'Text');
   let prst = PRST[kind] ?? 'rect';
@@ -213,15 +245,17 @@ function boxXml(c: Ctx, e: Extract<El, { type: 'text' | 'shape' }>): string {
   return `<p:sp>${nv}<p:spPr>${xfrm(e.x, e.y, e.w, e.h, e.rot)}<a:prstGeom prst="${prst}">${av}</a:prstGeom>${fill}${lnXml(e.line, e.lineW, e.dash, t, op)}${e.shadow ? SHADOW : ''}</p:spPr>${txBody(c, e, op)}</p:sp>`;
 }
 
-function imageXml(c: Ctx, e: ImageEl): string {
+function imageXml(c: Ctx, e: ImageEl, href?: string): string {
   const pic = e.src ? c.o.picture(e.src) : null;
   if (!pic) return '';
   const rid = c.media.add(pic);
-  const { cNvPr } = nvPr(c, e, 'Picture');
+  const { cNvPr } = nvPr(c, e, 'Picture', href);
   let { x, y, w, h } = e;
   let crop = '';
   const fit = e.fit ?? 'cover';
-  if (pic.w > 0 && pic.h > 0) {
+  const v = (f: number) => Math.round(Math.max(0, f) * 100000);
+  if (e.crop) crop = `<a:srcRect l="${v(e.crop.l)}" t="${v(e.crop.t)}" r="${v(e.crop.r)}" b="${v(e.crop.b)}"/>`;
+  else if (pic.w > 0 && pic.h > 0) {
     if (fit === 'cover') {
       const k = Math.max(w / pic.w, h / pic.h);
       const cw = (pic.w - w / k) / 2 / pic.w;
@@ -239,7 +273,15 @@ function imageXml(c: Ctx, e: ImageEl): string {
     }
   }
   const op = e.opacity ?? 1;
-  const alpha = op < 1 ? `<a:alphaModFix amt="${Math.round(op * 100000)}"/>` : '';
+  const a = e.adjust;
+  // The picture's colours as DrawingML's own picture effects.
+  const alpha = [
+    op < 1 ? `<a:alphaModFix amt="${Math.round(op * 100000)}"/>` : '',
+    a?.gray ? '<a:grayscl/>' : '',
+    a?.sat !== undefined && a.sat !== 100 && !a.gray ? `<a:hsl hue="0" sat="${Math.round((a.sat - 100) * 1000)}" lum="0"/>` : '',
+    a?.bright || a?.contrast ? `<a:lum bright="${Math.round((a.bright ?? 0) * 1000)}" contrast="${Math.round((a.contrast ?? 0) * 1000)}"/>` : '',
+    a?.blur ? `<a:blur rad="${emu(a.blur)}" grow="0"/>` : '',
+  ].join('');
   const flip = `${e.flipH ? ' flipH="1"' : ''}${e.flipV ? ' flipV="1"' : ''}`;
   const geom = e.radius ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.round(Math.min(50000, (e.radius / Math.max(1, Math.min(w, h))) * 100000))}"/></a:avLst></a:prstGeom>` : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
   return `<p:pic><p:nvPicPr>${cNvPr}<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${rid}">${alpha}</a:blip>${crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(x, y, w, h, e.rot, flip)}${geom}${e.line ? lnXml(e.line, e.lineW, undefined, c.t, op) : ''}${e.shadow ? SHADOW : ''}</p:spPr></p:pic>`;
@@ -269,12 +311,19 @@ function tableXml(c: Ctx, e: TableEl): string {
   const ln = (tag: string) => `<a:${tag} w="9525"><a:solidFill><a:srgbClr val="${border}"/></a:solidFill></a:${tag}>`;
   const pad = emu(e.size * 0.35);
   const padX = emu(e.size * 0.6);
+  // Merged cells: the first spans its block, the rest say which way they are merged into it.
+  const spans = new Map<string, { rs: number; cs: number }>();
+  const merged = new Map<string, string>();
+  for (const m of e.merges ?? []) {
+    spans.set(`${m.r},${m.c}`, { rs: m.rs, cs: m.cs });
+    for (let i = m.r; i < m.r + m.rs; i++) for (let j = m.c; j < m.c + m.cs; j++) if (i !== m.r || j !== m.c) merged.set(`${i},${j}`, `${j > m.c ? ' hMerge="1"' : ''}${i > m.r ? ' vMerge="1"' : ''}`);
+  }
   const rows = e.rows
     .map((r, ri) => {
       const head = ri === 0 && !!e.head;
       const band = !head && e.band && (ri - (e.head ? 1 : 0)) % 2 === 1;
       const cells = Array.from({ length: cols }, (_, ci) => {
-        const text = r[ci] ?? '';
+        const text = merged.has(`${ri},${ci}`) ? '' : (r[ci] ?? '');
         const align = e.aligns?.[ci] ?? 'left';
         const algn = align === 'center' ? 'ctr' : align === 'right' ? 'r' : align === 'justify' ? 'just' : 'l';
         const color = head ? (e.headColor ?? 'accentFg') : (e.color ?? 'fg');
@@ -283,13 +332,121 @@ function tableXml(c: Ctx, e: TableEl): string {
           .split('\n')
           .map((line) => `<a:p><a:pPr algn="${algn}"/>${line ? `<a:r><a:rPr lang="en-US" sz="${sz(e.size)}"${head ? ' b="1"' : ''} dirty="0"><a:solidFill>${clr(color, t, '#000000')}</a:solidFill><a:latin typeface="${esc(face)}"/></a:rPr><a:t>${esc(line)}</a:t></a:r>` : ''}<a:endParaRPr lang="en-US" sz="${sz(e.size)}" dirty="0"/></a:p>`)
           .join('');
-        const fill = head ? fillXml(e.fill ?? 'accent', t) : band ? fillXml('soft', t) : '<a:noFill/>';
-        return `<a:tc><a:txBody><a:bodyPr/><a:lstStyle/>${paras}</a:txBody><a:tcPr marL="${padX}" marR="${padX}" marT="${pad}" marB="${pad}" anchor="ctr">${ln('lnL')}${ln('lnR')}${ln('lnT')}${ln('lnB')}${fill}</a:tcPr></a:tc>`;
+        const own = e.fills?.[`${ri},${ci}`];
+        const fill = own ? fillXml(own, t) : head ? fillXml(e.fill ?? 'accent', t) : band ? fillXml('soft', t) : '<a:noFill/>';
+        const sp = spans.get(`${ri},${ci}`);
+        const attrs = sp ? `${sp.cs > 1 ? ` gridSpan="${sp.cs}"` : ''}${sp.rs > 1 ? ` rowSpan="${sp.rs}"` : ''}` : (merged.get(`${ri},${ci}`) ?? '');
+        return `<a:tc${attrs}><a:txBody><a:bodyPr/><a:lstStyle/>${paras}</a:txBody><a:tcPr marL="${padX}" marR="${padX}" marT="${pad}" marB="${pad}" anchor="ctr">${ln('lnL')}${ln('lnR')}${ln('lnT')}${ln('lnB')}${fill}</a:tcPr></a:tc>`;
       }).join('');
       return `<a:tr h="${rowH}">${cells}</a:tr>`;
     })
     .join('');
   return `<p:graphicFrame><p:nvGraphicFramePr>${cNvPr}<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="${emu(e.x)}" y="${emu(e.y)}"/><a:ext cx="${emu(e.w)}" cy="${emu(e.h)}"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr${e.head ? ' firstRow="1"' : ''}${e.band ? ' bandRow="1"' : ''}/><a:tblGrid>${widths.map((w) => `<a:gridCol w="${w}"/>`).join('')}</a:tblGrid>${rows}</a:tbl></a:graphicData></a:graphic></p:graphicFrame>`;
+}
+
+// ---- icons, equations, videos, groups ---------------------------------------------------------------------
+
+/** A picture of the slide (an icon's, an equation's): `svg` beside it for programs that read SVG. */
+function picXml(c: Ctx, e: El, png: Picture, box: { x: number; y: number; w: number; h: number }, kind: string, svg?: string, href?: string): string {
+  const rid = c.media.add(png);
+  const { cNvPr } = nvPr(c, e, kind, href);
+  const op = e.opacity ?? 1;
+  const alpha = op < 1 ? `<a:alphaModFix amt="${Math.round(op * 100000)}"/>` : '';
+  const ext = svg ? `<a:extLst><a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}"><asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="${c.media.add({ data: Buffer.from(svg, 'utf8'), ext: 'svg' })}"/></a:ext></a:extLst>` : '';
+  return `<p:pic><p:nvPicPr>${cNvPr}<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${rid}">${alpha}${ext}</a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(box.x, box.y, box.w, box.h, e.rot)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+}
+
+function iconXml(c: Ctx, e: IconEl): string {
+  return picXml(c, e, c.o.renders?.get(`icon:${e.id}`) ?? CLEAR_PNG, e, 'Icon', iconSvgText(e, c.t));
+}
+
+/** An equation: its picture where one was made, as large as its box allows; else its LaTeX as words. */
+function mathXml(c: Ctx, e: MathEl): string {
+  const pic = c.o.renders?.get(`math:${e.id}`);
+  if (pic && pic.w > 0 && pic.h > 0) {
+    const k = Math.min(e.w / pic.w, e.h / pic.h);
+    const w = pic.w * k;
+    const h = pic.h * k;
+    const x = e.align === 'left' ? e.x : e.align === 'right' ? e.x + e.w - w : e.x + (e.w - w) / 2;
+    return picXml(c, e, pic, { x, y: e.y + (e.h - h) / 2, w, h }, 'Equation');
+  }
+  const words: TextProps & { id: string } = { id: e.id, paras: [{ runs: [{ t: e.tex }] }], size: 28, color: e.color ?? 'fg', font: 'Cambria Math', align: e.align ?? 'center', valign: 'middle', fit: 'shrink' };
+  const { cNvPr } = nvPr(c, e, 'Equation');
+  return `<p:sp><p:nvSpPr>${cNvPr}<p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(e.x, e.y, e.w, e.h, e.rot)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr>${txBody(c, words, e.opacity ?? 1)}</p:sp>`;
+}
+
+/** A video: its still (or a dark box), a play button on it, both linked to the video's page. */
+function videoXml(c: Ctx, e: VideoEl): string {
+  const href = videoPage(e.src);
+  const still = e.poster ?? videoStill(e.src);
+  const pic = still ? c.o.picture(still) : null;
+  const gid = c.next++;
+  c.ids.set(e.id, gid);
+  const inner = { ...e, x: 0, y: 0, rot: undefined, id: `${e.id}-still`, link: undefined } as VideoEl;
+  let back: string;
+  if (pic) {
+    const img: ImageEl = { id: `${e.id}-still`, type: 'image', src: still!, x: 0, y: 0, w: e.w, h: e.h, fit: 'cover', radius: e.radius, alt: 'Video' };
+    back = imageXml(c, img, href);
+  } else {
+    const { cNvPr } = nvPr(c, inner, 'Video', href);
+    back = `<p:sp><p:nvSpPr>${cNvPr}<p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(0, 0, e.w, e.h)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="111111"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr></p:sp>`;
+  }
+  const d = Math.min(e.w, e.h) * 0.22;
+  const play = `<p:sp><p:nvSpPr><p:cNvPr id="${c.next++}" name="Play">${link(c, href)}</p:cNvPr><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(e.w / 2 - d / 2, e.h / 2 - d / 2, d, d)}<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="000000"><a:alpha val="60000"/></a:srgbClr></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr></p:sp><p:sp><p:nvSpPr><p:cNvPr id="${c.next++}" name="Play arrow">${link(c, href)}</p:cNvPr><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(e.w / 2 - d * 0.16, e.h / 2 - d * 0.22, d * 0.4, d * 0.44, 90)}<a:prstGeom prst="triangle"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr></p:sp>`;
+  const name = c.morph.get(e.id) ?? e.name ?? 'Video';
+  return `<p:grpSp><p:nvGrpSpPr><p:cNvPr id="${gid}" name="${esc(name)}" descr="${esc(href)}"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr>${grpXfrm(e)}</p:grpSpPr>${back}${play}</p:grpSp>`;
+}
+
+/** A group's frame: its place on the slide, its parts placed from its top-left corner as they are in the deck. */
+const grpXfrm = (e: El) =>
+  `<a:xfrm${e.rot ? ` rot="${Math.round((((e.rot % 360) + 360) % 360) * 60000)}"` : ''}><a:off x="${emu(e.x)}" y="${emu(e.y)}"/><a:ext cx="${emu(Math.max(0, e.w))}" cy="${emu(Math.max(0, e.h))}"/><a:chOff x="0" y="0"/><a:chExt cx="${emu(Math.max(0, e.w))}" cy="${emu(Math.max(0, e.h))}"/></a:xfrm>`;
+
+function groupXml(c: Ctx, e: GroupEl): string {
+  const { cNvPr } = nvPr(c, e, 'Group');
+  // A group's see-through goes on its parts (a group has none of its own in PowerPoint).
+  const op = e.opacity ?? 1;
+  const els = op < 1 ? e.els.map((x) => ({ ...x, opacity: Math.round((x.opacity ?? 1) * op * 100) / 100 }) as El) : e.els;
+  c.depth++;
+  const inner = els.map((x) => partXml(c, x)).join('');
+  c.depth--;
+  return `<p:grpSp><p:nvGrpSpPr>${cNvPr}<p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr>${grpXfrm(e)}</p:grpSpPr>${inner}</p:grpSp>`;
+}
+
+function partXml(c: Ctx, e: El): string {
+  if (e.type === 'text' || e.type === 'shape') return boxXml(c, e);
+  if (e.type === 'image') return imageXml(c, e);
+  if (e.type === 'line') return lineXml(c, e);
+  if (e.type === 'table') return tableXml(c, e);
+  if (e.type === 'chart') return chartFrame(c, e);
+  if (e.type === 'icon') return iconXml(c, e);
+  if (e.type === 'math') return mathXml(c, e);
+  if (e.type === 'video') return videoXml(c, e);
+  if (e.type === 'group') return groupXml(c, e);
+  return '';
+}
+
+/** The footer as text boxes at the foot of the slide: the date and the number as fields PowerPoint keeps up to date. */
+function footerXml(c: Ctx, i: number): string {
+  const d = c.deck;
+  const f = d.footer;
+  const s = d.slides[i];
+  if (!f || !s || s.nofooter || (f.skipTitle && (i === 0 || s.layout === 'title'))) return '';
+  const H = slideH(d.ratio);
+  const face = esc(officeFont(fontName('body', c.t)));
+  const rPr = `<a:rPr lang="en-US" sz="${sz(17)}" dirty="0"><a:solidFill>${clr('muted', c.t, '#777777')}</a:solidFill><a:latin typeface="${face}"/><a:cs typeface="${face}"/></a:rPr>`;
+  const box = (name: string, x: number, w: number, algn: string, run: string) => {
+    const id = c.next++;
+    return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${name}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(x, H - 56, w, 56)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr><p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" anchor="ctr"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr algn="${algn}"/>${run}</a:p></p:txBody></p:sp>`;
+  };
+  let out = '';
+  if (f.date) {
+    const today = f.date === 'today';
+    const text = today ? new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : f.date;
+    out += box('Date', 64, 320, 'l', today ? `<a:fld id="{4A9C2F6B-6D0E-4B8E-9C3A-1F2D3E4A5B60}" type="datetime4">${rPr}<a:t>${esc(text)}</a:t></a:fld>` : `<a:r>${rPr}<a:t>${esc(text)}</a:t></a:r>`);
+  }
+  if (f.text) out += box('Footer', 400, 1280 - 800, 'ctr', `<a:r>${rPr}<a:t>${esc(f.text)}</a:t></a:r>`);
+  if (f.num) out += box('Slide number', 1280 - 264, 200, 'r', `<a:fld id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2B}" type="slidenum">${rPr}<a:t>${i + 1}</a:t></a:fld>`);
+  return out;
 }
 
 // ---- charts ---------------------------------------------------------------------------------------------
@@ -525,6 +682,10 @@ function transitionXml(s: Slide): string {
   if (!t || (t.fx === 'none' && !t.auto)) return '';
   const dur = t.dur ?? 600;
   const spd = dur <= 450 ? 'fast' : dur <= 900 ? 'med' : 'slow';
+  const adv = t.auto ? ` advTm="${Math.round(t.auto * 1000)}"` : '';
+  // Morph is PowerPoint's since 2016: older programs and other apps take the fade beside it.
+  if (t.fx === 'morph')
+    return `<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" Requires="p159"><p:transition spd="slow" p14:dur="${Math.round(dur)}"${adv}><p159:morph option="byObject"/></p:transition></mc:Choice><mc:Fallback><p:transition spd="${spd}"${adv}><p:fade/></p:transition></mc:Fallback></mc:AlternateContent>`;
   // The side it comes from, as the way it moves.
   const dir = t.dir === 'left' ? 'r' : t.dir === 'up' ? 'd' : t.dir === 'down' ? 'u' : 'l';
   const fx: Record<string, string> = {
@@ -535,7 +696,7 @@ function transitionXml(s: Slide): string {
     zoom: '<p:zoom/>',
     split: '<p:split orient="vert" dir="out"/>',
   };
-  return `<p:transition spd="${spd}"${t.auto ? ` advTm="${Math.round(t.auto * 1000)}"` : ''}>${fx[t.fx] ?? ''}</p:transition>`;
+  return `<p:transition spd="${spd}"${adv}>${fx[t.fx] ?? ''}</p:transition>`;
 }
 
 // ---- the slide ------------------------------------------------------------------------------------------
@@ -566,18 +727,34 @@ function bgXml(c: Ctx, s: Slide): { bg: string; under: string } {
 
 function slideXml(c: Ctx, s: Slide): string {
   const { bg, under } = bgXml(c, s);
-  const parts = s.els
-    .map((e) => {
-      if (e.type === 'text' || e.type === 'shape') return boxXml(c, e);
-      if (e.type === 'image') return imageXml(c, e);
-      if (e.type === 'line') return lineXml(c, e);
-      if (e.type === 'table') return tableXml(c, e);
-      if (e.type === 'chart') return chartFrame(c, e);
-      return '';
-    })
-    .join('');
+  const parts = s.els.map((e) => partXml(c, e)).join('') + footerXml(c, c.n - 1);
   const grp = '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>';
   return `${XML_HEAD}<p:sld ${NS}${s.hidden ? ' show="0"' : ''}><p:cSld>${bg}<p:spTree>${grp}${under}${parts}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>${transitionXml(s)}${timingXml(c, s)}</p:sld>`;
+}
+
+/**
+ * The names that tie each part to its match across a Morph (PowerPoint pairs shapes named "!!" alike): a part and its
+ * copy on the slide before share a key (or one's key is the other's id).
+ */
+function morphNames(d: Deck): Map<string, string> {
+  const out = new Map<string, string>();
+  const mk = (e: El) => e.key ?? e.id;
+  d.slides.forEach((s, i) => {
+    if (s.transition?.fx !== 'morph' || i === 0) return;
+    const before = d.slides[i - 1].els;
+    const usedA = new Set<string>();
+    const usedB = new Set<string>();
+    for (const e of s.els) {
+      const k = mk(e);
+      const m = before.find((x) => mk(x) === k && !usedA.has(x.id));
+      if (!m || usedB.has(k)) continue;
+      usedA.add(m.id);
+      usedB.add(k);
+      out.set(m.id, `!!${k}`);
+      out.set(e.id, `!!${k}`);
+    }
+  });
+  return out;
 }
 
 function notesXml(text: string): string {
@@ -630,6 +807,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
   let chartN = 0;
   const charts: { name: string; xml: string }[] = [];
   const hasNotes = deck.slides.some((s) => s.notes);
+  const morph = morphNames(deck);
   const slides = deck.slides.map((s, i) => {
     const rels = new Rels();
     rels.add('slideLayout', '../slideLayouts/slideLayout1.xml');
@@ -659,6 +837,9 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
       ids: new Map(),
       next: 2,
       titled: false,
+      n: i + 1,
+      depth: 0,
+      morph,
     };
     const xml = slideXml(c, s);
     if (s.notes) rels.add('notesSlide', `../notesSlides/notesSlide${i + 1}.xml`);
@@ -672,6 +853,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
     '<Default Extension="jpeg" ContentType="image/jpeg"/>',
     '<Default Extension="gif" ContentType="image/gif"/>',
     '<Default Extension="webp" ContentType="image/webp"/>',
+    '<Default Extension="svg" ContentType="image/svg+xml"/>',
     '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>',
     '<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>',
     '<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>',

@@ -16,6 +16,8 @@ import { injectHead, kitHead } from './kit.ts';
 import { imageSize } from './ooxml.ts';
 import type { Picture } from './pptx.ts';
 import { mustKind, type ExportFormat, type ExportHelp, type KindDef } from './kinds.ts';
+import { readDeck } from './slides.ts';
+import { deckRenders } from './slides-render.ts';
 import { mustPage, pageSource, storageMap } from './store.ts';
 
 export type { ExportFormat };
@@ -154,8 +156,13 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
     if (o.format === 'pptx' || o.format === 'docx') {
       for (const s of new Set(k.sources(src.text))) pics.set(s, await pictureFor(db, s));
     }
-    if (o.format === 'pptx') scales = await fitScales(db, k, src.text, title);
-    return out(await make(db, src.text, title, { picture: (s) => pics.get(s) ?? null, scales }), o.format);
+    let renders: ExportHelp['renders'];
+    if (o.format === 'pptx') {
+      scales = await fitScales(db, k, src.text, title);
+      // A deck's icons and equations, as pictures for PowerPoint.
+      if (src.kind === 'slides') renders = await deckRenders(readDeck(src.text));
+    }
+    return out(await make(db, src.text, title, { picture: (s) => pics.get(s) ?? null, scales, renders }), o.format);
   }
 
   if (o.format === 'html') return out(pageFileHtml(src.text), 'html');
