@@ -211,7 +211,7 @@ export function startRun(o: StartInput): RunRecord {
   if (errors.length) throw new HttpError(400, `Check the form: ${errors.join('; ')}`);
   // The keys it needs, before it starts (an agent step's run goes by its app's; a public run cannot use them).
   if (!o.public && o.source !== 'step') {
-    needSecrets(d().db, o.recipe);
+    needSecrets(d().db, o.recipe, o.flow ?? 'run');
     // Models from a provider it needs that only you can set up (OpenRouter's are added by themselves, below).
     needModels(o.recipe);
   }

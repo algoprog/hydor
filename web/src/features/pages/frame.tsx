@@ -430,7 +430,7 @@ export function PageFrame({
       const changed = d.data;
       if (appId && changed?.app === appId) w.postMessage({ type: 'wa-app-event', n, kind: 'data', collection: changed.collection }, '*');
       if (uiApp && d.run && (d.run.app === uiApp || d.run.app === `tpl:${uiApp}`)) w.postMessage({ type: 'wa-ui-run', n, run: d.run }, '*');
-      if (uiApp && changed?.app === uiApp) w.postMessage({ type: 'wa-ui-data', n, collection: changed.collection }, '*');
+      if (uiApp && (changed?.app === uiApp || changed?.app === `tpl:${uiApp}`)) w.postMessage({ type: 'wa-ui-data', n, collection: changed.collection }, '*');
     });
   }, [appId, uiApp]);
   // A view's new values (its run changed, a follow-up updated its answer): it draws itself again with them.

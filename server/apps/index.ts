@@ -867,13 +867,24 @@ function routes(d: Deps) {
 
   // ---- what an app keeps ----
 
-  const kept = (req: FastifyRequest) => {
+  /** An app that keeps records: one of yours, or a ready-made one that does (the Reading list), its records under "tpl:<id>". */
+  const keeper = (req: FastifyRequest): { id: string; data: AppRecipe['data'] } => {
+    const id = P(req).id;
+    if (id.startsWith('tpl:')) {
+      const t = builtinOf(id);
+      if (!t.data) throw new HttpError(404, `${t.name} keeps no records`);
+      return { id: `tpl:${t.id}`, data: t.data };
+    }
     const a = own(req);
+    return { id: a.id, data: a.data };
+  };
+  const kept = (req: FastifyRequest) => {
+    const a = keeper(req);
     if (!a.data?.[P(req).collection] && P(req).collection) throw new HttpError(404, `The app keeps no collection “${P(req).collection}”`);
     return a;
   };
   app.get('/api/apps/:id/data', async (req) => {
-    const a = own(req);
+    const a = keeper(req);
     return { collections: collectionsOf(db, a.id, a.data), limits: DATA_LIMITS };
   });
   app.get('/api/apps/:id/data/:collection', async (req) => {

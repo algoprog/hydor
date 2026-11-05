@@ -5,6 +5,7 @@
 // run through OpenRouter (models.ts) needs OpenRouter's key too: asked for the same way, and kept with Settings → Models.
 import type { AppRecipe } from '../../shared/apps.ts';
 import type { AppSecretState } from '../../shared/app-secrets.ts';
+import { neededBy } from '../../shared/app-secrets.ts';
 import { domainAllowed } from '../../shared/connections.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -31,16 +32,18 @@ export function secretsOf(db: DB, recipe: Recipe): SecretStateView[] {
   return p && !own.some((s) => s.name === p.name) ? [...own, p] : own;
 }
 
-/** The keys it needs and does not have (not those it can do without). */
-export const missingSecrets = (db: DB, recipe: Recipe) => secretsOf(db, recipe).filter((s) => !s.have && !s.optional);
+/** The keys it needs and does not have (not those it can do without, nor those only its other flows need). */
+export const missingSecrets = (db: DB, recipe: Recipe, flow = 'run') => secretsOf(db, recipe).filter((s) => !s.have && !s.optional && neededBy(s, flow));
 
-/** Refuses a run that needs keys the vault does not have, saying which; the pages ask for them on seeing `secrets`. */
-export function needSecrets(db: DB, recipe: Recipe) {
-  const miss = missingSecrets(db, recipe);
+/** Refuses a run (of a flow: "run", the main one) that needs keys the vault does not have, saying which; the pages ask for them on seeing `secrets`. */
+export function needSecrets(db: DB, recipe: Recipe, flow = 'run') {
+  const states = secretsOf(db, recipe);
+  const miss = states.filter((s) => !s.have && !s.optional && neededBy(s, flow));
   if (!miss.length) return;
   const names = miss.map((s) => s.label).join(', ');
   const vault = miss.map((s) => s.name).join(', ');
-  const secrets = miss.map(({ name, label, help, url, optional }) => ({ name, label, help, url, optional, have: false }));
+  // The keys this flow needs that the vault lacks, the optional ones too, for the page to ask for together.
+  const secrets = states.filter((s) => !s.have && neededBy(s, flow)).map(({ name, label, help, url, optional }) => ({ name, label, help, url, optional, have: false }));
   // Whole sentences, so each reads right in the app's other languages.
   if (miss.length > 1) throw new HttpError(409, `${recipe.name} needs these keys first: ${names}. Add them on its page (or in Keys, as ${vault}).`, { secrets });
   throw new HttpError(409, `${recipe.name} needs a key first: ${names}. Add it on its page (or in Keys, as ${vault}).`, { secrets });

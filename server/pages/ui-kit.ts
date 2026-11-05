@@ -439,7 +439,9 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
         const y = E.valueOf(x, s);
         if (y !== '' && y !== null && y !== undefined) where[k] = y;
       }
-      const got = want(m[1], { ...(Object.keys(where).length ? { where } : {}), ...(b.sort ? { sort: b.sort } : {}), limit: b.limit ?? 100 });
+      // with.search: words to look for anywhere in a record (a search box's), filled with the view's values.
+      const words = isObj(b.with) && typeof b.with.search === 'string' ? E.fill(b.with.search, s).trim() : '';
+      const got = want(m[1], { ...(Object.keys(where).length ? { where } : {}), ...(words ? { search: words } : {}), ...(b.sort ? { sort: b.sort } : {}), limit: b.limit ?? 100 });
       waiting = got === null;
       v = got ?? [];
     } else if (b.data) v = E.evaluate(b.data, s);

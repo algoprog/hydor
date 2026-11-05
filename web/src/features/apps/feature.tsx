@@ -3,7 +3,8 @@
 //   /apps                 Agent apps: your apps, the latest runs, the ready-made ones
 //   /apps/connected       Connected apps: services every agent can use, their marketplace, the keys (?tab=market|keys)
 //   /apps/<id>            an app: its form and Run, runs, rows of a CSV, API and sharing
-//   /apps/t/<template>    a template, run as it is
+//   /apps/t/<template>    a template, run as it is (also /apps/tpl:<template>)
+//   ?in.<question>=…      on an app's page: its form filled in with that answer (several may be given), not run yet
 //   /apps/new, …/edit     the builder (?template=… to start from one, ?from=<session> from a session)
 //   /apps/runs/<run>      a run's result, its follow-ups and a box for the next one
 //   /a/<slug>             the public page (main.tsx, without the sign-in)
@@ -38,10 +39,10 @@ function AppsRoutes() {
   if (loc === '/apps/new') return <BuilderPage key={search} template={q.get('template') ?? undefined} from={q.get('from') ?? undefined} />;
   if (loc === '/apps/connected') return <GalleryPage key="connected" tab="connected" />;
   if ((m = /^\/apps\/runs\/([^/]+)$/.exec(loc))) return <RunPage key={m[1]} id={decodeURIComponent(m[1])} />;
-  if ((m = /^\/apps\/t\/([^/]+)$/.exec(loc))) return <AppPage key={m[1]} id={`tpl:${decodeURIComponent(m[1])}`} tab="run" again={q.get('again')} />;
+  if ((m = /^\/apps\/t\/([^/]+)$/.exec(loc))) return <AppPage key={m[1]} id={`tpl:${decodeURIComponent(m[1])}`} tab="run" again={q.get('again')} prefill={search} />;
   if ((m = /^\/apps\/([^/]+)\/edit$/.exec(loc))) return <BuilderPage key={m[1]} id={decodeURIComponent(m[1])} />;
   if ((m = /^\/apps\/([^/]+)$/.exec(loc)))
-    return <AppPage key={m[1]} id={decodeURIComponent(m[1])} tab={tab === 'runs' || tab === 'rows' || tab === 'share' ? tab : 'run'} again={q.get('again')} />;
+    return <AppPage key={m[1]} id={decodeURIComponent(m[1])} tab={tab === 'runs' || tab === 'rows' || tab === 'share' ? tab : 'run'} again={q.get('again')} prefill={search} />;
   return <GalleryPage />;
 }
 

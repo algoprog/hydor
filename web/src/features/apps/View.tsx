@@ -18,6 +18,7 @@ import { LOCALE } from '../../i18n/locale';
 import { cx } from '../../components/ui';
 import { appCall, memoryStore, PageFrame, type UiBridge } from '../pages/frame';
 import { runPath } from './api';
+import type { KeyState } from './AppKeys';
 
 /** What a view may ask of its app. */
 export type ViewCan = 'keep' | 'ask' | 'run' | 'again' | 'start' | 'data';
@@ -49,6 +50,8 @@ export function AppView({
   publicView,
   info,
   assets,
+  keeps,
+  onKeys,
 }: {
   ui: AppUi;
   name: string;
@@ -76,13 +79,17 @@ export function AppView({
   info?: AppInfo;
   /** Its own files, by name: what asset:<name> shows. */
   assets?: Record<string, Pick<AppAsset, 'sha'>>;
+  /** It keeps records (a ready-made app's too: the Reading list's), which its view finds and changes. */
+  keeps?: boolean;
+  /** One of its flows needs keys the vault lacks (it was run without them): the page asks for them. */
+  onKeys?: (keys: KeyState[]) => void;
 }) {
   const [height, setHeight] = useState(240);
   const lang = LOCALE ?? (typeof navigator !== 'undefined' ? navigator.language : 'en');
   const def = useMemo(() => (translate ? translateUi(ui, tr) : ui), [ui, translate]);
   const html = useMemo(() => shell(name, lang), [name, lang]);
   const store = useMemo(() => memoryStore(), []);
-  const saved = !appId.startsWith('tpl:') && appId !== 'test' && !publicView;
+  const saved = (!appId.startsWith('tpl:') || !!keeps) && appId !== 'test' && !publicView;
   // What changes while it is on screen: its run's status and answer (compared by what they hold, not by each new copy).
   const runKey = run ? JSON.stringify([run.id, run.status, run.result ?? null, run.inputs]) : '';
   const lastKey = last ? JSON.stringify([last.id, last.status, last.result ?? null]) : '';
@@ -138,8 +145,15 @@ export function AppView({
         }
         case 'run': {
           need('run');
-          const r = await post<{ run: AppRun }>(`/api/apps/${enc(appId)}/runs`, { flow: typeof a.flow === 'string' ? a.flow : 'run', inputs: a.inputs && typeof a.inputs === 'object' ? a.inputs : {}, source: 'screen' });
-          return { id: r.run.id, status: r.run.status, result: r.run.result ?? null, error: r.run.error ?? '' };
+          try {
+            const r = await post<{ run: AppRun }>(`/api/apps/${enc(appId)}/runs`, { flow: typeof a.flow === 'string' ? a.flow : 'run', inputs: a.inputs && typeof a.inputs === 'object' ? a.inputs : {}, source: 'screen' });
+            return { id: r.run.id, status: r.run.status, result: r.run.result ?? null, error: r.run.error ?? '' };
+          } catch (e) {
+            // A flow that needs keys the vault lacks: the page asks for them.
+            const keys = (e as { data?: { secrets?: KeyState[] } }).data?.secrets;
+            if (keys?.length) onKeys?.(keys);
+            throw e;
+          }
         }
         case 'again': {
           need('again');
