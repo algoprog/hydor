@@ -875,7 +875,8 @@ function openWindow(at) {
       // Windows and Linux: the menu shows when you press Alt.
       autoHideMenuBar: !MAC,
       ...(MAC || WIN ? {} : { icon: resource('icon-256.png') }),
-      webPreferences: { contextIsolation: true, sandbox: true, spellcheck: true, backgroundThrottling: false },
+      // preload.cjs gives the app's own page a dropped file's path, so the Library moves it in rather than copying it.
+      webPreferences: { contextIsolation: true, sandbox: true, spellcheck: true, backgroundThrottling: false, preload: path.join(__dirname, 'preload.cjs') },
     });
     win.webContents.setUserAgent(`${win.webContents.getUserAgent()} Hydor${MAC ? 'Mac' : WIN ? 'Windows' : 'Linux'}/${app.getVersion()}`);
     win.once('ready-to-show', () => win && win.show());
