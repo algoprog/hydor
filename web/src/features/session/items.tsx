@@ -135,7 +135,7 @@ export function Elapsed({ since }: { since?: number }) {
 
 /**
  * While a session works: how long this stretch has run, and after earlier turns (`before`, their lengths added up) the
- * time it has worked in all, "2m 10s · 1h 5m in all". Each part is an element of its own, so it reads in any language.
+ * time it has worked in all, in brackets: "2m 10s (1h 5m)". Each part is an element of its own, so it reads in any language.
  */
 export function WorkTime({ since, before, className }: { since?: number; before?: number; className?: string }) {
   useTick(!!since);
@@ -148,7 +148,7 @@ export function WorkTime({ since, before, className }: { since?: number; before?
       </span>
       {before && before >= 1000 ? (
         <span className={cx('tnum min-w-0 truncate', className)} title="The time it has worked in this session, all its turns together">
-          · <span>{`${duration(before + now)} in all`}</span>
+          ({duration(before + now)})
         </span>
       ) : null}
     </>
