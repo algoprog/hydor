@@ -413,6 +413,9 @@ function whenLine(daily: HomeSettings['daily']): string {
   return `A new one every ${dayName(Number(c))} at ${daily.time}`;
 }
 
+/** A field as the others, sized by the row it is in (inputCls fills its line). */
+const fieldCls = inputCls.replace(/(^|\s)w-full(?=\s|$)/, ' ');
+
 /** Update automatically's days and time, in one row: every day, on weekdays, or once a week on a day of your choice. */
 function WhenRow({ daily, disabled, onChange }: { daily: HomeSettings['daily']; disabled?: boolean; onChange: (d: { days?: number[] | null; time?: string }) => void }) {
   const choice = daysChoice(daily.days);
@@ -427,7 +430,7 @@ function WhenRow({ daily, disabled, onChange }: { daily: HomeSettings['daily']; 
           if (v === 'other') return;
           onChange({ days: v === 'all' ? null : v === 'weekdays' ? [1, 2, 3, 4, 5] : [Number(v)] });
         }}
-        className={cx(inputCls, 'h-8 min-w-0 flex-1 px-2 text-[13px]')}
+        className={cx(fieldCls, 'h-8 min-w-0 flex-1 px-2 text-[13px]')}
       >
         <option value="all">Every day</option>
         <option value="weekdays">On weekdays</option>
@@ -437,7 +440,7 @@ function WhenRow({ daily, disabled, onChange }: { daily: HomeSettings['daily']; 
         {choice === 'other' && <option value="other">{daily.days!.map(dayName).join(', ')}</option>}
       </select>
       <span className="shrink-0">at</span>
-      <input type="time" aria-label="At what time" value={daily.time} disabled={disabled} onChange={(e) => /^\d{2}:\d{2}$/.test(e.target.value) && onChange({ time: e.target.value })} className={cx(inputCls, 'h-8 w-[7.5rem] shrink-0 text-[13px]')} />
+      <input type="time" aria-label="At what time" value={daily.time} disabled={disabled} onChange={(e) => /^\d{2}:\d{2}$/.test(e.target.value) && onChange({ time: e.target.value })} className={cx(fieldCls, 'h-8 w-[8rem] shrink-0 px-2 text-[13px]')} />
     </div>
   );
 }
@@ -519,7 +522,7 @@ function HomeSettingsButton(props: { id: string; recipe: AppDef | AppTemplate; t
         <SlidersHorizontal size={16} />
       </IconButton>
       <SheetsOnPhone.Provider value>
-        <Popover anchor={ref} open={open} onClose={() => setOpen(false)} align="end" width={340} title="Settings">
+        <Popover anchor={ref} open={open} onClose={() => setOpen(false)} align="end" width={380} title="Settings">
           <HomeSettingsPanel {...props} />
         </Popover>
       </SheetsOnPhone.Provider>
