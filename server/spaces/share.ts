@@ -6,8 +6,8 @@
 // its address (server/auth.ts). What a person's browser reads and sends is portal.ts, under /p-api/<token>/… alone.
 //
 // Here: the links, the owner's routes, what the owner hears (a notice and an inbox line when someone comments, until
-// it is answered or resolved), and comments by people carried into a save made on an older version, so a document
-// saved on top of them keeps them. A person's comment is a new version of the document (comments live in it, so
+// it is answered or resolved), what an agent in a shared project is told (who reads its sessions), and comments by
+// people carried into a save made on an older version, so a document saved on top of them keeps them. A person's comment is a new version of the document (comments live in it, so
 // agents read and answer them as the owner's); a run of them in a row is kept as one version, its latest.
 //
 // Routes, signed in (the owner's):
@@ -506,11 +506,29 @@ function stopOrphans(db: DB) {
   } catch {}
 }
 
+/** "Maria Lopez, Nikos Papas and Eleni Kosta". */
+const names = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : (xs[0] ?? ''));
+
+/** What an agent in a shared project is told: who reads what it writes there (not in a Confidential session, which no one sees). */
+export function sharedNote(db: DB, extra: { space?: unknown; confidential?: unknown }): string | null {
+  if (typeof extra.space !== 'string' || !extra.space || extra.confidential) return null;
+  const sp = spaceById(db, extra.space);
+  const now = Date.now();
+  const people = sp ? listShares(db, sp.id).filter((x) => !x.expiresAt || x.expiresAt > now) : [];
+  if (!sp || !people.length) return null;
+  const list = names(people.slice(0, 8).map((x) => x.name)) + (people.length > 8 ? ` and ${people.length - 8} more` : '');
+  return `The user shared the project “${sp.name}” with ${people.length === 1 ? 'someone' : `${people.length} people`}: ${list}. Through links of their own they read its documents and its sessions, this one too (your replies and your steps by name and file changes, never command output), and comment on its documents. Write nothing in this session the user would not want them to read, such as keys, passwords or private details.`;
+}
+
 export const sharing: Feature = {
   id: 'sharing',
   routes(d) {
     routes(d);
     portalRoutes(d);
+  },
+  spawn(s, d) {
+    const note = sharedNote(d.db, s.extra as { space?: unknown; confidential?: unknown });
+    return note ? { instructions: [note] } : undefined;
   },
   inbox: (d) => shareInbox(d.db),
   event(e, d) {

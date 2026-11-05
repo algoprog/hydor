@@ -6,7 +6,7 @@
 //
 // save_doc is how agents make and change documents; get_page gives one back as Markdown, which says all a
 // document holds but its blocks' ids (carried over from the version it changes when it comes back).
-import { authorForAgent, newCommentId } from '../../shared/comments.ts';
+import { authorForAgent, newCommentId, peopleNote } from '../../shared/comments.ts';
 import {
   ASSET,
   blockHtml,
@@ -417,6 +417,7 @@ function commentsForAgent(doc: Doc): string[] {
     ]),
     '',
     'To answer them, save_doc with this id and comments: [{"id": "<id>", "reply": "what you did or say"}], adding "resolve": true once a comment is dealt with (or "reopen": true). Make the change a comment asks for in the markdown too. Add a comment of your own with <span data-comment="new1">the words</span> in the markdown and {"id": "new1", "text": "…"} in comments.',
+    ...(peopleNote(list) ? [peopleNote(list)!] : []),
   ];
 }
 
