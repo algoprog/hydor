@@ -2314,17 +2314,21 @@ export function writing(E: Core): Writing {
   };
   /** What each code block was last coloured for (its language and code): coloured again only when they change. */
   const painted = new WeakMap<Element, string>();
-  const paintCode = (pre: HTMLElement) => {
-    const sign = `${pre.getAttribute('data-lang') ?? ''}\u0000${CC.textOf(pre)}`;
+  const paintCode = (pre: Element) => {
+    // (a plain block's <code>, as agents write it, says its language by a class, on it or its <pre>, too)
+    const said = (x: Element | null) => `${x?.getAttribute('data-lang') ?? ''}\u0000${x?.tagName === 'PRE' && isCode(x) ? '' : (x?.getAttribute('class') ?? '')}`;
+    const sign = `${said(pre)}\u0000${pre.tagName === 'CODE' ? said(pre.parentElement) : ''}\u0000${CC.textOf(pre)}`;
     if (painted.get(pre) === sign) return;
     CC.paint(pre);
     painted.set(pre, sign);
   };
-  /** Every code block's colours, but the one being written in (which keeps up as it is typed). */
+  /** Every code block's colours (plain ones agents write too), but the one being written in (which keeps up as it is typed). */
   const paintAll = () => {
     const w = E.editing();
-    for (const pre of doc.body.querySelectorAll<HTMLElement>('pre.n-code')) if (pre !== w) paintCode(pre);
+    for (const el of CC.blocks(doc.body)) if (!w || !(w === el || w.contains(el) || el.contains(w))) paintCode(el);
   };
+  /** A plain code block's <code> (a block of an agent's, <pre><code>), for the part `h` being written in. */
+  const plainCodeOf = (h: Element) => (h.tagName === 'CODE' ? [h] : CC.blocks(h)).filter((c) => c.tagName === 'CODE');
   // As code is typed, its colours follow a moment later, the caret where it was.
   let livePaint = 0;
   const paintWriting = () => {
@@ -3517,6 +3521,8 @@ export function writing(E: Core): Writing {
     },
     started(h) {
       if (h.tagName === 'LI') for (const s of subLists(h)) (s.setAttribute('contenteditable', 'false'), s.setAttribute('data-n-ceoff', ''));
+      // A plain code block is written in as plain text (its colours, put on again once it is left, would catch the words typed).
+      for (const c of plainCodeOf(h)) (painted.delete(c), CC.unpaint(c));
       lockChips(h);
       hint(h);
     },
@@ -3532,6 +3538,7 @@ export function writing(E: Core): Writing {
         painted.delete(h);
         paintCode(h);
       }
+      for (const c of plainCodeOf(h)) (painted.delete(c), paintCode(c));
       // A block of words keeps a line when it is empty; a lone line break a browser leaves in another part is not the user's.
       if (kindOf(unitOf(h))) fillEmpty(h);
       else if (h.innerHTML === '<br>') h.innerHTML = '';
@@ -3549,8 +3556,9 @@ export function writing(E: Core): Writing {
       placeComments();
     },
     clean(root) {
-      // Code is kept as plain text: its colours are put on as it shows.
-      for (const pre of root.querySelectorAll('pre.n-code')) CC.unpaint(pre);
+      // Code is kept as plain text: its colours are put on as it shows (a plain block's too, as its agent wrote it: only
+      // the colours' own spans come off, from any <pre><code>, whatever it holds now).
+      for (const el of root.querySelectorAll('pre.n-code, pre > code')) CC.unpaint(el);
       for (const x of root.querySelectorAll('[data-n-ph]')) x.removeAttribute('data-n-ph');
       for (const x of root.querySelectorAll('[data-n-ceoff]')) (x.removeAttribute('contenteditable'), x.removeAttribute('data-n-ceoff'));
       for (const x of root.querySelectorAll('[data-n-sign]')) x.removeAttribute('data-n-sign');

@@ -6,7 +6,7 @@
 // are taken with (Settings → Browser).
 import { STORAGE_LIMITS } from '../../shared/pages.ts';
 import { KIT_CSS } from '../../shared/page-kit.ts';
-import { codeColoursScript } from '../../shared/code-colours.ts';
+import { codeColoursScript, hasCode } from '../../shared/code-colours.ts';
 import { ASSET } from '../../shared/slides.ts';
 import { HttpError } from '../auth.ts';
 import { canCapture, printPdf, withTab } from '../capture/index.ts';
@@ -68,7 +68,7 @@ const pageHead = (db: DB, id: string) => kitHead({ n: '', theme: 'light', max: {
 export const pageFileHtml = (html: string) =>
   injectHead(
     html,
-    `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${/\bn-code\b/.test(html) ? codeColoursScript() : ''}`,
+    `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${hasCode(html) ? codeColoursScript() : ''}`,
   );
 
 /** A picture made into PNG by the browser (an SVG, or WebP that PowerPoint may not read), at its own size or `w`×`h`. */

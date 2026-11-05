@@ -17,7 +17,7 @@ import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { canCapture, closeCapture, withTab, type Tab } from '../capture/index.ts';
 import { KIT_CSS } from '../../shared/page-kit.ts';
-import { CODE_COLOURS_SRC, codeColours } from '../../shared/code-colours.ts';
+import { CODE_COLOURS_SRC, codeColours, hasCode } from '../../shared/code-colours.ts';
 import { extractText } from '../documents/extract.ts';
 import { EDITOR_SRC } from './editor.ts';
 import { pages } from './index.ts';
@@ -69,7 +69,11 @@ ok(compiles, 'the editor’s script (with the writing) is one function the page 
   same([C.detect('import os\ndef f():\n    print(None)'), C.detect('const x = () => 1;\nconsole.log(x)'), C.detect('{"a": 1}'), C.detect('SELECT * FROM t WHERE a = 1'), C.detect('hello there')].join(','), 'python,js,json,sql,', 'a block’s language is told from its code (none, from plain words)');
   same([C.langId('py'), C.langId('TypeScript'), C.langId('sh'), C.langId('klingon')].join(','), 'python,ts,bash,', 'a language is known by its usual names');
   ok(!/<\/script/i.test(CODE_COLOURS_SRC) && !/<!--/.test(CODE_COLOURS_SRC), 'the colours’ script can go in a <script> as it is');
-  ok(KIT_CSS.includes('pre.n-code .n-ck{'), 'the kit colours the code’s words');
+  ok(KIT_CSS.includes('pre.n-code .n-ck,'), 'the kit colours the code’s words');
+  // Plain blocks agents write (<pre><code>): coloured only when the code surely is a language (it may be a command's output).
+  same([C.detect('const xs = [1].map((x) => x);\nconsole.log(xs)', true), C.detect('x => y', true), C.detect('total 12\ndrwxr-xr-x 2 alex', true), C.detect('x => y')].join(','), 'js,,,js', 'a plain block’s language is told only when the code shows it plainly');
+  same([hasCode('<pre class="n-code">x</pre>'), hasCode('<pre>\n <code class="language-py">x</code></pre>'), hasCode('<p><code>x</code></p>')].join(','), 'true,true,false', 'a page with plain code blocks gets the colours’ script, one with inline code alone does not');
+  ok(KIT_CSS.includes(',pre>code>.n-ck{'), 'the kit colours a plain block’s words, inside its <code>');
 }
 
 // ---- the editor in a browser --------------------------------------------------------------------------------------
@@ -652,6 +656,25 @@ if (canCapture()) {
     same(await d.js<string>('return document.querySelector("#c").hasAttribute("data-lang")'), false, 'Auto takes the language off');
   });
 
+  // ---- plain code blocks agents write (<pre><code>): coloured in Edit inside their <code>, kept as they were written ----------
+  await drive(
+    '<pre id="p1"><code class="language-python">def f(a):\n    return a  # one</code></pre><pre id="p2"><code>total 12\nnotes</code></pre><pre id="p3"><code class="lang-js">let <b>x</b> = 1;</code></pre><pre id="p4" data-lang="sql"><code>SELECT 1</code></pre>',
+    async (d) => {
+      const kinds = (sel: string) => d.js<string>(`return [...document.querySelectorAll(${JSON.stringify(sel)})].map(s => s.className + ":" + s.textContent).join(" ")`);
+      same(await kinds('#p1 > code > span'), 'n-ck:def n-cf:f n-ck:return n-cc:# one', 'a plain code block shows its code coloured as its class says, inside its <code>');
+      same([await kinds('#p2 span'), await kinds('#p3 code > span'), await kinds('#p4 code > span')].join('|'), '||n-ck:SELECT n-cn:1', 'one that is surely no language stays plain, one with markup of its own is left as it is, its block’s data-lang counts');
+      await d.click('#p1 .n-cf');
+      same((await d.msgs('wa-ed-sel')).at(-1)?.sel?.tag, 'code', 'a click on a coloured word picks the block’s code, not the word');
+      await d.write('#p1 code');
+      same(await d.js<number>('return document.querySelectorAll("#p1 span").length'), 0, 'written in, its code is plain text');
+      await d.type('!');
+      await d.press('Escape');
+      same(await kinds('#p1 > code > .n-ck'), 'n-ck:def n-ck:return', 'and coloured again once it is left');
+      const out = await d.html();
+      ok(out.includes('<pre id="p1"><code class="language-python">def f(a):\n    return a  # one!</code></pre>') && out.includes('<pre id="p3"><code class="lang-js">let <b>x</b> = 1;</code></pre>') && !/n-c[a-z]"/.test(out), 'the page given back has its plain code blocks as they were written, no colours');
+    },
+  );
+
   // ---- comments: Comment on a block, marks beside the blocks, their places kept as blocks change -----------------------------
   await drive('<h2 id="h">Prices</h2><p id="p">Ten euros a day.</p><p id="q">Paid at the door.</p>', async (d) => {
     await d.cmd('caps', { comment: true });
@@ -818,7 +841,7 @@ if (canCapture()) {
   // ---- a page in Use (the kit's bridge): links, and a table of contents left empty -------------------------------------------------
   {
     const body =
-      '<a id="out" href="https://example.com/x">Out</a> <a id="pg" class="n-pagelink" data-page="abc123" href="/pages/abc123">A page</a> <a id="in" href="#days">In</a> <a id="own" href="https://example.com/y" onclick="event.preventDefault()">Own</a><nav class="n-toc"></nav><h2>Days</h2><h3>Monday</h3><pre class="n-code" data-lang="js">let a = 1;</pre>';
+      '<a id="out" href="https://example.com/x">Out</a> <a id="pg" class="n-pagelink" data-page="abc123" href="/pages/abc123">A page</a> <a id="in" href="#days">In</a> <a id="own" href="https://example.com/y" onclick="event.preventDefault()">Own</a><nav class="n-toc"></nav><h2>Days</h2><h3>Monday</h3><pre class="n-code" data-lang="js">let a = 1;</pre><pre id="plain"><code class="language-python">x = None</code></pre>';
     const html = injectHead(`<!doctype html><html><head><title>Use</title></head><body>${body}</body></html>`, kitHead({ n: 't', theme: 'light', max: { key: 200, value: 1000 } }));
     await withTab({ html, width: 700, height: 500, settleMs: 150 }, async (tab) => {
       const js = <T>(code: string) => tab.evaluate<T>(`(() => { ${code} })()`);
@@ -840,6 +863,7 @@ if (canCapture()) {
       same(await js<string>('return location.href.split("#")[0]'), at.split('#')[0], 'and the page stays where it is');
       same(await js<string>('return [...document.querySelectorAll("nav.n-toc a")].map(a => a.getAttribute("href") + " " + a.className).join(",")'), '#days n-toc-1,#monday n-toc-2', 'a table of contents left empty shows the page’s headings');
       same(await js<string>('return [...document.querySelectorAll("pre.n-code span")].map(s => s.className + ":" + s.textContent).join(" ")'), 'n-ck:let n-cn:1', 'a code block shows its code coloured, as in Edit');
+      same(await js<string>('return [...document.querySelectorAll("#plain > code > span")].map(s => s.className + ":" + s.textContent + ":" + (getComputedStyle(s).color !== getComputedStyle(s.parentElement).color)).join(" ")'), 'n-cv:None:true', 'and a plain block an agent wrote, inside its <code>, in the kit’s colours');
     });
   }
   closeCapture();

@@ -103,16 +103,16 @@ li.n-block>:not(ul,ol){margin-top:.1em;margin-bottom:.1em}
 .n-page .n-tbl th{background:var(--n-soft)}
 pre.n-code{padding:.85em 1em;border-radius:var(--n-radius,12px);background:color-mix(in srgb,currentColor 7%,transparent);overflow-x:auto;font-size:.88em;line-height:1.55;white-space:pre}
 :where(.n-page) pre.n-code{background:var(--n-soft)}
-pre.n-code .n-ck{color:color-mix(in srgb,#b259d0 80%,currentColor)}
-pre.n-code .n-cs{color:color-mix(in srgb,#3f9f52 80%,currentColor)}
-pre.n-code :is(.n-cn,.n-cv){color:color-mix(in srgb,#d4782f 82%,currentColor)}
-pre.n-code .n-cc{color:color-mix(in srgb,currentColor 55%,transparent);font-style:italic}
-pre.n-code .n-cf{color:color-mix(in srgb,#3d7fe0 80%,currentColor)}
-pre.n-code .n-ct{color:color-mix(in srgb,#c99a1e 80%,currentColor)}
-pre.n-code .n-ca{color:color-mix(in srgb,#2c9fa8 80%,currentColor)}
-pre.n-code .n-cg{color:color-mix(in srgb,#d9534f 80%,currentColor)}
-pre.n-code .n-ci{background:color-mix(in srgb,#3f9f52 18%,transparent)}
-pre.n-code .n-cd{background:color-mix(in srgb,#d9534f 18%,transparent)}
+pre.n-code .n-ck,pre>code>.n-ck{color:color-mix(in srgb,#b259d0 80%,currentColor)}
+pre.n-code .n-cs,pre>code>.n-cs{color:color-mix(in srgb,#3f9f52 80%,currentColor)}
+pre.n-code :is(.n-cn,.n-cv),pre>code>:is(.n-cn,.n-cv){color:color-mix(in srgb,#d4782f 82%,currentColor)}
+pre.n-code .n-cc,pre>code>.n-cc{color:color-mix(in srgb,currentColor 55%,transparent);font-style:italic}
+pre.n-code .n-cf,pre>code>.n-cf{color:color-mix(in srgb,#3d7fe0 80%,currentColor)}
+pre.n-code .n-ct,pre>code>.n-ct{color:color-mix(in srgb,#c99a1e 80%,currentColor)}
+pre.n-code .n-ca,pre>code>.n-ca{color:color-mix(in srgb,#2c9fa8 80%,currentColor)}
+pre.n-code .n-cg,pre>code>.n-cg{color:color-mix(in srgb,#d9534f 80%,currentColor)}
+pre.n-code .n-ci,pre>code>.n-ci{background:color-mix(in srgb,#3f9f52 18%,transparent)}
+pre.n-code .n-cd,pre>code>.n-cd{background:color-mix(in srgb,#d9534f 18%,transparent)}
 img.n-pic{display:block;max-width:100%;height:auto;margin:.8em 0;border-radius:calc(var(--n-radius,12px) * .6)}
 a.n-pagelink{padding:.05em .35em .1em;border-radius:.35em;background:color-mix(in srgb,currentColor 7%,transparent);color:inherit;font-weight:500;text-decoration:none;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 a.n-pagelink:hover{background:color-mix(in srgb,currentColor 13%,transparent)}

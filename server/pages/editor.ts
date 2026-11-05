@@ -855,6 +855,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
 
   // ---- the parts as a tree (the inspector's Layers) ------------------------------------------------------
   const SKIP = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'LINK', 'META', 'NOSCRIPT', 'N-EDITOR-UI']);
+  /** The spans a plain code block's colours are put on with (shared/code-colours.ts): no parts of the page's own. */
+  const COLOURED = 'pre > code > span:is(.n-ck,.n-cs,.n-cn,.n-cc,.n-cf,.n-ct,.n-ca,.n-cg,.n-cv,.n-ci,.n-cd)';
   let layersOn = false;
   const layers = () => {
     let count = 0;
@@ -862,7 +864,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     const walk = (el: Element, path: number[]): Node => {
       const kids: Node[] = [];
       [...el.children].forEach((c, i) => {
-        if (count > 2500 || SKIP.has(c.tagName) || isUi(c)) return;
+        if (count > 2500 || SKIP.has(c.tagName) || isUi(c) || c.matches(COLOURED) || (c.tagName === 'SPAN' && c.parentElement?.matches('pre.n-code'))) return;
         count++;
         kids.push(walk(c, [...path, i]));
       });
@@ -1049,7 +1051,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
   /** The page's body as it is kept: without the editor's marks on the words being written. */
   const cleanBody = (): string => {
     const b = document.body;
-    if (!editing && !b.querySelector('[data-n-ph],[data-n-ceoff],[data-n-hovering],[data-n-ce],pre.n-code > *')) return b.outerHTML;
+    if (!editing && !b.querySelector(`[data-n-ph],[data-n-ceoff],[data-n-hovering],[data-n-ce],pre.n-code > *,${COLOURED}`)) return b.outerHTML;
     const c = b.cloneNode(true) as HTMLElement;
     for (const x of c.querySelectorAll('[data-n-ce]')) {
       x.removeAttribute('data-n-ce');
@@ -1865,8 +1867,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
 
   // ---- the page's own events: held, except while words are being changed -----------------------------------
   const fromUi = (e: Event) => e.composedPath().includes(host);
-  /** The part a press is on: a code block for a word its colours wrap (writing.ts colours code as it shows). */
-  const partAt = (t: Element) => (t.closest?.('pre.n-code') as Element | null) ?? t;
+  /** The part a press is on: a code block for a word its colours wrap (writing.ts colours code as it shows; a plain block's <code>). */
+  const partAt = (t: Element) => (t.closest?.('pre.n-code') as Element | null) ?? (t.matches?.(COLOURED) ? t.parentElement! : t);
   const inEditing = (e: Event) => !!editing && e.target instanceof Node && editing.contains(e.target);
   const hold = (e: Event) => {
     if (fromUi(e) || inEditing(e)) return;

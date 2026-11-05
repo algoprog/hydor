@@ -14,7 +14,7 @@ import { KIT_CSS } from '../../shared/page-kit.ts';
 import { ENGINE_SRC, UI_KIT_CSS, UI_SRC } from './ui-kit.ts';
 import { KIT_LIB_URLS, MEDIA_SRC } from './media-kit.ts';
 import { LIB_CDN } from '../../shared/app-media.ts';
-import { CODE_COLOURS_SRC, codeColoursScript } from '../../shared/code-colours.ts';
+import { CODE_COLOURS_SRC, codeColoursScript, hasCode } from '../../shared/code-colours.ts';
 
 export { KIT_CSS };
 
@@ -885,7 +885,7 @@ const cfgJson = (cfg: BridgeCfg) => JSON.stringify(cfg).replace(/</g, '\\u003c')
 
 /** The kit's <style> and <script>, for a page (with the colours of its code blocks, when `html`, the page, has any). */
 export function kitHead(cfg: BridgeCfg, html?: string): string {
-  return `<style id="n-kit">${KIT_CSS}</style><script>(${BRIDGE_SRC})(${cfgJson(cfg)})</script>${html === undefined || /\bn-code\b/.test(html) ? codeColoursScript() : ''}`;
+  return `<style id="n-kit">${KIT_CSS}</style><script>(${BRIDGE_SRC})(${cfgJson(cfg)})</script>${html === undefined || hasCode(html) ? codeColoursScript() : ''}`;
 }
 
 /** Only the stand-ins for localStorage and sessionStorage, for the pages of a published folder. */
@@ -1035,8 +1035,8 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: str
         for (const v of Array.isArray(d.ui.libs.css) ? d.ui.libs.css.slice(0, 16) : []) if (typeof v === 'string' && v.startsWith(cdn) && /\.css$/i.test(v) && !/["'<>\s]/.test(v)) sheets.push(v);
       }
       const libHead = `${Object.keys(imports).length ? `<script type="importmap">${js({ imports })}</script>` : ''}${sheets.map((h) => `<link rel="stylesheet" href="${h}">`).join('')}`;
-      // The colours of the page editor's code blocks, for a page that has any.
-      const code = /\bn-code\b/.test(d.html) ? `<script>(${codeSrc})().run()</script>` : '';
+      // The colours of its code blocks, for a page that has any (the page editor's, or plain ones agents write).
+      const code = /\bn-code\b|<pre\b[^>]*>\s*<code\b/i.test(d.html) ? `<script>(${codeSrc})().run()</script>` : '';
       head = `${libHead}<style id="n-kit">${kit}</style><style id="n-theme">${themeText(d.css)}</style><script>(${schemeSrc})(${js(cfg.theme)})</script><script>(${bridgeSrc})(${js(cfg)})</script>${code}${app ? `<script>(${appSrc})(${js(app)})</script>` : ''}${ui ? `<script>(${uiSrc})(${js(ui)}, (${engineSrc})(), (${mediaSrc}))</script>` : ''}`;
     }
     const at = DOCTYPE.exec(html);
