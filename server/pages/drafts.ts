@@ -14,7 +14,8 @@ import type { Deps } from '../features/types.ts';
 export interface ToolStream {
   id: string;
   name: string;
-  at: 'start' | 'delta' | 'end';
+  /** result: the call's answer came back (after its tool ran, or without it: refused, or its input not taken). */
+  at: 'start' | 'delta' | 'end' | 'result';
   delta?: string;
   /** At the end: the whole input. */
   input?: Record<string, unknown>;
@@ -253,6 +254,15 @@ export function feedDraft(deps: Deps, key: string, e: ToolStream) {
     return;
   }
   const d = m?.get(e.id);
+  if (e.at === 'result') {
+    // Answered without saving (a save that ran has settled its draft by now): the page stays as it was.
+    if (!d || !MODEL.has(d.tool) || d.saved || d.failed) return;
+    if (!d.done) setTimeout(() => forget(key, d.id), KEEP_MS).unref();
+    d.done = true;
+    d.failed = true;
+    send(deps, d);
+    return;
+  }
   if (!d || d.done) return;
   if (e.at === 'delta' && MODEL.has(d.tool)) {
     if (!e.delta) return;
@@ -328,14 +338,20 @@ export function settleDraft(deps: Deps, key: string, tool: string, pageId: strin
   send(deps, d);
 }
 
+/**
+ * A draft whole, as far as it was sent: the next piece sent goes on at its end (what came in since goes with that
+ * piece, not here, or the two would not meet and the page would ask for it whole again, piece after piece).
+ */
+const whole = (d: Draft): PageDraft => ({ ...info(d), text: d.started ? d.text.slice(0, d.sent) : '' });
+
 /** A session's drafts as they are now, whole (a page that opens mid-way, or missed a piece). */
 export function draftsOf(key: string): PageDraft[] {
-  return [...(drafts.get(key)?.values() ?? [])].filter(showable).map((d) => ({ ...info(d), text: d.text }));
+  return [...(drafts.get(key)?.values() ?? [])].filter(showable).map(whole);
 }
 
 /** The saves of a page being written now (from any session), whole: an editor that opens it mid-way. */
 export function draftsOfPage(pageId: string): PageDraft[] {
   const out: PageDraft[] = [];
-  for (const m of drafts.values()) for (const d of m.values()) if (MODEL.has(d.tool) && d.pageId === pageId) out.push({ ...info(d), text: d.text });
+  for (const m of drafts.values()) for (const d of m.values()) if (MODEL.has(d.tool) && d.pageId === pageId) out.push(whole(d));
   return out;
 }

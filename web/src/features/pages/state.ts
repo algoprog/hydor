@@ -5,8 +5,10 @@
 import { create } from 'zustand';
 import type { PageDraft, PageInfo, PagesEvent, PublishRequest, SiteInfo } from '@shared/pages';
 import type { ToolInfo } from '@shared/types';
+import { DRAFT_TOOLS } from '@shared/page-drafts';
 import { api, enc } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
+import { live as socket } from '../../lib/ws';
 
 interface PagesState {
   pages: PageInfo[] | null;
@@ -48,8 +50,24 @@ interface DraftsState {
   loadPage(pageId: string): Promise<void>;
 }
 
-/** Drafts fetched whole, each kept by its session (a newer one already here stays). */
-function keepWhole(list: PageDraft[], key?: string) {
+/** A draft still to end: being written, or a save of a document, slides, a spreadsheet or LaTeX still to say how it went. */
+const going = (d: PageDraft) => !d.done || (d.tool in DRAFT_TOOLS && !d.saved && !d.failed);
+
+/** The drafts open here now, of a session or of a page (by id, with the last piece heard of each). */
+function goingNow(o: { key?: string; page?: string }): Map<string, number> {
+  const out = new Map<string, number>();
+  const byKey = useDrafts.getState().byKey;
+  for (const k of o.key ? [o.key] : Object.keys(byKey)) for (const d of Object.values(byKey[k] ?? {})) if (going(d) && (o.key || d.pageId === o.page)) out.set(d.id, d.seq ?? 0);
+  return out;
+}
+
+/**
+ * Drafts fetched whole, each kept by its session (a newer one already here stays). One open here when they were asked
+ * for (`was`) that the server no longer has, nothing heard of it since (the server started again, or its end was sent
+ * while this window was away), ends where it is: a save of a document, slides, a spreadsheet or LaTeX as one that
+ * saved nothing, so its page shows as it is (and can be changed) rather than waiting for good.
+ */
+function keepWhole(list: PageDraft[], key: string | undefined, was: Map<string, number>) {
   const byKey = { ...useDrafts.getState().byKey };
   for (const d of list) {
     const k = d.key ?? key;
@@ -58,14 +76,34 @@ function keepWhole(list: PageDraft[], key?: string) {
     if (had && (had.seq ?? 0) > (d.seq ?? 0)) continue;
     byKey[k] = { ...byKey[k], [d.id]: d };
   }
+  const has = new Set(list.map((d) => d.id));
+  for (const [k, ds] of Object.entries(byKey))
+    for (const d of Object.values(ds)) if (was.get(d.id) === (d.seq ?? 0) && !has.has(d.id) && going(d)) byKey[k] = { ...byKey[k], [d.id]: { ...d, done: true, ...(d.tool in DRAFT_TOOLS ? { failed: true } : {}) } };
   useDrafts.setState({ byKey });
 }
 
 export const useDrafts = create<DraftsState>(() => ({
   byKey: {},
-  load: (key) => api<{ drafts: PageDraft[] }>(`/api/pages/drafts?key=${enc(key)}`).then((r) => keepWhole(r.drafts, key)),
-  loadPage: (pageId) => api<{ drafts: PageDraft[] }>(`/api/pages/drafts?page=${enc(pageId)}`).then((r) => keepWhole(r.drafts)),
+  load: (key) => {
+    const was = goingNow({ key });
+    return api<{ drafts: PageDraft[] }>(`/api/pages/drafts?key=${enc(key)}`).then((r) => keepWhole(r.drafts, key, was));
+  },
+  loadPage: (pageId) => {
+    const was = goingNow({ page: pageId });
+    return api<{ drafts: PageDraft[] }>(`/api/pages/drafts?page=${enc(pageId)}`).then((r) => keepWhole(r.drafts, undefined, was));
+  },
 }));
+
+// Back after the connection dropped (or the server started again): the sessions with drafts still open here ask for
+// them again, which ends those the server no longer has.
+let down = false;
+socket.onStatus((up) => {
+  if (!up) return void (down = true);
+  if (!down) return;
+  down = false;
+  const s = useDrafts.getState();
+  for (const [k, ds] of Object.entries(s.byKey)) if (Object.values(ds).some(going)) s.load(k).catch(() => {});
+});
 
 /** Who should hear that a page started being written (the session on screen opens it beside). */
 const startListeners = new Set<(key: string, d: PageDraft) => void>();

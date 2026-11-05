@@ -384,6 +384,21 @@ const textOf = (d: Doc) => d.blocks.map(blockText).join('\n');
   const c3 = draftsOf('claude:s1').find((d) => d.id === 'c3');
   ok(c3?.done && c3.failed, 'a call the turn stopped saved nothing');
   ok(!draftsOf('claude:s1').find((d) => d.id === 'c1')?.failed, 'one already kept stays kept');
+  // Asked for whole between two pieces: as far as it was sent, so the next piece goes on at its end.
+  feedDraft(deps, 'claude:s1', { id: 'c4', name, at: 'start' });
+  feedDraft(deps, 'claude:s1', { id: 'c4', name, at: 'delta', delta: '{"id":"abcdef0123","markdown":"# One' });
+  await new Promise((r) => setTimeout(r, 200));
+  feedDraft(deps, 'claude:s1', { id: 'c4', name, at: 'delta', delta: ' two' });
+  const mid = draftsOf('claude:s1').find((d) => d.id === 'c4')!;
+  await new Promise((r) => setTimeout(r, 200));
+  const next = sent.filter((x) => x.key === 'claude:s1' && x.data.draft.id === 'c4').at(-1)!.data;
+  ok(mid.text === '{"id":"abcdef0123","markdown":"# One' && next.from === mid.text.length && next.text === ' two', 'a draft asked for whole is what was sent of it: the next piece meets it');
+  // Answered without its save running (refused, or its input not taken): it saved nothing.
+  feedDraft(deps, 'claude:s1', { id: 'c4', name, at: 'end', input: { id: 'abcdef0123', markdown: '# One two' } });
+  feedDraft(deps, 'claude:s1', { id: 'c4', name, at: 'result' });
+  ok(draftsOf('claude:s1').find((d) => d.id === 'c4')?.failed && sent.at(-1)!.key === 'page:abcdef0123', 'a call answered without saving ends: its page stays as it was');
+  feedDraft(deps, 'claude:s1', { id: 'c1', name, at: 'result' });
+  ok(!draftsOf('claude:s1').find((d) => d.id === 'c1')?.failed, 'the answer of one that saved changes nothing');
 }
 
 console.log(`${passed} passed, ${failed} failed`);

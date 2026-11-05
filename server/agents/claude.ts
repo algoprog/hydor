@@ -473,8 +473,9 @@ export class ClaudeLive extends LiveAdapter {
     if (Array.isArray(content)) {
       for (const b of content) {
         if (b?.type !== 'tool_result') continue;
-        // The tool ran (or was refused): any approval for it is settled.
+        // The tool ran (or was refused): any approval for it is settled, and so is a page it was writing.
         for (const [id, a] of this.approvals) if (a.itemId === b.tool_use_id) this.approvals.delete(id);
+        if (typeof b.tool_use_id === 'string' && this.toolNames.has(b.tool_use_id)) this.emit('toolstream', { id: b.tool_use_id, name: this.toolNames.get(b.tool_use_id), at: 'result' });
       }
     }
     const isPrompt = !(Array.isArray(content) && content.some((b: Json) => b?.type === 'tool_result'));
