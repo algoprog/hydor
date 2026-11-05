@@ -3,7 +3,7 @@
 // pages agents are writing right now (drafts, as their calls stream in) and what each session shows
 // beside its conversation (the canvas).
 import { create } from 'zustand';
-import type { PageDraft, PageInfo, PagesEvent, PublishRequest, SiteInfo } from '@shared/pages';
+import type { LibFolder, PageDraft, PageInfo, PagesEvent, PublishRequest, SiteInfo } from '@shared/pages';
 import type { ToolInfo } from '@shared/types';
 import { DRAFT_TOOLS } from '@shared/page-drafts';
 import { api, enc } from '../../lib/api';
@@ -12,6 +12,8 @@ import { live as socket } from '../../lib/ws';
 
 interface PagesState {
   pages: PageInfo[] | null;
+  /** The Library's folders, loaded with the pages. */
+  folders: LibFolder[] | null;
   sites: SiteInfo[] | null;
   /** By session: which of its show_html calls were kept, as which page. */
   kept: Record<string, Record<string, string>>;
@@ -28,11 +30,12 @@ interface PagesState {
 
 export const usePagesStore = create<PagesState>((set, get) => ({
   pages: null,
+  folders: null,
   sites: null,
   kept: {},
   requests: {},
   thumbs: {},
-  loadPages: () => api<{ pages: PageInfo[] }>('/api/pages').then((r) => set({ pages: r.pages })),
+  loadPages: () => api<{ pages: PageInfo[]; folders?: LibFolder[] }>('/api/pages').then((r) => set({ pages: r.pages, folders: r.folders ?? [] })),
   loadSites: () => api<{ sites: SiteInfo[] }>('/api/sites').then((r) => set({ sites: r.sites })),
   loadKept: (key) => api<{ items: Record<string, string> }>(`/api/pages/kept?key=${enc(key)}`).then((r) => set({ kept: { ...get().kept, [key]: r.items } })),
   setKept: (key, item, page) => set({ kept: { ...get().kept, [key]: { ...get().kept[key], [item]: page } } }),

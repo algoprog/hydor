@@ -196,7 +196,8 @@ const base64Of = (f: File) =>
     r.readAsDataURL(f);
   });
 
-export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }: { open: boolean; onClose: () => void; kind?: NewKind; space?: string | null }) {
+/** New in the Library: a page, slides, a document… made in the space it shows (`space`), in its folder open (`folder`) unless another project is picked. */
+export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, folder }: { open: boolean; onClose: () => void; kind?: NewKind; space?: string | null; folder?: string }) {
   const [kind, setKind] = useState<NewKind>(startKind);
   const [pick, setPick] = useState(STARTERS[0].id);
   const [title, setTitle] = useState(STARTERS[0].title);
@@ -221,18 +222,21 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
   }, [open, startKind, space]);
   const starter = STARTERS.find((s) => s.id === pick)!;
   const defaultTitle = kind === 'tex' ? tplTitle(tpl) : NEW_TITLE[kind] || starter.title;
+  // In the folder the Library shows, unless another project is picked.
+  const inFolder = folder && where === (space ?? null) ? folder : undefined;
   const make = async () => {
     setBusy(true);
     try {
       const t = title.trim() || defaultTitle;
+      const at = { space: where, folder: inFolder };
       const r =
         kind === 'slides'
-          ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind: 'slides', model: newDeck(t, theme, ratio), space: where })
+          ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind: 'slides', model: newDeck(t, theme, ratio), ...at })
           : kind === 'page'
-            ? await post<{ page: PageInfo }>('/api/pages', { title: t, html: starter.html(t), space: where })
+            ? await post<{ page: PageInfo }>('/api/pages', { title: t, html: starter.html(t), ...at })
             : kind === 'tex'
-              ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind, model: texFromTemplate(tpl, t), space: where })
-              : await post<{ page: PageInfo }>('/api/pages', { title: t, kind, space: where });
+              ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind, model: texFromTemplate(tpl, t), ...at })
+              : await post<{ page: PageInfo }>('/api/pages', { title: t, kind, ...at });
       onClose();
       go(kind === 'page' ? `/pages/${r.page.id}?mode=${pick === 'blank' ? 'edit' : 'view'}` : `/pages/${r.page.id}`);
     } catch (e) {
@@ -251,7 +255,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
       if (!f) return;
       setBusy(true);
       try {
-        const r = await post<{ page: PageInfo; notes?: string[] }>('/api/pages/import', { name: f.name, data: await base64Of(f), space: where });
+        const r = await post<{ page: PageInfo; notes?: string[] }>('/api/pages/import', { name: f.name, data: await base64Of(f), space: where, folder: inFolder });
         onClose();
         go(`/pages/${r.page.id}`);
         if (r.notes?.length) toast(r.notes.map((n) => tr(n)).join(' '));
