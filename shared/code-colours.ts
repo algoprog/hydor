@@ -2,6 +2,9 @@
 // the words of about twenty languages apart (keywords, strings, numbers, comments, names of functions and types, tags
 // and attributes, keys) and wraps them in spans the page kit colours (shared/page-kit.ts), light or dark as the page is.
 // A block's language is its data-lang (python, js…); without one, the highlighter tells it from the code.
+// Code blocks agents write as plain HTML (<pre><code class="language-python">) are coloured too, inside their <code>
+// (a page's own look for `pre code` stays): their language from a language-x or lang-x class (or data-lang), else
+// one the code surely is, else none; code with markup of its own (links, another highlighter's spans) is left as it is.
 //
 // The page keeps its code as plain text: the colours are put on as it shows, by the kit's script in Use (and in a page
 // saved as a file), and by the page editor as the code is written, which takes them off again before the page is kept.
@@ -14,17 +17,19 @@ export interface CodeColours {
   langs: [string, string][];
   /** A language's id from what a block says (an alias such as "py" or "sh" too), or '' when it knows none by that name. */
   langId(name: string): string;
-  /** The language some code looks like, or '' when it can't tell. */
-  detect(text: string): string;
+  /** The language some code looks like, or '' when it can't tell (`sure`: only when it shows plainly, for code that may be anything). */
+  detect(text: string, sure?: boolean): string;
   /** Code as runs of words, each with what it is ('k' keyword, 's' string, 'n' number, 'c' comment, 'f' function, 't' type, 'a' attribute or key, 'g' tag, 'v' constant; '' plain). */
   tokens(text: string, lang: string): [string, string][];
   /** The code of a block as text: its lines' breaks as new lines, a last one a browser keeps for the caret left out. */
   textOf(pre: Element): string;
+  /** The code blocks in a part of a page: the page editor's (pre.n-code), and the <code> of a plain <pre> (as agents write them). */
+  blocks(root: ParentNode): Element[];
   /** Colours a block's code (its language, else the one it looks like): its words in spans the kit colours. */
-  paint(pre: Element): void;
-  /** Takes the colours off again, the code as plain text. */
-  unpaint(pre: Element): void;
-  /** Colours every code block in the page once it is read, and those a page's own script adds later (a page in Use). */
+  paint(el: Element): void;
+  /** Takes the colours off again, the code as plain text (a plain block's: the spans it put in, and nothing else). */
+  unpaint(el: Element): void;
+  /** Colours every code block in the page once it is read (a page in Use). */
   run(): void;
 }
 
@@ -235,6 +240,7 @@ export function codeColours(): CodeColours {
     patch: 'diff',
     text: 'plain',
     txt: 'plain',
+    plaintext: 'plain',
     none: 'plain',
     postgres: 'sql',
     postgresql: 'sql',
@@ -613,7 +619,7 @@ export function codeColours(): CodeColours {
     ['markdown', [/^#{1,6} \w/m, /^\s*[-*] \[[ xX]\] /m, /\*\*\w[^*]*\*\*/, /\[[^\]]+\]\(https?:/]],
     ['yaml', [/^[\w-]+:\s*$/m, /^\s+[\w-]+:\s+\S/m, /^\s*-\s+[\w-]+:\s/m]],
   ];
-  const detect = (text: string): string => {
+  const detect = (text: string, sure = false): string => {
     const s = text.slice(0, 6000);
     if (!s.trim()) return '';
     if (/^\s*[[{]/.test(s) && /[}\]]\s*$/.test(s)) {
@@ -633,7 +639,9 @@ export function codeColours(): CodeColours {
         ties = 0;
       } else if (n && n === score) ties++;
     }
-    // Two signs of a language, or one where no other language shows any (a line of code may look like several).
+    // Two signs of a language, or one where no other language shows any (a line of code may look like several); for code
+    // that may be anything (a plain block, which may hold a command's output), two signs and no other language as likely.
+    if (sure) return score >= 2 && !ties ? best : '';
     return score >= 2 || (score === 1 && !ties) ? best : '';
   };
 
@@ -656,11 +664,9 @@ export function codeColours(): CodeColours {
     const said = langId(pre.getAttribute('data-lang') ?? '');
     return said === 'plain' ? '' : said || detect(text);
   };
-  const paint = (pre: Element) => {
-    const text = textOf(pre);
-    const id = langOf(pre, text);
+  /** Code as a few spans and words: runs of one colour together, not a node a letter. */
+  const coloured = (text: string, id: string) => {
     const f = document.createDocumentFragment();
-    // Runs of one colour together, so the code is a few spans and words, not a node a letter.
     const runs: Tok[] = [];
     for (const [c0, t] of id ? tokens(text, id) : [['', text] as Tok]) {
       const c = CLS[c0] ? c0 : '';
@@ -678,22 +684,57 @@ export function codeColours(): CodeColours {
         f.append(span);
       }
     }
-    pre.replaceChildren(f);
-    // An empty last line shows, and holds a caret, by a line break after it (as a browser writes one).
-    if (!text || text.endsWith('\n')) pre.append(document.createElement('br'));
+    return f;
   };
-  const unpaint = (pre: Element) => {
-    const text = textOf(pre);
-    pre.replaceChildren(text);
+  // ---- a plain block's code (<pre><code>, as agents write it) -------------------------------------------------------------
+  const OWN = new Set(Object.values(CLS));
+  const LANG_CLASS = /(?:^|\s)(?:language|lang)-([\w+#.-]{1,30})/i;
+  /** A plain block's <code>: the only part of its <pre> (but spaces). */
+  const isPlain = (el: Element) => {
+    const pre = el.parentElement;
+    return el.tagName === 'CODE' && pre?.tagName === 'PRE' && !pre.classList.contains('n-code') && pre.children.length === 1 && [...pre.childNodes].every((n) => n === el || (n.nodeType === 3 && !(n as Text).data.trim()));
+  };
+  /** What the block says its language is (a class on the code or its block, or data-lang), else what its code surely is. */
+  const plainLang = (code: Element, text: string) => {
+    let said = '';
+    for (const x of [code, code.parentElement!]) said ||= LANG_CLASS.exec(x.getAttribute('class') ?? '')?.[1] ?? x.getAttribute('data-lang') ?? '';
+    // (a language it names that the highlighter doesn't know stays plain: the code is not guessed at against its word)
+    if (said) return langId(said) === 'plain' ? '' : langId(said);
+    return detect(text, true);
+  };
+  const unpaintPlain = (code: Element) => {
+    for (const s of [...code.querySelectorAll('span')]) if (OWN.has(s.getAttribute('class') ?? '')) s.replaceWith(...s.childNodes);
+    code.normalize();
+  };
+  const paintPlain = (code: Element) => {
+    unpaintPlain(code);
+    // Code with markup of its own (a link, a mark, another highlighter's spans) is left as it is.
+    if ([...code.childNodes].some((n) => n.nodeType !== 3)) return;
+    const text = code.textContent ?? '';
+    const id = plainLang(code, text);
+    if (id) code.replaceChildren(coloured(text, id));
+  };
+  const blocks = (root: ParentNode): Element[] => [...root.querySelectorAll('pre.n-code, pre:not(.n-code) > code')].filter((x) => x.tagName === 'PRE' || isPlain(x));
+  const paint = (el: Element) => {
+    if (el.tagName === 'CODE') return isPlain(el) ? paintPlain(el) : undefined;
+    const text = textOf(el);
+    el.replaceChildren(coloured(text, langOf(el, text)));
+    // An empty last line shows, and holds a caret, by a line break after it (as a browser writes one).
+    if (!text || text.endsWith('\n')) el.append(document.createElement('br'));
+  };
+  const unpaint = (el: Element) => {
+    if (el.tagName === 'CODE') return unpaintPlain(el);
+    const text = textOf(el);
+    el.replaceChildren(text);
   };
   const run = () => {
     const all = () => {
-      for (const pre of document.querySelectorAll('pre.n-code')) paint(pre);
+      for (const el of blocks(document)) paint(el);
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', all);
     else all();
   };
-  return { langs: LANGS, langId, detect, tokens, textOf, paint, unpaint, run };
+  return { langs: LANGS, langId, detect, tokens, textOf, blocks, paint, unpaint, run };
 }
 
 /** Puts a function's source in a <script> safely: nothing in it may end the element or open an HTML comment there. */
@@ -704,3 +745,6 @@ export const CODE_COLOURS_SRC = scriptSafe(codeColours.toString());
 
 /** The script that colours a page's code blocks once it is read (a page in Use, one saved as a file). */
 export const codeColoursScript = () => `<script>(${CODE_COLOURS_SRC})().run()</script>`;
+
+/** Whether a page has code blocks to colour: the page editor's, or plain ones agents write (<pre><code>). */
+export const hasCode = (html: string) => /\bn-code\b/.test(html) || /<pre\b[^>]*>\s*<code\b/i.test(html);

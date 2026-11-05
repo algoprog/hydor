@@ -9,7 +9,7 @@
 // what it asks for (an emoji, a picture, maths…) is chosen in the app and sent back to it.
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { KIT_CSS } from '@shared/page-kit';
-import { codeColoursScript } from '@shared/code-colours';
+import { codeColoursScript, hasCode } from '@shared/code-colours';
 import { cleanAnchor, type PageAnchor } from '@shared/page-comments';
 import { STORAGE_LIMITS } from '@shared/pages';
 import type { AppRun } from '@shared/apps';
@@ -364,7 +364,7 @@ function useThemeChange(f: () => void) {
  * opened, light or dark as that device is, and the script that colours its code blocks.
  */
 export function pageFile(html: string): string {
-  const head = `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${/\bn-code\b/.test(html) ? codeColoursScript() : ''}`;
+  const head = `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${hasCode(html) ? codeColoursScript() : ''}`;
   const d = /^(?:\s|<!--[\s\S]*?-->)*<!doctype[^>]*>/i.exec(html);
   return d ? d[0] + head + html.slice(d[0].length) : head + html;
 }
