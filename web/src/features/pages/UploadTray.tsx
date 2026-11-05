@@ -70,7 +70,6 @@ const LOST: Record<string, string> = {
   protection: 'sheet protection',
   print: 'print settings',
   rich: 'words formatted in parts of a cell',
-  cut: 'all of it: it did not all fit',
   files: 'the files it reads from its folder',
 };
 /** Charts and pictures are named apart: a document's charts and graphs, a spreadsheet's charts it cannot draw. */
@@ -146,8 +145,11 @@ function More({ it }: { it: UpItem }): ReactNode {
   const lines: ReactNode[] = [];
   if (it.copied) lines.push(tr(COPIED[it.copied]));
   if (d.stayed) {
-    const lost = (d.lost ?? []).map((k) => tr(lostWord(k, d.page?.kind)));
-    lines.push(lost.length ? tr(`The original stays where it was: the Library’s copy has no ${lost.join(', ')}`) : 'The original stays where it was');
+    const keys = d.lost ?? [];
+    const lost = keys.filter((k) => k !== 'cut').map((k) => tr(lostWord(k, d.page?.kind)));
+    if (lost.length) lines.push(tr(`The original stays where it was: the Library’s copy lacks ${lost.join(', ')}`));
+    if (keys.includes('cut')) lines.push('The original stays where it was: not all of it fitted in the Library’s copy');
+    if (!lost.length && !keys.includes('cut')) lines.push('The original stays where it was');
   } else if (d.trashed) lines.push('Moved: the original is in the Trash');
   else if (d.moved) lines.push(d.as === 'file' ? 'Moved into the project’s folder' : 'Moved into the Library');
   else if (it.byPath && d.existed) lines.push('The file stays where it was');
