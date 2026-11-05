@@ -26,6 +26,7 @@ const TOPIC = {
   general: 'app',
   notifications: 'inbox',
   security: 'app',
+  signatures: 'library',
   scm: 'devices',
   connect: 'devices',
   machines: 'devices',

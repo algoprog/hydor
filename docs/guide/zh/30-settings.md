@@ -43,6 +43,12 @@
 - [**修改密码**](/settings?s=security&find=Change%20password)：更改后，其他所有浏览器都会退出登录。
 - [**在此浏览器上退出登录**](/settings?s=security&find=Sign%20out%20of%20this%20browser)：你需要密码才能重新进入。
 
+### 签名
+
+[设置 → 签名](/settings?s=signatures)：你的签名和姓名缩写：画一次，加密保存，用于你要签署的文档。详见[资料库：页面、图片、视频和网站](/guide/library)。
+
+- [**新建签名**](/settings?s=signatures&find=New%20signature)：画出、输入或上传你的签名或姓名缩写。
+
 ### 源代码管理
 
 [设置 → 源代码管理](/settings?s=scm)：用于创建拉取请求的 GitHub 和 Gitea 账号。详见[手机、其他机器和分享](/guide/devices)。
