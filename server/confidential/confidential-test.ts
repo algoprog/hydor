@@ -270,6 +270,8 @@ test('a child of a confidential session is confidential too, on Custom with a lo
   assert.throws(() => start({ model: 'openrouter/anthropic/claude-sonnet', extra: { parent: SECRET } }), refused(409, /OpenRouter/));
   const child = confidentialStart(db, { agent: 'claude', cwd: tmp, extra: { parent: PLAIN } }, deps);
   assert.equal(isConfidential(child.extra), false, 'a child of another session is not');
+  // Nor can a session that isn't confidential have a confidential child, whose replies would go to it.
+  assert.throws(() => start({ extra: { confidential: true, parent: PLAIN } }), refused(400, /can’t be the child of one that isn’t/));
 });
 
 test('each message: refused while its model is elsewhere or gone, or its agent is not Custom', async () => {
