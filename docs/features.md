@@ -130,6 +130,11 @@ agents that speak ACP and take MCP servers.
   read-only, its experiments' runs and its reading list; they comment under their name (you get a notice and an Inbox
   line), and edit documents if you let them. Never your agents, files, settings or other projects; confidential
   sessions never show; wrong links count as wrong passwords.
+- **Folders in the Library**: each project's things in folders (and folders in folders), shown first as tiles, with the
+  way back over them; More → Move to a folder, or drag a card onto one; a folder moved to another project takes what
+  it holds; deleting one deletes nothing in it. **New → Import a folder** brings a folder of this computer in: a LaTeX
+  project as one document with its whole tree, any other folder as Library folders with its documents, spreadsheets,
+  slides, notebooks and LaTeX. Agents save into a folder by its name or path.
 - **Knowledge bases**: drop documents or a folder in once, and agents can search them: by their words (a
   full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning on) or for exact
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and
@@ -435,6 +440,15 @@ agents that speak ACP and take MCP servers.
   to 30 papers into a Library spreadsheet, each cell citing its page; **Reproduce a paper** (finds the code, builds a clean
   environment, sends long runs to Experiments, and compares each number with the paper's). A paper is found however
   it is given (DOI, arXiv id, link, title, PDF, .tex, a LaTeX project or a Library document), from open copies only.
+- **Read and highlight PDFs** (Files → a PDF → Highlight): the app's own reader, the words in reading order (two columns
+  too) to select; highlight passages, equations and figures in four colours, write notes beside them, copy them, and ask
+  an agent about the exact part you picked. Notes are kept beside the file, follow it when it moves, and are found again
+  by their words when the PDF changes; **Keep in a project** makes them one document of a project's knowledge, updated
+  as you go, and **Save into the PDF** writes them as its own annotations. Agents read them with pdf_notes.
+- **LaTeX projects as a tree**: a document's files beside its source on the left (the main file first, folders, the
+  order the document reads them), with what it doesn't use set apart under Not used and what TeX takes from a folder
+  shown read-only; new files, folders and pictures go where you say, and renaming or dragging a file keeps its
+  \input and \includegraphics right. A chapter opened from Files opens with its document's tree.
 - **Check a paper before you submit** (LaTeX editor → Tools → Check before submitting): pick the venue (ACL Rolling
   Review, SIGIR, CIKM, WSDM, TheWebConf, KDD, NeurIPS, ICLR, ICML, AAAI, journals, Other) and it checks every citation
   against the bibliography and online (Crossref, arXiv, OpenAlex, Semantic Scholar: does it exist, are the authors,
