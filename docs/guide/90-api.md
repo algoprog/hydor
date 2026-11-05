@@ -725,6 +725,42 @@ Agents take them with their own ui_screenshot tool when they change how a web ap
 - `GET /api/shots/:id/pair` — a screenshot and, for an after one, the before one it answers (the session's latest before with the same label and viewport, taken earlier). Returns: `{ shot: Shot, before: Shot | null }`; 404 when it is no longer kept.
 - `GET /api/shots/:id` — the picture itself (WebP). 404 when it is no longer kept (the pictures go with their session, and the oldest go past 500 MB in all).
 
+## Experiments (System → Experiments)
+
+<!-- Workstream A: one bullet per route, as the others. -->
+
+<!-- end: api-a -->
+
+## Research tools (the LaTeX editor's checks and packages)
+
+<!-- Workstream C. -->
+
+<!-- end: api-c -->
+
+## Research apps' helpers
+
+<!-- Workstreams B1, B2 and D, if they add routes. -->
+
+<!-- end: api-b -->
+
+## Confidential sessions
+
+<!-- Workstream F. -->
+
+<!-- end: api-f -->
+
+## Sharing a project (Projects → Share)
+
+<!-- Workstream G. -->
+
+<!-- end: api-g -->
+
+## Engineering (Git: find what broke it; campaigns)
+
+<!-- Workstream E. -->
+
+<!-- end: api-e -->
+
 ## Not for agents
 
 These routes serve the app’s own pages, need the user’s browser, or are the user’s alone; app_api refuses the ones an agent must never use.
