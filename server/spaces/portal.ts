@@ -494,6 +494,11 @@ export function portalRoutes(d: Deps) {
       if (!c.onlyComments && b.force !== true) throw new HttpError(409, `Version ${page.version} was saved after the one you changed (${base}).`);
     }
     const stored = pageModel(db, page.id) as { comments?: Comment[] } | null;
+    // Pictures come from the person's device (as naget-asset:): a picture at a web address that was not there before
+    // would have this computer fetch it when it draws the document (an export, its picture in the list).
+    const webSrcs = (v: unknown) => new Set([...JSON.stringify(v ?? null).matchAll(/"src":"(https?:\/\/[^"]+)"/gi)].map((m) => m[1]));
+    const had = webSrcs(stored);
+    if ([...webSrcs(model)].some((u) => !had.has(u))) throw new HttpError(400, 'Add pictures from your device: a picture at a web address can’t be added through a link');
     model = withTheirComments(page.kind, model, stored, p.who);
     const saved = addVersion(db, page.id, { model, by: 'edit', who: p.share.name });
     noteShareVersion(db, page.id, saved.version, p.share.id, 'edit');
