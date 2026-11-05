@@ -1122,7 +1122,7 @@ export function SlidesEditor({
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
-          <MenuBar menus={menus} compact={width < 1020 || layout === 'sheet'} className="shrink-0" />
+          <MenuBar menus={menus} compact={layout === 'sheet' ? true : 'auto'} />
         </div>
         {layout === 'page' && mid && (
           <Segmented

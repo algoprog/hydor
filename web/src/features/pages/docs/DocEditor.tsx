@@ -1,6 +1,6 @@
 // A document to read and edit as in Word or Google Docs: its sheet of paper (its size and margins; on a phone the
 // words fill the screen's width), edited in place (engine.ts), with the menus (Edit, View, Insert, Format, Tools,
-// and Search the menus) and the toolbar over it (menu.tsx, Toolbar.tsx), its headings beside it on a wide screen
+// and Search the menus) beside its title and the toolbar over it (menu.tsx, Toolbar.tsx), its headings beside it on a wide screen
 // (folded away on a narrow one) to go to, and the words it has in a quiet corner (a click there counts them all). A
 // page break shows as a gap between two sheets, the header and footer on each sheet's margins. A picture picked gets
 // handles to size it and a bar for its alignment, caption and description (Picture.tsx); a table, handles on its
@@ -864,7 +864,11 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     <div ref={root} className="flex h-full min-h-0 flex-col bg-bg">
       <style>{`${css}\n${marks}\n.nd-ed.nd-painting,.nd-ed.nd-painting *{cursor:copy!important}\n::highlight(nd-find){background-color:rgba(255,213,79,.55)}\n::highlight(nd-find-now){background-color:#ff9632;color:#000}\n.nd-math-wait{font-family:${'ui-monospace,monospace'};color:#80868b;font-size:.9em}`}</style>
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">{lead}</div>
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
+          {/* The menus beside the title, where the header has room for them; one button where it hasn't. */}
+          {st && e && <MenuBar menus={readOnly ? menus.filter((m) => m.label === 'View' || m.label === 'Tools') : menus} compact={phone ? true : 'auto'} />}
+        </div>
         {(comments.length > 0 || panel) && (
           <button
             ref={commentsRef}
@@ -895,15 +899,9 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
         {tail}
       </div>
       {band}
-      {st && e && (
+      {st && e && !readOnly && (
         <div className="flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-panel px-2 [&::-webkit-scrollbar]:hidden">
-          <MenuBar menus={readOnly ? menus.filter((m) => m.label === 'View' || m.label === 'Tools') : menus} compact={phone || width < 1060} className="shrink-0" />
-          {!readOnly && (
-            <>
-              <span className="mx-1 h-5 w-px shrink-0 bg-line" />
-              <Toolbar engine={e} st={st} doc={model} linking={linking} setLinking={setLinking} linkRef={linkRef} onComment={startComment} slim={!phone && width >= 1060 && width < 1240} />
-            </>
-          )}
+          <Toolbar engine={e} st={st} doc={model} linking={linking} setLinking={setLinking} linkRef={linkRef} onComment={startComment} slim={!phone && width < 820} />
         </div>
       )}
       <div className="relative flex min-h-0 flex-1">
