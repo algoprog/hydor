@@ -2,7 +2,7 @@
 // what you can do with them: draw a new one, rename one, draw one again, keep one you gave an agent for now only, or
 // delete it. Also the dialog that draws a signature and keeps it, which other parts of the app open too.
 import { useCallback, useRef, useState } from 'react';
-import { Ellipsis, Pencil, PenLine, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, Ellipsis, Pencil, PenLine, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { defaultSignatureName, signatureName, type SignatureKind, type SignatureView } from '@shared/signatures';
 import { del, enc, patch } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
@@ -126,7 +126,8 @@ function Row({ s, onRename, onRedraw, onDelete, onKeep }: { s: SignatureView; on
     setMenu(false);
     f();
   };
-  const date = (t: number) => new Date(t).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' });
+  // This year's dates without their year, so a row fits a phone.
+  const date = (t: number) => new Date(t).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
   const note = s.until ? `Kept until ${new Date(s.until).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : s.usedAt ? `Last placed ${date(s.usedAt)}` : `Added ${date(s.createdAt)}`;
   return (
     <div className="flex items-center gap-3 py-2.5">
@@ -140,7 +141,8 @@ function Row({ s, onRename, onRedraw, onDelete, onKeep }: { s: SignatureView; on
         </div>
       </div>
       {s.until && (
-        <Button size="sm" variant="secondary" onClick={onKeep}>
+        // On a phone it is in the menu, so the name keeps its room.
+        <Button size="sm" variant="secondary" onClick={onKeep} className="max-md:hidden">
           Keep it
         </Button>
       )}
@@ -148,6 +150,11 @@ function Row({ s, onRename, onRedraw, onDelete, onKeep }: { s: SignatureView; on
         <Ellipsis size={16} />
       </IconButton>
       <Popover anchor={more} open={menu} onClose={() => setMenu(false)} align="end" width={220}>
+        {s.until && (
+          <MenuItem icon={<Check size={14} />} onClick={run(onKeep)}>
+            Keep it for later
+          </MenuItem>
+        )}
         <MenuItem icon={<Pencil size={14} />} onClick={run(onRename)}>
           Rename
         </MenuItem>
