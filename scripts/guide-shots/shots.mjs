@@ -224,7 +224,7 @@ export const SHOTS = [
       await p.eval(`(${group.slice(3)})?.scrollIntoView({ block: 'center' })`);
       await sleep(500);
       await p.park();
-      return p.shot(ctx.file, { clip: await around(p, [group], 20) });
+      return p.shot(ctx.file, { clip: await around(p, [group], 12) });
     },
   },
   {

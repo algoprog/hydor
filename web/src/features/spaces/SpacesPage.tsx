@@ -145,7 +145,7 @@ function SpaceCard({ s, spaces }: { s: SpaceView; spaces: SpaceView[] }) {
         </div>
         <div className="mt-3 text-[12.5px] text-fg-2">{holds(s)}</div>
         <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
-          <span className="min-w-0 flex-1 truncate text-[12px] text-fg-3">{s.lastAt ? tr(`Last at work ${timeAgo(s.lastAt)} ago`) : 'No sessions yet'}</span>
+          <span className="min-w-0 flex-1 truncate text-[12px] text-fg-3">{s.lastAt ? (timeAgo(s.lastAt) === 'just now' ? 'Last at work just now' : tr(`Last at work ${timeAgo(s.lastAt)} ago`)) : 'No sessions yet'}</span>
           <Button
             size="sm"
             variant="secondary"
