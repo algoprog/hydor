@@ -18,9 +18,9 @@ import { normalizeTex, type TexDoc } from '../../shared/latex.ts';
 import { ARXIV_DEFAULTS, detectVenue, venueById, venueWith, type CheckFinding, type CheckState } from '../../shared/latex-submit.ts';
 import type { ResultsTable, RunRecord } from '../../shared/experiments.ts';
 import { arxivPackage, flattenTex, pictureSize, stripComments, usedFiles } from './latex-arxiv.ts';
-import { checkJob, finishedCheck, fontsOf, gridOf, infoOf, pagesOf, startCheck, useRecords } from './latex-check.ts';
+import { checkJob, countEnd, finishedCheck, fontsOf, gridOf, infoOf, pagesOf, startCheck, useRecords } from './latex-check.ts';
 import { differences, entryFrom, Lookup, sameVenue, type PaperRecord } from './latex-lookup.ts';
-import { betterOf, bibAuthors, bibField, cellNumber, citesIn, cleanTex, parseBibFile, scanTex, tabularsIn, templateMode, texSources, titleLikeness } from './latex-paper.ts';
+import { betterOf, bibAuthors, bibField, cellNumber, citesIn, cleanTex, headingsIn, parseBibFile, scanTex, tabularsIn, templateMode, texSources, titleLikeness } from './latex-paper.ts';
 import { pages } from './index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -295,7 +295,7 @@ const PAPER = (body: string, pre = '\\documentclass[11pt]{article}\n\\usepackage
     '\\bottomrule',
     '\\end{tabular}',
     '\\end{table}',
-    '% hydor:table t1',
+    '% hydor:table tmq3x9a1f2',
     '\\begin{tabular}{lc}',
     '\\toprule',
     'Run & MRR \\\\',
@@ -313,29 +313,54 @@ const PAPER = (body: string, pre = '\\documentclass[11pt]{article}\n\\usepackage
   ].join('\n');
   const d = doc(`\\documentclass{article}\\begin{document}\n${table}\n\\end{document}\n`);
   const newer: ResultsTable = {
-    id: 't1',
+    id: 'tmq3x9a1f2',
     spec: { columns: [{ metric: 'mrr', better: 'max' }] },
     rows: [],
-    latex: '% hydor:table t1\n\\begin{tabular}{lc}\n\\toprule\nRun & MRR \\\\\n\\midrule\nA & 0.31 \\\\\nB & \\textbf{0.36}$^\\dagger$ \\\\\n\\bottomrule\n\\end{tabular}\n',
+    latex: '% hydor:table tmq3x9a1f2\n\\begin{tabular}{lc}\n\\toprule\nRun & MRR \\\\\n\\midrule\nA & 0.31 \\\\\nB & \\textbf{0.36}$^\\dagger$ \\\\\n\\bottomrule\n\\end{tabular}\n',
     markdown: '',
     csv: '',
     madeAt: 0,
   };
   const runs = [{ id: 'r1', status: 'done', command: 'x', cwd: tmp, createdAt: 0, metrics: { last: { p: 0.7012, r: 0.6, f1: 0.6462 } } }] as RunRecord[];
-  useRecords({ recomputeTable: (_db, id) => (id === 't1' ? newer : null), listRuns: () => runs });
+  useRecords({ recomputeTable: (_db, id) => (id === 'tmq3x9a1f2' ? newer : null), listRuns: () => runs });
   const st = await check(d, 'other');
   const bold = has(st, 'numbers:bold:');
   ok(bold?.level === 'must' && /0\.412/.test(bold.detail ?? ''), `bold on a value that is not the best (${bold?.detail})`);
   const fixed = applied(d.main, bold!, 'main.tex');
   ok(fixed.includes('BM25 & \\textbf{0.412} & \\textbf{12}') && fixed.includes('Ours & 0.405 & 30'), 'Move the bold puts it on the best, and only there');
-  const stale = has(st, 'numbers:stale:t1');
+  const stale = has(st, 'numbers:stale:tmq3x9a1f2');
   ok(stale?.level === 'must' && /0\.35 in the paper, 0\.36 now/.test(stale.detail ?? '') && stale.fix?.label === 'Update the table', `a table of Experiments' whose runs changed (${stale?.detail})`);
-  ok(applied(d.main, stale!, 'main.tex').includes('B & \\textbf{0.36}$^\\dagger$') && applied(d.main, stale!, 'main.tex').includes('% hydor:table t1\n\\begin{tabular}'), 'Update the table puts in the new one, under its marker');
+  ok(applied(d.main, stale!, 'main.tex').includes('B & \\textbf{0.36}$^\\dagger$') && applied(d.main, stale!, 'main.tex').includes('% hydor:table tmq3x9a1f2\n\\begin{tabular}'), 'Update the table puts in the new one, under its marker');
   const traced = st.findings.filter((f) => f.id.startsWith('numbers:traced:'));
   ok(traced.length === 2 && traced.some((f) => /^3 of the 6 numbers/.test(f.title)) && traced.some((f) => /^0 of the 4 numbers/.test(f.title)) && traced.every((f) => f.level === 'info'), `numbers traced to runs, as the table rounds them and as percentages (${traced.map((f) => f.title)})`);
+  // A table as Experiments writes it (its marker, arrows in the header, mean ± std, bold, daggers): read as it is.
+  const aTable = [
+    '\\begin{table}[t]',
+    '\\centering',
+    '\\caption{Results. Mean $\\pm$ standard deviation over 3 seeds.}',
+    '\\label{tab:bm25}',
+    '% hydor:table tmq3x9b2c4',
+    '\\begin{tabular}{lcc}',
+    '\\toprule',
+    'Method & nDCG@10 $\\uparrow$ & latency $\\downarrow$ \\\\',
+    '\\midrule',
+    'BM25 & 0.412 $\\pm$ 0.010 & \\textbf{12.0} $\\pm$ 0.4 \\\\',
+    'Ours & \\textbf{0.455} $\\pm$ 0.008$^\\dagger$ & 30.1 $\\pm$ 1.2 \\\\',
+    '\\bottomrule',
+    '\\end{tabular}',
+    '\\end{table}',
+  ].join('\n');
+  const ad = doc(`\\documentclass{article}\\begin{document}\n${aTable}\n\\end{document}\n`);
+  const at = tabularsIn(texSources(ad)[0])[0];
+  const ag = gridOf(at);
+  ok(at.marker === 'tmq3x9b2c4' && ag.head === 1 && betterOf(ag.header[1]).better === 'max' && betterOf(ag.header[2]).better === 'min', 'Experiments’ table: its marker, and which way each column is better');
+  const ours = ag.rows[2].cells[1].n!;
+  ok(ours.value === 0.455 && ours.bold && ours.marked && ag.rows[1].cells[1].n?.value === 0.412 && !ag.rows[1].cells[1].n?.marked, 'its cells: the mean, bold, the dagger');
+  useRecords({ recomputeTable: (_db, id) => (id === 'tmq3x9b2c4' ? { ...newer, id, latex: aTable } : null), listRuns: () => [] });
+  ok(!(await check(ad, 'other')).findings.some((f) => f.id.startsWith('numbers:stale') || f.id.startsWith('numbers:bold')), 'the same as its runs give now: nothing to say');
   useRecords({ recomputeTable: () => null, listRuns: () => [] });
   const st2 = await check(d, 'other');
-  ok(has(st2, 'numbers:gone:t1')?.level === 'info' && has(st2, 'numbers:noruns')?.level === 'info', 'no runs: said as information, never as an error');
+  ok(has(st2, 'numbers:gone:tmq3x9a1f2')?.level === 'info' && has(st2, 'numbers:noruns')?.level === 'info', 'no runs: said as information, never as an error');
   // Ties, blocks and a table with its metrics in rows are fine.
   const fine = doc(
     '\\documentclass{article}\\begin{document}\n\\begin{tabular}{lcc}\nModel & Acc & F1 \\\\\n\\midrule\nA & \\textbf{0.9} & \\textbf{0.8} \\\\\nB & 0.9 & 0.7 \\\\\n\\midrule\nC & \\textbf{0.5} & \\textbf{0.4} \\\\\nD & 0.4 & 0.3 \\\\\n\\end{tabular}\n\\begin{tabular}{lcc}\nMetric & M1 & M2 \\\\\n\\midrule\nLoss & \\textbf{0.1} & 0.2 \\\\\nAccuracy & 0.8 & \\textbf{0.9} \\\\\n\\end{tabular}\n\\end{document}\n',
@@ -417,12 +442,21 @@ const PAPER = (body: string, pre = '\\documentclass[11pt]{article}\n\\usepackage
 // ---- a typeset PDF: pages, fonts, the PDF's own fields ---------------------------------------------------------------------------
 {
   const text = 'A title\nSome words of the abstract go here\n\fPage two text with many words in it\n1 Introduction\n\fMore text on page three\nReferences\nA. Author. A paper.\n\fAppendix text\n\f';
-  const p = pagesOf(text, { freeHeadings: [] });
+  const p = pagesOf(text);
   ok(p.total === 4 && p.counted === 3 && p.refsAt === 3, `pages before the references (${JSON.stringify(p)})`);
   const top = pagesOf('Under review as a conference paper\nThe text of the first page\n\fUnder review as a conference paper\nReferences\nx\n\f', {});
   ok(top.counted === 1, `a references heading at the top of its page, under the running head: that page does not count (${JSON.stringify(top)})`);
-  const acl = pagesOf('words words words words\n\fmore words here and there\nLimitations\nThe limits.\n\fReferences\n', { freeHeadings: ['limitations?'] });
-  ok(acl.counted === 2 && /Limitations/.test(acl.heading ?? ''), 'the count stops at a part the venue does not count');
+  const acl = pagesOf('words words words words\n3.2 Limitations\nof the method, in the body\n\fmore words here and there\nLimitations\nThe limits.\n\fReferences\n', { end: 'Limitations' });
+  ok(acl.counted === 2 && /Limitations/.test(acl.heading ?? ''), `the count stops at the part the venue does not count, its last heading before the references (${JSON.stringify(acl)})`);
+  const src = (main: string) => {
+    const d = doc(main);
+    const sources = texSources(d);
+    return { sources, headings: headingsIn(sources) };
+  };
+  const a1 = src('\\documentclass{article}\\begin{document}\\section{Intro}\\subsection{Limitations}x\\section{Conclusion}\\section*{Limitations}\\section*{Ethics Statement}\\bibliography{r}\\end{document}');
+  ok(countEnd(a1.sources, a1.headings, venueById('arr-long')) === 'Limitations', 'from the source: the first of the parts after the main text that ACL does not count');
+  const a2 = src('\\documentclass{article}\\begin{document}\\section{Intro}\\section{Conclusion}\\appendix\\section{Proofs}\\section{More}\\bibliography{r}\\end{document}');
+  ok(countEnd(a2.sources, a2.headings, venueById('neurips')) === 'Proofs' && countEnd(a2.sources, a2.headings, venueById('sigir-full')) === null, 'an appendix before the references: not counted where the venue does not count it');
   const row = (n: string, t: string, e: string, emb: string) => `${n.padEnd(37)}${t.padEnd(18)}${e.padEnd(17)}${emb.padEnd(4)}no  no      4  0`;
   const fonts = fontsOf(
     [
