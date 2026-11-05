@@ -348,7 +348,7 @@ const NOTES_TOOL: RunTool = {
     'The highlights and notes the user made on a PDF in the app (Files → a PDF → Highlight), page by page: the words each highlight covers, or, for an area they dragged around',
     'a figure or an equation, a picture of that part and any words in it; its colour, and the note they wrote on it. Use it when they speak of their highlights, notes or annotations on a paper:',
     'to sum them up, answer from them, or check them against the paper (read_document reads the whole PDF, pdf_look shows its pages). Without path: the PDF they asked about from Files.',
-    'The notes are theirs: quote them as they wrote them.',
+    'The notes are theirs: quote them as they wrote them. To highlight words for them when they ask, app_api POST /api/pdf-notes { path, put: [{ page, text, color?, note? }] } finds the words on that page (the API guide says more).',
   ].join(' '),
   inputSchema: {
     type: 'object',

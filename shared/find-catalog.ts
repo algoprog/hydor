@@ -237,6 +237,7 @@ const PAGES: [string, string, string, string, string][] = [
   ['search-files', 'Search in files', '/search', 'grep find text in files code names where folder', 'Find files by their names and the text inside them, in any folder'],
   ['files-recent', 'Recent files', '/files?place=recent', 'recent files opened lately last history', 'The files you opened lately'],
   ['files-trash', 'Trash', '/files?place=trash', 'trash deleted files put back restore undelete recycle bin empty', 'What you deleted in Files, to put back or delete for good'],
+  ['pdf-highlights', 'Highlight a PDF', '/guide/files-git#read-and-highlight-a-pdf', 'pdf highlight highlighter highlights annotate annotations notes reader read paper papers mark passage equation figure ask agent keep in project knowledge save into pdf', 'Open a PDF in Files and press Highlight: mark passages, equations and figures, write notes beside them and ask an agent about them'],
   ['git', 'Git', '/git', 'repositories commits branches push pull sync diff merge conflicts rebase stash clone tags history graph', 'Repositories, changes, branches and history'],
   ['git-bisect', 'Find what broke it', '/git?tab=history&bisect=1', 'bisect git bisect regression first bad commit which commit broke worked before used to work', 'An agent finds the commit that broke something, between where it worked and now'],
   ['terminal', 'Terminal', '/terminal', 'shell console command line bash', 'Shells on this computer'],
