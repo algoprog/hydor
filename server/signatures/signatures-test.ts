@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { cropPixels, hasClearBackground, inkBox, padBox, paperToClear } from '../../shared/signatures.ts';
+import { APP_ROOT } from '../config.ts';
 import { rotateVaultKey } from '../connections/vault.ts';
 import { openDb } from '../db.ts';
 import { ruleFor } from '../guide/api.ts';
@@ -23,7 +24,7 @@ import { zipParts } from '../pages/ooxml.ts';
 import { createPage, initPages, pageSource } from '../pages/store.ts';
 import { placeInDoc } from './doc.ts';
 import { placeInDocx, xmlProblem } from './docx.ts';
-import { PDF_NOT_READY, pdfHooks, type PdfSpot } from './pdf.ts';
+import { pdfHooks, type PdfSpot } from './pdf.ts';
 import { pictureView, signPicture } from './picture.ts';
 import type { ApprovalRequest } from '../../shared/types.ts';
 import type { ApprovalAnswer } from '../agents/live.ts';
@@ -512,10 +513,25 @@ const plain = (xml: string) => [...xml.matchAll(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>
   fs.writeFileSync(path.join(folder, 'notes.txt'), 'hello');
   ok(/not a kind of file this signs/.test(text(await tool('place_signature').run({ signature: 'Signature', file: path.join(folder, 'notes.txt') }, yes.ctx))), 'a file of another kind: a plain answer');
 
-  // A PDF, before the PDF code is merged: not ready yet.
+  // A file that only starts like a PDF: the PDF code's plain answer.
   fs.writeFileSync(path.join(folder, 'form.pdf'), '%PDF-1.7\n%%EOF\n');
-  const notYet = await tool('place_signature').run({ signature: 'Signature', file: path.join(folder, 'form.pdf'), near: 'Signature' }, yes.ctx);
-  ok(typeof notYet !== 'string' && notYet.isError && notYet.text === PDF_NOT_READY, 'a PDF answers that PDFs are not ready yet', notYet);
+  const broken = await tool('place_signature').run({ signature: 'Signature', file: path.join(folder, 'form.pdf'), near: 'Signature' }, yes.ctx);
+  ok(typeof broken !== 'string' && broken.isError && /damaged/.test(broken.text), 'a damaged PDF: the PDF code says so', broken);
+  // With the PDF code itself (server/documents/pdf): a form printed by LibreOffice, signed after its "Signature:", in
+  // an update that leaves the file's own bytes as they were, the picture's see-through background kept.
+  const printed = fs.readFileSync(path.join(APP_ROOT, 'server/documents/pdf/test-files/printed-form.pdf'));
+  fs.writeFileSync(path.join(folder, 'printed.pdf'), printed);
+  const real = allowWith('accept', 'claude:pdf-real');
+  const realDone = text(await tool('place_signature').run({ signature: 'Signature', file: path.join(folder, 'printed.pdf'), near: 'Signature:' }, real.ctx));
+  const signedPdf = fs.existsSync(path.join(folder, 'printed (signed).pdf')) ? fs.readFileSync(path.join(folder, 'printed (signed).pdf')) : Buffer.alloc(0);
+  const { PdfFile } = await import('../documents/pdf/file.ts');
+  const pf = signedPdf.length ? new PdfFile(signedPdf) : null;
+  const imgs = pf ? pf.objectNumbers().map((n) => pf.getObj(n)).filter((o) => !!o && typeof o === 'object' && 'dict' in o && (o as { dict: Map<string, unknown> }).dict.get('Subtype') === 'Image') : [];
+  ok(
+    signedPdf.subarray(0, printed.length).equals(printed) && imgs.length === 2 && real.cards[0]?.signature?.place?.page === 1 && /page 1 of 1, right after “Signature:”/.test(realDone),
+    'a real PDF: signed beside the words in an update, the picture with its soft mask',
+    realDone,
+  );
   // With PDF code (a stand-in here): beside the words found, the card with the page as it will be, the copy written.
   const stamped: PdfSpot[] = [];
   pdfHooks.tools = {
