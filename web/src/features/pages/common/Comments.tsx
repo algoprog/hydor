@@ -1,5 +1,6 @@
-// A comment as the editors show it, beside a document's page or in a list of comments: who wrote it (you, or an
-// agent), how long ago, what it says and the replies under it, with Reply, Resolve (or Reopen), and in its menu Edit
+// A comment as the editors show it, beside a document's page or in a list of comments: who wrote it (you, an agent,
+// or someone named, with their initials), how long ago, what it says and the replies under it, with Reply, Resolve
+// (or Reopen), and in its menu Edit
 // and Delete. CommentBox is the field a new comment or a reply is written in: Ctrl+Enter sends it, Esc drops it.
 // Who and ago say who did something and when, for other notes of the editors as well (a tracked change).
 // What people and agents wrote is shown as written, never translated.
@@ -20,8 +21,30 @@ export function ago(at: number): string {
   return d.toLocaleDateString(LOCALE, d.getFullYear() === now.getFullYear() ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-/** Who wrote it: you or an agent, with their icon (for a tracked change too). */
-export function Who({ by }: { by: 'user' | 'agent' }) {
+/** A named author's initials ("ML" for Maria Lopez), and a colour of their own, the same each time. */
+function initials(name: string): { letters: string; hue: number } {
+  const words = name.split(/\s+/).filter(Boolean);
+  const letters = (words.length > 1 ? `${[...words[0]][0]}${[...words[words.length - 1]][0]}` : [...name].slice(0, 2).join('')).toUpperCase();
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.codePointAt(0)!) % 360;
+  return { letters, hue: h };
+}
+
+/** Who wrote it: you, an agent or someone named (a Word file's comments), with their icon or initials (for a tracked change too). */
+export function Who({ by, author }: { by: 'user' | 'agent'; author?: string }) {
+  if (author) {
+    const { letters, hue } = initials(author);
+    return (
+      <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium text-fg">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9.5px] font-semibold text-white" style={{ background: `hsl(${hue} 45% 45%)` }} translate="no">
+          {letters}
+        </span>
+        <span className="truncate" translate="no">
+          {author}
+        </span>
+      </span>
+    );
+  }
   return (
     <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-fg">
       <span className={cx('flex h-5 w-5 items-center justify-center rounded-full', by === 'agent' ? 'bg-accent-soft text-accent' : 'bg-bg-3 text-fg-2')}>{by === 'agent' ? <Bot size={12} /> : <User size={12} />}</span>
@@ -134,8 +157,8 @@ export function CommentThread({
       className={cx('rounded-xl border bg-elevated p-2.5 text-[13px] transition-shadow', active ? 'border-accent/60 shadow-lg' : 'border-line hover:border-line-2', c.resolved && 'opacity-70', onFocus && 'cursor-pointer', className)}
     >
       <div className="flex items-center gap-2">
-        <Who by={c.by} />
-        <span className="text-[11.5px] text-fg-3">{ago(c.at)}</span>
+        <Who by={c.by} author={c.author} />
+        <span className="shrink-0 text-[11.5px] text-fg-3">{ago(c.at)}</span>
         <span className="flex-1" />
         {!readOnly && (
           <>
@@ -161,7 +184,7 @@ export function CommentThread({
               <MoreHorizontal size={15} />
             </IconButton>
             <Popover anchor={more} open={menu} onClose={() => setMenu(false)} align="end" width={180} title="Comment">
-              {onEdit && c.by === 'user' && (
+              {onEdit && c.by === 'user' && !c.author && (
                 <MenuItem
                   icon={<Pencil size={14} />}
                   onClick={() => {
@@ -212,8 +235,8 @@ export function CommentThread({
       {c.replies?.map((r) => (
         <div key={r.id} className="mt-2.5 border-t border-line/70 pt-2">
           <div className="flex items-center gap-2">
-            <Who by={r.by} />
-            <span className="text-[11.5px] text-fg-3">{ago(r.at)}</span>
+            <Who by={r.by} author={r.author} />
+            <span className="shrink-0 text-[11.5px] text-fg-3">{ago(r.at)}</span>
           </div>
           <div translate="no" className="mt-1 whitespace-pre-wrap break-words text-fg">
             {r.text}
