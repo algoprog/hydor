@@ -1530,7 +1530,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
             value={pane}
             onChange={setPane}
             options={[
-              { value: 'source', label: 'Source' },
+              { value: 'source', label: 'LaTeX source' },
               { value: 'preview', label: 'Preview' },
             ]}
           />
