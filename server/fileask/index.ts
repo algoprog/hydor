@@ -8,6 +8,7 @@ const BY_KIND: Record<string, string> = {
   xlsx: 'It is an Excel workbook: change it with a script that keeps the rest as it is (openpyxl, say), and keep formulas as formulas.',
   ipynb: 'It is a Jupyter notebook: change its cells with your notebook-editing tool (NotebookEdit) or nbformat rather than rewriting its JSON, keep the cell ids and the outputs of cells you do not change, and remember that a cell you change has no output until it runs again ("cell 3" is the third, as the notebook page numbers them).',
   tex: 'It is a LaTeX file: the comments the user wrote on its words (and on the files it reads) are kept by the app, not in the file. get_page with its path lists them; answer, resolve or add them with save_latex’s path and comments.',
+  pdf: 'It is a PDF they are reading in the app: read it with read_document, and see its pages with pdf_look. A passage they quote, or a picture of a part of a page they send, comes from it, with its page: answer about that part, using the rest of the file as you need. The highlights and notes they made on it, if any, are listed by pdf_notes. Leave the file as it is unless they ask for a change.',
 };
 
 /** What the agent is told of the file it was asked about. */
