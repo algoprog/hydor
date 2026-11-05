@@ -2241,6 +2241,8 @@ export function docxFile(
       const pPr = pPrXml({ keepLines: true, pageBreak, spacing: editor ? spaceXml(b.space) : '', jc: '<w:jc w:val="center"/>' });
       body.push(omml ? para(pPr, `<m:oMathPara>${mathSized(omml, S * 1.21)}</m:oMathPara>`) : para(pPr, runXml({ t: b.tex, i: true, font: 'Cambria Math' })));
     } else if (b.k === 'pb') {
+      // A page break after another: the empty page between them holds a paragraph a point high.
+      if (editor && breakNext) body.push(tiny({ pageBreak: true }));
       if (editor) breakNext = true;
       else body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
     } else if (b.k === 'pre') {
