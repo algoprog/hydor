@@ -73,7 +73,8 @@ the ones you start in VS Code or a terminal show up too.
 - **For researchers**: papers to keep up with (a Paper radar ranked against your projects, citation alerts, new models,
   deadlines), a reading list kept in step with Zotero, a check before you submit a LaTeX paper (references verified
   online, anonymity, page limits, the numbers in your tables) and an arXiv package, simulated reviews and rebuttals, a
-  paper turned into a talk, poster and thread, and **Experiments**: training runs that wait for a free GPU on your
+  paper turned into a talk, poster and thread, PDFs you highlight and ask about, LaTeX projects shown as a tree of their
+  files, and **Experiments**: training runs that wait for a free GPU on your
   machines or a SLURM cluster, kept as records, with an agent on call, sweeps and results tables with significance.
 - **For engineers**: failed CI runs looked into, new issues triaged, dependencies kept up to date, alerts answered, the
   commit that broke something found by git bisect, and big changes made in parts by a campaign of agents.
