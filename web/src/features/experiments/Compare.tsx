@@ -40,7 +40,8 @@ export function Compare({ runs, onClose }: { runs: RunRecord[]; onClose: () => v
     for (const s of series ?? []) for (const [k, pts] of Object.entries(s ?? {})) if (pts.length) seen.add(k);
     return [...seen];
   }, [series]);
-  const params = useMemo(() => [...new Set(runs.flatMap((r) => Object.keys(r.params ?? {})))], [runs]);
+  // The seed has a row of its own.
+  const params = useMemo(() => [...new Set(runs.flatMap((r) => Object.keys(r.params ?? {})))].filter((p) => p !== 'seed'), [runs]);
   const label = (r: RunRecord) => r.name ?? r.id;
   const rows = [...ROWS.map((x) => ({ label: x.label, cells: runs.map(x.of), mono: x.label === 'Command' || x.label === 'Folder' || x.label === 'Commit' })), ...params.map((p) => ({ label: p, cells: runs.map((r) => (r.params?.[p] === undefined ? '' : String(r.params[p]))), mono: true, param: true }))];
   return (
