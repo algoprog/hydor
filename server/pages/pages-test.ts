@@ -335,6 +335,13 @@ let privPath = '';
   r = await run('save_sheet', { id: sheet, title: 'Costs', update: [{ sheet: 'costs', cells: { B3: 350, A5: 'Checked' } }] });
   const book = (await req('GET', `/api/pages/${sheet}`)).json().model;
   ok(!r.error && book.sheets[0].cells.B3.v === 350 && book.sheets[0].cells.B2.v === 1200 && book.sheets[0].cells.A5.v === 'Checked' && book.sheets[0].cells.B2.s?.fmt === 'currency', 'save_sheet update changes some cells, the rest (values and looks) as it was');
+  ok(book.sheets[0].cells.B3.s?.fmt === 'currency', 'a value written over a cell keeps its look (its words change)');
+  r = await run('save_sheet', { id: sheet, title: 'Costs', update: [{ sheet: 'Costs', cells: { B2: { bold: true }, A2: { note: 'Monthly' } } }, { sheet: 'Notes', rows: [['Kept']] }, { sheet: 'notes', cells: { B1: 'too' } }, { cells: { A2: 'Rent, paid' } }] });
+  const book2 = (await req('GET', `/api/pages/${sheet}`)).json().model;
+  const b2 = book2.sheets[0].cells.B2;
+  ok(!r.error && b2.v === 1200 && b2.s?.b === true && b2.s?.fmt === 'currency', 'a cell given as an object keeps what it leaves out (its value, its format)');
+  ok(book2.sheets[0].cells.A2.v === 'Rent, paid' && book2.sheets[0].cells.A2.note === 'Monthly', 'a cell written again keeps its note');
+  ok(book2.sheets.length === 2 && book2.sheets[1].name === 'Notes' && book2.sheets[1].cells.A1.v === 'Kept' && book2.sheets[1].cells.B1.v === 'too', 'two updates of a sheet the call adds make one sheet');
 
   // LaTeX: a section.
   const tex = idOf((await run('save_latex', { title: 'Paper', source: '\\documentclass{article}\n\\begin{document}\n\\section{Intro}\nHello.\n\n\\section{Method}\nOld.\n\\end{document}\n' })).text);

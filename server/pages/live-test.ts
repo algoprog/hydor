@@ -289,6 +289,10 @@ const textOf = (d: Doc) => d.blocks.map(blockText).join('\n');
     ud.model.sheets[0].cells.B5?.v === 71 && ud.model.sheets[0].cells.B6?.v === 81 && ud.model.sheets[0].cells.B10?.v === base.sheets[0].cells.B10?.v && ud.mark?.kind === 'sheet',
     'an update being written shows on top of its sheet, the rest as it was',
   );
+  ok(after.sheets[0].cells.B3?.s?.fmt === 'currency' && ud.model.sheets[0].cells.B5?.s?.fmt === 'currency', 'a value written over a cell keeps its look, saved and while it is written');
+  const whole = draftBook(base, readPartial(uj), new DraftMemo())!;
+  const saved = normalizeBook({ sheets: applyBookEdits(base, JSON.parse(uj).update).sheets });
+  ok(JSON.stringify(whole.model.sheets[0].cells) === JSON.stringify(saved.sheets[0].cells), 'an update written whole shows as it is saved');
 }
 
 // ---- LaTeX: the version being written, and small changes ---------------------------------------------------------
