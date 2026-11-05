@@ -2,7 +2,7 @@
 // as shares of the page), and the signed PDF, the page as a picture for the card, and a box where it would go for an
 // agent to look at. Reading and writing PDFs is the PDF code's (server/documents/pdf/): its signed copy an incremental
 // update that leaves what is there as it was (so digital signatures already in the file stay valid). pdfTools() below
-// is where that code comes in; until it does, PDFs are not ready yet.
+// is where that code comes in.
 import type { PlaceSpot } from '../../shared/signatures.ts';
 
 /** What placing a signature needs of the PDF code. Positions are in points, from the page's top-left corner. */
@@ -25,16 +25,14 @@ export interface PdfSpot {
   h: number;
 }
 
-export const PDF_NOT_READY = 'PDFs are not ready yet.';
-
 /** For the script tests: PDF code of their own. */
 export const pdfHooks: { tools?: PdfTools } = {};
 
-// STUB, wired to the PDF code (server/documents/pdf/) when it is merged: return its stampImage, findWords, pagePicture
-// and pages here. Until then, placing a signature into a PDF answers that PDFs are not ready yet.
+/** The PDF code's (server/documents/pdf/), or the script tests' own. */
 export async function pdfTools(): Promise<PdfTools> {
   if (pdfHooks.tools) return pdfHooks.tools;
-  throw new Error(PDF_NOT_READY);
+  const pdf = await import('../documents/pdf/index.ts');
+  return { pages: pdf.pageSizes, stampImage: pdf.stampImage, findWords: pdf.findWords, pagePicture: (b, page) => pdf.pagePicture(b, page) };
 }
 
 export type Side = 'right' | 'left' | 'above' | 'below';

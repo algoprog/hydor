@@ -4,7 +4,7 @@
 // update (what was there stays byte for byte, so a signature made before stays valid for what it signed), or, for page
 // operations, as a whole new file.
 //
-// For the signatures: stampImage, findWords and pagePicture, as below.
+// For the signatures (server/signatures/pdf.ts): pageSizes, stampImage, findWords and pagePicture, as below.
 import { type Mark, drawMarks, type Placed, stampOn } from './draw.ts';
 import { editPages, extractPages, type PageOp, splitPdf } from './edit.ts';
 import { PdfError, PdfFile } from './file.ts';
@@ -27,6 +27,11 @@ export function stampImage(pdf: Buffer, at: { page: number; x: number; y: number
   const f = new PdfFile(pdf);
   stampOn(f, at, png);
   return f.saveUpdate();
+}
+
+/** Each page's size in points as it shows (a turned page turned), for spots given as shares of a page. */
+export function pageSizes(pdf: Buffer): { w: number; h: number }[] {
+  return pages(new PdfFile(pdf)).map((p) => ({ w: round(p.width), h: round(p.height) }));
 }
 
 /** Where `words` are printed (on one page, from 1, or on all): boxes in points from each page's top-left. */
