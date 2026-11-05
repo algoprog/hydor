@@ -15,7 +15,7 @@
 //   GET/POST /api/pages, GET/PATCH/DELETE /api/pages/:id, GET /api/pages/kept?key=, GET /api/pages/drafts?key=
 //   POST /api/pages/:id/versions, GET /api/pages/:id/versions/:v, POST …/restore, POST /api/pages/:id/copy
 //   POST /api/pages/:id/storage, GET/DELETE /api/pages/:id/data, POST /api/pages/:id/link, GET /api/pages/:id/thumb
-//   POST /api/pages/file-edit, GET /api/pages/:id/export?format=, POST /api/pages/assets, GET /api/pages/assets/:sha
+//   POST /api/pages/file-edit, GET /api/pages/:id/export?format=, POST /api/pages/docs/print, POST /api/pages/assets, GET /api/pages/assets/:sha
 //   GET/PUT /api/pages/file (a file of the computer's in an editor: filemodel.ts)
 //   GET/POST /api/pages/:id/notebook (where a notebook of the Library runs: notebooks.ts)
 //   GET /api/pages/picture?url=, GET /api/pages/fonts.css?f=, GET /api/pages/fonts/*
@@ -42,7 +42,8 @@ import { dropEdits, initEdits, noteEdit, noteFileEdit, takeEdits } from './edits
 import { getAsset, MAX_ASSET, putAsset, sweepAssets, takeIn } from './assets.ts';
 import { exportPage, EXPORT_TYPES, type ExportFormat } from './export.ts';
 import { fontFile, fontsCss } from './fonts.ts';
-import { agentDoc, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
+import { agentDoc, docPage, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
+import { normalizeDoc } from '../../shared/docs.ts';
 import { agentTex, compileSummary, compileTex, readTex, SAVE_LATEX_DESCRIPTION, SAVE_LATEX_SCHEMA, texRoutes } from './latex.ts';
 import { agentBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
 import { agentDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
@@ -621,6 +622,17 @@ function routes(d: Deps) {
       .header('Content-Disposition', `attachment; filename="${f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(f.name)}`)
       .type(f.type)
       .send(f.data);
+  });
+  /** A document as it prints (unsaved changes and all), for the editor to print: its pages, header and footer, maths. */
+  app.post('/api/pages/docs/print', { bodyLimit: 12 * 1024 * 1024 }, async (req) => {
+    const b = B(req);
+    let doc;
+    try {
+      doc = normalizeDoc(b.model);
+    } catch (e) {
+      throw new HttpError(400, (e as Error).message);
+    }
+    return { html: docPage(db, doc, typeof b.title === 'string' ? b.title.slice(0, 300) : 'Document', 'print') };
   });
 
   // ---- a deck's pictures and fonts ---------------------------------------------------------------

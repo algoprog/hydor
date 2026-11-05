@@ -1,9 +1,9 @@
-// The documents editor's toolbar, one row that fits a laptop's screen (sideways on a phone): undo and redo; the
-// paragraph's style; the words' font and size; bold, italic, underline; their colour and highlight; a link (Ctrl+K);
-// alignment, in a menu; bullets, numbers and a checklist; Insert (a picture from the device or the web, a table of a
-// size picked on a grid, a line across, a page break); the table's rows and columns when the caret is in one; and
-// More formatting (struck, raised and lowered words, indent, clearing the words' look). It acts on what is selected in the
-// document, which keeps its selection meanwhile.
+// The documents editor's toolbar, the most used of what the menus hold, in one row that fits a laptop's screen
+// (sideways on a phone): undo and redo; the paragraph's style; the words' font and size; bold, italic, underline;
+// their colour and highlight; a link (Ctrl+K); a comment on the words picked (Ctrl+Alt+M); the format painter (a
+// click carries the look of the words at the caret to the next words picked, a double click keeps it on until Esc);
+// alignment, in a menu; bullets, numbers and a checklist; and the table's rows and columns when the caret is in one.
+// It acts on what is selected in the document, which keeps its selection meanwhile.
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   AlignCenter,
@@ -14,23 +14,14 @@ import {
   Bold,
   ChevronDown,
   Highlighter,
-  Image as ImageIcon,
-  IndentDecrease,
-  IndentIncrease,
   Italic,
-  MoreHorizontal,
   Link2,
   List,
   ListChecks,
   ListOrdered,
-  Minus,
-  Plus,
+  MessageSquarePlus,
+  PaintRoller,
   Redo2,
-  RemoveFormatting,
-  SeparatorHorizontal,
-  Strikethrough,
-  Subscript,
-  Superscript,
   Table2,
   Trash2,
   Underline,
@@ -106,34 +97,6 @@ function ColorPick({ label, icon, value, colors, none, onPick }: { label: string
   );
 }
 
-/** A grid to pick a table's size from: hover (or tap) the corner cell. */
-function TableGrid({ onPick }: { onPick: (rows: number, cols: number) => void }) {
-  const [at, setAt] = useState<[number, number]>([2, 3]);
-  return (
-    <div className="p-2">
-      <div className="mb-1.5 text-center text-[12.5px] text-fg-2 tabular-nums">
-        {at[1]} × {at[0]}
-      </div>
-      <div className="grid grid-cols-8 gap-[3px]" onMouseLeave={() => setAt([2, 3])}>
-        {Array.from({ length: 64 }, (_, k) => {
-          const r = Math.floor(k / 8) + 1;
-          const c = (k % 8) + 1;
-          return (
-            <button
-              key={k}
-              type="button"
-              aria-label={`${c} × ${r}`}
-              onMouseEnter={() => setAt([r, c])}
-              onClick={() => onPick(r, c)}
-              className={cx('h-[22px] w-[22px] rounded-[3px] border', r <= at[0] && c <= at[1] ? 'border-accent bg-accent-soft' : 'border-line-2 bg-bg-1')}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export function Toolbar({
   engine,
   st,
@@ -141,8 +104,7 @@ export function Toolbar({
   linking,
   setLinking,
   linkRef,
-  onPicture,
-  onPictureUrl,
+  onComment,
 }: {
   engine: DocEngine;
   st: SelState;
@@ -150,15 +112,13 @@ export function Toolbar({
   linking: { url: string; text: string } | null;
   setLinking: (l: { url: string; text: string } | null) => void;
   linkRef: RefObject<HTMLButtonElement | null>;
-  onPicture: () => void;
-  onPictureUrl: (url: string) => void;
+  onComment: () => void;
 }) {
-  const [menu, setMenu] = useState<'insert' | 'url' | 'grid' | 'table' | 'align' | 'more' | null>(null);
-  const [url, setUrl] = useState('');
-  const insertRef = useRef<HTMLButtonElement>(null);
+  const [menu, setMenu] = useState<'table' | 'align' | null>(null);
   const tableRef = useRef<HTMLButtonElement>(null);
   const alignRef = useRef<HTMLButtonElement>(null);
-  const moreRef = useRef<HTMLButtonElement>(null);
+  // A double click on the painter keeps it on: the first click's start is undone by the second.
+  const clicks = useRef(0);
   const AlignIcon = ALIGNS.find((a) => a.value === st.align)?.icon ?? AlignLeft;
   const act = (f: () => void) => () => (setMenu(null), f());
   const shownSize = st.look.size ?? Math.round(doc.size * STYLES[st.style].k * 2) / 2;
@@ -212,6 +172,27 @@ export function Toolbar({
       >
         <Link2 size={15} />
       </button>
+      <Tool label="Comment (Ctrl+Alt+M)" disabled={st.collapsed || !st.text.trim()} onClick={onComment}>
+        <MessageSquarePlus size={15} />
+      </Tool>
+      <button
+        type="button"
+        title="Format painter (a double click keeps it on until Esc)"
+        aria-label="Format painter"
+        aria-pressed={!!engine.paint}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => {
+          clicks.current++;
+          const n = clicks.current;
+          setTimeout(() => n === clicks.current && (clicks.current = 0), 350);
+          if (n === 2) return engine.startPaint(true);
+          if (engine.paint) engine.stopPaint();
+          else engine.startPaint(false);
+        }}
+        className={cx('flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg px-1.5 text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg', engine.paint && 'bg-accent-soft text-accent')}
+      >
+        <PaintRoller size={15} />
+      </button>
       <Sep />
       <button
         ref={alignRef}
@@ -235,28 +216,13 @@ export function Toolbar({
       <Tool label="Checklist (Ctrl+Shift+9)" on={st.list === 'check'} onClick={() => engine.list('check')}>
         <ListChecks size={15} />
       </Tool>
-      <Sep />
-      <Button ref={insertRef} size="sm" variant="ghost" icon={<Plus size={14} />} onMouseDown={(e) => e.preventDefault()} onClick={() => setMenu(menu ? null : 'insert')} className={cx('shrink-0 px-2', menu && menu !== 'table' && 'bg-bg-2')}>
-        Insert
-        <ChevronDown size={12} className="-ml-0.5 text-fg-3" />
-      </Button>
+      {t && <Sep />}
       {t && (
         <Button ref={tableRef} size="sm" variant="ghost" icon={<Table2 size={14} />} onMouseDown={(e) => e.preventDefault()} onClick={() => setMenu(menu === 'table' ? null : 'table')} className={cx('shrink-0 px-2', menu === 'table' && 'bg-bg-2')}>
           Table
           <ChevronDown size={12} className="-ml-0.5 text-fg-3" />
         </Button>
       )}
-      <button
-        ref={moreRef}
-        type="button"
-        title="More formatting"
-        aria-label="More formatting"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => setMenu(menu === 'more' ? null : 'more')}
-        className={cx('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg', menu === 'more' && 'bg-bg-2')}
-      >
-        <MoreHorizontal size={15} />
-      </button>
       <Popover anchor={alignRef} open={menu === 'align'} onClose={() => setMenu(null)} width={230}>
         {ALIGNS.map((a) => (
           <MenuItem key={a.value} icon={<a.icon size={14} />} hint={a.keys} checked={st.align === a.value} onClick={act(() => engine.align(a.value))}>
@@ -264,85 +230,18 @@ export function Toolbar({
           </MenuItem>
         ))}
       </Popover>
-      <Popover anchor={moreRef} open={menu === 'more'} onClose={() => setMenu(null)} width={250}>
-        <MenuItem icon={<Strikethrough size={14} />} hint="Ctrl+Shift+X" checked={!!st.on.s} onClick={act(() => engine.toggle('s'))}>
-          Strikethrough
-        </MenuItem>
-        <MenuItem icon={<Superscript size={14} />} hint="Ctrl+." checked={!!st.on.sup} onClick={act(() => engine.toggle('sup'))}>
-          Superscript
-        </MenuItem>
-        <MenuItem icon={<Subscript size={14} />} hint="Ctrl+," checked={!!st.on.sub} onClick={act(() => engine.toggle('sub'))}>
-          Subscript
-        </MenuItem>
-        <MenuSep />
-        <MenuItem icon={<IndentDecrease size={14} />} hint="Shift+Tab" onClick={act(() => engine.indent(-1))}>
-          Less indent
-        </MenuItem>
-        <MenuItem icon={<IndentIncrease size={14} />} hint="Tab" onClick={act(() => engine.indent(1))}>
-          More indent
-        </MenuItem>
-        <MenuSep />
-        <MenuItem icon={<RemoveFormatting size={14} />} hint="Ctrl+\" onClick={act(() => engine.clear())}>
-          Clear the formatting
-        </MenuItem>
-      </Popover>
-
-      <Popover anchor={insertRef} open={menu === 'insert' || menu === 'url' || menu === 'grid'} onClose={() => setMenu(null)} width={menu === 'grid' ? 230 : 260} title="Insert">
-        {menu === 'insert' && (
-          <>
-            <MenuItem icon={<ImageIcon size={14} />} onClick={() => (setMenu(null), onPicture())}>
-              A picture from this device
-            </MenuItem>
-            <MenuItem icon={<Link2 size={14} />} onClick={() => setMenu('url')}>
-              A picture from the web
-            </MenuItem>
-            <MenuItem icon={<Table2 size={14} />} submenu onClick={() => setMenu('grid')}>
-              A table
-            </MenuItem>
-            <MenuSep />
-            <MenuItem icon={<Minus size={14} />} onClick={() => (setMenu(null), engine.insertAtom('hr'))}>
-              A line across
-            </MenuItem>
-            <MenuItem icon={<SeparatorHorizontal size={14} />} hint="Ctrl+Enter" onClick={() => (setMenu(null), engine.insertAtom('pagebreak'))}>
-              A page break
-            </MenuItem>
-          </>
-        )}
-        {menu === 'url' && (
-          <form
-            className="space-y-2 p-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const u = url.trim();
-              setMenu(null);
-              setUrl('');
-              if (u) onPictureUrl(u);
-            }}
-          >
-            <p className="text-[12px] text-fg-3">The picture’s own address (it ends in .jpg, .png…). The app keeps a copy in the document.</p>
-            <input autoFocus value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" className={inputCls} />
-            <div className="flex justify-end">
-              <Button size="sm" variant="primary" type="submit" disabled={!url.trim()}>
-                Add it
-              </Button>
-            </div>
-          </form>
-        )}
-        {menu === 'grid' && (
-          <TableGrid
-            onPick={(r, c) => {
-              setMenu(null);
-              engine.insertTable(r, c);
-            }}
-          />
-        )}
-      </Popover>
       <Popover anchor={tableRef} open={menu === 'table' && !!t} onClose={() => setMenu(null)} width={250} title="Table">
         <MenuItem onClick={() => (setMenu(null), engine.table('rowAbove'))}>Insert a row above</MenuItem>
         <MenuItem onClick={() => (setMenu(null), engine.table('rowBelow'))}>Insert a row below</MenuItem>
         <MenuItem onClick={() => (setMenu(null), engine.table('colLeft'))}>Insert a column on the left</MenuItem>
         <MenuItem onClick={() => (setMenu(null), engine.table('colRight'))}>Insert a column on the right</MenuItem>
         <MenuSep />
+        <MenuItem disabled={!st.cells || (st.cells.a[0] === st.cells.f[0] && st.cells.a[1] === st.cells.f[1])} onClick={() => (setMenu(null), engine.mergeCells())}>
+          Merge cells
+        </MenuItem>
+        <MenuItem disabled={!(st.cell && t && (t.rows[st.cell[0]]?.[st.cell[1]]?.rs || t.rows[st.cell[0]]?.[st.cell[1]]?.cs))} onClick={() => (setMenu(null), engine.unmergeCell())}>
+          Unmerge cells
+        </MenuItem>
         <MenuItem checked={!!t?.head} onClick={() => (setMenu(null), engine.table('head'))}>
           Header row
         </MenuItem>

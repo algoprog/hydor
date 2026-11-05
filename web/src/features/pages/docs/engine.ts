@@ -1,12 +1,15 @@
 // The documents editor's engine: the document drawn into one contentEditable element (shared/docs.ts' blockHtml,
 // the same HTML the document's own page shows), the browser's selection read as places in the model and set from
 // them (ops.ts), and every edit made to the model and drawn again: Enter, Backspace and Delete across blocks,
-// typing over a selection, pasting and dropping, lists, styles, tables, pictures. The browser itself only types and
-// deletes within one block's words (so spelling, accents and phone keyboards work as they do anywhere), and those
-// words are read back after each change; anything else it would do to the page is stopped and done here. Undo and
-// redo go back and forth through the model's versions.
+// typing over a selection, pasting and dropping, lists, styles, spacing, tables (merged and filled cells), pictures,
+// equations, a table of contents, comments' marks, replacing what was found, words' case and the format painter. The
+// browser itself only types and deletes within one block's words (so spelling, accents and phone keyboards work as
+// they do anywhere), and those words are read back after each change; anything else it would do to the page is
+// stopped and done here. An equation among words is one thing to the caret, never words to type in. Undo and redo go
+// back and forth through the model's versions.
 import {
   blockHtml,
+  CALLOUT,
   docMarkdown,
   htmlBlocks,
   htmlRuns,
@@ -15,14 +18,20 @@ import {
   PAPERS,
   runsHtml,
   runsText,
+  tocEntries,
   type Align,
+  type Band,
   type Block,
   type Doc,
   type ImageBlock,
   type ListKind,
   type Look,
+  type MathDraw,
+  type ParaBlock,
   type ParaStyle,
   type Run,
+  type Spacing,
+  type TocEntry,
 } from '@shared/docs';
 import * as ops from './ops';
 import type { Pos, TableOp } from './ops';
@@ -54,8 +63,23 @@ export interface SelState {
   text: string;
   /** The link the caret is in. */
   link: string | null;
+  /** The comments on the words at the caret (or picked). */
+  cm: string[];
+  /** In a table, from one cell to another: the cells picked. */
+  cells: { b: string; a: [number, number]; f: [number, number] } | null;
   canUndo: boolean;
   canRedo: boolean;
+}
+
+/** What a click on a thing of its own in the page asks the editor for. */
+export type AtomClick = { kind: 'math'; id: string } | { kind: 'mathRun'; at: Pos; tex: string } | { kind: 'icon'; id: string };
+
+/** The look and the paragraph's style the format painter carries to the next words picked. */
+export interface Paint {
+  look: Look;
+  para: { style: ParaStyle; align?: Align; lh?: number; sb?: number; sa?: number } | null;
+  /** Stays on until Esc (a double click). */
+  sticky: boolean;
 }
 
 export interface EngineOpts {
@@ -73,15 +97,24 @@ export interface EngineOpts {
   /** A picture at an address (or a data: one) kept by the app: its kept source, or null. */
   takeIn: (src: string) => Promise<string | null>;
   onError: (e: unknown) => void;
+  /** Maths as HTML (KaTeX's, once it has loaded). */
+  math?: MathDraw;
+  /** What a table of contents says while there are no headings. */
+  tocHint?: string;
+  /** A click on an equation, or on a callout's emoji. */
+  onAtom?: (a: AtomClick) => void;
+  /** The format painter carried its look to words (and, unless it stays on, is off now). */
+  onPainted?: () => void;
 }
 
 const HISTORY_MAX = 200;
 const FLAGS: Flag[] = ['b', 'i', 'u', 's', 'code', 'sup', 'sub'];
 
-/** How many characters the model counts for a piece of the page: text, and line breaks (not the ones that only hold a line open). */
+/** How many characters the model counts for a piece of the page: text, and line breaks (not the ones that only hold a line open); an equation, its LaTeX's. */
 function lengthOf(n: Node): number {
   if (n.nodeType === 3) return (n as Text).data.length;
   if (n.nodeName === 'BR') return (n as Element).hasAttribute('data-ph') ? 0 : 1;
+  if (n.nodeType === 1 && (n as Element).hasAttribute('data-tex')) return (n as Element).getAttribute('data-tex')!.length;
   let k = 0;
   for (let c = n.firstChild; c; c = c.nextSibling) k += lengthOf(c);
   return k;
@@ -171,6 +204,10 @@ export class DocEngine {
   private plainNext = false;
   private frame = 0;
   private off: (() => void)[] = [];
+  /** The headings a table of contents showed when last drawn. */
+  private tocKey = '';
+  /** The format painter, while it is on. */
+  paint: Paint | null = null;
 
   constructor(
     public root: HTMLElement,
@@ -202,6 +239,8 @@ export class DocEngine {
       this.onInput();
     });
     on('focus', () => this.emitSoon());
+    on('mouseup', () => setTimeout(() => this.painted(), 0));
+    on('keyup', (e) => e.shiftKey && setTimeout(() => this.painted(), 0));
     const sc = () => this.onSelChange();
     document.addEventListener('selectionchange', sc);
     this.off.push(() => document.removeEventListener('selectionchange', sc));
@@ -232,12 +271,27 @@ export class DocEngine {
 
   // ---- drawing --------------------------------------------------------------------------------------------
 
+  private toc: TocEntry[] = [];
+
   private make(b: Block, label: string): HTMLElement {
     const t = document.createElement('template');
-    t.innerHTML = blockHtml(b, label, { src: this.o.src, edit: true, breakLabel: this.o.breakLabel });
+    t.innerHTML = blockHtml(b, label, { src: this.o.src, edit: true, breakLabel: this.o.breakLabel, math: this.o.math, toc: this.toc, tocHint: this.o.tocHint });
     const el = t.content.firstElementChild as HTMLElement;
     if (b.type === 'image') el.querySelector('img')?.setAttribute('draggable', 'false');
     return el;
+  }
+
+  /** Runs as the editor draws them (its equations too). */
+  private runsHtml = (runs: Run[]) => runsHtml(runs, { math: this.o.math });
+
+  /** Maths drawn again (KaTeX has loaded): the blocks that have any. */
+  redrawMath() {
+    const has = (runs: Run[]) => runs.some((r) => r.math);
+    for (const b of this.doc.blocks)
+      if (b.type === 'math' || ((b.type === 'p' || b.type === 'li') && has(b.runs)) || (b.type === 'table' && b.rows.some((r) => r.some((c) => has(c.runs))))) this.drawn.delete(b.id);
+    const sel = this.picked ? null : this.readSel();
+    this.draw();
+    if (sel && document.activeElement === this.root) this.place(sel, false);
   }
 
   /** The page made to show the model: blocks that changed drawn anew, the others left as they are. */
@@ -248,10 +302,16 @@ export class DocEngine {
       this.root.replaceChildren();
     }
     const { labels } = listInfo(this.doc.blocks);
+    // A table of contents follows the headings: drawn again when they change.
+    const hasToc = this.doc.blocks.some((b) => b.type === 'toc');
+    this.toc = hasToc ? tocEntries(this.doc) : [];
+    const tocKey = hasToc ? JSON.stringify(this.toc) : '';
+    const tocChanged = tocKey !== this.tocKey;
+    this.tocKey = tocKey;
     const mine = new Set<Node>();
     this.doc.blocks.forEach((b, i) => {
       let el = this.els.get(b.id);
-      if (!el || this.drawn.get(b.id) !== b) {
+      if (!el || this.drawn.get(b.id) !== b || (tocChanged && b.type === 'toc')) {
         const fresh = this.make(b, labels[i]);
         el?.remove();
         el = fresh;
@@ -320,11 +380,20 @@ export class DocEngine {
     const box = p.c ? blk.querySelector(`[data-c="${p.c[0]},${p.c[1]}"]`) : blk;
     if (!box) return null;
     let left = p.o;
-    const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+    // An equation is one thing: the caret goes before or after it, never into what KaTeX drew.
+    const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (n) => (n.parentElement?.closest('[data-tex]') && n.parentElement.closest('[data-t]') === box ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    });
     for (let x = walk.nextNode(); x; x = walk.nextNode()) {
       if (x.nodeType === 3) {
         const len = (x as Text).data.length;
         if (left <= len) return { node: x, offset: left };
+        left -= len;
+      } else if ((x as Element).hasAttribute?.('data-tex')) {
+        const len = (x as Element).getAttribute('data-tex')!.length;
+        const at = x.parentNode!;
+        if (left === 0) return { node: at, offset: indexIn(x) };
+        if (left <= len) return { node: at, offset: indexIn(x) + 1 };
         left -= len;
       } else if (x.nodeName === 'BR' && !(x as Element).hasAttribute('data-ph')) {
         if (left === 0) return { node: x.parentNode!, offset: indexIn(x) };
@@ -430,6 +499,8 @@ export class DocEngine {
     for (const k of FLAGS) on[k] = collapsed ? !!look[k] : ops.allHave(this.doc, s, e, k);
     const cell = s.c && block?.type === 'table' ? block.rows[s.c[0]]?.[s.c[1]] : null;
     const picked = this.picked ? (ops.blockOf(this.doc, this.picked) ?? null) : null;
+    // The comments here: on the word at the caret (or the character before it), or on any of the words picked.
+    const cm = collapsed ? (runs.length ? (ops.runAt(runs, s.o)?.cm ?? []) : []) : [...new Set(ops.runsBetween(this.doc, s, e).flatMap((r) => r.cm ?? []))];
     return {
       collapsed,
       block,
@@ -443,6 +514,8 @@ export class DocEngine {
       picked,
       text: collapsed ? '' : ops.textBetween(this.doc, s, e).slice(0, 2000),
       link: collapsed ? (ops.linkAt(this.doc, s)?.link ?? null) : (look.link ?? null),
+      cm,
+      cells: s.c && e.c && s.b === e.b ? { b: s.b, a: s.c, f: e.c } : null,
       canUndo: this.past.length > 0,
       canRedo: this.future.length > 0,
     };
@@ -628,7 +701,7 @@ export class DocEngine {
     if (this.composing) return;
     // What the browser left is drawn as this editor draws it (its own spans and breaks gone).
     const t = document.createElement('template');
-    t.innerHTML = runsHtml(runs);
+    t.innerHTML = this.runsHtml(runs);
     if (t.innerHTML !== box.innerHTML) {
       box.innerHTML = t.innerHTML;
       if (sel) this.place(sel, false);
@@ -702,6 +775,10 @@ export class DocEngine {
   private onKey(e: KeyboardEvent) {
     if (this.o.onKey?.(e)) return;
     if (this.o.readOnly) return;
+    if (e.key === 'Escape' && this.paint) {
+      e.preventDefault();
+      return this.stopPaint();
+    }
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
     if (this.picked) {
@@ -783,10 +860,40 @@ export class DocEngine {
 
   private onDown(e: MouseEvent) {
     const t = e.target as HTMLElement;
-    const atom = t.closest('figure.nd-img, .nd-hr, .nd-pb') as HTMLElement | null;
+    // A line of a table of contents goes to its heading.
+    const line = t.closest('.nd-toc [data-h]') as HTMLElement | null;
+    if (line && this.root.contains(line)) {
+      e.preventDefault();
+      return this.focusBlock(line.dataset.h!);
+    }
+    const atom = t.closest('figure.nd-img, .nd-hr, .nd-pb, .nd-toc, .nd-math') as HTMLElement | null;
     if (atom && this.root.contains(atom) && !this.o.readOnly) {
       e.preventDefault();
-      return this.setPicked(atom.dataset.b ?? null);
+      this.setPicked(atom.dataset.b ?? null);
+      if (atom.classList.contains('nd-math') && atom.dataset.b) this.o.onAtom?.({ kind: 'math', id: atom.dataset.b });
+      return;
+    }
+    // An equation among words: changed in its box (the caret goes after it).
+    const m = t.closest('.nd-m[data-tex]') as HTMLElement | null;
+    if (m && this.root.contains(m) && !this.o.readOnly) {
+      e.preventDefault();
+      const box = m.closest('[data-t]');
+      const after = box ? this.posOf(m.parentNode!, indexIn(m) + 1) : null;
+      if (after) {
+        this.place({ a: after, f: after }, false);
+        this.o.onAtom?.({ kind: 'mathRun', at: { ...after, o: after.o - m.getAttribute('data-tex')!.length }, tex: m.getAttribute('data-tex')! });
+      }
+      return;
+    }
+    // A callout's emoji: another one.
+    const call = t.closest('.nd-callout') as HTMLElement | null;
+    if (call && this.root.contains(call) && !this.o.readOnly) {
+      const r = call.getBoundingClientRect();
+      const em = parseFloat(getComputedStyle(call).fontSize) || 15;
+      if (e.clientX < r.left + em * 2.6 && e.clientY < r.top + em * 2.4) {
+        e.preventDefault();
+        return this.o.onAtom?.({ kind: 'icon', id: call.dataset.b! });
+      }
     }
     const li = t.closest('.nd-check') as HTMLElement | null;
     if (li && this.root.contains(li) && !this.o.readOnly) {
@@ -819,15 +926,16 @@ export class DocEngine {
   private blocksFrom(dt: DataTransfer, plain: boolean): Block[] {
     const html = plain ? '' : dt.getData('text/html');
     const text = dt.getData('text/plain');
+    // A copy is not what comments were made on: their marks stay behind.
     const ours = /<!--naget-doc:([A-Za-z0-9+/=]+)-->/.exec(html);
     if (ours) {
       try {
-        const list = normalizeBlocks(JSON.parse(unb64(ours[1])) as unknown[], {}, this.ids());
+        const list = ops.withoutComments(normalizeBlocks(JSON.parse(unb64(ours[1])) as unknown[], {}, this.ids()));
         if (list.length) return list;
       } catch {}
     }
     if (html) {
-      const list = normalizeBlocks(htmlBlocks(html), {}, this.ids());
+      const list = ops.withoutComments(normalizeBlocks(htmlBlocks(html), {}, this.ids()));
       if (list.length) return list;
     }
     if (!text) return [];
@@ -888,8 +996,13 @@ export class DocEngine {
   private onPaste(e: ClipboardEvent) {
     if (this.o.readOnly) return;
     e.preventDefault();
-    const dt = e.clipboardData;
-    if (!dt) return;
+    if (e.clipboardData) this.paste(e.clipboardData);
+  }
+
+  /** What was copied, put in at the caret (Paste in the Edit menu reads the clipboard itself); `plain`: its words alone. */
+  paste(dt: DataTransfer, asPlain = false) {
+    if (this.o.readOnly) return;
+    if (asPlain) this.plainNext = true;
     const files = [...dt.files].filter((f) => f.type.startsWith('image/'));
     if (files.length && !dt.getData('text/html')) return void this.addPictures(files);
     const [s] = this.range();
@@ -1097,10 +1210,279 @@ export class DocEngine {
     this.emitSoon();
   }
 
-  /** The document's paper, margins, font or size. */
-  setDoc(patch: Partial<Pick<Doc, 'page' | 'font' | 'size'>>) {
+  /** The document's paper, margins, font or size, its header and footer, its comments. */
+  setDoc(patch: Partial<Pick<Doc, 'page' | 'font' | 'size' | 'header' | 'footer' | 'titlePage' | 'comments'>>) {
     this.before = this.sel;
-    this.commit({ ...this.doc, ...patch }, null, { key: `doc:${Object.keys(patch).join()}` });
+    const next: Doc = { ...this.doc, ...patch };
+    for (const k of ['header', 'footer', 'titlePage', 'comments'] as const) if (next[k] === undefined || (k === 'comments' && !next.comments?.length)) delete next[k];
+    if (!next.header && !next.footer) delete next.titlePage;
+    this.commit(next, null, { key: `doc:${Object.keys(patch).join()}` });
+  }
+
+  /** The header, footer or title page changed. */
+  setBands(patch: { header?: Band | null; footer?: Band | null; titlePage?: boolean }) {
+    this.setDoc({
+      ...('header' in patch ? { header: patch.header ?? undefined } : {}),
+      ...('footer' in patch ? { footer: patch.footer ?? undefined } : {}),
+      ...('titlePage' in patch ? { titlePage: patch.titlePage || undefined } : {}),
+    });
+  }
+
+  // ---- what the menus ask ----------------------------------------------------------------------------------------------
+
+  /** Line spacing, or the space before or after, for the paragraphs picked. */
+  spacing(patch: Spacing) {
+    this.before = this.sel;
+    const [s, e] = this.range();
+    this.commit(ops.setSpacing(this.doc, s, e, patch), this.sel);
+  }
+
+  /** A callout's emoji or tint. */
+  callout(id: string, patch: { icon?: string; tint?: string }) {
+    this.before = this.sel;
+    const clean = { ...patch };
+    if (clean.icon === CALLOUT.icon) clean.icon = undefined;
+    if (clean.tint === CALLOUT.tint) clean.tint = undefined;
+    this.commit(ops.setCallout(this.doc, id, clean), this.sel);
+  }
+
+  /** The words picked as another case. */
+  setCase(k: ops.Case) {
+    this.before = this.sel;
+    const [s, e] = this.range();
+    if (ops.samePos(s, e)) {
+      const w = ops.wordAt(ops.boxRuns(this.doc, s.b, s.c) ?? [], s.o);
+      if (w) return this.commit(ops.setCase(this.doc, { ...s, o: w[0] }, { ...s, o: w[1] }, k), { a: s, f: s });
+      return;
+    }
+    this.commit(ops.setCase(this.doc, s, e, k), this.sel);
+  }
+
+  /** A comment's mark on the words picked (false when no words are). */
+  comment(id: string, doc?: Doc): boolean {
+    const [s, e] = this.range();
+    if (ops.samePos(s, e) || !ops.textBetween(this.doc, s, e).trim()) return false;
+    this.before = this.sel;
+    this.commit(ops.markComment(doc ?? this.doc, s, e, id), this.sel);
+    return true;
+  }
+
+  /** The comments changed (one added, answered, resolved, edited); a deleted one's marks go too. */
+  setComments(list: Doc['comments'], gone?: string) {
+    this.before = this.sel;
+    let d: Doc = { ...this.doc, comments: list };
+    if (!list?.length) delete d.comments;
+    if (gone) d = ops.unmarkComment(d, gone);
+    this.commit(d, null, { key: undefined, pick: this.picked });
+  }
+
+  /** A new comment on the words picked, as one change (its marks and its thread). */
+  addComment(c: NonNullable<Doc['comments']>[number]): boolean {
+    const [s, e] = this.range();
+    if (ops.samePos(s, e) || !ops.textBetween(this.doc, s, e).trim()) return false;
+    this.before = this.sel;
+    this.commit(ops.markComment({ ...this.doc, comments: [...(this.doc.comments ?? []), c] }, s, e, c.id), this.sel);
+    return true;
+  }
+
+  /** A comment's words picked and brought into view (false when they are gone). */
+  selectComment(id: string): boolean {
+    const span = ops.commentSpan(this.doc, id);
+    if (!span) return false;
+    this.setPicked(null);
+    this.place({ a: span[0], f: span[1] });
+    return true;
+  }
+
+  /** Words found, put in place of others: one stretch, or many as one change (to undo together). */
+  replace(list: ops.Found[], text: (f: ops.Found) => string) {
+    if (!list.length) return;
+    this.before = this.sel;
+    // From the last to the first, so the places of the ones before stay where they are.
+    const sorted = [...list].sort((x, y) => -ops.cmp(this.doc, { b: x.b, c: x.c, o: x.s }, { b: y.b, c: y.c, o: y.s }));
+    let d = this.doc;
+    for (const f of sorted) d = ops.replaceIn(d, f, text(f));
+    const first = list.length === 1 ? list[0] : null;
+    const at: Pos | null = first ? { b: first.b, ...(first.c ? { c: first.c } : {}), o: first.s + text(first).length } : null;
+    this.commit(d, at ? { a: at, f: at } : null);
+  }
+
+  /** Words put in at the caret, in place of what is picked (a character, a date). */
+  typeText(text: string) {
+    if (this.picked) return;
+    this.before = this.sel;
+    const [s, e] = this.range();
+    const look = this.pending ?? ops.lookAt(ops.boxRuns(this.doc, s.b, s.c) ?? [], s.o);
+    const cut = ops.deleteRange(this.doc, s, e);
+    this.pending = null;
+    this.apply(ops.insertText(cut.doc, cut.at, text, look));
+  }
+
+  /** The words in the caret's block before it (for "/" commands), and where they are. */
+  before_(): { at: Pos; text: string } | null {
+    const [s, e] = this.range();
+    if (!ops.samePos(s, e) || this.picked) return null;
+    const runs = ops.boxRuns(this.doc, s.b, s.c);
+    return runs ? { at: s, text: runsText(runs).slice(0, s.o) } : null;
+  }
+
+  /** Words taken out of the caret's block, from `from` to the caret (a "/" command typed). */
+  cutBack(from: number) {
+    const [s] = this.range();
+    if (from >= s.o) return;
+    this.before = this.sel;
+    this.apply(ops.deleteRange(this.doc, { ...s, o: from }, s));
+  }
+
+  /** Where the caret (or what is picked) is on the screen. */
+  caretRect(): DOMRect | null {
+    if (this.picked) return this.els.get(this.picked)?.getBoundingClientRect() ?? null;
+    const sel = window.getSelection();
+    if (!sel?.rangeCount || !this.root.contains(sel.anchorNode)) return null;
+    const r = sel.getRangeAt(0);
+    const rects = r.getClientRects();
+    const rect = rects.length ? rects[rects.length - 1] : r.getBoundingClientRect();
+    if (rect.height) return rect;
+    const n = sel.focusNode;
+    const el = (n?.nodeType === 1 ? (n as Element) : n?.parentElement)?.closest('[data-t], [data-b]');
+    return el?.getBoundingClientRect() ?? null;
+  }
+
+  // ---- equations, a table of contents ------------------------------------------------------------------------------------
+
+  /** An equation on a line of its own at the caret; its id. */
+  insertMath(tex: string): string {
+    const id = ops.freshId(this.doc);
+    this.insert([{ id, type: 'math', tex }]);
+    this.setPicked(id);
+    return id;
+  }
+
+  /** An equation's LaTeX (none: it goes). */
+  setMath(id: string, tex: string) {
+    this.before = this.sel;
+    if (!tex.trim()) {
+      this.setPicked(null);
+      return this.apply(ops.removeBlock(this.doc, id));
+    }
+    this.commit(
+      ops.patchBlock(this.doc, id, (b) => (b.type === 'math' ? { ...b, tex } : b)),
+      null,
+      { key: `math:${id}`, pick: this.picked },
+    );
+  }
+
+  /** Maths among the words, at the caret; where it starts. */
+  insertMathRun(tex: string): Pos | null {
+    if (this.picked || !tex.trim()) return null;
+    this.before = this.sel;
+    const [s, e] = this.range();
+    const cut = ops.deleteRange(this.doc, s, e);
+    this.apply(ops.insertRuns(cut.doc, cut.at, [{ t: tex.trim(), math: true }]));
+    return cut.at;
+  }
+
+  /** Maths among the words changed (none: it goes), found where it starts. */
+  setMathRun(at: Pos, tex: string) {
+    const runs = ops.boxRuns(this.doc, at.b, at.c);
+    if (!runs) return;
+    let o = 0;
+    const i = runs.findIndex((r) => {
+      const hit = r.math && o === at.o;
+      o += r.t.length;
+      return hit;
+    });
+    if (i < 0) return;
+    this.before = this.sel;
+    const next = tex.trim() ? runs.map((r, k) => (k === i ? { ...r, t: tex.trim() } : r)) : runs.filter((_, k) => k !== i);
+    const end: Pos = { ...at, o: at.o + (tex.trim() ? tex.trim().length : 0) };
+    this.commit(ops.setBox(this.doc, at.b, at.c, next), { a: end, f: end });
+  }
+
+  /** A table of contents at the caret. */
+  insertToc() {
+    this.insert([{ id: ops.freshId(this.doc), type: 'toc' }]);
+  }
+
+  // ---- tables ----------------------------------------------------------------------------------------------------------
+
+  /** The cells picked (from one to another), or the caret's. */
+  private cellPick(): { b: string; a: [number, number]; f: [number, number] } | null {
+    const [s, e] = this.range();
+    if (!s.c) return null;
+    return { b: s.b, a: s.c, f: e.c && e.b === s.b ? e.c : s.c };
+  }
+
+  /** The cells picked merged into one. */
+  mergeCells() {
+    const p = this.cellPick();
+    if (!p) return;
+    this.before = this.sel;
+    this.apply(ops.mergeCells(this.doc, p.b, p.a, p.f));
+  }
+
+  /** The merged cell at the caret split up again. */
+  unmergeCell() {
+    const p = this.cellPick();
+    if (!p) return;
+    this.before = this.sel;
+    this.apply(ops.unmergeCell(this.doc, p.b, p.a));
+  }
+
+  /** A fill, or where words sit up and down, for the cells picked. */
+  cells(patch: { fill?: string; va?: 'middle' | 'bottom' }) {
+    const p = this.cellPick();
+    if (!p) return;
+    this.before = this.sel;
+    this.commit(ops.setCells(this.doc, p.b, p.a, p.f, patch), this.sel);
+  }
+
+  /** A table's columns' widths. */
+  setCols(id: string, cols: number[]) {
+    this.before = this.sel;
+    this.commit(ops.setCols(this.doc, id, cols), null, { key: `cols:${id}` });
+  }
+
+  // ---- the format painter ------------------------------------------------------------------------------------------------
+
+  /** The format painter on: it carries the look of the words at the caret, and their paragraph's style, to the next words picked. */
+  startPaint(sticky: boolean) {
+    const [s] = this.range();
+    const runs = ops.boxRuns(this.doc, s.b, s.c) ?? [];
+    const { link: _l, cm: _c, math: _m, ...look } = this.pending ?? ops.lookAt(runs, s.o);
+    const b = ops.blockOf(this.doc, s.b);
+    const para = !s.c && b && ops.isText(b) ? { style: b.type === 'p' ? (b.style ?? 'normal') : ('normal' as ParaStyle), align: b.align, lh: b.lh, sb: b.sb, sa: b.sa } : null;
+    this.paint = { look, para, sticky };
+    this.root.classList.add('nd-painting');
+    this.emitSoon();
+  }
+
+  stopPaint() {
+    if (!this.paint) return;
+    this.paint = null;
+    this.root.classList.remove('nd-painting');
+    this.emitSoon();
+  }
+
+  /** Words just picked, while the painter is on: they take its look. */
+  private painted() {
+    const p = this.paint;
+    if (!p || this.o.readOnly) return;
+    const [s, e] = this.range();
+    if (ops.samePos(s, e)) return;
+    this.before = this.sel;
+    let d = ops.mapLook(this.doc, s, e, (r) => (r.math ? r : { t: r.t, ...p.look, ...(r.link ? { link: r.link } : {}), ...(r.cm ? { cm: r.cm } : {}) }));
+    if (p.para && !s.c) {
+      const para = p.para;
+      d = ops.setStyle(d, s, e, para.style);
+      d = ops.setAlign(d, s, e, para.align ?? 'left');
+      d = ops.setSpacing(d, s, e, { lh: para.lh, sb: para.sb, sa: para.sa });
+    }
+    this.commit(d, this.sel);
+    if (!p.sticky) {
+      this.stopPaint();
+      this.o.onPainted?.();
+    }
   }
 
   /** The document as Markdown (to copy it all as text). */

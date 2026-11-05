@@ -1,8 +1,8 @@
 // How the documents editor looks around the words (the words themselves look as on the document's own page, from
 // shared/docs.ts' docCss): the sheet of paper (its size and margins; on a narrow screen the width there is, with
-// small margins), page breaks as a gap between sheets, a picked picture, the boxes of a checklist, and a hint in an
-// empty title and first paragraph. And the Google fonts a document uses, loaded through this server (the app's
-// pages load no font from elsewhere).
+// small margins), page breaks as a gap between sheets, a picked picture, equation or table of contents, the boxes
+// of a checklist and a callout's emoji (each pressed to change), and a hint in an empty title and first paragraph.
+// And the Google fonts a document uses, loaded through this server (the app's pages load no font from elsewhere).
 import { useEffect, useState } from 'react';
 import { docCss, docFonts, FONTS, INK, PAPERS, type Doc } from '@shared/docs';
 
@@ -30,6 +30,12 @@ export function editorCss(doc: Doc, o: { narrow: boolean; hints: { title: string
     `${s} .nd-picked img{outline:2px solid #1a73e8;outline-offset:1px}`,
     `${s} .nd-hr.nd-picked,${s} .nd-pb.nd-picked{outline:2px solid #1a73e8;outline-offset:-2px}`,
     `${s} .nd-check::before{cursor:pointer}`,
+    `${s} .nd-callout::before{cursor:pointer}`,
+    `${s} .nd-toc,${s} .nd-math{cursor:pointer;user-select:none;border-radius:6px}`,
+    `${s} .nd-toc:hover,${s} .nd-math:hover{background:rgba(26,115,232,.05)}`,
+    `${s} .nd-toc a{cursor:pointer}${s} .nd-toc a:hover{color:#1a5fd8;text-decoration:underline}`,
+    `${s} .nd-toc.nd-picked,${s} .nd-math.nd-picked{outline:2px solid #1a73e8;outline-offset:2px}`,
+    `${s} .nd-m{cursor:pointer;border-radius:3px}${s} .nd-m:hover{background:rgba(26,115,232,.08)}`,
     `${s} ::selection{background:rgba(26,115,232,.22)}`,
     `${s} a{cursor:text}`,
     // Hints in a document that has nothing in it yet.
