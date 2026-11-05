@@ -102,13 +102,14 @@ interface Ctx {
 }
 
 /** A finding's place: a file, the words [from, to) in it, and their line. */
-function place(doc: TexDoc, file: string, from: number, to = from): Pick<CheckFinding, 'file' | 'line' | 'from' | 'to'> {
+function place(doc: TexDoc, file: string, from: number, to = from): Pick<CheckFinding, 'file' | 'line' | 'from' | 'to' | 'quote'> {
   const text = texFileText(doc, file) ?? '';
-  return { file, line: lineOf(text, from), from, to: Math.max(from, to) };
+  const end = Math.max(from, to);
+  return { file, line: lineOf(text, from), from, to: end, quote: text.slice(from, Math.min(end, from + 300)) };
 }
 
 /** A whole line's place. */
-function linePlace(doc: TexDoc, file: string, line: number): Pick<CheckFinding, 'file' | 'line' | 'from' | 'to'> {
+function linePlace(doc: TexDoc, file: string, line: number): Pick<CheckFinding, 'file' | 'line' | 'from' | 'to' | 'quote'> {
   const text = texFileText(doc, file) ?? '';
   let at = 0;
   for (let i = 1; i < line && at >= 0; i++) {
@@ -118,11 +119,11 @@ function linePlace(doc: TexDoc, file: string, line: number): Pick<CheckFinding, 
   }
   const sp = lineSpan(text, at);
   const lead = text.slice(sp.from, sp.to).length - text.slice(sp.from, sp.to).trimStart().length;
-  return { file, line, from: sp.from + lead, to: sp.to };
+  return { file, line, from: sp.from + lead, to: sp.to, quote: text.slice(sp.from + lead, Math.min(sp.to, sp.from + lead + 300)) };
 }
 
 /** Where a document-wide finding goes: on main.tex's \documentclass. */
-function topPlace(doc: TexDoc): Pick<CheckFinding, 'file' | 'line' | 'from' | 'to'> {
+function topPlace(doc: TexDoc): Pick<CheckFinding, 'file' | 'line' | 'from' | 'to' | 'quote'> {
   const m = /\\documentclass[^\n]*/.exec(cleanTex(doc.main));
   return m ? place(doc, TEX_MAIN, m.index, m.index + m[0].length) : { file: TEX_MAIN, line: 1, from: 0, to: 0 };
 }
@@ -320,7 +321,8 @@ async function checkReferencesOnline(c: Ctx, bibs: Bibs, lookup: Lookup, progres
     const text = bibs.texts.get(e.file) ?? '';
     // The entry's first line (@type{key,): where its findings are shown and commented.
     const nl = text.indexOf('\n', e.from);
-    const head = { file: e.file, line: e.line, from: e.from, to: nl > e.from && nl < e.to ? nl : e.to };
+    const headTo = nl > e.from && nl < e.to ? nl : e.to;
+    const head = { file: e.file, line: e.line, from: e.from, to: headTo, quote: text.slice(e.from, headTo) };
     const was = text.slice(e.from, e.to);
     const fix = (rec: PaperRecord, published: boolean) => {
       const next = entryFrom(text, e, rec, published);
@@ -735,7 +737,7 @@ export function infoOf(out: string): Record<string, string> {
 }
 
 /** Where the bibliography is printed in the source (for the page limit's finding). */
-function bibPlace(c: Ctx): Pick<CheckFinding, 'file' | 'line' | 'from' | 'to'> {
+function bibPlace(c: Ctx): Pick<CheckFinding, 'file' | 'line' | 'from' | 'to' | 'quote'> {
   for (const s of c.sources) {
     const m = /\\(bibliography|printbibliography)\b[^\n]*|\\begin\s*\{thebibliography\}/.exec(s.clean);
     if (m) return place(c.doc, s.name, m.index, m.index + m[0].length);
