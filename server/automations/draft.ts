@@ -3,6 +3,7 @@
 // trigger; the agent, model, folder and settings come from the session. The user edits the draft in
 // the task form before anything is saved.
 import type { TaskDraft, TaskSchedule } from '../../shared/automations.ts';
+import { isConfidential } from '../../shared/confidential.ts';
 import { HttpError } from '../auth.ts';
 import type { Deps } from '../features/types.ts';
 import { helperJson } from '../helper.ts';
@@ -25,6 +26,8 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…`
 export async function draftFromSession(d: Deps, key: string, ask: typeof helperJson = helperJson): Promise<{ draft: TaskDraft; why?: string }> {
   const s = d.sessions.summary(key);
   if (!s) throw new HttpError(404, 'No such session');
+  // The helper model would read it, and a task's runs may go to other models (server/confidential).
+  if (isConfidential(s.extra)) throw new HttpError(409, 'A confidential session’s words stay on this computer, so it can’t be made into an automation.');
   const lines: string[] = [];
   for (const it of (await d.sessions.timeline(key)).parser.items) {
     if (it.kind === 'user' && !it.meta) lines.push(`USER: ${clip(it.text, 1500)}`);
