@@ -9,6 +9,9 @@
 import {
   ASSET,
   blockHtml,
+  fontCss,
+  tocEntries,
+  type Band,
   carryIds,
   docCss,
   docFonts,
@@ -43,6 +46,7 @@ import { all, att, isEl, kid, kids, parseXml, patt, path as xpath, type El } fro
 import { Zip } from '../documents/zip.ts';
 import { assetDataUrl, getAsset, pictureType, putAsset, takeIn } from './assets.ts';
 import { docxFile, type DocBlock as WordBlock, type DocLook, type DocRun as WordRun } from './docx.ts';
+import { katexStyle, texToHtml } from './math.ts';
 import { imageSize } from './ooxml.ts';
 import type { Picture } from './pptx.ts';
 
@@ -132,46 +136,91 @@ function pageCss(doc: Doc, mode: 'viewer' | 'print' | 'still'): string {
     `.nd-sheet{box-sizing:border-box;background:#fff;width:${paper.w}mm;max-width:none;margin:0 auto 20px;padding:${m}mm;` +
       'box-shadow:0 1px 3px rgba(0,0,0,.12),0 10px 30px rgba(0,0,0,.07);border-radius:2px}',
     '.nd-sheet:last-child{margin-bottom:0}',
+    // The header and footer on each sheet's margins (in print, on every page's, below).
+    '.nd-sheet{position:relative}',
+    `.nd-band{position:absolute;left:${m}mm;right:${m}mm;height:${m}mm;display:flex;align-items:center;font-family:${fontCss(doc.font)};font-size:${bandPt(doc)}pt;color:#5f6368;white-space:pre;overflow:hidden}`,
+    '.nd-band.nd-head{top:0}.nd-band.nd-foot{bottom:0}.nd-band.nd-center{justify-content:center}.nd-band.nd-right{justify-content:flex-end}',
   ];
-  if (mode === 'print')
-    return [
-      ...base,
-      `@page{size:${doc.page.size === 'letter' ? 'letter' : 'A4'};margin:${m}mm}`,
-      'html,body{background:#fff!important}',
-      '.nd-doc{padding:0}',
-      '.nd-sheet{width:auto;padding:0;margin:0;box-shadow:none;border-radius:0}',
-      '.nd-sheet+.nd-sheet{break-before:page}',
-      '.nd-doc tr,.nd-doc figure,.nd-doc .nd-hr,.nd-doc pre.nd-b{break-inside:avoid}',
-      '.nd-doc thead{display:table-header-group}',
-      '.nd-doc h1,.nd-doc h2,.nd-doc h3,.nd-doc h4,.nd-doc .nd-title,.nd-doc .nd-subtitle{break-after:avoid}',
-      '.nd-doc .nd-b{orphans:2;widows:2}',
-    ].join('\n');
+  if (mode === 'print') return [...base, printCss(doc)].join('\n');
   if (mode === 'still') {
     // The top of the first page, large enough to read in the list's picture.
     const zoom = Math.round((1040 / w) * 100) / 100;
     return [...base, 'html,body{overflow:hidden;background:#e8e6e1!important}', '.nd-doc{padding:56px 0 0}', `.nd-sheet{zoom:${zoom};min-height:${paper.h}mm;box-shadow:0 1px 4px rgba(0,0,0,.14)}`].join('\n');
   }
-  // In a narrower frame the sheet is drawn smaller; on a phone its words fill the width instead.
+  // In a narrower frame the sheet is drawn smaller; on a phone its words fill the width instead (on screens: printed,
+  // it is its pages).
   const fit = [0.92, 0.85, 0.78, 0.72]
-    .map((k, i, all) => `@media (max-width:${Math.round(w * (i ? all[i - 1] : 1) + 32)}px){.nd-sheet{zoom:${k}}}`)
+    .map((k, i, all) => `@media screen and (max-width:${Math.round(w * (i ? all[i - 1] : 1) + 32)}px){.nd-sheet{zoom:${k}}}`)
     .join('\n');
   return [
     ...base,
     fit,
     // There, a table's columns take what their words need, not the widths set for the paper.
-    `@media (max-width:${Math.round(w * 0.72 + 31)}px){.nd-doc{padding:0;--nd-step:22pt}.nd-sheet{zoom:1;width:auto;padding:22px 18px 28px;margin:0 0 8px;box-shadow:none;border-radius:0}.nd-doc table.nd-table{table-layout:auto}.nd-doc .nd-table col{width:auto!important}}`,
+    `@media screen and (max-width:${Math.round(w * 0.72 + 31)}px){.nd-doc{padding:0;--nd-step:22pt}.nd-sheet{zoom:1;width:auto;padding:22px 18px 28px;margin:0 0 8px;box-shadow:none;border-radius:0}.nd-band{display:none}.nd-doc table.nd-table{table-layout:auto}.nd-doc .nd-table col{width:auto!important}}`,
   ].join('\n');
+}
+
+/** How the document prints: its paper and margins, its header and footer on every page, its sheets as pages, what belongs together kept together. */
+function printCss(doc: Doc): string {
+  return [
+    `@page{size:${doc.page.size === 'letter' ? 'letter' : 'A4'};margin:${doc.page.margin}mm;${marginBoxes(doc)}}`,
+    doc.titlePage ? '@page:first{@top-left{content:none}@top-center{content:none}@top-right{content:none}@bottom-left{content:none}@bottom-center{content:none}@bottom-right{content:none}}' : '',
+    '.nd-band{display:none}',
+    'html,body{background:#fff!important}',
+    '.nd-doc{padding:0}',
+    '.nd-sheet{width:auto;padding:0;margin:0;box-shadow:none;border-radius:0;zoom:1}',
+    '.nd-sheet+.nd-sheet{break-before:page}',
+    '.nd-doc tr,.nd-doc figure,.nd-doc .nd-hr,.nd-doc pre.nd-b,.nd-doc .nd-math,.nd-doc .nd-callout{break-inside:avoid}',
+    '.nd-doc thead{display:table-header-group}',
+    '.nd-doc h1,.nd-doc h2,.nd-doc h3,.nd-doc h4,.nd-doc .nd-title,.nd-doc .nd-subtitle{break-after:avoid}',
+    '.nd-doc .nd-b{orphans:2;widows:2}',
+  ].join('\n');
+}
+
+/** A header's or footer's size: a little smaller than the words. */
+const bandPt = (doc: Doc) => Math.round(doc.size * 0.82 * 2) / 2;
+
+/** Words as a CSS string, safe inside a <style> (no way out of it, nor of the string). */
+const cssText = (s: string) => `"${s.replace(/[\\"<>\n\r]/g, (c) => `\\${c.charCodeAt(0).toString(16)} `)}"`;
+
+/** A header's or footer's words as CSS content: its words, and the page's number and count where it says {page} and {pages}. */
+function bandContent(text: string): string {
+  const parts = text.split(/(\{pages?\})/i).filter(Boolean);
+  return parts.map((p) => (/^\{page\}$/i.test(p) ? 'counter(page)' : /^\{pages\}$/i.test(p) ? 'counter(pages)' : cssText(p))).join(' ') || '""';
+}
+
+/** The printed pages' header and footer, as Chromium draws them in the page's margins. */
+function marginBoxes(doc: Doc): string {
+  const box = (where: 'top' | 'bottom', b: Band | undefined) =>
+    b ? `@${where}-${b.align ?? 'left'}{content:${bandContent(b.text)};font-family:${fontCss(doc.font)};font-size:${bandPt(doc)}pt;color:#5f6368;vertical-align:middle}` : '';
+  return box('top', doc.header) + box('bottom', doc.footer);
+}
+
+/** A header or footer drawn on a sheet of the page as it reads (its page's number: the sheet's). */
+function bandHtml(b: Band | undefined, kind: 'head' | 'foot', page: number, pages: number): string {
+  if (!b) return '';
+  const text = b.text.replace(/\{page\}/gi, String(page)).replace(/\{pages\}/gi, String(pages));
+  return `<div class="nd-band nd-${kind}${b.align ? ` nd-${b.align}` : ''}">${esc(text)}</div>`;
+}
+
+/** Whether a document has maths in it (an equation, or maths among its words). */
+export function docHasMath(d: Doc): boolean {
+  const inRuns = (runs: Run[]) => runs.some((r) => r.math);
+  return d.blocks.some((b) => b.type === 'math' || ((b.type === 'p' || b.type === 'li') && inRuns(b.runs)) || (b.type === 'table' && b.rows.some((r) => r.some((c) => inRuns(c.runs)))));
 }
 
 /**
  * The document's own page: its sheets of paper to read (`viewer`, in a frame or on its own; a page break starts
- * another sheet), its pages to print as Chromium makes them a PDF (`print`: its paper and margins, page breaks
- * where it has them, tables' rows, pictures and code kept whole), or the top of its first page (`still`, its
- * picture in Pages, at 1280×800). Its pictures go inside it; nothing in it is markup or a script but what this writes.
+ * another sheet), its pages to print as Chromium makes them a PDF (`print`: its paper and margins, its header and
+ * footer on every page with the page's number, page breaks where it has them, tables' rows, pictures and code kept
+ * whole; a table of contents' lines link to their headings), or the top of its first page (`still`, its picture in
+ * Pages, at 1280×800). Its pictures go inside it, and its maths is drawn here with KaTeX's fonts inside it; nothing
+ * in it is markup or a script but what this writes. Printed from a browser, the page as it reads prints as its pages.
  */
 export function docPage(db: DB, doc: Doc, title: string, mode: 'viewer' | 'print' | 'still' = 'viewer'): string {
   const inside = mapDocSources(doc, (s) => (s.startsWith(ASSET) ? (assetDataUrl(db, s.slice(ASSET.length)) ?? '') : s));
   const { labels } = listInfo(inside.blocks);
+  const draw = { src: (s: string) => s, math: texToHtml, toc: tocEntries(inside) };
   const sheets: string[][] = [[]];
   for (let i = 0; i < inside.blocks.length; i++) {
     const b = inside.blocks[i];
@@ -181,16 +230,22 @@ export function docPage(db: DB, doc: Doc, title: string, mode: 'viewer' | 'print
       continue;
     }
     if (mode === 'still' && sheets[0].length >= 60) break;
-    sheets[sheets.length - 1].push(blockHtml(b, labels[i], { src: (s) => s }));
+    sheets[sheets.length - 1].push(blockHtml(b, labels[i], draw));
   }
   const fams = googleFamilies(docFonts(inside));
+  const body = sheets.map((s, i) => {
+    const bands = doc.titlePage && i === 0 ? '' : bandHtml(doc.header, 'head', i + 1, sheets.length) + bandHtml(doc.footer, 'foot', i + 1, sheets.length);
+    return `<div class="nd-sheet">${bands}${s.join('')}</div>`;
+  });
+  const html = body.join('');
   return [
     '<!doctype html>',
     `<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>`,
     '<meta name="generator" content="Hydor documents">',
     fams ? `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?${esc(fams)}&amp;display=swap">` : '',
-    `<style>${pageCss(doc, mode)}\n${docCss(doc)}</style></head><body>`,
-    `<main class="nd-doc" translate="no">${sheets.map((s) => `<div class="nd-sheet">${s.join('')}</div>`).join('')}</main>`,
+    docHasMath(inside) ? `<style>${katexStyle(html)}</style>` : '',
+    `<style>${pageCss(doc, mode)}\n${docCss(doc)}${mode === 'viewer' ? `\n@media print{${printCss(doc)}}` : ''}</style></head><body>`,
+    `<main class="nd-doc" translate="no">${html}</main>`,
     '</body></html>',
   ].join('\n');
 }

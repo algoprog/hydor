@@ -1,26 +1,31 @@
 // Documents: a document kept in Pages (a page of the kind "doc"), as the server, the editor and the exports share
-// it, made as in Word or Google Docs: a paper size and margins, the document's own font and size, and blocks one
-// after another: paragraphs (normal text, a title, a subtitle, headings, quotes, code), list items (bullets, numbers,
-// checklists, five levels deep), tables, pictures, lines across and page breaks. Words are runs of text with their
-// look: bold, italic, underlined, struck, code, raised or lowered, a colour, a highlight, a size, a font, a link.
+// it, made as in Word or Google Docs: a paper size and margins, the document's own font and size, a header and a
+// footer on every page (with its number), and blocks one after another: paragraphs (normal text, a title, a
+// subtitle, headings, quotes, code, callouts), list items (bullets, numbers, checklists, five levels deep), tables
+// (cells with a fill, merged across rows and columns), pictures, equations, a table of contents, lines across and page
+// breaks. A paragraph may have its own line spacing and space before and after. Words are runs of text with their
+// look: bold, italic, underlined, struck, code, raised or lowered, a colour, a highlight, a size, a font, a link; a
+// run may be maths (LaTeX) among the words, and carry the comments on it (the document keeps their threads).
 //
 // normalizeDoc takes what an agent, the editor or an imported file gives (Markdown, lenient blocks, or the model as
 // it is kept) and returns the model with every value checked: the editor shows documents inside the app itself, so
 // nothing in one may be markup, a script or a style rule; colours, fonts, sizes and addresses are each of a known
 // form. docMarkdown writes it back as Markdown, with a few additions for what plain Markdown cannot say; htmlBlocks
 // reads HTML (a page, or what is pasted from Word, Google Docs or the web) into blocks; blockHtml draws a block
-// for the editor and for the document's own page alike, every word escaped.
+// for the editor and for the document's own page alike, every word escaped (maths drawn by whoever draws it).
+import { cleanComments, type Comment } from './comments.ts';
 import { cleanColor, cleanFont, COLOR_REFS, fontCss, FONTS, hexColor, newId, THEMES } from './slides.ts';
 
 export { FONTS, fontCss, newId };
+export type { Comment };
 
-export const DOC_LIMITS = { blocks: 20000, runs: 4000, text: 200_000, rows: 500, cols: 30, caption: 1000, levels: 5 };
+export const DOC_LIMITS = { blocks: 20000, runs: 4000, text: 200_000, rows: 500, cols: 30, caption: 1000, levels: 5, tex: 20_000, band: 500 };
 
 /** A picture kept by the app (server/pages/assets.ts), by its content's hash: "naget-asset:<sha>". */
 export const ASSET = 'naget-asset:';
 
 export type Align = 'left' | 'center' | 'right' | 'justify';
-export type ParaStyle = 'normal' | 'title' | 'subtitle' | 'h1' | 'h2' | 'h3' | 'h4' | 'quote' | 'code';
+export type ParaStyle = 'normal' | 'title' | 'subtitle' | 'h1' | 'h2' | 'h3' | 'h4' | 'quote' | 'code' | 'callout';
 export type ListKind = 'bullet' | 'number' | 'check';
 export type PaperSize = 'a4' | 'letter';
 
@@ -41,12 +46,25 @@ export interface Run {
   size?: number;
   font?: string;
   link?: string;
+  /** Maths among the words: `t` is LaTeX, drawn as an equation (a run of its own, never joined to its neighbours). */
+  math?: boolean;
+  /** The comments on these words: their ids in the document's comments. */
+  cm?: string[];
 }
 
 /** What a run looks like, without its words. */
 export type Look = Omit<Run, 't'>;
 
-export interface ParaBlock {
+/** How a paragraph's lines are spaced; what is left out is as its style has it. */
+export interface Spacing {
+  /** Line spacing, in lines: 1 single, 1.15, 1.5, 2 double. */
+  lh?: number;
+  /** The space before and after it, in points. */
+  sb?: number;
+  sa?: number;
+}
+
+export interface ParaBlock extends Spacing {
   id: string;
   type: 'p';
   /** Normal text when left out. */
@@ -54,10 +72,13 @@ export interface ParaBlock {
   align?: Align;
   /** Indent, 0–4 steps. */
   lvl?: number;
+  /** A callout's emoji (💡 when left out) and the colour behind it (#rrggbb). */
+  icon?: string;
+  tint?: string;
   runs: Run[];
 }
 
-export interface ItemBlock {
+export interface ItemBlock extends Spacing {
   id: string;
   type: 'li';
   list: ListKind;
@@ -73,6 +94,13 @@ export interface Cell {
   /** Its words; "\n" breaks a line. */
   runs: Run[];
   align?: Align;
+  /** The colour behind it, #rrggbb. */
+  fill?: string;
+  /** Where its words sit, up and down (at the top when left out). */
+  va?: 'middle' | 'bottom';
+  /** Merged: how many rows and columns it spans from here (the cells it covers keep their places, empty). */
+  rs?: number;
+  cs?: number;
 }
 
 export interface TableBlock {
@@ -108,7 +136,20 @@ export interface BreakBlock {
   type: 'pagebreak';
 }
 
-export type Block = ParaBlock | ItemBlock | TableBlock | ImageBlock | RuleBlock | BreakBlock;
+/** A table of contents: the document's headings, each a link to it, drawn from them wherever it shows. */
+export interface TocBlock {
+  id: string;
+  type: 'toc';
+}
+
+/** An equation on a line of its own, in LaTeX. */
+export interface MathBlock {
+  id: string;
+  type: 'math';
+  tex: string;
+}
+
+export type Block = ParaBlock | ItemBlock | TableBlock | ImageBlock | RuleBlock | BreakBlock | TocBlock | MathBlock;
 export type TextBlock = ParaBlock | ItemBlock;
 export type BlockType = Block['type'];
 
@@ -118,13 +159,26 @@ export interface Page {
   margin: number;
 }
 
+/** A header or a footer: a line of words on every page's top or bottom margin; {page} and {pages} are the page's number and how many there are. */
+export interface Band {
+  text: string;
+  /** On the left when left out. */
+  align?: 'center' | 'right';
+}
+
 export interface Doc {
   v: 1;
   page: Page;
   /** The body text's font and its size in points; headings are sized from it. */
   font: string;
   size: number;
+  header?: Band;
+  footer?: Band;
+  /** The first page is a title page: no header or footer on it. */
+  titlePage?: boolean;
   blocks: Block[];
+  /** The comments on its words, with their replies (runs say where each is, by its id). */
+  comments?: Comment[];
 }
 
 // ---- how documents look --------------------------------------------------------------------------------
@@ -167,9 +221,18 @@ export const STYLES: Record<ParaStyle, { label: string; k: number; bold?: boolea
   h4: { label: 'Heading 4', k: 1.08, bold: true, color: '#3c4043', lh: 1.4, before: 0.75, after: 0.2 },
   quote: { label: 'Quote', k: 1, italic: true, color: '#3c4043', lh: 1.45, before: 0.3, after: 0.6 },
   code: { label: 'Code', k: 0.9, color: INK, lh: 1.5, before: 0.2, after: 0.8 },
+  callout: { label: 'Callout', k: 1, color: INK, lh: 1.45, before: 0.3, after: 0.8 },
 };
 
-export const PARA_STYLES: ParaStyle[] = ['normal', 'title', 'subtitle', 'h1', 'h2', 'h3', 'h4', 'quote', 'code'];
+export const PARA_STYLES: ParaStyle[] = ['normal', 'title', 'subtitle', 'h1', 'h2', 'h3', 'h4', 'quote', 'code', 'callout'];
+
+/** A callout's emoji and tint, unless it has its own; and the tints the editor offers (light, as words in ink read on them). */
+export const CALLOUT = { icon: '💡', tint: '#fef7e0' };
+export const CALLOUT_TINTS = ['#fef7e0', '#e8f0fe', '#e6f4ea', '#fce8e6', '#f3e8fd', '#f1f3f4'];
+
+/** Line spacing as a person picks it (in lines), and the CSS line height it is drawn with: a font's own line is about 1.15 of its size. */
+export const LINE_SPACINGS = [1, 1.15, 1.5, 2];
+export const cssLine = (lines: number) => Math.round(lines * 1.15 * 1000) / 1000;
 const HEADING: Record<string, number> = { h1: 1, h2: 2, h3: 3, h4: 4 };
 
 /** A paragraph style's heading level (1–4), or 0. */
@@ -317,8 +380,10 @@ export function docSrc(v: unknown): string | null {
 
 const LOOK_KEYS = ['b', 'i', 'u', 's', 'code', 'sup', 'sub', 'color', 'hl', 'size', 'font', 'link'] as const;
 
-/** Whether two runs look the same. */
-export const sameLook = (a: Look, b: Look) => LOOK_KEYS.every((k) => a[k] === b[k]);
+const cmKey = (l: Look) => l.cm?.join(' ') ?? '';
+
+/** Whether two runs look the same (and carry the same comments). */
+export const sameLook = (a: Look, b: Look) => LOOK_KEYS.every((k) => a[k] === b[k]) && !!a.math === !!b.math && cmKey(a) === cmKey(b);
 
 /** A run's look alone. */
 export function lookOf(r: Run): Look {
@@ -332,17 +397,32 @@ export function mergeRuns(runs: Run[]): Run[] {
   for (const r of runs) {
     if (!r.t) continue;
     const last = out[out.length - 1];
-    if (last && sameLook(last, r)) out[out.length - 1] = { ...last, t: last.t + r.t };
+    // Two equations side by side stay two: their LaTeX joined could read as another one (\alpha and b as \alphab).
+    if (last && sameLook(last, r) && !r.math) out[out.length - 1] = { ...last, t: last.t + r.t };
     else out.push(r);
   }
   return out;
+}
+
+/** Comment ids as a run keeps them: each of a known form, once, in order. */
+export function cleanCm(v: unknown): string[] | undefined {
+  const list = typeof v === 'string' ? v.split(/[\s,]+/) : Array.isArray(v) ? v : [];
+  const out = [...new Set(list.filter((x): x is string => typeof x === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(x)))].slice(0, 20);
+  return out.length ? out : undefined;
 }
 
 export const runsText = (runs: Run[]) => runs.map((r) => r.t).join('');
 
 /** A run checked: its words and its look, every value of a known form. */
 function cleanRun(r: Obj, t: string): Run {
+  const cm = cleanCm(r.cm ?? r.comments);
+  // Maths is its LaTeX on one line, with no look of its own but its comments.
+  if (r.math === true || typeof r.tex === 'string') {
+    const tex = oneLine(typeof r.tex === 'string' ? r.tex : t, DOC_LIMITS.tex);
+    return tex ? { t: tex, math: true, ...(cm ? { cm } : {}) } : { t: '' };
+  }
   const out: Run = { t };
+  if (cm) out.cm = cm;
   if (r.b === true || r.bold === true) out.b = true;
   if (r.i === true || r.italic === true) out.i = true;
   if (r.u === true || r.underline === true) out.u = true;
@@ -412,6 +492,7 @@ const STYLE_OF: Record<string, Exclude<ParaStyle, 'normal'> | 'normal'> = {
   blockquote: 'quote',
   code: 'code',
   pre: 'code',
+  callout: 'callout',
 };
 
 /** A map's own entry (never one of Object's: "constructor"). */
@@ -441,6 +522,40 @@ function wordsOf(v: unknown, code: boolean): Run[] {
   return cleanRuns(v);
 }
 
+/** Points from a number or a length ("12pt", "16px"), 0 included; null when it is not one. */
+function ptZero(v: unknown, max: number): number | null {
+  if (v === 0 || (typeof v === 'string' && /^\s*0+(\.0+)?\s*(pt|px)?\s*$/i.test(v))) return 0;
+  return v === undefined || v === null || v === '' ? null : ptOf(v, 0.5, max);
+}
+
+/** A paragraph's own spacing, from what was written for it (lh or line; sb or before; sa or after). */
+function spacingOf(v: Obj, into: Spacing) {
+  const lh = v.lh ?? v.line ?? v.lineSpacing ?? v.spacing;
+  if (lh !== undefined && lh !== null && lh !== '') {
+    const n = num(typeof lh === 'string' ? lh.replace(/^single$/i, '1').replace(/^double$/i, '2') : lh, 0.5, 5, NaN);
+    if (Number.isFinite(n)) into.lh = n;
+  }
+  const sb = ptZero(v.sb ?? v.before ?? v.spaceBefore, 200);
+  if (sb !== null) into.sb = sb;
+  const sa = ptZero(v.sa ?? v.after ?? v.spaceAfter, 200);
+  if (sa !== null) into.sa = sa;
+}
+
+/** A callout's emoji: one symbol or a few (an emoji with its joiners), never words or markup. */
+export function cleanIcon(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const s = v.trim();
+  if (!s || s.length > 16 || [...s].length > 8 || /[\s<>&"'`\\{}\p{Cc}]|[A-Za-z]{2}/u.test(s)) return undefined;
+  return /[\p{Extended_Pictographic}\p{So}\p{Sm}\p{Sc}\p{Sk}\p{No}\p{P}]/u.test(s) ? s : undefined;
+}
+
+/** The emoji a callout's words start with, and the words after it. */
+export function leadingIcon(t: string): { icon: string; rest: string } | null {
+  const m = /^\s*((?:\p{Extended_Pictographic}|\p{Regional_Indicator}|[\u2139\u203c\u2049\u2122\u24c2\u3030\u303d\u3297\u3299])(?:[\u{fe0f}\u{20e3}\u{1f3fb}-\u{1f3ff}]|\u200d(?:\p{Extended_Pictographic}|[\u2640\u2642\u2695\u2696\u2708\u2764]))*\u{fe0f}?)\s+/u.exec(t);
+  const icon = m ? cleanIcon(m[1]) : undefined;
+  return m && icon ? { icon, rest: t.slice(m[0].length) } : null;
+}
+
 function para(v: Obj, style: ParaStyle, used: Set<string>, words: unknown): ParaBlock {
   const b = { id: cleanId(v.id, used), type: 'p' } as ParaBlock;
   if (style !== 'normal') b.style = style;
@@ -448,6 +563,13 @@ function para(v: Obj, style: ParaStyle, used: Set<string>, words: unknown): Para
   if (align && align !== 'left') b.align = align;
   const lvl = Math.round(num(v.lvl ?? v.indent ?? v.level, 0, 4, 0));
   if (lvl && style !== 'title' && style !== 'subtitle' && !headingLevel(style)) b.lvl = lvl;
+  spacingOf(v, b);
+  if (style === 'callout') {
+    const icon = cleanIcon(v.icon ?? v.emoji);
+    if (icon && icon !== CALLOUT.icon) b.icon = icon;
+    const tint = docColor(v.tint ?? v.color ?? v.background);
+    if (tint && tint !== CALLOUT.tint) b.tint = tint;
+  }
   b.runs = wordsOf(words, style === 'code');
   // A paragraph whose words are a single space (as Markdown writes an empty one) is empty.
   if (b.runs.length === 1 && /^[\s\u00a0]+$/.test(b.runs[0].t) && !b.runs[0].t.includes('\n') && style !== 'code') b.runs = [];
@@ -461,6 +583,7 @@ function item(v: Obj, list: ListKind, used: Set<string>, words: unknown): ItemBl
   if (lvl) b.lvl = lvl;
   const align = alignOf(v.align);
   if (align && align !== 'left') b.align = align;
+  spacingOf(v, b);
   b.runs = cleanRuns(words);
   // "[x] Done" written into a checklist's item.
   if (list === 'check' && b.runs[0]) {
@@ -491,9 +614,54 @@ function cellOf(v: unknown): Cell {
     const c: Cell = { runs: cleanRuns(v.runs ?? v.text ?? v.t ?? '') };
     const align = alignOf(v.align);
     if (align && align !== 'left') c.align = align;
+    const fill = docColor(v.fill ?? v.background ?? v.bg);
+    if (fill) c.fill = fill;
+    const va = v.va ?? v.valign ?? v.vertical;
+    if (va === 'middle' || va === 'center' || va === 'centre') c.va = 'middle';
+    else if (va === 'bottom') c.va = 'bottom';
+    const rs = Math.round(num(v.rs ?? v.rowspan ?? v.rows, 1, DOC_LIMITS.rows, 1));
+    const cs = Math.round(num(v.cs ?? v.colspan ?? v.cols, 1, DOC_LIMITS.cols, 1));
+    if (rs > 1) c.rs = rs;
+    if (cs > 1) c.cs = cs;
     return c;
   }
   return { runs: v === null || v === undefined ? [] : cleanRuns(typeof v === 'string' ? v.replace(/<br\s*\/?>/gi, '\n') : String(v)) };
+}
+
+/**
+ * A table's merged cells made to fit: each within the table and over no other, the cells it covers empty (their
+ * words, if any, joined to its own). Returns, for each cell, the merged one it is under ([row, column]), or null.
+ */
+export function fixMerges(rows: Cell[][]): ([number, number] | null)[][] {
+  const width = rows[0]?.length ?? 0;
+  const under: ([number, number] | null)[][] = rows.map((r) => r.map(() => null));
+  rows.forEach((row, r) =>
+    row.forEach((cell, c) => {
+      if (under[r][c] || (!cell.rs && !cell.cs)) return;
+      let rs = Math.min(cell.rs ?? 1, rows.length - r);
+      let cs = Math.min(cell.cs ?? 1, width - c);
+      // As far as it can go without another merge in the way.
+      const clear = (rr: number, cc: number) => !under[rr][cc] && (rr === r && cc === c ? true : !rows[rr][cc].rs && !rows[rr][cc].cs);
+      while (cs > 1 && !Array.from({ length: rs }, (_, k) => clear(r + k, c + cs - 1)).every(Boolean)) cs--;
+      while (rs > 1 && !Array.from({ length: cs }, (_, k) => clear(r + rs - 1, c + k)).every(Boolean)) rs--;
+      if (rs > 1) cell.rs = rs;
+      else delete cell.rs;
+      if (cs > 1) cell.cs = cs;
+      else delete cell.cs;
+      if (rs === 1 && cs === 1) return;
+      const runs = [...cell.runs];
+      for (let rr = r; rr < r + rs; rr++)
+        for (let cc = c; cc < c + cs; cc++) {
+          if (rr === r && cc === c) continue;
+          under[rr][cc] = [r, c];
+          const x = rows[rr][cc];
+          if (x.runs.some((y) => y.t.trim())) runs.push({ t: '\n' }, ...x.runs);
+          rows[rr][cc] = { runs: [] };
+        }
+      cell.runs = mergeRuns(runs);
+    }),
+  );
+  return under;
 }
 
 function table(v: Obj, rowsIn: unknown, used: Set<string>, headDefault: boolean): TableBlock | null {
@@ -506,6 +674,7 @@ function table(v: Obj, rowsIn: unknown, used: Set<string>, headDefault: boolean)
   const width = Math.max(0, ...rows.map((r) => r.length));
   if (!rows.length || !width) return null;
   for (const r of rows) while (r.length < width) r.push({ runs: [] });
+  fixMerges(rows);
   const t = { id: cleanId(v.id, used), type: 'table' } as TableBlock;
   if (v.head === true || v.header === true || (v.head === undefined && v.header === undefined && headDefault)) t.head = true;
   if (Array.isArray(v.cols) && v.cols.length === width) {
@@ -548,6 +717,16 @@ function image(v: Obj, srcIn: unknown, used: Set<string>, o: NormalizeOpts): Ima
   return b;
 }
 
+/** An equation on a line of its own: its LaTeX, the $$ around it (as Markdown writes it) left out. */
+function mathBlock(v: Obj, texIn: unknown, used: Set<string>): MathBlock | null {
+  const tex = str(texIn, DOC_LIMITS.tex)
+    .trim()
+    .replace(/^\$\$([\s\S]*)\$\$$/, '$1')
+    .replace(/^\\\[([\s\S]*)\\\]$/, '$1')
+    .trim();
+  return tex ? { id: cleanId(v.id, used), type: 'math', tex } : null;
+}
+
 /** Blocks from what was written for one: none, one, or (Markdown, a list) several. */
 function blocksOf(v: unknown, used: Set<string>, o: NormalizeOpts, out: Block[]) {
   if (out.length >= DOC_LIMITS.blocks) return;
@@ -578,6 +757,9 @@ function blocksOf(v: unknown, used: Set<string>, o: NormalizeOpts, out: Block[])
     if (type === 'image' || type === 'img' || type === 'picture' || type === 'figure') return push(image(v, v.src ?? v.url, used, o));
     if (type === 'hr' || type === 'rule' || type === 'line' || type === 'divider' || type === 'separator') return push({ id: cleanId(v.id, used), type: 'hr' });
     if (type === 'pagebreak' || type === 'page-break' || type === 'break' || type === 'newpage') return push({ id: cleanId(v.id, used), type: 'pagebreak' });
+    if (type === 'toc' || type === 'contents' || type === 'table-of-contents') return push({ id: cleanId(v.id, used), type: 'toc' });
+    if (type === 'math' || type === 'equation' || type === 'formula') return push(mathBlock(v, v.tex ?? v.latex ?? words, used));
+    if (type === 'callout' || type === 'note') return push(para(v, 'callout', used, words));
     return;
   }
   // Shorthands: { image: "…" }, { table: [[…]] }, { bullets: ["…", ["…"]] }, { bullet: "…" }, { h2: "Pricing" }.
@@ -586,6 +768,9 @@ function blocksOf(v: unknown, used: Set<string>, o: NormalizeOpts, out: Block[])
   if (Array.isArray(v.rows)) return push(table(v, v.rows, used, true));
   if (v.hr === true || v.rule === true || v.line === true || v.divider === true) return push({ id: cleanId(v.id, used), type: 'hr' });
   if (v.pagebreak === true || v.pageBreak === true || v.newpage === true) return push({ id: cleanId(v.id, used), type: 'pagebreak' });
+  if (v.toc === true || v.contents === true) return push({ id: cleanId(v.id, used), type: 'toc' });
+  if (typeof v.math === 'string' || typeof v.equation === 'string' || typeof v.tex === 'string') return push(mathBlock(v, v.math ?? v.equation ?? v.tex, used));
+  if (v.callout !== undefined && (typeof v.callout === 'string' || Array.isArray(v.callout))) return push(para(v, 'callout', used, v.callout));
   if (typeof v.markdown === 'string') return void mdBlocks(v.markdown).forEach((r) => blocksOf(r, used, o, out));
   for (const k of ['bullets', 'numbers', 'checks', 'checklist', 'items', 'list'])
     if (Array.isArray(v[k])) return items(v[k] as unknown[], own(LIST_OF, k) ?? (v.ordered === true ? 'number' : 'bullet'), used, out);
@@ -633,7 +818,53 @@ export function normalizeDoc(input: unknown, o: NormalizeOpts = {}): Doc {
   const used = new Set<string>();
   const blocks = typeof v.markdown === 'string' && !Array.isArray(v.blocks) ? normalizeBlocks(mdBlocks(v.markdown), o, used) : normalizeBlocks(v.blocks as unknown[], o, used);
   if (!blocks.length) blocks.push({ id: cleanId(undefined, used), type: 'p', runs: [] });
-  return { v: 1, page: { size, margin }, font: docFont(v.font) ?? DOC_DEFAULTS.font, size: ptOf(v.size, 6, 72) ?? DOC_DEFAULTS.size, blocks };
+  const d: Doc = { v: 1, page: { size, margin }, font: docFont(v.font) ?? DOC_DEFAULTS.font, size: ptOf(v.size, 6, 72) ?? DOC_DEFAULTS.size, blocks };
+  const header = bandOf(v.header);
+  if (header) d.header = header;
+  const footer = bandOf(v.footer);
+  if (footer) d.footer = footer;
+  if (v.titlePage === true && (header || footer)) d.titlePage = true;
+  return withComments(d, v.comments);
+}
+
+/** A header or footer from its words (a string) or { text, align }; none when it has no words. */
+export function bandOf(v: unknown): Band | undefined {
+  const o = typeof v === 'string' ? { text: v } : isObj(v) ? v : null;
+  const text = o ? oneLine(o.text ?? o.t, DOC_LIMITS.band) : '';
+  if (!text) return undefined;
+  const align = o!.align === 'centre' || o!.align === 'middle' ? 'center' : o!.align;
+  return align === 'center' || align === 'right' ? { text, align } : { text };
+}
+
+/**
+ * A document with its comments checked (`list`; none given: the ones it has), and the marks on its words kept only for
+ * comments it has. A comment whose words are all gone stays (its quote says what it was about).
+ */
+export function withComments(d: Doc, list: unknown = d.comments): Doc {
+  const comments = cleanComments(list);
+  const ids = new Set(comments.map((c) => c.id));
+  const fix = (runs: Run[]): Run[] => {
+    if (!runs.some((r) => r.cm)) return runs;
+    return mergeRuns(
+      runs.map((r) => {
+        if (!r.cm) return r;
+        const cm = r.cm.filter((x) => ids.has(x));
+        if (cm.length === r.cm.length) return r;
+        const { cm: _cm, ...rest } = r;
+        return cm.length ? { ...rest, cm } : rest;
+      }),
+    );
+  };
+  const blocks = d.blocks.map((b): Block => {
+    if (b.type === 'p' || b.type === 'li') {
+      const runs = fix(b.runs);
+      return runs === b.runs ? b : { ...b, runs };
+    }
+    if (b.type === 'table' && b.rows.some((r) => r.some((c) => c.runs.some((x) => x.cm)))) return { ...b, rows: b.rows.map((r) => r.map((c) => ({ ...c, runs: fix(c.runs) }))) };
+    return b;
+  });
+  const { comments: _c, ...rest } = d;
+  return comments.length ? { ...rest, blocks, comments } : { ...rest, blocks };
 }
 
 /** A new document: its title, and an empty paragraph to write in. */
@@ -658,7 +889,8 @@ export function newDoc(title = ''): Doc {
  * versions read as a diff of lines. normalizeDoc reads it back.
  */
 export function docText(d: Doc): string {
-  const out: string[] = [`{"v":1,"page":${JSON.stringify(d.page)},"font":${JSON.stringify(d.font)},"size":${d.size},"blocks":[`];
+  const bands = `${d.header ? `,"header":${JSON.stringify(d.header)}` : ''}${d.footer ? `,"footer":${JSON.stringify(d.footer)}` : ''}${d.titlePage ? ',"titlePage":true' : ''}`;
+  const out: string[] = [`{"v":1,"page":${JSON.stringify(d.page)},"font":${JSON.stringify(d.font)},"size":${d.size}${bands},"blocks":[`];
   d.blocks.forEach((b, i) => {
     const end = i < d.blocks.length - 1 ? ',' : '';
     if (b.type === 'table') {
@@ -668,6 +900,10 @@ export function docText(d: Doc): string {
       out.push(` ]}${end}`);
     } else out.push(` ${JSON.stringify(b)}${end}`);
   });
+  if (d.comments?.length) {
+    out.push('],"comments":[');
+    d.comments.forEach((c, i) => out.push(` ${JSON.stringify(c)}${i < d.comments!.length - 1 ? ',' : ''}`));
+  }
   out.push(']}');
   return out.join('\n');
 }
@@ -677,11 +913,14 @@ export const isDocText = (s: string) => /^\s*\{\s*"v"\s*:\s*1\s*,\s*"page"/.test
 
 /** A block's words as plain text (a table's, a cell a tab and a row a line; a picture's caption). */
 export function blockText(b: Block): string {
-  if (b.type === 'p' || b.type === 'li') return runsText(b.runs);
-  if (b.type === 'table') return b.rows.map((r) => r.map((c) => runsText(c.runs).replace(/\n/g, ' ')).join('\t')).join('\n');
+  if (b.type === 'p' || b.type === 'li') return wordsText(b.runs);
+  if (b.type === 'table') return b.rows.map((r) => r.map((c) => wordsText(c.runs).replace(/\n/g, ' ')).join('\t')).join('\n');
   if (b.type === 'image') return b.caption ?? b.alt ?? '';
   return '';
 }
+
+/** Runs' words, an equation among them as a mark that stands for it (its LaTeX is not words to count or read). */
+export const wordsText = (runs: Run[]) => runs.map((r) => (r.math ? '\u2063' : r.t)).join('');
 
 /** The headings (and the title), in order: for an outline. */
 export function docHeadings(d: Doc): { id: string; index: number; level: number; text: string }[] {
@@ -823,8 +1062,8 @@ interface Attrs {
   kv: Record<string, string>;
 }
 
-const KNOWN_CLS = new Set(['title', 'subtitle', 'left', 'center', 'centre', 'right', 'justify']);
-const KNOWN_KV = new Set(['indent', 'align', 'width', 'w']);
+const KNOWN_CLS = new Set(['title', 'subtitle', 'left', 'center', 'centre', 'right', 'justify', 'callout']);
+const KNOWN_KV = new Set(['indent', 'align', 'width', 'w', 'line', 'before', 'after', 'tint', 'icon']);
 
 function parseAttrs(body: string): Attrs | null {
   const a: Attrs = { cls: [], kv: {} };
@@ -1005,7 +1244,12 @@ function tagLook(name: string, at: Record<string, string>, looks: boolean): Look
         if (f) m.font = f;
       }
       break;
-    case 'span':
+    case 'span': {
+      // The words a comment is on (as docMarkdown writes them for an agent).
+      const cm = cleanCm(at['data-comment']);
+      if (cm) m.cm = cm;
+      break;
+    }
     case 'small':
     case 'big':
     case 'abbr':
@@ -1096,6 +1340,30 @@ function linkAt(s: string, i: number): { text: string; dest: string; title: stri
   return { text: s.slice(i + 1, j), dest: unescapeMd(dest), title: unescapeMd(title), end: k + 1 };
 }
 
+/**
+ * Maths at s[i] ("$"), as Pandoc reads it: $x^2$ or $$x^2$$, the opening $ followed by no space, the closing one after
+ * no space and before no digit (so "$5 and $10" stay words).
+ */
+function mathAt(s: string, i: number): { tex: string; end: number } | null {
+  if (s[i - 1] === '$') return null;
+  const n = s[i + 1] === '$' ? 2 : 1;
+  const from = i + n;
+  if (!s[from] || /\s/.test(s[from]) || s[from] === '$') return null;
+  for (let j = from; j < s.length; j++) {
+    if (s[j] === '\\') {
+      j++;
+      continue;
+    }
+    if (s[j] === '\n' && s[j + 1] === '\n') return null;
+    if (s[j] !== '$') continue;
+    if (n === 2 ? s[j + 1] !== '$' : s[j + 1] === '$') return null;
+    if (/\s/.test(s[j - 1]) || /\d/.test(s[j + n] ?? '')) return null;
+    const tex = s.slice(from, j).replace(/\s+/g, ' ');
+    return tex ? { tex, end: j + n } : null;
+  }
+  return null;
+}
+
 /** Attributes in braces at s[i] ("{"), and where they end. */
 function braceAt(s: string, i: number): { attrs: Attrs; end: number } | null {
   const e = s.indexOf('}', i);
@@ -1176,6 +1444,15 @@ function inlineToks(s: string, depth: number): Tok[] {
       buf += s.slice(i, k);
       i = k;
       continue;
+    }
+    if (c === '$') {
+      const m = mathAt(s, i);
+      if (m) {
+        flush();
+        toks.push({ k: 't', t: m.tex, m: { math: true } });
+        i = m.end;
+        continue;
+      }
     }
     if (c === '!' && s[i + 1] === '[') {
       const l = linkAt(s, i + 1);
@@ -1309,7 +1586,7 @@ function flatten(toks: Tok[]): Piece[] {
   };
   const push = (t: string, m: Look) => {
     if (!t) return;
-    if (m.link || m.code || !/https?:\/\/|www\./.test(t)) return void out.push({ t, ...m });
+    if (m.link || m.code || m.math || !/https?:\/\/|www\./.test(t)) return void out.push({ t, ...m });
     // Addresses written out are links.
     let at = 0;
     for (const u of t.matchAll(URL_RE)) {
@@ -1401,7 +1678,7 @@ function splitRow(line: string): string[] {
 }
 
 /** Whether a line starts a block of its own (and so ends a paragraph before it). */
-const startsBlock = (l: string) => FENCE.test(l) || ATX.test(l) || RULE.test(l) || QUOTE.test(l) || ITEM.test(l) || PAGEBREAK.test(l);
+const startsBlock = (l: string) => FENCE.test(l) || ATX.test(l) || RULE.test(l) || QUOTE.test(l) || ITEM.test(l) || PAGEBREAK.test(l) || /^ {0,3}(\$\$|<table[\s>])/i.test(l);
 
 /** A paragraph's lines as one text: a line ending in two spaces or a backslash breaks there. */
 function joinLines(lines: string[]): string {
@@ -1436,6 +1713,22 @@ function textBlocks(text: string, base: Raw, out: Raw[]) {
     const align = attrsAlign(attrs);
     if (align) b.align = align;
     if (attrs.kv.indent) b.lvl = attrs.kv.indent;
+    if (attrs.kv.line) b.lh = attrs.kv.line;
+    if (attrs.kv.before) b.sb = attrs.kv.before;
+    if (attrs.kv.after) b.sa = attrs.kv.after;
+    if (b.type === 'p' && attrs.cls.includes('callout')) {
+      b.style = 'callout';
+      if (attrs.kv.tint) b.tint = attrs.kv.tint;
+      if (attrs.kv.icon) b.icon = attrs.kv.icon;
+    }
+  }
+  // A callout's emoji is the first thing in its words.
+  if (b.style === 'callout' && !b.icon && runs[0]) {
+    const m = leadingIcon(runs[0].t);
+    if (m) {
+      b.icon = m.icon;
+      runs[0] = { ...runs[0], t: m.rest };
+    }
   }
   if (!alone && (runs.some((r) => r.t) || !imgs.length)) out.push({ ...b, runs });
   for (const im of imgs) {
@@ -1443,6 +1736,15 @@ function textBlocks(text: string, base: Raw, out: Raw[]) {
     out.push({ type: 'image', src: im.src, alt: im.alt, caption: im.title, w: a?.kv.width ?? a?.kv.w ?? im.width, align: attrsAlign(a) });
   }
 }
+
+/** GitHub's alerts as callouts: their emoji and tint. */
+const ALERTS: Record<string, { icon: string; tint: string }> = {
+  note: { icon: 'ℹ️', tint: '#e8f0fe' },
+  tip: { icon: '💡', tint: '#e6f4ea' },
+  important: { icon: '❗', tint: '#f3e8fd' },
+  warning: { icon: '⚠️', tint: '#fef7e0' },
+  caution: { icon: '🛑', tint: '#fce8e6' },
+};
 
 /** Cells of a table's row: their words (a <br> breaks a line). */
 const cellRuns = (s: string) => mdRuns(s);
@@ -1470,6 +1772,44 @@ export function mdBlocks(md: string, depth = 0): Raw[] {
     if (!line.trim()) {
       endPara();
       i++;
+      continue;
+    }
+    // An equation: $$ on a line of its own (or $$…$$ alone on one), its LaTeX between.
+    const dd = /^ {0,3}\$\$(.*)$/.exec(line);
+    const one = dd ? /^(.*?)\$\$\s*$/.exec(dd[1]) : null;
+    // Its end: on the same line, or a line ending in $$ not far below (else the line is words that start with $$).
+    let ddEnd = one && one[1].trim() ? i : -1;
+    if (dd && ddEnd < 0) for (let j = i + 1; j < Math.min(lines.length, i + 300) && ddEnd < 0; j++) if (/\$\$\s*$/.test(lines[j])) ddEnd = j;
+    if (dd && ddEnd >= 0) {
+      endPara();
+      stack = [];
+      const body = ddEnd === i ? [one![1]] : [dd[1], ...lines.slice(i + 1, ddEnd), lines[ddEnd].replace(/\$\$\s*$/, '')];
+      if (body.join('').trim()) out.push({ type: 'math', tex: body.join('\n').trim() });
+      i = ddEnd + 1;
+      continue;
+    }
+    if (/^ {0,3}(?:\[TOC\]|\[\[_TOC_\]\]|\\tableofcontents)\s*$/i.test(line)) {
+      endPara();
+      stack = [];
+      out.push({ type: 'toc' });
+      i++;
+      continue;
+    }
+    // A table written in HTML (as docMarkdown writes one with merged or filled cells).
+    if (/^ {0,3}<table[\s>]/i.test(line)) {
+      endPara();
+      stack = [];
+      let j = i;
+      const html: string[] = [];
+      for (; j < lines.length; j++) {
+        html.push(lines[j]);
+        if (/<\/table>/i.test(lines[j])) {
+          j++;
+          break;
+        }
+      }
+      out.push(...htmlBlocks(html.join('\n'), { looks: true }));
+      i = j;
       continue;
     }
     const fence = FENCE.exec(line);
@@ -1554,8 +1894,18 @@ export function mdBlocks(md: string, depth = 0): Raw[] {
         else if (lines[j].trim() && body.length && body[body.length - 1].trim() && !startsBlock(lines[j])) body.push(lines[j]);
         else break;
       }
-      const inner = depth < 4 ? mdBlocks(body.join('\n'), depth + 1) : [{ type: 'p', runs: mdRuns(body.join(' ')) }];
-      for (const b of inner) out.push(b.type === 'p' && b.style !== 'code' ? { ...b, style: 'quote' } : b);
+      // GitHub's alerts (> [!NOTE], > [!WARNING]…) are callouts.
+      const alert = /^\s*\[!(note|tip|important|warning|caution)\]\s*$/i.exec(body[0] ?? '');
+      const inner = depth < 4 ? mdBlocks((alert ? body.slice(1) : body).join('\n'), depth + 1) : [{ type: 'p', runs: mdRuns(body.join(' ')) }];
+      if (alert) {
+        const runs: Run[] = [];
+        for (const b of inner) {
+          if (!Array.isArray(b.runs)) continue;
+          if (runs.length) runs.push({ t: '\n' });
+          runs.push(...(b.runs as Run[]));
+        }
+        out.push({ type: 'p', style: 'callout', ...ALERTS[alert[1].toLowerCase()], runs });
+      } else for (const b of inner) out.push(b.type === 'p' && b.style !== 'code' && b.style !== 'callout' ? { ...b, style: 'quote' } : b);
       i = j;
       continue;
     }
@@ -1615,13 +1965,15 @@ export function mdBlocks(md: string, depth = 0): Raw[] {
 // ---- Markdown out ---------------------------------------------------------------------------------------------
 
 /** Text written so Markdown reads it as text: what would be syntax escaped (at a line's start too, with `start`). */
-function escText(t: string, start: boolean, table: boolean): string {
+function escText(t: string, start: boolean, table: boolean, dollars = false): string {
   let out = '';
   const alnum = (ch: string | undefined) => !!ch && /[\p{L}\p{N}]/u.test(ch);
   for (let i = 0; i < t.length; i++) {
     const ch = t[i];
     const lone = (i === 0 || SPACE.test(t[i - 1])) && (i === t.length - 1 || SPACE.test(t[i + 1]));
     if (ch === '\\' || ch === '`' || ch === '[' || ch === ']') out += `\\${ch}`;
+    // A $ that could start maths with one after it (or, with `dollars`, any): "\$5 and \$10$" stays words.
+    else if (ch === '$') out += dollars || (t[i + 1] && !SPACE.test(t[i + 1]) && /\S\$/.test(t.slice(i + 1))) ? '\\$' : '$';
     else if (ch === '*') out += lone && !(start && i === 0) ? '*' : '\\*';
     else if (ch === '_') out += lone || (alnum(t[i - 1]) && alnum(t[i + 1])) ? '_' : '\\_';
     else if (ch === '<') out += /[A-Za-z/!?]/.test(t[i + 1] ?? '') ? '\\<' : '<';
@@ -1636,8 +1988,9 @@ function escText(t: string, start: boolean, table: boolean): string {
 }
 
 /** A run's look as Markdown's marks, outermost first: a link, a style, the default highlight, bold, italic, struck… */
-function marksOf(r: Look, tags: boolean): string[] {
+function marksOf(r: Look, tags: boolean, cm = false): string[] {
   const k: string[] = [];
+  if (cm && r.cm) k.push(`c:${r.cm.join(' ')}`);
   if (r.link) k.push(`a:${r.link}`);
   const st: string[] = [];
   if (r.color) st.push(`color:${r.color}`);
@@ -1661,14 +2014,15 @@ const CLOSE: Record<string, string> = { hl: '==', b: '**', i: '*', s: '~~', u: '
 /** Spaces at the edges of a marked run take only the marks their neighbour on that side shares (so "**bold** next"). */
 function shiftSpaces(runs: Run[]): Run[] {
   const out: Run[] = [];
+  // A comment's mark is a span, which holds spaces as well as words: they keep it.
   const common = (a: Run, b: Run | undefined): Look => {
-    const m: Look = {};
+    const m: Look = a.cm ? { cm: a.cm } : {};
     if (!b) return m;
     for (const k of LOOK_KEYS) if (a[k] !== undefined && a[k] === b[k]) (m as Record<string, unknown>)[k] = a[k];
     return m;
   };
   runs.forEach((r, i) => {
-    if (r.code) return void out.push(r);
+    if (r.code || r.math) return void out.push(r);
     const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(r.t)!;
     if (!m[2]) return void out.push({ ...common(r, runs[i - 1] ?? runs[i + 1]), t: r.t });
     if (m[1]) out.push({ ...common(r, runs[i - 1]), t: m[1] });
@@ -1679,23 +2033,27 @@ function shiftSpaces(runs: Run[]): Run[] {
 }
 
 /** Runs as Markdown, marks opened and closed as a stack; `nl` follows each line break. */
-function writeRuns(runs: Run[], o: { table: boolean; nl: string; tags: boolean }): string {
+function writeRuns(runs: Run[], o: { table: boolean; nl: string; tags: boolean; cm?: boolean; dollars?: boolean }): string {
   let out = '';
   const stack: string[] = [];
   const close = (to: number) => {
     while (stack.length > to) {
       const k = stack.pop()!;
-      out += k.startsWith('a:') ? `](${/[()\s<>]/.test(k.slice(2)) ? `<${k.slice(2)}>` : k.slice(2)})` : k.startsWith('span:') ? '</span>' : CLOSE[k];
+      out += k.startsWith('a:') ? `](${/[()\s<>]/.test(k.slice(2)) ? `<${k.slice(2)}>` : k.slice(2)})` : k.startsWith('span:') || k.startsWith('c:') ? '</span>' : CLOSE[k];
     }
   };
   for (const r of runs) {
-    const want = marksOf(r, o.tags);
+    const want = marksOf(r, o.tags, o.cm);
     let k = 0;
     while (k < stack.length && k < want.length && stack[k] === want[k]) k++;
     close(k);
     for (const m of want.slice(k)) {
-      out += m.startsWith('a:') ? '[' : m.startsWith('span:') ? `<span style="${m.slice(5)}">` : OPEN[m];
+      out += m.startsWith('a:') ? '[' : m.startsWith('span:') ? `<span style="${m.slice(5)}">` : m.startsWith('c:') ? `<span data-comment="${m.slice(2)}">` : OPEN[m];
       stack.push(m);
+    }
+    if (r.math) {
+      out += `$${r.t.replace(/\n/g, ' ')}$`;
+      continue;
     }
     const lines = r.t.split('\n');
     lines.forEach((line, j) => {
@@ -1705,7 +2063,7 @@ function writeRuns(runs: Run[], o: { table: boolean; nl: string; tags: boolean }
         const ticks = '`'.repeat(Math.max(0, ...(line.match(/`+/g) ?? []).map((x) => x.length)) + 1);
         const pad = /^`|`$|^ .* $/.test(line) ? ' ' : '';
         out += `${ticks}${pad}${line.replace(/\|/g, o.table ? '\\|' : '|')}${pad}${ticks}`;
-      } else out += escText(line, !out || out.endsWith('\n') || out.endsWith(o.nl), o.table);
+      } else out += escText(line, !out || out.endsWith('\n') || out.endsWith(o.nl), o.table, o.dollars);
     });
   }
   close(0);
@@ -1715,13 +2073,14 @@ function writeRuns(runs: Run[], o: { table: boolean; nl: string; tags: boolean }
 const sameRuns = (a: Run[], b: Run[]) => a.length === b.length && a.every((r, i) => r.t === b[i].t && sameLook(r, b[i]));
 
 /** A block's runs as Markdown that reads back as the same runs: marks as * and ~~ where they can be, as tags where not. */
-function runsMd(runs: Run[], o: { table?: boolean; nl?: string } = {}): string {
-  const rs = shiftSpaces(mergeRuns(runs));
-  const opts = { table: !!o.table, nl: o.nl ?? '\\\n', tags: false };
+function runsMd(runs: Run[], o: { table?: boolean; nl?: string; cm?: boolean } = {}): string {
+  const rs = shiftSpaces(mergeRuns(o.cm ? runs : runs.some((r) => r.cm) ? runs.map(({ cm: _cm, ...r }) => r) : runs));
+  const opts = { table: !!o.table, nl: o.nl ?? '\\\n', tags: false, cm: !!o.cm };
   const md = writeRuns(rs, opts);
   const back = (s: string) => mdRuns(o.table ? s : s.replace(new RegExp(opts.nl.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&'), 'g'), '\n'));
   if (sameRuns(back(md), rs)) return md;
-  return writeRuns(rs, { ...opts, tags: true });
+  const tagged = writeRuns(rs, { ...opts, tags: true });
+  return sameRuns(back(tagged), rs) ? tagged : writeRuns(rs, { ...opts, tags: true, dollars: true });
 }
 
 function attrsMd(a: { cls?: string[]; kv?: Record<string, string | number> }): string {
@@ -1729,15 +2088,54 @@ function attrsMd(a: { cls?: string[]; kv?: Record<string, string | number> }): s
   return parts.length ? ` {${parts.join(' ')}}` : '';
 }
 
+/** A paragraph's own spacing as attributes: {line=1.5 before=12 after=0}. */
+const spacingKv = (b: Spacing): Record<string, number> => ({ ...(b.lh !== undefined ? { line: b.lh } : {}), ...(b.sb !== undefined ? { before: b.sb } : {}), ...(b.sa !== undefined ? { after: b.sa } : {}) });
+
+/** Whether a table says more than Markdown's tables can (merged or filled cells, words set low): written as HTML then. */
+const htmlTable = (t: TableBlock) => t.rows.some((r) => r.some((c) => c.rs || c.cs || c.fill || c.va));
+
+/** A table as HTML that htmlBlocks reads back: its widths, header, merged cells, fills and alignment, its words' looks. */
+export function tableHtml(t: TableBlock, o: { cm?: boolean } = {}): string {
+  const under = fixMerges(t.rows.map((r) => r.map((c) => ({ ...c }))));
+  const cell = (c: Cell, r: number, k: number, th: boolean) => {
+    if (under[r][k]) return '';
+    const st = [c.fill ? `background-color:${c.fill}` : '', c.va ? `vertical-align:${c.va}` : '', c.align ? `text-align:${c.align}` : ''].filter(Boolean).join(';');
+    const tag = th ? 'th' : 'td';
+    return `<${tag}${c.cs ? ` colspan="${c.cs}"` : ''}${c.rs ? ` rowspan="${c.rs}"` : ''}${st ? ` style="${st}"` : ''}>${runsInline(c.runs, o)}</${tag}>`;
+  };
+  const row = (r: Cell[], ri: number, th: boolean) => `<tr>${r.map((c, k) => cell(c, ri, k, th)).join('')}</tr>`;
+  const cols = t.cols ? `<colgroup>${t.cols.map((w) => `<col style="width:${Math.round(w * 10000) / 100}%">`).join('')}</colgroup>` : '';
+  const head = t.head ? `<thead>${row(t.rows[0], 0, true)}</thead>` : '';
+  return `<table>${cols}${head}<tbody>${t.rows.map((r, ri) => (t.head && ri === 0 ? '' : row(r, ri, false))).join('')}</tbody></table>`;
+}
+
+/** Runs as HTML that htmlBlocks reads back (maths as its LaTeX in a marked span; comments' marks for an agent). */
+function runsInline(runs: Run[], o: { cm?: boolean }): string {
+  return runs
+    .map((r) => {
+      const h = r.math ? `<span data-tex="${escHtml(r.t)}">${escHtml(r.t)}</span>` : runHtml({ ...r, cm: undefined }, { view: true });
+      return o.cm && r.cm ? `<span data-comment="${r.cm.join(' ')}">${h}</span>` : h;
+    })
+    .join('');
+}
+
+export interface MarkdownOpts {
+  /** For an agent: the words comments are on, marked (<span data-comment="id">), to keep or answer. */
+  comments?: boolean;
+}
+
 /**
- * The document as Markdown, as mdBlocks reads it back: headings, paragraphs, lists, quotes, code, tables, pictures,
- * rules and page breaks, with {.title} {.center} {indent=1}-style attributes, <u>, <sup>, <sub>, ==highlights== and
- * <span style> for colours, sizes and fonts. What it cannot hold: block ids, a table's alignment cell by cell (a
- * column's is kept), spaces at the start of a line, and the document's paper, margins, font and size.
+ * The document as Markdown, as mdBlocks reads it back: headings, paragraphs, lists, quotes, callouts, code, tables,
+ * pictures, equations ($$…$$, and $…$ among words), a table of contents ([TOC]), rules and page breaks, with
+ * {.title} {.center} {indent=1} {line=1.5 before=12 after=0}-style attributes, <u>, <sup>, <sub>, ==highlights== and
+ * <span style> for colours, sizes and fonts; a table with merged or filled cells as HTML. What it cannot hold: block
+ * ids, a table's alignment cell by cell (a column's is kept), spaces at the start of a line, the document's paper,
+ * margins, font and size, its header and footer, and (but for an agent, with `comments`) its comments.
  */
-export function docMarkdown(d: Doc): string {
+export function docMarkdown(d: Doc, o: MarkdownOpts = {}): string {
   const { counts } = listInfo(d.blocks);
   const parts: string[] = [];
+  const cm = !!o.comments;
   // Where each level's item's words start, for the items under it.
   const content: number[] = [];
   let prev: Block | undefined;
@@ -1746,18 +2144,22 @@ export function docMarkdown(d: Doc): string {
     if (b.type === 'p') {
       const style = b.style ?? 'normal';
       const align = b.align ? [b.align] : [];
+      const kv = { ...(b.lvl ? { indent: b.lvl } : {}), ...spacingKv(b) };
       if (style === 'code') {
         const text = runsText(b.runs);
         const fence = '`'.repeat(Math.max(3, ...(text.match(/`{3,}/g) ?? []).map((x) => x.length + 1)));
         s = `${fence}\n${text}\n${fence}`;
       } else if (style === 'quote') {
-        const body = runsMd(b.runs, { nl: '\\\n> ' }) || '&nbsp;';
-        s = `> ${body}${attrsMd({ cls: align, kv: b.lvl ? { indent: b.lvl } : {} })}`;
+        const body = runsMd(b.runs, { nl: '\\\n> ', cm }) || '&nbsp;';
+        s = `> ${body}${attrsMd({ cls: align, kv })}`;
+      } else if (style === 'callout') {
+        const body = runsMd(b.runs, { nl: '\\\n> ', cm }) || '&nbsp;';
+        s = `> ${b.icon ?? CALLOUT.icon} ${body}${attrsMd({ cls: ['callout', ...align], kv: { ...kv, ...(b.tint ? { tint: b.tint } : {}) } })}`;
       } else {
         const lvl = headingLevel(style);
         const cls = [...(style === 'title' || style === 'subtitle' ? [style] : []), ...align];
-        const body = runsMd(b.runs, { nl: '\\\n' });
-        s = `${lvl ? `${'#'.repeat(lvl)} ` : ''}${body || (lvl ? '' : '&nbsp;')}${attrsMd({ cls, kv: b.lvl ? { indent: b.lvl } : {} })}`;
+        const body = runsMd(b.runs, { nl: '\\\n', cm });
+        s = `${lvl ? `${'#'.repeat(lvl)} ` : ''}${body || (lvl ? '' : '&nbsp;')}${attrsMd({ cls, kv })}`;
       }
       content.length = 0;
     } else if (b.type === 'li') {
@@ -1767,11 +2169,14 @@ export function docMarkdown(d: Doc): string {
       const lead = `${' '.repeat(ind)}${mark} ${b.list === 'check' ? (b.checked ? '[x] ' : '[ ] ') : ''}`;
       content.length = L;
       content[L] = ind + mark.length + 1;
-      s = `${lead}${runsMd(b.runs, { nl: `\\\n${' '.repeat(ind + mark.length + 1)}` })}${attrsMd({ cls: b.align ? [b.align] : [] })}`;
+      s = `${lead}${runsMd(b.runs, { nl: `\\\n${' '.repeat(ind + mark.length + 1)}`, cm })}${attrsMd({ cls: b.align ? [b.align] : [], kv: spacingKv(b) })}`;
+    } else if (b.type === 'table' && htmlTable(b)) {
+      content.length = 0;
+      s = tableHtml(b, { cm });
     } else if (b.type === 'table') {
       content.length = 0;
       const n = b.rows[0]?.length ?? 0;
-      const cell = (c: Cell) => runsMd(c.runs, { table: true }) || ' ';
+      const cell = (c: Cell) => runsMd(c.runs, { table: true, cm }) || ' ';
       const row = (r: Cell[]) => `| ${r.map(cell).join(' | ')} |`;
       const body = b.head ? b.rows.slice(1) : b.rows;
       const aligns = Array.from({ length: n }, (_, c) => {
@@ -1807,6 +2212,12 @@ export function docMarkdown(d: Doc): string {
     } else if (b.type === 'hr') {
       content.length = 0;
       s = '---';
+    } else if (b.type === 'toc') {
+      content.length = 0;
+      s = '[TOC]';
+    } else if (b.type === 'math') {
+      content.length = 0;
+      s = `$$\n${b.tex.replace(/\$\$/g, '$ $')}\n$$`;
     } else {
       content.length = 0;
       s = '\\pagebreak';
@@ -1882,6 +2293,11 @@ export function parseHtml(html: string, maxNodes = 300_000): HNode[] {
     if (RAW.has(name) && !/\/\s*$/.test(m[4] ?? '')) {
       const end = new RegExp(`</${name}\\s*>`, 'i');
       const e = end.exec(src.slice(at));
+      // Maths keeps the LaTeX it was written in, where it says it (KaTeX's and MathJax's do).
+      if (name === 'math') {
+        const tex = /<annotation[^>]*encoding\s*=\s*["']application\/x-tex["'][^>]*>([\s\S]*?)<\/annotation>/i.exec(src.slice(at, e ? at + e.index : undefined));
+        if (tex) el.at['data-tex'] = decodeEntities(tex[1]).trim();
+      }
       at = e ? at + e.index + e[0].length : src.length;
       re.lastIndex = at;
       continue;
@@ -1992,14 +2408,24 @@ export function htmlBlocks(input: string | HNode[], o: HtmlOpts = {}): Raw[] {
     flush();
     const rows: Raw[][] = [];
     let head = false;
+    // Columns still taken by a cell merged down from a row above: how many rows more.
+    const down: number[] = [];
+    let widths: number[] = [];
     const walkRows = (n: Extract<HNode, object>, inHead: boolean) => {
       for (const k of n.kids) {
         if (typeof k === 'string') continue;
         if (k.tag === 'tr') {
           if (rows.length >= DOC_LIMITS.rows) return;
           const cells: Raw[] = [];
+          const skip = () => {
+            while (cells.length < DOC_LIMITS.cols && down[cells.length] > 0) {
+              down[cells.length]--;
+              cells.push({ runs: [] });
+            }
+          };
           for (const c of k.kids) {
             if (typeof c === 'string' || (c.tag !== 'td' && c.tag !== 'th') || hiddenEl(c.at)) continue;
+            skip();
             // A cell's words: its blocks as lines.
             const inner = htmlBlocks(c.kids, o).map((b) => (Array.isArray(b.runs) ? (b.runs as Run[]) : []));
             const runs: Run[] = [];
@@ -2007,26 +2433,55 @@ export function htmlBlocks(input: string | HNode[], o: HtmlOpts = {}): Raw[] {
               if (j && r.length) runs.push({ t: '\n' });
               runs.push(...r);
             });
-            const align = alignOf(c.at.align ?? styleProps(c.at.style)['text-align']);
-            cells.push({ runs: mergeRuns(runs), ...(align && align !== 'left' ? { align } : {}) });
-            for (let s = Number(c.at.colspan) || 1; s > 1 && cells.length < DOC_LIMITS.cols; s--) cells.push({ runs: [] });
+            const st = styleProps(c.at.style);
+            const align = alignOf(c.at.align ?? st['text-align']);
+            const cs = Math.max(1, Math.min(DOC_LIMITS.cols - cells.length, Math.round(Number(c.at.colspan)) || 1));
+            const rs = Math.max(1, Math.min(DOC_LIMITS.rows, Math.round(Number(c.at.rowspan)) || 1));
+            const va = (c.at.valign ?? st['vertical-align'] ?? '').toLowerCase();
+            const fill = looks ? docColor(st['background-color'] ?? (st.background && !/url\(|gradient/i.test(st.background) ? st.background.split(/\s+/)[0] : undefined) ?? c.at.bgcolor) : null;
+            const cell: Raw = { runs: mergeRuns(runs) };
+            if (align && align !== 'left') cell.align = align;
+            if (fill && fill !== '#ffffff') cell.fill = fill;
+            if (va === 'middle' || va === 'center' || va === 'bottom') cell.va = va === 'bottom' ? 'bottom' : 'middle';
+            if (cs > 1) cell.cs = cs;
+            if (rs > 1) cell.rs = rs;
+            cells.push(cell);
+            for (let x = 0; x < cs; x++) {
+              if (x) cells.push({ runs: [] });
+              if (rs > 1) down[cells.length - 1] = rs - 1;
+            }
             if (!rows.length && (c.tag === 'th' || inHead)) head = true;
           }
+          skip();
           if (cells.length) rows.push(cells);
         } else if (k.tag === 'thead') walkRows(k, true);
         else if (k.tag === 'tbody' || k.tag === 'tfoot') walkRows(k, false);
+        else if (k.tag === 'colgroup') widths = k.kids.flatMap((x) => (typeof x !== 'string' && x.tag === 'col' ? [parseFloat(styleProps(x.at.style).width ?? x.at.width ?? '') || 0] : []));
         else if (k.tag !== 'table' && k.tag !== 'caption') walkRows(k, inHead);
       }
     };
     walkRows(el, false);
     void ctx;
-    if (rows.length) out.push({ type: 'table', rows, ...(head ? { head: true } : {}) });
+    const width = Math.max(0, ...rows.map((r) => r.length));
+    if (rows.length) out.push({ type: 'table', rows, ...(head ? { head: true } : {}), ...(widths.length === width && widths.every((w) => w > 0) ? { cols: widths } : {}) });
   };
 
   const walk = (n: HNode, ctx: Ctx) => {
     if (out.length >= DOC_LIMITS.blocks) return;
     if (typeof n === 'string') return addText(n, ctx.look, ctx);
     const tag = n.tag;
+    // Maths: an equation of its own when it is shown as one, alone; else among the words.
+    const tex = (tag === 'math' || tag === 'span') && !hiddenEl(n.at) ? n.at['data-tex'] : undefined;
+    if (tex) {
+      if (tag === 'math' && n.at.display === 'block' && !ctx.cell && !ctx.inItem && !cur?.runs.some((r) => r.t.trim())) {
+        flush();
+        out.push({ type: 'math', tex });
+      } else {
+        if (!cur) cur = { runs: [], props: ctx.props(), keep: false };
+        cur.runs.push({ t: tex, math: true });
+      }
+      return;
+    }
     if (RAW.has(tag) || SKIP.has(tag) || hiddenEl(n.at)) {
       // A ticked box in a list item says whether it is done.
       return;
@@ -2194,12 +2649,20 @@ export function htmlRuns(html: string): Run[] {
       if (!('data-ph' in n.at)) runs.push({ t: '\n', ...look });
       return;
     }
+    // An equation drawn among the words: its LaTeX, not what KaTeX drew.
+    if (n.at['data-tex']) {
+      runs.push({ t: n.at['data-tex'], math: true, ...(look.cm ? { cm: look.cm } : {}) });
+      return;
+    }
     if (RAW.has(n.tag) || n.tag === 'img') return;
     const m = tagLook(n.tag, n.at, true) ?? (() => {
       const x: Look = {};
       styleLook(styleProps(n.at.style), x, true);
       return x;
     })();
+    // The comments the words carry, as the editor marks them.
+    const cm = cleanCm(n.at['data-cm']);
+    if (cm) m.cm = cm;
     // A block inside a paragraph (the browser's doing) is a line of it.
     if (BLOCK.has(n.tag) && runs.length && !runs[runs.length - 1].t.endsWith('\n')) runs.push({ t: '\n' });
     for (const k of n.kids) walk(k, { ...look, ...m });
@@ -2212,8 +2675,17 @@ export function htmlRuns(html: string): Run[] {
 
 const escHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
+/** How maths is drawn: KaTeX's HTML for its LaTeX (display: an equation on a line of its own). */
+export type MathDraw = (tex: string, display: boolean) => string;
+
 /** A run as HTML: its words escaped (line breaks as <br>), wrapped in the elements its look asks for. */
-function runHtml(r: Run, o: { view: boolean }): string {
+function runHtml(r: Run, o: { view: boolean; math?: MathDraw }): string {
+  if (r.math) {
+    // Its LaTeX stays on it (what the editor reads back); in the editor it is one thing, not words to type in.
+    const drawn = o.math ? o.math(r.t, false) : `<code>${escHtml(r.t)}</code>`;
+    const h = `<span class="nd-m" data-tex="${escHtml(r.t)}"${o.view ? '' : ' contenteditable="false"'}>${drawn}</span>`;
+    return !o.view && r.cm ? `<span data-cm="${escHtml(r.cm.join(' '))}">${h}</span>` : h;
+  }
   let h = escHtml(r.t).replace(/\n/g, '<br>');
   if (r.code) h = `<code>${h}</code>`;
   if (r.sup) h = `<sup>${h}</sup>`;
@@ -2229,16 +2701,18 @@ function runHtml(r: Run, o: { view: boolean }): string {
   if (r.font) st.push(`font-family:${fontCss(r.font)}`);
   if (st.length) h = `<span style="${escHtml(st.join(';'))}">${h}</span>`;
   if (r.link) h = `<a href="${escHtml(r.link)}"${o.view ? ' target="_blank" rel="noopener noreferrer"' : ''}>${h}</a>`;
+  // The comments on the words, marked in the editor (which shows the open ones' highlights); never on the page.
+  if (!o.view && r.cm) h = `<span data-cm="${escHtml(r.cm.join(' '))}">${h}</span>`;
   return h;
 }
 
 /** Runs as HTML; an empty paragraph (or a line break at its end) keeps its line with a <br> (marked, in the editor). */
-export function runsHtml(runs: Run[], o: { view?: boolean } = {}): string {
+export function runsHtml(runs: Run[], o: { view?: boolean; math?: MathDraw } = {}): string {
   const view = !!o.view;
   const ph = view ? '<br>' : '<br data-ph="">';
   if (!runs.length) return ph;
-  const h = runs.map((r) => runHtml(r, { view })).join('');
-  return runs[runs.length - 1].t.endsWith('\n') ? h + ph : h;
+  const h = runs.map((r) => runHtml(r, { view, math: o.math })).join('');
+  return runs[runs.length - 1].t.endsWith('\n') && !runs[runs.length - 1].math ? h + ph : h;
 }
 
 export interface DrawOpts {
@@ -2248,32 +2722,63 @@ export interface DrawOpts {
   edit?: boolean;
   /** A page break's label (in the editor). */
   breakLabel?: string;
+  /** Maths as HTML; without it, an equation shows its LaTeX. */
+  math?: MathDraw;
+  /** The headings a table of contents lists (tocEntries). */
+  toc?: TocEntry[];
+  /** What a table of contents says while there are no headings (in the editor). */
+  tocHint?: string;
 }
 
-const TAG: Record<ParaStyle, string> = { normal: 'p', title: 'p', subtitle: 'p', h1: 'h1', h2: 'h2', h3: 'h3', h4: 'h4', quote: 'blockquote', code: 'pre' };
+export interface TocEntry {
+  id: string;
+  level: number;
+  text: string;
+}
+
+/** What a table of contents lists: the headings, levels 1 to 3, in order. */
+export const tocEntries = (d: Doc): TocEntry[] => docHeadings(d).flatMap((h) => (h.level >= 1 && h.level <= 3 ? [{ id: h.id, level: h.level, text: h.text }] : []));
+
+const TAG: Record<ParaStyle, string> = { normal: 'p', title: 'p', subtitle: 'p', h1: 'h1', h2: 'h2', h3: 'h3', h4: 'h4', quote: 'blockquote', code: 'pre', callout: 'div' };
+
+/** A paragraph's own spacing as CSS. */
+const spacingCss = (b: Spacing) => [b.lh !== undefined ? `line-height:${cssLine(b.lh)}` : '', b.sb !== undefined ? `margin-top:${b.sb}pt` : '', b.sa !== undefined ? `margin-bottom:${b.sa}pt` : ''];
 
 /** A block as HTML: `label` is a list item's mark (listInfo). Every word escaped; looks only from checked values. */
 export function blockHtml(b: Block, label: string, o: DrawOpts): string {
   const view = !o.edit;
   const id = o.edit ? ` data-b="${escHtml(b.id)}"` : '';
   const atom = o.edit ? ' contenteditable="false"' : '';
+  const ro = { view, math: o.math };
   if (b.type === 'p') {
     const style = b.style ?? 'normal';
-    const st = [b.align ? `text-align:${b.align}` : '', b.lvl ? `--lvl:${b.lvl}` : ''].filter(Boolean).join(';');
-    return `<${TAG[style]} class="nd-b nd-${style}${b.lvl ? ' nd-in' : ''}"${id}${o.edit ? ' data-t=""' : ''}${st ? ` style="${st}"` : ''}>${runsHtml(b.runs, { view })}</${TAG[style]}>`;
+    const callout = style === 'callout';
+    const st = [b.align ? `text-align:${b.align}` : '', b.lvl ? `--lvl:${b.lvl}` : '', ...spacingCss(b), callout && b.tint ? `--tint:${b.tint}` : ''].filter(Boolean).join(';');
+    // Headings are where a table of contents' links lead, on the document's own page.
+    const anchor = view && (headingLevel(style) || style === 'title') ? ` id="nd-${escHtml(b.id)}"` : '';
+    const icon = callout ? ` data-icon="${escHtml(b.icon ?? CALLOUT.icon)}"` : '';
+    return `<${TAG[style]} class="nd-b nd-${style}${b.lvl ? ' nd-in' : ''}"${id}${anchor}${icon}${o.edit ? ' data-t=""' : ''}${st ? ` style="${st}"` : ''}>${runsHtml(b.runs, ro)}</${TAG[style]}>`;
   }
   if (b.type === 'li') {
-    const st = [b.align ? `text-align:${b.align}` : '', `--lvl:${b.lvl ?? 0}`].join(';');
-    return `<p class="nd-b nd-li nd-${b.list}${b.checked ? ' nd-on' : ''}"${id}${o.edit ? ' data-t=""' : ''} data-n="${escHtml(label)}" style="${st.replace(/^;/, '')}">${runsHtml(b.runs, { view })}</p>`;
+    const st = [b.align ? `text-align:${b.align}` : '', `--lvl:${b.lvl ?? 0}`, ...spacingCss(b)].filter(Boolean).join(';');
+    return `<p class="nd-b nd-li nd-${b.list}${b.checked ? ' nd-on' : ''}"${id}${o.edit ? ' data-t=""' : ''} data-n="${escHtml(label)}" style="${st}">${runsHtml(b.runs, ro)}</p>`;
   }
   if (b.type === 'table') {
     const n = b.rows[0]?.length ?? 0;
     const cols = b.cols ?? new Array(n).fill(1 / Math.max(1, n));
+    // The cells a merged one covers are not drawn.
+    const covered = new Set<string>();
+    b.rows.forEach((r, ri) => r.forEach((c, ci) => {
+      for (let y = 0; y < (c.rs ?? 1); y++) for (let x = 0; x < (c.cs ?? 1); x++) if (y || x) covered.add(`${ri + y},${ci + x}`);
+    }));
     const row = (r: Cell[], ri: number, th: boolean) =>
       `<tr>${r
         .map((c, ci) => {
+          if (covered.has(`${ri},${ci}`)) return '';
           const tag = th ? 'th' : 'td';
-          return `<${tag}${o.edit ? ` data-c="${ri},${ci}" data-t=""` : ''}${c.align ? ` style="text-align:${c.align}"` : ''}>${runsHtml(c.runs, { view })}</${tag}>`;
+          const st = [c.align ? `text-align:${c.align}` : '', c.fill ? `background-color:${c.fill}` : '', c.va ? `vertical-align:${c.va}` : ''].filter(Boolean).join(';');
+          const span = `${c.cs ? ` colspan="${c.cs}"` : ''}${c.rs ? ` rowspan="${c.rs}"` : ''}`;
+          return `<${tag}${o.edit ? ` data-c="${ri},${ci}" data-t=""` : ''}${span}${st ? ` style="${st}"` : ''}>${runsHtml(c.runs, ro)}</${tag}>`;
         })
         .join('')}</tr>`;
     const head = b.head && b.rows.length ? `<thead>${row(b.rows[0], 0, true)}</thead>` : '';
@@ -2286,6 +2791,12 @@ export function blockHtml(b: Block, label: string, o: DrawOpts): string {
     return `<figure class="nd-b nd-img nd-${b.align ?? 'center'}"${id}${atom}>${img}${cap}</figure>`;
   }
   if (b.type === 'hr') return `<div class="nd-b nd-hr"${id}${atom}><hr></div>`;
+  if (b.type === 'toc') {
+    const list = o.toc ?? [];
+    const lines = list.map((h) => `<a class="nd-toc-${h.level}" href="#nd-${escHtml(h.id)}" data-h="${escHtml(h.id)}">${escHtml(h.text)}</a>`).join('');
+    return `<nav class="nd-b nd-toc"${id}${atom}>${lines || (o.tocHint ? `<span class="nd-toc-hint">${escHtml(o.tocHint)}</span>` : '')}</nav>`;
+  }
+  if (b.type === 'math') return `<div class="nd-b nd-math"${id}${atom}>${o.math ? o.math(b.tex, true) : `<code>${escHtml(b.tex)}</code>`}</div>`;
   return `<div class="nd-b nd-pb"${id}${atom}${o.breakLabel ? ` data-label="${escHtml(o.breakLabel)}"` : ''}></div>`;
 }
 
@@ -2344,5 +2855,17 @@ export function docCss(d: Doc, scope = '.nd-doc'): string {
     rule('code', `font-family:${MONO};font-size:.9em;background:#f1f3f5;border-radius:4px;padding:.08em .3em`),
     rule('pre code', 'background:none;padding:0;font-size:1em'),
     rule('sup, sub', 'font-size:.72em;line-height:0'),
+    rule('.nd-callout', `background:var(--tint,${CALLOUT.tint});border-radius:8px;padding:.75em 1em .75em 2.8em;position:relative;font-style:normal`),
+    rule('.nd-callout::before', 'content:attr(data-icon);position:absolute;left:.8em;top:.75em;width:1.4em;text-align:center;font-size:1.05em;line-height:1.35'),
+    rule('.nd-toc', 'margin:.2em 0 1em;padding:.1em 0'),
+    rule('.nd-toc a', `display:block;color:${INK};text-decoration:none;padding:.14em 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis`),
+    rule('.nd-toc .nd-toc-1', 'font-weight:600'),
+    rule('.nd-toc .nd-toc-2', 'padding-left:1.4em'),
+    rule('.nd-toc .nd-toc-3', 'padding-left:2.8em;color:#3c4043'),
+    rule('.nd-toc-hint', 'color:#80868b;font-style:italic'),
+    rule('.nd-math', 'margin:.5em 0 1em;text-align:center;overflow-x:auto;overflow-y:hidden;white-space:normal'),
+    rule('.nd-math .katex-display', 'margin:0'),
+    rule('.nd-m', 'white-space:nowrap'),
+    rule('.nd-m .katex', 'font-size:1.1em'),
   ].join('\n');
 }
