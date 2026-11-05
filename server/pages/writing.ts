@@ -840,8 +840,10 @@ export function writing(E: Core): Writing {
     if (!(k === 'p' || isHeading(k) || k === 'bullet' || k === 'number')) return false;
     const r = caretIn(h);
     if (!r) return false;
-    const typed = head(h, r).toString().replace(/ /g, ' ');
-    const whole = ownText(h).replace(/ /g, ' ');
+    const typed = head(h, r)
+      .toString()
+      .replace(/\u00a0/g, ' ');
+    const whole = ownText(h).replace(/\u00a0/g, ' ');
     if (k === 'p' && (whole === '---' || whole === '```') && typed === whole) {
       E.change(() => {
         takeAll(h);
@@ -1034,7 +1036,6 @@ export function writing(E: Core): Writing {
   const dl = $('.dl');
   const menuEl = $('.menu');
   const slEl = $('.sl');
-  const coarse = matchMedia('(pointer: coarse)').matches;
   // The parts drawn over the page keep the words' selection: they take no focus. The page takes the keys, though
   // (a menu opened from a handle answers the arrows).
   for (const el of [hd, endBtn, offer, cv, menuEl, slEl])
@@ -1298,6 +1299,7 @@ export function writing(E: Core): Writing {
       ...(texty ? [{ icon: svg('turn'), label: L('turnInto', 'Turn into'), to: 'turn' as const, keys: 'Ctrl+/' }] : []),
       { icon: svg('colour'), label: L('colour', 'Colour'), to: 'colour' },
       '-',
+      ...(n === 1 ? [{ icon: svg('plus'), label: L('addBelowShort', 'Add a block below'), run: () => (closeMenu(), addBlock(list[0], false)) }] : []),
       { icon: svg('dup'), label: L('duplicate', 'Duplicate'), keys: 'Ctrl+D', run: () => (closeMenu(), duplicate(list)) },
       { icon: svg('up'), label: L('upTip', 'Move up'), keys: 'Ctrl+Shift+↑', run: () => (closeMenu(), moveBy(list, -1)), off: !list.length || !prevSib(inOrder(list)[0]) },
       { icon: svg('down'), label: L('downTip', 'Move down'), keys: 'Ctrl+Shift+↓', run: () => (closeMenu(), moveBy(list, 1)), off: !list.length || !nextSib(inOrder(list)[n - 1]) },
@@ -1490,8 +1492,10 @@ export function writing(E: Core): Writing {
     if (t.data[r.startOffset - 1] !== '/') return;
     const typed = head(h, r).toString();
     const before = typed.slice(-2, -1);
-    if (typed.length > 1 && !/[\s ]/.test(before)) return;
-    if (kindOf(unitOf(h)) === 'code') return;
+    if (typed.length > 1 && !/[\s\u00a0]/.test(before)) return;
+    // In blocks of words only: not in code, a table's cell, a button or a link.
+    const k = kindOf(unitOf(h));
+    if (!k || k === 'code') return;
     openSlash(h, t, r.startOffset - 1);
   };
   const slashQuery = (): string | null => {
@@ -1581,7 +1585,7 @@ export function writing(E: Core): Writing {
       fillEmpty(h);
       const empty = emptyHost(h);
       if (TURNABLE.has(it.id)) {
-        if (empty) return writeIn(turnInto(u, it.id as Kind));
+        if (empty && kindOf(u)) return writeIn(turnInto(u, it.id as Kind));
         const { unit, host } = newUnit(it.id as Kind);
         putAfter(unit, u);
         return writeIn(host);
@@ -2004,8 +2008,8 @@ export function writing(E: Core): Writing {
     return new DOMRect(r.left, r.top, r.width, Math.min(r.height, 28));
   };
   const drawHandles = () => {
-    const s = E.sel();
-    const b = (hoverBlock?.isConnected ? hoverBlock : null) ?? (coarse && s && s !== doc.body && !E.editing() ? blockOf(s) : null);
+    // Under the pointer (a phone has none: there, the bar of the block picked has the handle).
+    const b = hoverBlock?.isConnected ? hoverBlock : null;
     handleBlock = b;
     if (!b || dragging || slash) {
       hd.style.display = 'none';
@@ -2067,6 +2071,9 @@ export function writing(E: Core): Writing {
       dragging = false;
       showDrop(null);
       if (moved) {
+        // The click that ends a drag is not one on the page.
+        noClick = true;
+        setTimeout(() => (noClick = false), 0);
         if (drop) moveTo(list, drop);
         drop = null;
         return;
@@ -2308,7 +2315,7 @@ export function writing(E: Core): Writing {
       if (!e.inputType?.startsWith('insertText') || !e.data) return;
       const ch = e.data.slice(-1);
       if (ch === '/') return maybeSlash(h);
-      if ((ch === ' ' || ch === ' ' || ch === '`' || ch === '-') && blockMarkdown(h)) return;
+      if ((ch === ' ' || ch === '\u00a0' || ch === '`' || ch === '-') && blockMarkdown(h)) return;
       if ('*_`~'.includes(ch)) inlineMarkdown(h);
     },
     true,
@@ -2444,13 +2451,15 @@ export function writing(E: Core): Writing {
         const f = flow();
         const last = lastBlock(f);
         const r = last?.getBoundingClientRect();
-        if (r && e.clientY > r.bottom && e.clientX >= f.getBoundingClientRect().left - 40) {
+        // (or anywhere in a page with no blocks left)
+        if ((!last || (r && e.clientY > r.bottom)) && e.clientX >= f.getBoundingClientRect().left - 40) {
           stop(e);
-          const lh = hostOf(last!);
+          const lh = last ? hostOf(last) : null;
           if (lh && kindOf(last) === 'p' && emptyHost(lh)) return E.write(lh, { off: 0 });
           E.change(() => {
             const { unit, host } = newUnit('p');
-            last!.after(unit);
+            if (last) last.after(unit);
+            else f.append(unit);
             return writeIn(host);
           });
           return;
@@ -2462,7 +2471,8 @@ export function writing(E: Core): Writing {
   addEventListener(
     'pointermove',
     (e) => {
-      if (e.pointerType === 'touch' || dragging) return;
+      // Not while a button is held (the handles stay where the press began).
+      if (e.pointerType === 'touch' || dragging || e.buttons) return;
       if (fromUi(e)) return;
       const t = e.target as Element;
       let b = t === doc.body || t === doc.documentElement || t === flow() ? blockAtY(flow(), e.clientY) : blockOf(t);

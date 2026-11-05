@@ -330,7 +330,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
   <div class="box sel"><i class="h r" data-h="r"></i><i class="h b" data-h="b"></i><i class="h rb" data-h="rb"></i></div>
   <div class="tag"></div><div class="size"></div><div class="drop"></div>
   <div class="bar" role="toolbar">
-    <button class="drag" data-a="drag" title="${L('drag', 'Drag to move it')}">${svg('drag')}</button>
+    <button class="drag" data-a="drag" title="${attr(L('gripTip', 'Drag to move it, click for its menu'))}">${svg('drag')}</button>
     <button data-a="parent" title="${L('parentTip', 'Pick the part around it (Esc)')}">${svg('parent')}</button>
     <button data-a="edit" title="${L('editTip', 'Change the words (click again)')}">${svg('edit')}</button>
     <span class="sep"></span>
@@ -1738,7 +1738,13 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
   function dragStart(e: PointerEvent) {
     const el = sel;
     if (!el || el === document.body) return;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    const handle = (e.composedPath()[0] as Element).closest?.('button')?.getBoundingClientRect();
+    let moved = false;
     const move = (ev: PointerEvent) => {
+      if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
+      moved = true;
       let t = under(ev.clientX, ev.clientY);
       // Not into itself; the page's top level parts when pointing at the page.
       while (t && (el.contains(t) || t === root)) t = t.parentElement;
@@ -1771,6 +1777,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
       drop.style.display = 'none';
       const d = dragging;
       dragging = null;
+      // A tap on the handle (a phone has no pointing at a block): the block's menu, Turn into, Colour and the rest.
+      if (!moved && handle) return void W.act('menu', { at: { left: handle.left, top: handle.top, bottom: handle.bottom } });
       if (!d || !el.isConnected) return;
       remember();
       if (d.after) d.target.after(el);
@@ -1781,7 +1789,6 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     addEventListener('pointermove', move, true);
     addEventListener('pointerup', up, true);
     addEventListener('pointercancel', up, true);
-    move(e);
   }
 
   // ---- writing as in Notion (writing.ts), handed what it needs -------------------------------------------------
