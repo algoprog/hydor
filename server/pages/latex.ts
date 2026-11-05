@@ -48,7 +48,7 @@ import {
 import { newCommentId } from '../../shared/comments.ts';
 import { TEX_ASKED } from '../../shared/latex-catalog.ts';
 import { texCount, totalWords } from '../../shared/latex-count.ts';
-import { TEX_TEMPLATES, texFromTemplate, texTemplate } from '../../shared/latex-templates.ts';
+import { TEMPLATE_NEEDS, TEX_TEMPLATES, texFromTemplate, texTemplate } from '../../shared/latex-templates.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
@@ -127,7 +127,21 @@ export function textOf(b: Buffer): string {
 }
 
 /** Other names agents may give the templates. */
-const TEMPLATE_ALIASES: Record<string, string> = { thesis: 'book', slides: 'beamer', presentation: 'beamer', resume: 'cv', résumé: 'cv', problemset: 'homework', 'problem-set': 'homework', conference: 'paper' };
+const TEMPLATE_ALIASES: Record<string, string> = {
+  thesis: 'book',
+  slides: 'beamer',
+  presentation: 'beamer',
+  resume: 'cv',
+  résumé: 'cv',
+  problemset: 'homework',
+  'problem-set': 'homework',
+  conference: 'paper',
+  ieeetran: 'ieee',
+  acmart: 'acm',
+  sigconf: 'acm',
+  llncs: 'lncs',
+  springer: 'lncs',
+};
 
 /**
  * A document from an agent, checked as keepTex does. Files and pictures may be named by path in its session's folder
@@ -1071,6 +1085,26 @@ const PACKAGES: Record<string, string> = {
   'tikz-cd': 'texlive-pictures',
   algorithm2e: 'texlive-science',
   physics: 'texlive-science',
+  IEEEtran: 'texlive-publishers',
+  acmart: 'texlive-publishers (and texlive-fonts-extra for its fonts)',
+  llncs: 'texlive-publishers',
+  elsarticle: 'texlive-publishers',
+  'revtex4-2': 'texlive-publishers',
+  libertine: 'texlive-fonts-extra',
+  newtxmath: 'texlive-fonts-extra',
+};
+
+/** TeX Live's names (tlmgr's) for the classes and packages whose files are named otherwise. */
+const CTAN: Record<string, string> = {
+  IEEEtran: 'ieeetran',
+  'ACM-Reference-Format': 'acmart',
+  splncs04: 'llncs',
+  zi4: 'inconsolata',
+  newtxmath: 'newtx',
+  manyfoot: 'ncctools',
+  beamerinnerthememetropolis: 'beamertheme-metropolis',
+  times: 'psnfss',
+  'revtex4-2': 'revtex',
 };
 
 /** What a missing file most likely is, and what to do. */
@@ -1082,7 +1116,7 @@ function missingFile(name: string, names: Set<string>): { message: string; hint:
     const pkg = PACKAGES[base];
     return {
       message: `The ${what} ${base} is not installed on this computer.`,
-      hint: `Install it with your TeX: TeX Live's tlmgr install ${base}${pkg ? `; on Debian or Ubuntu it comes with ${pkg}` : '; on Debian or Ubuntu, apt-file search ' + name + ' names the package (most are in texlive-latex-extra, texlive-science or texlive-fonts-extra)'}. Or add ${name} to the document as a file of its own.`,
+      hint: `Install it with your TeX: TeX Live's tlmgr install ${CTAN[base] ?? base}${pkg ? `; on Debian or Ubuntu it comes with ${pkg}` : '; on Debian or Ubuntu, apt-file search ' + name + ' names the package (most are in texlive-latex-extra, texlive-science or texlive-fonts-extra)'}; MiKTeX installs it by itself the first time. Or add ${name} to the document as a file of its own.`,
     };
   }
   if ((!ext || ['png', 'jpg', 'jpeg', 'pdf', 'eps'].includes(ext)) && !names.has(name))
@@ -1784,7 +1818,7 @@ const LATEX_HELP = [
   'Make or change a LaTeX document, kept in the user’s Library: a paper, a thesis, a CV, a letter, a report, math-heavy notes, a beamer talk, anything the user wants typeset with LaTeX. It shows in the conversation and in the Library as its typeset pages; there the user edits the source beside its PDF (typeset again as they type) and downloads the PDF, main.tex or the whole project as a .zip. Use it rather than writing .tex files when the user asks for LaTeX, unless they want the files in a folder of theirs.',
   'source: the whole of main.tex, from \\documentclass to \\end{document}. files: the other files it reads, by the names it gives them ({"refs.bib": "…", "chapters/intro.tex": "…"}, or [{name, text}], or {name, path} for a file of this session); names are letters, digits, - _ . and / between folders. Or folder: a LaTeX project folder of this session, taken in whole.',
   'comments: the user’s comments on words of the document (get_page lists them, with their ids): answer with [{"id": "…", "reply": "…"}], resolve with {"id", "resolve": true} once you did what it asks, or add your own with {"file": "main.tex", "quote": the exact words it is on, "text": "…"}; what you leave out stays as it is.',
-  'Or, for a new document, template: article, report, book (a book or thesis: chapters, theorems, a bibliography), letter, beamer (slides), cv (moderncv), homework (problems and solutions), paper (two columns, as for a conference) or poster (tikzposter): a whole project that typesets, with the title in it, to change with source and files in the same call or in later saves (get_page shows it).',
+  'Or, for a new document, template: article, report, book (a book or thesis: chapters, theorems, a bibliography), letter, beamer (slides), cv (moderncv), homework (problems and solutions), paper (two columns, as for a conference), ieee (IEEEtran, as IEEE conferences ask), acm (acmart, sigconf), lncs (Springer’s llncs) or poster (tikzposter): a whole project that typesets, with the title in it, to change with source and files in the same call or in later saves (get_page shows it). ieee, acm and lncs need TeX Live’s publishers’ classes (texlive-publishers): if this computer lacks one, the save says what to install.',
   'pictures: what \\includegraphics shows, each by the name it uses: [{"name": "figures/plot.png", "src": "plots/plot.png"}] with src a PNG or JPEG file of this session, a public https address, or a picture of the document already (naget-asset:…); a path alone is its own name. A PDF picture becomes a PNG of it.',
   'engine: pdflatex (the default), xelatex (Unicode text and this computer’s fonts with fontspec: Greek, Chinese and other scripts), or lualatex. Packages: those of a standard TeX Live (amsmath, graphicx, hyperref, geometry, tikz, pgfplots, booktabs, beamer, natbib…); for a bibliography, a .bib file with \\bibliography and BibTeX (biblatex and biber may be missing). Nothing that runs programs (minted, svg, shell escape): it is turned off.',
   'The answer says whether it typeset, with each error’s file, line and what it most likely means: fix them and save again with the same id.',
@@ -1848,7 +1882,45 @@ function installedFiles(t: Tools): Promise<string[] | undefined> {
   );
 }
 
-/** What this computer can do with LaTeX: which engines it has, whether it can show pages and shut TeX in, and which of the common classes and packages it has. */
+/** Debian's and Ubuntu's packages of the files the templates need (TEMPLATE_NEEDS). */
+const DEBIAN: Record<string, string> = {
+  'booktabs.sty': 'texlive-latex-recommended',
+  'beamer.cls': 'texlive-latex-recommended',
+  'cite.sty': 'texlive-latex-recommended',
+  'fancyhdr.sty': 'texlive-latex-base',
+  'times.sty': 'texlive-latex-base',
+  'tikzposter.cls': 'texlive-pictures',
+  'IEEEtran.cls': 'texlive-publishers',
+  'IEEEtran.bst': 'texlive-publishers',
+  'acmart.cls': 'texlive-publishers',
+  'ACM-Reference-Format.bst': 'texlive-publishers',
+  'llncs.cls': 'texlive-publishers',
+  'splncs04.bst': 'texlive-publishers',
+  'fontawesome5.sty': 'texlive-fonts-extra',
+  'libertine.sty': 'texlive-fonts-extra',
+  'zi4.sty': 'texlive-fonts-extra',
+  'newtxmath.sty': 'texlive-fonts-extra',
+};
+
+/**
+ * What adds the templates' `missing` classes and packages on this computer: Debian's or Fedora's packages where the
+ * system's TeX Live runs, TeX Live's own tlmgr where it was installed from TeX Live or MacTeX; MiKTeX installs them
+ * by itself the first time a document asks for them.
+ */
+function addFor(t: Tools, missing: string[]): TexSetup['add'] {
+  const bin = t.pdflatex ?? t.xelatex ?? t.lualatex ?? '';
+  if (/miktex/i.test(bin)) return { auto: true };
+  if (!missing.length) return undefined;
+  const uniq = (xs: string[]) => [...new Set(xs)].join(' ');
+  const system = bin.startsWith('/usr/bin/');
+  if (system && fs.existsSync('/etc/debian_version')) return { cmd: `sudo apt install ${uniq(missing.map((f) => DEBIAN[f] ?? 'texlive-latex-extra'))}` };
+  if (system && (fs.existsSync('/etc/fedora-release') || fs.existsSync('/etc/redhat-release'))) return { cmd: `sudo dnf install ${missing.map((f) => `'tex(${f})'`).join(' ')}` };
+  const stem = (f: string) => f.replace(/\.[^.]+$/, '');
+  const own = bin.startsWith(os.homedir() + path.sep) || process.platform === 'win32';
+  return { cmd: `${own ? '' : 'sudo '}tlmgr install ${uniq(missing.map((f) => CTAN[stem(f)] ?? stem(f).toLowerCase()))}` };
+}
+
+/** What this computer can do with LaTeX: which engines it has, whether it can show pages and shut TeX in, which of the common classes and packages it has, and what adds those the templates lack. */
 export async function texSetup(): Promise<TexSetup> {
   const t = tools();
   const box = t.pdflatex || t.xelatex || t.lualatex || t.pdftoppm ? await sandbox(t) : null;
@@ -1859,6 +1931,7 @@ export async function texSetup(): Promise<TexSetup> {
     else if (e === 'lualatex' && !box) notes[e] = LUA_UNSAFE;
   }
   const any = !!(t.pdflatex || t.xelatex || t.lualatex);
+  const installed = any ? await installedFiles(t) : undefined;
   return {
     engines: { pdflatex: !!t.pdflatex, xelatex: !!t.xelatex, lualatex: !!t.lualatex && !!box },
     latexmk: !!t.latexmk,
@@ -1868,7 +1941,8 @@ export async function texSetup(): Promise<TexSetup> {
     sandbox: !!box,
     missing: any ? undefined : missingFor(t, 'pdflatex')!,
     notes,
-    installed: any ? await installedFiles(t) : undefined,
+    installed,
+    add: installed ? addFor(t, TEMPLATE_NEEDS.filter((n) => !installed.includes(n))) : undefined,
   };
 }
 
@@ -1890,7 +1964,7 @@ const forEditor = (r: TexResult): TexCompiled => ({
 
 /**
  * The editor's live preview, signed in:
- *   GET  /api/pages/tex/setup — what this computer has: { engines, latexmk, bibtex, pictures, sync, sandbox, missing?, notes, installed? }
+ *   GET  /api/pages/tex/setup — what this computer has: { engines, latexmk, bibtex, pictures, sync, sandbox, missing?, notes, installed?, add? }
  *   POST /api/pages/tex/compile { model, base? } — typesets the editor's model as it is (saved or not):
  *        { key, ok, pdf, pages, sizes, errors, warnings, log, engine, missing?, ms }
  *   GET  /api/pages/tex/:key/:page?w= — a page's picture (PNG), w pixels wide

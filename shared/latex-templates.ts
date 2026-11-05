@@ -1,11 +1,12 @@
 // Templates for a new LaTeX document: what the Library's New → LaTeX offers, and save_latex's `template`. Each is a
 // whole project that typesets with a standard TeX Live (an article, a report, a book or thesis, a letter, beamer
-// slides, a CV, a problem set, a two-column paper and a poster), written with pdfLaTeX in mind; a title with letters
-// pdfLaTeX's fonts lack (Greek, Chinese…) makes it a XeLaTeX document with a font that has them. Each names the
-// classes and packages it needs that a smaller TeX may lack, so New offers only those this computer can typeset.
+// slides, a CV, a problem set, a two-column paper, papers in the styles IEEE, ACM and Springer's LNCS ask for, and a
+// poster), written with pdfLaTeX in mind; a title with letters pdfLaTeX's fonts lack (Greek, Chinese…) makes it a
+// XeLaTeX document with a font that has them. Each names the classes and packages it needs that a smaller TeX may
+// lack, so New offers only those this computer can typeset (and says what to install for the others).
 import { lettersFor, newTex, texEscape, type TexDoc, type TexEngine } from './latex.ts';
 
-export type TexTemplateId = 'article' | 'report' | 'book' | 'letter' | 'beamer' | 'cv' | 'homework' | 'paper' | 'poster';
+export type TexTemplateId = 'article' | 'report' | 'book' | 'letter' | 'beamer' | 'cv' | 'homework' | 'paper' | 'ieee' | 'acm' | 'lncs' | 'poster';
 
 export interface TexTemplate {
   id: TexTemplateId;
@@ -15,6 +16,10 @@ export interface TexTemplate {
   title: string;
   /** Classes and packages a TeX may lack, by file name: offered where they are all there. */
   needs: string[];
+  /** One of a kind New shows as one card, its styles to pick under it: the papers. */
+  family?: 'paper';
+  /** Its name among its family's styles. */
+  style?: string;
 }
 
 export const TEX_TEMPLATES: TexTemplate[] = [
@@ -25,7 +30,18 @@ export const TEX_TEMPLATES: TexTemplate[] = [
   { id: 'beamer', label: 'Beamer slides', hint: 'A talk: title, outline, blocks, columns', title: 'Slides', needs: ['beamer.cls', 'beamerinnerthememetropolis.sty', 'booktabs.sty'] },
   { id: 'cv', label: 'CV or résumé', hint: 'Education, experience and skills', title: 'CV', needs: ['moderncv.cls', 'fontawesome5.sty'] },
   { id: 'homework', label: 'Homework', hint: 'Problems and solutions, your name on top', title: 'Problem set', needs: ['enumitem.sty', 'fancyhdr.sty'] },
-  { id: 'paper', label: 'Conference paper', hint: 'Two columns, authors, results, references', title: 'Paper', needs: ['booktabs.sty', 'times.sty'] },
+  { id: 'paper', label: 'Conference paper', hint: 'Two columns, or as IEEE, ACM or Springer ask', title: 'Paper', needs: ['booktabs.sty', 'times.sty'], family: 'paper', style: 'Two columns' },
+  { id: 'ieee', label: 'IEEE paper', hint: 'IEEEtran: two columns, as IEEE conferences ask', title: 'Paper', needs: ['IEEEtran.cls', 'IEEEtran.bst', 'cite.sty', 'booktabs.sty'], family: 'paper', style: 'IEEE' },
+  {
+    id: 'acm',
+    label: 'ACM paper',
+    hint: 'acmart, as ACM conferences ask',
+    title: 'Paper',
+    needs: ['acmart.cls', 'ACM-Reference-Format.bst', 'libertine.sty', 'zi4.sty', 'newtxmath.sty', 'hyperxmp.sty', 'manyfoot.sty', 'totpages.sty', 'environ.sty'],
+    family: 'paper',
+    style: 'ACM',
+  },
+  { id: 'lncs', label: 'Springer LNCS paper', hint: 'llncs, for Lecture Notes in Computer Science', title: 'Paper', needs: ['llncs.cls', 'splncs04.bst', 'booktabs.sty'], family: 'paper', style: 'Springer LNCS' },
   { id: 'poster', label: 'Poster', hint: 'A0, in blocks and columns', title: 'Poster', needs: ['tikzposter.cls', 'anyfontsize.sty'] },
 ];
 
@@ -39,20 +55,23 @@ export const TEMPLATE_BIB = `@book{knuth1984,
   author    = {Donald E. Knuth},
   title     = {The {\\TeX}book},
   publisher = {Addison-Wesley},
+  address   = {Reading, MA},
   year      = {1984}
 }
 `;
 
 /**
  * main.tex from its lines, with the letters of the title loaded after \documentclass when pdfLaTeX's fonts lack them
- * (and then without the fonts only pdfLaTeX reads). `engine`: the one it always wants.
+ * (and then without the fonts and the font encoding only pdfLaTeX reads). `engine`: the one it always wants.
+ * `ownFonts`: the class's own fonts under XeLaTeX have Greek and Cyrillic letters (acmart's Libertine), so only
+ * Chinese, Japanese or Korean ones need a font of their own.
  */
-function project(title: string, lines: string[], files: { name: string; text: string }[] = [], engine?: TexEngine): TexDoc {
+function project(title: string, lines: string[], files: { name: string; text: string }[] = [], engine?: TexEngine, ownFonts = false): TexDoc {
   const letters = lettersFor(title);
   const xe = letters.engine === 'xelatex';
-  const body = xe ? lines.filter((l) => !/^\\usepackage\{(times|mathptmx)\}$/.test(l)) : lines;
+  const body = xe ? lines.filter((l) => !/^\\usepackage(\[T1\])?\{(times|mathptmx|fontenc)\}$/.test(l)) : lines;
   const at = body.findIndex((l) => l.startsWith('\\documentclass')) + 1;
-  const main = [...body.slice(0, at), ...letters.lines, ...body.slice(at)].join('\n');
+  const main = [...body.slice(0, at), ...(ownFonts && !letters.cjk ? [] : letters.lines), ...body.slice(at)].join('\n');
   return { v: 1, engine: xe ? 'xelatex' : (engine ?? 'pdflatex'), main, files, pictures: [] };
 }
 
@@ -448,7 +467,7 @@ export function texFromTemplate(id: unknown, title: string): TexDoc {
           '\\section{Experiments}',
           'Table~\\ref{tab:results} compares the methods.',
           '',
-          '\\begin{table}[t]',
+          '\\begin{table}[htbp]',
           '  \\centering',
           '  \\caption{Results on the test set.}',
           '  \\label{tab:results}',
@@ -466,6 +485,259 @@ export function texFromTemplate(id: unknown, title: string): TexDoc {
           'What was shown, and what comes next.',
           '',
           '\\bibliographystyle{plain}',
+          '\\bibliography{refs}',
+          '',
+          '\\end{document}',
+          '',
+        ],
+        [{ name: 'refs.bib', text: TEMPLATE_BIB }],
+      );
+    case 'ieee':
+      return project(
+        name,
+        [
+          '\\documentclass[conference]{IEEEtran}',
+          '\\usepackage{amsmath,amssymb}',
+          '\\usepackage{graphicx}',
+          '\\usepackage{booktabs}',
+          '% Citations in square brackets, a run of them shortened: [1]-[3].',
+          '\\usepackage{cite}',
+          '',
+          '\\begin{document}',
+          '',
+          `\\title{${t}}`,
+          '',
+          '% One block for each author, side by side.',
+          '\\author{',
+          '  \\IEEEauthorblockN{First Author}',
+          '  \\IEEEauthorblockA{\\textit{Department of Physics}\\\\',
+          '    \\textit{University One}\\\\',
+          '    City, Country\\\\',
+          '    first@example.com}',
+          '  \\and',
+          '  \\IEEEauthorblockN{Second Author}',
+          '  \\IEEEauthorblockA{\\textit{Research Group}\\\\',
+          '    \\textit{Company Two}\\\\',
+          '    City, Country\\\\',
+          '    second@example.com}',
+          '}',
+          '',
+          '\\maketitle',
+          '',
+          '\\begin{abstract}',
+          'The problem, the approach and the main result, in 150 to 250 words.',
+          '\\end{abstract}',
+          '',
+          '\\begin{IEEEkeywords}',
+          'first keyword, second keyword, third keyword',
+          '\\end{IEEEkeywords}',
+          '',
+          '\\section{Introduction}',
+          'What the problem is, why it matters, and what this paper adds~\\cite{knuth1984}.',
+          '',
+          '\\section{Related Work}',
+          'What others have done, and how this work differs.',
+          '',
+          '\\section{Method}',
+          'The model is trained to make the loss in~\\eqref{eq:loss} small:',
+          '\\begin{equation}',
+          '  \\mathcal{L}(\\theta) = \\frac{1}{N} \\sum_{i=1}^{N} \\ell\\bigl(f_\\theta(x_i), y_i\\bigr)',
+          '  \\label{eq:loss}',
+          '\\end{equation}',
+          '',
+          '\\section{Experiments}',
+          'Table~\\ref{tab:results} compares the methods.',
+          '',
+          '% IEEE puts a table\'s caption above it, and a figure\'s under it.',
+          '\\begin{table}[htbp]',
+          '  \\caption{Results on the Test Set}',
+          '  \\label{tab:results}',
+          '  \\centering',
+          '  \\begin{tabular}{lcc}',
+          '    \\toprule',
+          '    Method & Accuracy (\\%) & Time (s) \\\\',
+          '    \\midrule',
+          '    Baseline & 81.2 & 1.0 \\\\',
+          '    Ours & \\textbf{86.5} & 1.3 \\\\',
+          '    \\bottomrule',
+          '  \\end{tabular}',
+          '\\end{table}',
+          '',
+          '\\section{Conclusion}',
+          'What was shown, and what comes next.',
+          '',
+          '\\section*{Acknowledgment}',
+          'Who helped, and who funded the work.',
+          '',
+          '\\bibliographystyle{IEEEtran}',
+          '\\bibliography{refs}',
+          '',
+          '\\end{document}',
+          '',
+        ],
+        [{ name: 'refs.bib', text: TEMPLATE_BIB }],
+      );
+    case 'acm':
+      return project(
+        name,
+        [
+          '% For a review copy without the authors\' names: \\documentclass[sigconf,review,anonymous]{acmart}',
+          '\\documentclass[sigconf]{acmart}',
+          '',
+          '% What the conference sends once the paper is in: its rights, its name, dates and place, the DOI and ISBN.',
+          '\\setcopyright{none}',
+          '\\copyrightyear{2026}',
+          '\\acmYear{2026}',
+          '\\acmConference[CONF \'26]{The Conference on Your Field}{June 2026}{City, Country}',
+          '',
+          '\\begin{document}',
+          '',
+          `\\title{${t}}`,
+          '',
+          '% Each author with their place, one after the other.',
+          '\\author{First Author}',
+          '\\affiliation{%',
+          '  \\institution{University One}',
+          '  \\city{City}',
+          '  \\country{Country}}',
+          '\\email{first@example.com}',
+          '',
+          '\\author{Second Author}',
+          '\\affiliation{%',
+          '  \\institution{Company Two}',
+          '  \\city{City}',
+          '  \\country{Country}}',
+          '\\email{second@example.com}',
+          '',
+          '\\begin{abstract}',
+          'The problem, the approach and the main result, in about 150 words.',
+          '\\end{abstract}',
+          '',
+          '\\keywords{first keyword, second keyword, third keyword}',
+          '',
+          '\\maketitle',
+          '',
+          '\\section{Introduction}',
+          'What the problem is, why it matters, and what this paper adds~\\cite{knuth1984}.',
+          '',
+          '\\section{Related Work}',
+          'What others have done, and how this work differs.',
+          '',
+          '\\section{Method}',
+          'The model is trained to make the loss in Equation~\\ref{eq:loss} small:',
+          '\\begin{equation}',
+          '  \\mathcal{L}(\\theta) = \\frac{1}{N} \\sum_{i=1}^{N} \\ell\\bigl(f_\\theta(x_i), y_i\\bigr)',
+          '  \\label{eq:loss}',
+          '\\end{equation}',
+          '',
+          '\\section{Experiments}',
+          'Table~\\ref{tab:results} compares the methods.',
+          '',
+          '\\begin{table}[htbp]',
+          '  \\caption{Results on the test set.}',
+          '  \\label{tab:results}',
+          '  \\begin{tabular}{lcc}',
+          '    \\toprule',
+          '    Method & Accuracy (\\%) & Time (s) \\\\',
+          '    \\midrule',
+          '    Baseline & 81.2 & 1.0 \\\\',
+          '    Ours & \\textbf{86.5} & 1.3 \\\\',
+          '    \\bottomrule',
+          '  \\end{tabular}',
+          '\\end{table}',
+          '',
+          '\\section{Conclusion}',
+          'What was shown, and what comes next.',
+          '',
+          '\\begin{acks}',
+          'Who helped, and who funded the work.',
+          '\\end{acks}',
+          '',
+          '\\bibliographystyle{ACM-Reference-Format}',
+          '\\bibliography{refs}',
+          '',
+          '\\end{document}',
+          '',
+        ],
+        [{ name: 'refs.bib', text: TEMPLATE_BIB }],
+        undefined,
+        true,
+      );
+    case 'lncs':
+      return project(
+        name,
+        [
+          '\\documentclass[runningheads]{llncs}',
+          '\\usepackage[T1]{fontenc}',
+          '% amsmath may go in too (for align, say): it warns that llncs keeps \\vec for bold vectors, which does no harm.',
+          '\\usepackage{amssymb}',
+          '\\usepackage{graphicx}',
+          '\\usepackage{booktabs}',
+          '',
+          '\\begin{document}',
+          '',
+          `\\title{${t}}`,
+          '',
+          '% The authors, each with the number of their place below.',
+          '\\author{First Author\\inst{1} \\and Second Author\\inst{2}}',
+          '% Their names as the running heads show them.',
+          '\\authorrunning{F. Author and S. Author}',
+          '\\institute{University One, City, Country\\\\',
+          '  \\email{first@example.com}',
+          '  \\and',
+          '  Company Two, City, Country\\\\',
+          '  \\email{second@example.com}}',
+          '',
+          '\\maketitle',
+          '',
+          '\\begin{abstract}',
+          'The problem, the approach and the main result, in 150 to 250 words.',
+          '',
+          '\\keywords{First keyword \\and Second keyword \\and Third keyword.}',
+          '\\end{abstract}',
+          '',
+          '\\section{Introduction}',
+          'What the problem is, why it matters, and what this paper adds~\\cite{knuth1984}.',
+          '',
+          '\\section{Related Work}',
+          'What others have done, and how this work differs.',
+          '',
+          '\\section{Method}',
+          'The model is trained to make the loss in Equation~(\\ref{eq:loss}) small:',
+          '\\begin{equation}',
+          '  \\mathcal{L}(\\theta) = \\frac{1}{N} \\sum_{i=1}^{N} \\ell\\bigl(f_\\theta(x_i), y_i\\bigr)',
+          '  \\label{eq:loss}',
+          '\\end{equation}',
+          '',
+          '\\begin{theorem}',
+          'A statement, numbered as Springer numbers them.',
+          '\\end{theorem}',
+          '',
+          '\\section{Experiments}',
+          'Table~\\ref{tab:results} compares the methods.',
+          '',
+          '% Springer puts a table\'s caption above it, and a figure\'s under it.',
+          '\\begin{table}[htbp]',
+          '  \\caption{Results on the test set.}',
+          '  \\label{tab:results}',
+          '  \\centering',
+          '  \\begin{tabular}{lcc}',
+          '    \\toprule',
+          '    Method & Accuracy (\\%) & Time (s) \\\\',
+          '    \\midrule',
+          '    Baseline & 81.2 & 1.0 \\\\',
+          '    Ours & \\textbf{86.5} & 1.3 \\\\',
+          '    \\bottomrule',
+          '  \\end{tabular}',
+          '\\end{table}',
+          '',
+          '\\section{Conclusion}',
+          'What was shown, and what comes next.',
+          '',
+          '\\subsubsection*{Acknowledgements.}',
+          'Who helped, and who funded the work.',
+          '',
+          '\\bibliographystyle{splncs04}',
           '\\bibliography{refs}',
           '',
           '\\end{document}',
