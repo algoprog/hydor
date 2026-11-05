@@ -267,13 +267,18 @@ const hash = (s: string) => crypto.createHash('sha256').update(s).digest('hex').
 // Not a browser: Google gives such programs each face as a TrueType file of its own (static, with all its characters).
 const UA = 'Hydor (office files)';
 
+/** When Google could not be reached, not before then again: a computer offline (or behind a wall that drops what it sends) makes its Word files at once, without fonts inside, instead of waiting on each font. */
+let unreachableUntil = 0;
+
 async function get(url: string, max: number): Promise<Buffer | null> {
+  if (Date.now() < unreachableUntil) return null;
   try {
-    const r = await fetch(url, { headers: { 'user-agent': UA }, signal: AbortSignal.timeout(20_000), redirect: 'error' });
+    const r = await fetch(url, { headers: { 'user-agent': UA }, signal: AbortSignal.timeout(10_000), redirect: 'error' });
     if (!r.ok) return null;
     const b = Buffer.from(await r.arrayBuffer());
     return b.length <= max ? b : null;
   } catch {
+    unreachableUntil = Date.now() + 5 * 60_000;
     return null;
   }
 }
