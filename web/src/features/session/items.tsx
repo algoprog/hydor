@@ -132,6 +132,28 @@ export function Elapsed({ since }: { since?: number }) {
   return <span className="tnum">{duration(Date.now() - since)}</span>;
 }
 
+/**
+ * While a session works: how long this stretch has run, and after earlier turns (`before`, their lengths added up) the
+ * time it has worked in all, "2m 10s · 1h 5m in all". Each part is an element of its own, so it reads in any language.
+ */
+export function WorkTime({ since, before, className }: { since?: number; before?: number; className?: string }) {
+  useTick(!!since);
+  if (!since) return null;
+  const now = Math.max(0, Date.now() - since);
+  return (
+    <>
+      <span className={cx('tnum shrink-0', className)}>
+        · <span>{duration(now)}</span>
+      </span>
+      {before && before >= 1000 ? (
+        <span className={cx('tnum min-w-0 truncate', className)} title="The time it has worked in this session, all its turns together">
+          · <span>{`${duration(before + now)} in all`}</span>
+        </span>
+      ) : null}
+    </>
+  );
+}
+
 function PathLink({ path, className }: { path: string; className?: string }) {
   const home = useApp((s) => s.boot?.home);
   return (
