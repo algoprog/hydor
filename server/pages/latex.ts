@@ -16,7 +16,7 @@
 //
 // Typesetting is kept by the hash of what goes in (the last 30 on disk), and the same document is never typeset
 // twice at once.
-import { execFileSync, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { linkPath } from '../platform.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -44,12 +44,16 @@ import {
   type TexPicture,
   type TexSetup,
 } from '../../shared/latex.ts';
+import { TEX_ASKED } from '../../shared/latex-catalog.ts';
+import { texCount, totalWords } from '../../shared/latex-count.ts';
+import { TEX_TEMPLATES, texFromTemplate, texTemplate } from '../../shared/latex-templates.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import { which } from '../documents/tools.ts';
 import { Zip } from '../documents/zip.ts';
 import { getAsset, putAsset, takeIn } from './assets.ts';
+import { findReferences } from './latex-refs.ts';
 import { zipParts } from './ooxml.ts';
 
 export { isTexText } from '../../shared/latex.ts';
@@ -120,6 +124,9 @@ export function textOf(b: Buffer): string {
   return s.includes('\ufffd') && !b.includes(Buffer.from([0xef, 0xbf, 0xbd])) ? b.toString('latin1') : s;
 }
 
+/** Other names agents may give the templates. */
+const TEMPLATE_ALIASES: Record<string, string> = { thesis: 'book', slides: 'beamer', presentation: 'beamer', resume: 'cv', résumé: 'cv', problemset: 'homework', 'problem-set': 'homework', conference: 'paper' };
+
 /**
  * A document from an agent, checked as keepTex does. Files and pictures may be named by path in its session's folder
  * (and pictures by an address on the web); a whole project folder of the session may come as `folder`. With `prev`
@@ -141,6 +148,15 @@ export async function agentTex(db: DB, input: unknown, cwd: string, prev?: TexDo
     for (const f of prev.files) files.set(f.name, f.text);
     for (const p of prev.pictures) pictures.set(p.name, p.src);
     engine ??= prev.engine;
+  } else if (typeof v.template === 'string' && v.template.trim()) {
+    // A new document from a template: its whole project, with the title where it shows one.
+    const asked = v.template.trim().toLowerCase();
+    const tpl = texTemplate(TEMPLATE_ALIASES[asked] ?? asked);
+    if (!tpl) throw new Error(`There is no LaTeX template “${v.template}”: ${TEX_TEMPLATES.map((t) => t.id).join(', ')}.`);
+    const d = texFromTemplate(tpl.id, typeof v.title === 'string' ? v.title : '');
+    main = d.main;
+    for (const f of d.files) files.set(f.name, f.text);
+    engine ??= d.engine;
   }
   if (typeof v.folder === 'string' && v.folder.trim()) {
     const dir = fromSession(cwd, v.folder.trim());
@@ -1687,6 +1703,11 @@ export function texForAgent(text: string): string {
   const outline = texOutline(d);
   const top = Math.min(...outline.map((h) => h.level));
   if (outline.length) out.push(`\nOutline:\n${outline.slice(0, 200).map((h) => `${'  '.repeat(h.level - top)}- ${h.title} (${h.file}:${h.line})`).join('\n')}`);
+  const c = texCount(d);
+  const n1 = (x: number, one: string, many = `${one}s`) => `${x.toLocaleString('en')} ${x === 1 ? one : many}`;
+  out.push(
+    `\nWords, counted as texcount does: about ${totalWords(c).toLocaleString('en')} (${c.words.toLocaleString('en')} in the text, ${c.headingWords.toLocaleString('en')} in ${n1(c.headings, 'heading')}, ${c.otherWords.toLocaleString('en')} in captions and footnotes); ${n1(c.inline, 'formula')} in the text, ${c.display.toLocaleString('en')} on lines of their own; ${n1(c.floats, 'figure or table', 'figures and tables')}.`,
+  );
   const k = keptResult(keyOf(d));
   if (k) out.push(`\nAs last typeset: ${compileSummary(k).replace(/\nFix them and save again with the same id\.$/, '')}`);
   else out.push('\nIt has not been typeset in this version yet.');
@@ -1715,6 +1736,7 @@ export function texForAgent(text: string): string {
 const LATEX_HELP = [
   'Make or change a LaTeX document, kept in the user’s Library: a paper, a thesis, a CV, a letter, a report, math-heavy notes, a beamer talk, anything the user wants typeset with LaTeX. It shows in the conversation and in the Library as its typeset pages; there the user edits the source beside its PDF (typeset again as they type) and downloads the PDF, main.tex or the whole project as a .zip. Use it rather than writing .tex files when the user asks for LaTeX, unless they want the files in a folder of theirs.',
   'source: the whole of main.tex, from \\documentclass to \\end{document}. files: the other files it reads, by the names it gives them ({"refs.bib": "…", "chapters/intro.tex": "…"}, or [{name, text}], or {name, path} for a file of this session); names are letters, digits, - _ . and / between folders. Or folder: a LaTeX project folder of this session, taken in whole.',
+  'Or, for a new document, template: article, report, book (a book or thesis: chapters, theorems, a bibliography), letter, beamer (slides), cv (moderncv), homework (problems and solutions), paper (two columns, as for a conference) or poster (tikzposter): a whole project that typesets, with the title in it, to change with source and files in the same call or in later saves (get_page shows it).',
   'pictures: what \\includegraphics shows, each by the name it uses: [{"name": "figures/plot.png", "src": "plots/plot.png"}] with src a PNG or JPEG file of this session, a public https address, or a picture of the document already (naget-asset:…); a path alone is its own name. A PDF picture becomes a PNG of it.',
   'engine: pdflatex (the default), xelatex (Unicode text and this computer’s fonts with fontspec: Greek, Chinese and other scripts), or lualatex. Packages: those of a standard TeX Live (amsmath, graphicx, hyperref, geometry, tikz, pgfplots, booktabs, beamer, natbib…); for a bibliography, a .bib file with \\bibliography and BibTeX (biblatex and biber may be missing). Nothing that runs programs (minted, svg, shell escape): it is turned off.',
   'The answer says whether it typeset, with each error’s file, line and what it most likely means: fix them and save again with the same id.',
@@ -1740,13 +1762,40 @@ export const SAVE_LATEX_SCHEMA = {
     engine: { type: 'string', enum: ['pdflatex', 'xelatex', 'lualatex'] },
     folder: { type: 'string', description: 'Instead of source and files: a LaTeX project folder of this session, taken in whole.' },
     remove: { type: 'array', items: { type: 'string' }, description: 'With id: names of files or pictures to take out.' },
+    template: {
+      type: 'string',
+      enum: TEX_TEMPLATES.map((t) => t.id),
+      description: 'A new document only: start from a template (a whole project with the title in it) instead of source; source or files sent with it replace its parts.',
+    },
   },
   required: ['title'],
 };
 
 // ---- the editor's routes --------------------------------------------------------------------------------------------
 
-/** What this computer can do with LaTeX: which engines it has, and whether it can show pages and shut TeX in. */
+let installedCache: { at: number; list: string[] } | null = null;
+
+/** Which of the classes and packages the editor asks about (TEX_ASKED) this TeX has: asked of kpsewhich, kept a while. */
+function installedFiles(t: Tools): Promise<string[] | undefined> {
+  if (!t.kpsewhich) return Promise.resolve(undefined);
+  if (installedCache && Date.now() - installedCache.at < 15 * 60_000) return Promise.resolve(installedCache.list);
+  return new Promise((ok) =>
+    // It says where each file it finds is (and fails for those it does not, which is the answer too).
+    execFile(t.kpsewhich!, TEX_ASKED, { timeout: 15_000, maxBuffer: 1024 * 1024, env: { PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: os.homedir() } }, (_e, out) => {
+      const have = new Set(
+        String(out ?? '')
+          .split('\n')
+          .map((l) => path.basename(l.trim()))
+          .filter(Boolean),
+      );
+      if (!have.size) return ok(undefined);
+      installedCache = { at: Date.now(), list: TEX_ASKED.filter((n) => have.has(n)) };
+      ok(installedCache.list);
+    }),
+  );
+}
+
+/** What this computer can do with LaTeX: which engines it has, whether it can show pages and shut TeX in, and which of the common classes and packages it has. */
 export async function texSetup(): Promise<TexSetup> {
   const t = tools();
   const box = t.pdflatex || t.xelatex || t.lualatex || t.pdftoppm ? await sandbox(t) : null;
@@ -1766,6 +1815,7 @@ export async function texSetup(): Promise<TexSetup> {
     sandbox: !!box,
     missing: any ? undefined : missingFor(t, 'pdflatex')!,
     notes,
+    installed: any ? await installedFiles(t) : undefined,
   };
 }
 
@@ -1787,7 +1837,7 @@ const forEditor = (r: TexResult): TexCompiled => ({
 
 /**
  * The editor's live preview, signed in:
- *   GET  /api/pages/tex/setup — what this computer has: { engines, latexmk, bibtex, pictures, sync, sandbox, missing?, notes }
+ *   GET  /api/pages/tex/setup — what this computer has: { engines, latexmk, bibtex, pictures, sync, sandbox, missing?, notes, installed? }
  *   POST /api/pages/tex/compile { model, base? } — typesets the editor's model as it is (saved or not):
  *        { key, ok, pdf, pages, sizes, errors, warnings, log, engine, missing?, ms }
  *   GET  /api/pages/tex/:key/:page?w= — a page's picture (PNG), w pixels wide
@@ -1795,6 +1845,8 @@ const forEditor = (r: TexResult): TexCompiled => ({
  *   GET  /api/pages/tex/:key/sync?page=&x=&y= — the source of a point of a page (points from its top left): { file, line } or {}
  *   GET  /api/pages/tex/:key/place?file=&line= — where a line shows: { page, x, y, w, h } or {}
  *   POST /api/pages/tex/picture { name, data } — a picture for a document (PNG, JPEG, or PDF made into PNG): { name, src }
+ *   POST /api/pages/tex/reference { query } — BibTeX for a DOI, an arXiv paper, or words of a title or authors (Crossref
+ *        and arXiv): { kind, entries: [{ key, bibtex, title, authors, year, venue }] }
  * Keys are typesettings' hashes; nothing outside their folders is ever served.
  */
 export function texRoutes(app: FastifyInstance, db: DB) {
@@ -1869,4 +1921,5 @@ export function texRoutes(app: FastifyInstance, db: DB) {
     if (!['png', 'jpg', 'jpeg'].includes(ext) || (ext === 'png') !== png) name = `${ext ? name.slice(0, -ext.length - 1) : name}.${png ? 'png' : 'jpg'}`;
     return { name, src: ASSET + putAsset(db, data) };
   });
+  app.post('/api/pages/tex/reference', async (req) => findReferences(((req.body ?? {}) as { query?: unknown }).query));
 }
