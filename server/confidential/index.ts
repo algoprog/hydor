@@ -40,8 +40,8 @@ export const confidentialRun = (ctx: Pick<RunCtx, 'runId' | 'key' | 'deps'>): bo
  * The app's tools a confidential session keeps: they read and write on this computer, or show something in the
  * conversation. Every other tool is off in it (web search and pages, the browser, the screen, connected apps and
  * the vault, pictures, videos and sound, publishing, apps and app_api, scheduled tasks, saving to memory or to
- * skills, screenshots of pages, second opinions, experiments' runs…), and so is any tool added later until it is
- * named here.
+ * skills, screenshots of pages and exports (a browser that would load what a page points to), second opinions,
+ * experiments' runs…), and so is any tool added later until it is named here.
  */
 export const CONFIDENTIAL_TOOLS = new Set([
   // Files and documents, read here.
@@ -56,7 +56,6 @@ export const CONFIDENTIAL_TOOLS = new Set([
   'save_slides',
   'save_latex',
   'save_notebook',
-  'export_page',
   // Knowledge bases, and memory to read (nothing new is saved).
   'knowledge_search',
   'knowledge_read',
@@ -260,6 +259,7 @@ export function confidentialInstructions(cut: boolean): string {
       ? '- Your commands run without network: they can’t download, install from the internet, push, send or reach any service. Use what is on this computer.'
       : '- Commands can’t be cut off from the network on this computer, so the user approves each one: don’t run commands that use the network (downloads, installs from the internet, pushes, calls to services).',
     '- Still yours: the files in the folder, documents (read here), the Library, knowledge bases, and memory notes to read (nothing new is saved).',
+    '- Pages you show or save load nothing from the web here: put their scripts, styles and data inside them, with no libraries from a CDN.',
     'Don’t look for ways around this. When the task needs the internet or another service, say what and why, and leave it to the user: they can start a session without Confidential for that part, with only what may be shared.',
   ].join('\n');
 }

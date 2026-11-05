@@ -38,7 +38,7 @@ import { DEFAULT_TASK_ROOT, taskRoot } from './assistants/store.ts';
 import { WORK_DIR as APPS_WORK_DIR } from './apps/runs.ts';
 import { FRAME_CSP, FRAME_HTML } from './notebook/frame.ts';
 import { accessOk, accessTokens, bearerOf, createAccessToken, machineInfo, Machines, revokeAccessToken } from './machines.ts';
-import { createMcpToken, mcpRoutes, mcpTokens, PAGE_CSP, PAGE_FRAME_HTML, revokeMcpToken, runOf } from './mcp.ts';
+import { createMcpToken, mcpRoutes, mcpTokens, OFFLINE_PAGE_CSP, PAGE_CSP, PAGE_FRAME_HTML, revokeMcpToken, runOf } from './mcp.ts';
 import { ModelManager } from './models/manager.ts';
 import { clients as agentClients, clientUpdates, ensureCommand, install as installClient, setClientAutoUpdate, startClientUpdates, watchClients } from './clients.ts';
 import { MODES as CONSOLE_MODES } from './agent/prompt.ts';
@@ -1781,7 +1781,14 @@ app.delete('/api/mcp/tokens/:id', async (req) => {
   return { ok: true };
 });
 // Pages agents show (show_html) render here, sandboxed like notebook outputs.
-app.get('/htmlframe', async (_req, reply) => reply.header('Content-Security-Policy', PAGE_CSP).header('Cache-Control', 'no-cache').type('text/html; charset=utf-8').send(PAGE_FRAME_HTML));
+// ?offline=1: a confidential session's pages, which load nothing from anywhere.
+app.get('/htmlframe', async (req, reply) =>
+  reply
+    .header('Content-Security-Policy', (req.query as Record<string, string>).offline === '1' ? OFFLINE_PAGE_CSP : PAGE_CSP)
+    .header('Cache-Control', 'no-cache')
+    .type('text/html; charset=utf-8')
+    .send(PAGE_FRAME_HTML),
+);
 
 // Notebook HTML outputs render here, in a sandboxed frame with its own (permissive) policy.
 app.get('/nbframe', async (_req, reply) => reply.header('Content-Security-Policy', FRAME_CSP).header('Cache-Control', 'no-cache').type('text/html; charset=utf-8').send(FRAME_HTML));

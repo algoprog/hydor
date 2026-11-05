@@ -291,6 +291,14 @@ export function mcpRoutes(app: FastifyInstance, db: DB, sessions: SessionManager
 export const PAGE_CSP = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals; default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'";
 
 /**
+ * The frame of a confidential session's pages (server/confidential; /htmlframe?offline=1): their scripts and styles run,
+ * but nothing loads from anywhere, not even through this app (pictures, fonts and media from data: and blob: only), no
+ * form is sent and no window opens, so a page can't carry off what it shows. The app's own pages let a frame go nowhere else.
+ */
+export const OFFLINE_PAGE_CSP =
+  "sandbox allow-scripts allow-modals; default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' data: blob:; style-src 'unsafe-inline' data: blob:; img-src data: blob:; font-src data: blob:; media-src data: blob:; worker-src blob:; form-action 'none'; frame-ancestors 'self'";
+
+/**
  * The frame every page renders in (show_html, saved pages, a page's own address): sandboxed, its own
  * opaque origin, permissive inside. The parent posts the page, which replaces this document, with the
  * page kit first (server/pages/kit.ts): ready-made classes, and the bridge that reports the page's
