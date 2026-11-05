@@ -195,7 +195,7 @@ export class PdfFile {
     const n = Number(lex.read(false));
     lex.read(false);
     lex.read(false);
-    const o = this.parseBody(lex, n, 0, false);
+    const o = this.parseBody(lex, n, false);
     if (!isStream(o)) throw new ParseError('Bad cross-reference stream');
     const d = o.dict;
     const data = decoded(o, (x) => this.resolve(x));
@@ -350,13 +350,13 @@ export class PdfFile {
     lex.read(false);
     const kw = lex.read(false);
     if (a !== n || !(kw instanceof Op) || kw.op !== 'obj') throw new ParseError(`Object ${n} is not at ${off}`);
-    let o = this.parseBody(lex, n, gen, true);
+    let o = this.parseBody(lex, n, true);
     if (this.crypt && n !== this.encNum) o = this.crypt.decryptObject(o, n, gen);
     return o;
   }
 
   /** An object's value after "n g obj", with its stream's bytes if it has one. */
-  private parseBody(lex: Lexer, n: number, gen: number, lengthByRef: boolean): Obj {
+  private parseBody(lex: Lexer, n: number, lengthByRef: boolean): Obj {
     const o = lex.read();
     if (!isDict(o)) return o instanceof Op ? null : o;
     lex.skip();
@@ -380,7 +380,6 @@ export class PdfFile {
       if (lex.buf[end - 1] === 0x0a) end--;
       if (lex.buf[end - 1] === 0x0d) end--;
     }
-    void gen;
     return new Stream(o, lex.buf.subarray(p, Math.max(p, end)));
   }
 
