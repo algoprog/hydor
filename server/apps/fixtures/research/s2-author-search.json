@@ -1,0 +1,16 @@
+{
+ "total": 1,
+ "offset": 0,
+ "data": [
+  {
+   "authorId": "2006776003",
+   "name": "Chris Samarinas",
+   "affiliations": [
+    "University of Massachusetts Amherst"
+   ],
+   "paperCount": 16,
+   "citationCount": 155,
+   "hIndex": 6
+  }
+ ]
+}
