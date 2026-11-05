@@ -127,6 +127,7 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+B', 'Bold, or plain again'],
       ['Ctrl+I', 'Italic, or plain again'],
       ['Ctrl+/', 'Comment lines out, or back in'],
+      ['Ctrl+Alt+M', 'A comment on the words picked'],
       ['Ctrl+Space', 'Show what can be typed here'],
       ['Tab', 'The next place to fill in'],
       ['Enter', 'After a \\begin{…}: its \\end{…} goes in too'],
