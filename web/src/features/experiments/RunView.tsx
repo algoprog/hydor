@@ -172,6 +172,8 @@ export function RunView({ id, machine, onClose, onAgain, wide }: { id: string; m
       toastError(e);
     }
   };
+  /** Run again: New run filled in; a run kept on another machine goes there again. */
+  const again = () => v && onAgain(machine ? { ...v.run, where: `m:${machine}`, machine: { id: machine, name: v.run.machine?.name ?? machine } } : v.run);
   const showPatch = async () => {
     try {
       const r = await api<{ patch: string | null }>(`/api/experiments/runs/${id}/patch`, base !== undefined ? { base } : {});
@@ -195,7 +197,7 @@ export function RunView({ id, machine, onClose, onAgain, wide }: { id: string; m
         </Button>
       )}
       {v && (
-        <Button size="sm" variant="ghost" icon={<RotateCcw size={14} />} onClick={() => onAgain(machine ? { ...v.run, where: `m:${machine}` } : v.run)} className="max-sm:hidden">
+        <Button size="sm" variant="ghost" icon={<RotateCcw size={14} />} onClick={again} className="max-sm:hidden">
           Run again
         </Button>
       )}
@@ -210,7 +212,7 @@ export function RunView({ id, machine, onClose, onAgain, wide }: { id: string; m
                 icon={<RotateCcw size={14} />}
                 onClick={() => {
                   setMenu(false);
-                  onAgain(v.run);
+                  again();
                 }}
               >
                 Run again

@@ -207,7 +207,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
       if (mode === 'sweep') {
         const r = await post<{ sweep: { group: string } }>('/api/experiments/sweeps', body());
         onStarted({ group: r.sweep.group });
-      } else if (from) {
+      } else if (from && !from.machine) {
         const r = await post<{ run: RunRecord }>(`/api/experiments/runs/${from.id}/again`, body());
         onStarted({ run: r.run });
       } else {

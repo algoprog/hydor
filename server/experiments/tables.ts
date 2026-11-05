@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { TABLE_MARK, type ResultsCell, type ResultsColumn, type ResultsTable, type ResultsTableSpec, type RunRecord } from '../../shared/experiments.ts';
+import { looseObject } from './metrics.ts';
 import { holm, mean, pairedBootstrap, pairedT, std, welch } from './stats.ts';
 
 /** Per-example scores: metric → example id → value. */
@@ -16,8 +17,8 @@ export type ScoreMap = Map<string, Map<string, number>>;
 const MAX_SCORES = 50 * 1024 * 1024;
 
 /**
- * Per-example scores as a run writes them: JSON lines with an id ("id", "qid", "query", "example", "doc") and a
- * number per metric, or trec_eval -q's lines ("metric  query  value"; its "all" line left out).
+ * Per-example scores as a run writes them: JSON lines (or Python's printed dicts) with an id ("id", "qid", "query",
+ * "example", "doc") and a number per metric, or trec_eval -q's lines ("metric  query  value"; its "all" line left out).
  */
 export function parseScores(text: string): ScoreMap {
   const out: ScoreMap = new Map();
@@ -31,13 +32,12 @@ export function parseScores(text: string): ScoreMap {
     const t = line.trim();
     if (!t) continue;
     if (t.startsWith('{')) {
-      try {
-        const o = JSON.parse(t) as Record<string, unknown>;
-        const idKey = ['id', 'qid', 'query_id', 'query', 'example', 'example_id', 'doc', 'idx'].find((k) => o[k] !== undefined && o[k] !== null);
-        if (!idKey) continue;
-        const id = String(o[idKey]);
-        for (const [k, v] of Object.entries(o)) if (k !== idKey && typeof v === 'number') put(k, id, v);
-      } catch {}
+      // JSON, or as Python prints a dict.
+      const o = looseObject(t);
+      const idKey = o && ['id', 'qid', 'query_id', 'query', 'example', 'example_id', 'doc', 'idx'].find((k) => o[k] !== undefined && o[k] !== null);
+      if (!o || !idKey) continue;
+      const id = String(o[idKey]);
+      for (const [k, v] of Object.entries(o)) if (k !== idKey && typeof v === 'number') put(k, id, v);
       continue;
     }
     const f = t.split(/\s+/);
