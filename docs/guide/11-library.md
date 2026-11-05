@@ -67,7 +67,7 @@ On a phone, tap a part to pick it and tap it again to write in it. The tabs belo
 Once you write in a paragraph, a heading or a list, the words flow from block to block as in Notion or a word processor:
 
 - **Enter** at the end of a block makes the next one and puts the caret in it: a paragraph after a heading, the next item in a list. Enter in the middle splits the block in two; Enter in an empty item leaves the list. **Shift+Enter** is a line break in the same block.
-- **Backspace** at the start of a block joins it to the block before (an empty block goes). At the start of a list's item, a quote or a callout, it first turns it back into a paragraph; at the start of a block after a picture or a line across, it picks that part, so another Backspace deletes it.
+- **Backspace** at the start of a block joins it to the block before (an empty block goes). At the start of a list's item it first takes the item up a level, or out of the list; at the start of a quote, a callout, a toggle or code it turns it into a paragraph; at the start of a block after a picture or a line across, it picks that part, so another Backspace deletes it.
 - **↑** and **↓** on the first or last line go on into the block above or below; **Tab** and **Shift+Tab** nest a list's item under the one before it and take it back out.
 - An empty block shows a quiet hint ("Type ‘/’ for commands", "Heading 1", "To-do", "List") that is never part of the page.
 - Click below the last block to start a new paragraph at the end; the **+** under the last block does the same and lists the blocks to add.

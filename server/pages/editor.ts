@@ -1284,7 +1284,15 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
   /** A change as one step to undo (the words typed before it are a step of their own), then where to write or what to pick. */
   const change = (f: () => Next) => {
     const before = snap();
-    const r = f();
+    let r: Next;
+    try {
+      r = f();
+    } catch (err) {
+      // A page shaped in a way the change did not foresee: it goes back as it was, never half changed.
+      console.warn(err);
+      restore(before, !!editing);
+      return;
+    }
     if (!r) return;
     undo.push(before);
     if (undo.length > 150) undo.shift();
