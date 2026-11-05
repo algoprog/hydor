@@ -843,13 +843,20 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
     withCode(name, (c) => {
       if (id === 'bold') return c.toggle('textbf', 'bold');
       if (id === 'italic') return c.toggle('textit', 'italic');
-      const p = c.pickedLines();
-      const made = makeSnippet(id, p.empty ? '' : p.text, { picture, key, labels: docWords(live.current ?? model!).labels });
-      if (made.needs) editFile(TEX_MAIN, (t) => withPackages(t, made.needs!));
-      if (made.block && !p.empty && (id === 'itemize' || id === 'enumerate' || id === 'description' || id === 'align')) {
-        // The lines picked become the list's items: the whole lines go.
-        c.replacePicked('');
+      let p = c.pickedLines();
+      // What does not take in the words picked goes after them, so they stay: a citation or a cross-reference after
+      // the words, a table of contents, a page break, or a figure for several lines, after those lines.
+      const after = id === 'cite' || id === 'ref' ? 'words' : id === 'toc' || id === 'newpage' || (id === 'figure' && p.text.includes('\n')) ? 'lines' : null;
+      if (after && !p.empty) {
+        const end = after === 'words' ? c.view.state.selection.main.to : c.view.state.doc.line(p.to).to;
+        c.view.dispatch({ selection: { anchor: end } });
+        p = c.pickedLines();
       }
+      const at = c.cursor();
+      const made = makeSnippet(id, p.empty ? '' : p.text, { picture, key, labels: docWords(live.current ?? model!).labels, prev: c.text().slice(Math.max(0, at - 1), at) });
+      if (made.needs) editFile(TEX_MAIN, (t) => withPackages(t, made.needs!));
+      // The lines picked are in it (a list's items, a quotation's lines): the whole lines go, it goes in their place.
+      if (made.block && made.lines && !p.empty) c.replacePicked('');
       c.insert(made.template, made.block);
     });
   };
@@ -1656,7 +1663,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
           const name = cleanTexName(n, 'file')!;
           setNaming(null);
           change((d) => ({ ...d, files: [...d.files, { name, text: '' }] }));
-          open(name);
+          // Its editor takes the keys at once, to write in it.
+          withCode(name, (c) => c.focus());
         }}
       />
       <NameDialog
