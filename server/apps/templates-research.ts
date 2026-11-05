@@ -1176,6 +1176,7 @@ for (const k of rows(input.keep)) {
 }
 const a = input.author && typeof input.author === 'object' ? input.author : {};
 return {
+  headline: citations.length ? citations.length + (citations.length === 1 ? ' new citation' : ' new citations') + (papers.filter((p) => p.new).length > 1 ? ' of ' + papers.filter((p) => p.new).length + ' of your papers' : '') : 'No new citations',
   name: a.name || '',
   where: a.where || '',
   total: Number(a.citations) || 0,
@@ -1188,6 +1189,7 @@ return {
   note: [input.notes, input.more].filter(Boolean).join('. '),
 };`,
         outputs: [
+          { id: 'headline', label: 'In a line', type: 'text' },
           { id: 'name', label: 'You', type: 'text' },
           { id: 'where', label: 'Where you work', type: 'text' },
           { id: 'total', label: 'Citations in all', type: 'number' },
@@ -1203,6 +1205,7 @@ return {
       },
     ],
     outputs: {
+      headline: '{{report.headline}}',
       name: '{{report.name}}',
       where: '{{report.where}}',
       total: '{{report.total}}',
@@ -1216,7 +1219,8 @@ return {
     },
   },
   answer: [
-    { id: 'name', label: 'You', type: 'text', required: true },
+    { id: 'headline', label: 'In a line', type: 'text', required: true },
+    { id: 'name', label: 'You', type: 'text' },
     { id: 'where', label: 'Where you work', type: 'text' },
     { id: 'total', label: 'Citations in all', type: 'number' },
     { id: 'hindex', label: 'h-index', type: 'number' },
@@ -1302,7 +1306,8 @@ const NEW_MODEL_WATCH: Draft = {
           HTTP +
           String.raw`// The newest models of the kind on Hugging Face (a thousand at most, with the words given each searched for), as old
 // as the days given and no more than three weeks older: those with enough downloads by then are the ones to look at,
-// most downloaded first (eight an update; the rest wait for the next); those too new wait. Those seen before are left.
+// most downloaded first (eight an update; the rest wait for the next); those too new wait. Those seen before are left,
+// and so are copies of a model in another format (GGUF, ONNX, quantized) unless your words ask for them.
 const task = (/\(([a-z-]+)\)/.exec(String(input.task || '')) || [])[1] || 'text-ranking';
 const words = String(input.words || '').split(/[,;]/).map((w) => w.trim()).filter(Boolean).slice(0, 4);
 const least = Math.max(0, Number(input.downloads) || 0);
@@ -1321,7 +1326,9 @@ for (const w of words.length ? words : ['']) {
 }
 const all = Array.from(found.values());
 const age = (m) => (today - Date.parse(m.createdAt)) / 86400000;
-const unseen = all.filter((m) => !kept.has(m.id) && isFinite(age(m)));
+const COPY = /(?:^|[-_./])(gguf|onnx|awq|gptq|mlx|exl2|int4|int8|fp8|nvfp4|bnb|4bit|8bit|w4a\d+|q\d_k\w*|q\d_\d)(?:$|[-_.])/i;
+const copies = words.some((w) => COPY.test('-' + w + '-')) ? [] : all.filter((m) => COPY.test(m.id));
+const unseen = all.filter((m) => !kept.has(m.id) && isFinite(age(m)) && copies.indexOf(m) < 0);
 const ready = unseen.filter((m) => age(m) >= days && age(m) <= days + 21 && (m.downloads || 0) >= least).sort((a, b) => (b.downloads || 0) - (a.downloads || 0));
 const young = unseen.filter((m) => age(m) < days).sort((a, b) => (b.downloads || 0) - (a.downloads || 0) || (b.likes || 0) - (a.likes || 0));
 const one = (m) => ({ model: m.id, created: String(m.createdAt || '').slice(0, 10), downloads: m.downloads || 0, likes: m.likes || 0 });
@@ -1331,6 +1338,7 @@ return {
   later: Math.max(0, ready.length - 8),
   young: young.slice(0, 6).map(one),
   young_count: young.length,
+  copies: copies.length,
   listed: all.length,
   notes: notes.join('. '),
 };`,
@@ -1340,6 +1348,7 @@ return {
           { id: 'later', label: 'Left for the next update', type: 'number' },
           { id: 'young', label: 'Too new to judge', type: 'table', columns: [{ id: 'model', label: 'Model', type: 'text' }, { id: 'created', label: 'Out since', type: 'text' }, { id: 'downloads', label: 'Downloads', type: 'number' }, { id: 'likes', label: 'Likes', type: 'number' }] },
           { id: 'young_count', label: 'How many too new', type: 'number' },
+          { id: 'copies', label: 'Copies in other formats', type: 'number' },
           { id: 'listed', label: 'Models listed', type: 'number' },
           { id: 'notes', label: 'What did not answer', type: 'text' },
         ],
@@ -1516,7 +1525,7 @@ return { changed: changed, notes: notes.join('. ') };`,
         title: 'Lay out the models',
         do: 'code',
         language: 'javascript',
-        with: { changed: '{{runs.changed}}', kept: '{{kept.records}}', young: '{{list.young}}', young_count: '{{list.young_count}}', later: '{{list.later}}', task: '{{list.task}}', listed: '{{list.listed}}', best: '{{best}}', metric: '{{metric}}', command: '{{command}}', notes: '{{list.notes}}', more: '{{runs.notes}}', today: '{{today}}' },
+        with: { changed: '{{runs.changed}}', kept: '{{kept.records}}', young: '{{list.young}}', young_count: '{{list.young_count}}', copies: '{{list.copies}}', later: '{{list.later}}', task: '{{list.task}}', listed: '{{list.listed}}', best: '{{best}}', metric: '{{metric}}', command: '{{command}}', notes: '{{list.notes}}', more: '{{runs.notes}}', today: '{{today}}' },
         code:
           LIST +
           String.raw`// The page: those that beat your best first, then what is new this time, then those with a score (the best first), those
@@ -1541,6 +1550,7 @@ return {
   models: models.concat(young),
   fresh: fresh,
   young: Number(input.young_count) || 0,
+  copies: Number(input.copies) || 0,
   later: Number(input.later) || 0,
   listed: Number(input.listed) || 0,
   best: input.best === '' || input.best === null || input.best === undefined ? null : Number(input.best),
@@ -1554,6 +1564,7 @@ return {
           { id: 'models', label: 'Models', type: 'table', columns: MODEL_COLS },
           { id: 'fresh', label: 'New this time', type: 'number' },
           { id: 'young', label: 'Too new to judge', type: 'number' },
+          { id: 'copies', label: 'Copies in other formats', type: 'number' },
           { id: 'later', label: 'Left for the next update', type: 'number' },
           { id: 'listed', label: 'Models listed', type: 'number' },
           { id: 'best', label: 'Your best', type: 'number' },
@@ -1570,6 +1581,7 @@ return {
       models: '{{report.models}}',
       fresh: '{{report.fresh}}',
       young: '{{report.young}}',
+      copies: '{{report.copies}}',
       later: '{{report.later}}',
       listed: '{{report.listed}}',
       best: '{{report.best}}',
@@ -1584,6 +1596,7 @@ return {
     { id: 'models', label: 'Models', type: 'table', columns: MODEL_COLS },
     { id: 'fresh', label: 'New this time', type: 'number' },
     { id: 'young', label: 'Too new to judge', type: 'number' },
+    { id: 'copies', label: 'Copies in other formats', type: 'number' },
     { id: 'later', label: 'Left for the next update', type: 'number' },
     { id: 'listed', label: 'Models listed', type: 'number' },
     { id: 'best', label: 'Your best', type: 'number' },
@@ -2066,9 +2079,9 @@ return {
     },
   },
   answer: [
+    { id: 'headline', label: 'Next', type: 'text', required: true },
     { id: 'zone', label: 'Your time zone', type: 'text' },
     { id: 'today', label: 'Checked', type: 'date' },
-    { id: 'headline', label: 'Next', type: 'text', required: true },
     { id: 'deadlines', label: 'Deadlines', type: 'table', columns: DEADLINE_COLS },
     { id: 'venues', label: 'Venues', type: 'table', columns: VENUE_COLS },
     { id: 'missing', label: 'Not in the lists', type: 'list' },

@@ -514,6 +514,26 @@ function firstLine(recipe: AppDef | AppTemplate, r: AppRun): string {
 function HomeView({ id, recipe, template, view, home, own, onHome }: { id: string; recipe: AppDef | AppTemplate; template: boolean; view?: Record<string, unknown>; home?: HomeSettings; own: OwnPage; onHome: (h: HomeSettings) => void }) {
   const info = useMemo(() => appInfo(id, recipe), [id, recipe]);
   const [starting, setStarting] = useState(false);
+  // Before the first one: the questions it cannot do without that its settings leave empty (your venues, your name), asked here.
+  const needs = recipe.fields.filter((f) => f.required && f.type !== 'file' && !String(home?.inputs[f.id] ?? '').trim());
+  const [values, setValues] = useState<FormValues>(() => initialValues(needs));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const first = async () => {
+    let settings = home;
+    if (needs.length) {
+      const errs = formErrors(needs, values, {});
+      setErrors(errs);
+      if (Object.keys(errs).length) return;
+      try {
+        settings = (await put<{ home: HomeSettings }>(`/api/apps/${enc(id)}/home`, { inputs: Object.fromEntries(needs.map((f) => [f.id, String(values[f.id] ?? '')])) })).home;
+        onHome(settings);
+      } catch (e) {
+        return toastError(e);
+      }
+    }
+    setStarting(true);
+    await runFromPage(id, settings, own.reload).finally(() => setStarting(false));
+  };
   if (own.last === undefined)
     return (
       <div className="flex justify-center py-20 text-fg-3">
@@ -559,7 +579,12 @@ function HomeView({ id, recipe, template, view, home, own, onHome }: { id: strin
             <p className="mt-1.5 text-[14.5px] leading-relaxed text-fg-2" translate={template ? undefined : 'no'}>
               {recipe.description}
             </p>
-            <Button variant="primary" icon={starting ? <Throbber /> : <Play size={14} fill="currentColor" />} disabled={starting} className="mt-6 h-10 px-5" onClick={() => (setStarting(true), void runFromPage(id, home, own.reload).finally(() => setStarting(false)))}>
+            {needs.length > 0 && (
+              <div className="mt-6 w-full rounded-2xl border border-line bg-panel px-5 py-4 text-left">
+                <AppForm fields={needs} values={values} files={{}} errors={errors} disabled={starting} onChange={(k, v) => (setValues((x) => ({ ...x, [k]: v })), errors[k] && setErrors((e) => ({ ...e, [k]: '' })))} onFile={() => {}} />
+              </div>
+            )}
+            <Button variant="primary" icon={starting ? <Throbber /> : <Play size={14} fill="currentColor" />} disabled={starting} className="mt-6 h-10 px-5" onClick={() => void first()}>
               Make the first one
             </Button>
             {home && (

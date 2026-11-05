@@ -187,8 +187,8 @@ const PAPER_RADAR_UI: AppUi = {
 
 const CITE_HEAD = String.raw`<header class="hero">
   <p class="kicker">Citation alerts{{#checked}} · {{checked|longdate}}{{/checked}}</p>
-  <h1>{{name|or:Your citations}}</h1>
-  {{#where}}<p class="sub">{{where}}</p>{{/where}}
+  <h1>{{headline}}</h1>
+  <p class="sub">{{name}}{{#where}} · {{where}}{{/where}}</p>
   <div class="stats">
     <div class="stat"><b>{{fresh|number}}</b><span>new this time</span></div>
     <div class="stat"><b>{{total|number}}</b><span>citations in all</span></div>
@@ -278,7 +278,7 @@ const CITATION_ALERTS_UI: AppUi = {
 const NM_HEAD = String.raw`<header class="hero">
   <p class="kicker">New-model watch{{#task}} · {{task}}{{/task}}</p>
   <h1>{{headline}}</h1>
-  <p class="sub">{{listed|number}} models listed{{#young}}, {{young}} too new to judge yet{{/young}}{{#later}}, {{later}} left for the next update{{/later}}.</p>
+  <p class="sub">{{listed|number}} models listed{{#young}}, {{young}} too new to judge yet{{/young}}{{#copies}}, {{copies}} copies in other formats left out{{/copies}}{{#later}}, {{later}} left for the next update{{/later}}.</p>
   <div class="stats">
     <div class="stat"><b>{{fresh|number}}</b><span>new this time</span></div>
     <div class="stat"><b>{{models|where:state=beats|count}}</b><span>beat your best</span></div>
