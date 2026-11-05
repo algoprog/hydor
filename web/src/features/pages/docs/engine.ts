@@ -282,6 +282,9 @@ export class DocEngine {
   setReadOnly(ro: boolean) {
     this.o.readOnly = ro;
     this.root.contentEditable = ro ? 'false' : 'true';
+    // Ctrl+B and Ctrl+K in the words are the document's (bold, a link), not the app's sidebar and search box.
+    if (ro) delete this.root.dataset.keys;
+    else this.root.dataset.keys = 'b k';
   }
 
   /** Another document (or another version): drawn anew, its history its own. */
