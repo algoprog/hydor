@@ -46,6 +46,7 @@ import { Studio, type StudioDoc } from './studio/Studio';
 import { tr } from '../../i18n/runtime';
 import { closePageAsk, openPageAsk, PageAskPanel, PageAskPill, usePageAsk } from './AskPage';
 import { loadModelVersion, type AskScope } from './kinds';
+import { useLiveDraft, usePageDraft } from './live';
 import { EDITORS } from './editors';
 import { exportFile, type ExportFormat } from './exportFile';
 import { EXPORTS } from './exports';
@@ -246,6 +247,7 @@ function PageView({ id }: { id: string }) {
   // and has not saved yet, as Save does (the version before stays among its versions): nothing else would keep it.
   // Closing or reloading the tab asks first.
   const unsaved = useRef(false);
+  const [dirty, setDirty] = useState(false);
   const leaving = useRef(false);
   useEffect(
     () => () => {
@@ -293,6 +295,12 @@ function PageView({ id }: { id: string }) {
   const startPresent = new URLSearchParams(search).get('present') === '1';
   const kind = data?.page.kind;
   const slides = kind === 'slides';
+  // An agent saving a new version of it, from any session: shown as it comes (live.ts), unless an older version is on view.
+  const draft = usePageDraft(kind ? id : undefined, { watch: !!kind });
+  const live = useLiveDraft(kind === 'notebook' ? null : kind, data?.model, data?.page.version, old ? null : draft);
+  // Said under the title while it is written, and while its version is being kept (a LaTeX document is typeset first).
+  const writing = !old && !!kind && kind !== 'notebook' && ((!!draft && !draft.done && !draft.failed) || !!live);
+  const keeping = writing && !!draft?.done;
 
   const viewVersion = async (v: number) => {
     setMenu(null);
@@ -405,9 +413,12 @@ function PageView({ id }: { id: string }) {
           {title}
         </h1>
         {page && (
-          <div className="truncate text-[11.5px] text-fg-3">
-            {old ? `Version ${old.version} of ${page.version}` : `Version ${page.version} · ${ago(page.updatedAt)}`}
-            {page.storageBytes ? ` · keeps ${bytes(page.storageBytes)}` : ''}
+          <div className="flex min-w-0 items-center gap-1.5 truncate text-[11.5px] text-fg-3">
+            {writing && <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" />}
+            <span className="min-w-0 truncate">
+              {old ? `Version ${old.version} of ${page.version}` : keeping ? `Version ${page.version} · An agent is saving a new version` : writing ? `Version ${page.version} · An agent is writing a new version` : `Version ${page.version} · ${ago(page.updatedAt)}`}
+              {page.storageBytes ? ` · keeps ${bytes(page.storageBytes)}` : ''}
+            </span>
           </div>
         )}
       </button>
@@ -447,7 +458,13 @@ function PageView({ id }: { id: string }) {
       </IconButton>
     </>
   );
-  const band: ReactNode = old && (
+  // Changes not saved here are left as they are while an agent writes a new version: said once, under the bar.
+  const band: ReactNode = writing && dirty && !old ? (
+    <div className="flex shrink-0 items-center gap-2 border-b border-line bg-accent-soft px-3 py-2 text-[12.5px] text-fg-2 sm:px-5">
+      <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" />
+      <span className="min-w-0 flex-1">An agent is writing a new version. Your changes stay as they are here until you save them.</span>
+    </div>
+  ) : old && (
     <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-line bg-accent-soft px-3 py-2 text-[12.5px] sm:px-5">
       <span className="min-w-0 flex-1 text-fg-2">An older version, as it was {ago(data?.versions.find((v) => v.version === old.version)?.createdAt)}. What it changes here is not kept.</span>
       <Button size="sm" variant="primary" onClick={restore} className="h-7">
@@ -475,8 +492,12 @@ function PageView({ id }: { id: string }) {
         onAsk={(text) => askThis(text)}
         onScopes={setScopes}
         saveNowRef={saveFirst}
-        onDirty={(d) => void (unsaved.current = d)}
+        onDirty={(d) => {
+          unsaved.current = d;
+          setDirty(d);
+        }}
         startPresent={startPresent}
+        live={live}
       />
     ) : (
       <Empty icon={<AppWindow size={22} />} title="This app cannot open it">

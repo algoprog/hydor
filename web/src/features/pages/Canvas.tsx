@@ -23,6 +23,7 @@ import { exportFile } from './exportFile';
 import { EXPORTS } from './exports';
 import { EDITORS } from './editors';
 import type { ModelDoc } from './kinds';
+import { draftKind, emptyModel, useLiveDraft, usePageDraft } from './live';
 import type { Deck } from '@shared/slides';
 import { usePicks } from '../session/HtmlPage';
 import { ReviewPane, shotsOfTurn } from '../shots/Review';
@@ -123,6 +124,8 @@ interface Loaded {
   /** Where it lives: a saved page or a file. */
   pageId?: string;
   path?: string;
+  /** A saved page's version shown. */
+  version?: number;
 }
 
 function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined, kind: PageCall | null): { loaded: Loaded | null; error: string | null } {
@@ -138,8 +141,10 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
     if (!keptMap) usePagesStore.getState().loadKept(key).catch(() => {});
   }, [key, !keptMap]);
 
-  // The saved page it is (save_page's, a kept one, or one opened by id).
-  const pageId = target.kind === 'page' ? target.id : kind === 'save_page' ? savedRef(item?.tool.output)?.id : kind === 'show_html' ? kept : undefined;
+  // The saved page it is (save_page's, a kept one, or one opened by id). A document, deck, spreadsheet or LaTeX being
+  // saved shows the version it changes while its call comes in (the version being written over it: live.ts).
+  const modelSave = !!item && /__save_(?:doc|slides|sheet|latex)$/.test(item.tool.name);
+  const pageId = target.kind === 'page' ? target.id : kind === 'save_page' ? (modelSave && item ? savedPageOf(item.tool) : savedRef(item?.tool.output)?.id) : kind === 'show_html' ? kept : undefined;
   const loadPage = () => {
     if (!pageId) return;
     api<{ page: PageInfo; html?: string; model?: unknown }>(`/api/pages/${enc(pageId)}`)
@@ -185,6 +190,7 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
       const id = page.info.id;
       return {
         pageId: id,
+        version: page.info.version,
         doc: { key: `page:${id}:${page.info.version}`, title: page.info.title, html: page.html ?? '', store: pageStore(id) },
         ...(page.info.kind && page.model !== undefined
           ? {
@@ -249,9 +255,18 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
 export function SessionPage({ sessionKey: key, target, layout, onClose }: { sessionKey: string; target: CanvasTarget; layout: 'panel' | 'sheet' | 'page'; onClose: () => void }) {
   const items = usePageItems(key);
   const item = target.kind === 'item' ? items.find((i) => i.id === target.id) : undefined;
-  const draft = useDrafts((x) => (target.kind === 'item' ? x.byKey[key]?.[target.id] : undefined));
-  const kind: PageCall | null = target.kind === 'page' ? 'save_page' : (pageCall(item?.tool) ?? (draft ? draft.tool : null));
+  // The call's own draft; for a saved page opened here, the newest save of it being written (from any session).
+  const draft = usePageDraft(target.kind === 'page' ? target.id : undefined, target.kind === 'item' ? { sessionKey: key, item: target.id } : { watch: true });
+  const callKind = draft && !draftKind(draft) ? draft.tool : null;
+  const kind: PageCall | null = target.kind === 'page' ? 'save_page' : (pageCall(item?.tool) ?? (draft ? (draftKind(draft) ? 'save_page' : (callKind as PageCall)) : null));
   const { loaded, error } = useLoaded(key, target, item, kind);
+  // A document, deck, spreadsheet or LaTeX document being saved: the version being written, over the one it changes
+  // (none for a new one, whose editor starts empty).
+  const saving = draftKind(draft);
+  const changing = target.kind === 'page' || typeof (item?.tool.input as { id?: unknown } | undefined)?.id === 'string';
+  const fresh = !!saving && !changing && !loaded;
+  const liveKind = loaded?.kind && loaded.kind !== 'notebook' ? loaded.kind : fresh ? saving : null;
+  const live = useLiveDraft(liveKind, fresh ? null : loaded?.model?.model, fresh ? undefined : loaded?.version, draft);
   // The pages to switch to, newest first: a page saved several times once, at its newest save that saved it.
   const picks = useMemo(() => {
     const newest = items.slice().reverse();
@@ -392,34 +407,50 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
     return () => void dirty.delete(key);
   }, [isDirty, key]);
 
-  const Editor = loaded?.kind ? EDITORS[loaded.kind] : undefined;
-  if (loaded?.kind && loaded.model && loaded.saveModel && Editor) {
-    const saveModel = loaded.saveModel;
+  const Editor = loaded?.kind ? EDITORS[loaded.kind] : fresh && saving ? EDITORS[saving] : undefined;
+  // A new one being written: its editor, empty until the first words come (the same editor then shows it saved).
+  const freshDoc = useMemo(() => (fresh && saving && draft ? { key: `draft:${draft.id}`, title: draft.title ?? title, model: emptyModel(saving) } : null), [fresh, saving, draft?.id]);
+  if (Editor && ((loaded?.kind && loaded.model && loaded.saveModel) || freshDoc)) {
+    const saveModel = loaded?.saveModel;
     return (
       <>
         {confirmNode}
         <Editor
-          doc={loaded.model}
-          pageId={loaded.pageId!}
+          doc={loaded?.model ?? freshDoc}
+          pageId={loaded?.pageId ?? ''}
           layout={layout}
-          onSave={async (model: unknown) => {
-            try {
-              return await saveModel(model);
-            } catch (e) {
-              if ((e as { status?: number }).status !== 409) throw e;
-              if (!(await confirm({ title: 'A newer version is there', body: 'It was saved again while you changed it (by the agent, say). Save yours on top? The other stays among its versions.', confirm: 'Save on top' })))
-                return false;
-              return saveModel(model, true);
-            }
-          }}
+          onSave={
+            saveModel
+              ? async (model: unknown) => {
+                  try {
+                    return await saveModel(model);
+                  } catch (e) {
+                    if ((e as { status?: number }).status !== 409) throw e;
+                    if (!(await confirm({ title: 'A newer version is there', body: 'It was saved again while you changed it (by the agent, say). Save yours on top? The other stays among its versions.', confirm: 'Save on top' })))
+                      return false;
+                    return saveModel(model, true);
+                  }
+                }
+              : undefined
+          }
+          readOnly={!saveModel}
           onDirty={setDirty}
           lead={lead}
           tail={tail}
+          band={
+            writing && isDirty ? (
+              <div className="flex shrink-0 items-center gap-2 border-b border-line bg-accent-soft px-3 py-2 text-[12.5px] text-fg-2">
+                <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" />
+                <span className="min-w-0 flex-1">An agent is writing a new version. Your changes stay as they are here until you save them.</span>
+              </div>
+            ) : undefined
+          }
           savedNote="the agent sees your changes with your next message"
           onAsk={(text) => {
             composeInsert(text, key);
             if (layout === 'sheet') onClose();
           }}
+          live={live}
         />
       </>
     );
@@ -430,7 +461,7 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
     {confirmNode}
     <Studio
       doc={loaded?.doc ?? null}
-      draft={draft ? { text: draft.text, done: draft.done } : null}
+      draft={draft && !saving ? { text: draft.text, done: draft.done } : null}
       layout={layout}
       onSave={loaded ? save : undefined}
       onPick={onPick}

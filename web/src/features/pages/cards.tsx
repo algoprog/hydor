@@ -151,7 +151,19 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
   const status = saving ? ' · saving a new version…' : ref && !current ? ' · a newer one is there' : '';
   if (item.tool.status === 'error') return <Note>{`Could not save ${noun}`}: {failure(item)}</Note>;
   if (wide && besideOpen) {
-    const sub = writing ? `Writing the page · ${kb(draft?.text.length ?? 0)}` : `Saved in the Library · version ${ref?.version ?? 1}${status}`;
+    // What is being written, and how much of the call has come (nothing to count for an agent that hands over whole calls).
+    const size = draft?.text ? ` · ${kb(draft.text.length)}` : '';
+    const sub = writing
+      ? kind === 'doc'
+        ? `Writing the document${size}`
+        : kind === 'slides'
+          ? `Writing the slides${size}`
+          : kind === 'sheet'
+            ? `Writing the spreadsheet${size}`
+            : kind === 'tex'
+              ? `Writing the LaTeX document${size}`
+              : `Writing the page${size}`
+      : `Saved in the Library · version ${ref?.version ?? 1}${status}`;
     return (
       <SmallPageCard
         sessionKey={sessionKey}

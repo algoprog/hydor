@@ -1506,8 +1506,9 @@ app.register(async (scope) => {
             send(c, { t: 'kernel', id, e: { op: 'gone' } });
           }
         }
-      } else if (m.t !== 'ping' && typeof m.key === 'string' && m.key.startsWith('preview:')) {
-        // A dev server's page streaming to Preview: its frames and state only, no session behind it.
+      } else if (m.t !== 'ping' && typeof m.key === 'string' && (m.key.startsWith('preview:') || m.key.startsWith('page:'))) {
+        // A dev server's page streaming to Preview, or a page of the Library open in its editor (an agent's save of it
+        // shows as it comes: server/pages/drafts.ts): their news only, no session behind them.
         if (m.t === 'sub') c.subs.add(m.key);
         else if (m.t === 'unsub') c.subs.delete(m.key);
       } else if (m.t === 'sub' && m.key === SYSTEM_CHANNEL && !c.subs.has(m.key)) {
@@ -1528,7 +1529,7 @@ app.register(async (scope) => {
     ws.on('close', () => {
       for (const k of c.subs) {
         if (k === SYSTEM_CHANNEL) system.watch(-1);
-        else if (!k.startsWith('kernel:') && !k.startsWith('preview:')) sessions.subscribe(k, -1);
+        else if (!k.startsWith('kernel:') && !k.startsWith('preview:') && !k.startsWith('page:')) sessions.subscribe(k, -1);
       }
       clients.delete(c);
     });
