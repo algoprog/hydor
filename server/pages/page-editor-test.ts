@@ -18,10 +18,11 @@ import type { Deps, RunCtx } from '../features/types.ts';
 import { canCapture, closeCapture, withTab, type Tab } from '../capture/index.ts';
 import { KIT_CSS } from '../../shared/page-kit.ts';
 import { CODE_COLOURS_SRC, codeColours, hasCode } from '../../shared/code-colours.ts';
+import { dbBlocks, PAGE_DB_SRC, pageDatabases, pageDbScript } from '../../shared/page-db.ts';
 import { extractText } from '../documents/extract.ts';
 import { EDITOR_SRC } from './editor.ts';
 import { pages } from './index.ts';
-import { injectHead, kitHead } from './kit.ts';
+import { BRIDGE_SRC, injectHead, kitHead } from './kit.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -76,11 +77,30 @@ ok(compiles, 'the editor’s script (with the writing) is one function the page 
   ok(KIT_CSS.includes(',pre>code>.n-ck{'), 'the kit colours a plain block’s words, inside its <code>');
 }
 
+// ---- databases (shared/page-db.ts): what one is, checked; an agent's changes ----------------------------------------------
+{
+  const D = pageDatabases();
+  const s = D.normalize({ cols: [{ name: 'Task' }, { name: 'Status', kind: 'select', options: ['To do', { name: 'Done', color: 'green' }] }, { name: 'Tags', kind: 'multi-select' }, { name: 'Due', kind: 'date' }, { name: 'Cost', kind: 'number' }, { name: 'Paid', kind: 'checkbox' }, { name: 'Web', kind: 'url' }], rows: [{ Task: 'Book', Status: 'Done', Tags: 'a, b', Due: '2026-11-10T09:00', Cost: '12,5', Paid: 'yes', Web: 'https://x.test' }, { Task: '<b>x</b>', Status: 'Doing' }] });
+  same(s.cols.map((c) => c.kind).join(','), 'text,select,multi,date,number,check,link', 'a database’s columns take their kinds (by their usual names too)');
+  same(s.rows.map((r) => s.cols.map((c) => D.text(c, r.cells[c.id])).join('|')).join(' / '), 'Book|Done|a, b|2026-11-10|12.5|✓|https://x.test / <b>x</b>|Doing|||||', 'its rows’ values as their columns keep them (a new option for a new name; words stay words)');
+  same(s.cols[1].options?.find((o) => o.name === 'Done')?.color, 'green', 'an option keeps the colour it was given');
+  const s2 = D.change(s, { add: [{ Task: 'Visa', Status: 'To do' }], update: [{ id: s.rows[1].id, Status: 'Done', Cost: 3 }], remove: [s.rows[0].id] });
+  same(s2.rows.map((r) => `${D.text(s2.cols[0], r.cells[s2.cols[0].id])}:${D.text(s2.cols[1], r.cells[s2.cols[1].id])}`).join(','), '<b>x</b>:Done,Visa:To do', 'an agent adds, changes and removes rows by their columns’ names');
+  const s3 = D.change(s2, { cols: s2.cols.map((c) => (c.name === 'Status' ? { ...c, kind: 'text' } : c)) });
+  const s4 = D.change(s3, { cols: s3.cols.map((c) => (c.name === 'Status' ? { ...c, kind: 'select' } : c)) });
+  same(s4.rows.map((r) => D.text(s4.cols[1], r.cells[s4.cols[1].id])).join(','), 'Done,To do', 'a column of another kind keeps its values where they fit (a select’s options back from its words)');
+  same(JSON.stringify(D.normalize({ ...s4, rows: [{ id: 'r1', cells: { [s4.cols[1].id]: 'onotanoption' } }] }).rows[0].cells), '{}', 'a kept value that names no option is no value (nothing makes options of it)');
+  same(JSON.stringify(dbBlocks('<div class="n-db" data-db="tasks" data-title="A &amp; B" data-schema=\'{"cols":["X"]}\'></div><div class="n-db" data-db="bad name"></div>')), '[{"name":"tasks","title":"A & B","schema":{"cols":["X"]}}]', 'the server reads a page’s databases from its HTML');
+  ok(!/<\/script/i.test(PAGE_DB_SRC) && !/<!--/.test(PAGE_DB_SRC), 'the databases’ script can go in a <script> as it is');
+}
+
 // ---- the editor in a browser --------------------------------------------------------------------------------------
 const LABELS = { phText: 'Type ‘/’ for commands' };
 const pageOf = (body: string, cls = 'n-page') =>
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Test page</title><style id="n-kit" data-n-own>${KIT_CSS}</style>` +
   `<script data-n-own>window.__msgs=[];addEventListener('message',function(e){var d=e.data;if(d&&typeof d.type==='string'&&d.type.indexOf('wa-ed')===0)window.__msgs.push(d)});</script>` +
+  // (the app's side of the page's data, for the databases: kept here)
+  `<script data-n-own>window.__store={};addEventListener('message',function(e){var d=e.data;if(!d||d.type!=='wa-ed-store')return;var v=null;if(d.op==='get')v=window.__store[d.key]===undefined?null:JSON.parse(window.__store[d.key]);else window.__store[d.key]=JSON.stringify(d.value);window.postMessage({type:'wa-ed',n:'test',cmd:'store',arg:{id:d.id,value:v}},'*')});</script>` +
   `<script data-n-own>(${EDITOR_SRC})(${JSON.stringify({ n: 'test', theme: 'light', doctype: '<!doctype html>', labels: LABELS })})</script>` +
   `<style>body{max-width:640px;margin:0 auto;padding:40px 60px;font:16px/1.5 sans-serif}</style></head><body class="${cls}">${body}</body></html>`;
 
@@ -709,6 +729,42 @@ if (canCapture()) {
     same(/c1|c2|cmshow|n-cm/.test(out), false, 'nothing of the comments is in the page given back');
   });
 
+  // ---- a database in Edit: "/database", its cells written in where they are, kept with the page's data through the app ---------
+  await drive('<h1 id="t">Trips</h1><p id="a">Plans</p>', async (d) => {
+    await d.write('#a');
+    await d.press('Enter');
+    await d.type('/database');
+    await d.press('Enter');
+    await sleep(400);
+    const db = await d.js<string>('const x = document.querySelector(".n-db"); return x ? x.getAttribute("data-db") + "|" + x.shadowRoot.querySelectorAll("tbody tr").length + "|" + [...x.shadowRoot.querySelectorAll("th")].map(t => t.textContent).join(",") : "none"');
+    ok(/^db-\w+\|3\|Name,Status,Date,$/.test(db), `"/database" puts in a database: a name of its own, three empty rows, a name, a status and a date (${db})`);
+    same((await d.msgs('wa-ed-sel')).at(-1)?.sel?.name, 'Database', 'and picks it');
+    const at = await d.js<{ x: number; y: number }>('const i = document.querySelector(".n-db").shadowRoot.querySelector("tbody input.cell"); const b = i.getBoundingClientRect(); return { x: b.left + 20, y: b.top + b.height / 2 };');
+    await d.clickAt(at.x, at.y);
+    await d.type('Lisbox');
+    await d.press('Backspace');
+    await d.type('n');
+    await sleep(500);
+    same(await d.js<string>('return document.querySelector(".n-db").shadowRoot.querySelector("tbody input.cell").value'), 'Lisbon', 'its cells are written in where they are (Backspace too), the block staying');
+    ok(/^n-db:db-\w+=\{.*"Lisbon"/.test(await d.js<string>('const k = Object.keys(window.__store)[0]; return k ? k + "=" + window.__store[k] : ""')), 'and what it holds is kept with the page’s data, through the app');
+    const out = await d.html();
+    ok(/<div class="n-db" data-db="db-\w+" data-schema="[^"]*"><\/div>/.test(out) && !/Lisbon|<table/.test(out), 'the page given back has the block alone, nothing it draws or holds');
+    // A copy (Ctrl+D, a paste) is a database of its own: two blocks of one name would overwrite each other's rows.
+    // (picked as its handle picks it, the caret no longer in its cell: there, Ctrl+D is the cell's)
+    await d.click('#t');
+    await d.cmd('select', await d.js<number[]>('const x = document.querySelector(".n-db"); return [[...document.documentElement.children].indexOf(document.body), [...document.body.children].indexOf(x)];'));
+    await d.press('d', { ctrl: true });
+    await sleep(400);
+    const both = await d.js<string>('return [...document.querySelectorAll(".n-db")].map(x => x.getAttribute("data-db") + ":" + (x.shadowRoot ? x.shadowRoot.querySelector("tbody input.cell").value : "")).join(",")');
+    const [first, copy] = both.split(',').map((x) => x.split(':'));
+    ok(!!copy && first[0] !== copy[0] && copy[1] === 'Lisbon', `Duplicate makes a database of its own, a name of its own, with the rows the first holds (${both})`);
+    const cellAt = await d.js<{ x: number; y: number }>('const i = document.querySelectorAll(".n-db")[1].shadowRoot.querySelector("tbody input.cell"); const b = i.getBoundingClientRect(); return { x: b.left + 20, y: b.top + b.height / 2 };');
+    await d.clickAt(cellAt.x, cellAt.y);
+    const saves = (await d.msgs('wa-ed-save')).length;
+    await d.press('s', { ctrl: true });
+    same((await d.msgs('wa-ed-save')).length, saves + 1, 'Ctrl+S in a database’s cell saves the page (its other keys are its own)');
+  });
+
   // ---- links to other pages: "@" or "/" → Link to a page, a chip with the page's icon -----------------------------------------
   await drive('<p id="a">See</p><p id="b">Also</p>', async (d) => {
     await d.cmd('pages', [
@@ -866,6 +922,76 @@ if (canCapture()) {
       same(await js<string>('return [...document.querySelectorAll("#plain > code > span")].map(s => s.className + ":" + s.textContent + ":" + (getComputedStyle(s).color !== getComputedStyle(s.parentElement).color)).join(" ")'), 'n-cv:None:true', 'and a plain block an agent wrote, inside its <code>, in the kit’s colours');
     });
   }
+
+  // ---- a database in Use: rows added, sorted, a board whose cards move between lanes, kept by the page's storage -----------
+  {
+    const schema = JSON.stringify({ cols: [{ name: 'Task' }, { name: 'Status', kind: 'select', options: ['To do', 'Done'] }, { name: 'Cost', kind: 'number' }], rows: [{ Task: 'Book', Status: 'To do', Cost: 3 }, { Task: 'Pack', Status: 'Done', Cost: 1 }] }).replace(/"/g, '&quot;');
+    const head = `<style id="n-kit">${KIT_CSS}</style><script>(${BRIDGE_SRC})(${JSON.stringify({ n: 't', theme: 'light', max: { key: 200, value: 600000 } })})</script><script>(${PAGE_DB_SRC})().run(null, null, { readOnly: false })</script>`;
+    const html = injectHead(`<!doctype html><html><head></head><body class="n-page"><div class="n-db" data-db="tasks" data-title="Tasks" data-schema="${schema}"></div></body></html>`, head);
+    await withTab({ html, width: 900, height: 700, settleMs: 300 }, async (tab) => {
+      const js = <T>(code: string) => tab.evaluate<T>(`(async () => { const R = document.querySelector(".n-db").shadowRoot; ${code} })()`);
+      const click = async (code: string) => {
+        const r = await js<{ x: number; y: number } | null>(`const el = (${code}); if (!el) return null; const b = el.getBoundingClientRect(); return { x: b.left + Math.min(20, b.width / 2), y: b.top + b.height / 2 };`);
+        if (!r) throw new Error(`nothing to click: ${code}`);
+        for (const type of ['mousePressed', 'mouseReleased'] as const) await tab.s.send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: 'left', clickCount: 1 });
+        await sleep(120);
+      };
+      const cells = () => js<string>('return [...R.querySelectorAll("tbody tr")].map(tr => [...tr.querySelectorAll("td")].slice(0, 3).map(td => (td.querySelector("input") ? td.querySelector("input").value : td.textContent)).join(":")).join(",")');
+      same(await cells(), 'Book:To do:3,Pack:Done:1', 'a database shows its rows, as its block starts it');
+      await click('[...R.querySelectorAll(".foot .b")].find(b => /New/.test(b.textContent))');
+      for (const ch of 'Visa') await tab.s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ch, text: ch });
+      await sleep(500);
+      same(await cells(), 'Book:To do:3,Pack:Done:1,Visa::', 'New adds a row, its first cell ready to type');
+      ok(/"Visa"/.test(JSON.stringify(await tab.evaluate('hydor.storage.get("n-db:tasks")'))), 'what it holds is kept by the page’s storage');
+      await click('[...R.querySelectorAll("th .b")].find(b => /Cost/.test(b.textContent))');
+      await click('[...R.querySelectorAll(".pop .row")].find(b => /ascending/.test(b.textContent))');
+      same(await cells(), 'Pack:Done:1,Book:To do:3,Visa::', 'a column’s menu sorts the rows by it (the empty last)');
+      await click('[...R.querySelectorAll(".tabs .b")].find(b => /Board/.test(b.textContent))');
+      same(await js<string>('return [...R.querySelectorAll(".lane")].map(l => l.querySelector(".lh").textContent + "=" + [...l.querySelectorAll(".card .ct")].map(c => c.textContent).join("+")).join(" | ")'), 'To do1=Book | Done1=Pack | No value1=Visa', 'its board has a lane for each option, with its cards');
+      const from = await js<{ x: number; y: number }>('const b = [...R.querySelectorAll(".card")].find(c => c.textContent.startsWith("Book")).getBoundingClientRect(); return { x: b.left + 20, y: b.top + 10 };');
+      const to = await js<{ x: number; y: number }>('const b = R.querySelectorAll(".lane")[1].getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.bottom - 10 };');
+      await tab.s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: from.x, y: from.y, button: 'left', clickCount: 1 });
+      for (let i = 1; i <= 8; i++) await tab.s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: from.x + ((to.x - from.x) * i) / 8, y: from.y + ((to.y - from.y) * i) / 8, buttons: 1 });
+      await tab.s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: to.x, y: to.y, button: 'left', clickCount: 1 });
+      await sleep(500);
+      same(await js<string>('return [...R.querySelectorAll(".lane")].map(l => [...l.querySelectorAll(".card .ct")].map(c => c.textContent).join("+")).join(" | ")'), ' | Pack+Book | Visa', 'a card dragged to another lane takes its option');
+    });
+  }
+
+  // ---- a database only to read (a page saved as a file, a PDF, a published copy): its rows as words, sorted for whoever reads -
+  {
+    const schema = JSON.stringify({ cols: ['Task'] }).replace(/"/g, '&quot;');
+    const stored = JSON.stringify({ cols: [{ name: 'Task' }, { name: 'When', kind: 'date' }, { name: 'Tags', kind: 'multi', options: ['red', 'blue'] }, { name: 'Site', kind: 'link' }, { name: 'Done', kind: 'check' }], rows: [{ Task: 'Visa', When: '2026-12-01', Tags: ['red', 'blue'], Site: 'https://example.com/a', Done: true }, { Task: 'Book' }] });
+    const html = injectHead(`<!doctype html><html><head></head><body class="n-page"><div class="n-db" data-db="trip" data-schema="${schema}"></div></body></html>`, `<style id="n-kit">${KIT_CSS}</style>${pageDbScript(null, { 'n-db:trip': stored })}`);
+    await withTab({ html, width: 900, height: 700, settleMs: 300 }, async (tab) => {
+      const js = <T>(code: string) => tab.evaluate<T>(`(async () => { const R = document.querySelector(".n-db").shadowRoot; ${code} })()`);
+      const click = async (code: string) => {
+        const r = await js<{ x: number; y: number }>(`const b = (${code}).getBoundingClientRect(); return { x: b.left + Math.min(20, b.width / 2), y: b.top + b.height / 2 };`);
+        for (const type of ['mousePressed', 'mouseReleased'] as const) await tab.s.send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: 'left', clickCount: 1 });
+        await sleep(120);
+      };
+      const rows = () => js<string>('return [...R.querySelectorAll("tbody tr")].map(tr => [...tr.querySelectorAll("td")].map(td => td.textContent + (td.querySelector("input:checked") ? "✓" : "")).join(":")).join(",")');
+      const first = await rows();
+      ok(/^Visa:[^:]*2026[^:]*:redblue:https:\/\/example\.com\/a:✓,Book::::$/.test(first) && !first.includes('2026-12-01'), `a database shows the rows its page keeps, as words (a date as this device writes one) (${first})`);
+      same(await js<string>('return [R.querySelectorAll("input:not([type=checkbox]), .foot .b, th.end").length, R.querySelector("td a")?.href].join("|")'), '0|https://example.com/a', 'only to read: no fields, no New, its links open');
+      await click('R.querySelector("input[type=checkbox]")');
+      ok(await js<boolean>('return R.querySelector("input[type=checkbox]").checked'), 'and its boxes stay as they are');
+      await click('R.querySelector(".tools .b")');
+      await click('[...R.querySelectorAll(".pop .row")].find(b => b.textContent === "Task")');
+      ok((await rows()).startsWith('Book'), 'whoever reads it can still sort it (for them alone)');
+      const note = await tab.evaluate<string>(`(async () => {
+        const el = document.createElement('div');
+        el.setAttribute('data-db', 'other');
+        el.setAttribute('data-schema', '{"cols":["Name"],"rows":[{"Name":"Kept"}]}');
+        document.body.append(el);
+        (${PAGE_DB_SRC})().mount(el, { store: { get: () => Promise.reject(new Error('No answer')), set: () => Promise.resolve() }, edit: true });
+        await new Promise((r) => setTimeout(r, 50));
+        const R = el.shadowRoot;
+        return [R.querySelector('.note')?.textContent, R.querySelectorAll('input:not([type=checkbox])').length, R.querySelector('tbody td')?.textContent].join('|');
+      })()`);
+      same(note, 'Its rows can be changed in Use.|0|Kept', 'in the editor, a database whose rows the app does not give stays as its block says, to read, saying where they change');
+    });
+  }
   closeCapture();
 } else console.log('(no Chromium here: the editor’s browser tests were skipped)');
 
@@ -922,7 +1048,7 @@ if (canCapture()) {
     const read = (await tools.get_page.run({ id }, ctx)) as string;
     ok(read.includes(`- ${c1} · open · on the <h1> “Plan”`) && read.includes('Bigger, please') && read.includes('save_page with this id and comments'), 'an agent reads them in get_page, and how to answer');
     const answered = (await tools.save_page.run({ id, title: 'Plan', comments: [{ id: c1, reply: 'Made it bigger.', resolve: true }, { text: 'Check the dates', on: 'Packing list' }] }, ctx)) as string;
-    ok(/Answered the comments/.test(answered) && /0 open/.test(answered) === false, `save_page answers them without the page (${answered})`);
+    ok(/answered its comments; the page itself is as it was/.test(answered), `save_page answers them without the page (${answered})`);
     const after = JSON.parse((await req('GET', `/api/pages/${id}/comments`)).body).comments;
     ok(after.find((c: { id: string }) => c.id === c1)?.replies?.[0]?.by === 'agent' && after.find((c: { id: string }) => c.id === c1)?.resolved, 'as the agent');
     ok(after.some((c: { by: string; on?: { words?: string } }) => c.by === 'agent' && c.on?.words === 'Packing list'), 'and adds its own, on the words of its block');
@@ -934,6 +1060,23 @@ if (canCapture()) {
       refused = (e as Error).message;
     }
     ok(/html/.test(refused), 'a new page still needs its html');
+  }
+
+  // ---- a database: an agent makes one, fills it with save_page's databases, reads it in get_page; its exports show it ------
+  {
+    const dbHtml = `<!doctype html><html><body class="n-page"><h1>Trip</h1><div class="n-db" data-db="tasks" data-title="Tasks" data-schema='{"cols":[{"name":"Task"},{"name":"Status","kind":"select","options":["To do","Done"]}],"rows":[{"Task":"Book","Status":"To do"}]}'></div></body></html>`;
+    const made = (await tools.save_page.run({ title: 'Trip', html: dbHtml, databases: { tasks: { add: [{ Task: 'Pack', Status: 'Done' }] } } }, ctx)) as string;
+    const pid = /\(page ([a-f0-9]{10})/.exec(made)?.[1] ?? '';
+    ok(/Database tasks: 2 rows/.test(made), `save_page fills a page’s database as it makes the page (${made})`);
+    const kept = JSON.parse((await req('GET', `/api/pages/${pid}/data`)).body).entries.find((x: { key: string }) => x.key === 'n-db:tasks')?.value;
+    same(kept?.rows?.length, 2, 'what it holds is kept as the page’s data (n-db:tasks)');
+    const changed = (await tools.save_page.run({ id: pid, title: 'Trip', databases: { tasks: { update: [{ id: kept.rows[0].id, Status: 'Done' }], add: [{ Task: 'Visa' }] }, nowhere: { add: [{}] } } }, ctx)) as string;
+    ok(/changed its databases/.test(changed) && /Database tasks: 3 rows/.test(changed) && /no database "nowhere"/.test(changed), `and changes its rows without the page (${changed})`);
+    const read = (await tools.get_page.run({ id: pid }, ctx)) as string;
+    ok(/- tasks “Tasks” · 3 rows/.test(read) && /Task="Book", Status="Done"/.test(read) && /Task="Visa"/.test(read) && !/Stored data:\n\{\n "n-db/.test(read), 'get_page shows its columns and rows (and not twice, as stored data)');
+    same(JSON.parse((await req('GET', `/api/pages/${pid}`)).body).page.version, 1, 'its rows are the page’s data: no new version');
+    const web = (await req('GET', `/api/pages/${pid}/export?format=html`)).body;
+    ok(web.includes('().run(null, {"n-db:tasks"') && web.includes('Visa'), 'a page saved as a file carries its databases’ rows, to show them');
   }
   const web = await req('GET', `/api/pages/${id}/export?format=html`);
   ok(web.statusCode === 200 && web.body.includes('id="n-kit"') && web.body.includes('.n-todo{') && web.body.includes('<input type="checkbox" checked>'), 'as a web page it keeps its blocks, with the kit’s look for them');

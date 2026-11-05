@@ -11,6 +11,8 @@ import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, us
 import { KIT_CSS } from '@shared/page-kit';
 import { codeColoursScript, hasCode } from '@shared/code-colours';
 import { cleanAnchor, type PageAnchor } from '@shared/page-comments';
+import { pageDbScript } from '@shared/page-db';
+import { dbLabels } from './studio/blocks';
 import { STORAGE_LIMITS } from '@shared/pages';
 import type { AppRun } from '@shared/apps';
 import type { AppInfo } from '@shared/app-manifest';
@@ -364,7 +366,7 @@ function useThemeChange(f: () => void) {
  * opened, light or dark as that device is, and the script that colours its code blocks.
  */
 export function pageFile(html: string): string {
-  const head = `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${hasCode(html) ? codeColoursScript() : ''}`;
+  const head = `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${hasCode(html) ? codeColoursScript() : ''}${/\bn-db\b/.test(html) ? pageDbScript() : ''}`;
   const d = /^(?:\s|<!--[\s\S]*?-->)*<!doctype[^>]*>/i.exec(html);
   return d ? d[0] + head + html.slice(d[0].length) : head + html;
 }
@@ -467,7 +469,9 @@ export function PageFrame({
         const v = cb.current.ui;
         const uiInfo = v ? { def: v.def, ctx: v.ctx, can: v.can, labels: uiLabels(), lang: v.lang ?? 'en', ...(v.start ? { start: v.start } : {}), ...(v.libs ? { libs: v.libs } : {}) } : undefined;
         if (v) sentCtx.current = v.ctx;
-        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill, play: true, open: true, app: appInfo, ui: uiInfo }, '*');
+        // (a page with databases: their words in the app's language)
+        const db = /\bn-db\b/.test(cb.current.html) ? dbLabels() : undefined;
+        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill, play: true, open: true, app: appInfo, ui: uiInfo, db }, '*');
         return;
       }
       const { store, onHeight, onPick } = cb.current;
@@ -770,6 +774,8 @@ export const EditFrame = forwardRef<
     onComment?: (c: { on: PageAnchor; quote: string }) => void;
     /** A comment's mark beside its block, clicked. */
     onCommentOpen?: (id: string) => void;
+    /** The page's own data, which its databases are kept in (the editor reads and writes their keys only). */
+    store?: Store;
     /** The editor asks for something chosen in the app: an emoji, an icon, a cover, a picture, a video, maths. */
     onAsk?: (a: EdAsk) => void;
     /** A picture dropped or pasted in the page, to make small enough to live in it (and answer with `fill`). */
@@ -780,10 +786,10 @@ export const EditFrame = forwardRef<
     onKeys?: () => void;
     className?: string;
   }
->(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, onAsk, onFile, onAgent, onKeys, className }, handle) {
+>(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, className }, handle) {
   const ref = useRef<HTMLIFrameElement>(null);
-  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, onAsk, onFile, onAgent, onKeys });
-  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, onAsk, onFile, onAgent, onKeys };
+  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys });
+  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys };
   const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>(), anchorWaits: new Map<number, (list: { id: string; on: PageAnchor }[]) => void>() });
   const send = (m: Record<string, unknown>) => ref.current?.contentWindow?.postMessage({ ...m, type: 'wa-ed', n: ch.current.n }, '*');
   useThemeChange(() => ch.current.n && send({ cmd: 'theme', arg: { theme: themeNow(), css: themeCss() } }));
@@ -845,6 +851,16 @@ export const EditFrame = forwardRef<
       else if (d.type === 'wa-ed-menu') c.onMenu?.(!!d.on);
       else if (d.type === 'wa-ed-comment' && d.on && typeof d.on === 'object' && isStr(d.quote, 500)) c.onComment?.({ on: cleanAnchor(d.on) ?? {}, quote: d.quote });
       else if (d.type === 'wa-ed-comment-open' && isStr(d.id, 40)) c.onCommentOpen?.(d.id);
+      else if (d.type === 'wa-ed-store' && Number.isInteger(d.id)) {
+        // A database's rows, for the editor: its keys only (n-db:<name>), within the storage's limits.
+        const reply = (m: { value?: unknown; error?: string }) => send({ cmd: 'store', arg: { id: d.id, ...m } });
+        if (!c.store || (d.op !== 'get' && d.op !== 'set') || !isStr(d.key, 60) || !/^n-db:[\w-]{1,40}$/.test(d.key)) return reply({ error: 'Not a database' });
+        if (d.op === 'set' && (JSON.stringify(d.value) ?? '').length > STORAGE_LIMITS.value) return reply({ error: `That is over ${STORAGE_LIMITS.value / 1024} KB` });
+        c.store({ op: d.op, key: d.key, value: d.value }).then(
+          (value) => reply({ value }),
+          (err) => reply({ error: String((err as Error)?.message ?? err) }),
+        );
+      }
       else if (d.type === 'wa-ed-anchors' && Array.isArray(d.list)) {
         const done = ch.current.anchorWaits.get(d.id);
         ch.current.anchorWaits.delete(d.id);

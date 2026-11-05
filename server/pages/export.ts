@@ -7,6 +7,7 @@
 import { STORAGE_LIMITS } from '../../shared/pages.ts';
 import { KIT_CSS } from '../../shared/page-kit.ts';
 import { codeColoursScript, hasCode } from '../../shared/code-colours.ts';
+import { pageDbScript } from '../../shared/page-db.ts';
 import { ASSET } from '../../shared/slides.ts';
 import { HttpError } from '../auth.ts';
 import { canCapture, printPdf, withTab } from '../capture/index.ts';
@@ -21,7 +22,7 @@ import type { Picture } from './pptx.ts';
 import { mustKind, type ExportFormat, type ExportHelp, type KindDef } from './kinds.ts';
 import { readDeck } from './slides.ts';
 import { deckPictures, deckRenders } from './slides-render.ts';
-import { mustPage, pageSource, storageMap } from './store.ts';
+import { dbSeed, mustPage, pageSource, storageMap } from './store.ts';
 import { wordFonts } from './word-fonts.ts';
 
 export type { ExportFormat };
@@ -64,11 +65,14 @@ const PRINT_CSS = '<style>@media print{:root{--n-bg:#fff}}</style>';
 /** The kit as a page has it in the app, light, with the data it keeps (and nothing to send it to). */
 const pageHead = (db: DB, id: string) => kitHead({ n: '', theme: 'light', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, seed: storageMap(db, id) }) + PRINT_CSS;
 
-/** A page as a file to open anywhere: with the kit's stylesheet, light or dark as that device is (and its code blocks' colours). */
-export const pageFileHtml = (html: string) =>
+/**
+ * A page as a file to open anywhere: with the kit's stylesheet, light or dark as that device is, its code blocks'
+ * colours, and its databases with what they hold now (`dbs`: their stored values by key), shown as they are.
+ */
+export const pageFileHtml = (html: string, dbs?: Record<string, string>) =>
   injectHead(
     html,
-    `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${hasCode(html) ? codeColoursScript() : ''}`,
+    `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${hasCode(html) ? codeColoursScript() : ''}${/\bn-db\b/.test(html) ? pageDbScript(null, dbs) : ''}`,
   );
 
 /** A picture made into PNG by the browser (an SVG, or WebP that PowerPoint may not read), at its own size or `w`×`h`. */
@@ -188,7 +192,7 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
     return notes.length ? { ...made, note: notes.join(' ') } : made;
   }
 
-  if (o.format === 'html') return out(pageFileHtml(src.text), 'html');
+  if (o.format === 'html') return out(pageFileHtml(src.text, dbSeed(db, id)), 'html');
   if (o.format === 'pdf') {
     if (!canCapture()) throw noBrowser();
     const html = injectHead(src.text, pageHead(db, id));

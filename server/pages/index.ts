@@ -59,6 +59,7 @@ import { applyTexEdits } from '../../shared/tex-edits.ts';
 import { TEX_MAIN } from '../../shared/latex.ts';
 import { normalizeDoc } from '../../shared/docs.ts';
 import { commentsForAgent } from '../../shared/page-comments.ts';
+import { dbBlocks, dbKey, dbsForAgent, pageDatabases } from '../../shared/page-db.ts';
 import { agentTex, compileSummary, compileTex, readTex, SAVE_LATEX_DESCRIPTION, SAVE_LATEX_SCHEMA, texRoutes } from './latex.ts';
 import { agentBook, readBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
 import { agentDeck, readDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
@@ -87,6 +88,7 @@ import {
   putValues,
   pageComments,
   changeComments,
+  storageMap,
   renamePage,
   resetPageLink,
   setPageSpace,
@@ -114,7 +116,7 @@ const LOOK =
   'Its look: unless the user asks for another (their brand, colours of their own, a style), make the page look like part of this app, in its theme: <body class="n-page">, and every colour from the page kit’s variables, which take the app’s current theme, light or dark as the app is, and the user’s own colours: var(--n-bg) the page, --n-card cards, --n-fg text, --n-muted quieter text, --n-line borders, --n-soft quiet fills, --n-accent (with --n-accent-fg on it, --n-accent-soft for tints), --n-ok, --n-warn, --n-err, --n-info, and --n-c1 to --n-c6 for the series of a chart or a diagram (a chart library takes them from getComputedStyle(document.body)); corners var(--n-radius); the app’s font comes with n-page (var(--n-mono) for code). Write no colours of your own and no prefers-color-scheme rules: the kit switches light and dark with the app.';
 const CLASSES =
   'Ready-made classes, all optional: .n-options > .n-option (rows: .n-letter, h3, p), .n-grid > .n-card (an img or .n-media, then .n-body), table.n-compare (.n-yes, .n-no, .n-best; wrap wide ones in .n-scroll), .n-proscons > .n-pros + .n-cons (h4, ul), .n-btn (.n-primary), .n-field (a label around an input), .n-row, .n-tag, .n-muted. A picked choice gets .n-selected. ' +
-  'Blocks as the user’s page editor writes them (Notion’s): ul.n-todo > li > input[type=checkbox] (checked when done) + span (its words); a block kept under a list’s item, where an item would be: li.n-block > the block (a p, a heading, a quote…; no marker) + the item’s own nested lists; details.n-toggle > summary + blocks; .n-callout > span.n-callout-icon (an emoji) + div.n-callout-text; .n-cols > div per column; nav.n-toc (the editor fills it with links to the headings); pre.n-code[data-lang="python"] (code as plain text, coloured as it shows: data-lang is one of plain, bash, c, cpp, csharp, css, diff, go, html, java, js, json, kotlin, lua, markdown, php, python, ruby, rust, sql, swift, ts, yaml; left out, the page tells it from the code; plain <pre><code class="language-python"> is coloured too, by its class); table.n-tbl; .n-cover (a div with a gradient background-image, or an img) then .n-icon (an emoji) before the first heading; a.n-video[data-video="https://www.youtube-nocookie.com/embed/ID"] > img (a video’s still, linked to the video); a link to another of the user’s pages (get_page lists their ids): <a class="n-pagelink" href="/pages/ID" data-page="ID"><span class="n-pagelink-icon">its emoji, or nothing</span>its title</a>, which opens that page in the app; .n-math[data-tex] (KaTeX’s HTML, with <link id="n-katex"> to KaTeX’s CSS on jsDelivr); colours of words .n-tc-grey|brown|orange|yellow|green|blue|purple|pink|red, and behind them .n-hl-… (on a block or a span/mark).';
+  'Blocks as the user’s page editor writes them (Notion’s): ul.n-todo > li > input[type=checkbox] (checked when done) + span (its words); a block kept under a list’s item, where an item would be: li.n-block > the block (a p, a heading, a quote…; no marker) + the item’s own nested lists; details.n-toggle > summary + blocks; .n-callout > span.n-callout-icon (an emoji) + div.n-callout-text; .n-cols > div per column; nav.n-toc (the editor fills it with links to the headings); a database (Notion’s: a table, or a board of cards by a select column, whose rows the user adds and changes): <div class="n-db" data-db="tasks" data-title="Tasks" data-schema=\'{"cols":[{"name":"Task","kind":"text"},{"name":"Status","kind":"select","options":["To do","Doing","Done"]},{"name":"Due","kind":"date"}],"rows":[{"Task":"Book flights","Status":"To do"}],"view":"table"}\'></div> (kinds text, number, select, multi, date, check, link; "view": "board" with "group": a select column; data-schema gives its start: its rows then live in the page’s data, changed with save_page’s databases); pre.n-code[data-lang="python"] (code as plain text, coloured as it shows: data-lang is one of plain, bash, c, cpp, csharp, css, diff, go, html, java, js, json, kotlin, lua, markdown, php, python, ruby, rust, sql, swift, ts, yaml; left out, the page tells it from the code; plain <pre><code class="language-python"> is coloured too, by its class); table.n-tbl; .n-cover (a div with a gradient background-image, or an img) then .n-icon (an emoji) before the first heading; a.n-video[data-video="https://www.youtube-nocookie.com/embed/ID"] > img (a video’s still, linked to the video); a link to another of the user’s pages (get_page lists their ids): <a class="n-pagelink" href="/pages/ID" data-page="ID"><span class="n-pagelink-icon">its emoji, or nothing</span>its title</a>, which opens that page in the app; .n-math[data-tex] (KaTeX’s HTML, with <link id="n-katex"> to KaTeX’s CSS on jsDelivr); colours of words .n-tc-grey|brown|orange|yellow|green|blue|purple|pink|red, and behind them .n-hl-… (on a block or a span/mark).';
 
 const SHOW_HTML: RunTool = {
   name: 'show_html',
@@ -156,13 +158,19 @@ const SAVE_PAGE: RunTool = {
     'Leave out id to make a new page; give the id of a saved page (get_page lists them) to replace it with a new version:',
     'older versions stay restorable, and its stored data stays.',
     'The user can leave comments on a page’s blocks in its editor; get_page shows them, and comments answers, resolves or adds them (with id; leave html out to only answer them).',
+    'A database block’s rows are the page’s own data: get_page shows them, and databases adds, changes or removes them (with id; leave html out to only change them).',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       id: { type: 'string', description: 'A saved page’s id, to save a new version of it.' },
       title: { type: 'string', description: 'The page’s name in the Library and on a home screen: "Workout log".' },
-      html: { type: 'string', description: 'The whole page, <!doctype html> included. With id and comments, leave it out to only answer the comments.' },
+      html: { type: 'string', description: 'The whole page, <!doctype html> included. With id and comments or databases, leave it out to only answer the comments or change the rows.' },
+      databases: {
+        type: 'object',
+        description:
+          'Changes to the page’s database blocks, by their names (data-db): {"tasks": {"add": [{"Task": "Book flights", "Status": "To do"}], "update": [{"id": "r1", "Status": "Done"}], "remove": ["r2"]}}; also "rows" (all of them anew), "cols" (the columns: [{"name", "kind": text|number|select|multi|date|check|link, "options": [names]}]) and "title". Values by column name: get_page shows each database’s columns, rows and their ids.',
+      },
       comments: {
         type: 'array',
         description:
@@ -178,7 +186,40 @@ const SAVE_PAGE: RunTool = {
     const other = id ? kindOf(mustPage(db, id).kind) : null;
     if (other) throw new Error(`Page ${id} is a ${other.noun}: change it with ${other.tool}.`);
     const answering = a.comments !== undefined && a.comments !== null;
-    if ((a.html === undefined || a.html === null || a.html === '') && !(id && answering)) throw new Error('html: give the whole page (only answering comments, with id and comments, leaves it out).');
+    const rows = a.databases && typeof a.databases === 'object' && !Array.isArray(a.databases) ? (a.databases as Record<string, unknown>) : null;
+    if ((a.html === undefined || a.html === null || a.html === '') && !(id && (answering || rows)))
+      throw new Error('html: give the whole page (only answering comments or changing a database’s rows, with id, leaves it out).');
+    // Its databases' rows (the page's own data, shared/page-db.ts): changed as asked, kept as the page stores them.
+    const fill = async (pid: string) => {
+      if (!rows) return '';
+      const html = (await pageHtml(db, pid))?.html ?? '';
+      const blocks = dbBlocks(html);
+      const stored = storageMap(db, pid);
+      const D = pageDatabases();
+      const notes: string[] = [];
+      const puts: [string, string][] = [];
+      for (const [name, ch] of Object.entries(rows).slice(0, 20)) {
+        const b = blocks.find((x) => x.name === name);
+        if (!b) {
+          notes.push(`The page has no database "${name}": put <div class="n-db" data-db="${name}"></div> in its html first.`);
+          continue;
+        }
+        let cur: unknown = b.schema;
+        try {
+          if (stored[dbKey(name)]) cur = JSON.parse(stored[dbKey(name)]);
+        } catch {}
+        const next = D.change(D.normalize(cur, b.title), ch);
+        puts.push([dbKey(name), JSON.stringify(next)]);
+        notes.push(`Database ${name}: ${next.rows.length} row${next.rows.length === 1 ? '' : 's'}.`);
+      }
+      try {
+        if (puts.length) putValues(db, pid, puts);
+      } catch (e) {
+        return ` Its databases were left as they were: ${(e as Error).message}.`;
+      }
+      if (puts.length) tell(ctx.deps, { what: 'pages' });
+      return notes.length ? ` ${notes.join(' ')}` : '';
+    };
     // Its comments: answered, resolved or added (shared/page-comments.ts), after the new version if there is one.
     const comment = (pid: string) => {
       if (!answering) return '';
@@ -189,12 +230,13 @@ const SAVE_PAGE: RunTool = {
     };
     if (a.html === undefined || a.html === null || a.html === '') {
       const page = mustPage(db, id!);
-      return `Answered the comments of "${page.title}" (page ${page.id}); the page itself is as it was.${comment(page.id)}`;
+      const done = [answering && 'answered its comments', rows && 'changed its databases'].filter(Boolean).join(' and ');
+      return `Saved "${page.title}" (page ${page.id}): ${done}; the page itself is as it was.${await fill(page.id)}${comment(page.id)}`;
     }
     const p = id ? addVersion(db, id, { title: a.title, html: a.html, by: 'agent' }) : createPage(db, { title: a.title, html: a.html, by: 'agent', sessionKey: ctx.key, space: sessionSpace(db, ctx.key) });
     tell(ctx.deps, { what: 'pages' });
     refreshThumbs(ctx.deps, [p.id]);
-    return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.${comment(p.id)}`;
+    return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.${await fill(p.id)}${comment(p.id)}`;
   },
 };
 
@@ -235,7 +277,8 @@ const GET_PAGE: RunTool = {
     // Agents' tool output is cut further on anyway: say so here rather than lose the end unnoticed.
     const cut = html.length > 100_000 ? `${html.slice(0, 100_000)}\n… (cut: the page is ${Math.round(html.length / 1024)} KB; write the whole page anew to change it)` : html;
     const notes = commentsForAgent(pageComments(db, id));
-    return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${by}\n\n${data ? `Stored data:\n${data}\n\n` : 'It stores no data yet.\n\n'}${notes ? `${notes}\n\n` : ''}HTML:\n${cut}`;
+    const dbs = dbsForAgent(html, storageMap(db, id));
+    return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${by}\n\n${data ? `Stored data:\n${data}\n\n` : 'It stores no data yet.\n\n'}${dbs ? `${dbs}\n\n` : ''}${notes ? `${notes}\n\n` : ''}HTML:\n${cut}`;
   },
 };
 

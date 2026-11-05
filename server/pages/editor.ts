@@ -12,13 +12,16 @@
 // the page's HTML with the user's changes and its scripts as they were.
 //
 // Writing as in Notion (blocks that flow into each other, Markdown as you type, "/" for blocks, handles
-// beside each block and their menu, several blocks picked, an icon and a cover) is writing.ts, which this
-// hands its insides to. Undo keeps a step per change of a block: while words are being written, Ctrl+Z
-// takes back the last few words typed first, then the change before.
+// beside each block and their menu, several blocks picked, an icon and a cover, databases) is writing.ts, which this
+// hands its insides to; a database's own cells, menus and keys are its own (Ctrl+S still saves), and its rows are
+// read and kept through the app (`wa-ed-store`), with the page's own data. Undo keeps a step per change of a block:
+// while words are being written, Ctrl+Z takes back the last few words typed first, then the change before (a
+// database's rows, kept as they change, are not in its steps).
 //
 // Like the kit's bridge, the function below runs in the browser: its source is sent as text, so it uses
 // only its argument and the browser's own globals.
 import { codeColours, type CodeColours } from '../../shared/code-colours.ts';
+import { pageDatabases, type PageDatabases } from '../../shared/page-db.ts';
 import { writing, type At, type Core, type Next, type Writing } from './writing.ts';
 
 export interface EditorCfg {
@@ -30,7 +33,7 @@ export interface EditorCfg {
   labels: Record<string, string>;
 }
 
-function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: () => CodeColours) {
+function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: () => CodeColours, pageDatabases: () => PageDatabases) {
   const P = window.parent;
   const L = (k: string, fallback: string) => (typeof cfg.labels?.[k] === 'string' ? cfg.labels[k] : fallback);
   const send = (m: Record<string, unknown>) => {
@@ -187,6 +190,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     if (c?.contains('n-icon')) return L('icon', 'Icon');
     if (c?.contains('n-video')) return L('video', 'Video');
     if (c?.contains('n-math')) return L('sMath', 'Maths');
+    if (c?.contains('n-db')) return L('sDatabase', 'Database');
     // An item that holds a block under its parent item (writing.ts) is named by that block: "Heading 3", "Text".
     if (el.tagName === 'LI' && c?.contains('n-block') && el.firstElementChild && !/^(UL|OL)$/.test(el.firstElementChild.tagName)) return nameOf(el.firstElementChild);
     if (el.tagName === 'LI' && el.parentElement?.classList.contains('n-todo')) return L('phTodo', 'To-do');
@@ -195,7 +199,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
   };
   const isUi = (el: Element | null) => !!el && (el === host || !!el.closest?.('[data-n-own]'));
   /** Blocks that are drawn rather than written (changed through their own fields). */
-  const DRAWN = '.n-video,.n-math,.n-toc,.n-cover,.n-icon';
+  const DRAWN = '.n-video,.n-math,.n-toc,.n-cover,.n-icon,.n-db';
   const inlineOnly = (c: Element) => (INLINE.has(c.tagName) || c.tagName === 'IMG') && [...c.querySelectorAll('*')].every((x) => INLINE.has(x.tagName) || x.tagName === 'IMG');
   /**
    * Words that can be changed where they are: only words and inline parts inside. A list's item may have lists
@@ -1522,6 +1526,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
         const node = fromHtml(arg?.html);
         if (!node) return;
         remember();
+        W.prepare(node);
         placeNew(node, arg?.where ?? (arg?.inside ? 'inside' : 'after'), el);
         sel = node;
         changed();
@@ -1829,6 +1834,26 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     addEventListener('pointercancel', up, true);
   }
 
+  // ---- the page's own data, for its databases: kept by the app (the page's storage), asked by message ----------
+  const storeWaits = new Map<number, [(v: unknown) => void, (e: Error) => void]>();
+  let storeSeq = 0;
+  const storeAsk = (op: 'get' | 'set', key: string, value?: unknown) =>
+    new Promise<unknown>((ok, fail) => {
+      const id = ++storeSeq;
+      storeWaits.set(id, [ok, fail]);
+      send({ type: 'wa-ed-store', id, op, key, value });
+      // An app of before (or none) answers nothing: the database shows what its block says, and keeps nothing.
+      setTimeout(() => storeWaits.has(id) && (storeWaits.delete(id), fail(new Error('No answer'))), 10_000);
+    });
+  const storeAnswer = (a: any) => {
+    const w = storeWaits.get(Number(a?.id));
+    if (!w) return;
+    storeWaits.delete(Number(a.id));
+    if (typeof a.error === 'string') w[1](new Error(a.error));
+    else w[0](a.value ?? null);
+  };
+  const dbStore = { get: (k: string) => storeAsk('get', k), set: (k: string, v: unknown) => storeAsk('set', k, v) };
+
   // ---- writing as in Notion (writing.ts), handed what it needs -------------------------------------------------
   const core: Core = {
     L,
@@ -1858,6 +1883,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     canAsk: () => canAskAgent,
     code: codeColours(),
     canComment: () => canComment,
+    db: pageDatabases(),
+    store: dbStore,
   };
   // A paste event (Ctrl+V of the part copied waits for it, below): any one, a picture's too, which writing.ts takes.
   let pasteTimer = 0;
@@ -1869,16 +1896,24 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
   const fromUi = (e: Event) => e.composedPath().includes(host);
   /** The part a press is on: a code block for a word its colours wrap (writing.ts colours code as it shows; a plain block's <code>). */
   const partAt = (t: Element) => (t.closest?.('pre.n-code') as Element | null) ?? (t.matches?.(COLOURED) ? t.parentElement! : t);
+  /** A database's own cells, buttons and menus (shared/page-db.ts): its presses and keys are its own, not the editor's. */
+  const fromDb = (e: Event) => e.composedPath().some((x) => x instanceof Element && x.hasAttribute('data-db-ui'));
   const inEditing = (e: Event) => !!editing && e.target instanceof Node && editing.contains(e.target);
   const hold = (e: Event) => {
-    if (fromUi(e) || inEditing(e)) return;
+    if (fromUi(e) || inEditing(e) || fromDb(e)) return;
     e.preventDefault();
     e.stopPropagation();
   };
   addEventListener(
     'pointerdown',
     (e) => {
-      if (fromUi(e) || inEditing(e)) return;
+      // A press anywhere but in a database takes the caret out of its cell (held presses move no focus): the keys that
+      // follow (Delete, Ctrl+D, arrows) are for the part picked, not for the cell written in before.
+      if (!fromDb(e)) {
+        const a = document.activeElement;
+        if (a?.matches?.('.n-db')) ((a.shadowRoot?.activeElement ?? a) as HTMLElement).blur();
+      }
+      if (fromUi(e) || inEditing(e) || fromDb(e)) return;
       e.preventDefault();
       // Held, the press would not give the page the keys (Delete, Esc, arrows).
       window.focus();
@@ -1888,7 +1923,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
   addEventListener(
     'click',
     (e) => {
-      if (fromUi(e) || inEditing(e)) return;
+      if (fromUi(e) || inEditing(e) || fromDb(e)) return;
       hold(e);
       const t = partAt(e.target as Element);
       // A second click (or tap) on the picked part changes its words: phones have no double tap here.
@@ -1900,7 +1935,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
   addEventListener(
     'dblclick',
     (e) => {
-      if (fromUi(e) || inEditing(e)) return;
+      if (fromUi(e) || inEditing(e) || fromDb(e)) return;
       hold(e);
       startEditing(partAt(e.target as Element), { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY });
     },
@@ -1940,8 +1975,14 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       else if (r.top < 0) scrollBy(0, r.top - 16);
     }, 60);
   });
-  // The page grows or shrinks by itself too (a stylesheet or a picture that loads): what is drawn over it follows.
-  new ResizeObserver(redraw).observe(root);
+  // The page grows or shrinks by itself too (a stylesheet or a picture that loads, a database drawn once its rows come):
+  // what is drawn over it follows, and the app hears the picked part's size as it is now.
+  let sizeTimer = 0;
+  new ResizeObserver(() => {
+    redraw();
+    clearTimeout(sizeTimer);
+    sizeTimer = window.setTimeout(() => sel && !editing && tell(), 150);
+  }).observe(root);
   document.addEventListener('selectionchange', () => editing && redraw());
   addEventListener(
     'focusout',
@@ -1956,6 +1997,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
   addEventListener(
     'paste',
     (e) => {
+      if (fromDb(e)) return;
       if (!inEditing(e)) {
         clearTimeout(pasteTimer);
         if (!editing && clip && sel) {
@@ -1991,11 +2033,13 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key;
       if (fromUi(e) || e.isComposing || e.keyCode === 229) return;
+      // (Ctrl+S saves from a database's cell too: its other keys are its own)
       if (mod && k.toLowerCase() === 's') {
         e.preventDefault();
         finishEditing();
         return send({ type: 'wa-ed-save' });
       }
+      if (fromDb(e)) return;
       if (editing) {
         if (mod && (k.toLowerCase() === 'z' || k.toLowerCase() === 'y')) {
           e.preventDefault();
@@ -2108,6 +2152,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       dirty = false;
       return state();
     }
+    if (d.cmd === 'store') return storeAnswer(d.arg);
     act(String(d.cmd), d.arg);
   });
 
@@ -2139,5 +2184,5 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
 /** Puts `function`s' sources in a <script> safely (kit.ts's rules). */
 const scriptSafe = (src: string) => src.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 
-/** The editor, with the writing it hands its insides to and the code blocks' colours (all run in the page, as one script). */
-export const EDITOR_SRC = scriptSafe(`(cfg) => (${editor.toString()})(cfg, ${writing.toString()}, ${codeColours.toString()})`);
+/** The editor, with the writing it hands its insides to, the code blocks' colours and the databases (all run in the page, as one script). */
+export const EDITOR_SRC = scriptSafe(`(cfg) => (${editor.toString()})(cfg, ${writing.toString()}, ${codeColours.toString()}, ${pageDatabases.toString()})`);

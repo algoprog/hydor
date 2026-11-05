@@ -114,6 +114,7 @@ pre.n-code .n-cg,pre>code>.n-cg{color:color-mix(in srgb,#d9534f 80%,currentColor
 pre.n-code .n-ci,pre>code>.n-ci{background:color-mix(in srgb,#3f9f52 18%,transparent)}
 pre.n-code .n-cd,pre>code>.n-cd{background:color-mix(in srgb,#d9534f 18%,transparent)}
 img.n-pic{display:block;max-width:100%;height:auto;margin:.8em 0;border-radius:calc(var(--n-radius,12px) * .6)}
+.n-db{display:block;margin:.8em 0;min-height:2em}
 a.n-pagelink{padding:.05em .35em .1em;border-radius:.35em;background:color-mix(in srgb,currentColor 7%,transparent);color:inherit;font-weight:500;text-decoration:none;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 a.n-pagelink:hover{background:color-mix(in srgb,currentColor 13%,transparent)}
 .n-pagelink-icon{margin-right:.25em;font-weight:400}

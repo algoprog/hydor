@@ -82,13 +82,24 @@ Markdown works as you type: "# ", "## " and "### " at a paragraph's start make h
 Type **/** in an empty block, or after a space, and a list of blocks opens under the caret. Keep typing to filter it ("/to" finds **To-do list**), pick with the arrows and Enter (or a click), and Esc closes it. What you typed after the / goes away. In an empty block, the block becomes the one you picked; after some words, the new block comes under them.
 
 - **Text**, **Heading 1** to **Heading 3**, **Bulleted list**, **Numbered list**, **To-do list**, **Toggle list** (a title that opens to show what is under it), **Quote**, **Callout** (an emoji and words on a tinted box: click the emoji to change it), **Divider** and **Code**.
-- **Table**, **Button**, **Two columns**, **Three columns**, **Card** and **Table of contents** (links to the page's headings, kept up to date as you change them).
+- **Table**, **Button**, **Two columns**, **Three columns**, **Card**, **Table of contents** (links to the page's headings, kept up to date as you change them) and **Database** (see [Databases](#databases)).
 - **Picture** (from this device or a web address), **Video** (a YouTube or Vimeo address: the page shows its still, and a click plays it), **Maths** (LaTeX, drawn as you type it; change it later on the Part tab) and **Emoji** (picked by name, the ones you used lately first) open beside the caret.
 - **Link to a page**, or **@** as you write (at a block's start or after a space): the pages of your Library, the newest first. Type a few letters of a page's name to find it and press Enter: a link to it goes in, shown with the page's icon and name, and it keeps up when you rename the page. In **Use**, a click on it opens that page.
 
 Drop a picture from your computer onto the page, or paste one, and it lands where you dropped it (or after the block you are writing in), made small enough to live in the page.
 
 A **Code** block colours its code as you write it (keywords, strings, numbers, comments, names), in the page's light or dark look, in **Use** too. Its language shows at its top right when you point at it or pick it: **Auto** tells the language from the code; click it to choose another (Bash, C, C++, C#, CSS, Diff, Go, HTML, Java, JavaScript, JSON, Kotlin, Lua, Markdown, PHP, Python, Ruby, Rust, SQL, Swift, TypeScript, YAML, or **Plain text** for none). The block's menu (⋮⋮) has **Language** too, and so has the **Part** tab. The page keeps the code as plain text, with its language, and colours it wherever it opens, a page saved as a file included. Code an agent wrote in a page in its own way is coloured too, in the page's own look for it: in the language the agent named, or, when it named none, only when the code is plainly one (a command's output stays plain), and it is kept as the agent wrote it.
+
+### Databases
+
+**Database**, from **/** or **Add**, puts a table of your own in the page, as Notion has them: a title, columns that each hold one kind of value, and rows. A new one has a **Name**, a **Status** (To do, Doing, Done) and a **Date** column, and three empty rows.
+
+- Write in a cell where it is. A **Select** or **Multi-select** cell opens its options when you click it (type a new one and press Enter to add it), a **Checkbox** ticks, and a **Link** opens with the arrow beside it. **New** under the table adds a row; the × at the end of a row removes it.
+- Click a column's name for its menu: rename it, change its **Kind** (**Text**, **Number**, **Select**, **Multi-select**, **Date**, **Checkbox** or **Link**; its values are kept where they fit the new kind), change a select's **Options** and their colours, **Sort ascending**, **Sort descending**, **Filter by it**, **Move left**, **Move right** or **Delete the column**. The + at the end of the header adds a column.
+- **Sort** and **Filter** above the table order its rows by a column and show only the rows that match (contains, is, is before, is ticked…). The database keeps them for next time.
+- **Board view** shows the rows as cards in lanes, one lane for each option of a select column (**Group by** picks which). Drag a card to another lane to change its option (on a phone, drag it sideways); click a card to see and change all of it; **New** in a lane adds a card there.
+
+Its rows are kept with the page's data (see [The data a page keeps](#the-data-a-page-keeps)), not in the page itself: whatever you change, in **Use** or in **Edit**, is kept at once, without **Save**, shows on every device and stays through the page's versions. **Duplicate** makes a database of its own, with the rows as they are now. Where nothing could keep a change (a page saved as a file, a PDF, a picture of the page, a published copy), a database shows its rows as they are, to read and print. Agents see each database's columns and rows, and add, change or remove rows when you ask.
 
 ### Move, turn and colour blocks
 
@@ -597,6 +608,7 @@ A small tool needs to remember things: the workouts you logged, the boxes you ti
 - A page can keep about 2 MB in all, up to 512 KB in one entry and up to 1,000 entries. Past that, it can't save more.
 - New versions and versions brought back keep the same data.
 - Agents can read a page's data, to answer questions about it ("how many runs did I log this month?") or to change the page to fit it.
+- A [database](#databases)'s rows are kept here too, under its name (`n-db:` and the name).
 - A published copy of a page does not keep data (see [Publish a page](#publish-a-page)).
 
 To see what a page keeps, open it and use **More** (⋯) → **What it keeps**. Each value is listed by its name, with its size and when it changed; click one to read it. Its bin removes that one value; **Download** saves them all as a `.json` file, and **Forget it all** empties the page's data (the page itself stays). Both ask first and can't be undone.
@@ -711,6 +723,8 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "Give my reading list page a cover and a book as its icon."
 - "Answer the comments on my trip page, make the changes they ask for, and resolve them."
 - "On my notes page, link the word 'budget' to my Budget page, and make its code blocks Python."
+- "Add a reading list database to my books page, with a status and a rating, and put the five books I mentioned in it."
+- "Mark everything due this week in my trip page's tasks database as Doing."
 - "Make me 10 slides for a talk on our first year, with a chart of sales and speaker notes."
 - "On my 'Launch plan' slides, make every title shorter and add a closing slide."
 - "In my 'Launch plan' slides, change only slides 3 and 5, and add two slides after slide 7."
