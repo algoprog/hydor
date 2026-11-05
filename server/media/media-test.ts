@@ -16,7 +16,7 @@ import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { images } from '../images/index.ts';
 import { paramsOf, PREFERRED } from '../images/openrouter.ts';
-import { imageDefaults, imageForm, videoCost, videoDefaults, videoForm, videoMismatch } from '../images/settings.ts';
+import { imageDefaults, imageForm, promptQuote, videoCost, videoDefaults, videoForm, videoMismatch } from '../images/settings.ts';
 import { perSecondFor, PREFERRED_VIDEO, skusOf, timing, videoModel } from '../images/video.ts';
 import { loadConfig, saveConfig } from '../models/config.ts';
 import { readCaption, titleFrom } from './caption.ts';
@@ -233,6 +233,10 @@ const until = async (cond: () => boolean, ms = 8000) => {
   const sf = imageForm(seedream, sd);
   ok(sd.aspect === '1:1' && sd.size === '1K' && sd.count === undefined && sf.size.oneOf.length === 2 && !('count' in sf) && !('transparent' in sf), `Seedream 5.0: 1K or 2K, one at a time: ${JSON.stringify(sd)}`);
   ok(sf.aspect.oneOf.some((x: any) => x.const === 'auto') && !sf.aspect.oneOf.some((x: any) => x.const === '9:19.5'), 'its shapes, the odd ones left off the form');
+  const quoted = promptQuote('Poster text:  \r\n# SALE *today*\n\n\n1. From $5 to $10, \\(no maths\\)');
+  ok(quoted === '> Poster text:\\\n> &#35; SALE &#42;today&#42;\n>\n> 1&#46; From &#36;5 to &#36;10, &#92;(no maths&#92;)', `the form's quote keeps the lines and shows Markdown's marks as they are: ${JSON.stringify(quoted)}`);
+  const cut = promptQuote('word '.repeat(1000));
+  ok(cut.length < 4010 && /word…$/.test(cut), 'only a text longer than a card can show is cut, at a word');
   const dance = videoModel({
     id: 'bytedance/seedance-2.5',
     name: 'ByteDance: Seedance 2.5',
@@ -276,6 +280,10 @@ const until = async (cond: () => boolean, ms = 8000) => {
   ok(!again.isError && !cards.length && /16:9, 2K/.test(again.text), 'the next image in the session uses the same settings, without the form');
   const forced = await run('generate_image', { prompt: 'A green one', ask: true });
   ok(!forced.isError && cards.length === 1, 'ask: true shows it again');
+  cards.length = 0;
+  const long = `${'A sunlit city street, warm light and long shadows across the pavement. '.repeat(8)}A sign that says *OPEN* for $5, and the end.`;
+  await run('generate_image', { prompt: long, ask: true });
+  ok(long.length > 600 && /> A sunlit city street, .* &#42;OPEN&#42; for &#36;5, and the end\.$/.test(cards[0]?.detail ?? ''), `the form quotes the whole description: ${cards[0]?.detail.slice(-60)}`);
 
   cards.length = 0;
   answer = () => ({ decision: 'decline' });

@@ -27,7 +27,8 @@ export async function fillForm(ctx: RunCtx, o: { title: string; message?: string
     id: `form-${crypto.randomBytes(6).toString('hex')}`,
     kind: 'other',
     title: o.title.trim().replace(/\s+/g, ' ').slice(0, 120) || 'A few details, please',
-    detail: o.message?.trim() ? o.message.trim().slice(0, 4000) : undefined,
+    // The app's own forms say what they need whole (an image's description); ask_form's message is cut to fit.
+    detail: o.message?.trim() || undefined,
     prose: true,
     options: [
       { id: 'accept', label: o.submit?.trim().slice(0, 30) || 'Send', style: 'primary' },
@@ -52,7 +53,7 @@ export async function askForm(a: Json, ctx: RunCtx): Promise<ToolOutput> {
   const props: Json = a.fields && typeof a.fields === 'object' && !Array.isArray(a.fields) ? a.fields : {};
   const r = await fillForm(ctx, {
     title: String(a.title ?? ''),
-    message: typeof a.message === 'string' ? a.message : undefined,
+    message: typeof a.message === 'string' ? a.message.trim().slice(0, 4000) : undefined,
     schema: { properties: props, required: Array.isArray(a.required) ? a.required.map(String) : [] },
     submit: String(a.submit ?? ''),
   });

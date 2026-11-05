@@ -65,6 +65,7 @@ import {
   pickedFor,
   pickedKey,
   priceLine,
+  promptQuote,
   rememberPicked,
   videoAnswers,
   videoCost,
@@ -210,7 +211,7 @@ function imageTool(db: DB): RunTool {
       if ((ask === true || (ask === undefined && left && !pickedFor(memo))) && Object.keys(fields).length && attended(ctx)) {
         const r = await fillForm(ctx, {
           title: tr(refs.length ? FORM.imageChanged : FORM.image),
-          message: [priceLine('image', info, id, tr), `> ${prompt.replace(/\s+/g, ' ').slice(0, 400)}`].join('\n\n'),
+          message: [priceLine('image', info, id, tr), promptQuote(prompt)].join('\n\n'),
           schema: { properties: fields },
           submit: tr(FORM.submit),
         });
@@ -379,7 +380,7 @@ function videoTool(db: DB): RunTool {
         const cost = videoCost(info, v);
         const r = await fillForm(ctx, {
           title: tr(video ? FORM.videoChanged : FORM.video),
-          message: [priceLine('video', info, id, tr, cost), ...(prompt ? [`> ${prompt.replace(/\s+/g, ' ').slice(0, 400)}`] : [])].join('\n\n'),
+          message: [priceLine('video', info, id, tr, cost), ...(prompt ? [promptQuote(prompt)] : [])].join('\n\n'),
           schema: { properties: fields },
           submit: tr(FORM.submit),
           waitMs: Math.max(60_000, until - Date.now() - 120_000),
@@ -615,13 +616,13 @@ function audioTool(db: DB): RunTool {
       const left = Object.keys(fields).some((f) => !(f in given));
       const ask = askOf(a);
       if ((ask === true || (ask === undefined && left && !before)) && Object.keys(fields).length && attended(ctx)) {
-        const what = prompt || turns.map((t) => t.text).join(' ');
+        const what = prompt || turns.map((t) => t.text).join('\n');
         const r = await fillForm(ctx, {
           title: tr(FORM[kind]),
           message: [
             audioPriceLine(info, id, tr, audioCost(info, wish(v, true))),
             ...(instead && info ? [insteadLine(instead, info.label, tr)] : []),
-            `> ${what.replace(/\s+/g, ' ').slice(0, 400)}`,
+            promptQuote(what),
           ].join('\n\n'),
           schema: { properties: fields },
           submit: tr(FORM.submit),
