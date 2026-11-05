@@ -145,3 +145,29 @@ export interface BrowserNote {
   status: 'waiting' | 'done' | 'skipped';
   endedAt?: number;
 }
+
+/**
+ * What the agent is doing right now in a few words, for the live view's busy line: whole phrases, so the page
+ * translates them (`name` is the part's name as the page has it, in quotes, or its number).
+ */
+export function busyWords(action: string, name: string, more: { direction?: string; keys?: string } = {}): string {
+  switch (action) {
+    case 'click':
+    case 'double_click':
+      return `Clicking ${name}`;
+    case 'hover':
+      return `Pointing at ${name}`;
+    case 'type':
+      return `Typing into ${name}`;
+    case 'select':
+      return `Choosing in ${name}`;
+    case 'scroll':
+      return more.direction === 'up' ? 'Scrolling up' : more.direction === 'left' ? 'Scrolling left' : more.direction === 'right' ? 'Scrolling right' : 'Scrolling down';
+    case 'keys':
+      return `Pressing ${more.keys ?? ''}`;
+    case 'back':
+      return 'Going back';
+    default:
+      return 'Waiting';
+  }
+}

@@ -3,6 +3,7 @@
 // points, clicks and types, and each step saves a small picture for its row, with where it acted.
 import fs from 'node:fs';
 import path from 'node:path';
+import { busyWords } from '../../shared/browser.ts';
 import { domainAllowed, secretName } from '../../shared/connections.ts';
 import type { PointerAct, StepMark, Way } from '../../shared/pointer.ts';
 import type { ToolOutput } from '../features/types.ts';
@@ -376,25 +377,7 @@ export async function act(ctx: OpCtx, raw: unknown, screenshot: boolean): Promis
 
 function busyLabel(s: ActStep, e?: El): string {
   const n = e?.name ? quote(e.name.slice(0, 40)) : s.id !== undefined ? `[${s.id}]` : '';
-  switch (s.action) {
-    case 'click':
-    case 'double_click':
-      return `Clicking ${n}`;
-    case 'hover':
-      return `Pointing at ${n}`;
-    case 'type':
-      return `Typing into ${n}`;
-    case 'select':
-      return `Choosing in ${n}`;
-    case 'scroll':
-      return `Scrolling ${s.direction ?? 'down'}`;
-    case 'keys':
-      return `Pressing ${s.keys ?? ''}`;
-    case 'back':
-      return 'Going back';
-    default:
-      return 'Waiting';
-  }
+  return busyWords(s.action, n, { direction: s.direction, keys: s.keys });
 }
 
 interface StepResult {
