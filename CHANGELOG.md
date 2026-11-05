@@ -3,6 +3,15 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.29.2 · 5 November 2026
+
+Notebooks and documents an agent hands over go into the Library from their cards.
+
+- **Save to Library** in a file card's **More** (⋯), under an agent's reply: a Jupyter notebook, a Word or Markdown
+  document, a spreadsheet or a LaTeX file becomes a copy of its own in the Library, opened in its editor there, in the
+  project you pick when you have projects (the session's first). **Add to a project** still copies the file itself
+  into a project's folder, where it shows in Files.
+
 ## 0.29.1 · 5 November 2026
 
 The Mac and Windows apps of 0.29.0, with everything it brought.
