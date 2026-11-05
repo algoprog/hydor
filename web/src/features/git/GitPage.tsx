@@ -149,9 +149,10 @@ export function GitPage({ selected }: { selected: string | null }) {
   useEffect(() => {
     void load();
   }, []);
-  // On a computer the most recently used repository opens when none is picked.
+  // On a computer the most recently used repository opens when none is picked (its History with Find what broke it
+  // open, when the search box asked for that: ?bisect=1).
   useEffect(() => {
-    if (!mobile && !selected && repos?.length) go(repoUrl(repos[0].path), true);
+    if (!mobile && !selected && repos?.length) go(new URLSearchParams(location.search).has('bisect') ? `${repoUrl(repos[0].path, { tab: 'history' })}&bisect=1` : repoUrl(repos[0].path), true);
   }, [mobile, selected, repos]);
 
   const fetchAll = async () => {
