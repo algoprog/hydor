@@ -29,6 +29,7 @@ import {
   Redo2,
   Scissors,
   Shapes,
+  Shrink,
   Sparkles,
   Table2,
   Trash2,
@@ -1010,8 +1011,15 @@ export function SlidesEditor({
           onCellSel={setCellSel}
         />
         {zoom !== 'fit' && (
-          <button type="button" onClick={() => setZoom('fit')} title="Fit the slide" className="absolute right-3 bottom-3 z-10 rounded-full border border-line bg-elevated px-2.5 py-1 text-[12px] text-fg-2 tabular-nums shadow-sm hover:text-fg">
-            {`${Math.round(zoom * 100)}%`} · Fit
+          <button
+            type="button"
+            onClick={() => setZoom('fit')}
+            title="Fit the slide"
+            aria-label="Fit the slide"
+            className="absolute right-3 bottom-3 z-10 flex items-center gap-1.5 rounded-full border border-line bg-elevated px-2.5 py-1 text-[12px] text-fg-2 tabular-nums shadow-sm hover:text-fg"
+          >
+            {`${Math.round(zoom * 100)}%`}
+            <Shrink size={12} />
           </button>
         )}
         {(painter || scope.length > 0 || cropping) && (
