@@ -110,7 +110,7 @@ export interface FileSaved {
 }
 
 /** Which kind of document a file is, for its icon and its name in words. */
-export type DocKind = 'word' | 'sheet' | 'slides' | 'pdf' | 'image' | 'text' | 'code' | 'archive' | 'audio' | 'video' | 'book' | 'web' | 'file';
+export type DocKind = 'word' | 'sheet' | 'slides' | 'pdf' | 'image' | 'text' | 'code' | 'notebook' | 'archive' | 'audio' | 'video' | 'book' | 'web' | 'file';
 
 const KINDS: Record<string, DocKind> = {
   doc: 'word', docx: 'word', docm: 'word', dotx: 'word', odt: 'word', ott: 'word', rtf: 'word', pages: 'word',
@@ -124,7 +124,8 @@ const KINDS: Record<string, DocKind> = {
   mp4: 'video', mov: 'video', webm: 'video', mkv: 'video', avi: 'video',
   epub: 'book',
   html: 'web', htm: 'web',
-  js: 'code', ts: 'code', tsx: 'code', jsx: 'code', py: 'code', json: 'code', sh: 'code', css: 'code', yaml: 'code', yml: 'code', toml: 'code', xml: 'code', sql: 'code', go: 'code', rs: 'code', java: 'code', c: 'code', cpp: 'code', h: 'code', rb: 'code', php: 'code', ipynb: 'code',
+  js: 'code', ts: 'code', tsx: 'code', jsx: 'code', py: 'code', json: 'code', sh: 'code', css: 'code', yaml: 'code', yml: 'code', toml: 'code', xml: 'code', sql: 'code', go: 'code', rs: 'code', java: 'code', c: 'code', cpp: 'code', h: 'code', rb: 'code', php: 'code',
+  ipynb: 'notebook',
 };
 
 export const docKind = (path: string): DocKind => KINDS[path.split('.').pop()?.toLowerCase() ?? ''] ?? 'file';
@@ -137,6 +138,7 @@ const KIND_WORDS: Record<DocKind, string> = {
   image: 'Image',
   text: 'Text',
   code: 'Code',
+  notebook: 'Notebook',
   archive: 'Archive',
   audio: 'Audio',
   video: 'Video',
@@ -152,7 +154,7 @@ export function kindLabel(path: string): string {
     doc: 'Word document', docx: 'Word document', odt: 'OpenDocument text', rtf: 'Rich text',
     xls: 'Excel workbook', xlsx: 'Excel workbook', xlsm: 'Excel workbook', ods: 'OpenDocument sheet', csv: 'CSV table', tsv: 'TSV table',
     ppt: 'PowerPoint', pptx: 'PowerPoint', odp: 'OpenDocument slides',
-    md: 'Markdown', zip: 'ZIP archive', epub: 'EPUB book', svg: 'SVG image',
+    md: 'Markdown', zip: 'ZIP archive', epub: 'EPUB book', svg: 'SVG image', ipynb: 'Jupyter notebook',
   };
   return named[ext] ?? (KIND_WORDS[docKind(path)] === 'Image' && ext ? `${ext.toUpperCase()} image` : KIND_WORDS[docKind(path)]);
 }

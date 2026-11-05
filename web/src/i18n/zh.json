@@ -11013,5 +11013,11 @@
 "the connection went quiet":"连接没有数据了",
 "the download stopped at {0} of {1} MB ({2}); the next try carries on from there":"下载停在了 {1} MB 中的 {0} MB（{2}）；下次尝试会从那里接着下载",
 "the file ended early":"文件提前结束了",
-"the server sent another part of the file":"服务器发来了文件的另一部分"
+"the server sent another part of the file":"服务器发来了文件的另一部分",
+"New notebook":"新建笔记本",
+"Notebook":"笔记本",
+"Jupyter notebook":"Jupyter 笔记本",
+"Python 3 (ipykernel)":"Python 3 (ipykernel)",
+"Untitled{0}{1}":"Untitled{0}{1}",
+"Use when making, running or changing a Jupyter notebook (.ipynb), such as an analysis, a lesson or tutorial, a model trained step by step, or any notebook handed over to run again. Not for a one-off answer from data (data-analysis).":"在制作、运行或修改 Jupyter 笔记本（.ipynb）时使用，例如一份分析、一节课或教程、一个一步步训练的模型，或任何交给别人再次运行的笔记本。不适用于根据数据得出的一次性答案（data-analysis）。"
 }

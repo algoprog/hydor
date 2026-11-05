@@ -1,7 +1,7 @@
 // A file's icon and colour by its kind (Word blue, Excel green, PowerPoint orange, PDF red…), and paths
 // an agent gave, resolved as the server does.
 import type { CSSProperties } from 'react';
-import { BookOpenText, File, FileArchive, FileAudio, FileCode2, FileImage, FileSpreadsheet, FileText, FileVideo, Globe, Presentation, type LucideIcon } from 'lucide-react';
+import { BookOpenText, File, FileArchive, FileAudio, FileCode2, FileImage, FileSpreadsheet, FileText, FileVideo, Globe, NotebookText, Presentation, type LucideIcon } from 'lucide-react';
 import { docKind, type DocKind } from '@shared/documents';
 import { cx } from '../../components/ui';
 
@@ -13,6 +13,7 @@ const LOOK: Record<DocKind, { icon: LucideIcon; hue: number }> = {
   image: { icon: FileImage, hue: 275 },
   text: { icon: FileText, hue: 40 },
   code: { icon: FileCode2, hue: 190 },
+  notebook: { icon: NotebookText, hue: 240 },
   archive: { icon: FileArchive, hue: 48 },
   audio: { icon: FileAudio, hue: 330 },
   video: { icon: FileVideo, hue: 300 },

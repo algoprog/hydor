@@ -81,7 +81,22 @@ function writeOutput(o: NbOutput): Json {
   return out;
 }
 
+/** A new notebook: one empty code cell, in Python until a kernel says otherwise. */
+export function emptyNotebook(): Notebook {
+  return {
+    cells: [newCell('code')],
+    metadata: { kernelspec: { display_name: 'Python 3 (ipykernel)', language: 'python', name: 'python3' }, language_info: { name: 'python' } },
+    minor: 5,
+    rest: {},
+  };
+}
+
+/** A new notebook file's text, as nbformat writes it. */
+export const newNotebookText = () => serializeNotebook(emptyNotebook());
+
 export function parseNotebook(text: string): Notebook {
+  // An empty file (made as "x.ipynb" by hand or by a program) opens as a new notebook, written out when saved.
+  if (!text.trim()) return emptyNotebook();
   const j = JSON.parse(text);
   if (!j || typeof j !== 'object' || !Array.isArray(j.cells)) throw new Error('This file has no notebook cells');
   if (j.nbformat !== 4) throw new Error(`Notebook format ${j.nbformat} is not supported here (only format 4)`);
