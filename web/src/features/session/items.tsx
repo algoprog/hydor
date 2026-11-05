@@ -51,6 +51,7 @@ import { mu } from '../../lib/machine';
 import { ReadAloudButton } from '../voice/ReadAloud';
 import { TriggerIcon } from '../automations/parts';
 import { ChildReplyRow } from '../children/ChildReply';
+import { tr } from '../../i18n/runtime';
 
 /** The session's folder (paths inside it are shown relative to it) and a way to show its changes. */
 /** `fork(at)`: start a new session from this one, up to the transcript entry `at` (Claude) or all of it. */
@@ -1116,14 +1117,14 @@ export function summarize(items: TimelineItem[]): { text: string; added: number;
       removed += f.removed;
     }
   }
-  const n = (k: number, one: string, many = one + 's') => `${k} ${k === 1 ? one : many}`;
+  // Each part a whole phrase, translated as it is made (the parts are joined into one line, which no dictionary holds).
   const p: string[] = [];
-  if (commands) p.push(`ran ${n(commands, 'command')}`);
-  if (edits) p.push(`made ${n(edits, 'edit')}`);
-  if (reads) p.push(`read ${n(reads, 'file')}`);
-  if (searches) p.push(`searched ${n(searches, 'time')}`);
-  if (messages) p.push(`sent ${n(messages, 'message')}`);
-  if (other) p.push(n(other, 'other step'));
+  if (commands) p.push(tr(commands === 1 ? 'ran 1 command' : `ran ${commands} commands`));
+  if (edits) p.push(tr(edits === 1 ? 'made 1 edit' : `made ${edits} edits`));
+  if (reads) p.push(tr(reads === 1 ? 'read 1 file' : `read ${reads} files`));
+  if (searches) p.push(tr(searches === 1 ? 'searched once' : `searched ${searches} times`));
+  if (messages) p.push(tr(messages === 1 ? 'sent 1 message' : `sent ${messages} messages`));
+  if (other) p.push(tr(other === 1 ? '1 other step' : `${other} other steps`));
   const text = p.join(', ');
   return { text: text ? text[0].toUpperCase() + text.slice(1) : 'Thinking', added, removed };
 }
