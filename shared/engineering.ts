@@ -51,7 +51,7 @@ export const CI: Record<CiService, Ci> = {
   github: {
     label: 'GitHub Actions',
     filter: { path: 'body.workflow_run.conclusion', value: 'failure' },
-    where: 'In the repository on GitHub: Settings → Webhooks → Add webhook. Paste this address as the Payload URL, pick application/json, and under “Let me select individual events” tick only Workflow runs.',
+    where: 'In the repository on GitHub: Settings → Webhooks → Add webhook. Paste the task’s address as the Payload URL, pick application/json, and under “Let me select individual events” tick only Workflow runs.',
     facts: [
       ['Workflow', 'body.workflow_run.name'],
       ['Run', 'body.workflow_run.html_url'],
@@ -69,7 +69,7 @@ export const CI: Record<CiService, Ci> = {
   gitlab: {
     label: 'GitLab CI',
     filter: { path: 'body.object_attributes.status', value: 'failed' },
-    where: 'In the project on GitLab: Settings → Webhooks → Add new webhook. Paste this address as the URL and tick only Pipeline events.',
+    where: 'In the project on GitLab: Settings → Webhooks → Add new webhook. Paste the task’s address as the URL and tick only Pipeline events.',
     facts: [
       ['Pipeline', 'body.object_attributes.url'],
       ['Pipeline id', 'body.object_attributes.id'],
@@ -86,7 +86,7 @@ export const CI: Record<CiService, Ci> = {
   buildkite: {
     label: 'Buildkite',
     filter: { path: 'body.build.state', value: 'failed' },
-    where: 'In Buildkite: Settings → Notification Services → Add on Webhook. Paste this address as the Webhook URL, tick the event build.finished, and pick the pipelines.',
+    where: 'In Buildkite: Settings → Notification Services → Add on Webhook. Paste the task’s address as the Webhook URL, tick the event build.finished, and pick the pipelines.',
     facts: [
       ['Pipeline', 'body.pipeline.slug'],
       ['Build', 'body.build.web_url'],
@@ -102,7 +102,7 @@ export const CI: Record<CiService, Ci> = {
   circleci: {
     label: 'CircleCI',
     filter: { path: 'body.workflow.status', value: 'failed' },
-    where: 'In CircleCI: the project’s Project Settings → Webhooks → Add Webhook. Paste this address as the Receiver URL and tick Workflow Completed.',
+    where: 'In CircleCI: the project’s Project Settings → Webhooks → Add Webhook. Paste the task’s address as the Receiver URL and tick Workflow Completed.',
     facts: [
       ['Workflow', 'body.workflow.name'],
       ['Workflow page', 'body.workflow.url'],
@@ -156,7 +156,7 @@ export function ciDoctorTask(v: { folder?: string; ci?: string; rerun?: string; 
 // ---- Issue triage -----------------------------------------------------------------------------------------
 
 export const ISSUE_TRIAGE_WHERE =
-  'In the repository on GitHub: Settings → Webhooks → Add webhook. Paste this address as the Payload URL, pick application/json, and under “Let me select individual events” tick only Issues. On Gitea: the repository’s Settings → Webhooks, with Issues events.';
+  'In the repository on GitHub: Settings → Webhooks → Add webhook. Paste the task’s address as the Payload URL, pick application/json, and under “Let me select individual events” tick only Issues. On Gitea: the repository’s Settings → Webhooks, with Issues events.';
 
 /** Issue triage: each new issue labelled, its duplicates found by meaning, a missing repro asked for, easy ones tried. */
 export function issueTriageTask(v: { folder?: string; comment?: string; label?: string; fix?: string }): ExampleTask {
@@ -233,23 +233,23 @@ export const ALERTS: Record<AlertSource, Alerts> = {
   sentry: {
     label: 'Sentry',
     filter: { path: 'body.action', value: 'resolved', skip: true },
-    where: 'In Sentry: Settings → Developer Settings → Create New Integration → Internal Integration. Paste this address as the Webhook URL, turn on Alert Rule Action, then add the integration to your alert rules’ actions.',
+    where: 'In Sentry: Settings → Developer Settings → Create New Integration → Internal Integration. Paste the task’s address as the Webhook URL, turn on Alert Rule Action, then add the integration to your alert rules’ actions.',
   },
   grafana: {
     label: 'Grafana',
     filter: { path: 'body.status', value: 'resolved', skip: true },
-    where: 'In Grafana: Alerting → Contact points → Add contact point, with the Webhook integration and this address as the URL; then send your alerts to it from a notification policy.',
+    where: 'In Grafana: Alerting → Contact points → Add contact point, with the Webhook integration and the task’s address as the URL; then send your alerts to it from a notification policy.',
   },
   datadog: {
     label: 'Datadog',
     filter: { path: 'body.transition', value: 'Recovered', skip: true },
-    where: 'In Datadog: Integrations → Webhooks → New. Paste this address as the URL and add "transition": "$ALERT_TRANSITION" to its payload; then mention @webhook-<its name> in your monitors’ messages.',
+    where: 'In Datadog: Integrations → Webhooks → New. Paste the task’s address as the URL and add "transition": "$ALERT_TRANSITION" to its payload; then mention @webhook-<its name> in your monitors’ messages.',
   },
   betterstack: {
     label: 'Better Stack',
-    where: 'In Better Stack: Incidents → Integrations → Exporting data → Outgoing webhooks → Configure, then Add on Incident. Paste this address as the Webhook URL and pick only the events for an incident created or reopened.',
+    where: 'In Better Stack: Incidents → Integrations → Exporting data → Outgoing webhooks → Configure, then Add on Incident. Paste the task’s address as the Webhook URL and pick only the events for an incident created or reopened.',
   },
-  other: { label: 'Another service', where: 'Point your alerting service’s webhook at this address: a POST with the alert as JSON.' },
+  other: { label: 'Another service', where: 'Point your alerting service’s webhook at the task’s address: a POST with the alert as JSON.' },
 };
 
 export const ALERT_SOURCES = Object.keys(ALERTS) as AlertSource[];
@@ -286,7 +286,7 @@ export function incidentTask(v: { folder?: string; source?: string; rollback?: s
 // ---- Review new pull requests (made before these, kept here for its card's help) ----------------------------
 
 export const PR_REVIEW_WHERE =
-  'In the repository on GitHub: Settings → Webhooks → Add webhook. Paste this address as the Payload URL, pick application/json, and under “Let me select individual events” tick only Pull requests. On Gitea: the repository’s Settings → Webhooks, with Pull request events.';
+  'In the repository on GitHub: Settings → Webhooks → Add webhook. Paste the task’s address as the Payload URL, pick application/json, and under “Let me select individual events” tick only Pull requests. On Gitea: the repository’s Settings → Webhooks, with Pull request events.';
 
 // ---- where a webhook task's address goes -----------------------------------------------------------------------
 
