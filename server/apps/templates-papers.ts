@@ -1973,11 +1973,11 @@ const FIGURE_COLS: AnswerField['columns'] = [
 
 /** The venues' templates: a column's and the page's width, in inches, and the font their text is set in. */
 const FIGURE_VENUES: Record<string, { one: number; two: number; font: string }> = {
-  'ACL, EMNLP, NAACL': { one: 3.03, two: 6.3, font: 'Times' },
+  'ACL, EMNLP, NAACL': { one: 3.03, two: 6.3, font: 'Times New Roman' },
   'ACM (SIGIR, KDD, CIKM, WSDM, TheWebConf)': { one: 3.33, two: 7.0, font: 'Linux Libertine' },
-  IEEE: { one: 3.49, two: 7.14, font: 'Times' },
-  ICML: { one: 3.25, two: 6.75, font: 'Times' },
-  'NeurIPS, ICLR': { one: 5.5, two: 5.5, font: 'Times' },
+  IEEE: { one: 3.49, two: 7.14, font: 'Times New Roman' },
+  ICML: { one: 3.25, two: 6.75, font: 'Times New Roman' },
+  'NeurIPS, ICLR': { one: 5.5, two: 5.5, font: 'Times New Roman' },
   'Springer LNCS': { one: 4.8, two: 4.8, font: 'Computer Modern' },
 };
 
@@ -1993,7 +1993,7 @@ const FIGURE_DOCTOR: Draft = {
     { id: 'venue', label: 'The venue’s template', type: 'choice', options: [...Object.keys(FIGURE_VENUES), 'Other (give the width)'], default: 'ACL, EMNLP, NAACL' },
     { id: 'span', label: 'Width', type: 'choice', options: ['One column', 'Both columns'], default: 'One column' },
     { id: 'inches', label: 'Or the width in inches', type: 'number', help: 'For another template: its \\columnwidth (or \\textwidth) in inches' },
-    { id: 'font', label: 'The paper’s font', type: 'choice', options: ['As the template', 'Times', 'Computer Modern', 'Linux Libertine', 'Helvetica'], default: 'As the template' },
+    { id: 'font', label: 'The paper’s font', type: 'choice', options: ['As the template', 'Times New Roman', 'Computer Modern', 'Linux Libertine', 'Helvetica'], default: 'As the template' },
   ],
   prompt: '',
   flow: {
@@ -2016,9 +2016,9 @@ const full = /both/i.test(String(input.span || ''));
 const given = Number(input.inches);
 const width = given > 0 ? Math.min(12, given) : v ? (full ? v.two : v.one) : 3.33;
 const height = Math.round(width * (full ? 0.36 : 0.62) * 100) / 100;
-const font = input.font && input.font !== 'As the template' ? input.font : v ? v.font : 'Times';
+const font = input.font && input.font !== 'As the template' ? input.font : v ? v.font : 'Times New Roman';
 const FAMILY = {
-  Times: ['serif', 'font.serif : Times New Roman, Times, Nimbus Roman, TeX Gyre Termes, DejaVu Serif', 'mathtext.fontset : stix'],
+  'Times New Roman': ['serif', 'font.serif : Times New Roman, Times, Nimbus Roman, TeX Gyre Termes, DejaVu Serif', 'mathtext.fontset : stix'],
   'Computer Modern': ['serif', 'font.serif : CMU Serif, Latin Modern Roman, cmr10, DejaVu Serif', 'mathtext.fontset : cm\naxes.formatter.use_mathtext : True'],
   'Linux Libertine': ['serif', 'font.serif : Linux Libertine O, Libertinus Serif, Linux Libertine, DejaVu Serif', 'mathtext.fontset : stix'],
   Helvetica: ['sans-serif', 'font.sans-serif : Helvetica, Arial, Nimbus Sans, TeX Gyre Heros, DejaVu Sans', 'mathtext.fontset : stixsans'],

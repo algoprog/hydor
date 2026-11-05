@@ -741,7 +741,7 @@ test('paper to talk: its figures gathered; the slides timed to the talk’s leng
 
 test('figure doctor: the width from the venue’s template (or inches given), the paper’s font, and one style file with vector PDFs and TrueType fonts', async () => {
   const acl = await program('figure-doctor', 'setup', { venue: 'ACL, EMNLP, NAACL', span: 'One column', inches: '', font: 'As the template' });
-  assert.deepEqual([acl.width, acl.font, acl.size], [3.03, 'Times', 8]);
+  assert.deepEqual([acl.width, acl.font, acl.size], [3.03, 'Times New Roman', 8]);
   assert.match(acl.style, /^figure\.figsize : 3\.03, 1\.88$/m);
   assert.match(acl.style, /^pdf\.fonttype : 42$/m);
   assert.match(acl.style, /^axes\.prop_cycle : cycler\('color', \['0072B2', 'E69F00'/m, 'colours without # (an .mplstyle reads # as a comment)');

@@ -1880,7 +1880,7 @@
 "Charts":"图表",
 "Cheapest":"最便宜",
 "check":"检查",
-"Check":"查看",
+"Check":"检查",
 "check {0}":"检查 {0}",
 "Check {0}":"检查 {0}",
 "Check a service":"检查服务",
@@ -15737,5 +15737,6 @@
 "“{0}” has been published since, in {1}":"“{0}”此后已正式发表于 {1}",
 "“{0}” has been published since":"“{0}”此后已正式发表",
 "higher":"越高",
-"lower":"越低"
+"lower":"越低",
+"Labelling":"标注"
 }

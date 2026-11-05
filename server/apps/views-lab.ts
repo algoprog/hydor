@@ -111,7 +111,7 @@ const ANNOTATE_UI: AppUi = {
   pages: [
     {
       id: 'label',
-      title: 'Label',
+      title: 'Labelling',
       blocks: [
         { element: 'set-head' },
         { element: 'workbench', data: 'data.items', where: { sample: '{{run.id}}' }, sort: 'order', limit: 1000, empty: 'No texts in this set yet: they show here once the run has loaded them.' },
