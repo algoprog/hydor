@@ -97,3 +97,33 @@ async function load(key: string) {
   );
   await Promise.all([summary, useTimeline.getState().load(key)]);
 }
+
+const NO_STATS = { userMessages: 1, assistantMessages: 0, toolCalls: 0, commands: 0, backgroundCommands: 0, filesChanged: 0, linesAdded: 0, linesRemoved: 0, turns: 0, tokensIn: 0, tokensOut: 0, tokensCached: 0 };
+
+/**
+ * The sidebar's rows for sessions still starting: each shows at once, at the top of Active, as the session will
+ * ("Starting", its first words for a title), until the session itself is in the list. One that did not start
+ * leaves it (its page says why).
+ */
+export function startingRows(byId: Record<string, Starting>, listed: Record<string, SessionSummary | undefined>): SessionSummary[] {
+  const all = Object.values(byId).filter((st) => !st.error);
+  if (!all.length) return [];
+  // The session can be in the list a moment before its start is answered: one made since, with your message.
+  const since = Math.min(...all.map((st) => st.at)) - 5_000;
+  const fresh = Object.values(listed).filter((s): s is SessionSummary => !!s && (s.createdAt ?? 0) >= since);
+  return all
+    .filter((st) => !(st.key && listed[st.key]) && !fresh.some((s) => s.agent === st.agent && (s.createdAt ?? 0) >= st.at - 5_000 && !!st.text && s.firstPrompt === st.text.slice(0, 300)))
+    .map((st) => ({
+      key: st.id,
+      id: st.id,
+      agent: st.agent,
+      acpName: st.acpName,
+      title: st.title,
+      firstPrompt: st.text,
+      cwd: st.cwd || undefined,
+      createdAt: st.at,
+      updatedAt: st.at,
+      stats: NO_STATS,
+      live: { status: 'starting', startedAt: st.at, pendingApprovals: 0 },
+    }));
+}

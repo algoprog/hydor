@@ -22,7 +22,8 @@ import type { AgentAccount, SearchHit, SessionSummary } from '@shared/types';
 import { isConfidential } from '@shared/confidential';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { basename, markRuns, tildify, timeAgo } from '../../lib/format';
-import { filePath, go, openSession } from '../../lib/nav';
+import { filePath, go, openSession, sessionPath } from '../../lib/nav';
+import { isStartingKey, startingRows, useStarting } from '../../lib/starting';
 import { activityOf, inBackground, isBusy, isWorking } from '../../lib/activity';
 import { toastError, useApp, useSessions, useUI } from '../../lib/store';
 import { folderName, givenName, namedFolders, renameFolder, translatable, useFolderNames } from '../../lib/folderNames';
@@ -178,6 +179,21 @@ export const deleteDialog = (s: SessionSummary) => ({
 });
 
 /** The end of a row's text fades out under its ⋯ (on a computer, while it shows). */
+/**
+ * A row's title. One that changes while the row shows (the name the agent gave a new session, in place of its
+ * first words) comes in word by word; a row that appears shows its title as it is.
+ */
+function TitleText({ title }: { title: string }) {
+  const first = useRef(title);
+  const changed = title !== first.current;
+  if (!changed) return <>{title}</>;
+  return (
+    <span key={title} className="title-in">
+      {title.split(/(\s+)/).map((w, i) => (/^\s+$/.test(w) ? w : <span key={i} style={{ '--i': Math.min(i >> 1, 12) } as CSSProperties}>{w}</span>))}
+    </span>
+  );
+}
+
 const FADE = '[mask-image:linear-gradient(to_left,transparent_26px,black_54px)]';
 const HOVER_FADE = 'group-hover:[mask-image:linear-gradient(to_left,transparent_26px,black_54px)] group-focus-within:[mask-image:linear-gradient(to_left,transparent_26px,black_54px)]';
 
@@ -228,7 +244,7 @@ const RowBody = memo(function RowBody({
         className={cx('min-w-0 flex-1 truncate text-[13.5px]', active || unread ? 'font-medium text-fg' : 'text-fg')}
         translate="no"
       >
-        {s.title}
+        <TitleText title={s.title} />
       </span>
     );
   const marks = !renaming && (
@@ -401,6 +417,21 @@ const SortableRow = memo(function SortableRow(p: RowProps) {
       {...p}
       drag={{ ref: setNodeRef, style: { transform: CSS.Transform.toString(transform), transition }, attrs: { ...attributes, ...(listeners as HTMLAttributes<HTMLDivElement>) }, lifted: isDragging }}
     />
+  );
+});
+
+/** A session still starting: it opens its page, and has no menu and no drag until it has started. */
+const StartingRow = memo(function StartingRow({ s, active, home, touch, place }: RowProps) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => go(sessionPath(s.key))}
+      onKeyDown={(e) => e.key === 'Enter' && go(sessionPath(s.key))}
+      className="cursor-default rounded-[10px] outline-none select-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-accent/50"
+    >
+      <RowBody s={s} active={active} home={home} touch={touch} place={place} />
+    </div>
   );
 });
 
@@ -746,6 +777,9 @@ function SortablePlace({ id, className, children }: { id: string; className?: st
  */
 export function SessionList({ query }: { query: string }) {
   const { byKey, order, loaded } = useSessions();
+  // Sessions sent from the start page and still starting: listed at once.
+  const startingById = useStarting((x) => x.byId);
+  const standIns = useMemo(() => startingRows(startingById, byKey), [startingById, byKey]);
   const filter = useUI((s) => s.agentFilter);
   const spaceFilter = useUI((s) => s.spaceFilter);
   const home = useApp((s) => s.boot?.home);
@@ -789,7 +823,7 @@ export function SessionList({ query }: { query: string }) {
   const places = useToolOrder((s) => s.places);
 
   const groups = useMemo(() => {
-    const listed = order.map((k) => byKey[k]).filter((s): s is SessionSummary => !!s && !s.archived && shown(s) && !nest.under.has(s.key));
+    const listed = [...standIns, ...order.map((k) => byKey[k])].filter((s): s is SessionSummary => !!s && !s.archived && shown(s) && !nest.under.has(s.key));
     // The list showing one space: its sessions go by day.
     const out = groupSessions(listed, { now: new Date(), byFolder: byFolder && !spaceFilter, spaces, unpicked, places, names: folderNames, origins });
     const snz = out.find((g) => g.kind === 'snoozed');
@@ -799,9 +833,10 @@ export function SessionList({ query }: { query: string }) {
     if (act) act.items = byManualOrder(act.items, sortActive);
     const pin = out.find((g) => g.kind === 'pinned');
     if (pin) pin.items = byManualOrder(pin.items, (l) => l);
-    for (const g of out) g.keys = g.items.map((s) => s.key);
+    // A session still starting cannot be dragged: it is in no group's order.
+    for (const g of out) g.keys = g.items.filter((s) => !isStartingKey(s.key)).map((s) => s.key);
     return out;
-  }, [byKey, order, filter, spaceFilter, nest, byFolder, spaces, unpicked, places, groupTime, folderNames, origins]);
+  }, [standIns, byKey, order, filter, spaceFilter, nest, byFolder, spaces, unpicked, places, groupTime, folderNames, origins]);
 
   // Move sessions out of Active even when no new session events arrive.
   useEffect(() => {
@@ -974,7 +1009,7 @@ export function SessionList({ query }: { query: string }) {
         place,
         inPinned: g.kind === 'pinned',
       };
-      const row = sortable ? <SortableRow key={s.key} {...p} /> : <DraggableRow key={s.key} {...p} />;
+      const row = isStartingKey(s.key) ? <StartingRow key={s.key} {...p} /> : sortable ? <SortableRow key={s.key} {...p} /> : <DraggableRow key={s.key} {...p} />;
       const kids = nest.byParent.get(s.key);
       if (!kids) return row;
       return (
