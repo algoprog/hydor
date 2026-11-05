@@ -1635,8 +1635,8 @@ export const SlideCanvas = forwardRef<
             <button
               key={p.key}
               type="button"
-              title={p.ids.length === 1 ? 'A comment' : `${p.ids.length} comments`}
-              aria-label={p.ids.length === 1 ? 'A comment' : `${p.ids.length} comments`}
+              title="Comments"
+              aria-label="Comments"
               onPointerDown={(e) => e.stopPropagation()}
               onDoubleClick={(e) => e.stopPropagation()}
               onClick={(e) => {

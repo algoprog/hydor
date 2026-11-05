@@ -630,6 +630,8 @@ export function partName(e: El): string {
   if (e.type === 'math') return `Equation: ${e.tex.length > 24 ? `${e.tex.slice(0, 23)}…` : e.tex}`;
   if (e.type === 'video') return 'Video';
   if (e.type === 'group') return `Group of ${e.els.length}`;
+  if (e.route === 'elbow') return 'Elbow connector';
+  if (e.from || e.to) return 'Connector';
   return e.end === 'arrow' || e.start === 'arrow' ? 'Arrow' : 'Straight line';
 }
 

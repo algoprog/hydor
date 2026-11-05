@@ -107,8 +107,8 @@ export function SlideComments({
             Comment
           </Button>
           {open > 0 && onAsk && (
-            <Button size="sm" variant="ghost" icon={<Sparkles size={14} />} onClick={() => onAsk('Answer the comments on the slides: make the changes they ask for, and reply to each. ')}>
-              Ask the agent to answer them
+            <Button size="sm" variant="ghost" icon={<Sparkles size={14} />} className="max-w-full min-w-0" title="Ask the agent to answer the comments" onClick={() => onAsk('Answer the comments on the slides: make the changes they ask for, and reply to each. ')}>
+              <span className="min-w-0 truncate">Ask the agent to answer the comments</span>
             </Button>
           )}
         </div>
@@ -131,7 +131,8 @@ export function SlideComments({
       {!all.length && !adding && <p className="text-[12.5px] leading-relaxed text-fg-3">No comments yet. Pick a part of a slide (or nothing, for the whole slide), then Comment, or Insert → Comment (Ctrl+Alt+M).</p>}
       {done > 0 && (
         <button type="button" onClick={() => setResolved((r) => !r)} className="text-[12px] text-fg-3 hover:text-fg">
-          {resolved ? 'Hide resolved comments' : `Show resolved comments (${done})`}
+          {resolved ? 'Hide resolved comments' : 'Show resolved comments'}
+          {!resolved && <span className="tabular-nums"> ({done})</span>}
         </button>
       )}
       {slides.map((i) => {
