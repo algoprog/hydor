@@ -19,6 +19,7 @@ import { computerFeature } from './computer/feature';
 import { connectionsFeature } from './connections/feature';
 import { customFeature } from './custom/feature';
 import { documentsFeature } from './documents/feature';
+import { experimentsFeature } from './experiments/feature';
 import { commitsFeature } from './git/feature';
 import { guideFeature } from './guide/feature';
 import { guidelinesFeature } from './guidelines/feature';
@@ -134,6 +135,7 @@ export const features = (): WebFeature[] =>
     mediaFeature,
     connectionsFeature,
     automationsFeature,
+    experimentsFeature,
     voiceFeature,
     assistantsFeature,
     appsFeature,

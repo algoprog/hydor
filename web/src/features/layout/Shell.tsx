@@ -71,7 +71,8 @@ function useDrag(onMove: (dy: number) => void) {
 const Routes = memo(function Routes() {
   const [loc] = useLocation();
   const project = /^\/projects\/[^/]+/.exec(loc)?.[0];
-  const section = loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc.startsWith('/guide') ? '/guide' : (project ?? loc);
+  // A run of Experiments opens beside its list: the same page.
+  const section = loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc.startsWith('/guide') ? '/guide' : loc.startsWith('/system/experiments') ? '/system/experiments' : (project ?? loc);
   return (
     <div key={section} className="h-full">
       <Page />
