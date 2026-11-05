@@ -1,8 +1,8 @@
 // The spreadsheet editor's changes as plain functions: a change is a patch that says what the cells (or a sheet's
-// sizes, or the whole workbook) were before and after, so Undo and Redo replay it either way. The editor keeps one
-// workbook it changes in place, patch by patch. Here too: typing into cells, styles over a selection, clearing,
-// copying and pasting (tab-separated text, as Excel and Google Sheets exchange it), filling down and right, sorting,
-// and where Ctrl+arrow goes.
+// other parts: sizes, hidden rows, merges, its filter, rules and charts; or the whole workbook) were before and after,
+// so Undo and Redo replay it either way. The editor keeps one workbook it changes in place, patch by patch. Here too:
+// typing into cells, styles over a selection, clearing, copying and pasting (tab-separated text, as Excel and Google
+// Sheets exchange it), filling down and right, sorting, and where Ctrl+arrow goes (tools.ts and fill.ts have the rest).
 import {
   adjustForDelete,
   adjustForInsert,
@@ -44,12 +44,18 @@ export const rectOf = (s: Sel): Rect => ({ r1: Math.min(s.ar, s.fr), c1: Math.mi
 export const single = (s: Sel) => s.ar === s.fr && s.ac === s.fc;
 export const rectSel = (x: Rect, r = x.r1, c = x.c1): Sel => ({ r, c, ar: x.r1, ac: x.c1, fr: x.r2, fc: x.c2 });
 
-/** A sheet's sizes and frozen panes. */
+/** A sheet's parts besides its cells: sizes and hidden rows, frozen panes, merges, the filter, rules and charts. */
 export interface Meta {
   cols?: Sheet['cols'];
   rows?: Sheet['rows'];
   freeze?: Sheet['freeze'];
+  merges?: Sheet['merges'];
+  filter?: Sheet['filter'];
+  conditional?: Sheet['conditional'];
+  validation?: Sheet['validation'];
+  charts?: Sheet['charts'];
 }
+const META_KEYS = ['cols', 'rows', 'freeze', 'merges', 'filter', 'conditional', 'validation', 'charts'] as const;
 
 export type Patch = (
   | { k: 'cells'; sheet: string; before: Record<string, Cell | null>; after: Record<string, Cell | null> }
@@ -82,14 +88,21 @@ export function cellsPatch(book: Workbook, si: number, after: Record<string, Cel
   return n ? { k: 'cells', sheet: sh.id, before, after: next } : null;
 }
 
-export const metaOf = (sh: Sheet): Meta => ({ cols: sh.cols, rows: sh.rows, freeze: sh.freeze });
+export const metaOf = (sh: Sheet): Meta => ({ cols: sh.cols, rows: sh.rows, freeze: sh.freeze, merges: sh.merges, filter: sh.filter, conditional: sh.conditional, validation: sh.validation, charts: sh.charts });
 
 function setMeta(sh: Sheet, m: Meta) {
-  for (const k of ['cols', 'rows', 'freeze'] as const) {
+  for (const k of META_KEYS) {
     const v = m[k];
     if (v && Object.keys(v).length) (sh as unknown as Record<string, unknown>)[k] = v;
     else delete sh[k];
   }
+}
+
+/** A change to some of a sheet's other parts (the rest stay as they are); null when nothing changes. */
+export function metaPatch(sh: Sheet, set: Partial<Meta>): Patch | null {
+  const before = metaOf(sh);
+  const after = { ...before, ...set };
+  return JSON.stringify(before) === JSON.stringify(after) ? null : { k: 'meta', sheet: sh.id, before, after };
 }
 
 /** The workbook with a patch done (or undone): cells and sizes change in place; a whole workbook is swapped. */
@@ -112,11 +125,14 @@ export function applyPatch(book: Workbook, p: Patch, back: boolean): Workbook {
 /** Whether a cell holds something (a value or a formula), not only a look. */
 export const holds = (c: Cell | undefined) => !!c && (c.v !== undefined || c.f !== undefined);
 
-/** A cell typed into: its words as a value or a formula, its look kept (a number typed as 12% becomes a percent). */
+/** A cell typed into: its words as a value or a formula, its look and note kept (a number typed as 12% becomes a percent). */
 export function typedInto(cell: Cell | undefined, text: string): Cell | null {
-  if (text === '') return cell?.s ? { s: cell.s } : null;
-  return typedCell(parseInput(text, cell?.s?.fmt), cell?.s);
+  const typed = text === '' ? (cell?.s ? { s: cell.s } : null) : typedCell(parseInput(text, cell?.s?.fmt), cell?.s);
+  return cell?.note ? { ...(typed ?? {}), note: cell.note } : typed;
 }
+
+/** A cell with only what remains of it: null when it holds nothing, no look and no note. */
+export const tidyCell = (c: Cell): Cell | null => (c.v === undefined && c.f === undefined && !c.s && !c.note ? null : c);
 
 /** The cells of a rectangle that exist, by name, row by row (a big rectangle is looked through by the sheet's own cells). */
 export function cellsIn(sh: Sheet, calc: Calc, si: number, x: Rect): [string, number, number][] {
@@ -139,12 +155,12 @@ export function cellsIn(sh: Sheet, calc: Calc, si: number, x: Rect): [string, nu
   return out;
 }
 
-/** The selection's contents emptied; their looks kept unless `all`. */
+/** The selection's contents emptied; their looks and notes kept unless `all`. */
 export function clearChanges(sh: Sheet, calc: Calc, si: number, x: Rect, all = false): Record<string, Cell | null> {
   const out: Record<string, Cell | null> = {};
   for (const [k] of cellsIn(sh, calc, si, x)) {
     const c = sh.cells[k];
-    out[k] = !all && c.s ? { s: c.s } : null;
+    out[k] = all ? null : tidyCell({ ...(c.s ? { s: c.s } : {}), ...(c.note ? { note: c.note } : {}) });
   }
   return out;
 }
@@ -161,7 +177,7 @@ export function styleChanges(sh: Sheet, calc: Calc, si: number, x: Rect, f: (s: 
     const next: Cell = { ...(c ?? {}) };
     if (s && Object.keys(s).length) next.s = s;
     else delete next.s;
-    out[k] = next.v === undefined && next.f === undefined && !next.s ? null : next;
+    out[k] = tidyCell(next);
   };
   const area = (x.r2 - x.r1 + 1) * (x.c2 - x.c1 + 1);
   if (area <= 10_000) {
@@ -204,11 +220,12 @@ export function touched(p: Patch, out = new Map<string, string[]>()): Map<string
 
 // ---- copy and paste ---------------------------------------------------------------------------------------------
 
-/** Cells copied (or cut): what they hold, from where, and the text that went to the clipboard with them. */
+/** Cells copied (or cut): what they hold and what they showed then (for Paste special), from where, and the text that went to the clipboard with them. */
 export interface Clip {
   sheet: string;
   x: Rect;
   cells: (Cell | null)[][];
+  vals: Scalar[][];
   text: string;
   cut?: boolean;
 }
@@ -221,15 +238,18 @@ export function copyOf(sh: Sheet, calc: Calc, si: number, x0: Rect): { clip: Cli
   // Whole columns or rows: only as far as the sheet holds.
   const x: Rect = { r1: x0.r1, c1: x0.c1, r2: Math.max(x0.r1, Math.min(x0.r2, e.rows - 1)), c2: Math.max(x0.c1, Math.min(x0.c2, e.cols - 1)) };
   const cells: (Cell | null)[][] = [];
+  const vals: Scalar[][] = [];
   const lines: string[] = [];
   const rows: string[] = [];
   for (let r = x.r1; r <= x.r2; r++) {
     const row: (Cell | null)[] = [];
+    const vrow: Scalar[] = [];
     const texts: string[] = [];
     const tds: string[] = [];
     for (let c = x.c1; c <= x.c2; c++) {
       const cell = sh.cells[refName(r, c)] ?? null;
       row.push(cell);
+      vrow.push(cell && holds(cell) ? calc.value(si, r, c) : null);
       const t = cell && holds(cell) ? formatValue(calc.value(si, r, c), cell.s) : '';
       texts.push(/[\t\n"]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t);
       const s = cell?.s;
@@ -246,11 +266,12 @@ export function copyOf(sh: Sheet, calc: Calc, si: number, x0: Rect): { clip: Cli
       tds.push(`<td${css ? ` style="${css}"` : ''}>${htmlEsc(t).replace(/\n/g, '<br>')}</td>`);
     }
     cells.push(row);
+    vals.push(vrow);
     lines.push(texts.join('\t'));
     rows.push(`<tr>${tds.join('')}</tr>`);
   }
   const text = lines.join('\n');
-  return { clip: { sheet: sh.id, x, cells, text }, text, html: `<table>${rows.join('')}</table>` };
+  return { clip: { sheet: sh.id, x, cells, vals, text }, text, html: `<table>${rows.join('')}</table>` };
 }
 
 /** What a paste puts where: from cells copied here (formulas moved along, looks kept), or from text (typed as typing). */

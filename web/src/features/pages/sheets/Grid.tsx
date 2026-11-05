@@ -1,13 +1,19 @@
 // A sheet's grid. Only the rows and columns in view are drawn, so thousands of rows scroll as smoothly as a few. The
 // column letters and row numbers stay in view, as do frozen rows and columns: each is a band that sticks to its
-// edge (the browser keeps it there while scrolling), and every cell is placed in the band it belongs to. Over the
-// cells: the selection, references outlined while a formula is typed, what was cut, and the box to type in, which
-// is also what takes the keys and the clipboard while nothing is typed (so typing starts at once, in any language).
+// edge (the browser keeps it there while scrolling), and every cell is placed in the band it belongs to. Cells show
+// what the sheet's rules make of them: merged cells as one, hidden rows and columns folded to a mark that shows them
+// again, borders, conditional formatting (looks, colour scales, data bars), checkboxes, lists' coloured chips, stars,
+// a mark for a note (shown when pointed at) and for a value its rule does not allow, and a filter's buttons on its
+// header row. Over the cells: the selection, references outlined while a formula is typed, what was cut, the fill
+// handle, the charts, and the box to type in, which is also what takes the keys and the clipboard while nothing is
+// typed (so typing starts at once, in any language). It is drawn at the zoom asked for.
 // Mouse: click, drag, Shift+click, the letters and numbers, edges of headers to size columns and rows (a double
-// click fits them). Touch: a tap picks, a tap on the picked cell types in it, a drag scrolls, the round handle
-// stretches the selection, a long press opens the menu.
-import { forwardRef, memo, useCallback, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { colName, formatValue, isError, refName, textOn, type Calc, type Cell, type CellStyle, type Rect, type Sheet } from '@shared/sheets';
+// click fits them), the fill handle (drag it, or double-click it to fill down). Touch: a tap picks, a tap on the
+// picked cell types in it, a drag scrolls, the round handle stretches the selection, a long press opens the menu.
+import { forwardRef, memo, useCallback, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ChevronDown, ChevronsLeftRight, ChevronsUpDown, ListFilter, Maximize2 } from 'lucide-react';
+import { accountingParts, borderOf, CELL_FONTS, codeColor, colName, formatValue, inputText, isError, refName, textOn, type Calc, type Cell, type CellStyle, type Rect, type Sheet } from '@shared/sheets';
+import { allowed, isTicked, listOptions, type CondFormats, type Merges, type Rules } from '@shared/sheet-rules';
 import { cx } from '../../../components/ui';
 import { colW, indexAt, offsets, rectOf, rowH, type Sel } from './ops';
 
@@ -38,6 +44,19 @@ export interface RefBox extends Rect {
   color: string;
 }
 
+/** What the sheet's rules make of it, worked out once per change: hidden rows and columns, merges, looks, rules for cells, the filter. */
+export interface GridView {
+  /** Rows hidden, by hand or by the filter; those by hand (they get a mark to show them). */
+  hidR: Set<number>;
+  handR: Set<number>;
+  hidC: Set<number>;
+  merges: Merges;
+  cf: CondFormats;
+  rules: Rules;
+  /** The filter's range, and the columns it filters by. */
+  filter: { x: Rect; on: Set<number> } | null;
+}
+
 export interface GridHandle {
   focus(): void;
   input(): HTMLTextAreaElement | null;
@@ -45,7 +64,12 @@ export interface GridHandle {
   reveal(r: number, c: number): void;
   /** How many rows fit in view (for Page Up and Page Down). */
   pageRows(): number;
+  /** Where a cell is on screen. */
+  rectOf(r: number, c: number): DOMRect | null;
 }
+
+/** What a click on a cell's own widget asks for: a checkbox ticked, a list or a date picker opened, stars given. */
+export type Smart = 'check' | 'list' | 'date' | 'rate';
 
 interface Props {
   sheet: Sheet;
@@ -60,6 +84,12 @@ interface Props {
   refs: RefBox[];
   cut: Rect | null;
   readOnly?: boolean;
+  view: GridView;
+  zoom: number;
+  /** Formulas shown instead of what they give. */
+  formulas?: boolean;
+  /** Drawn over the cells, scrolling with them (the charts), placed from A1's corner. */
+  overlay?: ReactNode;
   onSel: (s: Sel) => void;
   onEdit: (mode: 'type' | 'edit', text?: string) => void;
   onText: (text: string, caret: number) => void;
@@ -75,6 +105,14 @@ interface Props {
   onCopy: (e: React.ClipboardEvent) => void;
   onCut: (e: React.ClipboardEvent) => void;
   onPaste: (e: React.ClipboardEvent) => void;
+  onSmart: (kind: Smart, r: number, c: number, at: DOMRect, n?: number) => void;
+  /** A filter button pressed: its column, and where it is. */
+  onFilter: (c: number, at: DOMRect) => void;
+  /** The fill handle dragged from the selection over `target`; Ctrl held. */
+  onFill: (target: Rect, ctrl: boolean) => void;
+  onFillDown: () => void;
+  onUnhide: (axis: 'row' | 'col', i: number) => void;
+  onExpand: (r: number) => void;
 }
 
 // ---- measuring words ----------------------------------------------------------------------------------------------
@@ -83,9 +121,9 @@ let ctx2d: CanvasRenderingContext2D | null = null;
 const widths = new Map<string, number>();
 let family = 'system-ui, sans-serif';
 
-/** A text's width in px in a cell's type, remembered. */
+/** A text's width in px in a cell's type (at 100%), remembered. */
 export function textWidth(text: string, s?: CellStyle): number {
-  const font = `${s?.i ? 'italic ' : ''}${s?.b ? 700 : 400} ${fontPx(s)}px ${family}`;
+  const font = `${s?.i ? 'italic ' : ''}${s?.b ? 700 : 400} ${fontPx(s)}px ${s?.font && CELL_FONTS[s.font] ? CELL_FONTS[s.font] : family}`;
   const key = `${font}|${text}`;
   let w = widths.get(key);
   if (w !== undefined) return w;
@@ -99,7 +137,7 @@ export function textWidth(text: string, s?: CellStyle): number {
 }
 
 /** A cell's type size in px (styles keep points). */
-export const fontPx = (s?: CellStyle) => Math.round(((s?.size ?? 10) * 4) / 3 * 10) / 10;
+export const fontPx = (s?: CellStyle) => Math.round((((s?.size ?? 10) * 4) / 3) * 10) / 10;
 
 // ---- how a cell looks -------------------------------------------------------------------------------------------------
 
@@ -107,30 +145,48 @@ interface Shown {
   text: string;
   style: React.CSSProperties;
   cls: string;
+  /** An amount in the Accounting format: its sign, shown at the cell's left edge. */
+  sign?: string;
 }
 
-/** A cell's words and look (numbers right, TRUE and FALSE and errors in the middle, words left unless it says). */
-function shown(cell: Cell, v: ReturnType<Calc['value']>): Shown {
+/** A cell's words and look (numbers right, TRUE and FALSE and errors in the middle, words left unless it says), at a zoom. */
+function shown(cell: Cell, v: ReturnType<Calc['value']>, z: number, formulas: boolean): Shown {
   const s = cell.s;
-  const text = cell.v === undefined && cell.f === undefined ? '' : formatValue(v, s);
+  let text = cell.v === undefined && cell.f === undefined ? '' : formatValue(v, s);
+  if (formulas && cell.f !== undefined) text = inputText(cell);
   const style: React.CSSProperties = {};
   let cls = '';
-  const align = s?.align ?? (typeof v === 'number' ? 'right' : typeof v === 'boolean' || isError(v) ? 'center' : 'left');
+  const align = s?.align ?? (formulas && cell.f !== undefined ? 'left' : typeof v === 'number' ? 'right' : typeof v === 'boolean' || isError(v) ? 'center' : 'left');
   style.justifyContent = align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start';
   style.textAlign = align;
   // Words wrapped start at the top (a row too short for them shows their beginning).
   style.alignItems = s?.valign === 'top' || (s?.wrap && !s.valign) ? 'flex-start' : s?.valign === 'bottom' ? 'flex-end' : 'center';
-  if (s?.wrap) style.paddingTop = 3;
+  if (s?.wrap) style.paddingTop = 3 * z;
   if (s?.b) style.fontWeight = 700;
   if (s?.i) style.fontStyle = 'italic';
   if (s?.u || s?.s) style.textDecoration = [s.u ? 'underline' : '', s.s ? 'line-through' : ''].filter(Boolean).join(' ');
-  if (s?.size) style.fontSize = fontPx(s);
+  if (s?.size || z !== 1) style.fontSize = fontPx(s) * z;
+  if (s?.font && CELL_FONTS[s.font]) style.fontFamily = CELL_FONTS[s.font];
   if (s?.fill) style.background = s.fill;
-  const color = s?.color ?? (s?.fill ? textOn(s.fill) : undefined);
+  const color = codeColor(v, s?.code) ?? s?.color ?? (s?.fill ? textOn(s.fill) : undefined);
   if (color) style.color = color;
   else if (isError(v)) cls = 'text-err';
   if (s?.wrap) style.whiteSpace = 'pre-wrap';
-  return { text, style, cls };
+  let sign: string | undefined;
+  if (s?.fmt === 'accounting' && !s.code && typeof v === 'number' && !(formulas && cell.f !== undefined)) {
+    const [cur, body] = accountingParts(v, s);
+    sign = cur;
+    text = body;
+  }
+  return { text, style, cls, sign };
+}
+
+/** A border as CSS for one edge: its weight, pattern and colour (the text's when it has none). */
+function edgeCss(b: string | undefined, z: number): string | null {
+  const x = borderOf(b);
+  if (!x) return null;
+  const w = Math.max(1, Math.round((x.kind === 'medium' ? 2 : x.kind === 'thick' || x.kind === 'double' ? 3 : 1) * Math.min(z, 1.5)));
+  return `${w}px ${x.kind === 'dashed' ? 'dashed' : x.kind === 'dotted' ? 'dotted' : x.kind === 'double' ? 'double' : 'solid'} ${x.color ?? 'var(--fg)'}`;
 }
 
 // ---- the grid ---------------------------------------------------------------------------------------------------------
@@ -145,26 +201,38 @@ interface View {
 type Region = 'corner' | 'top' | 'left' | 'body';
 
 export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
-  const { sheet, si, calc, rev, rows, cols, sel, edit, readOnly } = p;
+  const { sheet, si, calc, rev, rows, cols, sel, edit, readOnly, view: gv, zoom: z } = p;
   const scroller = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const [view, setView] = useState<View>({ top: 0, left: 0, w: 800, h: 600 });
   // A column or row being sized: its live size.
   const [sizing, setSizing] = useState<{ axis: 'col' | 'row'; i: number; size: number } | null>(null);
+  // The fill handle being dragged: the cells it would fill.
+  const [filling, setFilling] = useState<Rect | null>(null);
+  // The cell the mouse is over (for its note).
+  const [hover, setHover] = useState<{ r: number; c: number } | null>(null);
   const touch = useRef(false);
   // An input method composing (Chinese, Japanese, Greek accents…): the caret is left where it is meanwhile.
   const composing = useRef(false);
   const cb = useRef(p);
   cb.current = p;
+  const HH = Math.round(HEAD_H * z);
+  const NW = Math.round(NUM_W * z);
 
   const fr = Math.min(sheet.freeze?.rows ?? 0, rows - 1);
   const fc = Math.min(sheet.freeze?.cols ?? 0, cols - 1);
-  const colOff = useMemo(() => offsets(cols, (c) => (sizing?.axis === 'col' && sizing.i === c ? sizing.size : colW(sheet, c))), [cols, sheet, sheet.cols, sizing, rev]);
-  const rowOff = useMemo(() => offsets(rows, (r) => (sizing?.axis === 'row' && sizing.i === r ? sizing.size : rowH(sheet, r))), [rows, sheet, sheet.rows, sizing, rev]);
+  const colOff = useMemo(
+    () => offsets(cols, (c) => (gv.hidC.has(c) ? 0 : Math.round((sizing?.axis === 'col' && sizing.i === c ? sizing.size : colW(sheet, c)) * z))),
+    [cols, sheet, sheet.cols, sizing, rev, z, gv], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const rowOff = useMemo(
+    () => offsets(rows, (r) => (gv.hidR.has(r) ? 0 : Math.round((sizing?.axis === 'row' && sizing.i === r ? sizing.size : rowH(sheet, r)) * z))),
+    [rows, sheet, sheet.rows, sizing, rev, z, gv], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const FW = colOff[fc];
   const FH = rowOff[fr];
-  const W = NUM_W + colOff[cols];
-  const H = HEAD_H + rowOff[rows];
+  const W = NW + colOff[cols];
+  const H = HH + rowOff[rows];
 
   useLayoutEffect(() => {
     const el = scroller.current;
@@ -179,12 +247,12 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   // What is in view (and a little more), as row and column ranges: drawn anew only when they change.
   const range = useMemo(() => {
     const r1 = Math.max(fr, indexAt(rowOff, view.top + FH) - 3);
-    const r2 = Math.min(rows - 1, indexAt(rowOff, view.top + view.h - HEAD_H) + 3);
+    const r2 = Math.min(rows - 1, indexAt(rowOff, view.top + view.h - HH) + 3);
     // A few columns before the first in view too: their words may run on into it.
     const c1 = Math.max(fc, indexAt(colOff, view.left + FW) - 3);
-    const c2 = Math.min(cols - 1, indexAt(colOff, view.left + view.w - NUM_W) + 1);
+    const c2 = Math.min(cols - 1, indexAt(colOff, view.left + view.w - NW) + 1);
     return { r1, r2, c1, c2 };
-  }, [view, rowOff, colOff, rows, cols, fr, fc, FH, FW]);
+  }, [view, rowOff, colOff, rows, cols, fr, fc, FH, FW, HH, NW]);
   const rangeKey = `${range.r1}:${range.r2}:${range.c1}:${range.c2}`;
   const stableRange = useMemo(() => range, [rangeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -197,12 +265,14 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   /** A cell's place within its band. */
   const place = useCallback(
     (r: number, c: number, region: Region) => ({
-      left: NUM_W + colOff[c],
-      top: region === 'left' ? rowOff[r] - FH : HEAD_H + rowOff[r],
+      left: NW + colOff[c],
+      top: region === 'left' ? rowOff[r] - FH : HH + rowOff[r],
     }),
-    [colOff, rowOff, FH],
+    [colOff, rowOff, FH, NW, HH],
   );
   const regionOf = (r: number, c: number): Region => (r < fr ? (c < fc ? 'corner' : 'top') : c < fc ? 'left' : 'body');
+  /** A cell's rectangle: its merge's when it is in one. */
+  const spanOf = (r: number, c: number): Rect => gv.merges.at(r, c) ?? { r1: r, c1: c, r2: r, c2: c };
 
   // ---- where the pointer is ------------------------------------------------------------------------------------------
   /** The cell under a point on screen: -1 for the column letters or the row numbers. */
@@ -211,9 +281,19 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     const b = el.getBoundingClientRect();
     const vx = x - b.left;
     const vy = y - b.top;
-    const c = vx < NUM_W ? -1 : vx < NUM_W + FW ? indexAt(colOff, vx - NUM_W) : indexAt(colOff, vx - NUM_W + el.scrollLeft);
-    const r = vy < HEAD_H ? -1 : vy < HEAD_H + FH ? indexAt(rowOff, vy - HEAD_H) : indexAt(rowOff, vy - HEAD_H + el.scrollTop);
+    const c = vx < NW ? -1 : vx < NW + FW ? indexAt(colOff, vx - NW) : indexAt(colOff, vx - NW + el.scrollLeft);
+    const r = vy < HH ? -1 : vy < HH + FH ? indexAt(rowOff, vy - HH) : indexAt(rowOff, vy - HH + el.scrollTop);
     return [Math.min(r, rows - 1), Math.min(c, cols - 1)];
+  };
+  /** A cell's (or its merge's) rectangle on screen. */
+  const screenRect = (r: number, c: number): DOMRect | null => {
+    const el = scroller.current;
+    if (!el) return null;
+    const b = el.getBoundingClientRect();
+    const m = spanOf(r, c);
+    const x = b.left + NW + colOff[m.c1] - (m.c1 < fc ? 0 : el.scrollLeft);
+    const y = b.top + HH + rowOff[m.r1] - (m.r1 < fr ? 0 : el.scrollTop);
+    return new DOMRect(x, y, colOff[m.c2 + 1] - colOff[m.c1], rowOff[m.r2 + 1] - rowOff[m.r1]);
   };
 
   useImperativeHandle(ref, () => ({
@@ -225,31 +305,50 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     reveal: (r, c) => {
       const el = scroller.current;
       if (!el) return;
+      const m = spanOf(r, c);
       if (r >= fr) {
-        const y0 = rowOff[r] - FH;
-        const y1 = rowOff[r + 1] - FH;
-        const room = el.clientHeight - HEAD_H - FH;
+        const y0 = rowOff[m.r1] - FH;
+        const y1 = rowOff[m.r2 + 1] - FH;
+        const room = el.clientHeight - HH - FH;
         if (y0 < el.scrollTop) el.scrollTop = y0;
-        else if (y1 > el.scrollTop + room) el.scrollTop = y1 - room;
+        else if (y1 > el.scrollTop + room) el.scrollTop = Math.min(y0, y1 - room);
       }
       if (c >= fc) {
-        const x0 = colOff[c] - FW;
-        const x1 = colOff[c + 1] - FW;
-        const room = el.clientWidth - NUM_W - FW;
+        const x0 = colOff[m.c1] - FW;
+        const x1 = colOff[m.c2 + 1] - FW;
+        const room = el.clientWidth - NW - FW;
         if (x0 < el.scrollLeft) el.scrollLeft = x0;
         else if (x1 > el.scrollLeft + room) el.scrollLeft = Math.min(x0, x1 - room);
       }
     },
-    pageRows: () => Math.max(1, Math.floor((view.h - HEAD_H - FH) / 24) - 1),
+    pageRows: () => Math.max(1, Math.floor((view.h - HH - FH) / (24 * z)) - 1),
+    rectOf: screenRect,
   }));
 
   // ---- pointer: picking, dragging, typing in ----------------------------------------------------------------------------
-  const drag = useRef<{ kind: 'cells' | 'cols' | 'rows' | 'point' | 'handle'; id: number; x: number; y: number; moved: boolean; timer?: number } | null>(null);
+  type DragKind = 'cells' | 'cols' | 'rows' | 'point' | 'handle' | 'fill';
+  const drag = useRef<{ kind: DragKind; id: number; x: number; y: number; moved: boolean; timer?: number } | null>(null);
   const auto = useRef<number | null>(null);
 
-  const extendTo = (r: number, c: number, kind: 'cells' | 'cols' | 'rows' | 'point' | 'handle') => {
+  /** The cells the fill handle would fill, dragged to (r, c): the selection grown down, up, right or left, whichever the pointer is furthest past. */
+  const fillTarget = (r: number, c: number): Rect => {
+    const x = rectOf(cb.current.sel);
+    const dDown = r - x.r2;
+    const dUp = x.r1 - r;
+    const dRight = c - x.c2;
+    const dLeft = x.c1 - c;
+    const most = Math.max(dDown, dUp, dRight, dLeft);
+    if (most <= 0) return x;
+    if (most === dDown) return { ...x, r2: r };
+    if (most === dUp) return { ...x, r1: r };
+    if (most === dRight) return { ...x, c2: c };
+    return { ...x, c1: c };
+  };
+
+  const extendTo = (r: number, c: number, kind: DragKind) => {
     const s = cb.current.sel;
     if (kind === 'point') return void cb.current.onPoint(Math.max(0, r), Math.max(0, c), true);
+    if (kind === 'fill') return setFilling(fillTarget(Math.max(0, r), Math.max(0, c)));
     if (kind === 'cols') return cb.current.onSel({ ...s, fr: rows - 1, fc: Math.max(0, c) });
     if (kind === 'rows') return cb.current.onSel({ ...s, fr: Math.max(0, r), fc: cols - 1 });
     cb.current.onSel({ ...s, fr: Math.max(0, r), fc: Math.max(0, c) });
@@ -262,8 +361,8 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     const d = drag.current;
     if (!el || !d) return;
     const b = el.getBoundingClientRect();
-    const dx = x < b.left + NUM_W + FW ? -1 : x > b.right - 4 ? 1 : 0;
-    const dy = y < b.top + HEAD_H + FH ? -1 : y > b.bottom - 4 ? 1 : 0;
+    const dx = x < b.left + NW + FW ? -1 : x > b.right - 4 ? 1 : 0;
+    const dy = y < b.top + HH + FH ? -1 : y > b.bottom - 4 ? 1 : 0;
     if (!dx && !dy) return;
     const step = () => {
       if (!drag.current) return;
@@ -276,9 +375,28 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     auto.current = requestAnimationFrame(step);
   };
 
+  /** A click on a cell's own widget (a checkbox, a list's arrow, stars): what it asks for, or null. */
+  const smartAt = (x: number, y: number, r: number, c: number): { kind: Smart; n?: number } | null => {
+    const rule = gv.rules.any ? gv.rules.at(r, c)?.rule : undefined;
+    if (!rule) return null;
+    const b = screenRect(r, c);
+    if (!b) return null;
+    if (rule.type === 'checkbox') {
+      const half = 9 * z;
+      return Math.abs(x - (b.left + b.width / 2)) <= half + 2 && Math.abs(y - (b.top + b.height / 2)) <= half + 2 ? { kind: 'check' } : null;
+    }
+    if (rule.type === 'rating') {
+      const star = 15 * z;
+      const i = Math.floor((x - b.left - 5 * z) / star);
+      return i >= 0 && i < (rule.max ?? 5) ? { kind: 'rate', n: i + 1 } : null;
+    }
+    if (rule.type === 'list') return x > b.right - 20 * z ? { kind: 'list' } : null;
+    return null;
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
     const t = e.target as HTMLElement;
-    if (t.closest('[data-sizer]') || t === input.current) return;
+    if (t.closest('[data-sizer],[data-own]') || t === input.current) return;
     if (e.button !== 0 && e.pointerType === 'mouse') return;
     touch.current = e.pointerType !== 'mouse';
     const [r, c] = cellAt(e.clientX, e.clientY);
@@ -318,7 +436,13 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
       P.onSel(next);
       drag.current = { kind: 'rows', id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
     } else {
+      const smart = !e.shiftKey && !readOnly ? smartAt(e.clientX, e.clientY, r, c) : null;
       P.onSel(e.shiftKey ? { ...s, fr: r, fc: c } : { r, c, ar: r, ac: c, fr: r, fc: c });
+      if (smart) {
+        const at = screenRect(r, c);
+        if (at) P.onSmart(smart.kind, r, c, at, smart.n);
+        return;
+      }
       drag.current = { kind: 'cells', id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
     }
     scroller.current?.setPointerCapture(e.pointerId);
@@ -327,11 +451,20 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
 
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current;
+    if (!d && e.pointerType === 'mouse') {
+      // The cell pointed at, for its note.
+      const [r, c] = cellAt(e.clientX, e.clientY);
+      const m = r >= 0 && c >= 0 ? spanOf(r, c) : null;
+      const note = m ? sheet.cells[refName(m.r1, m.c1)]?.note : undefined;
+      const next = m && note ? { r: m.r1, c: m.c1 } : null;
+      if (next?.r !== hover?.r || next?.c !== hover?.c) setHover(next);
+      return;
+    }
     if (!d || d.id !== e.pointerId) return;
     if (Math.abs(e.clientX - d.x) + Math.abs(e.clientY - d.y) > 6) d.moved = true;
     if (touch.current && d.kind !== 'handle') return;
     const [r, c] = cellAt(e.clientX, e.clientY);
-    extendTo(r < 0 ? (d.kind === 'cols' ? rows - 1 : 0) : r, c < 0 ? (d.kind === 'rows' ? cols - 1 : 0) : c, d.kind);
+    extendTo(r < 0 ? (d.kind === 'cols' ? rows - 1 : 0) : r, c < 0 ? (d.kind === 'rows' ? cols - 1 : 0) : c, d.kind === 'handle' ? 'cells' : d.kind);
     autoScroll(e.clientX, e.clientY);
   };
 
@@ -342,6 +475,12 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     drag.current = null;
     if (!d || d.id !== e.pointerId) return;
     if (d.timer) clearTimeout(d.timer);
+    if (d.kind === 'fill') {
+      const target = filling;
+      setFilling(null);
+      if (target) cb.current.onFill(target, e.ctrlKey || e.metaKey);
+      return;
+    }
     if (!touch.current || d.kind === 'handle' || d.moved) return;
     // A tap: picks the cell; on the cell picked already, types in it (the keyboard opens, as it is a tap).
     const P = cb.current;
@@ -350,8 +489,20 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     if (r < 0) return P.onSel({ r: 0, c, ar: 0, ac: c, fr: rows - 1, fc: c });
     if (c < 0) return P.onSel({ r, c: 0, ar: r, ac: 0, fr: r, fc: cols - 1 });
     if (P.edit && P.onPoint(r, c, false)) return;
+    const smart = !P.readOnly && !P.edit ? smartAt(e.clientX, e.clientY, r, c) : null;
+    if (smart) {
+      P.onSel({ r, c, ar: r, ac: c, fr: r, fc: c });
+      const at = screenRect(r, c);
+      if (at) P.onSmart(smart.kind, r, c, at, smart.n);
+      return;
+    }
     const s = P.sel;
-    if (!P.edit && !P.readOnly && s.r === r && s.c === c && s.ar === s.fr && s.ac === s.fc) {
+    const m = spanOf(r, c);
+    if (!P.edit && !P.readOnly && s.r === m.r1 && s.c === m.c1 && (single(s) || sameRect(rectOf(s), m))) {
+      const rule = gv.rules.any ? gv.rules.at(m.r1, m.c1)?.rule : undefined;
+      const at = screenRect(m.r1, m.c1);
+      // A list's cell opens its list; a date's, the calendar; others are typed in.
+      if (rule?.type === 'list' && at) return P.onSmart('list', m.r1, m.c1, at);
       input.current?.focus({ preventScroll: true });
       P.onEdit('edit');
       return;
@@ -361,10 +512,18 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   };
 
   const onDoubleClick = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('[data-sizer]') || readOnly) return;
+    if ((e.target as HTMLElement).closest('[data-sizer],[data-own]') || readOnly) return;
     const [r, c] = cellAt(e.clientX, e.clientY);
     if (r < 0 || c < 0 || cb.current.edit) return;
-    cb.current.onSel({ r, c, ar: r, ac: c, fr: r, fc: c });
+    const m = spanOf(r, c);
+    const rule = gv.rules.any ? gv.rules.at(m.r1, m.c1)?.rule : undefined;
+    if (rule?.type === 'checkbox' || rule?.type === 'rating') return;
+    const at = screenRect(m.r1, m.c1);
+    if (rule?.type === 'list' && at) return cb.current.onSmart('list', m.r1, m.c1, at);
+    const cell = sheet.cells[refName(m.r1, m.c1)];
+    const fmt = cell?.s?.fmt;
+    if (at && cell?.f === undefined && (rule?.type === 'date' || fmt === 'date' || fmt === 'datetime')) return cb.current.onSmart('date', m.r1, m.c1, at);
+    cb.current.onSel({ r: m.r1, c: m.c1, ar: m.r1, ac: m.c1, fr: m.r2, fc: m.c2 });
     input.current?.focus({ preventScroll: true });
     cb.current.onEdit('edit');
   };
@@ -397,7 +556,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     target.setPointerCapture(e.pointerId);
     let size = base;
     const move = (ev: PointerEvent) => {
-      size = Math.max(axis === 'col' ? 24 : 16, Math.min(axis === 'col' ? 1200 : 600, Math.round(base + (axis === 'col' ? ev.clientX : ev.clientY) - start)));
+      size = Math.max(axis === 'col' ? 24 : 16, Math.min(axis === 'col' ? 1200 : 600, Math.round(base + ((axis === 'col' ? ev.clientX : ev.clientY) - start) / z)));
       setSizing({ axis, i, size });
     };
     const up = () => {
@@ -414,14 +573,15 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
 
   // ---- the box typed into -------------------------------------------------------------------------------------------------
   // One box for the whole grid, never moved from band to band (that would lose the focus): it sits over the active
-  // cell, a frozen cell's place following the scrolling, and over the bands while words are typed in it.
-  const at = { left: NUM_W + colOff[sel.c] + (sel.c < fc ? view.left : 0), top: HEAD_H + rowOff[sel.r] + (sel.r < fr ? view.top : 0) };
-  const cellW = colOff[sel.c + 1] - colOff[sel.c];
-  const cellH = rowOff[sel.r + 1] - rowOff[sel.r];
-  const editCell = sheet.cells[refName(sel.r, sel.c)];
-  const editW = edit ? Math.min(Math.max(cellW, textWidth(edit.text || ' ', editCell?.s) + 18), Math.max(cellW, view.w - (at.left - view.left) - 8)) : cellW;
-  const lineCount = edit ? edit.text.split('\n').length + (editCell?.s?.wrap ? Math.floor(textWidth(edit.text, editCell.s) / Math.max(40, editW - 12)) : 0) : 1;
-  const editH = Math.max(cellH, lineCount * (fontPx(editCell?.s) * 1.35) + 8);
+  // cell (its merge), a frozen cell's place following the scrolling, and over the bands while words are typed in it.
+  const am = spanOf(sel.r, sel.c);
+  const at = { left: NW + colOff[am.c1] + (am.c1 < fc ? view.left : 0), top: HH + rowOff[am.r1] + (am.r1 < fr ? view.top : 0) };
+  const cellW = colOff[am.c2 + 1] - colOff[am.c1];
+  const cellH = rowOff[am.r2 + 1] - rowOff[am.r1];
+  const editCell = sheet.cells[refName(am.r1, am.c1)];
+  const editW = edit ? Math.min(Math.max(cellW, textWidth(edit.text || ' ', editCell?.s) * z + 18), Math.max(cellW, view.w - (at.left - view.left) - 8)) : cellW;
+  const lineCount = edit ? edit.text.split('\n').length + (editCell?.s?.wrap ? Math.floor((textWidth(edit.text, editCell.s) * z) / Math.max(40, editW - 12)) : 0) : 1;
+  const editH = Math.max(cellH, lineCount * (fontPx(editCell?.s) * z * 1.35) + 8);
 
   // Not typing: the box holds a selected space, so a key typed replaces it (and copying always has something to copy).
   useLayoutEffect(() => {
@@ -476,9 +636,10 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
         top: at.top,
         width: edit ? editW : cellW,
         height: edit ? editH : cellH,
-        fontSize: fontPx(editCell?.s),
+        fontSize: fontPx(editCell?.s) * z,
         fontWeight: edit && editCell?.s?.b ? 700 : undefined,
         fontStyle: edit && editCell?.s?.i ? 'italic' : undefined,
+        fontFamily: edit && editCell?.s?.font ? CELL_FONTS[editCell.s.font] : undefined,
         whiteSpace: 'pre-wrap',
         // While not typing it sits still and unseen at the cell (the keys and the clipboard come to it).
         caretColor: edit ? undefined : 'transparent',
@@ -489,57 +650,91 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   // ---- drawing --------------------------------------------------------------------------------------------------------
   const allRows = useMemo(() => ({ r1: 0, r2: fr - 1 }), [fr]);
   const allCols = useMemo(() => ({ c1: 0, c2: fc - 1 }), [fc]);
-  const cellsBody = <Cells sheet={sheet} si={si} calc={calc} rev={rev} rows={stableRange} cols={stableRange} fc={fc} region="body" place={place} colOff={colOff} rowOff={rowOff} />;
-  const cellsTop = fr > 0 && <Cells sheet={sheet} si={si} calc={calc} rev={rev} rows={allRows} cols={stableRange} fc={fc} region="top" place={place} colOff={colOff} rowOff={rowOff} />;
-  const cellsLeft = fc > 0 && <Cells sheet={sheet} si={si} calc={calc} rev={rev} rows={stableRange} cols={allCols} fc={fc} region="left" place={place} colOff={colOff} rowOff={rowOff} />;
-  const cellsCorner = fr > 0 && fc > 0 && <Cells sheet={sheet} si={si} calc={calc} rev={rev} rows={allRows} cols={allCols} fc={fc} region="corner" place={place} colOff={colOff} rowOff={rowOff} />;
+  const common = { sheet, si, calc, rev, fc, place, colOff, rowOff, view: gv, z, formulas: !!p.formulas };
+  const cellsBody = <Cells {...common} rows={stableRange} cols={stableRange} region="body" />;
+  const cellsTop = fr > 0 && <Cells {...common} rows={allRows} cols={stableRange} region="top" />;
+  const cellsLeft = fc > 0 && <Cells {...common} rows={stableRange} cols={allCols} region="left" />;
+  const cellsCorner = fr > 0 && fc > 0 && <Cells {...common} rows={allRows} cols={allCols} region="corner" />;
 
   const x = rectOf(sel);
   const selCols = (c: number) => c >= x.c1 && c <= x.c2;
   const selRows = (r: number) => r >= x.r1 && r <= x.r2;
   const wholeCols = x.r1 === 0 && x.r2 >= rows - 1;
   const wholeRows = x.c1 === 0 && x.c2 >= cols - 1;
+  const fx = gv.filter?.x;
+  const marker = 'absolute z-20 flex items-center justify-center rounded-sm border border-line-2 bg-elevated text-fg-3 shadow-sm hover:text-accent';
 
-  const colHead = (c: number) => (
-    <div
-      key={c}
-      className={cx(
-        'absolute top-0 flex items-center justify-center border-r border-b border-line text-[11px] select-none',
-        selCols(c) ? (wholeCols ? 'bg-accent text-accent-fg' : 'bg-accent-soft font-semibold text-accent') : 'bg-panel text-fg-3',
-      )}
-      style={{ left: NUM_W + colOff[c], width: colOff[c + 1] - colOff[c], height: HEAD_H }}
-    >
-      {colName(c)}
-      {!readOnly && (
-        <span
-          data-sizer
-          onPointerDown={startSize('col', c)}
-          onDoubleClick={() => cb.current.onFit('col', c)}
-          className="absolute top-0 -right-[4px] z-10 h-full w-[8px] cursor-col-resize hover:bg-accent/40"
-        />
-      )}
-    </div>
-  );
-  const rowHead = (r: number, region: 'corner' | 'left') => (
-    <div
-      key={r}
-      className={cx(
-        'absolute left-0 flex items-center justify-center border-r border-b border-line text-[11px] tabular-nums select-none',
-        selRows(r) ? (wholeRows ? 'bg-accent text-accent-fg' : 'bg-accent-soft font-semibold text-accent') : 'bg-panel text-fg-3',
-      )}
-      style={{ top: region === 'left' ? rowOff[r] - FH : HEAD_H + rowOff[r], width: NUM_W, height: rowOff[r + 1] - rowOff[r] }}
-    >
-      {r + 1}
-      {!readOnly && (
-        <span
-          data-sizer
-          onPointerDown={startSize('row', r)}
-          onDoubleClick={() => cb.current.onFit('row', r)}
-          className="absolute -bottom-[4px] left-0 z-10 h-[8px] w-full cursor-row-resize hover:bg-accent/40"
-        />
-      )}
-    </div>
-  );
+  const colHead = (c: number) => {
+    const w = colOff[c + 1] - colOff[c];
+    if (!w) return null;
+    // Columns hidden by hand next to this one: a mark that shows them.
+    const hiddenAfter = gv.hidC.has(c + 1);
+    const hiddenBefore = c > 0 && gv.hidC.has(c - 1) && [...Array(c).keys()].every((k) => gv.hidC.has(k));
+    return (
+      <div
+        key={c}
+        className={cx('absolute top-0 flex items-center justify-center border-r border-b border-line select-none', selCols(c) ? (wholeCols ? 'bg-accent text-accent-fg' : 'bg-accent-soft font-semibold text-accent') : 'bg-panel text-fg-3')}
+        style={{ left: NW + colOff[c], width: w, height: HH, fontSize: 11 * Math.min(z, 1.4) }}
+      >
+        {colName(c)}
+        {!readOnly && <span data-sizer onPointerDown={startSize('col', c)} onDoubleClick={() => cb.current.onFit('col', c)} className="absolute top-0 -right-[4px] z-10 h-full w-[8px] cursor-col-resize hover:bg-accent/40" />}
+        {hiddenAfter && (
+          <button type="button" data-own title="Show the hidden columns" aria-label="Show the hidden columns" onClick={() => cb.current.onUnhide('col', c + 1)} className={marker} style={{ right: -7, top: 3, width: 14, height: HH - 6 }}>
+            <ChevronsLeftRight size={10} />
+          </button>
+        )}
+        {hiddenBefore && (
+          <button type="button" data-own title="Show the hidden columns" aria-label="Show the hidden columns" onClick={() => cb.current.onUnhide('col', c - 1)} className={marker} style={{ left: 1, top: 3, width: 14, height: HH - 6 }}>
+            <ChevronsLeftRight size={10} />
+          </button>
+        )}
+      </div>
+    );
+  };
+  const rowHead = (r: number, region: 'corner' | 'left') => {
+    const h = rowOff[r + 1] - rowOff[r];
+    if (!h) return null;
+    const hiddenAfter = gv.handR.has(r + 1);
+    const hiddenBefore = r > 0 && gv.handR.has(r - 1) && [...Array(r).keys()].every((k) => gv.hidR.has(k));
+    // Rows a filter runs over are numbered in the accent colour, as spreadsheets mark a filtered range.
+    const filtered = !!fx && gv.filter!.on.size > 0 && r > fx.r1 && r <= fx.r2;
+    return (
+      <div
+        key={r}
+        className={cx(
+          'group absolute left-0 flex items-center justify-center border-r border-b border-line tabular-nums select-none',
+          selRows(r) ? (wholeRows ? 'bg-accent text-accent-fg' : 'bg-accent-soft font-semibold text-accent') : filtered ? 'bg-panel text-accent' : 'bg-panel text-fg-3',
+        )}
+        style={{ top: region === 'left' ? rowOff[r] - FH : HH + rowOff[r], width: NW, height: h, fontSize: 11 * Math.min(z, 1.4) }}
+      >
+        {/* The number makes room for the button that expands the row (its cells as a card, as Airtable opens a record). */}
+        <span className={cx(h >= 16 && (sel.r === r ? 'pl-3.5' : 'group-hover:pl-3.5'))}>{r + 1}</span>
+        {h >= 16 && (
+          <button
+            type="button"
+            data-own
+            title="Expand row (Space)"
+            aria-label="Expand row"
+            onClick={() => cb.current.onExpand(r)}
+            className={cx('absolute top-1/2 left-0.5 h-4 w-4 -translate-y-1/2 place-items-center rounded text-fg-3 hover:bg-bg-2 hover:text-accent', sel.r === r ? 'grid' : 'hidden group-hover:grid')}
+          >
+            <Maximize2 size={10} />
+          </button>
+        )}
+        {!readOnly && <span data-sizer onPointerDown={startSize('row', r)} onDoubleClick={() => cb.current.onFit('row', r)} className="absolute -bottom-[4px] left-0 z-10 h-[8px] w-full cursor-row-resize hover:bg-accent/40" />}
+        {hiddenAfter && (
+          <button type="button" data-own title="Show the hidden rows" aria-label="Show the hidden rows" onClick={() => cb.current.onUnhide('row', r + 1)} className={marker} style={{ bottom: -7, right: 3, width: 18, height: 14 }}>
+            <ChevronsUpDown size={10} />
+          </button>
+        )}
+        {hiddenBefore && (
+          <button type="button" data-own title="Show the hidden rows" aria-label="Show the hidden rows" onClick={() => cb.current.onUnhide('row', r - 1)} className={marker} style={{ top: 1, right: 3, width: 18, height: 14 }}>
+            <ChevronsUpDown size={10} />
+          </button>
+        )}
+      </div>
+    );
+  };
 
   /** A range outlined in each band it crosses: borders only on its own edges. */
   const boxes = (rect: Rect, region: Region, cls: string, style: React.CSSProperties = {}, key = '') => {
@@ -570,29 +765,84 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     );
   };
 
-  const overlay = (region: Region) => (
-    <>
-      {p.refs.map((b, i) => boxes(b, region, 'border-2 border-dashed', { borderColor: b.color, background: `color-mix(in srgb, ${b.color} 10%, transparent)` }, `ref${i}`))}
-      {p.cut && boxes(p.cut, region, 'border-2 border-dashed border-accent', {}, 'cut')}
-      {!(x.r1 === x.r2 && x.c1 === x.c2) && boxes(x, region, 'border border-accent bg-accent/10', {}, 'sel')}
-      {regionOf(sel.r, sel.c) === region && !edit && boxes({ r1: sel.r, c1: sel.c, r2: sel.r, c2: sel.c }, region, 'border-2 border-accent', {}, 'act')}
-      {regionOf(x.r2, x.c2) === region && !readOnly && !edit && touch.current && (
-        <div
-          key="handle"
-          className="absolute z-30 h-6 w-6 -translate-x-1/2 -translate-y-1/2 touch-none"
-          style={{ left: place(x.r2, x.c2, region).left + colOff[x.c2 + 1] - colOff[x.c2], top: place(x.r2, x.c2, region).top + rowOff[x.r2 + 1] - rowOff[x.r2] }}
-          onPointerDown={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            drag.current = { kind: 'handle', id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
-            scroller.current?.setPointerCapture(e.pointerId);
-          }}
-        >
-          <span className="absolute top-1/2 left-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-panel bg-accent shadow" />
-        </div>
-      )}
-    </>
-  );
+  const multi = !(x.r1 === x.r2 && x.c1 === x.c2) && !sameRect(x, am);
+  const overlay = (region: Region) => {
+    const corner = place(x.r2, x.c2, region);
+    const cx2 = corner.left + colOff[x.c2 + 1] - colOff[x.c2];
+    const cy2 = corner.top + rowOff[x.r2 + 1] - rowOff[x.r2];
+    return (
+      <>
+        {p.refs.map((b, i) => boxes(b, region, 'border-2 border-dashed', { borderColor: b.color, background: `color-mix(in srgb, ${b.color} 10%, transparent)` }, `ref${i}`))}
+        {p.cut && boxes(p.cut, region, 'border-2 border-dashed border-accent', {}, 'cut')}
+        {multi && boxes(x, region, 'border border-accent bg-accent/10', {}, 'sel')}
+        {filling && boxes(filling, region, 'border-2 border-dashed border-fg-3', {}, 'fill')}
+        {regionOf(am.r1, am.c1) === region && !edit && boxes(am, region, 'border-2 border-accent', {}, 'act')}
+        {/* A filter's buttons on its header row. */}
+        {fx &&
+          regionOf(fx.r1, fx.c1) === region &&
+          [...Array(fx.c2 - fx.c1 + 1).keys()].map((j) => {
+            const c = fx.c1 + j;
+            const w = colOff[c + 1] - colOff[c];
+            const hgt = rowOff[fx.r1 + 1] - rowOff[fx.r1];
+            if (!w || !hgt || (region === 'body' && (c < stableRange.c1 || c > stableRange.c2))) return null;
+            const pos = place(fx.r1, c, region);
+            const on = gv.filter!.on.has(c);
+            const size = Math.min(18 * z, hgt - 4);
+            return (
+              <button
+                key={`f${c}`}
+                type="button"
+                data-own
+                title="Sort and filter this column"
+                aria-label="Sort and filter this column"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => cb.current.onFilter(c, (e.currentTarget as HTMLElement).getBoundingClientRect())}
+                className={cx('absolute z-10 grid place-items-center rounded', on ? 'bg-accent text-accent-fg' : 'bg-bg-2/90 text-fg-2 hover:text-fg')}
+                style={{ left: pos.left + w - size - 3, top: pos.top + (hgt - size) / 2, width: size, height: size }}
+              >
+                <ListFilter size={Math.round(size * 0.65)} />
+              </button>
+            );
+          })}
+        {/* The fill handle: drag it to fill, or double-click it to fill down. */}
+        {regionOf(x.r2, x.c2) === region && !readOnly && !edit && !touch.current && (
+          <div
+            key="fill"
+            data-own
+            title="Drag to fill; double-click to fill down"
+            className="absolute z-30 h-[9px] w-[9px] cursor-crosshair border-2 border-bg bg-accent"
+            style={{ left: cx2 - 5, top: cy2 - 5 }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              drag.current = { kind: 'fill', id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+              setFilling(x);
+              scroller.current?.setPointerCapture(e.pointerId);
+            }}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              cb.current.onFillDown();
+            }}
+          />
+        )}
+        {regionOf(x.r2, x.c2) === region && !readOnly && !edit && touch.current && (
+          <div
+            key="handle"
+            className="absolute z-30 h-6 w-6 -translate-x-1/2 -translate-y-1/2 touch-none"
+            style={{ left: cx2, top: cy2 }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              drag.current = { kind: 'handle', id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+              scroller.current?.setPointerCapture(e.pointerId);
+            }}
+          >
+            <span className="absolute top-1/2 left-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-panel bg-accent shadow" />
+          </div>
+        )}
+      </>
+    );
+  };
 
   /** The grid's lines in a band, at the right and bottom edge of each column and row in view. */
   const gridLines = (region: Region) => {
@@ -601,10 +851,11 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     const out = [];
     const y0 = place(rs.r1, 0, region).top;
     const y1 = place(rs.r2, 0, region).top + rowOff[rs.r2 + 1] - rowOff[rs.r2];
-    const x0 = NUM_W + colOff[cs.c1];
-    const x1 = NUM_W + colOff[cs.c2 + 1];
-    for (let c = cs.c1; c <= cs.c2; c++) out.push(<div key={`c${c}`} className="absolute w-px bg-line" style={{ left: NUM_W + colOff[c + 1] - 1, top: y0, height: y1 - y0 }} />);
+    const x0 = NW + colOff[cs.c1];
+    const x1 = NW + colOff[cs.c2 + 1];
+    for (let c = cs.c1; c <= cs.c2; c++) if (colOff[c + 1] > colOff[c]) out.push(<div key={`c${c}`} className="absolute w-px bg-line" style={{ left: NW + colOff[c + 1] - 1, top: y0, height: y1 - y0 }} />);
     for (let r = rs.r1; r <= rs.r2; r++) {
+      if (rowOff[r + 1] === rowOff[r]) continue;
       const y = place(r, 0, region).top + rowOff[r + 1] - rowOff[r] - 1;
       out.push(<div key={`r${r}`} className="absolute h-px bg-line" style={{ top: y, left: x0, width: x1 - x0 }} />);
     }
@@ -620,6 +871,25 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   const frozenNums: React.ReactNode[] = [];
   for (let r = 0; r < fr; r++) frozenNums.push(rowHead(r, 'corner'));
 
+  // A note: shown beside the cell pointed at, or the active cell, while nothing is typed.
+  const noteAt = hover ?? (!edit && sheet.cells[refName(am.r1, am.c1)]?.note ? { r: am.r1, c: am.c1 } : null);
+  const noteText = noteAt ? sheet.cells[refName(noteAt.r, noteAt.c)]?.note : undefined;
+  let noteCard: ReactNode = null;
+  if (noteAt && noteText) {
+    const m = spanOf(noteAt.r, noteAt.c);
+    const left = NW + colOff[m.c2 + 1] + (m.c2 < fc ? view.left : 0) + 4;
+    const top = HH + rowOff[m.r1] + (m.r1 < fr ? view.top : 0);
+    noteCard = (
+      <div
+        translate="no"
+        className="pointer-events-none absolute z-40 max-w-[260px] min-w-[120px] rounded-lg border border-line bg-elevated px-2.5 py-1.5 text-[12.5px] leading-snug whitespace-pre-wrap text-fg shadow-lg"
+        style={{ left: Math.min(left, NW + colOff[cols] - 140), top }}
+      >
+        {noteText}
+      </div>
+    );
+  }
+
   return (
     <div
       ref={scroller}
@@ -629,53 +899,65 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerLeave={() => hover && setHover(null)}
       onPointerCancel={() => {
         if (drag.current?.timer) clearTimeout(drag.current.timer);
         drag.current = null;
+        setFilling(null);
       }}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
       onKeyDown={(e) => e.target === scroller.current && cb.current.onKey(e)}
-      className="relative min-h-0 flex-1 overflow-auto overscroll-contain bg-bg text-[13.3px] leading-[1.35] text-fg outline-none select-none [-webkit-touch-callout:none]"
+      className="relative min-h-0 flex-1 overflow-auto overscroll-contain bg-bg leading-[1.35] text-fg outline-none select-none [-webkit-touch-callout:none]"
+      style={{ fontSize: 13.3 * z }}
     >
       <div className="relative" style={{ width: W, height: H }}>
         {/* The letters along the top, with the frozen rows under them: they stay at the top. */}
-        <div className="sticky top-0 z-30 bg-bg" style={{ width: W, height: HEAD_H + FH }}>
-          <div className="sticky left-0 z-10 bg-bg" style={{ width: NUM_W + FW, height: HEAD_H + FH }}>
-            <div className="absolute top-0 left-0 border-r border-b border-line bg-panel" style={{ width: NUM_W, height: HEAD_H }} />
+        <div className="sticky top-0 z-30 bg-bg" style={{ width: W, height: HH + FH }}>
+          <div className="sticky left-0 z-10 bg-bg" style={{ width: NW + FW, height: HH + FH }}>
+            <div className="absolute top-0 left-0 border-r border-b border-line bg-panel" style={{ width: NW, height: HH }} />
             {frozenHeads}
             {frozenNums}
             {fr > 0 && fc > 0 && gridLines('corner')}
             {cellsCorner}
             {fr > 0 && fc > 0 && overlay('corner')}
             {/* Where the frozen part ends: a firmer line. */}
-            {fc > 0 && <div className="pointer-events-none absolute top-0 z-20 bg-fg-3/50" style={{ left: NUM_W + FW - 1, width: 2, height: HEAD_H + FH }} />}
-            {fr > 0 && <div className="pointer-events-none absolute left-0 z-20 bg-fg-3/50" style={{ top: HEAD_H + FH - 1, height: 2, width: NUM_W + FW }} />}
+            {fc > 0 && <div className="pointer-events-none absolute top-0 z-20 bg-fg-3/50" style={{ left: NW + FW - 1, width: 2, height: HH + FH }} />}
+            {fr > 0 && <div className="pointer-events-none absolute left-0 z-20 bg-fg-3/50" style={{ top: HH + FH - 1, height: 2, width: NW + FW }} />}
           </div>
           {heads}
           {fr > 0 && gridLines('top')}
           {cellsTop}
           {fr > 0 && overlay('top')}
-          {fr > 0 && <div className="pointer-events-none absolute left-0 z-[5] bg-fg-3/50" style={{ top: HEAD_H + FH - 1, height: 2, width: W }} />}
+          {fr > 0 && <div className="pointer-events-none absolute left-0 z-[5] bg-fg-3/50" style={{ top: HH + FH - 1, height: 2, width: W }} />}
         </div>
         {/* The numbers down the side, with the frozen columns beside them: they stay at the left. */}
-        <div className="sticky left-0 z-20 bg-bg" style={{ width: NUM_W + FW, height: H - HEAD_H - FH }}>
+        <div className="sticky left-0 z-20 bg-bg" style={{ width: NW + FW, height: H - HH - FH }}>
           {nums}
           {fc > 0 && gridLines('left')}
           {cellsLeft}
           {fc > 0 && overlay('left')}
-          {fc > 0 && <div className="pointer-events-none absolute top-0 z-20 bg-fg-3/50" style={{ left: NUM_W + FW - 1, width: 2, height: H - HEAD_H - FH }} />}
+          {fc > 0 && <div className="pointer-events-none absolute top-0 z-20 bg-fg-3/50" style={{ left: NW + FW - 1, width: 2, height: H - HH - FH }} />}
         </div>
         <div className="absolute top-0 left-0" style={{ width: W, height: H }}>
           {gridLines('body')}
           {cellsBody}
           {overlay('body')}
+          {p.overlay && (
+            <div className="absolute z-10" style={{ left: NW, top: HH }}>
+              {p.overlay}
+            </div>
+          )}
         </div>
+        {noteCard}
         {box}
       </div>
     </div>
   );
 });
+
+const single = (s: Sel) => s.ar === s.fr && s.ac === s.fc;
+const sameRect = (a: Rect, b: Rect) => a.r1 === b.r1 && a.c1 === b.c1 && a.r2 === b.r2 && a.c2 === b.c2;
 
 // ---- the cells of one band ----------------------------------------------------------------------------------------------
 
@@ -691,46 +973,162 @@ interface CellsProps {
   place: (r: number, c: number, region: Region) => { left: number; top: number };
   colOff: Float64Array;
   rowOff: Float64Array;
+  view: GridView;
+  z: number;
+  formulas: boolean;
 }
 
-/** The filled cells of a band in view; words run on over empty cells to their right, as in a spreadsheet. */
-const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, place, colOff, rowOff }: CellsProps) {
+/**
+ * The cells of a band in view: filled ones, those its rules draw on (checkboxes, stars, conditional looks) and merged
+ * ones; words run on over empty cells to their right, as in a spreadsheet.
+ */
+const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, place, colOff, rowOff, view: gv, z, formulas }: CellsProps) {
   const out: React.ReactNode[] = [];
-  for (let r = rows.r1; r <= rows.r2; r++) {
-    for (let c = cols.c1; c <= cols.c2; c++) {
-      const cell = sheet.cells[refName(r, c)];
-      if (!cell) continue;
-      const v = cell.v === undefined && cell.f === undefined ? null : calc.value(si, r, c);
-      const look = shown(cell, v);
-      let w = colOff[c + 1] - colOff[c];
-      const h = rowOff[r + 1] - rowOff[r];
-      let text = look.text;
-      if (text && !cell.s?.wrap) {
-        const need = textWidth(text, cell.s) + 9;
-        if (typeof v === 'number' && need > w) text = '#'.repeat(Math.max(1, Math.floor((w - 8) / 8)));
-        else if (need > w && look.style.justifyContent === 'flex-start') {
-          // Over the empty cells to the right, as far as the words need (not out of the frozen columns).
-          const last = region === 'left' || region === 'corner' ? fc - 1 : cols.c2 + 8;
-          for (let k = c + 1; k <= last && w < need; k++) {
-            const next = sheet.cells[refName(r, k)];
-            if (next && (next.v !== undefined || next.f !== undefined || next.s?.fill)) break;
-            w += colOff[k + 1] - colOff[k];
-          }
-        }
+  const lines: React.ReactNode[] = [];
+  // Merges that reach into the band, drawn once each from their first cell; their other cells are not drawn.
+  const merges = gv.merges.list.filter((m) => m.r2 >= rows.r1 && m.r1 <= rows.r2 && m.c2 >= cols.c1 && m.c1 <= cols.c2);
+  // Cells the rules draw on though they hold nothing: in view, in a rule's range.
+  const extra = new Set<string>();
+  if (gv.cf.any || gv.rules.any) {
+    for (let r = rows.r1; r <= rows.r2; r++) {
+      if (rowOff[r + 1] === rowOff[r]) continue;
+      for (let c = cols.c1; c <= cols.c2; c++) {
+        const k = refName(r, c);
+        if (sheet.cells[k] || colOff[c + 1] === colOff[c]) continue;
+        const rule = gv.rules.any ? gv.rules.at(r, c)?.rule : undefined;
+        if (rule?.type === 'checkbox' || rule?.type === 'rating' || (gv.cf.any && gv.cf.at(r, c))) extra.add(k);
       }
-      const at = place(r, c, region);
-      out.push(
-        <div
-          key={`${r}:${c}`}
-          className={cx('absolute flex overflow-hidden border-r border-b border-line px-[4px] whitespace-nowrap', look.cls, !look.style.background && 'bg-bg')}
-          style={{ left: at.left, top: at.top, width: w, height: h, ...look.style }}
-        >
-          <span className="min-w-0 overflow-hidden" style={{ textOverflow: 'clip' }}>
-            {text}
-          </span>
-        </div>,
-      );
     }
   }
-  return <>{out}</>;
+  const draw = (r: number, c: number, m: Rect | null) => {
+    const k = refName(r, c);
+    const cell: Cell = sheet.cells[k] ?? {};
+    const filled = cell.v !== undefined || cell.f !== undefined;
+    const v = filled ? calc.value(si, r, c) : null;
+    const look = shown(cell, v, z, formulas);
+    const r2 = m ? m.r2 : r;
+    const c2 = m ? m.c2 : c;
+    let w = colOff[c2 + 1] - colOff[c];
+    const h = rowOff[r2 + 1] - rowOff[r];
+    if (!w || !h) return;
+    const style: React.CSSProperties = { ...look.style };
+    // Conditional formatting: its look over the cell's own, a colour scale's fill, a data bar.
+    const cfLook = gv.cf.any ? gv.cf.at(r, c) : null;
+    if (cfLook?.style) {
+      const s = cfLook.style;
+      if (s.b) style.fontWeight = 700;
+      if (s.i) style.fontStyle = 'italic';
+      if (s.u || s.s) style.textDecoration = [s.u ? 'underline' : '', s.s ? 'line-through' : ''].filter(Boolean).join(' ');
+      if (s.fill) style.background = s.fill;
+      if (s.color || s.fill) style.color = s.color ?? textOn(s.fill!);
+    }
+    if (cfLook?.scale && !cfLook.style?.fill) {
+      style.background = cfLook.scale;
+      if (!cell.s?.color) style.color = textOn(cfLook.scale);
+    }
+    const rule = gv.rules.any ? gv.rules.at(r, c) : null;
+    let text = look.text;
+    let content: ReactNode = null;
+    if (rule?.rule.type === 'checkbox') {
+      const on = isTicked(v);
+      const s = Math.round(16 * z);
+      content = (
+        <span className="flex w-full items-center justify-center">
+          <span className={cx('grid place-items-center rounded-[4px] border-2', on ? 'border-accent bg-accent text-accent-fg' : 'border-fg-3')} style={{ width: s, height: s }}>
+            {on && (
+              <svg viewBox="0 0 12 12" width={s - 4} height={s - 4} aria-hidden>
+                <path d="M2.5 6.2 5 8.6 9.6 3.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </span>
+        </span>
+      );
+    } else if (rule?.rule.type === 'rating' && (typeof v === 'number' || v === null)) {
+      const max = rule.rule.max ?? 5;
+      const n = Math.max(0, Math.min(max, Math.round(typeof v === 'number' ? v : 0)));
+      content = (
+        <span className="flex items-center" style={{ fontSize: 14 * z, letterSpacing: 1 * z, paddingLeft: 1 * z }}>
+          {[...Array(max).keys()].map((i) => (
+            <span key={i} style={{ width: 15 * z, color: i < n ? '#f5a623' : undefined }} className={i < n ? '' : 'text-fg-3 opacity-40'}>
+              ★
+            </span>
+          ))}
+        </span>
+      );
+    } else if (rule?.rule.type === 'list' && text) {
+      const opt = listOptions(calc, si, rule.rule).find((o) => o.v.toLowerCase() === text.trim().toLowerCase());
+      if (opt?.color)
+        content = (
+          <span className="min-w-0 truncate rounded-full px-2 leading-[1.45]" style={{ background: opt.color, color: textOn(opt.color), fontSize: '0.92em' }}>
+            {text}
+          </span>
+        );
+    }
+    if (rule?.rule.type === 'list' && !formulas) {
+      // The list's arrow at the cell's right edge.
+      content = (
+        <>
+          <span className="flex min-w-0 flex-1 items-center overflow-hidden">{content ?? <span className="min-w-0 truncate">{text}</span>}</span>
+          <ChevronDown size={Math.round(13 * z)} className="ml-0.5 shrink-0 text-fg-3" />
+        </>
+      );
+      text = '';
+    }
+    // Words that do not fit: numbers become ###, words run on over empty cells to the right.
+    if (!content && text && !cell.s?.wrap && !cell.s?.rot && !m) {
+      const need = textWidth(text, cell.s) * z + 9;
+      if (typeof v === 'number' && !look.sign && need > w) text = '#'.repeat(Math.max(1, Math.floor((w - 8) / (8 * z))));
+      else if (need > w && look.style.justifyContent === 'flex-start') {
+        // Over the empty cells to the right, as far as the words need (not out of the frozen columns, nor into a merge).
+        const last = region === 'left' || region === 'corner' ? fc - 1 : cols.c2 + 8;
+        for (let k2 = c + 1; k2 <= last && w < need; k2++) {
+          const next = sheet.cells[refName(r, k2)];
+          if ((next && (next.v !== undefined || next.f !== undefined || next.s?.fill)) || gv.merges.at(r, k2)) break;
+          w += colOff[k2 + 1] - colOff[k2];
+        }
+      }
+    }
+    const pos = place(r, c, region);
+    const invalid = rule && filled && rule.rule.type !== 'checkbox' && !allowed(calc, si, rule.rule, v, look.text, { r, c, r0: rule.r0, c0: rule.c0 });
+    out.push(
+      <div key={`${r}:${c}`} className={cx('absolute flex overflow-hidden border-r border-b border-line px-[4px] whitespace-nowrap', look.cls, !style.background && 'bg-bg')} style={{ left: pos.left, top: pos.top, width: w, height: h, ...style }}>
+        {cfLook?.bar && <span className="pointer-events-none absolute top-[3px] bottom-[3px] rounded-sm opacity-60" style={{ left: `${cfLook.bar.from * 100}%`, width: `${(cfLook.bar.to - cfLook.bar.from) * 100}%`, background: cfLook.bar.color }} />}
+        {look.sign && <span className="relative mr-auto pr-1">{look.sign}</span>}
+        {content ?? (
+          <span className="relative min-w-0 overflow-hidden" style={{ textOverflow: 'clip', ...(cell.s?.rot ? { transform: `rotate(${-cell.s.rot}deg)`, display: 'inline-block', alignSelf: 'center' } : {}) }}>
+            {text}
+          </span>
+        )}
+        {cell.note && <span className="pointer-events-none absolute top-0 right-0 border-t-[7px] border-l-[7px] border-t-[#e37400] border-l-transparent" />}
+        {invalid && <span className="pointer-events-none absolute top-0 left-0 border-t-[7px] border-r-[7px] border-t-err border-r-transparent" title="This value is not one its rule allows" />}
+      </div>,
+    );
+    // Borders: drawn on the grid's lines, each side as the style says.
+    const s = cell.s;
+    if (s && (s.bt || s.br || s.bb || s.bl)) {
+      const sides: [string | undefined, React.CSSProperties][] = [
+        [s.bt, { left: pos.left - 1, top: pos.top - 1, width: w + 1, height: 0, borderTop: edgeCss(s.bt, z) ?? undefined }],
+        [s.bb, { left: pos.left - 1, top: pos.top + h - 1, width: w + 1, height: 0, borderTop: edgeCss(s.bb, z) ?? undefined }],
+        [s.bl, { left: pos.left - 1, top: pos.top - 1, width: 0, height: h + 1, borderLeft: edgeCss(s.bl, z) ?? undefined }],
+        [s.br, { left: pos.left + w - 1, top: pos.top - 1, width: 0, height: h + 1, borderLeft: edgeCss(s.br, z) ?? undefined }],
+      ];
+      sides.forEach(([b, st], i) => b && lines.push(<span key={`b${r}:${c}:${i}`} className="pointer-events-none absolute z-[1]" style={st} />));
+    }
+  };
+  for (const m of merges) draw(m.r1, m.c1, m);
+  for (let r = rows.r1; r <= rows.r2; r++) {
+    if (rowOff[r + 1] === rowOff[r]) continue;
+    for (let c = cols.c1; c <= cols.c2; c++) {
+      const k = refName(r, c);
+      if (!sheet.cells[k] && !extra.has(k)) continue;
+      if (merges.length && gv.merges.at(r, c)) continue;
+      draw(r, c, null);
+    }
+  }
+  return (
+    <>
+      {out}
+      {lines}
+    </>
+  );
 });

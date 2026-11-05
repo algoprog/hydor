@@ -1,26 +1,38 @@
-// A spreadsheet to edit, as in Excel or Google Sheets: the grid of cells (Grid), the formula bar with the name box
-// above it (FormulaBar), a toolbar for how cells look and show their numbers (Toolbar), and the sheets' tabs under it
-// with what the selection adds up to (Tabs). Formulas are worked out as they change (shared/sheets.ts); typing a
-// formula, clicking or arrowing to cells puts their references in, outlined in colour. Copy and paste go through the
-// system clipboard as tab-separated text, so cells move to and from Excel and Google Sheets; formulas pasted here
-// move along. Changes stay unsaved until Save (Ctrl+S), as a page's do; Undo and Redo step through them.
+// A spreadsheet to edit, as in Excel, Google Sheets and Airtable: the grid of cells (Grid), the formula bar with the
+// name box above it (FormulaBar), the menus and a toolbar of the most used looks (Toolbar, menus.tsx), and the sheets'
+// tabs under it with what the selection adds up to (Tabs). Formulas are worked out as they change (shared/sheets.ts);
+// typing a formula, clicking or arrowing to cells puts their references in, outlined in colour, with each function's
+// arguments shown as it is typed. Copy and paste go through the system clipboard as tab-separated text, so cells move to
+// and from Excel and Google Sheets; formulas pasted here move along, and Paste special pastes values, looks or formulas
+// alone, or turned on its side. Besides: find and replace; filters on a header row; conditional formatting; rules for
+// what cells take, with checkboxes, lists' coloured chips, stars and a calendar for dates; borders; merged cells; the
+// fill handle; hidden rows and columns; number formats with Excel's codes; charts over the grid; the data tools;
+// notes; a row expanded into a card; zoom. Changes stay unsaved until Save (Ctrl+S), as a page's do; Undo and Redo
+// step through them.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDownAZ, ArrowDownZA, BetweenHorizontalStart, BetweenVerticalStart, ClipboardPaste, Copy, Eraser, Scissors, Sparkles, Trash2 } from 'lucide-react';
+import { BetweenHorizontalStart, BetweenVerticalStart, ClipboardPaste, Copy, Eraser, EyeOff, Maximize2, Scissors, Sparkles, StickyNote, Trash2, ArrowDownAZ, ArrowDownZA, Eye } from 'lucide-react';
 import {
+  cleanBorder,
+  colName,
   COL_W,
   computeBook,
+  dateSerial,
   DEFAULT_DP,
   formatValue,
   formulaProblem,
   formulaRefs,
   generalNumber,
   inputText,
+  isDateFmt,
   MAX_H,
   MAX_W,
   MIN_W,
   newId,
+  nowSerial,
+  parseDelimited,
   parseRange,
   parseRef,
+  rangeName,
   refGoesAt,
   refName,
   removeSheet,
@@ -29,20 +41,36 @@ import {
   SHEET_LIMITS,
   shiftFormula,
   uniqueSheetName,
+  type BorderKind,
   type Calc,
   type Cell,
   type CellStyle,
+  type FilterCol,
   type NumFmt,
   type Rect,
   type Sheet,
+  type SheetChart,
+  type Validation,
   type Workbook,
 } from '@shared/sheets';
+import { allowed, columnValues, CondFormats, filterHidden, listOptions, Merges, Rules } from '@shared/sheet-rules';
 import { toast, toastError } from '../../../lib/store';
 import { tr } from '../../../i18n/runtime';
-import { Button, MenuItem, MenuSep, Popover, useConfirm } from '../../../components/ui';
+import { Button, cx, MenuBack, MenuItem, MenuSep, Popover, SheetsOnPhone, useConfirm } from '../../../components/ui';
+import { CharPicker } from '../common/CharPicker';
+import { FindBar, useFind } from '../common/FindBar';
+import { isMod } from '../common/keys';
+import { MenuBar } from '../common/menus';
+import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
+import { ChartLayer, ChartPanel } from './Charts';
+import { CondPanel } from './CondPanel';
+import { DupDialog, FormatDialog, SortDialog, SplitDialog, type ColChoice } from './Dialogs';
+import { fillDownTo, fillSeries } from './fill';
+import { FilterMenu } from './FilterMenu';
 import { FormulaBar, formulaHelp } from './FormulaBar';
-import { fontPx, Grid, textWidth, type Edit, type GridHandle, type RefBox } from './Grid';
+import { fontPx, Grid, textWidth, type Edit, type GridHandle, type GridView, type RefBox, type Smart } from './Grid';
+import { sheetMenus, type MenuCtx } from './menus';
 import {
   applyPatch,
   cellSel,
@@ -60,17 +88,20 @@ import {
   holds,
   insertPatch,
   metaOf,
+  metaPatch,
   pasteChanges,
   rectLabel,
   rectOf,
   rectSel,
   regionAround,
+  rowH,
   sheetFromCsv,
   single,
   sortChanges,
   statsOf,
   styleChanges,
   swapsBook,
+  tidyCell,
   together,
   touched,
   typedInto,
@@ -79,14 +110,25 @@ import {
   type Patch,
   type Sel,
 } from './ops';
+import { DatePicker, ListPicker } from './Panel';
+import { RowCard } from './RowCard';
 import { SheetTabs } from './Tabs';
 import { Toolbar } from './Toolbar';
+import { borderChanges, findCells, guessSeparator, hiddenRun, hiddenSet, mergeResult, pasteSpecial, pasteTextValues, removeDuplicates, replacedCell, sortByKeys, splitColumn, trimChanges, type BorderWhere, type FindHow, type PasteHow } from './tools';
+import { CHIP_COLORS, ValidPanel } from './ValidPanel';
 
 /** Cells copied or cut, to paste in this or another spreadsheet while the app is open (their formulas and looks). */
 let clip: Clip | null = null;
 
 /** The colours references are outlined in while a formula is typed. */
 const REF_COLORS = ['#1a73e8', '#e8710a', '#188038', '#d93025', '#9334e6', '#00838f'];
+
+/** The zoom each device keeps for spreadsheets. */
+const ZOOM_KEY = 'wa.sheet.zoom';
+const savedZoom = () => {
+  const z = Number(localStorage.getItem(ZOOM_KEY));
+  return z >= 0.5 && z <= 2 ? z : 1;
+};
 
 /** A formula with the brackets it left open closed, as spreadsheets close them. */
 function closeBrackets(text: string): string {
@@ -100,7 +142,52 @@ function closeBrackets(text: string): string {
   return open > 0 && !quoted ? text + ')'.repeat(open) : text;
 }
 
+/** The reference under the caret with its $ signs turned to the next of A1 → $A$1 → A$1 → $A1 (F4). */
+function cycleRef(text: string, caret: number): { text: string; caret: number } | null {
+  if (!text.startsWith('=')) return null;
+  for (const f of formulaRefs(text.slice(1))) {
+    const s = f.s + 1;
+    const e = f.e + 1;
+    if (caret < s || caret > e) continue;
+    const part = text.slice(s, e);
+    const bang = part.lastIndexOf('!');
+    const head = bang >= 0 ? part.slice(0, bang + 1) : '';
+    const next = part
+      .slice(head.length)
+      .split(':')
+      .map((p) => {
+        const m = /^(\$?)([A-Za-z]{1,3})?(\$?)(\d+)?$/.exec(p);
+        if (!m) return p;
+        const [, ac, col, ar, row] = m;
+        const state = ac && ar ? 1 : !ac && ar ? 2 : ac && !ar ? 3 : 0;
+        const to = (state + 1) % 4;
+        return `${to === 1 || to === 3 ? '$' : ''}${col ?? ''}${to === 1 || to === 2 ? '$' : ''}${row ?? ''}`;
+      })
+      .join(':');
+    const t = text.slice(0, s) + head + next + text.slice(e);
+    return { text: t, caret: s + head.length + next.length };
+  }
+  return null;
+}
+
+/** A code with one decimal more (or fewer) in each of its number parts. */
+function codeDecimals(code: string, d: 1 | -1): string {
+  return code
+    .split(';')
+    .map((sec) =>
+      sec.replace(/(?<!["\\])([0#])(\.(0+))?(?![0-9#])/, (m, digit: string, _dot: string, zeros: string | undefined) => {
+        const n = Math.max(0, (zeros?.length ?? 0) + d);
+        return `${digit}${n ? `.${'0'.repeat(n)}` : ''}`;
+      }),
+    )
+    .join(';');
+}
+
 const clone = (b: Workbook): Workbook => structuredClone(b);
+
+type PanelState = { kind: 'cf' } | { kind: 'dv'; start?: Validation } | { kind: 'chart'; id: string } | null;
+type DialogState = 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | null;
+type PickState = { kind: 'list' | 'date' | 'note' | 'chars'; r: number; c: number; at: DOMRect } | null;
 
 export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef }: ModelEditorProps<Workbook>) {
   const root = useRef<HTMLDivElement>(null);
@@ -111,7 +198,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const bookRef = useRef<Workbook | null>(doc ? clone(doc.model) : null);
   const savedRef = useRef<Workbook | null>(doc ? clone(doc.model) : null);
   const calcRef = useRef<Calc | null>(bookRef.current ? computeBook(bookRef.current) : null);
-  const hist = useRef<{ past: Patch[]; future: Patch[]; saved: number }>({ past: [], future: [], saved: 0 });
+  const hist = useRef<{ past: Patch[]; future: Patch[]; saved: number; last?: { key: string; at: number } }>({ past: [], future: [], saved: 0 });
   const [rev, setRev] = useState(0);
   const [si, setSi] = useState(0);
   const [sel, setSelState] = useState<Sel>(cellSel(0, 0));
@@ -123,11 +210,29 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const caretRef = useRef(0);
   const [caret, setCaret] = useState(0);
   const [cutMark, setCutMark] = useState<{ sheet: string; x: Rect } | null>(null);
-  const [ctx, setCtx] = useState<{ x: number; y: number; on: 'cell' | 'col' | 'row' } | null>(null);
+  const [ctx, setCtx] = useState<{ x: number; y: number; on: 'cell' | 'col' | 'row'; sub?: 'paste' } | null>(null);
   const ctxRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [confirm, confirmNode] = useConfirm();
   const [width, setWidth] = useState(1200);
+  const [zoom, setZoomState] = useState(savedZoom);
+  const [formulas, setFormulas] = useState(false);
+  const [panel, setPanel] = useState<PanelState>(null);
+  const [dialog, setDialog] = useState<DialogState>(null);
+  const [pick, setPick] = useState<PickState>(null);
+  const pickRef = useRef<HTMLDivElement>(null);
+  const [filterMenu, setFilterMenu] = useState<{ c: number; at: DOMRect } | null>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
+  const [chartSel, setChartSel] = useState<string | null>(null);
+  const [rowCard, setRowCard] = useState<number | null>(null);
+  const [line, setLine] = useState<{ kind: BorderKind; color?: string }>({ kind: 'thin' });
+  const [header, setHeader] = useState(true);
+  const [noteDraft, setNoteDraft] = useState('');
+  // A list cell being typed into: the option its words pick (Enter takes it).
+  const [suggestAt, setSuggestAt] = useState(0);
+  const find = useFind();
+  const [findHow, setFindHow] = useState({ formulas: false, wholeCell: false, allSheets: false });
+  const [findAt, setFindAt] = useState(-1);
 
   const setEdit = (e: Edit | null) => {
     editRef.current = e;
@@ -143,6 +248,8 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     return () => ro.disconnect();
   }, []);
   const narrow = width < 640 || layout === 'sheet';
+  // The menus' names go in the title bar where there is room for them, as Google Docs has them; else one button holds them.
+  const menusInBar = !narrow && width >= 900;
 
   const h = hist.current;
   const dirty = !!bookRef.current && h.saved !== h.past.length;
@@ -170,6 +277,29 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const size = useMemo(() => (calc ? gridSize(calc, sheetIx) : { rows: 1000, cols: 26 }), [calc, sheetIx, rev]);
   const x = rectOf(sel);
 
+  // What the sheet's rules make of it, worked out once per change.
+  const view = useMemo<GridView>(() => {
+    const empty = {
+      hidR: new Set<number>(),
+      handR: new Set<number>(),
+      hidC: new Set<number>(),
+      merges: new Merges(undefined),
+      cf: new CondFormats({ id: '', name: '', cells: {} }, 0, calc!),
+      rules: new Rules({ id: '', name: '', cells: {} }),
+      filter: null,
+    };
+    if (!sheet || !calc) return empty;
+    const handR = new Set<number>();
+    for (const [k, v] of Object.entries(sheet.rows ?? {})) if (v.hidden) handR.add(Number(k));
+    const hidC = new Set<number>();
+    for (const [k, v] of Object.entries(sheet.cols ?? {})) if (v.hidden) hidC.add(Number(k));
+    const hidR = filterHidden(sheet, sheetIx, calc);
+    for (const r of handR) hidR.add(r);
+    const fx = sheet.filter ? parseRange(sheet.filter.range) : null;
+    const on = new Set(Object.keys(sheet.filter?.cols ?? {}).map((k) => parseRef(`${k}1`)?.c ?? -1));
+    return { hidR, handR, hidC, merges: new Merges(sheet.merges), cf: new CondFormats(sheet, sheetIx, calc), rules: new Rules(sheet), filter: fx ? { x: fx, on } : null };
+  }, [sheet, calc, sheetIx, rev]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ---- changes, Undo and Redo ----------------------------------------------------------------------------------------
   /** The calculator brought up to date after a patch (done either way). */
   const sync = (p: Patch) => {
@@ -179,14 +309,28 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     for (const [id, keys] of touched(p)) c.update(b.sheets.findIndex((s) => s.id === id), keys);
   };
 
-  /** A change: done now, and kept for Undo. */
-  const change = (p: Patch | null, at?: Sel) => {
+  /**
+   * A change: done now, and kept for Undo. Changes with the same `key` a moment apart (a chart's title typed letter by
+   * letter) are one step of Undo.
+   */
+  const change = (p: Patch | null, at?: Sel, key?: string) => {
     const b = bookRef.current;
     if (!p || readOnly || !b) return;
     p.at = { sheet: b.sheets[sheetIx]?.id ?? '', sel: at ?? selRef.current };
     bookRef.current = applyPatch(b, p, false);
     sync(p);
     const hh = hist.current;
+    const prev = hh.past[hh.past.length - 1];
+    const now = Date.now();
+    if (key && hh.last?.key === key && now - hh.last.at < 1500 && prev?.k === 'meta' && p.k === 'meta' && prev.sheet === p.sheet && hh.saved !== hh.past.length) {
+      // One step with the change before it: from what that one started from to what this one makes.
+      prev.after = p.after;
+      hh.last = { key, at: now };
+      hh.future = [];
+      setRev((r) => r + 1);
+      return;
+    }
+    hh.last = key ? { key, at: now } : undefined;
     if (hh.saved > hh.past.length) hh.saved = -1;
     hh.past.push(p);
     if (hh.past.length > HISTORY_MAX) {
@@ -208,6 +352,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     if (editRef.current) return cancelEdit();
     const hh = hist.current;
     const p = hh.past.pop();
+    hh.last = undefined;
     if (!p || !bookRef.current) return;
     bookRef.current = applyPatch(bookRef.current, p, true);
     sync(p);
@@ -218,6 +363,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const redo = () => {
     const hh = hist.current;
     const p = hh.future.shift();
+    hh.last = undefined;
     if (!p || !bookRef.current) return;
     bookRef.current = applyPatch(bookRef.current, p, false);
     sync(p);
@@ -230,12 +376,14 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const save = async (): Promise<boolean> => {
     if (!bookRef.current || !onSave || saving || readOnly) return false;
     if (editRef.current) commitEdit(null);
+    if (editRef.current) setEdit(null);
     setSaving(true);
     try {
       const copy = clone(bookRef.current);
       if (await onSave(copy)) {
         savedRef.current = clone(copy);
         hist.current.saved = hist.current.past.length;
+        hist.current.last = undefined;
         setRev((r) => r + 1);
         return true;
       }
@@ -267,30 +415,70 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     const c = (n: number) => Math.max(0, Math.min(size.cols - 1, n));
     return { r: r(s.r), c: c(s.c), ar: r(s.ar), ac: c(s.ac), fr: r(s.fr), fc: c(s.fc) };
   };
+  /** A selection grown to take in whole the merges it touches, its active cell a merge's first. */
+  const growSel = (s: Sel): Sel => {
+    if (!view.merges.list.length) return s;
+    const b = rectOf(s);
+    // Whole rows or columns stay as they were picked.
+    if ((b.r1 === 0 && b.r2 >= size.rows - 1) || (b.c1 === 0 && b.c2 >= size.cols - 1)) return s;
+    const g = view.merges.grow(b);
+    const m = view.merges.at(s.r, s.c);
+    const down = s.fr >= s.ar;
+    const right = s.fc >= s.ac;
+    return { r: m ? m.r1 : s.r, c: m ? m.c1 : s.c, ar: down ? g.r1 : g.r2, fr: down ? g.r2 : g.r1, ac: right ? g.c1 : g.c2, fc: right ? g.c2 : g.c1 };
+  };
   /** A new selection (what is being typed goes in first); `reveal` scrolls to it. */
   const setSel = (s: Sel, reveal = false, keepEdit = false) => {
-    if (editRef.current && !keepEdit) commitEdit(null);
-    const next = clampSel(s);
+    if (editRef.current && !keepEdit) {
+      commitEdit(null);
+      // Words its rule refused stay out of the cell.
+      if (editRef.current) setEdit(null);
+    }
+    const next = growSel(clampSel(s));
     selRef.current = next;
     setSelState(next);
+    setChartSel(null);
     if (sheet) sels.current.set(sheet.id, next);
-    if (reveal) requestAnimationFrame(() => grid.current?.reveal(next.fr, next.fc));
+    // The far corner comes into view (as the selection grows), or the active cell when whole rows or columns are picked.
+    const b = rectOf(next);
+    const whole = (b.r1 === 0 && b.r2 >= size.rows - 1) || (b.c1 === 0 && b.c2 >= size.cols - 1);
+    if (reveal) requestAnimationFrame(() => (whole ? grid.current?.reveal(next.r, next.c) : grid.current?.reveal(next.fr, next.fc)));
   };
   const pickSheet = (i: number) => {
     if (!book || i === sheetIx) return;
     if (editRef.current) commitEdit(null);
+    if (editRef.current) setEdit(null);
     if (sheet) sels.current.set(sheet.id, selRef.current);
     const next = book.sheets[i];
     const s = sels.current.get(next.id) ?? cellSel(0, 0);
     setSi(i);
+    setChartSel(null);
+    setPanel((p) => (p?.kind === 'chart' ? null : p));
     selRef.current = s;
     setSelState(s);
+  };
+
+  /** One step from a cell: past its merge, over hidden rows and columns, onto a merge's first cell. */
+  const stepFrom = (r: number, c: number, dr: number, dc: number, snap = true): [number, number] => {
+    const m = view.merges.at(r, c) ?? { r1: r, c1: c, r2: r, c2: c };
+    let nr = dr > 0 ? m.r2 + 1 : dr < 0 ? m.r1 - 1 : r;
+    let nc = dc > 0 ? m.c2 + 1 : dc < 0 ? m.c1 - 1 : c;
+    while (dr && nr >= 0 && nr < size.rows && view.hidR.has(nr)) nr += dr;
+    while (dc && nc >= 0 && nc < size.cols && view.hidC.has(nc)) nc += dc;
+    if (nr < 0 || nc < 0 || nr >= size.rows || nc >= size.cols) return [r, c];
+    const m2 = snap ? view.merges.at(nr, nc) : null;
+    return m2 ? [m2.r1, m2.c1] : [nr, nc];
   };
 
   /** Moves the active cell one step: within the selection when it is more than a cell (Enter, Tab), else from it. */
   const advance = (dr: number, dc: number) => {
     const s = selRef.current;
-    if (single(s)) return setSel(cellSel(s.r + dr, s.c + dc), true);
+    const m = view.merges.at(s.r, s.c);
+    const b0 = rectOf(s);
+    if (single(s) || (m && m.r1 === b0.r1 && m.r2 === b0.r2 && m.c1 === b0.c1 && m.c2 === b0.c2)) {
+      const [r, c] = stepFrom(s.r, s.c, dr, dc);
+      return setSel(cellSel(r, c), true);
+    }
     const b = rectOf(s);
     let r = s.r + dr;
     let c = s.c + dc;
@@ -301,7 +489,9 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       if (r > b.r2) [r, c] = [b.r1, c + 1 > b.c2 ? b.c1 : c + 1];
       else if (r < b.r1) [r, c] = [b.r2, c - 1 < b.c1 ? b.c2 : c - 1];
     }
-    setSel({ ...s, r, c }, false);
+    const next = { ...s, r, c };
+    selRef.current = next;
+    setSelState(next);
     requestAnimationFrame(() => grid.current?.reveal(r, c));
   };
 
@@ -310,6 +500,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     if (readOnly || !sheet) return;
     const t = text ?? inputText(sheet.cells[refName(selRef.current.r, selRef.current.c)]);
     setEdit({ text: t, mode, where });
+    setSuggestAt(0);
     caretRef.current = t.length;
     setCaret(t.length);
   };
@@ -322,7 +513,10 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     if (!e) return;
     caretRef.current = pos;
     setCaret(pos);
-    if (text !== e.text) setEdit({ ...e, text, point: undefined });
+    if (text !== e.text) {
+      setEdit({ ...e, text, point: undefined });
+      setSuggestAt(0);
+    }
     if (place)
       requestAnimationFrame(() => {
         const el = e.where === 'bar' ? barRef.current : grid.current?.input();
@@ -341,15 +535,48 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     setCaret(pos);
   };
 
+  /** Whether a cell's rule takes what was typed: a rule that refuses other input says why and keeps the typing open. */
+  const refused = (r: number, c: number, cell: Cell | null): boolean => {
+    const got = view.rules.any ? view.rules.at(r, c) : null;
+    if (!got || !calc || !cell || (cell.v === undefined && cell.f === undefined)) return false;
+    const v = cell.f !== undefined ? null : (cell.v ?? null);
+    if (v === null) return false;
+    const shown = formatValue(v, cell.s);
+    if (allowed(calc, sheetIx, got.rule, v, shown, { r, c, r0: got.r0, c0: got.c0 })) return false;
+    if (!got.rule.reject) return false;
+    const opts = got.rule.type === 'list' ? listOptions(calc, sheetIx, got.rule).map((o) => o.v) : [];
+    toast(opts.length ? `${tr('This cell takes one of')}: ${opts.slice(0, 8).join(', ')}` : tr('This value is not allowed in this cell.'), 'error');
+    return true;
+  };
+
+  /** The options a list cell offers for what is typed in it. */
+  const suggestions = (): string[] => {
+    const e = editRef.current;
+    if (!e || !calc || e.text.startsWith('=')) return [];
+    const got = view.rules.any ? view.rules.at(selRef.current.r, selRef.current.c) : null;
+    if (got?.rule.type !== 'list') return [];
+    const t = e.text.trim().toLowerCase();
+    return listOptions(calc, sheetIx, got.rule)
+      .map((o) => o.v)
+      .filter((o) => !t || o.toLowerCase().includes(t))
+      .slice(0, 8);
+  };
+
   /** What was typed goes into the cell (or every cell of the selection, with Ctrl+Enter); then the active cell moves. */
-  const commitEdit = (move: [number, number] | null, all = false) => {
+  const commitEdit = (move: [number, number] | null, all = false, pickedText?: string) => {
     const e = editRef.current;
     if (!e) return;
-    setEdit(null);
     const b = bookRef.current;
-    if (readOnly || !b || !sheet) return;
+    if (readOnly || !b || !sheet) return setEdit(null);
     const s = selRef.current;
-    const text = e.text.startsWith('=') ? closeBrackets(e.text) : e.text;
+    // A list cell: what was typed picks the option it starts (or is in), as a dropdown does.
+    let text = pickedText ?? (e.text.startsWith('=') ? closeBrackets(e.text) : e.text);
+    if (pickedText === undefined && !text.startsWith('=') && text.trim()) {
+      const opts = suggestions();
+      const exact = opts.find((o) => o.toLowerCase() === text.trim().toLowerCase());
+      if (!exact && opts.length) text = opts[Math.min(suggestAt, opts.length - 1)];
+      else if (exact) text = exact;
+    }
     const changes: Record<string, Cell | null> = {};
     const key = refName(s.r, s.c);
     if (all && !single(s)) {
@@ -361,6 +588,8 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
           changes[k] = cell?.f !== undefined ? { ...cell, f: shiftFormula(cell.f, r - s.r, c - s.c) } : cell;
         }
     } else changes[key] = typedInto(sheet.cells[key], text);
+    if (refused(s.r, s.c, changes[key])) return;
+    setEdit(null);
     const f = changes[key]?.f;
     if (f !== undefined) {
       const why = formulaProblem(f);
@@ -411,6 +640,19 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     setText(`${e.text.slice(0, start)}${n}(${e.text.slice(pos)}`, start + n.length + 1, true);
   };
 
+  /** Words put in the active cell (a date, a function to fill in, a character): at the caret while typing; else typing begins with them, after what the cell holds when `after`. */
+  const typeIn = (text: string, after = false) => {
+    if (readOnly || !sheet) return;
+    const e = editRef.current;
+    if (e) {
+      const pos = caretRef.current;
+      return setText(e.text.slice(0, pos) + text + e.text.slice(pos), pos + text.length, true);
+    }
+    const s = selRef.current;
+    grid.current?.input()?.focus({ preventScroll: true });
+    startEdit('edit', (after ? inputText(sheet.cells[refName(s.r, s.c)]) : '') + text);
+  };
+
   // ---- how cells look -------------------------------------------------------------------------------------------------------
   const active: Cell | undefined = sheet?.cells[refName(sel.r, sel.c)];
   const restyle = (f: (s: CellStyle | undefined) => CellStyle | undefined, extra?: (changes: Record<string, Cell | null>) => Patch | null) => {
@@ -425,12 +667,17 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       // Words wrapped need their rows taller: rows not sized by hand fit them.
       set.wrap ? (changes) => fitRows(Object.keys(changes), changes) : undefined,
     );
-  const setFormat = (fmt: NumFmt, cur?: string) => restyle((s) => withStyle(s, { fmt: fmt === 'general' ? undefined : fmt, dp: undefined, cur: fmt === 'currency' && cur !== '$' ? cur : undefined }));
+  const setFormat = (fmt: NumFmt | 'custom', cur?: string) => {
+    if (fmt === 'custom') return setDialog('format');
+    restyle((s) => withStyle(s, { fmt: fmt === 'general' ? undefined : fmt, dp: undefined, code: undefined, cur: (fmt === 'currency' || fmt === 'accounting') && cur && cur !== '$' ? cur : undefined }));
+  };
+  const setCode = (code: string | undefined) => restyle((s) => withStyle(s, { code, dp: undefined, cur: undefined, fmt: undefined }));
   const stepDecimals = (d: 1 | -1) => {
     if (!calc) return;
     const s = active?.s;
+    if (s?.code) return restyle((st) => withStyle(st, { code: st?.code ? codeDecimals(st.code, d) : undefined }));
     const fmt = s?.fmt ?? 'general';
-    if (fmt === 'date' || fmt === 'text') return;
+    if (isDateFmt(fmt) || fmt === 'text') return;
     let now = s?.dp ?? DEFAULT_DP[fmt];
     if (now === undefined) {
       const v = calc.value(sheetIx, sel.r, sel.c);
@@ -444,14 +691,14 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   /** Rows' heights for their wrapped words (rows sized by hand stay as they are). */
   const fitRows = (names: string[], changes: Record<string, Cell | null> = {}): Patch | null => {
     if (!sheet || !calc) return null;
-    const rows = new Set(names.map((n) => (parseRef(n)?.r ?? -1)).filter((r) => r >= 0 && !sheet.rows?.[r]?.h));
+    const rows = new Set(names.map((n) => parseRef(n)?.r ?? -1).filter((r) => r >= 0 && !sheet.rows?.[r]?.h));
     if (!rows.size) return null;
     const next = { ...(sheet.rows ?? {}) };
     let any = false;
     for (const r of rows) {
       const hgt = neededHeight(r, changes);
       if (hgt > ROW_H) {
-        next[r] = { h: Math.min(MAX_H, hgt) };
+        next[r] = { ...next[r], h: Math.min(MAX_H, hgt) };
         any = true;
       }
     }
@@ -467,22 +714,23 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       if (!cell || !holds(cell)) continue;
       const text = formatValue(calc.value(sheetIx, r, c), cell.s);
       const lh = fontPx(cell.s) * 1.35;
-      const lines = cell.s?.wrap
-        ? text.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(textWidth(line, cell.s) / Math.max(20, colW(sheet, c) - 10))), 0)
-        : text.split('\n').length;
+      const lines = cell.s?.wrap ? text.split('\n').reduce((n, l) => n + Math.max(1, Math.ceil(textWidth(l, cell.s) / Math.max(20, colW(sheet, c) - 10))), 0) : text.split('\n').length;
       most = Math.max(most, Math.ceil(lines * lh + 8));
     }
     return most;
   };
 
-  // ---- sizes, freezing ------------------------------------------------------------------------------------------------------
+  // ---- sizes, freezing, zoom --------------------------------------------------------------------------------------------------
   const setSize = (axis: 'col' | 'row', i: number, sz: number | null) => {
     if (!sheet) return;
     const key = axis === 'col' ? 'cols' : 'rows';
-    const next: Record<number, { w?: number; h?: number }> = { ...(sheet[key] ?? {}) };
-    if (sz === null || sz === (axis === 'col' ? COL_W : ROW_H)) delete next[i];
-    else next[i] = axis === 'col' ? { w: sz } : { h: sz };
-    change({ k: 'meta', sheet: sheet.id, before: metaOf(sheet), after: { ...metaOf(sheet), [key]: Object.keys(next).length ? next : undefined } });
+    const next: Record<number, { w?: number; h?: number; hidden?: boolean }> = { ...(sheet[key] ?? {}) };
+    const cur = { ...(next[i] ?? {}) };
+    if (sz === null || sz === (axis === 'col' ? COL_W : ROW_H)) delete cur[axis === 'col' ? 'w' : 'h'];
+    else cur[axis === 'col' ? 'w' : 'h'] = sz;
+    if (Object.keys(cur).length) next[i] = cur;
+    else delete next[i];
+    change(metaPatch(sheet, { [key]: Object.keys(next).length ? next : undefined }));
   };
   const fit = (axis: 'col' | 'row', i: number) => {
     if (!sheet || !calc) return;
@@ -501,7 +749,13 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const setFreeze = (rows: number, cols: number) => {
     if (!sheet) return;
     const freeze = rows || cols ? { ...(rows ? { rows } : {}), ...(cols ? { cols } : {}) } : undefined;
-    change({ k: 'meta', sheet: sheet.id, before: metaOf(sheet), after: { ...metaOf(sheet), freeze } });
+    change(metaPatch(sheet, { freeze }));
+  };
+  const setZoom = (z: number) => {
+    setZoomState(z);
+    try {
+      localStorage.setItem(ZOOM_KEY, String(z));
+    } catch {}
   };
 
   // ---- rows and columns, sorting, clearing, filling ---------------------------------------------------------------------------
@@ -527,25 +781,76 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     setSel(cellSel(axis === 'row' ? at : sel.r, axis === 'col' ? at : sel.c));
     grid.current?.focus();
   };
+  const hide = (axis: 'row' | 'col') => {
+    if (!sheet) return;
+    const [a, b] = axis === 'row' ? [wholeCols ? sel.r : x.r1, wholeCols ? sel.r : x.r2] : [wholeRows ? sel.c : x.c1, wholeRows ? sel.c : x.c2];
+    change(axis === 'row' ? metaPatch(sheet, { rows: hiddenSet(sheet.rows, a, b, true) }) : metaPatch(sheet, { cols: hiddenSet(sheet.cols, a, b, true) }));
+    // The active cell goes past what was hidden.
+    if (axis === 'row') setSel(cellSel(Math.min(size.rows - 1, b + 1), sel.c));
+    else setSel(cellSel(sel.r, Math.min(size.cols - 1, b + 1)));
+  };
+  const unhide = (axis: 'row' | 'col', i: number) => {
+    if (!sheet) return;
+    const sizes = axis === 'row' ? sheet.rows : sheet.cols;
+    const run = hiddenRun(sizes, i);
+    if (!run) return;
+    change(axis === 'row' ? metaPatch(sheet, { rows: hiddenSet(sheet.rows, run[0], run[1], false) }) : metaPatch(sheet, { cols: hiddenSet(sheet.cols, run[0], run[1], false) }));
+  };
+  const showAll = (axis: 'row' | 'col') => {
+    if (!sheet) return;
+    const sizes = axis === 'row' ? sheet.rows : sheet.cols;
+    const keys = Object.entries(sizes ?? {})
+      .filter(([, v]) => v.hidden)
+      .map(([k]) => Number(k));
+    if (!keys.length) return;
+    let next = sizes;
+    for (const k of keys) next = hiddenSet(next, k, k, false);
+    change(metaPatch(sheet, axis === 'row' ? { rows: next as Sheet['rows'] } : { cols: next as Sheet['cols'] }));
+  };
+  /** The block a whole-sheet action works on: the cells picked, or the data around the active cell. */
+  const blockOf = (): Rect => {
+    if (!sheet || !calc) return x;
+    const e = calc.extent(sheetIx);
+    if (single(sel) || wholeCols || wholeRows) return regionAround(sheet, sel.r, sel.c, Math.max(e.rows, sel.r + 1), Math.max(e.cols, sel.c + 1));
+    return x;
+  };
   const sort = (asc: boolean) => {
     if (!book || !sheet || !calc) return;
-    const e = calc.extent(sheetIx);
-    let block: Rect;
-    if (single(sel) || wholeCols || wholeRows) block = regionAround(sheet, sel.r, sel.c, Math.max(e.rows, sel.r + 1), Math.max(e.cols, sel.c + 1));
-    else block = x;
+    const block = blockOf();
     const body = (single(sel) || wholeCols || wholeRows) && hasHeader(sheet, calc, sheetIx, block) ? { ...block, r1: block.r1 + 1 } : block;
     if (body.r2 <= body.r1) return void toast(tr('There is nothing to sort here: pick a column of a table, or the rows to sort.'));
     const col = Math.max(body.c1, Math.min(body.c2, sel.c));
     change(cellsPatch(book, sheetIx, sortChanges(sheet, calc, sheetIx, body, col, asc)));
     grid.current?.focus();
   };
-  const clear = () => {
+  const clear = (all = false) => {
     if (!book || !sheet || !calc) return;
+    if (all) {
+      // Clear formatting: the looks go, what cells hold stays.
+      restyle(() => undefined);
+      return;
+    }
     change(cellsPatch(book, sheetIx, clearChanges(sheet, calc, sheetIx, rectOf(selRef.current))));
   };
   const fill = (down: boolean) => {
     if (!book || !sheet) return;
     change(cellsPatch(book, sheetIx, fillChanges(sheet, rectOf(selRef.current), down)));
+  };
+  /** The fill handle let go over `target`: the series goes on there. */
+  const fillTo = (target: Rect, ctrl: boolean) => {
+    if (!book || !sheet) return;
+    const src = rectOf(selRef.current);
+    if (target.r1 === src.r1 && target.r2 === src.r2 && target.c1 === src.c1 && target.c2 === src.c2) return;
+    const limited = { ...target, r2: Math.min(target.r2, SHEET_LIMITS.rows - 1), c2: Math.min(target.c2, SHEET_LIMITS.cols - 1) };
+    change(cellsPatch(book, sheetIx, fillSeries(sheet, src, limited, ctrl)));
+    setSel(rectSel(limited, selRef.current.r, selRef.current.c));
+    grid.current?.focus();
+  };
+  const fillDown = () => {
+    if (!sheet || !calc) return;
+    const src = rectOf(selRef.current);
+    const to = fillDownTo(sheet, calc, sheetIx, src);
+    if (to > src.r2) fillTo({ ...src, r2: to }, false);
   };
 
   // ---- copy and paste --------------------------------------------------------------------------------------------------------
@@ -570,10 +875,10 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     e.clipboardData.setData('text/plain', got.text);
     e.clipboardData.setData('text/html', got.html);
   };
+  const norm = (t: string) => t.replace(/\r\n?/g, '\n').replace(/\n$/, '');
   const pasteText = (text: string) => {
     const b = bookRef.current;
     if (!b || !sheet || readOnly) return;
-    const norm = (t: string) => t.replace(/\r\n?/g, '\n').replace(/\n$/, '');
     const own = clip && norm(clip.text) === norm(text) ? clip : null;
     const target = rectOf(selRef.current);
     const got = pasteChanges(sheet, target, own ? { clip: own } : { text });
@@ -619,13 +924,35 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       }
     }
   };
-  const menuPaste = async () => {
+  const readClipboard = async (): Promise<string | null> => {
     try {
-      pasteText(await navigator.clipboard.readText());
+      return await navigator.clipboard.readText();
     } catch {
-      if (clip) pasteText(clip.text);
-      else toast(tr('This browser keeps its clipboard to itself: press Ctrl+V (or ⌘V) to paste.'));
+      return clip ? clip.text : null;
     }
+  };
+  const menuPaste = async () => {
+    const t = await readClipboard();
+    if (t !== null) pasteText(t);
+    else toast(tr('This browser keeps its clipboard to itself: press Ctrl+V (or ⌘V) to paste.'));
+  };
+  /** Paste special: values, looks or formulas alone, or turned on its side. */
+  const pasteHow = async (how: PasteHow) => {
+    const b = bookRef.current;
+    if (!b || !sheet || readOnly) return;
+    const text = await readClipboard();
+    const own = clip && (text === null || norm(clip.text) === norm(text)) ? clip : null;
+    const target = rectOf(selRef.current);
+    let got: { changes: Record<string, Cell | null>; x: Rect };
+    if (own) got = pasteSpecial(sheet, target, own, how);
+    else if (text !== null) {
+      if (how === 'formats') return void toast(tr('Only cells copied here bring their looks.'));
+      let rows = parseDelimited(text.replace(/\r?\n$/, ''), '\t').rows;
+      if (how === 'transposed') rows = rows.length ? Array.from({ length: Math.max(...rows.map((r) => r.length)) }, (_, j) => rows.map((r) => r[j] ?? '')) : rows;
+      got = how === 'values' || how === 'transposed' ? pasteTextValues(sheet, target, rows) : pasteChanges(sheet, target, { text });
+    } else return void toast(tr('This browser keeps its clipboard to itself: press Ctrl+V (or ⌘V) to paste.'));
+    change(cellsPatch(b, sheetIx, got.changes));
+    setSel(rectSel(got.x), true);
   };
 
   // ---- sheets -------------------------------------------------------------------------------------------------------------------
@@ -709,10 +1036,336 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     return true;
   };
 
+  // ---- the filter ---------------------------------------------------------------------------------------------------------------
+  const toggleFilter = () => {
+    if (!sheet || !calc) return;
+    if (sheet.filter) return change(metaPatch(sheet, { filter: undefined }));
+    const block = blockOf();
+    if (block.r2 <= block.r1 && single(sel)) return void toast(tr('Pick the table to filter, or a cell in it.'));
+    change(metaPatch(sheet, { filter: { range: rangeName(block) } }));
+  };
+  const setFilterCol = (c: number, fc: FilterCol | null) => {
+    if (!sheet?.filter) return;
+    const cols = { ...(sheet.filter.cols ?? {}) };
+    if (fc) cols[colName(c)] = fc;
+    else delete cols[colName(c)];
+    change(metaPatch(sheet, { filter: { range: sheet.filter.range, ...(Object.keys(cols).length ? { cols } : {}) } }));
+  };
+  const sortFiltered = (c: number, asc: boolean) => {
+    if (!book || !sheet || !calc || !view.filter) return;
+    const fx = view.filter.x;
+    const body = { ...fx, r1: fx.r1 + 1, r2: Math.min(fx.r2, calc.extent(sheetIx).rows - 1) };
+    if (body.r2 <= body.r1) return;
+    change(cellsPatch(book, sheetIx, sortChanges(sheet, calc, sheetIx, body, c, asc)));
+  };
+
+  // ---- rules for what cells take, and the cells they draw ------------------------------------------------------------------------
+  const setRules = (validation: Validation[]) => sheet && change(metaPatch(sheet, { validation: validation.length ? validation : undefined }));
+  /** A rule over the cells picked, in place of rules on exactly those cells; `values` fills them too. */
+  const addRule = (rule: Validation, values?: (c: Cell | undefined) => Cell | null | undefined) => {
+    if (!book || !sheet) return;
+    const rest = (sheet.validation ?? []).filter((v) => v.range !== rule.range);
+    const patches: (Patch | null)[] = [metaPatch(sheet, { validation: [...rest, rule] })];
+    if (values) {
+      const changes: Record<string, Cell | null> = {};
+      const b = rectOf(selRef.current);
+      for (let r = b.r1; r <= Math.min(b.r2, b.r1 + 5000); r++)
+        for (let c = b.c1; c <= b.c2; c++) {
+          const k = refName(r, c);
+          const next = values(sheet.cells[k]);
+          if (next !== undefined) changes[k] = next;
+        }
+      patches.push(cellsPatch(book, sheetIx, changes));
+    }
+    change(together(patches));
+  };
+  const selRange = () => rangeName(wholeCols || wholeRows ? { ...x, r2: Math.min(x.r2, calc ? Math.max(calc.extent(sheetIx).rows - 1, x.r1) : x.r2), c2: Math.min(x.c2, calc ? Math.max(calc.extent(sheetIx).cols - 1, x.c1) : x.c2) } : x);
+  const insertCheckbox = () => addRule({ range: selRange(), type: 'checkbox' }, (c) => (typeof c?.v === 'boolean' || c?.f !== undefined ? undefined : tidyCell({ ...(c ?? {}), v: false })));
+  const insertRating = () => addRule({ range: selRange(), type: 'rating' });
+  const insertDropdown = () => {
+    if (!sheet || !calc) return;
+    // The values the cells hold already become the options, each with a colour.
+    const seen = new Map<string, string>();
+    for (const [k, r, c] of cellsIn(sheet, calc, sheetIx, x)) {
+      if (!holds(sheet.cells[k])) continue;
+      const t = formatValue(calc.value(sheetIx, r, c), sheet.cells[k].s).trim();
+      if (t && !seen.has(t.toLowerCase()) && seen.size < 20) seen.set(t.toLowerCase(), t);
+    }
+    const options = seen.size ? [...seen.values()].map((v, i) => ({ v, color: CHIP_COLORS[i % CHIP_COLORS.length] })) : undefined;
+    setPanel({
+      kind: 'dv',
+      start: {
+        range: selRange(),
+        type: 'list',
+        ...(options
+          ? { options }
+          : {
+              options: [
+                { v: 'Option 1', color: CHIP_COLORS[0] },
+                { v: 'Option 2', color: CHIP_COLORS[1] },
+              ],
+            }),
+      },
+    });
+  };
+  /** A value put in a cell from its widget (a checkbox, a list, stars, the calendar). */
+  const setCellValue = (r: number, c: number, text: string) => {
+    if (!book || !sheet || readOnly) return;
+    const k = refName(r, c);
+    if (sheet.cells[k]?.f !== undefined) return void toast(tr('This cell holds a formula: change it in the formula bar.'));
+    const next = typedInto(sheet.cells[k], text);
+    if (refused(r, c, next)) return;
+    change(cellsPatch(book, sheetIx, { [k]: next }));
+  };
+  const onSmart = (kind: Smart, r: number, c: number, at: DOMRect, n?: number) => {
+    if (!sheet || !calc || readOnly) return;
+    if (kind === 'check') {
+      const v = calc.value(sheetIx, r, c);
+      return setCellValue(r, c, v === true ? 'FALSE' : 'TRUE');
+    }
+    if (kind === 'rate') {
+      const v = calc.value(sheetIx, r, c);
+      return setCellValue(r, c, String(v === n ? 0 : (n ?? 0)));
+    }
+    setPick({ kind, r, c, at });
+  };
+  /** Space on a checkbox ticks every checkbox picked (all to the same, as Sheets does). */
+  const toggleChecks = (): boolean => {
+    if (!book || !sheet || !calc || !view.rules.any) return false;
+    const b = rectOf(selRef.current);
+    const first = view.rules.at(selRef.current.r, selRef.current.c);
+    if (first?.rule.type !== 'checkbox') return false;
+    const to = calc.value(sheetIx, selRef.current.r, selRef.current.c) !== true;
+    const changes: Record<string, Cell | null> = {};
+    for (let r = b.r1; r <= Math.min(b.r2, b.r1 + 5000); r++)
+      for (let c = b.c1; c <= b.c2; c++) {
+        if (view.rules.at(r, c)?.rule.type !== 'checkbox') continue;
+        const k = refName(r, c);
+        if (sheet.cells[k]?.f !== undefined) continue;
+        changes[k] = tidyCell({ ...(sheet.cells[k] ?? {}), v: to });
+      }
+    change(cellsPatch(book, sheetIx, changes));
+    return true;
+  };
+
+  // ---- borders, merges ------------------------------------------------------------------------------------------------------------
+  const lineText = cleanBorder(`${line.kind}${line.color ? ` ${line.color}` : ''}`);
+  const borders = (where: BorderWhere) => {
+    if (!book || !sheet) return;
+    change(cellsPatch(book, sheetIx, borderChanges(sheet, rectOf(selRef.current), where, where === 'none' ? undefined : lineText)));
+    grid.current?.focus();
+  };
+  const merged = !!view.merges.list.length && view.merges.list.some((m) => m.r1 <= x.r2 && m.r2 >= x.r1 && m.c1 <= x.c2 && m.c2 >= x.c1);
+  const merge = async (how: 'all' | 'across' | 'down' | 'none') => {
+    if (!book || !sheet) return;
+    const b = rectOf(selRef.current);
+    if (how !== 'none' && b.r1 === b.r2 && b.c1 === b.c2) return void toast(tr('Pick two cells or more to merge.'));
+    if (how !== 'none' && (b.r2 - b.r1 + 1) * (b.c2 - b.c1 + 1) > 100_000) return void toast(tr('That is too many cells to merge.'));
+    const got = mergeResult(sheet, b, how);
+    if (got.lost.length && !(await confirm({ title: 'Merge these cells?', body: 'Only the top-left value of each merge is kept; the others are cleared.', confirm: 'Merge' }))) return;
+    const lost: Record<string, Cell | null> = {};
+    for (const k of got.lost) {
+      const c = sheet.cells[k];
+      lost[k] = c ? tidyCell({ ...(c.s ? { s: c.s } : {}) }) : null;
+    }
+    change(together([metaPatch(sheet, { merges: got.merges.length ? got.merges : undefined }), cellsPatch(book, sheetIx, lost)]));
+    setSel(rectSel(b, b.r1, b.c1));
+  };
+
+  // ---- conditional formatting -------------------------------------------------------------------------------------------------------
+  const setConditional = (rules: Sheet['conditional']) => sheet && change(metaPatch(sheet, { conditional: rules?.length ? rules : undefined }));
+
+  // ---- charts -------------------------------------------------------------------------------------------------------------------
+  const setCharts = (charts: SheetChart[], key?: string) => sheet && change(metaPatch(sheet, { charts: charts.length ? charts : undefined }), undefined, key);
+  const insertChart = () => {
+    if (!sheet || !calc) return;
+    if ((sheet.charts?.length ?? 0) >= SHEET_LIMITS.charts) return void toast(tr('A sheet holds at most 20 charts.'));
+    const block = blockOf();
+    const e = calc.extent(sheetIx);
+    if (!e.rows) return void toast(tr('Put some numbers in the sheet first, then pick them for the chart.'));
+    // Beside the sheet's data (a column's width clear of it), level with the cells it draws.
+    const at = Math.max(block.c2 + 1, e.cols);
+    let px = 20;
+    for (let c = 0; c < at; c++) px += view.hidC.has(c) ? 0 : colW(sheet, c);
+    let py = 0;
+    for (let r = 0; r < block.r1; r++) py += view.hidR.has(r) ? 0 : rowH(sheet, r);
+    const chart: SheetChart = { id: newId(), kind: 'column', range: rangeName(block), x: px, y: py, w: 480, h: 300 };
+    setCharts([...(sheet.charts ?? []), chart]);
+    setChartSel(chart.id);
+    setPanel({ kind: 'chart', id: chart.id });
+    requestAnimationFrame(() => grid.current?.reveal(block.r1, Math.min(size.cols - 1, at + 3)));
+  };
+  const chartOf = (id: string) => sheet?.charts?.find((c) => c.id === id);
+  const updateChart = (c: SheetChart, key?: string) =>
+    sheet &&
+    setCharts(
+      (sheet.charts ?? []).map((x) => (x.id === c.id ? c : x)),
+      key,
+    );
+  const deleteChart = (id: string) => {
+    if (!sheet) return;
+    setCharts((sheet.charts ?? []).filter((c) => c.id !== id));
+    setChartSel(null);
+    setPanel((p) => (p?.kind === 'chart' && p.id === id ? null : p));
+    grid.current?.focus();
+  };
+
+  // ---- notes ------------------------------------------------------------------------------------------------------------------
+  const editNote = () => {
+    const s = selRef.current;
+    const at = grid.current?.rectOf(s.r, s.c);
+    if (!at || readOnly) return;
+    setNoteDraft(sheet?.cells[refName(s.r, s.c)]?.note ?? '');
+    setPick({ kind: 'note', r: s.r, c: s.c, at });
+  };
+  const saveNote = (r: number, c: number, text: string) => {
+    if (!book || !sheet) return;
+    const k = refName(r, c);
+    const cur = sheet.cells[k] ?? {};
+    const note = text.trim().slice(0, SHEET_LIMITS.note);
+    const next: Cell = { ...cur };
+    if (note) next.note = note;
+    else delete next.note;
+    change(cellsPatch(book, sheetIx, { [k]: tidyCell(next) }));
+    setPick(null);
+    grid.current?.focus();
+  };
+
+  // ---- the data tools ---------------------------------------------------------------------------------------------------------------
+  /** The columns of a block, by their header's words (or their letters). */
+  const colChoices = (b: Rect, head: boolean): ColChoice[] =>
+    Array.from({ length: b.c2 - b.c1 + 1 }, (_, j) => {
+      const c = b.c1 + j;
+      const t = head && sheet && calc ? formatValue(calc.value(sheetIx, b.r1, c), sheet.cells[refName(b.r1, c)]?.s) : '';
+      return { c, name: t ? `${t} (${colName(c)})` : `${tr('Column')} ${colName(c)}` };
+    });
+  const [toolBlock, setToolBlock] = useState<Rect | null>(null);
+  const openTool = (d: DialogState) => {
+    if (!sheet || !calc) return;
+    const b = blockOf();
+    setToolBlock(b);
+    setHeader(hasHeader(sheet, calc, sheetIx, b));
+    setDialog(d);
+  };
+  const sortSheet = (asc: boolean) => sort(asc);
+  const sortRangeBy = (keys: { c: number; asc: boolean }[]) => {
+    if (!book || !sheet || !calc || !toolBlock) return;
+    const body = header ? { ...toolBlock, r1: toolBlock.r1 + 1 } : toolBlock;
+    if (body.r2 <= body.r1) return;
+    change(cellsPatch(book, sheetIx, sortByKeys(sheet, calc, sheetIx, body, keys)));
+  };
+  const removeDups = (cols: number[]) => {
+    if (!book || !sheet || !calc || !toolBlock) return;
+    const got = removeDuplicates(sheet, calc, sheetIx, toolBlock, header, cols);
+    change(cellsPatch(book, sheetIx, got.changes));
+    toast(got.removed ? `${got.removed} duplicate row${got.removed === 1 ? '' : 's'} removed` : tr('No duplicate rows were found.'));
+  };
+  const splitText = (sepr: string) => {
+    if (!book || !sheet || !calc) return;
+    const b: Rect = { ...x, c2: x.c1, r2: Math.min(x.r2, Math.max(x.r1, calc.extent(sheetIx).rows - 1)) };
+    const got = splitColumn(sheet, calc, sheetIx, b, sepr);
+    change(cellsPatch(book, sheetIx, got.changes));
+  };
+  const splitGuess = () => {
+    if (!sheet || !calc) return ',';
+    const texts: string[] = [];
+    for (let r = x.r1; r <= Math.min(x.r2, x.r1 + 200, calc.extent(sheetIx).rows - 1); r++) texts.push(formatValue(calc.value(sheetIx, r, x.c1)));
+    return guessSeparator(texts);
+  };
+  const trim = () => {
+    if (!book || !sheet || !calc) return;
+    const got = trimChanges(sheet, calc, sheetIx, single(sel) ? blockOf() : x);
+    change(cellsPatch(book, sheetIx, got.changes));
+    toast(got.count ? `${got.count} cell${got.count === 1 ? '' : 's'} trimmed` : tr('No extra spaces were found.'));
+  };
+
+  // ---- find and replace -----------------------------------------------------------------------------------------------------------
+  const how: FindHow = { ...find.options, ...findHow };
+  const matches = useMemo(
+    // Across sheets, in their order (so the place in the list stays as sheets are switched to).
+    () => (find.open && book && calc ? findCells(book, calc, how.allSheets ? 0 : sheetIx, find.query, how) : []),
+    [find.open, find.query, find.options, findHow, rev, sheetIx], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  useEffect(() => setFindAt(-1), [find.query, find.options, findHow]);
+  useEffect(() => {
+    if (!findHow.allSheets) setFindAt(-1);
+  }, [sheetIx]); // eslint-disable-line react-hooks/exhaustive-deps
+  const afterReplace = useRef(false);
+  useEffect(() => {
+    if (!afterReplace.current) return;
+    afterReplace.current = false;
+    if (matches.length) goMatch(Math.min(Math.max(0, findAt), matches.length - 1));
+    else setFindAt(-1);
+  }, [matches]); // eslint-disable-line react-hooks/exhaustive-deps
+  const goMatch = (i: number) => {
+    const m = matches[i];
+    if (!m || !book) return;
+    setFindAt(i);
+    if (m.si !== sheetIx) {
+      sels.current.set(book.sheets[m.si].id, cellSel(m.r, m.c));
+      pickSheet(m.si);
+      requestAnimationFrame(() => requestAnimationFrame(() => grid.current?.reveal(m.r, m.c)));
+    } else setSel(cellSel(m.r, m.c), true);
+  };
+  const nextMatch = (d: 1 | -1) => {
+    if (!matches.length) return;
+    // From the cell picked: the next match after it (or before it), in reading order.
+    let i = findAt;
+    if (i < 0) {
+      const s = selRef.current;
+      const after = matches.findIndex((m) => m.si === sheetIx && (m.r > s.r || (m.r === s.r && m.c > s.c)));
+      i = d > 0 ? (after < 0 ? 0 : after) : (after < 0 ? matches.length : after) - 1;
+      if (i < 0) i = matches.length - 1;
+      return goMatch(i);
+    }
+    goMatch((i + d + matches.length) % matches.length);
+  };
+  const replaceOne = () => {
+    if (!book || !calc || readOnly) return;
+    const m = matches[findAt];
+    if (!m) return nextMatch(1);
+    const sh = book.sheets[m.si];
+    const cell = sh.cells[refName(m.r, m.c)];
+    const got = cell ? replacedCell(cell, calc, m.si, m.r, m.c, find.query, find.replacement, how, false) : null;
+    if (!got) return nextMatch(1);
+    change(cellsPatch(book, m.si, { [refName(m.r, m.c)]: got.cell }), cellSel(m.r, m.c));
+    // On to the next match, once the list is worked out again.
+    afterReplace.current = true;
+  };
+  const replaceAll = () => {
+    if (!book || !calc || readOnly) return;
+    const bySheet = new Map<number, Record<string, Cell | null>>();
+    let count = 0;
+    for (const m of findCells(book, calc, how.allSheets ? 0 : sheetIx, find.query, how, 100_000)) {
+      const sh = book.sheets[m.si];
+      const cell = sh.cells[refName(m.r, m.c)];
+      const got = cell ? replacedCell(cell, calc, m.si, m.r, m.c, find.query, find.replacement, how, true) : null;
+      if (!got) continue;
+      count += got.count;
+      const list = bySheet.get(m.si) ?? {};
+      list[refName(m.r, m.c)] = got.cell;
+      bySheet.set(m.si, list);
+    }
+    change(together([...bySheet].map(([s, changes]) => cellsPatch(book, s, changes))));
+    toast(count ? `${count} replacement${count === 1 ? '' : 's'} made` : tr('Nothing was replaced.'));
+  };
+
+  // ---- the row card -------------------------------------------------------------------------------------------------------------
+  const cardInfo = useMemo(() => {
+    if (rowCard === null || !sheet || !calc) return null;
+    const e = calc.extent(sheetIx);
+    const fx = view.filter?.x;
+    const block = fx && rowCard > fx.r1 && rowCard <= fx.r2 ? fx : regionAround(sheet, rowCard, Math.min(sel.c, Math.max(0, e.cols - 1)), Math.max(e.rows, rowCard + 1), Math.max(e.cols, 1));
+    const head = fx && rowCard > fx.r1 && rowCard <= fx.r2 ? fx.r1 : sheet.freeze?.rows && rowCard >= sheet.freeze.rows ? sheet.freeze.rows - 1 : block.r1 < rowCard && hasHeader(sheet, calc, sheetIx, block) ? block.r1 : null;
+    const cols: number[] = [];
+    for (let c = block.c1; c <= Math.min(block.c2, block.c1 + 60); c++) if (!view.hidC.has(c)) cols.push(c);
+    return { cols: cols.length ? cols : [sel.c], head, first: head !== null ? head + 1 : 0, last: Math.max(rowCard, Math.min(block.r2, e.rows - 1)) };
+  }, [rowCard, sheet, calc, sheetIx, rev, view]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ---- keys ---------------------------------------------------------------------------------------------------------------------
   const editKey = (e: React.KeyboardEvent<HTMLElement>) => {
     const ed = editRef.current!;
-    const mod = e.ctrlKey || e.metaKey;
+    const mod = isMod(e);
     if (mod && e.key.toLowerCase() === 's') {
       e.preventDefault();
       void save();
@@ -722,11 +1375,30 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       e.preventDefault();
       return cancelEdit();
     }
+    if (e.key === 'F4') {
+      // The reference under the caret cycles through its $ signs.
+      e.preventDefault();
+      const got = cycleRef(ed.text, caretRef.current);
+      if (got) setText(got.text, got.caret, true);
+      return;
+    }
+    if (mod && (e.key === ';' || e.key === ':')) {
+      e.preventDefault();
+      const now = new Date();
+      typeIn(e.shiftKey || e.key === ':' ? `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}` : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
+      return;
+    }
     if (e.key === 'Enter' && e.altKey) {
       e.preventDefault();
       const el = e.target as HTMLTextAreaElement;
       const pos = el.selectionStart ?? ed.text.length;
       setText(`${ed.text.slice(0, pos)}\n${ed.text.slice(el.selectionEnd ?? pos)}`, pos + 1, true);
+      return;
+    }
+    const opts = suggestions();
+    if (opts.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && !ed.text.startsWith('=')) {
+      e.preventDefault();
+      setSuggestAt((i) => (i + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length);
       return;
     }
     if (e.key === 'Enter') {
@@ -764,20 +1436,50 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
 
   const navKey = (e: React.KeyboardEvent<HTMLElement>) => {
     if (!sheet) return;
-    const mod = e.ctrlKey || e.metaKey;
+    const mod = isMod(e);
     const k = e.key;
     const lower = k.toLowerCase();
     const s = selRef.current;
     if (mod && lower === 's') return void (e.preventDefault(), save());
-    if (mod && lower === 'z') return void (e.preventDefault(), e.shiftKey ? redo() : undo());
-    if (mod && lower === 'y') return void (e.preventDefault(), redo());
+    if (mod && lower === 'f') return void (e.preventDefault(), find.show());
+    if (mod && lower === 'h') return void (e.preventDefault(), find.show(!readOnly));
+    if (mod && (k === '/' || e.code === 'Slash')) return void (e.preventDefault(), setDialog('shortcuts'));
+    if (mod && (k === '`' || e.code === 'Backquote')) return void (e.preventDefault(), setFormulas((f) => !f));
     if (mod && lower === 'a') return void (e.preventDefault(), setSel({ r: s.r, c: s.c, ar: 0, ac: 0, fr: size.rows - 1, fc: size.cols - 1 }));
+    // Ctrl+Space: the whole column; Shift+Space: the whole row; Space on rows picked whole: expand the row.
+    if (k === ' ' && mod) return void (e.preventDefault(), setSel({ r: 0, c: s.c, ar: 0, ac: x.c1, fr: size.rows - 1, fc: x.c2 }));
+    if (k === ' ' && e.shiftKey) return void (e.preventDefault(), setSel({ r: s.r, c: 0, ar: x.r1, ac: 0, fr: x.r2, fc: size.cols - 1 }));
+    if (chartSel) {
+      if (k === 'Delete' || k === 'Backspace') return void (e.preventDefault(), !readOnly && deleteChart(chartSel));
+      if (k === 'Escape') return void (e.preventDefault(), setChartSel(null));
+    }
+    if (k === ' ' && !e.altKey && wholeRows && !readOnly) return void (e.preventDefault(), setRowCard(s.r));
+    if (k === ' ' && !e.altKey && !readOnly && toggleChecks()) return void e.preventDefault();
     if (mod && !readOnly && (lower === 'b' || lower === 'i' || lower === 'u')) {
       e.preventDefault();
       const key = lower as 'b' | 'i' | 'u';
       return setStyle({ [key]: !active?.s?.[key] || undefined });
     }
+    if (e.altKey && e.shiftKey && e.code === 'Digit5' && !readOnly) return void (e.preventDefault(), setStyle({ s: !active?.s?.s || undefined }));
+    if (mod && k === '\\' && !readOnly) return void (e.preventDefault(), clear(true));
+    if (mod && e.shiftKey && lower === 'l' && !readOnly) return void (e.preventDefault(), toggleFilter());
+    if (mod && e.shiftKey && lower === 'v' && !readOnly) return void (e.preventDefault(), pasteHow('values'));
     if (mod && !readOnly && (lower === 'd' || lower === 'r')) return void (e.preventDefault(), fill(lower === 'd'));
+    if (mod && !readOnly && (k === ';' || k === ':')) {
+      // Ctrl+; today's date, Ctrl+Shift+; the time now.
+      e.preventDefault();
+      const now = nowSerial();
+      const time = e.shiftKey || k === ':';
+      const cell = sheet.cells[refName(s.r, s.c)];
+      const next = tidyCell({
+        ...(cell ?? {}),
+        v: time ? now - Math.floor(now) : dateSerial(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate()),
+        s: withStyle(cell?.s, cell?.s?.fmt && isDateFmt(cell.s.fmt) ? {} : { fmt: time ? 'time' : 'date' }),
+      });
+      delete next?.f;
+      change(cellsPatch(book!, sheetIx, { [refName(s.r, s.c)]: next }));
+      return;
+    }
     if (mod && (lower === 'c' || lower === 'x' || lower === 'v')) {
       // The browser sends the clipboard's events to the box (the grid itself has none on a touch screen).
       if (e.target !== grid.current?.input()) {
@@ -787,14 +1489,28 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       }
       return;
     }
+    if (e.altKey && k === 'ArrowDown' && !readOnly) {
+      // A list's options, or the calendar of a date cell.
+      e.preventDefault();
+      const at = grid.current?.rectOf(s.r, s.c);
+      const rule = view.rules.any ? view.rules.at(s.r, s.c)?.rule : undefined;
+      const fmt = sheet.cells[refName(s.r, s.c)]?.s?.fmt;
+      if (at && rule?.type === 'list') setPick({ kind: 'list', r: s.r, c: s.c, at });
+      else if (at && (rule?.type === 'date' || fmt === 'date' || fmt === 'datetime')) setPick({ kind: 'date', r: s.r, c: s.c, at });
+      return;
+    }
+    if (k === 'F2' && e.shiftKey && !readOnly) return void (e.preventDefault(), editNote());
     const arrows: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
     if (arrows[k]) {
       e.preventDefault();
       const [dr, dc] = arrows[k];
-      const [r0, c0] = e.shiftKey ? [s.fr, s.fc] : [s.r, s.c];
-      const [r, c] = mod ? dataEdge(sheet, r0, c0, dr, dc, size.rows, size.cols) : [r0 + dr, c0 + dc];
-      if (e.shiftKey) setSel({ ...s, fr: r, fc: c }, true);
-      else setSel(cellSel(r, c), true);
+      if (e.shiftKey) {
+        const [r, c] = mod ? dataEdge(sheet, s.fr, s.fc, dr, dc, size.rows, size.cols) : stepFrom(s.fr, s.fc, dr, dc, false);
+        setSel({ ...s, fr: r, fc: c }, true);
+      } else {
+        const [r, c] = mod ? dataEdge(sheet, s.r, s.c, dr, dc, size.rows, size.cols) : stepFrom(s.r, s.c, dr, dc);
+        setSel(cellSel(r, c), true);
+      }
       return;
     }
     if (k === 'Tab') return void (e.preventDefault(), advance(0, e.shiftKey ? -1 : 1));
@@ -816,6 +1532,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       return e.shiftKey ? setSel({ ...s, fr: s.fr + n }, true) : setSel(cellSel(s.r + n, s.c), true);
     }
     if (k === 'Escape') {
+      if (find.open) find.close();
       if (cutMark) {
         setCutMark(null);
         if (clip) clip = { ...clip, cut: false };
@@ -841,12 +1558,13 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
 
   const onKey = (e: React.KeyboardEvent<HTMLElement>) => (editRef.current ? editKey(e) : navKey(e));
 
-  // Ctrl+S anywhere in the editor (a toolbar button or a menu may hold the focus).
+  // Ctrl+S anywhere in the editor (a toolbar button or a menu may hold the focus); Ctrl+F and Ctrl+H too.
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       const a = document.activeElement;
       if (a && a !== document.body && !root.current?.contains(a)) return;
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && (!a || a === document.body || !(a as HTMLElement).closest('textarea'))) {
+      const inField = !!a && a !== document.body && !!(a as HTMLElement).closest('textarea,input');
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && !inField) {
         e.preventDefault();
         void saveNow.current();
       }
@@ -934,6 +1652,12 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         return [{ r1: Math.min(ra, rb), c1: Math.min(ca, cb), r2: Math.max(ra, rb), c2: Math.max(ca, cb), color: REF_COLORS[i % REF_COLORS.length] }];
       })
     : [];
+  // What find found on this sheet, marked (the current one most).
+  if (find.open && matches.length)
+    for (let i = 0; i < Math.min(matches.length, 400); i++) {
+      const m = matches[i];
+      if (m.si === sheetIx) refs.push({ r1: m.r, c1: m.c, r2: m.r, c2: m.c, color: i === findAt ? '#f29900' : '#fbbc04' });
+    }
 
   const status = stats && stats.count > 1 && (
     <>
@@ -962,41 +1686,183 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     </>
   );
 
-  const ask = onAsk && (
-    <MenuItem icon={<Sparkles size={14} />} onClick={() => (setCtx(null), onAsk(leadFor(selRef.current).lead))}>
-      Ask the agent about it
-    </MenuItem>
-  );
+  const askNow = onAsk ? () => (setCtx(null), onAsk(leadFor(selRef.current).lead)) : undefined;
+  const hasHiddenRows = Object.values(sheet.rows ?? {}).some((v) => v.hidden);
+  const hasHiddenCols = Object.values(sheet.cols ?? {}).some((v) => v.hidden);
+  const activeNote = !!active?.note;
+  const openChars = () => {
+    const s = selRef.current;
+    const at = grid.current?.rectOf(s.r, s.c);
+    if (at) setPick({ kind: 'chars', r: s.r, c: s.c, at });
+  };
+  const openDate = () => {
+    const s = selRef.current;
+    const at = grid.current?.rectOf(s.r, s.c);
+    if (at) setPick({ kind: 'date', r: s.r, c: s.c, at });
+  };
 
-  return (
+  const menuCtx: MenuCtx = {
+    readOnly,
+    style: active?.s,
+    nRows,
+    nCols,
+    col: colName(sel.c),
+    canUndo: hist.current.past.length > 0 || !!edit,
+    canRedo: hist.current.future.length > 0,
+    filtered: !!sheet.filter,
+    merged,
+    freeze: sheet.freeze,
+    r: sel.r,
+    c: sel.c,
+    hiddenRows: hasHiddenRows,
+    hiddenCols: hasHiddenCols,
+    zoom,
+    formulas,
+    note: activeNote,
+    line,
+    onAsk: askNow,
+    undo,
+    redo,
+    copy: (cut) => void menuCopy(cut),
+    paste: () => void menuPaste(),
+    pasteSpecial: (p) => void pasteHow(p),
+    find: (replace) => find.show(replace),
+    fill,
+    clear,
+    selectAll: () => setSel({ r: sel.r, c: sel.c, ar: 0, ac: 0, fr: size.rows - 1, fc: size.cols - 1 }),
+    setFreeze,
+    setZoom,
+    setFormulas,
+    showAll,
+    insert,
+    remove,
+    hide,
+    chart: insertChart,
+    checkbox: insertCheckbox,
+    dropdown: insertDropdown,
+    rating: insertRating,
+    date: openDate,
+    noteEdit: editNote,
+    func: (name) => typeIn(`=${name}(`),
+    chars: openChars,
+    addSheet: () => addSheet(),
+    setStyle,
+    setFormat,
+    setCode,
+    borders,
+    setLine,
+    merge: (h2) => void merge(h2),
+    conditional: () => setPanel({ kind: 'cf' }),
+    sortRange: () => openTool('sort'),
+    sortSheet,
+    toggleFilter,
+    validation: () => setPanel({ kind: 'dv' }),
+    dups: () => openTool('dups'),
+    split: () => setDialog('split'),
+    trim,
+    shortcuts: () => setDialog('shortcuts'),
+    expand: () => setRowCard(sel.r),
+  };
+  const menus = sheetMenus(menuCtx);
+
+  const shortcutGroups: ShortcutGroup[] = [
+    {
+      title: 'Moving and picking',
+      items: [
+        ['Ctrl+→', 'To the edge of the data'],
+        ['Shift+→', 'Pick more cells'],
+        ['Ctrl+Space', 'Pick the whole column'],
+        ['Shift+Space', 'Pick the whole row'],
+        ['Ctrl+A', 'Pick everything'],
+        ['Space', 'Expand the row picked whole, or tick a checkbox'],
+        ['Alt+↓', 'Open a list or a calendar'],
+      ],
+    },
+    {
+      title: 'Typing',
+      items: [
+        ['Enter', 'Put it in and go down'],
+        ['Tab', 'Put it in and go right'],
+        ['Alt+Enter', 'A new line in the cell'],
+        ['Ctrl+Enter', 'Put it in every cell picked'],
+        ['F2', 'Change what the cell holds'],
+        ['F4', 'Fix the reference ($A$1, A$1, $A1)'],
+        ['Ctrl+;', 'Today’s date'],
+        ['Ctrl+Shift+;', 'The time now'],
+        ['Shift+F2', 'A note on the cell'],
+      ],
+    },
+    {
+      title: 'Editing',
+      items: [
+        ['Ctrl+C', 'Copy'],
+        ['Ctrl+X', 'Cut'],
+        ['Ctrl+V', 'Paste'],
+        ['Ctrl+Shift+V', 'Paste values only'],
+        ['Ctrl+D', 'Fill down'],
+        ['Ctrl+R', 'Fill right'],
+        ['Delete', 'Clear'],
+        ['Ctrl+Z', 'Undo'],
+        ['Ctrl+Shift+Z', 'Redo'],
+        ['Ctrl+F', 'Find'],
+        ['Ctrl+H', 'Find and replace'],
+        ['Ctrl+S', 'Save'],
+      ],
+    },
+    {
+      title: 'Looks and data',
+      items: [
+        ['Ctrl+B', 'Bold'],
+        ['Ctrl+I', 'Italic'],
+        ['Ctrl+U', 'Underline'],
+        ['Alt+Shift+5', 'Strikethrough'],
+        ['Ctrl+\\', 'Clear formatting'],
+        ['Ctrl+Shift+L', 'Create or remove a filter'],
+        ['Ctrl+`', 'Show formulas'],
+        ['Alt+/', 'Search the menus'],
+        ['Ctrl+/', 'Keyboard shortcuts'],
+      ],
+    },
+  ];
+
+  // The list typed into: the options its words pick, under the cell.
+  const typedOpts = edit && edit.where === 'cell' ? suggestions() : [];
+  const cellBox = edit && typedOpts.length ? grid.current?.rectOf(sel.r, sel.c) : null;
+
+  const pickCell = pick ? sheet.cells[refName(pick.r, pick.c)] : undefined;
+  const pickRule = pick && view.rules.any ? view.rules.at(pick.r, pick.c)?.rule : undefined;
+  const panelChart = panel?.kind === 'chart' ? chartOf(panel.id) : undefined;
+
+  const body = (
     <div ref={root} className="flex h-full min-h-0 flex-col bg-bg" onFocusCapture={onFocusCapture}>
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">{lead}</div>
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          {lead}
+          {menusInBar && <MenuBar menus={menus} className="ml-3 shrink-0" />}
+        </div>
         {tail}
       </div>
       {band}
-      {!readOnly && (
-        <Toolbar
-          style={active?.s}
-          r={sel.r}
-          c={sel.c}
-          nRows={nRows}
-          nCols={nCols}
-          canUndo={hist.current.past.length > 0 || !!edit}
-          canRedo={hist.current.future.length > 0}
-          narrow={narrow}
-          onUndo={undo}
-          onRedo={redo}
-          onStyle={setStyle}
-          onFormat={setFormat}
-          onDecimals={stepDecimals}
-          onFreeze={setFreeze}
-          freeze={sheet.freeze}
-          onSort={sort}
-          onInsert={insert}
-          onDelete={remove}
-        />
-      )}
+      <Toolbar
+        menus={menusInBar ? undefined : menus}
+        style={active?.s}
+        readOnly={readOnly}
+        canUndo={hist.current.past.length > 0 || !!edit}
+        canRedo={hist.current.future.length > 0}
+        narrow={narrow}
+        merged={merged}
+        filtered={!!sheet.filter}
+        line={line}
+        onLine={setLine}
+        onUndo={undo}
+        onRedo={redo}
+        onStyle={setStyle}
+        onFormat={setFormat}
+        onDecimals={stepDecimals}
+        onBorders={borders}
+        onMerge={(h2) => void merge(h2)}
+        onFilter={toggleFilter}
+      />
       <FormulaBar
         name={rectLabel(x, size.rows, size.cols) === 'the whole sheet' ? `${refName(0, 0)}:${refName(size.rows - 1, size.cols - 1)}` : rectLabel(x, size.rows, size.cols)}
         onName={goName}
@@ -1012,32 +1878,95 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         onSuggest={suggest}
         barRef={barRef}
       />
-      <Grid
-        ref={grid}
-        sheet={sheet}
-        si={sheetIx}
-        calc={calc}
-        rev={rev}
-        rows={size.rows}
-        cols={size.cols}
-        sel={sel}
-        edit={edit}
-        refs={refs}
-        cut={cutMark?.sheet === sheet.id ? cutMark.x : null}
-        readOnly={readOnly}
-        onSel={(s) => setSel(s, true)}
-        onEdit={(mode, text) => startEdit(mode, text)}
-        onText={(t, pos) => setText(t, pos)}
-        onCaret={onCaret}
-        onKey={onKey}
-        onPoint={pointAt}
-        onSize={setSize}
-        onFit={fit}
-        onMenu={(at, on) => setCtx({ ...at, on })}
-        onCopy={onCopy}
-        onCut={readOnly ? onCopy : onCut}
-        onPaste={readOnly ? () => {} : onPaste}
-      />
+      <div className="relative flex min-h-0 flex-1">
+        <Grid
+          ref={grid}
+          sheet={sheet}
+          si={sheetIx}
+          calc={calc}
+          rev={rev}
+          rows={size.rows}
+          cols={size.cols}
+          sel={sel}
+          edit={edit}
+          refs={refs}
+          cut={cutMark?.sheet === sheet.id ? cutMark.x : null}
+          readOnly={readOnly}
+          view={view}
+          zoom={zoom}
+          formulas={formulas}
+          overlay={
+            sheet.charts?.length ? (
+              <ChartLayer
+                book={book}
+                calc={calc}
+                si={sheetIx}
+                charts={sheet.charts}
+                rev={rev}
+                zoom={zoom}
+                picked={chartSel}
+                readOnly={readOnly}
+                onPick={(id) => {
+                  setChartSel(id);
+                  grid.current?.focus();
+                }}
+                onChange={(c) => updateChart(c)}
+                onOpen={(id) => !readOnly && setPanel({ kind: 'chart', id })}
+              />
+            ) : undefined
+          }
+          onSel={(s) => setSel(s, true)}
+          onEdit={(mode, text) => startEdit(mode, text)}
+          onText={(t, pos) => setText(t, pos)}
+          onCaret={onCaret}
+          onKey={onKey}
+          onPoint={pointAt}
+          onSize={setSize}
+          onFit={fit}
+          onMenu={(at, on) => setCtx({ ...at, on })}
+          onCopy={onCopy}
+          onCut={readOnly ? onCopy : onCut}
+          onPaste={readOnly ? () => {} : onPaste}
+          onSmart={onSmart}
+          onFilter={(c, at) => setFilterMenu({ c, at })}
+          onFill={fillTo}
+          onFillDown={fillDown}
+          onUnhide={unhide}
+          onExpand={(r) => setRowCard(r)}
+        />
+        {find.open && (
+          <div className="absolute top-2 right-3 z-40 max-sm:right-2 max-sm:left-2">
+            <FindBar
+              find={find}
+              count={matches.length}
+              index={findAt}
+              onNext={() => nextMatch(1)}
+              onPrev={() => nextMatch(-1)}
+              onReplace={readOnly ? undefined : replaceOne}
+              onReplaceAll={readOnly ? undefined : replaceAll}
+              extra={
+                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 px-1 text-[12px] text-fg-2">
+                  <label className="flex items-center gap-1.5">
+                    <input type="checkbox" checked={findHow.wholeCell} onChange={(e) => setFindHow({ ...findHow, wholeCell: e.target.checked })} className="accent-[var(--accent)]" />
+                    Whole cell
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input type="checkbox" checked={findHow.formulas} onChange={(e) => setFindHow({ ...findHow, formulas: e.target.checked })} className="accent-[var(--accent)]" />
+                    In formulas
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input type="checkbox" checked={findHow.allSheets} onChange={(e) => setFindHow({ ...findHow, allSheets: e.target.checked })} className="accent-[var(--accent)]" />
+                    All sheets
+                  </label>
+                </div>
+              }
+            />
+          </div>
+        )}
+        {panel?.kind === 'cf' && <CondPanel rules={sheet.conditional ?? []} picked={selRange()} narrow={narrow} onChange={setConditional} onClose={() => setPanel(null)} />}
+        {panel?.kind === 'dv' && <ValidPanel rules={sheet.validation ?? []} picked={selRange()} start={panel.start} narrow={narrow} onChange={setRules} onClose={() => setPanel(null)} />}
+        {panelChart && <ChartPanel key={panelChart.id} chart={panelChart} narrow={narrow} onChange={(c) => updateChart(c, `chart:${c.id}`)} onDelete={() => deleteChart(panelChart.id)} onClose={() => setPanel(null)} />}
+      </div>
       <SheetTabs
         names={book.sheets.map((s) => s.name)}
         active={sheetIx}
@@ -1077,75 +2006,268 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
           if (f) void importCsv(f);
         }}
       />
+      {/* The right-click menu, its Paste special list opened in its place. */}
       <div ref={ctxRef} className="pointer-events-none fixed h-px w-px" style={{ left: ctx?.x ?? -10, top: ctx?.y ?? -10 }} />
-      <Popover anchor={ctxRef} open={!!ctx} onClose={() => setCtx(null)} width={240}>
+      <Popover anchor={ctxRef} open={!!ctx} onClose={() => setCtx(null)} width={248}>
         {ctx && (
           <div onMouseDown={(e) => e.preventDefault()}>
-            {!readOnly && (
-              <MenuItem icon={<Scissors size={14} />} hint="Ctrl+X" onClick={() => (setCtx(null), void menuCopy(true))}>
-                Cut
-              </MenuItem>
-            )}
-            <MenuItem icon={<Copy size={14} />} hint="Ctrl+C" onClick={() => (setCtx(null), void menuCopy(false))}>
-              Copy
-            </MenuItem>
-            {!readOnly && (
-              <MenuItem icon={<ClipboardPaste size={14} />} hint="Ctrl+V" onClick={() => (setCtx(null), void menuPaste())}>
-                Paste
-              </MenuItem>
-            )}
-            {!readOnly && <MenuSep />}
-            {!readOnly && ctx.on !== 'col' && (
-              <MenuItem icon={<BetweenHorizontalStart size={14} />} onClick={() => (setCtx(null), insert('row', false))}>
-                {nRows === 1 ? 'Insert a row above' : `Insert ${nRows} rows above`}
-              </MenuItem>
-            )}
-            {!readOnly && ctx.on === 'row' && (
-              <MenuItem icon={<BetweenHorizontalStart size={14} />} onClick={() => (setCtx(null), insert('row', true))}>
-                {nRows === 1 ? 'Insert a row below' : `Insert ${nRows} rows below`}
-              </MenuItem>
-            )}
-            {!readOnly && ctx.on !== 'row' && (
-              <MenuItem icon={<BetweenVerticalStart size={14} />} onClick={() => (setCtx(null), insert('col', false))}>
-                {nCols === 1 ? 'Insert a column left' : `Insert ${nCols} columns left`}
-              </MenuItem>
-            )}
-            {!readOnly && ctx.on === 'col' && (
-              <MenuItem icon={<BetweenVerticalStart size={14} />} onClick={() => (setCtx(null), insert('col', true))}>
-                {nCols === 1 ? 'Insert a column right' : `Insert ${nCols} columns right`}
-              </MenuItem>
-            )}
-            {!readOnly && ctx.on !== 'col' && (
-              <MenuItem icon={<Trash2 size={14} />} onClick={() => (setCtx(null), remove('row'))}>
-                {nRows === 1 ? 'Delete this row' : `Delete ${nRows} rows`}
-              </MenuItem>
-            )}
-            {!readOnly && ctx.on !== 'row' && (
-              <MenuItem icon={<Trash2 size={14} />} onClick={() => (setCtx(null), remove('col'))}>
-                {nCols === 1 ? 'Delete this column' : `Delete ${nCols} columns`}
-              </MenuItem>
-            )}
-            {!readOnly && ctx.on === 'col' && (
+            {ctx.sub === 'paste' ? (
               <>
-                <MenuItem icon={<ArrowDownAZ size={14} />} onClick={() => (setCtx(null), sort(true))}>
-                  Sort A to Z
+                <MenuBack onClick={() => setCtx({ ...ctx, sub: undefined })}>Paste special</MenuBack>
+                <MenuItem hint="Ctrl+Shift+V" onClick={() => (setCtx(null), void pasteHow('values'))}>
+                  Values only
                 </MenuItem>
-                <MenuItem icon={<ArrowDownZA size={14} />} onClick={() => (setCtx(null), sort(false))}>
-                  Sort Z to A
+                <MenuItem onClick={() => (setCtx(null), void pasteHow('formats'))}>Formats only</MenuItem>
+                <MenuItem onClick={() => (setCtx(null), void pasteHow('formulas'))}>Formulas only</MenuItem>
+                <MenuItem onClick={() => (setCtx(null), void pasteHow('transposed'))}>Transposed</MenuItem>
+              </>
+            ) : (
+              <>
+                {!readOnly && (
+                  <MenuItem icon={<Scissors size={14} />} hint="Ctrl+X" onClick={() => (setCtx(null), void menuCopy(true))}>
+                    Cut
+                  </MenuItem>
+                )}
+                <MenuItem icon={<Copy size={14} />} hint="Ctrl+C" onClick={() => (setCtx(null), void menuCopy(false))}>
+                  Copy
                 </MenuItem>
+                {!readOnly && (
+                  <MenuItem icon={<ClipboardPaste size={14} />} hint="Ctrl+V" onClick={() => (setCtx(null), void menuPaste())}>
+                    Paste
+                  </MenuItem>
+                )}
+                {!readOnly && (
+                  <MenuItem icon={<ClipboardPaste size={14} />} submenu onClick={() => setCtx({ ...ctx, sub: 'paste' })}>
+                    Paste special
+                  </MenuItem>
+                )}
+                {!readOnly && <MenuSep />}
+                {!readOnly && ctx.on !== 'col' && (
+                  <MenuItem icon={<BetweenHorizontalStart size={14} />} onClick={() => (setCtx(null), insert('row', false))}>
+                    {nRows === 1 ? 'Insert a row above' : `Insert ${nRows} rows above`}
+                  </MenuItem>
+                )}
+                {!readOnly && ctx.on === 'row' && (
+                  <MenuItem icon={<BetweenHorizontalStart size={14} />} onClick={() => (setCtx(null), insert('row', true))}>
+                    {nRows === 1 ? 'Insert a row below' : `Insert ${nRows} rows below`}
+                  </MenuItem>
+                )}
+                {!readOnly && ctx.on !== 'row' && (
+                  <MenuItem icon={<BetweenVerticalStart size={14} />} onClick={() => (setCtx(null), insert('col', false))}>
+                    {nCols === 1 ? 'Insert a column left' : `Insert ${nCols} columns left`}
+                  </MenuItem>
+                )}
+                {!readOnly && ctx.on === 'col' && (
+                  <MenuItem icon={<BetweenVerticalStart size={14} />} onClick={() => (setCtx(null), insert('col', true))}>
+                    {nCols === 1 ? 'Insert a column right' : `Insert ${nCols} columns right`}
+                  </MenuItem>
+                )}
+                {!readOnly && ctx.on !== 'col' && (
+                  <MenuItem icon={<Trash2 size={14} />} onClick={() => (setCtx(null), remove('row'))}>
+                    {nRows === 1 ? 'Delete this row' : `Delete ${nRows} rows`}
+                  </MenuItem>
+                )}
+                {!readOnly && ctx.on !== 'row' && (
+                  <MenuItem icon={<Trash2 size={14} />} onClick={() => (setCtx(null), remove('col'))}>
+                    {nCols === 1 ? 'Delete this column' : `Delete ${nCols} columns`}
+                  </MenuItem>
+                )}
+                {!readOnly && ctx.on === 'row' && (
+                  <MenuItem icon={<EyeOff size={14} />} onClick={() => (setCtx(null), hide('row'))}>
+                    {nRows === 1 ? 'Hide this row' : `Hide ${nRows} rows`}
+                  </MenuItem>
+                )}
+                {!readOnly && ctx.on === 'col' && (
+                  <MenuItem icon={<EyeOff size={14} />} onClick={() => (setCtx(null), hide('col'))}>
+                    {nCols === 1 ? 'Hide this column' : `Hide ${nCols} columns`}
+                  </MenuItem>
+                )}
+                {!readOnly && ctx.on === 'row' && hasHiddenRows && (
+                  <MenuItem icon={<Eye size={14} />} onClick={() => (setCtx(null), showAll('row'))}>
+                    Show all hidden rows
+                  </MenuItem>
+                )}
+                {!readOnly && ctx.on === 'col' && hasHiddenCols && (
+                  <MenuItem icon={<Eye size={14} />} onClick={() => (setCtx(null), showAll('col'))}>
+                    Show all hidden columns
+                  </MenuItem>
+                )}
+                {!readOnly && ctx.on === 'col' && (
+                  <>
+                    <MenuItem icon={<ArrowDownAZ size={14} />} onClick={() => (setCtx(null), sort(true))}>
+                      Sort A to Z
+                    </MenuItem>
+                    <MenuItem icon={<ArrowDownZA size={14} />} onClick={() => (setCtx(null), sort(false))}>
+                      Sort Z to A
+                    </MenuItem>
+                  </>
+                )}
+                {!readOnly && <MenuSep />}
+                {!readOnly && ctx.on === 'cell' && (
+                  <MenuItem icon={<StickyNote size={14} />} hint="Shift+F2" onClick={() => (setCtx(null), editNote())}>
+                    {activeNote ? 'Edit note' : 'Insert note'}
+                  </MenuItem>
+                )}
+                {ctx.on !== 'col' && (
+                  <MenuItem icon={<Maximize2 size={14} />} onClick={() => (setCtx(null), setRowCard(sel.r))}>
+                    Expand row
+                  </MenuItem>
+                )}
+                {!readOnly && (
+                  <MenuItem icon={<Eraser size={14} />} hint="Delete" onClick={() => (setCtx(null), clear())}>
+                    Clear
+                  </MenuItem>
+                )}
+                {askNow && <MenuSep />}
+                {askNow && (
+                  <MenuItem icon={<Sparkles size={14} />} onClick={askNow}>
+                    Ask the agent about it
+                  </MenuItem>
+                )}
               </>
             )}
-            {!readOnly && (
-              <MenuItem icon={<Eraser size={14} />} hint="Delete" onClick={() => (setCtx(null), clear())}>
-                Clear
-              </MenuItem>
-            )}
-            {ask && <MenuSep />}
-            {ask}
           </div>
         )}
       </Popover>
+      {/* A cell's own pickers: a list, a calendar, its note, a character to put in. */}
+      <div ref={pickRef} className="pointer-events-none fixed" style={pick ? { left: pick.at.left, top: pick.at.top, width: pick.at.width, height: pick.at.height } : { left: -10, top: -10, width: 1, height: 1 }} />
+      <Popover
+        anchor={pickRef}
+        open={!!pick}
+        onClose={() => (setPick(null), grid.current?.focus())}
+        width={pick?.kind === 'chars' ? 330 : pick?.kind === 'date' ? 260 : 260}
+        title={pick?.kind === 'note' ? 'Note' : pick?.kind === 'date' ? 'Date' : pick?.kind === 'chars' ? 'Special character' : 'Options'}
+      >
+        {pick?.kind === 'list' && pickRule?.type === 'list' && (
+          <ListPicker
+            options={listOptions(calc, sheetIx, pickRule)}
+            value={pickCell ? formatValue(calc.value(sheetIx, pick.r, pick.c), pickCell.s) : ''}
+            onPick={(v) => {
+              setPick(null);
+              setCellValue(pick.r, pick.c, v.startsWith('=') || v.startsWith("'") ? `'${v}` : v);
+              grid.current?.focus();
+            }}
+            onClose={() => setPick(null)}
+          />
+        )}
+        {pick?.kind === 'date' && (
+          <DatePicker
+            value={(() => {
+              const v = calc.value(sheetIx, pick.r, pick.c);
+              return typeof v === 'number' ? v : null;
+            })()}
+            onPick={(serial) => {
+              if (!book) return;
+              const k = refName(pick.r, pick.c);
+              const cell = sheet.cells[k];
+              setPick(null);
+              if (cell?.f !== undefined) return;
+              const next = tidyCell({ ...(cell ?? {}), v: serial, s: withStyle(cell?.s, cell?.s?.fmt && isDateFmt(cell.s.fmt) ? {} : { fmt: 'date' }) });
+              if (!refused(pick.r, pick.c, next)) change(cellsPatch(book, sheetIx, { [k]: next }));
+              grid.current?.focus();
+            }}
+          />
+        )}
+        {pick?.kind === 'note' && (
+          <div className="p-1">
+            <textarea
+              autoFocus
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) saveNote(pick.r, pick.c, noteDraft);
+                if (e.key === 'Escape') setPick(null);
+              }}
+              rows={4}
+              maxLength={SHEET_LIMITS.note}
+              placeholder="A note on the cell"
+              aria-label="A note on the cell"
+              translate="no"
+              className="w-full resize-none rounded-lg border border-line bg-bg px-2.5 py-2 text-[13px] leading-snug outline-none focus:border-accent"
+            />
+            <div className="mt-1.5 flex items-center gap-2">
+              {pickCell?.note && (
+                <Button size="sm" variant="ghost" className="text-err" onClick={() => saveNote(pick.r, pick.c, '')}>
+                  Delete note
+                </Button>
+              )}
+              <Button size="sm" variant="primary" className="ml-auto" onClick={() => saveNote(pick.r, pick.c, noteDraft)}>
+                Save
+              </Button>
+            </div>
+          </div>
+        )}
+        {pick?.kind === 'chars' && (
+          <CharPicker
+            onPick={(ch) => {
+              setPick(null);
+              typeIn(ch, true);
+            }}
+          />
+        )}
+      </Popover>
+      {/* A filter's menu, from its button. */}
+      <div ref={filterRef} className="pointer-events-none fixed" style={filterMenu ? { left: filterMenu.at.left, top: filterMenu.at.top, width: filterMenu.at.width, height: filterMenu.at.height } : { left: -10, top: -10, width: 1, height: 1 }} />
+      <Popover anchor={filterRef} open={!!filterMenu && !!view.filter} onClose={() => setFilterMenu(null)} width={300} title="Sort and filter">
+        {filterMenu && view.filter && (
+          <FilterMenu
+            key={filterMenu.c}
+            values={columnValues(sheet, sheetIx, calc, view.filter.x, filterMenu.c)}
+            current={sheet.filter?.cols?.[colName(filterMenu.c)]}
+            onSort={(asc) => sortFiltered(filterMenu.c, asc)}
+            onApply={(fc) => setFilterCol(filterMenu.c, fc)}
+            onClose={() => setFilterMenu(null)}
+          />
+        )}
+      </Popover>
+      {/* The options a list cell's words pick, under it while typing. */}
+      {cellBox && (
+        <div className="fixed z-50 w-[220px] rounded-xl border border-line bg-elevated p-1 shadow-lg" style={{ left: cellBox.left, top: cellBox.bottom + 4 }} onMouseDown={(e) => e.preventDefault()}>
+          {typedOpts.map((o, i) => (
+            <button
+              key={o}
+              type="button"
+              translate="no"
+              onClick={() => commitEdit([1, 0], false, o)}
+              className={cx('flex h-7 w-full items-center rounded-lg px-2 text-left text-[13px] hover:bg-bg-2', i === Math.min(suggestAt, typedOpts.length - 1) && 'bg-bg-2')}
+            >
+              <span className="truncate">{o}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {rowCard !== null && cardInfo && (
+        <RowCard
+          sheet={sheet}
+          si={sheetIx}
+          calc={calc}
+          rev={rev}
+          rules={view.rules}
+          row={rowCard}
+          cols={cardInfo.cols}
+          head={cardInfo.head}
+          first={cardInfo.first}
+          last={cardInfo.last}
+          readOnly={readOnly}
+          onRow={(r) => {
+            setRowCard(r);
+            setSel(cellSel(r, sel.c), true);
+          }}
+          onSet={setCellValue}
+          onClose={() => {
+            setRowCard(null);
+            grid.current?.focus();
+          }}
+        />
+      )}
+      {dialog === 'sort' && toolBlock && <SortDialog cols={colChoices(toolBlock, header)} header={header} onHeader={setHeader} onSort={sortRangeBy} onClose={() => setDialog(null)} />}
+      {dialog === 'dups' && toolBlock && <DupDialog cols={colChoices(toolBlock, header)} header={header} onHeader={setHeader} onRemove={removeDups} onClose={() => setDialog(null)} />}
+      {dialog === 'split' && <SplitDialog guess={splitGuess()} onSplit={splitText} onClose={() => setDialog(null)} />}
+      {dialog === 'format' && <FormatDialog code={active?.s?.code ?? ''} sample={calc.value(sheetIx, sel.r, sel.c)} style={active?.s} onApply={(c) => setCode(c)} onClose={() => setDialog(null)} />}
+      <ShortcutsDialog open={dialog === 'shortcuts'} onClose={() => setDialog(null)} groups={shortcutGroups} />
       {confirmNode}
     </div>
   );
+  // On a phone, what opens from the editor comes up from the bottom of the screen.
+  return narrow ? <SheetsOnPhone.Provider value>{body}</SheetsOnPhone.Provider> : body;
 }
