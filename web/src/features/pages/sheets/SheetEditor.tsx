@@ -312,9 +312,12 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   useEffect(() => onDirty?.(dirty), [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Another spreadsheet, or a new version of it (the agent's) while nothing was changed here: start from it (before it
-  // is drawn, so the one it replaces never shows again for a moment).
+  // is drawn, so the one it replaces never shows again for a moment). A cell being typed in keeps it waiting until it is
+  // done: then it is a change here, left as it is, or there is none and it comes in.
+  const taken = useRef<string | undefined>(undefined);
   useLayoutEffect(() => {
-    if (!doc || dirtyRef.current) return;
+    if (!doc || doc.key === taken.current || dirtyRef.current || edit) return;
+    taken.current = doc.key;
     bookRef.current = clone(doc.model);
     savedRef.current = clone(doc.model);
     calcRef.current = computeBook(bookRef.current);
@@ -323,7 +326,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     setEdit(null);
     setRev((r) => r + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc?.key]);
+  }, [doc?.key, !!edit, dirty]);
 
   // An agent's version being written shows in place of the workbook (read-only, the cell being written in view, its
   // formulas worked out as it comes), unless there are changes here not saved: those are left as they are. A cell being

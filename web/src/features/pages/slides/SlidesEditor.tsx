@@ -307,17 +307,20 @@ export function SlidesEditor({
   };
 
   // Another deck, or the agent's new version while nothing was changed here: start from it (before it is drawn, so the
-  // one it replaces never shows again for a moment).
+  // one it replaces never shows again for a moment). Words being typed in a text box keep it waiting until they are done:
+  // then they are a change here, left as it is, or there are none and it comes in.
+  const taken = useRef<string | undefined>(undefined);
   useLayoutEffect(() => {
-    if (!doc) return;
-    if (dirtyRef.current) return;
+    if (!doc || doc.key === taken.current) return;
+    if (dirtyRef.current || editing) return;
+    taken.current = doc.key;
     setD(doc.model);
     setSaved(doc.model);
     setHist({ past: [], future: [] });
     setCur((c) => Math.min(c, doc.model.slides.length - 1));
     setSel((s) => s.filter((id) => doc.model.slides.some((x) => pickedOf(x, [id]).length)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc?.key]);
+  }, [doc?.key, !!editing, dirty]);
 
   const index = deck ? Math.min(cur, deck.slides.length - 1) : 0;
   const slide = deck?.slides[index];
