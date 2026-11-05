@@ -92,3 +92,40 @@ What still differs, and why:
   checkboxes or stars in cells: they are TRUE or FALSE and numbers there (LibreOffice shows TRUE and FALSE as 1 and 0).
   Words that start or end with a space keep the mark Excel's own files give them (`xml:space="preserve"`), which
   ECMA-376's schema lacks there and Office's own has.
+
+## PowerPoint (.pptx)
+
+`pptx-check.mjs` makes the sample decks of `pptx-samples.mjs` (every layout and theme, text in every format, bullets
+and numbers, spacing, words made smaller to fit, every shape, turns and flips, groups, pictures cropped and recoloured,
+tables, every kind of chart, icons, equations, a video, connectors, comments, the footer, notes, animations and
+transitions, Chinese and Greek words) in a running copy of the app, and for each one:
+
+1. exports it as PowerPoint and as the app's own pictures of its slides (which match the editor);
+2. validates every XML part of the .pptx against the ECMA-376 Transitional schemas with xmllint (Microsoft's
+   extensions inside `mc:AlternateContent` and `extLst` are left to the schemas' lax parts; check them by hand against
+   [MS-PPTX] and [MS-ODRAWXML]);
+3. opens the .pptx in LibreOffice (in Docker, without the network) and prints its slides: once as it is, and once with
+   the fonts the file carries installed (taken out of its Embedded OpenType parts), which is how PowerPoint shows a file
+   whose embedded fonts it loads (LibreOffice 7.4 does not read fonts embedded in a .pptx itself);
+4. puts each slide's three pictures side by side with how much they differ, worst first, in `report.html`, and lists
+   the fonts LibreOffice drew with.
+
+Run it against the demo app (`scripts/guide-shots/run.mjs --serve`, see its README) or any copy you can sign in to:
+
+```bash
+node scripts/office-check/pptx-check.mjs --url http://127.0.0.1:8795 --password 'a demo password' --out /tmp/pptx-check
+```
+
+`--only text,shapes` checks some decks; `--schemas DIR` keeps the schemas somewhere (they are fetched from
+ecma-international.org the first time); `--image NAME` and `--prefix NAME` name LibreOffice's image and its containers;
+`--no-office` checks the schemas alone; `--decks DIR` checks decks already exported there. It needs xmllint (`XMLLINT`
+says where), Docker with the image above, and Playwright's Chromium headless shell to compare the pictures.
+
+What still differs, and why:
+
+- LibreOffice fits words that are made smaller to fit its own way (it fits them again); PowerPoint draws the file's
+  `fontScale` as it is until the words are edited.
+- LibreOffice spaces lines by each font's own height; PowerPoint (and the file) by 1.2 times the size, as the app does.
+  Fonts with tall metrics (Poppins, Nunito, Open Sans) come out with taller lines in LibreOffice than in PowerPoint.
+- Fonts the app does not serve (Georgia, Courier New, Times New Roman) are Office's own: LibreOffice in the image draws
+  its stand-ins for them.

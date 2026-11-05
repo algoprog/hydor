@@ -15,6 +15,7 @@
 import type { Anim, ChartEl, Deck, El, GroupEl, IconEl, ImageEl, LineEl, MathEl, Para, Run, Side, Slide, Stick, TableEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
 import { everyEl, fontName, FONTS, hexColor, mixColor, plainText, slideH, VIDEO, videoStill } from '../../shared/slides.ts';
 import { coreXml, esc, relsXml, XML_HEAD, zipParts, type ZipPart } from './ooxml.ts';
+import { eotOf, fontAttrs } from './pptx-fonts.ts';
 
 /** A picture ready for the file: PNG, JPEG or GIF bytes and its size in pixels. */
 export interface Picture {
@@ -34,6 +35,8 @@ export interface PptxOpts {
   renders?: Map<string, Picture>;
   /** A video the app keeps ("naget-video:<sha>"): its bytes and kind, to go inside the file; null when it is not there. */
   video?: (src: string) => { data: Buffer; ext: string; mime: string } | null;
+  /** The faces of the app's fonts the deck shows (pptx-fonts.ts deckFontFiles: TrueType files by "family|bold|italic"), carried inside the file. */
+  fonts?: Map<string, Buffer>;
 }
 
 /** A dark 1×1 PNG: the still of a video that has none (PowerPoint shows its first frame once it plays). */
@@ -66,6 +69,15 @@ const sz = (px: number) => Math.max(100, Math.min(400000, Math.round(px * 75)));
 
 /** An Office font name for one of the deck's (PowerPoint keeps it; a device without it shows a close one). */
 const officeFont = (name: string) => FONTS.find((f) => f.name === name)?.office ?? name;
+
+/**
+ * A run's fonts as PowerPoint wants them: the deck's font for Latin, Greek and Cyrillic, with what a computer without it
+ * picks the closest by; East Asian and complex scripts in the theme's fonts for them (its heading's or its body's).
+ */
+const fontsXml = (name: string, head = false) => {
+  const f = officeFont(name);
+  return `<a:latin typeface="${esc(f)}"${fontAttrs(f)}/><a:ea typeface="${head ? '+mj-ea' : '+mn-ea'}"/><a:cs typeface="${head ? '+mj-cs' : '+mn-cs'}"/>`;
+};
 
 function fillXml(color: string | undefined, t: Theme, opacity = 1, fallback?: string): string {
   if (!color && !fallback) return '<a:noFill/>';
@@ -155,59 +167,102 @@ function link(c: Ctx, href: string | undefined, tag: 'hlinkClick' = 'hlinkClick'
 
 // ---- text -----------------------------------------------------------------------------------------------
 
-function runXml(c: Ctx, r: Run, e: TextProps, scale: number, extraOpacity: number): string {
-  const size = (r.size ?? e.size) * scale;
+/** The language of some words by their letters (Chinese, Japanese, Korean, Greek, Arabic, Hebrew, Thai; else English): PowerPoint checks their spelling and picks their fonts by it. */
+export function langOf(s: string): string {
+  if (/[\u3040-\u30ff\u31f0-\u31ff]/.test(s)) return 'ja-JP';
+  if (/[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/.test(s)) return 'ko-KR';
+  if (/[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(s)) return 'zh-CN';
+  if (/[\u0370-\u03ff\u1f00-\u1fff]/.test(s)) return 'el-GR';
+  if (/[\u0600-\u06ff]/.test(s)) return 'ar-SA';
+  if (/[\u0590-\u05ff]/.test(s)) return 'he-IL';
+  if (/[\u0e00-\u0e7f]/.test(s)) return 'th-TH';
+  return 'en-US';
+}
+const langAttrs = (s: string) => {
+  const lang = langOf(s);
+  return `lang="${lang}"${/^(zh|ja|ko)-/.test(lang) ? ' altLang="en-US"' : ''}`;
+};
+
+/** Hundredths of a point, for `px` slide pixels (PowerPoint's spcPts, at most 1584 pt). */
+const pts = (px: number) => Math.max(0, Math.min(158400, Math.round(px * 75)));
+
+/** A text part's colour, as its role gives it when it has none of its own. */
+const textColor = (e: TextProps) => e.color ?? (e.role === 'title' || e.role === 'quote' ? 'head' : e.role === 'subtitle' || e.role === 'caption' ? 'muted' : 'fg');
+const headRole = (e: TextProps) => e.role === 'title' || e.role === 'quote' || e.role === 'big';
+
+/**
+ * A run. Its size is the deck's (a box made smaller to fit says so once, in its fontScale); what PowerPoint does not
+ * scale with it, the letter spacing, is given at the size shown (`k`). Kerned at every size, as the browser kerns; a
+ * link in the run's own colour, underlined, as the app shows links.
+ */
+function runXml(c: Ctx, r: Run, e: TextProps, k: number, extraOpacity: number): string {
+  const size = r.size ?? e.size;
   const b = r.b ?? !!e.bold;
   const i = r.i ?? !!e.italic;
-  const attrs = [`lang="en-US"`, `sz="${sz(size)}"`, b ? 'b="1"' : 'b="0"', i ? 'i="1"' : 'i="0"', r.u ? 'u="sng"' : '', r.s ? 'strike="sngStrike"' : '', r.sup ? 'baseline="30000"' : r.sub ? 'baseline="-25000"' : '', 'dirty="0"']
+  const href = link(c, r.link);
+  // The box's letter spacing is in its own em, as CSS takes it (so a larger run is spaced alike).
+  const spc = e.ls ? Math.max(-400000, Math.min(400000, Math.round(e.ls * e.size * k * 75))) : 0;
+  const attrs = [langAttrs(r.t), `sz="${sz(size)}"`, b ? 'b="1"' : 'b="0"', i ? 'i="1"' : 'i="0"', r.u || href ? 'u="sng"' : '', r.s ? 'strike="sngStrike"' : '', 'kern="100"', spc ? `spc="${spc}"` : '', r.sup ? 'baseline="30000"' : r.sub ? 'baseline="-25000"' : '', 'dirty="0"']
     .filter(Boolean)
     .join(' ');
-  const base = e.color ?? (e.role === 'title' || e.role === 'quote' ? 'head' : e.role === 'subtitle' || e.role === 'caption' ? 'muted' : 'fg');
-  const fill = `<a:solidFill>${clr(r.color ?? base, c.t, '#000000', extraOpacity)}</a:solidFill>`;
+  const fill = `<a:solidFill>${clr(r.color ?? textColor(e), c.t, '#000000', extraOpacity)}</a:solidFill>`;
   const hl = r.hl ? `<a:highlight>${clr(r.hl, c.t, '#ffff00')}</a:highlight>` : '';
-  const face = officeFont(fontName(r.font ?? e.font, c.t, e.role));
-  const latin = `<a:latin typeface="${esc(face)}"/><a:cs typeface="${esc(face)}"/>`;
+  const fonts = fontsXml(fontName(r.font ?? e.font, c.t, e.role), headRole(e));
+  // A link keeps its words' colour (PowerPoint's own hyperlink colour otherwise).
+  const linked = href ? href.replace(/\/>$/, `><a:extLst><a:ext uri="{A12FA001-AC4F-418D-AE19-62706E023703}"><ahyp:hlinkClr xmlns:ahyp="http://schemas.microsoft.com/office/drawing/2018/hyperlinkcolor" val="tx"/></a:ext></a:extLst></a:hlinkClick>`) : '';
   const lines = r.t.split('\n');
-  const rPr = (inner: string) => `<a:rPr ${attrs}>${fill}${hl}${latin}${inner}</a:rPr>`;
+  const rPr = (inner: string) => `<a:rPr ${attrs}>${fill}${hl}${fonts}${inner}</a:rPr>`;
   return lines
-    .map((line, k) => `${k ? `<a:br>${rPr('')}</a:br>` : ''}${line ? `<a:r>${rPr(link(c, r.link))}<a:t>${esc(line)}</a:t></a:r>` : ''}`)
+    .map((line, n) => `${n ? `<a:br>${rPr('')}</a:br>` : ''}${line ? `<a:r>${rPr(linked)}<a:t>${esc(line)}</a:t></a:r>` : ''}`)
     .join('');
 }
 
 const BULLET = ['•', '◦', '▪', '•', '◦'];
 const NUMBER = ['arabicPeriod', 'alphaLcPeriod', 'romanLcPeriod', 'arabicPeriod', 'alphaLcPeriod'];
 
-function paraXml(c: Ctx, p: Para, e: TextProps, scale: number, last: boolean, opacity: number): string {
-  const first = p.runs.find((r) => r.t)?.size ?? p.runs[0]?.size ?? e.size;
-  const em = first * scale;
+/**
+ * A paragraph as the app lays it out: its lines `lh` times their size apart (PowerPoint's single spacing is 1.2 times a
+ * line's largest size, whatever the font, so a percentage of it gives the app's pitch exactly and follows a box's
+ * fontScale; points it would round to whole ones), its space after (not after the last), its bullet or number in the
+ * box's font and colour, hanging 1.25 em, each level 1.5 em in. What fontScale does not scale is written at the size
+ * the words are shown at (`k`: a box made smaller to fit).
+ */
+function paraXml(c: Ctx, p: Para, e: TextProps, k: number, last: boolean, opacity: number): string {
+  const worded = p.runs.filter((r) => r.t);
+  // The paragraph is as large as its first words (CSS sizes it so).
+  const first = worded[0]?.size ?? p.runs[0]?.size ?? e.size;
+  const em = first * k;
   const lvl = Math.max(0, Math.min(4, p.lvl ?? 0));
   const align = p.align ?? e.align ?? 'left';
   const algn = align === 'center' ? 'ctr' : align === 'right' ? 'r' : align === 'justify' ? 'just' : 'l';
   const lh = e.lh ?? (e.role === 'title' ? 1.1 : 1.2);
   const lnSpc = `<a:lnSpc><a:spcPct val="${Math.round((lh / 1.2) * 100000)}"/></a:lnSpc>`;
-  const gap = e.gap && !last ? `<a:spcAft><a:spcPts val="${Math.round(e.gap * scale * 75)}"/></a:spcAft>` : '<a:spcAft><a:spcPts val="0"/></a:spcAft>';
+  const gap = `<a:spcAft><a:spcPts val="${e.gap && !last ? pts(e.gap * k) : 0}"/></a:spcAft>`;
+  const boxFont = fontName(e.font, c.t, e.role);
   let bu = '<a:buNone/>';
   let marL = emu(lvl * 1.5 * em);
   let indent = 0;
   if (p.list) {
     marL = emu((lvl * 1.5 + 1.25) * em);
     indent = -emu(1.25 * em);
-    bu = p.list === 'bullet' ? `<a:buFont typeface="Arial"/><a:buChar char="${BULLET[lvl]}"/>` : `<a:buFont typeface="+mj-lt"/><a:buAutoNum type="${NUMBER[lvl]}"/>`;
+    const f = officeFont(boxFont);
+    bu = `<a:buClr>${clr(textColor(e), c.t, '#000000', opacity)}</a:buClr><a:buFont typeface="${esc(f)}"${fontAttrs(f)}/>${p.list === 'bullet' ? `<a:buChar char="${BULLET[lvl]}"/>` : `<a:buAutoNum type="${NUMBER[lvl]}"/>`}`;
   }
-  const runs = p.runs.map((r) => runXml(c, r, e, scale, opacity)).join('');
-  const end = `<a:endParaRPr lang="en-US" sz="${sz(em)}" dirty="0"/>`;
+  const runs = p.runs.map((r) => runXml(c, r, e, k, opacity)).join('');
+  // What words typed at its end look like in PowerPoint: the box's own.
+  const end = `<a:endParaRPr ${langAttrs(plainText([p]))} sz="${sz(first)}" b="${e.bold ? 1 : 0}" i="${e.italic ? 1 : 0}" dirty="0"><a:solidFill>${clr(textColor(e), c.t, '#000000', opacity)}</a:solidFill>${fontsXml(boxFont, headRole(e))}</a:endParaRPr>`;
   return `<a:p><a:pPr marL="${marL}" indent="${indent}" algn="${algn}"${lvl ? ` lvl="${lvl}"` : ''}>${lnSpc}<a:spcBef><a:spcPts val="0"/></a:spcBef>${gap}${bu}</a:pPr>${runs}${end}</a:p>`;
 }
 
 function txBody(c: Ctx, e: TextProps & { id: string }, opacity: number, tag = 'p:txBody'): string {
   const pad = emu(e.pad ?? 10);
   const anchor = e.valign === 'middle' ? 'ctr' : e.valign === 'bottom' ? 'b' : 't';
-  const scale = c.o.scales?.get(e.id) ?? 1;
-  const fit = e.fit === 'shrink' ? (scale < 0.999 ? `<a:normAutofit fontScale="${Math.round(scale * 100000)}"/>` : '<a:normAutofit/>') : '<a:noAutofit/>';
+  const k = c.o.scales?.get(e.id) ?? 1;
+  // The fitting is in fontScale (the sizes themselves stay the deck's); what it does not scale is written at the size shown.
+  const fit = e.fit === 'shrink' ? (k < 0.999 ? `<a:normAutofit fontScale="${Math.round(Math.max(0.01, k) * 100000)}"/>` : '<a:normAutofit/>') : '<a:noAutofit/>';
   const empty = !e.paras.some((p) => p.runs.some((r) => r.t));
-  // The fitting is in fontScale; the sizes themselves stay the deck's.
   const paras = empty ? [{ runs: [{ t: '' }] }] : e.paras;
-  return `<${tag}><a:bodyPr wrap="square" lIns="${pad}" tIns="${pad}" rIns="${pad}" bIns="${pad}" anchor="${anchor}" rtlCol="0">${fit}</a:bodyPr><a:lstStyle/>${paras.map((p, i) => paraXml(c, p, e, 1, i === paras.length - 1, opacity)).join('')}</${tag}>`;
+  return `<${tag}><a:bodyPr wrap="square" lIns="${pad}" tIns="${pad}" rIns="${pad}" bIns="${pad}" anchor="${anchor}" rtlCol="0">${fit}</a:bodyPr><a:lstStyle/>${paras.map((p, i) => paraXml(c, p, e, k, i === paras.length - 1, opacity)).join('')}</${tag}>`;
 }
 
 // ---- parts ----------------------------------------------------------------------------------------------
@@ -371,10 +426,12 @@ function tableXml(c: Ctx, e: TableEl): string {
         const align = e.aligns?.[ci] ?? 'left';
         const algn = align === 'center' ? 'ctr' : align === 'right' ? 'r' : align === 'justify' ? 'just' : 'l';
         const color = head ? (e.headColor ?? 'accentFg') : (e.color ?? 'fg');
-        const face = officeFont(fontName(e.font, t));
+        // Its lines 1.2 times its size apart, as the slide's own line height sets them (PowerPoint's single spacing).
+        const fonts = fontsXml(fontName(e.font, t));
+        const rPr = (tag: string, line: string) => `<a:${tag} ${langAttrs(line || text)} sz="${sz(e.size)}" b="${head ? 1 : 0}" kern="100" dirty="0"><a:solidFill>${clr(color, t, '#000000')}</a:solidFill>${fonts}</a:${tag}>`;
         const paras = text
           .split('\n')
-          .map((line) => `<a:p><a:pPr algn="${algn}"/>${line ? `<a:r><a:rPr lang="en-US" sz="${sz(e.size)}"${head ? ' b="1"' : ''} dirty="0"><a:solidFill>${clr(color, t, '#000000')}</a:solidFill><a:latin typeface="${esc(face)}"/></a:rPr><a:t>${esc(line)}</a:t></a:r>` : ''}<a:endParaRPr lang="en-US" sz="${sz(e.size)}" dirty="0"/></a:p>`)
+          .map((line) => `<a:p><a:pPr algn="${algn}"><a:lnSpc><a:spcPct val="100000"/></a:lnSpc></a:pPr>${line ? `<a:r>${rPr('rPr', line)}<a:t>${esc(line)}</a:t></a:r>` : ''}${rPr('endParaRPr', line)}</a:p>`)
           .join('');
         const own = e.fills?.[`${ri},${ci}`];
         const fill = own ? fillXml(own, t) : head ? fillXml(e.fill ?? 'accent', t) : band ? fillXml('soft', t) : '<a:noFill/>';
@@ -503,8 +560,7 @@ function footerXml(c: Ctx, i: number): string {
   const s = d.slides[i];
   if (!f || !s || s.nofooter || (f.skipTitle && (i === 0 || s.layout === 'title'))) return '';
   const H = slideH(d.ratio);
-  const face = esc(officeFont(fontName('body', c.t)));
-  const rPr = `<a:rPr lang="en-US" sz="${sz(17)}" dirty="0"><a:solidFill>${clr('muted', c.t, '#777777')}</a:solidFill><a:latin typeface="${face}"/><a:cs typeface="${face}"/></a:rPr>`;
+  const rPr = `<a:rPr lang="en-US" sz="${sz(17)}" kern="100" dirty="0"><a:solidFill>${clr('muted', c.t, '#777777')}</a:solidFill>${fontsXml(fontName('body', c.t))}</a:rPr>`;
   const box = (name: string, x: number, w: number, algn: string, run: string) => {
     const id = c.next++;
     return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${name}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(x, H - 56, w, 56)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr><p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" anchor="ctr"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr algn="${algn}"/>${run}</a:p></p:txBody></p:sp>`;
@@ -536,9 +592,9 @@ const col = (i: number) => {
 function chartXml(e: ChartEl, t: Theme): string {
   const C = 'xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
   const ink = hexColor(e.color ?? 'muted', t).hex;
-  const face = esc(officeFont(fontName(e.font, t)));
+  const fonts = fontsXml(fontName(e.font, t));
   const txPr = (size: number, bold = false, color = ink) =>
-    `<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${sz(size)}" b="${bold ? 1 : 0}"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:latin typeface="${face}"/></a:defRPr></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr>`;
+    `<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${sz(size)}" b="${bold ? 1 : 0}" kern="100"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill>${fonts}</a:defRPr></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr>`;
   const labels = e.labels;
   const n = labels.length;
   const pie = e.kind === 'pie' || e.kind === 'doughnut';
@@ -586,7 +642,7 @@ function chartXml(e: ChartEl, t: Theme): string {
     plot += `<c:valAx><c:axId val="51600002"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${horiz ? 'b' : 'l'}"/>${grid}<c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:spPr><a:ln><a:noFill/></a:ln></c:spPr>${txPr(e.size)}<c:crossAx val="51600001"/><c:crosses val="${horiz ? 'max' : 'autoZero'}"/><c:crossBetween val="between"/></c:valAx>`;
   }
   const title = e.title
-    ? `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${sz(e.size * 1.2)}" b="1"/></a:pPr><a:r><a:rPr lang="en-US" sz="${sz(e.size * 1.2)}" b="1"><a:solidFill><a:srgbClr val="${hexColor('head', t).hex}"/></a:solidFill><a:latin typeface="${face}"/></a:rPr><a:t>${esc(e.title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/>`
+    ? `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${sz(e.size * 1.2)}" b="1"/></a:pPr><a:r><a:rPr ${langAttrs(e.title)} sz="${sz(e.size * 1.2)}" b="1" kern="100"><a:solidFill><a:srgbClr val="${hexColor('head', t).hex}"/></a:solidFill>${fonts}</a:rPr><a:t>${esc(e.title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/>`
     : '<c:autoTitleDeleted val="1"/>';
   const legend = e.legend && (pie || series.length > 1 || !!series[0]?.name) ? `<c:legend><c:legendPos val="b"/><c:overlay val="0"/>${txPr(e.size)}</c:legend>` : '';
   return `${XML_HEAD}<c:chartSpace ${C}><c:roundedCorners val="0"/><c:chart>${title}<c:plotArea><c:layout/>${plot}</c:plotArea>${legend}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>${txPr(e.size)}</c:chartSpace>`;
@@ -898,10 +954,25 @@ function themeXml(name: string, t: Theme | null): string {
   const hex = (c: string, def: string) => (t ? hexColor(c, t).hex : def);
   const office = ['4472C4', 'ED7D31', 'A5A5A5', 'FFC000', '5B9BD5', '70AD47'];
   const accents = Array.from({ length: 6 }, (_, i) => `<a:accent${i + 1}><a:srgbClr val="${t ? hexColor(`c${i + 1}`, t).hex : office[i]}"/></a:accent${i + 1}>`).join('');
-  const head = t ? esc(officeFont(t.headFont)) : 'Calibri Light';
-  const body = t ? esc(officeFont(t.font)) : 'Calibri';
+  const head = t ? officeFont(t.headFont) : 'Calibri Light';
+  const body = t ? officeFont(t.font) : 'Calibri';
+  // Its heading and body fonts, with what a computer without them picks the closest by; East Asian and complex
+  // scripts in Office's own fonts for them (what PowerPoint shows Chinese, Japanese, Korean, Arabic, Hebrew and Thai in).
+  const scripts = (major: boolean) =>
+    [
+      ['Jpan', '游ゴシック'],
+      ['Hang', '맑은 고딕'],
+      ['Hans', '等线'],
+      ['Hant', '新細明體'],
+      ['Arab', major ? 'Times New Roman' : 'Arial'],
+      ['Hebr', major ? 'Times New Roman' : 'Arial'],
+      ['Thai', major ? 'Angsana New' : 'Cordia New'],
+    ]
+      .map(([s, f]) => `<a:font script="${s}" typeface="${f}"/>`)
+      .join('');
+  const fontSet = (name: string, major: boolean) => `<a:latin typeface="${esc(name)}"${fontAttrs(name)}/><a:ea typeface=""/><a:cs typeface=""/>${scripts(major)}`;
   const sch = '<a:solidFill><a:schemeClr val="phClr"/></a:solidFill>';
-  return `${XML_HEAD}<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="${esc(name)}"><a:themeElements><a:clrScheme name="${esc(name)}"><a:dk1><a:srgbClr val="${hex('fg', '000000')}"/></a:dk1><a:lt1><a:srgbClr val="${hex('bg', 'FFFFFF')}"/></a:lt1><a:dk2><a:srgbClr val="${hex('head', '44546A')}"/></a:dk2><a:lt2><a:srgbClr val="${hex('soft', 'E7E6E6')}"/></a:lt2>${accents}<a:hlink><a:srgbClr val="${hex('accent', '0563C1')}"/></a:hlink><a:folHlink><a:srgbClr val="${hex('muted', '954F72')}"/></a:folHlink></a:clrScheme><a:fontScheme name="${esc(name)}"><a:majorFont><a:latin typeface="${head}"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="${body}"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="Office"><a:fillStyleLst>${sch}${sch}${sch}</a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements><a:objectDefaults/><a:extraClrSchemeLst/></a:theme>`;
+  return `${XML_HEAD}<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="${esc(name)}"><a:themeElements><a:clrScheme name="${esc(name)}"><a:dk1><a:srgbClr val="${hex('fg', '000000')}"/></a:dk1><a:lt1><a:srgbClr val="${hex('bg', 'FFFFFF')}"/></a:lt1><a:dk2><a:srgbClr val="${hex('head', '44546A')}"/></a:dk2><a:lt2><a:srgbClr val="${hex('soft', 'E7E6E6')}"/></a:lt2>${accents}<a:hlink><a:srgbClr val="${hex('accent', '0563C1')}"/></a:hlink><a:folHlink><a:srgbClr val="${hex('muted', '954F72')}"/></a:folHlink></a:clrScheme><a:fontScheme name="${esc(name)}"><a:majorFont>${fontSet(head, true)}</a:majorFont><a:minorFont>${fontSet(body, false)}</a:minorFont></a:fontScheme><a:fmtScheme name="Office"><a:fillStyleLst>${sch}${sch}${sch}</a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements><a:objectDefaults/><a:extraClrSchemeLst/></a:theme>`;
 }
 
 const GRP = '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>';
@@ -990,6 +1061,14 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
     return { xml, rels, notes: s.notes, n: i + 1, comments };
   });
   const hasComments = slides.some((s) => s.comments);
+  // The faces of its fonts it carries, each as Embedded OpenType (as PowerPoint reads a font kept in a file), by family.
+  const SLOTS = ['regular', 'bold', 'italic', 'boldItalic'];
+  const fonts: { family: string; slot: number; name: string; data: Buffer }[] = [];
+  for (const [key, ttf] of o.fonts ?? []) {
+    const [family, b, i] = key.split('|');
+    const eot = family ? eotOf(ttf) : null;
+    if (eot) fonts.push({ family, slot: (b === '1' ? 1 : 0) + (i === '1' ? 2 : 0), name: `font${fonts.length + 1}.fntdata`, data: eot });
+  }
 
   const types = [
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
@@ -1002,6 +1081,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
     '<Default Extension="mp4" ContentType="video/mp4"/>',
     '<Default Extension="mov" ContentType="video/quicktime"/>',
     '<Default Extension="webm" ContentType="video/webm"/>',
+    ...(fonts.length ? ['<Default Extension="fntdata" ContentType="application/x-fontdata"/>'] : []),
     '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>',
     '<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>',
     '<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>',
@@ -1050,11 +1130,22 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
   presRels.add('viewProps', 'viewProps.xml');
   presRels.add('theme', 'theme/theme1.xml');
   presRels.add('tableStyles', 'tableStyles.xml');
+  const fontIds = fonts.map((f) => presRels.add('font', `fonts/${f.name}`));
+  const families = [...new Set(fonts.map((f) => f.family))];
+  const embedded = families
+    .map((fam) => {
+      const faces = SLOTS.map((slot, n) => {
+        const k = fonts.findIndex((f) => f.family === fam && f.slot === n);
+        return k >= 0 ? `<p:${slot} r:id="${fontIds[k]}"/>` : '';
+      }).join('');
+      return `<p:embeddedFont><p:font typeface="${esc(fam)}"${fontAttrs(fam)}/>${faces}</p:embeddedFont>`;
+    })
+    .join('');
   if (hasComments) presRels.add('commentAuthors', 'commentAuthors.xml');
   const cy = emu(H);
   parts.push({
     name: 'ppt/presentation.xml',
-    data: `${XML_HEAD}<p:presentation ${NS} saveSubsetFonts="1"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>${hasNotes ? `<p:notesMasterIdLst><p:notesMasterId r:id="${notesMasterId}"/></p:notesMasterIdLst>` : ''}<p:sldIdLst>${sldIds}</p:sldIdLst><p:sldSz cx="12192000" cy="${cy}"/><p:notesSz cx="6858000" cy="9144000"/><p:defaultTextStyle><a:defPPr><a:defRPr lang="en-US"/></a:defPPr></p:defaultTextStyle></p:presentation>`,
+    data: `${XML_HEAD}<p:presentation ${NS}${fonts.length ? ' embedTrueTypeFonts="1"' : ''}><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>${hasNotes ? `<p:notesMasterIdLst><p:notesMasterId r:id="${notesMasterId}"/></p:notesMasterIdLst>` : ''}<p:sldIdLst>${sldIds}</p:sldIdLst><p:sldSz cx="12192000" cy="${cy}"/><p:notesSz cx="6858000" cy="9144000"/>${embedded ? `<p:embeddedFontLst>${embedded}</p:embeddedFontLst>` : ''}<p:defaultTextStyle><a:defPPr><a:defRPr lang="en-US"/></a:defPPr></p:defaultTextStyle></p:presentation>`,
   });
   parts.push({ name: 'ppt/_rels/presentation.xml.rels', data: relsXml(presRels.list) });
   parts.push({ name: 'ppt/presProps.xml', data: `${XML_HEAD}<p:presentationPr ${NS}/>` });
@@ -1100,6 +1191,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
   }
   for (const m of media) parts.push({ name: `ppt/media/${m.name}`, data: m.key });
   for (const m of movies) parts.push({ name: `ppt/media/${m.name}`, data: m.key });
+  for (const f of fonts) parts.push({ name: `ppt/fonts/${f.name}`, data: f.data });
   return zipParts(parts);
 }
 
