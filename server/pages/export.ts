@@ -182,7 +182,11 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
   if (o.format === 'pdf') {
     if (!canCapture()) throw noBrowser();
     const html = injectHead(src.text, pageHead(db, id));
-    const data = await withTab({ html, width: 1024, height: 800, settleMs: 900, blockPrivate: true }, (tab) => printPdf(tab.s, { paperWidth: paper.w, paperHeight: paper.h, margin: 0.5 }));
+    // On paper, what a toggle folds away shows too.
+    const data = await withTab({ html, width: 1024, height: 800, settleMs: 900, blockPrivate: true }, async (tab) => {
+      await tab.evaluate('(() => { for (const d of document.querySelectorAll("details")) d.open = true; return true; })()').catch(() => {});
+      return printPdf(tab.s, { paperWidth: paper.w, paperHeight: paper.h, margin: 0.5 });
+    });
     return out(data, 'pdf');
   }
   if (o.format === 'docx') {

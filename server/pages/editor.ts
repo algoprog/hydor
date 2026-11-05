@@ -11,8 +11,14 @@
 // editor's own in the page (<style id="n-styles">), so they stay with the page. What it gives back is
 // the page's HTML with the user's changes and its scripts as they were.
 //
+// Writing as in Notion (blocks that flow into each other, Markdown as you type, "/" for blocks, handles
+// beside each block and their menu, several blocks picked, an icon and a cover) is writing.ts, which this
+// hands its insides to. Undo keeps a step per change of a block: while words are being written, Ctrl+Z
+// takes back the last few words typed first, then the change before.
+//
 // Like the kit's bridge, the function below runs in the browser: its source is sent as text, so it uses
 // only its argument and the browser's own globals.
+import { writing, type At, type Core, type Next, type Writing } from './writing.ts';
 
 export interface EditorCfg {
   n: string;
@@ -23,7 +29,7 @@ export interface EditorCfg {
   labels: Record<string, string>;
 }
 
-function editor(cfg: EditorCfg) {
+function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
   const P = window.parent;
   const L = (k: string, fallback: string) => (typeof cfg.labels?.[k] === 'string' ? cfg.labels[k] : fallback);
   const send = (m: Record<string, unknown>) => {
@@ -171,14 +177,37 @@ function editor(cfg: EditorCfg) {
     if (c?.contains('n-btn')) return NAMES.BUTTON;
     if (c?.contains('n-card')) return L('card', 'Card');
     if (c?.contains('n-option')) return L('option', 'Option');
+    if (c?.contains('n-callout')) return L('sCallout', 'Callout');
+    if (c?.contains('n-toggle')) return L('sToggle', 'Toggle list');
+    if (c?.contains('n-cols')) return L('columns', 'Columns');
+    if (c?.contains('n-toc')) return L('sToc', 'Table of contents');
+    if (c?.contains('n-cover')) return L('cover', 'Cover');
+    if (c?.contains('n-icon')) return L('icon', 'Icon');
+    if (c?.contains('n-video')) return L('video', 'Video');
+    if (c?.contains('n-math')) return L('sMath', 'Maths');
+    if (el.tagName === 'LI' && el.parentElement?.classList.contains('n-todo')) return L('phTodo', 'To-do');
+    if (c?.contains('n-todo')) return L('sTodo', 'To-do list');
     return NAMES[el.tagName.toUpperCase()] ?? L('box', 'Block');
   };
   const isUi = (el: Element | null) => !!el && (el === host || !!el.closest?.('[data-n-own]'));
-  /** Words that can be changed where they are: only words and inline parts inside. */
+  /** Blocks that are drawn rather than written (changed through their own fields). */
+  const DRAWN = '.n-video,.n-math,.n-toc,.n-cover,.n-icon';
+  const inlineOnly = (c: Element) => (INLINE.has(c.tagName) || c.tagName === 'IMG') && [...c.querySelectorAll('*')].every((x) => INLINE.has(x.tagName) || x.tagName === 'IMG');
+  /**
+   * Words that can be changed where they are: only words and inline parts inside. A list's item may have lists
+   * nested after its words (its own words are written; the lists stay as they are).
+   */
   const wordy = (el: Element): boolean => {
-    if (!(el instanceof HTMLElement) || el === document.body || NO_TEXT.has(el.tagName)) return false;
-    if (!(el.textContent ?? '').trim() && !ONE_LINE.has(el.tagName) && el.tagName !== 'P') return false;
-    for (const c of el.querySelectorAll('*')) if (!INLINE.has(c.tagName) && c.tagName !== 'IMG') return false;
+    if (!(el instanceof HTMLElement) || el === document.body || NO_TEXT.has(el.tagName) || el.matches(DRAWN)) return false;
+    if (!(el.textContent ?? '').trim() && !ONE_LINE.has(el.tagName) && !/^(P|BLOCKQUOTE|PRE)$/.test(el.tagName) && !el.classList.contains('n-callout-text')) return false;
+    let lists = false;
+    for (const c of el.children) {
+      if (el.tagName === 'LI' && (c.tagName === 'UL' || c.tagName === 'OL')) {
+        lists = true;
+        continue;
+      }
+      if (lists || !inlineOnly(c)) return false;
+    }
     return true;
   };
   const OWN = /^n-s[a-z0-9]{5}$/;
@@ -223,6 +252,9 @@ function editor(cfg: EditorCfg) {
       '<path d="m18.8 13.4 1.7-1.7a5 5 0 0 0-7.1-7.1l-1.7 1.7"/><path d="m5.2 10.6-1.7 1.7a5 5 0 0 0 7.1 7.1l1.7-1.7"/><path d="m8 2v3"/><path d="M2 8h3"/><path d="M16 22v-3"/><path d="M22 16h-3"/>',
     clear: '<path d="M4 7V4h16v3"/><path d="M5 20h6"/><path d="M13 4 8 20"/><path d="m15 15 5 5"/><path d="m20 15-5 5"/>',
     done: '<path d="M20 6 9 17l-5-5"/>',
+    code: '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
+    colour: '<path d="M6 16 12 4l6 12"/><path d="M8.5 11h7"/><path d="M4 20h16" stroke-width="3"/>',
+    chev: '<path d="m6 9 6 6 6-6"/>',
   };
   const svg = (k: string) => `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
   const dark = cfg.theme === 'dark';
@@ -230,6 +262,29 @@ function editor(cfg: EditorCfg) {
   const panel = dark ? '#1b1f27' : '#fff';
   const line = dark ? '#3a4150' : '#e2ddd2';
   const ink = dark ? '#e9edf5' : '#1d1b17';
+  const muted = dark ? '#8f99ab' : '#7a7266';
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  const attr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  /** The colours of words, Notion's: text and highlight (the kit's .n-tc-… and .n-hl-… classes). */
+  const COLOURS: [string, string][] = [
+    ['grey', '#787774'],
+    ['brown', '#9f6b53'],
+    ['orange', '#d9730d'],
+    ['yellow', '#cb912f'],
+    ['green', '#448361'],
+    ['blue', '#337ea9'],
+    ['purple', '#9065b0'],
+    ['pink', '#c14c8a'],
+    ['red', '#d44c47'],
+  ];
+  const colourWord = (c: string) => attr(L(`c${c[0].toUpperCase()}${c.slice(1)}`, c[0].toUpperCase() + c.slice(1)));
+  const swatches = (type: 'tc' | 'hl') =>
+    [['', ''] as [string, string], ...COLOURS]
+      .map(
+        ([c, hex]) =>
+          `<button data-w="${type}:${c}" title="${c ? colourWord(c) : attr(L('cDefault', 'No colour'))}" style="${type === 'tc' ? `color:${hex || ink}` : hex ? `background:${hex}38` : ''}">${type === 'tc' ? 'A' : hex ? '' : '⌀'}</button>`,
+      )
+      .join('');
   shadow.innerHTML = `<style>
     :host{all:initial}
     .box{position:fixed;pointer-events:none;box-sizing:border-box;border-radius:3px;display:none}
@@ -256,6 +311,16 @@ function editor(cfg: EditorCfg) {
     .rtb.linking .cmds{display:none}
     .cmds{display:flex;align-items:center;gap:1px}
     .rtb input{all:unset;width:190px;height:26px;padding:0 8px;border-radius:7px;background:${dark ? '#151412' : '#f5f3ee'};color:${ink};font:13px system-ui,sans-serif}
+    .rtb{flex-wrap:wrap;max-width:calc(100vw - 8px);box-sizing:border-box}
+    .cmds{flex-wrap:wrap}
+    .rtb button.kind{width:auto;gap:3px;padding:0 6px 0 8px;font:500 12.5px system-ui,sans-serif;display:flex;align-items:center;white-space:nowrap}
+    .rtb button.kind[hidden],.rtb .sep[hidden]{display:none}
+    .pal{display:none;flex-direction:column;gap:4px;padding:3px 4px}
+    .rtb.colouring .pal{display:flex}
+    .rtb.colouring .cmds{display:none}
+    .pal .row{display:flex;align-items:center;gap:3px}
+    .pal .lbl{width:74px;color:${muted};font:11.5px system-ui,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .rtb .pal button{width:24px;height:24px;border:1px solid ${line};box-sizing:border-box;border-radius:6px;font:700 13px/1 system-ui,sans-serif}
     .drop{position:fixed;display:none;height:3px;border-radius:2px;background:${accent};pointer-events:none;box-shadow:0 0 0 2px ${accent}33}
     @media (pointer:coarse){.bar button,.rtb button{width:38px;height:36px}.h.r{width:14px;height:34px;margin-top:-17px;right:-9px}.h.b{height:14px;width:34px;margin-left:-17px;bottom:-9px}.h.rb{width:18px;height:18px;right:-10px;bottom:-10px}}
   </style>
@@ -275,10 +340,14 @@ function editor(cfg: EditorCfg) {
   </div>
   <div class="rtb" role="toolbar">
     <span class="cmds">
+      <button class="kind" data-c="turn" title="${attr(L('turnTip', 'Turn into (Ctrl+/)'))}"><span class="kn"></span>${svg('chev')}</button>
+      <span class="sep ks"></span>
       <button data-c="bold" title="${L('boldTip', 'Bold (Ctrl+B)')}">${svg('bold')}</button>
       <button data-c="italic" title="${L('italicTip', 'Italic (Ctrl+I)')}">${svg('italic')}</button>
       <button data-c="underline" title="${L('underlineTip', 'Underline (Ctrl+U)')}">${svg('underline')}</button>
       <button data-c="strikeThrough" title="${L('strikeTip', 'Strike through')}">${svg('strike')}</button>
+      <button data-c="code" title="${attr(L('codeTip', 'Code (Ctrl+E)'))}">${svg('code')}</button>
+      <button data-c="colour" title="${attr(L('colourTip', 'Colour and highlight'))}">${svg('colour')}</button>
       <span class="sep"></span>
       <button data-c="link" title="${L('linkTip', 'Make it a link')}">${svg('link')}</button>
       <button data-c="unlink" title="${L('unlinkTip', 'Not a link')}">${svg('unlink')}</button>
@@ -286,6 +355,7 @@ function editor(cfg: EditorCfg) {
       <span class="sep"></span>
       <button data-c="done" title="${L('doneTip', 'Done (Esc)')}">${svg('done')}</button>
     </span>
+    <span class="pal"><span class="row"><span class="lbl">${attr(L('textColour', 'Text colour'))}</span>${swatches('tc')}</span><span class="row"><span class="lbl">${attr(L('highlight', 'Highlight'))}</span>${swatches('hl')}</span></span>
     <form><input name="url" placeholder="https://…" autocomplete="off" spellcheck="false"><button type="submit" title="${L('addLinkTip', 'Add the link')}">${svg('done')}</button></form>
   </div>`;
   const $ = (s: string) => shadow.querySelector(s) as HTMLElement;
@@ -302,7 +372,8 @@ function editor(cfg: EditorCfg) {
   let sel: Element | null = null;
   let hover: Element | null = null;
   let editing: HTMLElement | null = null;
-  let editBefore = '';
+  /** Whether the app has an agent to ask about a part (the block menu's Ask the agent). */
+  let canAskAgent = false;
   /** What the inspector's changes apply to: this part, every part of its kind or class; on hover; at a size and smaller. */
   let ctx: { scope: string; state: '' | 'hover'; media: Media } = { scope: 'self', state: '', media: '' };
 
@@ -363,7 +434,28 @@ function editor(cfg: EditorCfg) {
     el.style.top = `${top}px`;
     return top;
   };
+  /** The kinds of block words can be turned into, by their names on the bar over them. */
+  const KIND_NAME: Record<string, [string, string]> = {
+    p: ['text', 'Text'],
+    h1: ['h1', 'Heading 1'],
+    h2: ['h2', 'Heading 2'],
+    h3: ['h3', 'Heading 3'],
+    h4: ['h4', 'Heading 4'],
+    h5: ['h5', 'Heading 5'],
+    h6: ['h6', 'Heading 6'],
+    bullet: ['sBullet', 'Bulleted list'],
+    number: ['sNumber', 'Numbered list'],
+    todo: ['sTodo', 'To-do list'],
+    quote: ['quote', 'Quote'],
+    code: ['sCode', 'Code'],
+    toggle: ['sToggle', 'Toggle list'],
+    callout: ['sCallout', 'Callout'],
+  };
   const draw = () => {
+    drawSel();
+    W.draw();
+  };
+  const drawSel = () => {
     place(hoverBox, hover && hover !== sel && hover.isConnected ? hover.getBoundingClientRect() : null);
     if (!sel || !sel.isConnected) {
       place(selBox, null);
@@ -390,12 +482,26 @@ function editor(cfg: EditorCfg) {
     tag.style.top = `${tagTop}px`;
     if (editing) {
       bar.style.display = 'none';
+      // While writing, nothing sits over the line above: the bar shows once words are selected (always on a phone,
+      // which has no keys for bold and the rest).
+      tag.style.display = 'none';
+      const s = getSelection();
+      const words = !!s && !s.isCollapsed && !!s.anchorNode && editing.contains(s.anchorNode);
+      if (!coarse && !words && !rtb.classList.contains('linking') && !rtb.classList.contains('colouring')) {
+        rtb.style.display = 'none';
+        return;
+      }
+      const kind = KIND_NAME[String(W.info(editing).kind ?? '')];
+      const kb = rtb.querySelector('.kind') as HTMLElement;
+      kb.hidden = !kind;
+      (rtb.querySelector('.ks') as HTMLElement).hidden = !kind;
+      if (kind) (kb.querySelector('.kn') as HTMLElement).textContent = L(kind[0], kind[1]);
       rtb.style.display = 'flex';
       placeAbove(rtb, r, false);
       return;
     }
     rtb.style.display = 'none';
-    rtb.classList.remove('linking');
+    rtb.classList.remove('linking', 'colouring');
     bar.style.display = 'flex';
     (bar.querySelector('[data-a=drag]') as HTMLElement).hidden = isBody;
     (bar.querySelector('[data-a=parent]') as HTMLElement).hidden = isBody;
@@ -736,7 +842,7 @@ function editor(cfg: EditorCfg) {
       const cs = el ? getComputedStyle(el) : null;
       kinds[k] = { declared: ruleOf(ctx.media, boosted(k)), computed: cs ? Object.fromEntries(KIND_PROPS.map((p) => [p, cs.getPropertyValue(p)])) : {} };
     }
-    return { vars: varsOf(), fonts: fontsOf(), title: document.title, lang: root.getAttribute('lang') ?? '', css: customEl()?.textContent ?? '', kinds, media: ctx.media, bg: canvasBg() };
+    return { vars: varsOf(), fonts: fontsOf(), title: document.title, lang: root.getAttribute('lang') ?? '', css: customEl()?.textContent ?? '', kinds, media: ctx.media, bg: canvasBg(), ...W.page() };
   };
   const tellPage = () => send({ type: 'wa-ed-page', page: pageInfo() });
 
@@ -873,17 +979,84 @@ function editor(cfg: EditorCfg) {
       selector: cssPath(el),
       snippet: snippet(el),
       can: { up: el !== document.body && !!el.previousElementSibling, down: el !== document.body && !!nextPart(el), parent: el !== document.body, remove: el !== document.body },
+      ...W.info(el),
     };
   };
   const tell = () => send({ type: 'wa-ed-sel', sel: sel && sel.isConnected ? info(sel) : null });
+
+  // ---- where the caret is, as a number: characters of a part's own words, a line break counting as one ---------
+  const subListsOf = (h: Element) => (h.tagName === 'LI' ? [...h.children].filter((c) => c.tagName === 'UL' || c.tagName === 'OL') : []);
+  const ownRangeOf = (h: Element) => {
+    const x = document.createRange();
+    x.selectNodeContents(h);
+    const s = subListsOf(h)[0];
+    if (s) x.setEndBefore(s);
+    return x;
+  };
+  const charsIn = (x: Range) => x.toString().length + x.cloneContents().querySelectorAll('br').length;
+  const offsetIn = (h: Element): number | null => {
+    const s = getSelection();
+    if (!s || !s.rangeCount) return null;
+    const r = s.getRangeAt(0);
+    if (!(h === r.startContainer || h.contains(r.startContainer))) return null;
+    const x = document.createRange();
+    x.setStart(h, 0);
+    x.setEnd(r.startContainer, r.startOffset);
+    return charsIn(x);
+  };
+  /** How many characters the words have (a line break a browser keeps at their end, showing nothing, not counted). */
+  const lengthOf = (h: Element) => {
+    const x = ownRangeOf(h);
+    let n = charsIn(x);
+    let last: Node | null = x.endContainer === h ? (h.childNodes[x.endOffset - 1] ?? null) : h.lastChild;
+    while (last && last.nodeType === 3 && !(last as Text).data.trim()) last = last.previousSibling;
+    if (last?.nodeName === 'BR') n--;
+    return Math.max(0, n);
+  };
+  /** The place `n` characters into a part's own words. */
+  const pointAt = (h: Element, n: number): [Node, number] => {
+    const subs = subListsOf(h);
+    const w = document.createTreeWalker(h, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, { acceptNode: (x) => (subs.includes(x as Element) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+    let last: [Node, number] = [h, 0];
+    for (let x = w.nextNode(); x; x = w.nextNode()) {
+      if (x.nodeType === 3) {
+        const len = (x as Text).data.length;
+        if (n <= len) return [x, n];
+        n -= len;
+        last = [x, len];
+      } else if ((x as Element).tagName === 'BR') {
+        const p = x.parentNode!;
+        const i = [...p.childNodes].indexOf(x as ChildNode);
+        if (n === 0) return [p, i];
+        n -= 1;
+        last = [p, i + 1];
+      }
+    }
+    return last;
+  };
 
   // ---- history ------------------------------------------------------------------------------------------
   const undo: string[] = [];
   const redo: string[] = [];
   let dirty = false;
+  /** The page's body as it is kept: without the editor's marks on the words being written. */
+  const cleanBody = (): string => {
+    const b = document.body;
+    if (!editing && !b.querySelector('[data-n-ph],[data-n-ceoff],[data-n-hovering],[data-n-ce]')) return b.outerHTML;
+    const c = b.cloneNode(true) as HTMLElement;
+    for (const x of c.querySelectorAll('[data-n-ce]')) {
+      x.removeAttribute('data-n-ce');
+      x.removeAttribute('contenteditable');
+    }
+    for (const x of c.querySelectorAll('[data-n-hovering]')) x.removeAttribute('data-n-hovering');
+    W.clean(c);
+    return c.outerHTML;
+  };
+  /** Where words were being written, kept with each step to undo, so the caret goes back there. */
+  const writingAt = () => (editing ? { p: pathOf(editing), o: offsetIn(editing) ?? 0 } : null);
   // The body and what the editor keeps in the head: its stylesheet, the user's CSS, the fonts, the title and language.
-  const snap = () => JSON.stringify({ b: document.body.outerHTML, s: cssText(), c: customEl()?.textContent ?? '', f: fontsOf(), t: document.title, l: root.getAttribute('lang') ?? '' });
-  const state = () => send({ type: 'wa-ed-state', dirty, canUndo: undo.length > 0, canRedo: redo.length > 0 });
+  const snap = () => JSON.stringify({ b: cleanBody(), s: cssText(), c: customEl()?.textContent ?? '', f: fontsOf(), t: document.title, l: root.getAttribute('lang') ?? '', w: writingAt() });
+  const state = () => send({ type: 'wa-ed-state', dirty, canUndo: undo.length > 0 || typing.length > 0, canRedo: redo.length > 0 || typingRedo.length > 0 });
   /** Before a change: what to go back to. */
   const remember = () => {
     undo.push(snap());
@@ -892,6 +1065,7 @@ function editor(cfg: EditorCfg) {
   };
   let paletteTimer = 0;
   const changed = (page = false) => {
+    W.changed();
     dirty = true;
     state();
     tell();
@@ -901,8 +1075,8 @@ function editor(cfg: EditorCfg) {
     clearTimeout(paletteTimer);
     paletteTimer = window.setTimeout(() => send({ type: 'wa-ed-palette', colors: palette() }), 600);
   };
-  const restore = (saved: string) => {
-    const o = JSON.parse(saved) as { b: string; s: string; c: string; f: string[]; t: string; l: string };
+  const restore = (saved: string, write = false) => {
+    const o = JSON.parse(saved) as { b: string; s: string; c: string; f: string[]; t: string; l: string; w?: { p: number[]; o: number } | null };
     const path = sel ? pathOf(sel) : null;
     const d = new DOMParser().parseFromString(`<!doctype html><html><head></head>${o.b}</html>`, 'text/html');
     root.replaceChild(document.importNode(d.body, true), document.body);
@@ -922,18 +1096,81 @@ function editor(cfg: EditorCfg) {
     setTitle(o.t);
     if (o.l) root.setAttribute('lang', o.l);
     else root.removeAttribute('lang');
+    W.restored();
     sel = (path && byPath(path)) || null;
     hover = null;
+    const h = o.w ? byPath(o.w.p) : null;
     changed(true);
+    // The caret goes back where the words were written then (or that block is picked).
+    if (h && write) startEditing(h, { off: o.w!.o });
+    else if (h) {
+      sel = W.unitOf(h);
+      tell();
+    }
   };
   const step = (back: boolean) => {
-    finishEditing();
     const from = back ? undo : redo;
     const to = back ? redo : undo;
-    const saved = from.pop();
-    if (saved === undefined) return;
-    to.push(snap());
-    restore(saved);
+    if (!from.length) return;
+    const wasWriting = !!editing;
+    const cur = snap();
+    finishEditing(true);
+    to.push(cur);
+    restore(from.pop()!, wasWriting);
+  };
+
+  // ---- the words being written: a step to undo for each change of a block, and the last few words typed -----
+  /** Whether what was written since writing began has a step to undo yet. */
+  let editPushed = false;
+  const typing: { h: string; o: number }[] = [];
+  const typingRedo: { h: string; o: number }[] = [];
+  let lastTyped = 0;
+  let lastKind = '';
+  /** Before the words being written change: the first change makes a step to undo; each few words typed, a step of their own. */
+  const noteTyping = (kind = 'edit', data = '') => {
+    if (!editing) return;
+    if (!editPushed) {
+      remember();
+      editPushed = true;
+    }
+    const now = Date.now();
+    const top = typing[typing.length - 1];
+    if (!top || (top.h !== editing.innerHTML && (kind !== lastKind || now - lastTyped > 900 || kind === 'edit' || (kind === 'insert' && /^\s$/.test(data))))) {
+      typing.push({ h: editing.innerHTML, o: offsetIn(editing) ?? 0 });
+      if (typing.length > 300) typing.shift();
+    }
+    typingRedo.length = 0;
+    lastTyped = now;
+    lastKind = kind;
+    if (typing.length === 1) state();
+  };
+  const putWords = (t: { h: string; o: number }) => {
+    if (!editing) return;
+    editing.innerHTML = t.h;
+    W.started(editing);
+    placeCaret(editing, { off: t.o });
+    redraw();
+  };
+  const undoTyping = () => {
+    if (!editing || !typing.length) return step(true);
+    typingRedo.push({ h: editing.innerHTML, o: offsetIn(editing) ?? 0 });
+    putWords(typing.pop()!);
+    // Back to where writing began: no step is left to keep.
+    if (!typing.length && editPushed) {
+      undo.pop();
+      editPushed = false;
+    }
+    state();
+  };
+  const redoTyping = () => {
+    if (!editing || !typingRedo.length) return step(false);
+    if (!editPushed) {
+      remember();
+      editPushed = true;
+    }
+    typing.push({ h: editing.innerHTML, o: offsetIn(editing) ?? 0 });
+    putWords(typingRedo.pop()!);
+    state();
   };
 
   // ---- picking and changing words -------------------------------------------------------------------------
@@ -941,67 +1178,135 @@ function editor(cfg: EditorCfg) {
     if (el && (isUi(el) || el === root || el === document.head || document.head.contains(el))) el = document.body;
     if (editing && el !== editing) finishEditing();
     sel = el;
+    W.selected(el);
     showHover();
     tell();
     redraw();
   };
-  /** The caret where the click was (in the part's words), else at their end. */
-  const caretAt = (el: HTMLElement, at?: { x: number; y: number }) => {
+  /** The caret where `at` says: where a click was, near an x on the top or bottom line, so many characters in, its words selected, or at their end. */
+  const placeCaret = (el: HTMLElement, at?: At) => {
     const s = getSelection();
     if (!s) return;
     let r: Range | null = null;
     const d = document as Document & { caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null };
-    if (at) {
-      if (d.caretRangeFromPoint) r = d.caretRangeFromPoint(at.x, at.y);
+    const fromPoint = (x: number, y: number): Range | null => {
+      host.style.setProperty('display', 'none', 'important');
+      let q: Range | null = null;
+      if (d.caretRangeFromPoint) q = d.caretRangeFromPoint(x, y);
       else if (d.caretPositionFromPoint) {
-        const p = d.caretPositionFromPoint(at.x, at.y);
+        const p = d.caretPositionFromPoint(x, y);
         if (p) {
-          r = document.createRange();
-          r.setStart(p.offsetNode, p.offset);
+          q = document.createRange();
+          q.setStart(p.offsetNode, p.offset);
         }
       }
-      if (r && !el.contains(r.startContainer)) r = null;
+      host.style.setProperty('display', 'block', 'important');
+      return q && (el === q.startContainer || el.contains(q.startContainer)) && !subListsOf(el).some((x) => x.contains(q!.startContainer)) ? q : null;
+    };
+    if (at?.point) r = fromPoint(at.point.x, at.point.y);
+    else if (at?.edge && at.x !== undefined) {
+      el.scrollIntoView({ block: 'nearest' });
+      const rs = [...ownRangeOf(el).getClientRects()].filter((q) => q.height > 0);
+      if (rs.length) {
+        const ln = at.edge === 'top' ? rs.reduce((a, b) => (b.top < a.top ? b : a)) : rs.reduce((a, b) => (b.bottom > a.bottom ? b : a));
+        const box = el.getBoundingClientRect();
+        r = fromPoint(Math.max(box.left + 1, Math.min(at.x, box.right - 1)), ln.top + ln.height / 2);
+      }
+      if (!r) at = at.edge === 'top' ? { off: 0 } : { end: true };
     }
+    if (!r && at?.all) r = ownRangeOf(el);
     if (!r) {
+      const [n, o] = pointAt(el, at?.off !== undefined ? at.off : lengthOf(el));
       r = document.createRange();
-      r.selectNodeContents(el);
-      r.collapse(false);
+      r.setStart(n, o);
+      r.collapse(true);
     }
     s.removeAllRanges();
     s.addRange(r);
   };
-  const startEditing = (el: Element | null, at?: { x: number; y: number }) => {
+  let editBefore = '';
+  let saidEditing = false;
+  /** Tells the app whether words are being written (a phone's keyboard is up): only when that changes. */
+  const sayEditing = (on: boolean) => {
+    if (on === saidEditing) return;
+    saidEditing = on;
+    send({ type: 'wa-ed-editing', on });
+  };
+  const startEditing = (el: Element | null, at?: At | { x: number; y: number }) => {
     if (!el || !wordy(el)) return;
     if (editing === el) return;
     finishEditing();
     sel = el;
     editing = el as HTMLElement;
-    editBefore = editing.innerHTML;
-    remember();
+    editPushed = false;
+    typing.length = 0;
+    typingRedo.length = 0;
     editing.setAttribute('contenteditable', 'true');
     editing.setAttribute('data-n-ce', '');
+    W.started(editing);
+    W.selected(el);
+    editBefore = editing.innerHTML;
     editing.focus({ preventScroll: true });
-    caretAt(editing, at);
-    send({ type: 'wa-ed-editing', on: true });
+    const where = at && 'y' in at && typeof at.y === 'number' && !('edge' in at) ? { point: at as { x: number; y: number } } : (at as At | undefined);
+    placeCaret(editing, where);
+    sayEditing(true);
     tell();
     redraw();
   };
-  function finishEditing() {
+  /** Writing ends: `quiet` when a change that keeps its own step to undo goes on from here. */
+  function finishEditing(quiet = false) {
     const el = editing;
     if (!el) return;
     editing = null;
+    const same = el.innerHTML === editBefore;
+    W.finished(el);
     el.removeAttribute('contenteditable');
     el.removeAttribute('data-n-ce');
-    // A lone line break the browser leaves in an emptied part is not the user's.
-    if (el.innerHTML === '<br>') el.innerHTML = '';
-    if (el.innerHTML === editBefore) undo.pop();
-    else changed();
+    typing.length = 0;
+    typingRedo.length = 0;
+    const was = editPushed;
+    editPushed = false;
+    // Typed and taken back again: no step to keep.
+    if (was && same && !quiet) undo.pop();
+    else if (was && !quiet) changed();
+    else state();
     getSelection()?.removeAllRanges();
-    send({ type: 'wa-ed-editing', on: false });
+    queueMicrotask(() => sayEditing(!!editing));
     redraw();
   }
+  /** Writes in another part (or elsewhere in this one). */
+  const write = (h: Element, at?: At) => {
+    if (editing === h && document.activeElement === h) return placeCaret(h as HTMLElement, at);
+    if (editing === h) finishEditing();
+    startEditing(h, at);
+  };
+  /** A change as one step to undo (the words typed before it are a step of their own), then where to write or what to pick. */
+  const change = (f: () => Next) => {
+    const before = snap();
+    const r = f();
+    if (!r) return;
+    undo.push(before);
+    if (undo.length > 150) undo.shift();
+    redo.length = 0;
+    lastStyle = null;
+    if (typeof r === 'object' && 'write' in r) {
+      finishEditing(true);
+      startEditing(r.write, r.at);
+    } else if (typeof r === 'object' && 'pick' in r) {
+      finishEditing(true);
+      select(r.pick);
+    } else if (editing && !editing.isConnected) finishEditing(true);
+    else if (editing) {
+      editPushed = false;
+      typing.length = 0;
+      typingRedo.length = 0;
+      editBefore = editing.innerHTML;
+    }
+    changed();
+  };
 
-  // The bar over words being changed: bold, italic, underline, strike, link, plain words, done.
+  // The bar over words being changed: Turn into, bold, italic, underline, strike, code, colour and highlight, link,
+  // plain words, done.
   let saved: Range | null = null;
   const linkForm = rtb.querySelector('form') as HTMLFormElement;
   const linkInput = rtb.querySelector('input') as HTMLInputElement;
@@ -1015,7 +1320,26 @@ function editor(cfg: EditorCfg) {
     e.preventDefault();
     e.stopPropagation();
     const c = b.dataset.c;
+    if (b.dataset.w) {
+      const [type, name] = b.dataset.w.split(':');
+      rtb.classList.remove('colouring');
+      W.act('wordsColour', { type, name: name || null });
+      return redraw();
+    }
     if (c === 'done') return finishEditing();
+    if (c === 'turn') {
+      const r = b.getBoundingClientRect();
+      W.act('menu', { at: { left: r.left, top: r.top, bottom: r.bottom }, view: 'turn' });
+      return;
+    }
+    if (c === 'code') {
+      W.act('code', null);
+      return redraw();
+    }
+    if (c === 'colour') {
+      rtb.classList.add('colouring');
+      return redraw();
+    }
     if (c === 'link') {
       const s = getSelection();
       saved = s && s.rangeCount ? s.getRangeAt(0).cloneRange() : null;
@@ -1026,7 +1350,10 @@ function editor(cfg: EditorCfg) {
       redraw();
       return;
     }
-    if (c) document.execCommand(c, false);
+    if (c) {
+      noteTyping();
+      document.execCommand(c, false);
+    }
     redraw();
   });
   linkForm.addEventListener('submit', (e) => {
@@ -1040,7 +1367,10 @@ function editor(cfg: EditorCfg) {
       s.removeAllRanges();
       s.addRange(saved);
     }
-    if (url && !/^\s*javascript:/i.test(url)) document.execCommand('createLink', false, url);
+    if (url && !/^\s*javascript:/i.test(url)) {
+      noteTyping();
+      document.execCommand('createLink', false, url);
+    }
     saved = null;
     redraw();
   });
@@ -1080,7 +1410,13 @@ function editor(cfg: EditorCfg) {
     const body = document.body;
     const styleKey = `${a}:${el ? pathOf(el).join('.') : ''}:${JSON.stringify(ctx)}`;
     if (a !== 'style' && a !== 'pageStyle' && a !== 'setVar') lastStyle = null;
+    // Blocks as Notion has them (Turn into, colours, an icon and a cover, what the app was asked for), and several picked at once.
+    if (/^(del|dup|up|down|copy|cut)$/.test(a) && W.picked().length > 1 && W.act(`many:${a}`, arg)) return;
+    if (W.act(a, arg)) return;
     switch (a) {
+      case 'caps':
+        canAskAgent = !!arg?.ask;
+        return;
       case 'parent':
         if (el && el !== body) select(el.parentElement);
         return;
@@ -1130,11 +1466,16 @@ function editor(cfg: EditorCfg) {
         clip = typeof arg?.html === 'string' ? arg.html : clip;
         return;
       case 'paste': {
-        const node = fromHtml(typeof arg?.html === 'string' ? arg.html : clip);
-        if (!node) return;
+        // Every part copied (several blocks copied together paste together), in their order.
+        const t = document.createElement('template');
+        t.innerHTML = String(typeof arg?.html === 'string' ? arg.html : clip);
+        for (const s of t.content.querySelectorAll('script')) s.remove();
+        const nodes = [...t.content.children];
+        if (!nodes.length) return;
         remember();
-        placeNew(node, arg?.where ?? 'after', el);
-        sel = node;
+        placeNew(nodes[0], arg?.where ?? 'after', el);
+        for (let i = 1; i < nodes.length; i++) nodes[i - 1].after(nodes[i]);
+        sel = nodes[0];
         break;
       }
       case 'insert': {
@@ -1172,7 +1513,9 @@ function editor(cfg: EditorCfg) {
         // A slider dragged along is one change to undo, not one per step.
         if (!(lastStyle && lastStyle.key === styleKey && Date.now() - lastStyle.at < 1200)) remember();
         lastStyle = { key: styleKey, at: Date.now() };
-        styleOf(el, props);
+        // Several blocks picked: the change goes to each of them.
+        const many = W.picked();
+        for (const x of many.length > 1 && many.includes(el) ? many : [el]) styleOf(x, props);
         break;
       }
       case 'pageStyle': {
@@ -1256,7 +1599,7 @@ function editor(cfg: EditorCfg) {
         break;
       }
       case 'words': {
-        if (!el || !wordy(el)) return;
+        if (!el || !wordy(el) || el.children.length) return;
         remember();
         (el as HTMLElement).innerText = String(arg ?? '');
         break;
@@ -1434,6 +1777,37 @@ function editor(cfg: EditorCfg) {
     move(e);
   }
 
+  // ---- writing as in Notion (writing.ts), handed what it needs -------------------------------------------------
+  const core: Core = {
+    L,
+    send,
+    shadow,
+    look: { accent, panel, line, ink, muted, dark },
+    isUi,
+    wordy,
+    nameOf,
+    pathOf,
+    byPath,
+    under,
+    sel: () => (sel && sel.isConnected ? sel : null),
+    editing: () => editing,
+    select,
+    write,
+    finish: () => finishEditing(),
+    change,
+    redraw,
+    noteTyping: () => noteTyping(),
+    offset: offsetIn,
+    length: lengthOf,
+    copy: (html, name) => {
+      clip = html;
+      send({ type: 'wa-ed-copied', html, name });
+    },
+    canAsk: () => canAskAgent,
+  };
+  // Its listeners come before the editor's own, so the keys it takes (Enter, Backspace, "/"…) go to it first.
+  const W: Writing = writing(core);
+
   // ---- the page's own events: held, except while words are being changed -----------------------------------
   const fromUi = (e: Event) => e.composedPath().includes(host);
   const inEditing = (e: Event) => !!editing && e.target instanceof Node && editing.contains(e.target);
@@ -1492,6 +1866,7 @@ function editor(cfg: EditorCfg) {
   });
   addEventListener('scroll', redraw, true);
   addEventListener('resize', redraw);
+  document.addEventListener('selectionchange', () => editing && redraw());
   addEventListener(
     'focusout',
     (e) => {
@@ -1500,14 +1875,36 @@ function editor(cfg: EditorCfg) {
     },
     true,
   );
-  // Pasted words come in as words, not as another page's markup.
+  // Pasted words come in as words, not as another page's markup; with no words being written, the part copied
+  // goes after the one picked (a picture pasted is writing.ts's).
   addEventListener(
     'paste',
     (e) => {
-      if (!inEditing(e)) return;
+      if (!inEditing(e)) {
+        if (!editing && clip && sel) {
+          e.preventDefault();
+          act('paste');
+        }
+        return;
+      }
       e.preventDefault();
       const text = e.clipboardData?.getData('text/plain') ?? '';
+      noteTyping();
       document.execCommand('insertText', false, text);
+    },
+    true,
+  );
+  // Before the words being written change: a step to undo (the browser's own undo is the editor's here).
+  addEventListener(
+    'beforeinput',
+    (ev) => {
+      const e = ev as InputEvent;
+      if (!editing || !(e.target instanceof Node) || !(editing === e.target || editing.contains(e.target))) return;
+      if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') {
+        e.preventDefault();
+        return e.inputType === 'historyUndo' ? undoTyping() : redoTyping();
+      }
+      noteTyping(e.inputType.startsWith('delete') ? 'delete' : e.inputType.startsWith('insert') ? 'insert' : 'edit', e.data ?? '');
     },
     true,
   );
@@ -1523,12 +1920,17 @@ function editor(cfg: EditorCfg) {
         return send({ type: 'wa-ed-save' });
       }
       if (editing) {
+        if (mod && (k.toLowerCase() === 'z' || k.toLowerCase() === 'y')) {
+          e.preventDefault();
+          return k.toLowerCase() === 'y' || e.shiftKey ? redoTyping() : undoTyping();
+        }
         if (k === 'Escape' || (k === 'Enter' && !e.shiftKey && ONE_LINE.has(editing.tagName))) {
           e.preventDefault();
           finishEditing();
         } else if (k === 'Enter') {
           // A new line in the same part (a browser would start a new block in it, and the part would hold blocks).
           e.preventDefault();
+          noteTyping();
           if (!document.execCommand('insertLineBreak')) document.execCommand('insertHTML', false, '<br>');
         }
         if (mod && k.toLowerCase() === 'k') {
@@ -1544,10 +1946,6 @@ function editor(cfg: EditorCfg) {
       if (mod && k.toLowerCase() === 'y') {
         e.preventDefault();
         return act('redo');
-      }
-      if (mod && k.toLowerCase() === 'v' && clip) {
-        e.preventDefault();
-        return act('paste');
       }
       if (!sel) return;
       if (mod && ['c', 'x', 'd', 'g'].includes(k.toLowerCase())) {
@@ -1613,6 +2011,7 @@ function editor(cfg: EditorCfg) {
         el.removeAttribute('contenteditable');
       }
     }
+    W.clean(copy);
     copy.removeAttribute('data-n-theme');
     return `${cfg.doctype ? `${cfg.doctype}\n` : ''}${copy.outerHTML}`;
   };
@@ -1632,7 +2031,7 @@ function editor(cfg: EditorCfg) {
     // Taps don't zoom, a long press doesn't select the page's words (only words being changed).
     const own = document.createElement('style');
     own.setAttribute('data-n-own', '');
-    own.textContent = 'html{touch-action:manipulation}body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}[data-n-ce]{-webkit-user-select:text;user-select:text;outline:none}';
+    own.textContent = `html{touch-action:manipulation}body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}[data-n-ce]{-webkit-user-select:text;user-select:text;outline:none}${W.css}`;
     // A page narrower than the frame sits in the middle, as it does when it is used (the kit's bridge).
     const b = getComputedStyle(document.body);
     const l = parseFloat(b.marginLeft);
@@ -1655,4 +2054,5 @@ function editor(cfg: EditorCfg) {
 /** Puts `function`s' sources in a <script> safely (kit.ts's rules). */
 const scriptSafe = (src: string) => src.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 
-export const EDITOR_SRC = scriptSafe(editor.toString());
+/** The editor, with the writing it hands its insides to (both run in the page, as one script). */
+export const EDITOR_SRC = scriptSafe(`(cfg) => (${editor.toString()})(cfg, ${writing.toString()})`);
