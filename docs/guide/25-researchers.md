@@ -117,6 +117,8 @@ Its view has **Did it reproduce?** (the verdict, how many numbers came close, th
 
 It runs code on this computer and can take hours: it keeps within your limits, and when one would be passed it stops and reports what it has. Code it cannot get, or data that is not public, it says plainly.
 
+**Highlight papers as you read them.** Open a paper's PDF in Files and press **Highlight**: select a passage, or drag a box around an equation or a figure, to highlight it in one of four colours and write a note on it. **Ask** asks an agent about just that part ("What does this equation say?"), and **Notes** lists everything you marked, page by page. **Keep in a project** puts your highlights and notes into a project's knowledge as one document named after the paper, kept up to date, so the project's sessions find them; **Save into the PDF** writes them into the file for other apps. See [Read and highlight a PDF](/guide/files-git#read-and-highlight-a-pdf).
+
 <!-- end: read -->
 
 ## Check a paper before you submit

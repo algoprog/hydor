@@ -243,7 +243,7 @@ Click **Ask** in the editor's bar (✨ on a phone) and say what should change ("
 - Unsaved changes are saved first, so the agent works on them.
 - The agent starts in the file's folder, knows which file you mean, and changes that file itself. You watch each change arrive in the editor as soon as it is written, the changed lines tinted for a moment, with your place in the file kept.
 - The conversation goes on in the panel: write back to ask for more. **A new request** starts again, and **Open as a session** opens it in full; it is in your sessions too. On a phone, **See the file** folds the panel away to watch the file, and the bar at the bottom brings it back.
-- The panel stays open as you switch between files' tabs, each with its own conversation. It works the same in the Word, Excel, CSV and LaTeX editors, and in notebooks, where the agent changes cells and keeps the outputs of the others. As with [asking from the Library](/guide/library#change-it-by-asking-an-agent), the agent's remembered model and permissions stay as they were.
+- The panel stays open as you switch between files' tabs, each with its own conversation. It works the same in the Word, Excel, CSV and LaTeX editors, and in notebooks, where the agent changes cells and keeps the outputs of the others. On a PDF, the agent reads it and answers, and you can ask about a passage, an equation or a figure you picked in it ([Ask about a part of a PDF](#ask-about-a-part-of-a-pdf)). As with [asking from the Library](/guide/library#change-it-by-asking-an-agent), the agent's remembered model and permissions stay as they were.
 
 ### When the file changes while you have it open
 
@@ -286,7 +286,7 @@ PowerPoint files, older Office files (.doc, .xls, .ppt), OpenDocument files, RTF
 The file viewer shows files as they look:
 
 - **Images** (PNG, JPEG, GIF, WebP, SVG, ICO, BMP, AVIF): shown whole, on a checkerboard where they are see-through.
-- **PDFs**: in your browser's own PDF viewer, with **Fill & sign** at the top to fill them in and sign them (see [Fill in and sign a PDF](#fill-in-and-sign-a-pdf)).
+- **PDFs**: in your browser's own PDF viewer, with **Highlight** at the top to read them in the app's own reader, highlight them and keep notes beside them (see [Read and highlight a PDF](#read-and-highlight-a-pdf)), and **Fill & sign** to fill them in and sign them (see [Fill in and sign a PDF](#fill-in-and-sign-a-pdf)). A PDF you highlighted opens in the reader.
 - **Video** (MP4, WebM, MOV and M4V; MKV and OGV where your browser plays them): in the app's own player (see [Watch a video](#watch-a-video) below). **Audio** (MP3, WAV, OGG) plays in place.
 - **Office documents**: PowerPoint (.pptx, .ppt), older Word and Excel files (.doc, .xls and the like), OpenDocument (.odt, .ods, .odp), RTF and EPUB; and Word (.docx) and Excel (.xlsx) files from **More** (⋯) → **Show as a preview** in their editors. A switch at the top picks the view:
   - **Pages**: the document as LibreOffice lays it out, page by page ("Laying out the pages…" the first time). This view is there only when LibreOffice is installed on this computer, and not for EPUB books.
@@ -335,6 +335,33 @@ What it can't do:
 - Nothing here takes words out of a PDF for good. White boxes, which agents can put over words, hide them from the eye only: the words stay in the file.
 
 Agents fill in, write on and change PDFs too, with their own tools: see [Documents, images, videos and voice](/guide/documents-voice#pdfs).
+
+## Read and highlight a PDF
+
+Open a PDF and press **Highlight** at the top (on a phone, the marker beside its name). Its pages show as paper, drawn by the app, with their words over them to select as in any reader. A PDF you highlighted opens this way by itself, so your notes are there when you come back; **Close** goes back to your browser's own viewer.
+
+- **Highlight words**: select them with the mouse, or on a phone press and hold a word and drag the handles. A small bar comes up: one of its four colours (yellow, green, blue or pink) highlights them, **Note** highlights them and opens a note to write, **Ask** asks an agent about them ([below](#ask-about-a-part-of-a-pdf)), and **Copy** copies them, a word broken over a line's end put back together. A selection runs from one column of a paper into the next, as you read it.
+- **Highlight a figure or an equation**: press **Select an area** and drag a box around it; on a computer, hold Alt and drag, without the button. The same bar comes up for that part of the page, which is kept as a picture of it (**Copy** copies the picture).
+- **Change a highlight**: click it for its bar, to pick another colour, **Edit note**, **Ask**, **Copy** or delete it (the bin, or Delete; **Undo** in the message that follows brings it back). Resting the pointer on a highlight shows its note, and a small dot marks the ones that have one. Highlighting the same words again changes their colour.
+- **Zoom**: pinch on a phone or tablet; on a computer, Ctrl with the mouse wheel, or Ctrl+= and Ctrl+−. **Fit width** (or Ctrl+0) goes back. Highlights stay on their words at any size.
+
+A page that is only a picture (a scan) has no words to select: highlight its parts with **Select an area**. Words that run up or down a page (a page turned sideways) can't be selected either. Highlights other apps saved in a PDF show on its pages, but not in **Notes**.
+
+### Your notes
+
+**Notes** lists your highlights beside the pages (as a sheet from the bottom on a phone), page by page: each one's words or the picture of its area, its note, which you write or change right there, and its colour. Click one to go to it on its page; the bin deletes it, and ✨ asks an agent about it.
+
+The app keeps your highlights and notes beside the file, by its path: the PDF itself doesn't change. They go along when you rename or move the file (or its folder) here, and a file moved some other way (in a terminal, by an agent) finds its notes again by its contents when you open it. When the file itself changes (a paper you typeset again), each highlight is found again by its words, on another page too; one whose words are no longer in it stays where it was, marked "The file changed, and these words are not in it now".
+
+**More** (⋯) in Notes has:
+
+- **Keep in a project**: your highlights and notes go into a project's [knowledge](/guide/projects#knowledge) as one document named after the paper ("Its title (notes).md"): the paper's title, then each highlight's words (a line for an area) and your note, page by page, so the project's sessions find them when they search its documents. The project whose folder holds the PDF comes first. The document follows every change you make to the notes; **Open the project's knowledge** shows it there, and **Stop keeping them there** takes it out.
+- **Save into the PDF**: writes the highlights into the file as its own, each note as its highlight's comment, so other PDF apps show them. **Save a copy beside it** writes "name (highlighted).pdf", which keeps your notes too; **Replace the file** writes over it, its old version to the [Trash](#delete-and-put-back). Saving again puts them in as they are then, in place of the ones saved before. A file whose owner forbids comments, or one certified against them, can't take them: they stay beside it.
+- **Copy all**: the notes as text, to paste elsewhere.
+
+### Ask about a part of a PDF
+
+**Ask** on the bar opens [Ask an agent](#ask-an-agent-about-the-file) beside the PDF (over it on a narrow screen) with what you picked: the words, or a picture of the area, and its page. Pick an example ("Explain this passage", "What does this equation say?", "How does this compare with my approach?", "Sum up this section") or write your own question; the agent can read the whole PDF too. While a conversation about the file is going on, **Ask** puts the part into its message box instead, so you ask about it next. Agents also read your highlights and notes of a PDF when you ask them to ("sum up my highlights of this paper").
 
 ## Find a file by name
 
@@ -693,6 +720,10 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 - "In the file I have open, add a comment over each function saying what it does."
 - "Copy the PDFs in ~/Downloads from this week into my Taxes 2026 project."
 - "Fill in ~/Downloads/rental-application.pdf with my details, and ask me for anything you don't know."
+- "Sum up my highlights of ~/Papers/sparse-retrieval.pdf, page by page, with my notes."
+- "Which of my notes on the paper I have open disagree with what the paper says?"
+- "Keep my notes on ~/Papers/attention.pdf in my Thesis project."
+- "Highlight in green every sentence of ~/Papers/sparse-retrieval.pdf that states a result, with a note saying which experiment it comes from."
 - "Merge the PDFs in ~/Documents/Scans into one file, the cover first, and turn the sideways pages upright."
 - "Which files in ~/code/shop mention the checkout, and what does each do with it?"
 - "Add a column to ~/Documents/people.csv with each person's share of the total."
