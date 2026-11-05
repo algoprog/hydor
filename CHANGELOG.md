@@ -3,6 +3,92 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.30.0 · 5 November 2026
+
+The editors' second round, and what you keep around them: documents on real pages with Suggesting, comments and charts
+on their cells in spreadsheets, videos and connectors on slides, Track changes in LaTeX, Notion's drag-select, links
+and databases in pages; agents' writing you watch as it comes; Word, Excel and PowerPoint files that look the same in
+Office, and PowerPoint files that open as slides; PDFs you and agents fill in and sign, with a signature you draw
+once; files dropped on the Library; and the agent's pointer plain to see.
+
+- **Documents** are laid out on real pages of their paper, as in Word and Google Docs: what does not fit goes on to the
+  next page (a long paragraph between its lines, a long table between its rows with its header row again), and each
+  page has its own header, footer and "Page 3 of 9". **Suggesting** (View → Editing or suggesting, the pencil at the
+  end of the toolbar, or Ctrl+Alt+Shift+X) makes what you type, delete or restyle a suggestion beside the page, with
+  Accept, Reject and replies, and Tools → Accept all suggestions or Reject all suggestions; Word files keep them as
+  tracked changes both ways, and agents read, accept, reject, answer or make suggestions. **Tools → Compare with a
+  version** shows what changed since any version, words added and taken out marked, with Restore this version. A Word
+  file's comments keep their authors' names, typing just after commented words no longer stretches the comment, and
+  the "/" list fits without scrolling.
+- **Spreadsheets**: charts sit on their cells and move and stretch with them as rows and columns go in, out or change
+  size, and draw ranges in several parts (picked with Ctrl+click or Ctrl+drag, or typed as A1:A7,F1:F7); a range a
+  chart cannot draw says why. **Comments** with replies and Resolve beside notes (right-click → Comment, or
+  Ctrl+Alt+M), all of them in View → Comments, answered by agents and kept as Excel's threaded comments. The Kanban
+  board remembers what it groups by, the fields its cards show and the order of its lanes, and a sheet can open on it.
+  Undo and redo keys work; spilled values count in the sum under the sheet, in CSV saves and in Paste special;
+  OpenDocument files bring their merged cells, notes, dropdowns and conditional formatting; long dropdown lists and
+  their chips' colours come back from Excel files; and Files says exactly what saving an Excel file loses.
+- **Slides**: videos from your computer (Insert → Video → From this device, or a video file dropped on a slide; up to
+  200 MB), played in the slideshow, a deck's own page and PowerPoint; Vimeo videos with their stills; **comments** on
+  a slide or a part of it (Insert → Comment, or Ctrl+Alt+M), with replies and Resolve, that agents answer, kept as
+  PowerPoint's comments; **connectors** (Insert → Line or arrow) whose ends stay joined to shapes as they move,
+  straight or elbowed, joined in PowerPoint too; equations drawn without the internet in a deck's own page, its
+  exports and published copies; find and replace in charts and equations; a part in a group placed where it is on the
+  slide; and rulers that stay in view as you zoom.
+- **LaTeX**: papers as IEEE, ACM and Springer LNCS ask (New → LaTeX → Conference paper → Paper style), with what to
+  install for one your TeX lacks; **Track changes** (Tools → Track changes): your edits and an agent's marked with who
+  made them and when, each accepted or rejected, all at once too; comments on .tex files opened from Files; completion
+  as you type on a phone; a toolbar that folds into the menus instead of scrolling sideways; and Insert keeps the words
+  you picked.
+- **Pages**: pick several blocks with a drag from either margin, as in Notion; an item of a nested list turned into
+  text, a heading or a quote keeps its place under its parent; code blocks coloured in about twenty languages, with a
+  language picker (code agents write in pages is coloured too); "@" (or "/" → Link to a page) links to another page of
+  your Library; **comments** on blocks or words (⋮⋮ → Comment, or Ctrl+Alt+M), kept beside the page rather than in it,
+  that agents answer; and **databases** as in Notion ("/" → Database): a table of typed columns (text, number, select,
+  multi-select, date, checkbox, link) with sort and filter, or a board of cards you drag between lanes, its rows kept
+  with the page on every device and changed in Use and in Edit, by agents too.
+- **Watch agents write**: a document, slides, a spreadsheet or a LaTeX paper grows on screen as an agent writes it,
+  beside the conversation and in the Library, with an **Agent** caret where its words arrive; the page is read-only
+  meanwhile, your unsaved changes and the words you are typing are never overwritten, and a save that fails or is
+  stopped leaves the page as it was. Agents change just part of a page too (a section, some slides, some cells) and
+  build long ones in steps you watch; an agent's saves in one turn are one version ("· 4 saves").
+- **Office files that look the same in Office**: Word files carry their fonts and break their pages where the editor
+  does (lines, spacing, lists, tables, headers and footers as here); Excel files keep the editor's column widths, row
+  heights, font size, list colours and print layout; PowerPoint files carry their fonts (compressed, as PowerPoint
+  keeps them), wrap and fit words as here, and have PowerPoint's own layouts (New Slide, Reset Slide), footer boxes
+  and guides, and charts with their data for **Edit Data**. Every file passes the Office standard's checks.
+- **PowerPoint files open as slides** (New → Slides → **Open a PowerPoint file**, Save to Library, or dropped on
+  the Library), up to 200 MB with their videos: layouts, text, pictures, tables, charts, groups, connectors, notes and
+  comments come in.
+- **PDFs**: **Fill & sign** in Files types into a form's fields over its pages, puts text, ticks, crosses, dates and
+  signatures anywhere with a click, and saves a copy or the file itself. Agents fill in forms too (so every viewer
+  shows the values, Greek and Chinese as well; a form already signed digitally stays valid), write beside the words
+  printed on a page, and rotate, reorder, merge and split pages.
+- **Signatures**: draw yours with a mouse, a finger or a pen, type it in a handwriting, or upload a photo of it;
+  it is kept encrypted (Settings → Signatures). **Insert → Signature** puts it in a document; an agent asks you for
+  one on a card, and places it into Word files, PDFs, pictures and Library documents only after your OK on a card that
+  shows where. It is a picture of your signature, not a cryptographic digital signature.
+- **Drop files on the Library** (or on a project in it, or a project's card), whole folders too: each becomes what it
+  is (a document, a spreadsheet, slides, a LaTeX document, a notebook, a picture, a video or a sound; anything else a
+  file in the project's folder), with a tray of their progress; **Upload files** in New does the same on a phone. In
+  the desktop apps a drop moves the file instead of copying it.
+- **The agent's pointer, plain to see**: in the browser's live view it glides to where the agent acts, with a ring on
+  each click and the field it types into outlined; over your screen in computer use, a ring with an Agent tag circles
+  the pointer, which now glides instead of jumping, with the words and keys it types beside it (never in the agent's
+  own screenshots). Each step's picture marks where it clicked.
+- **In every editor**, leaving a page for another place in the app saves what you changed (a note says so), and closing
+  or reloading the tab with changes not saved asks first. Ctrl+B in a document or on a slide makes words bold without
+  hiding the sidebar, and Ctrl+K in a document puts in a link without opening the search box.
+- Fixes: PDFs, pictures and Word files of pages no longer fail now and then with "The browser has closed", and PDFs
+  made on a Linux server set their words as Mac and Windows do; a click you make while driving the agent's browser
+  lands where you click; words on screen in Chinese and Greek are no longer split ("Forms" is not "For" + "ms") or
+  half English (the browser's busy line, a turn's steps in short); the LaTeX editor's menus are reachable again in
+  narrow windows and on phones, and Replace all keeps its comments in place; a page's words typed in Edit show Save at
+  once (they could be lost), and on a phone a tap no longer lands on a block menu's Delete; a link in a page opens in
+  a tab of its own; a document's web page opened again keeps its lists and layout; PowerPoint files keep words inside
+  the boxes the editor shrinks them to, and PDFs keep a deck's equations and video stills; Esc in the slides editor
+  closes a menu and keeps what is picked; and a right-click on a row's number in a spreadsheet is about that row.
+
 ## 0.29.3 · 5 November 2026
 
 Hydor's code is now under the Apache License 2.0, which keeps its credit with whatever is built on it.
