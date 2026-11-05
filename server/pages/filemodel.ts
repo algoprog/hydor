@@ -1,6 +1,7 @@
 // Files of this computer opened in Pages' editors: Files opens a Word document (.docx) in the document editor, a
 // spreadsheet (.xlsx, .csv, .tsv) in the spreadsheet editor and a LaTeX file (.tex) in the LaTeX editor, with the files
-// it reads from its folder; Save writes what the editor holds back to the same file, in its own format.
+// it reads from its folder and the comments the app keeps on them (filecomments.ts); Save writes what the editor holds
+// back to the same file, in its own format, and keeps the comments.
 //
 // Writing back keeps what it can of the file as it was. A CSV's rows and cells nobody changed keep their text exactly
 // (its separator, quotes, line ends, encoding and byte-order mark too); a LaTeX project writes only the files that
@@ -10,21 +11,23 @@
 // be read only.
 //
 //   GET /api/pages/file?path=   PUT /api/pages/file { path, model, mtime, force?, backup?, copy?, tex? }
+//   GET /api/pages/file/comments?path= (a LaTeX project's comments, read again when an agent changed them)
 import { isUtf8 } from 'node:buffer';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { editorKindOf, type FileOpened, type FileSaved } from '../../shared/documents.ts';
 import { docSources } from '../../shared/docs.ts';
-import { cleanEngine, cleanTexName, extOf, normalizeTex, TEX_FILE_EXT, TEX_LIMITS, TEX_MAIN, uncommented, type TexDoc } from '../../shared/latex.ts';
+import { cleanEngine, cleanTexName, extOf, normalizeTex, TEX_FILE_EXT, TEX_LIMITS, TEX_MAIN, uncommented, type TexComment, type TexDoc } from '../../shared/latex.ts';
 import { cellsFromRows, computeBook, detectSep, formatValue, normalizeBook, parseRef, refName, type Cell, type Workbook } from '../../shared/sheets.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { deletePath, resolvePath, trashCopy, writeFile } from '../files.ts';
 import { getAsset } from './assets.ts';
 import { docFromFile, docxOfDoc, keepDoc, readDoc, wordLosses } from './docs.ts';
+import { projectComments, saveProjectComments } from './filecomments.ts';
 import { pictureFor } from './export.ts';
-import { texFolderOk, textOf } from './latex.ts';
+import { texCommentOps, texCommentsForAgent, texFolderOk, textOf } from './latex.ts';
 import type { Picture } from './pptx.ts';
 import { decodeText, importBook, keepBook, readBook, xlsxOfBook } from './sheets.ts';
 
@@ -54,7 +57,12 @@ export async function openFile(db: DB, fileIn: string): Promise<FileOpened> {
       const got = importBook(buf, path.basename(file));
       return { ...base, model: readBook(keepBook(got.book).text), loses: got.loses ?? [], cut: got.cut, notes: got.notes };
     }
-    return { ...base, ...texProject(file, buf) };
+    const proj = texProject(file, buf);
+    // Its comments, kept by the app beside the files (a file keeps only its text).
+    const doc = proj.model as TexDoc;
+    const comments = projectComments(db, doc, proj.tex!.folder, proj.tex!.main);
+    if (comments.length) doc.comments = comments;
+    return { ...base, ...proj };
   } catch (e) {
     if (e instanceof HttpError) throw e;
     throw new HttpError(422, `The editor cannot read it: ${(e as Error).message}`);
@@ -490,7 +498,51 @@ async function saveTex(db: DB, file: string, b: Obj): Promise<FileSaved> {
     const st = fs.statSync(at(rel), { throwIfNoEntry: false });
     if (st) files[rel] = mtimeOf(st);
   }
+  // The comments, by each file's path: the editor's, with what an agent did since it had them (`tex.comments`).
+  const comments = saveProjectComments(db, doc, folder, mainRel, t.comments, Object.keys(was));
   const shown = fs.existsSync(file) ? file : at(mainRel);
   const st = fs.statSync(shown);
-  return { path: shown, mtime: mtimeOf(st), size: st.size, files, dropped: [] };
+  return { path: shown, mtime: mtimeOf(st), size: st.size, files, dropped: [], comments };
+}
+
+/**
+ * What get_page tells an agent of a LaTeX file of this computer: its project (the document and the files it reads),
+ * and the comments the user wrote on their words, which the app keeps beside them, with how to answer them. The
+ * files themselves the agent reads and changes with its own tools.
+ */
+export async function texFileForAgent(db: DB, fileIn: string): Promise<string> {
+  const f = await openFile(db, fileIn);
+  if (f.kind !== 'tex' || !f.tex) throw new HttpError(415, 'Only a LaTeX file (.tex) has comments kept by the app.');
+  const d = f.model as TexDoc;
+  const t = f.tex;
+  const real = (n: string) => (n === TEX_MAIN ? t.main : n);
+  const head = `${f.path}: a LaTeX file of this computer${path.join(t.folder, t.main) !== f.path ? `, read by ${path.join(t.folder, t.main)}` : ''}. Its project's files, in ${t.folder}: ${[t.main, ...d.files.map((x) => x.name)].join(', ')}. Read and change them with your own tools; the comments the user wrote on their words are kept by the app, and listed here.`;
+  return d.comments?.length ? `${head}\n\n${texCommentsForAgent(d, 'save_latex’s path and comments', real)}` : `${head}\n\nIt has no comments.`;
+}
+
+/**
+ * An agent's answers to a LaTeX file's comments (save_latex with its path): replies, resolutions and new comments on
+ * the words of the project's files, kept by the app; the files themselves are not written. Returns what to tell the
+ * agent, and the files whose comments an open editor takes in again.
+ */
+export async function agentFileComments(db: DB, fileIn: string, ops: unknown): Promise<{ text: string; paths: string[] }> {
+  const f = await openFile(db, fileIn);
+  if (f.kind !== 'tex' || !f.tex) throw new HttpError(415, 'Only a LaTeX file (.tex) has comments kept by the app: edit other files with your own tools.');
+  const d = f.model as TexDoc;
+  const t = f.tex;
+  // The document's own file goes by its name here; the model calls it main.tex.
+  const named = Array.isArray(ops) ? ops.map((o) => (o && typeof o === 'object' && (o as { file?: unknown }).file === t.main ? { ...o, file: TEX_MAIN } : o)) : ops;
+  const notes: string[] = [];
+  const comments = texCommentOps(d.comments ?? [], named, (n) => (n === TEX_MAIN ? d.main : (d.files.find((x) => x.name === n)?.text ?? null)), notes);
+  const kept = saveProjectComments(db, { ...d, comments }, t.folder, t.main, d.comments ?? []);
+  const open = kept.filter((c) => !c.resolved).length;
+  const paths = [t.main, ...d.files.map((x) => x.name)].map((n) => path.resolve(t.folder, n));
+  return { text: [`Kept the comments of ${path.join(t.folder, t.main)} and the files it reads: ${open} open, ${kept.length - open} resolved. The user sees them in the editor.`, ...notes].join(' '), paths };
+}
+
+/** The comments of the LaTeX project a file belongs to, as the editor's model has them (GET /api/pages/file/comments). */
+export async function openFileComments(db: DB, fileIn: string): Promise<{ comments: TexComment[] }> {
+  if (editorKindOf(resolvePath(fileIn)) !== 'tex') throw new HttpError(415, 'Comments are kept for LaTeX files (.tex)');
+  const f = await openFile(db, fileIn);
+  return { comments: (f.model as TexDoc).comments ?? [] };
 }

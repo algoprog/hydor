@@ -283,33 +283,7 @@ export async function agentTex(db: DB, input: unknown, cwd: string, prev?: TexDo
   }
 
   // Comments: the version's own, answered, resolved or added to.
-  const comments: TexComment[] = (prev?.comments ?? []).map((c) => ({ ...c, replies: c.replies ? [...c.replies] : undefined }));
-  if (Array.isArray(v.comments))
-    for (const op of v.comments) {
-      if (!isObj(op)) continue;
-      const now = Date.now();
-      if (typeof op.id === 'string' && op.id) {
-        const c = comments.find((x) => x.id === op.id);
-        if (!c) {
-          notes.push(`There is no comment ${op.id}: get_page lists them.`);
-          continue;
-        }
-        if (typeof op.reply === 'string' && op.reply.trim()) c.replies = [...(c.replies ?? []), { id: newCommentId(), by: 'agent', text: op.reply.trim(), at: now }];
-        if (typeof op.resolve === 'boolean') c.resolved = op.resolve || undefined;
-        continue;
-      }
-      if (typeof op.text !== 'string' || !op.text.trim()) continue;
-      // A new comment, on the words it quotes in its file.
-      const file = typeof op.file === 'string' && op.file.trim() ? op.file.trim() : TEX_MAIN;
-      const text = file === TEX_MAIN ? main : (files.get(file) ?? null);
-      const quote = typeof op.quote === 'string' ? op.quote.trim() : '';
-      const at = text !== null && quote ? text.indexOf(quote) : -1;
-      if (text === null || at < 0) {
-        notes.push(`The comment “${op.text.trim().slice(0, 60)}” was left out: ${text === null ? `the document has no file ${file}` : `${file} has no “${quote.slice(0, 60)}” to put it on`}.`);
-        continue;
-      }
-      comments.push({ id: newCommentId(), by: 'agent', text: op.text.trim(), at: now, quote, file, from: at, to: at + quote.length });
-    }
+  const comments = texCommentOps(prev?.comments ?? [], v.comments, (file) => (file === TEX_MAIN ? main : (files.get(file) ?? null)), notes);
 
   let doc: TexDoc;
   try {
@@ -327,6 +301,42 @@ export async function agentTex(db: DB, input: unknown, cwd: string, prev?: TexDo
   const text = texText(doc);
   if (Buffer.byteLength(text) > MAX_TEX) throw new Error(`The document is over ${Math.round(MAX_TEX / 1024 / 1024)} MB without its pictures; make it smaller.`);
   return { doc, text, notes };
+}
+
+/**
+ * Comments answered, resolved or added by an agent (save_latex's `comments`): [{id, reply?, resolve?}] for one there
+ * is, [{file?, quote, text}] for a new one on the words it quotes in its file (`textOf`: a file's text by its name, or
+ * null). What could not be done is said in `notes`. Returns the comments as they are then.
+ */
+export function texCommentOps(had: TexComment[], ops: unknown, textOf: (file: string) => string | null, notes: string[]): TexComment[] {
+  const comments: TexComment[] = had.map((c) => ({ ...c, replies: c.replies ? [...c.replies] : undefined }));
+  if (!Array.isArray(ops)) return comments;
+  for (const op of ops) {
+    if (!isObj(op)) continue;
+    const now = Date.now();
+    if (typeof op.id === 'string' && op.id) {
+      const c = comments.find((x) => x.id === op.id);
+      if (!c) {
+        notes.push(`There is no comment ${op.id}: get_page lists them.`);
+        continue;
+      }
+      if (typeof op.reply === 'string' && op.reply.trim()) c.replies = [...(c.replies ?? []), { id: newCommentId(), by: 'agent', text: op.reply.trim(), at: now }];
+      if (typeof op.resolve === 'boolean') c.resolved = op.resolve || undefined;
+      continue;
+    }
+    if (typeof op.text !== 'string' || !op.text.trim()) continue;
+    // A new comment, on the words it quotes in its file.
+    const file = typeof op.file === 'string' && op.file.trim() ? op.file.trim() : TEX_MAIN;
+    const text = textOf(file);
+    const quote = typeof op.quote === 'string' ? op.quote.trim() : '';
+    const at = text !== null && quote ? text.indexOf(quote) : -1;
+    if (text === null || at < 0) {
+      notes.push(`The comment “${op.text.trim().slice(0, 60)}” was left out: ${text === null ? `the document has no file ${file}` : `${file} has no “${quote.slice(0, 60)}” to put it on`}.`);
+      continue;
+    }
+    comments.push({ id: newCommentId(), by: 'agent', text: op.text.trim(), at: now, quote, file, from: at, to: at + quote.length });
+  }
+  return comments;
 }
 
 // ---- TeX on this computer ------------------------------------------------------------------------------------------
@@ -1760,6 +1770,25 @@ export function compileSummary(r: Omit<TexResult, 'pdf'> & { pdf?: Buffer | bool
 /** The keys of a .bib's entries, to cite. */
 const bibKeys = (text: string) => [...text.matchAll(/@\s*([A-Za-z]+)\s*[{(]\s*([^,\s]+)\s*,/g)].filter((m) => !/^(comment|string|preamble)$/i.test(m[1])).map((m) => m[2]);
 
+/**
+ * A document's comments for an agent: how many are open, each with its id, where it is (file and line), the words it
+ * is on, who wrote it and its replies, and how to answer (`how`: the tool and argument that do it).
+ */
+export function texCommentsForAgent(d: TexDoc, how: string, name: (file: string) => string = (f) => f): string {
+  const cs = d.comments ?? [];
+  const open = cs.filter((c) => !c.resolved);
+  const lineOf = (c: TexComment) => (texFileTextOf(d, c.file) ?? '').slice(0, c.from).split('\n').length;
+  const who = (by: string) => (by === 'agent' ? 'an agent' : 'the user');
+  const out = [
+    `Comments: ${open.length} open${cs.length > open.length ? `, ${cs.length - open.length} resolved` : ''}. Answer one with ${how}: [{"id", "reply": "…"}], resolve it with {"id", "resolve": true} once done, or add one with {"file", "quote": the words it is on, "text"}.`,
+  ];
+  for (const c of [...open, ...cs.filter((x) => x.resolved)].slice(0, 60))
+    out.push(
+      `- ${c.id}${c.resolved ? ' (resolved)' : ''} on ${name(c.file)}:${lineOf(c)}${c.quote ? ` “${c.quote.slice(0, 120)}”` : ''}, by ${who(c.by)}: ${c.text.slice(0, 600)}${(c.replies ?? []).map((r) => `\n  - ${who(r.by)}: ${r.text.slice(0, 400)}`).join('')}`,
+    );
+  return out.join('\n');
+}
+
 /** What get_page tells an agent of a LaTeX document: its outline, its files, and how it last typeset. */
 export function texForAgent(text: string): string {
   const d = readTex(text);
@@ -1771,19 +1800,7 @@ export function texForAgent(text: string): string {
   const outline = texOutline(d);
   const top = Math.min(...outline.map((h) => h.level));
   if (outline.length) out.push(`\nOutline:\n${outline.slice(0, 200).map((h) => `${'  '.repeat(h.level - top)}- ${h.title} (${h.file}:${h.line})`).join('\n')}`);
-  const cs = d.comments ?? [];
-  if (cs.length) {
-    const open = cs.filter((c) => !c.resolved);
-    const lineOf = (c: TexComment) => (texFileTextOf(d, c.file) ?? '').slice(0, c.from).split('\n').length;
-    const who = (by: string) => (by === 'agent' ? 'an agent' : 'the user');
-    out.push(
-      `\nComments: ${open.length} open${cs.length > open.length ? `, ${cs.length - open.length} resolved` : ''}. Answer one with save_latex's comments: [{"id", "reply": "…"}], resolve it with {"id", "resolve": true} once done, or add one with {"file", "quote": the words it is on, "text"}.`,
-    );
-    for (const c of [...open, ...cs.filter((x) => x.resolved)].slice(0, 60))
-      out.push(
-        `- ${c.id}${c.resolved ? ' (resolved)' : ''} on ${c.file}:${lineOf(c)}${c.quote ? ` “${c.quote.slice(0, 120)}”` : ''}, by ${who(c.by)}: ${c.text.slice(0, 600)}${(c.replies ?? []).map((r) => `\n  - ${who(r.by)}: ${r.text.slice(0, 400)}`).join('')}`,
-      );
-  }
+  if (d.comments?.length) out.push(`\n${texCommentsForAgent(d, 'save_latex’s comments')}`);
   const c = texCount(d);
   const n1 = (x: number, one: string, many = `${one}s`) => `${x.toLocaleString('en')} ${x === 1 ? one : many}`;
   out.push(
@@ -1817,7 +1834,7 @@ export function texForAgent(text: string): string {
 const LATEX_HELP = [
   'Make or change a LaTeX document, kept in the user’s Library: a paper, a thesis, a CV, a letter, a report, math-heavy notes, a beamer talk, anything the user wants typeset with LaTeX. It shows in the conversation and in the Library as its typeset pages; there the user edits the source beside its PDF (typeset again as they type) and downloads the PDF, main.tex or the whole project as a .zip. Use it rather than writing .tex files when the user asks for LaTeX, unless they want the files in a folder of theirs.',
   'source: the whole of main.tex, from \\documentclass to \\end{document}. files: the other files it reads, by the names it gives them ({"refs.bib": "…", "chapters/intro.tex": "…"}, or [{name, text}], or {name, path} for a file of this session); names are letters, digits, - _ . and / between folders. Or folder: a LaTeX project folder of this session, taken in whole.',
-  'comments: the user’s comments on words of the document (get_page lists them, with their ids): answer with [{"id": "…", "reply": "…"}], resolve with {"id", "resolve": true} once you did what it asks, or add your own with {"file": "main.tex", "quote": the exact words it is on, "text": "…"}; what you leave out stays as it is.',
+  'comments: the user’s comments on words of the document (get_page lists them, with their ids): answer with [{"id": "…", "reply": "…"}], resolve with {"id", "resolve": true} once you did what it asks, or add your own with {"file": "main.tex", "quote": the exact words it is on, "text": "…"}; what you leave out stays as it is. A LaTeX file of this computer (opened from Files) has comments too, which the app keeps beside it: get_page with its path lists them, and save_latex with path (instead of id and title) and comments answers them; change the file itself with your own tools.',
   'Or, for a new document, template: article, report, book (a book or thesis: chapters, theorems, a bibliography), letter, beamer (slides), cv (moderncv), homework (problems and solutions), paper (two columns, as for a conference), ieee (IEEEtran, as IEEE conferences ask), acm (acmart, sigconf), lncs (Springer’s llncs) or poster (tikzposter): a whole project that typesets, with the title in it, to change with source and files in the same call or in later saves (get_page shows it). ieee, acm and lncs need TeX Live’s publishers’ classes (texlive-publishers): if this computer lacks one, the save says what to install.',
   'pictures: what \\includegraphics shows, each by the name it uses: [{"name": "figures/plot.png", "src": "plots/plot.png"}] with src a PNG or JPEG file of this session, a public https address, or a picture of the document already (naget-asset:…); a path alone is its own name. A PDF picture becomes a PNG of it.',
   'engine: pdflatex (the default), xelatex (Unicode text and this computer’s fonts with fontspec: Greek, Chinese and other scripts), or lualatex. Packages: those of a standard TeX Live (amsmath, graphicx, hyperref, geometry, tikz, pgfplots, booktabs, beamer, natbib…); for a bibliography, a .bib file with \\bibliography and BibTeX (biblatex and biber may be missing). Nothing that runs programs (minted, svg, shell escape): it is turned off.',
@@ -1849,13 +1866,13 @@ export const SAVE_LATEX_SCHEMA = {
       items: { type: 'object' },
       description: 'Answer, resolve or add comments: [{"id", "reply"?, "resolve"?: true}] for one get_page lists, or [{"file"?, "quote": the words it is on, "text"}] for a new one.',
     },
+    path: { type: 'string', description: 'Instead of id and title: a .tex file of this computer, whose comments (kept by the app) change; the file itself is not written.' },
     template: {
       type: 'string',
       enum: TEX_TEMPLATES.map((t) => t.id),
       description: 'A new document only: start from a template (a whole project with the title in it) instead of source; source or files sent with it replace its parts.',
     },
   },
-  required: ['title'],
 };
 
 // ---- the editor's routes --------------------------------------------------------------------------------------------

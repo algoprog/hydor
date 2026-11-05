@@ -57,12 +57,15 @@ import {
   WholeWord,
 } from 'lucide-react';
 import {
+  cleanTexComments,
   cleanTexName,
   engineLabel,
   headingAt,
+  mergeTexComments,
   TEX_ENGINES,
   TEX_MAIN,
   texOutline,
+  type TexComment,
   type TexCompiled,
   type TexDoc,
   type TexEngine,
@@ -709,7 +712,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   /** A comment on the words picked (or the line the cursor is on), written in the panel. */
   const addComment = () => {
     setMenu(null);
-    if (readOnly || onDisk || file === PICTURES) return;
+    if (readOnly || file === PICTURES) return;
     const c = codes.current.get(file);
     if (!c) return;
     let { from, to } = c.picked();
@@ -724,6 +727,28 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   };
   const addCommentRef = useRef(addComment);
   addCommentRef.current = addComment;
+  // A file's comments as the app kept them when it came (what comments coming in later are merged against).
+  const keptComments = useRef<TexComment[]>(doc?.model.comments ?? []);
+  useEffect(() => {
+    keptComments.current = doc?.model.comments ?? [];
+  }, [doc?.key]);
+  const savedRef = useRef(saved);
+  savedRef.current = saved;
+  // A file's comments changed elsewhere (an agent answered one): in with the user's own, placed on their words as the
+  // text is here; nothing to save when nothing was changed here.
+  useEffect(() => {
+    const inc = onDisk?.comments;
+    const d = live.current;
+    if (!inc || !d) return;
+    const theirs = cleanTexComments(inc.list, d);
+    const merged = mergeTexComments(keptComments.current, d.comments ?? [], theirs);
+    keptComments.current = theirs;
+    if (JSON.stringify(merged) === JSON.stringify(d.comments ?? [])) return;
+    const next: TexDoc = { ...d, comments: merged.length ? merged : undefined };
+    if (d === savedRef.current) setSaved(next);
+    setM(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onDisk?.comments?.n]);
   const setComments = (f: (cs: NonNullable<TexDoc['comments']>) => NonNullable<TexDoc['comments']>) => change((d) => ({ ...d, comments: f(d.comments ?? []) }));
   const draftDone = (text: string) => {
     const dr = draft;
@@ -991,7 +1016,12 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         c.destroy();
         codes.current.delete(n);
       }
-    change((d) => renameRefs({ ...d, files: d.files.map((f) => (f.name === from ? { ...f, name: to } : f)) }, from, to));
+    // Its comments go with it, each placed again on its words (the references renamed may have moved them).
+    change((d) => {
+      const n = renameRefs({ ...d, files: d.files.map((f) => (f.name === from ? { ...f, name: to } : f)) }, from, to);
+      if (!n.comments?.length) return n;
+      return { ...n, comments: cleanTexComments(n.comments.map((c) => (c.file === from ? { ...c, file: to } : c)), n) };
+    });
     setOpened((o) => o.map((n) => (n === from ? to : n)));
     if (file === from) setFile(to);
     if (lastTex.current === from) lastTex.current = to;
@@ -1120,8 +1150,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
     });
   const fmt = (cmd: string) => () => onCode((c) => c.toggle(cmd, 'words'));
   const canCompare = !onDisk && !!pageId;
-  // A file of this computer keeps its files only: comments are for documents in the Library.
-  const canComment = !onDisk;
+  // Documents in the Library keep their comments; a file of this computer has its comments kept by the app.
+  const canComment = true;
 
   const menus: MenuDef[] = [
     {

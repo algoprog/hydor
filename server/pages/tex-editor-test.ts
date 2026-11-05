@@ -3,8 +3,9 @@
 // the table editor's grid read from a tabular and written back, BibTeX entries (read, keyed, made safe, added to a
 // .bib), the reference finder's reading of what was asked (and, with TEX_REFS_LIVE=1, real lookups on the web), the
 // quick checks before typesetting, comments on a document's words (kept, found again when the text moves, answered
-// by agents), and what get_page tells an agent. Through the routes, with a stand-in for the session manager. Build and run with a
-// scratch folder:
+// by agents) and on a file's of this computer (kept by the app by its path, merged with an agent's answers, moved
+// along with the file), and what get_page tells an agent. Through the routes, with a stand-in for the session
+// manager. Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/tex-editor-test.ts
 //   DATA_DIR=/tmp/hydor-test-tex-editor node dist/dev/tex-editor-test.js
 import fs from 'node:fs';
@@ -19,7 +20,8 @@ import { texCheck } from '../../shared/latex-check.ts';
 import { texCount, texCountText, totalWords } from '../../shared/latex-count.ts';
 import { blankTable, cellTex, cellText, tableAt, tableTex } from '../../shared/latex-table.ts';
 import { TEMPLATE_NEEDS, TEX_TEMPLATES, texFromTemplate, texTemplate } from '../../shared/latex-templates.ts';
-import { newTex, normalizeTex, parseTexText, texText } from '../../shared/latex.ts';
+import { mergeTexComments, newTex, normalizeTex, parseTexText, texText } from '../../shared/latex.ts';
+import { fileComments, moveFileComments } from './filecomments.ts';
 import { refQuery } from './latex-refs.ts';
 import { pages } from './index.ts';
 
@@ -441,6 +443,59 @@ code words not counted
   const v4 = (await req('GET', `/api/pages/${id}`)).json().model;
   const c4 = v4.comments.find((c: { id: string }) => c.id === 'cu1');
   ok(v4.main.slice(c4.from, c4.to) === 'Heat flows', 'a source rewritten by an agent keeps each comment on its words');
+}
+
+// ---- comments on LaTeX files of this computer (Files), kept by the app by each file's path -----------------------------
+{
+  const dir = path.join(tmp, 'files', 'heat');
+  fs.mkdirSync(dir, { recursive: true });
+  const mainText = doc('\\section{Heat}\nHeat flows from hot to cold.\n\\input{results}');
+  const resultsText = '\\section{Results}\nThe rod warms up.\n';
+  fs.writeFileSync(path.join(dir, 'paper.tex'), mainText);
+  fs.writeFileSync(path.join(dir, 'results.tex'), resultsText);
+  const put = (body: unknown) => app.inject({ method: 'PUT', url: '/api/pages/file', payload: JSON.stringify(body), headers: { 'content-type': 'application/json', host: 'app.test' } });
+  const open = async () => (await req('GET', `/api/pages/file?path=${encodeURIComponent(path.join(dir, 'paper.tex'))}`)).json();
+  const o1 = await open();
+  ok(o1.kind === 'tex' && !o1.model.comments && o1.tex.main === 'paper.tex' && o1.model.files.some((f: { name: string }) => f.name === 'results.tex'), 'a LaTeX file opens with its project, no comments yet');
+  const at = (t: string, w: string) => ({ from: t.indexOf(w), to: t.indexOf(w) + w.length, quote: w });
+  const mine = [
+    { id: 'fc1', by: 'user', text: 'Which rod?', at: 1, file: 'main.tex', ...at(mainText, 'Heat flows') },
+    { id: 'fc2', by: 'user', text: 'How fast?', at: 2, file: 'results.tex', ...at(resultsText, 'warms up') },
+  ];
+  const s1 = await put({ path: path.join(dir, 'paper.tex'), model: { ...o1.model, comments: mine }, mtime: o1.mtime, tex: { ...o1.tex, comments: [] } });
+  ok(s1.statusCode === 200 && s1.json().comments?.length === 2 && fs.readFileSync(path.join(dir, 'paper.tex'), 'utf8') === mainText, 'saving keeps the comments in the app, the file as it was');
+  ok(fileComments(db, path.join(dir, 'paper.tex'))[0]?.id === 'fc1' && fileComments(db, path.join(dir, 'results.tex'))[0]?.id === 'fc2', 'each by its own file’s path');
+  const o2 = await open();
+  ok(o2.model.comments?.length === 2 && o2.model.comments.find((c: { id: string }) => c.id === 'fc2')?.file === 'results.tex', 'the file opens again with its project’s comments');
+
+  // An agent reads and answers them, without writing the file.
+  const told = (await run('get_page', { path: path.join(dir, 'paper.tex') })).text ?? '';
+  ok(/Comments: 2 open/.test(told) && /- fc1 on paper\.tex:4 “Heat flows”, by the user: Which rod\?/.test(told) && /- fc2 on results\.tex:2/.test(told), 'get_page with a path lists a file’s comments, by the files’ own names');
+  const answered = await run('save_latex', { path: path.join(dir, 'paper.tex'), comments: [{ id: 'fc1', reply: 'Copper.' }, { file: 'paper.tex', quote: 'hot to cold', text: 'Say from where.' }] });
+  ok(/1 resolved|3 open/.test(answered.text ?? '') && !answered.error, `save_latex with a path answers a file’s comments (${answered.error ?? answered.text})`);
+  ok(fs.readFileSync(path.join(dir, 'paper.tex'), 'utf8') === mainText, 'and leaves the file as it is');
+  const kept = fileComments(db, path.join(dir, 'paper.tex'));
+  ok(kept.find((c) => c.id === 'fc1')?.replies?.[0]?.text === 'Copper.' && kept.some((c) => c.by === 'agent' && c.quote === 'hot to cold'), 'the answer and the agent’s own comment are kept on the file');
+
+  // The editor saves what it had before the agent answered: both are kept (the user's resolution, the agent's reply).
+  const theirs = o2.model.comments;
+  const resolved = theirs.map((c: { id: string }) => (c.id === 'fc1' ? { ...c, resolved: true } : c));
+  const s2 = await put({ path: path.join(dir, 'paper.tex'), model: { ...o2.model, comments: resolved }, mtime: s1.json().mtime, tex: { ...o2.tex, files: s1.json().files, comments: theirs } });
+  const after = s2.json().comments as { id: string; resolved?: boolean; replies?: { text: string }[]; by: string }[];
+  ok(after.find((c) => c.id === 'fc1')?.resolved && after.find((c) => c.id === 'fc1')?.replies?.[0]?.text === 'Copper.' && after.some((c) => c.by === 'agent'), 'a save keeps what an agent did meanwhile, with the user’s changes');
+  // The user deletes the agent's comment: it stays deleted.
+  const s3 = await put({ path: path.join(dir, 'paper.tex'), model: { ...o2.model, comments: after.filter((c) => c.by !== 'agent') }, mtime: s2.json().mtime, tex: { ...o2.tex, files: s2.json().files, comments: after } });
+  ok(!s3.json().comments.some((c: { by: string }) => c.by === 'agent'), 'a comment deleted in the editor stays deleted');
+  ok(mergeTexComments([], [], [{ id: 'x', by: 'agent', text: 't', at: 1, file: 'main.tex', from: 0, to: 0 }]).length === 1, 'one added elsewhere since comes in');
+
+  // Files renames the folder: the comments go with it.
+  const moved = path.join(tmp, 'files', 'heat-moved');
+  fs.renameSync(dir, moved);
+  moveFileComments(db, dir, moved);
+  ok(fileComments(db, path.join(moved, 'results.tex'))[0]?.id === 'fc2' && !fileComments(db, path.join(dir, 'results.tex')).length, 'a folder renamed takes its files’ comments along');
+  moveFileComments(db, path.join(moved, 'results.tex'), path.join(moved, 'findings.tex'));
+  ok(fileComments(db, path.join(moved, 'findings.tex'))[0]?.id === 'fc2', 'and a file renamed, its own');
+  ok(String(tools.get_page.description).includes('path') && String(tools.save_latex.description).includes('save_latex with path'), 'agents are told how to read and answer a file’s comments');
 }
 
 // ---- what an agent is told ---------------------------------------------------------------------------------------------

@@ -356,6 +356,32 @@ export function cleanTexComments(v: unknown, d: TexDoc): TexComment[] {
   return out;
 }
 
+/**
+ * Comments merged three ways: `mine` (what the editor has, the user's changes in it) with what changed in `theirs`
+ * (kept elsewhere: an agent's answers, resolutions and new comments) since `base` (what both started from). A comment
+ * the user deleted stays deleted and one added elsewhere comes in; a reply added elsewhere joins the user's; a
+ * resolution made elsewhere holds unless the user changed it too. The user's words and places win.
+ */
+export function mergeTexComments(base: TexComment[], mine: TexComment[], theirs: TexComment[]): TexComment[] {
+  const was = new Map(base.map((c) => [c.id, c]));
+  const kept = new Set(mine.map((c) => c.id));
+  const out: TexComment[] = mine.map((c) => {
+    const t = theirs.find((x) => x.id === c.id);
+    if (!t) return c;
+    const b = was.get(c.id);
+    const had = new Set([...(b?.replies ?? []), ...(c.replies ?? [])].map((r) => r.id));
+    const added = (t.replies ?? []).filter((r) => !had.has(r.id));
+    const resolved = b && !!t.resolved !== !!b.resolved && !!c.resolved === !!b.resolved ? t.resolved : c.resolved;
+    const m: TexComment = { ...c, replies: added.length ? [...(c.replies ?? []), ...added] : c.replies };
+    if (resolved) m.resolved = true;
+    else delete m.resolved;
+    if (!m.replies) delete m.replies;
+    return m;
+  });
+  for (const t of theirs) if (!kept.has(t.id) && !was.has(t.id)) out.push(t);
+  return out;
+}
+
 // ---- the kept text ----------------------------------------------------------------------------------------------
 
 const HEAD = '%% naget-latex ';
