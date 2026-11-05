@@ -393,28 +393,64 @@ async function moveIn(d: Deps, file: string, plan: Plan, space: string | null, r
 
 // ---- the routes -----------------------------------------------------------------------------------------------------
 
+/** How far past what a piece may carry (or past a write that failed) its bytes are still read and let go; much more, and it is cut. */
+const LET_GO = 8 * MB;
+
+/** Until the file takes more: it drained, or it failed (the piece is answered with that), or it closed. */
+const drained = (out: fs.WriteStream) =>
+  new Promise<void>((r) => {
+    const go = () => (out.off('drain', go).off('error', go).off('close', go), r());
+    out.on('drain', go).on('error', go).on('close', go);
+  });
+
+/** A piece the disk would not take, as the page is told: 507 when it is full (or the user's share of it is), else 500 with what failed. */
+const writeFailed = (e: NodeJS.ErrnoException) =>
+  e.code === 'ENOSPC' || e.code === 'EDQUOT' ? refused(507, 'There is not enough room on this computer’s disk for the rest of it.', 'room') : new HttpError(500, `The piece could not be written to the disk: ${e.message}`);
+
 /**
  * A piece's bytes added to the upload's file, counted as they come: no more than `limit` in all (the piece's share, the
  * file's size). What comes past it is read and let go a little way, so the refusal reaches the page rather than a broken
- * connection; much more, and the request is cut.
+ * connection; much more, and the request is cut. A write that fails (a full disk, its folder gone) is heard, never left
+ * to stop the server or the piece waiting for the disk, and the piece is answered with it once its bytes are read.
  */
 async function takePiece(body: Readable, file: string, offset: number, limit: number, size: number): Promise<number> {
   const out = fs.createWriteStream(file, { flags: 'a' });
+  let failed: NodeJS.ErrnoException | null = null;
+  out.on('error', (e) => void (failed ??= e));
   let got = offset;
+  let cut: Error | null = null;
   try {
     for await (const chunk of body as AsyncIterable<Buffer>) {
       got += chunk.length;
-      if (got > limit) {
-        if (got > limit + 8 * MB) break;
-        continue;
-      }
-      if (!out.write(chunk)) await new Promise<void>((r) => out.once('drain', () => r()));
+      if (got > limit + LET_GO) break;
+      if (failed || got > limit) continue;
+      if (!out.write(chunk)) await drained(out);
     }
-  } finally {
-    await new Promise<void>((r, j) => out.end((e?: Error | null) => (e ? j(e) : r())));
+  } catch (e) {
+    cut = e as Error;
   }
-  if (got > limit) throw new HttpError(413, got > size ? 'The file is larger than its upload said' : `A piece carries at most ${PIECE / MB} MB`, { received: offset });
+  // Its bytes on the disk before it is answered: one that fails as they are flushed fails the piece.
+  if (failed || cut) out.destroy();
+  else await new Promise<void>((r) => out.end((e?: Error | null) => (e && (failed ??= e as NodeJS.ErrnoException), r())));
+  if (failed) throw writeFailed(failed);
+  if (cut) throw cut;
+  if (got > limit) throw new HttpError(413, got > size ? 'The file is larger than its upload said' : `A piece carries at most ${PIECE / MB} MB`);
   return got;
+}
+
+/**
+ * After a piece failed: the upload's file as it was before it (its whole pieces, safely written), so a retry picks up
+ * from there; when that cannot be had (its folder was removed, the disk would not shorten it), empty again, for a retry
+ * from the first byte. Returns how much it holds.
+ */
+async function rollBack(part: string, offset: number): Promise<number> {
+  try {
+    if ((await fs.promises.stat(part)).size > offset) await fs.promises.truncate(part, offset);
+    if ((await fs.promises.stat(part)).size === offset) return offset;
+  } catch {}
+  await fs.promises.mkdir(path.dirname(part), { recursive: true, mode: 0o700 }).catch(() => {});
+  await fs.promises.writeFile(part, '').catch(() => {});
+  return 0;
 }
 
 /** Uploads left behind: those idle an hour, and (at a start) every part from before. */
@@ -474,10 +510,17 @@ export function uploadRoutes(d: Deps) {
     try {
       got = await takePiece(body, partOf(id), offset, Math.min(u.size, offset + PIECE), u.size);
     } catch (e) {
-      // What came of the broken piece goes, so it can be sent again from where the last whole one ended.
-      await fs.promises.truncate(partOf(id), offset).catch(() => {});
       u.busy = false;
-      throw e instanceof HttpError ? e : new HttpError(499, `The piece was cut off: ${(e as Error).message}`, { received: offset });
+      u.at = Date.now();
+      if (uploads.get(id) !== u) {
+        await fs.promises.rm(partOf(id), { force: true });
+        throw new HttpError(499, 'That upload was cancelled');
+      }
+      // What came of the broken piece goes: the upload stays, holding what is safely written, and says where to go on from.
+      u.got = await rollBack(partOf(id), offset);
+      const err = e instanceof HttpError ? e : new HttpError(499, `The piece was cut off: ${(e as Error).message}`);
+      err.extra = { ...err.extra, received: u.got };
+      throw err;
     }
     u.busy = false;
     // Cancelled while the piece came: nothing of it is made (the cancel took its part away).
