@@ -18,6 +18,8 @@ import { fontsFor } from './fontset.ts';
 import { editPages, extractPages, fillAndMark, fillPdf, findWords, FormError, pagePicture, pageText, PdfError, pdfInfo, splitPdf, stampImage, writeOnPdf } from './index.ts';
 import { isStream } from './objects.ts';
 import { pages } from './pages.ts';
+import { PDF_TOOLS } from './tools.ts';
+import type { RunCtx, ToolOutput } from '../../features/types.ts';
 
 if (!config.dataDir.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing real is touched.');
@@ -408,6 +410,40 @@ const png = (() => {
   assert.throws(() => editPages(form, [{ op: 'rotate', pages: [7], angle: 90 }]), PdfError);
 }
 
+// ---- agents' tools ----------------------------------------------------------------------------------
+
+{
+  const session = path.join(tmp, 'session');
+  fs.mkdirSync(session);
+  fs.writeFileSync(path.join(session, 'form.pdf'), form);
+  fs.writeFileSync(path.join(session, 'sig.png'), png);
+  const ctx = { cwd: session } as unknown as RunCtx;
+  const tool = (n: string) => PDF_TOOLS.find((t) => t.name === n)!;
+  const text = (r: string | ToolOutput) => (typeof r === 'string' ? r : r.text);
+  const listed = text(await tool('pdf_form').run({ path: 'form.pdf' }, ctx));
+  assert.match(listed, /#1 "first_name" text = "" · label "First name:"/);
+  assert.match(listed, /#6 "shift" radio = "afternoon" choices: "morning" \(Morning\)/);
+  const filled = text(await tool('pdf_fill').run({ path: 'form.pdf', values: { 'First name': 'Ana', agree: 'yes' } }, ctx));
+  assert.match(filled, /Filled 2 fields \(first_name, agree\) and saved .*form \(filled\)\.pdf/, 'a copy beside it');
+  assert.equal(pdfInfo(fs.readFileSync(path.join(session, 'form (filled).pdf'))).form.fields[0].value, 'Ana');
+  assert.ok(fs.readFileSync(path.join(session, 'form.pdf')).equals(form), 'the file itself is untouched');
+  const again = text(await tool('pdf_fill').run({ path: 'form.pdf', values: { age: 30 }, replace: true }, ctx));
+  assert.match(again, /replaced; its old version is in the Trash/);
+  assert.equal(pdfInfo(fs.readFileSync(path.join(session, 'form.pdf'))).form.fields[2].value, '30');
+  const wrote = text(await tool('pdf_write').run({ path: 'form (filled).pdf', marks: [{ type: 'image', page: 1, near: { words: 'Signature:' }, w: 90, image: 'sig.png' }] }, ctx));
+  assert.match(wrote, /1\. image on page 1 at x/);
+  assert.ok(fs.existsSync(path.join(session, 'form (filled) (filled).pdf')));
+  const look = (await tool('pdf_look').run({ path: 'form.pdf', pages: '1-2' }, ctx)) as ToolOutput;
+  if (poppler) assert.equal(look.images?.length, 2, 'a picture a page');
+  assert.match(look.text, /Page 2: 595\.3 × 841\.9 points/);
+  assert.match(look.text, /60, 93\.1 55×11 {2}First name:/, 'the words with where they are');
+  const edited = text(await tool('pdf_pages').run({ path: 'form.pdf', ops: [{ op: 'delete', pages: '2' }] }, ctx));
+  assert.match(edited, /form \(edited\)\.pdf: 1 page \(it had 2\)/);
+  await assert.rejects(tool('pdf_pages').run({ path: 'form.pdf' }, ctx), /Give ops/);
+  await assert.rejects(tool('pdf_fill').run({ path: 'nothing.pdf', values: { a: 1 } }, ctx), /No such file/);
+  await assert.rejects(tool('pdf_fill').run({ path: 'sig.png', values: { a: 1 } }, ctx), /not a PDF/);
+}
+
 // ---- pictures of pages ------------------------------------------------------------------------------
 
 if (poppler) {
@@ -423,4 +459,4 @@ function write(name: string, data: Buffer) {
 }
 
 fs.rmSync(tmp, { recursive: true, force: true });
-console.log(`pdf: reading, words, forms, filling, signatures, encryption, writing, page operations and pictures passed${notes.length ? ` (${notes.join('; ')})` : ''}`);
+console.log(`pdf: reading, words, forms, filling, signatures, encryption, writing, page operations, agents' tools and pictures passed${notes.length ? ` (${notes.join('; ')})` : ''}`);

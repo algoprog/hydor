@@ -67,6 +67,21 @@ TrueType font first (`pdfmetrics.registerFont(TTFont("DejaVu", "/usr/share/fonts
 
 ## Changing one
 
+Filling in a form, writing on a page and changing pages: use the hydor tools, which keep a digital
+signature valid when they fill a signed form, write Greek, Chinese or any script, and save a copy beside
+the file (`name (filled).pdf`) unless you pass `replace`:
+
+- `pdf_form` lists a form's fields with the words printed beside each (what "f1_02[0]" is for); ask the
+  user for what you do not know, then `pdf_fill` fills them by name. A PDF with no fields is a form only
+  printed: `pdf_look` shows its pages with the words on them and a ruler, and `pdf_write` writes text
+  beside the words printed ("near": { "words": "Date of birth:" }), ticks, pictures, white boxes,
+  highlights and comments.
+- `pdf_pages` rotates, deletes, moves, merges, extracts or splits pages, and puts in blank ones.
+- Look at the result with `pdf_look` before handing it over.
+
+The scripts below do the rest: stamping big faint words across every page, and a copy without a password
+(when the user gives it).
+
 ```
 scripts/office-python scripts/pdf_tools.py merge all.pdf a.pdf b.pdf
 scripts/office-python scripts/pdf_tools.py pages report.pdf 1-3,7 short.pdf
