@@ -246,7 +246,7 @@ export function Toolbar({
           <button
             type="button"
             title={suggesting ? 'Suggesting: your changes are suggestions (Ctrl+Alt+Shift+X to edit)' : 'Editing (Ctrl+Alt+Shift+X to suggest changes instead)'}
-            aria-label={suggesting ? 'Suggesting' : 'Editing'}
+            aria-label="Suggest changes"
             aria-pressed={!!suggesting}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onSuggesting(!suggesting)}
