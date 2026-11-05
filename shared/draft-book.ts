@@ -4,7 +4,7 @@
 // call has not reached yet stay as they were (those it has passed are what it wrote), and its widths, merges, rules
 // and charts stay until the call says otherwise. The version's other sheets follow. A call that changes some cells
 // (update) shows them made on the version's sheets as they come.
-import { applyBookEdits, sheetNamed, updatesSheets } from './sheet-edits.ts';
+import { applyBookEdits, cellsOver, sheetNamed, updatesSheets } from './sheet-edits.ts';
 import type { JsonPath, PartialJson } from './partial-json.ts';
 import { writingIn, type DraftMemo, type Drafted } from './page-drafts.ts';
 import { normalizeBook, parseRef, refName, type Sheet, type Workbook } from './sheets.ts';
@@ -74,6 +74,8 @@ function writing(raw0: Obj, rest: JsonPath, was: Sheet | undefined, patch: boole
     const s = one(raw);
     return s ? { sheet: s, cell: r?.cell } : null;
   }
+  // A change on top of a sheet: what it writes over a cell keeps the cell's look and note, as it will once saved.
+  if (patch) raw = cellsOver(was, raw);
   // A whole sheet written again: the version's cells it has not reached yet stay; a change on top of a sheet keeps them all.
   let base: Sheet = was;
   if (!patch) {
@@ -111,9 +113,9 @@ export function draftBook(base: Workbook | null, p: PartialJson, memo: DraftMemo
   };
   // Some cells changed: on the version's sheets as they come.
   if (base && updatesSheets(v)) {
-    const { sheets: raws, at } = applyBookEdits(base, v.update as unknown[]);
     const o = p.open;
     const openUpdate = o && o[0] === 'update' && typeof o[1] === 'number' ? (o[1] as number) : -1;
+    const { sheets: raws, at } = applyBookEdits(base, v.update as unknown[], { open: openUpdate });
     const openAt = openUpdate >= 0 ? at.get(openUpdate) : undefined;
     const sheets: Sheet[] = [];
     let mark: Drafted<Workbook>['mark'] = null;
