@@ -649,7 +649,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     readOnly,
     focus: (id) => {
       setActive(id);
-      if (!engine.current?.selectComment(id)) toast(tr('The words this comment was on are gone.'));
+      if (!engine.current?.revealComment(id)) toast(tr('The words this comment was on are gone.'));
     },
     reply: (id, text) => setComments(comments.map((c) => (c.id === id ? { ...c, replies: [...(c.replies ?? []), { id: newCommentId(), by: 'user', text, at: Date.now() }] } : c))),
     resolve: (id, resolved) => {
@@ -742,7 +742,10 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
             const text = p.text.replace(/^Page /, `${tr('Page')} `).replace(' of ', ` ${tr('of')} `);
             e.setBands({ [p.where]: { text, ...(p.align ? { align: p.align } : {}) } });
           },
-          pageSetup: () => setMenu('page'),
+          pageSetup: () => {
+            if (phone) spotAt(host.current?.getBoundingClientRect());
+            setMenu('page');
+          },
           spacing: () => setDialog('spacing'),
           wordCount: openCount,
           shortcuts: () => setDialog('keys'),
@@ -881,7 +884,8 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
         >
           <ListTree size={16} />
         </IconButton>
-        {!readOnly && (
+        {/* On a phone, Page setup is in the Format menu: the title keeps its room. */}
+        {!readOnly && !phone && (
           <IconButton ref={pageRef} label="Page setup" active={menu === 'page'} onClick={() => setMenu(menu === 'page' ? null : 'page')}>
             <FileCog size={16} />
           </IconButton>
@@ -895,7 +899,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           {!readOnly && (
             <>
               <span className="mx-1 h-5 w-px shrink-0 bg-line" />
-              <Toolbar engine={e} st={st} doc={model} linking={linking} setLinking={setLinking} linkRef={linkRef} onComment={startComment} />
+              <Toolbar engine={e} st={st} doc={model} linking={linking} setLinking={setLinking} linkRef={linkRef} onComment={startComment} slim={!phone && width >= 1060 && width < 1240} />
             </>
           )}
         </div>
@@ -1077,7 +1081,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           </Button>
         </div>
       )}
-      <Popover anchor={pageRef} open={menu === 'page'} onClose={() => setMenu(null)} align="end" width={300} title="Page setup">
+      <Popover anchor={phone ? spotRef : pageRef} open={menu === 'page'} onClose={() => setMenu(null)} align="end" width={300} title="Page setup">
         {pageSetup}
       </Popover>
       <Popover anchor={outlineRef} open={menu === 'outline' && !wideOutline} onClose={() => setMenu(null)} align="end" width={280} title="Outline">

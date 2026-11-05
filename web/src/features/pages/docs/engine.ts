@@ -1285,12 +1285,20 @@ export class DocEngine {
     return true;
   }
 
-  /** A comment's words picked and brought into view (false when they are gone). */
-  selectComment(id: string): boolean {
-    const span = ops.commentSpan(this.doc, id);
-    if (!span) return false;
-    this.setPicked(null);
-    this.place({ a: span[0], f: span[1] });
+  /**
+   * A comment's words brought into view (false when they are gone). The editor marks them as the comment picked; the
+   * caret and the focus stay where they are, so a reply can be written in its place.
+   */
+  revealComment(id: string): boolean {
+    if (!ops.commentSpan(this.doc, id)) return false;
+    const el = this.root.querySelector(`[data-cm~="${CSS.escape(id)}"]`);
+    let sc: HTMLElement | null = this.root.parentElement;
+    while (sc && !/(auto|scroll)/.test(getComputedStyle(sc).overflowY)) sc = sc.parentElement;
+    if (el && sc) {
+      const r = el.getBoundingClientRect();
+      const box = sc.getBoundingClientRect();
+      if (r.top < box.top + 40 || r.bottom > box.bottom - 40) sc.scrollTop += r.top - box.top - box.height / 3;
+    }
     return true;
   }
 

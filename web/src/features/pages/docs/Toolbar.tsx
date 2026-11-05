@@ -105,6 +105,7 @@ export function Toolbar({
   setLinking,
   linkRef,
   onComment,
+  slim,
 }: {
   engine: DocEngine;
   st: SelState;
@@ -113,6 +114,8 @@ export function Toolbar({
   setLinking: (l: { url: string; text: string } | null) => void;
   linkRef: RefObject<HTMLButtonElement | null>;
   onComment: () => void;
+  /** Beside the menus where room is short: undo, redo and comment are left to the menus (and their keys). */
+  slim?: boolean;
 }) {
   const [menu, setMenu] = useState<'table' | 'align' | null>(null);
   const tableRef = useRef<HTMLButtonElement>(null);
@@ -126,13 +129,17 @@ export function Toolbar({
   const openLink = () => setLinking({ url: st.link ?? '', text: '' });
   return (
     <div className="flex shrink-0 items-center gap-0.5" data-keeps-editing>
-      <Tool label="Undo (Ctrl+Z)" disabled={!st.canUndo} onClick={() => engine.undo()}>
-        <Undo2 size={15} />
-      </Tool>
-      <Tool label="Redo (Ctrl+Shift+Z)" disabled={!st.canRedo} onClick={() => engine.redo()}>
-        <Redo2 size={15} />
-      </Tool>
-      <Sep />
+      {!slim && (
+        <>
+          <Tool label="Undo (Ctrl+Z)" disabled={!st.canUndo} onClick={() => engine.undo()}>
+            <Undo2 size={15} />
+          </Tool>
+          <Tool label="Redo (Ctrl+Shift+Z)" disabled={!st.canRedo} onClick={() => engine.redo()}>
+            <Redo2 size={15} />
+          </Tool>
+          <Sep />
+        </>
+      )}
       <Select
         value={st.style}
         title="Paragraph style"
@@ -172,9 +179,11 @@ export function Toolbar({
       >
         <Link2 size={15} />
       </button>
-      <Tool label="Comment (Ctrl+Alt+M)" disabled={st.collapsed || !st.text.trim()} onClick={onComment}>
-        <MessageSquarePlus size={15} />
-      </Tool>
+      {!slim && (
+        <Tool label="Comment (Ctrl+Alt+M)" disabled={st.collapsed || !st.text.trim()} onClick={onComment}>
+          <MessageSquarePlus size={15} />
+        </Tool>
+      )}
       <button
         type="button"
         title="Format painter (a double click keeps it on until Esc)"
