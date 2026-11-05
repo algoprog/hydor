@@ -14,6 +14,7 @@ import {
   cleanStyle,
   parseDelimited,
   parseInput,
+  parseRef,
   refName,
   ROW_H,
   SHEET_LIMITS,
@@ -44,7 +45,7 @@ export const rectOf = (s: Sel): Rect => ({ r1: Math.min(s.ar, s.fr), c1: Math.mi
 export const single = (s: Sel) => s.ar === s.fr && s.ac === s.fc;
 export const rectSel = (x: Rect, r = x.r1, c = x.c1): Sel => ({ r, c, ar: x.r1, ac: x.c1, fr: x.r2, fc: x.c2 });
 
-/** A sheet's parts besides its cells: sizes and hidden rows, frozen panes, merges, the filter, rules and charts. */
+/** A sheet's parts besides its cells: sizes and hidden rows, frozen panes, merges, the filter, rules, charts, its board and comments. */
 export interface Meta {
   cols?: Sheet['cols'];
   rows?: Sheet['rows'];
@@ -54,8 +55,10 @@ export interface Meta {
   conditional?: Sheet['conditional'];
   validation?: Sheet['validation'];
   charts?: Sheet['charts'];
+  board?: Sheet['board'];
+  comments?: Sheet['comments'];
 }
-const META_KEYS = ['cols', 'rows', 'freeze', 'merges', 'filter', 'conditional', 'validation', 'charts'] as const;
+const META_KEYS = ['cols', 'rows', 'freeze', 'merges', 'filter', 'conditional', 'validation', 'charts', 'board', 'comments'] as const;
 
 export type Patch = (
   | { k: 'cells'; sheet: string; before: Record<string, Cell | null>; after: Record<string, Cell | null> }
@@ -88,7 +91,18 @@ export function cellsPatch(book: Workbook, si: number, after: Record<string, Cel
   return n ? { k: 'cells', sheet: sh.id, before, after: next } : null;
 }
 
-export const metaOf = (sh: Sheet): Meta => ({ cols: sh.cols, rows: sh.rows, freeze: sh.freeze, merges: sh.merges, filter: sh.filter, conditional: sh.conditional, validation: sh.validation, charts: sh.charts });
+export const metaOf = (sh: Sheet): Meta => ({
+  cols: sh.cols,
+  rows: sh.rows,
+  freeze: sh.freeze,
+  merges: sh.merges,
+  filter: sh.filter,
+  conditional: sh.conditional,
+  validation: sh.validation,
+  charts: sh.charts,
+  board: sh.board,
+  comments: sh.comments,
+});
 
 function setMeta(sh: Sheet, m: Meta) {
   for (const k of META_KEYS) {
@@ -234,8 +248,8 @@ const htmlEsc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)}
 
 /** A selection as the clipboard takes it: tab-separated values as they show, and a small HTML table with their looks. */
 export function copyOf(sh: Sheet, calc: Calc, si: number, x0: Rect): { clip: Clip; text: string; html: string } {
-  const e = calc.extent(si);
-  // Whole columns or rows: only as far as the sheet holds.
+  const e = calc.shownExtent(si);
+  // Whole columns or rows: only as far as the sheet holds (what formulas spilled too).
   const x: Rect = { r1: x0.r1, c1: x0.c1, r2: Math.max(x0.r1, Math.min(x0.r2, e.rows - 1)), c2: Math.max(x0.c1, Math.min(x0.c2, e.cols - 1)) };
   const cells: (Cell | null)[][] = [];
   const vals: Scalar[][] = [];
@@ -396,8 +410,8 @@ export function hasHeader(sh: Sheet, calc: Calc, si: number, x: Rect): boolean {
   return false;
 }
 
-/** The rows of a block sorted by one column's values: whole rows move (their formulas along with them). */
-export function sortChanges(sh: Sheet, calc: Calc, si: number, x: Rect, col: number, asc: boolean): Record<string, Cell | null> {
+/** The rows of a block sorted by one column's values: whole rows move (their formulas along with them); `moved`: where each row went. */
+export function sortChanges(sh: Sheet, calc: Calc, si: number, x: Rect, col: number, asc: boolean, moved?: Map<number, number>): Record<string, Cell | null> {
   const rows: { r: number; key: Scalar; cells: (Cell | undefined)[] }[] = [];
   for (let r = x.r1; r <= x.r2; r++) {
     const cells: (Cell | undefined)[] = [];
@@ -414,6 +428,7 @@ export function sortChanges(sh: Sheet, calc: Calc, si: number, x: Rect, col: num
   const out: Record<string, Cell | null> = {};
   sorted.forEach((row, i) => {
     const r = x.r1 + i;
+    moved?.set(row.r, r);
     row.cells.forEach((cell, j) => {
       const c = x.c1 + j;
       if (!cell) out[refName(r, c)] = null;
@@ -421,6 +436,22 @@ export function sortChanges(sh: Sheet, calc: Calc, si: number, x: Rect, col: num
     });
   });
   return out;
+}
+
+/** A sheet's comments after the rows of a block were sorted (`moved`: where each row went), each with its cell's row; null when none moved. */
+export function commentsMoved(sh: Sheet, x: Rect, moved: Map<number, number>): Patch | null {
+  if (!sh.comments?.length) return null;
+  let any = false;
+  const comments = sh.comments
+    .map((cm) => {
+      const p = parseRef(cm.cell);
+      const to = p && p.c >= x.c1 && p.c <= x.c2 ? moved.get(p.r) : undefined;
+      if (!p || to === undefined || to === p.r) return cm;
+      any = true;
+      return { ...cm, cell: refName(to, p.c) };
+    })
+    .sort((a, b) => (parseRef(a.cell)!.r - parseRef(b.cell)!.r) * MAX_COLS + parseRef(a.cell)!.c - parseRef(b.cell)!.c);
+  return any ? metaPatch(sh, { comments }) : null;
 }
 
 // ---- rows and columns ------------------------------------------------------------------------------------------------
@@ -450,19 +481,37 @@ export function dataEdge(sh: Sheet, r: number, c: number, dr: number, dc: number
   return inside(rr, cc) ? [rr, cc] : [Math.max(0, Math.min(rows - 1, rr - dr)), Math.max(0, Math.min(cols - 1, cc - dc))];
 }
 
-/** Sum, average and counts of a selection, for the bar under the sheet. */
-export function statsOf(sh: Sheet, calc: Calc, si: number, x: Rect): { sum: number; count: number; nums: number } {
+/** Sum, average and counts of a selection (or of several), for the bar under the sheet: what formulas spilled into it counts too. */
+export function statsOf(sh: Sheet, calc: Calc, si: number, rects: Rect | Rect[]): { sum: number; count: number; nums: number } {
   let sum = 0;
   let count = 0;
   let nums = 0;
-  for (const [k, r, c] of cellsIn(sh, calc, si, x)) {
-    if (!holds(sh.cells[k])) continue;
-    const v = calc.value(si, r, c);
-    if (v === null || v === '') continue;
+  const add = (v: Scalar) => {
+    if (v === null || v === '') return;
     count++;
     if (typeof v === 'number') {
       sum += v;
       nums++;
+    }
+  };
+  // A cell in two of the ranges counts once.
+  const seen = new Set<string>();
+  const list = Array.isArray(rects) ? rects : [rects];
+  for (const x of list) {
+    for (const [k, r, c] of cellsIn(sh, calc, si, x)) {
+      if (!holds(sh.cells[k]) || seen.has(k)) continue;
+      seen.add(k);
+      add(calc.value(si, r, c));
+    }
+    // The values an array formula spilled into the cells picked, which hold nothing of their own.
+    for (const { r, c, sp } of calc.spillsOf(si)) {
+      for (let rr = Math.max(r, x.r1); rr <= Math.min(r + sp.h - 1, x.r2); rr++)
+        for (let cc = Math.max(c, x.c1); cc <= Math.min(c + sp.w - 1, x.c2); cc++) {
+          const k = refName(rr, cc);
+          if ((rr === r && cc === c) || holds(sh.cells[k]) || seen.has(k)) continue;
+          seen.add(k);
+          add(sp.d[(rr - r) * sp.w + (cc - c)]);
+        }
     }
   }
   return { sum, count, nums };
@@ -495,10 +544,16 @@ export function indexAt(off: Float64Array, pos: number): number {
   return lo;
 }
 
-/** How many rows and columns the grid shows: what the sheet holds and more to go on with, within its limits. */
-export function gridSize(calc: Calc, si: number): { rows: number; cols: number } {
+/** How many rows and columns the grid shows: what the sheet holds (its charts too) and more to go on with, within its limits. */
+export function gridSize(calc: Calc, si: number, sh?: Sheet): { rows: number; cols: number } {
   const e = calc.shownExtent(si);
-  return { rows: Math.min(SHEET_LIMITS.rows, Math.max(1000, e.rows + 200)), cols: Math.min(SHEET_LIMITS.cols, Math.max(26, e.cols + 10)) };
+  let rows = e.rows;
+  let cols = e.cols;
+  for (const ch of sh?.charts ?? []) {
+    const p = parseRef(ch.to.cell);
+    if (p) [rows, cols] = [Math.max(rows, p.r + 1), Math.max(cols, p.c + 1)];
+  }
+  return { rows: Math.min(SHEET_LIMITS.rows, Math.max(1000, rows + 200)), cols: Math.min(SHEET_LIMITS.cols, Math.max(26, cols + 10)) };
 }
 
 /** A rectangle's name as people say it: "B2:D9", "B2", columns "B:C" or rows "2:5" when it spans them whole. */

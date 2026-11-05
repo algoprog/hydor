@@ -1,5 +1,6 @@
 // Computer use on Windows (server/computer/windows.ts runs it): sees the main display and uses the mouse and keyboard
-// through Win32 (SendInput, SetCursorPos, a copy of the screen), and opens apps the Start menu lists. It stays running
+// through Win32 (SendInput, SetCursorPos, a copy of the screen; the pointer gliding to where it acts, so the eye can
+// follow), and opens apps the Start menu lists. It stays running
 // and reads one request per line on stdin, {"id":1,"ops":[...]}, {"id":2,"shot":{"max":1280,"quality":70}} or
 // {"id":3,"open":"Notepad"}, and answers each on stdout, {"id":1,"ok":true,"out":{...}}; first it says {"ready":true}.
 // The steps are those of plan.ts (Op), in the screen's own pixels (the helper is per-monitor DPI aware); keys come as
@@ -150,6 +151,29 @@ public static class HydorComputer
     {
         Place(x, y);
         Thread.Sleep(50);
+    }
+
+    // The pointer to a place in small steps over "ms", slow at both ends as a hand moves, so the eye can follow it.
+    static void Glide(Dictionary<string, object> o)
+    {
+        double x = Num(o, "x"), y = Num(o, "y");
+        int ms = Math.Max(0, Int(o, "ms"));
+        POINT p;
+        GetCursorPos(out p);
+        double dx = x - p.X, dy = y - p.Y;
+        if (ms <= 0 || Math.Abs(dx) + Math.Abs(dy) < 3)
+        {
+            Place(x, y);
+            return;
+        }
+        int n = Math.Max(4, (int)Math.Round(ms / 16.0));
+        for (int i = 1; i <= n; i++)
+        {
+            double t = (double)i / n;
+            double e = t < 0.5 ? 4 * t * t * t : 1 - Math.Pow(-2 * t + 2, 3) / 2;
+            Place(p.X + dx * e, p.Y + dy * e);
+            Thread.Sleep(Math.Max(1, ms / n));
+        }
     }
 
     static void Click(Dictionary<string, object> o)
@@ -438,6 +462,7 @@ public static class HydorComputer
             string op = Convert.ToString(o["op"], CultureInfo.InvariantCulture);
             switch (op)
             {
+                case "glide": Glide(o); break;
                 case "move": MoveTo(Num(o, "x"), Num(o, "y")); break;
                 case "click": Click(o); break;
                 case "drag": Drag(o); break;

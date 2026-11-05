@@ -2,7 +2,8 @@
 // classes (options, picture cards, compare tables, pros and cons, buttons, fields) and the bridge
 // script. The bridge reports the page's height, sends the user's choices and form answers to the app
 // (and a video's still, which the app plays over the page), and gives saved pages window.hydor.storage;
-// it talks to the app only by postMessage, each message
+// it opens a link to another site in a tab of its own and one to another of the Library's pages in the app,
+// and fills a table of contents an agent left empty. It talks to the app only by postMessage, each message
 // carrying the number the app gave this page. Both go in right after the page's doctype, before its
 // own styles and scripts, so its CSS wins and its scripts find window.hydor (and window.naget, its name before) from their first line.
 //
@@ -13,6 +14,8 @@ import { KIT_CSS } from '../../shared/page-kit.ts';
 import { ENGINE_SRC, UI_KIT_CSS, UI_SRC } from './ui-kit.ts';
 import { KIT_LIB_URLS, MEDIA_SRC } from './media-kit.ts';
 import { LIB_CDN } from '../../shared/app-media.ts';
+import { CODE_COLOURS_SRC, codeColoursScript, hasCode } from '../../shared/code-colours.ts';
+import { PAGE_DB_SRC, pageDbScript } from '../../shared/page-db.ts';
 
 export { KIT_CSS };
 
@@ -98,6 +101,8 @@ export interface BridgeCfg {
   fill?: boolean;
   /** The app plays a video's still (a.n-video) over the page: its player cannot run in the sandbox. */
   play?: boolean;
+  /** The app opens a link to another of its pages (a.n-pagelink, or /pages/<id>) in its own place; without it, in a tab of its own. */
+  open?: boolean;
 }
 
 /**
@@ -275,6 +280,66 @@ function bridge(cfg: BridgeCfg) {
       e.preventDefault();
       post({ type: 'wa-video', src: (a.getAttribute('data-video') ?? '').slice(0, 300), title: (a.getAttribute('title') ?? '').slice(0, 200) });
     });
+  // Links, once the page's own scripts had their say: one to another site opens in a tab of its own (followed in the
+  // frame, it would take the page's place there, or show an error where the site may not be framed); one to another of
+  // the Library's pages (the page editor's a.n-pagelink, or /pages/<id>) opens that page in the app.
+  addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = (e.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+    if (!a || a.hasAttribute('download')) return;
+    const target = (a.getAttribute('target') ?? '').toLowerCase();
+    if (target && !/^_(self|top|parent)$/.test(target)) return;
+    let u: URL;
+    try {
+      u = new URL(a.href, location.href);
+    } catch {
+      return;
+    }
+    const here = new URL(location.href);
+    const page = a.getAttribute('data-page') ?? (u.origin === here.origin ? (/^\/pages\/([\w-]{1,40})\/?$/.exec(u.pathname)?.[1] ?? null) : null);
+    if (page && /^[\w-]{1,40}$/.test(page)) {
+      e.preventDefault();
+      if (cfg.open && P) post({ type: 'wa-open-page', id: page });
+      else window.open(`${here.origin}/pages/${page}`, '_blank', 'noopener');
+      return;
+    }
+    if (!/^https?:$/.test(u.protocol) || u.origin === here.origin) return;
+    e.preventDefault();
+    window.open(u.href, '_blank', 'noopener');
+  });
+  // A table of contents (the page editor's nav.n-toc) an agent left empty: the page's headings, linked.
+  const toc = () => {
+    for (const nav of document.querySelectorAll('nav.n-toc')) {
+      if (nav.children.length) continue;
+      const heads = [...document.querySelectorAll('h1,h2,h3')].filter((h) => !h.closest('.n-toc') && (h.textContent ?? '').trim());
+      if (!heads.length) continue;
+      const top = Math.min(...heads.map((h) => Number(h.tagName[1])));
+      const used = new Set([...document.querySelectorAll('[id]')].map((x) => x.id));
+      for (const h of heads) {
+        if (!h.id) {
+          const base =
+            (h.textContent ?? '')
+              .toLowerCase()
+              .normalize('NFKD')
+              .replace(/[̀-ͯ]/g, '')
+              .replace(/[^\p{L}\p{N}]+/gu, '-')
+              .replace(/^-+|-+$/g, '')
+              .slice(0, 60) || 'section';
+          let id = base;
+          for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+          h.id = id;
+          used.add(id);
+        }
+        const link = document.createElement('a');
+        link.className = `n-toc-${Number(h.tagName[1]) - top + 1}`;
+        link.setAttribute('href', `#${h.id}`);
+        link.textContent = (h.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+        nav.append(link);
+      }
+    }
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', toc);
+  else toc();
   // Choices that are not buttons or links can be reached and picked from the keyboard too.
   const arm = () => {
     for (const x of document.querySelectorAll('[data-choice]')) {
@@ -819,9 +884,12 @@ if (/<\/style/i.test(KIT_CSS)) throw new Error('The page kit must not close its 
 
 const cfgJson = (cfg: BridgeCfg) => JSON.stringify(cfg).replace(/</g, '\\u003c');
 
-/** The kit's <style> and <script>, for a page. */
-export function kitHead(cfg: BridgeCfg): string {
-  return `<style id="n-kit">${KIT_CSS}</style><script>(${BRIDGE_SRC})(${cfgJson(cfg)})</script>`;
+/**
+ * The kit's <style> and <script>, for a page: with the colours of its code blocks and its databases (drawn from what
+ * the bridge's storage holds, `cfg.seed` without an app), when `html`, the page, has any.
+ */
+export function kitHead(cfg: BridgeCfg, html?: string): string {
+  return `<style id="n-kit">${KIT_CSS}</style><script>(${BRIDGE_SRC})(${cfgJson(cfg)})</script>${html === undefined || hasCode(html) ? codeColoursScript() : ''}${html === undefined || /\bn-db\b/.test(html) ? pageDbScript() : ''}`;
 }
 
 /** Only the stand-ins for localStorage and sessionStorage, for the pages of a published folder. */
@@ -842,7 +910,7 @@ export function injectHead(html: string, head: string): string {
  *   are held back, and the page is changed in place (what was there stays), so it grows without
  *   flashing, following its end unless the reader scrolled up.
  */
-function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: string, appSrc: string, uiSrc: string, engineSrc: string, uiCss: string, mediaSrc: string, kitLibs: Record<string, string>, cdn: string) {
+function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: string, appSrc: string, uiSrc: string, engineSrc: string, uiCss: string, mediaSrc: string, kitLibs: Record<string, string>, cdn: string, codeSrc: string, dbSrc: string) {
   const num = (v: unknown, def: number) => (typeof v === 'number' && v > 0 && v < 1e8 ? v : def);
   const nonce = (v: unknown) => (typeof v === 'string' ? v.slice(0, 64) : '');
   const theme = (v: unknown) => (v === 'dark' ? 'dark' : 'light');
@@ -954,7 +1022,7 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: str
       head = `<style id="n-kit" data-n-own>${kit}</style><style id="n-theme" data-n-own>${themeText(d.css)}</style><script data-n-own>(${schemeSrc})(${js(cfg.theme)})</script><script data-n-own>(${editorSrc})(${js(cfg)})</script>`;
       html = (m ? m[0] : '') + doc.documentElement.outerHTML;
     } else {
-      const cfg = { n: nonce(d.n), theme: theme(d.theme), max: { key: num(d.max?.key, 200), value: num(d.max?.value, 524288) }, fill: d.fill === true, play: d.play === true };
+      const cfg = { n: nonce(d.n), theme: theme(d.theme), max: { key: num(d.max?.key, 200), value: num(d.max?.value, 524288) }, fill: d.fill === true, play: d.play === true, open: d.open === true };
       // A template's screen: its app's flows and data (no more than its parent sent, and not too much of it).
       const app = d.app && typeof d.app === 'object' && JSON.stringify(d.app).length < 400_000 ? { n: cfg.n, info: d.app.info, labels: d.app.labels } : null;
       // An app's view: drawn by the view's kit, with the template engine, from the view and its values its parent sent.
@@ -971,7 +1039,12 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: str
         for (const v of Array.isArray(d.ui.libs.css) ? d.ui.libs.css.slice(0, 16) : []) if (typeof v === 'string' && v.startsWith(cdn) && /\.css$/i.test(v) && !/["'<>\s]/.test(v)) sheets.push(v);
       }
       const libHead = `${Object.keys(imports).length ? `<script type="importmap">${js({ imports })}</script>` : ''}${sheets.map((h) => `<link rel="stylesheet" href="${h}">`).join('')}`;
-      head = `${libHead}<style id="n-kit">${kit}</style><style id="n-theme">${themeText(d.css)}</style><script>(${schemeSrc})(${js(cfg.theme)})</script><script>(${bridgeSrc})(${js(cfg)})</script>${app ? `<script>(${appSrc})(${js(app)})</script>` : ''}${ui ? `<script>(${uiSrc})(${js(ui)}, (${engineSrc})(), (${mediaSrc}))</script>` : ''}`;
+      // The colours of its code blocks, for a page that has any (the page editor's, or plain ones agents write).
+      const code = /\bn-code\b|<pre\b[^>]*>\s*<code\b/i.test(d.html) ? `<script>(${codeSrc})().run()</script>` : '';
+      // Its databases (after the bridge, whose storage keeps them), in the app's words.
+      const dbWords = d.db && typeof d.db === 'object' && !Array.isArray(d.db) ? Object.fromEntries(Object.entries(d.db as Record<string, unknown>).filter(([, v]) => typeof v === 'string' && v.length < 300).slice(0, 120)) : null;
+      const dbs = /\bn-db\b/.test(d.html) ? `<script>(${dbSrc})().run(${js(dbWords)})</script>` : '';
+      head = `${libHead}<style id="n-kit">${kit}</style><style id="n-theme">${themeText(d.css)}</style><script>(${schemeSrc})(${js(cfg.theme)})</script><script>(${bridgeSrc})(${js(cfg)})</script>${code}${dbs}${app ? `<script>(${appSrc})(${js(app)})</script>` : ''}${ui ? `<script>(${uiSrc})(${js(ui)}, (${engineSrc})(), (${mediaSrc}))</script>` : ''}`;
     }
     const at = DOCTYPE.exec(html);
     html = at ? at[0] + head + html.slice(at[0].length) : head + html;
@@ -986,4 +1059,4 @@ const asJs = (s: string) => JSON.stringify(s).replace(/</g, '\\u003c');
 
 /** The document of /htmlframe, where every page renders (sandboxed by PAGE_CSP). */
 export const frameHtml = () =>
-  `<!doctype html>\n<html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(frame.toString())})(${asJs(KIT_CSS)}, ${asJs(BRIDGE_SRC)}, ${asJs(EDITOR_SRC)}, ${asJs(SCHEME_SRC)}, ${asJs(APP_SRC)}, ${asJs(UI_SRC)}, ${asJs(ENGINE_SRC)}, ${asJs(UI_KIT_CSS)}, ${asJs(MEDIA_SRC)}, ${JSON.stringify(KIT_LIB_URLS).replace(/</g, '\\u003c')}, ${asJs(LIB_CDN)})</script></body></html>`;
+  `<!doctype html>\n<html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(frame.toString())})(${asJs(KIT_CSS)}, ${asJs(BRIDGE_SRC)}, ${asJs(EDITOR_SRC)}, ${asJs(SCHEME_SRC)}, ${asJs(APP_SRC)}, ${asJs(UI_SRC)}, ${asJs(ENGINE_SRC)}, ${asJs(UI_KIT_CSS)}, ${asJs(MEDIA_SRC)}, ${JSON.stringify(KIT_LIB_URLS).replace(/</g, '\\u003c')}, ${asJs(LIB_CDN)}, ${asJs(CODE_COLOURS_SRC)}, ${asJs(PAGE_DB_SRC)})</script></body></html>`;

@@ -5,21 +5,25 @@
 // as Word (docx.ts writes the file) and Markdown, and is made from Word, Markdown, text and HTML files.
 //
 // save_doc is how agents make and change documents; get_page gives one back as Markdown, which says all a
-// document holds but its blocks' ids (carried over from the version it changes when it comes back).
-import { authorForAgent, newCommentId, peopleNote } from '../../shared/comments.ts';
+// document holds but its blocks' ids (carried over from the version it changes when it comes back). Agents answer the
+// comments and the suggested changes, and may suggest their own changes rather than make them.
+import { authorForAgent, cleanAuthor, newCommentId, peopleNote } from '../../shared/comments.ts';
+import { changesOf, compareDocs, suggestionColor } from '../../shared/doc-changes.ts';
 import {
   ASSET,
   blockHtml,
+  blockText,
+  cleanIcon,
   CALLOUT,
   leadingIcon,
   withComments,
+  withSuggestions,
   type Block,
   type Comment,
   fixMerges,
   fontCss,
   tocEntries,
   type Band,
-  type Spacing,
   type TableBlock,
   carryIds,
   docCss,
@@ -40,6 +44,8 @@ import {
   normalizeBlocks,
   normalizeDoc,
   PAPERS,
+  resolveSuggestion,
+  type Suggestion,
   STYLES,
   type Align,
   type Doc,
@@ -54,11 +60,14 @@ import { rels } from '../documents/ooxml.ts';
 import { all, att, isEl, kid, kids, parseXml, patt, path as xpath, type El } from '../documents/xml.ts';
 import { Zip } from '../documents/zip.ts';
 import { assetDataUrl, getAsset, pictureType, putAsset, takeIn } from './assets.ts';
-import { docxFile, type DocBlock as WordBlock, type DocCell, type DocLook, type DocRun as WordRun, type DocSpace } from './docx.ts';
+import { authorOf, docxFile, MONO_DOC, type DocBlock as WordBlock, type DocCell, type DocLook, type DocRev, type DocRun as WordRun, type DocSpace } from './docx.ts';
 import { katexStyle, texToHtml } from './math.ts';
+import { DOC_EDITS_HELP } from '../../shared/doc-edits.ts';
 import { texOfOmml } from './omml.ts';
 import { imageSize } from './ooxml.ts';
 import type { Picture } from './pptx.ts';
+import { wordLine, type EmbeddedFont, type FontFace } from './word-fonts.ts';
+import { grows, ownLine, wordLineOf, wordPlaces } from './word-layout.ts';
 
 /** The longest a document's text may be (its pictures are kept apart). */
 export const MAX_DOC = 3 * 1024 * 1024;
@@ -116,6 +125,14 @@ export async function agentDoc(db: DB, input: unknown, cwd: string, prev?: strin
   // resolved or added to as `comments` says.
   const given = (k: string) => Object.prototype.hasOwnProperty.call(v, k);
   const comments = commentOps(base?.comments ?? [], v.comments, notes);
+  // The suggestions it had, and new ones the agent marks in what it sends (ids it has not: its own, made now).
+  const now = Date.now();
+  const had = base?.suggestions ?? [];
+  const known = new Set(had.map((x) => x.id));
+  const marked = new Set<string>();
+  const raw = JSON.stringify([v.markdown ?? '', v.blocks ?? []]);
+  for (const m of raw.matchAll(/data-s=\\?"([A-Za-z0-9_-]{1,40})\\?"|\b(?:ins|del)=([A-Za-z0-9_-]{1,40})\b|\\?"(?:ins|del|fmt)\\?":\\?"([A-Za-z0-9_-]{1,40})\\?"/g)) marked.add(m[1] ?? m[2] ?? m[3]);
+  const suggestions: Suggestion[] = [...had, ...[...marked].filter((id) => !known.has(id)).map((id) => ({ id, by: 'agent' as const, at: now }))];
   let doc: Doc;
   try {
     // Any source may be a file of the session's: kept as written until it is taken in below.
@@ -130,6 +147,7 @@ export async function agentDoc(db: DB, input: unknown, cwd: string, prev?: strin
         footer: given('footer') ? v.footer : base?.footer,
         titlePage: given('titlePage') ? v.titlePage : base?.titlePage,
         comments: comments.list,
+        suggestions,
       },
       { src: (s) => (s.length <= 4096 ? s : null) },
     );
@@ -137,10 +155,13 @@ export async function agentDoc(db: DB, input: unknown, cwd: string, prev?: strin
     throw new Error(`${(e as Error).message} See save_doc’s description for the document’s shape.`);
   }
   doc = anchorComments(doc, comments.on, notes);
+  if (base) doc = keepBlockMarks(base, carryIds(base, doc));
+  // Its changes as suggestions of its own (the version it changes compared with what it sends), where it asks.
+  if (base && v.suggest === true) doc = compareDocs(base, doc, { by: 'agent', at: now }, `a${now.toString(36)}`);
+  doc = suggestionOps(doc, v.suggestions, notes, now);
   const done = new Map<string, string>();
   for (const s of new Set(docSources(doc))) done.set(s, await takeIn(db, s, { cwd, notes }));
   doc = notEmpty(mapDocSources(doc, (s) => done.get(s) ?? s));
-  if (base) doc = carryIds(base, doc);
   const text = docText(doc);
   if (Buffer.byteLength(text) > MAX_DOC) throw new Error(`The document is over ${MAX_DOC / 1024 / 1024} MB without its pictures; make it smaller.`);
   return { doc, text, notes };
@@ -187,6 +208,53 @@ function commentOps(list: Comment[], ops: unknown, notes: string[]): { list: Com
     if (text('on')) on.set(nid, text('on'));
   }
   return { list: out, on };
+}
+
+/**
+ * Suggested changes of blocks Markdown has no way to mark (a line across, a page break, a table of contents, an
+ * equation, code) kept from the version an agent changes, where it sent the block back as it was.
+ */
+function keepBlockMarks(base: Doc, doc: Doc): Doc {
+  const before = new Map(base.blocks.map((b) => [b.id, b]));
+  const same = (a: Block, b: Block) => {
+    const { id: _a, ins: _ai, del: _ad, ...x } = a;
+    const { id: _b, ins: _bi, del: _bd, ...y } = b;
+    return JSON.stringify(x) === JSON.stringify(y);
+  };
+  const blocks = doc.blocks.map((b) => {
+    const was = before.get(b.id);
+    if (!was || b.ins || b.del || (!was.ins && !was.del) || !same(was, b)) return b;
+    const noAttrs = b.type === 'hr' || b.type === 'pagebreak' || b.type === 'toc' || b.type === 'math' || (b.type === 'p' && b.style === 'code');
+    return noAttrs ? { ...b, ...(was.ins ? { ins: was.ins } : {}), ...(was.del ? { del: was.del } : {}) } : b;
+  });
+  return withSuggestions({ ...doc, blocks }, [...(doc.suggestions ?? []), ...(base.suggestions ?? []).filter((x) => !doc.suggestions?.some((y) => y.id === x.id))]);
+}
+
+/**
+ * Suggested changes after an agent's answers (save_doc's suggestions): {id, accept: true} makes one's change, {id,
+ * reject: true} undoes it, {id, reply} answers it. What it could not do is said in `notes`.
+ */
+function suggestionOps(doc: Doc, ops: unknown, notes: string[], now: number): Doc {
+  if (ops === undefined || ops === null) return doc;
+  if (!Array.isArray(ops)) {
+    notes.push('suggestions must be a list, such as [{"id": "s1", "accept": true}]: they were left as they were.');
+    return doc;
+  }
+  let d = doc;
+  for (const raw of ops.slice(0, 500)) {
+    const op = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+    const id = typeof op.id === 'string' ? op.id.trim() : '';
+    const sg = d.suggestions?.find((x) => x.id === id);
+    if (!sg) {
+      notes.push(`There is no suggestion ${id || '(no id)'} to answer: get_page lists them.`);
+      continue;
+    }
+    const reply = typeof op.reply === 'string' ? op.reply.trim().slice(0, 4000) : '';
+    if (reply) d = { ...d, suggestions: d.suggestions!.map((x) => (x.id === id ? { ...x, replies: [...(x.replies ?? []), { id: `${id}r${(x.replies?.length ?? 0) + 1}${now.toString(36).slice(-3)}`, by: 'agent' as const, text: reply, at: now }] } : x)) };
+    if (op.accept === true) d = resolveSuggestion(d, id, true);
+    else if (op.reject === true) d = resolveSuggestion(d, id, false);
+  }
+  return d;
 }
 
 /**
@@ -266,6 +334,8 @@ function pageCss(doc: Doc, mode: 'viewer' | 'print' | 'still'): string {
     '.nd-sheet{position:relative}',
     `.nd-band{position:absolute;left:${m}mm;right:${m}mm;height:${m}mm;display:flex;align-items:center;font-family:${fontCss(doc.font)};font-size:${bandPt(doc)}pt;color:#5f6368;white-space:pre;overflow:hidden}`,
     '.nd-band.nd-head{top:0}.nd-band.nd-foot{bottom:0}.nd-band.nd-center{justify-content:center}.nd-band.nd-right{justify-content:flex-end}',
+    // A sheet's first block starts at the top of its words, as the editor's does, its header and footer before it or not.
+    '.nd-sheet>.nd-band+.nd-b,.nd-sheet>.nd-band+.nd-band+.nd-b{margin-top:0}',
   ];
   if (mode === 'print') return [...base, printCss(doc)].join('\n');
   if (mode === 'still') {
@@ -329,6 +399,9 @@ function bandHtml(b: Band | undefined, kind: 'head' | 'foot', page: number, page
   return `<div class="nd-band nd-${kind}${b.align ? ` nd-${b.align}` : ''}">${esc(text)}</div>`;
 }
 
+/** The suggested changes in the colours of who suggested each (ids and colours of a known form only). */
+const suggestionsCss = (doc: Doc) => (doc.suggestions ?? []).map((x) => `\n.nd-doc [data-s="${x.id}"]{--sc:${suggestionColor(x)}}`).join('');
+
 /** Whether a document has maths in it (an equation, or maths among its words). */
 export function docHasMath(d: Doc): boolean {
   const inRuns = (runs: Run[]) => runs.some((r) => r.math);
@@ -370,7 +443,7 @@ export function docPage(db: DB, doc: Doc, title: string, mode: 'viewer' | 'print
     '<meta name="generator" content="Hydor documents">',
     fams ? `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?${esc(fams)}&amp;display=swap">` : '',
     docHasMath(inside) ? `<style>${katexStyle(html)}</style>` : '',
-    `<style>${pageCss(doc, mode)}\n${docCss(doc)}${mode === 'viewer' ? `\n@media print{${printCss(doc)}}` : ''}</style></head><body>`,
+    `<style>${pageCss(doc, mode)}\n${docCss(doc)}${suggestionsCss(doc)}${mode === 'viewer' ? `\n@media print{${printCss(doc)}}` : ''}</style></head><body>`,
     `<main class="nd-doc" translate="no">${html}</main>`,
     '</body></html>',
   ].join('\n');
@@ -394,14 +467,47 @@ export function docForAgent(text: string): string {
     'Outline:',
     docOutline(doc),
     '',
-    'The document as Markdown. To change it, send it back whole with save_doc and this id (markdown; page, font, size, header and footer only to change them). Keep what you do not mean to change as it is: the attributes in braces ({.title}, {.center}, {line=1.5}…), <u>, <span style>, ==highlights==, $maths$, the comments’ <span data-comment> marks, and the pictures’ naget-asset: sources.',
+    'The document as Markdown. To change it, send it back whole with save_doc and this id (markdown; page, font, size, header and footer only to change them), or make small changes with edits (find and replace, a section, after or before a heading, append). Keep what you do not mean to change as it is: the attributes in braces ({.title}, {.center}, {line=1.5}…), <u>, <span style>, ==highlights==, $maths$, the comments’ <span data-comment> marks, the suggested changes’ marks (<ins data-s>, <del data-s>, <span data-s data-was>, {ins=…} and {del=…}), and the pictures’ naget-asset: sources.',
     '',
     body,
     ...commentsForAgent(doc),
+    ...suggestionsForAgent(doc),
   ].join('\n');
 }
 
 const when = (at: number) => new Date(at).toISOString().slice(0, 16).replace('T', ' ');
+
+/** The suggested changes, after the comments: what each does, who made it, its replies, and how to answer them. */
+function suggestionsForAgent(doc: Doc): string[] {
+  const list = doc.suggestions ?? [];
+  if (!list.length) return [];
+  const by = new Map(list.map((x) => [x.id, x]));
+  const who = (x: Parameters<typeof authorForAgent>[0]) => authorForAgent(x);
+  const q = (t: string) => `“${t.replace(/\n/g, ' / ').slice(0, 200)}”`;
+  const lines = changesOf(doc).flatMap((c) => {
+    const x = by.get(c.id);
+    if (!x) return [];
+    const what = [
+      c.removed ? `take out ${q(c.removed)}` : '',
+      c.added ? `add ${q(c.added)}` : '',
+      c.looks.length ? `change the look (${c.looks.join(', ')})` : '',
+      c.paras.added ? `add ${c.paras.added > 1 ? `${c.paras.added} paragraphs` : 'a paragraph'}` : '',
+      c.paras.removed ? `take out ${c.paras.removed > 1 ? `${c.paras.removed} paragraphs` : 'a paragraph'}` : '',
+      c.breaks.added ? `break a paragraph in two${c.breaks.added > 1 ? ` (${c.breaks.added})` : ''}` : '',
+      c.breaks.removed ? `join a paragraph to the one before${c.breaks.removed > 1 ? ` (${c.breaks.removed})` : ''}` : '',
+      ...c.blocks.added.map((k) => `add a block (${k})`),
+      ...c.blocks.removed.map((k) => `take out a block (${k})`),
+    ].filter(Boolean);
+    return [`- ${c.id} · ${who(x)}, ${when(x.at)} UTC: ${what.join('; ')}`, ...(x.replies ?? []).map((r) => `    ↳ ${who(r)}, ${when(r.at)} UTC: ${r.text.replace(/\n/g, ' / ')}`)];
+  });
+  return [
+    '',
+    `Suggested changes (${lines.filter((l) => l.startsWith('-')).length}), each marked above with its id (words to add <ins data-s="id">, to take out <del data-s="id">, a new look <span data-s="id" data-was="…">, a paragraph's new or removed break {ins=id} or {del=id}):`,
+    ...lines,
+    '',
+    'To answer them, save_doc with this id and suggestions: [{"id": "<id>", "accept": true}] (makes the change), {"id": "<id>", "reject": true} (undoes it) or {"id": "<id>", "reply": "…"}; keep the marks of those you leave. To suggest changes yourself instead of making them, send the document as you would have it with "suggest": true: each difference becomes a suggestion of yours for the user to accept or reject.',
+  ];
+}
 
 /** The comments' threads, after the document, and how to answer them. */
 function commentsForAgent(doc: Doc): string[] {
@@ -426,7 +532,13 @@ function commentsForAgent(doc: Doc): string[] {
 const JC: Record<string, 'center' | 'right' | 'justify' | undefined> = { center: 'center', right: 'right', justify: 'justify' };
 const PX_PER_TEXT = (doc: Doc) => (PAPERS[doc.page.size].w - 2 * doc.page.margin) * PX_MM;
 
-const wordRun = (r: Run): WordRun => {
+/** A suggestion's tracked change for Word: what it is, who made it (by name), when. */
+const revOf = (sgs: Map<string, Suggestion>, id: string | undefined, kind: 'ins' | 'del'): DocRev | undefined => {
+  const x = id ? sgs.get(id) : undefined;
+  return x ? { kind, author: authorOf(x.by, x.author).name, at: x.at } : undefined;
+};
+
+const wordRun = (r: Run, sgs: Map<string, Suggestion> = new Map()): WordRun => {
   const w: WordRun = { t: r.t };
   for (const k of ['b', 'i', 'u', 's', 'code', 'sup', 'sub', 'math'] as const) if (r[k]) w[k] = true;
   if (r.color) w.color = r.color;
@@ -435,15 +547,16 @@ const wordRun = (r: Run): WordRun => {
   if (r.font) w.font = r.font;
   if (r.link) w.link = r.link;
   if (r.cm) w.cm = r.cm;
+  // Its suggested change, as a tracked change (words taken out over words added: those are Word's deleted text).
+  const rev = revOf(sgs, r.del, 'del') ?? revOf(sgs, r.ins, 'ins');
+  if (rev) w.rev = rev;
+  const f = r.fmt ? sgs.get(r.fmt) : undefined;
+  if (f) w.fmtRev = { author: authorOf(f.by, f.author).name, at: f.at, was: { ...(r.was ?? {}) } };
   return w;
 };
 
-/** A paragraph's own spacing for Word. */
-const wordSpace = (b: Spacing): DocSpace | undefined =>
-  b.lh === undefined && b.sb === undefined && b.sa === undefined ? undefined : { ...(b.lh !== undefined ? { line: b.lh } : {}), ...(b.sb !== undefined ? { before: b.sb } : {}), ...(b.sa !== undefined ? { after: b.sa } : {}) };
-
 /** A table's rows for Word: a cell merged across columns spans them, one merged down starts a run of cells Word joins. */
-function wordRows(t: TableBlock): { cells: DocCell[] }[] {
+function wordRows(t: TableBlock, sgs: Map<string, Suggestion>): { cells: DocCell[] }[] {
   const under = fixMerges(t.rows.map((r) => r.map((c) => ({ ...c }))));
   return t.rows.map((r, ri) => {
     const cells: DocCell[] = [];
@@ -457,7 +570,7 @@ function wordRows(t: TableBlock): { cells: DocCell[] }[] {
         }
         return;
       }
-      const cell: DocCell = { runs: c.runs.map(wordRun) };
+      const cell: DocCell = { runs: c.runs.map((r) => wordRun(r, sgs)) };
       if (t.head && ri === 0) cell.head = true;
       if (c.align && JC[c.align]) cell.align = JC[c.align];
       if (c.fill) cell.fill = c.fill;
@@ -482,81 +595,141 @@ function keptPicture(db: DB, src: string): Picture | null {
   return data && size && size.type !== 'webp' ? { data, ext: size.type, w: size.w, h: size.h } : null;
 }
 
+/** Whether words are Chinese, Japanese or Korean. */
+const CJK = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff\uac00-\ud7af]/;
+
+/** The faces of fonts a document's Word file uses: its font's, its words' own, and its code's, each bold or italic as they are shown. */
+export function docFaces(doc: Doc): FontFace[] {
+  const out = new Map<string, FontFace>();
+  const add = (name: string, b: boolean, i: boolean) => out.set(`${name}|${b}|${i}`, { name, b, i });
+  add(doc.font, false, false);
+  const words = (runs: Run[], b: boolean, i: boolean) => {
+    for (const r of runs) if (!r.math) add(r.code ? MONO_DOC : (r.font ?? doc.font), b || !!r.b, i || !!r.i);
+  };
+  for (const blk of doc.blocks) {
+    if (blk.type === 'p') {
+      const st = blk.style ?? 'normal';
+      if (st === 'code') add(MONO_DOC, false, false);
+      else words(blk.runs, !!STYLES[st].bold, !!STYLES[st].italic);
+    } else if (blk.type === 'li') words(blk.runs, false, false);
+    else if (blk.type === 'table') blk.rows.forEach((r, ri) => r.forEach((c) => words(c.runs, !!blk.head && ri === 0, false)));
+    else if (blk.type === 'toc' && tocEntries(doc).some((e) => e.level === 1)) add(doc.font, true, false);
+  }
+  return [...out.values()];
+}
+
 /**
- * The document as a Word file: its paper and margins, font and sizes, headings, lists (checklists with boxes Word
- * ticks), tables, pictures (from the kept ones, or `picture`: made ready for Office, an SVG drawn as PNG) and page
- * breaks.
+ * Word's spacing for each of a document's blocks, as the editor lays them out (word-layout.ts): space before and after
+ * in points, and lines in points (at least, or exactly) or, where lines must grow with what they hold, as a multiple
+ * of Word's line; `sep`, for a table right after another, the gap between them.
  */
-export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: string) => Picture | null): Buffer {
+export function wordSpaces(doc: Doc, blocks: Block[] = doc.blocks): (DocSpace & { sep?: number })[] {
+  const places = wordPlaces(doc, blocks);
+  return blocks.map((b, i) => {
+    const p = places[i];
+    const sp: DocSpace & { sep?: number } = { before: p.before, after: p.after };
+    if (p.sep !== undefined) sp.sep = p.sep;
+    if (b.type === 'p' || b.type === 'li') {
+      const code = b.type === 'p' && b.style === 'code';
+      const font = code ? MONO_DOC : doc.font;
+      const l = wordLineOf(p.box.line, ownLine(b.runs, font, MONO_DOC, p.box.size), !code && grows(b.runs, p.box.size), wordLine(font) * p.box.size);
+      sp.line = l.line;
+      if (l.rule) sp.rule = l.rule;
+    } else if (b.type === 'math') sp.line = 1;
+    return sp;
+  });
+}
+
+/**
+ * The document as a Word file, laid out as the editor lays it out (its pages break where the editor's do, as near as
+ * Word allows): its paper and margins, font and sizes, headings, lists (checklists with boxes Word ticks), tables,
+ * pictures (from the kept ones, or `picture`: made ready for Office, an SVG drawn as PNG), page breaks, and the faces
+ * of its fonts (`fonts`, wordFonts of docFaces) inside it.
+ */
+export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: string) => Picture | null, fonts?: Map<string, EmbeddedFont>): Buffer {
   const { groups } = listInfo(doc.blocks);
   const blocks: WordBlock[] = [];
   const pictures: Buffer[] = [];
-  const textPx = PX_PER_TEXT(doc);
+  const spaces = wordSpaces(doc);
   // The headings a table of contents lists, each with a bookmark its line leads to.
   const toc = doc.blocks.some((b) => b.type === 'toc') ? tocEntries(doc) : [];
   const anchors = new Map(toc.map((e, k) => [e.id, `_Toc${k + 1}`]));
+  // Suggested changes as tracked changes: a paragraph's new (or removed) break is the paragraph before's mark.
+  const sgs = new Map((doc.suggestions ?? []).map((x) => [x.id, x]));
+  let lastPara = -1;
+  let cjk = false;
   doc.blocks.forEach((b, i) => {
+    if (b.type === 'p' || b.type === 'li') {
+      const mark = revOf(sgs, b.del, 'del') ?? revOf(sgs, b.ins, 'ins');
+      const prev = blocks[lastPara];
+      if (mark && prev && (prev.k === 'p' || prev.k === 'h' || prev.k === 'li')) prev.mark = mark;
+    }
+    if (!cjk && CJK.test(blockText(b))) cjk = true;
+    const pushed = blocks.length;
+    blockOf(b, i);
+    if ((b.type === 'p' || b.type === 'li') && blocks.length > pushed && ['p', 'h', 'li'].includes(blocks[blocks.length - 1].k)) lastPara = blocks.length - 1;
+  });
+  function blockOf(b: (typeof doc.blocks)[number], i: number) {
+    const { sep, ...space } = spaces[i];
     if (b.type === 'p') {
-      const runs = b.runs.map(wordRun);
+      const runs = b.runs.map((r) => wordRun(r, sgs));
       const align = b.align ? JC[b.align] : undefined;
       const style = b.style ?? 'normal';
       const lvl = headingLevel(style);
-      const space = wordSpace(b);
-      if (lvl) blocks.push({ k: 'h', lvl: lvl as 1 | 2 | 3 | 4, runs, keep: true, ...(align ? { align } : {}), ...(space ? { space } : {}), ...(anchors.has(b.id) ? { anchor: anchors.get(b.id) } : {}) });
-      else if (style === 'code') blocks.push({ k: 'pre', text: b.runs.map((r) => r.t).join('') || ' ' });
+      if (lvl) blocks.push({ k: 'h', lvl: lvl as 1 | 2 | 3 | 4, runs, keep: true, space, ...(align ? { align } : {}), ...(anchors.has(b.id) ? { anchor: anchors.get(b.id) } : {}) });
+      else if (style === 'code') blocks.push({ k: 'pre', text: b.runs.map((r) => r.t).join('') || ' ', space });
       else
         blocks.push({
           k: 'p',
           runs,
           keep: true,
+          space,
           ...(align ? { align } : {}),
           ...(style === 'quote' ? { quote: true } : {}),
           ...(style === 'title' || style === 'subtitle' ? { style } : {}),
           ...(style === 'callout' ? { shade: b.tint ?? CALLOUT.tint, icon: b.icon ?? CALLOUT.icon } : {}),
           ...(b.lvl ? { indent: b.lvl } : {}),
-          ...(space ? { space } : {}),
         });
     } else if (b.type === 'li') {
       const align = b.align ? JC[b.align] : undefined;
-      const space = wordSpace(b);
       blocks.push({
         k: 'li',
         ordered: b.list === 'number',
         lvl: b.lvl ?? 0,
         list: groups[i],
-        runs: b.runs.map(wordRun),
+        runs: b.runs.map((r) => wordRun(r, sgs)),
         keep: true,
+        space,
         ...(b.list === 'check' ? { check: true, ...(b.checked ? { checked: true } : {}) } : {}),
         ...(align ? { align } : {}),
-        ...(space ? { space } : {}),
       });
     } else if (b.type === 'table') {
-      blocks.push({ k: 'table', rows: wordRows(b), ...(b.cols ? { cols: b.cols } : {}) });
+      const rev = revOf(sgs, b.del, 'del') ?? revOf(sgs, b.ins, 'ins');
+      blocks.push({ k: 'table', rows: wordRows(b, sgs), ...(b.cols ? { cols: b.cols } : {}), ...(rev ? { rev } : {}), ...(sep !== undefined ? { sep } : {}) });
     } else if (b.type === 'toc') {
-      blocks.push({ k: 'toc', entries: toc.map((e) => ({ lvl: e.level, text: e.text, anchor: anchors.get(e.id)! })) });
+      blocks.push({ k: 'toc', entries: toc.map((e) => ({ lvl: e.level, text: e.text, anchor: anchors.get(e.id)! })), space });
     } else if (b.type === 'math') {
-      blocks.push({ k: 'math', tex: b.tex });
+      blocks.push({ k: 'math', tex: b.tex, space });
     } else if (b.type === 'image') {
       const pic = picture?.(b.src) ?? keptPicture(db, b.src);
       if (!pic || pic.ext === 'webp') {
-        if (b.alt || b.caption) blocks.push({ k: 'p', runs: [{ t: b.caption || b.alt || '', i: true }] });
+        if (b.alt || b.caption) blocks.push({ k: 'p', runs: [{ t: b.caption || b.alt || '', i: true }], space });
         return;
       }
-      const w = Math.max(16, Math.round(textPx * b.w));
+      const w = Math.max(16, Math.round(PX_PER_TEXT(doc) * b.w));
       pictures.push(pic.data);
-      blocks.push({ k: 'img', shot: pictures.length - 1, w, h: Math.round((w * pic.h) / Math.max(1, pic.w)), align: b.align ?? 'center', ...(b.alt ? { alt: b.alt } : {}), ...(b.caption ? { caption: b.caption } : {}) });
-    } else if (b.type === 'hr') blocks.push({ k: 'hr' });
+      const rev = revOf(sgs, b.del, 'del') ?? revOf(sgs, b.ins, 'ins');
+      blocks.push({ k: 'img', shot: pictures.length - 1, w, h: Math.round((w * pic.h) / Math.max(1, pic.w)), share: b.w, align: b.align ?? 'center', space, ...(b.alt ? { alt: b.alt } : {}), ...(b.caption ? { caption: b.caption } : {}), ...(rev ? { rev } : {}) });
+    } else if (b.type === 'hr') blocks.push({ k: 'hr', space });
     else blocks.push({ k: 'pb' });
-  });
+  }
   const look: DocLook = {
     font: doc.font,
     size: doc.size,
     title: Math.round(doc.size * STYLES.title.k * 2) / 2,
     subtitle: Math.round(doc.size * STYLES.subtitle.k * 2) / 2,
     heads: (['h1', 'h2', 'h3', 'h4', 'h4', 'h4'] as ParaStyle[]).map((s) => Math.round(doc.size * STYLES[s].k * 2) / 2),
-    // Word's line spacing counts from the font's own line (about 1.15 of its size), CSS's from its size.
-    line: Math.round((STYLES.normal.lh / 1.15) * 100) / 100,
-    after: Math.round(doc.size * STYLES.normal.after * 2) / 2,
+    editor: { cjk },
   };
   return docxFile({ title, lang: '', blocks, shots: pictures.map(() => ({ x: 0, y: 0, w: 1, h: 1 })) }, pictures, {
     title,
@@ -567,7 +740,9 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
     header: doc.header,
     footer: doc.footer,
     titlePage: doc.titlePage,
-    comments: doc.comments?.map((c) => ({ id: c.id, by: c.by, name: c.name, text: c.text, at: c.at, resolved: c.resolved, replies: c.replies?.map((r) => ({ by: r.by, name: r.name, text: r.text, at: r.at })) })),
+    // Someone the project is shared with goes into the file by their name, as other people's comments do.
+    comments: doc.comments?.map((c) => ({ id: c.id, by: c.by === 'person' ? 'user' : c.by, author: c.by === 'person' ? c.name : c.author, text: c.text, at: c.at, resolved: c.resolved, replies: c.replies?.map((r) => ({ by: r.by === 'person' ? 'user' : r.by, author: r.by === 'person' ? r.name : r.author, text: r.text, at: r.at })) })),
+    fonts,
   });
 }
 
@@ -662,6 +837,26 @@ interface WCtx {
   cmIds: Map<string, string>;
   /** Inside a table of contents Word keeps as a field: how deep in fields, while its lines are skipped. */
   toc: number;
+  /** Tracked changes read as suggestions: the one being read (inserted or deleted words), the suggestions made, the last one (to go on with it while nothing unchanged came between), and a paragraph's mark for the next paragraph's break. */
+  rev: { kind: 'ins' | 'del'; id: string } | null;
+  sugs: Suggestion[];
+  lastRev: { key: string; id: string } | null;
+  plainSince: boolean;
+  nextBreak: { kind: 'ins' | 'del'; id: string } | null;
+}
+
+/** A tracked change's suggestion: the one of its author and time just before it, while nothing unchanged came between; else a new one. */
+function revSuggestion(ctx: WCtx, el: El): string {
+  const author = att(el, 'author') ?? '';
+  const date = att(el, 'date') ?? '';
+  const key = `${author}|${date}`;
+  if (ctx.lastRev && ctx.lastRev.key === key && !ctx.plainSince) return ctx.lastRev.id;
+  const id = `t${ctx.sugs.length + 1}`;
+  const name = cleanAuthor(author);
+  ctx.sugs.push({ id, by: /^agent$/i.test(author) ? 'agent' : 'user', ...(name ? { author: name } : {}), at: Date.parse(date) || Date.now() });
+  ctx.lastRev = { key, id };
+  ctx.plainSince = false;
+  return id;
 }
 
 /** A style and those it is based on. */
@@ -708,13 +903,14 @@ function rLook(ctx: WCtx, rPr: El | undefined, into: Look) {
   if (sz > 0) into.size = Math.round(sz) / 2;
   const font = fontOf(ctx, kid(rPr, 'rFonts'));
   if (font) {
-    if (MONO_FONTS.test(font)) into.code = true;
+    // A monospaced font marks code, but one the app offers (JetBrains Mono, Courier New) is the words' font.
+    if (MONO_FONTS.test(font) && !FONTS.some((f) => f.name.toLowerCase() === font.toLowerCase())) into.code = true;
     else into.font = font;
   }
 }
 
 /** What a paragraph is: its style (a heading, the title…), list, alignment and indent. */
-function pKind(ctx: WCtx, pPr: El | undefined): { style: ParaStyle; list?: { kind: 'bullet' | 'number' | 'check'; lvl: number }; align?: Align; lvl: number; left: number; caption: boolean } {
+function pKind(ctx: WCtx, pPr: El | undefined): { style: ParaStyle; list?: { kind: 'bullet' | 'number' | 'check'; lvl: number }; align?: Align; lvl: number; left: number; hanging: number; caption: boolean } {
   const id = att(kid(pPr, 'pStyle'), 'val');
   const styles = chain(ctx, id);
   let style: ParaStyle = 'normal';
@@ -751,8 +947,9 @@ function pKind(ctx: WCtx, pPr: El | undefined): { style: ParaStyle; list?: { kin
   }
   const jc = att(kid(pPr, 'jc'), 'val');
   const align: Align | undefined = jc === 'center' ? 'center' : jc === 'right' || jc === 'end' ? 'right' : jc === 'both' || jc === 'distribute' ? 'justify' : undefined;
-  const left = Number(att(kid(pPr, 'ind'), 'left') ?? att(kid(pPr, 'ind'), 'start') ?? 0);
-  return { style, list, align, lvl: list ? 0 : Math.min(4, Math.max(0, Math.round(left / 720))), left, caption };
+  const left = Number(att(kid(pPr, 'ind'), 'left') ?? att(kid(pPr, 'ind'), 'start') ?? 0) || 0;
+  const hanging = Number(att(kid(pPr, 'ind'), 'hanging') ?? 0) || 0;
+  return { style, list, align, lvl: list ? 0 : Math.min(4, Math.max(0, Math.round(left / 720))), left, hanging, caption };
 }
 
 /** A picture of a drawing, from the file's media, as a picture block (its width as a share of the text's). */
@@ -774,7 +971,8 @@ function drawingImage(ctx: WCtx, x: El, align: Align | undefined): Record<string
     src: `data:${mime};base64,${data.toString('base64')}`,
     w: cx && ctx.textEmu ? Math.min(1, cx / ctx.textEmu) : 1,
     ...(alt ? { alt } : {}),
-    ...(align === 'left' || align === 'right' ? { align } : {}),
+    // Word puts a picture whose paragraph says nothing on the left (this app's files say each one's).
+    ...(!align || align === 'left' || align === 'right' ? { align: align ?? 'left' } : {}),
   };
 }
 
@@ -802,12 +1000,18 @@ function runContent(ctx: WCtx, r: El, look: Look, c: PCollect, align: Align | un
     if (!t) return;
     const link = c.field?.result ? (c.field.link ?? c.link) : c.link;
     const cm = openComments(ctx);
-    c.runs.push({ t, ...look, ...(link ? { link } : {}), ...(cm ? { cm } : {}) });
+    // Inside a tracked change, words added or taken out; else words that stay (what goes on with a change ends here).
+    if (ctx.rev) c.runs.push({ t, ...look, ...(link ? { link } : {}), ...(cm ? { cm } : {}), [ctx.rev.kind]: ctx.rev.id });
+    else {
+      ctx.plainSince = true;
+      c.runs.push({ t, ...look, ...(link ? { link } : {}), ...(cm ? { cm } : {}) });
+    }
   };
   for (const x of r.c) {
     if (!isEl(x)) continue;
     switch (x.n) {
       case 't':
+      case 'delText':
         if (!c.field || c.field.result) add(x.c.map((y) => (typeof y === 'string' ? y : '')).join(''));
         break;
       case 'tab':
@@ -868,14 +1072,24 @@ function inline(ctx: WCtx, el: El, c: PCollect, align: Align | undefined) {
       case 'r': {
         const rPr = kid(x, 'rPr');
         const look: Look = {};
-        // Its character style's look, then its own.
+        // Its character style's look, then its own. Code's look (its font, size, shading) is code's, a link's (blue,
+        // underlined) the link's, and a ticked checklist item's (struck, grey) the item's: not the words' own.
         for (const s of chain(ctx, att(kid(rPr, 'rStyle'), 'val')).reverse()) {
           if (/code/i.test(s.name)) look.code = true;
-          rLook(ctx, s.rPr, look);
+          else if (s.name !== 'Done item' && !/^(hyperlink|followedhyperlink)$/i.test(s.name.replace(/\s+/g, ''))) rLook(ctx, s.rPr, look);
         }
         rLook(ctx, rPr, look);
         if (look.size === ctx.size) delete look.size;
         if (look.font && look.font.toLowerCase() === ctx.font.toLowerCase()) delete look.font;
+        // A tracked change of its formatting: a new look suggested, the one in the change its old one.
+        const chg = kid(rPr, 'rPrChange');
+        if (chg) {
+          const was: Look = {};
+          rLook(ctx, kid(chg, 'rPr'), was);
+          if (was.size === ctx.size) delete was.size;
+          look.fmt = revSuggestion(ctx, chg);
+          look.was = was;
+        }
         runContent(ctx, x, look, c, align);
         break;
       }
@@ -908,6 +1122,15 @@ function inline(ctx: WCtx, el: El, c: PCollect, align: Align | undefined) {
       }
       case 'ins':
       case 'moveTo':
+      case 'del':
+      case 'moveFrom': {
+        // Tracked changes: words inserted (or moved here) are words to add; deleted (or moved away), words to take out.
+        const was = ctx.rev;
+        ctx.rev = { kind: x.n === 'ins' || x.n === 'moveTo' ? 'ins' : 'del', id: revSuggestion(ctx, x) };
+        inline(ctx, x, c, align);
+        ctx.rev = was;
+        break;
+      }
       case 'smartTag':
       case 'customXml':
       case 'sdtContent':
@@ -941,23 +1164,71 @@ function inline(ctx: WCtx, el: El, c: PCollect, align: Align | undefined) {
 /** How deep in fields a paragraph leaves Word's reader (fields it opens, less those it closes). */
 const fieldDepth = (p: El) => all(p, 'fldChar').reduce((n, f) => n + (att(f, 'fldCharType') === 'begin' ? 1 : att(f, 'fldCharType') === 'end' ? -1 : 0), 0);
 
-/** A paragraph's own spacing as a document keeps it (lines, and points before and after). */
-function wordSpacing(pPr: El | undefined): Spacing {
+/** A paragraph's own spacing as Word says it (points before and after; lines in points with their rule, or as a multiple), kept on its block until ownSpacing decides what of it is the paragraph's own. */
+type RawSpace = { before?: number; after?: number; line?: number; rule?: 'atLeast' | 'exact' };
+const RAW = '__space';
+
+function wordSpacing(pPr: El | undefined): RawSpace | undefined {
   const sp = kid(pPr, 'spacing');
-  const out: Spacing = {};
-  if (!sp) return out;
+  if (!sp) return undefined;
+  const out: RawSpace = {};
   const before = att(sp, 'before');
   const after = att(sp, 'after');
   const line = att(sp, 'line');
   const rule = att(sp, 'lineRule') ?? 'auto';
-  if (before !== undefined && /^\d+$/.test(before) && att(sp, 'beforeAutospacing') !== '1') out.sb = Math.min(200, Math.round((Number(before) / 20) * 2) / 2);
-  if (after !== undefined && /^\d+$/.test(after) && att(sp, 'afterAutospacing') !== '1') out.sa = Math.min(200, Math.round((Number(after) / 20) * 2) / 2);
-  if (line !== undefined && /^\d+$/.test(line) && rule === 'auto') out.lh = Math.min(5, Math.max(0.5, Math.round((Number(line) / 240) * 100) / 100));
-  return out;
+  if (before !== undefined && /^\d+$/.test(before) && att(sp, 'beforeAutospacing') !== '1') out.before = Math.min(400, Number(before) / 20);
+  if (after !== undefined && /^\d+$/.test(after) && att(sp, 'afterAutospacing') !== '1') out.after = Math.min(400, Number(after) / 20);
+  if (line !== undefined && /^\d+$/.test(line) && Number(line) > 0) {
+    if (rule === 'auto') out.line = Number(line) / 240;
+    else if (rule === 'exact' || rule === 'atLeast') {
+      out.line = Number(line) / 20;
+      out.rule = rule;
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * A Word file's paragraphs' own spacing, as a document keeps it: what Word says of a paragraph beyond what the
+ * editor's layout gives it there anyway (word-layout.ts, the same that writes a document's files, so one written here
+ * comes back as it was). Lines come back as the document's lines (1 is the editor's single line): Word's in points as
+ * they are, and a multiple of Word's own line by the font's Word line.
+ */
+function ownSpacing(out: Record<string, unknown>[], font: string, size: number) {
+  const doc = { v: 1, page: { size: 'a4', margin: 25.4 }, font, size, blocks: [] } as Doc;
+  out.forEach((b, i) => {
+    const sp = b[RAW] as RawSpace | undefined;
+    delete b[RAW];
+    if (!sp || (b.type !== 'p' && b.type !== 'li')) return;
+    const win = (i === 0 ? [b, out[i + 1]] : [out[i - 1], b, out[i + 1]]).filter(Boolean) as unknown as Block[];
+    const at = i === 0 ? 0 : 1;
+    const p = wordPlaces(doc, win)[at];
+    const near = (a: number, x: number) => Math.abs(a - x) < 0.06;
+    const pt = (x: number) => Math.min(200, Math.round(x * 2) / 2);
+    if (sp.after !== undefined && !near(sp.after, p.after)) b.sa = pt(sp.after - p.box.pb);
+    if (sp.before !== undefined && !near(sp.before, p.before)) b.sb = pt(sp.before - p.box.pt);
+    if (sp.line !== undefined) {
+      const h = sp.rule ? sp.line : sp.line * wordLine(b.type === 'p' && b.style === 'code' ? MONO_DOC : font) * p.box.size;
+      if (Math.abs(h - p.box.line) > 0.3) b.lh = Math.min(5, Math.max(0.5, Math.round((h / (1.15 * p.box.size)) * 100) / 100));
+    }
+  });
 }
 
 function wordParagraph(ctx: WCtx, p: El, out: Record<string, unknown>[], depth: number) {
   const pPr = kid(p, 'pPr');
+  // The paragraph before's mark inserted or deleted: this one's break is that suggestion; this one's own, the next's.
+  const start = out.length;
+  const breakHere = ctx.nextBreak;
+  ctx.nextBreak = null;
+  wordParagraphBody(ctx, p, pPr, out, depth);
+  const first = out[start];
+  if (breakHere && first && (first.type === 'p' || first.type === 'li')) first[breakHere.kind] = breakHere.id;
+  // Read after its words, so the next paragraph's words of the same change go on with it (a new paragraph is one suggestion).
+  const markEl = kid(kid(pPr, 'rPr'), 'ins') ?? kid(kid(pPr, 'rPr'), 'del') ?? kid(kid(pPr, 'rPr'), 'moveTo') ?? kid(kid(pPr, 'rPr'), 'moveFrom');
+  if (markEl && depth === 0) ctx.nextBreak = { kind: markEl.n === 'ins' || markEl.n === 'moveTo' ? 'ins' : 'del', id: revSuggestion(ctx, markEl) };
+}
+
+function wordParagraphBody(ctx: WCtx, p: El, pPr: El | undefined, out: Record<string, unknown>[], depth: number) {
   // A table of contents Word keeps as a field: one of ours in its place, its lines (Word's last filling in) left out.
   if (ctx.toc > 0) {
     ctx.toc = Math.max(0, ctx.toc + fieldDepth(p));
@@ -980,6 +1251,8 @@ function wordParagraph(ctx: WCtx, p: El, out: Record<string, unknown>[], depth: 
   const c: PCollect = { runs: [], after: [], breaks: [] };
   inline(ctx, p, c, k.align);
   let runs = mergeRuns(c.runs);
+  // A box Word ticks, then the tab to the item's words.
+  if (c.check && /^[\t ]/.test(runs[0]?.t ?? '')) runs = mergeRuns([{ ...runs[0], t: runs[0].t.replace(/^[\t ]+/, '') }, ...runs.slice(1)].filter((r) => r.t));
   // A box drawn as a character starts a checklist's item.
   const glyph = /^\s*([☐☑☒])\s*/.exec(runs[0]?.t ?? '');
   if (glyph && (k.list || runs.length)) {
@@ -994,15 +1267,19 @@ function wordParagraph(ctx: WCtx, p: El, out: Record<string, unknown>[], depth: 
     prevImg.caption = text.replace(/\s+/g, ' ').trim();
     return;
   }
-  // A checklist's item is indented by its level (as docx.ts writes them: half an inch, and a quarter more a level).
-  const checkLvl = Math.min(4, Math.max(0, Math.round((k.left - 720) / 360)));
-  const space = wordSpacing(pPr);
-  // A shaded paragraph that starts with an emoji is a callout (as this app writes one).
+  // A checklist's item is a step (half an inch) further in a level, its box where its first line starts (left less hanging).
+  const checkLvl = Math.min(4, Math.max(0, Math.floor((k.left - k.hanging + 180) / 720)));
+  const raw = wordSpacing(pPr);
+  const space = raw ? { [RAW]: raw } : {};
+  // A shaded paragraph that starts with an emoji is a callout (as this app writes one: the emoji in a run of its own, then a tab).
   const shade = att(kid(pPr, 'shd'), 'fill');
-  const lead = shade && /^[0-9a-f]{6}$/i.test(shade) && !/^ffffff$/i.test(shade) ? leadingIcon(runs[0]?.t ?? '') : null;
+  const shaded = !!shade && /^[0-9a-f]{6}$/i.test(shade) && !/^ffffff$/i.test(shade);
+  const own = shaded && runs.length > 1 && cleanIcon(runs[0].t.trim()) && /^[\t ]/.test(runs[1].t) ? cleanIcon(runs[0].t.trim()) : undefined;
+  if (own) runs = mergeRuns([{ ...runs[1], t: runs[1].t.replace(/^[\t ]+/, '') }, ...runs.slice(2)].filter((r) => r.t));
+  const lead = own ? { icon: own, rest: runs[0]?.t ?? '' } : shaded ? leadingIcon(runs[0]?.t ?? '') : null;
   const block = (rs: Run[]): Record<string, unknown> => {
     if (c.check || k.list) return { type: 'li', list: c.check ? 'check' : k.list!.kind, lvl: k.list?.lvl ?? checkLvl, ...(c.checked ? { checked: true } : {}), ...(k.align ? { align: k.align } : {}), ...space, runs: rs };
-    if (lead && k.style === 'normal') return { type: 'p', style: 'callout', icon: lead.icon, tint: `#${shade!.toLowerCase()}`, ...(k.align ? { align: k.align } : {}), runs: mergeRuns([{ ...rs[0], t: lead.rest }, ...rs.slice(1)]) };
+    if (lead && k.style === 'normal') return { type: 'p', style: 'callout', icon: lead.icon, tint: `#${shade!.toLowerCase()}`, ...(k.align ? { align: k.align } : {}), ...space, runs: rs.length ? mergeRuns([{ ...rs[0], t: lead.rest }, ...rs.slice(1)]) : [] };
     const b: Record<string, unknown> = { type: 'p', runs: k.style === 'code' ? [{ t: rs.map((r) => r.t).join('') }] : rs, ...space };
     if (k.style !== 'normal') b.style = k.style;
     if (k.align) b.align = k.align;
@@ -1024,7 +1301,7 @@ function wordParagraph(ctx: WCtx, p: El, out: Record<string, unknown>[], depth: 
     }
     const rest = mergeRuns(flat.slice(at));
     if (rest.some((r) => r.t.trim())) out.push(block(rest));
-  } else if (text || !c.after.length) out.push(block(runs));
+  } else if ((text || !c.after.length) && !(raw?.rule === 'exact' && (raw.line ?? 99) <= 1.5 && !text.trim() && depth === 0)) out.push(block(runs));
   out.push(...c.after);
   // A section that starts on a new page.
   const sect = kid(pPr, 'sectPr');
@@ -1039,10 +1316,14 @@ function wordTable(ctx: WCtx, tbl: El, out: Record<string, unknown>[], depth: nu
   let head = false;
   // Each column's cell merged down that is still open (by where it is), for the cells under it.
   const down = new Map<number, WCell>();
+  // Its rows added or taken out as tracked changes (every row so: the table is a suggestion).
+  const revs: El[] = [];
   rowsOf(tbl)
     .slice(0, DOC_LIMITS.rows)
     .forEach((tr, ri) => {
       if (ri === 0 && on(xpath(tr, 'trPr', 'tblHeader'))) head = true;
+      const rev = xpath(tr, 'trPr', 'ins') ?? xpath(tr, 'trPr', 'del');
+      if (rev) revs.push(rev);
       const row: WCell[] = [];
       for (const tc of cellsOf(tr)) {
         if (row.length >= DOC_LIMITS.cols) break;
@@ -1078,14 +1359,18 @@ function wordTable(ctx: WCtx, tbl: El, out: Record<string, unknown>[], depth: nu
       if (row.length) rows.push(row);
     });
   if (!rows.length) return;
-  // A first row all in bold is a header (its bold the header's own).
-  if (!head && rows.length > 1 && rows[0].every((c) => c.runs.every((r) => r.b || !r.t.trim())) && rows[0].some((c) => c.runs.some((r) => r.t.trim()))) {
+  // A first row all in bold is a header (its bold the header's own); a header row's bold, and the shading this app
+  // gives one, are the header's own too.
+  const bold = rows[0].every((c) => c.runs.every((r) => r.b || !r.t.trim())) && rows[0].some((c) => c.runs.some((r) => r.t.trim()));
+  if ((head || rows.length > 1) && bold) {
     head = true;
     rows[0] = rows[0].map((c) => ({ ...c, runs: mergeRuns(c.runs.map(({ b: _b, ...r }) => r)) }));
   }
+  if (head) rows[0] = rows[0].map(({ fill, ...c }) => (fill && /^#f3f(4f6|5f7)$/.test(fill) ? c : { ...c, ...(fill ? { fill } : {}) }));
   const grid = kids(kid(tbl, 'tblGrid'), 'gridCol').map((g) => Number(att(g, 'w')) || 0);
   const width = Math.max(...rows.map((r) => r.length));
-  out.push({ type: 'table', rows, ...(head ? { head: true } : {}), ...(grid.length === width && grid.every((g) => g > 0) ? { cols: grid } : {}) });
+  const kind = revs.length === rows.length && revs.every((r) => r.n === revs[0].n) ? (revs[0].n === 'ins' ? 'ins' : 'del') : null;
+  out.push({ type: 'table', rows, ...(head ? { head: true } : {}), ...(grid.length === width && grid.every((g) => g > 0) ? { cols: grid } : {}), ...(kind ? { [kind]: revSuggestion(ctx, revs[0]) } : {}) });
 }
 
 function wordBody(ctx: WCtx, el: El, out: Record<string, unknown>[], depth: number) {
@@ -1213,7 +1498,7 @@ function wordDoc(buf: Buffer): Doc {
   const defaults = all(sroot, 'rPrDefault')[0];
   const normal = [...styles.entries()].find(([id, s]) => id === 'Normal' || s.name.toLowerCase() === 'normal')?.[1];
   const defLook: Look = {};
-  const ctx: WCtx = { zip, rels: r, styles, nums, theme, font: 'Arial', size: 11, textEmu: Math.max(1, pw - left - right) * 635, pics: 0, openCm: new Set(), cmIds: new Map(), toc: 0 };
+  const ctx: WCtx = { zip, rels: r, styles, nums, theme, font: 'Arial', size: 11, textEmu: Math.max(1, pw - left - right) * 635, pics: 0, openCm: new Set(), cmIds: new Map(), toc: 0, rev: null, sugs: [], lastRev: null, plainSince: true, nextBreak: null };
   const comments = wordComments(zip, part('comments'), part('commentsExtended'), ctx.cmIds);
   rLook(ctx, kid(defaults, 'rPr'), defLook);
   rLook(ctx, normal?.rPr, defLook);
@@ -1223,6 +1508,7 @@ function wordDoc(buf: Buffer): Doc {
 
   const out: Record<string, unknown>[] = [];
   wordBody(ctx, body, out, 0);
+  ownSpacing(out, font, ctx.size);
   // A document's last empty paragraphs are left out.
   while (out.length > 1 && out[out.length - 1].type === 'p' && !(out[out.length - 1].runs as Run[]).some((x) => x.t.trim())) out.pop();
   if (out[out.length - 1]?.type === 'pagebreak') out.pop();
@@ -1236,7 +1522,7 @@ function wordDoc(buf: Buffer): Doc {
   };
   const header = bandOfPart('header');
   const footer = bandOfPart('footer');
-  const doc = normalizeDoc({ page: { size: letter ? 'letter' : 'a4', margin }, font, size: ctx.size, blocks: out, header, footer, titlePage: !!kid(sect, 'titlePg') && on(kid(sect, 'titlePg')), comments });
+  const doc = normalizeDoc({ page: { size: letter ? 'letter' : 'a4', margin }, font, size: ctx.size, blocks: out, header, footer, titlePage: !!kid(sect, 'titlePg') && on(kid(sect, 'titlePg')), comments, suggestions: ctx.sugs });
   // Each comment's quote: the words it is on, as they read.
   if (!doc.comments?.length) return doc;
   const quotes = new Map<string, string>();
@@ -1316,16 +1602,18 @@ function wordComments(zip: Zip, part: string | undefined, extended: string | und
     const pid = att(ps[ps.length - 1], 'paraId') ?? '';
     const at = Date.parse(att(c, 'date') ?? '') || Date.now();
     const by = /^agent$/i.test(att(c, 'author') ?? '') ? 'agent' : 'user';
+    // Its author by name (Maria Lopez), but for the names this app writes for you and an agent.
+    const author = cleanAuthor(att(c, 'author'));
     const parent = pid ? byPara.get(parentOf.get(pid) ?? '') : undefined;
     if (parent) {
       // A reply: its words join its thread's, and its marks are its thread's.
-      if (text) (parent.replies ??= []).push({ id: `r${out.length}${parent.replies?.length ?? 0}`, by, text, at });
+      if (text) (parent.replies ??= []).push({ id: `r${out.length}${parent.replies?.length ?? 0}`, by, ...(author ? { author } : {}), text, at });
       ids.set(wid, parent.id);
       continue;
     }
     if (!text) continue;
     const id = `w${wid.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 30) || out.length}`;
-    const k: Comment = { id, by, text, at };
+    const k: Comment = { id, by, ...(author ? { author } : {}), text, at };
     if (done.has(pid)) k.resolved = true;
     ids.set(wid, id);
     if (pid) byPara.set(pid, k);
@@ -1348,11 +1636,11 @@ function docChars(d: Doc): number {
 /**
  * What of a Word file a document here does not hold, so that the document editor saving over it would lose it (keys
  * Files words for the person: "headers" for headers and footers with more than a line of words (pictures, tables,
- * other ones on even pages), "footnotes", "changes" for tracked changes, which come in as they read, "charts",
+ * other ones on even pages), "footnotes", "charts",
  * "diagrams" for SmartArt, "objects" for embedded files, "boxes" for text boxes, whose words come in after their
  * paragraph, "columns", "layout" for pages laid out apart, such as a landscape section); and `cut`, whether `doc`,
- * read from it, came in short of its words (a document longer than one here may be). Comments, equations and a
- * table of contents come in as the document's own.
+ * read from it, came in short of its words (a document longer than one here may be). Comments, tracked changes (as
+ * suggested changes), equations and a table of contents come in as the document's own.
  */
 export function wordLosses(buf: Buffer, doc: Doc): { loses: string[]; cut: boolean } {
   const zip = new Zip(buf);
@@ -1366,7 +1654,6 @@ export function wordLosses(buf: Buffer, doc: Doc): { loses: string[]; cut: boole
   const bands = r.filter((x) => x.type === 'header' || x.type === 'footer').map((x) => zip.text(x.target) ?? '');
   if (bands.some((x) => words.test(x) && /<w:(?:drawing|pict|tbl)[\s>]/.test(x)) || /<w:(?:header|footer)Reference\s[^>]*w:type="even"/.test(xml)) loses.add('headers');
   if (/<w:(?:footnote|endnote)Reference[\s/>]/.test(xml)) loses.add('footnotes');
-  if (/<w:(?:ins|del|moveFrom|moveTo)\s[^>]*w:author=/.test(xml)) loses.add('changes');
   if (r.some((x) => x.type === 'chart') || /<c:chart[\s/>]/.test(xml)) loses.add('charts');
   if (r.some((x) => x.type === 'diagramData')) loses.add('diagrams');
   if (r.some((x) => x.type === 'oleObject' || x.type === 'package') || /<o:OLEObject[\s/>]/.test(xml)) loses.add('objects');
@@ -1392,8 +1679,10 @@ const DOC_HELP = [
   'More in markdown: > 💡 words {.callout} is a callout, a tinted box with its emoji (tint=#e8f0fe for another tint; GitHub’s > [!NOTE], [!TIP], [!WARNING] work too); {line=1.5 before=12 after=6} at a paragraph’s end sets its line spacing (in lines) and the space before and after it (in points); $$ on lines of their own around LaTeX is an equation, and $x^2$ is maths among words (write a dollar sign as \\$); [TOC] alone on a line is a table of contents, made from the headings and kept up to date. A table with merged or shaded cells is written as HTML: <table><tr><td colspan="2" rowspan="2" style="background-color:#e8f0fe; vertical-align:middle">…</td></tr></table>.',
   'header and footer: a line of words on every page’s top and bottom margin, {page} and {pages} for the page’s number and how many there are: "footer": {"text": "Page {page} of {pages}", "align": "center"} (align left unless said); "titlePage": true leaves them off the first page. Left out, they stay as they were; "" removes one.',
   'Comments: get_page lists the user’s comments after the document, each on the words marked <span data-comment="id">. Answer with comments: [{"id": "c1", "reply": "…", "resolve": true}] beside the document (make the change asked for, too); {"id": "c1", "reopen": true} reopens one, {"id": "c1", "delete": true} takes it out. To add one of your own, mark its words <span data-comment="new1">…</span> and add {"id": "new1", "text": "…"}. Comments you do not mention stay as they are; keep their marks where they are.',
+  'Suggested changes (as Word’s tracked changes): get_page lists them after the comments, each marked with its id: <ins data-s="s1">words to add</ins>, <del data-s="s1">words to take out</del>, <span data-s="s2" data-was="…">a new look</span>, {ins=s3} or {del=s3} at a paragraph’s end for its break. Answer with suggestions: [{"id": "s1", "accept": true}], {"id": "s1", "reject": true} or {"id": "s1", "reply": "…"}; keep the marks of the others as they are. To suggest your own changes instead of making them (when the user asks you to suggest, review or propose edits), send the whole document as you would have it with "suggest": true: each difference becomes a suggestion of yours, which the user accepts or rejects. Or mark them yourself: <ins data-s="new1">…</ins> and <del data-s="new1">…</del> with an id of your own.',
   'Good documents start with a title, have short headings that say what follows, short paragraphs, lists for steps and options, and tables for what is compared.',
-  'To change a document, get_page with its id gives it as markdown; send the whole document back with save_doc and the same id: a new version, the older ones restorable. Keep what the user changed, and what you were not asked to change, as it is.',
+  'To change a document, get_page with its id gives it as markdown; send the whole document back with save_doc and the same id, or only what changes with edits: a new version, the older ones restorable. Keep what the user changed, and what you were not asked to change, as it is.',
+  DOC_EDITS_HELP,
 ].join(' ');
 
 export const SAVE_DOC_DESCRIPTION = DOC_HELP;
@@ -1415,6 +1704,18 @@ export const SAVE_DOC_SCHEMA = {
       type: 'array',
       items: { type: 'object' },
       description: 'Changes to the comments: {"id": "c1", "reply": "…"}, {"id": "c1", "resolve": true}, {"id": "c1", "reopen": true}, {"id": "c1", "delete": true}, or a new one: {"id": "new1", "text": "…"} on the words marked <span data-comment="new1">.',
+    },
+    suggestions: {
+      type: 'array',
+      items: { type: 'object' },
+      description: 'Answers to the suggested changes get_page lists: {"id": "s1", "accept": true}, {"id": "s1", "reject": true}, {"id": "s1", "reply": "…"}.',
+    },
+    suggest: { type: 'boolean', description: 'true: your changes to the document are suggested (each a suggestion the user accepts or rejects) rather than made.' },
+    edits: {
+      type: 'array',
+      items: { type: 'object' },
+      description:
+        'With id, instead of markdown: changes made in order on its Markdown as get_page gives it: {"find": "…", "replace": "…", "all"?: true}, {"section": "a heading’s words", "markdown": "…"}, {"after": "a heading’s words", "markdown": "…"}, {"before": "…", "markdown": "…"}, {"append": "markdown"}.',
     },
   },
   required: ['title'],

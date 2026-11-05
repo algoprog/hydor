@@ -1,7 +1,8 @@
 // Computer use, in the desktop apps (Mac, Windows, Linux on X11): agents see the computer's screen and use its mouse and
 // keyboard, in any app, beside the browser (which stays the way for websites). Off at first (Settings → Capabilities
 // → Computer use, which on a Mac also asks macOS for its two permissions); each session asks the user before its agent
-// starts. While an agent acts, a glow lines the screen's edges (desktop/glow.cjs), with a note that Esc stops it; Esc,
+// starts. While an agent acts, a glow lines the screen's edges (desktop/glow.cjs), with a note that Esc stops it, and a
+// ring with an "Agent" tag circles the pointer it moves (each step's picture marks where it acted); Esc,
 // Stop in the menu bar or tray (⌘⇧Esc too on a Mac), Settings or the session's line ends it. Elsewhere than the
 // desktop apps it is not offered.
 import fs from 'node:fs';
@@ -10,7 +11,7 @@ import { HttpError } from '../auth.ts';
 import { askDesktop, onDesktop } from '../desktop.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { clearActive, computerSettings, computerState, forgetSession, hooks, setComputerDeps, setComputerSettings, stopAll, wordsHere } from './access.ts';
-import { dropSteps, pruneSteps, stepFile } from './steps.ts';
+import { dropSteps, pruneSteps, readMarks, stepFile } from './steps.ts';
 import { computerInstructions, computerTools, forgetGeometry } from './tools.ts';
 import type { DB } from '../db.ts';
 
@@ -40,11 +41,16 @@ function routes(d: Deps) {
     stopAll();
     return computerState(db);
   });
-  /** A step's picture of the screen, for its row in the conversation. */
+  /** A step's picture of the screen, for its row in the conversation; N.json says where its actions were on it ({ marks }). */
   app.get('/api/computer/sessions/:key/steps/:n', async (req, reply) => {
-    const f = stepFile(decodeURIComponent(P(req).key), Number(String(P(req).n).replace(/\.jpg$/, '')));
+    const key = decodeURIComponent(P(req).key);
+    const raw = String(P(req).n);
+    const n = Number(raw.replace(/\.(jpg|json)$/, ''));
+    const f = stepFile(key, n);
     if (!f) return reply.code(404).send({ error: 'No picture for that step' });
-    return reply.header('Cache-Control', 'private, max-age=604800, immutable').type('image/jpeg').send(fs.createReadStream(f));
+    reply.header('Cache-Control', 'private, max-age=604800, immutable');
+    if (raw.endsWith('.json')) return { marks: readMarks(stepFile(key, n, 'json')) };
+    return reply.type('image/jpeg').send(fs.createReadStream(f));
   });
 }
 

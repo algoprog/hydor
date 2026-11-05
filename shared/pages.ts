@@ -42,6 +42,8 @@ export interface PageInfo {
   app?: string;
   /** The space it is in (the Library shows each space's together); none when unset. */
   space?: string;
+  /** A page of HTML's icon: the emoji the page editor puts at its top (links to it in other pages show it). */
+  icon?: string;
 }
 
 export interface PageVersion {
@@ -53,6 +55,8 @@ export interface PageVersion {
   by: 'agent' | 'user' | 'restore' | 'edit' | 'made';
   /** Changed (or commented on) by someone the project is shared with, through their link: their name. */
   who?: string;
+  /** An agent's saves in a row kept as this one version (left out for one). */
+  steps?: number;
 }
 
 /** One of a page's stored values (window.hydor.storage), as the Data view lists them. */
@@ -64,23 +68,32 @@ export interface PageDataEntry {
 }
 
 /**
- * A page an agent is writing (show_html, save_page, or an HTML file written whole), as its call streams in:
- * the pages showing the session watch it grow until the call is complete.
+ * A page an agent is writing (show_html, save_page, or an HTML file written whole), or a document, deck, spreadsheet
+ * or LaTeX document it is saving (save_doc, save_slides, save_sheet, save_latex), as its call streams in: the pages
+ * showing the session (and an editor that has that page open) watch it grow until the call is complete.
  */
 export interface PageDraft {
   /** The tool call's id: its item in the conversation. */
   id: string;
-  tool: 'show_html' | 'save_page' | 'file';
+  tool: 'show_html' | 'save_page' | 'file' | 'save_doc' | 'save_slides' | 'save_sheet' | 'save_latex';
   title?: string;
   /** An HTML file's path. */
   path?: string;
-  /** save_page with an id: the saved page it changes. */
+  /** save_page (or a save of another kind) with an id: the saved page it changes. */
   pageId?: string;
-  /** The page's HTML so far. */
+  /** The page's HTML so far; for a save of another kind, the call's own input so far (JSON still being written). */
   text: string;
   /** The call is complete (or stopped). */
   done: boolean;
   startedAt: number;
+  /** The session it is in. */
+  key?: string;
+  /** Counts what was sent of it: a window that hears of it twice (the session and the page both open) takes it once. */
+  seq?: number;
+  /** A save of another kind, once its call has run: the version it saved (the page's, when it made a new one)… */
+  saved?: { pageId: string; version: number };
+  /** …or that it saved nothing (the call failed, or the turn stopped first): the page stays as it was. */
+  failed?: boolean;
 }
 
 export type SiteVisibility = 'private' | 'public';
@@ -125,8 +138,12 @@ export type PagesEvent =
   | { what: 'request'; request: PublishRequest }
   /** A page's picture in Pages is ready. */
   | { what: 'thumb'; id: string; thumb: string }
-  /** To one session's pages: a draft grew by `text`, which goes at `from` (0 with the whole text so far starts it over). */
-  | { what: 'draft'; draft: Omit<PageDraft, 'text'>; from: number; text: string };
+  /** A page's comments changed (by an agent's save_page, or in another window). */
+  | { what: 'comments'; id: string }
+  /** To one session's pages (and a save's page, open in an editor): a draft grew by `text`, which goes at `from` (0 with the whole text so far starts it over). */
+  | { what: 'draft'; draft: Omit<PageDraft, 'text'>; from: number; text: string }
+  /** An agent answered, resolved or added comments of these files of this computer (LaTeX files opened from Files). */
+  | { what: 'file-comments'; paths: string[] };
 
 /** What a page-edit note in the conversation holds: the user changed a page, and whether the agent heard of it yet. */
 export interface PageEditNote {

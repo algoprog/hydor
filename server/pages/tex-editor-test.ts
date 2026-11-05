@@ -3,8 +3,10 @@
 // the table editor's grid read from a tabular and written back, BibTeX entries (read, keyed, made safe, added to a
 // .bib), the reference finder's reading of what was asked (and, with TEX_REFS_LIVE=1, real lookups on the web), the
 // quick checks before typesetting, comments on a document's words (kept, found again when the text moves, answered
-// by agents), and what get_page tells an agent. Through the routes, with a stand-in for the session manager. Build and run with a
-// scratch folder:
+// by agents) and on a file's of this computer (kept by the app by its path, merged with an agent's answers, moved
+// along with the file), tracked changes (kept, found again, accepted and rejected; an agent's saves marked while it is
+// on), and what get_page tells an agent. Through the routes, with a stand-in for the session
+// manager. Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/tex-editor-test.ts
 //   DATA_DIR=/tmp/hydor-test-tex-editor node dist/dev/tex-editor-test.js
 import fs from 'node:fs';
@@ -18,8 +20,10 @@ import { addBibEntry, bibInfo, bibKeyFor, bibKeys, bibText, cleanBibEntry, parse
 import { texCheck } from '../../shared/latex-check.ts';
 import { texCount, texCountText, totalWords } from '../../shared/latex-count.ts';
 import { blankTable, cellTex, cellText, tableAt, tableTex } from '../../shared/latex-table.ts';
-import { TEX_TEMPLATES, texFromTemplate } from '../../shared/latex-templates.ts';
-import { newTex, normalizeTex, parseTexText, texText } from '../../shared/latex.ts';
+import { TEMPLATE_NEEDS, TEX_TEMPLATES, texFromTemplate, texTemplate } from '../../shared/latex-templates.ts';
+import { diffWords } from '../../shared/latex-diff.ts';
+import { editText, mergeTexComments, newTex, normalizeTex, parseTexText, texChangeOps, texText, type TexChange } from '../../shared/latex.ts';
+import { fileComments, moveFileComments } from './filecomments.ts';
 import { refQuery } from './latex-refs.ts';
 import { pages } from './index.ts';
 
@@ -119,6 +123,45 @@ const tex = !setup.missing && setup.engines?.pdflatex;
   const again = await run('save_latex', { id, title: 'Wave notes', template: 'poster' });
   ok(!again.error && (await req('GET', `/api/pages/${id}`)).json().model.main.includes('\\newtheorem{problem}'), 'a template is for new documents only: a saved one keeps its source');
   ok(tools.save_latex.inputSchema && JSON.stringify(tools.save_latex.inputSchema).includes('"template"') && String(tools.save_latex.description).includes('template:'), 'save_latex tells agents of its templates');
+
+  // The papers in the styles conferences ask for: one family, each with its class, its bibliography style and refs.bib.
+  const papers = TEX_TEMPLATES.filter((t) => t.family === 'paper').map((t) => t.id);
+  ok(['paper', 'ieee', 'acm', 'lncs'].every((x) => papers.includes(x as never)), 'the papers are a family: two columns, IEEE, ACM and Springer LNCS');
+  for (const [id, cls, bst] of [
+    ['ieee', '\\documentclass[conference]{IEEEtran}', '\\bibliographystyle{IEEEtran}'],
+    ['acm', '\\documentclass[sigconf]{acmart}', '\\bibliographystyle{ACM-Reference-Format}'],
+    ['lncs', '\\documentclass[runningheads]{llncs}', '\\bibliographystyle{splncs04}'],
+  ] as const) {
+    const d = texFromTemplate(id, 'Heat & light');
+    ok(d.engine === 'pdflatex' && d.main.includes(cls) && d.main.includes(bst) && d.main.includes('\\title{Heat \\& light}') && d.files.some((f) => f.name === 'refs.bib'), `the ${id} template is a paper in its class, with its bibliography style`);
+    ok(texTemplate(id)!.needs.some((n) => n.endsWith('.cls')) && texTemplate(id)!.needs.some((n) => n.endsWith('.bst')), `the ${id} template asks for its class and its bibliography style`);
+  }
+  ok(TEMPLATE_NEEDS.includes('IEEEtran.cls') && TEX_ASKED.includes('acmart.cls') && TEX_ASKED.includes('splncs04.bst'), 'the setup asks TeX for the publishers’ classes and styles');
+  const greekLncs = texFromTemplate('lncs', 'Θερμότητα');
+  ok(greekLncs.engine === 'xelatex' && !greekLncs.main.includes('fontenc') && greekLncs.main.includes('\\usepackage{fontspec}'), 'a Greek title makes an LNCS paper XeLaTeX, without the font encoding only pdfLaTeX reads');
+  const greekAcm = texFromTemplate('acm', 'Θερμότητα');
+  ok(greekAcm.engine === 'xelatex' && !greekAcm.main.includes('fontspec'), 'an ACM paper keeps acmart’s own fonts for Greek letters');
+  ok(texFromTemplate('acm', '热传导').main.includes('\\usepackage{fontspec}'), 'and gets a font for Chinese ones');
+  for (const [alias, cls] of [
+    ['ieeetran', 'IEEEtran'],
+    ['sigconf', 'acmart'],
+    ['springer', 'llncs'],
+  ]) {
+    const made = (await req('GET', `/api/pages/${idOf((await run('save_latex', { title: 'A paper', template: alias })).text)}`)).json().model;
+    ok(made?.main.includes(`{${cls}}`), `save_latex knows the ${cls} template as ${alias} too`);
+  }
+  ok(/ieee \(IEEEtran/.test(String(tools.save_latex.description)) && /texlive-publishers/.test(String(tools.save_latex.description)), 'save_latex tells agents of the papers and what they need');
+  // What the setup says to install for the templates this TeX lacks (or that MiKTeX installs them by itself).
+  if (tex && setup.installed) {
+    const lacking = TEMPLATE_NEEDS.filter((n) => !setup.installed.includes(n));
+    ok(lacking.length ? !!(setup.add?.cmd || setup.add?.auto) : !setup.add || !!setup.add.auto, `the setup says what adds what the templates lack${setup.add?.cmd ? ` (${setup.add.cmd})` : ''}`);
+    if (lacking.includes('IEEEtran.cls') && setup.add?.cmd?.startsWith('sudo apt')) ok(setup.add.cmd.includes('texlive-publishers'), 'on Debian or Ubuntu, the publishers’ classes come with texlive-publishers');
+    if (lacking.includes('IEEEtran.cls')) {
+      const c = (await req('POST', '/api/pages/tex/compile', { model: texFromTemplate('ieee', 'A test') })).json();
+      const e = c.errors.find((x: { message: string }) => /IEEEtran/.test(x.message));
+      ok(e && /texlive-publishers/.test(e.hint ?? '') && /tlmgr install ieeetran/.test(e.hint ?? ''), 'a paper whose class is missing says what to install');
+    }
+  }
 
   if (tex) {
     for (const t of TEX_TEMPLATES) {
@@ -402,6 +445,126 @@ code words not counted
   const v4 = (await req('GET', `/api/pages/${id}`)).json().model;
   const c4 = v4.comments.find((c: { id: string }) => c.id === 'cu1');
   ok(v4.main.slice(c4.from, c4.to) === 'Heat flows', 'a source rewritten by an agent keeps each comment on its words');
+}
+
+// ---- comments on LaTeX files of this computer (Files), kept by the app by each file's path -----------------------------
+{
+  const dir = path.join(tmp, 'files', 'heat');
+  fs.mkdirSync(dir, { recursive: true });
+  const mainText = doc('\\section{Heat}\nHeat flows from hot to cold.\n\\input{results}');
+  const resultsText = '\\section{Results}\nThe rod warms up.\n';
+  fs.writeFileSync(path.join(dir, 'paper.tex'), mainText);
+  fs.writeFileSync(path.join(dir, 'results.tex'), resultsText);
+  const put = (body: unknown) => app.inject({ method: 'PUT', url: '/api/pages/file', payload: JSON.stringify(body), headers: { 'content-type': 'application/json', host: 'app.test' } });
+  const open = async () => (await req('GET', `/api/pages/file?path=${encodeURIComponent(path.join(dir, 'paper.tex'))}`)).json();
+  const o1 = await open();
+  ok(o1.kind === 'tex' && !o1.model.comments && o1.tex.main === 'paper.tex' && o1.model.files.some((f: { name: string }) => f.name === 'results.tex'), 'a LaTeX file opens with its project, no comments yet');
+  const at = (t: string, w: string) => ({ from: t.indexOf(w), to: t.indexOf(w) + w.length, quote: w });
+  const mine = [
+    { id: 'fc1', by: 'user', text: 'Which rod?', at: 1, file: 'main.tex', ...at(mainText, 'Heat flows') },
+    { id: 'fc2', by: 'user', text: 'How fast?', at: 2, file: 'results.tex', ...at(resultsText, 'warms up') },
+  ];
+  const s1 = await put({ path: path.join(dir, 'paper.tex'), model: { ...o1.model, comments: mine }, mtime: o1.mtime, tex: { ...o1.tex, comments: [] } });
+  ok(s1.statusCode === 200 && s1.json().comments?.length === 2 && fs.readFileSync(path.join(dir, 'paper.tex'), 'utf8') === mainText, 'saving keeps the comments in the app, the file as it was');
+  ok(fileComments(db, path.join(dir, 'paper.tex'))[0]?.id === 'fc1' && fileComments(db, path.join(dir, 'results.tex'))[0]?.id === 'fc2', 'each by its own file’s path');
+  const o2 = await open();
+  ok(o2.model.comments?.length === 2 && o2.model.comments.find((c: { id: string }) => c.id === 'fc2')?.file === 'results.tex', 'the file opens again with its project’s comments');
+
+  // An agent reads and answers them, without writing the file.
+  const told = (await run('get_page', { path: path.join(dir, 'paper.tex') })).text ?? '';
+  ok(/Comments: 2 open/.test(told) && /- fc1 on paper\.tex:4 “Heat flows”, by the user: Which rod\?/.test(told) && /- fc2 on results\.tex:2/.test(told), 'get_page with a path lists a file’s comments, by the files’ own names');
+  const answered = await run('save_latex', { path: path.join(dir, 'paper.tex'), comments: [{ id: 'fc1', reply: 'Copper.' }, { file: 'paper.tex', quote: 'hot to cold', text: 'Say from where.' }] });
+  ok(/1 resolved|3 open/.test(answered.text ?? '') && !answered.error, `save_latex with a path answers a file’s comments (${answered.error ?? answered.text})`);
+  ok(fs.readFileSync(path.join(dir, 'paper.tex'), 'utf8') === mainText, 'and leaves the file as it is');
+  const kept = fileComments(db, path.join(dir, 'paper.tex'));
+  ok(kept.find((c) => c.id === 'fc1')?.replies?.[0]?.text === 'Copper.' && kept.some((c) => c.by === 'agent' && c.quote === 'hot to cold'), 'the answer and the agent’s own comment are kept on the file');
+
+  // The editor saves what it had before the agent answered: both are kept (the user's resolution, the agent's reply).
+  const theirs = o2.model.comments;
+  const resolved = theirs.map((c: { id: string }) => (c.id === 'fc1' ? { ...c, resolved: true } : c));
+  const s2 = await put({ path: path.join(dir, 'paper.tex'), model: { ...o2.model, comments: resolved }, mtime: s1.json().mtime, tex: { ...o2.tex, files: s1.json().files, comments: theirs } });
+  const after = s2.json().comments as { id: string; resolved?: boolean; replies?: { text: string }[]; by: string }[];
+  ok(after.find((c) => c.id === 'fc1')?.resolved && after.find((c) => c.id === 'fc1')?.replies?.[0]?.text === 'Copper.' && after.some((c) => c.by === 'agent'), 'a save keeps what an agent did meanwhile, with the user’s changes');
+  // The user deletes the agent's comment: it stays deleted.
+  const s3 = await put({ path: path.join(dir, 'paper.tex'), model: { ...o2.model, comments: after.filter((c) => c.by !== 'agent') }, mtime: s2.json().mtime, tex: { ...o2.tex, files: s2.json().files, comments: after } });
+  ok(!s3.json().comments.some((c: { by: string }) => c.by === 'agent'), 'a comment deleted in the editor stays deleted');
+  ok(mergeTexComments([], [], [{ id: 'x', by: 'agent', text: 't', at: 1, file: 'main.tex', from: 0, to: 0 }]).length === 1, 'one added elsewhere since comes in');
+
+  // Files renames the folder: the comments go with it.
+  const moved = path.join(tmp, 'files', 'heat-moved');
+  fs.renameSync(dir, moved);
+  moveFileComments(db, dir, moved);
+  ok(fileComments(db, path.join(moved, 'results.tex'))[0]?.id === 'fc2' && !fileComments(db, path.join(dir, 'results.tex')).length, 'a folder renamed takes its files’ comments along');
+  moveFileComments(db, path.join(moved, 'results.tex'), path.join(moved, 'findings.tex'));
+  ok(fileComments(db, path.join(moved, 'findings.tex'))[0]?.id === 'fc2', 'and a file renamed, its own');
+  ok(String(tools.get_page.description).includes('path') && String(tools.save_latex.description).includes('save_latex with path'), 'agents are told how to read and answer a file’s comments');
+}
+
+// ---- tracked changes ----------------------------------------------------------------------------------------------------
+{
+  const main = doc('Heat flows from hot to cold.\nThe rod is long.\n%%%% naget-changes\nEnd.');
+  const at = (w: string) => main.indexOf(w);
+  const d = normalizeTex({
+    main,
+    track: true,
+    changes: [
+      { id: 't1', kind: 'ins', file: 'main.tex', from: at('hot'), to: at('hot') + 3, text: 'hot', by: 'user', at: 5 },
+      { id: 't2', kind: 'del', file: 'main.tex', from: at(' long'), to: at(' long'), text: ' very', by: 'agent', at: 6 },
+      { id: 't3', kind: 'ins', file: 'gone.tex', from: 0, to: 1, text: 'x' },
+      { id: 't4', kind: 'nonsense', file: 'main.tex', from: 0, to: 1 },
+      { kind: 'del', file: 'main.tex', from: 3, to: 3, text: '' },
+    ],
+  });
+  ok(d.track === true && d.changes?.length === 2 && d.changes[0].id === 't1' && d.changes[1].before?.endsWith('The rod is'), 'tracked changes are kept, checked: on a file the document has, with something in them, the place before words taken out');
+  const kept = texText(d);
+  ok(JSON.stringify(normalizeTex(parseTexText(kept))) === JSON.stringify(d), 'they keep as text with the switch, and read back');
+  ok(kept.includes('\n!%%%% naget-changes\n') && parseTexText(kept).main === main, 'a line of a file that reads like their marker is kept as itself');
+  const shifted = normalizeTex({ ...d, main: main.replace('Heat flows', 'Heat always flows') });
+  ok(shifted.main.slice(shifted.changes![0].from, shifted.changes![0].to) === 'hot' && shifted.main.slice(shifted.changes![1].from - 10, shifted.changes![1].from) === 'The rod is', 'text changed elsewhere: each is found again on its words');
+  ok(normalizeTex({ ...d, main: main.replace('hot', 'warm') }).changes?.every((c) => c.id !== 't1'), 'words put in that are gone are no change any more');
+  // Accept and reject.
+  const acc = texChangeOps(d, [{ id: 't1', accept: true }]);
+  ok(acc.main === d.main && acc.changes?.length === 1 && acc.changes[0].id === 't2', 'accepting keeps the text and forgets the change');
+  const rejIns = texChangeOps(d, [{ id: 't1', reject: true }]);
+  ok(rejIns.main.includes('from  to cold') && rejIns.changes?.[0].id === 't2' && rejIns.main.slice(rejIns.changes[0].from - 10, rejIns.changes[0].from) === 'The rod is', 'rejecting words put in takes them out; the others stay on their words');
+  const rejDel = texChangeOps(d, [{ id: 't2', reject: true }]);
+  ok(rejDel.main.includes('The rod is very long.') && rejDel.changes?.[0].id === 't1' && rejDel.main.slice(rejDel.changes[0].from, rejDel.changes[0].to) === 'hot', 'rejecting words taken out puts them back');
+  ok(!texChangeOps(d, 'accept all').changes && texChangeOps(d, 'accept all').main === d.main, 'accept all');
+  const all = texChangeOps(d, { all: 'reject' });
+  ok(!all.changes && all.main.includes('from  to cold') && all.main.includes('is very long'), 'reject all');
+  const notes: string[] = [];
+  texChangeOps(d, [{ id: 'nope', accept: true }], notes);
+  ok(/no tracked change nope/.test(notes.join()), 'a change that is not there is said');
+  const e = editText('abcdef', [
+    { from: 1, to: 3, insert: '' },
+    { from: 4, to: 4, insert: 'XY' },
+  ]);
+  ok(e.text === 'adXYef' && e.map(5, 1) === 5 && e.map(4, -1) === 2 && e.map(4, 1) === 4 && e.map(2, 1) === 1, 'edits at once, and where places go');
+
+  // Agents: the switch, their saves marked word by word, deciding the changes.
+  const made = await run('save_latex', { title: 'Tracked', source: doc('We study how heat flows along a thin rod.\nIt is copper.') });
+  const id = idOf(made.text);
+  await run('save_latex', { id, track: true });
+  const on = (await req('GET', `/api/pages/${id}`)).json().model;
+  ok(on.track === true && !on.changes, 'an agent switches Track changes on');
+  await run('save_latex', { id, source: on.main.replace('a thin rod', 'a long rod').replace('It is copper.', 'It is made of copper.') });
+  const v3 = (await req('GET', `/api/pages/${id}`)).json().model;
+  const kinds = (v3.changes ?? []).map((c: TexChange) => `${c.kind}:${c.text.trim()}:${c.by}`);
+  ok(kinds.includes('del:thin:agent') && kinds.includes('ins:long:agent') && kinds.includes('ins:made of:agent') && v3.main.includes('a long rod'), `while it is on, an agent's save is marked as its changes, word by word (${kinds.join(', ')})`);
+  const told = (await run('get_page', { id })).text ?? '';
+  ok(/Track changes: on/.test(told) && /3 tracked changes/.test(told) && /taken out by an agent in main\.tex:3: “thin”/.test(told), 'get_page lists them, where they are and who made them');
+  const thin = v3.changes.find((c: TexChange) => c.text === 'thin');
+  const long = v3.changes.find((c: TexChange) => c.text === 'long');
+  await run('save_latex', { id, changes: [{ id: thin.id, reject: true }, { id: long.id, reject: true }] });
+  const v4 = (await req('GET', `/api/pages/${id}`)).json().model;
+  ok(v4.main.includes('a thin rod') && v4.changes?.length === 1 && v4.changes[0].text.trim() === 'made of', 'an agent rejects changes: the text comes back');
+  await run('save_latex', { id, changes: 'accept all', track: false });
+  const v5 = (await req('GET', `/api/pages/${id}`)).json().model;
+  ok(!v5.changes && !v5.track && v5.main.includes('made of copper'), 'and accepts the rest, and switches it off');
+  await run('save_latex', { id, source: v5.main.replace('copper', 'steel') });
+  ok(!(await req('GET', `/api/pages/${id}`)).json().model.changes, 'with it off, an agent’s save is not marked');
+  ok(JSON.stringify(tools.save_latex.inputSchema).includes('"track"') && String(tools.save_latex.description).includes('Track changes'), 'save_latex tells agents of Track changes');
+  ok(diffWords('the red car', 'the blue truck')[0]?.del === 'red car' && diffWords('Intro', 'Introduction')[0]?.ins === 'Introduction', 'changes are whole words');
 }
 
 // ---- what an agent is told ---------------------------------------------------------------------------------------------

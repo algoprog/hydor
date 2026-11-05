@@ -1,0 +1,18 @@
+% A form of hyperref's fields, for the PDF tests (pdf-test.ts): pdflatex tex-form-source.tex makes tex-form.pdf.
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\begin{document}
+\section*{Membership form}
+\begin{Form}
+Full name: \TextField[name=fullname,width=6cm]{}\par\medskip
+Email address: \TextField[name=email,width=6cm,value={ann@example.com}]{}\par\medskip
+Comments: \TextField[name=comments,multiline=true,width=8cm,height=2cm]{}\par\medskip
+\CheckBox[name=newsletter]{Send me the newsletter}\par\medskip
+Plan: \ChoiceMenu[radio,name=plan]{}{Basic=basic,Pro=pro,Team=team}\par\medskip
+Country: \ChoiceMenu[combo,name=country,width=4cm]{}{Greece,Cyprus,Portugal,Other}\par\medskip
+Languages: \ChoiceMenu[name=langs,width=4cm,height=1.5cm]{}{English,Greek,Chinese}\par
+\end{Form}
+\bigskip
+Signature: \underline{\hspace{6cm}} \qquad Date: \underline{\hspace{3cm}}
+\end{document}

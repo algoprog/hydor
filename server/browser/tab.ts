@@ -443,16 +443,18 @@ export class Tab {
     return { x: 0, y: 0 };
   }
 
-  /** Scrolls an element into view and finds the point to click it, checking nothing covers it. */
-  async point(ref: ElRef): Promise<Point> {
+  /** Where an element shows in the viewport (its first box on screen, cut to the viewport), in CSS pixels; scrolled into view first when asked. */
+  async rectOf(ref: ElRef, scroll = false): Promise<{ x: number; y: number; w: number; h: number } | { error: string }> {
     const s = this.sessionOf(ref);
     if (!s) return { error: 'its frame has gone' };
-    try {
-      await s.send('DOM.scrollIntoViewIfNeeded', { backendNodeId: ref.backendNodeId });
-    } catch (e) {
-      return { error: /not.*(found|visible)|No node/i.test((e as Error).message) ? 'it is no longer on the page' : (e as Error).message };
+    if (scroll) {
+      try {
+        await s.send('DOM.scrollIntoViewIfNeeded', { backendNodeId: ref.backendNodeId });
+      } catch (e) {
+        return { error: /not.*(found|visible)|No node/i.test((e as Error).message) ? 'it is no longer on the page' : (e as Error).message };
+      }
+      await sleep(60);
     }
-    await sleep(60);
     let quads: number[][];
     try {
       quads = (await s.send('DOM.getContentQuads', { backendNodeId: ref.backendNodeId })).quads ?? [];
@@ -469,15 +471,37 @@ export class Tab {
       const y0 = Math.max(0, Math.min(...ys));
       const y1 = Math.min(vh, Math.max(...ys));
       if (x1 - x0 < 1 || y1 - y0 < 1) continue;
-      const p = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
-      // Something else on top (a cookie banner, a dialog) would take the click.
-      if (!ref.session) {
-        const cover = await this.coveredBy(ref.backendNodeId, p);
-        if (cover) return { error: `it is covered by ${cover}` };
-      }
-      return p;
+      return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
     }
     return { error: 'it is not visible (zero size or off screen)' };
+  }
+
+  /** Scrolls an element into view (unless it was just now) and finds the point to click it, checking nothing covers it. */
+  async point(ref: ElRef, scroll = true): Promise<Point> {
+    const r = await this.rectOf(ref, scroll);
+    if ('error' in r) return r;
+    const p = { x: r.x + r.w / 2, y: r.y + r.h / 2 };
+    // Something else on top (a cookie banner, a dialog) would take the click.
+    if (!ref.session) {
+      const cover = await this.coveredBy(ref.backendNodeId, p);
+      if (cover) return { error: `it is covered by ${cover}` };
+    }
+    return p;
+  }
+
+  /**
+   * The CSS pixels the live view's frames span: the whole viewport, its scrollbars too (a page zoomed out to fit a
+   * phone's screen shows more of them). Fractions of the frame times these are where input lands, and the other way.
+   */
+  async frameSize(): Promise<{ w: number; h: number }> {
+    try {
+      const m = await this.s.send('Page.getLayoutMetrics', {}, 5000);
+      const v = m.cssVisualViewport ?? m.visualViewport;
+      const k = v?.scale > 0 ? v.scale : 1;
+      return { w: Math.max(v?.clientWidth || 0, this.viewport.w / k), h: Math.max(v?.clientHeight || 0, this.viewport.h / k) };
+    } catch {
+      return { w: this.viewport.w, h: this.viewport.h };
+    }
   }
 
   /** What covers an element at a point, described; null when the element (or its own content) is there. */

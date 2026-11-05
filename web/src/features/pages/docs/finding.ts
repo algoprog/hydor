@@ -129,9 +129,10 @@ export function useDocFind(engine: DocEngine | null, model: Doc | null, find: Fi
       if (!engine || !matches.length) return;
       engine.replace(matches, (x) => replacementOf(textOf(x), { s: x.s, e: x.e }, find.query, find.replacement, find.options));
     },
-    /** The current match picked in the page (when the bar closes). */
+    /** The current match picked in the page (when the bar closes); with none left, the caret back where it was. */
     select: () => {
-      if (!engine || current < 0) return;
+      if (!engine) return;
+      if (current < 0) return engine.focus();
       const f = matches[current];
       const at = { b: f.b, ...(f.c ? { c: f.c } : {}) };
       engine.place({ a: { ...at, o: f.s }, f: { ...at, o: f.e } });

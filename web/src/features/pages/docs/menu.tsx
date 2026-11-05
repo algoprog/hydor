@@ -3,6 +3,11 @@
 // picture, a table's size, zoom, line spacing, a table's cells…) open in the menu's place. What a menu does is the
 // engine's, or the editor's (a dialog, a panel): this file only says what is where.
 import {
+  CheckCheck,
+  GitCompareArrows,
+  FilePenLine,
+  ListX,
+  PencilLine,
   AlignCenter,
   AlignJustify,
   AlignLeft,
@@ -37,6 +42,7 @@ import {
   Search,
   SeparatorHorizontal,
   Sigma,
+  Signature,
   SpellCheck,
   Strikethrough,
   Subscript,
@@ -96,6 +102,8 @@ export interface DocMenuCtx {
   comment: () => void;
   picture: () => void;
   pictureUrl: () => void;
+  /** Insert → Signature: a saved one, or one drawn there. */
+  signature: () => void;
   link: () => void;
   equation: (inline: boolean) => void;
   chars: () => void;
@@ -111,6 +119,16 @@ export interface DocMenuCtx {
   copy: (cut: boolean) => void;
   painter: () => void;
   today: () => void;
+  /** Editing, or Suggesting (changes suggested). */
+  mode: 'edit' | 'suggest';
+  setMode: (m: 'edit' | 'suggest') => void;
+  /** How many suggested changes there are. */
+  suggestions: number;
+  resolveAll: (accept: boolean) => void;
+  /** Compare with a version: the list of versions to pick one from. */
+  compare: () => void;
+  /** An older version on view: nothing changes it. */
+  readOnly?: boolean;
 }
 
 /** The editor's menus, for what is where the caret is now. */
@@ -142,6 +160,15 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     { label: 'Outline', icon: <ListTree size={15} />, checked: c.outline, also: 'headings navigation', run: c.toggleOutline },
     { label: 'Comments', icon: <MessageSquarePlus size={15} />, checked: c.comments, run: c.toggleComments },
     { label: 'Show resolved comments', checked: c.resolved, run: c.toggleResolved },
+    {
+      label: 'Editing or suggesting',
+      icon: <FilePenLine size={15} />,
+      also: 'mode track changes review',
+      items: [
+        { label: 'Edit directly', icon: <PencilLine size={15} />, checked: c.mode === 'edit', disabled: c.readOnly, also: 'editing mode', run: () => c.setMode('edit') },
+        { label: 'Suggest changes', icon: <FilePenLine size={15} />, keys: 'Ctrl+Alt+Shift+X', checked: c.mode === 'suggest', disabled: c.readOnly, also: 'suggesting mode track changes', run: () => c.setMode('suggest') },
+      ],
+    },
     '-',
     {
       label: 'Zoom',
@@ -171,6 +198,7 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
         { label: 'A picture from the web', icon: <Link2 size={15} />, run: c.pictureUrl },
       ],
     },
+    { label: 'Signature', icon: <Signature size={15} />, also: 'sign signing initials autograph handwriting', disabled: c.readOnly, run: c.signature },
     { label: 'Table', icon: <Table2 size={15} />, also: 'grid', items: tableSizes },
     { label: 'Link', icon: <Link2 size={15} />, keys: 'Ctrl+K', run: c.link },
     { label: 'Comment', icon: <MessageSquarePlus size={15} />, keys: 'Ctrl+Alt+M', disabled: !st.text.trim(), run: c.comment },
@@ -300,6 +328,10 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
   const tools: MenuEntry[] = [
     { label: 'Word count', icon: <BookOpenText size={15} />, keys: 'Ctrl+Shift+C', also: 'characters pages reading time', run: c.wordCount },
     { label: 'Keyboard shortcuts', icon: <Keyboard size={15} />, keys: 'Ctrl+/', run: c.shortcuts },
+    '-',
+    { label: 'Accept all suggestions', icon: <CheckCheck size={15} />, disabled: !c.suggestions || c.readOnly, also: 'track changes review', run: () => c.resolveAll(true) },
+    { label: 'Reject all suggestions', icon: <ListX size={15} />, disabled: !c.suggestions || c.readOnly, also: 'track changes review', run: () => c.resolveAll(false) },
+    { label: 'Compare with a version', icon: <GitCompareArrows size={15} />, also: 'versions history diff changes since restore', run: c.compare },
     '-',
     { label: 'Format painter', icon: <PaintRoller size={15} />, checked: !!e.paint, run: c.painter },
     { label: 'Print', icon: <Printer size={15} />, keys: 'Ctrl+P', run: c.print },

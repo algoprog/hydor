@@ -2,12 +2,21 @@
 // which hands it what it needs (`Core`) and asks it to draw, act and clean up (`Writing`). Words flow from block to
 // block: Enter makes the next block of the right kind (and leaves a list from an empty item), Backspace at a block's
 // start joins it to the block before, the arrows go on into the block above or below, Tab and Shift+Tab nest and
-// un-nest a list's items. Markdown works as you type ("# ", "- ", "1. ", "[] ", "> ", "```", "---", **bold**,
+// un-nest a list's items (and Tab puts a block under the list before it). An item under another turned into a
+// paragraph, a heading, a quote… keeps its place there, held by its item (li.n-block), with the items under it, as
+// Notion keeps a block under its parent. Markdown works as you type ("# ", "- ", "1. ", "[] ", "> ", "```", "---", **bold**,
 // *italic*, `code`, ~~struck~~). "/" lists the blocks to add, filtered as you type. Beside the block under the
 // pointer sit a + (adds a block under it) and a ⋮⋮ (drag it elsewhere, or click it for its menu: Turn into, Colour,
-// Duplicate, Move, Copy, Delete, Ask the agent). Shift+click or a drag down the margin picks several blocks. To-dos
+// Duplicate, Move, Copy, Delete, Ask the agent). Shift+click, or a drag from beside the blocks (either margin, a gap,
+// beside a block's words, the +) as Notion's drag-select, picks several blocks, a list's items one by one. To-dos
 // tick and toggles fold in Edit too, a table of contents keeps up with the headings, a page gets an icon and a cover,
-// and pictures dropped or pasted in land where they fall (the app makes them small enough to live in the page).
+// pictures dropped or pasted in land where they fall (the app makes them small enough to live in the page), and code
+// blocks are coloured as their code is written (shared/code-colours.ts), with a language picked by the chip at their
+// corner or Auto; the colours are taken off again in the page given back, which keeps its code as plain text (plain
+// <pre><code> blocks agents write are coloured too, and kept as they were written). "@" (or "/" → Link to a page) puts
+// in a link to another of the Library's pages, whose list the app tells it, as a chip. "/" → Database puts in a
+// database (shared/page-db.ts), drawn in its block and kept with the page's own data through the app: a copy of one
+// (Duplicate, a paste) becomes a database of its own, with the rows the first holds.
 //
 // What it adds to the page uses the kit's classes (shared/page-kit.ts), so it suits the page light or dark; what is
 // its own (hints in empty blocks, handles, menus) is drawn over the page or stripped before the page is given back.
@@ -15,6 +24,9 @@
 //
 // Like the editor, the function runs in the browser: its source is sent as text, so it uses only its argument and
 // the browser's own globals.
+
+import type { CodeColours } from '../../shared/code-colours.ts';
+import type { DbStore, PageDatabases } from '../../shared/page-db.ts';
 
 /** What a block is, for writing in it. */
 export type Kind = 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'bullet' | 'number' | 'todo' | 'quote' | 'code' | 'toggle' | 'callout';
@@ -62,11 +74,22 @@ export interface Core {
   length: (h: Element) => number;
   copy: (html: string, name: string) => void;
   canAsk: () => boolean;
+  /** The code blocks' colours (shared/code-colours.ts). */
+  code: CodeColours;
+  /** Whether the app keeps comments for this page (a page of the Library). */
+  canComment: () => boolean;
+  /** The databases (shared/page-db.ts), and the page's own data they are kept in, through the app. */
+  db: PageDatabases;
+  store: DbStore;
 }
 
 /** What the writing does for the editor. */
 export interface Writing {
   draw(): void;
+  /** The page is in place: what follows it (a table of contents an agent left empty) is brought up to date, not counted as a change. */
+  ready(): void;
+  /** A part put in from the app (Add): a database it brings gets a name of its own in the page. */
+  prepare(node: Element): void;
   act(a: string, arg: any): boolean;
   started(h: HTMLElement): void;
   finished(h: HTMLElement): void;
@@ -89,6 +112,7 @@ export function writing(E: Core): Writing {
     e.stopImmediatePropagation();
   };
   const isMod = (e: KeyboardEvent | MouseEvent) => e.metaKey || e.ctrlKey;
+  const coarse = matchMedia('(pointer: coarse)').matches;
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = ''): HTMLElementTagNameMap[K] => {
     const x = doc.createElement(tag);
@@ -110,8 +134,22 @@ export function writing(E: Core): Writing {
 
   // ---- what blocks are -------------------------------------------------------------------------------------------
   const isList = (x: Element | null | undefined): x is HTMLElement => !!x && (x.tagName === 'UL' || x.tagName === 'OL');
+  /**
+   * A block under a list's item keeps its place there, as Notion keeps a block under its parent: an item of the list
+   * holds it (li.n-block, no marker of its own), with the items under it after it. The block it holds, or null.
+   */
+  const blockIn = (li: Element | null | undefined): HTMLElement | null => {
+    if (!li || li.tagName !== 'LI' || !li.classList.contains('n-block')) return null;
+    const b = li.firstElementChild;
+    return b && !isList(b) ? (b as HTMLElement) : null;
+  };
+  /** The item that holds a block, if one does. */
+  const holderOf = (b: Element) => {
+    const p = b.parentElement;
+    return p && blockIn(p) === b ? (p as HTMLElement) : null;
+  };
   const boxOf = (li: Element) => li.querySelector<HTMLInputElement>(':scope > input[type=checkbox]');
-  const isTodo = (li: Element) => li.tagName === 'LI' && (!!li.parentElement?.classList.contains('n-todo') || !!boxOf(li));
+  const isTodo = (li: Element) => li.tagName === 'LI' && !li.classList.contains('n-block') && (!!li.parentElement?.classList.contains('n-todo') || !!boxOf(li));
   const subLists = (h: Element) => (h.tagName === 'LI' ? [...h.children].filter(isList) : []);
   /** A to-do's words (the span after its box), made when it has none yet: an agent's to-do may have its words loose. */
   const todoWords = (li: Element, mk: boolean): HTMLElement | null => {
@@ -136,17 +174,20 @@ export function writing(E: Core): Writing {
     c.append(d);
     return d;
   };
-  /** The block some words belong to: a to-do's item, a callout, a toggle; else the words' own element. */
+  /** The block some words belong to: a to-do's item, a callout, a toggle (and the item that holds it, if one does); else the words' own element. */
   const unitOf = (h: Element): Element => {
     const p = h.parentElement;
+    let u = h;
     if (!p) return h;
-    if (h.tagName === 'SPAN' && p.tagName === 'LI' && isTodo(p) && todoWords(p, false) === h) return p;
-    if (h.classList.contains('n-callout-text') && p.classList.contains('n-callout')) return p;
-    if (h.tagName === 'SUMMARY' && p.tagName === 'DETAILS') return p;
-    return h;
+    if (h.tagName === 'SPAN' && p.tagName === 'LI' && isTodo(p) && todoWords(p, false) === h) u = p;
+    else if (h.classList.contains('n-callout-text') && p.classList.contains('n-callout')) u = p;
+    else if (h.tagName === 'SUMMARY' && p.tagName === 'DETAILS') u = p;
+    return holderOf(u) ?? u;
   };
   const kindOf = (u: Element | null | undefined): Kind | null => {
     if (!u) return null;
+    const held = blockIn(u);
+    if (held) return kindOf(held);
     const t = u.tagName;
     if (/^H[1-6]$/.test(t)) return t.toLowerCase() as Kind;
     if (t === 'P') return 'p';
@@ -159,6 +200,8 @@ export function writing(E: Core): Writing {
   };
   /** Where a block's words are written (made when `mk` and it has none yet), or null when there are none to write. */
   const hostOf = (u: Element, mk = false): HTMLElement | null => {
+    const held = blockIn(u);
+    if (held) return hostOf(held, mk);
     let h: HTMLElement | null = null;
     if (u.tagName === 'LI' && isTodo(u)) h = todoWords(u, mk);
     else if (u.classList.contains('n-callout')) h = calloutWords(u, mk);
@@ -304,7 +347,8 @@ export function writing(E: Core): Writing {
       }
       case 'code': {
         const pre = make('pre', 'n-code');
-        const text = words ? plainOf(words) : '';
+        // (the line break a browser keeps at the end of a block's words is no line of code)
+        const text = words ? plainOf(words).replace(/\n$/, '') : '';
         if (text) pre.append(text);
         else pre.append(make('br'));
         return { unit: pre, host: pre };
@@ -404,6 +448,25 @@ export function writing(E: Core): Writing {
     while (nested(li)) outdent(li);
     split(li);
   };
+  /** A block put in a list beside its items: an item of its own holds it. */
+  const holdIn = (b: Element): HTMLElement => {
+    const li = make('li', 'n-block');
+    b.replaceWith(li);
+    li.append(b);
+    return li;
+  };
+  /** A held block at the list's top level leaves it, where it was (the list splits there), the items under it after it. */
+  const unhold = (li: HTMLElement) => {
+    const b = blockIn(li);
+    if (!b) return;
+    split(li);
+    li.replaceWith(b, ...subLists(li));
+  };
+  /** Shift+Tab, Backspace at its start, Enter in it empty: a held block goes up a level, and out of the list from its top. */
+  const lift = (li: HTMLElement) => {
+    if (nested(li)) outdent(li);
+    if (!nested(li)) unhold(li);
+  };
   /** Makes an item the only one of a list of its own, where it is. */
   const isolate = (li: Element): HTMLElement => {
     const list = li.parentElement as HTMLElement;
@@ -467,10 +530,11 @@ export function writing(E: Core): Writing {
     const h = hostOf(u, true);
     if (!from || !h) return null;
     if (from === kind) return h;
+    const held = blockIn(u);
     let words = takeAll(h);
     if (from === 'code' && kind !== 'code') words = textFrag(plainOf(words));
     const { unit: nu, host: nh } = newUnit(kind, words);
-    copyLook(u, nu, true);
+    copyLook(held ?? u, nu, true);
     const lk = LISTK[kind];
     if (u.tagName === 'LI') {
       const checked = kind === 'todo' && from === 'todo' ? boxOf(u)?.hasAttribute('checked') : false;
@@ -481,6 +545,19 @@ export function writing(E: Core): Writing {
         for (const s of subs) nu.append(s);
         if (checked) boxOf(nu)?.setAttribute('checked', '');
         merge(retype(list, lk[0], lk[1]));
+      } else if (held) {
+        // A block an item holds, turned into another: in its place there (what a toggle folded, after it).
+        held.replaceWith(nu);
+        if (held.tagName === 'DETAILS') nu.after(...[...held.children].filter((c) => c.tagName !== 'SUMMARY'));
+      } else if (nested(u)) {
+        // An item under another, turned into a block, keeps its place there, and the items under it stay under it: the
+        // item holds the block now, with no marker of its own (its look and colours go to the block).
+        boxOf(u)?.remove();
+        todoWords(u, false)?.remove();
+        nu.removeAttribute('id');
+        u.removeAttribute('style');
+        u.className = 'n-block';
+        u.prepend(nu);
       } else {
         // Up to the top first: on the way the items after it go inside it, so its lists are read after.
         toTop(u);
@@ -502,14 +579,18 @@ export function writing(E: Core): Writing {
     return nh;
   };
   /**
-   * Puts a new block after a block: an item stays in its list (or one of its own kind there), anything else goes after
-   * the list it would be in. `kind`: what the new block is (an item not yet in a list can't say which list it is for).
+   * Puts a new block after a block: an item stays in its list (or one of its own kind there); anything else, after an
+   * item under another, stays at that level (held), else goes after the list it would be in. `kind`: what the new block
+   * is (an item not yet in a list can't say which list it is for).
    */
   const putAfter = (nu: HTMLElement, u: Element, kind: Kind = kindOf(nu) ?? 'p') => {
     const lk = LISTK[kind];
     if (u.tagName === 'LI') {
       u.after(nu);
-      if (nu.tagName !== 'LI') {
+      if (nu.tagName !== 'LI' && nested(u)) {
+        // Under an item, at the level of the one it follows: an item of its own holds it.
+        holdIn(nu);
+      } else if (nu.tagName !== 'LI') {
         // Out of the list, splitting it there: by way of an item that goes up to the top, then makes room.
         const tmp = make('li');
         nu.replaceWith(tmp);
@@ -677,15 +758,20 @@ export function writing(E: Core): Writing {
     if (!k || k === 'code') return false;
     dropSelected(h);
     const empty = emptyHost(h);
-    if (isListKind(k) && empty) {
-      // An empty item leaves the list (or goes up a level).
-      E.change(() => (nested(u) ? (outdent(u), writeIn(h)) : writeIn(turnInto(u, 'p'))));
+    // A block an item holds: the item is what comes and goes (its block's own element, for a toggle's inside).
+    const held = blockIn(u);
+    const blk = held ?? u;
+    if ((isListKind(k) || held) && empty) {
+      // An empty item leaves the list (or goes up a level); so does an empty block an item holds.
+      E.change(() => (held ? (lift(u as HTMLElement), writeIn(h)) : nested(u) ? (outdent(u), writeIn(h)) : writeIn(turnInto(u, 'p'))));
       return true;
     }
     if (!empty && atStart(h)) {
       // At a block's start: an empty block before it, the caret staying.
       E.change(() => {
-        u.before(newUnit(isListKind(k) ? k : 'p').unit);
+        const nb = newUnit(isListKind(k) ? k : 'p').unit;
+        u.before(nb);
+        if (held) holdIn(nb);
         return writeIn(h);
       });
       return true;
@@ -695,13 +781,15 @@ export function writing(E: Core): Writing {
       const words = end ? null : takeTail(h);
       const nk: Kind = isListKind(k) ? k : (isHeading(k) || k === 'quote') && !end ? k : 'p';
       const { unit: nu, host: nh } = newUnit(nk, words);
-      if (!end && nk === k) copyLook(u, nu, false);
+      if (!end && nk === k) copyLook(blk, nu, false);
       if (k === 'toggle') {
-        (u as HTMLDetailsElement).open = true;
+        (blk as HTMLDetailsElement).open = true;
         h.after(nu);
       } else {
         u.after(nu);
-        if (u.tagName === 'LI' && nu.tagName === 'LI') for (const s of subLists(u)) nu.append(s);
+        // The items under it go with the new one, which comes right under its words.
+        const into = held ? holdIn(nu) : nu;
+        if (u.tagName === 'LI' && into.tagName === 'LI') for (const s of subLists(u)) into.append(s);
       }
       fillEmpty(h);
       return writeIn(nh);
@@ -713,10 +801,12 @@ export function writing(E: Core): Writing {
     const u = unitOf(h);
     const k = kindOf(u);
     const off = E.offset(h) ?? 0;
+    const blk = blockIn(u) ?? u;
     if (k === 'code') {
       E.change(() => {
         const { unit, host } = newUnit('p');
         u.after(unit);
+        if (blk !== u) holdIn(unit);
         return writeIn(host);
       });
       return true;
@@ -724,7 +814,7 @@ export function writing(E: Core): Writing {
     if (k === 'todo' || k === 'toggle') {
       E.change(() => {
         if (k === 'todo') tick(u);
-        else (u as HTMLDetailsElement).open = !(u as HTMLDetailsElement).open;
+        else (blk as HTMLDetailsElement).open = !(blk as HTMLDetailsElement).open;
         return writeIn(h, { off });
       });
       return true;
@@ -743,6 +833,11 @@ export function writing(E: Core): Writing {
     }
     if (k === 'quote' || k === 'callout' || k === 'toggle' || k === 'code') {
       E.change(() => writeIn(turnInto(u, 'p')));
+      return true;
+    }
+    if (blockIn(u)) {
+      // A block an item holds goes up a level first (out of the list from its top), as an item does.
+      E.change(() => (lift(u as HTMLElement), writeIn(h)));
       return true;
     }
     if (emptyHost(h)) {
@@ -809,9 +904,20 @@ export function writing(E: Core): Writing {
   const tab = (e: KeyboardEvent, h: HTMLElement): boolean => {
     const u = unitOf(h);
     const k = kindOf(u);
-    if (isListKind(k)) {
-      const off = E.offset(h) ?? 0;
-      E.change(() => ((e.shiftKey ? outdent(u) : indent(u)) ? writeIn(h, { off }) : null));
+    const off = E.offset(h) ?? 0;
+    if (isListKind(k) || blockIn(u)) {
+      E.change(() => ((e.shiftKey ? (blockIn(u) ? (lift(u as HTMLElement), true) : outdent(u)) : indent(u)) ? writeIn(h, { off }) : null));
+      return true;
+    }
+    // A block right after a list goes under its last item (as Notion nests a block under the one before it).
+    const before = prevSib(u);
+    if (!e.shiftKey && k && k !== 'code' && isList(before) && before.lastElementChild?.tagName === 'LI') {
+      E.change(() => {
+        const li = holdIn(u);
+        before.append(li);
+        indent(li);
+        return writeIn(h, { off });
+      });
       return true;
     }
     if (k === 'code') {
@@ -864,9 +970,14 @@ export function writing(E: Core): Writing {
         takeAll(h);
         if (whole === '```') return writeIn(turnInto(u, 'code'));
         const hr = make('hr');
-        u.replaceWith(hr);
+        const blk = blockIn(u) ?? u;
+        blk.replaceWith(hr);
         const { unit, host } = newUnit('p');
-        hr.after(unit);
+        // (in a list, the line across stays held where the block was, and the next words get an item of their own)
+        if (blk !== u) {
+          u.after(unit);
+          holdIn(unit);
+        } else hr.after(unit);
         return writeIn(host);
       });
       return true;
@@ -992,6 +1103,12 @@ export function writing(E: Core): Writing {
     left: '<path d="m15 6-6 6 6 6"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
     image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+    comment: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    // a page of the Library, by its kind (for links to it)
+    page: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+    pagelink: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4"/><path d="M14 3v5h5V11"/><path d="M15 21l6-6"/><path d="M17 15h4v4"/>',
+    doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h6"/>',
+    slides: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4"/><path d="M8 20h8"/>',
   };
   const svg = (k: string, size = 16) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k] ?? ''}</svg>`;
   const glyph = (t: string) => `<span class="gl">${t}</span>`;
@@ -1006,6 +1123,8 @@ export function writing(E: Core): Writing {
     .hd.col .hb{width:18px;height:22px}
     .end{position:fixed;display:none;pointer-events:auto;width:26px;height:26px;border:1px dashed ${line}}
     .menu,.sl{position:fixed;display:none;flex-direction:column;pointer-events:auto;box-sizing:border-box;min-width:232px;max-width:calc(100vw - 12px);padding:4px;border-radius:12px;background:${panel};border:1px solid ${line};box-shadow:0 10px 32px rgba(0,0,0,${dark ? '.45' : '.18'});font:13px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;color:${ink};overflow-y:auto;overscroll-behavior:contain}
+    :is(.menu,.sl)>*{flex:none}
+    .mh .q{margin-left:6px;font:500 11.5px ui-monospace,monospace;color:${ink}}
     :is(.menu,.sl) .row{all:unset;display:flex;align-items:center;gap:9px;height:30px;padding:0 9px;border-radius:7px;cursor:pointer;white-space:nowrap;box-sizing:border-box;min-width:0}
     :is(.menu,.sl) .row.on{background:${hover}}
     :is(.menu,.sl) .row.danger{color:${dark ? '#f28b8b' : '#bd2525'}}
@@ -1031,12 +1150,19 @@ export function writing(E: Core): Writing {
     .offer button:hover{background:${hover};color:${ink}}
     .cv button{background:${panel};color:${ink};border:1px solid ${line};box-shadow:0 2px 8px rgba(0,0,0,.15)}
     .cv button:hover{background:${hover}}
-    @media (pointer:coarse){.offer button{height:32px;font-size:13px}.hb,.hd.col .hb{width:32px;height:34px}.end{width:34px;height:34px}:is(.menu,.sl) .row{height:40px}.sw{grid-template-columns:repeat(10,28px)}.sw button{width:28px;height:28px}.offer button,.cv button{height:34px}}
+    .cl{all:unset;position:fixed;display:none;align-items:center;gap:2px;height:22px;padding:0 5px 0 8px;border-radius:6px;background:${panel};border:1px solid ${line};color:${muted};font:500 11.5px system-ui,-apple-system,sans-serif;cursor:pointer;pointer-events:auto;box-sizing:border-box;white-space:nowrap}
+    .cl:hover{color:${ink};background:${hover}}
+    .cm{all:unset;position:fixed;display:flex;align-items:center;gap:3px;height:20px;padding:0 6px;border-radius:10px;background:${dark ? '#3a3215' : '#fbefc4'};color:${dark ? '#f2c94c' : '#7a5600'};font:600 11px/1 system-ui,-apple-system,sans-serif;cursor:pointer;pointer-events:auto;box-sizing:border-box;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+    .cm:hover{filter:brightness(${dark ? 1.25 : 0.96})}
+    .cmshow{position:fixed;display:none;pointer-events:none;box-sizing:border-box;border:2px solid #e3b341;border-radius:6px;background:#e3b3411a}
+    @media (pointer:coarse){.offer button{height:32px;font-size:13px}.hb,.hd.col .hb{width:32px;height:34px}.end{width:34px;height:34px}:is(.menu,.sl) .row{height:40px}.rk{display:none}.cl,.cm{height:30px}.sw{grid-template-columns:repeat(10,28px)}.sw button{width:28px;height:28px}.offer button,.cv button{height:34px}}
   </style>
   <div class="hd"><button class="hb add" title="${esc(L('addBelow', 'Add a block below (Alt: above)'))}">${svg('plus')}</button><button class="hb grip" title="${esc(L('gripTip', 'Drag to move it, click for its menu'))}">${svg('grip')}</button></div>
   <button class="end" title="${esc(L('addEnd', 'Add a block at the end'))}">${svg('plus', 15)}</button>
   <div class="offer"><button data-o="icon">${svg('emoji', 14)}${esc(L('addIcon', 'Add an icon'))}</button><button data-o="cover">${svg('image', 14)}${esc(L('addCover', 'Add a cover'))}</button></div>
   <div class="cv"><button data-o="cover">${esc(L('changeCover', 'Change cover'))}</button><button data-o="nocover">${esc(L('removeCover', 'Remove'))}</button></div>
+  <button class="cl" title="${esc(L('language', 'Language'))}"></button>
+  <div class="cms"></div>
   <div class="boxes"></div><div class="band"></div><div class="dl"></div>
   <div class="menu" role="menu"></div>
   <div class="sl" role="listbox"></div>`;
@@ -1046,6 +1172,8 @@ export function writing(E: Core): Writing {
   const endBtn = $('.end');
   const offer = $('.offer');
   const cv = $('.cv');
+  const langChip = $('.cl');
+  const cmMarks = $('.cms');
   const boxes = $('.boxes');
   const bandEl = $('.band');
   const dl = $('.dl');
@@ -1053,13 +1181,28 @@ export function writing(E: Core): Writing {
   const slEl = $('.sl');
   // The parts drawn over the page keep the words' selection: they take no focus. The page takes the keys, though
   // (a menu opened from a handle answers the arrows).
-  for (const el of [hd, endBtn, offer, cv, menuEl, slEl])
+  for (const el of [hd, endBtn, offer, cv, langChip, cmMarks, menuEl, slEl])
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       if (!E.editing()) window.focus();
+      pressedIn = el;
     });
+  /**
+   * Where the last press began: a menu acts on a click only when the press was on it. A tap on a phone ends in a click
+   * where the finger was, which could otherwise land on the menu it just opened (over the handle, where room is short).
+   */
+  let pressedIn: HTMLElement | null = null;
+  addEventListener('pointerdown', (e) => !(e.composedPath() as Element[]).some((x) => x === menuEl || x === slEl) && (pressedIn = null), true);
+  const pressedOn = (el: HTMLElement) => {
+    const was = pressedIn === el;
+    pressedIn = null;
+    return was;
+  };
 
-  /** Places a floating part beside a rectangle: under it, else over it, inside the window. */
+  /**
+   * Places a floating part beside a rectangle: under it, else over it; with room on neither side, the whole of it in
+   * the window, over the line it was opened from (a list cut to the room left would hide some of what it offers).
+   */
   const placeAt = (el: HTMLElement, r: { left: number; top: number; bottom: number }, gap = 4) => {
     el.style.maxHeight = '';
     const w = el.offsetWidth;
@@ -1067,20 +1210,22 @@ export function writing(E: Core): Writing {
     const below = innerHeight - r.bottom - gap - 6;
     const above = r.top - gap - 6;
     let top: number;
-    if (h <= below || below >= above) {
-      top = r.bottom + gap;
-      if (h > below) el.style.maxHeight = `${Math.max(120, below)}px`;
-    } else {
-      top = Math.max(6, r.top - gap - Math.min(h, above));
-      if (h > above) el.style.maxHeight = `${Math.max(120, above)}px`;
+    if (h <= below) top = r.bottom + gap;
+    else if (h <= above) top = r.top - gap - h;
+    else {
+      const room = innerHeight - 12;
+      if (h > room) el.style.maxHeight = `${room}px`;
+      top = Math.max(6, Math.min(below >= above ? r.bottom + gap : r.top - gap - h, innerHeight - Math.min(h, room) - 6));
     }
     el.style.top = `${top}px`;
     el.style.left = `${Math.max(6, Math.min(r.left, innerWidth - w - 6))}px`;
   };
+  /** How much room a list has under a rectangle and over it. */
+  const roomAt = (r: { top: number; bottom: number }, gap = 4) => Math.max(innerHeight - r.bottom - gap - 6, r.top - gap - 6);
   const rectJson = (r: DOMRect | null) => (r ? { x: r.left, y: r.top, w: r.width, h: r.height } : null);
 
   // ---- the blocks in the page, for handles, dragging and picking ---------------------------------------------------
-  const COMPONENT = '.n-callout,.n-video,.n-math,.n-toc,.n-cover,.n-icon,pre,figure';
+  const COMPONENT = '.n-callout,.n-video,.n-math,.n-toc,.n-cover,.n-icon,.n-db,pre,figure';
   /** The block a part belongs to: the item, the paragraph, the callout, the table, the card… */
   const blockOf = (t: Element | null): Element | null => {
     for (let x = t; x && x !== doc.body && x !== doc.documentElement; x = x.parentElement) {
@@ -1281,8 +1426,9 @@ export function writing(E: Core): Writing {
   };
 
   // ---- the block menu (the ⋮⋮, Ctrl+/) ------------------------------------------------------------------------------
-  type Row = { icon: string; label: string; keys?: string; run?: () => void; to?: 'turn' | 'colour'; danger?: boolean; on?: boolean; off?: boolean } | '-' | { head: string };
-  let menu: { blocks: Element[]; view: 'main' | 'turn' | 'colour'; i: number; at: { left: number; top: number; bottom: number } } | null = null;
+  type View = 'main' | 'turn' | 'colour' | 'lang';
+  type Row = { icon: string; label: string; keys?: string; run?: () => void; to?: Exclude<View, 'main'>; danger?: boolean; on?: boolean; off?: boolean } | '-' | { head: string };
+  let menu: { blocks: Element[]; view: View; i: number; at: { left: number; top: number; bottom: number } } | null = null;
   const TURNS: [Kind, string, string, string][] = [
     ['p', 'text', 'Text', 'text'],
     ['h1', 'h1', 'Heading 1', 'H1'],
@@ -1318,10 +1464,24 @@ export function writing(E: Core): Writing {
       ];
     }
     if (menu.view === 'colour') return [{ icon: svg('left'), label: L('colour', 'Colour'), run: () => view('main') }];
+    if (menu.view === 'lang') {
+      // A code block's language: Auto (and what its code looks like), or one of them.
+      const pre = codeOf(list[0]);
+      const cur = pre ? CC.langId(pre.getAttribute('data-lang') ?? '') : '';
+      const seen = pre ? CC.detect(CC.textOf(pre)) : '';
+      return [
+        { icon: svg('left'), label: L('language', 'Language'), run: () => view('main') },
+        '-',
+        { icon: svg('code'), label: seen ? `${L('langAuto', 'Auto')} · ${langName(seen)}` : L('langAuto', 'Auto'), on: !cur, run: () => (closeMenu(), setLang(list, '')) },
+        ...CC.langs.map(([id]): Row => ({ icon: '', label: langName(id), on: cur === id, run: () => (closeMenu(), setLang(list, id)) })),
+      ];
+    }
     const n = list.length;
     return [
       { head: n > 1 ? L('nBlocks', '{n} blocks').replace('{n}', String(n)) : E.nameOf(list[0]) },
       ...(texty ? [{ icon: svg('turn'), label: L('turnInto', 'Turn into'), to: 'turn' as const, keys: 'Ctrl+/' }] : []),
+      ...(n === 1 && codeOf(list[0]) ? [{ icon: svg('code'), label: L('language', 'Language'), to: 'lang' as const }] : []),
+      ...(n === 1 && E.canComment() ? [{ icon: svg('comment'), label: L('comment', 'Comment'), keys: 'Ctrl+Alt+M', run: () => (closeMenu(), askComment()) }] : []),
       { icon: svg('colour'), label: L('colour', 'Colour'), to: 'colour' },
       '-',
       ...(n === 1 ? [{ icon: svg('plus'), label: L('addBelowShort', 'Add a block below'), run: () => (closeMenu(), addBlock(list[0], false)) }] : []),
@@ -1334,7 +1494,7 @@ export function writing(E: Core): Writing {
     ];
   };
   const pressable = (r: Row): r is Exclude<Row, '-' | { head: string }> => r !== '-' && !('head' in r) && !r.off;
-  const view = (v: 'main' | 'turn' | 'colour') => {
+  const view = (v: View) => {
     if (!menu) return;
     menu.view = v;
     menu.i = v === 'main' ? -1 : 0;
@@ -1346,14 +1506,19 @@ export function writing(E: Core): Writing {
       return;
     }
     const rows = menuRows();
-    let html = rows
-      .map((r, i) => {
-        if (r === '-') return '<div class="ms"></div>';
-        if ('head' in r) return `<div class="mh">${esc(r.head)}</div>`;
-        const tail = r.to ? svg('right', 14) : r.on ? svg('check', 14) : '';
-        return `<button class="row${r.danger ? ' danger' : ''}${i === menu!.i ? ' on' : ''}" data-i="${i}" role="menuitem"${r.off ? ' aria-disabled="true"' : ''}><span class="ri">${r.icon}</span><span class="rl">${esc(r.label)}</span>${r.keys ? `<span class="rk">${esc(keyText(r.keys))}</span>` : ''}${tail ? `<span class="ri">${tail}</span>` : ''}</button>`;
-      })
-      .join('');
+    const row = (r: Row, i: number) => {
+      if (r === '-') return '<div class="ms"></div>';
+      if ('head' in r) return `<div class="mh">${esc(r.head)}</div>`;
+      const tail = r.to ? svg('right', 14) : r.on ? svg('check', 14) : '';
+      return `<button class="row${r.danger ? ' danger' : ''}${i === menu!.i ? ' on' : ''}" data-i="${i}" role="menuitem"${r.off ? ' aria-disabled="true"' : ''}><span class="ri">${r.icon}</span><span class="rl">${esc(r.label)}</span>${r.keys ? `<span class="rk">${esc(keyText(r.keys))}</span>` : ''}${tail ? `<span class="ri">${tail}</span>` : ''}</button>`;
+    };
+    let html: string;
+    if (menu.view === 'lang') {
+      // The languages in columns (two, or three where there is room), so the list fits without scrolling.
+      const cols = innerWidth >= 640 ? 3 : innerWidth >= 340 ? 2 : 1;
+      const langs = rows.slice(2);
+      html = `${rows.slice(0, 2).map(row).join('')}<div class="sg" style="grid-template-rows:repeat(${Math.ceil(langs.length / cols)},auto);grid-template-columns:repeat(${cols},1fr)">${langs.map((r, i) => row(r, i + 2)).join('')}</div>`;
+    } else html = rows.map(row).join('');
     if (menu.view === 'colour') {
       const one = menu.blocks.length === 1 ? menu.blocks[0] : null;
       const tc = one ? colourOf(one, 'tc') : undefined;
@@ -1366,18 +1531,22 @@ export function writing(E: Core): Writing {
     menuEl.style.display = 'flex';
     placeAt(menuEl, menu.at);
   };
-  const openMenu = (blocks: Element[], at: { left: number; top: number; bottom: number }, v: 'main' | 'turn' | 'colour' = 'main') => {
+  const openMenu = (blocks: Element[], at: { left: number; top: number; bottom: number }, v: View = 'main') => {
     closeSlash();
     menu = { blocks, view: v, i: v === 'main' ? -1 : 0, at };
     renderMenu();
+    // On a phone the app folds the drawer under the page meanwhile, so the menu has the page's height to show in.
+    E.send({ type: 'wa-ed-menu', on: true });
   };
   const closeMenu = () => {
     if (!menu) return;
     menu = null;
     renderMenu();
     E.redraw();
+    E.send({ type: 'wa-ed-menu', on: false });
   };
   menuEl.addEventListener('click', (e) => {
+    if (!pressedOn(menuEl)) return;
     const t = e.composedPath()[0] as Element;
     const sw = (t as HTMLElement).closest?.('[data-sw]') as HTMLElement | null;
     if (sw && menu) {
@@ -1463,6 +1632,8 @@ export function writing(E: Core): Writing {
       ['toc', 'sToc', 'Table of contents', 'toc outline headings contents', 'toc', ''],
       ['math', 'sMath', 'Maths', 'equation formula latex katex tex math', 'math', ''],
       ['emoji', 'sEmoji', 'Emoji', 'smiley icon face symbol', 'emoji', ''],
+      ['link', 'linkPage', 'Link to a page', 'mention page link reference library', 'pagelink', '@'],
+      ['database', 'sDatabase', 'Database', 'db table board kanban rows columns notion data', 'table', ''],
     ] as const
   ).map(([id, key, en, also, icon, k]) => ({ id, label: L(key, en), en, also, icon, key: k }));
   let slash: { h: HTMLElement; node: Text; at: number; items: Item[]; i: number; misses: number; rows: number } | null = null;
@@ -1486,17 +1657,23 @@ export function writing(E: Core): Writing {
       return;
     }
     const items = slash.items;
-    const two = items.length >= 10 && innerWidth >= 460;
-    slash.rows = two ? Math.ceil(items.length / 2) : items.length;
+    const c = caretBox() ?? slash.h.getBoundingClientRect();
+    const at = { left: c.left - 8, top: c.top, bottom: c.top + c.height };
+    // As many columns as it takes for the whole list to fit beside the caret (three where the page is wide enough).
+    const fits = (cols: number) => Math.ceil(items.length / cols) * (coarse ? 40 : 30) + 38 <= roomAt(at);
+    let cols = items.length >= 10 && innerWidth >= 460 ? 2 : 1;
+    if (cols === 1 && items.length > 6 && innerWidth >= 460 && !fits(1)) cols = 2;
+    if (cols === 2 && innerWidth >= 640 && !fits(2)) cols = 3;
+    slash.rows = Math.ceil(items.length / cols);
     const row = (it: Item, i: number) =>
-      `<button class="row${i === slash!.i ? ' on' : ''}" data-i="${i}" role="option" aria-selected="${i === slash!.i}"><span class="ri">${/^H[1-6]$/.test(it.icon) ? glyph(it.icon) : svg(it.icon)}</span><span class="rl">${esc(it.label)}</span>${it.key && !two ? `<span class="rk">${esc(it.key)}</span>` : ''}</button>`;
+      `<button class="row${i === slash!.i ? ' on' : ''}" data-i="${i}" role="option" aria-selected="${i === slash!.i}"><span class="ri">${/^H[1-6]$/.test(it.icon) ? glyph(it.icon) : svg(it.icon)}</span><span class="rl">${esc(it.label)}</span>${it.key && cols === 1 ? `<span class="rk">${esc(it.key)}</span>` : ''}</button>`;
+    const q = slashQuery();
     slEl.innerHTML = items.length
-      ? `<div class="mh">${esc(L('blocks', 'Blocks'))}</div><div class="sg" style="grid-template-rows:repeat(${slash.rows},auto)${two ? ';grid-template-columns:1fr 1fr' : ''}">${items.map(row).join('')}</div>`
+      ? `<div class="mh">${esc(L('blocks', 'Blocks'))}${q ? `<span class="q">/${esc(q)}</span>` : ''}</div><div class="sg" style="grid-template-rows:repeat(${slash.rows},auto);grid-template-columns:repeat(${cols},1fr)">${items.map(row).join('')}</div>`
       : `<div class="none">${esc(L('noBlocks', 'No block by that name'))}</div>`;
     slEl.style.display = 'flex';
-    slEl.style.minWidth = two ? '400px' : '';
-    const c = caretBox() ?? slash.h.getBoundingClientRect();
-    placeAt(slEl, { left: c.left - 8, top: c.top, bottom: c.top + c.height });
+    slEl.style.minWidth = cols === 3 ? '600px' : cols === 2 ? '400px' : '';
+    placeAt(slEl, at);
     slEl.querySelector('.row.on')?.scrollIntoView({ block: 'nearest' });
   };
   const openSlash = (h: HTMLElement, node: Text, at: number) => {
@@ -1566,15 +1743,183 @@ export function writing(E: Core): Writing {
     return false;
   };
   slEl.addEventListener('click', (e) => {
+    if (!pressedOn(slEl)) return;
     const b = ((e.composedPath()[0] as HTMLElement).closest?.('[data-i]') as HTMLElement | null) ?? null;
     if (b && slash) pickItem(slash.items[Number(b.dataset.i)]);
+    else if (b && mention) pickPage(mention.items[Number(b.dataset.i)]);
   });
   slEl.addEventListener('pointermove', (e) => {
     const b = ((e.composedPath()[0] as HTMLElement).closest?.('[data-i]') as HTMLElement | null) ?? null;
-    if (!slash || !b || Number(b.dataset.i) === slash.i) return;
-    slash.i = Number(b.dataset.i);
+    const list = slash ?? mention;
+    if (!list || !b || Number(b.dataset.i) === list.i) return;
+    list.i = Number(b.dataset.i);
     for (const x of slEl.querySelectorAll('.row')) x.classList.toggle('on', (x as HTMLElement).dataset.i === b.dataset.i);
   });
+
+  // ---- "@" (or "/" → Link to a page): a link to another page of the Library ---------------------------------------------
+  /** The Library's pages, as the app tells them (their titles, kinds and icons), newest first. */
+  interface PageRef {
+    id: string;
+    title: string;
+    kind: string;
+    icon: string;
+  }
+  let pageList: PageRef[] = [];
+  let mention: { h: HTMLElement; node: Text; at: number; items: PageRef[]; i: number; misses: number } | null = null;
+  const plainWords = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[̀-ͯ]/g, '');
+  /** The pages whose titles have the words typed (those starting with them first, then the newest). */
+  const findPages = (q: string): PageRef[] => {
+    const words = plainWords(q).split(/\s+/).filter(Boolean);
+    return pageList
+      .map((p) => {
+        const t = plainWords(p.title);
+        const s = !words.every((w) => t.includes(w)) ? 0 : !words.length ? 1 : t.startsWith(words[0]) ? 3 : t.includes(` ${words[0]}`) ? 2 : 1;
+        return { p, s };
+      })
+      .filter((x) => x.s)
+      .sort((a, b) => b.s - a.s)
+      .slice(0, 8)
+      .map((x) => x.p);
+  };
+  const KIND_ICON: Record<string, string> = { page: 'page', doc: 'doc', slides: 'slides', sheet: 'table', tex: 'math', notebook: 'code' };
+  const mentionQuery = (): string | null => {
+    if (!mention) return null;
+    const r = caretIn(mention.h);
+    if (!r || r.startContainer !== mention.node || r.startOffset <= mention.at || mention.node.data[mention.at] !== '@') return null;
+    return mention.node.data.slice(mention.at + 1, r.startOffset);
+  };
+  const renderMention = () => {
+    const m = mention;
+    if (!m) {
+      if (!slash) slEl.style.display = 'none';
+      return;
+    }
+    const q = mentionQuery() ?? '';
+    const row = (p: PageRef, i: number) =>
+      `<button class="row${i === m.i ? ' on' : ''}" data-i="${i}" role="option" aria-selected="${i === m.i}"><span class="ri">${p.icon ? `<span style="font-size:15px;line-height:1">${esc(p.icon)}</span>` : svg(KIND_ICON[p.kind] ?? 'page')}</span><span class="rl">${esc(p.title)}</span></button>`;
+    slEl.innerHTML = `<div class="mh">${esc(L('linkPage', 'Link to a page'))}${q ? `<span class="q">@${esc(q)}</span>` : ''}</div>${
+      m.items.length ? m.items.map(row).join('') : `<div class="none">${esc(pageList.length ? L('noPages', 'No page by that name') : L('noPagesYet', 'No other pages yet'))}</div>`
+    }`;
+    slEl.style.display = 'flex';
+    slEl.style.minWidth = '280px';
+    const c = caretBox() ?? m.h.getBoundingClientRect();
+    placeAt(slEl, { left: c.left - 8, top: c.top, bottom: c.top + c.height });
+  };
+  const closeMention = () => {
+    if (!mention) return;
+    mention = null;
+    renderMention();
+  };
+  /** "@" typed at a block's start or after a space opens the Library's pages (not in code, nor in an address). */
+  const maybeMention = (h: HTMLElement) => {
+    const r = caretIn(h);
+    if (!r || r.startContainer.nodeType !== 3 || r.startOffset < 1) return;
+    const t = r.startContainer as Text;
+    if (t.data[r.startOffset - 1] !== '@') return;
+    const typed = head(h, r).toString();
+    if (typed.length > 1 && !/[\s ]/.test(typed.slice(-2, -1))) return;
+    const k = kindOf(unitOf(h));
+    if (!k || k === 'code' || t.parentElement?.closest('a')) return;
+    closeSlash();
+    closeMenu();
+    mention = { h, node: t, at: r.startOffset - 1, items: findPages(''), i: 0, misses: 0 };
+    renderMention();
+  };
+  const mentionInput = () => {
+    if (!mention) return;
+    const q = mentionQuery();
+    if (q === null || /^\s|\s\s$/.test(q) || q.length > 40) return closeMention();
+    const items = findPages(q);
+    mention.misses = items.length ? 0 : mention.misses + 1;
+    if (mention.misses > 3) return closeMention();
+    mention.items = items;
+    mention.i = 0;
+    renderMention();
+  };
+  const mentionKey = (e: KeyboardEvent): boolean => {
+    if (!mention) return false;
+    const n = mention.items.length;
+    if (e.key === 'Escape') {
+      closeMention();
+      return true;
+    }
+    if (!n) return false;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      mention.i = (mention.i + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
+      renderMention();
+      return true;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      pickPage(mention.items[mention.i]);
+      return true;
+    }
+    return false;
+  };
+  /** A link to a page as the page shows it: a chip with the page's icon (its emoji, or one of its kind) and its title. */
+  const pageChip = (p: PageRef) => {
+    const a = make('a', 'n-pagelink');
+    a.setAttribute('href', `/pages/${p.id}`);
+    a.setAttribute('data-page', p.id);
+    const ic = make('span', 'n-pagelink-icon');
+    ic.setAttribute('aria-hidden', 'true');
+    if (p.kind !== 'page') ic.setAttribute('data-kind', p.kind);
+    if (p.icon) ic.textContent = p.icon;
+    a.append(ic, p.title);
+    return a;
+  };
+  /** Words being written don't change a link's chip: it is one piece, deleted whole. */
+  const lockChips = (h: Element) => {
+    for (const a of h.querySelectorAll('a.n-pagelink')) (a.setAttribute('contenteditable', 'false'), a.setAttribute('data-n-ceoff', ''));
+  };
+  /** The "@…" typed goes, and the link to the page picked takes its place, the caret after it. */
+  const pickPage = (p: PageRef | undefined) => {
+    const m = mention;
+    if (!m || !p) return;
+    closeMention();
+    const h = m.h;
+    if (!m.node.isConnected || m.node.data[m.at] !== '@' || E.editing() !== h) return;
+    E.noteTyping();
+    const r = caretIn(h);
+    const end = r && r.startContainer === m.node ? r.startOffset : m.at + 1;
+    const x = doc.createRange();
+    x.setStart(m.node, m.at);
+    x.setEnd(m.node, Math.max(m.at + 1, Math.min(end, m.node.length)));
+    x.deleteContents();
+    const a = pageChip(p);
+    x.insertNode(a);
+    // A space after it (one that does not fold away at the end of the words), and the caret after that.
+    const sp = doc.createTextNode(' ');
+    a.after(sp);
+    trimEdge(a.previousSibling, true);
+    lockChips(h);
+    const c = doc.createRange();
+    c.setStart(sp, 1);
+    c.collapse(true);
+    getSelection()?.removeAllRanges();
+    getSelection()?.addRange(c);
+    hint(h);
+    E.redraw();
+  };
+  /** The list of pages from the app; the links already in the page take their pages' titles and icons as they are now. */
+  const setPages = (v: unknown) => {
+    pageList = (Array.isArray(v) ? v : [])
+      .filter((p): p is Record<string, unknown> => !!p && typeof p === 'object' && typeof p.id === 'string' && /^[\w-]{1,40}$/.test(p.id) && typeof p.title === 'string')
+      .slice(0, 2000)
+      .map((p) => ({ id: p.id as string, title: (p.title as string).slice(0, 200), kind: typeof p.kind === 'string' && /^\w{1,12}$/.test(p.kind) ? p.kind : 'page', icon: typeof p.icon === 'string' ? p.icon.slice(0, 16) : '' }));
+    const by = new Map(pageList.map((p) => [p.id, p]));
+    for (const a of doc.body.querySelectorAll('a.n-pagelink[data-page]')) {
+      const p = by.get(a.getAttribute('data-page') ?? '');
+      const ic = a.querySelector(':scope > .n-pagelink-icon');
+      const title = [...a.childNodes].filter((n) => n !== ic).map((n) => n.textContent).join('');
+      if (!p || (title === p.title && (ic?.textContent ?? '') === p.icon) || E.editing()?.contains(a)) continue;
+      a.replaceWith(pageChip(p));
+    }
+    if (mention) mentionInput();
+  };
   const TURNABLE = new Set(['p', 'h1', 'h2', 'h3', 'bullet', 'number', 'todo', 'toggle', 'quote', 'callout', 'code']);
   const pickItem = (it: Item | undefined) => {
     const s = slash;
@@ -1595,6 +1940,21 @@ export function writing(E: Core): Writing {
       const t = s.node;
       if (s.at > 0 && s.at === t.length && t.data[s.at - 1] === ' ') t.replaceData(s.at - 1, 1, '\u00a0');
     };
+    if (it.id === 'link') {
+      // The pages to link to, as "@" opens them: the "/…" typed goes, an "@" in its place (the caret where the "/" was:
+      // keeping a space before it moved the caret).
+      E.noteTyping();
+      dropTyped();
+      if (s.node.isConnected) {
+        const c = doc.createRange();
+        c.setStart(s.node, Math.min(s.at, s.node.length));
+        c.collapse(true);
+        getSelection()?.removeAllRanges();
+        getSelection()?.addRange(c);
+      }
+      doc.execCommand('insertText', false, '@');
+      return;
+    }
     if (it.id === 'emoji' || it.id === 'picture' || it.id === 'video' || it.id === 'math') {
       // Chosen in the app (its picker, or a small form there), and put in place when it comes back.
       E.noteTyping();
@@ -1630,11 +1990,15 @@ export function writing(E: Core): Writing {
       return el;
     };
     const textAfter = (el: Element): Next => {
-      const n = nextSib(el);
+      // (after a block an item holds, in an item of its own at that level)
+      const hl = holderOf(el);
+      const at = hl ?? el;
+      const n = nextSib(at);
       const h = n ? firstHostIn(n) : null;
       if (h && emptyHost(h)) return writeIn(h);
       const { unit, host } = newUnit('p');
-      el.after(unit);
+      at.after(unit);
+      if (hl) holdIn(unit);
       return writeIn(host);
     };
     switch (id) {
@@ -1688,6 +2052,13 @@ export function writing(E: Core): Writing {
         put(nav);
         refreshToc();
         return textAfter(nav);
+      }
+      case 'database': {
+        // Notion's database: drawn by its runtime, its rows kept with the page's own data from its first change.
+        const db = newDatabase();
+        put(db);
+        mountDbs();
+        return { pick: db };
       }
       default:
         return null;
@@ -1950,6 +2321,266 @@ export function writing(E: Core): Writing {
     }
   };
 
+  // ---- code blocks: their colours, and their language ------------------------------------------------------------------
+  const CC = E.code;
+  const isCode = (x: Element | null | undefined): x is HTMLElement => !!x && x.tagName === 'PRE' && x.classList.contains('n-code');
+  /** A block's code block (or the one an item holds), if it is one. */
+  const codeOf = (b: Element | null | undefined): HTMLElement | null => {
+    const x = b ? (blockIn(b) ?? b) : null;
+    return isCode(x) ? x : null;
+  };
+  /** What each code block was last coloured for (its language and code): coloured again only when they change. */
+  const painted = new WeakMap<Element, string>();
+  const paintCode = (pre: Element) => {
+    // (a plain block's <code>, as agents write it, says its language by a class, on it or its <pre>, too)
+    const said = (x: Element | null) => `${x?.getAttribute('data-lang') ?? ''}\u0000${x?.tagName === 'PRE' && isCode(x) ? '' : (x?.getAttribute('class') ?? '')}`;
+    const sign = `${said(pre)}\u0000${pre.tagName === 'CODE' ? said(pre.parentElement) : ''}\u0000${CC.textOf(pre)}`;
+    if (painted.get(pre) === sign) return;
+    CC.paint(pre);
+    painted.set(pre, sign);
+  };
+  /** Every code block's colours (plain ones agents write too), but the one being written in (which keeps up as it is typed). */
+  const paintAll = () => {
+    const w = E.editing();
+    for (const el of CC.blocks(doc.body)) if (!w || !(w === el || w.contains(el) || el.contains(w))) paintCode(el);
+  };
+  /** A plain code block's <code> (a block of an agent's, <pre><code>), for the part `h` being written in. */
+  const plainCodeOf = (h: Element) => (h.tagName === 'CODE' ? [h] : CC.blocks(h)).filter((c) => c.tagName === 'CODE');
+  // As code is typed, its colours follow a moment later, the caret where it was.
+  let livePaint = 0;
+  const paintWriting = () => {
+    cancelAnimationFrame(livePaint);
+    livePaint = requestAnimationFrame(() => {
+      const h = E.editing();
+      if (!isCode(h)) return;
+      const off = E.offset(h);
+      painted.delete(h);
+      paintCode(h);
+      if (off !== null) E.write(h, { off });
+    });
+  };
+  const langName = (id: string) => (id === 'plain' ? L('langPlain', 'Plain text') : (CC.langs.find(([x]) => x === id)?.[1] ?? id));
+  /** What the language chip says: the block's language, or Auto and the one its code looks like. */
+  const langWords = (pre: Element) => {
+    const id = CC.langId(pre.getAttribute('data-lang') ?? '');
+    if (id) return langName(id);
+    const seen = CC.detect(CC.textOf(pre));
+    return seen ? `${L('langAuto', 'Auto')} · ${langName(seen)}` : L('langAuto', 'Auto');
+  };
+  /** The code blocks' language ('' for Auto): their colours change with it. */
+  const setLang = (list: Element[], id: string) => {
+    const pres = list.map(codeOf).filter((x): x is HTMLElement => !!x);
+    if (!pres.length) return;
+    const back = stay();
+    E.change(() => {
+      for (const pre of pres) {
+        if (id) pre.setAttribute('data-lang', id);
+        else pre.removeAttribute('data-lang');
+        painted.delete(pre);
+        paintCode(pre);
+      }
+      return back(list);
+    });
+  };
+  /** The code block the language chip is for: the one written in, picked, or under the pointer. */
+  let chipFor: HTMLElement | null = null;
+  const drawLang = () => {
+    const w = E.editing();
+    const s = E.sel();
+    const pre = (isCode(w) ? w : null) ?? (s ? codeOf(unitOf(s)) : null) ?? (picked.length ? null : hoverBlock ? codeOf(hoverBlock) : null);
+    chipFor = pre;
+    const r = pre?.getBoundingClientRect();
+    if (!pre || !r || dragging || menu || r.bottom < 24 || r.top > innerHeight - 24) {
+      langChip.style.display = 'none';
+      return;
+    }
+    langChip.innerHTML = `${esc(langWords(pre))}${svg('down', 12)}`;
+    langChip.style.display = 'flex';
+    langChip.style.left = `${Math.max(2, r.right - langChip.offsetWidth - 6)}px`;
+    langChip.style.top = `${Math.max(2, r.top + 6)}px`;
+  };
+  langChip.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const pre = chipFor;
+    if (!pre) return;
+    const u = holderOf(pre) ?? pre;
+    const r = langChip.getBoundingClientRect();
+    if (!E.editing() && E.sel() !== u && E.sel() !== pre) E.select(pre);
+    openMenu([u], { left: r.left, top: r.top, bottom: r.bottom }, 'lang');
+  });
+
+  // ---- databases (shared/page-db.ts): drawn in their blocks, kept with the page's own data through the app --------------
+  /** A name no other database of the page has (its rows are kept under it). */
+  const dbName = () => {
+    const used = new Set([...doc.querySelectorAll('.n-db')].map((x) => x.getAttribute('data-db')));
+    let n = '';
+    do n = `db-${Math.random().toString(36).slice(2, 7)}`;
+    while (used.has(n));
+    return n;
+  };
+  /** A new database: a name, a status and a date, three empty rows, its words in the app's language. */
+  const newDatabase = () => {
+    const el = make('div', 'n-db');
+    el.setAttribute('data-db', dbName());
+    const schema = {
+      cols: [
+        { name: L('db.colName0', 'Name'), kind: 'text' },
+        { name: L('db.status', 'Status'), kind: 'select', options: [{ name: L('db.todo', 'To do'), color: 'grey' }, { name: L('db.doing', 'Doing'), color: 'blue' }, { name: L('db.done', 'Done'), color: 'green' }] },
+        { name: L('db.kDate', 'Date'), kind: 'date' },
+      ],
+      rows: [{}, {}, {}],
+    };
+    el.setAttribute('data-schema', JSON.stringify(schema));
+    return el;
+  };
+  /** The database's own words: the editor's labels of theirs (db.…), without the prefix. */
+  const dbLabels = (() => {
+    const out: Record<string, string> = {};
+    for (const k of ['untitled', 'table', 'board', 'sort', 'filter', 'newRow', 'oneRow', 'nRows', 'nOfRows', 'kText', 'kNumber', 'kSelect', 'kMulti', 'kDate', 'kCheck', 'kLink', 'colName', 'kind', 'options', 'addOption', 'newOption', 'sortAsc', 'sortDesc', 'noSort', 'filterBy', 'moveLeft', 'moveRight', 'delCol', 'addCol', 'newCol', 'delRow', 'addFilter', 'remove', 'clear', 'groupBy', 'noValue', 'needSelect', 'addSelect', 'status', 'untitledRow', 'open', 'full', 'failed', 'unread', 'inUse', 'opContains', 'opNotContains', 'opIs', 'opIsNot', 'opHas', 'opHasNot', 'opEmpty', 'opFilled', 'opBefore', 'opAfter', 'opChecked', 'opUnchecked', 'cDefault', 'cGrey', 'cBrown', 'cOrange', 'cYellow', 'cGreen', 'cBlue', 'cPurple', 'cPink', 'cRed']) {
+      const v = L(`db.${k}`, '');
+      if (v) out[k] = v;
+    }
+    return out;
+  })();
+  /**
+   * Every database of the page drawn (those already drawn stay as they are; a page put back by Undo is drawn anew). A copy
+   * of one on the page (Duplicate, a paste) is a database of its own: a name of its own, starting with what the first holds.
+   */
+  const mountDbs = () => {
+    const all = [...doc.body.querySelectorAll('.n-db')];
+    const drawn = new Map(all.filter((x) => x.shadowRoot).map((x) => [x.getAttribute('data-db'), x]));
+    const named = new Set(drawn.keys());
+    for (const el of all) {
+      if (el.shadowRoot) continue;
+      const name = el.getAttribute('data-db');
+      if (name && named.has(name)) {
+        const from = drawn.get(name);
+        const now = from ? E.db.stateOf(from) : null;
+        el.setAttribute('data-db', dbName());
+        if (now) el.setAttribute('data-schema', JSON.stringify(now));
+      }
+      named.add(el.getAttribute('data-db'));
+    }
+    for (const el of all) E.db.mount(el, { store: E.store, labels: dbLabels, edit: true });
+  };
+
+  // ---- comments on blocks (kept by the app, outside the page: shared/page-comments.ts) -----------------------------------
+  interface Anchor {
+    path?: number[];
+    tag?: string;
+    words?: string;
+  }
+  interface CommentMark {
+    id: string;
+    on?: Anchor;
+    resolved?: boolean;
+    /** How many messages its thread has (the comment and its replies). */
+    n: number;
+  }
+  let comments: CommentMark[] = [];
+  /** The block each comment is on, found again in the page as it is now. */
+  let anchored = new Map<string, Element>();
+  /** The comment the app shows now: its block is outlined. */
+  let shownComment: string | null = null;
+  /** A block's words, as a comment remembers them to find it again: the start of what it says, in one line. */
+  const blockWords = (el: Element) => (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  const anchorOf = (el: Element): Anchor => ({ path: E.pathOf(el), tag: el.tagName.toLowerCase(), words: blockWords(el) });
+  /** A comment's block: where it was, when it still is the same block; else the block with its words, the nearest to where it was. */
+  const findAnchor = (on: Anchor | undefined): Element | null => {
+    if (!on) return null;
+    const at = on.path ? E.byPath(on.path) : null;
+    const lead = (on.words ?? '').slice(0, 60);
+    if (at && at !== doc.body && (!on.tag || at.tagName.toLowerCase() === on.tag) && (!lead || blockWords(at).startsWith(lead))) return at;
+    if (lead) {
+      const all = [...doc.body.querySelectorAll(on.tag && /^[a-z][a-z0-9-]*$/.test(on.tag) ? on.tag : 'p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,div,figure,table')].filter((x) => !E.isUi(x) && blockWords(x).startsWith(lead));
+      if (all.length) {
+        const near = (x: Element) => {
+          const p = E.pathOf(x);
+          let i = 0;
+          while (on.path && i < p.length && p[i] === on.path[i]) i++;
+          return i;
+        };
+        return all.reduce((a, b) => (near(b) > near(a) ? b : a));
+      }
+      // Words a comment was given by an agent: the first block that has them.
+      const loose = [...doc.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,td,figcaption,.n-callout-text,summary')].find((x) => !E.isUi(x) && blockWords(x).includes(lead));
+      if (loose) return unitOf(loose);
+    }
+    return at && at !== doc.body && (!on.tag || at.tagName.toLowerCase() === on.tag) ? at : null;
+  };
+  const placeComments = () => {
+    anchored = new Map();
+    for (const c of comments) {
+      const el = findAnchor(c.on);
+      if (el) anchored.set(c.id, el);
+    }
+    E.redraw();
+  };
+  const setComments = (v: unknown) => {
+    comments = (Array.isArray(v) ? v : [])
+      .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object' && typeof c.id === 'string' && /^[\w-]{1,40}$/.test(c.id))
+      .slice(0, 500)
+      .map((c) => ({ id: c.id as string, on: c.on && typeof c.on === 'object' ? (c.on as Anchor) : undefined, resolved: c.resolved === true, n: Math.max(1, Math.min(99, Number(c.n) || 1)) }));
+    placeComments();
+  };
+  /** Comment (the block menu, the bar over words, Ctrl+Alt+M): the app opens a new comment on the block picked, or written in, and on the words picked there. */
+  const askComment = () => {
+    const w = E.editing();
+    const s = getSelection();
+    const quote = w && s && s.rangeCount && !s.isCollapsed && w.contains(s.getRangeAt(0).commonAncestorContainer) ? s.toString().replace(/\s+/g, ' ').trim() : '';
+    const b = w ? unitOf(w) : (blocksNow()[0] ?? null);
+    if (!b || b === doc.body) return;
+    E.send({ type: 'wa-ed-comment', on: anchorOf(b), quote: (quote || blockWords(b)).slice(0, 500), rect: rectJson(b.getBoundingClientRect()) });
+    // The comment is written beside the page: writing here stops (a phone's drawer opens for it), the block stays picked.
+    if (w) {
+      E.finish();
+      E.select(b);
+    }
+  };
+  const cmBox = make('div', 'cmshow');
+  const drawComments = () => {
+    // A mark beside each block with open comments (their count), in the margin on its right where there is room.
+    const by = new Map<Element, CommentMark[]>();
+    for (const c of comments) {
+      const el = anchored.get(c.id);
+      if (c.resolved || !el?.isConnected) continue;
+      by.set(el, [...(by.get(el) ?? []), c]);
+    }
+    const live = [...by].filter(([el]) => {
+      const r = el.getBoundingClientRect();
+      return r.height > 0 && r.bottom > 0 && r.top < innerHeight;
+    });
+    while (cmMarks.children.length < live.length) cmMarks.append(make('button', 'cm'));
+    while (cmMarks.children.length > live.length) cmMarks.lastElementChild!.remove();
+    live.forEach(([el, list], i) => {
+      const b = cmMarks.children[i] as HTMLElement;
+      const r = el.getBoundingClientRect();
+      const n = list.reduce((a, c) => a + c.n, 0);
+      b.dataset.id = list[0].id;
+      b.title = L('comments', 'Comments');
+      b.innerHTML = `${svg('comment', 13)}<span>${n}</span>`;
+      const w = 40;
+      // (beside a code block's language, when it is the block)
+      const inside = innerWidth - r.right < w + 6;
+      b.style.left = `${inside ? r.right - w - (isCode(codeOf(el)) ? 120 : 4) : r.right + 6}px`;
+      b.style.top = `${Math.max(2, firstLineBox(el).top + (inside ? 2 : -2))}px`;
+    });
+    const shown = shownComment ? anchored.get(shownComment) : null;
+    if (shown?.isConnected) {
+      const r = shown.getBoundingClientRect();
+      Object.assign(cmBox.style, { display: 'block', left: `${r.left - 4}px`, top: `${r.top - 3}px`, width: `${r.width + 8}px`, height: `${r.height + 6}px` });
+    } else cmBox.style.display = 'none';
+  };
+  cmMarks.addEventListener('click', (e) => {
+    const b = ((e.composedPath()[0] as HTMLElement).closest?.('.cm') as HTMLElement | null) ?? null;
+    if (!b?.dataset.id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    E.send({ type: 'wa-ed-comment-open', id: b.dataset.id });
+  });
+  cmMarks.after(cmBox);
+
   // ---- handles beside the block under the pointer, and dragging it ---------------------------------------------------
   let hoverBlock: Element | null = null;
   let handleBlock: Element | null = null;
@@ -1998,8 +2629,13 @@ export function writing(E: Core): Writing {
     const out: Element[] = [];
     let run: HTMLElement | null = null;
     for (const b of all) {
-      if (b.tagName !== 'LI') {
-        out.push(b);
+      const held = blockIn(b);
+      if (b.tagName !== 'LI' || held) {
+        // (a block an item held comes out as the block, the items under it after it)
+        if (held) {
+          out.push(held, ...subLists(b));
+          b.remove();
+        } else out.push(b);
         run = null;
         continue;
       }
@@ -2035,7 +2671,7 @@ export function writing(E: Core): Writing {
       for (const l of oldLists) if (!l.children.length) l.remove();
       for (const n of nodes) if (isList(n) && n.isConnected) merge(n);
       picked = [];
-      return { pick: all[0] };
+      return { pick: all[0].isConnected ? all[0] : nodes[0] };
     });
   };
   const firstLineBox = (b: Element): DOMRect => {
@@ -2051,7 +2687,7 @@ export function writing(E: Core): Writing {
     // Under the pointer (a phone has none: there, the bar of the block picked has the handle).
     const b = hoverBlock?.isConnected ? hoverBlock : null;
     handleBlock = b;
-    if (!b || dragging || slash) {
+    if (!b || dragging || slash || mention) {
       hd.style.display = 'none';
       return;
     }
@@ -2062,7 +2698,7 @@ export function writing(E: Core): Writing {
     }
     hd.style.display = 'flex';
     const first = firstLineBox(b);
-    const marker = b.tagName === 'LI' ? 20 : 0;
+    const marker = b.tagName === 'LI' && !blockIn(b) ? 20 : 0;
     // Side by side where the margin has room; one over the other in a narrow one (a page's usual 20 pixels).
     hd.classList.remove('col');
     let w = hd.offsetWidth;
@@ -2141,8 +2777,10 @@ export function writing(E: Core): Writing {
         const last = lastBlock(f);
         if (last) last.after(unit);
         else f.append(unit);
-      } else if (above) b.before(unit);
-      else putAfter(unit, b, kind);
+      } else if (above) {
+        b.before(unit);
+        if (b.tagName === 'LI' && unit.tagName !== 'LI') holdIn(unit);
+      } else putAfter(unit, b, kind);
       return writeIn(host);
     });
     if (E.editing()) doc.execCommand('insertText', false, '/');
@@ -2150,7 +2788,13 @@ export function writing(E: Core): Writing {
   hd.querySelector('.add')!.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (noClick) return;
     addBlock(handleBlock, (e as MouseEvent).altKey);
+  });
+  // A drag from the + picks blocks, as from the margin it sits in (a page's narrow margin is mostly handles).
+  hd.querySelector('.add')!.addEventListener('pointerdown', (e) => {
+    const p = e as PointerEvent;
+    if (p.button === 0 && p.pointerType !== 'touch') bandFrom(p, true, null);
   });
   endBtn.addEventListener('click', (e) => {
     e.preventDefault();
@@ -2235,6 +2879,8 @@ export function writing(E: Core): Writing {
     drawOffer();
     drawEnd();
     drawPicked();
+    drawLang();
+    drawComments();
     if (menu) {
       if (menu.blocks.some((b) => !b.isConnected)) closeMenu();
     }
@@ -2242,12 +2888,15 @@ export function writing(E: Core): Writing {
 
   // ---- the page's events ---------------------------------------------------------------------------------------------
   const fromUi = (e: Event) => e.composedPath().some((x) => x instanceof Element && E.isUi(x));
+  /** A database's own cells, buttons and menus: their presses and keys are theirs. */
+  const fromDb = (e: Event) => e.composedPath().some((x) => x instanceof Element && x.hasAttribute('data-db-ui'));
   addEventListener(
     'keydown',
     (e) => {
-      if (fromUi(e)) return;
+      if (fromUi(e) || fromDb(e)) return;
       if (menu && menuKey(e)) return stop(e);
       if (slash && slashKey(e)) return stop(e);
+      if (mention && mentionKey(e)) return stop(e);
       if (e.isComposing || e.keyCode === 229) return;
       const mod = isMod(e);
       const h = E.editing();
@@ -2263,6 +2912,10 @@ export function writing(E: Core): Writing {
         if (!list.length || !list.every((b) => kindOf(b))) return stop(e);
         const r = (h ? caretBox() : null) ?? list[0].getBoundingClientRect();
         openMenu(list, { left: r.left, top: r.top, bottom: r.top + (r.height || 20) }, 'turn');
+        return stop(e);
+      }
+      if (mod && e.altKey && !e.shiftKey && e.code === 'KeyM') {
+        if (E.canComment()) askComment();
         return stop(e);
       }
       if (mod && (e.key === '?' || (e.key === '/' && e.shiftKey))) {
@@ -2336,6 +2989,7 @@ export function writing(E: Core): Writing {
       if (!h || !(e.target instanceof Node) || !(h === e.target || h.contains(e.target))) return;
       // Typing in a block keeps the list of blocks open while it filters; leaving it closes the list.
       if (slash && slash.h !== h) closeSlash();
+      if (mention && mention.h !== h) closeMention();
     },
     true,
   );
@@ -2352,69 +3006,155 @@ export function writing(E: Core): Writing {
         tocTimer = window.setTimeout(refreshToc, 250);
       }
       if (e.isComposing) return;
+      if (isCode(h)) return paintWriting();
       if (slash) return slashInput();
+      if (mention) return mentionInput();
       if (!e.inputType?.startsWith('insertText') || !e.data) return;
       const ch = e.data.slice(-1);
       if (ch === '/') return maybeSlash(h);
+      if (ch === '@') return maybeMention(h);
       if ((ch === ' ' || ch === '\u00a0' || ch === '`' || ch === '-') && blockMarkdown(h)) return;
       if ('*_`~'.includes(ch)) inlineMarkdown(h);
     },
     true,
   );
   doc.addEventListener('selectionchange', () => {
-    if (!slash) return;
-    if (slashQuery() === null) closeSlash();
+    if (slash && slashQuery() === null) closeSlash();
+    if (mention && mentionQuery() === null) closeMention();
   });
-  // The page scrolled: the list of blocks stays by the caret, a block's menu closes (its block moved away).
+  // Code typed with an input method: coloured once its words are in.
+  addEventListener('compositionend', () => isCode(E.editing()) && paintWriting(), true);
+  // The page scrolled: the list of blocks stays by the caret, a block's menu closes (its block moved away). The frame
+  // growing (a phone's drawer folding as the menu opens) scrolls a page at its end too: the menu stays, placed again.
+  let resized = 0;
+  addEventListener('resize', () => {
+    resized = Date.now();
+    if (menu) renderMenu();
+    if (slash) renderSlash();
+    if (mention) renderMention();
+  });
   addEventListener(
     'scroll',
     () => {
       if (slash) renderSlash();
-      if (menu) closeMenu();
+      if (mention) renderMention();
+      if (menu && Date.now() - resized > 400) closeMenu();
     },
     true,
   );
+  // ---- picking blocks with a drag, as Notion's drag-select does -----------------------------------------------------
+  /** Whether a point is on a block's words (a press there and a short drag is still a click on them). */
+  const overWords = (b: Element | null, x: number, y: number) => {
+    const h = b ? hostOf(b) : null;
+    return !!h && lineBoxes(h).some((q) => x >= q.left - 2 && x <= q.right + 2 && y >= q.top - 2 && y <= q.bottom + 2);
+  };
+  /**
+   * The blocks a dragged rectangle touches, top to bottom: a list's items one by one (an item's own line, else the items
+   * under it), the blocks of one column when it stays inside that column; blocks whole otherwise.
+   */
+  const bandBlocks = (r: { left: number; right: number; top: number; bottom: number }): Element[] => {
+    const out: Element[] = [];
+    const hits = (q: DOMRect) => q.height > 0 && q.bottom >= r.top && q.top <= r.bottom;
+    const items = (list: Element) => {
+      for (const li of list.children) {
+        if (li.tagName !== 'LI' || !hits(li.getBoundingClientRect())) continue;
+        if (hits(firstLineBox(li))) out.push(li);
+        else for (const s of subLists(li)) items(s);
+      }
+    };
+    const visit = (c: Element) => {
+      for (const k of c.children) {
+        if (skip(k) || !hits(k.getBoundingClientRect())) continue;
+        if (isList(k)) items(k);
+        else if (k.classList.contains('n-cols')) {
+          const col = [...k.children].find((x) => {
+            const q = x.getBoundingClientRect();
+            return r.left >= q.left - 12 && r.right <= q.right + 12;
+          });
+          if (col) visit(col);
+          else out.push(k);
+        } else out.push(k);
+      }
+    };
+    visit(flow());
+    return out;
+  };
+  /**
+   * A press that may become a drag-select: from empty space (a margin, a gap between blocks, beside a block's words, the
+   * + beside a block) it starts once the pointer has moved a little; from a block's words, once the pointer leaves that
+   * block (a click with a shake of the hand stays a click). The rectangle picks the blocks it touches; the page scrolls
+   * when it reaches the top or the bottom.
+   */
+  const bandFrom = (e: PointerEvent, fromSpace: boolean, start: Element | null) => {
+    const x0 = e.clientX;
+    const y0 = e.clientY + scrollY;
+    let band = false;
+    let last = { x: e.clientX, y: e.clientY };
+    let roll = 0;
+    const draw = () => {
+      const { x, y } = last;
+      const top = Math.min(y0 - scrollY, y);
+      const bottom = Math.max(y0 - scrollY, y);
+      const left = Math.min(x0, x);
+      const right = Math.max(x0, x);
+      Object.assign(bandEl.style, { display: 'block', left: `${left}px`, width: `${Math.max(1, right - left)}px`, top: `${top}px`, height: `${bottom - top}px` });
+      picked = bandBlocks({ left, right, top, bottom });
+      drawPicked();
+    };
+    const move = (m: PointerEvent) => {
+      last = { x: m.clientX, y: m.clientY };
+      if (!band) {
+        if (Math.hypot(m.clientX - x0, m.clientY + scrollY - y0) < 6) return;
+        const r = !fromSpace && start ? start.getBoundingClientRect() : null;
+        if (r && m.clientY >= r.top && m.clientY <= r.bottom) return;
+        band = true;
+        E.finish();
+        hoverBlock = null;
+        dragging = true;
+        E.redraw();
+      }
+      // Near the window's top or bottom, the page scrolls on by itself while the pointer stays there.
+      const edge = m.clientY < 28 ? m.clientY - 28 : m.clientY > innerHeight - 28 ? m.clientY - innerHeight + 28 : 0;
+      clearInterval(roll);
+      if (edge)
+        roll = window.setInterval(() => {
+          scrollBy(0, Math.max(-24, Math.min(24, edge)));
+          draw();
+        }, 30);
+      draw();
+    };
+    const up = () => {
+      removeEventListener('pointermove', move, true);
+      removeEventListener('pointerup', up, true);
+      removeEventListener('pointercancel', up, true);
+      clearInterval(roll);
+      bandEl.style.display = 'none';
+      if (!band) return;
+      dragging = false;
+      // The click that ends the drag is not one on the page (nor on the + it may have started from).
+      noClick = true;
+      setTimeout(() => (noClick = false), 0);
+      const list = picked;
+      pickMany(list, list[0] ?? null);
+    };
+    addEventListener('pointermove', move, true);
+    addEventListener('pointerup', up, true);
+    addEventListener('pointercancel', up, true);
+  };
   addEventListener(
     'pointerdown',
     (e) => {
-      if (fromUi(e)) return;
+      if (fromUi(e) || fromDb(e)) return;
       if (menu) closeMenu();
       if (slash) closeSlash();
-      // A drag down the margin, from beside the blocks: picks the blocks it passes.
+      if (mention) closeMention();
+      // Words being written keep the browser's own selection by dragging; touch scrolls the page.
       if (e.button !== 0 || e.pointerType === 'touch' || E.editing()?.contains(e.target as Node)) return;
       const t = e.target as Element;
       const f = flow();
-      if (!(t === doc.body || t === doc.documentElement || t === f)) return;
-      const y0 = e.clientY;
-      let band = false;
-      const move = (m: PointerEvent) => {
-        if (!band && Math.abs(m.clientY - y0) < 6) return;
-        band = true;
-        const top = Math.min(y0, m.clientY);
-        const bottom = Math.max(y0, m.clientY);
-        const fr = f.getBoundingClientRect();
-        Object.assign(bandEl.style, { display: 'block', left: `${fr.left}px`, width: `${fr.width}px`, top: `${top}px`, height: `${bottom - top}px` });
-        picked = [...f.children].filter((k) => {
-          if (skip(k)) return false;
-          const r = k.getBoundingClientRect();
-          return r.height > 0 && r.bottom >= top && r.top <= bottom;
-        });
-        drawPicked();
-      };
-      const up = () => {
-        removeEventListener('pointermove', move, true);
-        removeEventListener('pointerup', up, true);
-        removeEventListener('pointercancel', up, true);
-        bandEl.style.display = 'none';
-        if (!band) return;
-        noClick = true;
-        setTimeout(() => (noClick = false), 0);
-        const list = picked;
-        pickMany(list, list[0] ?? null);
-      };
-      addEventListener('pointermove', move, true);
-      addEventListener('pointerup', up, true);
-      addEventListener('pointercancel', up, true);
+      const space = t === doc.body || t === doc.documentElement || t === f;
+      const b = space ? null : blockOf(t);
+      bandFrom(e, space || !overWords(b, e.clientX, e.clientY), b);
     },
     true,
   );
@@ -2423,7 +3163,7 @@ export function writing(E: Core): Writing {
     'click',
     (ev) => {
       const e = ev as MouseEvent;
-      if (fromUi(e)) return;
+      if (fromUi(e) || fromDb(e)) return;
       if (noClick) return stop(e);
       const t = e.target as Element;
       const w = E.editing();
@@ -2587,6 +3327,7 @@ export function writing(E: Core): Writing {
   addEventListener(
     'paste',
     (e) => {
+      if (fromDb(e)) return;
       const files = [...(e.clipboardData?.files ?? [])].filter(isPicture);
       const w = E.editing();
       if (files.length) {
@@ -2733,6 +3474,20 @@ export function writing(E: Core): Writing {
   return {
     css: `[data-n-ph]::before{content:attr(data-n-ph);float:left;height:0;pointer-events:none;opacity:.4;white-space:nowrap}nav.n-toc:empty::before{content:"${L('tocEmpty', 'The headings of the page show here').replace(/["\\\n<]/g, '')}";opacity:.45}iframe{pointer-events:none}`,
     draw,
+    ready() {
+      refreshToc();
+      paintAll();
+      mountDbs();
+    },
+    prepare(node) {
+      // A database from Add ("new"): a name of its own in the page, and its first columns in the app's words.
+      for (const el of [node, ...node.querySelectorAll('.n-db')]) {
+        if (!el.matches('.n-db') || el.getAttribute('data-db') !== 'new') continue;
+        const fresh = newDatabase();
+        el.setAttribute('data-db', fresh.getAttribute('data-db')!);
+        if (!el.hasAttribute('data-schema')) el.setAttribute('data-schema', fresh.getAttribute('data-schema')!);
+      }
+    },
     act(a: string, arg: any): boolean {
       switch (a) {
         case 'turn': {
@@ -2758,6 +3513,46 @@ export function writing(E: Core): Writing {
         case 'code':
           inlineCode();
           return true;
+        case 'pages':
+          setPages(arg);
+          return true;
+        case 'comments':
+          setComments(arg);
+          return true;
+        case 'comment':
+          askComment();
+          return true;
+        case 'commentShow': {
+          // A comment picked in the app: its block outlined and in sight.
+          shownComment = typeof arg === 'string' ? arg : null;
+          const el = shownComment ? anchored.get(shownComment) : null;
+          if (el?.isConnected) (el as HTMLElement).scrollIntoView({ block: 'nearest' });
+          E.redraw();
+          return true;
+        }
+        case 'anchors':
+          // Where the comments' blocks are now, for the app to keep with them once the page is saved.
+          E.send({ type: 'wa-ed-anchors', id: arg?.id, list: comments.filter((c) => anchored.get(c.id)?.isConnected).map((c) => ({ id: c.id, on: anchorOf(anchored.get(c.id)!) })) });
+          return true;
+        case 'codeLang': {
+          // A code block's language, from the Part tab ('' for Auto).
+          const id = CC.langId(typeof arg === 'string' ? arg : '');
+          const list = blocksNow().filter((b) => codeOf(b));
+          if (list.length) setLang(list, id);
+          return true;
+        }
+        case 'words': {
+          // A code block's code, changed on the Part tab (its colours are only spans, which the editor's own way would refuse).
+          const pre = codeOf(E.sel() ? unitOf(E.sel()!) : null);
+          if (!pre) return false;
+          E.change(() => {
+            pre.textContent = String(arg ?? '').slice(0, 200_000);
+            painted.delete(pre);
+            paintCode(pre);
+            return true;
+          });
+          return true;
+        }
         case 'menu': {
           const list = blocksNow();
           const r = arg?.at;
@@ -2811,19 +3606,24 @@ export function writing(E: Core): Writing {
     },
     started(h) {
       if (h.tagName === 'LI') for (const s of subLists(h)) (s.setAttribute('contenteditable', 'false'), s.setAttribute('data-n-ceoff', ''));
+      // A plain code block is written in as plain text (its colours, put on again once it is left, would catch the words typed).
+      for (const c of plainCodeOf(h)) (painted.delete(c), CC.unpaint(c));
+      lockChips(h);
       hint(h);
     },
     finished(h) {
       closeSlash();
+      closeMention();
       dropSpacers(h);
       h.removeAttribute('data-n-ph');
       for (const s of h.querySelectorAll('[data-n-ceoff]')) (s.removeAttribute('contenteditable'), s.removeAttribute('data-n-ceoff'));
-      // Code keeps its lines as new-line characters (a browser writes line breaks), so it reads the same anywhere.
-      if (kindOf(unitOf(h)) === 'code') {
-        const brs = [...h.querySelectorAll('br')];
-        brs.forEach((b, i) => (i === brs.length - 1 && b === fillerBr(h) && brs.length > 1 ? b.remove() : b.replaceWith('\n')));
-        h.normalize();
+      // Code keeps its lines as new-line characters (a browser writes line breaks), so it reads the same anywhere;
+      // its colours are put on again from them.
+      if (isCode(h)) {
+        painted.delete(h);
+        paintCode(h);
       }
+      for (const c of plainCodeOf(h)) (painted.delete(c), paintCode(c));
       // A block of words keeps a line when it is empty; a lone line break a browser leaves in another part is not the user's.
       if (kindOf(unitOf(h))) fillEmpty(h);
       else if (h.innerHTML === '<br>') h.innerHTML = '';
@@ -2836,8 +3636,15 @@ export function writing(E: Core): Writing {
       hoverBlock = null;
       closeMenu();
       closeSlash();
+      closeMention();
+      paintAll();
+      mountDbs();
+      placeComments();
     },
     clean(root) {
+      // Code is kept as plain text: its colours are put on as it shows (a plain block's too, as its agent wrote it: only
+      // the colours' own spans come off, from any <pre><code>, whatever it holds now).
+      for (const el of root.querySelectorAll('pre.n-code, pre > code')) CC.unpaint(el);
       for (const x of root.querySelectorAll('[data-n-ph]')) x.removeAttribute('data-n-ph');
       for (const x of root.querySelectorAll('[data-n-ceoff]')) (x.removeAttribute('contenteditable'), x.removeAttribute('data-n-ceoff'));
       for (const x of root.querySelectorAll('[data-n-sign]')) x.removeAttribute('data-n-sign');
@@ -2849,12 +3656,27 @@ export function writing(E: Core): Writing {
     },
     changed() {
       refreshToc();
+      paintAll();
+      mountDbs();
+      // A comment's block changed or was made anew (Turn into): it is found again where it was, by its words.
+      for (const c of comments) {
+        const el = anchored.get(c.id);
+        if (el?.isConnected) c.on = anchorOf(el);
+        else {
+          const f = findAnchor(c.on);
+          if (f) anchored.set(c.id, f);
+          else anchored.delete(c.id);
+        }
+      }
     },
     info(el) {
       const u = unitOf(el);
       const k = kindOf(u) ?? kindOf(el);
+      const pre = codeOf(u) ?? codeOf(el);
       return {
         kind: k ?? undefined,
+        // A code block: its code (for the Part tab), its language ('' for Auto) and the one its code looks like.
+        ...(pre ? { words: CC.textOf(pre), lang: CC.langId(pre.getAttribute('data-lang') ?? ''), langAuto: CC.detect(CC.textOf(pre)) } : {}),
         multi: picked.length > 1 ? picked.length : undefined,
         tex: el.classList.contains('n-math') ? (el.getAttribute('data-tex') ?? '') : undefined,
         colour: colourOf(u, 'tc') ?? undefined,

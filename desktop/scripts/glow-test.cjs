@@ -6,7 +6,8 @@
 //            in windows that ask to be left out, as the first run of this test showed)
 //   Linux    the app's own capture, on an X display with a compositor (else the app shows no glow at all)
 // It also checks the person sees it: on Linux a capture without hiding it shows it; on a Mac, where captures may leave
-// it out by themselves, macOS's own list of the windows on screen has it, over the whole display, above the others.
+// it out by themselves, macOS's own list of the windows on screen has it, over the whole display, above the others. The
+// agent's pointer over the screen (drawn in the same windows) is checked the same way: seen, never in the screenshot.
 //   npx electron scripts/glow-test.cjs     (in desktop/)
 'use strict';
 const { app, BrowserWindow, desktopCapturer, nativeImage, screen } = require('electron');
@@ -149,6 +150,23 @@ app.whenReady().then(async () => {
     const glowing = !near(pixel(seen, (spots['left edge'][0] - d.bounds.x) * s, (spots['left edge'][1] - d.bounds.y) * s), COLOUR, 60);
     if (MAC) console.log(`      without hiding it, a capture ${glowing ? 'shows' : 'leaves out'} the glow on this macOS (${os.release()}): ${glowing ? 'hiding it is needed' : 'it keeps the window out by itself'}`);
     else say(glowing, 'the person sees the glow (a capture without hiding it shows it)');
+  }
+  // The agent's pointer, over the plain window: in the person's view of the screen, never in the agent's screenshot.
+  const spot = { x: Math.round(w.x + w.width / 2), y: Math.round(w.y + w.height / 2) };
+  const sf = MAC ? 1 : d.scaleFactor || 1;
+  glow.pointer({ steps: [{ at: 0, act: 'move', x: spot.x * sf, y: spot.y * sf }] });
+  await wait(700);
+  // On its ring, beside the point (the ring is 46 points across).
+  const ring = [spot.x + 24, spot.y];
+  const agent2 = await agentShot();
+  say(near(at(agent2, ring), COLOUR), 'the agent’s screenshot shows no pointer of its own', fmt(at(agent2, ring)));
+  if (!WIN) {
+    await wait(500);
+    const seen = await screenAsIs();
+    const s = scale * (seen.getSize().width / agent2.getSize().width);
+    const p = pixel(seen, (ring[0] - d.bounds.x) * s, (ring[1] - d.bounds.y) * s);
+    if (MAC && near(p, COLOUR)) console.log('      a capture leaves the pointer out by itself on this macOS: macOS’s own list of the windows says the person sees it (above)');
+    else say(!near(p, COLOUR, 60), 'the person sees the agent’s pointer (a capture without hiding it shows its ring)', fmt(p));
   }
   glow.setGlow(false);
   fs.rmSync(tmp, { recursive: true, force: true });

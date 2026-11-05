@@ -3,16 +3,22 @@
 // that frame, carrying that number, of a known shape and size: the page's height, a choice or a form
 // to put in the message box, and calls of window.hydor.storage, which a store answers. A template's
 // screen also gets window.hydor.app: its calls are answered here, for that template only (its runs,
-// its data), and what changes in them is passed on to it. A video's still in a page plays over it here.
+// its data), and what changes in them is passed on to it. A video's still in a page plays over it here, and a link to
+// another of the Library's pages opens that page in the app.
 // In Edit, the frame holds the visual editor (editor.ts): what it picks and changes comes back here, and
 // what it asks for (an emoji, a picture, maths…) is chosen in the app and sent back to it.
 import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { KIT_CSS } from '@shared/page-kit';
+import { codeColoursScript, hasCode } from '@shared/code-colours';
+import { cleanAnchor, type PageAnchor } from '@shared/page-comments';
+import { pageDbScript } from '@shared/page-db';
+import { dbLabels } from './studio/blocks';
 import { STORAGE_LIMITS } from '@shared/pages';
 import type { AppRun } from '@shared/apps';
 import type { AppInfo } from '@shared/app-manifest';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
+import { go } from '../../lib/nav';
 import { tr } from '../../i18n/runtime';
 import { cx } from '../../components/ui';
 import { openVideo } from '../../components/Lightbox';
@@ -357,10 +363,10 @@ function useThemeChange(f: () => void) {
 
 /**
  * A page as a file to keep: with the kit's stylesheet, so its ready-made classes and colours work wherever it is
- * opened, light or dark as that device is.
+ * opened, light or dark as that device is, and the script that colours its code blocks.
  */
 export function pageFile(html: string): string {
-  const head = `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>`;
+  const head = `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${hasCode(html) ? codeColoursScript() : ''}${/\bn-db\b/.test(html) ? pageDbScript() : ''}`;
   const d = /^(?:\s|<!--[\s\S]*?-->)*<!doctype[^>]*>/i.exec(html);
   return d ? d[0] + head + html.slice(d[0].length) : head + html;
 }
@@ -450,6 +456,7 @@ export function PageFrame({
     let busy = 0;
     let appBusy = 0;
     let picks: number[] = [];
+    let opened = 0;
     const onMessage = (e: MessageEvent) => {
       const w = ref.current?.contentWindow;
       // Only this frame: a sandboxed page's origin is opaque ("null").
@@ -463,7 +470,9 @@ export function PageFrame({
         const v = cb.current.ui;
         const uiInfo = v ? { def: v.def, ctx: v.ctx, can: v.can, labels: uiLabels(), lang: v.lang ?? 'en', ...(v.start ? { start: v.start } : {}), ...(v.libs ? { libs: v.libs } : {}) } : undefined;
         if (v) sentCtx.current = v.ctx;
-        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill, play: true, app: appInfo, ui: uiInfo }, '*');
+        // (a page with databases: their words in the app's language)
+        const db = /\bn-db\b/.test(cb.current.html) ? dbLabels() : undefined;
+        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill, play: true, open: true, app: appInfo, ui: uiInfo, db }, '*');
         return;
       }
       const { store, onHeight, onPick } = cb.current;
@@ -521,6 +530,14 @@ export function PageFrame({
       } else if (d.type === 'wa-video') {
         // A video's still in the page (the page editor's): its player cannot run in the sandbox, so it plays over the page.
         if (isStr(d.src, 300)) openVideo(d.src, isStr(d.title, 200) ? d.title : '');
+      } else if (d.type === 'wa-open-page') {
+        // A link to another of the Library's pages (the page editor's a.n-pagelink), clicked: that page, in the app. Once a
+        // second at most, so a page cannot move the app about by itself.
+        const now = Date.now();
+        if (isStr(d.id, 40) && /^[\w-]+$/.test(d.id) && now - opened > 1000) {
+          opened = now;
+          go(`/pages/${d.id}`);
+        }
       } else if (d.type === 'wa-ui-top') {
         // A view went to another page: its top comes into sight when it was scrolled past.
         const r = ref.current?.getBoundingClientRect();
@@ -671,6 +688,9 @@ export interface EdSel {
   /** Its block's text colour and background, by name (the kit's .n-tc-… and .n-hl-…). */
   colour?: string;
   fill?: string;
+  /** A code block: its language ('' for Auto, shared/code-colours.ts), and the one its code looks like. */
+  lang?: string;
+  langAuto?: string;
 }
 
 /** A part in the editor's Layers: where it is, its name, its tag, a few of its words, the parts in it. */
@@ -734,6 +754,8 @@ export interface EditHandle {
   saved(): void;
   /** The frame, to place what the app shows over the page. */
   frame(): HTMLIFrameElement | null;
+  /** Where the blocks the page's comments are on are now (to keep with the comments once the page is saved). */
+  anchors(): Promise<{ id: string; on: PageAnchor }[]>;
 }
 
 /** The page in the visual editor (its scripts held back), and the channel to it. */
@@ -756,6 +778,14 @@ export const EditFrame = forwardRef<
     onCopied?: (c: { html: string; name: string }) => void;
     /** Words are being changed in the page (a phone's keyboard is up). */
     onEditing?: (on: boolean) => void;
+    /** A block's menu is open in the page (on a phone, the drawer under it makes room). */
+    onMenu?: (on: boolean) => void;
+    /** Comment, on a block (and on words of it): a new comment's block and words, and where it is in the frame. */
+    onComment?: (c: { on: PageAnchor; quote: string }) => void;
+    /** A comment's mark beside its block, clicked. */
+    onCommentOpen?: (id: string) => void;
+    /** The page's own data, which its databases are kept in (the editor reads and writes their keys only). */
+    store?: Store;
     /** The editor asks for something chosen in the app: an emoji, an icon, a cover, a picture, a video, maths. */
     onAsk?: (a: EdAsk) => void;
     /** A picture dropped or pasted in the page, to make small enough to live in it (and answer with `fill`). */
@@ -766,12 +796,12 @@ export const EditFrame = forwardRef<
     onKeys?: () => void;
     className?: string;
   }
->(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onAsk, onFile, onAgent, onKeys, className }, handle) {
+>(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, className }, handle) {
   const ref = useRef<HTMLIFrameElement>(null);
   const offline = useContext(OfflineFrames);
-  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onAsk, onFile, onAgent, onKeys });
-  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onAsk, onFile, onAgent, onKeys };
-  const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>() });
+  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys });
+  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys };
+  const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>(), anchorWaits: new Map<number, (list: { id: string; on: PageAnchor }[]) => void>() });
   const send = (m: Record<string, unknown>) => ref.current?.contentWindow?.postMessage({ ...m, type: 'wa-ed', n: ch.current.n }, '*');
   useThemeChange(() => ch.current.n && send({ cmd: 'theme', arg: { theme: themeNow(), css: themeCss() } }));
   useImperativeHandle(handle, () => ({
@@ -791,6 +821,17 @@ export const EditFrame = forwardRef<
       }),
     saved: () => send({ cmd: 'saved' }),
     frame: () => ref.current,
+    anchors: () =>
+      new Promise((resolve) => {
+        const id = ++ch.current.seq;
+        // Not told within a moment (an editor of before): the comments stay where they were.
+        const t = window.setTimeout(() => (ch.current.anchorWaits.delete(id), resolve([])), 3000);
+        ch.current.anchorWaits.set(id, (list) => {
+          window.clearTimeout(t);
+          resolve(list);
+        });
+        send({ cmd: 'anchors', arg: { id } });
+      }),
   }));
   useLayoutEffect(() => {
     const onMessage = (e: MessageEvent) => {
@@ -818,6 +859,24 @@ export const EditFrame = forwardRef<
       } else if (d.type === 'wa-ed-layers' && d.tree && typeof d.tree === 'object') c.onLayers?.(d.tree as EdLayer);
       else if (d.type === 'wa-ed-copied' && typeof d.html === 'string' && d.html.length < 2_000_000) c.onCopied?.({ html: d.html, name: typeof d.name === 'string' ? d.name : '' });
       else if (d.type === 'wa-ed-editing') c.onEditing?.(!!d.on);
+      else if (d.type === 'wa-ed-menu') c.onMenu?.(!!d.on);
+      else if (d.type === 'wa-ed-comment' && d.on && typeof d.on === 'object' && isStr(d.quote, 500)) c.onComment?.({ on: cleanAnchor(d.on) ?? {}, quote: d.quote });
+      else if (d.type === 'wa-ed-comment-open' && isStr(d.id, 40)) c.onCommentOpen?.(d.id);
+      else if (d.type === 'wa-ed-store' && Number.isInteger(d.id)) {
+        // A database's rows, for the editor: its keys only (n-db:<name>), within the storage's limits.
+        const reply = (m: { value?: unknown; error?: string }) => send({ cmd: 'store', arg: { id: d.id, ...m } });
+        if (!c.store || (d.op !== 'get' && d.op !== 'set') || !isStr(d.key, 60) || !/^n-db:[\w-]{1,40}$/.test(d.key)) return reply({ error: 'Not a database' });
+        if (d.op === 'set' && (JSON.stringify(d.value) ?? '').length > STORAGE_LIMITS.value) return reply({ error: `That is over ${STORAGE_LIMITS.value / 1024} KB` });
+        c.store({ op: d.op, key: d.key, value: d.value }).then(
+          (value) => reply({ value }),
+          (err) => reply({ error: String((err as Error)?.message ?? err) }),
+        );
+      }
+      else if (d.type === 'wa-ed-anchors' && Array.isArray(d.list)) {
+        const done = ch.current.anchorWaits.get(d.id);
+        ch.current.anchorWaits.delete(d.id);
+        done?.(d.list.flatMap((x: { id?: unknown; on?: unknown }) => (isStr(x?.id, 40) && cleanAnchor(x.on) ? [{ id: x.id, on: cleanAnchor(x.on)! }] : [])).slice(0, 500));
+      }
       else if (d.type === 'wa-ed-save') c.onSave?.();
       else if (d.type === 'wa-ed-ask' && ASKS.has(d.what) && isStr(d.id, 20)) c.onAsk?.({ what: d.what, id: d.id, rect: rectOf(d.rect), has: d.has === true, tex: isStr(d.tex, 5000) ? d.tex : undefined });
       else if (d.type === 'wa-ed-file' && isStr(d.id, 20) && d.file instanceof File && d.file.size <= 40_000_000 && /^image\//.test(d.file.type)) c.onFile?.(d.id, d.file);

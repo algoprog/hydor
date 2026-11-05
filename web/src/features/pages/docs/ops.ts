@@ -133,25 +133,40 @@ export function splitAt(runs: Run[], o: number): [Run[], Run[]] {
 
 export const sliceRuns = (runs: Run[], from: number, to: number) => splitAt(splitAt(runs, to)[0], from)[1];
 
-/** How words typed at `o` look: as the character before (or, at the start, after); a link does not go on past its end. */
+/**
+ * How words typed at `o` look: as the character before (or, at the start, after). A link, or a comment's words, does
+ * not go on past its end (as in Google Docs); in their middle, where they go on in the next run, words typed are theirs.
+ */
 export function lookAt(runs: Run[], o: number): Look {
   let at = 0;
-  for (const r of runs) {
+  for (let k = 0; k < runs.length; k++) {
+    const r = runs[k];
     const end = at + r.t.length;
     if (o > at && o <= end) {
-      // Words typed after an equation are words; after a link or a comment's words, not more of them.
+      // Words typed after an equation are words.
       if (r.math) return {};
-      const look = lookOf(r);
-      if (o === end && look.link) delete look.link;
-      if (o === end) delete look.cm;
+      const look = typedLook(r);
+      if (o === end) {
+        const next = runs[k + 1];
+        if (look.link && next?.link !== look.link) delete look.link;
+        const cm = look.cm?.filter((id) => next?.cm?.includes(id));
+        if (cm?.length) look.cm = cm;
+        else delete look.cm;
+      }
       return look;
     }
     at = end;
   }
-  const first = runs[0] && !runs[0].math ? lookOf(runs[0]) : {};
+  const first = runs[0] && !runs[0].math ? typedLook(runs[0]) : {};
   delete first.link;
   delete first.cm;
   return first;
+}
+
+/** A run's look for words typed beside it: never its suggested change's marks (words typed are yours, or a suggestion of yours). */
+function typedLook(r: Run): Look {
+  const { ins: _i, del: _d, fmt: _f, was: _w, ...look } = lookOf(r);
+  return look;
 }
 
 /** The run a place is in: the character before it's (at the start, the first). */
@@ -174,6 +189,43 @@ export function snapOut(runs: Run[], o: number, after?: boolean): number {
     at = end;
   }
   return o;
+}
+
+/** Where the character before `o` starts (`back`), or the one after it ends: a letter as people see one (an emoji with its joiners), an equation whole. */
+export function charStep(runs: Run[], o: number, back: boolean): number {
+  let at = 0;
+  for (const r of runs) {
+    const end = at + r.t.length;
+    if (r.math && (back ? o > at && o <= end : o >= at && o < end)) return back ? at : end;
+    at = end;
+  }
+  const text = runsText(runs);
+  if (typeof Intl.Segmenter !== 'function') return Math.max(0, Math.min(text.length, o + (back ? -1 : 1)));
+  let last = 0;
+  for (const { index } of new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)) {
+    if (back) {
+      if (index >= o) return last;
+      last = index;
+    } else if (index > o) return index;
+  }
+  return back ? last : text.length;
+}
+
+/** Where the word before `o` starts (`back`), or the one after it ends, as Ctrl+Backspace takes one out: the spaces beside it with it. */
+export function wordStep(runs: Run[], o: number, back: boolean): number {
+  const t = searchText(runs);
+  const w = (ch: string | undefined) => !!ch && /[\p{L}\p{N}_'’]/u.test(ch);
+  let i = o;
+  if (back) {
+    while (i > 0 && /\s/.test(t[i - 1])) i--;
+    if (w(t[i - 1])) while (w(t[i - 1])) i--;
+    else if (i > 0) i--;
+  } else {
+    while (i < t.length && /\s/.test(t[i])) i++;
+    if (w(t[i])) while (w(t[i])) i++;
+    else if (i < t.length) i++;
+  }
+  return snapOut(runs, i, !back);
 }
 
 /** The word around `o` (letters and digits), or null where there is none (between spaces). */
@@ -318,6 +370,9 @@ function like(doc: Doc, b: TextBlock, atEnd: boolean): TextBlock {
 /** A list item made a paragraph (its indent kept). */
 const toPara = (b: ItemBlock): ParaBlock => tidy({ id: b.id, type: 'p', align: b.align, lvl: b.lvl, runs: b.runs } as ParaBlock);
 
+/** A quote, code or callout made normal text (a callout's emoji and tint go with its style). */
+const plainPara = (b: ParaBlock): ParaBlock => tidy({ ...b, style: undefined, icon: undefined, tint: undefined });
+
 /** Enter: the block split at the caret (a list's empty item ends the list; code takes a line break instead). */
 export function enter(doc: Doc, at: Pos): Edit {
   if (at.c) return insertText(doc, at, '\n');
@@ -335,7 +390,8 @@ export function enter(doc: Doc, at: Pos): Edit {
   }
   if (!text) {
     if (B.type === 'li') return { doc: withBlock(doc, i, B.lvl ? tidy({ ...B, lvl: B.lvl - 1 }) : toPara(B)), at };
-    if (B.style === 'quote') return { doc: withBlock(doc, i, tidy({ ...B, style: undefined })), at };
+    // An empty quote or callout ends it: what is typed next is normal text (else each Enter made another one).
+    if (B.style === 'quote' || B.style === 'callout') return { doc: withBlock(doc, i, plainPara(B)), at };
   }
   if (at.o === 0 && text) {
     // At its start: an empty block before it, its words where they are.
@@ -354,7 +410,7 @@ export function backspace(doc: Doc, at: Pos): Edit {
   if (!isText(B)) return { doc, at };
   if (B.type === 'li') return { doc: withBlock(doc, i, toPara(B)), at };
   if (B.lvl) return { doc: withBlock(doc, i, tidy({ ...B, lvl: B.lvl - 1 })), at };
-  if (B.style === 'quote' || B.style === 'code') return { doc: withBlock(doc, i, tidy({ ...B, style: undefined })), at };
+  if (B.style === 'quote' || B.style === 'code' || B.style === 'callout') return { doc: withBlock(doc, i, plainPara(B)), at };
   const P = doc.blocks[i - 1];
   if (!P) return B.style ? { doc: withBlock(doc, i, tidy({ ...B, style: undefined })), at } : { doc, at };
   if (isText(P)) return { doc: splice(doc, i - 1, 2, [{ ...P, runs: mergeRuns([...P.runs, ...B.runs]) }]), at: { b: P.id, o: lenOf(P.runs) } };
@@ -524,32 +580,43 @@ export function allHave(doc: Doc, s: Pos, e: Pos, k: Flag): boolean {
   return runs.length > 0 && runs.every((r) => r[k]);
 }
 
-/** A look on (or off) for the words between two places: bold, italic… (raised and lowered words are one or the other). */
-export function setFlag(doc: Doc, s: Pos, e: Pos, k: Flag, on: boolean): Doc {
-  return mapLook(doc, s, e, (r) => {
+/** A run with a look on (or off): bold, italic… (raised and lowered words are one or the other). */
+export const flagFn =
+  (k: Flag, on: boolean) =>
+  (r: Run): Run => {
     const n: Run = { ...r };
     if (on) n[k] = true;
     else delete n[k];
     if (on && k === 'sup') delete n.sub;
     if (on && k === 'sub') delete n.sup;
     return n;
-  });
-}
+  };
 
-/** A colour, highlight, size, font or link for the words between two places (undefined takes it off). */
-export function setValue(doc: Doc, s: Pos, e: Pos, k: 'color' | 'hl' | 'size' | 'font' | 'link', v: string | number | undefined): Doc {
-  return mapLook(doc, s, e, (r) => {
+/** A run with a colour, highlight, size, font or link (undefined takes it off). */
+export const valueFn =
+  (k: 'color' | 'hl' | 'size' | 'font' | 'link', v: string | number | undefined) =>
+  (r: Run): Run => {
     const n: Record<string, unknown> = { ...r };
     if (v === undefined || v === '') delete n[k];
     else n[k] = v;
     return n as unknown as Run;
-  });
-}
+  };
 
-/** The words between two places with no look of their own but their links. */
-export function clearLook(doc: Doc, s: Pos, e: Pos): Doc {
-  return mapLook(doc, s, e, (r) => (r.link ? { t: r.t, link: r.link } : { t: r.t }));
-}
+/** A run with no look of its own but its link (an equation stays one; comments and suggestions stay on their words). */
+export const clearFn = (r: Run): Run => {
+  if (r.math) return r;
+  const { t, link, cm, ins, del, fmt, was } = r;
+  return { t, ...(link ? { link } : {}), ...(cm ? { cm } : {}), ...(ins ? { ins } : {}), ...(del ? { del } : {}), ...(fmt ? { fmt, was } : {}) };
+};
+
+/** A look on (or off) for the words between two places. */
+export const setFlag = (doc: Doc, s: Pos, e: Pos, k: Flag, on: boolean): Doc => mapLook(doc, s, e, flagFn(k, on));
+
+/** A colour, highlight, size, font or link for the words between two places (undefined takes it off). */
+export const setValue = (doc: Doc, s: Pos, e: Pos, k: 'color' | 'hl' | 'size' | 'font' | 'link', v: string | number | undefined): Doc => mapLook(doc, s, e, valueFn(k, v));
+
+/** The words between two places with no look of their own but their links (an equation stays one, comments stay on their words). */
+export const clearLook = (doc: Doc, s: Pos, e: Pos): Doc => mapLook(doc, s, e, clearFn);
 
 /** What the words between two places share: each value they all have. */
 export function commonLook(doc: Doc, s: Pos, e: Pos): Look {
@@ -895,10 +962,13 @@ export function commentSpan(doc: Doc, id: string): [Pos, Pos] | null {
   return first && last ? [first, last] : null;
 }
 
-/** Blocks with no comments' marks (pasted copies are not the comments' words). */
+/** Blocks with no comments' or suggestions' marks (pasted copies are not the comments' words, nor the suggestions). */
 export function withoutComments(blocks: Block[]): Block[] {
-  const clean = (runs: Run[]) => (runs.some((r) => r.cm) ? mergeRuns(runs.map(({ cm: _cm, ...r }) => r)) : runs);
-  return blocks.map((b) => (isText(b) ? { ...b, runs: clean(b.runs) } : b.type === 'table' ? { ...b, rows: b.rows.map((r) => r.map((c) => ({ ...c, runs: clean(c.runs) }))) } : b));
+  const clean = (runs: Run[]) => (runs.some((r) => r.cm || r.ins || r.del || r.fmt) ? mergeRuns(runs.map(({ cm: _cm, ins: _i, del: _d, fmt: _f, was: _w, ...r }) => r)) : runs);
+  return blocks.map((b) => {
+    const { ins: _i, del: _d, ...own } = b;
+    return isText(own) ? { ...own, runs: clean(own.runs) } : own.type === 'table' ? { ...own, rows: own.rows.map((r) => r.map((c) => ({ ...c, runs: clean(c.runs) }))) } : own;
+  });
 }
 
 // ---- finding and replacing ------------------------------------------------------------------------------------------
@@ -912,7 +982,7 @@ export interface Found {
 }
 
 /** The text of a box to search: an equation counts as marks no query matches (its LaTeX is not words). */
-export const searchText = (runs: Run[]) => runs.map((r) => (r.math ? '\u0000'.repeat(r.t.length) : r.t)).join('');
+export const searchText = (runs: Run[]) => runs.map((r) => (r.math || r.del ? '\u0000'.repeat(r.t.length) : r.t)).join('');
 
 /** Words put in place of a stretch of one box's words, looking as its first character does. */
 export function replaceIn(doc: Doc, f: Found, text: string): Doc {
@@ -920,7 +990,7 @@ export function replaceIn(doc: Doc, f: Found, text: string): Doc {
   if (!runs) return doc;
   const [l, rest] = splitAt(runs, f.s);
   const [mid, r] = splitAt(rest, f.e - f.s);
-  const look = mid[0] ? lookOf(mid[0]) : lookAt(runs, f.s);
+  const look = mid[0] ? typedLook(mid[0]) : lookAt(runs, f.s);
   delete look.math;
   return setBox(doc, f.b, f.c, mergeRuns([...l, ...(text ? [{ ...look, t: text }] : []), ...r]));
 }

@@ -6,12 +6,15 @@
 // are taken with (Settings → Browser).
 import { STORAGE_LIMITS } from '../../shared/pages.ts';
 import { KIT_CSS } from '../../shared/page-kit.ts';
+import { codeColoursScript, hasCode } from '../../shared/code-colours.ts';
+import { pageDbScript } from '../../shared/page-db.ts';
 import { ASSET } from '../../shared/slides.ts';
 import { HttpError } from '../auth.ts';
 import { canCapture, printPdf, withTab } from '../capture/index.ts';
 import type { DB } from '../db.ts';
 import { fetchPage } from '../web/fetch.ts';
 import { getAsset, pictureType } from './assets.ts';
+import { docFaces, readDoc } from './docs.ts';
 import { docxOfPage } from './docx.ts';
 import { injectHead, kitHead } from './kit.ts';
 import { imageSize, zipParts } from './ooxml.ts';
@@ -19,7 +22,8 @@ import type { Picture } from './pptx.ts';
 import { mustKind, type ExportFormat, type ExportHelp, type KindDef } from './kinds.ts';
 import { readDeck } from './slides.ts';
 import { deckPictures, deckRenders } from './slides-render.ts';
-import { mustPage, pageSource, storageMap } from './store.ts';
+import { dbSeed, mustPage, pageSource, storageMap } from './store.ts';
+import { wordFonts } from './word-fonts.ts';
 
 export type { ExportFormat };
 
@@ -61,9 +65,15 @@ const PRINT_CSS = '<style>@media print{:root{--n-bg:#fff}}</style>';
 /** The kit as a page has it in the app, light, with the data it keeps (and nothing to send it to). */
 const pageHead = (db: DB, id: string) => kitHead({ n: '', theme: 'light', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, seed: storageMap(db, id) }) + PRINT_CSS;
 
-/** A page as a file to open anywhere: with the kit's stylesheet, light or dark as that device is. */
-export const pageFileHtml = (html: string) =>
-  injectHead(html, `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>`);
+/**
+ * A page as a file to open anywhere: with the kit's stylesheet, light or dark as that device is, its code blocks'
+ * colours, and its databases with what they hold now (`dbs`: their stored values by key), shown as they are.
+ */
+export const pageFileHtml = (html: string, dbs?: Record<string, string>) =>
+  injectHead(
+    html,
+    `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${hasCode(html) ? codeColoursScript() : ''}${/\bn-db\b/.test(html) ? pageDbScript(null, dbs) : ''}`,
+  );
 
 /** A picture made into PNG by the browser (an SVG, or WebP that PowerPoint may not read), at its own size or `w`×`h`. */
 async function rasterize(data: Buffer, mime: string, w?: number, h?: number): Promise<Picture | null> {
@@ -128,7 +138,7 @@ async function fitScales(db: DB, k: KindDef, text: string, title: string): Promi
 export const formatsOf = (k: KindDef): ExportFormat[] => [...new Set([...(Object.keys(k.files) as ExportFormat[]), 'pdf', 'html'] as ExportFormat[])];
 
 /** A page, deck, document or spreadsheet (its current version, or `version`) as a file. */
-export async function exportPage(db: DB, id: string, o: { format: ExportFormat; version?: number; paper?: Paper; slide?: number }): Promise<{ data: Buffer; type: string; name: string }> {
+export async function exportPage(db: DB, id: string, o: { format: ExportFormat; version?: number; paper?: Paper; slide?: number }): Promise<{ data: Buffer; type: string; name: string; note?: string }> {
   mustPage(db, id);
   const src = pageSource(db, id, Number.isInteger(o.version) && o.version! > 0 ? o.version : undefined);
   if (!src) throw new HttpError(404, 'That version is no longer kept');
@@ -170,15 +180,19 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
       for (const s of new Set(k.sources(src.text))) pics.set(s, await pictureFor(db, s));
     }
     let renders: ExportHelp['renders'];
+    // A document's fonts go inside its Word file (the faces it uses, from Google once).
+    const wordFontsOf = o.format === 'docx' && src.kind === 'doc' ? await wordFonts(docFaces(readDoc(src.text))) : undefined;
     if (o.format === 'pptx') {
       scales = await fitScales(db, k, src.text, title);
-      // A deck's icons and equations, as pictures for PowerPoint.
-      if (src.kind === 'slides') renders = await deckRenders(readDeck(src.text));
+      // A deck's icons and equations, as pictures for PowerPoint, and its pictures whose colours were changed, changed.
+      if (src.kind === 'slides') renders = await deckRenders(readDeck(src.text), (s) => pics.get(s) ?? null);
     }
-    return out(await make(db, src.text, title, { picture: (s) => pics.get(s) ?? null, scales, renders }), o.format);
+    const notes: string[] = [];
+    const made = out(await make(db, src.text, title, { picture: (s) => pics.get(s) ?? null, scales, renders, wordFonts: wordFontsOf, note: (t) => notes.push(t) }), o.format);
+    return notes.length ? { ...made, note: notes.join(' ') } : made;
   }
 
-  if (o.format === 'html') return out(pageFileHtml(src.text), 'html');
+  if (o.format === 'html') return out(pageFileHtml(src.text, dbSeed(db, id)), 'html');
   if (o.format === 'pdf') {
     if (!canCapture()) throw noBrowser();
     const html = injectHead(src.text, pageHead(db, id));

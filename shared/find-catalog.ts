@@ -34,6 +34,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['general', 'General', 'App', 'Theme, and what Enter does while an agent works'],
   ['notifications', 'Notifications', 'App', 'When a session finishes, fails or needs your answer'],
   ['security', 'Password', 'App', 'The password for this app, and signing out'],
+  ['signatures', 'Signatures', 'App', 'Your signature and initials, drawn once and kept encrypted, for the documents you sign'],
   ['scm', 'Source control', 'App', 'GitHub and Gitea accounts for opening pull requests'],
   ['connect', 'Connect other agents', 'App', 'Let agents elsewhere start and steer sessions here, through this app’s MCP server'],
   ['machines', 'Machines', 'App', 'Other machines running Hydor, to use from here, and access to this one'],
@@ -82,6 +83,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   // App › Password
   ['security', 'Change password', 'password reset new security', 'Changing it signs out every other browser'],
   ['security', 'Sign out of this browser', 'log out logout sign out', 'You need the password to come back'],
+  ['signatures', 'New signature', 'signature initials draw sign autograph handwriting type upload', 'Draw, type or upload your signature or initials'],
   // App › Source control
   ['scm', 'Add an account', 'github gitea token pull request', 'An account to open pull requests with', 'Add a GitHub or Gitea account'],
   // App › Connect other agents
@@ -251,6 +253,7 @@ const PAGES: [string, string, string, string, string][] = [
   ['videos', 'Videos', '/library?kind=video', 'videos clips movies films media kept saved generated library titles descriptions captions frames', 'The videos agents made that you kept, each with a title and a description'],
   ['audio', 'Audio', '/library?kind=audio', 'audio sounds music songs jingles voices voice overs speech narration sound effects recordings media kept saved generated library titles descriptions', 'The music, voices and sounds agents made that you kept, each with a title and a description'],
   ['new-page', 'New page', '/library?new=1', 'make create new page blank notes checklist tracker write design editor', 'A page of your own: blank, notes, a checklist or a tracker, or one an agent makes'],
+  ['upload-files', 'Upload files', '/library?new=1', 'upload add files drop drag import folder move pictures photos videos sounds documents word excel powerpoint pptx csv pdf', 'Files of yours into the Library or a project: drop them on it, or Upload files in New'],
   ['new-slides', 'New slides', '/library?new=slides', 'make create new slides slide deck presentation powerpoint keynote google slides talk pitch present morph icons equations video groups laser pen captions', 'Slides of your own to edit and present, or a deck an agent makes'],
   ['new-doc', 'New document', '/library?new=doc', 'make create new document doc word docx google docs write letter report cv essay notes open import comments table of contents equations header footer page numbers', 'A document to write and edit as in Word, or one an agent writes'],
   ['new-sheet', 'New spreadsheet', '/library?new=sheet', 'make create new spreadsheet sheet excel xlsx csv google sheets airtable table budget formulas open import filters charts conditional formatting dropdowns checkboxes kanban pivot', 'A spreadsheet with formulas as in Excel, or one an agent makes'],

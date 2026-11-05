@@ -11,7 +11,7 @@ import { hostPort, isPrivate, refusal } from './guard.ts';
 import { normalizeUrl } from './ops.ts';
 import { browserOf, emitView, ensureBrowser, openBrowsers, outsideSessions, profileKey, viewOf } from './session.ts';
 import { addProfile, browserSettings, profiles, removeProfile, renameProfile, sessionOptions, setBrowserSettings, setSessionOptions } from './settings.ts';
-import { stepFile } from './steps.ts';
+import { readMarks, stepFile } from './steps.ts';
 
 const P = (req: FastifyRequest) => req.params as Record<string, string>;
 const B = (req: FastifyRequest) => (req.body ?? {}) as Record<string, any>;
@@ -179,10 +179,14 @@ export function browserRoutes(d: Deps) {
     return { view: b.view() };
   });
 
-  /** A step's small picture, for its row in the conversation. */
+  /** A step's small picture, for its row in the conversation; N.json says where the step acted on it ({ marks }). */
   app.get('/api/browser/sessions/:key/steps/:n', async (req, reply) => {
-    const f = stepFile(key(req), Number(String(P(req).n).replace(/\.jpg$/, '')));
+    const raw = String(P(req).n);
+    const n = Number(raw.replace(/\.(jpg|json)$/, ''));
+    const f = stepFile(key(req), n);
     if (!f) return reply.code(404).send({ error: 'No picture for that step' });
-    return reply.header('Cache-Control', 'private, max-age=604800, immutable').type('image/jpeg').send(fs.createReadStream(f));
+    reply.header('Cache-Control', 'private, max-age=604800, immutable');
+    if (raw.endsWith('.json')) return { marks: readMarks(stepFile(key(req), n, 'json')) };
+    return reply.type('image/jpeg').send(fs.createReadStream(f));
   });
 }

@@ -7,12 +7,12 @@
 // header row. Over the cells: the selection, references outlined while a formula is typed, what was cut, the fill
 // handle, the charts, and the box to type in, which is also what takes the keys and the clipboard while nothing is
 // typed (so typing starts at once, in any language). It is drawn at the zoom asked for.
-// Mouse: click, drag, Shift+click, the letters and numbers, edges of headers to size columns and rows (a double
-// click fits them), the fill handle (drag it, or double-click it to fill down). Touch: a tap picks, a tap on the
+// Mouse: click, drag, Shift+click, Ctrl+click and Ctrl+drag (more ranges), the letters and numbers, edges of headers to
+// size columns and rows (a double click fits them), the fill handle (drag it, or double-click it to fill down). Touch: a tap picks, a tap on the
 // picked cell types in it, a drag scrolls, the round handle stretches the selection, a long press opens the menu.
 import { forwardRef, memo, useCallback, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, ChevronsLeftRight, ChevronsUpDown, ListFilter, Maximize2 } from 'lucide-react';
-import { accountingParts, borderOf, CELL_FONTS, codeColor, colName, formatValue, inputText, isError, refName, textOn, type Calc, type Cell, type CellStyle, type ListOption, type Rect, type Sheet, type Validation } from '@shared/sheets';
+import { ChevronDown, ChevronsLeftRight, ChevronsUpDown, ListFilter, Maximize2, MessageSquare } from 'lucide-react';
+import { accountingParts, borderOf, CELL_FONTS, codeColor, colName, formatValue, inputText, isError, refName, textOn, type Calc, type Cell, type CellStyle, type ListOption, type Rect, type Sheet, type SheetComment, type Validation } from '@shared/sheets';
 import { allowed, isTicked, listOptions, type CondFormats, type Merges, type Rules } from '@shared/sheet-rules';
 import { cx } from '../../../components/ui';
 import { colW, indexAt, offsets, rectOf, rowH, type Sel } from './ops';
@@ -57,6 +57,13 @@ export interface GridView {
   filter: { x: Rect; on: Set<number> } | null;
 }
 
+/** Where the grid's columns and rows start (px from A1's corner, at its zoom; a hidden one is 0 wide), for what is drawn over the cells. */
+export interface GridGeo {
+  colOff: Float64Array;
+  rowOff: Float64Array;
+  z: number;
+}
+
 export interface GridHandle {
   focus(): void;
   input(): HTMLTextAreaElement | null;
@@ -88,9 +95,14 @@ interface Props {
   zoom: number;
   /** Formulas shown instead of what they give. */
   formulas?: boolean;
-  /** Drawn over the cells, scrolling with them (the charts), placed from A1's corner. */
-  overlay?: ReactNode;
-  onSel: (s: Sel) => void;
+  /** Drawn over the cells, scrolling with them (the charts), placed from A1's corner by where the columns and rows are. */
+  overlay?: (geo: GridGeo) => ReactNode;
+  /** More ranges picked besides the selection (Ctrl+click, for a chart of several ranges). */
+  more?: Rect[];
+  /** `keepMore`: the selection grows (a Ctrl+drag), the other ranges picked stay. */
+  onSel: (s: Sel, keepMore?: boolean) => void;
+  /** Ctrl+click on a cell: a range of its own begins there, the ones picked stay picked. */
+  onAddRange?: (r: number, c: number) => void;
   onEdit: (mode: 'type' | 'edit', text?: string) => void;
   onText: (text: string, caret: number) => void;
   /** The caret moved in the words (`text`: what the box holds then, to tell a late report from a current one). */
@@ -113,6 +125,8 @@ interface Props {
   onFillDown: () => void;
   onUnhide: (axis: 'row' | 'col', i: number) => void;
   onExpand: (r: number) => void;
+  /** A comment's card clicked: its thread opens, to read and answer. */
+  onComment?: (r: number, c: number) => void;
 }
 
 // ---- measuring words ----------------------------------------------------------------------------------------------
@@ -212,6 +226,8 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   // The cell the mouse is over (for its note).
   const [hover, setHover] = useState<{ r: number; c: number } | null>(null);
   const touch = useRef(false);
+  // A finger held still has opened the menu: lifting it must not click what now lies under it (the menu's dimmed page).
+  const held = useRef(false);
   // An input method composing (Chinese, Japanese, Greek accents…): the caret is left where it is meanwhile.
   const composing = useRef(false);
   const cb = useRef(p);
@@ -221,6 +237,8 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
 
   const fr = Math.min(sheet.freeze?.rows ?? 0, rows - 1);
   const fc = Math.min(sheet.freeze?.cols ?? 0, cols - 1);
+  // The comments' threads by their cells.
+  const threads = useMemo(() => new Map<string, SheetComment>((sheet.comments ?? []).map((c) => [c.cell, c])), [sheet.comments]);
   const colOff = useMemo(
     () => offsets(cols, (c) => (gv.hidC.has(c) ? 0 : Math.round((sizing?.axis === 'col' && sizing.i === c ? sizing.size : colW(sheet, c)) * z))),
     [cols, sheet, sheet.cols, sizing, rev, z, gv], // eslint-disable-line react-hooks/exhaustive-deps
@@ -327,7 +345,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
 
   // ---- pointer: picking, dragging, typing in ----------------------------------------------------------------------------
   type DragKind = 'cells' | 'cols' | 'rows' | 'point' | 'handle' | 'fill';
-  const drag = useRef<{ kind: DragKind; id: number; x: number; y: number; moved: boolean; timer?: number } | null>(null);
+  const drag = useRef<{ kind: DragKind; id: number; x: number; y: number; moved: boolean; timer?: number; more?: boolean } | null>(null);
   const auto = useRef<number | null>(null);
 
   /** The cells the fill handle would fill, dragged to (r, c): the selection grown down, up, right or left, whichever the pointer is furthest past. */
@@ -351,7 +369,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     if (kind === 'fill') return setFilling(fillTarget(Math.max(0, r), Math.max(0, c)));
     if (kind === 'cols') return cb.current.onSel({ ...s, fr: rows - 1, fc: Math.max(0, c) });
     if (kind === 'rows') return cb.current.onSel({ ...s, fr: Math.max(0, r), fc: cols - 1 });
-    cb.current.onSel({ ...s, fr: Math.max(0, r), fc: Math.max(0, c) });
+    cb.current.onSel({ ...s, fr: Math.max(0, r), fc: Math.max(0, c) }, !!drag.current?.more);
   };
 
   /** While a drag is past the edge of the grid, it scrolls on. */
@@ -407,6 +425,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
       d.timer = window.setTimeout(() => {
         if (!drag.current || drag.current.moved) return;
         drag.current = null;
+        held.current = true;
         const s = P.sel;
         const x = rectOf(s);
         if (r >= 0 && c >= 0 && !(r >= x.r1 && r <= x.r2 && c >= x.c1 && c <= x.c2)) P.onSel({ r, c, ar: r, ac: c, fr: r, fc: c });
@@ -436,6 +455,14 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
       P.onSel(next);
       drag.current = { kind: 'rows', id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
     } else {
+      // Ctrl+click (⌘ on a Mac): another range, the ones picked staying picked (a chart of several ranges).
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !P.edit && P.onAddRange) {
+        P.onAddRange(r, c);
+        drag.current = { kind: 'cells', id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, more: true };
+        scroller.current?.setPointerCapture(e.pointerId);
+        input.current?.focus({ preventScroll: true });
+        return;
+      }
       const smart = !e.shiftKey && !readOnly ? smartAt(e.clientX, e.clientY, r, c) : null;
       P.onSel(e.shiftKey ? { ...s, fr: r, fc: c } : { r, c, ar: r, ac: c, fr: r, fc: c });
       if (smart) {
@@ -452,11 +479,11 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current;
     if (!d && e.pointerType === 'mouse') {
-      // The cell pointed at, for its note.
+      // The cell pointed at, for its note or comment.
       const [r, c] = cellAt(e.clientX, e.clientY);
       const m = r >= 0 && c >= 0 ? spanOf(r, c) : null;
-      const note = m ? sheet.cells[refName(m.r1, m.c1)]?.note : undefined;
-      const next = m && note ? { r: m.r1, c: m.c1 } : null;
+      const k = m ? refName(m.r1, m.c1) : '';
+      const next = m && (sheet.cells[k]?.note || threads.has(k)) ? { r: m.r1, c: m.c1 } : null;
       if (next?.r !== hover?.r || next?.c !== hover?.c) setHover(next);
       return;
     }
@@ -536,7 +563,11 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     const [r, c] = cellAt(e.clientX, e.clientY);
     const s = cb.current.sel;
     const x = rectOf(s);
-    const inside = (r < 0 || (r >= x.r1 && r <= x.r2)) && (c < 0 || (c >= x.c1 && c <= x.c2));
+    // A row's number keeps the selection only when whole rows are picked and it is one of them (a column's letter
+    // likewise): else that row (column) is picked, so its menu is about it.
+    const allCols = x.c1 === 0 && x.c2 >= cols - 1;
+    const allRows = x.r1 === 0 && x.r2 >= rows - 1;
+    const inside = c < 0 && r >= 0 ? allCols && r >= x.r1 && r <= x.r2 : r < 0 && c >= 0 ? allRows && c >= x.c1 && c <= x.c2 : (r < 0 || (r >= x.r1 && r <= x.r2)) && (c < 0 || (c >= x.c1 && c <= x.c2));
     if (!inside) {
       if (r < 0 && c >= 0) cb.current.onSel({ r: 0, c, ar: 0, ac: c, fr: rows - 1, fc: c });
       else if (c < 0 && r >= 0) cb.current.onSel({ r, c: 0, ar: r, ac: 0, fr: r, fc: cols - 1 });
@@ -676,7 +707,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
         className={cx('absolute top-0 flex items-center justify-center border-r border-b border-line select-none', selCols(c) ? (wholeCols ? 'bg-accent text-accent-fg' : 'bg-accent-soft font-semibold text-accent') : 'bg-panel text-fg-3')}
         style={{ left: NW + colOff[c], width: w, height: HH, fontSize: 11 * Math.min(z, 1.4) }}
       >
-        {colName(c)}
+        <span translate="no">{colName(c)}</span>
         {!readOnly && <span data-sizer onPointerDown={startSize('col', c)} onDoubleClick={() => cb.current.onFit('col', c)} className="absolute top-0 -right-[4px] z-10 h-full w-[8px] cursor-col-resize hover:bg-accent/40" />}
         {hiddenAfter && (
           <button type="button" data-own title="Show the hidden columns" aria-label="Show the hidden columns" onClick={() => cb.current.onUnhide('col', c + 1)} className={marker} style={{ right: -7, top: 3, width: 14, height: HH - 6 }}>
@@ -708,7 +739,9 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
         style={{ top: region === 'left' ? rowOff[r] - FH : HH + rowOff[r], width: NW, height: h, fontSize: 11 * Math.min(z, 1.4) }}
       >
         {/* The number makes room for the button that expands the row (its cells as a card, as Airtable opens a record). */}
-        <span className={cx(h >= 16 && (sel.r === r ? 'pl-3.5' : 'group-hover:pl-3.5'))}>{r + 1}</span>
+        <span translate="no" className={cx(h >= 16 && (sel.r === r ? 'pl-3.5' : 'group-hover:pl-3.5'))}>
+          {r + 1}
+        </span>
         {h >= 16 && (
           <button
             type="button"
@@ -765,7 +798,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     );
   };
 
-  const multi = !(x.r1 === x.r2 && x.c1 === x.c2) && !sameRect(x, am);
+  const multi = (!(x.r1 === x.r2 && x.c1 === x.c2) && !sameRect(x, am)) || !!p.more?.length;
   const overlay = (region: Region) => {
     const corner = place(x.r2, x.c2, region);
     const cx2 = corner.left + colOff[x.c2 + 1] - colOff[x.c2];
@@ -773,6 +806,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     return (
       <>
         {p.refs.map((b, i) => boxes(b, region, 'border-2 border-dashed', { borderColor: b.color, background: `color-mix(in srgb, ${b.color} 10%, transparent)` }, `ref${i}`))}
+        {p.more?.map((b, i) => boxes(b, region, 'border border-accent bg-accent/10', {}, `more${i}`))}
         {p.cut && boxes(p.cut, region, 'border-2 border-dashed border-accent', {}, 'cut')}
         {multi && boxes(x, region, 'border border-accent bg-accent/10', {}, 'sel')}
         {filling && boxes(filling, region, 'border-2 border-dashed border-fg-3', {}, 'fill')}
@@ -871,21 +905,42 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   const frozenNums: React.ReactNode[] = [];
   for (let r = 0; r < fr; r++) frozenNums.push(rowHead(r, 'corner'));
 
-  // A note: shown beside the cell pointed at, or the active cell, while nothing is typed.
-  const noteAt = hover ?? (!edit && sheet.cells[refName(am.r1, am.c1)]?.note ? { r: am.r1, c: am.c1 } : null);
+  // A note, and a comment's thread in brief: shown beside the cell pointed at, or the active cell, while nothing is
+  // typed; a click on a comment's opens its thread.
+  const activeKey = refName(am.r1, am.c1);
+  const noteAt = hover ?? (!edit && (sheet.cells[activeKey]?.note || threads.get(activeKey)) ? { r: am.r1, c: am.c1 } : null);
   const noteText = noteAt ? sheet.cells[refName(noteAt.r, noteAt.c)]?.note : undefined;
+  const thread = noteAt ? threads.get(refName(noteAt.r, noteAt.c)) : undefined;
   let noteCard: ReactNode = null;
-  if (noteAt && noteText) {
+  if (noteAt && (noteText || thread)) {
     const m = spanOf(noteAt.r, noteAt.c);
     const left = NW + colOff[m.c2 + 1] + (m.c2 < fc ? view.left : 0) + 4;
     const top = HH + rowOff[m.r1] + (m.r1 < fr ? view.top : 0);
+    const n = thread?.replies?.length ?? 0;
     noteCard = (
       <div
-        translate="no"
-        className="pointer-events-none absolute z-40 max-w-[260px] min-w-[120px] rounded-lg border border-line bg-elevated px-2.5 py-1.5 text-[12.5px] leading-snug whitespace-pre-wrap text-fg shadow-lg"
+        data-own={thread ? '' : undefined}
+        onClick={thread ? () => cb.current.onComment?.(noteAt.r, noteAt.c) : undefined}
+        className={cx(
+          'absolute z-40 max-w-[260px] min-w-[120px] rounded-lg border border-line bg-elevated px-2.5 py-1.5 text-[12.5px] leading-snug whitespace-pre-wrap text-fg shadow-lg',
+          thread ? 'cursor-pointer hover:border-line-2' : 'pointer-events-none',
+        )}
         style={{ left: Math.min(left, NW + colOff[cols] - 140), top }}
       >
-        {noteText}
+        {noteText && <div translate="no">{noteText}</div>}
+        {thread && (
+          <div className={cx(noteText && 'mt-1.5 border-t border-line pt-1.5')}>
+            <div className="flex items-center gap-1.5 text-[11.5px] text-fg-3">
+              <MessageSquare size={11} className="text-[#a142f4]" />
+              {thread.author ? <span translate="no">{thread.author}</span> : <span>{thread.by === 'agent' ? 'Agent' : 'You'}</span>}
+              {thread.resolved && <span>Resolved</span>}
+              {n > 0 && <span>{n === 1 ? '1 reply' : `${n} replies`}</span>}
+            </div>
+            <div translate="no" className="line-clamp-3">
+              {thread.text}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -894,7 +949,6 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     <div
       ref={scroller}
       tabIndex={-1}
-      translate="no"
       onScroll={onScroll}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -904,6 +958,11 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
         if (drag.current?.timer) clearTimeout(drag.current.timer);
         drag.current = null;
         setFilling(null);
+      }}
+      onTouchEnd={(e) => {
+        if (!held.current) return;
+        held.current = false;
+        e.preventDefault();
       }}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
@@ -945,7 +1004,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
           {overlay('body')}
           {p.overlay && (
             <div className="absolute z-10" style={{ left: NW, top: HH }}>
-              {p.overlay}
+              {p.overlay({ colOff, rowOff, z })}
             </div>
           )}
         </div>
@@ -1007,8 +1066,10 @@ const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, pla
         ghosts.set(k, { v: sp.d[(rr - r) * sp.w + (cc - c)], s: own?.s ?? s });
       }
   }
+  // Cells with a comment's open thread (marked in their corner), drawn though they hold nothing.
+  const open = new Set((sheet.comments ?? []).filter((c) => !c.resolved).map((c) => c.cell));
   // Cells the rules draw on though they hold nothing: in view, in a rule's range.
-  const extra = new Set<string>();
+  const extra = new Set<string>(open);
   if (gv.cf.any || gv.rules.any) {
     for (let r = rows.r1; r <= rows.r2; r++) {
       if (rowOff[r + 1] === rowOff[r]) continue;
@@ -1116,7 +1177,7 @@ const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, pla
       rule.rule.type !== 'checkbox' &&
       (rule.rule.type === 'list' ? !!look.text.trim() && !optionsOf(rule.rule).some((o) => o.v.toLowerCase() === look.text.trim().toLowerCase()) : !allowed(calc, si, rule.rule, v, look.text, { r, c, r0: rule.r0, c0: rule.c0 }));
     out.push(
-      <div key={`${r}:${c}`} className={cx('absolute flex overflow-hidden border-r border-b border-line px-[4px] whitespace-nowrap', look.cls, !style.background && 'bg-bg')} style={{ left: pos.left, top: pos.top, width: w, height: h, ...style }}>
+      <div key={`${r}:${c}`} translate="no" className={cx('absolute flex overflow-hidden border-r border-b border-line px-[4px] whitespace-nowrap', look.cls, !style.background && 'bg-bg')} style={{ left: pos.left, top: pos.top, width: w, height: h, ...style }}>
         {cfLook?.bar && <span className="pointer-events-none absolute top-[3px] bottom-[3px] rounded-sm opacity-60" style={{ left: `${cfLook.bar.from * 100}%`, width: `${(cfLook.bar.to - cfLook.bar.from) * 100}%`, background: cfLook.bar.color }} />}
         {look.sign && <span className="relative mr-auto pr-1">{look.sign}</span>}
         {content ?? (
@@ -1124,6 +1185,8 @@ const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, pla
             {text}
           </span>
         )}
+        {/* A comment's open thread marks the corner (purple, as Excel marks its threads), a note too (orange, its tip). */}
+        {open.has(k) && <span className="pointer-events-none absolute top-0 right-0 border-t-[9px] border-l-[9px] border-t-[#a142f4] border-l-transparent" />}
         {cell.note && <span className="pointer-events-none absolute top-0 right-0 border-t-[7px] border-l-[7px] border-t-[#e37400] border-l-transparent" />}
         {invalid && <span className="pointer-events-none absolute top-0 left-0 border-t-[7px] border-r-[7px] border-t-err border-r-transparent" title="This value is not one its rule allows" />}
       </div>,

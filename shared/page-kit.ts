@@ -6,8 +6,9 @@
 // as a file takes it along.
 //
 // It also styles the blocks the page editor writes as Notion does (to-dos, toggles, callouts, columns, a table of
-// contents, a cover and an icon, a video's still, maths, colours of words and of blocks): in a page with the kit's
-// look they take its colours; in a page of its own look, shades of its own text colour, so they suit it light or dark.
+// contents, a cover and an icon, a video's still, maths, colours of words and of blocks, a block kept under a list's
+// item, the colours of code): in a page with the kit's look they take its colours; in a page of its own look, shades of
+// its own text colour, so they suit it light or dark.
 
 /** The ready-made classes and their colours. Light by default; body.n-page follows the app's dark theme. */
 export const KIT_CSS = `
@@ -70,6 +71,8 @@ html[data-n-theme=dark]:has(>body.n-page){color-scheme:dark}
 .n-todo li>span{flex:1;min-width:0}
 .n-todo li>input:checked+span{text-decoration:line-through;opacity:.6}
 .n-todo li>ul,.n-todo li>ol{flex-basis:100%;margin:0;padding-left:1.6em}
+li.n-block{display:block;list-style:none}
+li.n-block>:not(ul,ol){margin-top:.1em;margin-bottom:.1em}
 .n-toggle{margin:.3em 0}
 .n-toggle>summary{cursor:pointer;padding:.1em 0}
 .n-toggle>summary::marker{color:color-mix(in srgb,currentColor 55%,transparent)}
@@ -100,7 +103,24 @@ html[data-n-theme=dark]:has(>body.n-page){color-scheme:dark}
 .n-page .n-tbl th{background:var(--n-soft)}
 pre.n-code{padding:.85em 1em;border-radius:var(--n-radius,12px);background:color-mix(in srgb,currentColor 7%,transparent);overflow-x:auto;font-size:.88em;line-height:1.55;white-space:pre}
 :where(.n-page) pre.n-code{background:var(--n-soft)}
+pre.n-code .n-ck,pre>code>.n-ck{color:color-mix(in srgb,#b259d0 80%,currentColor)}
+pre.n-code .n-cs,pre>code>.n-cs{color:color-mix(in srgb,#3f9f52 80%,currentColor)}
+pre.n-code :is(.n-cn,.n-cv),pre>code>:is(.n-cn,.n-cv){color:color-mix(in srgb,#d4782f 82%,currentColor)}
+pre.n-code .n-cc,pre>code>.n-cc{color:color-mix(in srgb,currentColor 55%,transparent);font-style:italic}
+pre.n-code .n-cf,pre>code>.n-cf{color:color-mix(in srgb,#3d7fe0 80%,currentColor)}
+pre.n-code .n-ct,pre>code>.n-ct{color:color-mix(in srgb,#c99a1e 80%,currentColor)}
+pre.n-code .n-ca,pre>code>.n-ca{color:color-mix(in srgb,#2c9fa8 80%,currentColor)}
+pre.n-code .n-cg,pre>code>.n-cg{color:color-mix(in srgb,#d9534f 80%,currentColor)}
+pre.n-code .n-ci,pre>code>.n-ci{background:color-mix(in srgb,#3f9f52 18%,transparent)}
+pre.n-code .n-cd,pre>code>.n-cd{background:color-mix(in srgb,#d9534f 18%,transparent)}
 img.n-pic{display:block;max-width:100%;height:auto;margin:.8em 0;border-radius:calc(var(--n-radius,12px) * .6)}
+.n-db{display:block;margin:.8em 0;min-height:2em}
+a.n-pagelink{padding:.05em .35em .1em;border-radius:.35em;background:color-mix(in srgb,currentColor 7%,transparent);color:inherit;font-weight:500;text-decoration:none;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+a.n-pagelink:hover{background:color-mix(in srgb,currentColor 13%,transparent)}
+.n-pagelink-icon{margin-right:.25em;font-weight:400}
+.n-pagelink-icon:empty::before{content:"";display:inline-block;width:.85em;height:1em;vertical-align:-.15em;background:currentColor;opacity:.6;-webkit-mask:var(--n-pl,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 3v5h5'/%3E%3C/svg%3E")) center/contain no-repeat;mask:var(--n-pl,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 3v5h5'/%3E%3C/svg%3E")) center/contain no-repeat}
+.n-pagelink-icon[data-kind=slides]{--n-pl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='4' width='18' height='12' rx='2'/%3E%3Cpath d='M12 16v4M8 20h8'/%3E%3C/svg%3E")}
+.n-pagelink-icon[data-kind=sheet]{--n-pl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Crect x='3' y='4' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M3 15h18M9 4v16'/%3E%3C/svg%3E")}
 .n-tc-grey{color:color-mix(in srgb,#787774 78%,currentColor)}
 .n-tc-brown{color:color-mix(in srgb,#9f6b53 78%,currentColor)}
 .n-tc-orange{color:color-mix(in srgb,#d9730d 78%,currentColor)}

@@ -1,5 +1,7 @@
 // The web browser agents drive (server/browser), as the pages see it: a session's browser and its live
-// view, the user's input when they take over, the cards it adds to a conversation, and Settings → Browser.
+// view (with the agent's pointer in it), the user's input when they take over, the cards it adds to a
+// conversation, and Settings → Browser.
+import type { AgentPointer } from './pointer.ts';
 
 /** One tab of a session's browser. */
 export interface BrowserTab {
@@ -51,12 +53,16 @@ export interface BrowserView {
   viewport: { w: number; h: number; mobile?: boolean };
   /** Files the browser saved lately, into the session's folder. */
   downloads: { name: string; path: string; done: boolean; failed?: boolean; at: number }[];
+  /** Where the agent's pointer rests, as fractions of the page: the live view shows it there until the agent acts again. */
+  pointer?: { x: number; y: number };
 }
 
 /** News from the server ({ t: 'feature', id: 'browser', key, data }); `download` goes to every page. */
 export type BrowserEvent =
   | { type: 'state'; view: BrowserView }
   | { type: 'frame'; tab: string; data: string; w: number; h: number }
+  /** The agent's pointer moves or acts (shared/pointer.ts), for the live view to draw. */
+  | { type: 'pointer'; tab: string; pointer: AgentPointer }
   | { type: 'download'; download: ChromeDownload };
 
 /** Shift, Control, Alt and Meta, as CDP counts them. */
@@ -138,4 +144,30 @@ export interface BrowserNote {
   ask: BrowserAsk;
   status: 'waiting' | 'done' | 'skipped';
   endedAt?: number;
+}
+
+/**
+ * What the agent is doing right now in a few words, for the live view's busy line: whole phrases, so the page
+ * translates them (`name` is the part's name as the page has it, in quotes, or its number).
+ */
+export function busyWords(action: string, name: string, more: { direction?: string; keys?: string } = {}): string {
+  switch (action) {
+    case 'click':
+    case 'double_click':
+      return `Clicking ${name}`;
+    case 'hover':
+      return `Pointing at ${name}`;
+    case 'type':
+      return `Typing into ${name}`;
+    case 'select':
+      return `Choosing in ${name}`;
+    case 'scroll':
+      return more.direction === 'up' ? 'Scrolling up' : more.direction === 'left' ? 'Scrolling left' : more.direction === 'right' ? 'Scrolling right' : 'Scrolling down';
+    case 'keys':
+      return `Pressing ${more.keys ?? ''}`;
+    case 'back':
+      return 'Going back';
+    default:
+      return 'Waiting';
+  }
 }

@@ -25,7 +25,8 @@ Custom also reads PDFs, Office documents and pictures with its ordinary file rea
 - The text of each page, laid out as on the page.
 - This works best with the pdftotext program (in poppler-utils). Without it, the app fetches pdf.js once (about 35 MB, which needs the internet that first time), and the layout is only approximate.
 - Scanned pages have no text, and the agent is told which ones ("Pages 3, 5–7 have no text"). With the **pdf** skill it then looks at those pages as images and reads them itself, or runs OCR on them when tesseract is installed.
-- A PDF locked with a password can't be read. Give the agent the password, and the **pdf** skill makes an unlocked copy.
+- A PDF locked with a password can't be read. Give the agent the password, and the **pdf** skill makes an unlocked copy. One that opens without a password but limits changes (many official forms) is read as any other.
+- **Forms**: the agent lists a PDF's form fields, each with the words printed beside it (which say what a field named "f1_02" is for), and looks at its pages as pictures with the fields numbered and a ruler in points.
 
 ### Word, Excel and PowerPoint
 
@@ -66,6 +67,7 @@ Reports, letters, CVs, memos, contracts, forms, handouts and notes, to open in W
 - A table of contents (Word fills it in when the file opens), page numbers ("Page 1 of 3"), links and shaded table cells.
 - A4 or US Letter, and fonts that look the same on any computer (Calibri, Arial, Cambria, Times New Roman).
 - Your own documents changed in place, keeping their styles, headers and layout; text replaced without losing its formatting; comments added.
+- Signed with your saved signature: in place of {{signature}}, right after words such as "Signature:", in a table's cell or at the end, once you allow it on a card ([Signatures](/guide/library#signatures)).
 - A PDF of it too, through LibreOffice.
 
 ### Spreadsheets
@@ -95,7 +97,12 @@ Reports, invoices, certificates, flyers, letters and forms.
 - Mostly text, or something you'll want to edit: the agent makes a Word document, then a PDF from it with LibreOffice.
 - Laid out exactly (invoices, certificates, tickets, forms): it draws the PDF directly.
 - Slides or a sheet as a PDF: made with their skill, then turned into a PDF.
-- Everyday jobs on PDFs you have: merge several into one, keep some pages in an order, split one into a PDF per page, rotate pages, list a form's fields and fill them in, stamp big faint words such as DRAFT across every page, and make a copy without its password (you give the password).
+- **Fill in a form**: its fields by name (text, ticks, choices, in Greek, Chinese or any script), so any viewer shows them and they can still be changed there; or, for a form that is only printed lines and boxes, the words written on the page beside the words printed ("Date of birth:") and ticks in its boxes; on a scanned one, which has no words to find, where the agent sees the blanks in a picture of the page. The agent asks you for what it doesn't know, and looks at the pages before and after. A digitally signed form stays valid when only its fields are filled in. XFA forms (Adobe LiveCycle) fill in only in Adobe's own apps: the agent says so, and can still write on their pages.
+- **Write on pages**: words, ticks and crosses, pictures, white boxes over what is there (they hide words from the eye only: the words stay in the file, so this is no redaction), outlines and lines, and highlights and comments as the PDF's own, which other viewers list and can take away.
+- **Change pages**: rotate them, delete them, move them, put in blank pages, merge PDFs, take some pages into a file of their own or split one into several. A file changed this way can't keep a digital signature, and the agent says so.
+- What the agent writes goes in a copy beside the file ("name (filled).pdf"), unless you ask for the file itself to change; then its old version goes to the Trash. You can also fill in and sign a PDF yourself: [Fill in and sign a PDF](/guide/files-git#fill-in-and-sign-a-pdf).
+- Big faint words such as DRAFT across every page, and a copy without its password (you give the password), with the **pdf** skill.
+- Signed with your saved signature, beside words on a page or at a spot it shows you first, once you allow it on a card; added to the PDF without changing what was in it ([Signatures](/guide/library#signatures)).
 - Office files turned into PDFs.
 
 ### What the computer needs
@@ -104,7 +111,7 @@ These are about the computer that runs Hydor, not the device you use it from.
 
 - **Python 3**, with its venv module: needed to make documents. The first time, the skills install a few Python libraries for Office files and PDFs into a private folder of the app (about 30 MB, once, from the internet); nothing is installed system-wide. If Python is missing, the agent tells you the one command to run (on Debian or Ubuntu `sudo apt install python3 python3-venv`; on a Mac `brew install python`).
 - **LibreOffice** (optional): previews as laid-out pages in the file viewer, reading old .doc, .xls and .ppt files, agents looking at Office documents as pages, formula checks, and PDFs from Office files. On Debian or Ubuntu: `sudo apt install libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui`; on a Mac: `brew install --cask libreoffice`.
-- **poppler-utils** (optional): the best PDF reading, and agents looking at pages as images. On Debian or Ubuntu: `sudo apt install poppler-utils`; on a Mac: `brew install poppler`.
+- **poppler-utils** (optional): the best PDF reading, and pictures of PDF pages for agents and for **Fill & sign**. Without it, the app draws them with what the computer has (a Mac's or Windows' own way of drawing PDFs), or with the browser of **Settings → Browser**. On Debian or Ubuntu: `sudo apt install poppler-utils`; on a Mac: `brew install poppler`.
 - **tesseract** (optional): OCR for scanned PDFs.
 
 Without LibreOffice or poppler-utils, agents read their files back as text to check them, and keep the layout simple.
@@ -120,7 +127,7 @@ When an agent has made files for you (a document, a spreadsheet, slides, a PDF, 
 
 **Open** shows the file in the file viewer, in a window over the conversation, which stays where it was (on a phone the window comes up from the bottom of the screen). **Open in Files** at its top takes the file to the Files page; the cross, or Escape, closes the window. The download button saves the file on your device.
 
-**More** (⋯), on a card and at the top of the window, has **Start a session with it** (the start page, with the file in its message box), **Add to a project** (copies it into a project's folder), **Save to Library** (a Jupyter notebook, a Word or Markdown document, a spreadsheet or a LaTeX file: a copy kept in your Library, in its editor there, in the project you pick when you have projects, the session's first), **Show in Files** (on a card) and **Copy path**. See [Start a session with files](/guide/files-git#start-a-session-with-files) and [Add files to a project](/guide/files-git#add-files-to-a-project).
+**More** (⋯), on a card and at the top of the window, has **Start a session with it** (the start page, with the file in its message box), **Add to a project** (copies it into a project's folder), **Save to Library** (a Jupyter notebook, a PowerPoint deck, a Word or Markdown document, a spreadsheet or a LaTeX file: a copy kept in your Library, in its editor there, in the project you pick when you have projects, the session's first), **Show in Files** (on a card) and **Copy path**. See [Start a session with files](/guide/files-git#start-a-session-with-files) and [Add files to a project](/guide/files-git#add-files-to-a-project).
 
 A file deleted or moved since shows as **No longer there**. If an agent names a file that doesn't exist, you see "Could not show the files" with the reason, and the agent is told to fix it.
 
@@ -128,7 +135,7 @@ A file deleted or moved since shows as **No longer there**. If an agent names a 
 
 The file viewer shows documents from a card, from the Files page, or from a link in a reply (see [System: files, Git, Terminal and Preview](/guide/files-git)).
 
-- **PDFs** show as they are, in the browser's own PDF view.
+- **PDFs** show as they are, in the browser's own PDF view, with **Fill & sign** to fill them in and sign them ([Fill in and sign a PDF](/guide/files-git#fill-in-and-sign-a-pdf)).
 - **Word, Excel, PowerPoint, OpenDocument, EPUB and RTF** files (old .doc, .xls and .ppt too) show as a preview. When LibreOffice is installed, a switch at the top offers two views:
   - **Pages**: "As LibreOffice lays it out", each page as it would print. The first time takes a moment ("Laying out the pages…"); after that the pages open at once until the file changes.
   - **Text**: "Its text, sheets and slides", as the app reads them. A text document shows as a page of paper; a workbook as a grid with column letters, row numbers and a tab for each sheet at the bottom (hidden sheets marked with a crossed-out eye); slides as cards, each with its number and its speaker notes under it. Pictures show as a box with their description. A line at the top says when something was left out ("Shows the first 1000 rows").
@@ -357,9 +364,12 @@ It stops listening to say these, then listens again. Sessions on your other mach
 
 ## Ask an agent
 
+- "Fill in the form ~/Downloads/visa-application.pdf with my details from my profile, and ask me for the rest."
+- "Write today's date and my name on the lines of ~/Documents/permission-slip.pdf, and tick Yes."
+- "Take pages 3 to 5 out of ~/Documents/contract.pdf into a file of their own."
 - "Turn on speech recognition on this computer, with the Small model."
 - "Use my speech server at http://192.168.1.20:8000/v1 for dictation, with the model whisper-large-v3."
-- "Which whisper models are on this computer, and how much project do they take? Remove the ones not in use."
+- "Which whisper models are on this computer, and how much space do they take? Remove the ones not in use."
 - "Which image model do agents use now, and about what does one image cost?"
 - "Switch the image model to the cheapest one that can edit pictures."
 - "Stop agents from making images."

@@ -1,9 +1,11 @@
-// The screen after each computer step, for its row in the conversation (a small picture, opening large). A step's
-// answer starts with "Computer step N", which the row uses to find its picture. The last 200 of a session are kept,
-// and a session's go a month after it was last used, or with the session.
+// The screen after each computer step, for its row in the conversation (a small picture, opening large), with where
+// the step's actions were on it (N.json beside N.jpg). A step's answer starts with "Computer step N", which the row uses
+// to find its picture. The last 200 of a session are kept, and a session's go a month after it was last used, or with
+// the session.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { cleanMarks, type StepMark } from '../../shared/pointer.ts';
 import { config } from '../config.ts';
 
 const DIR = path.join(config.dataDir, 'computer', 'steps');
@@ -31,18 +33,29 @@ export function nextStep(key: string): number {
   return n;
 }
 
-export function saveStep(key: string, n: number, jpeg: Buffer) {
+export function saveStep(key: string, n: number, jpeg: Buffer, marks: StepMark[] = []) {
   const dir = dirOf(key);
   try {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     fs.writeFileSync(path.join(dir, `${n}.jpg`), jpeg, { mode: 0o600 });
-    if (n % 25 === 0) for (const old of numbers(dir).filter((x) => x <= n - KEEP)) fs.rmSync(path.join(dir, `${old}.jpg`), { force: true });
+    if (marks.length) fs.writeFileSync(path.join(dir, `${n}.json`), JSON.stringify({ marks }), { mode: 0o600 });
+    if (n % 25 === 0) for (const old of numbers(dir).filter((x) => x <= n - KEEP)) for (const ext of ['jpg', 'json']) fs.rmSync(path.join(dir, `${old}.${ext}`), { force: true });
   } catch {}
 }
 
-export function stepFile(key: string, n: number): string | null {
+/** Where a step acted, from its file (none when it has none, or it cannot be read). */
+export function readMarks(file: string | null): StepMark[] {
+  try {
+    return file ? cleanMarks(JSON.parse(fs.readFileSync(file, 'utf8'))) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** A step's picture (jpg), or where it acted on it (json). */
+export function stepFile(key: string, n: number, ext: 'jpg' | 'json' = 'jpg'): string | null {
   if (!Number.isInteger(n) || n <= 0) return null;
-  const f = path.join(dirOf(key), `${n}.jpg`);
+  const f = path.join(dirOf(key), `${n}.${ext}`);
   return fs.existsSync(f) ? f : null;
 }
 

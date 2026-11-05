@@ -48,6 +48,7 @@ import { accountEnv, accountPool, addAccount, addedAccounts, autoSwitchOn, remov
 import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
 import { devServerShot, listDevServers, livePreview, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
+import { moveFileComments } from './pages/filecomments.ts';
 import * as setup from './setup.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
 import { onDesktop, tellDesktop } from './desktop.ts';
@@ -1029,7 +1030,12 @@ app.put('/api/fs/write', async (req) => {
   return files.writeFile(b.path, b.content, { expectedMtime: b.expectedMtime, create: !!b.create });
 });
 app.post('/api/fs/mkdir', async (req) => files.makeDir((req.body as any)?.path));
-app.post('/api/fs/rename', async (req) => files.renamePath((req.body as any)?.from, (req.body as any)?.to));
+app.post('/api/fs/rename', async (req) => {
+  const r = await files.renamePath((req.body as any)?.from, (req.body as any)?.to);
+  // The comments the app keeps on LaTeX files go with them (and with a folder's files).
+  moveFileComments(db, files.resolvePath((req.body as any)?.from), r.path);
+  return r;
+});
 app.post('/api/fs/delete', async (req) => files.deletePath((req.body as any)?.path, { forGood: (req.body as any)?.forGood === true }));
 app.post('/api/fs/copy', async (req) => {
   const b = (req.body ?? {}) as Record<string, unknown>;
@@ -1516,8 +1522,9 @@ app.register(async (scope) => {
             send(c, { t: 'kernel', id, e: { op: 'gone' } });
           }
         }
-      } else if (m.t !== 'ping' && typeof m.key === 'string' && m.key.startsWith('preview:')) {
-        // A dev server's page streaming to Preview: its frames and state only, no session behind it.
+      } else if (m.t !== 'ping' && typeof m.key === 'string' && (m.key.startsWith('preview:') || m.key.startsWith('page:'))) {
+        // A dev server's page streaming to Preview, or a page of the Library open in its editor (an agent's save of it
+        // shows as it comes: server/pages/drafts.ts): their news only, no session behind them.
         if (m.t === 'sub') c.subs.add(m.key);
         else if (m.t === 'unsub') c.subs.delete(m.key);
       } else if (m.t === 'sub' && m.key === SYSTEM_CHANNEL && !c.subs.has(m.key)) {
@@ -1538,7 +1545,7 @@ app.register(async (scope) => {
     ws.on('close', () => {
       for (const k of c.subs) {
         if (k === SYSTEM_CHANNEL) system.watch(-1);
-        else if (!k.startsWith('kernel:') && !k.startsWith('preview:')) sessions.subscribe(k, -1);
+        else if (!k.startsWith('kernel:') && !k.startsWith('preview:') && !k.startsWith('page:')) sessions.subscribe(k, -1);
       }
       clients.delete(c);
     });

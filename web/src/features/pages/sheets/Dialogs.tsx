@@ -171,7 +171,7 @@ export function SplitDialog({ guess, onSplit, onClose }: { guess: string; onSpli
             <input type="radio" name="sep" checked={how === k} onChange={() => setHow(k)} className="accent-[var(--accent)]" />
             {label}
             {k === 'auto' && <span className="text-[12px] text-fg-3">{`(${named})`}</span>}
-            {k === 'custom' && how === 'custom' && <input autoFocus value={custom} onChange={(e) => setCustom(e.target.value)} maxLength={5} aria-label="Separator" className={cx(smallInput, 'ml-1 w-24')} />}
+            {k === 'custom' && how === 'custom' && <input autoFocus value={custom} onChange={(e) => setCustom(e.target.value)} maxLength={5} aria-label="Separator" className={cx(smallInput, 'ml-1')} style={{ width: 96 }} />}
           </label>
         ))}
       </div>
@@ -306,7 +306,7 @@ export function SummaryDialog({ cols, onMake, onClose }: { cols: ColChoice[]; on
         {values.map((v, i) => (
           <div key={i} className="flex items-center gap-2 text-[13px]">
             <span className="w-[86px] shrink-0 text-fg-3">{i === 0 ? 'Values' : ''}</span>
-            <select value={v.fn} onChange={(e) => setValues(values.map((x, j) => (j === i ? { ...x, fn: e.target.value as SummaryFn } : x)))} aria-label="Summed up as" className={cx(smallInput, 'w-[110px] shrink-0')}>
+            <select value={v.fn} onChange={(e) => setValues(values.map((x, j) => (j === i ? { ...x, fn: e.target.value as SummaryFn } : x)))} aria-label="Summed up as" className={cx(smallInput, 'shrink-0')} style={{ width: 110 }}>
               {SUMMARY_FNS.map(([k, label]) => (
                 <option key={k} value={k}>
                   {label}

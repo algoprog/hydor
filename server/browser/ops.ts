@@ -1,11 +1,15 @@
 // What the agent's browser tools do, and how their answers read: a short line on what happened, then
-// the page as an outline marked as outside data. Each step saves a small picture for its row.
+// the page as an outline marked as outside data. The agent's pointer shows in the live view where it
+// points, clicks and types, and each step saves a small picture for its row, with where it acted.
 import fs from 'node:fs';
 import path from 'node:path';
+import { busyWords } from '../../shared/browser.ts';
 import { domainAllowed, secretName } from '../../shared/connections.ts';
+import type { PointerAct, StepMark, Way } from '../../shared/pointer.ts';
 import type { ToolOutput } from '../features/types.ts';
 import { refusal, hostPort, isPrivate, type Policy } from './guard.ts';
 import { browserOf, ensureBrowser, pageLine, type SessionBrowser } from './session.ts';
+import { parseKey } from './keys.ts';
 import { nextStep, saveStep } from './steps.ts';
 import { sleep, type ElRef, type Tab } from './tab.ts';
 import { shownUrl, type El } from './outline.ts';
@@ -107,15 +111,54 @@ function extras(b: SessionBrowser, t: Tab): string {
   return out.join(' ');
 }
 
-/** A small picture of the page for the step's row, numbered; the answer starts with the number. */
-async function step(b: SessionBrowser, t: Tab | null, what: string): Promise<string> {
+/** A small picture of the page for the step's row, numbered, with where its actions were; the answer starts with the number. */
+async function step(b: SessionBrowser, t: Tab | null, what: string, marks: Marked[] = []): Promise<string> {
   const n = nextStep(b.key);
   if (t && !t.dialog && !t.closed) {
     try {
-      saveStep(b.key, n, await t.screenshot({ quality: 55, width: 360 }));
+      saveStep(b.key, n, await t.screenshot({ quality: 55, width: 360 }), await marksFor(t, marks));
     } catch {}
   }
   return `Browser step ${n}: ${what}`;
+}
+
+/** Where an action was, for the step's picture, with the page it was on and how far it was scrolled then. */
+type Marked = StepMark & { scrollY: number; loader: string };
+
+/** The marks that still fit the picture taken after the steps (the same page, scrolled the same), and the last one wherever it was. */
+async function marksFor(t: Tab, marks: Marked[]): Promise<StepMark[]> {
+  if (!marks.length) return [];
+  const y = await t.scrollY().catch(() => 0);
+  return marks.filter((m, i) => i === marks.length - 1 || (m.loader === t.loaderId && Math.abs(m.scrollY - y) < 4)).map(({ scrollY: _y, loader: _l, ...m }) => m);
+}
+
+/** The agent's pointer goes to a place on the page and acts there: in the live view (gliding there first while someone watches), and on the step's picture. */
+async function aim(b: SessionBrowser, t: Tab, p: { x: number; y: number; act: PointerAct; box?: { x: number; y: number; w: number; h: number }; dir?: Way }, marks: Marked[]) {
+  const shown = await b.pointAt(t, p);
+  const { glide: _g, keys: _k, ...mark } = shown;
+  marks.push({ ...mark, scrollY: await t.scrollY().catch(() => 0), loader: t.loaderId });
+  return shown;
+}
+
+/**
+ * The agent's pointer to an element it clicks or points at: the point to act on, or why it can't. When the pointer
+ * glided there, the element is found again after, since the page may have moved meanwhile (the click goes where it is).
+ */
+async function aimAt(b: SessionBrowser, t: Tab, ref: ElRef, act: PointerAct, marks: Marked[]): Promise<{ x: number; y: number } | { error: string }> {
+  const p = await t.point(ref);
+  if ('error' in p) return p;
+  if (!(await aim(b, t, { ...p, act }, marks)).glide) return p;
+  const now = await t.point(ref, false);
+  if ('error' in now || Math.hypot(now.x - p.x, now.y - p.y) <= 2) return now;
+  marks.pop();
+  await aim(b, t, { ...now, act }, marks);
+  return now;
+}
+
+/** The agent's pointer to a field it types into or chooses in (near its end, off the words going in), the field outlined; nothing when the field does not show. */
+async function aimField(b: SessionBrowser, t: Tab, ref: ElRef, act: 'type' | 'select', marks: Marked[], scroll = false) {
+  const r = await t.rectOf(ref, scroll);
+  if (!('error' in r)) await aim(b, t, { x: r.x + r.w - Math.min(r.w / 3, 26), y: r.y + Math.min(r.h / 2, 20), act, box: r }, marks);
 }
 
 async function withBusy<T>(b: SessionBrowser, label: string, fn: () => Promise<T>): Promise<T> {
@@ -277,6 +320,7 @@ export async function act(ctx: OpCtx, raw: unknown, screenshot: boolean): Promis
   const t0 = b.active;
   return t0.run(async () => {
     const lines: string[] = [];
+    const marks: Marked[] = [];
     let stop: string | null = null;
     let ran = 0;
     const started = Date.now();
@@ -293,7 +337,7 @@ export async function act(ctx: OpCtx, raw: unknown, screenshot: boolean): Promis
       }
       const before = { tab: t, loader: t.loaderId, url: t.url, tabs: b.tabs.length };
       const el = s.id !== undefined ? known.get(b.key)?.get(s.id) : undefined;
-      const r = await withBusy(b, busyLabel(s, el), () => doStep(b, t, s, el, ctx));
+      const r = await withBusy(b, busyLabel(s, el), () => doStep(b, t, s, el, ctx, marks));
       lines.push(`${i + 1}. ${r.line}`);
       if (r.failed) {
         stop = r.stop ?? null;
@@ -324,7 +368,7 @@ export async function act(ctx: OpCtx, raw: unknown, screenshot: boolean): Promis
     }
     if (stop && ran < steps.length) stop += ` Step${steps.length - ran > 1 ? `s ${ran + 1}–${steps.length}` : ` ${ran + 1}`} did not run.`;
     const t = b.active!;
-    const head = await step(b, t, `ran ${ran} of ${steps.length} step${steps.length > 1 ? 's' : ''}.`);
+    const head = await step(b, t, `ran ${ran} of ${steps.length} step${steps.length > 1 ? 's' : ''}.`, marks);
     const body = t.dialog ? '' : await pageState(b, t, ctx);
     const img = screenshot && !t.dialog ? await labeled(b, t, ctx) : null;
     return { text: [head, ...lines, ...(stop ? [stop] : []), ...(body ? ['', body] : [])].join('\n'), images: img ? [img] : undefined };
@@ -333,25 +377,7 @@ export async function act(ctx: OpCtx, raw: unknown, screenshot: boolean): Promis
 
 function busyLabel(s: ActStep, e?: El): string {
   const n = e?.name ? quote(e.name.slice(0, 40)) : s.id !== undefined ? `[${s.id}]` : '';
-  switch (s.action) {
-    case 'click':
-    case 'double_click':
-      return `Clicking ${n}`;
-    case 'hover':
-      return `Pointing at ${n}`;
-    case 'type':
-      return `Typing into ${n}`;
-    case 'select':
-      return `Choosing in ${n}`;
-    case 'scroll':
-      return `Scrolling ${s.direction ?? 'down'}`;
-    case 'keys':
-      return `Pressing ${s.keys ?? ''}`;
-    case 'back':
-      return 'Going back';
-    default:
-      return 'Waiting';
-  }
+  return busyWords(s.action, n, { direction: s.direction, keys: s.keys });
 }
 
 interface StepResult {
@@ -360,7 +386,7 @@ interface StepResult {
   stop?: string;
 }
 
-async function doStep(b: SessionBrowser, t: Tab, s: ActStep, e: El | undefined, ctx: OpCtx): Promise<StepResult> {
+async function doStep(b: SessionBrowser, t: Tab, s: ActStep, e: El | undefined, ctx: OpCtx, marks: Marked[]): Promise<StepResult> {
   const needId = ['click', 'double_click', 'hover', 'type', 'select'].includes(s.action);
   const ref = s.id !== undefined ? b.refs.get(s.id) : undefined;
   if (needId) {
@@ -375,7 +401,7 @@ async function doStep(b: SessionBrowser, t: Tab, s: ActStep, e: El | undefined, 
     case 'hover': {
       if (s.action !== 'hover' && e?.payment) return payment(b, t, e);
       if (s.action === 'click' && e?.fileInput) return { line: `${what} is a file input: use browser_upload with a file from the session’s folder.`, failed: true };
-      const p = await t.point(ref!);
+      const p = await aimAt(b, t, ref!, s.action === 'hover' ? 'move' : s.action === 'double_click' ? 'double' : 'click', marks);
       if ('error' in p) return { line: `Could not click ${what}: ${p.error}.`, failed: true };
       if (s.action === 'hover') {
         await t.mouse('mouseMoved', p.x, p.y);
@@ -386,10 +412,11 @@ async function doStep(b: SessionBrowser, t: Tab, s: ActStep, e: El | undefined, 
       return r === 'dialog' ? { line: `Clicked ${what}.`, stop: dialogNote(t)! } : { line: `${s.action === 'double_click' ? 'Double-clicked' : 'Clicked'} ${what}.` };
     }
     case 'type': {
-      if (s.secret) return typeSecret(b, t, s, ref!, what, ctx);
+      if (s.secret) return typeSecret(b, t, s, ref!, what, ctx, marks);
       const text = String(s.text ?? '');
       const f = await t.focusField(ref!);
       if ('error' in f) return { line: `Could not type into ${what}: ${f.error}.`, failed: true };
+      await aimField(b, t, ref!, 'type', marks);
       if (/^(date|time|datetime-local|month|week|color|range)$/.test(f.kind)) {
         const v = await t.setValue(ref!, text);
         return { line: `Set ${what} to ${quote(v)}.` };
@@ -408,12 +435,15 @@ async function doStep(b: SessionBrowser, t: Tab, s: ActStep, e: El | undefined, 
       if (s.enter) {
         const pay = paymentOnPage(b);
         if (pay) return payment(b, t, pay, line);
+        await b.pointAt(t, { act: 'key', keys: 'Enter' });
         if ((await t.key('Enter')) === 'dialog') return { line: `${line} Pressed Enter.`, stop: dialogNote(t)! };
         line += ' Pressed Enter.';
       }
       return { line };
     }
     case 'select': {
+      // Chosen by the page's script, so nothing in the way stops it: the pointer shows it where it can.
+      await aimField(b, t, ref!, 'select', marks, true);
       const r = await t.select(ref!, String(s.option ?? s.text ?? ''));
       if (r.ok) return { line: `Chose ${quote(r.label)} in ${what}.` };
       if (r.notSelect) return { line: `${what} is not a list to choose from: click it, then click the option.`, failed: true };
@@ -431,6 +461,7 @@ async function doStep(b: SessionBrowser, t: Tab, s: ActStep, e: El | undefined, 
         if (!('error' in p)) ({ x, y } = p);
       }
       const amount = (dir === 'left' || dir === 'right' ? w : h) * 0.85 * pages;
+      await aim(b, t, { x, y, act: 'scroll', dir: (['up', 'down', 'left', 'right'].includes(dir) ? dir : 'down') as Way }, marks);
       const before = await t.scrollY();
       await t.wheel(x, y, dir === 'left' ? -amount : dir === 'right' ? amount : 0, dir === 'up' ? -amount : dir === 'down' ? amount : 0);
       await sleep(350);
@@ -447,6 +478,7 @@ async function doStep(b: SessionBrowser, t: Tab, s: ActStep, e: El | undefined, 
           const pay = paymentOnPage(b);
           if (pay) return payment(b, t, pay, said.length ? `Pressed ${said.join(', ')}.` : undefined);
         }
+        if (parseKey(k)) await b.pointAt(t, { act: 'key', keys: k });
         const r = await t.key(k);
         if (r === 'unknown') return { line: `Unknown key ${quote(k)} (use names like Enter, Tab, Escape, ArrowDown, PageDown, Control+A).`, failed: true };
         said.push(k);
@@ -474,7 +506,7 @@ async function doStep(b: SessionBrowser, t: Tab, s: ActStep, e: El | undefined, 
  * key's hosts: over https, or on this computer. The value is never said; from then on the outline says the
  * field holds the key and the page shows dots in it, so neither the outline nor a screenshot gives it away.
  */
-async function typeSecret(b: SessionBrowser, t: Tab, s: ActStep, ref: ElRef, what: string, ctx: OpCtx): Promise<StepResult> {
+async function typeSecret(b: SessionBrowser, t: Tab, s: ActStep, ref: ElRef, what: string, ctx: OpCtx, marks: Marked[]): Promise<StepResult> {
   const name = secretName(String(s.secret));
   let k: { value: string; domains: string[] } | null = null;
   try {
@@ -500,6 +532,7 @@ async function typeSecret(b: SessionBrowser, t: Tab, s: ActStep, ref: ElRef, wha
   if ('error' in f) return { line: `Could not type into ${what}: ${f.error}.`, failed: true };
   if (/^(textarea|editable|date|time|datetime-local|month|week|color|range|checkbox|radio|file|submit|button|reset|image)$/.test(f.kind))
     return { line: `${what} is not a one-line text field, and a key is only typed into one.`, failed: true };
+  await aimField(b, t, ref, 'type', marks);
   const typed = await t.insertText(k.value);
   await t.markVault(ref, name);
   let line = `Typed ${name} into ${what}.`;
@@ -507,6 +540,7 @@ async function typeSecret(b: SessionBrowser, t: Tab, s: ActStep, ref: ElRef, wha
   if (s.enter) {
     const pay = paymentOnPage(b);
     if (pay) return payment(b, t, pay, line);
+    await b.pointAt(t, { act: 'key', keys: 'Enter' });
     if ((await t.key('Enter')) === 'dialog') return { line: `${line} Pressed Enter.`, stop: dialogNote(t)! };
     line += ' Pressed Enter.';
   }

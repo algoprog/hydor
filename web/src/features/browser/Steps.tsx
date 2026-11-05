@@ -1,8 +1,10 @@
 // The browser's steps in the conversation: what the agent did in a line, with a small picture of the
-// page after it (its answer starts "Browser step N"), opening to the picture and the full answer.
-import { memo, useState } from 'react';
+// page after it (its answer starts "Browser step N"), opening to the picture, marked where the step
+// clicked and typed, and the full answer.
+import { memo, useRef, useState } from 'react';
 import { ChevronRight, Globe, Hand, XCircle } from 'lucide-react';
 import type { ToolItem } from '@shared/types';
+import { StepMarks, useStepMarks } from '../../components/StepMarks';
 import { cx } from '../../components/ui';
 import { enc } from '../../lib/api';
 import { mu } from '../../lib/machine';
@@ -88,6 +90,8 @@ export const BrowserStep = memo(function BrowserStep({ item, sessionKey }: { ite
   const running = t.status === 'running' || t.status === 'pending';
   const n = /Browser step (\d+)/.exec((t.output ?? '').slice(0, 400))?.[1];
   const pic = n && !noPic ? mu(`/api/browser/sessions/${enc(sessionKey)}/steps/${n}`) : null;
+  const big = useRef<HTMLImageElement>(null);
+  const marks = useStepMarks(n && !noPic ? `/api/browser/sessions/${enc(sessionKey)}/steps/${n}.json` : null, open);
   const failed = t.status === 'error' || /^(Not opened|That is not|Could not)/m.test((t.output ?? '').slice(0, 200));
   const Icon = tool === 'browser_ask_user' ? Hand : Globe;
   return (
@@ -102,8 +106,9 @@ export const BrowserStep = memo(function BrowserStep({ item, sessionKey }: { ite
       {open && (
         <div>
           {pic && (
-            <div className="pt-1.5 pl-7">
-              <img src={pic} alt="The page after this step" className="max-h-[220px] max-w-full rounded-lg border border-line" />
+            <div className="relative pt-1.5 pl-7">
+              <img ref={big} src={pic} alt="The page after this step" className="max-h-[220px] max-w-full rounded-lg border border-line" />
+              <StepMarks img={big} marks={marks} />
             </div>
           )}
           <ToolDetail t={t} item={item} sessionKey={sessionKey} />

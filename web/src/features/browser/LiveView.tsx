@@ -1,9 +1,11 @@
-// The live view of a browser: its screencast, and while the user drives, their mouse, touch, wheel and
-// keys sent to the page. A phone's own keyboard types through a hidden field.
+// The live view of a browser: its screencast with the agent's pointer over it, and while the user drives
+// (the agent's pointer gone), their mouse, touch, wheel and keys sent to the page. A phone's own keyboard
+// types through a hidden field.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { BrowserView } from '@shared/browser';
 import { MOD } from '@shared/browser';
 import { cx, Throbber } from '../../components/ui';
+import { AgentPointer } from './AgentPointer';
 import { browserCall, frames, InputRelay, onFrame } from './store';
 
 export interface LiveViewApi {
@@ -224,6 +226,7 @@ export const LiveView = forwardRef<LiveViewApi, { k: string; view: BrowserView; 
         onContextMenu={(e) => driving && e.preventDefault()}
         className={cx('block h-full w-full select-none', driving ? 'cursor-default touch-none' : 'pointer-events-none', !has && 'invisible')}
       />
+      {has && !driving && <AgentPointer k={k} rest={view.pointer} small={small} />}
       {!has && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[12.5px] text-fg-3">
           <Throbber size={small ? 18 : 30} />

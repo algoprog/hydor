@@ -15,7 +15,8 @@ import { editPage, SmallPageCard, useOpensBeside, usePicks } from '../session/Ht
 import { StepLine, ToolDetail } from '../session/items';
 import { PageFrame, pageStore, StreamFrame, usePreviewMax } from './frame';
 import { PageOverlay } from './overlay';
-import { absolute, CANVAS_MEDIA, requestRef, savedRef, useCanvas, useDrafts, usePagesStore } from './state';
+import { absolute, CANVAS_MEDIA, onScreen, requestRef, savedRef, useCanvas, useDrafts, usePagesStore } from './state';
+import { openOver, showBeside } from './Canvas';
 
 /** A line under a card while a call runs, or when it failed. */
 function Note({ children }: { children: ReactNode }) {
@@ -151,7 +152,19 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
   const status = saving ? ' · saving a new version…' : ref && !current ? ' · a newer one is there' : '';
   if (item.tool.status === 'error') return <Note>{`Could not save ${noun}`}: {failure(item)}</Note>;
   if (wide && besideOpen) {
-    const sub = writing ? `Writing the page · ${kb(draft?.text.length ?? 0)}` : `Saved in the Library · version ${ref?.version ?? 1}${status}`;
+    // What is being written, and how much of the call has come (nothing to count for an agent that hands over whole calls).
+    const size = draft?.text ? ` · ${kb(draft.text.length)}` : '';
+    const sub = writing
+      ? kind === 'doc'
+        ? `Writing the document${size}`
+        : kind === 'slides'
+          ? `Writing the slides${size}`
+          : kind === 'sheet'
+            ? `Writing the spreadsheet${size}`
+            : kind === 'tex'
+              ? `Writing the LaTeX document${size}`
+              : `Writing the page${size}`
+      : `Saved in the Library · version ${ref?.version ?? 1}${status}`;
     return (
       <SmallPageCard
         sessionKey={sessionKey}
@@ -165,12 +178,27 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
       />
     );
   }
-  if (writing && deck)
+  if (writing && deck) {
+    const label = kind === 'slides' ? 'Making the slides…' : kind === 'doc' ? 'Writing the document…' : kind === 'tex' ? 'Writing and typesetting the LaTeX…' : kind === 'notebook' ? 'Keeping the notebook…' : 'Making the spreadsheet…';
+    // Where there is no room beside the conversation (a phone, a narrow window): a tap opens it over everything, to
+    // watch it being written as the panel shows it. (Beside a page in the Library, that page is the one in view.)
+    if (draft && kind !== 'notebook' && onScreen(sessionKey))
+      return (
+        <button
+          type="button"
+          onClick={() => showBeside(sessionKey, { kind: 'item', id: item.id }) || openOver(sessionKey, { kind: 'item', id: item.id })}
+          className="tl-item my-1 flex min-h-9 items-center gap-2 px-1 text-left text-[12.5px] text-fg-3 hover:text-fg-2"
+        >
+          <Throbber /> {label}
+          <span className="font-medium text-accent">Open</span>
+        </button>
+      );
     return (
       <Note>
-        <Throbber /> {kind === 'slides' ? 'Making the slides…' : kind === 'doc' ? 'Writing the document…' : kind === 'tex' ? 'Writing and typesetting the LaTeX…' : kind === 'notebook' ? 'Keeping the notebook…' : 'Making the spreadsheet…'}
+        <Throbber /> {label}
       </Note>
     );
+  }
   if (writing)
     return draft?.text ? (
       <div className="tl-item my-1.5 overflow-hidden rounded-xl border border-line bg-panel">

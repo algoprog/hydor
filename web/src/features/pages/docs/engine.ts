@@ -6,8 +6,12 @@
 // browser itself only types and deletes within one block's words (so spelling, accents and phone keyboards work as
 // they do anywhere), and those words are read back after each change; anything else it would do to the page is
 // stopped and done here. An equation among words is one thing to the caret, never words to type in. Undo and redo go
-// back and forth through the model's versions.
+// back and forth through the model's versions. In Suggesting, every edit goes through the model as a suggestion
+// (suggest.ts): the browser types nothing itself then, but for an input method's words, made a suggestion afterwards.
+// An agent's version being written shows in place of the document (preview), drawn only where it differs, the
+// document and its history kept underneath.
 import {
+  asAccepted,
   blockHtml,
   CALLOUT,
   docMarkdown,
@@ -17,6 +21,7 @@ import {
   normalizeBlocks,
   PAPERS,
   runsHtml,
+  resolveSuggestion,
   runsText,
   tocEntries,
   type Align,
@@ -35,6 +40,8 @@ import {
 } from '@shared/docs';
 import * as ops from './ops';
 import type { Pos, TableOp } from './ops';
+import { CUT, htmlWithoutCuts } from './paging';
+import * as sg from './suggest';
 
 export interface Sel {
   a: Pos;
@@ -65,6 +72,10 @@ export interface SelState {
   link: string | null;
   /** The comments on the words at the caret (or picked). */
   cm: string[];
+  /** The suggested changes at the caret (or among the words picked). */
+  sg: string[];
+  /** Edits are suggestions. */
+  suggesting: boolean;
   /** In a table, from one cell to another: the cells picked. */
   cells: { b: string; a: [number, number]; f: [number, number] } | null;
   canUndo: boolean;
@@ -105,6 +116,8 @@ export interface EngineOpts {
   onAtom?: (a: AtomClick) => void;
   /** The format painter carried its look to words (and, unless it stays on, is off now). */
   onPainted?: () => void;
+  /** Blocks drawn anew (null: all of them), as soon as they are on the page: the pages' layout puts back what it gave them. */
+  onDrawn?: (ids: string[] | null) => void;
 }
 
 const HISTORY_MAX = 200;
@@ -146,6 +159,14 @@ function caretAt(x: number, y: number): { node: Node; offset: number } | null {
   }
   const r = document.caretRangeFromPoint?.(x, y);
   return r ? { node: r.startContainer, offset: r.startOffset } : null;
+}
+
+/** The layout's cut right after a text node (where a page turns), if there is one there. */
+function cutAfter(x: Node, box: Element): Element | null {
+  let n: Node | null = x;
+  while (n && n !== box && !n.nextSibling) n = n.parentNode;
+  const sib = n && n !== box ? n.nextSibling : null;
+  return sib?.nodeType === 1 && (sib as Element).hasAttribute(CUT) ? (sib as Element) : null;
 }
 
 const b64 = (s: string) => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
@@ -208,6 +229,8 @@ export class DocEngine {
   private tocKey = '';
   /** The format painter, while it is on. */
   paint: Paint | null = null;
+  /** Who suggests, while edits are suggestions (Suggesting); null while they are edits. */
+  suggesting: sg.Me | null = null;
 
   constructor(
     public root: HTMLElement,
@@ -251,22 +274,64 @@ export class DocEngine {
     cancelAnimationFrame(this.frame);
   }
 
-  setReadOnly(ro: boolean) {
-    this.o.readOnly = ro;
-    this.root.contentEditable = ro ? 'false' : 'true';
+  /** Edits as suggestions (of `me`), or as edits again (null). */
+  setSuggesting(me: sg.Me | null) {
+    this.suggesting = me;
+    this.pending = null;
+    this.emitSoon();
   }
 
-  /** Another document (or another version): drawn anew, its history its own. */
-  load(doc: Doc) {
+  setReadOnly(ro: boolean) {
+    this.o.readOnly = ro;
+    // While an agent's version shows, nothing is typed into it.
+    const off = ro || !!this.own;
+    this.root.contentEditable = off ? 'false' : 'true';
+    // Ctrl+B and Ctrl+K in the words are the document's (bold, a link), not the app's sidebar and search box.
+    if (off) delete this.root.dataset.keys;
+    else this.root.dataset.keys = 'b k';
+  }
+
+  /**
+   * Another document (or another version): its history its own. Drawn anew; with `keep`, the blocks that hold what they
+   * held keep their elements (a version that changed a few blocks of a long document draws only those).
+   */
+  load(doc: Doc, keep = false) {
+    this.own = null;
     this.doc = ops.fixDoc(doc);
     this.past = [];
     this.future = [];
     this.last = null;
     this.pending = null;
     this.picked = null;
-    this.draw(true);
+    this.setReadOnly(!!this.o.readOnly);
+    this.draw(!keep, keep);
     this.sel = null;
     this.emitSoon();
+  }
+
+  /** The document itself while an agent's version shows in its place (preview). */
+  private own: Doc | null = null;
+  /** The document as it is, whatever shows: its own while an agent's version shows. */
+  get kept(): Doc {
+    return this.own ?? this.doc;
+  }
+
+  /**
+   * An agent's version as it is being written, shown in place of the document (null: the document again), read-only
+   * and drawn only where it differs; the document and its history stay as they are underneath.
+   */
+  preview(doc: Doc | null) {
+    if (doc) {
+      if (!this.own) this.own = this.doc;
+      this.doc = doc;
+    } else {
+      if (!this.own) return;
+      this.doc = this.own;
+      this.own = null;
+    }
+    this.picked = null;
+    this.setReadOnly(!!this.o.readOnly);
+    this.draw(false, true);
   }
 
   // ---- drawing --------------------------------------------------------------------------------------------
@@ -294,13 +359,17 @@ export class DocEngine {
     if (sel && document.activeElement === this.root) this.place(sel, false);
   }
 
-  /** The page made to show the model: blocks that changed drawn anew, the others left as they are. */
-  private draw(all = false) {
+  /**
+   * The page made to show the model: blocks that changed drawn anew, the others left as they are (`loose`: a block of
+   * another object that holds the same as the one drawn is left as it is too).
+   */
+  private draw(all = false, loose = false) {
     if (all) {
       this.els.clear();
       this.drawn.clear();
       this.root.replaceChildren();
     }
+    const fresh: string[] = [];
     const { labels } = listInfo(this.doc.blocks);
     // A table of contents follows the headings: drawn again when they change.
     const hasToc = this.doc.blocks.some((b) => b.type === 'toc');
@@ -311,12 +380,15 @@ export class DocEngine {
     const mine = new Set<Node>();
     this.doc.blocks.forEach((b, i) => {
       let el = this.els.get(b.id);
+      const was = this.drawn.get(b.id);
+      if (loose && el && was && was !== b && !(tocChanged && b.type === 'toc') && JSON.stringify(was) === JSON.stringify(b)) this.drawn.set(b.id, b);
       if (!el || this.drawn.get(b.id) !== b || (tocChanged && b.type === 'toc')) {
-        const fresh = this.make(b, labels[i]);
+        const made = this.make(b, labels[i]);
         el?.remove();
-        el = fresh;
+        el = made;
         this.els.set(b.id, el);
         this.drawn.set(b.id, b);
+        fresh.push(b.id);
       } else if (b.type === 'li' && el.dataset.n !== labels[i]) el.dataset.n = labels[i];
       mine.add(el);
     });
@@ -340,6 +412,7 @@ export class DocEngine {
       if (p) p.classList.add('nd-picked');
       else this.picked = null;
     }
+    if (fresh.length) this.o.onDrawn?.(all ? null : fresh);
   }
 
   /** A block's element on the page. */
@@ -387,7 +460,12 @@ export class DocEngine {
     for (let x = walk.nextNode(); x; x = walk.nextNode()) {
       if (x.nodeType === 3) {
         const len = (x as Text).data.length;
-        if (left <= len) return { node: x, offset: left };
+        if (left < len || (left === len && !cutAfter(x, box))) return { node: x, offset: left };
+        if (left === len) {
+          // Where the page turns: the caret goes on the next page's line, after the cut.
+          const c = cutAfter(x, box)!;
+          return { node: c.parentNode!, offset: indexIn(c) + 1 };
+        }
         left -= len;
       } else if ((x as Element).hasAttribute?.('data-tex')) {
         const len = (x as Element).getAttribute('data-tex')!.length;
@@ -452,6 +530,24 @@ export class DocEngine {
     if (scroll) this.reveal();
   }
 
+  /** The focus back in the page, the caret where it last was (after a bar or a box over the page closes). */
+  focus() {
+    if (this.o.readOnly) return;
+    if (this.picked) return this.root.focus({ preventScroll: true });
+    this.place(this.sel ?? { a: ops.firstPos(this.doc), f: ops.firstPos(this.doc) }, false);
+  }
+
+  /**
+   * The focus back in the page once a box over it has closed, unless it went somewhere already (a click in the words, a
+   * field): without it, keys after a caption or an equation went nowhere.
+   */
+  refocusSoon() {
+    requestAnimationFrame(() => {
+      const a = document.activeElement;
+      if (!a || a === document.body) this.focus();
+    });
+  }
+
   /** The caret brought into view, if it is out of it. */
   private reveal() {
     const s = window.getSelection();
@@ -501,6 +597,11 @@ export class DocEngine {
     const picked = this.picked ? (ops.blockOf(this.doc, this.picked) ?? null) : null;
     // The comments here: on the word at the caret (or the character before it), or on any of the words picked.
     const cm = collapsed ? (runs.length ? (ops.runAt(runs, s.o)?.cm ?? []) : []) : [...new Set(ops.runsBetween(this.doc, s, e).flatMap((r) => r.cm ?? []))];
+    // The suggestions here: on the words on either side of the caret (or picked), and the block's own.
+    const marks = (r: Run | undefined) => (r ? [r.ins, r.del, r.fmt].filter((x): x is string => !!x) : []);
+    const at = collapsed ? [...marks(ops.runAt(runs, s.o)), ...marks(ops.sliceRuns(runs, s.o, s.o + 1)[0])] : ops.runsBetween(this.doc, s, e).flatMap(marks);
+    const own = [block?.ins, block?.del].filter((x): x is string => !!x);
+    const sgs = [...new Set([...at, ...own])];
     return {
       collapsed,
       block,
@@ -515,6 +616,8 @@ export class DocEngine {
       text: collapsed ? '' : ops.textBetween(this.doc, s, e).slice(0, 2000),
       link: collapsed ? (ops.linkAt(this.doc, s)?.link ?? null) : (look.link ?? null),
       cm,
+      sg: sgs,
+      suggesting: !!this.suggesting,
       cells: s.c && e.c && s.b === e.b ? { b: s.b, a: s.c, f: e.c } : null,
       canUndo: this.past.length > 0,
       canRedo: this.future.length > 0,
@@ -528,6 +631,8 @@ export class DocEngine {
    * shows it already), the selection set where the change leaves it.
    */
   private commit(doc: Doc, sel: Sel | null, o: { key?: string; draw?: boolean; pick?: string | null } = {}) {
+    // Nothing changes while an agent's version shows (a key or a menu would change that version, not the document).
+    if (this.own) return;
     const next = ops.fixDoc(doc);
     if (next === this.doc && o.pick === undefined) {
       if (sel) this.place(sel);
@@ -558,6 +663,7 @@ export class DocEngine {
   }
 
   undo() {
+    if (this.own) return;
     const e = this.past.pop();
     if (!e) return;
     this.future.push({ doc: this.doc, sel: this.sel });
@@ -571,6 +677,7 @@ export class DocEngine {
   }
 
   redo() {
+    if (this.own) return;
     const e = this.future.pop();
     if (!e) return;
     this.past.push({ doc: this.doc, sel: this.sel });
@@ -633,10 +740,18 @@ export class DocEngine {
     const oneBox = ops.sameBox(s, en);
     const len = ops.lenOf(ops.boxRuns(this.doc, s.b, s.c) ?? []);
     if (t === 'insertCompositionText') return;
+    if (this.suggesting && this.suggestInput(e, t, s, en)) return;
     if (t === 'insertText' || t === 'insertReplacementText') {
       const data = e.data ?? e.dataTransfer?.getData('text/plain') ?? '';
       if (collapsed && t === 'insertText' && data === ' ' && this.shortcut(s)) return e.preventDefault();
-      if (oneBox && !(collapsed && this.pending && t === 'insertText')) return;
+      // At the end of a comment's words (or a link), the browser would type into them and stretch the comment: the
+      // words go in here instead, as lookAt says they look.
+      const boxRuns = ops.boxRuns(this.doc, s.b, s.c) ?? [];
+      const before = collapsed ? ops.runAt(boxRuns, s.o) : undefined;
+      const want = collapsed ? ops.lookAt(boxRuns, s.o) : null;
+      // So too beside a suggestion's words: words typed while editing are no suggestion's.
+      const edge = !!before && !!want && !before.math && ((before.cm?.join() ?? '') !== (want.cm?.join() ?? '') || (before.link ?? '') !== (want.link ?? '') || !!(before.ins || before.del || before.fmt));
+      if (oneBox && !edge && !(collapsed && this.pending && t === 'insertText')) return;
       e.preventDefault();
       const look = this.pending ?? ops.lookAt(ops.boxRuns(this.doc, s.b, s.c) ?? [], collapsed ? s.o : s.o + 1);
       const cut = ops.deleteRange(this.doc, s, en);
@@ -668,6 +783,15 @@ export class DocEngine {
         e.preventDefault();
         return this.apply(ops.deleteForward(this.doc, s));
       }
+      // Words where a page turns: the browser would take out the cut itself, so a character or a word goes here.
+      const box = this.elementOf(s.b)?.querySelector(s.c ? `[data-c="${s.c[0]},${s.c[1]}"]` : '[data-t]') ?? this.elementOf(s.b);
+      if (box?.querySelector(`[${CUT}]`) && /^delete(Content|Word)(Backward|Forward)$/.test(t)) {
+        e.preventDefault();
+        const runs = ops.boxRuns(this.doc, s.b, s.c) ?? [];
+        const to = t.startsWith('deleteWord') ? ops.wordStep(runs, s.o, back) : ops.charStep(runs, s.o, back);
+        if (to === s.o) return;
+        return this.apply(ops.deleteRange(this.doc, { ...s, o: Math.min(to, s.o) }, { ...s, o: Math.max(to, s.o) }), `type:${s.b}`);
+      }
       return;
     }
     const fmt: Record<string, Flag> = { formatBold: 'b', formatItalic: 'i', formatUnderline: 'u', formatStrikeThrough: 's', formatSuperscript: 'sup', formatSubscript: 'sub' };
@@ -678,9 +802,52 @@ export class DocEngine {
     else if (t === 'formatRemove') this.clear();
   }
 
+  /**
+   * Suggesting: what the browser was about to type or take out made a suggestion here instead (true when it was one of
+   * those: words, Enter, a line break, a deletion).
+   */
+  private suggestInput(e: InputEvent, t: string, s: Pos, en: Pos): boolean {
+    const me = this.suggesting!;
+    const collapsed = ops.samePos(s, en);
+    const look = () => this.pending ?? ops.lookAt(ops.boxRuns(this.doc, s.b, s.c) ?? [], collapsed ? s.o : s.o + 1);
+    if (t === 'insertText' || t === 'insertReplacementText') {
+      e.preventDefault();
+      const data = (e.data ?? e.dataTransfer?.getData('text/plain') ?? '').replace(/\r\n?/g, '\n');
+      if (collapsed && t === 'insertText' && data === ' ' && this.shortcut(s)) return true;
+      const l = look();
+      this.pending = null;
+      this.apply(sg.insert(this.doc, s, en, data, l, me), `type:${s.b}`);
+      return true;
+    }
+    if (t === 'insertParagraph') {
+      e.preventDefault();
+      this.enter();
+      return true;
+    }
+    if (t === 'insertLineBreak') {
+      e.preventDefault();
+      this.apply(sg.insert(this.doc, s, en, '\n', look(), me));
+      return true;
+    }
+    if (t.startsWith('delete')) {
+      e.preventDefault();
+      if (t === 'deleteByDrag' || t === 'deleteByCut') return true;
+      const back = t.includes('Backward');
+      if (!collapsed) {
+        const r = sg.remove(this.doc, s, en, me);
+        this.apply({ doc: r.doc, at: back ? r.start : r.end }, `del:${s.b}`);
+      } else if (t.startsWith('deleteWord')) this.apply(sg.deleteWord(this.doc, s, back, me), `del:${s.b}`);
+      else this.apply(back ? sg.backspace(this.doc, s, me) : sg.deleteForward(this.doc, s, me), `del:${s.b}`);
+      return true;
+    }
+    return false;
+  }
+
   /** Words the browser typed or took out, inside one block: read back into the model. */
   private onInput() {
     if (this.o.readOnly) return;
+    // Suggesting: an input method's words wait for it to finish (then they are made a suggestion).
+    if (this.suggesting && this.composing) return;
     const s = window.getSelection();
     const node = s?.anchorNode;
     const el = node ? (node.nodeType === 1 ? (node as Element) : node.parentElement) : null;
@@ -691,6 +858,7 @@ export class DocEngine {
     const cs = (box as HTMLElement).dataset.c;
     const c = cs ? (cs.split(',').map(Number) as [number, number]) : undefined;
     const runs = this.readBox(box);
+    if (this.suggesting) return this.suggestFromBrowser(box, id, c, runs);
     const doc = ops.setBox(this.doc, id, c, runs);
     if (doc === this.doc) return;
     // The page shows this block as it now is.
@@ -699,13 +867,26 @@ export class DocEngine {
     this.commit(doc, null, { key: `type:${id}`, draw: false });
     this.sel = sel;
     if (this.composing) return;
-    // What the browser left is drawn as this editor draws it (its own spans and breaks gone).
+    // What the browser left is drawn as this editor draws it (its own spans and breaks gone; a page's cut is no difference).
     const t = document.createElement('template');
     t.innerHTML = this.runsHtml(runs);
-    if (t.innerHTML !== box.innerHTML) {
+    if (t.innerHTML !== htmlWithoutCuts(box)) {
       box.innerHTML = t.innerHTML;
+      this.o.onDrawn?.([id]);
       if (sel) this.place(sel, false);
-    }
+    } else if (box.querySelector(`[${CUT}]`)) this.o.onDrawn?.([id]);
+  }
+
+  /** Suggesting: words the browser changed itself (an input method's) made a suggestion, and drawn as one. */
+  private suggestFromBrowser(box: Element, id: string, c: [number, number] | undefined, runs: Run[]) {
+    const before = ops.boxRuns(this.doc, id, c) ?? [];
+    const r = sg.fromBrowser(this.doc, { b: id, c }, before, runs, this.suggesting!);
+    if (r.doc === this.doc) return;
+    this.commit(r.doc, null, { key: `type:${id}`, draw: false });
+    this.drawn.set(id, ops.blockOf(this.doc, id)!);
+    box.innerHTML = this.runsHtml(ops.boxRuns(this.doc, id, c) ?? []);
+    this.o.onDrawn?.([id]);
+    this.place({ a: r.at, f: r.at }, false);
   }
 
   /** The page read back whole, after the browser changed more than one block's words: its blocks, as they now are. */
@@ -757,6 +938,23 @@ export class DocEngine {
   /** Enter: the block split (a line of "---" becomes a line across, "```" a block of code). */
   enter() {
     const [s, e] = this.range();
+    if (this.suggesting) {
+      const me = this.suggesting;
+      const r = ops.samePos(s, e) ? { doc: this.doc, end: s } : sg.remove(this.doc, s, e, me);
+      const at = r.end;
+      const b = ops.blockOf(r.doc, at.b);
+      // "---" or "```" just typed: a line across added, or code, as when editing (the marks typed go).
+      if (!at.c && b?.type === 'p' && !b.style) {
+        const shown = b.runs.filter((x) => !x.del);
+        const text = runsText(shown);
+        if (at.o === runsText(b.runs).length && (/^(-{3,}|\*{3,}|_{3,})$/.test(text) || /^```\w*$/.test(text))) {
+          const cut = sg.remove(r.doc, { b: b.id, o: 0 }, at, me);
+          if (text.startsWith('`')) return this.apply({ doc: ops.patchBlock(cut.doc, b.id, (x) => ({ ...x, style: 'code' }) as Block), at: cut.start });
+          return this.apply(sg.insertBlocks(cut.doc, cut.start, cut.start, [{ id: ops.freshId(cut.doc), type: 'hr' }], me));
+        }
+      }
+      return this.apply(sg.enter(r.doc, at, ops.lookAt(ops.boxRuns(r.doc, at.b, at.c) ?? [], at.o), me));
+    }
     const cut = ops.deleteRange(this.doc, s, e);
     const at = cut.at;
     const b = ops.blockOf(cut.doc, at.b);
@@ -796,6 +994,11 @@ export class DocEngine {
         e.preventDefault();
         return k === 'y' || e.shiftKey ? this.redo() : this.undo();
       }
+      // Select all picks the words, not the picture any more (else typing went nowhere and Delete took only it).
+      if (mod && k === 'a' && !e.shiftKey && !e.altKey) {
+        this.setPicked(null);
+        return;
+      }
       if (!mod && e.key.length === 1) e.preventDefault();
       return;
     }
@@ -807,6 +1010,7 @@ export class DocEngine {
       if (b?.type === 'li' || e.shiftKey) return this.indent(e.shiftKey ? -1 : 1);
       this.before = this.sel;
       const [a, z] = this.range();
+      if (this.suggesting) return this.apply(sg.insert(this.doc, a, z, '\t', ops.lookAt(ops.boxRuns(this.doc, a.b, a.c) ?? [], a.o), this.suggesting), `type:${s.b}`);
       const cut = ops.deleteRange(this.doc, a, z);
       return this.apply(ops.insertText(cut.doc, cut.at, '\t'), `type:${s.b}`);
     }
@@ -951,6 +1155,18 @@ export class DocEngine {
   insert(blocks: Block[]) {
     if (!blocks.length) return;
     let e: ops.Edit;
+    if (this.suggesting) {
+      // After a picked block, at the start of what follows it.
+      if (this.picked) {
+        const at = ops.nearPos(this.doc, ops.indexOf(this.doc, this.picked) + 1);
+        this.setPicked(null);
+        this.sel = { a: at, f: at };
+      } else this.before = this.sel;
+      const [s, en] = this.range();
+      this.apply(sg.insertBlocks(this.doc, s, en, blocks, this.suggesting));
+      void this.takeInPictures(blocks);
+      return;
+    }
     if (this.picked) {
       const i = ops.indexOf(this.doc, this.picked);
       const np: Block = { id: ops.freshId(this.doc), type: 'p', runs: [] };
@@ -1045,12 +1261,17 @@ export class DocEngine {
     const picked = this.picked ? ops.blockOf(this.doc, this.picked) : undefined;
     if (!picked && ops.samePos(s, en)) return;
     e.preventDefault();
-    const blocks = picked ? [{ ...picked }] : ops.sliceBlocks(this.doc, s, en);
+    // What is copied is as the suggestions would make it (words marked to go left out).
+    const blocks = asAccepted(ops.asDoc(this.doc, picked ? [{ ...picked }] : ops.sliceBlocks(this.doc, s, en))).blocks;
     e.clipboardData?.setData('text/html', copyHtml(blocks, this.o.src));
     e.clipboardData?.setData('text/plain', ops.blocksPlain(blocks));
     if (!cut || this.o.readOnly) return;
     if (picked) return this.removePicked();
     this.before = this.sel;
+    if (this.suggesting) {
+      const r = sg.remove(this.doc, s, en, this.suggesting);
+      return this.apply({ doc: r.doc, at: r.start });
+    }
     this.apply(ops.deleteRange(this.doc, s, en));
   }
 
@@ -1070,11 +1291,17 @@ export class DocEngine {
 
   // ---- what the toolbar asks ----------------------------------------------------------------------------------------
 
+  /** A run's look changed between two places: as an edit, or (Suggesting) as a suggestion with the old look kept. */
+  private relook(doc: Doc, s: Pos, e: Pos, fr: (r: Run) => Run): Doc {
+    return this.suggesting ? sg.look(doc, s, e, fr, this.suggesting) : ops.mapLook(doc, s, e, fr);
+  }
+
   /** A look for the words picked; at a caret, for its word (or, between words, for what is typed next). */
-  private looks(f: (s: Pos, e: Pos) => Doc, pend: (l: Look) => Look) {
+  private looks(fr: (r: Run) => Run, pend: (l: Look) => Look) {
     if (this.picked) return;
     this.before = this.sel;
     const [s, e] = this.range();
+    const f = (a: Pos, z: Pos) => this.relook(this.doc, a, z, fr);
     if (ops.samePos(s, e)) {
       const runs = ops.boxRuns(this.doc, s.b, s.c) ?? [];
       const w = ops.wordAt(runs, s.o);
@@ -1096,7 +1323,7 @@ export class DocEngine {
     const w = ops.samePos(s, e) ? ops.wordAt(runs, s.o) : null;
     const on = ops.samePos(s, e) ? !(w ? ops.allHave(this.doc, { ...s, o: w[0] }, { ...s, o: w[1] }, k) : (this.pending ?? ops.lookAt(runs, s.o))[k]) : !ops.allHave(this.doc, s, e, k);
     this.looks(
-      (a, z) => ops.setFlag(this.doc, a, z, k, on),
+      ops.flagFn(k, on),
       (l) => {
         if (on) l[k] = true;
         else delete l[k];
@@ -1110,7 +1337,7 @@ export class DocEngine {
   /** A colour, highlight, size or font (undefined: none of its own). */
   value(k: 'color' | 'hl' | 'size' | 'font', v: string | number | undefined) {
     this.looks(
-      (a, z) => ops.setValue(this.doc, a, z, k, v),
+      ops.valueFn(k, v),
       (l) => {
         if (v === undefined) delete l[k];
         else (l as Record<string, unknown>)[k] = v;
@@ -1120,10 +1347,7 @@ export class DocEngine {
   }
 
   clear() {
-    this.looks(
-      (a, z) => ops.clearLook(this.doc, a, z),
-      () => ({}),
-    );
+    this.looks(ops.clearFn, () => ({}));
   }
 
   /** A link on the words picked (or the link the caret is in; with `text`, new words with it at the caret); null takes it off. */
@@ -1189,7 +1413,7 @@ export class DocEngine {
     if (!this.picked) return;
     const id = this.picked;
     this.setPicked(null);
-    this.apply(ops.removeBlock(this.doc, id));
+    this.apply(this.suggesting ? sg.removeBlock(this.doc, id, this.suggesting) : ops.removeBlock(this.doc, id));
   }
 
   /** Enter on a picked block: a paragraph after it, the caret in it. */
@@ -1302,10 +1526,39 @@ export class DocEngine {
     return true;
   }
 
+  /** A suggestion accepted or rejected (null: every one), as one change to undo. */
+  resolve(id: string | null, accept: boolean) {
+    this.before = this.sel;
+    this.commit(resolveSuggestion(this.doc, id, accept), this.sel, { pick: null });
+  }
+
+  /** The suggestions' list changed (a reply). */
+  setSuggestions(list: Doc['suggestions']) {
+    this.before = this.sel;
+    const d: Doc = { ...this.doc, suggestions: list };
+    if (!list?.length) delete d.suggestions;
+    this.commit(d, null, { pick: this.picked });
+  }
+
+  /** A suggestion's words (or block) brought into view (false when it marks nothing on the page). */
+  revealSuggestion(id: string): boolean {
+    const el = this.root.querySelector(`[data-s="${CSS.escape(id)}"]`);
+    if (!el) return false;
+    let sc: HTMLElement | null = this.root.parentElement;
+    while (sc && !/(auto|scroll)/.test(getComputedStyle(sc).overflowY)) sc = sc.parentElement;
+    if (sc) {
+      const r = el.getBoundingClientRect();
+      const box = sc.getBoundingClientRect();
+      if (r.top < box.top + 40 || r.bottom > box.bottom - 40) sc.scrollTop += r.top - box.top - box.height / 3;
+    }
+    return true;
+  }
+
   /** Words found, put in place of others: one stretch, or many as one change (to undo together). */
   replace(list: ops.Found[], text: (f: ops.Found) => string) {
     if (!list.length) return;
     this.before = this.sel;
+    if (this.suggesting) return this.commit(sg.replace(this.doc, list, text, this.suggesting), this.sel);
     // From the last to the first, so the places of the ones before stay where they are.
     const sorted = [...list].sort((x, y) => -ops.cmp(this.doc, { b: x.b, c: x.c, o: x.s }, { b: y.b, c: y.c, o: y.s }));
     let d = this.doc;
@@ -1321,8 +1574,9 @@ export class DocEngine {
     this.before = this.sel;
     const [s, e] = this.range();
     const look = this.pending ?? ops.lookAt(ops.boxRuns(this.doc, s.b, s.c) ?? [], s.o);
-    const cut = ops.deleteRange(this.doc, s, e);
     this.pending = null;
+    if (this.suggesting) return this.apply(sg.insert(this.doc, s, e, text, look, this.suggesting));
+    const cut = ops.deleteRange(this.doc, s, e);
     this.apply(ops.insertText(cut.doc, cut.at, text, look));
   }
 
@@ -1339,6 +1593,10 @@ export class DocEngine {
     const [s] = this.range();
     if (from >= s.o) return;
     this.before = this.sel;
+    if (this.suggesting) {
+      const r = sg.remove(this.doc, { ...s, o: from }, s, this.suggesting);
+      return this.apply({ doc: r.doc, at: r.start });
+    }
     this.apply(ops.deleteRange(this.doc, { ...s, o: from }, s));
   }
 
@@ -1385,6 +1643,11 @@ export class DocEngine {
     if (this.picked || !tex.trim()) return null;
     this.before = this.sel;
     const [s, e] = this.range();
+    if (this.suggesting) {
+      const r = ops.samePos(s, e) ? { doc: this.doc, end: s } : sg.remove(this.doc, s, e, this.suggesting);
+      this.apply(sg.insertRuns(r.doc, r.end, [{ t: tex.trim(), math: true }], this.suggesting));
+      return r.end;
+    }
     const cut = ops.deleteRange(this.doc, s, e);
     this.apply(ops.insertRuns(cut.doc, cut.at, [{ t: tex.trim(), math: true }]));
     return cut.at;
@@ -1486,7 +1749,7 @@ export class DocEngine {
     const [s, e] = this.range();
     if (ops.samePos(s, e)) return;
     this.before = this.sel;
-    let d = ops.mapLook(this.doc, s, e, (r) => (r.math ? r : { t: r.t, ...p.look, ...(r.link ? { link: r.link } : {}), ...(r.cm ? { cm: r.cm } : {}) }));
+    let d = this.relook(this.doc, s, e, (r) => (r.math ? r : { t: r.t, ...p.look, ...(r.link ? { link: r.link } : {}), ...(r.cm ? { cm: r.cm } : {}), ...(r.ins ? { ins: r.ins } : {}), ...(r.del ? { del: r.del } : {}), ...(r.fmt ? { fmt: r.fmt, was: r.was } : {}) }));
     if (p.para && !s.c) {
       const para = p.para;
       d = ops.setStyle(d, s, e, para.style);

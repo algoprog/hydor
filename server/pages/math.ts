@@ -1,4 +1,4 @@
-// Maths on a document's own page (and so in its PDF, its picture in Pages and a published copy): LaTeX drawn as
+// Maths on a document's or a slide deck's own page (and so in its PDF, its picture in Pages and a published copy): LaTeX drawn as
 // KaTeX's HTML here on the server, and the page given KaTeX's stylesheet with the fonts its maths uses inside it, so
 // it shows the same wherever the page goes, with nothing loaded from elsewhere. KaTeX comes inside the server's own
 // bundle (the paths below are relative so the build takes it in): the desktop app's server ships without the

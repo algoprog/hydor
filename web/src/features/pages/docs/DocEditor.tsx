@@ -9,18 +9,22 @@
 // what to put there (Slash.tsx); Ctrl+F finds and Ctrl+H replaces (finding.ts); equations are written in a box with
 // their preview. The page around is told what an agent asked now would be about (the whole document, the section
 // the caret is in, the words picked). Changes stay unsaved until Save (Ctrl+S), as a page's do; the paper, margins,
-// font and size are under Page setup.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+// font and size are under Page setup. While an agent writes a new version (live.ts), it shows as it comes, read-only,
+// with the agent's caret where its words arrive, kept in view (AgentCaret.tsx).
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, FileCog, Link2, ListTree, MessageSquare, MessageSquarePlus, Sparkles, Unlink } from 'lucide-react';
 import { docHeadings, docWords, FONTS, MARGINS, PAPERS, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type TableBlock } from '@shared/docs';
 import { newCommentId, openComments, type Comment } from '@shared/comments';
-import { post } from '../../../lib/api';
+import { changesOf, compareDocs, suggestionColor } from '@shared/doc-changes';
+import { api, post } from '../../../lib/api';
 import { mu } from '../../../lib/machine';
-import { toast, toastError } from '../../../lib/store';
+import { toast, toastError, useUI } from '../../../lib/store';
 import { tr } from '../../../i18n/runtime';
 import { LOCALE } from '../../../i18n/locale';
-import { Button, cx, IconButton, Popover, Segmented, useConfirm } from '../../../components/ui';
-import type { AskScope, ModelEditorProps } from '../kinds';
+import { Button, cx, IconButton, Popover, Segmented, useConfirm, useMediaQuery } from '../../../components/ui';
+import { loadModelVersion, type AskScope, type ModelEditorProps } from '../kinds';
+import type { PageVersion } from '@shared/pages';
+import { SIGNATURE_WIDTH_MM } from '@shared/signatures';
 import { choosePicture, pictureFromUrl, uploadPicture } from '../pictures';
 import { NumInput } from '../slides/controls';
 import { Select } from '../studio/fields';
@@ -30,18 +34,26 @@ import { loadKatex, texHtmlNow } from '../common/katex';
 import { MenuBar } from '../common/menus';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import { inputCls } from '../../../components/ui';
+import { AgentCaret } from './AgentCaret';
 import { BlockHandle } from './BlockHandle';
-import { CommentsColumn, CommentsPanel, type CommentActions, type Draft } from './CommentsView';
+import { CommentsColumn, CommentsPanel, type CommentActions, type Draft, type Extra } from './CommentsView';
+import { CompareView, VersionsDialog } from './Compare';
 import { editorCss, paperPx, useDocFonts } from './css';
 import { BandsDialog, EquationBox, SpacingDialog, WordCountDialog, type Counts } from './Dialogs';
 import { DocEngine, type AtomClick, type SelState } from './engine';
 import { useDocFind } from './finding';
 import { docMenus, PAGE_NUMBERS, type Zoom } from './menu';
 import { fixDoc, runsBetween, sameDoc, type Pos } from './ops';
+import { GAP, Paging, type Layout } from './paging';
+import { Bands, Sheets } from './PaperSheets';
 import { Picked } from './Picture';
-import { slashAt, slashItems, slashMatches, SlashMenu } from './Slash';
+import { SuggestionCard } from './Suggestions';
+import { slashAt, slashItems, slashLayout, slashMatches, SlashMenu } from './Slash';
 import { ColumnHandles, printDoc } from './TableTools';
 import { Toolbar } from './Toolbar';
+
+// Insert → Signature: the saved signatures and the pad, loaded when first opened.
+const InsertSignature = lazy(() => import('../../signatures/InsertSignature').then((m) => ({ default: m.InsertSignature })));
 
 const OUTLINE_KEY = 'wa.docs.outline';
 const VIEW_KEY = 'wa.docs.view';
@@ -122,6 +134,7 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+K', 'Link'],
       ['Ctrl+\\', 'Clear the formatting'],
       ['Ctrl+Alt+M', 'Comment'],
+      ['Ctrl+Alt+Shift+X', 'Suggesting, or editing again'],
     ],
   },
   {
@@ -160,8 +173,11 @@ const SHORTCUTS: ShortcutGroup[] = [
   },
 ];
 
-export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef }: ModelEditorProps<Doc>) {
-  const [model, setModel] = useState<Doc | null>(() => (doc?.model ? fixDoc(doc.model) : null));
+/** A place words are typed in. */
+const typing = (t: EventTarget | null) => t instanceof HTMLTextAreaElement || (t instanceof HTMLInputElement && t.type === 'text') || (t instanceof HTMLElement && t.isContentEditable);
+
+export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, live }: ModelEditorProps<Doc>) {
+  const [model, setModel] = useState<Doc | null>(() => (doc?.model ? fixDoc(doc.model) : live?.model ? fixDoc(live.model) : null));
   const [saved, setSaved] = useState<Doc | null>(model);
   const [st, setSt] = useState<SelState | null>(null);
   const [saving, setSaving] = useState(false);
@@ -173,21 +189,41 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   const [width, setWidth] = useState(1200);
   const [words, setWords] = useState(0);
   const [float, setFloat] = useState<{ ask?: { x: number; y: number }; link?: { x: number; y: number } } | null>(null);
-  const [dialog, setDialog] = useState<'count' | 'spacing' | 'bands' | 'keys' | null>(null);
+  const [dialog, setDialog] = useState<'count' | 'spacing' | 'bands' | 'keys' | 'signature' | null>(null);
   const [counts, setCounts] = useState<Counts & { picked: boolean }>({ words: 0, chars: 0, charsNoSpaces: 0, paragraphs: 0, pages: 1, picked: false });
   const [panel, setPanel] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [showResolved, setShowResolved] = useState(false);
+  // Editing (changes are made) or Suggesting (changes are suggested, as Google Docs' Suggesting and Word's Track changes).
+  const [mode, setMode] = useState<'edit' | 'suggest'>('edit');
+  // The document compared with a version (Tools → Compare with a version, or an older version opened from the
+  // Library's Versions, compared with the latest), and the list of versions to pick one from.
+  const [compare, setCompare] = useState<{ version: number; at?: number; merged: Doc; from: 'tools' | 'versions' } | null>(null);
+  const [versions, setVersions] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [tops, setTops] = useState<Map<string, number>>(new Map());
   const [eq, setEq] = useState<{ kind: 'block'; id: string; tex: string } | { kind: 'run'; at: Pos; tex: string } | { kind: 'new'; inline: boolean } | null>(null);
   const [chars, setChars] = useState<{ kind: 'insert' } | { kind: 'icon'; id: string } | null>(null);
+  /** Words being typed beside the page (a comment, a reply, an edit of one). */
+  const [noting, setNoting] = useState(false);
+  // An agent's version being written shows in place of this one (read-only, its words arriving where its mark is),
+  // unless there are changes here not saved: those are left as they are. A comment, an equation, a link or another
+  // change still being made here holds it back until it is done.
+  const making = noting || !!draft || !!eq || !!chars || !!linking || menu === 'page' || menu === 'url' || dialog === 'bands' || dialog === 'spacing';
+  const liveDoc = live && !making && !(!!model && !!saved && model !== saved) ? live.model : null;
+  const liveOn = !!liveDoc;
+  /** What the page shows: the document, or the agent's version being written. */
+  const shownDoc = liveDoc ?? model;
+  // A comment box that went while typed in (its panel closed, say) holds nothing back.
+  useEffect(() => {
+    if (noting && !typing(document.activeElement)) setNoting(false);
+  });
   const [spot, setSpot] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [slash, setSlash] = useState<{ key: string; from: number; query: string; index: number } | null>(null);
   const [slashPos, setSlashPos] = useState<{ x: number; top: number; bottom: number } | null>(null);
   const [math, setMath] = useState(0);
   const [hoverTable, setHoverTable] = useState<string | null>(null);
-  const [bands, setBands] = useState<{ y: number; x: number; kind: 'head' | 'foot'; page: number }[]>([]);
+  const [pageLayout, setPageLayout] = useState<Layout | null>(null);
   const [confirm, confirmNode] = useConfirm();
   const find = useFind();
   const root = useRef<HTMLDivElement>(null);
@@ -195,13 +231,16 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   const host = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const engine = useRef<DocEngine | null>(null);
+  const paging = useRef<Paging | null>(null);
+  const zoomRef = useRef(1);
   const linkRef = useRef<HTMLButtonElement>(null);
   const pageRef = useRef<HTMLButtonElement>(null);
   const outlineRef = useRef<HTMLButtonElement>(null);
   const commentsRef = useRef<HTMLButtonElement>(null);
   const spotRef = useRef<HTMLDivElement>(null);
+  const askChip = useRef<HTMLDivElement>(null);
   const dismissed = useRef('');
-  const fonts = useDocFonts(model);
+  const fonts = useDocFonts(shownDoc);
 
   useLayoutEffect(() => {
     const el = root.current;
@@ -212,14 +251,21 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     return () => ro.disconnect();
   }, []);
   const phone = layout === 'sheet' || width < 640;
+  // The app's ? sits in the window's bottom right corner while its sidebar is hidden (Shell's HelpButton): the save
+  // bar's buttons and the word count keep clear of it.
+  const helpShown = useUI((s) => !s.sideOpen && !s.panelOpen);
+  const roomy = useMediaQuery('(min-width: 900px)');
+  const corner = helpShown && roomy && !phone;
   const wideOutline = width >= 1100 && layout !== 'sheet';
   const outlineW = wideOutline && outlineOpen ? 220 : 0;
   const comments: Comment[] = model?.comments ?? [];
   const shownComments = showResolved ? comments : openComments(comments);
-  const ppx = model ? paperPx(model) : 794;
+  // The suggested changes, each as it shows beside the page.
+  const changes = useMemo(() => (model?.suggestions?.length ? changesOf(model) : []), [model]);
+  const ppx = shownDoc ? paperPx(shownDoc) : 794;
   // The comments beside the page where there is room for them, else in a panel.
   const columnFits = !phone && width - outlineW >= ppx * (typeof view.zoom === 'number' ? Math.min(1, view.zoom) : 1) + COLUMN + 24 + 48;
-  const column = columnFits && view.comments && (shownComments.length > 0 || !!draft);
+  const column = columnFits && view.comments && (shownComments.length > 0 || changes.length > 0 || !!draft);
   const panelW = !phone && panel && !columnFits ? 320 : 0;
   const room = width - outlineW - panelW - (column ? COLUMN + 24 : 0) - 48;
   // Fit the width: the paper as wide as there is room for; else as large as asked, or (no room for it) the words
@@ -245,8 +291,9 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
 
   const save = async (): Promise<boolean> => {
     const e = engine.current;
-    if (!e || !onSave || saving || readOnly) return false;
-    const d = e.doc;
+    // Not while an agent's version shows (Ctrl+S would keep that, as far as it has come): there is nothing of yours to save then.
+    if (!e || !onSave || saving || readOnly || liveOn) return false;
+    const d = e.kept;
     setSaving(true);
     try {
       if (await onSave(d)) {
@@ -266,7 +313,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   const stRef = useRef(st);
   stRef.current = st;
   const readOnlyRef = useRef(readOnly);
-  readOnlyRef.current = readOnly;
+  readOnlyRef.current = readOnly || liveOn;
   // What the engine's keys and clicks ask of the editor (kept current: the engine is made once).
   const keys = useRef<(e: KeyboardEvent) => boolean>(() => false);
   const atoms = useRef<(a: AtomClick) => void>(() => {});
@@ -280,7 +327,11 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
       breakLabel: tr('Page break'),
       tocHint: tr('Headings you add show here, to go to them.'),
       math: drawMath,
-      onChange: (d) => setModel(d),
+      onChange: (d) => {
+        setModel(d);
+        paging.current?.changed(d);
+      },
+      onDrawn: (ids) => paging.current?.drawn(ids),
       onState: (s) => setSt(s),
       onKey: (e) => keys.current(e),
       onAtom: (a) => atoms.current(a),
@@ -292,12 +343,22 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
       onError: toastError,
     });
     setSt(engine.current.state());
+    paging.current = new Paging(engine.current, { zoom: () => zoomRef.current, onLayout: setPageLayout });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!model]);
-  useEffect(() => () => engine.current?.destroy(), []);
+  useEffect(
+    () => () => {
+      paging.current?.destroy();
+      engine.current?.destroy();
+    },
+    [],
+  );
   useEffect(() => {
     engine.current?.setReadOnly(!!readOnly);
   }, [readOnly]);
+  useEffect(() => {
+    engine.current?.setSuggesting(mode === 'suggest' && !readOnly ? { by: 'user' } : null);
+  }, [mode, readOnly, !!engine.current]);
   useEffect(() => {
     if (engine.current) engine.current.root.spellcheck = view.spell;
   }, [view.spell, !!engine.current]);
@@ -329,11 +390,44 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     }
     if (dirtyRef.current) return;
     // The version just saved from here: it stays as it is (the caret and the history with it).
-    if (sameDoc(m, e.doc)) return setSaved(e.doc);
-    e.load(m);
+    if (sameDoc(m, e.kept)) return setSaved(e.kept);
+    // Blocks that hold what they held keep their place on the page (an agent's version changed a few of them).
+    e.load(m, true);
+    paging.current?.reload();
     setModel(e.doc);
     setSaved(e.doc);
     setSt(e.state());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc?.key]);
+
+  // The agent's version as it comes, drawn where it changed (the document's own again once it is saved, or failed);
+  // its caret placed once it is drawn.
+  const [drawnLive, setDrawnLive] = useState(0);
+  useEffect(() => {
+    const e = engine.current;
+    if (!e) return;
+    e.preview(liveDoc);
+    paging.current?.changed(e.doc);
+    if (liveDoc) setDrawnLive((n) => n + 1);
+  }, [liveDoc, !!engine.current]);
+
+  // An older version opened from the Library's Versions (its key ends in :v<n>): shown with what changed since it, the
+  // latest saved version fetched to compare with (the band over the editor brings it back, or leaves it).
+  const olderVersion = readOnly ? Number(/:v(\d+)$/.exec(doc?.key ?? '')?.[1]) || 0 : 0;
+  useEffect(() => {
+    if (!olderVersion || !doc) return setCompare((c) => (c?.from === 'versions' ? null : c));
+    let alive = true;
+    api<{ model: Doc; versions: PageVersion[] }>(`/api/pages/${encodeURIComponent(pageId)}`).then(
+      (r) => {
+        if (!alive) return;
+        const at = r.versions.find((v) => v.version === olderVersion)?.createdAt;
+        setCompare({ version: olderVersion, at, merged: compareDocs(fixDoc(doc.model), fixDoc(r.model), { by: 'user', at: Date.now() }, 'v'), from: 'versions' });
+      },
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc?.key]);
 
@@ -349,12 +443,18 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     return () => window.removeEventListener('keydown', on);
   });
 
-  // The words it has, a moment after each change.
+  // The words it has, a moment after each change; while an agent writes, those shown, counted once a second at most.
+  const wordsAt = useRef(0);
   useEffect(() => {
-    if (!model) return;
-    const t = setTimeout(() => setWords(docWords(model)), 400);
+    const d = shownDoc;
+    if (!d) return;
+    const wait = liveOn ? Math.max(0, 1000 - (performance.now() - wordsAt.current)) : 400;
+    const t = setTimeout(() => {
+      wordsAt.current = performance.now();
+      setWords(docWords(d));
+    }, wait);
     return () => clearTimeout(t);
-  }, [model]);
+  }, [shownDoc]);
 
   // What an agent asked now would be about, told as the caret moves.
   const lastScopes = useRef('');
@@ -367,7 +467,19 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     onScopes(s);
   }, [st, model?.blocks]);
 
-  const tick = `${width}:${fonts}:${narrow}:${zoom}:${math}:${column}:${panelW}`;
+  // The words on pages of the paper (not on a phone or in a narrow window): laid out again whole when what they are
+  // laid out with changes (fonts arrive, maths is drawn, the paper, its margins, the document's font or size).
+  zoomRef.current = zoom;
+  const geometry = `${narrow}:${zoom}:${fonts}:${math}:${shownDoc?.page.size}:${shownDoc?.page.margin}:${shownDoc?.font}:${shownDoc?.size}`;
+  useLayoutEffect(() => {
+    const pg = paging.current;
+    if (!pg) return;
+    pg.setOn(!narrow);
+    if (!narrow) pg.run(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geometry, !!engine.current]);
+
+  const tick = `${width}:${fonts}:${narrow}:${zoom}:${math}:${column}:${panelW}:${pageLayout?.n ?? 0}`;
 
   // The chips by the words picked (comment on them, ask the agent about them), and the bar of the link the caret is in.
   useLayoutEffect(() => {
@@ -378,7 +490,9 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     const s = window.getSelection();
     if ((onAsk || !readOnly) && !st.collapsed && st.text.trim() && s?.rangeCount && paper.current?.contains(s.anchorNode)) {
       const r = s.getRangeAt(0).getBoundingClientRect();
-      if (r.width || r.height) out.ask = { x: Math.min(Math.max(r.left - hr.left + r.width / 2, 110), hr.width - 110), y: phone ? r.bottom - hr.top + 10 : r.top - hr.top - 8 };
+      // Centred over the words, as far in as its own width needs (it is cut off at the page's edge otherwise).
+      const half = (askChip.current?.offsetWidth ?? 260) / 2 + 4;
+      if (r.width || r.height) out.ask = { x: Math.min(Math.max(r.left - hr.left + r.width / 2, half), hr.width - half), y: phone ? r.bottom - hr.top + 10 : r.top - hr.top - 8 };
     }
     if (st.collapsed && st.link && !readOnly) {
       const a = engine.current?.linkElement();
@@ -390,13 +504,14 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     setFloat(out.ask || out.link ? out : null);
   }, [st, tick]);
 
-  // The comment picked follows the caret into the words of one.
+  // The comment picked follows the caret into the words of one; a suggestion, into what it changes.
   useEffect(() => {
     if (st?.cm.length && !st.cm.includes(active ?? '')) setActive(st.cm.find((id) => comments.some((c) => c.id === id && (showResolved || !c.resolved))) ?? active);
+    else if (st?.sg.length && !st.sg.includes(active ?? '')) setActive(st.sg[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [st?.cm.join()]);
+  }, [st?.cm.join(), st?.sg.join()]);
 
-  // Where each comment's words are down the page, for the column beside it; and the header and footer on each sheet.
+  // Where each comment's words are down the page, for the column beside it.
   useLayoutEffect(() => {
     const h = host.current;
     const p = paper.current;
@@ -408,26 +523,13 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
         const el = p.querySelector(`[data-cm~="${CSS.escape(c.id)}"]`);
         if (el) next.set(c.id, el.getBoundingClientRect().top - hr.top);
       }
+      for (const c of changes) {
+        const el = p.querySelector(`[data-s="${CSS.escape(c.id)}"]`);
+        if (el) next.set(c.id, el.getBoundingClientRect().top - hr.top);
+      }
       setTops((old) => (old.size === next.size && [...next].every(([k, v]) => Math.abs((old.get(k) ?? -1) - v) < 1) ? old : next));
     }
-    // The header at the top of each sheet, the footer at its bottom (a page break ends a sheet).
-    if (!narrow && (model.header || model.footer)) {
-      const pr = p.getBoundingClientRect();
-      const m = (model.page.margin * 96) / 25.4;
-      const out: { y: number; x: number; kind: 'head' | 'foot'; page: number }[] = [];
-      const x = pr.left - hr.left;
-      const breaks = [...p.querySelectorAll<HTMLElement>(':scope > .nd-pb')].map((b) => b.getBoundingClientRect());
-      const sheets = breaks.length + 1;
-      for (let k = 0; k < sheets; k++) {
-        if (model.titlePage && k === 0) continue;
-        const top = k === 0 ? pr.top - hr.top + (m * zoom) / 2 : breaks[k - 1].bottom - hr.top + (m * zoom * 0.35);
-        const bottom = k === sheets - 1 ? pr.bottom - hr.top - (m * zoom) / 2 : breaks[k].top - hr.top - (m * zoom * 0.35);
-        if (model.header) out.push({ y: top, x, kind: 'head', page: k + 1 });
-        if (model.footer) out.push({ y: bottom, x, kind: 'foot', page: k + 1 });
-      }
-      setBands(out);
-    } else setBands([]);
-  }, [model, tick, column, showResolved, active]);
+  }, [model, tick, column, showResolved, active, changes]);
 
   // "/" typed at a line's start, or after a space: its menu, narrowed as more is typed.
   useEffect(() => {
@@ -444,28 +546,33 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     const r = slash ? engine.current?.caretRect() : null;
     const h = host.current?.getBoundingClientRect();
     if (!r || !h) return setSlashPos(null);
-    setSlashPos({ x: Math.max(4, Math.min(r.left - h.left, h.width - 244)), top: r.top - h.top, bottom: r.bottom - h.top });
+    setSlashPos({ x: Math.max(4, Math.min(r.left - h.left, h.width - slashBox.width - 4)), top: r.top - h.top, bottom: r.bottom - h.top });
   }, [slash?.key, slash?.query, tick]);
 
   const found = useDocFind(engine.current, model, find, host.current, tick);
-  const heads = useMemo(() => (model ? docHeadings(model) : []), [model?.blocks]);
+  const heads = useMemo(() => (shownDoc ? docHeadings(shownDoc) : []), [shownDoc?.blocks]);
   const current = model && st ? sectionOf(model, st.index)?.id : undefined;
-  const css = useMemo(() => (model ? editorCss(model, { narrow, hints: { title: tr('Title'), body: tr('Start writing') } }) : ''), [model?.page, model?.font, model?.size, narrow]);
+  const css = useMemo(() => (shownDoc ? editorCss(shownDoc, { narrow, hints: { title: tr('Title'), body: tr('Start writing') } }) : ''), [shownDoc?.page, shownDoc?.font, shownDoc?.size, narrow]);
   // The comments' marks: open ones in yellow, the one picked stronger; resolved ones not at all.
+  // The suggestions' marks in the colour of who suggested each, the one picked shaded.
   const marks = useMemo(
     () =>
-      comments
-        .filter((c) => !c.resolved || (showResolved && c.id === active))
-        .map((c) => `.nd-ed [data-cm~="${CSS.escape(c.id)}"]{background:${c.id === active ? 'rgba(251,188,4,.5)' : 'rgba(251,188,4,.22)'};border-bottom:2px solid rgba(251,188,4,.8)}`)
-        .join('\n'),
-    [comments, active, showResolved],
+      [
+        ...comments
+          .filter((c) => !c.resolved || (showResolved && c.id === active))
+          .map((c) => `.nd-ed [data-cm~="${CSS.escape(c.id)}"]{background:${c.id === active ? 'rgba(251,188,4,.5)' : 'rgba(251,188,4,.22)'};border-bottom:2px solid rgba(251,188,4,.8)}`),
+        ...(model?.suggestions ?? []).map((x) => `.nd-ed [data-s="${CSS.escape(x.id)}"]{--sc:${suggestionColor(x)}}`),
+        active && model?.suggestions?.some((x) => x.id === active) ? `.nd-ed :is(ins,del,span)[data-s="${CSS.escape(active)}"]{background:color-mix(in srgb,var(--sc) 14%,transparent)}` : '',
+      ].join('\n'),
+    [comments, active, showResolved, model?.suggestions],
   );
 
   if (!model) return <div className="flex h-full items-center justify-center text-fg-3">…</div>;
 
   const e = engine.current;
-  const slashList = e && slash ? slashMatches(slashItems(e, { picture: () => void pickPicture(), equation: () => openEquation(false), today: () => today() }), slash.query) : [];
+  const slashList = e && slash ? slashMatches(slashItems(e, { picture: () => void pickPicture(), signature: () => setDialog('signature'), equation: () => openEquation(false), today: () => today() }), slash.query) : [];
   const slashOpen = !!slash && slashList.length > 0 && !!slashPos;
+  const slashBox = slashLayout(slashList.length, (host.current?.clientWidth ?? width) - 8);
 
   /** A place over the page for a box to open by (the caret, or a block). */
   const spotAt = (r: DOMRect | null | undefined) => {
@@ -495,6 +602,13 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
         ev.preventDefault();
         const n = slashList.length;
         setSlash({ ...slash, index: (slash.index + (ev.key === 'ArrowDown' ? 1 : n - 1)) % n });
+        return true;
+      }
+      // Across the two columns.
+      if ((ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') && slashBox.rows < slashList.length) {
+        ev.preventDefault();
+        const j = slash.index + (ev.key === 'ArrowRight' ? slashBox.rows : -slashBox.rows);
+        if (j >= 0 && j < slashList.length) setSlash({ ...slash, index: j });
         return true;
       }
       if (ev.key === 'Enter' || ev.key === 'Tab') {
@@ -544,6 +658,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     if ((k === '/' || ev.code === 'Slash') && !ev.altKey && !ev.shiftKey) return setDialog('keys'), true;
     if (ev.code === 'KeyC' && ev.shiftKey && !ev.altKey) return openCount(), true;
     if (ev.code === 'KeyM' && ev.altKey && !ro) return startComment(), true;
+    if (ev.code === 'KeyX' && ev.altKey && ev.shiftKey && !ro) return setMode((m) => (m === 'suggest' ? 'edit' : 'suggest')), true;
     if (k === 'k' && !ev.shiftKey && !ev.altKey && !ro && engine.current?.root.contains(document.activeElement)) {
       setLinking({ url: stRef.current?.link ?? '', text: '' });
       return true;
@@ -555,6 +670,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     if (!(await confirm({ title: 'Discard your changes?', body: 'The document goes back to how it was saved.', confirm: 'Discard', danger: true }))) return;
     if (!e || !saved) return;
     e.load(saved);
+    paging.current?.reload();
     setModel(e.doc);
     setSaved(e.doc);
   };
@@ -619,35 +735,60 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     }
     const w = wordCount(text);
     const plain = text.replace(/⁣/g, '');
-    // Pages: the sheets the paper takes as it is drawn (a page break starts one), else as many words as a page holds.
-    const p = paper.current;
-    const pageH = ((PAPERS[en.doc.page.size].h - 2 * en.doc.page.margin) * 96) / 25.4;
+    // Pages: as many as the words are laid out on (the layout worked out now, for the last change), else as many as
+    // a page's worth of words make (on a phone, where there are no pages); the words picked, the pages they run over.
     let pages = 1;
-    if (p && !narrow) {
-      let used = 0;
-      for (const el of Array.from(p.children) as HTMLElement[]) {
-        if (el.classList.contains('nd-pb')) {
-          pages++;
-          used = 0;
-          continue;
-        }
-        used += el.offsetHeight + 8;
-        while (used > pageH) {
-          pages++;
-          used -= pageH;
-        }
+    const pg = paging.current;
+    if (pg && !narrow) {
+      pg.run();
+      const count = pg.layout?.count ?? 1;
+      pages = count;
+      if (picked) {
+        const a = pg.pageOfBlock(s.b) ?? 0;
+        const b = pg.pageOfBlock(z.b) ?? a;
+        pages = Math.max(1, b - a + 1);
       }
     } else pages = Math.max(1, Math.ceil(docWords(en.doc) / 450));
-    if (picked) pages = Math.max(1, Math.round((w / Math.max(1, docWords(en.doc))) * pages));
+    if (picked && (!pg || narrow)) pages = Math.max(1, Math.round((w / Math.max(1, docWords(en.doc))) * pages));
     setCounts({ words: w, chars: plain.replace(/\n/g, '').length, charsNoSpaces: plain.replace(/\s/g, '').length, paragraphs, pages, picked });
     setDialog('count');
   }
+
+  // ---- comparing with a version ----------------------------------------------------------------------------------------
+  const compareWith = async (v: PageVersion) => {
+    setVersions(false);
+    const en = engine.current;
+    if (!en) return;
+    try {
+      const old = await loadModelVersion<Doc>(encodeURIComponent(pageId), v.version);
+      setCompare({ version: v.version, at: v.createdAt, merged: compareDocs(fixDoc(old.model), en.doc, { by: 'user', at: Date.now() }, 'v'), from: 'tools' });
+    } catch (err) {
+      toastError(err);
+    }
+  };
+  /** The version brought back, as the Library does it (a new version on top); changes not saved here go first. */
+  const restoreVersion = async () => {
+    if (!compare) return;
+    if (dirty && !(await confirm({ title: 'Restore this version?', body: 'Your changes that are not saved yet are dropped, and this version comes back as the latest.', confirm: 'Restore', danger: true }))) return;
+    try {
+      const r = await post<{ page: { version: number } }>(`/api/pages/${encodeURIComponent(pageId)}/versions/${compare.version}/restore`);
+      if (dirty && engine.current && saved) {
+        engine.current.load(saved);
+        paging.current?.reload();
+        setModel(engine.current.doc);
+      }
+      toast(`Version ${compare.version} is back, as version ${r.page.version}`, 'ok');
+      setCompare(null);
+    } catch (err) {
+      toastError(err);
+    }
+  };
 
   // ---- comments ------------------------------------------------------------------------------------------------------
   const setComments = (list: Comment[], gone?: string) => engine.current?.setComments(list, gone);
   const ca: CommentActions = {
     active,
-    readOnly,
+    readOnly: readOnly || liveOn,
     focus: (id) => {
       setActive(id);
       if (!engine.current?.revealComment(id)) toast(tr('The words this comment was on are gone.'));
@@ -668,7 +809,8 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   };
   function startComment() {
     const en = engine.current;
-    const s = stRef.current;
+    // The selection as it is now: the state the page was told of lags a frame behind keys (Shift+→, then Ctrl+Alt+M).
+    const s = en?.state();
     if (!en || readOnlyRef.current || !s) return;
     if (s.collapsed || !s.text.trim()) return void toast(tr('Pick the words to comment on first.'));
     const r = en.caretRect();
@@ -706,7 +848,11 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           st,
           doc: model,
           outline: wideOutline ? outlineOpen : menu === 'outline',
-          toggleOutline: () => (wideOutline ? setOutlineOpen((o) => !o) : setMenu(menu === 'outline' ? null : 'outline')),
+          toggleOutline: () => {
+            if (wideOutline) return setOutlineOpen((o) => !o);
+            if (phone) spotAt(host.current?.getBoundingClientRect());
+            setMenu(menu === 'outline' ? null : 'outline');
+          },
           zoom: view.zoom,
           setZoom: (z) => setPrefs({ zoom: z }),
           spell: view.spell,
@@ -721,6 +867,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           comment: startComment,
           picture: () => void pickPicture(),
           pictureUrl: () => setMenu('url'),
+          signature: () => setDialog('signature'),
           link: () => setLinking({ url: st.link ?? '', text: '' }),
           equation: openEquation,
           chars: () => {
@@ -769,6 +916,12 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           },
           painter: () => (e.paint ? e.stopPaint() : e.startPaint(false)),
           today,
+          mode,
+          setMode,
+          suggestions: changes.length,
+          resolveAll: (accept) => e.resolve(null, accept),
+          compare: () => setVersions(true),
+          readOnly: !!readOnly || !!compare || liveOn,
         })
       : [];
 
@@ -845,19 +998,55 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   const hoverT = hoverTable ? (model.blocks.find((b) => b.id === hoverTable && b.type === 'table') as TableBlock | undefined) : undefined;
   const caretT = st?.block?.type === 'table' ? st.block : undefined;
   const handlesFor = !readOnly && !narrow ? (caretT ?? hoverT) : undefined;
+  // Each suggested change's card, beside the page with the comments: Accept, Reject and replies.
+  const sgById = new Map((model.suggestions ?? []).map((x) => [x.id, x]));
+  const resolveOne = (id: string, accept: boolean) => {
+    e?.resolve(id, accept);
+    if (active === id) setActive(null);
+  };
+  const replyTo = (id: string, text: string) =>
+    e?.setSuggestions((model.suggestions ?? []).map((x) => (x.id === id ? { ...x, replies: [...(x.replies ?? []), { id: newCommentId(), by: 'user' as const, text, at: Date.now() }] } : x)));
+  const extra: Extra[] = changes.map((c) => ({
+    id: c.id,
+    top: tops.get(c.id),
+    node: (
+      <SuggestionCard
+        change={c}
+        sg={sgById.get(c.id)}
+        color={suggestionColor(sgById.get(c.id))}
+        active={active === c.id}
+        readOnly={readOnly || liveOn}
+        onFocus={() => {
+          setActive(c.id);
+          e?.revealSuggestion(c.id);
+        }}
+        onAccept={() => resolveOne(c.id, true)}
+        onReject={() => resolveOne(c.id, false)}
+        onReply={(t) => replyTo(c.id, t)}
+      />
+    ),
+  }));
+  // Words typed in a comment, a reply or an edit of one (not yet made) hold the agent's version back (noting).
+  const notes = {
+    onFocus: (ev: React.FocusEvent<HTMLDivElement>) => setNoting(typing(ev.target)),
+    onBlur: (ev: React.FocusEvent<HTMLDivElement>) => setNoting(typing(ev.relatedTarget) && ev.currentTarget.contains(ev.relatedTarget as Node)),
+  };
   const panelBody = (
-    <CommentsPanel
-      comments={shownComments}
-      all={comments}
-      showResolved={showResolved}
-      setShowResolved={setShowResolved}
-      draft={draft}
-      onDraft={addDraft}
-      onCancelDraft={() => setDraft(null)}
-      onAsk={askComments}
-      onClose={() => (setPanel(false), setDraft(null))}
-      a={ca}
-    />
+    <div className="contents" {...notes}>
+      <CommentsPanel
+        comments={shownComments}
+        all={comments}
+        extra={extra}
+        showResolved={showResolved}
+        setShowResolved={setShowResolved}
+        draft={draft}
+        onDraft={addDraft}
+        onCancelDraft={() => setDraft(null)}
+        onAsk={askComments}
+        onClose={() => (setPanel(false), setDraft(null))}
+        a={ca}
+      />
+    </div>
   );
 
   return (
@@ -867,9 +1056,9 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
           {/* The menus beside the title, where the header has room for them; one button where it hasn't. */}
-          {st && e && <MenuBar menus={readOnly ? menus.filter((m) => m.label === 'View' || m.label === 'Tools') : menus} compact={phone ? true : 'auto'} />}
+          {st && e && <MenuBar menus={readOnly || compare || liveOn ? menus.filter((m) => m.label === 'View' || m.label === 'Tools') : menus} compact={phone ? true : 'auto'} className={phone ? 'shrink-0' : undefined} />}
         </div>
-        {(comments.length > 0 || panel) && (
+        {(comments.length > 0 || changes.length > 0 || panel) && (
           <button
             ref={commentsRef}
             type="button"
@@ -879,29 +1068,44 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
             className={cx('flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-[12.5px] font-medium text-fg-2 hover:bg-bg-2 hover:text-fg', (columnFits ? view.comments : panel) && 'bg-bg-2 text-fg')}
           >
             <MessageSquare size={16} />
-            {openComments(comments).length > 0 && <span className="tabular-nums">{openComments(comments).length}</span>}
+            {openComments(comments).length + changes.length > 0 && <span className="tabular-nums">{openComments(comments).length + changes.length}</span>}
           </button>
         )}
-        <IconButton
-          ref={outlineRef}
-          label={wideOutline ? (outlineOpen ? 'Hide the outline' : 'Show the outline') : 'Outline'}
-          active={wideOutline ? outlineOpen : menu === 'outline'}
-          onClick={() => (wideOutline ? setOutlineOpen((o) => !o) : setMenu(menu === 'outline' ? null : 'outline'))}
-        >
-          <ListTree size={16} />
-        </IconButton>
+        {/* On a phone the outline is in View: the header has no room for its button beside the title and the page's own. */}
+        {!phone && (
+          <IconButton
+            ref={outlineRef}
+            label={wideOutline ? (outlineOpen ? 'Hide the outline' : 'Show the outline') : 'Outline'}
+            active={wideOutline ? outlineOpen : menu === 'outline'}
+            onClick={() => (wideOutline ? setOutlineOpen((o) => !o) : setMenu(menu === 'outline' ? null : 'outline'))}
+          >
+            <ListTree size={16} />
+          </IconButton>
+        )}
         {/* On a phone, Page setup is in the Format menu: the title keeps its room. */}
         {!readOnly && !phone && (
-          <IconButton ref={pageRef} label="Page setup" active={menu === 'page'} onClick={() => setMenu(menu === 'page' ? null : 'page')}>
+          <IconButton ref={pageRef} label="Page setup" active={menu === 'page'} disabled={liveOn} onClick={() => setMenu(menu === 'page' ? null : 'page')}>
             <FileCog size={16} />
           </IconButton>
         )}
         {tail}
       </div>
       {band}
-      {st && e && !readOnly && (
-        <div className="flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-panel px-2 [&::-webkit-scrollbar]:hidden">
-          <Toolbar engine={e} st={st} doc={model} linking={linking} setLinking={setLinking} linkRef={linkRef} onComment={startComment} slim={!phone && width < 820} />
+      {st && e && !readOnly && !compare && (
+        // While an agent's version shows, the toolbar stays where it is, out of use.
+        <div inert={liveOn} className={cx('flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-panel px-2 [&::-webkit-scrollbar]:hidden', liveOn && 'opacity-45')}>
+          <Toolbar
+            engine={e}
+            st={st}
+            doc={model}
+            linking={linking}
+            setLinking={setLinking}
+            linkRef={linkRef}
+            onComment={startComment}
+            slim={!phone && width < 820}
+            suggesting={mode === 'suggest'}
+            onSuggesting={(on) => setMode(on ? 'suggest' : 'edit')}
+          />
         </div>
       )}
       <div className="relative flex min-h-0 flex-1">
@@ -923,43 +1127,30 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
                 if (id !== hoverTable && (id || !(ev.target as HTMLElement).closest?.('[data-keeps-editing]'))) setHoverTable(id);
               }}
             >
-              <div ref={paper} className="nd-ed nd-doc" style={narrow ? undefined : { ...(zoom !== 1 ? { zoom } : {}), ...(column ? { marginLeft: 0 } : {}) }} />
-              {bands.map((b, k) => {
-                const band = b.kind === 'head' ? model.header : model.footer;
-                if (!band) return null;
-                const text = band.text.replace(/\{page\}/gi, String(b.page)).replace(/\{pages\}/gi, String(bands.filter((x) => x.kind === b.kind).length + (model.titlePage ? 1 : 0)));
-                return (
-                  <button
-                    key={k}
-                    type="button"
-                    data-keeps-editing
-                    title={b.kind === 'head' ? 'Header' : 'Footer'}
-                    onClick={() => !readOnly && setDialog('bands')}
-                    className="absolute -translate-y-1/2 truncate text-[#5f6368] hover:text-[#1f2328]"
-                    style={{
-                      left: b.x + (model.page.margin * 96 * zoom) / 25.4,
-                      width: ppx * zoom - (2 * model.page.margin * 96 * zoom) / 25.4,
-                      top: b.y,
-                      textAlign: band.align ?? 'left',
-                      fontSize: `${Math.round(model.size * 0.82 * zoom * 10) / 10}pt`,
-                      fontFamily: FONTS.find((f) => f.name === model.font)?.css,
-                    }}
-                    translate="no"
-                  >
-                    {text}
-                  </button>
-                );
-              })}
+              {/* The sheets behind the words, on pages; each one's header and footer over them. */}
+              {!narrow && pageLayout && <Sheets layout={pageLayout} zoom={zoom} width={ppx * zoom} />}
+              <div
+                ref={paper}
+                className="nd-ed nd-doc"
+                style={
+                  narrow
+                    ? undefined
+                    : { ...(zoom !== 1 ? { zoom } : {}), ...(column ? { marginLeft: 0 } : {}), ...(pageLayout ? { minHeight: pageLayout.count * pageLayout.pageH + (pageLayout.count - 1) * GAP } : {}) }
+                }
+              />
+              {!narrow && pageLayout && <Bands layout={pageLayout} zoom={zoom} doc={shownDoc ?? model} readOnly={readOnly || liveOn} onOpen={() => setDialog('bands')} />}
               {st?.picked && e && st.picked.type !== 'math' && (
                 <Picked engine={e} block={st.picked} host={host} tick={tick} readOnly={readOnly} onReplace={(id) => void replacePicture(id)} onAsk={onAsk ? askPicture : undefined} />
               )}
               {handlesFor && e && <ColumnHandles engine={e} table={handlesFor} host={host} tick={`${tick}:${model.blocks.length}`} />}
-              {e && !readOnly && !narrow && <BlockHandle engine={e} host={host} paper={paper} tick={model.blocks} />}
+              {e && !readOnly && !liveOn && !narrow && <BlockHandle engine={e} host={host} paper={paper} tick={model.blocks} />}
+              {liveOn && e && <AgentCaret engine={e} mark={live!.mark} host={host} scroller={scroller} tick={`${drawnLive}:${pageLayout?.n ?? 0}:${zoom}:${narrow}`} />}
               {found.boxes.map((b, k) => (
                 <span key={k} className="pointer-events-none absolute rounded-[2px]" style={{ left: b.x, top: b.y, width: b.w, height: b.h, background: b.now ? 'rgba(255,150,50,.55)' : 'rgba(255,213,79,.45)' }} />
               ))}
               {float?.ask && (
                 <div
+                  ref={askChip}
                   data-keeps-editing
                   onMouseDown={(ev) => ev.preventDefault()}
                   className="absolute z-20 flex h-8 items-center overflow-hidden rounded-full border border-line bg-elevated text-[12.5px] font-medium text-fg shadow-lg"
@@ -1014,28 +1205,46 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
                   index={Math.min(slash!.index, slashList.length - 1)}
                   at={slashPos}
                   bound={scroller.current?.getBoundingClientRect().bottom ?? window.innerHeight}
+                  rows={slashBox.rows}
+                  width={slashBox.width}
                   onPick={pickSlash}
                   onHover={(k) => setSlash((s) => (s ? { ...s, index: k } : s))}
                 />
               )}
               {column && (
-                <CommentsColumn
-                  comments={shownComments}
-                  tops={tops}
-                  draft={draft}
-                  onDraft={addDraft}
-                  onCancelDraft={() => setDraft(null)}
-                  onAsk={askComments}
-                  a={ca}
-                  left={ppx * zoom + 24}
-                  width={COLUMN}
-                />
+                <div className="contents" {...notes}>
+                  <CommentsColumn
+                    comments={shownComments}
+                    tops={tops}
+                    extra={extra}
+                    draft={draft}
+                    onDraft={addDraft}
+                    onCancelDraft={() => setDraft(null)}
+                    onAsk={askComments}
+                    a={ca}
+                    left={ppx * zoom + 24}
+                    width={COLUMN}
+                  />
+                </div>
               )}
               <div ref={spotRef} className="pointer-events-none absolute" style={spot ? { left: spot.x, top: spot.y, width: spot.w, height: spot.h } : { left: 0, top: 0, width: 1, height: 1 }} />
             </div>
           </div>
         </div>
         {panelW > 0 && <aside className="w-[320px] shrink-0 border-l border-line bg-panel">{panelBody}</aside>}
+        {compare && (
+          <CompareView
+            merged={compare.merged}
+            version={compare.version}
+            at={compare.at}
+            src={pictureSrc}
+            math={drawMath}
+            phone={phone}
+            onRestore={compare.from === 'tools' ? () => void restoreVersion() : undefined}
+            onBack={() => setCompare(null)}
+            backLabel={compare.from === 'versions' ? 'This version as it was' : undefined}
+          />
+        )}
         {phone && panel && <div className="absolute inset-0 z-30 bg-panel">{panelBody}</div>}
         {find.open && (
           <div className="absolute top-2 right-3 z-30 max-w-[calc(100%-24px)]" data-keeps-editing>
@@ -1062,14 +1271,14 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
             onClick={openCount}
             title="Word count"
             className="absolute right-3 bottom-1.5 rounded-md bg-bg/80 px-1.5 text-[11px] text-fg-3 tabular-nums hover:text-fg"
-            style={{ right: panelW ? panelW + 12 : 12 }}
+            style={{ right: panelW ? panelW + 12 : corner ? 64 : 12 }}
           >
             {`${words.toLocaleString(LOCALE)} word${words === 1 ? '' : 's'}`}
           </button>
         )}
       </div>
       {dirty && !readOnly && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-panel px-3 py-2 pb-[max(8px,var(--safe-bottom))]">
+        <div className={cx('flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-panel px-3 py-2 pb-[max(8px,var(--safe-bottom))]', corner && 'pr-16')}>
           <span className="min-w-0 flex-1 text-[12.5px] text-fg-2">
             <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-warn align-middle" />
             Not saved yet{savedNote ? <span className="text-fg-3"> · {savedNote}</span> : null}
@@ -1082,13 +1291,13 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           </Button>
         </div>
       )}
-      <Popover anchor={phone ? spotRef : pageRef} open={menu === 'page'} onClose={() => setMenu(null)} align="end" width={300} title="Page setup">
+      <Popover anchor={phone ? spotRef : pageRef} open={menu === 'page'} onClose={() => (setMenu(null), e?.refocusSoon())} align="end" width={300} title="Page setup">
         {pageSetup}
       </Popover>
-      <Popover anchor={outlineRef} open={menu === 'outline' && !wideOutline} onClose={() => setMenu(null)} align="end" width={280} title="Outline">
+      <Popover anchor={phone ? spotRef : outlineRef} open={menu === 'outline' && !wideOutline} onClose={() => (setMenu(null), e?.refocusSoon())} align="end" width={280} title="Outline">
         <div className="max-h-[min(60vh,440px)] overflow-y-auto">{outline}</div>
       </Popover>
-      <Popover anchor={linkRef} open={menu === 'url'} onClose={() => setMenu(null)} width={300} title="A picture from the web">
+      <Popover anchor={linkRef} open={menu === 'url'} onClose={() => (setMenu(null), e?.refocusSoon())} width={300} title="A picture from the web">
         <form
           className="space-y-2 p-2"
           onSubmit={(ev) => {
@@ -1108,12 +1317,12 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           </div>
         </form>
       </Popover>
-      <Popover anchor={spotRef} open={!!eq} onClose={() => setEq(null)} width={360} title="Equation">
+      <Popover anchor={spotRef} open={!!eq} onClose={() => (setEq(null), e?.refocusSoon())} width={360} title="Equation">
         {eq && (
           <EquationBox
             initial={eq.kind === 'new' ? '' : eq.tex}
             display={eq.kind === 'block' || (eq.kind === 'new' && !eq.inline)}
-            onCancel={() => setEq(null)}
+            onCancel={() => (setEq(null), e?.refocusSoon())}
             onRemove={eq.kind === 'block' ? () => (e?.setMath(eq.id, ''), setEq(null)) : eq.kind === 'run' ? () => (e?.setMathRun(eq.at, ''), setEq(null)) : undefined}
             onDone={(tex) => {
               if (!e || !tex.trim()) return setEq(null);
@@ -1125,12 +1334,13 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
                 e.setPicked(null);
               }
               setEq(null);
+              e?.refocusSoon();
               void loadKatex().then(() => setMath((m) => m || 1));
             }}
           />
         )}
       </Popover>
-      <Popover anchor={spotRef} open={!!chars} onClose={() => setChars(null)} width={340} title={chars?.kind === 'icon' ? 'The callout’s emoji' : 'Special characters'}>
+      <Popover anchor={spotRef} open={!!chars} onClose={() => (setChars(null), e?.refocusSoon())} width={340} title={chars?.kind === 'icon' ? 'The callout’s emoji' : 'Special characters'}>
         {chars && (
           <CharPicker
             kinds={chars.kind === 'icon' ? ['emoji'] : undefined}
@@ -1138,14 +1348,30 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
               if (chars.kind === 'icon') e?.callout(chars.id, { icon: ch });
               else e?.typeText(ch);
               setChars(null);
+              e?.refocusSoon();
             }}
           />
         )}
       </Popover>
-      <WordCountDialog open={dialog === 'count'} onClose={() => setDialog(null)} counts={counts} picked={counts.picked} showCount={view.count} setShowCount={(on) => setPrefs({ count: on })} />
-      <SpacingDialog open={dialog === 'spacing'} onClose={() => setDialog(null)} value={{ lh: sp?.lh, sb: sp?.sb, sa: sp?.sa }} onApply={(v) => e?.spacing(v)} />
-      <BandsDialog open={dialog === 'bands'} onClose={() => setDialog(null)} header={model.header} footer={model.footer} titlePage={model.titlePage} onApply={(v) => e?.setBands(v)} />
-      <ShortcutsDialog open={dialog === 'keys'} onClose={() => setDialog(null)} groups={SHORTCUTS} />
+      <WordCountDialog open={dialog === 'count'} onClose={() => (setDialog(null), e?.refocusSoon())} counts={counts} picked={counts.picked} showCount={view.count} setShowCount={(on) => setPrefs({ count: on })} />
+      <SpacingDialog open={dialog === 'spacing'} onClose={() => (setDialog(null), e?.refocusSoon())} value={{ lh: sp?.lh, sb: sp?.sb, sa: sp?.sa }} onApply={(v) => e?.spacing(v)} />
+      <BandsDialog open={dialog === 'bands'} onClose={() => (setDialog(null), e?.refocusSoon())} header={model.header} footer={model.footer} titlePage={model.titlePage} onApply={(v) => e?.setBands(v)} />
+      <VersionsDialog open={versions} pageId={pageId} onClose={() => (setVersions(false), e?.refocusSoon())} onPick={(v) => void compareWith(v)} />
+      <ShortcutsDialog open={dialog === 'keys'} onClose={() => (setDialog(null), e?.refocusSoon())} groups={SHORTCUTS} />
+      {dialog === 'signature' && (
+        <Suspense fallback={null}>
+          <InsertSignature
+            open
+            onClose={() => (setDialog(null), e?.refocusSoon())}
+            onInsert={(p) => {
+              if (!e) return;
+              // Sized for a signature line (initials smaller), on the left as a signature is; its handles size it after.
+              const b = e.picture(p.src, (SIGNATURE_WIDTH_MM[p.kind] * 96) / 25.4);
+              e.insert([{ ...b, align: 'left', alt: tr(p.kind === 'initials' ? 'Initials' : 'Signature') }]);
+            }}
+          />
+        </Suspense>
+      )}
       {confirmNode}
     </div>
   );

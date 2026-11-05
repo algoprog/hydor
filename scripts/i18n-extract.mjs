@@ -290,8 +290,11 @@ const add = (s, where, jsx = false) => {
   if (!found.has(t)) found.set(t, where);
 };
 
+// Files with no words the pages show: the code highlighter's keyword lists (its languages' names are the same in every
+// language), which read as words.
+const NO_WORDS = new Set(['shared/code-colours.ts']);
 for (const f of [...files(path.join(ROOT, 'web/src'), /\.(tsx|ts)$/), ...files(path.join(ROOT, 'shared'), /\.ts$/)]) {
-  if (f.includes(`${path.sep}i18n${path.sep}`)) continue;
+  if (f.includes(`${path.sep}i18n${path.sep}`) || NO_WORDS.has(path.relative(ROOT, f).split(path.sep).join('/'))) continue;
   const src = fs.readFileSync(f, 'utf8');
   const js = transformSync(src, { loader: f.endsWith('x') ? 'tsx' : 'ts', jsx: 'automatic', minifyWhitespace: false, legalComments: 'none' }).code;
   const where = path.relative(ROOT, f);

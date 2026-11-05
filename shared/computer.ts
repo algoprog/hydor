@@ -81,3 +81,5 @@ export const COMPUTER_ALLOW = 'Allow for this session';
 export const COMPUTER_DENY = 'Not now';
 /** The glow's note: what stops the agent. */
 export const PRESS_ESC = 'Press Esc to stop';
+/** The tag beside the agent's pointer over the screen (and in the browser's live view). */
+export const AGENT_TAG = 'Agent';

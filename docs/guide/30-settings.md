@@ -43,6 +43,12 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Change password**](/settings?s=security&find=Change%20password): Changing it signs out every other browser.
 - [**Sign out of this browser**](/settings?s=security&find=Sign%20out%20of%20this%20browser): You need the password to come back.
 
+### Signatures
+
+[Settings → Signatures](/settings?s=signatures): your signature and initials, drawn once and kept encrypted, for the documents you sign. More in [Library: pages, images, videos and sites](/guide/library).
+
+- [**New signature**](/settings?s=signatures&find=New%20signature): Draw, type or upload your signature or initials.
+
 ### Source control
 
 [Settings → Source control](/settings?s=scm): GitHub and Gitea accounts for opening pull requests. More in [Phones, other machines and sharing](/guide/devices).

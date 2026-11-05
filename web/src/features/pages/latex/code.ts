@@ -2,18 +2,20 @@
 // what writing LaTeX wants on top. Ctrl+Enter typesets; Ctrl+B and Ctrl+I make the words picked bold or italic (and
 // plain again), Ctrl+/ comments lines out and back. Typing \ offers commands, \begin{ environments (the \end goes in
 // too, as it does when Enter follows a \begin{…} typed by hand), \usepackage{ packages, and \ref, \cite,
-// \includegraphics and \input the document's own labels, bibliography, pictures and files; brackets and $ close
-// themselves. Environments, sections, the preamble and { groups fold. The formula the cursor is in shows drawn in a
-// card by its line. Visual mode (visual.ts) shows the source as a document, and Check spelling has the browser check
-// its words (spell.ts). The typesetting's errors and warnings are marked at their lines, and what is sure to fail
+// \includegraphics and \input the document's own labels, bibliography, pictures and files (on a phone too, where the
+// list opens as you type them, in rows to tap, and Return still starts a new line); brackets and $ close themselves.
+// Environments, sections, the preamble and { groups fold. The formula the cursor is in shows drawn in a card by its
+// line. Visual mode (visual.ts) shows the source as a document, and Check spelling has the browser check its words
+// (spell.ts). The typesetting's errors and warnings are marked at their lines, and what is sure to fail
 // (a \begin without its \end, a brace or a $ left open: shared/latex-check.ts) where it is, a moment after typing.
-import { snippet, startCompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
+// While an agent writes a new version of the file, that shows in its place read-only, with the agent's caret (setLive).
+import { autocompletion, closeCompletion, completionStatus, snippet, startCompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
 import { redo, selectAll, toggleComment, undo } from '@codemirror/commands';
 import { foldAll, indentUnit, unfoldAll } from '@codemirror/language';
 import { gotoLine } from '@codemirror/search';
 import { lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint';
-import { Compartment, EditorSelection, EditorState, Prec, StateEffect, StateField } from '@codemirror/state';
-import { Decoration, EditorView, keymap, type DecorationSet } from '@codemirror/view';
+import { Compartment, EditorSelection, EditorState, Prec, StateEffect, StateField, Transaction } from '@codemirror/state';
+import { Decoration, EditorView, keymap, WidgetType, type DecorationSet } from '@codemirror/view';
 import { texCheck } from '@shared/latex-check';
 import { tr } from '../../../i18n/runtime';
 import { createEditor, type EditorHandle } from '../../../lib/codemirror';
@@ -22,6 +24,7 @@ import { texFolding } from './fold';
 import { mathPreview } from './mathpreview';
 import { braced, inMathAt } from './scan';
 import { spellCheck } from './spell';
+import { acceptTracked, loaded, loadTracked, pickTracked, rejectTracked, trackChanges, trackedNow, trackField, untracked, type Tracked } from './track';
 import { visualMode } from './visual';
 
 /** What the document offers to complete with. */
@@ -53,6 +56,8 @@ export interface CodeHooks {
   onCommentsMoved: (list: CommentRange[]) => void;
   /** Ctrl+Alt+M: a comment on the words picked. */
   onComment: () => void;
+  /** The tracked changes moved or changed (an edit recorded, one accepted or rejected, Undo): the file's, as they are now. */
+  onTracked: (list: Tracked[]) => void;
 }
 
 /** Where a comment's words are in the file; `active`: the one picked. */
@@ -115,8 +120,26 @@ export interface Code {
   replaceQuiet: (from: number, to: number, text: string) => void;
   setVisual: (on: boolean) => void;
   setSpell: (on: boolean) => void;
+  /** Track changes on or off: while on, what is typed and deleted is marked. */
+  setTrack: (on: boolean) => void;
+  /** The file's tracked changes, as the document has them (when its editor starts). */
+  setTracked: (list: Tracked[]) => void;
+  /** Accepts or rejects tracked changes of the file, as one step Undo takes back. */
+  acceptChanges: (ids: string[]) => void;
+  rejectChanges: (ids: string[]) => void;
+  /** A tracked change picked (marked apart, and scrolled to); null: none. */
+  pickChange: (id: string | null) => void;
   foldAll: () => void;
   unfoldAll: () => void;
+  /**
+   * An agent's version of the file shown in place of its text (live.ts), read-only, a caret where its words arrive at
+   * `at` (kept in view when `follow`); null: the file's own text again. The text underneath stays as it was: nothing
+   * of the agent's is reported as typed, tracked or undone.
+   */
+  setLive: (text: string | null, at?: number, follow?: boolean) => void;
+  /** The line at the top of the view, and a line put there (the cursor and the focus left where they are). */
+  topLine: () => number;
+  showLine: (line: number) => void;
   goto: (line: number) => void;
   focus: () => void;
   destroy: () => void;
@@ -198,16 +221,118 @@ const commentTheme = EditorView.baseTheme({
   '.cm-tex-commented-active': { backgroundColor: 'color-mix(in srgb, #f5b400 40%, transparent)' },
 });
 
+/** What, typed just before the cursor, opens the list of completions on a phone: a command (a backslash that is not a
+ * line break's second), \begin{, and the braces of \cite, \ref, \includegraphics, \input, \usepackage and the like. */
+const OPENS_LIST =
+  /(?:(?:^|[^\\])(?:\\\\)*\\[A-Za-z@]*|\\begin\s*\{[A-Za-z@*]*|\\(?:[A-Za-z]*(?:cite|ref)[A-Za-z]*|includegraphics|input|include|subfile|bibliography|usepackage|RequirePackage|documentclass)\*?(?:\[[^\]\n]*\])*\{[^{}\n]*)$/;
+
+/**
+ * The list on a phone: rows a finger can pick, no wider than the screen, each with what it does on a line under it
+ * (beside the list, as on a computer, it would cover the next row), and no icons, for the room.
+ */
+const phoneList = [
+  autocompletion({
+    icons: false,
+    addToOptions: [
+      {
+        position: 90,
+        render: (c) => {
+          if (typeof c.info !== 'string' || !c.info) return null;
+          const el = document.createElement('div');
+          el.className = 'cm-tex-option-info';
+          el.textContent = c.info;
+          return el;
+        },
+      },
+    ],
+  }),
+  EditorView.theme({
+    '.cm-tooltip.cm-tooltip-autocomplete > ul': { maxHeight: 'min(42vh, 340px)', maxWidth: 'calc(100vw - 32px)', minWidth: '220px' },
+    '.cm-tooltip.cm-tooltip-autocomplete > ul > li': { display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', minHeight: '44px', padding: '6px 12px', fontSize: '15px', lineHeight: '1.3' },
+    // Return takes no row on a phone: the one picked is only a little apart, in the app's colours in either theme.
+    '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': { backgroundColor: 'var(--bg-2)', color: 'var(--fg)' },
+    '.cm-tooltip.cm-tooltip-autocomplete > ul > li .cm-completionDetail': { marginLeft: '8px' },
+    '.cm-tex-option-info': { flexBasis: '100%', fontFamily: 'var(--font-sans)', fontSize: '12.5px', color: 'var(--fg-3)', whiteSpace: 'normal' },
+    '.cm-tooltip.cm-completionInfo': { display: 'none' },
+  }),
+];
+
 /** The commands Clear formatting takes away. */
 const FORMATS = /\\(textbf|textit|textsl|emph|underline|uline|texttt|textsc|textsf|textrm|textsuperscript|textsubscript|textnormal)\s*\{/g;
 
+// ---- an agent writing the file -------------------------------------------------------------------------------------
+
+/** Where an agent's words are arriving (null: none). */
+const agentAt = StateEffect.define<number | null>();
+
+class AgentCaret extends WidgetType {
+  toDOM() {
+    const s = document.createElement('span');
+    s.className = 'cm-agent';
+    s.setAttribute('aria-hidden', 'true');
+    const flag = document.createElement('span');
+    flag.className = 'cm-agent-flag';
+    flag.textContent = tr('Agent');
+    s.appendChild(flag);
+    return s;
+  }
+  eq() {
+    return true;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
+
+const agentField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, t) {
+    for (const e of t.effects) if (e.is(agentAt)) return e.value === null ? Decoration.none : Decoration.set([Decoration.widget({ widget: new AgentCaret(), side: 1 }).range(Math.min(e.value, t.state.doc.length))]);
+    return deco.map(t.changes);
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+// The app's busy colour, as an agent at work shows elsewhere; a flag with its name over the caret, as a collaborator's.
+const agentTheme = EditorView.baseTheme({
+  '.cm-agent': { position: 'relative', borderLeft: '2px solid var(--busy)', marginLeft: '-1px', marginRight: '-1px' },
+  '.cm-agent-flag': {
+    position: 'absolute',
+    bottom: '100%',
+    left: '-2px',
+    background: 'var(--busy)',
+    color: 'var(--bg)',
+    font: '600 10px/14px system-ui, sans-serif',
+    padding: '0 4px',
+    borderRadius: '3px',
+    whiteSpace: 'nowrap',
+    pointerEvents: 'none',
+  },
+});
+
+/** The part of `a` that differs from `b`: what goes in its place (null: the same). */
+function differs(a: string, b: string): { from: number; to: number; insert: string } | null {
+  if (a === b) return null;
+  let i = 0;
+  const n = Math.min(a.length, b.length);
+  while (i < n && a.charCodeAt(i) === b.charCodeAt(i)) i++;
+  let j = 0;
+  while (j < n - i && a.charCodeAt(a.length - 1 - j) === b.charCodeAt(b.length - 1 - j)) j++;
+  return { from: i, to: a.length - j, insert: b.slice(i, b.length - j) };
+}
+
 export async function mountCode(parent: HTMLElement, o: { text: string; name: string; dark: boolean; phone: boolean; readOnly?: boolean; visual?: boolean; spell?: boolean; hooks: CodeHooks }): Promise<Code> {
   const hooks = o.hooks;
-  const handle = await createEditor(parent, { doc: o.text, path: pathFor(o.name), dark: o.dark, wrap: true, phone: o.phone, readOnly: o.readOnly, onChange: (d) => hooks.onChange(d), onSave: () => hooks.onSave() });
+  // The file as it was while an agent's version shows in its place (setLive), else null: brought back whole when that
+  // version is not kept (its comments' places, tracked changes and undo with it, which the agent's text would move).
+  let own: EditorState | null = null;
+  const handle = await createEditor(parent, { doc: o.text, path: pathFor(o.name), dark: o.dark, wrap: true, phone: o.phone, readOnly: o.readOnly, onChange: (d) => own === null && hooks.onChange(d), onSave: () => hooks.onSave() });
   const view = handle.view;
   const tex = isTex(o.name);
   const visualC = new Compartment();
   const spellC = new Compartment();
+  const liveC = new Compartment();
+  const track = trackChanges();
   const visualExt = () => visualMode({ macros: hooks.macros, picture: hooks.picture });
 
   const picked = () => {
@@ -348,7 +473,31 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     view.dispatch(setDiagnostics(view.state, diags));
   };
 
+  // A phone's keyboard has no Ctrl+Space: the list opens by itself as a command, an environment or a citation is typed
+  // (the app's editor opens none as you type on a phone, where Return would take one), in rows big enough to tap.
+  // Return still starts a new line there: an option is taken by a tap.
+  let completeTimer: ReturnType<typeof setTimeout> | undefined;
+  const onPhone = o.phone
+    ? [
+        EditorView.updateListener.of((u) => {
+          if (!u.docChanged || !u.transactions.some((t) => t.isUserEvent('input.type')) || completionStatus(u.state)) return;
+          const at = u.state.selection.main;
+          if (!at.empty) return;
+          const line = u.state.doc.lineAt(at.head);
+          if (!OPENS_LIST.test(line.text.slice(Math.max(0, at.head - line.from - 200), at.head - line.from))) return;
+          clearTimeout(completeTimer);
+          completeTimer = setTimeout(() => startCompletion(view), 60);
+        }),
+        phoneList,
+      ]
+    : [];
+  const enterTakesNone = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && completionStatus(view.state) === 'active') closeCompletion(view);
+  };
+  if (o.phone) view.dom.addEventListener('keydown', enterTakesNone, true);
+
   const extra = [
+    onPhone,
     Prec.highest(
       keymap.of([
         { key: 'Mod-Enter', preventDefault: true, run: () => (hooks.onCompile(), true) },
@@ -368,14 +517,23 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     foundField,
     commentField,
     commentTheme,
+    track.extension,
     tex ? [texFolding, mathPreview(hooks.macros)] : [],
     visualC.of(o.visual && tex ? visualExt() : []),
     spellC.of(o.spell ? spellCheck : []),
+    liveC.of([]),
+    agentField,
+    agentTheme,
     EditorView.updateListener.of((u) => {
+      // An agent's version on show moves nothing of the file's own (its comments, its problems).
+      if (own !== null) return;
       if (u.docChanged) {
         const list = u.state.field(commentField).list;
         if (list.length) hooks.onCommentsMoved(list);
       }
+      // (The state before the extension was added has no changes at all.)
+      const was = u.startState.field(trackField, false);
+      if (was !== undefined && was !== u.state.field(trackField) && !u.transactions.some((t) => t.annotation(loaded))) hooks.onTracked(trackedNow(u.state));
       if (u.docChanged && tex) {
         clearTimeout(checkTimer);
         checkTimer = setTimeout(showIssues, 700);
@@ -482,6 +640,17 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     },
     setVisual: (on) => view.dispatch({ effects: visualC.reconfigure(on && tex ? visualExt() : []) }),
     setSpell: (on) => view.dispatch({ effects: spellC.reconfigure(on ? spellCheck : []) }),
+    setTrack: (on) => track.on(view, on),
+    setTracked: (list) => loadTracked(view, list),
+    acceptChanges: (ids) => acceptTracked(view, ids),
+    rejectChanges: (ids) => {
+      if (!o.readOnly) rejectTracked(view, ids);
+    },
+    pickChange: (id) => {
+      pickTracked(view, id);
+      const c = id ? view.state.field(trackField).find((x) => x.id === id) : null;
+      if (c) view.dispatch({ selection: EditorSelection.range(c.from, c.to), effects: EditorView.scrollIntoView(c.from, { y: 'center' }) });
+    },
     foldAll: () => {
       foldAll(view);
       view.focus();
@@ -490,10 +659,41 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
       unfoldAll(view);
       view.focus();
     },
+    setLive: (text, at, follow) => {
+      const quiet = [Transaction.addToHistory.of(false), untracked.of(true), loaded.of(true)];
+      if (text === null) {
+        if (own === null) return;
+        const was = own;
+        const line = view.state.doc.lineAt(view.lineBlockAtHeight(view.scrollDOM.scrollTop).from).number;
+        own = null;
+        view.setState(was);
+        view.dispatch({ effects: EditorView.scrollIntoView(was.doc.line(Math.min(line, was.doc.lines)).from, { y: 'start' }) });
+        return;
+      }
+      if (own === null) own = view.state;
+      const d = differs(view.state.doc.toString(), text);
+      const where = at !== undefined && at >= 0 ? Math.min(at, text.length) : null;
+      view.dispatch({
+        changes: d ?? [],
+        annotations: quiet,
+        effects: [
+          liveC.reconfigure([EditorState.readOnly.of(true), EditorView.editable.of(false)]),
+          agentAt.of(where),
+          ...(follow && where !== null ? [EditorView.scrollIntoView(where, { y: 'nearest', yMargin: 96 })] : []),
+        ],
+      });
+    },
+    topLine: () => view.state.doc.lineAt(view.lineBlockAtHeight(view.scrollDOM.scrollTop).from).number,
+    showLine: (line) => {
+      const l = view.state.doc.line(Math.max(1, Math.min(line, view.state.doc.lines)));
+      view.dispatch({ effects: EditorView.scrollIntoView(l.from, { y: 'start' }) });
+    },
     goto: (line) => handle.gotoLine(line),
     focus: () => view.focus(),
     destroy: () => {
       clearTimeout(checkTimer);
+      clearTimeout(completeTimer);
+      view.dom.removeEventListener('keydown', enterTakesNone, true);
       handle.destroy();
     },
   };

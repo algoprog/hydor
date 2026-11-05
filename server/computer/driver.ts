@@ -1,7 +1,7 @@
 // The Mac's side of computer use: one JavaScript for Automation script, run as
 //   osascript -l JavaScript -e DRIVER '<steps as JSON>'
 // which posts mouse and keyboard events through CoreGraphics (CGEvent, the ObjC bridge; event types and flags as
-// numbers, since not all of them are bridged) and reads where things are. No native module and no build step: macOS
+// numbers, since not all of them are bridged), gliding the pointer to where it acts, and reads where things are. No native module and no build step: macOS
 // has osascript. The events count as Hydor's, the app the server runs in, so its Accessibility permission
 // is the one that matters.
 //
@@ -45,6 +45,20 @@ function lift(mods, f) {
   for (var i = mods.length - 1; i >= 0; i--) { f &= ~(FLAG[mods[i]] || 0); key(mods[i], false, f); delay(0.01); }
 }
 function moveTo(p) { mouse(MOVED, p, 0, 0, 0); delay(0.05); }
+// The pointer to a place in small steps over o.ms, slow at both ends as a hand moves, so the eye can follow it. While
+// the left button is held (a drag the agent began), the moves are drags, as apps expect.
+function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+function held() { try { return !!$.CGEventSourceButtonState(0, 0); } catch (x) { return false; } }
+function glide(o) {
+  var a = here(), dx = o.x - a.x, dy = o.y - a.y, drag = held(), type = drag ? 6 : MOVED, clicks = drag ? 1 : 0;
+  if (!(o.ms > 0) || Math.abs(dx) + Math.abs(dy) < 3) { mouse(type, { x: o.x, y: o.y }, 0, 0, clicks); return; }
+  var n = Math.max(4, Math.round(o.ms / 16));
+  for (var i = 1; i <= n; i++) {
+    var e = ease(i / n);
+    mouse(type, { x: a.x + dx * e, y: a.y + dy * e }, 0, 0, clicks);
+    delay(o.ms / 1000 / n);
+  }
+}
 
 function click(o) {
   var p = where(o), b = BUTTONS[o.button] || BUTTONS[0];
@@ -200,6 +214,7 @@ function run(argv) {
   for (var i = 0; i < ops.length; i++) {
     var o = ops[i];
     switch (o.op) {
+      case 'glide': glide(o); break;
       case 'move': moveTo(o); break;
       case 'click': click(o); break;
       case 'drag': drag(o); break;

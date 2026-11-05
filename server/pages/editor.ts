@@ -12,12 +12,16 @@
 // the page's HTML with the user's changes and its scripts as they were.
 //
 // Writing as in Notion (blocks that flow into each other, Markdown as you type, "/" for blocks, handles
-// beside each block and their menu, several blocks picked, an icon and a cover) is writing.ts, which this
-// hands its insides to. Undo keeps a step per change of a block: while words are being written, Ctrl+Z
-// takes back the last few words typed first, then the change before.
+// beside each block and their menu, several blocks picked, an icon and a cover, databases) is writing.ts, which this
+// hands its insides to; a database's own cells, menus and keys are its own (Ctrl+S still saves), and its rows are
+// read and kept through the app (`wa-ed-store`), with the page's own data. Undo keeps a step per change of a block:
+// while words are being written, Ctrl+Z takes back the last few words typed first, then the change before (a
+// database's rows, kept as they change, are not in its steps).
 //
 // Like the kit's bridge, the function below runs in the browser: its source is sent as text, so it uses
 // only its argument and the browser's own globals.
+import { codeColours, type CodeColours } from '../../shared/code-colours.ts';
+import { pageDatabases, type PageDatabases } from '../../shared/page-db.ts';
 import { writing, type At, type Core, type Next, type Writing } from './writing.ts';
 
 export interface EditorCfg {
@@ -29,7 +33,7 @@ export interface EditorCfg {
   labels: Record<string, string>;
 }
 
-function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
+function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: () => CodeColours, pageDatabases: () => PageDatabases) {
   const P = window.parent;
   const L = (k: string, fallback: string) => (typeof cfg.labels?.[k] === 'string' ? cfg.labels[k] : fallback);
   const send = (m: Record<string, unknown>) => {
@@ -186,13 +190,16 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     if (c?.contains('n-icon')) return L('icon', 'Icon');
     if (c?.contains('n-video')) return L('video', 'Video');
     if (c?.contains('n-math')) return L('sMath', 'Maths');
+    if (c?.contains('n-db')) return L('sDatabase', 'Database');
+    // An item that holds a block under its parent item (writing.ts) is named by that block: "Heading 3", "Text".
+    if (el.tagName === 'LI' && c?.contains('n-block') && el.firstElementChild && !/^(UL|OL)$/.test(el.firstElementChild.tagName)) return nameOf(el.firstElementChild);
     if (el.tagName === 'LI' && el.parentElement?.classList.contains('n-todo')) return L('phTodo', 'To-do');
     if (c?.contains('n-todo')) return L('sTodo', 'To-do list');
     return NAMES[el.tagName.toUpperCase()] ?? L('box', 'Block');
   };
   const isUi = (el: Element | null) => !!el && (el === host || !!el.closest?.('[data-n-own]'));
   /** Blocks that are drawn rather than written (changed through their own fields). */
-  const DRAWN = '.n-video,.n-math,.n-toc,.n-cover,.n-icon';
+  const DRAWN = '.n-video,.n-math,.n-toc,.n-cover,.n-icon,.n-db';
   const inlineOnly = (c: Element) => (INLINE.has(c.tagName) || c.tagName === 'IMG') && [...c.querySelectorAll('*')].every((x) => INLINE.has(x.tagName) || x.tagName === 'IMG');
   /**
    * Words that can be changed where they are: only words and inline parts inside. A list's item may have lists
@@ -256,6 +263,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     code: '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
     colour: '<path d="M6 16 12 4l6 12"/><path d="M8.5 11h7"/><path d="M4 20h16" stroke-width="3"/>',
     chev: '<path d="m6 9 6 6 6-6"/>',
+    comment: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
   };
   const svg = (k: string) => `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
   const dark = cfg.theme === 'dark';
@@ -315,7 +323,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     .rtb{flex-wrap:wrap;max-width:calc(100vw - 8px);box-sizing:border-box}
     .cmds{flex-wrap:wrap}
     .rtb button.kind{width:auto;gap:3px;padding:0 6px 0 8px;font:500 12.5px system-ui,sans-serif;display:flex;align-items:center;white-space:nowrap}
-    .rtb button.kind[hidden],.rtb .sep[hidden]{display:none}
+    .rtb button.kind[hidden],.rtb .sep[hidden],.rtb button[hidden]{display:none}
     .pal{display:none;flex-direction:column;gap:4px;padding:3px 4px}
     .rtb.colouring .pal{display:flex}
     .rtb.colouring .cmds{display:none}
@@ -353,6 +361,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
       <button data-c="link" title="${L('linkTip', 'Make it a link')}">${svg('link')}</button>
       <button data-c="unlink" title="${L('unlinkTip', 'Not a link')}">${svg('unlink')}</button>
       <button data-c="removeFormat" title="${L('clearTip', 'Plain words')}">${svg('clear')}</button>
+      <button data-c="comment" title="${attr(L('commentTip', 'Comment (Ctrl+Alt+M)'))}" hidden>${svg('comment')}</button>
       <span class="sep"></span>
       <button data-c="done" title="${L('doneTip', 'Done (Esc)')}">${svg('done')}</button>
     </span>
@@ -373,8 +382,9 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
   let sel: Element | null = null;
   let hover: Element | null = null;
   let editing: HTMLElement | null = null;
-  /** Whether the app has an agent to ask about a part (the block menu's Ask the agent). */
+  /** Whether the app has an agent to ask about a part (the block menu's Ask the agent), and keeps comments for the page. */
   let canAskAgent = false;
+  let canComment = false;
   /** What the inspector's changes apply to: this part, every part of its kind or class; on hover; at a size and smaller. */
   let ctx: { scope: string; state: '' | 'hover'; media: Media } = { scope: 'self', state: '', media: '' };
 
@@ -849,6 +859,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
 
   // ---- the parts as a tree (the inspector's Layers) ------------------------------------------------------
   const SKIP = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'LINK', 'META', 'NOSCRIPT', 'N-EDITOR-UI']);
+  /** The spans a plain code block's colours are put on with (shared/code-colours.ts): no parts of the page's own. */
+  const COLOURED = 'pre > code > span:is(.n-ck,.n-cs,.n-cn,.n-cc,.n-cf,.n-ct,.n-ca,.n-cg,.n-cv,.n-ci,.n-cd)';
   let layersOn = false;
   const layers = () => {
     let count = 0;
@@ -856,7 +868,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     const walk = (el: Element, path: number[]): Node => {
       const kids: Node[] = [];
       [...el.children].forEach((c, i) => {
-        if (count > 2500 || SKIP.has(c.tagName) || isUi(c)) return;
+        if (count > 2500 || SKIP.has(c.tagName) || isUi(c) || c.matches(COLOURED) || (c.tagName === 'SPAN' && c.parentElement?.matches('pre.n-code'))) return;
         count++;
         kids.push(walk(c, [...path, i]));
       });
@@ -1043,7 +1055,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
   /** The page's body as it is kept: without the editor's marks on the words being written. */
   const cleanBody = (): string => {
     const b = document.body;
-    if (!editing && !b.querySelector('[data-n-ph],[data-n-ceoff],[data-n-hovering],[data-n-ce]')) return b.outerHTML;
+    if (!editing && !b.querySelector(`[data-n-ph],[data-n-ceoff],[data-n-hovering],[data-n-ce],pre.n-code > *,${COLOURED}`)) return b.outerHTML;
     const c = b.cloneNode(true) as HTMLElement;
     for (const x of c.querySelectorAll('[data-n-ce]')) {
       x.removeAttribute('data-n-ce');
@@ -1123,6 +1135,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
   // ---- the words being written: a step to undo for each change of a block, and the last few words typed -----
   /** Whether what was written since writing began has a step to undo yet. */
   let editPushed = false;
+  /** Whether the page had changes before writing in this block began (words typed and taken back leave it so). */
+  let dirtyBefore = false;
   const typing: { h: string; o: number }[] = [];
   const typingRedo: { h: string; o: number }[] = [];
   let lastTyped = 0;
@@ -1133,6 +1147,11 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     if (!editPushed) {
       remember();
       editPushed = true;
+      // The app shows Save from the first letter typed (and asks before the page is left), not only once the block is left.
+      if (!dirty) {
+        dirty = true;
+        state();
+      }
     }
     const now = Date.now();
     const top = typing[typing.length - 1];
@@ -1245,6 +1264,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     sel = el;
     editing = el as HTMLElement;
     editPushed = false;
+    dirtyBefore = dirty;
     typing.length = 0;
     typingRedo.length = 0;
     editing.setAttribute('contenteditable', 'true');
@@ -1272,9 +1292,12 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     typingRedo.length = 0;
     const was = editPushed;
     editPushed = false;
-    // Typed and taken back again: no step to keep.
-    if (was && same && !quiet) undo.pop();
-    else if (was && !quiet) changed();
+    // Typed and taken back again: no step to keep, and the page is as changed as it was before.
+    if (was && same && !quiet) {
+      undo.pop();
+      dirty = dirtyBefore;
+      state();
+    } else if (was && !quiet) changed();
     else state();
     getSelection()?.removeAllRanges();
     queueMicrotask(() => sayEditing(!!editing));
@@ -1349,6 +1372,10 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     if (c === 'code') {
       W.act('code', null);
       return redraw();
+    }
+    if (c === 'comment') {
+      W.act('comment', null);
+      return;
     }
     if (c === 'colour') {
       rtb.classList.add('colouring');
@@ -1430,6 +1457,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     switch (a) {
       case 'caps':
         canAskAgent = !!arg?.ask;
+        canComment = !!arg?.comment;
+        (rtb.querySelector('[data-c=comment]') as HTMLElement).hidden = !canComment;
         return;
       case 'parent':
         if (el && el !== body) select(el.parentElement);
@@ -1497,6 +1526,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
         const node = fromHtml(arg?.html);
         if (!node) return;
         remember();
+        W.prepare(node);
         placeNew(node, arg?.where ?? (arg?.inside ? 'inside' : 'after'), el);
         sel = node;
         changed();
@@ -1804,6 +1834,26 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     addEventListener('pointercancel', up, true);
   }
 
+  // ---- the page's own data, for its databases: kept by the app (the page's storage), asked by message ----------
+  const storeWaits = new Map<number, [(v: unknown) => void, (e: Error) => void]>();
+  let storeSeq = 0;
+  const storeAsk = (op: 'get' | 'set', key: string, value?: unknown) =>
+    new Promise<unknown>((ok, fail) => {
+      const id = ++storeSeq;
+      storeWaits.set(id, [ok, fail]);
+      send({ type: 'wa-ed-store', id, op, key, value });
+      // An app of before (or none) answers nothing: the database shows what its block says, and keeps nothing.
+      setTimeout(() => storeWaits.has(id) && (storeWaits.delete(id), fail(new Error('No answer'))), 10_000);
+    });
+  const storeAnswer = (a: any) => {
+    const w = storeWaits.get(Number(a?.id));
+    if (!w) return;
+    storeWaits.delete(Number(a.id));
+    if (typeof a.error === 'string') w[1](new Error(a.error));
+    else w[0](a.value ?? null);
+  };
+  const dbStore = { get: (k: string) => storeAsk('get', k), set: (k: string, v: unknown) => storeAsk('set', k, v) };
+
   // ---- writing as in Notion (writing.ts), handed what it needs -------------------------------------------------
   const core: Core = {
     L,
@@ -1831,6 +1881,10 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
       send({ type: 'wa-ed-copied', html, name });
     },
     canAsk: () => canAskAgent,
+    code: codeColours(),
+    canComment: () => canComment,
+    db: pageDatabases(),
+    store: dbStore,
   };
   // A paste event (Ctrl+V of the part copied waits for it, below): any one, a picture's too, which writing.ts takes.
   let pasteTimer = 0;
@@ -1840,16 +1894,26 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
 
   // ---- the page's own events: held, except while words are being changed -----------------------------------
   const fromUi = (e: Event) => e.composedPath().includes(host);
+  /** The part a press is on: a code block for a word its colours wrap (writing.ts colours code as it shows; a plain block's <code>). */
+  const partAt = (t: Element) => (t.closest?.('pre.n-code') as Element | null) ?? (t.matches?.(COLOURED) ? t.parentElement! : t);
+  /** A database's own cells, buttons and menus (shared/page-db.ts): its presses and keys are its own, not the editor's. */
+  const fromDb = (e: Event) => e.composedPath().some((x) => x instanceof Element && x.hasAttribute('data-db-ui'));
   const inEditing = (e: Event) => !!editing && e.target instanceof Node && editing.contains(e.target);
   const hold = (e: Event) => {
-    if (fromUi(e) || inEditing(e)) return;
+    if (fromUi(e) || inEditing(e) || fromDb(e)) return;
     e.preventDefault();
     e.stopPropagation();
   };
   addEventListener(
     'pointerdown',
     (e) => {
-      if (fromUi(e) || inEditing(e)) return;
+      // A press anywhere but in a database takes the caret out of its cell (held presses move no focus): the keys that
+      // follow (Delete, Ctrl+D, arrows) are for the part picked, not for the cell written in before.
+      if (!fromDb(e)) {
+        const a = document.activeElement;
+        if (a?.matches?.('.n-db')) ((a.shadowRoot?.activeElement ?? a) as HTMLElement).blur();
+      }
+      if (fromUi(e) || inEditing(e) || fromDb(e)) return;
       e.preventDefault();
       // Held, the press would not give the page the keys (Delete, Esc, arrows).
       window.focus();
@@ -1859,9 +1923,9 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
   addEventListener(
     'click',
     (e) => {
-      if (fromUi(e) || inEditing(e)) return;
+      if (fromUi(e) || inEditing(e) || fromDb(e)) return;
       hold(e);
-      const t = e.target as Element;
+      const t = partAt(e.target as Element);
       // A second click (or tap) on the picked part changes its words: phones have no double tap here.
       if (t === sel && wordy(t)) return startEditing(t, { x: e.clientX, y: e.clientY });
       select(t);
@@ -1871,9 +1935,9 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
   addEventListener(
     'dblclick',
     (e) => {
-      if (fromUi(e) || inEditing(e)) return;
+      if (fromUi(e) || inEditing(e) || fromDb(e)) return;
       hold(e);
-      startEditing(e.target as Element, { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY });
+      startEditing(partAt(e.target as Element), { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY });
     },
     true,
   );
@@ -1882,7 +1946,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     'pointermove',
     (e) => {
       if (e.pointerType === 'touch' || dragging) return;
-      const t = fromUi(e) ? null : (e.target as Element);
+      const t = fromUi(e) ? null : partAt(e.target as Element);
       if (t !== hover) {
         hover = t && t !== root ? t : null;
         redraw();
@@ -1895,9 +1959,30 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     redraw();
   });
   addEventListener('scroll', redraw, true);
-  addEventListener('resize', redraw);
-  // The page grows or shrinks by itself too (a stylesheet or a picture that loads): what is drawn over it follows.
-  new ResizeObserver(redraw).observe(root);
+  // The frame grew or shrank (on a phone, the drawer under it opened as a part was picked): the part picked, or the words
+  // being written, stay in sight rather than ending up under the frame's new edge.
+  let resizeTimer = 0;
+  addEventListener('resize', () => {
+    redraw();
+    clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(() => {
+      const el = editing ?? sel;
+      if (!el || el === document.body || !el.isConnected) return;
+      const s = editing ? getSelection() : null;
+      const at = s && s.rangeCount ? s.getRangeAt(0).getBoundingClientRect() : null;
+      const r = at && (at.height || at.width) ? at : el.getBoundingClientRect();
+      if (r.bottom > innerHeight) scrollBy(0, Math.min(r.bottom - innerHeight + 16, r.top - 16));
+      else if (r.top < 0) scrollBy(0, r.top - 16);
+    }, 60);
+  });
+  // The page grows or shrinks by itself too (a stylesheet or a picture that loads, a database drawn once its rows come):
+  // what is drawn over it follows, and the app hears the picked part's size as it is now.
+  let sizeTimer = 0;
+  new ResizeObserver(() => {
+    redraw();
+    clearTimeout(sizeTimer);
+    sizeTimer = window.setTimeout(() => sel && !editing && tell(), 150);
+  }).observe(root);
   document.addEventListener('selectionchange', () => editing && redraw());
   addEventListener(
     'focusout',
@@ -1912,6 +1997,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
   addEventListener(
     'paste',
     (e) => {
+      if (fromDb(e)) return;
       if (!inEditing(e)) {
         clearTimeout(pasteTimer);
         if (!editing && clip && sel) {
@@ -1947,11 +2033,13 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key;
       if (fromUi(e) || e.isComposing || e.keyCode === 229) return;
+      // (Ctrl+S saves from a database's cell too: its other keys are its own)
       if (mod && k.toLowerCase() === 's') {
         e.preventDefault();
         finishEditing();
         return send({ type: 'wa-ed-save' });
       }
+      if (fromDb(e)) return;
       if (editing) {
         if (mod && (k.toLowerCase() === 'z' || k.toLowerCase() === 'y')) {
           e.preventDefault();
@@ -2064,6 +2152,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
       dirty = false;
       return state();
     }
+    if (d.cmd === 'store') return storeAnswer(d.arg);
     act(String(d.cmd), d.arg);
   });
 
@@ -2082,6 +2171,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     readCss();
     writeForced();
     document.head.appendChild(forced);
+    W.ready();
     select(null);
     state();
     send({ type: 'wa-ed-ready', colors: palette(), bg: canvasBg() });
@@ -2094,5 +2184,5 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
 /** Puts `function`s' sources in a <script> safely (kit.ts's rules). */
 const scriptSafe = (src: string) => src.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 
-/** The editor, with the writing it hands its insides to (both run in the page, as one script). */
-export const EDITOR_SRC = scriptSafe(`(cfg) => (${editor.toString()})(cfg, ${writing.toString()})`);
+/** The editor, with the writing it hands its insides to, the code blocks' colours and the databases (all run in the page, as one script). */
+export const EDITOR_SRC = scriptSafe(`(cfg) => (${editor.toString()})(cfg, ${writing.toString()}, ${codeColours.toString()}, ${pageDatabases.toString()})`);

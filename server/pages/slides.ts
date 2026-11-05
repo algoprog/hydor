@@ -5,18 +5,23 @@
 // through, or every slide on a page of its own to print.
 //
 // save_slides is how agents make and change decks; get_page gives a deck back as it is kept. An agent names an icon
-// and gets its lines from the app's copy of Lucide (where this install has one); a deck with equations gets KaTeX in
-// its own page, from the CDN its other libraries come from.
+// and gets its lines from the app's copy of Lucide (where this install has one); a video it adds gets its site's still
+// (video-still.ts). A deck's equations are drawn here by the server's own KaTeX (math.ts) and go into its page with
+// only the fonts they use, so they draw with no network.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { ASSET, deckFonts, deckOutline, deckSources, deckText, everyEl, FONT_TABLE, googleFamilies, iconNodes, isDeckText, mapSources, normalizeDeck, type Deck, type IconNode } from '../../shared/slides.ts';
+import { ASSET, deckFonts, deckOutline, deckSources, deckText, everyEl, FONT_TABLE, googleFamilies, iconNodes, isDeckText, mapSources, mapVideoSources, normalizeDeck, plainText, VIDEO, videoSrc, type Deck, type El, type IconNode, type SlideComment, type VideoEl } from '../../shared/slides.ts';
 import { slidesRuntime } from '../../shared/slides-runtime.ts';
-import { LIB_CDN } from '../../shared/app-media.ts';
+import { newCommentId } from '../../shared/comments.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { assetDataUrl, putAsset, takeIn } from './assets.ts';
 import { scriptSafe } from './kit.ts';
+import { katexStyle, texToHtml } from './math.ts';
+import { videoStillOf } from './video-still.ts';
+import { keepVideoFile, MAX_VIDEO, VIDEO_INSIDE, videoAddress, videoDataUrl } from './videos.ts';
+import { DECK_EDITS_HELP } from '../../shared/deck-edits.ts';
 
 export { isDeckText };
 
@@ -121,17 +126,146 @@ export function lucideIcon(name: string): IconNode[] | null {
 /** Whether this install has Lucide's icons for agents to name. */
 export const hasIcons = () => !!lucide();
 
+/** The ids of the parts a deck's kept text has, in groups too (to tell the parts an agent adds from those it sends back). */
+function partIds(text: string | undefined): Set<string> {
+  const out = new Set<string>();
+  if (!text) return out;
+  try {
+    for (const s of readDeck(text).slides) for (const e of everyEl(s.els)) out.add(e.id);
+  } catch {}
+  return out;
+}
+
+/**
+ * A shape an agent adds with words has them in its middle, as PowerPoint's shapes and the editor's own do, unless it says
+ * where (align, valign). Only new ones: a part it sends back as it was (by its id) keeps its look.
+ */
+function centreNewShapes(input: unknown, known: Set<string>): unknown {
+  const obj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+  const part = (e: unknown): unknown => {
+    if (!obj(e)) return e;
+    if (e.type === 'group') return { ...e, ...(Array.isArray(e.els) ? { els: e.els.map(part) } : {}), ...(Array.isArray(e.parts) ? { parts: e.parts.map(part) } : {}) };
+    const worded = e.text !== undefined || e.paras !== undefined || e.bullets !== undefined;
+    if (e.type !== 'shape' || !worded || (typeof e.id === 'string' && known.has(e.id))) return e;
+    return { ...e, align: e.align ?? 'center', valign: e.valign ?? 'middle' };
+  };
+  if (!obj(input) || !Array.isArray(input.slides)) return input;
+  return {
+    ...input,
+    slides: input.slides.map((s) => (obj(s) ? { ...s, ...(Array.isArray(s.els) ? { els: s.els.map(part) } : {}), ...(Array.isArray(s.extra) ? { extra: s.extra.map(part) } : {}) } : s)),
+  };
+}
+
+/** The deck with its videos' files kept: each one's kept source (and its first frame, unless it had a still), the rest left out. */
+function withVideoFiles(d: Deck, files: Map<string, { src: string; poster?: string } | null>): Deck {
+  const map = (els: El[]): El[] =>
+    els.flatMap((e): El[] => {
+      if (e.type === 'group') return [{ ...e, els: map(e.els) }];
+      if (e.type !== 'video' || !files.has(e.src)) return [e];
+      const f = files.get(e.src);
+      return f ? [{ ...e, src: f.src, ...(!e.poster && f.poster ? { poster: f.poster } : {}) }] : [];
+    });
+  return { ...d, slides: d.slides.map((s) => ({ ...s, els: map(s.els) })) };
+}
+
+/**
+ * The comments of a deck an agent sends: those of the version it changes, on the same slides (by their ids) and parts
+ * as they were (a part gone, the comment is on its slide), then answered, resolved, reopened, deleted or added to as
+ * `ops` (save_slides' comments) says. A slide's own list of comments is not taken from the agent: comments change only
+ * so. What could not be done is said in `notes`.
+ */
+function carryComments(d: Deck, before: Deck | null, ops: unknown, notes: string[]): Deck {
+  const had = new Map<string, SlideComment[]>();
+  for (const s of before?.slides ?? []) if (s.comments?.length) had.set(s.id, s.comments.map((c) => ({ ...c, ...(c.replies ? { replies: [...c.replies] } : {}) })));
+  const partsOf = (i: number) => new Set(everyEl(d.slides[i].els).map((e) => e.id));
+  const lists = d.slides.map((s, i) => {
+    const parts = partsOf(i);
+    const list = (had.get(s.id) ?? []).map((c) => {
+      if (!c.el || parts.has(c.el)) return c;
+      const { el: _gone, ...rest } = c;
+      return rest;
+    });
+    had.delete(s.id);
+    return list;
+  });
+  const lost = [...had.values()].reduce((a, l) => a + l.length, 0);
+  if (lost) notes.push(`${lost} comment${lost === 1 ? '' : 's'} went with slides no longer in the deck (a slide keeps its comments while it keeps its id).`);
+  if (ops !== undefined && ops !== null) {
+    if (!Array.isArray(ops)) notes.push('comments must be a list of changes, such as [{"id": "c1", "reply": "…"}]: they were left as they were.');
+    else {
+      const now = Date.now();
+      const find = (id: string) => {
+        for (const [i, l] of lists.entries()) {
+          const k = l.findIndex((c) => c.id === id);
+          if (k >= 0) return { i, k };
+        }
+        return null;
+      };
+      for (const raw of ops.slice(0, 500)) {
+        const op = (raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>;
+        const id = typeof op.id === 'string' ? op.id.trim() : '';
+        const text = (k: string) => (typeof op[k] === 'string' ? (op[k] as string).trim().slice(0, 4000) : '');
+        const at = id ? find(id) : null;
+        if (at) {
+          const c = lists[at.i][at.k];
+          if (op.delete === true) {
+            lists[at.i].splice(at.k, 1);
+            continue;
+          }
+          if (text('reply')) c.replies = [...(c.replies ?? []), { id: `${c.id}r${(c.replies?.length ?? 0) + 1}${now.toString(36).slice(-3)}`, by: 'agent', text: text('reply'), at: now }];
+          if (op.resolve === true || op.resolved === true) c.resolved = true;
+          if (op.reopen === true || op.resolved === false) delete c.resolved;
+          if (!text('reply') && op.resolve === undefined && op.resolved === undefined && op.reopen === undefined && text('text')) notes.push(`Comment ${id} is there already: answer it with "reply", not "text".`);
+          continue;
+        }
+        if (op.delete === true || text('reply') || op.resolve !== undefined || op.reopen !== undefined) {
+          notes.push(`There is no comment ${id || '(no id)'} to change: get_page lists them.`);
+          continue;
+        }
+        const words = text('text');
+        if (!words) continue;
+        // A new one of the agent's: on a slide (by its number or its id), on one of its parts or the whole slide.
+        const i = typeof op.slide === 'number' ? Math.round(op.slide) - 1 : typeof op.slide === 'string' ? d.slides.findIndex((s) => s.id === op.slide) : -1;
+        if (i < 0 || i >= d.slides.length) {
+          notes.push(`The comment “${words.slice(0, 60)}” needs its slide ("slide": its number or its id): it was left out.`);
+          continue;
+        }
+        const c: SlideComment = { id: /^[A-Za-z0-9_-]{1,40}$/.test(id) ? id : newCommentId(), by: 'agent', text: words, at: now };
+        if (typeof op.el === 'string' && partsOf(i).has(op.el)) c.el = op.el;
+        else if (typeof op.el === 'string') notes.push(`Slide ${i + 1} has no part ${op.el}: comment “${words.slice(0, 40)}” is on the slide itself.`);
+        lists[i].push(c);
+      }
+    }
+  }
+  return {
+    ...d,
+    slides: d.slides.map((s, i) => {
+      const { comments: _c, ...rest } = s;
+      return lists[i].length ? { ...rest, comments: lists[i] } : rest;
+    }),
+  };
+}
+
+/** The deck with these videos' stills (by the video's id), in groups too. */
+function withPosters(d: Deck, posters: Map<string, string>): Deck {
+  const map = (els: El[]): El[] => els.map((e) => (e.type === 'group' ? { ...e, els: map(e.els) } : e.type === 'video' && posters.has(e.id) ? { ...e, poster: posters.get(e.id) } : e));
+  return { ...d, slides: d.slides.map((s) => ({ ...s, els: map(s.els) })) };
+}
+
 /**
  * A deck from an agent: checked as keepDeck does, its pictures taken in first (files of its session, data:
- * addresses, pictures on the web), its icons named looked up. What could not be taken in is said in `notes`, for the agent.
+ * addresses, pictures on the web), its icons named looked up. `prev`, the kept text of the version it changes, tells
+ * the parts it adds from those it sends back. What could not be taken in is said in `notes`, for the agent.
  */
-export async function agentDeck(db: DB, input: unknown, cwd: string): Promise<{ deck: Deck; text: string; notes: string[] }> {
+export async function agentDeck(db: DB, input: unknown, cwd: string, prev?: string): Promise<{ deck: Deck; text: string; notes: string[] }> {
   let deck: Deck;
   const missing = new Set<string>();
+  const known = partIds(prev);
   try {
     // Any source may be a file of the session's: kept as written until it is taken in below.
-    deck = normalizeDeck(input, {
+    deck = normalizeDeck(centreNewShapes(input, known), {
       src: (s) => (s.length <= 4096 ? s : null),
+      video: (s) => (s.length <= 4096 ? s : null),
       icon: (name) => {
         const got = lucideIcon(name);
         if (!got) missing.add(name);
@@ -151,6 +285,38 @@ export async function agentDeck(db: DB, input: unknown, cwd: string): Promise<{ 
   const done = new Map<string, string>();
   for (const s of new Set(deckSources(deck))) done.set(s, await takeIn(db, s, { cwd, notes }));
   deck = mapSources(deck, (s) => done.get(s) ?? s);
+  // Its videos that are files of its session, kept (with their first frame as their still, where this computer can take one).
+  const files = new Map<string, { src: string; poster?: string } | null>();
+  for (const s of deck.slides)
+    for (const e of everyEl(s.els)) {
+      if (e.type !== 'video' || videoSrc(e.src) || e.src.startsWith(VIDEO) || files.has(e.src)) continue;
+      const got = await keepVideoFile(db, e.src, cwd).catch((err: Error) => {
+        notes.push(`The video "${e.src.length > 120 ? `${e.src.slice(0, 120)}…` : e.src}" was left out: ${err.message} (a video is an MP4, MOV or WebM file of up to ${MAX_VIDEO / 1024 / 1024} MB, or a YouTube or Vimeo address).`);
+        return null;
+      });
+      let poster: string | undefined;
+      if (got?.frame)
+        try {
+          poster = ASSET + putAsset(db, got.frame);
+        } catch {}
+      files.set(e.src, got ? { src: got.src, poster } : null);
+    }
+  if (files.size) deck = normalizeDeck(withVideoFiles(deck, files));
+  // The videos it adds without a still get their site's, kept, as the editor's do (a few at a time, each bounded in time).
+  const stills = new Map<string, string>();
+  const want = deck.slides.flatMap((s) => everyEl(s.els)).filter((e) => e.type === 'video' && !e.poster && !e.src.startsWith(VIDEO) && !known.has(e.id)) as VideoEl[];
+  for (let i = 0; i < Math.min(want.length, 24); i += 6)
+    await Promise.all(want.slice(i, Math.min(i + 6, 24)).map(async (v) => {
+      const got = await videoStillOf(db, v.src).catch(() => null);
+      if (got) stills.set(v.id, got);
+    }));
+  if (stills.size) deck = withPosters(deck, stills);
+  // Its comments: kept from the version it changes, changed as it says (checked once more, ids once each).
+  let before: Deck | null = null;
+  try {
+    before = prev ? readDeck(prev) : null;
+  } catch {}
+  deck = normalizeDeck(carryComments(deck, before, input && typeof input === 'object' ? (input as Record<string, unknown>).comments : undefined, notes));
   const text = deckText(deck);
   if (Buffer.byteLength(text) > MAX_DECK) throw new Error(`The deck is over ${MAX_DECK / 1024 / 1024} MB without its pictures; make it smaller.`);
   return { deck, text, notes };
@@ -158,15 +324,29 @@ export async function agentDeck(db: DB, input: unknown, cwd: string): Promise<{ 
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-/** The KaTeX a deck's page draws its equations with (the app's own version, from the CDN). */
-export const KATEX_VERSION = '0.19.0';
-const KATEX_URL = `${LIB_CDN}katex@${KATEX_VERSION}/dist/`;
+/** JSON to put inside a page's <script>: nothing in it can end the script or break a line in it. */
+const scriptJson = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 
-/** Whether a deck has equations (its page then loads KaTeX). */
-export const deckHasMath = (d: Deck) => d.slides.some((s) => everyEl(s.els).some((e) => e.type === 'math'));
+/**
+ * A deck's equations drawn here by the server's own KaTeX (math.ts, as a document's are), each once by its LaTeX, and
+ * what a page needs to show them: the drawings (the runtime puts each in its place, never the deck's own words as
+ * markup) and KaTeX's stylesheet with only the fonts they use inside it. No network: offline, published or saved as a
+ * file, a deck's equations draw. Null for a deck without equations.
+ */
+export function deckMaths(d: Deck): { json: string; style: string } | null {
+  const tex = new Set<string>();
+  for (const s of d.slides) for (const e of everyEl(s.els)) if (e.type === 'math' && e.tex) tex.add(e.tex);
+  if (!tex.size) return null;
+  const drawn: Record<string, string> = {};
+  for (const t of tex) drawn[t] = texToHtml(t, true);
+  return { json: scriptJson(drawn), style: katexStyle(Object.values(drawn).join('')) };
+}
 
-/** KaTeX's stylesheet and script for a page's head. */
-export const KATEX_TAGS = `<link rel="stylesheet" href="${KATEX_URL}katex.min.css" crossorigin="anonymous"><script src="${KATEX_URL}katex.min.js" crossorigin="anonymous"></script>`;
+/** A page's head and body parts for a deck's equations ('' without any): the stylesheet, and the drawings as #n-math. */
+export function mathTags(d: Deck): { head: string; body: string } {
+  const m = deckMaths(d);
+  return m ? { head: `<style>${m.style}</style>`, body: `<script type="application/json" id="n-math">${m.json}</script>` } : { head: '', body: '' };
+}
 
 /** What every deck's page looks like around its slides: the app's colours in a frame, dark when it fills a window. */
 const PAGE_CSS = [
@@ -181,21 +361,32 @@ const PAGE_CSS = [
 
 /**
  * The deck's own page: a viewer to click through (`viewer`), every slide on a page of its own (`print`), or its
- * first slide alone (`still`, for its picture in Pages). Its pictures go inside it.
+ * first slide alone (`still`, for its picture in Pages). Its pictures go inside it; its videos from a device play from
+ * an address of this server's that is its own permission (the page opens without the app's sign-in), or, in a page
+ * that is a file on its own (`videosInside`), go inside it too where they are small enough (else their still shows).
  */
-export function deckPage(db: DB, deck: Deck, title: string, mode: 'viewer' | 'print' | 'still' = 'viewer'): string {
-  const inside = mapSources(deck, (s) => (s.startsWith(ASSET) ? (assetDataUrl(db, s.slice(ASSET.length)) ?? '') : s));
+export function deckPage(db: DB, deck: Deck, title: string, mode: 'viewer' | 'print' | 'still' = 'viewer', o: { videosInside?: boolean } = {}): string {
+  const pictured = mapSources(deck, (s) => (s.startsWith(ASSET) ? (assetDataUrl(db, s.slice(ASSET.length)) ?? '') : s));
+  let room = 2 * VIDEO_INSIDE;
+  const inside = mapVideoSources(pictured, (s) => {
+    const sha = s.slice(VIDEO.length);
+    if (!o.videosInside) return videoAddress(sha);
+    const data = videoDataUrl(db, s, Math.min(VIDEO_INSIDE, room));
+    if (data) room -= data.length * 0.75;
+    return data ?? '';
+  });
   const fams = googleFamilies(deckFonts(deck));
-  const json = JSON.stringify(inside).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  const maths = mathTags(deck);
   return [
     '<!doctype html>',
     `<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>`,
     '<meta name="generator" content="Hydor slides">',
     fams ? `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?${esc(fams)}&amp;display=swap">` : '',
-    // Before the slides are drawn, so equations draw at once (offline they show as their LaTeX).
-    deckHasMath(deck) ? KATEX_TAGS : '',
+    maths.head,
     `<style>${PAGE_CSS}</style></head><body>`,
-    `<script type="application/json" id="n-deck">${json}</script>`,
+    `<script type="application/json" id="n-deck">${scriptJson(inside)}</script>`,
+    // Before the slides are drawn, so the equations draw with them.
+    maths.body,
     `<script>(${RUNTIME_SRC})(window, ${FONTS_JSON}).boot(${JSON.stringify({ mode })})</script>`,
     '</body></html>',
   ].join('\n');
@@ -210,21 +401,47 @@ export function deckForAgent(text: string): string {
   const body = text.length > 150_000 ? `${text.slice(0, 150_000)}\n… (cut: the deck is ${Math.round(text.length / 1024)} KB; keep the parts you did not read as they are by changing the deck slide by slide)` : text;
   const f = deck.footer;
   const foot = f ? `; on each slide${f.skipTitle ? ' but the title slide' : ''}: ${[f.num && 'its number', f.text && `"${f.text}"`, f.date && (f.date === 'today' ? "the day's date" : `the date "${f.date}"`)].filter(Boolean).join(', ')}` : '';
-  return `A slide deck of ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'} (${deck.ratio}, theme ${deck.theme.id ?? 'custom'}${foot}).\n\nOutline:\n${deckOutline(deck)}\n\nThe deck (send it back whole with save_slides and this id to change it; keep naget-asset: pictures and icons' paths as they are):\n${body}`;
+  return `A slide deck of ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'} (${deck.ratio}, theme ${deck.theme.id ?? 'custom'}${foot}).\n\nOutline:\n${deckOutline(deck)}\n\nThe deck (send it back whole with save_slides and this id to change it, or only the slides that change with change, add and remove; keep naget-asset: pictures, naget-video: videos and icons' paths as they are):\n${body}${commentsForAgent(deck)}`;
+}
+
+/** The deck's comments, slide by slide, each on its part or slide, with how to answer them; '' when it has none. */
+function commentsForAgent(deck: Deck): string {
+  const all = deck.slides.flatMap((s, i) => (s.comments ?? []).map((c) => ({ c, s, i })));
+  if (!all.length) return '';
+  const open = all.filter((x) => !x.c.resolved).length;
+  const when = (at: number) => new Date(at).toISOString().slice(0, 16).replace('T', ' ');
+  const who = (by: string) => (by === 'agent' ? 'an agent' : 'the user');
+  const partOf = (s: Deck['slides'][number], id: string) => {
+    const e = everyEl(s.els).find((x) => x.id === id);
+    if (!e) return '';
+    const words = e.type === 'text' || e.type === 'shape' ? plainText(e.paras).replace(/\s+/g, ' ').trim().slice(0, 60) : e.type === 'chart' ? (e.title ?? '') : e.type === 'math' ? e.tex.slice(0, 60) : '';
+    return `, on its part ${id} (${e.name ? `“${e.name}”, ` : ''}${e.type}${words ? `: “${words}”` : ''})`;
+  };
+  const lines = all.map(({ c, s, i }) => {
+    const replies = (c.replies ?? []).map((r) => `\n    reply by ${who(r.by)}, ${when(r.at)}: “${r.text}”`).join('');
+    return `- ${c.id} (${c.resolved ? 'resolved' : 'open'}) on slide ${i + 1} [${s.id}]${c.el ? partOf(s, c.el) : ''}, by ${who(c.by)}, ${when(c.at)} UTC: “${c.text}”${replies}`;
+  });
+  return [
+    `\n\nComments (${open} open, ${all.length - open} resolved):`,
+    ...lines,
+    'To answer them, save_slides with this id and comments: [{"id": "<id>", "reply": "what you did or say"}], adding "resolve": true once one is dealt with ("reopen": true opens it again, "delete": true takes it out); make the change a comment asks for in the slides too. Add one of your own with {"slide": <its number or id>, "el": "<a part’s id, or leave it out for the whole slide>", "text": "…"}. Comments you do not mention stay as they are (the slides’ own "comments" lists are kept from this version, whatever you send in them).',
+  ].join('\n');
 }
 
 const SLIDES_HELP = [
-  'Make or change a slide deck, kept in the user’s Library: they can present it (full screen; a presenter view with notes, the next slide and a timer), edit it as in PowerPoint or Google Slides, and export it to PowerPoint (.pptx) or PDF. Use it whenever the user asks for slides, a deck or a presentation, rather than writing a .pptx file (unless they ask for a file, or work on one they have). It shows in the conversation as a slideshow.',
+  'Make or change a slide deck, kept in the user’s Library: they can present it (full screen; a presenter view with notes, the next slide and a timer), edit it as in PowerPoint or Google Slides, and export it to PowerPoint (.pptx) or PDF. Use it whenever the user asks for slides, a deck or a presentation, rather than writing a .pptx file (unless they ask for a file, or work on one they have). It shows in the conversation as a slideshow. A PowerPoint file they have (.pptx) opens as a deck in their Library with app_api POST /api/pages/import {path} (its slides, notes, comments and theme come along); get_page then gives it, to change with save_slides.',
   'Slides are 1280×720 px ("ratio": "4:3" makes them 1280×960); text sizes are px too (1 px = 0.75 pt: body 24–30, titles 44–60).',
   'Each slide comes from a layout with its words, from parts placed by position ("els"), or both ("extra": parts added to a layout). Layouts: title {title, subtitle}; content {title, text}; two {title, left, right, leftTitle, rightTitle}; section {title, subtitle}; image-right {title, text, image}; image {title, image, caption}; stats {title, stats: [{value, label}]}; cards {title, cards: [{title, text}]}; steps {title, steps: [{title, text}]}; quote {quote, by}; chart {title, chart: {kind, labels, series}}; table {title, table: [[header…], [row…]]}; title-only {title}; end {title, subtitle}; blank.',
   'Words (text, left, right, a part’s text): a line per paragraph, "- " for a bullet and "1. " for a number, two spaces before them a level deeper, **bold**, *italic*, [words](https://…); or an array of bullets (a nested array a level deeper).',
-  'Parts: {type, x, y, w, h, …}. text {text, size, color, font, bold, italic, align, valign: top|middle|bottom, fill, line, radius, role: title|subtitle|body|caption|quote|big}. shape {shape: rect|round|ellipse|triangle|rtriangle|diamond|pentagon|hexagon|octagon|star|arrow|larrow|uarrow|darrow|chevron|parallelogram|trapezoid|plus|heart|callout, fill ("none" for none), fill2 and angle for a gradient, line, lineW, shadow, and text like a text part}. image {src, fit: cover|contain|fill, radius, alt, crop: {l, t, r, b} (the share cut off each side, 0–0.95; the rest fills the box), adjust: {bright and contrast −100…100, sat 0…200 (100 as it is), gray: true, blur in px}}: src is a file of this session (a picture you made), a public https address, or a picture of the deck already (naget-asset:…). line {x, y to x+w, y+h; color, width, dash: solid|dash|dot, start and end: none|arrow|dot}. table {rows: [[…]], head, band, size, merges: [{r, c, rs, cs}] (cells merged from row r, column c, rs rows down, cs across), fills: {"row,col": colour}}. chart {kind: column|bar|line|area|pie|doughnut, labels, series: [{name, values}], legend, values, stacked}. icon {icon: a Lucide icon’s name ("rocket", "chart-line", "users", "shield-check", "lightbulb"), color, lineW (its lines’ width, 2 by default)}: square, 120×120 if no w and h. math {tex: an equation in LaTeX ("E = mc^2", "\\int_0^1 x^2\\,dx"), color, align: left|right}: drawn as large as its box allows, in the text colour. video {src: a YouTube or Vimeo address, start (seconds), autoplay, muted, loop, poster}: its still shows until it plays in the slideshow. group {els: [parts]}: parts that move as one; without x and y its parts are placed on the slide, with them its parts are placed from its top-left corner. Any part may have rot (degrees), opacity, link ("https://…", or "#3" for slide 3), name, key, and anim: its entrance ("fade", or {fx, on, dur, delay, dir}).',
+  'Parts: {type, x, y, w, h, …}. text {text, size, color, font, bold, italic, align, valign: top|middle|bottom, fill, line, radius, role: title|subtitle|body|caption|quote|big}. shape {shape: rect|round|ellipse|triangle|rtriangle|diamond|pentagon|hexagon|octagon|star|arrow|larrow|uarrow|darrow|chevron|parallelogram|trapezoid|plus|heart|callout, fill ("none" for none), fill2 and angle for a gradient, line, lineW, shadow, and text like a text part, in its middle unless align or valign say otherwise}. image {src, fit: cover|contain|fill, radius, alt, crop: {l, t, r, b} (the share cut off each side, 0–0.95; the rest fills the box), adjust: {bright and contrast −100…100, sat 0…200 (100 as it is), gray: true, blur in px}}: src is a file of this session (a picture you made), a public https address, or a picture of the deck already (naget-asset:…). line {x, y to x+w, y+h; color, width, dash: solid|dash|dot, start and end: none|arrow|dot; from and to: a part’s id (or {el, at: t|r|b|l}) to stick that end to the middle of the part’s side that faces the other end (a connector, which follows its parts as they move; its x, y, w, h follow), route: "elbow" for right angles}; type "connector" is a line too. table {rows: [[…]], head, band, size, merges: [{r, c, rs, cs}] (cells merged from row r, column c, rs rows down, cs across), fills: {"row,col": colour}}. chart {kind: column|bar|line|area|pie|doughnut, labels, series: [{name, values}], legend, values, stacked}. icon {icon: a Lucide icon’s name ("rocket", "chart-line", "users", "shield-check", "lightbulb"), color, lineW (its lines’ width, 2 by default)}: square, 120×120 if no w and h. math {tex: an equation in LaTeX ("E = mc^2", "\\int_0^1 x^2\\,dx"), color, align: left|right}: drawn as large as its box allows, in the text colour. video {src: a YouTube or Vimeo address, or a video file of this session (an .mp4, .mov or .webm of up to 200 MB, kept with the deck; naget-video:… once kept), start (seconds), autoplay, muted, loop, poster}: its still (its site’s, or a file’s first frame, fetched and kept, unless you give a poster) shows until it plays in the slideshow. group {els: [parts]}: parts that move as one; without x and y its parts are placed on the slide, with them its parts are placed from its top-left corner. Any part may have rot (degrees), opacity, link ("https://…", or "#3" for slide 3), name, key, and anim: its entrance ("fade", or {fx, on, dur, delay, dir}).',
   'Colours: the theme’s names, which follow it (accent, accentFg, fg, head, muted, bg, soft, c1 to c6), or #hex.',
   'A slide may also have notes (speaker notes: what to say), bg (a colour; {color, to, angle} for a gradient; {image, dim} for a picture), transition (none|fade|push|wipe|cover|zoom|split|morph, or {fx, dir, dur, auto: seconds to go on by itself}), hidden, nofooter (no footer or number on it), build: true (its bullets come one at a time), and anims: [{el: a part’s id, type: in|em|out, fx: appear|fade|fly|float|zoom|wipe|bounce for in and out, pulse|spin|grow|shake for em, on: click|with|after, dur and delay in ms, dir: left|right|up|down, byPara}]. Morph: the parts this slide shares with the one before glide from where they were (moving, growing, turning, recolouring) and the rest fade; a part matches one of the slide before with the same key (or whose id is its key), else the same name, else the same words or picture, so to morph, repeat the part on the next slide with "key" set to its id and change its x, y, w, h, rot or colour.',
   'The deck may have footer {num: true (each slide’s number), text, date: "today" or a date as written, skipTitle: true (not on the title slide)} and guides {x: [px], y: [px]} (the lines its parts are lined up on).',
   'theme: a preset (paper, midnight, ember, forest, ocean, noir, blossom, slate) or {id, bg, fg, head, muted, accent, accentFg, soft, colors: [6], font, headFont}; fonts: Inter, Roboto, Open Sans, Lato, Montserrat, Poppins, Nunito, DM Sans, Work Sans, Space Grotesk, IBM Plex Sans, Outfit, Playfair Display, Merriweather, Lora, Fraunces, DM Serif Display, Source Serif 4, JetBrains Mono, Arial, Georgia.',
   'Good slides: one idea each, a title that says the point, a few short bullets, numbers as charts or big numbers, pictures where they help, and what to say in the notes.',
-  'To change a deck, get_page with its id gives it whole (each slide and part with its id); send the whole deck back with the same id: a new version, the older ones restorable. Keep what the user changed.',
+  'To change a deck, get_page with its id gives it whole (each slide and part with its id); send the whole deck back with the same id, or only the slides that change (change, add, remove): a new version, the older ones restorable. Keep what the user changed.',
+  DECK_EDITS_HELP,
+  'Comments: get_page lists the comments people left on slides and their parts (and their ids). Answer with comments: [{"id": "c1", "reply": "…", "resolve": true}] beside the slides (and make the change asked for); {"id", "reopen": true} reopens one, {"id", "delete": true} takes it out; {"slide": 3, "el": "<a part’s id, or none for the whole slide>", "text": "…"} adds one of yours. Comments you do not mention stay as they are; keep each slide’s id so its comments stay with it.',
 ].join(' ');
 
 export const SAVE_SLIDES_DESCRIPTION = SLIDES_HELP;
@@ -236,9 +453,17 @@ export const SAVE_SLIDES_SCHEMA = {
     title: { type: 'string', description: 'The deck’s name in the Library: "Q3 results".' },
     ratio: { type: 'string', enum: ['16:9', '4:3'] },
     theme: { description: 'A preset’s name, or the theme’s colours and fonts.', anyOf: [{ type: 'string' }, { type: 'object' }] },
-    slides: { type: 'array', items: { type: 'object' }, description: 'The slides, in order.' },
+    slides: { type: 'array', items: { type: 'object' }, description: 'The slides, in order (or, with id, change, add and remove instead).' },
+    change: { type: 'array', items: { type: 'object' }, description: 'With id: slides written again in place, each {"slide": its number from 1 or its id, …the slide}.' },
+    add: { type: 'array', items: { type: 'object' }, description: 'With id: new slides, each {"after": a slide’s number or id (0: first; left out: at the end), …the slide}.' },
+    remove: { type: 'array', items: { anyOf: [{ type: 'number' }, { type: 'string' }] }, description: 'With id: slides to take out, by number (from 1) or id.' },
     footer: { type: 'object', description: 'What the foot of each slide shows: {num, text, date, skipTitle}.' },
     guides: { type: 'object', description: 'The guides parts line up on: {x: [px], y: [px]}.' },
+    comments: {
+      type: 'array',
+      items: { type: 'object' },
+      description: 'Changes to the comments: {"id": "c1", "reply": "…"}, {"id": "c1", "resolve": true}, {"id": "c1", "reopen": true}, {"id": "c1", "delete": true}, or a new one: {"slide": 3, "el": "<a part’s id, optional>", "text": "…"}.',
+    },
   },
-  required: ['title', 'slides'],
+  required: ['title'],
 };

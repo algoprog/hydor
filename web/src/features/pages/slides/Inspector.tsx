@@ -1,5 +1,5 @@
 // The slides editor's side panel, in four tabs. Format: the part picked (its place and size, its words' look, its
-// fill and border, a shape's kind, a picture's fit, crop and colours, a line's ends, a table's or a chart's look and
+// fill and border, a shape's kind, a picture's fit, crop and colours, a line's ends and path, a table's or a chart's look and
 // numbers, an icon's colour, an equation's LaTeX, a video's address and how it plays, a group's parts, a link) or the
 // parts picked lined up, spread and grouped. Animate: the slide's animations in their order, each one's effect,
 // start, timing and direction, and a new one for the part picked. Slide: its background, its transition (Morph too),
@@ -68,9 +68,10 @@ import { Button, cx, Switch } from '../../../components/ui';
 import { useTexHtml } from '../common/katex';
 import { Choice, Select } from '../studio/fields';
 import { ColorButton, Field, NumInput, Swatches, Tool } from './controls';
-import { addAnim, align, distribute, dropMergesPast, fillCells, heightOf, mergeAt, mergeCells, moveAnim, partName, pathTo, pickedOf, removeAnim, removeEls, restack, setAnim, setEls, setSlide, topOf, unmergeCell, W } from './ops';
+import { addAnim, align, distribute, dropMergesPast, fillCells, heightOf, mergeAt, mergeCells, moveAnim, onSlide, partName, pathTo, pickedOf, removeAnim, removeEls, restack, setAnim, setEls, setSlide, topOf, unmergeCell, W } from './ops';
 import type { CellSel } from './SlideCanvas';
 import { SlideThumb } from './Thumb';
+import { fetchVideoStill } from './media';
 
 export type InspectorTab = 'format' | 'animate' | 'slide' | 'theme';
 export const INSPECTOR_TABS: { value: InspectorTab; label: string }[] = [
@@ -272,33 +273,55 @@ function Arrange({ deck, index, ids, change }: { deck: Deck; index: number; ids:
   );
 }
 
-function Place({ el, set, H }: { el: El; set: (patch: Partial<El>, key?: string) => void; H: number }) {
-  if (el.type === 'line') {
+/**
+ * A part's place and size, as it is on the slide: a part in a group shows where it is on the slide (its groups' places
+ * and turns added), and a place or turn typed there is taken back through them, so the part goes there on the slide.
+ */
+function Place({ el, slide, set, H }: { el: El; slide: Slide; set: (patch: Partial<El>, key?: string) => void; H: number }) {
+  const groups = pathTo(slide.els, el.id) ?? [];
+  const shown = groups.length ? onSlide(slide, el) : el;
+  // The groups' turns add up: a step on the slide is that much less turned in the part's own group.
+  const turn = groups.reduce((a, g) => a + (g.rot ?? 0), 0);
+  const back = (dx: number, dy: number) => {
+    const a = (-turn * Math.PI) / 180;
+    return [dx * Math.cos(a) - dy * Math.sin(a), dx * Math.sin(a) + dy * Math.cos(a)];
+  };
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  if (el.type === 'line' && shown.type === 'line') {
+    // Its start moved (its end stays), or its end.
+    const moveEnd = (which: 'from' | 'to', x: number, y: number) => {
+      const [lx, ly] = back(x - (which === 'from' ? shown.x : shown.x + shown.w), y - (which === 'from' ? shown.y : shown.y + shown.h));
+      set(which === 'from' ? { x: r2(el.x + lx), y: r2(el.y + ly), w: r2(el.w - lx), h: r2(el.h - ly) } : { w: r2(el.w + lx), h: r2(el.h + ly) }, 'place');
+    };
     return (
       <Section title="Place">
         <Field label="From">
-          <NumInput label="X" value={el.x} onChange={(x) => set({ w: el.w + (el.x - x), x }, 'place')} unit="x" />
-          <NumInput label="Y" value={el.y} onChange={(y) => set({ h: el.h + (el.y - y), y }, 'place')} unit="y" />
+          <NumInput label="X" value={r2(shown.x)} onChange={(x) => moveEnd('from', x, shown.y)} unit="x" />
+          <NumInput label="Y" value={r2(shown.y)} onChange={(y) => moveEnd('from', shown.x, y)} unit="y" />
         </Field>
         <Field label="To">
-          <NumInput label="X" value={el.x + el.w} onChange={(x) => set({ w: x - el.x }, 'place')} unit="x" />
-          <NumInput label="Y" value={el.y + el.h} onChange={(y) => set({ h: y - el.y }, 'place')} unit="y" />
+          <NumInput label="X" value={r2(shown.x + shown.w)} onChange={(x) => moveEnd('to', x, shown.y + shown.h)} unit="x" />
+          <NumInput label="Y" value={r2(shown.y + shown.h)} onChange={(y) => moveEnd('to', shown.x + shown.w, y)} unit="y" />
         </Field>
       </Section>
     );
   }
+  const moveTo = (x: number, y: number) => {
+    const [lx, ly] = back(x - shown.x, y - shown.y);
+    set({ x: r2(el.x + lx), y: r2(el.y + ly) }, 'place');
+  };
   return (
     <Section title="Place and size">
       <Field label="Position">
-        <NumInput label="From the left" value={el.x} onChange={(x) => set({ x }, 'place')} min={-W} max={W * 2} unit="x" />
-        <NumInput label="From the top" value={el.y} onChange={(y) => set({ y }, 'place')} min={-H} max={H * 2} unit="y" />
+        <NumInput label="From the left" value={r2(shown.x)} onChange={(x) => moveTo(x, shown.y)} min={-W} max={W * 2} unit="x" />
+        <NumInput label="From the top" value={r2(shown.y)} onChange={(y) => moveTo(shown.x, y)} min={-H} max={H * 2} unit="y" />
       </Field>
       <Field label="Size">
         <NumInput label="Width" value={el.w} onChange={(w) => set({ w }, 'place')} min={4} max={W * 3} unit="w" />
         <NumInput label="Height" value={el.h} onChange={(h) => set({ h }, 'place')} min={4} max={H * 3} unit="h" />
       </Field>
       <Field label="Turn">
-        <NumInput label="Degrees" value={el.rot ?? 0} onChange={(rot) => set({ rot: ((rot % 360) + 360) % 360 || undefined }, 'place')} min={-360} max={360} unit="°" />
+        <NumInput label="Degrees" value={r2(((((shown.rot ?? 0) % 360) + 360) % 360))} onChange={(rot) => set({ rot: ((((rot - turn) % 360) + 360) % 360) || undefined }, 'place')} min={-360} max={360} unit="°" />
         <NumInput label="See-through (%)" value={Math.round((1 - (el.opacity ?? 1)) * 100)} onChange={(v) => set({ opacity: v > 0 ? Math.max(0, 1 - v / 100) : undefined }, 'place')} min={0} max={100} unit="%" />
       </Field>
     </Section>
@@ -564,6 +587,19 @@ function LineLook({ el, theme, set }: { el: LineEl; theme: Theme; set: (patch: P
       <Field label="Ends with">
         <Select value={el.end ?? 'none'} onChange={(v) => set({ end: v === 'none' ? undefined : (v as 'arrow' | 'dot') })} options={caps} />
       </Field>
+      <Field label="Path">
+        <Choice
+          value={el.route ?? 'straight'}
+          onChange={(v) => set({ route: v === 'elbow' ? 'elbow' : undefined } as Partial<El>)}
+          options={[
+            { value: 'straight', label: 'Straight' },
+            { value: 'elbow', label: 'Elbow' },
+          ]}
+        />
+      </Field>
+      <p className="text-[11.5px] leading-snug text-fg-3">
+        {el.from || el.to ? 'Its ends stay on the parts they are stuck to as those move; drag an end away to free it.' : 'Drag an end onto a part to stick it to the middle of one of its sides.'}
+      </p>
     </Section>
   );
 }
@@ -688,22 +724,26 @@ function ChartLook({ el, theme, set }: { el: ChartEl; theme: Theme; set: (patch:
               <tr>
                 <th className="w-[38%]" />
                 {series.map((s, si) => (
-                  <th key={si} className="min-w-[72px]">
-                    <div className="flex items-center gap-0.5">
-                      {!pie && <ColorButton value={s.color ?? `c${(si % 6) + 1}`} theme={theme} onChange={(color) => set({ series: el.series.map((x, k) => (k === si ? { ...x, color } : x)) })} label="Its colour" className="h-7 min-w-6 px-0.5" />}
-                      <input
-                        value={s.name}
-                        aria-label="The series’ name"
-                        onChange={(e) => set({ series: el.series.map((x, k) => (k === si ? { ...x, name: e.target.value } : x)) }, `chart:name:${si}`)}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        className={cx(cell, 'font-medium')}
-                      />
-                      {!pie && el.series.length > 1 && (
-                        <button type="button" title="Remove this series" aria-label="Remove this series" onClick={() => set({ series: el.series.filter((_, k) => k !== si) })} className="text-fg-3 hover:text-err">
-                          <X size={12} />
-                        </button>
-                      )}
-                    </div>
+                  <th key={si} className="min-w-[72px] align-bottom font-normal">
+                    {/* Its colour and Remove over its name, which has the column's whole width. */}
+                    {!pie && (
+                      <div className="flex items-center justify-between gap-0.5">
+                        <ColorButton value={s.color ?? `c${(si % 6) + 1}`} theme={theme} onChange={(color) => set({ series: el.series.map((x, k) => (k === si ? { ...x, color } : x)) })} label="Its colour" className="h-6 min-w-6 px-0.5" />
+                        {el.series.length > 1 && (
+                          <button type="button" title="Remove this series" aria-label="Remove this series" onClick={() => set({ series: el.series.filter((_, k) => k !== si) })} className="grid h-6 w-6 place-items-center text-fg-3 hover:text-err">
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <input
+                      value={s.name}
+                      aria-label="The series’ name"
+                      onChange={(e) => set({ series: el.series.map((x, k) => (k === si ? { ...x, name: e.target.value } : x)) }, `chart:name:${si}`)}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      translate="no"
+                      className={cx(cell, 'font-medium')}
+                    />
                   </th>
                 ))}
               </tr>
@@ -863,23 +903,35 @@ function MathLook({ el, theme, set, focus }: { el: MathEl; theme: Theme; set: (p
 }
 
 function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: string) => void }) {
-  const [url, setUrl] = useState(el.src.includes('vimeo') ? `https://vimeo.com/${el.src.split('/').pop()}` : `https://www.youtube.com/watch?v=${el.src.split('/').pop()}`);
-  const bad = !videoSrc(url);
+  // A video the app keeps (from a device) has no address to change; an online one is changed by its address.
+  const kept = !videoSrc(el.src);
+  const [url, setUrl] = useState(kept ? '' : el.src.includes('vimeo') ? `https://vimeo.com/${el.src.split('/').pop()}` : `https://www.youtube.com/watch?v=${el.src.split('/').pop()}`);
+  const bad = !kept && !videoSrc(url);
+  // Another video, another still: the old one goes at once, the new one comes when the server has it (the last asked wins).
+  const asked = useRef('');
   return (
     <Section title="Video">
-      <input
-        value={url}
-        onChange={(e) => {
-          setUrl(e.target.value);
-          const src = videoSrc(e.target.value);
-          if (src) set({ src, ...(videoStart(e.target.value) ? { start: videoStart(e.target.value) } : {}) } as Partial<El>, 'video');
-        }}
-        onKeyDown={(e) => e.stopPropagation()}
-        aria-label="The video’s address"
-        placeholder="https://www.youtube.com/watch?v=…"
-        translate="no"
-        className={cx('h-8 w-full rounded-lg border bg-bg-1 px-2 text-[12.5px] outline-none focus:border-accent/60', bad ? 'border-err' : 'border-line')}
-      />
+      {kept ? (
+        <p className="text-[12px] leading-snug text-fg-3">A video from a device, kept with the deck.</p>
+      ) : (
+        <input
+          value={url}
+          onChange={(e) => {
+            const address = e.target.value;
+            setUrl(address);
+            const src = videoSrc(address);
+            if (!src || src === el.src) return;
+            set({ src, poster: undefined, ...(videoStart(address) ? { start: videoStart(address) } : {}) } as Partial<El>, 'video');
+            asked.current = src;
+            void fetchVideoStill(address).then((poster) => poster && asked.current === src && set({ poster } as Partial<El>, 'video'));
+          }}
+          onKeyDown={(e) => e.stopPropagation()}
+          aria-label="The video’s address"
+          placeholder="https://www.youtube.com/watch?v=…"
+          translate="no"
+          className={cx('h-8 w-full rounded-lg border bg-bg-1 px-2 text-[12.5px] outline-none focus:border-accent/60', bad ? 'border-err' : 'border-line')}
+        />
+      )}
       {bad && <p className="text-[11.5px] text-err">A YouTube or Vimeo address.</p>}
       <Field label="Starts at">
         <NumInput label="Seconds into the video" value={el.start ?? 0} onChange={(start) => set({ start: Math.round(start) || undefined } as Partial<El>, 'start')} min={0} max={86400} unit="s" />
@@ -896,7 +948,9 @@ function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: s
           <Switch label={label} on={!!el[k]} onChange={(v) => set({ [k]: v || undefined } as Partial<El>)} />
         </label>
       ))}
-      <p className="text-[11.5px] leading-snug text-fg-3">It plays in the slideshow when clicked; in PowerPoint it is its picture, linked to the video.</p>
+      <p className="text-[11.5px] leading-snug text-fg-3">
+        {kept ? 'It plays in the slideshow when clicked, and goes into PowerPoint as its own video.' : 'It plays in the slideshow when clicked; in PowerPoint it is its picture, linked to the video.'}
+      </p>
     </Section>
   );
 }
@@ -989,7 +1043,7 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cro
       {el.type === 'icon' && <IconLook el={el} theme={deck.theme} set={set} onIcon={onIcon} />}
       {el.type === 'math' && <MathLook el={el} theme={deck.theme} set={set} focus={texFocus} />}
       {el.type === 'video' && <VideoLook key={el.id} el={el} set={set} />}
-      <Place el={el} set={set} H={H} />
+      <Place el={el} slide={slide} set={set} H={H} />
       <Arrange deck={deck} index={index} ids={[el.id]} change={change} />
       <Section title="Link">
         <input

@@ -4,7 +4,8 @@
 // adjusted), lines and arrows, tables, charts, icons, equations (LaTeX), videos, and groups of parts that move as
 // one. Each slide has its background, its order of animations (a part comes in, is stressed or goes out: on a
 // click, with the one before or after it), its transition from the slide before (Morph glides the parts two slides
-// share into place), and speaker notes. The deck's theme names the colours and fonts parts refer to ("accent",
+// share into place), speaker notes, and the comments people and agents leave on it or its parts (with replies,
+// resolved or not). The deck's theme names the colours and fonts parts refer to ("accent",
 // "head"), so a new theme recolours it all; the deck may number its slides and give them a footer, and keeps the
 // guides its slides are lined up on.
 //
@@ -12,6 +13,10 @@
 // with its title and bullets, text as a string with "- " bullets and **bold**), and returns the full model,
 // every value checked: the editor shows decks inside the app itself, so nothing in a deck may be markup, a
 // script or a style rule; colours, fonts and addresses are each of a known form.
+
+import { cleanComment, COMMENT_LIMITS, newCommentId, type Comment } from './comments.ts';
+
+export type { Comment };
 
 export const SLIDE_W = 1280;
 export type Ratio = '16:9' | '4:3';
@@ -21,6 +26,8 @@ export const SLIDE_LIMITS = { slides: 300, els: 150, anims: 120, paras: 200, run
 
 /** A picture kept by the app (server/pages/assets.ts), by its content's hash: "naget-asset:<sha>". */
 export const ASSET = 'naget-asset:';
+/** A video kept by the app (server/pages/videos.ts), one from someone's device or an agent's session: "naget-video:<sha>". */
+export const VIDEO = 'naget-video:';
 
 export type Align = 'left' | 'center' | 'right' | 'justify';
 export type VAlign = 'top' | 'middle' | 'bottom';
@@ -200,6 +207,16 @@ export interface Adjust {
 
 export type Cap = 'none' | 'arrow' | 'dot';
 
+/** A side of a part, the middle of which a connector's end sticks to: top, right, bottom, left. */
+export type Side = 't' | 'r' | 'b' | 'l';
+export const SIDES: Side[] = ['t', 'r', 'b', 'l'];
+
+/** Where a connector's end is stuck: a part of its slide (by its id, in a group too), at the middle of one of its sides. */
+export interface Stick {
+  el: string;
+  at: Side;
+}
+
 export interface LineEl extends Base {
   type: 'line';
   color?: string;
@@ -207,6 +224,11 @@ export interface LineEl extends Base {
   dash?: 'solid' | 'dash' | 'dot';
   start?: Cap;
   end?: Cap;
+  /** A connector's ends stuck to parts of the slide: they follow them as they move, size and turn (x, y, w, h say where they are now). */
+  from?: Stick;
+  to?: Stick;
+  /** Its path: elbowed (across and down at right angles, as PowerPoint's elbow connectors), else straight. */
+  route?: 'elbow';
 }
 
 export interface TableEl extends Base {
@@ -287,11 +309,11 @@ export interface MathEl extends Base {
   align?: 'left' | 'center' | 'right';
 }
 
-/** A video from YouTube or Vimeo: its player's address, and the still that shows until it plays. */
+/** A video: from YouTube or Vimeo (its player's address), or one the app keeps (naget-video:<sha>); its still shows until it plays. */
 export interface VideoEl extends Base {
   type: 'video';
   src: string;
-  /** A picture's source; YouTube's own still when not given. */
+  /** A picture's source (a kept video's first frame, an online one's still from its site); YouTube's own still when not given. */
   poster?: string;
   /** Seconds into the video it starts at. */
   start?: number;
@@ -375,6 +397,15 @@ export interface Slide {
   layout?: LayoutId;
   /** The deck's footer and slide number left off this slide. */
   nofooter?: boolean;
+  /** Comments on the slide or on parts of it (shown only in the editor, never in the slideshow). */
+  comments?: SlideComment[];
+}
+
+/** A comment on a slide: on one of its parts (`el`), or on the slide itself, its mark at `x`, `y` (the slide's pixels). */
+export interface SlideComment extends Comment {
+  el?: string;
+  x?: number;
+  y?: number;
 }
 
 /** What the foot of every slide shows. */
@@ -758,6 +789,95 @@ export function scaleEls(els: El[], kx: number, ky: number): El[] {
   });
 }
 
+// ---- connectors -------------------------------------------------------------------------------------------------
+
+/** A part as it shows on the slide: one in a group placed where it shows, turned with its groups; null when it is not there. */
+export function partOnSlide(els: El[], id: string): El | null {
+  for (const e of els) {
+    if (e.id === id) return e;
+    if (e.type === 'group') {
+      const inner = partOnSlide(e.els, id);
+      if (inner) return ungroupEls({ ...e, els: [inner] })[0];
+    }
+  }
+  return null;
+}
+
+/** The middle of a side of a part (its box, turned as it is): where a connector's end sticks to it. */
+export function sidePoint(e: El, at: Side): { x: number; y: number } {
+  const cx = e.x + e.w / 2;
+  const cy = e.y + e.h / 2;
+  const dx = at === 'r' ? e.w / 2 : at === 'l' ? -e.w / 2 : 0;
+  const dy = at === 'b' ? e.h / 2 : at === 't' ? -e.h / 2 : 0;
+  const a = rad(e.rot);
+  return { x: r2(cx + dx * Math.cos(a) - dy * Math.sin(a)), y: r2(cy + dx * Math.sin(a) + dy * Math.cos(a)) };
+}
+
+/** The sides of two parts (or of a part and a point) that face each other: across when they are more apart across, else up and down. */
+export function facingSides(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }): [Side, Side] {
+  const dx = b.x + b.w / 2 - (a.x + a.w / 2);
+  const dy = b.y + b.h / 2 - (a.y + a.h / 2);
+  if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? ['r', 'l'] : ['l', 'r'];
+  return dy >= 0 ? ['b', 't'] : ['t', 'b'];
+}
+
+const across = (at: Side | undefined) => at === 'l' || at === 'r';
+
+/**
+ * An elbow connector's path from (x1, y1) to (x2, y2): it leaves across or up and down as the side it starts from does
+ * (across when free), and comes in as the side it ends on does; across both ways it turns halfway across, up and down
+ * both ways halfway down, else once. PowerPoint's own elbow connectors take the same paths.
+ */
+export function elbowPoints(x1: number, y1: number, x2: number, y2: number, from?: Side, to?: Side): number[][] {
+  const h1 = from ? across(from) : to ? across(to) : true;
+  const h2 = to ? across(to) : h1;
+  if (h1 && h2) return [[x1, y1], [(x1 + x2) / 2, y1], [(x1 + x2) / 2, y2], [x2, y2]];
+  if (!h1 && !h2) return [[x1, y1], [x1, (y1 + y2) / 2], [x2, (y1 + y2) / 2], [x2, y2]];
+  return h1 ? [[x1, y1], [x2, y1], [x2, y2]] : [[x1, y1], [x1, y2], [x2, y2]];
+}
+
+/**
+ * A slide's connectors with their ends where the parts they are stuck to are now (a part turned, sized or moved takes them
+ * along); those in groups move with their group. The same slide when nothing moved.
+ */
+export function reconnect(s: Slide): Slide {
+  let changed = false;
+  const els = s.els.map((e) => {
+    if (e.type !== 'line' || (!e.from && !e.to)) return e;
+    const a = e.from ? partOnSlide(s.els, e.from.el) : null;
+    const b = e.to ? partOnSlide(s.els, e.to.el) : null;
+    const p1 = a && e.from ? sidePoint(a, e.from.at) : { x: e.x, y: e.y };
+    const p2 = b && e.to ? sidePoint(b, e.to.at) : { x: e.x + e.w, y: e.y + e.h };
+    const next = { x: r2(p1.x), y: r2(p1.y), w: r2(p2.x - p1.x), h: r2(p2.y - p1.y) };
+    if (next.x === e.x && next.y === e.y && next.w === e.w && next.h === e.h) return e;
+    changed = true;
+    return { ...e, ...next };
+  });
+  return changed ? { ...s, els } : s;
+}
+
+/** A slide's connectors checked: each end on a part of the slide (not a line, nor itself), on a side (the one facing the other end when not said). */
+function checkConnectors(els: El[]): El[] {
+  const fix = (list: El[]): El[] =>
+    list.map((e) => {
+      if (e.type === 'group') return { ...e, els: fix(e.els) };
+      if (e.type !== 'line' || (!e.from && !e.to)) return e;
+      const part = (st?: Stick) => (st && st.el !== e.id ? partOnSlide(els, st.el) : null);
+      const a = part(e.from);
+      const b = part(e.to);
+      const ok = (p: El | null) => !!p && p.type !== 'line';
+      const out: LineEl = { ...e };
+      delete out.from;
+      delete out.to;
+      // The free end, as a point, for the side that faces it.
+      const free = (x: number, y: number) => ({ x, y, w: 0, h: 0 });
+      if (ok(a) && e.from) out.from = { el: a!.id, at: e.from.at ?? facingSides(a!, ok(b) ? b! : free(e.x + e.w, e.y + e.h))[0] };
+      if (ok(b) && e.to) out.to = { el: b!.id, at: e.to.at ?? facingSides(ok(a) ? a! : free(e.x, e.y), b!)[1] };
+      return out;
+    });
+  return fix(els);
+}
+
 /** What a slide is called: its title's words, else its first words. */
 export function slideTitle(s: Slide): string {
   const texts = everyEl(s.els).filter((e): e is TextEl | ShapeEl => (e.type === 'text' || e.type === 'shape') && plainText(e.paras).trim().length > 1);
@@ -860,6 +980,9 @@ export function videoSrc(v: unknown): string | null {
   const vm = host === 'vimeo.com' ? /^\/(?:video\/)?(\d{4,12})/.exec(u.pathname)?.[1] : host === 'player.vimeo.com' ? /^\/video\/(\d{4,12})/.exec(u.pathname)?.[1] : undefined;
   return vm ? `https://player.vimeo.com/video/${vm}` : null;
 }
+
+/** A video the app keeps, as a deck names it (naget-video:<sha>), or null. */
+export const keptVideo = (v: unknown): string | null => (typeof v === 'string' && /^naget-video:[a-f0-9]{16,64}$/.test(v.trim()) ? v.trim() : null);
 
 /** Where a video address says to start, in seconds ("t=90", "t=1m30s", "start=90"), or 0. */
 export function videoStart(v: unknown): number {
@@ -1103,6 +1226,8 @@ export interface NormalizeOpts {
   src?: SrcHook;
   /** An icon given by its name alone (an agent's): its lines from the library, or null when it has none of that name. */
   icon?: (name: string) => IconNode[] | null;
+  /** A video's source that is neither online nor kept yet (a file of an agent's session): what it becomes, or null to leave the video out. */
+  video?: SrcHook;
 }
 
 const ALIGNS = ['left', 'center', 'right', 'justify'] as const;
@@ -1306,7 +1431,7 @@ interface Budget {
 function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts, depth = 0, budget: Budget = { n: 0 }): El | null {
   if (!isObj(e)) return null;
   if (++budget.n > SLIDE_LIMITS.els * 3) return null;
-  const type = e.type === 'textbox' ? 'text' : e.type === 'picture' ? 'image' : e.type === 'arrow' ? 'line' : e.type === 'equation' ? 'math' : e.type;
+  const type = e.type === 'textbox' ? 'text' : e.type === 'picture' ? 'image' : e.type === 'arrow' || e.type === 'connector' || e.type === 'elbow' ? 'line' : e.type === 'equation' ? 'math' : e.type;
   if (type === 'text' || type === 'shape') {
     const b = base(e, used, H);
     const t: Partial<TextProps> = {};
@@ -1344,6 +1469,17 @@ function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts, dep
   }
   if (type === 'line') {
     const l: LineEl = { ...base(e, used, H, true), type: 'line', width: num(e.width, 0.5, 60, 3) };
+    // A connector's ends, by a part's id (its side, else the side that faces the other end, once the slide's parts are known).
+    const stick = (v: unknown): Stick | undefined => {
+      const el = typeof v === 'string' ? v : isObj(v) && typeof v.el === 'string' ? v.el : '';
+      if (!/^[A-Za-z0-9_-]{1,24}$/.test(el)) return undefined;
+      return { el, at: (isObj(v) ? opt(v.at ?? v.side, SIDES) : undefined) as Side };
+    };
+    const from = stick(e.from);
+    const to = stick(e.to);
+    if (from) l.from = from;
+    if (to) l.to = to;
+    if (e.route === 'elbow' || e.elbow === true || e.type === 'elbow') l.route = 'elbow';
     const color = cleanColor(e.color);
     if (color) l.color = color;
     const dash = opt(e.dash, DASHES);
@@ -1451,7 +1587,8 @@ function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts, dep
   }
   if (type === 'video') {
     const raw = e.src ?? e.url;
-    const src = videoSrc(raw);
+    // An online video's player, a video the app keeps, or one not kept yet (an agent's file) as the hook makes it.
+    const src = videoSrc(raw) ?? keptVideo(raw) ?? (typeof raw === 'string' && raw.trim() && o.video ? o.video(raw.trim()) : null);
     if (!src) return null;
     const v: VideoEl = { ...base(e, used, H, false, { w: 800, h: 450 }), type: 'video', src };
     const rawPoster = typeof e.poster === 'string' ? e.poster.trim() : '';
@@ -1566,7 +1703,30 @@ function transition(v: unknown): Transition | undefined {
   return t;
 }
 
-function slide(v: unknown, used: Set<string>, ratio: Ratio, o: NormalizeOpts): Slide | null {
+/**
+ * A slide's comments, each checked as comments are (comments.ts): on one of its parts (by an id it has), or on the slide,
+ * its mark where it said (on the slide, else near its top-right corner). Ids are kept once across the deck (`seen`).
+ */
+function slideComments(v: unknown, parts: Set<string>, H: number, seen: Set<string>): SlideComment[] {
+  if (!Array.isArray(v)) return [];
+  const out: SlideComment[] = [];
+  for (const raw of v.slice(0, COMMENT_LIMITS.comments)) {
+    const c: SlideComment | null = cleanComment(raw);
+    if (!c) continue;
+    while (seen.has(c.id)) c.id = newCommentId();
+    seen.add(c.id);
+    const r = raw as Obj;
+    if (typeof r.el === 'string' && parts.has(r.el)) c.el = r.el;
+    else if (r.x !== undefined || r.y !== undefined) {
+      c.x = Math.round(num(r.x, 0, SLIDE_W, SLIDE_W - 40));
+      c.y = Math.round(num(r.y, 0, H, 40));
+    }
+    out.push(c);
+  }
+  return out;
+}
+
+function slide(v: unknown, used: Set<string>, ratio: Ratio, o: NormalizeOpts, cids: Set<string> = new Set()): Slide | null {
   if (!isObj(v)) return null;
   const H = slideH(ratio);
   let s: Slide;
@@ -1593,7 +1753,7 @@ function slide(v: unknown, used: Set<string>, ratio: Ratio, o: NormalizeOpts): S
     const a = isObj(raw) ? elAnim(raw.anim, el.id) : null;
     if (a) pending.push(a);
   }
-  s.els = els;
+  s.els = checkConnectors(els);
   const ids = new Set(els.map((e) => e.id));
   const anims = [...(Array.isArray(v.anims) ? v.anims : []), ...pending]
     .slice(0, SLIDE_LIMITS.anims)
@@ -1614,7 +1774,9 @@ function slide(v: unknown, used: Set<string>, ratio: Ratio, o: NormalizeOpts): S
   if (notes) s.notes = notes;
   if (v.hidden === true) s.hidden = true;
   if (v.nofooter === true) s.nofooter = true;
-  return s;
+  const comments = slideComments(v.comments, new Set(everyEl(els).map((e) => e.id)), H, cids);
+  if (comments.length) s.comments = comments;
+  return reconnect(s);
 }
 
 function footer(v: unknown): Footer | undefined {
@@ -1684,9 +1846,10 @@ export function normalizeDeck(input: unknown, o: NormalizeOpts = {}): Deck {
   if (!isObj(v) || !Array.isArray(v.slides)) throw new Error('A deck needs slides: an array.');
   const ratio = pick(v.ratio, ['16:9', '4:3'] as const, '16:9');
   const used = new Set<string>();
+  const cids = new Set<string>();
   const slides = v.slides
     .slice(0, SLIDE_LIMITS.slides)
-    .map((s) => slide(s, used, ratio, o))
+    .map((s) => slide(s, used, ratio, o, cids))
     .filter((s): s is Slide => !!s);
   if (!slides.length) slides.push({ ...layoutSlide('title', {}, ratio) });
   const d: Deck = { v: 1, ratio, theme: theme(v.theme, THEMES[0]), slides };
@@ -1717,6 +1880,19 @@ export function deckSources(d: Deck, stills = false): string[] {
     }
   }
   return out;
+}
+
+/** The videos the app keeps that a deck shows ("naget-video:<sha>"), in groups too. */
+export function deckVideos(d: Deck): string[] {
+  const out: string[] = [];
+  for (const s of d.slides) for (const e of everyEl(s.els)) if (e.type === 'video' && e.src.startsWith(VIDEO)) out.push(e.src);
+  return out;
+}
+
+/** The deck with each kept video's source changed by `f` (to where a page fetches it, say). */
+export function mapVideoSources(d: Deck, f: (src: string) => string): Deck {
+  const map = (els: El[]): El[] => els.map((e) => (e.type === 'group' ? { ...e, els: map(e.els) } : e.type === 'video' && e.src.startsWith(VIDEO) ? { ...e, src: f(e.src) } : e));
+  return { ...d, slides: d.slides.map((s) => ({ ...s, els: map(s.els) })) };
 }
 
 function mapEls(els: El[], f: (src: string) => string): El[] {
@@ -1762,7 +1938,8 @@ export function deckOutline(d: Deck): string {
     .map((s, i) => {
       const kinds = s.els.map((e) => (e.type === 'shape' ? `shape:${e.shape}` : e.type === 'group' ? `group of ${e.els.length}` : e.type));
       const what = [...new Set(kinds)].map((k) => `${kinds.filter((x) => x === k).length}× ${k}`).join(', ');
-      return `${i + 1}. ${slideTitle(s) || '(no title)'} [${s.id}]${s.hidden ? ' (hidden)' : ''}: ${what || 'empty'}${s.anims?.length ? `, ${s.anims.length} animation${s.anims.length === 1 ? '' : 's'}` : ''}${s.notes ? ', notes' : ''}`;
+      const open = (s.comments ?? []).filter((c) => !c.resolved).length;
+      return `${i + 1}. ${slideTitle(s) || '(no title)'} [${s.id}]${s.hidden ? ' (hidden)' : ''}: ${what || 'empty'}${s.anims?.length ? `, ${s.anims.length} animation${s.anims.length === 1 ? '' : 's'}` : ''}${s.notes ? ', notes' : ''}${open ? `, ${open} open comment${open === 1 ? '' : 's'}` : ''}`;
     })
     .join('\n');
 }

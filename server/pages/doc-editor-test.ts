@@ -8,7 +8,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { blockHtml, docMarkdown, docText, mdBlocks, normalizeDoc, tocEntries, type Block, type Cell, type Doc, type ParaBlock, type Run, type TableBlock } from '../../shared/docs.ts';
+import { changesOf, compareDocs } from '../../shared/doc-changes.ts';
+import { blockHtml, docMarkdown, docText, docWords, htmlRuns, mdBlocks, normalizeDoc, resolveSuggestion, tocEntries, type Block, type Cell, type Doc, type ParaBlock, type Run, type TableBlock } from '../../shared/docs.ts';
 import { openDb } from '../db.ts';
 import { parseXml } from '../documents/xml.ts';
 import { Zip } from '../documents/zip.ts';
@@ -22,11 +23,11 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
 
 let failed = 0;
 let passed = 0;
-const ok = (cond: unknown, what: string) => {
+const ok = (cond: unknown, what: string, extra?: unknown) => {
   if (cond) passed++;
   else {
     failed++;
-    console.log(`FAIL ${what}`);
+    console.log(`FAIL ${what}${extra !== undefined ? ` :: ${JSON.stringify(extra).slice(0, 600)}` : ''}`);
   }
 };
 
@@ -347,7 +348,8 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
   const file = docxOfDoc(db, withCm, 'Report');
   const zip = new Zip(file);
   const xml = zip.text('word/document.xml') ?? '';
-  ok(/<w:spacing w:before="240" w:after="0" w:line="480" w:lineRule="auto"\/>/.test(xml), "spacing goes to Word as the paragraph's own");
+  // Two lines of 11pt Arial as the editor draws them (2 × 1.15 × 11pt), at least: Word's own line for Arial is no taller.
+  ok(/<w:spacing w:before="240" w:after="0" w:line="506" w:lineRule="atLeast"\/>/.test(xml), "spacing goes to Word as the paragraph's own, its lines in points");
   ok(xml.includes('w:fill="FCE8E6"') && xml.includes('🔥'), 'a callout is a shaded paragraph with its emoji');
   ok(xml.includes('TOC \\o "1-3"') && /w:anchor="_Toc1"/.test(xml) && /<w:bookmarkStart w:id="\d+" w:name="_Toc1"\/>/.test(xml), 'a table of contents is a field Word fills in, its lines leading to bookmarks');
   ok(xml.includes('<m:oMathPara><m:oMath><m:f>') && xml.includes('<m:oMath>'), "equations are Word's own");
@@ -381,6 +383,182 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
   ok((back.blocks.find((b) => words(b) === 'Spaced out') as ParaBlock).runs[0].cm?.[0] === k1?.id, 'the words keep their comment');
   const losses = wordLosses(file, back);
   ok(!losses.loses.length && !losses.cut, 'a file written here loses nothing coming back');
+}
+
+// ---- comments' authors ------------------------------------------------------------------------------------------------
+{
+  const d = normalizeDoc({
+    blocks: [{ p: [{ t: 'Budget ', cm: ['m1'] }, { t: 'and plan.' }] }],
+    comments: [
+      { id: 'm1', by: 'user', author: '  Maria   Lopez ', text: 'Too high?', at: 1_700_000_000_000, replies: [{ id: 'm1r', by: 'user', author: 'Jun Park', text: 'Agreed.', at: 1_700_000_100_000 }, { id: 'm1s', by: 'user', text: 'Cut it.', at: 1_700_000_200_000 }] },
+      { id: 'm2', by: 'user', author: 'You', text: 'Mine.', at: 1_700_000_300_000 },
+    ],
+  });
+  ok(d.comments?.[0].author === 'Maria Lopez' && d.comments[0].replies?.[0].author === 'Jun Park' && !d.comments[0].replies?.[1].author, 'a comment and its replies keep who wrote them, by name');
+  ok(!d.comments?.[1].author, 'the names that stand for you and an agent are no names of their own');
+  const file = docxOfDoc(db, d, 'Budget');
+  const cx = new Zip(file).text('word/comments.xml') ?? '';
+  ok(cx.includes('w:author="Maria Lopez"') && cx.includes('w:initials="ML"') && cx.includes('w:author="Jun Park"') && cx.includes('w:author="You" w:date="') && cx.includes('w:initials="Y"'), 'a Word file carries their names and initials');
+  const back = docFromFile(file, 'Budget.docx');
+  const m = back.comments?.find((c) => c.text === 'Too high?');
+  ok(m?.author === 'Maria Lopez' && m.replies?.[0].author === 'Jun Park' && !m.replies?.[1].author && !back.comments?.find((c) => c.text === 'Mine.')?.author, 'and they come back from Word, yours as yours');
+  ok(docForAgent(docText(d)).includes('“Maria Lopez”, 2023-11-14') && docForAgent(docText(d)).includes('↳ “Jun Park”'), 'get_page names them');
+}
+
+// ---- suggestions: kept, read back, accepted and rejected ---------------------------------------------------------------
+{
+  const d = normalizeDoc({
+    blocks: [
+      { title: 'Plan' },
+      { p: [{ t: 'We grow ' }, { t: 'big ', del: 's1' }, { t: 'small ', ins: 's1' }, { t: 'beans', b: true, fmt: 's2', was: { i: true } }, { t: '.' }] },
+      { p: 'A new paragraph.', ins: 's3', runs: [{ t: 'A new paragraph.', ins: 's3' }] },
+      { p: 'Joined.', del: 's4' },
+      { hr: true, ins: 's5' },
+      { p: [{ t: 'Dangling', ins: 'nope' }] },
+    ],
+    suggestions: [
+      { id: 's1', by: 'user', at: 1_700_000_000_000, replies: [{ id: 'r', by: 'agent', text: 'Fine.', at: 1_700_000_100_000 }] },
+      { id: 's2', by: 'agent', at: 1_700_000_000_000 },
+      { id: 's3', by: 'user', author: 'Maria Lopez', at: 1_700_000_000_000 },
+      { id: 's4', by: 'user', at: 1_700_000_000_000 },
+      { id: 's5', by: 'user', at: 1_700_000_000_000 },
+      { id: 's6', by: 'user', at: 1_700_000_000_000 },
+    ],
+  });
+  const p1 = d.blocks[1] as ParaBlock;
+  ok(p1.runs.some((r) => r.del === 's1' && r.t === 'big ') && p1.runs.some((r) => r.ins === 's1') && p1.runs.some((r) => r.fmt === 's2' && r.was?.i && r.b), 'words keep their suggested changes: added, taken out, a new look and the old one');
+  ok(d.blocks[2].ins === 's3' && d.blocks[3].del === 's4' && d.blocks[4].type === 'hr' && d.blocks[4].ins === 's5', 'blocks keep theirs: a break added or taken out, a block added');
+  ok(!(d.blocks[5] as ParaBlock).runs[0].ins && d.suggestions?.length === 5 && !d.suggestions.some((x) => x.id === 's6'), "marks of suggestions it does not have come off, and suggestions that mark nothing go");
+  ok(d.suggestions?.find((x) => x.id === 's3')?.author === 'Maria Lopez' && d.suggestions?.[0].replies?.[0].text === 'Fine.', 'a suggestion keeps who made it and its replies');
+  ok(docText(again(d)) === docText(d), 'kept as text and read back');
+  ok(!docMarkdown(d).includes('data-s'), 'Markdown for a file leaves the marks out');
+  const md = docMarkdown(d, { comments: true });
+  ok(md.includes('<del data-s="s1">big </del><ins data-s="s1">small </ins>') && md.includes('data-s="s2" data-was=') && md.includes('{ins=s3}') && md.includes('Joined. {del=s4}'), 'for an agent, the marks are written', md);
+  const back = normalizeDoc({ markdown: md, suggestions: d.suggestions });
+  ok(JSON.stringify((back.blocks[1] as ParaBlock).runs) === JSON.stringify(p1.runs) && back.blocks[2].ins === 's3' && back.blocks[3].del === 's4', 'and read back where they were');
+  const ed = blockHtml(p1, '', { src: (s) => s, edit: true });
+  ok(ed.includes('<del class="nd-del" data-s="s1">big </del>') && ed.includes('data-was="'), 'the editor draws them, the old look on a new one');
+  ok(JSON.stringify(htmlRuns(ed.replace(/^<p[^>]*>|<\/p>$/g, ''))) === JSON.stringify(p1.runs), 'and reads them back from what it drew');
+  ok(docWords(d) === docWords(normalizeDoc({ markdown: 'Plan\n\nWe grow small beans.\n\nA new paragraph.\n\nJoined.\n\nDangling' })), 'words taken out are not counted');
+  // Accepting and rejecting.
+  const acc = resolveSuggestion(d, 's1', true);
+  ok(words(acc.blocks[1]).startsWith('We grow small beans') && !acc.suggestions?.some((x) => x.id === 's1'), 'accepted: words added stay, words taken out go');
+  const rej = resolveSuggestion(d, 's1', false);
+  ok(words(rej.blocks[1]).startsWith('We grow big beans'), 'rejected: as it was');
+  const rf = (resolveSuggestion(d, 's2', false).blocks[1] as ParaBlock).runs.find((r) => r.t === 'beans');
+  ok(rf && rf.i && !rf.b && !rf.fmt, 'a new look rejected goes back to the old one');
+  ok(resolveSuggestion(d, 's3', false).blocks.length === d.blocks.length - 1, 'a new paragraph rejected goes, words and all');
+  const j = resolveSuggestion(d, 's4', true);
+  ok(j.blocks.length === d.blocks.length - 1 && words(j.blocks[2]).endsWith('A new paragraph.Joined.'), 'a break taken out joins the paragraph to the one before');
+  ok(!resolveSuggestion(d, 's5', false).blocks.some((b) => b.type === 'hr') && resolveSuggestion(d, 's5', true).blocks.some((b) => b.type === 'hr' && !b.ins), 'a block added: rejected it goes, accepted it stays');
+  const all = resolveSuggestion(d, null, true);
+  ok(!all.suggestions && !docText(all).includes('"ins"') && !docText(all).includes('"del"'), 'all accepted at once leaves none');
+}
+
+// ---- suggestions through Word, and from agents ----------------------------------------------------------------------------
+{
+  const at = 1_700_000_000_000;
+  const d = normalizeDoc({
+    blocks: [
+      { title: 'Plan' },
+      { p: [{ t: 'We grow ' }, { t: 'big ', del: 's1' }, { t: 'small ', ins: 's1' }, { t: 'beans', b: true, fmt: 's2', was: { i: true } }, { t: '.' }] },
+      { type: 'p', ins: 's3', runs: [{ t: 'New one.', ins: 's3' }] },
+      { p: 'Joined.', del: 's4' },
+    ],
+    suggestions: [
+      { id: 's1', by: 'user', author: 'Maria Lopez', at },
+      { id: 's2', by: 'agent', at: at + 60_000 },
+      { id: 's3', by: 'user', at: at + 120_000 },
+      { id: 's4', by: 'user', at: at + 180_000 },
+    ],
+  });
+  const file = docxOfDoc(db, d, 'Plan');
+  const xml = new Zip(file).text('word/document.xml') ?? '';
+  ok(/<w:del w:id="\d+" w:author="Maria Lopez" w:date="2023-11-14T22:13:20Z"><w:r><w:delText xml:space="preserve">big <\/w:delText><\/w:r><\/w:del>/.test(xml) && /<w:ins w:id="\d+" w:author="Maria Lopez"[^>]*><w:r><w:t xml:space="preserve">small <\/w:t>/.test(xml), 'a Word file has the words added and taken out as tracked changes, with who made them and when');
+  ok(/<w:rPrChange w:id="\d+" w:author="Agent"[^>]*><w:rPr><w:i\/><w:iCs\/><\/w:rPr><\/w:rPrChange>/.test(xml), 'a new look as a tracked change of formatting, with the old one');
+  ok(/<w:rPr><w:ins w:id="\d+" w:author="You"/.test(xml) && /<w:rPr><w:del w:id="\d+" w:author="You"/.test(xml), "a paragraph's new or removed break as its paragraph mark's");
+  const back = docFromFile(file, 'Plan.docx');
+  const bp = back.blocks[1] as ParaBlock;
+  const ids = (k: 'ins' | 'del' | 'fmt') => bp.runs.filter((r) => r[k]).map((r) => r.t).join('|');
+  ok(ids('del') === 'big ' && ids('ins') === 'small ' && bp.runs.find((r) => r.fmt)?.was?.i === true, 'and come back from Word as suggestions', bp.runs);
+  ok(back.blocks[2].ins && words(back.blocks[2]) === 'New one.' && back.blocks[3].del, "with the paragraphs' breaks", back.blocks.map((b) => [b.ins, b.del, (b as ParaBlock).runs]));
+  const sm = back.suggestions?.find((x) => bp.runs.some((r) => r.del === x.id));
+  ok(sm?.author === 'Maria Lopez' && sm.at === at && bp.runs.find((r) => r.ins)?.ins === sm.id, "who made each and when, a replacement one suggestion", back.suggestions);
+  ok(back.suggestions?.find((x) => x.id === bp.runs.find((r) => r.fmt)?.fmt)?.by === 'agent', "an agent's as an agent's");
+  ok(!wordLosses(file, back).loses.length, 'nothing of them is lost');
+  // Agents: get_page lists them; save_doc answers them, and suggests its own changes.
+  const got = docForAgent(docText(d));
+  ok(got.includes('Suggested changes (4)') && got.includes('- s1 · “Maria Lopez”') && got.includes('take out “big ”; add “small ”') && got.includes('"accept": true') && got.includes('"suggest": true'), 'get_page lists the suggested changes and how to answer them', got.slice(got.indexOf('Suggested')));
+  const md = docMarkdown(d, { comments: true });
+  const r = await agentDoc(db, { markdown: md, suggestions: [{ id: 's1', accept: true }, { id: 's2', reject: true }, { id: 's3', reply: 'Good idea.' }, { id: 'nope', accept: true }] }, tmp, docText(d));
+  ok(words(r.doc.blocks[1]) === 'We grow small beans.' && !(r.doc.blocks[1] as ParaBlock).runs.some((x) => x.fmt || x.b), 'an agent accepts and rejects them', (r.doc.blocks[1] as ParaBlock).runs);
+  ok(r.doc.suggestions?.find((x) => x.id === 's3')?.replies?.[0]?.by === 'agent' && r.notes.some((n) => n.includes('nope')), 'answers one, and is told of one that is not there');
+  ok(r.doc.blocks[3].del === 's4', 'and leaves the others as they were');
+  const plain = normalizeDoc({ markdown: '# Plan\n\nWe grow beans.\n\nWater daily.' });
+  const s2 = await agentDoc(db, { markdown: '# Plan\n\nWe grow runner beans.\n\nWater twice a day.\n\nHarvest in August.', suggest: true }, tmp, docText(plain));
+  const sg = s2.doc.suggestions ?? [];
+  ok(sg.length >= 3 && sg.every((x) => x.by === 'agent') && words(s2.doc.blocks[1]) === 'We grow runner beans.' && (s2.doc.blocks[1] as ParaBlock).runs.some((x) => x.ins && x.t.includes('runner')), "with suggest, an agent's changes are its suggestions", s2.doc.blocks);
+  ok(words(resolveSuggestion(s2.doc, null, false).blocks[2]) === 'Water daily.' && resolveSuggestion(s2.doc, null, false).blocks.length === 3, 'rejected, the document is as it was');
+  const s3 = await agentDoc(db, { markdown: 'We <del data-s="x1">grow</del><ins data-s="x1">plant</ins> beans.' }, tmp, docText(plain));
+  ok(s3.doc.suggestions?.[0]?.id === 'x1' && s3.doc.suggestions[0].by === 'agent', 'an agent may mark its own suggestions in the Markdown');
+}
+
+// ---- comparing two versions ---------------------------------------------------------------------------------------------
+{
+  const v1 = normalizeDoc({ markdown: '# Plan\n\nWe grow big beans and peas.\n\nWater daily.\n\nOld line.\n\n| a | b |\n| --- | --- |\n| 1 | 2 |' });
+  const v2 = normalizeDoc({
+    blocks: [
+      ...v1.blocks.map((b) => (words(b) === 'We grow big beans and peas.' ? { ...b, runs: [{ t: 'We grow ' }, { t: 'small', b: true }, { t: ' beans and peas.' }] } : b)).filter((b) => words(b) !== 'Old line.').map((b) => (b.type === 'table' ? { ...b, rows: [[{ runs: [{ t: 'a' }] }, { runs: [{ t: 'b' }] }], [{ runs: [{ t: '1' }] }, { runs: [{ t: '3' }] }]] } : b)),
+      { p: 'Added at the end.' },
+    ],
+  });
+  const c = compareDocs(v1, v2, { by: 'user', at: 1_700_000_000_000 });
+  const p = c.blocks.find((b) => words(b).startsWith('We grow')) as ParaBlock;
+  ok(p.runs.some((r) => r.del && r.t === 'big') && p.runs.some((r) => r.ins && r.t === 'small' && r.b), 'compared: words taken out and added in place', p.runs);
+  ok(c.blocks.some((b) => b.del && words(b) === 'Old line.') && c.blocks.some((b) => b.ins && words(b) === 'Added at the end.'), 'paragraphs taken out and added');
+  const t = c.blocks.find((b) => b.type === 'table') as TableBlock;
+  ok(t.rows[1][1].runs.some((r) => r.del && r.t === '2') && t.rows[1][1].runs.some((r) => r.ins && r.t === '3'), 'a table’s cells compared');
+  const changes = changesOf(c);
+  ok(changes.length >= 4 && changes.some((x) => x.removed === 'big' && x.added === 'small'), 'each change listed, a word replaced as one', changes);
+  ok(docText(resolveSuggestion(c, null, true)).replace(/"id":"[^"]*",?/g, '') === docText(v2).replace(/"id":"[^"]*",?/g, ''), 'accepting them all gives the second');
+  ok(JSON.stringify(resolveSuggestion(c, null, false).blocks.map((b) => words(b))) === JSON.stringify(v1.blocks.map((b) => words(b))), 'rejecting them all gives the first');
+}
+
+// ---- its own web page, opened again --------------------------------------------------------------------------------
+{
+  const d = normalizeDoc({
+    markdown: [
+      '# Plan {.title}',
+      '[TOC]',
+      '# One',
+      'Airy {line=1.5 before=12 after=0}',
+      'In a step {indent=1}',
+      '- Dig',
+      '  - Deeper',
+      '1. First',
+      '- [x] Done',
+      '- [ ] To do',
+      '> 🔥 Hot {.callout tint=#fce8e6}',
+      '![A box](data:image/png;base64,iVBORw0KGgo= "Its caption"){width=40%}',
+      '\\pagebreak',
+      'Second page.',
+    ].join('\n\n'),
+    header: 'ACME',
+    footer: { text: 'Page {page} of {pages}', align: 'center' },
+  });
+  const back = docFromFile(Buffer.from(docPage(db, d, 'Plan', 'viewer')), 'Plan.html');
+  const kinds = back.blocks.map((b) => `${b.type}${b.type === 'p' && b.style ? `:${b.style}` : ''}${b.type === 'li' ? `:${b.list}${b.lvl ? b.lvl : ''}${b.checked ? 'x' : ''}` : ''}`);
+  ok(
+    kinds.join(' ') === 'p:title toc p:h1 p p li:bullet li:bullet1 li:number li:checkx li:check p:callout image pagebreak p',
+    "a document's own web page opened again has its lists, checklists, callout, table of contents and page breaks",
+  );
+  ok(!back.blocks.some((b) => words(b).includes('ACME') || words(b).includes('Page 1')), 'and not its header and footer as words');
+  const airy = back.blocks.find((b) => words(b) === 'Airy') as ParaBlock;
+  ok(airy?.lh === 1.5 && airy.sb === 12 && airy.sa === 0 && (back.blocks.find((b) => words(b) === 'In a step') as ParaBlock)?.lvl === 1, 'nor its spacing and indents');
+  const call = back.blocks.find((b) => b.type === 'p' && b.style === 'callout') as ParaBlock;
+  ok(call?.icon === '🔥' && call.tint === '#fce8e6', "a callout keeps its emoji and tint");
+  const pic = back.blocks.find((b) => b.type === 'image');
+  ok(pic?.type === 'image' && pic.w === 0.4 && pic.caption === 'Its caption', 'a picture keeps its width and caption');
 }
 
 fs.rmSync(tmp, { recursive: true, force: true });

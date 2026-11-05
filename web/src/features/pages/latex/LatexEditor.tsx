@@ -9,14 +9,18 @@
 // arXiv id or title, folding, spelling, a word count, versions compared, the pages presented. An outline goes to a
 // section, a double click on a page goes to its source and Show in the PDF the other way. On a phone, Source and
 // Preview are two tabs and the menus are behind one button. Changes stay unsaved until Save (Ctrl+S), as a page's do.
+// While an agent writes a new version (live.ts), its source shows as it comes, read-only, with the agent's caret where
+// its words arrive (the file it writes brought into view); it is typeset once it is saved.
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
   BookPlus,
   Bold,
+  CheckCheck,
   ChevronDown,
   Copy,
   ExternalLink,
+  FilePen,
   FilePlus,
   FileUp,
   FoldVertical,
@@ -55,14 +59,21 @@ import {
   Undo2,
   UnfoldVertical,
   WholeWord,
+  X,
 } from 'lucide-react';
 import {
+  cleanTexChanges,
+  cleanTexComments,
   cleanTexName,
   engineLabel,
   headingAt,
+  mergeTexComments,
   TEX_ENGINES,
   TEX_MAIN,
+  texChangeOps,
   texOutline,
+  type TexChange,
+  type TexComment,
   type TexCompiled,
   type TexDoc,
   type TexEngine,
@@ -77,12 +88,14 @@ import type { TexReference } from '@shared/latex-bib';
 import { Button, cx, Dialog, IconButton, MenuItem, MenuSep, Popover, Segmented, Throbber, useConfirm } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
 import { toast, toastError } from '../../../lib/store';
-import { findIn, replaceAllIn, replacementOf, type Match } from '../common/find';
+import { findIn, replacementOf, type Match } from '../common/find';
 import { FindBar, useFind } from '../common/FindBar';
 import { MenuBar, type MenuDef, type MenuEntry } from '../common/menus';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
+import { useOwnScroll } from '../live';
 import { addFileFromDevice, addPicture, assetUrl, chooseFiles, FILE_ACCEPT, freeName, pdfUrl, PICTURE_ACCEPT, placeOf, texSetup, typeset } from './api';
+import { ChangesList } from './ChangesList';
 import { mountCode, type Code } from './code';
 import { CommentsPanel, type CommentDraft } from './CommentsPanel';
 import { CompareDialog } from './Compare';
@@ -96,6 +109,7 @@ import { docWords, makeSnippet, SAMPLE_BIB, withBibliography, withPackages, type
 import { rememberSymbol, SymbolsPanel } from './SymbolsPanel';
 import { symInsert, type Sym } from './symbols';
 import { TableEditor } from './TableEditor';
+import { ToolRow, type RowTool } from './ToolRow';
 import { MAX_VISUAL } from './visual';
 import { WordCountDialog } from './WordCount';
 
@@ -233,7 +247,7 @@ function scopesFor(file: string, cursor: Cursor, heading: TexHeading | null): As
   return out;
 }
 
-export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, file: onDisk }: ModelEditorProps<TexDoc>) {
+export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, file: onDisk, live: agent }: ModelEditorProps<TexDoc>) {
   const [model, setModel] = useState<TexDoc | null>(doc?.model ?? null);
   // The model as the latest change left it (changes made before it is drawn again build on it).
   const live = useRef<TexDoc | null>(model);
@@ -328,7 +342,12 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   }, [!model]);
   const wide = width >= 900 && layout !== 'sheet';
   const roomy = width >= 640;
-  const dirty = !!model && model !== saved && !readOnly;
+  const dirty = !!model && model !== saved && !readOnlyProp;
+  // An agent's version being written shows in place of the source (read-only, its words arriving where its caret is;
+  // typeset once it is saved), unless there are changes here not saved: those are left as they are.
+  const liveTex = agent && !dirty ? agent.model : null;
+  const liveOn = !!liveTex;
+  const readOnly = !!readOnlyProp || liveOn;
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
   useEffect(() => {
@@ -355,9 +374,13 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
     texSetup().then(setSetup, () => {});
   }, []);
 
-  // Another document, or the agent's new version while nothing was changed here: start from it.
+  // Another document, or the agent's new version while nothing was changed here: start from it (the file in view at the
+  // same place, as the agent's version being written was read).
+  const keepPlace = useRef<{ file: string; line: number } | null>(null);
   useEffect(() => {
     if (!doc || dirtyRef.current) return;
+    const shown = codes.current.get(file);
+    keepPlace.current = shown ? { file, line: shown.topLine() } : null;
     setM(doc.model);
     setSaved(doc.model);
     setEpoch((e) => e + 1);
@@ -435,7 +458,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         name,
         dark: isDark(),
         phone: matchMedia('(pointer: coarse)').matches,
-        readOnly,
+        // Its own setting: an agent's version shows read-only by itself (setLive), and the file is editable after.
+        readOnly: !!readOnlyProp,
         hooks: {
           onChange: (text) => change((d) => withText(d, name, text)),
           onSave: () => void saveRef.current(),
@@ -463,6 +487,12 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
                 : d,
             ),
           onComment: () => addCommentRef.current(),
+          // The file's tracked changes as its editor has them now, in the document beside the other files'.
+          onTracked: (list) =>
+            change((d) => {
+              const next = [...(d.changes ?? []).filter((c) => c.file !== name), ...list.map((c) => ({ ...c, file: name }))];
+              return next.length || d.changes ? { ...d, changes: next.length ? next : undefined } : d;
+            }),
         },
         visual: modeRef.current === 'visual',
         spell: spellRef.current,
@@ -472,6 +502,15 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         codes.current.set(name, c);
         setMade((n) => n + 1);
         markCode(name, c);
+        const place = keepPlace.current;
+        if (place?.file === name) {
+          keepPlace.current = null;
+          if (place.line > 1) c.showLine(place.line);
+        }
+        const d = live.current;
+        if (d?.track) c.setTrack(true);
+        const mine = (d?.changes ?? []).filter((x) => x.file === name);
+        if (mine.length) c.setTracked(mine);
         const after = afterMount.current.get(name);
         afterMount.current.delete(name);
         if (after) after(c);
@@ -480,6 +519,29 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   });
   const epochRef = useRef(epoch);
   epochRef.current = epoch;
+
+  // The agent's version as it comes, in each file open (its caret in the file being written, brought into view unless
+  // a file was picked or the source scrolled here lately); each file's own text again once it is saved, or failed.
+  const pickedAt = useRef(0);
+  const ownScroll = useOwnScroll(root);
+  const mark = liveOn && agent?.mark?.kind === 'tex' ? agent.mark : null;
+  useEffect(() => {
+    if (mark && mark.file !== file && performance.now() - pickedAt.current > 4000 && (mark.file === TEX_MAIN || model?.files.some((f) => f.name === mark.file))) {
+      if (!opened.includes(mark.file)) setOpened((o) => [...o, mark.file]);
+      setFile(mark.file);
+    }
+  }, [mark?.file]);
+  // The version it was shown over: when another comes in its place (the agent's, saved), the files mount again with it,
+  // the agent's text shown until then (not the old one for a moment).
+  const liveOver = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (liveTex) liveOver.current = doc?.key;
+    const saved = !liveTex && liveOver.current !== undefined && liveOver.current !== doc?.key;
+    for (const [name, c] of codes.current) {
+      if (liveTex) c.setLive(textIn(liveTex, name), mark?.file === name ? mark.at : undefined, !ownScroll());
+      else if (!saved) c.setLive(null);
+    }
+  }, [liveTex, made, epoch]);
   useEffect(() => {
     const mo = new MutationObserver(() => {
       for (const c of codes.current.values()) c.handle.setDark(isDark());
@@ -490,6 +552,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   }, []);
 
   const open = (name: string) => {
+    pickedAt.current = performance.now();
     if (name !== PICTURES) {
       if (!opened.includes(name)) setOpened((o) => [...o, name]);
       if (/\.(tex|ltx)$/i.test(name)) lastTex.current = name;
@@ -680,11 +743,15 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
     c.replaceQuiet(m.s, m.e, rep);
   };
   const replaceAll = () => {
-    if (!codeInView() || readOnly) return;
-    const r = replaceAllIn(codeInView()!.text(), find.query, find.replacement, find.options);
-    if (!r.count) return;
-    editFile(file, () => r.text);
-    toast(`Replaced ${r.count} time${r.count === 1 ? '' : 's'}`, 'ok');
+    const c = codeInView();
+    if (!c || readOnly) return;
+    // One change for each match (not one from the first to the last), so what is between them keeps its comments and
+    // Track changes marks each word replaced; Undo takes them all back at once.
+    const text = c.text();
+    const list = findIn(text, find.query, find.options, Number.MAX_SAFE_INTEGER);
+    if (!list.length) return;
+    c.view.dispatch({ changes: list.map((m) => ({ from: m.s, to: m.e, insert: replacementOf(text, m, find.query, find.replacement, find.options) })), userEvent: 'input.replace.all' });
+    toast(`Replaced ${list.length} time${list.length === 1 ? '' : 's'}`, 'ok');
   };
 
   // ---- comments -----------------------------------------------------------------------------------------------------------
@@ -711,7 +778,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   /** A comment on the words picked (or the line the cursor is on), written in the panel. */
   const addComment = () => {
     setMenu(null);
-    if (readOnly || onDisk || file === PICTURES) return;
+    if (readOnly || file === PICTURES) return;
     const c = codes.current.get(file);
     if (!c) return;
     let { from, to } = c.picked();
@@ -726,6 +793,28 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   };
   const addCommentRef = useRef(addComment);
   addCommentRef.current = addComment;
+  // A file's comments as the app kept them when it came (what comments coming in later are merged against).
+  const keptComments = useRef<TexComment[]>(doc?.model.comments ?? []);
+  useEffect(() => {
+    keptComments.current = doc?.model.comments ?? [];
+  }, [doc?.key]);
+  const savedRef = useRef(saved);
+  savedRef.current = saved;
+  // A file's comments changed elsewhere (an agent answered one): in with the user's own, placed on their words as the
+  // text is here; nothing to save when nothing was changed here.
+  useEffect(() => {
+    const inc = onDisk?.comments;
+    const d = live.current;
+    if (!inc || !d) return;
+    const theirs = cleanTexComments(inc.list, d);
+    const merged = mergeTexComments(keptComments.current, d.comments ?? [], theirs);
+    keptComments.current = theirs;
+    if (JSON.stringify(merged) === JSON.stringify(d.comments ?? [])) return;
+    const next: TexDoc = { ...d, comments: merged.length ? merged : undefined };
+    if (d === savedRef.current) setSaved(next);
+    setM(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onDisk?.comments?.n]);
   const setComments = (f: (cs: NonNullable<TexDoc['comments']>) => NonNullable<TexDoc['comments']>) => change((d) => ({ ...d, comments: f(d.comments ?? []) }));
   const draftDone = (text: string) => {
     const dr = draft;
@@ -757,10 +846,70 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         onEdit={(id, text) => setComments((cs) => cs.map((c) => (c.id === id ? { ...c, text } : c)))}
         onDelete={(id) => setComments((cs) => cs.filter((c) => c.id !== id))}
         onOpenFile={(name) => open(name)}
+        review={
+          canTrack && (
+            <ChangesList
+              changes={model.changes ?? []}
+              file={file}
+              label={label}
+              track={tracking}
+              active={activeChange}
+              readOnly={readOnly}
+              onPick={pickChange}
+              onAccept={(id) => decide([id], true)}
+              onReject={(id) => decide([id], false)}
+              onAll={(accept) => decide(null, accept)}
+              onOpenFile={(name) => open(name)}
+            />
+          )
+        }
         className={className}
       />
     );
   const openCount = model?.comments?.filter((c) => !c.resolved).length ?? 0;
+
+  // ---- tracked changes ----------------------------------------------------------------------------------------------------
+  // Kept with a document of the Library (a file of this computer keeps only its text).
+  const canTrack = !onDisk;
+  const tracking = !!model?.track;
+  const [activeChange, setActiveChange] = useState<string | null>(null);
+  useEffect(() => {
+    for (const c of codes.current.values()) c.setTrack(tracking && canTrack);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracking, made]);
+  const toggleTrack = () => {
+    if (readOnly || !canTrack) return;
+    const on = !live.current?.track;
+    change((d) => ({ ...d, track: on || undefined }));
+    // What is marked shows beside the source, where there is room for it (a sheet over the source would be in the way).
+    if (on && roomy) setCommentsOpen(true);
+    toast(on ? 'Track changes is on: what you type and delete is marked' : 'Track changes is off', 'ok');
+  };
+  /** Changes accepted or rejected (`ids`: those, or null for all): in a file's editor, so Undo takes it back, else in the document. */
+  const decide = (ids: string[] | null, accept: boolean) => {
+    const d = live.current;
+    if (!d || readOnly) return;
+    const picked = (d.changes ?? []).filter((c) => !ids || ids.includes(c.id));
+    for (const name of new Set(picked.map((c) => c.file))) {
+      const mine = picked.filter((c) => c.file === name).map((c) => c.id);
+      const c = codes.current.get(name);
+      if (c) (accept ? c.acceptChanges : c.rejectChanges)(mine);
+      else
+        change((x) => {
+          const n = texChangeOps(
+            x,
+            mine.map((id) => ({ id, [accept ? 'accept' : 'reject']: true })),
+          );
+          return n.comments?.length ? { ...n, comments: cleanTexComments(n.comments, n) } : n;
+        });
+    }
+    if (!ids && picked.length) toast(accept ? `Accepted ${picked.length} change${picked.length === 1 ? '' : 's'}` : `Rejected ${picked.length} change${picked.length === 1 ? '' : 's'}`, 'ok');
+  };
+  const pickChange = (x: TexChange) => {
+    setActiveChange(x.id);
+    withCode(x.file, (c) => c.pickChange(x.id));
+  };
+  const changeCount = model?.changes?.length ?? 0;
 
   // ---- what an agent is asked about ------------------------------------------------------------------------------------
   const settled = useDeferredValue(model);
@@ -846,13 +995,20 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
     withCode(name, (c) => {
       if (id === 'bold') return c.toggle('textbf', 'bold');
       if (id === 'italic') return c.toggle('textit', 'italic');
-      const p = c.pickedLines();
-      const made = makeSnippet(id, p.empty ? '' : p.text, { picture, key, labels: docWords(live.current ?? model!).labels });
-      if (made.needs) editFile(TEX_MAIN, (t) => withPackages(t, made.needs!));
-      if (made.block && !p.empty && (id === 'itemize' || id === 'enumerate' || id === 'description' || id === 'align')) {
-        // The lines picked become the list's items: the whole lines go.
-        c.replacePicked('');
+      let p = c.pickedLines();
+      // What does not take in the words picked goes after them, so they stay: a citation or a cross-reference after
+      // the words, a table of contents, a page break, or a figure for several lines, after those lines.
+      const after = id === 'cite' || id === 'ref' ? 'words' : id === 'toc' || id === 'newpage' || (id === 'figure' && p.text.includes('\n')) ? 'lines' : null;
+      if (after && !p.empty) {
+        const end = after === 'words' ? c.view.state.selection.main.to : c.view.state.doc.line(p.to).to;
+        c.view.dispatch({ selection: { anchor: end } });
+        p = c.pickedLines();
       }
+      const at = c.cursor();
+      const made = makeSnippet(id, p.empty ? '' : p.text, { picture, key, labels: docWords(live.current ?? model!).labels, prev: c.text().slice(Math.max(0, at - 1), at) });
+      if (made.needs) editFile(TEX_MAIN, (t) => withPackages(t, made.needs!));
+      // The lines picked are in it (a list's items, a quotation's lines): the whole lines go, it goes in their place.
+      if (made.block && made.lines && !p.empty) c.replacePicked('');
       c.insert(made.template, made.block);
     });
   };
@@ -986,7 +1142,13 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         c.destroy();
         codes.current.delete(n);
       }
-    change((d) => renameRefs({ ...d, files: d.files.map((f) => (f.name === from ? { ...f, name: to } : f)) }, from, to));
+    // Its comments and tracked changes go with it, each placed again on its words (the references renamed may have moved them).
+    change((d) => {
+      const n = renameRefs({ ...d, files: d.files.map((f) => (f.name === from ? { ...f, name: to } : f)) }, from, to);
+      const comments = n.comments?.length ? cleanTexComments(n.comments.map((c) => (c.file === from ? { ...c, file: to } : c)), n) : n.comments;
+      const changes = n.changes?.length ? cleanTexChanges(n.changes.map((c) => (c.file === from ? { ...c, file: to } : c)), n) : n.changes;
+      return { ...n, comments: comments?.length ? comments : undefined, changes: changes?.length ? changes : undefined };
+    });
     setOpened((o) => o.map((n) => (n === from ? to : n)));
     if (file === from) setFile(to);
     if (lastTex.current === from) lastTex.current = to;
@@ -1072,7 +1234,6 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
       </Button>
     </div>
   );
-  const sep = <span className="mx-1 h-5 w-px shrink-0 bg-line" />;
   const code = codes.current.get(file);
 
   const showInPdf = async () => {
@@ -1116,8 +1277,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
     });
   const fmt = (cmd: string) => () => onCode((c) => c.toggle(cmd, 'words'));
   const canCompare = !onDisk && !!pageId;
-  // A file of this computer keeps its files only: comments are for documents in the Library.
-  const canComment = !onDisk;
+  // Documents in the Library keep their comments; a file of this computer has its comments kept by the app.
+  const canComment = true;
 
   const menus: MenuDef[] = [
     {
@@ -1263,8 +1424,13 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         { label: 'Word count', icon: <WholeWord size={14} />, also: 'words texcount', run: () => setDialog('count') },
         canCompare && { label: 'Compare versions', icon: <History size={14} />, also: 'diff history changes', run: () => setDialog('compare') },
         '-',
+        canTrack && { label: 'Track changes', icon: <FilePen size={14} />, checked: tracking, disabled: readOnly, also: 'review suggest suggestions tracked revisions', run: toggleTrack },
+        canTrack && { label: 'Accept all changes', icon: <CheckCheck size={14} />, disabled: readOnly || !changeCount, also: 'tracked review', run: () => decide(null, true) },
+        canTrack && { label: 'Reject all changes', icon: <X size={14} />, disabled: readOnly || !changeCount, also: 'tracked review', run: () => decide(null, false) },
+        '-',
         { label: 'Show the log', icon: <ScrollText size={14} />, disabled: !result?.log, run: () => setLogOpen(true) },
         { label: 'Open the PDF', icon: <ExternalLink size={14} />, disabled: !result?.pdf, run: openPdf },
+        !!onAsk && { label: 'Ask the agent', icon: <Sparkles size={14} />, also: 'lines section question help', run: askHere },
         !!onAsk && !readOnly && !!result?.errors.length && { label: 'Ask the agent to fix them', icon: <Sparkles size={14} />, also: 'errors', run: askFix },
         '-',
         { label: 'Keyboard shortcuts', icon: <Keyboard size={14} />, also: 'keys', run: () => setDialog('keys') },
@@ -1272,16 +1438,35 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
     },
   ];
 
-  const toolbar = (
-    <div className="flex h-11 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-line bg-panel px-2 [&::-webkit-scrollbar]:hidden">
-      {!wide && (
-        <>
-          {compileButtons}
-          {engineChip}
-          {sep}
-        </>
-      )}
-      <div className="shrink-0">
+  // The toolbar: what fits the row, the most used first (the rest folds away, all of it in the menus too). Where the
+  // source and the pages do not fit side by side, the row starts with the switch between them and Recompile; over
+  // the pages it holds only those.
+  const askLabel = cursor.picked && file !== PICTURES ? 'Ask the agent about these lines' : 'Ask the agent';
+  const overPages = !wide && pane === 'preview';
+  const tools: RowTool[] = ([
+    !wide && {
+      id: 'pane',
+      rank: 0,
+      group: 'pane',
+      node: (
+        <Segmented
+          size="sm"
+          value={pane}
+          onChange={setPane}
+          options={[
+            { value: 'source', label: 'LaTeX source' },
+            { value: 'preview', label: 'Preview' },
+          ]}
+        />
+      ),
+    },
+    !wide && { id: 'compile', rank: 1, group: 'compile', node: compileButtons },
+    !wide && { id: 'engine', rank: 12, group: 'compile', node: engineChip },
+    !overPages && {
+      id: 'mode',
+      rank: 8,
+      group: 'mode',
+      node: (
         <Segmented
           size="sm"
           value={mode}
@@ -1291,59 +1476,133 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
             { value: 'visual', label: 'Visual' },
           ]}
         />
-      </div>
-      {!readOnly && (
-        <>
-          {sep}
+      ),
+    },
+    !overPages &&
+      !readOnly && {
+        id: 'bold',
+        rank: 2,
+        group: 'insert',
+        node: (
           <IconButton label="Bold (Ctrl+B)" size="sm" onClick={() => void insert('bold')}>
             <Bold size={15} />
           </IconButton>
+        ),
+      },
+    !overPages &&
+      !readOnly && {
+        id: 'italic',
+        rank: 3,
+        group: 'insert',
+        node: (
           <IconButton label="Italic (Ctrl+I)" size="sm" onClick={() => void insert('italic')}>
             <Italic size={15} />
           </IconButton>
+        ),
+      },
+    !overPages &&
+      !readOnly && {
+        id: 'symbols',
+        rank: 5,
+        group: 'insert',
+        node: (
           <IconButton ref={anchors.symbols} label="Symbols" size="sm" active={menu === 'symbols'} onClick={() => setMenu(menu === 'symbols' ? null : 'symbols')}>
             <Omega size={15} />
           </IconButton>
+        ),
+      },
+    !overPages &&
+      !readOnly && {
+        id: 'equation',
+        rank: 4,
+        group: 'insert',
+        node: (
           <IconButton label="Equation" size="sm" onClick={() => void insert('equation')}>
             <Sigma size={15} />
           </IconButton>
+        ),
+      },
+    !overPages &&
+      !readOnly && {
+        id: 'figure',
+        rank: 6,
+        group: 'insert',
+        node: (
           <IconButton label="Figure with a picture" size="sm" onClick={() => void insert('figure')}>
             <ImagePlus size={15} />
           </IconButton>
-        </>
-      )}
-      {sep}
-      <IconButton
-        ref={anchors.outline}
-        label="Outline"
-        size="sm"
-        active={wide ? outlineOpen : menu === 'outline'}
-        onClick={() => (wide ? setOutlineOpen((o) => !o) : setMenu(menu === 'outline' ? null : 'outline'))}
-      >
-        <ListTree size={15} />
-      </IconButton>
-      {canComment && (
-        <IconButton label="Comments" size="sm" active={commentsOpen} onClick={() => setCommentsOpen((x) => !x)} className="relative">
-          <MessageSquare size={15} />
-          {openCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-3.5 rounded-full bg-accent px-1 text-[9.5px] leading-3.5 font-semibold text-accent-fg tabular-nums">{openCount}</span>}
+        ),
+      },
+    !overPages && {
+      id: 'outline',
+      rank: 11,
+      group: 'view',
+      node: (
+        <IconButton
+          ref={anchors.outline}
+          label="Outline"
+          size="sm"
+          active={wide ? outlineOpen : menu === 'outline'}
+          onClick={() => (wide ? setOutlineOpen((o) => !o) : setMenu(menu === 'outline' ? null : 'outline'))}
+        >
+          <ListTree size={15} />
         </IconButton>
-      )}
-      <IconButton label="Find and replace (Ctrl+F)" size="sm" disabled={!code} active={find.open} onClick={() => (find.open ? find.close() : find.show())}>
-        <Search size={15} />
-      </IconButton>
-      {setup?.sync !== false && (
-        <IconButton label="Show this line in the PDF" size="sm" disabled={!result?.pdf || file === PICTURES} onClick={() => void showInPdf()}>
-          <LocateFixed size={15} />
+      ),
+    },
+    !overPages &&
+      canComment && {
+        id: 'comments',
+        rank: 10,
+        group: 'view',
+        node: (
+          <IconButton label="Comments" size="sm" active={commentsOpen} onClick={() => setCommentsOpen((x) => !x)} className="relative">
+            <MessageSquare size={15} />
+            {openCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-3.5 rounded-full bg-accent px-1 text-[9.5px] leading-3.5 font-semibold text-accent-fg tabular-nums">{openCount}</span>}
+          </IconButton>
+        ),
+      },
+    !overPages && {
+      id: 'find',
+      rank: 9,
+      group: 'view',
+      node: (
+        <IconButton label="Find and replace (Ctrl+F)" size="sm" disabled={!code} active={find.open} onClick={() => (find.open ? find.close() : find.show())}>
+          <Search size={15} />
         </IconButton>
-      )}
-      {onAsk && (
-        <>
-          {sep}
+      ),
+    },
+    !overPages &&
+      setup?.sync !== false && {
+        id: 'showpdf',
+        rank: 13,
+        group: 'view',
+        node: (
+          <IconButton label="Show this line in the PDF" size="sm" disabled={!result?.pdf || file === PICTURES} onClick={() => void showInPdf()}>
+            <LocateFixed size={15} />
+          </IconButton>
+        ),
+      },
+    !overPages &&
+      !!onAsk && {
+        id: 'ask',
+        rank: 7,
+        group: 'ask',
+        node: (
           <Button size="sm" variant="ghost" icon={<Sparkles size={14} className="text-accent" />} onClick={askHere} className="shrink-0">
-            {cursor.picked && file !== PICTURES ? 'Ask the agent about these lines' : 'Ask the agent'}
+            {askLabel}
           </Button>
-        </>
-      )}
+        ),
+        small: (
+          <IconButton label={askLabel} size="sm" onClick={askHere}>
+            <Sparkles size={15} className="text-accent" />
+          </IconButton>
+        ),
+      },
+  ] as (RowTool | false)[]).filter((t): t is RowTool => !!t);
+  const toolbar = (
+    // While an agent's version shows, the toolbar stays where it is, out of use.
+    <div inert={liveOn} className={cx('flex h-11 shrink-0 items-center border-b border-line bg-panel px-2', liveOn && 'opacity-45')}>
+      <ToolRow tools={tools} className="flex-1" />
     </div>
   );
 
@@ -1526,20 +1785,10 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
-          {/* The menus beside the title, where the header has room for them; one button where it hasn't. */}
-          <MenuBar menus={menus} compact={roomy ? 'auto' : true} />
+          {/* The menus beside the title, where the header has room for them; one button where it hasn't, which the
+              title gives way to (the switch between the source and the pages is in the toolbar then). */}
+          <MenuBar menus={menus} compact={roomy ? 'auto' : true} className={roomy ? undefined : 'shrink-0'} />
         </div>
-        {!wide && (
-          <Segmented
-            size="sm"
-            value={pane}
-            onChange={setPane}
-            options={[
-              { value: 'source', label: 'LaTeX source' },
-              { value: 'preview', label: 'Preview' },
-            ]}
-          />
-        )}
         {wide && engineChip}
         {wide && compileButtons}
         {tail}
@@ -1661,7 +1910,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
           const name = cleanTexName(n, 'file')!;
           setNaming(null);
           change((d) => ({ ...d, files: [...d.files, { name, text: '' }] }));
-          open(name);
+          // Its editor takes the keys at once, to write in it.
+          withCode(name, (c) => c.focus());
         }}
       />
       <NameDialog

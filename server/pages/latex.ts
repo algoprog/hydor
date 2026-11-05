@@ -27,6 +27,8 @@ import {
   cleanEngine,
   cleanTexName,
   engineLabel,
+  newChangeId,
+  texChangeOps,
   extOf,
   guessEngine,
   normalizeTex,
@@ -42,13 +44,15 @@ import {
   type TexEngine,
   type TexIssue,
   type TexPicture,
+  type TexChange,
   type TexComment,
   type TexSetup,
 } from '../../shared/latex.ts';
 import { authorForAgent, newCommentId, peopleNote } from '../../shared/comments.ts';
 import { TEX_ASKED } from '../../shared/latex-catalog.ts';
+import { diffWords } from '../../shared/latex-diff.ts';
 import { texCount, totalWords } from '../../shared/latex-count.ts';
-import { TEX_TEMPLATES, texFromTemplate, texTemplate } from '../../shared/latex-templates.ts';
+import { TEMPLATE_NEEDS, TEX_TEMPLATES, texFromTemplate, texTemplate } from '../../shared/latex-templates.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
@@ -57,6 +61,7 @@ import { Zip } from '../documents/zip.ts';
 import { getAsset, putAsset, takeIn } from './assets.ts';
 import { findReferences } from './latex-refs.ts';
 import { zipParts } from './ooxml.ts';
+import { TEX_EDITS_HELP } from '../../shared/tex-edits.ts';
 
 export { isTexText } from '../../shared/latex.ts';
 
@@ -127,7 +132,21 @@ export function textOf(b: Buffer): string {
 }
 
 /** Other names agents may give the templates. */
-const TEMPLATE_ALIASES: Record<string, string> = { thesis: 'book', slides: 'beamer', presentation: 'beamer', resume: 'cv', résumé: 'cv', problemset: 'homework', 'problem-set': 'homework', conference: 'paper' };
+const TEMPLATE_ALIASES: Record<string, string> = {
+  thesis: 'book',
+  slides: 'beamer',
+  presentation: 'beamer',
+  resume: 'cv',
+  résumé: 'cv',
+  problemset: 'homework',
+  'problem-set': 'homework',
+  conference: 'paper',
+  ieeetran: 'ieee',
+  acmart: 'acm',
+  sigconf: 'acm',
+  llncs: 'lncs',
+  springer: 'lncs',
+};
 
 /**
  * A document from an agent, checked as keepTex does. Files and pictures may be named by path in its session's folder
@@ -269,33 +288,24 @@ export async function agentTex(db: DB, input: unknown, cwd: string, prev?: TexDo
   }
 
   // Comments: the version's own, answered, resolved or added to.
-  const comments: TexComment[] = (prev?.comments ?? []).map((c) => ({ ...c, replies: c.replies ? [...c.replies] : undefined }));
-  if (Array.isArray(v.comments))
-    for (const op of v.comments) {
-      if (!isObj(op)) continue;
-      const now = Date.now();
-      if (typeof op.id === 'string' && op.id) {
-        const c = comments.find((x) => x.id === op.id);
-        if (!c) {
-          notes.push(`There is no comment ${op.id}: get_page lists them.`);
-          continue;
-        }
-        if (typeof op.reply === 'string' && op.reply.trim()) c.replies = [...(c.replies ?? []), { id: newCommentId(), by: 'agent', text: op.reply.trim(), at: now }];
-        if (typeof op.resolve === 'boolean') c.resolved = op.resolve || undefined;
-        continue;
+  const comments = texCommentOps(prev?.comments ?? [], v.comments, (file) => (file === TEX_MAIN ? main : (files.get(file) ?? null)), notes);
+
+  // Track changes: as the agent sets it, else as the document had it. While it is on, what the agent changed in the
+  // document's files is marked as its own changes, word by word, beside those waiting already (a new file is simply
+  // there); those waiting are found again on their words.
+  const track = typeof v.track === 'boolean' ? v.track : !!prev?.track;
+  const changes: unknown[] = [...(prev?.changes ?? [])];
+  if (track && prev && main !== null) {
+    const now = Date.now();
+    const pairs: [string, string | undefined, string][] = [[TEX_MAIN, prev.main, main], ...[...files].map(([name, text]): [string, string | undefined, string] => [name, prev.files.find((f) => f.name === name)?.text, text])];
+    for (const [file, was, is] of pairs) {
+      if (was === undefined || was === is) continue;
+      for (const h of diffWords(was, is)) {
+        if (h.del) changes.push({ id: newChangeId(), kind: 'del', file, from: h.at, to: h.at, text: h.del, by: 'agent', at: now });
+        if (h.ins) changes.push({ id: newChangeId(), kind: 'ins', file, from: h.at, to: h.at + h.ins.length, text: h.ins, by: 'agent', at: now });
       }
-      if (typeof op.text !== 'string' || !op.text.trim()) continue;
-      // A new comment, on the words it quotes in its file.
-      const file = typeof op.file === 'string' && op.file.trim() ? op.file.trim() : TEX_MAIN;
-      const text = file === TEX_MAIN ? main : (files.get(file) ?? null);
-      const quote = typeof op.quote === 'string' ? op.quote.trim() : '';
-      const at = text !== null && quote ? text.indexOf(quote) : -1;
-      if (text === null || at < 0) {
-        notes.push(`The comment “${op.text.trim().slice(0, 60)}” was left out: ${text === null ? `the document has no file ${file}` : `${file} has no “${quote.slice(0, 60)}” to put it on`}.`);
-        continue;
-      }
-      comments.push({ id: newCommentId(), by: 'agent', text: op.text.trim(), at: now, quote, file, from: at, to: at + quote.length });
     }
+  }
 
   let doc: TexDoc;
   try {
@@ -306,13 +316,53 @@ export async function agentTex(db: DB, input: unknown, cwd: string, prev?: TexDo
       files: [...files].map(([name, text]) => ({ name, text })),
       pictures: [...pictures].map(([name, src]) => ({ name, src })),
       comments,
+      track,
+      changes,
     });
   } catch (e) {
     throw new Error(`${(e as Error).message} See save_latex's description for the document's shape.`);
   }
+  // Tracked changes accepted or rejected (after what the agent sent: its text has them as accepted).
+  if (v.changes != null) doc = texChangeOps(doc, v.changes, notes);
   const text = texText(doc);
   if (Buffer.byteLength(text) > MAX_TEX) throw new Error(`The document is over ${Math.round(MAX_TEX / 1024 / 1024)} MB without its pictures; make it smaller.`);
   return { doc, text, notes };
+}
+
+/**
+ * Comments answered, resolved or added by an agent (save_latex's `comments`): [{id, reply?, resolve?}] for one there
+ * is, [{file?, quote, text}] for a new one on the words it quotes in its file (`textOf`: a file's text by its name, or
+ * null). What could not be done is said in `notes`. Returns the comments as they are then.
+ */
+export function texCommentOps(had: TexComment[], ops: unknown, textOf: (file: string) => string | null, notes: string[]): TexComment[] {
+  const comments: TexComment[] = had.map((c) => ({ ...c, replies: c.replies ? [...c.replies] : undefined }));
+  if (!Array.isArray(ops)) return comments;
+  for (const op of ops) {
+    if (!isObj(op)) continue;
+    const now = Date.now();
+    if (typeof op.id === 'string' && op.id) {
+      const c = comments.find((x) => x.id === op.id);
+      if (!c) {
+        notes.push(`There is no comment ${op.id}: get_page lists them.`);
+        continue;
+      }
+      if (typeof op.reply === 'string' && op.reply.trim()) c.replies = [...(c.replies ?? []), { id: newCommentId(), by: 'agent', text: op.reply.trim(), at: now }];
+      if (typeof op.resolve === 'boolean') c.resolved = op.resolve || undefined;
+      continue;
+    }
+    if (typeof op.text !== 'string' || !op.text.trim()) continue;
+    // A new comment, on the words it quotes in its file.
+    const file = typeof op.file === 'string' && op.file.trim() ? op.file.trim() : TEX_MAIN;
+    const text = textOf(file);
+    const quote = typeof op.quote === 'string' ? op.quote.trim() : '';
+    const at = text !== null && quote ? text.indexOf(quote) : -1;
+    if (text === null || at < 0) {
+      notes.push(`The comment “${op.text.trim().slice(0, 60)}” was left out: ${text === null ? `the document has no file ${file}` : `${file} has no “${quote.slice(0, 60)}” to put it on`}.`);
+      continue;
+    }
+    comments.push({ id: newCommentId(), by: 'agent', text: op.text.trim(), at: now, quote, file, from: at, to: at + quote.length });
+  }
+  return comments;
 }
 
 // ---- TeX on this computer ------------------------------------------------------------------------------------------
@@ -1109,6 +1159,26 @@ const PACKAGES: Record<string, string> = {
   'tikz-cd': 'texlive-pictures',
   algorithm2e: 'texlive-science',
   physics: 'texlive-science',
+  IEEEtran: 'texlive-publishers',
+  acmart: 'texlive-publishers (and texlive-fonts-extra for its fonts)',
+  llncs: 'texlive-publishers',
+  elsarticle: 'texlive-publishers',
+  'revtex4-2': 'texlive-publishers',
+  libertine: 'texlive-fonts-extra',
+  newtxmath: 'texlive-fonts-extra',
+};
+
+/** TeX Live's names (tlmgr's) for the classes and packages whose files are named otherwise. */
+const CTAN: Record<string, string> = {
+  IEEEtran: 'ieeetran',
+  'ACM-Reference-Format': 'acmart',
+  splncs04: 'llncs',
+  zi4: 'inconsolata',
+  newtxmath: 'newtx',
+  manyfoot: 'ncctools',
+  beamerinnerthememetropolis: 'beamertheme-metropolis',
+  times: 'psnfss',
+  'revtex4-2': 'revtex',
 };
 
 /** What a missing file most likely is, and what to do. */
@@ -1120,7 +1190,7 @@ function missingFile(name: string, names: Set<string>): { message: string; hint:
     const pkg = PACKAGES[base];
     return {
       message: `The ${what} ${base} is not installed on this computer.`,
-      hint: `Install it with your TeX: TeX Live's tlmgr install ${base}${pkg ? `; on Debian or Ubuntu it comes with ${pkg}` : '; on Debian or Ubuntu, apt-file search ' + name + ' names the package (most are in texlive-latex-extra, texlive-science or texlive-fonts-extra)'}. Or add ${name} to the document as a file of its own.`,
+      hint: `Install it with your TeX: TeX Live's tlmgr install ${CTAN[base] ?? base}${pkg ? `; on Debian or Ubuntu it comes with ${pkg}` : '; on Debian or Ubuntu, apt-file search ' + name + ' names the package (most are in texlive-latex-extra, texlive-science or texlive-fonts-extra)'}; MiKTeX installs it by itself the first time. Or add ${name} to the document as a file of its own.`,
     };
   }
   if ((!ext || ['png', 'jpg', 'jpeg', 'pdf', 'eps'].includes(ext)) && !names.has(name))
@@ -1764,6 +1834,39 @@ export function compileSummary(r: Omit<TexResult, 'pdf'> & { pdf?: Buffer | bool
 /** The keys of a .bib's entries, to cite. */
 const bibKeys = (text: string) => [...text.matchAll(/@\s*([A-Za-z]+)\s*[{(]\s*([^,\s]+)\s*,/g)].filter((m) => !/^(comment|string|preamble)$/i.test(m[1])).map((m) => m[2]);
 
+/**
+ * A document's comments for an agent: how many are open, each with its id, where it is (file and line), the words it
+ * is on, who wrote it and its replies, and how to answer (`how`: the tool and argument that do it).
+ */
+export function texCommentsForAgent(d: TexDoc, how: string, name: (file: string) => string = (f) => f): string {
+  const cs = d.comments ?? [];
+  const open = cs.filter((c) => !c.resolved);
+  const lineOf = (c: TexComment) => (texFileTextOf(d, c.file) ?? '').slice(0, c.from).split('\n').length;
+  const out = [
+    `Comments: ${open.length} open${cs.length > open.length ? `, ${cs.length - open.length} resolved` : ''}. Answer one with ${how}: [{"id", "reply": "…"}], resolve it with {"id", "resolve": true} once done, or add one with {"file", "quote": the words it is on, "text"}.`,
+  ];
+  for (const c of [...open, ...cs.filter((x) => x.resolved)].slice(0, 60))
+    out.push(
+      `- ${c.id}${c.resolved ? ' (resolved)' : ''} on ${name(c.file)}:${lineOf(c)}${c.quote ? ` “${c.quote.slice(0, 120)}”` : ''}, by ${authorForAgent(c)}: ${c.text.slice(0, 600)}${(c.replies ?? []).map((r) => `\n  - ${authorForAgent(r)}: ${r.text.slice(0, 400)}`).join('')}`,
+    );
+  // People the project is shared with: their comments are requests about the document, not the user's say.
+  const note = peopleNote(cs);
+  if (note) out.push(note);
+  return out.join('\n');
+}
+
+/** A document's tracked changes for an agent: whether Track changes is on, each change waiting (what, where, who), and how to decide them. */
+export function texChangesForAgent(d: TexDoc): string {
+  const cs = d.changes ?? [];
+  const lineOf = (c: TexChange) => (texFileTextOf(d, c.file) ?? '').slice(0, c.from).split('\n').length;
+  const out = [
+    `Track changes: ${d.track ? 'on (what the user types and deletes is marked, and so is what you change when you save)' : 'off'}. ${cs.length ? `${cs.length} tracked change${cs.length === 1 ? '' : 's'} to accept or reject` : 'No tracked changes waiting'}; the files below read as if all were accepted. Decide them with save_latex’s changes: [{"id", "accept": true}] or [{"id", "reject": true}] (rejecting words put in takes them out, rejecting words taken out puts them back), or "accept all" / "reject all"; track: true or false switches it.`,
+  ];
+  for (const c of cs.slice(0, 80)) out.push(`- ${c.id}: ${c.kind === 'ins' ? 'put in' : 'taken out'} by ${c.by === 'agent' ? 'an agent' : 'the user'} in ${c.file}:${lineOf(c)}: “${c.text.slice(0, 200)}${c.text.length > 200 ? '…' : ''}”`);
+  if (cs.length > 80) out.push(`- … and ${cs.length - 80} more`);
+  return out.join('\n');
+}
+
 /** What get_page tells an agent of a LaTeX document: its outline, its files, and how it last typeset. */
 export function texForAgent(text: string): string {
   const d = readTex(text);
@@ -1775,20 +1878,8 @@ export function texForAgent(text: string): string {
   const outline = texOutline(d);
   const top = Math.min(...outline.map((h) => h.level));
   if (outline.length) out.push(`\nOutline:\n${outline.slice(0, 200).map((h) => `${'  '.repeat(h.level - top)}- ${h.title} (${h.file}:${h.line})`).join('\n')}`);
-  const cs = d.comments ?? [];
-  if (cs.length) {
-    const open = cs.filter((c) => !c.resolved);
-    const lineOf = (c: TexComment) => (texFileTextOf(d, c.file) ?? '').slice(0, c.from).split('\n').length;
-    out.push(
-      `\nComments: ${open.length} open${cs.length > open.length ? `, ${cs.length - open.length} resolved` : ''}. Answer one with save_latex's comments: [{"id", "reply": "…"}], resolve it with {"id", "resolve": true} once done, or add one with {"file", "quote": the words it is on, "text"}.`,
-    );
-    for (const c of [...open, ...cs.filter((x) => x.resolved)].slice(0, 60))
-      out.push(
-        `- ${c.id}${c.resolved ? ' (resolved)' : ''} on ${c.file}:${lineOf(c)}${c.quote ? ` “${c.quote.slice(0, 120)}”` : ''}, by ${authorForAgent(c)}: ${c.text.slice(0, 600)}${(c.replies ?? []).map((r) => `\n  - ${authorForAgent(r)}: ${r.text.slice(0, 400)}`).join('')}`,
-      );
-    const note = peopleNote(cs);
-    if (note) out.push(note);
-  }
+  if (d.track || d.changes?.length) out.push(`\n${texChangesForAgent(d)}`);
+  if (d.comments?.length) out.push(`\n${texCommentsForAgent(d, 'save_latex’s comments')}`);
   const c = texCount(d);
   const n1 = (x: number, one: string, many = `${one}s`) => `${x.toLocaleString('en')} ${x === 1 ? one : many}`;
   out.push(
@@ -1822,12 +1913,14 @@ export function texForAgent(text: string): string {
 const LATEX_HELP = [
   'Make or change a LaTeX document, kept in the user’s Library: a paper, a thesis, a CV, a letter, a report, math-heavy notes, a beamer talk, anything the user wants typeset with LaTeX. It shows in the conversation and in the Library as its typeset pages; there the user edits the source beside its PDF (typeset again as they type) and downloads the PDF, main.tex or the whole project as a .zip. Use it rather than writing .tex files when the user asks for LaTeX, unless they want the files in a folder of theirs.',
   'source: the whole of main.tex, from \\documentclass to \\end{document}. files: the other files it reads, by the names it gives them ({"refs.bib": "…", "chapters/intro.tex": "…"}, or [{name, text}], or {name, path} for a file of this session); names are letters, digits, - _ . and / between folders. Or folder: a LaTeX project folder of this session, taken in whole.',
-  'comments: the user’s comments on words of the document (get_page lists them, with their ids): answer with [{"id": "…", "reply": "…"}], resolve with {"id", "resolve": true} once you did what it asks, or add your own with {"file": "main.tex", "quote": the exact words it is on, "text": "…"}; what you leave out stays as it is.',
-  'Or, for a new document, template: article, report, book (a book or thesis: chapters, theorems, a bibliography), letter, beamer (slides), cv (moderncv), homework (problems and solutions), paper (two columns, as for a conference) or poster (tikzposter): a whole project that typesets, with the title in it, to change with source and files in the same call or in later saves (get_page shows it).',
+  'Track changes (track: true or false): while it is on, what the user types and deletes is marked, and what you change when you save is marked as yours, word by word, for the user to accept or reject; get_page lists the changes waiting (the files read as if all were accepted), and changes: [{"id", "accept": true}] or [{"id", "reject": true}], or "accept all" / "reject all", decides them.',
+  'comments: the user’s comments on words of the document (get_page lists them, with their ids): answer with [{"id": "…", "reply": "…"}], resolve with {"id", "resolve": true} once you did what it asks, or add your own with {"file": "main.tex", "quote": the exact words it is on, "text": "…"}; what you leave out stays as it is. A LaTeX file of this computer (opened from Files) has comments too, which the app keeps beside it: get_page with its path lists them, and save_latex with path (instead of id and title) and comments answers them; change the file itself with your own tools.',
+  'Or, for a new document, template: article, report, book (a book or thesis: chapters, theorems, a bibliography), letter, beamer (slides), cv (moderncv), homework (problems and solutions), paper (two columns, as for a conference), ieee (IEEEtran, as IEEE conferences ask), acm (acmart, sigconf), lncs (Springer’s llncs) or poster (tikzposter): a whole project that typesets, with the title in it, to change with source and files in the same call or in later saves (get_page shows it). ieee, acm and lncs need TeX Live’s publishers’ classes (texlive-publishers): if this computer lacks one, the save says what to install.',
   'pictures: what \\includegraphics shows, each by the name it uses: [{"name": "figures/plot.png", "src": "plots/plot.png"}] with src a PNG or JPEG file of this session, a public https address, or a picture of the document already (naget-asset:…); a path alone is its own name. A PDF picture becomes a PNG of it.',
   'engine: pdflatex (the default), xelatex (Unicode text and this computer’s fonts with fontspec: Greek, Chinese and other scripts), or lualatex. Packages: those of a standard TeX Live (amsmath, graphicx, hyperref, geometry, tikz, pgfplots, booktabs, beamer, natbib…); for a bibliography, a .bib file with \\bibliography and BibTeX (biblatex and biber may be missing). Nothing that runs programs (minted, svg, shell escape): it is turned off.',
   'The answer says whether it typeset, with each error’s file, line and what it most likely means: fix them and save again with the same id.',
-  'To change a document: get_page with its id gives every file; send save_latex with that id and only what changes (source for main.tex, files to add or replace, an empty text or remove: [names] to take one out, pictures to add); what you leave out stays as it is. Each save is a new version, the older ones restorable. Keep what the user changed.',
+  'To change a document: get_page with its id gives every file; send save_latex with that id and only what changes (source for main.tex, files to add or replace, an empty text or remove: [names] to take one out, pictures to add, or edits for small changes in them); what you leave out stays as it is. Each save is a new version, the older ones restorable. Keep what the user changed.',
+  TEX_EDITS_HELP,
 ].join(' ');
 
 export const SAVE_LATEX_DESCRIPTION = LATEX_HELP;
@@ -1854,13 +1947,24 @@ export const SAVE_LATEX_SCHEMA = {
       items: { type: 'object' },
       description: 'Answer, resolve or add comments: [{"id", "reply"?, "resolve"?: true}] for one get_page lists, or [{"file"?, "quote": the words it is on, "text"}] for a new one.',
     },
+    path: { type: 'string', description: 'Instead of id and title: a .tex file of this computer, whose comments (kept by the app) change; the file itself is not written.' },
+    track: { type: 'boolean', description: 'Track changes on or off: while on, the user’s edits and yours are marked, to accept or reject.' },
+    changes: {
+      description: 'Accept or reject tracked changes (get_page lists them): [{"id", "accept": true}] or [{"id", "reject": true}], or "accept all" / "reject all".',
+      anyOf: [{ type: 'array', items: { type: 'object' } }, { type: 'string' }],
+    },
+    edits: {
+      type: 'array',
+      items: { type: 'object' },
+      description:
+        'With id, instead of source: changes made in order in its files as get_page gives them (main.tex unless "file" says another): {"find": "…", "replace": "…", "all"?: true}, {"section": "a section’s title", "text": "…"}, {"after": "…", "text": "…"}, {"before": "…", "text": "…"}, {"append": "text before \\end{document}"}.',
+    },
     template: {
       type: 'string',
       enum: TEX_TEMPLATES.map((t) => t.id),
       description: 'A new document only: start from a template (a whole project with the title in it) instead of source; source or files sent with it replace its parts.',
     },
   },
-  required: ['title'],
 };
 
 // ---- the editor's routes --------------------------------------------------------------------------------------------
@@ -1887,7 +1991,45 @@ function installedFiles(t: Tools): Promise<string[] | undefined> {
   );
 }
 
-/** What this computer can do with LaTeX: which engines it has, whether it can show pages and shut TeX in, and which of the common classes and packages it has. */
+/** Debian's and Ubuntu's packages of the files the templates need (TEMPLATE_NEEDS). */
+const DEBIAN: Record<string, string> = {
+  'booktabs.sty': 'texlive-latex-recommended',
+  'beamer.cls': 'texlive-latex-recommended',
+  'cite.sty': 'texlive-latex-recommended',
+  'fancyhdr.sty': 'texlive-latex-base',
+  'times.sty': 'texlive-latex-base',
+  'tikzposter.cls': 'texlive-pictures',
+  'IEEEtran.cls': 'texlive-publishers',
+  'IEEEtran.bst': 'texlive-publishers',
+  'acmart.cls': 'texlive-publishers',
+  'ACM-Reference-Format.bst': 'texlive-publishers',
+  'llncs.cls': 'texlive-publishers',
+  'splncs04.bst': 'texlive-publishers',
+  'fontawesome5.sty': 'texlive-fonts-extra',
+  'libertine.sty': 'texlive-fonts-extra',
+  'zi4.sty': 'texlive-fonts-extra',
+  'newtxmath.sty': 'texlive-fonts-extra',
+};
+
+/**
+ * What adds the templates' `missing` classes and packages on this computer: Debian's or Fedora's packages where the
+ * system's TeX Live runs, TeX Live's own tlmgr where it was installed from TeX Live or MacTeX; MiKTeX installs them
+ * by itself the first time a document asks for them.
+ */
+function addFor(t: Tools, missing: string[]): TexSetup['add'] {
+  const bin = t.pdflatex ?? t.xelatex ?? t.lualatex ?? '';
+  if (/miktex/i.test(bin)) return { auto: true };
+  if (!missing.length) return undefined;
+  const uniq = (xs: string[]) => [...new Set(xs)].join(' ');
+  const system = bin.startsWith('/usr/bin/');
+  if (system && fs.existsSync('/etc/debian_version')) return { cmd: `sudo apt install ${uniq(missing.map((f) => DEBIAN[f] ?? 'texlive-latex-extra'))}` };
+  if (system && (fs.existsSync('/etc/fedora-release') || fs.existsSync('/etc/redhat-release'))) return { cmd: `sudo dnf install ${missing.map((f) => `'tex(${f})'`).join(' ')}` };
+  const stem = (f: string) => f.replace(/\.[^.]+$/, '');
+  const own = bin.startsWith(os.homedir() + path.sep) || process.platform === 'win32';
+  return { cmd: `${own ? '' : 'sudo '}tlmgr install ${uniq(missing.map((f) => CTAN[stem(f)] ?? stem(f).toLowerCase()))}` };
+}
+
+/** What this computer can do with LaTeX: which engines it has, whether it can show pages and shut TeX in, which of the common classes and packages it has, and what adds those the templates lack. */
 export async function texSetup(): Promise<TexSetup> {
   const t = tools();
   const box = t.pdflatex || t.xelatex || t.lualatex || t.pdftoppm ? await sandbox(t) : null;
@@ -1898,6 +2040,7 @@ export async function texSetup(): Promise<TexSetup> {
     else if (e === 'lualatex' && !box) notes[e] = LUA_UNSAFE;
   }
   const any = !!(t.pdflatex || t.xelatex || t.lualatex);
+  const installed = any ? await installedFiles(t) : undefined;
   return {
     engines: { pdflatex: !!t.pdflatex, xelatex: !!t.xelatex, lualatex: !!t.lualatex && !!box },
     latexmk: !!t.latexmk,
@@ -1907,7 +2050,8 @@ export async function texSetup(): Promise<TexSetup> {
     sandbox: !!box,
     missing: any ? undefined : missingFor(t, 'pdflatex')!,
     notes,
-    installed: any ? await installedFiles(t) : undefined,
+    installed,
+    add: installed ? addFor(t, TEMPLATE_NEEDS.filter((n) => !installed.includes(n))) : undefined,
   };
 }
 
@@ -1937,7 +2081,7 @@ export function texPdfFile(key: string): string | null {
 
 /**
  * The editor's live preview, signed in:
- *   GET  /api/pages/tex/setup — what this computer has: { engines, latexmk, bibtex, pictures, sync, sandbox, missing?, notes, installed? }
+ *   GET  /api/pages/tex/setup — what this computer has: { engines, latexmk, bibtex, pictures, sync, sandbox, missing?, notes, installed?, add? }
  *   POST /api/pages/tex/compile { model, base? } — typesets the editor's model as it is (saved or not):
  *        { key, ok, pdf, pages, sizes, errors, warnings, log, engine, missing?, ms }
  *   GET  /api/pages/tex/:key/:page?w= — a page's picture (PNG), w pixels wide
