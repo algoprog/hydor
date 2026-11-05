@@ -659,6 +659,8 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "On my 'Launch plan' slides, number every slide but the title and put 'Acme · Confidential' at the foot of each."
 - "Put an icon beside each step on slide 3, and the formula for compound interest on slide 5."
 - "Make slide 4 a copy of slide 3 where the chart moves to the right and grows, with Morph between them."
+- "Answer the comments on my 'Launch plan' slides, make the changes they ask for, and resolve them."
+- "On slide 4 of my 'Launch plan', join the steps with elbow connectors, and put my demo.mp4 on slide 6."
 - "Write me a cover letter for this job ad and keep it in my Library: I'll change it myself."
 - "Answer my comments in the 'Field report' document and resolve the ones you dealt with."
 - "Add a table of contents and page numbers to my 'Thesis notes' document, and put the formulas in as equations."
