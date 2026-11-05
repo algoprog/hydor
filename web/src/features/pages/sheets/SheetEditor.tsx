@@ -1538,7 +1538,8 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     if (mod && (k === '`' || e.code === 'Backquote')) return void (e.preventDefault(), setFormulas((f) => !f));
     if (mod && lower === 'a') return void (e.preventDefault(), setSel({ r: s.r, c: s.c, ar: 0, ac: 0, fr: size.rows - 1, fc: size.cols - 1 }));
     // Ctrl+Space: the whole column; Shift+Space: the whole row; Space on rows picked whole: expand the row.
-    if (k === ' ' && mod) return void (e.preventDefault(), setSel({ r: 0, c: s.c, ar: 0, ac: x.c1, fr: size.rows - 1, fc: x.c2 }));
+    // Ctrl even on a Mac, as Sheets has it (⌘Space is the Mac's own search).
+    if (k === ' ' && e.ctrlKey) return void (e.preventDefault(), setSel({ r: 0, c: s.c, ar: 0, ac: x.c1, fr: size.rows - 1, fc: x.c2 }));
     if (k === ' ' && e.shiftKey) return void (e.preventDefault(), setSel({ r: s.r, c: 0, ar: x.r1, ac: 0, fr: x.r2, fc: size.cols - 1 }));
     if (chartSel) {
       if (k === 'Delete' || k === 'Backspace') return void (e.preventDefault(), !readOnly && deleteChart(chartSel));
