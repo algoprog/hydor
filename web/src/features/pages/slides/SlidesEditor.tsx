@@ -1,21 +1,27 @@
 // A slide deck to edit and present, as in PowerPoint or Google Slides: the slides down the side (or across under
-// the slide on a phone) to pick, drag into order, copy and skip; the slide itself to edit (SlideCanvas); a toolbar
-// to add slides from layouts and parts (text, shapes, pictures, lines and arrows, tables, charts) and to style
-// words; a side panel for the part picked, the animations, the slide and the theme (Inspector); speaker notes
-// under the slide; every slide at once (Grid); and Present: the slideshow, or the presenter's view with the
-// audience's window. Changes stay unsaved until Save (Ctrl+S), as a page's do; Undo and Redo go back and forth.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+// the slide on a phone) to pick, drag into order, copy and skip; the slide itself to edit (SlideCanvas), zoomed and
+// scrolled, with a grid, rulers and guides; menus (Edit, View, Insert, Format, Arrange, Slide, Tools, and Search the
+// menus) and a toolbar of the most used (new slides from layouts, text, shapes, pictures, lines and arrows, tables,
+// charts, the format painter, how words look); a side panel for the part picked, the animations, the slide and the
+// theme (Inspector); speaker notes under the slide; Find and replace across the slides and notes; every slide at once
+// (Grid); and Present: the slideshow, or the presenter's view with the audience's window. Changes stay unsaved until
+// Save (Ctrl+S), as a page's do; Undo and Redo go back and forth.
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
   Clipboard,
   Copy,
+  Crop,
   Grid2x2,
+  Group as GroupIcon,
   Image as ImageIcon,
   LayoutTemplate,
+  Link2,
   Minus,
   MonitorPlay,
   MoveRight,
+  Paintbrush,
   PieChart,
   Play,
   Plus,
@@ -28,48 +34,72 @@ import {
   Trash2,
   Type,
   Undo2,
-  Link2,
+  Ungroup,
 } from 'lucide-react';
-import { slideTitle, SHAPES, type Deck, type El, type LayoutId } from '@shared/slides';
+import { newId, slideTitle, SHAPES, videoSrc, videoStart, type Deck, type El, type ImageEl, type LayoutId, type TextEl } from '@shared/slides';
 import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
-import { Button, cx, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, useConfirm } from '../../../components/ui';
+import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, useConfirm } from '../../../components/ui';
+import { FindBar, useFind } from '../common/FindBar';
+import { isMod, keyLabel } from '../common/keys';
+import { MenuBar } from '../common/menus';
+import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import { Inspector, INSPECTOR_TABS, SHAPE_NAMES, ShapeIcon, type InspectorTab } from './Inspector';
 import {
   addEls,
   addSlide,
+  align,
   chart,
   copies,
+  distribute,
   duplicateSlides,
+  groupEls,
   HISTORY_MAX,
   image,
   line,
+  lookOf,
   moveSlide,
   partName,
+  pickedOf,
   removeEls,
   removeSlides,
+  restack,
   setEls,
   setSlide,
   shape,
   table,
   textBox,
+  ungroup,
+  withLook,
+  W,
+  heightOf,
   type History,
+  type Look,
 } from './ops';
 import type { AskScope, ModelDoc, ModelEditorProps } from '../kinds';
 import { tr } from '../../../i18n/runtime';
 import { Presenter, Slideshow } from './Present';
 import { choosePicture as chooseFile, uploadPicture as upload } from '../pictures';
 import { useDeckFonts } from './rt';
-import { SlideCanvas, type CanvasHandle } from './SlideCanvas';
+import { SlideCanvas, type CanvasHandle, type CellSel, type FindMark, type GridOpts } from './SlideCanvas';
 import { LayoutGrid, Strip } from './Strip';
-import { TextBar } from './TextBar';
+import { textActions, TextBar } from './TextBar';
+import { slidesMenus } from './SlidesMenus';
+import { IconPicker, type IconDef } from './IconPicker';
+import { FooterDialog } from './FooterDialog';
+import { NotesField } from './Notes';
+import { findInDeck, replaceAllInDeck, replaceHit } from './find';
 
 export type SlidesDoc = ModelDoc<Deck>;
 
 /** Parts copied (or cut), to paste on another slide or in another deck while the app is open. */
 let clip: El[] | null = null;
+/** A part's look copied (Copy the look), to put on others. */
+let lookClip: Look | null = null;
 
 const PRESET_KEY = 'wa.slides.notes';
+const GRID_KEY = 'wa.slides.grid';
+const RULERS_KEY = 'wa.slides.rulers';
 
 /** What an agent asked now could be about: this slide, every slide, the parts picked. */
 function scopesFor(index: number, title: string, parts: string[]): AskScope[] {
@@ -82,6 +112,82 @@ function scopesFor(index: number, title: string, parts: string[]): AskScope[] {
   if (parts.length) out.push({ id: 'part', label: `${tr('What’s picked')}: ${parts.join(', ')}`, lead: `On slide ${n}, the ${parts.map((x) => x.replace(/^(\w)/, (c) => c.toLowerCase())).join(' and the ')}: ` });
   return out;
 }
+
+const savedGrid = (): GridOpts => {
+  try {
+    const g = JSON.parse(localStorage.getItem(GRID_KEY) ?? 'null');
+    if (g && typeof g === 'object') return { show: !!g.show, snap: !!g.snap, size: [10, 20, 40, 80].includes(g.size) ? g.size : 40 };
+  } catch {}
+  return { show: false, snap: false, size: 40 };
+};
+
+const SHORTCUTS: ShortcutGroup[] = [
+  {
+    title: 'Slides',
+    items: [
+      ['Ctrl+M', 'A new slide'],
+      ['PageDown / PageUp', 'The next or the previous slide'],
+      ['F5 / Ctrl+Enter', 'Present from the beginning'],
+      ['Shift+F5', 'Present from this slide'],
+      ['Ctrl+S', 'Save'],
+    ],
+  },
+  {
+    title: 'Parts of a slide',
+    items: [
+      ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy, cut, paste'],
+      ['Ctrl+D', 'Duplicate'],
+      ['Delete', 'Delete'],
+      ['Ctrl+A', 'Select all'],
+      ['Arrow keys', 'Move it a pixel (with Shift: ten)'],
+      ['Enter', 'Change its words; into a group'],
+      ['Esc', 'Pick nothing; out of a group'],
+      ['Ctrl+G', 'Group'],
+      ['Ctrl+Shift+G', 'Ungroup'],
+      ['Ctrl+↑ / Ctrl+↓', 'Bring forward, send backward'],
+      ['Ctrl+Shift+↑ / Ctrl+Shift+↓', 'Bring to front, send to back'],
+      ['Ctrl+Shift+C / Ctrl+Shift+V', 'Copy the look, paste the look'],
+      ['Alt', 'While dragging: no snapping'],
+      ['Shift', 'While dragging: straight across or down; while sizing: keep or lose its shape'],
+    ],
+  },
+  {
+    title: 'Words',
+    items: [
+      ['Ctrl+B / Ctrl+I / Ctrl+U', 'Bold, italic, underline'],
+      ['Ctrl+Shift+. / Ctrl+Shift+,', 'Bigger text, smaller text'],
+      ['Tab / Shift+Tab', 'A level deeper, a level up'],
+      ['Esc', 'Done changing the words'],
+    ],
+  },
+  {
+    title: 'Viewing',
+    items: [
+      ['Ctrl+Alt+= / Ctrl+Alt+-', 'Zoom in, zoom out'],
+      ['Ctrl+Alt+0', 'Fit the slide'],
+      ['Ctrl+scroll', 'Zoom where the pointer is'],
+      ['Ctrl+F', 'Find'],
+      ['Ctrl+H', 'Find and replace'],
+      ['Alt+/', 'Search the menus'],
+      ['Ctrl+/', 'Keyboard shortcuts'],
+    ],
+  },
+  {
+    title: 'Slideshow',
+    items: [
+      ['→ / Space / Enter', 'Next'],
+      ['← / Backspace', 'Previous'],
+      ['A number, then Enter', 'Go to that slide'],
+      ['B / W', 'A black or white screen'],
+      ['G', 'Every slide'],
+      ['L', 'Laser pointer'],
+      ['P', 'Pen'],
+      ['E', 'Erase the drawings'],
+      ['C', 'Live captions'],
+      ['Esc', 'End the slideshow'],
+    ],
+  },
+];
 
 export function SlidesEditor({
   doc,
@@ -113,6 +219,7 @@ export function SlidesEditor({
   const [hist, setHist] = useState<History>({ past: [], future: [] });
   const [cur, setCur] = useState(0);
   const [sel, setSel] = useState<string[]>([]);
+  const [scope, setScope] = useState<string[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [tab, setTab] = useState<InspectorTab>('format');
   const [view, setView] = useState<'edit' | 'grid'>('edit');
@@ -124,7 +231,21 @@ export function SlidesEditor({
   const [saving, setSaving] = useState(false);
   const [urlAsk, setUrlAsk] = useState<{ replace?: string } | null>(null);
   const [url, setUrl] = useState('');
+  const [zoom, setZoom] = useState<number | 'fit'>('fit');
+  const [grid, setGridState] = useState<GridOpts>(savedGrid);
+  const [rulers, setRulersState] = useState(() => localStorage.getItem(RULERS_KEY) === '1');
+  const [painter, setPainter] = useState<{ look: Look; keep: boolean } | null>(null);
+  const [cropping, setCropping] = useState<string | null>(null);
+  const [iconAsk, setIconAsk] = useState<{ replace?: string; start: 'icons' | 'emoji' } | null>(null);
+  const [videoAsk, setVideoAsk] = useState(false);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [footerOpen, setFooterOpen] = useState(false);
+  const [keysOpen, setKeysOpen] = useState(false);
+  const [cellSel, setCellSel] = useState<CellSel | null>(null);
+  const [texFocus, setTexFocus] = useState(0);
   const [confirm, confirmNode] = useConfirm();
+  const find = useFind();
+  const [findAt, setFindAt] = useState(-1);
   const canvas = useRef<CanvasHandle>(null);
   const root = useRef<HTMLDivElement>(null);
   const anchors = { slide: useRef<HTMLButtonElement>(null), shape: useRef<HTMLButtonElement>(null), line: useRef<HTMLButtonElement>(null), picture: useRef<HTMLButtonElement>(null), present: useRef<HTMLButtonElement>(null) };
@@ -146,6 +267,16 @@ export function SlidesEditor({
   dirtyRef.current = dirty;
   useEffect(() => onDirty?.(dirty), [dirty]);
   useEffect(() => localStorage.setItem(PRESET_KEY, notesOpen ? '1' : '0'), [notesOpen]);
+  const setGrid = (g: Partial<GridOpts>) =>
+    setGridState((old) => {
+      const next = { ...old, ...g };
+      localStorage.setItem(GRID_KEY, JSON.stringify(next));
+      return next;
+    });
+  const setRulers = (on: boolean) => {
+    setRulersState(on);
+    localStorage.setItem(RULERS_KEY, on ? '1' : '0');
+  };
 
   // Another deck, or the agent's new version while nothing was changed here: start from it.
   useEffect(() => {
@@ -155,16 +286,22 @@ export function SlidesEditor({
     setSaved(doc.model);
     setHist({ past: [], future: [] });
     setCur((c) => Math.min(c, doc.model.slides.length - 1));
-    setSel((s) => s.filter((id) => doc.model.slides.some((x) => x.els.some((e) => e.id === id))));
+    setSel((s) => s.filter((id) => doc.model.slides.some((x) => pickedOf(x, [id]).length)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc?.key]);
 
   const index = deck ? Math.min(cur, deck.slides.length - 1) : 0;
   const slide = deck?.slides[index];
+  // Another slide: out of any group, no cells or crop.
+  useEffect(() => {
+    setScope([]);
+    setCellSel(null);
+    setCropping(null);
+  }, [index]);
 
   useEffect(() => {
     if (!deck || !slide) return;
-    onScopes?.(scopesFor(index, slideTitle(slide), slide.els.filter((e) => sel.includes(e.id)).map(partName)));
+    onScopes?.(scopesFor(index, slideTitle(slide), pickedOf(slide, sel).map(partName)));
   }, [deck, index, sel]);
 
   /** A change to the deck: kept for Undo (changes of one kind in a row go back together). */
@@ -230,10 +367,66 @@ export function SlidesEditor({
     setSel([]);
   };
 
+  // ---- Find and replace --------------------------------------------------------------------------------
+  const hits = useMemo(() => (find.open && deck ? findInDeck(deck, find.query, find.options) : []), [deck, find.open, find.query, find.options]);
+  const findKey = `${find.open}|${find.query}|${JSON.stringify(find.options)}`;
+  const lastKey = useRef('');
+  useEffect(() => {
+    if (lastKey.current !== findKey) {
+      // Asked anew: the first match from this slide on.
+      lastKey.current = findKey;
+      const from = hits.findIndex((h) => h.slide >= index);
+      setFindAt(hits.length ? (from < 0 ? 0 : from) : -1);
+    } else setFindAt((i) => (hits.length ? Math.min(Math.max(i, 0), hits.length - 1) : -1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hits]);
+  const hit = findAt >= 0 ? hits[findAt] : undefined;
+  // The match on view: its slide, and its notes open when it is in them.
+  useEffect(() => {
+    if (!hit) return;
+    if (hit.slide !== index) {
+      canvas.current?.stopEditing();
+      setCur(hit.slide);
+      setSel([]);
+      setView('edit');
+    }
+    if (hit.where === 'notes') {
+      if (wide) setNotesOpen(true);
+      else {
+        setTab('notes' as InspectorTab);
+        setDrawer('open');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hit?.slide, hit?.where, hit?.s, hit?.id, hit?.para]);
+  const marks: FindMark[] = hits
+    .map((h, i) => ({ h, i }))
+    .filter(({ h }) => h.slide === index && h.where !== 'notes')
+    .map(({ h, i }) => ({ id: h.id!, para: h.para, cell: h.cell, s: h.s, e: h.e, current: i === findAt }));
+  const noteMarks = hits
+    .map((h, i) => ({ h, i }))
+    .filter(({ h }) => h.slide === index && h.where === 'notes')
+    .map(({ h, i }) => ({ s: h.s, e: h.e, current: i === findAt }));
+  const findStep = (by: 1 | -1) => hits.length && setFindAt((i) => (i + by + hits.length) % hits.length);
+  const replaceOne = () => {
+    if (!hit || !deck) return;
+    canvas.current?.stopEditing();
+    change((d) => replaceHit(d, hit, find.query, find.replacement, find.options));
+  };
+  const replaceAll = () => {
+    if (!deck) return;
+    canvas.current?.stopEditing();
+    const r = replaceAllInDeck(live.current ?? deck, find.query, find.replacement, find.options);
+    if (!r.count) return;
+    change(r.deck);
+    toast(r.count === 1 ? 'Replaced 1' : `Replaced ${r.count}`, 'ok');
+  };
+
   // ---- adding things -------------------------------------------------------------------------------------
   const put = (els: El[]) => {
     if (!deck) return;
     canvas.current?.stopEditing();
+    setScope([]);
     change((d) => addEls(d, index, els));
     setSel(els.map((e) => e.id));
     setTab('format');
@@ -266,7 +459,7 @@ export function SlidesEditor({
   };
   const replacePicture = async (id: string) => {
     const p = await pickPicture();
-    if (p) change((d) => setEls(d, index, [id], (e) => ({ ...e, src: p.src }) as El));
+    if (p) change((d) => setEls(d, index, [id], (e) => ({ ...e, src: p.src, crop: undefined }) as El));
   };
   const pictureFromUrl = async () => {
     const u = url.trim();
@@ -282,15 +475,41 @@ export function SlidesEditor({
         i.onerror = () => ok({ w: 800, h: 600 });
         i.src = `/api/pages/assets/${r.src.slice('naget-asset:'.length)}`;
       });
-      if (target?.replace) change((d) => setEls(d, index, [target.replace!], (e) => ({ ...e, src: r.src }) as El));
+      if (target?.replace) change((d) => setEls(d, index, [target.replace!], (e) => ({ ...e, src: r.src, crop: undefined }) as El));
       else put([image(deck, r.src, size.w, size.h)]);
     } catch (e) {
       toastError(e);
     }
   };
+  const centred = (w: number, h: number) => ({ x: Math.round((W - w) / 2), y: Math.round(((deck ? heightOf(deck) : 720) - h) / 2), w, h });
+  const putIcon = (ic: IconDef) => {
+    if (!deck) return;
+    const replace = iconAsk?.replace;
+    if (replace) return change((d) => setEls(d, index, [replace], (e) => ({ ...e, icon: ic.name, paths: ic.paths }) as El));
+    put([{ id: newId(), type: 'icon', icon: ic.name, paths: ic.paths, ...centred(160, 160) }]);
+  };
+  const putEmoji = (ch: string) => {
+    if (!deck) return;
+    const t = textBox(deck);
+    put([{ ...t, ...centred(200, 200), paras: [{ runs: [{ t: ch }], align: 'center' }], size: 140, align: 'center', valign: 'middle', role: undefined, ph: undefined, fit: 'none', pad: 0 } as TextEl]);
+  };
+  const putEquation = () => {
+    if (!deck) return;
+    put([{ id: newId(), type: 'math', tex: 'e^{i\\pi} + 1 = 0', ...centred(560, 140) }]);
+    setTexFocus((n) => n + 1);
+    if (!wide) setDrawer('open');
+  };
+  const putVideo = () => {
+    const src = videoSrc(videoUrl.trim());
+    if (!src || !deck) return;
+    const start = videoStart(videoUrl.trim());
+    put([{ id: newId(), type: 'video', src, ...(start ? { start } : {}), ...centred(800, 450) }]);
+    setVideoAsk(false);
+    setVideoUrl('');
+  };
 
   // ---- copy and paste ---------------------------------------------------------------------------------------
-  const picked = slide ? slide.els.filter((e) => sel.includes(e.id)) : [];
+  const picked = pickedOf(slide, sel);
   const copy = () => {
     if (!picked.length) return;
     clip = picked.map((e) => ({ ...e }));
@@ -309,6 +528,13 @@ export function SlidesEditor({
   };
   const duplicate = () => {
     if (!picked.length) return;
+    // Copies of parts in a group stay in it.
+    if (scope.length) {
+      const fresh = copies(picked);
+      change((d) => setEls(d, index, [scope[scope.length - 1]], (g) => (g.type === 'group' ? { ...g, els: [...g.els, ...fresh] } : g)));
+      setSel(fresh.map((e) => e.id));
+      return;
+    }
     put(copies(picked));
   };
   const remove = () => {
@@ -317,20 +543,97 @@ export function SlidesEditor({
     setSel([]);
   };
 
+  // ---- groups, looks, arranging -------------------------------------------------------------------------
+  const group = () => {
+    if (!deck || sel.length < 2) return;
+    const r = groupEls(live.current ?? deck, index, sel);
+    if (!r) return toast('Parts in different groups can’t be grouped together');
+    change(r.deck);
+    setSel([r.id]);
+  };
+  const unGroup = (id?: string) => {
+    const g = id ?? (picked.length === 1 && picked[0].type === 'group' ? picked[0].id : null);
+    if (!deck || !g) return;
+    const r = ungroup(live.current ?? deck, index, g);
+    if (!r) return;
+    change(r.deck);
+    setSel(r.ids);
+  };
+  const copyLook = () => {
+    if (picked.length !== 1) return;
+    lookClip = lookOf(picked[0]);
+    toast('The look is copied', 'ok');
+  };
+  const pasteLook = () => {
+    if (!lookClip || !sel.length) return;
+    const look = lookClip;
+    change((d) => setEls(d, index, sel, (e) => withLook(e, look)));
+  };
+  const startPainter = (keep: boolean) => {
+    if (painter && !keep) return setPainter(null);
+    if (picked.length !== 1) return;
+    setPainter({ look: lookOf(picked[0]), keep });
+  };
+  const paint = (id: string | null) => {
+    if (!painter) return;
+    if (id) change((d) => setEls(d, index, [id], (e) => withLook(e, painter.look)));
+    if (!painter.keep || !id) setPainter(null);
+  };
+  const restackSel = (how: 'front' | 'back' | 'forward' | 'backward') => sel.length && change((d) => restack(d, index, sel, how));
+  const alignSel = (how: Parameters<typeof align>[3]) => sel.length && change((d) => align(d, index, sel, how));
+  const turn = (by: number) => sel.length && change((d) => setEls(d, index, sel, (e) => (e.type === 'line' ? e : { ...e, rot: ((((e.rot ?? 0) + by) % 360) + 360) % 360 || undefined })));
+  const flip = (axis: 'h' | 'v') => sel.length && change((d) => setEls(d, index, sel, (e) => (e.type === 'image' ? ({ ...e, [axis === 'h' ? 'flipH' : 'flipV']: !(axis === 'h' ? e.flipH : e.flipV) || undefined } as El) : e)));
+  const zoomBy = (f: number) => {
+    const el = root.current?.querySelector<HTMLElement>('[data-slide-canvas]');
+    const now = zoom === 'fit' ? (el ? Number(el.dataset.k) || 1 : 1) : zoom;
+    const next = Math.max(0.1, Math.min(4, Math.round(now * f * 100) / 100));
+    setZoom(next);
+  };
+  const crop = (id: string | null, keep?: boolean) => {
+    if (id) {
+      setCropping(id);
+      return;
+    }
+    canvas.current?.endCrop(!!keep);
+  };
+  const addGuide = (axis: 'x' | 'y') => {
+    if (!deck) return;
+    setRulers(true);
+    const at = axis === 'x' ? Math.round(W / 2) : Math.round(heightOf(deck) / 2);
+    change((d) => {
+      const list = [...new Set([...(d.guides?.[axis] ?? []), at])].sort((a, b) => a - b);
+      return { ...d, guides: { ...(d.guides ?? {}), [axis]: list } };
+    });
+  };
+
   // ---- keys ---------------------------------------------------------------------------------------------------
   const keys = useRef<(e: KeyboardEvent) => void>(() => {});
   keys.current = (e: KeyboardEvent) => {
     if (!deck || present) return;
     const t = e.target as HTMLElement | null;
     const typing = !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
-    const mod = e.ctrlKey || e.metaKey;
+    const mod = isMod(e);
     const k = e.key.toLowerCase();
     if (mod && k === 's') {
       e.preventDefault();
       void save();
       return;
     }
+    // Find, replace and the shortcuts, from the words being changed too.
+    if (mod && !e.altKey && (k === 'f' || k === 'h') && (!typing || t?.isContentEditable)) {
+      e.preventDefault();
+      find.show(k === 'h' && !readOnly);
+      return;
+    }
+    if (mod && (e.key === '/' || e.code === 'Slash') && !e.altKey) {
+      e.preventDefault();
+      setKeysOpen(true);
+      return;
+    }
     if (typing) return;
+    if (mod && e.altKey && (e.key === '=' || e.key === '+' || e.code === 'Equal')) return (e.preventDefault(), zoomBy(1.25));
+    if (mod && e.altKey && (e.key === '-' || e.code === 'Minus')) return (e.preventDefault(), zoomBy(0.8));
+    if (mod && e.altKey && (e.key === '0' || e.code === 'Digit0')) return (e.preventDefault(), setZoom('fit'));
     if (mod && k === 'z') {
       e.preventDefault();
       if (e.shiftKey) redo();
@@ -352,16 +655,35 @@ export function SlidesEditor({
       if (e.key === 'ArrowUp' || e.key === 'PageUp') setCur((c) => Math.max(0, c - 1));
       return;
     }
+    if (mod && e.shiftKey && k === 'c') return (e.preventDefault(), copyLook());
+    if (mod && e.shiftKey && k === 'v') return (e.preventDefault(), pasteLook());
+    if (mod && k === 'g') return (e.preventDefault(), e.shiftKey ? unGroup() : group());
     if (mod && k === 'c') return (e.preventDefault(), copy());
     if (mod && k === 'x') return (e.preventDefault(), cut());
     if (mod && k === 'v' && clip) return (e.preventDefault(), paste());
     if (mod && k === 'd') return (e.preventDefault(), duplicate());
     if (mod && k === 'a') {
       e.preventDefault();
-      setSel(slide?.els.map((x) => x.id) ?? []);
+      const lv = scope.length ? pickedOf(slide, [scope[scope.length - 1]])[0] : null;
+      setSel(lv?.type === 'group' ? lv.els.map((x) => x.id) : (slide?.els.map((x) => x.id) ?? []));
       return;
     }
     if (mod && k === 'm') return (e.preventDefault(), newSlide('content'));
+    if (mod && textEls.length && (k === 'b' || k === 'i' || k === 'u')) {
+      e.preventDefault();
+      text?.toggle(k === 'b' ? 'bold' : k === 'i' ? 'italic' : 'underline');
+      return;
+    }
+    if (mod && e.shiftKey && textEls.length && (e.key === '>' || e.key === '.' || e.key === '<' || e.key === ',')) {
+      e.preventDefault();
+      text?.grow(e.key === '>' || e.key === '.' ? 2 : -2);
+      return;
+    }
+    if (mod && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && sel.length) {
+      e.preventDefault();
+      restackSel(e.key === 'ArrowUp' ? (e.shiftKey ? 'front' : 'forward') : e.shiftKey ? 'back' : 'backward');
+      return;
+    }
     if (e.key === 'Delete' || e.key === 'Backspace') {
       if (sel.length) {
         e.preventDefault();
@@ -370,13 +692,28 @@ export function SlidesEditor({
       return;
     }
     if (e.key === 'Escape') {
-      if (sel.length) setSel([]);
+      if (painter) setPainter(null);
+      else if (cellSel) setCellSel(null);
+      else if (scope.length) {
+        // Out of the group: it is picked.
+        setSel([scope[scope.length - 1]]);
+        setScope(scope.slice(0, -1));
+      } else if (sel.length) setSel([]);
       return;
     }
-    if (e.key === 'Enter' && picked.length === 1 && (picked[0].type === 'text' || picked[0].type === 'shape')) {
-      e.preventDefault();
-      setEditing(picked[0].id);
-      return;
+    if (e.key === 'Enter' && picked.length === 1) {
+      const p = picked[0];
+      if (p.type === 'text' || p.type === 'shape') {
+        e.preventDefault();
+        setEditing(p.id);
+        return;
+      }
+      if (p.type === 'group' && p.els.length) {
+        e.preventDefault();
+        setScope([...scope, p.id]);
+        setSel([p.els[0].id]);
+        return;
+      }
     }
     if (e.key.startsWith('Arrow')) {
       e.preventDefault();
@@ -422,6 +759,13 @@ export function SlidesEditor({
       const text = e.clipboardData?.getData('text/plain');
       if (text && !clip && live.current) {
         e.preventDefault();
+        // A YouTube or Vimeo address pasted is the video.
+        const v = text.trim().length < 300 ? videoSrc(text.trim()) : null;
+        if (v) {
+          const start = videoStart(text.trim());
+          put([{ id: newId(), type: 'video', src: v, ...(start ? { start } : {}), ...centred(800, 450) }]);
+          return;
+        }
         const t = textBox(live.current);
         put([{ ...t, paras: text.split('\n').map((l) => ({ runs: [{ t: l }] })) }]);
       }
@@ -441,10 +785,13 @@ export function SlidesEditor({
     }
   };
 
-  if (!deck || !slide) return <div className="flex h-full items-center justify-center text-fg-3">…</div>;
-
   const textEls = picked.filter((e): e is Extract<El, { type: 'text' | 'shape' }> => e.type === 'text' || e.type === 'shape');
   const showText = textEls.length > 0 && textEls.length === picked.length;
+  const textArgs = deck && showText ? { deck, index, els: textEls, editing: !!editing && textEls.some((x) => x.id === editing), canvas, change } : null;
+  const text = textArgs ? textActions(textArgs) : null;
+
+  if (!deck || !slide) return <div className="flex h-full items-center justify-center text-fg-3">…</div>;
+
   const stripAct = {
     pick: (i: number) => {
       canvas.current?.stopEditing();
@@ -470,12 +817,100 @@ export function SlidesEditor({
     toggleHidden: (i: number) => change((d) => setSlide(d, i, (s) => ({ ...s, hidden: !s.hidden || undefined }))),
   };
 
+  const openPanel = (t: InspectorTab) => {
+    setTab(t);
+    if (!wide) setDrawer('open');
+  };
+  const one = picked.length === 1 ? picked[0] : null;
+  const menus = slidesMenus({
+    readOnly,
+    wide,
+    pageLayout: layout === 'page',
+    picked,
+    canUndo: hist.past.length > 0,
+    canRedo: hist.future.length > 0,
+    canPaste: !!clip?.length,
+    hasLook: !!lookClip,
+    painting: !!painter,
+    zoom,
+    grid,
+    rulers,
+    notesOpen,
+    gridView: view === 'grid',
+    hidden: !!slide.hidden,
+    text,
+    undo,
+    redo,
+    cut,
+    copy,
+    paste,
+    duplicate,
+    remove,
+    selectAll: () => setSel(slide.els.map((x) => x.id)),
+    find: (replace) => find.show(replace),
+    copyLook,
+    pasteLook,
+    painter: () => startPainter(false),
+    setZoom,
+    zoomBy,
+    setGrid,
+    setRulers,
+    addGuide,
+    clearGuides: () =>
+      change((d) => {
+        const { guides: _g, ...rest } = d;
+        return rest;
+      }),
+    hasGuides: !!deck.guides,
+    setNotes: setNotesOpen,
+    setGridView: (on) => {
+      canvas.current?.stopEditing();
+      setView(on ? 'grid' : 'edit');
+    },
+    newSlide: () => setMenu('slide'),
+    textBox: () => put([textBox(deck)]),
+    shape: () => setMenu('shape'),
+    picture: () => void addPicture(),
+    pictureUrl: () => setUrlAsk({}),
+    line: (arrow) => put([line(deck, arrow)]),
+    table: () => put([table(deck)]),
+    chart: () => put([chart(deck)]),
+    icon: () => setIconAsk({ start: 'icons' }),
+    emoji: () => setIconAsk({ start: 'emoji' }),
+    equation: putEquation,
+    video: () => setVideoAsk(true),
+    footer: () => setFooterOpen(true),
+    crop: () => one && crop(one.id),
+    resetPicture: () => one && change((d) => setEls(d, index, [one.id], (e) => ({ ...e, crop: undefined, adjust: undefined }) as El)),
+    editTex: () => {
+      openPanel('format');
+      setTexFocus((n) => n + 1);
+    },
+    replaceIcon: () => one && setIconAsk({ replace: one.id, start: 'icons' }),
+    formatPanel: () => openPanel('format'),
+    group,
+    ungroup: () => unGroup(),
+    restack: restackSel,
+    align: alignSel,
+    spread: (axis) => change((d) => distribute(d, index, sel, axis)),
+    turn,
+    flip,
+    lock: () => one && change((d) => setEls(d, index, [one.id], (e) => ({ ...e, lock: !e.lock || undefined }))),
+    duplicateSlide: () => stripAct.duplicate(index),
+    deleteSlide: () => stripAct.remove(index),
+    skipSlide: () => stripAct.toggleHidden(index),
+    openTab: (t) => openPanel(t),
+    present: (from) => setPresent({ from: from === 'start' ? 0 : index, presenter: from === 'presenter' }),
+    shortcuts: () => setKeysOpen(true),
+    ask: onAsk ? () => onAsk(`On slide ${index + 1}${slideTitle(slide) ? ` (“${slideTitle(slide)}”)` : ''}: `) : undefined,
+  });
+
   const insertBar = !readOnly && (
     <>
-      <IconButton label="Undo (Ctrl+Z)" size="sm" disabled={!hist.past.length} onClick={undo}>
+      <IconButton label={`Undo (${keyLabel('Ctrl+Z')})`} size="sm" disabled={!hist.past.length} onClick={undo}>
         <Undo2 size={15} />
       </IconButton>
-      <IconButton label="Redo (Ctrl+Shift+Z)" size="sm" disabled={!hist.future.length} onClick={redo}>
+      <IconButton label={`Redo (${keyLabel('Ctrl+Shift+Z')})`} size="sm" disabled={!hist.future.length} onClick={redo}>
         <Redo2 size={15} />
       </IconButton>
       <span className="mx-1 h-5 w-px shrink-0 bg-line" />
@@ -499,6 +934,17 @@ export function SlidesEditor({
       </IconButton>
       <IconButton label="Chart" size="sm" onClick={() => put([chart(deck)])}>
         <PieChart size={15} />
+      </IconButton>
+      <span className="mx-1 h-5 w-px shrink-0 bg-line" />
+      <IconButton
+        label="Format painter: click a part to give it this look (double-click: for several)"
+        size="sm"
+        active={!!painter}
+        disabled={!painter && picked.length !== 1}
+        onClick={() => startPainter(false)}
+        onDoubleClick={() => startPainter(true)}
+      >
+        <Paintbrush size={15} />
       </IconButton>
     </>
   );
@@ -527,10 +973,56 @@ export function SlidesEditor({
           onReplaceImage={(id) => void replacePicture(id)}
           onChartData={(id) => {
             setSel([id]);
-            setTab('format');
-            if (!wide) setDrawer('open');
+            openPanel('format');
           }}
+          onOpen={(id) => {
+            setSel([id]);
+            const el = pickedOf(slide, [id])[0];
+            if (el?.type === 'icon') setIconAsk({ replace: id, start: 'icons' });
+            else {
+              openPanel('format');
+              if (el?.type === 'math') setTexFocus((n) => n + 1);
+            }
+          }}
+          zoom={zoom}
+          onZoom={setZoom}
+          scope={scope}
+          onScope={setScope}
+          grid={grid}
+          rulers={rulers}
+          painting={!!painter}
+          onPaint={paint}
+          cropping={cropping}
+          onCropping={setCropping}
+          marks={marks}
+          cellSel={cellSel}
+          onCellSel={setCellSel}
         />
+        {zoom !== 'fit' && (
+          <button type="button" onClick={() => setZoom('fit')} title="Fit the slide" className="absolute right-3 bottom-3 z-10 rounded-full border border-line bg-elevated px-2.5 py-1 text-[12px] text-fg-2 tabular-nums shadow-sm hover:text-fg">
+            {`${Math.round(zoom * 100)}%`} · Fit
+          </button>
+        )}
+        {(painter || scope.length > 0 || cropping) && (
+          <div className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full border border-line bg-elevated px-3 py-1 text-[12px] text-fg-2 shadow-sm">
+            {cropping ? 'Cropping: Enter keeps it, Esc does not' : painter ? (painter.keep ? 'Format painter: click parts to give them the look; Esc when done' : 'Format painter: click a part to give it the look') : 'In a group: Esc to leave it'}
+          </div>
+        )}
+        {find.open && (
+          <div className={cx('absolute z-20', mid ? 'top-2 right-2' : 'inset-x-2 top-2')}>
+            <FindBar
+              find={find}
+              count={hits.length}
+              index={findAt}
+              onNext={() => findStep(1)}
+              onPrev={() => findStep(-1)}
+              onReplace={readOnly ? undefined : replaceOne}
+              onReplaceAll={readOnly ? undefined : replaceAll}
+              className={mid ? undefined : 'w-full'}
+              extra={hit?.where === 'notes' ? <span className="text-fg-3">This one is in the speaker notes.</span> : undefined}
+            />
+          </div>
+        )}
       </div>
       {wide && (
         <div className="shrink-0 border-t border-line bg-panel">
@@ -539,16 +1031,7 @@ export function SlidesEditor({
             Speaker notes
             {!notesOpen && slide.notes && <span className="min-w-0 truncate font-normal">· {slide.notes.split('\n')[0]}</span>}
           </button>
-          {notesOpen && (
-            <textarea
-              value={slide.notes ?? ''}
-              readOnly={readOnly}
-              onChange={(e) => change((d) => setSlide(d, index, (s) => ({ ...s, notes: e.target.value || undefined })), `notes:${slide.id}`)}
-              placeholder={tr('What to say on this slide: you see it in the presenter’s view.')}
-              translate="no"
-              className="block h-[88px] w-full resize-none bg-transparent px-3 pb-2 text-[13px] leading-relaxed outline-none placeholder:text-fg-3"
-            />
-          )}
+          {notesOpen && <NotesField value={slide.notes ?? ''} readOnly={readOnly} marks={noteMarks} onChange={(v) => change((d) => setSlide(d, index, (s) => ({ ...s, notes: v || undefined })), `notes:${slide.id}`)} className="h-[88px]" />}
         </div>
       )}
     </div>
@@ -567,6 +1050,15 @@ export function SlidesEditor({
       onReplaceImage={(id) => void replacePicture(id)}
       onPreview={() => setPresent({ from: index, presenter: false })}
       onAsk={onAsk}
+      cropping={cropping}
+      onCrop={crop}
+      onIcon={(id) => setIconAsk({ replace: id, start: 'icons' })}
+      onGroup={group}
+      onUngroup={(id) => unGroup(id)}
+      onFooter={() => setFooterOpen(true)}
+      cellSel={cellSel}
+      onCellSel={setCellSel}
+      texFocus={texFocus}
     />
   );
 
@@ -591,16 +1083,7 @@ export function SlidesEditor({
     </div>
   );
 
-  const notesPanel = (
-    <textarea
-      value={slide.notes ?? ''}
-      readOnly={readOnly}
-      onChange={(e) => change((d) => setSlide(d, index, (s) => ({ ...s, notes: e.target.value || undefined })), `notes:${slide.id}`)}
-      placeholder={tr('What to say on this slide: you see it in the presenter’s view.')}
-      translate="no"
-      className="block h-full min-h-[120px] w-full resize-none bg-transparent px-3 py-2 text-[13.5px] leading-relaxed outline-none placeholder:text-fg-3"
-    />
-  );
+  const notesPanel = <NotesField value={slide.notes ?? ''} readOnly={readOnly} marks={noteMarks} onChange={(v) => change((d) => setSlide(d, index, (s) => ({ ...s, notes: v || undefined })), `notes:${slide.id}`)} className="h-full min-h-[120px]" />;
 
   const presentButtons = (
     <div className="flex shrink-0 items-center">
@@ -618,7 +1101,10 @@ export function SlidesEditor({
   return (
     <div ref={root} className="flex h-full min-h-0 flex-col bg-bg">
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">{lead}</div>
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
+          <MenuBar menus={menus} compact={width < 1020 || layout === 'sheet'} className="shrink-0" />
+        </div>
         {layout === 'page' && mid && (
           <Segmented
             size="sm"
@@ -640,10 +1126,10 @@ export function SlidesEditor({
       {!readOnly && (
         <div className="flex h-11 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-line bg-panel px-2 [&::-webkit-scrollbar]:hidden">
           {insertBar}
-          {showText && view === 'edit' && (
+          {textArgs && view === 'edit' && (
             <>
               <span className="mx-1 h-5 w-px shrink-0 bg-line" />
-              <TextBar deck={deck} index={index} els={textEls} editing={!!editing && textEls.some((x) => x.id === editing)} canvas={canvas} change={change} />
+              <TextBar {...textArgs} />
             </>
           )}
         </div>
@@ -752,26 +1238,44 @@ export function SlidesEditor({
         </MenuItem>
       </Popover>
       <div ref={ctxRef} className="pointer-events-none fixed h-px w-px" style={{ left: ctxAt?.x ?? -10, top: ctxAt?.y ?? -10 }} />
-      <Popover anchor={ctxRef} open={menu === 'context'} onClose={() => setMenu(null)} width={220}>
+      <Popover anchor={ctxRef} open={menu === 'context'} onClose={() => setMenu(null)} width={230}>
         {picked.length > 0 && !readOnly && (
           <>
-            <MenuItem icon={<Scissors size={14} />} hint="Ctrl+X" onClick={() => (setMenu(null), cut())}>
+            <MenuItem icon={<Scissors size={14} />} hint={keyLabel('Ctrl+X')} onClick={() => (setMenu(null), cut())}>
               Cut
             </MenuItem>
-            <MenuItem icon={<Copy size={14} />} hint="Ctrl+C" onClick={() => (setMenu(null), copy())}>
+            <MenuItem icon={<Copy size={14} />} hint={keyLabel('Ctrl+C')} onClick={() => (setMenu(null), copy())}>
               Copy
             </MenuItem>
           </>
         )}
         {clip && !readOnly && (
-          <MenuItem icon={<Clipboard size={14} />} hint="Ctrl+V" onClick={() => (setMenu(null), paste())}>
+          <MenuItem icon={<Clipboard size={14} />} hint={keyLabel('Ctrl+V')} onClick={() => (setMenu(null), paste())}>
             Paste
           </MenuItem>
         )}
         {picked.length > 0 && !readOnly && (
           <>
-            <MenuItem icon={<Copy size={14} />} hint="Ctrl+D" onClick={() => (setMenu(null), duplicate())}>
+            <MenuItem icon={<Copy size={14} />} hint={keyLabel('Ctrl+D')} onClick={() => (setMenu(null), duplicate())}>
               Duplicate
+            </MenuItem>
+            {picked.length > 1 && (
+              <MenuItem icon={<GroupIcon size={14} />} hint={keyLabel('Ctrl+G')} onClick={() => (setMenu(null), group())}>
+                Group
+              </MenuItem>
+            )}
+            {one?.type === 'group' && (
+              <MenuItem icon={<Ungroup size={14} />} hint={keyLabel('Ctrl+Shift+G')} onClick={() => (setMenu(null), unGroup())}>
+                Ungroup
+              </MenuItem>
+            )}
+            {one?.type === 'image' && !!(one as ImageEl).src && (
+              <MenuItem icon={<Crop size={14} />} onClick={() => (setMenu(null), crop(one.id))}>
+                Crop the picture
+              </MenuItem>
+            )}
+            <MenuItem icon={<Paintbrush size={14} />} disabled={!one} onClick={() => (setMenu(null), startPainter(false))}>
+              Format painter
             </MenuItem>
             {onAsk && picked.length === 1 && (
               <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(`On slide ${index + 1}, the ${partName(picked[0]).replace(/^(\w)/, (c) => c.toLowerCase())}: `))}>
@@ -821,6 +1325,44 @@ export function SlidesEditor({
           </form>
         </Popover>
       )}
+      <IconPicker open={!!iconAsk} onClose={() => setIconAsk(null)} start={iconAsk?.start ?? 'icons'} title={iconAsk?.replace ? 'Another icon' : 'Insert an icon'} onIcon={putIcon} onEmoji={iconAsk?.replace ? undefined : putEmoji} />
+      <Dialog
+        open={videoAsk}
+        onClose={() => setVideoAsk(false)}
+        title="A video"
+        width={460}
+        footer={
+          <Button size="sm" variant="primary" disabled={!videoSrc(videoUrl.trim())} onClick={putVideo}>
+            Add it
+          </Button>
+        }
+      >
+        <form
+          className="space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            putVideo();
+          }}
+        >
+          <p className="text-[12.5px] text-fg-3">The address of a video on YouTube or Vimeo. Its picture shows on the slide; it plays when clicked in the slideshow.</p>
+          <input
+            autoFocus
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              putVideo();
+            }}
+            placeholder="https://www.youtube.com/watch?v=…"
+            aria-label="The video’s address"
+            className={inputCls}
+          />
+          {videoUrl.trim() && !videoSrc(videoUrl.trim()) && <p className="text-[12px] text-err">That is not a YouTube or Vimeo address.</p>}
+        </form>
+      </Dialog>
+      <FooterDialog open={footerOpen} onClose={() => setFooterOpen(false)} deck={deck} index={index} change={change} />
+      <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={SHORTCUTS} />
       {present && !present.presenter && <Slideshow deck={deck} from={present.from} onClose={() => setPresent(null)} />}
       {present?.presenter && <Presenter deck={deck} from={present.from} pageId={pageId} onClose={() => setPresent(null)} />}
       {confirmNode}

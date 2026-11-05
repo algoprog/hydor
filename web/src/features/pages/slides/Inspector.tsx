@@ -1,9 +1,10 @@
 // The slides editor's side panel, in four tabs. Format: the part picked (its place and size, its words' look, its
-// fill and border, a shape's kind, a picture's fit, a line's ends, a table's or a chart's look and numbers, a link)
-// or the parts picked lined up and spread. Animate: the slide's animations in their order, each one's effect,
-// start, timing and direction, and a new one for the part picked. Slide: its background, its transition, hidden or
-// not. Theme: a ready-made look, or the deck's own colours and fonts, and the slides' shape.
-import { useState, type ReactNode } from 'react';
+// fill and border, a shape's kind, a picture's fit, crop and colours, a line's ends, a table's or a chart's look and
+// numbers, an icon's colour, an equation's LaTeX, a video's address and how it plays, a group's parts, a link) or the
+// parts picked lined up, spread and grouped. Animate: the slide's animations in their order, each one's effect,
+// start, timing and direction, and a new one for the part picked. Slide: its background, its transition (Morph too),
+// hidden or not, the footer. Theme: a ready-made look, or the deck's own colours and fonts, and the slides' shape.
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -17,8 +18,10 @@ import {
   ArrowDownToLine,
   ArrowUp,
   ArrowUpToLine,
+  Crop as CropIcon,
   FlipHorizontal2,
   FlipVertical2,
+  Group as GroupIcon,
   ImagePlus,
   Lock,
   MousePointerClick,
@@ -26,6 +29,7 @@ import {
   Plus,
   Sparkles,
   Trash2,
+  Ungroup as UngroupIcon,
   Unlock,
   X,
 } from 'lucide-react';
@@ -38,25 +42,34 @@ import {
   THEMES,
   TRANSITIONS,
   newId,
+  scaleEls,
   slideH,
+  videoSrc,
+  videoStart,
+  type Adjust,
   type Anim,
   type AnimFx,
   type ChartEl,
   type Deck,
   type Dir,
   type El,
+  type IconEl,
   type ImageEl,
   type LineEl,
+  type MathEl,
   type ShapeKind,
   type Slide,
   type TableEl,
   type Theme,
   type TransitionFx,
+  type VideoEl,
 } from '@shared/slides';
 import { Button, cx, Switch } from '../../../components/ui';
+import { useTexHtml } from '../common/katex';
 import { Choice, Select } from '../studio/fields';
 import { ColorButton, Field, NumInput, Swatches, Tool } from './controls';
-import { addAnim, align, distribute, heightOf, moveAnim, partName, removeAnim, removeEls, restack, setAnim, setEls, setSlide, W } from './ops';
+import { addAnim, align, distribute, dropMergesPast, fillCells, heightOf, mergeAt, mergeCells, moveAnim, partName, pathTo, pickedOf, removeAnim, removeEls, restack, setAnim, setEls, setSlide, unmergeCell, W } from './ops';
+import type { CellSel } from './SlideCanvas';
 import { SlideThumb } from './Thumb';
 
 export type InspectorTab = 'format' | 'animate' | 'slide' | 'theme';
@@ -81,6 +94,19 @@ interface Props {
   onReplaceImage: (id: string) => void;
   onPreview: () => void;
   onAsk?: (text: string) => void;
+  /** Crop mode for a picture (null: none). */
+  cropping?: string | null;
+  onCrop?: (id: string | null, keep?: boolean) => void;
+  /** Another icon in this one's place. */
+  onIcon?: (id: string) => void;
+  onGroup?: () => void;
+  onUngroup?: (id: string) => void;
+  onFooter?: () => void;
+  /** The table cells picked together. */
+  cellSel?: CellSel | null;
+  onCellSel?: (s: CellSel | null) => void;
+  /** The equation's LaTeX field takes the keys (it was just added, or double-clicked). */
+  texFocus?: number;
 }
 
 function Section({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
@@ -195,8 +221,9 @@ function SHAPE_PATHS(kind: ShapeKind, w: number, h: number): string {
 function Arrange({ deck, index, ids, change }: { deck: Deck; index: number; ids: string[]; change: Change }) {
   const many = ids.length > 1;
   const al = (how: Parameters<typeof align>[3]) => change((d) => align(d, index, ids, how));
+  const inGroup = !many && !!pathTo(deck.slides[index].els, ids[0])?.length;
   return (
-    <Section title={many ? 'Line them up' : 'On the slide'}>
+    <Section title={many ? 'Line them up' : inGroup ? 'In its group' : 'On the slide'}>
       <div className="flex flex-wrap items-center gap-0.5">
         <Tool label={many ? 'Left edges' : 'To the left'} onClick={() => al('left')}>
           <AlignStartVertical size={15} />
@@ -387,12 +414,84 @@ function BoxLook({ el, theme, set }: { el: Extract<El, { type: 'text' | 'shape' 
   );
 }
 
-function PictureLook({ el, theme, set, onReplace }: { el: ImageEl; theme: Theme; set: (patch: Partial<El>, key?: string) => void; onReplace: () => void }) {
+/** A slider with its number, for a picture's colours. */
+function Slider({ label, value, min, max, onChange, unit = '' }: { label: string; value: number; min: number; max: number; onChange: (v: number) => void; unit?: string }) {
+  return (
+    <Field label={label}>
+      <input type="range" min={min} max={max} step={1} value={value} onChange={(e) => onChange(Number(e.target.value))} className="min-w-0 flex-1 accent-[var(--accent)]" aria-label={label} />
+      <span className="w-10 shrink-0 text-right text-[12px] text-fg-3 tabular-nums">{`${value}${unit}`}</span>
+    </Field>
+  );
+}
+
+function PictureColours({ el, set }: { el: ImageEl; set: (patch: Partial<El>, key?: string) => void }) {
+  const a = el.adjust ?? {};
+  const adj = (patch: Partial<Adjust>) => {
+    const next: Adjust = { ...a, ...patch };
+    if (!next.bright) delete next.bright;
+    if (!next.contrast) delete next.contrast;
+    if (next.sat === undefined || next.sat === 100) delete next.sat;
+    if (!next.gray) delete next.gray;
+    if (!next.blur) delete next.blur;
+    set({ adjust: Object.keys(next).length ? next : undefined } as Partial<El>, 'adjust');
+  };
+  const changed = !!el.adjust || el.opacity !== undefined;
+  return (
+    <Section
+      title="Colours"
+      aside={
+        changed && (
+          <Button size="sm" variant="ghost" className="h-7" onClick={() => set({ adjust: undefined, opacity: undefined } as Partial<El>)}>
+            Reset
+          </Button>
+        )
+      }
+    >
+      <Slider label="Brightness" value={a.bright ?? 0} min={-100} max={100} onChange={(bright) => adj({ bright })} />
+      <Slider label="Contrast" value={a.contrast ?? 0} min={-100} max={100} onChange={(contrast) => adj({ contrast })} />
+      <Slider label="Saturation" value={a.sat ?? 100} min={0} max={200} onChange={(sat) => adj({ sat })} unit="%" />
+      <Slider label="Blur" value={a.blur ?? 0} min={0} max={40} onChange={(blur) => adj({ blur })} unit="px" />
+      <Slider label="See-through" value={Math.round((1 - (el.opacity ?? 1)) * 100)} min={0} max={100} onChange={(v) => set({ opacity: v > 0 ? Math.max(0, 1 - v / 100) : undefined }, 'opacity')} unit="%" />
+      <label className="flex min-h-8 items-center gap-2 text-[12.5px] text-fg-2">
+        <span className="min-w-0 flex-1">Black and white</span>
+        <Switch label="Black and white" on={!!a.gray} onChange={(gray) => adj({ gray })} />
+      </label>
+    </Section>
+  );
+}
+
+function PictureLook({ el, theme, set, onReplace, cropping, onCrop }: { el: ImageEl; theme: Theme; set: (patch: Partial<El>, key?: string) => void; onReplace: () => void; cropping?: boolean; onCrop?: (id: string | null, keep?: boolean) => void }) {
   return (
     <Section title="Picture">
-      <Button size="sm" variant="secondary" icon={<ImagePlus size={14} />} onClick={onReplace}>
-        Another picture
-      </Button>
+      <div className="flex flex-wrap gap-1.5">
+        <Button size="sm" variant="secondary" icon={<ImagePlus size={14} />} onClick={onReplace}>
+          Another picture
+        </Button>
+        {onCrop && el.src && !cropping && (
+          <Button size="sm" variant="secondary" icon={<CropIcon size={14} />} onClick={() => onCrop(el.id)}>
+            Crop
+          </Button>
+        )}
+        {onCrop && el.crop && !cropping && (
+          <Button size="sm" variant="ghost" onClick={() => set({ crop: undefined } as Partial<El>)}>
+            Uncrop
+          </Button>
+        )}
+      </div>
+      {cropping && onCrop && (
+        <div className="space-y-2 rounded-lg bg-bg-1 p-2 text-[12px] text-fg-3">
+          <p>Drag the frame’s edges and corners, or the picture under it.</p>
+          <div className="flex gap-1.5">
+            <Button size="sm" variant="primary" onClick={() => onCrop(null, true)}>
+              Done
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => onCrop(null, false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+      {!el.crop && (
       <Field label="Fit">
         <Choice
           value={el.fit ?? 'cover'}
@@ -404,6 +503,7 @@ function PictureLook({ el, theme, set, onReplace }: { el: ImageEl; theme: Theme;
           ]}
         />
       </Field>
+      )}
       <Field label="Corners">
         <NumInput label="Corner radius" value={el.radius ?? 0} onChange={(radius) => set({ radius: radius || undefined }, 'radius')} min={0} max={1000} unit="px" />
         <Tool label="Flip across" on={!!el.flipH} onClick={() => set({ flipH: !el.flipH || undefined })}>
@@ -468,15 +568,37 @@ function LineLook({ el, theme, set }: { el: LineEl; theme: Theme; set: (patch: P
   );
 }
 
-function TableLook({ el, theme, set }: { el: TableEl; theme: Theme; set: (patch: Partial<El>, key?: string) => void }) {
+function TableLook({ el, theme, set, cellSel }: { el: TableEl; theme: Theme; set: (patch: Partial<El>, key?: string) => void; cellSel?: CellSel | null }) {
   const cols = Math.max(1, ...el.rows.map((r) => r.length));
   const rows = el.rows;
+  const cs = cellSel?.id === el.id ? cellSel : null;
+  const many = !!cs && (cs.r0 !== cs.r1 || cs.c0 !== cs.c1);
+  const merged = cs ? mergeAt(el, cs.r0, cs.c0) : undefined;
+  const replace = (t: TableEl) => set({ rows: t.rows, merges: t.merges, fills: t.fills } as Partial<El>);
   return (
     <Section title="Table">
-      <p className="text-[12px] leading-snug text-fg-3">Double-click a cell to type in it; Tab goes to the next one.</p>
+      <p className="text-[12px] leading-snug text-fg-3">Double-click a cell to type in it; Tab goes to the next one. Shift-click another cell to pick the cells between.</p>
+      {cs && (
+        <div className="space-y-1.5 rounded-lg bg-bg-1 p-2">
+          <div className="text-[12px] text-fg-2">{many ? `${(Math.abs(cs.r1 - cs.r0) + 1) * (Math.abs(cs.c1 - cs.c0) + 1)} cells picked` : 'One cell picked'}</div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {many && (
+              <Button size="sm" variant="secondary" onClick={() => replace(mergeCells(el, cs.r0, cs.c0, cs.r1, cs.c1))}>
+                Merge cells
+              </Button>
+            )}
+            {merged && !many && (
+              <Button size="sm" variant="secondary" onClick={() => replace(unmergeCell(el, cs.r0, cs.c0))}>
+                Unmerge cells
+              </Button>
+            )}
+            <ColorButton value={el.fills?.[`${cs.r0},${cs.c0}`]} theme={theme} none="The table’s own" onChange={(fill) => replace(fillCells(el, cs.r0, cs.c0, cs.r1, cs.c1, fill))} label="Cell fill" />
+          </div>
+        </div>
+      )}
       <Field label="Number of rows">
         <span className="min-w-6 text-center text-[12.5px] tabular-nums">{rows.length}</span>
-        <Tool label="One row fewer" disabled={rows.length < 2} onClick={() => set({ rows: rows.slice(0, -1), h: Math.max(20, el.h - el.h / rows.length) })}>
+        <Tool label="One row fewer" disabled={rows.length < 2} onClick={() => set({ ...dropMergesPast({ ...el, rows: rows.slice(0, -1) }), h: Math.max(20, el.h - el.h / rows.length) } as Partial<El>)}>
           <span className="text-[15px]">−</span>
         </Tool>
         <Tool label="One more row" disabled={rows.length >= 40} onClick={() => set({ rows: [...rows, Array(cols).fill('')], h: el.h + el.h / rows.length })}>
@@ -485,7 +607,7 @@ function TableLook({ el, theme, set }: { el: TableEl; theme: Theme; set: (patch:
       </Field>
       <Field label="Number of columns">
         <span className="min-w-6 text-center text-[12.5px] tabular-nums">{cols}</span>
-        <Tool label="One column fewer" disabled={cols < 2} onClick={() => set({ rows: rows.map((r) => r.slice(0, cols - 1)), cols: undefined, aligns: undefined })}>
+        <Tool label="One column fewer" disabled={cols < 2} onClick={() => set({ ...dropMergesPast({ ...el, rows: rows.map((r) => r.slice(0, cols - 1)) }), cols: undefined, aligns: undefined } as Partial<El>)}>
           <span className="text-[15px]">−</span>
         </Tool>
         <Tool label="One more column" disabled={cols >= 12} onClick={() => set({ rows: rows.map((r) => [...r, '']), cols: undefined, aligns: undefined })}>
@@ -626,21 +748,164 @@ function ChartLook({ el, theme, set }: { el: ChartEl; theme: Theme; set: (patch:
   );
 }
 
-function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk }: Props) {
+function IconLook({ el, theme, set, onIcon }: { el: IconEl; theme: Theme; set: (patch: Partial<El>, key?: string) => void; onIcon?: (id: string) => void }) {
+  return (
+    <Section title="Icon">
+      {onIcon && (
+        <Button size="sm" variant="secondary" onClick={() => onIcon(el.id)}>
+          Another icon
+        </Button>
+      )}
+      <Swatches value={el.color ?? 'accent'} theme={theme} onChange={(color) => set({ color: color ?? 'accent' } as Partial<El>)} />
+      <Field label="Line width">
+        <NumInput label="Line width" value={el.lineW ?? 2} onChange={(lineW) => set({ lineW: lineW === 2 ? undefined : lineW } as Partial<El>, 'lineW')} min={0.25} max={6} step={0.25} />
+      </Field>
+    </Section>
+  );
+}
+
+/** Pieces of LaTeX to put in at the caret, with what they look like. */
+const TEX_BITS: [string, string, string?][] = [
+  ['\\frac{a}{b}', 'Fraction'],
+  ['\\sqrt{x}', 'Square root'],
+  ['x^{2}', 'Power'],
+  ['x_{i}', 'Below'],
+  ['\\sum_{i=1}^{n}', 'Sum'],
+  ['\\int_{a}^{b}', 'Integral'],
+  ['\\lim_{x \\to 0}', 'Limit'],
+  ['\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}', 'Matrix', '\\begin{pmatrix} a \\\\ c \\end{pmatrix}'],
+  ['\\alpha', 'α'],
+  ['\\pi', 'π'],
+  ['\\infty', '∞'],
+  ['\\leq', '≤'],
+  ['\\neq', '≠'],
+  ['\\times', '×'],
+];
+
+function TexBit({ tex, label, shown, onPick }: { tex: string; label: string; shown?: string; onPick: () => void }) {
+  const html = useTexHtml(shown ?? tex, false);
+  return (
+    <button type="button" title={label} aria-label={label} onMouseDown={(e) => e.preventDefault()} onClick={onPick} className="grid h-9 min-w-9 place-items-center overflow-hidden rounded-lg border border-line px-1 text-[12px] text-fg hover:border-accent/50 hover:bg-accent-soft">
+      {html ? <span translate="no" className="pointer-events-none origin-center scale-[.8]" dangerouslySetInnerHTML={{ __html: html }} /> : label}
+    </button>
+  );
+}
+
+function MathLook({ el, theme, set, focus }: { el: MathEl; theme: Theme; set: (patch: Partial<El>, key?: string) => void; focus?: number }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!focus || !ref.current) return;
+    ref.current.focus();
+    ref.current.select();
+  }, [focus]);
+  const put = (bit: string) => {
+    const t = ref.current;
+    if (!t) return;
+    const s = t.selectionStart ?? el.tex.length;
+    const e = t.selectionEnd ?? s;
+    const tex = el.tex.slice(0, s) + bit + el.tex.slice(e);
+    set({ tex } as Partial<El>, 'tex');
+    requestAnimationFrame(() => {
+      t.focus();
+      t.setSelectionRange(s + bit.length, s + bit.length);
+    });
+  };
+  return (
+    <Section title="Equation">
+      <textarea
+        ref={ref}
+        value={el.tex}
+        onChange={(e) => set({ tex: e.target.value.slice(0, 4000) } as Partial<El>, 'tex')}
+        onKeyDown={(e) => e.stopPropagation()}
+        rows={3}
+        spellCheck={false}
+        translate="no"
+        aria-label="The equation in LaTeX"
+        placeholder="E = mc^2"
+        className="w-full min-w-0 resize-y rounded-lg border border-line bg-bg-1 px-2 py-1.5 font-mono text-[12.5px] leading-relaxed outline-none focus:border-accent/60"
+      />
+      <div className="flex flex-wrap gap-1">
+        {TEX_BITS.map(([tex, label, shown]) => (
+          <TexBit key={tex} tex={tex} label={label} shown={shown} onPick={() => put(tex)} />
+        ))}
+      </div>
+      <Field label="Colour">
+        <ColorButton value={el.color ?? 'fg'} theme={theme} onChange={(color) => set({ color } as Partial<El>)} label="Colour" />
+        <Choice
+          value={el.align ?? 'center'}
+          onChange={(a) => set({ align: a === 'center' ? undefined : a } as Partial<El>)}
+          options={[
+            { value: 'left', label: 'Left' },
+            { value: 'center', label: 'Centre' },
+            { value: 'right', label: 'Right' },
+          ]}
+        />
+      </Field>
+    </Section>
+  );
+}
+
+function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: string) => void }) {
+  const [url, setUrl] = useState(el.src.includes('vimeo') ? `https://vimeo.com/${el.src.split('/').pop()}` : `https://www.youtube.com/watch?v=${el.src.split('/').pop()}`);
+  const bad = !videoSrc(url);
+  return (
+    <Section title="Video">
+      <input
+        value={url}
+        onChange={(e) => {
+          setUrl(e.target.value);
+          const src = videoSrc(e.target.value);
+          if (src) set({ src, ...(videoStart(e.target.value) ? { start: videoStart(e.target.value) } : {}) } as Partial<El>, 'video');
+        }}
+        onKeyDown={(e) => e.stopPropagation()}
+        aria-label="The video’s address"
+        placeholder="https://www.youtube.com/watch?v=…"
+        translate="no"
+        className={cx('h-8 w-full rounded-lg border bg-bg-1 px-2 text-[12.5px] outline-none focus:border-accent/60', bad ? 'border-err' : 'border-line')}
+      />
+      {bad && <p className="text-[11.5px] text-err">A YouTube or Vimeo address.</p>}
+      <Field label="Starts at">
+        <NumInput label="Seconds into the video" value={el.start ?? 0} onChange={(start) => set({ start: Math.round(start) || undefined } as Partial<El>, 'start')} min={0} max={86400} unit="s" />
+      </Field>
+      {(
+        [
+          ['autoplay', 'Plays when the slide shows'],
+          ['muted', 'Without sound'],
+          ['loop', 'Plays again from the start'],
+        ] as const
+      ).map(([k, label]) => (
+        <label key={k} className="flex min-h-8 items-center gap-2 text-[12.5px] text-fg-2">
+          <span className="min-w-0 flex-1">{label}</span>
+          <Switch label={label} on={!!el[k]} onChange={(v) => set({ [k]: v || undefined } as Partial<El>)} />
+        </label>
+      ))}
+      <p className="text-[11.5px] leading-snug text-fg-3">It plays in the slideshow when clicked; in PowerPoint it is its picture, linked to the video.</p>
+    </Section>
+  );
+}
+
+function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cropping, onCrop, onIcon, onGroup, onUngroup, cellSel, texFocus }: Props) {
   const slide = deck.slides[index];
-  const els = slide.els.filter((e) => sel.includes(e.id));
+  const els = pickedOf(slide, sel);
   const H = heightOf(deck);
   if (!els.length)
     return (
       <div className="space-y-2 px-3 py-3 text-[12.5px] leading-relaxed text-fg-3">
         <p>Click a part of the slide to change it; Shift-click or drag across the slide to pick several.</p>
-        <p>Double-click words to change them, a picture to change it, a table’s cell to type in it.</p>
+        <p>Double-click words to change them, a picture to crop it, a group to pick a part of it, a table’s cell to type in it.</p>
       </div>
     );
   if (els.length > 1)
     return (
       <>
-        <div className="px-3 pt-3 text-[12.5px] text-fg-2">{els.length} parts picked</div>
+        <div className="flex items-center gap-2 px-3 pt-3">
+          <span className="min-w-0 flex-1 text-[12.5px] text-fg-2">{els.length} parts picked</span>
+          {onGroup && (
+            <Button size="sm" variant="secondary" icon={<GroupIcon size={14} />} onClick={onGroup}>
+              Group them
+            </Button>
+          )}
+        </div>
         <Arrange deck={deck} index={index} ids={sel} change={change} />
         <Section title="Remove">
           <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} className="text-err" onClick={() => (change((d) => removeEls(d, index, sel)), onSel([]))}>
@@ -650,7 +915,9 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk }: P
       </>
     );
   const el = els[0];
-  const set = (patch: Partial<El>, key?: string) => change((d) => setEls(d, index, [el.id], (e) => ({ ...e, ...patch }) as El), key ? `${key}:${el.id}` : undefined);
+  // A group sized from the panel sizes its parts with it.
+  const set = (patch: Partial<El>, key?: string) =>
+    change((d) => setEls(d, index, [el.id], (e) => (e.type === 'group' && (patch.w !== undefined || patch.h !== undefined) ? ({ ...e, ...patch, els: scaleEls(e.els, (patch.w ?? e.w) / e.w, (patch.h ?? e.h) / e.h) } as El) : ({ ...e, ...patch } as El))), key ? `${key}:${el.id}` : undefined);
   return (
     <>
       <div className="flex items-center gap-1.5 px-3 pt-3">
@@ -682,12 +949,26 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk }: P
           </Button>
         </div>
       )}
+      {el.type === 'group' && (
+        <Section title="Group">
+          <p className="text-[12px] leading-snug text-fg-3">{`${el.els.length} parts that move as one. Double-click one to change it on its own.`}</p>
+          {onUngroup && (
+            <Button size="sm" variant="secondary" icon={<UngroupIcon size={14} />} onClick={() => onUngroup(el.id)}>
+              Ungroup
+            </Button>
+          )}
+        </Section>
+      )}
       {(el.type === 'text' || el.type === 'shape') && <TextLook el={el} theme={deck.theme} set={set} />}
       {(el.type === 'text' || el.type === 'shape') && <BoxLook el={el} theme={deck.theme} set={set} />}
-      {el.type === 'image' && <PictureLook el={el} theme={deck.theme} set={set} onReplace={() => onReplaceImage(el.id)} />}
+      {el.type === 'image' && <PictureLook el={el} theme={deck.theme} set={set} onReplace={() => onReplaceImage(el.id)} cropping={cropping === el.id} onCrop={onCrop} />}
+      {el.type === 'image' && el.src && <PictureColours el={el} set={set} />}
       {el.type === 'line' && <LineLook el={el} theme={deck.theme} set={set} />}
-      {el.type === 'table' && <TableLook el={el} theme={deck.theme} set={set} />}
+      {el.type === 'table' && <TableLook el={el} theme={deck.theme} set={set} cellSel={cellSel} />}
       {el.type === 'chart' && <ChartLook el={el} theme={deck.theme} set={set} />}
+      {el.type === 'icon' && <IconLook el={el} theme={deck.theme} set={set} onIcon={onIcon} />}
+      {el.type === 'math' && <MathLook el={el} theme={deck.theme} set={set} focus={texFocus} />}
+      {el.type === 'video' && <VideoLook key={el.id} el={el} set={set} />}
       <Place el={el} set={set} H={H} />
       <Arrange deck={deck} index={index} ids={[el.id]} change={change} />
       <Section title="Link">
@@ -840,7 +1121,7 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview }: Props) {
 
 const TR_NAMES: Record<TransitionFx, string> = { none: 'None', fade: 'Fade', push: 'Push in', wipe: 'Wipe', cover: 'Cover', zoom: 'Zoom', split: 'Split', morph: 'Morph' };
 
-function SlideTab({ deck, index, change, pickPicture }: Props) {
+function SlideTab({ deck, index, change, pickPicture, onFooter }: Props) {
   const slide = deck.slides[index];
   const t = deck.theme;
   const bg = slide.bg ?? {};
@@ -921,7 +1202,7 @@ function SlideTab({ deck, index, change, pickPicture }: Props) {
             <button
               key={fx}
               type="button"
-              onClick={() => setTr({ fx, ...(fx === 'push' || fx === 'wipe' || fx === 'cover' ? { dir: tr.dir ?? 'right' } : { dir: undefined }), dur: fx === 'none' ? undefined : (tr.dur ?? 600) })}
+              onClick={() => setTr({ fx, ...(fx === 'push' || fx === 'wipe' || fx === 'cover' ? { dir: tr.dir ?? 'right' } : { dir: undefined }), dur: fx === 'none' ? undefined : fx === 'morph' ? Math.max(tr.dur ?? 1000, 800) : (tr.dur ?? 600) })}
               className={cx('h-8 rounded-lg border text-[12px] transition-colors', tr.fx === fx ? 'border-accent/60 bg-accent-soft text-fg' : 'border-line text-fg-2 hover:border-line-2 hover:bg-bg-1')}
             >
               {TR_NAMES[fx]}
@@ -933,6 +1214,7 @@ function SlideTab({ deck, index, change, pickPicture }: Props) {
             <Select value={tr.dir ?? 'right'} onChange={(dir) => setTr({ dir: dir as Dir })} options={(['right', 'left', 'down', 'up'] as Dir[]).map((x) => ({ value: x, label: x === 'right' ? 'The right' : x === 'left' ? 'The left' : x === 'down' ? 'The bottom' : 'The top' }))} />
           </Field>
         )}
+        {tr.fx === 'morph' && <p className="text-[12px] leading-snug text-fg-3">What this slide shares with the one before glides into place: duplicate a slide, then move, size, turn or recolour its parts.</p>}
         {tr.fx !== 'none' && (
           <Field label="How long">
             <NumInput label="How long" value={(tr.dur ?? 600) / 1000} onChange={(v) => setTr({ dur: Math.round(v * 1000) })} min={0.1} max={5} step={0.1} unit="s" />
@@ -958,6 +1240,22 @@ function SlideTab({ deck, index, change, pickPicture }: Props) {
           <span className="min-w-0 flex-1">Skip this slide</span>
           <Switch label="Skip this slide" on={!!slide.hidden} onChange={(hidden) => change((d) => setSlide(d, index, (s) => ({ ...s, hidden: hidden || undefined })))} />
         </label>
+      </Section>
+      <Section title="Footer">
+        <p className="text-[12px] leading-snug text-fg-3">
+          {deck.footer ? [deck.footer.num && 'Slide numbers', deck.footer.text?.trim() && 'Footer words', deck.footer.date && 'The date'].filter(Boolean).join(' · ') + (deck.footer.skipTitle ? ' · Not on the title slide' : '') : 'No slide numbers or footer.'}
+        </p>
+        {onFooter && (
+          <Button size="sm" variant="secondary" onClick={onFooter}>
+            Slide numbers and footer
+          </Button>
+        )}
+        {deck.footer && (
+          <label className="flex min-h-8 items-center gap-2 text-[12.5px] text-fg-2">
+            <span className="min-w-0 flex-1">Leave it off this slide</span>
+            <Switch label="Leave it off this slide" on={!!slide.nofooter} onChange={(off) => change((d) => setSlide(d, index, (s) => ({ ...s, nofooter: off || undefined })))} />
+          </label>
+        )}
       </Section>
     </>
   );

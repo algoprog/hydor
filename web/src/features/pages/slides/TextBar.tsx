@@ -1,6 +1,6 @@
 // How words look, in the slides editor's toolbar: the font, its size, bold, italic, underline and strike, colour,
 // alignment, bullets and numbers, indent, a link. While words are changed in place it acts on the words selected;
-// otherwise on the whole of each text box or shape picked.
+// otherwise on the whole of each text box or shape picked. The same actions are the Format menu's (textActions).
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import {
   AlignCenter,
@@ -73,28 +73,13 @@ function wholeIfNothing(box: HTMLElement | null | undefined) {
   s?.addRange(r);
 }
 
-export function TextBar({ deck, index, els, editing, canvas, change }: { deck: Deck; index: number; els: TextEl[]; editing: boolean; canvas: RefObject<CanvasHandle | null>; change: (d: Deck | ((d: Deck) => Deck), key?: string) => void }) {
+type TextArgs = { deck: Deck; index: number; els: TextEl[]; editing: boolean; canvas: RefObject<CanvasHandle | null>; change: (d: Deck | ((d: Deck) => Deck), key?: string) => void };
+export type TextActions = ReturnType<typeof textActions>;
+
+/** What can be done to the words of the text boxes and shapes picked (or to the words selected in the one being edited). */
+export function textActions({ deck, index, els, editing, canvas, change }: TextArgs) {
   const t = deck.theme;
   const first = els[0];
-  const [, setTick] = useState(0);
-  const linkRef = useRef<HTMLButtonElement>(null);
-  const [linking, setLinking] = useState<string | null>(null);
-  // The toolbar follows the words selected while editing.
-  useEffect(() => {
-    if (!editing) return;
-    const on = () => {
-      const s = window.getSelection();
-      const box = canvas.current?.editBox();
-      if (s?.rangeCount && box?.contains(s.anchorNode)) lastRange = s.getRangeAt(0).cloneRange();
-      setTick((x) => x + 1);
-    };
-    document.addEventListener('selectionchange', on);
-    return () => {
-      document.removeEventListener('selectionchange', on);
-      lastRange = null;
-    };
-  }, [editing]);
-  if (!first) return null;
   const ids = els.map((e) => e.id);
   const set = (f: (e: TextEl) => TextEl, key?: string) => change((d) => setEls(d, index, ids, (e) => f(e as TextEl) as El), key);
   const state = (cmd: string) => {
@@ -185,6 +170,46 @@ export function TextBar({ deck, index, els, editing, canvas, change }: { deck: D
     }
     set((e) => ({ ...e, link: url ? (/^(https?:|mailto:|tel:|#\d)/i.test(url) ? url : `https://${url}`) : undefined }));
   };
+  /** Raised or lowered words (superscript, subscript): on, or off when they already are. */
+  const script = (which: 'sup' | 'sub') => {
+    if (editing) return exec(which === 'sup' ? 'superscript' : 'subscript');
+    const all = first.paras.flatMap((p) => p.runs).filter((r) => r.t);
+    const was = all.length > 0 && all.every((r) => r[which]);
+    set((e) => ({ ...e, paras: eachRun(e.paras, (r) => ({ ...r, sup: undefined, sub: undefined, ...(was ? {} : { [which]: true }) })) }));
+  };
+  /** The words a step bigger or smaller (two pixels). */
+  const grow = (by: number) => size(Math.max(6, Math.min(400, (first.size ?? 24) + by)));
+  const clear = () => {
+    if (editing) return exec('removeFormat');
+    set((e) => ({ ...e, paras: e.paras.map((p) => ({ ...p, runs: p.runs.map((r) => ({ t: r.t, ...(r.link ? { link: r.link } : {}) })) })) }));
+  };
+  return { first, ids, on, toggle, align, curAlign, list, indent, size, color, font, link, script, grow, clear };
+}
+
+export function TextBar(args: TextArgs) {
+  const { deck, els, editing, canvas } = args;
+  const t = deck.theme;
+  const first = els[0];
+  const [, setTick] = useState(0);
+  const linkRef = useRef<HTMLButtonElement>(null);
+  const [linking, setLinking] = useState<string | null>(null);
+  // The toolbar follows the words selected while editing.
+  useEffect(() => {
+    if (!editing) return;
+    const on = () => {
+      const s = window.getSelection();
+      const box = canvas.current?.editBox();
+      if (s?.rangeCount && box?.contains(s.anchorNode)) lastRange = s.getRangeAt(0).cloneRange();
+      setTick((x) => x + 1);
+    };
+    document.addEventListener('selectionchange', on);
+    return () => {
+      document.removeEventListener('selectionchange', on);
+      lastRange = null;
+    };
+  }, [editing]);
+  if (!first) return null;
+  const { on, toggle, align, curAlign, list, indent, size, color, font, link } = textActions(args);
   const fonts = [
     { value: 'head', label: `Headings (${t.headFont})` },
     { value: 'body', label: `Body (${t.font})` },
