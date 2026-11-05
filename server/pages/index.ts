@@ -490,15 +490,25 @@ function routes(d: Deps) {
   /** A file someone opens (a Word document, a spreadsheet, a CSV): made into a page of its kind. */
   app.post('/api/pages/import', { bodyLimit: 40 * 1024 * 1024 }, async (req) => {
     const b = B(req);
-    const name = typeof b.name === 'string' ? b.name.slice(0, 300) : '';
+    // A file of this computer's by its path (Save to Library on a file an agent handed over, or in Files), or a file's
+    // name and bytes as the browser sends them (a file someone opens in New page).
+    const from = typeof b.path === 'string' && b.path.trim() ? resolvePath(b.path) : null;
+    const name = from ? path.basename(from) : typeof b.name === 'string' ? b.name.slice(0, 300) : '';
     const kind = kindForFile(name);
-    if (!kind || typeof b.data !== 'string') {
-      throw new HttpError(400, 'Send a file’s name and its data (base64): a .docx, .md, .txt or .html document, an .xlsx, .ods, .csv or .tsv spreadsheet, a .tex file or a LaTeX project’s .zip, or a Jupyter notebook (.ipynb).');
+    if (!kind || (!from && typeof b.data !== 'string')) {
+      throw new HttpError(400, 'Send a file’s path, or its name and its data (base64): a .docx, .md, .txt or .html document, an .xlsx, .ods, .csv or .tsv spreadsheet, a .tex file or a LaTeX project’s .zip, or a Jupyter notebook (.ipynb).');
     }
+    let data: Buffer;
+    if (from) {
+      const st = await fs.promises.stat(from).catch(() => null);
+      if (!st?.isFile()) throw new HttpError(404, `Not found: ${from}`);
+      if (st.size > 30 * 1024 * 1024) throw new HttpError(413, 'It is over 30 MB, too large to keep in the Library');
+      data = await fs.promises.readFile(from);
+    } else data = Buffer.from(String(b.data), 'base64');
     const k = mustKind(kind);
     let got: Awaited<ReturnType<NonNullable<typeof k.fromFile>>>;
     try {
-      got = await k.fromFile!(Buffer.from(b.data, 'base64'), name);
+      got = await k.fromFile!(data, name);
     } catch (e) {
       throw new HttpError(422, `That file could not be read: ${(e as Error).message}`);
     }
