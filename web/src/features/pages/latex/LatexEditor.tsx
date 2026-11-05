@@ -1276,8 +1276,6 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
           {sep}
         </>
       )}
-      <MenuBar menus={menus} compact={!roomy} className="shrink-0" />
-      {sep}
       <div className="shrink-0">
         <Segmented
           size="sm"
@@ -1521,7 +1519,11 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
       onDrop={(e) => void onDrop(e)}
     >
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">{lead}</div>
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
+          {/* The menus beside the title, where the header has room for them; one button where it hasn't. */}
+          <MenuBar menus={menus} compact={roomy ? 'auto' : true} />
+        </div>
         {!wide && (
           <Segmented
             size="sm"

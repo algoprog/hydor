@@ -4,9 +4,10 @@
 // pointing at another's name opens that one, and the arrow keys move through the rows and from menu to menu, as a menu
 // bar does. Search the menus (the magnifier at the row's end, or Alt+/) finds any action by its words, in English or
 // in the language the app is read in, and does it. Where there is no room for the row (a phone, a narrow panel) one
-// button holds the menus. Pressing a menu never takes the focus from what is being edited, so the words or cells picked
-// stay picked for the action.
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+// button holds the menus; with compact 'auto' the bar tells by itself, from the room it is given beside the editor's
+// title. Pressing a menu never takes the focus from what is being edited, so the words or cells picked stay picked for
+// the action.
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { Menu as MenuIcon, Search } from 'lucide-react';
 import { cx, IconButton, MenuBack, MenuItem, MenuSep, Popover } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
@@ -251,8 +252,39 @@ function MenuSearch({ menus, close }: { menus: MenuDef[]; close: () => void }) {
 
 const WIDTH = 272;
 
+/** Whether the row of menu names fits the room the bar has: its root (which takes what room there is) against the row measured unseen. */
+function useRowFits(on: boolean, menus: MenuDef[]) {
+  const root = useRef<HTMLDivElement>(null);
+  const row = useRef<HTMLDivElement>(null);
+  const [ok, setOk] = useState(true);
+  useLayoutEffect(() => {
+    if (!on) return;
+    const a = root.current;
+    const b = row.current;
+    if (!a || !b) return;
+    const check = () => setOk(b.scrollWidth <= a.clientWidth + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(a);
+    ro.observe(b);
+    return () => ro.disconnect();
+  }, [on, menus]);
+  return { root, row, ok };
+}
+
 /** The menus of an editor: a row of names (or one button when compact), and Search the menus at the end. */
-export function MenuBar({ menus, compact, className }: { menus: MenuDef[]; compact?: boolean; className?: string }) {
+export function MenuBar({
+  menus,
+  compact,
+  className,
+}: {
+  menus: MenuDef[];
+  /** One Menus button instead of the row; 'auto': the row when it fits the room the bar is given, else the button. */
+  compact?: boolean | 'auto';
+  className?: string;
+}) {
+  const fits = useRowFits(compact === 'auto', menus);
+  const folded = compact === 'auto' ? !fits.ok : !!compact;
   const [open, setOpen] = useState<number | null>(null);
   const [searching, setSearching] = useState(false);
   const names = useRef<(HTMLButtonElement | null)[]>([]);
@@ -289,8 +321,19 @@ export function MenuBar({ menus, compact, className }: { menus: MenuDef[]; compa
   const asOne: MenuDef[] = useMemo(() => [{ label: 'Menus', items: menus.map((m) => ({ label: m.label, items: m.items })) }], [menus]);
 
   return (
-    <div className={cx('flex min-w-0 items-center gap-0.5', className)} onMouseDown={keepFocus}>
-      {compact ? (
+    <div ref={fits.root} className={cx('relative flex min-w-0 items-center gap-0.5', compact === 'auto' && 'flex-1', className)} onMouseDown={keepFocus}>
+      {compact === 'auto' && (
+        // The row as it would be, unseen, to tell whether it fits (in the app's language: its words are translated too).
+        <div ref={fits.row} aria-hidden className="pointer-events-none invisible absolute top-0 left-0 flex items-center gap-0.5 whitespace-nowrap">
+          {menus.map((m) => (
+            <span key={m.label} className="h-7 shrink-0 px-2 text-[13px]">
+              {m.label}
+            </span>
+          ))}
+          <span className="ml-0.5 w-7 shrink-0" />
+        </div>
+      )}
+      {folded ? (
         <>
           <IconButton ref={one} label="Menus" active={open === 0} onClick={() => setOpen((o) => (o === 0 ? null : 0))}>
             <MenuIcon size={17} />
