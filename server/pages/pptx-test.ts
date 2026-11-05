@@ -660,6 +660,10 @@ const deck = normalizeDeck({
   ok(gp && gp.els.length === 2 && gp.els[1].type === 'shape' && Math.abs(gp.els[1].x - 210) < 0.6, 'a group with its parts placed in it');
   ok(s2.comments?.[0]?.text === 'On the slide' && s2.comments[0].replies?.[0]?.by === 'agent' && s2.comments[0].x === 500, 'comments with their replies');
   ok(got.notes.length === 0, `nothing said to be left out: ${got.notes.join(' ')}`);
+  // Bold first words, plain after them (as LibreOffice writes them: b="1", then b="0"): the box is not bold.
+  const boldFirst = normalizeDeck((await deckFromPptx(pptxFile(normalizeDeck({ slides: [{ els: [{ type: 'text', x: 0, y: 0, w: 500, h: 100, text: '**Bold** and plain' }] }] }), { title: 'T', picture: () => null }))).model);
+  const bf = boldFirst.slides[0].els[0] as Extract<El, { type: 'text' }>;
+  ok(!bf.bold && bf.paras[0].runs[0].b === true && !bf.paras[0].runs[1].b, 'bold first words keep the rest plain');
 
   // A file in PowerPoint's own way: placeholders that take their place and look from their layout and master.
   const pp = powerpointFile();
