@@ -291,6 +291,58 @@ let privPath = '';
   ok(draftsOf('claude:s9').find((x) => x.id === 't2')?.done, 'a turn that stops leaves the page where it was, done');
 }
 
+// ---- smaller saves: part of a document, some slides, some cells, a section of LaTeX; saves in a row as one version -------
+{
+  pages.beforeMessage!('claude:s1', deps);
+  const md = (t: string) => `# Plan {.title}\n\n## Goals\n\nShip it.\n\n## Risks\n\nNone yet.\n\n## Budget\n\n${t}`;
+  const doc = idOf((await run('save_doc', { title: 'Plan', markdown: md('Small.') })).text);
+  let r = await run('save_doc', { id: doc, title: 'Plan', edits: [{ section: 'Risks', markdown: '## Risks\n\nThe launch date.' }, { append: '## Next\n\nAsk Sam.' }, { find: 'Ship it.', replace: 'Ship it in May.' }] });
+  let got = (await req('GET', `/api/pages/${doc}`)).json();
+  const text = JSON.stringify(got.model.blocks);
+  ok(!r.error && text.includes('The launch date.') && text.includes('Ask Sam.') && text.includes('Ship it in May.') && !text.includes('None yet.') && text.includes('Small.'), 'save_doc edits change part of a document, the rest as it was');
+  ok(/took the place of version 1/.test(r.text ?? '') && got.versions.length === 1 && got.versions[0].steps === 2 && got.page.version === 2, 'saves in a row by the same agent are one version (the last), its number the next, saying how many saves it holds');
+  ok((await run('save_doc', { id: doc, title: 'Plan', edits: [{ section: 'Nowhere', markdown: 'x' }] })).error?.includes('no heading “Nowhere”'), 'an edit that cannot be made says why, and nothing is saved');
+  ok((await run('save_doc', { id: doc, title: 'Plan', markdown: 'x', edits: [{ append: 'y' }] })).error?.includes('not both'), 'edits or the whole document, not both');
+  ok((await run('save_doc', { title: 'Plan', edits: [{ append: 'y' }] })).error?.includes('give its id'), 'edits need the document they change');
+  // The user's own version in between: the agent's next save is a version of its own.
+  await req('POST', `/api/pages/${doc}/versions`, { model: got.model, base: got.page.version, sessionKey: 'claude:s1' });
+  r = await run('save_doc', { id: doc, title: 'Plan', edits: [{ append: 'Later.' }] });
+  got = (await req('GET', `/api/pages/${doc}`)).json();
+  ok(got.versions.length === 3 && !/took the place/.test(r.text ?? ''), 'a version the user saved is never folded into');
+  // A new message from the user: a new turn, a new version.
+  pages.beforeMessage!('claude:s1', deps);
+  await run('save_doc', { id: doc, title: 'Plan', edits: [{ append: 'Next turn.' }] });
+  ok((await req('GET', `/api/pages/${doc}`)).json().versions.length === 4, 'saves of another turn are versions of their own');
+  // Restoring stays safe: an older version brought back, then the agent's save is a version beside it.
+  const restored = (await req('POST', `/api/pages/${doc}/versions/2/restore`)).json();
+  ok(restored.page?.by === 'restore', 'an older version can be brought back');
+  r = await run('save_doc', { id: doc, title: 'Plan', edits: [{ append: 'After the restore.' }] });
+  ok(!/took the place/.test(r.text ?? '') && (await req('GET', `/api/pages/${doc}`)).json().versions.some((v: { by: string }) => v.by === 'restore'), 'and an agent’s save after it does not take its place');
+
+  // Slides: some changed, added, taken out.
+  pages.beforeMessage!('claude:s1', deps);
+  const deck = idOf((await run('save_slides', { title: 'Talk', theme: 'ocean', slides: [{ layout: 'title', title: 'Talk' }, { layout: 'content', title: 'Two', text: 'Words' }, { layout: 'content', title: 'Three', text: 'More' }] })).text);
+  const before = (await req('GET', `/api/pages/${deck}`)).json().model;
+  r = await run('save_slides', { id: deck, title: 'Talk', change: [{ slide: 2, layout: 'content', title: 'Two, again', text: 'New words' }], add: [{ after: 3, layout: 'end', title: 'Thanks' }], remove: [3] });
+  const after = (await req('GET', `/api/pages/${deck}`)).json().model;
+  const titles = JSON.stringify(after.slides);
+  ok(!r.error && after.slides.length === 3 && titles.includes('Two, again') && titles.includes('Thanks') && !titles.includes('"Three"'), 'save_slides changes, adds and takes out the slides named, the rest as it was');
+  ok(after.slides[1].id === before.slides[1].id && after.slides[0].id === before.slides[0].id && after.theme.id === before.theme.id, 'a slide changed keeps its id, and the deck its theme');
+  ok((await run('save_slides', { id: deck, title: 'Talk', change: [{ slide: 9, title: 'x' }] })).error?.includes('no slide 9'), 'a slide not there says so');
+
+  // Spreadsheets: some cells.
+  const sheet = idOf((await run('save_sheet', { title: 'Costs', sheets: [{ name: 'Costs', header: true, rows: [['Item', 'Cost'], ['Rent', 1200], ['Food', 300], ['Total', '=SUM(B2:B3)']], formats: { B: 'currency' } }] })).text);
+  r = await run('save_sheet', { id: sheet, title: 'Costs', update: [{ sheet: 'costs', cells: { B3: 350, A5: 'Checked' } }] });
+  const book = (await req('GET', `/api/pages/${sheet}`)).json().model;
+  ok(!r.error && book.sheets[0].cells.B3.v === 350 && book.sheets[0].cells.B2.v === 1200 && book.sheets[0].cells.A5.v === 'Checked' && book.sheets[0].cells.B2.s?.fmt === 'currency', 'save_sheet update changes some cells, the rest (values and looks) as it was');
+
+  // LaTeX: a section.
+  const tex = idOf((await run('save_latex', { title: 'Paper', source: '\\documentclass{article}\n\\begin{document}\n\\section{Intro}\nHello.\n\n\\section{Method}\nOld.\n\\end{document}\n' })).text);
+  r = await run('save_latex', { id: tex, edits: [{ section: 'Method', text: '\\section{Method}\nNew way.' }] });
+  const paper = (await req('GET', `/api/pages/${tex}`)).json().model;
+  ok(!r.error && paper.main.includes('New way.') && !paper.main.includes('Old.') && paper.main.includes('Hello.'), 'save_latex edits change a section, the rest as it was');
+}
+
 // ---- the user changes a page; the agent hears of it -------------------------------------------------------
 {
   const id = idOf((await run('save_page', { title: 'Habits', html: '<!doctype html>\n<h1>Habits</h1>\n<p>Walk</p>\n' })).text);

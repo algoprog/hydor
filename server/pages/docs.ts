@@ -62,6 +62,7 @@ import { Zip } from '../documents/zip.ts';
 import { assetDataUrl, getAsset, pictureType, putAsset, takeIn } from './assets.ts';
 import { authorOf, docxFile, MONO_DOC, type DocBlock as WordBlock, type DocCell, type DocLook, type DocRev, type DocRun as WordRun, type DocSpace } from './docx.ts';
 import { katexStyle, texToHtml } from './math.ts';
+import { DOC_EDITS_HELP } from '../../shared/doc-edits.ts';
 import { texOfOmml } from './omml.ts';
 import { imageSize } from './ooxml.ts';
 import type { Picture } from './pptx.ts';
@@ -466,7 +467,7 @@ export function docForAgent(text: string): string {
     'Outline:',
     docOutline(doc),
     '',
-    'The document as Markdown. To change it, send it back whole with save_doc and this id (markdown; page, font, size, header and footer only to change them). Keep what you do not mean to change as it is: the attributes in braces ({.title}, {.center}, {line=1.5}…), <u>, <span style>, ==highlights==, $maths$, the comments’ <span data-comment> marks, the suggested changes’ marks (<ins data-s>, <del data-s>, <span data-s data-was>, {ins=…} and {del=…}), and the pictures’ naget-asset: sources.',
+    'The document as Markdown. To change it, send it back whole with save_doc and this id (markdown; page, font, size, header and footer only to change them), or make small changes with edits (find and replace, a section, after or before a heading, append). Keep what you do not mean to change as it is: the attributes in braces ({.title}, {.center}, {line=1.5}…), <u>, <span style>, ==highlights==, $maths$, the comments’ <span data-comment> marks, the suggested changes’ marks (<ins data-s>, <del data-s>, <span data-s data-was>, {ins=…} and {del=…}), and the pictures’ naget-asset: sources.',
     '',
     body,
     ...commentsForAgent(doc),
@@ -1679,7 +1680,8 @@ const DOC_HELP = [
   'Comments: get_page lists the user’s comments after the document, each on the words marked <span data-comment="id">. Answer with comments: [{"id": "c1", "reply": "…", "resolve": true}] beside the document (make the change asked for, too); {"id": "c1", "reopen": true} reopens one, {"id": "c1", "delete": true} takes it out. To add one of your own, mark its words <span data-comment="new1">…</span> and add {"id": "new1", "text": "…"}. Comments you do not mention stay as they are; keep their marks where they are.',
   'Suggested changes (as Word’s tracked changes): get_page lists them after the comments, each marked with its id: <ins data-s="s1">words to add</ins>, <del data-s="s1">words to take out</del>, <span data-s="s2" data-was="…">a new look</span>, {ins=s3} or {del=s3} at a paragraph’s end for its break. Answer with suggestions: [{"id": "s1", "accept": true}], {"id": "s1", "reject": true} or {"id": "s1", "reply": "…"}; keep the marks of the others as they are. To suggest your own changes instead of making them (when the user asks you to suggest, review or propose edits), send the whole document as you would have it with "suggest": true: each difference becomes a suggestion of yours, which the user accepts or rejects. Or mark them yourself: <ins data-s="new1">…</ins> and <del data-s="new1">…</del> with an id of your own.',
   'Good documents start with a title, have short headings that say what follows, short paragraphs, lists for steps and options, and tables for what is compared.',
-  'To change a document, get_page with its id gives it as markdown; send the whole document back with save_doc and the same id: a new version, the older ones restorable. Keep what the user changed, and what you were not asked to change, as it is.',
+  'To change a document, get_page with its id gives it as markdown; send the whole document back with save_doc and the same id, or only what changes with edits: a new version, the older ones restorable. Keep what the user changed, and what you were not asked to change, as it is.',
+  DOC_EDITS_HELP,
 ].join(' ');
 
 export const SAVE_DOC_DESCRIPTION = DOC_HELP;
@@ -1708,6 +1710,12 @@ export const SAVE_DOC_SCHEMA = {
       description: 'Answers to the suggested changes get_page lists: {"id": "s1", "accept": true}, {"id": "s1", "reject": true}, {"id": "s1", "reply": "…"}.',
     },
     suggest: { type: 'boolean', description: 'true: your changes to the document are suggested (each a suggestion the user accepts or rejects) rather than made.' },
+    edits: {
+      type: 'array',
+      items: { type: 'object' },
+      description:
+        'With id, instead of markdown: changes made in order on its Markdown as get_page gives it: {"find": "…", "replace": "…", "all"?: true}, {"section": "a heading’s words", "markdown": "…"}, {"after": "a heading’s words", "markdown": "…"}, {"before": "…", "markdown": "…"}, {"append": "markdown"}.',
+    },
   },
   required: ['title'],
 };

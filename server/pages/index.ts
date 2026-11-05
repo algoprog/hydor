@@ -50,12 +50,17 @@ import { getVideo, sendVideo, takeVideoPiece, videoAddressOk } from './videos.ts
 import { videoSrc } from '../../shared/slides.ts';
 import { exportPage, EXPORT_TYPES, type ExportFormat } from './export.ts';
 import { fontFile, fontsCss } from './fonts.ts';
-import { agentDoc, docPage, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
+import { agentDoc, docPage, readDoc, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
+import { applyDocEdits } from '../../shared/doc-edits.ts';
+import { applyDeckEdits, changesSlides } from '../../shared/deck-edits.ts';
+import { applyBookEdits } from '../../shared/sheet-edits.ts';
+import { applyTexEdits } from '../../shared/tex-edits.ts';
+import { TEX_MAIN } from '../../shared/latex.ts';
 import { normalizeDoc } from '../../shared/docs.ts';
 import { commentsForAgent } from '../../shared/page-comments.ts';
 import { agentTex, compileSummary, compileTex, readTex, SAVE_LATEX_DESCRIPTION, SAVE_LATEX_SCHEMA, texRoutes } from './latex.ts';
 import { agentBook, readBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
-import { agentDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
+import { agentDeck, readDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
 import { agentFileComments, openFile, openFileComments, saveFile, texFileForAgent } from './filemodel.ts';
 import { kindForFile, kindOf, mustKind, type PageKind } from './kinds.ts';
 import { shellManifest, shellPage } from './shell.ts';
@@ -233,6 +238,8 @@ const GET_PAGE: RunTool = {
   },
 };
 
+const isObjIn = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
 /** The page an agent's save_slides, save_doc… names to change (it must be of that kind), or null to make a new one. */
 function changing(db: Deps['db'], a: Record<string, unknown>, kind: PageKind): string | null {
   const id = typeof a.id === 'string' && a.id.trim() ? a.id.trim() : null;
@@ -242,16 +249,29 @@ function changing(db: Deps['db'], a: Record<string, unknown>, kind: PageKind): s
   return id;
 }
 
-/** Keeps what an agent made: a new version of the page it named, or a new page of its session. */
+/** When each session last had a message from the user (since the server started): its agent's saves after it are one turn's. */
+const lastAsked = new Map<string, number>();
+
+/**
+ * Keeps what an agent made: a new version of the page it named, or a new page of its session. Its saves of a page in a
+ * row, in one turn, are kept as one version (store.ts addVersion), so working in steps does not fill the Versions list.
+ */
 function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknown, model: unknown) {
   const db = ctx.deps.db;
-  const p = id ? addVersion(db, id, { title, model, by: 'agent' }) : createPage(db, { title, kind, model, by: 'agent', sessionKey: ctx.key, space: sessionSpace(db, ctx.key) });
+  const since = lastAsked.get(ctx.key);
+  let folded: number | undefined;
+  const p = id
+    ? addVersion(db, id, { title, model, by: 'agent', session: ctx.key, fold: since !== undefined ? { since } : undefined, onFold: (v) => (folded = v) })
+    : createPage(db, { title, kind, model, by: 'agent', sessionKey: ctx.key, space: sessionSpace(db, ctx.key), session: ctx.key });
   tell(ctx.deps, { what: 'pages' });
   refreshThumbs(ctx.deps, [p.id]);
   // The draft the user watched while the call came in gives way to this version.
   settleDraft(ctx.deps, ctx.key, mustKind(kind).tool, id, { saved: { pageId: p.id, version: p.version } });
-  return p;
+  return { ...p, folded };
 }
+
+/** For the agent, when its save took the place of its own save before it (keepModel). */
+const foldNote = (p: { folded?: number }) => (p.folded ? [`It took the place of version ${p.folded}, your save of it a moment ago: saves in a row are kept as one version.`] : []);
 
 /** A save whose call the user watched come in (drafts.ts): when it fails, its draft goes and the page shows as it was. */
 const watched = (tool: RunTool): RunTool => ({
@@ -273,12 +293,22 @@ const SAVE_SLIDES: RunTool = {
   inputSchema: SAVE_SLIDES_SCHEMA,
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'slides');
+    const prev = id ? pageSource(ctx.deps.db, id)?.text : undefined;
+    let input: Record<string, unknown> = { ratio: a.ratio, theme: a.theme, slides: a.slides, footer: a.footer, guides: a.guides, comments: a.comments };
+    // Some slides changed, added or taken out: the deck they make, its look as it was unless said.
+    if (changesSlides(a)) {
+      if (!id || !prev) throw new Error('change, add and remove change a saved deck: give its id (get_page lists them), or send the whole deck as slides.');
+      if (a.slides !== undefined) throw new Error('Give slides (the whole deck) or change, add and remove (some of its slides), not both.');
+      const was = readDeck(prev);
+      input = { ratio: a.ratio ?? was.ratio, theme: a.theme ?? was.theme, footer: a.footer ?? was.footer, guides: a.guides ?? was.guides, comments: a.comments, slides: applyDeckEdits(was, a).slides };
+    }
     // The version it changes: the parts it sends back as they were keep their look.
-    const { deck, notes } = await agentDeck(ctx.deps.db, { ratio: a.ratio, theme: a.theme, slides: a.slides, footer: a.footer, guides: a.guides, comments: a.comments }, ctx.cwd, id ? pageSource(ctx.deps.db, id)?.text : undefined);
+    const { deck, notes } = await agentDeck(ctx.deps.db, input, ctx.cwd, prev);
     const p = keepModel(ctx, id, 'slides', a.title, deck);
     const n = deck.slides.length;
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} slide${n === 1 ? '' : 's'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it, present it and export it to PowerPoint or PDF.`,
+      ...foldNote(p),
       ...notes,
     ].join(' ');
   },
@@ -290,12 +320,21 @@ const SAVE_DOC: RunTool = {
   inputSchema: SAVE_DOC_SCHEMA,
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'doc');
-    const { id: _id, title: _title, ...rest } = a;
+    const { id: _id, title: _title, edits, ...rest } = a;
+    const prev = id ? pageSource(ctx.deps.db, id)?.text : undefined;
+    // Small changes: made on its Markdown as get_page gives it, then saved as the whole document sent back would be.
+    if (edits !== undefined && edits !== null) {
+      if (!id || !prev) throw new Error('edits change a saved document: give its id (get_page lists them), or send the whole document as markdown.');
+      if (typeof rest.markdown === 'string' || Array.isArray(rest.blocks)) throw new Error('Give edits (small changes) or the whole document (markdown or blocks), not both.');
+      if (!Array.isArray(edits) || !edits.length) throw new Error('edits is a list of changes, such as [{"find": "…", "replace": "…"}]: see save_doc’s description.');
+      rest.markdown = applyDocEdits(readDoc(prev), edits)!.markdown;
+    }
     // The version it changes: what the agent leaves out (paper, font) stays, and unchanged blocks keep their ids.
-    const { doc, notes } = await agentDoc(ctx.deps.db, rest, ctx.cwd, id ? pageSource(ctx.deps.db, id)?.text : undefined);
+    const { doc, notes } = await agentDoc(ctx.deps.db, rest, ctx.cwd, prev);
     const p = keepModel(ctx, id, 'doc', a.title, doc);
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Word or Google Docs and export it as a Word document, a PDF or Markdown.`,
+      ...foldNote(p),
       ...notes,
     ].join(' ');
   },
@@ -307,13 +346,22 @@ const SAVE_SHEET: RunTool = {
   inputSchema: SAVE_SHEET_SCHEMA,
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'sheet');
-    const { id: _id, title: _title, ...rest } = a;
+    const { id: _id, title: _title, update, ...rest } = a;
+    const prev = id ? readBook(pageSource(ctx.deps.db, id)!.text) : undefined;
+    // Some cells changed: on top of the sheets they name, the others as they are.
+    if (update !== undefined && update !== null) {
+      if (!prev) throw new Error('update changes a saved spreadsheet: give its id (get_page lists them), or send the whole workbook as sheets.');
+      if (rest.sheets !== undefined || rest.file !== undefined) throw new Error('Give update (some cells) or sheets (the whole workbook), not both.');
+      if (!Array.isArray(update) || !update.length) throw new Error('update is a list of changes, such as [{"sheet": "Budget", "cells": {"B7": 1250}}]: see save_sheet’s description.');
+      rest.sheets = applyBookEdits(prev, update).sheets;
+    }
     // The version it changes: its comments' threads stay as they are, changed only by the comments asked for.
-    const { book, notes } = await agentBook(rest, ctx.cwd, id ? readBook(pageSource(ctx.deps.db, id)!.text) : undefined);
+    const { book, notes } = await agentBook(rest, ctx.cwd, prev);
     const p = keepModel(ctx, id, 'sheet', a.title, book);
     const n = book.sheets.length;
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} sheet${n === 1 ? '' : 's'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Excel or Google Sheets and export it as an Excel file, a CSV or a PDF.`,
+      ...foldNote(p),
       ...notes,
     ].join(' ');
   },
@@ -334,15 +382,28 @@ const SAVE_LATEX: RunTool = {
       return r.text;
     }
     const id = changing(db, a, 'tex');
-    const { id: _id, ...rest } = a;
+    const { id: _id, edits, ...rest } = a;
+    const prev = id ? readTex(pageSource(db, id)!.text) : undefined;
+    // Small changes in its files: made on them as get_page gives them, the files they change then sent as written.
+    if (edits !== undefined && edits !== null) {
+      if (!prev) throw new Error('edits change a saved LaTeX document: give its id (get_page lists them), or send its files with source and files.');
+      if (typeof rest.source === 'string' || typeof rest.main === 'string' || typeof rest.tex === 'string') throw new Error('Give edits (small changes) or source (the whole of main.tex), not both.');
+      if (!Array.isArray(edits) || !edits.length) throw new Error('edits is a list of changes, such as [{"find": "…", "replace": "…"}]: see save_latex’s description.');
+      const files = new Map<string, string>([[TEX_MAIN, prev.main], ...prev.files.map((f) => [f.name, f.text] as [string, string])]);
+      const out = applyTexEdits(files, edits).files;
+      rest.source = out.get(TEX_MAIN);
+      const changed = Object.fromEntries([...out].filter(([n, t]) => n !== TEX_MAIN && files.get(n) !== t));
+      if (Object.keys(changed).length) rest.files = { ...(isObjIn(rest.files) ? rest.files : {}), ...changed };
+    }
     // The version it changes: the files and pictures the agent leaves out stay. (The title goes in a template's text.)
-    const { doc, notes } = await agentTex(db, rest, ctx.cwd, id ? readTex(pageSource(db, id)!.text) : undefined);
+    const { doc, notes } = await agentTex(db, rest, ctx.cwd, prev);
     // Typeset first: the agent hears of errors to fix, and the picture in the list comes from this run.
     const r = await compileTex(db, doc);
     const p = keepModel(ctx, id, 'tex', a.title, doc);
     return [
       [
         `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit the source beside its typeset pages and export it as a PDF, its .tex source or the project as a .zip.`,
+        ...foldNote(p),
         ...notes,
       ].join(' '),
       compileSummary(r),
@@ -454,16 +515,16 @@ function askInstructions(db: Deps['db'], v: unknown): string | null {
   if (!p) return null;
   const k = kindOf(p.kind);
   const how: Record<string, string> = {
-    slides: 'Read it with get_page (each slide and part has its id; slides are numbered from 1 in the order they show), change what they ask, and save it with save_slides and that id. "This slide" or "slide 3" means the one they name; "every slide" means all of them.',
-    doc: 'Read it with get_page, change what they ask (a section is a heading and what follows it, up to the next heading of its level), and save the whole document with save_doc and that id.',
-    sheet: 'Read it with get_page, change what they ask (cells and ranges as A1 or B2:D9, on the sheet they name), and save the whole workbook with save_sheet and that id; keep formulas as formulas.',
-    tex: 'Read it with get_page (its files, and the errors of its last typesetting), change what they ask (lines are numbered from 1 in each file, as its editor shows them), and save it with save_latex and that id, sending what changes (what you leave out stays); it is typeset again, and you hear of any errors: fix them.',
+    slides: 'Read it with get_page (each slide and part has its id; slides are numbered from 1 in the order they show), change what they ask, and save it with save_slides and that id: only the slides that change (change, add, remove) when the rest stays as it is. "This slide" or "slide 3" means the one they name; "every slide" means all of them.',
+    doc: 'Read it with get_page, change what they ask (a section is a heading and what follows it, up to the next heading of its level), and save it with save_doc and that id: edits for a few changes (a section, words found and replaced), else the whole document.',
+    sheet: 'Read it with get_page, change what they ask (cells and ranges as A1 or B2:D9, on the sheet they name), and save it with save_sheet and that id: update for the cells that change, else the whole workbook; keep formulas as formulas.',
+    tex: 'Read it with get_page (its files, and the errors of its last typesetting), change what they ask (lines are numbered from 1 in each file, as its editor shows them), and save it with save_latex and that id, sending what changes (edits for small changes in a file; what you leave out stays); it is typeset again, and you hear of any errors: fix them.',
     notebook: 'Read it with get_page (its cells in order, numbered from 1, each with its id and what its last run showed), change what they ask ("cell 3" is the third, as the notebook shows them), and save the whole notebook with save_notebook and that id, keeping the cells, ids and outputs you do not change. To run code and keep real outputs, export it (export_page, ipynb) into your folder, run it there, and save it back with save_notebook and path. To answer a question about it, read it and answer.',
   };
   return [
     `The user is asking from their ${k?.noun ?? 'page'} "${p.title}" (saved page ${p.id}), open in front of them in the Library: their messages are about changing it.`,
     k ? how[p.kind!] : 'Read it with get_page and save the whole changed page with save_page and that id. When they name a part, change that part, and the rest only as needed.',
-    'What they look at updates as soon as you save; keep their own changes, and answer in a sentence or two what you changed. Do not make a new page or a file unless they ask.',
+    'What they look at shows your changes as you write them, and updates as soon as you save; keep their own changes, and answer in a sentence or two what you changed. Do not make a new page or a file unless they ask.',
   ].join(' ');
 }
 
@@ -895,8 +956,11 @@ export const pages: Feature = {
     const ask = s.extra?.page ? askInstructions(d.db, s.extra.page) : null;
     return { instructions: ask ? [INSTRUCTIONS, ask] : [INSTRUCTIONS] };
   },
-  // The pages the user changed in the editor, with their next message.
-  beforeMessage: (key, d) => takeEdits(d.db, key),
+  // The pages the user changed in the editor, with their next message (which starts a new turn of saves).
+  beforeMessage: (key, d) => {
+    lastAsked.set(key, Date.now());
+    return takeEdits(d.db, key);
+  },
   start(d) {
     setCaptureDb(d.db);
     d.sessions.on('toolstream', (key: string, e: ToolStream) => feedDraft(d, key, e));

@@ -21,6 +21,7 @@ import { scriptSafe } from './kit.ts';
 import { katexStyle, texToHtml } from './math.ts';
 import { videoStillOf } from './video-still.ts';
 import { keepVideoFile, MAX_VIDEO, VIDEO_INSIDE, videoAddress, videoDataUrl } from './videos.ts';
+import { DECK_EDITS_HELP } from '../../shared/deck-edits.ts';
 
 export { isDeckText };
 
@@ -400,7 +401,7 @@ export function deckForAgent(text: string): string {
   const body = text.length > 150_000 ? `${text.slice(0, 150_000)}\n… (cut: the deck is ${Math.round(text.length / 1024)} KB; keep the parts you did not read as they are by changing the deck slide by slide)` : text;
   const f = deck.footer;
   const foot = f ? `; on each slide${f.skipTitle ? ' but the title slide' : ''}: ${[f.num && 'its number', f.text && `"${f.text}"`, f.date && (f.date === 'today' ? "the day's date" : `the date "${f.date}"`)].filter(Boolean).join(', ')}` : '';
-  return `A slide deck of ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'} (${deck.ratio}, theme ${deck.theme.id ?? 'custom'}${foot}).\n\nOutline:\n${deckOutline(deck)}\n\nThe deck (send it back whole with save_slides and this id to change it; keep naget-asset: pictures, naget-video: videos and icons' paths as they are):\n${body}${commentsForAgent(deck)}`;
+  return `A slide deck of ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'} (${deck.ratio}, theme ${deck.theme.id ?? 'custom'}${foot}).\n\nOutline:\n${deckOutline(deck)}\n\nThe deck (send it back whole with save_slides and this id to change it, or only the slides that change with change, add and remove; keep naget-asset: pictures, naget-video: videos and icons' paths as they are):\n${body}${commentsForAgent(deck)}`;
 }
 
 /** The deck's comments, slide by slide, each on its part or slide, with how to answer them; '' when it has none. */
@@ -438,7 +439,8 @@ const SLIDES_HELP = [
   'The deck may have footer {num: true (each slide’s number), text, date: "today" or a date as written, skipTitle: true (not on the title slide)} and guides {x: [px], y: [px]} (the lines its parts are lined up on).',
   'theme: a preset (paper, midnight, ember, forest, ocean, noir, blossom, slate) or {id, bg, fg, head, muted, accent, accentFg, soft, colors: [6], font, headFont}; fonts: Inter, Roboto, Open Sans, Lato, Montserrat, Poppins, Nunito, DM Sans, Work Sans, Space Grotesk, IBM Plex Sans, Outfit, Playfair Display, Merriweather, Lora, Fraunces, DM Serif Display, Source Serif 4, JetBrains Mono, Arial, Georgia.',
   'Good slides: one idea each, a title that says the point, a few short bullets, numbers as charts or big numbers, pictures where they help, and what to say in the notes.',
-  'To change a deck, get_page with its id gives it whole (each slide and part with its id); send the whole deck back with the same id: a new version, the older ones restorable. Keep what the user changed.',
+  'To change a deck, get_page with its id gives it whole (each slide and part with its id); send the whole deck back with the same id, or only the slides that change (change, add, remove): a new version, the older ones restorable. Keep what the user changed.',
+  DECK_EDITS_HELP,
   'Comments: get_page lists the comments people left on slides and their parts (and their ids). Answer with comments: [{"id": "c1", "reply": "…", "resolve": true}] beside the slides (and make the change asked for); {"id", "reopen": true} reopens one, {"id", "delete": true} takes it out; {"slide": 3, "el": "<a part’s id, or none for the whole slide>", "text": "…"} adds one of yours. Comments you do not mention stay as they are; keep each slide’s id so its comments stay with it.',
 ].join(' ');
 
@@ -451,7 +453,10 @@ export const SAVE_SLIDES_SCHEMA = {
     title: { type: 'string', description: 'The deck’s name in the Library: "Q3 results".' },
     ratio: { type: 'string', enum: ['16:9', '4:3'] },
     theme: { description: 'A preset’s name, or the theme’s colours and fonts.', anyOf: [{ type: 'string' }, { type: 'object' }] },
-    slides: { type: 'array', items: { type: 'object' }, description: 'The slides, in order.' },
+    slides: { type: 'array', items: { type: 'object' }, description: 'The slides, in order (or, with id, change, add and remove instead).' },
+    change: { type: 'array', items: { type: 'object' }, description: 'With id: slides written again in place, each {"slide": its number from 1 or its id, …the slide}.' },
+    add: { type: 'array', items: { type: 'object' }, description: 'With id: new slides, each {"after": a slide’s number or id (0: first; left out: at the end), …the slide}.' },
+    remove: { type: 'array', items: { anyOf: [{ type: 'number' }, { type: 'string' }] }, description: 'With id: slides to take out, by number (from 1) or id.' },
     footer: { type: 'object', description: 'What the foot of each slide shows: {num, text, date, skipTitle}.' },
     guides: { type: 'object', description: 'The guides parts line up on: {x: [px], y: [px]}.' },
     comments: {
@@ -460,5 +465,5 @@ export const SAVE_SLIDES_SCHEMA = {
       description: 'Changes to the comments: {"id": "c1", "reply": "…"}, {"id": "c1", "resolve": true}, {"id": "c1", "reopen": true}, {"id": "c1", "delete": true}, or a new one: {"slide": 3, "el": "<a part’s id, optional>", "text": "…"}.',
     },
   },
-  required: ['title', 'slides'],
+  required: ['title'],
 };
