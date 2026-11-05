@@ -7,7 +7,10 @@
 // files as an object of name → text), and returns the model with every name and size checked: the files are written
 // into a folder for TeX to read, so a name is a plain path inside it (no "..", no absolute path, no hidden file, a
 // known extension). texText keeps a model as text that is the source itself, line by line, each other file after a
-// marker line, so two versions diff as the source does.
+// marker line, so two versions diff as the source does; its comments (on words of a file, with replies) come last,
+// one to a line.
+
+import { cleanComment, COMMENT_LIMITS, newCommentId, type Comment } from './comments.ts';
 
 export type TexEngine = 'pdflatex' | 'xelatex' | 'lualatex';
 
@@ -40,6 +43,15 @@ export interface TexDoc {
   /** The other files, in their order. */
   files: TexFile[];
   pictures: TexPicture[];
+  /** Comments on words of its files (none: left out). */
+  comments?: TexComment[];
+}
+
+/** A comment on words of one of the document's files: where they are ([from, to) in its text), and what they were (quote). */
+export interface TexComment extends Comment {
+  file: string;
+  from: number;
+  to: number;
 }
 
 export const TEX_MAIN = 'main.tex';
@@ -297,17 +309,57 @@ export function normalizeTex(input: unknown, o: TexNormalizeOpts = {}): TexDoc {
   if (pictures.length > TEX_LIMITS.pictures) throw new Error(`A document may have ${TEX_LIMITS.pictures} pictures; this one has ${pictures.length}.`);
 
   const engine = cleanEngine(v.engine) ?? guessEngine(main);
-  return { v: 1, engine, main, files, pictures };
+  const doc: TexDoc = { v: 1, engine, main, files, pictures };
+  const comments = cleanTexComments(v.comments, doc);
+  if (comments.length) doc.comments = comments;
+  return doc;
+}
+
+/**
+ * Comments checked as a document keeps them: each on a file it has, its place inside that file's text, and that place
+ * found again by the words it quotes when the text changed elsewhere (the nearest place they are, or where it was).
+ */
+export function cleanTexComments(v: unknown, d: TexDoc): TexComment[] {
+  if (!Array.isArray(v)) return [];
+  const out: TexComment[] = [];
+  const seen = new Set<string>();
+  for (const raw of v) {
+    if (out.length >= COMMENT_LIMITS.comments || !isObj(raw)) continue;
+    const c = cleanComment(raw);
+    if (!c) continue;
+    if (seen.has(c.id)) c.id = newCommentId();
+    seen.add(c.id);
+    // On a file the document no longer has, a comment goes with it.
+    if (typeof raw.file === 'string' && raw.file !== TEX_MAIN && !d.files.some((f) => f.name === raw.file)) continue;
+    const file = typeof raw.file === 'string' ? raw.file : TEX_MAIN;
+    const text = texFileText(d, file) ?? '';
+    const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? Math.max(0, Math.min(text.length, Math.round(x))) : 0);
+    let from = num(raw.from);
+    let to = Math.max(from, num(raw.to));
+    if (c.quote && text.slice(from, to) !== c.quote) {
+      // The words moved (an agent changed the text): their nearest place, if they are still there.
+      let best = -1;
+      for (let at = text.indexOf(c.quote); at >= 0 && at < text.length; at = text.indexOf(c.quote, at + 1)) if (best < 0 || Math.abs(at - from) < Math.abs(best - from)) best = at;
+      if (best >= 0) {
+        from = best;
+        to = best + c.quote.length;
+      }
+    }
+    out.push({ ...c, file, from, to });
+  }
+  return out;
 }
 
 // ---- the kept text ----------------------------------------------------------------------------------------------
 
 const HEAD = '%% naget-latex ';
 const MARK = '%%%% file: ';
+/** After the files: the comments, one JSON a line. */
+const COMMENTS = '%%%% naget-comments';
 /** A line of a file that would read as a marker gets a "!" in front (and one that has some already, one more). */
-const MARKISH = /^!*%%%% file: /;
+const MARKISH = /^!*%%%% (file: |naget-comments$)/;
 const escLine = (l: string) => (MARKISH.test(l) ? `!${l}` : l);
-const unescLine = (l: string) => (/^!+%%%% file: /.test(l) ? l.slice(1) : l);
+const unescLine = (l: string) => (/^!+%%%% (file: |naget-comments$)/.test(l) ? l.slice(1) : l);
 
 /** Whether stored page text is a LaTeX document's. */
 export const isTexText = (s: string) => s.startsWith(HEAD);
@@ -322,6 +374,10 @@ export function texText(d: TexDoc): string {
   for (const f of d.files) {
     out.push(MARK + f.name);
     for (const l of f.text.split('\n')) out.push(escLine(l));
+  }
+  if (d.comments?.length) {
+    out.push(COMMENTS);
+    for (const c of d.comments) out.push(JSON.stringify(c));
   }
   return out.join('\n');
 }
@@ -340,8 +396,18 @@ export function parseTexText(s: string): TexDoc {
     if (name === null) main = text;
     else files.push({ name, text });
   };
+  const comments: unknown[] = [];
   for (let i = 1; i < all.length; i++) {
     const l = all[i];
+    if (l === COMMENTS) {
+      // The comments, one to a line, to the end.
+      for (const c of all.slice(i + 1)) {
+        try {
+          comments.push(JSON.parse(c));
+        } catch {}
+      }
+      break;
+    }
     if (l.startsWith(MARK)) {
       flush();
       name = l.slice(MARK.length);
@@ -350,7 +416,9 @@ export function parseTexText(s: string): TexDoc {
   }
   flush();
   const pictures = Array.isArray(meta.pictures) ? (meta.pictures as TexPicture[]).filter((p) => isObj(p) && typeof p.name === 'string' && typeof p.src === 'string') : [];
-  return { v: 1, engine: cleanEngine(meta.engine) ?? 'pdflatex', main, files, pictures };
+  const d: TexDoc = { v: 1, engine: cleanEngine(meta.engine) ?? 'pdflatex', main, files, pictures };
+  if (comments.length) d.comments = comments as TexComment[];
+  return d;
 }
 
 /** The pictures a document shows, by their sources (for the app to keep them while a version shows them). */

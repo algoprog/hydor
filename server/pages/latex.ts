@@ -42,8 +42,10 @@ import {
   type TexEngine,
   type TexIssue,
   type TexPicture,
+  type TexComment,
   type TexSetup,
 } from '../../shared/latex.ts';
+import { newCommentId } from '../../shared/comments.ts';
 import { TEX_ASKED } from '../../shared/latex-catalog.ts';
 import { texCount, totalWords } from '../../shared/latex-count.ts';
 import { TEX_TEMPLATES, texFromTemplate, texTemplate } from '../../shared/latex-templates.ts';
@@ -266,6 +268,35 @@ export async function agentTex(db: DB, input: unknown, cwd: string, prev?: TexDo
     pictures.set(name, src);
   }
 
+  // Comments: the version's own, answered, resolved or added to.
+  const comments: TexComment[] = (prev?.comments ?? []).map((c) => ({ ...c, replies: c.replies ? [...c.replies] : undefined }));
+  if (Array.isArray(v.comments))
+    for (const op of v.comments) {
+      if (!isObj(op)) continue;
+      const now = Date.now();
+      if (typeof op.id === 'string' && op.id) {
+        const c = comments.find((x) => x.id === op.id);
+        if (!c) {
+          notes.push(`There is no comment ${op.id}: get_page lists them.`);
+          continue;
+        }
+        if (typeof op.reply === 'string' && op.reply.trim()) c.replies = [...(c.replies ?? []), { id: newCommentId(), by: 'agent', text: op.reply.trim(), at: now }];
+        if (typeof op.resolve === 'boolean') c.resolved = op.resolve || undefined;
+        continue;
+      }
+      if (typeof op.text !== 'string' || !op.text.trim()) continue;
+      // A new comment, on the words it quotes in its file.
+      const file = typeof op.file === 'string' && op.file.trim() ? op.file.trim() : TEX_MAIN;
+      const text = file === TEX_MAIN ? main : (files.get(file) ?? null);
+      const quote = typeof op.quote === 'string' ? op.quote.trim() : '';
+      const at = text !== null && quote ? text.indexOf(quote) : -1;
+      if (text === null || at < 0) {
+        notes.push(`The comment “${op.text.trim().slice(0, 60)}” was left out: ${text === null ? `the document has no file ${file}` : `${file} has no “${quote.slice(0, 60)}” to put it on`}.`);
+        continue;
+      }
+      comments.push({ id: newCommentId(), by: 'agent', text: op.text.trim(), at: now, quote, file, from: at, to: at + quote.length });
+    }
+
   let doc: TexDoc;
   try {
     if (main === null) throw new Error('A LaTeX document needs its main file: source, the whole text of main.tex (\\documentclass{…} … \\end{document}).');
@@ -274,6 +305,7 @@ export async function agentTex(db: DB, input: unknown, cwd: string, prev?: TexDo
       engine: engine ?? undefined,
       files: [...files].map(([name, text]) => ({ name, text })),
       pictures: [...pictures].map(([name, src]) => ({ name, src })),
+      comments,
     });
   } catch (e) {
     throw new Error(`${(e as Error).message} See save_latex's description for the document's shape.`);
@@ -1675,6 +1707,8 @@ export const texFromFile = async (buf: Buffer, name: string) => (await importTex
 
 // ---- what an agent is told -------------------------------------------------------------------------------------------
 
+const texFileTextOf = (d: TexDoc, name: string) => (name === TEX_MAIN ? d.main : (d.files.find((f) => f.name === name)?.text ?? null));
+
 const issueLine = (x: TexIssue) => `- ${x.file ? `${x.file}${x.line ? `:${x.line}` : ''}: ` : x.line ? `line ${x.line}: ` : ''}${x.message}${x.hint ? ` (${x.hint})` : ''}`;
 
 /** A typesetting in a few lines, for the agent that saved the document (`pdf`: the PDF, or whether there is one). */
@@ -1703,6 +1737,19 @@ export function texForAgent(text: string): string {
   const outline = texOutline(d);
   const top = Math.min(...outline.map((h) => h.level));
   if (outline.length) out.push(`\nOutline:\n${outline.slice(0, 200).map((h) => `${'  '.repeat(h.level - top)}- ${h.title} (${h.file}:${h.line})`).join('\n')}`);
+  const cs = d.comments ?? [];
+  if (cs.length) {
+    const open = cs.filter((c) => !c.resolved);
+    const lineOf = (c: TexComment) => (texFileTextOf(d, c.file) ?? '').slice(0, c.from).split('\n').length;
+    const who = (by: string) => (by === 'agent' ? 'an agent' : 'the user');
+    out.push(
+      `\nComments: ${open.length} open${cs.length > open.length ? `, ${cs.length - open.length} resolved` : ''}. Answer one with save_latex's comments: [{"id", "reply": "…"}], resolve it with {"id", "resolve": true} once done, or add one with {"file", "quote": the words it is on, "text"}.`,
+    );
+    for (const c of [...open, ...cs.filter((x) => x.resolved)].slice(0, 60))
+      out.push(
+        `- ${c.id}${c.resolved ? ' (resolved)' : ''} on ${c.file}:${lineOf(c)}${c.quote ? ` “${c.quote.slice(0, 120)}”` : ''}, by ${who(c.by)}: ${c.text.slice(0, 600)}${(c.replies ?? []).map((r) => `\n  - ${who(r.by)}: ${r.text.slice(0, 400)}`).join('')}`,
+      );
+  }
   const c = texCount(d);
   const n1 = (x: number, one: string, many = `${one}s`) => `${x.toLocaleString('en')} ${x === 1 ? one : many}`;
   out.push(
@@ -1736,6 +1783,7 @@ export function texForAgent(text: string): string {
 const LATEX_HELP = [
   'Make or change a LaTeX document, kept in the user’s Library: a paper, a thesis, a CV, a letter, a report, math-heavy notes, a beamer talk, anything the user wants typeset with LaTeX. It shows in the conversation and in the Library as its typeset pages; there the user edits the source beside its PDF (typeset again as they type) and downloads the PDF, main.tex or the whole project as a .zip. Use it rather than writing .tex files when the user asks for LaTeX, unless they want the files in a folder of theirs.',
   'source: the whole of main.tex, from \\documentclass to \\end{document}. files: the other files it reads, by the names it gives them ({"refs.bib": "…", "chapters/intro.tex": "…"}, or [{name, text}], or {name, path} for a file of this session); names are letters, digits, - _ . and / between folders. Or folder: a LaTeX project folder of this session, taken in whole.',
+  'comments: the user’s comments on words of the document (get_page lists them, with their ids): answer with [{"id": "…", "reply": "…"}], resolve with {"id", "resolve": true} once you did what it asks, or add your own with {"file": "main.tex", "quote": the exact words it is on, "text": "…"}; what you leave out stays as it is.',
   'Or, for a new document, template: article, report, book (a book or thesis: chapters, theorems, a bibliography), letter, beamer (slides), cv (moderncv), homework (problems and solutions), paper (two columns, as for a conference) or poster (tikzposter): a whole project that typesets, with the title in it, to change with source and files in the same call or in later saves (get_page shows it).',
   'pictures: what \\includegraphics shows, each by the name it uses: [{"name": "figures/plot.png", "src": "plots/plot.png"}] with src a PNG or JPEG file of this session, a public https address, or a picture of the document already (naget-asset:…); a path alone is its own name. A PDF picture becomes a PNG of it.',
   'engine: pdflatex (the default), xelatex (Unicode text and this computer’s fonts with fontspec: Greek, Chinese and other scripts), or lualatex. Packages: those of a standard TeX Live (amsmath, graphicx, hyperref, geometry, tikz, pgfplots, booktabs, beamer, natbib…); for a bibliography, a .bib file with \\bibliography and BibTeX (biblatex and biber may be missing). Nothing that runs programs (minted, svg, shell escape): it is turned off.',
@@ -1762,6 +1810,11 @@ export const SAVE_LATEX_SCHEMA = {
     engine: { type: 'string', enum: ['pdflatex', 'xelatex', 'lualatex'] },
     folder: { type: 'string', description: 'Instead of source and files: a LaTeX project folder of this session, taken in whole.' },
     remove: { type: 'array', items: { type: 'string' }, description: 'With id: names of files or pictures to take out.' },
+    comments: {
+      type: 'array',
+      items: { type: 'object' },
+      description: 'Answer, resolve or add comments: [{"id", "reply"?, "resolve"?: true}] for one get_page lists, or [{"file"?, "quote": the words it is on, "text"}] for a new one.',
+    },
     template: {
       type: 'string',
       enum: TEX_TEMPLATES.map((t) => t.id),

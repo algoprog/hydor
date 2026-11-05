@@ -49,6 +49,18 @@ export interface CodeHooks {
   picture: (name: string) => string | null;
   /** Ctrl+F (and Ctrl+H, to replace): the editor's find bar. */
   onFind: (replace: boolean) => void;
+  /** The text changed: where the comments' words are now. */
+  onCommentsMoved: (list: CommentRange[]) => void;
+  /** Ctrl+Alt+M: a comment on the words picked. */
+  onComment: () => void;
+}
+
+/** Where a comment's words are in the file; `active`: the one picked. */
+export interface CommentRange {
+  id: string;
+  from: number;
+  to: number;
+  active?: boolean;
 }
 
 export interface Issue {
@@ -93,6 +105,8 @@ export interface Code {
   picked: () => { from: number; to: number; text: string; empty: boolean };
   /** A part of the text changed (undone as one), the cursor after it. */
   replaceRange: (from: number, to: number, text: string) => void;
+  /** The comments' words marked (open ones), moved with the text as it changes. */
+  setComments: (list: CommentRange[]) => void;
   /** The find bar's matches marked, the current one apart. */
   markFound: (ranges: { s: number; e: number }[], current: number) => void;
   /** A part of the text picked and scrolled to, the focus left where it is. */
@@ -156,6 +170,32 @@ const foundField = StateField.define<DecorationSet>({
     return d;
   },
   provide: (f) => EditorView.decorations.from(f),
+});
+
+// The words comments are on: marked, and moved with the text (what is typed at their ends stays out of them).
+const setCommentRanges = StateEffect.define<CommentRange[]>();
+const commentMark = Decoration.mark({ class: 'cm-tex-commented' });
+const commentActive = Decoration.mark({ class: 'cm-tex-commented cm-tex-commented-active' });
+const commentField = StateField.define<{ list: CommentRange[]; deco: DecorationSet }>({
+  create: () => ({ list: [], deco: Decoration.none }),
+  update(v, tr) {
+    let list = v.list;
+    if (tr.docChanged && list.length) list = list.map((c) => ({ ...c, from: tr.changes.mapPos(c.from, 1), to: Math.max(tr.changes.mapPos(c.from, 1), tr.changes.mapPos(c.to, -1)) }));
+    for (const e of tr.effects) if (e.is(setCommentRanges)) list = e.value.map((c) => ({ ...c, from: Math.min(c.from, tr.state.doc.length), to: Math.min(Math.max(c.from, c.to), tr.state.doc.length) }));
+    if (list === v.list) return v;
+    return {
+      list,
+      deco: Decoration.set(
+        list.filter((c) => c.to > c.from).map((c) => (c.active ? commentActive : commentMark).range(c.from, c.to)),
+        true,
+      ),
+    };
+  },
+  provide: (f) => EditorView.decorations.from(f, (v) => v.deco),
+});
+const commentTheme = EditorView.baseTheme({
+  '.cm-tex-commented': { backgroundColor: 'color-mix(in srgb, #f5b400 22%, transparent)', borderBottom: '2px solid color-mix(in srgb, #f5b400 70%, transparent)' },
+  '.cm-tex-commented-active': { backgroundColor: 'color-mix(in srgb, #f5b400 40%, transparent)' },
 });
 
 /** The commands Clear formatting takes away. */
@@ -317,6 +357,7 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
         { key: 'Mod-f', preventDefault: true, run: () => (hooks.onFind(false), true) },
         { key: 'Mod-h', preventDefault: true, run: () => (hooks.onFind(true), true) },
         { key: 'Mod-g', preventDefault: true, run: () => (hooks.onFind(false), true) },
+        { key: 'Mod-Alt-m', preventDefault: true, run: () => (hooks.onComment(), true) },
         { key: 'F3', preventDefault: true, run: () => (hooks.onFind(false), true) },
         ...(tex ? [{ key: 'Enter', run: autoEnd }] : []),
       ]),
@@ -325,10 +366,16 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     EditorState.languageData.of(() => languageData),
     lintGutter(),
     foundField,
+    commentField,
+    commentTheme,
     tex ? [texFolding, mathPreview(hooks.macros)] : [],
     visualC.of(o.visual && tex ? visualExt() : []),
     spellC.of(o.spell ? spellCheck : []),
     EditorView.updateListener.of((u) => {
+      if (u.docChanged) {
+        const list = u.state.field(commentField).list;
+        if (list.length) hooks.onCommentsMoved(list);
+      }
       if (u.docChanged && tex) {
         clearTimeout(checkTimer);
         checkTimer = setTimeout(showIssues, 700);
@@ -374,6 +421,7 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
       return { from: r.from, to: r.to, text: view.state.sliceDoc(r.from, r.to), empty: r.empty };
     },
     markFound: (ranges, current) => view.dispatch({ effects: found.of({ ranges, current }) }),
+    setComments: (list) => view.dispatch({ effects: setCommentRanges.of(list) }),
     select: (from, to) => view.dispatch({ selection: EditorSelection.range(from, to), effects: EditorView.scrollIntoView(from, { y: 'center' }) }),
     replaceQuiet: (from, to, text) => {
       if (!o.readOnly) view.dispatch({ changes: { from, to, insert: text }, userEvent: 'input.replace' });
