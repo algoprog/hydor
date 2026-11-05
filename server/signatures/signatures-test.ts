@@ -466,6 +466,8 @@ const plain = (xml: string) => [...xml.matchAll(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>
   const l = allowWith('accept');
   const looked = text(await tool('place_signature').run({ signature: 'signature', file: 'lease.docx', after: 'Signature:', look: true }, { ...l.ctx, cwd: folder } as RunCtx));
   ok(!l.cards.length && /⟦signature here⟧/.test(looked) && fs.readdirSync(folder).length === 1, 'look: the words around the spot, no card, nothing written', looked);
+  const empty = text(await tool('place_signature').run({ file: lease, placeholder: '', after: 'Signature:', look: true }, l.ctx));
+  ok(/right after “Signature:”/.test(empty), 'empty words count as none (and the only signature saved needs no name)', empty);
   // Denied: nothing written.
   const no = allowWith('deny');
   const denied = text(await tool('place_signature').run({ signature: 'Signature', file: lease, after: 'Signature:' }, no.ctx));

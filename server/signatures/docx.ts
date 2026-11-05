@@ -572,7 +572,7 @@ export function placeInDocx(file: Buffer, png: Buffer, px: { width: number; heig
   let at: { piece: number; k: number } | { para: number } | { end: true };
   let body = b0;
   if (spot.placeholder || spot.after) {
-    const words = (spot.placeholder ?? spot.after)!;
+    const words = (spot.placeholder || spot.after)!;
     const hits = findAll(b0, words);
     const hit = pickOccurrence(hits, spot.occurrence, `“${words}” is not in the document. Read it (read_document) and name words that are, as they are written there.`);
     const { text, at: map } = paraWords(b0, hit.p);

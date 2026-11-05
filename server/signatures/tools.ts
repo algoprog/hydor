@@ -146,9 +146,14 @@ const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : t
 /** What placing it means for one kind of target: what the card shows, what an agent sees first, and the writing. */
 interface Plan {
   card: Omit<SignaturePlaceCard, 'signature'>;
+  /** The page as it will be, for the card (made only when a card shows): its address. */
+  picture?: () => Promise<string>;
   look(): Promise<ToolOutput>;
   write(): Promise<string>;
 }
+
+/** Words an agent named, or nothing when it named none. */
+const wordsOf = (v: unknown) => (typeof v === 'string' && v.trim() ? v : undefined);
 
 const SIDES: Side[] = ['right', 'left', 'above', 'below'];
 
@@ -214,7 +219,7 @@ const PLACE_SIGNATURE: RunTool = {
         const page = mustPage(db, id);
         if (page.kind !== 'doc') throw new Error(`Page ${id} is not a document: only documents of the Library (and Word files, PDFs and PNG pictures) can be signed.`);
         const doc = normalizeDoc(pageModel(db, id));
-        const spot = { placeholder: typeof a.placeholder === 'string' ? a.placeholder : undefined, after: typeof a.after === 'string' ? a.after : undefined, cell: a.cell, occurrence };
+        const spot = { placeholder: wordsOf(a.placeholder), after: wordsOf(a.after), cell: a.cell, occurrence };
         const alt = sig.kind === 'initials' ? 'Initials' : 'Signature';
         const r = placeInDoc(doc, `${ASSET}${'0'.repeat(40)}`, spot, { widthMm, alt });
         plan = {
@@ -242,8 +247,8 @@ const PLACE_SIGNATURE: RunTool = {
         };
         if (ext === '.docx' || ext === '.docm') {
           const spot = {
-            placeholder: typeof a.placeholder === 'string' ? a.placeholder : undefined,
-            after: typeof a.after === 'string' ? a.after : undefined,
+            placeholder: wordsOf(a.placeholder),
+            after: wordsOf(a.after),
             cell: a.cell && typeof a.cell === 'object' ? (a.cell as { table: number; row: number; column: number }) : undefined,
             occurrence,
           };
@@ -278,6 +283,7 @@ const PLACE_SIGNATURE: RunTool = {
           const r = pdfSpot(t, buf, pic, { page: pageNo, near, side, x, y, occurrence, widthMm });
           plan = {
             card: { target: { kind: 'pdf', path: file }, spot: r.spot, page: r.at.page, pages: r.pages, out, replace, widthMm },
+            picture: async () => putPreview(smaller(await t.pagePicture(t.stampImage(buf, r.at, pic.png), r.at.page), 1000)),
             look: async () => {
               const boxed = t.stampImage(buf, r.at, writePng(boxPicture(r.at.w * 4, r.at.h * 4)));
               const shot = smaller(await t.pagePicture(boxed, r.at.page), 1100);
@@ -293,7 +299,6 @@ const PLACE_SIGNATURE: RunTool = {
               return `Placed “${sig.name}” on ${r.where} in ${out}${replace ? '' : ' (a signed copy beside the file)'}, added to the PDF without changing what was in it.`;
             },
           };
-          plan.card.picture = putPreview(smaller(await t.pagePicture(t.stampImage(buf, r.at, pic.png), r.at.page), 1000));
         } else if (ext === '.png') {
           const base = readPicture(buf);
           const sigPx = readPng(pic.png);
@@ -309,7 +314,8 @@ const PLACE_SIGNATURE: RunTool = {
           }
           const spot = { x, y, width: Math.min(1, Math.max(0.02, num(a.width) ?? 0.3)) };
           plan = {
-            card: { target: { kind: 'png', path: file }, spot: { kind: 'point', x, y }, out, replace, picture: putPreview(pictureView(base, sigPx, spot, { max: 1000 })) },
+            card: { target: { kind: 'png', path: file }, spot: { kind: 'point', x, y }, out, replace },
+            picture: async () => putPreview(pictureView(base, sigPx, spot, { max: 1000 })),
             look: async () => ({ text: `${path.basename(file)}: the blue box shows where it would go.`, images: [{ data: pictureView(base, sigPx, spot, { box: true }).toString('base64'), mimeType: 'image/png' }] }),
             write: async () => {
               await unchanged();
@@ -328,6 +334,11 @@ const PLACE_SIGNATURE: RunTool = {
     // The user's OK first, unless they allowed this signature for the rest of the session.
     const key = `${ctx.key}\n${sig.id}`;
     if (!allowed.has(key)) {
+      try {
+        if (plan.picture) plan.card.picture = await plan.picture();
+      } catch (e) {
+        return { isError: true, text: `The page could not be shown to the user, so nothing was written: ${(e as Error).message}` };
+      }
       const card = signatureCard({
         title: sig.kind === 'initials' ? `Place your initials “${sig.name}”?` : `Place your signature “${sig.name}”?`,
         options: [
