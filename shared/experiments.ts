@@ -256,7 +256,7 @@ export const STATUS_WORDS: Record<RunStatus, string> = {
   done: 'Done',
   failed: 'Failed',
   stopped: 'Stopped',
-  lost: 'Lost',
+  lost: 'Went missing',
 };
 
 /** Statuses of runs that have not ended. */

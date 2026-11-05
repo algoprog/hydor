@@ -345,10 +345,10 @@ export function TableDialog({ start, onClose }: { start: TableStart | null; onCl
             <label className="block">
               <span className="mb-1 block text-fg-2">Rows</span>
               <select value={rows} onChange={(e) => setRows(e.target.value)} className={cx(inputCls, 'h-9 text-[13px]')}>
-                <option value="group">By experiment</option>
+                <option value="group">A row per experiment</option>
                 {settings.map((s) => (
                   <option key={s} value={`param:${s}`}>
-                    By {s}
+                    {`A row per value of ${s}`}
                   </option>
                 ))}
               </select>

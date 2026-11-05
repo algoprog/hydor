@@ -14,7 +14,7 @@ Below, your runs, grouped by experiment, the experiment with the newest run firs
 
 - **In line**: it has just been added. **Waiting for a GPU**, **Waiting** or **In the cluster’s queue**: its turn has come, but what it needs is not free yet; hover over the row to see why.
 - **Starting**, **Running 2 h 13 min**, **Stopping**.
-- **Done** (it ended with exit code 0), **Failed**, **Stopped**, **Stopped early** (a sweep's early stop), **Lost** (its process went missing, for example when the computer restarted).
+- **Done** (it ended with exit code 0), **Failed**, **Stopped**, **Stopped early** (a sweep's early stop), **Went missing** (its process went missing, for example when the computer restarted).
 
 **Find**, at the right above the list, opens a search (by name, experiment or command) and filters by status and by where runs run. While a filter is on, **× N shown** beside it clears it.
 
@@ -46,7 +46,7 @@ The new run opens, so you can watch it start.
 - Jobs without a GPU start at once, a few at a time; how many is set in [Where runs go](#where-runs-go) (at first a quarter of the computer's threads, from 1 to 4).
 - A job that asks for more GPUs than the computer has, or for one on a computer without NVIDIA GPUs, fails at once and says so.
 - A run sees only its own GPUs (CUDA_VISIBLE_DEVICES); one without a GPU sees none. It also gets HYDOR_RUN (its id), HYDOR_RUN_DIR (its folder) and HYDOR_SEED, and Python prints at once (PYTHONUNBUFFERED), so its log follows as it goes.
-- Runs go on in tmux (or in the background, where there is no tmux) when the app restarts or updates. When the app is back, it finds them again, reads what they printed meanwhile and sees which ended; one whose process went missing is marked **Lost**.
+- Runs go on in tmux (or in the background, where there is no tmux) when the app restarts or updates. When the app is back, it finds them again, reads what they printed meanwhile and sees which ended; one whose process went missing is marked **Went missing**.
 
 ## What a run records
 

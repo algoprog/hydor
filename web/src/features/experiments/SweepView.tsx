@@ -43,10 +43,16 @@ export function SweepView({ id, onClose, onTable, onCompare }: { id: string | nu
       ) : (
         <div className="space-y-4 text-[13px]">
           <p className="text-fg-2">
-            {data.runs.length} runs: {count((r) => r.status === 'done')} done
-            {count(isActive) ? `, ${count(isActive)} going` : ''}
-            {count((r) => r.status === 'failed' || r.status === 'lost') ? `, ${count((r) => r.status === 'failed' || r.status === 'lost')} failed` : ''}
-            {count((r) => !!r.why?.startsWith('Stopped early')) ? `, ${count((r) => !!r.why?.startsWith('Stopped early'))} stopped early` : ''}. {data.sweep.mode === 'random' ? 'A random sample of the combinations.' : 'Every combination.'}
+            {[
+              `${data.runs.length} runs`,
+              `${count((r) => r.status === 'done')} done`,
+              count(isActive) ? `${count(isActive)} going` : '',
+              count((r) => r.status === 'failed' || r.status === 'lost') ? `${count((r) => r.status === 'failed' || r.status === 'lost')} failed` : '',
+              count((r) => !!r.why?.startsWith('Stopped early')) ? `${count((r) => !!r.why?.startsWith('Stopped early'))} stopped early` : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            . <span>{data.sweep.mode === 'random' ? 'A random sample of the combinations.' : 'Every combination.'}</span>
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <select value={metric} onChange={(e) => setMetric(e.target.value)} className={cx(inputCls.replace('w-full', ''), 'h-8 max-w-[220px] text-[13px]')} translate="no">

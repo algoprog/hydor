@@ -203,7 +203,7 @@ export function BoardDialog({ swarm, open, onClose }: { swarm: string; open: boo
             <section>
               <div className="mb-1.5 flex items-center gap-2">
                 <h3 className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-fg-3">
-                  Parts{parts.length ? ` · ${n.done} of ${n.total} done${n.failed ? `, ${n.failed} failed` : ''}` : ''}
+                  {!parts.length ? 'Parts' : n.failed ? `Parts · ${n.done} of ${n.total} done · ${n.failed} failed` : `Parts · ${n.done} of ${n.total} done`}
                 </h3>
                 {stopAll}
               </div>
@@ -219,7 +219,7 @@ export function BoardDialog({ swarm, open, onClose }: { swarm: string; open: boo
             </section>
             {working.length > 0 && (
               <section>
-                <h3 className="mb-1.5 text-[12.5px] font-medium text-fg-3">{`Working now · ${working.length}${b ? ` of ${b.size} at most` : ''}`}</h3>
+                <h3 className="mb-1.5 text-[12.5px] font-medium text-fg-3">{b ? `Working now · ${working.length} of ${b.size} at most` : `Working now · ${working.length}`}</h3>
                 <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
                   {working.map((m) => (
                     <MemberRow key={m.key} s={m} stopped={!!b?.stopped.includes(m.key)} onOpen={() => go(m.key)} />
