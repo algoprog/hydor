@@ -352,7 +352,7 @@ Changes stay unsaved until **Save** (Ctrl+S) in the bar at the bottom, as a page
 
 Pick a part of a slide (or nothing, for the whole slide), then **Insert → Comment** (Ctrl+Alt+M, or **Comment** in a right-click), write it and press **Comment** (or Ctrl+Enter). A small mark shows at the part's top-right corner (in the editor only: never in the slideshow, the deck's own page or its files); click it to read the comment. **Comments** in the side panel (the speech bubble after **Theme**, with how many are open) lists every slide's comments in order, each under the part it is on: click one to go to its slide and pick its part. Each has **Reply**, **Resolve** (the tick) and, in its **More** menu (⋯), **Edit** and **Delete**; **Show resolved comments** brings the resolved ones back, with **Reopen**. Comments are saved with the slides (**Save**); a part deleted leaves its comments on its slide.
 
-Agents read the comments too, and the part each is on. **Ask the agent to answer them**, at the top of the comments, asks it to make the changes they ask for and reply to each; its replies show as **Agent**. In the PowerPoint file the open comments are PowerPoint's own, replies and all.
+Agents read the comments too, and the part each is on. **Ask the agent to answer the comments**, at the top of the comments, asks it to make the changes they ask for and reply to each; its replies show as **Agent**. In the PowerPoint file the open comments are PowerPoint's own, replies and all.
 
 ### Format, Animate, Slide and Theme
 
