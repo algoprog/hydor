@@ -547,7 +547,7 @@ test('the views draw with a run’s values: the workbench’s next text with a b
   assert.match(head, /Weekly report · 2–6 November 2026 · for your team/);
   assert.match(head, /<span><b>4<\/b> sessions<\/span><span><b>3<\/b> commits<\/span>/);
   const body = draw(w, 'report-body', report);
-  assert.match(body, /<h3>Done<\/h3><ul><li>A<\/li><li>B<\/li><\/ul>/);
+  assert.match(body, /<h3>Done this week<\/h3><ul><li>A<\/li><li>B<\/li><\/ul>/);
   assert.match(body, /class="warn"><h3>Problems and blockers<\/h3>/);
   assert.doesNotMatch(body, /Results|Questions/, 'empty parts left out');
   const n = tpl('lab-notebook');

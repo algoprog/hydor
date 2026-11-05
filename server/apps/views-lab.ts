@@ -573,7 +573,7 @@ const REPORT_HEAD_CSS =
 `;
 
 const REPORT_BODY = String.raw`<div class="parts">
-  {{#done|count}}<section><h3>Done</h3><ul>{{#done}}<li>{{.}}</li>{{/done}}</ul></section>{{/done}}
+  {{#done|count}}<section><h3>Done this week</h3><ul>{{#done}}<li>{{.}}</li>{{/done}}</ul></section>{{/done}}
   {{#results|count}}<section><h3>Results</h3><ul>{{#results}}<li>{{.}}</li>{{/results}}</ul></section>{{/results}}
   {{#problems|count}}<section class="warn"><h3>Problems and blockers</h3><ul>{{#problems}}<li>{{.}}</li>{{/problems}}</ul></section>{{/problems}}
   {{#next|count}}<section><h3>Next week</h3><ul>{{#next}}<li>{{.}}</li>{{/next}}</ul></section>{{/next}}

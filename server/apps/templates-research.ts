@@ -1511,7 +1511,7 @@ if (waiting.length) {
       const r = runs.find((x) => x && x.id === k.run);
       if (!r) continue;
       const s = scoreOf(r.metrics);
-      const state = r.status === 'done' ? (beats(s) ? 'beats' : 'done') : r.status === 'failed' || r.status === 'stopped' || r.status === 'lost' ? 'failed' : 'evaluating';
+      const state = r.status === 'done' ? (beats(s) ? 'beats' : 'evaluated') : r.status === 'failed' || r.status === 'stopped' || r.status === 'lost' ? 'failed' : 'evaluating';
       if (state !== k.state || s !== k.score) changed.push(Object.assign({}, k, { state: state, score: s, checked: today, fresh: false }));
     }
   } catch (e) {
@@ -1544,7 +1544,7 @@ const now = new Map();
 for (const k of rows(input.kept)) now.set(k.id, Object.assign({}, k, { fresh: false }));
 for (const c of rows(input.changed)) now.set(c.id, Object.assign({}, now.get(c.id) || {}, c));
 const link = (m) => 'https://huggingface.co/' + m;
-const order = { beats: 0, new: 1, evaluating: 2, done: 3, failed: 4, 'not run': 5, skipped: 6 };
+const order = { beats: 0, new: 1, evaluating: 2, evaluated: 3, failed: 4, 'not run': 5, skipped: 6 };
 const month = new Date(Date.parse(String(input.today || '').slice(0, 10)) - 45 * 86400000).toISOString().slice(0, 10);
 const models = Array.from(now.values())
   .filter((m) => m.fresh || (m.state !== 'skipped' && String(m.checked || '') >= month))
@@ -2479,7 +2479,7 @@ const IDEA_COLS: NonNullable<Draft['answer'][number]['columns']> = [
   { id: 'title', label: 'Idea', type: 'text' },
   { id: 'idea', label: 'What it is', type: 'text' },
   { id: 'crosses', label: 'What it crosses', type: 'text' },
-  { id: 'verdict', label: 'Done before?', type: 'text', description: 'new, partly done or done' },
+  { id: 'verdict', label: 'Done before?', type: 'text', description: 'new, partly done or already done' },
   { id: 'why', label: 'Why that verdict', type: 'text' },
   { id: 'closest', label: 'Closest work', type: 'text' },
   { id: 'closest_url', label: 'Its link', type: 'url' },
@@ -2751,11 +2751,13 @@ const named = (t) => String(t || '').replace(/\b([MRP])(\d{1,2})\b/g, (m, k, n) 
   const p = lists[k][Number(n) - 1];
   return p ? '“' + clip(p.title, 60) + '”' : m;
 });
+// The model says “done”; the page says “already done”, which no translation reads as a run that ended.
+const verdict = pick(v.verdict, ['partly done', 'done', 'new'], 'new');
 return {
   title: idea.title,
   idea: idea.idea,
   crosses: named(idea.crosses),
-  verdict: pick(v.verdict, ['partly done', 'done', 'new'], 'new'),
+  verdict: verdict === 'done' ? 'already done' : verdict,
   why: named(v.why),
   closest: near ? near.title + (near.year ? ' (' + near.year + ')' : '') : '',
   closest_url: near && /^https?:\/\/\S+$/.test(String(near.url)) ? near.url : null,
@@ -2783,7 +2785,7 @@ return {
           LIST +
           String.raw`// The ideas the checks kept, new ones first, then those partly done; those that fit your compute before those that do
 // not; as many as asked. Ideas already done go last, for you to see why.
-const V = { new: 0, 'partly done': 1, done: 2 };
+const V = { new: 0, 'partly done': 1, 'already done': 2, done: 2 };
 const F = { fits: 0, tight: 1, 'too big': 2 };
 const want = Math.max(2, Math.min(8, Math.round(Number(input.want) || 5)));
 const ideas = list(input.checked)
