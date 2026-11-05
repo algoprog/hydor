@@ -17,7 +17,7 @@ import { canCapture } from '../capture/index.ts';
 import { deckSources, deckText, fitGroup, footerOn, groupOf, isDeckText, normalizeDeck, scaleEls, turnedBox, ungroupEls, videoSrc, type Deck, type El, type GroupEl } from '../../shared/slides.ts';
 import { slidesRuntime } from '../../shared/slides-runtime.ts';
 import { pptxFile, type Picture } from './pptx.ts';
-import { deckPage, KATEX_VERSION, lucideIcon } from './slides.ts';
+import { deckPage, KATEX_VERSION, lucideIcon, RUNTIME_SRC } from './slides.ts';
 import { pages } from './index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -345,6 +345,9 @@ const dot: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
   ok(pairs.includes('logo1>logo2'), 'by its name');
   ok(pairs.includes('title1>title2'), 'by its words');
   ok(pairs.length === 3 && !pairs.some((p) => p.includes('gone') || p.includes('new')), 'and leaves the rest to fade');
+  // The grid of slides (in the slideshow, the presenter's view, a deck's page) numbers its thumbnails, and only them.
+  ok(!RT.css.includes('.ns-thumb span{') && RT.css.includes('.ns-thumb>span{'), 'a thumbnail’s number does not restyle the words and equations of the slide in it');
+  ok(RT.css.includes('.ns-print.ns-onscreen{display:block}') && RUNTIME_SRC.includes('ns-onscreen'), 'a page made to be printed shows its slides on the screen too, fitted and loaded before it prints');
 }
 
 // ---- the PowerPoint file -----------------------------------------------------------------------------------------
