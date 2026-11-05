@@ -101,13 +101,19 @@ Keys for blocks: Ctrl+/ opens **Turn into**; Ctrl+Alt+0 turns a block into text,
 
 To pick several blocks, Shift+click them (from the one picked to the one you click, when they sit together), or drag across them as in Notion: press in the margin on either side of them, between them, beside a block's words (or on the **+**) and drag; a box shows what you pick, a list's items one by one, and the page scrolls when you reach its top or bottom. A drag that starts on a block's words picks once it leaves that block, so a click stays a click. Delete, Duplicate, Move, Copy, **Turn into** and **Colour** then act on all of them, and so do the changes on the **Part** tab.
 
+### Comments on blocks
+
+As in Notion, a page of your Library can have comments on its blocks: a note for later, or a change to ask an agent for. Pick a block (or select some words in it), then **Comment** in its ⋮⋮ menu or on the bar over the words, or press Ctrl+Alt+M. The **Comments** tab beside the page opens with a box for it, the block's words (or the ones you picked) above it; Ctrl+Enter or **Comment** keeps it. A block with comments shows a mark with their number at its right: click it for them. Each comment has **Reply** and **Resolve** (✓), and in its ⋯ menu **Edit** and **Delete**; the resolved ones wait under "… resolved", where **Reopen** brings one back. Click a comment to outline its block on the page.
+
+Comments are kept with the page, not in it: they don't change how it looks or works, show only here in **Edit** (never on the page's own address or where it is published), and adding one makes no new version. They stay on their blocks as you change the page: a block you move, write in or turn into another kind keeps its comments. An agent asked about the page reads them, answers or resolves them, and can leave its own.
+
 ### An icon and a cover
 
 As in Notion, a page can have an icon (an emoji above its title) and a cover (a band of colour or a picture across its top). Point at the page's first heading and **Add an icon** and **Add a cover** show above it; the **Page** tab has them too, under **Icon and cover**. An icon is picked by name, like an emoji. A cover is one of a few gradients, **A picture from this device**, or a picture's web address. Click the icon to change it or **Remove the icon**; point at the cover for **Change cover** and **Remove**.
 
 ### Part, Layers and Page
 
-Beside the page (under it in a narrow panel or on a phone), three tabs show what you can change.
+Beside the page (under it in a narrow panel or on a phone), three tabs show what you can change (and, for a page of your Library, a fourth with its [comments](#comments-on-blocks)).
 
 **Part** is the part picked, with the parts around it above (click one to pick it). At the top: **Ask the agent** (in a conversation: it puts a note in your message box saying which part you mean, so you only say what to change; changes not saved yet are saved first, so the agent sees them), **Copy**, **Paste**, and **More** (⋯) with **Cut**, **Paste inside it**, **Wrap in a block**, **Take out what is in it**, **Duplicate**, **Show it on the page** and **Delete**. With several blocks picked, a note says so, and what you change goes to all of them. Then its groups, which fold; the ones most people use are open (**Content**, **Text**, **Fill and border**), the others wait until you open them, and each remembers whether you left it open:
 
@@ -638,6 +644,8 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "Make the headings on my landing page smaller on phones, and its buttons rounder."
 - "On my trip page, make the packing list a to-do list, put the tips in a callout and add a table of contents at the top."
 - "Give my reading list page a cover and a book as its icon."
+- "Answer the comments on my trip page, make the changes they ask for, and resolve them."
+- "On my notes page, link the word 'budget' to my Budget page, and make its code blocks Python."
 - "Make me 10 slides for a talk on our first year, with a chart of sales and speaker notes."
 - "On my 'Launch plan' slides, make every title shorter and add a closing slide."
 - "Send me the 'Launch plan' slides as a PowerPoint file, and the report page as a PDF."

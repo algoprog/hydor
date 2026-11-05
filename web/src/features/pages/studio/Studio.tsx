@@ -10,8 +10,12 @@
 // are written in the page itself as in Notion (server/pages/writing.ts); what it asks for while you write (an
 // emoji, a picture, a video, maths, an icon, a cover) is chosen in the app, beside where it was asked, and it is told
 // the Library's pages, for links to them ("@").
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronUp, Code2, Eye, Keyboard, Monitor, PenLine, Plus, Redo2, Smartphone, Tablet, Undo2 } from 'lucide-react';
+import type { PageComment, PageCommentOp } from '@shared/page-comments';
+import type { PagesEvent } from '@shared/pages';
+import { api, enc, post } from '../../../lib/api';
+import { useFeatureEvent } from '../../../lib/featureEvents';
 import { toast, toastError } from '../../../lib/store';
 import { Button, cx, IconButton, MenuItem, Popover, Segmented, Throbber, useConfirm, useMediaQuery } from '../../../components/ui';
 import type { EditorHandle } from '../../../lib/codemirror';
@@ -23,6 +27,7 @@ import { editorLabels } from './blocks';
 import { InsertPopover, PAGE_SHORTCUTS } from './Inserts';
 import { PartPanel, pictureData, type Ctx, type Media } from './Inspector';
 import { LayersPanel } from './Layers';
+import { PageComments } from './PageComments';
 import { PagePanel } from './PagePanel';
 
 export type StudioMode = 'view' | 'edit' | 'code';
@@ -47,7 +52,7 @@ const DEVICES: { value: Device; label: string; icon: ReactNode }[] = [
   { value: 'phone', label: 'Phone', icon: <Smartphone size={14} /> },
 ];
 const MEDIA_OF: Record<Device, Media> = { desktop: '', tablet: 'tablet', phone: 'phone' };
-type Tab = 'part' | 'layers' | 'page';
+type Tab = 'part' | 'layers' | 'page' | 'comments';
 const TABS: { value: Tab; label: string }[] = [
   { value: 'part', label: 'Part' },
   { value: 'layers', label: 'Layers' },
@@ -148,6 +153,7 @@ export function Studio({
   initialMode,
   onAsk,
   saveNowRef,
+  pageId,
 }: {
   doc: StudioDoc | null;
   /** An agent is writing it: what came so far. */
@@ -173,6 +179,8 @@ export function Studio({
   onAsk?: (text: string) => void;
   /** Saves now, if there are changes (before an agent is asked about the page): false when it did not. */
   saveNowRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
+  /** A page of the Library: comments on its blocks (kept by the app, outside the page) show in Edit's Comments tab. */
+  pageId?: string;
 }) {
   const [mode, setMode] = useState<StudioMode>(initialMode ?? 'view');
   const [device, setDevice] = useState<Device>('desktop');
@@ -219,6 +227,38 @@ export function Studio({
   useEffect(() => {
     if (mode === 'edit') editRef.current?.cmd('pages', pageRefs);
   }, [pageRefs, mode]);
+
+  // Comments on the page's blocks (a page of the Library's): kept by the app outside the page, shown in Edit, beside it.
+  const [comments, setComments] = useState<PageComment[]>([]);
+  const [activeComment, setActiveComment] = useState<string | null>(null);
+  const [commentDraft, setCommentDraft] = useState<{ on: PageComment['on']; quote: string } | null>(null);
+  const loadComments = useCallback(() => (pageId ? api<{ comments: PageComment[] }>(`/api/pages/${enc(pageId)}/comments`).then((r) => setComments(r.comments)) : Promise.resolve()), [pageId]);
+  useEffect(() => {
+    setComments([]);
+    loadComments().catch(() => {});
+  }, [loadComments]);
+  // An agent answered (save_page), or another window changed them.
+  useFeatureEvent('pages', (e) => {
+    const d = e.data as PagesEvent | null;
+    if (pageId && d?.what === 'comments' && d.id === pageId) loadComments().catch(() => {});
+  });
+  const commentOps = async (ops: PageCommentOp[]) => {
+    if (!pageId) return null;
+    const r = await post<{ comments: PageComment[]; added: string[] }>(`/api/pages/${enc(pageId)}/comments`, { ops });
+    setComments(r.comments);
+    return r;
+  };
+  // The editor marks the blocks they are on, and outlines the one picked here.
+  const commentMarks = useMemo(() => comments.map((c) => ({ id: c.id, on: c.on, resolved: !!c.resolved, n: 1 + (c.replies?.length ?? 0) })), [comments]);
+  const marksRef = useRef(commentMarks);
+  marksRef.current = commentMarks;
+  useEffect(() => {
+    if (mode === 'edit') editRef.current?.cmd('comments', commentMarks);
+  }, [commentMarks, mode]);
+  useEffect(() => {
+    if (mode === 'edit') editRef.current?.cmd('commentShow', activeComment);
+  }, [activeComment, mode]);
+  const openComments = commentMarks.filter((c) => !c.resolved).length;
   const [confirm, confirmNode] = useConfirm();
   const writing = !!draft && !draft.done;
   const html = pending ?? doc?.html ?? '';
@@ -303,6 +343,12 @@ export function Studio({
         setPending(null);
         if (mode === 'code') setCode(h);
         editRef.current?.saved();
+        // The comments keep the places of their blocks in the page as saved (found again by them next time).
+        if (mode === 'edit' && marksRef.current.length && editRef.current)
+          editRef.current
+            .anchors()
+            .then((list) => (list.length ? commentOps(list.map(({ id, on }) => ({ id, on }))) : null))
+            .catch(() => {});
         setEd((s) => ({ ...s, dirty: false }));
         return true;
       }
@@ -385,7 +431,28 @@ export function Studio({
       </div>
     );
     const panel =
-      tab === 'layers' ? (
+      tab === 'comments' && pageId ? (
+        <PageComments
+          comments={comments}
+          active={activeComment}
+          draft={commentDraft}
+          readOnly={readOnly}
+          onAdd={() => cmd('comment')}
+          onDraftDone={(text) => {
+            const d = commentDraft;
+            setCommentDraft(null);
+            commentOps([{ text, on: d?.on, quote: d?.quote }])
+              .then((r) => r?.added[0] && setActiveComment(r.added[0]))
+              .catch(toastError);
+          }}
+          onDraftCancel={() => setCommentDraft(null)}
+          onPick={(id) => setActiveComment(id)}
+          onReply={(id, text) => void commentOps([{ id, reply: text }]).catch(toastError)}
+          onResolve={(id, resolved) => void commentOps([resolved ? { id, resolve: true } : { id, reopen: true }]).catch(toastError)}
+          onEdit={(id, text) => void commentOps([{ id, edit: text }]).catch(toastError)}
+          onDelete={(id) => void commentOps([{ id, delete: true }]).catch(toastError)}
+        />
+      ) : tab === 'layers' ? (
         <LayersPanel tree={layers} sel={sel} cmd={cmd} />
       ) : tab === 'page' ? (
         <PagePanel page={page} palette={palette} cmd={cmd} media={media} onError={toastError} />
@@ -428,7 +495,8 @@ export function Studio({
               onReady={() => {
                 editRef.current?.cmd('ctx', { ...ctx, media });
                 editRef.current?.cmd('layers', tab === 'layers');
-                editRef.current?.cmd('caps', { ask: !!onAsk });
+                editRef.current?.cmd('caps', { ask: !!onAsk, comment: !!pageId && !readOnly });
+                editRef.current?.cmd('comments', marksRef.current);
                 editRef.current?.cmd('pages', pageRefsRef.current);
                 if (clipboard) editRef.current?.cmd('clip', { html: clipboard.html });
               }}
@@ -441,6 +509,18 @@ export function Studio({
               }}
               onEditing={setWordsOn}
               onMenu={setMenuOn}
+              onComment={(c) => {
+                // Comment, in the page: a new one is written beside it, on that block (and words).
+                setCommentDraft(c);
+                setActiveComment(null);
+                setTab('comments');
+                if (!beside) setDrawer('open');
+              }}
+              onCommentOpen={(id) => {
+                setActiveComment(id);
+                setTab('comments');
+                if (!beside) setDrawer('open');
+              }}
               onAsk={setAsking}
               onFile={(id, f) => pictureData(f).then((src) => cmd('fill', { id, src }), toastError)}
               onAgent={() => void ask()}
@@ -452,7 +532,7 @@ export function Studio({
         <aside className={cx('flex min-h-0 shrink-0 flex-col bg-panel', beside ? 'w-[320px] border-l border-line' : cx('border-t border-line', folded ? 'pb-[var(--safe-bottom)]' : 'h-[min(48%,440px)] min-h-[200px]'))}>
           <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-1">
             <div role="tablist" className="flex min-w-0 flex-1 items-center gap-0.5">
-              {TABS.map((t) => (
+              {(pageId ? [...TABS, { value: 'comments' as const, label: 'Comments' }] : TABS).map((t) => (
                 <button
                   key={t.value}
                   type="button"
@@ -462,9 +542,10 @@ export function Studio({
                     setTab(t.value);
                     if (folded) setDrawer('open');
                   }}
-                  className={cx('relative h-10 px-2.5 text-[13px] font-medium transition-colors', tab === t.value ? 'text-fg' : 'text-fg-3 hover:text-fg-2')}
+                  className={cx('relative flex h-10 shrink-0 items-center gap-1 px-2.5 text-[13px] font-medium transition-colors', tab === t.value ? 'text-fg' : 'text-fg-3 hover:text-fg-2')}
                 >
                   {t.label}
+                  {t.value === 'comments' && openComments > 0 && <span className="rounded-full bg-accent-soft px-1.5 text-[11px] leading-4 font-semibold text-accent tabular-nums">{openComments}</span>}
                   {tab === t.value && !folded && <span className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-fg" />}
                 </button>
               ))}

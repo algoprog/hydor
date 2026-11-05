@@ -1,10 +1,12 @@
 // Saved pages: the Pages library in SQLite. Each save is a new version (the oldest go past a count and
-// a size); each page keeps its own small storage (window.hydor.storage) and has a link of its own,
+// a size); each page keeps its own small storage (window.hydor.storage), comments on its blocks (outside its HTML)
+// and its icon (for links to it from other pages), and has a link of its own,
 // signed with the app's key, that opens it on any device without the app's sign-in. A page of another kind
 // (slides, a document, a spreadsheet: kinds.ts) keeps its model's text in place of HTML, and its own page is made
 // from it when it shows; its pictures are kept apart (assets.ts).
 import crypto from 'node:crypto';
 import { STORAGE_LIMITS, VERSION_LIMITS, type PageDataEntry, type PageInfo, type PageVersion } from '../../shared/pages.ts';
+import { applyCommentOps, cleanPageComments, type PageComment } from '../../shared/page-comments.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { signWithKey } from '../links.ts';
@@ -57,6 +59,8 @@ export function initPages(db: DB) {
   if (!cols.includes('space')) db.exec('alter table pages add column space text');
   // A page's icon (the emoji the page editor puts at its top), for links to it in other pages: kept as each version is
   // saved, and read once from the pages saved before ('' for none).
+  // Comments on its blocks (shared/page-comments.ts): kept with the page, outside its HTML, not by version.
+  if (!cols.includes('comments')) db.exec('alter table pages add column comments text');
   if (!cols.includes('icon')) {
     db.exec('alter table pages add column icon text');
     const set = db.prepare('update pages set icon = ? where id = ?');
@@ -336,6 +340,30 @@ export function resetPageLink(db: DB, id: string): string {
   mustPage(db, id);
   db.prepare('update pages set link_nonce = ? where id = ?').run(nonce(), id);
   return pageToken(db, id);
+}
+
+// ---- comments on its blocks ------------------------------------------------------------------------------
+
+/** A page's comments (a page of HTML's: other kinds keep theirs in their model). */
+export function pageComments(db: DB, id: string): PageComment[] {
+  const r = db.prepare('select comments from pages where id = ?').get(id) as { comments: string | null } | undefined;
+  if (!r?.comments) return [];
+  try {
+    return cleanPageComments(JSON.parse(r.comments));
+  } catch {
+    return [];
+  }
+}
+
+/** Changes a page's comments (as `by` makes them): the list after them, what could not be done, and the new ones' ids. */
+export function changeComments(db: DB, id: string, ops: unknown, by: 'user' | 'agent'): { list: PageComment[]; notes: string[]; added: string[] } {
+  const p = mustPage(db, id);
+  if (p.kind) throw new HttpError(400, `This page is a ${mustKind(p.kind).noun}: its comments are in it.`);
+  return db.transaction(() => {
+    const out = applyCommentOps(pageComments(db, id), ops, by);
+    db.prepare('update pages set comments = ? where id = ?').run(out.list.length ? JSON.stringify(out.list) : null, id);
+    return out;
+  })();
 }
 
 // ---- storage ------------------------------------------------------------------------------------------

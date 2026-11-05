@@ -474,6 +474,7 @@ function PageView({ id }: { id: string }) {
       savedNote={page?.sessionKey ? 'the agent that made it sees your changes' : undefined}
       onAsk={(text) => askThis(text)}
       saveNowRef={saveFirst}
+      pageId={old ? undefined : id}
     />
   );
   const allScopes = page ? scopesOf(page, scopes, part) : [];
