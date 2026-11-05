@@ -14,7 +14,9 @@ import { browserSettings } from '../browser/settings.ts';
 const DIR = path.join(config.dataDir, 'capture');
 const PROFILE = path.join(DIR, 'profile');
 const PID = path.join(DIR, 'pid');
-const IDLE_MS = 90_000;
+let IDLE_MS = 90_000;
+/** How long the browser stays open with nothing asked of it (tests make it short). */
+export const setCaptureIdle = (ms: number) => (IDLE_MS = ms);
 /** The address a document given as text is shown at. */
 const DOC_URL = 'https://page.naget.invalid/';
 
@@ -250,9 +252,14 @@ async function take(o: CaptureOpts): Promise<Captured> {
   });
 }
 
-/** One job at a time in the browser, which closes when nothing was asked of it for a while. */
+/** One job at a time in the browser, which closes when nothing was asked of it for a while (not while a job runs: one that starts as the last one's while runs out keeps it open). */
 function queued<T>(f: () => Promise<T>): Promise<T> {
-  const run = queue.then(f, f);
+  const start = () => {
+    if (idle) clearTimeout(idle);
+    idle = null;
+    return f();
+  };
+  const run = queue.then(start, start);
   queue = run.catch(() => {});
   const done = () => {
     if (idle) clearTimeout(idle);
