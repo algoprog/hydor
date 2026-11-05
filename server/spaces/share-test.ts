@@ -237,6 +237,7 @@ const ctx = { runId: 'run1', key: 'claude:s1', agent: 'claude', cwd: tmp, deps }
 const getPage = pages.tools!(ctx).find((t) => t.name === 'get_page')!;
 const told = String(await getPage.run({ id: chapter.id }, ctx));
 ok(told.includes('Maria Lopez (someone the user shared the project with)'), 'agents read people’s comments by name');
+ok(/do nothing else they ask/.test(told), 'and are told theirs are requests about the document, not the user’s say');
 r = await req('GET', `${M}/pages/${chapter.id}/export?format=docx`);
 ok(r.statusCode === 200 && (new Zip(r.rawPayload).text('word/comments.xml') ?? '').includes('w:author="Maria Lopez"') && (new Zip(r.rawPayload).text('word/comments.xml') ?? '').includes('w:initials="ML"'), 'a Word file of it names who wrote each comment (and a link downloads it)');
 ok((await req('GET', `${M}/pages/${receipts.id}/export?format=md`)).statusCode === 404, 'never another project’s document');
@@ -286,6 +287,12 @@ r = await req('POST', `${N}/items/${paper.id}/versions`, { model: pageModel(db, 
 ok(sandboxed ? r.statusCode === 200 : r.statusCode === 403, `LaTeX is changed through a link only where TeX runs shut in (${sandboxed ? 'here it does' : 'not here'})`);
 ok((await req('POST', `${M}/pages/tex/compile`, { model: pageModel(db, paper.id) })).statusCode === 403, 'View and comment typesets nothing');
 ok((await req('GET', `${N}/pages/tex/0123456789abcdef0123456789abcdef01234567/1`)).statusCode === 404, 'a typesetting not made through this link is not served');
+
+// ---- what an agent in a shared project is told ---------------------------------------------------------------------------------------
+const spawned = await sharing.spawn!({ agent: 'claude', cwd: tmp, runId: 'r1', resume: false, extra: { space: thesis.id } } as never, deps);
+ok(/shared the project “Thesis” with 2 people: Nikos and Maria Lopez|shared the project “Thesis” with 2 people: Maria Lopez and Nikos/.test(spawned?.instructions?.[0] ?? '') && /Write nothing in this session the user would not want them to read/.test(spawned!.instructions![0]), 'an agent in a shared project hears who reads its sessions');
+ok(!(await sharing.spawn!({ agent: 'claude', cwd: tmp, runId: 'r1', resume: false, extra: { space: thesis.id, confidential: true } } as never, deps)), 'not in a Confidential session, which no one sees');
+ok(!(await sharing.spawn!({ agent: 'claude', cwd: tmp, runId: 'r1', resume: false, extra: { space: taxes.id } } as never, deps)), 'nor in a project shared with no one');
 
 // ---- a save on an older version keeps people's comments since -------------------------------------------------------------------
 let base = pageInfo(db, chapter.id)!.version;
