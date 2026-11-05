@@ -21,6 +21,8 @@ export const SLIDE_LIMITS = { slides: 300, els: 150, anims: 120, paras: 200, run
 
 /** A picture kept by the app (server/pages/assets.ts), by its content's hash: "naget-asset:<sha>". */
 export const ASSET = 'naget-asset:';
+/** A video kept by the app (server/pages/videos.ts), one from someone's device or an agent's session: "naget-video:<sha>". */
+export const VIDEO = 'naget-video:';
 
 export type Align = 'left' | 'center' | 'right' | 'justify';
 export type VAlign = 'top' | 'middle' | 'bottom';
@@ -287,11 +289,11 @@ export interface MathEl extends Base {
   align?: 'left' | 'center' | 'right';
 }
 
-/** A video from YouTube or Vimeo: its player's address, and the still that shows until it plays. */
+/** A video: from YouTube or Vimeo (its player's address), or one the app keeps (naget-video:<sha>); its still shows until it plays. */
 export interface VideoEl extends Base {
   type: 'video';
   src: string;
-  /** A picture's source; YouTube's own still when not given. */
+  /** A picture's source (a kept video's first frame, an online one's still from its site); YouTube's own still when not given. */
   poster?: string;
   /** Seconds into the video it starts at. */
   start?: number;
@@ -861,6 +863,9 @@ export function videoSrc(v: unknown): string | null {
   return vm ? `https://player.vimeo.com/video/${vm}` : null;
 }
 
+/** A video the app keeps, as a deck names it (naget-video:<sha>), or null. */
+export const keptVideo = (v: unknown): string | null => (typeof v === 'string' && /^naget-video:[a-f0-9]{16,64}$/.test(v.trim()) ? v.trim() : null);
+
 /** Where a video address says to start, in seconds ("t=90", "t=1m30s", "start=90"), or 0. */
 export function videoStart(v: unknown): number {
   if (typeof v !== 'string') return 0;
@@ -1103,6 +1108,8 @@ export interface NormalizeOpts {
   src?: SrcHook;
   /** An icon given by its name alone (an agent's): its lines from the library, or null when it has none of that name. */
   icon?: (name: string) => IconNode[] | null;
+  /** A video's source that is neither online nor kept yet (a file of an agent's session): what it becomes, or null to leave the video out. */
+  video?: SrcHook;
 }
 
 const ALIGNS = ['left', 'center', 'right', 'justify'] as const;
@@ -1451,7 +1458,8 @@ function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts, dep
   }
   if (type === 'video') {
     const raw = e.src ?? e.url;
-    const src = videoSrc(raw);
+    // An online video's player, a video the app keeps, or one not kept yet (an agent's file) as the hook makes it.
+    const src = videoSrc(raw) ?? keptVideo(raw) ?? (typeof raw === 'string' && raw.trim() && o.video ? o.video(raw.trim()) : null);
     if (!src) return null;
     const v: VideoEl = { ...base(e, used, H, false, { w: 800, h: 450 }), type: 'video', src };
     const rawPoster = typeof e.poster === 'string' ? e.poster.trim() : '';
@@ -1717,6 +1725,19 @@ export function deckSources(d: Deck, stills = false): string[] {
     }
   }
   return out;
+}
+
+/** The videos the app keeps that a deck shows ("naget-video:<sha>"), in groups too. */
+export function deckVideos(d: Deck): string[] {
+  const out: string[] = [];
+  for (const s of d.slides) for (const e of everyEl(s.els)) if (e.type === 'video' && e.src.startsWith(VIDEO)) out.push(e.src);
+  return out;
+}
+
+/** The deck with each kept video's source changed by `f` (to where a page fetches it, say). */
+export function mapVideoSources(d: Deck, f: (src: string) => string): Deck {
+  const map = (els: El[]): El[] => els.map((e) => (e.type === 'group' ? { ...e, els: map(e.els) } : e.type === 'video' && e.src.startsWith(VIDEO) ? { ...e, src: f(e.src) } : e));
+  return { ...d, slides: d.slides.map((s) => ({ ...s, els: map(s.els) })) };
 }
 
 function mapEls(els: El[], f: (src: string) => string): El[] {

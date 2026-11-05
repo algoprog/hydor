@@ -17,18 +17,20 @@
 //   POST /api/pages/:id/storage, GET/DELETE /api/pages/:id/data, POST /api/pages/:id/link, GET /api/pages/:id/thumb
 //   GET/POST /api/pages/:id/comments (comments on a page's blocks: shared/page-comments.ts)
 //   POST /api/pages/file-edit, GET /api/pages/:id/export?format=, POST /api/pages/docs/print, POST /api/pages/assets, GET /api/pages/assets/:sha,
-//   POST /api/pages/video-still
+//   POST /api/pages/video-still, POST /api/pages/videos, GET /api/pages/videos/:sha
 //   GET/PUT /api/pages/file (a file of the computer's in an editor: filemodel.ts)
 //   GET/POST /api/pages/:id/notebook (where a notebook of the Library runs: notebooks.ts)
 //   GET /api/pages/picture?url=, GET /api/pages/fonts.css?f=, GET /api/pages/fonts/*
 //   GET/POST /api/sites, DELETE /api/sites/:id, GET/POST /api/sites/requests/:id
 // Routes whose token is the permission (no sign-in, never the app's cookies at work):
-//   GET /pg/:token (the page's own address), /pg/:token/html, /pg/:token/manifest.webmanifest, POST /pg/:token/storage
+//   GET /pg/:token (the page's own address), /pg/:token/html, /pg/:token/manifest.webmanifest, POST /pg/:token/storage,
+//   GET /pg/video/:sha/:sig (a deck's video, its signed address the permission)
 //   GET /site/:token/* (published sites, sandboxed)
 import fs from 'node:fs';
 import { isAbsPath } from '../platform.ts';
 import os from 'node:os';
 import path from 'node:path';
+import type { Readable } from 'node:stream';
 import type { FastifyRequest } from 'fastify';
 import type { PagesEvent, PublishRequest } from '../../shared/pages.ts';
 import { HttpError } from '../auth.ts';
@@ -43,6 +45,7 @@ import { agentNotebook, dropWorkFolder, SAVE_NOTEBOOK_DESCRIPTION, SAVE_NOTEBOOK
 import { dropEdits, initEdits, noteEdit, noteFileEdit, takeEdits } from './edits.ts';
 import { getAsset, MAX_ASSET, putAsset, sweepAssets, takeIn } from './assets.ts';
 import { videoStillOf } from './video-still.ts';
+import { getVideo, sendVideo, takeVideoPiece, videoAddressOk } from './videos.ts';
 import { videoSrc } from '../../shared/slides.ts';
 import { exportPage, EXPORT_TYPES, type ExportFormat } from './export.ts';
 import { fontFile, fontsCss } from './fonts.ts';
@@ -727,6 +730,13 @@ function routes(d: Deps) {
     if (!src) throw new HttpError(422, 'That video’s still could not be had: it may be private, or its site could not be reached');
     return { src };
   });
+  /** A video for a deck from this device, in pieces sent in order (the bytes themselves): the last one gives its source. */
+  app.post('/api/pages/videos', async (req) => {
+    const body = req.body as Readable | undefined;
+    if (!body || typeof body.pipe !== 'function') throw new HttpError(400, 'Send the video’s bytes (application/octet-stream), a piece at a time');
+    return takeVideoPiece(db, body, req.query as Record<string, string>);
+  });
+  app.get('/api/pages/videos/:sha', async (req, reply) => sendVideo(req, reply, getVideo(db, P(req).sha)));
   app.get('/api/pages/assets/:sha', async (req, reply) => {
     const a = getAsset(db, P(req).sha);
     if (!a) return reply.code(404).send({ error: 'No such picture' });
@@ -822,6 +832,13 @@ function routes(d: Deps) {
     const p = byToken(req);
     if (!p) return reply.code(404).send({ error: 'Not found' });
     return reply.header('Cache-Control', 'no-cache').type('application/manifest+json').send(JSON.stringify(shellManifest(P(req).token, p.title)));
+  });
+  // A deck's video from a device, for what opens without the app's sign-in (a deck's own page, published copies, the
+  // conversation's frame): the address, signed by this server, is the permission.
+  app.get('/pg/video/:sha/:sig', async (req, reply) => {
+    const { sha, sig } = P(req);
+    reply.header('X-Robots-Tag', 'noindex, nofollow');
+    return videoAddressOk(sha, sig) ? sendVideo(req, reply, getVideo(db, sha)) : reply.code(404).send({ error: 'No such video' });
   });
   app.post('/pg/:token/storage', { bodyLimit: 1024 * 1024 }, async (req, reply) => {
     if (!sameOrigin(req)) return reply.code(403).send({ error: 'Cross-origin request refused' });

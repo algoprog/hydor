@@ -118,6 +118,8 @@ export interface MenuArgs {
   emoji(): void;
   equation(): void;
   video(): void;
+  /** A video from this device. */
+  videoFile(): void;
   footer(): void;
   crop(): void;
   resetPicture(): void;
@@ -236,7 +238,15 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         { label: 'Icon', icon: <Star size={14} />, also: 'icon symbol pictogram lucide', disabled: ro, run: a.icon },
         { label: 'Emoji', icon: <Smile size={14} />, also: 'emoji smiley', disabled: ro, run: a.emoji },
         { label: 'Equation', icon: <Sigma size={14} />, also: 'equation maths formula latex', disabled: ro, run: a.equation },
-        { label: 'Video', icon: <Video size={14} />, also: 'video youtube vimeo', disabled: ro, run: a.video },
+        {
+          label: 'Video',
+          icon: <Video size={14} />,
+          disabled: ro,
+          items: [
+            { label: 'From YouTube or Vimeo', also: 'video youtube vimeo online address link', run: a.video },
+            { label: 'From this device', also: 'video file upload mp4 mov webm film clip', run: a.videoFile },
+          ],
+        },
         '-',
         { label: 'Slide numbers and footer', also: 'footer page number date', disabled: ro, run: a.footer },
       ],

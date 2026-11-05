@@ -92,7 +92,7 @@ import { FooterDialog } from './FooterDialog';
 import { NotesField } from './Notes';
 import { findInDeck, replaceAllInDeck, replaceHit } from './find';
 import { exportFile } from '../exportFile';
-import { fetchVideoStill } from './media';
+import { chooseVideo, fetchVideoStill, firstFrame, isVideoFile, uploadVideo } from './media';
 
 export type SlidesDoc = ModelDoc<Deck>;
 
@@ -243,6 +243,8 @@ export function SlidesEditor({
   const [iconAsk, setIconAsk] = useState<{ replace?: string; start: 'icons' | 'emoji' } | null>(null);
   const [videoAsk, setVideoAsk] = useState(false);
   const [videoUrl, setVideoUrl] = useState('');
+  /** A video from this device on its way to the app: how much of it went (0–1), shown over the slide. */
+  const [sending, setSending] = useState<number | null>(null);
   const [footerOpen, setFooterOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [cellSel, setCellSel] = useState<CellSel | null>(null);
@@ -524,6 +526,30 @@ export function SlidesEditor({
     setVideoUrl('');
     void putOnlineVideo(address);
   };
+  /** A video from this device on the slide: kept by the app with the deck, its first frame its still, as large as fits 800×450. */
+  const putVideoFile = async (file: File) => {
+    if (!live.current || sending !== null) return;
+    setSending(0);
+    try {
+      const [frame, src] = await Promise.all([firstFrame(file), uploadVideo(file, setSending)]);
+      const poster = frame ? (await post<{ src: string }>('/api/pages/assets', { data: frame.data }).catch(() => null))?.src : undefined;
+      const k = frame ? Math.min(800 / frame.w, 450 / frame.h) : 1;
+      const w = frame ? Math.max(40, Math.round(frame.w * k)) : 800;
+      const h = frame ? Math.max(40, Math.round(frame.h * k)) : 450;
+      const name = file.name.replace(/\.[^.]+$/, '').trim().slice(0, 60);
+      if (live.current) put([{ id: newId(), type: 'video', src, ...(poster ? { poster } : {}), ...(name ? { name } : {}), ...centred(w, h) }]);
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setSending(null);
+    }
+  };
+  const pickVideoFile = async () => {
+    const f = await chooseVideo();
+    if (!f) return;
+    if (!isVideoFile(f)) return toast('That is not a video a slide takes: an MP4, MOV or WebM file');
+    await putVideoFile(f);
+  };
 
   // ---- copy and paste ---------------------------------------------------------------------------------------
   const picked = pickedOf(slide, sel);
@@ -803,6 +829,11 @@ export function SlidesEditor({
     return () => window.removeEventListener('paste', onPaste);
   });
   const onDrop = async (e: React.DragEvent) => {
+    const video = [...e.dataTransfer.files].find(isVideoFile);
+    if (video && !readOnly && deck) {
+      e.preventDefault();
+      return void putVideoFile(video);
+    }
     const file = [...e.dataTransfer.files].find((f) => f.type.startsWith('image/'));
     if (!file || readOnly || !deck) return;
     e.preventDefault();
@@ -908,6 +939,7 @@ export function SlidesEditor({
     emoji: () => setIconAsk({ start: 'emoji' }),
     equation: putEquation,
     video: () => setVideoAsk(true),
+    videoFile: () => void pickVideoFile(),
     footer: () => setFooterOpen(true),
     crop: () => one && crop(one.id),
     resetPicture: () => one && change((d) => setEls(d, index, [one.id], (e) => ({ ...e, crop: undefined, adjust: undefined }) as El)),
@@ -1047,9 +1079,17 @@ export function SlidesEditor({
             <Shrink size={12} />
           </button>
         )}
-        {(painter || scope.length > 0 || cropping) && (
-          <div className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full border border-line bg-elevated px-3 py-1 text-[12px] text-fg-2 shadow-sm">
-            {cropping ? 'Cropping: Enter keeps it, Esc does not' : painter ? (painter.keep ? 'Format painter: click parts to give them the look; Esc when done' : 'Format painter: click a part to give it the look') : 'In a group: Esc to leave it'}
+        {(sending !== null || painter || scope.length > 0 || cropping) && (
+          <div className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full border border-line bg-elevated px-3 py-1 text-[12px] text-fg-2 tabular-nums shadow-sm">
+            {sending !== null
+              ? `Adding the video… ${Math.round(sending * 100)}%`
+              : cropping
+                ? 'Cropping: Enter keeps it, Esc does not'
+                : painter
+                  ? painter.keep
+                    ? 'Format painter: click parts to give them the look; Esc when done'
+                    : 'Format painter: click a part to give it the look'
+                  : 'In a group: Esc to leave it'}
           </div>
         )}
         {find.open && (

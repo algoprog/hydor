@@ -14,11 +14,13 @@ import type { Deps, RunCtx } from '../features/types.ts';
 import { Zip } from '../documents/zip.ts';
 import { extractText } from '../documents/extract.ts';
 import { canCapture } from '../capture/index.ts';
-import { deckSources, deckText, fitGroup, footerOn, groupOf, isDeckText, normalizeDeck, scaleEls, turnedBox, ungroupEls, videoSrc, type Deck, type El, type GroupEl } from '../../shared/slides.ts';
+import { deckSources, deckText, deckVideos, fitGroup, footerOn, groupOf, isDeckText, normalizeDeck, scaleEls, turnedBox, ungroupEls, videoSrc, type Deck, type El, type GroupEl } from '../../shared/slides.ts';
 import { slidesRuntime } from '../../shared/slides-runtime.ts';
 import { pptxFile, type Picture } from './pptx.ts';
 import { deckPage, lucideIcon, RUNTIME_SRC } from './slides.ts';
 import { pages } from './index.ts';
+import { sweepAssets } from './assets.ts';
+import { getVideo } from './videos.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -37,6 +39,8 @@ app.addContentTypeParser('application/json', { parseAs: 'string' }, (_r, b, done
     done(e as Error, undefined);
   }
 });
+// Raw bodies stay streams, as the server has them (uploads in pieces).
+app.addContentTypeParser('application/octet-stream', (_r, payload, done) => done(null, payload));
 app.setErrorHandler((err: Error & { status?: number; statusCode?: number }, _req, reply) => reply.code(err.status ?? err.statusCode ?? 500).send({ error: err.message }));
 const deps = {
   app,
@@ -432,6 +436,65 @@ const dot: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
   fs.writeFileSync(file, bare);
   const read = (await extractText(file))?.text ?? '';
   ok(read.includes('Inside a group') && read.includes('Also inside'), 'the PowerPoint file reads back with the words in its groups');
+}
+
+// ---- videos from a device ------------------------------------------------------------------------------------------
+{
+  // A small MP4's start (its "ftyp" box), then bytes: what the store checks a video by.
+  const film = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypisom', 'latin1'), Buffer.alloc(12), Buffer.alloc(3000, 7)]);
+  const piece = (id: string, offset: number, total: number, body: Buffer) =>
+    app.inject({ method: 'POST', url: `/api/pages/videos?upload=${id}&offset=${offset}&total=${total}`, payload: body, headers: { 'content-type': 'application/octet-stream', host: 'app.test' } });
+  const first = await piece('testupload1', 0, film.length, film.subarray(0, 1000));
+  ok(first.statusCode === 200 && first.json().received === 1000, 'a video comes in pieces: each says how much has come');
+  ok((await piece('testupload1', 500, film.length, film.subarray(500, 1000))).statusCode === 409, 'a piece out of step is refused');
+  await piece('testupload1', 0, film.length, film.subarray(0, 1000));
+  const last = await piece('testupload1', 1000, film.length, film.subarray(1000));
+  const src = String(last.json().src ?? '');
+  ok(last.statusCode === 200 && /^naget-video:[a-f0-9]{40}$/.test(src) && last.json().mime === 'video/mp4' && last.json().bytes === film.length, 'the last piece gives the kept video’s source');
+  const sha = src.slice('naget-video:'.length);
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==', 'base64');
+  ok((await piece('testupload2', 0, png.length, png)).statusCode === 415, 'a file that is no video is refused');
+  ok((await piece('testupload3', 0, 300 * 1024 * 1024, film)).statusCode === 413, 'a video over 200 MB is refused');
+  // Served with ranges, as a player seeks.
+  const ranged = await app.inject({ method: 'GET', url: `/api/pages/videos/${sha}`, headers: { range: 'bytes=10-19', host: 'app.test' } });
+  ok(ranged.statusCode === 206 && ranged.headers['content-range'] === `bytes 10-19/${film.length}` && ranged.rawPayload.equals(film.subarray(10, 20)) && ranged.headers['content-type'] === 'video/mp4', 'a kept video is served a part at a time');
+  // In a deck: kept while a version shows it; its page plays it from a signed address that needs no sign-in.
+  const deck = normalizeDeck({ slides: [{ els: [{ id: 'clip', type: 'video', src, x: 100, y: 100, w: 640, h: 360, muted: true, loop: true, start: 2 }, { type: 'video', src: '/home/someone/clip.mp4' }] }] });
+  const vids = deck.slides[0].els.filter((e) => e.type === 'video');
+  ok(vids.length === 1 && vids[0].type === 'video' && vids[0].src === src && deckVideos(deck)[0] === src, 'a deck keeps a kept video, and nothing else that is not a video’s address');
+  const made = (await req('POST', '/api/pages', { kind: 'slides', title: 'Film', model: deck })).json().page.id as string;
+  const page = deckPage(db, (await req('GET', `/api/pages/${made}`)).json().model as Deck, 'Film');
+  const signed = /"src":"(\/pg\/video\/[a-f0-9]{40}\/[A-Za-z0-9_-]{32})"/.exec(page)?.[1] ?? '';
+  ok(!!signed && !page.includes('"src":"naget-video:'), 'its page plays it from a signed address of this server');
+  ok((await app.inject({ method: 'GET', url: signed, headers: { host: 'app.test' } })).statusCode === 200 && (await app.inject({ method: 'GET', url: `${signed.slice(0, -4)}AAAA`, headers: { host: 'app.test' } })).statusCode === 404, 'which works signed, and only signed');
+  db.prepare('update page_videos set created_at = 1').run();
+  sweepAssets(db);
+  ok(!!getVideo(db, sha), 'a video a deck shows stays');
+  // The deck's files: PowerPoint gets the video itself, the web page has it inside.
+  const pptx = (await req('GET', `/api/pages/${made}/export?format=pptx`)).rawPayload;
+  const z = new Zip(pptx);
+  const s1 = slideXml(pptx, 1);
+  const rels = z.read('ppt/slides/_rels/slide1.xml.rels')?.toString() ?? '';
+  ok(z.read('ppt/media/media1.mp4')?.equals(film) === true && /Extension="mp4" ContentType="video\/mp4"/.test(z.read('[Content_Types].xml')?.toString() ?? ''), 'the video goes into the PowerPoint file as it is');
+  ok(/relationships\/video" Target="\.\.\/media\/media1\.mp4"/.test(rels) && /2007\/relationships\/media" Target="\.\.\/media\/media1\.mp4"/.test(rels), 'linked and embedded, as PowerPoint links its videos');
+  ok(s1.includes('<a:videoFile r:link=') && s1.includes('<p14:media') && s1.includes('<p14:trim st="2000"/>') && s1.includes('action="ppaction://media"'), 'as PowerPoint’s own video, from where it starts');
+  ok(/<p:video><p:cMediaNode vol="80000" mute="1"><p:cTn id="\d+" repeatCount="indefinite"/.test(s1), 'played on a click, without sound and again and again as the deck says');
+  const html = (await req('GET', `/api/pages/${made}/export?format=html`)).body;
+  ok(html.includes(`data:video/mp4;base64,${film.toString('base64').slice(0, 40)}`), 'the web page (a file on its own) has the video inside it');
+  // An agent's video file, kept with its deck.
+  fs.writeFileSync(path.join(tmp, 'clip.mp4'), film);
+  const fromAgent = await run('save_slides', { title: 'Agent film', slides: [{ els: [{ type: 'video', src: 'clip.mp4' }, { type: 'video', src: 'missing.mp4' }] }] });
+  const agentDeck = (await req('GET', `/api/pages/${idOf(fromAgent.text)}`)).json().model as Deck;
+  ok(agentDeck.slides[0].els.length === 1 && agentDeck.slides[0].els[0].type === 'video' && agentDeck.slides[0].els[0].src === src, 'an agent’s video file is kept with its deck');
+  ok(!!fromAgent.text?.includes('missing.mp4') && fromAgent.text.includes('left out'), 'one that is not there is said to be left out');
+  ok((await run('get_page', { id: idOf(fromAgent.text) })).text?.includes('naget-video:') === true, 'get_page gives the kept video by its source');
+  // A video nothing shows any more goes a day after.
+  await req('POST', `/api/pages/${made}/versions`, { model: { slides: [{ layout: 'title', title: 'No film' }] } });
+  await req('POST', `/api/pages/${idOf(fromAgent.text)}/versions`, { model: { slides: [{ layout: 'title', title: 'No film' }] } });
+  for (const p of [made, idOf(fromAgent.text)]) db.prepare('delete from page_asset_refs where page_id = ? and version = 1').run(p);
+  db.prepare('update page_videos set created_at = 1').run();
+  sweepAssets(db);
+  ok(!getVideo(db, sha), 'a video nothing shows goes after a day');
 }
 
 // ---- the deck's own page, and agents ------------------------------------------------------------------------------

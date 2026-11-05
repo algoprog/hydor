@@ -26,8 +26,8 @@ export function zipParts(parts: ZipPart[], when = new Date()): Buffer {
     const name = Buffer.from(p.name, 'utf8');
     const raw = typeof p.data === 'string' ? Buffer.from(p.data, 'utf8') : p.data;
     const crc = zlib.crc32(raw) >>> 0;
-    // Pictures are packed already: stored, they open faster and lose nothing.
-    const packed = /\.(png|jpe?g|gif|webp)$/i.test(p.name) ? null : zlib.deflateRawSync(raw, { level: 6 });
+    // Pictures and videos are packed already: stored, they open faster and lose nothing.
+    const packed = /\.(png|jpe?g|gif|webp|mp4|m4v|mov|webm)$/i.test(p.name) ? null : zlib.deflateRawSync(raw, { level: 6 });
     const data = packed && packed.length < raw.length ? packed : raw;
     const method = data === raw ? 0 : 8;
     const head = Buffer.alloc(30);

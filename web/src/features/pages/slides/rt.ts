@@ -1,6 +1,6 @@
-// The slides runtime as the app uses it: one for the app's window, pictures from this server (the app's own pages
-// load no picture from the web, so pictures on the web come through it too), Google's fonts through it, KaTeX for
-// equations (loaded when a deck has one), and dates written as the app's language writes them.
+// The slides runtime as the app uses it: one for the app's window, pictures and kept videos from this server (the
+// app's own pages load no picture from the web, so pictures on the web come through it too), Google's fonts through it,
+// KaTeX for equations (loaded when a deck has one), and dates written as the app's language writes them.
 import { useEffect, useState } from 'react';
 import { deckFonts, everyEl, FONT_TABLE, FONTS, type Deck } from '@shared/slides';
 import { slidesRuntime, type DrawOpts } from '@shared/slides-runtime';
@@ -12,9 +12,10 @@ import { loadKatex } from '../common/katex';
 export const RT = slidesRuntime(window, FONT_TABLE);
 RT.style();
 
-/** Where the app finds a deck's pictures, and what draws its equations once loaded. */
-export const PICS: Pick<DrawOpts, 'asset' | 'web' | 'hint' | 'katex' | 'locale'> = {
+/** Where the app finds a deck's pictures and videos, and what draws its equations once loaded. */
+export const PICS: Pick<DrawOpts, 'asset' | 'web' | 'video' | 'hint' | 'katex' | 'locale'> = {
   asset: (sha) => mu(`/api/pages/assets/${sha}`),
+  video: (sha) => mu(`/api/pages/videos/${sha}`),
   web: (url) => mu(`/api/pages/picture?url=${encodeURIComponent(url)}`),
   hint: tr,
   locale: LOCALE,
