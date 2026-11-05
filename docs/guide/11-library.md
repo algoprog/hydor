@@ -278,7 +278,7 @@ Or describe what you want under **Or describe it, and an agent makes it** ("a pa
 
 ## Add files of yours
 
-Drop files from your computer anywhere on the Library to add them: as many as you like, or whole folders (the files in them). While they are over it, the place they will go is outlined and a line says it: "Drop to add to Thesis", or "Drop to add to the Library, not in a project".
+Drop files from your computer anywhere on the Library to add them: as many as you like, or whole folders (the files in them). While they are over it, the place they will go is outlined and a line says it: "Drop to add to “Thesis”", or "Drop to add to the Library, not in a project".
 
 - Dropped on a project in the list of places beside the cards (its chip, on a phone), they go in that project; on **Everything**, **Not in a project** or **Published**, in none.
 - Dropped on the cards, they go in the place you have open: the project you are looking at, or none on **Everything** and **Not in a project**.

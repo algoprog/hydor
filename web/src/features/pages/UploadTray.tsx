@@ -251,10 +251,10 @@ export function DropHint({ name, className }: { name?: string; className?: strin
       <span className="truncate">
         {moves
           ? name
-            ? tr(`Drop to move them into ${name}`)
+            ? tr(`Drop to move them into “${name}”`)
             : 'Drop to move them into the Library, not in a project'
           : name
-            ? tr(`Drop to add to ${name}`)
+            ? tr(`Drop to add to “${name}”`)
             : 'Drop to add to the Library, not in a project'}
       </span>
     </span>

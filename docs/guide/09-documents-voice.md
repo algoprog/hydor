@@ -369,7 +369,7 @@ It stops listening to say these, then listens again. Sessions on your other mach
 - "Take pages 3 to 5 out of ~/Documents/contract.pdf into a file of their own."
 - "Turn on speech recognition on this computer, with the Small model."
 - "Use my speech server at http://192.168.1.20:8000/v1 for dictation, with the model whisper-large-v3."
-- "Which whisper models are on this computer, and how much project do they take? Remove the ones not in use."
+- "Which whisper models are on this computer, and how much space do they take? Remove the ones not in use."
 - "Which image model do agents use now, and about what does one image cost?"
 - "Switch the image model to the cheapest one that can edit pictures."
 - "Stop agents from making images."
