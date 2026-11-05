@@ -14,14 +14,15 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, FileCog, Link2, ListTree, MessageSquare, MessageSquarePlus, Sparkles, Unlink } from 'lucide-react';
 import { docHeadings, docWords, FONTS, MARGINS, PAPERS, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type TableBlock } from '@shared/docs';
 import { newCommentId, openComments, type Comment } from '@shared/comments';
-import { changesOf, suggestionColor } from '@shared/doc-changes';
-import { post } from '../../../lib/api';
+import { changesOf, compareDocs, suggestionColor } from '@shared/doc-changes';
+import { api, post } from '../../../lib/api';
 import { mu } from '../../../lib/machine';
 import { toast, toastError, useUI } from '../../../lib/store';
 import { tr } from '../../../i18n/runtime';
 import { LOCALE } from '../../../i18n/locale';
 import { Button, cx, IconButton, Popover, Segmented, useConfirm, useMediaQuery } from '../../../components/ui';
-import type { AskScope, ModelEditorProps } from '../kinds';
+import { loadModelVersion, type AskScope, type ModelEditorProps } from '../kinds';
+import type { PageVersion } from '@shared/pages';
 import { choosePicture, pictureFromUrl, uploadPicture } from '../pictures';
 import { NumInput } from '../slides/controls';
 import { Select } from '../studio/fields';
@@ -33,6 +34,7 @@ import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import { inputCls } from '../../../components/ui';
 import { BlockHandle } from './BlockHandle';
 import { CommentsColumn, CommentsPanel, type CommentActions, type Draft, type Extra } from './CommentsView';
+import { CompareView, VersionsDialog } from './Compare';
 import { editorCss, paperPx, useDocFonts } from './css';
 import { BandsDialog, EquationBox, SpacingDialog, WordCountDialog, type Counts } from './Dialogs';
 import { DocEngine, type AtomClick, type SelState } from './engine';
@@ -165,7 +167,7 @@ const SHORTCUTS: ShortcutGroup[] = [
   },
 ];
 
-export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef }: ModelEditorProps<Doc>) {
+export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef }: ModelEditorProps<Doc>) {
   const [model, setModel] = useState<Doc | null>(() => (doc?.model ? fixDoc(doc.model) : null));
   const [saved, setSaved] = useState<Doc | null>(model);
   const [st, setSt] = useState<SelState | null>(null);
@@ -185,6 +187,10 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   const [showResolved, setShowResolved] = useState(false);
   // Editing (changes are made) or Suggesting (changes are suggested, as Google Docs' Suggesting and Word's Track changes).
   const [mode, setMode] = useState<'edit' | 'suggest'>('edit');
+  // The document compared with a version (Tools → Compare with a version, or an older version opened from the
+  // Library's Versions, compared with the latest), and the list of versions to pick one from.
+  const [compare, setCompare] = useState<{ version: number; at?: number; merged: Doc; from: 'tools' | 'versions' } | null>(null);
+  const [versions, setVersions] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [tops, setTops] = useState<Map<string, number>>(new Map());
   const [eq, setEq] = useState<{ kind: 'block'; id: string; tex: string } | { kind: 'run'; at: Pos; tex: string } | { kind: 'new'; inline: boolean } | null>(null);
@@ -366,6 +372,26 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     setModel(e.doc);
     setSaved(e.doc);
     setSt(e.state());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc?.key]);
+
+  // An older version opened from the Library's Versions (its key ends in :v<n>): shown with what changed since it, the
+  // latest saved version fetched to compare with (the band over the editor brings it back, or leaves it).
+  const olderVersion = readOnly ? Number(/:v(\d+)$/.exec(doc?.key ?? '')?.[1]) || 0 : 0;
+  useEffect(() => {
+    if (!olderVersion || !doc) return setCompare((c) => (c?.from === 'versions' ? null : c));
+    let alive = true;
+    api<{ model: Doc; versions: PageVersion[] }>(`/api/pages/${encodeURIComponent(pageId)}`).then(
+      (r) => {
+        if (!alive) return;
+        const at = r.versions.find((v) => v.version === olderVersion)?.createdAt;
+        setCompare({ version: olderVersion, at, merged: compareDocs(fixDoc(doc.model), fixDoc(r.model), { by: 'user', at: Date.now() }, 'v'), from: 'versions' });
+      },
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc?.key]);
 
@@ -686,6 +712,36 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     setDialog('count');
   }
 
+  // ---- comparing with a version ----------------------------------------------------------------------------------------
+  const compareWith = async (v: PageVersion) => {
+    setVersions(false);
+    const en = engine.current;
+    if (!en) return;
+    try {
+      const old = await loadModelVersion<Doc>(encodeURIComponent(pageId), v.version);
+      setCompare({ version: v.version, at: v.createdAt, merged: compareDocs(fixDoc(old.model), en.doc, { by: 'user', at: Date.now() }, 'v'), from: 'tools' });
+    } catch (err) {
+      toastError(err);
+    }
+  };
+  /** The version brought back, as the Library does it (a new version on top); changes not saved here go first. */
+  const restoreVersion = async () => {
+    if (!compare) return;
+    if (dirty && !(await confirm({ title: 'Restore this version?', body: 'Your changes that are not saved yet are dropped, and this version comes back as the latest.', confirm: 'Restore', danger: true }))) return;
+    try {
+      const r = await post<{ page: { version: number } }>(`/api/pages/${encodeURIComponent(pageId)}/versions/${compare.version}/restore`);
+      if (dirty && engine.current && saved) {
+        engine.current.load(saved);
+        paging.current?.reload();
+        setModel(engine.current.doc);
+      }
+      toast(`Version ${compare.version} is back, as version ${r.page.version}`, 'ok');
+      setCompare(null);
+    } catch (err) {
+      toastError(err);
+    }
+  };
+
   // ---- comments ------------------------------------------------------------------------------------------------------
   const setComments = (list: Comment[], gone?: string) => engine.current?.setComments(list, gone);
   const ca: CommentActions = {
@@ -821,6 +877,8 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           setMode,
           suggestions: changes.length,
           resolveAll: (accept) => e.resolve(null, accept),
+          compare: () => setVersions(true),
+          readOnly: !!readOnly || !!compare,
         })
       : [];
 
@@ -948,7 +1006,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
           {/* The menus beside the title, where the header has room for them; one button where it hasn't. */}
-          {st && e && <MenuBar menus={readOnly ? menus.filter((m) => m.label === 'View' || m.label === 'Tools') : menus} compact={phone ? true : 'auto'} className={phone ? 'shrink-0' : undefined} />}
+          {st && e && <MenuBar menus={readOnly || compare ? menus.filter((m) => m.label === 'View' || m.label === 'Tools') : menus} compact={phone ? true : 'auto'} className={phone ? 'shrink-0' : undefined} />}
         </div>
         {(comments.length > 0 || changes.length > 0 || panel) && (
           <button
@@ -983,7 +1041,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
         {tail}
       </div>
       {band}
-      {st && e && !readOnly && (
+      {st && e && !readOnly && !compare && (
         <div className="flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-panel px-2 [&::-webkit-scrollbar]:hidden">
           <Toolbar
             engine={e}
@@ -1120,6 +1178,19 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           </div>
         </div>
         {panelW > 0 && <aside className="w-[320px] shrink-0 border-l border-line bg-panel">{panelBody}</aside>}
+        {compare && (
+          <CompareView
+            merged={compare.merged}
+            version={compare.version}
+            at={compare.at}
+            src={pictureSrc}
+            math={drawMath}
+            phone={phone}
+            onRestore={compare.from === 'tools' ? () => void restoreVersion() : undefined}
+            onBack={() => setCompare(null)}
+            backLabel={compare.from === 'versions' ? 'This version as it was' : undefined}
+          />
+        )}
         {phone && panel && <div className="absolute inset-0 z-30 bg-panel">{panelBody}</div>}
         {find.open && (
           <div className="absolute top-2 right-3 z-30 max-w-[calc(100%-24px)]" data-keeps-editing>
@@ -1231,6 +1302,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
       <WordCountDialog open={dialog === 'count'} onClose={() => (setDialog(null), e?.refocusSoon())} counts={counts} picked={counts.picked} showCount={view.count} setShowCount={(on) => setPrefs({ count: on })} />
       <SpacingDialog open={dialog === 'spacing'} onClose={() => (setDialog(null), e?.refocusSoon())} value={{ lh: sp?.lh, sb: sp?.sb, sa: sp?.sa }} onApply={(v) => e?.spacing(v)} />
       <BandsDialog open={dialog === 'bands'} onClose={() => (setDialog(null), e?.refocusSoon())} header={model.header} footer={model.footer} titlePage={model.titlePage} onApply={(v) => e?.setBands(v)} />
+      <VersionsDialog open={versions} pageId={pageId} onClose={() => (setVersions(false), e?.refocusSoon())} onPick={(v) => void compareWith(v)} />
       <ShortcutsDialog open={dialog === 'keys'} onClose={() => (setDialog(null), e?.refocusSoon())} groups={SHORTCUTS} />
       {confirmNode}
     </div>
