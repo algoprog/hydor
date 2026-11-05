@@ -1,9 +1,9 @@
 // The inbox: everything waiting on the user (approvals, questions, forms, a browser that needs them, a
-// key an agent asked for, a skill to review), across sessions, scheduled tasks and template runs. Each
-// machine lists its own (GET /api/inbox); the page asks the other machines too.
+// key an agent asked for, a skill to review, a comment from someone a project is shared with), across sessions,
+// scheduled tasks and template runs. Each machine lists its own (GET /api/inbox); the page asks the other machines too.
 import type { Agent, ApprovalOption, ApprovalRequest } from './types.ts';
 
-export type InboxKind = 'approval' | 'question' | 'form' | 'browser' | 'key' | 'skill' | 'elsewhere';
+export type InboxKind = 'approval' | 'question' | 'form' | 'browser' | 'key' | 'skill' | 'elsewhere' | 'comment';
 
 export interface InboxItem {
   /** Stable while it waits: "approval:<session>:<id>", "browser:<session>:<ask>"… */
