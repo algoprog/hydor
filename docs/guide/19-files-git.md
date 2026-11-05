@@ -464,13 +464,25 @@ Until then, Sync and the commit box wait: Continue makes the commit.
 
 - **This branch** shows the history that led to the branch you are on; **All branches** shows every branch's, the remote's too.
 - **Find a commit** finds commits by words in their message, their author's name or address, or their hash.
+- **Find what broke it**, the button beside it, has an agent find the commit that broke something (see [Find what broke it](#find-what-broke-it)).
 - **Load more**, at the end, shows older commits.
 
 Click a commit to open it beside the list (on a phone, on a page of its own): its whole message, author, date and hash (click the hash to copy it), the branches and tags on it, and the files it changed, each opening to its diff. A merge says which commits it joined.
 
 - **Explain** opens the start page with a prompt that asks an agent to explain the commit in plain words.
 - **Undo this commit** shows on the last commit while no remote has it: the commit goes away, and what it changed goes back to Changes, ready to commit again.
-- The ⋯ menu also has **Copy hash**, **New branch from here** (a branch that starts at this commit; you switch to it), **Tag this commit** (a name such as `v1.2.0` and, if you like, a message; **Push tags** in the repository's ⋯ menu sends tags to the remote) and **Revert this commit**: a new commit that undoes what this one changed, after a question. The commit itself stays in the history.
+- The ⋯ menu also has **Copy hash**, **Find what broke it** (from this commit, as where it last worked), **New branch from here** (a branch that starts at this commit; you switch to it), **Tag this commit** (a name such as `v1.2.0` and, if you like, a message; **Push tags** in the repository's ⋯ menu sends tags to the remote) and **Revert this commit**: a new commit that undoes what this one changed, after a question. The commit itself stays in the history.
+
+### Find what broke it
+
+When something worked in an earlier version and is broken now, open the commit where it last worked and choose **Find what broke it** in its ⋯ menu, or select the **Find what broke it** button beside **Find a commit**. Its form asks:
+
+- **Worked at**: that commit (by its tag when it has one), or else the latest tag; any tag, branch or commit works, and the commit it stands for shows under it.
+- **Broken at**: `HEAD` to start.
+- **What is broken**, in your words, and **How to check (optional)**: a command that fails while it is broken.
+- **Run by**: the agent that does it.
+
+**Start** opens a new session in a worktree of the repository, so your own copy stays as it is. Its agent writes a check, tries it at both ends, runs git bisect to find the first commit where it broke, and explains what in that commit broke it and why, with a fix to suggest. See [Find what broke it](/guide/engineering#find-what-broke-it).
 
 ## Work with branches
 
@@ -661,6 +673,7 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 - "Write a reading guide for what this branch changes."
 - "Resolve the merge conflicts in ~/code/shop-api: keep what each side meant, then tell me what you chose."
 - "What changed in ~/code/shop-api this week? Sum up the commits in plain words."
+- "Search went slow after v2.3 in ~/code/shop-api: find the commit that made it slow."
 - "Which dev servers are running on this computer right now?"
 - "Make the checkout page's button bigger, and show me before and after on a phone."
 - "What's using the most memory on this computer?"
