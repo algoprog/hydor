@@ -212,6 +212,22 @@ const post = async (url: string, payload: Record<string, unknown>, status = 200)
     assert.ok(Math.abs(ph - (600 * area.h) / area.w) <= 2, `its shape kept: ${pw}×${ph}`);
   } else notes.push('poppler is not installed: pictures not tested');
   assert.equal((await app.inject({ url: `/api/pdf-notes/area?path=${q(file)}&page=1&x=10&y=10&w=0&h=3` })).statusCode, 400);
+  // A page cut to a crop box smaller than its paper: drawn as it shows, the size its words are placed on.
+  {
+    const f = new PdfFile(paper);
+    const pg = pages(f)[0];
+    f.edit(pg.ref).set('CropBox', [40, 60, 572, 760]);
+    const cropped = path.join(tmp, 'cropped.pdf');
+    fs.writeFileSync(cropped, f.saveUpdate());
+    const runs2 = (await app.inject({ url: `/api/pdf-notes/text?path=${q(cropped)}&page=1` })).json();
+    assert.equal(Math.round(runs2.width), 532);
+    assert.equal(Math.round(runs2.height), 700);
+    if (poppler) {
+      const pic = await app.inject({ url: `/api/pdf-notes/page?path=${q(cropped)}&page=1&width=532` });
+      assert.equal(pic.statusCode, 200);
+      assert.equal(pic.rawPayload.readUInt32BE(20), 700, 'the crop box drawn, not the whole paper');
+    }
+  }
 
   // Agents' app_api may read them freely; changes need the user's OK.
   assert.equal(ruleFor('GET', '/api/pdf-notes').level, 'free');

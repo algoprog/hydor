@@ -26,7 +26,7 @@ import type { Deps, Feature, RunTool, ToolOutput } from '../features/types.ts';
 import { freeName, resolvePath, trashCopy, writeFile } from '../files.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { spaceById } from '../spaces/index.ts';
-import { cutTo, withoutOurs, writeHighlights } from './annots.ts';
+import { cutTo, forReader, writeHighlights } from './annots.ts';
 import { dropDocument, keepIn, rewrite } from './keep.ts';
 import { areaOrder, findRuns, loadPdf, type Loaded, shownRuns, titleOf, wordsIn } from './layer.ts';
 import { anyGone, anyNotes, cleanHighlight, isColor, movePdfNotes, orphanFor, ordered, readNotes, type Stored, writeNotes } from './store.ts';
@@ -249,7 +249,7 @@ function routes(d: Deps) {
     const page = pageOf(l, q.page);
     const width = Math.max(200, Math.min(3200, intOf(q.width, 1200)));
     // Highlights saved into the file show once: as the reader draws them, while the app keeps them here.
-    const src = readNotes(db, abs).highlights.length ? withoutOurs(l.data, page) : l.data;
+    const src = forReader(l.data, page, readNotes(db, abs).highlights.length > 0);
     return picture(reply, `${l.mtime}-${page}-${width}-${src === l.data ? 1 : 0}`, src, page, width);
   });
 
@@ -307,16 +307,17 @@ function routes(d: Deps) {
     if (b.replace === true) {
       const trashed = await trashCopy(abs);
       await writeFile(abs, out.data, {});
-      // The words stay where they were: the highlights are placed on the file as it is now.
+      // The words stay where they were: the highlights are placed on the file as it is now (as they are now, a change
+      // made while it was written included).
       const nl = load(abs);
-      writeNotes(db, abs, { ...s, fp: { size: nl.size, mtime: nl.mtime, hash: nl.hash() } });
+      writeNotes(db, abs, { ...readNotes(db, abs), fp: { size: nl.size, mtime: nl.mtime, hash: nl.hash() } });
       return { path: abs, replaced: true, trashed, count: out.count, notes: out.notes };
     }
     const dest = freeName(path.dirname(abs), `${path.basename(abs, path.extname(abs))} (highlighted).pdf`);
     await writeFile(dest, out.data, { create: true });
     // The copy keeps the notes too, so it opens in the reader with them (and its saved ones drawn once).
     const cl = load(dest);
-    writeNotes(db, dest, { highlights: s.highlights, fp: { size: cl.size, mtime: cl.mtime, hash: cl.hash() } });
+    writeNotes(db, dest, { highlights: readNotes(db, abs).highlights, fp: { size: cl.size, mtime: cl.mtime, hash: cl.hash() } });
     return { path: dest, replaced: false, count: out.count, notes: out.notes };
   });
 }

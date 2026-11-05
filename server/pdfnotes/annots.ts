@@ -157,6 +157,23 @@ export function writeHighlights(data: Buffer, hs: PdfHighlight[], author = 'Hydo
   return { data: pdf.changed ? pdf.saveUpdate() : data, count, notes };
 }
 
+/**
+ * The file as the reader draws a page of it (in memory): the page as it shows, cut to its crop box (pictures are drawn
+ * from the media box, the words are placed on the crop box), and, while the app keeps its notes, without the highlights
+ * saved into it (the reader draws its own over them).
+ */
+export function forReader(data: Buffer, page: number, dropOurs: boolean): Buffer {
+  const src = dropOurs ? withoutOurs(data, page) : data;
+  const pdf = new PdfFile(src);
+  const p = pages(pdf)[page - 1];
+  if (!p) return src;
+  const same = (a: number, b: number) => Math.abs(a - b) < 0.01;
+  if (same(p.crop.x0, p.media.x0) && same(p.crop.y0, p.media.y0) && same(p.crop.x1, p.media.x1) && same(p.crop.y1, p.media.y1)) return src;
+  const d = pdf.edit(p.ref);
+  d.set('MediaBox', [p.crop.x0, p.crop.y0, p.crop.x1, p.crop.y1]);
+  return pdf.saveUpdate();
+}
+
 /** The file with the app's own highlights taken off a page (in memory, for a picture of the page under the reader's). */
 export function withoutOurs(data: Buffer, page: number): Buffer {
   if (!mayHold(data)) return data;
