@@ -334,7 +334,8 @@ const sh = book.sheets[0];
     'in the order Excel wants them',
   );
   ok(
-    (z.text('xl/styles.xml') ?? '').includes('<dxfs count="3">') && z.has('xl/comments1.xml') && z.has('xl/drawings/vmlDrawing1.vml') && z.has('xl/charts/chart1.xml') && z.has('xl/drawings/drawing1.xml'),
+    // Three looks of its rules, and two of its list's coloured options (Doing, Done), as Excel shows them.
+    (z.text('xl/styles.xml') ?? '').includes('<dxfs count="5">') && z.has('xl/comments1.xml') && z.has('xl/drawings/vmlDrawing1.vml') && z.has('xl/charts/chart1.xml') && z.has('xl/drawings/drawing1.xml'),
     'with dxfs, comments and their VML, a drawing and its chart',
   );
   ok((z.text('xl/charts/chart1.xml') ?? '').includes('<c:f>Work!$C$2:$C$5</c:f>') && (z.text('[Content_Types].xml') ?? '').includes('drawingml.chart+xml'), 'the chart’s series point at the cells');

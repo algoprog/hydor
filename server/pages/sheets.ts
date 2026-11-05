@@ -55,6 +55,7 @@ import {
   type Calc,
   type Cell,
   type CellStyle,
+  type CondRule,
   type Rect,
   type Scalar,
   type Sheet,
@@ -71,8 +72,9 @@ import { resolvePart, Zip } from '../documents/zip.ts';
 import { chartData, chartProblem, chartSvg } from '../../shared/sheet-chart.ts';
 import { CondFormats, hiddenCols, hiddenRows, isTicked, listOptions, Merges, Rules } from '../../shared/sheet-rules.ts';
 import { coreXml, esc as xesc, relsXml, XML_HEAD, zipParts } from './ooxml.ts';
-import { chartXml, commentsXml, condXml, drawingXml, Dxfs, filterXml, isListsSheet, listFromSheet, listsSheet, mergesXml, namedAuthors, personsXml, readCharts, readConditional, readDxfs, readFilter, readNotes, readPersons, readThreaded, readValidation, validationXml } from './sheet-parts.ts';
+import { chartXml, commentsXml, condXml, drawingXml, Dxfs, filterXml, isListColor, isListsSheet, listFromSheet, listsSheet, mergesXml, namedAuthors, personsXml, readCharts, readConditional, readDxfs, readFilter, readNotes, readPersons, readThreaded, readValidation, validationXml } from './sheet-parts.ts';
 import { joinRects, odfFormula, odfText, odsCondStyles, odsConditional, odsNote, odsValidations } from './sheet-ods.ts';
+import { officeFont } from './word-fonts.ts';
 
 export { isBookText } from '../../shared/sheets.ts';
 
@@ -401,8 +403,14 @@ const NS_MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const CT = 'application/vnd.openxmlformats-officedocument.spreadsheetml';
 
-/** A column's px as Excel's width (characters of its default font's digits, Calibri 11: 7 px each, 5 px of margin). */
-const xlWidth = (px: number) => Math.round((Math.max(0, px - 5) / 7) * 256) / 256;
+/**
+ * A column's px as Excel's width: characters of its default font's widest digit (7 px for Arial 10 and Calibri 11), the
+ * cell's padding included, as ECMA-376 (18.3.1.13) has Excel turn it back into pixels: trunc((256w + trunc(128/7)) / 256 × 7).
+ */
+const MDW = 7;
+const xlWidth = (px: number) => Math.ceil((Math.max(0, px) * 256) / MDW - Math.trunc(128 / MDW)) / 256;
+/** An Excel width as the px it shows. */
+const pxOfWidth = (w: number) => Math.trunc(((256 * w + Math.trunc(128 / MDW)) / 256) * MDW);
 /** A row's px as points. */
 const xlHeight = (px: number) => Math.round(px * 0.75 * 100) / 100;
 const argb = (hex: string) => `FF${hex.slice(1).toUpperCase()}`;
@@ -439,13 +447,20 @@ function numFmtFor(s: CellStyle | undefined, v: Scalar): { id: number } | { code
   return id !== undefined ? { id } : { code };
 }
 
+/**
+ * The cells' font in Excel: the editor shows them in the app's own (Inter) at 10pt, and Excel can carry no fonts, so
+ * they are in the Office font closest to it at that size; and words sit in the middle of their rows, as in the editor.
+ */
+const XL_FONT = officeFont('Inter');
+const XL_SIZE = FONT_PT;
+
 /** The styles a file's cells use: fonts, fills, number formats and their combinations (cellXfs), each written once. */
 class XlStyles {
-  fonts = ['<font><sz val="11"/><name val="Calibri"/><family val="2"/></font>'];
+  fonts = [`<font><sz val="${XL_SIZE}"/><name val="${XL_FONT}"/><family val="2"/></font>`];
   fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'];
   borders = ['<border><left/><right/><top/><bottom/><diagonal/></border>'];
   codes: string[] = [];
-  xfs = ['<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'];
+  xfs = ['<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>'];
   /** Conditional formatting's looks. */
   dxfs = new Dxfs();
   private ix = new Map<string, number>();
@@ -468,7 +483,7 @@ class XlStyles {
     if (s && (s.b || s.i || s.u || s.s || s.color || s.size || s.font)) {
       font = this.once(
         this.fonts,
-        `<font>${s.b ? '<b/>' : ''}${s.i ? '<i/>' : ''}${s.s ? '<strike/>' : ''}${s.u ? '<u/>' : ''}<sz val="${s.size ?? 11}"/>${s.color ? `<color rgb="${argb(s.color)}"/>` : ''}<name val="${xesc(s.font ?? 'Calibri')}"/>${s.font ? '' : '<family val="2"/>'}</font>`,
+        `<font>${s.b ? '<b/>' : ''}${s.i ? '<i/>' : ''}${s.s ? '<strike/>' : ''}${s.u ? '<u/>' : ''}<sz val="${s.size ?? XL_SIZE}"/>${s.color ? `<color rgb="${argb(s.color)}"/>` : ''}<name val="${xesc(s.font ?? XL_FONT)}"/>${s.font ? '' : '<family val="2"/>'}</font>`,
       );
     }
     const fill = s?.fill ? this.once(this.fills, `<fill><patternFill patternType="solid"><fgColor rgb="${argb(s.fill)}"/><bgColor indexed="64"/></patternFill></fill>`) : 0;
@@ -481,12 +496,12 @@ class XlStyles {
     const border = s && (s.bt || s.br || s.bb || s.bl) ? this.once(this.borders, `<border>${side('left', s.bl)}${side('right', s.br)}${side('top', s.bt)}${side('bottom', s.bb)}<diagonal/></border>`) : 0;
     // Excel turns words 1–90 degrees anticlockwise, and 91–180 for 1–90 clockwise.
     const rot = s?.rot ? (s.rot > 0 ? s.rot : 90 - s.rot) : 0;
-    const al =
-      s && (s.align || s.valign || s.wrap || rot)
-        ? `<alignment${s.align ? ` horizontal="${s.align}"` : ''}${s.valign ? ` vertical="${s.valign === 'middle' ? 'center' : s.valign}"` : ''}${rot ? ` textRotation="${rot}"` : ''}${s.wrap ? ' wrapText="1"' : ''}/>`
-        : '';
+    // Up and down as the editor puts words: in the middle of the row, wrapped ones from the top (the default style
+    // has the middle, so a cell without its own alignment needs none).
+    const vertical = s?.valign === 'top' || (s?.wrap && !s.valign) ? 'top' : s?.valign === 'bottom' ? 'bottom' : 'center';
+    const al = s && (s.align || (s.valign && s.valign !== 'middle') || s.wrap || rot) ? `<alignment${s.align ? ` horizontal="${s.align}"` : ''} vertical="${vertical}"${rot ? ` textRotation="${rot}"` : ''}${s.wrap ? ' wrapText="1"' : ''}/>` : '';
     if (!numFmtId && !font && !fill && !al && !border) return 0;
-    const xml = `<xf numFmtId="${numFmtId}" fontId="${font}" fillId="${fill}" borderId="${border}" xfId="0"${numFmtId ? ' applyNumberFormat="1"' : ''}${font ? ' applyFont="1"' : ''}${fill ? ' applyFill="1"' : ''}${border ? ' applyBorder="1"' : ''}${al ? ` applyAlignment="1">${al}</xf>` : '/>'}`;
+    const xml = `<xf numFmtId="${numFmtId}" fontId="${font}" fillId="${fill}" borderId="${border}" xfId="0"${numFmtId ? ' applyNumberFormat="1"' : ''}${font ? ' applyFont="1"' : ''}${fill ? ' applyFill="1"' : ''}${border ? ' applyBorder="1"' : ''} applyAlignment="1">${al || '<alignment vertical="center"/>'}</xf>`;
     return this.once(this.xfs, xml);
   }
 
@@ -497,7 +512,7 @@ class XlStyles {
       `<fonts count="${this.fonts.length}">${this.fonts.join('')}</fonts>` +
       `<fills count="${this.fills.length}">${this.fills.join('')}</fills>` +
       `<borders count="${this.borders.length}">${this.borders.join('')}</borders>` +
-      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"><alignment vertical="center"/></xf></cellStyleXfs>' +
       `<cellXfs count="${this.xfs.length}">${this.xfs.join('')}</cellXfs>` +
       '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
       `${this.dxfs.xml()}<tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`
@@ -520,7 +535,8 @@ class XlStrings {
     return i;
   }
   xml(): string {
-    const si = this.list.map((s) => `<si><t${/^\s|\s$|\n/.test(s) ? ' xml:space="preserve"' : ''}>${xesc(s)}</t></si>`).join('');
+    // Words that start or end with a space say so, as Excel's own files do (only there: ECMA-376's schema has no xml:space on them).
+    const si = this.list.map((s) => `<si><t${/^\s|\s$/.test(s) ? ' xml:space="preserve"' : ''}>${xesc(s)}</t></si>`).join('');
     return `${XML_HEAD}<sst xmlns="${NS_MAIN}" count="${this.count}" uniqueCount="${this.list.length}">${si}</sst>`;
   }
 }
@@ -627,18 +643,29 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
     .filter(([, w, hid]) => w || hid)
     .sort((a, b) => a[0] - b[0]);
   const cols = widths.length ? `<cols>${widths.map(([c, w, hid]) => `<col min="${c + 1}" max="${c + 1}" width="${xlWidth(w ?? COL_W)}"${hid ? ' hidden="1"' : ''}${w ? ' customWidth="1"' : ''}/>`).join('')}</cols>` : '';
-  const wide = Array.from({ length: e.cols }, (_, c) => (sh.cols?.[c]?.hidden ? 0 : (sh.cols?.[c]?.w ?? COL_W))).reduce((a, b) => a + b, 0) > 900;
+  // Printed as the app prints it: across the page when its columns are wider than an upright one holds, made smaller
+  // to fit the page's width when they are wider than that too, 12 mm margins, its name at the top.
+  const across = Array.from({ length: e.cols }, (_, c) => (sh.cols?.[c]?.hidden ? 0 : (sh.cols?.[c]?.w ?? COL_W))).reduce((a, b) => a + b, 0);
+  const wide = across > 700;
+  const fit = across > 1030;
+  const mm12 = '0.4724';
   return (
     `${XML_HEAD}<worksheet xmlns="${NS_MAIN}" xmlns:r="${NS_R}">` +
+    (fit ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '') +
     `<dimension ref="${e.rows ? `A1:${refName(e.rows - 1, Math.max(0, e.cols - 1))}` : 'A1'}"/>` +
     `<sheetViews><sheetView workbookViewId="0"${si === 0 && !ofLists ? ' tabSelected="1"' : ''}>${pane}</sheetView></sheetViews>` +
-    `<sheetFormatPr defaultColWidth="${xlWidth(COL_W)}" defaultRowHeight="15"/>${cols}` +
+    // Rows as tall as the editor's (24 px) unless they say.
+    `<sheetFormatPr defaultColWidth="${xlWidth(COL_W)}" defaultRowHeight="${xlHeight(ROW_H)}" customHeight="1"/>${cols}` +
     `<sheetData>${body}</sheetData>` +
     filterXml(sh, si, calc) +
     mergesXml(sh) +
     condXml(sh, st.dxfs, names) +
     validationXml(sh, names, lists) +
-    `<pageMargins left="0.5" right="0.5" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>${wide ? '<pageSetup orientation="landscape"/>' : ''}` +
+    // The cells' lines, as the app prints round its table's cells (not across the empty ones charts stand over).
+    (sh.charts?.length ? '' : '<printOptions gridLines="1"/>') +
+    `<pageMargins left="${mm12}" right="${mm12}" top="${mm12}" bottom="${mm12}" header="0.2" footer="0.2"/>` +
+    `<pageSetup orientation="${wide ? 'landscape' : 'portrait'}"${fit ? ' fitToWidth="1" fitToHeight="0"' : ''}/>` +
+    `<headerFooter><oddHeader>${xesc(`&L&"-,Bold"&12&A`)}</oddHeader></headerFooter>` +
     (links.drawing ? `<drawing r:id="${links.drawing}"/>` : '') +
     (links.legacy ? `<legacyDrawing r:id="${links.legacy}"/>` : '') +
     '</worksheet>'
@@ -721,11 +748,16 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
     `<HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>${n}</vt:i4></vt:variant></vt:vector></HeadingPairs>` +
     `<TitlesOfParts><vt:vector size="${n}" baseType="lpstr">${titles.map((t) => `<vt:lpstr>${xesc(t)}</vt:lpstr>`).join('')}</vt:vector></TitlesOfParts>` +
     '<LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged><AppVersion>16.0300</AppVersion></Properties>';
-  // Excel keeps each filter's range in a hidden name of its sheet's.
+  // Excel keeps each filter's range in a hidden name of its sheet's, and the rows each printed page repeats (the app's
+  // print repeats a sheet's frozen rows, or a first row of words over the rest) in another.
   const filterNames = book.sheets
     .map((sh, i) => {
       const x = sh.filter ? parseRange(sh.filter.range) : null;
-      return x ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">${xesc(`${quoteSheet(sh.name)}!$${colName(x.c1)}$${x.r1 + 1}:$${colName(x.c2)}$${x.r2 + 1}`)}</definedName>` : '';
+      const heads = headerRows(sh, i, calc);
+      return (
+        (x ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">${xesc(`${quoteSheet(sh.name)}!$${colName(x.c1)}$${x.r1 + 1}:$${colName(x.c2)}$${x.r2 + 1}`)}</definedName>` : '') +
+        (heads ? `<definedName name="_xlnm.Print_Titles" localSheetId="${i}">${xesc(`${quoteSheet(sh.name)}!$1:$${heads}`)}</definedName>` : '')
+      );
     })
     .join('');
   const workbook =
@@ -831,9 +863,9 @@ function relsOf(z: Zip, part: string): Map<string, Rel> {
 
 /** Excel's built-in number formats this reads (the others are General). */
 const BUILTIN = new Map<number, string>([
-  [1, '0'], [2, '0.00'], [3, '#,##0'], [4, '#,##0.00'], [5, '$#,##0'], [6, '$#,##0'], [7, '$#,##0.00'], [8, '$#,##0.00'], [9, '0%'], [10, '0.00%'],
+  [1, '0'], [2, '0.00'], [3, '#,##0'], [4, '#,##0.00'], [5, '$#,##0'], [6, '$#,##0'], [7, '$#,##0.00'], [8, '$#,##0.00'], [9, '0%'], [10, '0.00%'], [11, '0.00E+00'], [12, '# ?/?'], [13, '# ??/??'],
   [14, 'yyyy-mm-dd'], [15, 'd-mmm-yy'], [16, 'd-mmm'], [17, 'mmm-yy'], [18, 'h:mm AM/PM'], [19, 'h:mm:ss AM/PM'], [20, 'h:mm'], [21, 'h:mm:ss'], [22, 'yyyy-mm-dd h:mm'],
-  [37, '#,##0'], [38, '#,##0'], [39, '#,##0.00'], [40, '#,##0.00'], [45, 'mm:ss'], [46, '[h]:mm:ss'], [47, 'mm:ss.0'], [49, '@'],
+  [37, '#,##0'], [38, '#,##0'], [39, '#,##0.00'], [40, '#,##0.00'], [45, 'mm:ss'], [46, '[h]:mm:ss'], [47, 'mm:ss.0'], [48, '##0.0E+0'], [49, '@'],
 ]);
 
 /** Excel's 64 colours by index, for files that name colours that way. */
@@ -958,10 +990,13 @@ function stylesOf(xml: string | null, theme: string[]): { s?: CellStyle; date: b
     const h = att(al, 'horizontal');
     if (h === 'left' || h === 'right' || h === 'center') raw.align = h;
     else if (h === 'centerContinuous') raw.align = 'center';
+    // The editor puts words in the middle of their rows, and wrapped ones at the top: those need no place of their own.
     const v = att(al, 'vertical');
-    if (v === 'top') raw.valign = 'top';
-    else if (v === 'center') raw.valign = 'middle';
-    if (on(att(al, 'wrapText'))) raw.wrap = true;
+    const wrap = on(att(al, 'wrapText'));
+    if (v === 'top' && !wrap) raw.valign = 'top';
+    else if (v === 'bottom') raw.valign = 'bottom';
+    else if (v === 'center' && wrap) raw.valign = 'middle';
+    if (wrap) raw.wrap = true;
     const rot = Number(att(al, 'textRotation') ?? 0);
     if (rot > 0 && rot <= 90) raw.rot = rot;
     else if (rot > 90 && rot <= 180) raw.rot = 90 - rot;
@@ -1006,9 +1041,10 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     const name = att(d, 'name') ?? '';
     const ref = textOf(d).trim();
     if (!name.startsWith('_xlnm.') && /^(?:'[^']+'|[A-Za-z_][\w.]*)!\$?[A-Z]{1,3}\$?\d+(?::\$?[A-Z]{1,3}\$?\d+)?$/.test(ref)) names.set(name.toLowerCase(), ref);
-    // Names go (formulas that use them get what they stand for), and so do print areas and titles.
+    // Names go (formulas that use them get what they stand for), and so do print areas and titles (but the first rows
+    // repeated on each page, as the app prints a sheet's header rows anyway, as its own files say).
     if (!name.startsWith('_xlnm.') && att(d, 'hidden') !== '1') loses.add('names');
-    if (name === '_xlnm.Print_Area' || name === '_xlnm.Print_Titles') loses.add('print');
+    if (name === '_xlnm.Print_Area' || (name === '_xlnm.Print_Titles' && !/^(?:'(?:[^']|'')+'|[^!',]+)!\$1:\$[1-5]$/.test(ref))) loses.add('print');
   }
   if (rich) loses.add('rich');
   if (kid(wb, 'workbookProtection')) loses.add('protection');
@@ -1039,7 +1075,8 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     if (/<(?:\w+:)?sparklineGroups?[\s>]/.test(xml)) loses.add('sparklines');
     if (/<(?:\w+:)?cfRule\b[^>]*\btype="iconSet"/.test(xml) || /<x14:iconSet\b/.test(xml)) loses.add('icons');
     if (/<(?:\w+:)?sheetProtection\b/.test(xml)) loses.add('protection');
-    if (/<(?:\w+:)?(?:odd|even|first)(?:Header|Footer)>\s*[^<\s]/.test(xml)) loses.add('print');
+    // A header or footer (but the sheet's name at the top, as the app prints it and its own files say).
+    if (/<(?:\w+:)?(?:odd|even|first)(?:Header|Footer)>\s*[^<\s]/.test(xml.replace(/<(?:\w+:)?oddHeader>&amp;L&amp;(?:"|&quot;)-,Bold(?:"|&quot;)&amp;12&amp;A<\/(?:\w+:)?oddHeader>/, ''))) loses.add('print');
     const sheet = readWorksheet(xml, name, shared, styles, date1904, state, names);
     const base = sheet.base as { cells: Record<string, Cell>; cols: Record<number, { w?: number; hidden?: boolean }>; rows: Record<number, { h?: number; hidden?: boolean }> } & Obj;
     if (isListsSheet(name) && /^(hidden|veryHidden)$/.test(att(s, 'state') ?? '')) {
@@ -1079,7 +1116,8 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     }
   }
   if (!sheets.length) throw new Error('This Excel file has no sheets of cells in it.');
-  // Lists on that hidden sheet are lists of options again, with their chips' colours.
+  // Lists on that hidden sheet are lists of options again, with their chips' colours; the conditional formatting this
+  // app writes to show those colours in Excel is theirs, not a rule of the sheet's.
   if (listSheets.length)
     for (const sh of sheets) {
       const base = sh.base as Obj;
@@ -1089,6 +1127,7 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
         const { source: _s, ...rest } = v;
         return { ...rest, options };
       });
+      if (Array.isArray(base.conditional)) base.conditional = (base.conditional as CondRule[]).filter((r) => !isListColor(r, base.validation as Validation[]));
     }
   if (state.drawn) notes.push('Pictures, shapes and charts this cannot draw were left out.');
   if (state.bad) notes.push('Some formulas could not be read here (links to other files, tables by name…): their last values were kept instead.');
@@ -1097,7 +1136,36 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
   if (cutSheets) notes.push(`Only the first ${SHEET_LIMITS.sheets} sheets were taken in.`);
   if (state.bad) loses.add('formulas');
   if (z.names().some((n) => n.startsWith('xl/externalLinks/'))) loses.add('links');
-  return { book: normalizeBook({ sheets }, { notes }), notes, loses: [...loses], cut: state.cutRows || state.cutCells || cutSheets };
+  return { book: plainCharts(normalizeBook({ sheets }, { notes })), notes, loses: [...loses], cut: state.cutRows || state.cutCells || cutSheets };
+}
+
+/**
+ * A workbook's charts without what the app would take for them anyway (whether the first column is labels and the
+ * first row names, where the legend goes): a chart written here comes back as it was kept, and one made in Excel
+ * keeps only what makes it draw as it did there.
+ */
+function plainCharts(book: Workbook): Workbook {
+  if (!book.sheets.some((s) => s.charts?.length)) return book;
+  const calc = computeBook(book);
+  book.sheets.forEach((sh, si) => {
+    if (!sh.charts) return;
+    sh.charts = sh.charts.map((ch) => {
+      let out = ch;
+      for (const k of ['labels', 'names'] as const) {
+        if (out[k] === undefined) continue;
+        const { [k]: _drop, ...rest } = out;
+        if (JSON.stringify(chartData(book, calc, si, rest)) === JSON.stringify(chartData(book, calc, si, out))) out = rest;
+      }
+      const pie = out.kind === 'pie' || out.kind === 'doughnut';
+      const series = chartData(book, calc, si, out)?.series.length ?? 0;
+      if (out.legend !== undefined && out.legend === (pie || series > 1 ? 'bottom' : 'none')) {
+        const { legend: _l, ...rest } = out;
+        out = rest;
+      }
+      return out;
+    });
+  });
+  return book;
 }
 
 /**
@@ -1223,7 +1291,7 @@ function readWorksheet(xml: string, name: string, shared: string[], styles: { s?
         case 'col': {
           const min = Number(a.min);
           const max = Math.min(Number(a.max), SHEET_LIMITS.cols);
-          if (on(a.customWidth) && a.width && max - min < 50) for (let k = min - 1; k < max; k++) cols[k] = { w: Math.round(Number(a.width) * 7 + 5) };
+          if (on(a.customWidth) && a.width && max - min < 50) for (let k = min - 1; k < max; k++) cols[k] = { w: pxOfWidth(Number(a.width)) };
           if (on(a.hidden) && max - min < 500) for (let k = min - 1; k < max; k++) cols[k] = { ...cols[k], hidden: true };
           break;
         }

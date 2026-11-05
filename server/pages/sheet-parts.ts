@@ -36,6 +36,7 @@ import {
   type Cell,
   type ChartCorner,
   type Cond,
+  textOn,
   type CondRule,
   type CondStyle,
   type FilterCol,
@@ -55,6 +56,7 @@ import { newCommentId } from '../../shared/comments.ts';
 import { columnValues } from '../../shared/sheet-rules.ts';
 import { all, att, kid, kids, parseXml, textOf, type El } from '../documents/xml.ts';
 import { esc, XML_HEAD } from './ooxml.ts';
+import { officeFont } from './word-fonts.ts';
 
 const NS_MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const argb = (hex: string) => `FF${hex.slice(1).toUpperCase()}`;
@@ -315,10 +317,25 @@ const cfvo = (p: ScalePoint, place: 'min' | 'mid' | 'max') => {
   return `<cfvo type="${type}"${at === 'min' || at === 'max' ? '' : ` val="${xnum(p.v ?? 50)}"`}/>`;
 };
 
-/** A sheet's conditional formatting, in its rules' order (their priorities). */
+/**
+ * The colours of a list's options, as conditional formatting Excel shows: a cell holding a coloured option filled with
+ * its colour (the editor draws it as a chip of that colour), after the sheet's own rules.
+ */
+export function listColorRules(sh: Sheet): CondRule[] {
+  return (sh.validation ?? []).flatMap((v) => (v.type === 'list' ? (v.options ?? []).filter((o) => o.color).map((o) => ({ range: v.range, when: { op: 'is' as const, a: o.v }, style: { fill: o.color, color: textOn(o.color!) } })) : []));
+}
+
+/** Whether a rule read from a file is one listColorRules wrote for a list of the sheet's (so not a rule of its own). */
+export const isListColor = (rule: CondRule, lists: Validation[]) =>
+  rule.when?.op === 'is' &&
+  !!rule.style?.fill &&
+  Object.keys(rule.style).every((k) => k === 'fill' || k === 'color') &&
+  lists.some((v) => v.type === 'list' && v.range === rule.range && (v.options ?? []).some((o) => !!o.color && o.v === rule.when!.a && o.color === rule.style!.fill && (rule.style!.color ?? textOn(o.color)) === textOn(o.color)));
+
+/** A sheet's conditional formatting, in its rules' order (their priorities), and its lists' colours after them. */
 export function condXml(sh: Sheet, dxfs: Dxfs, names: Set<string>): string {
   let priority = 0;
-  return (sh.conditional ?? [])
+  return [...(sh.conditional ?? []), ...listColorRules(sh)]
     .map((rule) => {
       const first = rectsOf(rule.range)[0];
       if (!first) return '';
@@ -380,6 +397,27 @@ export function readConditional(xml: string, dxfs: CondStyle[], names: Map<strin
     .sort((a, b) => a.p - b.p)
     .map((x) => x.rule)
     .slice(0, 100);
+}
+
+/** A date condition as cfRule writes it in a formula (before or after a day, on a day, within the last month or year), back as that condition; null for another formula. */
+function dateRule(f: string, range: string): Cond | null {
+  const first = rectsOf(range)[0];
+  if (!first) return null;
+  const x = refName(first.r1, first.c1);
+  const day = (s: string) => Object.entries(DATE_WORD_XL).find(([, v]) => v === s)?.[0] ?? (/^\d+$/.test(s) ? dateText(Number(s)) : null);
+  const t = f.trim();
+  let m = new RegExp(`^AND\\(ISNUMBER\\(${x}\\),FLOOR\\(${x},1\\)([<>])(.+)\\)$`).exec(t);
+  if (m) {
+    const a = day(m[2]);
+    return a ? { op: m[1] === '<' ? 'before' : 'after', a } : null;
+  }
+  m = new RegExp(`^FLOOR\\(${x},1\\)=(.+)$`).exec(t);
+  if (m) {
+    const a = day(m[1]);
+    return a ? { op: 'dateIs', a } : null;
+  }
+  m = new RegExp(`^AND\\(FLOOR\\(${x},1\\)>=EDATE\\(TODAY\\(\\),-(1|12)\\),FLOOR\\(${x},1\\)<=TODAY\\(\\)\\)$`).exec(t);
+  return m ? { op: 'dateIs', a: m[1] === '1' ? 'month' : 'year' } : null;
 }
 
 function ruleOf(type: string, r: El, fs: string[], style: CondStyle | undefined, range: string, names: Map<string, string>, colorOf: (el: El | undefined) => string | null): CondRule | null {
@@ -449,7 +487,7 @@ function ruleOf(type: string, r: El, fs: string[], style: CondStyle | undefined,
       break;
     }
     case 'expression':
-      when = fs[0] ? { op: 'formula', a: `=${replaceNames(formulaFromFile(fs[0]), names)}` } : null;
+      when = fs[0] ? (dateRule(fs[0], range) ?? { op: 'formula', a: `=${replaceNames(formulaFromFile(fs[0]), names)}` }) : null;
       break;
     case 'duplicateValues':
       when = { op: 'dup' };
@@ -672,6 +710,9 @@ export const personsXml = (named: string[] = []) =>
 /** The words Excel's own files put in a threaded comment's plain copy, for programs that know only notes. */
 const THREAD_HEAD =
   '[Threaded comment]\n\nYour version of Excel allows you to read this threaded comment; however, any edits to it will get removed if the file is opened in a newer version of Excel. Learn more: https://go.microsoft.com/fwlink/?linkid=870924\n\n';
+/** Words as a comment's text: marked to keep the spaces at their ends where they have them, as Excel's own files are (only there: ECMA-376's schema has no xml:space on them). */
+const tXml = (s: string) => `<t${/^\s|\s$/.test(s) ? ' xml:space="preserve"' : ''}>${esc(s)}</t>`;
+
 /** A thread as words: its comment and replies, as a plain copy has them. */
 const threadWords = (c: SheetComment) => `Comment:\n    ${c.text.replace(/\n/g, '\n    ')}${(c.replies ?? []).map((r) => `\nReply:\n    ${r.text.replace(/\n/g, '\n    ')}`).join('')}`;
 
@@ -698,13 +739,13 @@ export function commentsXml(sh: Sheet, n: number): { comments: string; vml: stri
     if (c && !note) {
       const id = guid();
       authors.push(`tc=${id}`);
-      list.push(`<comment ref="${k}" authorId="${authors.length - 1}" shapeId="0" xr:uid="${id}"><text><t xml:space="preserve">${esc(THREAD_HEAD + threadWords(c))}</t></text></comment>`);
+      list.push(`<comment ref="${k}" authorId="${authors.length - 1}" shapeId="0" xr:uid="${id}"><text>${tXml(THREAD_HEAD + threadWords(c))}</text></comment>`);
       const who = (x: { by: 'user' | 'agent'; author?: string }) => (x.author ? personId(x.author) : PERSONS[x.by].id);
       tc.push(`<threadedComment ref="${k}" dT="${stamp(c.at)}" personId="${who(c)}" id="${id}"${c.resolved ? ' done="1"' : ''}><text>${esc(c.text)}</text></threadedComment>`);
       for (const r of c.replies ?? []) tc.push(`<threadedComment ref="${k}" dT="${stamp(r.at)}" personId="${who(r)}" id="${guid()}" parentId="${id}"><text>${esc(r.text)}</text></threadedComment>`);
     } else {
       const words = note && c ? `${note}\n\n${threadWords(c)}` : (note ?? '');
-      list.push(`<comment ref="${k}" authorId="0"><text><r><t xml:space="preserve">${esc(words)}</t></r></text></comment>`);
+      list.push(`<comment ref="${k}" authorId="0"><text><r>${tXml(words)}</r></text></comment>`);
     }
   }
   const comments =
@@ -901,7 +942,9 @@ export function chartXml(book: Workbook, chart: SheetChart, data: ChartData | nu
   const legendAt = chart.legend ?? (pie || series.length > 1 ? 'bottom' : 'none');
   const legend = legendAt === 'none' ? '' : `<c:legend><c:legendPos val="${legendAt === 'right' ? 'r' : legendAt === 'top' ? 't' : 'b'}"/><c:overlay val="0"/>${tx(9)}</c:legend>`;
   const title = chart.title ? `${titleOf(chart.title, 14)}<c:autoTitleDeleted val="0"/>` : '<c:autoTitleDeleted val="1"/>';
-  return `${XML_HEAD}<c:chartSpace xmlns:c="${NS_C}" xmlns:a="${NS_A}" xmlns:r="${NS_R}"><c:roundedCorners val="0"/><c:chart>${title}<c:plotArea><c:layout/>${plot}</c:plotArea>${legend}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
+  // On a white card with a thin line round it and rounded corners, its words in the cells' font, as the editor draws a chart.
+  const frame = `<c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln w="9525"><a:solidFill><a:srgbClr val="E2E0DA"/></a:solidFill></a:ln></c:spPr><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:latin typeface="${officeFont('Inter')}"/></a:defRPr></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr>`;
+  return `${XML_HEAD}<c:chartSpace xmlns:c="${NS_C}" xmlns:a="${NS_A}" xmlns:r="${NS_R}"><c:roundedCorners val="1"/><c:chart>${title}<c:plotArea><c:layout/>${plot}</c:plotArea>${legend}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart>${frame}</c:chartSpace>`;
 }
 
 /**
@@ -990,7 +1033,8 @@ function chartFrom(xml: string, sheetName: string): Omit<SheetChart, 'id' | 'fro
     add(kid(s, 'tx'), 'name');
     add(kid(s, 'cat') ?? kid(s, 'xVal'), 'cat');
     add(kid(s, 'val') ?? kid(s, 'yVal'), 'val');
-    const rgb = att(all(kid(s, 'spPr'), 'srgbClr')[0], 'val');
+    // Its colour: its own fill or line's, else its markers' (a scatter's points, drawn without a line).
+    const rgb = att(all(kid(s, 'spPr'), 'srgbClr')[0] ?? all(kid(kid(s, 'marker'), 'spPr'), 'srgbClr')[0], 'val');
     if (rgb && /^[0-9a-f]{6}$/i.test(rgb)) colors.push(`#${rgb.toLowerCase()}`);
   }
   const vals = refs.filter((r) => r.what === 'val');
