@@ -125,7 +125,7 @@ function spotWords(s: PlaceSpot, page?: number, pages?: number): ReactNode {
       `${Math.round(s.x * 100)}% across and ${Math.round(s.y * 100)}% down`
     ) : (
       <>
-        {s.how === 'replace' ? 'In place of' : s.how === 'after' ? (s.table ? 'After the table with' : 'Right after') : s.how === 'right' ? 'Right after' : s.how === 'left' ? 'Before' : s.how === 'above' ? 'Above' : 'Below'} {quote(s.words)}
+        {s.how === 'replace' ? 'In place of' : s.how === 'after' ? (s.table ? 'After the table with' : 'Right after') : s.how === 'right' ? 'Right after' : s.how === 'left' ? 'Just before' : s.how === 'above' ? 'Just above' : 'Just below'} {quote(s.words)}
         {which}
       </>
     );
