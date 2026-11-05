@@ -212,6 +212,8 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   // The cell the mouse is over (for its note).
   const [hover, setHover] = useState<{ r: number; c: number } | null>(null);
   const touch = useRef(false);
+  // A finger held still has opened the menu: lifting it must not click what now lies under it (the menu's dimmed page).
+  const held = useRef(false);
   // An input method composing (Chinese, Japanese, Greek accents…): the caret is left where it is meanwhile.
   const composing = useRef(false);
   const cb = useRef(p);
@@ -407,6 +409,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
       d.timer = window.setTimeout(() => {
         if (!drag.current || drag.current.moved) return;
         drag.current = null;
+        held.current = true;
         const s = P.sel;
         const x = rectOf(s);
         if (r >= 0 && c >= 0 && !(r >= x.r1 && r <= x.r2 && c >= x.c1 && c <= x.c2)) P.onSel({ r, c, ar: r, ac: c, fr: r, fc: c });
@@ -536,7 +539,11 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     const [r, c] = cellAt(e.clientX, e.clientY);
     const s = cb.current.sel;
     const x = rectOf(s);
-    const inside = (r < 0 || (r >= x.r1 && r <= x.r2)) && (c < 0 || (c >= x.c1 && c <= x.c2));
+    // A row's number keeps the selection only when whole rows are picked and it is one of them (a column's letter
+    // likewise): else that row (column) is picked, so its menu is about it.
+    const allCols = x.c1 === 0 && x.c2 >= cols - 1;
+    const allRows = x.r1 === 0 && x.r2 >= rows - 1;
+    const inside = c < 0 && r >= 0 ? allCols && r >= x.r1 && r <= x.r2 : r < 0 && c >= 0 ? allRows && c >= x.c1 && c <= x.c2 : (r < 0 || (r >= x.r1 && r <= x.r2)) && (c < 0 || (c >= x.c1 && c <= x.c2));
     if (!inside) {
       if (r < 0 && c >= 0) cb.current.onSel({ r: 0, c, ar: 0, ac: c, fr: rows - 1, fc: c });
       else if (c < 0 && r >= 0) cb.current.onSel({ r, c: 0, ar: r, ac: 0, fr: r, fc: cols - 1 });
@@ -904,6 +911,11 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
         if (drag.current?.timer) clearTimeout(drag.current.timer);
         drag.current = null;
         setFilling(null);
+      }}
+      onTouchEnd={(e) => {
+        if (!held.current) return;
+        held.current = false;
+        e.preventDefault();
       }}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}

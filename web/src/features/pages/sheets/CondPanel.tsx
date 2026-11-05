@@ -116,7 +116,7 @@ export function CondPanel({ rules, picked, narrow, onChange, onClose }: { rules:
         />
         <span className="w-[62px] shrink-0 text-[12.5px] text-fg-2">{label}</span>
         {p && (
-          <select value={at2} aria-label={`${label} point`} onChange={(e) => set({ ...p, at: e.target.value as ScalePoint['at'], v: p.v ?? 50 })} className={cx(smallInput, 'w-[128px] shrink-0')}>
+          <select value={at2} aria-label={`${label} point`} onChange={(e) => set({ ...p, at: e.target.value as ScalePoint['at'], v: p.v ?? 50 })} className={cx(smallInput, 'shrink-0')} style={{ width: 128 }}>
             {place !== 'max' && place !== 'mid' && <option value="min">Lowest value</option>}
             {place === 'max' && <option value="max">Highest value</option>}
             <option value="num">Number</option>

@@ -575,11 +575,17 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     const opts = rule.type === 'list' && calc ? listOptions(calc, sheetIx, rule).map((o) => o.v) : [];
     if (opts.length) return `${tr('This cell takes one of')}: ${opts.slice(0, 8).join(', ')}${opts.length > 8 ? '…' : ''}`;
     if (rule.type === 'checkbox') return tr('This cell takes TRUE or FALSE.');
-    if (rule.type === 'rating') return `${tr('This cell takes a whole number of stars from 0 to')} ${rule.max ?? 5}.`;
-    const what = rule.type === 'date' ? 'date' : rule.type === 'length' ? 'length' : 'number';
+    const max = rule.max ?? 5;
+    if (rule.type === 'rating') return tr(`This cell takes a whole number of stars from 0 to ${max}.`);
     if (!w || rule.type === 'formula') return tr('This value is not allowed in this cell.');
-    const op = w.op === 'between' ? `between ${w.a} and ${w.b}` : w.op === 'notBetween' ? `not between ${w.a} and ${w.b}` : `${{ eq: '=', neq: '≠', gt: '>', gte: '≥', lt: '<', lte: '≤' }[w.op as 'eq'] ?? ''} ${w.a ?? ''}`;
-    return `${tr(what === 'date' ? 'This cell takes a date' : what === 'length' ? 'This cell takes words whose length is' : 'This cell takes a number')} ${op.trim()}.`;
+    // Each a whole sentence, so it translates whole (its words may go in another order).
+    const [a, b] = [w.a ?? '', w.b ?? ''];
+    const sign = { eq: '=', neq: '≠', gt: '>', gte: '≥', lt: '<', lte: '≤' }[w.op as 'eq'] ?? '=';
+    if (rule.type === 'date')
+      return tr(w.op === 'between' ? `This cell takes a date between ${a} and ${b}.` : w.op === 'notBetween' ? `This cell takes a date not between ${a} and ${b}.` : `This cell takes a date ${sign} ${a}.`);
+    if (rule.type === 'length')
+      return tr(w.op === 'between' ? `This cell takes words whose length is between ${a} and ${b}.` : w.op === 'notBetween' ? `This cell takes words whose length is not between ${a} and ${b}.` : `This cell takes words whose length is ${sign} ${a}.`);
+    return tr(w.op === 'between' ? `This cell takes a number between ${a} and ${b}.` : w.op === 'notBetween' ? `This cell takes a number not between ${a} and ${b}.` : `This cell takes a number ${sign} ${a}.`);
   };
 
   /** The options a list cell offers for what is typed in it. */
@@ -1465,6 +1471,18 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       e.preventDefault();
       return cancelEdit();
     }
+    const lower = e.key.toLowerCase();
+    if (mod && (lower === 'b' || lower === 'i' || lower === 'u')) {
+      // The cell being typed in turns bold (italic, underlined) as in Sheets; the typing goes on where it was.
+      e.preventDefault();
+      e.stopPropagation();
+      const el = document.activeElement as HTMLTextAreaElement | null;
+      const key = lower as 'b' | 'i' | 'u';
+      setStyle({ [key]: !active?.s?.[key] || undefined });
+      requestAnimationFrame(() => el?.focus({ preventScroll: true }));
+      return;
+    }
+    if (mod && (e.key === '`' || e.code === 'Backquote')) return void (e.preventDefault(), e.stopPropagation());
     if (e.key === 'F4') {
       // The reference under the caret cycles through its $ signs.
       e.preventDefault();
@@ -1533,8 +1551,11 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     if (mod && lower === 's') return void (e.preventDefault(), save());
     if (mod && lower === 'f') return void (e.preventDefault(), find.show());
     if (mod && lower === 'h') return void (e.preventDefault(), find.show(!readOnly));
+    // Undo and Redo: Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y, as the menu says (the app's own Ctrl+Z, for a pin, is not for here).
+    if (mod && (lower === 'z' || lower === 'y')) return void (e.preventDefault(), e.stopPropagation(), lower === 'y' || e.shiftKey ? redo() : undo());
     if (mod && (k === '/' || e.code === 'Slash')) return void (e.preventDefault(), setDialog('shortcuts'));
-    if (mod && (k === '`' || e.code === 'Backquote')) return void (e.preventDefault(), setFormulas((f) => !f));
+    // Ctrl+` shows the formulas here, not the app's terminal panel.
+    if (mod && (k === '`' || e.code === 'Backquote')) return void (e.preventDefault(), e.stopPropagation(), setFormulas((f) => !f));
     if (mod && lower === 'a') return void (e.preventDefault(), setSel({ r: s.r, c: s.c, ar: 0, ac: 0, fr: size.rows - 1, fc: size.cols - 1 }));
     // Ctrl+Space: the whole column; Shift+Space: the whole row; Space on rows picked whole: expand the row.
     // Ctrl even on a Mac, as Sheets has it (⌘Space is the Mac's own search).
@@ -1546,8 +1567,11 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     }
     if (k === ' ' && !e.altKey && wholeRows && !readOnly) return void (e.preventDefault(), setRowCard(s.r));
     if (k === ' ' && !e.altKey && !readOnly && toggleChecks()) return void e.preventDefault();
-    if (mod && !readOnly && (lower === 'b' || lower === 'i' || lower === 'u')) {
+    if (mod && (lower === 'b' || lower === 'i' || lower === 'u')) {
+      // Bold here, not the app's sidebar (Ctrl+B there).
       e.preventDefault();
+      e.stopPropagation();
+      if (readOnly) return;
       const key = lower as 'b' | 'i' | 'u';
       return setStyle({ [key]: !active?.s?.[key] || undefined });
     }
@@ -1980,6 +2004,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
           onSuggest={suggest}
           barRef={barRef}
           ghost={spillFormula}
+          cellAnchor={edit?.where === 'cell' ? () => grid.current?.input()?.getBoundingClientRect() ?? null : null}
         />
       )}
       <div className="relative flex min-h-0 flex-1">

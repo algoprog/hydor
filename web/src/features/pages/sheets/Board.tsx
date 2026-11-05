@@ -65,8 +65,16 @@ export function Board(p: BoardProps) {
   const lanes = useMemo(() => {
     const out: { key: string; label: string; color?: string; rows: number[] }[] = (choice?.options ?? []).map((o) => ({ key: o.v.toLowerCase(), label: o.v, color: o.color, rows: [] }));
     const none: { key: string; label: string; color?: string; rows: number[] } = { key: NONE, label: '', rows: [] };
+    // A row of the table with nothing in it (left by Remove duplicates, say) is no card.
+    const empty = (r: number) => {
+      for (let c = block.c1; c <= block.c2; c++) {
+        const v = calc.value(si, r, c);
+        if (v !== null && v !== '') return false;
+      }
+      return true;
+    };
     for (let r = block.r1 + 1; r <= block.r2; r++) {
-      if (p.hidden.has(r)) continue;
+      if (p.hidden.has(r) || empty(r)) continue;
       const v = shown(r, by).trim();
       if (!v) {
         none.rows.push(r);
