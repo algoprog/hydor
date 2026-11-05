@@ -98,7 +98,7 @@ export interface OpenRouterPick {
 /** The OpenRouter models shown first, before any search. */
 export const OPENROUTER_PICKS: OpenRouterPick[] = [
   { id: 'openai/gpt-6-luna', role: 'text', note: 'Fast and cheap' },
-  { id: 'z-ai/glm-5.3', role: 'text', note: 'Good, with fewer refusals' },
+  { id: 'x-ai/grok-4.7', role: 'text', note: 'Good, with fewer refusals' },
   { id: 'openai/gpt-6.1-sol', role: 'text', note: 'Better' },
   { id: 'anthropic/claude-opus-5.5', role: 'text', note: 'Best overall' },
   { id: 'bytedance-seed/seedream-5-0-pro', role: 'image', note: 'Makes and edits pictures' },

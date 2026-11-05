@@ -310,7 +310,7 @@ The section then shows **Connected to OpenRouter** with the start and end of you
 
 ### Suggested models
 
-Before you search, **Suggested** lists four models for Custom, each with why: **GPT-6 Luna** (Fast and cheap), **GLM 5.3** (Good, with fewer refusals), **GPT-6.1 Sol** (Better) and **Claude Opus 5.5** (Best overall). **Add** puts one in the pickers. For pictures, music, voices and videos, the app's choices are Seedream 5.0 Pro (and Flash, quicker and cheaper), Lyria 3 Pro, Seed Audio 1.0 and Seedance 2.5: see [Settings → Capabilities → Images, video and audio](/settings?s=images).
+Before you search, **Suggested** lists four models for Custom, each with why: **GPT-6 Luna** (Fast and cheap), **Grok 4.7** (Good, with fewer refusals), **GPT-6.1 Sol** (Better) and **Claude Opus 5.5** (Best overall). **Add** puts one in the pickers. For pictures, music, voices and videos, the app's choices are Seedream 5.0 Pro (and Flash, quicker and cheaper), Lyria 3 Pro, Seed Audio 1.0 and Seedance 2.5: see [Settings → Capabilities → Images, video and audio](/settings?s=images).
 
 ### Search the catalog
 
