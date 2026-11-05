@@ -1,6 +1,6 @@
 // What each kind of page exports as, in the order the Export menus show them.
 import type { ReactNode } from 'react';
-import { FileArchive, FileCode2, FileSpreadsheet, FileText, FileType2, NotebookText, Presentation, Sheet } from 'lucide-react';
+import { FileArchive, FileCode2, FileSpreadsheet, FileText, FileType2, Images, NotebookText, Presentation, Sheet } from 'lucide-react';
 import type { PageInfo } from '@shared/pages';
 import type { ExportFormat } from './exportFile';
 
@@ -11,7 +11,7 @@ const HTML: Item = { format: 'html', label: 'Web page (.html)', icon: <FileCode2
 
 export const EXPORTS = (kind: PageInfo['kind']): Item[] =>
   kind === 'slides'
-    ? [{ format: 'pptx', label: 'PowerPoint (.pptx)', icon: <Presentation size={14} /> }, PDF, HTML]
+    ? [{ format: 'pptx', label: 'PowerPoint (.pptx)', icon: <Presentation size={14} /> }, PDF, { format: 'png', label: 'Pictures of the slides (.png)', icon: <Images size={14} /> }, HTML]
     : kind === 'doc'
       ? [{ format: 'docx', label: 'Word document (.docx)', icon: <FileType2 size={14} /> }, PDF, { format: 'md', label: 'Markdown (.md)', icon: <FileCode2 size={14} /> }, HTML]
       : kind === 'sheet'

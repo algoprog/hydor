@@ -1,11 +1,13 @@
-// Pictures of a deck's parts for its PowerPoint file, made in the browser the app takes its pictures with: each icon
-// as a PNG (the file gets its SVG too; the PNG is for programs that do not read SVG) and each equation as KaTeX draws
-// it. One page holds them all, each at its size on the slide, and each is taken at up to twice that. Without a browser
-// (or offline, for KaTeX) there are none of that kind: icons then go as SVG alone, equations as their LaTeX.
+// Pictures of a deck, made in the browser the app takes its pictures with. For its PowerPoint file, pictures of its
+// parts: each icon as a PNG (the file gets its SVG too; the PNG is for programs that do not read SVG) and each equation
+// as KaTeX draws it; one page holds them all, each at its size on the slide, and each is taken at up to twice that.
+// Without a browser (or offline, for KaTeX) there are none of that kind: icons then go as SVG alone, equations as their
+// LaTeX. And its slides as pictures (the PNG export): taken from the deck's own page as it prints, twice its size.
 import { everyEl, type Deck, type El } from '../../shared/slides.ts';
 import { canCapture, withTab } from '../capture/index.ts';
 import { iconSvgText, type Picture } from './pptx.ts';
-import { deckHasMath, FONTS_JSON, KATEX_TAGS, RUNTIME_SRC } from './slides.ts';
+import type { DB } from '../db.ts';
+import { deckHasMath, deckPage, FONTS_JSON, KATEX_TAGS, RUNTIME_SRC } from './slides.ts';
 
 interface Item {
   n: number;
@@ -81,4 +83,26 @@ export async function deckRenders(deck: Deck): Promise<Map<string, Picture>> {
     }
     return out;
   }).catch(() => out);
+}
+
+/** The slides as PNG pictures, twice their size: every one the slideshow shows, or slide `only` (by its number) alone. */
+export async function deckPictures(db: DB, deck: Deck, title: string, only?: number): Promise<{ n: number; data: Buffer }[]> {
+  if (only !== undefined && !deck.slides[only - 1]) return [];
+  // The printed page draws the slides the slideshow shows; for one, every other is left out (its number stays its own).
+  const shown = only === undefined ? deck : { ...deck, slides: deck.slides.map((s, i) => ({ ...s, hidden: i !== only - 1 || undefined })) };
+  const numbers = shown.slides.map((s, i) => (s.hidden ? 0 : i + 1)).filter(Boolean);
+  if (!numbers.length) return [];
+  const H = deck.ratio === '4:3' ? 960 : 720;
+  return withTab({ html: deckPage(db, shown, title, 'print'), width: 1280, height: H, settleMs: 300, blockPrivate: true }, async (tab) => {
+    await tab.s.send('Emulation.setEmulatedMedia', { media: 'print' });
+    const rects = await tab.evaluate<[number, number][]>(
+      'document.fonts.ready.then(() => new Promise((ok) => setTimeout(() => ok(Array.from(document.querySelectorAll(".ns-pg")).map((p) => { const r = p.getBoundingClientRect(); return [r.left + scrollX, r.top + scrollY]; })), 150)))',
+    );
+    const out: { n: number; data: Buffer }[] = [];
+    for (let i = 0; i < Math.min(rects.length, numbers.length); i++) {
+      const shot = await tab.s.send('Page.captureScreenshot', { format: 'png', clip: { x: rects[i][0], y: rects[i][1], width: 1280, height: H, scale: 2 }, captureBeyondViewport: true }, 30_000).catch(() => null);
+      if (shot?.data) out.push({ n: numbers[i], data: Buffer.from(shot.data, 'base64') });
+    }
+    return out;
+  });
 }

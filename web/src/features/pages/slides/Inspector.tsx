@@ -68,7 +68,7 @@ import { Button, cx, Switch } from '../../../components/ui';
 import { useTexHtml } from '../common/katex';
 import { Choice, Select } from '../studio/fields';
 import { ColorButton, Field, NumInput, Swatches, Tool } from './controls';
-import { addAnim, align, distribute, dropMergesPast, fillCells, heightOf, mergeAt, mergeCells, moveAnim, partName, pathTo, pickedOf, removeAnim, removeEls, restack, setAnim, setEls, setSlide, unmergeCell, W } from './ops';
+import { addAnim, align, distribute, dropMergesPast, fillCells, heightOf, mergeAt, mergeCells, moveAnim, partName, pathTo, pickedOf, removeAnim, removeEls, restack, setAnim, setEls, setSlide, topOf, unmergeCell, W } from './ops';
 import type { CellSel } from './SlideCanvas';
 import { SlideThumb } from './Thumb';
 
@@ -1018,7 +1018,8 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview }: Props) {
   const [type, setType] = useState<Anim['type']>('in');
   const [open, setOpen] = useState<string | null>(null);
   const anims = slide.anims ?? [];
-  const target = sel.length === 1 ? slide.els.find((e) => e.id === sel[0]) : undefined;
+  // A part of a group moves with its group: the group is what is animated.
+  const target = sel.length === 1 ? topOf(slide, sel[0]) : undefined;
   const text = target && (target.type === 'text' || target.type === 'shape') && target.paras.length > 1;
   let clicks = 0;
   return (

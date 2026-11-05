@@ -483,10 +483,23 @@ const dot: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
     const z = new Zip(pptx.rawPayload);
     const rels = z.read('ppt/slides/_rels/slide1.xml.rels')?.toString() ?? '';
     const pngs = [...rels.matchAll(/media\/(image\d+\.png)/g)].map((m) => z.read(`ppt/media/${m[1]}`)?.length ?? 0);
-    ok(pngs.some((n) => n > 500), 'with a browser here, an icon’s PNG beside its SVG is a picture of it');
+    ok(
+      pngs.some((n) => n > 500),
+      'with a browser here, an icon’s PNG beside its SVG is a picture of it',
+    );
     const x1 = slideXml(pptx.rawPayload, 1);
     console.log(x1.includes('descr="\\sqrt{2}"') && !x1.includes('<a:t>\\sqrt{2}</a:t>') ? '(the equation went as a picture)' : '(the equation went as its LaTeX: KaTeX could not load here)');
-  }
+    // The slides as pictures.
+    const one = await req('GET', `/api/pages/${id}/export?format=png&slide=2`);
+    const png = one.rawPayload;
+    ok(one.statusCode === 200 && one.headers['content-type'] === 'image/png' && png.readUInt32BE(0) === 0x89504e47 && png.readUInt32BE(16) === 2560 && png.readUInt32BE(20) === 1440, 'a slide exports as a picture, twice its size');
+    const all = await req('GET', `/api/pages/${id}/export?format=png`);
+    const zip = new Zip(all.rawPayload);
+    ok(all.statusCode === 200 && /zip/.test(String(all.headers['content-type'])) && !!zip.read('slide-01.png') && !!zip.read('slide-02.png') && !zip.read('slide-03.png'), 'every slide exports as pictures, in a zip');
+    ok((await req('GET', `/api/pages/${id}/export?format=png&slide=9`)).statusCode === 404, 'a slide that is not there has no picture');
+  } else ok((await req('GET', `/api/pages/${id}/export?format=png`)).statusCode === 503, 'without a browser, pictures of slides say what they need');
+  const plain = idOf((await run('save_page', { title: 'Not a deck', html: '<!doctype html><p>x</p>' })).text);
+  ok((await req('GET', `/api/pages/${plain}/export?format=png`)).statusCode === 400, 'only slides export as pictures');
 }
 
 await app.close();

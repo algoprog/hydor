@@ -18,7 +18,7 @@ import { freshNotebook, keepNotebook, MAX_NOTEBOOK, notebookForAgent, notebookFr
 
 export type PageKind = 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
 export type PageMode = 'viewer' | 'print' | 'still';
-export type ExportFormat = 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py';
+export type ExportFormat = 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png';
 
 /** A file opened as a page of a kind: its model, and what was left out of it (said to the person who opened it). */
 export interface FromFile {
