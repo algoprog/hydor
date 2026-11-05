@@ -3,6 +3,53 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.29.0 · 5 November 2026
+
+The Library's editors on par with the apps they are compared with: documents as in Word and Google Docs, spreadsheets as
+in Excel, Google Sheets and Airtable, slides as in PowerPoint and Keynote, LaTeX as in Overleaf, and pages you write in
+as in Notion.
+
+- **Every editor has menus** beside its title (Edit, View, Insert, Format, Tools and the rest), their names shown
+  wherever there is room, and **Search the menus** (Alt+/) finds anything in them by its words. Each also has find and
+  replace (Ctrl+F, Ctrl+H) with Match case, Whole words and regular expressions, a list of its keyboard shortcuts
+  (Ctrl+/), and emoji and special characters found by name.
+- **Documents**: comments on words, with replies and Resolve, beside the page or in a panel, that agents read, answer
+  and resolve (and Word's own comments, out and back in); a "/" menu of what to put where you are; equations written
+  in LaTeX; a table of contents that keeps up with the headings; headers and footers with page numbers; callouts; line
+  and paragraph spacing; merged and coloured table cells, and columns sized by dragging; the format painter; UPPERCASE,
+  lowercase, Title Case and Sentence case; a word count with the reading time; zoom; printing; spelling on or off; and
+  blocks moved by the handle beside them. Word files keep all of it.
+- **Spreadsheets**: filters on a header row; conditional formatting (rules, colour scales, data bars); dropdowns with
+  coloured chips, checkboxes, star ratings and a calendar for dates; borders; merged cells; the fill handle with its
+  series; hidden rows and columns; Excel's number formats and codes of your own; charts of seven kinds; Paste special;
+  removing duplicates, splitting text into columns and trimming spaces; summaries as a pivot table makes them; notes;
+  a row opened as a card; a Kanban board; FILTER, SORT, UNIQUE and SEQUENCE that spill; each function's arguments as
+  you type; and zoom. Excel files keep them.
+- **Slides**: groups; zoom; about 1,900 icons and emoji; equations; YouTube and Vimeo videos; cropping and a picture's
+  colours; slide numbers and a footer; the format painter; a grid, rulers and guides, and equal gaps as you drag;
+  merged table cells; the Morph transition, where what two slides share glides into place; and in the slideshow a
+  laser pointer, a pen and live captions. Slides also export as pictures, and PowerPoint files keep groups, icons,
+  equations and Morph.
+- **LaTeX**: a Visual mode that shows the source as a document while you type; formulas drawn as you write them;
+  completion of commands, environments and packages; a symbols panel; tables made in a grid; references found by DOI,
+  arXiv id or title and added to the bibliography; nine templates for a new document; folding; spelling; checks for
+  what is sure to fail before TeX runs; a word count; comments agents answer; versions compared, a file brought back
+  from one; dark pages; and the pages presented full screen.
+- **Pages, written in as in Notion**: Enter makes the next block; "/" adds headings, lists, to-dos, toggles, callouts,
+  quotes, code, tables, pictures, videos, columns, cards, maths, a table of contents or a button; Markdown turns into
+  blocks as you type; the ⋮⋮ beside each block drags it, turns it into another kind or colours it; several blocks are
+  picked at once; and a page gets an icon and a cover. To-dos tick and toggles open on the page itself.
+- **Jupyter notebooks** are a kind of their own in the Library, shown and run in the notebook page's view with their
+  outputs, with **Ask** on the whole notebook or a cell, and exported as the .ipynb, a Python script, a PDF or a web
+  page. **New notebook** in Files makes one, an empty .ipynb file opens as a notebook, outputs show as Jupyter shows
+  them, and agents have a notebooks skill.
+- **Projects** live at /projects, with the guide's topic at /guide/projects; older links land in the new place, and
+  a project's Knowledge, Skills and Settings tabs are as wide as the rest.
+- As the app opens, the loading logo moves into its place in the sidebar.
+- Background tasks show how long they have run after the app restarts, a new terminal starts in your home folder, the
+  form before a picture, video or sound is made quotes the agent's whole description, and Settings → Models suggests
+  Grok 4.7 in GLM 5.3's place.
+
 ## 0.28.1 · 5 November 2026
 
 Updates of the desktop apps no longer give up on a slow or interrupted download, and on a Mac they keep the
