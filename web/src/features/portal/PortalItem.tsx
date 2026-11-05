@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Download, MessageSquare, MessageSquarePlus } from 'lucide-react';
 import type { Comment } from '@shared/comments';
 import { PORTAL_COMMENTS, type PortalItemView, type PortalView } from '@shared/share';
-import { Button, cx, Dialog, IconButton, inputCls, MenuItem, Popover, Throbber, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
+import { Button, cx, Dialog, IconButton, inputCls, MenuItem, Popover, SheetsOnPhone, Throbber, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
 import { ago } from '../../lib/format';
 import { toast, toastError } from '../../lib/store';
@@ -107,7 +107,7 @@ function DownloadMenu({ it }: { it: PortalItemView }) {
     }
   };
   return (
-    <>
+    <SheetsOnPhone.Provider value>
       {phone ? (
         <IconButton ref={ref} label="Download" active={open} onClick={() => setOpen((o) => !o)}>
           <Download size={16} />
@@ -124,7 +124,7 @@ function DownloadMenu({ it }: { it: PortalItemView }) {
           </MenuItem>
         ))}
       </Popover>
-    </>
+    </SheetsOnPhone.Provider>
   );
 }
 
@@ -139,7 +139,7 @@ function ReadView({ it, onBack }: { it: PortalItemView; onBack: () => void }) {
   const [open, setOpen] = useState(() => commented && wide);
   useEffect(() => setComments(it.comments ?? []), [it]);
   const waiting = comments.filter((c) => !c.resolved).length;
-  const panel = <CommentsPanel id={it.page.id} comments={comments} onChange={setComments} />;
+  const panel = <CommentsPanel id={it.page.id} comments={comments} onChange={setComments} inset={wide} />;
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg">
       <Bar onBack={onBack} title={it.page.title} sub={subOf(it)}>
@@ -167,7 +167,7 @@ function ReadView({ it, onBack }: { it: PortalItemView; onBack: () => void }) {
 }
 
 /** The comments of a document: a new one (on the words they copy from it, or the whole document), and each thread to answer. */
-function CommentsPanel({ id, comments, onChange }: { id: string; comments: Comment[]; onChange: (c: Comment[]) => void }) {
+function CommentsPanel({ id, comments, onChange, inset }: { id: string; comments: Comment[]; onChange: (c: Comment[]) => void; inset?: boolean }) {
   const [adding, setAdding] = useState(false);
   const [quote, setQuote] = useState('');
   const [active, setActive] = useState<string | null>(null);
@@ -197,12 +197,13 @@ function CommentsPanel({ id, comments, onChange }: { id: string; comments: Comme
     />
   );
   return (
-    <div className="space-y-2.5 p-3">
+    // Its own padding beside the page; a sheet on a phone has its own.
+    <div className={cx('space-y-2.5', inset ? 'p-3' : 'pb-2')}>
       {adding ? (
         <div className="space-y-2 rounded-xl border border-line bg-elevated p-2.5">
           <label className="block text-[12px] font-medium text-fg-3">
-            On the words (copy them from the document, or leave this empty for the whole document)
-            <input value={quote} onChange={(e) => setQuote(e.target.value)} placeholder={tr('The words it is about')} className={cx(inputCls, 'mt-1 h-8 text-[13px]')} />
+            On the words (optional)
+            <input value={quote} onChange={(e) => setQuote(e.target.value)} placeholder={tr('Paste them from the document, or leave this empty')} className={cx(inputCls, 'mt-1 h-8 text-[13px]')} />
           </label>
           <CommentBox
             autoFocus

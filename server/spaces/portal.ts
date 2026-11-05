@@ -42,6 +42,7 @@ import { EXPORT_TYPES, exportPage, type ExportFormat } from '../pages/export.ts'
 import { compileTex, forEditor, texPagePicture, texPdfFile, texPlaceOf, texSetup, texSourceAt } from '../pages/latex.ts';
 import { addVersion, listPages, pageHtml, pageInfo, pageModel, storageOp } from '../pages/store.ts';
 import { refreshThumbs, thumbFile } from '../pages/thumbs.ts';
+import { sessionExtra } from '../sessionExtra.ts';
 import { sessionsIn } from './index.ts';
 import { anchorByQuote, carryComments, commentVersion, docWords, findWords, forPerson, noteActivity, noteComment, noteShareVersion, noteVisit, openShare, ownerName, personComments, stamp, type Who } from './share.ts';
 
@@ -115,14 +116,18 @@ async function canEdit(p: Person, page: PageInfo): Promise<boolean> {
 
 // ---- the project ------------------------------------------------------------------------------------------------
 
-/** A session a person may not see: one kept Confidential (its words go nowhere else). */
-const hidden = (s: SessionSummary) => !!(s.extra as { confidential?: unknown } | undefined)?.confidential;
+/**
+ * A session a person never sees, nor hears of: one kept Confidential (SessionExtra.confidential: its words go nowhere
+ * else), as the session's own stored settings say, or the summary the app has of it.
+ */
+const confidential = (x: unknown) => !!(x as { confidential?: unknown } | null | undefined)?.confidential;
+const hidden = (db: DB, s: SessionSummary) => confidential(s.extra) || confidential(sessionExtra(db, s.key));
 
 function projectSessions(d: Deps, space: string): PortalSession[] {
   const out: PortalSession[] = [];
   for (const key of sessionsIn(d.db, space, 200)) {
     const s = d.sessions.summary(key);
-    if (!s || hidden(s)) continue;
+    if (!s || hidden(d.db, s)) continue;
     out.push({ key, title: s.title, agent: s.agent, ...(s.acpName ? { acpName: s.acpName } : {}), ...(s.updatedAt ? { updatedAt: s.updatedAt } : {}), status: s.live?.status ?? 'idle' });
   }
   return out;
@@ -503,7 +508,7 @@ export function portalRoutes(d: Deps) {
     quiet(reply);
     const key = String(P(req).key ?? '');
     const s = sessionsIn(db, p.space.id, 500).includes(key) ? d.sessions.summary(key) : null;
-    if (!s || hidden(s)) throw new HttpError(404, 'This project has no such session');
+    if (!s || hidden(db, s)) throw new HttpError(404, 'This project has no such session');
     const tl = await d.sessions.timeline(key);
     const all = tl.parser.items;
     const from = Math.max(0, Math.min(Number((req.query as { from?: string }).from) || 0, all.length));
