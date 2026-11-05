@@ -596,9 +596,9 @@ export function setValue(doc: Doc, s: Pos, e: Pos, k: 'color' | 'hl' | 'size' | 
   });
 }
 
-/** The words between two places with no look of their own but their links. */
+/** The words between two places with no look of their own but their links (an equation stays one, comments stay on their words). */
 export function clearLook(doc: Doc, s: Pos, e: Pos): Doc {
-  return mapLook(doc, s, e, (r) => (r.link ? { t: r.t, link: r.link } : { t: r.t }));
+  return mapLook(doc, s, e, (r) => (r.math ? r : { t: r.t, ...(r.link ? { link: r.link } : {}), ...(r.cm ? { cm: r.cm } : {}) }));
 }
 
 /** What the words between two places share: each value they all have. */
