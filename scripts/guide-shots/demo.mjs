@@ -505,6 +505,18 @@ export async function seedApi(api, home, now, s) {
     { name: 'Weekly shop report', time: '08:00', h: 8, days: [1], prompt: 'Sales, refunds and the slowest pages of the shop last week, with what changed since the week before.', cwd: path.join(home, 'code/shop-api') },
     { name: 'Water the greenhouse reminder', time: '18:00', h: 18, days: [0, 3], prompt: 'Remind me to water the greenhouse, and say whether frost is forecast tonight.', extra: { space: garden } },
   ];
+  // Experiments: a few short runs on the CPU (no GPU is ever used), two experiments of a dense retriever, three seeds
+  // each, their metrics printed as training logs do; the GPUs the page shows are made up (overrides, run.mjs).
+  const retriever = path.join(home, 'code/retriever');
+  fs.mkdirSync(retriever, { recursive: true });
+  const train = (base, seed) =>
+    `for s in 1 2 3 4 5 6 7 8; do l=$(( 900 - s * ${base} - ${seed} * 7 )); n=$(( 300 + s * ${Math.round(base / 3)} + ${seed} * 3 )); echo "step=$((s * 500)) loss=0.$l ndcg@10=0.$n"; sleep 0.15; done`;
+  for (const [group, base] of [
+    ['BM25 + dense, in-batch negatives', 60],
+    ['BM25 + dense, hard negatives', 75],
+  ])
+    for (const seed of [1, 2, 3])
+      await api('POST', '/api/experiments/jobs', { name: `${group.split(', ')[1]} · seed ${seed}`, group, command: train(base, seed), cwd: retriever, gpus: 0, seed, params: { negatives: group.split(', ')[1], lr: '2e-5', seed } }).catch((e) => console.warn(`  experiments: ${e.message}`));
   for (const t of tasks) {
     if (!away(t.h)) continue;
     await api('POST', '/api/tasks', {
@@ -751,7 +763,12 @@ export function overrides(s, now) {
     { repo: 'RecursiveSI/flint-int4', name: 'Flint', maker: 'Recursive', blurb: 'Made for coding agents, and quick for its size, on a Mac with Apple silicon and 32 GB or more.', params: 39.8, active: 2.5, mac: true, fit: none, runs: false, sizeBytes: 22_600_000_000, needs: 'A Mac with Apple silicon', ready: false },
     { repo: 'zai-org/GLM-5.3-Flash', name: 'GLM-5.3 Flash', maker: 'Z.ai', blurb: 'Among the strongest open models, for a server with several large graphics cards.', vision: true, params: 321, install: { repo: 'zai-org/GLM-5.3-Flash' }, fit: none, runs: false, sizeBytes: 328_400_000_000, needs: 'About 368 GB of graphics memory', ready: true },
   ];
-  return { live, usage, inbox, models, picks };
+  // Experiments' GPU meters: made up, so no real machine's cards show.
+  const gpus = [
+    { index: 0, name: 'NVIDIA GeForce RTX 4090', memUsed: 21_400, memTotal: 24_564, util: 87 },
+    { index: 1, name: 'NVIDIA GeForce RTX 4090', memUsed: 2_100, memTotal: 24_564, util: 4 },
+  ];
+  return { live, usage, inbox, models, picks, gpus };
 }
 
 /** The models Claude Code offers, as its own program lists them (the stand-in program lists none). */
