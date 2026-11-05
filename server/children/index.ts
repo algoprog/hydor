@@ -378,6 +378,8 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
   if (t.external) return;
   const parent = parentOf(d.db, t.key);
   if (!parent || !d.sessions.summary(parent)) return;
+  // A confidential child's words go to a confidential parent only (server/confidential).
+  if (confidentialKey(d.db, t.key) && !confidentialKey(d.db, parent)) return;
   const tl = await d.sessions.timeline(t.key);
   let turn = lastTurn(tl.parser.items);
   // The transcript's last lines may land a moment late.

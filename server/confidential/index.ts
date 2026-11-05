@@ -120,6 +120,8 @@ export function confidentialStart(db: DB, o: CreateOpts, deps?: Pick<Deps, 'mode
   const parent = typeof o.extra?.parent === 'string' ? o.extra.parent : undefined;
   const inherited = confidentialKey(db, parent);
   if (!isConfidential(o.extra) && !inherited) return o;
+  // A child's replies go to its parent: a confidential one only to a confidential parent.
+  if (parent && !inherited) throw new HttpError(400, 'A confidential session can’t be the child of one that isn’t: its replies would go there.');
   const d = deps ?? featureDeps();
   if (o.agent !== 'acp' || o.acpAgent !== CONSOLE_ID)
     throw new HttpError(
