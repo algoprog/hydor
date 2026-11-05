@@ -261,6 +261,45 @@ const sh = book.sheets[0];
   void calc;
 }
 
+// ---- OpenDocument files: merged cells, rules, notes ---------------------------------------------------------------
+{
+  const NS =
+    'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0" xmlns:of="urn:oasis:names:tc:opendocument:xmlns:of:1.2"';
+  const content =
+    `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${NS} office:version="1.3"><office:body><office:spreadsheet>` +
+    '<table:content-validations>' +
+    '<table:content-validation table:name="val1" table:condition="of:cell-content-is-in-list(&quot;Open&quot;;&quot;Doing&quot;;&quot;Done, really&quot;)" table:allow-empty-cell="true" table:base-cell-address="Work.B2"><table:error-message table:message-type="stop" table:display="true"/></table:content-validation>' +
+    '<table:content-validation table:name="val2" table:condition="of:cell-content-is-in-list([$Lists.$A$1:.$A$3])" table:allow-empty-cell="true" table:base-cell-address="Work.C2"><table:error-message table:message-type="warning" table:display="true"/></table:content-validation>' +
+    '<table:content-validation table:name="val3" table:condition="of:cell-content-is-whole-number() and cell-content-is-between(1;10)" table:allow-empty-cell="true" table:base-cell-address="Work.D2"/>' +
+    '</table:content-validations><table:table table:name="Work"><table:table-column table:number-columns-repeated="4"/>' +
+    '<table:table-row><table:table-cell table:number-columns-spanned="2" table:number-rows-spanned="1" office:value-type="string"><text:p>Title</text:p></table:table-cell><table:covered-table-cell/>' +
+    '<table:table-cell office:value-type="string"><text:p>Size</text:p><office:annotation><text:p>Check this</text:p></office:annotation></table:table-cell><table:table-cell office:value-type="float" office:value="7"><text:p>7</text:p></table:table-cell></table:table-row>' +
+    '<table:table-row table:number-rows-repeated="3"><table:table-cell/><table:table-cell table:content-validation-name="val1"/><table:table-cell table:content-validation-name="val2"/><table:table-cell table:content-validation-name="val3" office:value-type="float" office:value="5"><text:p>5</text:p></table:table-cell></table:table-row>' +
+    '<table:table-row table:number-rows-repeated="1048570"><table:table-cell table:number-columns-repeated="4"/></table:table-row>' +
+    '<calcext:conditional-formats>' +
+    '<calcext:conditional-format calcext:target-range-address="Work.D2:Work.D4"><calcext:condition calcext:apply-style-name="Good" calcext:value="&gt;3" calcext:base-cell-address="Work.D2"/></calcext:conditional-format>' +
+    '<calcext:conditional-format calcext:target-range-address="Work.D2:Work.D4"><calcext:color-scale><calcext:color-scale-entry calcext:value="0" calcext:type="minimum" calcext:color="#ff0000"/><calcext:color-scale-entry calcext:value="0" calcext:type="maximum" calcext:color="#00ff00"/></calcext:color-scale></calcext:conditional-format>' +
+    '<calcext:conditional-format calcext:target-range-address="Work.B2:Work.B4"><calcext:condition calcext:apply-style-name="Mine" calcext:value="begins-with(&quot;Do&quot;)" calcext:base-cell-address="Work.B2"/></calcext:conditional-format>' +
+    '<calcext:conditional-format calcext:target-range-address="Work.A2:Work.A4"><calcext:data-bar calcext:positive-color="#2a6099"/></calcext:conditional-format>' +
+    '</calcext:conditional-formats></table:table>' +
+    '<table:table table:name="Lists"><table:table-row><table:table-cell office:value-type="string"><text:p>Red</text:p></table:table-cell></table:table-row><table:table-row><table:table-cell office:value-type="string"><text:p>Green</text:p></table:table-cell></table:table-row></table:table>' +
+    '</office:spreadsheet></office:body></office:document-content>';
+  const styles = `<?xml version="1.0" encoding="UTF-8"?><office:document-styles ${NS}><office:styles><style:style style:name="Mine" style:family="table-cell"><style:table-cell-properties fo:background-color="#ffeeaa"/><style:text-properties fo:color="#aa5500" fo:font-weight="bold"/></style:style></office:styles></office:document-styles>`;
+  const ods = zipParts([
+    { name: 'mimetype', data: 'application/vnd.oasis.opendocument.spreadsheet' },
+    { name: 'content.xml', data: content },
+    { name: 'styles.xml', data: styles },
+  ]);
+  const o = importBook(ods, 'Rules.ods').book.sheets[0];
+  ok(JSON.stringify(o.merges) === '["A1:B1"]' && o.cells.A1.v === 'Title' && o.cells.C1.note === 'Check this' && o.cells.C1.v === 'Size', 'an .ods file brings in its merged cells and notes');
+  const [v1, v2, v3] = o.validation ?? [];
+  ok(v1?.range === 'B2:B4' && v1.options?.map((x) => x.v).join('|') === 'Open|Doing|Done, really' && v1.reject === true, 'and a validation list, rejecting');
+  ok(v2?.range === 'C2:C4' && v2.source === 'Lists!A1:A3' && !v2.reject && v3?.type === 'number' && v3.when?.op === 'between' && v3.when.a === '1' && v3.when.b === '10', 'a list from a range, warning; whole numbers between');
+  const cf = o.conditional ?? [];
+  ok(cf.length === 4 && cf[0].when?.op === 'gt' && cf[0].when.a === '3' && cf[0].style?.fill === '#ccffcc' && cf[1].scale?.max.color === '#00ff00', 'and its conditional formatting: a value compared, in LibreOffice’s own look; a colour scale');
+  ok(cf[2].when?.op === 'starts' && cf[2].when.a === 'Do' && cf[2].style?.fill === '#ffeeaa' && cf[2].style.b === true && cf[3].bar?.color === '#2a6099', 'text it starts with, in the file’s own style; data bars');
+}
+
 // ---- arrays that spill ----------------------------------------------------------------------------------------------
 {
   const b = normalizeBook({

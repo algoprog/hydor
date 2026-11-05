@@ -65,6 +65,7 @@ import { chartData, chartSvg } from '../../shared/sheet-chart.ts';
 import { CondFormats, hiddenCols, hiddenRows, isTicked, listOptions, Merges, Rules } from '../../shared/sheet-rules.ts';
 import { coreXml, esc as xesc, relsXml, XML_HEAD, zipParts } from './ooxml.ts';
 import { chartXml, condXml, drawingXml, Dxfs, filterXml, isListsSheet, listFromSheet, listsSheet, mergesXml, notesXml, readCharts, readConditional, readDxfs, readFilter, readNotes, readValidation, validationXml } from './sheet-parts.ts';
+import { joinRects, odfFormula, odfText, odsCondStyles, odsConditional, odsNote, odsValidations } from './sheet-ods.ts';
 
 export { isBookText } from '../../shared/sheets.ts';
 
@@ -1106,43 +1107,6 @@ function readWorksheet(xml: string, name: string, shared: string[], styles: { s?
   return { name, base: { cells, cols, rows, merges, ...(filter ? { filter } : {}) }, ...(freeze ? { freeze } : {}) };
 }
 
-/** An OpenDocument cell's words: its paragraphs, spaces (text:s) and tabs kept. */
-function odfText(el: El): string {
-  let s = '';
-  for (const x of el.c) {
-    if (typeof x === 'string') s += x;
-    else if (x.n === 's') s += ' '.repeat(Math.min(1000, Number(att(x, 'c') ?? 1) || 1));
-    else if (x.n === 'tab') s += '\t';
-    else if (x.n === 'line-break') s += '\n';
-    else if (x.n !== 'annotation') s += odfText(x);
-  }
-  return s;
-}
-
-/** An OpenDocument formula as Excel writes one: "of:=SUM([.A1:.B2];[$Data.C3])" is "SUM(A1:B2,Data!C3)". */
-function odfFormula(f: string): string {
-  const body = f.replace(/^[a-z]+:/i, '').replace(/^=/, '');
-  return body
-    .split(/("(?:[^"]|"")*")/)
-    .map((part, i) => {
-      if (i % 2) return part;
-      return part
-        .replace(/\[([^\]]+)\]/g, (_m, ref: string) => {
-          let sheet = '';
-          const cells = ref.split(':').map((p) => {
-            const dot = p.lastIndexOf('.');
-            const sh = p.slice(0, dot).replace(/^\$/, '');
-            if (sh) sheet = sh.replace(/^'(.*)'$/, '$1').replace(/''/g, "'");
-            return p.slice(dot + 1);
-          });
-          return `${sheet ? `${quoteName(sheet)}!` : ''}${cells.join(':')}`;
-        })
-        .replace(/;/g, ',');
-    })
-    .join('');
-}
-const quoteName = (n: string) => (/^[A-Za-z_][A-Za-z0-9_.]*$/.test(n) && !/^[A-Za-z]{1,3}\d+$/.test(n) ? n : `'${n.replace(/'/g, "''")}'`);
-
 const ODS_CUR: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', JPY: '¥', INR: '₹', CHF: 'CHF' };
 
 /**
@@ -1199,14 +1163,20 @@ function odsStyles(content: El, styles: El | null): Map<string, CellStyle> {
   return out;
 }
 
-/** An OpenDocument spreadsheet's sheets: values, formulas (with their last values where they cannot be read here), formats. */
+/**
+ * An OpenDocument spreadsheet's sheets: values, formulas (with their last values where they cannot be read here),
+ * formats; merged cells, data validation, conditional formatting and notes (sheet-ods.ts).
+ */
 function readOds(z: Zip, notes: string[]): { book: Workbook; notes: string[] } {
   const xml = z.text('content.xml');
   if (!xml) throw new Error('This OpenDocument file has no content in it.');
   const { root, cut } = parseXml(xml, 3_000_000);
   if (cut) notes.push('The file is too big to read whole: only its first part was taken in.');
   const stylesXml = z.text('styles.xml');
-  const looks = odsStyles(root, stylesXml ? parseXml(stylesXml).root : null);
+  const stylesRoot = stylesXml ? parseXml(stylesXml).root : null;
+  const looks = odsStyles(root, stylesRoot);
+  const condLooks = odsCondStyles(stylesRoot, root);
+  const rules = odsValidations(root);
   const sheets: Obj[] = [];
   let count = 0;
   let bad = false;
@@ -1226,10 +1196,31 @@ function readOds(z: Zip, notes: string[]): { book: Workbook; notes: string[] } {
       }
       return out;
     };
+    const merges: string[] = [];
+    const ruled = new Map<string, Rect[]>();
+    const noted = new Map<string, string>();
     let r = 0;
     for (const row of rowsOf(t)) {
       const rep = Math.max(1, Number(att(row, 'number-rows-repeated') ?? 1) || 1);
       const list = kids(row).filter((x) => x.n === 'table-cell' || x.n === 'covered-table-cell');
+      // Merges, rules and notes, empty cells' too (a rule on a whole column covers rows written as one, repeated).
+      let c0 = 0;
+      for (const x of list) {
+        const crep = Math.max(1, Number(att(x, 'number-columns-repeated') ?? 1) || 1);
+        if (r < SHEET_LIMITS.rows && c0 < SHEET_LIMITS.cols) {
+          const name = att(x, 'content-validation-name');
+          if (name && rules.has(name)) {
+            const at = { r1: r, c1: c0, r2: Math.min(r + rep, SHEET_LIMITS.rows) - 1, c2: Math.min(c0 + crep, SHEET_LIMITS.cols) - 1 };
+            (ruled.get(name) ?? ruled.set(name, []).get(name)!).push(at);
+          }
+          const across = Number(att(x, 'number-columns-spanned') ?? 1) || 1;
+          const down = Number(att(x, 'number-rows-spanned') ?? 1) || 1;
+          if (x.n === 'table-cell' && (across > 1 || down > 1) && merges.length < SHEET_LIMITS.merges) merges.push(rangeName({ r1: r, c1: c0, r2: r + down - 1, c2: c0 + across - 1 }));
+          const note = odsNote(x);
+          if (note) noted.set(refName(r, c0), note);
+        }
+        c0 += crep;
+      }
       const filled = list.some((x) => att(x, 'value-type') || att(x, 'formula') || kids(x, 'p').length);
       if (!filled) {
         r += rep;
@@ -1287,7 +1278,9 @@ function readOds(z: Zip, notes: string[]): { book: Workbook; notes: string[] } {
       }
       if (rep > 100) r += rep - 100;
     }
-    sheets.push({ name: att(t, 'name') ?? `Sheet ${sheets.length + 1}`, base: { cells } });
+    for (const [ref, note] of noted) cells[ref] = { ...(cells[ref] ?? {}), note };
+    const validation = [...ruled].map(([name, at]) => ({ ...rules.get(name)!, range: joinRects(at).slice(0, 20).map(rangeName).join(',') }));
+    sheets.push({ name: att(t, 'name') ?? `Sheet ${sheets.length + 1}`, base: { cells, merges, validation, conditional: odsConditional(t, condLooks) } });
   }
   if (!sheets.length) throw new Error('This OpenDocument file has no sheets in it.');
   if (bad) notes.push('Some formulas could not be read here: their last values were kept instead.');
