@@ -1290,7 +1290,7 @@ export function SlidesEditor({
   );
 
   return (
-    <div ref={root} className="flex h-full min-h-0 flex-col bg-bg">
+    <div ref={root} data-keys="b" data-keys-idle="b" className="flex h-full min-h-0 flex-col bg-bg">
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
