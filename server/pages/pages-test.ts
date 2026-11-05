@@ -341,6 +341,9 @@ let privPath = '';
   r = await run('save_latex', { id: tex, edits: [{ section: 'Method', text: '\\section{Method}\nNew way.' }] });
   const paper = (await req('GET', `/api/pages/${tex}`)).json().model;
   ok(!r.error && paper.main.includes('New way.') && !paper.main.includes('Old.') && paper.main.includes('Hello.'), 'save_latex edits change a section, the rest as it was');
+  r = await run('save_latex', { id: tex, edits: [{ append: 'Thanks.' }], files: [{ name: 'refs.bib', text: '@book{k, title = {T}}' }] });
+  const both = (await req('GET', `/api/pages/${tex}`)).json().model;
+  ok(!r.error && both.main.includes('Thanks.') && both.files.some((f: { name: string }) => f.name === 'refs.bib'), 'edits and files sent with them (as a list) both count');
 }
 
 // ---- the user changes a page; the agent hears of it -------------------------------------------------------

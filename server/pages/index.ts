@@ -397,7 +397,9 @@ const SAVE_LATEX: RunTool = {
       const out = applyTexEdits(files, edits).files;
       rest.source = out.get(TEX_MAIN);
       const changed = Object.fromEntries([...out].filter(([n, t]) => n !== TEX_MAIN && files.get(n) !== t));
-      if (Object.keys(changed).length) rest.files = { ...(isObjIn(rest.files) ? rest.files : {}), ...changed };
+      // Beside the files it sends itself, in either form (by name, or a list).
+      if (Object.keys(changed).length)
+        rest.files = Array.isArray(rest.files) ? [...rest.files, ...Object.entries(changed).map(([name, text]) => ({ name, text }))] : { ...(isObjIn(rest.files) ? rest.files : {}), ...changed };
     }
     // The version it changes: the files and pictures the agent leaves out stay. (The title goes in a template's text.)
     const { doc, notes } = await agentTex(db, rest, ctx.cwd, prev);
