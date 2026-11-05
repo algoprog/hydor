@@ -116,10 +116,11 @@ const OFF_AT_START: Record<'swarm' | 'research' | 'arena', string> = {
  * (then it is confidential too). It must run on Custom with a local model (the best one when none is named), with
  * memory off and without a swarm, a deep research or the arena. Throws why it can't start.
  */
-export function confidentialStart(db: DB, o: CreateOpts, d: Pick<Deps, 'models'> = featureDeps()): CreateOpts {
+export function confidentialStart(db: DB, o: CreateOpts, deps?: Pick<Deps, 'models'>): CreateOpts {
   const parent = typeof o.extra?.parent === 'string' ? o.extra.parent : undefined;
   const inherited = confidentialKey(db, parent);
   if (!isConfidential(o.extra) && !inherited) return o;
+  const d = deps ?? featureDeps();
   if (o.agent !== 'acp' || o.acpAgent !== CONSOLE_ID)
     throw new HttpError(
       400,
@@ -133,10 +134,10 @@ export function confidentialStart(db: DB, o: CreateOpts, d: Pick<Deps, 'models'>
 }
 
 /** A confidential session's model may change only to another local one, and not to the agent's own default. */
-export function checkModelSwitch(db: DB, key: string, model: string | null | undefined, d: Pick<Deps, 'models'> = featureDeps()) {
+export function checkModelSwitch(db: DB, key: string, model: string | null | undefined, deps?: Pick<Deps, 'models'>) {
   if (model === undefined || !confidentialKey(db, key)) return;
   if (!model) throw new HttpError(400, 'A confidential session keeps a model on this computer: pick one of those.');
-  localModel(d, model);
+  localModel(deps ?? featureDeps(), model);
 }
 
 /** A confidential session's conversation stays with its model: it can't be handed to another agent. */

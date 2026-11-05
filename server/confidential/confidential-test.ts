@@ -506,6 +506,11 @@ test('hands-free voice: a confidential session is not talked about, and what is 
   assert.equal(said.at(-1), `${SECRET}: look at section three again`);
   const read = await handsFree(d, 'read it', SECRET, ask as never);
   assert.match(read.say, /confidential: its replies stay on the screen/);
+  // With Confidential the start page's pick, a session is not started by voice.
+  kvSet(db, 'start', JSON.stringify({ confidential: true }));
+  const start = await handsFree(d, 'start a session that reviews the paper in my downloads', undefined, (async () => JSON.stringify({ action: 'start', text: 'Review the paper' })) as never);
+  assert.match(start.say, /start this one on the screen/);
+  kvSet(db, 'start', '{}');
 });
 
 // ---- commands without network ---------------------------------------------------------------------------------------
