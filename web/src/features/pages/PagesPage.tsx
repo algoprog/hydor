@@ -61,7 +61,8 @@ export function PagesRoute() {
   }, [loc, search]);
   if (show) return <AudienceView id={show} />;
   const id = /^\/pages\/([a-f0-9]{10})$/.exec(loc)?.[1];
-  return id ? <PageView id={id} /> : <Library />;
+  // One view a page (key): what one page's view still does as it is left (saving it) never lands on the next one.
+  return id ? <PageView key={id} id={id} /> : <Library />;
 }
 
 // ---- a page's own place ---------------------------------------------------------------------------
@@ -241,6 +242,26 @@ function PageView({ id }: { id: string }) {
   const shareRef = useRef<HTMLButtonElement>(null);
   const exportRef = useRef<HTMLButtonElement>(null);
   const saveFirst = useRef<(() => Promise<boolean>) | null>(null);
+  // Leaving the page for another place in the app (another page, a session, Settings) saves what its editor holds
+  // and has not saved yet, as Save does (the version before stays among its versions): nothing else would keep it.
+  // Closing or reloading the tab asks first.
+  const unsaved = useRef(false);
+  const leaving = useRef(false);
+  useEffect(
+    () => () => {
+      leaving.current = true;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      void saveFirst.current?.().catch(toastError);
+    },
+    [],
+  );
+  useEffect(() => {
+    const before = (e: BeforeUnloadEvent) => {
+      if (unsaved.current) e.preventDefault();
+    };
+    window.addEventListener('beforeunload', before);
+    return () => window.removeEventListener('beforeunload', before);
+  }, []);
   const ask = usePageAsk();
   const load = () =>
     api<Loaded>(`/api/pages/${enc(id)}`)
@@ -341,11 +362,12 @@ function PageView({ id }: { id: string }) {
       await post(`/api/pages/${enc(id)}/versions`, { ...body, base: data.page.version });
     } catch (e) {
       if ((e as { status?: number }).status !== 409) throw e;
-      if (!(await confirm({ title: 'A newer version is there', body: 'It was saved again while you changed it (by an agent, say). Save yours on top? The other stays among its versions.', confirm: 'Save on top' })))
+      // Left already: nobody to ask, and the newer version stays among the versions anyway.
+      if (!leaving.current && !(await confirm({ title: 'A newer version is there', body: 'It was saved again while you changed it (by an agent, say). Save yours on top? The other stays among its versions.', confirm: 'Save on top' })))
         return false;
       await post(`/api/pages/${enc(id)}/versions`, { ...body, base: data.page.version, force: true });
     }
-    toast(data.page.sessionKey ? 'Saved. The agent that made it sees your changes with your next message to it.' : 'Saved', 'ok');
+    toast(leaving.current ? `Saved your changes to “${data.page.title}”` : data.page.sessionKey ? 'Saved. The agent that made it sees your changes with your next message to it.' : 'Saved', 'ok');
     void load();
     return true;
   };
@@ -453,6 +475,7 @@ function PageView({ id }: { id: string }) {
         onAsk={(text) => askThis(text)}
         onScopes={setScopes}
         saveNowRef={saveFirst}
+        onDirty={(d) => void (unsaved.current = d)}
         startPresent={startPresent}
       />
     ) : (
