@@ -3,6 +3,54 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.31.0 · 5 November 2026
+
+For researchers and engineers: Experiments, where your training runs wait for a free GPU and are kept as records, with
+an agent on call; papers to keep up with, read, check and present; your lab's labelling, sprints, sweeps, weekly
+report and notebook; engineering tasks that look after CI, issues, dependencies and incidents; confidential sessions
+on models of your own computer; projects shared with your advisor or students; PDFs you highlight and ask about;
+LaTeX projects as a tree of their files; and folders in the Library.
+
+- **Experiments** (System → Experiments): a run waits until a GPU has enough free memory on any of your machines, or a
+  SLURM cluster's queue over SSH takes it, runs in tmux and is kept as a record: its commit and changes, settings,
+  seed, environment, log and metrics, drawn as charts. An **agent on call** wakes on NaN, out of memory, a stall, a
+  crash or divergence, and tells you or acts within your rules. Compare runs, sweep settings with losing runs stopped
+  early, and make **results tables** (mean ± std over seeds, the best in bold, paired or Welch tests with Holm's
+  correction as daggers) as LaTeX, Markdown or CSV, or straight into a LaTeX document. Agents start and read runs too.
+- **Keep up with your field** (Apps → Research): **Paper radar** ranks each morning's new papers against your projects
+  and says why each matters to you; **Citation alerts** shows who cited your papers, with the citing sentence;
+  **New-model watch** runs new Hugging Face models on your own evaluation and tells you only of those that beat your
+  best; **Deadline radar** puts your venues' deadlines in your time zone, with reminders; **Living related work** grows a
+  page per topic; **Gap finder** proposes projects, each checked for prior work.
+- **Papers**: a **Reading list** kept in step with Zotero, a **Literature matrix** made in one click into a spreadsheet,
+  **Reproduce a paper** (its code run, its numbers compared), a **Reviewer simulator** on a venue's own form, a **Rebuttal
+  workbench**, **Paper to talk, poster and thread**, and a **Figure doctor** for print-ready plots.
+- **Check before submitting** (LaTeX editor → Tools): every citation checked online (does it exist, are the authors,
+  year and venue right, is the preprint published since), anonymity, pages and fonts, the venue's required parts,
+  and the numbers in your tables against their runs; findings go on their lines as comments, with safe fixes in one
+  click. **Export → arXiv package (.zip)** strips comments, keeps what the paper uses, adds the .bbl and checks it
+  builds.
+- **The lab** (Apps → Lab and Work): an **Annotation workbench** (you and a model label the same sample; Cohen's κ;
+  published on Hugging Face), a **Research sprint** with you approving each step, a **Sweep planner**, a **Weekly
+  progress report** for your advisor or team, and a **Lab notebook** written each evening. Apps on their own page now
+  update automatically every day, on weekdays or once a week.
+- **Engineering** (Settings → Scheduled tasks → Start from an example): **CI doctor**, **Issue triage**, **Dependency
+  gardener** and **Incident first responder**, each with a skill of its own and switches for what it may do. **Find
+  what broke it** in Git's history runs git bisect in a worktree and names the commit. **Campaign** (Options → Swarm)
+  makes one big change in parts, each in a worktree.
+- **Confidential sessions** (Options → Confidential): only models on this computer or your network, no web, browser,
+  connected apps or outside models, commands without network, nothing sent out about it, and a lock that shows it.
+- **Share a project with people** (a project's ⋯ → Share with people): a link each for your advisor or students, to read
+  its documents, sessions, runs and reading list, comment under their name and, if you let them, edit documents;
+  never your agents, files or settings.
+- **Read and highlight PDFs** (Files → a PDF → Highlight): passages, equations and figures in four colours, notes beside
+  them that follow the file, Ask about the part you picked, notes kept in a project's knowledge or saved into the PDF.
+- **LaTeX projects as a tree** of their files beside the source, the ones the document doesn't use set apart, renames
+  that keep references right; a chapter from Files opens with its document's tree. **Folders in the Library**, and
+  **Import a folder**: a LaTeX project comes in as one document.
+- While a session works, its line also says how long it has worked in all, its turns together ("Working · 2m 10s
+  (47m)"); a share link's page no longer shows steps twice where the agent thought between them.
+
 ## 0.30.0 · 5 November 2026
 
 The editors' second round, and what you keep around them: documents on real pages with Suggesting, comments and charts
