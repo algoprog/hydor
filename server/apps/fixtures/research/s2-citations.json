@@ -1,0 +1,129 @@
+{
+ "offset": 0,
+ "data": [
+  {
+   "intents": [],
+   "isInfluential": false,
+   "contexts": [
+    "To address these limitations, STAR (Zhan et al., 2021) introduces stable negative sampling, while ColBERT (Khattab and Zaharia, 2020) and Sentence-BERT (Reimers and Gurevych, 2019) refine fine-grained similarity and semantic understanding."
+   ],
+   "citingPaper": {
+    "paperId": "b40f3f58393880d15d77c88f15b4776d9a88975d",
+    "externalIds": {
+     "DBLP": "journals/corr/abs-2608-30553",
+     "ArXiv": "2608.30553",
+     "DOI": "10.48550/arXiv.2608.30553",
+     "CorpusId": 291542017
+    },
+    "title": "Preference Shapes Relevance: Cross-component Hierarchical Semantic Alignment for Personalized Generative Retrieval",
+    "venue": "Conference on Empirical Methods in Natural Language Processing",
+    "year": 2026,
+    "publicationDate": "2026-08-31",
+    "authors": [
+     {
+      "authorId": "2458437453",
+      "name": "Gao-Ming Zhang"
+     },
+     {
+      "authorId": "2429421520",
+      "name": "Ang-Qing Jiang"
+     },
+     {
+      "authorId": "2458576561",
+      "name": "Jian-Chun Song"
+     }
+    ]
+   }
+  },
+  {
+   "intents": [],
+   "isInfluential": false,
+   "contexts": [
+    "(Robertson & Zaragoza, 2009), dense embedding retrieval (Karpukhin et al., 2020), or neural ranking and late interaction (Nogueira & Cho, 2019; Khattab & Zaharia, 2020)."
+   ],
+   "citingPaper": {
+    "paperId": "9a6a89252ad6e347eed939251305840c68336952",
+    "externalIds": {
+     "ArXiv": "2608.30478",
+     "DBLP": "journals/corr/abs-2608-30478",
+     "DOI": "10.48550/arXiv.2608.30478",
+     "CorpusId": 291542883
+    },
+    "title": "Agents in the Large: Perception-Centered Architecture for Persistent Agents",
+    "venue": "arXiv.org",
+    "year": 2026,
+    "publicationDate": "2026-08-31",
+    "authors": [
+     {
+      "authorId": "2042683163",
+      "name": "Shi-Han Dou"
+     },
+     {
+      "authorId": "2282474263",
+      "name": "Haoxiang Jia"
+     },
+     {
+      "authorId": "2211905760",
+      "name": "Shichun Liu"
+     }
+    ]
+   }
+  },
+  {
+   "intents": [],
+   "isInfluential": false,
+   "contexts": [
+    "[11, 15-17] The oracle can fail before the router does."
+   ],
+   "citingPaper": {
+    "paperId": "0ac10fa2dda05fc30cac988f70b85cee7796f5c5",
+    "externalIds": {
+     "ArXiv": "2608.30757",
+     "DBLP": "journals/corr/abs-2608-30757",
+     "DOI": "10.48550/arXiv.2608.30757",
+     "CorpusId": 291542904
+    },
+    "title": "Which Rules Matter Now? Policy-Centroid Routing Before an Intelligent System Acts",
+    "venue": "arXiv.org",
+    "year": 2026,
+    "publicationDate": "2026-08-31",
+    "authors": [
+     {
+      "authorId": "2453618254",
+      "name": "Thomson D. Nguy"
+     }
+    ]
+   }
+  },
+  {
+   "intents": [],
+   "isInfluential": false,
+   "contexts": [],
+   "citingPaper": {
+    "paperId": "5235e29d9c1348530c8d16f76f5e8bd69e053b84",
+    "externalIds": {
+     "ArXiv": "2609.01641",
+     "CorpusId": 291611376
+    },
+    "title": "SocialBuddy: Tailoring Search Agent for Social Scenarios",
+    "venue": "",
+    "year": 2026,
+    "publicationDate": "2026-08-28",
+    "authors": [
+     {
+      "authorId": "2475760320",
+      "name": "Ming-Xuan Li"
+     },
+     {
+      "authorId": "2398860514",
+      "name": "Yirong Mao"
+     },
+     {
+      "authorId": "2491703941",
+      "name": "Fa-Zhan Zhang"
+     }
+    ]
+   }
+  }
+ ]
+}

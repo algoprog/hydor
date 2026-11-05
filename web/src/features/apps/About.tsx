@@ -3,7 +3,7 @@
 // from a file shows it above the technical details; a ready-made app that was uninstalled shows it on its page
 // and in the dialog that installs it again. The same "Agents can use it" switch is on every installed app's page.
 import { useState, type ReactNode } from 'react';
-import { AppWindow, Bell, BookOpen, Bot, Brain, Code, Database, FileSearch, FileText, Globe, GitBranch, Hand, Image, Link2, MessagesSquare, Repeat, Sparkles, Split } from 'lucide-react';
+import { AppWindow, Bell, BookOpen, Bot, Brain, Code, Database, FileSearch, FileText, Globe, GitBranch, Hand, Image, LibraryBig, Link2, MessagesSquare, Repeat, Sparkles, Split } from 'lucide-react';
 import type { AppTemplate } from '@shared/apps';
 import type { AppSummary, WorkKind } from '@shared/app-summary';
 import { appSummary } from '@shared/app-summary';
@@ -39,6 +39,14 @@ const TOOLS: Record<string, { icon: ReactNode; text: string }> = {
   knowledge_read: { icon: <BookOpen size={14} />, text: 'Looks through your documents' },
   recall: { icon: <Brain size={14} />, text: 'Remembers what you told it' },
   notify_user: { icon: <Bell size={14} />, text: 'Sends you a notification' },
+  read_paper: { icon: <FileSearch size={14} />, text: 'Finds and reads papers' },
+  reading_list: { icon: <BookOpen size={14} />, text: 'Keeps your reading list' },
+  zotero_sync: { icon: <Link2 size={14} />, text: 'Syncs with Zotero' },
+  save_sheet: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
+  save_doc: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
+  save_slides: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
+  save_latex: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
+  save_page: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
 };
 
 /** How it works, as lines: each kind of work once, the same words once. */

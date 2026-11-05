@@ -3,6 +3,7 @@
 // unsaved changes, what an agent asked about it should be told it is about).
 import type { MutableRefObject, ReactNode } from 'react';
 import type { DraftMark } from '@shared/page-drafts';
+import type { TexFileKind } from '@shared/latex-files';
 import { api } from '../../lib/api';
 
 /** An older version's model, to look at in its editor (`id` already encoded for an address). */
@@ -66,7 +67,8 @@ export interface ModelEditorProps<M> {
    * A file of this computer's opened from Files rather than a page (the LaTeX editor uses it): the folder it is
    * typeset in, among its other files (none when TeX may not read it); its main file's own name, shown for main.tex;
    * the file to start on; and its comments as the app keeps them now, when they changed elsewhere (an agent answered
-   * one), `n` counting each time they come.
+   * one), `n` counting each time they come. `dir`: its folder (whether or not TeX may read it), and `uses`: the files of
+   * it the document uses that the editor does not hold (pictures, styles, data), for the files tree.
    */
-  file?: { folder?: string; main: string; open?: string; comments?: { list: unknown[]; n: number } };
+  file?: { folder?: string; main: string; open?: string; comments?: { list: unknown[]; n: number }; dir?: string; uses?: { name: string; kind: TexFileKind; size: number }[] };
 }

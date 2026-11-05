@@ -8,6 +8,8 @@ import { createPortal } from 'react-dom';
 import { create } from 'zustand';
 import { Headphones, Loader, Mic, Pause, Volume2, X } from 'lucide-react';
 import type { NotifyEvent } from '@shared/types';
+import type { SessionExtra } from '@shared/features';
+import { isConfidential } from '@shared/confidential';
 import { cx } from '../../components/ui';
 import { enc, post } from '../../lib/api';
 import { mu } from '../../lib/machine';
@@ -379,8 +381,10 @@ export function HandsFree() {
 }
 
 /** By the message box: hands-free mode, about this session when in one. Only where the browser can speak and listen. */
-export function HandsFreeButton({ s }: { s?: { key: string }; insert: (text: string) => void; disabled?: boolean }) {
+export function HandsFreeButton({ s, confidential }: { s?: { key: string; extra?: SessionExtra }; insert: (text: string) => void; disabled?: boolean; confidential?: boolean }) {
   const server = useServerVoice();
+  // Not for a confidential session: what it hears and says may pass through the browser's speech services.
+  if (confidential || isConfidential(s?.extra)) return null;
   if (!canSpeak() || !(SpeechRecognition() || (server?.ready && canRecord()))) return null;
   return (
     <button

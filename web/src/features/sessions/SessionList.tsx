@@ -1,7 +1,7 @@
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useRoute } from 'wouter';
-import { AlarmClock, Archive, Boxes, CheckCheck, ChevronRight, Ellipsis, Folder, FolderOpen, FolderPen, Pencil, Pin, PinOff, RotateCcw, SquarePen, Target, Trash2 } from 'lucide-react';
+import { AlarmClock, Archive, Boxes, CheckCheck, ChevronRight, Ellipsis, Folder, FolderOpen, FolderPen, Lock, Pencil, Pin, PinOff, RotateCcw, SquarePen, Target, Trash2 } from 'lucide-react';
 import {
   closestCenter,
   DndContext,
@@ -19,6 +19,7 @@ import {
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { AgentAccount, SearchHit, SessionSummary } from '@shared/types';
+import { isConfidential } from '@shared/confidential';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { basename, markRuns, tildify, timeAgo } from '../../lib/format';
 import { filePath, go, openSession, sessionPath } from '../../lib/nav';
@@ -248,6 +249,11 @@ const RowBody = memo(function RowBody({
     );
   const marks = !renaming && (
     <>
+      {isConfidential(s.extra) && (
+        <span title="Confidential: only models on this computer, nothing leaves it" className="shrink-0">
+          <Lock size={11} className="text-ok" />
+        </span>
+      )}
       {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
       {s.pr && <PrBadge pr={s.pr} />}
       {s.goal && (

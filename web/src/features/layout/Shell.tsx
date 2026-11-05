@@ -7,6 +7,7 @@ import { FilesPage } from '../files/FilesPage';
 import { QuickOpen } from '../files/FileSearch';
 import { UploadTrays } from '../pages/UploadTray';
 import { FilePeek } from '../files/FilePeek';
+import { ArxivHost } from '../pages/latex/ArxivHost';
 import { GitPage } from '../git/GitPage';
 import { HomePage } from '../home/HomePage';
 import { InboxPage } from '../inbox/InboxPage';
@@ -71,7 +72,8 @@ function useDrag(onMove: (dy: number) => void) {
 const Routes = memo(function Routes() {
   const [loc] = useLocation();
   const project = /^\/projects\/[^/]+/.exec(loc)?.[0];
-  const section = loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc.startsWith('/guide') ? '/guide' : (project ?? loc);
+  // A run of Experiments opens beside its list: the same page.
+  const section = loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc.startsWith('/guide') ? '/guide' : loc.startsWith('/system/experiments') ? '/system/experiments' : (project ?? loc);
   return (
     <div key={section} className="h-full">
       <Page />
@@ -262,6 +264,7 @@ export function Shell() {
         <ReleaseNotes />
         <WhatsNew />
         <FilePeek />
+        <ArxivHost />
         <Lightbox />
         <VideoBox />
         <Tour />
@@ -298,6 +301,7 @@ export function Shell() {
       <ReleaseNotes />
       <WhatsNew />
       <FilePeek />
+      <ArxivHost />
       <Lightbox />
       <VideoBox />
       {!sideOpen && roomy && !panelOpen && loc !== '/terminal' && <HelpButton />}

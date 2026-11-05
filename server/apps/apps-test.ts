@@ -197,9 +197,9 @@ test('form: defaults, numbers, dates, choices, yes/no and what to fix', () => {
 /** The ten ready-made tasks of before the apps for everyday things (templates-more.ts), each made of several kinds of step. */
 const FIRST_TEN = ['deep-research', 'trip-planner', 'compare-products', 'document-qa', 'meeting-actions', 'cover-letter', 'lesson-plan', 'news-digest', 'explain-contract', 'small-web-app'];
 
-test('templates: twenty-seven tasks in steps, each checking out as a save checks it, using its needed fields, giving every answer field it needs, asking a person only when someone is there, its programs readable; five blocks, whose steps check out and use theirs', async () => {
+test('templates: forty-five tasks in steps, each checking out as a save checks it, using its needed fields, giving every answer field it needs, asking a person only when someone is there, its programs readable; five blocks, whose steps check out and use theirs', async () => {
   const tasks = TEMPLATES.filter((t) => !t.block);
-  assert.equal(tasks.length, 27);
+  assert.equal(tasks.length, 45);
   assert.deepEqual(tasks.slice(0, 10).map((t) => t.id), FIRST_TEN, 'the first ten keep their place');
   const blocks = TEMPLATES.filter((t) => t.block);
   assert.equal(blocks.length, 5);
@@ -1064,7 +1064,7 @@ test('a session that cannot start fails the run with the reason', async () => {
   assert.match(after.error!, /did not start/);
 });
 
-test('an app that opens on its own page (Explore): its settings there are its form’s answers, kept; what its page keeps; Update every day is a daily task that runs it with them', async () => {
+test('an app that opens on its own page (Explore): its settings there are its form’s answers, kept; what its page keeps; Update automatically is a daily task that runs it with them', async () => {
   const ex = TEMPLATES.find((t) => t.id === 'explore')!;
   assert.equal(ex.sessions, false, 'it opens on its own page');
   assert.ok(!madeForSessions(ex), 'agents do not run it in sessions');

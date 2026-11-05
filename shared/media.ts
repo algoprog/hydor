@@ -135,6 +135,8 @@ export interface MediaItem {
   sessionKey?: string;
   /** The space it is in (the Library shows each space's together); none when unset. */
   space?: string;
+  /** The Library folder it is in (a folder of its space: shared/pages.ts LibFolder); none at its place's top. */
+  folder?: string;
   /** The file it was saved from. */
   source?: string;
   caption: CaptionStatus;
@@ -149,7 +151,8 @@ export interface MediaItem {
 }
 
 /** What news of the Library's media the pages hear ({ t: 'feature', id: 'media' }). */
-export type MediaEvent = { what: 'media'; item?: MediaItem; removed?: string };
+/** One item kept or changed, one removed, or (`reload`) many changed at once: a folder deleted or moved, their places with it. */
+export type MediaEvent = { what: 'media'; item?: MediaItem; removed?: string; reload?: true };
 
 /**
  * Where the model that writes titles and descriptions is: the app's choice, a vision model in OpenRouter's

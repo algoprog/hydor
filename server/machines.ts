@@ -243,11 +243,11 @@ class Machine extends EventEmitter {
     return req;
   }
 
-  /** A JSON call to the machine's API; errors say what is wrong in words. */
-  async call<T>(method: string, p: string, timeoutMs = 15_000): Promise<T> {
+  /** A JSON call to the machine's API (with a JSON body when given); errors say what is wrong in words. */
+  async call<T>(method: string, p: string, timeoutMs = 15_000, body?: unknown): Promise<T> {
     let req: http.ClientRequest;
     try {
-      req = await this.request(method, p, { accept: 'application/json' }, timeoutMs);
+      req = await this.request(method, p, { accept: 'application/json', ...(body !== undefined ? { 'content-type': 'application/json' } : {}) }, timeoutMs);
     } catch (e) {
       throw new Error(this.reason(e));
     }
@@ -267,7 +267,7 @@ class Machine extends EventEmitter {
         });
       });
       req.on('error', (e) => reject(new Error(this.reason(e))));
-      req.end();
+      req.end(body !== undefined ? JSON.stringify(body) : undefined);
     });
   }
 

@@ -4,6 +4,7 @@
 import { useEffect } from 'react';
 import { create } from 'zustand';
 import type { VoiceState } from '@shared/voice';
+import { isLocalAddress } from '@shared/confidential';
 import { api } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
 
@@ -74,10 +75,17 @@ export function useServerVoice(): VoiceState | null {
   return st;
 }
 
-/** How dictation works here: the browser's recognition, the server's, or none. */
-export function dictationMode(server: VoiceState | null, use: VoicePrefs['use']): 'browser' | 'server' | null {
+/** The server turns speech into text on this computer or your network (whisper.cpp, or a service at a local address). */
+export const serverVoiceLocal = (server: VoiceState | null) => !!server && (server.engine === 'local' || (server.engine === 'endpoint' && isLocalAddress(server.endpoint?.url ?? '')));
+
+/**
+ * How dictation works here: the browser's recognition, the server's, or none. For a confidential session (`local`),
+ * only the server's on this computer: a browser's recognition may send the recording to its maker.
+ */
+export function dictationMode(server: VoiceState | null, use: VoicePrefs['use'], local = false): 'browser' | 'server' | null {
   const own = !!SpeechRecognition();
   const viaServer = !!server?.ready && canRecord();
+  if (local) return viaServer && serverVoiceLocal(server) ? 'server' : null;
   if (use === 'server' && viaServer) return 'server';
   return own ? 'browser' : viaServer ? 'server' : null;
 }

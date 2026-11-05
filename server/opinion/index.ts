@@ -3,6 +3,7 @@
 // the answer itself, for work that changed no files). Its findings, rated Critical, Important or Minor,
 // show in a note under the turn, each a click away from the message box.
 import fs from 'node:fs';
+import { isConfidential } from '../../shared/confidential.ts';
 import type { OpinionNote, OpinionOptions, Reviewer } from '../../shared/opinion.ts';
 import type { AgentModel, SessionSummary } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
@@ -55,6 +56,12 @@ export function reviewersFor(s: Pick<SessionSummary, 'agent' | 'model'>, models:
   return out;
 }
 
+/** The reviewers offered for a session: a confidential one's work goes only to another model on this computer (server/confidential). */
+function offered(s: SessionSummary, models: AgentModel[]): Reviewer[] {
+  const all = reviewersFor(s, models);
+  return isConfidential(s.extra) ? all.filter((r) => models.find((m) => m.id === r.id)?.local) : all;
+}
+
 const agentLabel = (s: SessionSummary) => (s.agent === 'claude' ? 'Claude Code' : s.agent === 'codex' ? 'Codex' : [s.acpName ?? 'an agent', s.model].filter(Boolean).join(' · '));
 const running = (s: SessionSummary) => !!s.live && ['starting', 'working', 'waiting'].includes(s.live.status);
 
@@ -81,7 +88,7 @@ export async function opinionOptions(d: Deps, key: string): Promise<OpinionOptio
   const all = turnsOf(items).filter((t) => t.prompt);
   const done = running(s) ? all.slice(0, -1) : all;
   return {
-    reviewers: reviewersFor(s, customModels()),
+    reviewers: offered(s, customModels()),
     turns: done
       .slice(-12)
       .reverse()
@@ -101,8 +108,9 @@ export async function startOpinion(d: Deps, key: string, o: { reviewer?: string;
   if (!turn?.prompt) throw new HttpError(404, o.turn ? 'That turn is not in this session' : 'There is no finished turn to check yet');
   if (running(s) && turn.prompt.id === all.at(-1)?.prompt?.id) throw new HttpError(409, 'That turn is still running: ask once it ends');
   const models = customModels();
-  const options = reviewersFor(s, models);
+  const options = offered(s, models);
   const r = o.reviewer ? options.find((x) => x.id === o.reviewer) : options[0];
+  if (!r && isConfidential(s.extra)) throw new HttpError(400, 'In a confidential session only a model on this computer, from another maker, may check the work, and there is none: add one in Settings → Models.');
   if (!r) throw new HttpError(400, o.reviewer ? 'That reviewer is not offered for this session: it would be the same company checking its own work' : 'There is no reviewer from another company');
   const model = models.find((m) => m.id === r.id);
   const q = buildOpinionPrompt({

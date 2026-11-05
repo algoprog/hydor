@@ -1,6 +1,6 @@
 // An app's view in a page (shared/app-ui.ts): its pages drawn in the sandboxed frame with a run's answer (or, on
 // the app's own page, what it keeps and its latest run), and what its events ask of the app done here: find and
-// change its records, keep a tick, ask the run's agent, run one of its flows, run it again with changed answers,
+// change its records (a ready-made app's too), download them, keep a tick, ask the run's agent, run one of its flows, run it again with changed answers,
 // start another app, copy, open an address, say something. Only what `can` allows: a public page's view does
 // nothing that reaches the app. A ready-made app's view is put in the app's language first.
 import { useMemo, useState } from 'react';
@@ -11,6 +11,7 @@ import { openLightbox, openVideo } from '../../components/Lightbox';
 import type { AnswerField, AppRun } from '@shared/apps';
 import type { AppInfo } from '@shared/app-manifest';
 import { api, enc, post, put } from '../../lib/api';
+import { mu } from '../../lib/machine';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
@@ -18,6 +19,7 @@ import { LOCALE } from '../../i18n/locale';
 import { cx } from '../../components/ui';
 import { appCall, memoryStore, PageFrame, type UiBridge } from '../pages/frame';
 import { runPath } from './api';
+import type { KeyState } from './AppKeys';
 
 /** What a view may ask of its app. */
 export type ViewCan = 'keep' | 'ask' | 'run' | 'again' | 'start' | 'data';
@@ -49,6 +51,8 @@ export function AppView({
   publicView,
   info,
   assets,
+  keeps,
+  onKeys,
 }: {
   ui: AppUi;
   name: string;
@@ -76,13 +80,18 @@ export function AppView({
   info?: AppInfo;
   /** Its own files, by name: what asset:<name> shows. */
   assets?: Record<string, Pick<AppAsset, 'sha'>>;
+  /** It keeps records (a ready-made app's too: the Reading list's), which its view finds and changes. */
+  keeps?: boolean;
+  /** One of its flows needs keys the vault lacks (it was run without them): the page asks for them. */
+  onKeys?: (keys: KeyState[]) => void;
 }) {
   const [height, setHeight] = useState(240);
   const lang = LOCALE ?? (typeof navigator !== 'undefined' ? navigator.language : 'en');
   const def = useMemo(() => (translate ? translateUi(ui, tr) : ui), [ui, translate]);
   const html = useMemo(() => shell(name, lang), [name, lang]);
   const store = useMemo(() => memoryStore(), []);
-  const saved = !appId.startsWith('tpl:') && appId !== 'test' && !publicView;
+  // An app that keeps records: yours, or a ready-made one that keeps some (under its "tpl:" id); not a try of changes, nor a public page.
+  const saved = (!appId.startsWith('tpl:') || !!keeps) && appId !== 'test' && !publicView;
   // What changes while it is on screen: its run's status and answer (compared by what they hold, not by each new copy).
   const runKey = run ? JSON.stringify([run.id, run.status, run.result ?? null, run.inputs]) : '';
   const lastKey = last ? JSON.stringify([last.id, last.status, last.result ?? null]) : '';
@@ -92,7 +101,7 @@ export function AppView({
       result: run?.result ?? {},
       inputs: run?.inputs ?? {},
       run: run ? runOf(run) : {},
-      app: { name, description: description ?? '' },
+      app: { name, description: description ?? '', id: appId },
       last: last ? { result: last.result ?? {}, inputs: last.inputs, run: runOf(last) } : {},
       view: view ?? {},
       answer,
@@ -138,8 +147,15 @@ export function AppView({
         }
         case 'run': {
           need('run');
-          const r = await post<{ run: AppRun }>(`/api/apps/${enc(appId)}/runs`, { flow: typeof a.flow === 'string' ? a.flow : 'run', inputs: a.inputs && typeof a.inputs === 'object' ? a.inputs : {}, source: 'screen' });
-          return { id: r.run.id, status: r.run.status, result: r.run.result ?? null, error: r.run.error ?? '' };
+          try {
+            const r = await post<{ run: AppRun }>(`/api/apps/${enc(appId)}/runs`, { flow: typeof a.flow === 'string' ? a.flow : 'run', inputs: a.inputs && typeof a.inputs === 'object' ? a.inputs : {}, source: 'screen' });
+            return { id: r.run.id, status: r.run.status, result: r.run.result ?? null, error: r.run.error ?? '' };
+          } catch (e) {
+            // A flow that needs keys the vault lacks: the page asks for them.
+            const keys = (e as { data?: { secrets?: KeyState[] } }).data?.secrets;
+            if (keys?.length) onKeys?.(keys);
+            throw e;
+          }
         }
         case 'again': {
           need('again');
@@ -165,7 +181,14 @@ export function AppView({
         }
         case 'open': {
           const url = text(a.url, 2000).trim();
-          if (url.startsWith('/') && !url.startsWith('//')) go(url);
+          // A download of what this app keeps (its records as CSV or JSON lines): from here, where the sign-in goes with it.
+          if (/^\/api\/apps\/[^/?#]+\/data\//.test(url) && /[?&]format=(csv|jsonl)(&|$)/.test(url)) {
+            if (!saved || ![`/api/apps/${enc(appId)}/data/`, `/api/apps/${appId}/data/`].some((p) => url.startsWith(p))) throw new Error(tr('This can’t be done here.'));
+            const link = Object.assign(document.createElement('a'), { href: mu(url), download: '' });
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+          } else if (url.startsWith('/') && !url.startsWith('//')) go(url);
           else if (/^https?:\/\//i.test(url)) window.open(url, '_blank', 'noopener,noreferrer');
           else throw new Error(tr('That is not an address to open'));
           return null;

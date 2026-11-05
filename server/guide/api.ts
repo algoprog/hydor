@@ -10,6 +10,7 @@ import { formContent, formFields } from '../../shared/forms.ts';
 import type { ApprovalRequest } from '../../shared/types.ts';
 import type { ApprovalAnswer } from '../agents/live.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
+import { confidentialIn, NOT_FROM_HERE, withoutConfidential } from '../confidential/index.ts';
 import type { RunCtx, ToolOutput } from '../features/types.ts';
 import { internalHeaders } from '../internal.ts';
 
@@ -63,7 +64,10 @@ const RULES: Rule[] = [
   ['POST', /^\/api\/sessions$/, 'always', 'This starts a new session.'],
   ['W', /^\/api\/sessions\/[^/]+\/(message|handoff|fork|rewind|guest-links|pr|worktree|start|compact|goal)/, 'always'],
   ['W', /^\/api\/(preview\/link|pages\/[^/]+\/link)$/, 'always', 'Anyone with the link can open it.'],
+  ['W', /^\/api\/projects\/[^/]+\/shares(\/|$)/, 'always', 'Whoever has a project’s link sees its documents, sessions, runs and reading list, and may comment on (or change) its documents.'],
   ['W', /^\/api\/(tasks|apps\/[^/]+\/(runs|batches)|apps\/runs\/[^/]+\/ask|apps\/[^/]+\/run|automations\/(test-run|runs\/[^/]+\/rerun)|opinion\/[^/]+|arena\/[^/]+\/winner)(\/|$)/, 'always', 'This starts agent work that may cost.'],
+  ['POST', /^\/api\/experiments\/(jobs|sweeps|runs\/[^/]+\/again)$/, 'always', 'This starts jobs on this computer (its GPUs), another machine or a cluster. Agents in sessions use experiment_run and experiment_sweep.'],
+  ['POST', /^\/api\/experiments\/(tables\/preview|clusters\/check)$/, 'free'],
   // Every other change: the user's OK, once or for the rest of the session.
   ['W', /./, 'confirm'],
   ['GET', /./, 'free'],
@@ -191,8 +195,9 @@ export async function call(ctx: RunCtx, method: string, url: string, body?: Json
 
 const MAX_OUT = 24_000;
 
-function out(r: Reply): ToolOutput {
-  const text = r.json !== undefined ? JSON.stringify(r.json, null, 1) : r.text;
+/** The app's answer for the agent; confidential sessions are left out of it (server/confidential). */
+function out(r: Reply, ctx: RunCtx): ToolOutput {
+  const text = r.json !== undefined ? JSON.stringify(withoutConfidential(ctx.deps.db, r.json), null, 1) : r.text;
   const cut = text.length > MAX_OUT ? `${text.slice(0, MAX_OUT)}\n… (cut: ${Math.round(text.length / 1024)} KB in all; ask for less, by id or with a query string)` : text;
   const err = r.status >= 400 ? ((r.json as Json | undefined)?.error ?? r.text).toString() : '';
   return r.status >= 400 ? { text: `${r.status}: ${err || 'failed'}`, isError: true } : { text: `${r.status} OK\n${cut || '(no content)'}` };
@@ -256,7 +261,9 @@ export async function appApi(a: ApiArgs, ctx: RunCtx): Promise<ToolOutput> {
   if (rule.level === 'refuse') return { text: `Not through app_api: ${rule.why ?? 'that is the user’s to do.'}`, isError: true };
   const refused = refusedBody(method, path, body, ctx.key);
   if (refused) return { text: `Not through app_api: ${refused}`, isError: true };
-  if (method === 'GET' || rule.level === 'free') return out(await call(ctx, method, url));
+  // A confidential session stays out of other sessions' reach (server/confidential).
+  if (confidentialIn(ctx.deps.db, url).some((k) => k !== ctx.key)) return { text: `Not through app_api: ${NOT_FROM_HERE}`, isError: true };
+  if (method === 'GET' || rule.level === 'free') return out(await call(ctx, method, url), ctx);
   if (mode === 'read-only') return { text: 'This session only reads (Plan mode, or read-only): tell the user what you would change, or ask them to switch the mode.', isError: true };
 
   const form = a.form && typeof a.form === 'object' ? (a.form as Json) : null;
@@ -268,7 +275,7 @@ export async function appApi(a: ApiArgs, ctx: RunCtx): Promise<ToolOutput> {
     if (answer.declined) return { text: answer.declined, isError: true };
     Object.assign(body, answer.body);
   }
-  return out(await call(ctx, method, url, method === 'DELETE' && !Object.keys(body).length ? undefined : body));
+  return out(await call(ctx, method, url, method === 'DELETE' && !Object.keys(body).length ? undefined : body), ctx);
 }
 
 interface CardIn {

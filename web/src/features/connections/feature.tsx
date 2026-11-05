@@ -20,7 +20,8 @@ export const connectionsFeature: WebFeature = {
     request_secret: { place: 'attention', Row: SecretCard },
     run_with_secrets: { Row: StepRow, step: (t: ToolInfo) => ({ category: 'command', verb: t.status === 'running' || t.status === 'pending' ? 'Running' : 'Ran', title: commandOf(t) }) },
   },
-  SessionMenu: SessionAppsItem,
+  // A confidential session reaches no connected app.
+  SessionMenu: (p) => (p.s.extra?.confidential ? null : <SessionAppsItem {...p} />),
   sessionMenuPart: 'settings',
   SessionDock: SessionAppsDialog,
 };

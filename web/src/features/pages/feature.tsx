@@ -7,6 +7,7 @@ import { HtmlPage } from '../session/HtmlPage';
 import type { ToolView, WebFeature } from '../registry';
 import { CanvasSide, closeCanvas, PageOver, useCanvasOpen } from './Canvas';
 import { exportPageStep, PublishCard, ReadPageRow, readPageStep, SavedPageCard, savedPageStep } from './cards';
+import { latexCheckStep } from './checkStep';
 import { PageEditNoteView } from './notes';
 import { PagesRoute } from './PagesPage';
 import { savedPageOf } from './state';
@@ -33,6 +34,7 @@ export const pagesFeature: WebFeature = {
     // A step of the work, counted with the agent's other reads.
     get_page: { place: 'work', Row: ReadPageRow, step: readPageStep },
     export_page: { place: 'work', Row: ReadPageRow, step: exportPageStep },
+    latex_check: { place: 'work', Row: ReadPageRow, step: latexCheckStep },
   },
   noteViews: { 'page-edit': PageEditNoteView },
   routes: [{ match: isPages, Page: PagesRoute }],

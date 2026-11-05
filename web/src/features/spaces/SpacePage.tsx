@@ -1,11 +1,12 @@
 // A space's own page. At the top, in the space's colour: its mark, name and what it is about, New session, and
-// one menu (open its folder in Files, show only its sessions in the sidebar, delete it); its tabs under them.
-// Overview: its sessions, what it holds in the Library, and what every session in it gets (its folder, guidelines,
-// documents, skills, assistant and memory), with a group's spaces. Then its Library, its files (SpaceFiles), its
+// one menu (open its folder in Files, show only its sessions in the sidebar, share it with people, delete it); its
+// tabs under them. Overview: its sessions, what it holds in the Library, who it is shared with (ShareDialog.tsx) and
+// what every session in it gets (its folder, guidelines, documents, skills, assistant and memory), with a group's spaces. Then its Library, its files (SpaceFiles), its
 // knowledge (documents only its sessions search, with the shared ones too unless it leaves them out), its skills
 // (SpaceSkills) and its settings. It shows at once from the spaces the app knows, and fills in what it fetches.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Boxes, Brain, Check, ChevronRight, FolderOpen, FolderPlus, ListFilter, MessagesSquare, MoreHorizontal, Plus, ScrollText, Sparkles, SquarePen, Trash2, UserRound } from 'lucide-react';
+import { useSearch } from 'wouter';
+import { ArrowLeft, ArrowRight, BookOpen, Boxes, Brain, Check, ChevronRight, FolderOpen, FolderPlus, ListFilter, MessagesSquare, MoreHorizontal, Plus, ScrollText, Sparkles, SquarePen, Trash2, UserPlus, UserRound } from 'lucide-react';
 import type { KnowledgeBase } from '@shared/knowledge';
 import type { SessionSummary } from '@shared/types';
 import { isGroup, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, spaceColor, type Space, type SpaceView } from '@shared/spaces';
@@ -25,6 +26,7 @@ import { BackButton, NavButton, PageHeader } from '../layout/PageHeader';
 import { SpaceLibrary } from '../pages/Library';
 import { ActivityText } from '../sessions/SessionList';
 import { MemberPicker, memberNames, SpaceMark, startInSpace } from './parts';
+import { activityText, openShareDialog, PersonMark, ShareDialogHost, useShares } from './ShareDialog';
 import { SpaceFiles } from './SpaceFiles';
 import { SpaceSkillsTab } from './SpaceSkills';
 import { loadSpaces, useSpaces } from './state';
@@ -108,8 +110,8 @@ async function deleteSpace(s: Space, confirm: ReturnType<typeof useConfirm>[0]) 
 
 // ---- the top --------------------------------------------------------------------------------------------------
 
-/** The space's one menu: its folder in Files, only its sessions in the sidebar, and deleting it. */
-function SpaceMenu({ s }: { s: Space }) {
+/** The space's one menu: its folder in Files, only its sessions in the sidebar, sharing it with people, and deleting it (on its page and its card). */
+export function SpaceMenu({ s }: { s: Space }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
   const filter = useUI((x) => x.spaceFilter);
@@ -129,6 +131,9 @@ function SpaceMenu({ s }: { s: Space }) {
         </MenuItem>
         <MenuItem icon={<ListFilter size={15} />} checked={filter === s.id} onClick={pick(() => useUI.getState().set({ spaceFilter: filter === s.id ? null : s.id }))}>
           Only its sessions in the sidebar
+        </MenuItem>
+        <MenuItem icon={<UserPlus size={15} />} onClick={pick(() => openShareDialog(s))}>
+          Share with people
         </MenuItem>
         <MenuSep />
         <MenuItem icon={<Trash2 size={15} />} danger onClick={pick(() => void deleteSpace(s, confirm))}>
@@ -262,6 +267,7 @@ function OverviewTab({ s, view, keys }: { s: Space; view?: SpaceView; keys?: str
         </Card>
       </div>
       <aside className="min-w-0 space-y-5">
+        <SharedWith s={s} />
         <Card title="Every session here">
           <div className="divide-y divide-line border-t border-line">
             <Fact icon={<FolderOpen size={16} />} label="Folder" onClick={() => to('files')}>
@@ -311,6 +317,29 @@ function OverviewTab({ s, view, keys }: { s: Space; view?: SpaceView; keys?: str
         )}
       </aside>
     </div>
+  );
+}
+
+/** Who the project is shared with (ShareDialog.tsx), each with what they did last; nothing while it is shared with no one. */
+function SharedWith({ s }: { s: Space }) {
+  const { shares } = useShares(s.id);
+  if (!shares?.length) return null;
+  return (
+    <Card title="Shared with" count={shares.length} action={<CardLink onClick={() => openShareDialog(s)}>Share</CardLink>}>
+      <div className="divide-y divide-line border-t border-line">
+        {shares.map((sh) => (
+          <button key={sh.id} type="button" onClick={() => openShareDialog(s)} className="flex w-full min-w-0 items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-bg-1">
+            <PersonMark name={sh.name} size={28} />
+            <span className="min-w-0 flex-1">
+              <span translate="no" className="block truncate text-[13.5px] font-medium">
+                {sh.name}
+              </span>
+              <span className="block truncate text-[12px] text-fg-3">{activityText(sh)}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </Card>
   );
 }
 
@@ -583,6 +612,13 @@ function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void 
 export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
   const spaces = useSpaces();
   const view = spaces?.find((x) => x.id === id);
+  // Its address with ?share=1 (from the search box, the guide or an agent) opens the Share dialog.
+  const share = new URLSearchParams(useSearch()).get('share') === '1';
+  useEffect(() => {
+    if (!share || !view) return;
+    openShareDialog(view);
+    go(tabPath(id, tab), true);
+  }, [share, !!view]);
   const [data, setData] = useState<{ space: Space; sessions: string[] } | null>(null);
   const [gone, setGone] = useState(false);
   useEffect(() => {
@@ -625,6 +661,7 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
   const saved = (next: Space) => setData((d) => ({ space: next, sessions: d?.sessions ?? [] }));
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <ShareDialogHost />
       <Top s={s} view={view} tab={tab} />
       {tab === 'files' ? (
         // The folder scrolls in its own box, so the page keeps its height.

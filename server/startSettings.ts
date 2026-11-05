@@ -1,5 +1,5 @@
 // What the start page had picked last (the agent and each agent's model, effort and mode, the assistant,
-// the folder, memory and a spending cap), so it opens that way again, on every device. The page sends
+// the folder, memory, a spending cap and Confidential), so it opens that way again, on every device. The page sends
 // what changed; this keeps the whole, tidied, and leaves out a folder that is gone.
 import fs from 'node:fs';
 import { isAbsPath } from './platform.ts';
@@ -47,6 +47,7 @@ function tidy(x: unknown): StartSettings {
   if (cwd && isAbsPath(cwd)) s.cwd = cwd;
   if (typeof o.worktree === 'boolean') s.worktree = o.worktree;
   if (o.memory === false) s.memory = false;
+  if (o.confidential === true) s.confidential = true;
   if (typeof o.capUsd === 'number' && Number.isFinite(o.capUsd) && o.capUsd > 0 && o.capUsd <= 1_000_000) s.capUsd = o.capUsd;
   return s;
 }

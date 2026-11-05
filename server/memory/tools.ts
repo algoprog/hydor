@@ -4,6 +4,7 @@
 // Notes are found by words and, when search by meaning is on, by meaning; what recall returns counts as
 // used. Sessions with memory off are left out of the search, and cannot be read from here.
 import { isUserProfile, type MemoryEntry, type MemoryScope } from '../../shared/memory.ts';
+import { confidentialRun } from '../confidential/index.ts';
 import type { RunCtx, RunTool } from '../features/types.ts';
 import { ftsQuery } from '../indexer/index.ts';
 import { itemText, line } from '../mcp.ts';
@@ -11,10 +12,11 @@ import { sessionExtra } from '../sessionExtra.ts';
 import { embed, meaningReady } from './embed.ts';
 import { findNotes } from './search.ts';
 import { secretIn, steeringIn } from './secrets.ts';
-import { addEntry, cleanText, deleteEntry, entries, markUsed, placesOf, repoRoot, sameText, sessionMemoryOn, setExpiry, updateEntry, visibleEntry, type Place } from './store.ts';
+import { addEntry, cleanText, deleteEntry, entries, markUsed, memoryOn, placesOf, repoRoot, sameText, sessionMemoryOn, setExpiry, updateEntry, visibleEntry, type Place } from './store.ts';
 import { endOfDay } from './tidy.ts';
 import { nearest, setVectors } from './vectors.ts';
 import { USER_PROFILE } from './about-user.ts';
+import { RANK_BY_INTEREST } from './interest.ts';
 
 const SCOPES = ['global', 'repo', 'session'];
 const WHERE: Record<MemoryScope, string> = { global: 'about the user', repo: 'this project', session: 'this session' };
@@ -40,8 +42,12 @@ const entryLine = (e: MemoryEntry) =>
 /** Tells the pages that notes changed (Settings and open notes refresh). */
 export const changed = (ctx: Pick<RunCtx, 'deps'>) => ctx.deps.broadcast({ t: 'feature', id: 'memory', data: { changed: true } });
 
-function on(ctx: RunCtx) {
-  if (!sessionMemoryOn(ctx.deps.db, ctx.key)) throw new Error('Memory is off for this session: nothing was read or saved.');
+/** A confidential session reads memory, and keeps nothing in it (server/confidential). */
+const readsOnly = (ctx: RunCtx) => memoryOn(ctx.deps.db) && confidentialRun(ctx);
+
+function on(ctx: RunCtx, read = false) {
+  if (sessionMemoryOn(ctx.deps.db, ctx.key) || (read && readsOnly(ctx))) return;
+  throw new Error('Memory is off for this session: nothing was read or saved.');
 }
 
 /** "until" as an end time: a date (the end of that day) or a date and time, from now to five years on. */
@@ -146,7 +152,7 @@ const RECALL: RunTool = {
     },
   },
   async run(a, ctx) {
-    on(ctx);
+    on(ctx, true);
     const db = ctx.deps.db;
     const now = Date.now();
     const places = placesOf({ cwd: ctx.cwd, key: ctx.key }).filter((p) => !SCOPES.includes(a.scope) || p.scope === a.scope);
@@ -187,7 +193,7 @@ const SEARCH: RunTool = {
     required: ['query'],
   },
   async run(a, ctx) {
-    on(ctx);
+    on(ctx, true);
     const fts = ftsQuery(String(a.query ?? ''));
     if (!fts) throw new Error('query is empty');
     const db = ctx.deps.db;
@@ -252,7 +258,7 @@ const READ: RunTool = {
     required: ['key'],
   },
   async run(a, ctx) {
-    on(ctx);
+    on(ctx, true);
     const s = typeof a.key === 'string' ? ctx.deps.sessions.summary(a.key) : null;
     if (!s) throw new Error('No session with that key. search_sessions gives the keys.');
     if (sessionExtra(ctx.deps.db, s.key).memory === false) throw new Error('That session has memory turned off, so it cannot be read from here.');
@@ -264,8 +270,12 @@ const READ: RunTool = {
   },
 };
 
-/** The tools for one run: none when memory is off for its session; an app's steps have user_profile too. */
+/**
+ * The tools for one run: none when memory is off for its session (a confidential one only reads); an app's steps have
+ * user_profile and rank_by_interest too, and rank_by_interest even with memory off (it then goes by what the step gives
+ * and the user's projects alone).
+ */
 export function memoryTools(ctx: RunCtx): RunTool[] {
-  if (!sessionMemoryOn(ctx.deps.db, ctx.key)) return [];
-  return ctx.step ? [REMEMBER, FORGET, RECALL, SEARCH, READ, USER_PROFILE] : [REMEMBER, FORGET, RECALL, SEARCH, READ];
+  if (!sessionMemoryOn(ctx.deps.db, ctx.key)) return ctx.step ? [RANK_BY_INTEREST] : readsOnly(ctx) ? [RECALL, SEARCH, READ] : [];
+  return ctx.step ? [REMEMBER, FORGET, RECALL, SEARCH, READ, USER_PROFILE, RANK_BY_INTEREST] : [REMEMBER, FORGET, RECALL, SEARCH, READ];
 }

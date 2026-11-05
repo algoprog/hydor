@@ -1,9 +1,9 @@
 // A comment as the editors show it, beside a document's page or in a list of comments: who wrote it (you, an agent,
-// or someone named, with their initials), how long ago, what it says and the replies under it, with Reply, Resolve
-// (or Reopen), and in its menu Edit
-// and Delete. CommentBox is the field a new comment or a reply is written in: Ctrl+Enter sends it, Esc drops it.
-// Who and ago say who did something and when, for other notes of the editors as well (a tracked change).
-// What people and agents wrote is shown as written, never translated.
+// or someone named: a person a project is shared with, or a Word file's comments' author, with their initials), how
+// long ago, what it says and the replies under it, with Reply, Resolve (or Reopen), and in its menu Edit and Delete.
+// CommentBox is the field a new comment or a reply is written in: Ctrl+Enter sends it, Esc drops it. Who and ago say
+// who did something and when, for other notes of the editors as well (a tracked change). What people and agents wrote
+// is shown as written, never translated.
 import { useEffect, useRef, useState } from 'react';
 import { Bot, Check, MoreHorizontal, Pencil, RotateCcw, Trash2, User } from 'lucide-react';
 import type { Comment } from '@shared/comments';
@@ -21,6 +21,13 @@ export function ago(at: number): string {
   return d.toLocaleDateString(LOCALE, d.getFullYear() === now.getFullYear() ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+/** Who "you" are where comments show: the app's owner, or (in a shared project's portal, which sets it) that person's share. */
+let me: string | null = null;
+export const setCommentMe = (id: string | null) => void (me = id);
+
+/** Whether you wrote it: the owner's own, or in a shared project's portal, that person's. */
+export const isMine = (c: Pick<Comment, 'by' | 'who'>) => c.by === 'user' || (c.by === 'person' && !!me && c.who === me);
+
 /** A named author's initials ("ML" for Maria Lopez), and a colour of their own, the same each time. */
 function initials(name: string): { letters: string; hue: number } {
   const words = name.split(/\s+/).filter(Boolean);
@@ -30,24 +37,30 @@ function initials(name: string): { letters: string; hue: number } {
   return { letters, hue: h };
 }
 
-/** Who wrote it: you, an agent or someone named (a Word file's comments), with their icon or initials (for a tracked change too). */
-export function Who({ by, author }: { by: 'user' | 'agent'; author?: string }) {
-  if (author) {
-    const { letters, hue } = initials(author);
+/**
+ * Who wrote it: you, an agent, someone the project is shared with (by their name), or someone named (a Word file's
+ * comments), with their icon or initials (for a tracked change too).
+ */
+export function Who({ by, author, name, who }: { by: Comment['by']; author?: string; name?: string; who?: string }) {
+  const named = by === 'person' ? (isMine({ by, who }) ? undefined : name || 'Someone') : author;
+  if (named) {
+    const { letters, hue } = initials(named);
     return (
       <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium text-fg">
         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9.5px] font-semibold text-white" style={{ background: `hsl(${hue} 45% 45%)` }} translate="no">
           {letters}
         </span>
         <span className="truncate" translate="no">
-          {author}
+          {named}
         </span>
       </span>
     );
   }
   return (
-    <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-fg">
-      <span className={cx('flex h-5 w-5 items-center justify-center rounded-full', by === 'agent' ? 'bg-accent-soft text-accent' : 'bg-bg-3 text-fg-2')}>{by === 'agent' ? <Bot size={12} /> : <User size={12} />}</span>
+    <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium text-fg">
+      <span className={cx('flex h-5 w-5 shrink-0 items-center justify-center rounded-full', by === 'agent' ? 'bg-accent-soft text-accent' : 'bg-bg-3 text-fg-2')}>
+        {by === 'agent' ? <Bot size={12} /> : <User size={12} />}
+      </span>
       {by === 'agent' ? 'Agent' : 'You'}
     </span>
   );
@@ -140,13 +153,16 @@ export function CommentThread({
   onReply: (text: string) => void;
   onResolve: (resolved: boolean) => void;
   onEdit?: (text: string) => void;
-  onDelete: () => void;
+  /** Left out where it may not be deleted (someone else's, in a shared project's portal). */
+  onDelete?: () => void;
   readOnly?: boolean;
   className?: string;
 }) {
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
   const [replying, setReplying] = useState(false);
+  // In a shared project's portal, only your own comments can be deleted (the owner's app deletes any).
+  const deletable = !!onDelete && (!me || isMine(c));
   const more = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!active) setReplying(false);
@@ -157,7 +173,7 @@ export function CommentThread({
       className={cx('rounded-xl border bg-elevated p-2.5 text-[13px] transition-shadow', active ? 'border-accent/60 shadow-lg' : 'border-line hover:border-line-2', c.resolved && 'opacity-70', onFocus && 'cursor-pointer', className)}
     >
       <div className="flex items-center gap-2">
-        <Who by={c.by} author={c.author} />
+        <Who by={c.by} author={c.author} name={c.name} who={c.who} />
         <span className="shrink-0 text-[11.5px] text-fg-3">{ago(c.at)}</span>
         <span className="flex-1" />
         {!readOnly && (
@@ -172,19 +188,21 @@ export function CommentThread({
             >
               {c.resolved ? <RotateCcw size={14} /> : <Check size={15} />}
             </IconButton>
-            <IconButton
-              ref={more}
-              label="More"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenu((m) => !m);
-              }}
-            >
-              <MoreHorizontal size={15} />
-            </IconButton>
+            {((onEdit && isMine(c)) || deletable) && (
+              <IconButton
+                ref={more}
+                label="More"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenu((m) => !m);
+                }}
+              >
+                <MoreHorizontal size={15} />
+              </IconButton>
+            )}
             <Popover anchor={more} open={menu} onClose={() => setMenu(false)} align="end" width={180} title="Comment">
-              {onEdit && c.by === 'user' && !c.author && (
+              {onEdit && isMine(c) && !c.author && (
                 <MenuItem
                   icon={<Pencil size={14} />}
                   onClick={() => {
@@ -195,16 +213,18 @@ export function CommentThread({
                   Edit
                 </MenuItem>
               )}
-              <MenuItem
-                icon={<Trash2 size={14} />}
-                danger
-                onClick={() => {
-                  setMenu(false);
-                  onDelete();
-                }}
-              >
-                Delete
-              </MenuItem>
+              {deletable && (
+                <MenuItem
+                  icon={<Trash2 size={14} />}
+                  danger
+                  onClick={() => {
+                    setMenu(false);
+                    onDelete?.();
+                  }}
+                >
+                  Delete
+                </MenuItem>
+              )}
             </Popover>
           </>
         )}
@@ -235,7 +255,7 @@ export function CommentThread({
       {c.replies?.map((r) => (
         <div key={r.id} className="mt-2.5 border-t border-line/70 pt-2">
           <div className="flex items-center gap-2">
-            <Who by={r.by} author={r.author} />
+            <Who by={r.by} author={r.author} name={r.name} who={r.who} />
             <span className="shrink-0 text-[11.5px] text-fg-3">{ago(r.at)}</span>
           </div>
           <div translate="no" className="mt-1 whitespace-pre-wrap break-words text-fg">

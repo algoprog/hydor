@@ -1,0 +1,31 @@
+- title: ACL
+  description: Annual Meeting of the Association for Computational Linguistics
+  sub: AI
+  rank:
+    ccf: A
+    core: A*
+    thcpl: A
+  dblp: acl
+  confs:
+    - year: 2026
+      id: acl26
+      link: https://2026.aclweb.org/
+      timeline:
+        - deadline: '2025-10-06 23:59:59'
+          comment: 'ARR October cycle'
+        - deadline: '2026-01-05 23:59:59'
+          comment: 'ARR January cycle'
+        - deadline: '2026-03-14 23:59:59'
+          comment: 'ARR commitment; reviewed papers only'
+      timezone: UTC-12
+      date: July 5-7, 2026
+      place: San Diego, California, United States (Hybrid)
+    - year: 2027
+      id: acl27
+      link: https://2027.aclweb.org/
+      timeline:
+        - deadline: '2027-01-04 23:59:59'
+          comment: 'ARR Submission'
+      timezone: UTC-12
+      date: August 17-22, 2027
+      place: Kyoto, Japan

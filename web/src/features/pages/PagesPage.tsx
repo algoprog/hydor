@@ -17,6 +17,7 @@ import {
   Ellipsis,
   ExternalLink,
   FolderInput,
+  FolderTree,
   Globe,
   GlobeLock,
   History,
@@ -41,7 +42,8 @@ import { PublishDialog, RenameDialog } from './parts';
 import { SpaceMenu } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
 import { pageStore, previewStore, type AppBridge } from './frame';
-import { absolute } from './state';
+import { absolute, usePagesStore } from './state';
+import { FolderMenu, moveToFolder, placeFolders, placeTopName } from './folders';
 import { Studio, type StudioDoc } from './studio/Studio';
 import { tr } from '../../i18n/runtime';
 import { closePageAsk, openPageAsk, PageAskPanel, PageAskPill, usePageAsk } from './AskPage';
@@ -232,7 +234,12 @@ function PageView({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   // An older version on view.
   const [old, setOld] = useState<{ version: number; title: string; html?: string; model?: unknown } | null>(null);
-  const [menu, setMenu] = useState<'history' | 'more' | 'share' | 'export' | 'space' | null>(null);
+  const [menu, setMenu] = useState<'history' | 'more' | 'share' | 'export' | 'space' | 'folder' | null>(null);
+  // The Library's folders, for More → Move to a folder (loaded with the list, when it is not yet).
+  const folders = usePagesStore((s) => s.folders);
+  useEffect(() => {
+    if (!usePagesStore.getState().folders) usePagesStore.getState().loadPages().catch(() => {});
+  }, []);
   const spaces = useSpaces();
   const [dialog, setDialog] = useState<'rename' | 'publish' | 'data' | null>(null);
   const [scopes, setScopes] = useState<AskScope[]>([]);
@@ -547,7 +554,7 @@ function PageView({ id }: { id: string }) {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] text-fg">{v.version === data.page.version ? 'The latest' : v.title}</span>
                     <span className="block truncate text-[11.5px] text-fg-3">
-                      {ago(v.createdAt)} · {BY[v.by] ?? v.by}
+                      {ago(v.createdAt)} · {v.who ? <span translate="no">{v.who}</span> : (BY[v.by] ?? v.by)}
                       {v.steps ? ` · ${v.steps} saves` : ''} · {bytes(v.bytes)}
                     </span>
                   </span>
@@ -602,6 +609,11 @@ function PageView({ id }: { id: string }) {
                 Move to a project
               </MenuItem>
             )}
+            {!data.page.app && placeFolders(folders, data.page.space ?? null).length > 0 && (
+              <MenuItem icon={<FolderTree size={14} />} hint={<span translate="no">{folders?.find((f) => f.id === data.page.folder)?.name ?? ''}</span>} onClick={() => setMenu('folder')}>
+                Move to a folder
+              </MenuItem>
+            )}
             <MenuItem
               icon={<ExternalLink size={14} />}
               onClick={() => {
@@ -631,6 +643,15 @@ function PageView({ id }: { id: string }) {
                 })
                 .catch(toastError);
             }}
+          />
+          <FolderMenu
+            anchor={moreRef}
+            open={menu === 'folder'}
+            onClose={() => setMenu(null)}
+            folders={placeFolders(folders, data.page.space ?? null)}
+            value={data.page.folder ?? null}
+            topName={placeTopName(data.page.space ?? null, spaces)}
+            onPick={(f) => void moveToFolder({ kind: 'page', id }, f, placeTopName(data.page.space ?? null, spaces))}
           />
           <RenameDialog page={data.page} open={dialog === 'rename'} onClose={() => setDialog(null)} />
           <PublishDialog page={data.page} open={dialog === 'publish'} onClose={() => setDialog(null)} />

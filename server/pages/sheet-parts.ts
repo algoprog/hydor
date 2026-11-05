@@ -740,7 +740,11 @@ export function commentsXml(sh: Sheet, n: number): { comments: string; vml: stri
       const id = guid();
       authors.push(`tc=${id}`);
       list.push(`<comment ref="${k}" authorId="${authors.length - 1}" shapeId="0" xr:uid="${id}"><text>${tXml(THREAD_HEAD + threadWords(c))}</text></comment>`);
-      const who = (x: { by: 'user' | 'agent'; author?: string }) => (x.author ? personId(x.author) : PERSONS[x.by].id);
+      // Someone the project is shared with goes into the file by their name, as other named authors do.
+      const who = (x: { by: 'user' | 'agent' | 'person'; author?: string; name?: string }) => {
+        const named = x.by === 'person' ? x.name || x.author : x.author;
+        return named ? personId(named) : PERSONS[x.by === 'agent' ? 'agent' : 'user'].id;
+      };
       tc.push(`<threadedComment ref="${k}" dT="${stamp(c.at)}" personId="${who(c)}" id="${id}"${c.resolved ? ' done="1"' : ''}><text>${esc(c.text)}</text></threadedComment>`);
       for (const r of c.replies ?? []) tc.push(`<threadedComment ref="${k}" dT="${stamp(r.at)}" personId="${who(r)}" id="${guid()}" parentId="${id}"><text>${esc(r.text)}</text></threadedComment>`);
     } else {

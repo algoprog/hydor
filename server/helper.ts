@@ -56,6 +56,16 @@ export function helperOptions(db: DB) {
   };
 }
 
+/**
+ * The helper model when it runs on this computer or your private network (one of Custom's local models), else null:
+ * what a confidential session's titles, summaries and checks may use (server/confidential). "auto" is Claude's or
+ * Codex's, online.
+ */
+export function localHelper(db: DB): string | null {
+  const id = helperModelId(db);
+  return id !== 'auto' && customModels().find((m) => m.id === id)?.local ? id : null;
+}
+
 /** Whether the helper (or the given model) can look at images. */
 export function helperSees(db: DB, model?: string): boolean {
   const id = model ?? helperModelId(db);

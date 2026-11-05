@@ -12,6 +12,7 @@ import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { signWithKey } from '../links.ts';
 import { dropRefs, initAssets, noteRefs } from './assets.ts';
+import { fitFolder, initFolders } from './folders.ts';
 import { kindOf, mustKind, type PageKind, type PageMode } from './kinds.ts';
 
 export const MAX_PAGE = 2 * 1024 * 1024;
@@ -63,6 +64,11 @@ export function initPages(db: DB) {
   if (!cols.includes('app')) db.exec('alter table pages add column app text');
   // The space it belongs to (shared/spaces.ts), or none: the Library shows each space's pages together.
   if (!cols.includes('space')) db.exec('alter table pages add column space text');
+  // Who made a version, when it was someone the project is shared with (server/spaces/share.ts): their name.
+  if (!(db.prepare('pragma table_info(page_versions)').all() as { name: string }[]).some((c) => c.name === 'who')) db.exec('alter table page_versions add column who text');
+  // The Library folder it is in (folders.ts), or none: at its space's top.
+  if (!cols.includes('folder')) db.exec('alter table pages add column folder text');
+  initFolders(db);
   // A page's icon (the emoji the page editor puts at its top), for links to it in other pages: kept as each version is
   // saved, and read once from the pages saved before ('' for none).
   // Comments on its blocks (shared/page-comments.ts): kept with the page, outside its HTML, not by version.
@@ -115,16 +121,19 @@ interface Row {
   kind: string | null;
   app: string | null;
   space: string | null;
+  folder: string | null;
   icon: string | null;
   versions: number;
   bytes: number;
   by: PageVersion['by'] | null;
+  who: string | null;
   storage: number;
 }
 
 const SELECT = `select p.*, (select count(*) from page_versions v where v.page_id = p.id) as versions,
   (select bytes from page_versions v where v.page_id = p.id and v.version = p.version) as bytes,
   (select by from page_versions v where v.page_id = p.id and v.version = p.version) as by,
+  (select who from page_versions v where v.page_id = p.id and v.version = p.version) as who,
   (select coalesce(sum(bytes), 0) from page_storage s where s.page_id = p.id) as storage from pages p`;
 
 const toInfo = (r: Row): PageInfo => ({
@@ -138,10 +147,12 @@ const toInfo = (r: Row): PageInfo => ({
   updatedAt: r.updated_at,
   sessionKey: r.session_key ?? undefined,
   by: r.by ?? undefined,
+  ...(r.who ? { who: r.who } : {}),
   thumb: r.thumb ?? undefined,
   ...(kindOf(r.kind) ? { kind: r.kind as PageKind } : {}),
   ...(r.app ? { app: r.app } : {}),
   ...(r.space ? { space: r.space } : {}),
+  ...(r.folder ? { folder: r.folder } : {}),
   ...(r.icon ? { icon: r.icon } : {}),
 });
 
@@ -168,15 +179,16 @@ export function mustPage(db: DB, id: string): PageInfo {
 
 export function versionsOf(db: DB, id: string): PageVersion[] {
   return (
-    db.prepare('select version, title, bytes, created_at, by, steps from page_versions where page_id = ? order by version desc').all(id) as {
+    db.prepare('select version, title, bytes, created_at, by, steps, who from page_versions where page_id = ? order by version desc').all(id) as {
       version: number;
       title: string;
       bytes: number;
       created_at: number;
       by: PageVersion['by'];
       steps: number | null;
+      who: string | null;
     }[]
-  ).map((v) => ({ version: v.version, title: v.title, bytes: v.bytes, createdAt: v.created_at, by: v.by, ...(v.steps && v.steps > 1 ? { steps: v.steps } : {}) }));
+  ).map((v) => ({ version: v.version, title: v.title, bytes: v.bytes, createdAt: v.created_at, by: v.by, ...(v.steps && v.steps > 1 ? { steps: v.steps } : {}), ...(v.who ? { who: v.who } : {}) }));
 }
 
 /** A version as it is kept: a page's HTML, or another kind's text (the current version when `version` is left out). */
@@ -242,7 +254,11 @@ const safeJson = (s: string) => {
 
 const DEFAULT_TITLE: Record<string, string> = { slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', notebook: 'Notebook' };
 
-export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: PageKind; model?: unknown; by: PageVersion['by']; sessionKey?: string; sourceItem?: string; app?: string; space?: string | null; turn?: string }): PageInfo {
+/** A new page. `folder`: the Library folder it goes in, of its `space` (folders.ts placeFor makes the two agree). */
+export function createPage(
+  db: DB,
+  p: { title: unknown; html?: unknown; kind?: PageKind; model?: unknown; by: PageVersion['by']; sessionKey?: string; sourceItem?: string; app?: string; space?: string | null; folder?: string | null; turn?: string },
+): PageInfo {
   const kind = p.kind ?? 'page';
   const { text: html, sources } = contentOf(db, kind, p);
   const title = cleanTitle(p.title, DEFAULT_TITLE[kind] ?? 'Page');
@@ -251,7 +267,7 @@ export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: P
   let id = newId();
   while (db.prepare('select 1 from pages where id = ?').get(id)) id = newId();
   db.transaction(() => {
-    db.prepare('insert into pages (id, title, version, created_at, updated_at, session_key, source_item, link_nonce, kind, app, space) values (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+    db.prepare('insert into pages (id, title, version, created_at, updated_at, session_key, source_item, link_nonce, kind, app, space, folder) values (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
       id,
       title,
       now,
@@ -262,6 +278,7 @@ export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: P
       kind === 'page' ? null : kind,
       p.app ?? null,
       p.app ? null : (p.space ?? null),
+      p.app ? null : (p.folder ?? null),
     );
     db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by, turn) values (?, 1, ?, ?, ?, ?, ?, ?)').run(id, title, html, Buffer.byteLength(html), now, p.by, p.turn ?? null);
     if (kind === 'page') db.prepare('update pages set icon = ? where id = ?').run(iconOf(html), id);
@@ -278,12 +295,12 @@ export const FOLD_MS = 5 * 60_000;
  * session's, answering one message of its user) takes the place of the version before it when that was saved in the
  * same turn less than FOLD_MS ago: saves in a row are one version (the last), its number still the next one, so an
  * editor holding the one before hears that a newer one is there. A version the user made, kept or brought back is never
- * folded into. `onFold` hears which version went.
+ * folded into. `onFold` hears which version went. `who`: someone the project is shared with made it (their name).
  */
 export function addVersion(
   db: DB,
   id: string,
-  p: { title?: unknown; html?: unknown; model?: unknown; by: PageVersion['by']; turn?: string; onFold?: (version: number) => void },
+  p: { title?: unknown; html?: unknown; model?: unknown; by: PageVersion['by']; turn?: string; onFold?: (version: number) => void; who?: string },
 ): PageInfo {
   const cur = mustPage(db, id);
   const { text: html, sources } = contentOf(db, cur.kind ?? 'page', p);
@@ -296,7 +313,7 @@ export function addVersion(
       | undefined;
     const fold = !!last && p.by === 'agent' && !!p.turn && last.by === 'agent' && last.turn === p.turn && last.version === cur.version && now - last.created_at <= FOLD_MS;
     const next = ((db.prepare('select max(version) as v from page_versions where page_id = ?').get(id) as { v: number | null }).v ?? 0) + 1;
-    db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by, turn, steps) values (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+    db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by, turn, steps, who) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
       id,
       next,
       title,
@@ -306,6 +323,7 @@ export function addVersion(
       p.by,
       p.turn ?? null,
       fold ? (last!.steps ?? 1) + 1 : null,
+      p.who ?? null,
     );
     db.prepare('update pages set title = ?, version = ?, updated_at = ? where id = ?').run(title, next, now, id);
     if (!cur.kind) db.prepare('update pages set icon = ? where id = ?').run(iconOf(html), id);
@@ -333,7 +351,8 @@ export function copyPage(db: DB, id: string): PageInfo {
   const p = mustPage(db, id);
   const cur = pageSource(db, id)!;
   const title = cleanTitle(`${p.title} (copy)`);
-  return createPage(db, cur.kind === 'page' ? { title, html: cur.text, by: 'made', space: p.space } : { title, kind: cur.kind, model: mustKind(cur.kind).read(cur.text), by: 'made', space: p.space });
+  const place = { space: p.space, folder: p.folder };
+  return createPage(db, cur.kind === 'page' ? { title, html: cur.text, by: 'made', ...place } : { title, kind: cur.kind, model: mustKind(cur.kind).read(cur.text), by: 'made', ...place });
 }
 
 export function renamePage(db: DB, id: string, title: unknown): PageInfo {
@@ -342,11 +361,12 @@ export function renamePage(db: DB, id: string, title: unknown): PageInfo {
   return pageInfo(db, id)!;
 }
 
-/** Puts a page in a space (its id, checked by the caller), or in none. Moving it is not a change to the page. */
+/** Puts a page in a space (its id, checked by the caller), or in none; out of its folder unless that is of the space. Moving it is not a change to the page. */
 export function setPageSpace(db: DB, id: string, space: string | null): PageInfo {
   const p = mustPage(db, id);
   if (p.app) throw new HttpError(400, 'An app’s screen stays with its app');
   db.prepare('update pages set space = ? where id = ?').run(space, id);
+  fitFolder(db, 'pages', id);
   return pageInfo(db, id)!;
 }
 

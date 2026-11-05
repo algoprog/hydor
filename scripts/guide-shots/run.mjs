@@ -209,9 +209,9 @@ async function main() {
 }
 
 /** The faked parts: sessions waiting on a card, Claude Code's models, the plans' usage, the inbox, Settings → Models
- * and the models it suggests. */
+ * and the models it suggests, and Experiments' GPUs. */
 async function route(p, api, fake) {
-  await p.route(/\/api\/(sessions(\?|\/[^/?]+(\?|$))|usage|inbox|catalog\/claude|models(\?|$)|models\/picks)/, async (req) => {
+  await p.route(/\/api\/(sessions(\?|\/[^/?]+(\?|$))|usage|inbox|catalog\/claude|models(\?|$)|models\/picks|experiments\/queue)/, async (req) => {
     if (req.method !== 'GET') return null;
     const u = new URL(req.url);
     if (u.pathname === '/api/models') return { json: fake.models(await api('GET', u.pathname)) };
@@ -219,6 +219,10 @@ async function route(p, api, fake) {
     if (u.pathname === '/api/catalog/claude') return { json: { ...(await api('GET', u.pathname)), models: CATALOG.claude } };
     if (u.pathname === '/api/usage') return { json: { ...fake.usage, accounts: {} } };
     if (u.pathname === '/api/inbox') return { json: { items: fake.inbox } };
+    if (u.pathname === '/api/experiments/queue') {
+      const { gpuNote, ...q } = await api('GET', u.pathname);
+      return { json: { ...q, gpus: fake.gpus } };
+    }
     if (u.pathname === '/api/sessions') {
       const list = await api('GET', u.pathname + u.search);
       const patch = (x) => (fake.live[x.key] ? { ...x, live: fake.live[x.key].live } : x);

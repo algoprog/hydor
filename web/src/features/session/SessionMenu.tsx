@@ -4,6 +4,7 @@
 import { useState, type ReactNode, type RefObject } from 'react';
 import { AlarmClock, Archive, ArrowRightLeft, CheckCheck, CircleEllipsis, Copy, FileDiff, FolderCode, FolderOpen, GitBranch, GitFork, GitPullRequest, Link2, Pencil, Pin, Shrink, SlidersHorizontal, Square, SquareTerminal, Target, Trash2 } from 'lucide-react';
 import type { Agent, SessionSummary } from '@shared/types';
+import { isConfidential } from '@shared/confidential';
 import { del, enc, post } from '../../lib/api';
 import { activityOf, isBusy } from '../../lib/activity';
 import { setFlags, settle } from '../../lib/flags';
@@ -64,9 +65,11 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
   const working = running && isBusy(activityOf(s));
   // Custom (the app's own agent) forks and keeps goals like Claude Code and Codex; other ACP agents do not.
   const custom = s.agent === 'acp' && s.acpAgent === 'console';
+  // A confidential session stays on this computer: no read-only link, no pull request, no other agent.
+  const closed = isConfidential(s.extra);
   // Claude Code and Codex hand the conversation to each other, and to Custom once it has a model (a Codex
   // session open elsewhere is read-only here).
-  const handsOff = s.agent === 'claude' || (s.agent === 'codex' && (running || !s.external));
+  const handsOff = !closed && (s.agent === 'claude' || (s.agent === 'codex' && (running || !s.external)));
   const targets: { agent: Agent; acp?: string }[] = handsOff ? [{ agent: s.agent === 'claude' ? 'codex' : 'claude' }, ...(customReady ? [{ agent: 'acp' as const, acp: 'console' }] : [])] : [];
   const resumeCmd = s.agent === 'claude' ? `cd ${s.cwd ?? '~'} && claude --resume ${s.id}` : `codex resume ${s.id}`;
 
@@ -87,9 +90,11 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
             <MenuItem icon={<FileDiff size={15} />} onClick={() => (close(), go(`/review/${enc(s.key)}`))}>
               Review the changes
             </MenuItem>
-            <MenuItem icon={<GitPullRequest size={15} />} onClick={() => (close(), onPullRequest())}>
-              {s.pr ? `Pull request #${s.pr.number}` : 'Open a pull request'}
-            </MenuItem>
+            {(!closed || s.pr) && (
+              <MenuItem icon={<GitPullRequest size={15} />} onClick={() => (close(), onPullRequest())}>
+                {s.pr ? `Pull request #${s.pr.number}` : 'Open a pull request'}
+              </MenuItem>
+            )}
           </>
         )}
         {s.worktree && (
@@ -197,9 +202,11 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
           </MenuItem>
         )}
         <FeatureMenuItems s={s} close={close} part="main" />
-        <MenuItem icon={<Link2 size={15} />} onClick={() => (close(), show('share'))}>
-          Share a read-only link
-        </MenuItem>
+        {!closed && (
+          <MenuItem icon={<Link2 size={15} />} onClick={() => (close(), show('share'))}>
+            Share a read-only link
+          </MenuItem>
+        )}
         <MenuSep />
         {(s.cwd || s.worktree) && (
           <MenuItem icon={<FolderCode size={15} />} submenu onClick={() => enter('code')}>

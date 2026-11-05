@@ -38,7 +38,7 @@ import { DEFAULT_TASK_ROOT, taskRoot } from './assistants/store.ts';
 import { WORK_DIR as APPS_WORK_DIR } from './apps/runs.ts';
 import { FRAME_CSP, FRAME_HTML } from './notebook/frame.ts';
 import { accessOk, accessTokens, bearerOf, createAccessToken, machineInfo, Machines, revokeAccessToken } from './machines.ts';
-import { createMcpToken, mcpRoutes, mcpTokens, PAGE_CSP, PAGE_FRAME_HTML, revokeMcpToken, runOf } from './mcp.ts';
+import { createMcpToken, mcpRoutes, mcpTokens, OFFLINE_PAGE_CSP, PAGE_CSP, PAGE_FRAME_HTML, revokeMcpToken, runOf } from './mcp.ts';
 import { ModelManager } from './models/manager.ts';
 import { clients as agentClients, clientUpdates, ensureCommand, install as installClient, setClientAutoUpdate, startClientUpdates, watchClients } from './clients.ts';
 import { MODES as CONSOLE_MODES } from './agent/prompt.ts';
@@ -49,6 +49,7 @@ import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAc
 import { devServerShot, listDevServers, livePreview, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
 import { moveFileComments } from './pages/filecomments.ts';
+import { movedPdfNotes } from './pdfnotes/index.ts';
 import * as setup from './setup.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
 import { onDesktop, tellDesktop } from './desktop.ts';
@@ -68,9 +69,12 @@ import { setOneShotAccounts } from './oneshot.ts';
 import { appWords } from './language/index.ts';
 import { noteEvents, notesOf } from './notes.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
+import { isConfidential } from '../shared/confidential.ts';
+import { checkExtraChange, confidentialKey, privateHelper, privateNotice } from './confidential/index.ts';
 import { localNow, setUserTimezone, userTimezone } from './userPrefs.ts';
 import { codexFolderNames } from './codex-projects.ts';
 import { folderOrigins } from './sidebar/origins.ts';
+import { useMachines } from './experiments/remote.ts';
 
 ensureDirs();
 ensureProbeDir();
@@ -87,6 +91,8 @@ const system = new SystemMonitor();
 const kernels = new Kernels();
 const push = new Push(db, config.dataDir);
 const machines = new Machines(db);
+// Experiments sends jobs to other machines and lists their runs.
+useMachines(machines);
 const SYSTEM_CHANNEL = '@system';
 
 agentBaseEnv(); // capture the login environment once, up front
@@ -353,6 +359,7 @@ app.post('/api/sessions', async (req) => {
   const prompt = typeof b.prompt === 'string' ? b.prompt : undefined;
   // Other models picked for the arena: the same prompt goes to each, in a match (server/arena).
   const others = arenaOf(extra);
+  if (others && isConfidential(extra)) throw new HttpError(400, 'The arena sends your message to other models, so it is off in a confidential session.');
   const opts: CreateOpts = {
     acpAgent: b.agent === 'acp' ? b.acpAgent : undefined,
     agent: b.agent,
@@ -790,8 +797,14 @@ app.post('/agent/run/:token/describe', async (req, reply) => {
     .slice(0, 6)
     .map((i) => ({ data: String(i.data), mimeType: String(i.mimeType) }));
   if (!images.length) return reply.code(400).send({ error: 'No image to describe' });
-  if (!helperSees(db)) return reply.code(409).send({ error: 'no helper model that sees images is set (pick one in Settings → Models)' });
+  // A confidential session's images go only to a helper model on this computer that sees them.
+  const live = sessions.liveByRun(runOf((req.params as { token: string }).token)!);
+  const conf = !!live && confidentialKey(db, live.key);
+  const model = conf ? privateHelper({ db, sessions }, live!.key, { sees: true }) : undefined;
+  if (conf && !model) return reply.code(409).send({ error: 'in a confidential session only a helper model on this computer that sees images may describe them (Settings → Models → Helper model)' });
+  if (!conf && !helperSees(db)) return reply.code(409).send({ error: 'no helper model that sees images is set (pick one in Settings → Models)' });
   const text = await helper(db, {
+    ...(model ? { model } : {}),
     system: [
       'You describe images for an assistant that cannot see them. Say what each image shows, so the assistant can work with it: the kind of image (photo, screenshot, chart, document, diagram), the main things in it and where they are, and any text in it, copied exactly.',
       'For a screenshot, name the app or page, its main parts and controls, what is selected or shown, and any messages or errors. For a chart or table, give the values. Be factual and complete but brief; do not guess what cannot be seen.',
@@ -1020,8 +1033,9 @@ app.put('/api/fs/write', async (req) => {
 app.post('/api/fs/mkdir', async (req) => files.makeDir((req.body as any)?.path));
 app.post('/api/fs/rename', async (req) => {
   const r = await files.renamePath((req.body as any)?.from, (req.body as any)?.to);
-  // The comments the app keeps on LaTeX files go with them (and with a folder's files).
+  // The comments the app keeps on LaTeX files go with them (and with a folder's files), and the notes on PDFs.
   moveFileComments(db, files.resolvePath((req.body as any)?.from), r.path);
+  movedPdfNotes(db, files.resolvePath((req.body as any)?.from), r.path);
   return r;
 });
 app.post('/api/fs/delete', async (req) => files.deletePath((req.body as any)?.path, { forGood: (req.body as any)?.forGood === true }));
@@ -1151,6 +1165,8 @@ app.get('/api/git/compare', async (req) => gitRepos.compare(repoPath(req), gitSt
 app.get('/api/git/branch-only', async (req) => gitRepos.branchOnly(repoPath(req), gitStr(req, 'branch')));
 app.post('/api/git/tag', async (req) => gitRepos.tag(repoPath(req), gitStr(req, 'name'), gitStr(req, 'hash'), gitStr(req, 'message') || undefined));
 app.post('/api/git/push-tags', async (req) => gitRepos.pushTags(repoPath(req), gitStr(req, 'name') || undefined));
+app.get('/api/git/tags', async (req) => gitRepos.tags(repoPath(req)));
+app.get('/api/git/resolve', async (req) => ({ commit: await gitRepos.resolve(repoPath(req), gitStr(req, 'ref')) }));
 app.post('/api/git/stash', async (req) => {
   const b = gitArgs(req);
   return gitRepos.stash(repoPath(req), String(b.message ?? ''), b.untracked !== false);
@@ -1449,7 +1465,9 @@ function pushed(n: NotifyEvent) {
   const approval = a && { ...a, title: tr(a.title), approve: { ...a.approve, label: tr(a.approve.label) }, deny: { ...a.deny, label: tr(a.deny.label) } };
   return { n: { ...n, approval }, t: noticeText(n, tr) };
 }
-sessions.on('notify', (n: NotifyEvent) => {
+sessions.on('notify', (event: NotifyEvent) => {
+  // A confidential session's notices say only that it finished, needs you or failed, without its words.
+  const n = privateNotice(db, event, appWords(db));
   broadcast({ t: 'notify', n });
   // A notification shows a title and a body: the session's name, then the status and the reply.
   const p = pushed(n);
@@ -1671,9 +1689,13 @@ app.get('/guest-api/:token', async (req, reply) => {
   if (!s) return reply.code(404).send({ error: 'The session is gone' });
   const tl = await sessions.timeline(key);
   const from = Math.max(0, Math.min(Number(q.from) || 0, tl.parser.items.length));
+  // Each with its place in the whole timeline (`pos`): the page asks again from a place, and thinking is left out here.
   const items = tl.parser.items
     .slice(from)
-    .map((it) => guestItem(previewItem(it)))
+    .map((it, i) => {
+      const g = guestItem(previewItem(it));
+      return g ? { ...g, pos: from + i } : null;
+    })
     .filter(Boolean);
   reply.header('Cache-Control', 'no-store').header('X-Robots-Tag', 'noindex');
   return { title: s.title, agent: s.agent, acpName: s.acpName, status: s.live?.status ?? 'idle', from, total: tl.parser.items.length, items };
@@ -1697,7 +1719,10 @@ noteEvents.on('removed', (note) => toSubscribers(note.key, { t: 'note', key: not
 app.get('/api/sessions/:key/extra', async (req) => ({ extra: sessionExtra(db, (req.params as { key: string }).key) }));
 app.patch('/api/sessions/:key/extra', async (req) => {
   const key = (req.params as { key: string }).key;
-  const extra = setSessionExtra(db, key, (req.body ?? {}) as Record<string, unknown>);
+  const patch = (req.body ?? {}) as Record<string, unknown>;
+  // Confidential is set when a session starts and stays; memory stays off in one (server/confidential).
+  checkExtraChange(db, key, patch);
+  const extra = setSessionExtra(db, key, patch);
   sessions.queueSummary(key);
   return { extra };
 });
@@ -1764,6 +1789,8 @@ app.register(async (scope) => {
   // Signed links to files (HTML previews) and read-only session links: the machine checks them, as it does for itself.
   scope.get('/m/:id/view/*', { compress: false }, (req, reply) => machines.forward(req, reply, (req.params as { id: string }).id, rest(req)));
   scope.get('/m/:id/guest-api/:token', { compress: false }, (req, reply) => machines.forward(req, reply, (req.params as { id: string }).id, rest(req)));
+  // A project shared from that machine (its people's own links): the machine checks the token.
+  scope.route({ method: ['GET', 'HEAD', 'POST'], url: '/m/:id/p-api/*', compress: false, handler: (req, reply) => machines.forward(req, reply, (req.params as { id: string }).id, rest(req)) });
   scope.get('/m/:id/ws', { websocket: true }, (ws: WebSocket, req) => machines.relay(ws, (req.params as { id: string }).id, rest(req)));
   scope.get('/m/:id/ws/term/:tid', { websocket: true }, (ws: WebSocket, req) => machines.relay(ws, (req.params as { id: string }).id, rest(req)));
 });
@@ -1774,7 +1801,14 @@ app.delete('/api/mcp/tokens/:id', async (req) => {
   return { ok: true };
 });
 // Pages agents show (show_html) render here, sandboxed like notebook outputs.
-app.get('/htmlframe', async (_req, reply) => reply.header('Content-Security-Policy', PAGE_CSP).header('Cache-Control', 'no-cache').type('text/html; charset=utf-8').send(PAGE_FRAME_HTML));
+// ?offline=1: a confidential session's pages, which load nothing from anywhere.
+app.get('/htmlframe', async (req, reply) =>
+  reply
+    .header('Content-Security-Policy', (req.query as Record<string, string>).offline === '1' ? OFFLINE_PAGE_CSP : PAGE_CSP)
+    .header('Cache-Control', 'no-cache')
+    .type('text/html; charset=utf-8')
+    .send(PAGE_FRAME_HTML),
+);
 
 // Notebook HTML outputs render here, in a sandboxed frame with its own (permissive) policy.
 app.get('/nbframe', async (_req, reply) => reply.header('Content-Security-Policy', FRAME_CSP).header('Cache-Control', 'no-cache').type('text/html; charset=utf-8').send(FRAME_HTML));

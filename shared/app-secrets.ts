@@ -23,7 +23,12 @@ export interface AppSecret {
   query?: string;
   /** The app runs without it, doing less. */
   optional?: boolean;
+  /** Only these of its flows need it ("run" is the main one): asked for when one of them runs. Unset: all of them. */
+  flows?: string[];
 }
+
+/** Whether a flow of an app needs a key (one that names its flows only for those; the main flow is "run"). */
+export const neededBy = (s: Pick<AppSecret, 'flows'>, flow = 'run') => !s.flows?.length || s.flows.includes(flow);
 
 /** A key an app needs, as its pages show it: whether the vault has it (and its masked end). */
 export type AppSecretState = AppSecret & { have: boolean; hint?: string };
@@ -73,6 +78,10 @@ export function cleanSecrets(raw: unknown): { secrets?: AppSecret[]; errors: str
       else errors.push(`The key ${name}: a query parameter's name has letters, digits, dots, dashes and underscores`);
     }
     if (o.optional === true) s.optional = true;
+    if (Array.isArray(o.flows)) {
+      const flows = [...new Set(o.flows.map((f) => String(f).trim()).filter((f) => /^[A-Za-z][A-Za-z0-9_-]{0,39}$/.test(f)))].slice(0, 20);
+      if (flows.length) s.flows = flows;
+    }
     if (!s.domains && !s.commands) errors.push(`The key ${name}: say where it may go (domains, like ["api.example.com"]) or that commands use it (commands: true), or nothing can use it`);
     out.push(s);
   }

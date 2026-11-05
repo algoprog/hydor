@@ -39,6 +39,8 @@ onFeatureEvent('media', ({ data }) => {
   const e = data as MediaEvent;
   if (e.item) useMedia.getState().put(e.item);
   if (e.removed) useMedia.getState().drop(e.removed);
+  // Many changed at once (a Library folder deleted or moved): the list again, when it is loaded.
+  if (e.reload && useMedia.getState().items) useMedia.getState().load().catch(() => {});
 });
 
 /** The item kept from a file, by its path. */

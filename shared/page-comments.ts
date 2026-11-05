@@ -133,7 +133,7 @@ const when = (at: number) => new Date(at).toISOString().slice(0, 16).replace('T'
 export function commentsForAgent(list: PageComment[]): string {
   if (!list.length) return '';
   const open = list.filter((c) => !c.resolved).length;
-  const who = (by: 'user' | 'agent') => (by === 'agent' ? 'an agent' : 'the user');
+  const who = (by: 'user' | 'agent' | 'person') => (by === 'agent' ? 'an agent' : by === 'person' ? 'someone the user shared the project with' : 'the user');
   return [
     `Comments (${open} open, ${list.length - open} resolved), each on a block of the page:`,
     ...list.flatMap((c) => [

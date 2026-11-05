@@ -64,7 +64,7 @@ import {
   type Validation,
   type Workbook,
 } from '../../shared/sheets.ts';
-import { newCommentId } from '../../shared/comments.ts';
+import { authorForAgent, newCommentId } from '../../shared/comments.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { all, att, kid, kids, parseXml, patt, scan, textOf, type El } from '../documents/xml.ts';
@@ -337,7 +337,7 @@ function commentsForAgent(book: Workbook): string[] {
   const list = book.sheets.flatMap((sh) => (sh.comments ?? []).map((c) => ({ sh, c })));
   if (!list.length) return [];
   const open = list.filter((x) => !x.c.resolved).length;
-  const who = (x: { by: 'user' | 'agent'; author?: string }) => (x.author ? `“${x.author}”` : x.by === 'agent' ? 'an agent' : 'the user');
+  const who = (x: Parameters<typeof authorForAgent>[0]) => authorForAgent(x);
   return [
     '',
     `Comments (${open} open, ${list.length - open} resolved), each on a cell:`,

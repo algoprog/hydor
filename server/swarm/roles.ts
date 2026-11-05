@@ -1,20 +1,22 @@
-// Who is who in a swarm: its lead (a session started in Swarm mode) and its members (the lead's child
-// sessions). Kept by run as each agent starts, since an agent lists its tools before the app has stored a
-// new session's settings; read from those settings otherwise.
+// Who is who in a swarm: its lead (a session started in Swarm mode, as a swarm or a campaign) and its members
+// (the lead's child sessions). Kept by run as each agent starts, since an agent lists its tools before the app
+// has stored a new session's settings; read from those settings otherwise.
 import type { SessionExtra } from '../../shared/features.ts';
-import { leadsSwarm } from '../../shared/swarm.ts';
+import { swarmMode, type SwarmMode } from '../../shared/swarm.ts';
 import type { DB } from '../db.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 
-export type SwarmRole = { role: 'lead' } | { role: 'member'; swarm: string };
+export type SwarmRole = { role: 'lead'; mode: SwarmMode } | { role: 'member'; swarm: string; mode: SwarmMode };
 
 const byRun = new Map<string, SwarmRole>();
 
 /** The role of a session starting with these settings: a lead, a member (its parent leads a swarm), or none. */
 export function roleFromExtra(db: DB, extra: SessionExtra | undefined): SwarmRole | null {
-  if (leadsSwarm(extra)) return { role: 'lead' };
+  const own = swarmMode(extra);
+  if (own) return { role: 'lead', mode: own };
   const p = extra?.parent;
-  return typeof p === 'string' && p && leadsSwarm(sessionExtra(db, p)) ? { role: 'member', swarm: p } : null;
+  const theirs = typeof p === 'string' && p ? swarmMode(sessionExtra(db, p)) : null;
+  return theirs ? { role: 'member', swarm: p as string, mode: theirs } : null;
 }
 
 /** Noted as an agent starts (Feature.spawn), for its run. */

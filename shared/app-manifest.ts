@@ -397,9 +397,40 @@ export function appInfo(id: string, r: Pick<AppRecipe, 'name' | 'fields' | 'answ
 }
 
 /** Tools a step may call on its own, outside a session: they answer without a conversation to answer in. */
-export const STEP_TOOLS = ['web_search', 'read_page', 'find_media', 'http_request', 'read_document', 'generate_image', 'knowledge_search', 'knowledge_read', 'recall', 'user_profile', 'notify_user'];
-/** Of those, the ones only steps have (agents in sessions don't): what the user is like, from memory and their sessions' titles. */
-export const STEP_ONLY_TOOLS = ['user_profile'];
+export const STEP_TOOLS = [
+  'web_search',
+  'read_page',
+  'find_media',
+  'http_request',
+  'read_document',
+  'generate_image',
+  'knowledge_search',
+  'knowledge_read',
+  'recall',
+  'user_profile',
+  'notify_user',
+  'rank_by_interest',
+  'work_log',
+  'experiment_run',
+  'experiment_sweep',
+  'experiment_list',
+  'experiment_get',
+  'experiment_wait',
+  'experiment_table',
+  'save_sheet',
+  'save_doc',
+  'save_slides',
+  'save_latex',
+  'save_page',
+  'read_paper',
+  'reading_list',
+  'zotero_sync',
+];
+/**
+ * Of those, the ones only steps have (agents in sessions don't): what the user is like, from memory and their sessions'
+ * titles; papers ranked by it; what they did in a period; waiting hours for runs to end; papers found, read and kept.
+ */
+export const STEP_ONLY_TOOLS = ['user_profile', 'rank_by_interest', 'work_log', 'experiment_wait', 'read_paper', 'reading_list', 'zotero_sync'];
 
 /**
  * Values every step can use beside the form's answers and the steps' values: the moment, in the user's time

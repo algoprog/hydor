@@ -7,7 +7,7 @@
 // another of the Library's pages opens that page in the app.
 // In Edit, the frame holds the visual editor (editor.ts): what it picks and changes comes back here, and
 // what it asks for (an emoji, a picture, maths…) is chosen in the app and sent back to it.
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { KIT_CSS } from '@shared/page-kit';
 import { codeColoursScript, hasCode } from '@shared/code-colours';
 import { cleanAnchor, type PageAnchor } from '@shared/page-comments';
@@ -419,6 +419,7 @@ export function PageFrame({
   ui?: UiBridge;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
+  const offline = useContext(OfflineFrames);
   const cb = useRef({ html, store, onHeight, onPick, fill, app, ui });
   cb.current = { html, store, onHeight, onPick, fill, app, ui };
   const nRef = useRef('');
@@ -436,7 +437,7 @@ export function PageFrame({
       const changed = d.data;
       if (appId && changed?.app === appId) w.postMessage({ type: 'wa-app-event', n, kind: 'data', collection: changed.collection }, '*');
       if (uiApp && d.run && (d.run.app === uiApp || d.run.app === `tpl:${uiApp}`)) w.postMessage({ type: 'wa-ui-run', n, run: d.run }, '*');
-      if (uiApp && changed?.app === uiApp) w.postMessage({ type: 'wa-ui-data', n, collection: changed.collection }, '*');
+      if (uiApp && changed && (changed.app === uiApp || changed.app === `tpl:${uiApp}`)) w.postMessage({ type: 'wa-ui-data', n, collection: changed.collection }, '*');
     });
   }, [appId, uiApp]);
   // A view's new values (its run changed, a follow-up updated its answer): it draws itself again with them.
@@ -566,9 +567,9 @@ export function PageFrame({
   return (
     <iframe
       ref={ref}
-      src="/htmlframe"
+      src={frameSrc(offline)}
       title={title}
-      sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
+      sandbox={offline ? OFFLINE_SANDBOX : SANDBOX}
       // A slide deck's own page may go full screen to present; an app's view copies what its events copy.
       allow={[isDeckPage(html) && 'fullscreen', ui && 'clipboard-write'].filter(Boolean).join('; ') || undefined}
       className={cx(FRAME_CLS, className)}
@@ -580,6 +581,14 @@ export function PageFrame({
 export const isDeckPage = (html: string) => html.slice(0, 6000).includes('<script type="application/json" id="n-deck">');
 
 const SANDBOX = 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals';
+
+/**
+ * Frames inside a confidential session's view (server/confidential): its pages load nothing from anywhere, send no
+ * form and open no window (the server's OFFLINE_PAGE_CSP), so a page can't carry off what it shows.
+ */
+export const OfflineFrames = createContext(false);
+const OFFLINE_SANDBOX = 'allow-scripts allow-modals';
+const frameSrc = (offline: boolean) => (offline ? '/htmlframe?offline=1' : '/htmlframe');
 
 /** A page's relative addresses (its pictures, its styles) resolved against `base`: an HTML file's own folder. */
 export function withBase(html: string, base?: string): string {
@@ -597,6 +606,7 @@ export function withBase(html: string, base?: string): string {
  */
 export function StreamFrame({ html, base, title = 'Page', onHeight, className }: { html: string; base?: string; title?: string; onHeight?: (h: number) => void; className?: string }) {
   const ref = useRef<HTMLIFrameElement>(null);
+  const offline = useContext(OfflineFrames);
   const st = useRef({ ready: false, sent: '', n: '', html, base, onHeight, timer: 0 });
   st.current.html = html;
   st.current.base = base;
@@ -642,7 +652,7 @@ export function StreamFrame({ html, base, title = 'Page', onHeight, className }:
       push();
     }, 160);
   }, [html]);
-  return <iframe ref={ref} src="/htmlframe" title={title} sandbox={SANDBOX} className={cx(FRAME_CLS, className)} />;
+  return <iframe ref={ref} src={frameSrc(offline)} title={title} sandbox={offline ? OFFLINE_SANDBOX : SANDBOX} className={cx(FRAME_CLS, className)} />;
 }
 
 /** What the visual editor says of the part picked (editor.ts `info`). */
@@ -788,6 +798,7 @@ export const EditFrame = forwardRef<
   }
 >(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, className }, handle) {
   const ref = useRef<HTMLIFrameElement>(null);
+  const offline = useContext(OfflineFrames);
   const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys });
   cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys };
   const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>(), anchorWaits: new Map<number, (list: { id: string; on: PageAnchor }[]) => void>() });
@@ -880,7 +891,7 @@ export const EditFrame = forwardRef<
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
   }, []);
-  return <iframe ref={ref} src="/htmlframe" title={title} sandbox={SANDBOX} className={cx(FRAME_CLS, className)} />;
+  return <iframe ref={ref} src={frameSrc(offline)} title={title} sandbox={offline ? OFFLINE_SANDBOX : SANDBOX} className={cx(FRAME_CLS, className)} />;
 });
 
 export type Device = 'desktop' | 'tablet' | 'phone';

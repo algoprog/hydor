@@ -1,0 +1,162 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/kaufqFIcgOvq4Q/CpeABQDG78Qs</id>
+  <title>arXiv Query: search_query=(cat:cs.IR OR cat:cs.CL) AND submittedDate:"202611030000 TO 202611052359"&amp;id_list=&amp;start=0&amp;max_results=50</title>
+  <updated>2026-11-05T21:10:57Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=(cat:cs.IR+OR+cat:cs.CL)+AND+submittedDate:%22202611030000+TO+202611052359%22&amp;start=0&amp;max_results=50&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>50</opensearch:itemsPerPage>
+  <opensearch:totalResults>4</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  
+  <entry>
+    <id>http://arxiv.org/abs/2611.06914v1</id>
+    <title>A Framework for Context Enrichment and Selective Robustness in LLM Social Agents</title>
+    <updated>2026-11-04T18:58:23Z</updated>
+    <link href="https://arxiv.org/abs/2611.06914v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2611.06914v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Researchers use large language models as agents in social simulations, where agents are prompted with observations and background information intended to shape their actions. Yet LLM agents have been shown to substantially change their behavior under meaning-preserving prompt variations, creating a validation problem for social simulation. One plausible hypothesis is that this brittleness reflects a lack of grounding and can be reduced by enriching the context provided to the agents. Whether richer context improves robustness remains unclear, in part because context richness and robustness are rarely defined in ways that support controlled comparisons. We address the first need with controlled context enrichment, a set of prompt substitution rules that systematically enriches distinct types of context: neutral padding, generic social background, descriptive decision grounding, and normative decision grounding. We address the second by introducing selective robustness as a validation criterion: insensitivity to meaning-preserving prompt variation combined with a directional response to decision-relevant changes in the social world. We demonstrate the framework in a Prisoner's Dilemma-like game, showing how it can be used to identify which forms of context enrichment produce more desirable and robust agent behavior. We find that these forms of enrichment produce distinct behavioral patterns that vary between the two models tested.</summary>
+    <category term="cs.MA" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-11-04T18:58:23Z</published>
+    <arxiv:comment>Accepted to the SocialAgent Workshop @ NeurIPS 2026. 12 pages, 1 figure, 2 tables</arxiv:comment>
+    <arxiv:primary_category term="cs.MA"/>
+    <author>
+      <name>Mattia Greiche</name>
+    </author>
+    <author>
+      <name>Reihaneh Rabbany</name>
+    </author>
+    <author>
+      <name>Maximilian Puelma Touzel</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2611.06876v1</id>
+    <title>SpecCompact: Accelerating LLM Agent Context Compaction with Slot-Parallel Semantic Speculative Verification</title>
+    <updated>2026-11-04T18:34:41Z</updated>
+    <link href="https://arxiv.org/abs/2611.06876v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2611.06876v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>LLM agents use context compaction to manage growing interaction histories, but summarizing long histories with large models can introduce substantial delays. Compaction therefore requires balancing information retention against latency. We observe that structured summary slots can retain information when generated independently. Based on this observation, we present SpecCompact, a framework that accelerates compaction through slot-parallel semantic speculation. SpecCompact fine-tunes a small drafter and generates slots in parallel. The target model verifies each proposed line and repairs rejected content, while subsequent drafting uses the updated slot prefix. System optimizations further reduce repeated context processing and model calls. Across AppWorld and $τ^3$ benchmarks with two target models, SpecCompact achieves $2.04$--$5.63\times$ compaction speedups over Hermes-style summarization. Separate downstream evaluations reveal model- and task-dependent performance trade-offs. A user study within Hermes further shows an $8.68\times$ median compaction speedup.</summary>
+    <category term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-11-04T18:34:41Z</published>
+    <arxiv:primary_category term="cs.CL"/>
+    <author>
+      <name>Yulu An</name>
+    </author>
+    <author>
+      <name>Yifei Feng</name>
+    </author>
+    <author>
+      <name>Xiangyang Yin</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2611.06859v1</id>
+    <title>Balancing hierarchical representation and quantization: A performance trade-off in text embeddings</title>
+    <updated>2026-11-04T18:15:08Z</updated>
+    <link href="https://arxiv.org/abs/2611.06859v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2611.06859v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Hierarchical text embedding models offer variable-length representations, while quantization reduces numerical precision; both aim to improve computational efficiency. This work is an empirical benchmark study of how these two orthogonal, already-established techniques interact. We evaluate 38 tasks from the Massive Text Embedding Benchmark (MTEB) using four transformer-based embedding models, covering 1D and 2D hierarchical representations combined with 32-bit, 8-bit, and binary quantization, for 168 configurations per task. We report each efficiency dimension separately: theoretical per-vector storage and end-to-end evaluation time. Under a Friedman test with Nemenyi post-hoc analysis, int8 quantization is statistically indistinguishable from float32 for pair classification and re-ranking and costs at most 1.5 percentage points overall, whereas binary quantization is significantly worse across every task category. Halving the embedding dimension once is not statistically detectable above $m=16$; two successive halvings always are. Combining an 8x dimensionality reduction with int8 yields a 32x reduction in per-vector storage at 94.4% of baseline effectiveness. Because evaluation times were measured once, we treat them as indicative: we find no evidence that quantization speeds up evaluation, whereas sampling from intermediate layers shortens it substantially. Retrieval degrades far faster than every other category, so we report findings per task category.</summary>
+    <category term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.IR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-11-04T18:15:08Z</published>
+    <arxiv:comment>29 pages. Authors' version of the open access article published in Information Sciences (CC BY 4.0). This version corrects the second affiliation of Marco Polignano (Otto von Guericke University Magdeburg); the published version lists the European Commission, Joint Research Centre (JRC) in error. Marco Polignano is not affiliated with the JRC. No other content has been changed</arxiv:comment>
+    <arxiv:primary_category term="cs.CL"/>
+    <arxiv:journal_ref>Information Sciences 763 (2027) 124271</arxiv:journal_ref>
+    <author>
+      <name>Kai Ponel</name>
+    </author>
+    <author>
+      <name>Marco Polignano</name>
+    </author>
+    <author>
+      <name>Erasmo Purificato</name>
+    </author>
+    <author>
+      <name>Aylin Julia Temizkan</name>
+    </author>
+    <author>
+      <name>Marco Levantesi</name>
+    </author>
+    <author>
+      <name>Giovanni Semeraro</name>
+    </author>
+    <author>
+      <name>Ernesto William De Luca</name>
+    </author>
+    <arxiv:doi>10.1016/j.ins.2026.124271</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1016/j.ins.2026.124271" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2611.06856v1</id>
+    <title>LongBanana: An Expert-Verified Benchmark for Long-Context Multi-Reference Image Synthesis</title>
+    <updated>2026-11-04T18:11:56Z</updated>
+    <link href="https://arxiv.org/abs/2611.06856v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2611.06856v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We introduce LongBanana, to our knowledge the first expert-designed and expert-verified benchmark for long-context multi-reference image synthesis in the age of agent-driven image generation. The task requires retrieving dispersed visual evidence, rejecting distractors, binding entities and relations, and composing one coherent final image from multiple references. LongBanana contains 90 carefully designed tasks organized by a 3-by-3 taxonomy; each task includes about 32 reference images, 20 constraints, and 50 evaluation items, yielding 4,670 expert-specified atomic evaluation items in total. Its graph-grounded evaluation design instantiates each task with reference images and an entity-relation graph, then converts node, edge, and whole-graph obligations into checklist items for Content Fidelity, Relational Binding, and Global Constraint Satisfaction. Reviewed expert labels include a 15% double-labeled subset with 89.4% exact agreement and 0.83 quadratic weighted kappa. We further introduce LongBanana-Gen, an agent-harness framework for long-horizon image generation; experiments show that minimal agent harnesses improve over direct generation, while a ReAct-Plan-Exec-Reflect (RPR) workflow yields harness-dependent gains by strengthening evidence grounding and repair. Together, LongBanana provides an auditable testbed for measuring dense visual evidence use and a shared target for developing stronger agent-driven image-generation systems. Code and data are available at the project page: https://long-banana.com/.</summary>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-11-04T18:11:56Z</published>
+    <arxiv:comment>NeurIPS 2026 Evaluations and Datasets Track. Project page: https://long-banana.com/</arxiv:comment>
+    <arxiv:primary_category term="cs.CV"/>
+    <author>
+      <name>Haoxiang Cao</name>
+    </author>
+    <author>
+      <name>Yuxuan Zhang</name>
+    </author>
+    <author>
+      <name>Penghui Du</name>
+    </author>
+    <author>
+      <name>Bo Li</name>
+    </author>
+    <author>
+      <name>Jiajiong Cao</name>
+    </author>
+    <author>
+      <name>Yingying Fan</name>
+    </author>
+    <author>
+      <name>Zimeng Wu</name>
+    </author>
+    <author>
+      <name>Yifu Luo</name>
+    </author>
+    <author>
+      <name>Mingzhe Zheng</name>
+    </author>
+    <author>
+      <name>Junwen Miao</name>
+    </author>
+    <author>
+      <name>Huaisong Zhang</name>
+    </author>
+    <author>
+      <name>Yang Yao</name>
+    </author>
+    <author>
+      <name>Yu Wang</name>
+    </author>
+    <author>
+      <name>Dongfu Jiang</name>
+    </author>
+    <author>
+      <name>Ping Nie</name>
+    </author>
+    <author>
+      <name>Wenhu Chen</name>
+    </author>
+    <author>
+      <name>Chaoqun Wang</name>
+    </author>
+    <author>
+      <name>Changqian Yu</name>
+    </author>
+    <author>
+      <name>Kelsey R. Allen</name>
+    </author>
+  </entry>
+</feed>

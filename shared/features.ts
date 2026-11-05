@@ -13,8 +13,8 @@ export interface SessionExtra {
   capUsd?: number;
   /** The session that started this one, for a child session. */
   parent?: string;
-  /** Swarm: this session leads a team of agents that attack its task from different angles. */
-  swarm?: boolean;
+  /** Swarm: this session leads a team of agents that attack its task from different angles (true), or a campaign that makes one big change part by part ("campaign"). */
+  swarm?: boolean | 'campaign';
   /** Deep research: this session leads a research, with these settings (shared/research.ts). */
   research?: ResearchSettings;
   /** The arena: on the start page, the other models to run the same prompt on; on a session, its match's id. */
@@ -23,6 +23,8 @@ export interface SessionExtra {
   space?: string;
   /** Agent Guidelines for this session alone (shared/guidelines.ts). */
   guidelines?: string;
+  /** Confidential: models on this computer only, nothing sent out, commands without network (shared/confidential.ts). Set when it starts, never removed. */
+  confidential?: true;
   /** Any other capability's settings, under its own name. */
   [field: string]: unknown;
 }

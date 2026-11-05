@@ -3,8 +3,8 @@
 // enjoy now (about half from their work, half from their life, never anything private), searches each topic's news
 // of the past two weeks and long reads, reads the best pages side by side, finds their pictures and writes the cover.
 // It opens on its own page (the view's "app" page shows the latest edition), never in a session (sessions: false),
-// and can make a new edition every day by itself (its page's Update every day, a scheduled task). Its form is its
-// settings: how many sessions it reads, what to always cover and what to leave out.
+// and can make a new edition by itself (its page's Update automatically, a scheduled task: every morning, or on the
+// days you pick). Its form is its settings: how many sessions it reads, what to always cover and what to leave out.
 //
 // The programs are JavaScript as the code steps show them: String.raw keeps their backslashes as written, so none of
 // them uses a backtick or a template literal.

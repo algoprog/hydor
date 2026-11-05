@@ -10,7 +10,10 @@ import { toast, toastError } from '../../lib/store';
 import { Button, cx, inputCls, Throbber } from '../../components/ui';
 
 /** A key as the pages get it (GET /api/apps/:id/secrets): whether the vault has it, and what it does not allow yet. */
-export type KeyState = Pick<AppSecretState, 'name' | 'label' | 'help' | 'url' | 'optional'> & { have?: boolean; hint?: string; blocked?: string[]; noCommands?: boolean };
+export type KeyState = Pick<AppSecretState, 'name' | 'label' | 'help' | 'url' | 'optional' | 'flows'> & { have?: boolean; hint?: string; blocked?: string[]; noCommands?: boolean };
+
+/** The keys a flow needs ("run", the main one, unless said): those that name no flows, and those that name it. */
+export const keysFor = (keys: KeyState[] | undefined, flow = 'run') => (keys ?? []).filter((k) => !k.flows?.length || k.flows.includes(flow));
 
 /** What the person typed, by key name, and the saved keys they let go to the app's hosts too. */
 export interface KeyInput {

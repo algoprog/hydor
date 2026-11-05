@@ -10,7 +10,7 @@ Claude Code only runs Anthropic's models, and Codex only OpenAI's. Custom runs a
 
 Use Custom when you want:
 
-- a model that never leaves your computer (Ollama or vLLM);
+- a model that never leaves your computer (Ollama or vLLM), or a whole session that doesn't: a [confidential session](/guide/sessions#keep-a-session-confidential) always runs on Custom;
 - a particular model, such as DeepSeek, Qwen, GLM or Kimi;
 - to keep costs down, or to work when your Claude or ChatGPT plan is used up.
 
@@ -109,7 +109,7 @@ Each step that would ask goes through these checks in order:
    - **ask**: it could do lasting harm or reaches further (deleting data, installing software for the whole system, changing settings, using passwords or keys, sending or publishing anything, spending money, or something you didn't ask for);
    - **deny**: it is clearly harmful or against what you want. The step doesn't run; Custom is told why and must find another way.
 
-The quick check sees only your own messages in the session (the first one and the latest ten), the goal if you set one, the folder and the step itself (for an edit, the start of the new text). It never sees what Custom read, so a web page or a file can't talk it into anything. If the check fails or takes more than 45 seconds, you decide. Within one turn the same step gets the same answer.
+The quick check sees only your own messages in the session (the first one and the latest ten), the goal if you set one, the folder and the step itself (for an edit, the start of the new text). It never sees what Custom read, so a web page or a file can't talk it into anything. If the check fails or takes more than 45 seconds, you decide. Within one turn the same step gets the same answer. In a [confidential session](/guide/sessions#keep-a-session-confidential) the check stays on this computer: the helper model does it when it runs here, else the session's own model.
 
 In the session, a step Auto let through carries a small **Auto** label; hover over it for the reason. A step Auto stopped shows the label in red; hover over it for "Auto stopped this: …" and the reason. A card Auto sends to you starts with "Auto:" and the reason.
 
@@ -124,6 +124,8 @@ When a command runs into the sandbox's walls, Custom is told it ran in a sandbox
 To turn it on or off, open [Settings → Capabilities → Custom](/settings?s=custom&find=Sandbox%20for%20commands) and use the switch by **Sandbox for commands**. It's on by default. Turn it off if a tool must write elsewhere, for example to install something for the whole system. The change applies to running sessions within about 15 seconds.
 
 The sandbox uses bubblewrap, a Linux tool. If it isn't installed, or can't run (as in some containers), the switch is greyed out and the section says so; commands then run without a sandbox. In Ask and Accept edits, commands don't use the sandbox: there, every command that does more than look around waits for your OK, or for a rule you saved with **Always allow**.
+
+In a [confidential session](/guide/sessions#keep-a-session-confidential) every command runs without network, in every mode and whatever this switch says: in a network of its own with nothing in it, so it can't reach the internet, your other computers or this one's servers. Its files stay as the mode has them. Where bubblewrap can't do that, each command asks you first, in every mode, with no **Always allow**. Custom is told, and a command that tries the network hears why it failed.
 
 ## Give Custom a goal
 
@@ -186,7 +188,7 @@ When Custom stops a turn for one of these reasons, the reply ends with "(Stopped
 
 A model that sees images gets your pictures directly. Pictures are made smaller first when this computer has ffmpeg or ImageMagick.
 
-For a model that doesn't see images, the helper model describes each picture in words: what it shows, where things are, and any text in it, copied exactly. This needs a helper model that sees images: open [Settings → Agents → Models](/settings?s=models&find=Helper%20model) and pick one marked "sees images" under **Helper model**. "Automatic" can't. Without one, Custom tells the model there is a picture it can't see.
+For a model that doesn't see images, the helper model describes each picture in words: what it shows, where things are, and any text in it, copied exactly. This needs a helper model that sees images: open [Settings → Agents → Models](/settings?s=models&find=Helper%20model) and pick one marked "sees images" under **Helper model**. "Automatic" can't. Without one, Custom tells the model there is a picture it can't see. In a confidential session only a helper model on this computer describes pictures.
 
 ## Forks and Edit from here
 
@@ -220,5 +222,6 @@ Custom's models are in [Settings → Agents → Models](/settings?s=models), and
 - "Let Custom's goals run for up to 100 rounds."
 - "Set a goal on my Custom session 'Upload page': npm test passes and uploads of 2 GB work."
 - "Which helper model does Auto mode use, and can it see images?"
+- "Can this computer run my confidential sessions' commands without network?"
 - "Add Qwen3 Coder from OpenRouter so I can use it with Custom." (once your OpenRouter key is set)
 - "Show my OpenRouter usage and costs without entering model prices."

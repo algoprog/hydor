@@ -32,7 +32,8 @@ export interface AppKey {
 /** An app that opens on its own page: the answers it runs with from there, and whether (and when) it updates every day. */
 export interface HomeSettings {
   inputs: Record<string, string>;
-  daily: { on: boolean; time: string };
+  /** Update automatically: on or off, the time, and the days of the week (0 is Sunday; unset: every day). */
+  daily: { on: boolean; time: string; days?: number[] };
 }
 
 export interface AppDetail {
@@ -49,7 +50,7 @@ export interface AppDetail {
   env?: EnvView;
   /** What its own page's view keeps (an app whose view has pages for its own page). */
   view?: Record<string, unknown>;
-  /** Such an app's settings there: the answers it runs with from its page, and Update every day. */
+  /** Such an app's settings there: the answers it runs with from its page, and Update automatically. */
   home?: HomeSettings;
   /** When its latest run of its main flow ended well. */
   latest?: number;
