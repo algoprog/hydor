@@ -51,26 +51,67 @@ Beside them, the screen buttons show the page as on a **Computer**, a **Tablet**
 ### Edit by clicking
 
 1. Click a part of the page: a heading, a paragraph, a picture, a card, a table. It gets a frame with its name ("Heading 2", "Picture", "Card"), and a small bar beside it.
-2. Click it again (or double-click it) to change its words where they are. A bar over the words has **Bold**, **Italic**, **Underline**, **Strike through**, **Make it a link** (Ctrl+K), **Not a link**, **Plain words** and **Done**. Enter starts a new line in a paragraph and finishes a heading; Esc finishes.
-3. The bar beside a picked part: drag its handle (⠿) to move the part elsewhere on the page; **Pick the part around it** (Esc does the same); **Change the words**; **Move up** and **Move down**; **Duplicate** (Ctrl+D); **Delete** (the Delete key). Drag the small handles on its right edge, bottom edge and corner to make it wider or taller.
+2. Click it again (or double-click it) to write in it: the caret goes where you clicked. While you write, a click in other words goes on writing there. Select some words and a bar over them has the kind of block they are in (**Text**, **Heading 1**, **Bulleted list**…, to turn it into another), **Bold**, **Italic**, **Underline**, **Strike through**, **Code** (Ctrl+E), **Colour and highlight** (a colour for the words, or one behind them), **Make it a link** (Ctrl+K), **Not a link**, **Plain words** and **Done**. On a phone the bar shows as soon as you write. Esc stops writing and picks the block.
+3. The bar beside a picked part: drag its handle (⠿) to move the part elsewhere on the page, or click it for the part's menu (as the ⋮⋮ beside a block has, below); **Pick the part around it** (Esc does the same); **Change the words**; **Move up** and **Move down**; **Duplicate** (Ctrl+D); **Delete** (the Delete key). Drag the small handles on its right edge, bottom edge and corner to make it wider or taller.
 
-The keys work as in other editors: Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste the part picked (into another page too, while the app is open); Ctrl+G wraps it in a block and Ctrl+Shift+G takes out what is in it; the arrow keys pick the part above, below, around it or in it; Alt+↑ and Alt+↓ move it.
+The keys work as in other editors: Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste the part picked (into another page too, while the app is open); Ctrl+G wraps it in a block and Ctrl+Shift+G takes out what is in it; the arrow keys pick the part above, below, around it or in it; Alt+↑ and Alt+↓ move it. The keyboard button at the end of the bar over the page (or Ctrl+Shift+/) lists every key, with a field to find one.
 
-On a phone, tap a part to pick it and tap it again to change its words. The tabs below the page (**Part**, **Layers**, **Page**) open a drawer with what you can change; the arrow folds it, and it folds by itself while you type.
+On a phone, tap a part to pick it and tap it again to write in it. The tabs below the page (**Part**, **Layers**, **Page**) open a drawer with what you can change; the arrow folds it, and it folds by itself while you type.
 
-**Add** puts a new part after the one picked, inside it, or at the end of the page (pick where with **Put it**): **Basics** (a heading, text, a button, a link, a picture, a list, a quote, a divider, some empty space), **Layout** (a section, two or three columns, a card, cards, a table, numbers, a fold-out, a field) and ready-made **Sections** (an introduction, features, prices, steps, questions, praise, a call to act, a contact form, a footer). Its words are ready to type where that fits.
+**Add** puts a new part after the one picked, inside it, or at the end of the page (pick where with **Put it**): **Basics** (a heading, text, a button, a link, a picture, a list, a to-do list, a callout, a quote, a divider, some empty space), **Layout** (a section, two or three columns, a card, cards, a table, numbers, a fold-out, a table of contents, a field) and ready-made **Sections** (an introduction, features, prices, steps, questions, praise, a call to act, a contact form, a footer). Its words are ready to type where that fits.
 
-**Undo** (Ctrl+Z) and **Redo** (Ctrl+Shift+Z) step through your changes.
+**Undo** (Ctrl+Z) and **Redo** (Ctrl+Shift+Z) step through your changes. While you write, Ctrl+Z takes back the last words you typed first, then each change before, a block at a time, and the caret goes back where it was.
+
+### Write as in Notion
+
+Once you write in a paragraph, a heading or a list, the words flow from block to block as in Notion or a word processor:
+
+- **Enter** at the end of a block makes the next one and puts the caret in it: a paragraph after a heading, the next item in a list. Enter in the middle splits the block in two; Enter in an empty item leaves the list. **Shift+Enter** is a line break in the same block.
+- **Backspace** at the start of a block joins it to the block before (an empty block goes). At the start of a list's item, a quote or a callout, it first turns it back into a paragraph; at the start of a block after a picture or a line across, it picks that part, so another Backspace deletes it.
+- **↑** and **↓** on the first or last line go on into the block above or below; **Tab** and **Shift+Tab** nest a list's item under the one before it and take it back out.
+- An empty block shows a quiet hint ("Type ‘/’ for commands", "Heading 1", "To-do", "List") that is never part of the page.
+- Click below the last block to start a new paragraph at the end; the **+** under the last block does the same and lists the blocks to add.
+- To-dos tick in **Edit** too (a click on the box), and the page keeps the tick; a toggle's triangle opens or folds it. In **Use**, to-dos tick and toggles open and fold as anywhere.
+
+Markdown works as you type: "# ", "## " and "### " at a paragraph's start make headings, "- " or "* " a bulleted list, "1. " a numbered list, "[] " a to-do, "> " a quote, "```" a code block and "---" a line across. \*\*bold\*\*, \*italic\*, \`code\` and \~\~struck\~\~ change as you type the closing mark. Ctrl+Z right after takes the change back to what you typed. Pasting several lines makes a block of each.
+
+### Add blocks
+
+Type **/** in an empty block, or after a space, and a list of blocks opens under the caret. Keep typing to filter it ("/to" finds **To-do list**), pick with the arrows and Enter (or a click), and Esc closes it. What you typed after the / goes away. In an empty block, the block becomes the one you picked; after some words, the new block comes under them.
+
+- **Text**, **Heading 1** to **Heading 3**, **Bulleted list**, **Numbered list**, **To-do list**, **Toggle list** (a title that opens to show what is under it), **Quote**, **Callout** (an emoji and words on a tinted box: click the emoji to change it), **Divider** and **Code**.
+- **Table**, **Button**, **Two columns**, **Three columns**, **Card** and **Table of contents** (links to the page's headings, kept up to date as you change them).
+- **Picture** (from this device or a web address), **Video** (a YouTube or Vimeo address: the page shows its still, and a click plays it), **Maths** (LaTeX, drawn as you type it; change it later on the Part tab) and **Emoji** (picked by name, the ones you used lately first) open beside the caret.
+
+Drop a picture from your computer onto the page, or paste one, and it lands where you dropped it (or after the block you are writing in), made small enough to live in the page.
+
+### Move, turn and colour blocks
+
+Point at a block and two buttons show in the margin on its left:
+
+- **+** adds a block under it and opens the list of blocks (Alt-click adds it above).
+- **⋮⋮** moves it: drag it up or down, and a line shows where it lands, between blocks or into an empty column. Click it for the block's menu: **Turn into** (any kind of block, keeping its words), **Colour** (a colour for its words, or one behind the whole block, from a palette that suits light and dark pages), **Add a block below**, **Duplicate**, **Move up**, **Move down**, **Copy**, **Delete** and, in a conversation, **Ask the agent** (it puts a note in your message box saying which block you mean).
+
+On a phone, tap a block to pick it, then tap its handle (⠿) on the bar beside it for the same menu.
+
+Keys for blocks: Ctrl+/ opens **Turn into**; Ctrl+Alt+0 turns a block into text, Ctrl+Alt+1 to 3 into a heading, Ctrl+Shift+7 into a numbered list, Ctrl+Shift+8 a bulleted list and Ctrl+Shift+9 a to-do list (the same keys again turn a list back into text); Ctrl+Shift+↑ and Ctrl+Shift+↓ move the block; Ctrl+D duplicates it; Ctrl+Enter ticks a to-do, opens or folds a toggle, and leaves a code block.
+
+To pick several blocks, Shift+click them (from the one picked to the one you click, when they sit together), or press beside the blocks (in the margin on their right, say) and drag down across them. Delete, Duplicate, Move, Copy, **Turn into** and **Colour** then act on all of them, and so do the changes on the **Part** tab.
+
+### An icon and a cover
+
+As in Notion, a page can have an icon (an emoji above its title) and a cover (a band of colour or a picture across its top). Point at the page's first heading and **Add an icon** and **Add a cover** show above it; the **Page** tab has them too, under **Icon and cover**. An icon is picked by name, like an emoji. A cover is one of a few gradients, **A picture from this device**, or a picture's web address. Click the icon to change it or **Remove the icon**; point at the cover for **Change cover** and **Remove**.
 
 ### Part, Layers and Page
 
 Beside the page (under it in a narrow panel or on a phone), three tabs show what you can change.
 
-**Part** is the part picked, with the parts around it above (click one to pick it). At the top: **Ask the agent** (in a conversation: it puts a note in your message box saying which part you mean, so you only say what to change; changes not saved yet are saved first, so the agent sees them), **Copy**, **Paste**, and **More** (⋯) with **Cut**, **Paste inside it**, **Wrap in a block**, **Take out what is in it**, **Duplicate**, **Show it on the page** and **Delete**. Under them, which parts the changes are for: **This part**, every part of its kind ("Every Heading 2") or every part with one of its classes ("Every .card"); and **Normal** or **Hover**, the look while the pointer is over it (the page shows that look while you change it). Then its groups, which fold:
+**Part** is the part picked, with the parts around it above (click one to pick it). At the top: **Ask the agent** (in a conversation: it puts a note in your message box saying which part you mean, so you only say what to change; changes not saved yet are saved first, so the agent sees them), **Copy**, **Paste**, and **More** (⋯) with **Cut**, **Paste inside it**, **Wrap in a block**, **Take out what is in it**, **Duplicate**, **Show it on the page** and **Delete**. With several blocks picked, a note says so, and what you change goes to all of them. Then its groups, which fold; the ones most people use are open (**Content**, **Text**, **Fill and border**), the others wait until you open them, and each remembers whether you left it open:
 
-- **Content**: its words; for a heading or text, its **Kind** (H1, H2, H3, Text, quote); for a link, where it **Goes to** and whether it opens in a **New tab**; for a picture, its address or **A picture from this device** (made small enough to live in the page) and its **Description**.
-- **Text**: **Font**, size and weight, **Spacing** (the height of its lines, the space between its letters), **Colour**, **Align** and **Style** (italic, underlined, struck through, capitals).
-- **Fill and border**: **Fill**, a **Picture** behind it, **See-through**, **Corners**, **Border** and **Shadow**.
+- **Content**: its words; for a block of words, its **Kind** (text, a heading, a list, a to-do list, a toggle list, a quote, a callout or code: pick another to turn it into that, keeping its words); for a link, where it **Goes to** and whether it opens in a **New tab**; for a picture, its address or **A picture from this device** (made small enough to live in the page) and its **Description**; for maths, its LaTeX.
+- Which parts the changes below are for: **This part**, every part of its kind ("Every Heading 2") or every part with one of its classes ("Every .card"); and **Normal** or **Hover**, the look while the pointer is over it (the page shows that look while you change it).
+- **Text**: **Colour**, size and weight, **Style** (italic, underlined, struck through, capitals), **Align**, **Font** and **Spacing** (the height of its lines, the space between its letters).
+- **Fill and border**: **Fill**, **Corners**, **Border**, **Shadow**, a **Picture** behind it and **See-through**.
 - **Space**: the space **Outside** its border and **Inside** it, side by side as the part has them. Type a number, or drag one up or down.
 - **Size**: its **Width** and how wide it may be at most, its **Height** and how tall at least, and how a picture **Fit**s its size.
 - **Layout**: how the parts in it **Show** (one under another, in a row, in a column, in a grid, or hidden), how they line up and spread out, the gap between them, and its **Place**: where it falls, moved from there, on its block, on the screen, or stuck while the page scrolls.
@@ -83,6 +124,7 @@ The name of a setting turns gold when something is set there; the ✕ beside it 
 **Page** is the whole page:
 
 - **The page**: its **Title** (the name in a browser's tab), **Background**, **Width** (how wide its content runs on a big screen, in the middle: **Full**, **Wide**, **Medium** or **Narrow**), **Inside space** and **Language**.
+- **Icon and cover**: the page's icon (an emoji above its title) and its cover (a gradient, or a picture from this device or the web), as in [An icon and a cover](#an-icon-and-a-cover).
 - **Colours**: the colours the page names (its CSS variables; for a page made with the app's ready-made look, its **Background**, **Cards**, **Text**, **Accent** and the rest). They start as your theme's colours. Change one and everything that uses it changes with it, and it stays so in any theme.
 - **Fonts**: the font of its **Text** and of its **Headings**: the device's own, or one of Google's, which the page then loads.
 - **Text styles**: how **Text**, **Heading 1** to **Heading 3**, **Links** and **Buttons** look everywhere in the page. A part you changed on its own keeps its change.
@@ -587,6 +629,8 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "I sent my packing list's address to the wrong person: give it a new address."
 - "Publish the trip plan at a private link", or "unpublish the site we made last week."
 - "Make the headings on my landing page smaller on phones, and its buttons rounder."
+- "On my trip page, make the packing list a to-do list, put the tips in a callout and add a table of contents at the top."
+- "Give my reading list page a cover and a book as its icon."
 - "Make me 10 slides for a talk on our first year, with a chart of sales and speaker notes."
 - "On my 'Launch plan' slides, make every title shorter and add a closing slide."
 - "Send me the 'Launch plan' slides as a PowerPoint file, and the report page as a PDF."
