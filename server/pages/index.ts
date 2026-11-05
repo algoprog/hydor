@@ -152,7 +152,7 @@ const SAVE_PAGE: RunTool = {
     const id = typeof a.id === 'string' && a.id.trim() ? a.id.trim() : null;
     const other = id ? kindOf(mustPage(db, id).kind) : null;
     if (other) throw new Error(`Page ${id} is a ${other.noun}: change it with ${other.tool}.`);
-    const p = id ? addVersion(db, id, { title: a.title, html: a.html, by: 'agent' }) : createPage(db, { title: a.title, html: a.html, by: 'agent', sessionKey: ctx.key, space: sessionSpace(db, ctx.key) });
+    const p = id ? addVersion(db, id, { title: a.title, html: a.html, by: 'agent' }) : createPage(db, { title: a.title, html: a.html, by: 'agent', ...madeBy(ctx, a.project) });
     tell(ctx.deps, { what: 'pages' });
     refreshThumbs(ctx.deps, [p.id]);
     return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.`;
@@ -201,10 +201,21 @@ function changing(db: Deps['db'], a: Record<string, unknown>, kind: PageKind): s
   return id;
 }
 
-/** Keeps what an agent made: a new version of the page it named, or a new page of its session. */
-function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknown, model: unknown) {
+/**
+ * Whose a new page is: an agent's goes with its session (and the session's project); an app's step has no session, so
+ * it goes in the project the step names (by its name or id), or in none.
+ */
+function madeBy(ctx: RunCtx, project: unknown): { sessionKey?: string; space: string | null } {
+  if (!ctx.step) return { sessionKey: ctx.key, space: sessionSpace(ctx.deps.db, ctx.key) };
+  const s = typeof project === 'string' ? project.trim().toLowerCase() : '';
+  const all = s ? allSpaces(ctx.deps.db) : [];
+  return { space: (all.find((x) => x.id.toLowerCase() === s) ?? all.find((x) => x.name.trim().toLowerCase() === s))?.id ?? null };
+}
+
+/** Keeps what an agent (or an app's step) made: a new version of the page it named, or a new page of its own. */
+function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknown, model: unknown, project?: unknown) {
   const db = ctx.deps.db;
-  const p = id ? addVersion(db, id, { title, model, by: 'agent' }) : createPage(db, { title, kind, model, by: 'agent', sessionKey: ctx.key, space: sessionSpace(db, ctx.key) });
+  const p = id ? addVersion(db, id, { title, model, by: 'agent' }) : createPage(db, { title, kind, model, by: 'agent', ...madeBy(ctx, project) });
   tell(ctx.deps, { what: 'pages' });
   refreshThumbs(ctx.deps, [p.id]);
   return p;
@@ -217,7 +228,7 @@ const SAVE_SLIDES: RunTool = {
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'slides');
     const { deck, notes } = await agentDeck(ctx.deps.db, { ratio: a.ratio, theme: a.theme, slides: a.slides, footer: a.footer, guides: a.guides }, ctx.cwd);
-    const p = keepModel(ctx, id, 'slides', a.title, deck);
+    const p = keepModel(ctx, id, 'slides', a.title, deck, a.project);
     const n = deck.slides.length;
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} slide${n === 1 ? '' : 's'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it, present it and export it to PowerPoint or PDF.`,
@@ -232,10 +243,10 @@ const SAVE_DOC: RunTool = {
   inputSchema: SAVE_DOC_SCHEMA,
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'doc');
-    const { id: _id, title: _title, ...rest } = a;
+    const { id: _id, title: _title, project: _project, ...rest } = a;
     // The version it changes: what the agent leaves out (paper, font) stays, and unchanged blocks keep their ids.
     const { doc, notes } = await agentDoc(ctx.deps.db, rest, ctx.cwd, id ? pageSource(ctx.deps.db, id)?.text : undefined);
-    const p = keepModel(ctx, id, 'doc', a.title, doc);
+    const p = keepModel(ctx, id, 'doc', a.title, doc, a.project);
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Word or Google Docs and export it as a Word document, a PDF or Markdown.`,
       ...notes,
@@ -249,9 +260,9 @@ const SAVE_SHEET: RunTool = {
   inputSchema: SAVE_SHEET_SCHEMA,
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'sheet');
-    const { id: _id, title: _title, ...rest } = a;
+    const { id: _id, title: _title, project: _project, ...rest } = a;
     const { book, notes } = await agentBook(rest, ctx.cwd);
-    const p = keepModel(ctx, id, 'sheet', a.title, book);
+    const p = keepModel(ctx, id, 'sheet', a.title, book, a.project);
     const n = book.sheets.length;
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} sheet${n === 1 ? '' : 's'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Excel or Google Sheets and export it as an Excel file, a CSV or a PDF.`,
@@ -267,12 +278,12 @@ const SAVE_LATEX: RunTool = {
   async run(a, ctx) {
     const db = ctx.deps.db;
     const id = changing(db, a, 'tex');
-    const { id: _id, ...rest } = a;
+    const { id: _id, project: _project, ...rest } = a;
     // The version it changes: the files and pictures the agent leaves out stay. (The title goes in a template's text.)
     const { doc, notes } = await agentTex(db, rest, ctx.cwd, id ? readTex(pageSource(db, id)!.text) : undefined);
     // Typeset first: the agent hears of errors to fix, and the picture in the list comes from this run.
     const r = await compileTex(db, doc);
-    const p = keepModel(ctx, id, 'tex', a.title, doc);
+    const p = keepModel(ctx, id, 'tex', a.title, doc, a.project);
     return [
       [
         `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit the source beside its typeset pages and export it as a PDF, its .tex source or the project as a .zip.`,
