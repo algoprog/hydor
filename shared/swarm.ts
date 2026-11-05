@@ -78,10 +78,10 @@ const clip = (s: string, n: number) => {
 };
 
 /** A part's name as the plan has it (any case), if it has one by that name. */
-export const partNamed = (parts: { name: string }[], name: string) => {
+export function partNamed<T extends { name: string }>(parts: T[], name: string): T | undefined {
   const w = name.trim().toLowerCase();
   return parts.find((p) => p.name.toLowerCase() === w);
-};
+}
 
 /**
  * A campaign's parts, read from its posts in order (on top of `start`, the parts as they stood before them): the

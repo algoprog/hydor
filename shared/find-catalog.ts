@@ -146,6 +146,10 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['tasks', 'Site up check', 'uptime monitor website down', 'A ready-made scheduled task'],
   ['tasks', 'Disk space alert', 'disk storage full alert', 'A ready-made scheduled task'],
   ['tasks', 'Review new pull requests', 'pull requests code review github', 'A ready-made scheduled task'],
+  ['tasks', 'CI doctor', 'ci failed build flaky tests github actions gitlab buildkite circleci logs fix rerun webhook', 'A ready-made scheduled task'],
+  ['tasks', 'Issue triage', 'new issues labels duplicates bug reports reproduction github gitea webhook', 'A ready-made scheduled task'],
+  ['tasks', 'Dependency gardener', 'dependencies upgrades outdated packages npm pip security advisories pull requests weekly', 'A ready-made scheduled task'],
+  ['tasks', 'Incident first responder', 'incident alert outage sentry grafana datadog better stack rollback postmortem on call', 'A ready-made scheduled task'],
   ['tasks', 'New files in a folder', 'folder watch new files', 'A ready-made scheduled task'],
   ['tasks', 'Reminder', 'remind reminder alarm later', 'A ready-made scheduled task'],
   // Capabilities › Search
@@ -182,7 +186,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['memory', 'Clear all…', 'delete erase wipe forget everything', 'Deletes every note and its history', 'Clear all memory'],
   // Capabilities › Child sessions
   ['children', 'Working at once, per session', 'child sessions parallel subagents concurrency limit', 'How many child sessions one session runs at once'],
-  ['children', 'Swarm size', 'swarm mode team of agents subagents parallel angles hard problems math proof', 'How many agents of a swarm work at once'],
+  ['children', 'Swarm size', 'swarm mode team of agents subagents parallel angles hard problems math proof campaign migration', 'How many agents of a swarm or campaign work at once'],
   // Capabilities › Images, video and audio
   ['images', 'Making images', 'image generation pictures openrouter', 'Let agents make images'],
   ['images', 'Image model', 'image model seedream flux gemini openrouter', 'The model that makes them'],
@@ -225,6 +229,7 @@ const PAGES: [string, string, string, string, string][] = [
   ['files-recent', 'Recent files', '/files?place=recent', 'recent files opened lately last history', 'The files you opened lately'],
   ['files-trash', 'Trash', '/files?place=trash', 'trash deleted files put back restore undelete recycle bin empty', 'What you deleted in Files, to put back or delete for good'],
   ['git', 'Git', '/git', 'repositories commits branches push pull sync diff merge conflicts rebase stash clone tags history graph', 'Repositories, changes, branches and history'],
+  ['git-bisect', 'Find what broke it', '/git?tab=history&bisect=1', 'bisect git bisect regression first bad commit which commit broke worked before used to work', 'An agent finds the commit that broke something, between where it worked and now'],
   ['terminal', 'Terminal', '/terminal', 'shell console command line bash', 'Shells on this computer'],
   ['apps', 'Apps', '/apps', 'app apps agent apps gallery templates ready-made tasks tools forms install uninstall download file view chart map weather recipes quiz find', 'Small tools that find things out and show them clearly: open one here, or ask in any chat'],
   ['connected', 'Connected apps', '/apps/connected', 'connections connected accounts services integrations notion linear github google gmail slack calendar sign in oauth mcp', 'Services every agent can use, connected once'],
