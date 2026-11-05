@@ -383,5 +383,55 @@ const deck = normalizeDeck({
   ok(c3.includes(`<c:size val="${Math.round(2 * Math.max(3, 18 / 4.5) * 0.75)}"/>`), 'a line’s dots as large as the app’s');
 }
 
+// ---- masters, layouts and the footer -----------------------------------------------------------------------------------
+{
+  const d = normalizeDeck({
+    theme: 'paper',
+    footer: { num: true, text: 'Acme', date: 'today', skipTitle: true },
+    slides: [
+      { layout: 'title', title: 'Hello', subtitle: 'World' },
+      { layout: 'content', title: 'Points', text: '- One\n- Two' },
+      { layout: 'image', title: 'No picture yet' },
+      { layout: 'section', title: 'Part two' },
+      { els: [{ type: 'text', role: 'title', x: 80, y: 40, w: 600, h: 80, text: 'Loose title' }] },
+    ],
+  });
+  const file = pptxFile(d, { title: 'T', picture: () => null });
+  const master = part(file, 'ppt/slideMasters/slideMaster1.xml');
+  const types = part(file, '[Content_Types].xml');
+  ok((master.match(/<p:sldLayoutId id="\d+" r:id="rId\d+"\/>/g) ?? []).length === 15 && (types.match(/slideLayout\d+\.xml" ContentType/g) ?? []).length === 15, 'every layout of the app’s is a layout of the file’s, for New Slide');
+  ok(
+    /<p:titleStyle><a:lvl1pPr [^>]*><a:lnSpc><a:spcPct val="91667"\/><\/a:lnSpc>[^]*?<a:defRPr sz="3450" b="1" kern="100"><a:solidFill><a:schemeClr val="tx2"\/><\/a:solidFill><a:latin typeface="\+mj-lt"\/>/.test(master),
+    'the master’s titles as the app’s: its heading font and colour, its size and line height',
+  );
+  ok(master.includes('<p:ph type="dt" sz="half" idx="2"/>') && master.includes('<p:ph type="ftr" sz="quarter" idx="3"/>') && master.includes('<p:ph type="sldNum" sz="quarter" idx="4"/>'), 'the master has the footer’s placeholders');
+  const lay = (n: number) => part(file, `ppt/slideLayouts/slideLayout${n}.xml`);
+  ok(lay(1).includes('type="title"') && lay(1).includes('<p:cSld name="Title">') && lay(1).includes('<p:ph type="ctrTitle"/>') && lay(1).includes('<p:ph type="subTitle" idx="1"/>'), 'the Title layout: a title and a subtitle where the app puts them');
+  ok(lay(2).includes('type="obj"') && lay(2).includes('<p:cSld name="Title and text">') && lay(2).includes('<p:ph idx="1"/>') && lay(2).includes(`<a:off x="${80 * 9525}" y="${196 * 9525}"/>`), 'Title and text: its text where the app’s is');
+  ok(lay(4).includes('type="secHead"') && /<p:bg><p:bgPr><a:solidFill><a:srgbClr val="2F6FEC">/.test(lay(4)), 'a section’s layout in the accent colour');
+  ok(lay(15).includes('type="blank"') && lay(15).includes('<p:ph type="sldNum" sz="quarter" idx="12"/>'), 'Blank has the footer’s placeholders too');
+  const rel = (n: number) => /slideLayouts\/slideLayout(\d+)\.xml/.exec(part(file, `ppt/slides/_rels/slide${n}.xml.rels`))?.[1];
+  ok(rel(1) === '1' && rel(2) === '2' && rel(3) === '6' && rel(5) === '15', 'each slide on the layout it was made from (Blank when made of parts)');
+  const s1 = part(file, 'ppt/slides/slide1.xml');
+  const s2 = part(file, 'ppt/slides/slide2.xml');
+  const s3 = part(file, 'ppt/slides/slide3.xml');
+  ok(s1.includes('<p:ph type="ctrTitle"/>') && s1.includes('<p:ph type="subTitle" idx="1"/>') && !s1.includes('type="sldNum"'), 'a title slide’s title and subtitle fill its placeholders; no footer on it');
+  ok(s2.includes('<p:ph type="title"/>') && s2.includes('<p:ph idx="1"/>') && !/<p:ph[^>]*>[^]*?<p:ph type="title"\/>/.test(s2.replace(/<p:ph type="(dt|ftr|sldNum)"[^>]*\/>/g, '')), 'a slide’s title and text fill its layout’s, each once');
+  ok(
+    /<p:sp><p:nvSpPr><p:cNvPr id="\d+" name="Picture Placeholder \d+"\/><p:cNvSpPr><a:spLocks noGrp="1"\/><\/p:cNvSpPr><p:nvPr><p:ph type="pic" idx="1"\/><\/p:nvPr><\/p:nvSpPr><p:spPr><a:xfrm>/.test(s3),
+    'a picture not given yet is a place to add one',
+  );
+  ok(
+    s2.includes('<p:ph type="sldNum" sz="quarter" idx="12"/>') &&
+      s2.includes('<a:fld id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2B}" type="slidenum">') &&
+      s2.includes('<p:ph type="ftr" sz="quarter" idx="11"/>') &&
+      s2.includes('>Acme<') &&
+      s2.includes('<p:ph type="dt" sz="half" idx="10"/>') &&
+      s2.includes('type="datetime4"'),
+    'the footer in the layout’s placeholders: the date and the number as fields',
+  );
+  ok(part(file, 'ppt/slides/slide5.xml').includes('<p:ph type="title"/>'), 'a slide made of parts has its first title as its title');
+}
+
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

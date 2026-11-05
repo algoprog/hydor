@@ -12,8 +12,8 @@
 // theme's colours and fonts become the file's theme.
 //
 // A slide is 1280 px wide: 1 px is 9525 EMU (12192000 across, PowerPoint's widescreen) and a font's px is 0.75 pt.
-import type { Anim, ChartEl, Deck, El, GroupEl, IconEl, ImageEl, LineEl, MathEl, Para, Run, Side, Slide, Stick, TableEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
-import { everyEl, fontName, FONTS, hexColor, mixColor, plainText, slideH, VIDEO, videoStill } from '../../shared/slides.ts';
+import type { Anim, ChartEl, Deck, El, GroupEl, IconEl, ImageEl, LayoutId, LineEl, MathEl, Para, Ratio, Run, Side, Slide, Stick, TableEl, TextEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
+import { everyEl, fontName, FONTS, footerOn, hexColor, LAYOUTS, layoutSlide, mixColor, plainText, slideH, VIDEO, videoStill } from '../../shared/slides.ts';
 import { coreXml, esc, relsXml, XML_HEAD, zipParts, type ZipPart } from './ooxml.ts';
 import { eotOf, fontAttrs } from './pptx-fonts.ts';
 
@@ -153,6 +153,8 @@ interface Ctx {
   depth: number;
   /** Names that tie parts to their match on the next or last slide for PowerPoint's Morph ("!!…"). */
   morph: Map<string, string>;
+  /** The slide's parts that fill its layout's placeholders, by their ids. */
+  phs: Map<string, Ph>;
 }
 
 function link(c: Ctx, href: string | undefined, tag: 'hlinkClick' = 'hlinkClick'): string {
@@ -407,9 +409,13 @@ function boxXml(c: Ctx, e: Extract<El, { type: 'text' | 'shape' }>): string {
   const t = c.t;
   const kind = e.type === 'shape' ? e.shape : 'rect';
   const op = e.opacity ?? 1;
-  const isTitle = e.type === 'text' && e.role === 'title' && !c.titled && !c.depth;
+  // A part that fills one of its layout's placeholders says which (PowerPoint's Reset Slide puts it back there); else
+  // a slide's first title is its title.
+  const ph = c.depth ? undefined : c.phs.get(e.id);
+  const isTitle = !ph && e.type === 'text' && e.role === 'title' && !c.titled && !c.depth;
   if (isTitle) c.titled = true;
-  const { cNvPr } = nvPr(c, e, isTitle ? 'Title' : e.type === 'shape' ? 'Shape' : 'Text');
+  const titled = isTitle || ph?.type === 'title' || ph?.type === 'ctrTitle';
+  const { cNvPr } = nvPr(c, e, titled ? 'Title' : ph ? 'Placeholder' : e.type === 'shape' ? 'Shape' : 'Text');
   let prst = PRST[kind] ?? 'rect';
   let av = '<a:avLst/>';
   // A rounded box's words keep the app's room: PowerPoint keeps them 0.29 of the corner's radius further in.
@@ -428,9 +434,10 @@ function boxXml(c: Ctx, e: Extract<El, { type: 'text' | 'shape' }>): string {
     e.fill && e.fill2 && e.fill !== 'transparent'
       ? `<a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0">${clr(e.fill, t, '#ffffff', op)}</a:gs><a:gs pos="100000">${clr(e.fill2, t, '#ffffff', op)}</a:gs></a:gsLst><a:lin ang="${linAng(e.angle ?? 180)}" scaled="${boxy ? 0 : 1}"/></a:gradFill>`
       : fillXml(e.fill, t, op);
-  const nv = isTitle
-    ? `<p:nvSpPr>${cNvPr}<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>`
-    : `<p:nvSpPr>${cNvPr}<p:cNvSpPr${e.type === 'text' ? ' txBox="1"' : ''}/><p:nvPr/></p:nvSpPr>`;
+  const nv =
+    ph || isTitle
+      ? `<p:nvSpPr>${cNvPr}<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr>${phXml(ph ?? { type: 'title', el: e })}</p:nvPr></p:nvSpPr>`
+      : `<p:nvSpPr>${cNvPr}<p:cNvSpPr${e.type === 'text' ? ' txBox="1"' : ''}/><p:nvPr/></p:nvSpPr>`;
   return `<p:sp>${nv}<p:spPr>${xfrm(e.x, e.y, e.w, e.h, e.rot)}${geom}${fill}${lnXml(e.line, e.lineW, e.dash, t, op)}${e.shadow ? (boxy ? BOX_SHADOW : SHAPE_SHADOW) : ''}</p:spPr>${txBody(c, e, op, 'p:txBody', inset)}</p:sp>`;
 }
 
@@ -438,7 +445,13 @@ function imageXml(c: Ctx, e: ImageEl, href?: string): string {
   // A picture whose colours were changed goes changed, as the editor shows it (slides-render.ts), where a browser made it.
   const baked = c.o.renders?.get(`adjust:${e.id}`);
   const pic = baked ?? (e.src ? c.o.picture(e.src) : null);
-  if (!pic) return '';
+  const ph = c.depth ? undefined : c.phs.get(e.id);
+  if (!pic) {
+    // A layout's picture not given yet: its placeholder, which PowerPoint shows as a place to add one (the app as a frame to).
+    if (!ph) return '';
+    const { cNvPr } = nvPr(c, e, 'Picture Placeholder');
+    return `<p:sp><p:nvSpPr>${cNvPr}<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr>${phXml(ph)}</p:nvPr></p:nvSpPr><p:spPr>${xfrm(e.x, e.y, e.w, e.h, e.rot)}</p:spPr></p:sp>`;
+  }
   const rid = c.media.add(pic);
   const { cNvPr } = nvPr(c, e, 'Picture', href);
   const { x, y, w, h } = e;
@@ -468,7 +481,8 @@ function imageXml(c: Ctx, e: ImageEl, href?: string): string {
   ].join('');
   const flip = `${e.flipH ? ' flipH="1"' : ''}${e.flipV ? ' flipV="1"' : ''}`;
   const geom = e.radius ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.round(Math.min(50000, (e.radius / Math.max(1, Math.min(w, h))) * 100000))}"/></a:avLst></a:prstGeom>` : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
-  return `<p:pic><p:nvPicPr>${cNvPr}<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${rid}">${alpha}</a:blip>${crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(x, y, w, h, e.rot, flip)}${geom}${e.line ? lnXml(e.line, e.lineW, undefined, c.t, op) : ''}${e.shadow ? PICTURE_SHADOW : ''}</p:spPr></p:pic>`;
+  const nv = ph ? `<p:cNvPicPr><a:picLocks noGrp="1" noChangeAspect="1"/></p:cNvPicPr><p:nvPr>${phXml(ph)}</p:nvPr>` : '<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/>';
+  return `<p:pic><p:nvPicPr>${cNvPr}${nv}</p:nvPicPr><p:blipFill><a:blip r:embed="${rid}">${alpha}</a:blip>${crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(x, y, w, h, e.rot, flip)}${geom}${e.line ? lnXml(e.line, e.lineW, undefined, c.t, op) : ''}${e.shadow ? PICTURE_SHADOW : ''}</p:spPr></p:pic>`;
 }
 
 /** The connection site PowerPoint knows a side's middle by, for the shapes whose sites are certain; null for others (the end then stays where it is, not stuck, in the file). */
@@ -570,7 +584,8 @@ function tableXml(c: Ctx, e: TableEl): string {
       return `<a:tr h="${rowH}">${cells}</a:tr>`;
     })
     .join('');
-  return `<p:graphicFrame><p:nvGraphicFramePr>${cNvPr}<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="${emu(e.x)}" y="${emu(e.y)}"/><a:ext cx="${emu(e.w)}" cy="${emu(e.h)}"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr${e.head ? ' firstRow="1"' : ''}${e.band ? ' bandRow="1"' : ''}/><a:tblGrid>${widths.map((w) => `<a:gridCol w="${w}"/>`).join('')}</a:tblGrid>${rows}</a:tbl></a:graphicData></a:graphic></p:graphicFrame>`;
+  const ph = c.depth ? undefined : c.phs.get(e.id);
+  return `<p:graphicFrame><p:nvGraphicFramePr>${cNvPr}<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr>${ph ? phXml(ph) : ''}</p:nvPr></p:nvGraphicFramePr><p:xfrm><a:off x="${emu(e.x)}" y="${emu(e.y)}"/><a:ext cx="${emu(e.w)}" cy="${emu(e.h)}"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr${e.head ? ' firstRow="1"' : ''}${e.band ? ' bandRow="1"' : ''}/><a:tblGrid>${widths.map((w) => `<a:gridCol w="${w}"/>`).join('')}</a:tblGrid>${rows}</a:tbl></a:graphicData></a:graphic></p:graphicFrame>`;
 }
 
 // ---- icons, equations, videos, groups ---------------------------------------------------------------------
@@ -681,26 +696,37 @@ function partXml(c: Ctx, e: El): string {
   return '';
 }
 
-/** The footer as text boxes at the foot of the slide: the date and the number as fields PowerPoint keeps up to date. */
+/** Where the app writes the footer: the date at the left, the words in the middle, the number at the right (as the runtime's footer()). */
+const FOOT = { dt: { x: 64, w: 320, algn: 'l' }, ftr: { x: 400, w: 480, algn: 'ctr' }, sldNum: { x: 1016, w: 200, algn: 'r' } } as const;
+/** The footer's placeholders' numbers in a layout, as PowerPoint numbers them. */
+const FOOT_IDX = { dt: 10, ftr: 11, sldNum: 12 } as const;
+
+/** A footer box's text properties: 17 px, the theme's muted colour, its body font. */
+const footRPr = (t: Theme, tag = 'rPr') => `<a:${tag} lang="en-US" sz="${sz(17)}" kern="100" dirty="0"><a:solidFill>${clr('muted', t, '#777777')}</a:solidFill>${fontsXml(fontName('body', t))}</a:${tag}>`;
+
+/**
+ * The footer as PowerPoint's own: the date, the words and the slide's number in the placeholders of its layout (so
+ * Insert → Header & Footer turns them on and off), the date and the number as fields PowerPoint keeps up to date.
+ */
 function footerXml(c: Ctx, i: number): string {
   const d = c.deck;
   const f = d.footer;
-  const s = d.slides[i];
-  if (!f || !s || s.nofooter || (f.skipTitle && (i === 0 || s.layout === 'title'))) return '';
+  if (!f || !footerOn(d, i)) return '';
   const H = slideH(d.ratio);
-  const rPr = `<a:rPr lang="en-US" sz="${sz(17)}" kern="100" dirty="0"><a:solidFill>${clr('muted', c.t, '#777777')}</a:solidFill>${fontsXml(fontName('body', c.t))}</a:rPr>`;
-  const box = (name: string, x: number, w: number, algn: string, run: string) => {
+  const box = (kind: keyof typeof FOOT, name: string, inner: string) => {
     const id = c.next++;
-    return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${name}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(x, H - 56, w, 56)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr><p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" anchor="ctr"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr algn="${algn}"/>${run}</a:p></p:txBody></p:sp>`;
+    const at = FOOT[kind];
+    return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${name}"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="${kind}" sz="${kind === 'dt' ? 'half' : 'quarter'}" idx="${FOOT_IDX[kind]}"/></p:nvPr></p:nvSpPr><p:spPr>${xfrm(at.x, H - 56, at.w, 56)}</p:spPr><p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" anchor="ctr"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr algn="${at.algn}"/>${inner}</a:p></p:txBody></p:sp>`;
   };
+  const rPr = footRPr(c.t);
   let out = '';
   if (f.date) {
     const today = f.date === 'today';
     const text = today ? new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : f.date;
-    out += box('Date', 64, 320, 'l', today ? `<a:fld id="{4A9C2F6B-6D0E-4B8E-9C3A-1F2D3E4A5B60}" type="datetime4">${rPr}<a:t>${esc(text)}</a:t></a:fld>` : `<a:r>${rPr}<a:t>${esc(text)}</a:t></a:r>`);
+    out += box('dt', 'Date Placeholder', today ? `<a:fld id="{4A9C2F6B-6D0E-4B8E-9C3A-1F2D3E4A5B60}" type="datetime4">${rPr}<a:t>${esc(text)}</a:t></a:fld>` : `<a:r>${rPr}<a:t>${esc(text)}</a:t></a:r>`);
   }
-  if (f.text) out += box('Footer', 400, 1280 - 800, 'ctr', `<a:r>${rPr}<a:t>${esc(f.text)}</a:t></a:r>`);
-  if (f.num) out += box('Slide number', 1280 - 264, 200, 'r', `<a:fld id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2B}" type="slidenum">${rPr}<a:t>${i + 1}</a:t></a:fld>`);
+  if (f.text) out += box('ftr', 'Footer Placeholder', `<a:r>${rPr}<a:t>${esc(f.text)}</a:t></a:r>`);
+  if (f.num) out += box('sldNum', 'Slide Number Placeholder', `<a:fld id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2B}" type="slidenum">${rPr}<a:t>${i + 1}</a:t></a:fld>`);
   return out;
 }
 
@@ -907,7 +933,8 @@ export function chartBook(e: ChartEl): Buffer {
 function chartFrame(c: Ctx, e: ChartEl): string {
   const rid = c.charts.add((book) => chartXml(e, c.t, book), chartBook(e));
   const { cNvPr } = nvPr(c, e, 'Chart');
-  return `<p:graphicFrame><p:nvGraphicFramePr>${cNvPr}<p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="${emu(e.x)}" y="${emu(e.y)}"/><a:ext cx="${emu(e.w)}" cy="${emu(e.h)}"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="${rid}"/></a:graphicData></a:graphic></p:graphicFrame>`;
+  const ph = c.depth ? undefined : c.phs.get(e.id);
+  return `<p:graphicFrame><p:nvGraphicFramePr>${cNvPr}${ph ? `<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr>${phXml(ph)}</p:nvPr>` : '<p:cNvGraphicFramePr/><p:nvPr/>'}</p:nvGraphicFramePr><p:xfrm><a:off x="${emu(e.x)}" y="${emu(e.y)}"/><a:ext cx="${emu(e.w)}" cy="${emu(e.h)}"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="${rid}"/></a:graphicData></a:graphic></p:graphicFrame>`;
 }
 
 // ---- animations -----------------------------------------------------------------------------------------
@@ -1120,6 +1147,9 @@ function bgXml(c: Ctx, s: Slide): { bg: string; under: string } {
 
 function slideXml(c: Ctx, s: Slide): string {
   const { bg, under } = bgXml(c, s);
+  // The parts that fill its layout's placeholders (a slide with a title placeholder filled has its title).
+  c.phs = slidePhs(s, c.deck.ratio);
+  c.titled = [...c.phs.values()].some((p) => p.type === 'title' || p.type === 'ctrTitle');
   // Connectors' ends: the parts they are stuck to by their ids in the file, written by now, at the sites PowerPoint knows.
   const all = everyEl(s.els);
   const parts = (s.els.map((e) => partXml(c, e)).join('') + footerXml(c, c.n - 1)).replace(/@@(stCxn|endCxn)\|([A-Za-z0-9_-]+)\|([trbl])@@/g, (_m, tag: string, el: string, at: Side) => {
@@ -1234,16 +1264,115 @@ function themeXml(name: string, t: Theme | null): string {
 const GRP = '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>';
 const CLR_MAP = '<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>';
 
-function masterXml(t: Theme): string {
-  const lvl = (n: number, size: number, font: string, extra = '') =>
-    `<a:lvl${n}pPr marL="0" indent="0" algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1"><a:lnSpc><a:spcPct val="90000"/></a:lnSpc><a:spcBef><a:spcPts val="0"/></a:spcBef><a:buNone/><a:defRPr sz="${size}" kern="1200"${extra}><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="${font}"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl${n}pPr>`;
-  const title = `<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title Placeholder 1"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:spPr>${xfrm(80, 52, 1120, 100)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0" anchor="b"><a:normAutofit/></a:bodyPr><a:lstStyle/><a:p><a:r><a:rPr lang="en-US"/><a:t>Click to edit the title</a:t></a:r><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>`;
-  const body = `<p:sp><p:nvSpPr><p:cNvPr id="3" name="Text Placeholder 2"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:spPr>${xfrm(80, 196, 1120, 470)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0"><a:normAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr lvl="0"/><a:r><a:rPr lang="en-US"/><a:t>Click to edit the text</a:t></a:r></a:p></p:txBody></p:sp>`;
-  return `${XML_HEAD}<p:sldMaster ${NS}><p:cSld><p:bg><p:bgPr>${fillXml('bg', t)}<a:effectLst/></p:bgPr></p:bg><p:spTree>${GRP}${title}${body}</p:spTree></p:cSld>${CLR_MAP}<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle>${lvl(1, 3450, '+mj-lt', ' b="1"')}</p:titleStyle><p:bodyStyle>${lvl(1, 1950, '+mn-lt')}${lvl(2, 1800, '+mn-lt')}${lvl(3, 1650, '+mn-lt')}</p:bodyStyle><p:otherStyle>${lvl(1, 1800, '+mn-lt')}</p:otherStyle></p:txStyles></p:sldMaster>`;
+/** A placeholder: its kind (none is PowerPoint's "object", which takes words, a table, a chart or a picture), its number, and the layout's part it stands for. */
+interface Ph {
+  type?: string;
+  idx?: number;
+  el: El;
 }
 
-function layoutXml(): string {
-  return `${XML_HEAD}<p:sldLayout ${NS} type="titleOnly" preserve="1"><p:cSld name="Title Only"><p:spTree>${GRP}<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title 1"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="en-US"/><a:t>Click to edit the title</a:t></a:r><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>`;
+const phXml = (ph: Ph) => `<p:ph${ph.type ? ` type="${ph.type}"` : ''}${ph.idx !== undefined ? ` idx="${ph.idx}"` : ''}/>`;
+
+/** PowerPoint's kind of each of the app's layouts (what it matches layouts by when a design changes). */
+const LAYOUT_TYPE: Record<LayoutId, string> = { title: 'title', content: 'obj', two: 'twoObj', section: 'secHead', 'image-right': 'picTx', image: 'picTx', stats: 'cust', cards: 'cust', steps: 'cust', quote: 'cust', chart: 'chart', table: 'tbl', 'title-only': 'titleOnly', end: 'cust', blank: 'blank' };
+
+/**
+ * The placeholders of one of the app's layouts, where it puts them: its words' boxes that hint at what goes in them (a
+ * title, a subtitle, text), its picture, chart and table. The layout's decorations (an accent bar, cards' panels) are
+ * the slides' own parts, not the layout's.
+ */
+function layoutPhs(id: LayoutId, ratio: Ratio): Ph[] {
+  const out: Ph[] = [];
+  let idx = 1;
+  let titled = false;
+  for (const e of layoutSlide(id, {}, ratio).els) {
+    if (e.type === 'text') {
+      if (!e.ph) continue;
+      if (e.role === 'title' && !titled) {
+        titled = true;
+        out.push({ type: id === 'title' || id === 'end' ? 'ctrTitle' : 'title', el: e });
+      } else out.push({ type: e.role === 'subtitle' && (id === 'title' || id === 'end') ? 'subTitle' : id === 'content' || id === 'two' ? undefined : 'body', idx: idx++, el: e });
+    } else if (e.type === 'image') out.push({ type: 'pic', idx: idx++, el: e });
+    else if (e.type === 'chart') out.push({ type: 'chart', idx: idx++, el: e });
+    else if (e.type === 'table') out.push({ type: 'tbl', idx: idx++, el: e });
+  }
+  return out;
+}
+
+/** Which of a slide's parts fill its layout's placeholders: each placeholder the first part like the layout's (its kind; a text box's role and hint), in order. */
+function slidePhs(s: Slide, ratio: Ratio): Map<string, Ph> {
+  const out = new Map<string, Ph>();
+  if (!s.layout) return out;
+  const used = new Set<string>();
+  for (const ph of layoutPhs(s.layout, ratio)) {
+    const like = (e: El) => e.type === ph.el.type && (e.type !== 'text' || (e.role === (ph.el as TextEl).role && e.ph === (ph.el as TextEl).ph));
+    const m = s.els.find((e) => !used.has(e.id) && like(e));
+    if (!m) continue;
+    used.add(m.id);
+    out.set(m.id, ph);
+  }
+  return out;
+}
+
+/** A placeholder's words as a box of the app's makes them: its insets, anchor and fitting, and its first level's look (what words typed in it take). */
+function phText(e: TextEl, t: Theme): string {
+  const pad = emu(e.pad ?? 10);
+  const anchor = e.valign === 'middle' ? 'ctr' : e.valign === 'bottom' ? 'b' : 't';
+  const lh = e.lh ?? (e.role === 'title' ? 1.1 : 1.2);
+  const align = e.align ?? 'left';
+  const algn = align === 'center' ? 'ctr' : align === 'right' ? 'r' : align === 'justify' ? 'just' : 'l';
+  const lvl = `<a:lvl1pPr marL="0" indent="0" algn="${algn}"><a:lnSpc><a:spcPct val="${Math.round((lh / 1.2) * 100000)}"/></a:lnSpc><a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="${pts(e.gap ?? 0)}"/></a:spcAft><a:buNone/><a:defRPr sz="${sz(e.size)}" b="${e.bold ? 1 : 0}" i="${e.italic ? 1 : 0}" kern="100"><a:solidFill>${clr(textColor(e), t, '#000000', e.opacity ?? 1)}</a:solidFill>${fontsXml(fontName(e.font, t, e.role), headRole(e))}</a:defRPr></a:lvl1pPr>`;
+  return `<p:txBody><a:bodyPr wrap="square" lIns="${pad}" tIns="${pad}" rIns="${pad}" bIns="${pad}" anchor="${anchor}" rtlCol="0">${e.fit === 'shrink' ? '<a:normAutofit/>' : '<a:noAutofit/>'}</a:bodyPr><a:lstStyle>${lvl}</a:lstStyle><a:p><a:r><a:rPr lang="en-US"/><a:t>${esc(e.ph ?? '')}</a:t></a:r></a:p></p:txBody>`;
+}
+
+/** A layout's (or the master's) placeholder: where it is, and what words in it look like. */
+function phSp(ph: Ph, id: number, name: string, t: Theme): string {
+  const e = ph.el;
+  const body = e.type === 'text' ? phText(e, t) : '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody>';
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${esc(name)}"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr>${phXml(ph)}</p:nvPr></p:nvSpPr><p:spPr>${xfrm(e.x, e.y, e.w, e.h)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>${body}</p:sp>`;
+}
+
+/** The footer's placeholders, as the app writes the footer: the date, the words, the number (the master's numbered 2–4, a layout's 10–12). */
+function footPhs(t: Theme, ratio: Ratio, master: boolean, next: number): string {
+  const H = slideH(ratio);
+  return (['dt', 'ftr', 'sldNum'] as const)
+    .map((kind, i) => {
+      const at = FOOT[kind];
+      const text = kind === 'sldNum' ? `<a:fld id="{B6F15528-21DE-4FAA-801E-634DDDAF4B2B}" type="slidenum">${footRPr(t)}<a:t>‹#›</a:t></a:fld>` : '';
+      return `<p:sp><p:nvSpPr><p:cNvPr id="${next + i}" name="${kind === 'dt' ? 'Date' : kind === 'ftr' ? 'Footer' : 'Slide Number'} Placeholder ${next + i - 1}"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="${kind}" sz="${kind === 'dt' ? 'half' : 'quarter'}" idx="${master ? 2 + i : FOOT_IDX[kind]}"/></p:nvPr></p:nvSpPr><p:spPr>${master ? `${xfrm(at.x, H - 56, at.w, 56)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>` : ''}</p:spPr><p:txBody><a:bodyPr${master ? ' wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" anchor="ctr"' : ''}/><a:lstStyle>${master ? `<a:lvl1pPr algn="${at.algn}">${footRPr(t, 'defRPr')}</a:lvl1pPr>` : ''}</a:lstStyle><a:p>${text}${footRPr(t, 'endParaRPr')}</a:p></p:txBody></p:sp>`;
+    })
+    .join('');
+}
+
+/**
+ * The slide master: the theme's background, its title, text and footer placeholders where the app's layouts put them,
+ * and its text styles as the app's boxes are (a title in the heading font and colour, text in the body's; plain
+ * paragraphs, each level 1.5 em in). Every one of the app's layouts is a layout of it.
+ */
+function masterXml(t: Theme, ratio: Ratio): string {
+  const content = layoutPhs('content', ratio);
+  const title = phSp({ type: 'title', el: content[0].el }, 2, 'Title Placeholder 1', t);
+  const body = phSp({ type: 'body', idx: 1, el: content[1].el }, 3, 'Text Placeholder 2', t);
+  const textLvl = (n: number, e: TextEl, head: boolean) => {
+    const lh = e.lh ?? (head ? 1.1 : 1.2);
+    return `<a:lvl${n}pPr marL="${emu((n - 1) * 1.5 * e.size)}" indent="0" algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1"><a:lnSpc><a:spcPct val="${Math.round((lh / 1.2) * 100000)}"/></a:lnSpc><a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="${pts(e.gap ?? 0)}"/></a:spcAft><a:buNone/><a:defRPr sz="${sz(e.size)}" b="${e.bold ? 1 : 0}" kern="100"><a:solidFill><a:schemeClr val="${head ? 'tx2' : 'tx1'}"/></a:solidFill><a:latin typeface="${head ? '+mj-lt' : '+mn-lt'}"/><a:ea typeface="${head ? '+mj-ea' : '+mn-ea'}"/><a:cs typeface="${head ? '+mj-cs' : '+mn-cs'}"/></a:defRPr></a:lvl${n}pPr>`;
+  };
+  const te = content[0].el as TextEl;
+  const be = content[1].el as TextEl;
+  const ids = LAYOUTS.map((_, i) => `<p:sldLayoutId id="${2147483649 + i}" r:id="rId${i + 1}"/>`).join('');
+  const styles = `<p:titleStyle>${textLvl(1, te, true)}</p:titleStyle><p:bodyStyle>${[1, 2, 3, 4, 5].map((n) => textLvl(n, be, false)).join('')}</p:bodyStyle><p:otherStyle>${textLvl(1, { ...be, gap: 0, lh: 1.2 }, false)}</p:otherStyle>`;
+  return `${XML_HEAD}<p:sldMaster ${NS}><p:cSld><p:bg><p:bgPr>${fillXml('bg', t)}<a:effectLst/></p:bgPr></p:bg><p:spTree>${GRP}${title}${body}${footPhs(t, ratio, true, 4)}</p:spTree></p:cSld>${CLR_MAP}<p:sldLayoutIdLst>${ids}</p:sldLayoutIdLst><p:txStyles>${styles}</p:txStyles></p:sldMaster>`;
+}
+
+/** One of the app's layouts as PowerPoint's: its name, its placeholders, the footer's, and its background (the section's accent). */
+function layoutXml(id: LayoutId, t: Theme, ratio: Ratio): string {
+  const made = layoutSlide(id, {}, ratio);
+  const phs = layoutPhs(id, ratio);
+  const names: Record<string, string> = { title: 'Title', ctrTitle: 'Title', subTitle: 'Subtitle', body: 'Text Placeholder', pic: 'Picture Placeholder', chart: 'Chart Placeholder', tbl: 'Table Placeholder' };
+  const sps = phs.map((ph, i) => phSp(ph, i + 2, `${names[ph.type ?? ''] ?? 'Content Placeholder'} ${i + 1}`, t)).join('');
+  const bg = made.bg?.color ? `<p:bg><p:bgPr>${fillXml(made.bg.color, t)}<a:effectLst/></p:bgPr></p:bg>` : '';
+  const label = LAYOUTS.find((l) => l.id === id)?.label ?? id;
+  return `${XML_HEAD}<p:sldLayout ${NS} type="${LAYOUT_TYPE[id]}" preserve="1"><p:cSld name="${esc(label)}">${bg}<p:spTree>${GRP}${sps}${footPhs(t, ratio, false, phs.length + 2)}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>`;
 }
 
 function notesMasterXml(): string {
@@ -1267,7 +1396,8 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
   const cmLast: [number, number] = [0, 0];
   const slides = deck.slides.map((s, i) => {
     const rels = new Rels();
-    rels.add('slideLayout', '../slideLayouts/slideLayout1.xml');
+    // Its layout, the app's one it was made from (Blank for a slide made of parts alone).
+    rels.add('slideLayout', `../slideLayouts/slideLayout${Math.max(0, LAYOUTS.findIndex((l) => l.id === (s.layout ?? 'blank'))) + 1}.xml`);
     const c: Ctx = {
       deck,
       t,
@@ -1310,6 +1440,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
       n: i + 1,
       depth: 0,
       morph,
+      phs: new Map(),
     };
     const xml = slideXml(c, s);
     if (s.notes) rels.add('notesSlide', `../notesSlides/notesSlide${i + 1}.xml`);
@@ -1342,7 +1473,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
     ...(charts.length ? ['<Default Extension="xlsx" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/>'] : []),
     '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>',
     '<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>',
-    '<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>',
+    ...LAYOUTS.map((_, i) => `<Override PartName="/ppt/slideLayouts/slideLayout${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>`),
     '<Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>',
     '<Override PartName="/ppt/presProps.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presProps+xml"/>',
     '<Override PartName="/ppt/viewProps.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml"/>',
@@ -1410,16 +1541,16 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
   parts.push({ name: 'ppt/viewProps.xml', data: `${XML_HEAD}<p:viewPr ${NS}><p:normalViewPr><p:restoredLeft sz="15620"/><p:restoredTop sz="94660"/></p:normalViewPr><p:gridSpacing cx="76200" cy="76200"/></p:viewPr>` });
   parts.push({ name: 'ppt/tableStyles.xml', data: `${XML_HEAD}<a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>` });
   parts.push({ name: 'ppt/theme/theme1.xml', data: themeXml(t.id ? `Hydor ${t.id}` : 'Hydor', t) });
-  parts.push({ name: 'ppt/slideMasters/slideMaster1.xml', data: masterXml(t) });
+  parts.push({ name: 'ppt/slideMasters/slideMaster1.xml', data: masterXml(t, deck.ratio) });
   parts.push({
     name: 'ppt/slideMasters/_rels/slideMaster1.xml.rels',
-    data: relsXml([
-      ['rId1', 'slideLayout', '../slideLayouts/slideLayout1.xml'],
-      ['rId2', 'theme', '../theme/theme1.xml'],
-    ]),
+    data: relsXml([...LAYOUTS.map((_, i): [string, string, string] => [`rId${i + 1}`, 'slideLayout', `../slideLayouts/slideLayout${i + 1}.xml`]), [`rId${LAYOUTS.length + 1}`, 'theme', '../theme/theme1.xml']]),
   });
-  parts.push({ name: 'ppt/slideLayouts/slideLayout1.xml', data: layoutXml() });
-  parts.push({ name: 'ppt/slideLayouts/_rels/slideLayout1.xml.rels', data: relsXml([['rId1', 'slideMaster', '../slideMasters/slideMaster1.xml']]) });
+  // The app's layouts, each one of PowerPoint's (New Slide offers them; Reset Slide puts a slide's parts back on its own).
+  LAYOUTS.forEach((l, i) => {
+    parts.push({ name: `ppt/slideLayouts/slideLayout${i + 1}.xml`, data: layoutXml(l.id, t, deck.ratio) });
+    parts.push({ name: `ppt/slideLayouts/_rels/slideLayout${i + 1}.xml.rels`, data: relsXml([['rId1', 'slideMaster', '../slideMasters/slideMaster1.xml']]) });
+  });
   for (const s of slides) {
     parts.push({ name: `ppt/slides/slide${s.n}.xml`, data: s.xml });
     parts.push({ name: `ppt/slides/_rels/slide${s.n}.xml.rels`, data: relsXml(s.rels.list) });
