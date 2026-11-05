@@ -14,6 +14,7 @@ import { ASSET } from '../../shared/docs.ts';
 import { putAsset } from '../pages/assets.ts';
 import { addSignature, changeSignature, deleteSignature, findSignature, listSignatures, pictureBytes, signatureImage, signatureTables, touchSignature } from './store.ts';
 import { SIGNATURE_FOR_NOW_MS } from '../../shared/signatures.ts';
+import { signatureTools } from './tools.ts';
 
 /** Pictures come as base64 in JSON: a little over 4 MB of PNG. */
 const BODY = 6 * 1024 * 1024;
@@ -73,4 +74,5 @@ function routes(d: Deps) {
 export const signatures: Feature = {
   id: 'signatures',
   routes,
+  tools: signatureTools,
 };
