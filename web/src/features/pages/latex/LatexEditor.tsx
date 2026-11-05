@@ -14,9 +14,11 @@ import {
   BookOpen,
   BookPlus,
   Bold,
+  CheckCheck,
   ChevronDown,
   Copy,
   ExternalLink,
+  FilePen,
   FilePlus,
   FileUp,
   FoldVertical,
@@ -55,6 +57,7 @@ import {
   Undo2,
   UnfoldVertical,
   WholeWord,
+  X,
 } from 'lucide-react';
 import {
   cleanTexComments,
@@ -64,7 +67,9 @@ import {
   mergeTexComments,
   TEX_ENGINES,
   TEX_MAIN,
+  texChangeOps,
   texOutline,
+  type TexChange,
   type TexComment,
   type TexCompiled,
   type TexDoc,
@@ -86,6 +91,7 @@ import { MenuBar, type MenuDef, type MenuEntry } from '../common/menus';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
 import { addFileFromDevice, addPicture, assetUrl, chooseFiles, FILE_ACCEPT, freeName, pdfUrl, PICTURE_ACCEPT, placeOf, texSetup, typeset } from './api';
+import { ChangesList } from './ChangesList';
 import { mountCode, type Code } from './code';
 import { CommentsPanel, type CommentDraft } from './CommentsPanel';
 import { CompareDialog } from './Compare';
@@ -464,6 +470,12 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
                 : d,
             ),
           onComment: () => addCommentRef.current(),
+          // The file's tracked changes as its editor has them now, in the document beside the other files'.
+          onTracked: (list) =>
+            change((d) => {
+              const next = [...(d.changes ?? []).filter((c) => c.file !== name), ...list.map((c) => ({ ...c, file: name }))];
+              return next.length || d.changes ? { ...d, changes: next.length ? next : undefined } : d;
+            }),
         },
         visual: modeRef.current === 'visual',
         spell: spellRef.current,
@@ -473,6 +485,10 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         codes.current.set(name, c);
         setMade((n) => n + 1);
         markCode(name, c);
+        const d = live.current;
+        if (d?.track) c.setTrack(true);
+        const mine = (d?.changes ?? []).filter((x) => x.file === name);
+        if (mine.length) c.setTracked(mine);
         const after = afterMount.current.get(name);
         afterMount.current.delete(name);
         if (after) after(c);
@@ -780,10 +796,70 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         onEdit={(id, text) => setComments((cs) => cs.map((c) => (c.id === id ? { ...c, text } : c)))}
         onDelete={(id) => setComments((cs) => cs.filter((c) => c.id !== id))}
         onOpenFile={(name) => open(name)}
+        review={
+          canTrack && (
+            <ChangesList
+              changes={model.changes ?? []}
+              file={file}
+              label={label}
+              track={tracking}
+              active={activeChange}
+              readOnly={readOnly}
+              onPick={pickChange}
+              onAccept={(id) => decide([id], true)}
+              onReject={(id) => decide([id], false)}
+              onAll={(accept) => decide(null, accept)}
+              onOpenFile={(name) => open(name)}
+            />
+          )
+        }
         className={className}
       />
     );
   const openCount = model?.comments?.filter((c) => !c.resolved).length ?? 0;
+
+  // ---- tracked changes ----------------------------------------------------------------------------------------------------
+  // Kept with a document of the Library (a file of this computer keeps only its text).
+  const canTrack = !onDisk;
+  const tracking = !!model?.track;
+  const [activeChange, setActiveChange] = useState<string | null>(null);
+  useEffect(() => {
+    for (const c of codes.current.values()) c.setTrack(tracking && canTrack);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracking, made]);
+  const toggleTrack = () => {
+    if (readOnly || !canTrack) return;
+    const on = !live.current?.track;
+    change((d) => ({ ...d, track: on || undefined }));
+    // What is marked shows beside the source.
+    if (on) setCommentsOpen(true);
+    toast(on ? 'Track changes is on: what you type and delete is marked' : 'Track changes is off', 'ok');
+  };
+  /** Changes accepted or rejected (`ids`: those, or null for all): in a file's editor, so Undo takes it back, else in the document. */
+  const decide = (ids: string[] | null, accept: boolean) => {
+    const d = live.current;
+    if (!d || readOnly) return;
+    const picked = (d.changes ?? []).filter((c) => !ids || ids.includes(c.id));
+    for (const name of new Set(picked.map((c) => c.file))) {
+      const mine = picked.filter((c) => c.file === name).map((c) => c.id);
+      const c = codes.current.get(name);
+      if (c) (accept ? c.acceptChanges : c.rejectChanges)(mine);
+      else
+        change((x) => {
+          const n = texChangeOps(
+            x,
+            mine.map((id) => ({ id, [accept ? 'accept' : 'reject']: true })),
+          );
+          return n.comments?.length ? { ...n, comments: cleanTexComments(n.comments, n) } : n;
+        });
+    }
+    if (!ids && picked.length) toast(accept ? `Accepted ${picked.length} change${picked.length === 1 ? '' : 's'}` : `Rejected ${picked.length} change${picked.length === 1 ? '' : 's'}`, 'ok');
+  };
+  const pickChange = (x: TexChange) => {
+    setActiveChange(x.id);
+    withCode(x.file, (c) => c.pickChange(x.id));
+  };
+  const changeCount = model?.changes?.length ?? 0;
 
   // ---- what an agent is asked about ------------------------------------------------------------------------------------
   const settled = useDeferredValue(model);
@@ -1294,6 +1370,10 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         '-',
         { label: 'Word count', icon: <WholeWord size={14} />, also: 'words texcount', run: () => setDialog('count') },
         canCompare && { label: 'Compare versions', icon: <History size={14} />, also: 'diff history changes', run: () => setDialog('compare') },
+        '-',
+        canTrack && { label: 'Track changes', icon: <FilePen size={14} />, checked: tracking, disabled: readOnly, also: 'review suggest suggestions tracked revisions', run: toggleTrack },
+        canTrack && { label: 'Accept all changes', icon: <CheckCheck size={14} />, disabled: readOnly || !changeCount, also: 'tracked review', run: () => decide(null, true) },
+        canTrack && { label: 'Reject all changes', icon: <X size={14} />, disabled: readOnly || !changeCount, also: 'tracked review', run: () => decide(null, false) },
         '-',
         { label: 'Show the log', icon: <ScrollText size={14} />, disabled: !result?.log, run: () => setLogOpen(true) },
         { label: 'Open the PDF', icon: <ExternalLink size={14} />, disabled: !result?.pdf, run: openPdf },
