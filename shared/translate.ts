@@ -71,7 +71,14 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
     // first letter matches in either case.
     const last = parts.filter(Boolean).at(-1);
     const ending = (p: string) => (kept.has(num(p)) ? '((?:e?s)?|[^A-Za-z].*?)' : '((?:e?s)?)');
-    const body = parts.map((p) => (isValue(p) ? (endings.has(num(p)) ? ending(p) : p === last ? '(.*?)' : '(.+?)') : esc(p))).join('');
+    // A value glued to letters with no space ("{0}ms" for "12ms") is no piece of a word: it ends (or starts) with
+    // something other than a letter, so "Forms" is not "For" + "ms".
+    const glued = (i: number) => {
+      const after = /^[A-Za-z]/.test(parts[i + 1] ?? '');
+      const before = /[A-Za-z]$/.test(parts[i - 1] ?? '');
+      return after && before ? '([^A-Za-z](?:.*?[^A-Za-z])?)' : after ? '(.*?[^A-Za-z])' : before ? '([^A-Za-z].*?)' : null;
+    };
+    const body = parts.map((p, i) => (isValue(p) ? (endings.has(num(p)) ? ending(p) : (glued(i) ?? (p === last ? '(.*?)' : '(.+?)'))) : esc(p))).join('');
     const re = new RegExp(`^${cased(k[0]) ? `[${k[0].toLowerCase()}${k[0].toUpperCase()}]${body.slice(1)}` : body}$`, 's');
     const text = parts.filter((p) => !isValue(p));
     const longest = [...text].sort((a, b) => b.length - a.length)[0]?.trim() ?? '';
