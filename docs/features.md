@@ -367,7 +367,7 @@ about risky ones, and commands can run in a sandbox that lets them change files 
 
 Its models come from Settings → Models:
 
-- **OpenRouter**: add a key, then add the suggested models (GPT-6 Luna, fast and cheap; GLM 5.3, good with fewer
+- **OpenRouter**: add a key, then add the suggested models (GPT-6 Luna, fast and cheap; Grok 4.7, good with fewer
   refusals; GPT-6.1 Sol, better; Claude Opus 5.5, best overall) or search its catalog (each model's maker, context,
   longest reply, price, release date, and whether it reasons, sees images or calls tools; filter and sort).
 - **Ollama**: the models of an Ollama server, with GGUF weights pulled straight from Hugging Face.
