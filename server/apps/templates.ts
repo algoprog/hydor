@@ -14,10 +14,12 @@ import type { Step } from '../../shared/app-manifest.ts';
 import { EXPLORE, EXPLORE_UI } from './explore.ts';
 import { MORE } from './templates-more.ts';
 import { LAB } from './templates-lab.ts';
+import { PAPERS } from './templates-papers.ts';
 import { RESEARCH } from './templates-research.ts';
 import { VIEWS } from './views.ts';
 import { MORE_VIEWS } from './views-more.ts';
 import { LAB_VIEWS } from './views-lab.ts';
+import { PAPER_VIEWS } from './views-papers.ts';
 import { RESEARCH_VIEWS } from './views-research.ts';
 
 type Draft = Omit<AppTemplate, 'agent' | 'tools' | 'limits'>;
@@ -3333,12 +3335,13 @@ return { summary: String(input.summary || '').trim() + '\n\n' + tested, files, n
 /**
  * The templates, tidied like any recipe: the ten tasks above, Explore (a magazine made for you, opened on its own
  * page: explore.ts), the apps for keeping up with a research field (Paper radar and the rest: templates-research.ts),
- * the apps for everyday things (the weather, sports, food, films and games, plans, charts: templates-more.ts), the
- * lab's (labelling, research sprints, sweeps, the weekly report and the lab notebook: templates-lab.ts), then the
- * blocks. They run with Claude Code unless their page picks another agent.
+ * those for papers (reading, writing and presenting them: templates-papers.ts), the apps for everyday things (the
+ * weather, sports, food, films and games, plans, charts: templates-more.ts), the lab's (labelling, research sprints,
+ * sweeps, the weekly report and the lab notebook: templates-lab.ts), then the blocks. They run with Claude Code unless
+ * their page picks another agent.
  */
-const ALL: Draft[] = [...T.filter((t) => !t.block), EXPLORE, ...RESEARCH, ...MORE, ...LAB, ...T.filter((t) => t.block)];
-const UIS = { ...VIEWS, ...MORE_VIEWS, ...RESEARCH_VIEWS, ...LAB_VIEWS, [EXPLORE.id]: EXPLORE_UI };
+const ALL: Draft[] = [...T.filter((t) => !t.block), EXPLORE, ...RESEARCH, ...PAPERS, ...MORE, ...LAB, ...T.filter((t) => t.block)];
+const UIS = { ...VIEWS, ...MORE_VIEWS, ...RESEARCH_VIEWS, ...PAPER_VIEWS, ...LAB_VIEWS, [EXPLORE.id]: EXPLORE_UI };
 export const TEMPLATES: AppTemplate[] = ALL.map((t) => ({ ...cleanRecipe({ ...t, agent: 'claude', tools: null, limits: {}, ...(UIS[t.id] ? { ui: UIS[t.id] } : {}) }), id: t.id }));
 
 export const templateById = (id: string): AppTemplate | null => TEMPLATES.find((t) => t.id === id) ?? null;

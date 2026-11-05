@@ -246,9 +246,9 @@ function answerOf(answer: AnswerField[]): Record<string, unknown> {
   );
 }
 
-test('ready-made apps: each of the thirty-eight has a view of pages and elements of its own that checks out, uses only what its answer and form give, and has events', () => {
+test('ready-made apps: each of the forty-five has a view of pages and elements of its own that checks out, uses only what its answer and form give, and has events', () => {
   const tasks = TEMPLATES.filter((t) => !t.block);
-  assert.equal(tasks.length, 38);
+  assert.equal(tasks.length, 45);
   for (const t of tasks) {
     assert.ok(t.ui, `${t.id}: a view`);
     assert.ok(t.ui!.pages.filter((p) => p.tab !== false).length >= 2, `${t.id}: pages`);
