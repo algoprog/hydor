@@ -157,6 +157,7 @@ The app comes with these skills, in the groups the page shows them in. Open any 
 
 - **data-analysis**: answers questions from data (a CSV, an Excel sheet, an export): checks and cleans it, works it out in a way that can be checked, and says what the answer rests on.
 - **dashboards**: the right chart for the question, and dashboards to come back to as a page in your Library, with their data kept or fetched live.
+- **notebooks**: Jupyter notebooks that read well and run again: a text cell before each section, small cells, an environment to run them in (made beside the notebook when none fits), a full run from the top before one is handed over, and a card that opens it in the app's notebook page.
 - **financial-model**: a business's numbers in a spreadsheet (revenue, costs, cash flow, break-even, scenarios), with the assumptions on a sheet of their own and formulas that can be followed.
 - **sql-and-databases**: correct, safe SQL, schema changes and migrations that are safe on live data, indexes, and a backup before anything risky.
 

@@ -64,7 +64,7 @@ The bar over the folder holds, from the left:
 - **The folder above** (the up arrow).
 - The folder's path, in steps: a house for your home folder, then **code › shop**; a folder outside your home folder starts from **Computer** (`/`). Click a step to go there, or drop rows on it to move them there. A long path folds its middle into **…**, which lists the folders between. The last step, or the small arrow beside it, opens **Go to a folder**.
 - **Find in** *the folder*: narrows the list to the names that hold what you type, as you type. Enter, or the line **Search everything in … for "…", inside files too** at the top of the list, searches every folder under this one, file names and what is in the files (see [Search files](/guide/files-git#search-files)).
-- **New**: **New folder**, **New file**, **Upload files** and **Upload a folder**.
+- **New**: **New folder**, **New file**, **New notebook**, **Upload files** and **Upload a folder**.
 - **As a list** or **As tiles, with pictures**: tiles show pictures as themselves, a good way to look through photos.
 - **More** (⋯): **Sort by** (**Name**, **Date changed**, **Size** or **Kind**, and **The other way round**), **Show hidden files**, **Pin to Places**, **New session in this folder**, **Open a terminal here**, **Copy path**, **Download as .zip** and **Refresh**.
 
@@ -134,10 +134,10 @@ Typing a letter starts **Find in** with it.
 
 ### Make a file or folder
 
-1. Click **New** → **New folder** or **New file** (on a phone, the **+** button).
+1. Click **New** → **New folder**, **New file** or **New notebook** (on a phone, the **+** button).
 2. Type the name in the field that appears in the list and press Enter. Esc cancels.
 
-A new file is empty and opens in the editor at once. If the name is taken, the app says so and makes nothing.
+A new file is empty and opens in the editor at once. A new notebook is called `Untitled.ipynb` (`Untitled 2.ipynb` when that is taken) until you type another name; it starts with one empty code cell and opens as a notebook. A new file whose name ends in `.ipynb` starts as an empty notebook too. If the name is taken, the app says so and makes nothing.
 
 ### Rename or move
 
@@ -338,6 +338,8 @@ The search is in the page's address, so Back and a reload keep it. It skips file
 
 A notebook (`.ipynb`) opens as a notebook: its cells, each with its output. The bar at the top holds the kernel button, **Run all cells**, **Interrupt (I, I)**, **Restart the kernel (0, 0)**, **Clear all outputs**, **View the notebook file (JSON)**, **Download** and **Save**. On a phone, the less used ones are under **More**: **Restart the kernel**, **Restart and run all**, **Clear all outputs**, **View the file (JSON)** and **Download**.
 
+Make one with **New** → **New notebook** in a folder (see [Make a file or folder](/guide/files-git#make-a-file-or-folder)), or ask an agent for one: it writes the notebook, runs it from the top so its outputs are there, sets up an environment to run it in when none fits, and hands it over as a card that opens it here.
+
 ### Pick where the code runs
 
 The kernel button (a dot and a name, or "No kernel") opens **Run this notebook with**: the Python environments on this computer. It lists virtual environments named `.venv`, `venv` or `env` in the notebook's folder or the folders above it, conda environments, the system Python, and Jupyter kernels registered here (other languages too). Each shows its version, and the one the notebook asks for (or a virtual environment beside it) is marked **suggested**.
@@ -357,7 +359,7 @@ A cell is **Code**, **Text** (Markdown) or **Raw**. Click a code cell to edit it
 - When code asks for input (Python's `input()`), a field appears under the cell: "Type, then Enter". Passwords stay hidden.
 - While you edit code, Tab after a name asks the running kernel for completions.
 
-Outputs show text, errors in colour, images and charts, tables, HTML (in a sealed-off frame), Markdown and formulas. "Interactive widgets do not run here", and neither does JavaScript output.
+Outputs show text, errors in colour, images and charts, tables, HTML (in a sealed-off frame), Markdown and formulas. "Interactive widgets do not run here", and neither does JavaScript output. Progress bars show as they last stood, and text a cell prints bit by bit shows as one block, as in Jupyter.
 
 ### Keys
 
@@ -652,6 +654,7 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 - "Copy the PDFs in ~/Downloads from this week into my Taxes 2026 project."
 - "Which files in ~/code/shop mention the checkout, and what does each do with it?"
 - "Add a column to ~/Documents/people.csv with each person's share of the total."
+- "Make a notebook in ~/code/ml that trains a small image classifier, run it, and set up an environment I can run it in."
 - "Open a pull request for this session's branch, with a title and description written from the commits."
 - "Link https://github.com/acme/site/pull/42 to this session."
 - "Have the checks on this session's pull request passed yet?"

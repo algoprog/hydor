@@ -124,6 +124,8 @@ agents that speak ACP and take MCP servers.
   turns that off.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the
   app's document skills; the file viewer previews them, and finished files show as cards to open or download.
+  Agents make Jupyter notebooks too (the notebooks skill: sections with text, a run from the top before handing one
+  over, an environment beside it to run it in), and a notebook's card opens it in the notebook page.
 - **Images, videos and audio**: agents make pictures (or change yours), short videos (from words, from a picture
   to start or end on, or by changing a video) and sound with OpenRouter's image, video and audio models, the ones
   picked in Settings → Images, video and audio or one you name. The app's choices are ByteDance's Seedream 5.0 for
@@ -449,7 +451,8 @@ programs shows each program's version and what is out, with Check now, Update no
   brings the chapters and bibliography it reads and typesets among its folder's pictures (read only to TeX),
   writing only the files that changed; a Word or Excel file says first what the editor doesn't keep (headers and
   footers, comments, charts…), offers to save a copy instead, and its first save keeps the old file in the trash.
-  Jupyter notebooks open and run. Videos play in the app's own player (seek with a
+  Jupyter notebooks open and run; New → New notebook starts one (an empty .ipynb opens as a new notebook too), and
+  saved outputs show as Jupyter shows them, a progress bar at its last state. Videos play in the app's own player (seek with a
   preview of the time, speed, loop, picture in picture, full screen, keyboard shortcuts, double-tap to skip on a
   phone), streamed in parts so they start at once and seek anywhere.
 - Git: your repositories (those sessions worked in, and any you add: a folder on this computer, which can start

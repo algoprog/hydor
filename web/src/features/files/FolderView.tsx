@@ -25,6 +25,7 @@ import {
   LayoutGrid,
   List,
   MessageSquarePlus,
+  NotebookText,
   Pin,
   PinOff,
   Plus,
@@ -44,6 +45,7 @@ import { openFile } from '../../lib/nav';
 import { toastError, useApp, useUI } from '../../lib/store';
 import { pickedFromInput, startUpload } from '../../lib/upload';
 import { FileIcon } from '../documents/fileTypes';
+import { newNotebookText } from '../notebook/model';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { addToSpace, copyPaths, download, dragStart, dropInto, moveInto, newSessionIn, rename, startSession, takesDrop, trash, type Item } from './actions';
 import { ItemMenu, useFolderLead } from './ItemMenu';
@@ -161,6 +163,15 @@ function Icon({ e, size, thumb }: { e: FsEntry; size: number; thumb?: boolean })
       />
     );
   return <FileIcon path={e.path} size={size} className={thumb ? 'rounded-xl' : 'rounded-md'} />;
+}
+
+/** "Untitled.ipynb", or "Untitled 2.ipynb" and on when the folder has one already. */
+function untitled(entries: FsEntry[], ext: string): string {
+  const names = new Set(entries.map((e) => e.name.toLowerCase()));
+  for (let i = 1; ; i++) {
+    const name = `Untitled${i > 1 ? ` ${i}` : ''}${ext}`;
+    if (!names.has(name.toLowerCase())) return name;
+  }
 }
 
 /** The name field of a row being named (a new file or folder, or one renamed). */
@@ -486,7 +497,7 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
   // The ring around the row the keys are on shows once keys are used, until the pointer is.
   const [keys, setKeys] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
-  const [creating, setCreating] = useState<'file' | 'dir' | null>(null);
+  const [creating, setCreating] = useState<'file' | 'dir' | 'notebook' | null>(null);
   const [drop, setDrop] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ items: Item[]; el: HTMLElement | null; at?: { x: number; y: number } } | null>(null);
   const [newMenu, setNewMenu] = useState(false);
@@ -652,14 +663,16 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
   const create = async (name: string) => {
     const kind = creating;
     setCreating(null);
-    const n = name.trim();
+    let n = name.trim();
     if (!kind || !n) return;
+    if (kind === 'notebook' && !/\.ipynb$/i.test(n)) n += '.ipynb';
     const p = joinPath(dir, n);
     try {
       if (kind === 'dir') await post('/api/fs/mkdir', { path: p });
-      else await put('/api/fs/write', { path: p, content: '', create: true });
+      // A .ipynb file starts as an empty notebook, however it was made, so it opens as one.
+      else await put('/api/fs/write', { path: p, content: /\.ipynb$/i.test(n) ? newNotebookText() : '', create: true });
       await load(dir);
-      if (kind === 'file') onFile(p);
+      if (kind !== 'dir') onFile(p);
     } catch (e) {
       toastError(e);
     }
@@ -778,6 +791,9 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
       </MenuItem>
       <MenuItem icon={<FilePlus2 size={14} />} onClick={() => (close(), setCreating('file'))}>
         New file
+      </MenuItem>
+      <MenuItem icon={<NotebookText size={14} />} onClick={() => (close(), setCreating('notebook'))}>
+        New notebook
       </MenuItem>
       <MenuSep />
       <MenuItem icon={<Upload size={14} />} onClick={() => (close(), upload(dir))}>
@@ -979,7 +995,7 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
           <span className="ml-auto shrink-0 text-[11.5px] text-fg-3 max-md:hidden">Enter</span>
         </button>
       )}
-      {creating && <NameInput dir={creating === 'dir'} onDone={create} />}
+      {creating && <NameInput dir={creating === 'dir'} initial={creating === 'notebook' ? untitled(entries ?? [], '.ipynb') : undefined} onDone={create} />}
       {f && !items.length && <div className="px-4 py-8 text-center text-[13px] text-fg-3">Nothing here is called “{filter.trim()}”.</div>}
       {grid ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(124px,1fr))] gap-1.5 p-2 max-md:grid-cols-[repeat(auto-fill,minmax(104px,1fr))]">

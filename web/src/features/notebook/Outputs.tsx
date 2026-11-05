@@ -1,5 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { NbOutput } from '@shared/types';
+import { collapseCarriageReturns } from '@shared/notebook';
 import { ansiToHtml } from '../../lib/ansi';
 import { Markdown } from '../../components/Markdown';
 import { cx } from '../../components/ui';
@@ -58,7 +59,21 @@ function HtmlFrame({ html }: { html: string }) {
   return <iframe ref={ref} src="/nbframe" title="Output" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" style={{ height }} className="block w-full border-0" />;
 }
 
-/** Stream text keeps to the bottom while it grows, unless it was scrolled up to read. */
+/**
+ * Text on one stream, one output after another, shows as one, as Jupyter shows it: live runs arrive joined, but
+ * notebooks saved by other programs (Jupyter itself, nbclient) keep each piece apart.
+ */
+function joinStreams(outputs: NbOutput[]): NbOutput[] {
+  const out: NbOutput[] = [];
+  for (const o of outputs) {
+    const last = out[out.length - 1];
+    if (o.output_type === 'stream' && last?.output_type === 'stream' && last.name === o.name) out[out.length - 1] = { ...last, text: (last.text ?? '') + (o.text ?? '') };
+    else out.push(o);
+  }
+  return out;
+}
+
+/** Stream text keeps to the bottom while it grows, unless it was scrolled up to read. A progress bar's redraws (\r) show as its last state. */
 function StreamText({ text, err }: { text: string; err?: boolean }) {
   const ref = useRef<HTMLPreElement>(null);
   const pinned = useRef(true);
@@ -74,7 +89,7 @@ function StreamText({ text, err }: { text: string; err?: boolean }) {
         pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
       }}
       className={cx('nb-text max-h-[440px] overflow-auto', err && 'nb-stderr')}
-      dangerouslySetInnerHTML={{ __html: ansiToHtml(text.replace(/\r/g, '')) }}
+      dangerouslySetInnerHTML={{ __html: ansiToHtml(collapseCarriageReturns(text).replace(/\r/g, '')) }}
     />
   );
 }
@@ -155,7 +170,7 @@ export const Outputs = memo(function Outputs({ outputs, run, onInput }: { output
   if (!outputs.length && !run?.input) return null;
   return (
     <div className="nb-outputs min-w-0 px-3 pt-1.5 pb-1">
-      {outputs.map((o, i) => (
+      {joinStreams(outputs).map((o, i) => (
         <OutputView key={i} o={o} />
       ))}
       {run?.input && <InputPrompt prompt={run.input.prompt} password={run.input.password} onSubmit={onInput} />}

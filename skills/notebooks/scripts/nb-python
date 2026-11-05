@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Python with the libraries for making and running notebooks: nbformat (the file format) and nbclient (runs a
+# notebook's cells in a kernel). They are installed once, on first use, into a private environment in Hydor's data
+# folder; nothing is installed system-wide. The notebooks' own packages come from the environment their kernel
+# runs in (run_notebook.py --python).
+#
+#   nb-python run_notebook.py analysis.ipynb --python .venv/bin/python
+#   nb-python -c 'import nbformat'           or anything python takes
+set -euo pipefail
+
+PKGS="nbformat>=5.9,<6 nbclient>=0.10,<1"
+
+data="${HYDOR_DATA_DIR:-${DATA_DIR:-}}"
+if [ -z "$data" ]; then
+  if [ ! -d "$HOME/.hydor" ] && [ -d "$HOME/.web-agent" ]; then data="$HOME/.web-agent"; else data="$HOME/.hydor"; fi
+fi
+venv="$data/notebooks/venv"
+py="$venv/bin/python"
+
+if [ ! -x "$py" ] || [ "$(cat "$venv/.packages" 2>/dev/null)" != "$PKGS" ]; then
+  mkdir -p "$data/notebooks"
+  # One setup at a time (several agents may start at once).
+  lock="$data/notebooks/.setup-lock"
+  for _ in $(seq 1 600); do mkdir "$lock" 2>/dev/null && break; sleep 1; done
+  trap 'rmdir "$lock" 2>/dev/null || true' EXIT
+  if [ ! -x "$py" ] || [ "$(cat "$venv/.packages" 2>/dev/null)" != "$PKGS" ]; then
+    sys="$(command -v python3 || true)"
+    if [ -z "$sys" ]; then
+      echo "Python 3 is not installed on this computer, and running notebooks needs it." >&2
+      echo "Install it (Debian/Ubuntu: sudo apt install python3 python3-venv; macOS: brew install python), then run this again." >&2
+      exit 3
+    fi
+    if [ ! -x "$py" ] && ! "$sys" -m venv "$venv" >/dev/null 2>&1; then
+      rm -rf "$venv"
+      echo "Python is here, but it cannot make a private environment: its venv module is missing." >&2
+      echo "Install it (Debian/Ubuntu: sudo apt install python3-venv), then run this again." >&2
+      exit 3
+    fi
+    echo "Setting up nbformat and nbclient (once, about 20 MB)…" >&2
+    # shellcheck disable=SC2086
+    if ! "$py" -m pip install --quiet --disable-pip-version-check $PKGS >&2; then
+      echo "Could not download the Python libraries. Is the internet reachable from here?" >&2
+      exit 4
+    fi
+    printf '%s' "$PKGS" > "$venv/.packages"
+  fi
+fi
+# No __pycache__ beside the scripts (they may live in the app's own folder).
+export PYTHONDONTWRITEBYTECODE=1
+exec "$py" "$@"
