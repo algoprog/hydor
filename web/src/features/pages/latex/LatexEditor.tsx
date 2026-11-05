@@ -371,9 +371,13 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     texSetup().then(setSetup, () => {});
   }, []);
 
-  // Another document, or the agent's new version while nothing was changed here: start from it.
+  // Another document, or the agent's new version while nothing was changed here: start from it (the file in view at the
+  // same place, as the agent's version being written was read).
+  const keepPlace = useRef<{ file: string; line: number } | null>(null);
   useEffect(() => {
     if (!doc || dirtyRef.current) return;
+    const shown = codes.current.get(file);
+    keepPlace.current = shown ? { file, line: shown.topLine() } : null;
     setM(doc.model);
     setSaved(doc.model);
     setEpoch((e) => e + 1);
@@ -495,6 +499,11 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         codes.current.set(name, c);
         setMade((n) => n + 1);
         markCode(name, c);
+        const place = keepPlace.current;
+        if (place?.file === name) {
+          keepPlace.current = null;
+          if (place.line > 1) c.showLine(place.line);
+        }
         const d = live.current;
         if (d?.track) c.setTrack(true);
         const mine = (d?.changes ?? []).filter((x) => x.file === name);
