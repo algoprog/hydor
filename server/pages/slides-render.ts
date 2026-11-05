@@ -1,13 +1,13 @@
 // Pictures of a deck, made in the browser the app takes its pictures with. For its PowerPoint file, pictures of its
 // parts: each icon as a PNG (the file gets its SVG too; the PNG is for programs that do not read SVG) and each equation
-// as KaTeX draws it; one page holds them all, each at its size on the slide, and each is taken at up to twice that.
-// Without a browser (or offline, for KaTeX) there are none of that kind: icons then go as SVG alone, equations as their
-// LaTeX. And its slides as pictures (the PNG export): taken from the deck's own page as it prints, twice its size.
+// as the server's KaTeX draws it; one page holds them all, each at its size on the slide, and each is taken at up to
+// twice that. Without a browser there are none of that kind: icons then go as SVG alone, equations as their LaTeX. And
+// its slides as pictures (the PNG export): taken from the deck's own page as it prints, twice its size.
 import { everyEl, type Deck, type El } from '../../shared/slides.ts';
 import { canCapture, withTab } from '../capture/index.ts';
 import { iconSvgText, type Picture } from './pptx.ts';
 import type { DB } from '../db.ts';
-import { deckHasMath, deckPage, FONTS_JSON, KATEX_TAGS, RUNTIME_SRC } from './slides.ts';
+import { deckPage, FONTS_JSON, mathTags, RUNTIME_SRC } from './slides.ts';
 
 interface Item {
   n: number;
@@ -31,6 +31,7 @@ function page(deck: Deck, items: Item[]): string {
     .replace(/\u2029/g, '\\u2029');
   const script = `(function (RT) {
   var c = JSON.parse(document.getElementById('n-r').textContent);
+  var katex = RT.maths();
   RT.style();
   var y = 0;
   c.items.forEach(function (it) {
@@ -43,14 +44,15 @@ function page(deck: Deck, items: Item[]): string {
       var i = new Image();
       i.src = 'data:image/svg+xml;base64,' + it.svg;
       b.appendChild(i);
-    } else b.appendChild(RT.part(c.deck, c.deck.slides[it.s], it.el, {}));
+    } else b.appendChild(RT.part(c.deck, c.deck.slides[it.s], it.el, { katex: katex }));
     document.body.appendChild(b);
     y += Math.ceil(it.h) + 8;
   });
   window.__fit = function () { RT.fit(document.body); };
   window.__fit();
 })((${RUNTIME_SRC})(window, ${FONTS_JSON}))`;
-  return `<!doctype html><html><head><meta charset="utf-8">${deckHasMath(deck) ? KATEX_TAGS : ''}<style>html,body{margin:0;background:transparent}.it{position:absolute;left:0;overflow:visible}.it img{display:block;width:100%;height:100%}</style></head><body><script type="application/json" id="n-r">${json}</script><script>${script}</script></body></html>`;
+  const maths = mathTags(deck);
+  return `<!doctype html><html><head><meta charset="utf-8">${maths.head}<style>html,body{margin:0;background:transparent}.it{position:absolute;left:0;overflow:visible}.it img{display:block;width:100%;height:100%}</style></head><body><script type="application/json" id="n-r">${json}</script>${maths.body}<script>${script}</script></body></html>`;
 }
 
 /** The deck's icons and equations as pictures, by "icon:<id>" and "math:<id>". */
@@ -71,7 +73,8 @@ export async function deckRenders(deck: Deck): Promise<Map<string, Picture>> {
   if (!items.length) return out;
   const width = Math.min(4000, Math.ceil(Math.max(800, ...items.map((i) => i.w))));
   return withTab({ html: page(deck, items), width, height: 800, settleMs: 150, blockPrivate: true }, async (tab) => {
-    const katex = await tab.evaluate<boolean>('document.fonts.ready.then(() => new Promise((ok) => setTimeout(() => { window.__fit(); ok(!!window.katex); }, 120)))');
+    // Equations come drawn by the server's KaTeX (with its fonts inside the page): none is left as its LaTeX.
+    const katex = await tab.evaluate<boolean>('document.fonts.ready.then(() => new Promise((ok) => setTimeout(() => { window.__fit(); ok(!!document.getElementById("n-math")); }, 120)))');
     await tab.s.send('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: 0 } }).catch(() => {});
     const rects = await tab.evaluate<[number, number, number, number][]>('Array.from(document.querySelectorAll(".it")).map((b) => { const r = b.getBoundingClientRect(); return [r.left + scrollX, r.top + scrollY, r.width, r.height]; })');
     for (const it of items) {
