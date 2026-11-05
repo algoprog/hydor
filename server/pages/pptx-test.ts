@@ -433,5 +433,17 @@ const deck = normalizeDeck({
   ok(part(file, 'ppt/slides/slide5.xml').includes('<p:ph type="title"/>'), 'a slide made of parts has its first title as its title');
 }
 
+// ---- guides ----------------------------------------------------------------------------------------------------------------
+{
+  const d = normalizeDeck({ guides: { x: [640], y: [100, 620] }, slides: [{ layout: 'blank' }] });
+  const pres = part(pptxFile(d, { title: 'T', picture: () => null }), 'ppt/presentation.xml');
+  ok(
+    pres.includes('<p:ext uri="{EFAFB233-063F-42B5-8137-9DF3F51BA10A}"><p15:sldGuideLst xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main"><p15:guide id="1" orient="vert" pos="3840" userDrawn="1">') &&
+      pres.includes('orient="horz" pos="3720"'),
+    'the deck’s guides are PowerPoint’s guides, where they are',
+  );
+  ok(!part(pptxFile(normalizeDeck({ slides: [{ layout: 'blank' }] }), { title: 'T', picture: () => null }), 'ppt/presentation.xml').includes('sldGuideLst'), 'a deck without guides has none');
+}
+
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
