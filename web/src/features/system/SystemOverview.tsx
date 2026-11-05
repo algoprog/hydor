@@ -1,9 +1,10 @@
 // System → Overview: this computer at a glance. How it is doing (processor, memory, disk, graphics), and a card
 // for each of its tools with what is useful now: files you opened lately and a search, repositories with
-// changes, the terminals running, the web apps you can preview. Each card opens its tab.
+// changes, the terminals running, the web apps you can preview, the experiments' runs going. Each card opens its tab.
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ChevronRight, Clock, Cpu, File, FolderTree, GitBranch, HardDrive, House, MemoryStick, Microchip, MonitorSmartphone, Plus, Search, SquareTerminal, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronRight, Clock, Cpu, File, FlaskConical, FolderTree, GitBranch, HardDrive, House, MemoryStick, Microchip, MonitorSmartphone, Plus, Search, SquareTerminal, Trash2 } from 'lucide-react';
 import type { GitRepo, SystemInfo, SystemSample } from '@shared/types';
+import type { RunRecord } from '@shared/experiments';
 import { api } from '../../lib/api';
 import { ago, basename, dirname, pct, tildify } from '../../lib/format';
 import { machineId } from '../../lib/machine';
@@ -16,6 +17,7 @@ import { useFilesPrefs } from '../files/prefs';
 import { searchUrl } from '../files/SearchView';
 import { loadTerms, newTerminal, useTerms } from '../terminal/TerminalPanel';
 import { SystemHeader } from './SystemHeader';
+import { metricsLine, runPath, statusTone, statusWords } from '../experiments/api';
 
 function uptime(s: number): string {
   const d = Math.floor(s / 86400);
@@ -305,6 +307,46 @@ function PreviewCard() {
   );
 }
 
+/** The experiments' runs going now (running, then waiting), each opening its page. */
+function ExperimentsCard() {
+  const [runs, setRuns] = useState<RunRecord[] | null>(null);
+  const load = () =>
+    api<{ runs: RunRecord[] }>('/api/experiments/runs?status=active&limit=50')
+      .then((r) => setRuns(r.runs))
+      .catch(() => setRuns([]));
+  useEffect(() => {
+    load();
+  }, []);
+  useInterval(load, 10_000);
+  const sorted = [...(runs ?? [])].sort((a, b) => Number(b.status === 'running') - Number(a.status === 'running'));
+  return (
+    <Card icon={<FlaskConical size={16} />} title="Experiments" count={runs?.length || undefined} to="/system/experiments">
+      {!runs ? (
+        <div className="flex justify-center py-6">
+          <Throbber />
+        </div>
+      ) : sorted.length ? (
+        sorted.slice(0, 5).map((r) => (
+          <Item
+            key={r.id}
+            icon={<span className={cx('h-1.5 w-1.5 rounded-full', statusTone(r.status))} />}
+            title={<span translate="no">{r.name ?? r.id}</span>}
+            sub={
+              <>
+                {statusWords(r)}
+                {metricsLine(r, 2) ? <span translate="no"> · {metricsLine(r, 2)}</span> : null}
+              </>
+            }
+            onClick={() => go(runPath(r))}
+          />
+        ))
+      ) : (
+        <Quiet>No runs going. Start a job that waits for a free GPU and is kept as a record, or ask an agent to train or evaluate something on one.</Quiet>
+      )}
+    </Card>
+  );
+}
+
 export function SystemOverview() {
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -317,6 +359,7 @@ export function SystemOverview() {
             <GitCard />
             <TerminalCard />
             {!machineId && <PreviewCard />}
+            <ExperimentsCard />
           </div>
         </div>
       </div>

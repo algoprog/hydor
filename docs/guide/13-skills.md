@@ -137,6 +137,9 @@ The app comes with these skills, in the groups the page shows them in. Open any 
 - **research**: plans the searches a question needs, searches wide and then narrow (papers, patents, news, filings), checks each key claim against two independent sources or one primary source, and answers with citations, saying what it could not confirm.
 - **spin-check**: whether an ad, a viral post, a pitch or a claim is true, misleading or a scam: claim by claim, each checked against the source that can settle it, the persuasion tricks named, and a verdict for each.
 - **papers**: works closely with academic papers: who cites one, a legal full text, reading and summarising, a table comparing studies, judging a study's quality, and citing it properly.
+- **peer-review**: reviews a paper (your draft before you submit it, or one you were asked to review) on the venue's own form and scores, with the weaknesses that sink papers checked one by one, and answers reviews: a rebuttal or a response to reviewers, point by point within the limit, never promising results it does not have.
+- **reproduce-paper**: reproduces a paper's results: the exact number to match, its code and setting, a clean environment, the data and checkpoints, a small run before the real one (long ones in [Experiments](/guide/experiments)), the numbers compared like with like, and every change written down in a report.
+- **figures-for-papers**: makes a paper's plots fit for print: as wide as the column of the venue's template, in the paper's font, in colours colour-blind readers tell apart, as vector PDFs with their fonts embedded (none of Type 3), all with one style file.
 - **blocked-pages**: when a page won't load or read (an error, a paywall, a cookie wall or bot check, a page that needs JavaScript), it tries the other ways to its content in order, and never gets round what you have no right to.
 - **web-scraping**: collects structured data from websites (listings, tables, prices, a catalogue) into CSV or JSON politely and reliably, and checks it.
 - **maps-and-places**: places without paid map services: the coordinates of an address, what is nearby, distances, routes and travel times, time zones, opening hours, and a map in a page.
@@ -188,6 +191,11 @@ The app comes with these skills, in the groups the page shows them in. Open any 
 - **security-check**: a practical security review: secrets, injections, who may do what, outdated packages, each problem reported by how serious it is.
 - **performance**: making software faster by measuring first, finding the biggest cost, fixing it and measuring again.
 - **mcp-servers**: building an MCP server so agents get new tools, designing its tools well, testing it, and adding it to an agent.
+- **ci-doctor**: a failed CI run (GitHub Actions, GitLab CI, Buildkite, CircleCI): the first real error in the logs, flaky or real by the evidence, reproduced in a worktree, then re-run once, fixed in a draft pull request or reported, as allowed.
+- **issue-triage**: a new issue labelled with the project's own labels, duplicates found in several wordings (and how sure), a kind request for what the report lacks, and a small fix tried as a draft pull request.
+- **dependency-upgrades**: what is outdated and which dependencies have security advisories, upgraded by risk (security fixes, patch, minor, majors apart) in worktrees with the tests run and the release notes read, one pull request per group.
+- **incident-response**: an alert or outage: you are told at once, then a timeline of errors, deploys and changes, the likely cause with its evidence, a rollback proposed and asked first, and a blameless postmortem afterwards.
+- **git-bisect**: finding the commit that broke something with a check script and git bisect run in a worktree of its own, and why it broke things (see [Find what broke it](/guide/engineering#find-what-broke-it)).
 
 **AI models**
 

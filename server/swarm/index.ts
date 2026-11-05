@@ -1,12 +1,13 @@
 // Swarm mode: a session started with it leads a swarm. Its members are its child sessions (server/children:
 // start_child_session, their reports coming back, at most the swarm's size working at once, never in a
-// freer mode, within a share of its spending cap), each attacking the task from its own angle. Here: the
-// board they share (posts, each to everyone or to one of them), the tools on it, what the lead and the
-// members are told, and how word gets around. A finding, a question or a message for the lead reaches the
-// lead within a minute, progress alone every few minutes, in one message that wakes it; a message for a
-// member that is not working wakes that member. The lead stops members with swarm_stop, the user from the
-// session's swarm bar.
-import { SWARM_KINDS, type SwarmBoard, type SwarmKind, type SwarmPost } from '../../shared/swarm.ts';
+// freer mode, within a share of its spending cap), each attacking the task from its own angle; or, as a
+// campaign, each making one part of a big change in a worktree of its own. Here: the board they share (posts,
+// each to everyone or to one of them, and a campaign's plan and parts), the tools on it, what the lead and the
+// members are told, and how word gets around. A finding, a question, a part done or failed, or a message for the
+// lead reaches the lead within a minute, progress alone every few minutes, in one message that wakes it; a
+// message for a member that is not working wakes that member (in a swarm, so does what the lead tells
+// everyone). The lead stops members with swarm_stop, the user from the session's swarm bar.
+import { CAMPAIGN_KINDS, campaignParts, partNamed, partsTally, SWARM_KINDS, swarmMode, type CampaignPart, type SwarmBoard, type SwarmKind, type SwarmMode, type SwarmPost } from '../../shared/swarm.ts';
 import type { SessionSummary } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { childKeys } from '../children/family.ts';
@@ -14,7 +15,7 @@ import { swarmSize } from '../children/index.ts';
 import type { DB } from '../db.ts';
 import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
 import { sessionExtra, setSessionExtra } from '../sessionExtra.ts';
-import { leadInstructions, MEMBER_INSTRUCTIONS } from './instructions.ts';
+import { CAMPAIGN_MEMBER_INSTRUCTIONS, campaignLeadInstructions, leadInstructions, MEMBER_INSTRUCTIONS } from './instructions.ts';
 import { noteRun, roleFromExtra, roleOf } from './roles.ts';
 
 /** A finding, a question or a message for the lead: the lead hears of it within this. */
@@ -23,6 +24,9 @@ const SOON_MS = 45_000;
 const LATER_MS = 5 * 60_000;
 /** The longest post kept. */
 const MAX_POST = 6000;
+/** A campaign's most parts, and the longest name one may have. */
+const MAX_PARTS = 300;
+const MAX_PART_NAME = 120;
 
 // ---- the board -------------------------------------------------------------------------------------
 
@@ -37,6 +41,10 @@ function tables(db: DB) {
     create index if not exists swarm_posts_swarm on swarm_posts(swarm, id);
     create table if not exists swarm_reads (swarm text not null, reader text not null, last integer not null, primary key (swarm, reader));
   `);
+  // A campaign's posts say which part they are about; its plan lists the parts.
+  const cols = new Set((db.prepare('pragma table_info(swarm_posts)').all() as { name: string }[]).map((c) => c.name));
+  if (!cols.has('part')) db.exec('alter table swarm_posts add column part text');
+  if (!cols.has('parts')) db.exec('alter table swarm_posts add column parts text');
   made.add(db);
 }
 
@@ -48,15 +56,32 @@ interface Row {
   kind: string;
   body: string;
   at: number;
+  part: string | null;
+  parts: string | null;
 }
 
-const toPost = (r: Row): SwarmPost => ({ id: r.id, swarm: r.swarm, from: r.author, ...(r.recipient ? { to: r.recipient } : {}), kind: r.kind as SwarmKind, text: r.body, at: r.at });
+function listOf(json: string | null): string[] | undefined {
+  if (!json) return undefined;
+  try {
+    const v = JSON.parse(json);
+    return Array.isArray(v) ? v.map(String) : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
-export function addPost(db: DB, p: { swarm: string; from: string; to?: string; kind: SwarmKind; text: string }): SwarmPost {
+const toPost = (r: Row): SwarmPost => {
+  const parts = listOf(r.parts);
+  return { id: r.id, swarm: r.swarm, from: r.author, ...(r.recipient ? { to: r.recipient } : {}), kind: r.kind as SwarmKind, text: r.body, at: r.at, ...(r.part ? { part: r.part } : {}), ...(parts ? { parts } : {}) };
+};
+
+export function addPost(db: DB, p: { swarm: string; from: string; to?: string; kind: SwarmKind; text: string; part?: string; parts?: string[] }): SwarmPost {
   tables(db);
   const at = Date.now();
-  const r = db.prepare('insert into swarm_posts (swarm, author, recipient, kind, body, at) values (?, ?, ?, ?, ?, ?)').run(p.swarm, p.from, p.to ?? null, p.kind, p.text, at);
-  return { id: Number(r.lastInsertRowid), swarm: p.swarm, from: p.from, ...(p.to ? { to: p.to } : {}), kind: p.kind, text: p.text, at };
+  const r = db
+    .prepare('insert into swarm_posts (swarm, author, recipient, kind, body, at, part, parts) values (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(p.swarm, p.from, p.to ?? null, p.kind, p.text, at, p.part ?? null, p.parts?.length ? JSON.stringify(p.parts) : null);
+  return { id: Number(r.lastInsertRowid), swarm: p.swarm, from: p.from, ...(p.to ? { to: p.to } : {}), kind: p.kind, text: p.text, at, ...(p.part ? { part: p.part } : {}), ...(p.parts?.length ? { parts: p.parts } : {}) };
 }
 
 /** A swarm's posts after `after` (oldest first), or its latest `limit`. */
@@ -65,6 +90,16 @@ export function postsOf(db: DB, swarm: string, o: { after?: number; limit?: numb
   if (o.after !== undefined) return (db.prepare('select * from swarm_posts where swarm = ? and id > ? order by id').all(swarm, o.after) as Row[]).map(toPost);
   return (db.prepare('select * from swarm_posts where swarm = ? order by id desc limit ?').all(swarm, o.limit ?? 300) as Row[]).reverse().map(toPost);
 }
+
+/** A campaign's parts and how each stands, from every post about them (however old). */
+export function partsOf(db: DB, swarm: string): CampaignPart[] {
+  tables(db);
+  const rows = db.prepare(`select * from swarm_posts where swarm = ? and (kind = 'plan' or part is not null) order by id`).all(swarm) as Row[];
+  return campaignParts(rows.map(toPost));
+}
+
+/** Which kind of team a lead leads (a swarm when its settings say nothing, as before campaigns). */
+const modeOf = (db: DB, swarm: string): SwarmMode => swarmMode(sessionExtra(db, swarm)) ?? 'swarm';
 
 const lastRead = (db: DB, swarm: string, reader: string): number => {
   tables(db);
@@ -116,7 +151,8 @@ function statusOf(d: Deps, key: string): string {
 }
 
 /** A post as a line in what an agent reads. */
-const line = (d: Deps, p: SwarmPost, reader: string, n = 700) => `- ${nameOf(d, p.swarm, p.from, reader)}${p.to ? ` → ${nameOf(d, p.swarm, p.to, reader)}` : ''} · ${p.kind}: ${clip(p.text, n)}`;
+const line = (d: Deps, p: SwarmPost, reader: string, n = 700) =>
+  `- ${nameOf(d, p.swarm, p.from, reader)}${p.to ? ` → ${nameOf(d, p.swarm, p.to, reader)}` : ''} · ${p.kind}${p.part ? ` (${p.part})` : ''}: ${clip(p.text, n)}${p.parts?.length ? ` [${p.parts.length} part${p.parts.length === 1 ? '' : 's'}: ${clip(p.parts.join(', '), 400)}]` : ''}`;
 
 function lines(d: Deps, posts: SwarmPost[], reader: string, budget = 12_000): string[] {
   const out: string[] = [];
@@ -177,7 +213,9 @@ export async function tellLead(d: Deps, swarm: string) {
 async function tellMember(d: Deps, swarm: string, member: string) {
   if (busy(d.sessions.summary(member)) || stopped(d.db, member)) return;
   const news = unread(d.db, swarm, member);
-  const forIt = news.filter((p) => p.to === member || (!p.to && p.from === swarm)).length;
+  // In a campaign what the lead tells everyone wakes nobody: a member whose part is done stays done.
+  const everyone = modeOf(d.db, swarm) !== 'campaign';
+  const forIt = news.filter((p) => p.to === member || (everyone && !p.to && p.from === swarm)).length;
   if (!forIt) return;
   markRead(d.db, swarm, member, news[news.length - 1].id);
   const others = news.length - forIt;
@@ -191,15 +229,15 @@ async function tellMember(d: Deps, swarm: string, member: string) {
 
 /**
  * A new post: open pages show it, and the one it is for hears of it. The lead's posts wake the members they
- * are for (all of them, for one to everyone); a member's go to the lead (soon unless it is only progress),
- * or wake the member they are for.
+ * are for (all of them, for one to everyone, except in a campaign: there members read those on the board);
+ * a member's go to the lead (soon unless it is only progress), or wake the member they are for.
  */
 export function posted(d: Deps, p: SwarmPost) {
   d.broadcast({ t: 'feature', id: 'swarm', key: p.swarm, data: { post: p } });
   const wake = (k: string) => void tellMember(d, p.swarm, k).catch(() => {});
   if (p.from === p.swarm) {
     if (p.to) wake(p.to);
-    else childKeys(d.db, p.swarm).forEach(wake);
+    else if (modeOf(d.db, p.swarm) !== 'campaign') childKeys(d.db, p.swarm).forEach(wake);
   } else if (p.to && p.to !== p.swarm) wake(p.to);
   else schedule(d, p.swarm, p.to === p.swarm || p.kind !== 'progress');
 }
@@ -236,6 +274,64 @@ function membersText(d: Deps, swarm: string, reader: string): string {
   return [`Members (${keys.length}; at most ${swarmSize(d.db)} work at once):`, ...(rows.length ? rows : ['- none yet'])].join('\n');
 }
 
+/** A campaign's plan from the tool's `parts`: short names, one each, in order. */
+function planParts(v: unknown): string[] {
+  const list = Array.isArray(v) ? v : typeof v === 'string' ? v.split('\n') : [];
+  const out: string[] = [];
+  for (const x of list) {
+    const name = String(x ?? '')
+      .replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!name) continue;
+    if (name.length > MAX_PART_NAME) throw new Error(`Part names are short (${MAX_PART_NAME} characters at most): "${clip(name, 60)}" is too long. Put what a part holds in its member’s brief.`);
+    if (partNamed(out.map((n) => ({ name: n })), name)) throw new Error(`"${name}" is in the plan twice: each part needs a name of its own.`);
+    out.push(name);
+  }
+  if (out.length > MAX_PARTS) throw new Error(`${out.length} parts is too many: at most ${MAX_PARTS}. Make the parts bigger.`);
+  return out;
+}
+
+/** The part a post is about, as the plan names it. */
+function partOf(d: Deps, swarm: string, name: unknown, lead: boolean): string | undefined {
+  const want = String(name ?? '').trim();
+  if (!want) return undefined;
+  const parts = partsOf(d.db, swarm);
+  if (!parts.length) throw new Error(lead ? 'There is no plan yet: post it first (kind plan, with parts).' : 'The lead has not posted the plan yet: ask the lead (to "lead") which part is yours.');
+  const hit = partNamed(parts, want);
+  if (!hit) {
+    const near = parts.filter((p) => p.name.toLowerCase().includes(want.toLowerCase()) || want.toLowerCase().includes(p.name.toLowerCase())).map((p) => p.name);
+    throw new Error(`There is no part "${want}" in the plan.${near.length ? ` Did you mean ${near.slice(0, 5).map((n) => `"${n}"`).join(' or ')}?` : ` Its parts: ${clip(parts.map((p) => p.name).join(', '), 1500)}.`}`);
+  }
+  return hit.name;
+}
+
+const POST_TEXT = { type: 'string', description: 'Short and concrete: numbers, formulas, file paths.' };
+const POST_TO = { type: 'string', description: 'A member’s key, or "lead". Leave it out for everyone.' };
+
+/** Posts and says what is new on the board for the poster. */
+async function postIt(ctx: RunCtx, swarm: string, p: { kind: SwarmKind; to?: string; text: string; part?: string; parts?: string[] }) {
+  const d = ctx.deps;
+  const post = addPost(d.db, { swarm, from: ctx.key, ...p, text: p.text.slice(0, MAX_POST) });
+  posted(d, post);
+  const news = unread(d.db, swarm, ctx.key);
+  if (news.length) markRead(d.db, swarm, ctx.key, news[news.length - 1].id);
+  const to = p.to;
+  const who = to ? nameOf(d, swarm, to, ctx.key) : 'everyone';
+  const campaign = modeOf(d.db, swarm) === 'campaign';
+  const awake =
+    to && to !== swarm
+      ? busy(d.sessions.summary(to))
+        ? ' It is working: it sees this the next time it reads the board.'
+        : stopped(d.db, to)
+          ? ' It was stopped, so this does not wake it.'
+          : ' It was not working: this wakes it.'
+      : !to && campaign && swarm === ctx.key
+        ? ' In a campaign this wakes nobody: members see it when they read the board.'
+        : '';
+  return [`Posted to ${who} (${p.kind}${p.part ? `, ${p.part}` : ''}${p.parts ? `, ${p.parts.length} part${p.parts.length === 1 ? '' : 's'}` : ''}).${awake}`, ...(news.length ? ['', 'New on the board since you last read:', ...lines(d, news, ctx.key)] : [])].join('\n');
+}
+
 const POST: RunTool = {
   name: 'swarm_post',
   description:
@@ -243,13 +339,13 @@ const POST: RunTool = {
   inputSchema: {
     type: 'object',
     properties: {
-      text: { type: 'string', description: 'Short and concrete: numbers, formulas, file paths.' },
+      text: POST_TEXT,
       kind: {
         type: 'string',
         enum: SWARM_KINDS,
         description: 'progress: what you tried and where you are; finding: a result the others can use now; question: something you need answered; note: anything else. Default: progress (note for the lead).',
       },
-      to: { type: 'string', description: 'A member’s key, or "lead". Leave it out for everyone.' },
+      to: POST_TO,
     },
     required: ['text'],
   },
@@ -261,19 +357,76 @@ const POST: RunTool = {
     const kind: SwarmKind = SWARM_KINDS.includes(a.kind) ? a.kind : lead ? 'note' : 'progress';
     const to = recipient(d, swarm, a.to);
     if (to === ctx.key) throw new Error('That is you.');
-    const p = addPost(d.db, { swarm, from: ctx.key, to, kind, text: text.slice(0, MAX_POST) });
-    posted(d, p);
-    const news = unread(d.db, swarm, ctx.key);
-    if (news.length) markRead(d.db, swarm, ctx.key, news[news.length - 1].id);
-    const who = to ? nameOf(d, swarm, to, ctx.key) : 'everyone';
-    const awake = to && to !== swarm ? (busy(d.sessions.summary(to)) ? ' It is working: it sees this the next time it reads the board.' : stopped(d.db, to) ? ' It was stopped, so this does not wake it.' : ' It was not working: this wakes it.') : '';
-    return [`Posted to ${who} (${kind}).${awake}`, ...(news.length ? ['', 'New on the board since you last read:', ...lines(d, news, ctx.key)] : [])].join('\n');
+    return postIt(ctx, swarm, { kind, to, text });
   },
 };
 
+/** A campaign's: its plan, and how each part stands, besides what a swarm's posts say. */
+const CAMPAIGN_POST: RunTool = {
+  name: 'swarm_post',
+  description:
+    'Post to your campaign’s board, which the lead and every member read. kind plan (the lead): the parts, in the order to do them, in parts; post it again, whole, when it changes. For a part (part set to its name as the plan has it): progress (where you are), done (finished, committed on its branch, its checks pass: say the branch and the checks) or failed (what went wrong, what you tried). Also finding, question or note. With to, a message for one member (its key) or the lead ("lead"), which wakes a member that is not working; posts to everyone wake nobody. Returns what others posted since you last read.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      text: POST_TEXT,
+      kind: {
+        type: 'string',
+        enum: CAMPAIGN_KINDS,
+        description: 'plan: the lead’s plan, with parts; progress, done or failed: how a part stands, with part; finding: something the other parts can use; question: something you need answered; note: anything else. Default: progress (note for the lead).',
+      },
+      part: { type: 'string', description: 'The part this is about, as the plan names it. Needed for done and failed.' },
+      parts: { type: 'array', items: { type: 'string' }, description: 'For kind plan: every part’s short, unique name ("packages/api", "src/billing"), in the order to do them.' },
+      to: POST_TO,
+    },
+    required: ['text'],
+  },
+  async run(a, ctx) {
+    const d = ctx.deps;
+    const { swarm, lead } = swarmOf(ctx);
+    const text = String(a.text ?? '').trim();
+    if (!text) throw new Error('The text is empty.');
+    const kind: SwarmKind = CAMPAIGN_KINDS.includes(a.kind) ? a.kind : lead ? 'note' : 'progress';
+    if (kind === 'plan') {
+      if (!lead) throw new Error('Only the lead posts the plan. Ask the lead (to "lead") if the parts should change.');
+      const parts = planParts(a.parts);
+      if (!parts.length) throw new Error('A plan needs its parts: parts, a list of short, unique names, in the order to do them.');
+      return postIt(ctx, swarm, { kind, text, parts });
+    }
+    const part = partOf(d, swarm, a.part, lead);
+    if ((kind === 'done' || kind === 'failed') && !part) throw new Error(`Say which part is ${kind}: part, its name as in the plan.`);
+    const to = recipient(d, swarm, a.to);
+    if (to === ctx.key) throw new Error('That is you.');
+    return postIt(ctx, swarm, { kind, to, text, ...(part ? { part } : {}) });
+  },
+};
+
+/** A campaign's parts as an agent reads them: the lead every part, a member the count and the parts it posted about. */
+function partsText(d: Deps, swarm: string, reader: string): string[] {
+  const parts = partsOf(d.db, swarm);
+  if (!parts.length) return ['Parts: no plan yet.'];
+  const n = partsTally(parts);
+  const head = `Parts (${n.total}): ${n.done} done, ${n.failed} failed, ${n.working} working, ${n.waiting} waiting.`;
+  const mine = reader === swarm ? parts : parts.filter((p) => p.member === reader);
+  const row = (p: CampaignPart) =>
+    `- ${p.name} · ${p.status}${p.tries > 1 ? ` (failed ${p.tries} times)` : p.status !== 'failed' && p.tries === 1 ? ' (failed once)' : ''}${p.member ? ` · ${p.member === reader ? 'you' : p.member}` : ''}${p.note ? ` · ${clip(p.note, 160)}` : ''}`;
+  const rows: string[] = [];
+  let used = 0;
+  for (const [i, p] of mine.entries()) {
+    const l = row(p);
+    if (used + l.length > 8000) {
+      rows.push(`- … and ${mine.length - i} more.`);
+      break;
+    }
+    rows.push(l);
+    used += l.length;
+  }
+  return [head, ...rows];
+}
+
 const READ: RunTool = {
   name: 'swarm_read',
-  description: 'Read your swarm’s board: the members (their keys, angles and what each is doing) and the posts since you last read; with all, the latest 60 posts whatever you have read.',
+  description: 'Read your swarm’s board: the members (their keys, angles and what each is doing), a campaign’s parts and how each stands, and the posts since you last read; with all, the latest 60 posts whatever you have read.',
   inputSchema: { type: 'object', properties: { all: { type: 'boolean', description: 'The latest posts, read or not.' } } },
   annotations: { readOnlyHint: true },
   async run(a, ctx) {
@@ -283,6 +436,7 @@ const READ: RunTool = {
     if (posts.length) markRead(d.db, swarm, ctx.key, Math.max(...posts.map((p) => p.id)));
     return [
       membersText(d, swarm, ctx.key),
+      ...(modeOf(d.db, swarm) === 'campaign' ? ['', ...partsText(d, swarm, ctx.key)] : []),
       '',
       posts.length ? (a.all ? 'The latest posts:' : 'New since you last read:') : a.all ? 'Nothing on the board yet.' : 'Nothing new since you last read.',
       ...lines(d, posts, ctx.key, 16_000),
@@ -316,14 +470,17 @@ export const swarm: Feature = {
   tools(ctx) {
     const r = roleOf(ctx.deps.db, ctx);
     if (!r) return [];
-    return r.role === 'lead' ? [POST, READ, STOP] : [POST, READ];
+    const post = r.mode === 'campaign' ? CAMPAIGN_POST : POST;
+    return r.role === 'lead' ? [post, READ, STOP] : [post, READ];
   },
 
   spawn(s, d) {
     const r = roleFromExtra(d.db, s.extra);
     noteRun(s.runId, r);
     if (!r) return undefined;
-    return { instructions: [r.role === 'lead' ? leadInstructions(swarmSize(d.db)) : MEMBER_INSTRUCTIONS] };
+    const size = swarmSize(d.db);
+    if (r.mode === 'campaign') return { instructions: [r.role === 'lead' ? campaignLeadInstructions(size) : CAMPAIGN_MEMBER_INSTRUCTIONS] };
+    return { instructions: [r.role === 'lead' ? leadInstructions(size) : MEMBER_INSTRUCTIONS] };
   },
 
   turnEnd(t, d) {
@@ -363,7 +520,8 @@ export const swarm: Feature = {
     d.app.get('/api/swarm/:key', async (req): Promise<SwarmBoard> => {
       const key = keyOf(req);
       const members = childKeys(d.db, key);
-      return { swarm: key, size: swarmSize(d.db), members, stopped: members.filter((k) => stopped(d.db, k)), posts: postsOf(d.db, key, { limit: 300 }) };
+      const mode = modeOf(d.db, key);
+      return { swarm: key, mode, size: swarmSize(d.db), members, stopped: members.filter((k) => stopped(d.db, k)), posts: postsOf(d.db, key, { limit: 300 }), ...(mode === 'campaign' ? { parts: partsOf(d.db, key) } : {}) };
     });
     // The user stops one member, or every member still working.
     d.app.post('/api/swarm/:key/stop', async (req) => {
@@ -375,9 +533,10 @@ export const swarm: Feature = {
       for (const k of keys) await stopMember(d, k);
       d.broadcast({ t: 'feature', id: 'swarm', key, data: { stopped: keys } });
       // The lead hears of it, since stopped members send no report of the turn cut short.
+      const team = modeOf(d.db, key);
       if (keys.length)
         await d.sessions
-          .deliverOrQueue(key, `[The user stopped ${keys.length === 1 ? `the swarm member ${nameOf(d, key, keys[0])}` : `${keys.length} swarm members: ${keys.map((k) => nameOf(d, key, k)).join(', ')}`}. Stopped members keep what they did; message_child gives one more to do.]`)
+          .deliverOrQueue(key, `[The user stopped ${keys.length === 1 ? `the ${team} member ${nameOf(d, key, keys[0])}` : `${keys.length} ${team} members: ${keys.map((k) => nameOf(d, key, k)).join(', ')}`}. Stopped members keep what they did; message_child gives one more to do.]`)
           .catch(() => {});
       return { stopped: keys };
     });

@@ -30,6 +30,8 @@ export interface PageInfo {
   sessionKey?: string;
   /** Who made the current version. */
   by?: PageVersion['by'];
+  /** Someone the project is shared with made it (their name). */
+  who?: string;
   /** Its picture in Pages is ready (GET /api/pages/:id/thumb?v=<thumb>). */
   thumb?: string;
   /** Published at a link. */
@@ -40,9 +42,49 @@ export interface PageInfo {
   app?: string;
   /** The space it is in (the Library shows each space's together); none when unset. */
   space?: string;
+  /** The Library folder it is in (LibFolder's id, a folder of its space); none at its place's top. */
+  folder?: string;
   /** A page of HTML's icon: the emoji the page editor puts at its top (links to it in other pages show it). */
   icon?: string;
 }
+
+/**
+ * A folder of the Library: it holds things kept (pages, documents, pictures…) and other folders of its place, a
+ * project or none. Deleting one deletes nothing it holds: what is in it goes up a level.
+ */
+export interface LibFolder {
+  id: string;
+  name: string;
+  /** The folder it is in; none at its place's top. */
+  parent?: string;
+  /** The project (space) it is in; none when it is in no project. */
+  space?: string;
+  createdAt: number;
+}
+
+/** A folder's name may be this long; folders go this deep (a folder at the top is 1), and the Library holds this many. */
+export const FOLDER_LIMITS = { name: 80, depth: 8, count: 2000 };
+
+/** What a folder of this computer brought into the Library gave (POST /api/pages/import-folder). */
+export interface FolderImport {
+  /** The Library folder made for it; none when it came in as one LaTeX document. */
+  folder?: LibFolder;
+  /** What came in, as things of the Library. */
+  pages: PageInfo[];
+  /** Folders made for its folders (the one made for it too). */
+  folders: number;
+  /** What was left out, by its path in the folder, and why. */
+  skipped: { path: string; why: FolderSkip }[];
+  /** More that was said: a LaTeX project's files that did not fit, and the like. */
+  notes: string[];
+}
+
+/**
+ * Why a file of a folder was left out: a picture, video or sound (kept from a conversation instead), a PDF or slides
+ * (opened in Files), a part of a LaTeX document rather than a whole one, too large, not readable as its kind, of a kind
+ * the Library does not keep, or past what one import brings in.
+ */
+export type FolderSkip = 'picture' | 'video' | 'audio' | 'pdf' | 'slides' | 'part' | 'large' | 'unreadable' | 'kind' | 'limit';
 
 export interface PageVersion {
   version: number;
@@ -51,6 +93,8 @@ export interface PageVersion {
   createdAt: number;
   /** agent: save_page; user: Keep; restore: an older version brought back; edit: changed by the user in the editor; made: a page the user made. */
   by: 'agent' | 'user' | 'restore' | 'edit' | 'made';
+  /** Changed (or commented on) by someone the project is shared with, through their link: their name. */
+  who?: string;
   /** An agent's saves in a row kept as this one version (left out for one). */
   steps?: number;
 }

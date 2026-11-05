@@ -1,17 +1,19 @@
-// Settings → Scheduled tasks: ready-made automations. Each opens a short form; it becomes a task at
-// once, or opens in the full task form for more options.
+// Settings → Scheduled tasks: ready-made automations, in a few groups. Each opens a short form; it becomes a
+// task at once, or opens in the full task form for more options. A webhook example's form says where its
+// address goes once it is made.
 import { useEffect, useState } from 'react';
 import type { TaskDraft } from '@shared/automations';
+import { hookHelp } from '@shared/engineering';
 import type { Agent } from '@shared/types';
 import { DAY_NAMES } from '@shared/automations';
 import { post } from '../../lib/api';
 import { lastAgent } from '../../lib/start';
 import { toast, toastError, useApp } from '../../lib/store';
 import { FolderChip } from '../../components/FolderPicker';
-import { Button, cx, Dialog, inputCls, Section } from '../../components/ui';
+import { Button, cx, Dialog, inputCls, Section, Switch } from '../../components/ui';
 import { AgentPicker } from '../home/AgentPicker';
 import { boxCls, Field } from './parts';
-import { TEMPLATES, type Template, type TemplateField } from './taskTemplates';
+import { GROUPS, TEMPLATES, type Template, type TemplateField } from './taskTemplates';
 
 const small = cx(boxCls, 'h-9 text-[13.5px]');
 
@@ -58,6 +60,25 @@ function Input({ f, value, onChange }: { f: TemplateField; value: string; onChan
           <FolderChip value={value} onChange={onChange} />
         </Field>
       );
+    case 'choice':
+      return (
+        <Field label={label} hint={f.hint}>
+          <select value={value} onChange={(e) => onChange(e.target.value)} className={cx(small, 'w-auto')}>
+            {(f.options ?? []).map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      );
+    case 'yesno':
+      return (
+        <div className="flex items-center gap-3">
+          <span className="min-w-0 flex-1 text-[13px] text-fg-2">{f.label}</span>
+          <Switch on={value === 'yes'} label={f.label} onChange={(on) => onChange(on ? 'yes' : '')} />
+        </div>
+      );
     case 'long':
       return (
         <Field label={label} hint={f.hint}>
@@ -87,11 +108,20 @@ function TemplateDialog({ template, onClose, onMore }: { template: Template; onC
   const [who, setWho] = useState(lastAgent);
   const [busy, setBusy] = useState(false);
   useEffect(() => setV(Object.fromEntries(template.fields.map((f) => [f.id, f.default ?? (f.kind === 'folder' ? folder : '')]))), [template, folder]);
-  const missing = template.fields.some((f) => !f.optional && !(v[f.id] ?? '').trim());
+  const missing = template.fields.some((f) => !f.optional && f.kind !== 'yesno' && !(v[f.id] ?? '').trim());
   const draft = (): TaskDraft => {
     const b = template.build(v);
-    return { ...b, cwd: b.cwd || folder, agent: who.agent, acpAgent: who.agent === 'acp' ? (who.acp ?? undefined) : undefined, mode: defaultMode(who.agent, who.acp), origin: `template:${template.id}` };
+    return { ...b, cwd: b.cwd || folder, agent: who.agent, acpAgent: who.agent === 'acp' ? (who.acp ?? undefined) : undefined, mode: defaultMode(who.agent, who.acp), origin: b.origin ?? `template:${template.id}` };
   };
+  // Where a webhook example's address goes, for what its form says now (CI doctor's CI…). A form still empty may not build.
+  const where = (() => {
+    try {
+      const b = template.build(v);
+      return hookHelp(b.origin ?? `template:${template.id}`, b.schedule);
+    } catch {
+      return null;
+    }
+  })();
   const create = async () => {
     setBusy(true);
     try {
@@ -139,8 +169,27 @@ function TemplateDialog({ template, onClose, onMore }: { template: Template; onC
             <AgentPicker agent={who.agent} acpId={who.acp} acpList={boot?.acpAgents ?? []} onPick={(agent, acp) => setWho({ agent, acp })} />
           </div>
         </Field>
+        {where && <p className="rounded-xl bg-bg-1 px-3 py-2 text-[12px] leading-relaxed text-fg-3">Once it is made, its address shows in the list. {where}</p>}
       </div>
     </Dialog>
+  );
+}
+
+function TemplateCard({ t, onPick }: { t: Template; onPick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      className="group flex items-start gap-3 rounded-xl border border-line px-3 py-2.5 text-left transition-colors hover:border-line-2 hover:bg-bg-1 active:scale-[0.99]"
+    >
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-bg-2 text-fg-2 transition-colors group-hover:text-accent">
+        <t.icon size={15} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[13.5px] font-medium text-fg">{t.title}</span>
+        <span className="block text-[12px] leading-snug text-fg-3">{t.blurb}</span>
+      </span>
+    </button>
   );
 }
 
@@ -148,22 +197,16 @@ export function TemplateGallery({ onMore }: { onMore: (d: TaskDraft) => void }) 
   const [pick, setPick] = useState<Template | null>(null);
   return (
     <Section title="Start from an example" sub="A short form each; change anything later.">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {TEMPLATES.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setPick(t)}
-            className="group flex items-start gap-3 rounded-xl border border-line px-3 py-2.5 text-left transition-colors hover:border-line-2 hover:bg-bg-1 active:scale-[0.99]"
-          >
-            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-bg-2 text-fg-2 transition-colors group-hover:text-accent">
-              <t.icon size={15} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[13.5px] font-medium text-fg">{t.title}</span>
-              <span className="block text-[12px] leading-snug text-fg-3">{t.blurb}</span>
-            </span>
-          </button>
+      <div className="space-y-4">
+        {GROUPS.map((g) => (
+          <div key={g.id}>
+            <h3 className="mb-1.5 text-[12px] font-medium text-fg-3">{g.title}</h3>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {TEMPLATES.filter((t) => t.group === g.id).map((t) => (
+                <TemplateCard key={t.id} t={t} onPick={() => setPick(t)} />
+              ))}
+            </div>
+          </div>
         ))}
       </div>
       {pick && (

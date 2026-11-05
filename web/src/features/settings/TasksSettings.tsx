@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, Clock, Copy, CopyPlus, Eye, FlaskConical, ListChecks, MoreHorizontal, Pencil, Play, Plus, Trash2, TriangleAlert, Webhook } from 'lucide-react';
 import { scheduleText, type ScheduledTask, type TaskApp, type TaskDraft, type TaskRun, type TaskSchedule } from '@shared/automations';
+import { hookHelp } from '@shared/engineering';
 import type { AppDef } from '@shared/apps';
 import type { Agent } from '@shared/types';
 import { api, del, enc, post } from '../../lib/api';
@@ -106,12 +107,16 @@ export function TaskRow({ t, onEdit, onDuplicate, onChanged }: { t: ScheduledTas
             </div>
           )}
           {t.schedule.kind === 'webhook' && t.hookPath && (
-            <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
-              <code className="min-w-0 flex-1 truncate rounded-md bg-bg-1 px-2 py-1 font-mono text-[11.5px] text-fg-2">{hookUrl(t)}</code>
-              <IconButton label="Copy the address" size="sm" onClick={() => navigator.clipboard.writeText(hookUrl(t)).then(() => toast('Copied the webhook address', 'ok'))}>
-                <Copy size={13} />
-              </IconButton>
-            </div>
+            <>
+              <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
+                <code className="min-w-0 flex-1 truncate rounded-md bg-bg-1 px-2 py-1 font-mono text-[11.5px] text-fg-2">{hookUrl(t)}</code>
+                <IconButton label="Copy the address" size="sm" onClick={() => navigator.clipboard.writeText(hookUrl(t)).then(() => toast('Copied the webhook address', 'ok'))}>
+                  <Copy size={13} />
+                </IconButton>
+              </div>
+              {/* An example's task: where its address goes. */}
+              {hookHelp(t.origin, t.schedule) && <p className="mt-1 text-[12px] leading-snug text-fg-3">{hookHelp(t.origin, t.schedule)}</p>}
+            </>
           )}
         </div>
         <Switch

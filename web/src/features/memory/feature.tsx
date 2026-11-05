@@ -4,6 +4,7 @@
 import { useRef, useState } from 'react';
 import { Brain } from 'lucide-react';
 import type { SessionExtra } from '@shared/features';
+import { isConfidential } from '@shared/confidential';
 import type { SessionSummary } from '@shared/types';
 import { go } from '../../lib/nav';
 import { MenuItem, MenuSep, OptionRow, Popover, SettingChip } from '../../components/ui';
@@ -15,6 +16,8 @@ import { useMemoryState } from './state';
 
 function SessionMenu({ s, close }: { s: SessionSummary; close: () => void }) {
   const st = useMemoryState();
+  // A confidential session keeps memory off.
+  if (isConfidential(s.extra)) return null;
   return <SessionMemoryItem label="Memory" sessionKey={s.key} on={s.extra?.memory !== false} allOff={!!st && !st.enabled} close={close} />;
 }
 
@@ -24,6 +27,8 @@ function StartOption({ value, onChange }: { value: SessionExtra; onChange: (patc
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   if (!st?.enabled) return null;
+  // A confidential session keeps nothing in memory (it reads what is there).
+  if (isConfidential(value)) return <SettingChip label="Memory" icon={<Brain size={14} />} value="Off" title="Memory is off in a confidential session: nothing from it is kept" disabled onClick={() => {}} />;
   const off = value.memory === false;
   const set = (memory: false | undefined) => {
     onChange({ memory });

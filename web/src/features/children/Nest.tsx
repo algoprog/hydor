@@ -2,7 +2,7 @@
 // are and what they are doing. Open while one of them is on screen.
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
-import { leadsSwarm } from '@shared/swarm';
+import { swarmMode } from '@shared/swarm';
 import type { SessionSummary } from '@shared/types';
 import { cx } from '../../components/ui';
 import { activityOf, isWorking } from '../../lib/activity';
@@ -28,7 +28,7 @@ const unfolded = new Set<string>();
 
 export function ChildNest({ parent, kids, activeKey, row }: { parent: string; kids: SessionSummary[]; activeKey: string | null; row: (s: SessionSummary, active: boolean) => ReactNode }) {
   const [, redraw] = useState(0);
-  const swarm = useSessions((x) => leadsSwarm(x.byKey[parent]?.extra));
+  const team = useSessions((x) => swarmMode(x.byKey[parent]?.extra));
   const holdsActive = kids.some((k) => k.key === activeKey);
   const open = unfolded.has(parent) || holdsActive;
   const working = kids.filter((k) => isWorking(activityOf(k))).length;
@@ -51,7 +51,7 @@ export function ChildNest({ parent, kids, activeKey, row }: { parent: string; ki
       >
         <ChevronRight size={12} className={cx('shrink-0 transition-transform duration-200', open && 'rotate-90')} />
         <span className="shrink-0">
-          {kids.length} {swarm ? 'swarm member' : 'child session'}
+          {kids.length} {team === 'campaign' ? 'campaign member' : team ? 'swarm member' : 'child session'}
           {kids.length === 1 ? '' : 's'}
         </span>
         {waiting > 0 && <span className="truncate text-warn">· {waiting} need{waiting === 1 ? 's' : ''} you</span>}

@@ -1,7 +1,7 @@
 // The inbox: everything waiting on you, on this machine and the others (Settings → Machines), newest
 // first. Approvals, questions and forms are answered right here; the rest open where they wait.
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowUpRight, Globe, Inbox, KeyRound, Library, MonitorSmartphone, Server } from 'lucide-react';
+import { ArrowUpRight, Globe, Inbox, KeyRound, Library, MessageSquare, MonitorSmartphone, Server } from 'lucide-react';
 import type { InboxItem } from '@shared/inbox';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Button, Empty, Throbber } from '../../components/ui';
@@ -29,6 +29,8 @@ const ICONS: Partial<Record<InboxItem['kind'], React.ReactNode>> = {
   key: <KeyRound size={16} />,
   skill: <Library size={16} />,
   elsewhere: <MonitorSmartphone size={16} />,
+  // Someone a project is shared with commented on one of its documents.
+  comment: <MessageSquare size={16} />,
 };
 
 async function listOf(base: string): Promise<InboxItem[] | null> {

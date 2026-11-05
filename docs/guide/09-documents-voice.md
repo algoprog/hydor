@@ -27,6 +27,7 @@ Custom also reads PDFs, Office documents and pictures with its ordinary file rea
 - Scanned pages have no text, and the agent is told which ones ("Pages 3, 5–7 have no text"). With the **pdf** skill it then looks at those pages as images and reads them itself, or runs OCR on them when tesseract is installed.
 - A PDF locked with a password can't be read. Give the agent the password, and the **pdf** skill makes an unlocked copy. One that opens without a password but limits changes (many official forms) is read as any other.
 - **Forms**: the agent lists a PDF's form fields, each with the words printed beside it (which say what a field named "f1_02" is for), and looks at its pages as pictures with the fields numbered and a ruler in points.
+- **Your highlights and notes**: what you highlighted in Files' reader, page by page, with your notes and pictures of the figures and equations you picked ([Read and highlight a PDF](/guide/files-git#read-and-highlight-a-pdf)), to sum them up or check them against the paper. Asked to, it highlights words for you too, which then show in the reader.
 
 ### Word, Excel and PowerPoint
 

@@ -23,6 +23,9 @@ import { PrBadge, PullRequestDialog } from './PullRequest';
 import { SessionMenu } from './SessionMenu';
 import { FindBar } from './FindBar';
 import { FeatureDock, sessionPaneOf, useSessionSide, type SessionPane } from '../registry';
+import { ConfidentialLock } from '../confidential/feature';
+import { OfflineFrames } from '../pages/frame';
+import { isConfidential } from '@shared/confidential';
 import { useSessionShow, type SessionShow } from './show';
 import { LOCALE } from '../../i18n/locale';
 import { startedIn } from '../../lib/origin';
@@ -118,6 +121,7 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
                 {s.title}
               </button>
             )}
+            <ConfidentialLock s={s} />
           </div>
           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-3">
             <StatusPill s={s} />
@@ -603,7 +607,7 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
   const pane = sessionPaneOf(summary);
   const show: SessionShow = pane ? (chosen ?? 'pane') : 'conversation';
 
-  return (
+  const view = (
     <SessionCtx.Provider value={{ sessionKey, cwd: summary.cwd, openChanges, fork: summary.external ? undefined : (at) => setForking({ at }) }}>
       <div className="flex h-full min-h-0">
         <div className="flex min-w-0 flex-1 flex-col">
@@ -656,4 +660,6 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
       </div>
     </SessionCtx.Provider>
   );
+  // A confidential session's pages load nothing from anywhere.
+  return <OfflineFrames.Provider value={isConfidential(summary.extra)}>{view}</OfflineFrames.Provider>;
 }

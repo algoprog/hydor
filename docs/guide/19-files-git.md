@@ -14,6 +14,7 @@ Click **System** in the sidebar's tools, or go to [System](/system). A row of ta
 - **Terminal** ([open it](/terminal)): shells on this computer (see [Use the terminal](#use-the-terminal)).
 - **Preview** ([open it](/preview)): the web apps running here (see [Look at a dev server with Preview](#look-at-a-dev-server-with-preview)). It shows only on this machine's own pages, not while you look at another machine.
 - **Monitor** ([open it](/system/monitor)): how busy the computer is (see [Watch this computer in Monitor](#watch-this-computer-in-monitor)).
+- **Experiments** ([open it](/system/experiments)): jobs that wait for a free GPU, run on their own and are kept as records (see [Experiments](/guide/experiments)).
 
 On a phone the tabs scroll sideways under the title. A tab's own buttons (Git's **Add**, Preview's refresh) sit at the right of the title.
 
@@ -27,6 +28,7 @@ Below, a card for each tool; its title, or **Open**, opens its tab:
 - **Git**: your repositories, those with changes or commits to send first, each with its branch and how many files changed. Click one to open it on the Git tab.
 - **Terminal**: the shells running, and **New** for another.
 - **Preview**: the web apps running here, each with its port. Click one to look at it.
+- **Experiments**: the runs going now, each with its status and metrics. Click one to open it.
 
 ## Open the Files page
 
@@ -241,7 +243,7 @@ Click **Ask** in the editor's bar (✨ on a phone) and say what should change ("
 - Unsaved changes are saved first, so the agent works on them.
 - The agent starts in the file's folder, knows which file you mean, and changes that file itself. You watch each change arrive in the editor as soon as it is written, the changed lines tinted for a moment, with your place in the file kept.
 - The conversation goes on in the panel: write back to ask for more. **A new request** starts again, and **Open as a session** opens it in full; it is in your sessions too. On a phone, **See the file** folds the panel away to watch the file, and the bar at the bottom brings it back.
-- The panel stays open as you switch between files' tabs, each with its own conversation. It works the same in the Word, Excel, CSV and LaTeX editors, and in notebooks, where the agent changes cells and keeps the outputs of the others. As with [asking from the Library](/guide/library#change-it-by-asking-an-agent), the agent's remembered model and permissions stay as they were.
+- The panel stays open as you switch between files' tabs, each with its own conversation. It works the same in the Word, Excel, CSV and LaTeX editors, and in notebooks, where the agent changes cells and keeps the outputs of the others. On a PDF, the agent reads it and answers, and you can ask about a passage, an equation or a figure you picked in it ([Ask about a part of a PDF](#ask-about-a-part-of-a-pdf)). As with [asking from the Library](/guide/library#change-it-by-asking-an-agent), the agent's remembered model and permissions stay as they were.
 
 ### When the file changes while you have it open
 
@@ -264,7 +266,7 @@ These files open in the editors the [Library](/guide/library#documents) has for 
 
 - **Word documents** (.docx) open in the document editor, as in Word or Google Docs, on a sheet of their paper.
 - **Excel files** (.xlsx), **CSV** and **TSV** files open in the spreadsheet editor, with their sheets and working formulas (and an Excel file's filters, conditional formatting, dropdowns and checkboxes, merged cells, notes and charts).
-- **LaTeX files** (.tex) open in the LaTeX editor, the source beside its typeset pages. The files the document reads (chapters it puts in with `\input`, its bibliography) open with it, each in a tab, and it is typeset among the rest of its folder (its pictures, styles and data), which TeX reads but never changes. A chapter opens the document that reads it, on the chapter's own tab. Comments work as in the [Library](/guide/library#latex-documents): a file keeps only its text, so the app keeps its comments beside it, by the file's path, saved with **Save**; they go along when you rename or move the file (or its folder) here, and an agent [asked about the file](#ask-an-agent-about-the-file) reads them, answers and resolves them, its answers showing as they come. **Compare versions** is for LaTeX documents kept in the Library.
+- **LaTeX files** (.tex) open in the LaTeX editor, the source beside its typeset pages. The files the document reads (chapters it puts in with `\input`, its bibliography) open with it, and it is typeset among the rest of its folder (its pictures, styles and data), which TeX reads but never changes. A chapter opens the document it belongs to (the one it names with `% !TEX root = …` or as a subfile's, else the one in its folder, or a folder or two up, that reads it), with the chapter open and the document's files in the [files tree](/guide/library#the-files-tree): the files it reads, in their folders, and, greyed, what TeX takes from the folder as it is (its pictures, styles and classes, data), to look at; change those in Files. On a narrow screen, **Files** over the source opens the tree. Comments work as in the [Library](/guide/library#latex-documents): a file keeps only its text, so the app keeps its comments beside it, by the file's path, saved with **Save**; they go along when you rename or move the file (or its folder) here, and an agent [asked about the file](#ask-an-agent-about-the-file) reads them, answers and resolves them, its answers showing as they come. **Compare versions** is for LaTeX documents kept in the Library.
 
 Change it as in the [Library](/guide/library#documents), then click **Save** in the bar at the bottom, or press Ctrl+S (⌘S on a Mac); **Discard** goes back to the file as it was. The bar above has the file's path, **Ask** ([ask an agent](#ask-an-agent-about-the-file)), **Download** and **More** (⋯): **Edit as text** (CSV, TSV and LaTeX files) or **Show as a preview** (Word and Excel files) shows the file as before, with a button in the bar to come back to the editor, and the Files page's **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**. A file opened at a line, from a search, opens as text.
 
@@ -284,7 +286,7 @@ PowerPoint files, older Office files (.doc, .xls, .ppt), OpenDocument files, RTF
 The file viewer shows files as they look:
 
 - **Images** (PNG, JPEG, GIF, WebP, SVG, ICO, BMP, AVIF): shown whole, on a checkerboard where they are see-through.
-- **PDFs**: in your browser's own PDF viewer, with **Fill & sign** at the top to fill them in and sign them (see [Fill in and sign a PDF](#fill-in-and-sign-a-pdf)).
+- **PDFs**: in your browser's own PDF viewer, with **Highlight** at the top to read them in the app's own reader, highlight them and keep notes beside them (see [Read and highlight a PDF](#read-and-highlight-a-pdf)), and **Fill & sign** to fill them in and sign them (see [Fill in and sign a PDF](#fill-in-and-sign-a-pdf)). A PDF you highlighted opens in the reader.
 - **Video** (MP4, WebM, MOV and M4V; MKV and OGV where your browser plays them): in the app's own player (see [Watch a video](#watch-a-video) below). **Audio** (MP3, WAV, OGG) plays in place.
 - **Office documents**: PowerPoint (.pptx, .ppt), older Word and Excel files (.doc, .xls and the like), OpenDocument (.odt, .ods, .odp), RTF and EPUB; and Word (.docx) and Excel (.xlsx) files from **More** (⋯) → **Show as a preview** in their editors. A switch at the top picks the view:
   - **Pages**: the document as LibreOffice lays it out, page by page ("Laying out the pages…" the first time). This view is there only when LibreOffice is installed on this computer, and not for EPUB books.
@@ -333,6 +335,33 @@ What it can't do:
 - Nothing here takes words out of a PDF for good. White boxes, which agents can put over words, hide them from the eye only: the words stay in the file.
 
 Agents fill in, write on and change PDFs too, with their own tools: see [Documents, images, videos and voice](/guide/documents-voice#pdfs).
+
+## Read and highlight a PDF
+
+Open a PDF and press **Highlight** at the top (on a phone, the marker beside its name). Its pages show as paper, drawn by the app, with their words over them to select as in any reader. A PDF you highlighted opens this way by itself, so your notes are there when you come back; **Close** goes back to your browser's own viewer.
+
+- **Highlight words**: select them with the mouse, or on a phone press and hold a word and drag the handles. A small bar comes up: one of its four colours (yellow, green, blue or pink) highlights them, **Note** highlights them and opens a note to write, **Ask** asks an agent about them ([below](#ask-about-a-part-of-a-pdf)), and **Copy** copies them, a word broken over a line's end put back together. A selection runs from one column of a paper into the next, as you read it.
+- **Highlight a figure or an equation**: press **Select an area** and drag a box around it; on a computer, hold Alt and drag, without the button. The same bar comes up for that part of the page, which is kept as a picture of it (**Copy** copies the picture, or its words where the browser doesn't let a page copy pictures).
+- **Change a highlight**: click it for its bar, to pick another colour, **Edit note**, **Ask**, **Copy** or delete it (the bin, or Delete; **Undo** in the message that follows brings it back). Resting the pointer on a highlight shows its note, and a small dot marks the ones that have one. Highlighting the same words again changes their colour.
+- **Zoom**: pinch on a phone or tablet; on a computer, Ctrl with the mouse wheel, or Ctrl+= and Ctrl+−. **Fit width** (or Ctrl+0) goes back. Highlights stay on their words at any size.
+
+A page that is only a picture (a scan) has no words to select: highlight its parts with **Select an area**. Words that run up or down a page (a page turned sideways) can't be selected either. Highlights other apps saved in a PDF show on its pages, but not in **Notes**.
+
+### Your notes
+
+**Notes** lists your highlights beside the pages (as a sheet from the bottom on a phone), page by page: each one's words or the picture of its area, its note, which you write or change right there, and its colour. Click one to go to it on its page; the bin deletes it, and ✨ asks an agent about it.
+
+The app keeps your highlights and notes beside the file, by its path: the PDF itself doesn't change. They go along when you rename or move the file (or its folder) here, and a file moved some other way (in a terminal, by an agent) finds its notes again by its contents when you open it. When the file itself changes (a paper you typeset again), each highlight is found again by its words, on another page too; one whose words are no longer in it stays where it was, marked "The file changed, and these words are not in it now".
+
+**More** (⋯) in Notes has:
+
+- **Keep in a project**: your highlights and notes go into a project's [knowledge](/guide/projects#knowledge) as one document named after the paper ("Sparse Retrieval with Learned Term Weights (notes).md", say): the paper's title, then each highlight's words (a line for an area) and your note, page by page, so the project's sessions find them when they search its documents. The project whose folder holds the PDF comes first. The document follows every change you make to the notes; **Open the project's knowledge** shows it there, and **Stop keeping them there** takes it out.
+- **Save into the PDF**: writes the highlights into the file as its own, each note as its highlight's comment, so other PDF apps show them. **Save a copy beside it** writes "name (highlighted).pdf", which keeps your notes too; **Replace the file** writes over it, its old version to the [Trash](#delete-and-put-back). Saving again puts them in as they are then, in place of the ones saved before. A file whose owner forbids comments, or one certified against them, can't take them: they stay beside it.
+- **Copy all**: the notes as text, to paste elsewhere.
+
+### Ask about a part of a PDF
+
+**Ask** on the bar opens [Ask an agent](#ask-an-agent-about-the-file) beside the PDF (over it on a narrow screen) with what you picked: the words, or a picture of the area, and its page. Pick an example ("Explain this passage", "What does this equation say?", "How does this compare with my approach?", "Sum up this section") or write your own question; the agent can read the whole PDF too. While a conversation about the file is going on, **Ask** puts the part into its message box instead, so you ask about it next. Agents also read your highlights and notes of a PDF when you ask them to ("sum up my highlights of this paper").
 
 ## Find a file by name
 
@@ -490,13 +519,25 @@ Until then, Sync and the commit box wait: Continue makes the commit.
 
 - **This branch** shows the history that led to the branch you are on; **All branches** shows every branch's, the remote's too.
 - **Find a commit** finds commits by words in their message, their author's name or address, or their hash.
+- **Find what broke it**, the button beside it, has an agent find the commit that broke something (see [Find what broke it](#find-what-broke-it)).
 - **Load more**, at the end, shows older commits.
 
 Click a commit to open it beside the list (on a phone, on a page of its own): its whole message, author, date and hash (click the hash to copy it), the branches and tags on it, and the files it changed, each opening to its diff. A merge says which commits it joined.
 
 - **Explain** opens the start page with a prompt that asks an agent to explain the commit in plain words.
 - **Undo this commit** shows on the last commit while no remote has it: the commit goes away, and what it changed goes back to Changes, ready to commit again.
-- The ⋯ menu also has **Copy hash**, **New branch from here** (a branch that starts at this commit; you switch to it), **Tag this commit** (a name such as `v1.2.0` and, if you like, a message; **Push tags** in the repository's ⋯ menu sends tags to the remote) and **Revert this commit**: a new commit that undoes what this one changed, after a question. The commit itself stays in the history.
+- The ⋯ menu also has **Copy hash**, **Find what broke it** (from this commit, as where it last worked), **New branch from here** (a branch that starts at this commit; you switch to it), **Tag this commit** (a name such as `v1.2.0` and, if you like, a message; **Push tags** in the repository's ⋯ menu sends tags to the remote) and **Revert this commit**: a new commit that undoes what this one changed, after a question. The commit itself stays in the history.
+
+### Find what broke it
+
+When something worked in an earlier version and is broken now, open the commit where it last worked and choose **Find what broke it** in its ⋯ menu, or select the **Find what broke it** button beside **Find a commit**. Its form asks:
+
+- **Worked at**: that commit (by its tag when it has one), or else the latest tag; any tag, branch or commit works, and the commit it stands for shows under it.
+- **Broken at**: `HEAD` to start.
+- **What is broken**, in your words, and **How to check (optional)**: a command that fails while it is broken.
+- **Run by**: the agent that does it.
+
+**Start** opens a new session in a worktree of the repository, so your own copy stays as it is. Its agent writes a check, tries it at both ends, runs git bisect to find the first commit where it broke, and explains what in that commit broke it and why, with a fix to suggest. See [Find what broke it](/guide/engineering#find-what-broke-it).
 
 ## Work with branches
 
@@ -679,6 +720,10 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 - "In the file I have open, add a comment over each function saying what it does."
 - "Copy the PDFs in ~/Downloads from this week into my Taxes 2026 project."
 - "Fill in ~/Downloads/rental-application.pdf with my details, and ask me for anything you don't know."
+- "Sum up my highlights of ~/Papers/sparse-retrieval.pdf, page by page, with my notes."
+- "Which of my notes on the paper I have open disagree with what the paper says?"
+- "Keep my notes on ~/Papers/attention.pdf in my Thesis project."
+- "Highlight in green every sentence of ~/Papers/sparse-retrieval.pdf that states a result, with a note saying which experiment it comes from."
 - "Merge the PDFs in ~/Documents/Scans into one file, the cover first, and turn the sideways pages upright."
 - "Which files in ~/code/shop mention the checkout, and what does each do with it?"
 - "Add a column to ~/Documents/people.csv with each person's share of the total."
@@ -689,6 +734,7 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 - "Write a reading guide for what this branch changes."
 - "Resolve the merge conflicts in ~/code/shop-api: keep what each side meant, then tell me what you chose."
 - "What changed in ~/code/shop-api this week? Sum up the commits in plain words."
+- "Search went slow after v2.3 in ~/code/shop-api: find the commit that made it slow."
 - "Which dev servers are running on this computer right now?"
 - "Make the checkout page's button bigger, and show me before and after on a phone."
 - "What's using the most memory on this computer?"

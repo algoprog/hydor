@@ -177,7 +177,7 @@ export function deleteSpace(db: DB, id: string): string[] {
   db.prepare('delete from spaces where id = ?').run(id);
   releaseSpace(db, id);
   // What the Library kept in it stays there, in no space.
-  for (const table of ['pages', 'media'])
+  for (const table of ['pages', 'media', 'library_folders'])
     try {
       db.prepare(`update ${table} set space = null where space = ?`).run(id);
     } catch {}

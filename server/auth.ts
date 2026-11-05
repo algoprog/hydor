@@ -121,6 +121,58 @@ export function clientAddress(peer: string, forwardedFor?: unknown): string {
 
 const minutes = (ms: number) => Math.max(1, Math.ceil(ms / 60_000));
 
+/** The wrong passwords of the last hour. They live in the database, so a restart lifts no pause and the command line can clear them. */
+function readTries(db: DB, now: number): Tries {
+  let saved: any = {};
+  try {
+    saved = JSON.parse(kvGet(db, TRIES) ?? '{}');
+  } catch {}
+  const recent = (xs: unknown) => (Array.isArray(xs) ? xs.filter((x): x is number => typeof x === 'number' && now - x < L.hour) : []);
+  const by: Tries['by'] = {};
+  for (const [key, a] of Object.entries<any>(saved?.by ?? {})) {
+    const fails = recent(a?.fails);
+    const until = typeof a?.until === 'number' && a.until > now ? a.until : 0;
+    if (fails.length || until) by[key] = { fails, until };
+  }
+  return { all: recent(saved?.all), by };
+}
+
+/** An address paused for wrong links: what it is told. */
+function linksPaused(ms: number) {
+  const m = minutes(ms);
+  return new HttpError(429, `Too many wrong links from this address. Try again in ${m} minute${m === 1 ? '' : 's'}.`);
+}
+
+/**
+ * Links that stand in for the sign-in to one thing (a project shared with someone, server/spaces/share.ts) count a
+ * token that opens nothing as a wrong password of the address it came from: the tenth in an hour pauses the address
+ * for an hour, for links and sign-ins alike, as wrong passwords do. They are not counted over every address (a bot's
+ * guesses could otherwise stop the owner's own sign-ins), and there is no picture to read on a link. A link that was
+ * turned off, ran out or was made again is no guess: it is not counted.
+ *
+ * linkPause: the address's pause, if it has one (every link is refused while it lasts, right or wrong).
+ * wrongLink: counts one; returns the pause it now has, if it has one.
+ */
+export function linkPause(db: DB, ip: string): HttpError | null {
+  const now = Date.now();
+  const a = readTries(db, now).by[addressKey(ip)];
+  return a && a.until > now ? linksPaused(a.until - now) : null;
+}
+
+export function wrongLink(db: DB, ip: string): HttpError | null {
+  const now = Date.now();
+  const key = addressKey(ip);
+  const t = readTries(db, now);
+  const a = t.by[key] ?? { fails: [], until: 0 };
+  if (a.until <= now) {
+    a.fails.push(now);
+    if (a.fails.length >= L.block) a.until = now + L.hour;
+    t.by[key] = a;
+    kvSet(db, TRIES, JSON.stringify(t));
+  }
+  return a.until > now ? linksPaused(a.until - now) : null;
+}
+
 /** An address's pause, as the sign-in page says it. */
 function paused(ms: number) {
   const m = minutes(ms);
@@ -182,20 +234,9 @@ export class AuthManager {
     this.db.prepare('delete from auth_sessions where token_hash != ?').run(keep);
   }
 
-  /** The wrong passwords of the last hour. They live in the database, so a restart lifts no pause and the command line can clear them. */
+  /** The wrong passwords of the last hour (readTries). */
   private tries(now: number): Tries {
-    let saved: any = {};
-    try {
-      saved = JSON.parse(kvGet(this.db, TRIES) ?? '{}');
-    } catch {}
-    const recent = (xs: unknown) => (Array.isArray(xs) ? xs.filter((x): x is number => typeof x === 'number' && now - x < L.hour) : []);
-    const by: Tries['by'] = {};
-    for (const [key, a] of Object.entries<any>(saved?.by ?? {})) {
-      const fails = recent(a?.fails);
-      const until = typeof a?.until === 'number' && a.until > now ? a.until : 0;
-      if (fails.length || until) by[key] = { fails, until };
-    }
-    return { all: recent(saved?.all), by };
+    return readTries(this.db, now);
   }
 
   private owesPicture(t: Tries, key: string): boolean {

@@ -1,5 +1,6 @@
 // Which agent a new session runs: Claude Code, Codex, Custom (any model) or another agent that speaks
-// ACP, all in one list, none ahead of the others. The last one used is picked next time.
+// ACP, all in one list, none ahead of the others. The last one used is picked next time. A confidential
+// session runs on Custom alone, with a model on this computer.
 import { useRef, useState } from 'react';
 import { ChevronDown, Plus, SlidersHorizontal } from 'lucide-react';
 import type { AcpAgentDef, Agent } from '@shared/types';
@@ -12,8 +13,22 @@ const HINT: Record<'claude' | 'codex', string> = {
   codex: 'OpenAI · ChatGPT plan or API key',
 };
 
-/** With `label`, a setting among the start page's others ("Agent  Claude Code"); else a pill of its own. */
-export function AgentPicker({ agent, acpId, acpList, onPick, label }: { agent: Agent; acpId: string | null; acpList: AcpAgentDef[]; onPick: (agent: Agent, acpId: string | null) => void; label?: string }) {
+/** With `label`, a setting among the start page's others ("Agent  Claude Code"); else a pill of its own. `localOnly`: Custom alone (Confidential). */
+export function AgentPicker({
+  agent,
+  acpId,
+  acpList,
+  onPick,
+  label,
+  localOnly,
+}: {
+  agent: Agent;
+  acpId: string | null;
+  acpList: AcpAgentDef[];
+  onPick: (agent: Agent, acpId: string | null) => void;
+  label?: string;
+  localOnly?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
   const acp = agent === 'acp' ? acpList.find((a) => a.id === acpId) : undefined;
@@ -52,9 +67,10 @@ export function AgentPicker({ agent, acpId, acpList, onPick, label }: { agent: A
         </button>
       )}
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={300} title="Agent">
-        <OptionRow icon={<AgentIcon agent="claude" size={15} />} label="Claude Code" hint={HINT.claude} selected={agent === 'claude'} onClick={() => pick('claude')} />
-        <OptionRow icon={<AgentIcon agent="codex" size={15} />} label="Codex" hint={HINT.codex} selected={agent === 'codex'} onClick={() => pick('codex')} />
-        {acpList.map((a) => (
+        {localOnly && <div className="px-2.5 pt-1 pb-1.5 text-[12px] leading-snug text-fg-3">Confidential: only Custom, with a model on this computer.</div>}
+        {!localOnly && <OptionRow icon={<AgentIcon agent="claude" size={15} />} label="Claude Code" hint={HINT.claude} selected={agent === 'claude'} onClick={() => pick('claude')} />}
+        {!localOnly && <OptionRow icon={<AgentIcon agent="codex" size={15} />} label="Codex" hint={HINT.codex} selected={agent === 'codex'} onClick={() => pick('codex')} />}
+        {acpList.filter((a) => !localOnly || a.builtin).map((a) => (
           <OptionRow
             key={a.id}
             icon={<AgentIcon agent="acp" name={a.name} size={15} />}

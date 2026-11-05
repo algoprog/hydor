@@ -282,6 +282,8 @@ function mediaKit(latest: MediaKitApi) {
     if (typeof w.yLabel === 'string') layout.yaxis = { title: { text: w.yLabel } };
     if (kind === 'scatter3d' || kind === 'line3d' || kind === 'surface') layout.scene = { xaxis: { title: { text: w.xLabel ?? xK } }, yaxis: { title: { text: w.yLabel ?? yKs[0] } }, zaxis: { title: { text: w.zLabel ?? zK ?? '' } } };
     if (kind === 'bar' && w.stacked) layout.barmode = 'stack';
+    // A box for each group: its x axis names the groups (values like 0.001 would otherwise lie on a number line).
+    if (kind === 'box') layout.xaxis = { ...(layout.xaxis ?? {}), type: 'category' };
     return { data, layout };
   };
 

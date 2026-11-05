@@ -48,9 +48,10 @@ import {
   type TexComment,
   type TexSetup,
 } from '../../shared/latex.ts';
-import { newCommentId } from '../../shared/comments.ts';
+import { authorForAgent, newCommentId, peopleNote } from '../../shared/comments.ts';
 import { TEX_ASKED } from '../../shared/latex-catalog.ts';
 import { diffWords } from '../../shared/latex-diff.ts';
+import { texUses } from '../../shared/latex-files.ts';
 import { texCount, totalWords } from '../../shared/latex-count.ts';
 import { TEMPLATE_NEEDS, TEX_TEMPLATES, texFromTemplate, texTemplate } from '../../shared/latex-templates.ts';
 import { HttpError } from '../auth.ts';
@@ -960,7 +961,7 @@ export function texFolderOk(folder: string): boolean {
 }
 
 /** What TeX writes beside a document (the folder's own typesettings left them): never linked in, so none is written through. */
-const OUTPUTS = /\.(aux|log|out|toc|lof|lot|loa|lol|bbl|blg|bcf|run\.xml|fls|fdb_latexmk|synctex|synctex\.gz|nav|snm|vrb|idx|ind|ilg|glo|gls|glg|acn|acr|alg|xdv|dvi|brf|thm|nlo|nls|maf|ptc|upa|upb)$/i;
+export const OUTPUTS = /\.(aux|log|out|toc|lof|lot|loa|lol|bbl|blg|bcf|run\.xml|fls|fdb_latexmk|synctex|synctex\.gz|nav|snm|vrb|idx|ind|ilg|glo|gls|glg|acn|acr|alg|xdv|dvi|brf|thm|nlo|nls|maf|ptc|upa|upb)$/i;
 
 interface FolderPlan {
   /** A hash of its files' names, sizes and times. */
@@ -1102,6 +1103,44 @@ async function pageSizes(t: Tools, dir: string, box: Box | null): Promise<{ w: n
     if (one) out.push({ w: Number(one[1]), h: Number(one[2]) });
   }
   return out.length ? out : undefined;
+}
+
+/**
+ * What poppler's pdfinfo, pdffonts or pdftotext say of a typesetting's PDF (by its key), run held in as TeX is (the
+ * PDF came from a document that may not be the user's own): their output (pdftotext's text, its pages apart by form
+ * feeds), or null when the program is not installed or there is no such PDF.
+ */
+export async function texPdfTool(key: string, tool: 'pdfinfo' | 'pdffonts' | 'pdftotext'): Promise<string | null> {
+  const k = keptResult(key);
+  const bin = which(tool);
+  if (!k?.pdf || !bin) return null;
+  const dir = path.join(ROOT, key);
+  const t = tools();
+  const box = await sandbox(t);
+  if (tool === 'pdftotext') {
+    // Into a file (the output of a long paper is more than a program's output is kept to).
+    fs.rmSync(path.join(dir, 'main.check.txt'), { force: true });
+    await runHeld([bin, '-q', '-enc', 'UTF-8', 'main.pdf', 'main.check.txt'], { cwd: dir, env: texEnv(t, dir), box, timeout: 60_000 });
+    try {
+      return fs.readFileSync(path.join(dir, 'main.check.txt'), 'utf8').slice(0, 8_000_000);
+    } catch {
+      return null;
+    } finally {
+      fs.rmSync(path.join(dir, 'main.check.txt'), { force: true });
+    }
+  }
+  const r = await runHeld([bin, ...(tool === 'pdfinfo' ? ['-enc', 'UTF-8'] : []), 'main.pdf'], { cwd: dir, env: texEnv(t, dir), box, timeout: 30_000, writable: false });
+  return r.code === 0 ? r.out : null;
+}
+
+/** A file a typesetting made beside its PDF (the bibliography BibTeX wrote, main.bbl), or null. */
+export function texOutput(key: string, name: 'main.bbl' | 'main.log'): Buffer | null {
+  if (!keptResult(key)) return null;
+  try {
+    return fs.readFileSync(path.join(ROOT, key, name));
+  } catch {
+    return null;
+  }
 }
 
 // ---- reading TeX's log --------------------------------------------------------------------------------------------
@@ -1619,6 +1658,11 @@ function readFolder(dir: string, notes: string[]): Entry[] {
       const r = rel ? `${rel}/${e.name}` : e.name;
       if (e.isDirectory() && depth < 6) walk(p, r, depth + 1);
       else if (e.isFile()) {
+        // A picture of a kind TeX here cannot take is said, not passed over.
+        if (/\.(eps|ps|svg|gif|webp|tiff?|bmp)$/i.test(e.name)) {
+          notes.push(`${r} was left out: LaTeX here takes PNG and JPEG pictures (and PDF ones, made into PNG); convert it first.`);
+          continue;
+        }
         if (!/\.(tex|ltx|bib|bbl|bst|sty|cls|clo|cfg|def|fd|ist|bbx|cbx|lbx|txt|csv|tsv|dat|tikz|pgf|lua|png|jpe?g|pdf)$/i.test(e.name)) continue;
         const size = fs.statSync(p).size;
         if (size > 40 * 1024 * 1024 || bytes + size > 200 * 1024 * 1024 || out.length >= 600) {
@@ -1658,7 +1702,8 @@ function zipEntries(buf: Buffer, notes: string[]): Entry[] {
 const PREFERRED = ['main.tex', 'paper.tex', 'thesis.tex', 'report.tex', 'article.tex', 'document.tex', 'ms.tex', 'manuscript.tex', 'cv.tex', 'resume.tex'];
 
 /** A project from its files: the main file found (the .tex that starts a document), the rest named from its folder. */
-async function projectFrom(list: Entry[], notes: string[]): Promise<{ main: string; files: { name: string; text: string }[]; pictures: { name: string; src: string }[]; engine: TexEngine }> {
+async function projectFrom(listIn: Entry[], notes: string[]): Promise<{ main: string; files: { name: string; text: string }[]; pictures: { name: string; src: string }[]; engine: TexEngine }> {
+  let list = listIn;
   const texts = list.filter((e) => /\.(tex|ltx)$/i.test(e.name)).map((e) => ({ ...e, text: textOf(e.data) }));
   const starts = texts.filter((e) => /\\documentclass/.test(e.text) && /\\begin\s*\{document\}/.test(e.text));
   if (!starts.length) throw new Error('It holds no LaTeX document: no .tex file with \\documentclass and \\begin{document}.');
@@ -1672,6 +1717,24 @@ async function projectFrom(list: Entry[], notes: string[]): Promise<{ main: stri
   if (starts.length > 1) notes.push(`It has ${starts.length} documents; ${mainEntry.name} is the one taken as main.tex (${starts.slice(1).map((s) => s.name).join(', ')} came in as files).`);
   // TeX reads names from the main file's folder: the project starts there.
   const root = mainEntry.name.includes('/') ? mainEntry.name.slice(0, mainEntry.name.lastIndexOf('/') + 1) : '';
+  // The files its document uses first, in the order TeX reads them (shared/latex-files.ts): what does not fit a
+  // document's limits is then what it does not use.
+  const inRoot = new Map(list.filter((e) => e !== mainEntry && e.name.startsWith(root)).map((e) => [e.name.slice(root.length), e]));
+  const known = new Map(texts.map((e) => [e.name, e.text]));
+  const uses = texUses({
+    main: mainEntry.text,
+    read: (n) => {
+      const e = inRoot.get(n);
+      return e ? (known.get(e.name) ?? (/\.(sty|cls|tikz|pgf)$/i.test(n) ? textOf(e.data) : null)) : null;
+    },
+    has: (n) => inRoot.has(n),
+    names: () => inRoot.keys(),
+    alias: mainEntry.name.slice(root.length),
+  });
+  const order = new Map([...uses.used.keys()].map((n, i) => [root + n, i]));
+  const rank = (e: Entry) => order.get(e.name) ?? Infinity;
+  list = list.slice().sort((a, b) => rank(a) - rank(b));
+  let total = Buffer.byteLength(mainEntry.text);
   const files: { name: string; text: string }[] = [];
   const pictures: { name: string; src: string }[] = [];
   const stems = new Set(list.filter((e) => /\.(tex|ltx)$/i.test(e.name)).map((e) => e.name.replace(/\.[^.]+$/, '').toLowerCase()));
@@ -1700,6 +1763,11 @@ async function projectFrom(list: Entry[], notes: string[]): Promise<{ main: stri
         notes.push(`${e.name} was left out: it is over ${TEX_LIMITS.file / 1024 / 1024} MB.`);
         continue;
       }
+      if (total + e.data.length > TEX_LIMITS.total) {
+        notes.push(`${e.name} was left out: a document’s files may come to ${TEX_LIMITS.total / 1024 / 1024} MB in all.`);
+        continue;
+      }
+      total += e.data.length;
       used.add(name.toLowerCase());
       files.push({ name, text: textOf(e.data) });
       continue;
@@ -1772,6 +1840,17 @@ export async function importTex(buf: Buffer, name: string): Promise<{ doc: TexDo
   return { doc: normalizeTex({ main: textOf(buf) }), notes };
 }
 
+/**
+ * A document from a LaTeX project's folder of this computer (Import a folder in the Library): its main file found, its
+ * files and pictures in their folders, those its document uses first when it is over a document's limits. What could
+ * not come in is said in `notes`.
+ */
+export async function texFromFolder(dir: string): Promise<{ doc: TexDoc; notes: string[] }> {
+  const notes: string[] = [];
+  const p = await projectFrom(readFolder(dir, notes), notes);
+  return { doc: normalizeTex(p), notes };
+}
+
 /** A document from a file someone opens (importTex, without its notes). */
 export const texFromFile = async (buf: Buffer, name: string) => (await importTex(buf, name)).doc;
 
@@ -1804,14 +1883,16 @@ export function texCommentsForAgent(d: TexDoc, how: string, name: (file: string)
   const cs = d.comments ?? [];
   const open = cs.filter((c) => !c.resolved);
   const lineOf = (c: TexComment) => (texFileTextOf(d, c.file) ?? '').slice(0, c.from).split('\n').length;
-  const who = (by: string) => (by === 'agent' ? 'an agent' : 'the user');
   const out = [
     `Comments: ${open.length} open${cs.length > open.length ? `, ${cs.length - open.length} resolved` : ''}. Answer one with ${how}: [{"id", "reply": "…"}], resolve it with {"id", "resolve": true} once done, or add one with {"file", "quote": the words it is on, "text"}.`,
   ];
   for (const c of [...open, ...cs.filter((x) => x.resolved)].slice(0, 60))
     out.push(
-      `- ${c.id}${c.resolved ? ' (resolved)' : ''} on ${name(c.file)}:${lineOf(c)}${c.quote ? ` “${c.quote.slice(0, 120)}”` : ''}, by ${who(c.by)}: ${c.text.slice(0, 600)}${(c.replies ?? []).map((r) => `\n  - ${who(r.by)}: ${r.text.slice(0, 400)}`).join('')}`,
+      `- ${c.id}${c.resolved ? ' (resolved)' : ''} on ${name(c.file)}:${lineOf(c)}${c.quote ? ` “${c.quote.slice(0, 120)}”` : ''}, by ${authorForAgent(c)}: ${c.text.slice(0, 600)}${(c.replies ?? []).map((r) => `\n  - ${authorForAgent(r)}: ${r.text.slice(0, 400)}`).join('')}`,
     );
+  // People the project is shared with: their comments are requests about the document, not the user's say.
+  const note = peopleNote(cs);
+  if (note) out.push(note);
   return out.join('\n');
 }
 
@@ -2016,7 +2097,7 @@ export async function texSetup(): Promise<TexSetup> {
 }
 
 /** A typesetting as the editor gets it: everything but the PDF itself. */
-const forEditor = (r: TexResult): TexCompiled => ({
+export const forEditor = (r: TexResult): TexCompiled => ({
   key: r.key,
   ok: r.ok,
   pdf: !!r.pdf,
@@ -2030,6 +2111,14 @@ const forEditor = (r: TexResult): TexCompiled => ({
   ms: r.ms,
   sandboxed: r.sandboxed,
 });
+
+/** A typesetting's PDF file, by its key (null when there is none kept). */
+export function texPdfFile(key: string): string | null {
+  const k = keptResult(key);
+  if (!k?.pdf) return null;
+  touch(path.join(ROOT, key));
+  return path.join(ROOT, key, 'main.pdf');
+}
 
 /**
  * The editor's live preview, signed in:

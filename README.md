@@ -65,16 +65,27 @@ the ones you start in VS Code or a terminal show up too.
   and Springer papers, exported to Word, PowerPoint or Excel files that look the same in Office (their fonts inside)
   or to PDF; you watch an agent write them as it goes; PowerPoint files open as decks; PDF forms filled and signed,
   by you or an agent, with a signature you draw once; and pictures, videos, music and voice-overs made through
-  OpenRouter. Drop files or folders on it and all of it waits in your Library, by project.
+  OpenRouter. Drop files or folders on it and all of it waits in your Library, by project and in folders of your own.
 - **Memory and know-how**: agents keep a profile of you and remember your projects, starting each session with what
   bears on your request (found by words and by meaning, on your own computer), follow your Agent Guidelines, search
   your documents, and use more than sixty built-in skills, your own, and plugins, each switched on or off for every
   session or for one project.
+- **For researchers**: papers to keep up with (a Paper radar ranked against your projects, citation alerts, new models,
+  deadlines), a reading list kept in step with Zotero, a check before you submit a LaTeX paper (references verified
+  online, anonymity, page limits, the numbers in your tables) and an arXiv package, simulated reviews and rebuttals, a
+  paper turned into a talk, poster and thread, PDFs you highlight and ask about, LaTeX projects shown as a tree of their
+  files, and **Experiments**: training runs that wait for a free GPU on your machines or a SLURM cluster, kept as
+  records, with an agent on call, sweeps and results tables with significance.
+- **For engineers**: failed CI runs looked into, new issues triaged, dependencies kept up to date, alerts answered, the
+  commit that broke something found by git bisect, and big changes made in parts by a campaign of agents.
+- **Confidential when it must be**: a session on models on your own computer only, for a submission you review,
+  patient data or a client's code, with no web, no outside services and commands without network.
 - **Work that runs by itself**: scheduled tasks, watchers and webhooks, child sessions, and goals an agent keeps
   working on until they hold.
 - **Everything around the agents**: a terminal, files, Git (one Sync button, the history as a graph, pull requests),
   usage and limits, several machines, and one search box (`Ctrl+K`) for all of it.
-- **Yours**: keys and sign-ins in a vault agents use without seeing them; the app in English, Chinese or Greek;
+- **Yours**: share a project with your advisor or students by a link each (they read its drafts and sessions, comment
+  by name, and edit if you let them); keys and sign-ins in a vault agents use without seeing them; the app in English, Chinese or Greek;
   ask any agent how the app works, or have it change a setting for you once you confirm.
 
 See [all features](docs/features.md), or the [user guide](docs/guide/), which the app also shows under Help.

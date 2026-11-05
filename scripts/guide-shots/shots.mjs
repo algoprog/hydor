@@ -192,6 +192,42 @@ export const SHOTS = [
   settingsShot('skills', 'skills'),
   settingsShot('plugins', 'plugins'),
   {
+    // System → Experiments: the queue's line, the GPUs (made up: demo.mjs) and the demo's runs, by experiment.
+    id: 'experiments',
+    height: 860,
+    async take(p, ctx) {
+      await ctx.go('/system/experiments', { settle: 2500 });
+      await p.waitFor(`[...document.querySelectorAll('main *')].some((e) => /hard negatives/.test(e.textContent))`, { timeout: 15000 }).catch(() => {});
+      await sleep(1500);
+      await p.park();
+      return p.shot(ctx.file, { clip: await main(p) });
+    },
+  },
+  {
+    // The Apps page with only the apps for research: Paper radar and the others.
+    id: 'researchers',
+    height: 1000,
+    async take(p, ctx) {
+      await ctx.go('/apps', { settle: 1500 });
+      await p.click(chip('main', 'Research'), { wait: 800 });
+      await p.park();
+      return p.shot(ctx.file, { clip: await main(p) });
+    },
+  },
+  {
+    // Settings → Scheduled tasks: the examples for engineering (CI doctor and the others).
+    id: 'engineering',
+    height: 900,
+    async take(p, ctx) {
+      await ctx.go('/settings?s=tasks', { settle: 1500 });
+      const group = `js:[...document.querySelectorAll('h3')].find((h) => h.textContent.trim() === 'Engineering')?.parentElement`;
+      await p.eval(`(${group.slice(3)})?.scrollIntoView({ block: 'center' })`);
+      await sleep(500);
+      await p.park();
+      return p.shot(ctx.file, { clip: await around(p, [group], 12) });
+    },
+  },
+  {
     // Apps → Connected apps: the services connected for every agent, the marketplace and the keys, as tabs.
     id: 'connections',
     async take(p, ctx) {

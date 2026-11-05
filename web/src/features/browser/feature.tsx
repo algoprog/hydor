@@ -46,7 +46,8 @@ export const browserFeature: WebFeature = {
   },
   noteViews: { browser: BrowserNoteCard },
   SessionDock: BrowserDock,
-  SessionMenu: BrowserMenuItem,
+  // A confidential session reaches no web page.
+  SessionMenu: (p) => (p.s.extra?.confidential ? null : <BrowserMenuItem {...p} />),
   sessionMenuPart: 'more',
   settings: [{ id: 'browser', label: 'Browser', icon: Globe, sub: 'A web browser agents use, which you can watch and take over', Body: BrowserSettingsBody }],
 };

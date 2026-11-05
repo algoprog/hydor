@@ -138,6 +138,7 @@ export function appSchema(): Record<string, unknown> {
             prefix: str('What goes before it in that header ("Bearer ")'),
             query: str('Or the query parameter it goes in'),
             optional: { type: 'boolean', description: 'It runs without it, doing less' },
+            flows: { type: 'array', items: { type: 'string' }, description: 'Only these of its flows need it ("run" is the main one): asked for when one of them runs' },
           },
           required: ['name', 'label'],
         },

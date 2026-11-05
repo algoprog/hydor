@@ -1,6 +1,6 @@
 # Scheduled tasks
 
-A scheduled task is agent work that starts by itself: at a time of day, every few minutes or hours, once, when another service calls its webhook, or when something you watch changes. Use one for a morning brief, a reminder, a price or a page to keep an eye on, a weekly report or a review of each new pull request, and the result comes to you without you having to start a session.
+A scheduled task is agent work that starts by itself: at a time of day, every few minutes or hours, once, when another service calls its webhook, or when something you watch changes. Use one for a morning brief, a reminder, a price or a page to keep an eye on, a weekly report, a review of each new pull request or a look into each failed CI run, and the result comes to you without you having to start a session.
 
 ![Settings → Scheduled tasks: work that starts by itself](images/tasks.webp)
 
@@ -39,7 +39,7 @@ Continuing a session by itself once a plan's usage limit resets is a separate sw
 - For a watcher, its last look: "Looked 5m ago: 12 items, 2 new" (in amber when the look failed).
 - When the task paused itself, why, with "Turn it on to try again."
 - Dots for its latest runs (up to six, oldest first: green for done, amber for partly done or blocked, red for failed or an error, grey for nothing new) with **History** beside them; **Last run 3h ago** (in red, with the reason, when the last run could not start); and **Open**, which opens the last run's session.
-- For a webhook task, its address with a copy button.
+- For a webhook task, its address with a copy button, and, for one made from an example, where to paste it in the service that calls it.
 
 At the right of each row are a switch that pauses the task or turns it on, and the task's menu (⋯): **Run now**, **Edit**, **History**, **Duplicate**, **New address** (webhook tasks only) and **Delete**.
 
@@ -156,21 +156,35 @@ If the address leaked, or a service should stop calling it: the task's menu (⋯
 
 ## Start from an example
 
-Below the list, [**Start from an example**](/settings?s=tasks&find=Start%20from%20an%20example) ("A short form each; change anything later.") holds ready-made tasks. Select one to open its short form, fill it in, pick who runs it under **Run by**, and select **Create task**. **More options…** opens the full task form with everything filled in instead. Fields marked (optional) can stay empty; the others are needed.
+Below the list, [**Start from an example**](/settings?s=tasks&find=Start%20from%20an%20example) ("A short form each; change anything later.") holds ready-made tasks, under three small headings: **Everyday**, **Watch** and **Engineering**. Select one to open its short form, fill it in, pick who runs it under **Run by**, and select **Create task**. **More options…** opens the full task form with everything filled in instead. Fields marked (optional) can stay empty; the others are needed. Switches (such as **Open pull requests**) say what the agent may do: on or off, as you like.
+
+**Everyday**
 
 - [**Morning brief**](/settings?s=tasks&find=Morning%20brief): the weather, news on what you follow, and your day, each morning. You give the time (07:30 to start with), the days, the city for the weather and the topics for the news; it adds today's events and urgent mail when a calendar or mail account is connected.
 - [**News on a topic**](/settings?s=tasks&find=News%20on%20a%20topic): what is genuinely new about a subject, with sources, at the time and on the days you pick (every day at 09:00 to start with); quiet when nothing is.
-- [**Price watch**](/settings?s=tasks&find=Price%20watch): watches a product page every 60 minutes (only near a text such as "Price", if you give one) and tells you when the price changes, or when it is at or below the target you give.
-- [**Page change alert**](/settings?s=tasks&find=Page%20change%20alert): watches a page, or the part near a text, every 30 minutes, and says what changed and whether it matters; trivial changes stay quiet.
 - [**Weekly report from a folder**](/settings?s=tasks&find=Weekly%20report%20from%20a%20folder): on a day of the week (Friday at 16:00 to start with), what changed in a folder or repository in the last seven days and what looks unfinished, with three suggestions for next week. It changes no files.
 - [**Inbox digest**](/settings?s=tasks&find=Inbox%20digest): what came into your mail since the last run, the messages that need you first. It only reads, and it needs a connected mail account (see [Connected apps, keys and tools](/guide/connections)).
 - [**Habit check-in**](/settings?s=tasks&find=Habit%20check-in): a friendly question about a habit at the time you pick (every day at 20:00 to start with), keeping your streak in the task's notes.
+- [**Reminder**](/settings?s=tasks&find=Reminder): a nudge at a set time on the days you pick (weekdays at 09:00 to start with). For a single reminder, see [Reminders](/guide/tasks#reminders).
+
+**Watch**
+
+- [**Price watch**](/settings?s=tasks&find=Price%20watch): watches a product page every 60 minutes (only near a text such as "Price", if you give one) and tells you when the price changes, or when it is at or below the target you give.
+- [**Page change alert**](/settings?s=tasks&find=Page%20change%20alert): watches a page, or the part near a text, every 30 minutes, and says what changed and whether it matters; trivial changes stay quiet.
 - [**New releases**](/settings?s=tasks&find=New%20releases): watches a GitHub repository's releases (owner/name) every 6 hours and sums up what is new and what could break.
 - [**Site up check**](/settings?s=tasks&find=Site%20up%20check): checks an address every 10 minutes. When the site goes down, the agent finds out why (DNS, certificate, HTTP status, time-out); when it comes back, it says so in a line.
 - [**Disk space alert**](/settings?s=tasks&find=Disk%20space%20alert): checks a disk (`/` to start with) every 30 minutes. When it fills past a mark (90%), the agent finds what takes the space and suggests what to clean up, deleting nothing.
-- [**Review new pull requests**](/settings?s=tasks&find=Review%20new%20pull%20requests): a webhook task in a repository folder that GitHub or Gitea calls for each new pull request (it runs only when the call says `opened`). The agent reviews the change and suggests fixes, without pushing or merging. Once it is saved, copy its address into the repository's webhook settings.
 - [**New files in a folder**](/settings?s=tasks&find=New%20files%20in%20a%20folder): watches a folder every 15 minutes (only files like `*.pdf`, if you say so) and does what you write under **Then** with each new file, or tells you in a line what each one is.
-- [**Reminder**](/settings?s=tasks&find=Reminder): a nudge at a set time on the days you pick (weekdays at 09:00 to start with). For a single reminder, see [Reminders](/guide/tasks#reminders).
+
+**Engineering** (more in [Engineering](/guide/engineering))
+
+- [**Review new pull requests**](/settings?s=tasks&find=Review%20new%20pull%20requests): a webhook task in a repository folder that GitHub or Gitea calls for each new pull request (it runs only when the call says `opened`). The agent reviews the change and suggests fixes, without pushing or merging. Once it is saved, copy its address into the repository's webhook settings, as its row says (only **Pull requests** under the individual events).
+- [**CI doctor**](/settings?s=tasks&find=CI%20doctor): a failed run on GitHub Actions, GitLab CI, Buildkite or CircleCI wakes an agent that reads the logs, tells flaky from real, re-runs it or opens a draft pull request with a fix, as you allow, and sums it up. See [CI doctor](/guide/engineering#ci-doctor).
+- [**Issue triage**](/settings?s=tasks&find=Issue%20triage): each new issue is labelled, checked for duplicates, answered with a kind request for what it lacks, and, when the fix is small, tried as a draft pull request. See [Issue triage](/guide/engineering#issue-triage).
+- [**Dependency gardener**](/settings?s=tasks&find=Dependency%20gardener): once a week (Mondays at 09:00 to start with), upgrades in worktrees with the tests run, security fixes first, one pull request per level of risk, or a report. See [Dependency gardener](/guide/engineering#dependency-gardener).
+- [**Incident first responder**](/settings?s=tasks&find=Incident%20first%20responder): an alert from Sentry, Grafana, Datadog, Better Stack or another service wakes an agent that tells you at once, finds the likely cause, and asks before any rollback. See [Incident first responder](/guide/engineering#incident-first-responder).
+
+A webhook example's form says, under its fields, where its address will go; once the task is made, its row says the same under the address.
 
 ## Try a task with a test run
 
@@ -261,7 +275,7 @@ A reminder is a task whose run tells you something at a set time, as a notificat
 
 ## On a phone
 
-[Settings → Scheduled tasks](/settings?s=tasks) works the same on a phone. The task form, the examples' forms and the confirmations (before **Delete** or **New address**) open as sheets from the bottom of the screen. The choices under **When** and a watcher's kinds scroll sideways when they do not fit, and the examples are listed in one column. To hear from your tasks with the app closed, turn on notifications for the phone (see [Inbox and notifications](/guide/inbox)).
+[Settings → Scheduled tasks](/settings?s=tasks) works the same on a phone. The task form, the examples' forms and the confirmations (before **Delete** or **New address**) open as sheets from the bottom of the screen. The choices under **When** and a watcher's kinds scroll sideways when they do not fit, and the examples are listed in one column under their headings. To hear from your tasks with the app closed, turn on notifications for the phone (see [Inbox and notifications](/guide/inbox)).
 
 ## Ask an agent
 
@@ -272,3 +286,4 @@ A reminder is a task whose run tells you something at a set time, as a notificat
 - "Pause my Morning brief", or "Run the weekly report now."
 - "Make this conversation a task that runs every Monday at 9."
 - "Run my Reading list app whenever this feed has a new post, with the post's link."
+- "Set up a CI doctor for ~/code/shop on GitHub Actions that may re-run flaky jobs."

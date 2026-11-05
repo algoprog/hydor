@@ -13,6 +13,8 @@
 //
 // Routes, signed in:
 //   GET/POST /api/pages, GET/PATCH/DELETE /api/pages/:id, GET /api/pages/kept?key=, GET /api/pages/drafts?key=
+//   POST /api/pages/folders, PATCH/DELETE /api/pages/folders/:id (the Library's folders: folders.ts),
+//   POST /api/pages/import-folder (a folder of this computer brought in: import-folder.ts)
 //   POST /api/pages/:id/versions, GET /api/pages/:id/versions/:v, POST …/restore, POST /api/pages/:id/copy
 //   POST /api/pages/:id/storage, GET/DELETE /api/pages/:id/data, POST /api/pages/:id/link, GET /api/pages/:id/thumb
 //   GET/POST /api/pages/:id/comments (comments on a page's blocks: shared/page-comments.ts)
@@ -40,8 +42,10 @@ import { config } from '../config.ts';
 import { resolvePath } from '../files.ts';
 import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
 import { setCaptureDb } from '../capture/index.ts';
+import { confidentialKey, confidentialRun } from '../confidential/index.ts';
 import { sessionSpace, spaceChoice } from '../spaces/choice.ts';
 import { allSpaces } from '../spaces/index.ts';
+import { carryComments } from '../spaces/share.ts';
 import { draftsOf, draftsOfPage, endDrafts, feedDraft, settleDraft, type ToolStream } from './drafts.ts';
 import { agentNotebook, dropWorkFolder, SAVE_NOTEBOOK_DESCRIPTION, SAVE_NOTEBOOK_SCHEMA, workFile, writeWorkFile } from './notebooks.ts';
 import { dropEdits, initEdits, noteEdit, noteFileEdit, takeEdits } from './edits.ts';
@@ -61,6 +65,8 @@ import { normalizeDoc } from '../../shared/docs.ts';
 import { commentsForAgent } from '../../shared/page-comments.ts';
 import { dbBlocks, dbKey, dbsForAgent, pageDatabases } from '../../shared/page-db.ts';
 import { agentTex, compileSummary, compileTex, readTex, SAVE_LATEX_DESCRIPTION, SAVE_LATEX_SCHEMA, texRoutes } from './latex.ts';
+import { arxivRoutes, dropPaperFolder } from './latex-arxiv.ts';
+import { checkRoutes, LATEX_CHECK } from './latex-check.ts';
 import { agentBook, readBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
 import { agentDeck, readDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
 import { agentFileComments, openFile, openFileComments, saveFile, texFileForAgent } from './filemodel.ts';
@@ -99,10 +105,23 @@ import {
   versionsOf,
 } from './store.ts';
 import { dropThumbs, enableThumbs, refreshThumbs, thumbFile } from './thumbs.ts';
+import { agentPlace, changeFolder, deleteFolder, folderPath, listFolders, makeFolder, placeFor, putInFolder } from './folders.ts';
+import { importFolder } from './import-folder.ts';
+import type { LibFolder } from '../../shared/pages.ts';
 
 export { MAX_PAGE } from './store.ts';
 
 const tell = (d: Deps, data: PagesEvent) => d.broadcast({ t: 'feature', id: 'pages', data });
+
+/**
+ * The save tools' libraryFolder: where in the Library what they save goes (folders.ts agentPlace). Not `folder`, which
+ * save_latex takes for a LaTeX project's folder of the session.
+ */
+const FOLDER_PROP = {
+  type: 'string',
+  description: 'A folder of the user’s Library to put it in: its name ("Thesis"), or a path ("Thesis/Drafts"); made when missing. Left out, something new goes at the top of the session’s project, and one you change stays where it is.',
+};
+const withFolder = <S extends { properties?: Record<string, unknown> }>(schema: S): S => ({ ...schema, properties: { ...schema.properties, libraryFolder: FOLDER_PROP } });
 
 /** A kind a request names, checked. */
 const mustKindName = (k: string): PageKind => {
@@ -177,6 +196,8 @@ const SAVE_PAGE: RunTool = {
           'Changes to the comments on the page’s blocks (get_page lists them with their ids): {"id": "c1", "reply": "what you did"}, adding "resolve": true once one is dealt with ("reopen": true opens it again); a comment of your own: {"text": "…", "on": "words of the block it is about"}.',
         items: { type: 'object' },
       },
+      project: { type: 'string', description: 'The project (by its name) to keep it in; left out, this session’s project.' },
+      libraryFolder: FOLDER_PROP,
     },
     required: ['title'],
   },
@@ -233,18 +254,22 @@ const SAVE_PAGE: RunTool = {
       const done = [answering && 'answered its comments', rows && 'changed its databases'].filter(Boolean).join(' and ');
       return `Saved "${page.title}" (page ${page.id}): ${done}; the page itself is as it was.${await fill(page.id)}${comment(page.id)}`;
     }
-    const p = id ? addVersion(db, id, { title: a.title, html: a.html, by: 'agent' }) : createPage(db, { title: a.title, html: a.html, by: 'agent', sessionKey: ctx.key, space: sessionSpace(db, ctx.key) });
+    const p = id ? addVersion(db, id, { title: a.title, html: a.html, by: 'agent' }) : createPage(db, { title: a.title, html: a.html, by: 'agent', ...placeOf(ctx, a.project, a.libraryFolder) });
+    if (id) moveForAgent(db, id, a.libraryFolder, ctx.key);
     tell(ctx.deps, { what: 'pages' });
     refreshThumbs(ctx.deps, [p.id]);
     return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.${await fill(p.id)}${comment(p.id)}`;
   },
 };
 
+/** What a confidential session saved stays out of reach of other sessions' agents (server/confidential). */
+const outOfReach = (ctx: RunCtx, p: { sessionKey?: string }) => !!p.sessionKey && p.sessionKey !== ctx.key && confidentialKey(ctx.deps.db, p.sessionKey) && !confidentialRun(ctx);
+
 const GET_PAGE: RunTool = {
   name: 'get_page',
   annotations: { readOnlyHint: true },
   description:
-    'The user’s saved pages, slide decks, documents, spreadsheets, LaTeX documents and Jupyter notebooks (Pages). With no id: each one’s id, title, kind, version and last change. With an id: a page’s current HTML, the data it stores and the comments on its blocks (to change it, or answer them, with save_page), or a deck’s slides, a document, a spreadsheet, a LaTeX project or a notebook’s cells and outputs as it is kept (to change it with save_slides, save_doc, save_sheet, save_latex or save_notebook), or to answer questions about it. With path instead: a LaTeX file of this computer (as Files opens it in its editor): the comments the user wrote on the words of its project’s files, which the app keeps beside them (answer them with save_latex’s path and comments).',
+    'The user’s saved pages, slide decks, documents, spreadsheets, LaTeX documents and Jupyter notebooks (Pages). With no id: each one’s id, title, kind, project and Library folder, version and last change. With an id: a page’s current HTML, the data it stores and the comments on its blocks (to change it, or answer them, with save_page), or a deck’s slides, a document, a spreadsheet, a LaTeX project or a notebook’s cells and outputs as it is kept (to change it with save_slides, save_doc, save_sheet, save_latex or save_notebook), or to answer questions about it. With path instead: a LaTeX file of this computer (as Files opens it in its editor): the comments the user wrote on the words of its project’s files, which the app keeps beside them (answer them with save_latex’s path and comments).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -257,23 +282,28 @@ const GET_PAGE: RunTool = {
     if (typeof a.path === 'string' && a.path.trim() && !(typeof a.id === 'string' && a.id.trim())) return texFileForAgent(db, fromSession(ctx.cwd, a.path.trim()));
     const id = typeof a.id === 'string' ? a.id.trim() : '';
     if (!id) {
-      const list = listPages(db);
+      const list = listPages(db).filter((p) => !outOfReach(ctx, p));
       const names = new Map(allSpaces(db).map((x) => [x.id, x.name]));
+      const folders = new Map<string, LibFolder>(listFolders(db).map((f) => [f.id, f]));
       return list.length
         ? list
-            .map((p) => `- ${p.id} · ${p.title}${p.kind ? ` · ${kindOf(p.kind)?.noun ?? p.kind}` : ''}${p.space && names.has(p.space) ? ` · in the project “${names.get(p.space)}”` : ''} · version ${p.version} · changed ${new Date(p.updatedAt).toISOString()}`)
+            .map(
+              (p) =>
+                `- ${p.id} · ${p.title}${p.kind ? ` · ${kindOf(p.kind)?.noun ?? p.kind}` : ''}${p.space && names.has(p.space) ? ` · in the project “${names.get(p.space)}”` : ''}${p.folder && folders.has(p.folder) ? ` · in the folder “${folderPath(db, p.folder, folders)}”` : ''} · version ${p.version} · changed ${new Date(p.updatedAt).toISOString()}`,
+            )
             .join('\n')
         : 'No saved pages yet.';
     }
     const p = mustPage(db, id);
+    if (outOfReach(ctx, p)) throw new HttpError(404, 'No saved page with that id');
     const k = kindOf(p.kind);
     if (k) {
-      const by = p.by === 'edit' || p.by === 'made' ? ` It was last changed by the user in its editor: keep their changes.` : '';
+      const by = p.who ? ` It was last changed by ${p.who}, someone the user shared the project with: keep their changes.` : p.by === 'edit' || p.by === 'made' ? ` It was last changed by the user in its editor: keep their changes.` : '';
       return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${by} ${k.forAgent(pageSource(db, id)!.text)}`;
     }
     const html = (await pageHtml(db, id))!.html;
     const data = storageText(db, id);
-    const by = p.by === 'edit' || p.by === 'made' ? ' It was last changed by the user in the page editor: keep their changes.' : '';
+    const by = p.who ? ` It was last changed by ${p.who}, someone the user shared the project with: keep their changes.` : p.by === 'edit' || p.by === 'made' ? ' It was last changed by the user in the page editor: keep their changes.' : '';
     // Agents' tool output is cut further on anyway: say so here rather than lose the end unnoticed.
     const cut = html.length > 100_000 ? `${html.slice(0, 100_000)}\n… (cut: the page is ${Math.round(html.length / 1024)} KB; write the whole page anew to change it)` : html;
     const notes = commentsForAgent(pageComments(db, id));
@@ -294,6 +324,30 @@ function changing(db: Deps['db'], a: Record<string, unknown>, kind: PageKind): s
 }
 
 /**
+ * Whose a new page is, and which project it goes in: the project named (by its name or id) when there is one; else an
+ * agent's goes in its session's project, and an app's step (which has no session) in none.
+ */
+function madeBy(ctx: RunCtx, project: unknown): { sessionKey?: string; space: string | null } {
+  const s = typeof project === 'string' ? project.trim().toLowerCase() : '';
+  const all = s ? allSpaces(ctx.deps.db) : [];
+  const named = (all.find((x) => x.id.toLowerCase() === s) ?? all.find((x) => x.name.trim().toLowerCase() === s))?.id ?? null;
+  if (!ctx.step) return { sessionKey: ctx.key, space: named ?? sessionSpace(ctx.deps.db, ctx.key) };
+  return { space: named };
+}
+
+/** Where a new page goes: madeBy's place (the project named, else the session's), then a Library folder in it when one is named. */
+function placeOf(ctx: RunCtx, project: unknown, folder: unknown): { sessionKey?: string; space: string | null; folder?: string | null } {
+  const m = madeBy(ctx, project);
+  return { ...(m.sessionKey ? { sessionKey: m.sessionKey } : {}), ...agentPlace(ctx.deps.db, folder, m.space) };
+}
+
+/** A save's input with the project to keep it in, by its name. */
+const withProject = (schema: { properties: Record<string, unknown> } & Record<string, unknown>) => ({
+  ...schema,
+  properties: { ...schema.properties, project: { type: 'string', description: 'The project (by its name) to keep it in; left out, this session’s project.' } },
+});
+
+/**
  * Each session's turn now: made anew with each message of its user, or with the first save of a turn that began
  * without one (a command, or one its agent began itself), and forgotten when the turn ends. Its agent's saves of a page
  * in one turn are kept as one version (store.ts addVersion).
@@ -306,21 +360,30 @@ const newTurn = (key: string) => {
 };
 
 /**
- * Keeps what an agent made: a new version of the page it named, or a new page of its session. Its saves of a page in a
- * row, in one turn, are kept as one version (store.ts addVersion), so working in steps does not fill the Versions list.
+ * Keeps what an agent (or an app's step) made: a new version of the page it named, or a new page of its own (in the
+ * project it names, else its session's). Its saves of a page in a row, in one turn, are kept as one version (store.ts
+ * addVersion), so working in steps does not fill the Versions list.
  */
-function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknown, model: unknown) {
+function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknown, model: unknown, project?: unknown, folder?: unknown) {
   const db = ctx.deps.db;
   const turn = turns.get(ctx.key) ?? newTurn(ctx.key);
   let folded: number | undefined;
   const p = id
     ? addVersion(db, id, { title, model, by: 'agent', turn, onFold: (v) => (folded = v) })
-    : createPage(db, { title, kind, model, by: 'agent', sessionKey: ctx.key, space: sessionSpace(db, ctx.key), turn });
+    : createPage(db, { title, kind, model, by: 'agent', turn, ...placeOf(ctx, project, folder) });
+  if (id) moveForAgent(db, id, folder, ctx.key);
   tell(ctx.deps, { what: 'pages' });
   refreshThumbs(ctx.deps, [p.id]);
   // The draft the user watched while the call came in gives way to this version.
   settleDraft(ctx.deps, ctx.key, mustKind(kind).tool, id, { saved: { pageId: p.id, version: p.version } });
   return { ...p, folded };
+}
+
+/** A saved page an agent changed, put in the folder it names (made when missing), when it names one. */
+function moveForAgent(db: Deps['db'], id: string, folder: unknown, key: string) {
+  if (typeof folder !== 'string' || !folder.trim()) return;
+  const place = agentPlace(db, folder, mustPage(db, id).space ?? sessionSpace(db, key));
+  putInFolder(db, 'pages', id, place.folder);
 }
 
 /** For the agent, when its save took the place of its own save before it (keepModel). */
@@ -343,7 +406,7 @@ const watched = (tool: RunTool): RunTool => ({
 const SAVE_SLIDES: RunTool = {
   name: 'save_slides',
   description: SAVE_SLIDES_DESCRIPTION,
-  inputSchema: SAVE_SLIDES_SCHEMA,
+  inputSchema: withProject(withFolder(SAVE_SLIDES_SCHEMA)),
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'slides');
     const prev = id ? pageSource(ctx.deps.db, id)?.text : undefined;
@@ -357,7 +420,7 @@ const SAVE_SLIDES: RunTool = {
     }
     // The version it changes: the parts it sends back as they were keep their look.
     const { deck, notes } = await agentDeck(ctx.deps.db, input, ctx.cwd, prev);
-    const p = keepModel(ctx, id, 'slides', a.title, deck);
+    const p = keepModel(ctx, id, 'slides', a.title, deck, a.project, a.libraryFolder);
     const n = deck.slides.length;
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} slide${n === 1 ? '' : 's'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it, present it and export it to PowerPoint or PDF.`,
@@ -370,10 +433,10 @@ const SAVE_SLIDES: RunTool = {
 const SAVE_DOC: RunTool = {
   name: 'save_doc',
   description: SAVE_DOC_DESCRIPTION,
-  inputSchema: SAVE_DOC_SCHEMA,
+  inputSchema: withProject(withFolder(SAVE_DOC_SCHEMA)),
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'doc');
-    const { id: _id, title: _title, edits, ...rest } = a;
+    const { id: _id, title: _title, project: _project, edits, libraryFolder: _into, ...rest } = a;
     const prev = id ? pageSource(ctx.deps.db, id)?.text : undefined;
     // Small changes: made on its Markdown as get_page gives it, then saved as the whole document sent back would be.
     if (edits !== undefined && edits !== null) {
@@ -384,7 +447,7 @@ const SAVE_DOC: RunTool = {
     }
     // The version it changes: what the agent leaves out (paper, font) stays, and unchanged blocks keep their ids.
     const { doc, notes } = await agentDoc(ctx.deps.db, rest, ctx.cwd, prev);
-    const p = keepModel(ctx, id, 'doc', a.title, doc);
+    const p = keepModel(ctx, id, 'doc', a.title, doc, a.project, a.libraryFolder);
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Word or Google Docs and export it as a Word document, a PDF or Markdown.`,
       ...foldNote(p),
@@ -396,10 +459,10 @@ const SAVE_DOC: RunTool = {
 const SAVE_SHEET: RunTool = {
   name: 'save_sheet',
   description: SAVE_SHEET_DESCRIPTION,
-  inputSchema: SAVE_SHEET_SCHEMA,
+  inputSchema: withProject(withFolder(SAVE_SHEET_SCHEMA)),
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'sheet');
-    const { id: _id, title: _title, update, ...rest } = a;
+    const { id: _id, title: _title, project: _project, update, libraryFolder: _into, ...rest } = a;
     const prev = id ? readBook(pageSource(ctx.deps.db, id)!.text) : undefined;
     // Some cells changed: on top of the sheets they name, the others as they are.
     if (update !== undefined && update !== null) {
@@ -410,7 +473,7 @@ const SAVE_SHEET: RunTool = {
     }
     // The version it changes: its comments' threads stay as they are, changed only by the comments asked for.
     const { book, notes } = await agentBook(rest, ctx.cwd, prev);
-    const p = keepModel(ctx, id, 'sheet', a.title, book);
+    const p = keepModel(ctx, id, 'sheet', a.title, book, a.project, a.libraryFolder);
     const n = book.sheets.length;
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} sheet${n === 1 ? '' : 's'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Excel or Google Sheets and export it as an Excel file, a CSV or a PDF.`,
@@ -423,7 +486,7 @@ const SAVE_SHEET: RunTool = {
 const SAVE_LATEX: RunTool = {
   name: 'save_latex',
   description: SAVE_LATEX_DESCRIPTION,
-  inputSchema: SAVE_LATEX_SCHEMA,
+  inputSchema: withProject(withFolder(SAVE_LATEX_SCHEMA)),
   async run(a, ctx) {
     const db = ctx.deps.db;
     // A file of this computer's: its comments only (the app keeps them); the file the agent changes itself.
@@ -435,7 +498,7 @@ const SAVE_LATEX: RunTool = {
       return r.text;
     }
     const id = changing(db, a, 'tex');
-    const { id: _id, edits, ...rest } = a;
+    const { id: _id, project: _project, edits, libraryFolder: _into, ...rest } = a;
     const prev = id ? readTex(pageSource(db, id)!.text) : undefined;
     // Small changes in its files: made on them as get_page gives them, the files they change then sent as written.
     if (edits !== undefined && edits !== null) {
@@ -454,7 +517,7 @@ const SAVE_LATEX: RunTool = {
     const { doc, notes } = await agentTex(db, rest, ctx.cwd, prev);
     // Typeset first: the agent hears of errors to fix, and the picture in the list comes from this run.
     const r = await compileTex(db, doc);
-    const p = keepModel(ctx, id, 'tex', a.title, doc);
+    const p = keepModel(ctx, id, 'tex', a.title, doc, a.project, a.libraryFolder);
     return [
       [
         `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit the source beside its typeset pages and export it as a PDF, its .tex source or the project as a .zip.`,
@@ -469,11 +532,11 @@ const SAVE_LATEX: RunTool = {
 const SAVE_NOTEBOOK: RunTool = {
   name: 'save_notebook',
   description: SAVE_NOTEBOOK_DESCRIPTION,
-  inputSchema: SAVE_NOTEBOOK_SCHEMA,
+  inputSchema: withFolder(SAVE_NOTEBOOK_SCHEMA),
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'notebook');
     const nb = agentNotebook(a, (p) => fromSession(ctx.cwd, p));
-    const p = keepModel(ctx, id, 'notebook', a.title, nb);
+    const p = keepModel(ctx, id, 'notebook', a.title, nb, a.libraryFolder);
     const cells = Array.isArray(nb.cells) ? nb.cells : [];
     const outs = cells.filter((c: { outputs?: unknown[] }) => c.outputs?.length).length;
     return `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${cells.length} cell${cells.length === 1 ? '' : 's'}, ${outs ? `${outs} with outputs` : 'no outputs yet'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can read it, edit and run its cells, ask an agent about it, and export it as an .ipynb file, a Python script, a PDF or a web page.`;
@@ -561,7 +624,7 @@ const PUBLISH_SITE: RunTool = {
  * keep" wrote an HTML file that never reached Pages.
  */
 const INSTRUCTIONS =
-  'Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, and a Jupyter notebook to read, run and come back to (a lesson, an analysis to show) with save_notebook, unless they ask for a file made another way or it belongs with a project’s code and data in a folder. get_page lists all of these, to change one. export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown, LaTeX, a notebook or a Python script). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how.';
+  'Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, and a Jupyter notebook to read, run and come back to (a lesson, an analysis to show) with save_notebook, unless they ask for a file made another way or it belongs with a project’s code and data in a folder. get_page lists all of these, to change one, with the Library folder each is in; the save tools’ libraryFolder puts one in a folder of the Library (by its name or a path, made when missing). export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown, LaTeX, a notebook or a Python script). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how.';
 
 /** A request made from a page or deck open in Pages (`extra.page`: its id): the session is about changing it. */
 function askInstructions(db: Deps['db'], v: unknown): string | null {
@@ -611,6 +674,8 @@ function routes(d: Deps) {
   initSites(db);
   initEdits(db);
   texRoutes(app, db);
+  checkRoutes(app, db);
+  arxivRoutes(app, db);
   // Files dropped on the Library or picked with Upload files, and files the desktop app moves in by their path.
   uploadRoutes(d);
   const P = (req: FastifyRequest) => req.params as Record<string, string>;
@@ -626,7 +691,45 @@ function routes(d: Deps) {
     const published = new Set(listSites(db).flatMap((s) => (s.pageId ? [s.pageId] : [])));
     // Pictures out of date (a page's data changed) are taken again meanwhile.
     refreshThumbs(d);
-    return { pages: listPages(db).map((p) => (published.has(p.id) ? { ...p, published: true } : p)) };
+    return { pages: listPages(db).map((p) => (published.has(p.id) ? { ...p, published: true } : p)), folders: listFolders(db) };
+  });
+  // ---- the Library's folders ------------------------------------------------------------------------
+  /** A new folder: in a folder (parent), or at the top of a project (space) or of none. */
+  app.post('/api/pages/folders', async (req) => {
+    const b = B(req);
+    const folder = makeFolder(db, { name: b.name, parent: typeof b.parent === 'string' && b.parent ? b.parent : null, space: spaceChoice(db, b.space) });
+    tell(d, { what: 'pages' });
+    return { folder };
+  });
+  /** A folder renamed ({ name }), moved into another (parent), to the top (parent: null), or to another project (space): what is in it goes along. */
+  app.patch('/api/pages/folders/:id', async (req) => {
+    const b = B(req);
+    if (b.name === undefined && b.parent === undefined && b.space === undefined) throw new HttpError(400, 'Send its new name, the folder to move it into (parent: an id, or null for the top), or the project to move it to (space)');
+    const r = changeFolder(db, P(req).id, {
+      name: b.name,
+      parent: b.parent === undefined ? undefined : typeof b.parent === 'string' && b.parent ? b.parent : null,
+      space: b.space === undefined ? undefined : spaceChoice(db, b.space),
+    });
+    tell(d, { what: 'pages' });
+    if (r.media) d.broadcast({ t: 'feature', id: 'media', data: { what: 'media', reload: true } });
+    return { folder: r.folder };
+  });
+  /** A folder deleted: what is in it goes up a level; nothing is deleted with it. */
+  app.delete('/api/pages/folders/:id', async (req) => {
+    const r = deleteFolder(db, P(req).id);
+    tell(d, { what: 'pages' });
+    if (r.media) d.broadcast({ t: 'feature', id: 'media', data: { what: 'media', reload: true } });
+    return { ok: true, moved: r.moved };
+  });
+  /** A folder of this computer brought in: a LaTeX project as one document, any other as a folder of the Library with its documents. */
+  app.post('/api/pages/import-folder', async (req) => {
+    const b = B(req);
+    if (typeof b.path !== 'string' || !b.path.trim()) throw new HttpError(400, 'Send the folder’s path (absolute, or from ~)');
+    const space = spaceChoice(db, b.space, sessionSpace(db, key(b.sessionKey)));
+    const r = await importFolder(db, b.path, { space, folder: typeof b.folder === 'string' && b.folder ? b.folder : null, sessionKey: key(b.sessionKey) });
+    if (r.pages.length || r.folders) tell(d, { what: 'pages' });
+    if (r.pages.length) refreshThumbs(d, r.pages.map((p) => p.id));
+    return r;
   });
   app.get('/api/pages/kept', async (req) => ({ items: keptIn(db, String((req.query as { key?: string }).key ?? '')) }));
   /** The pages an agent of this session is writing now, whole so far. */
@@ -650,12 +753,12 @@ function routes(d: Deps) {
     const fresh = !page;
     if (!page) {
       const data = b.data && typeof b.data === 'object' && !Array.isArray(b.data) ? Object.entries(b.data as Record<string, unknown>).map(([k, v]) => [k, JSON.stringify(v)] as [string, string]) : [];
-      // The space picked, or (not asked) the session's.
-      const space = spaceChoice(db, b.space, sessionSpace(db, sessionKey));
+      // The space picked, or (not asked) the session's; in a folder of it, when one is asked for.
+      const place = placeFor(db, b.folder, spaceChoice(db, b.space, sessionSpace(db, sessionKey)));
       page =
         typeof b.kind === 'string' && b.kind !== 'page'
-          ? createPage(db, { title: b.title, kind: mustKindName(b.kind), model: b.model ?? mustKind(b.kind).fresh(typeof b.title === 'string' && b.title.trim() ? b.title.trim() : ''), by: 'made', sessionKey, space })
-          : createPage(db, { title: b.title, html: b.html, by: item ? 'user' : 'made', sessionKey, sourceItem: item, space });
+          ? createPage(db, { title: b.title, kind: mustKindName(b.kind), model: b.model ?? mustKind(b.kind).fresh(typeof b.title === 'string' && b.title.trim() ? b.title.trim() : ''), by: 'made', sessionKey, ...place })
+          : createPage(db, { title: b.title, html: b.html, by: item ? 'user' : 'made', sessionKey, sourceItem: item, ...place });
       try {
         if (data.length) putValues(db, page.id, data.filter(([, v]) => v !== undefined));
       } catch (e) {
@@ -711,18 +814,22 @@ function routes(d: Deps) {
       model: got.model,
       by: 'made',
       sessionKey: key(b.sessionKey),
-      space: spaceChoice(db, b.space, sessionSpace(db, key(b.sessionKey))),
+      ...placeFor(db, b.folder, spaceChoice(db, b.space, sessionSpace(db, key(b.sessionKey)))),
     });
     changed(page.id);
     return { page, notes: got.notes ?? [] };
   });
-  /** Renames a page ({ title }), or moves it to a space ({ space: a space's id, or null for none }). */
+  /** Renames a page ({ title }), moves it to a space ({ space: a space's id, or null for none }), or into a Library folder ({ folder: an id, or null for none }). */
   app.patch('/api/pages/:id', async (req) => {
     const b = B(req);
     const id = P(req).id;
-    if (b.title === undefined && b.space === undefined) throw new HttpError(400, 'Send its new title, or the project to move it to (space: an id, or null)');
+    if (b.title === undefined && b.space === undefined && b.folder === undefined) throw new HttpError(400, 'Send its new title, the project to move it to (space: an id, or null), or the folder to put it in (folder: an id, or null)');
     let page = mustPage(db, id);
     if (b.space !== undefined) page = setPageSpace(db, id, spaceChoice(db, b.space));
+    if (b.folder !== undefined) {
+      putInFolder(db, 'pages', id, typeof b.folder === 'string' && b.folder ? b.folder : null);
+      page = mustPage(db, id);
+    }
     if (b.title !== undefined) page = renamePage(db, id, b.title);
     tell(d, { what: 'pages' });
     return { page };
@@ -734,6 +841,7 @@ function routes(d: Deps) {
     dropEdits(db, id);
     dropThumbs(id);
     dropWorkFolder(id);
+    dropPaperFolder(id);
     tell(d, { what: 'pages' });
     return { ok: true };
   });
@@ -747,8 +855,15 @@ function routes(d: Deps) {
     const id = P(req).id;
     const cur = mustPage(db, id);
     const base = Number(b.base);
-    if (Number.isInteger(base) && base > 0 && base !== cur.version && b.force !== true) throw new HttpError(409, `Version ${cur.version} was saved after the one you changed (${base}).`);
-    const page = addVersion(db, id, { title: b.title, html: b.html, model: b.model, by: 'edit' });
+    let model = b.model;
+    if (Number.isInteger(base) && base > 0 && base !== cur.version) {
+      // Comments people wrote meanwhile through a shared project's links join this save (server/spaces/share.ts); only
+      // when something else changed is it refused, unless `force`.
+      const carried = model !== undefined ? carryComments(db, id, base, model) : { model, onlyComments: false };
+      model = carried.model;
+      if (!carried.onlyComments && b.force !== true) throw new HttpError(409, `Version ${cur.version} was saved after the one you changed (${base}).`);
+    }
+    const page = addVersion(db, id, { title: b.title, html: b.html, model, by: 'edit' });
     noteEdit(db, [key(b.sessionKey), cur.sessionKey], id, Number.isInteger(base) && base > 0 ? base : cur.version, page.version);
     changed(id);
     return { page };
@@ -1006,7 +1121,7 @@ function routes(d: Deps) {
 export const pages: Feature = {
   id: 'pages',
   routes,
-  tools: () => [SHOW_HTML, SAVE_PAGE, watched(SAVE_SLIDES), watched(SAVE_DOC), watched(SAVE_SHEET), watched(SAVE_LATEX), SAVE_NOTEBOOK, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE],
+  tools: () => [SHOW_HTML, SAVE_PAGE, watched(SAVE_SLIDES), watched(SAVE_DOC), watched(SAVE_SHEET), watched(SAVE_LATEX), SAVE_NOTEBOOK, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE, LATEX_CHECK],
   spawn: (s, d) => {
     const ask = s.extra?.page ? askInstructions(d.db, s.extra.page) : null;
     return { instructions: ask ? [INSTRUCTIONS, ask] : [INSTRUCTIONS] };

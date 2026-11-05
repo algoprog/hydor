@@ -7,8 +7,12 @@
 // Files dropped anywhere on it (folders too) are added as what they are (uploads.ts): onto a project in the list of
 // places, into that project; elsewhere, into the place open (none on Everything); a line says where while they are
 // dragged. Upload files, beside a project's name (and in New), picks them on a device without a mouse.
-// Addresses: /library?project=<id>|none, &kind=<kind> (image, video and audio each, media pictures and videos both:
-// the old Media tab's ?tab=media too), ?tab=published; ?new=page|slides|doc|sheet|tex|notebook opens New with that kind.
+// A place (a project, or none) holds folders too (folders.tsx): its folders show first, as tiles, then its things; a
+// folder opens with the way back over it, and things go in folders by More → Move to a folder or, on a computer, by
+// dragging them onto one. Finding by name and the kind chips look through the whole place and say where each thing is.
+// Addresses: /library?project=<id>|none, &folder=<id>, &kind=<kind> (image, video and audio each, media pictures and
+// videos both: the old Media tab's ?tab=media too), ?tab=published; ?new=page|slides|doc|sheet|tex|notebook opens New
+// with that kind, ?new=folder New → Folder and ?new=import New → Import a folder.
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
 import {
@@ -22,7 +26,10 @@ import {
   Download,
   Ellipsis,
   FileText,
+  Folder,
   FolderInput,
+  FolderPlus,
+  FolderTree,
   Globe,
   ImageIcon,
   Layers,
@@ -43,7 +50,7 @@ import {
   X,
 } from 'lucide-react';
 import type { MediaItem } from '@shared/media';
-import type { PageInfo, SiteInfo } from '@shared/pages';
+import type { LibFolder, PageInfo, SiteInfo } from '@shared/pages';
 import type { SpaceView } from '@shared/spaces';
 import { del, enc, patch, post } from '../../lib/api';
 import { ago, bytes } from '../../lib/format';
@@ -61,6 +68,7 @@ import { preloadEditors } from './editors';
 import { exportFile, type ExportFormat } from './exportFile';
 import { EXPORTS } from './exports';
 import { NewPageDialog, PublishDialog, RenameDialog, SiteRow, Thumb, type NewKind } from './parts';
+import { CAN_DRAG, dragThing, FolderCrumbs, folderChain, FolderMenu, FolderNameDialog, FolderTile, ImportFolderDialog, moveToFolder, placeFolders, placeTopName } from './folders';
 import { usePagesStore } from './state';
 import { addToLibrary, dragsFiles, droppedFiles, dropMoves, pickFiles } from './uploads';
 import { DropHint } from './UploadTray';
@@ -76,6 +84,8 @@ interface Item {
   kind: ItemKind;
   title: string;
   space?: string;
+  /** The Library folder it is in (of its space); none at its place's top. */
+  folder?: string;
   /** When it last changed (a picture: when it was kept). */
   at: number;
   made: number;
@@ -118,20 +128,25 @@ const SORTS: { value: Sort; label: string }[] = [
   { value: 'made', label: 'Newest made' },
 ];
 
-const fromPage = (p: PageInfo): Item => ({ key: `p:${p.id}`, kind: p.kind ?? 'page', title: p.title, space: p.space, at: p.updatedAt, made: p.createdAt, page: p });
-const fromMedia = (m: MediaItem): Item => ({ key: `m:${m.id}`, kind: m.kind, title: m.title, space: m.space, at: m.updatedAt, made: m.createdAt, media: m });
+const fromPage = (p: PageInfo): Item => ({ key: `p:${p.id}`, kind: p.kind ?? 'page', title: p.title, space: p.space, folder: p.folder, at: p.updatedAt, made: p.createdAt, page: p });
+const fromMedia = (m: MediaItem): Item => ({ key: `m:${m.id}`, kind: m.kind, title: m.title, space: m.space, folder: m.folder, at: m.updatedAt, made: m.createdAt, media: m });
 
-/** Everything kept, the last changed first; with the spaces as they are now (a space deleted: in none). */
+/** Everything kept, the last changed first; with the spaces as they are now (a space deleted: in none) and the folders (one gone: at the top). */
 function useItems(): Item[] | null {
   const pages = usePagesStore((s) => s.pages);
+  const folders = usePagesStore((s) => s.folders);
   const media = useMedia((s) => s.items);
   const spaces = useSpaces();
   return useMemo(() => {
     if (!pages) return null;
     const known = new Set((spaces ?? []).map((s) => s.id));
-    const all = [...pages.map(fromPage), ...(media ?? []).map(fromMedia)].map((it) => (it.space && spaces && !known.has(it.space) ? { ...it, space: undefined } : it));
+    const dirs = new Set((folders ?? []).map((f) => f.id));
+    const all = [...pages.map(fromPage), ...(media ?? []).map(fromMedia)].map((it) => {
+      const x = it.space && spaces && !known.has(it.space) ? { ...it, space: undefined } : it;
+      return x.folder && folders && !dirs.has(x.folder) ? { ...x, folder: undefined } : x;
+    });
     return all.sort((a, b) => b.at - a.at);
-  }, [pages, media, spaces]);
+  }, [pages, folders, media, spaces]);
 }
 
 function sorted(list: Item[], sort: Sort): Item[] {
@@ -157,11 +172,17 @@ async function moveTo(it: Item, space: string | null, spaces: SpaceView[] | null
 
 // ---- one thing kept ----------------------------------------------------------------------------------------
 
-/** A card: its picture (with its kind), its name, its space when the list mixes them, and More. */
-function ItemCard({ it, showSpace }: { it: Item; showSpace?: boolean }) {
+/** A card: its picture (with its kind), its name, its space when the list mixes them (and its folder), and More. */
+function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean; showFolder?: boolean }) {
   const spaces = useSpaces();
+  const folders = usePagesStore((s) => s.folders);
   const [menu, setMenu] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [filing, setFiling] = useState(false);
+  // The folders of its place, for Move to a folder; the one it is in, to say where it is in a list of the whole place.
+  const mine = placeFolders(folders, it.space ?? null);
+  const inFolder = it.folder ? folders?.find((f) => f.id === it.folder) : undefined;
+  const topName = placeTopName(it.space ?? null, spaces);
   const [rename, setRename] = useState(false);
   const [confirm, confirmNode] = useConfirm();
   const anchor = useRef<HTMLButtonElement>(null);
@@ -201,7 +222,11 @@ function ItemCard({ it, showSpace }: { it: Item; showSpace?: boolean }) {
   };
   const sub = m?.caption === 'pending' ? 'Writing its title…' : tr(`Changed ${ago(it.at)}`);
   return (
-    <div className="group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel transition-colors hover:border-line-2">
+    <div
+      draggable={CAN_DRAG}
+      onDragStart={(e) => dragThing(e, { kind: p ? 'page' : 'media', id: p ? p.id : m!.id })}
+      className="group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel transition-colors hover:border-line-2"
+    >
       {/* A sound's picture is its shape, with a button to play it where it is (beside the one that opens it, not in it). */}
       {m?.kind === 'audio' ? (
         <SoundTile m={m} onOpen={() => open()} className="aspect-[16/10] w-full border-b border-line" />
@@ -232,12 +257,21 @@ function ItemCard({ it, showSpace }: { it: Item; showSpace?: boolean }) {
                 <span>·</span>
               </span>
             )}
+            {showFolder && inFolder && (
+              <span className="flex min-w-0 shrink items-center gap-1" title={folderChain(folders, inFolder.id).map((f) => f.name).join(' › ')}>
+                <Folder size={11} className="shrink-0" />
+                <span translate="no" className="truncate">
+                  {inFolder.name}
+                </span>
+                <span>·</span>
+              </span>
+            )}
             <span className="shrink-0 truncate">{sub}</span>
             {p?.published && <Globe size={11} className="shrink-0 text-accent" aria-label="Published" />}
             {!!p?.storageBytes && <Database size={11} className="shrink-0" aria-label={tr(`Keeps ${bytes(p.storageBytes)}`)} />}
           </span>
         </button>
-        <IconButton ref={anchor} label="More" size="sm" onClick={() => setMenu((x) => !x)} active={menu || moving}>
+        <IconButton ref={anchor} label="More" size="sm" onClick={() => setMenu((x) => !x)} active={menu || moving || filing}>
           <Ellipsis size={15} />
         </IconButton>
       </div>
@@ -265,6 +299,11 @@ function ItemCard({ it, showSpace }: { it: Item; showSpace?: boolean }) {
         {!!spaces?.length && (
           <MenuItem icon={<FolderInput size={14} />} onClick={() => (close(), setMoving(true))}>
             Move to a project
+          </MenuItem>
+        )}
+        {mine.length > 0 && (
+          <MenuItem icon={<FolderTree size={14} />} onClick={() => (close(), setFiling(true))}>
+            Move to a folder
           </MenuItem>
         )}
         {p ? (
@@ -296,6 +335,15 @@ function ItemCard({ it, showSpace }: { it: Item; showSpace?: boolean }) {
         </MenuItem>
       </Popover>
       <SpaceMenu anchor={anchor} open={moving} onClose={() => setMoving(false)} title="Move it to" value={it.space ?? null} onPick={(s) => s !== (it.space ?? null) && void moveTo(it, s, spaces)} />
+      <FolderMenu
+        anchor={anchor}
+        open={filing}
+        onClose={() => setFiling(false)}
+        folders={mine}
+        value={inFolder?.id ?? null}
+        topName={topName}
+        onPick={(f) => void moveToFolder({ kind: p ? 'page' : 'media', id: p ? p.id : m!.id }, f, topName)}
+      />
       {p && <RenameDialog page={p} open={rename} onClose={() => setRename(false)} />}
       {confirmNode}
     </div>
@@ -304,11 +352,11 @@ function ItemCard({ it, showSpace }: { it: Item; showSpace?: boolean }) {
 
 const GRID = 'grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] sm:gap-3.5';
 
-function Grid({ items, showSpace }: { items: Item[]; showSpace?: boolean }) {
+function Grid({ items, showSpace, showFolder }: { items: Item[]; showSpace?: boolean; showFolder?: boolean }) {
   return (
     <div className={GRID}>
       {items.map((it) => (
-        <ItemCard key={it.key} it={it} showSpace={showSpace} />
+        <ItemCard key={it.key} it={it} showSpace={showSpace} showFolder={showFolder} />
       ))}
     </div>
   );
@@ -327,12 +375,13 @@ function placeOf(q: URLSearchParams): Place {
   return { kind: 'all' };
 }
 
-function addressOf(place: Place, show: Show): string {
+function addressOf(place: Place, show: Show, folder?: string | null): string {
   const q = new URLSearchParams();
   if (place.kind === 'published') q.set('tab', 'published');
   else {
     if (place.kind === 'none') q.set('project', 'none');
     if (place.kind === 'space') q.set('project', place.id);
+    if (folder) q.set('folder', folder);
     if (show !== 'all') q.set('kind', show);
   }
   const s = q.toString();
@@ -439,7 +488,7 @@ function Places({ place, onPlace, items, sites, chips, dropAt }: { place: Place;
 const PER_SECTION = 8;
 
 /** A space's things in Everything: its name and mark, how many, and See all. */
-function SpaceSection({ space, items, onAll }: { space: SpaceView | null; items: Item[]; onAll: () => void }) {
+function SpaceSection({ space, items, onAll, showFolder }: { space: SpaceView | null; items: Item[]; onAll: () => void; showFolder?: boolean }) {
   const more = items.length > PER_SECTION;
   return (
     <section>
@@ -457,7 +506,7 @@ function SpaceSection({ space, items, onAll }: { space: SpaceView | null; items:
           </Button>
         )}
       </div>
-      <Grid items={items.slice(0, PER_SECTION)} />
+      <Grid items={items.slice(0, PER_SECTION)} showFolder={showFolder} />
     </section>
   );
 }
@@ -506,6 +555,11 @@ export function Library() {
   const sortRef = useRef<HTMLButtonElement>(null);
   const [making, setMaking] = useState<NewKind | null>(null);
   const [publish, setPublish] = useState(false);
+  const folders = usePagesStore((s) => s.folders);
+  const [newMenu, setNewMenu] = useState(false);
+  const newRef = useRef<HTMLButtonElement>(null);
+  const [folderAsk, setFolderAsk] = useState(false);
+  const [importing, setImporting] = useState(false);
   useEffect(() => {
     usePagesStore.getState().loadPages().catch(toastError);
     usePagesStore.getState().loadSites().catch(toastError);
@@ -517,7 +571,9 @@ export function Library() {
   const newAsked = q.get('new');
   useEffect(() => {
     if (!newAsked) return;
-    setMaking(newAsked === 'slides' || newAsked === 'doc' || newAsked === 'sheet' || newAsked === 'tex' || newAsked === 'notebook' ? newAsked : 'page');
+    if (newAsked === 'folder') setFolderAsk(true);
+    else if (newAsked === 'import') setImporting(true);
+    else setMaking(newAsked === 'slides' || newAsked === 'doc' || newAsked === 'sheet' || newAsked === 'tex' || newAsked === 'notebook' ? newAsked : 'page');
     go('/library', true);
   }, [newAsked]);
   // A space that is gone: everything again.
@@ -529,6 +585,17 @@ export function Library() {
     go(addressOf(p, samePlace(p, place) ? show : 'all'), true);
   };
   const space = place.kind === 'space' ? (spaces?.find((s) => s.id === place.id) ?? null) : null;
+  // A place of its own (a project, or none; everything, when there are no projects) shows its folders, and a folder open.
+  const placeSpace: string | null | undefined = place.kind === 'space' ? place.id : place.kind === 'none' || (place.kind === 'all' && !spaces?.length) ? null : undefined;
+  const placeList = placeSpace === undefined ? [] : placeFolders(folders, placeSpace);
+  const askedFolder = q.get('folder');
+  const current = askedFolder && placeList.some((f) => f.id === askedFolder) ? askedFolder : null;
+  const chain = folderChain(folders, current);
+  const topName = placeTopName(placeSpace ?? null, spaces);
+  const goFolder = (id: string | null) => {
+    setFind('');
+    go(addressOf(place, 'all', id), true);
+  };
 
   // Files dragged over the Library: where they would go (a place of the list under them, else the place open) and
   // what it says; dropped, each goes on its way into the Library.
@@ -565,6 +632,19 @@ export function Library() {
       sort,
     );
   }, [here, show, words, sort]);
+  // In a place, finding nothing and showing every kind: its folders, and what is in the folder open (or at its top).
+  const folderView = placeSpace !== undefined && !words && show === 'all';
+  const known = useMemo(() => new Set(placeList.map((f) => f.id)), [placeList]);
+  const subfolders = useMemo(() => {
+    const list = placeList.filter((f) => (f.parent && known.has(f.parent) ? f.parent : null) === current);
+    // Each folder by the sort the things have: by name, by the newest made, or by the latest change of what is in it.
+    const latest = (f: LibFolder) => Math.max(f.createdAt, ...here.filter((it) => it.folder === f.id).map((it) => it.at));
+    if (sort === 'name') return list.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+    if (sort === 'made') return list.sort((a, b) => b.createdAt - a.createdAt);
+    return list.sort((a, b) => latest(b) - latest(a));
+  }, [placeList, known, current, here, sort]);
+  const countIn = (f: LibFolder) => here.filter((it) => it.folder === f.id).length + placeList.filter((x) => x.parent === f.id).length;
+  const inView = useMemo(() => (folderView ? shown.filter((it) => (it.folder && known.has(it.folder) ? it.folder : null) === current) : shown), [folderView, shown, known, current]);
   // Everything, with spaces: each space's things under its name (those it holds most lately first), then those in none.
   const sections = useMemo(() => {
     if (place.kind !== 'all' || words || !spaces?.length) return null;
@@ -574,10 +654,34 @@ export function Library() {
     return [...order.map((id) => ({ space: spaces.find((s) => s.id === id) ?? null, items: by.get(id)! })), ...(by.has(null) ? [{ space: null, items: by.get(null)! }] : [])];
   }, [shown, place.kind, words, spaces]);
 
+  const newKinds: [NewKind, string, ReactNode][] = [
+    ['page', 'Page', <AppWindow size={14} />],
+    ['slides', 'Slides', <Presentation size={14} />],
+    ['doc', 'Document', <FileText size={14} />],
+    ['sheet', 'Spreadsheet', <Sheet size={14} />],
+    ['tex', 'LaTeX document', <Sigma size={14} />],
+    ['notebook', 'Notebook', <NotebookText size={14} />],
+  ];
   const newButton = (
-    <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setMaking('page')}>
-      New
-    </Button>
+    <>
+      <Button ref={newRef} size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setNewMenu((x) => !x)}>
+        New
+      </Button>
+      <Popover anchor={newRef} open={newMenu} onClose={() => setNewMenu(false)} align="end" width={220}>
+        {newKinds.map(([k, label, icon]) => (
+          <MenuItem key={k} icon={icon} onClick={() => (setNewMenu(false), setMaking(k))}>
+            {label}
+          </MenuItem>
+        ))}
+        <MenuSep />
+        <MenuItem icon={<FolderPlus size={14} />} onClick={() => (setNewMenu(false), setFolderAsk(true))}>
+          Folder
+        </MenuItem>
+        <MenuItem icon={<FolderInput size={14} />} onClick={() => (setNewMenu(false), setImporting(true))}>
+          Import a folder
+        </MenuItem>
+      </Popover>
+    </>
   );
   const title = place.kind === 'published' ? 'Published' : place.kind === 'none' ? 'Not in a project' : space ? space.name : 'Everything';
 
@@ -589,7 +693,8 @@ export function Library() {
           <Throbber size={28} />
         </div>
       );
-    if (!items.length)
+    // Nothing kept yet (folders show in their places, not in Everything).
+    if (!items.length && (!folders?.length || placeSpace === undefined))
       return (
         <Empty icon={<LibraryBig size={22} />} title="Your Library is empty">
           <span className="block">
@@ -606,6 +711,27 @@ export function Library() {
             </Button>
           </span>
         </Empty>
+      );
+    if (folderView && (current || subfolders.length || inView.length))
+      return (
+        <div className="space-y-5">
+          {subfolders.length > 0 && (
+            <div className={GRID}>
+              {subfolders.map((f) => (
+                <FolderTile key={f.id} folder={f} count={countIn(f)} folders={placeList} topName={topName} onOpen={() => goFolder(f.id)} />
+              ))}
+            </div>
+          )}
+          {inView.length > 0 ? (
+            <Grid items={inView} />
+          ) : (
+            !subfolders.length && (
+              <Empty icon={<Folder size={22} />} title="This folder is empty">
+                {CAN_DRAG ? 'Drag things onto it, or use their More → Move to a folder.' : 'Put things in it with their More → Move to a folder.'}
+              </Empty>
+            )
+          )}
+        </div>
       );
     if (!here.length)
       return space ? (
@@ -631,11 +757,11 @@ export function Library() {
       return (
         <div className="space-y-9">
           {sections.map((s) => (
-            <SpaceSection key={s.space?.id ?? 'none'} space={s.space} items={s.items} onAll={() => toPlace(s.space ? { kind: 'space', id: s.space.id } : { kind: 'none' })} />
+            <SpaceSection key={s.space?.id ?? 'none'} space={s.space} items={s.items} showFolder={!!folders?.length} onAll={() => toPlace(s.space ? { kind: 'space', id: s.space.id } : { kind: 'none' })} />
           ))}
         </div>
       );
-    return <Grid items={shown} showSpace={place.kind === 'all'} />;
+    return <Grid items={shown} showSpace={place.kind === 'all'} showFolder={!!folders?.length} />;
   };
 
   return (
@@ -663,17 +789,21 @@ export function Library() {
         <div className={cx('min-h-0 min-w-0 flex-1 overflow-y-auto', over?.at === 'main' && 'bg-accent/6 outline-2 -outline-offset-4 outline-accent/50 outline-dashed')}>
           <div className="mx-auto max-w-[1180px] px-3 py-4 sm:px-6 sm:py-5">
             {!wide && items && <Places chips place={place} onPlace={toPlace} items={items} sites={sites} dropAt={over?.at} />}
-            {place.kind !== 'published' && !!here.length && (
+            {place.kind !== 'published' && (!!here.length || !!placeList.length) && (
               <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2.5">
-                {wide && (
+                {folderView && chain.length > 0 ? (
+                  <FolderCrumbs chain={chain} space={space} topName={topName} onGo={goFolder} />
+                ) : (
+                  wide && (
                   <h2 className="flex min-w-0 items-center gap-2 text-[17px] font-semibold tracking-tight">
                     {space && <SpaceMark s={space} size={22} className="rounded-md" />}
                     <span translate={space ? 'no' : undefined} className="truncate">
                       {title}
                     </span>
                   </h2>
+                  )
                 )}
-                {space && wide && (
+                {space && wide && !chain.length && (
                   <>
                     <button type="button" onClick={() => go(`/projects/${space.id}`)} className="text-[12.5px] font-medium text-fg-3 hover:text-fg">
                       Open the project
@@ -716,7 +846,7 @@ export function Library() {
                         key={k.value}
                         type="button"
                         aria-pressed={show === k.value}
-                        onClick={() => go(addressOf(place, k.value), true)}
+                        onClick={() => go(addressOf(place, k.value, current), true)}
                         className={cx(
                           'h-7 shrink-0 rounded-full px-3 text-[12.5px] transition-colors',
                           show === k.value ? 'bg-bg-3 font-medium text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg',
@@ -739,7 +869,22 @@ export function Library() {
         )}
       </div>
       <PublishDialog open={publish} onClose={() => setPublish(false)} />
-      <NewPageDialog open={!!making} kind={making ?? 'page'} space={space?.id ?? null} onClose={() => setMaking(null)} />
+      <NewPageDialog open={!!making} kind={making ?? 'page'} space={space?.id ?? null} folder={current ?? undefined} onClose={() => setMaking(null)} />
+      <FolderNameDialog
+        open={folderAsk}
+        onClose={() => setFolderAsk(false)}
+        title={chain.length ? tr(`A new folder in ${chain[chain.length - 1].name}`) : 'A new folder'}
+        initial=""
+        confirm="Make it"
+        onDone={async (name) => {
+          const r = await post<{ folder: LibFolder }>('/api/pages/folders', { name, parent: current ?? undefined, space: placeSpace ?? null });
+          // Made where the Library shows (in Everything with projects, outside them): shown where it is.
+          if (placeSpace === undefined) go(addressOf({ kind: 'none' }, 'all'), true);
+          else if (words || show !== 'all') goFolder(current);
+          toast(tr(`Made the folder “${r.folder.name}”`), 'ok');
+        }}
+      />
+      <ImportFolderDialog open={importing} onClose={() => setImporting(false)} space={placeSpace ?? null} folder={current} folderName={chain[chain.length - 1]?.name} />
     </div>
   );
 }

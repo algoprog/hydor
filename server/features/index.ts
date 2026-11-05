@@ -9,9 +9,11 @@ import { children } from '../children/index.ts';
 import { cleanup } from '../cleanup/index.ts';
 import { commits } from '../commits/index.ts';
 import { computer } from '../computer/index.ts';
+import { confidential } from '../confidential/index.ts';
 import { connections } from '../connections/index.ts';
 import { custom } from '../custom/index.ts';
 import { documents } from '../documents/index.ts';
+import { experiments } from '../experiments/index.ts';
 import { fileAsk } from '../fileask/index.ts';
 import { find } from '../find/index.ts';
 import { formatting } from '../formatting/index.ts';
@@ -26,6 +28,8 @@ import { memory } from '../memory/index.ts';
 import { profile } from '../memory/profile.ts';
 import { opinion } from '../opinion/index.ts';
 import { pages } from '../pages/index.ts';
+import { papers } from '../papers/index.ts';
+import { pdfNotes } from '../pdfnotes/index.ts';
 import { plugins } from '../plugins/index.ts';
 import { releaseNotes } from '../releases/index.ts';
 import { research } from '../research/index.ts';
@@ -36,10 +40,11 @@ import { sidebar } from '../sidebar/index.ts';
 import { tips } from '../tips/index.ts';
 import { skillpack } from '../skillpack/index.ts';
 import { spaces } from '../spaces/index.ts';
+import { sharing } from '../spaces/share.ts';
 import { swarm } from '../swarm/index.ts';
 import { voice } from '../voice/index.ts';
 import type { Feature } from './types.ts';
 
-// The user's guidelines lead what an agent is told, their profile right after them; how to format replies follows the
-// pages it may show instead.
-export const FEATURES: Feature[] = [guidelines, profile, pages, formatting, shots, search, browser, computer, memory, knowledge, spaces, children, swarm, research, opinion, commits, budget, documents, fileAsk, images, media, connections, signatures, automations, voice, assistants, apps, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];
+// The user's guidelines lead what an agent is told, their profile right after them, then what a confidential session
+// may not do; how to format replies follows the pages it may show instead.
+export const FEATURES: Feature[] = [guidelines, profile, confidential, pages, formatting, shots, search, browser, computer, memory, knowledge, spaces, sharing, children, swarm, research, opinion, commits, budget, documents, fileAsk, pdfNotes, images, media, connections, signatures, automations, experiments, voice, assistants, apps, papers, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];

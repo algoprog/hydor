@@ -17,10 +17,11 @@ export interface HookCall {
   query: Record<string, unknown>;
 }
 
-// Where the usual senders put an HMAC-SHA256 of the body, hex (or base64), with or without "sha256=".
-const SIGNATURE_HEADERS = ['x-hub-signature-256', 'x-gitea-signature', 'x-gogs-signature', 'x-signature-256', 'x-signature', 'x-webhook-signature'];
+// Where the usual senders put an HMAC-SHA256 of the body, hex (or base64), with or without "sha256=" (CircleCI's
+// "v1=", among others after commas).
+const SIGNATURE_HEADERS = ['x-hub-signature-256', 'x-gitea-signature', 'x-gogs-signature', 'x-signature-256', 'x-signature', 'x-webhook-signature', 'circleci-signature', 'sentry-hook-signature'];
 // Senders that send the secret itself rather than a signature.
-const TOKEN_HEADERS = ['x-gitlab-token', 'x-webhook-token'];
+const TOKEN_HEADERS = ['x-gitlab-token', 'x-webhook-token', 'x-buildkite-token'];
 const DELIVERY_HEADERS = ['idempotency-key', 'x-github-delivery', 'x-gitea-delivery', 'x-gogs-delivery', 'x-gitlab-event-uuid', 'x-delivery-id'];
 
 const same = (a: Buffer, b: Buffer) => a.length === b.length && crypto.timingSafeEqual(a, b);
@@ -31,8 +32,10 @@ export function verifySignature(secret: string, raw: Buffer, headers: Record<str
   for (const name of header ? [header.toLowerCase()] : SIGNATURE_HEADERS) {
     const v = headers[name];
     if (typeof v !== 'string' || !v.trim()) continue;
-    const sig = v.trim().replace(/^sha256=/i, '');
-    if (same(/^[0-9a-f]{64}$/i.test(sig) ? Buffer.from(sig, 'hex') : Buffer.from(sig, 'base64'), want)) return true;
+    for (const part of v.split(',')) {
+      const sig = part.trim().replace(/^(sha256|v1)=/i, '');
+      if (sig && same(/^[0-9a-f]{64}$/i.test(sig) ? Buffer.from(sig, 'hex') : Buffer.from(sig, 'base64'), want)) return true;
+    }
   }
   for (const name of header ? [header.toLowerCase()] : TOKEN_HEADERS) {
     const v = headers[name];

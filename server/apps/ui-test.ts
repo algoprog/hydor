@@ -246,13 +246,15 @@ function answerOf(answer: AnswerField[]): Record<string, unknown> {
   );
 }
 
-test('ready-made apps: each of the twenty-seven has a view of pages and elements of its own that checks out, uses only what its answer and form give, and has events', () => {
+test('ready-made apps: each of the forty-five has a view of pages and elements of its own that checks out, uses only what its answer and form give, and has events', () => {
   const tasks = TEMPLATES.filter((t) => !t.block);
-  assert.equal(tasks.length, 27);
+  assert.equal(tasks.length, 45);
   for (const t of tasks) {
     assert.ok(t.ui, `${t.id}: a view`);
     assert.ok(t.ui!.pages.filter((p) => p.tab !== false).length >= 2, `${t.id}: pages`);
-    assert.ok(Object.keys(t.ui!.elements ?? {}).length >= 3, `${t.id}: elements of its own`);
+    // One that opens on its own page with one document (the weekly report, the lab notebook) may make do with two.
+    const own = t.ui!.pages.some((p) => p.on === 'app');
+    assert.ok(Object.keys(t.ui!.elements ?? {}).length >= (own ? 2 : 3), `${t.id}: elements of its own`);
     assert.ok(Object.keys(t.ui!.events ?? {}).length >= 1, `${t.id}: events`);
     assert.deepEqual(checkUi(t), { errors: [], warnings: [] }, `${t.id}: checks out`);
     const inputs = Object.fromEntries(t.fields.map((f) => [f.id, f.options?.[0] ?? (f.type === 'number' ? '3' : f.type === 'date' ? '2026-11-20' : 'x')]));

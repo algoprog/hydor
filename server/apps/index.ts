@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
-import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
+import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS, toCsv } from '../../shared/apps.ts';
 import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_ONLY_TOOLS, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import { cleanSecrets } from '../../shared/app-secrets.ts';
 import { checkUi, cleanUi, pagesFor, type AppUi } from '../../shared/app-ui.ts';
@@ -85,6 +85,7 @@ import { setModelsHere } from './models.ts';
 import { hasMedia, mediaRoutes, putAsset, takeInAnswer } from './media.ts';
 import { saveAppSecrets, secretsOf } from './secrets.ts';
 import { dropDaily, homeOf, saveHome } from './home.ts';
+import { WORK_LOG } from './worklog.ts';
 
 const keyLimiter = new Limiter();
 /** The largest request that installs an app: its file, as base64. */
@@ -237,7 +238,7 @@ function routes(d: Deps) {
     id: (idOrSlug) => (idOrSlug.startsWith('tpl:') ? (templateById(idOrSlug.slice(4)) ? idOrSlug : undefined) : getApp(db, idOrSlug)?.id),
     name: (id) => (id.startsWith('tpl:') ? templateById(id.slice(4))?.name : getApp(db, id)?.name),
     start: ({ app: id, inputs, test }) => {
-      // A ready-made app ("tpl:<id>"), as it is: Explore's Update every day.
+      // A ready-made app ("tpl:<id>"), as it is: Explore's Update automatically.
       if (id.startsWith('tpl:')) {
         const t = templateById(id.slice(4));
         if (!t) throw new HttpError(404, 'Its app is gone');
@@ -360,7 +361,7 @@ function routes(d: Deps) {
 
   app.get('/api/apps/:id', async (req) => {
     const { app: a, template } = recipeOf(db, P(req).id);
-    // Its own page in its view: what that page keeps, and the answers it runs with from there (with Update every day).
+    // Its own page in its view: what that page keeps, and the answers it runs with from there (with Update automatically).
     // `latest`: when its latest run of its main flow ended well (the start page's Explore shows a dot for a new one).
     const ownPage = (id: string, r: AppRecipe) => {
       if (!pagesFor(r.ui, 'app').length) return {};
@@ -383,8 +384,9 @@ function routes(d: Deps) {
   });
 
   /**
-   * An app that opens on its own page: the answers it runs with from there (its settings) and Update every day (a
-   * scheduled task at a time). Body: { inputs?: { question: answer }, daily?: { on, time: "HH:MM" } }. Gives its settings now.
+   * An app that opens on its own page: the answers it runs with from there (its settings) and Update automatically (a
+   * scheduled task at a time, every day or on some days). Body: { inputs?: { question: answer }, daily?: { on, time:
+   * "HH:MM", days: [0–6] | null } }. Gives its settings now.
    */
   app.put('/api/apps/:id/home', async (req) => {
     const { app: a, template } = recipeOf(db, P(req).id);
@@ -865,18 +867,30 @@ function routes(d: Deps) {
     return { run: runView(startRun({ app: a.id, slug: a.slug, recipe: chatRecipe(a), source: 'chat', inputs: { message: text } })) };
   });
 
-  // ---- what an app keeps ----
+  // ---- what an app keeps: yours, or a ready-made one's ("tpl:<id>", its records kept under that id) ----
 
-  const kept = (req: FastifyRequest) => {
+  /** An app that keeps records: one of yours, or a ready-made one that does (the Reading list, Paper radar), its records under "tpl:<id>" while it is installed. */
+  const keeper = (req: FastifyRequest): { id: string; data: AppRecipe['data'] } => {
+    const id = P(req).id;
+    if (id.startsWith('tpl:')) {
+      const t = builtinOf(id);
+      installedOr409(db, t);
+      if (!t.data) throw new HttpError(404, `${t.name} keeps no records`);
+      return { id: `tpl:${t.id}`, data: t.data };
+    }
     const a = own(req);
+    return { id: a.id, data: a.data };
+  };
+  const kept = (req: FastifyRequest) => {
+    const a = keeper(req);
     if (!a.data?.[P(req).collection] && P(req).collection) throw new HttpError(404, `The app keeps no collection “${P(req).collection}”`);
     return a;
   };
   app.get('/api/apps/:id/data', async (req) => {
-    const a = own(req);
+    const a = keeper(req);
     return { collections: collectionsOf(db, a.id, a.data), limits: DATA_LIMITS };
   });
-  app.get('/api/apps/:id/data/:collection', async (req) => {
+  app.get('/api/apps/:id/data/:collection', async (req, reply) => {
     const a = kept(req);
     const q = req.query as Record<string, string>;
     let where: Record<string, unknown> | undefined;
@@ -889,7 +903,16 @@ function routes(d: Deps) {
     }
     // A question: by words and by meaning, best first.
     if (q.ask) return searchRecords(db, a.id, a.data, P(req).collection, q.ask, { mode: q.mode === 'words' || q.mode === 'meaning' ? q.mode : 'auto', limit: Number(q.limit) || 10 });
-    return findRecords(db, a.id, a.data, P(req).collection, { where, search: q.q || undefined, sort: q.sort || undefined, limit: Number(q.limit) || 100 });
+    const found = findRecords(db, a.id, a.data, P(req).collection, { where, search: q.q || undefined, sort: q.sort || undefined, limit: Number(q.limit) || (q.format ? DATA_LIMITS.find : 100) });
+    if (q.format !== 'csv' && q.format !== 'jsonl') return found;
+    // As a file to download: the fields asked for (else the collection's own, in order), a row or a line each.
+    const known = a.data?.[P(req).collection]?.fields?.map((f) => f.id);
+    const cols = q.fields ? q.fields.split(',').map((f) => f.trim()).filter(Boolean).slice(0, 40) : (known ?? [...new Set(found.records.flatMap((r) => Object.keys(r)))].filter((k) => !['id', 'createdAt', 'updatedAt'].includes(k)));
+    const name = String(q.name ?? '').replace(/[^\w.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 80) || P(req).collection;
+    reply.header('Content-Type', q.format === 'csv' ? 'text/csv; charset=utf-8' : 'application/x-ndjson; charset=utf-8');
+    reply.header('Content-Disposition', `attachment; filename="${name}.${q.format}"`);
+    if (q.format === 'csv') return toCsv([cols, ...found.records.map((r) => cols.map((c) => r[c] ?? ''))]);
+    return found.records.map((r) => JSON.stringify(Object.fromEntries(cols.map((c) => [c, r[c] ?? null])))).join('\n') + (found.records.length ? '\n' : '');
   });
   app.post('/api/apps/:id/data/:collection', async (req) => {
     const a = kept(req);
@@ -1175,8 +1198,8 @@ export const apps: Feature = {
   tools(ctx) {
     // A template's run gets what it hands in with and what it keeps; any other session what templates are built with.
     if (runOfCtx(ctx)) return [submitTool(ctx), dataTool(ctx), flowTool(ctx)].filter((t): t is RunTool => !!t);
-    // Any other session: what apps are built with, and the user's apps to run for them.
-    return [...builderTools(ctx, { problemsOf: (raw) => problemsOf(ctx.deps.db, raw), prepare }), findAppsTool(ctx), useAppTool(ctx)].filter((t): t is RunTool => !!t);
+    // Any other session: what apps are built with, and the user's apps to run for them; a step also what the user did (work_log).
+    return [...builderTools(ctx, { problemsOf: (raw) => problemsOf(ctx.deps.db, raw), prepare }), findAppsTool(ctx), useAppTool(ctx), ctx.step ? WORK_LOG : null].filter((t): t is RunTool => !!t);
   },
   /** An app's run gets the tools its app allows; a public run only the answer and, if allowed, the web. */
   allowTool(name, ctx) {
@@ -1207,10 +1230,11 @@ export const apps: Feature = {
   // Templates the user changed in their editor, for the agents that built them, with the next message.
   beforeMessage: (key, d) => takeAppEdits(d.db, key),
   // A message one of the user's apps clearly does: the agent hears which, with it. Not in an app's own run, nor in
-  // sessions another agent or the app started for a part of its work (a child, a research, an arena match).
+  // sessions another agent or the app started for a part of its work (a child, a research, an arena match), nor in
+  // a confidential session, where apps are off.
   aboutMessage(text, key, d) {
     const x = sessionExtra(d.db, key);
-    if (markOf(x) || x.parent || x.research || typeof x.arena === 'string' || x.swarm) return null;
+    if (markOf(x) || x.parent || x.research || typeof x.arena === 'string' || x.swarm || x.confidential) return null;
     return appHint(d.db, text);
   },
   start(d) {
