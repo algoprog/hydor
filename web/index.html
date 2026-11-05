@@ -14,9 +14,10 @@
     <script src="/theme-boot.js"></script>
     <!--
       While the page loads: the logo, HYDΩR, its Ω filling with water (the wordmark's tide, components/Logo.tsx), over the
-      theme's page colour. It goes the moment the app has something of its own to show (lib/boot.ts). The Mac app shows
-      the same while its server starts (mac/main.cjs bootPage), so there the water is already in when this page opens
-      (theme-boot.js marks the page boot-full).
+      theme's page colour. The moment the app has something of its own to show, it is there under the logo, and the logo
+      goes home: into the app's own wordmark where one is in sight, its water draining, as the colour around it clears
+      (lib/boot.ts). The Mac app shows the same while its server starts (mac/main.cjs bootPage), so there the water is
+      already in when this page opens (theme-boot.js marks the page boot-full).
     -->
     <style>
       #boot { position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center; background: var(--bg, #000); color: var(--fg, #e9edf5); }
@@ -30,6 +31,7 @@
       @keyframes boot-ebb { 50% { transform: translateY(12px); } }
       @keyframes boot-bob { 50% { transform: translateY(4px); } }
       @keyframes boot-swell { to { transform: translateX(-36px); } }
+      .boot-landing svg[data-landing] { visibility: hidden; }
       @media (prefers-reduced-motion: reduce) {
         #boot .boot-fill { transform: translateY(8px); animation: none; }
         #boot .boot-ebb, #boot .boot-bob, #boot .boot-swell { animation: none; }
@@ -55,7 +57,7 @@
           <path transform="translate(104 0)" d="M-1 -6L35 52L71 -6M35 52V100" stroke="currentColor" />
           <path transform="translate(212 0)" d="M5 0V100M5 5H30A39 45 0 0 1 30 95H5" stroke="currentColor" />
           <g transform="translate(324 0)">
-            <path d="M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92" style="stroke: var(--water-ink, #38bdf8)" opacity="0.3" />
+            <path class="boot-omega" d="M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92" style="stroke: var(--water-ink, #38bdf8)" opacity="0.3" />
             <g mask="url(#boot-mask)">
               <g class="boot-fill"><g class="boot-ebb"><g class="boot-bob"><g class="boot-swell">
                 <path d="M-72 0 q9 -5.5 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 V130 H-72 Z" fill="url(#boot-sea)" stroke="none" />

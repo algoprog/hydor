@@ -512,7 +512,9 @@ programs shows each program's version and what is out, with Check now, Update no
 - On Windows the server runs as it does elsewhere: agents' commands in Git for Windows' bash, terminals the app keeps
   itself (Windows has no tmux), and each version run from a copy of its own so agents carry on through updates.
 - While the app loads, in a browser or while a desktop app starts, its logo shows, HYDΩR with water rising in the Ω
-  and a wave moving across it, and the app takes its place the moment it has something to show.
+  and a wave moving across it. The moment the app has something to show it is there under the logo, which moves into
+  its place at the top of the sidebar (or above the sign-in box) as its water drains and the screen clears; on a phone
+  it fades away instead, and with reduced motion it simply goes.
 - Computer use in the desktop apps, on a Mac, on Windows, and on Linux with an X11 desktop (Settings → Computer use,
   off at first): agents see the computer's screen and use its mouse and keyboard in any app (screenshots of the main
   display at about 1280 pixels, clicks, drags, scrolls, typing in any language and on any keyboard layout, keys and

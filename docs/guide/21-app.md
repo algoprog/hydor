@@ -123,7 +123,7 @@ It is kept by the app, so it works with no browser open.
 - **In a desktop app**: it opens in the background when you log in, with its icon in the menu bar (on Windows in the notification area of the taskbar, on Linux in the system tray) and its window closed. It is on from the first time you open it (the Mac app from the Applications folder).
 - **Started some other way**: turning it on sets it up as a service of your user. Where that isn't possible (no systemd for your user), the line says so.
 
-While the app loads, in a browser or while a desktop app starts, its logo shows with water rising in the Ω, and the app appears as soon as it is ready.
+While the app loads, in a browser or while a desktop app starts, its logo shows with water rising in the Ω. As soon as the app is ready it is there under the logo, which moves into its place at the top of the sidebar (or above the sign-in box) as the water drains from the Ω and the screen around it clears; on a phone, the logo fades away instead. You can click and type straight away. If your device asks for reduced motion, the logo simply goes.
 
 ## Keep the app up to date
 
