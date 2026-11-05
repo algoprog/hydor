@@ -476,6 +476,8 @@ export function uploadRoutes(d: Deps) {
       throw e instanceof HttpError ? e : new HttpError(499, `The piece was cut off: ${(e as Error).message}`, { received: offset });
     }
     u.busy = false;
+    // Cancelled while the piece came: nothing of it is made (the cancel took its part away).
+    if (uploads.get(id) !== u) throw new HttpError(499, 'That upload was cancelled');
     u.got = got;
     u.at = Date.now();
     if (got < u.size) return { received: got };
