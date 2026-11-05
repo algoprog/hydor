@@ -6845,6 +6845,7 @@
 "Label them with the model":"server/apps/templates-lab.ts",
 "Label, to refer to it (tab:results)":"web/src/features/pages/latex/TableEditor.tsx",
 "Labelled":"server/apps/templates-lab.ts",
+"Labelling":"server/apps/views.ts",
 "Labels":"web/src/features/pages/sheets/Charts.tsx",
 "Labels in a line":"server/apps/templates-lab.ts",
 "Labels past the ninth":"server/apps/templates-lab.ts",
