@@ -482,6 +482,17 @@ const dot: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
   ok(/<p:video><p:cMediaNode vol="80000" mute="1"><p:cTn id="\d+" repeatCount="indefinite"/.test(s1), 'played on a click, without sound and again and again as the deck says');
   const html = (await req('GET', `/api/pages/${made}/export?format=html`)).body;
   ok(html.includes(`data:video/mp4;base64,${film.toString('base64').slice(0, 40)}`), 'the web page (a file on its own) has the video inside it');
+  // The PowerPoint file opened again as a deck: its video kept by the app once more, as the same video.
+  const opened = await req('POST', '/api/pages/import', { name: 'Film.pptx', data: pptx.toString('base64') });
+  const reopened = opened.statusCode === 200 ? ((await req('GET', `/api/pages/${opened.json().page.id}`)).json() as { page: { kind: string }; model: Deck }) : null;
+  const vid = reopened?.model.slides[0].els.find((e) => e.type === 'video');
+  ok(reopened?.page.kind === 'slides' && vid?.type === 'video' && vid.src === src && vid.muted !== true && vid.start === 2, 'a PowerPoint file opens as a deck, its video kept by the app (the same one)');
+  // Gone again, so only the decks below show the video.
+  if (opened.statusCode === 200) await app.inject({ method: 'DELETE', url: `/api/pages/${opened.json().page.id}`, headers: { host: 'app.test' } });
+  const old = await req('POST', '/api/pages/import', { name: 'Old.ppt', data: Buffer.from('not a deck').toString('base64') });
+  ok(old.statusCode === 415 && /\.pptx/.test(old.json().error), 'a PowerPoint 97–2003 file is refused with how to open it');
+  const broken = await req('POST', '/api/pages/import', { name: 'Broken.pptx', data: Buffer.from('not a zip at all').toString('base64') });
+  ok(broken.statusCode === 422, 'a file that is no PowerPoint file says it could not be read');
   // An agent's video file, kept with its deck.
   fs.writeFileSync(path.join(tmp, 'clip.mp4'), film);
   const fromAgent = await run('save_slides', { title: 'Agent film', slides: [{ els: [{ type: 'video', src: 'clip.mp4' }, { type: 'video', src: 'missing.mp4' }] }] });

@@ -7,6 +7,10 @@
 //
 //   node scripts/office-check/pptx-check.mjs --url http://127.0.0.1:8795 --password 'a demo password' --out /tmp/pptx-check
 //
+// And the other way: --roundtrip opens each sample's .pptx in the app again (its pictures beside the original's) and
+// a copy LibreOffice saved itself (beside LibreOffice's pictures of it); --files a.pptx,b.pptx opens other files
+// (beside LibreOffice's pictures of them), in import.html.
+//
 // Options: --only text,shapes (some decks), --schemas DIR (where the schemas are kept; fetched from
 // ecma-international.org when missing), --image hydor-office-check (LibreOffice's Docker image), --prefix NAME (its
 // containers' names), --no-office (schemas only), --decks DIR (decks already exported there: no app needed).
@@ -90,6 +94,7 @@ async function signIn() {
 async function exportDeck(d, dir) {
   const made = await (await api('POST', '/api/pages', { kind: 'slides', title: d.title, model: d.model })).json();
   const id = made.page.id;
+  fs.writeFileSync(path.join(dir, 'page-id.txt'), id);
   fs.writeFileSync(path.join(dir, 'deck.pptx'), Buffer.from(await (await api('GET', `/api/pages/${id}/export?format=pptx`)).arrayBuffer()));
   fs.writeFileSync(path.join(dir, 'deck.pdf'), Buffer.from(await (await api('GET', `/api/pages/${id}/export?format=pdf`)).arrayBuffer()));
   const pics = unzip(Buffer.from(await (await api('GET', `/api/pages/${id}/export?format=png`)).arrayBuffer()));
@@ -209,11 +214,11 @@ export function eotFont(b) {
 }
 
 /** The deck opened in LibreOffice and printed as pictures of its slides (lo-NN.png), with `fonts` (a folder) installed or none; and the fonts its PDF used. */
-function office(dir, tag, fonts) {
+function office(dir, tag, fonts, file = 'deck.pptx') {
   const uid = `${process.getuid()}:${process.getgid()}`;
   const mounts = ['-v', `${dir}:/work`, ...(fonts ? ['-v', `${fonts}:/usr/share/fonts/truetype/deck:ro`] : [])];
   const name = `${PREFIX}-${path.basename(dir)}-${tag}`.replace(/[^\w.-]/g, '-');
-  const sh = `cd /work && mkdir -p ${tag} && soffice -env:UserInstallation=file:///tmp/lo --headless --convert-to pdf --outdir /work/${tag} /work/deck.pptx >/dev/null 2>&1 && pdftoppm -r 96 -png /work/${tag}/deck.pdf /work/${tag}/lo && pdffonts /work/${tag}/deck.pdf > /work/${tag}/fonts.txt`;
+  const sh = `cd /work && mkdir -p ${tag} && soffice -env:UserInstallation=file:///tmp/lo --headless --convert-to pdf --outdir /work/${tag} /work/${file} >/dev/null 2>&1 && pdftoppm -r 96 -png /work/${tag}/${file.replace(/\.\w+$/, '')}.pdf /work/${tag}/lo && pdffonts /work/${tag}/${file.replace(/\.\w+$/, '')}.pdf > /work/${tag}/fonts.txt`;
   const r = spawnSync('docker', ['run', '--rm', '--name', name, '--network', 'none', '--user', uid, '-e', 'HOME=/tmp', ...mounts, IMAGE, 'sh', '-c', sh], { encoding: 'utf8', timeout: 300_000 });
   if (r.status !== 0) throw new Error(`LibreOffice failed for ${dir}: ${r.stderr.slice(-500)}`);
   const pics = fs
@@ -250,7 +255,7 @@ async function compare(browser, rows) {
       document.body.innerHTML = '';
       const labels = ${JSON.stringify(row.labels)};
       imgs.forEach((i, k) => { const f = document.createElement('figure'); f.style.cssText = 'display:inline-block;margin:6px;vertical-align:top'; const cap = document.createElement('figcaption'); cap.textContent = labels[k]; f.appendChild(cap); if (i) { const c = document.createElement('img'); c.src = urls[k]; c.style.cssText = 'width:' + W + 'px;height:' + H + 'px;display:block'; f.appendChild(c); } document.body.appendChild(f); });
-      return { lo: diff(data[0], data[1]), fonts: diff(data[0], data[2]), h: H };
+      return { lo: diff(data[0], data[1]), fonts: data.length > 2 ? diff(data[0], data[2]) : null, h: H };
     })()`);
     await page.viewport(1960, res.h + 40, { scale: 1 });
     const shot = await page.send('Page.captureScreenshot', { format: 'png' });
@@ -258,6 +263,143 @@ async function compare(browser, rows) {
     out.push({ ...row, lo: res.lo, withFonts: res.fonts });
   }
   return out;
+}
+
+// ---- PowerPoint files opened in the app -------------------------------------------------------------------------------
+
+/** A .pptx opened in the app as New → Open a PowerPoint file opens it: the page's id and what the import said. */
+async function importDeck(file, title) {
+  const r = await (await api('POST', '/api/pages/import', { name: path.basename(file), data: fs.readFileSync(file).toString('base64'), title })).json();
+  return { id: r.page.id, notes: r.notes ?? [] };
+}
+
+/** The app's pictures of a page's slides, as `${prefix}-NN.png` in `dir`. */
+async function slidePictures(id, dir, prefix) {
+  const pics = unzip(Buffer.from(await (await api('GET', `/api/pages/${id}/export?format=png`)).arrayBuffer()));
+  const out = [];
+  for (const [name, data] of pics) {
+    const f = path.join(dir, `${prefix}-${/(\d+)/.exec(name)[1]}.png`);
+    fs.writeFileSync(f, data);
+    out.push(f);
+  }
+  return out.sort();
+}
+
+/** What differs between two decks, part by part: each slide's parts matched by kind and place (2 px), their words and sizes. */
+function deckDiff(a, b) {
+  const out = [];
+  const flat = (els, dx = 0, dy = 0) => els.flatMap((e) => (e.type === 'group' ? [{ ...e, x: e.x + dx, y: e.y + dy }, ...flat(e.els, e.x + dx, e.y + dy)] : [{ ...e, x: e.x + dx, y: e.y + dy }]));
+  const words = (e) => (e.paras ?? []).map((p) => p.runs.map((r) => r.t).join('')).join('\n');
+  if (a.slides.length !== b.slides.length) out.push(`${a.slides.length} slides came back as ${b.slides.length}`);
+  a.slides.forEach((s, i) => {
+    const t = b.slides[i];
+    if (!t) return;
+    const left = flat(t.els);
+    for (const e of flat(s.els)) {
+      const k = left.findIndex((x) => x.type === e.type && Math.abs(x.x - e.x) <= 2 && Math.abs(x.y - e.y) <= 2 && Math.abs(x.w - e.w) <= 2 && Math.abs(x.h - e.h) <= 2);
+      if (k < 0) {
+        out.push(`slide ${i + 1}: ${e.type}${e.shape ? ` ${e.shape}` : ''} at ${Math.round(e.x)},${Math.round(e.y)} did not come back as it was`);
+        continue;
+      }
+      const m = left.splice(k, 1)[0];
+      if (words(e) !== words(m)) out.push(`slide ${i + 1}: words "${words(e).slice(0, 40)}" came back as "${words(m).slice(0, 40)}"`);
+      if (e.size && m.size && Math.abs(e.size - m.size) > 0.5) out.push(`slide ${i + 1}: "${words(e).slice(0, 20)}" ${e.size}px came back ${m.size}px`);
+    }
+    for (const x of left) out.push(`slide ${i + 1}: an extra ${x.type} at ${Math.round(x.x)},${Math.round(x.y)}`);
+    for (const k of ['transition', 'notes', 'hidden', 'layout']) if (JSON.stringify(s[k] ?? null) !== JSON.stringify(t[k] ?? null)) out.push(`slide ${i + 1}: its ${k} ${JSON.stringify(s[k] ?? null)} came back as ${JSON.stringify(t[k] ?? null)}`);
+    if ((s.anims ?? []).length !== (t.anims ?? []).length) out.push(`slide ${i + 1}: ${(s.anims ?? []).length} animations came back as ${(t.anims ?? []).length}`);
+    if ((s.comments ?? []).length !== (t.comments ?? []).filter((c) => !c.resolved).length) out.push(`slide ${i + 1}: comments differ`);
+  });
+  for (const k of ['ratio', 'footer', 'guides']) if (JSON.stringify(a[k] ?? null) !== JSON.stringify(b[k] ?? null)) out.push(`its ${k} ${JSON.stringify(a[k] ?? null)} came back as ${JSON.stringify(b[k] ?? null)}`);
+  if (JSON.stringify(a.theme) !== JSON.stringify(b.theme)) out.push(`its theme ${JSON.stringify(a.theme)} came back as ${JSON.stringify(b.theme)}`);
+  return out;
+}
+
+/**
+ * Files opened in the app, beside what they should look like: each sample's own .pptx (beside the app's pictures of the
+ * deck it came from), a copy LibreOffice saved itself and other files (beside LibreOffice's pictures of them).
+ */
+async function imports() {
+  const rows = [];
+  const report = [];
+  const files = opt('files', '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (flag('roundtrip'))
+    for (const d of samples().filter((x) => !ONLY.length || ONLY.includes(x.name))) {
+      const dir = path.join(OUT, d.name);
+      if (!fs.existsSync(path.join(dir, 'deck.pptx'))) continue;
+      const h = d.model.ratio === '4:3' ? 960 : 720;
+      // Its own file again: the deck it was.
+      const back = await importDeck(path.join(dir, 'deck.pptx'), `${d.title} (back)`);
+      const pics = await slidePictures(back.id, dir, 'back');
+      const app = fs
+        .readdirSync(dir)
+        .filter((f) => /^app-\d+\.png$/.test(f))
+        .sort();
+      const before = (await (await api('GET', `/api/pages/${fs.readFileSync(path.join(dir, 'page-id.txt'), 'utf8').trim()}`)).json()).model;
+      const after = (await (await api('GET', `/api/pages/${back.id}`)).json()).model;
+      const diff = deckDiff(before, after);
+      report.push({ name: `${d.name} (its own file)`, notes: back.notes, diff });
+      app.forEach((f, i) =>
+        rows.push({ deck: `${d.name} back`, n: i + 1, h, file: path.join(dir, `back-side-${String(i + 1).padStart(2, '0')}.png`), pics: [path.join(dir, f), pics[i] ?? null], labels: ['The deck', 'Its PowerPoint file opened in the app'] }),
+      );
+      // LibreOffice's own copy of it (saved through its own format), beside LibreOffice's pictures of that copy.
+      const lo = path.join(dir, 'lomade');
+      fs.rmSync(lo, { recursive: true, force: true });
+      fs.mkdirSync(lo);
+      const uid = `${process.getuid()}:${process.getgid()}`;
+      const sh =
+        'cd /work && soffice -env:UserInstallation=file:///tmp/lo --headless --convert-to odp --outdir /work/lomade /work/deck.pptx >/dev/null 2>&1 && mkdir -p /work/lomade/x && soffice -env:UserInstallation=file:///tmp/lo --headless --convert-to pptx --outdir /work/lomade/x /work/lomade/deck.odp >/dev/null 2>&1 && cp /work/lomade/x/deck.pptx /work/lomade/libreoffice.pptx';
+      spawnSync('docker', ['run', '--rm', '--name', `${PREFIX}-${d.name}-lomade`, '--network', 'none', '--user', uid, '-e', 'HOME=/tmp', '-v', `${dir}:/work`, IMAGE, 'sh', '-c', sh], { timeout: 300_000 });
+      if (fs.existsSync(path.join(lo, 'libreoffice.pptx'))) {
+        const shown = office(lo, 'lo', null, 'libreoffice.pptx');
+        const came = await importDeck(path.join(lo, 'libreoffice.pptx'), `${d.title} (LibreOffice)`);
+        const got = await slidePictures(came.id, lo, 'app');
+        report.push({ name: `${d.name} (saved by LibreOffice)`, notes: came.notes, diff: [] });
+        shown.pics.forEach((p, i) =>
+          rows.push({ deck: `${d.name} libreoffice`, n: i + 1, h, file: path.join(lo, `side-${String(i + 1).padStart(2, '0')}.png`), pics: [p, got[i] ?? null], labels: ['LibreOffice shows its own file', 'The file opened in the app'] }),
+        );
+      }
+      process.stdout.write(`${d.name}: back ${diff.length ? `with ${diff.length} difference${diff.length === 1 ? '' : 's'}` : 'as it was'}\n`);
+    }
+  for (const file of files) {
+    const name = path.basename(file, path.extname(file));
+    const dir = path.join(OUT, 'files', name.replace(/[^\w.-]/g, '-'));
+    fs.mkdirSync(dir, { recursive: true });
+    fs.copyFileSync(file, path.join(dir, 'deck.pptx'));
+    const shown = office(dir, 'lo');
+    const came = await importDeck(path.join(dir, 'deck.pptx'), name);
+    const got = await slidePictures(came.id, dir, 'app');
+    const h = (await (await api('GET', `/api/pages/${came.id}`)).json()).model.ratio === '4:3' ? 960 : 720;
+    report.push({ name, notes: came.notes, diff: [] });
+    shown.pics.forEach((p, i) => rows.push({ deck: name, n: i + 1, h, file: path.join(dir, `side-${String(i + 1).padStart(2, '0')}.png`), pics: [p, got[i] ?? null], labels: ['LibreOffice shows the file', 'The file opened in the app'] }));
+    process.stdout.write(`${name}: ${got.length} slides opened; ${came.notes.join(' ')}\n`);
+  }
+  const browser = await Browser.launch();
+  let done = [];
+  try {
+    done = await compare(browser, rows);
+  } finally {
+    await browser.close();
+  }
+  done.sort((a, b) => (b.lo?.mean ?? 0) - (a.lo?.mean ?? 0));
+  const pct = (v) => (v ? `${(v.off * 100).toFixed(1)}% off, mean ${v.mean.toFixed(1)}` : '—');
+  const esc = (t) => String(t).replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]);
+  const html = `<!doctype html><meta charset="utf-8"><title>PowerPoint files opened</title><style>body{font:14px system-ui;background:#111;color:#ddd;margin:20px}img{max-width:100%;display:block;margin:6px 0 24px}li{margin:2px 0}</style><h1>PowerPoint files opened in the app</h1>${report.map((r) => `<h3>${esc(r.name)}</h3><ul>${[...r.notes.map((n) => `note: ${n}`), ...r.diff].map((x) => `<li>${esc(x)}</li>`).join('') || '<li>as it was</li>'}</ul>`).join('')}<h2>Slides, most different first</h2>${done.map((s) => `<h3>${esc(s.deck)} ${s.n}: ${pct(s.lo)}</h3><img src="${path.relative(OUT, s.file)}">`).join('')}`;
+  fs.writeFileSync(path.join(OUT, 'import.html'), html);
+  console.log('Most different:');
+  for (const s of done.slice(0, 12)) console.log(`  ${s.deck} ${s.n}: ${pct(s.lo)}`);
+  for (const r of report)
+    if (r.diff.length)
+      console.log(
+        `${r.name}:\n${r.diff
+          .slice(0, 30)
+          .map((x) => `  ${x}`)
+          .join('\n')}`,
+      );
+  console.log(`\nReport: ${path.join(OUT, 'import.html')}`);
 }
 
 // ---- the run -------------------------------------------------------------------------------------------------------
@@ -335,4 +477,12 @@ async function main() {
   console.log(`\nReport: ${path.join(OUT, 'report.html')}`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) await main();
+if (import.meta.url === `file://${process.argv[1]}`) {
+  if (flag('roundtrip') || opt('files', '')) {
+    fs.mkdirSync(OUT, { recursive: true });
+    await signIn();
+    // The samples' files first, unless they were exported here before.
+    if (flag('roundtrip') && !flag('reuse')) await main();
+    await imports();
+  } else await main();
+}

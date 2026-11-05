@@ -546,8 +546,10 @@ function routes(d: Deps) {
     const from = typeof b.path === 'string' && b.path.trim() ? resolvePath(b.path) : null;
     const name = from ? path.basename(from) : typeof b.name === 'string' ? b.name.slice(0, 300) : '';
     const kind = kindForFile(name);
+    // PowerPoint's old binary files are another format altogether.
+    if (/\.(ppt|pps|pot)$/i.test(name)) throw new HttpError(415, 'PowerPoint 97–2003 files (.ppt) cannot be opened here: save it as a .pptx in PowerPoint (or LibreOffice) and open that.');
     if (!kind || (!from && typeof b.data !== 'string')) {
-      throw new HttpError(400, 'Send a file’s path, or its name and its data (base64): a .docx, .md, .txt or .html document, an .xlsx, .ods, .csv or .tsv spreadsheet, a .tex file or a LaTeX project’s .zip, or a Jupyter notebook (.ipynb).');
+      throw new HttpError(400, 'Send a file’s path, or its name and its data (base64): a .docx, .md, .txt or .html document, an .xlsx, .ods, .csv or .tsv spreadsheet, a PowerPoint deck (.pptx), a .tex file or a LaTeX project’s .zip, or a Jupyter notebook (.ipynb).');
     }
     let data: Buffer;
     if (from) {
@@ -559,7 +561,7 @@ function routes(d: Deps) {
     const k = mustKind(kind);
     let got: Awaited<ReturnType<NonNullable<typeof k.fromFile>>>;
     try {
-      got = await k.fromFile!(data, name);
+      got = await k.fromFile!(data, name, db);
     } catch (e) {
       throw new HttpError(422, `That file could not be read: ${(e as Error).message}`);
     }

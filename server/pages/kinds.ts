@@ -13,6 +13,7 @@ import { docForAgent, docFromFile, docPage, docxOfDoc, keepDoc, MAX_DOC, readDoc
 import { importTex, keepTex, MAX_TEX, readTex, TEX_OPENS, texForAgent, texPage, texPdf, texSource, texZip } from './latex.ts';
 import { pptxFile, type Picture } from './pptx.ts';
 import { deckFontFiles } from './pptx-fonts.ts';
+import { deckFromPptx } from './pptx-import.ts';
 import { bookForAgent, bookPage, csvOfBook, importBook, keepBook, MAX_BOOK, readBook, xlsxOfBook } from './sheets.ts';
 import { deckForAgent, deckPage, keepDeck, MAX_DECK, readDeck } from './slides.ts';
 import { videoFileFor } from './videos.ts';
@@ -62,8 +63,8 @@ export interface KindDef {
   still: (text: string) => { width: number; height: number };
   /** A new one, empty but for its title (what New makes). */
   fresh: (title: string) => unknown;
-  /** Made from a file someone opens (a .docx, a .csv…): the model, given to `keep`, and what could not come along. */
-  fromFile?: (buf: Buffer, name: string) => FromFile | Promise<FromFile>;
+  /** Made from a file someone opens (a .docx, a .csv…): the model, given to `keep`, and what could not come along (`db` keeps what goes beside the model, a deck's videos). */
+  fromFile?: (buf: Buffer, name: string, db?: DB) => FromFile | Promise<FromFile>;
   /** The file names it is made from. */
   opens?: RegExp;
 }
@@ -99,6 +100,9 @@ KINDS.set('slides', {
   },
   still: (text) => ({ width: 1280, height: /"ratio":"4:3"/.test(text.slice(0, 200)) ? 960 : 720 }),
   fresh: (title) => newDeck(title),
+  // A PowerPoint file, its slides as the deck's (pptx-import.ts).
+  fromFile: (buf, _name, db) => deckFromPptx(buf, db),
+  opens: /\.(pptx|ppsx|potx|pptm)$/i,
 });
 
 KINDS.set('doc', {
