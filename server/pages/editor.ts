@@ -178,6 +178,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     if (c?.contains('n-card')) return L('card', 'Card');
     if (c?.contains('n-option')) return L('option', 'Option');
     if (c?.contains('n-callout')) return L('sCallout', 'Callout');
+    if (c?.contains('n-callout-text')) return NAMES.P;
     if (c?.contains('n-toggle')) return L('sToggle', 'Toggle list');
     if (c?.contains('n-cols')) return L('columns', 'Columns');
     if (c?.contains('n-toc')) return L('sToc', 'Table of contents');
@@ -1487,7 +1488,11 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
         sel = node;
         changed();
         (node as HTMLElement).scrollIntoView?.({ block: 'nearest' });
-        if (arg?.edit) startEditing(node.matches('h1,h2,h3,h4,p,a,button,li,blockquote') ? node : node.querySelector('h1,h2,h3,h4,p,a,button,li'));
+        if (arg?.edit) {
+          // Its first words that can be written (a to-do's are in a span beside its box).
+          const words = 'h1,h2,h3,h4,p,a,button,li,blockquote,summary,li>span,.n-callout-text';
+          startEditing([node, ...node.querySelectorAll(words)].find((x) => x.matches(words) && wordy(x)) ?? null);
+        }
         return;
       }
       case 'wrap': {
@@ -1670,6 +1675,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     if (!b) return;
     e.preventDefault();
     e.stopPropagation();
+    // The page keeps the keys (Delete, the arrows) after a press on its bar.
+    window.focus();
     if (b.dataset.a === 'drag') dragStart(e as PointerEvent);
   });
   bar.addEventListener('click', (e) => {
@@ -1866,6 +1873,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
   });
   addEventListener('scroll', redraw, true);
   addEventListener('resize', redraw);
+  // The page grows or shrinks by itself too (a stylesheet or a picture that loads): what is drawn over it follows.
+  new ResizeObserver(redraw).observe(root);
   document.addEventListener('selectionchange', () => editing && redraw());
   addEventListener(
     'focusout',

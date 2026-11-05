@@ -1,7 +1,8 @@
 // What every page agents make runs with, inside its sandboxed frame: a small stylesheet of ready-made
 // classes (options, picture cards, compare tables, pros and cons, buttons, fields) and the bridge
-// script. The bridge reports the page's height, sends the user's choices and form answers to the app,
-// and gives saved pages window.hydor.storage; it talks to the app only by postMessage, each message
+// script. The bridge reports the page's height, sends the user's choices and form answers to the app
+// (and a video's still, which the app plays over the page), and gives saved pages window.hydor.storage;
+// it talks to the app only by postMessage, each message
 // carrying the number the app gave this page. Both go in right after the page's doctype, before its
 // own styles and scripts, so its CSS wins and its scripts find window.hydor (and window.naget, its name before) from their first line.
 //
@@ -95,6 +96,8 @@ export interface BridgeCfg {
   seed?: Record<string, string>;
   /** The page fills a window of its own (its own address), rather than a frame that grows with it. */
   fill?: boolean;
+  /** The app plays a video's still (a.n-video) over the page: its player cannot run in the sandbox. */
+  play?: boolean;
 }
 
 /**
@@ -264,6 +267,14 @@ function bridge(cfg: BridgeCfg) {
     if (el.tagName === 'A') e.preventDefault();
     choose(el);
   });
+  // A video's still (the page editor's a.n-video): the app plays it over the page; elsewhere the link opens it.
+  if (cfg.play && P)
+    document.addEventListener('click', (e) => {
+      const a = (e.target as Element | null)?.closest?.('a.n-video[data-video]');
+      if (!a) return;
+      e.preventDefault();
+      post({ type: 'wa-video', src: (a.getAttribute('data-video') ?? '').slice(0, 300), title: (a.getAttribute('title') ?? '').slice(0, 200) });
+    });
   // Choices that are not buttons or links can be reached and picked from the keyboard too.
   const arm = () => {
     for (const x of document.querySelectorAll('[data-choice]')) {
@@ -943,7 +954,7 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: str
       head = `<style id="n-kit" data-n-own>${kit}</style><style id="n-theme" data-n-own>${themeText(d.css)}</style><script data-n-own>(${schemeSrc})(${js(cfg.theme)})</script><script data-n-own>(${editorSrc})(${js(cfg)})</script>`;
       html = (m ? m[0] : '') + doc.documentElement.outerHTML;
     } else {
-      const cfg = { n: nonce(d.n), theme: theme(d.theme), max: { key: num(d.max?.key, 200), value: num(d.max?.value, 524288) }, fill: d.fill === true };
+      const cfg = { n: nonce(d.n), theme: theme(d.theme), max: { key: num(d.max?.key, 200), value: num(d.max?.value, 524288) }, fill: d.fill === true, play: d.play === true };
       // A template's screen: its app's flows and data (no more than its parent sent, and not too much of it).
       const app = d.app && typeof d.app === 'object' && JSON.stringify(d.app).length < 400_000 ? { n: cfg.n, info: d.app.info, labels: d.app.labels } : null;
       // An app's view: drawn by the view's kit, with the template engine, from the view and its values its parent sent.

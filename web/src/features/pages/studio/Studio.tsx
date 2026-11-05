@@ -6,16 +6,20 @@
 // width is a choice for a while, not kept.
 //
 // Edit has an inspector with three tabs: Part (the part picked), Layers (the page's parts as a tree) and
-// Page (the whole page's look). Beside the page when there is room, else a drawer under it that folds.
+// Page (the whole page's look). Beside the page when there is room, else a drawer under it that folds. Words
+// are written in the page itself as in Notion (server/pages/writing.ts); what it asks for while you write (an
+// emoji, a picture, a video, maths, an icon, a cover) is chosen in the app, beside where it was asked.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, ChevronUp, Code2, Eye, Monitor, PenLine, Plus, Redo2, Smartphone, Tablet, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Code2, Eye, Keyboard, Monitor, PenLine, Plus, Redo2, Smartphone, Tablet, Undo2 } from 'lucide-react';
 import { toast, toastError } from '../../../lib/store';
 import { Button, cx, IconButton, MenuItem, Popover, Segmented, Throbber, useConfirm, useMediaQuery } from '../../../components/ui';
 import type { EditorHandle } from '../../../lib/codemirror';
-import { DeviceStage, EditFrame, PageFrame, StreamFrame, withBase, type AppBridge, type Device, type EdLayer, type EdPage, type EdSel, type EditHandle, type EdState, type Pick, type Store } from '../frame';
+import { DeviceStage, EditFrame, PageFrame, StreamFrame, withBase, type AppBridge, type Device, type EdAsk, type EdLayer, type EdPage, type EdSel, type EditHandle, type EdState, type Pick, type Store } from '../frame';
+import { ShortcutsDialog } from '../common/Shortcuts';
 import { AddPanel } from './AddPanel';
 import { editorLabels } from './blocks';
-import { PartPanel, type Ctx, type Media } from './Inspector';
+import { InsertPopover, PAGE_SHORTCUTS } from './Inserts';
+import { PartPanel, pictureData, type Ctx, type Media } from './Inspector';
 import { LayersPanel } from './Layers';
 import { PagePanel } from './PagePanel';
 
@@ -190,6 +194,9 @@ export function Studio({
   const [epoch, setEpoch] = useState(0);
   const [saving, setSaving] = useState(false);
   const [adding, setAdding] = useState(false);
+  // What the editor in the page asked for (an emoji, a picture…), and the keyboard shortcuts.
+  const [asking, setAsking] = useState<EdAsk | null>(null);
+  const [keysOpen, setKeysOpen] = useState(false);
   const [streamCode, setStreamCode] = useState(false);
   const editRef = useRef<EditHandle>(null);
   const addRef = useRef<HTMLButtonElement>(null);
@@ -358,7 +365,7 @@ export function Studio({
       tab === 'layers' ? (
         <LayersPanel tree={layers} sel={sel} cmd={cmd} />
       ) : tab === 'page' ? (
-        <PagePanel page={page} palette={palette} cmd={cmd} media={media} />
+        <PagePanel page={page} palette={palette} cmd={cmd} media={media} onError={toastError} />
       ) : sel ? (
         <PartPanel
           sel={sel}
@@ -375,7 +382,7 @@ export function Studio({
         />
       ) : (
         <p className="px-3 py-2 text-[12.5px] leading-relaxed text-fg-3">
-          Click a part of the page to change it, and click it again to change its words. Drag it by its handle to move it, or by its edges to size it.
+          Click a part of the page to change it, and click it again to write in it: Enter makes the next block, and / in an empty one lists the blocks to add. Drag a block by the ⋮⋮ beside it to move it, or click the ⋮⋮ for its menu.
         </p>
       );
     // Folded, only the tabs show; a tab opens it. While words are changed in the page, it makes room.
@@ -398,6 +405,7 @@ export function Studio({
               onReady={() => {
                 editRef.current?.cmd('ctx', { ...ctx, media });
                 editRef.current?.cmd('layers', tab === 'layers');
+                editRef.current?.cmd('caps', { ask: !!onAsk });
                 if (clipboard) editRef.current?.cmd('clip', { html: clipboard.html });
               }}
               onLayers={setLayers}
@@ -408,8 +416,13 @@ export function Studio({
                 toast(c.name ? `${c.name} copied` : 'Copied', 'ok');
               }}
               onEditing={setWordsOn}
+              onAsk={setAsking}
+              onFile={(id, f) => pictureData(f).then((src) => cmd('fill', { id, src }), toastError)}
+              onAgent={() => void ask()}
+              onKeys={() => setKeysOpen(true)}
             />
           </DeviceStage>
+          <InsertPopover ask={asking} frame={() => editRef.current?.frame() ?? null} answer={(payload) => asking && cmd('fill', { id: asking.id, ...payload })} cmd={cmd} onClose={() => setAsking(null)} onError={toastError} />
         </div>
         <aside className={cx('flex min-h-0 shrink-0 flex-col bg-panel', beside ? 'w-[320px] border-l border-line' : cx('border-t border-line', folded ? 'pb-[var(--safe-bottom)]' : 'h-[min(48%,440px)] min-h-[200px]'))}>
           <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-1">
@@ -540,10 +553,14 @@ export function Studio({
               {media === 'phone' ? 'For phones' : 'For tablets'}
             </span>
           )}
-          <span className="ml-1 truncate text-[12px] text-fg-3 max-sm:hidden">
-            {sel ? (sel.wordy ? 'Click it again to change its words' : 'Drag the handle to move it, the edges to size it') : 'Click a part of the page'}
+          <span className="ml-1 min-w-0 flex-1 truncate text-[12px] text-fg-3 max-sm:hidden">
+            {sel?.multi ? `${sel.multi} blocks picked` : sel ? (sel.wordy ? 'Click it again to write in it, type / for blocks' : 'Drag the handle to move it, the edges to size it') : 'Click a part of the page, and again to write in it'}
           </span>
+          <IconButton label="Keyboard shortcuts (Ctrl+Shift+/)" size="sm" onClick={() => setKeysOpen(true)} className="ml-auto">
+            <Keyboard size={15} />
+          </IconButton>
           <AddPanel anchor={addRef} open={adding} onClose={() => setAdding(false)} sel={sel} cmd={cmd} app={doc.app?.info} />
+          <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={PAGE_SHORTCUTS} />
         </div>
       )}
       <div className="relative min-h-0 flex-1">{body}</div>

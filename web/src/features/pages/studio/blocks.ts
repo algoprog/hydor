@@ -35,6 +35,8 @@ export const BLOCKS: Block[] = [
   { id: 'link', kind: 'basic', label: 'Link', html: '<p><a href="https://example.com">A link</a></p>', edit: true },
   { id: 'image', kind: 'basic', label: 'Picture', html: `<img src="${PICTURE}" alt="" style="display:block;width:100%;height:auto;border-radius:12px">` },
   { id: 'list', kind: 'basic', label: 'List', html: '<ul><li>First thing</li><li>Second thing</li><li>Third thing</li></ul>' },
+  { id: 'todo', kind: 'basic', label: 'To-do list', html: '<ul class="n-todo"><li><input type="checkbox"><span>Something to do</span></li><li><input type="checkbox"><span>Something else</span></li></ul>', edit: true },
+  { id: 'callout', kind: 'basic', label: 'Callout', html: '<div class="n-callout"><span class="n-callout-icon">💡</span><div class="n-callout-text">Something to keep in mind.</div></div>', edit: true },
   {
     id: 'quote',
     kind: 'basic',
@@ -87,6 +89,7 @@ export const BLOCKS: Block[] = [
     ),
   },
   { id: 'foldout', kind: 'layout', label: 'Fold-out', html: question('A question', 'The answer, shown when it is opened.') },
+  { id: 'toc', kind: 'layout', label: 'Table of contents', html: '<nav class="n-toc"></nav>' },
   { id: 'field', kind: 'layout', label: 'Field', html: '<label class="n-field">Your name<input type="text" placeholder="Type here"></label>' },
 
   {

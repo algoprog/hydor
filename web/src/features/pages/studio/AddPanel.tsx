@@ -1,5 +1,6 @@
-// The visual editor's Add: parts to put in the page (words, pictures, buttons), blocks to lay them out
-// (columns, cards, a table), and ready-made sections (an opening, features, prices, questions, a footer),
+// The visual editor's Add: parts to put in the page (words, pictures, buttons, a to-do list, a callout), blocks to
+// lay them out (columns, cards, a table, a table of contents), and ready-made sections (an opening, features, prices,
+// questions, a footer),
 // after the part picked, inside it, or at the end of the page. A template's screen also has its App parts:
 // a form for each of its flows, its answer, its runs, a conversation with its agent, a table and a count for
 // each collection it keeps.
@@ -21,7 +22,10 @@ import {
   LayoutGrid,
   Link2,
   List,
+  ListChecks,
   ListOrdered,
+  ListTree,
+  Lightbulb,
   Mail,
   Megaphone,
   Minus,
@@ -50,6 +54,9 @@ const ICONS: Record<string, ReactNode> = {
   link: <Link2 size={17} />,
   image: <Image size={17} />,
   list: <List size={17} />,
+  todo: <ListChecks size={17} />,
+  callout: <Lightbulb size={17} />,
+  toc: <ListTree size={17} />,
   quote: <Quote size={17} />,
   divider: <Minus size={17} />,
   space: <MoveVertical size={17} />,

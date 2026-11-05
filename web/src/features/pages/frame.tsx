@@ -3,7 +3,9 @@
 // that frame, carrying that number, of a known shape and size: the page's height, a choice or a form
 // to put in the message box, and calls of window.hydor.storage, which a store answers. A template's
 // screen also gets window.hydor.app: its calls are answered here, for that template only (its runs,
-// its data), and what changes in them is passed on to it.
+// its data), and what changes in them is passed on to it. A video's still in a page plays over it here.
+// In Edit, the frame holds the visual editor (editor.ts): what it picks and changes comes back here, and
+// what it asks for (an emoji, a picture, maths…) is chosen in the app and sent back to it.
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { KIT_CSS } from '@shared/page-kit';
 import { STORAGE_LIMITS } from '@shared/pages';
@@ -13,6 +15,7 @@ import { api, del, enc, patch, post } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
 import { tr } from '../../i18n/runtime';
 import { cx } from '../../components/ui';
+import { openVideo } from '../../components/Lightbox';
 
 // ---- how tall a page stands in the conversation ---------------------------------------------------------
 
@@ -459,7 +462,7 @@ export function PageFrame({
         const v = cb.current.ui;
         const uiInfo = v ? { def: v.def, ctx: v.ctx, can: v.can, labels: uiLabels(), lang: v.lang ?? 'en', ...(v.start ? { start: v.start } : {}), ...(v.libs ? { libs: v.libs } : {}) } : undefined;
         if (v) sentCtx.current = v.ctx;
-        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill, app: appInfo, ui: uiInfo }, '*');
+        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill, play: true, app: appInfo, ui: uiInfo }, '*');
         return;
       }
       const { store, onHeight, onPick } = cb.current;
@@ -514,6 +517,9 @@ export function PageFrame({
             (err) => reply({ error: String((err as Error)?.message ?? err) }),
           )
           .finally(() => appBusy--);
+      } else if (d.type === 'wa-video') {
+        // A video's still in the page (the page editor's): its player cannot run in the sandbox, so it plays over the page.
+        if (isStr(d.src, 300)) openVideo(d.src, isStr(d.title, 200) ? d.title : '');
       } else if (d.type === 'wa-ui-top') {
         // A view went to another page: its top comes into sight when it was scrolled past.
         const r = ref.current?.getBoundingClientRect();
@@ -646,6 +652,15 @@ export interface EdSel {
   selector: string;
   snippet: string;
   can: { up: boolean; down: boolean; parent: boolean; remove: boolean };
+  /** The kind of block it is, which Turn into changes (writing.ts): p, h1…h6, bullet, number, todo, quote, code, toggle, callout. */
+  kind?: string;
+  /** How many blocks are picked with it, when it is more than one. */
+  multi?: number;
+  /** Maths drawn in the page: its TeX. */
+  tex?: string;
+  /** Its block's text colour and background, by name (the kit's .n-tc-… and .n-hl-…). */
+  colour?: string;
+  fill?: string;
 }
 
 /** A part in the editor's Layers: where it is, its name, its tag, a few of its words, the parts in it. */
@@ -673,7 +688,27 @@ export interface EdPage {
   kinds: Record<string, EdKind>;
   media: '' | 'tablet' | 'phone';
   bg: string;
+  /** The page's icon (an emoji) and cover, as Notion pages have them. */
+  icon?: string;
+  cover?: { kind: 'gradient' | 'picture'; value: string } | null;
 }
+
+/** What the editor in the page asks the app for (writing.ts `ask`): chosen in the app, then put where it was asked. */
+export interface EdAsk {
+  what: 'emoji' | 'icon' | 'callout-icon' | 'cover' | 'picture' | 'video' | 'math';
+  id: string;
+  /** Where it was asked, in the frame's own pixels. */
+  rect: { x: number; y: number; w: number; h: number } | null;
+  /** There is one already (an icon, a cover), which can be taken away. */
+  has?: boolean;
+  /** A formula's TeX, to change it. */
+  tex?: string;
+}
+const ASKS = new Set(['emoji', 'icon', 'callout-icon', 'cover', 'picture', 'video', 'math']);
+const rectOf = (v: unknown): EdAsk['rect'] => {
+  const r = v as Record<string, unknown> | null;
+  return r && typeof r === 'object' && ['x', 'y', 'w', 'h'].every((k) => typeof r[k] === 'number' && Number.isFinite(r[k])) ? { x: r.x as number, y: r.y as number, w: r.w as number, h: r.h as number } : null;
+};
 
 export interface EdState {
   dirty: boolean;
@@ -687,6 +722,8 @@ export interface EditHandle {
   html(): Promise<string>;
   /** What it holds is saved: no longer changed. */
   saved(): void;
+  /** The frame, to place what the app shows over the page. */
+  frame(): HTMLIFrameElement | null;
 }
 
 /** The page in the visual editor (its scripts held back), and the channel to it. */
@@ -709,12 +746,20 @@ export const EditFrame = forwardRef<
     onCopied?: (c: { html: string; name: string }) => void;
     /** Words are being changed in the page (a phone's keyboard is up). */
     onEditing?: (on: boolean) => void;
+    /** The editor asks for something chosen in the app: an emoji, an icon, a cover, a picture, a video, maths. */
+    onAsk?: (a: EdAsk) => void;
+    /** A picture dropped or pasted in the page, to make small enough to live in it (and answer with `fill`). */
+    onFile?: (id: string, file: File) => void;
+    /** The block menu's Ask the agent. */
+    onAgent?: () => void;
+    /** Ctrl+Shift+/ in the page: the keyboard shortcuts. */
+    onKeys?: () => void;
     className?: string;
   }
->(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, className }, handle) {
+>(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onAsk, onFile, onAgent, onKeys, className }, handle) {
   const ref = useRef<HTMLIFrameElement>(null);
-  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing });
-  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing };
+  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onAsk, onFile, onAgent, onKeys });
+  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onAsk, onFile, onAgent, onKeys };
   const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>() });
   const send = (m: Record<string, unknown>) => ref.current?.contentWindow?.postMessage({ ...m, type: 'wa-ed', n: ch.current.n }, '*');
   useThemeChange(() => ch.current.n && send({ cmd: 'theme', arg: { theme: themeNow(), css: themeCss() } }));
@@ -734,6 +779,7 @@ export const EditFrame = forwardRef<
         send({ cmd: 'html', id });
       }),
     saved: () => send({ cmd: 'saved' }),
+    frame: () => ref.current,
   }));
   useLayoutEffect(() => {
     const onMessage = (e: MessageEvent) => {
@@ -762,6 +808,10 @@ export const EditFrame = forwardRef<
       else if (d.type === 'wa-ed-copied' && typeof d.html === 'string' && d.html.length < 2_000_000) c.onCopied?.({ html: d.html, name: typeof d.name === 'string' ? d.name : '' });
       else if (d.type === 'wa-ed-editing') c.onEditing?.(!!d.on);
       else if (d.type === 'wa-ed-save') c.onSave?.();
+      else if (d.type === 'wa-ed-ask' && ASKS.has(d.what) && isStr(d.id, 20)) c.onAsk?.({ what: d.what, id: d.id, rect: rectOf(d.rect), has: d.has === true, tex: isStr(d.tex, 5000) ? d.tex : undefined });
+      else if (d.type === 'wa-ed-file' && isStr(d.id, 20) && d.file instanceof File && d.file.size <= 40_000_000 && /^image\//.test(d.file.type)) c.onFile?.(d.id, d.file);
+      else if (d.type === 'wa-ed-agent') c.onAgent?.();
+      else if (d.type === 'wa-ed-keys') c.onKeys?.();
       else if (d.type === 'wa-ed-html' && typeof d.html === 'string') {
         const done = ch.current.waits.get(d.id);
         ch.current.waits.delete(d.id);

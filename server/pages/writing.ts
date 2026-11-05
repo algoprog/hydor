@@ -985,6 +985,8 @@ export function writing(E: Core): Writing {
     .hb,.end{all:unset;display:grid;place-items:center;width:22px;height:24px;border-radius:5px;color:${muted};cursor:pointer;box-sizing:border-box}
     .hb:hover,.end:hover{background:${hover};color:${ink}}
     .hb.grip{cursor:grab}
+    .hd.col{flex-direction:column;gap:0}
+    .hd.col .hb{width:18px;height:22px}
     .end{position:fixed;display:none;pointer-events:auto;width:26px;height:26px;border:1px dashed ${line}}
     .menu,.sl{position:fixed;display:none;flex-direction:column;pointer-events:auto;box-sizing:border-box;min-width:232px;max-width:calc(100vw - 12px);padding:4px;border-radius:12px;background:${panel};border:1px solid ${line};box-shadow:0 10px 32px rgba(0,0,0,${dark ? '.45' : '.18'});font:13px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;color:${ink};overflow-y:auto;overscroll-behavior:contain}
     .row{all:unset;display:flex;align-items:center;gap:9px;height:30px;padding:0 9px;border-radius:7px;cursor:pointer;white-space:nowrap;box-sizing:border-box;min-width:0}
@@ -1008,10 +1010,11 @@ export function writing(E: Core): Writing {
     .dl{position:fixed;display:none;height:3px;border-radius:2px;background:${accent};pointer-events:none;box-shadow:0 0 0 2px ${accent}33}
     .offer,.cv{position:fixed;display:none;gap:4px;pointer-events:auto}
     .offer button,.cv button{all:unset;display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:7px;color:${muted};font:12.5px system-ui,-apple-system,sans-serif;cursor:pointer;white-space:nowrap}
+    .offer button{height:20px;padding:0 6px;gap:5px;font-size:12px;border-radius:5px}
     .offer button:hover{background:${hover};color:${ink}}
     .cv button{background:${panel};color:${ink};border:1px solid ${line};box-shadow:0 2px 8px rgba(0,0,0,.15)}
     .cv button:hover{background:${hover}}
-    @media (pointer:coarse){.hb{width:32px;height:34px}.end{width:34px;height:34px}.row{height:40px}.sw{grid-template-columns:repeat(10,28px)}.sw button{width:28px;height:28px}.offer button,.cv button{height:34px}}
+    @media (pointer:coarse){.offer button{height:32px;font-size:13px}.hb,.hd.col .hb{width:32px;height:34px}.end{width:34px;height:34px}.row{height:40px}.sw{grid-template-columns:repeat(10,28px)}.sw button{width:28px;height:28px}.offer button,.cv button{height:34px}}
   </style>
   <div class="hd"><button class="hb add" title="${esc(L('addBelow', 'Add a block below (Alt: above)'))}">${svg('plus')}</button><button class="hb grip" title="${esc(L('gripTip', 'Drag to move it, click for its menu'))}">${svg('grip')}</button></div>
   <button class="end" title="${esc(L('addEnd', 'Add a block at the end'))}">${svg('plus', 15)}</button>
@@ -1032,8 +1035,13 @@ export function writing(E: Core): Writing {
   const menuEl = $('.menu');
   const slEl = $('.sl');
   const coarse = matchMedia('(pointer: coarse)').matches;
-  // The parts drawn over the page keep the words' selection: they take no focus.
-  for (const el of [hd, endBtn, offer, cv, menuEl, slEl]) el.addEventListener('pointerdown', (e) => e.preventDefault());
+  // The parts drawn over the page keep the words' selection: they take no focus. The page takes the keys, though
+  // (a menu opened from a handle answers the arrows).
+  for (const el of [hd, endBtn, offer, cv, menuEl, slEl])
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (!E.editing()) window.focus();
+    });
 
   /** Places a floating part beside a rectangle: under it, else over it, inside the window. */
   const placeAt = (el: HTMLElement, r: { left: number; top: number; bottom: number }, gap = 4) => {
@@ -1554,6 +1562,9 @@ export function writing(E: Core): Writing {
       x.setStart(s.node, s.at);
       x.setEnd(s.node, Math.max(s.at + 1, Math.min(end, s.node.length)));
       x.deleteContents();
+      // A space left last before the caret would fold away as the next words come: it stays a space.
+      const t = s.node;
+      if (s.at > 0 && s.at === t.length && t.data[s.at - 1] === ' ') t.replaceData(s.at - 1, 1, '\u00a0');
     };
     if (it.id === 'emoji' || it.id === 'picture' || it.id === 'video' || it.id === 'math') {
       // Chosen in the app (its picker, or a small form there), and put in place when it comes back.
@@ -2006,16 +2017,22 @@ export function writing(E: Core): Writing {
       return;
     }
     hd.style.display = 'flex';
-    const w = hd.offsetWidth;
-    const h = hd.offsetHeight;
     const first = firstLineBox(b);
     const marker = b.tagName === 'LI' ? 20 : 0;
-    let left = r.left - marker - w - 4;
-    let top = first.top + Math.min(first.height, 32) / 2 - h / 2;
-    if (left < 2) {
-      // No room beside it (a phone's narrow margin): over its top-left corner.
+    // Side by side where the margin has room; one over the other in a narrow one (a page's usual 20 pixels).
+    hd.classList.remove('col');
+    let w = hd.offsetWidth;
+    if (r.left - marker - w - 4 < 2) hd.classList.add('col');
+    w = hd.offsetWidth;
+    const h = hd.offsetHeight;
+    const col = hd.classList.contains('col');
+    let left = r.left - marker - w - (col ? 1 : 4);
+    let top = col ? first.top : first.top + Math.min(first.height, 32) / 2 - h / 2;
+    if (left < 1) {
+      // No room beside it at all (a phone's margin): over its top-left corner.
+      hd.classList.remove('col');
       left = Math.max(2, r.left);
-      top = r.top - h - 2;
+      top = r.top - hd.offsetHeight - 2;
     }
     hd.style.left = `${left}px`;
     hd.style.top = `${Math.max(2, Math.min(top, innerHeight - h - 2))}px`;
@@ -2024,6 +2041,7 @@ export function writing(E: Core): Writing {
     const e = ev as PointerEvent;
     e.preventDefault();
     e.stopPropagation();
+    if (!E.editing()) window.focus();
     const b = handleBlock;
     if (!b) return;
     const grip = e.currentTarget as HTMLElement;
@@ -2123,11 +2141,10 @@ export function writing(E: Core): Writing {
       (offer.querySelector('[data-o=icon]') as HTMLElement).style.display = i ? 'none' : '';
       (offer.querySelector('[data-o=cover]') as HTMLElement).style.display = c ? 'none' : '';
       offer.style.display = 'flex';
+      // In the space over the title (a page's top margin, 20 pixels in the kit's look).
       const r = (i ?? t)!.getBoundingClientRect();
-      const h = offer.offsetHeight;
-      const top = r.top - h - 2 >= 2 ? r.top - h - 2 : r.top - h + 4;
       offer.style.left = `${Math.max(2, r.left - 6)}px`;
-      offer.style.top = `${Math.max(2, top)}px`;
+      offer.style.top = `${Math.max(0, r.top - offer.offsetHeight - 1)}px`;
     }
     if (c && hb === c && !dragging) {
       cv.style.display = 'flex';
