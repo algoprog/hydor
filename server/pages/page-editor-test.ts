@@ -376,6 +376,71 @@ if (canCapture()) {
     same(/<li id="q"><input type="checkbox"><span>Quoted<\/span><\/li>/.test(out), true, 'as the kit’s to-do, keeping its name (id)');
   });
 
+  // ---- what a review found: nested items kept, several items dragged, boxes that show their tick, redo after undoing words -------
+  await drive(
+    '<ul><li>A<ul><li id="b">B</li><li>C</li></ul></li></ul><p id="pa">Under <a id="anchor"></a>here</p><ul class="n-todo"><li id="t1"><input type="checkbox"><span>One</span></li><li><input type="checkbox"><span>Two</span></li><li><input type="checkbox"><span>Three</span></li></ul><p id="end">End</p><details class="n-toggle" open><summary>Title</summary><p id="first">First inside</p></details>',
+    async (d) => {
+      await d.write('#b', 'start');
+      await d.cmd('turn', 'p');
+      same((await shape(d)).split('|').slice(0, 3).join('|'), 'ul>li:A|p:B|ul>li:C', 'a nested item turned into text keeps the items after it');
+      await d.write('#pa');
+      await d.press('Enter');
+      same(await d.js<boolean>('return !!document.getElementById("anchor")'), true, 'Enter leaves an empty anchor of the page’s where it was');
+      await d.press('Escape');
+      await d.cmd('deselect');
+      await d.click('#t1 input');
+      same(await d.js<string>('const b = document.querySelector("#t1 input"); return b.checked + "/" + b.hasAttribute("checked")'), 'true/true', 'a to-do’s box shows its tick, and the page keeps it');
+      await d.click('#t1 input');
+      same(await d.js<string>('const b = document.querySelector("#t1 input"); return b.checked + "/" + b.hasAttribute("checked")'), 'false/false', 'and its untick');
+      // Three to-dos picked and dragged below the last paragraph: all three go.
+      await d.cmd('deselect');
+      await d.click('#t1 span');
+      await d.press('Escape');
+      const items = await d.js<{ x: number; y: number }[]>('return [...document.querySelectorAll(".n-todo > li")].map(li => { const r = li.getBoundingClientRect(); return { x: r.left, y: r.top }; });');
+      await d.clickAt(items[2].x + 40, items[2].y + 8, true);
+      same((await d.msgs('wa-ed-sel')).at(-1)?.sel?.multi, 3, 'Shift+click picks the items between');
+      const s = d.tab.s;
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: items[0].x + 40, y: items[0].y + 8 });
+      await sleep(60);
+      const gx = items[0].x - 30;
+      const gy = items[0].y + 33;
+      const end = await d.js<{ x: number; y: number }>('const b = document.querySelector("#end").getBoundingClientRect(); return { x: b.left + 30, y: b.bottom - 3 };');
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: gx, y: gy });
+      await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: gx, y: gy, button: 'left', clickCount: 1 });
+      for (let i = 1; i <= 6; i++) await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: gx + ((end.x - gx) * i) / 6, y: gy + ((end.y - gy) * i) / 6, buttons: 1 });
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: end.x, y: end.y, button: 'left', clickCount: 1 });
+      await sleep(80);
+      same(
+        await d.js<string>('const e = document.getElementById("end"); const n = e.nextElementSibling; return n && n.matches("ul.n-todo") ? [...n.children].map(li => li.textContent).join(",") : "none";'),
+        'One,Two,Three',
+        'several items dragged together all arrive, in a list of their kind',
+      );
+      // A toggle's first block joins its title.
+      await d.write('#first', 'start');
+      await d.press('Home');
+      await d.press('Backspace');
+      same(await d.js<string>('return document.querySelector("summary").textContent'), 'TitleFirst inside', 'Backspace at the start of a toggle’s first block joins it to the title');
+    },
+  );
+
+  await drive('<p id="a">Alpha</p><p id="b">Beta</p>', async (d) => {
+    await d.write('#a');
+    await d.type(' one');
+    await d.write('#b');
+    await d.type(' xyz');
+    await d.press('z', { ctrl: true });
+    await d.press('z', { ctrl: true });
+    same(await shape(d), 'p:Alpha|p:Beta', 'Ctrl+Z takes back the words of the block, then those of the block before');
+    await d.press('y', { ctrl: true });
+    await d.press('y', { ctrl: true });
+    same(await shape(d), 'p:Alpha one|p:Beta xyz', 'and Ctrl+Y brings both back');
+    await d.write('#a');
+    await d.press('Home');
+    for (let i = 0; i < 5; i++) await d.press('ArrowRight', { shift: true });
+    await d.press('Enter');
+    same(await shape(d), 'p:|p:one|p:Beta xyz', 'Enter with words selected takes them out, then splits');
+  });
+
   // ---- undo, a step per block ------------------------------------------------------------------------------------------------
   await drive('<p id="a">Alpha</p>', async (d) => {
     await d.write('#a');
