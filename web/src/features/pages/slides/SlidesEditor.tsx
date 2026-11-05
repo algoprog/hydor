@@ -92,6 +92,7 @@ import { FooterDialog } from './FooterDialog';
 import { NotesField } from './Notes';
 import { findInDeck, replaceAllInDeck, replaceHit } from './find';
 import { exportFile } from '../exportFile';
+import { fetchVideoStill } from './media';
 
 export type SlidesDoc = ModelDoc<Deck>;
 
@@ -506,13 +507,22 @@ export function SlidesEditor({
     setTexFocus((n) => n + 1);
     if (!wide) setDrawer('open');
   };
+  /** A YouTube or Vimeo video put on the slide, with its still (fetched and kept by the server; without one when it can't be had). */
+  const putOnlineVideo = async (address: string) => {
+    const src = videoSrc(address);
+    if (!src) return;
+    const start = videoStart(address);
+    toast('Adding the video…');
+    const poster = await fetchVideoStill(address);
+    if (!live.current) return;
+    put([{ id: newId(), type: 'video', src, ...(poster ? { poster } : {}), ...(start ? { start } : {}), ...centred(800, 450) }]);
+  };
   const putVideo = () => {
-    const src = videoSrc(videoUrl.trim());
-    if (!src || !deck) return;
-    const start = videoStart(videoUrl.trim());
-    put([{ id: newId(), type: 'video', src, ...(start ? { start } : {}), ...centred(800, 450) }]);
+    const address = videoUrl.trim();
+    if (!videoSrc(address) || !deck) return;
     setVideoAsk(false);
     setVideoUrl('');
+    void putOnlineVideo(address);
   };
 
   // ---- copy and paste ---------------------------------------------------------------------------------------
@@ -781,10 +791,8 @@ export function SlidesEditor({
       if (text && !clip && live.current) {
         e.preventDefault();
         // A YouTube or Vimeo address pasted is the video.
-        const v = text.trim().length < 300 ? videoSrc(text.trim()) : null;
-        if (v) {
-          const start = videoStart(text.trim());
-          put([{ id: newId(), type: 'video', src: v, ...(start ? { start } : {}), ...centred(800, 450) }]);
+        if (text.trim().length < 300 && videoSrc(text.trim())) {
+          void putOnlineVideo(text.trim());
           return;
         }
         const t = textBox(live.current);
