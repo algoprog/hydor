@@ -417,6 +417,7 @@ export const STEP_TOOLS = [
   'experiment_get',
   'experiment_wait',
   'experiment_table',
+  'save_doc',
 ];
 /** Of those, the ones only steps have (agents in sessions don't): what the user is like, from memory and their sessions' titles; papers ranked by it; what they did in a period; waiting hours for runs to end. */
 export const STEP_ONLY_TOOLS = ['user_profile', 'rank_by_interest', 'work_log', 'experiment_wait'];
