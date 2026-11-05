@@ -1544,12 +1544,16 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     setBoardLocal({ r: b.r1, c: b.c1, by: (choices.find((x) => x.c === sel.c) ?? choices[0]).c });
     setBoardOn(true);
   };
-  // A sheet opens on its board when it says so (on picking it, and when the workbook opens).
+  // A sheet opens on its board when it says so: when the workbook opens and a sheet is picked (not again on each
+  // version saved, which would close a board shown meanwhile).
+  const boardFor = useRef<string | null>(null);
   useEffect(() => {
+    if (!sheet || boardFor.current === sheet.id) return;
+    boardFor.current = sheet.id;
     setBoardLocal(null);
-    setBoardOn(!!sheet?.board?.open);
+    setBoardOn(!!sheet.board?.open);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheet?.id, doc?.key]);
+  }, [sheet?.id]);
   const boardBlock = board && sheet && calc ? tableAt(board.r, board.c) : null;
   /** A new row under the board's table, in a lane: its group's value set, then opened as a card. */
   const boardAdd = (value: string) => {
