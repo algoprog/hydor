@@ -138,5 +138,5 @@ To build the Docker image yourself, see [With Docker](docs/install.md#with-docke
 
 [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). If you share a changed version, or let
 others use one over a network, you share your changes under the same license.
-Hydor is an independent project, not affiliated with or endorsed by Anthropic or
-OpenAI ([disclaimer](docs/how-it-works.md#disclaimer)).
+Hydor is an independent project, not
+affiliated with or endorsed by Anthropic or OpenAI ([disclaimer](docs/how-it-works.md#disclaimer)).

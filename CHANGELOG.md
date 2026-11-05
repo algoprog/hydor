@@ -3,6 +3,13 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.29.3 · 5 November 2026
+
+The desktop apps carry Hydor's license and notices.
+
+- **License and notices in the apps**: the desktop apps carry the NOTICE file beside the license, and the app's own plugins are under
+  the same license as the app.
+
 ## 0.29.2 · 5 November 2026
 
 Notebooks and documents an agent hands over go into the Library from their cards.
