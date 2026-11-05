@@ -173,15 +173,12 @@ const SHORTCUTS: ShortcutGroup[] = [
   },
 ];
 
+/** A place words are typed in. */
+const typing = (t: EventTarget | null) => t instanceof HTMLTextAreaElement || (t instanceof HTMLInputElement && t.type === 'text') || (t instanceof HTMLElement && t.isContentEditable);
+
 export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, live }: ModelEditorProps<Doc>) {
   const [model, setModel] = useState<Doc | null>(() => (doc?.model ? fixDoc(doc.model) : live?.model ? fixDoc(live.model) : null));
   const [saved, setSaved] = useState<Doc | null>(model);
-  // An agent's version being written shows in place of this one (read-only, its words arriving where its mark is),
-  // unless there are changes here not saved: those are left as they are.
-  const liveDoc = live && !(!!model && !!saved && model !== saved) ? live.model : null;
-  const liveOn = !!liveDoc;
-  /** What the page shows: the document, or the agent's version being written. */
-  const shownDoc = liveDoc ?? model;
   const [st, setSt] = useState<SelState | null>(null);
   const [saving, setSaving] = useState(false);
   const [linking, setLinking] = useState<{ url: string; text: string } | null>(null);
@@ -207,6 +204,20 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const [tops, setTops] = useState<Map<string, number>>(new Map());
   const [eq, setEq] = useState<{ kind: 'block'; id: string; tex: string } | { kind: 'run'; at: Pos; tex: string } | { kind: 'new'; inline: boolean } | null>(null);
   const [chars, setChars] = useState<{ kind: 'insert' } | { kind: 'icon'; id: string } | null>(null);
+  /** Words being typed beside the page (a comment, a reply, an edit of one). */
+  const [noting, setNoting] = useState(false);
+  // An agent's version being written shows in place of this one (read-only, its words arriving where its mark is),
+  // unless there are changes here not saved: those are left as they are. A comment, an equation, a link or another
+  // change still being made here holds it back until it is done.
+  const making = noting || !!draft || !!eq || !!chars || !!linking || menu === 'page' || menu === 'url' || dialog === 'bands' || dialog === 'spacing';
+  const liveDoc = live && !making && !(!!model && !!saved && model !== saved) ? live.model : null;
+  const liveOn = !!liveDoc;
+  /** What the page shows: the document, or the agent's version being written. */
+  const shownDoc = liveDoc ?? model;
+  // A comment box that went while typed in (its panel closed, say) holds nothing back.
+  useEffect(() => {
+    if (noting && !typing(document.activeElement)) setNoting(false);
+  });
   const [spot, setSpot] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [slash, setSlash] = useState<{ key: string; from: number; query: string; index: number } | null>(null);
   const [slashPos, setSlashPos] = useState<{ x: number; top: number; bottom: number } | null>(null);
@@ -302,7 +313,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const stRef = useRef(st);
   stRef.current = st;
   const readOnlyRef = useRef(readOnly);
-  readOnlyRef.current = readOnly;
+  readOnlyRef.current = readOnly || liveOn;
   // What the engine's keys and clicks ask of the editor (kept current: the engine is made once).
   const keys = useRef<(e: KeyboardEvent) => boolean>(() => false);
   const atoms = useRef<(a: AtomClick) => void>(() => {});
@@ -777,7 +788,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const setComments = (list: Comment[], gone?: string) => engine.current?.setComments(list, gone);
   const ca: CommentActions = {
     active,
-    readOnly,
+    readOnly: readOnly || liveOn,
     focus: (id) => {
       setActive(id);
       if (!engine.current?.revealComment(id)) toast(tr('The words this comment was on are gone.'));
@@ -910,7 +921,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           suggestions: changes.length,
           resolveAll: (accept) => e.resolve(null, accept),
           compare: () => setVersions(true),
-          readOnly: !!readOnly || !!compare,
+          readOnly: !!readOnly || !!compare || liveOn,
         })
       : [];
 
@@ -1004,7 +1015,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
         sg={sgById.get(c.id)}
         color={suggestionColor(sgById.get(c.id))}
         active={active === c.id}
-        readOnly={readOnly}
+        readOnly={readOnly || liveOn}
         onFocus={() => {
           setActive(c.id);
           e?.revealSuggestion(c.id);
@@ -1015,20 +1026,27 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       />
     ),
   }));
+  // Words typed in a comment, a reply or an edit of one (not yet made) hold the agent's version back (noting).
+  const notes = {
+    onFocus: (ev: React.FocusEvent<HTMLDivElement>) => setNoting(typing(ev.target)),
+    onBlur: (ev: React.FocusEvent<HTMLDivElement>) => setNoting(typing(ev.relatedTarget) && ev.currentTarget.contains(ev.relatedTarget as Node)),
+  };
   const panelBody = (
-    <CommentsPanel
-      comments={shownComments}
-      all={comments}
-      extra={extra}
-      showResolved={showResolved}
-      setShowResolved={setShowResolved}
-      draft={draft}
-      onDraft={addDraft}
-      onCancelDraft={() => setDraft(null)}
-      onAsk={askComments}
-      onClose={() => (setPanel(false), setDraft(null))}
-      a={ca}
-    />
+    <div className="contents" {...notes}>
+      <CommentsPanel
+        comments={shownComments}
+        all={comments}
+        extra={extra}
+        showResolved={showResolved}
+        setShowResolved={setShowResolved}
+        draft={draft}
+        onDraft={addDraft}
+        onCancelDraft={() => setDraft(null)}
+        onAsk={askComments}
+        onClose={() => (setPanel(false), setDraft(null))}
+        a={ca}
+      />
+    </div>
   );
 
   return (
@@ -1194,18 +1212,20 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
                 />
               )}
               {column && (
-                <CommentsColumn
-                  comments={shownComments}
-                  tops={tops}
-                  extra={extra}
-                  draft={draft}
-                  onDraft={addDraft}
-                  onCancelDraft={() => setDraft(null)}
-                  onAsk={askComments}
-                  a={ca}
-                  left={ppx * zoom + 24}
-                  width={COLUMN}
-                />
+                <div className="contents" {...notes}>
+                  <CommentsColumn
+                    comments={shownComments}
+                    tops={tops}
+                    extra={extra}
+                    draft={draft}
+                    onDraft={addDraft}
+                    onCancelDraft={() => setDraft(null)}
+                    onAsk={askComments}
+                    a={ca}
+                    left={ppx * zoom + 24}
+                    width={COLUMN}
+                  />
+                </div>
               )}
               <div ref={spotRef} className="pointer-events-none absolute" style={spot ? { left: spot.x, top: spot.y, width: spot.w, height: spot.h } : { left: 0, top: 0, width: 1, height: 1 }} />
             </div>

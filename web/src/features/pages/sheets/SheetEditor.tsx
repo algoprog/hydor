@@ -311,8 +311,9 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   dirtyRef.current = dirty;
   useEffect(() => onDirty?.(dirty), [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Another spreadsheet, or a new version of it (the agent's) while nothing was changed here: start from it.
-  useEffect(() => {
+  // Another spreadsheet, or a new version of it (the agent's) while nothing was changed here: start from it (before it
+  // is drawn, so the one it replaces never shows again for a moment).
+  useLayoutEffect(() => {
     if (!doc || dirtyRef.current) return;
     bookRef.current = clone(doc.model);
     savedRef.current = clone(doc.model);
@@ -325,8 +326,9 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   }, [doc?.key]);
 
   // An agent's version being written shows in place of the workbook (read-only, the cell being written in view, its
-  // formulas worked out as it comes), unless there are changes here not saved: those are left as they are.
-  const liveBook = agent && !dirty ? agent.model : null;
+  // formulas worked out as it comes), unless there are changes here not saved: those are left as they are. A cell being
+  // typed in holds it back until it is done.
+  const liveBook = agent && !dirty && !edit ? agent.model : null;
   const liveOn = !!liveBook;
   const readOnly = !!readOnlyProp || liveOn;
   const liveCalc = useMemo(() => (liveBook ? computeBook(liveBook) : null), [liveBook]);
