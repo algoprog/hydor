@@ -1,7 +1,9 @@
 // What the slides editor does to a deck, each as a new deck (the old one stays for Undo): parts added, changed
 // (in groups too), moved, lined up and stacked, grouped and ungrouped; slides added from a layout, copied, moved and
-// removed; animations in their order; a part's look copied onto others (the format painter); table cells merged.
+// removed; animations in their order; a part's look copied onto others (the format painter); table cells merged;
+// the comments on a part that goes kept on its slide.
 import {
+  everyEl,
   fitGroup,
   groupOf,
   layoutSlide,
@@ -103,7 +105,7 @@ function renew(e: El): El {
   return c.type === 'group' ? { ...c, els: c.els.map(renew) } : c;
 }
 
-/** Every part of the deck has a new id (copies of slides and parts), its animations following. */
+/** Every part of the deck has a new id (copies of slides and parts), its animations following; its comments stay with the slide copied. */
 function fresh(s: Slide): Slide {
   const ids = new Map<string, string>();
   const els = s.els.map((e) => {
@@ -111,7 +113,8 @@ function fresh(s: Slide): Slide {
     ids.set(e.id, c.id);
     return c;
   });
-  return { ...s, id: newId(), els, anims: s.anims?.filter((a) => ids.has(a.el)).map((a) => ({ ...a, id: newId(), el: ids.get(a.el)! })) };
+  const { comments: _c, ...rest } = s;
+  return { ...rest, id: newId(), els, anims: s.anims?.filter((a) => ids.has(a.el)).map((a) => ({ ...a, id: newId(), el: ids.get(a.el)! })) };
 }
 
 export function addSlide(d: Deck, after: number, layout: LayoutId): { deck: Deck; at: number } {
@@ -225,7 +228,16 @@ export function removeEls(d: Deck, i: number, ids: string[]): Deck {
     const els = dropDeep(s.els, ids);
     const left = new Set(els.map((e) => e.id));
     const anims = s.anims?.filter((a) => left.has(a.el));
-    return { ...s, els, ...(anims ? { anims } : {}) };
+    // The comments on a part that goes stay on the slide, their mark where the part's top-right corner was.
+    const gone = new Set(everyEl(s.els).map((e) => e.id).filter((id) => !everyEl(els).some((e) => e.id === id)));
+    const comments = s.comments?.map((c) => {
+      if (!c.el || !gone.has(c.el)) return c;
+      const was = findEl(s.els, c.el);
+      const b = was ? boxOf(onSlide(s, was)) : { x: W - 40, y: 40, w: 0, h: 0 };
+      const { el: _e, ...rest } = c;
+      return { ...rest, x: Math.round(Math.min(W, Math.max(0, b.x + b.w))), y: Math.round(Math.max(0, b.y)) };
+    });
+    return { ...s, els, ...(anims ? { anims } : {}), ...(comments ? { comments } : {}) };
   });
 }
 

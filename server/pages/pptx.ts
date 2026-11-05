@@ -5,9 +5,10 @@
 // groups as groups, icons as pictures that stay sharp (SVG, with a PNG beside it for older programs), equations as
 // pictures (their LaTeX as words where no picture could be made), videos from a device inside the file as PowerPoint's
 // own (with their still, played on a click), YouTube's and Vimeo's as their still linked to the video; the
-// slide's background, its title as the slide's title, the footer and slide number as fields, speaker notes, the
-// transition (Morph as PowerPoint's own, a fade where it has none) and the animations in their order (on a click,
-// with or after the one before, a paragraph at a time). The theme's colours and fonts become the file's theme.
+// slide's background, its title as the slide's title, the footer and slide number as fields, speaker notes, comments
+// (PowerPoint's own, replies threaded, the open ones), the transition (Morph as PowerPoint's own, a fade where it has
+// none) and the animations in their order (on a click, with or after the one before, a paragraph at a time). The
+// theme's colours and fonts become the file's theme.
 //
 // A slide is 1280 px wide: 1 px is 9525 EMU (12192000 across, PowerPoint's widescreen) and a font's px is 0.75 pt.
 import type { Anim, ChartEl, Deck, El, GroupEl, IconEl, ImageEl, LineEl, MathEl, Para, Run, Slide, TableEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
@@ -804,6 +805,46 @@ function morphNames(d: Deck): Map<string, string> {
   return out;
 }
 
+// ---- comments ---------------------------------------------------------------------------------------------
+
+/** Where a part's top-right corner shows on the slide, through the groups around it (unturned): for its comment's mark. */
+function cornerOf(els: El[], id: string, dx = 0, dy = 0): { x: number; y: number } | null {
+  for (const e of els) {
+    if (e.id === id) return { x: dx + Math.max(e.x, e.x + e.w), y: dy + Math.min(e.y, e.y + (e.type === 'line' ? e.h : 0)) };
+    if (e.type === 'group') {
+      const got = cornerOf(e.els, id, dx + e.x, dy + e.y);
+      if (got) return got;
+    }
+  }
+  return null;
+}
+
+/**
+ * A slide's open comments as PowerPoint's own: each a comment by You (author 0) or Agent (1), its replies comments
+ * threaded to it, at its part's corner or its place on the slide (in master units, 576 an inch: 6 a pixel); null when it
+ * has none open. `last` counts each author's comments across the deck (PowerPoint numbers them so).
+ */
+function commentsXml(s: Slide, last: [number, number]): string | null {
+  const open = (s.comments ?? []).filter((c) => !c.resolved);
+  if (!open.length) return null;
+  const when = (at: number) => new Date(at).toISOString().slice(0, 23);
+  const out: string[] = [];
+  for (const c of open) {
+    const a = c.by === 'agent' ? 1 : 0;
+    const idx = ++last[a];
+    const at = (c.el ? cornerOf(s.els, c.el) : null) ?? { x: c.x ?? 1240, y: c.y ?? 40 };
+    const pos = `<p:pos x="${Math.round(Math.max(0, at.x) * 6)}" y="${Math.round(Math.max(0, at.y) * 6)}"/>`;
+    out.push(`<p:cm authorId="${a}" dt="${when(c.at)}" idx="${idx}">${pos}<p:text>${esc(c.text)}</p:text></p:cm>`);
+    for (const r of c.replies ?? []) {
+      const ra = r.by === 'agent' ? 1 : 0;
+      out.push(
+        `<p:cm authorId="${ra}" dt="${when(r.at)}" idx="${++last[ra]}">${pos}<p:text>${esc(r.text)}</p:text><p:extLst><p:ext uri="{C676402C-5697-4E1C-873F-D02D1690AC5C}"><p15:threadingInfo xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main" timeZoneBias="0"><p15:parentCm authorId="${a}" idx="${idx}"/></p15:threadingInfo></p:ext></p:extLst></p:cm>`,
+      );
+    }
+  }
+  return `${XML_HEAD}<p:cmLst ${NS}>${out.join('')}</p:cmLst>`;
+}
+
 function notesXml(text: string): string {
   const paras = text
     .split('\n')
@@ -856,6 +897,8 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
   const charts: { name: string; xml: string }[] = [];
   const hasNotes = deck.slides.some((s) => s.notes);
   const morph = morphNames(deck);
+  // Comments: each author's count across the deck, and each slide's comments file.
+  const cmLast: [number, number] = [0, 0];
   const slides = deck.slides.map((s, i) => {
     const rels = new Rels();
     rels.add('slideLayout', '../slideLayouts/slideLayout1.xml');
@@ -903,8 +946,11 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
     };
     const xml = slideXml(c, s);
     if (s.notes) rels.add('notesSlide', `../notesSlides/notesSlide${i + 1}.xml`);
-    return { xml, rels, notes: s.notes, n: i + 1 };
+    const comments = commentsXml(s, cmLast);
+    if (comments) rels.add('comments', `../comments/comment${i + 1}.xml`);
+    return { xml, rels, notes: s.notes, n: i + 1, comments };
   });
+  const hasComments = slides.some((s) => s.comments);
 
   const types = [
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
@@ -928,6 +974,12 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
     '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>',
     ...slides.map((s) => `<Override PartName="/ppt/slides/slide${s.n}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`),
     ...charts.map((c) => `<Override PartName="/ppt/charts/${c.name}" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`),
+    ...(hasComments
+      ? [
+          '<Override PartName="/ppt/commentAuthors.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml"/>',
+          ...slides.filter((s) => s.comments).map((s) => `<Override PartName="/ppt/comments/comment${s.n}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.comments+xml"/>`),
+        ]
+      : []),
     ...(hasNotes
       ? [
           '<Override PartName="/ppt/notesMasters/notesMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"/>',
@@ -959,6 +1011,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
   presRels.add('viewProps', 'viewProps.xml');
   presRels.add('theme', 'theme/theme1.xml');
   presRels.add('tableStyles', 'tableStyles.xml');
+  if (hasComments) presRels.add('commentAuthors', 'commentAuthors.xml');
   const cy = emu(H);
   parts.push({
     name: 'ppt/presentation.xml',
@@ -999,6 +1052,13 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
     parts.push({ name: 'ppt/theme/theme2.xml', data: themeXml('Office', null) });
   }
   for (const c of charts) parts.push({ name: `ppt/charts/${c.name}`, data: c.xml });
+  if (hasComments) {
+    parts.push({
+      name: 'ppt/commentAuthors.xml',
+      data: `${XML_HEAD}<p:cmAuthorLst ${NS}><p:cmAuthor id="0" name="You" initials="Y" lastIdx="${cmLast[0]}" clrIdx="0"/><p:cmAuthor id="1" name="Agent" initials="A" lastIdx="${cmLast[1]}" clrIdx="1"/></p:cmAuthorLst>`,
+    });
+    for (const s of slides) if (s.comments) parts.push({ name: `ppt/comments/comment${s.n}.xml`, data: s.comments });
+  }
   for (const m of media) parts.push({ name: `ppt/media/${m.name}`, data: m.key });
   for (const m of movies) parts.push({ name: `ppt/media/${m.name}`, data: m.key });
   return zipParts(parts);
