@@ -745,9 +745,9 @@ const services: Feature = {
     ctx.step
       ? [
           stepTool('http_request', (a) => fakeHttp(a)),
-          stepTool('web_search', (a) => JSON.stringify({ results: [{ title: `${String(a.query)}`, url: 'https://sigir2027.org/calls/full-papers', snippet: 'Call for full papers' }] })),
-          stepTool('read_page', (a) => `The call for full papers at ${String(a.url)}: papers are up to 9 pages, references not counted. Use the ACM template: https://www.acm.org/publications/proceedings-template`),
-          stepTool('notify_user', (a) => (notified.push(a), 'Sent.')),
+          stepTool('web_search', async (a) => JSON.stringify({ results: [{ title: `${String(a.query)}`, url: 'https://sigir2027.org/calls/full-papers', snippet: 'Call for full papers' }] })),
+          stepTool('read_page', async (a) => `The call for full papers at ${String(a.url)}: papers are up to 9 pages, references not counted. Use the ACM template: https://www.acm.org/publications/proceedings-template`),
+          stepTool('notify_user', async (a) => (notified.push(a), 'Sent.')),
           RANK_BY_INTEREST,
           USER_PROFILE,
         ]
