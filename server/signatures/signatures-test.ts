@@ -15,6 +15,10 @@ import { openDb } from '../db.ts';
 import { ruleFor } from '../guide/api.ts';
 import { boxPicture, composite, hasAlpha, isPng, pngSize, readPng, resize, writePng, type Rgba } from './png.ts';
 import { addSignature, changeSignature, cleanPicture, deleteSignature, findSignature, listSignatures, signatureImage, signatureTables } from './store.ts';
+import { signatureTools } from './tools.ts';
+import type { ApprovalRequest } from '../../shared/types.ts';
+import type { ApprovalAnswer } from '../agents/live.ts';
+import type { RunCtx, ToolOutput } from '../features/types.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -236,6 +240,61 @@ const wave = (w = 300, h = 100) =>
   ok(Buffer.from(readPng((await signatureImage(db, s.id))!.png).data).equals(Buffer.from(wave().data)), 'and they still open');
   deleteSignature(db, soon.id);
   ok(!findSignature(db, soon.id), 'a deleted signature is gone');
+}
+
+// ---- an agent asks for one -------------------------------------------------------------------------------------
+
+/** A run whose session shows cards: `user` answers each as the person would (null: the card is withdrawn). */
+function runWith(user: ((card: ApprovalRequest, check?: (a: ApprovalAnswer) => string | null) => ApprovalAnswer | null) | null, key = 'claude:sig-test'): { ctx: RunCtx; cards: ApprovalRequest[] } {
+  const cards: ApprovalRequest[] = [];
+  const adapter = user && {
+    ask: async (card: ApprovalRequest, o: { check?: (a: ApprovalAnswer) => string | null }) => {
+      cards.push(card);
+      return user(card, o.check);
+    },
+  };
+  const ctx = { runId: 'run-1', key, agent: 'claude', cwd: tmp, deps: { db, sessions: { adapterByRun: () => adapter ?? undefined } } } as unknown as RunCtx;
+  return { ctx, cards };
+}
+const tool = (name: string) => signatureTools({} as RunCtx).find((t) => t.name === name)!;
+const text = (r: string | ToolOutput) => (typeof r === 'string' ? r : r.text);
+{
+  for (const x of listSignatures(db)) deleteSignature(db, x.id);
+  const drawn = writePng(wave(240, 90));
+  // The user draws it on the card, which keeps it, then answers with its id.
+  const { ctx, cards } = runWith((card, check) => {
+    const s = addSignature(db, { name: card.signature!.ask!.name, kind: card.signature!.ask!.kind, png: drawn });
+    const a = { decision: 'accept', form: { signature: s.id } };
+    return check?.(a) ? null : a;
+  });
+  const r = text(await tool('ask_signature').run({ kind: 'signature', name: 'Work signature', why: 'To sign the lease, page 3' }, ctx));
+  const card = cards[0];
+  ok(card?.signature?.ask?.kind === 'signature' && card.signature.ask.name === 'Work signature' && card.signature.ask.why === 'To sign the lease, page 3', 'ask_signature shows a card with the pad, the name and why', card);
+  ok(card.options.map((o) => o.id).join() === 'accept,decline', 'the card has Save and Not now');
+  ok(/saved their signature as “Work signature”/.test(r) && /place_signature/.test(r) && /not a cryptographic digital signature/.test(r), 'the agent hears it is saved, its name, and what it is', r);
+  ok(!r.includes('iVBOR') && !r.includes(drawn.toString('base64').slice(20, 80)), 'the agent never gets the picture');
+  // Saved already: the names, and no card.
+  const again = runWith(() => null);
+  const r2 = text(await tool('ask_signature').run({}, again.ctx));
+  ok(!again.cards.length && /saved already: “Work signature” \(signature\)/.test(r2), 'one saved already: the agent gets its name instead of a card', r2);
+  // new: true asks again, with a name no saved one has.
+  const fresh = runWith(() => ({ decision: 'decline' }));
+  const r3 = text(await tool('ask_signature').run({ name: 'Work signature', new: true }, fresh.ctx));
+  ok(fresh.cards[0]?.signature?.ask?.name === 'Work signature 2', 'asked again, the card suggests a name no saved one has', fresh.cards[0]?.signature);
+  ok(/chose not to/.test(r3), 'Not now: the agent hears the user declined', r3);
+  // Initials are asked for apart from signatures.
+  const ini = runWith(() => null);
+  const r4 = await tool('ask_signature').run({ kind: 'initials' }, ini.ctx);
+  ok(ini.cards[0]?.signature?.ask?.kind === 'initials' && ini.cards[0].title === 'Your initials, please' && typeof r4 !== 'string' && r4.isError, 'initials get a card of their own; one withdrawn is an error for the agent', r4);
+  // An answer that names no saved signature is refused, and the card stays.
+  let refused: string | null = null;
+  const bad = runWith((_card, check) => ((refused = check?.({ decision: 'accept', form: { signature: 'sg_nothing' } }) ?? null), null));
+  await tool('ask_signature').run({ new: true }, bad.ctx);
+  ok(refused === 'Draw your signature and save it first', 'an answer without a saved signature is refused', refused);
+  // Nobody to draw it.
+  const none = runWith(null);
+  const r5 = await tool('ask_signature').run({ new: true }, none.ctx);
+  ok(typeof r5 !== 'string' && r5.isError && /Settings → App → Signatures/.test(r5.text), 'with nobody to answer, the agent is told where the user can draw one', r5);
 }
 
 // ---- agents' app_api ------------------------------------------------------------------------------------------

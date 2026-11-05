@@ -3,6 +3,7 @@ import type { SessionExtra, SessionNote } from './features.ts';
 import type { ApprovalForm } from './forms.ts';
 import type { QuickAnswer } from './inbox.ts';
 import type { AppTheme } from './themes.ts';
+import type { SignatureCard } from './signatures.ts';
 
 /** Claude Code, Codex, or an agent that speaks the Agent Client Protocol (Gemini CLI, OpenCode…). */
 export type Agent = 'claude' | 'codex' | 'acp';
@@ -87,6 +88,11 @@ export interface ApprovalRequest {
     /** Keys it needs that the vault does not have yet: the card saves them there (POST /api/apps/:id/secrets) before it answers. */
     secrets?: { name: string; label: string; help?: string; url?: string }[];
   };
+  /**
+   * A signature: a pad to draw one an agent asked for (kept by the card itself, POST /api/signatures, before it answers
+   * with the saved one's id alone), or where an agent would place one, to allow or deny.
+   */
+  signature?: SignatureCard;
   createdAt: number;
 }
 
