@@ -193,6 +193,19 @@ function MobileDrawer() {
   );
 }
 
+/**
+ * A key an editor on screen takes for itself (Ctrl+B for bold, Ctrl+K for a link, Ctrl+` for formulas), which the
+ * app's own shortcuts then leave alone: one an editor used already, one the part with the focus marks as its own
+ * (data-keys="b k"), or one an editor takes while nothing has the focus (data-keys-idle: a slide's parts are picked
+ * without it). Editors listening on the window hear keys after the shell, so their marks say it beforehand.
+ */
+function editorsKey(e: KeyboardEvent, key: string): boolean {
+  if (e.defaultPrevented) return true;
+  const a = document.activeElement;
+  if (a && a !== document.body) return !!a.closest(`[data-keys~="${key}"]`);
+  return !!document.querySelector(`[data-keys-idle~="${key}"]`);
+}
+
 export function Shell() {
   const mobile = useIsMobile();
   // Only what the shell lays out: the drawer listens for itself (MobileDrawer).
@@ -211,16 +224,16 @@ export function Shell() {
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === '`') {
+      if (e.ctrlKey && e.key === '`' && !editorsKey(e, '`')) {
         e.preventDefault();
         useUI.getState().set({ panelOpen: !useUI.getState().panelOpen });
       }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b' && !e.shiftKey && !(e.target as HTMLElement)?.closest('.cm-editor')) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b' && !e.shiftKey && !(e.target as HTMLElement)?.closest('.cm-editor') && !editorsKey(e, 'b')) {
         e.preventDefault();
         useUI.getState().set({ sideOpen: !useUI.getState().sideOpen });
       }
       if (e.key === 'Escape' && useUI.getState().drawerOpen) useUI.getState().set({ drawerOpen: false });
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'k' && !(e.target as HTMLElement)?.closest?.('.cm-editor, .xterm')) {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'k' && !(e.target as HTMLElement)?.closest?.('.cm-editor, .xterm') && !editorsKey(e, 'k')) {
         e.preventDefault();
         usePalette.setState({ open: !usePalette.getState().open });
       }
