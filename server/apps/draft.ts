@@ -6,6 +6,7 @@
 // left out, the task for one agent staying. Without a helper model the draft is the request itself with one field.
 import { checkFlow, cleanFlow, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import type { AppRecipe } from '../../shared/apps.ts';
+import { isConfidential } from '../../shared/confidential.ts';
 import { APP_COLORS, APP_ICONS, cleanRecipe } from '../../shared/apps.ts';
 import type { Agent, TimelineItem, ToolItem } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
@@ -67,6 +68,8 @@ const lastReply = (items: TimelineItem[]): string => [...items].reverse().find((
 export async function draftFromSession(d: Deps, key: string): Promise<{ recipe: AppRecipe; note?: string }> {
   const s = d.sessions.summary(key);
   if (!s) throw new HttpError(404, 'No such session');
+  // The helper model would read it, and an app's steps may use other models (server/confidential).
+  if (isConfidential(s.extra)) throw new HttpError(409, 'A confidential session’s words stay on this computer, so it can’t be saved as an app.');
   const tl = await d.sessions.timeline(key);
   const request = firstRequest(tl.parser.items);
   if (!request) throw new HttpError(400, 'This session has no request to make an app from');

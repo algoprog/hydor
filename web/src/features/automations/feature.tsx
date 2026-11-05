@@ -24,6 +24,8 @@ const running = (t: ToolInfo) => t.status === 'running' || t.status === 'pending
 const useDraft = create<{ key: string | null; set: (key: string | null) => void }>((set) => ({ key: null, set: (key) => set({ key }) }));
 
 function MakeAutomation({ s, close }: { s: SessionSummary; close: () => void }) {
+  // Not for a confidential session: the helper model would read it, and the task's runs may use other models.
+  if (s.extra?.confidential) return null;
   return (
     <MenuItem icon={<CalendarPlus size={15} />} onClick={() => (close(), useDraft.getState().set(s.key))}>
       Make this an automation

@@ -492,6 +492,8 @@ export interface StartSettings {
   memory?: boolean;
   /** A spending cap in US dollars. */
   capUsd?: number;
+  /** Confidential: local models only, nothing leaves this computer. */
+  confidential?: boolean;
 }
 
 /** Live additions layered over the persisted timeline. */
@@ -530,6 +532,8 @@ export interface ModelOption {
   efforts: string[];
   defaultEffort?: string;
   isDefault?: boolean;
+  /** Custom's: it runs on this computer or your private network, so a confidential session may use it. */
+  local?: boolean;
 }
 
 export interface ModeOption {
@@ -1281,6 +1285,8 @@ export interface AgentModel {
   reasoning?: boolean;
   /** The longest reply it gives, in tokens, when known. */
   maxOutput?: number;
+  /** It runs on this computer or your private network (Ollama, vLLM, a local endpoint): a confidential session may use it. */
+  local?: boolean;
 }
 
 export interface ModelEntry {

@@ -12,6 +12,7 @@ import type { Agent, AgentModel, SessionSummary } from '../../shared/types.ts';
 import { acpAgents, CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
 import { capReached, childShare, spending } from '../budget/index.ts';
+import { confidentialKey, confidentialRun, privateHelper } from '../confidential/index.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from '../sessionExtra.ts';
 import type { Deps, Feature, RunCtx, RunTool, TurnInfo } from '../features/types.ts';
@@ -144,13 +145,16 @@ const firstLine = (s: string, n: number) => {
 
 // ---- the tools -----------------------------------------------------------------------------------
 
-function startTool(d: Deps, max: number): RunTool {
-  const models = customModels();
+/** `local`: the parent is confidential, so its children run on Custom with a model on this computer (server/confidential). */
+function startTool(d: Deps, max: number, local = false): RunTool {
+  const models = customModels().filter((m) => !local || m.local);
   return {
     name: 'start_child_session',
     description: [
       'Hand a self-contained part of the job to a new session that works on it in parallel: a child session.',
-      'It can run another agent or model of this app: a cheaper or local model for bulk work, Claude Code or Codex for a hard part.',
+      local
+        ? 'This session is confidential, so a child runs here too: on custom, with one of the models on this computer, and confidential like this one.'
+        : 'It can run another agent or model of this app: a cheaper or local model for bulk work, Claude Code or Codex for a hard part.',
       'It starts at once and returns its key; when its turn ends, its reply comes back to you as a message, and you go on from there.',
       'The child sees nothing of this conversation: put everything it needs in the brief (the goal, the facts and files it needs, what to hand back).',
       `Use it for independent pieces that take a while, not for small steps. A child cannot start children; at most ${max} of yours run at once.`,
@@ -318,17 +322,23 @@ export function resultMessage(o: { key: string; title: string; label: string; li
   return `${head}\n\n${reply}`;
 }
 
-/** A long reply in a few lines, by the helper model; its start when that fails. */
-async function summarize(d: Deps, reply: string): Promise<string> {
-  try {
-    const s = await helper(d.db, {
-      system: 'You summarize a report one AI agent wrote for another. Keep every finding, number, decision, file path and open question; drop the narration. Plain text, at most 200 words, beginning with the first finding: no title or preamble.',
-      prompt: reply.slice(0, 60_000),
-      maxTokens: 600,
-      timeoutMs: 60_000,
-    });
-    if (s.trim()) return s.trim();
-  } catch {}
+/**
+ * A long reply in a few lines, by the helper model; its start when that fails. A confidential child's (`key`) only by
+ * a model on this computer, else its start.
+ */
+async function summarize(d: Deps, reply: string, key?: string): Promise<string> {
+  const model = key && confidentialKey(d.db, key) ? privateHelper(d, key) : undefined;
+  if (model !== null)
+    try {
+      const s = await helper(d.db, {
+        system: 'You summarize a report one AI agent wrote for another. Keep every finding, number, decision, file path and open question; drop the narration. Plain text, at most 200 words, beginning with the first finding: no title or preamble.',
+        prompt: reply.slice(0, 60_000),
+        maxTokens: 600,
+        timeoutMs: 60_000,
+        ...(model ? { model } : {}),
+      });
+      if (s.trim()) return s.trim();
+    } catch {}
   return `${reply.slice(0, 1500).trimEnd()}…`;
 }
 
@@ -368,6 +378,8 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
   if (t.external) return;
   const parent = parentOf(d.db, t.key);
   if (!parent || !d.sessions.summary(parent)) return;
+  // A confidential child's words go to a confidential parent only (server/confidential).
+  if (confidentialKey(d.db, t.key) && !confidentialKey(d.db, parent)) return;
   const tl = await d.sessions.timeline(t.key);
   let turn = lastTurn(tl.parser.items);
   // The transcript's last lines may land a moment late.
@@ -398,7 +410,7 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
     // An error the agent got past (it still replied) is not how the turn ended.
     error: turn.status === 'failed' || (turn.error && !turn.reply) ? (turn.error ?? s?.live?.error ?? 'it failed') : undefined,
     stopped: cap ? 'its spending cap was reached' : undefined,
-    summary: turn.reply.length > LONG_REPLY ? await summarize(d, turn.reply) : undefined,
+    summary: turn.reply.length > LONG_REPLY ? await summarize(d, turn.reply, t.key) : undefined,
   });
   await tell(d, parent, msg);
 }
@@ -411,7 +423,7 @@ export const children: Feature = {
   tools(ctx) {
     // A child gets none: one level only.
     if (parentOf(ctx.deps.db, ctx.key) || roleOf(ctx.deps.db, ctx)?.role === 'member') return [];
-    return [startTool(ctx.deps, maxFor(ctx.deps.db, ctx)), LIST, MESSAGE];
+    return [startTool(ctx.deps, maxFor(ctx.deps.db, ctx), confidentialRun(ctx)), LIST, MESSAGE];
   },
 
   spawn(s) {

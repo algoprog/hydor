@@ -89,12 +89,14 @@ export function runTools(ctx: RunCtx): RunTool[] {
 export async function spawnAdditions(s: SpawnInfo): Promise<Required<SpawnAdditions>> {
   const out: Required<SpawnAdditions> = { instructions: [], mcpServers: {}, env: {}, args: [], skillRoots: [], disallowedTools: [], strictMcp: false, codexConfig: {} };
   if (!deps) return out;
+  // A confidential session gets no MCP server but the app's own (server/confidential): connected apps and plugins' servers reach outside.
+  const closed = s.extra?.confidential === true;
   for (const f of list) {
     try {
       const a = await f.spawn?.(s, deps);
       if (!a) continue;
       out.instructions.push(...(a.instructions ?? []).filter((t) => t.trim()));
-      Object.assign(out.mcpServers, a.mcpServers);
+      if (!closed) Object.assign(out.mcpServers, a.mcpServers);
       Object.assign(out.env, a.env);
       out.args.push(...(a.args ?? []));
       out.skillRoots.push(...(a.skillRoots ?? []));

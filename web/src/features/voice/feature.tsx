@@ -12,7 +12,7 @@ import { VoiceSettings } from './VoiceSettings';
 
 export const voiceFeature: WebFeature = {
   id: 'voice',
-  ComposerButtons: (p: { s?: SessionSummary; insert: (text: string) => void; disabled?: boolean }) => (
+  ComposerButtons: (p: { s?: SessionSummary; insert: (text: string) => void; disabled?: boolean; confidential?: boolean }) => (
     <>
       <MicButton {...p} />
       <HandsFreeButton {...p} />

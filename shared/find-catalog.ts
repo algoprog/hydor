@@ -219,6 +219,13 @@ export const THEMES: [string, 'dark' | 'light'][] = [
 const PAGES: [string, string, string, string, string][] = [
   // id, title, path, other words, what it is
   ['new', 'New session', '/', 'start new chat conversation task claude codex agent', 'Start a session with any agent and model, in any folder'],
+  [
+    'confidential',
+    'New confidential session',
+    '/?confidential=1',
+    'confidential private secret session local model offline no internet air gapped lock review submission peer review paper patient data client code nda nothing leaves this computer',
+    'A session on a model on this computer, with nothing sent out: Options → Confidential',
+  ],
   ['inbox', 'Inbox', '/inbox', 'waiting approvals approve deny questions forms needs you pending to do', 'Everything waiting on you, across sessions, tasks and machines'],
   ['files', 'Files', '/files', 'explorer browse folders documents system', 'Browse, open and edit the files on this computer'],
   ['search-files', 'Search in files', '/search', 'grep find text in files code names where folder', 'Find files by their names and the text inside them, in any folder'],

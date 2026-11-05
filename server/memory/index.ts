@@ -68,8 +68,10 @@ export const memory: Feature = {
     return { instructions: [await memoryInstructions(d.db, { cwd: s.cwd, key: s.key, session: s.resume, query })] };
   },
   async context(s, d) {
-    if (!memoryOn(d.db) || s.extra.memory === false) return null;
-    return memoryInstructions(d.db, { cwd: s.cwd, key: s.key, session: true, query: await lastAsk(d, s.key) });
+    // A confidential session reads memory and keeps nothing in it (server/confidential).
+    const reads = s.extra.confidential === true;
+    if (!memoryOn(d.db) || (s.extra.memory === false && !reads)) return null;
+    return memoryInstructions(d.db, { cwd: s.cwd, key: s.key, session: true, query: await lastAsk(d, s.key), readOnly: reads });
   },
   turnEnd(t, d) {
     // Only sessions this app runs, and turns that ended with a reply. With memory off they are still

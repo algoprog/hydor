@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { STORAGE_LIMITS } from '../../shared/pages.ts';
 import { canCapture, capture } from '../capture/index.ts';
+import { confidentialKey } from '../confidential/index.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import type { Deps } from '../features/types.ts';
@@ -73,17 +74,19 @@ async function take(d: Deps, id: string) {
   const stamp = stampOf(db, id);
   const info = pageInfo(db, id);
   if (!stamp || !info || fs.existsSync(fileOf(id, stamp))) return;
+  // A confidential session's page reaches nowhere, not even for its picture.
+  const offline = confidentialKey(db, info.sessionKey);
   let shot;
   if (info.kind) {
     // A deck's first slide, a document's first page, a spreadsheet's first cells: alone.
     const page = (await pageHtml(db, id, undefined, 'still'))!;
     const size = mustKind(info.kind).still(pageSource(db, id)!.text);
-    shot = await capture({ html: page.html, width: size.width, height: size.height, outWidth: 528, format: 'webp', quality: 78, settleMs: 700, blockPrivate: true });
+    shot = await capture({ html: page.html, width: size.width, height: size.height, outWidth: 528, format: 'webp', quality: 78, settleMs: 700, blockPrivate: true, offline });
   } else {
     const page = (await pageHtml(db, id))!;
     // The kit with the page's data to read, nothing to write it to, and no parent to talk to.
     const head = kitHead({ n: '', theme: 'light', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, seed: storageMap(db, id) });
-    shot = await capture({ html: injectHead(page.html, head), width: 880, height: 550, outWidth: 528, format: 'webp', quality: 74, settleMs: 700, blockPrivate: true });
+    shot = await capture({ html: injectHead(page.html, head), width: 880, height: 550, outWidth: 528, format: 'webp', quality: 74, settleMs: 700, blockPrivate: true, offline });
   }
   fs.mkdirSync(DIR, { recursive: true, mode: 0o700 });
   // Only one picture per page: the others are out of date.
