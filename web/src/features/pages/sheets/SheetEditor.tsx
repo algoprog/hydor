@@ -13,6 +13,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { BetweenHorizontalStart, BetweenVerticalStart, ClipboardPaste, Copy, Eraser, EyeOff, Maximize2, Scissors, Sparkles, StickyNote, Trash2, ArrowDownAZ, ArrowDownZA, Eye } from 'lucide-react';
 import {
   cleanBorder,
+  colIndex,
   colName,
   COL_W,
   computeBook,
@@ -53,6 +54,7 @@ import {
   type NumFmt,
   type Rect,
   type Sheet,
+  type SheetBoard,
   type SheetChart,
   type Validation,
   type Workbook,
@@ -256,8 +258,10 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const filterRef = useRef<HTMLDivElement>(null);
   const [chartSel, setChartSel] = useState<string | null>(null);
   const [rowCard, setRowCard] = useState<number | null>(null);
-  // The Kanban board: the table it shows (by a cell of its header row) and the column it groups by.
-  const [board, setBoard] = useState<{ r: number; c: number; by: number } | null>(null);
+  // The Kanban board: whether it is shown, and (until settings of its own are kept with the sheet) the table it shows,
+  // by its header row's first cell, and the column it groups by.
+  const [boardOn, setBoardOn] = useState(false);
+  const [boardLocal, setBoardLocal] = useState<{ r: number; c: number; by: number } | null>(null);
   const [line, setLine] = useState<{ kind: BorderKind; color?: string }>({ kind: 'thin' });
   const [header, setHeader] = useState(true);
   const [noteDraft, setNoteDraft] = useState('');
@@ -1433,6 +1437,22 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   };
 
   // ---- the Kanban board ------------------------------------------------------------------------------------------------------------
+  // Its settings kept with the sheet (what it groups by, its cards' fields, its lanes' order), else those it was opened with.
+  const keptBoard = (() => {
+    const k = sheet?.board;
+    const at = k ? parseRef(k.at) : null;
+    return k && at ? { r: at.r, c: at.c, by: colIndex(k.by), fields: k.fields?.map(colIndex), lanes: k.lanes, open: !!k.open } : null;
+  })();
+  const board = boardOn ? (boardLocal ?? keptBoard) : null;
+  /** A change to the board's settings, kept with the sheet (and undone with Undo). */
+  const setBoardModel = (set: Partial<SheetBoard>) => {
+    if (!sheet || !board) return;
+    const base: SheetBoard = sheet.board && !boardLocal ? sheet.board : { at: refName(board.r, board.c), by: colName(board.by) };
+    const next: SheetBoard = { ...base, ...set };
+    for (const k of Object.keys(set) as (keyof SheetBoard)[]) if (set[k] === undefined) delete next[k];
+    change(metaPatch(sheet, { board: next }));
+    setBoardLocal(null);
+  };
   /** A table: the filter's range when the cell is in it, else the data around the cell. */
   const tableAt = (r: number, c: number): Rect => {
     const fx = view.filter?.x;
@@ -1450,14 +1470,29 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     return out;
   };
   const toggleBoard = () => {
-    if (board) return setBoard(null);
+    if (board) return setBoardOn(false);
     if (!sheet || !calc) return;
+    if (editRef.current) commitEdit(null);
+    // The board kept with the sheet, while its table still has rows and its column a dropdown.
+    if (keptBoard) {
+      const b = tableAt(keptBoard.r, keptBoard.c);
+      if (b.r2 > b.r1 && dropdownCols(b).some((x) => x.c === keptBoard.by)) {
+        setBoardLocal(null);
+        return setBoardOn(true);
+      }
+    }
     const b = tableAt(sel.r, sel.c);
     const choices = dropdownCols(b);
     if (!choices.length || b.r2 <= b.r1) return void toast(tr('Give the table a dropdown column first (Insert → Dropdown): the board groups its rows by it.'));
-    if (editRef.current) commitEdit(null);
-    setBoard({ r: b.r1, c: b.c1, by: (choices.find((x) => x.c === sel.c) ?? choices[0]).c });
+    setBoardLocal({ r: b.r1, c: b.c1, by: (choices.find((x) => x.c === sel.c) ?? choices[0]).c });
+    setBoardOn(true);
   };
+  // A sheet opens on its board when it says so (on picking it, and when the workbook opens).
+  useEffect(() => {
+    setBoardLocal(null);
+    setBoardOn(!!sheet?.board?.open);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheet?.id, doc?.key]);
   const boardBlock = board && sheet && calc ? tableAt(board.r, board.c) : null;
   /** A new row under the board's table, in a lane: its group's value set, then opened as a card. */
   const boardAdd = (value: string) => {
@@ -1914,6 +1949,8 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     expand: () => setRowCard(sel.r),
     board: !!board,
     toggleBoard,
+    boardOpens: board ? !!keptBoard?.open && !boardLocal : undefined,
+    boardOpen: () => board && setBoardModel({ open: keptBoard?.open && !boardLocal ? undefined : true }),
   };
   const menus = sheetMenus(menuCtx);
 
@@ -2046,12 +2083,16 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
             hidden={view.hidR}
             by={board.by}
             choices={dropdownCols(boardBlock)}
+            fields={boardLocal ? undefined : keptBoard?.fields}
+            lanes={boardLocal ? undefined : keptBoard?.lanes}
             readOnly={readOnly}
-            onBy={(c) => setBoard({ ...board, by: c })}
+            onBy={(c) => (readOnly ? setBoardLocal({ r: board.r, c: board.c, by: c }) : setBoardModel({ by: colName(c), lanes: undefined }))}
+            onFields={(cols) => setBoardModel({ fields: cols.map(colName) })}
+            onLanes={(order) => setBoardModel({ lanes: order })}
             onMove={(r, v) => setCellValue(r, board.by, v)}
             onOpen={(r) => setRowCard(r)}
             onAdd={boardAdd}
-            onClose={() => setBoard(null)}
+            onClose={() => setBoardOn(false)}
           />
         ) : (
           <Grid

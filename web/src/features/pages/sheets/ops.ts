@@ -45,7 +45,7 @@ export const rectOf = (s: Sel): Rect => ({ r1: Math.min(s.ar, s.fr), c1: Math.mi
 export const single = (s: Sel) => s.ar === s.fr && s.ac === s.fc;
 export const rectSel = (x: Rect, r = x.r1, c = x.c1): Sel => ({ r, c, ar: x.r1, ac: x.c1, fr: x.r2, fc: x.c2 });
 
-/** A sheet's parts besides its cells: sizes and hidden rows, frozen panes, merges, the filter, rules and charts. */
+/** A sheet's parts besides its cells: sizes and hidden rows, frozen panes, merges, the filter, rules, charts and its board. */
 export interface Meta {
   cols?: Sheet['cols'];
   rows?: Sheet['rows'];
@@ -55,8 +55,9 @@ export interface Meta {
   conditional?: Sheet['conditional'];
   validation?: Sheet['validation'];
   charts?: Sheet['charts'];
+  board?: Sheet['board'];
 }
-const META_KEYS = ['cols', 'rows', 'freeze', 'merges', 'filter', 'conditional', 'validation', 'charts'] as const;
+const META_KEYS = ['cols', 'rows', 'freeze', 'merges', 'filter', 'conditional', 'validation', 'charts', 'board'] as const;
 
 export type Patch = (
   | { k: 'cells'; sheet: string; before: Record<string, Cell | null>; after: Record<string, Cell | null> }
@@ -89,7 +90,7 @@ export function cellsPatch(book: Workbook, si: number, after: Record<string, Cel
   return n ? { k: 'cells', sheet: sh.id, before, after: next } : null;
 }
 
-export const metaOf = (sh: Sheet): Meta => ({ cols: sh.cols, rows: sh.rows, freeze: sh.freeze, merges: sh.merges, filter: sh.filter, conditional: sh.conditional, validation: sh.validation, charts: sh.charts });
+export const metaOf = (sh: Sheet): Meta => ({ cols: sh.cols, rows: sh.rows, freeze: sh.freeze, merges: sh.merges, filter: sh.filter, conditional: sh.conditional, validation: sh.validation, charts: sh.charts, board: sh.board });
 
 function setMeta(sh: Sheet, m: Meta) {
   for (const k of META_KEYS) {
