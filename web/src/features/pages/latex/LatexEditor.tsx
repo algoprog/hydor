@@ -60,6 +60,7 @@ import {
   X,
 } from 'lucide-react';
 import {
+  cleanTexChanges,
   cleanTexComments,
   cleanTexName,
   engineLabel,
@@ -85,7 +86,7 @@ import type { TexReference } from '@shared/latex-bib';
 import { Button, cx, Dialog, IconButton, MenuItem, MenuSep, Popover, Segmented, Throbber, useConfirm } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
 import { toast, toastError } from '../../../lib/store';
-import { findIn, replaceAllIn, replacementOf, type Match } from '../common/find';
+import { findIn, replacementOf, type Match } from '../common/find';
 import { FindBar, useFind } from '../common/FindBar';
 import { MenuBar, type MenuDef, type MenuEntry } from '../common/menus';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
@@ -697,11 +698,15 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
     c.replaceQuiet(m.s, m.e, rep);
   };
   const replaceAll = () => {
-    if (!codeInView() || readOnly) return;
-    const r = replaceAllIn(codeInView()!.text(), find.query, find.replacement, find.options);
-    if (!r.count) return;
-    editFile(file, () => r.text);
-    toast(`Replaced ${r.count} time${r.count === 1 ? '' : 's'}`, 'ok');
+    const c = codeInView();
+    if (!c || readOnly) return;
+    // One change for each match (not one from the first to the last), so what is between them keeps its comments and
+    // Track changes marks each word replaced; Undo takes them all back at once.
+    const text = c.text();
+    const list = findIn(text, find.query, find.options, Number.MAX_SAFE_INTEGER);
+    if (!list.length) return;
+    c.view.dispatch({ changes: list.map((m) => ({ from: m.s, to: m.e, insert: replacementOf(text, m, find.query, find.replacement, find.options) })), userEvent: 'input.replace.all' });
+    toast(`Replaced ${list.length} time${list.length === 1 ? '' : 's'}`, 'ok');
   };
 
   // ---- comments -----------------------------------------------------------------------------------------------------------
@@ -831,8 +836,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
     if (readOnly || !canTrack) return;
     const on = !live.current?.track;
     change((d) => ({ ...d, track: on || undefined }));
-    // What is marked shows beside the source.
-    if (on) setCommentsOpen(true);
+    // What is marked shows beside the source, where there is room for it (a sheet over the source would be in the way).
+    if (on && roomy) setCommentsOpen(true);
     toast(on ? 'Track changes is on: what you type and delete is marked' : 'Track changes is off', 'ok');
   };
   /** Changes accepted or rejected (`ids`: those, or null for all): in a file's editor, so Undo takes it back, else in the document. */
@@ -1092,11 +1097,12 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         c.destroy();
         codes.current.delete(n);
       }
-    // Its comments go with it, each placed again on its words (the references renamed may have moved them).
+    // Its comments and tracked changes go with it, each placed again on its words (the references renamed may have moved them).
     change((d) => {
       const n = renameRefs({ ...d, files: d.files.map((f) => (f.name === from ? { ...f, name: to } : f)) }, from, to);
-      if (!n.comments?.length) return n;
-      return { ...n, comments: cleanTexComments(n.comments.map((c) => (c.file === from ? { ...c, file: to } : c)), n) };
+      const comments = n.comments?.length ? cleanTexComments(n.comments.map((c) => (c.file === from ? { ...c, file: to } : c)), n) : n.comments;
+      const changes = n.changes?.length ? cleanTexChanges(n.changes.map((c) => (c.file === from ? { ...c, file: to } : c)), n) : n.changes;
+      return { ...n, comments: comments?.length ? comments : undefined, changes: changes?.length ? changes : undefined };
     });
     setOpened((o) => o.map((n) => (n === from ? to : n)));
     if (file === from) setFile(to);
