@@ -257,6 +257,8 @@ function useRowFits(on: boolean, menus: MenuDef[]) {
   const root = useRef<HTMLDivElement>(null);
   const row = useRef<HTMLDivElement>(null);
   const [ok, setOk] = useState(true);
+  // Measured again when the names change, not each time an editor draws (its menus are made anew each time).
+  const names = menus.map((m) => m.label).join('\n');
   useLayoutEffect(() => {
     if (!on) return;
     const a = root.current;
@@ -268,7 +270,7 @@ function useRowFits(on: boolean, menus: MenuDef[]) {
     ro.observe(a);
     ro.observe(b);
     return () => ro.disconnect();
-  }, [on, menus]);
+  }, [on, names]);
   return { root, row, ok };
 }
 
