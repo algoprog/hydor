@@ -428,12 +428,17 @@ export function SlidesEditor({
         setDrawer('open');
       }
     }
+    // In a chart or an equation: it is picked, so the side panel shows its numbers or its LaTeX.
+    if ((hit.where === 'chart' || hit.where === 'tex') && hit.id && deck) {
+      setSel([topOf(deck.slides[hit.slide], hit.id)?.id ?? hit.id]);
+      setTab('format');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hit?.slide, hit?.where, hit?.s, hit?.id, hit?.para]);
   const marks: FindMark[] = hits
     .map((h, i) => ({ h, i }))
     .filter(({ h }) => h.slide === index && h.where !== 'notes')
-    .map(({ h, i }) => ({ id: h.id!, para: h.para, cell: h.cell, s: h.s, e: h.e, current: i === findAt }));
+    .map(({ h, i }) => ({ id: h.id!, para: h.para, cell: h.cell, chart: h.where === 'chart' ? h.t : undefined, tex: h.where === 'tex' || undefined, s: h.s, e: h.e, current: i === findAt }));
   const noteMarks = hits
     .map((h, i) => ({ h, i }))
     .filter(({ h }) => h.slide === index && h.where === 'notes')
@@ -1160,7 +1165,15 @@ export function SlidesEditor({
               onReplace={readOnly ? undefined : replaceOne}
               onReplaceAll={readOnly ? undefined : replaceAll}
               className={mid ? undefined : 'w-full'}
-              extra={hit?.where === 'notes' ? <span className="text-fg-3">This one is in the speaker notes.</span> : undefined}
+              extra={
+                hit?.where === 'notes' ? (
+                  <span className="text-fg-3">This one is in the speaker notes.</span>
+                ) : hit?.where === 'chart' ? (
+                  <span className="text-fg-3">This one is in a chart.</span>
+                ) : hit?.where === 'tex' ? (
+                  <span className="text-fg-3">This one is in an equation’s LaTeX.</span>
+                ) : undefined
+              }
             />
           </div>
         )}
