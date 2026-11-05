@@ -144,6 +144,11 @@ export interface AppRecipe {
 export interface HomeStart {
   time?: string;
   days?: number[];
+  /**
+   * false: its own page is a place to work with what it keeps (the Reading list), not editions it makes: no Update or
+   * settings there, and its view shows at once, before any run.
+   */
+  editions?: false;
 }
 
 /** A time of day, as 07:00. */
@@ -162,7 +167,8 @@ export function cleanHomeStart(raw: unknown): HomeStart | undefined {
   const r = raw as Record<string, unknown>;
   const time = typeof r.time === 'string' && TIME_OF_DAY.test(r.time.trim()) ? r.time.trim() : undefined;
   const days = cleanDays(r.days);
-  return time || days ? { ...(time ? { time } : {}), ...(days ? { days } : {}) } : undefined;
+  const editions = r.editions === false ? false : undefined;
+  return time || days || editions === false ? { ...(time ? { time } : {}), ...(days ? { days } : {}), ...(editions === false ? { editions } : {}) } : undefined;
 }
 
 /** The graph's layout, which the editor keeps and agents may leave out. */
@@ -399,6 +405,24 @@ export const APP_COLORS: Record<string, string> = {
 export const RESERVED_SLUGS = new Set(['runs', 'batches', 'tools', 'draft', 'models', 'new', 't', 'templates', 'run', 'test', 'check', 'install', 'export', 'data', 'connected', 'media', 'assets']);
 
 // ---- names -----------------------------------------------------------------------------------------
+
+/**
+ * The answers an address gives an app's form: ?in.<question>=<answer> (as many as it has), for a page that opens an app
+ * with its form filled in, not run until Run is pressed (the LaTeX editor opens the Reviewer simulator with in.paper set
+ * to the paper's PDF). Only the form's own questions count, a choice as the form writes it; never a file.
+ */
+export function prefillOf(fields: AppField[], search: string | URLSearchParams): Record<string, string> {
+  const q = typeof search === 'string' ? new URLSearchParams(search.replace(/^\?/, '')) : search;
+  const out: Record<string, string> = {};
+  for (const [k, raw] of q) {
+    if (!k.startsWith('in.')) continue;
+    const f = fields.find((x) => x.id === k.slice(3));
+    if (!f || f.type === 'file') continue;
+    const v = raw.replace(/\r\n/g, '\n').slice(0, f.type === 'long' ? 60_000 : 4000);
+    out[f.id] = f.type === 'choice' ? ((f.options ?? []).find((o) => o.toLowerCase() === v.trim().toLowerCase()) ?? v) : v;
+  }
+  return out;
+}
 
 /** "Trip planner!" → "trip-planner". */
 export function slugify(s: string): string {

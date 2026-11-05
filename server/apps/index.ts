@@ -869,10 +869,13 @@ function routes(d: Deps) {
 
   // ---- what an app keeps: yours, or a ready-made one's ("tpl:<id>", its records kept under that id) ----
 
+  /** An app that keeps records: one of yours, or a ready-made one that does (the Reading list, Paper radar), its records under "tpl:<id>" while it is installed. */
   const keeper = (req: FastifyRequest): { id: string; data: AppRecipe['data'] } => {
-    if (P(req).id.startsWith('tpl:')) {
-      const t = builtinOf(P(req).id);
+    const id = P(req).id;
+    if (id.startsWith('tpl:')) {
+      const t = builtinOf(id);
       installedOr409(db, t);
+      if (!t.data) throw new HttpError(404, `${t.name} keeps no records`);
       return { id: `tpl:${t.id}`, data: t.data };
     }
     const a = own(req);

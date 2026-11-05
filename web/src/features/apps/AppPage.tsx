@@ -8,7 +8,7 @@ import type { AcpAgentDef, Agent } from '@shared/types';
 import type { AppDef, AppRun, AppTemplate } from '@shared/apps';
 import { appInfo } from '@shared/app-manifest';
 import { pagesFor } from '@shared/app-ui';
-import { inputsLine, isActive, madeForSessions } from '@shared/apps';
+import { inputsLine, isActive, madeForSessions, prefillOf } from '@shared/apps';
 import { appSummary } from '@shared/app-summary';
 import { api, del, enc, post, put } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
@@ -20,7 +20,7 @@ import { Button, cx, Empty, IconButton, inputCls, MenuItem, Popover, Section, Sh
 import { AgentPicker } from '../home/AgentPicker';
 import { PageHeader } from '../layout/PageHeader';
 import { AgentsCard, AppAbout } from './About';
-import { AppKeys, AppKeysCard, emptyKeys, keysBody, keysMissing, type KeyInput, type KeyState } from './AppKeys';
+import { AppKeys, AppKeysCard, emptyKeys, keysBody, keysFor, keysMissing, type KeyInput, type KeyState } from './AppKeys';
 import { appPath, money, runPath, SOURCE_LABEL, useRunDetail, useRunEvents, type AppDetail, type HomeSettings, type RunDetail } from './api';
 import { AppIcon } from './AppIcon';
 import { BatchTab } from './Batch';
@@ -142,13 +142,14 @@ function LatestRuns({ id, recipe, template }: { id: string; recipe: AppDef | App
   );
 }
 
-function RunTab({ id, recipe, template, again, agents, secrets }: { id: string; recipe: AppDef | AppTemplate; template: boolean; again?: string | null; agents?: ReactNode; secrets?: KeyState[] }) {
-  // The keys it needs: those the vault lacks are asked for here, and saved there as it starts.
-  const [keyStates, setKeyStates] = useState<KeyState[]>(secrets ?? []);
-  useEffect(() => setKeyStates(secrets ?? []), [secrets]);
+function RunTab({ id, recipe, template, again, given, agents, secrets }: { id: string; recipe: AppDef | AppTemplate; template: boolean; again?: string | null; given?: Record<string, string>; agents?: ReactNode; secrets?: KeyState[] }) {
+  // The keys it needs: those the vault lacks are asked for here, and saved there as it starts (not those only its other flows need).
+  const [keyStates, setKeyStates] = useState<KeyState[]>(keysFor(secrets));
+  useEffect(() => setKeyStates(keysFor(secrets)), [secrets]);
   const [keys, setKeys] = useState<KeyInput>(emptyKeys);
   const [keyErrors, setKeyErrors] = useState<Record<string, string>>({});
-  const [values, setValues] = useState<FormValues>(() => initialValues(recipe.fields));
+  // Its form as it starts, with the answers its address gave (?in.<question>=…).
+  const [values, setValues] = useState<FormValues>(() => ({ ...initialValues(recipe.fields), ...given }));
   // "Run again": the answers of an earlier run (files are chosen afresh).
   useEffect(() => {
     if (!again) return;
@@ -592,13 +593,19 @@ function HomeView({ id, recipe, template, view, home, own, onHome }: { id: strin
     setStarting(true);
     await runFromPage(id, settings, own.reload).finally(() => setStarting(false));
   };
+  // The keys one of its flows needs, asked for here when it ran without them (Sync with Zotero, say).
+  const [keys, setKeys] = useState<KeyState[] | null>(null);
+  // An app whose page is a place to work with what it keeps (the Reading list) shows it at once, with no edition to update.
+  const editions = updatable(recipe);
+  const keeps = !!recipe.data && Object.keys(recipe.data).length > 0;
+  const atOnce = keeps && !editions;
   if (own.last === undefined)
     return (
       <div className="flex justify-center py-20 text-fg-3">
         <Throbber size={28} />
       </div>
     );
-  const working = own.active && (
+  const working = own.active && editions && (
     <div className="mb-5 flex items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3 text-[13px]">
       <Throbber className="shrink-0 text-accent" />
       <span className="shrink-0 font-medium">{own.last ? 'Updating' : 'Making the first one'}</span>
@@ -610,7 +617,7 @@ function HomeView({ id, recipe, template, view, home, own, onHome }: { id: strin
       </button>
     </div>
   );
-  const failed = !own.active && own.failed && (
+  const failed = !own.active && own.failed && editions && (
     <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-3 text-[13px] text-fg-2">
       <TriangleAlert size={15} className="mt-0.5 shrink-0 text-warn" />
       <span className="min-w-0 flex-1">
@@ -625,8 +632,13 @@ function HomeView({ id, recipe, template, view, home, own, onHome }: { id: strin
     <div className="mx-auto max-w-[1040px] px-4 py-6 sm:px-6">
       {working}
       {failed}
-      {own.last ? (
-        <AppView ui={recipe.ui!} name={recipe.name} description={recipe.description} appId={id} on="app" last={own.last} answer={recipe.answer} view={view} info={info} can={['keep', 'run', 'start', 'data']} assets={recipe.assets} translate={template} />
+      {keys && (
+        <div className="mb-5">
+          <AppKeysCard appId={id} keys={keys} own={!template} onSaved={() => setKeys(null)} />
+        </div>
+      )}
+      {own.last || atOnce ? (
+        <AppView ui={recipe.ui!} name={recipe.name} description={recipe.description} appId={id} on="app" last={own.last} answer={recipe.answer} view={view} info={info} can={['keep', 'run', 'start', 'data']} assets={recipe.assets} translate={template} keeps={keeps} onKeys={setKeys} />
       ) : (
         !own.active && (
           <div className="mx-auto flex max-w-[560px] flex-col items-center py-10 text-center sm:py-16">
@@ -657,7 +669,7 @@ function HomeView({ id, recipe, template, view, home, own, onHome }: { id: strin
           </div>
         )
       )}
-      {own.earlier.length > 0 && (
+      {editions && own.earlier.length > 0 && (
         <section className="mt-8 border-t border-line pt-4">
           <h3 className="mb-1 text-[12px] font-semibold tracking-wide text-fg-3 uppercase">Earlier</h3>
           <ul>
@@ -678,6 +690,13 @@ function HomeView({ id, recipe, template, view, home, own, onHome }: { id: strin
     </div>
   );
 }
+
+/**
+ * Whether an app's own page updates (Explore's editions: Update, and Update every day): its form runs as it is, with no
+ * question that needs a new answer each time. The Reading list's needs a paper each time: its page is where you work.
+ */
+/** Whether its own page makes editions to update (Explore, Paper radar…), not a place to work with what it keeps (the Reading list: home.editions false). */
+export const updatable = (r: Pick<AppDef, 'home'>) => r.home?.editions !== false;
 
 export function RunsList({ app, runs, more, onMore }: { app: { fields: AppDef['fields'] }; runs: AppRun[]; more?: boolean; onMore?: () => void }) {
   if (!runs.length) return <Empty title="No runs yet">Runs from the form, the API, other agents and the public page all show here.</Empty>;
@@ -725,7 +744,7 @@ function RunsTab({ id, app, def }: { id: string; app: AppDef | AppTemplate; def?
   );
 }
 
-export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: string | null }) {
+export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; again?: string | null; prefill?: string }) {
   const [d, setD] = useState<AppDetail | null>(null);
   const [err, setErr] = useState('');
   const [menu, setMenu] = useState(false);
@@ -770,9 +789,12 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
       toastError(e);
     }
   };
+  // Answers its address gives its form (?in.<question>=…): its form opens with them, even where it has a page of its own.
+  const given = useMemo(() => (recipe && prefill ? prefillOf(recipe.fields, prefill) : {}), [recipe, prefill]);
+  const filled = Object.keys(given).length > 0;
   // An app that opens on its own page (its view's "app" pages, as Explore's magazine): there in place of its form,
-  // with Update and its settings at the top.
-  const ownPage = !!recipe && installed && tab === 'run' && !again && pagesFor(recipe.ui, 'app').length > 0;
+  // with Update and its settings at the top (when it updates: see updatable).
+  const ownPage = !!recipe && installed && tab === 'run' && !again && !filled && pagesFor(recipe.ui, 'app').length > 0;
   const own = useOwnPage(id, ownPage);
   // Seen: the start page's Explore shows no dot for the edition you are looking at.
   useEffect(() => {
@@ -812,8 +834,8 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
           (template ? (
             installed && (
               <>
-                {ownPage && <UpdateButton id={id} own={own} home={home} />}
-                {ownPage && home && <HomeSettingsButton id={id} recipe={recipe} template home={home} onSaved={setHome} keys={d?.secrets} onKeys={(secrets) => setD((x) => (x ? { ...x, secrets } : x))} />}
+                {ownPage && updatable(recipe) && <UpdateButton id={id} own={own} home={home} />}
+                {ownPage && updatable(recipe) && home && <HomeSettingsButton id={id} recipe={recipe} template home={home} onSaved={setHome} keys={d?.secrets} onKeys={(secrets) => setD((x) => (x ? { ...x, secrets } : x))} />}
                 {/* On its own page, Make it mine waits in the menu: Update and Settings are what it is for. */}
                 {!ownPage && (
                   <Button size="sm" icon={<Pencil size={14} />} onClick={() => go(`/apps/new?template=${enc(id.slice(4))}`)}>
@@ -838,8 +860,8 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
             )
           ) : (
             <>
-              {ownPage && <UpdateButton id={id} own={own} home={home} />}
-              {ownPage && home && <HomeSettingsButton id={id} recipe={recipe} template={false} home={home} onSaved={setHome} keys={d?.secrets} onKeys={(secrets) => setD((x) => (x ? { ...x, secrets } : x))} />}
+              {ownPage && updatable(recipe) && <UpdateButton id={id} own={own} home={home} />}
+              {ownPage && updatable(recipe) && home && <HomeSettingsButton id={id} recipe={recipe} template={false} home={home} onSaved={setHome} keys={d?.secrets} onKeys={(secrets) => setD((x) => (x ? { ...x, secrets } : x))} />}
               <Button size="sm" icon={<Pencil size={14} />} onClick={() => go(`${appPath(id)}/edit`)}>
                 Edit
               </Button>
@@ -923,9 +945,9 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
         ) : (
           <>
             {/* An app that opens on its own screen or view: the keys it still needs, given here (its form asks for them otherwise). */}
-            {d?.app && tab === 'run' && !again && (pagesFor(d.app.ui, 'app').length > 0 || !!d.app.screens?.main) && (d.secrets ?? []).some((k) => !k.have && !k.optional) && (
+            {d?.app && tab === 'run' && !again && (pagesFor(d.app.ui, 'app').length > 0 || !!d.app.screens?.main) && keysFor(d.secrets).some((k) => !k.have && !k.optional) && (
               <div className="mx-auto max-w-[920px] px-4 pt-5 sm:px-6">
-                <AppKeysCard appId={d.app.id} keys={d.secrets!} own onSaved={(secrets) => setD((x) => (x ? { ...x, secrets } : x))} />
+                <AppKeysCard appId={d.app.id} keys={keysFor(d.secrets)} own onSaved={(secrets) => setD((x) => (x ? { ...x, secrets } : x))} />
               </div>
             )}
             {d?.app && d.env && tab === 'run' && (d.env.state !== 'none' && d.env.state !== 'ready' ? true : d.env.missing.length > 0) && (
@@ -938,12 +960,12 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
               <NotInstalled id={id} t={d.template} onInstalled={load} />
             ) : ownPage ? (
               <HomeView id={id} recipe={recipe} template={template} view={d?.view} home={home} own={own} onHome={setHome} />
-            ) : tab === 'run' && d?.app?.screens?.main && !again ? (
+            ) : tab === 'run' && d?.app?.screens?.main && !again && !filled ? (
               <div className="h-full min-h-[420px]">
                 <AppScreen app={d.app} />
               </div>
             ) : (
-              (tab === 'run' || template) && <RunTab key={id} id={id} recipe={recipe} template={template} again={again} agents={agentsCard} secrets={d?.secrets} />
+              (tab === 'run' || template) && <RunTab key={`${id}:${JSON.stringify(given)}`} id={id} recipe={recipe} template={template} again={again} given={given} agents={agentsCard} secrets={d?.secrets} />
             )}
             {tab === 'runs' && !template && <RunsTab id={id} app={recipe} def={d?.app} />}
             {tab === 'rows' && d?.app && <BatchTab app={d.app} />}
