@@ -46,6 +46,7 @@ import {
   type Cell,
   type CellStyle,
   type FilterCol,
+  type ListOption,
   type NumFmt,
   type Rect,
   type Sheet,
@@ -63,6 +64,7 @@ import { isMod } from '../common/keys';
 import { MenuBar } from '../common/menus';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
+import { Board } from './Board';
 import { ChartLayer, ChartPanel } from './Charts';
 import { CondPanel } from './CondPanel';
 import { DupDialog, FormatDialog, SortDialog, SplitDialog, SummaryDialog, type ColChoice } from './Dialogs';
@@ -244,6 +246,8 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const filterRef = useRef<HTMLDivElement>(null);
   const [chartSel, setChartSel] = useState<string | null>(null);
   const [rowCard, setRowCard] = useState<number | null>(null);
+  // The Kanban board: the table it shows (by a cell of its header row) and the column it groups by.
+  const [board, setBoard] = useState<{ r: number; c: number; by: number } | null>(null);
   const [line, setLine] = useState<{ kind: BorderKind; color?: string }>({ kind: 'thin' });
   const [header, setHeader] = useState(true);
   const [noteDraft, setNoteDraft] = useState('');
@@ -1396,6 +1400,47 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     toast(count ? `${count} replacement${count === 1 ? '' : 's'} made` : tr('Nothing was replaced.'));
   };
 
+  // ---- the Kanban board ------------------------------------------------------------------------------------------------------------
+  /** A table: the filter's range when the cell is in it, else the data around the cell. */
+  const tableAt = (r: number, c: number): Rect => {
+    const fx = view.filter?.x;
+    if (fx && r >= fx.r1 && r <= fx.r2 && c >= fx.c1 && c <= fx.c2) return fx;
+    const e = calc!.extent(sheetIx);
+    return regionAround(sheet!, r, c, Math.max(e.rows, r + 1), Math.max(e.cols, c + 1));
+  };
+  /** The columns of a table a board may group by: those with a dropdown on their cells. */
+  const dropdownCols = (b: Rect) => {
+    const out: { c: number; options: ListOption[] }[] = [];
+    for (let c = b.c1; c <= b.c2; c++) {
+      const rule = view.rules.any ? view.rules.at(b.r1 + 1, c)?.rule : undefined;
+      if (rule?.type === 'list' && calc) out.push({ c, options: listOptions(calc, sheetIx, rule) });
+    }
+    return out;
+  };
+  const toggleBoard = () => {
+    if (board) return setBoard(null);
+    if (!sheet || !calc) return;
+    const b = tableAt(sel.r, sel.c);
+    const choices = dropdownCols(b);
+    if (!choices.length || b.r2 <= b.r1) return void toast(tr('Give the table a dropdown column first (Insert → Dropdown): the board groups its rows by it.'));
+    if (editRef.current) commitEdit(null);
+    setBoard({ r: b.r1, c: b.c1, by: (choices.find((x) => x.c === sel.c) ?? choices[0]).c });
+  };
+  const boardBlock = board && sheet && calc ? tableAt(board.r, board.c) : null;
+  /** A new row under the board's table, in a lane: its group's value set, then opened as a card. */
+  const boardAdd = (value: string) => {
+    if (!book || !sheet || !board || !boardBlock) return;
+    const r = boardBlock.r2 + 1;
+    if (r >= SHEET_LIMITS.rows) return;
+    const k = refName(r, board.by);
+    const fx = view.filter?.x;
+    const grow = fx && sheet.filter && boardBlock === fx ? metaPatch(sheet, { filter: { ...sheet.filter, range: rangeName({ ...fx, r2: fx.r2 + 1 }) } }) : null;
+    // A row needs something in it to join the table: the group's value, or a space-free placeholder in its first cell.
+    const changes: Record<string, Cell | null> = value ? { [k]: typedInto(sheet.cells[k], value) } : { [refName(r, boardBlock.c1)]: typedInto(sheet.cells[refName(r, boardBlock.c1)], tr('New row')) };
+    change(together([cellsPatch(book, sheetIx, changes), grow]));
+    setRowCard(r);
+  };
+
   // ---- the row card -------------------------------------------------------------------------------------------------------------
   const cardInfo = useMemo(() => {
     if (rowCard === null || !sheet || !calc) return null;
@@ -1816,6 +1861,8 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     trim,
     shortcuts: () => setDialog('shortcuts'),
     expand: () => setRowCard(sel.r),
+    board: !!board,
+    toggleBoard,
   };
   const menus = sheetMenus(menuCtx);
 
@@ -1917,78 +1964,100 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         onMerge={(h2) => void merge(h2)}
         onFilter={toggleFilter}
       />
-      <FormulaBar
-        name={rectLabel(x, size.rows, size.cols) === 'the whole sheet' ? `${refName(0, 0)}:${refName(size.rows - 1, size.cols - 1)}` : rectLabel(x, size.rows, size.cols)}
-        onName={goName}
-        text={edit ? edit.text : inputText(active)}
-        editing={!!edit}
-        readOnly={readOnly}
-        narrow={narrow}
-        caret={caret}
-        onStart={() => startEdit('edit', undefined, 'bar')}
-        onText={(t, pos) => setText(t, pos)}
-        onCaret={onCaret}
-        onKey={onKey}
-        onSuggest={suggest}
-        barRef={barRef}
-        ghost={spillFormula}
-      />
-      <div className="relative flex min-h-0 flex-1">
-        <Grid
-          ref={grid}
-          sheet={sheet}
-          si={sheetIx}
-          calc={calc}
-          rev={rev}
-          rows={size.rows}
-          cols={size.cols}
-          sel={sel}
-          edit={edit}
-          refs={refs}
-          cut={cutMark?.sheet === sheet.id ? cutMark.x : null}
+      {!board && (
+        <FormulaBar
+          name={rectLabel(x, size.rows, size.cols) === 'the whole sheet' ? `${refName(0, 0)}:${refName(size.rows - 1, size.cols - 1)}` : rectLabel(x, size.rows, size.cols)}
+          onName={goName}
+          text={edit ? edit.text : inputText(active)}
+          editing={!!edit}
           readOnly={readOnly}
-          view={view}
-          zoom={zoom}
-          formulas={formulas}
-          overlay={
-            sheet.charts?.length ? (
-              <ChartLayer
-                book={book}
-                calc={calc}
-                si={sheetIx}
-                charts={sheet.charts}
-                rev={rev}
-                zoom={zoom}
-                picked={chartSel}
-                readOnly={readOnly}
-                onPick={(id) => {
-                  setChartSel(id);
-                  grid.current?.focus();
-                }}
-                onChange={(c) => updateChart(c)}
-                onOpen={(id) => !readOnly && setPanel({ kind: 'chart', id })}
-              />
-            ) : undefined
-          }
-          onSel={(s) => setSel(s, true)}
-          onEdit={(mode, text) => startEdit(mode, text)}
+          narrow={narrow}
+          caret={caret}
+          onStart={() => startEdit('edit', undefined, 'bar')}
           onText={(t, pos) => setText(t, pos)}
           onCaret={onCaret}
           onKey={onKey}
-          onPoint={pointAt}
-          onSize={setSize}
-          onFit={fit}
-          onMenu={(at, on) => setCtx({ ...at, on })}
-          onCopy={onCopy}
-          onCut={readOnly ? onCopy : onCut}
-          onPaste={readOnly ? () => {} : onPaste}
-          onSmart={onSmart}
-          onFilter={(c, at) => setFilterMenu({ c, at })}
-          onFill={fillTo}
-          onFillDown={fillDown}
-          onUnhide={unhide}
-          onExpand={(r) => setRowCard(r)}
+          onSuggest={suggest}
+          barRef={barRef}
+          ghost={spillFormula}
         />
+      )}
+      <div className="relative flex min-h-0 flex-1">
+        {board && boardBlock ? (
+          <Board
+            sheet={sheet}
+            si={sheetIx}
+            calc={calc}
+            rev={rev}
+            rules={view.rules}
+            block={boardBlock}
+            hidden={view.hidR}
+            by={board.by}
+            choices={dropdownCols(boardBlock)}
+            readOnly={readOnly}
+            onBy={(c) => setBoard({ ...board, by: c })}
+            onMove={(r, v) => setCellValue(r, board.by, v)}
+            onOpen={(r) => setRowCard(r)}
+            onAdd={boardAdd}
+            onClose={() => setBoard(null)}
+          />
+        ) : (
+          <Grid
+            ref={grid}
+            sheet={sheet}
+            si={sheetIx}
+            calc={calc}
+            rev={rev}
+            rows={size.rows}
+            cols={size.cols}
+            sel={sel}
+            edit={edit}
+            refs={refs}
+            cut={cutMark?.sheet === sheet.id ? cutMark.x : null}
+            readOnly={readOnly}
+            view={view}
+            zoom={zoom}
+            formulas={formulas}
+            overlay={
+              sheet.charts?.length ? (
+                <ChartLayer
+                  book={book}
+                  calc={calc}
+                  si={sheetIx}
+                  charts={sheet.charts}
+                  rev={rev}
+                  zoom={zoom}
+                  picked={chartSel}
+                  readOnly={readOnly}
+                  onPick={(id) => {
+                    setChartSel(id);
+                    grid.current?.focus();
+                  }}
+                  onChange={(c) => updateChart(c)}
+                  onOpen={(id) => !readOnly && setPanel({ kind: 'chart', id })}
+                />
+              ) : undefined
+            }
+            onSel={(s) => setSel(s, true)}
+            onEdit={(mode, text) => startEdit(mode, text)}
+            onText={(t, pos) => setText(t, pos)}
+            onCaret={onCaret}
+            onKey={onKey}
+            onPoint={pointAt}
+            onSize={setSize}
+            onFit={fit}
+            onMenu={(at, on) => setCtx({ ...at, on })}
+            onCopy={onCopy}
+            onCut={readOnly ? onCopy : onCut}
+            onPaste={readOnly ? () => {} : onPaste}
+            onSmart={onSmart}
+            onFilter={(c, at) => setFilterMenu({ c, at })}
+            onFill={fillTo}
+            onFillDown={fillDown}
+            onUnhide={unhide}
+            onExpand={(r) => setRowCard(r)}
+          />
+        )}
         {find.open && (
           <div className="absolute top-2 right-3 z-40 max-sm:right-2 max-sm:left-2">
             <FindBar
