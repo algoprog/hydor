@@ -1,5 +1,5 @@
 // Script tests for files dropped on the Library: uploads in pieces (in order, out of order, a piece too large, the whole
-// larger than said, cancelled, an empty file), what each file becomes (a document, a spreadsheet, a notebook, a LaTeX
+// larger than said, cancelled, an empty file, a disk that will not take one), what each file becomes (a document, a spreadsheet, a notebook, a LaTeX
 // document, a picture kept once by its bytes, a video, a sound, a file in a project's folder at its place in the folder
 // dropped, a name taken there already), what is refused and why (a kind the Library does not keep, a size past its
 // limits, no room on the disk, a project that is not one, a place outside the folder); and the desktop app's moves by
@@ -15,7 +15,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { PassThrough } from 'node:stream';
+import { PassThrough, Writable } from 'node:stream';
 import Fastify from 'fastify';
 import { canCapture, closeCapture, withTab } from '../capture/index.ts';
 import { config } from '../config.ts';
@@ -207,6 +207,74 @@ const pptxImports = kindForFile('a.pptx') === 'slides';
   slow.end(text.subarray(5));
   const late = await going;
   ok(late.statusCode === 499 && json(await app.inject({ method: 'GET', url: '/api/pages' })).pages.length === pagesBefore, 'an upload cancelled while its last piece comes makes nothing');
+}
+
+// ---- a disk that will not take a piece -----------------------------------------------------------------------------
+
+/** The next writes to an upload's file fail as a disk does: `keep` bytes reach it, then `code`. Returns how to undo it. */
+function failWrites(upload: string, code: string, keep = 0): () => void {
+  const real = fs.createWriteStream;
+  const failing = (p: fs.PathLike, o?: Parameters<typeof real>[1]) => {
+    if (!String(p).endsWith(`${upload}.part`)) return real(p, o);
+    let written = 0;
+    return new Writable({
+      write(chunk: Buffer, _enc, done) {
+        const take = chunk.subarray(0, Math.max(0, keep - written));
+        if (take.length) {
+          fs.appendFileSync(String(p), take);
+          written += take.length;
+        }
+        if (written >= keep) return done(Object.assign(new Error(`${code}: the disk would not take it, write`), { code }));
+        done();
+      },
+    });
+  };
+  (fs as unknown as { createWriteStream: typeof failing }).createWriteStream = failing;
+  return () => void ((fs as unknown as { createWriteStream: typeof real }).createWriteStream = real);
+}
+/** An answer, or 'hung' when none came in 15 s. */
+const inTime = <T,>(p: Promise<T>) => Promise.race([p, new Promise<'hung'>((r) => setTimeout(() => r('hung'), 15_000))]);
+
+{
+  const words = 'Words that go in two pieces. '.repeat(40);
+  const text = Buffer.from(`# On a full disk\n\n${words}\n`);
+  const whole = async (upload: string) => {
+    const r = await put(`/api/library/uploads/${upload}?offset=300`, text.subarray(300));
+    const id = json(r).done?.page?.id;
+    const model = id ? json(await app.inject({ method: 'GET', url: `/api/pages/${id}` })).model : null;
+    return JSON.stringify(model ?? {}).includes(words.trim());
+  };
+  const part = (upload: string) => path.join(config.dataDir, 'library-uploads', `${upload}.part`);
+
+  // The disk is full: 507, nothing more of the piece kept, and the upload goes on once there is room.
+  const a = json(await start({ name: 'On a full disk.md', size: text.length, space: null })).upload;
+  await put(`/api/library/uploads/${a}?offset=0`, text.subarray(0, 300));
+  let undo = failWrites(a, 'ENOSPC');
+  const full = await inTime(put(`/api/library/uploads/${a}?offset=300`, text.subarray(300)));
+  undo();
+  ok(full !== 'hung' && full.statusCode === 507 && json(full).why === 'room' && json(full).received === 300, 'a piece the full disk will not take is answered at once (507, no room), saying where to go on from');
+  ok(fs.statSync(part(a)).size === 300, 'what came before it stays as it was');
+  ok(await whole(a), 'sent again once there is room, it goes on from there and the file comes whole');
+
+  // The disk fails part-way through a piece: 500 with what failed, and what of it reached the disk is taken back.
+  const b = json(await start({ name: 'On a full disk.md', size: text.length, space: null })).upload;
+  await put(`/api/library/uploads/${b}?offset=0`, text.subarray(0, 300));
+  undo = failWrites(b, 'EIO', 100);
+  const broken = await inTime(put(`/api/library/uploads/${b}?offset=300`, text.subarray(300)));
+  undo();
+  ok(broken !== 'hung' && broken.statusCode === 500 && /could not be written to the disk: EIO/.test(json(broken).error) && json(broken).received === 300, 'a write the disk fails is answered (500, with what failed)');
+  ok(fs.statSync(part(b)).size === 300, 'and the bytes of the piece that reached the disk are taken back');
+  ok(await whole(b), 'sent again, the file comes whole');
+
+  // Its folder removed between two pieces: nothing safe is left, so it starts again from its first byte.
+  const c = json(await start({ name: 'On a full disk.md', size: text.length, space: null })).upload;
+  await put(`/api/library/uploads/${c}?offset=0`, text.subarray(0, 300));
+  fs.rmSync(path.join(config.dataDir, 'library-uploads'), { recursive: true, force: true });
+  const gone = await inTime(put(`/api/library/uploads/${c}?offset=300`, text.subarray(300)));
+  ok(gone !== 'hung' && gone.statusCode === 500 && /ENOENT/.test(json(gone).error) && json(gone).received === 0, 'a piece whose folder was removed is answered, saying to start again');
+  ok(json(await put(`/api/library/uploads/${c}?offset=300`, text.subarray(300))).received === 0, 'a piece sent from where it was is out of step');
+  await put(`/api/library/uploads/${c}?offset=0`, text.subarray(0, 300));
+  ok(await whole(c), 'sent again from its first byte, the file comes whole');
 }
 
 // ---- what each file becomes --------------------------------------------------------------------------------------------
