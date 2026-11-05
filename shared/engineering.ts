@@ -143,6 +143,7 @@ export function ciDoctorTask(v: { folder?: string; ci?: string; rerun?: string; 
       `The run, as ${ci.label} sent it:`,
       factLines(ci.prompt.facts),
       '',
+      'If the details above were not filled in (the task was run by hand, so they still read {{…}}), take the latest failed run of this repository instead; if none failed lately, say so and report done.',
       `Read the failed jobs’ logs (${ci.prompt.logs}) and find the first real error; look at the same job’s recent runs to tell a flaky failure from a real one; reproduce it in a new worktree (git worktree add), never in this folder’s own checkout.`,
       allowed(
         [
@@ -182,7 +183,7 @@ export function issueTriageTask(v: { folder?: string; comment?: string; label?: 
         ['What it says', 'body.issue.body'],
       ]),
       '',
-      'If this call is not about a newly opened issue (there is no issue above, or it is a pull request), report silent.',
+      'If the issue above was not filled in (the task was run by hand, so it still reads {{…}}), triage the issues opened in the last day that have no labels yet. If the call is about a pull request instead, report silent.',
       'Look for the same problem among open and recently closed issues, in several wordings, and say how sure you are.',
       allowed(
         [
@@ -276,7 +277,7 @@ export function incidentTask(v: { folder?: string; source?: string; rollback?: s
       'The alert, as it was sent:',
       '{{body}}',
       '',
-      'If it says the problem is resolved or recovered, add a line about it to your task notes and report silent.',
+      'If it says the problem is resolved or recovered, add a line about it to your task notes and report silent. If the alert above was not filled in (the task was run by hand, so it still reads {{…}}), check how the service stands now (its health, its latest errors) and report that.',
       'Within the first minutes, tell the user with notify_user what is wrong, since when, and the likely cause so far. Then gather the errors, logs, recent deploys and the changes since the last good release into one timeline, and find the likely cause with its evidence.',
       rollback
         ? `How to roll back: ${rollback}. Run it only after the user said yes to it on a card (ask_form) in this run.`

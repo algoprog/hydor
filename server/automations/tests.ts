@@ -906,6 +906,13 @@ await test('CI doctor: only a failed run starts one, with its essentials quoted,
     await sessions.endTurn(scheduler, lastRun(t.id).key!, 'Flaky: a timeout in the payment test; re-ran it, green now.');
     scheduler.remove(t.id);
   }
+  // Run by hand (Run now, a test run): no call fills it in, and the prompt says what to do then.
+  const byHand = saveExample(ciDoctorTask({ folder: root, ci: 'github' }));
+  await scheduler.runNow(byHand.id);
+  assert.match(sessions.created.at(-1).prompt, /- Workflow: \{\{body\.workflow_run\.name\}\}/);
+  assert.match(sessions.created.at(-1).prompt, /not filled in \(the task was run by hand, so they still read \{\{…\}\}\), take the latest failed run/);
+  await sessions.endTurn(scheduler, lastRun(byHand.id).key!, 'Nothing failed lately.');
+  scheduler.remove(byHand.id);
   // Nothing allowed: it says what it would have done instead.
   const quiet = ciDoctorTask({ folder: root, ci: 'github' }).prompt;
   assert.doesNotMatch(quiet, /You may:/);
