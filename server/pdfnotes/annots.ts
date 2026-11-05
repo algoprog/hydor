@@ -162,15 +162,17 @@ export function writeHighlights(data: Buffer, hs: PdfHighlight[], author = 'Hydo
  * from the media box, the words are placed on the crop box), and, while the app keeps its notes, without the highlights
  * saved into it (the reader draws its own over them).
  */
-export function forReader(data: Buffer, page: number, dropOurs: boolean): Buffer {
-  const src = dropOurs ? withoutOurs(data, page) : data;
-  const pdf = new PdfFile(src);
-  const p = pages(pdf)[page - 1];
-  if (!p) return src;
+export function forReader(data: Buffer, shown: Page, dropOurs: boolean): Buffer {
   const same = (a: number, b: number) => Math.abs(a - b) < 0.01;
-  if (same(p.crop.x0, p.media.x0) && same(p.crop.y0, p.media.y0) && same(p.crop.x1, p.media.x1) && same(p.crop.y1, p.media.y1)) return src;
-  const d = pdf.edit(p.ref);
-  d.set('MediaBox', [p.crop.x0, p.crop.y0, p.crop.x1, p.crop.y1]);
+  const cut = !(same(shown.crop.x0, shown.media.x0) && same(shown.crop.y0, shown.media.y0) && same(shown.crop.x1, shown.media.x1) && same(shown.crop.y1, shown.media.y1));
+  // Most pages need neither: the file as it is (read once, its pictures drawn and kept by its contents).
+  if (!cut && !(dropOurs && mayHold(data))) return data;
+  const src = dropOurs ? withoutOurs(data, shown.index) : data;
+  if (!cut) return src;
+  const pdf = new PdfFile(src);
+  const p = pages(pdf)[shown.index - 1];
+  if (!p) return src;
+  pdf.edit(p.ref).set('MediaBox', [p.crop.x0, p.crop.y0, p.crop.x1, p.crop.y1]);
   return pdf.saveUpdate();
 }
 

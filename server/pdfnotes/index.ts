@@ -16,7 +16,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { MAX_HIGHLIGHTS, type PdfHighlight, type PdfNotesView } from '../../shared/pdfnotes.ts';
+import { joinLines, MAX_HIGHLIGHTS, type PdfHighlight, type PdfNotesView } from '../../shared/pdfnotes.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
@@ -113,7 +113,10 @@ function incoming(l: Loaded, v: unknown, have: PdfHighlight | undefined, i: numb
   const page = Math.round(Number(o.page));
   if (!(page >= 1 && page <= l.pages.length)) throw new HttpError(400, `put[${i}].page: the file has ${l.pages.length} page${l.pages.length === 1 ? '' : 's'}`);
   o.page = page;
-  if (!have || (v as Record<string, unknown>).rects !== undefined || (v as Record<string, unknown>).text !== undefined) {
+  const sent = v as Record<string, unknown>;
+  // Words moved to another page without their boxes: found there by their words.
+  if (have && page !== have.page && sent.rects === undefined) o.rects = [];
+  if (!have || sent.rects !== undefined || sent.text !== undefined || page !== have.page) {
     const rects = Array.isArray(o.rects) ? o.rects : [];
     if (!rects.length) {
       // Words only: found on their page.
@@ -133,6 +136,11 @@ function incoming(l: Loaded, v: unknown, have: PdfHighlight | undefined, i: numb
         o.anchor = w.anchor;
         o.o = areaOrder(l.runs(page), h.rects[0]);
       }
+    } else {
+      // Boxes over words without the words themselves: the words read from under them, so they can be found again.
+      const h = cleanHighlight(o);
+      if (h && (typeof o.text !== 'string' || !o.text.trim())) o.text = joinLines(h.rects.map((r) => wordsIn(l.runs(page), r).text));
+      if (h && typeof o.o !== 'number') o.o = areaOrder(l.runs(page), h.rects[0]);
     }
   }
   if (have && (o.note !== have.note || o.color !== have.color)) o.edited = Date.now();
@@ -249,7 +257,7 @@ function routes(d: Deps) {
     const page = pageOf(l, q.page);
     const width = Math.max(200, Math.min(3200, intOf(q.width, 1200)));
     // Highlights saved into the file show once: as the reader draws them, while the app keeps them here.
-    const src = forReader(l.data, page, readNotes(db, abs).highlights.length > 0);
+    const src = forReader(l.data, l.pages[page - 1], readNotes(db, abs).highlights.length > 0);
     return picture(reply, `${l.mtime}-${page}-${width}-${src === l.data ? 1 : 0}`, src, page, width);
   });
 

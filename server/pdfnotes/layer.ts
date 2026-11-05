@@ -117,6 +117,26 @@ export function spanOf(runs: Run[], a: number, i: number, b: number, j: number):
 /** Text as finding compares it: folded (case, accents, quotes, dashes), without spaces or hyphens, so line breaks and hyphenation do not matter. */
 const keyOf = (s: string) => fold(s).replace(/[\s-]+/g, '');
 
+/** A page as one folded text, each of its characters pointing back at a run's character (made once a page). */
+const keys = new WeakMap<Run[], { key: string; at: [number, number][] }>();
+function pageKey(runs: Run[]): { key: string; at: [number, number][] } {
+  let k = keys.get(runs);
+  if (!k) {
+    let key = '';
+    const at: [number, number][] = [];
+    runs.forEach((r, ri) =>
+      [...r.text].forEach((ch, ci) => {
+        for (const f of keyOf(ch)) {
+          key += f;
+          at.push([ri, ci]);
+        }
+      }),
+    );
+    keys.set(runs, (k = { key, at }));
+  }
+  return k;
+}
+
 /**
  * Where `words` are on the page: each time they appear (as runs and characters), nearest to `near` first when given
  * (the top-left of where they were). Words broken over lines, hyphenated or not, are found too.
@@ -124,17 +144,7 @@ const keyOf = (s: string) => fold(s).replace(/[\s-]+/g, '');
 export function findRuns(runs: Run[], words: string, near?: { x: number; y: number }): { rects: PdfRect[]; text: string; o: number }[] {
   const q = keyOf(words);
   if (!q) return [];
-  // The page as one folded text, each of its characters pointing back at a run's character.
-  let key = '';
-  const at: [number, number][] = [];
-  runs.forEach((r, ri) =>
-    [...r.text].forEach((ch, ci) => {
-      for (const f of keyOf(ch)) {
-        key += f;
-        at.push([ri, ci]);
-      }
-    }),
-  );
+  const { key, at } = pageKey(runs);
   const found: { rects: PdfRect[]; text: string; o: number }[] = [];
   for (let i = key.indexOf(q); i >= 0 && found.length < 200; i = key.indexOf(q, i + 1)) {
     const [a, ci] = at[i];

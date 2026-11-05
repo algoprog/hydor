@@ -230,6 +230,25 @@ const post = async (url: string, payload: Record<string, unknown>, status = 200)
     }
   }
 
+  // On a paper of two pages: a highlight moved to the other page by its id finds its words there; boxes sent without
+  // their words get the words under them.
+  {
+    // Page 2 is the paper cut to a smaller crop box: the same words, 40 points further left and 32 higher.
+    const f = new PdfFile(paper);
+    f.edit(pages(f)[0].ref).set('CropBox', [40, 60, 572, 760]);
+    const two = path.join(tmp, 'two.pdf');
+    fs.writeFileSync(two, editPages(paper, [{ op: 'merge', file: f.saveUpdate() }]).data);
+    let w: PdfNotesView = await post('/api/pdf-notes', { path: two, put: [{ id: 'mv', page: 1, text: 'standard benchmarks' }] });
+    const at1 = w.highlights[0].rects[0];
+    w = await post('/api/pdf-notes', { path: two, put: [{ id: 'mv', page: 2 }] });
+    assert.equal(w.highlights[0].page, 2);
+    const at2 = w.highlights[0].rects[0];
+    assert.ok(Math.abs(at2.x - (at1.x - 40)) < 0.1 && Math.abs(at2.y - (at1.y - 32)) < 0.1, `on its words there: ${JSON.stringify([at1, at2])}`);
+    const box = findRuns(loadPdf(two).runs(2), 'single processor')[0].rects;
+    w = await post('/api/pdf-notes', { path: two, put: [{ id: 'bx', page: 2, kind: 'text', rects: box }] });
+    assert.equal(w.highlights.find((h) => h.id === 'bx')?.text, 'single processor');
+  }
+
   // Agents' app_api may read them freely; changes need the user's OK.
   assert.equal(ruleFor('GET', '/api/pdf-notes').level, 'free');
   assert.equal(ruleFor('POST', '/api/pdf-notes').level, 'confirm');
