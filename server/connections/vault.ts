@@ -75,6 +75,11 @@ const SEALED: { table: string; id: string; col: string; aad: (id: string) => str
   { table: 'conn_clients', id: 'k', col: 'client', aad: (n) => `client:${n}` },
 ];
 
+/** A sealed column of another store's (the saved signatures'), sealed again with the rest when the key is replaced. */
+export function addSealed(s: (typeof SEALED)[number]) {
+  if (!SEALED.some((x) => x.table === s.table && x.col === s.col)) SEALED.push(s);
+}
+
 /** A new vault key: everything is sealed again with it, then the old key file goes. */
 export function rotateVaultKey(db: DB): { sealed: number; keyId: string } {
   const file = keyFile();
@@ -85,6 +90,8 @@ export function rotateVaultKey(db: DB): { sealed: number; keyId: string } {
   let n = 0;
   db.transaction(() => {
     for (const s of SEALED) {
+      // A store another database has (a test's) is not in this one.
+      if (!db.prepare("select 1 from sqlite_master where type = 'table' and name = ?").get(s.table)) continue;
       const rows = db.prepare(`select ${s.id} as id, ${s.col} as v from ${s.table} where ${s.col} is not null`).all() as { id: string; v: string }[];
       for (const r of rows) {
         const plain = unseal(r.v, s.aad(r.id));
