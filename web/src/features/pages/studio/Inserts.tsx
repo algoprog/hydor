@@ -298,6 +298,7 @@ export const PAGE_SHORTCUTS: ShortcutGroup[] = [
       ['Tab / Shift+Tab', 'Nest or un-nest a list’s item, or a block after a list'],
       ['↑ / ↓', 'From the first or last line: into the block above or below'],
       ['/', 'The blocks to add (in an empty block, or after a space)'],
+      ['@', 'A link to another page of your Library'],
       ['Esc', 'Stop writing, and pick the block'],
     ],
   },
@@ -324,6 +325,7 @@ export const PAGE_SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+Shift+S', 'Strike through'],
       ['Ctrl+E', 'Code'],
       ['Ctrl+K', 'Make it a link'],
+      ['Ctrl+Alt+M', 'Comment on the block, or the words picked'],
     ],
   },
   {
