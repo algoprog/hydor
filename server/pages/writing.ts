@@ -224,31 +224,33 @@ export function writing(E: Core): Writing {
     const f = x.cloneContents();
     return !f.querySelector('img') && f.querySelectorAll('br').length <= (fillerBr(h) ? 1 : 0);
   };
-  /** Inline parts left empty (a bold whose words all went to the other half of a split). */
-  const tidy = (root: ParentNode, keep?: (x: Element) => boolean) => {
-    for (const x of [...root.querySelectorAll('*')].reverse()) {
-      if (keep && !keep(x)) continue;
-      if (/^(BR|IMG|INPUT|UL|OL|LI)$/.test(x.tagName) || x.textContent || x.querySelector('img,br,input')) continue;
+  /**
+   * Inline parts a cut left empty, along its edge only: from `n` down its last parts (`end`) or its first ones. An empty
+   * part elsewhere (an anchor, a font's icon) is the page's own and stays.
+   */
+  const trimEdge = (first: Node | null, end: boolean) => {
+    const edge: Element[] = [];
+    for (let n: Node | null = first; n; n = end ? n.lastChild : n.firstChild) {
+      while (n && n.nodeType === 3 && !(n as Text).data) n = end ? n.previousSibling : n.nextSibling;
+      if (!n || n.nodeType !== 1 || /^(BR|IMG|INPUT|UL|OL|LI)$/.test((n as Element).tagName)) break;
+      edge.push(n as Element);
+    }
+    for (const x of edge.reverse()) {
+      if (x.textContent || x.querySelector('img,br,input') || x.id || x.getAttribute('name')) break;
       x.remove();
     }
-  };
-  const tidyOwn = (h: Element) => {
-    const subs = subLists(h);
-    tidy(h, (x) => !subs.some((s) => s.contains(x)));
-  };
-  const cut = (r: Range): DocumentFragment => {
-    const f = r.extractContents();
-    tidy(f);
-    return f;
   };
   /** The words after the caret, taken out of the block. */
   const takeTail = (h: Element) => {
     const r = caretIn(h);
-    const f = r ? cut(tail(h, r)) : doc.createDocumentFragment();
-    tidyOwn(h);
+    if (!r) return doc.createDocumentFragment();
+    const f = tail(h, r).extractContents();
+    trimEdge(f.firstChild, false);
+    // What is left ends where the cut was (before the lists nested in an item).
+    trimEdge(subLists(h)[0]?.previousSibling ?? h.lastChild, true);
     return f;
   };
-  const takeAll = (h: Element) => cut(ownRange(h));
+  const takeAll = (h: Element) => ownRange(h).extractContents();
   const putOwn = (h: Element, n: Node) => h.insertBefore(n, subLists(h)[0] ?? null);
   /** An empty block keeps a line's height (a line break in it, as browsers write it). */
   const fillEmpty = (h: Element) => {
@@ -372,9 +374,10 @@ export function writing(E: Core): Writing {
     const parent = list.parentElement!;
     const rest = after(li);
     if (rest.length) {
-      let sub = [...li.children].reverse().find((c) => c.tagName === list.tagName) as HTMLElement | undefined;
-      if (!sub) {
+      let sub = li.lastElementChild;
+      if (!sub || !sameList(sub, list)) {
         sub = cloneList(list);
+        sub.removeAttribute('start');
         li.append(sub);
       }
       sub.append(...rest);
@@ -389,7 +392,7 @@ export function writing(E: Core): Writing {
     if (!prev || prev.tagName !== 'LI') return false;
     const list = li.parentElement!;
     let sub = prev.lastElementChild;
-    if (!sub || sub.tagName !== list.tagName) {
+    if (!sub || !sameList(sub, list)) {
       sub = cloneList(list);
       sub.removeAttribute('start');
       prev.append(sub);
@@ -407,8 +410,10 @@ export function writing(E: Core): Writing {
     if (list.children.length === 1) return list;
     const rest = after(li);
     const mine = cloneList(list);
+    mine.removeAttribute('start');
     if (rest.length) {
       const n = cloneList(list);
+      n.removeAttribute('start');
       n.append(...rest);
       list.after(n);
     }
@@ -468,16 +473,18 @@ export function writing(E: Core): Writing {
     copyLook(u, nu, true);
     const lk = LISTK[kind];
     if (u.tagName === 'LI') {
-      const subs = subLists(u);
       const checked = kind === 'todo' && from === 'todo' ? boxOf(u)?.hasAttribute('checked') : false;
       if (lk) {
+        const subs = subLists(u);
         const list = isolate(u);
         u.replaceWith(nu);
         for (const s of subs) nu.append(s);
         if (checked) boxOf(nu)?.setAttribute('checked', '');
         merge(retype(list, lk[0], lk[1]));
       } else {
+        // Up to the top first: on the way the items after it go inside it, so its lists are read after.
         toTop(u);
+        const subs = subLists(u);
         u.replaceWith(nu);
         let at: Element = nu;
         for (const s of subs) {
@@ -507,7 +514,7 @@ export function writing(E: Core): Writing {
         const tmp = make('li');
         nu.replaceWith(tmp);
         toTop(tmp);
-        tmp.replaceWith(nu);
+        tmp.replaceWith(nu, ...subLists(tmp));
       } else if (lk && kind !== kindOf(u)) merge(retype(isolate(nu), lk[0], lk[1]));
       return;
     }
@@ -564,6 +571,7 @@ export function writing(E: Core): Writing {
   /** The words Backspace at a block's start joins it to: the block right before it, in its list or toggle. */
   const joinBefore = (u: Element): HTMLElement | null => {
     const p = prevSib(u);
+    if (p?.tagName === 'SUMMARY' && u.parentElement?.tagName === 'DETAILS') return hostOf(u.parentElement);
     if (p) return lastHostIn(p);
     const parent = u.parentElement;
     if (parent?.tagName === 'DETAILS') return hostOf(parent);
@@ -655,10 +663,19 @@ export function writing(E: Core): Writing {
   // ---- writing's keys ------------------------------------------------------------------------------------------------
   const writeIn = (h: HTMLElement | null, at: At = { off: 0 }): Next => (h ? { write: h, at } : true);
   /** Enter: the next block of the right kind (the words after the caret go with it). */
+  /** Words selected in the block go before Enter or a paste acts there (as typing over them does). */
+  const dropSelected = (h: HTMLElement) => {
+    const r = caret();
+    if (!r || r.collapsed || !h.contains(r.commonAncestorContainer)) return;
+    E.noteTyping();
+    r.deleteContents();
+    r.collapse(true);
+  };
   const enter = (h: HTMLElement): boolean => {
     const u = unitOf(h);
     const k = kindOf(u);
     if (!k || k === 'code') return false;
+    dropSelected(h);
     const empty = emptyHost(h);
     if (isListKind(k) && empty) {
       // An empty item leaves the list (or goes up a level).
@@ -815,7 +832,7 @@ export function writing(E: Core): Writing {
   };
   const TURN_KEYS: Record<string, Kind> = { 'alt:Digit0': 'p', 'alt:Digit1': 'h1', 'alt:Digit2': 'h2', 'alt:Digit3': 'h3', 'shift:Digit7': 'number', 'shift:Digit8': 'bullet', 'shift:Digit9': 'todo' };
   const turnKey = (e: KeyboardEvent): Kind | null => {
-    if (!isMod(e)) return null;
+    if (!isMod(e) || e.getModifierState?.('AltGraph')) return null;
     if (e.altKey && !e.shiftKey) return TURN_KEYS[`alt:${e.code}`] ?? null;
     if (e.shiftKey && !e.altKey) return TURN_KEYS[`shift:${e.code}`] ?? null;
     return null;
@@ -989,10 +1006,10 @@ export function writing(E: Core): Writing {
     .hd.col .hb{width:18px;height:22px}
     .end{position:fixed;display:none;pointer-events:auto;width:26px;height:26px;border:1px dashed ${line}}
     .menu,.sl{position:fixed;display:none;flex-direction:column;pointer-events:auto;box-sizing:border-box;min-width:232px;max-width:calc(100vw - 12px);padding:4px;border-radius:12px;background:${panel};border:1px solid ${line};box-shadow:0 10px 32px rgba(0,0,0,${dark ? '.45' : '.18'});font:13px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;color:${ink};overflow-y:auto;overscroll-behavior:contain}
-    .row{all:unset;display:flex;align-items:center;gap:9px;height:30px;padding:0 9px;border-radius:7px;cursor:pointer;white-space:nowrap;box-sizing:border-box;min-width:0}
-    .row.on{background:${hover}}
-    .row.danger{color:${dark ? '#f28b8b' : '#bd2525'}}
-    .row[aria-disabled=true]{opacity:.4;cursor:default}
+    :is(.menu,.sl) .row{all:unset;display:flex;align-items:center;gap:9px;height:30px;padding:0 9px;border-radius:7px;cursor:pointer;white-space:nowrap;box-sizing:border-box;min-width:0}
+    :is(.menu,.sl) .row.on{background:${hover}}
+    :is(.menu,.sl) .row.danger{color:${dark ? '#f28b8b' : '#bd2525'}}
+    :is(.menu,.sl) .row[aria-disabled=true]{opacity:.4;cursor:default}
     .ri{display:grid;place-items:center;width:20px;flex:none;color:${muted}}
     .danger .ri{color:inherit}
     .rl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -1014,7 +1031,7 @@ export function writing(E: Core): Writing {
     .offer button:hover{background:${hover};color:${ink}}
     .cv button{background:${panel};color:${ink};border:1px solid ${line};box-shadow:0 2px 8px rgba(0,0,0,.15)}
     .cv button:hover{background:${hover}}
-    @media (pointer:coarse){.offer button{height:32px;font-size:13px}.hb,.hd.col .hb{width:32px;height:34px}.end{width:34px;height:34px}.row{height:40px}.sw{grid-template-columns:repeat(10,28px)}.sw button{width:28px;height:28px}.offer button,.cv button{height:34px}}
+    @media (pointer:coarse){.offer button{height:32px;font-size:13px}.hb,.hd.col .hb{width:32px;height:34px}.end{width:34px;height:34px}:is(.menu,.sl) .row{height:40px}.sw{grid-template-columns:repeat(10,28px)}.sw button{width:28px;height:28px}.offer button,.cv button{height:34px}}
   </style>
   <div class="hd"><button class="hb add" title="${esc(L('addBelow', 'Add a block below (Alt: above)'))}">${svg('plus')}</button><button class="hb grip" title="${esc(L('gripTip', 'Drag to move it, click for its menu'))}">${svg('grip')}</button></div>
   <button class="end" title="${esc(L('addEnd', 'Add a block at the end'))}">${svg('plus', 15)}</button>
@@ -1068,6 +1085,9 @@ export function writing(E: Core): Writing {
   const blockOf = (t: Element | null): Element | null => {
     for (let x = t; x && x !== doc.body && x !== doc.documentElement; x = x.parentElement) {
       if (E.isUi(x)) return null;
+      // A to-do's words, a callout's, a toggle's title: their block.
+      const u = unitOf(x);
+      if (u !== x) return u;
       const tag = x.tagName;
       if (tag === 'SUMMARY' && x.parentElement?.tagName === 'DETAILS') return x.parentElement;
       if (tag === 'LI') return x;
@@ -1128,7 +1148,7 @@ export function writing(E: Core): Writing {
     const w = E.editing();
     if (w) return [unitOf(w)];
     const s = E.sel();
-    return s && s !== doc.body ? [s] : [];
+    return s && s !== doc.body ? [unitOf(s)] : [];
   };
   const inOrder = (list: Element[]) => [...list].sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
 
@@ -1236,7 +1256,14 @@ export function writing(E: Core): Writing {
   const copyBlocks = (list: Element[]) => {
     const all = inOrder(list);
     if (!all.length) return;
-    E.copy(all.map((b) => b.outerHTML).join(''), all.length > 1 ? L('nBlocks', '{n} blocks').replace('{n}', String(all.length)) : E.nameOf(all[0]));
+    const html = all
+      .map((b) => {
+        const c = b.cloneNode(true) as Element;
+        for (const x of [c, ...c.querySelectorAll('[data-n-ce],[data-n-ph],[data-n-ceoff]')]) for (const a of ['contenteditable', 'data-n-ce', 'data-n-ph', 'data-n-ceoff']) x.removeAttribute(a);
+        return c.outerHTML;
+      })
+      .join('');
+    E.copy(html, all.length > 1 ? L('nBlocks', '{n} blocks').replace('{n}', String(all.length)) : E.nameOf(all[0]));
   };
   const removeBlocks = (list: Element[]) => {
     const all = inOrder(list).filter((x) => x !== doc.body);
@@ -1741,12 +1768,18 @@ export function writing(E: Core): Writing {
         const img = make('img', 'n-pic');
         img.src = src;
         img.alt = typeof arg.alt === 'string' ? arg.alt.slice(0, 300) : '';
-        // Several dropped at once keep their order: each after the one before it.
-        const group = where.group as { done: Element[] } | undefined;
-        const prev = group?.done.filter((x) => x.isConnected).pop();
-        if (prev) prev.after(img);
+        // Several dropped at once keep their order, whichever is ready first: after the one before it, or before the one after it.
+        const group = where.group as { done: (Element | undefined)[] } | undefined;
+        const n = Number(where.n) || 0;
+        const before = group?.done
+          .slice(0, n)
+          .filter((x): x is Element => !!x && x.isConnected)
+          .pop();
+        const later = group?.done.slice(n + 1).find((x): x is Element => !!x && x.isConnected);
+        if (before) before.after(img);
+        else if (later) later.before(img);
         else placeBlock(img, where);
-        group?.done.push(img);
+        if (group) group.done[n] = img;
         return { pick: img };
       });
       return;
@@ -1960,38 +1993,47 @@ export function writing(E: Core): Writing {
     const r = b.getBoundingClientRect();
     return { ref: b, after: y > r.top + r.height / 2 };
   };
+  /** Items moved out of their lists, each run of them in a list of their old one's kind (blocks stay as they are). */
+  const asBlocks = (all: Element[]): Element[] => {
+    const out: Element[] = [];
+    let run: HTMLElement | null = null;
+    for (const b of all) {
+      if (b.tagName !== 'LI') {
+        out.push(b);
+        run = null;
+        continue;
+      }
+      const from = b.parentElement ?? make('ul');
+      if (!run || !sameList(run, from)) {
+        run = cloneList(from);
+        run.removeAttribute('start');
+        out.push(run);
+      }
+      run.append(b);
+    }
+    return out;
+  };
   const moveTo = (list: Element[], d: NonNullable<typeof drop>) => {
     const all = inOrder(list);
     E.change(() => {
+      const oldLists = new Set(all.filter((b) => b.tagName === 'LI').map((b) => b.parentElement!));
       let ref: Element = d.ref;
-      let afterRef = d.after;
-      if (d.into) {
-        for (const b of all) ref.append(b);
-        return true;
-      }
-      for (const b of all) {
-        const oldList = b.tagName === 'LI' ? b.parentElement : null;
-        let node: Element = b;
-        if (b.tagName === 'LI' && ref.tagName !== 'LI') {
-          // An item dragged out of its list takes a list of its own kind along.
-          const l = cloneList(oldList ?? make('ul'));
-          l.removeAttribute('start');
-          l.append(b);
-          node = l;
-        } else if (b.tagName !== 'LI' && ref.tagName === 'LI') {
-          // A block dragged among a list's items goes beside the whole list.
+      let nodes: Element[];
+      if (!d.into && ref.tagName === 'LI' && all.every((b) => b.tagName === 'LI')) nodes = all;
+      else {
+        // Blocks dragged among a list's items go beside the whole list; items dragged elsewhere take a list along.
+        if (ref.tagName === 'LI') {
           let top: Element = ref.parentElement!;
           while (top.parentElement?.tagName === 'LI') top = top.parentElement.parentElement!;
           ref = top;
         }
-        if (afterRef) ref.after(node);
-        else ref.before(node);
-        if (afterRef) {
-          ref = node;
-        }
-        if (oldList && !oldList.children.length) oldList.remove();
-        if (node !== b && isList(node)) merge(node);
+        nodes = asBlocks(all);
       }
+      if (d.into) ref.append(...nodes);
+      else if (d.after) ref.after(...nodes);
+      else ref.before(...nodes);
+      for (const l of oldLists) if (!l.children.length) l.remove();
+      for (const n of nodes) if (isList(n) && n.isConnected) merge(n);
       picked = [];
       return { pick: all[0] };
     });
@@ -2389,10 +2431,12 @@ export function writing(E: Core): Writing {
       const box = t.closest?.('input[type=checkbox]');
       const li = box?.parentElement;
       if (box && li && li.tagName === 'LI' && isTodo(li) && boxOf(li) === box) {
-        stop(e);
+        // The browser ticks it (held back, the click would untick it again): the page keeps what it shows.
+        e.stopImmediatePropagation();
+        const on = (box as HTMLInputElement).checked;
         const off = w ? (E.offset(w) ?? 0) : 0;
         E.change(() => {
-          tick(li);
+          box.toggleAttribute('checked', on);
           return w ? writeIn(w, { off }) : true;
         });
         return;
@@ -2504,7 +2548,7 @@ export function writing(E: Core): Writing {
   const hasFiles = (dt: DataTransfer | null) => !!dt && [...dt.types].includes('Files');
   /** Sends pictures to the app, which makes them small enough to live in the page and sends each back to its place. */
   const sendPictures = (files: File[], where: Record<string, unknown>) => {
-    const group = { done: [] as Element[] };
+    const group = { done: [] as (Element | undefined)[] };
     files.slice(0, 12).forEach((f, i) => {
       const id = `a${++asks}`;
       asked.set(id, { what: 'picture', ...where, group, n: i });
@@ -2564,6 +2608,7 @@ export function writing(E: Core): Writing {
     true,
   );
   const pasteLines = (h: HTMLElement, text: string) => {
+    dropSelected(h);
     const lines = text.replace(/\n+$/, '').split(/\n/);
     E.change(() => {
       const u = unitOf(h);
@@ -2653,13 +2698,15 @@ export function writing(E: Core): Writing {
     const last = node.nodeType === 11 ? node.lastChild : node;
     r.insertNode(node);
     if (first && last) {
+      // What the cut left empty on either side of the words goes.
+      trimEdge(first.previousSibling, true);
+      trimEdge(last.nextSibling, false);
       const s = doc.createRange();
       s.setStartBefore(first);
       s.setEndAfter(last);
       getSelection()?.removeAllRanges();
       getSelection()?.addRange(s);
     }
-    tidyOwn(h);
   };
   const inlineCode = () => {
     const h = E.editing();
@@ -2675,6 +2722,8 @@ export function writing(E: Core): Writing {
     const c = make('code');
     c.append(r.extractContents());
     r.insertNode(c);
+    trimEdge(c.previousSibling, true);
+    trimEdge(c.nextSibling, false);
     const s = doc.createRange();
     s.selectNodeContents(c);
     getSelection()?.removeAllRanges();

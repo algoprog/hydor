@@ -84,6 +84,13 @@ function AddressRow({ placeholder, label, onSend, check, button = 'Add', autoFoc
   );
 }
 
+/** A gradient as a browser writes it back (rgb() for #hex), so the page's cover is found among the ones offered. */
+const asWritten = (css: string) => {
+  const el = document.createElement('div');
+  el.style.backgroundImage = css;
+  return el.style.backgroundImage.replace(/\s/g, '');
+};
+
 /** The covers to choose from: gradients, a picture from this device, one from the web, and none. */
 export function CoverChoices({ onPick, onRemove, onError, current }: { onPick: (c: { gradient: string } | { src: string }) => void; onRemove?: () => void; onError: (e: unknown) => void; current?: string }) {
   return (
@@ -97,7 +104,7 @@ export function CoverChoices({ onPick, onRemove, onError, current }: { onPick: (
             aria-label={g.name}
             onClick={() => onPick({ gradient: g.css })}
             style={{ backgroundImage: g.css }}
-            className={cx('h-10 rounded-lg border border-line-2 transition-transform hover:scale-[1.04]', current?.replace(/\s/g, '') === g.css.replace(/\s/g, '') && 'ring-2 ring-accent ring-offset-1 ring-offset-elevated')}
+            className={cx('h-10 rounded-lg border border-line-2 transition-transform hover:scale-[1.04]', !!current && asWritten(current) === asWritten(g.css) && 'ring-2 ring-accent ring-offset-1 ring-offset-elevated')}
           />
         ))}
       </div>

@@ -1154,13 +1154,18 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
   };
   const undoTyping = () => {
     if (!editing || !typing.length) return step(true);
-    typingRedo.push({ h: editing.innerHTML, o: offsetIn(editing) ?? 0 });
-    putWords(typing.pop()!);
-    // Back to where writing began: no step is left to keep.
-    if (!typing.length && editPushed) {
+    if (typing.length === 1 && editPushed) {
+      // Back to where writing in this block began: its words become a step to redo, as any other change.
+      const now = snap();
+      putWords(typing.pop()!);
       undo.pop();
       editPushed = false;
+      redo.push(now);
+      typingRedo.length = 0;
+      return state();
     }
+    typingRedo.push({ h: editing.innerHTML, o: offsetIn(editing) ?? 0 });
+    putWords(typing.pop()!);
     state();
   };
   const redoTyping = () => {
@@ -1827,6 +1832,9 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     },
     canAsk: () => canAskAgent,
   };
+  // A paste event (Ctrl+V of the part copied waits for it, below): any one, a picture's too, which writing.ts takes.
+  let pasteTimer = 0;
+  addEventListener('paste', () => clearTimeout(pasteTimer), true);
   // Its listeners come before the editor's own, so the keys it takes (Enter, Backspace, "/"…) go to it first.
   const W: Writing = writing(core);
 
@@ -1905,6 +1913,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     'paste',
     (e) => {
       if (!inEditing(e)) {
+        clearTimeout(pasteTimer);
         if (!editing && clip && sel) {
           e.preventDefault();
           act('paste');
@@ -1937,7 +1946,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     (e) => {
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key;
-      if (fromUi(e)) return;
+      if (fromUi(e) || e.isComposing || e.keyCode === 229) return;
       if (mod && k.toLowerCase() === 's') {
         e.preventDefault();
         finishEditing();
@@ -1970,6 +1979,13 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
       if (mod && k.toLowerCase() === 'y') {
         e.preventDefault();
         return act('redo');
+      }
+      if (mod && k.toLowerCase() === 'v' && clip && sel) {
+        // The paste event comes next where the browser sends one (with a picture, say: writing.ts takes it); Safari
+        // sends none while nothing editable has the focus, so the part copied goes in after a moment unless one came.
+        clearTimeout(pasteTimer);
+        pasteTimer = window.setTimeout(() => act('paste'), 80);
+        return;
       }
       if (!sel) return;
       if (mod && ['c', 'x', 'd', 'g'].includes(k.toLowerCase())) {
