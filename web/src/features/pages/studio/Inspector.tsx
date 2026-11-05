@@ -9,6 +9,7 @@ import { useRef, useState, type ReactNode } from 'react';
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ClipboardPaste, Copy, ImageUp, Italic, MessageSquarePlus, MoreHorizontal, Strikethrough, Type, Underline } from 'lucide-react';
 import { Button, cx, IconButton, MenuItem, MenuSep, Popover, Switch } from '../../../components/ui';
 import { codeColours } from '@shared/code-colours';
+import { tr } from '../../../i18n/runtime';
 import type { EdSel } from '../frame';
 import { loadKatex, texHtml } from '../common/katex';
 import { BoxModel, Choice, ColorField, Group, hexOf, NumField, Row, Select, splitNum, Typed } from './fields';
@@ -263,7 +264,7 @@ export function PartPanel({
             <Row label="Language" hint="Its code is coloured as this language's; Auto tells it from the code">
               <Select
                 value={sel.lang}
-                options={[{ value: '', label: sel.langAuto ? `Auto · ${CODE_LANGS.find((l) => l.value === sel.langAuto)?.label ?? sel.langAuto}` : 'Auto' }, ...CODE_LANGS]}
+                options={[{ value: '', label: sel.langAuto ? `${tr('Auto')} · ${CODE_LANGS.find((l) => l.value === sel.langAuto)?.label ?? sel.langAuto}` : 'Auto' }, ...CODE_LANGS]}
                 onChange={(v) => cmd('codeLang', v)}
                 title="Language"
               />
