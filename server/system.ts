@@ -18,8 +18,25 @@ const read = (p: string) => {
 };
 
 function run(cmd: string, args: string[], timeout = 4000): Promise<string> {
-  return new Promise((resolve) => execFile(cmd, args, { timeout, maxBuffer: 4 << 20 }, (_e, out) => resolve(String(out ?? ''))));
+  return runResult(cmd, args, timeout).then((r) => r.out);
 }
+
+/** Output plus the error code, so a missing program can be told from one that failed once. */
+function runResult(cmd: string, args: string[], timeout = 4000): Promise<{ out: string; code: string | number | null }> {
+  return new Promise((resolve) => {
+    try {
+      execFile(cmd, args, { timeout, maxBuffer: 4 << 20 }, (e, out) =>
+        resolve({ out: String(out ?? ''), code: e ? ((e as NodeJS.ErrnoException).code ?? 'failed') : null }),
+      );
+    } catch (e) {
+      // spawn throws synchronously on some errors (ENOMEM under memory pressure).
+      resolve({ out: '', code: (e as NodeJS.ErrnoException).code ?? 'failed' });
+    }
+  });
+}
+
+// How long to stop asking nvidia-smi after it turns out not to be installed (a driver may be added later).
+const NO_GPU_RECHECK_MS = 5 * 60_000;
 
 const CLK = 100; // USER_HZ on Linux
 const PAGE = 4096;
@@ -40,7 +57,11 @@ export class SystemMonitor extends EventEmitter {
   private users = new Map<number, string>();
   private info: SystemInfo | null = null;
   private infoAt = 0;
-  private hasGpu = true;
+  // nvidia-smi is skipped until this time; set only when it is missing, never for a single failed call.
+  private gpuOffUntil = 0;
+  private get hasGpu() {
+    return Date.now() >= this.gpuOffUntil;
+  }
 
   /** A client started or stopped watching; sampling runs only while someone watches. */
   watch(delta: 1 | -1) {
@@ -83,12 +104,14 @@ export class SystemMonitor extends EventEmitter {
 
   private async gpus(): Promise<GpuSample[]> {
     if (!this.hasGpu) return [];
-    const out = await run('nvidia-smi', [
+    const { out, code } = await runResult('nvidia-smi', [
       '--query-gpu=index,name,utilization.gpu,utilization.memory,memory.used,memory.total,temperature.gpu,power.draw,power.limit,fan.speed,clocks.sm,pstate',
       '--format=csv,noheader,nounits',
     ]);
     if (!out.trim()) {
-      this.hasGpu = false;
+      // Not installed, or no driver: check again in a while. Anything else (a timeout while the
+      // GPUs are busy, a driver hiccup, a failed spawn) only loses this one reading.
+      if (code === 'ENOENT' || code === 9) this.gpuOffUntil = Date.now() + NO_GPU_RECHECK_MS;
       return [];
     }
     const num = (s: string) => {
