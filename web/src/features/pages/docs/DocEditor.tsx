@@ -1,14 +1,19 @@
 // A document to read and edit as in Word or Google Docs: its sheet of paper (its size and margins; on a phone the
-// words fill the screen's width), edited in place (engine.ts), the toolbar over it (Toolbar.tsx), its headings
-// beside it on a wide screen (folded away on a narrow one) to go to, and the words it has in a quiet corner. A page
-// break shows as a gap between two sheets. A picture picked gets handles to size it and a bar for its alignment,
-// caption and description (Picture.tsx). Words picked offer to ask the agent about them, and the page around is
-// told what an agent asked now would be about (the whole document, the section the caret is in, the words
-// picked). Changes stay unsaved until Save (Ctrl+S), as a page's do; the paper, margins, font and size are under
-// Page setup.
+// words fill the screen's width), edited in place (engine.ts), with the menus (Edit, View, Insert, Format, Tools,
+// and Search the menus) and the toolbar over it (menu.tsx, Toolbar.tsx), its headings beside it on a wide screen
+// (folded away on a narrow one) to go to, and the words it has in a quiet corner (a click there counts them all). A
+// page break shows as a gap between two sheets, the header and footer on each sheet's margins. A picture picked gets
+// handles to size it and a bar for its alignment, caption and description (Picture.tsx); a table, handles on its
+// columns' borders. Words picked offer to comment on them or ask the agent about them; comments show beside the page
+// on a wide screen, level with their words, or in a panel (CommentsView.tsx). "/" at a line's start opens a menu of
+// what to put there (Slash.tsx); Ctrl+F finds and Ctrl+H replaces (finding.ts); equations are written in a box with
+// their preview. The page around is told what an agent asked now would be about (the whole document, the section
+// the caret is in, the words picked). Changes stay unsaved until Save (Ctrl+S), as a page's do; the paper, margins,
+// font and size are under Page setup.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink, FileCog, Link2, ListTree, Sparkles, Unlink } from 'lucide-react';
-import { docHeadings, docWords, FONTS, MARGINS, PAPERS, sectionOf, type Doc, type ImageBlock } from '@shared/docs';
+import { ExternalLink, FileCog, Link2, ListTree, MessageSquare, MessageSquarePlus, Sparkles, Unlink } from 'lucide-react';
+import { docHeadings, docWords, FONTS, MARGINS, PAPERS, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type TableBlock } from '@shared/docs';
+import { newCommentId, openComments, type Comment } from '@shared/comments';
 import { post } from '../../../lib/api';
 import { mu } from '../../../lib/machine';
 import { toast, toastError } from '../../../lib/store';
@@ -19,13 +24,28 @@ import type { AskScope, ModelEditorProps } from '../kinds';
 import { choosePicture, pictureFromUrl, uploadPicture } from '../pictures';
 import { NumInput } from '../slides/controls';
 import { Select } from '../studio/fields';
+import { CharPicker } from '../common/CharPicker';
+import { FindBar, useFind } from '../common/FindBar';
+import { loadKatex, texHtmlNow } from '../common/katex';
+import { MenuBar } from '../common/menus';
+import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
+import { inputCls } from '../../../components/ui';
+import { CommentsColumn, CommentsPanel, type CommentActions, type Draft } from './CommentsView';
 import { editorCss, paperPx, useDocFonts } from './css';
-import { DocEngine, type SelState } from './engine';
-import { fixDoc, sameDoc } from './ops';
+import { BandsDialog, EquationBox, SpacingDialog, WordCountDialog, type Counts } from './Dialogs';
+import { DocEngine, type AtomClick, type SelState } from './engine';
+import { useDocFind } from './finding';
+import { docMenus, PAGE_NUMBERS, type Zoom } from './menu';
+import { fixDoc, runsBetween, sameDoc, type Pos } from './ops';
 import { Picked } from './Picture';
+import { slashAt, slashItems, slashMatches, SlashMenu } from './Slash';
+import { ColumnHandles, printDoc } from './TableTools';
 import { Toolbar } from './Toolbar';
 
 const OUTLINE_KEY = 'wa.docs.outline';
+const VIEW_KEY = 'wa.docs.view';
+/** The comments' column beside the page, and the room around it. */
+const COLUMN = 280;
 
 /** Where a picture of a document shows from in the app (whose own pages load no picture from the web). */
 const pictureSrc = (s: string) =>
@@ -38,6 +58,9 @@ const short = (s: string, n = 48) => {
   const t = s.replace(/\s+/g, ' ').trim();
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 };
+
+/** Maths as KaTeX draws it, once it has loaded (until then, its LaTeX, quietly). */
+const drawMath = (tex: string, display: boolean) => texHtmlNow(tex, display) ?? `<span class="nd-math-wait">${tex.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)}</span>`;
 
 /** What an agent asked now would be about: the document, the section the caret is in, the words or the picture picked. */
 function scopesOf(doc: Doc, st: SelState): AskScope[] {
@@ -53,25 +76,130 @@ function scopesOf(doc: Doc, st: SelState): AskScope[] {
   return out;
 }
 
+interface ViewPrefs {
+  zoom: Zoom;
+  spell: boolean;
+  count: boolean;
+  comments: boolean;
+}
+
+function loadView(): ViewPrefs {
+  try {
+    const v = JSON.parse(localStorage.getItem(VIEW_KEY) ?? 'null');
+    if (v && typeof v === 'object')
+      return { zoom: v.zoom === 'fit' || (typeof v.zoom === 'number' && v.zoom >= 0.25 && v.zoom <= 4) ? v.zoom : 1, spell: v.spell !== false, count: v.count !== false, comments: v.comments !== false };
+  } catch {}
+  return { zoom: 1, spell: true, count: true, comments: true };
+}
+
+/** The editor's keys, for the shortcuts dialog. */
+const SHORTCUTS: ShortcutGroup[] = [
+  {
+    title: 'Common',
+    items: [
+      ['Ctrl+S', 'Save'],
+      ['Ctrl+Z', 'Undo'],
+      ['Ctrl+Shift+Z', 'Redo'],
+      ['Ctrl+F', 'Find'],
+      ['Ctrl+H', 'Find and replace'],
+      ['Ctrl+P', 'Print'],
+      ['Ctrl+Shift+V', 'Paste without formatting'],
+      ['Ctrl+Shift+C', 'Word count'],
+      ['Ctrl+/', 'Keyboard shortcuts'],
+      ['Alt+/', 'Search the menus'],
+    ],
+  },
+  {
+    title: 'Text',
+    items: [
+      ['Ctrl+B', 'Bold'],
+      ['Ctrl+I', 'Italic'],
+      ['Ctrl+U', 'Underline'],
+      ['Ctrl+Shift+X', 'Strikethrough'],
+      ['Ctrl+.', 'Superscript'],
+      ['Ctrl+,', 'Subscript'],
+      ['Ctrl+K', 'Link'],
+      ['Ctrl+\\', 'Clear the formatting'],
+      ['Ctrl+Alt+M', 'Comment'],
+    ],
+  },
+  {
+    title: 'Paragraphs',
+    items: [
+      ['Ctrl+Alt+0', 'Normal text'],
+      ['Ctrl+Alt+1', 'Heading 1'],
+      ['Ctrl+Alt+2', 'Heading 2'],
+      ['Ctrl+Alt+3', 'Heading 3'],
+      ['Ctrl+Alt+4', 'Heading 4'],
+      ['Ctrl+Shift+7', 'Numbered list'],
+      ['Ctrl+Shift+8', 'Bulleted list'],
+      ['Ctrl+Shift+9', 'Checklist'],
+      ['Ctrl+Shift+L', 'Align left'],
+      ['Ctrl+Shift+E', 'Centre'],
+      ['Ctrl+Shift+R', 'Align right'],
+      ['Ctrl+Shift+J', 'Justify'],
+      ['Tab', 'More indent (in a table: the next cell)'],
+      ['Shift+Tab', 'Less indent'],
+      ['Ctrl+Enter', 'A page break'],
+      ['Shift+Enter', 'A new line in the same paragraph'],
+    ],
+  },
+  {
+    title: 'Typed at the start of a line',
+    items: [
+      ['/', 'The menu of what to put there'],
+      ['# Space', 'Heading 1 (## for Heading 2…)'],
+      ['- Space', 'Bulleted list'],
+      ['1. Space', 'Numbered list'],
+      ['[] Space', 'Checklist'],
+      ['> Space', 'Quote'],
+      ['--- Enter', 'A line across'],
+      ['``` Enter', 'Code'],
+    ],
+  },
+];
+
 export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef }: ModelEditorProps<Doc>) {
   const [model, setModel] = useState<Doc | null>(() => (doc?.model ? fixDoc(doc.model) : null));
   const [saved, setSaved] = useState<Doc | null>(model);
   const [st, setSt] = useState<SelState | null>(null);
   const [saving, setSaving] = useState(false);
   const [linking, setLinking] = useState<{ url: string; text: string } | null>(null);
-  const [menu, setMenu] = useState<'page' | 'outline' | null>(null);
+  const [menu, setMenu] = useState<'page' | 'outline' | 'url' | null>(null);
+  const [url, setUrl] = useState('');
   const [outlineOpen, setOutlineOpen] = useState(() => localStorage.getItem(OUTLINE_KEY) !== '0');
+  const [view, setView] = useState<ViewPrefs>(loadView);
   const [width, setWidth] = useState(1200);
   const [words, setWords] = useState(0);
   const [float, setFloat] = useState<{ ask?: { x: number; y: number }; link?: { x: number; y: number } } | null>(null);
+  const [dialog, setDialog] = useState<'count' | 'spacing' | 'bands' | 'keys' | null>(null);
+  const [counts, setCounts] = useState<Counts & { picked: boolean }>({ words: 0, chars: 0, charsNoSpaces: 0, paragraphs: 0, pages: 1, picked: false });
+  const [panel, setPanel] = useState(false);
+  const [active, setActive] = useState<string | null>(null);
+  const [showResolved, setShowResolved] = useState(false);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [tops, setTops] = useState<Map<string, number>>(new Map());
+  const [eq, setEq] = useState<{ kind: 'block'; id: string; tex: string } | { kind: 'run'; at: Pos; tex: string } | { kind: 'new'; inline: boolean } | null>(null);
+  const [chars, setChars] = useState<{ kind: 'insert' } | { kind: 'icon'; id: string } | null>(null);
+  const [spot, setSpot] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [slash, setSlash] = useState<{ key: string; from: number; query: string; index: number } | null>(null);
+  const [slashPos, setSlashPos] = useState<{ x: number; top: number; bottom: number } | null>(null);
+  const [math, setMath] = useState(0);
+  const [hoverTable, setHoverTable] = useState<string | null>(null);
+  const [bands, setBands] = useState<{ y: number; x: number; kind: 'head' | 'foot'; page: number }[]>([]);
   const [confirm, confirmNode] = useConfirm();
+  const find = useFind();
   const root = useRef<HTMLDivElement>(null);
   const paper = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
   const engine = useRef<DocEngine | null>(null);
   const linkRef = useRef<HTMLButtonElement>(null);
   const pageRef = useRef<HTMLButtonElement>(null);
   const outlineRef = useRef<HTMLButtonElement>(null);
+  const commentsRef = useRef<HTMLButtonElement>(null);
+  const spotRef = useRef<HTMLDivElement>(null);
+  const dismissed = useRef('');
   const fonts = useDocFonts(model);
 
   useLayoutEffect(() => {
@@ -83,8 +211,26 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     return () => ro.disconnect();
   }, []);
   const phone = layout === 'sheet' || width < 640;
-  const narrow = !!model && width - (outlineOpen && width >= 1100 ? 220 : 0) < paperPx(model) + 56;
   const wideOutline = width >= 1100 && layout !== 'sheet';
+  const outlineW = wideOutline && outlineOpen ? 220 : 0;
+  const comments: Comment[] = model?.comments ?? [];
+  const shownComments = showResolved ? comments : openComments(comments);
+  const ppx = model ? paperPx(model) : 794;
+  // The comments beside the page where there is room for them, else in a panel.
+  const columnFits = !phone && width - outlineW >= ppx * (typeof view.zoom === 'number' ? Math.min(1, view.zoom) : 1) + COLUMN + 24 + 48;
+  const column = columnFits && view.comments && (comments.length > 0 || !!draft);
+  const panelW = !phone && panel && !columnFits ? 320 : 0;
+  const room = width - outlineW - panelW - (column ? COLUMN + 24 : 0) - 48;
+  // Fit the width: the paper as wide as there is room for; else as large as asked, or (no room for it) the words
+  // filling the width, as on a phone.
+  const want = view.zoom === 'fit' ? Math.min(3, room / ppx) : view.zoom;
+  const narrow = !!model && (phone || room < ppx * Math.min(want, 1) || want < 0.4);
+  const zoom = narrow ? 1 : want;
+  const setPrefs = (p: Partial<ViewPrefs>) => {
+    const next = { ...view, ...p };
+    setView(next);
+    localStorage.setItem(VIEW_KEY, JSON.stringify(next));
+  };
 
   const dirty = !!model && !!saved && model !== saved;
   const dirtyRef = useRef(dirty);
@@ -120,6 +266,9 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   stRef.current = st;
   const readOnlyRef = useRef(readOnly);
   readOnlyRef.current = readOnly;
+  // What the engine's keys and clicks ask of the editor (kept current: the engine is made once).
+  const keys = useRef<(e: KeyboardEvent) => boolean>(() => false);
+  const atoms = useRef<(a: AtomClick) => void>(() => {});
 
   // The page's engine, once there is a document to show.
   useLayoutEffect(() => {
@@ -128,23 +277,12 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
       readOnly: !!readOnly,
       src: pictureSrc,
       breakLabel: tr('Page break'),
+      tocHint: tr('Headings you add show here, to go to them.'),
+      math: drawMath,
       onChange: (d) => setModel(d),
       onState: (s) => setSt(s),
-      onKey: (e) => {
-        const mod = e.ctrlKey || e.metaKey;
-        const k = e.key.toLowerCase();
-        if (mod && k === 's') {
-          e.preventDefault();
-          void saveNow.current();
-          return true;
-        }
-        if (mod && k === 'k' && !e.shiftKey && !readOnlyRef.current) {
-          e.preventDefault();
-          setLinking({ url: stRef.current?.link ?? '', text: '' });
-          return true;
-        }
-        return false;
-      },
+      onKey: (e) => keys.current(e),
+      onAtom: (a) => atoms.current(a),
       upload: (f) => {
         toast(tr('Adding the picture…'));
         return uploadPicture(f);
@@ -159,6 +297,24 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   useEffect(() => {
     engine.current?.setReadOnly(!!readOnly);
   }, [readOnly]);
+  useEffect(() => {
+    if (engine.current) engine.current.root.spellcheck = view.spell;
+  }, [view.spell, !!engine.current]);
+
+  // KaTeX, once a document with maths opens: its equations drawn again with it.
+  const hasMath = !!model && JSON.stringify(model.blocks).includes('"math"');
+  useEffect(() => {
+    if (!hasMath || math) return;
+    let alive = true;
+    void loadKatex().then(() => {
+      if (!alive) return;
+      engine.current?.redrawMath();
+      setMath(1);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [hasMath, math]);
 
   // Another document, or another version of it, while nothing was changed here: start from it.
   useEffect(() => {
@@ -180,18 +336,17 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc?.key]);
 
-  // Ctrl+S from the toolbar's fields too.
+  // The editor's keys from the toolbar's and the find bar's fields too: save, find, print, the shortcuts.
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || !(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 's') return;
+      if (e.defaultPrevented || !(e.ctrlKey || e.metaKey)) return;
       const a = document.activeElement;
       if (a && a !== document.body && !root.current?.contains(a)) return;
-      e.preventDefault();
-      void saveNow.current();
+      if (globalKey(e)) e.preventDefault();
     };
     window.addEventListener('keydown', on);
     return () => window.removeEventListener('keydown', on);
-  }, []);
+  });
 
   // The words it has, a moment after each change.
   useEffect(() => {
@@ -211,16 +366,18 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     onScopes(s);
   }, [st, model?.blocks]);
 
-  // The chip to ask about the words picked, and the bar of the link the caret is in.
+  const tick = `${width}:${fonts}:${narrow}:${zoom}:${math}:${column}:${panelW}`;
+
+  // The chips by the words picked (comment on them, ask the agent about them), and the bar of the link the caret is in.
   useLayoutEffect(() => {
     const h = host.current;
     if (!st || !h) return setFloat(null);
     const hr = h.getBoundingClientRect();
     const out: { ask?: { x: number; y: number }; link?: { x: number; y: number } } = {};
     const s = window.getSelection();
-    if (onAsk && !st.collapsed && st.text.trim() && s?.rangeCount && paper.current?.contains(s.anchorNode)) {
+    if ((onAsk || !readOnly) && !st.collapsed && st.text.trim() && s?.rangeCount && paper.current?.contains(s.anchorNode)) {
       const r = s.getRangeAt(0).getBoundingClientRect();
-      if (r.width || r.height) out.ask = { x: Math.min(Math.max(r.left - hr.left + r.width / 2, 60), hr.width - 60), y: phone ? r.bottom - hr.top + 10 : r.top - hr.top - 8 };
+      if (r.width || r.height) out.ask = { x: Math.min(Math.max(r.left - hr.left + r.width / 2, 110), hr.width - 110), y: phone ? r.bottom - hr.top + 10 : r.top - hr.top - 8 };
     }
     if (st.collapsed && st.link && !readOnly) {
       const a = engine.current?.linkElement();
@@ -230,15 +387,169 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
       }
     }
     setFloat(out.ask || out.link ? out : null);
-  }, [st, width, fonts]);
+  }, [st, tick]);
 
+  // The comment picked follows the caret into the words of one.
+  useEffect(() => {
+    if (st?.cm.length && !st.cm.includes(active ?? '')) setActive(st.cm.find((id) => comments.some((c) => c.id === id && (showResolved || !c.resolved))) ?? active);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st?.cm.join()]);
+
+  // Where each comment's words are down the page, for the column beside it; and the header and footer on each sheet.
+  useLayoutEffect(() => {
+    const h = host.current;
+    const p = paper.current;
+    if (!h || !p || !model) return;
+    const hr = h.getBoundingClientRect();
+    if (column) {
+      const next = new Map<string, number>();
+      for (const c of shownComments) {
+        const el = p.querySelector(`[data-cm~="${CSS.escape(c.id)}"]`);
+        if (el) next.set(c.id, el.getBoundingClientRect().top - hr.top);
+      }
+      setTops((old) => (old.size === next.size && [...next].every(([k, v]) => Math.abs((old.get(k) ?? -1) - v) < 1) ? old : next));
+    }
+    // The header at the top of each sheet, the footer at its bottom (a page break ends a sheet).
+    if (!narrow && (model.header || model.footer)) {
+      const pr = p.getBoundingClientRect();
+      const m = (model.page.margin * 96) / 25.4;
+      const out: { y: number; x: number; kind: 'head' | 'foot'; page: number }[] = [];
+      const x = pr.left - hr.left;
+      const breaks = [...p.querySelectorAll<HTMLElement>(':scope > .nd-pb')].map((b) => b.getBoundingClientRect());
+      const sheets = breaks.length + 1;
+      for (let k = 0; k < sheets; k++) {
+        if (model.titlePage && k === 0) continue;
+        const top = k === 0 ? pr.top - hr.top + (m * zoom) / 2 : breaks[k - 1].bottom - hr.top + (m * zoom * 0.35);
+        const bottom = k === sheets - 1 ? pr.bottom - hr.top - (m * zoom) / 2 : breaks[k].top - hr.top - (m * zoom * 0.35);
+        if (model.header) out.push({ y: top, x, kind: 'head', page: k + 1 });
+        if (model.footer) out.push({ y: bottom, x, kind: 'foot', page: k + 1 });
+      }
+      setBands(out);
+    } else setBands([]);
+  }, [model, tick, column, showResolved, active]);
+
+  // "/" typed at a line's start, or after a space: its menu, narrowed as more is typed.
+  useEffect(() => {
+    const e = engine.current;
+    if (!e || !st || readOnly) return setSlash(null);
+    const b = e.before_();
+    const m = b ? slashAt(b.text) : null;
+    if (!b || !m) return setSlash(null);
+    const key = `${b.at.b}:${b.at.c?.join() ?? ''}:${m.from}`;
+    if (dismissed.current === key) return setSlash(null);
+    setSlash((s) => ({ key, from: m.from, query: m.query, index: s?.key === key && s.query === m.query ? s.index : 0 }));
+  }, [st]);
+  useLayoutEffect(() => {
+    const r = slash ? engine.current?.caretRect() : null;
+    const h = host.current?.getBoundingClientRect();
+    if (!r || !h) return setSlashPos(null);
+    setSlashPos({ x: Math.max(4, Math.min(r.left - h.left, h.width - 244)), top: r.top - h.top, bottom: r.bottom - h.top });
+  }, [slash?.key, slash?.query, tick]);
+
+  const found = useDocFind(engine.current, model, find, host.current, tick);
   const heads = useMemo(() => (model ? docHeadings(model) : []), [model?.blocks]);
   const current = model && st ? sectionOf(model, st.index)?.id : undefined;
   const css = useMemo(() => (model ? editorCss(model, { narrow, hints: { title: tr('Title'), body: tr('Start writing') } }) : ''), [model?.page, model?.font, model?.size, narrow]);
+  // The comments' marks: open ones in yellow, the one picked stronger; resolved ones not at all.
+  const marks = useMemo(
+    () =>
+      comments
+        .filter((c) => !c.resolved || (showResolved && c.id === active))
+        .map((c) => `.nd-ed [data-cm~="${CSS.escape(c.id)}"]{background:${c.id === active ? 'rgba(251,188,4,.5)' : 'rgba(251,188,4,.22)'};border-bottom:2px solid rgba(251,188,4,.8)}`)
+        .join('\n'),
+    [comments, active, showResolved],
+  );
 
   if (!model) return <div className="flex h-full items-center justify-center text-fg-3">…</div>;
 
   const e = engine.current;
+  const slashList = e && slash ? slashMatches(slashItems(e, { picture: () => void pickPicture(), equation: () => openEquation(false), today: () => today() }), slash.query) : [];
+  const slashOpen = !!slash && slashList.length > 0 && !!slashPos;
+
+  /** A place over the page for a box to open by (the caret, or a block). */
+  const spotAt = (r: DOMRect | null | undefined) => {
+    const h = host.current?.getBoundingClientRect();
+    if (!r || !h) return setSpot({ x: 40, y: 40, w: 1, h: 1 });
+    setSpot({ x: r.left - h.left, y: r.top - h.top, w: Math.max(1, r.width), h: Math.max(1, r.height) });
+  };
+  function today() {
+    engine.current?.typeText(new Date().toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' }));
+  }
+  function openEquation(inline: boolean) {
+    spotAt(engine.current?.caretRect());
+    setEq({ kind: 'new', inline });
+  }
+  const pickSlash = (k: number) => {
+    const it = slashList[k];
+    if (!it || !e || !slash) return;
+    dismissed.current = '';
+    e.cutBack(slash.from);
+    setSlash(null);
+    it.run();
+  };
+  // The engine's keys first: the "/" menu's, then the editor's own.
+  keys.current = (ev) => {
+    if (slashOpen && slash) {
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        const n = slashList.length;
+        setSlash({ ...slash, index: (slash.index + (ev.key === 'ArrowDown' ? 1 : n - 1)) % n });
+        return true;
+      }
+      if (ev.key === 'Enter' || ev.key === 'Tab') {
+        ev.preventDefault();
+        pickSlash(slash.index);
+        return true;
+      }
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        dismissed.current = slash.key;
+        setSlash(null);
+        return true;
+      }
+    }
+    if (globalKey(ev)) {
+      ev.preventDefault();
+      return true;
+    }
+    return false;
+  };
+  atoms.current = (a) => {
+    const en = engine.current;
+    if (!en || readOnlyRef.current) return;
+    if (a.kind === 'math') {
+      const b = en.doc.blocks.find((x) => x.id === a.id);
+      if (b?.type !== 'math') return;
+      spotAt(en.elementOf(a.id)?.getBoundingClientRect());
+      setEq({ kind: 'block', id: a.id, tex: b.tex });
+    } else if (a.kind === 'mathRun') {
+      spotAt(en.caretRect());
+      setEq({ kind: 'run', at: a.at, tex: a.tex });
+    } else {
+      spotAt(en.elementOf(a.id)?.getBoundingClientRect());
+      setChars({ kind: 'icon', id: a.id });
+    }
+  };
+  /** Keys the editor has wherever its focus is: true when one was. */
+  function globalKey(ev: KeyboardEvent): boolean {
+    const mod = ev.ctrlKey || ev.metaKey;
+    if (!mod) return false;
+    const k = ev.key.toLowerCase();
+    const ro = readOnlyRef.current;
+    if (k === 's' && !ev.shiftKey && !ev.altKey) return void saveNow.current(), true;
+    if (k === 'f' && !ev.shiftKey && !ev.altKey) return find.show(false), true;
+    if (k === 'h' && !ev.shiftKey && !ev.altKey && !ro) return find.show(true), true;
+    if (k === 'p' && !ev.shiftKey && !ev.altKey) return void print(), true;
+    if ((k === '/' || ev.code === 'Slash') && !ev.altKey && !ev.shiftKey) return setDialog('keys'), true;
+    if (ev.code === 'KeyC' && ev.shiftKey && !ev.altKey) return openCount(), true;
+    if (ev.code === 'KeyM' && ev.altKey && !ro) return startComment(), true;
+    if (k === 'k' && !ev.shiftKey && !ev.altKey && !ro && engine.current?.root.contains(document.activeElement)) {
+      setLinking({ url: stRef.current?.link ?? '', text: '' });
+      return true;
+    }
+    return false;
+  }
+
   const discard = async () => {
     if (!(await confirm({ title: 'Discard your changes?', body: 'The document goes back to how it was saved.', confirm: 'Discard', danger: true }))) return;
     if (!e || !saved) return;
@@ -246,10 +557,10 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     setModel(e.doc);
     setSaved(e.doc);
   };
-  const pickPicture = async () => {
+  async function pickPicture() {
     const f = await choosePicture();
-    if (f && e) await e.addPictures([f]);
-  };
+    if (f && engine.current) await engine.current.addPictures([f]);
+  }
   const replacePicture = async (id: string) => {
     const f = await choosePicture();
     if (!f || !e) return;
@@ -275,6 +586,186 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     const s = scopesOf(model, st).find((x) => x.id === 'picture');
     if (s) onAsk(s.lead);
   };
+  async function print() {
+    const en = engine.current;
+    if (!en) return;
+    try {
+      await printDoc(en.doc, doc?.title ?? 'Document');
+    } catch (err) {
+      toastError(err);
+    }
+  }
+  function openCount() {
+    const en = engine.current;
+    if (!en) return;
+    const [s, z] = en.range();
+    const picked = !(s.b === z.b && s.o === z.o && (s.c?.join() ?? '') === (z.c?.join() ?? ''));
+    let text = '';
+    let paragraphs = 0;
+    if (picked) {
+      text = wordsText(runsBetween(en.doc, s, z));
+      paragraphs = Math.max(1, new Set([s.b, z.b]).size);
+    } else {
+      const parts: string[] = [];
+      for (const b of en.doc.blocks) {
+        if (b.type === 'p' || b.type === 'li') {
+          const t = wordsText(b.runs);
+          if (t.trim()) paragraphs++;
+          parts.push(t);
+        } else if (b.type === 'table') for (const r of b.rows) for (const c of r) parts.push(wordsText(c.runs));
+      }
+      text = parts.join('\n');
+    }
+    const w = wordCount(text);
+    const plain = text.replace(/⁣/g, '');
+    // Pages: the sheets the paper takes as it is drawn (a page break starts one), else as many words as a page holds.
+    const p = paper.current;
+    const pageH = ((PAPERS[en.doc.page.size].h - 2 * en.doc.page.margin) * 96) / 25.4;
+    let pages = 1;
+    if (p && !narrow) {
+      let used = 0;
+      for (const el of Array.from(p.children) as HTMLElement[]) {
+        if (el.classList.contains('nd-pb')) {
+          pages++;
+          used = 0;
+          continue;
+        }
+        used += el.offsetHeight + 8;
+        while (used > pageH) {
+          pages++;
+          used -= pageH;
+        }
+      }
+    } else pages = Math.max(1, Math.ceil(docWords(en.doc) / 450));
+    if (picked) pages = Math.max(1, Math.round((w / Math.max(1, docWords(en.doc))) * pages));
+    setCounts({ words: w, chars: plain.replace(/\n/g, '').length, charsNoSpaces: plain.replace(/\s/g, '').length, paragraphs, pages, picked });
+    setDialog('count');
+  }
+
+  // ---- comments ------------------------------------------------------------------------------------------------------
+  const setComments = (list: Comment[], gone?: string) => engine.current?.setComments(list, gone);
+  const ca: CommentActions = {
+    active,
+    readOnly,
+    focus: (id) => {
+      setActive(id);
+      if (!engine.current?.selectComment(id)) toast(tr('The words this comment was on are gone.'));
+    },
+    reply: (id, text) => setComments(comments.map((c) => (c.id === id ? { ...c, replies: [...(c.replies ?? []), { id: newCommentId(), by: 'user', text, at: Date.now() }] } : c))),
+    resolve: (id, resolved) => {
+      setComments(comments.map((c) => (c.id === id ? (resolved ? { ...c, resolved: true } : (({ resolved: _r, ...x }) => x)(c)) : c)));
+      if (resolved && active === id) setActive(null);
+    },
+    edit: (id, text) => setComments(comments.map((c) => (c.id === id ? { ...c, text } : c))),
+    remove: (id) => {
+      setComments(
+        comments.filter((c) => c.id !== id),
+        id,
+      );
+      if (active === id) setActive(null);
+    },
+  };
+  function startComment() {
+    const en = engine.current;
+    const s = stRef.current;
+    if (!en || readOnlyRef.current || !s) return;
+    if (s.collapsed || !s.text.trim()) return void toast(tr('Pick the words to comment on first.'));
+    const r = en.caretRect();
+    const h = host.current?.getBoundingClientRect();
+    setDraft({ y: r && h ? r.top - h.top : 0, quote: s.text.slice(0, 500) });
+    if (!columnFits) setPanel(true);
+    else if (!view.comments) setPrefs({ comments: true });
+  }
+  const addDraft = (text: string) => {
+    const en = engine.current;
+    if (!en || !draft) return;
+    const c: Comment = { id: newCommentId(), by: 'user', text, at: Date.now(), quote: draft.quote };
+    if (!en.addComment(c)) toast(tr('Pick the words to comment on first.'));
+    else {
+      setActive(c.id);
+      // The words stay marked; the caret goes after them.
+      const [, z] = en.range();
+      en.place({ a: z, f: z }, false);
+    }
+    setDraft(null);
+  };
+  const askComments = onAsk
+    ? () => {
+        const open = openComments(comments);
+        const list = open.map((c) => `${c.id}${c.quote ? ` on “${short(c.quote, 60)}”` : ''}: ${short(c.text, 200)}`).join('; ');
+        onAsk(`Answer the open comments in this document (make the changes they ask for, then reply to each and resolve it): ${list}`);
+      }
+    : undefined;
+
+  // ---- the menus --------------------------------------------------------------------------------------------------------
+  const menus =
+    e && st
+      ? docMenus({
+          engine: e,
+          st,
+          doc: model,
+          outline: wideOutline ? outlineOpen : menu === 'outline',
+          toggleOutline: () => (wideOutline ? setOutlineOpen((o) => !o) : setMenu(menu === 'outline' ? null : 'outline')),
+          zoom: view.zoom,
+          setZoom: (z) => setPrefs({ zoom: z }),
+          spell: view.spell,
+          setSpell: (on) => setPrefs({ spell: on }),
+          showCount: view.count,
+          setShowCount: (on) => setPrefs({ count: on }),
+          comments: columnFits ? view.comments : panel,
+          toggleComments: () => (columnFits ? setPrefs({ comments: !view.comments }) : setPanel((p) => !p)),
+          resolved: showResolved,
+          toggleResolved: () => setShowResolved((r) => !r),
+          find: (r) => find.show(r),
+          comment: startComment,
+          picture: () => void pickPicture(),
+          pictureUrl: () => setMenu('url'),
+          link: () => setLinking({ url: st.link ?? '', text: '' }),
+          equation: openEquation,
+          chars: () => {
+            spotAt(e.caretRect());
+            setChars({ kind: 'insert' });
+          },
+          calloutIcon: () => {
+            if (st.block?.type !== 'p') return;
+            spotAt(e.elementOf(st.block.id)?.getBoundingClientRect());
+            setChars({ kind: 'icon', id: st.block.id });
+          },
+          bands: () => setDialog('bands'),
+          pageNumbers: (k) => {
+            if (k === null) {
+              const strip = (b: Doc['header']) => (b && /\{pages?\}/i.test(b.text) ? (b.text.replace(/(Page\s*)?\{page\}(\s*of\s*\{pages\})?/gi, '').trim() ? { ...b, text: b.text.replace(/(Page\s*)?\{page\}(\s*of\s*\{pages\})?/gi, '').trim() } : null) : b);
+              e.setBands({ header: strip(model.header), footer: strip(model.footer) });
+              return;
+            }
+            const p = PAGE_NUMBERS[k];
+            const text = p.text.replace(/^Page /, `${tr('Page')} `).replace(' of ', ` ${tr('of')} `);
+            e.setBands({ [p.where]: { text, ...(p.align ? { align: p.align } : {}) } });
+          },
+          pageSetup: () => setMenu('page'),
+          spacing: () => setDialog('spacing'),
+          wordCount: openCount,
+          shortcuts: () => setDialog('keys'),
+          print: () => void print(),
+          paste: (plain) => {
+            void (async () => {
+              try {
+                const items = await navigator.clipboard.read();
+                const dt = new DataTransfer();
+                for (const it of items) for (const type of it.types) if (type === 'text/html' || type === 'text/plain') dt.setData(type, await (await it.getType(type)).text());
+                e.paste(dt, plain);
+              } catch {
+                toast(tr('Press Ctrl+V to paste here.'));
+              }
+            })();
+          },
+          copy: (cut) => {
+            if (!document.execCommand(cut ? 'cut' : 'copy')) toast(tr('Press Ctrl+C to copy.'));
+          },
+          painter: () => (e.paint ? e.stopPaint() : e.startPaint(false)),
+          today,
+        })
+      : [];
 
   const outline = (
     <nav className="space-y-px p-2" translate="no">
@@ -338,15 +829,50 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
           <NumInput value={model.size} onChange={(v) => e?.setDoc({ size: v })} min={6} max={72} step={0.5} unit="pt" label="The document’s size" className="w-full" />
         </div>
       </div>
+      <Button size="sm" variant="ghost" onClick={() => (setMenu(null), setDialog('bands'))} className="w-full justify-start">
+        Header and footer
+      </Button>
       <p className="text-[11.5px] leading-relaxed text-fg-3">Headings and the title are sized from the document’s size. The PDF and Word files use this paper.</p>
     </div>
   );
 
+  const sp = st?.block && (st.block.type === 'p' || st.block.type === 'li') ? st.block : null;
+  const hoverT = hoverTable ? (model.blocks.find((b) => b.id === hoverTable && b.type === 'table') as TableBlock | undefined) : undefined;
+  const caretT = st?.block?.type === 'table' ? st.block : undefined;
+  const handlesFor = !readOnly && !narrow ? (caretT ?? hoverT) : undefined;
+  const panelBody = (
+    <CommentsPanel
+      comments={shownComments}
+      all={comments}
+      showResolved={showResolved}
+      setShowResolved={setShowResolved}
+      draft={draft}
+      onDraft={addDraft}
+      onCancelDraft={() => setDraft(null)}
+      onAsk={askComments}
+      onClose={() => (setPanel(false), setDraft(null))}
+      a={ca}
+    />
+  );
+
   return (
     <div ref={root} className="flex h-full min-h-0 flex-col bg-bg">
-      <style>{css}</style>
+      <style>{`${css}\n${marks}\n.nd-ed.nd-painting,.nd-ed.nd-painting *{cursor:copy!important}\n::highlight(nd-find){background-color:rgba(255,213,79,.55)}\n::highlight(nd-find-now){background-color:#ff9632;color:#000}\n.nd-math-wait{font-family:${'ui-monospace,monospace'};color:#80868b;font-size:.9em}`}</style>
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">{lead}</div>
+        {(comments.length > 0 || panel) && (
+          <button
+            ref={commentsRef}
+            type="button"
+            title="Comments"
+            aria-label="Comments"
+            onClick={() => (columnFits ? setPrefs({ comments: !view.comments }) : setPanel((p) => !p))}
+            className={cx('flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-[12.5px] font-medium text-fg-2 hover:bg-bg-2 hover:text-fg', (columnFits ? view.comments : panel) && 'bg-bg-2 text-fg')}
+          >
+            <MessageSquare size={16} />
+            {openComments(comments).length > 0 && <span className="tabular-nums">{openComments(comments).length}</span>}
+          </button>
+        )}
         <IconButton
           ref={outlineRef}
           label={wideOutline ? (outlineOpen ? 'Hide the outline' : 'Show the outline') : 'Outline'}
@@ -363,9 +889,15 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
         {tail}
       </div>
       {band}
-      {!readOnly && st && e && (
-        <div className="flex h-11 shrink-0 items-center overflow-x-auto border-b border-line bg-panel px-2 [&::-webkit-scrollbar]:hidden">
-          <Toolbar engine={e} st={st} doc={model} linking={linking} setLinking={setLinking} linkRef={linkRef} onPicture={() => void pickPicture()} onPictureUrl={(u) => void pictureUrl(u)} />
+      {st && e && (
+        <div className="flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-panel px-2 [&::-webkit-scrollbar]:hidden">
+          <MenuBar menus={readOnly ? menus.filter((m) => m.label === 'View' || m.label === 'Tools') : menus} compact={phone || width < 1060} className="shrink-0" />
+          {!readOnly && (
+            <>
+              <span className="mx-1 h-5 w-px shrink-0 bg-line" />
+              <Toolbar engine={e} st={st} doc={model} linking={linking} setLinking={setLinking} linkRef={linkRef} onComment={startComment} />
+            </>
+          )}
         </div>
       )}
       <div className="relative flex min-h-0 flex-1">
@@ -375,26 +907,80 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
             {outline}
           </aside>
         )}
-        <div className={cx('min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain', narrow ? 'bg-white' : 'bg-bg-2')}>
+        <div ref={scroller} className={cx('min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain', narrow ? 'bg-white' : 'bg-bg-2')}>
           <div className={narrow ? 'min-h-full' : 'px-6 pt-6 pb-[40vh]'}>
-            <div ref={host} className={cx('relative mx-auto', narrow && 'min-h-full')} style={{ width: narrow ? '100%' : paperPx(model) }}>
-              <div ref={paper} className="nd-ed nd-doc" />
-              {st?.picked && e && <Picked engine={e} block={st.picked} host={host} tick={`${width}:${fonts}:${narrow}`} readOnly={readOnly} onReplace={(id) => void replacePicture(id)} onAsk={onAsk ? askPicture : undefined} />}
+            <div
+              ref={host}
+              className={cx('relative mx-auto', narrow && 'min-h-full')}
+              style={{ width: narrow ? '100%' : ppx * zoom + (column ? COLUMN + 24 : 0) }}
+              onMouseMove={(ev) => {
+                const t = (ev.target as HTMLElement).closest?.('table.nd-table') as HTMLElement | null;
+                const id = t?.dataset.b ?? null;
+                if (id !== hoverTable && (id || !(ev.target as HTMLElement).closest?.('[data-keeps-editing]'))) setHoverTable(id);
+              }}
+            >
+              <div ref={paper} className="nd-ed nd-doc" style={narrow ? undefined : { ...(zoom !== 1 ? { zoom } : {}), ...(column ? { marginLeft: 0 } : {}) }} />
+              {bands.map((b, k) => {
+                const band = b.kind === 'head' ? model.header : model.footer;
+                if (!band) return null;
+                const text = band.text.replace(/\{page\}/gi, String(b.page)).replace(/\{pages\}/gi, String(bands.filter((x) => x.kind === b.kind).length + (model.titlePage ? 1 : 0)));
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    data-keeps-editing
+                    title={b.kind === 'head' ? 'Header' : 'Footer'}
+                    onClick={() => !readOnly && setDialog('bands')}
+                    className="absolute -translate-y-1/2 truncate text-[#5f6368] hover:text-[#1f2328]"
+                    style={{
+                      left: b.x + (model.page.margin * 96 * zoom) / 25.4,
+                      width: ppx * zoom - (2 * model.page.margin * 96 * zoom) / 25.4,
+                      top: b.y,
+                      textAlign: band.align ?? 'left',
+                      fontSize: `${Math.round(model.size * 0.82 * zoom * 10) / 10}pt`,
+                      fontFamily: FONTS.find((f) => f.name === model.font)?.css,
+                    }}
+                    translate="no"
+                  >
+                    {text}
+                  </button>
+                );
+              })}
+              {st?.picked && e && st.picked.type !== 'toc' && st.picked.type !== 'math' && (
+                <Picked engine={e} block={st.picked} host={host} tick={tick} readOnly={readOnly} onReplace={(id) => void replacePicture(id)} onAsk={onAsk ? askPicture : undefined} />
+              )}
+              {handlesFor && e && <ColumnHandles engine={e} table={handlesFor} host={host} tick={`${tick}:${model.blocks.length}`} />}
+              {found.boxes.map((b, k) => (
+                <span key={k} className="pointer-events-none absolute rounded-[2px]" style={{ left: b.x, top: b.y, width: b.w, height: b.h, background: b.now ? 'rgba(255,150,50,.55)' : 'rgba(255,213,79,.45)' }} />
+              ))}
               {float?.ask && (
-                <button
-                  type="button"
+                <div
                   data-keeps-editing
                   onMouseDown={(ev) => ev.preventDefault()}
-                  onClick={() => {
-                    const s = st && scopesOf(model, st).find((x) => x.id === 'words');
-                    if (s) onAsk?.(s.lead);
-                  }}
-                  className="absolute z-20 flex h-8 items-center gap-1.5 rounded-full border border-line bg-elevated px-3 text-[12.5px] font-medium text-fg shadow-lg hover:bg-bg-2"
+                  className="absolute z-20 flex h-8 items-center overflow-hidden rounded-full border border-line bg-elevated text-[12.5px] font-medium text-fg shadow-lg"
                   style={{ left: float.ask.x, top: float.ask.y, transform: `translate(-50%, ${phone ? '0' : '-100%'})` }}
                 >
-                  <Sparkles size={13} className="text-accent" />
-                  Ask the agent about it
-                </button>
+                  {!readOnly && (
+                    <button type="button" onClick={startComment} className="flex h-full items-center gap-1.5 px-3 hover:bg-bg-2">
+                      <MessageSquarePlus size={13} className="text-fg-2" />
+                      Comment
+                    </button>
+                  )}
+                  {!readOnly && onAsk && <span className="h-4 w-px bg-line" />}
+                  {onAsk && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const s = st && scopesOf(model, st).find((x) => x.id === 'words');
+                        if (s) onAsk(s.lead);
+                      }}
+                      className="flex h-full items-center gap-1.5 px-3 hover:bg-bg-2"
+                    >
+                      <Sparkles size={13} className="text-accent" />
+                      Ask the agent about it
+                    </button>
+                  )}
+                </div>
               )}
               {float?.link && st?.link && (
                 <div
@@ -417,12 +1003,65 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
                   </IconButton>
                 </div>
               )}
+              {slashOpen && slashPos && (
+                <SlashMenu
+                  items={slashList}
+                  index={Math.min(slash!.index, slashList.length - 1)}
+                  at={slashPos}
+                  bound={scroller.current?.getBoundingClientRect().bottom ?? window.innerHeight}
+                  onPick={pickSlash}
+                  onHover={(k) => setSlash((s) => (s ? { ...s, index: k } : s))}
+                />
+              )}
+              {column && (
+                <CommentsColumn
+                  comments={shownComments}
+                  tops={tops}
+                  draft={draft}
+                  onDraft={addDraft}
+                  onCancelDraft={() => setDraft(null)}
+                  onAsk={askComments}
+                  a={ca}
+                  left={ppx * zoom + 24}
+                  width={COLUMN}
+                />
+              )}
+              <div ref={spotRef} className="pointer-events-none absolute" style={spot ? { left: spot.x, top: spot.y, width: spot.w, height: spot.h } : { left: 0, top: 0, width: 1, height: 1 }} />
             </div>
           </div>
         </div>
-        <div className="pointer-events-none absolute right-3 bottom-1.5 rounded-md bg-bg/80 px-1.5 text-[11px] text-fg-3 tabular-nums">
-          {`${words.toLocaleString(LOCALE)} word${words === 1 ? '' : 's'}`}
-        </div>
+        {panelW > 0 && <aside className="w-[320px] shrink-0 border-l border-line bg-panel">{panelBody}</aside>}
+        {phone && panel && <div className="absolute inset-0 z-30 bg-panel">{panelBody}</div>}
+        {find.open && (
+          <div className="absolute top-2 right-3 z-30 max-w-[calc(100%-24px)]" data-keeps-editing>
+            <FindBar
+              find={{
+                ...find,
+                close: () => {
+                  find.close();
+                  found.select();
+                },
+              }}
+              count={found.count}
+              index={found.index}
+              onNext={found.next}
+              onPrev={found.prev}
+              onReplace={readOnly ? undefined : found.replace}
+              onReplaceAll={readOnly ? undefined : found.replaceAll}
+            />
+          </div>
+        )}
+        {view.count && (
+          <button
+            type="button"
+            onClick={openCount}
+            title="Word count"
+            className="absolute right-3 bottom-1.5 rounded-md bg-bg/80 px-1.5 text-[11px] text-fg-3 tabular-nums hover:text-fg"
+            style={{ right: panelW ? panelW + 12 : 12 }}
+          >
+            {`${words.toLocaleString(LOCALE)} word${words === 1 ? '' : 's'}`}
+          </button>
+        )}
       </div>
       {dirty && !readOnly && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-panel px-3 py-2 pb-[max(8px,var(--safe-bottom))]">
@@ -444,6 +1083,64 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
       <Popover anchor={outlineRef} open={menu === 'outline' && !wideOutline} onClose={() => setMenu(null)} align="end" width={280} title="Outline">
         <div className="max-h-[min(60vh,440px)] overflow-y-auto">{outline}</div>
       </Popover>
+      <Popover anchor={linkRef} open={menu === 'url'} onClose={() => setMenu(null)} width={300} title="A picture from the web">
+        <form
+          className="space-y-2 p-2"
+          onSubmit={(ev) => {
+            ev.preventDefault();
+            const u = url.trim();
+            setMenu(null);
+            setUrl('');
+            if (u) void pictureUrl(u);
+          }}
+        >
+          <p className="text-[12px] text-fg-3">The picture’s own address (it ends in .jpg, .png…). The app keeps a copy in the document.</p>
+          <input autoFocus value={url} onChange={(ev) => setUrl(ev.target.value)} placeholder="https://…" className={inputCls} />
+          <div className="flex justify-end">
+            <Button size="sm" variant="primary" type="submit" disabled={!url.trim()}>
+              Add it
+            </Button>
+          </div>
+        </form>
+      </Popover>
+      <Popover anchor={spotRef} open={!!eq} onClose={() => setEq(null)} width={360} title="Equation">
+        {eq && (
+          <EquationBox
+            initial={eq.kind === 'new' ? '' : eq.tex}
+            display={eq.kind === 'block' || (eq.kind === 'new' && !eq.inline)}
+            onCancel={() => setEq(null)}
+            onRemove={eq.kind === 'block' ? () => (e?.setMath(eq.id, ''), setEq(null)) : eq.kind === 'run' ? () => (e?.setMathRun(eq.at, ''), setEq(null)) : undefined}
+            onDone={(tex) => {
+              if (!e || !tex.trim()) return setEq(null);
+              if (eq.kind === 'block') e.setMath(eq.id, tex);
+              else if (eq.kind === 'run') e.setMathRun(eq.at, tex);
+              else if (eq.inline) e.insertMathRun(tex);
+              else {
+                e.insertMath(tex);
+                e.setPicked(null);
+              }
+              setEq(null);
+              void loadKatex().then(() => setMath((m) => m || 1));
+            }}
+          />
+        )}
+      </Popover>
+      <Popover anchor={spotRef} open={!!chars} onClose={() => setChars(null)} width={340} title={chars?.kind === 'icon' ? 'The callout’s emoji' : 'Special characters'}>
+        {chars && (
+          <CharPicker
+            kinds={chars.kind === 'icon' ? ['emoji'] : undefined}
+            onPick={(ch) => {
+              if (chars.kind === 'icon') e?.callout(chars.id, { icon: ch });
+              else e?.typeText(ch);
+              setChars(null);
+            }}
+          />
+        )}
+      </Popover>
+      <WordCountDialog open={dialog === 'count'} onClose={() => setDialog(null)} counts={counts} picked={counts.picked} showCount={view.count} setShowCount={(on) => setPrefs({ count: on })} />
+      <SpacingDialog open={dialog === 'spacing'} onClose={() => setDialog(null)} value={{ lh: sp?.lh, sb: sp?.sb, sa: sp?.sa }} onApply={(v) => e?.spacing(v)} />
+      <BandsDialog open={dialog === 'bands'} onClose={() => setDialog(null)} header={model.header} footer={model.footer} titlePage={model.titlePage} onApply={(v) => e?.setBands(v)} />
+      <ShortcutsDialog open={dialog === 'keys'} onClose={() => setDialog(null)} groups={SHORTCUTS} />
       {confirmNode}
     </div>
   );

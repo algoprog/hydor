@@ -1,16 +1,19 @@
 // The editing of a document, as changes to its model: where a place in it is (a block, a table's cell, how far into
 // its words), and what each edit does: typing, Enter, Backspace at a block's start and Delete at its end, taking
-// out what is selected, pasting blocks, the look of words, a paragraph's style, lists and indents, alignment,
-// tables' rows and columns, pictures. Pure functions of the model: the editor (engine.ts) maps the browser's
-// selection to places and draws what they return.
+// out what is selected, pasting blocks, the look of words, a paragraph's style, spacing, lists and indents,
+// alignment, tables' rows and columns (merged cells kept whole), their cells' fills and merges, pictures, comments'
+// marks on words, finding and replacing words, and words' case. Pure functions of the model: the editor (engine.ts)
+// maps the browser's selection to places and draws what they return.
 import {
   docText,
+  fixMerges,
   listInfo,
   lookOf,
   mergeRuns,
   newId,
   runsText,
   type Align,
+  type Spacing,
   type Block,
   type Cell,
   type Doc,
@@ -136,15 +139,41 @@ export function lookAt(runs: Run[], o: number): Look {
   for (const r of runs) {
     const end = at + r.t.length;
     if (o > at && o <= end) {
+      // Words typed after an equation are words; after a link or a comment's words, not more of them.
+      if (r.math) return {};
       const look = lookOf(r);
       if (o === end && look.link) delete look.link;
+      if (o === end) delete look.cm;
       return look;
     }
     at = end;
   }
-  const first = runs[0] ? lookOf(runs[0]) : {};
+  const first = runs[0] && !runs[0].math ? lookOf(runs[0]) : {};
   delete first.link;
+  delete first.cm;
   return first;
+}
+
+/** The run a place is in: the character before it's (at the start, the first). */
+export function runAt(runs: Run[], o: number): Run | undefined {
+  let at = 0;
+  for (const r of runs) {
+    const end = at + r.t.length;
+    if (o > at && o <= end) return r;
+    at = end;
+  }
+  return runs[0];
+}
+
+/** A place in words moved off the inside of an equation (which is one thing): to its nearer edge, or `after`. */
+export function snapOut(runs: Run[], o: number, after?: boolean): number {
+  let at = 0;
+  for (const r of runs) {
+    const end = at + r.t.length;
+    if (r.math && o > at && o < end) return after === undefined ? (o - at < end - o ? at : end) : after ? end : at;
+    at = end;
+  }
+  return o;
 }
 
 /** The word around `o` (letters and digits), or null where there is none (between spaces). */
@@ -651,37 +680,69 @@ export function tableOp(doc: Doc, id: string, cell: [number, number], op: TableO
   const i = indexOf(doc, id);
   const t = doc.blocks[i];
   if (t?.type !== 'table') return { doc, at: firstPos(doc) };
-  const [r, c] = cell;
+  // A merged cell's own row and column, and its last ones (a row goes in after its last, say).
+  const [r0, c0] = cellOwner(t, cell);
+  const own = t.rows[r0]?.[c0];
+  const r = op === 'rowBelow' ? r0 + (own?.rs ?? 1) - 1 : r0;
+  const c = op === 'colRight' ? c0 + (own?.cs ?? 1) - 1 : c0;
   const n = t.rows[0]?.length ?? 0;
   const empty = (align?: Align): Cell => (align ? { runs: [], align } : { runs: [] });
+  const rects = rectsOf(t);
   let next: TableBlock = t;
-  let at: Pos = { b: id, c: cell, o: 0 };
+  let at: Pos = { b: id, c: [r0, c0], o: 0 };
   switch (op) {
     case 'rowAbove':
     case 'rowBelow': {
       const k = op === 'rowAbove' ? r : r + 1;
       const row = t.rows[r].map((x) => empty(x.align));
-      next = { ...t, rows: [...t.rows.slice(0, k), row, ...t.rows.slice(k)] };
-      at = { b: id, c: [k, c], o: 0 };
+      // A merged cell the new row passes through grows over it.
+      const moved = rects.map((x) => (x.r >= k ? { ...x, r: x.r + 1 } : x.r < k && x.r + x.rs > k ? { ...x, rs: x.rs + 1 } : x));
+      next = { ...t, rows: withRects([...t.rows.slice(0, k), row, ...t.rows.slice(k)], moved) };
+      at = { b: id, c: [k, c0], o: 0 };
       break;
     }
     case 'colLeft':
     case 'colRight': {
       const k = op === 'colLeft' ? c : c + 1;
-      next = tidy({ ...t, rows: t.rows.map((row) => [...row.slice(0, k), empty(row[c]?.align), ...row.slice(k)]), cols: t.cols ? share([...t.cols.slice(0, k), 1 / (n + 1), ...t.cols.slice(k)]) : undefined });
-      at = { b: id, c: [r, k], o: 0 };
+      const moved = rects.map((x) => (x.c >= k ? { ...x, c: x.c + 1 } : x.c < k && x.c + x.cs > k ? { ...x, cs: x.cs + 1 } : x));
+      const rows = t.rows.map((row) => [...row.slice(0, k), empty(row[c]?.align), ...row.slice(k)]);
+      next = tidy({ ...t, rows: withRects(rows, moved), cols: t.cols ? share([...t.cols.slice(0, k), 1 / (n + 1), ...t.cols.slice(k)]) : undefined });
+      at = { b: id, c: [r0, k], o: 0 };
       break;
     }
-    case 'delRow':
+    case 'delRow': {
       if (t.rows.length <= 1) return removeBlock(doc, id);
-      next = tidy({ ...t, rows: t.rows.filter((_, k) => k !== r), head: r === 0 && t.rows.length === 2 ? undefined : t.head });
-      at = { b: id, c: [Math.min(r, next.rows.length - 1), c], o: 0 };
+      // A merged cell that starts in the row goes on from the next one, its words with it; one passing through shrinks.
+      const rows = t.rows.map((x) => x.slice());
+      const moved: Rect[] = [];
+      for (const x of rects) {
+        if (x.r === r && x.rs > 1) {
+          rows[r + 1][x.c] = { ...rows[r][x.c], rs: undefined, cs: undefined } as Cell;
+          moved.push({ ...x, rs: x.rs - 1 });
+        } else if (x.r < r && x.r + x.rs > r) moved.push({ ...x, rs: x.rs - 1 });
+        else if (x.r > r) moved.push({ ...x, r: x.r - 1 });
+        else if (x.r !== r) moved.push(x);
+      }
+      next = tidy({ ...t, rows: withRects(rows.filter((_, k) => k !== r), moved), head: r === 0 && t.rows.length === 2 ? undefined : t.head });
+      at = { b: id, c: [Math.min(r, next.rows.length - 1), 0], o: 0 };
       break;
-    case 'delCol':
+    }
+    case 'delCol': {
       if (n <= 1) return removeBlock(doc, id);
-      next = tidy({ ...t, rows: t.rows.map((row) => row.filter((_, k) => k !== c)), cols: t.cols ? share(t.cols.filter((_, k) => k !== c)) : undefined });
-      at = { b: id, c: [r, Math.min(c, n - 2)], o: 0 };
+      const rows = t.rows.map((x) => x.slice());
+      const moved: Rect[] = [];
+      for (const x of rects) {
+        if (x.c === c && x.cs > 1) {
+          rows[x.r][c + 1] = { ...rows[x.r][c], rs: undefined, cs: undefined } as Cell;
+          moved.push({ ...x, cs: x.cs - 1 });
+        } else if (x.c < c && x.c + x.cs > c) moved.push({ ...x, cs: x.cs - 1 });
+        else if (x.c > c) moved.push({ ...x, c: x.c - 1 });
+        else if (x.c !== c) moved.push(x);
+      }
+      next = tidy({ ...t, rows: withRects(rows.map((row) => row.filter((_, k) => k !== c)), moved), cols: t.cols ? share(t.cols.filter((_, k) => k !== c)) : undefined });
+      at = { b: id, c: [r0, Math.min(c, n - 2)], o: 0 };
       break;
+    }
     case 'delTable':
       return removeBlock(doc, id);
     case 'head':
@@ -697,14 +758,20 @@ export function nextCell(doc: Doc, at: Pos, back: boolean): Edit {
   const t = blockOf(doc, at.b);
   if (t?.type !== 'table' || !at.c) return { doc, at };
   const n = t.rows[0].length;
-  const k = at.c[0] * n + at.c[1] + (back ? -1 : 1);
-  if (k < 0) return { doc, at: { ...at, c: [0, 0], o: 0 } };
-  if (k >= t.rows.length * n) {
-    const e = tableOp(doc, t.id, [t.rows.length - 1, 0], 'rowBelow');
-    return { doc: e.doc, at: { b: t.id, c: [t.rows.length, 0], o: 0 } };
+  let k = at.c[0] * n + at.c[1];
+  // The next cell that is one of its own (cells a merged one covers are passed over).
+  for (;;) {
+    k += back ? -1 : 1;
+    if (k < 0) return { doc, at: { ...at, c: [0, 0], o: 0 } };
+    if (k >= t.rows.length * n) {
+      const e = tableOp(doc, t.id, [t.rows.length - 1, 0], 'rowBelow');
+      const nt = blockOf(e.doc, t.id) as TableBlock;
+      return { doc: e.doc, at: { b: t.id, c: [nt.rows.length - 1, 0], o: 0 } };
+    }
+    const c: [number, number] = [Math.floor(k / n), k % n];
+    const o = cellOwner(t, c);
+    if (o[0] === c[0] && o[1] === c[1]) return { doc, at: { b: t.id, c, o: lenOf(t.rows[c[0]][c[1]].runs) } };
   }
-  const c: [number, number] = [Math.floor(k / n), k % n];
-  return { doc, at: { b: t.id, c, o: lenOf(t.rows[c[0]][c[1]].runs) } };
 }
 
 // ---- copying -------------------------------------------------------------------------------------------------------
@@ -752,5 +819,240 @@ export function blocksPlain(blocks: Block[]): string {
 
 /** Whether two documents keep the same text (the editor's change, made again, came back to what was saved). */
 export const sameDoc = (a: Doc, b: Doc) => a === b || docText(a) === docText(b);
+
+// ---- spacing and callouts ---------------------------------------------------------------------------------------
+
+/** Line spacing, or the space before or after, for the text blocks between two places (undefined: as their style has it). */
+export function setSpacing(doc: Doc, s: Pos, e: Pos, patch: Spacing): Doc {
+  return mapBlocks(doc, textBlocksIn(doc, s, e), (b) => tidy({ ...b, ...patch } as TextBlock));
+}
+
+/** A callout's emoji or tint. */
+export function setCallout(doc: Doc, id: string, patch: { icon?: string; tint?: string }): Doc {
+  return patchBlock<ParaBlock>(doc, id, (b) => (b.style === 'callout' ? { ...b, ...patch } : b));
+}
+
+// ---- comments' marks ---------------------------------------------------------------------------------------------
+
+/** Every set of words in the document (text blocks, then each table's cells), with where they are. */
+export function allBoxes(doc: Doc): { b: string; c?: [number, number]; runs: Run[] }[] {
+  const out: { b: string; c?: [number, number]; runs: Run[] }[] = [];
+  for (const B of doc.blocks) {
+    if (isText(B)) out.push({ b: B.id, runs: B.runs });
+    else if (B.type === 'table') B.rows.forEach((r, ri) => r.forEach((cell, ci) => out.push({ b: B.id, c: [ri, ci], runs: cell.runs })));
+  }
+  return out;
+}
+
+/** A comment's mark on the words between two places. */
+export function markComment(doc: Doc, s: Pos, e: Pos, id: string): Doc {
+  return mapLook(doc, s, e, (r) => ({ ...r, cm: [...(r.cm ?? []).filter((x) => x !== id), id] }));
+}
+
+/** A comment's marks taken off the document's words (the comment deleted). */
+export function unmarkComment(doc: Doc, id: string): Doc {
+  let d = doc;
+  for (const bx of allBoxes(doc)) {
+    if (!bx.runs.some((r) => r.cm?.includes(id))) continue;
+    const runs = mergeRuns(
+      bx.runs.map((r) => {
+        if (!r.cm?.includes(id)) return r;
+        const cm = r.cm.filter((x) => x !== id);
+        const { cm: _cm, ...rest } = r;
+        return cm.length ? { ...rest, cm } : rest;
+      }),
+    );
+    d = setBox(d, bx.b, bx.c, runs);
+  }
+  return d;
+}
+
+/** Where a comment's words are: from the first to the last of them (null when they are gone). */
+export function commentSpan(doc: Doc, id: string): [Pos, Pos] | null {
+  let first: Pos | null = null;
+  let last: Pos | null = null;
+  for (const bx of allBoxes(doc)) {
+    let o = 0;
+    for (const r of bx.runs) {
+      if (r.cm?.includes(id)) {
+        if (!first) first = { b: bx.b, ...(bx.c ? { c: bx.c } : {}), o };
+        last = { b: bx.b, ...(bx.c ? { c: bx.c } : {}), o: o + r.t.length };
+      }
+      o += r.t.length;
+    }
+  }
+  return first && last ? [first, last] : null;
+}
+
+/** Blocks with no comments' marks (pasted copies are not the comments' words). */
+export function withoutComments(blocks: Block[]): Block[] {
+  const clean = (runs: Run[]) => (runs.some((r) => r.cm) ? mergeRuns(runs.map(({ cm: _cm, ...r }) => r)) : runs);
+  return blocks.map((b) => (isText(b) ? { ...b, runs: clean(b.runs) } : b.type === 'table' ? { ...b, rows: b.rows.map((r) => r.map((c) => ({ ...c, runs: clean(c.runs) }))) } : b));
+}
+
+// ---- finding and replacing ------------------------------------------------------------------------------------------
+
+/** A stretch of words found: in which words (a block, a cell of it), from and to. */
+export interface Found {
+  b: string;
+  c?: [number, number];
+  s: number;
+  e: number;
+}
+
+/** The text of a box to search: an equation counts as marks no query matches (its LaTeX is not words). */
+export const searchText = (runs: Run[]) => runs.map((r) => (r.math ? '\u0000'.repeat(r.t.length) : r.t)).join('');
+
+/** Words put in place of a stretch of one box's words, looking as its first character does. */
+export function replaceIn(doc: Doc, f: Found, text: string): Doc {
+  const runs = boxRuns(doc, f.b, f.c);
+  if (!runs) return doc;
+  const [l, rest] = splitAt(runs, f.s);
+  const [mid, r] = splitAt(rest, f.e - f.s);
+  const look = mid[0] ? lookOf(mid[0]) : lookAt(runs, f.s);
+  delete look.math;
+  return setBox(doc, f.b, f.c, mergeRuns([...l, ...(text ? [{ ...look, t: text }] : []), ...r]));
+}
+
+// ---- words' case ------------------------------------------------------------------------------------------------------
+
+export type Case = 'upper' | 'lower' | 'title' | 'sentence';
+
+/** The words between two places in another case (a character whose other case is longer stays as it is, so places hold). */
+export function setCase(doc: Doc, s: Pos, e: Pos, k: Case): Doc {
+  let d = doc;
+  for (const bx of boxesIn(doc, s, e)) {
+    if (bx.from >= bx.to) continue;
+    const runs = boxRuns(d, bx.b, bx.c) ?? [];
+    const text = runsText(runs);
+    let out = '';
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (i < bx.from || i >= bx.to) {
+        out += ch;
+        continue;
+      }
+      const prev = text.slice(0, i);
+      const upper = k === 'upper' || (k === 'title' && !/[\p{L}\p{N}'’]$/u.test(prev)) || (k === 'sentence' && (/^\s*$/.test(prev) || /[.!?]["')\]]*\s+$/.test(prev)));
+      const to = upper ? ch.toLocaleUpperCase() : ch.toLocaleLowerCase();
+      out += to.length === 1 ? to : ch;
+    }
+    let o = 0;
+    const next = runs.map((r) => {
+      const t = r.math ? r.t : out.slice(o, o + r.t.length);
+      o += r.t.length;
+      return { ...r, t };
+    });
+    d = setBox(d, bx.b, bx.c, next);
+  }
+  return d;
+}
+
+// ---- tables: merged cells, fills, widths ---------------------------------------------------------------------------
+
+type Rect = { r: number; c: number; rs: number; cs: number };
+
+/** A table's merged cells, as the rectangles they cover. */
+const rectsOf = (t: TableBlock): Rect[] => t.rows.flatMap((row, r) => row.flatMap((cell, c) => (cell.rs || cell.cs ? [{ r, c, rs: cell.rs ?? 1, cs: cell.cs ?? 1 }] : [])));
+
+/** Rows with their merged cells as `rects` say (each rectangle's first cell spans it). */
+function withRects(rows: Cell[][], rects: Rect[]): Cell[][] {
+  const out = rows.map((row) => row.map((c) => tidy({ ...c, rs: undefined, cs: undefined } as unknown as Block) as unknown as Cell));
+  for (const x of rects) {
+    if (x.rs <= 1 && x.cs <= 1) continue;
+    const cell = out[x.r]?.[x.c];
+    if (!cell) continue;
+    if (x.rs > 1) cell.rs = x.rs;
+    if (x.cs > 1) cell.cs = x.cs;
+  }
+  fixMerges(out);
+  return out;
+}
+
+/** Which merged cell a cell is under (its first cell, [row, column]), or itself. */
+export function cellOwner(t: TableBlock, at: [number, number]): [number, number] {
+  for (const x of rectsOf(t)) if (at[0] >= x.r && at[0] < x.r + x.rs && at[1] >= x.c && at[1] < x.c + x.cs) return [x.r, x.c];
+  return at;
+}
+
+/** The cells from one to another (a rectangle; merged cells it touches taken in whole). */
+export function cellRect(t: TableBlock, a: [number, number], b: [number, number]): Rect {
+  let r0 = Math.min(a[0], b[0]);
+  let r1 = Math.max(a[0], b[0]);
+  let c0 = Math.min(a[1], b[1]);
+  let c1 = Math.max(a[1], b[1]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const x of rectsOf(t)) {
+      const meets = x.r <= r1 && x.r + x.rs - 1 >= r0 && x.c <= c1 && x.c + x.cs - 1 >= c0;
+      if (!meets) continue;
+      const nr0 = Math.min(r0, x.r);
+      const nr1 = Math.max(r1, x.r + x.rs - 1);
+      const nc0 = Math.min(c0, x.c);
+      const nc1 = Math.max(c1, x.c + x.cs - 1);
+      if (nr0 !== r0 || nr1 !== r1 || nc0 !== c0 || nc1 !== c1) {
+        [r0, r1, c0, c1] = [nr0, nr1, nc0, nc1];
+        grew = true;
+      }
+    }
+  }
+  return { r: r0, c: c0, rs: r1 - r0 + 1, cs: c1 - c0 + 1 };
+}
+
+/** The cells between two cells merged into one (their words joined, line by line); the caret goes in it. */
+export function mergeCells(doc: Doc, id: string, a: [number, number], b: [number, number]): Edit {
+  const i = indexOf(doc, id);
+  const t = doc.blocks[i];
+  if (t?.type !== 'table') return { doc, at: firstPos(doc) };
+  const x = cellRect(t, a, b);
+  if (x.rs === 1 && x.cs === 1) return { doc, at: { b: id, c: [x.r, x.c], o: 0 } };
+  const rows = t.rows.map((r) => r.map((c) => ({ ...c })));
+  const runs: Run[] = [];
+  for (let r = x.r; r < x.r + x.rs; r++)
+    for (let c = x.c; c < x.c + x.cs; c++) {
+      const cell = rows[r][c];
+      if (cell.runs.some((y) => y.t.trim())) {
+        if (runs.length) runs.push({ t: '\n' });
+        runs.push(...cell.runs);
+      }
+      if (r !== x.r || c !== x.c) rows[r][c] = { runs: [] };
+    }
+  rows[x.r][x.c] = { ...rows[x.r][x.c], runs: mergeRuns(runs) };
+  const rects = rectsOf(t).filter((y) => !(y.r >= x.r && y.r < x.r + x.rs && y.c >= x.c && y.c < x.c + x.cs));
+  const next: TableBlock = { ...t, rows: withRects(rows, [...rects, x]) };
+  return { doc: withBlock(doc, i, next), at: { b: id, c: [x.r, x.c], o: lenOf(rows[x.r][x.c].runs) } };
+}
+
+/** A merged cell split back into the cells it covered (its words stay in the first). */
+export function unmergeCell(doc: Doc, id: string, at: [number, number]): Edit {
+  const i = indexOf(doc, id);
+  const t = doc.blocks[i];
+  if (t?.type !== 'table') return { doc, at: firstPos(doc) };
+  const own = cellOwner(t, at);
+  const rects = rectsOf(t).filter((y) => !(y.r === own[0] && y.c === own[1]));
+  return { doc: withBlock(doc, i, { ...t, rows: withRects(t.rows, rects) }), at: { b: id, c: own, o: 0 } };
+}
+
+/** A fill, or where words sit up and down, for the cells between two cells (undefined takes it off). */
+export function setCells(doc: Doc, id: string, a: [number, number], b: [number, number], patch: { fill?: string; va?: 'middle' | 'bottom' }): Doc {
+  const i = indexOf(doc, id);
+  const t = doc.blocks[i];
+  if (t?.type !== 'table') return doc;
+  const x = cellRect(t, a, b);
+  const rows = t.rows.map((row, r) =>
+    row.map((cell, c) => (r >= x.r && r < x.r + x.rs && c >= x.c && c < x.c + x.cs ? (tidy({ ...cell, ...patch } as unknown as Block) as unknown as Cell) : cell)),
+  );
+  return withBlock(doc, i, { ...t, rows });
+}
+
+/** A table's columns' widths (shares of its width); equal ones say nothing. */
+export function setCols(doc: Doc, id: string, cols: number[]): Doc {
+  return patchBlock<TableBlock>(doc, id, (t) => {
+    const n = t.rows[0]?.length ?? 0;
+    const shares = share(cols);
+    if (!shares || shares.length !== n) return t;
+    return tidy({ ...t, cols: shares.some((w) => Math.abs(w - 1 / n) > 0.004) ? shares : undefined });
+  });
+}
 
 export type { ImageBlock };
