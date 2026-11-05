@@ -733,7 +733,14 @@ Agents take them with their own ui_screenshot tool when they change how a web ap
 
 ## Research tools (the LaTeX editor's checks and packages)
 
-<!-- Workstream C. -->
+A LaTeX paper checked before it is submitted (**Tools → Check before submitting**), made into an arXiv package (**Export → arXiv package (.zip)**), and written to disk for the apps that take a paper. Agents check a paper with their latex_check tool instead of these.
+
+- `POST /api/pages/tex/check` — starts the pre-submission check of a LaTeX document, saved or not; it runs on as the job follows (typesetting, the PDF, the references online). Body: `{ model: object — the LaTeX document, venue: string — arr-long, arr-short, emnlp-long, emnlp-short, naacl-long, naacl-short, sigir-full, sigir-short, cikm, wsdm, www, kdd, neurips, iclr, icml, aaai, ieee, acm or other, other?: { pages?: number, anonymous?: boolean } — Other's rules, page?: string — the Library document's id (its project's runs are where the numbers are traced), folder?: string — a file's document: its folder, base?: string — a typesetting to build on }`. Returns: the check as it starts: `{ id, venue, done: false, stage, findings: [], notes: [], startedAt }`.
+- `GET /api/pages/tex/check/:id` — a check as it goes, and once it is done (kept half an hour). Returns: `{ id, venue, done, stage?, findings: [{ id, group: refs|anon|format|parts|numbers, level: must|check|info, title, detail?, file?, line?, from?, to?, quote?, fix?: { label, edits: [{ file, from, to, was, text }], shows? }, ask? }], notes: [string] — what could not be checked, pages?: { total, counted?, limit? }, online?: { done, of }, error? }`; 404 when it is no longer kept.
+- `POST /api/pages/tex/check/:id/stop` — stops a check. Returns: `{ ok: true }`.
+- `POST /api/pages/tex/arxiv` — makes a LaTeX document's arXiv package from its saved version and typesets it to see it builds. Body: `{ page: string — the document's id, version?: number, options?: { strip, iffalse, unused, bbl, flatten, pdfoutput: boolean } }` (or `{ model, title }` for a document not saved). Returns: `{ token, name, bytes, files: [{ name, bytes }], removed: [string], renamed: [[from, to]], compiled: { ok, pages, errors, missing? }, warnings: [string] }`.
+- `GET /api/pages/tex/arxiv/:token` — the arXiv package's .zip, for an hour after it was made. 404 when it is no longer kept.
+- `POST /api/pages/tex/paper` — writes a LaTeX document to disk for an app that takes a paper (its files and pictures, and its typeset PDF, in a folder of the app's data; a file's document keeps its own folder). Body: `{ model: object, page?: string, folder?: string, base?: string }`. Returns: `{ folder: string, pdf?: string }` (no pdf when it does not typeset).
 
 <!-- end: api-c -->
 
