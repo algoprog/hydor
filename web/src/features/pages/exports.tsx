@@ -1,6 +1,6 @@
 // What each kind of page exports as, in the order the Export menus show them.
 import type { ReactNode } from 'react';
-import { FileArchive, FileCode2, FileSpreadsheet, FileText, FileType2, Images, NotebookText, Presentation, Sheet } from 'lucide-react';
+import { FileArchive, FileCode2, FileSpreadsheet, FileText, FileType2, Images, NotebookText, PackageCheck, Presentation, Sheet } from 'lucide-react';
 import type { PageInfo } from '@shared/pages';
 import type { ExportFormat } from './exportFile';
 
@@ -17,7 +17,12 @@ export const EXPORTS = (kind: PageInfo['kind']): Item[] =>
       : kind === 'sheet'
         ? [{ format: 'xlsx', label: 'Excel (.xlsx)', icon: <FileSpreadsheet size={14} /> }, { format: 'csv', label: 'CSV (.csv)', icon: <Sheet size={14} /> }, PDF, HTML]
         : kind === 'tex'
-          ? [PDF, { format: 'tex', label: 'LaTeX source (.tex)', icon: <FileCode2 size={14} /> }, { format: 'zip', label: 'LaTeX project (.zip)', icon: <FileArchive size={14} /> }]
+          ? [
+              PDF,
+              { format: 'tex', label: 'LaTeX source (.tex)', icon: <FileCode2 size={14} /> },
+              { format: 'zip', label: 'LaTeX project (.zip)', icon: <FileArchive size={14} /> },
+              { format: 'arxiv', label: 'arXiv package (.zip)', icon: <PackageCheck size={14} /> },
+            ]
           : kind === 'notebook'
             ? [{ format: 'ipynb', label: 'Jupyter notebook (.ipynb)', icon: <NotebookText size={14} /> }, { format: 'py', label: 'Python script (.py)', icon: <FileCode2 size={14} /> }, PDF, HTML]
             : [PDF, { format: 'docx', label: 'Word document (.docx)', icon: <FileType2 size={14} /> }, HTML];

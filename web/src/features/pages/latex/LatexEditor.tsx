@@ -88,6 +88,7 @@ import { CommentsPanel, type CommentDraft } from './CommentsPanel';
 import { CompareDialog } from './Compare';
 import { docDefs, type DocDefs } from './complete';
 import { NameDialog, OutlineList, Problems, where } from './parts';
+import { paperItems, PaperTools, type PaperAsk } from './PaperTools';
 import { Preview, type Flash } from './Preview';
 import { ReferencesDialog } from './References';
 import { texMacros } from './scan';
@@ -272,6 +273,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   const [dark, setDark] = useState(isDark);
   const [presentAsk, setPresentAsk] = useState(0);
   const [dialog, setDialog] = useState<'refs' | 'count' | 'compare' | 'keys' | null>(null);
+  // Tools → Check before submitting and Your paper.
+  const [paperAsk, setPaperAsk] = useState<PaperAsk>(null);
   // Comments: the panel beside the source (remembered), the one picked, and a new one being written.
   const [commentsOpen, setCommentsOpen] = useState(() => localStorage.getItem(COMMENTS_KEY) === '1');
   const [activeComment, setActiveComment] = useState<string | null>(null);
@@ -1255,6 +1258,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         { label: 'Recompile as you type', checked: auto, also: 'auto compile', run: () => setAuto((a) => !a) },
         { label: 'Typeset with', also: 'engine', disabled: readOnly, items: TEX_ENGINES.map((x) => ({ label: x.label, checked: engine === x.id, run: () => pickEngine(x.id) })) },
         '-',
+        ...paperItems({ ask: setPaperAsk, readOnly, canAsk: !!onAsk, canArxiv: !!pageId && !onDisk }),
+        '-',
         { label: 'Word count', icon: <WholeWord size={14} />, also: 'words texcount', run: () => setDialog('count') },
         canCompare && { label: 'Compare versions', icon: <History size={14} />, also: 'diff history changes', run: () => setDialog('compare') },
         '-',
@@ -1736,6 +1741,24 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         />
       )}
       <ShortcutsDialog open={dialog === 'keys'} onClose={() => setDialog(null)} groups={SHORTCUTS} />
+      <PaperTools
+        ask={paperAsk}
+        onClose={() => setPaperAsk(null)}
+        doc={model}
+        pageId={pageId}
+        onDisk={onDisk}
+        base={lastGood.current}
+        dirty={dirty}
+        save={save}
+        readOnly={readOnly}
+        canComment={canComment}
+        label={label}
+        onAsk={onAsk}
+        goTo={goTo}
+        editFile={editFile}
+        setComments={setComments}
+        showComments={() => setCommentsOpen(true)}
+      />
       <Dialog
         open={canComment && commentsOpen && !roomy && file !== PICTURES}
         onClose={() => {
