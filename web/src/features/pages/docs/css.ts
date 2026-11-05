@@ -1,8 +1,11 @@
 // How the documents editor looks around the words (the words themselves look as on the document's own page, from
-// shared/docs.ts' docCss): the sheet of paper (its size and margins; on a narrow screen the width there is, with
-// small margins), page breaks as a gap between sheets, a picked picture, equation or table of contents, the boxes
-// of a checklist and a callout's emoji (each pressed to change), and a hint in an empty title and first paragraph.
-// And the Google fonts a document uses, loaded through this server (the app's pages load no font from elsewhere).
+// shared/docs.ts' docCss): the words laid on pages of the paper (its size and margins; the sheets themselves drawn
+// behind them, PaperSheets.tsx), what the pages' layout puts in the words (paging.ts: a block moved to the next page,
+// the gap where a paragraph or a table turns the page, a table's header row again), a page break as a mark at the
+// end of its page; on a narrow screen the width there is, with small margins, and a page break as a gap. A picked
+// picture, equation or table of contents, the boxes of a checklist and a callout's emoji (each pressed to change),
+// and a hint in an empty title and first paragraph. And the Google fonts a document uses, loaded through this server
+// (the app's pages load no font from elsewhere).
 import { useEffect, useState } from 'react';
 import { docCss, docFonts, FONTS, INK, PAPERS, type Doc } from '@shared/docs';
 
@@ -21,9 +24,25 @@ export function editorCss(doc: Doc, o: { narrow: boolean; hints: { title: string
     `${s}{box-sizing:border-box;background:#fff;color:${INK};outline:none;caret-color:#1a73e8;--m:${m};margin:0 auto;position:relative;` +
       (o.narrow
         ? 'width:100%;min-height:100%;padding:20px 18px 45vh;--nd-step:22pt}'
-        : `width:${paper.w}mm;min-height:${paper.h}mm;padding:${m};box-shadow:0 1px 3px rgba(0,0,0,.12),0 8px 28px rgba(0,0,0,.08);border-radius:2px}`),
-    // A page break: the paper cut, a gap of the page around it between the two sheets.
+        : // On pages, the sheets are drawn behind the words: the words' own element is clear.
+          `width:${paper.w}mm;min-height:${paper.h}mm;padding:${m};background:transparent}`),
+    // A page break: on a narrow screen the paper cut, a gap of the page around it between the two sheets.
     `${s} .nd-pb{position:relative;height:28px;margin:calc(var(--m) * .7) calc(var(--m) * -1);background:var(--bg-2,#eceae6);box-shadow:inset 0 7px 6px -7px rgba(0,0,0,.25),inset 0 -7px 6px -7px rgba(0,0,0,.25);cursor:pointer;user-select:none}`,
+    ...(o.narrow
+      ? []
+      : [
+          // On pages: a dashed mark at the end of its page's words (what follows starts the next page).
+          `${s} .nd-pb{height:16px;margin:6px 0 0;background:none;box-shadow:none;border-top:1px dashed #c4c7cc}`,
+          // What the pages' layout puts in the words: a block moved to the next page, the gap where a paragraph or a
+          // table turns the page (never words, never picked), a table's header row again.
+          `${s} .nd-push{margin-top:var(--nd-push)!important}`,
+          `${s} .nd-cut{display:block;user-select:none;pointer-events:none}`,
+          `${s} tr.nd-cutrow td{padding:0!important;border:0!important;background:transparent!important}`,
+          `${s} tr.nd-cutrow,${s} tr.nd-rehead{user-select:none;pointer-events:none}`,
+          `${s} tr.nd-rehead th{background:#f3f5f7;font-weight:700}`,
+          // A picture fits on a page.
+          `${s} .nd-img img{max-height:calc(${paper.h}mm - ${2 * doc.page.margin}mm - 2em);object-fit:contain}`,
+        ]),
     `${s} .nd-pb::after{content:attr(data-label);position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:500 11px/1 system-ui,-apple-system,sans-serif;color:var(--fg-3,#8a8a8a);letter-spacing:.02em;white-space:nowrap}`,
     `${s} .nd-hr{cursor:pointer;user-select:none}`,
     `${s} figure.nd-img{cursor:pointer;user-select:none}`,

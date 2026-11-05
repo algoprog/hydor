@@ -185,6 +185,43 @@ export function snapOut(runs: Run[], o: number, after?: boolean): number {
   return o;
 }
 
+/** Where the character before `o` starts (`back`), or the one after it ends: a letter as people see one (an emoji with its joiners), an equation whole. */
+export function charStep(runs: Run[], o: number, back: boolean): number {
+  let at = 0;
+  for (const r of runs) {
+    const end = at + r.t.length;
+    if (r.math && (back ? o > at && o <= end : o >= at && o < end)) return back ? at : end;
+    at = end;
+  }
+  const text = runsText(runs);
+  if (typeof Intl.Segmenter !== 'function') return Math.max(0, Math.min(text.length, o + (back ? -1 : 1)));
+  let last = 0;
+  for (const { index } of new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)) {
+    if (back) {
+      if (index >= o) return last;
+      last = index;
+    } else if (index > o) return index;
+  }
+  return back ? last : text.length;
+}
+
+/** Where the word before `o` starts (`back`), or the one after it ends, as Ctrl+Backspace takes one out: the spaces beside it with it. */
+export function wordStep(runs: Run[], o: number, back: boolean): number {
+  const t = searchText(runs);
+  const w = (ch: string | undefined) => !!ch && /[\p{L}\p{N}_'’]/u.test(ch);
+  let i = o;
+  if (back) {
+    while (i > 0 && /\s/.test(t[i - 1])) i--;
+    if (w(t[i - 1])) while (w(t[i - 1])) i--;
+    else if (i > 0) i--;
+  } else {
+    while (i < t.length && /\s/.test(t[i])) i++;
+    if (w(t[i])) while (w(t[i])) i++;
+    else if (i < t.length) i++;
+  }
+  return snapOut(runs, i, !back);
+}
+
 /** The word around `o` (letters and digits), or null where there is none (between spaces). */
 export function wordAt(runs: Run[], o: number): [number, number] | null {
   const t = runsText(runs);
