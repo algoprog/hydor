@@ -707,7 +707,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   /** A comment on the words picked (or the line the cursor is on), written in the panel. */
   const addComment = () => {
     setMenu(null);
-    if (readOnly || file === PICTURES) return;
+    if (readOnly || onDisk || file === PICTURES) return;
     const c = codes.current.get(file);
     if (!c) return;
     let { from, to } = c.picked();
@@ -1112,6 +1112,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
     });
   const fmt = (cmd: string) => () => onCode((c) => c.toggle(cmd, 'words'));
   const canCompare = !onDisk && !!pageId;
+  // A file of this computer keeps its files only: comments are for documents in the Library.
+  const canComment = !onDisk;
 
   const menus: MenuDef[] = [
     {
@@ -1158,7 +1160,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
             { label: 'Reference', icon: <BookPlus size={14} />, also: 'doi arxiv bibliography bibtex crossref paper', run: openRefs },
             { label: 'Citation', icon: <BookOpen size={14} />, also: 'cite', run: () => void insert('cite') },
             { label: 'Cross-reference', icon: <LocateFixed size={14} />, also: 'ref label', run: () => void insert('ref') },
-            { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'note review', disabled: file === PICTURES, run: addComment },
+            canComment && { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'note review', disabled: file === PICTURES, run: addComment },
             {
               label: 'More',
               items: [
@@ -1235,7 +1237,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         { label: 'Visual', checked: mode === 'visual', also: 'visual editor rich text', run: () => switchMode('visual') },
         '-',
         { label: 'Outline', icon: <ListTree size={14} />, checked: wide ? outlineOpen : undefined, also: 'sections headings', run: () => (wide ? setOutlineOpen((o) => !o) : setMenu('outline')) },
-        { label: 'Comments', icon: <MessageSquare size={14} />, checked: commentsOpen, also: 'review notes', run: () => setCommentsOpen((x) => !x) },
+        canComment && { label: 'Comments', icon: <MessageSquare size={14} />, checked: commentsOpen, also: 'review notes', run: () => setCommentsOpen((x) => !x) },
         { label: 'Check spelling', icon: <SpellCheck size={14} />, checked: spell, also: 'spell', run: () => setSpell((x) => !x) },
         { label: 'Fold all', icon: <FoldVertical size={14} />, keys: 'Ctrl+Alt+[', disabled: !code, also: 'collapse', run: () => code?.foldAll() },
         { label: 'Unfold all', icon: <UnfoldVertical size={14} />, keys: 'Ctrl+Alt+]', disabled: !code, also: 'expand', run: () => code?.unfoldAll() },
@@ -1316,10 +1318,12 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
       >
         <ListTree size={15} />
       </IconButton>
-      <IconButton label="Comments" size="sm" active={commentsOpen} onClick={() => setCommentsOpen((x) => !x)} className="relative">
-        <MessageSquare size={15} />
-        {openCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-3.5 rounded-full bg-accent px-1 text-[9.5px] leading-3.5 font-semibold text-accent-fg tabular-nums">{openCount}</span>}
-      </IconButton>
+      {canComment && (
+        <IconButton label="Comments" size="sm" active={commentsOpen} onClick={() => setCommentsOpen((x) => !x)} className="relative">
+          <MessageSquare size={15} />
+          {openCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-3.5 rounded-full bg-accent px-1 text-[9.5px] leading-3.5 font-semibold text-accent-fg tabular-nums">{openCount}</span>}
+        </IconButton>
+      )}
       <IconButton label="Find and replace (Ctrl+F)" size="sm" disabled={!code} active={find.open} onClick={() => (find.open ? find.close() : find.show())}>
         <Search size={15} />
       </IconButton>
@@ -1472,7 +1476,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
           )}
         </div>
         {/* Comments beside the source where there is room (a sheet on a phone, below). */}
-        {commentsOpen && roomy && file !== PICTURES && commentsPanel('w-64 shrink-0 border-l border-line bg-panel')}
+        {canComment && commentsOpen && roomy && file !== PICTURES && commentsPanel('w-64 shrink-0 border-l border-line bg-panel')}
       </div>
       <Problems
         result={result}
@@ -1730,7 +1734,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
       )}
       <ShortcutsDialog open={dialog === 'keys'} onClose={() => setDialog(null)} groups={SHORTCUTS} />
       <Dialog
-        open={commentsOpen && !roomy && file !== PICTURES}
+        open={canComment && commentsOpen && !roomy && file !== PICTURES}
         onClose={() => {
           setCommentsOpen(false);
           setDraft(null);
