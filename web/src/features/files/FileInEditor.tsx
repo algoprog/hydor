@@ -38,17 +38,24 @@ const DOC_LOST: Record<string, string> = {
   layout: 'landscape pages',
 };
 
-/** And of an Excel file, the spreadsheet editor. */
+/** And of an Excel file, the spreadsheet editor (merged cells, filters, conditional formatting, data validation, notes, comments and the charts it draws it keeps). */
 const SHEET_LOST: Record<string, string> = {
-  charts: 'charts and pictures',
-  merged: 'merged cells',
+  pictures: 'pictures',
+  shapes: 'shapes and text boxes',
+  charts: 'charts it cannot draw',
   formulas: 'formulas it cannot work out',
-  conditional: 'conditional formatting',
-  validation: 'data validation',
-  comments: 'cell comments',
   pivots: 'pivot tables',
   tables: 'formatted tables',
   links: 'links to other files',
+  hyperlinks: 'hyperlinks',
+  names: 'named ranges',
+  macros: 'macros',
+  groups: 'grouped rows and columns',
+  sparklines: 'sparklines',
+  icons: 'icon sets',
+  protection: 'sheet protection',
+  print: 'print settings',
+  rich: 'words formatted in parts of a cell',
 };
 
 /** What a CSV or TSV file cannot hold of a workbook: more sheets, formulas (their values go in), formatting. */

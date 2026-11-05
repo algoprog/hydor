@@ -18,6 +18,7 @@ import { chartData, chartSvg } from '../../shared/sheet-chart.ts';
 import { bookForAgent, bookPage, csvOfBook, importBook, xlsxOfBook } from './sheets.ts';
 import { delimitedFile } from './filemodel.ts';
 import { Zip } from '../documents/zip.ts';
+import { zipParts } from './ooxml.ts';
 import { pages } from './index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -231,6 +232,16 @@ const sh = book.sheets[0];
   const sb = importBook(xlsxOfBook(styled, 'S'), 'S.xlsx').book.sheets[0].cells;
   ok(sb.A1.s?.code === '#,##0;[Red]-#,##0' && sb.A1.s.bt === 'thick #ff0000' && sb.A1.s.font === 'Verdana' && sb.A1.s.rot === -30, 'a code, borders, a font and turned words come back from Excel');
   ok(sb.A2.s?.fmt === 'datetime' && sb.A3.s?.fmt === 'accounting' && sb.A3.s.cur === '€', 'and the new formats too');
+  // What saving an Excel file loses, said only of what it has: links, groups, icon sets, names, macros, rich words, pictures.
+  const parts = z.names().map((name) => ({ name, data: z.read(name)! }));
+  const edit = (name: string, f: (x: string) => string) => parts.map((q) => (q.name === name ? { name, data: f(q.data.toString()) } : q));
+  let more = edit('xl/worksheets/sheet1.xml', (x) => x.replace('<row r="2"', '<row r="2" outlineLevel="1"').replace('<pageMargins', '<hyperlinks><hyperlink ref="A2" display="x"/></hyperlinks><pageMargins'));
+  more = more.map((q) => (q.name === 'xl/workbook.xml' ? { name: q.name, data: q.data.toString().replace('</definedNames>', '<definedName name="Rate">Work!$C$2</definedName></definedNames>') } : q));
+  more = more.map((q) => (q.name === 'xl/sharedStrings.xml' ? { name: q.name, data: q.data.toString().replace('<si><t>Task</t></si>', '<si><r><rPr><b/></rPr><t>Ta</t></r><r><t>sk</t></r></si>') } : q));
+  more = more.map((q) => (q.name === 'xl/drawings/drawing1.xml' ? { name: q.name, data: q.data.toString().replace('</xdr:wsDr>', '<xdr:twoCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>3</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>5</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="9" name="Box"/><xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr/></xdr:sp><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>') } : q));
+  more.push({ name: 'xl/vbaProject.bin', data: Buffer.from('x') });
+  const lost = importBook(zipParts(more), 'Work.xlsm').loses ?? [];
+  ok(['groups', 'hyperlinks', 'names', 'rich', 'shapes', 'macros'].every((k) => lost.includes(k)) && !lost.includes('charts') && !lost.includes('pictures'), `what an Excel file loses is said: ${lost.join(', ')}`);
   void calc;
 }
 
