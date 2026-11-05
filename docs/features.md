@@ -168,8 +168,11 @@ agents that speak ACP and take MCP servers.
   Published) sit beside the cards, with Find by name, sorting and kind chips (Pages, Slides, Documents,
   Spreadsheets, LaTeX, Pictures, Videos, Audio). A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
   looks like part of the app (its theme, light or dark as the app is, your colours and the app's font, unless you
-  ask for another look), and you can change it in a visual editor that works on a phone too: click or tap a part to rewrite its words
-  (bold, italic, links), restyle it (this part, every part of its kind or class, on hover, or for tablets and
+  ask for another look), and you can change it in a visual editor that works on a phone too, written in as in Notion:
+  Enter makes the next block, "/" adds headings, lists, to-dos, toggles, callouts, quotes, code, tables, pictures,
+  videos, columns, cards, maths, a table of contents or a button, Markdown turns into blocks as you type, a ⋮⋮ beside
+  each block drags it or turns it into another kind and colours it, several blocks are picked at once, and a page gets
+  an icon and a cover; click or tap a part to rewrite its words (bold, italic, code, links, colours), restyle it (this part, every part of its kind or class, on hover, or for tablets and
   phones only), move, size, copy, wrap or delete it, pick it from its layers, add parts and ready-made sections,
   set the whole page's colours, fonts, width and the look of its headings, links and buttons, ask the agent about
   a part, or edit its HTML with the page beside it; the agent hears of your changes with your next message.
