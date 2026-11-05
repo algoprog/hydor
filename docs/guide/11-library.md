@@ -32,6 +32,8 @@ While an agent writes a page, you see it grow: headings, then the text, the tabl
 
 The panel also opens for an HTML file an agent writes whole (a static site's `index.html`, say), with its pictures and styles from the file's folder.
 
+A document, slides, a spreadsheet or a LaTeX document grows the same way as an agent writes it, in the panel (in its own editor) and, if you have it open in the Library, there too. Under its title, "An agent is writing a new version" and a dot say it is happening; meanwhile it is read-only (its toolbar dimmed) and the agent's caret, with a small **Agent** flag, shows where its words are arriving, kept in view unless you scroll away. A long document written again stays as it was and only what changes moves: the new words take over from the old ones as they come. In slides, the slide being written is on view, a box round the part being written; in a spreadsheet, the cell being written is boxed, its formulas worked out as they come; a LaTeX document's source grows, and its pages are typeset once it is saved. When the agent's save is done, its version takes the place of what you watched; if it fails or you stop it, the page stays as it was. Changes of yours not saved yet are left as they are: a note says an agent is writing a new version, and they stay yours until you save them. An agent that works in steps (a section, a few slides or some cells at a time) shows each step here as it comes.
+
 - Drag the panel's left edge to make it wider or narrower; the app remembers the width on this device.
 - When a conversation has several pages, click the page's title in the panel to switch to another.
 - **More** (⋯) in the panel has **Open in the Library** (a saved page), **Show in Files** (an HTML file), **Save as a file** (or, for a saved page or slides, **Download as** a PDF, a Word document, a PowerPoint file or a web page), and **Open pages here as they are written**: turn it off, and pages wait for you to open them from their cards.
@@ -342,7 +344,7 @@ Slides are kept in the Library too, with versions, a picture in the list and an 
 
 ### Make slides
 
-- **Ask an agent**: "make me 8 slides on our first year, with a chart of the sales", "turn this report into a short talk with speaker notes". The agent makes the deck in the Library and it shows in the conversation as a slideshow.
+- **Ask an agent**: "make me 8 slides on our first year, with a chart of the sales", "turn this report into a short talk with speaker notes". The agent makes the deck in the Library and it shows in the conversation as a slideshow; beside it, you watch it being made, slide by slide.
 - **New page** in the Library, then **Slides** at the top ([or New slides from the search box](/library?new=slides)): pick a look (**Daylight**, **Midnight**, **Ember**, **Forest**, **Ocean**, **Noir**, **Blossom** or **Slate**), **Wide (16:9)** or **Standard (4:3)**, a name, and **Make it**. Or describe the talk under **Or describe it, and an agent makes it**.
 - **From a PowerPoint file**: **New page** → **Slides** → **Open a PowerPoint file** (a .pptx, also .ppsx, .potx or .pptm), or **Save to Library** on such a file in Files or on a file an agent handed over. Its slides become slides you edit here: each part where it was, text boxes and shapes with their words as they look (fonts, sizes, colours, bullets, numbers and spacing, as their layout and master make them), pictures (cropped, their colours changed), tables, charts (from the numbers kept in them), groups, connectors, videos inside the file, PowerPoint's equations (as LaTeX), backgrounds, speaker notes, comments with their replies, the footer, transitions and simple animations; the file's colours and fonts become the slides' theme. What could not come along is said when it opens: shapes the editor has none like come in as boxes, freeform drawings as pictures of them, SmartArt and embedded objects are left out, and fonts the file carries show only where your computer has them. Files made here come back as the slides they were. PowerPoint 97–2003 files (.ppt) cannot be opened: save them as .pptx in PowerPoint or LibreOffice first.
 
@@ -526,7 +528,7 @@ An Excel file you open or save keeps all of this: its filters, conditional forma
 
 A LaTeX document is its source (the main file, main.tex, and any others it reads, such as a .bib of references) and its pictures, typeset into pages by LaTeX on the computer the app runs on. You edit the source beside its typeset pages, as in Overleaf, as code or shown as a document, and save the PDF, the .tex file or the whole project.
 
-- **Make one**: ask an agent ("write up these results as a short paper in LaTeX, with the equations numbered"), or **New page** in the Library, then **LaTeX** ([or New LaTeX document from the search box](/library?new=tex)), and pick what it starts from: **Article**, **Report**, **Book or thesis**, **Letter**, **Beamer slides**, **CV or résumé**, **Homework**, **Conference paper** or **Poster** (those the computer's TeX can typeset; a line under them names the others and what to install for them). A conference paper has its **Paper style** under the cards: **Two columns**, or as **IEEE**, **ACM** or **Springer LNCS** ask, each with its own class, its title block, its bibliography style and a refs.bib to start from. Or open your own with **Open a .tex or .zip file** (one file, or a project's folder in a .zip; PDF pictures in it become PNG ones).
+- **Make one**: ask an agent ("write up these results as a short paper in LaTeX, with the equations numbered") and watch its source being written, or **New page** in the Library, then **LaTeX** ([or New LaTeX document from the search box](/library?new=tex)), and pick what it starts from: **Article**, **Report**, **Book or thesis**, **Letter**, **Beamer slides**, **CV or résumé**, **Homework**, **Conference paper** or **Poster** (those the computer's TeX can typeset; a line under them names the others and what to install for them). A conference paper has its **Paper style** under the cards: **Two columns**, or as **IEEE**, **ACM** or **Springer LNCS** ask, each with its own class, its title block, its bibliography style and a refs.bib to start from. Or open your own with **Open a .tex or .zip file** (one file, or a project's folder in a .zip; PDF pictures in it become PNG ones).
 - **The source** has a tab for each file and one for **Pictures** (to add, rename, put in a figure or remove them); **Add a file or a picture** (+) has **A new file**, **A file from this device** and **A picture**, and a file's tab renames or deletes it.
 - **Code or Visual**, the switch above the source: **Visual** shows the source as a document while you type, with headings, bold and italic words, maths drawn, bullets and numbers in lists, pictures, figures and tables framed with their captions, citations, references and labels as small chips, footnotes folded into a mark (point at it to read it) and comments quiet. What the cursor is in shows as its source again, so you change it as it is: the text is the same either way. The editor remembers your choice on this device.
 - **As you type**, the editor offers what fits: a backslash offers LaTeX commands, each with what it does (with the document's own `\newcommand`s, and those of the packages it loads); `\begin{` offers environments and puts in the matching `\end{…}`; `\usepackage{` offers common packages and says which ones this computer lacks; `\cite{`, `\ref{` and `\includegraphics{` offer the document's references, labels and pictures. On a phone the list opens as you type these too, in rows big enough to tap, each saying what it does; tap one to take it (Return still starts a new line). Tab goes to the next place to fill in. Brackets and `$` close themselves, and Enter after a `\begin{…}` you typed puts its `\end{…}` under it. With the cursor in a formula (`$…$`, `\[…\]`, an equation, aligned equations…), a card above it shows it drawn, with your own `\newcommand`s.
@@ -562,7 +564,7 @@ What a run shows comes at once but stays unsaved until **Save** (Ctrl+S) in the 
 
 1. Pick what it is about: for slides, **This slide**, **Every slide** or **What's picked** (the parts picked on the slide); for a document, **The whole document**, **This section** (the one you are in), **The words picked** or **The picture picked**; for a spreadsheet, **The whole workbook**, **This sheet** or the cells picked; for a LaTeX document, **The whole document**, **This file**, **This section** or the lines picked; for a notebook, **The whole notebook** or the cell picked (**Cell 3**); for a page, **The whole page** or **The part picked** (after **Ask the agent** on a part in **Edit**).
 2. Say what should change ("make the titles shorter", "add a slide with a chart of these numbers", "make this section friendlier", "add a total row under the numbers", "fix the errors so it typesets") and send it. Changes not saved yet are saved first, so the agent works on them.
-3. The agent starts with the agent and model you picked last on the start page; the panel shows its work and its answer, and what you have open changes in front of you as soon as it saves it. Each change is a version, so you can go back ([Go back to an earlier version](#go-back-to-an-earlier-version)).
+3. The agent starts with the agent and model you picked last on the start page; the panel shows its work and its answer, and what you have open shows its changes as it writes them, the agent's caret where its words arrive ([Watch a page as it is written](#watch-a-page-as-it-is-written)). A big change may come in steps, a section or a few slides at a time, each showing as it is saved. Each change is a version, so you can go back ([Go back to an earlier version](#go-back-to-an-earlier-version)).
 
 Say more in the panel's message box; the buttons above it put which slide or part you mean in your message. **A new request** starts over, and **Open as a session** opens the conversation on its own page (it stays among your sessions). On a phone, **See the page** folds the panel away while the agent works; the button at the bottom brings it back.
 
@@ -582,6 +584,8 @@ Every save of a page is a version of its own: the first one (kept or made by you
 4. Click **Bring it back** to make it current, or **Back to the latest** to leave it.
 
 Bringing a version back adds it as a new version on top ("Version 3 is back, as version 6"), so the versions after it stay too. The page's data is not touched.
+
+An agent that saves a page several times in a row while it answers one message (a document written a section at a time, say) leaves one version: the last, its line saying how many saves it holds (**4 saves**). A version you saved or brought back is never replaced that way, and the next message you send starts a new one.
 
 A page keeps its newest 40 versions. Older ones go first, also when the versions together pass 24 MB; the current version always stays.
 
@@ -709,6 +713,7 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "On my notes page, link the word 'budget' to my Budget page, and make its code blocks Python."
 - "Make me 10 slides for a talk on our first year, with a chart of sales and speaker notes."
 - "On my 'Launch plan' slides, make every title shorter and add a closing slide."
+- "In my 'Launch plan' slides, change only slides 3 and 5, and add two slides after slide 7."
 - "Send me the 'Launch plan' slides as a PowerPoint file, and the report page as a PDF."
 - "Open quarterly-review.pptx from my Downloads as slides in my Library, then make its titles shorter."
 - "On my 'Launch plan' slides, number every slide but the title and put 'Acme · Confidential' at the foot of each."
@@ -717,6 +722,8 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "Answer the comments on my 'Launch plan' slides, make the changes they ask for, and resolve them."
 - "On slide 4 of my 'Launch plan', join the steps with elbow connectors, and put my demo.mp4 on slide 6."
 - "Write me a cover letter for this job ad and keep it in my Library: I'll change it myself."
+- "Write me a 20-page report on our first year, a section at a time, so I can watch it come in."
+- "In my 'Field report' document, rewrite only the section 'Results' and add a summary at the end."
 - "Answer my comments in the 'Field report' document and resolve the ones you dealt with."
 - "Suggest your edits to my 'Field report' document instead of making them, so I can accept or reject each."
 - "In the 'Budget' document, accept Maria's suggestions and reject the agent's."
@@ -724,12 +731,14 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "Sign my cover letter in the Library with my signature, under 'Kind regards'."
 - "Sign the lease in my Downloads folder on the line after 'Tenant signature', and put my initials next to 'Initials:' on page 2 of the PDF."
 - "In my 'Household budget' spreadsheet, add a column with each item's share of the total."
+- "Fill in March in my 'Household budget' spreadsheet: just those cells, leave the rest as it is."
 - "Turn these notes into a short paper in LaTeX, with the equations numbered."
 - "Start me a thesis in LaTeX from the book template, with chapters for my three studies."
 - "Turn my LaTeX notes into an IEEE conference paper, with the related work as its own section."
 - "How many words does my LaTeX paper have, without the captions?"
 - "Answer the comments on my LaTeX paper, change what they ask, and resolve them."
 - "Turn on Track changes in my LaTeX paper and tighten the introduction, so I can accept or reject each edit."
+- "Write the method section of my LaTeX paper again, and add a conclusion before the bibliography."
 - "Send me the 'Household budget' spreadsheet as an Excel file."
 - "Answer the comments on my 'Household budget' spreadsheet, fix what they point at, and resolve them."
 - "In my 'Sales' spreadsheet, chart column F against the months in column A, beside the table."
