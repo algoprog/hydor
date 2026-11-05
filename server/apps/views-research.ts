@@ -113,7 +113,7 @@ const PAPER_RADAR_UI: AppUi = {
     { id: 'today', title: 'Today', on: 'app', blocks: [{ element: 'radar', data: 'last.result' }] },
     {
       id: 'saved',
-      title: 'Saved',
+      title: 'Saved papers',
       on: 'app',
       blocks: [
         { element: 'saved-head', data: 'data.saved', sort: '-createdAt', limit: 300 },

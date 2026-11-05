@@ -18,7 +18,7 @@ On an app's own page, **Update** at the top makes a new one now, and the sliders
 
 - **What it reads**: arXiv's new papers in the categories you follow (a few hundred at most, sent in the last three days, more after a gap), those on your topics from any field, and those of the people you follow; OpenAlex's on your topics too (journals and proceedings). A paper an earlier update looked at never comes again.
 - **How it ranks**: against your projects (their names, descriptions and latest sessions), your topics and your profile. By meaning with the embedding model on your computer when [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) is on, else by their words. The papers you save pull the ranking toward them; those you put aside push it away. Papers by people you follow always come first.
-- **The page**: **Today**, the day's papers under the project or topic each fits best (pick one at the top, or **All**). Each card has where and when it came out, its title (a link to it), its authors, what it does in a sentence and why it is for you, with **☆ Save**, **Cite** (copies its BibTeX), **PDF**, **Dig deeper** (a [Deep research report](/apps/t/deep-research) on it, of a few minutes) and **Not for me** (it folds away, with **Undo**). **Saved** lists what you saved, newest first, with **Copy all as BibTeX**, and for each **Cite**, **Add to Reading list**, **Dig deeper** and **Take it out**.
+- **The page**: **Today**, the day's papers under the project or topic each fits best (pick one at the top, or **All**). Each card has where and when it came out, its title (a link to it), its authors, what it does in a sentence and why it is for you, with **☆ Save**, **Cite** (copies its BibTeX), **PDF**, **Dig deeper** (a [Deep research report](/apps/t/deep-research) on it, of a few minutes) and **Not for me** (it folds away, with **Undo**). **Saved papers** lists what you saved, newest first, with **Copy all as BibTeX**, and for each **Cite**, **Add to Reading list**, **Dig deeper** and **Take it out**.
 - **Its settings**: **Fields to follow** (arXiv's categories, by name or code: Information Retrieval or cs.IR, Computation and Language or cs.CL; a field that is no category is taken as a topic), **Topics** (one a line), **People to follow** (one a line, as their papers print their names) and **How many papers** (15 unless you change it, between 5 and 40). Left empty, it works out fields and topics from your profile and projects.
 
 An update asks the helper model one or two quick questions (what each paper means for you) and takes a minute or two.
@@ -37,7 +37,7 @@ An update asks the helper model one or two quick questions (what each paper mean
 
 - **What it looks at**: the newest models of the kind (with the words you give in their names), once they are as old as you said (7 days unless you change it) and have enough downloads by then; the eight most downloaded an update (the rest wait for the next). Copies of a model in another format (GGUF, ONNX, quantized) are left out unless your words ask for them. It reads each one's page and model card for its licence, its size and what it is, and leaves out those your licences or size rule out.
 - **Your evaluation**: give a command with `{model}` where the model's name goes (`python eval.py --model {model}`), its folder, the score it prints (`ndcg@10`), whether higher or lower is better, and your best so far. Each new model worth trying then runs in [Experiments](/system/experiments) (group "New-model watch", a GPU each, in its queue), which tells you when one does better than your best; the next update reads each run's score. Without a command it only lists the new models.
-- **The page**: **Models**, each with where it stands (**new**, **evaluating**, **done**, **beats** your best, **not run**, **skipped**, **too new**), what its card says, its size, licence, downloads and likes, and its score; those that beat your best come first. **Your evaluation** says what runs, with **Open Experiments**.
+- **The page**: **Models**, each with where it stands (**new**, **evaluating**, **evaluated**, **beats** your best, **not run**, **skipped**, **too new**), what its card says, its size, licence, downloads and likes, and its score; those that beat your best come first. **Your evaluation** says what runs, with **Open Experiments**.
 
 ### Deadline radar
 
@@ -61,10 +61,8 @@ An update asks the helper model one or two quick questions (what each paper mean
 [Gap finder](/apps/t/gap-finder) crosses your papers with this month's in an area for project ideas, checks each for prior work and sizes it to the compute you have. It runs from its form, or an agent runs it for you in a session.
 
 - **What you give**: **Your papers** (your name as an author, which brings your latest and most cited papers, or their titles or arXiv ids, one a line), **The area** (in words, or an arXiv category: conversational search, cs.IR), **The compute you have** (one 24 GB GPU unless you say) and **How many ideas** (5).
-- **What it does**: it reads your papers and the past month's in the area, ranks the month's against yours, and has the helper model propose ideas that cross them. For each idea it searches arXiv and Semantic Scholar for prior work and has the helper model judge it: **new**, **partly done** or **done**, with the closest paper; the first experiment to run, what it takes on your compute, and whether it **fits**, is **tight** or is **too big**.
+- **What it does**: it reads your papers and the past month's in the area, ranks the month's against yours, and has the helper model propose ideas that cross them. For each idea it searches arXiv and Semantic Scholar for prior work and has the helper model judge it: **new**, **partly done** or **already done**, with the closest paper; the first experiment to run, what it takes on your compute, and whether it **fits**, is **tight** or is **too big**.
 - **The view**: **Research ideas**, new ones first (show one verdict at the top), each with what it crosses, why its verdict, the closest work (a link), the first experiment and its cost, and **Plan it** (opens the Research sprint app with the idea as its question), **Dig deeper** (a deep research report on the work near it) and **Copy**. **What it crossed** lists your papers and the month's it used.
-
-<!-- end: keep-up -->
 
 ## Read and organise papers
 
@@ -119,8 +117,6 @@ It runs code on this computer and can take hours: it keeps within your limits, a
 
 **Highlight papers as you read them.** Open a paper's PDF in Files and press **Highlight**: select a passage, or drag a box around an equation or a figure, to highlight it in one of four colours and write a note on it. **Ask** asks an agent about just that part ("What does this equation say?"), and **Notes** lists everything you marked, page by page. **Keep in a project** puts your highlights and notes into a project's knowledge as one document named after the paper, kept up to date, so the project's sessions find them; **Save into the PDF** writes them into the file for other apps. See [Read and highlight a PDF](/guide/files-git#read-and-highlight-a-pdf).
 
-<!-- end: read -->
-
 ## Check a paper before you submit
 
 Before a paper goes out, the LaTeX editor checks it as a venue's desk and its reviewers would: its references, whether it gives you away, its pages and fonts, the parts the venue asks for, and the numbers in its tables. Open your paper ([your LaTeX documents](/library?kind=tex)) and pick **Tools → Check before submitting**.
@@ -172,8 +168,6 @@ Names with spaces get dashes, and the source follows. **Make the package** types
 
 What is not saved yet is saved first, so each gets the paper as you see it.
 
-<!-- end: check -->
-
 ## Review, answer and present your paper
 
 Four ready-made apps, under **Writing** on [the Apps page](/apps), help with your own paper: the **Reviewer simulator** reviews your draft as a venue's reviewers would, the **Rebuttal workbench** drafts your answer to the reviews you got, **Paper to talk, poster and thread** makes what you present it with, and the **Figure doctor** makes its plots fit for print. The first three read your paper from a PDF, a .tex file or a LaTeX project's folder on this computer, a link, or a LaTeX document of your Library (paste its address); **Or upload it** takes a PDF instead.
@@ -220,8 +214,6 @@ Its view has **Before and after** (the size, font and colours it used, then each
 
 Agents in your sessions know these crafts too, from skills that come with Hydor (**peer-review**, **reproduce-paper** and **figures-for-papers**: see [Skills](/guide/skills)): ask one to review a paper with you, answer one reviewer, or fix a single figure, and it works the same way.
 
-<!-- end: present -->
-
 ## Run your lab's work
 
 Three ready-made apps, under **Lab** on the [Apps](/apps) page, help with a lab's daily work: labelling data and checking a model against your labels, testing an idea on your own code from hypotheses to a report, and tuning a model's settings. The sprint and the sweep run their jobs in [Experiments](/guide/experiments), so they need it to have a computer (or a cluster) with GPUs.
@@ -267,15 +259,13 @@ Its view has **The sprint** (the question, how it went, its branch, and each hyp
 
 Its view has **Results** (the best run's settings and metric, what it found, what to try next, and a bar for each setting's weight), **By setting** (the metric for each of a setting's values, as boxes) and **All runs**.
 
-<!-- end: lab -->
-
 ## Reports: your week and your lab notebook
 
 Two ready-made apps, under **Work** on the [Apps](/apps) page, write up what you did from what Hydor knows of your work: your sessions (those here, and the Claude Code and Codex sessions in VS Code or a terminal that Hydor reads), your commits in the Git repositories they worked in, your Experiments runs, what you made in the Library and the papers you marked read in your Reading list. Sessions with memory off and Confidential sessions are left out, and so is the work of sessions agents start for parts of a task (it counts as their parent's). Both open on a page of their own, and can update by themselves.
 
 ### Weekly progress report
 
-**Weekly progress report** turns your week into an update for your advisor, your team or a manager: what got done, results with their numbers, problems and what blocks you, next week's plan, and questions to ask. It opens on its own page with this week's report (the seven days up to the day it is written): its title and summary, the week in numbers, then **Done**, **Results**, **Problems and blockers**, **Next week** and **Questions**.
+**Weekly progress report** turns your week into an update for your advisor, your team or a manager: what got done, results with their numbers, problems and what blocks you, next week's plan, and questions to ask. It opens on its own page with this week's report (the seven days up to the day it is written): its title and summary, the week in numbers, then **Done this week**, **Results**, **Problems and blockers**, **Next week** and **Questions**.
 
 - **Copy as Markdown**, and **Copy as an email** (a subject line, then a short note that opens and closes as yours would), put it on your clipboard; **Save as a document** keeps it in your Library, to change and export as Word or PDF.
 - **Update** writes this week's report now. **Earlier**, under it, lists the earlier weeks, each a click away.
@@ -290,8 +280,6 @@ Two ready-made apps, under **Work** on the [Apps](/apps) page, write up what you
 - **Update** writes today's entry now, and **Write an earlier day** a day you missed. A day written again takes the place of its entry; a day you did nothing gets none.
 - **Settings**: **Update automatically** (off until you turn it on) writes the day's entry each evening at 21:00, on the days and at the time you pick; **Projects** keeps it to some projects.
 
-<!-- end: reports -->
-
 ## Ask an agent
 
 - "Set up Paper radar to follow cs.IR and cs.CL, with dense retrieval and query performance prediction as topics, and have it update every day at 7:30."
@@ -301,9 +289,6 @@ Two ready-made apps, under **Work** on the [Apps](/apps) page, write up what you
 - "Watch Hugging Face for new rerankers under 1B parameters with an Apache or MIT licence, and run my evaluation on each: python eval.py --model {model} in ~/rerank-eval, ndcg@10, my best is 0.512."
 - "Start a living related work on learned sparse retrieval, seeded with SPLADE and ColBERT, and draft its related-work section."
 - "Find gaps between my papers and this month's work on conversational search; I have one 24 GB GPU."
-
-<!-- end: ask-b1 -->
-
 - "Add 2104.08663 and the ColBERT paper to my reading list, in the project Dense retrieval."
 - "Import ~/papers/refs.bib into my reading list, tagged survey."
 - "Sync my reading list with Zotero."
@@ -315,9 +300,6 @@ Two ready-made apps, under **Work** on the [Apps](/apps) page, write up what you
 - "Here are my ARR reviews: draft a rebuttal of at most 2,500 characters per reviewer."
 - "Make a 12-minute talk, an A0 poster and a thread from my paper in ~/papers/colbert, in the project ColBERT."
 - "Fix the plots in ~/papers/colbert/plots for an ACL paper, one column wide, in Times."
-
-<!-- end: ask-b2 -->
-
 - "Check my paper for ACL before I submit it, and fix what you safely can."
 - "Are all the references in my LaTeX paper real, with the right authors and years? Correct the ones that are not."
 - "Has any preprint my paper cites been published since? Cite the published versions."
@@ -326,11 +308,6 @@ Two ready-made apps, under **Work** on the [Apps](/apps) page, write up what you
 - "Do the numbers in my results tables still match my runs?"
 - "My SIGIR paper was accepted: make it camera-ready."
 - "Move my paper to the ICLR template, as the version for review."
-
-<!-- end: ask-c -->
-
-<!-- D's examples -->
-
 - "Load 200 texts from the sentiment part of tweet_eval on Hugging Face into the Annotation workbench, with the labels positive, negative and neutral and these guidelines: …"
 - "How well do I agree with the model on my latest annotation set? Which labels do we confuse most?"
 - "Run a research sprint on whether a curriculum from short to long queries helps the retriever in ~/code/retriever, with 6 GPU hours."

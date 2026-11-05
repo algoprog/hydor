@@ -782,8 +782,6 @@ Jobs that wait for free GPUs (or a cluster's queue), run on their own and are ke
 - `POST /api/experiments/tables/:id/insert` — puts the table into a file of a LaTeX document of the Library, as a new version of it: in place of the table with its marker there, else before \end{document} (or at the end of the file). Body: `{ page: string — the document's id, file?: string — default main.tex }`. Returns: `{ replaced: boolean, version: number, title }`.
 - `DELETE /api/experiments/tables/:id` — deletes a kept table. Returns: `{ ok: true }`.
 
-<!-- end: api-a -->
-
 ## Research tools (the LaTeX editor's checks and packages)
 
 A LaTeX paper checked before it is submitted (**Tools → Check before submitting**), made into an arXiv package (**Export → arXiv package (.zip)**), and written to disk for the apps that take a paper. Agents check a paper with their latex_check tool instead of these.
@@ -795,21 +793,11 @@ A LaTeX paper checked before it is submitted (**Tools → Check before submittin
 - `GET /api/pages/tex/arxiv/:token` — the arXiv package's .zip, for an hour after it was made. 404 when it is no longer kept.
 - `POST /api/pages/tex/paper` — writes a LaTeX document to disk for an app that takes a paper (its files and pictures, and its typeset PDF, in a folder of the app's data; a file's document keeps its own folder). Body: `{ model: object, page?: string, folder?: string, base?: string }`. Returns: `{ folder: string, pdf?: string }` (no pdf when it does not typeset).
 
-<!-- end: api-c -->
-
-## Research apps' helpers
-
-<!-- Workstreams B1, B2 and D, if they add routes. -->
-
-<!-- end: api-b -->
-
 ## Confidential sessions
 
 A confidential session (`extra.confidential: true`, set with `POST /api/sessions`) runs on Custom with a model on this computer or your private network, and nothing of it leaves the computer. The server keeps it so: its messages are refused while its model is elsewhere (409), and so are a switch to such a model, a hand-off, a read-only link, turning it off and memory on. Agents in other sessions don't reach it: app_api answers "That session is confidential" for its addresses and leaves it out of lists.
 
 - `GET /api/confidential` — what a confidential session can use here. Query: `prefer?: string — a model id that leads the list when it is one of them`. Returns: `{ models: string[] — Custom's models on this computer or your private network (Ollama at a local address but not its cloud models, vLLM, endpoints at localhost, 127.x, ::1, 10.x, 172.16–31.x, 192.168.x, fc00::/7 or a .local name), the best first: native tool calls, then the largest; sandbox: boolean — commands run without network here (bubblewrap; false: each command asks the user); helper: boolean — the helper model runs here (it names confidential sessions; else their first words do) }`.
-
-<!-- end: api-f -->
 
 ## Sharing a project (Projects → Share)
 
@@ -824,8 +812,6 @@ The owner invites people into one project, each with a link of their own (`/p/<t
 
 A person's comments show in documents and LaTeX documents as `by: "person"` with their `name` (see **Comment** under Library), in `GET /api/inbox` (`kind: "comment"`) until someone replies or resolves them, and to agents through get_page under their name. A version a person saved has `who`.
 
-<!-- end: api-g -->
-
 ## Engineering (Git: find what broke it; campaigns)
 
 These use the routes above; Git's own routes are the user's alone.
@@ -833,8 +819,6 @@ These use the routes above; Git's own routes are the user's alone.
 - The engineering examples (Settings → Scheduled tasks → Start from an example → Engineering) are scheduled tasks: make one with `POST /api/tasks`, a repository folder as cwd and the prompt and schedule you would write, with `origin` set to say which example it is: "template:ci-doctor:github" (or :gitlab, :buildkite, :circleci), "template:issue-triage", "template:dependencies", "template:incident:sentry" (or :grafana, :datadog, :betterstack, :other). The task's row then says where its webhook address goes. CI doctor's filter: `{ path: "body.workflow_run.conclusion", value: "failure" }` on GitHub, `body.object_attributes.status` on GitLab, `body.build.state` on Buildkite and `body.workflow.status` on CircleCI each `"failed"`; Issue triage's: `{ path: "body.action", value: "opened" }`; the incident responder skips resolved notices (`{ path: "body.action", value: "resolved", skip: true }` for Sentry, `body.status` "resolved" for Grafana, `body.transition` "Recovered" for Datadog).
 - Find what broke it starts a session: `POST /api/sessions` with cwd the repository's folder, `worktree: true`, and a prompt that says where it worked (a tag or commit), where it is broken, what is broken and, if there is one, a command that fails while it is broken; its agent follows the git-bisect skill.
 - A campaign is a swarm: `POST /api/sessions` with `extra: { swarm: "campaign" }` and cwd in a git repository; `GET /api/swarm/:key` gives its parts and how each stands, `POST /api/swarm/:key/stop` stops its members.
-
-<!-- end: api-e -->
 
 ## Not for agents
 
