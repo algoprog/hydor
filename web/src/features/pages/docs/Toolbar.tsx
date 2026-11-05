@@ -2,8 +2,9 @@
 // (sideways on a phone): undo and redo; the paragraph's style; the words' font and size; bold, italic, underline;
 // their colour and highlight; a link (Ctrl+K); a comment on the words picked (Ctrl+Alt+M); the format painter (a
 // click carries the look of the words at the caret to the next words picked, a double click keeps it on until Esc);
-// alignment, in a menu; bullets, numbers and a checklist; and the table's rows and columns when the caret is in one.
-// It acts on what is selected in the document, which keeps its selection meanwhile.
+// alignment, in a menu; bullets, numbers and a checklist; the table's rows and columns when the caret is in one; and at
+// its end Editing or Suggesting (Ctrl+Alt+Shift+X), named while suggesting. It acts on what is selected in the
+// document, which keeps its selection meanwhile.
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   AlignCenter,
@@ -13,6 +14,8 @@ import {
   Baseline,
   Bold,
   ChevronDown,
+  FilePenLine,
+  PencilLine,
   Highlighter,
   Italic,
   Link2,
@@ -106,6 +109,8 @@ export function Toolbar({
   linkRef,
   onComment,
   slim,
+  suggesting,
+  onSuggesting,
 }: {
   engine: DocEngine;
   st: SelState;
@@ -116,6 +121,9 @@ export function Toolbar({
   onComment: () => void;
   /** Beside the menus where room is short: undo, redo and comment are left to the menus (and their keys). */
   slim?: boolean;
+  /** Edits are suggestions (Suggesting), and the switch between that and Editing. */
+  suggesting?: boolean;
+  onSuggesting?: (on: boolean) => void;
 }) {
   const [menu, setMenu] = useState<'table' | 'align' | null>(null);
   const tableRef = useRef<HTMLButtonElement>(null);
@@ -231,6 +239,26 @@ export function Toolbar({
           Table
           <ChevronDown size={12} className="-ml-0.5 text-fg-3" />
         </Button>
+      )}
+      {onSuggesting && (
+        <>
+          <Sep />
+          <button
+            type="button"
+            title={suggesting ? 'Suggesting: your changes are suggestions (Ctrl+Alt+Shift+X to edit)' : 'Editing (Ctrl+Alt+Shift+X to suggest changes instead)'}
+            aria-label={suggesting ? 'Suggesting' : 'Editing'}
+            aria-pressed={!!suggesting}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onSuggesting(!suggesting)}
+            className={cx(
+              'flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[12.5px] font-medium transition-colors',
+              suggesting ? 'bg-[#188038]/15 text-[#188038] hover:bg-[#188038]/25 dark:text-[#5bc27a]' : 'text-fg-2 hover:bg-bg-2 hover:text-fg',
+            )}
+          >
+            {suggesting ? <FilePenLine size={15} /> : <PencilLine size={15} />}
+            {suggesting && <span>Suggesting</span>}
+          </button>
+        </>
       )}
       <Popover anchor={alignRef} open={menu === 'align'} onClose={() => (setMenu(null), engine.refocusSoon())} width={230}>
         {ALIGNS.map((a) => (

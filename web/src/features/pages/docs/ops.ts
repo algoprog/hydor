@@ -145,7 +145,7 @@ export function lookAt(runs: Run[], o: number): Look {
     if (o > at && o <= end) {
       // Words typed after an equation are words.
       if (r.math) return {};
-      const look = lookOf(r);
+      const look = typedLook(r);
       if (o === end) {
         const next = runs[k + 1];
         if (look.link && next?.link !== look.link) delete look.link;
@@ -157,10 +157,16 @@ export function lookAt(runs: Run[], o: number): Look {
     }
     at = end;
   }
-  const first = runs[0] && !runs[0].math ? lookOf(runs[0]) : {};
+  const first = runs[0] && !runs[0].math ? typedLook(runs[0]) : {};
   delete first.link;
   delete first.cm;
   return first;
+}
+
+/** A run's look for words typed beside it: never its suggested change's marks (words typed are yours, or a suggestion of yours). */
+function typedLook(r: Run): Look {
+  const { ins: _i, del: _d, fmt: _f, was: _w, ...look } = lookOf(r);
+  return look;
 }
 
 /** The run a place is in: the character before it's (at the start, the first). */
@@ -574,32 +580,43 @@ export function allHave(doc: Doc, s: Pos, e: Pos, k: Flag): boolean {
   return runs.length > 0 && runs.every((r) => r[k]);
 }
 
-/** A look on (or off) for the words between two places: bold, italic… (raised and lowered words are one or the other). */
-export function setFlag(doc: Doc, s: Pos, e: Pos, k: Flag, on: boolean): Doc {
-  return mapLook(doc, s, e, (r) => {
+/** A run with a look on (or off): bold, italic… (raised and lowered words are one or the other). */
+export const flagFn =
+  (k: Flag, on: boolean) =>
+  (r: Run): Run => {
     const n: Run = { ...r };
     if (on) n[k] = true;
     else delete n[k];
     if (on && k === 'sup') delete n.sub;
     if (on && k === 'sub') delete n.sup;
     return n;
-  });
-}
+  };
 
-/** A colour, highlight, size, font or link for the words between two places (undefined takes it off). */
-export function setValue(doc: Doc, s: Pos, e: Pos, k: 'color' | 'hl' | 'size' | 'font' | 'link', v: string | number | undefined): Doc {
-  return mapLook(doc, s, e, (r) => {
+/** A run with a colour, highlight, size, font or link (undefined takes it off). */
+export const valueFn =
+  (k: 'color' | 'hl' | 'size' | 'font' | 'link', v: string | number | undefined) =>
+  (r: Run): Run => {
     const n: Record<string, unknown> = { ...r };
     if (v === undefined || v === '') delete n[k];
     else n[k] = v;
     return n as unknown as Run;
-  });
-}
+  };
+
+/** A run with no look of its own but its link (an equation stays one; comments and suggestions stay on their words). */
+export const clearFn = (r: Run): Run => {
+  if (r.math) return r;
+  const { t, link, cm, ins, del, fmt, was } = r;
+  return { t, ...(link ? { link } : {}), ...(cm ? { cm } : {}), ...(ins ? { ins } : {}), ...(del ? { del } : {}), ...(fmt ? { fmt, was } : {}) };
+};
+
+/** A look on (or off) for the words between two places. */
+export const setFlag = (doc: Doc, s: Pos, e: Pos, k: Flag, on: boolean): Doc => mapLook(doc, s, e, flagFn(k, on));
+
+/** A colour, highlight, size, font or link for the words between two places (undefined takes it off). */
+export const setValue = (doc: Doc, s: Pos, e: Pos, k: 'color' | 'hl' | 'size' | 'font' | 'link', v: string | number | undefined): Doc => mapLook(doc, s, e, valueFn(k, v));
 
 /** The words between two places with no look of their own but their links (an equation stays one, comments stay on their words). */
-export function clearLook(doc: Doc, s: Pos, e: Pos): Doc {
-  return mapLook(doc, s, e, (r) => (r.math ? r : { t: r.t, ...(r.link ? { link: r.link } : {}), ...(r.cm ? { cm: r.cm } : {}) }));
-}
+export const clearLook = (doc: Doc, s: Pos, e: Pos): Doc => mapLook(doc, s, e, clearFn);
 
 /** What the words between two places share: each value they all have. */
 export function commonLook(doc: Doc, s: Pos, e: Pos): Look {
@@ -945,10 +962,13 @@ export function commentSpan(doc: Doc, id: string): [Pos, Pos] | null {
   return first && last ? [first, last] : null;
 }
 
-/** Blocks with no comments' marks (pasted copies are not the comments' words). */
+/** Blocks with no comments' or suggestions' marks (pasted copies are not the comments' words, nor the suggestions). */
 export function withoutComments(blocks: Block[]): Block[] {
-  const clean = (runs: Run[]) => (runs.some((r) => r.cm) ? mergeRuns(runs.map(({ cm: _cm, ...r }) => r)) : runs);
-  return blocks.map((b) => (isText(b) ? { ...b, runs: clean(b.runs) } : b.type === 'table' ? { ...b, rows: b.rows.map((r) => r.map((c) => ({ ...c, runs: clean(c.runs) }))) } : b));
+  const clean = (runs: Run[]) => (runs.some((r) => r.cm || r.ins || r.del || r.fmt) ? mergeRuns(runs.map(({ cm: _cm, ins: _i, del: _d, fmt: _f, was: _w, ...r }) => r)) : runs);
+  return blocks.map((b) => {
+    const { ins: _i, del: _d, ...own } = b;
+    return isText(own) ? { ...own, runs: clean(own.runs) } : own.type === 'table' ? { ...own, rows: own.rows.map((r) => r.map((c) => ({ ...c, runs: clean(c.runs) }))) } : own;
+  });
 }
 
 // ---- finding and replacing ------------------------------------------------------------------------------------------
@@ -962,7 +982,7 @@ export interface Found {
 }
 
 /** The text of a box to search: an equation counts as marks no query matches (its LaTeX is not words). */
-export const searchText = (runs: Run[]) => runs.map((r) => (r.math ? '\u0000'.repeat(r.t.length) : r.t)).join('');
+export const searchText = (runs: Run[]) => runs.map((r) => (r.math || r.del ? '\u0000'.repeat(r.t.length) : r.t)).join('');
 
 /** Words put in place of a stretch of one box's words, looking as its first character does. */
 export function replaceIn(doc: Doc, f: Found, text: string): Doc {
@@ -970,7 +990,7 @@ export function replaceIn(doc: Doc, f: Found, text: string): Doc {
   if (!runs) return doc;
   const [l, rest] = splitAt(runs, f.s);
   const [mid, r] = splitAt(rest, f.e - f.s);
-  const look = mid[0] ? lookOf(mid[0]) : lookAt(runs, f.s);
+  const look = mid[0] ? typedLook(mid[0]) : lookAt(runs, f.s);
   delete look.math;
   return setBox(doc, f.b, f.c, mergeRuns([...l, ...(text ? [{ ...look, t: text }] : []), ...r]));
 }

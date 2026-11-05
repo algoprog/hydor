@@ -5,7 +5,10 @@
 // (cells with a fill, merged across rows and columns), pictures, equations, a table of contents, lines across and page
 // breaks. A paragraph may have its own line spacing and space before and after. Words are runs of text with their
 // look: bold, italic, underlined, struck, code, raised or lowered, a colour, a highlight, a size, a font, a link; a
-// run may be maths (LaTeX) among the words, and carry the comments on it (the document keeps their threads).
+// run may be maths (LaTeX) among the words, and carry the comments on it (the document keeps their threads). Words and
+// blocks may be suggested changes, as Google Docs' Suggesting and Word's tracked changes have them: words to add, words
+// to take out (still there, struck through), a new look for words (their old one kept), a paragraph broken in two or
+// joined to the one before, a block added or taken out; the document keeps who suggested each, when, and the replies.
 //
 // normalizeDoc takes what an agent, the editor or an imported file gives (Markdown, lenient blocks, or the model as
 // it is kept) and returns the model with every value checked: the editor shows documents inside the app itself, so
@@ -13,13 +16,13 @@
 // form. docMarkdown writes it back as Markdown, with a few additions for what plain Markdown cannot say; htmlBlocks
 // reads HTML (a page, or what is pasted from Word, Google Docs or the web) into blocks; blockHtml draws a block
 // for the editor and for the document's own page alike, every word escaped (maths drawn by whoever draws it).
-import { cleanComments, type Comment } from './comments.ts';
+import { cleanAuthor, cleanComments, type Comment, type CommentReply } from './comments.ts';
 import { cleanColor, cleanFont, COLOR_REFS, fontCss, FONTS, hexColor, newId, THEMES } from './slides.ts';
 
 export { FONTS, fontCss, newId };
-export type { Comment };
+export type { Comment, CommentReply };
 
-export const DOC_LIMITS = { blocks: 20000, runs: 4000, text: 200_000, rows: 500, cols: 30, caption: 1000, levels: 5, tex: 20_000, band: 500 };
+export const DOC_LIMITS = { blocks: 20000, runs: 4000, text: 200_000, rows: 500, cols: 30, caption: 1000, levels: 5, tex: 20_000, band: 500, suggestions: 2000 };
 
 /** A picture kept by the app (server/pages/assets.ts), by its content's hash: "naget-asset:<sha>". */
 export const ASSET = 'naget-asset:';
@@ -50,10 +53,37 @@ export interface Run {
   math?: boolean;
   /** The comments on these words: their ids in the document's comments. */
   cm?: string[];
+  /** A suggestion (its id in the document's suggestions): these words are suggested to be added, */
+  ins?: string;
+  /** or taken out (they stay, struck through, until it is accepted), */
+  del?: string;
+  /** or to look as they look now: `was` is how they looked before. */
+  fmt?: string;
+  was?: Look;
 }
 
 /** What a run looks like, without its words. */
 export type Look = Omit<Run, 't'>;
+
+/**
+ * A suggested change of a block: of its own (a table, a picture, a line, a page break…) to add or take out; of a
+ * paragraph's or an item's, the break before it, to add (Enter made it: rejected, it joins the one before again) or to
+ * take out (accepted, it joins the one before).
+ */
+export interface Suggested {
+  ins?: string;
+  del?: string;
+}
+
+/** A suggested change, as Google Docs and Word keep one: who made it, when, and the replies to it (what it changes is where its id marks words and blocks). */
+export interface Suggestion {
+  id: string;
+  by: 'user' | 'agent';
+  /** Who, by name, when it is someone other than you or an agent (a Word file's tracked changes). */
+  author?: string;
+  at: number;
+  replies?: CommentReply[];
+}
 
 /** How a paragraph's lines are spaced; what is left out is as its style has it. */
 export interface Spacing {
@@ -64,7 +94,7 @@ export interface Spacing {
   sa?: number;
 }
 
-export interface ParaBlock extends Spacing {
+export interface ParaBlock extends Spacing, Suggested {
   id: string;
   type: 'p';
   /** Normal text when left out. */
@@ -78,7 +108,7 @@ export interface ParaBlock extends Spacing {
   runs: Run[];
 }
 
-export interface ItemBlock extends Spacing {
+export interface ItemBlock extends Spacing, Suggested {
   id: string;
   type: 'li';
   list: ListKind;
@@ -103,7 +133,7 @@ export interface Cell {
   cs?: number;
 }
 
-export interface TableBlock {
+export interface TableBlock extends Suggested {
   id: string;
   type: 'table';
   /** The first row is a header (shaded, repeated on each printed page). */
@@ -113,7 +143,7 @@ export interface TableBlock {
   rows: Cell[][];
 }
 
-export interface ImageBlock {
+export interface ImageBlock extends Suggested {
   id: string;
   type: 'image';
   src: string;
@@ -126,24 +156,24 @@ export interface ImageBlock {
   alt?: string;
 }
 
-export interface RuleBlock {
+export interface RuleBlock extends Suggested {
   id: string;
   type: 'hr';
 }
 
-export interface BreakBlock {
+export interface BreakBlock extends Suggested {
   id: string;
   type: 'pagebreak';
 }
 
 /** A table of contents: the document's headings, each a link to it, drawn from them wherever it shows. */
-export interface TocBlock {
+export interface TocBlock extends Suggested {
   id: string;
   type: 'toc';
 }
 
 /** An equation on a line of its own, in LaTeX. */
-export interface MathBlock {
+export interface MathBlock extends Suggested {
   id: string;
   type: 'math';
   tex: string;
@@ -179,6 +209,8 @@ export interface Doc {
   blocks: Block[];
   /** The comments on its words, with their replies (runs say where each is, by its id). */
   comments?: Comment[];
+  /** The changes suggested in it (runs and blocks say where each is, by its id). */
+  suggestions?: Suggestion[];
 }
 
 // ---- how documents look --------------------------------------------------------------------------------
@@ -381,9 +413,11 @@ export function docSrc(v: unknown): string | null {
 const LOOK_KEYS = ['b', 'i', 'u', 's', 'code', 'sup', 'sub', 'color', 'hl', 'size', 'font', 'link'] as const;
 
 const cmKey = (l: Look) => l.cm?.join(' ') ?? '';
+/** What a run's suggestion marks are, as one key. */
+const sgKey = (l: Look) => (l.ins || l.del || l.fmt ? `${l.ins ?? ''}|${l.del ?? ''}|${l.fmt ?? ''}|${l.was ? JSON.stringify(l.was) : ''}` : '');
 
-/** Whether two runs look the same (and carry the same comments). */
-export const sameLook = (a: Look, b: Look) => LOOK_KEYS.every((k) => a[k] === b[k]) && !!a.math === !!b.math && cmKey(a) === cmKey(b);
+/** Whether two runs look the same (and carry the same comments and suggestions). */
+export const sameLook = (a: Look, b: Look) => LOOK_KEYS.every((k) => a[k] === b[k]) && !!a.math === !!b.math && cmKey(a) === cmKey(b) && sgKey(a) === sgKey(b);
 
 /** A run's look alone. */
 export function lookOf(r: Run): Look {
@@ -413,16 +447,43 @@ export function cleanCm(v: unknown): string[] | undefined {
 
 export const runsText = (runs: Run[]) => runs.map((r) => r.t).join('');
 
+const SID = /^[A-Za-z0-9_-]{1,40}$/;
+/** A suggestion's id, of a known form. */
+export const cleanSid = (v: unknown) => (typeof v === 'string' && SID.test(v) ? v : undefined);
+
+/** A run's suggestion marks, checked: added and taken out (by the same person, or the second over the first), a new look with the old one. */
+function runMarks(r: Obj, math: boolean): Look {
+  const out: Look = {};
+  const ins = cleanSid(r.ins);
+  const del = cleanSid(r.del);
+  if (ins) out.ins = ins;
+  if (del) out.del = del;
+  const fmt = math ? undefined : cleanSid(r.fmt);
+  if (fmt) {
+    out.fmt = fmt;
+    out.was = isObj(r.was) ? lookOfRun(cleanRun({ ...r.was, ins: undefined, del: undefined, fmt: undefined, cm: undefined, math: undefined }, '')) : {};
+  }
+  return out;
+}
+
+/** A run's look alone, its comments and suggestions left out (what a suggested change of look keeps as the old one). */
+function lookOfRun(r: Run): Look {
+  const out: Look = {};
+  for (const k of LOOK_KEYS) if (r[k] !== undefined) (out as Record<string, unknown>)[k] = r[k];
+  return out;
+}
+
 /** A run checked: its words and its look, every value of a known form. */
 function cleanRun(r: Obj, t: string): Run {
   const cm = cleanCm(r.cm ?? r.comments);
-  // Maths is its LaTeX on one line, with no look of its own but its comments.
+  // Maths is its LaTeX on one line, with no look of its own but its comments (and whether it is suggested).
   if (r.math === true || typeof r.tex === 'string') {
     const tex = oneLine(typeof r.tex === 'string' ? r.tex : t, DOC_LIMITS.tex);
-    return tex ? { t: tex, math: true, ...(cm ? { cm } : {}) } : { t: '' };
+    return tex ? { t: tex, math: true, ...(cm ? { cm } : {}), ...runMarks(r, true) } : { t: '' };
   }
   const out: Run = { t };
   if (cm) out.cm = cm;
+  Object.assign(out, runMarks(r, false));
   if (r.b === true || r.bold === true) out.b = true;
   if (r.i === true || r.italic === true) out.i = true;
   if (r.u === true || r.underline === true) out.u = true;
@@ -737,8 +798,14 @@ function blocksOf(v: unknown, used: Set<string>, o: NormalizeOpts, out: Block[])
   if (!isObj(v)) return;
   const type = typeof v.type === 'string' ? v.type.toLowerCase().replace(/[\s_]+/g, '-') : '';
   const words = v.runs ?? v.text ?? v.t ?? v.content ?? '';
+  // A block's own suggested change (its break, for a paragraph or an item), as written for it.
+  const ins = cleanSid(v.ins);
+  const del = cleanSid(v.del);
   const push = (b: Block | null) => {
-    if (b && out.length < DOC_LIMITS.blocks) out.push(b);
+    if (!b || out.length >= DOC_LIMITS.blocks) return;
+    if (ins) b.ins = ins;
+    if (del) b.del = del;
+    out.push(b);
   };
   if (type) {
     if (type === 'markdown' || type === 'md') return void mdBlocks(str(v.markdown ?? v.text, 4_000_000)).forEach((r) => blocksOf(r, used, o, out));
@@ -824,7 +891,7 @@ export function normalizeDoc(input: unknown, o: NormalizeOpts = {}): Doc {
   const footer = bandOf(v.footer);
   if (footer) d.footer = footer;
   if (v.titlePage === true && (header || footer)) d.titlePage = true;
-  return withComments(d, v.comments);
+  return withSuggestions(withComments(d, v.comments), v.suggestions);
 }
 
 /** A header or footer from its words (a string) or { text, align }; none when it has no words. */
@@ -867,6 +934,164 @@ export function withComments(d: Doc, list: unknown = d.comments): Doc {
   return comments.length ? { ...rest, blocks, comments } : { ...rest, blocks };
 }
 
+/** Suggestions checked: an id of a known form (once), who made it, when, and its replies (plain text, within limits). */
+export function cleanSuggestions(v: unknown, now = Date.now()): Suggestion[] {
+  if (!Array.isArray(v)) return [];
+  const out: Suggestion[] = [];
+  const seen = new Set<string>();
+  for (const x of v.slice(0, DOC_LIMITS.suggestions)) {
+    if (!isObj(x)) continue;
+    const id = cleanSid(x.id);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const at = typeof x.at === 'number' && Number.isFinite(x.at) && x.at > 0 && x.at < 1e14 ? Math.round(x.at) : now;
+    const sg: Suggestion = { id, by: x.by === 'agent' ? 'agent' : 'user', at };
+    const author = cleanAuthor(x.author);
+    if (author) sg.author = author;
+    // Its replies checked as a comment's are.
+    const replies = cleanComments([{ id: 'r', by: 'user', text: '-', replies: x.replies }], now)[0]?.replies;
+    if (replies?.length) sg.replies = replies;
+    out.push(sg);
+  }
+  return out;
+}
+
+/**
+ * A document with its suggestions checked (`list`; none given: the ones it has). Marks of suggestions it does not have
+ * come off (the words stay as they are now); a suggestion that marks nothing any more is left out.
+ */
+export function withSuggestions(d: Doc, list: unknown = d.suggestions): Doc {
+  const sugs = cleanSuggestions(list);
+  const ids = new Set(sugs.map((x) => x.id));
+  const used = new Set<string>();
+  const fixRuns = (runs: Run[]): Run[] => {
+    if (!runs.some((r) => r.ins || r.del || r.fmt)) return runs;
+    let changed = false;
+    const out = runs.map((r) => {
+      if (!r.ins && !r.del && !r.fmt) return r;
+      const n: Run = { ...r };
+      for (const k of ['ins', 'del', 'fmt'] as const) {
+        const id = n[k];
+        if (!id) continue;
+        if (ids.has(id)) used.add(id);
+        else {
+          delete n[k];
+          if (k === 'fmt') delete n.was;
+          changed = true;
+        }
+      }
+      return n;
+    });
+    return changed ? mergeRuns(out) : runs;
+  };
+  const fixBlock = <B extends Block>(b: B): B => {
+    let n = b;
+    for (const k of ['ins', 'del'] as const) {
+      const id = b[k];
+      if (!id) continue;
+      if (ids.has(id)) used.add(id);
+      else {
+        n = { ...n };
+        delete n[k];
+      }
+    }
+    return n;
+  };
+  const blocks = d.blocks.map((b): Block => {
+    const own = fixBlock(b);
+    if (own.type === 'p' || own.type === 'li') {
+      const runs = fixRuns(own.runs);
+      return runs === own.runs ? own : { ...own, runs };
+    }
+    if (own.type === 'table' && own.rows.some((r) => r.some((c) => c.runs.some((x) => x.ins || x.del || x.fmt)))) return { ...own, rows: own.rows.map((r) => r.map((c) => ({ ...c, runs: fixRuns(c.runs) }))) };
+    return own;
+  });
+  const kept = sugs.filter((x) => used.has(x.id));
+  const { suggestions: _s, ...rest } = d;
+  return kept.length ? { ...rest, blocks, suggestions: kept } : { ...rest, blocks };
+}
+
+/** A run with a suggested new look put back as it looked before (its words, comments and other marks kept). */
+function lookBack(r: Run): Run {
+  const { fmt: _f, was, ...rest } = r;
+  const out: Run = { t: rest.t };
+  for (const [k, v] of Object.entries(rest)) if (!(LOOK_KEYS as readonly string[]).includes(k) && v !== undefined) (out as unknown as Record<string, unknown>)[k] = v;
+  return { ...out, ...(was ?? {}) };
+}
+
+/**
+ * A suggestion accepted (its change made: words added kept, words taken out gone, a new look kept, a break made or
+ * taken out, a block added or taken out) or rejected (as it was before it), and its record gone; `id` null: every
+ * suggestion. A paragraph whose break goes is joined to the paragraph before it.
+ */
+export function resolveSuggestion(d: Doc, id: string | null, accept: boolean): Doc {
+  if (!d.suggestions?.length) return d;
+  const hit = (x: string | undefined) => !!x && (id === null || x === id);
+  const fixRuns = (runs: Run[]): Run[] => {
+    if (!runs.some((r) => hit(r.ins) || hit(r.del) || hit(r.fmt))) return runs;
+    const out: Run[] = [];
+    for (const r of runs) {
+      let n: Run | null = r;
+      if (hit(r.ins)) {
+        if (accept) {
+          n = { ...r };
+          delete n.ins;
+        } else n = null;
+      }
+      if (n && hit(n.del)) {
+        if (accept) n = null;
+        else {
+          n = { ...n };
+          delete n.del;
+        }
+      }
+      if (n && hit(n.fmt)) {
+        if (accept) {
+          n = { ...n };
+          delete n.fmt;
+          delete n.was;
+        } else n = lookBack(n);
+      }
+      if (n) out.push(n);
+    }
+    return mergeRuns(out);
+  };
+  const out: Block[] = [];
+  for (const b0 of d.blocks) {
+    let b: Block = b0;
+    if (b.type === 'p' || b.type === 'li') {
+      const runs = fixRuns(b.runs);
+      if (runs !== b.runs) b = { ...b, runs };
+    } else if (b.type === 'table' && b.rows.some((r) => r.some((c) => c.runs.some((x) => hit(x.ins) || hit(x.del) || hit(x.fmt))))) {
+      b = { ...b, rows: b.rows.map((r) => r.map((c) => ({ ...c, runs: fixRuns(c.runs) }))) };
+    }
+    const insHit = hit(b.ins);
+    const delHit = hit(b.del);
+    if (insHit || delHit) {
+      b = { ...b };
+      if (insHit) delete b.ins;
+      if (delHit) delete b.del;
+      // Its break (a paragraph's) or itself (a block of its own) goes: a paragraph joins the one before it.
+      if ((insHit && !accept) || (delHit && accept)) {
+        if (b.type !== 'p' && b.type !== 'li') continue;
+        const prev = out[out.length - 1];
+        if (prev && (prev.type === 'p' || prev.type === 'li')) {
+          out[out.length - 1] = { ...prev, runs: mergeRuns([...prev.runs, ...b.runs]) };
+          continue;
+        }
+        if (!b.runs.length && out.length) continue;
+      }
+    }
+    out.push(b);
+  }
+  if (!out.length) out.push({ id: newId(), type: 'p', runs: [] });
+  const rest = id === null ? [] : d.suggestions.filter((x) => x.id !== id);
+  return withSuggestions({ ...d, blocks: out, suggestions: rest });
+}
+
+/** The document as its suggestions would make it, all accepted (for a file that cannot show them, as Markdown). */
+export const asAccepted = (d: Doc) => resolveSuggestion(d, null, true);
+
 /** A new document: its title, and an empty paragraph to write in. */
 export function newDoc(title = ''): Doc {
   const t = oneLine(title, 300);
@@ -900,10 +1125,14 @@ export function docText(d: Doc): string {
       out.push(` ]}${end}`);
     } else out.push(` ${JSON.stringify(b)}${end}`);
   });
-  if (d.comments?.length) {
-    out.push('],"comments":[');
-    d.comments.forEach((c, i) => out.push(` ${JSON.stringify(c)}${i < d.comments!.length - 1 ? ',' : ''}`));
-  }
+  // Its comments, then its suggestions, a line each.
+  const list = (k: string, items: unknown[] | undefined) => {
+    if (!items?.length) return;
+    out.push(`],"${k}":[`);
+    items.forEach((c, i) => out.push(` ${JSON.stringify(c)}${i < items.length - 1 ? ',' : ''}`));
+  };
+  list('comments', d.comments);
+  list('suggestions', d.suggestions);
   out.push(']}');
   return out.join('\n');
 }
@@ -919,8 +1148,11 @@ export function blockText(b: Block): string {
   return '';
 }
 
-/** Runs' words, an equation among them as a mark that stands for it (its LaTeX is not words to count or read). */
-export const wordsText = (runs: Run[]) => runs.map((r) => (r.math ? '\u2063' : r.t)).join('');
+/**
+ * Runs' words, an equation among them as a mark that stands for it (its LaTeX is not words to count or read); words
+ * suggested to be taken out are left out (they are counted as gone).
+ */
+export const wordsText = (runs: Run[]) => runs.map((r) => (r.del ? '' : r.math ? '\u2063' : r.t)).join('');
 
 /** The headings (and the title), in order: for an outline. */
 export function docHeadings(d: Doc): { id: string; index: number; level: number; text: string }[] {
@@ -1063,7 +1295,7 @@ interface Attrs {
 }
 
 const KNOWN_CLS = new Set(['title', 'subtitle', 'left', 'center', 'centre', 'right', 'justify', 'callout']);
-const KNOWN_KV = new Set(['indent', 'align', 'width', 'w', 'line', 'before', 'after', 'tint', 'icon']);
+const KNOWN_KV = new Set(['indent', 'align', 'width', 'w', 'line', 'before', 'after', 'tint', 'icon', 'ins', 'del']);
 
 function parseAttrs(body: string): Attrs | null {
   const a: Attrs = { cls: [], kv: {} };
@@ -1208,11 +1440,18 @@ function tagLook(name: string, at: Record<string, string>, looks: boolean): Look
       m.i = true;
       break;
     case 'u':
-    case 'ins':
       m.u = true;
       break;
-    case 's':
+    case 'ins':
+      // A suggestion's words to add (as docMarkdown writes them for an agent); else underlined.
+      if (cleanSid(at['data-s'])) m.ins = cleanSid(at['data-s']);
+      else m.u = true;
+      break;
     case 'del':
+      if (cleanSid(at['data-s'])) m.del = cleanSid(at['data-s']);
+      else m.s = true;
+      break;
+    case 's':
     case 'strike':
       m.s = true;
       break;
@@ -1245,9 +1484,14 @@ function tagLook(name: string, at: Record<string, string>, looks: boolean): Look
       }
       break;
     case 'span': {
-      // The words a comment is on (as docMarkdown writes them for an agent).
+      // The words a comment is on, or with a suggested new look (as docMarkdown writes them for an agent).
       const cm = cleanCm(at['data-comment']);
       if (cm) m.cm = cm;
+      const fmt = cleanSid(at['data-s']);
+      if (fmt) {
+        m.fmt = fmt;
+        m.was = wasOf(at['data-was']);
+      }
       break;
     }
     case 'small':
@@ -1721,6 +1965,9 @@ function textBlocks(text: string, base: Raw, out: Raw[]) {
       if (attrs.kv.tint) b.tint = attrs.kv.tint;
       if (attrs.kv.icon) b.icon = attrs.kv.icon;
     }
+    // A suggested change of its break.
+    if (attrs.kv.ins) b.ins = attrs.kv.ins;
+    if (attrs.kv.del) b.del = attrs.kv.del;
   }
   // A callout's emoji is the first thing in its words.
   if (b.style === 'callout' && !b.icon && runs[0]) {
@@ -1733,7 +1980,7 @@ function textBlocks(text: string, base: Raw, out: Raw[]) {
   if (!alone && (runs.some((r) => r.t) || !imgs.length)) out.push({ ...b, runs });
   for (const im of imgs) {
     const a = alone ? attrs : im.attrs;
-    out.push({ type: 'image', src: im.src, alt: im.alt, caption: im.title, w: a?.kv.width ?? a?.kv.w ?? im.width, align: attrsAlign(a) });
+    out.push({ type: 'image', src: im.src, alt: im.alt, caption: im.title, w: a?.kv.width ?? a?.kv.w ?? im.width, align: attrsAlign(a), ins: a?.kv.ins, del: a?.kv.del });
   }
 }
 
@@ -1991,6 +2238,10 @@ function escText(t: string, start: boolean, table: boolean, dollars = false): st
 function marksOf(r: Look, tags: boolean, cm = false): string[] {
   const k: string[] = [];
   if (cm && r.cm) k.push(`c:${r.cm.join(' ')}`);
+  // Suggested changes, for an agent (with the comments): words taken out, added, or with a new look.
+  if (cm && r.del) k.push(`del:${r.del}`);
+  if (cm && r.ins) k.push(`ins:${r.ins}`);
+  if (cm && r.fmt) k.push(`fmt:${r.fmt}:${JSON.stringify(r.was ?? {})}`);
   if (r.link) k.push(`a:${r.link}`);
   const st: string[] = [];
   if (r.color) st.push(`color:${r.color}`);
@@ -2017,6 +2268,12 @@ function shiftSpaces(runs: Run[]): Run[] {
   // A comment's mark is a span, which holds spaces as well as words: they keep it.
   const common = (a: Run, b: Run | undefined): Look => {
     const m: Look = a.cm ? { cm: a.cm } : {};
+    if (a.ins) m.ins = a.ins;
+    if (a.del) m.del = a.del;
+    if (a.fmt) {
+      m.fmt = a.fmt;
+      m.was = a.was;
+    }
     if (!b) return m;
     for (const k of LOOK_KEYS) if (a[k] !== undefined && a[k] === b[k]) (m as Record<string, unknown>)[k] = a[k];
     return m;
@@ -2039,7 +2296,15 @@ function writeRuns(runs: Run[], o: { table: boolean; nl: string; tags: boolean; 
   const close = (to: number) => {
     while (stack.length > to) {
       const k = stack.pop()!;
-      out += k.startsWith('a:') ? `](${/[()\s<>]/.test(k.slice(2)) ? `<${k.slice(2)}>` : k.slice(2)})` : k.startsWith('span:') || k.startsWith('c:') ? '</span>' : CLOSE[k];
+      out += k.startsWith('a:')
+        ? `](${/[()\s<>]/.test(k.slice(2)) ? `<${k.slice(2)}>` : k.slice(2)})`
+        : k.startsWith('span:') || k.startsWith('c:') || k.startsWith('fmt:')
+          ? '</span>'
+          : k.startsWith('ins:')
+            ? '</ins>'
+            : k.startsWith('del:')
+              ? '</del>'
+              : CLOSE[k];
     }
   };
   for (const r of runs) {
@@ -2048,7 +2313,20 @@ function writeRuns(runs: Run[], o: { table: boolean; nl: string; tags: boolean; 
     while (k < stack.length && k < want.length && stack[k] === want[k]) k++;
     close(k);
     for (const m of want.slice(k)) {
-      out += m.startsWith('a:') ? '[' : m.startsWith('span:') ? `<span style="${m.slice(5)}">` : m.startsWith('c:') ? `<span data-comment="${m.slice(2)}">` : OPEN[m];
+      const fmt = m.startsWith('fmt:') ? /^fmt:([^:]*):(.*)$/.exec(m) : null;
+      out += m.startsWith('a:')
+        ? '['
+        : m.startsWith('span:')
+          ? `<span style="${m.slice(5)}">`
+          : m.startsWith('c:')
+            ? `<span data-comment="${m.slice(2)}">`
+            : m.startsWith('ins:')
+              ? `<ins data-s="${m.slice(4)}">`
+              : m.startsWith('del:')
+                ? `<del data-s="${m.slice(4)}">`
+                : fmt
+                  ? `<span data-s="${fmt[1]}" data-was="${escHtml(fmt[2])}">`
+                  : OPEN[m];
       stack.push(m);
     }
     if (r.math) {
@@ -2091,6 +2369,9 @@ function attrsMd(a: { cls?: string[]; kv?: Record<string, string | number> }): s
 /** A paragraph's own spacing as attributes: {line=1.5 before=12 after=0}. */
 const spacingKv = (b: Spacing): Record<string, number> => ({ ...(b.lh !== undefined ? { line: b.lh } : {}), ...(b.sb !== undefined ? { before: b.sb } : {}), ...(b.sa !== undefined ? { after: b.sa } : {}) });
 
+/** A block's own suggested change as attributes, for an agent ({ins=s1}, {del=s1}). */
+const marksKv = (b: Suggested, cm: boolean): Record<string, string> => (cm ? { ...(b.ins ? { ins: b.ins } : {}), ...(b.del ? { del: b.del } : {}) } : {});
+
 /** Whether a table says more than Markdown's tables can (merged or filled cells, words set low): written as HTML then. */
 const htmlTable = (t: TableBlock) => t.rows.some((r) => r.some((c) => c.rs || c.cs || c.fill || c.va));
 
@@ -2106,7 +2387,8 @@ export function tableHtml(t: TableBlock, o: { cm?: boolean } = {}): string {
   const row = (r: Cell[], ri: number, th: boolean) => `<tr>${r.map((c, k) => cell(c, ri, k, th)).join('')}</tr>`;
   const cols = t.cols ? `<colgroup>${t.cols.map((w) => `<col style="width:${Math.round(w * 10000) / 100}%">`).join('')}</colgroup>` : '';
   const head = t.head ? `<thead>${row(t.rows[0], 0, true)}</thead>` : '';
-  return `<table>${cols}${head}<tbody>${t.rows.map((r, ri) => (t.head && ri === 0 ? '' : row(r, ri, false))).join('')}</tbody></table>`;
+  const marks = o.cm ? `${t.ins ? ` data-ins="${escHtml(t.ins)}"` : ''}${t.del ? ` data-del="${escHtml(t.del)}"` : ''}` : '';
+  return `<table${marks}>${cols}${head}<tbody>${t.rows.map((r, ri) => (t.head && ri === 0 ? '' : row(r, ri, false))).join('')}</tbody></table>`;
 }
 
 /** Runs as HTML that htmlBlocks reads back (maths as its LaTeX in a marked span; comments' marks for an agent). */
@@ -2169,7 +2451,7 @@ export function docMarkdown(d: Doc, o: MarkdownOpts = {}): string {
     if (b.type === 'p') {
       const style = b.style ?? 'normal';
       const align = b.align ? [b.align] : [];
-      const kv = { ...(b.lvl ? { indent: b.lvl } : {}), ...spacingKv(b) };
+      const kv = { ...(b.lvl ? { indent: b.lvl } : {}), ...spacingKv(b), ...marksKv(b, cm) };
       if (style === 'code') {
         const text = runsText(b.runs);
         const fence = '`'.repeat(Math.max(3, ...(text.match(/`{3,}/g) ?? []).map((x) => x.length + 1)));
@@ -2194,8 +2476,8 @@ export function docMarkdown(d: Doc, o: MarkdownOpts = {}): string {
       const lead = `${' '.repeat(ind)}${mark} ${b.list === 'check' ? (b.checked ? '[x] ' : '[ ] ') : ''}`;
       content.length = L;
       content[L] = ind + mark.length + 1;
-      s = `${lead}${runsMd(b.runs, { nl: `\\\n${' '.repeat(ind + mark.length + 1)}`, cm })}${attrsMd({ cls: b.align ? [b.align] : [], kv: spacingKv(b) })}`;
-    } else if (b.type === 'table' && htmlTable(b)) {
+      s = `${lead}${runsMd(b.runs, { nl: `\\\n${' '.repeat(ind + mark.length + 1)}`, cm })}${attrsMd({ cls: b.align ? [b.align] : [], kv: { ...spacingKv(b), ...marksKv(b, cm) } })}`;
+    } else if (b.type === 'table' && (htmlTable(b) || (cm && (b.ins || b.del)))) {
       content.length = 0;
       s = tableHtml(b, { cm });
     } else if (b.type === 'table') {
@@ -2232,7 +2514,7 @@ export function docMarkdown(d: Doc, o: MarkdownOpts = {}): string {
       const alt = (b.alt ?? '').replace(/([\\[\]])/g, '\\$1');
       const src = /[()\s<>]/.test(b.src) ? `<${b.src}>` : b.src;
       const title = b.caption ? ` "${b.caption.replace(/(["\\])/g, '\\$1')}"` : '';
-      const kv: Record<string, string> = b.w < 1 ? { width: `${Math.round(b.w * 1000) / 10}%` } : {};
+      const kv: Record<string, string> = { ...(b.w < 1 ? { width: `${Math.round(b.w * 1000) / 10}%` } : {}), ...marksKv(b, cm) };
       s = `![${alt}](${src}${title})${attrsMd({ cls: b.align ? [b.align] : [], kv }).trimStart()}`;
     } else if (b.type === 'hr') {
       content.length = 0;
@@ -2492,7 +2774,7 @@ export function htmlBlocks(input: string | HNode[], o: HtmlOpts = {}): Raw[] {
     walkRows(el, false);
     void ctx;
     const width = Math.max(0, ...rows.map((r) => r.length));
-    if (rows.length) out.push({ type: 'table', rows, ...(head ? { head: true } : {}), ...(widths.length === width && widths.every((w) => w > 0) ? { cols: widths } : {}) });
+    if (rows.length) out.push({ type: 'table', rows, ...(head ? { head: true } : {}), ...(widths.length === width && widths.every((w) => w > 0) ? { cols: widths } : {}), ins: el.at['data-ins'], del: el.at['data-del'] });
   };
 
   const walk = (n: HNode, ctx: Ctx) => {
@@ -2720,6 +3002,16 @@ export function htmlBlocks(input: string | HNode[], o: HtmlOpts = {}): Raw[] {
   return kept;
 }
 
+/** A suggested change of look's old look, as an element carries it (JSON; checked where the run is). */
+function wasOf(v: string | undefined): Look {
+  try {
+    const o = JSON.parse(v ?? '{}');
+    return isObj(o) ? (o as Look) : {};
+  } catch {
+    return {};
+  }
+}
+
 /** The runs of a paragraph's HTML (the editor's own, read back), its spaces and line breaks as written. */
 export function htmlRuns(html: string): Run[] {
   const runs: Run[] = [];
@@ -2734,10 +3026,17 @@ export function htmlRuns(html: string): Run[] {
     }
     // An equation drawn among the words: its LaTeX, not what KaTeX drew.
     if (n.at['data-tex']) {
-      runs.push({ t: n.at['data-tex'], math: true, ...(look.cm ? { cm: look.cm } : {}) });
+      runs.push({ t: n.at['data-tex'], math: true, ...(look.cm ? { cm: look.cm } : {}), ...(look.ins ? { ins: look.ins } : {}), ...(look.del ? { del: look.del } : {}) });
       return;
     }
     if (RAW.has(n.tag) || n.tag === 'img') return;
+    // A suggested change, as the editor draws it: words added, taken out, or with a new look (and their old one).
+    const sid = cleanSid(n.at['data-s']);
+    if (sid && (n.tag === 'ins' || n.tag === 'del' || n.tag === 'span')) {
+      const m: Look = n.tag === 'ins' ? { ins: sid } : n.tag === 'del' ? { del: sid } : { fmt: sid, was: wasOf(n.at['data-was']) };
+      for (const k of n.kids) walk(k, { ...look, ...m });
+      return;
+    }
     const m = tagLook(n.tag, n.at, true) ?? (() => {
       const x: Look = {};
       styleLook(styleProps(n.at.style), x, true);
@@ -2762,11 +3061,19 @@ const escHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)
 export type MathDraw = (tex: string, display: boolean) => string;
 
 /** A run as HTML: its words escaped (line breaks as <br>), wrapped in the elements its look asks for. */
+/** A run's suggested change drawn around it: words added (underlined), taken out (struck), or with a new look (its old one on it, for the editor to read back). */
+function suggestedHtml(r: Run, h: string, view: boolean): string {
+  if (r.fmt) h = `<span class="nd-fmt" data-s="${escHtml(r.fmt)}"${view ? '' : ` data-was="${escHtml(JSON.stringify(r.was ?? {}))}"`}>${h}</span>`;
+  if (r.ins) h = `<ins class="nd-ins" data-s="${escHtml(r.ins)}">${h}</ins>`;
+  if (r.del) h = `<del class="nd-del" data-s="${escHtml(r.del)}">${h}</del>`;
+  return h;
+}
+
 function runHtml(r: Run, o: { view: boolean; math?: MathDraw }): string {
   if (r.math) {
     // Its LaTeX stays on it (what the editor reads back); in the editor it is one thing, not words to type in.
     const drawn = o.math ? o.math(r.t, false) : `<code>${escHtml(r.t)}</code>`;
-    const h = `<span class="nd-m" data-tex="${escHtml(r.t)}"${o.view ? '' : ' contenteditable="false"'}>${drawn}</span>`;
+    const h = suggestedHtml(r, `<span class="nd-m" data-tex="${escHtml(r.t)}"${o.view ? '' : ' contenteditable="false"'}>${drawn}</span>`, o.view);
     return !o.view && r.cm ? `<span data-cm="${escHtml(r.cm.join(' '))}">${h}</span>` : h;
   }
   let h = escHtml(r.t).replace(/\n/g, '<br>');
@@ -2784,6 +3091,7 @@ function runHtml(r: Run, o: { view: boolean; math?: MathDraw }): string {
   if (r.font) st.push(`font-family:${fontCss(r.font)}`);
   if (st.length) h = `<span style="${escHtml(st.join(';'))}">${h}</span>`;
   if (r.link) h = `<a href="${escHtml(r.link)}"${o.view ? ' target="_blank" rel="noopener noreferrer"' : ''}>${h}</a>`;
+  h = suggestedHtml(r, h, o.view);
   // The comments on the words, marked in the editor (which shows the open ones' highlights); never on the page.
   if (!o.view && r.cm) h = `<span data-cm="${escHtml(r.cm.join(' '))}">${h}</span>`;
   return h;
@@ -2842,7 +3150,10 @@ function ourSpacing(st: Record<string, string>): Spacing {
 /** A block as HTML: `label` is a list item's mark (listInfo). Every word escaped; looks only from checked values. */
 export function blockHtml(b: Block, label: string, o: DrawOpts): string {
   const view = !o.edit;
-  const id = o.edit ? ` data-b="${escHtml(b.id)}"` : '';
+  // A block's own suggested change (its break, for a paragraph or an item): a bar in the colour of who suggested it.
+  const sb = b.ins ?? b.del;
+  const id = (o.edit ? ` data-b="${escHtml(b.id)}"` : '') + (sb ? ` data-s="${escHtml(sb)}"` : '');
+  const sc = `${b.ins ? ' nd-sins' : ''}${b.del ? ' nd-sdel' : ''}`;
   const atom = o.edit ? ' contenteditable="false"' : '';
   const ro = { view, math: o.math };
   if (b.type === 'p') {
@@ -2852,11 +3163,11 @@ export function blockHtml(b: Block, label: string, o: DrawOpts): string {
     // Headings are where a table of contents' links lead, on the document's own page.
     const anchor = view && (headingLevel(style) || style === 'title') ? ` id="nd-${escHtml(b.id)}"` : '';
     const icon = callout ? ` data-icon="${escHtml(b.icon ?? CALLOUT.icon)}"` : '';
-    return `<${TAG[style]} class="nd-b nd-${style}${b.lvl ? ' nd-in' : ''}"${id}${anchor}${icon}${o.edit ? ' data-t=""' : ''}${st ? ` style="${st}"` : ''}>${runsHtml(b.runs, ro)}</${TAG[style]}>`;
+    return `<${TAG[style]} class="nd-b nd-${style}${b.lvl ? ' nd-in' : ''}${sc}"${id}${anchor}${icon}${o.edit ? ' data-t=""' : ''}${st ? ` style="${st}"` : ''}>${runsHtml(b.runs, ro)}</${TAG[style]}>`;
   }
   if (b.type === 'li') {
     const st = [b.align ? `text-align:${b.align}` : '', `--lvl:${b.lvl ?? 0}`, ...spacingCss(b)].filter(Boolean).join(';');
-    return `<p class="nd-b nd-li nd-${b.list}${b.checked ? ' nd-on' : ''}"${id}${o.edit ? ' data-t=""' : ''} data-n="${escHtml(label)}" style="${st}">${runsHtml(b.runs, ro)}</p>`;
+    return `<p class="nd-b nd-li nd-${b.list}${b.checked ? ' nd-on' : ''}${sc}"${id}${o.edit ? ' data-t=""' : ''} data-n="${escHtml(label)}" style="${st}">${runsHtml(b.runs, ro)}</p>`;
   }
   if (b.type === 'table') {
     const n = b.rows[0]?.length ?? 0;
@@ -2878,22 +3189,22 @@ export function blockHtml(b: Block, label: string, o: DrawOpts): string {
         .join('')}</tr>`;
     const head = b.head && b.rows.length ? `<thead>${row(b.rows[0], 0, true)}</thead>` : '';
     const body = b.rows.map((r, ri) => (b.head && ri === 0 ? '' : row(r, ri, false))).join('');
-    return `<table class="nd-b nd-table"${id}><colgroup>${cols.map((w) => `<col style="width:${Math.round(w * 10000) / 100}%">`).join('')}</colgroup>${head}<tbody>${body}</tbody></table>`;
+    return `<table class="nd-b nd-table${sc}"${id}><colgroup>${cols.map((w) => `<col style="width:${Math.round(w * 10000) / 100}%">`).join('')}</colgroup>${head}<tbody>${body}</tbody></table>`;
   }
   if (b.type === 'image') {
     const cap = b.caption ? `<figcaption>${escHtml(b.caption)}</figcaption>` : '';
     const img = `<img src="${escHtml(o.src(b.src))}" alt="${escHtml(b.alt ?? '')}" style="width:${Math.round(b.w * 1000) / 10}%"${o.edit ? ' draggable="false"' : ''}>`;
-    return `<figure class="nd-b nd-img nd-${b.align ?? 'center'}"${id}${atom}>${img}${cap}</figure>`;
+    return `<figure class="nd-b nd-img nd-${b.align ?? 'center'}${sc}"${id}${atom}>${img}${cap}</figure>`;
   }
-  if (b.type === 'hr') return `<div class="nd-b nd-hr"${id}${atom}><hr></div>`;
+  if (b.type === 'hr') return `<div class="nd-b nd-hr${sc}"${id}${atom}><hr></div>`;
   if (b.type === 'toc') {
     const list = o.toc ?? [];
     // On the page, links to the headings; in the editor, lines it goes to on a click (no address of the app's changes).
     const lines = list.map((h) => `<a class="nd-toc-${h.level}"${view ? ` href="#nd-${escHtml(h.id)}"` : ''} data-h="${escHtml(h.id)}">${escHtml(h.text)}</a>`).join('');
-    return `<nav class="nd-b nd-toc"${id}${atom}>${lines || (o.tocHint ? `<span class="nd-toc-hint">${escHtml(o.tocHint)}</span>` : '')}</nav>`;
+    return `<nav class="nd-b nd-toc${sc}"${id}${atom}>${lines || (o.tocHint ? `<span class="nd-toc-hint">${escHtml(o.tocHint)}</span>` : '')}</nav>`;
   }
-  if (b.type === 'math') return `<div class="nd-b nd-math"${id}${atom}>${o.math ? o.math(b.tex, true) : `<code>${escHtml(b.tex)}</code>`}</div>`;
-  return `<div class="nd-b nd-pb"${id}${atom}${o.breakLabel ? ` data-label="${escHtml(o.breakLabel)}"` : ''}></div>`;
+  if (b.type === 'math') return `<div class="nd-b nd-math${sc}"${id}${atom}>${o.math ? o.math(b.tex, true) : `<code>${escHtml(b.tex)}</code>`}</div>`;
+  return `<div class="nd-b nd-pb${sc}"${id}${atom}${o.breakLabel ? ` data-label="${escHtml(o.breakLabel)}"` : ''}></div>`;
 }
 
 const CHECK_SVG =
@@ -2963,5 +3274,12 @@ export function docCss(d: Doc, scope = '.nd-doc'): string {
     rule('.nd-math .katex-display', 'margin:0'),
     rule('.nd-m', 'white-space:nowrap'),
     rule('.nd-m .katex', 'font-size:1.1em'),
+    // Suggested changes, in the colour of who suggested each (--sc): words added underlined, words taken out struck,
+    // a new look dotted under; a block's own, a bar at its side (a block to take out, faded too).
+    rule('ins.nd-ins', 'color:var(--sc,#188038);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px'),
+    rule('del.nd-del', 'color:var(--sc,#c5221f);text-decoration:line-through;text-decoration-thickness:1px'),
+    rule('.nd-fmt', 'text-decoration:underline dotted;text-decoration-color:var(--sc,#1a73e8);text-underline-offset:3px'),
+    rule('.nd-sins, .nd-sdel', 'box-shadow:-7px 0 0 -4px var(--sc,#1a73e8)'),
+    rule('figure.nd-sdel, table.nd-sdel, .nd-hr.nd-sdel, .nd-toc.nd-sdel, .nd-math.nd-sdel, .nd-pb.nd-sdel', 'opacity:.5'),
   ].join('\n');
 }

@@ -4,7 +4,7 @@
 // of it, which files it exports as, and which files it can be made from.
 import type { DB } from '../db.ts';
 import { HttpError } from '../auth.ts';
-import { ASSET, docMarkdown, docSources, mapDocSources, newDoc } from '../../shared/docs.ts';
+import { ASSET, asAccepted, docMarkdown, docSources, mapDocSources, newDoc } from '../../shared/docs.ts';
 import { newTex, texSources } from '../../shared/latex.ts';
 import { newBook } from '../../shared/sheets.ts';
 import { deckSources, deckVideos, newDeck } from '../../shared/slides.ts';
@@ -108,8 +108,8 @@ KINDS.set('doc', {
   sources: (text) => docSources(readDoc(text)),
   files: {
     docx: (db, text, title, help) => docxOfDoc(db, readDoc(text), title, help.picture),
-    // A file on its own: its pictures go inside it.
-    md: (db, text) => docMarkdown(mapDocSources(readDoc(text), (src) => (src.startsWith(ASSET) ? (assetDataUrl(db, src.slice(ASSET.length)) ?? src) : src)), { tocLinks: true }),
+    // A file on its own: its pictures go inside it; Markdown has no way to show suggested changes, so they are made.
+    md: (db, text) => docMarkdown(mapDocSources(asAccepted(readDoc(text)), (src) => (src.startsWith(ASSET) ? (assetDataUrl(db, src.slice(ASSET.length)) ?? src) : src)), { tocLinks: true }),
   },
   still: () => ({ width: 1280, height: 800 }),
   fresh: (title) => newDoc(title),
