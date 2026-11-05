@@ -8,6 +8,7 @@
 //   GET  /api/documents/preview?path=   the document read into blocks, sheets and slides (DocPreview)
 //   POST /api/documents/pages {path}    laid out as PDF pages by LibreOffice (when it is here), cached
 //   GET  /api/documents/pages.pdf?path= that PDF
+//   /api/pdf/info, /api/pdf/page, /api/pdf/save   Files' Fill & sign (pdf/routes.ts)
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,6 +19,7 @@ import { config } from '../config.ts';
 import { resolvePath } from '../files.ts';
 import type { Feature, RunCtx, RunTool } from '../features/types.ts';
 import { canRead, extractText, readDocument } from './extract.ts';
+import { pdfRoutes } from './pdf/routes.ts';
 import { PDF_INSTRUCTIONS, PDF_TOOLS } from './pdf/tools.ts';
 import { convert, soffice } from './tools.ts';
 
@@ -173,7 +175,7 @@ const READ: RunTool = {
 
 export const documents: Feature = {
   id: 'documents',
-  routes({ app }) {
+  routes({ app, db }) {
     app.get('/api/documents/preview', async (req): Promise<DocPreview> => {
       const file = resolvePath((req.query as Record<string, string>).path);
       const st = await fs.promises.stat(file).catch(() => null);
@@ -192,6 +194,8 @@ export const documents: Feature = {
       const { v } = await pagesPdf(file);
       return { url: `/api/documents/pages.pdf?path=${encodeURIComponent(file)}&v=${v}` };
     });
+    // Files' Fill & sign (pdf/routes.ts).
+    pdfRoutes(app, db);
     app.get('/api/documents/pages.pdf', async (req, reply) => {
       const file = resolvePath((req.query as Record<string, string>).path);
       const { pdf } = await pagesPdf(file);

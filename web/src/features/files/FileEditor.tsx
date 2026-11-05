@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
-import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileDiff, FolderOpen, MessageSquarePlus, RotateCcw, Save, Search, SquareTerminal, WrapText } from 'lucide-react';
+import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileDiff, FolderOpen, MessageSquarePlus, RotateCcw, Save, Search, Signature, SquareTerminal, WrapText } from 'lucide-react';
 import { api, ApiError, post, put } from '../../lib/api';
 import type { EditorHandle } from '../../lib/codemirror';
 import { basename, bytes, dirname, isWinPath, tildify } from '../../lib/format';
@@ -10,6 +10,7 @@ import { Button, cx, Throbber, Empty, IconButton, MenuItem, MenuSep, Popover, us
 import { VideoPlayer } from '../../components/VideoPlayer';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { mu } from '../../lib/machine';
+import { showInFiles } from '../../lib/nav';
 import { isPreviewable } from '@shared/documents';
 import { copyPaths, goFolder, itemOf, startSession } from './actions';
 import { useSpaceMenu } from './SpaceMenu';
@@ -17,6 +18,8 @@ import { useWatchMs } from './FileAsk';
 
 // Word, Excel, PowerPoint and other documents open as a preview (features/documents).
 const OfficePreview = lazy(() => import('../documents/OfficePreview').then((m) => ({ default: m.OfficePreview })));
+// A PDF's Fill & sign: its fields to fill and its pages to write and sign on (fill/).
+const FillSign = lazy(() => import('./fill/FillSign').then((m) => ({ default: m.FillSign })));
 
 interface FileData {
   path: string;
@@ -103,6 +106,9 @@ export function FileEditor({
   const [wrapKey] = useState(() => (mobile ? 'wa.wrap.phone' : 'wa.wrap'));
   const [wrap, setWrap] = useState(() => (localStorage.getItem(wrapKey) ?? (mobile ? '1' : '0')) === '1');
   const [menu, setMenu] = useState(false);
+  // A PDF being filled in and signed (Fill & sign) instead of shown.
+  const [fill, setFill] = useState(false);
+  useEffect(() => setFill(false), [path]);
   const moreRef = useRef<HTMLButtonElement>(null);
   const deskRef = useRef<HTMLButtonElement>(null);
   const [desk, setDesk] = useState(false);
@@ -315,13 +321,15 @@ export function FileEditor({
               {/* A dialog has the name in its title already. */}
               {!embedded && (
                 <div className="flex items-center gap-1.5">
-                  <span className="truncate text-[15px] font-semibold tracking-tight">{basename(path)}</span>
+                  <span className="truncate text-[15px] font-semibold tracking-tight" translate="no">
+                    {basename(path)}
+                  </span>
                   {unsaved}
                 </div>
               )}
               <div className="flex items-center gap-1.5">
                 {/* Cut at its start: the folders nearest the file say the most. */}
-                <span dir="rtl" className="min-w-0 truncate text-left font-mono text-[11.5px] text-fg-3">
+                <span dir="rtl" className="min-w-0 truncate text-left font-mono text-[11.5px] text-fg-3" translate="no">
                   <span dir="ltr">{tildify(dirname(path), home)}</span>
                 </span>
                 {embedded && unsaved}
@@ -330,6 +338,11 @@ export function FileEditor({
             {text && (isMd || isHtml) && (
               <IconButton label={isHtml ? 'Show as a page' : 'Preview'} active={mode === 'preview'} onClick={togglePreview}>
                 <Eye size={17} />
+              </IconButton>
+            )}
+            {media === 'pdf' && file && !fill && (
+              <IconButton label="Fill & sign" onClick={() => setFill(true)}>
+                <Signature size={17} />
               </IconButton>
             )}
             {actions}
@@ -381,7 +394,7 @@ export function FileEditor({
         </div>
       ) : (
         <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line px-3">
-          <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden font-mono text-[12px] text-fg-3" title={path}>
+          <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden font-mono text-[12px] text-fg-3" title={path} translate="no">
             {crumbs.map((c, i) => (
               <span key={i} className={cx('truncate', i === crumbs.length - 1 ? 'shrink-0 text-fg' : 'min-w-0 shrink')}>
                 {i > 0 && <span className="px-0.5 opacity-50">/</span>}
@@ -404,6 +417,11 @@ export function FileEditor({
                 <WrapText size={14} />
               </IconButton>
             </>
+          )}
+          {media === 'pdf' && file && !fill && (
+            <Button size="sm" variant="ghost" icon={<Signature size={14} />} onClick={() => setFill(true)}>
+              Fill & sign
+            </Button>
           )}
           {actions}
           {!embedded && (
@@ -457,10 +475,22 @@ export function FileEditor({
           <Suspense fallback={<div className="flex h-full items-center justify-center text-fg-3"><Throbber size={34} /></div>}>
             <OfficePreview path={path} mtime={file.mtime} />
           </Suspense>
+        ) : media === 'pdf' && fill ? (
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-fg-3"><Throbber size={34} /></div>}>
+            <FillSign
+              path={path}
+              onDone={(saved) => {
+                setFill(false);
+                // A copy opens beside it in Files; a file written over shows again as it is now.
+                if (saved && !saved.replaced && !embedded) showInFiles(saved.path);
+                else if (saved?.replaced) void load();
+              }}
+            />
+          </Suspense>
         ) : media && (file.binary || file.tooLarge || ext === 'svg') ? (
           <div className={cx('flex h-full items-center justify-center overflow-auto bg-bg-1', media === 'video' ? 'p-0 sm:p-3' : 'p-4')}>
             {media === 'image' && <img src={raw} alt={basename(path)} className="max-h-full max-w-full rounded-lg border border-line bg-[repeating-conic-gradient(var(--bg-2)_0%_25%,var(--bg)_0%_50%)] [background-size:16px_16px] object-contain" />}
-            {media === 'pdf' && <iframe src={raw} title={basename(path)} className="h-full w-full rounded-lg border border-line bg-white" />}
+            {media === 'pdf' && <iframe src={`${raw}&v=${file.mtime}`} title={basename(path)} className="h-full w-full rounded-lg border border-line bg-white" />}
             {media === 'video' && <VideoPlayer key={`${path}:${file.mtime}`} src={raw} name={basename(path)} downloadUrl={`${raw}&download=1`} />}
             {media === 'audio' && <audio src={raw} controls />}
           </div>

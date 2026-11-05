@@ -19,6 +19,11 @@ import { editPages, extractPages, fillAndMark, fillPdf, findWords, FormError, pa
 import { isStream } from './objects.ts';
 import { pages } from './pages.ts';
 import { PDF_TOOLS } from './tools.ts';
+import { pdfRoutes } from './routes.ts';
+import Fastify from 'fastify';
+import { openDb } from '../../db.ts';
+import { ruleFor } from '../../guide/api.ts';
+import { addSignature, signatureTables } from '../../signatures/store.ts';
 import type { RunCtx, ToolOutput } from '../../features/types.ts';
 
 if (!config.dataDir.startsWith('/tmp/')) {
@@ -442,6 +447,61 @@ const png = (() => {
   await assert.rejects(tool('pdf_pages').run({ path: 'form.pdf' }, ctx), /Give ops/);
   await assert.rejects(tool('pdf_fill').run({ path: 'nothing.pdf', values: { a: 1 } }, ctx), /No such file/);
   await assert.rejects(tool('pdf_fill').run({ path: 'sig.png', values: { a: 1 } }, ctx), /not a PDF/);
+}
+
+// ---- Files' Fill & sign routes ------------------------------------------------------------------------
+
+{
+  const app = Fastify();
+  const db = openDb(path.join(tmp, 'test.db'));
+  signatureTables(db);
+  pdfRoutes(app, db);
+  await app.ready();
+  const dir = path.join(tmp, 'files');
+  fs.mkdirSync(dir);
+  const file = path.join(dir, 'form.pdf');
+  fs.writeFileSync(file, form);
+  const info = (await app.inject({ url: `/api/pdf/info?path=${encodeURIComponent(file)}` })).json();
+  assert.equal(info.pages.length, 2);
+  assert.equal(info.form.fields.length, 9);
+  assert.equal(typeof info.mtime, 'number');
+  const sig = addSignature(db, { name: 'Ana', kind: 'signature', png });
+  const marks = [
+    { type: 'text', page: 1, x: 380, y: 488, text: '5 November 2026', size: 11 },
+    { type: 'check', page: 1, x: 300, y: 270, size: 14 },
+    { type: 'image', page: 1, x: 112, y: 470, w: 120, h: 40, signature: sig.id },
+  ];
+  const saved = await app.inject({ method: 'POST', url: '/api/pdf/save', payload: { path: file, mtime: info.mtime, values: { first_name: 'Ana', agree: true }, marks } });
+  assert.equal(saved.statusCode, 200, saved.body);
+  const out = saved.json();
+  assert.equal(out.path, path.join(dir, 'form (filled).pdf'), 'a copy beside it');
+  const copy = fs.readFileSync(out.path);
+  assert.ok(copy.subarray(0, form.length).equals(form), 'the copy keeps every byte of the file');
+  assert.equal(pdfInfo(copy).form.fields[0].value, 'Ana');
+  assert.ok(pageText(copy, 1).some((l) => l.text.includes('5 November 2026')));
+  const cf = new PdfFile(copy);
+  assert.equal(cf.objectNumbers().filter((n) => (cf.getObj(n) as { dict?: Map<string, unknown> } | null)?.dict?.get?.('Subtype') === 'Image').length, 2, 'the saved signature’s picture, read by the server, with its mask');
+  // The file changed since it was opened: refused.
+  const stale = await app.inject({ method: 'POST', url: '/api/pdf/save', payload: { path: file, mtime: info.mtime - 5000, values: { age: '3' } } });
+  assert.equal(stale.statusCode, 409);
+  // Replaced: the old version in the Trash.
+  const rep = await app.inject({ method: 'POST', url: '/api/pdf/save', payload: { path: file, replace: true, values: { age: '40' } } });
+  assert.equal(rep.statusCode, 200, rep.body);
+  assert.ok(rep.json().replaced && fs.existsSync(rep.json().trashed));
+  assert.equal(pdfInfo(fs.readFileSync(file)).form.fields[2].value, '40');
+  // What cannot be: a value that does not fit, nothing to save, a signature not there.
+  assert.equal((await app.inject({ method: 'POST', url: '/api/pdf/save', payload: { path: file, values: { age: '12345' } } })).statusCode, 422);
+  assert.equal((await app.inject({ method: 'POST', url: '/api/pdf/save', payload: { path: file } })).statusCode, 400);
+  assert.equal((await app.inject({ method: 'POST', url: '/api/pdf/save', payload: { path: file, marks: [{ type: 'image', page: 1, x: 1, y: 1, w: 9, h: 9, signature: 'sg_nothing' }] } })).statusCode, 404);
+  if (poppler) {
+    const pic = await app.inject({ url: `/api/pdf/page?path=${encodeURIComponent(file)}&page=1&width=400&fields=0` });
+    assert.equal(pic.statusCode, 200);
+    assert.equal(pic.headers['content-type'], 'image/png');
+  }
+  await app.close();
+  db.close();
+  // Agents' app_api keeps to their own PDF tools.
+  for (const [m, u] of [['GET', '/api/pdf/info'], ['GET', '/api/pdf/page'], ['POST', '/api/pdf/save']]) assert.equal(ruleFor(m, u).level, 'refuse', `${m} ${u} is not for app_api`);
 }
 
 // ---- pictures of pages ------------------------------------------------------------------------------
