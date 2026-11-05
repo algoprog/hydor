@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
-import { Brain, Check, ChevronRight, Gauge, ShieldCheck } from 'lucide-react';
+import { Check, ChevronRight, Cpu, Gauge, ShieldCheck } from 'lucide-react';
 import type { Agent, AgentCatalog, ModelOption, SessionPrefs } from '@shared/types';
 import { api } from '../lib/api';
 import { agentName } from './AgentIcon';
@@ -169,7 +169,7 @@ export function ModelPicker({
   disabled?: boolean;
   /** For an ACP agent: which one (its models are what it offered when it last ran). */
   acp?: string;
-  /** Named, without an icon (the start page): "Model  Opus 5.5", the default read as the model it stands for. */
+  /** Named (the start page): "Model  Opus 5.5", the default read as the model it stands for. */
   label?: string;
 }) {
   const c = useCatalog(agent, acp);
@@ -177,7 +177,7 @@ export function ModelPicker({
   const def = !value && label ? c?.models.find((m) => m.isDefault) : undefined;
   return (
     <Picker
-      icon={label ? undefined : <Brain size={13} className="shrink-0" />}
+      icon={<Cpu size={label ? 14 : 13} className="shrink-0" />}
       label={label}
       value={c ? (def?.resolved ? modelLabel(c, def.resolved) : modelLabel(c, value)) : '…'}
       title={def ? `Model: ${agentName(agent)}'s default` : 'Model'}
@@ -227,7 +227,7 @@ export function EffortPicker({
   onChange: (v: string | null) => void;
   disabled?: boolean;
   acp?: string;
-  /** Named, without an icon (the start page): "Effort  Medium". */
+  /** Named (the start page): "Effort  Medium". */
   label?: string;
 }) {
   const c = useCatalog(agent, acp);
@@ -237,7 +237,7 @@ export function EffortPicker({
   if (c && !levels.length) return null;
   const shown = value ? cap(value) : label ? (m?.defaultEffort ? cap(m.defaultEffort) : 'Default') : 'Effort';
   return (
-    <Picker icon={label ? undefined : <Gauge size={13} className="shrink-0" />} label={label} value={shown} title="Reasoning effort: how hard the model thinks" disabled={disabled} width={230}>
+    <Picker icon={<Gauge size={label ? 14 : 13} className="shrink-0" />} label={label} value={shown} title="Reasoning effort: how hard the model thinks" disabled={disabled} width={230}>
       {(close) => (
         <>
           <OptionRow
@@ -280,7 +280,7 @@ export function ModePicker({
   onChange: (v: string) => void;
   disabled?: boolean;
   acp?: string;
-  /** Named, without an icon (the start page): "Permissions  Ask". */
+  /** Named (the start page): "Permissions  Ask". */
   label?: string;
 }) {
   const c = useCatalog(agent, acp);
@@ -288,7 +288,7 @@ export function ModePicker({
   if (agent === 'acp' && !c?.modes.length) return null;
   return (
     <Picker
-      icon={label ? undefined : <ShieldCheck size={13} className="shrink-0" />}
+      icon={<ShieldCheck size={label ? 14 : 13} className="shrink-0" />}
       label={label}
       value={cur?.label ?? (label ? (c ? 'Default' : '…') : 'Mode')}
       title={`${label ? 'What the agent may do without asking you' : 'Mode'} (Shift+Tab cycles)${cur?.description ? `\n${cur.label} · ${cur.description}` : ''}`}

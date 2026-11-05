@@ -70,6 +70,7 @@ function ArenaStartOption({ value, onChange }: { value: SessionExtra; onChange: 
       <SettingChip
         ref={ref}
         label="Arena"
+        icon={<Swords size={14} />}
         value={picked.length ? `+${picked.length} model${picked.length === 1 ? '' : 's'}` : 'Off'}
         on={!!picked.length}
         open={open}

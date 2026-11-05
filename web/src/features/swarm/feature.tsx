@@ -90,6 +90,7 @@ function SwarmStartOption({ value, onChange }: { value: SessionExtra; onChange: 
       <SettingChip
         ref={ref}
         label="Swarm"
+        icon={<Users size={14} />}
         value={on ? `On${size ? ` · ${size} at once` : ''}` : 'Off'}
         on={on}
         open={open}
