@@ -1145,6 +1145,8 @@ app.get('/api/git/compare', async (req) => gitRepos.compare(repoPath(req), gitSt
 app.get('/api/git/branch-only', async (req) => gitRepos.branchOnly(repoPath(req), gitStr(req, 'branch')));
 app.post('/api/git/tag', async (req) => gitRepos.tag(repoPath(req), gitStr(req, 'name'), gitStr(req, 'hash'), gitStr(req, 'message') || undefined));
 app.post('/api/git/push-tags', async (req) => gitRepos.pushTags(repoPath(req), gitStr(req, 'name') || undefined));
+app.get('/api/git/tags', async (req) => gitRepos.tags(repoPath(req)));
+app.get('/api/git/resolve', async (req) => ({ commit: await gitRepos.resolve(repoPath(req), gitStr(req, 'ref')) }));
 app.post('/api/git/stash', async (req) => {
   const b = gitArgs(req);
   return gitRepos.stash(repoPath(req), String(b.message ?? ''), b.untracked !== false);

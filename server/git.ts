@@ -1114,6 +1114,25 @@ export class GitRepos {
     return this.result(repoPath, await git(repoPath, ['tag', ...(m ? ['-a', '-m', m] : []), name, hash], 15_000));
   }
 
+  /** The tags, the newest commit first, each with the commit it marks: where something last worked, to pick from. */
+  async tags(repoPath: string): Promise<{ tags: (GitCommit & { name: string })[] }> {
+    this.known(repoPath);
+    const r = await git(repoPath, ['log', '--no-walk', '--tags', '--decorate=full', `--format=${GRAPH_FORMAT}`, '-n200', '--'], 30_000);
+    const tags: (GitCommit & { name: string })[] = [];
+    for (const c of parseGraphLog(r.out)) for (const ref of c.refs) if (ref.kind === 'tag') tags.push({ name: ref.name, hash: c.hash, subject: c.subject, author: c.author, ts: c.ts });
+    return { tags };
+  }
+
+  /** The commit a name stands for (a tag, a branch, HEAD~3, a hash), or null when it stands for none. */
+  async resolve(repoPath: string, ref: string): Promise<GitCommit | null> {
+    this.known(repoPath);
+    const name = ref.trim();
+    if (!name || name.length > 200 || name.startsWith('-') || /[\x00-\x1f]/.test(name)) return null;
+    const hash = await git(repoPath, ['rev-parse', '--verify', '-q', '--end-of-options', `${name}^{commit}`]);
+    if (!hash.ok || !isHash(hash.out.trim())) return null;
+    return parseLog((await git(repoPath, ['log', '-1', `--format=${LOG_FORMAT}`, hash.out.trim(), '--'])).out)[0] ?? null;
+  }
+
   /** Sends a tag up, or every tag. */
   async pushTags(repoPath: string, name?: string): Promise<GitActionResult> {
     this.known(repoPath);
