@@ -266,8 +266,8 @@ const SAVE_LATEX: RunTool = {
   async run(a, ctx) {
     const db = ctx.deps.db;
     const id = changing(db, a, 'tex');
-    const { id: _id, title: _title, ...rest } = a;
-    // The version it changes: the files and pictures the agent leaves out stay.
+    const { id: _id, ...rest } = a;
+    // The version it changes: the files and pictures the agent leaves out stay. (The title goes in a template's text.)
     const { doc, notes } = await agentTex(db, rest, ctx.cwd, id ? readTex(pageSource(db, id)!.text) : undefined);
     // Typeset first: the agent hears of errors to fix, and the picture in the list comes from this run.
     const r = await compileTex(db, doc);

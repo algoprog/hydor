@@ -90,6 +90,11 @@ export interface TexSetup {
   missing?: string;
   /** Why an engine cannot be used here. */
   notes: Partial<Record<TexEngine, string>>;
+  /**
+   * The classes and packages this TeX has, of those the editor asks about (TEX_ASKED: the templates' and the common
+   * packages \usepackage offers), by their file names ("moderncv.cls", "siunitx.sty"). Missing on older servers.
+   */
+  installed?: string[];
 }
 
 export const TEX_LIMITS = { main: 2 * 1024 * 1024, file: 2 * 1024 * 1024, total: 4 * 1024 * 1024, files: 50, pictures: 200, name: 120, depth: 6 };
@@ -370,15 +375,14 @@ export function texEscape(s: string): string {
 const firstFont = (names: string[]): string => names.reduceRight((rest, n) => `\\IfFontExistsTF{${n}}{\\setmainfont{${n}}}{${rest}}`, '');
 
 /**
- * A new document: a short article (a title, an author, an abstract, two sections, an equation and a list) that every
- * engine typesets. A title pdfLaTeX cannot write (Greek, Cyrillic, Chinese…) makes it a XeLaTeX document, with a font
- * for its letters.
+ * What a new document needs to write `text` (its title): pdfLaTeX when its default fonts have the letters, else
+ * XeLaTeX and the preamble lines that load a font with them (Greek, Cyrillic, Chinese…).
  */
-export function newTex(title: string): TexDoc {
-  const t = title.trim().replace(/\s+/g, ' ') || 'Untitled';
-  const cjk = /[぀-ヿ㐀-鿿가-힯豈-﫿]/.test(t);
+export function lettersFor(text: string): { engine: TexEngine; lines: string[] } {
+  const cjk = /[぀-ヿ㐀-鿿가-힯豈-﫿]/.test(text);
   // Beyond Latin-1 and Latin Extended-A (and typographic punctuation), pdfLaTeX's default fonts have no letters.
-  const wide = cjk || /[^\u0000-ſ -⁯€]/.test(t);
+  const wide = cjk || /[^\u0000-ſ -⁯€]/.test(text);
+  if (!wide) return { engine: 'pdflatex', lines: [] };
   const fonts = cjk
     ? [
         firstFont(['Noto Serif CJK SC', 'Noto Sans CJK SC', 'Source Han Serif SC', 'Songti SC', 'PingFang SC', 'SimSun', 'Microsoft YaHei', 'WenQuanYi Zen Hei']),
@@ -386,11 +390,23 @@ export function newTex(title: string): TexDoc {
         '\\XeTeXlinebreakskip = 0pt plus 1pt',
       ]
     : [firstFont(['Noto Serif', 'DejaVu Serif', 'FreeSerif', 'Times New Roman'])];
+  return { engine: 'xelatex', lines: ['\\usepackage{fontspec}', '% A font with the letters of the title: the first of these this computer has.', ...fonts] };
+}
+
+/**
+ * A new document: a short article (a title, an author, an abstract, two sections, an equation and a list) that every
+ * engine typesets. A title pdfLaTeX cannot write (Greek, Cyrillic, Chinese…) makes it a XeLaTeX document, with a font
+ * for its letters.
+ */
+export function newTex(title: string): TexDoc {
+  const t = title.trim().replace(/\s+/g, ' ') || 'Untitled';
+  const letters = lettersFor(t);
+  const wide = letters.engine === 'xelatex';
   const main = [
     '\\documentclass[11pt]{article}',
     '\\usepackage[a4paper,margin=2.5cm]{geometry}',
     '\\usepackage{amsmath}',
-    ...(wide ? ['\\usepackage{fontspec}', '% A font with the letters of the title: the first of these this computer has.', ...fonts] : []),
+    ...letters.lines,
     '\\usepackage{graphicx}',
     '\\usepackage[hidelinks]{hyperref}',
     '',
