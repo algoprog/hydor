@@ -13394,5 +13394,7 @@
 "This database is full: some of the change could not be kept.":"这个数据库已满：部分更改无法保存。",
 "To change a database, save_page with this id and databases: {\"<name>\": {\"add\": [{\"<column>\": value, …}], \"update\": [{\"id\": \"<row id>\", \"<column>\": value}], \"remove\": [\"<row id>\"]}} (also \"rows\" to set all of them, \"cols\" for the columns, \"title\"); values by column name: text, a number, an option’s name (new names become options), a list of names for multi-select, \"YYYY-MM-DD\" for a date, true for a ticked checkbox, an address for a link.":"To change a database, save_page with this id and databases: {\"<name>\": {\"add\": [{\"<column>\": value, …}], \"update\": [{\"id\": \"<row id>\", \"<column>\": value}], \"remove\": [\"<row id>\"]}} (also \"rows\" to set all of them, \"cols\" for the columns, \"title\"); values by column name: text, a number, an option’s name (new names become options), a list of names for multi-select, \"YYYY-MM-DD\" for a date, true for a ticked checkbox, an address for a link.",
 "To do":"待办",
-"Untitled database":"未命名数据库"
+"Untitled database":"未命名数据库",
+"contains":"包含",
+"has":"含有"
 }
