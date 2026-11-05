@@ -173,7 +173,7 @@ export function chartSvg(chart: SheetChart, data: ChartData | null, w: number, h
   const pie = chart.kind === 'pie' || chart.kind === 'doughnut';
   const series = (data?.series ?? []).slice(0, pie ? 1 : 50);
   const labels = data?.labels ?? [];
-  if (!data || !series.length || !labels.length) {
+  if (!data || !series.length || !labels.length || !series.some((x) => x.values.some((v) => v !== null))) {
     text(w / 2, (top + bottom) / 2, 'No numbers to draw', { size: 12, opacity: 0.6 });
     return wrap(parts, w, h, font);
   }
