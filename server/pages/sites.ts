@@ -347,7 +347,7 @@ export async function serveSite(db: DB, req: FastifyRequest, reply: FastifyReply
     const page = site.page_id ? await pageHtml(db, site.page_id) : null;
     if (!page) return text(reply, 404, 'The page this site showed was deleted.');
     reply.header('Cache-Control', 'no-cache');
-    return reply.type('text/html; charset=utf-8').send(injectHead(page.html, kitHead({ n: '', theme: 'auto', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value } })));
+    return reply.type('text/html; charset=utf-8').send(injectHead(page.html, kitHead({ n: '', theme: 'auto', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value } }, page.html)));
   }
   // Never a dot file or folder (.env, .git), never a way out.
   const segs = rest.split('/');
