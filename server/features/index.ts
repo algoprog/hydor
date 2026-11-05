@@ -12,6 +12,7 @@ import { computer } from '../computer/index.ts';
 import { connections } from '../connections/index.ts';
 import { custom } from '../custom/index.ts';
 import { documents } from '../documents/index.ts';
+import { experiments } from '../experiments/index.ts';
 import { fileAsk } from '../fileask/index.ts';
 import { find } from '../find/index.ts';
 import { formatting } from '../formatting/index.ts';
@@ -41,4 +42,4 @@ import type { Feature } from './types.ts';
 
 // The user's guidelines lead what an agent is told, their profile right after them; how to format replies follows the
 // pages it may show instead.
-export const FEATURES: Feature[] = [guidelines, profile, pages, formatting, shots, search, browser, computer, memory, knowledge, spaces, children, swarm, research, opinion, commits, budget, documents, fileAsk, images, media, connections, automations, voice, assistants, apps, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];
+export const FEATURES: Feature[] = [guidelines, profile, pages, formatting, shots, search, browser, computer, memory, knowledge, spaces, children, swarm, research, opinion, commits, budget, documents, fileAsk, images, media, connections, automations, experiments, voice, assistants, apps, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];
