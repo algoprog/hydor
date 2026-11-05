@@ -494,9 +494,12 @@ export function writing(E: Core): Writing {
     fillEmpty(nh);
     return nh;
   };
-  /** Puts a new block after a block: an item stays in its list, anything else goes after the list it would be in. */
-  const putAfter = (nu: HTMLElement, u: Element) => {
-    const lk = LISTK[kindOf(nu) ?? 'p'];
+  /**
+   * Puts a new block after a block: an item stays in its list (or one of its own kind there), anything else goes after
+   * the list it would be in. `kind`: what the new block is (an item not yet in a list can't say which list it is for).
+   */
+  const putAfter = (nu: HTMLElement, u: Element, kind: Kind = kindOf(nu) ?? 'p') => {
+    const lk = LISTK[kind];
     if (u.tagName === 'LI') {
       u.after(nu);
       if (nu.tagName !== 'LI') {
@@ -505,16 +508,11 @@ export function writing(E: Core): Writing {
         nu.replaceWith(tmp);
         toTop(tmp);
         tmp.replaceWith(nu);
-      } else if (lk && !sameKindList(nu, u)) merge(retype(isolate(nu), lk[0], lk[1]));
+      } else if (lk && kind !== kindOf(u)) merge(retype(isolate(nu), lk[0], lk[1]));
       return;
     }
     u.after(nu);
     if (lk && nu.tagName === 'LI') wrapList(nu, lk[0], lk[1]);
-  };
-  const sameKindList = (nu: Element, u: Element) => {
-    const lk = LISTK[kindOf(nu) === 'todo' ? 'todo' : 'bullet'];
-    const list = u.parentElement!;
-    return kindOf(nu) === kindOf(u) || (list.tagName === lk?.[0] && list.classList.contains('n-todo') === lk?.[1]);
   };
   const tick = (li: Element) => {
     const b = boxOf(li);
@@ -1587,7 +1585,7 @@ export function writing(E: Core): Writing {
       if (TURNABLE.has(it.id)) {
         if (empty && kindOf(u)) return writeIn(turnInto(u, it.id as Kind));
         const { unit, host } = newUnit(it.id as Kind);
-        putAfter(unit, u);
+        putAfter(unit, u, it.id as Kind);
         return writeIn(host);
       }
       return insertBlock(it.id, u, empty);
@@ -2094,14 +2092,15 @@ export function writing(E: Core): Writing {
   const addBlock = (b: Element | null, above: boolean) => {
     E.change(() => {
       const k = b ? kindOf(b) : null;
-      const { unit, host } = newUnit(isListKind(k) ? k! : 'p');
+      const kind: Kind = isListKind(k) ? k! : 'p';
+      const { unit, host } = newUnit(kind);
       if (!b) {
         const f = flow();
         const last = lastBlock(f);
         if (last) last.after(unit);
         else f.append(unit);
       } else if (above) b.before(unit);
-      else putAfter(unit, b);
+      else putAfter(unit, b, kind);
       return writeIn(host);
     });
     if (E.editing()) doc.execCommand('insertText', false, '/');
@@ -2324,6 +2323,15 @@ export function writing(E: Core): Writing {
     if (!slash) return;
     if (slashQuery() === null) closeSlash();
   });
+  // The page scrolled: the list of blocks stays by the caret, a block's menu closes (its block moved away).
+  addEventListener(
+    'scroll',
+    () => {
+      if (slash) renderSlash();
+      if (menu) closeMenu();
+    },
+    true,
+  );
   addEventListener(
     'pointerdown',
     (e) => {
@@ -2561,6 +2569,7 @@ export function writing(E: Core): Writing {
       const u = unitOf(h);
       const k = kindOf(u)!;
       const rest = takeTail(h);
+      dropFiller(h);
       let cur = h;
       let curU = u;
       lines.forEach((ln, i) => {
@@ -2582,7 +2591,7 @@ export function writing(E: Core): Writing {
         if (!words.trim() && !isListKind(kind)) return;
         const { unit, host } = newUnit(kind, textFrag(words));
         if (/^\[[xX]\]/.test(ln)) boxOf(unit)?.setAttribute('checked', '');
-        putAfter(unit, curU);
+        putAfter(unit, curU, kind);
         cur = host;
         curU = unit;
       });

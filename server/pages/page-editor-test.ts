@@ -302,6 +302,16 @@ if (canCapture()) {
     await d.type('/divider');
     await d.press('Enter');
     ok((await d.js<number>('return document.querySelectorAll("hr").length')) === 1, 'a divider goes in, with a paragraph after it to go on writing');
+    await d.type('Steps follow /numbered');
+    await d.press('Enter');
+    await d.type('Pack');
+    same(
+      await d.js<string>('const li = document.activeElement.closest("li"); return li ? li.parentElement.tagName + ":" + li.textContent : document.activeElement.tagName'),
+      'OL:Pack',
+      'a numbered list asked for after some words is a numbered list, under them',
+    );
+    await d.press('Enter');
+    await d.press('Enter');
     await d.type('Mid text /qq');
     ok((await d.js<string>('return document.activeElement.textContent')) === 'Mid text /qq', 'a "/" after a word and an unknown name leave the words as typed');
     await d.press('Escape');
@@ -448,6 +458,24 @@ if (canCapture()) {
     await d.clickAt(400, 300);
     await d.type('A fresh start');
     same(await shape(d), 'p:A fresh start', 'and a click in an empty page starts a paragraph');
+  });
+
+  // ---- a picture dropped on the page -------------------------------------------------------------------------------------------------
+  await drive('<h1>Drop</h1><p id="one">First</p><p id="two">Second</p>', async (d) => {
+    const file = path.join(os.tmpdir(), `hydor-drop-${process.pid}.png`);
+    fs.writeFileSync(file, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'));
+    const r = await d.js<{ x: number; y: number }>('const b = document.querySelector("#two").getBoundingClientRect(); return { x: b.left + 20, y: b.top + 3 };');
+    const data = { items: [], files: [file], dragOperationsMask: 1 };
+    for (const type of ['dragEnter', 'dragOver', 'drop'] as const) await d.tab.s.send('Input.dispatchDragEvent', { type, x: r.x, y: r.y, data });
+    await sleep(150);
+    const sent = (await d.msgs('wa-ed-file')).at(-1);
+    ok(
+      sent && typeof sent.id === 'string' && (await d.js<boolean>('const m = window.__msgs.filter(function(m){return m.type==="wa-ed-file"}).pop(); return !!m && m.file instanceof File && m.file.type === "image/png";')),
+      'a picture dropped on the page goes to the app, as a file, to be made small enough',
+    );
+    await d.cmd('fill', { id: sent?.id, src: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' });
+    same(await shape(d), 'h1:Drop|p:First|img.n-pic:|p:Second', 'and it lands where it was dropped');
+    fs.rmSync(file, { force: true });
   });
 
   // ---- an icon, a cover, a picture, maths, a video ------------------------------------------------------------------------------
