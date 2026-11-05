@@ -5,6 +5,7 @@
 // stand-in for the session manager. Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/slides-editor-test.ts
 //   DATA_DIR=/tmp/hydor-test-slides-editor node dist/dev/slides-editor-test.js
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -17,6 +18,7 @@ import { canCapture } from '../capture/index.ts';
 import { deckSources, deckText, deckVideos, fitGroup, footerOn, groupOf, isDeckText, normalizeDeck, reconnect, scaleEls, turnedBox, ungroupEls, videoSrc, type Deck, type El, type GroupEl } from '../../shared/slides.ts';
 import { slidesRuntime } from '../../shared/slides-runtime.ts';
 import { pptxFile, type Picture } from './pptx.ts';
+import { deckFaces, faceKey } from './pptx-fonts.ts';
 import { deckPage, lucideIcon, RUNTIME_SRC } from './slides.ts';
 import { pages } from './index.ts';
 import { sweepAssets } from './assets.ts';
@@ -697,6 +699,23 @@ const dot: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
   ok(!!schema.properties.footer && !!schema.properties.guides, 'and its schema takes the footer and the guides');
   const pptx = await req('GET', `/api/pages/${id}/export?format=pptx`);
   ok(pptx.statusCode === 200 && slideXml(pptx.rawPayload, 1).includes('svgBlip'), 'the deck exports as PowerPoint, its icons in it');
+  {
+    // The faces its words show in, kept as if fetched before (KaTeX's, under their names): the file carries them
+    // compressed, and the export says so.
+    const faces = deckFaces(normalizeDeck((await req('GET', `/api/pages/${id}`)).json().model));
+    const dir = path.join(process.env.DATA_DIR!, 'pages', 'fonts', 'ttf');
+    fs.mkdirSync(dir, { recursive: true });
+    const kept = faces.map((f) => path.join(dir, `${crypto.createHash('sha256').update(faceKey(f)).digest('hex').slice(0, 24)}.ttf`));
+    faces.forEach((f, i) => fs.writeFileSync(kept[i], fs.readFileSync(path.join(process.cwd(), 'node_modules/katex/dist/fonts', f.bold ? 'KaTeX_Main-Bold.ttf' : 'KaTeX_Main-Regular.ttf'))));
+    const withFonts = await req('GET', `/api/pages/${id}/export?format=pptx`);
+    const note = String(withFonts.headers['x-export-note'] ?? '');
+    ok(
+      faces.length > 0 && note.startsWith('Fonts inside it: ') && note.endsWith(', compressed as PowerPoint keeps them.') && new Zip(withFonts.rawPayload).names().filter((n) => n.startsWith('ppt/fonts/')).length === faces.length,
+      `a PowerPoint file says which fonts went inside it, and that they are compressed: ${note}`,
+    );
+    ok((await run('export_page', { id, format: 'pptx' })).text?.includes(note), 'and export_page says the same');
+    for (const k of kept) fs.rmSync(k, { force: true });
+  }
   if (canCapture()) {
     const z = new Zip(pptx.rawPayload);
     const rels = z.read('ppt/slides/_rels/slide1.xml.rels')?.toString() ?? '';

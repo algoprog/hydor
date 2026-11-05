@@ -372,7 +372,7 @@ const EXPORT_PAGE: RunTool = {
     const file = fs.existsSync(dest) && fs.statSync(dest).isDirectory() ? path.join(dest, f.name) : dest;
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, f.data);
-    return `Wrote ${file} (${Math.max(1, Math.round(f.data.length / 1024))} KB). Hand it to the user with present_files.`;
+    return `Wrote ${file} (${Math.max(1, Math.round(f.data.length / 1024))} KB).${f.note ? ` ${f.note}` : ''} Hand it to the user with present_files.`;
   },
 };
 
@@ -695,6 +695,8 @@ function routes(d: Deps) {
     const format = String(q.format ?? '') as ExportFormat;
     if (!EXPORT_TYPES[format]) throw new HttpError(400, `format is one of ${Object.keys(EXPORT_TYPES).join(', ')}`);
     const f = await exportPage(db, P(req).id, { format, version: q.v ? Number(q.v) : undefined, paper: q.paper === 'letter' ? 'letter' : 'a4', slide: q.slide ? Number(q.slide) : undefined });
+    // What there is to say of it (a PowerPoint file's fonts inside it, and which compressed), beside it.
+    if (f.note) reply.header('X-Export-Note', f.note.replace(/[^\x20-\x7e]/g, '?'));
     return reply
       .header('Cache-Control', 'no-store')
       .header('Content-Disposition', `attachment; filename="${f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(f.name)}`)

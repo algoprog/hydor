@@ -134,7 +134,7 @@ async function fitScales(db: DB, k: KindDef, text: string, title: string): Promi
 export const formatsOf = (k: KindDef): ExportFormat[] => [...new Set([...(Object.keys(k.files) as ExportFormat[]), 'pdf', 'html'] as ExportFormat[])];
 
 /** A page, deck, document or spreadsheet (its current version, or `version`) as a file. */
-export async function exportPage(db: DB, id: string, o: { format: ExportFormat; version?: number; paper?: Paper; slide?: number }): Promise<{ data: Buffer; type: string; name: string }> {
+export async function exportPage(db: DB, id: string, o: { format: ExportFormat; version?: number; paper?: Paper; slide?: number }): Promise<{ data: Buffer; type: string; name: string; note?: string }> {
   mustPage(db, id);
   const src = pageSource(db, id, Number.isInteger(o.version) && o.version! > 0 ? o.version : undefined);
   if (!src) throw new HttpError(404, 'That version is no longer kept');
@@ -183,7 +183,9 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
       // A deck's icons and equations, as pictures for PowerPoint, and its pictures whose colours were changed, changed.
       if (src.kind === 'slides') renders = await deckRenders(readDeck(src.text), (s) => pics.get(s) ?? null);
     }
-    return out(await make(db, src.text, title, { picture: (s) => pics.get(s) ?? null, scales, renders, wordFonts: wordFontsOf }), o.format);
+    const notes: string[] = [];
+    const made = out(await make(db, src.text, title, { picture: (s) => pics.get(s) ?? null, scales, renders, wordFonts: wordFontsOf, note: (t) => notes.push(t) }), o.format);
+    return notes.length ? { ...made, note: notes.join(' ') } : made;
   }
 
   if (o.format === 'html') return out(pageFileHtml(src.text), 'html');

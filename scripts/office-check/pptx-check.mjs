@@ -202,15 +202,20 @@ function validate(file, work) {
 
 // ---- LibreOffice ---------------------------------------------------------------------------------------------------
 
-/** An embedded font (PowerPoint's .fntdata, Embedded OpenType) as the TrueType file inside it, or null (MicroType Express compressed). */
-export function eotFont(b) {
+/** An embedded font (PowerPoint's .fntdata, Embedded OpenType) as the TrueType file inside it (MicroType Express undone by the app's own decoder), or null. */
+export async function eotFont(b) {
   if (b.length < 82 || b.readUInt16LE(34) !== 0x504c) return null;
   const size = b.readUInt32LE(4);
   const flags = b.readUInt32LE(12);
-  if (flags & 0x4) return null;
   const data = Buffer.from(b.subarray(b.readUInt32LE(0) - size, b.readUInt32LE(0)));
   if (flags & 0x10000000) for (let i = 0; i < data.length; i++) data[i] ^= 0x50;
-  return data;
+  if (!(flags & 0x4)) return data;
+  const { fontOfMtx } = await import('../../server/pages/pptx-mtx.ts');
+  try {
+    return fontOfMtx(data);
+  } catch {
+    return null;
+  }
 }
 
 /** The deck opened in LibreOffice and printed as pictures of its slides (lo-NN.png), with `fonts` (a folder) installed or none; and the fonts its PDF used. */
@@ -428,7 +433,7 @@ async function main() {
       let n = 0;
       for (const [name, data] of unzip(fs.readFileSync(path.join(dir, 'deck.pptx'))))
         if (name.startsWith('ppt/fonts/')) {
-          const ttf = eotFont(data);
+          const ttf = await eotFont(data);
           if (ttf) (fs.writeFileSync(path.join(fonts, `${path.basename(name, path.extname(name))}.ttf`), ttf), n++);
         }
       const withFonts = n ? office(dir, 'lo-fonts', fonts) : null;
