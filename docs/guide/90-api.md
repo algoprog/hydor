@@ -749,7 +749,8 @@ These routes serve the app’s own pages, need the user’s browser, or are the 
 - `POST /api/browser/sessions/:key/open`, `/close`, `/watch` — the page opening or closing a session's browser, and asking for live-view frames.
 - `POST /api/browser/sessions/:key/takeover`, `/input`, `/navigate`, `/nav`, `/tab`, `/dialog` — the user driving the browser by hand.
 - `POST /api/browser/sessions/:key/asks/:id` — the user's own answer to what the browser waits for them on (Done, Can't, allowing a local address).
-- `GET /api/browser/sessions/:key/steps/:n` — a step's picture as a raw JPEG.
+- `GET /api/browser/sessions/:key/steps/:n` — a step's picture as a raw JPEG; `<n>.json` says where the step acted on it, for its marks: `{ marks: [{ x, y — fractions of the picture, act: click|double|move|type|select|scroll|…, box? — the field typed into, dir? — a scroll's way }] }`.
+- `GET /api/computer/sessions/:key/steps/:n` — a computer step's picture of the screen as a raw JPEG; `<n>.json` where its actions were on it, the same way (a drag with `from`).
 - `GET /api/documents/preview?path=` — reads a file's contents for the file viewer.
 - `POST /api/documents/pages` — has LibreOffice lay an Office file out as pages for the viewer.
 - `GET /api/documents/pages.pdf` — sends that PDF file itself (raw file).
