@@ -31,6 +31,7 @@ import type { Deps, Feature, RunCtx } from '../features/types.ts';
 import { createGuestLink } from '../guests.ts';
 import { appApi } from '../guide/api.ts';
 import { localHelper } from '../helper.ts';
+import { OFFLINE_PAGE_CSP, PAGE_CSP } from '../mcp.ts';
 import { profileBlock } from '../memory/profile.ts';
 import { memoryTools } from '../memory/tools.ts';
 import { AGENT_FILE } from '../models/config.ts';
@@ -316,8 +317,8 @@ const ALL_TOOLS = [
   'read_document', 'present_files', 'show_html', 'save_page', 'get_page', 'save_doc', 'save_sheet', 'save_slides', 'save_latex', 'save_notebook', 'export_page', 'knowledge_search', 'knowledge_read',
   'knowledge_list', 'recall', 'search_sessions', 'read_session', 'start_child_session', 'child_sessions', 'message_child', 'app_guide', 'ask_form', 'notify_user', 'list_tasks', 'experiment_list',
 ];
-const OFF = ['web_search', 'read_page', 'find_media', 'browser_open', 'browser_act', 'computer_screenshot', 'http_request', 'run_with_secrets', 'request_secret', 'list_connections', 'generate_image', 'generate_video', 'generate_audio', 'publish_site', 'use_app', 'app_save', 'app_api', 'schedule_task', 'update_task', 'remember', 'forget', 'update_user_profile', 'skill_save', 'skill_patch', 'ui_screenshot', 'experiment_run', 'experiment_sweep', 'a_tool_added_next_year'];
-const KEPT = ['read_document', 'present_files', 'show_html', 'save_page', 'get_page', 'save_doc', 'save_latex', 'export_page', 'knowledge_search', 'recall', 'search_sessions', 'read_session', 'start_child_session', 'child_sessions', 'message_child', 'app_guide', 'ask_form', 'notify_user'];
+const OFF = ['export_page', 'web_search', 'read_page', 'find_media', 'browser_open', 'browser_act', 'computer_screenshot', 'http_request', 'run_with_secrets', 'request_secret', 'list_connections', 'generate_image', 'generate_video', 'generate_audio', 'publish_site', 'use_app', 'app_save', 'app_api', 'schedule_task', 'update_task', 'remember', 'forget', 'update_user_profile', 'skill_save', 'skill_patch', 'ui_screenshot', 'experiment_run', 'experiment_sweep', 'a_tool_added_next_year'];
+const KEPT = ['read_document', 'present_files', 'show_html', 'save_page', 'get_page', 'save_doc', 'save_latex', 'knowledge_search', 'recall', 'search_sessions', 'read_session', 'start_child_session', 'child_sessions', 'message_child', 'app_guide', 'ask_form', 'notify_user'];
 
 test('tools: a confidential session keeps those that work here and loses the rest, new ones too', () => {
   const ctx = ctxOf(SECRET);
@@ -417,6 +418,17 @@ test('notices: a confidential session’s say only that it finished, needs you o
   assert.deepEqual(noticeText(privateNotice(db, { ...n, kind: 'failed', body: 'Error in 4711' })), { title: 'A confidential session', body: 'Failed' });
   const plain = { ...n, key: PLAIN };
   assert.equal(privateNotice(db, plain), plain);
+});
+
+test('its pages load nothing from anywhere, send no form and open no window', () => {
+  assert.match(OFFLINE_PAGE_CSP, /^sandbox allow-scripts allow-modals;/);
+  assert.match(OFFLINE_PAGE_CSP, /default-src 'none'/);
+  assert.match(OFFLINE_PAGE_CSP, /img-src data: blob:;/);
+  assert.match(OFFLINE_PAGE_CSP, /form-action 'none'/);
+  // Not even through this app (its picture proxy fetches the web), nor a popup.
+  const loads = OFFLINE_PAGE_CSP.replace(/frame-ancestors 'self'/, '');
+  for (const bad of ["'self'", ' * ', 'https:', 'http:', 'allow-popups', 'allow-forms', 'connect-src']) assert.ok(!loads.includes(bad), bad);
+  assert.match(PAGE_CSP, /default-src \*/, 'other sessions’ pages are as they were');
 });
 
 test('share links can’t be made for a confidential session', () => {
