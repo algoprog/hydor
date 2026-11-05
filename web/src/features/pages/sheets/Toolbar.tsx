@@ -1,5 +1,5 @@
-// The spreadsheet editor's toolbar, one row that scrolls sideways when narrow: the menus first when the title bar has no
-// room for their names (one Menus button: Edit, View, Insert, Format, Data, Tools, Search the menus), then the most used: Undo and Redo; how
+// The spreadsheet editor's toolbar, one row that scrolls sideways when narrow: the menus first when it is given them (the
+// editor puts them beside its title instead, as one Menus button where the title bar has no room), then the most used: Undo and Redo; how
 // numbers show, with fewer or more decimals; type size; bold, italic, struck through and the text's colour; the fill,
 // borders and merging; alignment and wrapping; and the filter. Everything else is in the menus. Its buttons keep the
 // focus where it was (a cell being typed into stays so).
