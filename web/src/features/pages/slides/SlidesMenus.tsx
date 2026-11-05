@@ -20,6 +20,7 @@ import {
   Bold,
   Clipboard,
   Copy,
+  CornerDownRight,
   Crop,
   Eye,
   Grid3x3,
@@ -52,6 +53,7 @@ import {
   Sigma,
   Smile,
   Sparkles,
+  Spline,
   Star,
   Strikethrough,
   Table2,
@@ -113,6 +115,8 @@ export interface MenuArgs {
   picture(): void;
   pictureUrl(): void;
   line(arrow: boolean): void;
+  /** A connector: straight or elbowed, between the two parts picked or free. */
+  connector(elbow: boolean): void;
   table(): void;
   chart(): void;
   icon(): void;
@@ -233,6 +237,9 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           items: [
             { label: 'Straight line', run: () => a.line(false) },
             { label: 'Arrow', run: () => a.line(true) },
+            '-',
+            { label: 'Straight connector', icon: <Spline size={14} />, also: 'connector join link shapes flowchart', run: () => a.connector(false) },
+            { label: 'Elbow connector', icon: <CornerDownRight size={14} />, also: 'connector elbow bent join link shapes flowchart', run: () => a.connector(true) },
           ],
         },
         { label: 'Table', icon: <Table2 size={14} />, disabled: ro, run: a.table },

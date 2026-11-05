@@ -12,6 +12,7 @@ import {
   ChevronUp,
   Clipboard,
   Copy,
+  CornerDownRight,
   Crop,
   Grid2x2,
   Group as GroupIcon,
@@ -33,13 +34,14 @@ import {
   Shapes,
   Shrink,
   Sparkles,
+  Spline,
   Table2,
   Trash2,
   Type,
   Undo2,
   Ungroup,
 } from 'lucide-react';
-import { newId, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type Deck, type El, type ImageEl, type LayoutId, type TextEl } from '@shared/slides';
+import { newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type Deck, type El, type ImageEl, type LayoutId, type TextEl } from '@shared/slides';
 import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
 import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, useConfirm } from '../../../components/ui';
@@ -53,6 +55,7 @@ import {
   addSlide,
   align,
   chart,
+  connector,
   copies,
   distribute,
   duplicateSlides,
@@ -323,8 +326,17 @@ export function SlidesEditor({
   const change = (next: Deck | ((d: Deck) => Deck), key?: string) => {
     const d = live.current;
     if (readOnly || !d) return;
-    const n = typeof next === 'function' ? next(d) : next;
-    if (n === d) return;
+    const n0 = typeof next === 'function' ? next(d) : next;
+    if (n0 === d) return;
+    // A part moved, sized or turned takes the connectors stuck to it along.
+    let along = false;
+    const slides = n0.slides.map((s, i) => {
+      if (s === d.slides[i]) return s;
+      const r = reconnect(s);
+      if (r !== s) along = true;
+      return r;
+    });
+    const n = along ? { ...n0, slides } : n0;
     const now = Date.now();
     setHist((h) => {
       const same = !!key && h.last?.key === key && now - h.last.at < 1200;
@@ -971,6 +983,7 @@ export function SlidesEditor({
     picture: () => void addPicture(),
     pictureUrl: () => setUrlAsk({}),
     line: (arrow) => put([line(deck, arrow)]),
+    connector: (elbow) => put([connector(deck, index, elbow, picked)]),
     table: () => put([table(deck)]),
     chart: () => put([chart(deck)]),
     icon: () => setIconAsk({ start: 'icons' }),
@@ -1375,12 +1388,19 @@ export function SlidesEditor({
           ))}
         </div>
       </Popover>
-      <Popover anchor={anchors.line} open={menu === 'line'} onClose={() => setMenu(null)} width={180}>
+      <Popover anchor={anchors.line} open={menu === 'line'} onClose={() => setMenu(null)} width={220}>
         <MenuItem icon={<Minus size={14} />} onClick={() => (setMenu(null), put([line(deck, false)]))}>
           Straight line
         </MenuItem>
         <MenuItem icon={<MoveRight size={14} />} onClick={() => (setMenu(null), put([line(deck, true)]))}>
           Arrow
+        </MenuItem>
+        <MenuSep />
+        <MenuItem icon={<Spline size={14} />} onClick={() => (setMenu(null), put([connector(deck, index, false, picked)]))}>
+          Straight connector
+        </MenuItem>
+        <MenuItem icon={<CornerDownRight size={14} />} onClick={() => (setMenu(null), put([connector(deck, index, true, picked)]))}>
+          Elbow connector
         </MenuItem>
       </Popover>
       <Popover anchor={anchors.picture} open={menu === 'picture'} onClose={() => setMenu(null)} width={230}>
