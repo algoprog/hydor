@@ -36,11 +36,7 @@ function routes(d: Deps) {
   // ---- runs ----------------------------------------------------------------------------------------------
   app.get('/api/experiments/runs', async (req) => {
     const q = Q(req);
-    const runs = await runsList(
-      d,
-      { group: q.group, tag: q.tag, status: statusesOf(q.status), cwd: q.cwd, project: q.project, sweep: q.sweep, q: q.q, limit: Math.min(Number(q.limit) || 200, 1000) },
-      q.everywhere === '1',
-    );
+    const runs = await runsList(d, { group: q.group, tag: q.tag, status: statusesOf(q.status), cwd: q.cwd, project: q.project, sweep: q.sweep, q: q.q, limit: Math.min(Number(q.limit) || 200, 1000) }, q.everywhere === '1');
     return { runs };
   });
   app.get('/api/experiments/runs/:id', async (req) => runView(d, runId(req), Q(req).log === '0' ? 0 : Math.min(Number(Q(req).lines ?? 300) || 0, 5000)));

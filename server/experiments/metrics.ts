@@ -74,7 +74,7 @@ class Loose {
     const out: Record<string, unknown> = {};
     for (;;) {
       this.ws();
-      if (this.s[this.i] === '}') return this.i++, out;
+      if (this.s[this.i] === '}') return (this.i++, out);
       const c = this.s[this.i];
       let key: string;
       if (c === '"' || c === "'") key = this.string();
@@ -99,7 +99,7 @@ class Loose {
     const out: unknown[] = [];
     for (;;) {
       this.ws();
-      if (this.s[this.i] === close) return this.i++, out;
+      if (this.s[this.i] === close) return (this.i++, out);
       out.push(this.value(depth + 1));
       this.ws();
       if (this.s[this.i] === ',') this.i++;
@@ -139,7 +139,12 @@ const toNum = (s: string): number => (/nan/i.test(s) ? NaN : /inf/i.test(s) ? (s
 /** What a line of output says of the run's metrics, if anything. */
 export function parseLine(raw: string): Reading | null {
   // A progress bar redraws itself with carriage returns: its last state is what it says.
-  const line = raw.includes('\r') ? (raw.split('\r').filter((x) => x.trim()).pop() ?? '') : raw;
+  const line = raw.includes('\r')
+    ? (raw
+        .split('\r')
+        .filter((x) => x.trim())
+        .pop() ?? '')
+    : raw;
   if (!line.trim() || line.length > MAX_LINE) return null;
   const values: Record<string, number> = {};
   let rest = line;
@@ -275,7 +280,6 @@ export class Tracker {
     }
     return added;
   }
-
 }
 
 /** The value of a metric at a step in a series: the last at or before it, once the series has got that far. */
@@ -339,6 +343,13 @@ export function tidyLog(text: string): string {
   return text
     .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
     .split('\n')
-    .map((l) => (l.includes('\r') ? (l.split('\r').filter((x) => x.length).pop() ?? '') : l))
+    .map((l) =>
+      l.includes('\r')
+        ? (l
+            .split('\r')
+            .filter((x) => x.length)
+            .pop() ?? '')
+        : l,
+    )
     .join('\n');
 }

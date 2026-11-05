@@ -197,9 +197,7 @@ export function specOf(r: Partial<RunRecord>): JobSpec {
 
 export function insertRun(db: DB, r: { id: string; spec: JobSpec; status: RunStatus; why?: string; info?: RunInfo; createdAt?: number }) {
   tables(db);
-  db.prepare(
-    'insert into exp_runs (id, status, why, name, grp, sweep, project, cwd, place, priority, created_at, spec, info) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(
+  db.prepare('insert into exp_runs (id, status, why, name, grp, sweep, project, cwd, place, priority, created_at, spec, info) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
     r.id,
     r.status,
     r.why ?? null,
@@ -283,9 +281,13 @@ export function eventsOf(db: DB, run: string, limit = 200): RunEvent[] {
 /** Events of a kind since a moment, across runs (how many agents went on call in the last hour). */
 export function eventsSince(db: DB, kind: RunEvent['kind'], since: number): (RunEvent & { run: string })[] {
   tables(db);
-  return (db.prepare('select run, at, kind, text, session from exp_events where kind = ? and at >= ? order by id').all(kind, since) as { run: string; at: number; kind: RunEvent['kind']; text: string; session: string | null }[]).map(
-    (r) => ({ run: r.run, at: r.at, kind: r.kind, text: r.text, ...(r.session ? { session: r.session } : {}) }),
-  );
+  return (db.prepare('select run, at, kind, text, session from exp_events where kind = ? and at >= ? order by id').all(kind, since) as { run: string; at: number; kind: RunEvent['kind']; text: string; session: string | null }[]).map((r) => ({
+    run: r.run,
+    at: r.at,
+    kind: r.kind,
+    text: r.text,
+    ...(r.session ? { session: r.session } : {}),
+  }));
 }
 
 // ---- metrics' series ---------------------------------------------------------------------------------------
@@ -316,12 +318,7 @@ export function getTable(db: DB, id: string): ResultsTable | null {
 
 export function saveTable(db: DB, t: ResultsTable) {
   tables(db);
-  db.prepare('insert into exp_tables (id, spec, data, made_at) values (?, ?, ?, ?) on conflict(id) do update set spec = excluded.spec, data = excluded.data, made_at = excluded.made_at').run(
-    t.id,
-    JSON.stringify(t.spec),
-    JSON.stringify(t),
-    t.madeAt,
-  );
+  db.prepare('insert into exp_tables (id, spec, data, made_at) values (?, ?, ?, ?) on conflict(id) do update set spec = excluded.spec, data = excluded.data, made_at = excluded.made_at').run(t.id, JSON.stringify(t.spec), JSON.stringify(t), t.madeAt);
 }
 
 export function listTables(db: DB, limit = 100): ResultsTable[] {

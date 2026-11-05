@@ -46,8 +46,7 @@ export function SweepView({ id, onClose, onTable, onCompare }: { id: string | nu
             {data.runs.length} runs: {count((r) => r.status === 'done')} done
             {count(isActive) ? `, ${count(isActive)} going` : ''}
             {count((r) => r.status === 'failed' || r.status === 'lost') ? `, ${count((r) => r.status === 'failed' || r.status === 'lost')} failed` : ''}
-            {count((r) => !!r.why?.startsWith('Stopped early')) ? `, ${count((r) => !!r.why?.startsWith('Stopped early'))} stopped early` : ''}.{' '}
-            {data.sweep.mode === 'random' ? 'A random sample of the combinations.' : 'Every combination.'}
+            {count((r) => !!r.why?.startsWith('Stopped early')) ? `, ${count((r) => !!r.why?.startsWith('Stopped early'))} stopped early` : ''}. {data.sweep.mode === 'random' ? 'A random sample of the combinations.' : 'Every combination.'}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <select value={metric} onChange={(e) => setMetric(e.target.value)} className={cx(inputCls.replace('w-full', ''), 'h-8 max-w-[220px] text-[13px]')} translate="no">

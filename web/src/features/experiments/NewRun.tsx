@@ -7,6 +7,7 @@ import { ChevronDown, Plus, X } from 'lucide-react';
 import type { ClusterSpec, RunRecord, WatchKind } from '@shared/experiments';
 import type { MachineView } from '@shared/types';
 import { api, post } from '../../lib/api';
+import { machineId } from '../../lib/machine';
 import { useApp } from '../../lib/store';
 import { FolderPicker } from '../../components/FolderPicker';
 import { Button, cx, Dialog, IconButton, inputCls, Segmented } from '../../components/ui';
@@ -114,9 +115,12 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
     if (!open) return;
     setError(null);
     setMode(asSweep ? 'sweep' : 'one');
-    api<{ machines: MachineView[] }>('/api/machines')
-      .then((r) => setMachines(r.machines.filter((m) => m.status.state === 'online')))
-      .catch(() => setMachines([]));
+    // The machines of Settings → Machines are this computer's: on another machine's pages, its runs go there or to its clusters.
+    if (machineId) setMachines([]);
+    else
+      api<{ machines: MachineView[] }>('/api/machines')
+        .then((r) => setMachines(r.machines.filter((m) => m.status.state === 'online')))
+        .catch(() => setMachines([]));
     api<{ clusters: ClusterSpec[] }>('/api/experiments/clusters')
       .then((r) => setClusters(r.clusters))
       .catch(() => setClusters([]));
@@ -253,7 +257,18 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
             ]}
           />
         )}
-        <Field label="Command" hint={mode === 'sweep' ? <>Put {'{name}'} where each setting’s value goes: python train.py --lr {'{lr}'}</> : 'As you would type it in its folder. Metrics are read from what it prints: loss=0.42, or a JSON object on a line.'}>
+        <Field
+          label="Command"
+          hint={
+            mode === 'sweep' ? (
+              <>
+                Put {'{name}'} where each setting’s value goes: python train.py --lr {'{lr}'}
+              </>
+            ) : (
+              'As you would type it in its folder. Metrics are read from what it prints: loss=0.42, or a JSON object on a line.'
+            )
+          }
+        >
           <textarea
             value={command}
             onChange={(e) => setCommand(e.target.value)}
@@ -267,11 +282,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
         <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
           <div>
             <span className="mb-1 block text-fg-2">{local ? 'Folder' : 'Folder there'}</span>
-            {local ? (
-              <FolderPicker value={cwd} onChange={setCwd} />
-            ) : (
-              <input value={cwd} onChange={(e) => setCwd(e.target.value)} spellCheck={false} placeholder="~/code/project" className={cx(inputCls, 'font-mono text-[12.5px]')} />
-            )}
+            {local ? <FolderPicker value={cwd} onChange={setCwd} /> : <input value={cwd} onChange={(e) => setCwd(e.target.value)} spellCheck={false} placeholder="~/code/project" className={cx(inputCls, 'font-mono text-[12.5px]')} />}
           </div>
           <Field label="Where it runs">
             <select value={where} onChange={(e) => setWhere(e.target.value)} className={cx(inputCls, 'pr-8 text-[13px]')}>
@@ -322,7 +333,13 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
             <div className="text-fg-2">Settings and their values</div>
             {params.map((p, i) => (
               <div key={i} className="flex items-center gap-2">
-                <input value={p.name} onChange={(e) => setParams(params.map((x, k) => (k === i ? { ...x, name: e.target.value } : x)))} placeholder="lr" spellCheck={false} className={cx(inputCls.replace('w-full', ''), 'w-28 shrink-0 font-mono text-[12.5px]')} />
+                <input
+                  value={p.name}
+                  onChange={(e) => setParams(params.map((x, k) => (k === i ? { ...x, name: e.target.value } : x)))}
+                  placeholder="lr"
+                  spellCheck={false}
+                  className={cx(inputCls.replace('w-full', ''), 'w-28 shrink-0 font-mono text-[12.5px]')}
+                />
                 <input
                   value={p.values}
                   onChange={(e) => setParams(params.map((x, k) => (k === i ? { ...x, values: e.target.value } : x)))}
@@ -489,4 +506,3 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
     </Dialog>
   );
 }
-

@@ -104,7 +104,7 @@ function examplesOf(row: Row, metric: string, scores: (r: RunRecord) => ScoreMap
   const out = new Map<string, number>();
   for (const id of maps[0]!.keys()) {
     const vs = maps.map((m) => m!.get(id));
-    if (vs.every((v) => v !== undefined)) out.set(id, (mean(vs as number[]) * scale));
+    if (vs.every((v) => v !== undefined)) out.set(id, mean(vs as number[]) * scale);
   }
   return out.size ? out : null;
 }
@@ -273,7 +273,12 @@ const slug = (s: string) =>
 function latexOf(t: ResultsTable, words: { cells: string; dagger?: string }): string {
   const cols = t.spec.columns.filter((c) => c.metric?.trim());
   const by = t.spec.rows?.startsWith('param:') ? t.spec.rows.slice(6) : null;
-  const digits = cols.map((c, ci) => digitsOf(c, t.rows.map((r) => r.cells[ci])));
+  const digits = cols.map((c, ci) =>
+    digitsOf(
+      c,
+      t.rows.map((r) => r.cells[ci]),
+    ),
+  );
   const caption = [t.spec.caption?.trim(), words.cells, words.dagger].filter(Boolean).join(' ');
   const head = [by ? texEscape(by) : 'Method', ...cols.map((c) => `${texEscape(colLabel(c))} ${c.better === 'min' ? '$\\downarrow$' : '$\\uparrow$'}`)].join(' & ');
   const body = t.rows.map((r) => [texEscape(r.label), ...r.cells.map((x, ci) => cellText(x, digits[ci], 'tex'))].join(' & ') + ' \\\\');
@@ -297,7 +302,12 @@ function latexOf(t: ResultsTable, words: { cells: string; dagger?: string }): st
 function markdownOf(t: ResultsTable, words: { cells: string; dagger?: string }): string {
   const cols = t.spec.columns.filter((c) => c.metric?.trim());
   const by = t.spec.rows?.startsWith('param:') ? t.spec.rows.slice(6) : null;
-  const digits = cols.map((c, ci) => digitsOf(c, t.rows.map((r) => r.cells[ci])));
+  const digits = cols.map((c, ci) =>
+    digitsOf(
+      c,
+      t.rows.map((r) => r.cells[ci]),
+    ),
+  );
   const pipe = (s: string) => s.replace(/\|/g, '\\|');
   const lines = [
     `| ${[by ?? 'Method', ...cols.map((c) => `${colLabel(c)} ${c.better === 'min' ? '↓' : '↑'}`)].map(pipe).join(' | ')} |`,

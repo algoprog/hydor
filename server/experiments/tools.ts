@@ -111,7 +111,11 @@ function runTool(ctx: RunCtx): RunTool {
       'Start a long job (training, an evaluation) in Experiments’ queue instead of running it in the foreground: it waits for free GPUs (or a place among the jobs without one), runs on its own (in tmux, so it outlives this session), and is recorded: the commit and a patch of changes not committed, its settings and seed, the environment, its log and the metrics it prints. Returns at once with the run’s id. Never start runs on the user’s GPUs unless they asked for it. With again: a run’s id, it runs that run again with the changes you give.',
     inputSchema: {
       type: 'object',
-      properties: { command: { type: 'string', description: 'The shell command, as you would type it in its folder.' }, again: { type: 'string', description: 'A run’s id: start it again with its settings, changed by what else you give.' }, ...JOB_PROPS(ctx) },
+      properties: {
+        command: { type: 'string', description: 'The shell command, as you would type it in its folder.' },
+        again: { type: 'string', description: 'A run’s id: start it again with its settings, changed by what else you give.' },
+        ...JOB_PROPS(ctx),
+      },
     },
     async run(a, ctx) {
       try {
@@ -297,7 +301,11 @@ const WAIT: RunTool = {
     const ids = Array.isArray(a.ids) ? a.ids.map(String) : typeof a.ids === 'string' ? a.ids.split(/[\s,]+/).filter(Boolean) : undefined;
     if (!ids?.length && !a.group && !a.tag) return failed('Say which runs: ids, a group or a tag.');
     const hours = Math.min(Math.max(Number(a.hours) || 24, 0.01), 168);
-    const key = `${ctx.runId}:${crypto.createHash('sha1').update(JSON.stringify([ids ?? null, a.group ?? null, a.tag ?? null])).digest('hex').slice(0, 16)}`;
+    const key = `${ctx.runId}:${crypto
+      .createHash('sha1')
+      .update(JSON.stringify([ids ?? null, a.group ?? null, a.tag ?? null]))
+      .digest('hex')
+      .slice(0, 16)}`;
     const w = await waitRuns(ctx.deps, { ids, group: a.group ? String(a.group) : undefined, tag: a.tag ? String(a.tag) : undefined }, { hours, key, signal: ctx.signal });
     return json({ ended: w.ended, ...(w.ended ? {} : { note: `Not all had ended after ${hours} h.` }), runs: w.runs.map((r) => ({ ...brief(ctx.deps.db, r), events: getRunWithEvents(ctx.deps.db, r.id)?.events?.slice(-5) })) });
   },

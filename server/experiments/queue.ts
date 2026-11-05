@@ -23,25 +23,7 @@ import { endOfSlurm, getCluster, listClusters, parseSacct, parseSbatch, parseSqu
 import { chooseGpus, gpuList, gpusVia, readGpus, type GpuReading } from './gpus.ts';
 import { aliveLocal, exitOf, files, startLocal, stopLocal, wrapperScript } from './local.ts';
 import { nanText, oomText, parseLine, readFrom, tailLines, Tracker } from './metrics.ts';
-import {
-  addEvent,
-  eventsOf,
-  eventsSince,
-  getRun,
-  getSweep,
-  insertRun,
-  listRuns,
-  newId,
-  offsetsOf,
-  runFolder,
-  saveSeries,
-  seriesOf,
-  specOf,
-  updateRun,
-  waitDone,
-  waitStarted,
-  type RunInfo,
-} from './records.ts';
+import { addEvent, eventsOf, eventsSince, getRun, getSweep, insertRun, listRuns, newId, offsetsOf, runFolder, saveSeries, seriesOf, specOf, updateRun, waitDone, waitStarted, type RunInfo } from './records.ts';
 import { remoteMachine, type RemoteRun } from './remote.ts';
 import { earlyStop, fillCommand, paramsOf, settingsLine, type Value } from './sweeps.ts';
 
@@ -166,7 +148,8 @@ export async function cleanJob(db: DB, b: Record<string, any>, o: { cwd?: string
   }
   const given: Record<string, Value> = {};
   if (b.params && typeof b.params === 'object')
-    for (const [k, v] of Object.entries(b.params as Record<string, unknown>).slice(0, 100)) if (/^[\w.@/-]{1,80}$/.test(k) && (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')) given[k] = typeof v === 'string' ? v.slice(0, 500) : v;
+    for (const [k, v] of Object.entries(b.params as Record<string, unknown>).slice(0, 100))
+      if (/^[\w.@/-]{1,80}$/.test(k) && (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')) given[k] = typeof v === 'string' ? v.slice(0, 500) : v;
   const seed = num(b.seed, -(2 ** 31), 2 ** 32, 'Seed');
   if (seed !== undefined) spec.seed = Math.round(seed);
   // {name} placeholders filled from the settings and the seed: the record keeps the command as it runs.
@@ -223,7 +206,16 @@ export async function cleanJob(db: DB, b: Record<string, any>, o: { cwd?: string
 /** A name for a run that has none: the script it runs and the settings that tell it apart. */
 export function nameFor(spec: JobSpec): string {
   const words = spec.command.split(/\s+/);
-  const script = words.find((w) => /\.(py|sh|jl|r|lua|js|ts)$/i.test(w))?.split('/').pop() ?? words.find((w) => !/^[A-Za-z_]\w*=/.test(w))?.split('/').pop() ?? 'run';
+  const script =
+    words
+      .find((w) => /\.(py|sh|jl|r|lua|js|ts)$/i.test(w))
+      ?.split('/')
+      .pop() ??
+    words
+      .find((w) => !/^[A-Za-z_]\w*=/.test(w))
+      ?.split('/')
+      .pop() ??
+    'run';
   return script.slice(0, 60);
 }
 
@@ -238,7 +230,13 @@ export async function submit(d: Deps, spec: JobSpec, o: { startedBy?: RunInfo['s
     const there = await m.call<{ run: RunRecord }>('POST', '/api/experiments/jobs', 30_000, { ...spec, where: 'local', report: false }).catch((e) => {
       throw new HttpError(502, `${m.name} did not take it: ${(e as Error).message}`);
     });
-    insertRun(d.db, { id, spec: { ...spec, name: spec.name ?? there.run.name }, status: there.run.status, why: there.run.why, info: { remote: { machine: place.id, id: there.run.id }, ...(o.startedBy ? { startedBy: o.startedBy } : {}), ...(o.from ? { from: o.from } : {}) } });
+    insertRun(d.db, {
+      id,
+      spec: { ...spec, name: spec.name ?? there.run.name },
+      status: there.run.status,
+      why: there.run.why,
+      info: { remote: { machine: place.id, id: there.run.id }, ...(o.startedBy ? { startedBy: o.startedBy } : {}), ...(o.from ? { from: o.from } : {}) },
+    });
   } else {
     insertRun(d.db, { id, spec: { ...spec, name: spec.name ?? nameFor(spec) }, status: 'queued', info: { folder: runFolder(id), ...(o.startedBy ? { startedBy: o.startedBy } : {}), ...(o.from ? { from: o.from } : {}) } });
     addEvent(d.db, id, { kind: 'queued', text: `In line${place.kind === 'cluster' ? ` for ${getCluster(d.db, place.id)?.name ?? place.id}` : ''}` });
@@ -453,7 +451,8 @@ async function followLocal(d: Deps, r: RunRecord) {
 /** NaN and divergence in its metrics (or NaN in its log's words), out of memory in its log. */
 async function watchOutput(d: Deps, r: RunRecord, L: Live) {
   const t = L.tracker;
-  if (!L.fired.has('nan') && (t.nan.length || L.nanLine)) await fire(d, r, L, 'nan', t.nan.length ? `${t.nan.join(', ')} became ${Number.isNaN(t.last[t.nan[0]]) ? 'NaN' : 'infinite'}${t.step !== undefined ? ` at step ${t.step}` : ''}` : `NaN in its log: “${L.nanLine}”`);
+  if (!L.fired.has('nan') && (t.nan.length || L.nanLine))
+    await fire(d, r, L, 'nan', t.nan.length ? `${t.nan.join(', ')} became ${Number.isNaN(t.last[t.nan[0]]) ? 'NaN' : 'infinite'}${t.step !== undefined ? ` at step ${t.step}` : ''}` : `NaN in its log: “${L.nanLine}”`);
   if (!L.fired.has('diverge') && t.diverged.length) {
     const k = t.diverged[0];
     await fire(d, r, L, 'diverge', `${k} went over twice its best (${fmt(t.best[k])}) and stayed there: ${fmt(t.last[k])} now`);
@@ -537,8 +536,17 @@ const WHAT: Record<WatchKind, string> = { nan: 'NaN', oom: 'out of memory', stal
 /** The brief an agent on call starts with: what happened, the run's record, the end of its log, the rules. */
 export function onCallBrief(d: Deps, r: RunRecord, kind: WatchKind, text: string): string {
   const log = tailLines(files(r.folder ?? runFolder(r.id)).log, 80, 64 * 1024).text.slice(-8000);
-  const env = r.environment ? Object.entries(r.environment).map(([k, v]) => `${k} ${v}`).join(', ') : '';
-  const metrics = r.metrics?.last ? Object.entries(r.metrics.last).slice(0, 12).map(([k, v]) => `${k}=${fmt(v)}`).join(', ') : '';
+  const env = r.environment
+    ? Object.entries(r.environment)
+        .map(([k, v]) => `${k} ${v}`)
+        .join(', ')
+    : '';
+  const metrics = r.metrics?.last
+    ? Object.entries(r.metrics.last)
+        .slice(0, 12)
+        .map(([k, v]) => `${k}=${fmt(v)}`)
+        .join(', ')
+    : '';
   const place = placeOf(r.where);
   return [
     `[Experiments · agent on call] The run “${r.name ?? r.id}” (${r.id}) ${kind === 'crash' ? 'crashed' : kind === 'stall' ? 'stalled' : kind === 'oom' ? 'ran out of memory' : kind === 'nan' ? 'has NaN in it' : 'is diverging'}.`,
@@ -631,15 +639,21 @@ export function notice(d: Deps, r: RunRecord, kind: NotifyEvent['kind'], body: s
   while (sent.length && sent[0] < now - 10 * 60_000) sent.shift();
   if (sent.length >= NOTICES) {
     held++;
-    heldTimer ??= setTimeout(
-      () => {
-        heldTimer = null;
-        const n = held;
-        held = 0;
-        if (n) d.sessions.emit('notify', { key: 'experiments', kind: 'done', title: 'Experiments', body: `${n} more notice${n === 1 ? '' : 's'} about your runs: see Experiments`, agent: 'claude', at: Date.now(), url: '/system/experiments' } satisfies NotifyEvent);
-      },
-      10 * 60_000,
-    ).unref();
+    heldTimer ??= setTimeout(() => {
+      heldTimer = null;
+      const n = held;
+      held = 0;
+      if (n)
+        d.sessions.emit('notify', {
+          key: 'experiments',
+          kind: 'done',
+          title: 'Experiments',
+          body: `${n} more notice${n === 1 ? '' : 's'} about your runs: see Experiments`,
+          agent: 'claude',
+          at: Date.now(),
+          url: '/system/experiments',
+        } satisfies NotifyEvent);
+    }, 10 * 60_000).unref();
     return;
   }
   sent.push(now);
@@ -692,7 +706,9 @@ async function sweepEnding(d: Deps, sweep: string) {
   const sw = getSweep(d.db, sweep);
   const count = (s: RunRecord['status']) => runs.filter((x) => x.status === s).length;
   const early = runs.filter((x) => x.status === 'stopped' && x.why?.startsWith('Stopped early')).length;
-  const parts = [`${count('done')} done`, count('failed') + count('lost') ? `${count('failed') + count('lost')} failed` : '', early ? `${early} stopped early` : '', count('stopped') - early ? `${count('stopped') - early} stopped` : ''].filter(Boolean);
+  const parts = [`${count('done')} done`, count('failed') + count('lost') ? `${count('failed') + count('lost')} failed` : '', early ? `${early} stopped early` : '', count('stopped') - early ? `${count('stopped') - early} stopped` : ''].filter(
+    Boolean,
+  );
   const metric = sw?.earlyStop?.metric ?? Object.keys(runs.find((x) => x.status === 'done')?.metrics?.last ?? {})[0];
   let best = '';
   if (metric) {
@@ -703,8 +719,10 @@ async function sweepEnding(d: Deps, sweep: string) {
   }
   const first = runs[runs.length - 1];
   const line = `${parts.join(', ')}.${best}`;
-  if (first.notify?.done !== false || (count('failed') && first.notify?.failed !== false)) notice(d, first, count('done') ? 'done' : 'failed', line, { title: `Sweep ${sw?.group ?? first.group ?? ''}`.trim(), url: `/system/experiments?sweep=${sweep}` });
-  if (first.report && first.startedBy?.session) await report(d, first.startedBy.session, `[Experiments] The sweep ${sw?.group ?? sweep} (${sweep}) ended: ${line} experiment_list with group "${sw?.group ?? first.group}" lists its runs; experiment_table compares them.`);
+  if (first.notify?.done !== false || (count('failed') && first.notify?.failed !== false))
+    notice(d, first, count('done') ? 'done' : 'failed', line, { title: `Sweep ${sw?.group ?? first.group ?? ''}`.trim(), url: `/system/experiments?sweep=${sweep}` });
+  if (first.report && first.startedBy?.session)
+    await report(d, first.startedBy.session, `[Experiments] The sweep ${sw?.group ?? sweep} (${sweep}) ended: ${line} experiment_list with group "${sw?.group ?? first.group}" lists its runs; experiment_table compares them.`);
 }
 
 // ---- the end of a run ----------------------------------------------------------------------------------------------
@@ -945,7 +963,11 @@ async function submitCluster(d: Deps, r: RunRecord, c: NonNullable<ReturnType<ty
         return { out: x.out, code: x.code === 0 ? null : x.code };
       });
       if (!reading.gpus.length) return fail(d, r, `${c.name} has no NVIDIA GPU that nvidia-smi can see`);
-      const held = new Set(listRuns(d.db, { status: ['starting', 'running'], limit: 5000 }).filter((x) => x.where === r.where && x.id !== r.id).flatMap((x) => x.gpuIds ?? []));
+      const held = new Set(
+        listRuns(d.db, { status: ['starting', 'running'], limit: 5000 })
+          .filter((x) => x.where === r.where && x.id !== r.id)
+          .flatMap((x) => x.gpuIds ?? []),
+      );
       const pick = chooseGpus(reading.gpus, r.gpus, r.gpuMemGb, held);
       if ('why' in pick) return setWaiting(d, r, `${pick.why} (on ${c.name})`);
       env.CUDA_VISIBLE_DEVICES = pick.ids.join(',');
@@ -1006,7 +1028,9 @@ async function followCluster(d: Deps, r: RunRecord) {
   const dir = r.remoteDir!;
   let state: { ended: false; status: 'waiting' | 'running'; why?: string } | { ended: true; code: number | null; slurm?: ReturnType<typeof endOfSlurm> };
   if (c.kind === 'slurm') {
-    const s = await runSsh(c.host, `squeue -h -j ${r.clusterJob} -o '%i|%T|%r|%M|%N' 2>/dev/null; echo @@; cat ${q(`${dir}/exit`)} 2>/dev/null; echo @@; sacct -j ${r.clusterJob} --format=State,ExitCode,Elapsed -P -n 2>/dev/null | head -n 3`, { timeoutMs: 45_000 });
+    const s = await runSsh(c.host, `squeue -h -j ${r.clusterJob} -o '%i|%T|%r|%M|%N' 2>/dev/null; echo @@; cat ${q(`${dir}/exit`)} 2>/dev/null; echo @@; sacct -j ${r.clusterJob} --format=State,ExitCode,Elapsed -P -n 2>/dev/null | head -n 3`, {
+      timeoutMs: 45_000,
+    });
     if (s.code !== 0) return setWhy(d, r, `Could not reach ${c.name} just now (${sshWhy(s)}); trying again`);
     const [sq, ex, sa] = s.out.split('@@\n');
     const inQueue = parseSqueue(sq ?? '').get(r.clusterJob!);

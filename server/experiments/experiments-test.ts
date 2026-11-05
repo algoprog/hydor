@@ -154,7 +154,10 @@ test('the t distribution and the tests give scipy’s values', () => {
   close(pairedT([1.5, 2.1, 3.9, 4.2, 5.8], [1, 2, 3, 4, 5]).p, 0.03410942316740959, 1e-8, 'paired 2');
   assert.equal(welch([1], [2, 3]).p, null, 'one value is too few');
   assert.equal(welch([1, 1, 1], [2, 2, 2]).p, 0, 'no spread, different means');
-  assert.deepEqual(holm([0.01, 0.04, 0.03, 0.005]).map((p) => Math.round(p! * 1e6) / 1e6), [0.03, 0.06, 0.06, 0.02]);
+  assert.deepEqual(
+    holm([0.01, 0.04, 0.03, 0.005]).map((p) => Math.round(p! * 1e6) / 1e6),
+    [0.03, 0.06, 0.06, 0.02],
+  );
   assert.deepEqual(holm([0.2, null, 0.01]), [0.2, null, 0.02]);
   const ours = [0.55, 0.62, 0.48, 0.71, 0.6, 0.7, 0.44, 0.42];
   const base = [0.5, 0.6, 0.4, 0.7, 0.55, 0.65, 0.45, 0.35];
@@ -305,7 +308,11 @@ test('a job runs in tmux and is recorded: commit, branch, patch, settings, seed,
   assert.equal(after.text.length, 10);
   assert.match((await http.inject({ method: 'GET', url: `/api/experiments/runs/${r.id}/patch` })).json().patch, /training harder/);
   assert.equal(listRuns(db, { tag: 'smoke' })[0].id, r.id);
-  assert.equal(listRuns(db, { cwd: tmp }).some((y) => y.id === r.id), true, 'a run under a folder is listed for it');
+  assert.equal(
+    listRuns(db, { cwd: tmp }).some((y) => y.id === r.id),
+    true,
+    'a run under a folder is listed for it',
+  );
 });
 
 test('a crash, out-of-memory text and NaN are noticed; the agent on call gets a brief, one per run at a time', async () => {
@@ -384,7 +391,10 @@ test('after a restart: a run still going is followed again, one whose process va
   const x = getRunWithEvents(db, id)!;
   assert.equal(x.status, 'lost');
   assert.match(x.why!, /went missing/);
-  assert.ok(x.events!.some((e) => e.kind === 'crash'), 'a dead process is one the agent on call watches for');
+  assert.ok(
+    x.events!.some((e) => e.kind === 'crash'),
+    'a dead process is one the agent on call watches for',
+  );
 });
 
 // ---- the record's parts ---------------------------------------------------------------------------------------------
@@ -459,7 +469,7 @@ test('a results table: mean ± std, the best in bold, Welch with Holm against sc
   assert.ok(t.latex.includes('Method & Accuracy $\\uparrow$ & loss $\\downarrow$ \\\\'));
   assert.match(t.latex, /\\caption\{Results on the dev set\. Mean \$\\pm\$ standard deviation over 3 seeds; the best in bold\. \$\^\\dagger\$ Better than base at \$p < 0\.05\$ \(Welch's \$t\$-test over 3 seeds, Holm-corrected\)\.\}/);
   assert.ok(t.markdown.includes('| ours | **83.37** ± 0.25 † | **0.453** ± 0.015 † |'), t.markdown);
-  assert.ok(t.markdown.endsWith('† Better than base at p < 0.05 (Welch\'s t-test over 3 seeds, Holm-corrected).'));
+  assert.ok(t.markdown.endsWith("† Better than base at p < 0.05 (Welch's t-test over 3 seeds, Holm-corrected)."));
   const csv = t.csv.split('\n');
   assert.equal(csv[0], 'row,label,acc_mean,acc_std,acc_n,acc_p,acc_p_holm,acc_significant,loss_mean,loss_std,loss_n,loss_p,loss_p_holm,loss_significant');
   assert.ok(csv[2].startsWith('ours,ours,83.3666666666666'), csv[2]);
@@ -474,14 +484,27 @@ test('tests pick themselves: paired over seeds when the rows share seeds, over e
   assert.deepEqual(t.tests, ['paired t-test over 3 seeds', 'paired t-test over 3 seeds']);
   // Per-example scores: JSON lines, or trec_eval -q's lines.
   const scores = parseScores('{"id": "q1", "ndcg": 0.5}\n{"qid": "q2", "ndcg": 0.6}\nndcg q3 0.4\nndcg all 0.5\n');
-  assert.deepEqual([...scores.get('ndcg')!.entries()], [
-    ['q1', 0.5],
-    ['q2', 0.6],
-    ['q3', 0.4],
-  ]);
+  assert.deepEqual(
+    [...scores.get('ndcg')!.entries()],
+    [
+      ['q1', 0.5],
+      ['q2', 0.6],
+      ['q3', 0.4],
+    ],
+  );
   const base = [0.5, 0.6, 0.4, 0.7, 0.55, 0.65, 0.45, 0.35];
   const ours = [0.55, 0.62, 0.48, 0.71, 0.6, 0.7, 0.44, 0.42];
-  const runs: RunRecord[] = [base, ours].map((xs, i) => ({ id: `ex${i}xxxx`, status: 'done', createdAt: i, command: 'x', cwd: tmp, group: i ? 'ours' : 'bm25', metrics: { last: { ndcg: xs.reduce((a, b) => a + b) / xs.length } }, scores: true, folder: `/s${i}` }));
+  const runs: RunRecord[] = [base, ours].map((xs, i) => ({
+    id: `ex${i}xxxx`,
+    status: 'done',
+    createdAt: i,
+    command: 'x',
+    cwd: tmp,
+    group: i ? 'ours' : 'bm25',
+    metrics: { last: { ndcg: xs.reduce((a, b) => a + b) / xs.length } },
+    scores: true,
+    folder: `/s${i}`,
+  }));
   const read = (r: RunRecord) => new Map([['ndcg', new Map((r.id === 'ex0xxxx' ? base : ours).map((v, k) => [`q${k}`, v]))]]);
   const e = makeTable({ runs: runs.map((r) => r.id), columns: [{ metric: 'ndcg', better: 'max' }] }, runs, { id: 'tex00001', scores: read });
   close(e.rows[1].cells[0].p, 0.007812808075189104, 1e-8, 'paired over examples');
@@ -582,11 +605,71 @@ test('sweeps: every combination or a sample, placeholders filled and quoted, the
   assert.equal(fillCommand('python t.py --lr {lr} --name {name} ${HOME} {other}', { lr: 0.001, name: 'my run' }), "python t.py --lr 0.001 --name 'my run' ${HOME} {other}");
   assert.deepEqual(placeholders('x {a} ${b} {c} {a}'), ['a', 'c']);
   const s = (pts: [number, number][]) => ({ loss: pts });
-  const others = [s([[100, 0.5], [200, 0.4]]), s([[100, 0.6], [200, 0.45]]), s([[100, 0.55], [200, 0.42], [300, 0.4]])];
-  assert.deepEqual(earlyStop(s([[50, 0.9], [100, 0.8], [200, 0.7]]), others, { metric: 'loss', better: 'min' }), { stop: true, step: 200, value: 0.7, median: 0.42, others: 3 });
-  assert.deepEqual(earlyStop(s([[50, 0.5], [100, 0.45], [200, 0.41]]), others, { metric: 'loss', better: 'min' }), { stop: false });
-  assert.deepEqual(earlyStop(s([[50, 0.9], [100, 0.8], [200, 0.7]]), others, { metric: 'loss', better: 'min', afterSteps: 500 }), { stop: false }, 'not before afterSteps');
-  assert.deepEqual(earlyStop(s([[50, 0.9], [100, 0.8], [400, 0.7]]), others, { metric: 'loss', better: 'min' }), { stop: false }, 'the others have not got there');
+  const others = [
+    s([
+      [100, 0.5],
+      [200, 0.4],
+    ]),
+    s([
+      [100, 0.6],
+      [200, 0.45],
+    ]),
+    s([
+      [100, 0.55],
+      [200, 0.42],
+      [300, 0.4],
+    ]),
+  ];
+  assert.deepEqual(
+    earlyStop(
+      s([
+        [50, 0.9],
+        [100, 0.8],
+        [200, 0.7],
+      ]),
+      others,
+      { metric: 'loss', better: 'min' },
+    ),
+    { stop: true, step: 200, value: 0.7, median: 0.42, others: 3 },
+  );
+  assert.deepEqual(
+    earlyStop(
+      s([
+        [50, 0.5],
+        [100, 0.45],
+        [200, 0.41],
+      ]),
+      others,
+      { metric: 'loss', better: 'min' },
+    ),
+    { stop: false },
+  );
+  assert.deepEqual(
+    earlyStop(
+      s([
+        [50, 0.9],
+        [100, 0.8],
+        [200, 0.7],
+      ]),
+      others,
+      { metric: 'loss', better: 'min', afterSteps: 500 },
+    ),
+    { stop: false },
+    'not before afterSteps',
+  );
+  assert.deepEqual(
+    earlyStop(
+      s([
+        [50, 0.9],
+        [100, 0.8],
+        [400, 0.7],
+      ]),
+      others,
+      { metric: 'loss', better: 'min' },
+    ),
+    { stop: false },
+    'the others have not got there',
+  );
 });
 
 test('a sweep through the route: runs of one group, each with its settings; mistakes start none', async () => {
@@ -620,7 +703,21 @@ test('a sweep through the route: runs of one group, each with its settings; mist
 test('SLURM: the batch script, and reading sbatch, squeue and sacct', () => {
   const c = { id: 'u', name: 'Unity', host: 'unity', kind: 'slurm' as const, workdir: '~/runs', setup: 'module load cuda/12.1\nsource ~/venv/bin/activate', partition: 'gpu', account: 'lab' };
   const s = sbatchScript({ run: { id: 'r1', name: 'BERT base', gpus: 2, cpus: 8, memGb: 32, hours: 2.5 }, cluster: c, dir: '/home/u/runs/r1', cwd: '~/code/bert', env: { HYDOR_RUN: 'r1', A: "it's" } });
-  for (const l of ['#SBATCH --job-name=hydor-bert-base', '#SBATCH --output=/home/u/runs/r1/log.txt', '#SBATCH --gres=gpu:2', '#SBATCH --cpus-per-task=8', '#SBATCH --mem=32G', '#SBATCH --time=150', '#SBATCH --partition=gpu', '#SBATCH --account=lab', 'module load cuda/12.1', "cd -- ~/'code/bert' ||", "export A='it'\\''s'", "bash '/home/u/runs/r1/command.sh'", "echo $code > '/home/u/runs/r1/exit'"])
+  for (const l of [
+    '#SBATCH --job-name=hydor-bert-base',
+    '#SBATCH --output=/home/u/runs/r1/log.txt',
+    '#SBATCH --gres=gpu:2',
+    '#SBATCH --cpus-per-task=8',
+    '#SBATCH --mem=32G',
+    '#SBATCH --time=150',
+    '#SBATCH --partition=gpu',
+    '#SBATCH --account=lab',
+    'module load cuda/12.1',
+    "cd -- ~/'code/bert' ||",
+    "export A='it'\\''s'",
+    "bash '/home/u/runs/r1/command.sh'",
+    "echo $code > '/home/u/runs/r1/exit'",
+  ])
     assert.ok(s.includes(l), `${l} in:\n${s}`);
   assert.ok(s.indexOf('module load') < s.indexOf('cd --'), 'setup lines first');
   assert.equal(parseSbatch('12345\n'), '12345');
@@ -669,7 +766,7 @@ test('a SLURM run through a stand-in ssh: submitted, waiting with the queue’s 
   state.phase = 'RUNNING';
   state.log = 'step=1 loss=2.0\nstep=2 loss=1.5\n';
   await until(() => getRun(db, r.id)!.status === 'running', 60_000, 'it to run');
-  await until(() => getRun(db, r.id)!.metrics?.last?.loss === 1.5 || fs.existsSync(path.join(runFolder(r.id), 'log.txt')) && fs.readFileSync(path.join(runFolder(r.id), 'log.txt'), 'utf8').includes('loss=1.5'), 60_000, 'its log');
+  await until(() => getRun(db, r.id)!.metrics?.last?.loss === 1.5 || (fs.existsSync(path.join(runFolder(r.id), 'log.txt')) && fs.readFileSync(path.join(runFolder(r.id), 'log.txt'), 'utf8').includes('loss=1.5')), 60_000, 'its log');
   state.log += 'step=3 loss=1.0\n';
   state.phase = 'DONE';
   state.exit = '0';
@@ -705,7 +802,15 @@ test('another machine: a job sent there is followed from here; its own runs are 
       throw new Error(`unexpected ${method} ${p}`);
     },
   };
-  useMachines({ list: () => [{ id: 'lab', name: 'Lab box', via: 'url', status: { state: 'online', waiting: 0, working: 0 } }], get: (id: string) => (id === 'lab' ? lab : (() => { throw new HttpError(404, 'no'); })()) } as any);
+  useMachines({
+    list: () => [{ id: 'lab', name: 'Lab box', via: 'url', status: { state: 'online', waiting: 0, working: 0 } }],
+    get: (id: string) =>
+      id === 'lab'
+        ? lab
+        : (() => {
+            throw new HttpError(404, 'no');
+          })(),
+  } as any);
   const r = await submit(deps, await cleanJob(db, { command: 'python train.py', cwd: '/data/code', where: 'm:lab', gpus: 1 }));
   assert.deepEqual(r.remote, { machine: 'lab', id: 'rlab0001' });
   assert.equal((calls[0].body as RunRecord).where, 'local', 'it runs there as there’s own');
@@ -716,11 +821,19 @@ test('another machine: a job sent there is followed from here; its own runs are 
   assert.equal(v.log, 'from the lab');
   assert.equal(v.run.id, r.id);
   const all = (await http.inject({ method: 'GET', url: '/api/experiments/runs?everywhere=1&limit=500' })).json().runs as RunRecord[];
-  assert.ok(all.some((x) => x.id === 'rlab0002' && x.machine?.name === 'Lab box'), 'its own runs, marked with where they run');
+  assert.ok(
+    all.some((x) => x.id === 'rlab0002' && x.machine?.name === 'Lab box'),
+    'its own runs, marked with where they run',
+  );
   assert.ok(!all.some((x) => x.id === 'rlab0001'), 'a run copied here is listed once');
   await http.inject({ method: 'POST', url: `/api/experiments/runs/${r.id}/stop`, payload: {} });
   assert.equal(getRun(db, r.id)!.status, 'stopped');
-  useMachines({ list: () => [], get: () => { throw new HttpError(404, 'no'); } } as any);
+  useMachines({
+    list: () => [],
+    get: () => {
+      throw new HttpError(404, 'no');
+    },
+  } as any);
 });
 
 // ---- the tools ------------------------------------------------------------------------------------------------------------
@@ -764,7 +877,10 @@ test('the tools: JSON answers; a step runs without asking, Plan mode refuses, a 
   assert.equal(getRun(db, again.id)!.seed, 3);
   sessions.answer = 'accept';
   await until(() => ended(ok.id)() && ended(again.id)(), 20_000, 'the session’s runs');
-  assert.ok(sessions.delivered.some((x) => x.key === 'claude:s1' && x.text.includes(`(${ok.id}) ended. Done in`)), 'report: the session hears how it went');
+  assert.ok(
+    sessions.delivered.some((x) => x.key === 'claude:s1' && x.text.includes(`(${ok.id}) ended. Done in`)),
+    'report: the session hears how it went',
+  );
   const list = JSON.parse((await call('experiment_list', { group: 'tools' }, ctxOf())).text);
   assert.equal(list.runs[0].id, id);
   assert.ok('metrics' in list.runs[0] && 'startedAt' in list.runs[0] && 'endedAt' in list.runs[0]);
@@ -821,7 +937,10 @@ test('the routes: a job’s mistakes in words, clusters added and refused, recor
   const s = (await http.inject({ method: 'PUT', url: '/api/experiments/settings', payload: { cpuSlots: 3 } })).json();
   assert.equal(s.cpuSlots, 3);
   assert.equal((await http.inject({ method: 'PUT', url: '/api/experiments/settings', payload: { cpuSlots: 0 } })).statusCode, 400);
-  assert.ok(told.some((e: any) => e.t === 'feature' && e.id === 'experiments'), 'open pages hear of changes');
+  assert.ok(
+    told.some((e: any) => e.t === 'feature' && e.id === 'experiments'),
+    'open pages hear of changes',
+  );
 });
 
 // ---- run ------------------------------------------------------------------------------------------------------------------

@@ -288,7 +288,13 @@ export function RunView({ id, machine, onClose, onAgain, wide }: { id: string; m
             </div>
             {r.why && <p className="text-[13px] leading-relaxed text-fg-2">{r.why}</p>}
             <p className="text-[12.5px] text-fg-3">
-              {[machine ? r.machine?.name : null, r.host, r.gpuIds?.length ? `GPU ${r.gpuIds.join(', ')}` : r.gpus ? null : 'no GPU', r.startedAt ? `started ${when(r.startedAt)}` : `added ${when(r.createdAt)}`, r.group ? `experiment ${r.group}` : null]
+              {[
+                machine ? r.machine?.name : null,
+                r.host,
+                r.gpuIds?.length ? `GPU ${r.gpuIds.join(', ')}` : r.gpus ? null : 'no GPU',
+                r.startedAt ? `started ${when(r.startedAt)}` : `added ${when(r.createdAt)}`,
+                r.group ? `experiment ${r.group}` : null,
+              ]
                 .filter(Boolean)
                 .join(' · ')}
             </p>
