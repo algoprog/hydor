@@ -65,7 +65,7 @@ the ones you start in VS Code or a terminal show up too.
   and Springer papers, exported to Word, PowerPoint or Excel files that look the same in Office (their fonts inside)
   or to PDF; you watch an agent write them as it goes; PowerPoint files open as decks; PDF forms filled and signed,
   by you or an agent, with a signature you draw once; and pictures, videos, music and voice-overs made through
-  OpenRouter. Drop files or folders on it and all of it waits in your Library, by project.
+  OpenRouter. Drop files or folders on it and all of it waits in your Library, by project and in folders of your own.
 - **Memory and know-how**: agents keep a profile of you and remember your projects, starting each session with what
   bears on your request (found by words and by meaning, on your own computer), follow your Agent Guidelines, search
   your documents, and use more than sixty built-in skills, your own, and plugins, each switched on or off for every
