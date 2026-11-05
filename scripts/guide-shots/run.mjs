@@ -2,7 +2,7 @@
 // of the app with made-up data (demo.mjs) in a folder of its own, then each shot (shots.mjs) in the dark and the
 // light theme with Chromium. See README.md.
 //
-//   node scripts/guide-shots/run.mjs --root /tmp/guide-shots-app [--only spaces,tasks] [--themes dark] [--out dir] [--keep]
+//   node scripts/guide-shots/run.mjs --root /tmp/guide-shots-app [--only projects,tasks] [--themes dark] [--out dir] [--keep]
 //   node scripts/guide-shots/run.mjs --root /tmp/guide-shots-app --shots website/shots.mjs --out website/src/img   another list
 //   node scripts/guide-shots/run.mjs --root /tmp/guide-shots-app --serve     the demo app alone, until Ctrl+C
 import { spawn } from 'node:child_process';

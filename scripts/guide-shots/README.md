@@ -12,7 +12,7 @@ git worktree add --detach /tmp/guide-shots-app HEAD
 ln -s "$PWD/node_modules" /tmp/guide-shots-app/node_modules
 (cd /tmp/guide-shots-app && OUTDIR=dist/server node scripts/build-server.mjs && npx vite build)
 
-# 2. Take every shot (about three minutes), or a few with --only spaces,tasks; --themes dark for one theme.
+# 2. Take every shot (about three minutes), or a few with --only projects,tasks; --themes dark for one theme.
 systemd-run --user --scope -q -p MemoryMax=4G nice node scripts/guide-shots/run.mjs --root /tmp/guide-shots-app
 
 # 3. Remove the worktree.

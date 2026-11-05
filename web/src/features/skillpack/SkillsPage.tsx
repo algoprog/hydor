@@ -352,7 +352,7 @@ function SkillDetail({
     const load: Promise<SkillDoc> = i.lib
       ? api<SkillDoc>(`/api/skillpack/skills/${enc(i.name)}`)
       : i.space
-        ? api<SkillDoc>(`/api/spaces/${enc(i.space.id)}/skills/${enc(i.name)}`)
+        ? api<SkillDoc>(`/api/projects/${enc(i.space.id)}/skills/${enc(i.name)}`)
         : api<{ content: string | null }>(`/api/fs/read?path=${enc(i.agent!.path)}`).then((f) => ({ name: i.name, text: f.content ?? '', source: 'learned', file: i.agent!.path, history: [] }) as SkillDoc);
     load.then(
       (d) => alive && setDoc(d),
@@ -416,7 +416,7 @@ function SkillDetail({
     );
   } else if (i.space) {
     actions.push(
-      <Button key="space" icon={<FolderOpen size={14} />} onClick={() => (onClose(), go(`/spaces/${enc(i.space!.id)}/skills`))}>
+      <Button key="space" icon={<FolderOpen size={14} />} onClick={() => (onClose(), go(`/projects/${enc(i.space!.id)}/skills`))}>
         The project’s skills
       </Button>,
     );
@@ -476,7 +476,7 @@ function SkillDetail({
               <button
                 key={p.id}
                 type="button"
-                onClick={() => (onClose(), go(`/spaces/${enc(p.id)}/skills`))}
+                onClick={() => (onClose(), go(`/projects/${enc(p.id)}/skills`))}
                 className="inline-flex h-6 items-center gap-1.5 rounded-full bg-bg-2 px-2.5 text-fg-2 transition-colors hover:bg-bg-3 hover:text-fg"
               >
                 <span translate="no">{p.name}</span>
@@ -671,7 +671,7 @@ function ProjectSkillEditor({ sp, name, onClose, onSaved }: { sp: Space; name?: 
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!name) return;
-    api<SkillDoc>(`/api/spaces/${enc(sp.id)}/skills/${enc(name)}`).then(
+    api<SkillDoc>(`/api/projects/${enc(sp.id)}/skills/${enc(name)}`).then(
       (d) => {
         const fm = parseSkill(d.text);
         setForm({ name, description: fm.description ?? '', body: fm.body.replace(/^\s*\n/, '') });
@@ -685,7 +685,7 @@ function ProjectSkillEditor({ sp, name, onClose, onSaved }: { sp: Space; name?: 
     setBusy(true);
     try {
       const body = { ...form, name: slugOf(form.name) };
-      await (name ? put(`/api/spaces/${enc(sp.id)}/skills/${enc(name)}`, body) : post(`/api/spaces/${enc(sp.id)}/skills`, body));
+      await (name ? put(`/api/projects/${enc(sp.id)}/skills/${enc(name)}`, body) : post(`/api/projects/${enc(sp.id)}/skills`, body));
       onSaved();
       onClose();
     } catch (e) {
@@ -848,7 +848,7 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
       api<{ skills: SkillEntry[]; errors: string[] }>(`/api/setup/skills${cwd ? `?cwd=${enc(cwd)}` : ''}`).then(setAgents, (e: Error) => setAgents({ skills: [], errors: [e.message] })),
     [cwd],
   );
-  const loadMine = useCallback(() => (spId ? api<SpaceSkills>(`/api/spaces/${enc(spId)}/skills`).then(setMine, toastError) : Promise.resolve()), [spId]);
+  const loadMine = useCallback(() => (spId ? api<SpaceSkills>(`/api/projects/${enc(spId)}/skills`).then(setMine, toastError) : Promise.resolve()), [spId]);
   useEffect(() => {
     loadLib();
   }, [loadLib]);
@@ -956,7 +956,7 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
         return { ...m, switches };
       });
       try {
-        const r = await put<{ switches: Record<string, boolean> }>(`/api/spaces/${enc(sp.id)}/skill-switches`, { name: h.name, agent: h.agent ?? null, on: value });
+        const r = await put<{ switches: Record<string, boolean> }>(`/api/projects/${enc(sp.id)}/skill-switches`, { name: h.name, agent: h.agent ?? null, on: value });
         setMine((m) => m && { ...m, switches: r.switches });
       } catch (e) {
         toastError(e);
@@ -988,7 +988,7 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
     });
     if (!ok) return;
     try {
-      await del(`/api/spaces/${enc(sp.id)}/skill-switches`);
+      await del(`/api/projects/${enc(sp.id)}/skill-switches`);
       setMine((m) => m && { ...m, switches: {} });
       toast('Every skill is as Settings has it', 'ok');
     } catch (e) {
@@ -1006,7 +1006,7 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
       });
       if (!ok) return;
       try {
-        await del(`/api/spaces/${enc(sp.id)}/skills/${enc(i.name)}`);
+        await del(`/api/projects/${enc(sp.id)}/skills/${enc(i.name)}`);
         toast(`Removed ${i.name}`, 'ok');
       } catch (e) {
         toastError(e);
@@ -1045,7 +1045,7 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
   const copy = async (i: Item) => {
     if (!sp) return;
     try {
-      await post(`/api/spaces/${enc(sp.id)}/skills`, { from: i.name });
+      await post(`/api/projects/${enc(sp.id)}/skills`, { from: i.name });
       setOpenKey(null);
       ownChanged();
       setOwnEdit({ name: i.name });
@@ -1056,7 +1056,7 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
 
   const restore = async (name: string) => {
     try {
-      await post(sp ? `/api/spaces/${enc(sp.id)}/skills/${enc(name)}/restore` : `/api/skillpack/skills/${enc(name)}/restore`);
+      await post(sp ? `/api/projects/${enc(sp.id)}/skills/${enc(name)}/restore` : `/api/skillpack/skills/${enc(name)}/restore`);
       toast(`${name} is back`, 'ok');
     } catch (e) {
       toastError(e);

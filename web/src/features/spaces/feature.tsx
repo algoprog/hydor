@@ -7,6 +7,6 @@ import { SpacesPage } from './SpacesPage';
 
 export const spacesFeature: WebFeature = {
   id: 'spaces',
-  routes: [{ match: (p) => p === '/spaces' || p.startsWith('/spaces/'), Page: SpacesPage }],
-  nav: [{ id: 'spaces', path: '/spaces', label: 'Projects', icon: <Boxes size={17} />, match: (p) => p === '/spaces' || p.startsWith('/spaces/') || p === '/knowledge' }],
+  routes: [{ match: (p) => p === '/projects' || p.startsWith('/projects/'), Page: SpacesPage }],
+  nav: [{ id: 'spaces', path: '/projects', label: 'Projects', icon: <Boxes size={17} />, match: (p) => p === '/projects' || p.startsWith('/projects/') || p === '/knowledge' }],
 };

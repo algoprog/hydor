@@ -266,7 +266,7 @@ export function placeOf(pathname: string, search: string, pagePaths: Record<stri
   const md = /^\/media\/([^/]+)$/.exec(pathname);
   if (md) return `media:${decodeURIComponent(md[1])}`;
   // A space, on any of its tabs (its files, knowledge, skills, settings).
-  const sp = /^\/spaces\/([^/]+)/.exec(pathname);
+  const sp = /^\/projects\/([^/]+)/.exec(pathname);
   if (sp) return `space:${decodeURIComponent(sp[1])}`;
   // A page's tab (Published pages), the Library's pictures and videos, or a place on the Files page (its trash, the recent files).
   // Pictures and videos together (the old Media tab, an older link) count as the pictures.

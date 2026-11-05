@@ -197,7 +197,7 @@ export function ProposalPanel({ p, onChange, framed = true }: { p: SkillProposal
               )}
             </span>
             {p.status === 'approved' && (
-              <button type="button" onClick={() => go(toSpace ? `/spaces/${p.space!.id}/skills` : '/settings?s=skills')} className="text-[12.5px] text-accent hover:underline">
+              <button type="button" onClick={() => go(toSpace ? `/projects/${p.space!.id}/skills` : '/settings?s=skills')} className="text-[12.5px] text-accent hover:underline">
                 {toSpace ? 'The project’s skills' : 'Your skills'}
               </button>
             )}

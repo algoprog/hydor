@@ -110,9 +110,9 @@ export const SHOTS = [
   sessionShot('web', 'ebike', { height: 1000, unfold: ['Worked for', 'Searched 3'] }),
   sessionShot('documents-voice', 'report', { unfold: ['Worked for', 'Ran 1 command'] }),
   {
-    id: 'spaces',
+    id: 'projects',
     async take(p, ctx) {
-      await ctx.go('/spaces', { settle: 1500 });
+      await ctx.go('/projects', { settle: 1500 });
       await p.park();
       return p.shot(ctx.file, { clip: await main(p, await bottomOf(p, last('main .grid > *, .grid > button'), 36)) });
     },

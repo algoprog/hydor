@@ -36,10 +36,10 @@ export const goFolder = (dir: string, select?: string, replace = false) => go(`/
  * space's files.
  */
 export async function addToSpace(items: Item[], space: Pick<Space, 'id' | 'name' | 'folder'>) {
-  const show = { label: 'Show', run: () => go(`/spaces/${space.id}/files`) };
+  const show = { label: 'Show', run: () => go(`/projects/${space.id}/files`) };
   let cur: Space;
   try {
-    cur = (await api<{ space: Space }>(`/api/spaces/${encodeURIComponent(space.id)}`)).space;
+    cur = (await api<{ space: Space }>(`/api/projects/${encodeURIComponent(space.id)}`)).space;
   } catch (e) {
     return toastError(e);
   }
@@ -51,7 +51,7 @@ export async function addToSpace(items: Item[], space: Pick<Space, 'id' | 'name'
   const folders = todo.filter((i) => i.dir);
   if (folders.length) {
     try {
-      await patch(`/api/spaces/${encodeURIComponent(space.id)}`, { folders: [...(cur.folders ?? []), ...folders.map((f) => f.path)] });
+      await patch(`/api/projects/${encodeURIComponent(space.id)}`, { folders: [...(cur.folders ?? []), ...folders.map((f) => f.path)] });
       added.push(...folders);
       loadSpaces();
     } catch (e) {

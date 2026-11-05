@@ -33,7 +33,7 @@ export type SpaceTab = 'overview' | 'library' | 'files' | 'knowledge' | 'skills'
 
 const plural = (n: number, one: string, many: string) => tr(`${n} ${n === 1 ? one : many}`);
 
-const tabPath = (id: string, t: SpaceTab) => `/spaces/${id}${t === 'overview' ? '' : `/${t}`}`;
+const tabPath = (id: string, t: SpaceTab) => `/projects/${id}${t === 'overview' ? '' : `/${t}`}`;
 
 // ---- pieces ----------------------------------------------------------------------------------------------------
 
@@ -97,13 +97,13 @@ async function deleteSpace(s: Space, confirm: ReturnType<typeof useConfirm>[0]) 
   });
   if (!ok) return;
   try {
-    await del(`/api/spaces/${enc(s.id)}`);
+    await del(`/api/projects/${enc(s.id)}`);
   } catch (e) {
     toastError(e);
     return;
   }
   loadSpaces();
-  go('/spaces');
+  go('/projects');
 }
 
 // ---- the top --------------------------------------------------------------------------------------------------
@@ -152,7 +152,7 @@ function Top({ s, view, tab }: { s: Space; view?: SpaceView; tab: SpaceTab }) {
       <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: `linear-gradient(180deg, color-mix(in oklab, ${c} 15%, transparent), color-mix(in oklab, ${c} 3%, transparent))` }} />
       <div className="relative mx-auto flex max-w-[1120px] items-center gap-2 px-3 pt-3 sm:gap-3 sm:px-6 sm:pt-5">
         <NavButton />
-        <BackButton label="All projects" onClick={() => go('/spaces')} />
+        <BackButton label="All projects" onClick={() => go('/projects')} />
         <SpaceMark s={s} size={wide ? 46 : 34} className="rounded-[12px] max-sm:rounded-[10px]" />
         <div className="min-w-0 flex-1">
           <h1 translate="no" className="truncate text-[17px] leading-tight font-semibold tracking-tight sm:text-[21px]">
@@ -252,7 +252,7 @@ function OverviewTab({ s, view, keys }: { s: Space; view?: SpaceView; keys?: str
           count={view?.library}
           action={
             !!view?.library && (
-              <CardLink onClick={() => go(`/library?space=${s.id}`)}>
+              <CardLink onClick={() => go(`/library?project=${s.id}`)}>
                 Open in the Library <ArrowRight size={13} />
               </CardLink>
             )
@@ -298,7 +298,7 @@ function OverviewTab({ s, view, keys }: { s: Space; view?: SpaceView; keys?: str
           <Card title="The projects it brings together" count={members.length}>
             <div className="divide-y divide-line border-t border-line">
               {members.map((m) => (
-                <button key={m.id} type="button" onClick={() => go(`/spaces/${m.id}`)} className="flex w-full min-w-0 items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-bg-1">
+                <button key={m.id} type="button" onClick={() => go(`/projects/${m.id}`)} className="flex w-full min-w-0 items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-bg-1">
                   <SpaceMark s={m} size={26} className="rounded-[8px]" />
                   <span translate="no" className="min-w-0 flex-1 truncate text-[13.5px] font-medium">
                     {m.name}
@@ -326,7 +326,7 @@ function KnowledgeTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void
   const members = (s.members ?? []).map((id) => spaces?.find((x) => x.id === id)).filter((x): x is SpaceView => !!x);
   const setShared = async (on: boolean) => {
     try {
-      onSaved(await patch<Space>(`/api/spaces/${enc(s.id)}`, { sharedKnowledge: on }));
+      onSaved(await patch<Space>(`/api/projects/${enc(s.id)}`, { sharedKnowledge: on }));
       loadSpaces();
     } catch (e) {
       toastError(e);
@@ -351,7 +351,7 @@ function KnowledgeTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void
     }
   };
   return (
-    <div className="mx-auto max-w-[880px] space-y-5">
+    <div className="space-y-5">
       <div className="flex items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-bg-2 text-fg-2">
           <BookOpen size={16} />
@@ -373,7 +373,7 @@ function KnowledgeTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void
           <div className="text-[13.5px] font-medium">Also the documents of the projects it brings together</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {members.map((m) => (
-              <button key={m.id} type="button" onClick={() => go(`/spaces/${m.id}/knowledge`)} className="flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-bg-2 pr-2.5 pl-1.5 text-[12.5px] hover:bg-bg-3">
+              <button key={m.id} type="button" onClick={() => go(`/projects/${m.id}/knowledge`)} className="flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-bg-2 pr-2.5 pl-1.5 text-[12.5px] hover:bg-bg-3">
                 <SpaceMark s={m} size={15} />
                 <span translate="no" className="min-w-0 truncate">
                   {m.name}
@@ -468,7 +468,7 @@ function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void 
   const save = async () => {
     try {
       onSaved(
-        await patch<Space>(`/api/spaces/${enc(s.id)}`, {
+        await patch<Space>(`/api/projects/${enc(s.id)}`, {
           name: form.name,
           description: form.description ?? '',
           instructions: form.instructions ?? '',
@@ -483,7 +483,7 @@ function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void 
     }
   };
   return (
-    <div className="mx-auto max-w-[860px]">
+    <div>
       <div className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-panel">
         <Row title="The project" sub="Its name, what it is about and its colour: on its card, its page and the start page">
           <label className="block">
@@ -587,7 +587,7 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
   const [gone, setGone] = useState(false);
   useEffect(() => {
     let live = true;
-    api<{ space: Space; sessions: string[] }>(`/api/spaces/${enc(id)}`).then(
+    api<{ space: Space; sessions: string[] }>(`/api/projects/${enc(id)}`).then(
       (r) => {
         if (!live) return;
         setData(r);
@@ -607,7 +607,7 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
         <Empty icon={<Boxes size={22} />} title="This project is gone">
           <span className="block">It was deleted, or the address is not one of your projects.</span>
           <span className="mt-3 inline-flex">
-            <Button size="sm" variant="secondary" icon={<ArrowLeft size={14} />} onClick={() => go('/spaces')}>
+            <Button size="sm" variant="secondary" icon={<ArrowLeft size={14} />} onClick={() => go('/projects')}>
               All projects
             </Button>
           </span>
@@ -647,7 +647,7 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="min-w-0 flex-1 text-[13px] text-fg-3">Pages, slides, documents, pictures and videos made in this project, or moved to it</span>
-                    <Button size="sm" variant="ghost" onClick={() => go(`/library?space=${s.id}`)}>
+                    <Button size="sm" variant="ghost" onClick={() => go(`/library?project=${s.id}`)}>
                       Open in the Library
                       <ArrowRight size={13} className="ml-1" />
                     </Button>

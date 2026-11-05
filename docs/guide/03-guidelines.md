@@ -17,7 +17,7 @@ What you ask in the conversation always comes first: if your guidelines say "sho
 Guidelines come at three levels, from the most general to the most specific:
 
 1. **For every session**: every agent, in every session. Set in [Settings → Agents → Agent Guidelines](/settings?s=guidelines).
-2. **For a project**: every session in that [project](/guide/spaces). Set on the project's page, in its **Agent Guidelines** field.
+2. **For a project**: every session in that [project](/guide/projects). Set on the project's page, in its **Agent Guidelines** field.
 3. **For one session**: only that session. Set on the start page (**Options → Guidelines**) before it starts, or later from the session's menu (⋯) → **Session settings → Guidelines**.
 
 An agent gets all the levels that apply to its session, in that order. Where two disagree, the more specific one wins: a session's guidelines over its project's, a project's over the ones for every session.

@@ -94,6 +94,8 @@ const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? 'warn' },
   bodyLimit: 40 * 1024 * 1024,
   trustProxy: '127.0.0.1',
+  // Projects' API was /api/spaces until 5 November 2026: pages open from before, agents' notes and other machines still call it.
+  rewriteUrl: (req) => (req.url ?? '/').replace(/^\/api\/spaces(?=[/?]|$)/, '/api/projects'),
 });
 
 await app.register(cookie);
@@ -1743,7 +1745,8 @@ app.delete('/api/access-tokens/:id', async (req) => {
 app.register(async (scope) => {
   scope.removeAllContentTypeParsers();
   scope.addContentTypeParser('*', (_req, payload, done) => done(null, payload));
-  const rest = (req: FastifyRequest) => req.raw.url!.slice(`/m/${(req.params as { id: string }).id}`.length);
+  // Projects' API by its old name (above), which a machine still on a version from before 5 November 2026 knows alone.
+  const rest = (req: FastifyRequest) => req.raw.url!.slice(`/m/${(req.params as { id: string }).id}`.length).replace(/^\/api\/projects(?=[/?]|$)/, '/api/spaces');
   // Answers come compressed (or not) as the machine sent them.
   scope.route({
     method: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],

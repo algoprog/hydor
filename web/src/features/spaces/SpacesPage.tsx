@@ -83,8 +83,8 @@ function SpaceCard({ s, spaces }: { s: SpaceView; spaces: SpaceView[] }) {
     <div
       role="link"
       tabIndex={0}
-      onClick={() => go(`/spaces/${s.id}`)}
-      onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && go(`/spaces/${s.id}`)}
+      onClick={() => go(`/projects/${s.id}`)}
+      onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && go(`/projects/${s.id}`)}
       className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-line bg-panel text-left transition-colors outline-none hover:border-line-2 focus-visible:ring-2 focus-visible:ring-accent/40"
     >
       <div className="relative h-14 w-full" style={{ background: wash(c) }}>
@@ -213,13 +213,13 @@ function List() {
           )}
         </div>
       </div>
-      <NewSpaceDialog open={!!made} group={made === 'group'} folder={made === 'space' ? from : undefined} onClose={() => setMade(false)} onMade={(s) => go(`/spaces/${s.id}`)} />
+      <NewSpaceDialog open={!!made} group={made === 'group'} folder={made === 'space' ? from : undefined} onClose={() => setMade(false)} onMade={(s) => go(`/projects/${s.id}`)} />
     </div>
   );
 }
 
 export function SpacesPage() {
   const [loc] = useLocation();
-  const m = /^\/spaces\/([a-z0-9]+)(?:\/(library|files|knowledge|skills|settings))?$/.exec(loc);
+  const m = /^\/projects\/([a-z0-9]+)(?:\/(library|files|knowledge|skills|settings))?$/.exec(loc);
   return m ? <SpacePage id={m[1]} tab={(m[2] as SpaceTab | undefined) ?? 'overview'} /> : <List />;
 }

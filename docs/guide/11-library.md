@@ -165,14 +165,14 @@ With nothing kept yet, the Library says "Your Library is empty", with **New page
 
 ## Sort it by project
 
-Everything in the Library belongs to one project, or to none (see [Projects and knowledge](/guide/spaces)):
+Everything in the Library belongs to one project, or to none (see [Projects and knowledge](/guide/projects)):
 
 - What an agent saves (a page, slides, a document, a spreadsheet, a LaTeX document) goes in its session's project, when the session is in one.
 - What you keep yourself (**Keep** on a page, **Save to Library** under a picture, a video or a sound) asks where it goes when you have projects, with the session's own project first; with no projects, it is kept at once.
 - **New**, at the top right of the Library, makes it in the project you are looking at; pick another under **In a project** (see [Make a page](#make-a-page)).
 - To move something, open its **More** (⋯) → **Move to a project**, on its card or on its own page, and pick a project or **No project**. "Moved to Thesis" confirms it. Moving it changes nothing else: its versions, its data and its addresses stay.
 
-A project's own page shows what it holds in the Library too, on its **Overview** and **Library** tabs (see [A project's own page](/guide/spaces#a-projects-own-page)). Deleting a project keeps what it held in the Library, in no project.
+A project's own page shows what it holds in the Library too, on its **Overview** and **Library** tabs (see [A project's own page](/guide/projects#a-projects-own-page)). Deleting a project keeps what it held in the Library, in no project.
 
 ## Images and videos in the Library
 

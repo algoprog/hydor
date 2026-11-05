@@ -277,32 +277,32 @@ export const spaces: Feature = {
     const id = (req: { params: unknown }) => String((req.params as { id: string }).id);
     const body = (req: { body: unknown }) => (req.body ?? {}) as Record<string, unknown>;
     const changed = () => d.broadcast({ t: 'feature', id: 'spaces', data: { changed: true } });
-    d.app.get('/api/spaces', async () => ({ spaces: spaceViews(d.db) }));
-    d.app.post('/api/spaces', async (req) => {
+    d.app.get('/api/projects', async () => ({ spaces: spaceViews(d.db) }));
+    d.app.post('/api/projects', async (req) => {
       const s = createSpace(d.db, body(req));
       changed();
       return s;
     });
     // Folders sessions worked in lately that no space has yet (server/spaces/suggest.ts).
-    d.app.get('/api/spaces/suggestions', async () => ({ folders: spaceSuggestions(d.db) }));
-    d.app.post('/api/spaces/suggestions/hide', async (req) => {
+    d.app.get('/api/projects/suggestions', async () => ({ folders: spaceSuggestions(d.db) }));
+    d.app.post('/api/projects/suggestions/hide', async (req) => {
       const folder = typeof body(req).folder === 'string' ? String(body(req).folder).trim() : '';
       if (!isAbsPath(folder)) throw new HttpError(400, 'Which folder?');
       hideSuggestion(d.db, folder);
       changed();
       return { folders: spaceSuggestions(d.db) };
     });
-    d.app.get('/api/spaces/:id', async (req) => {
+    d.app.get('/api/projects/:id', async (req) => {
       const s = spaceById(d.db, id(req));
       if (!s) throw new HttpError(404, 'No such project');
       return { space: s, sessions: sessionsIn(d.db, s.id) };
     });
-    d.app.patch('/api/spaces/:id', async (req) => {
+    d.app.patch('/api/projects/:id', async (req) => {
       const s = updateSpace(d.db, id(req), body(req));
       changed();
       return s;
     });
-    d.app.delete('/api/spaces/:id', async (req) => {
+    d.app.delete('/api/projects/:id', async (req) => {
       const skills = deleteSpace(d.db, id(req));
       changed();
       // Its knowledge bases are shared now, and its skills in the library.
@@ -323,49 +323,49 @@ export const spaces: Feature = {
       d.broadcast({ t: 'feature', id: 'skillpack', data: { space: s.id } });
     };
     // Its own skills, those of the spaces it brings together (a group's), and the skills it switches on or off.
-    d.app.get('/api/spaces/:id/skills', async (req) => {
+    d.app.get('/api/projects/:id/skills', async (req) => {
       const s = space(req);
       const members = membersNow(d.db, s).map((m) => ({ id: m.id, name: m.name, skills: spaceSkillsView(d.db, m.id, withGroups(d.db, m.id)).skills }));
       return { ...spaceSkillsView(d.db, s.id, withGroups(d.db, s.id)), ...(members.length ? { members } : {}) };
     });
     // A skill on or off for its sessions alone (on: null for what Settings → Skills says), or every one back to that.
-    d.app.put('/api/spaces/:id/skill-switches', async (req) => {
+    d.app.put('/api/projects/:id/skill-switches', async (req) => {
       const s = space(req);
       const switches = setSpaceSwitch(d.db, s.id, body(req));
       d.broadcast({ t: 'feature', id: 'skillpack', data: { space: s.id, switches: true } });
       return { switches };
     });
-    d.app.delete('/api/spaces/:id/skill-switches', async (req) => {
+    d.app.delete('/api/projects/:id/skill-switches', async (req) => {
       const s = space(req);
       clearSpaceSwitches(d.db, s.id);
       d.broadcast({ t: 'feature', id: 'skillpack', data: { space: s.id, switches: true } });
       return { switches: {} };
     });
-    d.app.get('/api/spaces/:id/skills/:name', async (req) => {
+    d.app.get('/api/projects/:id/skills/:name', async (req) => {
       const doc = spaceSkillDoc(d.db, space(req), skill(req));
       if (!doc) throw new HttpError(404, `The project has no skill named ${skill(req)}`);
       return doc;
     });
-    d.app.post('/api/spaces/:id/skills', async (req) => {
+    d.app.post('/api/projects/:id/skills', async (req) => {
       const s = space(req);
       const b = body(req);
       const out = typeof b.from === 'string' && b.from ? copyToSpace(d.db, s.id, b.from) : saveSpaceSkill(d.db, s.id, b);
       skillsChanged(s);
       return out;
     });
-    d.app.put('/api/spaces/:id/skills/:name', async (req) => {
+    d.app.put('/api/projects/:id/skills/:name', async (req) => {
       const s = space(req);
       const out = saveSpaceSkill(d.db, s.id, body(req), skill(req));
       skillsChanged(s);
       return out;
     });
-    d.app.delete('/api/spaces/:id/skills/:name', async (req) => {
+    d.app.delete('/api/projects/:id/skills/:name', async (req) => {
       const s = space(req);
       removeSpaceSkill(d.db, s.id, skill(req));
       skillsChanged(s);
       return { ok: true };
     });
-    d.app.post('/api/spaces/:id/skills/:name/restore', async (req) => {
+    d.app.post('/api/projects/:id/skills/:name/restore', async (req) => {
       const s = space(req);
       restoreSpaceSkill(d.db, s.id, skill(req));
       skillsChanged(s);

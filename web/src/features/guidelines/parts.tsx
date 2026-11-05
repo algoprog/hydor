@@ -113,7 +113,7 @@ export function GuidelinesSettings({ files }: { files: ReactNode }) {
         {!withText.length ? (
           <p className="text-[13px] leading-relaxed text-fg-3">
             None of your projects has guidelines yet. Open a project in{' '}
-            <button className="text-accent hover:underline" onClick={() => go('/spaces')}>
+            <button className="text-accent hover:underline" onClick={() => go('/projects')}>
               Projects
             </button>{' '}
             to give it some.
@@ -121,7 +121,7 @@ export function GuidelinesSettings({ files }: { files: ReactNode }) {
         ) : (
           <div className="-mx-2 divide-y divide-line">
             {withText.map((s) => (
-              <button key={s.id} onClick={() => go(`/spaces/${enc(s.id)}`)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-bg-1">
+              <button key={s.id} onClick={() => go(`/projects/${enc(s.id)}`)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-bg-1">
                 <span className="min-w-0 flex-1">
                   <span className="block text-[13.5px] font-medium">{s.name}</span>
                   <span translate="no" className="block truncate text-[12.5px] text-fg-3">

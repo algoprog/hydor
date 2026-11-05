@@ -5,7 +5,7 @@
 // translation (docs/guide/<lang>/<same file>) has the same headings in the same places, and takes their ids.
 
 export interface GuideSection {
-  /** The heading as an id ("make-a-space"). */
+  /** The heading as an id ("make-a-project"). */
   id: string;
   title: string;
   /** Its Markdown, its `### ` parts included, without its own heading. */
@@ -13,7 +13,7 @@ export interface GuideSection {
 }
 
 export interface GuideTopic {
-  /** The file's name without its number ("spaces"). */
+  /** The file's name without its number ("projects"). */
   id: string;
   title: string;
   /** The paragraph under the title. */
@@ -48,7 +48,7 @@ export const headingId = (h: string) =>
     .replace(/[^\p{L}\p{N}\s_-]/gu, '')
     .replace(/\s/g, '-');
 
-/** A topic's id from its file name: "04-spaces.md" → "spaces". */
+/** A topic's id from its file name: "04-projects.md" → "projects". */
 export const topicId = (file: string) => file.replace(/\.md$/, '').replace(/^\d+-/, '');
 
 /** A topic's headings below its title, in order: their level and words (headings in code blocks are not). */

@@ -125,7 +125,7 @@ What picking an assistant does on the start page:
 
 The start page opens with the assistant you picked last, on any device you use; the very first time, that is General. When the page opens this way, your other picks (agent, model, permissions) stay as you left them; only picking an assistant changes them. If the assistant you picked last has been deleted, General is picked instead.
 
-Picking a project in the folder menu also picks the assistant that project starts its sessions as, when it has one (see [Projects](/guide/spaces)).
+Picking a project in the folder menu also picks the assistant that project starts its sessions as, when it has one (see [Projects](/guide/projects)).
 
 ## Switch assistants in a session
 
@@ -255,7 +255,7 @@ How the name is made:
 Open the folder chip on the start page:
 
 - **New task folder** ("in ~/Hydor") makes a fresh folder for each session.
-- Pick a project, a folder you used lately, or any folder you find by typing its name or path, and the session works there instead (see [Projects](/guide/spaces) and [Sessions](/guide/sessions)).
+- Pick a project, a folder you used lately, or any folder you find by typing its name or path, and the session works there instead (see [Projects](/guide/projects) and [Sessions](/guide/sessions)).
 
 Until you choose, the assistant decides: the built-ins other than Coder, and your own set to "A new task folder", use a task folder; Coder and assistants set to "The folder on the start page" use the folder shown. The start page remembers what you chose. Picking another assistant hands the choice back to it, unless you picked a folder since the page opened.
 
@@ -266,7 +266,7 @@ Task folders don't crowd the folder menu: the folders used lately that it lists 
 1. In [Settings → Capabilities → Assistants](/settings?s=assistants&find=Task%20folders), find **Task folders** ("A session started without a folder gets a new one here, named by the day and the task").
 2. Click the folder's name. Under **Folder to work in**, type a path (it suggests folders as you type, and folders you used lately) and click **Use this folder**. Give a full path, or one starting with `~` for your home folder.
 
-New task folders go there from then on; folders already made stay where they are. **Back to ~/Hydor** appears once you've changed it, to go back to the default. The line under it shows what new ones look like. New projects that get a folder of their own get it here too, in a **Projects** folder inside (see [Projects](/guide/spaces)).
+New task folders go there from then on; folders already made stay where they are. **Back to ~/Hydor** appears once you've changed it, to go back to the default. The line under it shows what new ones look like. New projects that get a folder of their own get it here too, in a **Projects** folder inside (see [Projects](/guide/projects)).
 
 ## Clean up after a task
 
@@ -284,7 +284,7 @@ Turn it off and agents leave what they made in place. Either way, agents follow 
 
 ## Where else assistants come in
 
-- **Projects**: a project can say which assistant its sessions start as ("Its sessions start as"); picking the project on the start page picks it. See [Projects](/guide/spaces).
+- **Projects**: a project can say which assistant its sessions start as ("Its sessions start as"); picking the project on the start page picks it. See [Projects](/guide/projects).
 - **Apps**: an app can name an **Assistant**, and its runs start as it (runs from a public page don't). See [Apps](/guide/apps).
 - **Scheduled tasks**: a task an agent sets up for you from a session runs as that session does, with its assistant. See [Scheduled tasks](/guide/tasks).
 - **Hands-free voice**: sessions you start by voice start as the assistant picked last on the start page.

@@ -2,7 +2,7 @@
 
 A project keeps one piece of work together: its sessions, a folder for its files (and other folders of yours it works with), documents of its own, what agents remember about it, the guidelines every agent in it follows, skills of its own and the assistant its sessions start as. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using projects and groups of projects, giving a project skills of its own, and adding, searching and managing the documents agents search.
 
-![The Projects page: a card for each project, with what it holds and New session](images/spaces.webp)
+![The Projects page: a card for each project, with what it holds and New session](images/projects.webp)
 
 ## What a project is
 
@@ -39,7 +39,7 @@ Under the projects, **Folders you work in** lists folders your sessions used lat
 
 ## Make a project
 
-1. On the [Projects page](/spaces), click **New project**. The start page's folder menu has **New project** too (see [Start a session in a project](#start-a-session-in-a-project)).
+1. On the [Projects page](/projects), click **New project**. The start page's folder menu has **New project** too (see [Start a session in a project](#start-a-session-in-a-project)).
 2. Fill in the window:
    - **Name**: what you call the project, such as "Taxes 2026", "The garden" or "Thesis". Up to 60 characters. It is the only field you must fill in. The square beside it is the project's mark, in the colour it will get: click it to pick another of the eight colours (amber, blue, green, pink, violet, teal, orange, slate). If you pick none, projects take the colours in turn.
    - **Where its files go**: pick one of two.
@@ -61,7 +61,7 @@ In the **New project** window, pick **In a folder I already have** under **Where
 
 ### Folders you work in, not in a project yet
 
-Under your projects on the [Projects page](/spaces), the app lists up to six folders you could make projects for: folders your sessions worked in over the last 90 days, or changed files in while working somewhere else, that no project has yet. The ones used most, and most recently, come first. A folder inside a project kept in Git counts as the whole project. Each card shows the folder's name, where it is, how many sessions used it and when one last did.
+Under your projects on the [Projects page](/projects), the app lists up to six folders you could make projects for: folders your sessions worked in over the last 90 days, or changed files in while working somewhere else, that no project has yet. The ones used most, and most recently, come first. A folder inside a project kept in Git counts as the whole project. Each card shows the folder's name, where it is, how many sessions used it and when one last did.
 
 - **Make a project** opens the **New project** window with that folder picked and its name filled in.
 - ✕ (**Not a project**) stops suggesting that folder. The folder itself is untouched.
@@ -220,7 +220,7 @@ A group is a project that brings several projects together, for work that spans 
 
 ### Make a group
 
-1. On the [Projects page](/spaces), click **Group projects together**. This card shows once you have at least two projects that aren't groups.
+1. On the [Projects page](/projects), click **Group projects together**. This card shows once you have at least two projects that aren't groups.
 2. In **New group of projects**, give it a **Name**, such as "Work" or "Everything for the thesis".
 3. Under **The projects it brings together**, tap each project to bring in; tap one again to take it out. Pick at least one.
 4. Optionally, fill in **What it is about** and the **Agent Guidelines**, and pick a colour.

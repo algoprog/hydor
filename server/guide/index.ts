@@ -91,13 +91,13 @@ const APP_API: RunTool = {
     'To have the user fill in or check details on that card, give form: fields as a JSON schema’s properties, each named by its address in body ("name", "settings.results") and filled in from body; their answers go into body.',
     'Some things are only the user’s (the password, keys’ values, files and commands, answering approvals, permissions, spending caps): those are refused, with where the user does them. A session in Plan mode only reads.',
     'Settings kept on each device: PUT /device { theme: dark|light|system, themeName, language: en|zh|el, sound, enter: join|queue, terminalSuggestions, sidebar, groupSessions }, for the pages showing this session.',
-    'Links into the app for the user: its address plus the page (/spaces/<id>, /settings?s=<section>, /guide/<topic>).',
+    'Links into the app for the user: its address plus the page (/projects/<id>, /settings?s=<section>, /guide/<topic>).',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] },
-      path: { type: 'string', description: '"/api/spaces", with a query string when the endpoint takes one; or "/device".' },
+      path: { type: 'string', description: '"/api/projects", with a query string when the endpoint takes one; or "/device".' },
       body: { type: 'object', description: 'The JSON body, for POST, PUT and PATCH.' },
       summary: { type: 'string', description: 'For a change: what it does, as the user will read it on the card ("Make the project “Thesis”").' },
       form: {

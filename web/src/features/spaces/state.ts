@@ -22,7 +22,7 @@ export function loadSpaces() {
     onFeatureEvent('pages', soon);
     onFeatureEvent('media', soon);
   }
-  api<{ spaces: SpaceView[] }>('/api/spaces')
+  api<{ spaces: SpaceView[] }>('/api/projects')
     .then((r) => useSpacesStore.setState({ list: r.spaces }))
     .catch(() => {});
 }

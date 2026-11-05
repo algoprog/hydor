@@ -4,7 +4,7 @@
 // screen the places are a list beside it: Everything (each space's things together, under its name), each space,
 // Not in a space, and Published (the sites published from pages or a project's build); on a phone, a row of chips.
 // Kinds filter what a place shows, a box finds things by name, and each card's More moves it to another space.
-// Addresses: /library?space=<id>|none, &kind=<kind> (image, video and audio each, media pictures and videos both:
+// Addresses: /library?project=<id>|none, &kind=<kind> (image, video and audio each, media pictures and videos both:
 // the old Media tab's ?tab=media too), ?tab=published; ?new=page|slides|doc|sheet|tex opens New with that kind.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
@@ -313,7 +313,7 @@ type Place = { kind: 'all' } | { kind: 'none' } | { kind: 'published' } | { kind
 
 function placeOf(q: URLSearchParams): Place {
   if (q.get('tab') === 'published') return { kind: 'published' };
-  const s = q.get('space');
+  const s = q.get('project');
   if (s === 'none') return { kind: 'none' };
   if (s) return { kind: 'space', id: s };
   return { kind: 'all' };
@@ -323,8 +323,8 @@ function addressOf(place: Place, show: Show): string {
   const q = new URLSearchParams();
   if (place.kind === 'published') q.set('tab', 'published');
   else {
-    if (place.kind === 'none') q.set('space', 'none');
-    if (place.kind === 'space') q.set('space', place.id);
+    if (place.kind === 'none') q.set('project', 'none');
+    if (place.kind === 'space') q.set('project', place.id);
     if (show !== 'all') q.set('kind', show);
   }
   const s = q.toString();
@@ -395,7 +395,7 @@ function Places({ place, onPlace, items, sites, chips }: { place: Place; onPlace
         <div className="mt-4 rounded-xl border border-dashed border-line-2 px-3 py-3 text-[12.5px] leading-snug text-fg-3">
           <span className="block font-medium text-fg-2">Sort it by project</span>
           Make a project for each piece of work, and what its sessions make lands together here.
-          <button type="button" onClick={() => go('/spaces')} className="mt-1.5 flex items-center gap-1 font-medium text-accent hover:underline">
+          <button type="button" onClick={() => go('/projects')} className="mt-1.5 flex items-center gap-1 font-medium text-accent hover:underline">
             Projects <ArrowRight size={13} />
           </button>
         </div>
@@ -617,7 +617,7 @@ export function Library() {
                   </h2>
                 )}
                 {space && wide && (
-                  <button type="button" onClick={() => go(`/spaces/${space.id}`)} className="text-[12.5px] font-medium text-fg-3 hover:text-fg">
+                  <button type="button" onClick={() => go(`/projects/${space.id}`)} className="text-[12.5px] font-medium text-fg-3 hover:text-fg">
                     Open the project
                   </button>
                 )}
@@ -714,7 +714,7 @@ export function SpaceLibrary({ space, limit, framed = true }: { space: SpaceView
       )}
       {!!mine.length && limit !== undefined && mine.length > limit && (
         <div className="mt-3">
-          <Button size="sm" variant="ghost" onClick={() => go(`/library?space=${space.id}`)}>
+          <Button size="sm" variant="ghost" onClick={() => go(`/library?project=${space.id}`)}>
             {tr(`See all ${mine.length} in the Library`)}
             <ArrowRight size={13} className="ml-1" />
           </Button>

@@ -28,11 +28,11 @@ export function SpaceFiles({ s, onSaved }: { s: Space; onSaved: (next: Space) =>
   const root = under(dir, s.folder) ? s.folder : (roots.filter((r) => under(dir, r)).sort((a, b) => b.length - a.length)[0] ?? s.folder);
   const [attach, setAttach] = useState(false);
   const attachRef = useRef<HTMLButtonElement>(null);
-  const open = (d: string) => go(`/spaces/${s.id}/files${d === s.folder ? '' : `?dir=${enc(d)}`}`);
+  const open = (d: string) => go(`/projects/${s.id}/files${d === s.folder ? '' : `?dir=${enc(d)}`}`);
 
   const save = async (folders: string[]) => {
     try {
-      const next = await patch<Space>(`/api/spaces/${enc(s.id)}`, { folders });
+      const next = await patch<Space>(`/api/projects/${enc(s.id)}`, { folders });
       onSaved(next);
       loadSpaces();
       return next;

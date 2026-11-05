@@ -538,7 +538,7 @@ function renamePlace(g: SessionGroup, name: string) {
   const n = name.trim();
   if (g.space) {
     if (!n || n === g.space.name) return;
-    patch(`/api/spaces/${enc(g.space.id)}`, { name: n })
+    patch(`/api/projects/${enc(g.space.id)}`, { name: n })
       .then(() => loadSpaces())
       .catch(toastError);
   } else if (g.path && n !== g.label) renameFolder(g.path, n);
@@ -710,7 +710,7 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
               </MenuItem>
             )}
             {g.space ? (
-              <MenuItem icon={<Boxes size={14} />} onClick={() => (setMenu(false), go(`/spaces/${enc(g.space!.id)}`))}>
+              <MenuItem icon={<Boxes size={14} />} onClick={() => (setMenu(false), go(`/projects/${enc(g.space!.id)}`))}>
                 Open the project
               </MenuItem>
             ) : (

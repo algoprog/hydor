@@ -10,7 +10,7 @@ Every agent the app runs can read documents: Claude Code, Codex, Custom, and the
 
 1. **Attach it to your message**: the paperclip (**Attach files**) in the message box, or drag the file onto the box, or paste it. Pictures go to the model as pictures; any other file is saved on the computer that runs Hydor, and its path is added to your message so the agent can open it. One message carries up to 25 MB of files.
 2. **Name a file on this computer**: "Summarize ~/Documents/lease.pdf". A path that doesn't start with `/` or `~` starts in the session's folder.
-3. **Keep documents in a project or in the shared knowledge**, so that sessions can search them and cite the page: see [Projects and knowledge](/guide/spaces).
+3. **Keep documents in a project or in the shared knowledge**, so that sessions can search them and cite the page: see [Projects and knowledge](/guide/projects).
 
 While the agent reads, its work shows **Reading lease.pdf**, then **Read lease.pdf**. On a wider screen the line also says what the document is (the kind, its pages, sheets or slides) and which lines were read. Click the line to see the text the agent got, and **Open lease.pdf** to see the file itself.
 
