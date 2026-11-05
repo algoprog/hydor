@@ -1,6 +1,7 @@
 // A comment as the editors show it, beside a document's page or in a list of comments: who wrote it (you, or an
 // agent), how long ago, what it says and the replies under it, with Reply, Resolve (or Reopen), and in its menu Edit
 // and Delete. CommentBox is the field a new comment or a reply is written in: Ctrl+Enter sends it, Esc drops it.
+// Who and ago say who did something and when, for other notes of the editors as well (a tracked change).
 // What people and agents wrote is shown as written, never translated.
 import { useEffect, useRef, useState } from 'react';
 import { Bot, Check, MoreHorizontal, Pencil, RotateCcw, Trash2, User } from 'lucide-react';
@@ -9,7 +10,7 @@ import { Button, cx, IconButton, MenuItem, Popover } from '../../../components/u
 import { LOCALE } from '../../../i18n/locale';
 
 /** How long ago, in a few words ("now", "5 min ago", "yesterday", "12 Mar"). */
-function ago(at: number): string {
+export function ago(at: number): string {
   const s = Math.max(0, (Date.now() - at) / 1000);
   if (s < 60) return 'just now';
   if (s < 3600) return `${Math.floor(s / 60)} min ago`;
@@ -19,7 +20,8 @@ function ago(at: number): string {
   return d.toLocaleDateString(LOCALE, d.getFullYear() === now.getFullYear() ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function Who({ by }: { by: 'user' | 'agent' }) {
+/** Who wrote it: you or an agent, with their icon (for a tracked change too). */
+export function Who({ by }: { by: 'user' | 'agent' }) {
   return (
     <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-fg">
       <span className={cx('flex h-5 w-5 items-center justify-center rounded-full', by === 'agent' ? 'bg-accent-soft text-accent' : 'bg-bg-3 text-fg-2')}>{by === 'agent' ? <Bot size={12} /> : <User size={12} />}</span>
