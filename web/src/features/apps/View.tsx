@@ -82,7 +82,8 @@ export function AppView({
   const def = useMemo(() => (translate ? translateUi(ui, tr) : ui), [ui, translate]);
   const html = useMemo(() => shell(name, lang), [name, lang]);
   const store = useMemo(() => memoryStore(), []);
-  const saved = !appId.startsWith('tpl:') && appId !== 'test' && !publicView;
+  // What it keeps: an app of yours, or a ready-made one ("tpl:<id>", its own page's records); not a try, nor a public page.
+  const saved = appId !== 'test' && !publicView;
   // What changes while it is on screen: its run's status and answer (compared by what they hold, not by each new copy).
   const runKey = run ? JSON.stringify([run.id, run.status, run.result ?? null, run.inputs]) : '';
   const lastKey = last ? JSON.stringify([last.id, last.status, last.result ?? null]) : '';
