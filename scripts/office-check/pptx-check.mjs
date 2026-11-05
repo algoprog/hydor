@@ -104,7 +104,22 @@ const ECMA = 'https://ecma-international.org/wp-content/uploads/';
 /** The ECMA-376 Transitional schemas (Part 4) and the packaging ones (Part 2), fetched once, and one schema that takes them all in. */
 function schemas() {
   const driver = path.join(SCHEMAS, 'all.xsd');
-  if (fs.existsSync(driver)) return driver;
+  if (!fs.existsSync(path.join(SCHEMAS, 'pml.xsd'))) fetchSchemas();
+  const imports = [
+    ['http://schemas.openxmlformats.org/presentationml/2006/main', 'pml.xsd'],
+    ['http://schemas.openxmlformats.org/drawingml/2006/main', 'dml-main.xsd'],
+    ['http://schemas.openxmlformats.org/drawingml/2006/chart', 'dml-chart.xsd'],
+    ['http://schemas.openxmlformats.org/spreadsheetml/2006/main', 'sml.xsd'],
+    ['http://schemas.openxmlformats.org/officeDocument/2006/extended-properties', 'shared-documentPropertiesExtended.xsd'],
+    ['http://schemas.openxmlformats.org/package/2006/content-types', 'opc-contentTypes.xsd'],
+    ['http://schemas.openxmlformats.org/package/2006/relationships', 'opc-relationships.xsd'],
+    ['http://schemas.openxmlformats.org/package/2006/metadata/core-properties', 'opc-coreProperties.xsd'],
+  ];
+  fs.writeFileSync(driver, `<?xml version="1.0" encoding="UTF-8"?>\n<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">\n${imports.map(([ns, f]) => `  <xs:import namespace="${ns}" schemaLocation="${f}"/>`).join('\n')}\n</xs:schema>\n`);
+  return driver;
+}
+
+function fetchSchemas() {
   fs.mkdirSync(SCHEMAS, { recursive: true });
   const fetchZip = (url, file) => execFileSync('curl', ['-sfL', '-m', '300', '-o', file, url]);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ecma-'));
@@ -129,17 +144,6 @@ function schemas() {
       .replace(/<(xs|xsd):import (id="xml" )?namespace="http:\/\/www\.w3\.org\/XML\/1998\/namespace"\/>/g, '<$1:import $2namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="xml.xsd"/>');
   for (const n of fs.readdirSync(SCHEMAS)) if (n.endsWith('.xsd')) edit(n, local);
   fs.rmSync(tmp, { recursive: true, force: true });
-  const imports = [
-    ['http://schemas.openxmlformats.org/presentationml/2006/main', 'pml.xsd'],
-    ['http://schemas.openxmlformats.org/drawingml/2006/main', 'dml-main.xsd'],
-    ['http://schemas.openxmlformats.org/drawingml/2006/chart', 'dml-chart.xsd'],
-    ['http://schemas.openxmlformats.org/officeDocument/2006/extended-properties', 'shared-documentPropertiesExtended.xsd'],
-    ['http://schemas.openxmlformats.org/package/2006/content-types', 'opc-contentTypes.xsd'],
-    ['http://schemas.openxmlformats.org/package/2006/relationships', 'opc-relationships.xsd'],
-    ['http://schemas.openxmlformats.org/package/2006/metadata/core-properties', 'opc-coreProperties.xsd'],
-  ];
-  fs.writeFileSync(driver, `<?xml version="1.0" encoding="UTF-8"?>\n<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">\n${imports.map(([ns, f]) => `  <xs:import namespace="${ns}" schemaLocation="${f}"/>`).join('\n')}\n</xs:schema>\n`);
-  return driver;
 }
 
 /**
@@ -169,14 +173,20 @@ function validate(file, work) {
   const dir = path.join(work, 'parts');
   fs.rmSync(dir, { recursive: true, force: true });
   const names = [];
-  for (const [name, data] of parts) {
-    if (!/\.(xml|rels)$/.test(name)) continue;
+  // The package's parts, and those of the packages inside it (a chart's workbook).
+  const put = (name, data) => {
+    if (/\.(xlsx|docx|pptx)$/.test(name)) {
+      for (const [inner, d] of unzip(data)) put(`${name}/${inner}`, d);
+      return;
+    }
+    if (!/\.(xml|rels)$/.test(name)) return;
     const { xml } = standardOnly(data.toString('utf8'));
     const f = path.join(dir, name);
     fs.mkdirSync(path.dirname(f), { recursive: true });
     fs.writeFileSync(f, xml);
     names.push(f);
-  }
+  };
+  for (const [name, data] of parts) put(name, data);
   const r = spawnSync(XMLLINT, ['--noout', '--nonet', '--schema', driver, ...names], { encoding: 'utf8', maxBuffer: 64 << 20 });
   const errors = (r.stderr || '')
     .split('\n')

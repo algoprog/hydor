@@ -180,8 +180,8 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
     const wordFontsOf = o.format === 'docx' && src.kind === 'doc' ? await wordFonts(docFaces(readDoc(src.text))) : undefined;
     if (o.format === 'pptx') {
       scales = await fitScales(db, k, src.text, title);
-      // A deck's icons and equations, as pictures for PowerPoint.
-      if (src.kind === 'slides') renders = await deckRenders(readDeck(src.text));
+      // A deck's icons and equations, as pictures for PowerPoint, and its pictures whose colours were changed, changed.
+      if (src.kind === 'slides') renders = await deckRenders(readDeck(src.text), (s) => pics.get(s) ?? null);
     }
     return out(await make(db, src.text, title, { picture: (s) => pics.get(s) ?? null, scales, renders, wordFonts: wordFontsOf }), o.format);
   }

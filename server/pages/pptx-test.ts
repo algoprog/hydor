@@ -9,8 +9,11 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Zip } from '../documents/zip.ts';
-import { normalizeDeck } from '../../shared/slides.ts';
-import { langOf, pptxFile } from './pptx.ts';
+import zlib from 'node:zlib';
+import { normalizeDeck, type El } from '../../shared/slides.ts';
+import { canCapture } from '../capture/index.ts';
+import { chartPlan, langOf, pptxFile, shapeOutline, type Picture } from './pptx.ts';
+import { deckRenders } from './slides-render.ts';
 import { deckFaces, deckFontFiles, eotOf, faceFile, faceKey, fontAttrs, fontInfo } from './pptx-fonts.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -42,6 +45,37 @@ function withOs2(font: Buffer, at: number, value: number): Buffer {
 // KaTeX's italic face says so only in its name: one that says so where fonts do (fsSelection's ITALIC bit).
 const italic = withOs2(fs.readFileSync(path.join(KATEX, 'KaTeX_Main-Italic.ttf')), 62, 0x41);
 const part = (file: Buffer, name: string) => new Zip(file).read(name)?.toString('utf8') ?? '';
+
+/** A PNG of `w`×`h` pixels, each `px(x, y)`. */
+function png(w: number, h: number, px: (x: number, y: number) => number[]): Buffer {
+  const raw = Buffer.alloc((w * 4 + 1) * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) Buffer.from(px(x, y)).copy(raw, y * (w * 4 + 1) + 1 + x * 4);
+  const chunk = (type: string, data: Buffer) => {
+    const head = Buffer.alloc(8);
+    head.writeUInt32BE(data.length);
+    head.write(type, 4, 'latin1');
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(zlib.crc32(Buffer.concat([head.subarray(4), data])) >>> 0);
+    return Buffer.concat([head, data, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr.set([8, 6], 8);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+/** The first pixel of a PNG the browser wrote (8-bit RGBA, unfiltered or Sub/Up/Average/Paeth on the first row). */
+function pixel(b: Buffer): number[] {
+  const chunks: Buffer[] = [];
+  for (let at = 8; at < b.length; ) {
+    const n = b.readUInt32BE(at);
+    if (b.toString('latin1', at + 4, at + 8) === 'IDAT') chunks.push(b.subarray(at + 8, at + 8 + n));
+    at += 12 + n;
+  }
+  const raw = zlib.inflateSync(Buffer.concat(chunks));
+  return [raw[1], raw[2], raw[3]];
+}
 
 // ---- Embedded OpenType ------------------------------------------------------------------------------------------
 {
@@ -206,6 +240,147 @@ const deck = normalizeDeck({
   const only = normalizeDeck({ theme: 'paper', slides: [{ els: [{ type: 'text', x: 0, y: 0, w: 400, h: 100, text: 'Hi **there**' }] }] });
   const files = await deckFontFiles(only);
   ok(files.size === 2 && files.get('Inter|0|0')?.equals(regular) && files.get('Inter|1|0')?.equals(bold), 'a deck’s faces, ready for its file');
+}
+
+// ---- pictures ----------------------------------------------------------------------------------------------------------
+{
+  const pic: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAAAASUVORK5CYII=', 'base64'), ext: 'png', w: 400, h: 200 };
+  const d = normalizeDeck({
+    slides: [
+      {
+        els: [
+          { id: 'warm', type: 'image', src: 'naget-asset:0123456789abcdef', x: 0, y: 0, w: 200, h: 200, adjust: { bright: 40, sat: 0 }, opacity: 0.5 },
+          { id: 'grey', type: 'image', src: 'naget-asset:0123456789abcdef', x: 300, y: 0, w: 200, h: 200, adjust: { gray: true } },
+          { id: 'fit', type: 'image', src: 'naget-asset:0123456789abcdef', x: 600, y: 0, w: 200, h: 200, fit: 'contain', line: '#000000', shadow: true },
+        ],
+      },
+    ],
+  });
+  const baked: Picture = { ...pic, data: Buffer.concat([pic.data, Buffer.from([0])]) };
+  const x = part(pptxFile(d, { title: 'T', picture: () => pic, renders: new Map([['adjust:warm', baked]]) }), 'ppt/slides/slide1.xml');
+  const warm = /<p:pic>(?:(?!<\/p:pic>)[^])*?name="Picture 1"[^]*?<\/p:pic>/.exec(x)?.[0] ?? '';
+  ok(warm.includes('<a:alphaModFix amt="50000"/></a:blip>') && !warm.includes('<a:lum') && !warm.includes('<a:hsl'), 'a picture whose colours were changed goes as the editor shows it, see-through as it is, without PowerPoint’s effects on top');
+  const rels = part(pptxFile(d, { title: 'T', picture: () => pic, renders: new Map([['adjust:warm', baked]]) }), 'ppt/slides/_rels/slide1.xml.rels');
+  ok((rels.match(/media\/image\d\.png/g) ?? []).length === 2, 'the changed picture is a picture of its own beside the plain one');
+  ok(x.includes('<a:grayscl/>'), 'grey alone is PowerPoint’s own effect');
+  ok(
+    /<a:srcRect l="0" t="-50000" r="0" b="-50000"\/>/.test(x) && x.includes(`<a:ext cx="${200 * 9525}" cy="${200 * 9525}"/>`),
+    'a picture fitted inside its box keeps the box (and its outline), the picture inside it as PowerPoint’s Crop → Fit writes it',
+  );
+  ok(x.includes('<a:outerShdw blurRad="171450" dist="95250" dir="5400000" algn="t" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="25000"/>'), 'a picture’s shadow as the app casts it');
+  const plain = part(pptxFile(d, { title: 'T', picture: () => pic }), 'ppt/slides/slide1.xml');
+  ok(plain.includes('<a:lum bright="40000"'), 'without a browser to change it, the nearest of PowerPoint’s effects');
+  if (canCapture()) {
+    // Drawn by the browser's own filters: brighter, and grey without saturation.
+    const red = png(8, 8, () => [200, 40, 40, 255]);
+    const made = await deckRenders(d, () => ({ data: red, ext: 'png', w: 8, h: 8 }));
+    const got = made.get('adjust:warm');
+    ok(got && got.w === 8 && got.h === 8 && !made.has('adjust:grey') && !made.has('adjust:fit'), 'with a browser here, only pictures whose colours only pixels can show are drawn again, at their own size');
+    const px = got ? pixel(got.data) : [0, 0, 0];
+    // 200,40,40 made 1.4 times as bright (255,56,56), then grey by Rec. 709's weights, as CSS's filters do.
+    ok(
+      px.every((v) => Math.abs(v - 98) <= 3),
+      `as the editor draws them (brighter, no colour): ${px.join(',')}`,
+    );
+  }
+}
+
+// ---- shapes and lines -----------------------------------------------------------------------------------------------------
+{
+  const d = normalizeDeck({
+    slides: [
+      {
+        els: [
+          { id: 'st', type: 'shape', shape: 'star', x: 0, y: 0, w: 200, h: 200, fill: 'accent' },
+          { id: 'hb', type: 'shape', shape: 'heart', x: 220, y: 0, w: 200, h: 200, fill: 'accent' },
+          { id: 'lab', type: 'shape', shape: 'chevron', x: 440, y: 0, w: 300, h: 100, text: 'Plan the launch', shadow: true },
+          { id: 'rr', type: 'shape', shape: 'round', x: 760, y: 0, w: 200, h: 100, radius: 20, pad: 10, text: 'Go', shadow: true },
+          { id: 'cn', type: 'connector', from: { el: 'lab', at: 'b' }, to: { el: 'rr', at: 'b' }, width: 2, end: 'arrow', start: 'dot', dash: 'dash' },
+        ],
+      },
+    ],
+  });
+  const x = part(pptxFile(d, { title: 'T', picture: () => null }), 'ppt/slides/slide1.xml');
+  ok(x.includes('<a:prstGeom prst="star5"><a:avLst><a:gd name="adj" fmla="val 19098"/><a:gd name="hf" fmla="val 100000"/><a:gd name="vf" fmla="val 105000"/></a:avLst></a:prstGeom>'), 'a star is PowerPoint’s, in the app’s proportions');
+  const heart = /name="Shape 2"[^]*?<\/p:sp>/.exec(x)?.[0] ?? '';
+  ok(heart.includes('<a:custGeom>') && (heart.match(/<a:cubicBezTo>/g) ?? []).length === 4 && heart.includes('<a:path w="1905000" h="1905000">'), 'a heart is drawn as the app draws it, its own curves');
+  const chevron = /name="Shape 3"[^]*?<\/p:sp>/.exec(x)?.[0] ?? '';
+  ok(
+    chevron.includes('<a:custGeom>') && chevron.includes('<a:rect l="l" t="t" r="r" b="b"/>') && chevron.includes('<a:cxnLst><a:cxn ang="16200000"><a:pos x="hc" y="t"/>'),
+    'a shape with words in it keeps them to its whole box, as the app does, and is joined at its sides’ middles',
+  );
+  ok(chevron.includes('<a:outerShdw blurRad="152400" dist="76200"') && /name="Shape 4"[^]*?<a:outerShdw blurRad="266700" dist="95250"/.test(x), 'drawn shapes and boxes cast the app’s two kinds of shadow');
+  const rr = /name="Shape 4"[^]*?<\/p:sp>/.exec(x)?.[0] ?? '';
+  ok(rr.includes('<a:prstGeom prst="roundRect">') && rr.includes(`lIns="${Math.round((10 - 20 * 0.29289) * 9525)}"`), 'a rounded box is PowerPoint’s, its words as far in as the app’s');
+  const cn = /<p:cxnSp>[^]*?<\/p:cxnSp>/.exec(x)?.[0] ?? '';
+  const id3 = /<p:cNvPr id="(\d+)" name="Shape 3"/.exec(x)?.[1];
+  const id4 = /<p:cNvPr id="(\d+)" name="Shape 4"/.exec(x)?.[1];
+  ok(cn.includes(`<a:stCxn id="${id3}" idx="2"/><a:endCxn id="${id4}" idx="2"/>`), 'a connector stays stuck to a shape drawn as its own outline');
+  ok(
+    cn.includes('<a:custDash><a:ds d="300000" sp="200000"/></a:custDash>') && cn.includes('<a:headEnd type="oval" w="lg" len="lg"/>') && cn.includes('<a:tailEnd type="triangle" w="lg" len="lg"/>'),
+    'a dashed line as the app dashes it, its ends as large',
+  );
+  const outline = shapeOutline('callout', 100, 100);
+  ok(outline[0][0] === 'M' && outline.some((c) => c[0] === 'Q') && outline.at(-1)?.[0] === 'Z', 'a callout’s outline has the app’s rounded corners');
+}
+
+// ---- charts --------------------------------------------------------------------------------------------------------------
+{
+  const d = normalizeDeck({
+    slides: [
+      {
+        els: [
+          {
+            id: 'c1',
+            type: 'chart',
+            kind: 'column',
+            x: 0,
+            y: 0,
+            w: 600,
+            h: 300,
+            title: 'Sales',
+            labels: ['Q1', 'Q2', 'Q3'],
+            series: [
+              { name: 'North', values: [12, 18, 24] },
+              { name: 'South', values: [8, 11, 9] },
+            ],
+            values: true,
+            size: 16,
+          },
+          { id: 'c2', type: 'chart', kind: 'doughnut', x: 600, y: 0, w: 400, h: 300, labels: ['A', 'B'], series: [{ name: 'S', values: [3, 1] }], values: true },
+          { id: 'c3', type: 'chart', kind: 'line', x: 0, y: 300, w: 600, h: 300, labels: ['A', 'B'], series: [{ name: 'S', values: [3, 1] }], size: 18 },
+        ],
+      },
+    ],
+  });
+  const file = pptxFile(d, { title: 'T', picture: () => null });
+  const c1 = part(file, 'ppt/charts/chart1.xml');
+  const plan = chartPlan(d.slides[0].els[0] as Extract<El, { type: 'chart' }>);
+  const r4 = (v: number) => Math.round(v * 10000) / 10000;
+  ok(plan.lo === 0 && plan.hi === 25 && plan.step === 6.25, `the app’s ticks: ${plan.lo}…${plan.hi} by ${plan.step}`);
+  ok(c1.includes('<c:scaling><c:orientation val="minMax"/><c:max val="25"/><c:min val="0"/></c:scaling>') && c1.includes('<c:majorUnit val="6.25"/>'), 'its value axis on the app’s ticks');
+  ok(
+    c1.includes(
+      `<c:manualLayout><c:layoutTarget val="inner"/><c:xMode val="edge"/><c:yMode val="edge"/><c:x val="${r4(plan.plot.x / 600)}"/><c:y val="${r4(plan.plot.y / 300)}"/><c:w val="${r4(plan.plot.w / 600)}"/><c:h val="${r4(plan.plot.h / 300)}"/></c:manualLayout>`,
+    ),
+    'its plot where the app draws it',
+  );
+  ok(c1.includes('<c:gapWidth val="78"/>') && /<c:overlap val="-\d+"\/>/.test(c1) && c1.includes('<c:dLblPos val="outEnd"/>'), 'its bars as wide as the app’s, side by side, their values above them');
+  ok(
+    c1.includes('<c:externalData r:id="rId1"><c:autoUpdate val="0"/></c:externalData>') && part(file, 'ppt/charts/_rels/chart1.xml.rels').includes('relationships/package" Target="../embeddings/Microsoft_Excel_Worksheet1.xlsx"'),
+    'its numbers in a workbook beside it, for Edit Data',
+  );
+  const book = new Zip(new Zip(file).read('ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx')!);
+  const sheet = book.read('xl/worksheets/sheet1.xml')?.toString() ?? '';
+  ok(
+    sheet.includes('<c r="B1" t="inlineStr"><is><t>North</t></is></c>') && sheet.includes('<c r="A3" t="inlineStr"><is><t>Q2</t></is></c><c r="B3"><v>18</v></c><c r="C3"><v>11</v></c>') && !!book.read('xl/workbook.xml'),
+    'the workbook: labels down column A, a column per series, as the chart’s formulas say',
+  );
+  ok(part(file, '[Content_Types].xml').includes('<Default Extension="xlsx" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/>'), 'of a workbook’s type');
+  const c2 = part(file, 'ppt/charts/chart2.xml');
+  ok(c2.includes('<c:doughnutChart>') && !c2.includes('dLblPos') && c2.includes('<c:numFmt formatCode="0%" sourceLinked="0"/>'), 'a doughnut’s shares as percentages, where PowerPoint puts them (it takes no position for them)');
+  const c3 = part(file, 'ppt/charts/chart3.xml');
+  ok(c3.includes(`<c:size val="${Math.round(2 * Math.max(3, 18 / 4.5) * 0.75)}"/>`), 'a line’s dots as large as the app’s');
 }
 
 console.log(`${passed} passed, ${failed} failed`);

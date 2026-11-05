@@ -1,9 +1,13 @@
 // Pictures of a deck, made in the browser the app takes its pictures with. For its PowerPoint file, pictures of its
 // parts: each icon as a PNG (the file gets its SVG too; the PNG is for programs that do not read SVG) and each equation
 // as the server's KaTeX draws it; one page holds them all, each at its size on the slide, and each is taken at up to
-// twice that. Without a browser there are none of that kind: icons then go as SVG alone, equations as their LaTeX. And
-// its slides as pictures (the PNG export): taken from the deck's own page as it prints, twice its size.
-import { everyEl, type Deck, type El } from '../../shared/slides.ts';
+// twice that. Pictures whose colours were changed (brightness, contrast, saturation, blur) go changed, by the
+// browser's own filters as the editor shows them: Office's picture effects work otherwise (its brightness moves colours
+// towards white where the browser's multiplies them, and PowerPoint itself keeps corrected pictures as their pixels).
+// Without a browser there are none of these: icons then go as SVG alone, equations as their LaTeX, pictures with
+// PowerPoint's nearest effects. And its slides as pictures (the PNG export): taken from the deck's own page as it
+// prints, twice its size.
+import { everyEl, type Deck, type El, type ImageEl } from '../../shared/slides.ts';
 import { canCapture, withTab } from '../capture/index.ts';
 import { iconSvgText, type Picture } from './pptx.ts';
 import type { DB } from '../db.ts';
@@ -55,8 +59,55 @@ function page(deck: Deck, items: Item[]): string {
   return `<!doctype html><html><head><meta charset="utf-8">${maths.head}<style>html,body{margin:0;background:transparent}.it{position:absolute;left:0;overflow:visible}.it img{display:block;width:100%;height:100%}</style></head><body><script type="application/json" id="n-r">${json}</script>${maths.body}<script>${script}</script></body></html>`;
 }
 
-/** The deck's icons and equations as pictures, by "icon:<id>" and "math:<id>". */
-export async function deckRenders(deck: Deck): Promise<Map<string, Picture>> {
+/** Whether a picture's colours are changed in a way only its pixels can show (grey alone is PowerPoint's own grayscl). */
+export const recoloured = (e: ImageEl) => !!e.adjust && (!!e.adjust.bright || !!e.adjust.contrast || (e.adjust.sat !== undefined && e.adjust.sat !== 100) || !!e.adjust.blur);
+
+/** The CSS filter the editor draws a picture's colours with (shared/slides-runtime.ts), its blur in the picture's own pixels (`k` of them to a slide pixel). */
+function filterOf(e: ImageEl, k: number): string {
+  const a = e.adjust ?? {};
+  return [
+    a.bright ? `brightness(${1 + a.bright / 100})` : '',
+    a.contrast ? `contrast(${1 + a.contrast / 100})` : '',
+    a.sat !== undefined && a.sat !== 100 ? `saturate(${a.sat / 100})` : '',
+    a.gray ? 'grayscale(1)' : '',
+    a.blur ? `blur(${Math.round(a.blur * k * 100) / 100}px)` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/** How many of a picture's own pixels make one of the slide's, as the editor shows it (cropped, or fitted to its box). */
+function pixelsPerSlidePx(e: ImageEl, pic: Picture): number {
+  const w = Math.max(1, Math.abs(e.w));
+  const h = Math.max(1, Math.abs(e.h));
+  if (e.crop) return Math.sqrt(((pic.w * (1 - e.crop.l - e.crop.r)) / w) * ((pic.h * (1 - e.crop.t - e.crop.b)) / h));
+  const fit = e.fit ?? 'cover';
+  if (fit === 'cover') return 1 / Math.max(w / pic.w, h / pic.h);
+  if (fit === 'contain') return 1 / Math.min(w / pic.w, h / pic.h);
+  return Math.sqrt((pic.w / w) * (pic.h / h));
+}
+
+/** The pictures whose colours were changed, changed as the editor shows them, by "adjust:<id>": PNGs of their own size (at most 2400 pixels across). */
+async function recolour(tab: { evaluate<T>(js: string): Promise<T> }, deck: Deck, picture: (src: string) => Picture | null, out: Map<string, Picture>): Promise<void> {
+  const list = deck.slides.flatMap((s) => everyEl(s.els)).filter((e): e is ImageEl => e.type === 'image' && recoloured(e));
+  for (const e of list.slice(0, MAX_ITEMS)) {
+    const pic = e.src ? picture(e.src) : null;
+    if (!pic || pic.w < 1 || pic.h < 1) continue;
+    const q = Math.min(1, 2400 / Math.max(pic.w, pic.h));
+    const w = Math.max(1, Math.round(pic.w * q));
+    const h = Math.max(1, Math.round(pic.h * q));
+    const url = `data:image/${pic.ext};base64,${pic.data.toString('base64')}`;
+    const js = `new Promise((ok) => { const i = new Image(); i.onload = () => { const c = document.createElement('canvas'); c.width = ${w}; c.height = ${h}; const g = c.getContext('2d'); g.filter = ${JSON.stringify(filterOf(e, pixelsPerSlidePx(e, pic) * q))}; g.drawImage(i, 0, 0, ${w}, ${h}); ok(c.toDataURL('image/png').split(',')[1]); }; i.onerror = () => ok(''); i.src = ${JSON.stringify(url)}; })`;
+    const b64 = await tab.evaluate<string>(js).catch(() => '');
+    if (b64) out.set(`adjust:${e.id}`, { data: Buffer.from(b64, 'base64'), ext: 'png', w, h });
+  }
+}
+
+/**
+ * The deck's icons and equations as pictures, by "icon:<id>" and "math:<id>", and its pictures whose colours were
+ * changed, changed, by "adjust:<id>" (`picture` gives a picture's bytes as the file gets them).
+ */
+export async function deckRenders(deck: Deck, picture: (src: string) => Picture | null = () => null): Promise<Map<string, Picture>> {
   const out = new Map<string, Picture>();
   if (!canCapture()) return out;
   const items: Item[] = [];
@@ -70,9 +121,11 @@ export async function deckRenders(deck: Deck): Promise<Map<string, Picture>> {
       else if (e.type === 'math') items.push({ n: items.length, key: `math:${e.id}`, w, h, s: si, el: { ...e, x: 0, y: 0, rot: undefined, opacity: undefined, link: undefined } });
     }
   });
-  if (!items.length) return out;
+  const adjusted = deck.slides.some((s) => everyEl(s.els).some((e) => e.type === 'image' && recoloured(e)));
+  if (!items.length && !adjusted) return out;
   const width = Math.min(4000, Math.ceil(Math.max(800, ...items.map((i) => i.w))));
   return withTab({ html: page(deck, items), width, height: 800, settleMs: 150, blockPrivate: true }, async (tab) => {
+    await recolour(tab, deck, picture, out);
     // Equations come drawn by the server's KaTeX (with its fonts inside the page): none is left as its LaTeX.
     const katex = await tab.evaluate<boolean>('document.fonts.ready.then(() => new Promise((ok) => setTimeout(() => { window.__fit(); ok(!!document.getElementById("n-math")); }, 120)))');
     await tab.s.send('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: 0 } }).catch(() => {});
