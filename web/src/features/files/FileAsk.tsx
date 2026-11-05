@@ -176,7 +176,7 @@ function Start({ path, beforeSend }: { path: string; beforeSend: () => Promise<b
             <Quote size={14} className="mt-1 shrink-0 text-fg-3" />
           )}
           <div className="min-w-0 flex-1 py-0.5">
-            <div className="text-[11.5px] font-medium text-fg-3">{pick.image ? `A part of page ${pick.page}` : `Page ${pick.page}`}</div>
+            <div className="text-[11.5px] font-medium text-fg-3">{pick.image ? <>A part of page {pick.page}</> : <>Page {pick.page}</>}</div>
             {!pick.image && (
               <div translate="no" className="mt-0.5 line-clamp-4 text-[13px] leading-snug text-fg-2">
                 {pick.text}

@@ -13,7 +13,7 @@ import { tr } from '../../../i18n/runtime';
 import { cx, IconButton, MenuBack, MenuItem, MenuSep, Popover, Throbber, useIsMobile } from '../../../components/ui';
 import { SpaceMark } from '../../spaces/parts';
 import { useSpaces } from '../../spaces/state';
-import { areaUrl, COLOR_NAMES, deepOf, notesText, rgbOf, TAB } from './notes';
+import { areaUrl, COLOR_NAMES, copyWords, deepOf, notesText, rgbOf, TAB } from './notes';
 
 /** Projects whose folders hold the file first, then the others as they come. */
 function byFolder(spaces: SpaceView[], file: string): SpaceView[] {
@@ -148,10 +148,7 @@ export function NotesMenu({ path, hs, kept, onView, onFileSaved }: { path: strin
               disabled={!hs.length}
               onClick={() => {
                 close();
-                void navigator.clipboard.writeText(notesText(basename(path), hs)).then(
-                  () => toast(tr('Copied the notes'), 'ok'),
-                  () => toast(tr('The browser did not allow copying'), 'error'),
-                );
+                void copyWords(notesText(basename(path), hs), 'Copied the notes');
               }}
             >
               Copy all
@@ -232,7 +229,7 @@ function Item({
   return (
     <div className={cx('group mx-2 mb-1.5 rounded-xl border bg-panel', selected ? 'border-accent/60' : 'border-line')}>
       <button type="button" onClick={onGo} className="flex w-full items-start gap-2.5 px-3 pt-2.5 pb-0.5 text-left" title={tr('Show it on the page')}>
-        <span className="mt-[3px] h-3.5 w-1 shrink-0 rounded-full" style={{ background: deepOf(h.color) }} aria-label={COLOR_NAMES[h.color]} />
+        <span role="img" className="mt-[3px] h-3.5 w-1 shrink-0 rounded-full" style={{ background: deepOf(h.color) }} aria-label={COLOR_NAMES[h.color]} />
         {h.kind === 'area' && r ? (
           <img src={areaUrl(path, h.page, r, thumbW * 2, mtime)} alt={h.text ?? ''} className="rounded-md border border-line bg-white object-contain" style={{ width: Math.min(thumbW, (thumbH * r.w) / Math.max(1, r.h)), height: thumbH }} />
         ) : (
