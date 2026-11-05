@@ -262,7 +262,7 @@ export class ClaudeLive extends LiveAdapter {
     });
   }
 
-  /** `replay`: re-read after a restart, so when a task started is unknown (not now). */
+  /** `replay`: re-read after a restart, so a task did not start now: the session's transcript tells when (SessionManager.dateTasks). */
   private onSystem(m: Json, replay: boolean) {
     switch (m.subtype) {
       case 'init':
