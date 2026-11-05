@@ -6,7 +6,7 @@
 //
 // save_doc is how agents make and change documents; get_page gives one back as Markdown, which says all a
 // document holds but its blocks' ids (carried over from the version it changes when it comes back).
-import { newCommentId } from '../../shared/comments.ts';
+import { cleanAuthor, newCommentId } from '../../shared/comments.ts';
 import {
   ASSET,
   blockHtml,
@@ -408,13 +408,13 @@ function commentsForAgent(doc: Doc): string[] {
   const list = doc.comments ?? [];
   if (!list.length) return [];
   const open = list.filter((c) => !c.resolved).length;
-  const who = (by: 'user' | 'agent') => (by === 'agent' ? 'an agent' : 'the user');
+  const who = (by: 'user' | 'agent', author?: string) => (author ? `“${author}”` : by === 'agent' ? 'an agent' : 'the user');
   return [
     '',
     `Comments (${open} open, ${list.length - open} resolved), each on the words marked with its id above:`,
     ...list.flatMap((c) => [
-      `- ${c.id} · ${c.resolved ? 'resolved' : 'open'}${c.quote ? ` · on “${c.quote.slice(0, 160)}”` : ''} · ${who(c.by)}, ${when(c.at)} UTC: ${c.text.replace(/\n/g, ' / ')}`,
-      ...(c.replies ?? []).map((r) => `    ↳ ${who(r.by)}, ${when(r.at)} UTC: ${r.text.replace(/\n/g, ' / ')}`),
+      `- ${c.id} · ${c.resolved ? 'resolved' : 'open'}${c.quote ? ` · on “${c.quote.slice(0, 160)}”` : ''} · ${who(c.by, c.author)}, ${when(c.at)} UTC: ${c.text.replace(/\n/g, ' / ')}`,
+      ...(c.replies ?? []).map((r) => `    ↳ ${who(r.by, r.author)}, ${when(r.at)} UTC: ${r.text.replace(/\n/g, ' / ')}`),
     ]),
     '',
     'To answer them, save_doc with this id and comments: [{"id": "<id>", "reply": "what you did or say"}], adding "resolve": true once a comment is dealt with (or "reopen": true). Make the change a comment asks for in the markdown too. Add a comment of your own with <span data-comment="new1">the words</span> in the markdown and {"id": "new1", "text": "…"} in comments.',
@@ -567,7 +567,7 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
     header: doc.header,
     footer: doc.footer,
     titlePage: doc.titlePage,
-    comments: doc.comments?.map((c) => ({ id: c.id, by: c.by, text: c.text, at: c.at, resolved: c.resolved, replies: c.replies?.map((r) => ({ by: r.by, text: r.text, at: r.at })) })),
+    comments: doc.comments?.map((c) => ({ id: c.id, by: c.by, author: c.author, text: c.text, at: c.at, resolved: c.resolved, replies: c.replies?.map((r) => ({ by: r.by, author: r.author, text: r.text, at: r.at })) })),
   });
 }
 
@@ -1316,16 +1316,18 @@ function wordComments(zip: Zip, part: string | undefined, extended: string | und
     const pid = att(ps[ps.length - 1], 'paraId') ?? '';
     const at = Date.parse(att(c, 'date') ?? '') || Date.now();
     const by = /^agent$/i.test(att(c, 'author') ?? '') ? 'agent' : 'user';
+    // Its author by name (Maria Lopez), but for the names this app writes for you and an agent.
+    const author = cleanAuthor(att(c, 'author'));
     const parent = pid ? byPara.get(parentOf.get(pid) ?? '') : undefined;
     if (parent) {
       // A reply: its words join its thread's, and its marks are its thread's.
-      if (text) (parent.replies ??= []).push({ id: `r${out.length}${parent.replies?.length ?? 0}`, by, text, at });
+      if (text) (parent.replies ??= []).push({ id: `r${out.length}${parent.replies?.length ?? 0}`, by, ...(author ? { author } : {}), text, at });
       ids.set(wid, parent.id);
       continue;
     }
     if (!text) continue;
     const id = `w${wid.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 30) || out.length}`;
-    const k: Comment = { id, by, text, at };
+    const k: Comment = { id, by, ...(author ? { author } : {}), text, at };
     if (done.has(pid)) k.resolved = true;
     ids.set(wid, id);
     if (pid) byPara.set(pid, k);

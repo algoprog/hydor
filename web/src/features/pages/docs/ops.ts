@@ -133,17 +133,26 @@ export function splitAt(runs: Run[], o: number): [Run[], Run[]] {
 
 export const sliceRuns = (runs: Run[], from: number, to: number) => splitAt(splitAt(runs, to)[0], from)[1];
 
-/** How words typed at `o` look: as the character before (or, at the start, after); a link does not go on past its end. */
+/**
+ * How words typed at `o` look: as the character before (or, at the start, after). A link, or a comment's words, does
+ * not go on past its end (as in Google Docs); in their middle, where they go on in the next run, words typed are theirs.
+ */
 export function lookAt(runs: Run[], o: number): Look {
   let at = 0;
-  for (const r of runs) {
+  for (let k = 0; k < runs.length; k++) {
+    const r = runs[k];
     const end = at + r.t.length;
     if (o > at && o <= end) {
-      // Words typed after an equation are words; after a link or a comment's words, not more of them.
+      // Words typed after an equation are words.
       if (r.math) return {};
       const look = lookOf(r);
-      if (o === end && look.link) delete look.link;
-      if (o === end) delete look.cm;
+      if (o === end) {
+        const next = runs[k + 1];
+        if (look.link && next?.link !== look.link) delete look.link;
+        const cm = look.cm?.filter((id) => next?.cm?.includes(id));
+        if (cm?.length) look.cm = cm;
+        else delete look.cm;
+      }
       return look;
     }
     at = end;

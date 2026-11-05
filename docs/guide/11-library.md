@@ -403,11 +403,11 @@ Pick some words and **Comment** and **Ask the agent about it** show above them. 
 
 ### Comments
 
-Pick some words, then **Comment** (above the words, in the toolbar, **Insert → Comment**, or Ctrl+Alt+M), write it and press **Comment** (or Ctrl+Enter). The words get a yellow mark. On a wide screen the comments sit beside the page, each level with its words; on a narrower one, and on a phone, the button with the number of open comments at the top opens a panel with all of them.
+Pick some words, then **Comment** (above the words, in the toolbar, **Insert → Comment**, or Ctrl+Alt+M), write it and press **Comment** (or Ctrl+Enter). The words get a yellow mark; what you type right after them (or before them) stays out of the comment, as in Google Docs. On a wide screen the comments sit beside the page, each level with its words; on a narrower one, and on a phone, the button with the number of open comments at the top opens a panel with all of them.
 
 Each comment has **Reply**, **Resolve** (the tick) and, in its **More** menu (⋯), **Edit** and **Delete**. A resolved comment's mark goes away; **View → Show resolved comments** shows them again, with **Reopen**. Click a comment to bring its words into view, or click the words to pick their comment.
 
-Agents read the comments too, and the words each is on. **Ask the agent to answer the comments**, at the top of the comments, asks it to make the changes they ask for and reply to each; its replies show as **Agent**. Comments go into the Word file as Word's own comments, replies and all, and come back from Word files.
+Agents read the comments too, and the words each is on. **Ask the agent to answer the comments**, at the top of the comments, asks it to make the changes they ask for and reply to each; its replies show as **Agent**. Comments go into the Word file as Word's own comments, replies and all, and come back from Word files with who wrote each: a colleague's comments show their name and initials ("Maria Lopez"), yours show as **You** and an agent's as **Agent**.
 
 ## Spreadsheets
 
