@@ -77,6 +77,7 @@ export function FormulaBar({
   onKey,
   onSuggest,
   barRef,
+  ghost,
 }: {
   /** The selection's name ("B2", "B2:D9"). */
   name: string;
@@ -94,6 +95,8 @@ export function FormulaBar({
   onKey: (e: React.KeyboardEvent<HTMLElement>) => void;
   onSuggest: (name: string) => void;
   barRef: React.RefObject<HTMLTextAreaElement | null>;
+  /** The formula that spilled into the cell picked (shown faint: the cell itself holds nothing). */
+  ghost?: string;
 }) {
   const [box, setBox] = useState(name);
   const [boxFocus, setBoxFocus] = useState(false);
@@ -139,7 +142,7 @@ export function FormulaBar({
       </span>
       <textarea
         ref={barRef}
-        value={text}
+        value={!editing && !text && ghost ? ghost : text}
         rows={lines}
         readOnly={readOnly}
         aria-label="What the cell holds: its formula or value"
@@ -159,7 +162,7 @@ export function FormulaBar({
           }
           onKey(e);
         }}
-        className="min-h-8 min-w-0 flex-1 resize-none bg-transparent py-[7px] pr-2 font-mono text-[12.5px] leading-[18px] outline-none"
+        className={cx('min-h-8 min-w-0 flex-1 resize-none bg-transparent py-[7px] pr-2 font-mono text-[12.5px] leading-[18px] outline-none', !editing && !text && ghost && 'text-fg-3')}
       />
       {help && (help.names.length > 0 || help.inside) && (
         <div className="absolute top-full right-2 left-[136px] z-40 mt-1 max-w-[460px] overflow-hidden rounded-xl border border-line bg-elevated p-1 shadow-lg max-sm:left-2">

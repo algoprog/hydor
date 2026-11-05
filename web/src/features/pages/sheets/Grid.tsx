@@ -994,6 +994,19 @@ const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, pla
   };
   // Merges that reach into the band, drawn once each from their first cell; their other cells are not drawn.
   const merges = gv.merges.list.filter((m) => m.r2 >= rows.r1 && m.r1 <= rows.r2 && m.c2 >= cols.c1 && m.c1 <= cols.c2);
+  // What formulas spill into the band's cells that hold nothing (shown in their formula's number format).
+  const ghosts = new Map<string, { v: ReturnType<Calc['value']>; s?: CellStyle }>();
+  for (const { r, c, sp } of calc.spillsOf(si)) {
+    const s = sheet.cells[refName(r, c)]?.s;
+    for (let rr = Math.max(r, rows.r1); rr <= Math.min(r + sp.h - 1, rows.r2); rr++)
+      for (let cc = Math.max(c, cols.c1); cc <= Math.min(c + sp.w - 1, cols.c2); cc++) {
+        if (rr === r && cc === c) continue;
+        const k = refName(rr, cc);
+        const own = sheet.cells[k];
+        if (own?.v !== undefined || own?.f !== undefined) continue;
+        ghosts.set(k, { v: sp.d[(rr - r) * sp.w + (cc - c)], s: own?.s ?? s });
+      }
+  }
   // Cells the rules draw on though they hold nothing: in view, in a rule's range.
   const extra = new Set<string>();
   if (gv.cf.any || gv.rules.any) {
@@ -1009,9 +1022,10 @@ const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, pla
   }
   const draw = (r: number, c: number, m: Rect | null) => {
     const k = refName(r, c);
-    const cell: Cell = sheet.cells[k] ?? {};
+    const ghost = ghosts.get(k);
+    const cell: Cell = ghost ? { v: ghost.v === null || typeof ghost.v === 'object' ? '' : ghost.v, s: ghost.s } : (sheet.cells[k] ?? {});
     const filled = cell.v !== undefined || cell.f !== undefined;
-    const v = filled ? calc.value(si, r, c) : null;
+    const v = ghost ? ghost.v : filled ? calc.value(si, r, c) : null;
     const look = shown(cell, v, z, formulas);
     const r2 = m ? m.r2 : r;
     const c2 = m ? m.c2 : c;
@@ -1131,7 +1145,7 @@ const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, pla
     if (rowOff[r + 1] === rowOff[r]) continue;
     for (let c = cols.c1; c <= cols.c2; c++) {
       const k = refName(r, c);
-      if (!sheet.cells[k] && !extra.has(k)) continue;
+      if (!sheet.cells[k] && !extra.has(k) && !ghosts.has(k)) continue;
       if (merges.length && gv.merges.at(r, c)) continue;
       draw(r, c, null);
     }

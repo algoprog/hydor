@@ -286,9 +286,9 @@ export interface Workbook {
 
 // ---- errors ------------------------------------------------------------------------------------------------
 
-export type ErrCode = '#DIV/0!' | '#N/A' | '#NAME?' | '#NULL!' | '#NUM!' | '#REF!' | '#VALUE!' | '#CIRC!' | '#ERROR!';
+export type ErrCode = '#DIV/0!' | '#N/A' | '#NAME?' | '#NULL!' | '#NUM!' | '#REF!' | '#VALUE!' | '#CIRC!' | '#ERROR!' | '#SPILL!';
 
-/** A formula's error, as its cell shows it. #CIRC!: it needs itself; #ERROR!: it cannot be read. */
+/** A formula's error, as its cell shows it. #CIRC!: it needs itself; #ERROR!: it cannot be read; #SPILL!: its array has no room to spill into. */
 export class CellError {
   constructor(readonly code: ErrCode) {}
   toString() {
@@ -306,6 +306,7 @@ const E = {
   VALUE: new CellError('#VALUE!'),
   CIRC: new CellError('#CIRC!'),
   PARSE: new CellError('#ERROR!'),
+  SPILL: new CellError('#SPILL!'),
 };
 const ERR_BY_CODE = new Map<string, CellError>(Object.values(E).map((e) => [e.code, e]));
 /** The error of a code ("#N/A"), or null. */
@@ -2472,6 +2473,8 @@ export function fileFormula(f: string, sheetNames: Set<string>): string {
   return rewrite(f, (t) => {
     if (t.k === 'fn') {
       const n = fnName(t.v);
+      // FILTER and SORT came with a prefix of their own.
+      if (n === 'FILTER' || n === 'SORT') return `_xlfn._xlws.${n}`;
       return XLFN.has(n) ? `_xlfn.${n}` : n === t.v ? undefined : n;
     }
     if (t.k === 'ref' && t.ref.sheet !== undefined && !sheetNames.has(t.ref.sheet.toLowerCase())) return '#REF!';
@@ -2494,6 +2497,7 @@ export function replaceNames(f: string, names: Map<string, string>): string {
 const XLFN = new Set([
   'AGGREGATE', 'CEILING.MATH', 'CONCAT', 'DAYS', 'FLOOR.MATH', 'IFNA', 'IFS', 'ISOWEEKNUM', 'MAXIFS', 'MINIFS', 'MODE.SNGL', 'PERCENTILE.INC',
   'QUARTILE.INC', 'RANK.EQ', 'STDEV.P', 'STDEV.S', 'SWITCH', 'TEXTJOIN', 'VAR.P', 'VAR.S', 'XLOOKUP', 'XMATCH', 'XOR', 'NORM.DIST', 'NORM.INV',
+  'UNIQUE', 'SEQUENCE', 'SORTBY',
 ]);
 
 // ---- formulas: working them out ----------------------------------------------------------------------------------
@@ -2650,10 +2654,29 @@ export interface CalcOptions {
  * A workbook's formulas, worked out as they are needed and remembered until something changes: what a cell shows
  * (value), every result at once (all), and, for the editor, cells that changed (update) or a workbook that did (reset).
  */
+/** The functions whose arrays spill into the cells beside and under their own (dynamic arrays). */
+const SPILL_FNS = new Set(['FILTER', 'SORT', 'UNIQUE', 'SEQUENCE', 'SORTBY']);
+
+/** Whether a formula's result is an array that spills: one of SPILL_FNS outermost. */
+export function spills(f: string): boolean {
+  const n = parsedOf(f);
+  return !!n && n.k === 'f' && SPILL_FNS.has(n.name);
+}
+
+/** An array a formula spilled: its rows and columns, values row by row. */
+export interface Spill {
+  h: number;
+  w: number;
+  d: Scalar[];
+}
+
 export class Calc {
   book!: Workbook;
   private idx: Map<number, Cell>[] = [];
   private memo: Map<number, Scalar>[] = [];
+  /** Per sheet: the cells whose formulas spill, and the arrays they spilled (null: no room). */
+  private anchors: Set<number>[] = [];
+  private spilt: Map<number, Spill | null>[] = [];
   private busy: Set<number>[] = [];
   private ext: ({ rows: number; cols: number } | null)[] = [];
   private sorted: (number[] | null)[] = [];
@@ -2672,11 +2695,14 @@ export class Calc {
   /** Starts again from the workbook as it is now (rows went in or out, sheets changed). */
   reset(book: Workbook = this.book) {
     this.book = book;
-    this.idx = book.sheets.map((sh) => {
+    this.anchors = book.sheets.map(() => new Set<number>());
+    this.idx = book.sheets.map((sh, si) => {
       const m = new Map<number, Cell>();
       for (const k in sh.cells) {
         const n = keyOf(k);
-        if (n >= 0) m.set(n, sh.cells[k]);
+        if (n < 0) continue;
+        m.set(n, sh.cells[k]);
+        if (sh.cells[k].f !== undefined && spills(sh.cells[k].f!)) this.anchors[si].add(n);
       }
       return m;
     });
@@ -2700,6 +2726,8 @@ export class Calc {
       const had = m.has(n);
       if (c) m.set(n, c);
       else m.delete(n);
+      if (c?.f !== undefined && spills(c.f)) this.anchors[si]?.add(n);
+      else this.anchors[si]?.delete(n);
       if (had !== !!c) this.sorted[si] = null;
       if (e) {
         const r = unpackR(n);
@@ -2715,6 +2743,50 @@ export class Calc {
   private clear() {
     this.memo = this.book.sheets.map(() => new Map());
     this.busy = this.book.sheets.map(() => new Set());
+    this.spilt = this.book.sheets.map(() => new Map());
+  }
+
+  /**
+   * What spills into an empty cell from a formula above or left of it, or null. `top`: asked from outside a formula
+   * (the anchor is worked out as a top formula is); else from within one.
+   */
+  private ghost(si: number, key: number, top: boolean): Scalar {
+    const anchors = this.anchors[si];
+    if (!anchors?.size) return null;
+    const r = unpackR(key);
+    const c = unpackC(key);
+    for (const a of anchors) {
+      const ar = unpackR(a);
+      const ac = unpackC(a);
+      if (ar > r || ac > c) continue;
+      if (!this.spilt[si].has(a)) {
+        if (this.busy[si].has(a)) continue;
+        if (top) this.top(si, a);
+        else this.cell(si, a);
+      }
+      const sp = this.spilt[si].get(a);
+      if (sp && r < ar + sp.h && c < ac + sp.w) return sp.d[(r - ar) * sp.w + (c - ac)];
+    }
+    return null;
+  }
+
+  /** The arrays a sheet's formulas spilled, each with its first cell (worked out as needed). */
+  spillsOf(si: number): { r: number; c: number; sp: Spill }[] {
+    const out: { r: number; c: number; sp: Spill }[] = [];
+    for (const a of this.anchors[si] ?? []) {
+      if (!this.spilt[si].has(a)) this.top(si, a);
+      const sp = this.spilt[si].get(a);
+      if (sp) out.push({ r: unpackR(a), c: unpackC(a), sp });
+    }
+    return out;
+  }
+
+  /** How far a sheet's cells reach with what spills from them: for drawing and saving it. */
+  shownExtent(si: number): { rows: number; cols: number } {
+    const e = this.extent(si);
+    let { rows, cols } = e;
+    for (const { r, c, sp } of this.spillsOf(si)) [rows, cols] = [Math.max(rows, r + sp.h), Math.max(cols, c + sp.w)];
+    return { rows, cols };
   }
 
   /** How far a sheet's cells reach: rows and columns from A1 to its last one. */
@@ -2755,7 +2827,7 @@ export class Calc {
     if (r < 0 || c < 0 || r >= MAX_ROWS || c >= MAX_COLS) return E.REF;
     const key = pack(r, c);
     const cell = this.idx[si]?.get(key);
-    if (!cell) return null;
+    if (!cell) return this.ghost(si, key, true);
     if (cell.f === undefined) return cell.v ?? null;
     return this.top(si, key);
   }
@@ -2841,7 +2913,7 @@ export class Calc {
     const m = this.memo[si]?.get(key);
     if (m !== undefined) return m;
     const cell = this.idx[si]?.get(key);
-    if (!cell) return null;
+    if (!cell) return this.ghost(si, key, false);
     if (cell.f === undefined) return cell.v ?? null;
     if (this.busy[si].has(key)) return E.CIRC;
     if (this.frames > FRAME_LIMIT) throw new Deep(si, key);
@@ -2867,6 +2939,7 @@ export class Calc {
     const cx: Ctx = { si, r: unpackR(key), c: unpackC(key), n: 0 };
     const frames = this.frames;
     try {
+      if (this.anchors[si]?.has(key)) return this.spill(si, key, this.ev(node, cx), cx);
       const s = this.sc(this.ev(node, cx), cx);
       return s === null ? 0 : s;
     } catch (e) {
@@ -2875,6 +2948,43 @@ export class Calc {
       this.frames = frames;
       return E.VALUE;
     }
+  }
+
+  /**
+   * A spilling formula's result laid out from its cell: its first value there, the rest in the cells beside and under
+   * it, unless one of those holds something (then #SPILL!).
+   */
+  private spill(si: number, key: number, v: Val, cx: Ctx): Scalar {
+    if (!multi(v)) {
+      this.spilt[si].set(key, null);
+      const s = this.sc(v, cx);
+      return s === null ? 0 : s;
+    }
+    const a = this.arr(v);
+    if (a instanceof CellError) {
+      this.spilt[si].set(key, null);
+      return a;
+    }
+    const r = unpackR(key);
+    const c = unpackC(key);
+    let blocked = r + a.h > SHEET_LIMITS.rows || c + a.w > SHEET_LIMITS.cols;
+    const idx = this.idx[si];
+    for (let i = 0; i < a.h && !blocked; i++)
+      for (let j = 0; j < a.w; j++) {
+        if (!i && !j) continue;
+        const cell = idx.get(pack(r + i, c + j));
+        if (cell && (cell.v !== undefined || cell.f !== undefined)) {
+          blocked = true;
+          break;
+        }
+      }
+    if (blocked) {
+      this.spilt[si].set(key, null);
+      return E.SPILL;
+    }
+    this.spilt[si].set(key, { h: a.h, w: a.w, d: a.d });
+    const first = a.d[0];
+    return first === null || first === undefined ? 0 : first;
   }
 
   /** A formula's piece worked out: a value, or cells (a reference) or values in rows (an array) for what takes them. */
@@ -3013,6 +3123,23 @@ export class Calc {
       const a = this.arr(v);
       if (a instanceof CellError) return void f(a, 0, 0);
       return this.each(a, f);
+    }
+    // What spills into the range: visited first, so the cells holding something are visited as they always are.
+    if (this.anchors[v.si]?.size) {
+      for (const a of this.anchors[v.si]) {
+        if (!this.spilt[v.si].has(a)) this.cell(v.si, a);
+        const sp = this.spilt[v.si].get(a);
+        if (!sp) continue;
+        const ar = unpackR(a);
+        const ac = unpackC(a);
+        for (let i = 0; i < sp.h; i++)
+          for (let j = 0; j < sp.w; j++) {
+            const r = ar + i;
+            const c = ac + j;
+            if ((!i && !j) || r < v.r1 || r > v.r2 || c < v.c1 || c > v.c2 || idx.has(pack(r, c))) continue;
+            if (f(sp.d[i * sp.w + j], r - v.r1, c - v.c1) === false) return;
+          }
+      }
     }
     const e = this.extent(v.si);
     const r2 = Math.min(v.r2, e.rows - 1);
@@ -4493,7 +4620,124 @@ const MONEY_FNS: Record<string, Fn> = {
   }),
 };
 
-const FNS: Record<string, Fn> = { ...MATH_FNS, ...LOGIC_FNS, ...INFO_FNS, ...LOOKUP_FNS, ...TEXT_FNS, ...DATE_FNS, ...MONEY_FNS };
+// ---- formulas: arrays that spill ------------------------------------------------------------------------------------
+
+/** Values in sort order: numbers, words, TRUE and FALSE (as compare puts them), blanks last. */
+const sortCmp = (a: Scalar, b: Scalar) => {
+  const blank = (v: Scalar) => v === null || v === '';
+  if (blank(a) || blank(b)) return blank(a) === blank(b) ? 0 : blank(a) ? 1 : -1;
+  return compare(a, b);
+};
+
+/** An array's rows (or columns, `byCol`) as lists of values. */
+const linesOf = (a: Arr, byCol: boolean): Scalar[][] => (byCol ? Array.from({ length: a.w }, (_, j) => Array.from({ length: a.h }, (_, i) => a.d[i * a.w + j])) : Array.from({ length: a.h }, (_, i) => a.d.slice(i * a.w, (i + 1) * a.w)));
+/** Lists of values back as an array's rows (or columns). */
+const fromLines = (lines: Scalar[][], byCol: boolean): Arr => {
+  const n = lines.length;
+  const m = lines[0]?.length ?? 0;
+  if (!byCol) return { k: 'arr', h: n, w: m, d: lines.flat() };
+  const d: Scalar[] = new Array(n * m);
+  for (let j = 0; j < n; j++) for (let i = 0; i < m; i++) d[i * n + j] = lines[j][i];
+  return { k: 'arr', h: m, w: n, d };
+};
+
+const ARRAY_FNS: Record<string, Fn> = {
+  SEQUENCE: def(1, 4, (c, a, cx) => {
+    const nums = [N(c, a[0], cx), opt(c, a, 1, cx, 1), opt(c, a, 2, cx, 1), opt(c, a, 3, cx, 1)];
+    for (const n of nums) if (n instanceof CellError) return n;
+    const [rows, cols, start, step] = nums as number[];
+    const h = Math.trunc(rows);
+    const w = Math.trunc(cols);
+    if (h < 1 || w < 1) return E.VALUE;
+    if (h * w > MAX_ARRAY) return E.NUM;
+    return { k: 'arr', h, w, d: Array.from({ length: h * w }, (_, i) => fin(start + step * i) as Scalar) };
+  }),
+  FILTER: def(2, 3, (c, a, cx) => {
+    const src = c.arr(c.ev(a[0], cx));
+    if (src instanceof CellError) return src;
+    const inc = c.arr(c.ev(a[1], cx));
+    if (inc instanceof CellError) return inc;
+    // Which rows (a column of tests as tall as the array) or columns (a row of them as wide) stay.
+    const byCol = !(inc.w === 1 && inc.h === src.h) && inc.h === 1 && inc.w === src.w;
+    if (!byCol && !(inc.w === 1 && inc.h === src.h)) return E.VALUE;
+    const lines = linesOf(src, byCol);
+    const kept: Scalar[][] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const b = toBool(inc.d[i]);
+      if (b instanceof CellError) return b;
+      if (b) kept.push(lines[i]);
+    }
+    if (!kept.length) return has(a, 2) ? c.ev(a[2], cx) : E.NA;
+    return fromLines(kept, byCol);
+  }),
+  SORT: def(1, 4, (c, a, cx) => {
+    const src = c.arr(c.ev(a[0], cx));
+    if (src instanceof CellError) return src;
+    const idx = opt(c, a, 1, cx, 1);
+    const order = opt(c, a, 2, cx, 1);
+    const byCol = has(a, 3) ? B(c, a[3], cx) : false;
+    if (idx instanceof CellError) return idx;
+    if (order instanceof CellError) return order;
+    if (byCol instanceof CellError) return byCol;
+    const lines = linesOf(src, byCol);
+    const k = Math.trunc(idx) - 1;
+    if (k < 0 || k >= (lines[0]?.length ?? 0) || (order !== 1 && order !== -1)) return E.VALUE;
+    const sorted = lines.map((l, i) => [l, i] as const).sort((x, y) => sortCmp(x[0][k], y[0][k]) * (x[0][k] === null || y[0][k] === null ? 1 : order) || x[1] - y[1]);
+    return fromLines(
+      sorted.map((x) => x[0]),
+      byCol,
+    );
+  }),
+  SORTBY: def(2, 255, (c, a, cx) => {
+    const src = c.arr(c.ev(a[0], cx));
+    if (src instanceof CellError) return src;
+    const keys: { v: Arr; order: number }[] = [];
+    for (let i = 1; i < a.length; i += 2) {
+      const v = c.arr(c.ev(a[i], cx));
+      if (v instanceof CellError) return v;
+      if (v.h * v.w !== src.h) return E.VALUE;
+      const order = opt(c, a, i + 1, cx, 1);
+      if (order instanceof CellError) return order;
+      keys.push({ v, order });
+    }
+    const lines = linesOf(src, false);
+    const order = lines
+      .map((_, i) => i)
+      .sort((x, y) => {
+        for (const k of keys) {
+          const d = sortCmp(k.v.d[x], k.v.d[y]);
+          if (d) return d * (k.v.d[x] === null || k.v.d[y] === null ? 1 : k.order);
+        }
+        return x - y;
+      });
+    return fromLines(
+      order.map((i) => lines[i]),
+      false,
+    );
+  }),
+  UNIQUE: def(1, 3, (c, a, cx) => {
+    const src = c.arr(c.ev(a[0], cx));
+    if (src instanceof CellError) return src;
+    const byCol = has(a, 1) ? B(c, a[1], cx) : false;
+    const once = has(a, 2) ? B(c, a[2], cx) : false;
+    if (byCol instanceof CellError) return byCol;
+    if (once instanceof CellError) return once;
+    const lines = linesOf(src, byCol);
+    const key = (l: Scalar[]) => l.map((v) => (typeof v === 'string' ? `s${v.toLowerCase()}` : `${typeof v}${String(v)}`)).join('\u0001');
+    const counts = new Map<string, number>();
+    for (const l of lines) counts.set(key(l), (counts.get(key(l)) ?? 0) + 1);
+    const seen = new Set<string>();
+    const kept = lines.filter((l) => {
+      const k = key(l);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return !once || counts.get(k) === 1;
+    });
+    return kept.length ? fromLines(kept, byCol) : E.NA;
+  }),
+};
+
+const FNS: Record<string, Fn> = { ...MATH_FNS, ...LOGIC_FNS, ...INFO_FNS, ...LOOKUP_FNS, ...TEXT_FNS, ...DATE_FNS, ...MONEY_FNS, ...ARRAY_FNS };
 FNS['MODE.SNGL'] = FNS.MODE;
 FNS['RANK.EQ'] = FNS.RANK;
 
