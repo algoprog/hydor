@@ -1,5 +1,6 @@
 // The Library's images, videos and audio: what the user keeps of what agents made (or any picture, video or sound
-// on this computer), each copied in with a title and a description a model writes for it (caption.ts): from the
+// on this computer, or dropped on the Library: pages/uploads.ts moves those in), each copied in (the same bytes once)
+// with a title and a description a model writes for it (caption.ts): from the
 // picture itself, from ten of a video's frames on one picture (frames.ts), or for a sound, which the model cannot
 // hear, from what it was made from (its prompt, its words, its model). The Library page shows them beside the
 // pages; agents reach them through the API (app_api), and work from their files (an item's file).

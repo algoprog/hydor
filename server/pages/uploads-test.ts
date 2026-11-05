@@ -14,6 +14,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { PassThrough } from 'node:stream';
 import Fastify from 'fastify';
 import { config } from '../config.ts';
 import { openDb } from '../db.ts';
@@ -190,6 +191,18 @@ const pptxImports = kindForFile('a.pptx') === 'slides';
   ok(!fs.existsSync(path.join(config.dataDir, 'library-uploads', `${c.upload}.part`)), 'what came of it goes');
   ok((await put(`/api/library/uploads/${c.upload}?offset=50`, Buffer.alloc(50))).statusCode === 404, 'and it takes no more pieces');
   await app.inject({ method: 'DELETE', url: `/api/library/uploads/${s.upload}` });
+  // Cancelled while its last piece is still coming: nothing is made of it.
+  const pagesBefore = json(await app.inject({ method: 'GET', url: '/api/pages' })).pages.length;
+  const text = Buffer.from('# Late\n\nWords.\n');
+  const l = json(await start({ name: 'Late.md', size: text.length, space: null }));
+  const slow = new PassThrough();
+  const going = app.inject({ method: 'PUT', url: `/api/library/uploads/${l.upload}?offset=0`, payload: slow, headers: { 'content-type': 'application/octet-stream' } });
+  slow.write(text.subarray(0, 5));
+  await new Promise((r) => setTimeout(r, 50));
+  await app.inject({ method: 'DELETE', url: `/api/library/uploads/${l.upload}` });
+  slow.end(text.subarray(5));
+  const late = await going;
+  ok(late.statusCode === 499 && json(await app.inject({ method: 'GET', url: '/api/pages' })).pages.length === pagesBefore, 'an upload cancelled while its last piece comes makes nothing');
 }
 
 // ---- what each file becomes --------------------------------------------------------------------------------------------
