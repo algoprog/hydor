@@ -4,8 +4,8 @@
 // A group brings spaces together: its sessions work with all of them. Picked by name on the start page in place of
 // a folder.
 import { useState, type ReactNode } from 'react';
-import { useLocation } from 'wouter';
-import { Boxes, Folder, Layers, LibraryBig, MessagesSquare, Plus, SquarePen, X } from 'lucide-react';
+import { useLocation, useSearch } from 'wouter';
+import { Boxes, Folder, Layers, LibraryBig, MessagesSquare, Plus, SquarePen, UserPlus, X } from 'lucide-react';
 import type { SpaceView } from '@shared/spaces';
 import { isGroup, spaceColor } from '@shared/spaces';
 import { Button, Throbber } from '../../components/ui';
@@ -158,6 +158,8 @@ function Intro({ onMake }: { onMake: () => void }) {
 
 function List() {
   const spaces = useSpaces();
+  // Come to share a project (the search box's Share a project with people): which menu does it.
+  const sharing = new URLSearchParams(useSearch()).get('share') === '1';
   const [made, setMade] = useState<false | 'space' | 'group'>(false);
   // A suggested folder the new space starts with.
   const [from, setFrom] = useState<string | undefined>();
@@ -190,6 +192,17 @@ function List() {
             <Intro onMake={make} />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {sharing && (
+                <div className="flex items-center gap-2.5 rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[13px] text-fg-2 sm:col-span-2 xl:col-span-3">
+                  <UserPlus size={15} className="shrink-0 text-accent" />
+                  <span className="min-w-0 flex-1">
+                    To share a project, open its <span className="font-medium text-fg">More</span> (⋯) and pick <span className="font-medium text-fg">Share with people</span>.
+                  </span>
+                  <button type="button" aria-label="Close" onClick={() => go('/projects', true)} className="shrink-0 rounded p-1 text-fg-3 hover:bg-bg-3 hover:text-fg">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
               {spaces.map((s) => (
                 <SpaceCard key={s.id} s={s} spaces={spaces} />
               ))}

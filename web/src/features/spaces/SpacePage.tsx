@@ -5,6 +5,7 @@
 // knowledge (documents only its sessions search, with the shared ones too unless it leaves them out), its skills
 // (SpaceSkills) and its settings. It shows at once from the spaces the app knows, and fills in what it fetches.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useSearch } from 'wouter';
 import { ArrowLeft, ArrowRight, BookOpen, Boxes, Brain, Check, ChevronRight, FolderOpen, FolderPlus, ListFilter, MessagesSquare, MoreHorizontal, Plus, ScrollText, Sparkles, SquarePen, Trash2, UserPlus, UserRound } from 'lucide-react';
 import type { KnowledgeBase } from '@shared/knowledge';
 import type { SessionSummary } from '@shared/types';
@@ -611,6 +612,13 @@ function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void 
 export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
   const spaces = useSpaces();
   const view = spaces?.find((x) => x.id === id);
+  // Its address with ?share=1 (from the search box, the guide or an agent) opens the Share dialog.
+  const share = new URLSearchParams(useSearch()).get('share') === '1';
+  useEffect(() => {
+    if (!share || !view) return;
+    openShareDialog(view);
+    go(tabPath(id, tab), true);
+  }, [share, !!view]);
   const [data, setData] = useState<{ space: Space; sessions: string[] } | null>(null);
   const [gone, setGone] = useState(false);
   useEffect(() => {
