@@ -12,7 +12,7 @@
 // picked cell types in it, a drag scrolls, the round handle stretches the selection, a long press opens the menu.
 import { forwardRef, memo, useCallback, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronsLeftRight, ChevronsUpDown, ListFilter, Maximize2 } from 'lucide-react';
-import { accountingParts, borderOf, CELL_FONTS, codeColor, colName, formatValue, inputText, isError, refName, textOn, type Calc, type Cell, type CellStyle, type Rect, type Sheet } from '@shared/sheets';
+import { accountingParts, borderOf, CELL_FONTS, codeColor, colName, formatValue, inputText, isError, refName, textOn, type Calc, type Cell, type CellStyle, type ListOption, type Rect, type Sheet, type Validation } from '@shared/sheets';
 import { allowed, isTicked, listOptions, type CondFormats, type Merges, type Rules } from '@shared/sheet-rules';
 import { cx } from '../../../components/ui';
 import { colW, indexAt, offsets, rectOf, rowH, type Sel } from './ops';
@@ -985,6 +985,13 @@ interface CellsProps {
 const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, place, colOff, rowOff, view: gv, z, formulas }: CellsProps) {
   const out: React.ReactNode[] = [];
   const lines: React.ReactNode[] = [];
+  // Each list's options once per drawing (a list from a range reads its cells).
+  const optionsCache = new Map<Validation, ListOption[]>();
+  const optionsOf = (rule: Validation) => {
+    let o = optionsCache.get(rule);
+    if (!o) optionsCache.set(rule, (o = listOptions(calc, si, rule)));
+    return o;
+  };
   // Merges that reach into the band, drawn once each from their first cell; their other cells are not drawn.
   const merges = gv.merges.list.filter((m) => m.r2 >= rows.r1 && m.r1 <= rows.r2 && m.c2 >= cols.c1 && m.c1 <= cols.c2);
   // Cells the rules draw on though they hold nothing: in view, in a rule's range.
@@ -1056,7 +1063,7 @@ const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, pla
         </span>
       );
     } else if (rule?.rule.type === 'list' && text) {
-      const opt = listOptions(calc, si, rule.rule).find((o) => o.v.toLowerCase() === text.trim().toLowerCase());
+      const opt = optionsOf(rule.rule).find((o) => o.v.toLowerCase() === text.trim().toLowerCase());
       if (opt?.color)
         content = (
           <span className="min-w-0 truncate rounded-full px-2 leading-[1.45]" style={{ background: opt.color, color: textOn(opt.color), fontSize: '0.92em' }}>
@@ -1089,7 +1096,11 @@ const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, pla
       }
     }
     const pos = place(r, c, region);
-    const invalid = rule && filled && rule.rule.type !== 'checkbox' && !allowed(calc, si, rule.rule, v, look.text, { r, c, r0: rule.r0, c0: rule.c0 });
+    const invalid =
+      rule &&
+      filled &&
+      rule.rule.type !== 'checkbox' &&
+      (rule.rule.type === 'list' ? !!look.text.trim() && !optionsOf(rule.rule).some((o) => o.v.toLowerCase() === look.text.trim().toLowerCase()) : !allowed(calc, si, rule.rule, v, look.text, { r, c, r0: rule.r0, c0: rule.c0 }));
     out.push(
       <div key={`${r}:${c}`} className={cx('absolute flex overflow-hidden border-r border-b border-line px-[4px] whitespace-nowrap', look.cls, !style.background && 'bg-bg')} style={{ left: pos.left, top: pos.top, width: w, height: h, ...style }}>
         {cfLook?.bar && <span className="pointer-events-none absolute top-[3px] bottom-[3px] rounded-sm opacity-60" style={{ left: `${cfLook.bar.from * 100}%`, width: `${(cfLook.bar.to - cfLook.bar.from) * 100}%`, background: cfLook.bar.color }} />}
