@@ -32,7 +32,7 @@ export function CharPicker({ onPick, kinds = ['emoji', 'symbols'] }: { onPick: (
   const [recent, setRecent] = useState<string[]>(recentChars);
   const [hover, setHover] = useState<CharEntry | null>(null);
   const all = useMemo(allChars, []);
-  const allowed = useMemo(() => new Set(CHAR_GROUPS.filter((g) => kinds.includes(g.kind)).map((g) => g.id)), [kinds]);
+  const allowed = useMemo(() => new Set<string>(CHAR_GROUPS.filter((g) => kinds.includes(g.kind)).map((g) => g.id)), [kinds]);
   const byChar = useMemo(() => new Map(all.map((c) => [c.ch, c])), [all]);
 
   const current = groups.some((g) => g.id === group) ? group : groups[0]?.id;
