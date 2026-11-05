@@ -13396,5 +13396,7 @@
 "To do":"待办",
 "Untitled database":"未命名数据库",
 "contains":"包含",
-"has":"含有"
+"has":"含有",
+"{0} in all":"共 {0}",
+"The time it has worked in this session, all its turns together":"这个会话所有轮次合计工作的时间"
 }
