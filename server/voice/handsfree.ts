@@ -2,7 +2,9 @@
 // it), the helper model turns it into one thing to do (start a session, steer one, say how they all are,
 // read one's latest reply, answer its approval, stop it, or just answer), the app does it, and the page
 // says the answer aloud. Without a helper model, plain words are understood ("status", "approve", "stop").
-// The answer is in the language the user reads the app in.
+// The answer is in the language the user reads the app in. Confidential sessions (server/confidential) stay out of
+// it: never in what the helper reads, never read aloud; what is said while one is the focus goes to it by plain words.
+import { isConfidential } from '../../shared/confidential.ts';
 import { LANGS } from '../../shared/i18n.ts';
 import { quickAnswer } from '../../shared/inbox.ts';
 import type { Agent, SessionSummary, TimelineItem } from '../../shared/types.ts';
@@ -48,9 +50,9 @@ function line(d: Pick<Deps, 'sessions'>, s: SessionSummary): string {
   return `- ${s.key} · ${agent} · ${st}${asks ? ` (asks: ${asks})` : ''} · "${s.title}" · ${ago(s.updatedAt)}`;
 }
 
-/** The sessions worth talking about: those at work or waiting, then the latest. */
+/** The sessions worth talking about: those at work or waiting, then the latest (confidential ones are not talked about). */
 function recent(d: Pick<Deps, 'sessions'>, n = 12): SessionSummary[] {
-  const all = d.sessions.list({ limit: 200 }).sessions.filter((s) => !s.archived);
+  const all = d.sessions.list({ limit: 200 }).sessions.filter((s) => !s.archived && !isConfidential(s.extra));
   const busy = all.filter((s) => BUSY.has(s.live?.status ?? s.external?.status ?? ''));
   const rest = all.filter((s) => !busy.includes(s)).sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
   return [...busy, ...rest].slice(0, n);
@@ -103,8 +105,11 @@ export async function handsFree(d: Pick<Deps, 'db' | 'sessions'>, text: string, 
   const lang = LANGS.find((l) => l.id === userLang(d.db))!.english;
   const list = recent(d);
   const focused = focus ? d.sessions.summary(focus) : null;
+  const secret = (k?: string | null) => !!k && isConfidential(d.sessions.summary(k)?.extra);
   let plan: Plan;
   try {
+    // Talking to a confidential session: its words go to it alone, not to the helper model.
+    if (secret(focus)) throw new Error('confidential');
     const raw = await ask({
       system: SYSTEM(lang),
       prompt: `Sessions (busy first):\n${list.map((s) => line(d, s)).join('\n') || '(none)'}\n\nFocus: ${focused ? `${focused.key} ("${focused.title}")` : 'none'}\n\nThey said: "${text}"`,
@@ -117,7 +122,7 @@ export async function handsFree(d: Pick<Deps, 'db' | 'sessions'>, text: string, 
     plan = byWords(text, focus);
   }
   const key = plan.session && d.sessions.summary(plan.session) ? plan.session : focus;
-  const named = (k?: string) => (k ? (d.sessions.summary(k)?.title ?? 'the session') : 'the session');
+  const named = (k?: string) => (k ? (secret(k) ? 'the confidential session' : (d.sessions.summary(k)?.title ?? 'the session')) : 'the session');
   switch (plan.action) {
     case 'start': {
       const task = (plan.text || text).trim();
@@ -146,7 +151,7 @@ export async function handsFree(d: Pick<Deps, 'db' | 'sessions'>, text: string, 
     }
     case 'approve':
     case 'deny': {
-      const waiting = d.sessions.inbox().filter((x) => x.approval && (!key || x.key === key));
+      const waiting = d.sessions.inbox().filter((x) => x.approval && (!key || x.key === key) && !secret(x.key));
       const item = waiting[0];
       if (!item?.approval || !item.key) return { say: 'Nothing is waiting for an answer.', focus: key, did: 'answer' };
       const q = quickAnswer(item.approval);
@@ -162,6 +167,7 @@ export async function handsFree(d: Pick<Deps, 'db' | 'sessions'>, text: string, 
     case 'read': {
       const k = key ?? list[0]?.key;
       if (!k) return { say: 'There is nothing to read yet.', did: 'answer' };
+      if (secret(k)) return { say: 'That session is confidential: its replies stay on the screen.', focus: k, did: 'answer' };
       const reply = await lastReply(d, k);
       if (!reply) return { say: `${named(k)} has not replied yet.`, focus: k, did: 'read' };
       // Long replies, or ones in another language than theirs: the gist, for listening.

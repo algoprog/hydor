@@ -25,6 +25,13 @@ const HEAD = [
   'When the user asks you to remember something, or you learn something that will matter in a later session, save it with remember: one fact per note, said so that a search in other words finds it. What every agent should always know about the user goes in their profile instead (update_user_profile). forget removes a note by its number; recall searches every note, by words and by meaning, including those a summary below stands for; search_sessions and read_session look through past conversations. Never save secrets.',
 ].join('\n');
 
+/** For a confidential session, which reads memory and saves nothing to it (server/confidential). */
+const READ_ONLY_HEAD = [
+  '# Memory from earlier sessions',
+  'Hydor keeps notes from this user’s past sessions. You get those that bear most on this request, then the latest; recall finds the rest, and search_sessions and read_session look through past conversations. Use them as background: they may be out of date, and what the user says now always comes first. Do not mention them unless they help.',
+  'This session is confidential, so nothing from it is saved to memory: you can’t add or change notes or the user’s profile here.',
+].join('\n');
+
 const line = (e: MemoryEntry) => {
   const t = e.text.replace(/\s+/g, ' ');
   if (e.kind === 'profile') return `Profile: ${t} [#${e.id}]`;
@@ -36,7 +43,8 @@ const line = (e: MemoryEntry) => {
  * The memory block for an agent's instructions. `session` adds this session's own notes (for a session that
  * goes on); `query`, the request at hand, picks the k notes that bear most on it (`k`: Settings' unless given).
  */
-export async function memoryInstructions(db: DB, o: { cwd?: string; key?: string; session: boolean; query?: string; k?: number; budget?: number; now?: number }): Promise<string> {
+export async function memoryInstructions(db: DB, o: { cwd?: string; key?: string; session: boolean; query?: string; k?: number; budget?: number; now?: number; readOnly?: boolean }): Promise<string> {
+  const head = o.readOnly ? READ_ONLY_HEAD : HEAD;
   const now = o.now ?? Date.now();
   const k = o.k ?? topK(db);
   const places = placesOf({ cwd: o.cwd, key: o.session ? o.key : undefined });
@@ -47,7 +55,7 @@ export async function memoryInstructions(db: DB, o: { cwd?: string; key?: string
     lines: [] as string[],
   }));
   const byPlace = new Map(groups.map((g) => [placeKey(g.place), g]));
-  let left = (o.budget ?? Math.max(MEMORY_BUDGET, k * PER_NOTE)) - HEAD.length;
+  let left = (o.budget ?? Math.max(MEMORY_BUDGET, k * PER_NOTE)) - head.length;
   const taken = new Set<number>();
   const covered = new Set<number>();
   const used: number[] = [];
@@ -97,5 +105,5 @@ export async function memoryInstructions(db: DB, o: { cwd?: string; key?: string
         }
   markUsed(db, used, now);
   const body = groups.flatMap((g) => (g.lines.length ? ['', g.title, ...g.lines] : []));
-  return body.length ? `${HEAD}\n${body.join('\n')}` : HEAD;
+  return body.length ? `${head}\n${body.join('\n')}` : head;
 }

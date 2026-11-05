@@ -25,7 +25,7 @@ import { runningOf } from './procs.ts';
 import { findSkills, MODES, projectOf, systemPrompt, type Mode, type Skill } from './prompt.ts';
 import { adapt, checkArgs, cleanPath, closeNames, findTool, fitArgs, repairJson } from './repair.ts';
 import { autoReview } from './review.ts';
-import { SANDBOX_NOTE, sandboxShell } from './sandbox.ts';
+import { CONFIDENTIAL_ENV, confidentialSession, NET_NOTE, netRefused, SANDBOX_NOTE, sandboxShell } from './sandbox.ts';
 import { checkCommand } from './shell.ts';
 import { beforeEdit, snapDir } from './snapshots.ts';
 import { spill, sweep } from './spill.ts';
@@ -68,10 +68,21 @@ function models(): AgentModel[] {
   }
 }
 
+/** The models a session may use: in a confidential one, only those on this computer or your network. */
+const usable = (conf: boolean) => models().filter((m) => !conf || m.local);
+
 /** The session's model, ready: a local server is started first (the app does that and waits). */
 async function ready(s: Session): Promise<AgentModel> {
-  const list = models();
-  const m = list.find((x) => x.id === s.model) ?? list[0];
+  const conf = await confidentialSession();
+  const list = usable(conf);
+  // A confidential session never falls back to another model than its own, which may run elsewhere.
+  const m = list.find((x) => x.id === s.model) ?? (conf && s.model ? undefined : list[0]);
+  if (!m && conf)
+    throw new Error(
+      s.model
+        ? `${s.model} is not available on this computer now (is its server running?), and a confidential session uses only models here. Start it in Settings → Models, or pick another model on this computer.`
+        : 'A confidential session uses only models on this computer, and none is available now. Install or start one in Settings → Models.',
+    );
   if (!m) throw new Error('There is no model to use yet. Add one in Settings → Models: an OpenRouter key, Ollama, or a model from Hugging Face.');
   s.model = m.id;
   if (!m.start && m.baseUrl) return m;
@@ -138,7 +149,8 @@ function save(s: Session) {
 function connectMcp(s: Session) {
   s.mcp = Promise.all(
     mcpServers(s.cwd, s.mcpDefs)
-      .filter((d) => !PUBLIC_RUN || d.name === OWN)
+      // A public run, and a confidential session, have the app's own server alone: the user's other servers reach outside.
+      .filter((d) => (!PUBLIC_RUN && !CONFIDENTIAL_ENV) || d.name === OWN)
       .map(async (d) => {
         const c = new McpClient(d);
         try {
@@ -152,7 +164,7 @@ function connectMcp(s: Session) {
 }
 
 function offers(s: Session) {
-  const list = models();
+  const list = usable(CONFIDENTIAL_ENV);
   return {
     modes: { currentModeId: s.mode, availableModes: MODES.map((m) => ({ id: m.id, name: m.name, description: m.description })) },
     models: { currentModelId: s.model ?? list[0]?.id ?? '', availableModels: list.map((m) => ({ modelId: m.id, name: m.label, description: m.provider })) },
@@ -435,7 +447,10 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
   save(s);
   const clients = s.mcp ? await Promise.race([s.mcp, new Promise<McpClient[]>((r) => setTimeout(() => r([]), 15_000))]) : [];
   const project = projectOf(s.cwd);
-  let all = [...TOOLS, ...mcpTools(clients)];
+  const conf = await confidentialSession();
+  // A confidential session fetches nothing from the web, and uses the app's own server alone.
+  let all = [...TOOLS, ...mcpTools(conf ? clients.filter((c) => c.def.name === OWN) : clients)];
+  if (conf) all = all.filter((t) => t.name !== 'web_fetch');
   if (PUBLIC_RUN) all = all.filter((t) => !BUILTIN.has(t.name) || PUBLIC_RUN.tools.has(t.name));
   if (s.mode === 'plan') all = all.filter((t) => !t.writes);
   // The assistant's limits leave tools out; the servers the app gave this session (its own, connected apps) are not "other tools".
@@ -663,10 +678,13 @@ async function execute(s: Session, p: Prepared, guard: Guard, base: Omit<ToolCtx
   if (again) return fail(tool.title(args), again);
   const where = tool.path?.(args);
   update(s.id, { sessionUpdate: 'tool_call', toolCallId: c.id, title: tool.title(args), kind: tool.kind, status: 'in_progress', rawInput: args, locations: where ? [{ path: path.resolve(s.cwd, where) }] : undefined });
-  const shell = tool.name === 'bash' ? await sandboxShell(s.cwd, s.mode) : undefined;
+  const conf = await confidentialSession();
+  const shell = tool.name === 'bash' ? await sandboxShell(s.cwd, s.mode, conf) : undefined;
+  // A confidential session's command that can't be cut off from the network here asks the user, every time, in every mode.
+  const open = conf && tool.name === 'bash' && !shell;
   const ctx: ToolCtx = {
     ...base,
-    ask: (r) => ask(s, c.id, r),
+    ask: (r) => ask(s, c.id, open && r.kind === 'execute' ? { ...r, risk: r.risk ?? 'may use the network, which this computer can’t cut commands off from in a confidential session' } : r),
     update: (content) => update(s.id, { sessionUpdate: 'tool_call_update', toolCallId: c.id, content }),
     plan: (entries) => {
       s.plan = entries.map((e) => ({ content: e.content, status: e.status }));
@@ -684,6 +702,7 @@ async function execute(s: Session, p: Prepared, guard: Guard, base: Omit<ToolCtx
     if (tool.name === 'skill' && r.ok) s.skillsUsed = [...(s.skillsUsed ?? []).filter((n) => n !== args.name), String(args.name)].slice(-5);
     guard.after(tool.name, args, r.ok, tool.name === 'bash' && checkCommand(String(args.command ?? ''), s.cwd).parts.every((x) => x.safe));
     if (shell && /Read-only file system/.test(r.output)) r.output += SANDBOX_NOTE;
+    if (shell && conf && netRefused(r.output)) r.output += NET_NOTE;
     update(s.id, { sessionUpdate: 'tool_call_update', toolCallId: c.id, status: r.ok ? 'completed' : 'failed', content: r.content ?? [{ type: 'content', content: { type: 'text', text: clip(r.output, 20_000) } }] });
     // Output a tool did not keep short itself goes to a file, its start and end to the model.
     const output = r.output.length > base.maxOutput * 1.5 ? spill(r.output, { dir: base.dir, max: base.maxOutput, label: tool.name, tail: 0.4 }) : r.output;
@@ -739,7 +758,7 @@ async function handle(m: any): Promise<unknown> {
     }
     case 'session/set_model': {
       const s = sessions.get(p.sessionId);
-      if (!s || !models().some((x) => x.id === p.modelId)) throw new Error('No such model: add it in Settings → Models');
+      if (!s || !usable(await confidentialSession()).some((x) => x.id === p.modelId)) throw new Error('No such model: add it in Settings → Models (a confidential session takes only models on this computer)');
       s.model = p.modelId;
       save(s);
       return {};

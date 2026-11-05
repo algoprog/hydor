@@ -24,7 +24,7 @@ import { Timeline } from './timeline.ts';
 import { removeSessionScratch } from './tasklog.ts';
 import { checkpoint, createWorktree, removeWorktree, restoreCheckpoint, worktreeState } from './worktrees.ts';
 import { pageServerUrl, runToken } from './mcp.ts';
-import { beforeSend, messageNotes, spawnAdditions, turnEnded } from './features/registry.ts';
+import { beforeSend, featureDeps, messageNotes, spawnAdditions, turnEnded } from './features/registry.ts';
 import { dropNotes } from './notes.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import type { SessionExtra } from '../shared/features.ts';
@@ -35,6 +35,8 @@ import { ensureClaude, ensureCommand } from './clients.ts';
 import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custom/fork.ts';
 import { customGoal } from './custom/goal.ts';
 import { titleFor } from './titles.ts';
+import { isConfidential } from '../shared/confidential.ts';
+import { carriedExtra, checkHandoff, checkModelSwitch, confidentialStart, confidentialTitle, localModel } from './confidential/index.ts';
 
 /** The agent a session key names ("claude:…", "codex:…", "acp:…"). */
 export const agentOfKey = (key: string): Agent => (key.startsWith('codex:') ? 'codex' : key.startsWith('acp:') ? 'acp' : 'claude');
@@ -945,10 +947,13 @@ export class SessionManager extends EventEmitter {
   }
 
   async create(o: CreateOpts): Promise<string> {
+    // A confidential session (or a child of one): Custom with a local model, memory off (server/confidential).
+    o = confidentialStart(this.db, o);
     if (o.agent === 'claude') await ensureClaude();
-    // A session started with a request and no title gets one from the helper model, asked now, beside the agent's start.
+    // A session started with a request and no title gets one from the helper model, asked now, beside the agent's start;
+    // a confidential one only from a helper model on this computer, else from its first words.
     const request = (splitHandoff(o.prompt ?? '')?.request ?? o.prompt ?? '').trim();
-    const titling = !o.title?.trim() && request ? titleFor(this.db, request) : null;
+    const titling = !o.title?.trim() && request ? (isConfidential(o.extra) ? confidentialTitle(this.db, request) : titleFor(this.db, request)) : null;
     let cwd = path.resolve(o.cwd || config.defaultCwd);
     let wt: WorktreeInfo | undefined;
     if (o.worktree) {
@@ -1064,7 +1069,20 @@ export class SessionManager extends EventEmitter {
     const prefs = s.prefs ?? {};
     const next = at
       ? await this.fork(key, { prompt: o.text, at })
-      : await this.create({ agent: s.agent, cwd, prompt: o.text, model: prefs.model ?? s.model, effort: prefs.effort ?? undefined, mode: prefs.mode ?? undefined, title: s.title, remember: false, account: this.accountOf(key), acpAgent: s.acpAgent });
+      : await this.create({
+          agent: s.agent,
+          cwd,
+          prompt: o.text,
+          model: prefs.model ?? s.model,
+          effort: prefs.effort ?? undefined,
+          mode: prefs.mode ?? undefined,
+          title: s.title,
+          remember: false,
+          account: this.accountOf(key),
+          acpAgent: s.acpAgent,
+          // An edit of a confidential session stays confidential.
+          extra: carriedExtra(this.db, key),
+        });
     this.db.prepare('update app_sessions set title = ?, worktree = ? where key = ?').run(s.title, s.worktree ? JSON.stringify(s.worktree) : null, next);
     this.setFlags(key, { archived: true });
     this.queueSummary(next);
@@ -1109,6 +1127,7 @@ export class SessionManager extends EventEmitter {
    * `prompt`. The two sessions link to each other.
    */
   async handoff(fromKey: string, o: Omit<CreateOpts, 'cwd' | 'title'>): Promise<string> {
+    checkHandoff(this.db, fromKey);
     if (fromKey.startsWith('acp:') || (o.agent === 'acp' && o.acpAgent !== CONSOLE_ID)) throw new HttpError(400, 'Hand-offs go from Claude Code or Codex to the other one or to Custom');
     const from = this.summary(fromKey);
     const cwd = this.sessionCwd(fromKey);
@@ -1142,18 +1161,21 @@ export class SessionManager extends EventEmitter {
     if (this.external.get(key) && !this.lives.has(key)) throw new HttpError(409, 'This session is open in another app; fork it there, or close it there first');
     const prefs = from.prefs ?? {};
     const cfg = { model: prefs.model ?? undefined, effort: prefs.effort ?? undefined, mode: prefs.mode ?? undefined, account: this.accountOf(key) };
+    // A fork of a confidential session stays confidential, on a model on this computer.
+    const extra = carriedExtra(this.db, key);
+    if (extra) cfg.model = localModel(featureDeps(), cfg.model ?? from.model).id;
     let l: Live;
     if (from.agent === 'claude') {
       if (o.at && !/^[0-9a-f-]{36}$/i.test(o.at)) throw new HttpError(400, 'Bad message id');
-      l = await this.spawn('claude', cwd, { sessionId: crypto.randomUUID(), forkFrom: from.id, forkAt: o.at, ...cfg });
+      l = await this.spawn('claude', cwd, { sessionId: crypto.randomUUID(), forkFrom: from.id, forkAt: o.at, ...cfg, extra });
     } else if (from.agent === 'acp') {
       // Custom: a copy of its transcript and state up to the end of the turn `at` (a prompt's id), then loaded.
       const id = await prepareCustomFork(key, o.at);
-      l = await this.spawn('acp', cwd, { sessionId: id, resume: true, acpAgent: CONSOLE_ID, model: cfg.model, mode: cfg.mode });
+      l = await this.spawn('acp', cwd, { sessionId: id, resume: true, acpAgent: CONSOLE_ID, model: cfg.model, mode: cfg.mode, extra });
     } else {
       // The new session's own app-server copies the thread, so it is the one writing to the copy.
       // `at` is the last turn to keep (none: the whole thread).
-      l = await this.spawn('codex', cwd, { forkFrom: from.id, forkAt: o.at, ...cfg });
+      l = await this.spawn('codex', cwd, { forkFrom: from.id, forkAt: o.at, ...cfg, extra });
     }
     const now = Date.now();
     this.db
@@ -1164,6 +1186,7 @@ export class SessionManager extends EventEmitter {
       .run(l.key, from.agent, cwd, `${from.title} · fork`, cfg.model ?? null, cfg.effort ?? null, cfg.mode ?? null, key, now, now);
     if (cfg.account) this.db.prepare('update app_sessions set account = ? where key = ?').run(cfg.account, l.key);
     if (from.agent === 'acp') this.db.prepare('update app_sessions set acp_agent = ? where key = ?').run(CONSOLE_ID, l.key);
+    if (extra) setSessionExtra(this.db, l.key, extra);
     await l.adapter.sendMessage(withFiles(o.prompt.trim(), this.saveFiles(o.files ?? [])), this.saveImages(o.images ?? []));
     this.queueSummary(l.key);
     return l.key;
@@ -1439,6 +1462,7 @@ export class SessionManager extends EventEmitter {
 
   async start(key: string, cfg: LiveConfig = {}): Promise<void> {
     if (this.lives.has(key)) return;
+    checkModelSwitch(this.db, key, cfg.model);
     const ext = this.external.get(key);
     if (ext) {
       // Two processes appending to one transcript corrupt it.
@@ -1789,6 +1813,8 @@ export class SessionManager extends EventEmitter {
   }
 
   async configure(key: string, cfg: LiveConfig) {
+    // A confidential session switches only to another model on this computer.
+    checkModelSwitch(this.db, key, cfg.model);
     const l = this.lives.get(key);
     if (l) await l.adapter.configure(cfg);
     const agent = agentOfKey(key);

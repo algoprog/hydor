@@ -6,6 +6,7 @@
 //                          show_html, a page shown in the conversation.
 import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { isConfidential } from '../shared/confidential.ts';
 import type { Agent, SessionSummary, TimelineItem } from '../shared/types.ts';
 import { config } from './config.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
@@ -167,9 +168,10 @@ export function itemText(it: TimelineItem): string | null {
 }
 
 function sessionTools(sessions: SessionManager, publicUrl: (key: string) => string): Tool[] {
+  // Confidential sessions stay on this computer: other agents neither see nor reach them (server/confidential).
   const known = (key: unknown) => {
     const s = typeof key === 'string' ? sessions.summary(key) : null;
-    if (!s) throw new Error('No session with that key. list_sessions gives the keys.');
+    if (!s || isConfidential(s.extra)) throw new Error('No session with that key. list_sessions gives the keys.');
     return s;
   };
   return [
@@ -182,7 +184,7 @@ function sessionTools(sessions: SessionManager, publicUrl: (key: string) => stri
       },
       run: async (a) => {
         const q = String(a.query ?? '').toLowerCase();
-        const all = sessions.list({ limit: 400 }).sessions;
+        const all = sessions.list({ limit: 400 }).sessions.filter((s) => !isConfidential(s.extra));
         const hits = all
           .filter((s) => !q || s.title.toLowerCase().includes(q) || (s.cwd ?? '').toLowerCase().includes(q))
           .sort((x, y) => (y.updatedAt ?? 0) - (x.updatedAt ?? 0))

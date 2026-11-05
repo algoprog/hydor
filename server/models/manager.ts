@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { AgentModel, HfInspect, LocalModel, ModelDownload, ModelEntry, ModelOption, ModelsState, VllmServer } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
+import { isLocalAddress } from '../../shared/confidential.ts';
 import { keyHint, loadConfig, MODELS_DIR, saveConfig, writeAgentModels, type Endpoint, type ModelsConfig } from './config.ts';
 import * as hf from './hf.ts';
 import { machine } from './machine.ts';
@@ -20,7 +21,7 @@ export class ModelManager {
   private cfg: ModelsConfig = loadConfig();
   private servers: VllmServer[] = vllm.loadServers().filter((s) => vllm.alive(s.pid));
   private downloads = new Map<string, Download>();
-  private ollamaModels: (ModelEntry & { sizeBytes: number })[] = [];
+  private ollamaModels: (ModelEntry & { sizeBytes: number; remote?: boolean })[] = [];
   private ollamaVersion: string | null = null;
   private endpointModels = new Map<string, string[]>();
   private endpointContext = new Map<string, number>();
@@ -95,8 +96,11 @@ export class ModelManager {
           headers: { 'HTTP-Referer': 'https://github.com/algoprog/hydor', 'X-Title': 'Hydor' },
         });
       }
-    for (const m of this.ollamaModels)
-      out.push({ ...m, baseUrl: ollama.chatUrl(c.ollama.url), model: m.id.slice('ollama/'.length), tools: m.tools ?? 'text' });
+    // Models on this computer or your network (local): Ollama's at a local address, except its cloud models; vLLM's,
+    // which run here; endpoints at a local address. What a confidential session may use (server/confidential).
+    const ollamaHere = isLocalAddress(c.ollama.url);
+    for (const { remote, ...m } of this.ollamaModels)
+      out.push({ ...m, baseUrl: ollama.chatUrl(c.ollama.url), model: m.id.slice('ollama/'.length), tools: m.tools ?? 'text', ...(ollamaHere && !remote ? { local: true } : {}) });
     const v = vllm.findVllm(c.vllm.command);
     for (const r of hf.localRepos()) {
       if (!v || !r.arch || !v.archs.has(r.arch)) continue;
@@ -111,12 +115,38 @@ export class ModelManager {
         tools: (s ? s.parser : vllm.toolParser(r.modelType, v.parsers)) ? 'native' : templateTools(r.dir) ? 'template' : 'text',
         vision: r.vision,
         start: s?.state !== 'ready',
+        local: true,
       });
     }
     for (const e of c.endpoints)
       for (const m of this.endpointModels.get(e.id) ?? [])
-        out.push({ id: `endpoint/${e.id}/${m}`, label: `${m} (${e.name})`, provider: 'endpoint', baseUrl: e.baseUrl.replace(/\/+$/, ''), apiKey: e.apiKey, model: m, tools: 'native', contextLength: this.endpointContext.get(`${e.id}/${m}`) });
+        out.push({
+          id: `endpoint/${e.id}/${m}`,
+          label: `${m} (${e.name})`,
+          provider: 'endpoint',
+          baseUrl: e.baseUrl.replace(/\/+$/, ''),
+          apiKey: e.apiKey,
+          model: m,
+          tools: 'native',
+          contextLength: this.endpointContext.get(`${e.id}/${m}`),
+          ...(isLocalAddress(e.baseUrl) ? { local: true } : {}),
+        });
     return out;
+  }
+
+  /**
+   * The models a confidential session may use, the best first: those that take tools natively, then the larger,
+   * then the longer context. `prefer` (the one picked last) leads when it is one of them.
+   */
+  localModels(prefer?: string | null): AgentModel[] {
+    const size = new Map<string, number>();
+    for (const m of this.ollamaModels) size.set(m.id, m.sizeBytes);
+    for (const r of hf.localRepos()) size.set(`vllm/${r.repo}`, r.sizeBytes);
+    return rankLocal(
+      this.agentModels().filter((m) => m.local),
+      (m) => size.get(m.id) ?? 0,
+      prefer,
+    );
   }
 
   /** The models for the pickers (no addresses or keys). */
@@ -127,6 +157,7 @@ export class ModelManager {
       label: m.label,
       description: [where[m.provider], m.contextLength ? `${Math.round(m.contextLength / 1000)}K context` : '', m.start ? 'starts when used' : ''].filter(Boolean).join(' · '),
       efforts: [],
+      ...(m.local ? { local: true } : {}),
     }));
   }
 
@@ -370,6 +401,15 @@ export class ModelManager {
     m = this.agentModels().find((x) => x.id === id)!;
     return m;
   }
+}
+
+const TOOL_RANK = { native: 3, template: 2, text: 1 } as const;
+
+/** Local models, the best first (see localModels); `sizeOf` gives a model's size in bytes (0 when not known). */
+export function rankLocal(models: AgentModel[], sizeOf: (m: AgentModel) => number, prefer?: string | null): AgentModel[] {
+  const ranked = [...models].sort((a, b) => TOOL_RANK[b.tools] - TOOL_RANK[a.tools] || sizeOf(b) - sizeOf(a) || (b.contextLength ?? 0) - (a.contextLength ?? 0));
+  const i = prefer ? ranked.findIndex((m) => m.id === prefer) : -1;
+  return i > 0 ? [ranked[i], ...ranked.slice(0, i), ...ranked.slice(i + 1)] : ranked;
 }
 
 /** Whether a model's chat template lays out tools (so it can be shown them in its own format). */

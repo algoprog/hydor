@@ -1207,10 +1207,11 @@ export const apps: Feature = {
   // Templates the user changed in their editor, for the agents that built them, with the next message.
   beforeMessage: (key, d) => takeAppEdits(d.db, key),
   // A message one of the user's apps clearly does: the agent hears which, with it. Not in an app's own run, nor in
-  // sessions another agent or the app started for a part of its work (a child, a research, an arena match).
+  // sessions another agent or the app started for a part of its work (a child, a research, an arena match), nor in
+  // a confidential session, where apps are off.
   aboutMessage(text, key, d) {
     const x = sessionExtra(d.db, key);
-    if (markOf(x) || x.parent || x.research || typeof x.arena === 'string' || x.swarm) return null;
+    if (markOf(x) || x.parent || x.research || typeof x.arena === 'string' || x.swarm || x.confidential) return null;
     return appHint(d.db, text);
   },
   start(d) {
