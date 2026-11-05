@@ -201,10 +201,10 @@ function changing(db: Deps['db'], a: Record<string, unknown>, kind: PageKind): s
   return id;
 }
 
-/** Keeps what an agent made: a new version of the page it named, or a new page of its session. */
+/** Keeps what an agent made: a new version of the page it named, or a new page of its session (an app's step has none). */
 function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknown, model: unknown) {
   const db = ctx.deps.db;
-  const p = id ? addVersion(db, id, { title, model, by: 'agent' }) : createPage(db, { title, kind, model, by: 'agent', sessionKey: ctx.key, space: sessionSpace(db, ctx.key) });
+  const p = id ? addVersion(db, id, { title, model, by: 'agent' }) : createPage(db, { title, kind, model, by: 'agent', sessionKey: ctx.step ? undefined : ctx.key, space: ctx.step ? null : sessionSpace(db, ctx.key) });
   tell(ctx.deps, { what: 'pages' });
   refreshThumbs(ctx.deps, [p.id]);
   return p;

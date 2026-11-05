@@ -5,6 +5,7 @@
 // run through OpenRouter (models.ts) needs OpenRouter's key too: asked for the same way, and kept with Settings → Models.
 import type { AppRecipe } from '../../shared/apps.ts';
 import type { AppSecretState } from '../../shared/app-secrets.ts';
+import { allSteps } from '../../shared/app-manifest.ts';
 import { domainAllowed } from '../../shared/connections.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -31,12 +32,27 @@ export function secretsOf(db: DB, recipe: Recipe): SecretStateView[] {
   return p && !own.some((s) => s.name === p.name) ? [...own, p] : own;
 }
 
-/** The keys it needs and does not have (not those it can do without). */
-export const missingSecrets = (db: DB, recipe: Recipe) => secretsOf(db, recipe).filter((s) => !s.have && !s.optional);
+/**
+ * The keys one of its flows besides the main one signs its requests with (http_request's auth): that flow needs them,
+ * even when the app can do without them (a ready-made app's Publish, which needs a Hugging Face token the rest does not).
+ */
+export function keysOfFlow(recipe: Recipe, flow?: string): string[] {
+  const f = flow ? recipe.flows?.[flow] : undefined;
+  if (!f) return [];
+  const names = new Set<string>();
+  for (const s of allSteps(f.steps)) if (s.do === 'tool' && s.tool === 'http_request' && typeof s.with?.auth === 'string' && s.with.auth.trim()) names.add(s.with.auth.trim());
+  return [...names];
+}
+
+/** The keys it needs and does not have (not those it can do without, unless the flow it runs uses them). */
+export const missingSecrets = (db: DB, recipe: Recipe, flow?: string) => {
+  const used = keysOfFlow(recipe, flow);
+  return secretsOf(db, recipe).filter((s) => !s.have && (!s.optional || used.includes(s.name)));
+};
 
 /** Refuses a run that needs keys the vault does not have, saying which; the pages ask for them on seeing `secrets`. */
-export function needSecrets(db: DB, recipe: Recipe) {
-  const miss = missingSecrets(db, recipe);
+export function needSecrets(db: DB, recipe: Recipe, flow?: string) {
+  const miss = missingSecrets(db, recipe, flow);
   if (!miss.length) return;
   const names = miss.map((s) => s.label).join(', ');
   const vault = miss.map((s) => s.name).join(', ');

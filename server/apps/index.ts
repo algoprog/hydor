@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
-import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
+import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS, toCsv } from '../../shared/apps.ts';
 import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_ONLY_TOOLS, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import { cleanSecrets } from '../../shared/app-secrets.ts';
 import { checkUi, cleanUi, pagesFor, type AppUi } from '../../shared/app-ui.ts';
@@ -867,18 +867,27 @@ function routes(d: Deps) {
     return { run: runView(startRun({ app: a.id, slug: a.slug, recipe: chatRecipe(a), source: 'chat', inputs: { message: text } })) };
   });
 
-  // ---- what an app keeps ----
+  // ---- what an app keeps: yours, or a ready-made one's ("tpl:<id>", its records kept under that id) ----
 
-  const kept = (req: FastifyRequest) => {
+  const keeper = (req: FastifyRequest): { id: string; data: AppRecipe['data'] } => {
+    if (P(req).id.startsWith('tpl:')) {
+      const t = builtinOf(P(req).id);
+      installedOr409(db, t);
+      return { id: `tpl:${t.id}`, data: t.data };
+    }
     const a = own(req);
+    return { id: a.id, data: a.data };
+  };
+  const kept = (req: FastifyRequest) => {
+    const a = keeper(req);
     if (!a.data?.[P(req).collection] && P(req).collection) throw new HttpError(404, `The app keeps no collection “${P(req).collection}”`);
     return a;
   };
   app.get('/api/apps/:id/data', async (req) => {
-    const a = own(req);
+    const a = keeper(req);
     return { collections: collectionsOf(db, a.id, a.data), limits: DATA_LIMITS };
   });
-  app.get('/api/apps/:id/data/:collection', async (req) => {
+  app.get('/api/apps/:id/data/:collection', async (req, reply) => {
     const a = kept(req);
     const q = req.query as Record<string, string>;
     let where: Record<string, unknown> | undefined;
@@ -891,7 +900,16 @@ function routes(d: Deps) {
     }
     // A question: by words and by meaning, best first.
     if (q.ask) return searchRecords(db, a.id, a.data, P(req).collection, q.ask, { mode: q.mode === 'words' || q.mode === 'meaning' ? q.mode : 'auto', limit: Number(q.limit) || 10 });
-    return findRecords(db, a.id, a.data, P(req).collection, { where, search: q.q || undefined, sort: q.sort || undefined, limit: Number(q.limit) || 100 });
+    const found = findRecords(db, a.id, a.data, P(req).collection, { where, search: q.q || undefined, sort: q.sort || undefined, limit: Number(q.limit) || (q.format ? DATA_LIMITS.find : 100) });
+    if (q.format !== 'csv' && q.format !== 'jsonl') return found;
+    // As a file to download: the fields asked for (else the collection's own, in order), a row or a line each.
+    const known = a.data?.[P(req).collection]?.fields?.map((f) => f.id);
+    const cols = q.fields ? q.fields.split(',').map((f) => f.trim()).filter(Boolean).slice(0, 40) : (known ?? [...new Set(found.records.flatMap((r) => Object.keys(r)))].filter((k) => !['id', 'createdAt', 'updatedAt'].includes(k)));
+    const name = String(q.name ?? '').replace(/[^\w.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 80) || P(req).collection;
+    reply.header('Content-Type', q.format === 'csv' ? 'text/csv; charset=utf-8' : 'application/x-ndjson; charset=utf-8');
+    reply.header('Content-Disposition', `attachment; filename="${name}.${q.format}"`);
+    if (q.format === 'csv') return toCsv([cols, ...found.records.map((r) => cols.map((c) => r[c] ?? ''))]);
+    return found.records.map((r) => JSON.stringify(Object.fromEntries(cols.map((c) => [c, r[c] ?? null])))).join('\n') + (found.records.length ? '\n' : '');
   });
   app.post('/api/apps/:id/data/:collection', async (req) => {
     const a = kept(req);
