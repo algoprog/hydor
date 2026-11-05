@@ -425,11 +425,16 @@ test('New-model watch: the newest models, those old enough with downloads to loo
 test('New-model watch: each model worth trying goes to Experiments with your evaluation, told to say when it beats your best; the earlier ones’ scores read; what changed kept, and laid out', async () => {
   const runs: Record<string, unknown>[] = [];
   const tools = {
+    // As workstream A's tools answer (server/experiments/tools.ts): JSON text, its data read from it.
     experiment_run: (a: Record<string, unknown>) => {
       runs.push(a);
-      return { text: JSON.stringify({ id: `run${runs.length}`, status: 'queued' }), data: { id: `run${runs.length}`, status: 'queued' } };
+      const out = { id: `run${runs.length}`, status: 'queued', name: a.name, page: `/system/experiments/run${runs.length}` };
+      return { text: JSON.stringify(out, null, 1), data: out };
     },
-    experiment_list: () => ({ data: { runs: [{ id: 'old1', status: 'done', metrics: { 'nDCG@10': 0.512 } }, { id: 'old2', status: 'failed', metrics: {} }] } }),
+    experiment_list: () => {
+      const out = { runs: [{ id: 'old1', name: 'Evaluate org/older-a', group: 'New-model watch', status: 'done', where: 'this computer', metrics: { last: { 'nDCG@10': 0.512 }, best: { 'nDCG@10': 0.52 }, step: 1 } }, { id: 'old2', status: 'failed', metrics: { last: {} } }] };
+      return { text: JSON.stringify(out, null, 1), data: out };
+    },
   };
   const ctx = ctxOf({ tools });
   ctx.data.set('models', [
@@ -449,7 +454,16 @@ test('New-model watch: each model worth trying goes to Experiments with your eva
   ];
   const v = await program('new-model-watch', 'runs', { models, read, kept: ctx.data.get('models'), command: 'python eval.py --model {model}', folder: '~/eval', metric: 'ndcg@10', better: 'Higher', best: '0.5', today: '2026-11-05' }, ctx);
   assert.deepEqual(runs, [
-    { command: 'python eval.py --model hindsight-ai/hs-rerank-1', cwd: '~/eval', name: 'Evaluate hindsight-ai/hs-rerank-1', group: 'New-model watch', gpus: 1, tags: ['new-model-watch'], notify: { when: { metric: 'ndcg@10', op: '>', value: 0.5 } } },
+    {
+      command: 'python eval.py --model hindsight-ai/hs-rerank-1',
+      cwd: '~/eval',
+      name: 'Evaluate hindsight-ai/hs-rerank-1',
+      group: 'New-model watch',
+      gpus: 1,
+      tags: ['new-model-watch'],
+      notify: { done: false, failed: false, when: { metric: 'ndcg@10', op: '>', value: 0.5 } },
+      better: { 'ndcg@10': 'max' },
+    },
   ]);
   const changed = v.changed as Record<string, unknown>[];
   assert.deepEqual(
