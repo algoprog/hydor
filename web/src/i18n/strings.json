@@ -454,7 +454,6 @@
 "{0} in · {1} cached · {2} out":"web/src/features/budget/feature.tsx",
 "{0} in · {1} out":"web/src/features/session/items.tsx",
 "{0} in ({1} cached) · {2} out":"web/src/features/session/SessionView.tsx",
-"{0} in all":"web/src/features/session/items.tsx",
 "{0} in the Library":"web/src/features/spaces/SpacesPage.tsx",
 "{0} in this session":"web/src/features/connections/SessionApps.tsx",
 "{0} in, {1} out, per million tokens (about ¾ of a word each)":"web/src/features/tour/TourModels.tsx",
