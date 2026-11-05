@@ -355,16 +355,16 @@ export function FolderCrumbs({ chain, space, topName, onGo }: { chain: LibFolder
 
 /** Words for what was left out of a folder brought in, by why: "12 pictures, 2 PDFs". */
 const SKIPPED: Record<FolderSkip, (n: number) => string> = {
-  picture: (n) => (n === 1 ? '1 picture' : tr(`${n} pictures`)),
-  video: (n) => (n === 1 ? '1 video' : tr(`${n} videos`)),
-  audio: (n) => (n === 1 ? '1 sound' : tr(`${n} sounds`)),
-  pdf: (n) => (n === 1 ? '1 PDF' : tr(`${n} PDFs`)),
-  slides: (n) => (n === 1 ? '1 presentation' : tr(`${n} presentations`)),
-  part: (n) => (n === 1 ? '1 part of a LaTeX document' : tr(`${n} parts of LaTeX documents`)),
-  large: (n) => (n === 1 ? '1 file over 30 MB' : tr(`${n} files over 30 MB`)),
-  unreadable: (n) => (n === 1 ? '1 file that could not be read' : tr(`${n} files that could not be read`)),
-  kind: (n) => (n === 1 ? '1 file of another kind' : tr(`${n} files of other kinds`)),
-  limit: (n) => (n === 1 ? '1 past what one import brings in' : tr(`${n} past what one import brings in`)),
+  picture: (n) => (n === 1 ? tr('1 picture') : tr(`${n} pictures`)),
+  video: (n) => (n === 1 ? tr('1 video') : tr(`${n} videos`)),
+  audio: (n) => (n === 1 ? tr('1 sound') : tr(`${n} sounds`)),
+  pdf: (n) => (n === 1 ? tr('1 PDF') : tr(`${n} PDFs`)),
+  slides: (n) => (n === 1 ? tr('1 presentation') : tr(`${n} presentations`)),
+  part: (n) => (n === 1 ? tr('1 part of a LaTeX document') : tr(`${n} parts of LaTeX documents`)),
+  large: (n) => (n === 1 ? tr('1 file over 30 MB') : tr(`${n} files over 30 MB`)),
+  unreadable: (n) => (n === 1 ? tr('1 file that could not be read') : tr(`${n} files that could not be read`)),
+  kind: (n) => (n === 1 ? tr('1 file of another kind') : tr(`${n} files of other kinds`)),
+  limit: (n) => (n === 1 ? tr('1 past what one import brings in') : tr(`${n} past what one import brings in`)),
 };
 
 /**
@@ -403,6 +403,7 @@ export function ImportFolderDialog({ open, onClose, space, folder, folderName }:
   const counts = new Map<FolderSkip, number>();
   for (const s of done?.skipped ?? []) counts.set(s.why, (counts.get(s.why) ?? 0) + 1);
   const n = done?.pages.length ?? 0;
+  const things = n === 1 ? tr('1 thing') : tr(`${n} things`);
   const openIt = () => {
     onClose();
     if (!done) return;
@@ -445,10 +446,10 @@ export function ImportFolderDialog({ open, onClose, space, folder, folderName }:
             {n === 0
               ? 'Nothing in it could come into the Library.'
               : done.folder
-                ? tr(`Brought in ${n === 1 ? '1 thing' : `${n} things`}, in the folder “${done.folder.name}”.`)
+                ? tr(`Brought in ${things}, in the folder “${done.folder.name}”.`)
                 : done.pages.length === 1 && done.pages[0].kind === 'tex'
                   ? tr(`It is a LaTeX project: it came in as one LaTeX document, “${done.pages[0].title}”, its files in their folders.`)
-                  : tr(`Brought in ${n === 1 ? '1 thing' : `${n} things`}.`)}
+                  : tr(`Brought in ${things}.`)}
           </p>
           {counts.size > 0 && (
             <div className="rounded-xl border border-line bg-bg-1 px-3 py-2.5 text-[12.5px] text-fg-2">

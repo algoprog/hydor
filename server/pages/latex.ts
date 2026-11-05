@@ -1658,6 +1658,11 @@ function readFolder(dir: string, notes: string[]): Entry[] {
       const r = rel ? `${rel}/${e.name}` : e.name;
       if (e.isDirectory() && depth < 6) walk(p, r, depth + 1);
       else if (e.isFile()) {
+        // A picture of a kind TeX here cannot take is said, not passed over.
+        if (/\.(eps|ps|svg|gif|webp|tiff?|bmp)$/i.test(e.name)) {
+          notes.push(`${r} was left out: LaTeX here takes PNG and JPEG pictures (and PDF ones, made into PNG); convert it first.`);
+          continue;
+        }
         if (!/\.(tex|ltx|bib|bbl|bst|sty|cls|clo|cfg|def|fd|ist|bbx|cbx|lbx|txt|csv|tsv|dat|tikz|pgf|lua|png|jpe?g|pdf)$/i.test(e.name)) continue;
         const size = fs.statSync(p).size;
         if (size > 40 * 1024 * 1024 || bytes + size > 200 * 1024 * 1024 || out.length >= 600) {

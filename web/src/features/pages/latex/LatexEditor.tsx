@@ -386,6 +386,12 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     texSetup().then(setSetup, () => {});
   }, []);
 
+  /** The tabs that stay for another version of the document: those it still has, with the one in view. */
+  const keepTabs = (o: string[], d: TexDoc, keep: string) => {
+    const left = o.filter((k) => k !== PICTURES && has(d, k));
+    const k = keep === PICTURES ? TEX_MAIN : keep;
+    return left.includes(k) ? left : [...left, k];
+  };
   /** Whether a document still has what a tab shows: a file, a picture, a file of the folder, the Pictures tab. */
   const has = (d: TexDoc, k: string) =>
     k === PICTURES || k === TEX_MAIN || (k.startsWith(PIC) ? d.pictures.some((p) => p.name === viewName(k)) : k.startsWith(DISK) ? diskUses.some((u) => u.name === viewName(k)) : d.files.some((f) => f.name === k));
@@ -401,7 +407,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     setEpoch((e) => e + 1);
     const keep = has(doc.model, file) ? file : TEX_MAIN;
     setFile(keep);
-    setOpened([keep === PICTURES ? TEX_MAIN : keep]);
+    // The tabs open stay open, those the new version still has (their editors start again from it).
+    setOpened((o) => keepTabs(o, doc.model, keep));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc?.key]);
 
@@ -698,7 +705,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     setEpoch((e) => e + 1);
     const keep = saved && has(saved, file) ? file : TEX_MAIN;
     setFile(keep);
-    setOpened([keep === PICTURES ? TEX_MAIN : keep]);
+    setOpened((o) => (saved ? keepTabs(o, saved, keep) : [TEX_MAIN]));
   };
 
   // Keys that work anywhere in the editor (CodeMirror has its own for its text).

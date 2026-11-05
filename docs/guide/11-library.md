@@ -245,7 +245,7 @@ A project's own page shows what it holds in the Library too, on its **Overview**
 
 Folders sort what a place holds: a project, or **Not in a project** (with no projects, the whole Library). A folder holds things and other folders of its place. A place shows its folders first, as tiles with how many things are in each (**Empty** when nothing is), then the things at its top.
 
-- **Make one**: **New**, at the top right of the Library, then **Folder**, and give it a name ([or New folder from the search box](/library?new=folder)). It goes where you are: in the folder open, or at the top of the place.
+- **Make one**: **New**, at the top right of the Library, then **Folder**, and give it a name ([or New folder from the search box](/library?new=folder)). It goes where you are: in the folder open, or at the top of the place (from **Everything**, in **Not in a project**).
 - **Open one**: click its tile. Above the cards is the way back, the place first, then each folder down to the one open (**Thesis › Chapter drafts**): click a part of it to go back there. **New** in a folder makes things in it.
 - **Put things in one**: a card's **More** (⋯) → **Move to a folder** lists the place's folders as a tree, with the top of the place first; where it is now has a tick. On a computer you can also drag a card onto a folder's tile, or onto a part of the way back. A page open on its own has **More** (⋯) → **Move to a folder** too.
 - **A folder's More** (⋯): **Rename**, **Move to a folder** (into another folder, or to the top of the place; on a computer, drag its tile onto another), **Move to a project** (with everything in it) and **Delete**. Deleting a folder deletes nothing in it: what it held goes up a level, to the folder it was in, or to the top.
