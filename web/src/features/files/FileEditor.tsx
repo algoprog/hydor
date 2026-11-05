@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
-import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileDiff, FolderOpen, MessageSquarePlus, RotateCcw, Save, Search, Signature, SquareTerminal, WrapText } from 'lucide-react';
+import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileDiff, FolderOpen, Highlighter, MessageSquarePlus, RotateCcw, Save, Search, Signature, SquareTerminal, WrapText } from 'lucide-react';
 import { api, ApiError, post, put } from '../../lib/api';
 import type { EditorHandle } from '../../lib/codemirror';
 import { basename, bytes, dirname, isWinPath, tildify } from '../../lib/format';
@@ -20,6 +20,8 @@ import { useWatchMs } from './FileAsk';
 const OfficePreview = lazy(() => import('../documents/OfficePreview').then((m) => ({ default: m.OfficePreview })));
 // A PDF's Fill & sign: its fields to fill and its pages to write and sign on (fill/).
 const FillSign = lazy(() => import('./fill/FillSign').then((m) => ({ default: m.FillSign })));
+// A PDF's reader, to highlight it and keep notes beside it (read/).
+const PdfReader = lazy(() => import('./read/PdfReader').then((m) => ({ default: m.PdfReader })));
 
 interface FileData {
   path: string;
@@ -109,6 +111,8 @@ export function FileEditor({
   // A PDF being filled in and signed (Fill & sign) instead of shown.
   const [fill, setFill] = useState(false);
   useEffect(() => setFill(false), [path]);
+  // A PDF read in the app's reader (Highlight), as one with highlights opens, so its notes are there.
+  const [read, setRead] = useState(false);
   const moreRef = useRef<HTMLButtonElement>(null);
   const deskRef = useRef<HTMLButtonElement>(null);
   const [desk, setDesk] = useState(false);
@@ -274,6 +278,19 @@ export function FileEditor({
     return () => window.removeEventListener('beforeunload', before);
   }, [dirty]);
 
+  useEffect(() => {
+    setRead(false);
+    if (media !== 'pdf') return;
+    let alive = true;
+    api<{ highlights: unknown[] }>(`/api/pdf-notes?path=${encodeURIComponent(path)}`).then(
+      (r) => alive && r.highlights.length > 0 && setRead(true),
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
+  }, [path, media]);
+
   const raw = mu(`/api/fs/raw?path=${encodeURIComponent(path)}`);
   const crumbs = tildify(path, home).split(isWinPath(path) ? /[\\/]/ : '/');
   const text = !!file && !file.binary && !file.tooLarge;
@@ -338,6 +355,11 @@ export function FileEditor({
             {text && (isMd || isHtml) && (
               <IconButton label={isHtml ? 'Show as a page' : 'Preview'} active={mode === 'preview'} onClick={togglePreview}>
                 <Eye size={17} />
+              </IconButton>
+            )}
+            {media === 'pdf' && file && !fill && !read && (
+              <IconButton label="Highlight" onClick={() => setRead(true)}>
+                <Highlighter size={17} />
               </IconButton>
             )}
             {media === 'pdf' && file && !fill && (
@@ -418,6 +440,11 @@ export function FileEditor({
               </IconButton>
             </>
           )}
+          {media === 'pdf' && file && !fill && !read && (
+            <Button size="sm" variant="ghost" icon={<Highlighter size={14} />} onClick={() => setRead(true)}>
+              Highlight
+            </Button>
+          )}
           {media === 'pdf' && file && !fill && (
             <Button size="sm" variant="ghost" icon={<Signature size={14} />} onClick={() => setFill(true)}>
               Fill & sign
@@ -486,6 +513,10 @@ export function FileEditor({
                 else if (saved?.replaced) void load();
               }}
             />
+          </Suspense>
+        ) : media === 'pdf' && read ? (
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-fg-3"><Throbber size={34} /></div>}>
+            <PdfReader path={path} mtime={file.mtime} canAsk={!!saveFirst} onClose={() => setRead(false)} onFileSaved={(saved) => saved.replaced && void load()} />
           </Suspense>
         ) : media && (file.binary || file.tooLarge || ext === 'svg') ? (
           <div className={cx('flex h-full items-center justify-center overflow-auto bg-bg-1', media === 'video' ? 'p-0 sm:p-3' : 'p-4')}>

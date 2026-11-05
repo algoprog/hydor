@@ -178,10 +178,12 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   };
   useEffect(() => {
     const on = (e: Event) => {
-      const d = (e as CustomEvent<{ text: string; key?: string; replace?: string }>).detail;
-      if (!d || (d.key && d.key !== key) || (!d.text && !d.replace)) return;
+      const d = (e as CustomEvent<{ text: string; key?: string; replace?: string; files?: Attachment[] }>).detail;
+      if (!d || (d.key && d.key !== key) || (!d.text && !d.replace && !d.files?.length)) return;
       // A choice changed in a page: the new one takes the old one's place, if that is still there.
       setText((cur) => putText(cur, d.text, d.replace));
+      // A picture of a part of a PDF asked about comes with its words (Files' reader).
+      if (d.files?.length) setAtts((l) => [...l, ...d.files!.filter((f) => !l.some((x) => x.id === f.id))]);
       ta.current?.focus();
     };
     window.addEventListener('hydor:compose', on);
