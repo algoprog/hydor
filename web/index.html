@@ -14,10 +14,10 @@
     <script src="/theme-boot.js"></script>
     <!--
       While the page loads: the logo, HYDΩR, its Ω filling with water (the wordmark's tide, components/Logo.tsx), over the
-      theme's page colour. The moment the app has something of its own to show, it is there under the logo, and the logo
-      goes home: into the app's own wordmark where one is in sight, its water draining, as the colour around it clears
-      (lib/boot.ts). The Mac app shows the same while its server starts (mac/main.cjs bootPage), so there the water is
-      already in when this page opens (theme-boot.js marks the page boot-full).
+      theme's page colour. The moment the app has something of its own to show, it is there under the logo, which fades
+      as its water drains and the colour around it clears (lib/boot.ts). The Mac app shows the same while its server
+      starts (mac/main.cjs bootPage), so there the water is already in when this page opens (theme-boot.js marks the page
+      boot-full).
     -->
     <style>
       #boot { position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center; background: var(--bg, #000); color: var(--fg, #e9edf5); }
@@ -31,7 +31,6 @@
       @keyframes boot-ebb { 50% { transform: translateY(12px); } }
       @keyframes boot-bob { 50% { transform: translateY(4px); } }
       @keyframes boot-swell { to { transform: translateX(-36px); } }
-      .boot-landing svg[data-landing] { visibility: hidden; }
       @media (prefers-reduced-motion: reduce) {
         #boot .boot-fill { transform: translateY(8px); animation: none; }
         #boot .boot-ebb, #boot .boot-bob, #boot .boot-swell { animation: none; }

@@ -47,10 +47,9 @@ const TIDE_CREST = 'M-72 0 q9 -5.5 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 
  * The full logo, HYDΩR: `height` px tall (its capitals' height), the letters in the text's colour, the Ω in the sea's.
  * With `tide`, the pointer over it fills the Ω with the sea: the letter empties to a faint outline and bright water
  * rises in it, its crest a wave that keeps flowing and bobbing while the pointer stays, then drains away and the
- * letter is whole again (styles.css, "the logo's tide"). The letter itself never moves. With `landing`, the logo shown
- * while the page loads lands on this one when it is in sight (lib/boot.ts).
+ * letter is whole again (styles.css, "the logo's tide"). The letter itself never moves.
  */
-export function Wordmark({ height = 16, className, tide, landing }: { height?: number; className?: string; tide?: boolean; landing?: boolean }) {
+export function Wordmark({ height = 16, className, tide }: { height?: number; className?: string; tide?: boolean }) {
   const id = useId();
   return (
     <svg
@@ -62,7 +61,6 @@ export function Wordmark({ height = 16, className, tide, landing }: { height?: n
       className={['shrink-0', tide && 'wordmark-tide', className].filter(Boolean).join(' ')}
       role="img"
       aria-label="Hydor"
-      data-landing={landing ? '' : undefined}
     >
       <defs>
         <clipPath id={id}>
