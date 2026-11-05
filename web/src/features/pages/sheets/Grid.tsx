@@ -932,7 +932,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
           <div className={cx(noteText && 'mt-1.5 border-t border-line pt-1.5')}>
             <div className="flex items-center gap-1.5 text-[11.5px] text-fg-3">
               <MessageSquare size={11} className="text-[#a142f4]" />
-              <span>{thread.by === 'agent' ? 'Agent' : 'You'}</span>
+              {thread.author ? <span translate="no">{thread.author}</span> : <span>{thread.by === 'agent' ? 'Agent' : 'You'}</span>}
               {thread.resolved && <span>Resolved</span>}
               {n > 0 && <span>{n === 1 ? '1 reply' : `${n} replies`}</span>}
             </div>

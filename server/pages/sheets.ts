@@ -71,7 +71,7 @@ import { resolvePart, Zip } from '../documents/zip.ts';
 import { chartData, chartProblem, chartSvg } from '../../shared/sheet-chart.ts';
 import { CondFormats, hiddenCols, hiddenRows, isTicked, listOptions, Merges, Rules } from '../../shared/sheet-rules.ts';
 import { coreXml, esc as xesc, relsXml, XML_HEAD, zipParts } from './ooxml.ts';
-import { chartXml, commentsXml, condXml, drawingXml, Dxfs, filterXml, isListsSheet, listFromSheet, listsSheet, mergesXml, personsXml, readCharts, readConditional, readDxfs, readFilter, readNotes, readPersons, readThreaded, readValidation, validationXml } from './sheet-parts.ts';
+import { chartXml, commentsXml, condXml, drawingXml, Dxfs, filterXml, isListsSheet, listFromSheet, listsSheet, mergesXml, namedAuthors, personsXml, readCharts, readConditional, readDxfs, readFilter, readNotes, readPersons, readThreaded, readValidation, validationXml } from './sheet-parts.ts';
 import { joinRects, odfFormula, odfText, odsCondStyles, odsConditional, odsNote, odsValidations } from './sheet-ods.ts';
 
 export { isBookText } from '../../shared/sheets.ts';
@@ -334,13 +334,13 @@ function commentsForAgent(book: Workbook): string[] {
   const list = book.sheets.flatMap((sh) => (sh.comments ?? []).map((c) => ({ sh, c })));
   if (!list.length) return [];
   const open = list.filter((x) => !x.c.resolved).length;
-  const who = (by: 'user' | 'agent') => (by === 'agent' ? 'an agent' : 'the user');
+  const who = (x: { by: 'user' | 'agent'; author?: string }) => (x.author ? `“${x.author}”` : x.by === 'agent' ? 'an agent' : 'the user');
   return [
     '',
     `Comments (${open} open, ${list.length - open} resolved), each on a cell:`,
     ...list.flatMap(({ sh, c }) => [
-      `- ${c.id} · ${c.resolved ? 'resolved' : 'open'} · ${quoteSheet(sh.name)}!${c.cell} · ${who(c.by)}, ${when(c.at)} UTC: ${c.text.replace(/\n/g, ' / ')}`,
-      ...(c.replies ?? []).map((r) => `    ↳ ${who(r.by)}, ${when(r.at)} UTC: ${r.text.replace(/\n/g, ' / ')}`),
+      `- ${c.id} · ${c.resolved ? 'resolved' : 'open'} · ${quoteSheet(sh.name)}!${c.cell} · ${who(c)}, ${when(c.at)} UTC: ${c.text.replace(/\n/g, ' / ')}`,
+      ...(c.replies ?? []).map((r) => `    ↳ ${who(r)}, ${when(r.at)} UTC: ${r.text.replace(/\n/g, ' / ')}`),
     ]),
     '',
     'To answer them, save_sheet with this id and comments: [{"id": "<id>", "reply": "what you did or say"}], adding "resolve": true once a comment is dealt with (or "reopen": true). Make the change a comment asks for in the cells too. Add a comment of your own with {"sheet": "<its name>", "cell": "B3", "text": "…"}. The comments in the sheets you send back are left as they are.',
@@ -753,7 +753,7 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
     { name: 'xl/_rels/workbook.xml.rels', data: wbRels },
     ...sheets.map((x, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: x })),
     ...extra,
-    ...(threads ? [{ name: 'xl/persons/person.xml', data: personsXml() }] : []),
+    ...(threads ? [{ name: 'xl/persons/person.xml', data: personsXml(namedAuthors(book)) }] : []),
     { name: 'xl/styles.xml', data: st.xml() },
     { name: 'xl/sharedStrings.xml', data: ss.xml() },
   ]);

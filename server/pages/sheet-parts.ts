@@ -646,10 +646,27 @@ const NS_TC = 'http://schemas.microsoft.com/office/spreadsheetml/2018/threadedco
 const on = (v: string | undefined) => v !== undefined && v !== '0' && v !== 'false';
 /** Excel's people for threaded comments: the user and agents (their comments read back as theirs by these names). */
 const PERSONS = { user: { id: '{6F1C3A2B-0000-4000-8000-0000000000A1}', name: 'User' }, agent: { id: '{6F1C3A2B-0000-4000-8000-0000000000A2}', name: 'Agent' } };
-/** The workbook's people part, for its threaded comments. */
-export const personsXml = () =>
-  `${XML_HEAD}<personList xmlns="${NS_TC}" xmlns:x="${NS_MAIN}">${Object.values(PERSONS)
-    .map((p) => `<person displayName="${p.name}" id="${p.id}" userId="${p.name}" providerId="None"/>`)
+/** Someone named who wrote a comment (one that came from a file): an id made from the name, the same each time. */
+function personId(name: string): string {
+  let a = 0x811c9dc5;
+  let b = 0;
+  for (const ch of name) {
+    const c = ch.codePointAt(0)!;
+    a = Math.imul(a ^ c, 16777619) >>> 0;
+    b = (Math.imul(b, 31) + c) >>> 0;
+  }
+  return `{6F1C3A2B-0000-4000-9000-${(a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0').slice(0, 4)).toUpperCase()}}`;
+}
+/** The names of those other than you and agents who wrote a workbook's comments and replies. */
+export function namedAuthors(book: Workbook): string[] {
+  const out = new Set<string>();
+  for (const sh of book.sheets) for (const c of sh.comments ?? []) for (const x of [c, ...(c.replies ?? [])]) if (x.author) out.add(x.author);
+  return [...out];
+}
+/** The workbook's people part, for its threaded comments: the user, agents and everyone named (`named`). */
+export const personsXml = (named: string[] = []) =>
+  `${XML_HEAD}<personList xmlns="${NS_TC}" xmlns:x="${NS_MAIN}">${[...Object.values(PERSONS), ...named.map((name) => ({ id: personId(name), name }))]
+    .map((p) => `<person displayName="${esc(p.name)}" id="${p.id}" userId="${esc(p.name)}" providerId="None"/>`)
     .join('')}</personList>`;
 
 /** The words Excel's own files put in a threaded comment's plain copy, for programs that know only notes. */
@@ -682,9 +699,9 @@ export function commentsXml(sh: Sheet, n: number): { comments: string; vml: stri
       const id = guid();
       authors.push(`tc=${id}`);
       list.push(`<comment ref="${k}" authorId="${authors.length - 1}" shapeId="0" xr:uid="${id}"><text><t xml:space="preserve">${esc(THREAD_HEAD + threadWords(c))}</t></text></comment>`);
-      const who = (by: 'user' | 'agent') => PERSONS[by].id;
-      tc.push(`<threadedComment ref="${k}" dT="${stamp(c.at)}" personId="${who(c.by)}" id="${id}"${c.resolved ? ' done="1"' : ''}><text>${esc(c.text)}</text></threadedComment>`);
-      for (const r of c.replies ?? []) tc.push(`<threadedComment ref="${k}" dT="${stamp(r.at)}" personId="${who(r.by)}" id="${guid()}" parentId="${id}"><text>${esc(r.text)}</text></threadedComment>`);
+      const who = (x: { by: 'user' | 'agent'; author?: string }) => (x.author ? personId(x.author) : PERSONS[x.by].id);
+      tc.push(`<threadedComment ref="${k}" dT="${stamp(c.at)}" personId="${who(c)}" id="${id}"${c.resolved ? ' done="1"' : ''}><text>${esc(c.text)}</text></threadedComment>`);
+      for (const r of c.replies ?? []) tc.push(`<threadedComment ref="${k}" dT="${stamp(r.at)}" personId="${who(r)}" id="${guid()}" parentId="${id}"><text>${esc(r.text)}</text></threadedComment>`);
     } else {
       const words = note && c ? `${note}\n\n${threadWords(c)}` : (note ?? '');
       list.push(`<comment ref="${k}" authorId="0"><text><r><t xml:space="preserve">${esc(words)}</t></r></text></comment>`);
@@ -721,7 +738,7 @@ export function readPersons(xml: string | null): Map<string, string> {
 
 /**
  * A sheet's threaded comments part as comments: each thread on its cell with its replies (by when they were written),
- * resolved or not; Agent's are an agent's, others' the user's, with the name of whoever else wrote one before its words.
+ * resolved or not; Agent's are an agent's, User's yours, and anyone else's keep their name (author).
  */
 export function readThreaded(xml: string | null, persons: Map<string, string>): SheetComment[] {
   if (!xml) return [];
@@ -736,8 +753,7 @@ export function readThreaded(xml: string | null, persons: Map<string, string>): 
   };
   const words = (el: El) => {
     const w = who(att(el, 'personId'));
-    const t = textOf(kid(el, 'text')).trim();
-    return { by: w.by, text: w.name && t ? `${w.name}: ${t}` : t };
+    return { by: w.by, text: textOf(kid(el, 'text')).trim(), ...(w.name.trim() ? { author: w.name.trim().slice(0, 80) } : {}) };
   };
   const roots = new Map<string, SheetComment>();
   for (const el of all2) {
@@ -746,13 +762,13 @@ export function readThreaded(xml: string | null, persons: Map<string, string>): 
     if (!ref || !id || att(el, 'parentId') || !parseRef(ref)) continue;
     const w = words(el);
     if (!w.text) continue;
-    roots.set(id, { id: newCommentId(), cell: ref, by: w.by, text: w.text.slice(0, 4000), at: at(att(el, 'dT')), ...(on(att(el, 'done')) ? { resolved: true } : {}) });
+    roots.set(id, { id: newCommentId(), cell: ref, by: w.by, ...(w.author ? { author: w.author } : {}), text: w.text.slice(0, 4000), at: at(att(el, 'dT')), ...(on(att(el, 'done')) ? { resolved: true } : {}) });
   }
   for (const el of all2) {
     const root = roots.get(att(el, 'parentId') ?? '');
     const w = root ? words(el) : null;
     if (!root || !w?.text) continue;
-    root.replies = [...(root.replies ?? []), { id: newCommentId(), by: w.by, text: w.text.slice(0, 4000), at: at(att(el, 'dT')) }].sort((a, b) => a.at - b.at).slice(0, 50);
+    root.replies = [...(root.replies ?? []), { id: newCommentId(), by: w.by, ...(w.author ? { author: w.author } : {}), text: w.text.slice(0, 4000), at: at(att(el, 'dT')) }].sort((a, b) => a.at - b.at).slice(0, 50);
   }
   return [...roots.values()];
 }
