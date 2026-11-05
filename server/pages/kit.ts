@@ -14,6 +14,7 @@ import { KIT_CSS } from '../../shared/page-kit.ts';
 import { ENGINE_SRC, UI_KIT_CSS, UI_SRC } from './ui-kit.ts';
 import { KIT_LIB_URLS, MEDIA_SRC } from './media-kit.ts';
 import { LIB_CDN } from '../../shared/app-media.ts';
+import { CODE_COLOURS_SRC, codeColoursScript } from '../../shared/code-colours.ts';
 
 export { KIT_CSS };
 
@@ -882,9 +883,9 @@ if (/<\/style/i.test(KIT_CSS)) throw new Error('The page kit must not close its 
 
 const cfgJson = (cfg: BridgeCfg) => JSON.stringify(cfg).replace(/</g, '\\u003c');
 
-/** The kit's <style> and <script>, for a page. */
+/** The kit's <style> and <script>, for a page (with the colours of its code blocks). */
 export function kitHead(cfg: BridgeCfg): string {
-  return `<style id="n-kit">${KIT_CSS}</style><script>(${BRIDGE_SRC})(${cfgJson(cfg)})</script>`;
+  return `<style id="n-kit">${KIT_CSS}</style><script>(${BRIDGE_SRC})(${cfgJson(cfg)})</script>${codeColoursScript()}`;
 }
 
 /** Only the stand-ins for localStorage and sessionStorage, for the pages of a published folder. */
@@ -905,7 +906,7 @@ export function injectHead(html: string, head: string): string {
  *   are held back, and the page is changed in place (what was there stays), so it grows without
  *   flashing, following its end unless the reader scrolled up.
  */
-function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: string, appSrc: string, uiSrc: string, engineSrc: string, uiCss: string, mediaSrc: string, kitLibs: Record<string, string>, cdn: string) {
+function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: string, appSrc: string, uiSrc: string, engineSrc: string, uiCss: string, mediaSrc: string, kitLibs: Record<string, string>, cdn: string, codeSrc: string) {
   const num = (v: unknown, def: number) => (typeof v === 'number' && v > 0 && v < 1e8 ? v : def);
   const nonce = (v: unknown) => (typeof v === 'string' ? v.slice(0, 64) : '');
   const theme = (v: unknown) => (v === 'dark' ? 'dark' : 'light');
@@ -1034,7 +1035,9 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: str
         for (const v of Array.isArray(d.ui.libs.css) ? d.ui.libs.css.slice(0, 16) : []) if (typeof v === 'string' && v.startsWith(cdn) && /\.css$/i.test(v) && !/["'<>\s]/.test(v)) sheets.push(v);
       }
       const libHead = `${Object.keys(imports).length ? `<script type="importmap">${js({ imports })}</script>` : ''}${sheets.map((h) => `<link rel="stylesheet" href="${h}">`).join('')}`;
-      head = `${libHead}<style id="n-kit">${kit}</style><style id="n-theme">${themeText(d.css)}</style><script>(${schemeSrc})(${js(cfg.theme)})</script><script>(${bridgeSrc})(${js(cfg)})</script>${app ? `<script>(${appSrc})(${js(app)})</script>` : ''}${ui ? `<script>(${uiSrc})(${js(ui)}, (${engineSrc})(), (${mediaSrc}))</script>` : ''}`;
+      // The colours of the page editor's code blocks, for a page that has any.
+      const code = /\bn-code\b/.test(d.html) ? `<script>(${codeSrc})().run()</script>` : '';
+      head = `${libHead}<style id="n-kit">${kit}</style><style id="n-theme">${themeText(d.css)}</style><script>(${schemeSrc})(${js(cfg.theme)})</script><script>(${bridgeSrc})(${js(cfg)})</script>${code}${app ? `<script>(${appSrc})(${js(app)})</script>` : ''}${ui ? `<script>(${uiSrc})(${js(ui)}, (${engineSrc})(), (${mediaSrc}))</script>` : ''}`;
     }
     const at = DOCTYPE.exec(html);
     html = at ? at[0] + head + html.slice(at[0].length) : head + html;
@@ -1049,4 +1052,4 @@ const asJs = (s: string) => JSON.stringify(s).replace(/</g, '\\u003c');
 
 /** The document of /htmlframe, where every page renders (sandboxed by PAGE_CSP). */
 export const frameHtml = () =>
-  `<!doctype html>\n<html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(frame.toString())})(${asJs(KIT_CSS)}, ${asJs(BRIDGE_SRC)}, ${asJs(EDITOR_SRC)}, ${asJs(SCHEME_SRC)}, ${asJs(APP_SRC)}, ${asJs(UI_SRC)}, ${asJs(ENGINE_SRC)}, ${asJs(UI_KIT_CSS)}, ${asJs(MEDIA_SRC)}, ${JSON.stringify(KIT_LIB_URLS).replace(/</g, '\\u003c')}, ${asJs(LIB_CDN)})</script></body></html>`;
+  `<!doctype html>\n<html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(frame.toString())})(${asJs(KIT_CSS)}, ${asJs(BRIDGE_SRC)}, ${asJs(EDITOR_SRC)}, ${asJs(SCHEME_SRC)}, ${asJs(APP_SRC)}, ${asJs(UI_SRC)}, ${asJs(ENGINE_SRC)}, ${asJs(UI_KIT_CSS)}, ${asJs(MEDIA_SRC)}, ${JSON.stringify(KIT_LIB_URLS).replace(/</g, '\\u003c')}, ${asJs(LIB_CDN)}, ${asJs(CODE_COLOURS_SRC)})</script></body></html>`;
