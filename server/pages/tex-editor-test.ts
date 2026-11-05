@@ -2,7 +2,8 @@
 // Library's New or by save_latex's template), what the setup says this TeX has, the word count (as texcount counts),
 // the table editor's grid read from a tabular and written back, BibTeX entries (read, keyed, made safe, added to a
 // .bib), the reference finder's reading of what was asked (and, with TEX_REFS_LIVE=1, real lookups on the web), the
-// quick checks before typesetting, and what get_page tells an agent. Through the routes, with a stand-in for the session manager. Build and run with a
+// quick checks before typesetting, comments on a document's words (kept, found again when the text moves, answered
+// by agents), and what get_page tells an agent. Through the routes, with a stand-in for the session manager. Build and run with a
 // scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/tex-editor-test.ts
 //   DATA_DIR=/tmp/hydor-test-tex-editor node dist/dev/tex-editor-test.js
@@ -344,6 +345,63 @@ code words not counted
   ok(texCheck('\\begin{document}\n$a$ \\(b\\) \\[c\\] $$d$$ {e} \\begin{x}\\end{x}\n\\end{document}').length === 0, 'a sound file has nothing to say');
   ok(texCheck('\\(a').some((x) => x.message.includes('has no')) && texCheck('{a').some((x) => x.message.includes('never closed')), 'maths and braces never closed');
   for (const tpl of TEX_TEMPLATES) ok(texCheck(texFromTemplate(tpl.id, 'T').main).length === 0, `the ${tpl.id} template passes the quick checks`);
+}
+
+// ---- comments -----------------------------------------------------------------------------------------------------------
+{
+  const main = doc('\\section{Heat}\nHeat flows from hot to cold.\n%%%% naget-comments\nThe end.');
+  const d = normalizeTex({
+    main,
+    files: { 'refs.bib': '@book{k, title={T}}' },
+    comments: [
+      { id: 'c1', by: 'user', text: 'Which rod?', at: 1, quote: 'Heat flows', file: 'main.tex', from: main.indexOf('Heat flows'), to: main.indexOf('Heat flows') + 10, replies: [{ id: 'r1', by: 'agent', text: 'Copper.', at: 2 }] },
+      { id: 'c2', text: '<b>bold</b>\u0007 plain', file: 'gone.tex', from: 0, to: 1 },
+      { id: 'c3', text: '' },
+      { text: 'On the bibliography', file: 'refs.bib', from: 0, to: 5, quote: '@book' },
+    ],
+  });
+  ok(d.comments?.length === 2 && d.comments[0].id === 'c1' && d.comments[0].replies?.[0].text === 'Copper.' && d.comments[1].file === 'refs.bib', 'comments are kept, checked: those on a file the document lacks or with nothing to say go');
+  const kept = texText(d);
+  const back = normalizeTex(parseTexText(kept));
+  ok(JSON.stringify(back) === JSON.stringify(d), 'comments keep as text and read back');
+  ok(kept.includes('\n!%%%% naget-comments\n') && back.main === main, 'a line of a file that reads like the comments’ marker is kept as itself');
+  ok(kept.split('\n').filter((l) => l.startsWith('{"id":"c')).length === 2 && kept.trimEnd().endsWith('}'), 'each comment is a line of its own at the end, so versions diff by comment');
+  const moved = normalizeTex({ ...d, main: main.replace('\\section{Heat}', '\\section{Heat}\nA new first line.') });
+  ok(moved.main.slice(moved.comments![0].from, moved.comments![0].to) === 'Heat flows', 'text added before a comment’s words: it is found on them again');
+  ok(normalizeTex({ main: doc('x'), comments: [{ text: 'a', from: 999, to: 5 }] }).comments?.[0].from === normalizeTex({ main: doc('x') }).main.length, 'a place past the end is held to the text');
+
+  // Agents read them and answer.
+  const made = await run('save_latex', { title: 'Commented', source: main });
+  const id = idOf(made.text);
+  const v1 = (await req('GET', `/api/pages/${id}`)).json().model;
+  await req('POST', `/api/pages/${id}/versions`, {
+    model: { ...v1, comments: [{ id: 'cu1', by: 'user', text: 'Say which rod: copper or steel?', at: Date.now(), quote: 'Heat flows', file: 'main.tex', from: v1.main.indexOf('Heat flows'), to: v1.main.indexOf('Heat flows') + 10 }] },
+    base: 1,
+  });
+  const got = (await run('get_page', { id })).text ?? '';
+  ok(/Comments: 1 open/.test(got) && /- cu1 on main\.tex:4 “Heat flows”, by the user: Say which rod/.test(got), 'get_page lists the comments, where they are and who wrote them');
+  const answered = await run('save_latex', {
+    id,
+    title: 'Commented',
+    comments: [
+      { id: 'cu1', reply: 'Copper: I said so in the text.', resolve: true },
+      { quote: 'The end.', text: 'Should this go?' },
+      { id: 'nope', reply: 'x' },
+      { quote: 'not there', text: 'y' },
+    ],
+  });
+  const v3 = (await req('GET', `/api/pages/${id}`)).json().model;
+  const cu1 = v3.comments.find((c: { id: string }) => c.id === 'cu1');
+  ok(cu1?.resolved && cu1.replies?.[0]?.by === 'agent' && cu1.replies[0].text.startsWith('Copper'), 'an agent answers a comment and resolves it');
+  ok(
+    v3.comments.some((c: { by: string; quote: string }) => c.by === 'agent' && c.quote === 'The end.'),
+    'and adds its own, on the words it quotes',
+  );
+  ok(/no comment nope/.test(answered.text ?? '') && /has no “not there”/.test(answered.text ?? ''), 'what could not be done is said');
+  await run('save_latex', { id, title: 'Commented', source: v3.main.replace('\\section{Heat}', '\\section{Heat and cold}\nMore words first.') });
+  const v4 = (await req('GET', `/api/pages/${id}`)).json().model;
+  const c4 = v4.comments.find((c: { id: string }) => c.id === 'cu1');
+  ok(v4.main.slice(c4.from, c4.to) === 'Heat flows', 'a source rewritten by an agent keeps each comment on its words');
 }
 
 // ---- what an agent is told ---------------------------------------------------------------------------------------------

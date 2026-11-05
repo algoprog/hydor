@@ -28,6 +28,8 @@ import {
   Italic,
   Keyboard,
   Link2,
+  MessageSquare,
+  MessageSquarePlus,
   List,
   ListOrdered,
   ListTree,
@@ -68,6 +70,7 @@ import {
   type TexIssue,
   type TexSetup,
 } from '@shared/latex';
+import { newCommentId } from '@shared/comments';
 import { addBibEntry } from '@shared/latex-bib';
 import { blankTable, tableAt, tableTex, type TexTable } from '@shared/latex-table';
 import type { TexReference } from '@shared/latex-bib';
@@ -81,6 +84,7 @@ import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
 import { addFileFromDevice, addPicture, assetUrl, chooseFiles, FILE_ACCEPT, freeName, pdfUrl, PICTURE_ACCEPT, placeOf, texSetup, typeset } from './api';
 import { mountCode, type Code } from './code';
+import { CommentsPanel, type CommentDraft } from './CommentsPanel';
 import { CompareDialog } from './Compare';
 import { docDefs, type DocDefs } from './complete';
 import { NameDialog, OutlineList, Problems, where } from './parts';
@@ -99,6 +103,7 @@ const OUTLINE_KEY = 'wa.tex.outline';
 const MODE_KEY = 'wa.tex.mode';
 const SPELL_KEY = 'wa.tex.spell';
 const DARK_PAGES_KEY = 'wa.tex.darkpages';
+const COMMENTS_KEY = 'wa.tex.comments';
 /** The Pictures tab, among the files'. */
 const PICTURES = '#pictures';
 
@@ -266,6 +271,10 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   const [dark, setDark] = useState(isDark);
   const [presentAsk, setPresentAsk] = useState(0);
   const [dialog, setDialog] = useState<'refs' | 'count' | 'compare' | 'keys' | null>(null);
+  // Comments: the panel beside the source (remembered), the one picked, and a new one being written.
+  const [commentsOpen, setCommentsOpen] = useState(() => localStorage.getItem(COMMENTS_KEY) === '1');
+  const [activeComment, setActiveComment] = useState<string | null>(null);
+  const [draft, setDraft] = useState<CommentDraft | null>(null);
   // Find and replace (Ctrl+F, Ctrl+H): the shared bar, over the file in view.
   const find = useFind();
   const findRef = useRef(find);
@@ -292,7 +301,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   const codes = useRef(new Map<string, Code>());
   const mounting = useRef(new Set<string>());
   // Counts editors made, so what depends on them is drawn again.
-  const [, setMade] = useState(0);
+  const [made, setMade] = useState(0);
   /** What to do once a file's editor is there (an insertion asked for before it was). */
   const afterMount = useRef(new Map<string, (c: Code) => void>());
   const lastTex = useRef(TEX_MAIN);
@@ -437,6 +446,19 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
           macros: macrosOf,
           picture: pictureOf,
           onFind: (replace) => findRef.current.show(replace && !readOnly),
+          onCommentsMoved: (list) =>
+            change((d) =>
+              d.comments?.some((c) => c.file === name)
+                ? {
+                    ...d,
+                    comments: d.comments.map((c) => {
+                      const m = c.file === name ? list.find((x) => x.id === c.id) : undefined;
+                      return m && (m.from !== c.from || m.to !== c.to) ? { ...c, from: m.from, to: m.to } : c;
+                    }),
+                  }
+                : d,
+            ),
+          onComment: () => addCommentRef.current(),
         },
         visual: modeRef.current === 'visual',
         spell: spellRef.current,
@@ -660,6 +682,81 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
     editFile(file, () => r.text);
     toast(`Replaced ${r.count} time${r.count === 1 ? '' : 's'}`, 'ok');
   };
+
+  // ---- comments -----------------------------------------------------------------------------------------------------------
+  useEffect(() => {
+    localStorage.setItem(COMMENTS_KEY, commentsOpen ? '1' : '0');
+    // The comments take room from the source: it gets more of the width while they show.
+    if (commentsOpen) setSplit((x) => Math.max(x, 0.6));
+  }, [commentsOpen]);
+  // The open comments' words marked in each file's editor: again when comments come or go, or another one is picked.
+  const commentsKey = `${(model?.comments ?? []).map((c) => `${c.id}:${c.file}:${c.resolved ? 1 : 0}`).join('|')}#${activeComment}#${epoch}#${doc?.key}#${made}`;
+  useEffect(() => {
+    for (const [name, c] of codes.current) c.setComments((live.current?.comments ?? []).filter((x) => x.file === name && !x.resolved).map((x) => ({ id: x.id, from: x.from, to: x.to, active: x.id === activeComment })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commentsKey]);
+  // The cursor in a comment's words picks it.
+  useEffect(() => {
+    const c = codes.current.get(file);
+    if (!c || !model?.comments?.length) return;
+    const pos = c.cursor();
+    const hit = model.comments.find((x) => x.file === file && !x.resolved && pos >= x.from && pos <= x.to && x.to > x.from);
+    if (hit && hit.id !== activeComment) setActiveComment(hit.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cursor]);
+  /** A comment on the words picked (or the line the cursor is on), written in the panel. */
+  const addComment = () => {
+    setMenu(null);
+    if (readOnly || file === PICTURES) return;
+    const c = codes.current.get(file);
+    if (!c) return;
+    let { from, to } = c.picked();
+    if (from === to) {
+      const line = c.view.state.doc.lineAt(from);
+      from = line.from + (line.text.length - line.text.trimStart().length);
+      to = line.to;
+    }
+    const quote = c.text().slice(from, to).trim().slice(0, 500);
+    setDraft({ file, from, to, quote });
+    setCommentsOpen(true);
+  };
+  const addCommentRef = useRef(addComment);
+  addCommentRef.current = addComment;
+  const setComments = (f: (cs: NonNullable<TexDoc['comments']>) => NonNullable<TexDoc['comments']>) => change((d) => ({ ...d, comments: f(d.comments ?? []) }));
+  const draftDone = (text: string) => {
+    const dr = draft;
+    if (!dr) return;
+    const id = newCommentId();
+    setComments((cs) => [...cs, { id, by: 'user', text, at: Date.now(), quote: dr.quote || undefined, file: dr.file, from: dr.from, to: dr.to }]);
+    setDraft(null);
+    setActiveComment(id);
+  };
+  const pickComment = (x: NonNullable<TexDoc['comments']>[number]) => {
+    setActiveComment(x.id);
+    withCode(x.file, (c) => c.select(x.from, x.to));
+  };
+  const commentsPanel = (className?: string) =>
+    model && (
+      <CommentsPanel
+        comments={model.comments ?? []}
+        file={file}
+        label={label}
+        active={activeComment}
+        draft={draft}
+        readOnly={readOnly}
+        onAdd={addComment}
+        onDraftDone={draftDone}
+        onDraftCancel={() => setDraft(null)}
+        onPick={pickComment}
+        onReply={(id, text) => setComments((cs) => cs.map((c) => (c.id === id ? { ...c, replies: [...(c.replies ?? []), { id: newCommentId(), by: 'user', text, at: Date.now() }] } : c)))}
+        onResolve={(id, resolved) => setComments((cs) => cs.map((c) => (c.id === id ? { ...c, resolved: resolved || undefined } : c)))}
+        onEdit={(id, text) => setComments((cs) => cs.map((c) => (c.id === id ? { ...c, text } : c)))}
+        onDelete={(id) => setComments((cs) => cs.filter((c) => c.id !== id))}
+        onOpenFile={(name) => open(name)}
+        className={className}
+      />
+    );
+  const openCount = model?.comments?.filter((c) => !c.resolved).length ?? 0;
 
   // ---- what an agent is asked about ------------------------------------------------------------------------------------
   const settled = useDeferredValue(model);
@@ -1061,10 +1158,11 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
             { label: 'Reference', icon: <BookPlus size={14} />, also: 'doi arxiv bibliography bibtex crossref paper', run: openRefs },
             { label: 'Citation', icon: <BookOpen size={14} />, also: 'cite', run: () => void insert('cite') },
             { label: 'Cross-reference', icon: <LocateFixed size={14} />, also: 'ref label', run: () => void insert('ref') },
-            { label: 'Footnote', icon: <Footprints size={14} />, run: () => void insert('footnote') },
+            { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'note review', disabled: file === PICTURES, run: addComment },
             {
               label: 'More',
               items: [
+                { label: 'Footnote', icon: <Footprints size={14} />, run: () => void insert('footnote') },
                 { label: 'Link', icon: <Link2 size={14} />, also: 'url href', run: () => void insert('link') },
                 { label: 'Description list', also: 'description', run: () => void insert('description') },
                 { label: 'Quotation', icon: <Quote size={14} />, run: () => void insert('quote') },
@@ -1137,6 +1235,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         { label: 'Visual', checked: mode === 'visual', also: 'visual editor rich text', run: () => switchMode('visual') },
         '-',
         { label: 'Outline', icon: <ListTree size={14} />, checked: wide ? outlineOpen : undefined, also: 'sections headings', run: () => (wide ? setOutlineOpen((o) => !o) : setMenu('outline')) },
+        { label: 'Comments', icon: <MessageSquare size={14} />, checked: commentsOpen, also: 'review notes', run: () => setCommentsOpen((x) => !x) },
         { label: 'Check spelling', icon: <SpellCheck size={14} />, checked: spell, also: 'spell', run: () => setSpell((x) => !x) },
         { label: 'Fold all', icon: <FoldVertical size={14} />, keys: 'Ctrl+Alt+[', disabled: !code, also: 'collapse', run: () => code?.foldAll() },
         { label: 'Unfold all', icon: <UnfoldVertical size={14} />, keys: 'Ctrl+Alt+]', disabled: !code, also: 'expand', run: () => code?.unfoldAll() },
@@ -1216,6 +1315,10 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         onClick={() => (wide ? setOutlineOpen((o) => !o) : setMenu(menu === 'outline' ? null : 'outline'))}
       >
         <ListTree size={15} />
+      </IconButton>
+      <IconButton label="Comments" size="sm" active={commentsOpen} onClick={() => setCommentsOpen((x) => !x)} className="relative">
+        <MessageSquare size={15} />
+        {openCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-3.5 rounded-full bg-accent px-1 text-[9.5px] leading-3.5 font-semibold text-accent-fg tabular-nums">{openCount}</span>}
       </IconButton>
       <IconButton label="Find and replace (Ctrl+F)" size="sm" disabled={!code} active={find.open} onClick={() => (find.open ? find.close() : find.show())}>
         <Search size={15} />
@@ -1348,24 +1451,28 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
           </Button>
         </div>
       )}
-      <div className="relative min-h-0 flex-1">
-        {opened.map((n) => (
-          <div
-            key={`${epoch}:${n}`}
-            ref={(el) => {
-              if (el) hosts.current.set(n, el);
-              else if (hosts.current.get(n)?.isConnected === false) hosts.current.delete(n);
-            }}
-            translate="no"
-            className={cx('absolute inset-0 overflow-hidden bg-bg [&_.cm-editor]:h-full [&_.cm-scroller]:font-mono [&_.cm-scroller]:text-[12.5px]', file === n ? 'block' : 'hidden')}
-          />
-        ))}
-        {file === PICTURES && <div className="absolute inset-0 flex flex-col bg-bg">{pictures}</div>}
-        {find.open && file !== PICTURES && (
-          <div className="absolute top-2 right-3 z-20 w-[min(440px,calc(100%-24px))]">
-            <FindBar find={find} count={found.list.length} index={found.current} onNext={() => findGo(1)} onPrev={() => findGo(-1)} onReplace={readOnly ? undefined : replaceOne} onReplaceAll={readOnly ? undefined : replaceAll} />
-          </div>
-        )}
+      <div className="flex min-h-0 flex-1">
+        <div className="relative min-h-0 min-w-0 flex-1">
+          {opened.map((n) => (
+            <div
+              key={`${epoch}:${n}`}
+              ref={(el) => {
+                if (el) hosts.current.set(n, el);
+                else if (hosts.current.get(n)?.isConnected === false) hosts.current.delete(n);
+              }}
+              translate="no"
+              className={cx('absolute inset-0 overflow-hidden bg-bg [&_.cm-editor]:h-full [&_.cm-scroller]:font-mono [&_.cm-scroller]:text-[12.5px]', file === n ? 'block' : 'hidden')}
+            />
+          ))}
+          {file === PICTURES && <div className="absolute inset-0 flex flex-col bg-bg">{pictures}</div>}
+          {find.open && file !== PICTURES && (
+            <div className="absolute top-2 right-3 z-20 w-[min(440px,calc(100%-24px))]">
+              <FindBar find={find} count={found.list.length} index={found.current} onNext={() => findGo(1)} onPrev={() => findGo(-1)} onReplace={readOnly ? undefined : replaceOne} onReplaceAll={readOnly ? undefined : replaceAll} />
+            </div>
+          )}
+        </div>
+        {/* Comments beside the source where there is room (a sheet on a phone, below). */}
+        {commentsOpen && roomy && file !== PICTURES && commentsPanel('w-64 shrink-0 border-l border-line bg-panel')}
       </div>
       <Problems
         result={result}
@@ -1622,6 +1729,17 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         />
       )}
       <ShortcutsDialog open={dialog === 'keys'} onClose={() => setDialog(null)} groups={SHORTCUTS} />
+      <Dialog
+        open={commentsOpen && !roomy && file !== PICTURES}
+        onClose={() => {
+          setCommentsOpen(false);
+          setDraft(null);
+        }}
+        title="Comments"
+        width={520}
+      >
+        {commentsPanel('-mx-3 max-h-[70dvh]')}
+      </Dialog>
       {confirmNode}
     </div>
   );
