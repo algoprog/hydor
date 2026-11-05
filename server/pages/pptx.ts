@@ -9,7 +9,14 @@
 // slide's background, its title as the slide's title, the footer and slide number as fields, speaker notes, comments
 // (PowerPoint's own, replies threaded, the open ones), the transition (Morph as PowerPoint's own, a fade where it has
 // none) and the animations in their order (on a click, with or after the one before, a paragraph at a time). The
-// theme's colours and fonts become the file's theme.
+// theme's colours and fonts become the file's theme, every layout of the app's a layout of the file's (its slides'
+// parts filling their placeholders, the footer in PowerPoint's own), and the deck's guides PowerPoint's.
+//
+// It is made to look in Office as it does in the app: the fonts the deck's words use go inside it (pptx-fonts.ts),
+// each run says what to fall back on, words are spaced as the app spaces them (lines by 1.2 times their size, which is
+// PowerPoint's single spacing whatever the font), shapes the app draws otherwise are their own outlines, charts are laid
+// out where the app draws them, and pictures whose colours were changed go changed (slides-render.ts). Every part is
+// valid against the ECMA-376 schemas (scripts/office-check/pptx-check.mjs checks them, and the pictures side by side).
 //
 // A slide is 1280 px wide: 1 px is 9525 EMU (12192000 across, PowerPoint's widescreen) and a font's px is 0.75 pt.
 import type { Anim, ChartEl, Deck, El, GroupEl, IconEl, ImageEl, LayoutId, LineEl, MathEl, Para, Ratio, Run, Side, Slide, Stick, TableEl, TextEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
@@ -1379,6 +1386,16 @@ function notesMasterXml(): string {
   return `${XML_HEAD}<p:notesMaster ${NS}><p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg><p:spTree>${GRP}<p:sp><p:nvSpPr><p:cNvPr id="2" name="Slide Image Placeholder 1"/><p:cNvSpPr><a:spLocks noGrp="1" noRot="1" noChangeAspect="1"/></p:cNvSpPr><p:nvPr><p:ph type="sldImg" idx="2"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="685800" y="1143000"/><a:ext cx="5486400" cy="3086100"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln w="12700"><a:solidFill><a:prstClr val="black"/></a:solidFill></a:ln></p:spPr></p:sp><p:sp><p:nvSpPr><p:cNvPr id="3" name="Notes Placeholder 2"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="body" sz="quarter" idx="3"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="685800" y="4400550"/><a:ext cx="5486400" cy="3600450"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0"/><a:lstStyle/><a:p><a:pPr lvl="0"/><a:r><a:rPr lang="en-US"/><a:t>Click to edit the notes</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld>${CLR_MAP}<p:notesStyle><a:lvl1pPr marL="0" algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1"><a:defRPr sz="1200" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl1pPr></p:notesStyle></p:notesMaster>`;
 }
 
+/** The deck's guides as PowerPoint's own (View → Guides), in its master units (six to a slide pixel); '' without any. */
+function guidesXml(d: Deck): string {
+  const g = d.guides;
+  if (!g?.x?.length && !g?.y?.length) return '';
+  let id = 0;
+  const one = (orient: 'vert' | 'horz', px: number) => `<p15:guide id="${++id}" orient="${orient}" pos="${Math.round(px * 6)}" userDrawn="1"><p15:clr><a:srgbClr val="F26B43"/></p15:clr></p15:guide>`;
+  const list = [...(g.x ?? []).map((v) => one('vert', v)), ...(g.y ?? []).map((v) => one('horz', v))].join('');
+  return `<p:extLst><p:ext uri="{EFAFB233-063F-42B5-8137-9DF3F51BA10A}"><p15:sldGuideLst xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main">${list}</p15:sldGuideLst></p:ext></p:extLst>`;
+}
+
 // ---- the whole file -------------------------------------------------------------------------------------
 
 /** The deck as a .pptx file. */
@@ -1534,7 +1551,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
   const cy = emu(H);
   parts.push({
     name: 'ppt/presentation.xml',
-    data: `${XML_HEAD}<p:presentation ${NS}${fonts.length ? ' embedTrueTypeFonts="1"' : ''}><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>${hasNotes ? `<p:notesMasterIdLst><p:notesMasterId r:id="${notesMasterId}"/></p:notesMasterIdLst>` : ''}<p:sldIdLst>${sldIds}</p:sldIdLst><p:sldSz cx="12192000" cy="${cy}"/><p:notesSz cx="6858000" cy="9144000"/>${embedded ? `<p:embeddedFontLst>${embedded}</p:embeddedFontLst>` : ''}<p:defaultTextStyle><a:defPPr><a:defRPr lang="en-US"/></a:defPPr></p:defaultTextStyle></p:presentation>`,
+    data: `${XML_HEAD}<p:presentation ${NS}${fonts.length ? ' embedTrueTypeFonts="1"' : ''}><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>${hasNotes ? `<p:notesMasterIdLst><p:notesMasterId r:id="${notesMasterId}"/></p:notesMasterIdLst>` : ''}<p:sldIdLst>${sldIds}</p:sldIdLst><p:sldSz cx="12192000" cy="${cy}"/><p:notesSz cx="6858000" cy="9144000"/>${embedded ? `<p:embeddedFontLst>${embedded}</p:embeddedFontLst>` : ''}<p:defaultTextStyle><a:defPPr><a:defRPr lang="en-US"/></a:defPPr></p:defaultTextStyle>${guidesXml(deck)}</p:presentation>`,
   });
   parts.push({ name: 'ppt/_rels/presentation.xml.rels', data: relsXml(presRels.list) });
   parts.push({ name: 'ppt/presProps.xml', data: `${XML_HEAD}<p:presentationPr ${NS}/>` });
