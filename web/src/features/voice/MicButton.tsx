@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Mic } from 'lucide-react';
 import type { SessionSummary } from '@shared/types';
+import { isConfidential } from '@shared/confidential';
 import { go } from '../../lib/nav';
 import { Button, cx, OptionRow, Popover, Throbber } from '../../components/ui';
 import { useDictation, type Dictation, type Problem } from './dictation';
@@ -142,12 +143,13 @@ function LivePanel({ d }: { d: Dictation }) {
   );
 }
 
-export function MicButton({ insert, disabled }: { s?: SessionSummary; insert: (text: string) => void; disabled?: boolean }) {
+export function MicButton({ s, insert, disabled, confidential }: { s?: SessionSummary; insert: (text: string) => void; disabled?: boolean; confidential?: boolean }) {
   const server = useServerVoice();
   const use = useVoicePrefs((p) => p.use);
   const d = useDictation(insert);
   const ref = useRef<HTMLButtonElement>(null);
-  const mode = dictationMode(server, use);
+  // A confidential session's words are heard only on this computer.
+  const mode = dictationMode(server, use, !!confidential || isConfidential(s?.extra));
   const active = d.phase !== 'idle';
   if (!mode && !active && !d.problem) return null;
   const busy = d.phase === 'transcribing';

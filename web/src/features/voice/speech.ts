@@ -25,6 +25,16 @@ export const useReading = create<Reading>(() => IDLE);
 let queue: string[] = [];
 /** Bumped by every start, pause and stop, so a stopped utterance's late events change nothing. */
 let token = 0;
+/** What is read is a confidential session's: only a voice on this device reads it (some browsers' voices are online). */
+let localOnly = false;
+
+/** A voice on this device for the language, the chosen one when it is one. */
+function localVoice(synth: SpeechSynthesis, lang: string, chosen?: SpeechSynthesisVoice): SpeechSynthesisVoice | undefined {
+  if (chosen?.localService) return chosen;
+  const here = synth.getVoices().filter((v) => v.localService);
+  const base = lang.toLowerCase().split('-')[0];
+  return here.find((v) => v.lang.toLowerCase() === lang.toLowerCase()) ?? here.find((v) => v.lang.toLowerCase().split(/[-_]/)[0] === base);
+}
 
 function say(i: number) {
   const synth = window.speechSynthesis;
@@ -32,7 +42,14 @@ function say(i: number) {
   if (i >= queue.length) return stopReading();
   const u = new SpeechSynthesisUtterance(queue[i]);
   const p = useVoicePrefs.getState();
-  const v = p.voice ? synth.getVoices().find((x) => x.voiceURI === p.voice) : undefined;
+  let v = p.voice ? synth.getVoices().find((x) => x.voiceURI === p.voice) : undefined;
+  if (localOnly) {
+    v = localVoice(synth, speechLang(p.lang), v);
+    if (!v) {
+      stopReading();
+      return toast('This session is confidential, and this browser has no voice on this device for its language, so it is not read aloud.', 'error');
+    }
+  }
   if (v) {
     u.voice = v;
     u.lang = v.lang;
@@ -50,9 +67,10 @@ function say(i: number) {
   if (synth.paused) synth.resume();
 }
 
-/** Reads a reply aloud, from its start; another one being read stops. */
-export function readAloud(id: string, markdown: string) {
+/** Reads a reply aloud, from its start; another one being read stops. `local`: with a voice on this device only. */
+export function readAloud(id: string, markdown: string, local = false) {
   if (!canSpeak()) return;
+  localOnly = local;
   const synth = window.speechSynthesis;
   const list = parts(speakable(markdown));
   if (!list.length) return toast('There are no words to read in this reply');

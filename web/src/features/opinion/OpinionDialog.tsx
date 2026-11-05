@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import type { OpinionOptions } from '@shared/opinion';
+import { isConfidential } from '@shared/confidential';
 import type { SessionSummary } from '@shared/types';
 import { Button, Dialog, OptionRow, Throbber } from '../../components/ui';
 import { api, enc, post } from '../../lib/api';
@@ -72,8 +73,9 @@ export function OpinionDialog({ s }: { s: SessionSummary }) {
       }
     >
       <p className="text-[13px] leading-relaxed text-fg-3">
-        Another company’s model checks a turn’s work against what you asked: the files it changed, the commands it ran and its reply. What it finds shows under that turn, each point one click
-        from the message box.
+        {isConfidential(s.extra)
+          ? 'Another maker’s model on this computer checks a turn’s work against what you asked: this session is confidential, so models elsewhere don’t see it. What it finds shows under that turn.'
+          : 'Another company’s model checks a turn’s work against what you asked: the files it changed, the commands it ran and its reply. What it finds shows under that turn, each point one click from the message box.'}
       </p>
       {!opts ? (
         <div className="flex justify-center py-8 text-fg-3">
@@ -87,6 +89,7 @@ export function OpinionDialog({ s }: { s: SessionSummary }) {
               <OptionRow key={r.id} label={r.label} hint={r.detail} selected={r.id === reviewer} onClick={() => setReviewer(r.id)} />
             ))}
           </div>
+          {!opts.reviewers.length && <p className="text-[13px] text-fg-3">No model on this computer from another maker: add one in Settings → Models.</p>}
           <div className="mt-4 mb-1 text-[12.5px] font-medium text-fg-2">Which turn</div>
           {opts.turns.length ? (
             <div className="max-h-56 space-y-0.5 overflow-y-auto">

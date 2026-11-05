@@ -16,6 +16,7 @@ import { browserFeature } from './browser/feature';
 import { budgetFeature } from './budget/feature';
 import { childrenFeature } from './children/feature';
 import { computerFeature } from './computer/feature';
+import { confidentialFeature } from './confidential/feature';
 import { connectionsFeature } from './connections/feature';
 import { customFeature } from './custom/feature';
 import { documentsFeature } from './documents/feature';
@@ -104,8 +105,11 @@ export interface WebFeature {
   sessionPane?: SessionPane;
   /** Beside a session's conversation on a wide screen (a page being written or changed), while `useOpen` says so. */
   sessionSide?: { useOpen: (key: string) => boolean; close: (key: string) => void; Panel: ComponentType<{ s: SessionSummary }> };
-  /** Buttons beside the message box's attach button; `insert` adds text to the message being written. */
-  ComposerButtons?: ComponentType<{ s?: SessionSummary; insert: (text: string) => void; disabled?: boolean }>;
+  /**
+   * Buttons beside the message box's attach button; `insert` adds text to the message being written. `confidential`: the
+   * start page's box, for a confidential session (a session's own box has it in `s`).
+   */
+  ComposerButtons?: ComponentType<{ s?: SessionSummary; insert: (text: string) => void; disabled?: boolean; confidential?: boolean }>;
   /** On the start page, options for the new session, kept in its settings. */
   StartOptions?: ComponentType<{ value: SessionExtra; onChange: (patch: Partial<SessionExtra>) => void; cwd: string }>;
 }
@@ -119,6 +123,7 @@ export const features = (): WebFeature[] =>
     searchFeature,
     browserFeature,
     computerFeature,
+    confidentialFeature,
     memoryFeature,
     knowledgeFeature,
     spacesFeature,
@@ -200,7 +205,7 @@ export function FeatureDock({ s }: { s: SessionSummary }) {
   );
 }
 
-export function FeatureComposerButtons(p: { s?: SessionSummary; insert: (text: string) => void; disabled?: boolean }) {
+export function FeatureComposerButtons(p: { s?: SessionSummary; insert: (text: string) => void; disabled?: boolean; confidential?: boolean }) {
   return (
     <>
       {features().map((f) => (f.ComposerButtons ? <f.ComposerButtons key={f.id} {...p} /> : null))}

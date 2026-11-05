@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { ArrowRightLeft, ArrowUp, ChevronDown, ListTodo, MonitorUp, Paperclip, Plus, SlidersHorizontal, Square, X } from 'lucide-react';
 import type { Agent, BackgroundTask, SessionSummary } from '@shared/types';
 import { childReplyOf } from '@shared/children';
+import { isConfidential } from '@shared/confidential';
 import { enc, post } from '../../lib/api';
 import { openSession } from '../../lib/nav';
 import { toast, toastError, useLive, useTimeline } from '../../lib/store';
@@ -152,6 +153,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const locked = !!ext && !takeover;
   const [confirm, confirmNode] = useConfirm();
   const cat = useCatalog(s.agent, s.acpAgent);
+  // Confidential: only models on this computer (server/confidential).
+  const confidential = isConfidential(s.extra);
   // What was written and attached here and not sent waits for you (lib/drafts.ts).
   const [text, setText] = useState(() => draftText(key));
   const [atts, setAtts] = useState<Attachment[]>(() => draftFiles(key));
@@ -369,7 +372,11 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
           </div>
         )}
         <div
-          className="@container relative rounded-[22px] border border-line-2 bg-panel shadow-[0_8px_30px_rgba(0,0,0,0.10)] transition-colors focus-within:border-accent/50"
+          className={cx(
+            '@container relative rounded-[22px] border bg-panel shadow-[0_8px_30px_rgba(0,0,0,0.10)] transition-colors',
+            // A confidential session's box has a calm tint, so it is plain where your words stay.
+            confidential ? 'border-ok/45 focus-within:border-ok/70' : 'border-line-2 focus-within:border-accent/50',
+          )}
           onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
           onDrop={(e) => {
             if (!e.dataTransfer.files.length || locked) return;
@@ -511,7 +518,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                 ) : (
                   <>
                     <SessionAssistantPicker s={s} label="Assistant" onConfig={assistantSet} />
-                    <ModelPicker label="Model" agent={s.agent} acp={s.acpAgent} value={model} onChange={(v) => configure({ model: v })} />
+                    <ModelPicker label="Model" agent={s.agent} acp={s.acpAgent} value={model} onChange={(v) => configure({ model: v })} localOnly={confidential} />
                     <EffortPicker label="Effort" agent={s.agent} acp={s.acpAgent} model={model} value={effort} onChange={(v) => configure({ effort: v })} />
                     <ModePicker label="Permissions" agent={s.agent} acp={s.acpAgent} value={mode} onChange={(v) => configure({ mode: v })} />
                     {ctx != null && (
