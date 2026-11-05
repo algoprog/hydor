@@ -206,12 +206,12 @@ const NOTICE: Record<NotifyEvent['kind'], string> = { done: 'Finished', waiting:
 /**
  * A notice about a session, as it may leave this computer (a push to a phone goes through its maker's service) or
  * show on a screen: a confidential session's says only that a confidential session finished, needs you or failed,
- * without its title, words or what it asks.
+ * without its title, words or what it asks. `tr` puts its title in the user's language.
  */
-export function privateNotice(db: DB, n: NotifyEvent): NotifyEvent {
+export function privateNotice(db: DB, n: NotifyEvent, tr: (s: string) => string = (s) => s): NotifyEvent {
   if (!confidentialKey(db, n.key)) return n;
   const { approval: _a, ...rest } = n;
-  return { ...rest, title: 'A confidential session', body: NOTICE[n.kind] };
+  return { ...rest, title: tr('A confidential session'), body: NOTICE[n.kind] };
 }
 
 // ---- other agents --------------------------------------------------------------------------------------------
