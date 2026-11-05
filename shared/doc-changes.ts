@@ -14,8 +14,10 @@ export interface Change {
   removed: string;
   /** What of the words' look it changes: bold, italic, colour… (Look's keys). */
   looks: string[];
-  /** Paragraphs it breaks in two (added) or joins (removed). */
+  /** Paragraphs it breaks in two (added) or joins to the one before (removed). */
   breaks: { added: number; removed: number };
+  /** Whole paragraphs it adds or takes out (their words and their breaks). */
+  paras: { added: number; removed: number };
   /** Blocks of their own it adds or takes out (their kinds: table, image, hr, pagebreak, toc, math). */
   blocks: { added: string[]; removed: string[] };
   /** Where its first mark is: the block (and the table's cell). */
@@ -32,7 +34,7 @@ export function changesOf(d: Doc): Change[] {
   const get = (id: string, block: string, cell?: [number, number]) => {
     let c = by.get(id);
     if (!c) {
-      c = { id, added: '', removed: '', looks: [], breaks: { added: 0, removed: 0 }, blocks: { added: [], removed: [] }, block, ...(cell ? { cell } : {}) };
+      c = { id, added: '', removed: '', looks: [], breaks: { added: 0, removed: 0 }, paras: { added: 0, removed: 0 }, blocks: { added: [], removed: [] }, block, ...(cell ? { cell } : {}) };
       by.set(id, c);
     }
     return c;
@@ -50,14 +52,18 @@ export function changesOf(d: Doc): Change[] {
   };
   for (const b of d.blocks) {
     const text = b.type === 'p' || b.type === 'li';
+    // A paragraph all of whose words go with its break is a paragraph added (taken out), not one broken (joined).
+    const whole = (id: string, k: 'ins' | 'del') => text && (b as { runs: Run[] }).runs.every((r) => r[k] === id);
     if (b.ins) {
       const c = get(b.ins, b.id);
-      if (text) c.breaks.added++;
+      if (whole(b.ins, 'ins')) c.paras.added++;
+      else if (text) c.breaks.added++;
       else c.blocks.added.push(b.type);
     }
     if (b.del) {
       const c = get(b.del, b.id);
-      if (text) c.breaks.removed++;
+      if (whole(b.del, 'del')) c.paras.removed++;
+      else if (text) c.breaks.removed++;
       else c.blocks.removed.push(b.type);
     }
     if (text) runs(b.runs, b.id);
@@ -255,6 +261,15 @@ const blockKey = (b: Block): string => {
 
 const isText = (b: Block) => b.type === 'p' || b.type === 'li';
 
+/** Whether two paragraphs are one rewritten (half their words or more the same), rather than one taken out and another put in. */
+function alike(a: Block, b: Block): boolean {
+  const words = (x: Block) => tokens((x as { runs: Run[] }).runs).keys.filter((k) => /[\p{L}\p{N}]/u.test(k));
+  const wa = words(a);
+  const wb = words(b);
+  if (!wa.length || !wb.length) return !wa.length && !wb.length;
+  return align(wa, wb).length / Math.max(wa.length, wb.length) >= 0.5;
+}
+
 /**
  * Two documents compared as one: the second, with what changed from the first marked as suggestions by `who`: words
  * and blocks taken out (kept, marked to go), words and blocks added, looks changed, paragraphs broken or joined, each
@@ -298,7 +313,7 @@ export function compareDocs(a: Doc, b: Doc, who: Who, prefix = 'v'): Doc {
     const olds = a.blocks.slice(i, pi);
     const news = b.blocks.slice(j, pj);
     let k = 0;
-    while (k < olds.length && k < news.length && (isText(olds[k]) ? isText(news[k]) : olds[k].type === news[k].type)) {
+    while (k < olds.length && k < news.length && (isText(olds[k]) ? isText(news[k]) && alike(olds[k], news[k]) : olds[k].type === news[k].type)) {
       same(olds[k], news[k]);
       k++;
     }

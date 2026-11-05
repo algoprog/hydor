@@ -40,10 +40,13 @@ function ago(at: number): string {
   return d.toLocaleDateString(LOCALE, d.getFullYear() === new Date().getFullYear() ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-/** What a change does, line by line (Delete: “words”, Add: “words”, Format: Bold…), in the colour of who suggested it. */
-export function ChangeLines({ c, color }: { c: Change; color: string }) {
+/**
+ * What a change does, line by line (Delete: “words”, Add: “words”, Format: Bold…), in the colour of who suggested it;
+ * for a comparison (`past`), what changed (Taken out: “words”, Added: “words”), what was taken out in `removedColor`.
+ */
+export function ChangeLines({ c, color, removedColor, past }: { c: Change; color: string; removedColor?: string; past?: boolean }) {
   const quote = (t: string, del?: boolean) => (
-    <span translate="no" className={cx('break-words', del && 'line-through')} style={{ color }}>
+    <span translate="no" className={cx('break-words', del && 'line-through')} style={{ color: del ? (removedColor ?? color) : color }}>
       “{t.replace(/\n/g, ' ↵ ')}”
     </span>
   );
@@ -53,10 +56,10 @@ export function ChangeLines({ c, color }: { c: Change; color: string }) {
       <div key="d">
         {c.removed.trim() ? (
           <>
-            <span className="text-fg-3">Delete:</span> {quote(c.removed, true)}
+            <span className="text-fg-3">{past ? 'Taken out:' : 'Delete:'}</span> {quote(c.removed, true)}
           </>
         ) : (
-          <span className="text-fg-3">Delete a space or a line break</span>
+          <span className="text-fg-3">{past ? 'A space or a line break taken out' : 'Delete a space or a line break'}</span>
         )}
       </div>,
     );
@@ -65,15 +68,17 @@ export function ChangeLines({ c, color }: { c: Change; color: string }) {
       <div key="a">
         {c.added.trim() ? (
           <>
-            <span className="text-fg-3">Add:</span> {quote(c.added)}
+            <span className="text-fg-3">{past ? 'Added:' : 'Add:'}</span> {quote(c.added)}
           </>
         ) : (
-          <span className="text-fg-3">Add a space or a line break</span>
+          <span className="text-fg-3">{past ? 'A space or a line break added' : 'Add a space or a line break'}</span>
         )}
       </div>,
     );
   if (c.looks.length) lines.push(<div key="f" className="text-fg-3">{`Format: ${c.looks.map((k) => LOOK_WORDS[k] ?? k).join(', ')}`}</div>);
-  if (c.breaks.added) lines.push(<div key="ba" className="text-fg-3">{c.breaks.added === 1 ? 'A new paragraph' : `${c.breaks.added} new paragraphs`}</div>);
+  if (c.paras.added) lines.push(<div key="pa" className="text-fg-3">{c.paras.added === 1 ? 'A new paragraph' : `${c.paras.added} new paragraphs`}</div>);
+  if (c.paras.removed) lines.push(<div key="pr" className="text-fg-3">{c.paras.removed === 1 ? 'A paragraph taken out' : `${c.paras.removed} paragraphs taken out`}</div>);
+  if (c.breaks.added) lines.push(<div key="ba" className="text-fg-3">{c.breaks.added === 1 ? 'A paragraph broken in two' : `${c.breaks.added} paragraphs broken in two`}</div>);
   if (c.breaks.removed) lines.push(<div key="br" className="text-fg-3">{c.breaks.removed === 1 ? 'Two paragraphs joined' : `${c.breaks.removed + 1} paragraphs joined`}</div>);
   c.blocks.added.forEach((k, i) => lines.push(<div key={`+${i}`} className="text-fg-3">{BLOCK_ADDED[k] ?? k}</div>));
   c.blocks.removed.forEach((k, i) => lines.push(<div key={`-${i}`} className="text-fg-3">{BLOCK_REMOVED[k] ?? k}</div>));

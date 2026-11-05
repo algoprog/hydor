@@ -4,6 +4,7 @@
 // engine's, or the editor's (a dialog, a panel): this file only says what is where.
 import {
   CheckCheck,
+  GitCompareArrows,
   FilePenLine,
   ListX,
   PencilLine,
@@ -121,6 +122,10 @@ export interface DocMenuCtx {
   /** How many suggested changes there are. */
   suggestions: number;
   resolveAll: (accept: boolean) => void;
+  /** Compare with a version: the list of versions to pick one from. */
+  compare: () => void;
+  /** An older version on view: nothing changes it. */
+  readOnly?: boolean;
 }
 
 /** The editor's menus, for what is where the caret is now. */
@@ -157,8 +162,8 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
       icon: <FilePenLine size={15} />,
       also: 'mode track changes review',
       items: [
-        { label: 'Editing', icon: <PencilLine size={15} />, checked: c.mode === 'edit', also: 'edit directly', run: () => c.setMode('edit') },
-        { label: 'Suggesting', icon: <FilePenLine size={15} />, keys: 'Ctrl+Alt+Shift+X', checked: c.mode === 'suggest', also: 'suggest track changes', run: () => c.setMode('suggest') },
+        { label: 'Editing', icon: <PencilLine size={15} />, checked: c.mode === 'edit', disabled: c.readOnly, also: 'edit directly', run: () => c.setMode('edit') },
+        { label: 'Suggesting', icon: <FilePenLine size={15} />, keys: 'Ctrl+Alt+Shift+X', checked: c.mode === 'suggest', disabled: c.readOnly, also: 'suggest track changes', run: () => c.setMode('suggest') },
       ],
     },
     '-',
@@ -320,8 +325,9 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     { label: 'Word count', icon: <BookOpenText size={15} />, keys: 'Ctrl+Shift+C', also: 'characters pages reading time', run: c.wordCount },
     { label: 'Keyboard shortcuts', icon: <Keyboard size={15} />, keys: 'Ctrl+/', run: c.shortcuts },
     '-',
-    { label: 'Accept all suggestions', icon: <CheckCheck size={15} />, disabled: !c.suggestions, also: 'track changes review', run: () => c.resolveAll(true) },
-    { label: 'Reject all suggestions', icon: <ListX size={15} />, disabled: !c.suggestions, also: 'track changes review', run: () => c.resolveAll(false) },
+    { label: 'Accept all suggestions', icon: <CheckCheck size={15} />, disabled: !c.suggestions || c.readOnly, also: 'track changes review', run: () => c.resolveAll(true) },
+    { label: 'Reject all suggestions', icon: <ListX size={15} />, disabled: !c.suggestions || c.readOnly, also: 'track changes review', run: () => c.resolveAll(false) },
+    { label: 'Compare with a version', icon: <GitCompareArrows size={15} />, also: 'versions history diff changes since restore', run: c.compare },
     '-',
     { label: 'Format painter', icon: <PaintRoller size={15} />, checked: !!e.paint, run: c.painter },
     { label: 'Print', icon: <Printer size={15} />, keys: 'Ctrl+P', run: c.print },

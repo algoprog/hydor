@@ -399,6 +399,7 @@ Documents are kept in the Library too, with versions, a picture in the list and 
 - **Paste** from Word, Google Docs or a web page: headings, bold, italic, links, lists, tables and equations come along, and the rest is left out.
 - At the top: **Outline** (the headings, to go to one; beside the page on a wide screen) and **Page setup**: **Paper size** (**A4** or **US Letter**), **Margins** (**Narrow**, **Medium**, **Wide**, or in millimetres), the document's **Font** and **Size**, and **Header and footer**. The number of words shows at the bottom right; click it for the **Word count**: words, characters, paragraphs, pages and reading time, of the words you picked if you picked some (their pages, the ones they run over).
 - **Print** (Ctrl+P, or **Tools → Print**) prints the document as its PDF looks, with your changes, its header and footer and page numbers.
+- **Tools → Compare with a version**: pick one of the document's versions, and it shows what changed since then: words added in green and underlined, words taken out in red and struck through, paragraphs added or taken out, each change listed beside it (click one to go to it). **Restore this version** brings that version back, as **Bring it back** in **Versions** does; **Back to the document** leaves it. An older version opened from **Versions** (the clock) shows what changed since it the same way; **This version as it was** shows it plain.
 
 Pick some words and **Comment** and **Ask the agent about it** show above them. Changes stay unsaved until **Save** (Ctrl+S) in the bar at the bottom; **Discard** drops them. Each save is a version.
 
@@ -533,7 +534,7 @@ Every save of a page is a version of its own: the first one (kept or made by you
 
 1. Open the page and click **Versions**.
 2. The list shows each version (`v3`), its title (**The latest** for the current one), when it was made, who made it (**by the agent**, **kept by you**, **changed by you**, **made by you** or **brought back**) and its size.
-3. Click a version to look at it. A band above the page says "An older version, as it was 2 days ago. What it changes here is not kept." The older version works with the page's data, but anything you change in it is thrown away.
+3. Click a version to look at it. A band above the page says "An older version, as it was 2 days ago. What it changes here is not kept." The older version works with the page's data, but anything you change in it is thrown away. A document opens with what changed since that version marked in its words and listed beside it ([Compare with a version](#documents)).
 4. Click **Bring it back** to make it current, or **Back to the latest** to leave it.
 
 Bringing a version back adds it as a new version on top ("Version 3 is back, as version 6"), so the versions after it stay too. The page's data is not touched.
