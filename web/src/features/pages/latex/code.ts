@@ -5,7 +5,8 @@
 // \includegraphics and \input the document's own labels, bibliography, pictures and files; brackets and $ close
 // themselves. Environments, sections, the preamble and { groups fold. The formula the cursor is in shows drawn in a
 // card by its line. Visual mode (visual.ts) shows the source as a document, and Check spelling has the browser check
-// its words (spell.ts). The typesetting's errors and warnings are marked at their lines.
+// its words (spell.ts). The typesetting's errors and warnings are marked at their lines, and what is sure to fail
+// (a \begin without its \end, a brace or a $ left open: shared/latex-check.ts) where it is, a moment after typing.
 import { snippet, startCompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
 import { redo, selectAll, toggleComment, undo } from '@codemirror/commands';
 import { foldAll, indentUnit, unfoldAll } from '@codemirror/language';
@@ -13,6 +14,8 @@ import { gotoLine } from '@codemirror/search';
 import { lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint';
 import { Compartment, EditorSelection, EditorState, Prec, StateEffect } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
+import { texCheck } from '@shared/latex-check';
+import { tr } from '../../../i18n/runtime';
 import { createEditor, type EditorHandle } from '../../../lib/codemirror';
 import { commandSource, environmentSource, packageSource, type DocDefs } from './complete';
 import { texFolding } from './fold';
@@ -55,7 +58,7 @@ export interface Issue {
 export interface Code {
   handle: EditorHandle;
   view: EditorView;
-  /** Marks a typesetting's errors and warnings at their lines (the others go). */
+  /** Marks a typesetting's errors and warnings at their lines (the others go), beside the quick checks' problems. */
   mark: (issues: Issue[]) => void;
   /** A snippet at the cursor, on lines of its own when `block`: its ${fields} to fill in, Tab to the next. */
   insert: (template: string, block?: boolean) => void;
@@ -260,6 +263,21 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     // $ pairs up as brackets do; quotes do not (an apostrophe is a letter here).
     { closeBrackets: { brackets: ['(', '[', '{', '$'], before: ')]}:;>$' } },
   ];
+  // The typesetting's errors and warnings (by line), and the quick checks of the text as it is now.
+  let texIssues: Issue[] = [];
+  let checkTimer: ReturnType<typeof setTimeout> | undefined;
+  const showIssues = () => {
+    const doc = view.state.doc;
+    const diags: Diagnostic[] = [];
+    for (const x of texIssues) {
+      if (!(x.line >= 1 && x.line <= doc.lines)) continue;
+      const l = doc.line(x.line);
+      diags.push({ from: l.from, to: Math.max(l.from, l.to), severity: x.severity, message: x.message });
+    }
+    if (tex && doc.length < 3_000_000) for (const c of texCheck(doc.toString())) diags.push({ from: c.from, to: Math.min(doc.length, c.to), severity: 'warning', message: tr(c.message) });
+    view.dispatch(setDiagnostics(view.state, diags));
+  };
+
   const extra = [
     Prec.highest(
       keymap.of([
@@ -276,6 +294,10 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     visualC.of(o.visual && tex ? visualExt() : []),
     spellC.of(o.spell ? spellCheck : []),
     EditorView.updateListener.of((u) => {
+      if (u.docChanged && tex) {
+        clearTimeout(checkTimer);
+        checkTimer = setTimeout(showIssues, 700);
+      }
       if (!u.selectionSet && !u.docChanged) return;
       const p = picked();
       hooks.onCursor({ line: u.state.doc.lineAt(u.state.selection.main.head).number, from: p.from, to: p.to, picked: !p.empty });
@@ -287,14 +309,8 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     handle,
     view,
     mark: (issues) => {
-      const doc = view.state.doc;
-      const diags: Diagnostic[] = [];
-      for (const x of issues) {
-        if (!(x.line >= 1 && x.line <= doc.lines)) continue;
-        const l = doc.line(x.line);
-        diags.push({ from: l.from, to: Math.max(l.from, l.to), severity: x.severity, message: x.message });
-      }
-      view.dispatch(setDiagnostics(view.state, diags));
+      texIssues = issues;
+      showIssues();
     },
     insert: (template, block) => {
       if (o.readOnly) return;
@@ -384,6 +400,9 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     },
     goto: (line) => handle.gotoLine(line),
     focus: () => view.focus(),
-    destroy: () => handle.destroy(),
+    destroy: () => {
+      clearTimeout(checkTimer);
+      handle.destroy();
+    },
   };
 }
