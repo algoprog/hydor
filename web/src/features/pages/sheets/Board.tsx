@@ -1,6 +1,6 @@
 // A table's rows as a Kanban board, as Airtable shows them (View → Kanban board): a column for each option of a dropdown
 // column (and one for rows without one), a card for each row the filter shows, its first cell as its title and the
-// fields chosen under it (Fields: the first few, else). Drag a card to another lane to change its row's option, a lane
+// fields chosen under it (Card fields: the first few, else). Drag a card to another lane to change its row's option, a lane
 // by its name to put the lanes in another order; click a card to open the row as a card; "Add a row" puts a new row
 // under the table, in that lane. What it groups by, the fields and the lanes' order are kept with the sheet.
 import { useMemo, useRef, useState } from 'react';
@@ -182,9 +182,9 @@ export function Board(p: BoardProps) {
           ))}
         </select>
         <Button ref={fieldsBtn} size="sm" variant="ghost" icon={<SlidersHorizontal size={14} />} onClick={() => setPicking((x) => !x)}>
-          Fields
+          Card fields
         </Button>
-        <Popover anchor={fieldsBtn} open={picking} onClose={() => setPicking(false)} width={260} title="Fields">
+        <Popover anchor={fieldsBtn} open={picking} onClose={() => setPicking(false)} width={260} title="Card fields">
           <div className="max-h-[min(60vh,420px)] overflow-y-auto">
             {others.map((c) => {
               const on = fields.includes(c);
