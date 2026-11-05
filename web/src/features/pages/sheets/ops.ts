@@ -234,8 +234,8 @@ const htmlEsc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)}
 
 /** A selection as the clipboard takes it: tab-separated values as they show, and a small HTML table with their looks. */
 export function copyOf(sh: Sheet, calc: Calc, si: number, x0: Rect): { clip: Clip; text: string; html: string } {
-  const e = calc.extent(si);
-  // Whole columns or rows: only as far as the sheet holds.
+  const e = calc.shownExtent(si);
+  // Whole columns or rows: only as far as the sheet holds (what formulas spilled too).
   const x: Rect = { r1: x0.r1, c1: x0.c1, r2: Math.max(x0.r1, Math.min(x0.r2, e.rows - 1)), c2: Math.max(x0.c1, Math.min(x0.c2, e.cols - 1)) };
   const cells: (Cell | null)[][] = [];
   const vals: Scalar[][] = [];

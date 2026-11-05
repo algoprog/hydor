@@ -31,6 +31,8 @@ export function SheetTabs(p: TabsProps) {
   const strip = useRef<HTMLDivElement>(null);
   const drag = useRef<{ i: number; x: number; on: boolean; id: number } | null>(null);
   const press = useRef<number | null>(null);
+  // A long press has opened a tab's menu: lifting the finger must not click the menu's dimmed page under it.
+  const held = useRef(false);
 
   useEffect(() => {
     // The tab picked stays in view.
@@ -100,6 +102,8 @@ export function SheetTabs(p: TabsProps) {
                   // A long press opens the tab's menu.
                   const el = e.currentTarget;
                   press.current = window.setTimeout(() => {
+                    press.current = null;
+                    held.current = true;
                     p.onPick(i);
                     openMenu(i, el);
                   }, 520);
@@ -136,6 +140,11 @@ export function SheetTabs(p: TabsProps) {
                 if (press.current) clearTimeout(press.current);
                 drag.current = null;
                 setDrop(null);
+              }}
+              onTouchEnd={(e) => {
+                if (!held.current) return;
+                held.current = false;
+                e.preventDefault();
               }}
               className={cx(
                 'relative flex shrink-0 cursor-pointer items-center gap-1 border-r border-line px-3 text-[12.5px] select-none',
