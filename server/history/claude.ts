@@ -629,6 +629,13 @@ export class ClaudeParser {
     if (this.bg.size > 40) this.bg.delete(this.bg.keys().next().value!);
   }
 
+  /** When a background task began, as the transcript tells: the call that started it, or failing that its launch. */
+  taskStart(taskId: string, toolUseId?: string): number | undefined {
+    const t = this.bg.get(taskId);
+    const i = this.index.get(toolUseId ?? t?.toolUseId ?? '');
+    return (i == null ? undefined : this.items[i].ts) ?? t?.startedAt;
+  }
+
   private taskEnded(taskId: string) {
     if (!taskId) return;
     this.bg.delete(taskId);

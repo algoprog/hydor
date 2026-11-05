@@ -19,6 +19,7 @@ import { keptOfTranscript, type Indexer } from './indexer/index.ts';
 import { forget as forgetKept } from './indexer/kept.ts';
 import { Runner, type RunMeta } from './runner/client.ts';
 import { buildHandoff, splitHandoff } from './handoff.ts';
+import { ClaudeParser } from './history/claude.ts';
 import { Timeline } from './timeline.ts';
 import { removeSessionScratch } from './tasklog.ts';
 import { checkpoint, createWorktree, removeWorktree, restoreCheckpoint, worktreeState } from './worktrees.ts';
@@ -658,7 +659,13 @@ export class SessionManager extends EventEmitter {
         this.queueSummary(key);
       }
       const live = this.lives.get(key);
-      if (live) live.adapter.prune((id) => t.has(id), (since) => t.userTexts(since));
+      if (live) {
+        live.adapter.prune((id) => t.has(id), (since) => t.userTexts(since));
+        if (this.dateTasks(live)) {
+          const snap = this.liveSnapshot(key);
+          this.emit('live', key, snap.live, snap.overlay);
+        }
+      }
     });
     t.on('reset', () => this.emit('items', key, [], 0, true));
     await t.load(this.lives.has(key) || !!this.external.get(key));
@@ -685,7 +692,25 @@ export class SessionManager extends EventEmitter {
 
   liveSnapshot(key: string): { live: LiveState | null; overlay: LiveOverlay } {
     const l = this.lives.get(key);
+    if (l) this.dateTasks(l);
     return l ? { live: { ...l.adapter.state }, overlay: l.adapter.overlay() } : { live: null, overlay: { items: [], patches: {}, approvals: [] } };
+  }
+
+  /**
+   * Background tasks begun before this server last started have no start time from the agent's output, read again
+   * on reconnecting, so they would show no time running: the session's transcript tells when each began. True when
+   * one got its time.
+   */
+  private dateTasks(l: Live): boolean {
+    const parser = this.timelines.get(l.key)?.parser;
+    if (!(parser instanceof ClaudeParser)) return false;
+    let dated = false;
+    for (const t of l.adapter.state.backgroundTasks ?? []) {
+      if (t.startedAt) continue;
+      t.startedAt = parser.taskStart(t.id, t.toolUseId);
+      if (t.startedAt) dated = true;
+    }
+    return dated;
   }
 
   // ---- lifecycle ---------------------------------------------------------------
