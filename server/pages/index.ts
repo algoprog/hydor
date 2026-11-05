@@ -20,6 +20,7 @@
 //   POST /api/pages/video-still, POST /api/pages/videos, GET /api/pages/videos/:sha
 //   GET/PUT /api/pages/file (a file of the computer's in an editor: filemodel.ts)
 //   GET/POST /api/pages/:id/notebook (where a notebook of the Library runs: notebooks.ts)
+//   POST /api/library/uploads, PUT/DELETE /api/library/uploads/:id, POST /api/library/move (files dropped on the Library: uploads.ts)
 //   GET /api/pages/picture?url=, GET /api/pages/fonts.css?f=, GET /api/pages/fonts/*
 //   GET/POST /api/sites, DELETE /api/sites/:id, GET/POST /api/sites/requests/:id
 // Routes whose token is the permission (no sign-in, never the app's cookies at work):
@@ -58,6 +59,7 @@ import { agentDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides
 import { agentFileComments, openFile, openFileComments, saveFile, texFileForAgent } from './filemodel.ts';
 import { kindForFile, kindOf, mustKind, type PageKind } from './kinds.ts';
 import { shellManifest, shellPage } from './shell.ts';
+import { uploadRoutes } from './uploads.ts';
 import { createRequest, decideRequest, getRequest, initSites, listSites, publish, serveSite, unpublish, unpublishPage } from './sites.ts';
 import {
   addVersion,
@@ -475,6 +477,8 @@ function routes(d: Deps) {
   initSites(db);
   initEdits(db);
   texRoutes(app, db);
+  // Files dropped on the Library or picked with Upload files, and files the desktop app moves in by their path.
+  uploadRoutes(d);
   const P = (req: FastifyRequest) => req.params as Record<string, string>;
   const B = (req: FastifyRequest) => (req.body ?? {}) as Record<string, unknown>;
   const key = (v: unknown) => (typeof v === 'string' && v ? v.slice(0, 300) : undefined);

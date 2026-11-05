@@ -25,8 +25,9 @@ import { byteRange, resolvePath } from '../files.ts';
 import { dimensions, slug } from '../images/openrouter.ts';
 import { captionModels, captionSettings, setCaptionChoice, titleFrom, writeCaption } from './caption.ts';
 import { frameGrid, hasFfmpeg, probe, still, waveform } from './frames.ts';
-import { addMedia, deleteMedia, editMedia, filesOf, initMedia, listMedia, mustMedia, savedFrom, setCaption, setMediaSpace } from './store.ts';
+import { addMedia, deleteMedia, editMedia, filesOf, initMedia, keptWithBytes, listMedia, mustMedia, savedFrom, setCaption, setMediaSpace } from './store.ts';
 import { sessionSpace, spaceChoice } from '../spaces/choice.ts';
+import { fileHash } from '../filemove.ts';
 
 const TYPES: Record<string, { kind: MediaKind; mime: string }> = {
   png: { kind: 'image', mime: 'image/png' },
@@ -50,8 +51,13 @@ const TYPES: Record<string, { kind: MediaKind; mime: string }> = {
 };
 
 const MAX_BYTES = 1024 * 1024 * 1024;
+/** The largest picture, video or sound the Library keeps. */
+export const MAX_MEDIA = MAX_BYTES;
 
-const tell = (d: Pick<Deps, 'broadcast'>, data: MediaEvent) => d.broadcast({ t: 'feature', id: 'media', data });
+/** What a file is kept as in the Library, by its name: a picture, a video or a sound, or null (another kind of file). */
+export const mediaTypeOf = (name: string): { kind: MediaKind; mime: string } | null => TYPES[path.extname(name).slice(1).toLowerCase()] ?? null;
+
+const tell =(d: Pick<Deps, 'broadcast'>, data: MediaEvent) => d.broadcast({ t: 'feature', id: 'media', data });
 
 // ---- titles and descriptions, a few at a time --------------------------------------------------------------
 
@@ -90,7 +96,16 @@ function caption(d: Deps, id: string) {
 
 // ---- keeping a file ------------------------------------------------------------------------------------------
 
-export async function keepFile(d: Deps, b: { path?: unknown; prompt?: unknown; model?: unknown; lyrics?: unknown; sessionKey?: unknown; space?: unknown }): Promise<{ item: MediaItem; existed: boolean }> {
+/**
+ * Keeps a picture, a video or a sound in the Library: copied in, or with `move` moved in (the file leaves where it was:
+ * an upload's, a file the desktop app drops), recording `source` as what it came from when that is not its path. The
+ * same file kept already (its path and size, or anywhere its bytes) comes back instead, and nothing is copied or moved.
+ */
+export async function keepFile(
+  d: Deps,
+  b: { path?: unknown; prompt?: unknown; model?: unknown; lyrics?: unknown; sessionKey?: unknown; space?: unknown },
+  o: { move?: boolean; source?: string } = {},
+): Promise<{ item: MediaItem; existed: boolean }> {
   if (typeof b.path !== 'string' || !b.path.trim()) throw new HttpError(400, 'path: the image, video or sound to keep');
   const file = resolvePath(b.path);
   const st = await fs.promises.stat(file).catch(() => null);
@@ -99,8 +114,12 @@ export async function keepFile(d: Deps, b: { path?: unknown; prompt?: unknown; m
   const type = TYPES[ext];
   if (!type) throw new HttpError(400, 'The Library keeps pictures (PNG, JPEG, WebP, GIF, AVIF), videos (MP4, WebM, MOV) and sounds (MP3, WAV, M4A, AAC, OGG, OPUS, FLAC)');
   if (st.size > MAX_BYTES) throw new HttpError(413, 'The file is over 1 GB');
-  const had = savedFrom(d.db, file, st.size);
+  // A file moved in leaves its path free for another, so only its bytes say it was kept before.
+  const had = o.move ? null : savedFrom(d.db, file, st.size);
   if (had) return { item: had, existed: true };
+  const sha = await fileHash(file);
+  const same = await keptWithBytes(d.db, sha, st.size);
+  if (same) return { item: same, existed: true };
   const str = (v: unknown, n: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : undefined);
   // The space picked, or (not asked) the session's.
   const space = spaceChoice(d.db, b.space, sessionSpace(d.db, str(b.sessionKey, 200)));
@@ -132,6 +151,9 @@ export async function keepFile(d: Deps, b: { path?: unknown; prompt?: unknown; m
   const item = await addMedia(d.db, {
     kind: type.kind,
     from: file,
+    move: o.move,
+    source: o.source,
+    sha,
     ext: ext === 'jpeg' ? 'jpg' : ext === 'm4v' ? 'mp4' : ext === 'oga' ? 'ogg' : ext,
     mime: type.mime,
     bytes: st.size,
