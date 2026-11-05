@@ -693,7 +693,8 @@ export function Library() {
           <Throbber size={28} />
         </div>
       );
-    if (!items.length && !folders?.length)
+    // Nothing kept yet (folders show in their places, not in Everything).
+    if (!items.length && (!folders?.length || placeSpace === undefined))
       return (
         <Empty icon={<LibraryBig size={22} />} title="Your Library is empty">
           <span className="block">
