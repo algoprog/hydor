@@ -19,6 +19,7 @@ import path from 'node:path';
 import { editorKindOf, type FileOpened, type FileSaved } from '../../shared/documents.ts';
 import { docSources } from '../../shared/docs.ts';
 import { cleanEngine, cleanTexName, extOf, normalizeTex, TEX_FILE_EXT, TEX_LIMITS, TEX_MAIN, uncommented, type TexComment, type TexDoc } from '../../shared/latex.ts';
+import { texFileKind, texUses } from '../../shared/latex-files.ts';
 import { cellsFromRows, computeBook, detectSep, formatValue, normalizeBook, parseRef, refName, type Cell, type Workbook } from '../../shared/sheets.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -27,7 +28,7 @@ import { getAsset } from './assets.ts';
 import { docFaces, docFromFile, docxOfDoc, keepDoc, readDoc, wordLosses } from './docs.ts';
 import { projectComments, saveProjectComments } from './filecomments.ts';
 import { pictureFor } from './export.ts';
-import { texCommentOps, texCommentsForAgent, texFolderOk, textOf } from './latex.ts';
+import { OUTPUTS as TEX_OUTPUTS, texCommentOps, texCommentsForAgent, texFolderOk, textOf } from './latex.ts';
 import type { Picture } from './pptx.ts';
 import { decodeText, importBook, keepBook, readBook, xlsxOfBook } from './sheets.ts';
 import { wordFonts } from './word-fonts.ts';
@@ -307,72 +308,88 @@ const isWhole = (s: string) => {
   return /\\documentclass/.test(t) && /\\begin\s*\{document\}/.test(t);
 };
 
-/** Names a source may read files by: its commands' arguments in braces, each split at commas (\input{a}, \bibliography{a,b}, \import{dir}{a}), and \input's bare one. */
-function namesIn(text: string): string[] {
-  const src = source(text);
-  const out = new Set<string>();
-  const add = (s: string) => {
-    for (const part of s.split(',')) {
-      const n = part.trim().replace(/^"(.*)"$/, '$1').trim().replace(/^(\.\/)+/, '');
-      if (n && n.length < 200 && !/[\\#$%&~^{}]/.test(n)) out.add(n);
-    }
-  };
-  for (const m of src.matchAll(/\\[A-Za-z@]+\*?\s*(?:\[[^\]\n]*\]\s*)*\{([^{}\n]*)\}(?:\s*\{([^{}\n]*)\})?/g)) {
-    add(m[1]);
-    if (m[2] !== undefined) {
-      add(m[2]);
-      if (!/[\\,]/.test(m[1]) && !/[\\,]/.test(m[2])) add(`${m[1].trim().replace(/\/?$/, '/')}${m[2].trim()}`);
-    }
-  }
-  for (const m of src.matchAll(/\\input\s+([^\s{}\\%]+)/g)) add(m[1]);
-  return [...out];
+/**
+ * The main file a part of a document names itself: "% !TEX root = ../thesis.tex" (as TeXShop, TeXstudio and VS Code read
+ * it), or the subfiles class's option (\documentclass[../main]{subfiles}); null when it names none.
+ */
+function rootNamed(text: string): string | null {
+  const head = text.slice(0, 8000);
+  const magic = /^[ \t]*%[ \t]*!\s*TeX\s+root\s*=\s*(.+?)\s*$/im.exec(head)?.[1];
+  const sub = /\\documentclass\s*\[([^\]]+)\]\s*\{subfiles\}/.exec(source(head))?.[1];
+  const named = (magic ?? sub)?.trim().replace(/^"(.*)"$/, '$1');
+  return named ? (/\.(tex|ltx)$/i.test(named) ? named : `${named}.tex`) : null;
 }
 
+/** A file of the project the editor holds: where it is, its text, its time when it was read. */
 interface Found {
   abs: string;
   text: string;
   mtime: number;
 }
 
-/** The files a document reads from its folder (`exts`, by its sources' names, the files read in turn too), at most as a document may have. */
-function projectFiles(folder: string, mainFile: string, mainText: string, exts: string[], notes: string[]): Map<string, Found> {
-  const found = new Map<string, Found>();
-  let total = Buffer.byteLength(mainText);
-  let full = false;
-  const resolve = (n: string): string | null => {
-    for (const cand of [n, ...['tex', 'bib', 'sty', 'cls', 'bst'].map((e) => `${n}.${e}`)]) {
-      if (!exts.includes(extOf(cand))) continue;
-      const abs = path.resolve(folder, cand);
-      if (!abs.startsWith(folder + path.sep)) continue;
-      if (fs.statSync(abs, { throwIfNoEntry: false })?.isFile()) return abs;
-    }
-    return null;
+/**
+ * A project's folder as the shared reading of a document sees it (shared/latex-files.ts): whether it has a file (by its
+ * path in the folder), a source's text (up to a file's limit), a file's size, and its files' names (only when a name
+ * TeX makes at its run asks for them: a few thousand at most, none hidden, none TeX wrote).
+ */
+function diskProject(folder: string) {
+  const stats = new Map<string, fs.Stats | null>();
+  const texts = new Map<string, string | null>();
+  const stat = (n: string) => {
+    if (!stats.has(n)) stats.set(n, fs.statSync(path.join(folder, n), { throwIfNoEntry: false }) ?? null);
+    return stats.get(n)!;
   };
-  const queue = [mainText];
-  while (queue.length) {
-    for (const n of namesIn(queue.shift()!)) {
-      const abs = resolve(n);
-      if (!abs || abs === mainFile) continue;
-      const rel = path.relative(folder, abs).split(path.sep).join('/');
-      // A file named main.tex beside a document of another name: TeX reads the document's own main.tex by that name.
-      if (found.has(rel) || cleanTexName(rel, 'file') !== rel || rel === TEX_MAIN) continue;
-      const st = fs.statSync(abs);
-      if (st.size > TEX_LIMITS.file || found.size >= TEX_LIMITS.files || total + st.size > TEX_LIMITS.total) {
-        if (!full) notes.push(`Not every file it reads is in the editor (a document there may have ${TEX_LIMITS.files} files, ${TEX_LIMITS.total / 1024 / 1024} MB in all): the others are typeset from the folder as they are.`);
-        full = true;
-        continue;
-      }
-      const text = textOf(fs.readFileSync(abs));
-      total += st.size;
-      found.set(rel, { abs, text, mtime: mtimeOf(st) });
-      if (/\.(tex|ltx)$/i.test(rel)) queue.push(text);
+  const has = (n: string) => !!stat(n)?.isFile();
+  const read = (n: string): string | null => {
+    if (!texts.has(n)) {
+      const st = stat(n);
+      texts.set(n, st?.isFile() && st.size <= TEX_LIMITS.file ? textOf(fs.readFileSync(path.join(folder, n))) : null);
     }
-  }
-  return found;
+    return texts.get(n)!;
+  };
+  let all: string[] | null = null;
+  const names = () => {
+    if (all) return all;
+    const out: string[] = [];
+    const walk = (dir: string, rel: string, depth: number) => {
+      let list: fs.Dirent[];
+      try {
+        list = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const e of list) {
+        if (out.length >= 4000) return;
+        if (e.name.startsWith('.') || e.name === 'node_modules' || e.name === '__pycache__') continue;
+        const r = rel ? `${rel}/${e.name}` : e.name;
+        if (e.isDirectory()) {
+          if (depth < 6) walk(path.join(dir, e.name), r, depth + 1);
+        } else if (e.isFile() && !TEX_OUTPUTS.test(e.name)) out.push(r);
+      }
+    };
+    walk(folder, '', 0);
+    return (all = out);
+  };
+  return { has, read, names, size: (n: string) => (has(n) ? stat(n)!.size : null), mtime: (n: string) => mtimeOf(stat(n)!) };
 }
 
-/** The document a part of it belongs to (a chapter's): one in its folder or a folder or two up that reads it. */
-function findMain(file: string): { file: string; text: string } | null {
+/**
+ * The document a part of it belongs to (a chapter's): the one the part names itself (rootNamed), else one in its folder
+ * or a folder or two up that uses it, as TeX reads it (shared/latex-files.ts).
+ */
+function findMain(file: string, text: string): { file: string; text: string } | null {
+  const whole = (abs: string): string | null => {
+    const st = fs.statSync(abs, { throwIfNoEntry: false });
+    if (!st?.isFile() || st.size > TEX_LIMITS.main || abs === file) return null;
+    const t = textOf(fs.readFileSync(abs));
+    return isWhole(t) ? t : null;
+  };
+  const named = rootNamed(text);
+  if (named) {
+    const abs = path.resolve(path.dirname(file), named);
+    const t = whole(abs);
+    if (t !== null) return { file: abs, text: t };
+  }
   const home = os.homedir();
   let dir = path.dirname(file);
   for (let up = 0; up < 3 && dir !== home && dir !== path.parse(dir).root; up++, dir = path.dirname(dir)) {
@@ -383,40 +400,68 @@ function findMain(file: string): { file: string; text: string } | null {
       continue;
     }
     const rank = (n: string) => (MAINS.includes(n.toLowerCase()) ? MAINS.indexOf(n.toLowerCase()) : 99);
+    const disk = diskProject(dir);
+    const want = path.relative(dir, file).split(path.sep).join('/');
     for (const n of names.sort((a, b) => rank(a) - rank(b)).slice(0, 60)) {
       const abs = path.join(dir, n);
-      if (abs === file) continue;
-      const st = fs.statSync(abs, { throwIfNoEntry: false });
-      if (!st?.isFile() || st.size > TEX_LIMITS.main) continue;
-      const text = textOf(fs.readFileSync(abs));
-      if (isWhole(text) && [...projectFiles(dir, abs, text, ['tex', 'ltx'], []).values()].some((f) => f.abs === file)) return { file: abs, text };
+      const t = whole(abs);
+      if (t !== null && texUses({ main: t, read: disk.read, has: disk.has, alias: n }).used.has(want)) return { file: abs, text: t };
     }
   }
   return null;
 }
 
-/** A LaTeX file as the editor's project: the document (the file, or the one that reads it) and what it reads from its folder. */
+/**
+ * A LaTeX file as the editor's project: the document (the file, or the one it belongs to) and what it uses from its
+ * folder, as TeX reads it. The sources and bibliographies it uses come into the editor, in the order TeX reads them,
+ * as far as a document may hold them; the rest it uses (pictures, styles and classes, data, and what did not fit) is
+ * typeset from the folder as it is, and listed in `uses` for the editor's files tree.
+ */
 function texProject(file: string, buf: Buffer): Pick<FileOpened, 'model' | 'loses' | 'notes' | 'tex'> {
   const text = textOf(buf);
   let main = { file, text };
-  if (!isWhole(text)) {
-    const found = findMain(file);
-    if (!found) throw new HttpError(415, 'This .tex file is not a whole document, and no document beside it reads it');
-    main = found;
+  // A part of a document (a subfile is a whole one too, of the document it names): the document opens, on the part.
+  if (!isWhole(text) || rootNamed(text)) {
+    const found = findMain(file, text);
+    if (found) main = found;
+    else if (!isWhole(text)) throw new HttpError(415, 'This .tex file is not a whole document, and no document beside it reads it');
   }
   const folder = path.dirname(main.file);
   const inFolder = texFolderOk(folder);
   const notes: string[] = [];
-  const files = projectFiles(folder, main.file, main.text, inFolder ? TAB_EXT : ALL_EXT, notes);
   const rel = (abs: string) => path.relative(folder, abs).split(path.sep).join('/');
+  const mainRel = rel(main.file);
+  const disk = diskProject(folder);
+  const uses = texUses({ main: main.text, read: disk.read, has: disk.has, alias: mainRel, names: disk.names });
+  const editable = inFolder ? TAB_EXT : ALL_EXT;
+  const files = new Map<string, Found>();
+  const fromFolder: NonNullable<NonNullable<FileOpened['tex']>['uses']> = [];
+  let total = Buffer.byteLength(main.text);
+  let full = false;
+  for (const name of uses.used.keys()) {
+    if (name === TEX_MAIN || name === mainRel) continue;
+    const size = disk.size(name);
+    if (size === null) continue;
+    // A file named main.tex beside a document of another name: TeX reads the document's own main.tex by that name.
+    const fits = editable.includes(extOf(name)) && cleanTexName(name, 'file') === name;
+    if (fits && (size > TEX_LIMITS.file || files.size >= TEX_LIMITS.files || total + size > TEX_LIMITS.total)) {
+      if (!full) notes.push(`Not every file it reads is in the editor (a document there may have ${TEX_LIMITS.files} files, ${TEX_LIMITS.total / 1024 / 1024} MB in all): the others are typeset from the folder as they are.`);
+      full = true;
+    } else if (fits) {
+      total += size;
+      files.set(name, { abs: path.join(folder, name), text: disk.read(name) ?? textOf(fs.readFileSync(path.join(folder, name))), mtime: disk.mtime(name) });
+      continue;
+    }
+    fromFolder.push({ name, kind: texFileKind(name), size });
+  }
   // An engine the file asks for (% !TEX program = xelatex), else the one its preamble wants.
   const asked = /^\s*%\s*!\s*TEX\s+(?:TS-)?program\s*=\s*([A-Za-z]+)/im.exec(main.text.slice(0, 4000))?.[1];
   const doc: TexDoc = normalizeTex({ main: main.text, files: [...files].map(([name, f]) => ({ name, text: f.text })), engine: cleanEngine(asked) ?? undefined });
-  const times: Record<string, number> = { [rel(main.file)]: mtimeOf(fs.statSync(main.file)) };
+  const times: Record<string, number> = { [mainRel]: mtimeOf(fs.statSync(main.file)) };
   for (const [name, f] of files) times[name] = f.mtime;
   const open = file === main.file ? TEX_MAIN : rel(file);
   if (!inFolder) notes.push('Its folder is not one TeX may read beside it (the home folder, say): its pictures are not typeset with it.');
-  return { model: doc, loses: [], notes, tex: { folder, main: rel(main.file), open: files.has(open) || open === TEX_MAIN ? open : TEX_MAIN, files: times, inFolder } };
+  return { model: doc, loses: [], notes, tex: { folder, main: mainRel, open: files.has(open) || open === TEX_MAIN ? open : TEX_MAIN, files: times, inFolder, uses: fromFolder } };
 }
 
 /** Text as the LaTeX editor keeps it (shared/latex.ts cleanText): to tell whether a file on disk says the same. */
@@ -518,7 +563,8 @@ export async function texFileForAgent(db: DB, fileIn: string): Promise<string> {
   const d = f.model as TexDoc;
   const t = f.tex;
   const real = (n: string) => (n === TEX_MAIN ? t.main : n);
-  const head = `${f.path}: a LaTeX file of this computer${path.join(t.folder, t.main) !== f.path ? `, read by ${path.join(t.folder, t.main)}` : ''}. Its project's files, in ${t.folder}: ${[t.main, ...d.files.map((x) => x.name)].join(', ')}. Read and change them with your own tools; the comments the user wrote on their words are kept by the app, and listed here.`;
+  const more = t.uses?.length ? ` It also uses, from the folder: ${t.uses.slice(0, 40).map((x) => x.name).join(', ')}${t.uses.length > 40 ? `, and ${t.uses.length - 40} more` : ''}.` : '';
+  const head = `${f.path}: a LaTeX file of this computer${path.join(t.folder, t.main) !== f.path ? `, read by ${path.join(t.folder, t.main)}` : ''}. Its project's files, in ${t.folder}: ${[t.main, ...d.files.map((x) => x.name)].join(', ')}.${more} Read and change them with your own tools; the comments the user wrote on their words are kept by the app, and listed here.`;
   return d.comments?.length ? `${head}\n\n${texCommentsForAgent(d, 'save_latex’s path and comments', real)}` : `${head}\n\nIt has no comments.`;
 }
 

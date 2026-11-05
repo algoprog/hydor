@@ -960,7 +960,7 @@ export function texFolderOk(folder: string): boolean {
 }
 
 /** What TeX writes beside a document (the folder's own typesettings left them): never linked in, so none is written through. */
-const OUTPUTS = /\.(aux|log|out|toc|lof|lot|loa|lol|bbl|blg|bcf|run\.xml|fls|fdb_latexmk|synctex|synctex\.gz|nav|snm|vrb|idx|ind|ilg|glo|gls|glg|acn|acr|alg|xdv|dvi|brf|thm|nlo|nls|maf|ptc|upa|upb)$/i;
+export const OUTPUTS = /\.(aux|log|out|toc|lof|lot|loa|lol|bbl|blg|bcf|run\.xml|fls|fdb_latexmk|synctex|synctex\.gz|nav|snm|vrb|idx|ind|ilg|glo|gls|glg|acn|acr|alg|xdv|dvi|brf|thm|nlo|nls|maf|ptc|upa|upb)$/i;
 
 interface FolderPlan {
   /** A hash of its files' names, sizes and times. */
