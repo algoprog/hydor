@@ -41,14 +41,7 @@ function GpuMeters({ gpus, onOpen }: { gpus: GpuNow[]; onOpen: (id: string) => v
       {gpus.map((g) => {
         const p = g.memTotal ? (g.memUsed / g.memTotal) * 100 : 0;
         return (
-          <button
-            key={g.index}
-            type="button"
-            disabled={!g.run}
-            onClick={() => g.run && onOpen(g.run)}
-            title={`${g.name} · ${g.util}% busy${g.run ? ' · one of your runs holds it' : ''}`}
-            className="w-[124px] text-left disabled:cursor-default"
-          >
+          <button key={g.index} type="button" disabled={!g.run} onClick={() => g.run && onOpen(g.run)} title={`${g.name} · ${g.util}% busy${g.run ? ' · one of your runs holds it' : ''}`} className="w-[124px] text-left disabled:cursor-default">
             <div className="mb-0.5 flex justify-between gap-2 text-[11px] text-fg-3">
               <span className={g.run ? 'font-medium text-fg-2' : ''}>GPU {g.index}</span>
               <span className="tnum">
@@ -194,7 +187,7 @@ export function ExperimentsPage() {
     const seen = new Map<string, string>();
     for (const r of runs ?? []) {
       const p = placeOf(r);
-      if (!seen.has(p)) seen.set(p, p === 'local' ? 'This computer' : r.machine?.name ?? (p.startsWith('c:') ? clusterName(p.slice(2)) : p.slice(2)));
+      if (!seen.has(p)) seen.set(p, p === 'local' ? 'This computer' : (r.machine?.name ?? (p.startsWith('c:') ? clusterName(p.slice(2)) : p.slice(2))));
     }
     return [...seen.entries()];
   }, [runs, clusters]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -230,12 +223,7 @@ export function ExperimentsPage() {
   const going = (runs ?? []).filter((r) => r.status === 'running' || r.status === 'starting').length;
   const waiting = (runs ?? []).filter((r) => r.status === 'queued' || r.status === 'waiting');
   const forGpu = waiting.filter((r) => /GPU/.test(r.why ?? '') && !r.clusterJob).length;
-  const line = [
-    going ? `${going} running` : '',
-    waiting.length ? (forGpu === waiting.length ? `${waiting.length} waiting for a GPU` : `${waiting.length} waiting`) : '',
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const line = [going ? `${going} running` : '', waiting.length ? (forGpu === waiting.length ? `${waiting.length} waiting for a GPU` : `${waiting.length} waiting`) : ''].filter(Boolean).join(' · ');
   const filtered = filter.q.trim() || filter.status !== 'all' || filter.where !== 'all';
   const remotePicked = pickedRuns.some((r) => r.machine);
 
@@ -389,7 +377,13 @@ export function ExperimentsPage() {
                 <Button size="sm" variant="secondary" disabled={pickedRuns.length < 2} onClick={() => setCompare(pickedRuns.slice(0, 8))}>
                   Compare
                 </Button>
-                <Button size="sm" variant="primary" disabled={!pickedRuns.length || remotePicked} title={remotePicked ? 'Tables are made of this computer’s runs: open the other machine’s Experiments for its own' : undefined} onClick={() => setTableStart({ runs: pickedRuns })}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={!pickedRuns.length || remotePicked}
+                  title={remotePicked ? 'Tables are made of this computer’s runs: open the other machine’s Experiments for its own' : undefined}
+                  onClick={() => setTableStart({ runs: pickedRuns })}
+                >
                   Make a table
                 </Button>
                 <IconButton label="Pick none" size="sm" onClick={() => setPicked(new Set())}>

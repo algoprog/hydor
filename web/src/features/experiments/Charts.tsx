@@ -62,7 +62,12 @@ export function StepChart({ series, height = 140, className }: { series: StepSer
     const pad = (y1 - y0) * 0.08 || Math.abs(y1) * 0.05 || 1;
     return { x0, x1: x1 > x0 ? x1 : x0 + 1, y0: y0 - pad, y1: y1 + pad };
   }, [series]);
-  if (!box) return <div className={cx('flex items-center justify-center text-[12px] text-fg-3', className)} style={{ height }}>No values yet</div>;
+  if (!box)
+    return (
+      <div className={cx('flex items-center justify-center text-[12px] text-fg-3', className)} style={{ height }}>
+        No values yet
+      </div>
+    );
   const x = (v: number) => axisW + ((v - box.x0) / (box.x1 - box.x0)) * plotW;
   const y = (v: number) => top + plotH - ((v - box.y0) / (box.y1 - box.y0)) * plotH;
   const ys = ticks(box.y0, box.y1, 3);
@@ -216,7 +221,10 @@ export function Scatter({ points, setting, metric, best, height = 150 }: { point
         </svg>
       )}
       {h && (
-        <div className="pointer-events-none absolute z-10 rounded-lg border border-line-2 bg-panel px-2.5 py-1 text-[12px] whitespace-nowrap shadow-pop" style={{ left: Math.min(xOf(h.x) + 8, Math.max(0, width - 160)), top: Math.max(0, yOf(h.y) - 36) }}>
+        <div
+          className="pointer-events-none absolute z-10 rounded-lg border border-line-2 bg-panel px-2.5 py-1 text-[12px] whitespace-nowrap shadow-pop"
+          style={{ left: Math.min(xOf(h.x) + 8, Math.max(0, width - 160)), top: Math.max(0, yOf(h.y) - 36) }}
+        >
           <span translate="no">{setting}</span> {typeof h.x === 'number' ? num(h.x) : h.x} · <span translate="no">{metric}</span> <span className="tnum font-semibold">{num(h.y)}</span>
         </div>
       )}

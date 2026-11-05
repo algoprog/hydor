@@ -6,6 +6,7 @@ import { CheckCircle2, Plus, Server, XCircle } from 'lucide-react';
 import type { ClusterSpec, QueueNow } from '@shared/experiments';
 import type { MachineView } from '@shared/types';
 import { api, post, put } from '../../lib/api';
+import { machineId } from '../../lib/machine';
 import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
 import { Button, cx, Dialog, inputCls, Segmented, Throbber } from '../../components/ui';
@@ -173,7 +174,7 @@ export function Places({ open, onClose, adding }: { open: boolean; onClose: () =
     <Dialog open={open} onClose={onClose} title="Where runs go" width={620}>
       <div className="space-y-5 text-[13px]">
         <section className="space-y-2">
-          <h3 className="text-[13px] font-semibold">This computer</h3>
+          <h3 className="text-[13px] font-semibold">{machineId ? 'This machine' : 'This computer'}</h3>
           <p className="text-fg-2">{queue ? (queue.gpus.length ? `${queue.gpus.length} GPU${queue.gpus.length === 1 ? '' : 's'}: ${gpuNames.join(', ')}` : (queue.gpuNote ?? 'No NVIDIA GPU here')) : '…'}</p>
           <label className="flex flex-wrap items-center gap-2 text-fg-2">
             Jobs without a GPU: at most
@@ -181,30 +182,32 @@ export function Places({ open, onClose, adding }: { open: boolean; onClose: () =
             at once
           </label>
         </section>
-        <section className="space-y-2">
-          <h3 className="text-[13px] font-semibold">Other machines</h3>
-          {machines.length ? (
-            <ul className="space-y-1">
-              {machines.map((m) => (
-                <li key={m.id} className="flex items-center gap-2">
-                  <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', m.status.state === 'online' ? 'bg-ok' : 'bg-fg-3')} />
-                  <span translate="no" className="font-medium">
-                    {m.name}
-                  </span>
-                  <span className="text-fg-3">{m.status.state === 'online' ? 'connected: runs can go there' : 'not connected now'}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="leading-relaxed text-fg-3">
-              Other computers running Hydor, added in{' '}
-              <button type="button" className="text-accent hover:underline" onClick={() => go('/settings?s=machines')}>
-                Settings → Machines
-              </button>
-              , take runs too; their runs show here, marked with where they run.
-            </p>
-          )}
-        </section>
+        {!machineId && (
+          <section className="space-y-2">
+            <h3 className="text-[13px] font-semibold">Other machines</h3>
+            {machines.length ? (
+              <ul className="space-y-1">
+                {machines.map((m) => (
+                  <li key={m.id} className="flex items-center gap-2">
+                    <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', m.status.state === 'online' ? 'bg-ok' : 'bg-fg-3')} />
+                    <span translate="no" className="font-medium">
+                      {m.name}
+                    </span>
+                    <span className="text-fg-3">{m.status.state === 'online' ? 'connected: runs can go there' : 'not connected now'}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="leading-relaxed text-fg-3">
+                Other computers running Hydor, added in{' '}
+                <button type="button" className="text-accent hover:underline" onClick={() => go('/settings?s=machines')}>
+                  Settings → Machines
+                </button>
+                , take runs too; their runs show here, marked with where they run.
+              </p>
+            )}
+          </section>
+        )}
         <section className="space-y-2">
           <div className="flex items-center gap-2">
             <h3 className="flex-1 text-[13px] font-semibold">Clusters</h3>

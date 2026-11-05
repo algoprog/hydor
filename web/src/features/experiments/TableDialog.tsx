@@ -469,7 +469,11 @@ export function TablesList({ open, onClose, onOpen }: { open: boolean; onClose: 
         <p className="py-4 text-[13px] leading-relaxed text-fg-3">No tables yet. Tick runs in the list and choose Make a table; one is kept when you copy it or put it in a document.</p>
       )}
       <div className="mt-3 text-[12px] leading-relaxed text-fg-3">
-        A table put in a LaTeX document carries a line with its id, so <button type="button" className="text-accent hover:underline" onClick={() => go('/guide/experiments#results-tables-for-your-paper')}>the check before you submit</button> can work its numbers out again.
+        A table put in a LaTeX document carries a line with its id, so{' '}
+        <button type="button" className="text-accent hover:underline" onClick={() => go('/guide/experiments#results-tables-for-your-paper')}>
+          the check before you submit
+        </button>{' '}
+        can work its numbers out again.
       </div>
     </Dialog>
   );

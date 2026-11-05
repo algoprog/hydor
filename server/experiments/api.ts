@@ -106,7 +106,8 @@ export async function startSweep(d: Deps, b: Record<string, any>, o: { cwd?: str
   const missing = Object.keys(params).filter((k) => !holes.includes(k));
   if (missing.length) throw new HttpError(400, `The command has no ${missing.map((k) => `{${k}}`).join(', ')}: put each where its value goes, like --${missing[0]} {${missing[0]}}`);
   const unknown = holes.filter((h) => !(h in params) && !(h === 'seed' && b.seed !== undefined));
-  if (unknown.length) throw new HttpError(400, `The command has ${unknown.map((h) => `{${h}}`).join(', ')}, which ${unknown.length === 1 ? 'is not a setting' : 'are not settings'} of the sweep: give values for ${unknown.length === 1 ? 'it' : 'them'} in params`);
+  if (unknown.length)
+    throw new HttpError(400, `The command has ${unknown.map((h) => `{${h}}`).join(', ')}, which ${unknown.length === 1 ? 'is not a setting' : 'are not settings'} of the sweep: give values for ${unknown.length === 1 ? 'it' : 'them'} in params`);
   const mode = b.mode === 'random' ? 'random' : 'grid';
   const maxRuns = Number(b.maxRuns) > 0 ? Math.floor(Number(b.maxRuns)) : undefined;
   let combos: Record<string, Value>[];
@@ -165,7 +166,11 @@ export function cleanTableSpec(b: Record<string, any>): ResultsTableSpec {
   if (b.correction === 'none') spec.correction = 'none';
   if (typeof b.caption === 'string' && b.caption.trim()) spec.caption = b.caption.trim().slice(0, 500);
   if (b.labels && typeof b.labels === 'object') {
-    const labels = Object.fromEntries(Object.entries(b.labels as Record<string, unknown>).filter(([k, v]) => k.length <= 120 && typeof v === 'string' && v.trim()).map(([k, v]) => [k, String(v).trim().slice(0, 80)]));
+    const labels = Object.fromEntries(
+      Object.entries(b.labels as Record<string, unknown>)
+        .filter(([k, v]) => k.length <= 120 && typeof v === 'string' && v.trim())
+        .map(([k, v]) => [k, String(v).trim().slice(0, 80)]),
+    );
     if (Object.keys(labels).length) spec.labels = labels;
   }
   return spec;

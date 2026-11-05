@@ -120,23 +120,7 @@ const realSsh: Ssh = (host, script, o = {}) =>
       fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     } catch {}
     const remote = `bash -lc ${q(`printf '%s\\n' '${MARK}'; ${script}`)}`;
-    const args = [
-      '-o',
-      'BatchMode=yes',
-      '-o',
-      'ConnectTimeout=15',
-      '-o',
-      'ServerAliveInterval=30',
-      '-o',
-      'ControlMaster=auto',
-      '-o',
-      `ControlPath=${path.join(dir, '%C')}`,
-      '-o',
-      'ControlPersist=10m',
-      '--',
-      host,
-      remote,
-    ];
+    const args = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=30', '-o', 'ControlMaster=auto', '-o', `ControlPath=${path.join(dir, '%C')}`, '-o', 'ControlPersist=10m', '--', host, remote];
     let out = '';
     let err = '';
     let p;
@@ -197,11 +181,13 @@ export const rq = (p: string) => (p === '~' ? '~' : p.startsWith('~/') ? `~/${q(
 
 /** A job's name for squeue: the run's name in a word. */
 const jobName = (r: Pick<RunRecord, 'id' | 'name'>) =>
-  `hydor-${(r.name ?? r.id)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 40) || r.id}`;
+  `hydor-${
+    (r.name ?? r.id)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40) || r.id
+  }`;
 
 /**
  * The batch script: the job's needs as #SBATCH lines, its output to the run's log, the cluster's setup lines, the
@@ -314,7 +300,7 @@ export async function checkCluster(c: Pick<ClusterSpec, 'host' | 'kind'>): Promi
       .map((f) => `${f[0]}${f[1] && f[1] !== 'up' ? ` (${f[1]})` : ''}${f[3] && f[3] !== '(null)' ? ` · ${f[3]}` : ''}`);
     return { ok: true, text: parts.length ? `SSH and SLURM work. Partitions: ${[...new Set(parts)].slice(0, 12).join(', ')}` : 'SSH and SLURM work.' };
   }
-  const g = await runSsh(c.host, "command -v tmux >/dev/null && echo TMUX; nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader,nounits 2>/dev/null | head -n 16", { timeoutMs: 30_000 });
+  const g = await runSsh(c.host, 'command -v tmux >/dev/null && echo TMUX; nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader,nounits 2>/dev/null | head -n 16', { timeoutMs: 30_000 });
   const gpus = g.out
     .split('\n')
     .filter((l) => /^\d+,/.test(l))
