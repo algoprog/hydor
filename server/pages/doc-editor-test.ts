@@ -102,6 +102,7 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
   ok(html.includes(`href="#nd-${toc[0].id}"`) && html.includes('>One</a>'), 'the page draws each heading as a link to it');
   ok(blockHtml(d.blocks[2], '', { src: (s) => s }).includes(`id="nd-${toc[0].id}"`), 'and the headings are where they lead');
   ok(normalizeDoc({ blocks: [{ toc: true }] }).blocks[0].type === 'toc' && normalizeDoc({ markdown: '\\tableofcontents' }).blocks[0].type === 'toc', 'agents may write it as {"toc": true} or \\tableofcontents');
+  ok(docMarkdown(d, { tocLinks: true }).includes('- [One](#one)\n  - [Two](#two)'), 'a Markdown file has it as a list of links to its headings');
 }
 
 // ---- equations ---------------------------------------------------------------------------------------------------------

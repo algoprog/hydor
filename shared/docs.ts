@@ -2122,6 +2122,31 @@ function runsInline(runs: Run[], o: { cm?: boolean }): string {
 export interface MarkdownOpts {
   /** For an agent: the words comments are on, marked (<span data-comment="id">), to keep or answer. */
   comments?: boolean;
+  /** For a file: a table of contents as a list of links to its headings (as GitHub names them), not [TOC]. */
+  tocLinks?: boolean;
+}
+
+/** A heading's anchor as GitHub makes it from its words: lower case, words joined by dashes, others left out. */
+const slug = (t: string) =>
+  t
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+    .trim()
+    .replace(/\s/g, '-');
+
+/** A table of contents as Markdown's list of links, each heading's level a level of the list. */
+function tocList(d: Doc): string {
+  const seen = new Map<string, number>();
+  const anchors = new Map<string, string>();
+  for (const h of docHeadings(d)) {
+    if (!h.level) continue;
+    const base = slug(h.text);
+    const n = seen.get(base) ?? 0;
+    seen.set(base, n + 1);
+    anchors.set(h.id, n ? `${base}-${n}` : base);
+  }
+  const lines = tocEntries(d).map((e) => `${'  '.repeat(e.level - 1)}- [${e.text.replace(/([\\[\]])/g, '\\$1')}](#${anchors.get(e.id) ?? slug(e.text)})`);
+  return lines.join('\n') || '[TOC]';
 }
 
 /**
@@ -2214,7 +2239,7 @@ export function docMarkdown(d: Doc, o: MarkdownOpts = {}): string {
       s = '---';
     } else if (b.type === 'toc') {
       content.length = 0;
-      s = '[TOC]';
+      s = o.tocLinks ? tocList(d) : '[TOC]';
     } else if (b.type === 'math') {
       content.length = 0;
       s = `$$\n${b.tex.replace(/\$\$/g, '$ $')}\n$$`;

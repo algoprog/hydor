@@ -95,7 +95,7 @@ KINDS.set('doc', {
   files: {
     docx: (db, text, title, help) => docxOfDoc(db, readDoc(text), title, help.picture),
     // A file on its own: its pictures go inside it.
-    md: (db, text) => docMarkdown(mapDocSources(readDoc(text), (src) => (src.startsWith(ASSET) ? (assetDataUrl(db, src.slice(ASSET.length)) ?? src) : src))),
+    md: (db, text) => docMarkdown(mapDocSources(readDoc(text), (src) => (src.startsWith(ASSET) ? (assetDataUrl(db, src.slice(ASSET.length)) ?? src) : src)), { tocLinks: true }),
   },
   still: () => ({ width: 1280, height: 800 }),
   fresh: (title) => newDoc(title),
