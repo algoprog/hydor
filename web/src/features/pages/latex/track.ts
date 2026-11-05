@@ -202,8 +202,7 @@ export function trackChanges(): { extension: Extension; on: (v: EditorView, on: 
 }
 
 /** The changes as they are now: words put in with their words, words taken out with the characters before them. */
-export const trackedNow = (state: EditorState): Tracked[] =>
-  state.field(trackField).map((c) => (c.kind === 'ins' ? { ...c, text: state.sliceDoc(c.from, c.to) } : { ...c, before: state.sliceDoc(Math.max(0, c.from - 40), c.from) || undefined }));
+export const trackedNow = (state: EditorState): Tracked[] => state.field(trackField).map((c) => (c.kind === 'ins' ? { ...c, text: state.sliceDoc(c.from, c.to) } : { ...c, before: state.sliceDoc(Math.max(0, c.from - 40), c.from) || undefined }));
 
 /** Sets the changes from the document (when the file's editor starts): not an edit, nothing to undo. */
 export function loadTracked(v: EditorView, list: Tracked[]) {
