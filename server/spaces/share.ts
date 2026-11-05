@@ -287,7 +287,7 @@ export function findWords(text: string, quote: string): { at: number; words: str
 /** The words of a document (as its paragraphs, items and table cells hold them) a quote is, as written there. */
 export function docWords(doc: Doc, quote: string): string | null {
   const texts: string[] = [];
-  const runs = (rs: { t: string; math?: string }[]) => texts.push(rs.map((r) => (r.math ? '⁣'.repeat(r.t.length) : r.t)).join(''));
+  const runs = (rs: { t: string; math?: unknown }[]) => texts.push(rs.map((r) => (r.math ? '\u2063'.repeat(r.t.length) : r.t)).join(''));
   for (const b of doc.blocks) {
     if (b.type === 'p' || b.type === 'li') runs(b.runs);
     else if (b.type === 'table') for (const row of b.rows) for (const c of row) runs(c.runs);

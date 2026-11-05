@@ -1,6 +1,6 @@
 // Spaces: each project's sessions, files, documents, Library, memory, guidelines, skills and assistant together.
-// The list (beside the shared knowledge, on the page's second tab): a card for each space with what it holds and
-// New session, the folders worth a space of their own, and Group spaces together. A space's own page is SpacePage.
+// The list (beside the shared knowledge, on the page's second tab): a card for each space with what it holds,
+// New session and its menu (as on its page), the folders worth a space of their own, and Group spaces together. A space's own page is SpacePage.
 // A group brings spaces together: its sessions work with all of them. Picked by name on the start page in place of
 // a folder.
 import { useState, type ReactNode } from 'react';
@@ -15,7 +15,8 @@ import { useApp } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { PageHeader } from '../layout/PageHeader';
 import { memberNames, NewSpaceDialog, SpaceMark, SpacesTabs, startInSpace, useSpaceSuggestions } from './parts';
-import { SpacePage, type SpaceTab } from './SpacePage';
+import { ShareDialogHost } from './ShareDialog';
+import { SpaceMenu, SpacePage, type SpaceTab } from './SpacePage';
 import { useSpaces } from './state';
 
 const plural = (n: number, one: string, many: string) => tr(`${n} ${n === 1 ? one : many}`);
@@ -107,6 +108,10 @@ function SpaceCard({ s, spaces }: { s: SpaceView; spaces: SpaceView[] }) {
         <div className="mt-3 text-[12.5px] text-fg-2">{holds(s)}</div>
         <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
           <span className="min-w-0 flex-1 truncate text-[12px] text-fg-3">{s.lastAt ? tr(`Last at work ${timeAgo(s.lastAt)} ago`) : 'No sessions yet'}</span>
+          {/* Its menu, as on its page (share it with people…): a click in it is not a click on the card. */}
+          <span className="contents" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+            <SpaceMenu s={s} />
+          </span>
           <Button
             size="sm"
             variant="secondary"
@@ -214,6 +219,7 @@ function List() {
         </div>
       </div>
       <NewSpaceDialog open={!!made} group={made === 'group'} folder={made === 'space' ? from : undefined} onClose={() => setMade(false)} onMade={(s) => go(`/projects/${s.id}`)} />
+      <ShareDialogHost />
     </div>
   );
 }

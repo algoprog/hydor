@@ -109,7 +109,8 @@ export default function GuestPage({ token }: { token: string }) {
   );
 }
 
-function GuestItem({ it }: { it: TimelineItem }) {
+/** One item of a shared session, as a guest sees it (a shared project's portal shows its sessions so too). */
+export function GuestItem({ it }: { it: TimelineItem }) {
   switch (it.kind) {
     case 'user': {
       if (it.meta === 'note') return null;

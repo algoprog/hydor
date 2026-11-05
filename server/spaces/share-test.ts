@@ -65,7 +65,7 @@ session('claude:s1', thesis.id, 'Write chapter 3', [
   { kind: 'user', id: 'u1', seq: 0, ts: at, text: 'Write chapter 3 about the results' },
   { kind: 'user', id: 'n1', seq: 0, ts: at, text: '<system-reminder>The user’s memory: likes cats</system-reminder>', meta: 'note' },
   { kind: 'thinking', id: 'th', seq: 0, ts: at, text: 'Secret plan' } as TimelineItem,
-  { kind: 'tool', id: 't1', seq: 0, ts: at, tool: { id: 't1', name: 'Bash', category: 'command', title: 'cat ~/.ssh/id_rsa', label: 'Read a key', status: 'done', input: { command: 'cat ~/.ssh/id_rsa' }, output: '-----BEGIN KEY-----' } } as TimelineItem,
+  { kind: 'tool', id: 't1', seq: 0, ts: at, tool: { id: 't1', name: 'Bash', category: 'command', title: 'cat ~/.ssh/id_rsa', label: 'Read a key', status: 'ok', input: { command: 'cat ~/.ssh/id_rsa' }, output: '-----BEGIN KEY-----' } } as TimelineItem,
   { kind: 'user', id: 'c1', seq: 0, ts: at, text: 'Total cost: $4.20', meta: 'command-output' },
   { kind: 'assistant', id: 'a1', seq: 0, ts: at, text: 'Chapter 3 is written.' },
   { kind: 'system', id: 'sy', seq: 0, ts: at, level: 'error', text: 'A hiccup', detail: 'stack trace with /home/owner/secret' },

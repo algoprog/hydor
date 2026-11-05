@@ -47,7 +47,7 @@ export interface PortalItem {
   kind?: PageInfo['kind'];
   version: number;
   updatedAt: number;
-  /** Its picture is ready: GET /p-api/<token>/items/<id>/thumb?v=<thumb>. */
+  /** Its picture is ready: GET /p-api/<token>/pages/<id>/thumb?v=<thumb>. */
   thumb?: string;
 }
 
