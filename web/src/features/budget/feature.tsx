@@ -2,7 +2,7 @@
 // one is set ("$1.20 of $5.00"), the session menu's Spending cap, a note under a turn stopped at the
 // cap, and a cap for a new session on the start page.
 import { useRef, useState } from 'react';
-import { OctagonAlert, Wallet } from 'lucide-react';
+import { OctagonAlert, Wallet, X } from 'lucide-react';
 import { parseCap, usd, type BudgetNote } from '@shared/budget';
 import type { SessionExtra, SessionNote } from '@shared/features';
 import type { SessionSummary } from '@shared/types';
@@ -149,7 +149,7 @@ function StartCap({ value, onChange }: { value: SessionExtra; onChange: (patch: 
             ))}
           </div>
         </div>
-        {cap != null && <MenuItem onClick={() => set(undefined)}>No cap</MenuItem>}
+        {cap != null && <MenuItem icon={<X size={14} />} onClick={() => set(undefined)}>No cap</MenuItem>}
       </Popover>
     </>
   );

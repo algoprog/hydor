@@ -1,7 +1,7 @@
 // Which account a new session runs as, when an agent has more than one (Settings → Accounts):
 // the CLI's own sign-in, or an added one.
 import { useRef, useState } from 'react';
-import { UserRound } from 'lucide-react';
+import { Settings2, UserRound } from 'lucide-react';
 import type { Agent, AgentAccount } from '@shared/types';
 import { go } from '../../lib/nav';
 import { MenuItem, MenuSep, OptionRow, Popover, SettingChip } from '../../components/ui';
@@ -19,7 +19,7 @@ export function AccountPicker({ agent, accounts, value, onChange }: { agent: Age
           <OptionRow key={a.id} label={a.name} selected={a.id === value} onClick={() => (onChange(a.id), setOpen(false))} />
         ))}
         <MenuSep />
-        <MenuItem onClick={() => (setOpen(false), go('/settings?s=accounts'))}>Manage accounts</MenuItem>
+        <MenuItem icon={<Settings2 size={14} />} onClick={() => (setOpen(false), go('/settings?s=accounts'))}>Manage accounts</MenuItem>
       </Popover>
     </>
   );
