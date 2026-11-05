@@ -1054,6 +1054,44 @@ async function pageSizes(t: Tools, dir: string, box: Box | null): Promise<{ w: n
   return out.length ? out : undefined;
 }
 
+/**
+ * What poppler's pdfinfo, pdffonts or pdftotext say of a typesetting's PDF (by its key), run held in as TeX is (the
+ * PDF came from a document that may not be the user's own): their output (pdftotext's text, its pages apart by form
+ * feeds), or null when the program is not installed or there is no such PDF.
+ */
+export async function texPdfTool(key: string, tool: 'pdfinfo' | 'pdffonts' | 'pdftotext'): Promise<string | null> {
+  const k = keptResult(key);
+  const bin = which(tool);
+  if (!k?.pdf || !bin) return null;
+  const dir = path.join(ROOT, key);
+  const t = tools();
+  const box = await sandbox(t);
+  if (tool === 'pdftotext') {
+    // Into a file (the output of a long paper is more than a program's output is kept to).
+    fs.rmSync(path.join(dir, 'main.check.txt'), { force: true });
+    await runHeld([bin, '-q', '-enc', 'UTF-8', 'main.pdf', 'main.check.txt'], { cwd: dir, env: texEnv(t, dir), box, timeout: 60_000 });
+    try {
+      return fs.readFileSync(path.join(dir, 'main.check.txt'), 'utf8').slice(0, 8_000_000);
+    } catch {
+      return null;
+    } finally {
+      fs.rmSync(path.join(dir, 'main.check.txt'), { force: true });
+    }
+  }
+  const r = await runHeld([bin, ...(tool === 'pdfinfo' ? ['-enc', 'UTF-8'] : []), 'main.pdf'], { cwd: dir, env: texEnv(t, dir), box, timeout: 30_000, writable: false });
+  return r.code === 0 ? r.out : null;
+}
+
+/** A file a typesetting made beside its PDF (the bibliography BibTeX wrote, main.bbl), or null. */
+export function texOutput(key: string, name: 'main.bbl' | 'main.log'): Buffer | null {
+  if (!keptResult(key)) return null;
+  try {
+    return fs.readFileSync(path.join(ROOT, key, name));
+  } catch {
+    return null;
+  }
+}
+
 // ---- reading TeX's log --------------------------------------------------------------------------------------------
 
 const PACKAGES: Record<string, string> = {

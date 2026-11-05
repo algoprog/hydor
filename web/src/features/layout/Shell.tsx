@@ -7,6 +7,7 @@ import { FilesPage } from '../files/FilesPage';
 import { QuickOpen } from '../files/FileSearch';
 import { UploadsPanel } from '../files/Uploads';
 import { FilePeek } from '../files/FilePeek';
+import { ArxivHost } from '../pages/latex/ArxivHost';
 import { GitPage } from '../git/GitPage';
 import { HomePage } from '../home/HomePage';
 import { InboxPage } from '../inbox/InboxPage';
@@ -250,6 +251,7 @@ export function Shell() {
         <ReleaseNotes />
         <WhatsNew />
         <FilePeek />
+        <ArxivHost />
         <Lightbox />
         <VideoBox />
         <Tour />
@@ -286,6 +288,7 @@ export function Shell() {
       <ReleaseNotes />
       <WhatsNew />
       <FilePeek />
+      <ArxivHost />
       <Lightbox />
       <VideoBox />
       {!sideOpen && roomy && !panelOpen && loc !== '/terminal' && <HelpButton />}
