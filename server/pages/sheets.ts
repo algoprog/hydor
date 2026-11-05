@@ -54,6 +54,7 @@ import {
   type Rect,
   type Scalar,
   type Sheet,
+  type Validation,
   type Workbook,
 } from '../../shared/sheets.ts';
 import { HttpError } from '../auth.ts';
@@ -63,7 +64,7 @@ import { resolvePart, Zip } from '../documents/zip.ts';
 import { chartData, chartSvg } from '../../shared/sheet-chart.ts';
 import { CondFormats, hiddenCols, hiddenRows, isTicked, listOptions, Merges, Rules } from '../../shared/sheet-rules.ts';
 import { coreXml, esc as xesc, relsXml, XML_HEAD, zipParts } from './ooxml.ts';
-import { chartXml, condXml, drawingXml, Dxfs, filterXml, mergesXml, notesXml, readCharts, readConditional, readDxfs, readFilter, readNotes, readValidation, validationXml } from './sheet-parts.ts';
+import { chartXml, condXml, drawingXml, Dxfs, filterXml, isListsSheet, listFromSheet, listsSheet, mergesXml, notesXml, readCharts, readConditional, readDxfs, readFilter, readNotes, readValidation, validationXml } from './sheet-parts.ts';
 
 export { isBookText } from '../../shared/sheets.ts';
 
@@ -414,14 +415,17 @@ class XlStrings {
   }
 }
 
-/** A sheet's part: its frozen panes, columns' widths, rows' heights and cells, each formula with what it gives. */
 /** The relationships a sheet's part points at: its charts' drawing and its notes' VML drawing. */
 interface SheetLinks {
   drawing?: string;
   legacy?: string;
 }
 
-function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings, names: Set<string>, links: SheetLinks = {}): string {
+/**
+ * A sheet's part: its frozen panes, columns' widths, rows' heights and cells, each formula with what it gives, and its
+ * rules (`lists`: where the lists kept on the hidden sheet of lists are; `ofLists`: this is that sheet, never the one picked).
+ */
+function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings, names: Set<string>, links: SheetLinks = {}, lists?: Map<Validation, string>, ofLists = false): string {
   const e = calc.shownExtent(si);
   // Rows hidden by hand, or by the filter (Excel writes those hidden too, and its filter says why).
   const hidden = hiddenRows(sh, si, calc);
@@ -517,13 +521,13 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
   return (
     `${XML_HEAD}<worksheet xmlns="${NS_MAIN}" xmlns:r="${NS_R}">` +
     `<dimension ref="${e.rows ? `A1:${refName(e.rows - 1, Math.max(0, e.cols - 1))}` : 'A1'}"/>` +
-    `<sheetViews><sheetView workbookViewId="0"${si === 0 ? ' tabSelected="1"' : ''}>${pane}</sheetView></sheetViews>` +
+    `<sheetViews><sheetView workbookViewId="0"${si === 0 && !ofLists ? ' tabSelected="1"' : ''}>${pane}</sheetView></sheetViews>` +
     `<sheetFormatPr defaultColWidth="${xlWidth(COL_W)}" defaultRowHeight="15"/>${cols}` +
     `<sheetData>${body}</sheetData>` +
     filterXml(sh, si, calc) +
     mergesXml(sh) +
     condXml(sh, st.dxfs, names) +
-    validationXml(sh, names) +
+    validationXml(sh, names, lists) +
     `<pageMargins left="0.5" right="0.5" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>${wide ? '<pageSetup orientation="landscape"/>' : ''}` +
     (links.drawing ? `<drawing r:id="${links.drawing}"/>` : '') +
     (links.legacy ? `<legacyDrawing r:id="${links.legacy}"/>` : '') +
@@ -534,6 +538,9 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
 /** The workbook as an Excel file (.xlsx) that opens in Excel, LibreOffice and Google Sheets: formulas kept, with what they give; filters, merged cells, conditional formatting, rules for cells, notes and charts too. */
 export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBook(book)): Buffer {
   const names = new Set(book.sheets.map((s) => s.name.toLowerCase()));
+  // Lists a rule cannot hold in its own words, and lists whose chips have colours: on a hidden sheet the rules point at.
+  const lists = listsSheet(book);
+  if (lists.sheet) names.add(lists.sheet.name.toLowerCase());
   const st = new XlStyles();
   const ss = new XlStrings();
   // Each sheet's other parts: its charts' drawing (with a chart part each) and its notes (comments and their VML).
@@ -571,8 +578,11 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
       rels.push([links.legacy, 'vmlDrawing', `../drawings/vmlDrawing${k}.vml`]);
     }
     if (rels.length) extra.push({ name: `xl/worksheets/_rels/sheet${si + 1}.xml.rels`, data: relsXml(rels) });
-    return sheetXml(sh, si, calc, st, ss, names, links);
+    return sheetXml(sh, si, calc, st, ss, names, links, lists.ref);
   });
+  // The sheet of lists goes after the others, hidden.
+  if (lists.sheet) sheets.push(sheetXml(lists.sheet, 0, computeBook({ v: 1, sheets: [lists.sheet] }), st, ss, names, {}, undefined, true));
+  const titles = [...book.sheets.map((s) => s.name), ...(lists.sheet ? [lists.sheet.name] : [])];
   const n = sheets.length;
   const types =
     `${XML_HEAD}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
@@ -588,7 +598,7 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
     `${XML_HEAD}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">` +
     `<Application>Hydor</Application><DocSecurity>0</DocSecurity><ScaleCrop>false</ScaleCrop>` +
     `<HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>${n}</vt:i4></vt:variant></vt:vector></HeadingPairs>` +
-    `<TitlesOfParts><vt:vector size="${n}" baseType="lpstr">${book.sheets.map((s) => `<vt:lpstr>${xesc(s.name)}</vt:lpstr>`).join('')}</vt:vector></TitlesOfParts>` +
+    `<TitlesOfParts><vt:vector size="${n}" baseType="lpstr">${titles.map((t) => `<vt:lpstr>${xesc(t)}</vt:lpstr>`).join('')}</vt:vector></TitlesOfParts>` +
     '<LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged><AppVersion>16.0300</AppVersion></Properties>';
   // Excel keeps each filter's range in a hidden name of its sheet's.
   const filterNames = book.sheets
@@ -599,7 +609,7 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
     .join('');
   const workbook =
     `${XML_HEAD}<workbook xmlns="${NS_MAIN}" xmlns:r="${NS_R}"><workbookPr/><bookViews><workbookView activeTab="0"/></bookViews>` +
-    `<sheets>${book.sheets.map((s, i) => `<sheet name="${xesc(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets>` +
+    `<sheets>${titles.map((t, i) => `<sheet name="${xesc(t)}" sheetId="${i + 1}"${i >= book.sheets.length ? ' state="hidden"' : ''} r:id="rId${i + 1}"/>`).join('')}</sheets>` +
     (filterNames ? `<definedNames>${filterNames}</definedNames>` : '') +
     '<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>';
   const wbRels = relsXml([...sheets.map((_, i) => [`rId${i + 1}`, 'worksheet', `worksheets/sheet${i + 1}.xml`] as [string, string, string]), [`rId${n + 1}`, 'styles', 'styles.xml'], [`rId${n + 2}`, 'sharedStrings', 'sharedStrings.xml']]);
@@ -875,6 +885,8 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
   if (kid(wb, 'workbookProtection')) loses.add('protection');
   if (z.names().some((n) => /vbaProject\.bin$/i.test(n))) loses.add('macros');
   const sheets: Obj[] = [];
+  // The hidden sheets of lists this app writes (sheet-parts.ts listsSheet): read for their lists, not kept as sheets.
+  const listSheets: { name: string; cells: Record<string, Cell> }[] = [];
   const state = { cells: 0, drawn: false, bad: false, cutRows: false, cutCells: false };
   let cutSheets = false;
   const listed = all(kid(wb, 'sheets'), 'sheet');
@@ -901,6 +913,10 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     if (/<(?:\w+:)?(?:odd|even|first)(?:Header|Footer)>\s*[^<\s]/.test(xml)) loses.add('print');
     const sheet = readWorksheet(xml, name, shared, styles, date1904, state, names);
     const base = sheet.base as { cells: Record<string, Cell>; cols: Record<number, { w?: number; hidden?: boolean }>; rows: Record<number, { h?: number; hidden?: boolean }> } & Obj;
+    if (isListsSheet(name) && /^(hidden|veryHidden)$/.test(att(s, 'state') ?? '')) {
+      listSheets.push({ name, cells: base.cells });
+      continue;
+    }
     base.conditional = readConditional(xml, dxfs, names, (el) => colorOf(el, theme));
     base.validation = readValidation(xml, names);
     // Notes: the comments part's words on their cells.
@@ -929,6 +945,17 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     }
   }
   if (!sheets.length) throw new Error('This Excel file has no sheets of cells in it.');
+  // Lists on that hidden sheet are lists of options again, with their chips' colours.
+  if (listSheets.length)
+    for (const sh of sheets) {
+      const base = sh.base as Obj;
+      base.validation = (base.validation as Validation[]).map((v) => {
+        const options = v.type === 'list' && v.source ? listFromSheet(v.source, listSheets) : null;
+        if (!options) return v;
+        const { source: _s, ...rest } = v;
+        return { ...rest, options };
+      });
+    }
   if (state.drawn) notes.push('Pictures, shapes and charts this cannot draw were left out.');
   if (state.bad) notes.push('Some formulas could not be read here (links to other files, tables by name…): their last values were kept instead.');
   if (state.cutRows) notes.push(`Cells past row ${SHEET_LIMITS.rows.toLocaleString('en')} or column ${colName(SHEET_LIMITS.cols - 1)} were left out.`);

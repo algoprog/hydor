@@ -2,8 +2,10 @@
 // of the workbook): merged cells; a filter (autoFilter: the values each column shows, or the condition it keeps, with
 // the rows it hides written as hidden); conditional formatting, its looks in the styles' dxfs; data validation (lists
 // of options or of a range's values, checkboxes as a TRUE,FALSE list, ratings as whole numbers from 0, numbers,
-// dates, lengths of words, formulas); notes, as comments with the VML drawing Excel shows them by; and charts, as a
-// drawing of chart parts whose series point at the cells, their values cached for programs that do not work them out.
+// dates, lengths of words, formulas; a list Excel cannot hold in its rule, or whose chips have colours, on a hidden sheet
+// of lists the rule points at, each chip's colour its cell's fill); notes, as comments with the VML drawing Excel shows
+// them by; and charts, as a drawing of chart parts whose series point at the cells, their values cached for programs
+// that do not work them out.
 import {
   cleanSource,
   colIndex,
@@ -21,9 +23,12 @@ import {
   rectsOf,
   refName,
   replaceNames,
+  sourceOf,
+  uniqueSheetName,
   COL_W,
   ROW_H,
   type Calc,
+  type Cell,
   type Cond,
   type CondRule,
   type CondStyle,
@@ -465,8 +470,53 @@ const fixedRef = (source: string): string => {
   return `${m[1] ?? ''}$${m[2]}$${m[3]}${m[4] ? `:$${m[4]}$${m[5]}` : ''}`;
 };
 
-/** A rule for what cells take as a dataValidation (a checkbox as a TRUE,FALSE list, a rating as a whole number from 0). */
-function validationOne(v: Validation, names: Set<string>): string {
+// ---- lists on a sheet of their own ------------------------------------------------------------------------------
+
+/** The hidden sheet a file keeps lists on that its rules cannot hold (and their chips' colours, as the cells' fills). */
+export const LISTS_SHEET = 'Hydor lists';
+/** That sheet's name as a file writes it, or as it is beside a sheet of that name ("Hydor lists (2)"). */
+export const isListsSheet = (name: string) => /^Hydor lists( \(\d+\))?$/.test(name);
+
+/**
+ * The lists a file's rules cannot hold in their own words (Excel's hold at most 255 characters, no commas or quotes
+ * in an option) and those whose chips have colours: each in a column of a hidden sheet, an option a cell (a number
+ * as a number, so typed numbers match), its chip's colour the cell's fill; the rule points at its column.
+ */
+export function listsSheet(book: Workbook): { sheet: Sheet | null; ref: Map<Validation, string> } {
+  const ref = new Map<Validation, string>();
+  const cells: Record<string, Cell> = {};
+  const name = uniqueSheetName(LISTS_SHEET, book.sheets.map((s) => s.name));
+  let col = 0;
+  for (const sh of book.sheets)
+    for (const v of sh.validation ?? []) {
+      if (v.type !== 'list' || !v.options?.length || col >= 16_384) continue;
+      if (!v.options.some((o) => o.color || /[",]/.test(o.v)) && v.options.map((o) => o.v).join(',').length <= 255) continue;
+      v.options.forEach((o, r) => {
+        const n = Number(o.v);
+        cells[refName(r, col)] = { v: o.v.trim() && String(n) === o.v ? n : o.v, ...(o.color ? { s: { fill: o.color } } : {}) };
+      });
+      ref.set(v, `${quoteSheet(name)}!$${colName(col)}$1:$${colName(col)}$${v.options.length}`);
+      col++;
+    }
+  return { sheet: col ? { id: 'lists', name, cells } : null, ref };
+}
+
+/** A list rule's options from the hidden sheet a file of this app's keeps them on (their colours from the cells' fills), or null. */
+export function listFromSheet(source: string, sheets: { name: string; cells: Record<string, Cell> }[]): ListOption[] | null {
+  const src = sourceOf(source);
+  const on = src?.sheet ? sheets.find((s) => s.name.toLowerCase() === src.sheet!.toLowerCase()) : undefined;
+  if (!src || !on) return null;
+  const out: ListOption[] = [];
+  for (let r = src.x.r1; r <= Math.min(src.x.r2, src.x.r1 + 499); r++) {
+    const cell = on.cells[refName(r, src.x.c1)];
+    const v = typeof cell?.v === 'number' ? numText(cell.v) : typeof cell?.v === 'string' ? cell.v : typeof cell?.v === 'boolean' ? (cell.v ? 'TRUE' : 'FALSE') : '';
+    if (v.trim()) out.push(cell?.s?.fill ? { v, color: cell.s.fill } : { v });
+  }
+  return out.length ? out : null;
+}
+
+/** A rule for what cells take as a dataValidation (a checkbox as a TRUE,FALSE list, a rating as a whole number from 0); `lists`: where the lists on their own sheet are. */
+function validationOne(v: Validation, names: Set<string>, lists?: Map<Validation, string>): string {
   const sqref = v.range.split(',').join(' ');
   const base = `allowBlank="1" showErrorMessage="1"${v.reject ? '' : ' errorStyle="warning"'} sqref="${sqref}"`;
   const f = (n: 1 | 2, x: string) => `<formula${n}>${esc(x)}</formula${n}>`;
@@ -478,6 +528,8 @@ function validationOne(v: Validation, names: Set<string>): string {
   switch (v.type) {
     case 'list': {
       if (v.source) return `<dataValidation type="list" ${base}>${f(1, fileFormula(fixedRef(v.source), names))}</dataValidation>`;
+      const own = lists?.get(v);
+      if (own) return `<dataValidation type="list" ${base}>${f(1, fileFormula(own, names))}</dataValidation>`;
       // Excel's own lists hold at most 255 characters, without commas or quotes in an option.
       const items: string[] = [];
       let len = 0;
@@ -507,8 +559,8 @@ function validationOne(v: Validation, names: Set<string>): string {
   return '';
 }
 
-export function validationXml(sh: Sheet, names: Set<string>): string {
-  const list = (sh.validation ?? []).map((v) => validationOne(v, names)).filter(Boolean);
+export function validationXml(sh: Sheet, names: Set<string>, lists?: Map<Validation, string>): string {
+  const list = (sh.validation ?? []).map((v) => validationOne(v, names, lists)).filter(Boolean);
   return list.length ? `<dataValidations count="${list.length}">${list.join('')}</dataValidations>` : '';
 }
 

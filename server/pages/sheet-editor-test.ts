@@ -201,8 +201,8 @@ const sh = book.sheets[0];
   ok(sheet1.includes('<mergeCell ref="A7:C7"/>') && sheet1.includes('<conditionalFormatting sqref="C2:C5"><cfRule type="cellIs" dxfId="0" priority="1" operator="greaterThan"><formula>5</formula>'), 'merges and conditional formatting');
   ok(sheet1.includes('type="colorScale"') && sheet1.includes('type="dataBar"') && sheet1.includes('type="expression"') && sheet1.includes('type="duplicateValues"'), 'colour scales, data bars, formulas, duplicates');
   ok(
-    sheet1.includes('<formula1>&quot;Open,Doing,Done&quot;</formula1>') && sheet1.includes('&quot;TRUE,FALSE&quot;') && sheet1.includes('promptTitle="Rating"') && sheet1.includes('<formula1>Lists!$A$1:$A$3</formula1>'),
-    'lists, checkboxes, ratings and a list from a range as data validation',
+    sheet1.includes("<formula1>'Hydor lists'!$A$1:$A$3</formula1>") && sheet1.includes('&quot;TRUE,FALSE&quot;') && sheet1.includes('promptTitle="Rating"') && sheet1.includes('<formula1>Lists!$A$1:$A$3</formula1>'),
+    'lists (one with coloured chips on the hidden sheet of lists), checkboxes, ratings and a list from a range as data validation',
   );
   ok(
     sheet1.indexOf('<autoFilter') < sheet1.indexOf('<mergeCells') &&
@@ -223,7 +223,23 @@ const sh = book.sheets[0];
   ok(JSON.stringify(b.merges) === '["A7:C7"]' && b.rows?.[8]?.hidden && !b.rows?.[3]?.hidden && b.cols?.[7]?.hidden, 'merges and hidden rows come back; the filter’s rows are not hidden by hand');
   ok(b.filter?.range === 'A1:F5' && b.filter.cols?.D?.hide?.join() === 'Done', 'the filter comes back, hiding what it hid');
   ok(JSON.stringify(b.conditional) === JSON.stringify(sh.conditional), 'conditional formatting comes back as it was');
-  ok(JSON.stringify(b.validation?.map((v) => ({ ...v, options: v.options?.map((o) => o.v) }))) === JSON.stringify(sh.validation?.map((v) => ({ ...v, options: v.options?.map((o) => o.v) }))), 'rules for cells come back (lists without their colours)');
+  ok(JSON.stringify(b.validation) === JSON.stringify(sh.validation), 'rules for cells come back, lists with their chips’ colours');
+  ok(back.book.sheets.length === 2 && !back.book.sheets.some((s) => s.name.startsWith('Hydor lists')), 'and the hidden sheet that kept those colours is no sheet of the workbook');
+  // Lists Excel cannot hold in a rule: options with commas or quotes, or longer than 255 characters in all.
+  const long = Array.from({ length: 40 }, (_, i) => `Option number ${i + 1}`);
+  const listBook = normalizeBook({
+    sheets: [
+      { name: 'L', rows: [['Size'], ['Small, cheap']], validation: [{ range: 'A2:A9', list: ['Small, cheap', 'Big "deluxe"', '10', 'Plain'] }, { range: 'B2:B9', list: long }, { range: 'C2:C9', list: ['Yes', 'No'] }] },
+      { name: 'Hydor lists', rows: [['mine']] },
+    ],
+  });
+  const lx = new Zip(xlsxOfBook(listBook, 'L'));
+  const wbx = lx.text('xl/workbook.xml') ?? '';
+  const l1 = lx.text('xl/worksheets/sheet1.xml') ?? '';
+  ok(/<sheet name="Hydor lists \(2\)" sheetId="3" state="hidden"/.test(wbx) && l1.includes("<formula1>'Hydor lists (2)'!$A$1:$A$4</formula1>") && l1.includes("<formula1>'Hydor lists (2)'!$B$1:$B$40</formula1>") && l1.includes('<formula1>&quot;Yes,No&quot;</formula1>'), 'they go on a hidden sheet of lists (beside one of the same name), a list that fits stays in its rule');
+  ok(/<c r="A3"[^>]*><v>10<\/v><\/c>/.test(lx.text('xl/worksheets/sheet3.xml') ?? ''), 'an option that is a number is written as one, so typed numbers match it');
+  const lb = importBook(xlsxOfBook(listBook, 'L'), 'L.xlsx').book;
+  ok(lb.sheets.length === 2 && lb.sheets[1].name === 'Hydor lists' && lb.sheets[0].validation?.[0].options?.map((o) => o.v).join('|') === 'Small, cheap|Big "deluxe"|10|Plain' && lb.sheets[0].validation?.[1].options?.length === 40 && !lb.sheets[0].validation?.[0].source, 'and come back whole as lists of options');
   ok(b.cells.B3.note === 'Bo is away in May' && b.cells.Z9?.note === 'Far off', 'notes come back');
   ok(b.charts?.length === 2 && b.charts[0].kind === 'column' && b.charts[0].range === 'A1:C5' && b.charts[0].title === 'Hours' && Math.abs(b.charts[0].x - 700) < 2, 'charts come back, where they were');
   const styled = normalizeBook({
