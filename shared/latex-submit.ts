@@ -40,6 +40,8 @@ export interface CheckFinding {
   line?: number;
   from?: number;
   to?: number;
+  /** The words at [from, to) when it was found: where it is found again once the text moved. */
+  quote?: string;
   /** A safe change that fixes it, and what it puts in (a reference's entry) to look at first. */
   fix?: { label: string; edits: CheckEdit[]; shows?: string };
   /** Where there is no safe fix: what to ask the agent beside the editor. */

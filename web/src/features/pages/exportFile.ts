@@ -1,13 +1,15 @@
 // A page or a deck as a file, downloaded: a PDF, a Word document, a PowerPoint deck, a deck's slides as pictures or a
 // web page, made by the server (GET /api/pages/:id/export). Paper is Letter where people use it, else A4. Without the
 // browser the server makes PDFs with, a deck still prints from here: every slide on a page, through the device's own Print.
+// A LaTeX document's arXiv package opens its dialog first (what goes in, ticked), which then downloads it.
 import type { Deck } from '@shared/slides';
 import { ApiError, enc } from '../../lib/api';
 import { mu } from '../../lib/machine';
 import { toast } from '../../lib/store';
+import { askArxiv } from './latex/arxivAsk';
 import { PICS, RT } from './slides/rt';
 
-export type ExportFormat = 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png';
+export type ExportFormat = 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png' | 'arxiv';
 
 const LETTER = /^(en-US|en-CA|es-US|es-MX|fr-CA|en-PH|es-CO|es-CL|es-VE|es-GT|es-CR|es-PA)$/i;
 
@@ -60,6 +62,7 @@ const WHAT: Record<ExportFormat, string> = {
   md: 'the Markdown file',
   tex: 'the LaTeX file',
   zip: 'the LaTeX project',
+  arxiv: 'the arXiv package',
   html: 'the web page',
   ipynb: 'the notebook',
   py: 'the Python script',
@@ -68,6 +71,7 @@ const WHAT: Record<ExportFormat, string> = {
 
 /** Downloads the page (or its version `version`) as a file; a deck's PDF prints here when the server cannot make it. */
 export async function exportFile(id: string, format: ExportFormat, o: { version?: number; deck?: Deck; slide?: number } = {}) {
+  if (format === 'arxiv') return askArxiv(id, o.version);
   const paper = LETTER.test(navigator.language) ? 'letter' : 'a4';
   if (format !== 'html' && format !== 'csv' && format !== 'md' && format !== 'tex' && format !== 'ipynb' && format !== 'py') toast(o.slide ? 'Making the picture…' : `Making ${WHAT[format]}…`);
   const res = await fetch(mu(`/api/pages/${enc(id)}/export?format=${format}&paper=${paper}${o.version ? `&v=${o.version}` : ''}${o.slide ? `&slide=${o.slide}` : ''}`), { credentials: 'same-origin' });
