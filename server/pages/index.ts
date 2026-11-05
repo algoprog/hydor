@@ -251,10 +251,16 @@ function changing(db: Deps['db'], a: Record<string, unknown>, kind: PageKind): s
 }
 
 /**
- * Each session's turn now: made anew with each message of its user (since the server started; none after a restart, so
- * nothing is folded then). Its agent's saves of a page in one turn are kept as one version (store.ts addVersion).
+ * Each session's turn now: made anew with each message of its user, or with the first save of a turn that began
+ * without one (a command, or one its agent began itself), and forgotten when the turn ends. Its agent's saves of a page
+ * in one turn are kept as one version (store.ts addVersion).
  */
 const turns = new Map<string, string>();
+const newTurn = (key: string) => {
+  const t = `${key}#${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`;
+  turns.set(key, t);
+  return t;
+};
 
 /**
  * Keeps what an agent made: a new version of the page it named, or a new page of its session. Its saves of a page in a
@@ -262,7 +268,7 @@ const turns = new Map<string, string>();
  */
 function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknown, model: unknown) {
   const db = ctx.deps.db;
-  const turn = turns.get(ctx.key);
+  const turn = turns.get(ctx.key) ?? newTurn(ctx.key);
   let folded: number | undefined;
   const p = id
     ? addVersion(db, id, { title, model, by: 'agent', turn, onFold: (v) => (folded = v) })
@@ -964,15 +970,17 @@ export const pages: Feature = {
   },
   // The pages the user changed in the editor, with their next message (which starts a new turn of saves).
   beforeMessage: (key, d) => {
-    turns.set(key, `${key}#${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`);
+    newTurn(key);
     return takeEdits(d.db, key);
   },
   start(d) {
     setCaptureDb(d.db);
     d.sessions.on('toolstream', (key: string, e: ToolStream) => feedDraft(d, key, e));
-    // A turn that ended (or an agent that stopped) leaves no page being written.
+    // A turn that ended (or an agent that stopped) leaves no page being written, and its saves are done with.
     d.sessions.on('live', (key: string, live: { status?: string } | null) => {
-      if (!live || !['working', 'waiting', 'starting'].includes(live.status ?? '')) endDrafts(d, key);
+      if (live && ['working', 'waiting', 'starting'].includes(live.status ?? '')) return;
+      endDrafts(d, key);
+      turns.delete(key);
     });
     enableThumbs();
     setTimeout(() => refreshThumbs(d), 30_000).unref();
