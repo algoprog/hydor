@@ -169,11 +169,16 @@ async function repoOf(dir: string): Promise<string | null> {
   }
 }
 
-/** Each folder's repository (at most so many folders are looked at). */
+/** Each folder's repository (at most so many folders are looked at, a few at a time). */
 async function reposByFolder(folders: string[]): Promise<Map<string, string | null>> {
   const dirs = [...new Set(folders.filter(Boolean))].slice(0, WORK_LOG_LIMITS.repos * 4);
-  const found = await Promise.all(dirs.map((d) => repoOf(d)));
-  return new Map(dirs.map((d, i) => [d, found[i]]));
+  const out = new Map<string, string | null>();
+  for (let i = 0; i < dirs.length; i += 6) {
+    const part = dirs.slice(i, i + 6);
+    const found = await Promise.all(part.map((d) => repoOf(d)));
+    part.forEach((d, k) => out.set(d, found[k]));
+  }
+  return out;
 }
 
 /** The commits made in a repository in the period, the user's own when Git knows who they are: newest first, subjects only. */
@@ -331,7 +336,9 @@ export async function workLog(db: DB, a: { from?: unknown; to?: unknown; project
   // ---- commits, in the repositories those sessions worked in (and the projects' own folders) ----
   const own = await reposByFolder(onlyFolders);
   const repos = [...new Set([...workedIn, ...[...own.values()].filter((x): x is string => !!x)])].slice(0, WORK_LOG_LIMITS.repos);
-  const commits = (await Promise.all(repos.map((r) => commitsIn(r, start, end, tz))))
+  const found: WorkLog['commits'][] = [];
+  for (let i = 0; i < repos.length; i += 6) found.push(...(await Promise.all(repos.slice(i, i + 6).map((r) => commitsIn(r, start, end, tz)))));
+  const commits = found
     .flat()
     .sort((x, y) => (x.date < y.date ? 1 : x.date > y.date ? -1 : 0))
     .slice(0, WORK_LOG_LIMITS.commits);
