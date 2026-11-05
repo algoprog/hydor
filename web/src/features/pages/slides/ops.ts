@@ -229,10 +229,11 @@ export function copies(els: El[], shift = 24): El[] {
 /** The parts' own list that holds every one of `ids` (the slide's, or a group's), with the group it is in. */
 function levelOf(els: El[], ids: string[], group: GroupEl | null = null): { els: El[]; group: GroupEl | null } | null {
   if (ids.every((id) => els.some((e) => e.id === id))) return { els, group };
-  for (const e of els) if (e.type === 'group') {
-    const got = levelOf(e.els, ids, e);
-    if (got) return got;
-  }
+  for (const e of els)
+    if (e.type === 'group') {
+      const got = levelOf(e.els, ids, e);
+      if (got) return got;
+    }
   return null;
 }
 
@@ -501,7 +502,7 @@ export const mergeAt = (t: TableEl, r: number, c: number): Merge | undefined => 
 export function mergeCells(t: TableEl, r0: number, c0: number, r1: number, c1: number): TableEl {
   let [ra, rb, ca, cb] = [Math.min(r0, r1), Math.max(r0, r1), Math.min(c0, c1), Math.max(c0, c1)];
   // A merged block it touches becomes part of it.
-  for (let grew = true; grew; ) {
+  for (let grew = true; grew;) {
     grew = false;
     for (const m of t.merges ?? []) {
       const meets = m.r <= rb && m.r + m.rs - 1 >= ra && m.c <= cb && m.c + m.cs - 1 >= ca;

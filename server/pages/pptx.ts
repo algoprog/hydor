@@ -352,7 +352,9 @@ function picXml(c: Ctx, e: El, png: Picture, box: { x: number; y: number; w: num
   const { cNvPr } = nvPr(c, e, kind, href);
   const op = e.opacity ?? 1;
   const alpha = op < 1 ? `<a:alphaModFix amt="${Math.round(op * 100000)}"/>` : '';
-  const ext = svg ? `<a:extLst><a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}"><asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="${c.media.add({ data: Buffer.from(svg, 'utf8'), ext: 'svg' })}"/></a:ext></a:extLst>` : '';
+  const ext = svg
+    ? `<a:extLst><a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}"><asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="${c.media.add({ data: Buffer.from(svg, 'utf8'), ext: 'svg' })}"/></a:ext></a:extLst>`
+    : '';
   return `<p:pic><p:nvPicPr>${cNvPr}<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${rid}">${alpha}${ext}</a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(box.x, box.y, box.w, box.h, e.rot)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
 }
 

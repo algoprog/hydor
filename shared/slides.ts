@@ -745,7 +745,7 @@ export function ungroupEls(g: GroupEl): El[] {
       const h = e.w * sin + e.h * cos;
       return { ...e, x: r2(cx - w / 2), y: r2(cy - h / 2), w: r2(w), h: r2(h), opacity: op(e.opacity) };
     }
-    const rot = (((e.rot ?? 0) + (g.rot ?? 0)) % 360 + 360) % 360;
+    const rot = ((((e.rot ?? 0) + (g.rot ?? 0)) % 360) + 360) % 360;
     return { ...e, x: r2(cx - e.w / 2), y: r2(cy - e.h / 2), rot: rot ? r2(rot) : undefined, opacity: op(e.opacity) } as El;
   });
 }
@@ -1420,7 +1420,14 @@ function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts, dep
     return c;
   }
   if (type === 'icon') {
-    const name = typeof e.icon === 'string' ? e.icon.trim().replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase().replace(/[\s_]+/g, '-') : '';
+    const name =
+      typeof e.icon === 'string'
+        ? e.icon
+            .trim()
+            .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+            .toLowerCase()
+            .replace(/[\s_]+/g, '-')
+        : '';
     const icon = /^[a-z0-9][a-z0-9-]{0,59}$/.test(name) ? name : '';
     let paths = iconNodes(e.paths);
     if (!paths.length && icon && o.icon) paths = iconNodes(o.icon(icon) ?? []);
@@ -1626,7 +1633,14 @@ function footer(v: unknown): Footer | undefined {
 function guides(v: unknown, H: number): Guides | undefined {
   if (!isObj(v)) return undefined;
   const list = (a: unknown, max: number) =>
-    [...new Set((Array.isArray(a) ? a : []).slice(0, SLIDE_LIMITS.guides).filter((x): x is number => typeof x === 'number' && Number.isFinite(x) && x >= -max && x <= max * 2).map((x) => Math.round(x)))].sort((p, q) => p - q);
+    [
+      ...new Set(
+        (Array.isArray(a) ? a : [])
+          .slice(0, SLIDE_LIMITS.guides)
+          .filter((x): x is number => typeof x === 'number' && Number.isFinite(x) && x >= -max && x <= max * 2)
+          .map((x) => Math.round(x)),
+      ),
+    ].sort((p, q) => p - q);
   const g: Guides = {};
   const x = list(v.x, SLIDE_W);
   const y = list(v.y, H);

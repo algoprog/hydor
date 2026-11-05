@@ -269,7 +269,36 @@ export const SlideCanvas = forwardRef<
     children?: ReactNode;
   }
 >(function SlideCanvas(
-  { deck, index, sel, onSel, editing, onEditing, change, fonts, readOnly, onMenu, onReplaceImage, onChartData, onOpen, onTextSelection, zoom, onZoom, scope, onScope, grid, rulers, painting, onPaint, cropping, onCropping, marks, cellSel, onCellSel, children },
+  {
+    deck,
+    index,
+    sel,
+    onSel,
+    editing,
+    onEditing,
+    change,
+    fonts,
+    readOnly,
+    onMenu,
+    onReplaceImage,
+    onChartData,
+    onOpen,
+    onTextSelection,
+    zoom,
+    onZoom,
+    scope,
+    onScope,
+    grid,
+    rulers,
+    painting,
+    onPaint,
+    cropping,
+    onCropping,
+    marks,
+    cellSel,
+    onCellSel,
+    children,
+  },
   handle,
 ) {
   const H = heightOf(deck);
@@ -507,10 +536,12 @@ export const SlideCanvas = forwardRef<
     const cx = e.x + e.w / 2 + qx * Math.cos(a) - qy * Math.sin(a);
     const cy = e.y + e.h / 2 + qx * Math.sin(a) + qy * Math.cos(a);
     const next = { x: Math.round(cx - c.box.w / 2), y: Math.round(cy - c.box.h / 2), w: Math.max(4, Math.round(c.box.w)), h: Math.max(4, Math.round(c.box.h)), crop: cropOf(c.box, c.full, e) };
-    change((d) => setEls(d, index, [e.id], (x) => {
-      const { crop: _c, fit: _f, ...rest } = x as ImageEl;
-      return { ...rest, ...next, ...(next.crop ? {} : { fit: 'fill' as const }) } as El;
-    }));
+    change((d) =>
+      setEls(d, index, [e.id], (x) => {
+        const { crop: _c, fit: _f, ...rest } = x as ImageEl;
+        return { ...rest, ...next, ...(next.crop ? {} : { fit: 'fill' as const }) } as El;
+      }),
+    );
   };
   // Enter keeps the crop, Esc leaves the picture as it was; nothing else acts while cropping.
   useEffect(() => {
@@ -1276,7 +1307,11 @@ export const SlideCanvas = forwardRef<
                 const q = unframe(toSlide(ev.clientX, ev.clientY), [...frames, frameOf(cropImg)]);
                 begin(ev, { kind: 'crop', hx, hy, start: q, box, full });
               }}
-              className={cx('pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 border-black/60 bg-white', hx && hy ? 'h-4 w-4 rounded-[2px] border' : hx ? 'h-6 w-2 rounded-full border' : 'h-2 w-6 rounded-full border', 'pointer-coarse:scale-125')}
+              className={cx(
+                'pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 border-black/60 bg-white',
+                hx && hy ? 'h-4 w-4 rounded-[2px] border' : hx ? 'h-6 w-2 rounded-full border' : 'h-2 w-6 rounded-full border',
+                'pointer-coarse:scale-125',
+              )}
               style={{ left: `${((hx + 1) / 2) * 100}%`, top: `${((hy + 1) / 2) * 100}%`, cursor: CURSOR[`${hx},${hy}`] }}
             />
           ))}
@@ -1391,7 +1426,10 @@ export const SlideCanvas = forwardRef<
             </div>
           ))}
           {gd && (
-            <div className={cx('pointer-events-none absolute', gd.off && 'opacity-40')} style={gd.axis === 'x' ? { left: S(gd.at), top: -6, bottom: -6, width: 1, background: GUIDE } : { top: S(gd.at), left: -6, right: -6, height: 1, background: GUIDE }}>
+            <div
+              className={cx('pointer-events-none absolute', gd.off && 'opacity-40')}
+              style={gd.axis === 'x' ? { left: S(gd.at), top: -6, bottom: -6, width: 1, background: GUIDE } : { top: S(gd.at), left: -6, right: -6, height: 1, background: GUIDE }}
+            >
               <span className="absolute rounded bg-[#14b8d4] px-1 text-[10.5px] text-white tabular-nums" style={gd.axis === 'x' ? { top: 0, left: 4 } : { left: 0, top: 4 }}>
                 {gd.at}
               </span>
@@ -1422,7 +1460,10 @@ export const SlideCanvas = forwardRef<
                     <div className={cx('absolute', across ? 'inset-x-0 top-0 h-px' : 'inset-y-0 left-0 w-px')} style={{ background: SNAP }} />
                     <div className={cx('absolute', across ? '-top-1 left-0 h-2 w-px' : '-left-1 top-0 h-px w-2')} style={{ background: SNAP }} />
                     <div className={cx('absolute', across ? '-top-1 right-0 h-2 w-px' : '-left-1 bottom-0 h-px w-2')} style={{ background: SNAP }} />
-                    <span className="absolute rounded px-1 text-[10.5px] leading-[15px] text-white tabular-nums" style={{ background: SNAP, ...(across ? { left: '50%', top: 3, transform: 'translateX(-50%)' } : { top: '50%', left: 4, transform: 'translateY(-50%)' }) }}>
+                    <span
+                      className="absolute rounded px-1 text-[10.5px] leading-[15px] text-white tabular-nums"
+                      style={{ background: SNAP, ...(across ? { left: '50%', top: 3, transform: 'translateX(-50%)' } : { top: '50%', left: 4, transform: 'translateY(-50%)' }) }}
+                    >
                       {g.n}
                     </span>
                   </div>

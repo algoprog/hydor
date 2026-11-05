@@ -175,8 +175,8 @@ const SHORTCUTS: ShortcutGroup[] = [
   {
     title: 'Slideshow',
     items: [
-      ['→ / Space / Enter', 'Next'],
-      ['← / Backspace', 'Previous'],
+      ['Right arrow / Space / Enter', 'Next'],
+      ['Left arrow / Backspace', 'Previous'],
       ['A number, then Enter', 'Go to that slide'],
       ['B / W', 'A black or white screen'],
       ['G', 'Every slide'],
