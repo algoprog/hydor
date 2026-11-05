@@ -740,7 +740,8 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
               return;
             }
             const p = PAGE_NUMBERS[k];
-            const text = p.text.replace(/^Page /, `${tr('Page')} `).replace(' of ', ` ${tr('of')} `);
+            // The words go into the document, in the language the app is read in ({page} and {pages} kept as they are).
+            const text = p.text === 'Page {page} of {pages}' ? tr('Page {page} of {pages}') : p.text;
             e.setBands({ [p.where]: { text, ...(p.align ? { align: p.align } : {}) } });
           },
           pageSetup: () => {
