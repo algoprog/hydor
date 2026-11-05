@@ -14,6 +14,7 @@ import {
   cleanStyle,
   parseDelimited,
   parseInput,
+  parseRef,
   refName,
   ROW_H,
   SHEET_LIMITS,
@@ -513,10 +514,16 @@ export function indexAt(off: Float64Array, pos: number): number {
   return lo;
 }
 
-/** How many rows and columns the grid shows: what the sheet holds and more to go on with, within its limits. */
-export function gridSize(calc: Calc, si: number): { rows: number; cols: number } {
+/** How many rows and columns the grid shows: what the sheet holds (its charts too) and more to go on with, within its limits. */
+export function gridSize(calc: Calc, si: number, sh?: Sheet): { rows: number; cols: number } {
   const e = calc.shownExtent(si);
-  return { rows: Math.min(SHEET_LIMITS.rows, Math.max(1000, e.rows + 200)), cols: Math.min(SHEET_LIMITS.cols, Math.max(26, e.cols + 10)) };
+  let rows = e.rows;
+  let cols = e.cols;
+  for (const ch of sh?.charts ?? []) {
+    const p = parseRef(ch.to.cell);
+    if (p) [rows, cols] = [Math.max(rows, p.r + 1), Math.max(cols, p.c + 1)];
+  }
+  return { rows: Math.min(SHEET_LIMITS.rows, Math.max(1000, rows + 200)), cols: Math.min(SHEET_LIMITS.cols, Math.max(26, cols + 10)) };
 }
 
 /** A rectangle's name as people say it: "B2:D9", "B2", columns "B:C" or rows "2:5" when it spans them whole. */

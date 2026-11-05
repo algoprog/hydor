@@ -6,9 +6,9 @@
 // and from Excel and Google Sheets; formulas pasted here move along, and Paste special pastes values, looks or formulas
 // alone, or turned on its side. Besides: find and replace; filters on a header row; conditional formatting; rules for
 // what cells take, with checkboxes, lists' coloured chips, stars and a calendar for dates; borders; merged cells; the
-// fill handle; hidden rows and columns; number formats with Excel's codes; charts over the grid; the data tools;
-// notes; a row expanded into a card; zoom. Changes stay unsaved until Save (Ctrl+S), as a page's do; Undo and Redo
-// step through them.
+// fill handle; hidden rows and columns; number formats with Excel's codes; charts on the grid's cells (of the cells
+// picked, or of several ranges picked with Ctrl+click); the data tools; notes; a row expanded into a card; zoom.
+// Changes stay unsaved until Save (Ctrl+S), as a page's do; Undo and Redo step through them.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BetweenHorizontalStart, BetweenVerticalStart, ClipboardPaste, Copy, Eraser, EyeOff, Maximize2, Scissors, Sparkles, StickyNote, Trash2, ArrowDownAZ, ArrowDownZA, Eye } from 'lucide-react';
 import {
@@ -16,6 +16,8 @@ import {
   colName,
   COL_W,
   computeBook,
+  cornerAt,
+  cornerXY,
   dateSerial,
   DEFAULT_DP,
   formatValue,
@@ -39,6 +41,7 @@ import {
   renameSheet,
   ROW_H,
   SHEET_LIMITS,
+  sheetSizes,
   shiftFormula,
   uniqueSheetName,
   type BorderKind,
@@ -225,6 +228,13 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const [sel, setSelState] = useState<Sel>(cellSel(0, 0));
   const selRef = useRef(sel);
   selRef.current = sel;
+  // More ranges picked with Ctrl+click besides the selection (a chart of several ranges; looks and Delete go on all).
+  const [more, setMoreState] = useState<Rect[]>([]);
+  const moreRef = useRef(more);
+  const setMore = (m: Rect[]) => {
+    moreRef.current = m;
+    setMoreState(m);
+  };
   const sels = useRef(new Map<string, Sel>());
   const [edit, setEditState] = useState<Edit | null>(null);
   const editRef = useRef<Edit | null>(null);
@@ -296,7 +306,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const calc = calcRef.current;
   const sheetIx = book ? Math.min(si, book.sheets.length - 1) : 0;
   const sheet: Sheet | undefined = book?.sheets[sheetIx];
-  const size = useMemo(() => (calc ? gridSize(calc, sheetIx) : { rows: 1000, cols: 26 }), [calc, sheetIx, rev]);
+  const size = useMemo(() => (calc ? gridSize(calc, sheetIx, sheet) : { rows: 1000, cols: 26 }), [calc, sheetIx, rev, sheet]); // eslint-disable-line react-hooks/exhaustive-deps
   const x = rectOf(sel);
 
   // What the sheet's rules make of it, worked out once per change.
@@ -449,8 +459,9 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     const right = s.fc >= s.ac;
     return { r: m ? m.r1 : s.r, c: m ? m.c1 : s.c, ar: down ? g.r1 : g.r2, fr: down ? g.r2 : g.r1, ac: right ? g.c1 : g.c2, fc: right ? g.c2 : g.c1 };
   };
-  /** A new selection (what is being typed goes in first); `reveal` scrolls to it. */
-  const setSel = (s: Sel, reveal = false, keepEdit = false) => {
+  /** A new selection (what is being typed goes in first); `reveal` scrolls to it; `keepMore`: the other ranges picked stay. */
+  const setSel = (s: Sel, reveal = false, keepEdit = false, keepMore = false) => {
+    if (!keepMore && moreRef.current.length) setMore([]);
     if (editRef.current && !keepEdit) {
       commitEdit(null);
       // Words its rule refused stay out of the cell.
@@ -466,8 +477,17 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     const whole = (b.r1 === 0 && b.r2 >= size.rows - 1) || (b.c1 === 0 && b.c2 >= size.cols - 1);
     if (reveal) requestAnimationFrame(() => (whole ? grid.current?.reveal(next.r, next.c) : grid.current?.reveal(next.fr, next.fc)));
   };
+  /** Ctrl+click: the selection joins the ranges picked, and a new one begins at the cell. */
+  const addRange = (r: number, c: number) => {
+    const all = [...moreRef.current, rectOf(selRef.current)].slice(-20);
+    setSel(cellSel(r, c), false, false, true);
+    setMore(all);
+  };
+  /** Every range picked: those with Ctrl+click, then the selection. */
+  const picked = (): Rect[] => [...moreRef.current, rectOf(selRef.current)];
   const pickSheet = (i: number) => {
     if (!book || i === sheetIx) return;
+    if (moreRef.current.length) setMore([]);
     if (editRef.current) commitEdit(null);
     if (editRef.current) setEdit(null);
     if (sheet) sels.current.set(sheet.id, selRef.current);
@@ -699,7 +719,8 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const active: Cell | undefined = sheet?.cells[refName(sel.r, sel.c)];
   const restyle = (f: (s: CellStyle | undefined) => CellStyle | undefined, extra?: (changes: Record<string, Cell | null>) => Patch | null) => {
     if (!book || !sheet || !calc) return;
-    const changes = styleChanges(sheet, calc, sheetIx, rectOf(selRef.current), f);
+    const changes: Record<string, Cell | null> = {};
+    for (const x2 of picked()) Object.assign(changes, styleChanges(sheet, calc, sheetIx, x2, f));
     change(together([cellsPatch(book, sheetIx, changes), extra?.(changes) ?? null]));
     grid.current?.focus();
   };
@@ -872,7 +893,9 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       restyle(() => undefined);
       return;
     }
-    change(cellsPatch(book, sheetIx, clearChanges(sheet, calc, sheetIx, rectOf(selRef.current))));
+    const changes: Record<string, Cell | null> = {};
+    for (const x2 of picked()) Object.assign(changes, clearChanges(sheet, calc, sheetIx, x2));
+    change(cellsPatch(book, sheetIx, changes));
   };
   const fill = (down: boolean) => {
     if (!book || !sheet) return;
@@ -1194,7 +1217,9 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const lineText = cleanBorder(`${line.kind}${line.color ? ` ${line.color}` : ''}`);
   const borders = (where: BorderWhere) => {
     if (!book || !sheet) return;
-    change(cellsPatch(book, sheetIx, borderChanges(sheet, rectOf(selRef.current), where, where === 'none' ? undefined : lineText)));
+    const changes: Record<string, Cell | null> = {};
+    for (const x2 of picked()) Object.assign(changes, borderChanges(sheet, x2, where, where === 'none' ? undefined : lineText));
+    change(cellsPatch(book, sheetIx, changes));
     grid.current?.focus();
   };
   const merged = !!view.merges.list.length && view.merges.list.some((m) => m.r1 <= x.r2 && m.r2 >= x.r1 && m.c1 <= x.c2 && m.c2 >= x.c1);
@@ -1222,17 +1247,19 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const insertChart = () => {
     if (!sheet || !calc) return;
     if ((sheet.charts?.length ?? 0) >= SHEET_LIMITS.charts) return void toast(tr('A sheet holds at most 20 charts.'));
-    const block = blockOf();
-    const e = calc.extent(sheetIx);
+    // The ranges picked with Ctrl+click (the labels from one, the values from the others), or the cells picked, or the table around them.
+    const parts = moreRef.current.length ? picked() : [blockOf()];
+    const block = parts.reduce((a, b) => ({ r1: Math.min(a.r1, b.r1), c1: Math.min(a.c1, b.c1), r2: Math.max(a.r2, b.r2), c2: Math.max(a.c2, b.c2) }));
+    const e = calc.shownExtent(sheetIx);
     if (!e.rows) return void toast(tr('Put some numbers in the sheet first, then pick them for the chart.'));
-    // Beside the sheet's data (a column's width clear of it), level with the cells it draws.
-    const at = Math.max(block.c2 + 1, e.cols);
-    let px = 20;
-    for (let c = 0; c < at; c++) px += view.hidC.has(c) ? 0 : colW(sheet, c);
-    let py = 0;
-    for (let r = 0; r < block.r1; r++) py += view.hidR.has(r) ? 0 : rowH(sheet, r);
-    const chart: SheetChart = { id: newId(), kind: 'column', range: rangeName(block), x: px, y: py, w: 480, h: 300 };
+    // Beside the sheet's data, a little way into the column after it, level with the cells it draws: on those cells.
+    const at = Math.min(SHEET_LIMITS.cols - 1, Math.max(block.c2 + 1, e.cols));
+    const g = sheetSizes(sheet, view.hidR);
+    const from = { cell: refName(block.r1, at), dx: 20 };
+    const p0 = cornerXY(from, g);
+    const chart: SheetChart = { id: newId(), kind: 'column', range: parts.map(rangeName).join(','), from, to: cornerAt(p0.x + 480, p0.y + 300, g.colW, g.rowH) };
     setCharts([...(sheet.charts ?? []), chart]);
+    if (moreRef.current.length) setMore([]);
     setChartSel(chart.id);
     setPanel({ kind: 'chart', id: chart.id });
     requestAnimationFrame(() => grid.current?.reveal(block.r1, Math.min(size.cols - 1, at + 3)));
@@ -1673,16 +1700,16 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
 
   const onKey = (e: React.KeyboardEvent<HTMLElement>) => (editRef.current ? editKey(e) : navKey(e));
 
-  // Ctrl+S anywhere in the editor (a toolbar button or a menu may hold the focus); Ctrl+F and Ctrl+H too.
+  // Ctrl+S anywhere in the editor (a toolbar button, a menu or a panel's field may hold the focus; the grid and the
+  // formula bar save by themselves): a field gives up what was typed in it first, as leaving it would.
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       const a = document.activeElement;
       if (a && a !== document.body && !root.current?.contains(a)) return;
-      const inField = !!a && a !== document.body && !!(a as HTMLElement).closest('textarea,input');
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && !inField) {
-        e.preventDefault();
-        void saveNow.current();
-      }
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 's' || e.defaultPrevented) return;
+      e.preventDefault();
+      if (a && a !== document.body && (a as HTMLElement).closest('textarea,input,select')) (a as HTMLElement).blur();
+      setTimeout(() => void saveNow.current(), 0);
     };
     window.addEventListener('keydown', on);
     return () => window.removeEventListener('keydown', on);
@@ -1748,7 +1775,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   }, [sel, sheetIx, rev, leadFor, sheet]);
 
   // ---- what the selection adds up to ---------------------------------------------------------------------------------------
-  const stats = useMemo(() => (sheet && calc && !single(sel) ? statsOf(sheet, calc, sheetIx, x) : null), [rev, sel, sheetIx]); // eslint-disable-line react-hooks/exhaustive-deps
+  const stats = useMemo(() => (sheet && calc && (!single(sel) || more.length) ? statsOf(sheet, calc, sheetIx, [...more, x]) : null), [rev, sel, sheetIx, more]); // eslint-disable-line react-hooks/exhaustive-deps
   const statFmt = (v: number) => {
     const f = active?.s?.fmt;
     return formatValue(v, f === 'currency' || f === 'percent' || f === 'number' ? active!.s : { fmt: 'number', dp: Number.isInteger(v) ? 0 : 2 });
@@ -2043,27 +2070,31 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
             view={view}
             zoom={zoom}
             formulas={formulas}
+            more={more}
             overlay={
-              sheet.charts?.length ? (
-                <ChartLayer
-                  book={book}
-                  calc={calc}
-                  si={sheetIx}
-                  charts={sheet.charts}
-                  rev={rev}
-                  zoom={zoom}
-                  picked={chartSel}
-                  readOnly={readOnly}
-                  onPick={(id) => {
-                    setChartSel(id);
-                    grid.current?.focus();
-                  }}
-                  onChange={(c) => updateChart(c)}
-                  onOpen={(id) => !readOnly && setPanel({ kind: 'chart', id })}
-                />
-              ) : undefined
+              sheet.charts?.length
+                ? (geo) => (
+                    <ChartLayer
+                      book={book}
+                      calc={calc}
+                      si={sheetIx}
+                      charts={sheet.charts!}
+                      rev={rev}
+                      geo={geo}
+                      picked={chartSel}
+                      readOnly={readOnly}
+                      onPick={(id) => {
+                        setChartSel(id);
+                        grid.current?.focus();
+                      }}
+                      onChange={(c) => updateChart(c)}
+                      onOpen={(id) => !readOnly && setPanel({ kind: 'chart', id })}
+                    />
+                  )
+                : undefined
             }
-            onSel={(s) => setSel(s, true)}
+            onSel={(s, keepMore) => setSel(s, true, false, keepMore)}
+            onAddRange={addRange}
             onEdit={(mode, text) => startEdit(mode, text)}
             onText={(t, pos) => setText(t, pos)}
             onCaret={onCaret}
@@ -2114,7 +2145,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         )}
         {panel?.kind === 'cf' && <CondPanel rules={sheet.conditional ?? []} picked={selRange()} narrow={narrow} onChange={setConditional} onClose={() => setPanel(null)} />}
         {panel?.kind === 'dv' && <ValidPanel rules={sheet.validation ?? []} picked={selRange()} start={panel.start} narrow={narrow} onChange={setRules} onClose={() => setPanel(null)} />}
-        {panelChart && <ChartPanel key={panelChart.id} chart={panelChart} narrow={narrow} onChange={(c) => updateChart(c, `chart:${c.id}`)} onDelete={() => deleteChart(panelChart.id)} onClose={() => setPanel(null)} />}
+        {panelChart && <ChartPanel key={panelChart.id} book={book} chart={panelChart} narrow={narrow} onChange={(c) => updateChart(c, `chart:${c.id}`)} onDelete={() => deleteChart(panelChart.id)} onClose={() => setPanel(null)} />}
       </div>
       <SheetTabs
         names={book.sheets.map((s) => s.name)}
@@ -2326,6 +2357,12 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) saveNote(pick.r, pick.c, noteDraft);
                 if (e.key === 'Escape') setPick(null);
+                // Ctrl+S keeps the note and saves the spreadsheet.
+                if (e.key.toLowerCase() === 's' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  saveNote(pick.r, pick.c, noteDraft);
+                  setTimeout(() => void saveNow.current(), 0);
+                }
               }}
               rows={4}
               maxLength={SHEET_LIMITS.note}

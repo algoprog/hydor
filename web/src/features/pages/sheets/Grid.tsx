@@ -7,8 +7,8 @@
 // header row. Over the cells: the selection, references outlined while a formula is typed, what was cut, the fill
 // handle, the charts, and the box to type in, which is also what takes the keys and the clipboard while nothing is
 // typed (so typing starts at once, in any language). It is drawn at the zoom asked for.
-// Mouse: click, drag, Shift+click, the letters and numbers, edges of headers to size columns and rows (a double
-// click fits them), the fill handle (drag it, or double-click it to fill down). Touch: a tap picks, a tap on the
+// Mouse: click, drag, Shift+click, Ctrl+click and Ctrl+drag (more ranges), the letters and numbers, edges of headers to
+// size columns and rows (a double click fits them), the fill handle (drag it, or double-click it to fill down). Touch: a tap picks, a tap on the
 // picked cell types in it, a drag scrolls, the round handle stretches the selection, a long press opens the menu.
 import { forwardRef, memo, useCallback, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronsLeftRight, ChevronsUpDown, ListFilter, Maximize2 } from 'lucide-react';
@@ -57,6 +57,13 @@ export interface GridView {
   filter: { x: Rect; on: Set<number> } | null;
 }
 
+/** Where the grid's columns and rows start (px from A1's corner, at its zoom; a hidden one is 0 wide), for what is drawn over the cells. */
+export interface GridGeo {
+  colOff: Float64Array;
+  rowOff: Float64Array;
+  z: number;
+}
+
 export interface GridHandle {
   focus(): void;
   input(): HTMLTextAreaElement | null;
@@ -88,9 +95,14 @@ interface Props {
   zoom: number;
   /** Formulas shown instead of what they give. */
   formulas?: boolean;
-  /** Drawn over the cells, scrolling with them (the charts), placed from A1's corner. */
-  overlay?: ReactNode;
-  onSel: (s: Sel) => void;
+  /** Drawn over the cells, scrolling with them (the charts), placed from A1's corner by where the columns and rows are. */
+  overlay?: (geo: GridGeo) => ReactNode;
+  /** More ranges picked besides the selection (Ctrl+click, for a chart of several ranges). */
+  more?: Rect[];
+  /** `keepMore`: the selection grows (a Ctrl+drag), the other ranges picked stay. */
+  onSel: (s: Sel, keepMore?: boolean) => void;
+  /** Ctrl+click on a cell: a range of its own begins there, the ones picked stay picked. */
+  onAddRange?: (r: number, c: number) => void;
   onEdit: (mode: 'type' | 'edit', text?: string) => void;
   onText: (text: string, caret: number) => void;
   /** The caret moved in the words (`text`: what the box holds then, to tell a late report from a current one). */
@@ -329,7 +341,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
 
   // ---- pointer: picking, dragging, typing in ----------------------------------------------------------------------------
   type DragKind = 'cells' | 'cols' | 'rows' | 'point' | 'handle' | 'fill';
-  const drag = useRef<{ kind: DragKind; id: number; x: number; y: number; moved: boolean; timer?: number } | null>(null);
+  const drag = useRef<{ kind: DragKind; id: number; x: number; y: number; moved: boolean; timer?: number; more?: boolean } | null>(null);
   const auto = useRef<number | null>(null);
 
   /** The cells the fill handle would fill, dragged to (r, c): the selection grown down, up, right or left, whichever the pointer is furthest past. */
@@ -353,7 +365,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     if (kind === 'fill') return setFilling(fillTarget(Math.max(0, r), Math.max(0, c)));
     if (kind === 'cols') return cb.current.onSel({ ...s, fr: rows - 1, fc: Math.max(0, c) });
     if (kind === 'rows') return cb.current.onSel({ ...s, fr: Math.max(0, r), fc: cols - 1 });
-    cb.current.onSel({ ...s, fr: Math.max(0, r), fc: Math.max(0, c) });
+    cb.current.onSel({ ...s, fr: Math.max(0, r), fc: Math.max(0, c) }, !!drag.current?.more);
   };
 
   /** While a drag is past the edge of the grid, it scrolls on. */
@@ -439,6 +451,14 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
       P.onSel(next);
       drag.current = { kind: 'rows', id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
     } else {
+      // Ctrl+click (⌘ on a Mac): another range, the ones picked staying picked (a chart of several ranges).
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !P.edit && P.onAddRange) {
+        P.onAddRange(r, c);
+        drag.current = { kind: 'cells', id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, more: true };
+        scroller.current?.setPointerCapture(e.pointerId);
+        input.current?.focus({ preventScroll: true });
+        return;
+      }
       const smart = !e.shiftKey && !readOnly ? smartAt(e.clientX, e.clientY, r, c) : null;
       P.onSel(e.shiftKey ? { ...s, fr: r, fc: c } : { r, c, ar: r, ac: c, fr: r, fc: c });
       if (smart) {
@@ -772,7 +792,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     );
   };
 
-  const multi = !(x.r1 === x.r2 && x.c1 === x.c2) && !sameRect(x, am);
+  const multi = (!(x.r1 === x.r2 && x.c1 === x.c2) && !sameRect(x, am)) || !!p.more?.length;
   const overlay = (region: Region) => {
     const corner = place(x.r2, x.c2, region);
     const cx2 = corner.left + colOff[x.c2 + 1] - colOff[x.c2];
@@ -780,6 +800,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     return (
       <>
         {p.refs.map((b, i) => boxes(b, region, 'border-2 border-dashed', { borderColor: b.color, background: `color-mix(in srgb, ${b.color} 10%, transparent)` }, `ref${i}`))}
+        {p.more?.map((b, i) => boxes(b, region, 'border border-accent bg-accent/10', {}, `more${i}`))}
         {p.cut && boxes(p.cut, region, 'border-2 border-dashed border-accent', {}, 'cut')}
         {multi && boxes(x, region, 'border border-accent bg-accent/10', {}, 'sel')}
         {filling && boxes(filling, region, 'border-2 border-dashed border-fg-3', {}, 'fill')}
@@ -957,7 +978,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
           {overlay('body')}
           {p.overlay && (
             <div className="absolute z-10" style={{ left: NW, top: HH }}>
-              {p.overlay}
+              {p.overlay({ colOff, rowOff, z })}
             </div>
           )}
         </div>

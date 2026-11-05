@@ -1,9 +1,11 @@
 // A chart of a sheet's cells, as the editor, the workbook's page and its PDF draw it: the series and labels read from
-// its range as the cells are now (chartData, which the Excel export writes too), and the chart drawn as SVG
-// (chartSvg): columns, bars, lines, areas, pies, doughnuts and scatter plots, with a title, a legend, axis titles and
-// round numbers on the axes. The SVG is text made here from checked values, every word escaped; its words and lines
-// take the colour of what holds it (currentColor), so it reads in a dark theme and a light one alike.
-import { colName, formatValue, isDateFmt, sourceOf, type Calc, type Rect, type SheetChart, type Workbook } from './sheets.ts';
+// its range as the cells are now (chartData, which the Excel export writes too), a range in parts read as if its parts
+// stood side by side (the labels from one, the values from the others), and the chart drawn as SVG (chartSvg):
+// columns, bars, lines, areas, pies, doughnuts and scatter plots, with a title, a legend, axis titles and round
+// numbers on the axes. A range it cannot draw from says why (chartProblem), in the chart's place. The SVG is text made
+// here from checked values, every word escaped; its words and lines take the colour of what holds it (currentColor), so
+// it reads in a dark theme and a light one alike.
+import { chartParts, colName, formatValue, isDateFmt, rangeName, type Calc, type Rect, type SheetChart, type Workbook } from './sheets.ts';
 import { hiddenCols, hiddenRows } from './sheet-rules.ts';
 
 /** A series of a chart: its name, its values (null where a cell holds no number), and where its values and name are. */
@@ -22,6 +24,26 @@ export interface ChartData {
   series: ChartSeries[];
 }
 
+/**
+ * Why a chart cannot draw from its range, in plain words, or null when it can: words that are no range, parts on
+ * different sheets or of different lengths, a sheet that is not there.
+ */
+export function chartProblem(book: Workbook, chart: SheetChart): string | null {
+  const parts = chartParts(chart.range);
+  if (!parts) return `“${chart.range}” is not a range of cells: give one such as A1:C9, or several split by commas, such as A1:A7,F1:F7.`;
+  const sheets = new Set(parts.map((p) => (p.sheet ?? '').toLowerCase()));
+  if (sheets.size > 1) return 'Its ranges are on different sheets: a chart draws from one sheet.';
+  const name = parts[0].sheet;
+  if (name !== undefined && !book.sheets.some((s) => s.name.toLowerCase() === name.toLowerCase())) return `There is no sheet named “${name}”.`;
+  const rows = chart.by === 'rows';
+  const len = (x: Rect) => (rows ? x.c2 - x.c1 : x.r2 - x.r1) + 1;
+  if (parts.some((p) => len(p.x) !== len(parts[0].x))) {
+    const list = parts.map((p) => rangeName(p.x)).join(', ');
+    return rows ? `Its ranges are not as wide as each other (${list}): their columns go side by side.` : `Its ranges are not as long as each other (${list}): their rows go side by side.`;
+  }
+  return null;
+}
+
 /** Colours for series without their own, as spreadsheets give them. */
 export const CHART_COLORS = ['#4285f4', '#ea4335', '#fbbc04', '#34a853', '#ff6d01', '#46bdc6', '#7baaf7', '#f07b72', '#fcd04f', '#71c287', '#ff994d', '#7ed1d7'];
 
@@ -31,26 +53,29 @@ export const CHART_COLORS = ['#4285f4', '#ea4335', '#fbbc04', '#34a853', '#ff6d0
  * and columns hidden are left out, unless `withHidden` (an Excel file's series are whole ranges: Excel leaves them out itself).
  */
 export function chartData(book: Workbook, calc: Calc, si: number, chart: SheetChart, withHidden = false): ChartData | null {
-  const src = sourceOf(chart.range);
-  if (!src) return null;
-  const ds = src.sheet === undefined ? si : calc.sheetIndex(src.sheet);
+  const parts = chartParts(chart.range);
+  if (!parts || chartProblem(book, chart)) return null;
+  const ds = parts[0].sheet === undefined ? si : calc.sheetIndex(parts[0].sheet);
   if (ds < 0 || !book.sheets[ds]) return null;
   const sh = book.sheets[ds];
-  const e = calc.extent(ds);
-  const x: Rect = { r1: src.x.r1, c1: src.x.c1, r2: Math.min(src.x.r2, Math.max(src.x.r1, e.rows - 1)), c2: Math.min(src.x.c2, Math.max(src.x.c1, e.cols - 1)) };
+  const e = calc.shownExtent(ds);
   const rows = chart.by === 'rows';
   // Rows and columns hidden (by hand or by the filter) are left out, as spreadsheets leave them out of charts.
   const hidR = withHidden ? new Set<number>() : hiddenRows(sh, ds, calc);
   const hidC = withHidden ? new Set<number>() : hiddenCols(sh);
-  const rIdx: number[] = [];
-  for (let r = x.r1; r <= x.r2 && rIdx.length < 5000; r++) if (!hidR.has(r)) rIdx.push(r);
-  const cIdx: number[] = [];
-  for (let c = x.c1; c <= x.c2; c++) if (!hidC.has(c)) cIdx.push(c);
-  if (!rIdx.length || !cIdx.length) return null;
-  // Along: where a series runs (rows, for series in columns); across: one series after another.
-  const n = rows ? cIdx.length : rIdx.length;
-  const m = rows ? rIdx.length : cIdx.length;
-  const at = (i: number, j: number) => (rows ? { r: rIdx[j], c: cIdx[i] } : { r: rIdx[i], c: cIdx[j] });
+  // The parts as one table: series lines (columns, for series in columns) one part after another; along each, the
+  // places its values are at, counted from each part's first row (column), so the parts line up side by side.
+  const x0 = parts[0].x;
+  const along = rows ? Math.min(x0.c2, Math.max(x0.c1, e.cols - 1)) - x0.c1 + 1 : Math.min(x0.r2, Math.max(x0.r1, e.rows - 1)) - x0.r1 + 1;
+  const pos: number[] = [];
+  for (let k = 0; k < along && pos.length < 5000; k++) if (!(rows ? hidC : hidR).has((rows ? x0.c1 : x0.r1) + k)) pos.push(k);
+  const lines: { p: Rect; i: number }[] = [];
+  for (const { x } of parts) for (let i = rows ? x.r1 : x.c1; i <= (rows ? x.r2 : Math.min(x.c2, Math.max(x.c1, e.cols - 1))) && lines.length < 60; i++) if (!(rows ? hidR : hidC).has(i)) lines.push({ p: x, i });
+  if (!pos.length || !lines.length) return null;
+  // Along: where a series runs; across: one series after another.
+  const n = pos.length;
+  const m = lines.length;
+  const at = (i: number, j: number) => (rows ? { r: lines[j].i, c: lines[j].p.c1 + pos[i] } : { r: lines[j].p.r1 + pos[i], c: lines[j].i });
   const value = (i: number, j: number) => {
     const p = at(i, j);
     return calc.value(ds, p.r, p.c);
@@ -152,9 +177,18 @@ const fit = (s: string, w: number, size: number) => (wordsW(s, size) <= w ? s : 
 
 /**
  * A chart drawn as SVG, `w` × `h` px. Its words and lines are in currentColor (lines faint); series in the chart's
- * colours, else CHART_COLORS.
+ * colours, else CHART_COLORS. `problem`: why it cannot draw from its range, said in its place; `say` puts the chart's
+ * own words (not its title or labels) in the language the page is read in.
  */
-export function chartSvg(chart: SheetChart, data: ChartData | null, w: number, h: number, font = 'system-ui, -apple-system, "Segoe UI", sans-serif'): string {
+export function chartSvg(
+  chart: SheetChart,
+  data: ChartData | null,
+  w: number,
+  h: number,
+  font = 'system-ui, -apple-system, "Segoe UI", sans-serif',
+  o: { problem?: string | null; say?: (s: string) => string } = {},
+): string {
+  const say = o.say ?? ((x: string) => x);
   const parts: string[] = [];
   const text = (x: number, y: number, s: string, o: { size?: number; anchor?: 'start' | 'middle' | 'end'; weight?: number; rotate?: boolean; opacity?: number; fill?: string } = {}) =>
     parts.push(
@@ -173,8 +207,23 @@ export function chartSvg(chart: SheetChart, data: ChartData | null, w: number, h
   const pie = chart.kind === 'pie' || chart.kind === 'doughnut';
   const series = (data?.series ?? []).slice(0, pie ? 1 : 50);
   const labels = data?.labels ?? [];
+  if (o.problem) {
+    // Why it cannot draw, in lines that fit.
+    const lines: string[] = [];
+    let line = '';
+    for (const word of say(o.problem).split(/\s+/)) {
+      if (line && wordsW(`${line} ${word}`, 12) > w - pad * 4) {
+        lines.push(line);
+        line = word;
+      } else line = line ? `${line} ${word}` : word;
+    }
+    if (line) lines.push(line);
+    const shownLines = lines.slice(0, Math.max(1, Math.floor((bottom - top) / 17)));
+    shownLines.forEach((l, i) => text(w / 2, (top + bottom) / 2 + (i - (shownLines.length - 1) / 2) * 17, l, { size: 12, opacity: 0.75 }));
+    return wrap(parts, w, h, font);
+  }
   if (!data || !series.length || !labels.length || !series.some((x) => x.values.some((v) => v !== null))) {
-    text(w / 2, (top + bottom) / 2, 'No numbers to draw', { size: 12, opacity: 0.6 });
+    text(w / 2, (top + bottom) / 2, say('No numbers to draw'), { size: 12, opacity: 0.6 });
     return wrap(parts, w, h, font);
   }
   // The legend: the series' names (a pie's: its labels), under, over or beside the chart.
@@ -230,7 +279,7 @@ export function chartSvg(chart: SheetChart, data: ChartData | null, w: number, h
     const cy = (top + bottom) / 2;
     const hole = chart.kind === 'doughnut' ? r * 0.55 : 0;
     if (!sum) {
-      text(cx, cy, 'No numbers to draw', { size: 12, opacity: 0.6 });
+      text(cx, cy, say('No numbers to draw'), { size: 12, opacity: 0.6 });
       return wrap(parts, w, h, font);
     }
     let a0 = -Math.PI / 2;
