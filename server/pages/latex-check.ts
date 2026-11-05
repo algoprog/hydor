@@ -1080,7 +1080,9 @@ function checkBold(c: Ctx, src: TexSource, t: Tabular) {
     for (const p of i.problems.filter((x) => x.wrong).slice(0, 2)) {
       const best = i.problems.find((x) => !x.wrong) ?? null;
       const row = data.find((r) => r.cells.some((x) => x.cell === best?.cell));
-      lines.push(`in “${name(i.col)}”, ${p.cell.raw.replace(/\s+/g, ' ')} is bold, but ${best ? `${texPlain(best.cell.raw)} (${clip(row?.label || 'another row', 30)})` : p.best} is ${i.better.better === 'max' ? 'higher' : 'lower'}`);
+      lines.push(
+        `in “${name(i.col)}”, ${p.n.value.toFixed(p.n.digits)} is bold, but ${best ? `${best.n.value.toFixed(best.n.digits)} (${clip(row?.label || 'another row', 30)})` : p.best} is ${i.better.better === 'max' ? 'higher' : 'lower'}`,
+      );
     }
   for (const i of issues) if (!i.problems.some((x) => x.wrong)) lines.push(`in “${name(i.col)}”, the best value (${i.problems[0].best}) is not bold`);
   const unsure = issues.filter((i) => !i.better.sure).map((i) => name(i.col));

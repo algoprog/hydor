@@ -149,7 +149,7 @@ const ARR = {
   call: 'https://aclrollingreview.org/cfp',
   kit: 'https://github.com/acl-org/acl-style-files',
   final:
-    'switch the style to its final version (\\usepackage[final]{acl}, not [review]) so the authors show; put back the authors, their affiliations and e-mail addresses; put back the acknowledgements (where help from AI assistants with writing or code is described too); keep the Limitations section (it does not count toward the pages); the final version may use one more page of content than the review version',
+    'switch the style to its final version (\\usepackage[final]{acl}, not [review]) so the authors show; put back the authors, their affiliations and e-mail addresses; put back the acknowledgements (where help from AI assistants with writing or code is described too); keep the Limitations section (it does not count toward the pages)',
   note: 'Not counted: references, the Limitations section, an ethics section, acknowledgements and appendices.',
 };
 
@@ -291,7 +291,7 @@ export const VENUES: Venue[] = [
     call: 'https://neurips.cc/Conferences/2026/CallForPapers',
     kit: 'https://neurips.cc/Conferences/2026/CallForPapers',
     final:
-      'switch the style to its final version (\\usepackage[main, final]{neurips_…}) so the authors show; put back the authors and affiliations; put back the acknowledgements with the disclosure of funding and competing interests (the ack environment); the final version may use one more page of content; keep the checklist',
+      'switch the style to its final version (\\usepackage[main, final]{neurips_…}) so the authors show; put back the authors and affiliations; put back the acknowledgements with the disclosure of funding and competing interests (the ack environment); keep the checklist',
     note: 'Not counted: references, acknowledgements, the checklist and appendices. The PDF may be 50 MB at most.',
   },
   {
@@ -313,7 +313,7 @@ export const VENUES: Venue[] = [
     call: 'https://iclr.cc/Conferences/2027/CallForPapers',
     kit: 'https://github.com/ICLR/Master-Template',
     final:
-      'turn on the final version with \\iclrfinalcopy (uncomment it, before \\begin{document}) so the authors show and the line numbers go; put back the authors and affiliations; put back the acknowledgements; the final version may use one more page of content',
+      'turn on the final version with \\iclrfinalcopy (uncomment it, before \\begin{document}) so the authors show and the line numbers go; put back the authors and affiliations; put back the acknowledgements',
     note: 'Not counted: references, appendices, the ethics, reproducibility and AI use statements, and acknowledgements.',
   },
   {
@@ -330,7 +330,7 @@ export const VENUES: Venue[] = [
     call: 'https://icml.cc/Conferences/2026/CallForPapers',
     kit: 'https://icml.cc/Conferences/2026/AuthorInstructions',
     final:
-      'turn on the final version (\\usepackage[accepted]{icml…}) so the authors show; put back the authors and affiliations (\\icmlauthor, \\icmlaffiliation, \\icmlcorrespondingauthor); put back the acknowledgements; the final version may use one more page of content; keep the Impact Statement',
+      'turn on the final version (\\usepackage[accepted]{icml…}) so the authors show; put back the authors and affiliations (\\icmlauthor, \\icmlaffiliation, \\icmlcorrespondingauthor); put back the acknowledgements; keep the Impact Statement',
     note: 'Last year’s rules (this year’s call was not out yet). Not counted: references, the Impact Statement, acknowledgements and appendices.',
   },
   {

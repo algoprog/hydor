@@ -325,18 +325,20 @@ export function CheckDialog({
                 </>
               ) : state.error ? (
                 <span className="text-err">{state.error}</span>
-              ) : findings.length ? (
-                <span>
-                  {[counts.must && tr(`${counts.must} to fix`), counts.check && tr(`${counts.check} to check`), counts.info && tr(`${counts.info} for your information`)].filter(Boolean).join(' · ')}
-                </span>
               ) : (
-                <span className="text-ok">It found nothing to fix.</span>
-              )}
-              {state.pages && !running && (
-                <span className="shrink-0 text-fg-3">
-                  {state.pages.limit !== undefined && state.pages.counted !== undefined
-                    ? tr(`· ${state.pages.counted} of ${state.pages.limit} pages`)
-                    : tr(`· ${state.pages.total} page${state.pages.total === 1 ? '' : 's'}`)}
+                <span>
+                  {[
+                    findings.length ? '' : tr('It found nothing to fix'),
+                    counts.must && tr(`${counts.must} to fix`),
+                    counts.check && tr(`${counts.check} to check`),
+                    counts.info && tr(`${counts.info} for your information`),
+                    state.pages &&
+                      (state.pages.limit !== undefined && state.pages.counted !== undefined
+                        ? tr(`${state.pages.counted} of ${state.pages.limit} pages`)
+                        : tr(`${state.pages.total} page${state.pages.total === 1 ? '' : 's'}`)),
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </span>
               )}
             </span>
@@ -364,8 +366,8 @@ export function CheckDialog({
 
         {groups.map((g) => (
           <section key={g.id}>
-            <h3 className="mb-1 text-[12px] font-semibold tracking-wide text-fg-3 uppercase">
-              {g.label} <span className="font-normal tabular-nums">{g.list.length}</span>
+            <h3 className="mb-1 px-0.5 text-[12px] font-medium text-fg-3">
+              {g.label} <span className="font-normal tabular-nums">· {g.list.length}</span>
             </h3>
             <ul className="divide-y divide-line rounded-xl border border-line">
               {g.list.map((f) => {
