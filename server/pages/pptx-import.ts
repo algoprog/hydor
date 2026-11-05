@@ -382,8 +382,9 @@ function wordsOf(f: Frame, body: X | undefined, chain: Chain, href: (el: X | und
       if (font !== first.font && font) run.font = font;
       const col = deckColor(f, c);
       if (col !== first.color && col) run.color = col;
-      if (b !== first.b) run.b = b;
-      if (i !== first.i) run.i = i;
+      // Bold and italic as each run says (the box's are set below, when every word is).
+      if (b) run.b = true;
+      if (i) run.i = true;
       if (u && u !== 'none') run.u = true;
       if (strike && strike !== 'noStrike') run.s = true;
       if (baseline > 0) run.sup = true;
@@ -449,8 +450,16 @@ function wordsOf(f: Frame, body: X | undefined, chain: Chain, href: (el: X | und
   };
   if (first.font) out.font = first.font;
   if (first.color) out.color = first.color;
-  if (first.b) out.bold = true;
-  if (first.i) out.italic = true;
+  // The box is bold (or italic) when all its words are: then its runs need not say so (a run cannot say it is not).
+  const worded = paras.flatMap((p) => p.runs as Obj[]).filter((r) => String(r.t).trim());
+  for (const [key, prop] of [
+    ['b', 'bold'],
+    ['i', 'italic'],
+  ] as const)
+    if (worded.length && worded.every((r) => r[key])) {
+      out[prop] = true;
+      for (const p of paras) for (const r of p.runs as Obj[]) delete r[key];
+    }
   // A title's own line height is the app's 1.1: say PowerPoint's where it differs.
   if (lh && (role !== 'title' ? Math.abs(lh - 1.2) > 0.005 : Math.abs(lh - 1.1) > 0.005)) out.lh = Math.max(0.6, Math.min(4, lh));
   if (gap) out.gap = gap;
