@@ -601,8 +601,9 @@ const RULES = /\\(toprule|midrule|bottomrule|hline|cline|cmidrule|addlinespace|s
 export function tabularsIn(src: TexSource): Tabular[] {
   const out: Tabular[] = [];
   const { clean, text } = src;
-  // The markers Experiments puts above its tables are comments: read from the text itself.
-  const markers = [...text.matchAll(/^[ \t]*%[ \t]*hydor:table[ \t]+([A-Za-z0-9_.:-]+)/gm)].map((m) => ({ id: m[1], at: m.index! }));
+  // The markers Experiments puts above its tables are comments, read from the text itself: exactly as it writes them
+  // (TABLE_MARK and tableMarks in shared/experiments.ts).
+  const markers = [...text.matchAll(/^[ \t]*% hydor:table ([a-z0-9]{4,32})[ \t]*$/gm)].map((m) => ({ id: m[1], at: m.index! }));
   for (const b of clean.matchAll(/\\begin\s*\{(tabular\*?|tabularx|tabulary|longtable|NiceTabular)\}/g)) {
     const env = b[1];
     // Its end: the \end of the same environment at the same depth.

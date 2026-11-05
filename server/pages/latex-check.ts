@@ -27,6 +27,7 @@ import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import type { RunTool } from '../features/types.ts';
 import { listRuns, recomputeTable, type RunQuery } from '../experiments/records.ts';
+import { readSecret, touchSecret } from '../connections/vault.ts';
 import { spaceById } from '../spaces/index.ts';
 import { normalizeTex, TEX_MAIN, texFileText, texPlain, type TexDoc, type TexIssue } from '../../shared/latex.ts';
 import { CHECK_GROUPS, LEVEL_LABEL, VENUES, venueSummary, venueWith, detectVenue, type CheckEdit, type CheckFinding, type CheckState, type Venue } from '../../shared/latex-submit.ts';
@@ -310,6 +311,13 @@ async function checkReferencesOnline(c: Ctx, bibs: Bibs, lookup: Lookup, progres
   const t0 = Date.now();
   progress(0, list.length);
   const ax = await lookup.byArxiv(list.map(entryArxiv).filter((x): x is string => !!x));
+  // Every preprint's published version asked for at once, where a service can.
+  await lookup.prefetchPublished(
+    list
+      .filter(citedAsPreprint)
+      .map(entryArxiv)
+      .filter((x): x is string => !!x && !!ax.get(x)),
+  );
   let done = 0;
   let late = 0;
   const one = async (e: BibItem) => {
@@ -677,8 +685,12 @@ function headingLine(line: string, re: RegExp): boolean {
   return t.length > 0 && t.length < 90 && re.test(t);
 }
 
-/** The PDF's pages: in all, and those before the references (or the parts the venue does not count), from its text. */
-export function pagesOf(pdfText: string, venue: Pick<Venue, 'freeHeadings' | 'refsCount'>): { total: number; counted: number; refsAt?: number; endAt?: number; heading?: string } {
+/**
+ * The PDF's pages: in all, and those that count. The count ends where the references begin, or at `end` (the title of
+ * the first heading after the main text that the venue does not count, as the source has it: Limitations, an
+ * appendix's first section), its last line of that title before the references.
+ */
+export function pagesOf(pdfText: string, o: { end?: string | null; refsCount?: boolean } = {}): { total: number; counted: number; refsAt?: number; endAt?: number; heading?: string } {
   const pages = pdfText.split('\f');
   while (pages.length > 1 && !pages[pages.length - 1].trim()) pages.pop();
   const total = pages.length;
@@ -687,31 +699,71 @@ export function pagesOf(pdfText: string, venue: Pick<Venue, 'freeHeadings' | 're
   for (const pg of pages) for (const l of new Set(pg.split('\n').map((x) => x.trim()).filter(Boolean))) seen.set(l, (seen.get(l) ?? 0) + 1);
   const running = (l: string) => (seen.get(l.trim()) ?? 0) > 1 && total > 1;
   const refs = /^(references|bibliography|works cited|literature cited|references and notes)$/i;
-  const free = venue.freeHeadings?.length ? new RegExp(`^(${venue.freeHeadings.join('|')})$`, 'i') : null;
+  const words = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const endWords = o.end ? words(o.end) : '';
+  /** The page a heading's line ends the count at: the page before, when nothing but a running head is above it. */
+  const countAt = (p: number, lines: string[], i: number) => (lines.slice(0, i).filter((l) => !running(l) && l.trim().split(/\s+/).length >= 4).length === 0 && p > 0 ? p : p + 1);
   let refsAt: number | undefined;
+  let refsCount: number | undefined;
   let endAt: number | undefined;
-  let counted = total;
   let heading: string | undefined;
   for (let p = 0; p < total && refsAt === undefined; p++) {
     const lines = pages[p].split('\n').filter((l) => l.trim());
     for (let i = 0; i < lines.length; i++) {
-      const isRefs = headingLine(lines[i], refs);
-      const isFree = !isRefs && !!free && p + i > 0 && headingLine(lines[i], free);
-      if (!isRefs && !isFree) continue;
-      // At the top of its page (nothing above it but a running head or line numbers): the page before is the last.
-      const above = lines.slice(0, i).filter((l) => !running(l) && l.trim().split(/\s+/).length >= 4).length;
-      const pageCount = above === 0 && p > 0 ? p : p + 1;
-      if (endAt === undefined) {
-        endAt = pageCount;
-        heading = lines[i].trim();
+      if (headingLine(lines[i], refs)) {
+        refsAt = p + 1;
+        refsCount = countAt(p, lines, i);
+        break;
       }
-      if (isRefs) refsAt = p + 1;
-      if (endAt !== undefined && refsAt !== undefined) break;
-      if (isFree && endAt !== undefined) continue;
+      // The last line with the end heading's title before the references (a subsection of the same name earlier aside).
+      if (endWords && p + i > 0) {
+        const t = lines[i].trim().replace(/^((\d+|[A-Z])(\.\d+)*\.?|[IVXL]+\.)\s+/, '');
+        if (t.length < 120 && words(t) === endWords) {
+          endAt = countAt(p, lines, i);
+          heading = lines[i].trim();
+        }
+      }
     }
   }
-  if (!venue.refsCount && endAt !== undefined) counted = endAt;
-  return { total, counted, refsAt, endAt, heading };
+  if (endAt === undefined && refsCount !== undefined) {
+    endAt = refsCount;
+    heading = 'References';
+  }
+  return { total, counted: !o.refsCount && endAt !== undefined ? endAt : total, refsAt, endAt, heading };
+}
+
+/**
+ * The title of the heading the venue's count ends at, from the source: of the top headings just before the
+ * bibliography, the first of the run the venue does not count (Limitations, an ethics statement, acknowledgements…,
+ * and an appendix's sections where appendices are not counted). Null when the main text runs up to the references.
+ */
+export function countEnd(sources: TexSource[], headings: Heading[], venue: Pick<Venue, 'freeHeadings'>): string | null {
+  if (!venue.freeHeadings?.length) return null;
+  const free = new RegExp(`^(${venue.freeHeadings.join('|')})$`, 'i');
+  const appendixFree = free.test('appendix');
+  const order = new Map(sources.map((x, i) => [x.name, i]));
+  const at = (file: string, pos: number) => (order.get(file) ?? 0) * 1e9 + pos;
+  // Where the bibliography is.
+  let bib = Infinity;
+  for (const x of sources) {
+    const m = /\\(bibliography|printbibliography)\b|\\begin\s*\{thebibliography\}/.exec(x.clean);
+    if (m) bib = Math.min(bib, at(x.name, m.index));
+  }
+  const top = headings.some((h) => h.kind === 'chapter') ? 'chapter' : 'section';
+  const list = headings.filter((h) => h.kind === top || h.kind === 'environment' || h.kind === 'appendix').sort((a, b) => at(a.file, a.from) - at(b.file, b.from));
+  const appendix = list.find((h) => h.kind === 'appendix');
+  const before = list.filter((h) => at(h.file, h.from) < bib);
+  let first: Heading | null = null;
+  for (let i = before.length - 1; i >= 0; i--) {
+    const h = before[i];
+    const inAppendix = appendixFree && !!appendix && at(h.file, h.from) >= at(appendix.file, appendix.from);
+    if (!(free.test(h.title.trim()) || inAppendix)) break;
+    first = h;
+  }
+  if (!first) return null;
+  // The appendix itself has no title in the PDF: its first section has.
+  if (first.kind === 'appendix') return before.find((h) => at(h.file, h.from) > at(first!.file, first!.from) && h.kind === top)?.title ?? null;
+  return first.title;
 }
 
 /** pdffonts' table: each font's name, type and whether it is embedded. */
@@ -890,7 +942,7 @@ async function checkFormatPdf(c: Ctx, r: TexResult, set: (s: Partial<CheckState>
   const [text, fonts, infoOut] = await Promise.all([texPdfTool(r.key, 'pdftotext'), texPdfTool(r.key, 'pdffonts'), texPdfTool(r.key, 'pdfinfo')]);
   if (text === null || fonts === null || infoOut === null) c.note('Poppler’s tools (pdftotext, pdffonts, pdfinfo) are not all installed here, so some of the PDF was not checked (Debian or Ubuntu: sudo apt install poppler-utils).');
   if (text !== null) {
-    const p = pagesOf(text, venue);
+    const p = pagesOf(text, { end: countEnd(c.sources, c.headings, venue), refsCount: venue.refsCount });
     set({ pages: { total: p.total, counted: venue.pages ? p.counted : undefined, limit: venue.pages } });
     if (venue.pages && p.counted > venue.pages) {
       const before = venue.refsCount ? 'in all' : p.heading && !/^references|bibliography/i.test(p.heading.replace(/^[\d.]+\s*/, '')) ? `before “${clip(p.heading, 40)}”` : 'before the references';
@@ -1235,11 +1287,26 @@ export async function runCheck(db: DB, input: CheckInput, st: CheckState, o: { s
   if (o.signal.aborted) return;
   if (bibs.cited.length) {
     set({ stage: 'Checking the references online', online: { done: 0, of: bibs.cited.length } });
-    const lookup = new Lookup({ db, fetch: o.fetch, signal: o.signal, s2Key: process.env.SEMANTIC_SCHOLAR_API_KEY || undefined });
+    const lookup = new Lookup({ db, fetch: o.fetch, signal: o.signal, keys: o.fetch ? {} : { openalex: serviceKey(db, 'OPENALEX_API_KEY', 'api.openalex.org'), semanticscholar: serviceKey(db, 'SEMANTIC_SCHOLAR_API_KEY', 'api.semanticscholar.org') } });
     await checkReferencesOnline(c, bibs, lookup, (done, of) => set({ online: { done, of } }), o.signal, (id) => byId.get(id));
     for (const n of lookup.notes) c.note(n);
   }
   set({ stage: undefined });
+}
+
+/**
+ * The user's key for a service, from Keys where it may go to that service's host (its domains say so), else from the
+ * server's environment; none when there is neither.
+ */
+function serviceKey(db: DB, name: string, host: string): string | undefined {
+  try {
+    const s = readSecret(db, name);
+    if (s && s.view.domains.some((d) => host === d || host.endsWith(`.${d}`))) {
+      touchSecret(db, name);
+      return s.value;
+    }
+  } catch {}
+  return process.env[name] || undefined;
 }
 
 /** The headings the check reads (the document's, through texSources). */

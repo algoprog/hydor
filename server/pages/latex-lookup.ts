@@ -104,8 +104,8 @@ export interface LookupOptions {
   /** A stand-in for the web (the tests' canned answers). */
   fetch?: typeof fetch;
   signal?: AbortSignal;
-  /** Semantic Scholar's key, where there is one (SEMANTIC_SCHOLAR_API_KEY). */
-  s2Key?: string;
+  /** The user's own keys for the services that limit programs without one (OpenAlex, Semantic Scholar). */
+  keys?: { openalex?: string; semanticscholar?: string };
 }
 
 /** The lookups of one check: what could not be asked is gathered in `notes`. */
@@ -125,18 +125,24 @@ export class Lookup {
     return s.every((x) => !this.down.has(x));
   }
 
-  private async get(s: Service, url: string, accept = 'application/json', headers: Record<string, string> = {}): Promise<{ status: number; text: string } | null> {
+  private async get(s: Service, url: string, accept = 'application/json', headers: Record<string, string> = {}, body?: unknown, tries = 2): Promise<{ status: number; text: string } | null> {
     if (this.down.has(s)) return null;
     const f = this.o.fetch ?? fetch;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < tries; attempt++) {
       try {
         await gate(s, this.o.signal);
         this.asked++;
         const signal = this.o.signal ? AbortSignal.any([this.o.signal, AbortSignal.timeout(TIMEOUT)]) : AbortSignal.timeout(TIMEOUT);
-        const r = await f(url, { headers: { 'user-agent': UA, accept, ...headers }, signal, redirect: 'follow' });
+        const r = await f(url, {
+          method: body === undefined ? 'GET' : 'POST',
+          headers: { 'user-agent': UA, accept, ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers },
+          body: body === undefined ? undefined : JSON.stringify(body),
+          signal,
+          redirect: 'follow',
+        });
         if (r.status === 429 || r.status >= 500) {
-          if (attempt === 0) {
-            const wait = Math.min(5, Number(r.headers.get('retry-after')) || (r.status === 429 ? 2 : 1));
+          if (attempt < tries - 1) {
+            const wait = Math.min(5, Number(r.headers.get('retry-after')) || (r.status === 429 ? 2 * (attempt + 1) : 1));
             await new Promise((ok) => setTimeout(ok, wait * 1000));
             continue;
           }
@@ -156,7 +162,7 @@ export class Lookup {
         return { status: r.status, text: Buffer.concat(chunks).toString('utf8') };
       } catch (e) {
         if (this.o.signal?.aborted) throw new Error('stopped');
-        if (attempt === 0) continue;
+        if (attempt < tries - 1) continue;
         this.giveUp(s, (e as Error).name === 'TimeoutError' ? 'it took too long' : 'it could not be reached');
         return null;
       }
@@ -166,11 +172,18 @@ export class Lookup {
 
   private giveUp(s: Service, why: string) {
     this.down.add(s);
-    this.notes.add(`${SERVICE_NAME[s]} could not be asked (${why}), so what only it knows was not checked.`);
+    // Two services answer programs with a key of their own (free) when they are busy.
+    const key = (s === 'openalex' || s === 'semanticscholar') && !this.o.keys?.[s] ? ` A free key of your own, ${s === 'openalex' ? 'OPENALEX_API_KEY' : 'SEMANTIC_SCHOLAR_API_KEY'} in Keys, lets it answer.` : '';
+    this.notes.add(`${SERVICE_NAME[s]} could not be asked (${why}), so what only it knows was not checked.${key}`);
   }
 
-  private async json<T>(s: Service, url: string, headers?: Record<string, string>): Promise<{ status: number; data: T | null } | null> {
-    const r = await this.get(s, url, 'application/json', headers);
+  /** OpenAlex's address with the user's key, when there is one. */
+  private oa(url: string) {
+    return this.o.keys?.openalex ? `${url}&api_key=${encodeURIComponent(this.o.keys.openalex)}` : url;
+  }
+
+  private async json<T>(s: Service, url: string, headers?: Record<string, string>, body?: unknown, tries?: number): Promise<{ status: number; data: T | null } | null> {
+    const r = await this.get(s, url, 'application/json', headers, body, tries);
     if (!r) return null;
     if (r.status >= 400) return { status: r.status, data: null };
     try {
@@ -246,7 +259,7 @@ export class Lookup {
     const select = 'DOI,type,title,author,issued,container-title,publisher,volume,issue,page,event';
     const cr = await this.json<{ message?: { items?: CrossrefItem[] } }>('crossref', `https://api.crossref.org/works?rows=5&select=${select}&query.bibliographic=${q}`);
     const found: PaperRecord[] = (cr?.data?.message?.items ?? []).map(crossrefRecord).filter((r): r is PaperRecord => !!r);
-    const oa = await this.json<{ results?: OpenAlexWork[] }>('openalex', `https://api.openalex.org/works?per-page=5&search=${encodeURIComponent(plainWords(title).slice(0, 300))}`);
+    const oa = await this.json<{ results?: OpenAlexWork[] }>('openalex', this.oa(`https://api.openalex.org/works?per-page=5&search=${encodeURIComponent(plainWords(title).slice(0, 300))}`));
     found.push(...(oa?.data?.results ?? []).map(openAlexRecord).filter((r): r is PaperRecord => !!r));
     const close = found.filter((r) => titleLikeness(r.title, title) >= 0.85);
     if (!close.length && !this.down.has('dblp')) {
@@ -271,12 +284,13 @@ export class Lookup {
       titleLikeness(r.title, pre.title) >= 0.9 && (!first || !r.names.length || r.names.some((n) => lastWord(n.family) === first)) && r.kind !== 'preprint' && !(r.doi && /^10\.48550\//i.test(r.doi));
     let found: PaperRecord | null = null;
     let askedAll = true;
-    // What its authors told arXiv.
+    // 1. What its authors told arXiv (a DOI of the published version).
     if (pre.doi && !/^10\.48550\//i.test(pre.doi)) {
       const r = await this.byDoi(pre.doi);
       if (r && r.title) found = r;
       else if (r === undefined) askedAll = false;
     }
+    // 2. Crossref, by its title and first author: its records have the DOI and the pages.
     if (!found) {
       const select = 'DOI,type,title,author,issued,container-title,publisher,volume,issue,page,event';
       const q = encodeURIComponent(`${plainWords(pre.title)}${first ? ` ${first}` : ''}`.slice(0, 300));
@@ -284,8 +298,23 @@ export class Lookup {
       if (!cr) askedAll = false;
       found = (cr?.data?.message?.items ?? []).map(crossrefRecord).find((r): r is PaperRecord => !!r && same(r)) ?? null;
     }
+    // 3. Semantic Scholar, as it answered for all the paper's preprints at once (prefetchPublished), or now.
+    const s2 = pre.arxiv ? cacheGet<PaperRecord | { none: true }>(this.o.db, `s2:${pre.arxiv}`) : null;
+    if (!found && s2 && !('none' in s2.v) && same({ ...s2.v, names: s2.v.names.length ? s2.v.names : pre.names })) found = s2.v;
+    if (!found && pre.arxiv && !s2) {
+      const headers: Record<string, string> = this.o.keys?.semanticscholar ? { 'x-api-key': this.o.keys.semanticscholar } : {};
+      const one = await this.json<S2Paper>(
+        'semanticscholar',
+        `https://api.semanticscholar.org/graph/v1/paper/arXiv:${encodeURIComponent(pre.arxiv)}?fields=title,year,venue,publicationVenue,journal,externalIds,authors,publicationTypes`,
+        headers,
+      );
+      if (!one) askedAll = false;
+      const r = one?.data ? s2Record(one.data) : null;
+      if (r && r.kind !== 'preprint' && (r.venue || r.doi) && same({ ...r, names: r.names.length ? r.names : pre.names })) found = r;
+    }
+    // 4. OpenAlex, by its title (it limits programs without a key the most).
     if (!found) {
-      const oa = await this.json<{ results?: OpenAlexWork[] }>('openalex', `https://api.openalex.org/works?per-page=5&search=${encodeURIComponent(plainWords(pre.title).slice(0, 300))}`);
+      const oa = await this.json<{ results?: OpenAlexWork[] }>('openalex', this.oa(`https://api.openalex.org/works?per-page=5&search=${encodeURIComponent(plainWords(pre.title).slice(0, 300))}`));
       if (!oa) askedAll = false;
       for (const w of oa?.data?.results ?? []) {
         const r = openAlexPublished(w);
@@ -295,19 +324,51 @@ export class Lookup {
         }
       }
     }
-    if (!found && pre.arxiv) {
-      const headers: Record<string, string> = this.o.s2Key ? { 'x-api-key': this.o.s2Key } : {};
-      const s2 = await this.json<S2Paper>(
-        'semanticscholar',
-        `https://api.semanticscholar.org/graph/v1/paper/arXiv:${encodeURIComponent(pre.arxiv)}?fields=title,year,venue,publicationVenue,journal,externalIds,authors,publicationTypes`,
-        headers,
-      );
-      if (!s2) askedAll = false;
-      const r = s2?.data ? s2Record(s2.data) : null;
-      if (r && r.kind !== 'preprint' && (r.venue || r.doi) && same({ ...r, names: r.names.length ? r.names : pre.names })) found = r;
+    // 5. DBLP last: it shows programs from some places a check they cannot pass.
+    if (!found && !this.down.has('dblp')) {
+      const db = await this.json<DblpAnswer>('dblp', `https://dblp.org/search/publ/api?format=json&h=5&q=${encodeURIComponent(plainWords(pre.title).slice(0, 200))}`);
+      found = dblpRecords(db?.data).find((r) => r.kind !== 'preprint' && same(r)) ?? null;
     }
     if (found || askedAll) cachePut(this.o.db, key, found ?? { none: true }, 7 * DAY);
     return found;
+  }
+
+  /**
+   * Asks for every preprint at once where a service can (Semantic Scholar's batch, OpenAlex by their arXiv DOIs), so
+   * a paper with many preprints costs a request or two, not one each; what they said is kept for published().
+   */
+  async prefetchPublished(ids: string[]): Promise<void> {
+    const todo = [...new Set(ids)].filter((id) => !cacheGet(this.o.db, `published:${id}`) && !cacheGet(this.o.db, `s2:${id}`));
+    if (!todo.length) return;
+    // OpenAlex: a preprint it already knows with its published version (one work, several places).
+    for (let i = 0; i < todo.length && !this.down.has('openalex'); i += 50) {
+      const batch = todo.slice(i, i + 50);
+      const filter = batch.map((id) => `10.48550/arxiv.${id.toLowerCase()}`).join('|');
+      const oa = await this.json<{ results?: OpenAlexWork[] }>('openalex', this.oa(`https://api.openalex.org/works?per-page=50&filter=doi:${encodeURIComponent(filter)}`));
+      for (const w of oa?.data?.results ?? []) {
+        const id = /10\.48550\/arxiv\.(.+)$/i.exec(w.doi ?? '')?.[1];
+        const pub = openAlexPublished(w);
+        const own = batch.find((x) => x.toLowerCase() === id?.toLowerCase());
+        if (own && pub) cachePut(this.o.db, `published:${own}`, pub, 7 * DAY);
+      }
+    }
+    // Semantic Scholar: where each appeared, up to 500 at once (tried a few times: it is often busy for programs without a key).
+    const headers: Record<string, string> = this.o.keys?.semanticscholar ? { 'x-api-key': this.o.keys.semanticscholar } : {};
+    for (let i = 0; i < todo.length && !this.down.has('semanticscholar'); i += 400) {
+      const batch = todo.slice(i, i + 400);
+      const r = await this.json<(S2Paper | null)[]>(
+        'semanticscholar',
+        'https://api.semanticscholar.org/graph/v1/paper/batch?fields=title,year,venue,publicationVenue,journal,externalIds,authors,publicationTypes',
+        headers,
+        { ids: batch.map((id) => `arXiv:${id}`) },
+        4,
+      );
+      if (!Array.isArray(r?.data)) continue;
+      batch.forEach((id, k) => {
+        const rec = r!.data![k] ? s2Record(r!.data![k]!) : null;
+        cachePut(this.o.db, `s2:${id}`, rec && rec.kind !== 'preprint' ? rec : { none: true }, 7 * DAY);
+      });
+    }
   }
 }
 
@@ -506,14 +567,16 @@ function s2Record(p: S2Paper): PaperRecord | null {
   if (!p.title) return null;
   const doi = typeof p.externalIds?.DOI === 'string' ? p.externalIds.DOI.toLowerCase() : undefined;
   const venue = p.publicationVenue?.name || p.journal?.name || p.venue || undefined;
-  const pre = !venue || /arxiv/i.test(venue) || (doi && /^10\.48550\//.test(doi));
+  // Its arXiv DOI is among its ids even once it was published: where it appeared says which it is.
+  const pre = !venue || /arxiv/i.test(venue);
+  const type = p.publicationVenue?.type;
   return {
     source: 'semanticscholar',
     title: p.title,
     names: (p.authors ?? []).map((a) => splitName(a.name ?? '')).filter((n) => n.family),
     year: p.year,
     venue: pre ? undefined : venue,
-    kind: pre ? 'preprint' : p.publicationVenue?.type === 'journal' || p.publicationTypes?.includes('JournalArticle') ? 'journal' : 'conference',
+    kind: pre ? 'preprint' : type === 'journal' ? 'journal' : type === 'conference' ? 'conference' : p.publicationTypes?.includes('JournalArticle') ? 'journal' : 'conference',
     doi: doi && !/^10\.48550\//.test(doi) ? doi : undefined,
     volume: p.journal?.volume,
     pages: p.journal?.pages?.trim(),
