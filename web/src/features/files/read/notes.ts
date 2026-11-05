@@ -3,6 +3,8 @@
 // spans the browser selects, a selection read back as runs and characters, boxes for the words picked.
 import { api, enc, post } from '../../../lib/api';
 import { mu } from '../../../lib/machine';
+import { toast } from '../../../lib/store';
+import { tr } from '../../../i18n/runtime';
 import { HIGHLIGHT_RGB, joinLines, type HighlightColor, type PdfHighlight, type PdfNotesView, type PdfRect, type TextRun } from '@shared/pdfnotes';
 
 export const loadNotes = (path: string) => api<PdfNotesView>(`/api/pdf-notes?path=${enc(path)}`);
@@ -50,6 +52,24 @@ export async function areaPicture(path: string, page: number, r: PdfRect, mtime:
     fr.readAsDataURL(blob);
   });
   return { blob, base64 };
+}
+
+/** Copies words, on a page served over plain http too (where the clipboard API is missing); says so. */
+export async function copyWords(text: string, done = 'Copied') {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(tr(done), 'ok');
+    return;
+  } catch {}
+  const t = document.createElement('textarea');
+  t.value = text;
+  t.style.position = 'fixed';
+  t.style.opacity = '0';
+  document.body.appendChild(t);
+  t.select();
+  const ok = document.execCommand('copy');
+  t.remove();
+  toast(ok ? tr(done) : tr('The browser did not allow copying'), ok ? 'ok' : 'error');
 }
 
 export const COLOR_NAMES: Record<HighlightColor, string> = { yellow: 'Yellow', green: 'Green', blue: 'Blue', pink: 'Pink' };

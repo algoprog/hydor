@@ -20,6 +20,7 @@ import {
   areaPicture,
   changeNotes,
   COLOR_NAMES,
+  copyWords,
   deepOf,
   hitHighlight,
   keepColor,
@@ -418,23 +419,19 @@ export function PdfReader({ path, mtime, canAsk, onClose, onFileSaved }: { path:
   const copy = async () => {
     const w = whatOf();
     if (!w) return;
-    try {
-      if (w.area && typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+    clearSelection();
+    setPick(null);
+    // An area: its picture, where the browser lets a page copy one; else its words.
+    if (w.area && typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+      try {
         const pic = areaPicture(path, w.page, w.area, mtime).then((p) => p.blob);
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': pic })]);
         toast(tr('Copied a picture of it'), 'ok');
-      } else {
-        await navigator.clipboard.writeText(w.text ?? '');
-        toast(tr('Copied'), 'ok');
-      }
-    } catch {
-      if (w.text) {
-        await navigator.clipboard.writeText(w.text).catch(() => {});
-        toast(tr('Copied its words'), 'ok');
-      } else toast(tr('The browser did not allow copying'), 'error');
+        return;
+      } catch {}
     }
-    clearSelection();
-    setPick(null);
+    if (w.text) await copyWords(w.text, w.area ? 'Copied its words' : 'Copied');
+    else toast(tr('The browser did not allow copying'), 'error');
   };
 
   const note = () => {
