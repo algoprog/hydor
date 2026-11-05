@@ -37,7 +37,7 @@ cd "$root"
 # What the server reads from its own folder as it runs (APP_ROOT in server/config.ts).
 # (tar rather than rsync: macOS 15 ships openrsync, which lacks some of rsync's options.)
 tar -cf - \
-  package.json package-lock.json CHANGELOG.md LICENSE \
+  package.json package-lock.json CHANGELOG.md LICENSE NOTICE \
   dist/server dist/web \
   server/find/shipped-vectors.json server/memory/embed_worker.py \
   server/computer/x11-helper.py server/computer/windows-helper.cs \

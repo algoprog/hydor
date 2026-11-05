@@ -3,6 +3,16 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.29.3 · 5 November 2026
+
+Hydor's code is now under the Apache License 2.0, which keeps its credit with whatever is built on it.
+
+- **A new license**: Hydor moves from the MIT License to the Apache License 2.0. You may still use it, change it and
+  share it as you like, but whatever you share that is built on Hydor keeps its credit, the NOTICE file (in your own
+  NOTICE file, your documentation, or where your product shows the notices of the work it builds on), and says what
+  you changed. The license also gives a patent license from those who contribute. The desktop apps carry the NOTICE
+  beside the license, and the app's own plugins are under the same license.
+
 ## 0.29.2 · 5 November 2026
 
 Notebooks and documents an agent hands over go into the Library from their cards.

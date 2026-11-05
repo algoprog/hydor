@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Reads the text in pictures, photos of documents, screenshots and scanned PDFs on this computer (RapidOCR), so agents can use what a scan or a receipt says.",
   "author": { "name": "Hydor Devs", "url": "https://hydor.app" },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "keywords": ["ocr", "scans", "receipts", "images", "pdf"],
   "extensions": {
     "com.naget.agent": {

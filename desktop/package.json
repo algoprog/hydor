@@ -7,7 +7,7 @@
   "description": "Hydor for macOS, Windows and Linux: the app, its server and the agents, in one app that keeps itself up to date.",
   "homepage": "https://github.com/algoprog/hydor",
   "author": "Hydor Devs",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",

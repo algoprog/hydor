@@ -4,7 +4,7 @@
   "version": "1.0.1",
   "description": "Tools to look inside SQLite databases, query them safely, change them in one go, and move data in and out of CSV files.",
   "author": { "name": "Hydor Devs", "url": "https://hydor.app" },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "keywords": ["sqlite", "database", "sql", "csv"],
   "extensions": {
     "com.naget.agent": {

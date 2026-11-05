@@ -5,7 +5,7 @@
   "description": "Up-to-date documentation and code examples for programming libraries and frameworks, from Context7, so agents write code against the version you use rather than what they remember.",
   "author": { "name": "Hydor Devs", "url": "https://hydor.app" },
   "homepage": "https://context7.com",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "keywords": ["documentation", "libraries", "frameworks", "coding", "context7"],
   "extensions": {
     "com.naget.agent": { "title": "Library docs", "category": "coding", "icon": "book" }

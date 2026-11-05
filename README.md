@@ -136,5 +136,7 @@ To build the Docker image yourself, see [With Docker](docs/install.md#with-docke
 
 ## License
 
-[MIT](LICENSE). Hydor is an independent project, not affiliated with or endorsed by Anthropic or
-OpenAI ([disclaimer](docs/how-it-works.md#disclaimer)).
+[Apache License 2.0](LICENSE). Use it, change it and share it as you like; whatever you share that is built on
+Hydor keeps its credit, the [NOTICE](NOTICE) file (in your own NOTICE file, your documentation, or where your product
+shows the notices of the work it builds on), and says what you changed. Hydor is an independent project, not
+affiliated with or endorsed by Anthropic or OpenAI ([disclaimer](docs/how-it-works.md#disclaimer)).

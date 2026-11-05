@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Ebooks for every agent: read an EPUB's details, contents and text, make a valid EPUB from Markdown or HTML chapters with a cover and a table of contents, and check or repair one before it goes to Kindle, Apple Books or Kobo.",
   "author": { "name": "Hydor Devs", "url": "https://hydor.app" },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "keywords": ["epub", "ebooks", "kindle", "apple books", "self-publishing", "markdown"],
   "extensions": {
     "com.naget.agent": {
