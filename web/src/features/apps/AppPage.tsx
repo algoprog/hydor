@@ -394,7 +394,55 @@ function UpdateButton({ id, own, home }: { id: string; own: OwnPage; home?: Home
   );
 }
 
-/** Its settings: Update every day (and when), then its form's answers, which each update takes. */
+/** A day of the week's name, in the app's language (0 is Sunday). */
+const dayName = (d: number) => new Intl.DateTimeFormat(LOCALE, { weekday: 'long' }).format(new Date(Date.UTC(2026, 0, 4 + d, 12)));
+
+/** The days Update automatically runs on, as its picker has them: every day, weekdays, one day ("5"), or others set elsewhere. */
+function daysChoice(days?: number[]): string {
+  if (!days?.length) return 'all';
+  if (days.join() === '1,2,3,4,5') return 'weekdays';
+  return days.length === 1 ? String(days[0]) : 'other';
+}
+
+/** When it updates by itself, in a line: "A new one every Friday at 16:00". */
+function whenLine(daily: HomeSettings['daily']): string {
+  const c = daysChoice(daily.days);
+  if (c === 'all') return `A new one at ${daily.time} each day`;
+  if (c === 'weekdays') return `A new one at ${daily.time} on weekdays`;
+  if (c === 'other') return `A new one at ${daily.time} on ${daily.days!.map(dayName).join(', ')}`;
+  return `A new one every ${dayName(Number(c))} at ${daily.time}`;
+}
+
+/** Update automatically's days and time, in one row: every day, on weekdays, or once a week on a day of your choice. */
+function WhenRow({ daily, disabled, onChange }: { daily: HomeSettings['daily']; disabled?: boolean; onChange: (d: { days?: number[] | null; time?: string }) => void }) {
+  const choice = daysChoice(daily.days);
+  return (
+    <div className="flex items-center gap-2 text-[13px] text-fg-2">
+      <select
+        aria-label="Which days"
+        value={choice}
+        disabled={disabled}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v === 'other') return;
+          onChange({ days: v === 'all' ? null : v === 'weekdays' ? [1, 2, 3, 4, 5] : [Number(v)] });
+        }}
+        className={cx(inputCls, 'h-8 min-w-0 flex-1 px-2 text-[13px]')}
+      >
+        <option value="all">Every day</option>
+        <option value="weekdays">On weekdays</option>
+        {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+          <option key={d} value={String(d)}>{`Once a week on ${dayName(d)}`}</option>
+        ))}
+        {choice === 'other' && <option value="other">{daily.days!.map(dayName).join(', ')}</option>}
+      </select>
+      <span className="shrink-0">at</span>
+      <input type="time" aria-label="At what time" value={daily.time} disabled={disabled} onChange={(e) => /^\d{2}:\d{2}$/.test(e.target.value) && onChange({ time: e.target.value })} className={cx(inputCls, 'h-8 w-[7.5rem] shrink-0 text-[13px]')} />
+    </div>
+  );
+}
+
+/** Its settings: Update automatically (on which days, and when), then its form's answers, which each update takes. */
 function HomeSettingsPanel({ id, recipe, template, home, onSaved }: { id: string; recipe: AppDef | AppTemplate; template: boolean; home: HomeSettings; onSaved: (h: HomeSettings) => void }) {
   const [values, setValues] = useState<FormValues>(() => ({ ...initialValues(recipe.fields), ...home.inputs }));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -418,16 +466,15 @@ function HomeSettingsPanel({ id, recipe, template, home, onSaved }: { id: string
     <div className="px-1 pt-1 pb-1">
       <div className="flex items-start gap-3 px-2 py-2">
         <div className="min-w-0 flex-1">
-          <div className="text-[13.5px] font-medium">Update every day</div>
-          <div className="mt-0.5 text-[12px] leading-snug text-fg-3">{home.daily.on ? 'A new one is ready for you each morning; it shows in Scheduled tasks too.' : 'Off: it changes only when you press Update.'}</div>
+          <div className="text-[13.5px] font-medium">Update automatically</div>
+          <div className="mt-0.5 text-[12px] leading-snug text-fg-3">{home.daily.on ? `${whenLine(home.daily)}; it shows in Scheduled tasks too.` : 'Off: it changes only when you press Update.'}</div>
         </div>
-        <Switch label="Update every day" on={home.daily.on} disabled={saving} onChange={(on) => void save({ daily: { on } })} />
+        <Switch label="Update automatically" on={home.daily.on} disabled={saving} onChange={(on) => void save({ daily: { on } })} />
       </div>
       {home.daily.on && (
-        <label className="flex items-center gap-3 px-2 pb-2.5 text-[13px] text-fg-2">
-          <span className="flex-1">At</span>
-          <input type="time" value={home.daily.time} disabled={saving} onChange={(e) => /^\d{2}:\d{2}$/.test(e.target.value) && void save({ daily: { time: e.target.value } })} className={cx(inputCls, 'h-8 w-[7.5rem] text-[13px]')} />
-        </label>
+        <div className="px-2 pb-2.5">
+          <WhenRow daily={home.daily} disabled={saving} onChange={(d) => void save({ daily: d })} />
+        </div>
       )}
       {fields.length > 0 && (
         <div className="mt-1 border-t border-line px-2 pt-3 pb-1">
@@ -548,10 +595,10 @@ function HomeView({ id, recipe, template, view, home, own, onHome }: { id: strin
             {home && (
               <label className="mt-5 flex items-center gap-3 rounded-xl border border-line bg-panel px-4 py-2.5 text-left">
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[13.5px] font-medium">Update every day</span>
-                  <span className="block text-[12px] text-fg-3">{home.daily.on ? `A new one at ${home.daily.time} each day` : 'A new one ready for you each morning'}</span>
+                  <span className="block text-[13.5px] font-medium">Update automatically</span>
+                  <span className="block text-[12px] text-fg-3">{whenLine(home.daily)}</span>
                 </span>
-                <Switch label="Update every day" on={home.daily.on} onChange={(on) => void put<{ home: HomeSettings }>(`/api/apps/${enc(id)}/home`, { daily: { on } }).then((r) => onHome(r.home), toastError)} />
+                <Switch label="Update automatically" on={home.daily.on} onChange={(on) => void put<{ home: HomeSettings }>(`/api/apps/${enc(id)}/home`, { daily: { on } }).then((r) => onHome(r.home), toastError)} />
               </label>
             )}
           </div>
