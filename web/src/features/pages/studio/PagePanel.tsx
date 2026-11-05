@@ -1,13 +1,15 @@
-// The visual editor's Page tab: the look of the whole page. Its title and background, how wide its content
-// runs, the colours it names (its CSS variables, the page kit's among them), its fonts, how its text, headings,
-// links and buttons look everywhere in it, and CSS of your own. With a tablet or phone picked above the page,
-// sizes changed here are for that size and smaller.
-import { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
-import { cx, Throbber } from '../../../components/ui';
+// The visual editor's Page tab: the look of the whole page. Its title and background, its icon and cover (as
+// Notion pages have them), how wide its content runs, the colours it names (its CSS variables, the page kit's
+// among them), its fonts, how its text, headings, links and buttons look everywhere in it, and CSS of your own.
+// With a tablet or phone picked above the page, sizes changed here are for that size and smaller.
+import { useRef, useState } from 'react';
+import { ChevronDown, ChevronRight, Smile, Trash2 } from 'lucide-react';
+import { cx, IconButton, Popover, SheetsOnPhone, Throbber } from '../../../components/ui';
 import type { EdPage } from '../frame';
+import { CharPicker } from '../common/CharPicker';
 import { Choice, ColorField, Group, hexOf, NumField, Row, Select, splitNum, Typed } from './fields';
 import { FONTS, fontOf, fontOptions } from './fonts';
+import { CoverChoices } from './Inserts';
 import { MEDIA_NOTE, WEIGHTS, type Cmd, type Media } from './Inspector';
 
 /** The page kit's colours (and corners), in plain words. */
@@ -43,8 +45,10 @@ const WIDTHS = [
   { value: 'narrow', label: 'Narrow', px: '720px' },
 ] as const;
 
-export function PagePanel({ page, palette, cmd, media }: { page: EdPage | null; palette: string[]; cmd: Cmd; media: Media }) {
+export function PagePanel({ page, palette, cmd, media, onError }: { page: EdPage | null; palette: string[]; cmd: Cmd; media: Media; onError: (e: unknown) => void }) {
   const [openKind, setOpenKind] = useState<string | null>(null);
+  const iconRef = useRef<HTMLButtonElement>(null);
+  const [picking, setPicking] = useState(false);
   if (!page)
     return (
       <div className="flex justify-center py-10 text-fg-3">
@@ -94,6 +98,42 @@ export function PagePanel({ page, palette, cmd, media }: { page: EdPage | null; 
         </Row>
         <Row label="Language" hint="The language it is written in (en, el, zh…), for screen readers and spelling">
           <Typed value={page.lang} onChange={(v) => cmd('meta', { lang: v.trim() })} placeholder="en" label="Language" />
+        </Row>
+      </Group>
+
+      <Group id="pg-cover" title="Icon and cover" start summary={[page.icon, page.cover ? (page.cover.kind === 'picture' ? 'A picture' : 'A gradient') : ''].filter(Boolean).join(' · ')}>
+        <Row label="Icon" hint="An emoji above the page's first heading">
+          <button ref={iconRef} type="button" onClick={() => setPicking((o) => !o)} className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg border border-line bg-bg-1 px-2.5 text-left text-[12.5px] hover:bg-bg-2">
+            {page.icon ? (
+              <span translate="no" className="text-[18px] leading-none">
+                {page.icon}
+              </span>
+            ) : (
+              <Smile size={15} className="text-fg-3" />
+            )}
+            <span className="text-fg-2">{page.icon ? 'Change the icon' : 'Add an icon'}</span>
+          </button>
+          {page.icon && (
+            <IconButton label="Remove the icon" size="sm" onClick={() => cmd('icon', null)}>
+              <Trash2 size={14} />
+            </IconButton>
+          )}
+          <SheetsOnPhone.Provider value>
+            <Popover anchor={iconRef} open={picking} onClose={() => setPicking(false)} width={336} title="The page’s icon">
+              <CharPicker
+                kinds={['emoji']}
+                onPick={(ch) => {
+                  cmd('icon', ch);
+                  setPicking(false);
+                }}
+              />
+            </Popover>
+          </SheetsOnPhone.Provider>
+        </Row>
+        <Row label="Cover" top hint="A band of colour or a picture across the page's top">
+          <div className="min-w-0 flex-1 pt-1">
+            <CoverChoices current={page.cover?.kind === 'gradient' ? page.cover.value : undefined} onPick={(c) => cmd('cover', c)} onRemove={page.cover ? () => cmd('cover', null) : undefined} onError={onError} />
+          </div>
         </Row>
       </Group>
 

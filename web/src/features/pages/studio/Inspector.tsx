@@ -1,12 +1,15 @@
 // The visual editor's Part tab: the part picked in the page. At its top, what it does (ask an agent about
-// it, copy, paste, wrap), and where changes go: this part alone or every part of its kind or class, as it
-// is or under the pointer, and (with a tablet or phone picked above the page) at that size and smaller. Then
-// its words, address or picture, and its look in groups that fold: text, fill and border, space, size,
-// layout, and its class, name and CSS. A change goes to the editor in the page's frame at once.
+// it, copy, paste, wrap). Then its words, the kind of block it is (Turn into), its address, picture or maths;
+// where changes go: this part alone or every part of its kind or class, as it is or under the pointer, and
+// (with a tablet or phone picked above the page) at that size and smaller; and its look in groups that fold.
+// The ones most people use stay open (text, fill and border), with the commonest choices first; space, size,
+// layout and its class, name and CSS wait until opened. With several blocks picked, changes go to them all.
+// A change goes to the editor in the page's frame at once.
 import { useRef, useState, type ReactNode } from 'react';
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ClipboardPaste, Copy, ImageUp, Italic, MessageSquarePlus, MoreHorizontal, Strikethrough, Type, Underline } from 'lucide-react';
 import { Button, cx, IconButton, MenuItem, MenuSep, Popover, Switch } from '../../../components/ui';
 import type { EdSel } from '../frame';
+import { loadKatex, texHtml } from '../common/katex';
 import { BoxModel, Choice, ColorField, Group, hexOf, NumField, Row, Select, splitNum, Typed } from './fields';
 import { FONTS, fontOf, fontOptions } from './fonts';
 
@@ -76,12 +79,19 @@ export function PictureButton({ onPicture, onError, title = 'A picture from this
   );
 }
 
-const TURN = [
-  { value: 'h1', label: 'H1', title: 'Heading 1' },
-  { value: 'h2', label: 'H2', title: 'Heading 2' },
-  { value: 'h3', label: 'H3', title: 'Heading 3' },
-  { value: 'p', label: 'Text', title: 'Text' },
-  { value: 'blockquote', label: '❝', title: 'Quote' },
+/** The kinds of block words can be turned into (writing.ts), keeping them. */
+const KINDS = [
+  { value: 'p', label: 'Text' },
+  { value: 'h1', label: 'Heading 1' },
+  { value: 'h2', label: 'Heading 2' },
+  { value: 'h3', label: 'Heading 3' },
+  { value: 'bullet', label: 'Bulleted list' },
+  { value: 'number', label: 'Numbered list' },
+  { value: 'todo', label: 'To-do list' },
+  { value: 'toggle', label: 'Toggle list' },
+  { value: 'quote', label: 'Quote' },
+  { value: 'callout', label: 'Callout' },
+  { value: 'code', label: 'Code' },
 ];
 export const WEIGHTS = [
   { value: '300', label: 'Light (300)' },
@@ -230,37 +240,31 @@ export function PartPanel({
         </Popover>
       </div>
 
-      <div className="mb-1 space-y-1.5 rounded-xl bg-bg-1 p-2">
-        <div className="flex items-center gap-1.5">
-          <Select value={ctx.scope} options={scopes} onChange={(v) => onCtx({ ...ctx, scope: v })} title="Which parts the changes below are for" />
-          <div className="w-[112px] shrink-0">
-            <Choice
-              value={ctx.state || 'normal'}
-              onChange={(v) => onCtx({ ...ctx, state: v === 'hover' ? 'hover' : '' })}
-              options={[
-                { value: 'normal', label: 'Normal', title: 'As it is' },
-                { value: 'hover', label: 'Hover', title: 'While the pointer is over it' },
-              ]}
-            />
-          </div>
-        </div>
-        {(ctx.scope !== 'self' || ctx.state || media) && (
-          <p className="px-0.5 text-[11.5px] leading-snug text-fg-3">
-            {[ctx.scope !== 'self' ? `Every part it names changes together.` : '', ctx.state ? 'Shown while the pointer is over it.' : '', media ? MEDIA_NOTE[media] : ''].filter(Boolean).join(' ')}
-          </p>
-        )}
-      </div>
+      {!!sel.multi && (
+        <p className="mb-2 rounded-xl bg-accent-soft px-2.5 py-2 text-[12px] leading-snug text-fg-2">{`${sel.multi} blocks picked: the changes below, and Delete, Duplicate, Move, Turn into and Colour in their ⋮⋮ menu, go to all of them.`}</p>
+      )}
 
-      {(sel.words !== undefined || isLink || isImg || isField || /^(h[1-6]|p|blockquote)$/.test(sel.tag)) && (
+      {(sel.words !== undefined || isLink || isImg || isField || !!sel.kind || sel.tex !== undefined) && (
         <Group id="content" title="Content" start summary={sel.snippet}>
           {sel.words !== undefined && (
             <Row label="Words" top>
               <Typed value={sel.words} onChange={(v) => cmd('words', v)} area label="Words" />
             </Row>
           )}
-          {/^(h[1-6]|p|blockquote)$/.test(sel.tag) && (
-            <Row label="Kind">
-              <Choice value={sel.tag} onChange={(v) => cmd('retag', v)} options={TURN} />
+          {sel.kind && (
+            <Row label="Kind" hint="Turn it into another kind of block, keeping its words (Ctrl+/ while writing)">
+              <Select value={sel.kind} options={KINDS} onChange={(v) => cmd('turn', v)} title="Turn into" />
+            </Row>
+          )}
+          {sel.tex !== undefined && (
+            <Row label="Maths" top hint="LaTeX, drawn with KaTeX">
+              <Typed
+                value={sel.tex}
+                onChange={(tex) => tex.trim() && Promise.all([texHtml(tex, true), loadKatex()]).then(([html, k]) => cmd('mathEdit', { tex, html, css: `https://cdn.jsdelivr.net/npm/katex@${(k as { version?: string }).version ?? '0.19.0'}/dist/katex.min.css` }), onError)}
+                area
+                mono
+                label="Maths"
+              />
             </Row>
           )}
           {isLink && (
@@ -297,6 +301,27 @@ export function PartPanel({
         </Group>
       )}
 
+      <div className="my-1 space-y-1.5 rounded-xl bg-bg-1 p-2">
+        <div className="flex items-center gap-1.5">
+          <Select value={ctx.scope} options={scopes} onChange={(v) => onCtx({ ...ctx, scope: v })} title="Which parts the changes below are for" />
+          <div className="w-[112px] shrink-0">
+            <Choice
+              value={ctx.state || 'normal'}
+              onChange={(v) => onCtx({ ...ctx, state: v === 'hover' ? 'hover' : '' })}
+              options={[
+                { value: 'normal', label: 'Normal', title: 'As it is' },
+                { value: 'hover', label: 'Hover', title: 'While the pointer is over it' },
+              ]}
+            />
+          </div>
+        </div>
+        {(ctx.scope !== 'self' || ctx.state || media) && (
+          <p className="px-0.5 text-[11.5px] leading-snug text-fg-3">
+            {[ctx.scope !== 'self' ? `Every part it names changes together.` : '', ctx.state ? 'Shown while the pointer is over it.' : '', media ? MEDIA_NOTE[media] : ''].filter(Boolean).join(' ')}
+          </p>
+        )}
+      </div>
+
       {textual && (
         <Group
           id="text"
@@ -304,54 +329,12 @@ export function PartPanel({
           start
           summary={[FONTS.find((f) => f.value === font)?.label, c['font-size'], WEIGHTS.find((x) => x.value === c['font-weight'])?.label.replace(/ \(\d+\)$/, '')].filter(Boolean).join(' · ')}
         >
-          <Row label="Font" set={isSet('font-family')} onReset={reset('font-family')}>
-            <Select
-              value={isSet('font-family') ? font || get('font-family').split(',')[0].replace(/["']/g, '').trim() : ''}
-              options={fontOptions(font && !isSet('font-family') ? `As around it (${FONTS.find((f) => f.value === font)?.label})` : 'As around it')}
-              onChange={setFont}
-              title="Font"
-            />
+          <Row label="Colour" set={isSet('color')} onReset={reset('color')}>
+            <ColorField value={hexOf(get('color'))} palette={palette} onChange={(v) => style({ color: v })} />
           </Row>
           <Row label="Size" set={isSet('font-size')} onReset={reset('font-size')}>
             <NumField value={get('font-size')} onChange={(v) => style({ 'font-size': v })} units={['px', 'em', 'rem', '%']} min={0} scrub="A" title="Text size" />
             <Select value={c['font-weight'] ?? '400'} options={WEIGHTS} onChange={(v) => style({ 'font-weight': v })} title="Weight" className="w-[118px] shrink-0" />
-          </Row>
-          <Row label="Spacing" set={isSet('line-height') || isSet('letter-spacing')} onReset={reset('line-height', 'letter-spacing')} hint="The height of its lines, and the space between its letters">
-            <NumField
-              value={get('line-height') === 'normal' ? '' : get('line-height')}
-              onChange={(v) => style({ 'line-height': v })}
-              units={['', 'px', 'em']}
-              words={['normal']}
-              min={0}
-              step={0.1}
-              scrub="↕"
-              placeholder="Auto"
-              title="Line height"
-            />
-            <NumField
-              value={get('letter-spacing') === 'normal' ? '' : get('letter-spacing')}
-              onChange={(v) => style({ 'letter-spacing': v })}
-              units={['px', 'em']}
-              step={0.1}
-              scrub="↔"
-              placeholder="0"
-              title="Letter spacing"
-            />
-          </Row>
-          <Row label="Colour" set={isSet('color')} onReset={reset('color')}>
-            <ColorField value={hexOf(get('color'))} palette={palette} onChange={(v) => style({ color: v })} />
-          </Row>
-          <Row label="Align" set={isSet('text-align')} onReset={reset('text-align')}>
-            <Choice
-              value={c['text-align'] === 'center' ? 'center' : c['text-align'] === 'right' || c['text-align'] === 'end' ? 'right' : c['text-align'] === 'justify' ? 'justify' : 'left'}
-              onChange={(v) => style({ 'text-align': v })}
-              options={[
-                { value: 'left', label: <AlignLeft size={14} />, title: 'Left' },
-                { value: 'center', label: <AlignCenter size={14} />, title: 'Centre' },
-                { value: 'right', label: <AlignRight size={14} />, title: 'Right' },
-                { value: 'justify', label: <AlignJustify size={14} />, title: 'Both edges' },
-              ]}
-            />
           </Row>
           <Row label="Style" set={isSet('font-style') || isSet('text-decoration-line') || isSet('text-transform')} onReset={reset('font-style', 'text-decoration-line', 'text-transform')}>
             <div className="flex gap-1">
@@ -389,33 +372,54 @@ export function PartPanel({
               ))}
             </div>
           </Row>
+          <Row label="Align" set={isSet('text-align')} onReset={reset('text-align')}>
+            <Choice
+              value={c['text-align'] === 'center' ? 'center' : c['text-align'] === 'right' || c['text-align'] === 'end' ? 'right' : c['text-align'] === 'justify' ? 'justify' : 'left'}
+              onChange={(v) => style({ 'text-align': v })}
+              options={[
+                { value: 'left', label: <AlignLeft size={14} />, title: 'Left' },
+                { value: 'center', label: <AlignCenter size={14} />, title: 'Centre' },
+                { value: 'right', label: <AlignRight size={14} />, title: 'Right' },
+                { value: 'justify', label: <AlignJustify size={14} />, title: 'Both edges' },
+              ]}
+            />
+          </Row>
+          <Row label="Font" set={isSet('font-family')} onReset={reset('font-family')}>
+            <Select
+              value={isSet('font-family') ? font || get('font-family').split(',')[0].replace(/["']/g, '').trim() : ''}
+              options={fontOptions(font && !isSet('font-family') ? `As around it (${FONTS.find((f) => f.value === font)?.label})` : 'As around it')}
+              onChange={setFont}
+              title="Font"
+            />
+          </Row>
+          <Row label="Spacing" set={isSet('line-height') || isSet('letter-spacing')} onReset={reset('line-height', 'letter-spacing')} hint="The height of its lines, and the space between its letters">
+            <NumField
+              value={get('line-height') === 'normal' ? '' : get('line-height')}
+              onChange={(v) => style({ 'line-height': v })}
+              units={['', 'px', 'em']}
+              words={['normal']}
+              min={0}
+              step={0.1}
+              scrub="↕"
+              placeholder="Auto"
+              title="Line height"
+            />
+            <NumField
+              value={get('letter-spacing') === 'normal' ? '' : get('letter-spacing')}
+              onChange={(v) => style({ 'letter-spacing': v })}
+              units={['px', 'em']}
+              step={0.1}
+              scrub="↔"
+              placeholder="0"
+              title="Letter spacing"
+            />
+          </Row>
         </Group>
       )}
 
-      <Group id="fill" title="Fill and border" summary={hexOf(get('background-color')) ?? (bgImage ? 'Picture' : '')}>
+      <Group id="fill" title="Fill and border" start summary={hexOf(get('background-color')) ?? (bgImage ? 'Picture' : '')}>
         <Row label="Fill" set={isSet('background-color')} onReset={reset('background-color')}>
           <ColorField value={hexOf(get('background-color'))} palette={palette} onChange={(v) => style({ 'background-color': v ?? 'transparent' })} none />
-        </Row>
-        <Row label="Picture" set={isSet('background-image')} onReset={reset('background-image', 'background-size', 'background-position', 'background-repeat')} hint="A picture behind what is in it">
-          <Typed
-            value={bgImage.startsWith('data:') ? '' : bgImage}
-            onChange={(v) => style(v ? { 'background-image': `url("${v.replace(/"/g, '%22')}")`, 'background-size': 'cover', 'background-position': 'center' } : { 'background-image': null })}
-            placeholder={bgImage.startsWith('data:') ? 'In the page' : 'https://…'}
-            label="Picture behind it"
-          />
-          <PictureButton onPicture={(src) => style({ 'background-image': `url("${src}")`, 'background-size': 'cover', 'background-position': 'center' })} onError={onError} />
-        </Row>
-        <Row label="See-through" set={isSet('opacity')} onReset={reset('opacity')} hint="How much shows through it">
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={Math.round((1 - (parseFloat(get('opacity') || '1') || 0)) * 100)}
-            onChange={(e) => style({ opacity: String(1 - Number(e.target.value) / 100) })}
-            className="min-w-0 flex-1 accent-[var(--accent)]"
-            aria-label="See-through"
-          />
-          <span className="w-9 shrink-0 text-right text-[12px] text-fg-3 tabular-nums">{Math.round((1 - (parseFloat(get('opacity') || '1') || 0)) * 100)}%</span>
         </Row>
         <Row label="Corners" set={isSet('border-top-left-radius')} onReset={reset('border-radius')}>
           <NumField value={get('border-top-left-radius')} onChange={(v) => style({ 'border-radius': v })} units={['px', '%']} min={0} scrub="◜" title="Rounded corners" />
@@ -458,6 +462,27 @@ export function PartPanel({
               { value: 'strong', label: 'Strong' },
             ]}
           />
+        </Row>
+        <Row label="Picture" set={isSet('background-image')} onReset={reset('background-image', 'background-size', 'background-position', 'background-repeat')} hint="A picture behind what is in it">
+          <Typed
+            value={bgImage.startsWith('data:') ? '' : bgImage}
+            onChange={(v) => style(v ? { 'background-image': `url("${v.replace(/"/g, '%22')}")`, 'background-size': 'cover', 'background-position': 'center' } : { 'background-image': null })}
+            placeholder={bgImage.startsWith('data:') ? 'In the page' : 'https://…'}
+            label="Picture behind it"
+          />
+          <PictureButton onPicture={(src) => style({ 'background-image': `url("${src}")`, 'background-size': 'cover', 'background-position': 'center' })} onError={onError} />
+        </Row>
+        <Row label="See-through" set={isSet('opacity')} onReset={reset('opacity')} hint="How much shows through it">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round((1 - (parseFloat(get('opacity') || '1') || 0)) * 100)}
+            onChange={(e) => style({ opacity: String(1 - Number(e.target.value) / 100) })}
+            className="min-w-0 flex-1 accent-[var(--accent)]"
+            aria-label="See-through"
+          />
+          <span className="w-9 shrink-0 text-right text-[12px] text-fg-3 tabular-nums">{Math.round((1 - (parseFloat(get('opacity') || '1') || 0)) * 100)}%</span>
         </Row>
       </Group>
 
