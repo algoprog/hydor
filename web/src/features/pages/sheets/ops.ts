@@ -450,19 +450,37 @@ export function dataEdge(sh: Sheet, r: number, c: number, dr: number, dc: number
   return inside(rr, cc) ? [rr, cc] : [Math.max(0, Math.min(rows - 1, rr - dr)), Math.max(0, Math.min(cols - 1, cc - dc))];
 }
 
-/** Sum, average and counts of a selection, for the bar under the sheet. */
-export function statsOf(sh: Sheet, calc: Calc, si: number, x: Rect): { sum: number; count: number; nums: number } {
+/** Sum, average and counts of a selection (or of several), for the bar under the sheet: what formulas spilled into it counts too. */
+export function statsOf(sh: Sheet, calc: Calc, si: number, rects: Rect | Rect[]): { sum: number; count: number; nums: number } {
   let sum = 0;
   let count = 0;
   let nums = 0;
-  for (const [k, r, c] of cellsIn(sh, calc, si, x)) {
-    if (!holds(sh.cells[k])) continue;
-    const v = calc.value(si, r, c);
-    if (v === null || v === '') continue;
+  const add = (v: Scalar) => {
+    if (v === null || v === '') return;
     count++;
     if (typeof v === 'number') {
       sum += v;
       nums++;
+    }
+  };
+  // A cell in two of the ranges counts once.
+  const seen = new Set<string>();
+  const list = Array.isArray(rects) ? rects : [rects];
+  for (const x of list) {
+    for (const [k, r, c] of cellsIn(sh, calc, si, x)) {
+      if (!holds(sh.cells[k]) || seen.has(k)) continue;
+      seen.add(k);
+      add(calc.value(si, r, c));
+    }
+    // The values an array formula spilled into the cells picked, which hold nothing of their own.
+    for (const { r, c, sp } of calc.spillsOf(si)) {
+      for (let rr = Math.max(r, x.r1); rr <= Math.min(r + sp.h - 1, x.r2); rr++)
+        for (let cc = Math.max(c, x.c1); cc <= Math.min(c + sp.w - 1, x.c2); cc++) {
+          const k = refName(rr, cc);
+          if ((rr === r && cc === c) || holds(sh.cells[k]) || seen.has(k)) continue;
+          seen.add(k);
+          add(sp.d[(rr - r) * sp.w + (cc - c)]);
+        }
     }
   }
   return { sum, count, nums };
