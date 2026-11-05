@@ -544,9 +544,20 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     const shown = formatValue(v, cell.s);
     if (allowed(calc, sheetIx, got.rule, v, shown, { r, c, r0: got.r0, c0: got.c0 })) return false;
     if (!got.rule.reject) return false;
-    const opts = got.rule.type === 'list' ? listOptions(calc, sheetIx, got.rule).map((o) => o.v) : [];
-    toast(opts.length ? `${tr('This cell takes one of')}: ${opts.slice(0, 8).join(', ')}` : tr('This value is not allowed in this cell.'), 'error');
+    toast(ruleWords(got.rule), 'error');
     return true;
+  };
+  /** What a rule lets a cell take, in words, for when it refuses a value. */
+  const ruleWords = (rule: Validation): string => {
+    const w = rule.when;
+    const opts = rule.type === 'list' && calc ? listOptions(calc, sheetIx, rule).map((o) => o.v) : [];
+    if (opts.length) return `${tr('This cell takes one of')}: ${opts.slice(0, 8).join(', ')}${opts.length > 8 ? '…' : ''}`;
+    if (rule.type === 'checkbox') return tr('This cell takes TRUE or FALSE.');
+    if (rule.type === 'rating') return `${tr('This cell takes a whole number of stars from 0 to')} ${rule.max ?? 5}.`;
+    const what = rule.type === 'date' ? 'date' : rule.type === 'length' ? 'length' : 'number';
+    if (!w || rule.type === 'formula') return tr('This value is not allowed in this cell.');
+    const op = w.op === 'between' ? `between ${w.a} and ${w.b}` : w.op === 'notBetween' ? `not between ${w.a} and ${w.b}` : `${{ eq: '=', neq: '≠', gt: '>', gte: '≥', lt: '<', lte: '≤' }[w.op as 'eq'] ?? ''} ${w.a ?? ''}`;
+    return `${tr(what === 'date' ? 'This cell takes a date' : what === 'length' ? 'This cell takes words whose length is' : 'This cell takes a number')} ${op.trim()}.`;
   };
 
   /** The options a list cell offers for what is typed in it. */
@@ -595,7 +606,10 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       const why = formulaProblem(f);
       if (why) toast(`${tr('This formula cannot be worked out')}: ${tr(why)}`, 'error');
     }
-    change(cellsPatch(b, sheetIx, changes), s);
+    // A row typed just below a filter's range joins it, as in Google Sheets.
+    const fx = view.filter?.x;
+    const grow = fx && sheet.filter && holds(changes[key] ?? undefined) && s.r === fx.r2 + 1 && s.c >= fx.c1 && s.c <= fx.c2 ? metaPatch(sheet, { filter: { ...sheet.filter, range: rangeName({ ...fx, r2: fx.r2 + 1 }) } }) : null;
+    change(together([cellsPatch(b, sheetIx, changes), grow]), s);
     if (move) advance(move[0], move[1]);
     grid.current?.focus();
   };
@@ -1260,10 +1274,16 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     change(cellsPatch(book, sheetIx, got.changes));
     toast(got.removed ? `${got.removed} duplicate row${got.removed === 1 ? '' : 's'} removed` : tr('No duplicate rows were found.'));
   };
-  const splitText = (sepr: string) => {
+  const splitText = async (sepr: string) => {
     if (!book || !sheet || !calc) return;
     const b: Rect = { ...x, c2: x.c1, r2: Math.min(x.r2, Math.max(x.r1, calc.extent(sheetIx).rows - 1)) };
     const got = splitColumn(sheet, calc, sheetIx, b, sepr);
+    // Cells to the right that hold something are written over: asked first, as Sheets asks.
+    const over = Object.keys(got.changes).some((k) => {
+      const p = parseRef(k);
+      return p && p.c > b.c1 && holds(sheet.cells[k]);
+    });
+    if (over && !(await confirm({ title: 'Replace what the cells beside hold?', body: 'The parts go into the columns to the right, over what is there now.', confirm: 'Replace' }))) return;
     change(cellsPatch(book, sheetIx, got.changes));
   };
   const splitGuess = () => {
@@ -1769,13 +1789,13 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     {
       title: 'Moving and picking',
       items: [
-        ['Ctrl+→', 'To the edge of the data'],
-        ['Shift+→', 'Pick more cells'],
+        ['Ctrl+Arrow', 'To the edge of the data'],
+        ['Shift+Arrow', 'Pick more cells'],
         ['Ctrl+Space', 'Pick the whole column'],
         ['Shift+Space', 'Pick the whole row'],
         ['Ctrl+A', 'Pick everything'],
         ['Space', 'Expand the row picked whole, or tick a checkbox'],
-        ['Alt+↓', 'Open a list or a calendar'],
+        ['Alt+Down', 'Open a list or a calendar'],
       ],
     },
     {
@@ -2262,7 +2282,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       )}
       {dialog === 'sort' && toolBlock && <SortDialog cols={colChoices(toolBlock, header)} header={header} onHeader={setHeader} onSort={sortRangeBy} onClose={() => setDialog(null)} />}
       {dialog === 'dups' && toolBlock && <DupDialog cols={colChoices(toolBlock, header)} header={header} onHeader={setHeader} onRemove={removeDups} onClose={() => setDialog(null)} />}
-      {dialog === 'split' && <SplitDialog guess={splitGuess()} onSplit={splitText} onClose={() => setDialog(null)} />}
+      {dialog === 'split' && <SplitDialog guess={splitGuess()} onSplit={(sp) => void splitText(sp)} onClose={() => setDialog(null)} />}
       {dialog === 'format' && <FormatDialog code={active?.s?.code ?? ''} sample={calc.value(sheetIx, sel.r, sel.c)} style={active?.s} onApply={(c) => setCode(c)} onClose={() => setDialog(null)} />}
       <ShortcutsDialog open={dialog === 'shortcuts'} onClose={() => setDialog(null)} groups={shortcutGroups} />
       {confirmNode}

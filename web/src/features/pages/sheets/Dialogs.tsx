@@ -177,8 +177,21 @@ export function SplitDialog({ guess, onSplit, onClose }: { guess: string; onSpli
   );
 }
 
-/** Codes to start from, as Excel and Google Sheets offer them. */
-const CODES = ['#,##0.00', '0.0%', '$#,##0;[Red]-$#,##0', '#,##0;(#,##0)', '0.00E+00', '#,##0,"k"', 'yyyy-mm-dd', 'd mmm yyyy', 'dddd, d mmmm yyyy', 'h:mm AM/PM', '[h]:mm:ss', '@" items"'];
+/** Codes to start from, as Excel and Google Sheets offer them, each with a value that shows what it does. */
+const CODES: [string, number | string][] = [
+  ['#,##0.00', 1234.5],
+  ['0.0%', 0.1234],
+  ['$#,##0;[Red]-$#,##0', -1234.5],
+  ['#,##0;(#,##0)', -1234.5],
+  ['0.00E+00', 123456],
+  ['#,##0,"k"', 125000],
+  ['yyyy-mm-dd', 46331],
+  ['d mmm yyyy', 46331],
+  ['mmm yyyy', 46331],
+  ['h:mm AM/PM', 0.6042],
+  ['[h]:mm:ss', 1.1042],
+  ['@" items"', '12'],
+];
 
 export function FormatDialog({ code, sample, style, onApply, onClose }: { code: string; sample: Scalar; style: CellStyle | undefined; onApply: (code: string) => void; onClose: () => void }) {
   const [text, setText] = useState(code);
@@ -217,13 +230,13 @@ export function FormatDialog({ code, sample, style, onApply, onClose }: { code: 
       </div>
       <div className="mt-3 mb-1 text-[12px] font-medium text-fg-3">Start from</div>
       <div className="grid grid-cols-2 gap-1">
-        {CODES.map((c) => (
+        {CODES.map(([c, v]) => (
           <button key={c} type="button" onClick={() => setText(c)} className={cx('flex h-8 items-center justify-between gap-2 rounded-lg px-2 text-left font-mono text-[12px] hover:bg-bg-2', text === c && 'bg-bg-2')}>
-            <span translate="no" className="truncate">
+            <span translate="no" className="min-w-0 truncate">
               {c}
             </span>
             <span translate="no" className="shrink-0 font-sans text-fg-3">
-              {formatValue(c.includes('y') || c.includes('h') ? 46331.6 : -1234.5, { code: c })}
+              {formatValue(v, { code: c })}
             </span>
           </button>
         ))}
