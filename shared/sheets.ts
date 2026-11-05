@@ -1,16 +1,20 @@
 // Spreadsheets: a workbook kept in Pages (a page of the kind "sheet"), as the server, the editor and the exports
 // share it. A workbook is a list of sheets; a sheet keeps its cells by name ("B2"), each a value (a number, words,
-// TRUE or FALSE) or a formula ("=SUM(B2:B9)") and how it looks, the widths of its columns, the heights of its rows,
-// and the rows and columns that stay in view as it scrolls (frozen).
+// TRUE or FALSE) or a formula ("=SUM(B2:B9)"), how it looks (borders, a number format of Excel's own codes too) and
+// a note, the widths of its columns, the heights of its rows and which are hidden, the rows and columns that stay in
+// view as it scrolls (frozen), cells merged into one, a filter on a header row, conditional formatting, the rules for
+// what cells take (lists of options, checkboxes, ratings, numbers or dates in a range), and charts over the grid.
 //
 // normalizeBook takes what an agent or the editor sends, lenient about shorthand (rows from A1, a header row, a
 // format per column, words typed as a person types them: "12%", "2026-01-31", "=B2*2"), and returns the workbook as
 // it is kept, every value checked. computeBook works out what each formula gives, as Excel does: its operators,
 // references to cells, ranges and other sheets, a long list of functions, dates as Excel's day numbers (1900 system).
 // formatValue writes a value as its cell shows it. shiftFormula, adjustForInsert and adjustForDelete rewrite formulas
-// as cells are copied, or rows and columns go in or out. Nothing here needs Node or a browser.
+// (and the ranges rules and merges cover) as cells are copied, or rows and columns go in or out. What the rules make
+// of the cells (rows a filter hides, the look conditional formatting gives) is worked out in sheet-rules.ts. Nothing
+// here needs Node or a browser.
 
-export const SHEET_LIMITS = { sheets: 50, cells: 200_000, rows: 20_000, cols: 500, text: 32_767, formula: 8_192, name: 31 };
+export const SHEET_LIMITS = { sheets: 50, cells: 200_000, rows: 20_000, cols: 500, text: 32_767, formula: 8_192, name: 31, note: 4_000, merges: 5_000, rules: 100, charts: 20, options: 500 };
 
 /** A column's width and a row's height in the editor (px) when none is set. */
 export const COL_W = 100;
@@ -26,8 +30,26 @@ export const FONT_PT = 10;
 export const MAX_ROWS = 1_048_576;
 export const MAX_COLS = 16_384;
 
-export type NumFmt = 'general' | 'number' | 'percent' | 'currency' | 'date' | 'text';
-export const NUM_FMTS: NumFmt[] = ['general', 'number', 'percent', 'currency', 'date', 'text'];
+export type NumFmt = 'general' | 'number' | 'percent' | 'currency' | 'accounting' | 'scientific' | 'date' | 'time' | 'datetime' | 'duration' | 'text';
+export const NUM_FMTS: NumFmt[] = ['general', 'number', 'percent', 'currency', 'accounting', 'scientific', 'date', 'time', 'datetime', 'duration', 'text'];
+/** The formats that show a date or a time of day (a cell typed in them is read as one). */
+export const isDateFmt = (f: NumFmt | undefined) => f === 'date' || f === 'time' || f === 'datetime' || f === 'duration';
+
+/** The fonts a cell may be in, each with what the browser is to look for (and stand-ins that look alike). */
+export const CELL_FONTS: Record<string, string> = {
+  Arial: 'Arial, Arimo, "Liberation Sans", Helvetica, sans-serif',
+  Calibri: 'Calibri, Carlito, "Segoe UI", sans-serif',
+  Cambria: 'Cambria, Caladea, Georgia, serif',
+  'Courier New': '"Courier New", Cousine, "Liberation Mono", monospace',
+  Georgia: 'Georgia, "Times New Roman", serif',
+  'Times New Roman': '"Times New Roman", Tinos, "Liberation Serif", serif',
+  'Trebuchet MS': '"Trebuchet MS", "Segoe UI", sans-serif',
+  Verdana: 'Verdana, "DejaVu Sans", sans-serif',
+};
+
+/** A border's kinds: a line's weight or pattern. */
+export const BORDER_KINDS = ['thin', 'medium', 'thick', 'dashed', 'dotted', 'double'] as const;
+export type BorderKind = (typeof BORDER_KINDS)[number];
 
 export interface CellStyle {
   b?: boolean;
@@ -46,8 +68,19 @@ export interface CellStyle {
   dp?: number;
   /** A currency's sign: "$", "€", "£"… */
   cur?: string;
+  /** An Excel number format code ("#,##0.00;[Red]-#,##0.00", "dd/mm/yyyy"): how the value shows, over fmt (which says what kind it is). */
+  code?: string;
   /** Type size, in points. */
   size?: number;
+  /** A font of CELL_FONTS (the app's own otherwise). */
+  font?: string;
+  /** The words turned, in degrees anticlockwise (-90 to 90). */
+  rot?: number;
+  /** Borders at the top, right, bottom and left: a kind of BORDER_KINDS, with a colour after it ("thin", "thick #1a73e8"); without one, the text's. */
+  bt?: string;
+  br?: string;
+  bb?: string;
+  bl?: string;
 }
 
 export type CellValue = string | number | boolean;
@@ -58,6 +91,173 @@ export interface Cell {
   /** A formula, without its "=". */
   f?: string;
   s?: CellStyle;
+  /** A note on the cell, shown when it is pointed at. */
+  note?: string;
+}
+
+/**
+ * What a filter, conditional formatting or a rule for what cells take checks. Values are written as a person types
+ * them ("100", "2026-01-31", "words"); one starting with "=" is a formula, worked out for each cell from the range's
+ * first one (as Excel and Google Sheets do).
+ */
+export interface Cond {
+  op: CondOp;
+  a?: string;
+  b?: string;
+}
+
+/**
+ * empty, notEmpty; text: contains, notContains, starts, ends, is (exactly); numbers: eq, neq, gt, gte, lt, lte,
+ * between, notBetween; dates: dateIs, before, after (a date, or today, tomorrow, yesterday, week, month, year: the
+ * past ones); formula (a: "=$C2>100"); and for conditional formatting over a range: dup, unique, top, bottom (a: how
+ * many, b: "%" for a share), above, below (the average).
+ */
+export type CondOp =
+  | 'empty'
+  | 'notEmpty'
+  | 'contains'
+  | 'notContains'
+  | 'starts'
+  | 'ends'
+  | 'is'
+  | 'eq'
+  | 'neq'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'between'
+  | 'notBetween'
+  | 'dateIs'
+  | 'before'
+  | 'after'
+  | 'formula'
+  | 'dup'
+  | 'unique'
+  | 'top'
+  | 'bottom'
+  | 'above'
+  | 'below';
+export const COND_OPS: CondOp[] = [
+  'empty',
+  'notEmpty',
+  'contains',
+  'notContains',
+  'starts',
+  'ends',
+  'is',
+  'eq',
+  'neq',
+  'gt',
+  'gte',
+  'lt',
+  'lte',
+  'between',
+  'notBetween',
+  'dateIs',
+  'before',
+  'after',
+  'formula',
+  'dup',
+  'unique',
+  'top',
+  'bottom',
+  'above',
+  'below',
+];
+/** The conditions that look at a range's values together (conditional formatting only). */
+export const RANGE_OPS: CondOp[] = ['dup', 'unique', 'top', 'bottom', 'above', 'below'];
+/** Dates a condition may name instead of a day. */
+export const DATE_WORDS = ['today', 'tomorrow', 'yesterday', 'week', 'month', 'year'];
+
+/** A filter's choice for one column: values it hides (as their cells show them; "" for empty ones), and a condition the rows shown meet. */
+export interface FilterCol {
+  hide?: string[];
+  when?: Cond;
+}
+
+/** A filter on a block of rows: its range (the header row first), and what it keeps, by column letter. */
+export interface SheetFilter {
+  range: string;
+  cols?: Record<string, FilterCol>;
+}
+
+/** How conditional formatting changes a cell's look. */
+export interface CondStyle {
+  b?: boolean;
+  i?: boolean;
+  u?: boolean;
+  s?: boolean;
+  color?: string;
+  fill?: string;
+}
+
+/** A point of a colour scale: the lowest or highest value, a number, a percent of the way, or a percentile. */
+export interface ScalePoint {
+  color: string;
+  at?: 'min' | 'max' | 'num' | 'pct' | 'pctile';
+  v?: number;
+}
+
+/**
+ * A rule of conditional formatting over a range (several, split by commas): a condition with the look it gives
+ * (when), a colour scale of two or three colours (scale), or data bars (bar). Rules apply in order; for a cell, the
+ * first whose condition holds gives its look, as in Google Sheets (scales and bars go with it).
+ */
+export interface CondRule {
+  range: string;
+  when?: Cond;
+  style?: CondStyle;
+  scale?: { min: ScalePoint; mid?: ScalePoint; max: ScalePoint };
+  bar?: { color: string };
+}
+
+/** An option of a list, with the colour of its chip. */
+export interface ListOption {
+  v: string;
+  color?: string;
+}
+
+/**
+ * What cells of a range take: one of a list of options (or of a range's values: source), TRUE or FALSE shown as a
+ * checkbox, a rating of stars (1 to max), or a number, a date or words of a length that meet a condition, or what a
+ * formula allows. Other input is refused (reject) or kept with a warning.
+ */
+export interface Validation {
+  range: string;
+  type: 'list' | 'checkbox' | 'rating' | 'number' | 'date' | 'length' | 'formula';
+  options?: ListOption[];
+  source?: string;
+  when?: Cond;
+  max?: number;
+  reject?: boolean;
+}
+
+export type SheetChartKind = 'column' | 'bar' | 'line' | 'area' | 'pie' | 'doughnut' | 'scatter';
+export const SHEET_CHART_KINDS: SheetChartKind[] = ['column', 'bar', 'line', 'area', 'pie', 'doughnut', 'scatter'];
+
+/**
+ * A chart over the grid, drawn from a range's cells as they are now: its series in the range's columns (or rows,
+ * by: "rows"), the first column (or row) as the labels and the first row (or column) as the series' names when it
+ * says so. Where it sits: from the corner of A1, in px, and its size.
+ */
+export interface SheetChart {
+  id: string;
+  kind: SheetChartKind;
+  range: string;
+  by?: 'rows';
+  labels?: boolean;
+  names?: boolean;
+  title?: string;
+  legend?: 'bottom' | 'right' | 'top' | 'none';
+  xTitle?: string;
+  yTitle?: string;
+  colors?: string[];
+  stacked?: boolean;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 export interface Sheet {
@@ -65,12 +265,18 @@ export interface Sheet {
   name: string;
   /** By name: "A1", "B12". */
   cells: Record<string, Cell>;
-  /** Columns' widths in px, by index from 0 (A). */
-  cols?: Record<number, { w?: number }>;
-  /** Rows' heights in px, by index from 0 (row 1). */
-  rows?: Record<number, { h?: number }>;
+  /** Columns' widths in px, by index from 0 (A), and which are hidden. */
+  cols?: Record<number, { w?: number; hidden?: boolean }>;
+  /** Rows' heights in px, by index from 0 (row 1), and which are hidden. */
+  rows?: Record<number, { h?: number; hidden?: boolean }>;
   /** Rows (from the top) and columns (from the left) that stay in view. */
   freeze?: { rows?: number; cols?: number };
+  /** Cells merged into one, each a range ("A1:C1"): its first cell holds what it shows. */
+  merges?: string[];
+  filter?: SheetFilter;
+  conditional?: CondRule[];
+  validation?: Validation[];
+  charts?: SheetChart[];
 }
 
 export interface Workbook {
@@ -437,11 +643,19 @@ export function dateText(serial: number): string {
 
 const CUR_AFTER = /^[A-Za-z]/;
 
-/** A value as its cell shows it, in the cell's number format. */
+/** The codes of the formats that show times: of day, with a date, and lengths of time past a day. */
+export const TIME_CODES = { time: 'hh:mm:ss', datetime: 'yyyy-mm-dd hh:mm:ss', duration: '[h]:mm:ss' } as const;
+
+/** A value as its cell shows it, in the cell's number format (an Excel code when it has one). */
 export function formatValue(v: Scalar | undefined, s?: CellStyle): string {
   if (v === null || v === undefined) return '';
   if (v instanceof CellError) return v.code;
   if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+  if (s?.code && (typeof v === 'number' ? Number.isFinite(v) : true)) {
+    // Words go through a code's part for words only (its fourth, or one with @); else they show as they are.
+    const t = formatByCode(v, s.code);
+    return typeof t === 'string' ? t : t.code;
+  }
   if (typeof v === 'string') return v;
   if (!Number.isFinite(v)) return '#NUM!';
   const fmt = s?.fmt ?? 'general';
@@ -456,11 +670,52 @@ export function formatValue(v: Scalar | undefined, s?: CellStyle): string {
       const neg = v < 0 && Number(body.replace(/,/g, '')) !== 0;
       return CUR_AFTER.test(cur) ? `${neg ? '-' : ''}${body} ${cur}` : `${neg ? '-' : ''}${cur}${body}`;
     }
+    case 'accounting': {
+      const [cur, body] = accountingParts(v, s);
+      return CUR_AFTER.test(cur) ? `${body} ${cur}` : `${cur} ${body}`;
+    }
+    case 'scientific': {
+      const dp = s?.dp ?? 2;
+      return formatByCode(v, dp ? `0.${'0'.repeat(dp)}E+00` : '0E+00') as string;
+    }
     case 'date':
       return dateText(v);
+    case 'time':
+    case 'datetime':
+    case 'duration':
+      return formatByCode(v, TIME_CODES[fmt]) as string;
     default:
       return s?.dp !== undefined ? fixed(v, s.dp, false) : generalNumber(v);
   }
+}
+
+/** An amount as the Accounting format shows it: its currency's sign, and the number (negatives in brackets, zero a dash), which a cell shows apart. */
+export function accountingParts(v: number, s?: CellStyle): [string, string] {
+  const cur = s?.cur ?? '$';
+  const body = fixed(Math.abs(v), s?.dp ?? 2, true);
+  return [cur, Number(body.replace(/,/g, '')) === 0 ? '-' : v < 0 ? `(${body})` : body];
+}
+
+const CODE_COLORS: Record<string, string> = { black: '#000000', blue: '#0000ff', cyan: '#00ffff', green: '#008000', magenta: '#ff00ff', red: '#ff0000', white: '#ffffff', yellow: '#ffff00' };
+
+/** The colour a number format code gives a value (its part for negatives in [Red], say), or undefined. */
+export function codeColor(v: Scalar | undefined, code: string | undefined): string | undefined {
+  if (!code || (typeof v !== 'number' && typeof v !== 'string')) return undefined;
+  const secs = sections(code);
+  let sec: string | undefined;
+  if (typeof v === 'string') sec = secs.length >= 4 ? secs[3] : secs.find((x) => x.includes('@'));
+  else if (v < 0 && secs.length >= 2 && secs[1] !== '') sec = secs[1];
+  else if (v === 0 && secs.length >= 3) sec = secs[2];
+  else sec = secs[0];
+  const m = sec ? /\[(black|blue|cyan|green|magenta|red|white|yellow)\]/i.exec(sec) : null;
+  return m ? CODE_COLORS[m[1].toLowerCase()] : undefined;
+}
+
+/** A length of time as the Duration format writes it for typing again: hours past a day too ("26:30:00"). */
+export function durationText(v: number): string {
+  const secs = Math.round(Math.abs(v) * 86400);
+  const two = (x: number) => String(x).padStart(2, '0');
+  return `${v < 0 ? '-' : ''}${Math.floor(secs / 3600)}:${two(Math.floor((secs % 3600) / 60))}:${two(secs % 60)}`;
 }
 
 // ---- what a person types --------------------------------------------------------------------------------------
@@ -534,6 +789,9 @@ export function parseInput(text: string, fmt?: NumFmt): Typed {
   if (text.startsWith("'")) return text.length > 1 ? { v: text.slice(1) } : {};
   const t = text.trim();
   if (/^(true|false)$/i.test(t)) return { v: t.toLowerCase() === 'true' };
+  // A length of time may run past a day: 26:30 is 26 hours and a half.
+  const d = fmt === 'duration' ? /^(-?)(\d{1,6}):([0-5]\d)(?::([0-5]\d))?$/.exec(t) : null;
+  if (d) return { v: ((d[1] ? -1 : 1) * (Number(d[2]) * 3600 + Number(d[3]) * 60 + Number(d[4] ?? 0))) / 86400 };
   return parseNumberText(t) ?? { v: text };
 }
 
@@ -547,7 +805,8 @@ export function inputText(cell: Cell | undefined): string {
   if (typeof v === 'number') {
     const fmt = cell.s?.fmt;
     if (fmt === 'percent') return `${numText(roundTo(v * 100, 12))}%`;
-    if (fmt === 'date') return dateText(v);
+    if (fmt === 'duration') return durationText(v);
+    if (isDateFmt(fmt)) return dateText(v);
     return numText(v);
   }
   // Words that would be read as something else when typed again keep the mark that says they are words.
@@ -567,20 +826,91 @@ const intIn = (v: unknown, min: number, max: number): number | undefined => {
 
 export const newId = () => Math.random().toString(36).slice(2, 10).padEnd(8, '0');
 
-/** The format an Excel number format code stands for ("#,##0.00" → number, 2 decimals; "0%"; "$#,##0"; "yyyy-mm-dd"). */
+/** Date codes that show what a plain Date shows (the day, its time when it has one): no code of their own needed. */
+const PLAIN_DATES = new Set(['yyyy-mm-dd', 'yyyy-mm-dd hh:mm', 'yyyy-mm-dd h:mm', 'hh:mm', 'h:mm']);
+
+/** The format an Excel number format code stands for ("#,##0.00" → number, 2 decimals; "0%"; "$#,##0"; "0.00E+00"; "yyyy-mm-dd"; "h:mm"). */
 export function fmtFromCode(code: string): Pick<CellStyle, 'fmt' | 'dp' | 'cur'> {
   const c = code.trim();
   if (!c || /^general$/i.test(c)) return {};
   if (c === '@') return { fmt: 'text' };
+  const first = c.split(';')[0];
   // What is not in quotes, escaped or in brackets decides what it is.
-  const bare = c.split(';')[0].replace(/"[^"]*"|\\.|\[[^\]]*\]/g, (m) => (m.startsWith('[$') ? m : ''));
+  const bare = first.replace(/"[^"]*"|\\.|\[[^\]]*\]/g, (m) => (m.startsWith('[$') ? m : ''));
+  const noCur = bare.replace(/\[\$[^\]]*\]/g, '');
   const dp = (/\.([0#?]+)/.exec(bare)?.[1].length ?? 0) as number;
-  if (/[yd]|m{3,}|h|s/i.test(bare.replace(/\[\$[^\]]*\]/g, '')) && !/[0#?]/.test(bare.replace(/\[\$[^\]]*\]/g, ''))) return { fmt: 'date' };
+  if (/\[(h+|m+|s+)\]/i.test(first.replace(/"[^"]*"|\\./g, ''))) return { fmt: 'duration' };
+  if (/[yd]|m{3,}|h|s/i.test(noCur) && !/[0#?]/.test(noCur.replace(/\.0+/, ''))) {
+    if (PLAIN_DATES.has(noCur.trim().toLowerCase())) return { fmt: 'date' };
+    const day = /[yd]/i.test(noCur) || /m{3,}/i.test(noCur) || (/m/i.test(noCur) && !/[hs]/i.test(noCur));
+    const time = /[hs]/i.test(noCur);
+    return { fmt: day && time ? 'datetime' : time ? 'time' : 'date' };
+  }
+  if (/[0#?](?:\.[0#?]+)?[eE][+-]/.test(bare)) return { fmt: 'scientific', dp };
   if (bare.includes('%')) return { fmt: 'percent', dp };
   const cur = /\[\$([^\]-]+)/.exec(c)?.[1] ?? /"([^"0-9#?]{1,4})"/.exec(c)?.[1] ?? /([$€£¥₹])/.exec(bare)?.[1];
-  if (cur && /[0#?]/.test(bare)) return cur === '$' ? { fmt: 'currency', dp } : { fmt: 'currency', dp, cur: cur.trim() };
+  // Accounting: the sign kept at the cell's edge by a fill (* ) before the number.
+  const accounting = /\*\s/.test(first) && /^_[(-]/.test(first.trim());
+  if (cur && /[0#?]/.test(bare)) {
+    const fmt = accounting ? 'accounting' : 'currency';
+    return cur === '$' ? { fmt, dp } : { fmt, dp, cur: cur.trim() };
+  }
   if (/[0#?]/.test(bare)) return bare.includes(',') ? { fmt: 'number', dp } : dp ? { fmt: 'general', dp } : { fmt: 'general', dp: 0 };
   return {};
+}
+
+/** The plain code of a format: how Excel would write what a style without a code shows (by kind, decimals, currency). */
+export function fmtCode(s: Pick<CellStyle, 'fmt' | 'dp' | 'cur'> | undefined): string {
+  const dec = (n: number) => (n > 0 ? `.${'0'.repeat(n)}` : '');
+  const cur = s?.cur ?? '$';
+  switch (s?.fmt ?? 'general') {
+    case 'number':
+      return `#,##0${dec(s?.dp ?? 2)}`;
+    case 'percent':
+      return `0${dec(s?.dp ?? 0)}%`;
+    case 'currency': {
+      const num = `#,##0${dec(s?.dp ?? 2)}`;
+      return CUR_AFTER.test(cur) ? `${num} "${cur}"` : `"${cur}"${num}`;
+    }
+    case 'accounting': {
+      const num = `#,##0${dec(s?.dp ?? 2)}`;
+      const q = `"${cur}"`;
+      return CUR_AFTER.test(cur) ? `_-* ${num} ${q}_-;-* ${num} ${q}_-;_-* "-"?? ${q}_-;_-@_-` : `_(${q}* ${num}_);_(${q}* \\(${num}\\);_(${q}* "-"??_);_(@_)`;
+    }
+    case 'scientific':
+      return `0${dec(s?.dp ?? 2)}E+00`;
+    case 'date':
+      return 'yyyy-mm-dd';
+    case 'time':
+    case 'datetime':
+    case 'duration':
+      return TIME_CODES[s!.fmt as 'time'];
+    case 'text':
+      return '@';
+    default:
+      return s?.dp === undefined ? 'General' : `0${dec(s.dp)}`;
+  }
+}
+
+/**
+ * Whether a style needs a code to show what `code` shows: not when the plain format of its kind shows the same (tried
+ * on a few values), unless the code colours some of them ([Red]).
+ */
+export function codeNeeded(code: string, s: Pick<CellStyle, 'fmt' | 'dp' | 'cur'>): boolean {
+  if (!s.fmt || code === fmtCode(s)) return false;
+  if (/\[(black|blue|cyan|green|magenta|red|white|yellow|color\s*\d+)\]/i.test(code)) return true;
+  // Accounting shows its own way (the sign at the cell's edge), whatever spacing a file's code gives it.
+  if (s.fmt === 'accounting') return false;
+  if (s.fmt === 'text') return code.trim() !== '@';
+  if (s.fmt === 'date')
+    return !PLAIN_DATES.has(
+      code
+        .replace(/\[\$[^\]]*\]|\\/g, '')
+        .trim()
+        .toLowerCase(),
+    );
+  const samples = isDateFmt(s.fmt) ? [0.25, 0.6042, 46000.75, 1.5] : [1234.5678, -1234.5678, 0, 0.25, 12_345_678.9, -0.5];
+  return samples.some((x) => formatByCode(x, code) !== formatValue(x, s));
 }
 
 const FMT_ALIAS: Record<string, Pick<CellStyle, 'fmt' | 'dp' | 'cur'>> = {
@@ -604,25 +934,34 @@ const FMT_ALIAS: Record<string, Pick<CellStyle, 'fmt' | 'dp' | 'cur'>> = {
   pound: { fmt: 'currency', cur: '£' },
   jpy: { fmt: 'currency', cur: '¥' },
   inr: { fmt: 'currency', cur: '₹' },
+  accounting: { fmt: 'accounting' },
+  scientific: { fmt: 'scientific' },
+  sci: { fmt: 'scientific' },
+  exponential: { fmt: 'scientific' },
   date: { fmt: 'date' },
-  datetime: { fmt: 'date' },
-  time: { fmt: 'date' },
+  datetime: { fmt: 'datetime' },
+  time: { fmt: 'time' },
+  duration: { fmt: 'duration' },
   text: { fmt: 'text' },
   string: { fmt: 'text' },
   '@': { fmt: 'text' },
 };
 
-/** A format as a style takes it: a name ("currency", "percent", "eur"), an Excel code, or { fmt, dp, cur }. */
-function fmtOf(v: unknown): Pick<CellStyle, 'fmt' | 'dp' | 'cur'> | null {
+/** A number format code as a style keeps it: words of up to 120 characters, or none. */
+const cleanCode = (v: unknown) => (typeof v === 'string' && v.trim() && v.length <= 120 && !/[\u0000-\u001f\u007f]/.test(v) && !/^general$/i.test(v.trim()) ? v.trim() : undefined);
+
+/** A format as a style takes it: a name ("currency", "percent", "eur"), an Excel code (kept when no plain format shows the same), or { fmt, dp, cur }. */
+function fmtOf(v: unknown): Pick<CellStyle, 'fmt' | 'dp' | 'cur' | 'code'> | null {
   if (typeof v === 'string') {
     const a = FMT_ALIAS[v.trim().toLowerCase()];
     if (a) return a;
     const code = fmtFromCode(v);
-    return code.fmt ? code : null;
+    if (!code.fmt) return null;
+    return codeNeeded(v.trim(), code) && cleanCode(v) ? { ...code, code: v.trim() } : code;
   }
   if (!isObj(v)) return null;
   const base = fmtOf(v.fmt ?? v.format ?? v.type) ?? {};
-  const out: Pick<CellStyle, 'fmt' | 'dp' | 'cur'> = { ...base };
+  const out: Pick<CellStyle, 'fmt' | 'dp' | 'cur' | 'code'> = { ...base };
   const dp = intIn(v.dp ?? v.decimals, 0, 10);
   if (dp !== undefined) out.dp = dp;
   if (typeof (v.cur ?? v.currency) === 'string') out.cur = String(v.cur ?? v.currency);
@@ -633,7 +972,9 @@ const ALIGN: Record<string, CellStyle['align']> = { left: 'left', center: 'cente
 const VALIGN: Record<string, CellStyle['valign']> = { top: 'top', middle: 'middle', center: 'middle', centre: 'middle', bottom: 'bottom' };
 
 /** The decimals a format shows when its style says none. */
-export const DEFAULT_DP: Partial<Record<NumFmt, number>> = { number: 2, currency: 2, percent: 0 };
+export const DEFAULT_DP: Partial<Record<NumFmt, number>> = { number: 2, currency: 2, accounting: 2, scientific: 2, percent: 0 };
+/** The formats decimals mean nothing to. */
+const NO_DP = new Set<NumFmt | undefined>(['date', 'time', 'datetime', 'duration', 'text']);
 
 /** A currency's sign as styles keep it: a few signs or letters, nothing that could be markup. */
 const cleanCur = (v: unknown) => (typeof v === 'string' && /^[\p{Sc}A-Za-z. ]{1,5}$/u.test(v.trim()) ? v.trim() : undefined);
@@ -656,21 +997,73 @@ export function cleanStyle(v: unknown): CellStyle | undefined {
   if (valign) s.valign = valign;
   if ((v.wrap ?? v.wrapText) === true) s.wrap = true;
   const f = fmtOf(v.fmt ?? v.format ?? v.numFmt ?? v.numberFormat) ?? {};
-  const dp = intIn(v.dp ?? v.decimals, 0, 10) ?? f.dp;
-  const cur = cleanCur(v.cur ?? v.currency) ?? cleanCur(f.cur);
-  if (f.fmt && f.fmt !== 'general') s.fmt = f.fmt;
+  // An Excel code says what kind of format it is (its decimals and currency too); it is kept only when no plain format shows the same.
+  const code = cleanCode(v.code) ?? f.code;
+  const d = code ? fmtFromCode(code) : {};
+  const kind = d.fmt ? d : f;
+  const dp = d.fmt ? d.dp : (intIn(v.dp ?? v.decimals, 0, 10) ?? f.dp);
+  const cur = d.fmt ? cleanCur(d.cur) : (cleanCur(v.cur ?? v.currency) ?? cleanCur(f.cur));
+  if (kind.fmt && kind.fmt !== 'general') s.fmt = kind.fmt;
   // Decimals a format shows anyway are not kept (2 for numbers and amounts, none for percents).
-  if (dp !== undefined && s.fmt !== 'date' && s.fmt !== 'text' && !(s.fmt && DEFAULT_DP[s.fmt] === dp)) s.dp = dp;
-  if (cur && cur !== '$' && s.fmt === 'currency') s.cur = cur;
+  if (dp !== undefined && !NO_DP.has(s.fmt) && !(s.fmt && DEFAULT_DP[s.fmt] === dp)) s.dp = dp;
+  if (cur && cur !== '$' && (s.fmt === 'currency' || s.fmt === 'accounting')) s.cur = cur;
+  if (code && d.fmt && codeNeeded(code, d)) s.code = code;
   const size = intIn(v.size ?? v.fontSize, 6, 72);
   if (size !== undefined && size !== FONT_PT) s.size = size;
+  const font = typeof (v.font ?? v.fontFamily) === 'string' ? fontOf(String(v.font ?? v.fontFamily)) : undefined;
+  if (font) s.font = font;
+  const rot = intIn(v.rot ?? v.rotate ?? v.rotation, -90, 90);
+  if (rot) s.rot = rot;
+  // Borders: each side, or all four at once (border).
+  const all = cleanBorder(v.border ?? v.borders);
+  for (const [k, alias] of [
+    ['bt', 'borderTop'],
+    ['br', 'borderRight'],
+    ['bb', 'borderBottom'],
+    ['bl', 'borderLeft'],
+  ] as const) {
+    const b = v[k] !== undefined || v[alias] !== undefined ? cleanBorder(v[k] ?? v[alias]) : all;
+    if (b) s[k] = b;
+  }
   return Object.keys(s).length ? s : undefined;
+}
+
+/** A font's name as CELL_FONTS has it (in any case), or undefined. */
+export const fontOf = (name: string): string | undefined => Object.keys(CELL_FONTS).find((k) => k.toLowerCase() === name.trim().toLowerCase());
+
+/** A border as a style keeps it: its kind, and its colour when it has one ("thin", "dashed #1a73e8"); undefined for none. */
+export function cleanBorder(v: unknown): string | undefined {
+  let kind: BorderKind | undefined;
+  let color: string | null = null;
+  if (v === true) return 'thin';
+  if (typeof v === 'string') {
+    for (const p of v.trim().toLowerCase().split(/\s+/)) {
+      if ((BORDER_KINDS as readonly string[]).includes(p)) kind = p as BorderKind;
+      else if (p === 'solid' || p === 'hair') kind ??= 'thin';
+      else if (p === 'none' || p === 'false') return undefined;
+      else color = cleanColor(p) ?? color;
+    }
+    if (!kind && color) kind = 'thin';
+  } else if (isObj(v)) {
+    const k = String(v.style ?? v.kind ?? 'thin').toLowerCase();
+    kind = (BORDER_KINDS as readonly string[]).includes(k) ? (k as BorderKind) : k === 'none' ? undefined : 'thin';
+    color = cleanColor(v.color ?? v.c);
+  }
+  if (!kind) return undefined;
+  return color ? `${kind} ${color}` : kind;
+}
+
+/** A border's kind and colour, from how a style keeps it. */
+export function borderOf(b: string | undefined): { kind: BorderKind; color?: string } | null {
+  if (!b) return null;
+  const [kind, color] = b.split(' ');
+  return { kind: (BORDER_KINDS as readonly string[]).includes(kind) ? (kind as BorderKind) : 'thin', color: color && /^#[0-9a-f]{6}$/.test(color) ? color : undefined };
 }
 
 /** Two styles as one: `b`'s values over `a`'s, in the kept order. */
 export const mergeStyle = (a: CellStyle | undefined, b: CellStyle | undefined): CellStyle | undefined => (!b ? a : !a ? b : cleanStyle({ ...a, ...b }));
 
-const STYLE_KEYS = ['b', 'bold', 'i', 'italic', 'u', 'underline', 's', 'strike', 'color', 'fill', 'background', 'align', 'valign', 'wrap', 'fmt', 'format', 'dp', 'cur', 'size'];
+const STYLE_KEYS = ['b', 'bold', 'i', 'italic', 'u', 'underline', 's', 'strike', 'color', 'fill', 'background', 'align', 'valign', 'wrap', 'fmt', 'format', 'dp', 'cur', 'code', 'size', 'font', 'rot', 'bt', 'br', 'bb', 'bl', 'border'];
 
 /**
  * A cell from what was sent: a bare value is typed as a person types it (`typed`: "=B2*2", "12%"); a cell as an
@@ -696,8 +1089,17 @@ export function cleanCell(x: unknown, typed = true): Cell | null {
   else if (typeof v === 'string' && v !== '') cell.v = cleanText(v);
   const style = cleanStyle(isObj(x.s) ? x.s : isObj(x.style) ? x.style : STYLE_KEYS.some((k) => k in x && k !== 's') ? x : undefined);
   if (style) cell.s = style;
-  return cell.v === undefined && cell.f === undefined && !cell.s ? null : cell;
+  const note = cleanNote(x.note ?? x.comment);
+  if (note) cell.note = note;
+  return cell.v === undefined && cell.f === undefined && !cell.s && !cell.note ? null : cell;
 }
+
+/** A cell's note as it is kept: its words, without control characters, at most SHEET_LIMITS.note long; undefined for none. */
+export const cleanNote = (v: unknown): string | undefined => {
+  if (typeof v !== 'string') return undefined;
+  const t = cleanText(v).trim().slice(0, SHEET_LIMITS.note);
+  return t || undefined;
+};
 
 /** A cell from typed words and the style it has: the format the words suggest goes in when it has none of its own. */
 export function typedCell(t: Typed, s: CellStyle | undefined): Cell | null {
@@ -771,6 +1173,364 @@ function freezeOf(v: unknown): { rows?: number; cols?: number } | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
+// ---- merges, a filter, conditional formatting, rules for cells, charts: checking them --------------------------------
+
+/** Whether two rectangles share a cell. */
+export const overlaps = (a: Rect, b: Rect) => a.r1 <= b.r2 && b.r1 <= a.r2 && a.c1 <= b.c2 && b.c1 <= a.c2;
+
+/** A range within what a sheet may hold (a whole column stops at its last row), or null. */
+function rangeIn(text: string): Rect | null {
+  const rg = parseRange(text);
+  if (!rg || rg.r1 >= SHEET_LIMITS.rows || rg.c1 >= SHEET_LIMITS.cols) return null;
+  return { r1: rg.r1, c1: rg.c1, r2: Math.min(rg.r2, SHEET_LIMITS.rows - 1), c2: Math.min(rg.c2, SHEET_LIMITS.cols - 1) };
+}
+
+/** Ranges as a rule keeps them, each checked and within a sheet's limits, split by commas ("B2:B9,D2:D9"); '' for none. */
+export function cleanRanges(v: unknown): string {
+  const list = Array.isArray(v) ? v : typeof v === 'string' ? v.split(/[,;\s]+/) : [];
+  const out: string[] = [];
+  for (const x of list.slice(0, 20)) {
+    const rg = typeof x === 'string' ? rangeIn(x) : null;
+    if (rg) out.push(rangeName(rg));
+  }
+  return [...new Set(out)].join(',');
+}
+
+/** A rule's ranges as rectangles. */
+export const rectsOf = (ranges: string): Rect[] => ranges.split(',').flatMap((x) => parseRange(x) ?? []);
+
+/** A range that may be on another sheet ("Sheet2!A1:A9", "'My list'!$A:$A"), as kept: its sheet quoted where it must be; undefined when it is none. */
+export function cleanSource(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const m = /^\s*=?\s*(?:'((?:[^']|'')+)'|([A-Za-z_¡-￿][A-Za-z0-9_.¡-￿]*))!(.+)$/.exec(v);
+  const rg = rangeIn(m ? m[3] : v.replace(/^\s*=/, ''));
+  if (!rg) return undefined;
+  if (!m) return rangeName(rg);
+  const name = (m[1] ?? m[2]).replace(/''/g, "'");
+  return `${quoteSheet(name)}!${rangeName(rg)}`;
+}
+
+/** A range that may be on another sheet: the sheet's name (none for its own) and its rectangle. */
+export function sourceOf(text: string): { sheet?: string; x: Rect } | null {
+  const m = /^(?:'((?:[^']|'')+)'|([^!]+))!(.+)$/.exec(text);
+  const x = parseRange(m ? m[3] : text);
+  if (!x) return null;
+  return m ? { sheet: (m[1] ?? m[2]).replace(/''/g, "'"), x } : { x };
+}
+
+/** Merged ranges as kept: two cells or more each, within the limits, none over another (a later one gives way). */
+function cleanMerges(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const kept: Rect[] = [];
+  for (const x of v.slice(0, SHEET_LIMITS.merges)) {
+    const rg = typeof x === 'string' ? parseRange(x) : isObj(x) && typeof x.range === 'string' ? parseRange(x.range) : null;
+    if (!rg || (rg.r1 === rg.r2 && rg.c1 === rg.c2) || rg.r2 >= SHEET_LIMITS.rows || rg.c2 >= SHEET_LIMITS.cols) continue;
+    if (kept.some((k) => overlaps(k, rg))) continue;
+    kept.push(rg);
+  }
+  return kept.map(rangeName);
+}
+
+/** How agents and files may name a condition, besides its own name. */
+const OP_WORDS: Record<string, CondOp> = {
+  '>': 'gt',
+  '>=': 'gte',
+  '<': 'lt',
+  '<=': 'lte',
+  '=': 'eq',
+  '==': 'eq',
+  '<>': 'neq',
+  '!=': 'neq',
+  blank: 'empty',
+  isempty: 'empty',
+  isblank: 'empty',
+  notblank: 'notEmpty',
+  isnotempty: 'notEmpty',
+  nonempty: 'notEmpty',
+  doesnotcontain: 'notContains',
+  notcontain: 'notContains',
+  startswith: 'starts',
+  beginswith: 'starts',
+  endswith: 'ends',
+  exactly: 'is',
+  textis: 'is',
+  equal: 'eq',
+  equals: 'eq',
+  equalto: 'eq',
+  notequal: 'neq',
+  notequalto: 'neq',
+  greater: 'gt',
+  greaterthan: 'gt',
+  greaterorequal: 'gte',
+  greaterthanorequal: 'gte',
+  less: 'lt',
+  lessthan: 'lt',
+  lessorequal: 'lte',
+  lessthanorequal: 'lte',
+  date: 'dateIs',
+  on: 'dateIs',
+  datebefore: 'before',
+  dateafter: 'after',
+  custom: 'formula',
+  duplicate: 'dup',
+  duplicates: 'dup',
+  aboveaverage: 'above',
+  belowaverage: 'below',
+};
+
+const opOf = (v: unknown): CondOp | null => {
+  if (typeof v !== 'string') return null;
+  const k = v.trim();
+  return COND_OPS.find((o) => o.toLowerCase() === k.toLowerCase()) ?? OP_WORDS[k] ?? OP_WORDS[k.toLowerCase().replace(/[\s_-]+/g, '')] ?? null;
+};
+
+/** The conditions that compare a value with one or two others. */
+export const COMPARE_OPS: CondOp[] = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'between', 'notBetween'];
+
+/** A condition as kept, its values as text (a formula with its "="); null when it says nothing usable. `whole`: conditions on a range's values together too. */
+export function cleanCond(v: unknown, whole = false): Cond | null {
+  if (typeof v === 'string' && v.trim().startsWith('=')) v = { op: 'formula', a: v };
+  if (!isObj(v)) return null;
+  const op = opOf(v.op ?? v.type ?? v.is);
+  if (!op || (!whole && RANGE_OPS.includes(op))) return null;
+  const val = (x: unknown): string | undefined => {
+    if (typeof x === 'number' && Number.isFinite(x)) return numText(x);
+    if (typeof x === 'boolean') return x ? 'TRUE' : 'FALSE';
+    if (typeof x !== 'string') return undefined;
+    const t = cleanText(x).trim();
+    return t ? t.slice(0, t.startsWith('=') ? SHEET_LIMITS.formula : 1000) : undefined;
+  };
+  const list = Array.isArray(v.values) ? v.values : null;
+  const a = val(v.a ?? v.value ?? v.v ?? v.min ?? v.from ?? v.formula ?? list?.[0]);
+  const b = val(v.b ?? v.value2 ?? v.max ?? v.to ?? list?.[1]);
+  const out: Cond = { op };
+  switch (op) {
+    case 'empty':
+    case 'notEmpty':
+    case 'dup':
+    case 'unique':
+    case 'above':
+    case 'below':
+      break;
+    case 'between':
+    case 'notBetween':
+      if (a === undefined || b === undefined) return null;
+      out.a = a;
+      out.b = b;
+      break;
+    case 'top':
+    case 'bottom':
+      out.a = String(intIn(a ?? '10', 1, 1000) ?? 10);
+      if (b === '%' || v.percent === true || v.pct === true) out.b = '%';
+      break;
+    case 'formula':
+      if (!a) return null;
+      out.a = a.startsWith('=') ? a : `=${a}`;
+      break;
+    case 'dateIs':
+    case 'before':
+    case 'after':
+      if (!a) return null;
+      out.a = DATE_WORDS.includes(a.toLowerCase()) ? a.toLowerCase() : a;
+      break;
+    default:
+      if (a === undefined) return null;
+      out.a = a;
+  }
+  // A formula as a value must be one that can be read.
+  for (const k of ['a', 'b'] as const) if (out[k]?.startsWith('=') && formulaProblem(out[k]!.slice(1))) return null;
+  return out;
+}
+
+/** A filter as kept: its range, and per column (by letter, within it) the values it hides and a condition. */
+function cleanFilter(v: unknown): SheetFilter | undefined {
+  if (typeof v === 'string') v = { range: v };
+  if (!isObj(v)) return undefined;
+  const rg = rangeIn(String(v.range ?? v.ref ?? ''));
+  if (!rg) return undefined;
+  const out: SheetFilter = { range: rangeName(rg) };
+  const given = isObj(v.cols) ? v.cols : isObj(v.columns) ? v.columns : null;
+  const cols: [number, FilterCol][] = [];
+  if (given)
+    for (const [k, x] of Object.entries(given)) {
+      const c = colIndex(k.trim());
+      if (c < rg.c1 || c > rg.c2 || !isObj(x)) continue;
+      const fc: FilterCol = {};
+      const hide = Array.isArray(x.hide) ? x.hide : Array.isArray(x.hidden) ? x.hidden : null;
+      if (hide) {
+        const list = [...new Set(hide.filter((t) => typeof t === 'string' || typeof t === 'number').map((t) => cleanText(String(t)).slice(0, 255)))].slice(0, 5000);
+        if (list.length) fc.hide = list;
+      }
+      const when = cleanCond(x.when ?? x.condition ?? (x.op ? x : undefined));
+      if (when) fc.when = when;
+      if (fc.hide || fc.when) cols.push([c, fc]);
+    }
+  if (cols.length) out.cols = Object.fromEntries(cols.sort((a, b) => a[0] - b[0]).map(([c, fc]) => [colName(c), fc]));
+  return out;
+}
+
+/** How a rule of conditional formatting changes a cell's look, checked; undefined when it changes nothing. */
+function cleanCondStyle(v: unknown): CondStyle | undefined {
+  if (!isObj(v)) return undefined;
+  const s: CondStyle = {};
+  if ((v.b ?? v.bold) === true) s.b = true;
+  if ((v.i ?? v.italic) === true) s.i = true;
+  if ((v.u ?? v.underline) === true) s.u = true;
+  if ((v.s ?? v.strike ?? v.strikethrough) === true) s.s = true;
+  const color = cleanColor(v.color ?? v.textColor);
+  if (color) s.color = color;
+  const fill = cleanColor(v.fill ?? v.background ?? v.bg);
+  if (fill) s.fill = fill;
+  return Object.keys(s).length ? s : undefined;
+}
+
+const SCALE_AT = ['min', 'max', 'num', 'pct', 'pctile'] as const;
+
+/** A colour scale's point; what it is at is kept only when it is not its place's own (the lowest, the highest, the middle percentile). */
+function cleanScalePoint(v: unknown, place: 'min' | 'mid' | 'max'): ScalePoint | null {
+  const color = cleanColor(isObj(v) ? v.color : v);
+  if (!color) return null;
+  const def = place === 'mid' ? 'pctile' : place;
+  const raw = isObj(v) ? String(v.at ?? v.type ?? def).toLowerCase() : def;
+  const at = (SCALE_AT as readonly string[]).includes(raw) ? (raw as ScalePoint['at']) : raw === 'percent' ? 'pct' : raw === 'percentile' ? 'pctile' : raw === 'number' ? 'num' : def;
+  let n = isObj(v) ? Number(v.v ?? v.value) : NaN;
+  if (at === 'pct' || at === 'pctile') n = Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 50;
+  const out: ScalePoint = { color };
+  if (at === 'num' && !Number.isFinite(n)) return out;
+  if (at !== def || (at === 'pctile' && n !== 50)) out.at = at;
+  if (at === 'num' || at === 'pct' || (at === 'pctile' && n !== 50)) out.v = n;
+  return out;
+}
+
+/** A rule of conditional formatting as kept, or null. */
+function cleanRule(x: unknown): CondRule | null {
+  if (!isObj(x)) return null;
+  const range = cleanRanges(x.range ?? x.ranges ?? x.ref);
+  if (!range) return null;
+  const scale = x.scale ?? x.colorScale;
+  if (scale) {
+    const list = Array.isArray(scale) ? scale : null;
+    const min = cleanScalePoint(list ? list[0] : isObj(scale) ? scale.min : null, 'min');
+    const max = cleanScalePoint(list ? list[list.length - 1] : isObj(scale) ? scale.max : null, 'max');
+    const mid = list ? (list.length >= 3 ? cleanScalePoint(list[1], 'mid') : null) : isObj(scale) ? cleanScalePoint(scale.mid, 'mid') : null;
+    return min && max ? { range, scale: { min, ...(mid ? { mid } : {}), max } } : null;
+  }
+  const bar = x.bar ?? x.dataBar ?? x.bars;
+  if (bar) return { range, bar: { color: cleanColor(isObj(bar) ? bar.color : bar) ?? '#638ec6' } };
+  const when = cleanCond(x.when ?? x.condition ?? (x.op ? x : null), true);
+  const style = cleanCondStyle(x.style ?? x.format);
+  return when && style ? { range, when, style } : null;
+}
+
+const cleanRules = (v: unknown): CondRule[] => (Array.isArray(v) ? v.slice(0, SHEET_LIMITS.rules).flatMap((x) => cleanRule(x) ?? []) : []);
+
+/** A rule for what a range's cells take, as kept, or null. */
+function cleanValidation(x: unknown): Validation | null {
+  if (!isObj(x)) return null;
+  const range = cleanRanges(x.range ?? x.ranges ?? x.ref);
+  if (!range) return null;
+  const given = String(x.type ?? '').toLowerCase();
+  const listIn = x.options ?? x.list ?? x.values ?? x.items;
+  const type: Validation['type'] | null =
+    x.checkbox === true || given === 'checkbox' || given === 'boolean'
+      ? 'checkbox'
+      : (x.rating !== undefined && x.rating !== false) || given === 'rating' || given === 'stars'
+        ? 'rating'
+        : Array.isArray(listIn) || given === 'list' || given === 'dropdown' || given === 'select' || typeof x.source === 'string'
+          ? 'list'
+          : given === 'number' || given === 'decimal' || given === 'whole' || given === 'integer'
+            ? 'number'
+            : given === 'date'
+              ? 'date'
+              : given === 'length' || given === 'textlength'
+                ? 'length'
+                : given === 'formula' || given === 'custom'
+                  ? 'formula'
+                  : null;
+  if (!type) return null;
+  const out: Validation = { range, type };
+  if (type === 'list') {
+    const opts: ListOption[] = [];
+    const seen = new Set<string>();
+    for (const o of Array.isArray(listIn) ? listIn.slice(0, SHEET_LIMITS.options) : []) {
+      const raw = typeof o === 'string' || typeof o === 'number' ? String(o) : isObj(o) ? String(o.v ?? o.value ?? o.label ?? o.name ?? '') : '';
+      const v = cleanText(raw).trim().slice(0, 255);
+      if (!v || seen.has(v.toLowerCase())) continue;
+      seen.add(v.toLowerCase());
+      const color = isObj(o) ? cleanColor(o.color ?? o.fill) : null;
+      opts.push(color ? { v, color } : { v });
+    }
+    const source = cleanSource(x.source);
+    if (opts.length) out.options = opts;
+    else if (source) out.source = source;
+    else return null;
+  } else if (type === 'rating') {
+    const m = intIn(typeof x.rating === 'number' ? x.rating : x.max, 1, 10);
+    if (m && m !== 5) out.max = m;
+  } else if (type === 'formula') {
+    const when = cleanCond(typeof x.formula === 'string' ? { op: 'formula', a: x.formula } : (x.when ?? x.condition));
+    if (!when || when.op !== 'formula') return null;
+    out.when = when;
+  } else if (type !== 'checkbox') {
+    // A number or a date without a condition is any number or date; words' length needs one.
+    const when = cleanCond(x.when ?? x.condition ?? (x.op ? x : null));
+    if (when && COMPARE_OPS.includes(when.op)) out.when = when;
+    else if (type === 'length') return null;
+  }
+  if (x.reject === true || x.strict === true) out.reject = true;
+  return out;
+}
+
+const cleanValidations = (v: unknown): Validation[] => (Array.isArray(v) ? v.slice(0, SHEET_LIMITS.rules).flatMap((x) => cleanValidation(x) ?? []) : []);
+
+const CHART_ALIAS: Record<string, SheetChartKind> = { col: 'column', columns: 'column', bars: 'bar', lines: 'line', donut: 'doughnut', ring: 'doughnut', xy: 'scatter', points: 'scatter' };
+
+/** Charts as kept: each with its range and kind, its words checked, where it sits (from A1's corner: x and y, or at a cell) and its size. */
+function cleanCharts(v: unknown, colW: (c: number) => number, rowH: (r: number) => number): SheetChart[] {
+  if (!Array.isArray(v)) return [];
+  const ids = new Set<string>();
+  const out: SheetChart[] = [];
+  const left = (c: number) => Array.from({ length: Math.min(c, SHEET_LIMITS.cols) }, (_, i) => colW(i)).reduce((a, b) => a + b, 0);
+  const top = (r: number) => Array.from({ length: Math.min(r, SHEET_LIMITS.rows) }, (_, i) => rowH(i)).reduce((a, b) => a + b, 0);
+  const text = (x: unknown) => (typeof x === 'string' && x.trim() ? cleanText(x).trim().replace(/\n+/g, ' ').slice(0, 200) : undefined);
+  for (const x of v.slice(0, SHEET_LIMITS.charts)) {
+    if (!isObj(x)) continue;
+    const range = cleanSource(x.range ?? x.data);
+    if (!range) continue;
+    const k = String(x.kind ?? x.type ?? 'column').toLowerCase();
+    const kind = (SHEET_CHART_KINDS as string[]).includes(k) ? (k as SheetChartKind) : (CHART_ALIAS[k] ?? 'column');
+    let id = typeof x.id === 'string' && /^[A-Za-z0-9_-]{1,24}$/.test(x.id) ? x.id : newId();
+    while (ids.has(id)) id = newId();
+    ids.add(id);
+    const c: SheetChart = { id, kind, range, x: 0, y: 0, w: 480, h: 300 };
+    if (x.by === 'rows' || x.series === 'rows') c.by = 'rows';
+    if (typeof x.labels === 'boolean') c.labels = x.labels;
+    if (typeof x.names === 'boolean') c.names = x.names;
+    const title = text(x.title);
+    if (title) c.title = title;
+    const legend = x.legend === false ? 'none' : String(x.legend ?? '').toLowerCase();
+    if (legend === 'bottom' || legend === 'right' || legend === 'top' || legend === 'none') c.legend = legend;
+    const xt = text(x.xTitle ?? x.xAxis);
+    if (xt) c.xTitle = xt;
+    const yt = text(x.yTitle ?? x.yAxis);
+    if (yt) c.yTitle = yt;
+    const colors = Array.isArray(x.colors) ? x.colors.slice(0, 12).flatMap((col) => cleanColor(col) ?? []) : [];
+    if (colors.length) c.colors = colors;
+    if (x.stacked === true) c.stacked = true;
+    // Where it sits: as given, at a cell's corner, or beside the cells it draws.
+    const at = typeof x.at === 'string' ? parseRef(x.at) : null;
+    const src = sourceOf(range);
+    const px = intIn(x.x, 0, 400_000);
+    const py = intIn(x.y, 0, 2_000_000);
+    c.x = px ?? (at ? left(at.c) : src && !src.sheet ? left(Math.min(src.x.c2 + 2, SHEET_LIMITS.cols - 1)) : 0);
+    c.y = py ?? (at ? top(at.r) : src && !src.sheet ? top(src.x.r1) : 0);
+    c.w = intIn(x.w ?? x.width, 160, 3000) ?? 480;
+    c.h = intIn(x.h ?? x.height, 120, 2000) ?? 300;
+    out.push(c);
+  }
+  return out;
+}
+
 function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], budget: Budget): Sheet | null {
   if (Array.isArray(raw)) raw = { rows: raw };
   if (!isObj(raw)) return null;
@@ -828,14 +1588,43 @@ function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], bud
   if (isObj(raw.styles))
     for (const [k, x] of Object.entries(raw.styles)) {
       const rg = parseRange(k);
+      if (!rg) continue;
       const s = cleanStyle(x);
-      if (!rg || !s) continue;
+      // An outline: a border round the range's outer edge only.
+      const line = isObj(x) ? cleanBorder(x.outline) : undefined;
+      if (!s && !line) continue;
       const r2 = Math.min(rg.r2, SHEET_LIMITS.rows - 1);
       const c2 = Math.min(rg.c2, SHEET_LIMITS.cols - 1);
       const area = (r2 - rg.r1 + 1) * (c2 - rg.c1 + 1);
       // A small range is styled cell by cell, empty ones too (a fill shows on them); a big one where it has cells.
-      if (area <= 5000) for (let r = rg.r1; r <= r2; r++) for (let c = rg.c1; c <= c2; c++) styleAt(r, c, s, true);
-      else for (const key of [...cells.keys()]) if (unpackR(key) >= rg.r1 && unpackR(key) <= r2 && unpackC(key) >= rg.c1 && unpackC(key) <= c2) styleAt(unpackR(key), unpackC(key), s, false);
+      if (s) {
+        if (area <= 5000) for (let r = rg.r1; r <= r2; r++) for (let c = rg.c1; c <= c2; c++) styleAt(r, c, s, true);
+        else for (const key of [...cells.keys()]) if (unpackR(key) >= rg.r1 && unpackR(key) <= r2 && unpackC(key) >= rg.c1 && unpackC(key) <= c2) styleAt(unpackR(key), unpackC(key), s, false);
+      }
+      if (line && r2 - rg.r1 < 5000 && c2 - rg.c1 < 500)
+        for (let r = rg.r1; r <= r2; r++)
+          for (let c = rg.c1; c <= c2; c++) {
+            const edge: CellStyle = {};
+            if (r === rg.r1) edge.bt = line;
+            if (r === r2) edge.bb = line;
+            if (c === rg.c1) edge.bl = line;
+            if (c === c2) edge.br = line;
+            if (Object.keys(edge).length) styleAt(r, c, edge, true);
+          }
+    }
+  // Notes by cell: { "B2": "Checked by Sam" }.
+  if (isObj(raw.notes))
+    for (const [k, x] of Object.entries(raw.notes)) {
+      const p = parseRef(k);
+      const note = cleanNote(x);
+      if (!p || p.r >= SHEET_LIMITS.rows || p.c >= SHEET_LIMITS.cols) continue;
+      const cur = cells.get(pack(p.r, p.c));
+      if (cur) {
+        const next: Cell = { ...cur };
+        if (note) next.note = note;
+        else delete next.note;
+        cells.set(pack(p.r, p.c), next);
+      } else if (note) put(p.r, p.c, { note });
     }
   const formats = isObj(raw.formats) ? raw.formats : isObj(raw.format) ? raw.format : null;
   if (formats)
@@ -851,20 +1640,26 @@ function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], bud
         if (c < span[0] || c > span[1] || (header && r === r0)) continue;
         const cur = cells.get(key)!;
         // A format replaces what the cell had (general clears it).
-        const { fmt: _f, dp: _d, cur: _c, ...rest } = cur.s ?? {};
+        const { fmt: _f, dp: _d, cur: _c, code: _k, ...rest } = cur.s ?? {};
         cells.set(key, { ...cur, s: general ? cleanStyle({ ...rest, dp: f.dp }) : cleanStyle({ ...rest, ...s }) });
       }
     }
   if (header) for (const key of [...cells.keys()]) if (unpackR(key) === r0) styleAt(r0, unpackC(key), { b: true }, false);
 
   // Columns' widths and rows' heights: kept ones by index, or an agent's by letters and row numbers.
-  const cols: Record<number, { w: number }> = {};
+  const cols: Record<number, { w?: number; hidden?: boolean }> = {};
   const setW = (c: number, w: unknown) => {
     const n = intIn(w, MIN_W, MAX_W);
-    if (n !== undefined && c >= 0 && c < SHEET_LIMITS.cols && n !== COL_W) cols[c] = { w: n };
+    if (n !== undefined && c >= 0 && c < SHEET_LIMITS.cols && n !== COL_W) cols[c] = { ...cols[c], w: n };
   };
-  if (base && isObj(base.cols)) for (const [k, x] of Object.entries(base.cols)) if (/^\d+$/.test(k)) setW(Number(k), isObj(x) ? x.w : x);
-  if (isObj(raw.cols)) for (const [k, x] of Object.entries(raw.cols)) if (/^\d+$/.test(k)) setW(Number(k), isObj(x) ? x.w : x);
+  const hideCol = (c: number) => c >= 0 && c < SHEET_LIMITS.cols && (cols[c] = { ...cols[c], hidden: true });
+  for (const from of [base?.cols, raw.cols])
+    if (isObj(from))
+      for (const [k, x] of Object.entries(from)) {
+        if (!/^\d+$/.test(k)) continue;
+        setW(Number(k), isObj(x) ? x.w : x);
+        if (isObj(x) && x.hidden === true) hideCol(Number(k));
+      }
   const widths = raw.widths ?? raw.colWidths;
   if (Array.isArray(widths)) widths.forEach((w, c) => setW(c0 + c, w));
   else if (isObj(widths))
@@ -875,22 +1670,73 @@ function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], bud
         if (span) for (let c = span[0]; c <= span[1]; c++) setW(c, w);
       }
     }
-  const rows: Record<number, { h: number }> = {};
+  const rows: Record<number, { h?: number; hidden?: boolean }> = {};
   const setH = (r: number, h: unknown) => {
     const n = intIn(h, MIN_H, MAX_H);
-    if (n !== undefined && r >= 0 && r < SHEET_LIMITS.rows && n !== ROW_H) rows[r] = { h: n };
+    if (n !== undefined && r >= 0 && r < SHEET_LIMITS.rows && n !== ROW_H) rows[r] = { ...rows[r], h: n };
   };
-  if (base && isObj(base.rows)) for (const [k, x] of Object.entries(base.rows)) if (/^\d+$/.test(k)) setH(Number(k), isObj(x) ? x.h : x);
-  if (isObj(raw.rows)) for (const [k, x] of Object.entries(raw.rows)) if (/^\d+$/.test(k)) setH(Number(k), isObj(x) ? x.h : x);
+  const hideRow = (r: number) => r >= 0 && r < SHEET_LIMITS.rows && (rows[r] = { ...rows[r], hidden: true });
+  for (const from of [base?.rows, raw.rows])
+    if (isObj(from))
+      for (const [k, x] of Object.entries(from)) {
+        if (!/^\d+$/.test(k)) continue;
+        setH(Number(k), isObj(x) ? x.h : x);
+        if (isObj(x) && x.hidden === true) hideRow(Number(k));
+      }
   const heights = raw.heights ?? raw.rowHeights;
   if (Array.isArray(heights)) heights.forEach((h, r) => setH(r0 + r, h));
   else if (isObj(heights)) for (const [k, h] of Object.entries(heights)) if (/^\d+$/.test(k) && Number(k) >= 1) setH(Number(k) - 1, h);
+  // Hidden rows and columns as an agent names them: { rows: [3, "5:7"], cols: ["C", "E:F"] }.
+  if (isObj(raw.hidden)) {
+    for (const x of Array.isArray(raw.hidden.rows) ? raw.hidden.rows.slice(0, 1000) : []) {
+      const m = /^\s*(\d{1,6})(?:\s*:\s*(\d{1,6}))?\s*$/.exec(String(x));
+      if (m) for (let r = Number(m[1]); r <= Math.min(Number(m[2] ?? m[1]), Number(m[1]) + 5000); r++) hideRow(r - 1);
+    }
+    for (const x of Array.isArray(raw.hidden.cols) ? raw.hidden.cols.slice(0, 500) : []) {
+      const span = typeof x === 'string' ? colSpan(x) : null;
+      if (span) for (let c = span[0]; c <= span[1]; c++) hideCol(c);
+    }
+  }
 
   const sheet: Sheet = { id, name, cells: {} };
-  if (Object.keys(cols).length) sheet.cols = cols;
-  if (Object.keys(rows).length) sheet.rows = rows;
+  // Each in one order (its size, then whether it is hidden), so the kept text stays the same.
+  const tidy = <T extends { w?: number; h?: number; hidden?: boolean }>(m: Record<number, T>) => {
+    const out: Record<number, T> = {};
+    for (const k of Object.keys(m)
+      .map(Number)
+      .sort((a, b) => a - b)) {
+      const x = m[k];
+      const one = { ...(x.w ? { w: x.w } : {}), ...(x.h ? { h: x.h } : {}), ...(x.hidden ? { hidden: true } : {}) } as T;
+      if (Object.keys(one).length) out[k] = one;
+    }
+    return out;
+  };
+  const colsKept = tidy(cols);
+  const rowsKept = tidy(rows);
+  if (Object.keys(colsKept).length) sheet.cols = colsKept;
+  if (Object.keys(rowsKept).length) sheet.rows = rowsKept;
   const freeze = raw.freeze !== undefined ? freezeOf(raw.freeze) : header ? { rows: r0 + 1 } : base?.freeze !== undefined ? freezeOf(base.freeze) : undefined;
   if (freeze) sheet.freeze = freeze;
+  // Merges, a filter, conditional formatting, rules for what cells take, charts: an agent's, or else the file's.
+  const pick = (...keys: string[]) => {
+    for (const k of keys) if (raw[k] !== undefined) return raw[k];
+    for (const k of keys) if (base?.[k] !== undefined) return base[k];
+    return undefined;
+  };
+  const merges = cleanMerges(pick('merges', 'merged', 'merge'));
+  if (merges.length) sheet.merges = merges;
+  const filter = cleanFilter(pick('filter', 'autoFilter'));
+  if (filter) sheet.filter = filter;
+  const conditional = cleanRules(pick('conditional', 'conditionalFormatting', 'cf'));
+  if (conditional.length) sheet.conditional = conditional;
+  const validation = cleanValidations(pick('validation', 'validations', 'dataValidation'));
+  if (validation.length) sheet.validation = validation;
+  const charts = cleanCharts(
+    pick('charts'),
+    (c) => sheet.cols?.[c]?.w ?? COL_W,
+    (r) => sheet.rows?.[r]?.h ?? ROW_H,
+  );
+  if (charts.length) sheet.charts = charts;
   // Cells in reading order: row by row, left to right.
   const out: Record<string, Cell> = {};
   for (const k of [...cells.keys()].sort((a, b) => a - b)) out[refName(unpackR(k), unpackC(k))] = cells.get(k)!;
@@ -943,6 +1789,11 @@ export function bookText(b: Workbook): string {
     if (sh.cols && Object.keys(sh.cols).length) head.cols = sh.cols;
     if (sh.rows && Object.keys(sh.rows).length) head.rows = sh.rows;
     if (sh.freeze) head.freeze = sh.freeze;
+    if (sh.merges?.length) head.merges = sh.merges;
+    if (sh.filter) head.filter = sh.filter;
+    if (sh.conditional?.length) head.conditional = sh.conditional;
+    if (sh.validation?.length) head.validation = sh.validation;
+    if (sh.charts?.length) head.charts = sh.charts;
     out.push(` ${JSON.stringify(head).slice(0, -1)},"cells":{`);
     const byRow = new Map<number, string[]>();
     const keys = Object.keys(sh.cells)
@@ -1422,6 +2273,78 @@ function moveSizes<T>(m: Record<number, T> | undefined, f: (i: number) => number
   return Object.keys(out).length ? out : undefined;
 }
 
+/**
+ * A sheet's other references (its merges, filter, rules' ranges and formulas, lists' sources, charts' data), each
+ * rewritten by `f` as a formula's text would be; what no longer points anywhere goes. `col` moves a filter's column
+ * (null: it went).
+ */
+function mapSheetRefs(sh: Sheet, f: (text: string) => string, col?: (c: number) => number | null): Sheet {
+  if (!sh.merges && !sh.filter && !sh.conditional && !sh.validation && !sh.charts) return sh;
+  const out: Sheet = { ...sh };
+  const formula = (t: string | undefined) => (t?.startsWith('=') ? `=${f(t.slice(1))}` : t);
+  const broken = (t: string | undefined) => !!t && t.includes('#REF!');
+  const cond = (c: Cond | undefined): Cond | undefined | null => {
+    if (!c) return c;
+    const next: Cond = { ...c };
+    if (c.a !== undefined) next.a = formula(c.a);
+    if (c.b !== undefined) next.b = formula(c.b);
+    return broken(next.a) || broken(next.b) ? null : next;
+  };
+  if (sh.merges) {
+    const merges = cleanMerges(sh.merges.map(f));
+    if (merges.length) out.merges = merges;
+    else delete out.merges;
+  }
+  if (sh.filter) {
+    const range = f(sh.filter.range);
+    const rg = broken(range) ? null : parseRange(range);
+    if (!rg) delete out.filter;
+    else {
+      const filter: SheetFilter = { range: rangeName(rg) };
+      const cols: Record<string, FilterCol> = {};
+      for (const [k, fc] of Object.entries(sh.filter.cols ?? {})) {
+        const c0 = colIndex(k);
+        const c = col ? col(c0) : c0;
+        if (c !== null && c >= rg.c1 && c <= rg.c2) cols[colName(c)] = fc;
+      }
+      if (Object.keys(cols).length) filter.cols = cols;
+      out.filter = filter;
+    }
+  }
+  if (sh.conditional) {
+    const list = sh.conditional.flatMap((r) => {
+      const range = cleanRanges(f(r.range));
+      const when = cond(r.when);
+      return range && when !== null ? [{ ...r, range, ...(when ? { when } : {}) }] : [];
+    });
+    if (list.length) out.conditional = list;
+    else delete out.conditional;
+  }
+  if (sh.validation) {
+    const list = sh.validation.flatMap((v) => {
+      const range = cleanRanges(f(v.range));
+      const when = cond(v.when);
+      const source = v.source === undefined ? undefined : f(v.source);
+      if (!range || when === null || broken(source)) return [];
+      const next: Validation = { ...v, range };
+      if (when) next.when = when;
+      if (source !== undefined) next.source = source;
+      return [next];
+    });
+    if (list.length) out.validation = list;
+    else delete out.validation;
+  }
+  if (sh.charts) {
+    const list = sh.charts.flatMap((c) => {
+      const range = f(c.range);
+      return broken(range) ? [] : [{ ...c, range }];
+    });
+    if (list.length) out.charts = list;
+    else delete out.charts;
+  }
+  return out;
+}
+
 const withSizes = (sh: Sheet, cols: Sheet['cols'], rows: Sheet['rows']): Sheet => {
   const out: Sheet = { ...sh };
   if (cols) out.cols = cols;
@@ -1445,10 +2368,12 @@ export function adjustForInsert(book: Workbook, sheetId: string, axis: 'row' | '
     if (!row && q.c !== undefined && q.c >= at) q.c = Math.min(MAX_COLS - 1, q.c + count);
     return q;
   };
-  const moved = mapFormulas(book, (f, on) => moveRefs(f, on, sh.name, (ref) => ({ ...ref, a: bump(ref.a), ...(ref.b ? { b: bump(ref.b) } : {}) })));
+  const move = (ref: RefTok): RefTok => ({ ...ref, a: bump(ref.a), ...(ref.b ? { b: bump(ref.b) } : {}) });
+  const moved = mapFormulas(book, (f, on) => moveRefs(f, on, sh.name, move));
   return {
     ...moved,
-    sheets: moved.sheets.map((s) => {
+    sheets: moved.sheets.map((s0) => {
+      const s = mapSheetRefs(s0, (t) => moveRefs(t, s0, sh.name, move), s0.id === sheetId && !row ? (c) => (c >= at ? c + count : c) : undefined);
       if (s.id !== sheetId) return s;
       const cells = moveCells(s, (r, c) => (row ? [r >= at ? r + count : r, c] : [r, c >= at ? c + count : c]));
       const shift = (i: number) => (i >= at ? i + count : i);
@@ -1493,7 +2418,8 @@ export function adjustForDelete(book: Workbook, sheetId: string, axis: 'row' | '
   const moved = mapFormulas(book, (f, on) => moveRefs(f, on, sh.name, shrink));
   return {
     ...moved,
-    sheets: moved.sheets.map((s) => {
+    sheets: moved.sheets.map((s0) => {
+      const s = mapSheetRefs(s0, (t) => moveRefs(t, s0, sh.name, shrink), s0.id === sheetId && !row ? (c) => (c >= at && c < end ? null : c >= end ? c - count : c) : undefined);
       if (s.id !== sheetId) return s;
       const cells = moveCells(s, (r, c) => {
         const i = row ? r : c;
@@ -1525,10 +2451,9 @@ export function renameSheet(book: Workbook, sheetId: string, name: string): Work
   const clean = uniqueSheetName(cleanSheetName(name), book.sheets.filter((s) => s.id !== sheetId).map((s) => s.name));
   if (clean === sh.name) return book;
   const old = sh.name.toLowerCase();
-  const moved = mapFormulas(book, (f) =>
-    rewrite(f, (t) => (t.k === 'ref' && t.ref.sheet !== undefined && t.ref.sheet.toLowerCase() === old ? `${quoteSheet(clean)}!${f.slice(t.ps, t.e)}` : undefined)),
-  );
-  return { ...moved, sheets: moved.sheets.map((s) => (s.id === sheetId ? { ...s, name: clean } : s)) };
+  const renamed = (f: string) => rewrite(f, (t) => (t.k === 'ref' && t.ref.sheet !== undefined && t.ref.sheet.toLowerCase() === old ? `${quoteSheet(clean)}!${f.slice(t.ps, t.e)}` : undefined));
+  const moved = mapFormulas(book, renamed);
+  return { ...moved, sheets: moved.sheets.map((s0) => mapSheetRefs(s0, renamed)).map((s) => (s.id === sheetId ? { ...s, name: clean } : s)) };
 }
 
 /** A sheet taken out of the workbook: the references other sheets had to it become #REF!. */
@@ -1537,7 +2462,9 @@ export function removeSheet(book: Workbook, sheetId: string): Workbook {
   if (!sh || book.sheets.length < 2) return book;
   const old = sh.name.toLowerCase();
   const rest = { ...book, sheets: book.sheets.filter((s) => s.id !== sheetId) };
-  return mapFormulas(rest, (f) => rewrite(f, (t) => (t.k === 'ref' && t.ref.sheet !== undefined && t.ref.sheet.toLowerCase() === old ? '#REF!' : undefined)));
+  const gone = (f: string) => rewrite(f, (t) => (t.k === 'ref' && t.ref.sheet !== undefined && t.ref.sheet.toLowerCase() === old ? '#REF!' : undefined));
+  const moved = mapFormulas(rest, gone);
+  return { ...moved, sheets: moved.sheets.map((s) => mapSheetRefs(s, gone)) };
 }
 
 /** The formula for a file: newer functions named as Excel's files name them (_xlfn.XLOOKUP), references to sheets that are not there as #REF!. */
@@ -1593,12 +2520,18 @@ const isRg = (v: Val): v is Rg => typeof v === 'object' && v !== null && (v as R
 const isArr = (v: Val): v is Arr => typeof v === 'object' && v !== null && (v as Arr).k === 'arr';
 const multi = (v: Val) => isArr(v) || (isRg(v) && (v.r1 !== v.r2 || v.c1 !== v.c2));
 
-/** Where a formula is being worked out: its sheet and cell, and how many random numbers it drew so far. */
+/**
+ * Where a formula is being worked out: its sheet and cell, and how many random numbers it drew so far. A formula of
+ * conditional formatting or of a rule is written for a range's first cell and worked out for each of its cells: its
+ * references that are not fixed ($) move by dr rows and dc columns.
+ */
 export interface Ctx {
   si: number;
   r: number;
   c: number;
   n: number;
+  dr?: number;
+  dc?: number;
 }
 
 export function toNum(v: Scalar): number | CellError {
@@ -1834,6 +2767,28 @@ export class Calc {
     return si < 0 || !p ? E.REF : this.value(si, p.r, p.c);
   }
 
+  /**
+   * What a formula (without its "=") gives, written for the cell (r0, c0) and worked out for (r, c): conditional
+   * formatting's and rules' own formulas ("$C2>100" for C2, then C3 and on). Never throws.
+   */
+  evalAt(si: number, f: string, r: number, c: number, r0 = r, c0 = c): Scalar {
+    const node = parsedOf(f);
+    if (!node) return E.PARSE;
+    for (let tries = 0; tries < 50; tries++) {
+      const cx: Ctx = { si, r, c, n: 0, dr: r - r0, dc: c - c0 };
+      try {
+        this.frames = 0;
+        const v = this.sc(this.ev(node, cx), cx);
+        return v === null ? 0 : v;
+      } catch (e) {
+        if (!(e instanceof Deep)) return E.VALUE;
+        // A long chain of cells it needs: worked out from its far end, then this again.
+        this.top(e.si, e.key);
+      }
+    }
+    return E.VALUE;
+  }
+
   /** Every formula's result, by sheet id and cell name. */
   all(): Record<string, Record<string, Scalar>> {
     const out: Record<string, Record<string, Scalar>> = {};
@@ -1943,7 +2898,13 @@ export class Calc {
         v = { k: 'arr', h: n.rows.length, w: n.rows[0]?.length ?? 0, d: n.rows.flat() };
         break;
       case 'r':
-        v = this.refVal(n.sheet, n.a, n.b, cx);
+        if (cx.dr || cx.dc) {
+          const move = (p: RefPart): RefPart => ({ ...p, ...(p.r !== undefined && !p.ar ? { r: p.r + (cx.dr ?? 0) } : {}), ...(p.c !== undefined && !p.ac ? { c: p.c + (cx.dc ?? 0) } : {}) });
+          const a = move(n.a);
+          const b = n.b ? move(n.b) : undefined;
+          const off = (p: RefPart | undefined) => !!p && ((p.r ?? 0) < 0 || (p.c ?? 0) < 0 || (p.r ?? 0) >= MAX_ROWS || (p.c ?? 0) >= MAX_COLS);
+          v = off(a) || off(b) ? E.REF : this.refVal(n.sheet, a, b, cx);
+        } else v = this.refVal(n.sheet, n.a, n.b, cx);
         break;
       case 'neg':
         v = this.lift(this.ev(n.x, cx), cx, (s) => {
@@ -3738,6 +4699,21 @@ export function bookOutline(b: Workbook, calc: Calc = computeBook(b), rows = 4):
       const frozen = [sh.freeze?.rows ? n(sh.freeze.rows, 'row') : '', sh.freeze?.cols ? n(sh.freeze.cols, 'column') : ''].filter(Boolean).join(' and ');
       const size = `${n(e.rows, 'row')} × ${n(e.cols, 'column')}, ${n(names.length, 'cell')}, ${n(formulas, 'formula')}`;
       const lines = [`${head}: A1:${refName(e.rows - 1, e.cols - 1)}, ${size}${frozen ? `, frozen: ${frozen}` : ''}`];
+      // What else it has, in a line: a filter, rules, charts, merges, notes, hidden rows and columns.
+      const notes = names.filter((k) => sh.cells[k].note).length;
+      const hiddenR = Object.values(sh.rows ?? {}).filter((x) => x.hidden).length;
+      const hiddenC = Object.values(sh.cols ?? {}).filter((x) => x.hidden).length;
+      const more = [
+        sh.filter ? `a filter on ${sh.filter.range}` : '',
+        sh.conditional?.length ? n(sh.conditional.length, 'conditional formatting rule') : '',
+        sh.validation?.length ? `${sh.validation.length} rule${sh.validation.length === 1 ? '' : 's'} for what cells take` : '',
+        sh.charts?.length ? n(sh.charts.length, 'chart') : '',
+        sh.merges?.length ? `merged: ${sh.merges.slice(0, 6).join(', ')}${sh.merges.length > 6 ? '…' : ''}` : '',
+        notes ? n(notes, 'note') : '',
+        hiddenR ? n(hiddenR, 'hidden row') : '',
+        hiddenC ? n(hiddenC, 'hidden column') : '',
+      ].filter(Boolean);
+      if (more.length) lines.push(`   Also: ${more.join('; ')}`);
       const keys = calc.keys(si);
       let shown = 0;
       let at = 0;

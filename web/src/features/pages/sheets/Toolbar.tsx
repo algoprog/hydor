@@ -161,7 +161,7 @@ const FORMATS: { fmt: NumFmt; cur?: string; label: string; hint: string }[] = [
   { fmt: 'text', label: 'Text', hint: 'as typed' },
 ];
 
-const FMT_SHORT: Record<NumFmt, string> = { general: '123', number: '1.0', percent: '%', currency: '$', date: 'Date', text: 'Text' };
+const FMT_SHORT: Record<NumFmt, string> = { general: '123', number: '1.0', percent: '%', currency: '$', accounting: '$', scientific: '1E', date: 'Date', time: 'Time', datetime: 'Date', duration: 'Time', text: 'Text' };
 
 export function Toolbar(p: ToolbarProps) {
   const s = p.style;
