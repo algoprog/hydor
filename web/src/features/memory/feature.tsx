@@ -34,6 +34,7 @@ function StartOption({ value, onChange }: { value: SessionExtra; onChange: (patc
       <SettingChip
         ref={ref}
         label="Memory"
+        icon={<Brain size={14} />}
         value={off ? 'Off' : 'On'}
         on={off}
         open={open}

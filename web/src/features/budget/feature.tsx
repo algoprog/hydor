@@ -111,6 +111,7 @@ function StartCap({ value, onChange }: { value: SessionExtra; onChange: (patch: 
       <SettingChip
         ref={ref}
         label="Spending cap"
+        icon={<Wallet size={14} />}
         value={cap != null ? usd(cap) : 'None'}
         on={cap != null}
         open={open}

@@ -159,6 +159,7 @@ function ResearchStartOption({ value, onChange }: { value: SessionExtra; onChang
       <SettingChip
         ref={ref}
         label="Research"
+        icon={<Telescope size={14} />}
         value={r ? `Deep · ${r.queries} searches` : 'Off'}
         on={!!r}
         open={open}
