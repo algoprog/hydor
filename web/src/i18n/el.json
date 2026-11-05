@@ -13405,5 +13405,7 @@
 "To do":"Προς υλοποίηση",
 "Untitled database":"Βάση δεδομένων χωρίς τίτλο",
 "contains":"περιέχει",
-"has":"έχει"
+"has":"έχει",
+"{0} in all":"{0} συνολικά",
+"The time it has worked in this session, all its turns together":"Πόσο έχει δουλέψει σε αυτή τη συνεδρία, όλοι οι γύροι της μαζί"
 }
