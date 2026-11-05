@@ -14,6 +14,8 @@ import {
   bookOutline,
   bookText,
   borderOf,
+  chartBox,
+  chartParts,
   CELL_FONTS,
   codeColor,
   cellsFromRows,
@@ -43,6 +45,7 @@ import {
   refName,
   ROW_H,
   SHEET_LIMITS,
+  sheetSizes,
   shiftFormula,
   spills,
   textOn,
@@ -54,6 +57,7 @@ import {
   type Rect,
   type Scalar,
   type Sheet,
+  type SheetChart,
   type Validation,
   type Workbook,
 } from '../../shared/sheets.ts';
@@ -61,7 +65,7 @@ import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { all, att, kid, kids, parseXml, patt, scan, textOf, type El } from '../documents/xml.ts';
 import { resolvePart, Zip } from '../documents/zip.ts';
-import { chartData, chartSvg } from '../../shared/sheet-chart.ts';
+import { chartData, chartProblem, chartSvg } from '../../shared/sheet-chart.ts';
 import { CondFormats, hiddenCols, hiddenRows, isTicked, listOptions, Merges, Rules } from '../../shared/sheet-rules.ts';
 import { coreXml, esc as xesc, relsXml, XML_HEAD, zipParts } from './ooxml.ts';
 import { chartXml, condXml, drawingXml, Dxfs, filterXml, isListsSheet, listFromSheet, listsSheet, mergesXml, notesXml, readCharts, readConditional, readDxfs, readFilter, readNotes, readValidation, validationXml } from './sheet-parts.ts';
@@ -172,6 +176,12 @@ export async function agentBook(input: unknown, cwd: string): Promise<{ book: Wo
   if (Buffer.byteLength(text) > MAX_BOOK) throw new Error(`The spreadsheet is over ${MAX_BOOK / 1024 / 1024} MB as it is kept; make it smaller (fewer cells, or shorter words).`);
   const bad = formulaIssues(book);
   if (bad.length) notes.push(`These formulas cannot be read and show #ERROR!: ${bad.join('; ')}.`);
+  // A chart whose range it cannot draw from is kept, and says why in its place: the agent hears it too.
+  for (const sh of book.sheets)
+    for (const ch of sh.charts ?? []) {
+      const why = chartProblem(book, ch);
+      if (why) notes.push(`The chart${ch.title ? ` “${ch.title}”` : ''} on “${sh.name}” cannot draw from ${ch.range}: ${why}`);
+    }
   return { book, text, notes };
 }
 
@@ -234,8 +244,13 @@ export function bookForAgent(text: string): string {
     'Outline:',
     bookOutline(book, calc),
     ...(results.length ? ['', `What its formulas give${size > 20_000 ? ' (the first ones)' : ''}: ${results.join('; ')}`] : []),
+    ...(() => {
+      // Charts that cannot draw from their ranges, and why (each is kept, saying so in its place).
+      const why = book.sheets.flatMap((sh) => (sh.charts ?? []).flatMap((ch) => (chartProblem(book, ch) ? [`“${sh.name}” ${ch.range}: ${chartProblem(book, ch)}`] : [])));
+      return why.length ? ['', `Charts that cannot draw: ${why.join('; ')}`] : [];
+    })(),
     '',
-    'The workbook as it is kept: each sheet with its id, name, cells by name (v: a value, f: a formula without "=", s: its style, note: its note), cols and rows (widths and heights in px, hidden, by index from 0), freeze, merges, filter, conditional (formatting), validation (what cells take: lists, checkboxes, ratings…) and charts. To change it, send the whole workbook back with save_sheet and this id, each sheet with its id and the parts you keep; cells you leave out are emptied.',
+    'The workbook as it is kept: each sheet with its id, name, cells by name (v: a value, f: a formula without "=", s: its style, note: its note), cols and rows (widths and heights in px, hidden, by index from 0), freeze, merges, filter, conditional (formatting), validation (what cells take: lists, checkboxes, ratings…) and charts (each with from and to: the cells its corners are on, and dx and dy, px into them). To change it, send the whole workbook back with save_sheet and this id, each sheet with its id and the parts you keep; cells you leave out are emptied.',
     body + cut,
   ].join('\n');
 }
@@ -245,7 +260,7 @@ const SHEET_HELP = [
   'The workbook: { title, sheets: [{ name, rows: [[…], …] }] }. rows fill the sheet from A1 (or from start: "B2"), an array per row; a value is a number, words, true or false, null for an empty cell, or a formula: "=SUM(B2:B9)". Words are read as a person types them: "12%" is a percent, "$1,200" an amount, "2026-01-31" a date, "007" stays words; start with \' to keep words as they are. Cells by name, instead or as well: cells: { "B2": 12, "C2": "=B2*2", "D2": { "v": "Paid", "s": { "b": true } } } (as an object, v is taken as it is and f holds a formula, without "=").',
   "Formulas work as in Excel: + - * / ^ & = <> < > <= >=, 50%, references (A1, $A$1, A1:B5, A:A, Sheet2!A1, 'My sheet'!A1:B2) and functions: SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, COUNTBLANK, COUNTIF(S), SUMIF(S), AVERAGEIF(S), MAXIFS, MINIFS, SUMPRODUCT, PRODUCT, MEDIAN, STDEV, LARGE, SMALL, RANK, ROUND, ROUNDUP, ROUNDDOWN, INT, ABS, SQRT, POWER, MOD, IF, IFS, IFERROR, IFNA, AND, OR, NOT, SWITCH, CHOOSE, VLOOKUP, HLOOKUP, XLOOKUP, INDEX, MATCH, XMATCH, OFFSET, INDIRECT, CONCAT, TEXTJOIN, LEFT, RIGHT, MID, LEN, UPPER, LOWER, PROPER, TRIM, SUBSTITUTE, FIND, SEARCH, TEXT, VALUE, TODAY, NOW, DATE, YEAR, MONTH, DAY, WEEKDAY, EOMONTH, EDATE, DATEDIF, NETWORKDAYS, WORKDAY, PMT, FV, PV, NPER, RATE, NPV, IRR and more. Dates are Excel’s day numbers. FILTER, SORT, SORTBY, UNIQUE and SEQUENCE spill their results into the cells below and beside them, which must be empty (else #SPILL!).",
   'How it looks: header: true makes the first row bold and keeps it in view as the sheet scrolls; formats per column: { "B": "currency", "C:D": "percent", "E": "date", "F": { "fmt": "number", "dp": 1 }, "G": "dd/mm/yyyy" } (general, number, percent, currency with cur: "€", accounting, scientific, date, time, datetime, duration, text, or an Excel code: "#,##0.0;[Red]-#,##0.0", "d mmm yyyy", "h:mm AM/PM"; dp: decimals); widths: { "A": 180 } in px (100 otherwise); heights: { "1": 32 } by row number; freeze: { rows: 1, cols: 1 }; styles over ranges: { "A10:D10": { "b": true, "fill": "#fff3cd", "border": "thin" }, "A1:D10": { "outline": "medium" } } (outline: a border round the range). A style: b, i, u, s (struck through), color and fill (#hex), align (left, center, right), valign (top, middle, bottom), wrap, fmt, dp, cur, size (pt), font (Arial, Calibri, Cambria, Courier New, Georgia, Times New Roman, Trebuchet MS, Verdana), rot (degrees, -90 to 90), border on all four sides or bt, br, bb, bl for one ("thin", "medium", "thick", "dashed", "dotted" or "double", a colour after it: "thin #999999").',
-  'More a sheet may have: merges: ["A1:D1"] (cells merged into one; its first cell holds what it shows); hidden: { rows: [5, "8:9"], cols: ["C"] }; notes: { "B2": "Checked by Sam" } (or note on a cell object); filter: { range: "A1:D40", cols: { "C": { when: { op: "gt", a: "100" } }, "D": { hide: ["Done"] } } } (buttons on the header row; the rows it hides are hidden, not removed, and formulas still count them); conditional: [{ range: "C2:C40", when: { op: "gt", a: "100" }, style: { fill: "#fce8e6", color: "#c5221f", b: true } }, { range: "D2:D40", scale: ["#f8696b", "#ffeb84", "#63be7b"] }, { range: "E2:E40", bar: "#638ec6" }] (a condition’s op: empty, notEmpty, contains, notContains, starts, ends, is, eq, neq, gt, gte, lt, lte, between and notBetween with a and b, dateIs, before and after with a date or today, tomorrow, yesterday, week, month, year, formula with a: "=$C2>100" written for the range’s first cell; for conditional formatting also dup, unique, top and bottom with a: how many (b: "%" for a share), above and below the average; rules in order, the first that holds gives its look); validation: [{ range: "D2:D40", list: ["Open", { "v": "Done", "color": "#d9ead3" }] }, { range: "E2:E40", checkbox: true }, { range: "F2:F40", rating: 5 }, { range: "G2:G40", type: "number", when: { op: "between", a: "0", b: "100" }, reject: true }, { range: "H2:H40", source: "Lists!A1:A9" }] (lists show coloured chips and a dropdown, checkboxes hold TRUE or FALSE, ratings 0 to 5 stars; type also date, length and formula; reject refuses other input, else it is kept with a warning); charts: [{ kind: "line", range: "A1:C13", title: "Sales", at: "E2", w: 480, h: 300 }] (kind: column, bar, line, area, pie, doughnut or scatter; series down the columns, or by: "rows"; the first column as labels and the first row as names when they hold words, or labels and names: true or false; legend: bottom, right, top or none; xTitle, yTitle, colors, stacked; at a cell, or x and y in px from A1’s corner).',
+  'More a sheet may have: merges: ["A1:D1"] (cells merged into one; its first cell holds what it shows); hidden: { rows: [5, "8:9"], cols: ["C"] }; notes: { "B2": "Checked by Sam" } (or note on a cell object); filter: { range: "A1:D40", cols: { "C": { when: { op: "gt", a: "100" } }, "D": { hide: ["Done"] } } } (buttons on the header row; the rows it hides are hidden, not removed, and formulas still count them); conditional: [{ range: "C2:C40", when: { op: "gt", a: "100" }, style: { fill: "#fce8e6", color: "#c5221f", b: true } }, { range: "D2:D40", scale: ["#f8696b", "#ffeb84", "#63be7b"] }, { range: "E2:E40", bar: "#638ec6" }] (a condition’s op: empty, notEmpty, contains, notContains, starts, ends, is, eq, neq, gt, gte, lt, lte, between and notBetween with a and b, dateIs, before and after with a date or today, tomorrow, yesterday, week, month, year, formula with a: "=$C2>100" written for the range’s first cell; for conditional formatting also dup, unique, top and bottom with a: how many (b: "%" for a share), above and below the average; rules in order, the first that holds gives its look); validation: [{ range: "D2:D40", list: ["Open", { "v": "Done", "color": "#d9ead3" }] }, { range: "E2:E40", checkbox: true }, { range: "F2:F40", rating: 5 }, { range: "G2:G40", type: "number", when: { op: "between", a: "0", b: "100" }, reject: true }, { range: "H2:H40", source: "Lists!A1:A9" }] (lists show coloured chips and a dropdown, checkboxes hold TRUE or FALSE, ratings 0 to 5 stars; type also date, length and formula; reject refuses other input, else it is kept with a warning); charts: [{ kind: "line", range: "A1:C13", title: "Sales", at: "E2:J16" }] (kind: column, bar, line, area, pie, doughnut or scatter; range: the cells it draws, or several ranges split by commas read as if side by side, each as long as the others: "A1:A13,D1:D13" takes the labels from A and the values from D; series down the columns, or by: "rows"; the first column as labels and the first row as names when they hold words, or labels and names: true or false; legend: bottom, right, top or none; xTitle, yTitle, colors, stacked; where it sits: at: "E2:J16", the cells it covers, or at: "E2" with w and h in px; it is kept as from and to, the cells its corners are on, so it moves and stretches with them as rows and columns go in or out; a range it cannot draw from is kept and says why).',
   'A sheet may come from a file of this session instead: file: "data.csv" (CSV, TSV, .xlsx or .ods; from the session’s folder, ~ or absolute; sheet: which of an Excel file’s sheets), with rows, cells and formats given too going on top. file beside title (no sheets) makes the whole workbook from an .xlsx or .ods file.',
   'At most 50 sheets, 200,000 cells, 20,000 rows and 500 columns a sheet. Good sheets have a header row, one kind of value per column, and totals as formulas (=SUM(B2:B20)) rather than typed numbers, so they stay right when the user changes one.',
   'To change a spreadsheet, get_page with its id gives it whole (each sheet with its id and cells, and what its formulas give); send the whole workbook back with the same id: a new version, the older ones restorable. Keep what the user changed.',
@@ -553,16 +568,18 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
   const sheets = book.sheets.map((sh, si) => {
     const links: SheetLinks = {};
     const rels: [string, string, string][] = [];
-    if (sh.charts?.length) {
+    // Charts that cannot draw from their ranges are left out (the workbook keeps them, saying why).
+    const drawn = (sh.charts ?? []).filter((ch) => !chartProblem(book, ch));
+    if (drawn.length) {
       const d = ++drawings;
       const chartRels: [string, string, string][] = [];
-      sh.charts.forEach((ch, i) => {
+      drawn.forEach((ch, i) => {
         const n = ++charts;
         extra.push({ name: `xl/charts/chart${n}.xml`, data: chartXml(book, ch, chartData(book, calc, si, ch, true), names) });
         overrides.push(`<Override PartName="/xl/charts/chart${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`);
         chartRels.push([`rId${i + 1}`, 'chart', `../charts/chart${n}.xml`]);
       });
-      extra.push({ name: `xl/drawings/drawing${d}.xml`, data: drawingXml(sh, (i) => `rId${i + 1}`) });
+      extra.push({ name: `xl/drawings/drawing${d}.xml`, data: drawingXml(sh, drawn, (i) => `rId${i + 1}`) });
       extra.push({ name: `xl/drawings/_rels/drawing${d}.xml.rels`, data: relsXml(chartRels) });
       overrides.push(`<Override PartName="/xl/drawings/drawing${d}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`);
       links.drawing = `rId${rels.length + 1}`;
@@ -930,7 +947,7 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
       const dRels = relsOf(z, drawingRel!.target);
       const colW = (c: number) => (base.cols[c]?.hidden ? 0 : (base.cols[c]?.w ?? COL_W));
       const rowH = (r: number) => (base.rows[r]?.hidden ? 0 : (base.rows[r]?.h ?? ROW_H));
-      base.charts = readCharts(drawing, (rid) => (dRels.get(rid) ? z.text(dRels.get(rid)!.target) : null), name, colW, rowH);
+      base.charts = readCharts(drawing, (rid) => (dRels.get(rid) ? z.text(dRels.get(rid)!.target) : null), name, colW, rowH).map((ch) => wholeRange(ch, base.cells));
       const left = [
         /<(?:\w+:)?pic[\s>]/.test(drawing) && 'pictures',
         /<(?:\w+:)?sp[\s>]/.test(drawing) && 'shapes',
@@ -965,6 +982,29 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
   if (state.bad) loses.add('formulas');
   if (z.names().some((n) => n.startsWith('xl/externalLinks/'))) loses.add('links');
   return { book: normalizeBook({ sheets }, { notes }), notes, loses: [...loses], cut: state.cutRows || state.cutCells || cutSheets };
+}
+
+/**
+ * A chart read from its series as a range in parts, as one range when the columns (rows) between its parts hold no
+ * numbers to draw (words, or nothing): the block of cells it was made from, which draws the same.
+ */
+function wholeRange(ch: SheetChart, cells: Record<string, Cell>): SheetChart {
+  const parts = chartParts(ch.range);
+  if (!parts || parts.length < 2 || parts.some((p) => p.sheet !== undefined)) return ch;
+  const rows = ch.by === 'rows';
+  const u: Rect = { r1: Math.min(...parts.map((p) => p.x.r1)), c1: Math.min(...parts.map((p) => p.x.c1)), r2: Math.max(...parts.map((p) => p.x.r2)), c2: Math.max(...parts.map((p) => p.x.c2)) };
+  // The parts' lines, one after another and in order, with only gaps of words between them.
+  const own = new Set(parts.flatMap((p) => Array.from({ length: (rows ? p.x.r2 - p.x.r1 : p.x.c2 - p.x.c1) + 1 }, (_, k) => (rows ? p.x.r1 : p.x.c1) + k)));
+  const order = parts.map((p) => (rows ? p.x.r1 : p.x.c1));
+  if (order.some((v, i) => i && v < order[i - 1]) || parts.some((p) => (rows ? p.x.c1 !== u.c1 || p.x.c2 !== u.c2 : p.x.r1 !== u.r1 || p.x.r2 !== u.r2))) return ch;
+  for (let i = rows ? u.r1 : u.c1; i <= (rows ? u.r2 : u.c2); i++) {
+    if (own.has(i)) continue;
+    for (let j = (rows ? u.c1 : u.r1) + 1; j <= (rows ? u.c2 : u.r2); j++) {
+      const cell = cells[rows ? refName(i, j) : refName(j, i)];
+      if (cell && (cell.f !== undefined || typeof cell.v === 'number')) return ch;
+    }
+  }
+  return { ...ch, range: rangeName(u) };
 }
 
 /** One worksheet's XML, read as it streams by (a big sheet is never held as a tree). */
@@ -1606,14 +1646,23 @@ function tableHtml(sh: Sheet, si: number, calc: Calc, o: TableOpts, cls: CssClas
   return out.join('');
 }
 
-/** A sheet's charts as the page shows them: over the table where the editor shows them (`over`), or one after another. */
+/**
+ * A sheet's charts as the page shows them: over the table where the editor shows them (`over`: between their corners'
+ * cells, as the table draws them, rows and columns it leaves out folded away), or one after another at their size.
+ */
 function chartsHtml(book: Workbook, sh: Sheet, si: number, calc: Calc, over: { numW: number; head: number; k: number } | null): string {
+  const shown = sheetSizes(sh, hiddenRows(sh, si, calc));
+  const whole = sheetSizes(sh, undefined, true);
   return (sh.charts ?? [])
     .map((ch) => {
-      const svg = chartSvg(ch, chartData(book, calc, si, ch), ch.w, ch.h);
-      if (!over) return `<div class="nb-chart" style="width:${ch.w}px">${svg}</div>`;
+      const box = chartBox(ch, over ? shown : whole);
+      if (over && (box.w < 1 || box.h < 1)) return '';
+      const w = Math.max(160, Math.round(box.w));
+      const h = Math.max(120, Math.round(box.h));
+      const svg = chartSvg(ch, chartData(book, calc, si, ch), w, h, undefined, { problem: chartProblem(book, ch) });
+      if (!over) return `<div class="nb-chart" style="width:${w}px">${svg}</div>`;
       const k = over.k;
-      return `<div class="nb-chart" style="left:${Math.round(over.numW + ch.x * k)}px;top:${Math.round(over.head + ch.y * k)}px;width:${Math.round(ch.w * k)}px;height:${Math.round(ch.h * k)}px">${k === 1 ? svg : svg.replace(/ width="\d+" height="\d+"/, ' width="100%" height="100%"')}</div>`;
+      return `<div class="nb-chart" style="left:${Math.round(over.numW + box.x * k)}px;top:${Math.round(over.head + box.y * k)}px;width:${Math.round(box.w * k)}px;height:${Math.round(box.h * k)}px">${svg.replace(/ width="\d+" height="\d+"/, ' width="100%" height="100%"')}</div>`;
     })
     .join('');
 }

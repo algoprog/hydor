@@ -7,9 +7,13 @@
 // them by; and charts, as a drawing of chart parts whose series point at the cells, their values cached for programs
 // that do not work them out.
 import {
+  chartParts,
+  cleanChartRange,
   cleanSource,
   colIndex,
   colName,
+  cornerAt,
+  cornerXY,
   dateText,
   fileFormula,
   formulaFromFile,
@@ -23,12 +27,12 @@ import {
   rectsOf,
   refName,
   replaceNames,
+  sheetSizes,
   sourceOf,
   uniqueSheetName,
-  COL_W,
-  ROW_H,
   type Calc,
   type Cell,
+  type ChartCorner,
   type Cond,
   type CondRule,
   type CondStyle,
@@ -690,27 +694,24 @@ const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const emu = (px: number) => Math.round(px * 9525);
 
-/** The column (or row) a distance from the sheet's edge falls in, and how far into it. */
-function cellAt(px: number, size: (i: number) => number, limit: number): [number, number] {
-  let i = 0;
-  let at = 0;
-  while (i < limit - 1 && at + size(i) <= px) at += size(i++);
-  return [i, px - at];
-}
-
-/** A sheet's charts as a drawing part: each anchored at its cell, with its size. `rid(i)`: the relationship of its chart part. */
-export function drawingXml(sh: Sheet, rid: (i: number) => string): string {
-  const w = (c: number) => (sh.cols?.[c]?.hidden ? 0 : (sh.cols?.[c]?.w ?? COL_W));
-  const h = (r: number) => (sh.rows?.[r]?.hidden ? 0 : (sh.rows?.[r]?.h ?? ROW_H));
-  const anchors = (sh.charts ?? []).map((ch, i) => {
-    const [c, dx] = cellAt(ch.x, w, 16_384);
-    const [r, dy] = cellAt(ch.y, h, 1_048_576);
-    return (
-      `<xdr:oneCellAnchor><xdr:from><xdr:col>${c}</xdr:col><xdr:colOff>${emu(dx)}</xdr:colOff><xdr:row>${r}</xdr:row><xdr:rowOff>${emu(dy)}</xdr:rowOff></xdr:from><xdr:ext cx="${emu(ch.w)}" cy="${emu(ch.h)}"/>` +
+/**
+ * A sheet's charts as a drawing part: each anchored by its two corners on cells (Excel's "move and size with cells"),
+ * where in each cell (no further than the cell reaches). `rid(i)`: the relationship of its chart part.
+ */
+export function drawingXml(sh: Sheet, charts: SheetChart[], rid: (i: number) => string): string {
+  const g = sheetSizes(sh, undefined, true);
+  const corner = (tag: 'from' | 'to', k: ChartCorner) => {
+    const p = parseRef(k.cell)!;
+    const dx = Math.min(k.dx ?? 0, g.colW(p.c));
+    const dy = Math.min(k.dy ?? 0, g.rowH(p.r));
+    return `<xdr:${tag}><xdr:col>${p.c}</xdr:col><xdr:colOff>${emu(dx)}</xdr:colOff><xdr:row>${p.r}</xdr:row><xdr:rowOff>${emu(dy)}</xdr:rowOff></xdr:${tag}>`;
+  };
+  const anchors = charts.map(
+    (ch, i) =>
+      `<xdr:twoCellAnchor editAs="twoCell">${corner('from', ch.from)}${corner('to', ch.to)}` +
       `<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${i + 2}" name="${esc(ch.title || `Chart ${i + 1}`)}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>` +
-      `<a:graphic><a:graphicData uri="${NS_C}"><c:chart xmlns:c="${NS_C}" xmlns:r="${NS_R}" r:id="${rid(i)}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:oneCellAnchor>`
-    );
-  });
+      `<a:graphic><a:graphicData uri="${NS_C}"><c:chart xmlns:c="${NS_C}" xmlns:r="${NS_R}" r:id="${rid(i)}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`,
+  );
   return `${XML_HEAD}<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="${NS_A}">${anchors.join('')}</xdr:wsDr>`;
 }
 
@@ -783,39 +784,58 @@ export function chartXml(book: Workbook, chart: SheetChart, data: ChartData | nu
   return `${XML_HEAD}<c:chartSpace xmlns:c="${NS_C}" xmlns:a="${NS_A}" xmlns:r="${NS_R}"><c:roundedCorners val="0"/><c:chart>${title}<c:plotArea><c:layout/>${plot}</c:plotArea>${legend}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
 }
 
-/** The charts of a sheet's drawing part, each from its chart part (`chartOf`: a relationship's chart XML): what this can draw of them. */
+/**
+ * The charts of a sheet's drawing part, each from its chart part (`chartOf`: a relationship's chart XML): what this can
+ * draw of them, with their corners on cells (an anchor by one cell or by a place in px is found on the cells it covers,
+ * at the sizes `w` and `h` give, a hidden column or row 0).
+ */
 export function readCharts(drawing: string, chartOf: (rid: string) => string | null, sheetName: string, w: (c: number) => number, h: (r: number) => number): SheetChart[] {
   const out: SheetChart[] = [];
   const root = parseXml(drawing).root;
-  const sum = (n: number, size: (i: number) => number) => {
-    let s = 0;
-    for (let i = 0; i < n; i++) s += size(i);
-    return s;
-  };
+  const g = { colW: w, rowH: h, left: (c: number) => sum(c, w), top: (r: number) => sum(r, h) };
   for (const a of [...kids(root, 'oneCellAnchor'), ...kids(root, 'twoCellAnchor'), ...kids(root, 'absoluteAnchor')]) {
     const chartEl = all(a, 'chart').find((x) => Object.keys(x.a).some((k) => k.endsWith(':id')));
     const rid = chartEl ? Object.entries(chartEl.a).find(([k]) => k.endsWith(':id'))?.[1] : undefined;
     const xml = rid ? chartOf(rid) : null;
     if (!xml) continue;
-    const from = kid(a, 'from');
     const num = (el: El | undefined, n: string) => Number(textOf(kid(el, n)) || 0) || 0;
-    const x = from ? sum(num(from, 'col'), w) + num(from, 'colOff') / 9525 : 0;
-    const y = from ? sum(num(from, 'row'), h) + num(from, 'rowOff') / 9525 : 0;
-    let cw = 480;
-    let chh = 300;
+    const cornerOf = (el: El): ChartCorner => {
+      const dx = Math.round(num(el, 'colOff') / 9525);
+      const dy = Math.round(num(el, 'rowOff') / 9525);
+      return { cell: refName(Math.min(num(el, 'row'), 1_048_575), Math.min(num(el, 'col'), 16_383)), ...(dx > 0 ? { dx } : {}), ...(dy > 0 ? { dy } : {}) };
+    };
+    const fromEl = kid(a, 'from');
+    const toEl = kid(a, 'to');
+    const pos = kid(a, 'pos');
     const ext = kid(a, 'ext');
-    const to = kid(a, 'to');
-    if (ext) [cw, chh] = [Number(att(ext, 'cx') ?? 0) / 9525 || 480, Number(att(ext, 'cy') ?? 0) / 9525 || 300];
-    else if (to) [cw, chh] = [sum(num(to, 'col'), w) + num(to, 'colOff') / 9525 - x, sum(num(to, 'row'), h) + num(to, 'rowOff') / 9525 - y];
+    const from: ChartCorner = fromEl ? cornerOf(fromEl) : cornerAt(Number(att(pos, 'x') ?? 0) / 9525, Number(att(pos, 'y') ?? 0) / 9525, w, h);
+    let to: ChartCorner;
+    if (toEl) to = cornerOf(toEl);
+    else {
+      const p0 = cornerXY(from, g);
+      to = cornerAt(p0.x + (Number(att(ext, 'cx') ?? 0) / 9525 || 480), p0.y + (Number(att(ext, 'cy') ?? 0) / 9525 || 300), w, h);
+    }
+    // A far corner before the first (a file that says so): the chart gets a size of its own from the first.
+    if (parseRef(to.cell)!.r < parseRef(from.cell)!.r || parseRef(to.cell)!.c < parseRef(from.cell)!.c) {
+      const p0 = cornerXY(from, g);
+      to = cornerAt(p0.x + 480, p0.y + 300, w, h);
+    }
     const c = chartFrom(xml, sheetName);
-    if (c) out.push({ ...c, id: `c${out.length + 1}`, x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)), w: Math.max(160, Math.round(cw)), h: Math.max(120, Math.round(chh)) });
+    if (c) out.push({ ...c, id: `c${out.length + 1}`, from, to });
     if (out.length >= 20) break;
   }
   return out;
 }
 
+/** The sizes of the first `n` columns (or rows), added. */
+const sum = (n: number, size: (i: number) => number) => {
+  let s = 0;
+  for (let i = 0; i < Math.min(n, 1_048_576); i++) s += size(i);
+  return s;
+};
+
 /** What a chart part draws, as a chart over the sheet's cells: its kind, the range its series cover, its words. */
-function chartFrom(xml: string, sheetName: string): Omit<SheetChart, 'id' | 'x' | 'y' | 'w' | 'h'> | null {
+function chartFrom(xml: string, sheetName: string): Omit<SheetChart, 'id' | 'from' | 'to'> | null {
   const root = parseXml(xml).root;
   const plotArea = all(root, 'plotArea')[0];
   if (!plotArea) return null;
@@ -835,7 +855,7 @@ function chartFrom(xml: string, sheetName: string): Omit<SheetChart, 'id' | 'x' 
   if (!found) return null;
   const [plot, k0] = found;
   const kind: SheetChartKind = k0 === 'column' && att(kid(plot!, 'barDir'), 'val') === 'bar' ? 'bar' : k0;
-  // The cells its series use, on one sheet: their union is the chart's range.
+  // The cells its series use, on one sheet.
   const refs: { sheet?: string; x: Rect; what: 'name' | 'cat' | 'val' }[] = [];
   const add = (el: El | undefined, what: 'name' | 'cat' | 'val') => {
     const f = textOf(all(el, 'f')[0]).trim();
@@ -857,11 +877,26 @@ function chartFrom(xml: string, sheetName: string): Omit<SheetChart, 'id' | 'x' 
   if (!vals.length) return null;
   const sheet = vals[0].sheet;
   const same = refs.filter((r) => (r.sheet ?? '').toLowerCase() === (sheet ?? '').toLowerCase());
-  const u: Rect = { r1: Math.min(...same.map((r) => r.x.r1)), c1: Math.min(...same.map((r) => r.x.c1)), r2: Math.max(...same.map((r) => r.x.r2)), c2: Math.max(...same.map((r) => r.x.c2)) };
   const byRows = vals.every((r) => r.x.r1 === r.x.r2) && vals.some((r) => r.x.c1 !== r.x.c2);
+  // Its cells in parts: the labels' column (row) first, then each series' one, as far as their names and values go;
+  // columns (rows) side by side make one part, so a chart of one block of cells has one range, as before.
+  const lines: number[] = [];
+  const line = (x: Rect) => {
+    for (let i = byRows ? x.r1 : x.c1; i <= (byRows ? x.r2 : x.c2) && lines.length < 60; i++) if (!lines.includes(i)) lines.push(i);
+  };
+  for (const r of same) if (r.what === 'cat') line(r.x);
+  for (const r of vals) if ((r.sheet ?? '').toLowerCase() === (sheet ?? '').toLowerCase()) line(r.x);
+  const lo = Math.min(...same.map((r) => (byRows ? r.x.c1 : r.x.r1)));
+  const hi = Math.max(...same.map((r) => (byRows ? r.x.c2 : r.x.r2)));
+  const runs: [number, number][] = [];
+  for (const i of lines) {
+    const last = runs[runs.length - 1];
+    if (last && i === last[1] + 1) last[1] = i;
+    else runs.push([i, i]);
+  }
   const onOwn = !sheet || sheet.toLowerCase() === sheetName.toLowerCase();
-  const range = cleanSource(onOwn ? rangeName(u) : `${quoteSheet(sheet!)}!${rangeName(u)}`);
-  if (!range) return null;
+  const range = cleanChartRange(runs.map(([a, b]) => `${onOwn ? '' : `${quoteSheet(sheet!)}!`}${rangeName(byRows ? { r1: a, c1: lo, r2: b, c2: hi } : { r1: lo, c1: a, r2: hi, c2: b })}`).join(','));
+  if (!range || !chartParts(range)) return null;
   const words = (el: El | undefined) =>
     all(el, 't')
       .map((t) => textOf(t))
@@ -878,7 +913,7 @@ function chartFrom(xml: string, sheetName: string): Omit<SheetChart, 'id' | 'x' 
     );
   const legendEl = all(root, 'legend')[0];
   const lp = att(kid(legendEl, 'legendPos'), 'val');
-  const out: Omit<SheetChart, 'id' | 'x' | 'y' | 'w' | 'h'> = { kind, range };
+  const out: Omit<SheetChart, 'id' | 'from' | 'to'> = { kind, range };
   if (byRows) out.by = 'rows';
   out.labels = refs.some((r) => r.what === 'cat');
   out.names = refs.some((r) => r.what === 'name');

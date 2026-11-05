@@ -12,9 +12,9 @@ import path from 'node:path';
 import Fastify from 'fastify';
 import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
-import { accountingParts, adjustForDelete, adjustForInsert, bookText, cleanBorder, codeColor, computeBook, formatValue, inputText, normalizeBook, parseInput, renameSheet, type Workbook } from '../../shared/sheets.ts';
+import { accountingParts, adjustForDelete, adjustForInsert, bookText, chartBox, cleanBorder, codeColor, computeBook, formatValue, inputText, normalizeBook, parseInput, renameSheet, sheetSizes, type Workbook } from '../../shared/sheets.ts';
 import { allowed, CondFormats, filterHidden, hiddenRows, listOptions, Merges, Rules } from '../../shared/sheet-rules.ts';
-import { chartData, chartSvg } from '../../shared/sheet-chart.ts';
+import { chartData, chartProblem, chartSvg } from '../../shared/sheet-chart.ts';
 import { bookForAgent, bookPage, csvOfBook, importBook, xlsxOfBook } from './sheets.ts';
 import { delimitedFile } from './filemodel.ts';
 import { Zip } from '../documents/zip.ts';
@@ -128,7 +128,7 @@ const sh = book.sheets[0];
   );
   ok(sh.validation?.length === 5 && sh.validation[0].options?.length === 3 && sh.validation[0].options[2].color === '#008000', 'a list’s options once each, with colours');
   ok(sh.validation?.[3].reject === true && sh.validation[3].when?.op === 'between' && sh.validation[4].source === 'Lists!A1:A3', 'numbers between, rejecting; a list from a range');
-  ok(sh.charts?.length === 2 && sh.charts[0].x === 700 && sh.charts[0].y === 24 && sh.charts[1].kind === 'column', 'charts: placed at a cell; an unknown kind is a column chart; one of no cells goes');
+  ok(sh.charts?.length === 3 && sh.charts[0].from.cell === 'H2' && sh.charts[1].kind === 'column' && sh.charts[2].range === 'nope', 'charts: placed at a cell; an unknown kind is a column chart; one of words that are no range stays, to say why');
   const again = normalizeBook(JSON.parse(bookText(book)));
   ok(bookText(again) === bookText(book), 'kept and read back, the workbook is the same');
   ok(normalizeBook({ sheets: [{ name: 'Old', cells: { A1: 1 } }] }).sheets[0].merges === undefined, 'a workbook without them has none');
@@ -176,7 +176,7 @@ const sh = book.sheets[0];
 {
   const ins = adjustForInsert(book, sh.id, 'row', 0, 2).sheets[0];
   ok(ins.merges?.[0] === 'A9:C9' && ins.filter?.range === 'A3:F7' && ins.conditional?.[0].range === 'C4:C7' && ins.conditional[3].when?.a === '=$C4>10', 'rows put in above move merges, the filter and rules (their formulas too)');
-  ok(ins.charts?.[0].range === 'A3:C7' && ins.validation?.[4].source === 'Lists!A1:A3', 'a chart’s cells move; another sheet’s list stays');
+  ok(ins.charts?.[0].range === 'A3:C7' && ins.charts[0].from.cell === 'H4' && ins.validation?.[4].source === 'Lists!A1:A3', 'a chart’s cells move, and so does the chart; another sheet’s list stays');
   const insCol = adjustForInsert(book, sh.id, 'col', 1, 1).sheets[0];
   ok(insCol.filter?.cols?.E?.hide?.[0] === 'Done' && !insCol.filter.cols.D, 'a column put in moves a filter’s column');
   const del = adjustForDelete(book, sh.id, 'col', 3, 1).sheets[0];
@@ -188,6 +188,53 @@ const sh = book.sheets[0];
   ok(renamed.sheets[0].validation?.[4].source === 'Options!A1:A3', 'a list’s sheet renamed is followed');
   const delLists = adjustForDelete(book, lists, 'row', 0, 5).sheets[0];
   ok(!delLists.validation?.some((v) => v.source), 'a list whose cells went is dropped');
+}
+
+// ---- charts on cells, of ranges in parts ------------------------------------------------------------------------
+{
+  const base = { name: 'C', rows: [['Month', 'Units', 'Sales', 'Costs'], ['Jan', 1, 10, 4], ['Feb', 2, 20, 5], ['Mar', 3, 30, 6], ['Apr', 4, 40, 7]] };
+  const cb = normalizeBook({ sheets: [{ ...base, charts: [{ range: 'A1:A5,C1:D5', at: 'F2:K12', title: 'Parts' }, { range: ['A1:A5', 'C1:C4'] }, { range: 'A1:B5', x: 420, y: 48, w: 480, h: 300 }] }] });
+  const [c1, c2, c3] = cb.sheets[0].charts!;
+  ok(c1.from.cell === 'F2' && c1.to.cell === 'L13' && c1.range === 'A1:A5,C1:D5', 'a chart over a range of cells has its corners on them (the far one past the last cell)');
+  ok(c3.from.cell === 'E3' && c3.from.dx === 20 && !c3.from.dy && c3.to.cell === 'J15' && !c3.to.dx && c3.to.dy === 12, 'a chart kept in px before is put on the cells it was drawn over');
+  const calc = computeBook(cb);
+  const d1 = chartData(cb, calc, 0, c1)!;
+  ok(d1.labels.join() === 'Jan,Feb,Mar,Apr' && d1.series.map((x) => x.name).join() === 'Sales,Costs' && d1.series[1].values.join() === '4,5,6,7' && d1.series[0].ref.c1 === 2, 'a range in parts: the labels from one part, the values from the others, the column between left out');
+  const why = chartProblem(cb, c2);
+  ok(why?.includes('not as long as each other') && chartData(cb, calc, 0, c2) === null && chartSvg(c2, null, 400, 300, undefined, { problem: why }).includes('not as long'), 'parts of different lengths: the chart says why, in its place');
+  ok(chartProblem(cb, { ...c1, range: 'A1:A5,Other!C1:C5' })?.includes('different sheets') && chartProblem(cb, { ...c1, range: 'Nope!A1:B3' })?.includes('no sheet named') && chartProblem(cb, c3) === null, 'and so do parts on two sheets, and a sheet that is not there');
+  // Rows and columns in and out: the chart moves with its cells, and stretches with those under it.
+  const id = cb.sheets[0].id;
+  const above = adjustForInsert(cb, id, 'row', 0, 2).sheets[0].charts![0];
+  const inside = adjustForInsert(cb, id, 'row', 5, 3).sheets[0].charts![0];
+  const cols = adjustForInsert(cb, id, 'col', 2, 1).sheets[0].charts![0];
+  ok(above.from.cell === 'F4' && above.to.cell === 'L15' && above.range === 'A3:A7,C3:D7', 'rows put in above move it down, its range with it');
+  ok(inside.from.cell === 'F2' && inside.to.cell === 'L16', 'rows put in under its top stretch it');
+  ok(cols.from.cell === 'G2' && cols.range === 'A1:A5,D1:E5', 'a column put in before it moves it right');
+  const gone = adjustForDelete(cb, id, 'row', 1, 2).sheets[0].charts![0];
+  ok(gone.from.cell === 'F2' && !gone.from.dy && gone.to.cell === 'L11', 'rows taken out from under its top: its top goes to the row after them, it shrinks');
+  const all = adjustForDelete(cb, id, 'row', 0, 20).sheets[0].charts;
+  ok(all === undefined, 'the rows of all its cells taken out: it goes with them');
+  const lone = normalizeBook({ sheets: [{ ...base, charts: [{ range: 'A1:C5', at: 'F8:K12' }] }] });
+  const shrunk = adjustForDelete(lone, lone.sheets[0].id, 'row', 6, 30).sheets[0].charts![0];
+  ok(shrunk.from.cell === 'F7' && shrunk.to.cell === 'L12', 'the rows it sat on all taken out: it keeps its size from the row after them');
+  // Hidden rows and columns fold it; sizes stretch it.
+  const hid = normalizeBook({ sheets: [{ ...base, hidden: { rows: ['3:6'] }, heights: { 8: 48 }, charts: [{ range: 'A1:C5', at: 'F2:K12' }] }] }).sheets[0];
+  const box0 = chartBox(hid.charts![0], sheetSizes({ ...hid, rows: undefined }));
+  const box1 = chartBox(hid.charts![0], sheetSizes(hid));
+  ok(box0.h === 11 * 24 && box1.h === 11 * 24 - 4 * 24 + 24, 'rows hidden under it fold it, a taller row stretches it');
+  // Excel: two-cell anchors, the series pointing at each part.
+  const z = new Zip(xlsxOfBook(cb, 'C'));
+  const dr = z.text('xl/drawings/drawing1.xml') ?? '';
+  const ch1 = z.text('xl/charts/chart1.xml') ?? '';
+  ok(dr.includes('<xdr:twoCellAnchor editAs="twoCell"><xdr:from><xdr:col>5</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row>') && dr.includes('<xdr:to><xdr:col>11</xdr:col>') && (dr.match(/<xdr:twoCellAnchor/g)?.length ?? 0) === 2, 'Excel: each chart anchored by its two cells, the one that cannot draw left out');
+  ok(ch1.includes('<c:f>C!$A$2:$A$5</c:f>') && ch1.includes('<c:f>C!$C$2:$C$5</c:f>') && ch1.includes('<c:f>C!$D$2:$D$5</c:f>') && !ch1.includes('$B$'), 'its series point at each part, the labels at the first');
+  const cr = importBook(xlsxOfBook(cb, 'C'), 'C.xlsx').book.sheets[0].charts!;
+  ok(cr.length === 2 && cr[0].range === 'A1:A5,C1:D5' && cr[0].from.cell === 'F2' && cr[0].to.cell === 'L13' && cr[1].range === 'A1:B5', 'read back: a range in parts, on the same cells');
+  const words = normalizeBook({ sheets: [{ name: 'W', rows: [['Task', 'Owner', 'Hours'], ['Plan', 'Ann', 4], ['Build', 'Bo', 12]], charts: [{ range: 'A1:C3' }] }] });
+  ok(importBook(xlsxOfBook(words, 'W'), 'W.xlsx').book.sheets[0].charts?.[0].range === 'A1:C3', 'a chart of a table with a column of words in it comes back as the one range it was');
+  const page = bookPage(cb, 'C', 'viewer');
+  ok(page.includes(`left:${42 + 500}px;top:${22 + 24}px;width:${6 * 100}px;height:${11 * 24}px`) && page.includes('not as long as each other'), 'the page draws each chart between its cells, and says why one cannot draw');
 }
 
 // ---- Excel files: written and read back ---------------------------------------------------------------------------
@@ -241,7 +288,10 @@ const sh = book.sheets[0];
   const lb = importBook(xlsxOfBook(listBook, 'L'), 'L.xlsx').book;
   ok(lb.sheets.length === 2 && lb.sheets[1].name === 'Hydor lists' && lb.sheets[0].validation?.[0].options?.map((o) => o.v).join('|') === 'Small, cheap|Big "deluxe"|10|Plain' && lb.sheets[0].validation?.[1].options?.length === 40 && !lb.sheets[0].validation?.[0].source, 'and come back whole as lists of options');
   ok(b.cells.B3.note === 'Bo is away in May' && b.cells.Z9?.note === 'Far off', 'notes come back');
-  ok(b.charts?.length === 2 && b.charts[0].kind === 'column' && b.charts[0].range === 'A1:C5' && b.charts[0].title === 'Hours' && Math.abs(b.charts[0].x - 700) < 2, 'charts come back, where they were');
+  ok(
+    b.charts?.length === 2 && b.charts[0].kind === 'column' && b.charts[0].range === 'A1:C5' && b.charts[0].title === 'Hours' && JSON.stringify([b.charts[0].from, b.charts[0].to]) === JSON.stringify([sh.charts![0].from, sh.charts![0].to]),
+    'charts come back, on the same cells (the one that cannot draw is left out of the file)',
+  );
   const styled = normalizeBook({
     sheets: [{ name: 'S', cells: { A1: { v: -3, s: { code: '#,##0;[Red]-#,##0', border: 'thick #ff0000', font: 'Verdana', rot: -30 } }, A2: { v: 46000, s: { fmt: 'datetime' } }, A3: { v: 3, s: { fmt: 'accounting', cur: '€' } } } }],
   });
@@ -368,7 +418,7 @@ const sh = book.sheets[0];
   const e = bookPage(evil, 'E', 'viewer');
   ok(!e.includes('<script>alert') && !e.includes('</svg><script>'), 'a note’s and a chart’s words are escaped');
   const told = bookForAgent(bookText(book));
-  ok(told.includes('a filter on A1:F5') && told.includes('5 conditional formatting rules') && told.includes('2 charts') && told.includes('merged: A7:C7'), 'get_page tells an agent what else a sheet has');
+  ok(told.includes('a filter on A1:F5') && told.includes('5 conditional formatting rules') && told.includes('3 charts (column of A1:C5 on H2:') && told.includes('merged: A7:C7'), 'get_page tells an agent what else a sheet has');
 }
 
 // ---- through the routes ------------------------------------------------------------------------------------------
@@ -399,7 +449,8 @@ const sh = book.sheets[0];
   const gotPage = await req('GET', `/api/pages/${id}`);
   const model = gotPage.json().model as Workbook;
   if (!model) console.log(gotPage.statusCode, gotPage.body.slice(0, 300));
-  ok(model.sheets[0].charts?.length === 2 && model.sheets[0].validation?.length === 5 && model.sheets[0].cells.B3.note, 'and keeps them');
+  ok(model.sheets[0].charts?.length === 3 && model.sheets[0].validation?.length === 5 && model.sheets[0].cells.B3.note, 'and keeps them');
+  ok(text.includes('cannot draw from nope'), 'and says which chart cannot draw, and why');
   const got = await tools.get_page.run({ id }, ctx);
   ok((typeof got === 'string' ? got : got.text).includes('"conditional":['), 'get_page gives them back as kept');
   const xlsx = await req('GET', `/api/pages/${id}/export?format=xlsx`);

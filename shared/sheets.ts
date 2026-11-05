@@ -3,7 +3,8 @@
 // TRUE or FALSE) or a formula ("=SUM(B2:B9)"), how it looks (borders, a number format of Excel's own codes too) and
 // a note, the widths of its columns, the heights of its rows and which are hidden, the rows and columns that stay in
 // view as it scrolls (frozen), cells merged into one, a filter on a header row, conditional formatting, the rules for
-// what cells take (lists of options, checkboxes, ratings, numbers or dates in a range), and charts over the grid.
+// what cells take (lists of options, checkboxes, ratings, numbers or dates in a range), and charts on its cells (each
+// between the cells its corners are on, of a range or of several).
 //
 // normalizeBook takes what an agent or the editor sends, lenient about shorthand (rows from A1, a header row, a
 // format per column, words typed as a person types them: "12%", "2026-01-31", "=B2*2"), and returns the workbook as
@@ -236,10 +237,19 @@ export interface Validation {
 export type SheetChartKind = 'column' | 'bar' | 'line' | 'area' | 'pie' | 'doughnut' | 'scatter';
 export const SHEET_CHART_KINDS: SheetChartKind[] = ['column', 'bar', 'line', 'area', 'pie', 'doughnut', 'scatter'];
 
+/** A corner of a chart: the cell it is on, and where in that cell (px from its top-left corner, at 100%). */
+export interface ChartCorner {
+  cell: string;
+  dx?: number;
+  dy?: number;
+}
+
 /**
  * A chart over the grid, drawn from a range's cells as they are now: its series in the range's columns (or rows,
  * by: "rows"), the first column (or row) as the labels and the first row (or column) as the series' names when it
- * says so. Where it sits: from the corner of A1, in px, and its size.
+ * says so. Its range may be in parts ("A1:A7,F1:F7", as Sheets allows): the parts side by side, as if one table (the
+ * labels from one, the values from the others). Where it sits: its corners, each on a cell, so it moves and stretches
+ * with its cells as rows and columns go in or out, change size or hide (Excel's "move and size with cells").
  */
 export interface SheetChart {
   id: string;
@@ -254,10 +264,8 @@ export interface SheetChart {
   yTitle?: string;
   colors?: string[];
   stacked?: boolean;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+  from: ChartCorner;
+  to: ChartCorner;
 }
 
 export interface Sheet {
@@ -1486,24 +1494,152 @@ const cleanValidations = (v: unknown): Validation[] => (Array.isArray(v) ? v.sli
 
 const CHART_ALIAS: Record<string, SheetChartKind> = { col: 'column', columns: 'column', bars: 'bar', lines: 'line', donut: 'doughnut', ring: 'doughnut', xy: 'scatter', points: 'scatter' };
 
-/** Charts as kept: each with its range and kind, its words checked, where it sits (from A1's corner: x and y, or at a cell) and its size. */
-function cleanCharts(v: unknown, colW: (c: number) => number, rowH: (r: number) => number): SheetChart[] {
+// ---- charts: their ranges and where they sit -------------------------------------------------------------------
+
+/** A range's parts, split at the commas between them (not those in a sheet's quoted name). */
+function splitParts(text: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let quoted = false;
+  for (const ch of text) {
+    if (ch === "'") quoted = !quoted;
+    if (ch === ',' && !quoted) {
+      out.push(cur.trim());
+      cur = '';
+    } else cur += ch;
+  }
+  out.push(cur.trim());
+  return out.filter(Boolean);
+}
+
+/** The parts of a chart's range ("A1:A7,F1:F7", "'My sheet'!A1:B9"), each a rectangle maybe on another sheet; null when one of them is no range. */
+export function chartParts(range: string): { sheet?: string; x: Rect }[] | null {
+  const out: { sheet?: string; x: Rect }[] = [];
+  for (const p of splitParts(range)) {
+    const kept = cleanSource(p);
+    const src = kept ? sourceOf(kept) : null;
+    if (!src) return null;
+    out.push(src);
+  }
+  return out.length ? out : null;
+}
+
+/**
+ * A chart's range as kept: its parts, each checked ("A1:A7,F1:F7"), from words or a list of ranges. Words that are no
+ * range are kept as they were given (plain words, one line), so the chart stays and says why it cannot draw them.
+ */
+export function cleanChartRange(v: unknown): string {
+  const list = Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').flatMap(splitParts) : typeof v === 'string' ? splitParts(v) : [];
+  const parts = list.slice(0, 20).map((p) => cleanSource(p));
+  if (parts.length && parts.every(Boolean)) return parts.join(',');
+  return cleanText(list.join(',')).replace(/\s+/g, ' ').trim().slice(0, 200);
+}
+
+/** A sheet's sizes for placing charts: each column's width and row's height (0 when hidden, unless `all`; rows a filter hides in `hid`), and where each starts from A1's corner, in px at 100%. */
+export function sheetSizes(sh: Sheet, hid?: Set<number>, all = false) {
+  const colW = (c: number) => (!all && sh.cols?.[c]?.hidden ? 0 : (sh.cols?.[c]?.w ?? COL_W));
+  const rowH = (r: number) => (!all && (sh.rows?.[r]?.hidden || hid?.has(r)) ? 0 : (sh.rows?.[r]?.h ?? ROW_H));
+  const lefts = [0];
+  const tops = [0];
+  const left = (c: number) => {
+    while (lefts.length <= c) lefts.push(lefts[lefts.length - 1] + colW(lefts.length - 1));
+    return lefts[c];
+  };
+  const top = (r: number) => {
+    while (tops.length <= r) tops.push(tops[tops.length - 1] + rowH(tops.length - 1));
+    return tops[r];
+  };
+  return { colW, rowH, left, top };
+}
+export type SheetSizes = ReturnType<typeof sheetSizes>;
+
+/** The cell a point falls on (px from A1's corner) and where in it, at these sizes: never a hidden one, which is 0 wide. */
+export function cornerAt(x: number, y: number, colW: (c: number) => number, rowH: (r: number) => number): ChartCorner {
+  const walk = (px: number, size: (i: number) => number, limit: number): [number, number] => {
+    let i = 0;
+    let at = 0;
+    while (i < limit - 1 && at + size(i) <= px) at += size(i++);
+    return [i, Math.max(0, Math.round(px - at))];
+  };
+  const [c, dx] = walk(x, colW, SHEET_LIMITS.cols);
+  const [r, dy] = walk(y, rowH, SHEET_LIMITS.rows);
+  return { cell: refName(r, c), ...(dx ? { dx } : {}), ...(dy ? { dy } : {}) };
+}
+
+/** Where a corner is, in px from A1's corner, at these sizes and zoom: its cell's place and where in it (no further than the cell reaches, as it may have shrunk or hidden). */
+export function cornerXY(k: ChartCorner, g: Pick<SheetSizes, 'left' | 'top' | 'colW' | 'rowH'>, z = 1): { x: number; y: number } {
+  const p = parseRef(k.cell) ?? { r: 0, c: 0 };
+  return { x: g.left(p.c) + Math.min((k.dx ?? 0) * z, g.colW(p.c)), y: g.top(p.r) + Math.min((k.dy ?? 0) * z, g.rowH(p.r)) };
+}
+
+/** Where a chart is, in px from A1's corner: between its corners (nothing, when the rows or columns under it are hidden). */
+export function chartBox(ch: SheetChart, g: Pick<SheetSizes, 'left' | 'top' | 'colW' | 'rowH'>, z = 1): { x: number; y: number; w: number; h: number } {
+  const a = cornerXY(ch.from, g, z);
+  const b = cornerXY(ch.to, g, z);
+  return { x: a.x, y: a.y, w: Math.max(0, b.x - a.x), h: Math.max(0, b.y - a.y) };
+}
+
+/** A corner as kept: a cell ("E2", or { cell, dx, dy }) within a sheet's limits, and where in it. */
+function cleanCorner(v: unknown): ChartCorner | null {
+  const o = typeof v === 'string' ? { cell: v } : isObj(v) ? v : null;
+  const p = o && typeof o.cell === 'string' ? parseRef(o.cell.replace(/\$/g, '').trim().toUpperCase()) : null;
+  if (!p || p.r >= SHEET_LIMITS.rows || p.c >= SHEET_LIMITS.cols) return null;
+  const out: ChartCorner = { cell: refName(p.r, p.c) };
+  const dx = intIn(o!.dx, 0, MAX_W);
+  const dy = intIn(o!.dy, 0, MAX_H);
+  if (dx) out.dx = dx;
+  if (dy) out.dy = dy;
+  return out;
+}
+
+/** Whether a corner is past another, right and down (a chart's far corner past its first). */
+const pastCorner = (a: ChartCorner, b: ChartCorner) => {
+  const p = parseRef(a.cell)!;
+  const q = parseRef(b.cell)!;
+  return (p.c > q.c || (p.c === q.c && (a.dx ?? 0) > (b.dx ?? 0))) && (p.r > q.r || (p.r === q.r && (a.dy ?? 0) > (b.dy ?? 0)));
+};
+
+/**
+ * Charts as kept: each with its range and kind, its words checked, and its corners on cells: as given (from, to), at
+ * a cell or over a range (at: "E2" with w and h in px, or at: "E2:J16"), in px from A1's corner as charts were kept
+ * before (x, y, w, h: placed where they were drawn), or beside the cells it draws.
+ */
+function cleanCharts(v: unknown, g: SheetSizes): SheetChart[] {
   if (!Array.isArray(v)) return [];
   const ids = new Set<string>();
   const out: SheetChart[] = [];
-  const left = (c: number) => Array.from({ length: Math.min(c, SHEET_LIMITS.cols) }, (_, i) => colW(i)).reduce((a, b) => a + b, 0);
-  const top = (r: number) => Array.from({ length: Math.min(r, SHEET_LIMITS.rows) }, (_, i) => rowH(i)).reduce((a, b) => a + b, 0);
   const text = (x: unknown) => (typeof x === 'string' && x.trim() ? cleanText(x).trim().replace(/\n+/g, ' ').slice(0, 200) : undefined);
   for (const x of v.slice(0, SHEET_LIMITS.charts)) {
     if (!isObj(x)) continue;
-    const range = cleanSource(x.range ?? x.data);
+    const range = cleanChartRange(x.range ?? x.ranges ?? x.data);
     if (!range) continue;
     const k = String(x.kind ?? x.type ?? 'column').toLowerCase();
     const kind = (SHEET_CHART_KINDS as string[]).includes(k) ? (k as SheetChartKind) : (CHART_ALIAS[k] ?? 'column');
     let id = typeof x.id === 'string' && /^[A-Za-z0-9_-]{1,24}$/.test(x.id) ? x.id : newId();
     while (ids.has(id)) id = newId();
     ids.add(id);
-    const c: SheetChart = { id, kind, range, x: 0, y: 0, w: 480, h: 300 };
+    // Where it sits: its corners as given, else from a cell, a range, px, or the cells it draws.
+    let from = cleanCorner(x.from);
+    let to = cleanCorner(x.to);
+    const at = typeof x.at === 'string' ? parseRange(x.at.replace(/\$/g, '').trim().toUpperCase()) : null;
+    if (!from && at && at.r1 < SHEET_LIMITS.rows && at.c1 < SHEET_LIMITS.cols) {
+      from = { cell: refName(at.r1, at.c1) };
+      if (!to && (at.r2 > at.r1 || at.c2 > at.c1)) to = { cell: refName(Math.min(at.r2 + 1, SHEET_LIMITS.rows - 1), Math.min(at.c2 + 1, SHEET_LIMITS.cols - 1)) };
+    }
+    const px = intIn(x.x, 0, 400_000);
+    const py = intIn(x.y, 0, 2_000_000);
+    if (!from && (px !== undefined || py !== undefined)) from = cornerAt(px ?? 0, py ?? 0, g.colW, g.rowH);
+    if (!from) {
+      const src = chartParts(range)?.[0];
+      from = src && !src.sheet ? { cell: refName(src.x.r1, Math.min(src.x.c2 + 2, SHEET_LIMITS.cols - 1)) } : { cell: 'A1' };
+    }
+    if (!to || !pastCorner(to, from)) {
+      const w = intIn(x.w ?? x.width, 160, 3000) ?? 480;
+      const h = intIn(x.h ?? x.height, 120, 2000) ?? 300;
+      const p0 = cornerXY(from, g);
+      to = cornerAt(p0.x + w, p0.y + h, g.colW, g.rowH);
+    }
+    const c: SheetChart = { id, kind, range, from, to };
     if (x.by === 'rows' || x.series === 'rows') c.by = 'rows';
     if (typeof x.labels === 'boolean') c.labels = x.labels;
     if (typeof x.names === 'boolean') c.names = x.names;
@@ -1518,15 +1654,6 @@ function cleanCharts(v: unknown, colW: (c: number) => number, rowH: (r: number) 
     const colors = Array.isArray(x.colors) ? x.colors.slice(0, 12).flatMap((col) => cleanColor(col) ?? []) : [];
     if (colors.length) c.colors = colors;
     if (x.stacked === true) c.stacked = true;
-    // Where it sits: as given, at a cell's corner, or beside the cells it draws.
-    const at = typeof x.at === 'string' ? parseRef(x.at) : null;
-    const src = sourceOf(range);
-    const px = intIn(x.x, 0, 400_000);
-    const py = intIn(x.y, 0, 2_000_000);
-    c.x = px ?? (at ? left(at.c) : src && !src.sheet ? left(Math.min(src.x.c2 + 2, SHEET_LIMITS.cols - 1)) : 0);
-    c.y = py ?? (at ? top(at.r) : src && !src.sheet ? top(src.x.r1) : 0);
-    c.w = intIn(x.w ?? x.width, 160, 3000) ?? 480;
-    c.h = intIn(x.h ?? x.height, 120, 2000) ?? 300;
     out.push(c);
   }
   return out;
@@ -1732,11 +1859,8 @@ function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], bud
   if (conditional.length) sheet.conditional = conditional;
   const validation = cleanValidations(pick('validation', 'validations', 'dataValidation'));
   if (validation.length) sheet.validation = validation;
-  const charts = cleanCharts(
-    pick('charts'),
-    (c) => sheet.cols?.[c]?.w ?? COL_W,
-    (r) => sheet.rows?.[r]?.h ?? ROW_H,
-  );
+  // Charts placed in px before were drawn with hidden rows and columns folded away: their corners are found so too.
+  const charts = cleanCharts(pick('charts'), sheetSizes(sheet));
   if (charts.length) sheet.charts = charts;
   // Cells in reading order: row by row, left to right.
   const out: Record<string, Cell> = {};
@@ -2277,9 +2401,9 @@ function moveSizes<T>(m: Record<number, T> | undefined, f: (i: number) => number
 /**
  * A sheet's other references (its merges, filter, rules' ranges and formulas, lists' sources, charts' data), each
  * rewritten by `f` as a formula's text would be; what no longer points anywhere goes. `col` moves a filter's column
- * (null: it went).
+ * (null: it went); `corner` moves a chart's corners (on the sheet whose rows or columns went in or out).
  */
-function mapSheetRefs(sh: Sheet, f: (text: string) => string, col?: (c: number) => number | null): Sheet {
+function mapSheetRefs(sh: Sheet, f: (text: string) => string, col?: (c: number) => number | null, corner?: (k: ChartCorner) => ChartCorner): Sheet {
   if (!sh.merges && !sh.filter && !sh.conditional && !sh.validation && !sh.charts) return sh;
   const out: Sheet = { ...sh };
   const formula = (t: string | undefined) => (t?.startsWith('=') ? `=${f(t.slice(1))}` : t);
@@ -2337,14 +2461,35 @@ function mapSheetRefs(sh: Sheet, f: (text: string) => string, col?: (c: number) 
   }
   if (sh.charts) {
     const list = sh.charts.flatMap((c) => {
-      const range = f(c.range);
-      return broken(range) ? [] : [{ ...c, range }];
+      // A range in parts keeps the parts still there; a chart none of whose cells are left goes.
+      const parts = splitParts(f(c.range)).filter((p) => !broken(p));
+      if (!parts.length) return [];
+      const next: SheetChart = { ...c, range: parts.join(',') };
+      if (corner) {
+        next.from = corner(c.from);
+        next.to = corner(c.to);
+        // Its rows (or columns) all taken out: it keeps its size in cells from where it now is.
+        const [a, b, a0, b0] = [next.from, next.to, c.from, c.to].map((k) => parseRef(k.cell)!);
+        if (b.r < a.r || (b.r === a.r && (next.to.dy ?? 0) <= (next.from.dy ?? 0))) next.to = { ...next.to, cell: refName(Math.min(SHEET_LIMITS.rows - 1, a.r + Math.max(1, b0.r - a0.r)), b.c) };
+        const b2 = parseRef(next.to.cell)!;
+        if (b2.c < a.c || (b2.c === a.c && (next.to.dx ?? 0) <= (next.from.dx ?? 0))) next.to = { ...next.to, cell: refName(b2.r, Math.min(SHEET_LIMITS.cols - 1, a.c + Math.max(1, b0.c - a0.c))) };
+      }
+      return [next];
     });
     if (list.length) out.charts = list;
     else delete out.charts;
   }
   return out;
 }
+
+/** A chart's corner with its row (or column) moved by `f`: null puts it at the start of the row (column) `at` instead, the first after those taken out. */
+const moveCorner = (k: ChartCorner, row: boolean, f: (i: number) => number | null, at: number): ChartCorner => {
+  const p = parseRef(k.cell)!;
+  const i = f(row ? p.r : p.c);
+  const out: ChartCorner = { ...k, cell: row ? refName(i ?? at, p.c) : refName(p.r, i ?? at) };
+  if (i === null) delete out[row ? 'dy' : 'dx'];
+  return out;
+};
 
 const withSizes = (sh: Sheet, cols: Sheet['cols'], rows: Sheet['rows']): Sheet => {
   const out: Sheet = { ...sh };
@@ -2374,7 +2519,10 @@ export function adjustForInsert(book: Workbook, sheetId: string, axis: 'row' | '
   return {
     ...moved,
     sheets: moved.sheets.map((s0) => {
-      const s = mapSheetRefs(s0, (t) => moveRefs(t, s0, sh.name, move), s0.id === sheetId && !row ? (c) => (c >= at ? c + count : c) : undefined);
+      const mine = s0.id === sheetId;
+      // A chart's corners on rows (columns) from `at` on move along: one past them stretches it.
+      const corner = (k: ChartCorner) => moveCorner(k, row, (i) => (i >= at ? Math.min(i + count, (row ? SHEET_LIMITS.rows : SHEET_LIMITS.cols) - 1) : i), at);
+      const s = mapSheetRefs(s0, (t) => moveRefs(t, s0, sh.name, move), mine && !row ? (c) => (c >= at ? c + count : c) : undefined, mine ? corner : undefined);
       if (s.id !== sheetId) return s;
       const cells = moveCells(s, (r, c) => (row ? [r >= at ? r + count : r, c] : [r, c >= at ? c + count : c]));
       const shift = (i: number) => (i >= at ? i + count : i);
@@ -2420,7 +2568,10 @@ export function adjustForDelete(book: Workbook, sheetId: string, axis: 'row' | '
   return {
     ...moved,
     sheets: moved.sheets.map((s0) => {
-      const s = mapSheetRefs(s0, (t) => moveRefs(t, s0, sh.name, shrink), s0.id === sheetId && !row ? (c) => (c >= at && c < end ? null : c >= end ? c - count : c) : undefined);
+      const mine = s0.id === sheetId;
+      // A chart's corner on a row (column) taken out goes to the start of the first one after them.
+      const corner = (k: ChartCorner) => moveCorner(k, row, (i) => (i >= at && i < end ? null : i >= end ? i - count : i), at);
+      const s = mapSheetRefs(s0, (t) => moveRefs(t, s0, sh.name, shrink), mine && !row ? (c) => (c >= at && c < end ? null : c >= end ? c - count : c) : undefined, mine ? corner : undefined);
       if (s.id !== sheetId) return s;
       const cells = moveCells(s, (r, c) => {
         const i = row ? r : c;
@@ -4951,7 +5102,7 @@ export function bookOutline(b: Workbook, calc: Calc = computeBook(b), rows = 4):
         sh.filter ? `a filter on ${sh.filter.range}` : '',
         sh.conditional?.length ? n(sh.conditional.length, 'conditional formatting rule') : '',
         sh.validation?.length ? `${sh.validation.length} rule${sh.validation.length === 1 ? '' : 's'} for what cells take` : '',
-        sh.charts?.length ? n(sh.charts.length, 'chart') : '',
+        sh.charts?.length ? `${n(sh.charts.length, 'chart')} (${sh.charts.slice(0, 6).map((c) => `${c.kind} of ${c.range} on ${c.from.cell}:${c.to.cell}`).join(', ')}${sh.charts.length > 6 ? '…' : ''})` : '',
         sh.merges?.length ? `merged: ${sh.merges.slice(0, 6).join(', ')}${sh.merges.length > 6 ? '…' : ''}` : '',
         notes ? n(notes, 'note') : '',
         hiddenR ? n(hiddenR, 'hidden row') : '',
