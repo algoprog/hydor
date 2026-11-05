@@ -122,8 +122,8 @@ export class Helper {
     this.end(child);
   }
 
-  /** Asks it one thing and waits for the answer; Stop (the signal) or the time running out ends the helper. */
-  async call(req: Record<string, unknown>, o: { signal?: AbortSignal; timeoutMs: number }): Promise<Record<string, unknown>> {
+  /** Asks it one thing and waits for the answer; Stop (the signal) or the time running out ends the helper. `sent`: once it has the request. */
+  async call(req: Record<string, unknown>, o: { signal?: AbortSignal; timeoutMs: number; sent?: () => void }): Promise<Record<string, unknown>> {
     if (o.signal?.aborted) throw new Error('Stopped');
     await this.start();
     const child = this.child;
@@ -150,6 +150,7 @@ export class Helper {
           reject: (e) => (done(), reject(e)),
         });
         child.stdin!.write(`${asciiJson({ ...req, id })}\n`);
+        o.sent?.();
       });
     } finally {
       if (this.child === child && !this.waiting.size) {

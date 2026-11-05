@@ -16,8 +16,8 @@ export interface Shot {
 export interface Machine {
   /** The main display, scaled down to MAX_SIDE on its longer side, as a JPEG; and where it is. */
   screenshot(signal?: AbortSignal): Promise<Shot>;
-  /** Takes the driver's steps. */
-  drive(ops: Op[], signal?: AbortSignal): Promise<DriverOut>;
+  /** Takes the driver's steps; `started` is called as they go to the driver (the overlay's timeline starts then). */
+  drive(ops: Op[], signal?: AbortSignal, started?: () => void): Promise<DriverOut>;
   /** Opens (or brings forward) an app by its name; returns the name of what it opened, when that is known. */
   openApp(name: string, signal?: AbortSignal): Promise<string | void>;
   /** What keeps computer use from working here now, in words for the user and the agent; null when nothing does. */

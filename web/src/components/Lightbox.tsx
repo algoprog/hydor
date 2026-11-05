@@ -1,9 +1,11 @@
 // Images opened large: fitted to the screen, a click (or tap) shows them at full size to pan around,
-// arrows step through several, Escape closes.
-import { useEffect, useState } from 'react';
+// arrows step through several, Escape closes. A step's picture shows where the step acted on it.
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { create } from 'zustand';
 import { ChevronLeft, ChevronRight, ExternalLink, X } from 'lucide-react';
+import type { StepMark } from '@shared/pointer';
+import { StepMarks } from './StepMarks';
 import { cx } from './ui';
 
 export interface LightboxImage {
@@ -11,16 +13,21 @@ export interface LightboxImage {
   name?: string;
   /** Where Open in a new tab goes, when not to `src`: a picture's own address on the web, shown through this server. */
   href?: string;
+  /** Where an agent's step acted on the picture (a computer step's screen). */
+  marks?: StepMark[];
 }
 
 const useLightbox = create<{ images: LightboxImage[]; index: number }>(() => ({ images: [], index: 0 }));
 
 export const openLightbox = (images: LightboxImage[], index = 0) => useLightbox.setState({ images, index });
+/** A picture's marks, once read, for the open view showing it. */
+export const markLightbox = (src: string, marks: StepMark[]) => useLightbox.setState((s) => (s.images.some((i) => i.src === src) ? { images: s.images.map((i) => (i.src === src ? { ...i, marks } : i)) } : s));
 const close = () => useLightbox.setState({ images: [], index: 0 });
 
 export function Lightbox() {
   const { images, index } = useLightbox();
   const [zoom, setZoom] = useState(false);
+  const shown = useRef<HTMLImageElement>(null);
   const open = images.length > 0;
   const img = images[index];
   const step = (d: number) => {
@@ -66,11 +73,13 @@ export function Lightbox() {
       >
         <img
           key={img.src}
+          ref={shown}
           src={img.src}
           alt={img.name ?? ''}
           onClick={() => setZoom((z) => !z)}
           className={cx('select-none', zoom ? 'm-auto block max-w-none cursor-zoom-out' : 'max-h-full max-w-full cursor-zoom-in rounded-lg object-contain shadow-2xl')}
         />
+        {!!img.marks?.length && <StepMarks key={`${img.src}:${zoom}`} img={shown} marks={img.marks} />}
         {images.length > 1 && (
           <>
             <button onClick={() => step(-1)} className="absolute top-1/2 left-2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white/80 hover:bg-black/60 hover:text-white" aria-label="Previous">

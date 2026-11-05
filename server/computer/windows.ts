@@ -37,8 +37,8 @@ const helper = new Helper({ name: 'The Windows helper', command, startMs: 60_000
 
 type Place = { x: number; y: number; w: number; h: number };
 
-async function drive(ops: Op[], signal?: AbortSignal): Promise<DriverOut> {
-  return (await helper.call({ ops }, { signal, timeoutMs: driverTimeout(ops) })) as unknown as DriverOut;
+async function drive(ops: Op[], signal?: AbortSignal, started?: () => void): Promise<DriverOut> {
+  return (await helper.call({ ops }, { signal, timeoutMs: driverTimeout(ops), sent: started })) as unknown as DriverOut;
 }
 
 async function screenshot(signal?: AbortSignal): Promise<Shot> {
