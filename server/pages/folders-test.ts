@@ -122,6 +122,16 @@ ok(del.ok && del.moved === 2, 'deleting a folder says how many things went up');
 ok((await pageOf(p1.id)).folder === thesis.id && folderById(db, deep.id)?.parent === thesis.id, 'what it held is now in the folder it was in');
 ok(!folderById(db, drafts.id) && (await req('GET', `/api/pages/${p1.id}`)).statusCode === 200, 'the folder is gone, its pages stay');
 
+// A folder in a folder of its name keeps it when the outer one goes.
+{
+  const outer = (await req('POST', '/api/pages/folders', { name: 'Same', space: lab.id })).json().folder;
+  const inner = (await req('POST', '/api/pages/folders', { name: 'Same', parent: outer.id })).json().folder;
+  await req('DELETE', `/api/pages/folders/${outer.id}`);
+  const now = folderById(db, inner.id);
+  ok(now?.name === 'Same' && !now.parent && now.space === lab.id, 'a folder going up keeps its name when it is free there');
+  await req('DELETE', `/api/pages/folders/${inner.id}`);
+}
+
 // Pictures, videos and sounds go in folders too.
 initMedia(db);
 db.prepare("insert into media (id, kind, title, description, file, mime, bytes, caption, space, created_at, updated_at) values ('m1', 'image', 'Boat', '', 'x.png', 'image/png', 1, 'done', null, 1, 1)").run();

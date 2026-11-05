@@ -207,7 +207,10 @@ export function deleteFolder(db: DB, id: string): { moved: number; media: boolea
   let moved = 0;
   let media = false;
   db.transaction(() => {
-    for (const k of db.prepare('select * from library_folders where parent = ?').all(f.id) as Row[]) {
+    // Gone first, so a folder in it may keep a name it had (Drafts in Drafts).
+    const kids = db.prepare('select * from library_folders where parent = ?').all(f.id) as Row[];
+    db.prepare('delete from library_folders where id = ?').run(f.id);
+    for (const k of kids) {
       db.prepare('update library_folders set parent = ?, name = ? where id = ?').run(up, freeName(db, k.name, up, f.space ?? null, k.id), k.id);
       moved++;
     }
@@ -217,7 +220,6 @@ export function deleteFolder(db: DB, id: string): { moved: number; media: boolea
       moved += n;
       media = n > 0;
     }
-    db.prepare('delete from library_folders where id = ?').run(f.id);
   })();
   return { moved, media };
 }

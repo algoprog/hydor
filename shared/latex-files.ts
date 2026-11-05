@@ -131,10 +131,24 @@ export function texMask(text: string): string {
   return out.join('\n');
 }
 
-/** A line without its comment (a % no backslash escapes), the comment made spaces. */
+/** A line without its comment (a % no backslash escapes) and the words of \verb|…|, made spaces. */
 function maskLine(line: string): string {
-  for (let i = 0; i < line.length; i++) if (line[i] === '%' && !escaped(line, i)) return line.slice(0, i) + blank(line.slice(i));
-  return line;
+  let out = line;
+  for (let i = 0; i < out.length; i++) {
+    if (out[i] === '%' && !escaped(out, i)) return out.slice(0, i) + blank(out.slice(i));
+    // \verb|…| and \verb*|…|: what is between the two marks is shown as it is, never read (a % in it is no comment).
+    if (out.startsWith('\\verb', i) && !escaped(out, i) && !/[A-Za-z]/.test(out[i + 5] ?? '')) {
+      let j = i + 5;
+      if (out[j] === '*') j++;
+      const mark = out[j];
+      const end = mark && !/\s/.test(mark) ? out.indexOf(mark, j + 1) : -1;
+      if (end > j) {
+        out = out.slice(0, j + 1) + blank(out.slice(j + 1, end)) + out.slice(end);
+        i = end;
+      }
+    }
+  }
+  return out;
 }
 
 /** After `i`: spaces and line ends (a blank line too: TeX goes on to the argument). */
