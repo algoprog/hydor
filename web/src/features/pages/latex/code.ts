@@ -2,12 +2,13 @@
 // what writing LaTeX wants on top. Ctrl+Enter typesets; Ctrl+B and Ctrl+I make the words picked bold or italic (and
 // plain again), Ctrl+/ comments lines out and back. Typing \ offers commands, \begin{ environments (the \end goes in
 // too, as it does when Enter follows a \begin{…} typed by hand), \usepackage{ packages, and \ref, \cite,
-// \includegraphics and \input the document's own labels, bibliography, pictures and files; brackets and $ close
-// themselves. Environments, sections, the preamble and { groups fold. The formula the cursor is in shows drawn in a
-// card by its line. Visual mode (visual.ts) shows the source as a document, and Check spelling has the browser check
-// its words (spell.ts). The typesetting's errors and warnings are marked at their lines, and what is sure to fail
+// \includegraphics and \input the document's own labels, bibliography, pictures and files (on a phone too, where the
+// list opens as you type them, in rows to tap, and Return still starts a new line); brackets and $ close themselves.
+// Environments, sections, the preamble and { groups fold. The formula the cursor is in shows drawn in a card by its
+// line. Visual mode (visual.ts) shows the source as a document, and Check spelling has the browser check its words
+// (spell.ts). The typesetting's errors and warnings are marked at their lines, and what is sure to fail
 // (a \begin without its \end, a brace or a $ left open: shared/latex-check.ts) where it is, a moment after typing.
-import { snippet, startCompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
+import { autocompletion, closeCompletion, completionStatus, snippet, startCompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
 import { redo, selectAll, toggleComment, undo } from '@codemirror/commands';
 import { foldAll, indentUnit, unfoldAll } from '@codemirror/language';
 import { gotoLine } from '@codemirror/search';
@@ -198,6 +199,42 @@ const commentTheme = EditorView.baseTheme({
   '.cm-tex-commented-active': { backgroundColor: 'color-mix(in srgb, #f5b400 40%, transparent)' },
 });
 
+/** What, typed just before the cursor, opens the list of completions on a phone: a command (a backslash that is not a
+ * line break's second), \begin{, and the braces of \cite, \ref, \includegraphics, \input, \usepackage and the like. */
+const OPENS_LIST =
+  /(?:(?:^|[^\\])(?:\\\\)*\\[A-Za-z@]*|\\begin\s*\{[A-Za-z@*]*|\\(?:[A-Za-z]*(?:cite|ref)[A-Za-z]*|includegraphics|input|include|subfile|bibliography|usepackage|RequirePackage|documentclass)\*?(?:\[[^\]\n]*\])*\{[^{}\n]*)$/;
+
+/**
+ * The list on a phone: rows a finger can pick, no wider than the screen, each with what it does on a line under it
+ * (beside the list, as on a computer, it would cover the next row), and no icons, for the room.
+ */
+const phoneList = [
+  autocompletion({
+    icons: false,
+    addToOptions: [
+      {
+        position: 90,
+        render: (c) => {
+          if (typeof c.info !== 'string' || !c.info) return null;
+          const el = document.createElement('div');
+          el.className = 'cm-tex-option-info';
+          el.textContent = c.info;
+          return el;
+        },
+      },
+    ],
+  }),
+  EditorView.theme({
+    '.cm-tooltip.cm-tooltip-autocomplete > ul': { maxHeight: 'min(42vh, 340px)', maxWidth: 'calc(100vw - 32px)', minWidth: '220px' },
+    '.cm-tooltip.cm-tooltip-autocomplete > ul > li': { display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', minHeight: '44px', padding: '6px 12px', fontSize: '15px', lineHeight: '1.3' },
+    // Return takes no row on a phone: the one picked is only a little apart, in the app's colours in either theme.
+    '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': { backgroundColor: 'var(--bg-2)', color: 'var(--fg)' },
+    '.cm-tooltip.cm-tooltip-autocomplete > ul > li .cm-completionDetail': { marginLeft: '8px' },
+    '.cm-tex-option-info': { flexBasis: '100%', fontFamily: 'var(--font-sans)', fontSize: '12.5px', color: 'var(--fg-3)', whiteSpace: 'normal' },
+    '.cm-tooltip.cm-completionInfo': { display: 'none' },
+  }),
+];
+
 /** The commands Clear formatting takes away. */
 const FORMATS = /\\(textbf|textit|textsl|emph|underline|uline|texttt|textsc|textsf|textrm|textsuperscript|textsubscript|textnormal)\s*\{/g;
 
@@ -348,7 +385,31 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     view.dispatch(setDiagnostics(view.state, diags));
   };
 
+  // A phone's keyboard has no Ctrl+Space: the list opens by itself as a command, an environment or a citation is typed
+  // (the app's editor opens none as you type on a phone, where Return would take one), in rows big enough to tap.
+  // Return still starts a new line there: an option is taken by a tap.
+  let completeTimer: ReturnType<typeof setTimeout> | undefined;
+  const onPhone = o.phone
+    ? [
+        EditorView.updateListener.of((u) => {
+          if (!u.docChanged || !u.transactions.some((t) => t.isUserEvent('input.type')) || completionStatus(u.state)) return;
+          const at = u.state.selection.main;
+          if (!at.empty) return;
+          const line = u.state.doc.lineAt(at.head);
+          if (!OPENS_LIST.test(line.text.slice(Math.max(0, at.head - line.from - 200), at.head - line.from))) return;
+          clearTimeout(completeTimer);
+          completeTimer = setTimeout(() => startCompletion(view), 60);
+        }),
+        phoneList,
+      ]
+    : [];
+  const enterTakesNone = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && completionStatus(view.state) === 'active') closeCompletion(view);
+  };
+  if (o.phone) view.dom.addEventListener('keydown', enterTakesNone, true);
+
   const extra = [
+    onPhone,
     Prec.highest(
       keymap.of([
         { key: 'Mod-Enter', preventDefault: true, run: () => (hooks.onCompile(), true) },
@@ -494,6 +555,8 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     focus: () => view.focus(),
     destroy: () => {
       clearTimeout(checkTimer);
+      clearTimeout(completeTimer);
+      view.dom.removeEventListener('keydown', enterTakesNone, true);
       handle.destroy();
     },
   };
