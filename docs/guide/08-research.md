@@ -145,7 +145,7 @@ In [Settings → Capabilities → Child sessions](/settings?s=children), **Swarm
 
 ## Make one big change with a campaign
 
-A campaign is the other kind of swarm, for one big change across a codebase rather than one hard problem: a migration, a framework upgrade, a rename everywhere. Pick it in the same place, **Options** → **Swarm** → **Campaign** ("One big change in many parts, each in a worktree"), in a folder that is a git repository. The Swarm row then reads "Campaign · 5 at once".
+A campaign is the other kind of swarm, for one big change across a codebase rather than one hard problem: a migration, a framework upgrade, a rename everywhere. Pick it in the same place, **Options** → **Swarm** → **Campaign** ("One big change in parts, each in a worktree"), in a folder that is a git repository. The Swarm row then reads "Campaign · 5 at once".
 
 The lead splits the change into parts (packages, modules, folders) and posts them as its plan. A member makes each part on a branch of its own in a new worktree, at most your swarm size at once, runs its checks and posts the part as done or failed; a failed part gets one more try. The lead merges the finished parts one at a time with the checks run after each (or opens a pull request for each, if you asked for that), and reports what changed and what failed. Its bar reads "Campaign · 12 of 40 parts done · 2 failed", and its board shows the parts and how each stands beside the posts. See [Campaigns: a big change in many parts](/guide/engineering#campaigns-a-big-change-in-many-parts).
 

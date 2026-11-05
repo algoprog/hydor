@@ -139,11 +139,9 @@ function SwarmStartOption({ value, onChange }: { value: SessionExtra; onChange: 
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={300} title="Swarm">
         <OptionRow label="Off" hint="One agent works on the task" selected={!mode} onClick={() => set(undefined)} />
         <OptionRow label="Swarm" hint={`Up to ${size ?? 'several'} agents at once, each from its own angle`} selected={mode === 'swarm'} onClick={() => set(true)} />
-        <OptionRow label="Campaign" hint="One big change in many parts, each in a worktree" selected={mode === 'campaign'} onClick={() => set('campaign')} />
+        <OptionRow label="Campaign" hint="One big change in parts, each in a worktree" selected={mode === 'campaign'} onClick={() => set('campaign')} />
         <div className="mx-1 mt-1 border-t border-line px-2 pt-2 pb-1 text-[12px] leading-snug text-fg-3">
-          A lead agent splits the task and starts members that work at once. A swarm attacks a hard problem (a proof, a stubborn bug) from different angles, sharing what it finds on a
-          board. A campaign makes one big change (a migration, a rename across a codebase) part by part, each member in a worktree of its own with its tests, and the lead merges the
-          finished parts. Either costs several times what one agent does; a spending cap keeps it in hand.
+          A lead agent shares the work out and checks it; it costs several times what one agent does.
         </div>
         <MenuSep />
         <MenuItem

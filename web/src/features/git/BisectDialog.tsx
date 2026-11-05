@@ -165,7 +165,7 @@ export function BisectDialog({ repo, open, good: from, onClose }: { repo: GitRep
       <div className="space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Worked at">
-            <input value={good} onChange={(e) => setGood(e.target.value)} list="bisect-refs" placeholder="A tag or commit, such as v1.2.0" spellCheck={false} autoComplete="off" className={cx(small, 'font-mono')} />
+            <input value={good} onChange={(e) => setGood(e.target.value)} list="bisect-refs" placeholder="v1.2.0, or a commit" spellCheck={false} autoComplete="off" className={cx(small, 'font-mono')} />
             <Resolved value={good} commit={goodAt} />
           </Field>
           <Field label="Broken at">

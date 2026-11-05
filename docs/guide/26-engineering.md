@@ -99,7 +99,7 @@ A campaign makes one big, mostly mechanical change across a codebase (moving eve
 ### Start one
 
 1. On the start page, pick the repository's folder. A campaign needs a git repository.
-2. Open **Options**, pick **Swarm**, and choose **Campaign** ("One big change in many parts, each in a worktree").
+2. Open **Options**, pick **Swarm**, and choose **Campaign** ("One big change in parts, each in a worktree").
 3. Say the change and how it is checked ("Move every package from Jest to Vitest; npm test must pass in each"), and press **Start**.
 
 The Swarm row reads "Campaign · 5 at once" (your swarm size). As with a swarm, it is not kept for your next session, and a deep research and a campaign can't both be on. A spending cap set in the same menu covers the lead and every member. A scheduled task's editor has the same choice.
