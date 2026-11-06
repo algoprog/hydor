@@ -580,6 +580,7 @@ const SLIDES_HELP = [
   'Good slides: one idea each, a title that says the point, a few short bullets, numbers as charts or big numbers, pictures where they help, and what to say in the notes.',
   'To change a deck, get_page with its id gives it whole (each slide and part with its id); send the whole deck back with the same id, or only the slides that change (change, add, remove): a new version, the older ones restorable. Keep what the user changed.',
   DECK_EDITS_HELP,
+  'page_action does in one call what the editor does to the whole deck in a click, without sending it back: animate every slide, fix_accessibility, describe_pictures, powerpoint (compatible or the web format), theme (a ready-made one or the user’s own), slide_shape, reuse_slides from another deck, update_charts from their spreadsheets.',
   'Comments: get_page lists the comments people left on slides and their parts (and their ids). Answer with comments: [{"id": "c1", "reply": "…", "resolve": true}] beside the slides (and make the change asked for); {"id", "reopen": true} reopens one, {"id", "delete": true} takes it out; {"slide": 3, "el": "<a part’s id, or none for the whole slide>", "text": "…"} adds one of yours. Comments you do not mention stay as they are; keep each slide’s id so its comments stay with it.',
 ].join(' ');
 
