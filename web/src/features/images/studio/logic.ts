@@ -268,6 +268,18 @@ function splitRow(line: string, sep: string): string[] {
   return out;
 }
 
+// ---- pictures inside pages ---------------------------------------------------------------------------------------
+
+/** The longest side a picture keeps inside a page, and about the most bytes it takes there (as the server's page-pictures.ts). */
+export const PAGE_SIDE = 1600;
+export const PAGE_BYTES = 450_000;
+
+/** The size a picture takes inside a page: no side over PAGE_SIDE, its shape kept. */
+export function pageSize(w: number, h: number, side = PAGE_SIDE): { w: number; h: number } {
+  const k = Math.min(1, side / Math.max(w, h, 1));
+  return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) };
+}
+
 // ---- time ------------------------------------------------------------------------------------------------------------
 
 /** How long, in words a clock would say: "40 s", "1 min 20 s", "12 min". */
