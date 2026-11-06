@@ -76,7 +76,7 @@ agents that speak ACP and take MCP servers.
   accessibility check finds, describe pictures, PowerPoint compatible or the web format, a theme, the slide shape,
   slides from another deck, charts updated from their spreadsheets; accept or reject suggestions, page setup, a
   header and footer; sort, remove duplicates, fill, clear, trim, split text, summarize, insert or delete rows and
-  columns, the sheet tabs' menu; move a LaTeX document's files; clear a notebook's outputs; duplicate and turn into.
+  columns, the sheet tabs' menu; move a LaTeX document's files, tidy its source and its bibliography; clear a notebook's outputs; duplicate and turn into.
   The agent beside a page (Ask) is told its kind's actions and gets the ids of what was picked.
 - **The web**: search with Naget Search (its own index of the web, papers, patents and filings; free daily
   searches without a key) or SearXNG, Brave Search and DuckDuckGo, by category, site or date, up to 100 results;
@@ -461,7 +461,18 @@ agents that speak ACP and take MCP servers.
   quick checks before TeX runs, errors and warnings at their lines, the log, an outline, snippets, a word count,
   comments agents answer (on .tex files opened from Files too), Track changes as in Overleaf (an agent's
   edits too, each accepted or rejected), versions compared, dark pages, the pages presented full screen, and a jump between a place
-  on a page and its line. TeX runs in a folder of its own, with no shell escape and, where bubblewrap is installed,
+  on a page and its line; Find in the typeset pages (the matches marked, each taking the source to its line) and words picked on
+  a page going to their place in the source; Vim and Emacs keys; Tidy the source (environments indented, table columns lined
+  up at &); labels and citation keys that point nowhere marked as you type; Draft (pictures as boxes), Stop on the first
+  error, Clear the cached files and the time each typesetting took; named versions ("Sent to ICML", kept past the newest
+  40); and Tidy the bibliography (sorted, duplicates merged, keys fixed, fields filled from DOIs, unused entries out).
+  With AI, outside any session: Rewrite the words picked (shorter, clearer, more academic, grammar, translated, as you
+  say) with every command, formula, key and comment checked kept, as a change to accept (by AI while Track changes is
+  on); Write with AI at the cursor (Ctrl+K: an equation, a table, an algorithm, a TikZ figure, a paragraph, the packages
+  it needs said first); LaTeX from a pasted or dropped picture of an equation or a table (or the picture as a figure
+  under figures/); Explain and Fix beside each error; Find a citation for this (papers from OpenAlex and arXiv judged
+  against their abstracts, Cite adding the BibTeX and the \cite); and Proofread, as a list or as tracked changes by AI.
+  Agents tidy a document's source and bibliography with page_action. TeX runs in a folder of its own, with no shell escape and, where bubblewrap is installed,
   in its sandbox. They export as the PDF, the main .tex file or the whole project as a .zip. Jupyter notebooks
   (save_notebook, from an .ipynb an agent wrote and ran, or opened from one) show in the notebook page's own view,
   with their outputs: cells edited and run in a kernel of the Python environment picked, in a folder of their own in
