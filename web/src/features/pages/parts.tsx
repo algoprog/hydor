@@ -15,7 +15,7 @@ import { mu } from '../../lib/machine';
 import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { FolderPicker } from '../../components/FolderPicker';
-import { Button, cx, Dialog, inputCls, Segmented, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, inputCls, Segmented, Throbber, useConfirm } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
 import { useAskRun } from '../guide/ask';
 import { startInSpace } from '../spaces/parts';
@@ -113,8 +113,12 @@ export function RenameDialog({ page, open, onClose }: { page: PageInfo; open: bo
 }
 
 /** Publish a saved page, or (without one) a folder: a project's build. */
-export function PublishDialog({ page, open, onClose }: { page?: { id: string; title: string }; open: boolean; onClose: () => void }) {
+export function PublishDialog({ page, open, onClose }: { page?: { id: string; title: string; description?: string }; open: boolean; onClose: () => void }) {
   const [folder, setFolder] = useState('');
+  // Where its link is shared: its description, and its picture (the page's own, one from this device, or none).
+  const [desc, setDesc] = useState('');
+  const [pic, setPic] = useState<string>('thumb');
+  const [picBusy, setPicBusy] = useState(false);
   const [name, setName] = useState('');
   const [vis, setVis] = useState<SiteVisibility>('private');
   const [busy, setBusy] = useState(false);
@@ -124,11 +128,13 @@ export function PublishDialog({ page, open, onClose }: { page?: { id: string; ti
     setDone(null);
     setFolder('');
     setName(page?.title ?? '');
+    setDesc(page?.description ?? '');
+    setPic('thumb');
   }, [open, page?.id]);
   const submit = async () => {
     setBusy(true);
     try {
-      const r = await post<{ site: SiteInfo }>('/api/sites', { pageId: page?.id, folder: page ? undefined : folder, name, visibility: vis });
+      const r = await post<{ site: SiteInfo }>('/api/sites', { pageId: page?.id, folder: page ? undefined : folder, name, visibility: vis, ...(page ? { description: desc, image: pic } : {}) });
       setDone(r.site);
     } catch (e) {
       toastError(e);
@@ -182,6 +188,46 @@ export function PublishDialog({ page, open, onClose }: { page?: { id: string; ti
             <span className="text-[12.5px] font-medium text-fg-2">Name</span>
             <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} placeholder="My site" className={inputCls} />
           </label>
+          {page && (
+            <>
+              <label className="block space-y-1.5">
+                <span className="text-[12.5px] font-medium text-fg-2">Description, where its link is shared</span>
+                <textarea value={desc} maxLength={300} rows={2} onChange={(e) => setDesc(e.target.value)} placeholder="A sentence on what it is" className={cx(inputCls, 'h-auto py-2')} />
+              </label>
+              <div className="space-y-1.5">
+                <span className="block text-[12.5px] font-medium text-fg-2">Social picture</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Segmented<string>
+                    size="sm"
+                    value={pic.startsWith('naget-asset:') ? 'own' : pic}
+                    onChange={(v) => {
+                      if (v !== 'own') return setPic(v);
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/png,image/jpeg,image/webp';
+                      input.onchange = () => {
+                        const f = input.files?.[0];
+                        if (!f) return;
+                        setPicBusy(true);
+                        base64Of(f)
+                          .then((b64) => post<{ src: string }>('/api/pages/assets', { data: `data:${f.type || 'image/png'};base64,${b64}` }))
+                          .then((r) => setPic(r.src), toastError)
+                          .finally(() => setPicBusy(false));
+                      };
+                      input.click();
+                    }}
+                    options={[
+                      { value: 'thumb', label: 'The page as it looks' },
+                      { value: 'own', label: 'A picture of yours' },
+                      { value: 'none', label: 'None' },
+                    ]}
+                  />
+                  {picBusy && <Throbber size={14} />}
+                </div>
+                <p className="text-[12px] leading-relaxed text-fg-3">What shows when the link is pasted in a chat or a post (its og:image).</p>
+              </div>
+            </>
+          )}
           <div className="space-y-1.5">
             <Segmented<SiteVisibility> size="sm" value={vis} onChange={setVis} options={VISIBILITY.map((v) => ({ value: v.value, label: v.label }))} />
             <p className="text-[12.5px] leading-relaxed text-fg-3">

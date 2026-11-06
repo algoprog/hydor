@@ -80,7 +80,7 @@ import { agentFileComments, openFile, openFileComments, saveFile, texFileForAgen
 import { kindForFile, kindOf, mustKind, type PageKind } from './kinds.ts';
 import { shellManifest, shellPage } from './shell.ts';
 import { uploadRoutes } from './uploads.ts';
-import { createRequest, decideRequest, getRequest, initSites, listSites, publish, serveSite, unpublish, unpublishPage } from './sites.ts';
+import { createRequest, decideRequest, getRequest, initSites, listSites, publish, serveSite, unpublish, unpublishPage, setSocial } from './sites.ts';
 import {
   addVersion,
   checkHtml,
@@ -1194,7 +1194,14 @@ function routes(d: Deps) {
     const b = B(req);
     const pageId = typeof b.pageId === 'string' && b.pageId ? b.pageId : undefined;
     const folder = !pageId && typeof b.folder === 'string' && b.folder.trim() ? resolvePath(b.folder) : undefined;
-    const site = publish(db, { name: b.name, visibility: b.visibility, folder, pageId });
+    const site = publish(db, { name: b.name, visibility: b.visibility, folder, pageId, description: b.description, image: b.image });
+    tell(d, { what: 'sites' });
+    return { site };
+  });
+  // A published page's description and social picture (og:image), changed.
+  app.patch('/api/sites/:id', async (req) => {
+    const b = B(req);
+    const site = setSocial(db, P(req).id, { description: b.description, image: b.image });
     tell(d, { what: 'sites' });
     return { site };
   });
