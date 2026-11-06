@@ -880,7 +880,8 @@ function duplicate(x: Here, a: Args): string {
   const db = ctx.deps.db;
   const cur = pageSource(db, page.id)!;
   const title = str(a.title) || `${page.title} (copy)`;
-  const place = { by: 'agent' as const, sessionKey: ctx.key, space: page.space ?? null, folder: page.folder ?? null };
+  // Beside it, saying what it is as the first does (main's copyPage keeps the description too).
+  const place = { by: 'agent' as const, sessionKey: ctx.key, space: page.space ?? null, folder: page.folder ?? null, description: page.description };
   const p = cur.kind === 'page' ? createPage(db, { title, html: cur.text, ...place }) : createPage(db, { title, kind: cur.kind, model: mustKind(cur.kind).read(cur.text), ...place });
   ctx.deps.broadcast({ t: 'feature', id: 'pages', data: { what: 'pages' } });
   refreshThumbs(ctx.deps, [p.id]);
