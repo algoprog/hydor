@@ -72,7 +72,16 @@ const byId = (d: Deck, id: string) => d.slides.flatMap((s) => everyEl(s.els)).fi
 const slideXml = (pptx: Buffer, n: number) => new Zip(pptx).read(`ppt/slides/slide${n}.xml`)?.toString('utf8') ?? '';
 /** The same values, whatever order their keys came in. */
 const same = (a: unknown, b: unknown): boolean => {
-  const sorted = (v: unknown): unknown => (Array.isArray(v) ? v.map(sorted) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sorted((v as Record<string, unknown>)[k])])) : v);
+  const sorted = (v: unknown): unknown =>
+    Array.isArray(v)
+      ? v.map(sorted)
+      : v && typeof v === 'object'
+        ? Object.fromEntries(
+            Object.keys(v)
+              .sort()
+              .map((k) => [k, sorted((v as Record<string, unknown>)[k])]),
+          )
+        : v;
   return JSON.stringify(sorted(a)) === JSON.stringify(sorted(b));
 };
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAAAASUVORK5CYII=', 'base64');
@@ -151,8 +160,14 @@ function glb(): Buffer {
   ok(byId(d, 'e1')?.type === 'embed' && (byId(d, 'e1') as Extract<El, { type: 'embed' }>).url === 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', 'a web page of YouTube becomes its player');
   ok(!byId(d, 'e2') && !byId(d, 'e3') && !byId(d, 'e4') && !byId(d, 'e5'), 'web pages on this network, without https, with a password in them or by a bare name are refused');
   const q1 = byId(d, 'q1') as Extract<El, { type: 'quiz' }>;
-  ok(q1.choices.map((c) => `${c.text}${c.correct ? '*' : ''}`).join(',') === 'London,Paris*,Rome*' && q1.multi === true && q1.explain === 'Paris.' && q1.hover === 'lift', 'a quiz’s choices as strings, a * marking the right ones (several make it multi)');
-  ok((byId(d, 'q2') as Extract<El, { type: 'quiz' }>).choices.every((c) => !c.correct), 'a poll is a quiz with no right choice');
+  ok(
+    q1.choices.map((c) => `${c.text}${c.correct ? '*' : ''}`).join(',') === 'London,Paris*,Rome*' && q1.multi === true && q1.explain === 'Paris.' && q1.hover === 'lift',
+    'a quiz’s choices as strings, a * marking the right ones (several make it multi)',
+  );
+  ok(
+    (byId(d, 'q2') as Extract<El, { type: 'quiz' }>).choices.every((c) => !c.correct),
+    'a poll is a quiz with no right choice',
+  );
   ok((byId(d, 'q3') as Extract<El, { type: 'quiz' }>).choices[1].correct && !(byId(d, 'q3') as Extract<El, { type: 'quiz' }>).multi, 'its answer named by its words marks it');
   ok(byId(d, 's1')?.type === 'score', 'a score part');
   const d1 = byId(d, 'd1') as Extract<El, { type: 'scene3d' }>;
@@ -167,19 +182,44 @@ function glb(): Buffer {
   const type = an.find((a) => a.el === 't1' && a.fx === 'typewriter');
   ok(type?.by === 'letter' && type.ease === 'spring' && type.dur === 1600, 'typewriter letter by letter, its easing, its longer time');
   ok(an.some((a) => a.el === 'c1' && a.type === 'em' && a.fx === 'wiggle' && a.loop) && !an.some((a) => a.fx === 'draw' && a.loop), 'an emphasis keeps going; an entrance does not');
-  ok(an.some((a) => a.el === 'a1' && a.on === 'tap' && a.trigger === 'b1' && a.fx === 'pop'), 'a tap on its trigger (from the part’s own anim)');
-  ok(an.some((a) => a.el === 'a1' && a.on === 'tap' && a.trigger === 'a1' && a.fx === 'fade'), 'a tap with no such trigger is a tap on the part itself');
-  ok(an.some((a) => a.el === 'w1' && a.type === 'em' && a.fx === 'confetti'), 'an emphasis given by name alone is one');
-  ok(an.some((a) => a.el === 't1' && a.fx === 'fade' && a.type === 'in'), 'an unknown effect is a fade');
+  ok(
+    an.some((a) => a.el === 'a1' && a.on === 'tap' && a.trigger === 'b1' && a.fx === 'pop'),
+    'a tap on its trigger (from the part’s own anim)',
+  );
+  ok(
+    an.some((a) => a.el === 'a1' && a.on === 'tap' && a.trigger === 'a1' && a.fx === 'fade'),
+    'a tap with no such trigger is a tap on the part itself',
+  );
+  ok(
+    an.some((a) => a.el === 'w1' && a.type === 'em' && a.fx === 'confetti'),
+    'an emphasis given by name alone is one',
+  );
+  ok(
+    an.some((a) => a.el === 't1' && a.fx === 'fade' && a.type === 'in'),
+    'an unknown effect is a fade',
+  );
   ok(d.progress === true && isWebDeck(d) && d.format === undefined, 'a deck is in the web format unless it says, with its progress bar');
   const text = deckText(d);
   ok(isDeckText(text) && text.startsWith('{"v":1,"ratio":"16:9","progress":true,') && same(normalizeDeck(JSON.parse(text)), d), 'its text keeps the web format’s things and reads back the same');
   ok(deckSources(d).includes('https://example.com/p.png') && deckVideos(d).includes(`naget-video:${'a'.repeat(40)}`), 'posters are among its pictures, videos behind slides among its videos');
 
   // Limits and shorthand at the edges.
-  const big = normalizeDeck({ slides: [{ els: [{ type: 'html', html: 'x'.repeat(SLIDE_LIMITS.html + 50) }, { type: 'code', code: 'y'.repeat(SLIDE_LIMITS.code + 50) }, { type: 'quiz', question: 'q'.repeat(2000), choices: Array.from({ length: 12 }, (_, i) => `c${i}`) }] }] });
+  const big = normalizeDeck({
+    slides: [
+      {
+        els: [
+          { type: 'html', html: 'x'.repeat(SLIDE_LIMITS.html + 50) },
+          { type: 'code', code: 'y'.repeat(SLIDE_LIMITS.code + 50) },
+          { type: 'quiz', question: 'q'.repeat(2000), choices: Array.from({ length: 12 }, (_, i) => `c${i}`) },
+        ],
+      },
+    ],
+  });
   const [bh, bc, bq] = els(big) as [Extract<El, { type: 'html' }>, Extract<El, { type: 'code' }>, Extract<El, { type: 'quiz' }>];
-  ok(bh.html.length === SLIDE_LIMITS.html && bc.code.length === SLIDE_LIMITS.code && bq.question.length === SLIDE_LIMITS.question && bq.choices.length === SLIDE_LIMITS.choices, 'custom code, code, a question and its choices are kept within their limits');
+  ok(
+    bh.html.length === SLIDE_LIMITS.html && bc.code.length === SLIDE_LIMITS.code && bq.question.length === SLIDE_LIMITS.question && bq.choices.length === SLIDE_LIMITS.choices,
+    'custom code, code, a question and its choices are kept within their limits',
+  );
 }
 
 // ---- PowerPoint compatible decks ----------------------------------------------------------------------------------
@@ -211,10 +251,23 @@ function glb(): Buffer {
   });
   const list = richFeatures(web);
   const kinds = (k: string) => list.filter((f) => f.kind === k);
-  ok(kinds('part').map((f) => f.el).join() === 'q,sc,h,g,q2' && list.every((f) => f.slide >= 0 && f.what), 'richFeatures names each web part by its slide and id, in words');
-  ok(kinds('effect').map((f) => `${f.from}>${f.to}`).join() === 'typewriter>appear,jello>shake,pop>zoom,rise>float', 'and each effect with the nearest of PowerPoint’s');
+  ok(
+    kinds('part')
+      .map((f) => f.el)
+      .join() === 'q,sc,h,g,q2' && list.every((f) => f.slide >= 0 && f.what),
+    'richFeatures names each web part by its slide and id, in words',
+  );
+  ok(
+    kinds('effect')
+      .map((f) => `${f.from}>${f.to}`)
+      .join() === 'typewriter>appear,jello>shake,pop>zoom,rise>float',
+    'and each effect with the nearest of PowerPoint’s',
+  );
   ok(kinds('tap').length === 1 && kinds('loop').length === 1 && kinds('by').length === 1 && kinds('ease').length === 1, 'taps, repeats, words one by one and easing');
-  ok(kinds('transition')[0]?.from === 'blinds' && kinds('transition')[0]?.to === 'wipe' && kinds('bgFx').length === 1 && kinds('bgVideo').length === 1 && kinds('progress')[0]?.slide === 0, 'transitions, moving backgrounds, videos behind slides, the progress bar (the deck’s own)');
+  ok(
+    kinds('transition')[0]?.from === 'blinds' && kinds('transition')[0]?.to === 'wipe' && kinds('bgFx').length === 1 && kinds('bgVideo').length === 1 && kinds('progress')[0]?.slide === 0,
+    'transitions, moving backgrounds, videos behind slides, the progress bar (the deck’s own)',
+  );
   ok(kinds('hover').length === 1 && kinds('textFx').length === 1, 'pointer effects and shining text');
   const p = toPowerPoint(web);
   ok(p.format === 'pptx' && !p.progress && richFeatures(p).length === 0, 'toPowerPoint leaves nothing PowerPoint cannot keep');
@@ -225,8 +278,14 @@ function glb(): Buffer {
   ok((s.notes ?? '').startsWith('Say hello.') && (s.notes ?? '').includes('the answer is B (Jupiter). By far.'), 'its answer goes in the speaker notes, after the slide’s own');
   const sc = s.els.find((e) => e.id === 'sc');
   ok(sc?.type === 'text' && sc.paras[0].runs[0].t === '?/2 right', 'a score becomes its words, the number of quizzes in');
-  ok(s.els.find((e) => e.id === 'h')?.type === 'image' && (s.els.find((e) => e.id === 'h') as Extract<El, { type: 'image' }>).src === 'https://example.com/p.png' && s.els.find((e) => e.id === 'g')?.type === 'image', 'live parts become pictures (their posters), keeping their ids');
-  ok(s.els[0].type === 'video' && s.els[0].autoplay && s.els[0].muted && s.els[0].loop && s.els[1].type === 'shape' && s.els[1].opacity === 0.4 && !s.bg?.video && !s.bg?.fx, 'a video behind the slide becomes one at its back (its shade above it); the moving background goes');
+  ok(
+    s.els.find((e) => e.id === 'h')?.type === 'image' && (s.els.find((e) => e.id === 'h') as Extract<El, { type: 'image' }>).src === 'https://example.com/p.png' && s.els.find((e) => e.id === 'g')?.type === 'image',
+    'live parts become pictures (their posters), keeping their ids',
+  );
+  ok(
+    s.els[0].type === 'video' && s.els[0].autoplay && s.els[0].muted && s.els[0].loop && s.els[1].type === 'shape' && s.els[1].opacity === 0.4 && !s.bg?.video && !s.bg?.fx,
+    'a video behind the slide becomes one at its back (its shade above it); the moving background goes',
+  );
   ok(s.transition?.fx === 'wipe' && (s.anims ?? []).every((a) => !a.loop && !a.by && !a.ease && a.on !== 'tap'), 'transitions and effects become PowerPoint’s');
   ok(s.els.find((e) => e.id === 'k')?.type === 'code' && !(s.els.find((e) => e.id === 'b') as El).hover, 'code stays (PowerPoint has it as words); pointer effects go');
   ok(same(toPowerPoint(p).slides, p.slides) && same(normalizeDeck(JSON.parse(deckText(p))), p), 'made PowerPoint’s again, or read back, it stays the same');
@@ -245,10 +304,18 @@ function glb(): Buffer {
   ok(js.includes('k:const') && js.includes('s:`a ${b}`') && js.includes('c:// c') && js.includes('n:0x1F'), 'JavaScript: template strings, comments, numbers');
   ok(kinds('SELECT a FROM t -- why', 'sql').filter((x) => x.startsWith('k:')).length === 2 && kinds('select 1', 'sql')[0] === 'k:select', 'SQL’s keywords in any case');
   const h = kinds('<a href="x" title=\'<b>\'>t</a><!-- c --><style>p{color:#fff}</style>', 'html');
-  ok(h.includes('g:<a') && h.includes('a:href') && h.includes('s:"x"') && h.includes("s:'<b>'") && h.includes('c:<!-- c -->') && h.includes('n:#fff') && h.filter((x) => x === 'g:<b').length === 0, 'HTML: tags, attributes, values (a tag inside one is not one), comments, its CSS');
+  ok(
+    h.includes('g:<a') && h.includes('a:href') && h.includes('s:"x"') && h.includes("s:'<b>'") && h.includes('c:<!-- c -->') && h.includes('n:#fff') && h.filter((x) => x === 'g:<b').length === 0,
+    'HTML: tags, attributes, values (a tag inside one is not one), comments, its CSS',
+  );
   ok(kinds('{"a": 1, "b": [true]}', 'json').join('|').includes('a:"a"') && kinds('{"a": 1}', 'json').includes('n:1'), 'JSON: keys and numbers');
   ok(kinds('echo $HOME # x', 'bash').includes('a:$HOME') && kinds('x', 'nonesuch').join() === ':x', 'the shell’s names; an unknown language as plain words');
-  ok(codeTokens('a'.repeat(50_000), 'python').map(([, t]) => t).join('').length === 40_000, 'it reads so far, and no further');
+  ok(
+    codeTokens('a'.repeat(50_000), 'python')
+      .map(([, t]) => t)
+      .join('').length === 40_000,
+    'it reads so far, and no further',
+  );
 }
 
 // ---- the deck's page: one small file -------------------------------------------------------------------------------
@@ -257,7 +324,10 @@ function glb(): Buffer {
   ok(THREE_DEFAULT === THREE_BASE, 'three.js is pinned once (the runtime’s own address the same as the app’s)');
   const d = normalizeDeck({ theme: 'midnight', slides: [{ layout: 'title', title: 'Hi' }, { els: [{ type: 'code', code: 'x = 1' }] }] });
   const page = deckPage(db, d, 'T');
-  ok(page.includes(RUNTIME_SRC) && page.includes(JSON.stringify(THREE_BASE).slice(1, -1)) && /<script type="application\/json" id="n-deck">\{"v":1,"ratio":"16:9","theme":\{[^\n]*\}<\/script>/.test(page), 'its page: the runtime minified, three.js’s address, the deck as tight JSON');
+  ok(
+    page.includes(RUNTIME_SRC) && page.includes(JSON.stringify(THREE_BASE).slice(1, -1)) && /<script type="application\/json" id="n-deck">\{"v":1,"ratio":"16:9","theme":\{[^\n]*\}<\/script>/.test(page),
+    'its page: the runtime minified, three.js’s address, the deck as tight JSON',
+  );
   ok(/family=JetBrains\+Mono/.test(page) && /family=Space\+Grotesk/.test(page) && !page.includes('"Playfair Display"'), 'only the fonts it uses: its theme’s and code’s');
   const plain = deckPage(db, normalizeDeck({ slides: [{ layout: 'title', title: 'x' }] }), 'x');
   ok(Buffer.byteLength(plain) < 130_000, `a small deck’s page is small: ${Buffer.byteLength(plain)} bytes (${zlib.gzipSync(plain).length} gzipped)`);
@@ -278,7 +348,10 @@ function glb(): Buffer {
   const file = await deckFile(db, d, 'T');
   const inside = file.includes('<style id="n-fonts">@font-face');
   const head = file.slice(0, file.indexOf('<body>'));
-  ok(inside ? !/<link[^>]+fonts\.googleapis\.com/.test(head) && /url\(data:font\/woff2;base64,/.test(head) : /<link[^>]+fonts\.googleapis\.com/.test(head), inside ? `a downloaded page has its fonts inside it (${Math.round(Buffer.byteLength(file) / 1024)} KB, the page alone ${Math.round(Buffer.byteLength(page) / 1024)} KB)` : 'offline, a downloaded page loads its fonts from Google');
+  ok(
+    inside ? !/<link[^>]+fonts\.googleapis\.com/.test(head) && /url\(data:font\/woff2;base64,/.test(head) : /<link[^>]+fonts\.googleapis\.com/.test(head),
+    inside ? `a downloaded page has its fonts inside it (${Math.round(Buffer.byteLength(file) / 1024)} KB, the page alone ${Math.round(Buffer.byteLength(page) / 1024)} KB)` : 'offline, a downloaded page loads its fonts from Google',
+  );
 }
 
 // ---- /partframe ------------------------------------------------------------------------------------------------------
@@ -286,7 +359,10 @@ function glb(): Buffer {
   const src = fs.readFileSync(path.join(process.env.NAGET_AGENT_ROOT ?? process.cwd(), 'server/index.ts'), 'utf8');
   const route = /app\.get\('\/partframe'[\s\S]{0,400}?\.send\(PART_FRAME_HTML\)/.exec(src)?.[0] ?? '';
   ok(route.includes("'Content-Security-Policy', (req.query as Record<string, string>).offline === '1' ? OFFLINE_PAGE_CSP : PAGE_CSP"), '/partframe is served with the pages’ policy (sandboxed, scripts, no origin), offline in a confidential session');
-  ok(PART_FRAME_HTML.includes('.source !== parent') && PART_FRAME_HTML.includes('n-part-ready') && PART_FRAME_HTML.includes('document.write(') && !/innerHTML|eval\(/.test(PART_FRAME_HTML), 'its page takes its page from its parent only, and writes it');
+  ok(
+    PART_FRAME_HTML.includes('.source !== parent') && PART_FRAME_HTML.includes('n-part-ready') && PART_FRAME_HTML.includes('document.write(') && !/innerHTML|eval\(/.test(PART_FRAME_HTML),
+    'its page takes its page from its parent only, and writes it',
+  );
   if (canCapture()) {
     // In a frame as the app makes it: told it is ready, it writes the first page sent, and no other.
     const host = `<!doctype html><html><body><script>window.__got = []; addEventListener('message', (e) => { const d = e.data; if (d && d.type === 'n-part-ready') { const page = (w) => '<p id="x">' + w + '</p><script>parent.postMessage({ ns: "t", v: document.getElementById("x").textContent }, "*")<' + '/script>'; e.source.postMessage({ type: 'n-part-page', html: page('one') }, '*'); setTimeout(() => e.source.postMessage({ type: 'n-part-page', html: page('two') }, '*'), 300); } else if (d && d.ns === 't') window.__got.push(d.v); });</script><iframe sandbox="allow-scripts" srcdoc="${PART_FRAME_HTML.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"></iframe></body></html>`;
@@ -342,7 +418,17 @@ function glb(): Buffer {
   gltf.buffers[0].uri = 'tri.bin';
   fs.writeFileSync(path.join(tmp, 'model', 'tri.gltf'), JSON.stringify(gltf));
   fs.writeFileSync(path.join(tmp, 'model', 'out.gltf'), JSON.stringify({ ...gltf, buffers: [{ byteLength: 36, uri: '../thing.glb' }] }));
-  const g = await run('save_slides', { title: 'glTF', slides: [{ els: [{ id: 'in', type: 'scene3d', model: 'model/tri.gltf' }, { id: 'out', type: 'scene3d', model: 'model/out.gltf' }] }] });
+  const g = await run('save_slides', {
+    title: 'glTF',
+    slides: [
+      {
+        els: [
+          { id: 'in', type: 'scene3d', model: 'model/tri.gltf' },
+          { id: 'out', type: 'scene3d', model: 'model/out.gltf' },
+        ],
+      },
+    ],
+  });
   const gd = (await req('GET', `/api/pages/${idOf(g.text)}`)).json().model as Deck;
   const kept = getAsset(db, ((byId(gd, 'in') as Extract<El, { type: 'scene3d' }>).model ?? '').slice(12));
   ok(kept?.mime === 'model/gltf+json' && kept.data.toString('utf8').includes('"uri":"data:application/octet-stream;base64,'), 'a .gltf of the session is kept with its buffer inside it');
@@ -361,7 +447,23 @@ function glb(): Buffer {
   // What agents are told.
   const help = String(tools.save_slides.description);
   ok(
-    ['the web format is the default (no "format")', '"format": "pptx" keeps to what PowerPoint has', 'quiz {question', 'window.deck', 'deck.next()', 'trigger', 'file: an .html file', 'make_plot', 'scene3d {model', 'textFx', 'hover', 'cube|flip|dissolve|circle|blinds|glitch', 'aurora', 'progress: true', '"#next"'].every((w) => help.includes(w)),
+    [
+      'the web format is the default (no "format")',
+      '"format": "pptx" keeps to what PowerPoint has',
+      'quiz {question',
+      'window.deck',
+      'deck.next()',
+      'trigger',
+      'file: an .html file',
+      'make_plot',
+      'scene3d {model',
+      'textFx',
+      'hover',
+      'cube|flip|dissolve|circle|blinds|glitch',
+      'aurora',
+      'progress: true',
+      '"#next"',
+    ].every((w) => help.includes(w)),
     'save_slides tells agents of the web format, its parts, files, effects and examples',
   );
   const schema = tools.save_slides.inputSchema as { properties: Record<string, { enum?: string[] }> };
@@ -395,12 +497,23 @@ function glb(): Buffer {
   ok(px.statusCode === 200 && note.startsWith('Made for PowerPoint: 2 parts became pictures or text boxes (a quiz, custom code)'), `the PowerPoint file says what changed: ${note}`);
   ok(((await run('export_page', { id: web, format: 'pptx' })).text ?? '').includes('Made for PowerPoint'), 'export_page says the same');
   const x1 = slideXml(px.rawPayload, 1);
-  ok(x1.includes('typeface="JetBrains Mono"') && x1.includes('<a:t>x = </a:t>') && x1.includes('<a:t># one</a:t>') && /i="1"[^>]*><a:solidFill><a:srgbClr val="8B949E"/.test(x1), 'code goes as words in its monospaced font, coloured, its comment in italics');
+  ok(
+    x1.includes('typeface="JetBrains Mono"') && x1.includes('<a:t>x = </a:t>') && x1.includes('<a:t># one</a:t>') && /i="1"[^>]*><a:solidFill><a:srgbClr val="8B949E"/.test(x1),
+    'code goes as words in its monospaced font, coloured, its comment in italics',
+  );
   ok(x1.includes('ppaction://hlinkshowjump?jump=nextslide'), 'a link to the next slide is PowerPoint’s own');
   ok(x1.includes('<a:t>Pick</a:t>') && x1.includes('<a:t>A   </a:t>'), 'the quiz as words');
   if (canCapture()) {
     const rels = new Zip(px.rawPayload).read('ppt/slides/_rels/slide1.xml.rels')?.toString() ?? '';
     ok(/media\/image\d+\.png/.test(rels) && x1.includes('descr="Custom code"'), 'with a browser here, custom code goes to PowerPoint as a picture of it running');
+    // 3D needs three.js from jsDelivr and the browser's WebGL: where both are here, a picture of it too.
+    const three = idOf((await run('save_slides', { title: '3D', slides: [{ els: [{ id: 'g', type: 'scene3d', shape: 'torus', x: 100, y: 100, w: 400, h: 400 }] }] })).text);
+    const p3 = (await req('GET', `/api/pages/${three}/export?format=pptx`)).rawPayload;
+    if (slideXml(p3, 1).includes('descr="3D"')) {
+      const z = new Zip(p3);
+      const pic = [...(z.read('ppt/slides/_rels/slide1.xml.rels')?.toString() ?? '').matchAll(/media\/(image\d+\.png)/g)].map((m) => z.read(`ppt/media/${m[1]}`)).find(Boolean);
+      ok(!!pic && pic.length > 2000, 'with a browser here, a 3D part goes to PowerPoint as a picture of it drawn');
+    } else console.log('(3D could not be drawn here, no network or no WebGL: PowerPoint gets its poster)');
   }
 }
 
@@ -414,7 +527,15 @@ if (canCapture()) {
           { id: 's', type: 'score', y: 600, h: 80 },
           { id: 'b', type: 'shape', x: 900, y: 600, w: 200, h: 80, text: 'Show' },
           { id: 'a', type: 'text', x: 900, y: 500, w: 200, h: 80, text: '42' },
-          { id: 'live', type: 'html', x: 900, y: 80, w: 300, h: 200, html: '<p id="p">waiting</p><script>deck.on("enter", (e) => { document.getElementById("p").textContent = "slide " + deck.slide + " of " + deck.slides; parent.postMessage({ ns: "test", said: document.getElementById("p").textContent }, "*"); })</script>' },
+          {
+            id: 'live',
+            type: 'html',
+            x: 900,
+            y: 80,
+            w: 300,
+            h: 200,
+            html: '<p id="p">waiting</p><script>deck.on("enter", (e) => { document.getElementById("p").textContent = "slide " + deck.slide + " of " + deck.slides; parent.postMessage({ ns: "test", said: document.getElementById("p").textContent }, "*"); })</script>',
+          },
         ],
         anims: [{ el: 'a', fx: 'pop', on: 'tap', trigger: 'b' }],
       },

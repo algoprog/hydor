@@ -35,7 +35,17 @@ const ratio = (aspect?: string) => {
   return m ? `${m[1]} / ${m[2]}` : '1 / 1';
 };
 
-function Working({ since, aspect, prompt }: { since?: number; aspect?: string; prompt?: string }) {
+/** What the placeholder says while a picture tool works, by the tool (its name as the agent's program gives it ends with it). */
+function doing(tool: string): string {
+  if (/make_plot$/.test(tool)) return 'Drawing the plot';
+  if (/make_svg$/.test(tool)) return 'Making a drawing';
+  if (/remove_background$/.test(tool)) return 'Taking the background out';
+  if (/erase_from_image$/.test(tool)) return 'Erasing';
+  if (/edit_image$/.test(tool)) return 'Editing the picture';
+  return 'Making an image';
+}
+
+function Working({ since, aspect, prompt, what = 'Making an image' }: { since?: number; aspect?: string; prompt?: string; what?: string }) {
   const [, tick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => tick((x) => x + 1), 1000);
@@ -47,7 +57,10 @@ function Working({ since, aspect, prompt }: { since?: number; aspect?: string; p
         <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-bg-2 via-bg-3 to-bg-2" />
         <div className="relative flex flex-col items-center gap-2 px-4 text-center text-[13px] text-fg-2">
           <Sparkles size={20} className="spin-gentle text-accent" />
-          <span>Making an image{since ? ` · ${duration(Date.now() - since)}` : '…'}</span>
+          <span>
+            {what}
+            {since ? ` · ${duration(Date.now() - since)}` : '…'}
+          </span>
         </div>
       </div>
       {prompt && <p className="mt-1.5 line-clamp-2 px-0.5 text-[12.5px] text-fg-3">{prompt}</p>}
@@ -57,9 +70,10 @@ function Working({ since, aspect, prompt }: { since?: number; aspect?: string; p
 
 export function GeneratedImages({ item, sessionKey }: { item: ToolItem; sessionKey: string }) {
   const t = item.tool;
-  const input = (t.input ?? {}) as { prompt?: unknown; aspect_ratio?: unknown };
-  const prompt = typeof input.prompt === 'string' ? input.prompt : undefined;
-  const aspect = typeof input.aspect_ratio === 'string' ? input.aspect_ratio : undefined;
+  const input = (t.input ?? {}) as { prompt?: unknown; request?: unknown; aspect_ratio?: unknown; width?: unknown; height?: unknown };
+  // A plot says what it draws in its request, and its shape in pixels.
+  const prompt = typeof input.prompt === 'string' ? input.prompt : typeof input.request === 'string' ? input.request : undefined;
+  const aspect = typeof input.aspect_ratio === 'string' ? input.aspect_ratio : Number(input.width) > 0 && Number(input.height) > 0 ? `${Math.round(Number(input.width))}:${Math.round(Number(input.height))}` : undefined;
   const pics = picsOf(t.output);
   const [broken, setBroken] = useState<Set<string>>(new Set());
   // While it runs it may be waiting for an OpenRouter key: the card to give one (or skip) shows above it.
@@ -67,7 +81,7 @@ export function GeneratedImages({ item, sessionKey }: { item: ToolItem; sessionK
     return (
       <>
         <OpenRouterKeyCard sessionKey={sessionKey} />
-        <Working since={item.ts} aspect={aspect} prompt={prompt} />
+        <Working since={item.ts} aspect={aspect} prompt={prompt} what={doing(t.name)} />
       </>
     );
   if (!pics.length) {
