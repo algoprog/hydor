@@ -32,7 +32,11 @@ import {
   ListOrdered,
   ListTree,
   Lightbulb,
+  Languages,
+  MessageCircleQuestion,
   MessageSquarePlus,
+  SpellCheck2,
+  Speech,
   Minus,
   Omega,
   PaintRoller,
@@ -143,6 +147,10 @@ export interface DocMenuCtx {
   compare: () => void;
   /** An older version on view: nothing changes it. */
   readOnly?: boolean;
+  /** The AI that writes with you (ai/useDocAi.tsx): Write with AI, Proofread, the tone, a translation, questions, suggestions as you type. */
+  ai?: { write: () => void; proofread: () => void; tone: () => void; translate: () => void; ask: boolean; toggleAsk: () => void; busy: boolean };
+  ghost?: boolean;
+  setGhost?: (on: boolean) => void;
 }
 
 /** The editor's menus, for what is where the caret is now. */
@@ -191,6 +199,8 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     },
     '-',
     { label: 'Check spelling', icon: <SpellCheck size={15} />, checked: c.spell, also: 'spellcheck', run: () => c.setSpell(!c.spell) },
+    !!c.setGhost && { label: 'Suggest as I type', icon: <Sparkles size={15} />, checked: !!c.ghost, also: 'ai autocomplete smart compose complete sentence predict', run: () => c.setGhost!(!c.ghost) },
+    !!c.ai && { label: 'Ask about this document', icon: <MessageCircleQuestion size={15} />, checked: c.ai.ask, also: 'ai question answer chat questions', run: c.ai.toggleAsk },
     { label: 'Show the word count while typing', icon: <WholeWord size={15} />, checked: c.showCount, run: () => c.setShowCount(!c.showCount) },
   ];
 
@@ -204,6 +214,7 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
   ].map(([r, k]) => ({ label: `${k} × ${r}`, also: 'table grid', run: () => e.insertTable(r, k) }));
 
   const insert: MenuEntry[] = [
+    !!c.ai && { label: 'Write with AI', icon: <Sparkles size={15} />, keys: 'Ctrl+J', also: 'ai write generate paragraph continue summarize summary conclusion list table help me write', disabled: c.readOnly, run: c.ai.write },
     !!c.aiSection && { label: 'Section made with AI', icon: <Sparkles size={15} />, also: 'ai agent write generate section summary introduction conclusion faq glossary references table', disabled: c.readOnly, run: c.aiSection },
     {
       label: 'Picture',
@@ -355,6 +366,15 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
 
   const tools: MenuEntry[] = [
     { label: 'Word count', icon: <BookOpenText size={15} />, keys: 'Ctrl+Shift+C', also: 'characters pages reading time', run: c.wordCount },
+    ...(c.ai
+      ? ([
+          '-',
+          { label: 'Proofread', icon: <SpellCheck2 size={15} />, also: 'ai spelling grammar check clarity style corrections', disabled: c.readOnly || c.ai.busy, run: c.ai.proofread },
+          { label: 'Change the tone', icon: <Speech size={15} />, also: 'ai tone formal friendly confident simpler rewrite style', disabled: c.readOnly || c.ai.busy, run: c.ai.tone },
+          { label: 'Translate the document', icon: <Languages size={15} />, also: 'ai translate translation language copy', disabled: c.readOnly || c.ai.busy, run: c.ai.translate },
+          { label: 'Ask about this document', icon: <MessageCircleQuestion size={15} />, checked: c.ai.ask, also: 'ai question answer', run: c.ai.toggleAsk },
+        ] as MenuEntry[])
+      : []),
     { label: 'Keyboard shortcuts', icon: <Keyboard size={15} />, keys: 'Ctrl+/', run: c.shortcuts },
     '-',
     { label: 'Accept all suggestions', icon: <CheckCheck size={15} />, disabled: !c.suggestions || c.readOnly, also: 'track changes review', run: () => c.resolveAll(true) },
