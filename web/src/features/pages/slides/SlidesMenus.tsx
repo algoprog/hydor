@@ -1,9 +1,9 @@
-// The slides editor's menus, as Google Slides and PowerPoint have them: File (saving, PowerPoint compatible or the web
-// format, the slideshow's progress bar), Edit, View (zoom, the grid, the rulers and guides), Insert (every kind of part,
-// pictures, drawings, plots and videos made with AI, the web format's interactive parts, a comment, the footer),
-// Format (the words' look, the format painter, a picture's crop and its changes with AI, a chart made a plot, running
-// a live part in place), Arrange (groups, the stacking order, lining up, turning), Slide, and Tools. Each action with
-// its keys; what does not apply to what is picked is greyed. Search the menus (Alt+/) finds any of them.
+// The slides editor's menus, as Google Slides and PowerPoint have them: Edit, View (zoom, the grid, the rulers and
+// guides), Insert (every kind of part, pictures, drawings, plots and videos made with AI, the web format's interactive
+// parts, a comment), Format (the words' look, the format painter, a picture's crop and its changes with AI, a chart
+// made a plot, running a live part in place), Arrange (groups, the stacking order, lining up, turning), Slide, and Tools
+// (PowerPoint compatible or the web format too, which the Theme tab has beside the slides' shape). Each action with its
+// keys; what does not apply to what is picked is greyed. Search the menus (Alt+/) finds any of them.
 import {
   AlignCenter,
   AlignCenterHorizontal,
@@ -60,7 +60,6 @@ import {
   RotateCcw,
   RotateCw,
   Ruler,
-  Save,
   Scissors,
   Search,
   Shapes,
@@ -95,13 +94,8 @@ export interface MenuArgs {
   readOnly?: boolean;
   /** The deck is in the web format (not PowerPoint compatible). */
   web: boolean;
-  /** Its slideshow shows a progress bar. */
-  progress: boolean;
-  canSave: boolean;
-  save(): void;
   /** PowerPoint compatible on (asked first, with what changes) or off. */
   setCompatible(on: boolean): void;
-  setProgress(on: boolean): void;
   wide: boolean;
   pageLayout: boolean;
   picked: El[];
@@ -205,15 +199,6 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
   const many = n > 1;
   const live = one?.type === 'html' || one?.type === 'embed' || one?.type === 'scene3d';
   return [
-    {
-      label: 'File',
-      items: [
-        { label: 'Save', icon: <Save size={14} />, keys: 'Ctrl+S', disabled: ro || !a.canSave, run: a.save },
-        '-',
-        { label: 'PowerPoint compatible', icon: <Presentation size={14} />, checked: !a.web, also: 'powerpoint pptx keynote google slides format compatible web format', disabled: ro, run: () => a.setCompatible(a.web) },
-        a.web && { label: 'Progress bar in the slideshow', checked: a.progress, also: 'progress bar how far slideshow', disabled: ro, run: () => a.setProgress(!a.progress) },
-      ],
-    },
     {
       label: 'Edit',
       items: [
@@ -454,6 +439,8 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
       items: [
         { label: 'Find and replace', icon: <Search size={14} />, keys: 'Ctrl+H', also: 'find search', run: () => a.find(!ro) },
         { label: 'Keyboard shortcuts', icon: <Keyboard size={14} />, keys: 'Ctrl+/', also: 'keys help', run: a.shortcuts },
+        '-',
+        { label: 'PowerPoint compatible', icon: <Presentation size={14} />, checked: !a.web, also: 'powerpoint pptx keynote google slides format compatible web format made for', disabled: ro, run: () => a.setCompatible(a.web) },
         a.ask && '-',
         a.ask && { label: 'Ask the agent about this slide', icon: <Sparkles size={14} />, run: a.ask },
       ],

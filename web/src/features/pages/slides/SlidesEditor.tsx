@@ -7,8 +7,8 @@
 // (Grid); and Present: the slideshow, or the presenter's view with the audience's window. Changes stay unsaved until
 // Save (Ctrl+S), as a page's do; Undo and Redo go back and forth. While an agent writes a new version (live.ts), it
 // shows as it comes, read-only: the slide being written on view, a box round the part its words arrive in. A deck is
-// in the web format (custom code, web pages, quizzes, 3D, the web's effects) unless File → PowerPoint compatible is
-// ticked; its live parts run in frames of their own, in the slideshow, and here once Run is pressed. The AI tools
+// made for the web (custom code, web pages, quizzes, 3D, the web's effects) unless it is made PowerPoint compatible
+// (Theme → Made for, or Tools); its live parts run in frames of their own, in the slideshow, and here once Run is pressed. The AI tools
 // (images/studio) make pictures, drawings, plots and videos for it, change a picture picked, make a chart a plot and
 // a slide's background: each result lands as an uploaded one does, or takes the place of what it changed, one step to undo.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -1178,11 +1178,7 @@ export function SlidesEditor({
   const menus = slidesMenus({
     readOnly,
     web,
-    progress: !!deck.progress,
-    canSave: dirty && !!onSave && !saving,
-    save: () => void save(),
     setCompatible,
-    setProgress: (on) => change((d) => ({ ...d, progress: on || undefined })),
     wide,
     pageLayout: layout === 'page',
     picked,
@@ -1480,6 +1476,7 @@ export function SlidesEditor({
       onRun={setRunning}
       pickVideo={pickBgVideo}
       pickModel={pickModel}
+      onCompatible={setCompatible}
       onAiEdit={(id, mode) => void aiEdit(id, mode)}
       onPlotChart={(id) => void aiPlot(id)}
       onAiBackground={() => void aiBackground()}

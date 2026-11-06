@@ -138,6 +138,8 @@ interface Props {
   /** The part that starts an animation is picked on the slide: for that animation (null: none is being picked). */
   picking?: string | null;
   onPickTrigger?: (anim: string | null) => void;
+  /** The deck made PowerPoint compatible (asked first, with what changes) or for the web again. */
+  onCompatible?: (on: boolean) => void;
   /** The AI tools: a picture changed (with AI, its background out, part of it erased), a chart made a plot, the slide's background made. */
   onAiEdit?: (id: string, mode: 'change' | 'cutout' | 'erase') => void;
   onPlotChart?: (id: string) => void;
@@ -1615,7 +1617,8 @@ const SAMPLE = (theme: Theme): Deck => ({
   ],
 });
 
-function ThemeTab({ deck, change, fonts }: Props) {
+function ThemeTab({ deck, change, fonts, onCompatible }: Props) {
+  const web = isWebDeck(deck);
   const t = deck.theme;
   const setT = (patch: Partial<Theme>) => change((d) => ({ ...d, theme: { ...d.theme, ...patch, id: undefined } }), 'theme');
   const colors: [keyof Theme, string][] = [
@@ -1690,6 +1693,27 @@ function ThemeTab({ deck, change, fonts }: Props) {
             { value: '4:3', label: 'Standard (4:3)' },
           ]}
         />
+      </Section>
+      <Section title="Made for">
+        <Choice
+          value={web ? 'web' : 'pptx'}
+          onChange={(v) => (v === 'pptx') === web && onCompatible?.(v === 'pptx')}
+          options={[
+            { value: 'web', label: 'The web', title: 'Everything: custom code, quizzes, 3D, the web’s effects' },
+            { value: 'pptx', label: 'PowerPoint', title: 'PowerPoint compatible: only what PowerPoint has' },
+          ]}
+        />
+        <p className="text-[11.5px] leading-snug text-fg-3">
+          {web
+            ? 'Custom code, quizzes, 3D and the web’s effects; its PowerPoint file has them as pictures or PowerPoint’s nearest.'
+            : 'PowerPoint compatible: only what PowerPoint has, so its PowerPoint file keeps everything.'}
+        </p>
+        {web && (
+          <label className="flex min-h-8 items-center gap-2 text-[12.5px] text-fg-2">
+            <span className="min-w-0 flex-1">Progress bar in the slideshow</span>
+            <Switch label="Progress bar in the slideshow" on={!!deck.progress} onChange={(on) => change((d) => ({ ...d, progress: on || undefined }))} />
+          </label>
+        )}
       </Section>
     </>
   );
