@@ -88,7 +88,8 @@ const text = (runs: Run[]) => runs.map((r) => r.t).join('');
   ok(md.includes('[@lecun2015, p. 437]') && md.includes('[@knuth1984; @vaswani2017]') && md.includes('[BIBLIOGRAPHY]'), 'Markdown keeps citations as [@key]', md);
   const file = docMarkdown(d, { tocLinks: true, refs: docRefs(d) });
   ok(file.includes('(LeCun & Bengio, 2015, p. 437)') && file.includes('Knuth, D. E. (1984)'), 'a Markdown file has them as they read', file);
-  ok(JSON.stringify(viaMd(d).blocks[0]) === JSON.stringify({ ...d.blocks[0], id: viaMd(d).blocks[0].id }), 'and they read back');
+  const back = viaMd(d).blocks[0];
+  ok(JSON.stringify(back) === JSON.stringify({ ...d.blocks[0], id: back.id }), 'and they read back', back);
   const again2 = again({ ...d, cite: 'ieee' });
   ok(again2.cite === 'ieee' && again2.sources?.length === 3, 'the style and sources are kept');
   // From BibTeX, as Insert → Citation finds them.
