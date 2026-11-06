@@ -523,9 +523,10 @@ agents that speak ACP and take MCP servers.
   (skills, tools, needs, files, instructions), or have an agent make one, and pack it into a .zip to share.
   Claude Code's and Codex's own plugins and marketplaces have a tab each.
 - **Voice**: dictate into the message box, with the browser's own recognition or, when you turn it on, a model
-  on this machine; replies can be read aloud. Hands-free mode (the headphones by the message box) is for
-  walking: say what you want, and it starts, steers and checks sessions, answers approvals and reads you the
-  results, telling you when the session it follows finishes or needs you.
+  on this machine (whisper.cpp, on its GPU when it has one: Metal on a Mac, CUDA on an NVIDIA GPU, built for it in
+  the background; else, or when the GPU fails, on the processor); replies can be read aloud. Hands-free mode (the
+  headphones by the message box) is for walking: say what you want, and it starts, steers and checks sessions,
+  answers approvals and reads you the results, telling you when the session it follows finishes or needs you.
 - **Your language**: the app in English, Chinese (Simplified) or Greek (Settings → General → Language), with
   dates and times written that way and notifications in it too, and agents write to you in it. Translations
   live in `web/src/i18n`: `npm run i18n:extract` lists every string, the server's messages and what ships with

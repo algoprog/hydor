@@ -39,6 +39,7 @@ export const voice: Feature = {
     d.app.post('/api/voice/cancel', async () => service().cancel());
     d.app.post('/api/voice/remove', async (req) => service().remove((req.body ?? {}) as { size?: WhisperSize; english?: boolean; all?: boolean }));
     d.app.post('/api/voice/test', async () => service().test());
+    d.app.post('/api/voice/gpu-build', async () => service().retryGpu());
     // Hands-free: what the user said (as text), done, and what to say back.
     d.app.post('/api/voice/command', async (req) => {
       const b = (req.body ?? {}) as { text?: unknown; focus?: unknown };

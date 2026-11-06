@@ -3,7 +3,7 @@
 // replies are read aloud. What concerns the browser stays in the browser; the server keeps its own.
 import { useState, type ReactNode } from 'react';
 import { AlertTriangle, Check, Cpu, Lock, MicOff, Trash2 } from 'lucide-react';
-import { WHISPER_MODELS, type VoiceEngine, type VoicePatch, type VoiceState, type WhisperSize } from '@shared/voice';
+import { GPU_API, WHISPER_MODELS, type VoiceEngine, type VoicePatch, type VoiceState, type WhisperSize } from '@shared/voice';
 import { api, post } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
 import { Button, cx, inputCls, OptionRow, Picker, Section, Segmented, Throbber, useConfirm } from '../../components/ui';
@@ -212,6 +212,19 @@ function LocalEngine({ st, put, busy }: { st: VoiceState; put: (p: VoicePatch) =
     }
   };
   const where = L.program?.source === 'yours' ? 'your own whisper-cli' : L.program?.source === 'built' ? `whisper.cpp ${L.program.version ?? ''} (built here)` : `whisper.cpp ${L.program?.version ?? ''}`;
+  // What it ran on the last time (the Test, or a recording): known once it has run.
+  const dev = L.program?.runsOn;
+  const runs = L.program?.gpuError
+    ? `It runs on the processor for now: the GPU failed (${L.program.gpuError}). The GPU is tried again in a few minutes.`
+    : dev?.on === 'gpu'
+      ? dev.name
+        ? `It runs on the GPU: ${dev.name} (${dev.api ?? 'GPU'}).`
+        : `It runs on the GPU (${dev.api ?? 'GPU'}).`
+      : dev?.on === 'cpu'
+        ? L.program?.gpu
+          ? 'It runs on the processor: whisper.cpp found no GPU it can use.'
+          : 'It runs on this machine’s processor.'
+        : null;
   return (
     <div className="mt-2">
       <div className="-mb-1 divide-y divide-line">
@@ -242,18 +255,22 @@ function LocalEngine({ st, put, busy }: { st: VoiceState; put: (p: VoicePatch) =
       )}
       {on && L.status === 'installing' && <Progress st={st} />}
       {on && L.status === 'ready' && (
-        <div className="mt-3">
+        <div className="mt-3 space-y-2">
           <Note icon={<Check size={14} />} tone="ok">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <span className="min-w-0 flex-1">
-                Ready: {where} with the {m.label} model{L.english ? ', English only' : ''}, on this machine’s processor. Your voice stays here.
-                {!st.ffmpeg && ' (Without ffmpeg here, the browser turns recordings into WAV itself; current browsers all can.)'}
+                <span className="block">
+                  Ready: {where} with the {m.label} model{L.english ? ', English only' : ''}. Your voice stays here.
+                  {!st.ffmpeg && ' (Without ffmpeg here, the browser turns recordings into WAV itself; current browsers all can.)'}
+                </span>
+                {runs && <span className="mt-0.5 block text-fg-3">{runs}</span>}
               </span>
               <Button size="sm" variant="secondary" disabled={testing} onClick={test}>
                 {testing ? 'Testing…' : 'Test'}
               </Button>
             </div>
           </Note>
+          <GpuBuild st={st} />
         </div>
       )}
       {on && L.status === 'failed' && (
@@ -269,6 +286,41 @@ function LocalEngine({ st, put, busy }: { st: VoiceState; put: (p: VoicePatch) =
         </div>
       )}
     </div>
+  );
+}
+
+/** whisper.cpp for this machine's NVIDIA GPU (none is ready-made for Linux): its build in the background, a build that failed, or what it needs. */
+function GpuBuild({ st }: { st: VoiceState }) {
+  const g = st.local.gpuBuild;
+  if (!g) return null;
+  const again = () => post<VoiceState>('/api/voice/gpu-build').then((s) => useVoiceServer.setState({ st: s }), toastError);
+  if (g.status === 'building')
+    return (
+      <div className="flex items-center gap-3 rounded-xl bg-bg-2 px-3 py-2.5">
+        <Throbber size={16} className="shrink-0 text-fg-3" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] leading-snug break-words">{g.detail ?? 'Building whisper.cpp for the NVIDIA GPU (CUDA)'}</div>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-fg/10">
+            <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${Math.max(2, Math.min(100, g.percent ?? 0))}%` }} />
+          </div>
+          <div className="mt-1 text-[11.5px] text-fg-3">Dictation works on the processor meanwhile. The build takes 5 to 20 minutes, then dictation runs on the GPU.</div>
+        </div>
+        <span className="tnum shrink-0 text-[11.5px] text-fg-3">{Math.round(g.percent ?? 0)}%</span>
+      </div>
+    );
+  return (
+    <Note icon={g.status === 'failed' ? <AlertTriangle size={14} /> : <Cpu size={14} />} tone={g.status === 'failed' ? 'warn' : undefined}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span className="min-w-0 flex-1 break-words">
+          {g.status === 'failed'
+            ? `whisper.cpp could not be built for the NVIDIA GPU, so dictation runs on the processor: ${g.error ?? ''}`
+            : 'This computer has an NVIDIA GPU, and whisper.cpp has no ready-made build for it on Linux. With NVIDIA’s CUDA toolkit installed (nvcc), the app builds one, and dictation runs on the GPU.'}
+        </span>
+        <Button size="sm" variant="secondary" onClick={again}>
+          {g.status === 'failed' ? 'Try again' : 'Check again'}
+        </Button>
+      </div>
+    </Note>
   );
 }
 
@@ -375,7 +427,7 @@ function Downloaded({ st }: { st: VoiceState }) {
         <div className="flex items-center gap-2.5 py-1.5 text-[13px]">
           <Cpu size={14} className="shrink-0 text-fg-3" />
           <span className="min-w-0 flex-1 truncate">
-            whisper.cpp {own.version ?? ''} {own.source === 'built' ? '(built here)' : ''}
+            whisper.cpp {own.version ?? ''} {own.source === 'built' ? (own.gpu ? `(built here for ${GPU_API[own.gpu]})` : '(built here)') : ''}
           </span>
           <span className="tnum text-[12px] text-fg-3">{size(own.sizeBytes)}</span>
           <span className="w-7" />
