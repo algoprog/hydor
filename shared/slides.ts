@@ -22,7 +22,7 @@ export const SLIDE_W = 1280;
 export type Ratio = '16:9' | '4:3';
 export const slideH = (r: Ratio | undefined) => (r === '4:3' ? 960 : 720);
 
-export const SLIDE_LIMITS = { slides: 300, els: 150, anims: 120, paras: 200, run: 6000, notes: 20000, rows: 40, cols: 12, series: 12, labels: 80, nodes: 60, tex: 4000, depth: 4, guides: 40 };
+export const SLIDE_LIMITS = { slides: 300, els: 150, anims: 120, paras: 200, run: 6000, notes: 20000, rows: 40, cols: 12, series: 12, labels: 80, nodes: 60, tex: 4000, depth: 4, guides: 40, html: 200_000, code: 20_000, choices: 8, question: 1000 };
 
 /** A picture kept by the app (server/pages/assets.ts), by its content's hash: "naget-asset:<sha>". */
 export const ASSET = 'naget-asset:';
@@ -96,7 +96,12 @@ export interface Base {
    * Morph glides a part into the one of the next slide with the same key (or id).
    */
   key?: string;
+  /** The web format: how it answers the pointer in the slideshow (it rises, grows, glows or tilts towards it). */
+  hover?: Hover;
 }
+
+export type Hover = 'lift' | 'grow' | 'glow' | 'tilt';
+export const HOVERS: Hover[] = ['lift', 'grow', 'glow', 'tilt'];
 
 export type ShapeKind =
   | 'rect'
@@ -155,6 +160,10 @@ export interface TextProps {
   shadow?: boolean;
   /** Text that does not fit gets smaller. */
   fit?: 'shrink' | 'none';
+  /** The web format: how the words shine (a gradient of the accent colours, a glow, an outline, neon, a long shadow). */
+  textFx?: TextFx;
+  /** The web format: frosted glass behind the box (what is under it shows through, blurred). */
+  glass?: boolean;
   /** What an empty box shows while it is edited: "Click to add a title". */
   ph?: string;
 }
@@ -330,10 +339,161 @@ export interface GroupEl extends Base {
   els: El[];
 }
 
-export type El = TextEl | ShapeEl | ImageEl | LineEl | TableEl | ChartEl | IconEl | MathEl | VideoEl | GroupEl;
+export type TextFx = 'gradient' | 'glow' | 'outline' | 'neon' | 'shadow';
+export const TEXT_FX: TextFx[] = ['gradient', 'glow', 'outline', 'neon', 'shadow'];
+
+/** Code shown with its colours, as in an editor (PowerPoint keeps it as coloured words in a monospaced font). */
+export interface CodeEl extends Base {
+  type: 'code';
+  code: string;
+  /** Its language, for its colours: python, javascript, typescript, bash, json, html, css, sql, rust, go, java, c, cpp, … */
+  lang?: string;
+  size: number;
+  /** Dark, light, or the deck's own colours. */
+  look?: 'dark' | 'light' | 'deck';
+  lineNumbers?: boolean;
+  /** Lines lit up, the rest dimmed: "2-4,7". */
+  highlight?: string;
+  radius?: number;
+}
+
+// ---- parts of the web format (Deck.format "web"): none of them goes to PowerPoint as it is ----------------------
+
+/**
+ * A small web page of its own on the slide: HTML with its CSS and JavaScript, run in a sandboxed frame the size of
+ * the part, with no reach into the app, the deck's page or the viewer's data. It may load libraries from jsDelivr,
+ * unpkg or cdnjs, and gets the deck's colours and fonts as CSS variables (--n-bg, --n-fg, --n-head, --n-muted,
+ * --n-accent, --n-accent-fg, --n-soft, --n-c1 to --n-c6, --n-font, --n-head-font) and `window.deck`: the slide it is
+ * on, when the slideshow comes to it or leaves it, and next(), prev(), go(n).
+ */
+export interface HtmlEl extends Base {
+  type: 'html';
+  html: string;
+  /** A picture shown where it cannot run (PowerPoint, print, the deck's picture in the Library) and until it has started. */
+  poster?: string;
+  /** It takes the pointer and the keys in the slideshow (else a click on it goes on, as on the rest of the slide). */
+  interactive?: boolean;
+}
+
+/** A web page at an address, in a frame: a site, a map, a form, a CodePen (only sites that let others frame them show). */
+export interface EmbedEl extends Base {
+  type: 'embed';
+  url: string;
+  poster?: string;
+  interactive?: boolean;
+  radius?: number;
+}
+
+export interface QuizChoice {
+  text: string;
+  correct?: boolean;
+  /** Said when this one is picked. */
+  why?: string;
+}
+
+/**
+ * A question with choices, answered in the slideshow: right or wrong shows at once (after Check when several are
+ * right), with the explanation, and the deck keeps the score (a score part shows it). A quiz with no right choice is a
+ * poll: the choice picked shows, nothing is scored.
+ */
+export interface QuizEl extends Base {
+  type: 'quiz';
+  question: string;
+  choices: QuizChoice[];
+  /** Several choices are right: they are picked, then checked. */
+  multi?: boolean;
+  /** Said once it is answered, whatever was picked. */
+  explain?: string;
+  /** The question's font size; the choices a little smaller. */
+  size: number;
+  color?: string;
+  font?: string;
+  /** The choices' fill (the theme's soft colour when left out). */
+  fill?: string;
+  /** The choices in a column, or in a grid of two. */
+  layout?: 'list' | 'grid';
+}
+
+/** The deck's quiz score so far, in words of its own. */
+export interface ScoreEl extends Base {
+  type: 'score';
+  /** Its words, {right}, {total} and {percent} filled in: "You got {right} of {total}". */
+  text?: string;
+  size: number;
+  color?: string;
+  font?: string;
+  align?: Align;
+  bold?: boolean;
+}
+
+export type Shape3d = 'cube' | 'sphere' | 'torus' | 'knot' | 'cone' | 'cylinder' | 'icosahedron' | 'text';
+export const SHAPES_3D: Shape3d[] = ['cube', 'sphere', 'torus', 'knot', 'cone', 'cylinder', 'icosahedron', 'text'];
+export type Material3d = 'matte' | 'glossy' | 'metal' | 'glass' | 'wire' | 'toon';
+export const MATERIALS_3D: Material3d[] = ['matte', 'glossy', 'metal', 'glass', 'wire', 'toon'];
+export type Light3d = 'studio' | 'soft' | 'dramatic' | 'neon';
+export const LIGHTS_3D: Light3d[] = ['studio', 'soft', 'dramatic', 'neon'];
+
+/**
+ * 3D: a model (a glTF/GLB file the app keeps, "naget-asset:<sha>", or one at an https address) or a shape of its own,
+ * lit, turning by itself if wanted; viewers can turn and zoom it with the pointer in the slideshow.
+ */
+export interface Scene3dEl extends Base {
+  type: 'scene3d';
+  model?: string;
+  /** The shape drawn when there is no model. */
+  shape?: Shape3d;
+  /** The words of a 3D text shape. */
+  text?: string;
+  color?: string;
+  material?: Material3d;
+  light?: Light3d;
+  /** Turns by itself, degrees a second (0 or none: still). */
+  spin?: number;
+  /** Viewers can turn and zoom it with the pointer in the slideshow. */
+  orbit?: boolean;
+  /** Where it is seen from: degrees around it (turn) and from above (tilt). */
+  turn?: number;
+  tilt?: number;
+  /** How near: 1 fits it to the box. */
+  zoom?: number;
+  /** A colour behind it; see-through when left out. */
+  bg?: string;
+  poster?: string;
+}
+
+export type El = TextEl | ShapeEl | ImageEl | LineEl | TableEl | ChartEl | IconEl | MathEl | VideoEl | CodeEl | HtmlEl | EmbedEl | QuizEl | ScoreEl | Scene3dEl | GroupEl;
 export type ElType = El['type'];
 
-export type AnimFx = 'appear' | 'fade' | 'fly' | 'float' | 'zoom' | 'wipe' | 'bounce' | 'pulse' | 'spin' | 'grow' | 'shake';
+export type AnimFx =
+  | 'appear'
+  | 'fade'
+  | 'fly'
+  | 'float'
+  | 'zoom'
+  | 'wipe'
+  | 'bounce'
+  | 'pulse'
+  | 'spin'
+  | 'grow'
+  | 'shake'
+  // The web format's own (RICH_ANIM_FX).
+  | 'blur'
+  | 'rise'
+  | 'drop'
+  | 'flip'
+  | 'swing'
+  | 'roll'
+  | 'pop'
+  | 'typewriter'
+  | 'draw'
+  | 'count'
+  | 'glow'
+  | 'wiggle'
+  | 'heartbeat'
+  | 'jello'
+  | 'flash'
+  | 'bob'
+  | 'confetti';
 /** Which effects each kind of animation offers. */
 export const ANIM_FX: Record<Anim['type'], AnimFx[]> = {
   in: ['appear', 'fade', 'fly', 'float', 'zoom', 'wipe', 'bounce'],
@@ -342,6 +502,17 @@ export const ANIM_FX: Record<Anim['type'], AnimFx[]> = {
 };
 /** The effects that go one way or another. */
 export const ANIM_DIR: AnimFx[] = ['fly', 'float', 'wipe'];
+/**
+ * The web format's effects, beside PowerPoint's (ANIM_FX): text typed out, lines and shapes drawn, numbers counting
+ * up to theirs, confetti from a part… (PowerPoint gets the nearest of its own: toPowerPoint).
+ */
+export const RICH_ANIM_FX: Record<Anim['type'], AnimFx[]> = {
+  in: ['blur', 'rise', 'drop', 'flip', 'swing', 'roll', 'pop', 'typewriter', 'draw', 'count'],
+  em: ['glow', 'wiggle', 'heartbeat', 'jello', 'flash', 'bob', 'confetti'],
+  out: ['blur', 'drop', 'flip', 'roll', 'pop'],
+};
+export type Ease = 'smooth' | 'spring' | 'bounce' | 'linear' | 'snap';
+export const EASES: Ease[] = ['smooth', 'spring', 'bounce', 'linear', 'snap'];
 
 export interface Anim {
   id: string;
@@ -352,8 +523,19 @@ export interface Anim {
   fx: AnimFx;
   /** Where it comes from (or goes to). */
   dir?: Dir;
-  /** On a click, with the one before, or after it. */
-  on: 'click' | 'with' | 'after';
+  /**
+   * On a click, with the one before, or after it; the web format's "tap": whenever the part `trigger` is clicked in
+   * the slideshow (a button that shows an answer), outside the slide's build.
+   */
+  on: 'click' | 'with' | 'after' | 'tap';
+  /** The part a click on which runs it (on: "tap"). */
+  trigger?: string;
+  /** The web format: it goes on again and again (an emphasis that keeps going). */
+  loop?: boolean;
+  /** The web format: words come one by one, or letters. */
+  by?: 'word' | 'letter';
+  /** The web format: how it speeds up and slows down. */
+  ease?: Ease;
   /** Milliseconds. */
   dur: number;
   delay: number;
@@ -362,8 +544,11 @@ export interface Anim {
 }
 
 /** Morph: the parts this slide shares with the one before glide from where they were; the rest fade. */
-export type TransitionFx = 'none' | 'fade' | 'push' | 'wipe' | 'cover' | 'zoom' | 'split' | 'morph';
+export type TransitionFx = 'none' | 'fade' | 'push' | 'wipe' | 'cover' | 'zoom' | 'split' | 'morph' | 'cube' | 'flip' | 'dissolve' | 'circle' | 'blinds' | 'glitch';
+/** PowerPoint's transitions (and the editor's in either format). */
 export const TRANSITIONS: TransitionFx[] = ['none', 'fade', 'push', 'wipe', 'cover', 'zoom', 'split', 'morph'];
+/** The web format's own transitions: the slides turn as a cube's sides, flip over, dissolve, open in a circle, through blinds, or glitch. */
+export const RICH_TRANSITIONS: TransitionFx[] = ['cube', 'flip', 'dissolve', 'circle', 'blinds', 'glitch'];
 
 export interface Transition {
   fx: TransitionFx;
@@ -382,7 +567,14 @@ export interface Bg {
   image?: string;
   /** Darkens a picture behind words: 0 to 0.8. */
   dim?: number;
+  /** The web format: a background that moves, in the theme's colours (northern lights, drifting particles, stars, waves, a slow gradient mesh, a grid, soft lights). */
+  fx?: BgFx;
+  /** The web format: a video the app keeps ("naget-video:<sha>"), playing muted, over and over, behind the slide. */
+  video?: string;
 }
+
+export type BgFx = 'aurora' | 'particles' | 'stars' | 'waves' | 'mesh' | 'grid' | 'bokeh';
+export const BG_FX: BgFx[] = ['aurora', 'particles', 'stars', 'waves', 'mesh', 'grid', 'bokeh'];
 
 export interface Slide {
   id: string;
@@ -426,8 +618,24 @@ export interface Guides {
   y?: number[];
 }
 
+/**
+ * What a deck is made for. "web", the default (a deck without one is one): everything here, shown in the app, in
+ * the slideshow and as the deck's own web page in any browser, with the web format's parts (custom code, embedded
+ * pages, quizzes and scores, 3D), effects, transitions, moving backgrounds, text that shines and parts that answer
+ * the pointer; its PowerPoint file has them as pictures or their nearest PowerPoint effects. "pptx": only what
+ * PowerPoint has, so its file keeps everything (decks opened from a .pptx are so).
+ */
+export type DeckFormat = 'web' | 'pptx';
+
+/** The part types only the web format has. */
+export const RICH_TYPES: ElType[] = ['html', 'embed', 'quiz', 'score', 'scene3d'];
+
 export interface Deck {
   v: 1;
+  /** Left out: "web". */
+  format?: DeckFormat;
+  /** The web format: a thin bar across the top of the slideshow shows how far it has come. */
+  progress?: boolean;
   ratio: Ratio;
   theme: Theme;
   slides: Slide[];
@@ -1973,3 +2181,33 @@ export const FONT_TABLE: Record<string, { css: string; google?: boolean }> = Obj
 
 /** Whether stored page text is a deck (rather than a page's HTML). */
 export const isDeckText = (s: string) => /^\s*\{\s*"v"\s*:\s*1\s*,\s*"ratio"/.test(s);
+
+// ---- the web format and PowerPoint ------------------------------------------------------------------------------
+
+/** Whether a deck is in the web format (the default). */
+export const isWebDeck = (d: Pick<Deck, 'format'>) => d.format !== 'pptx';
+
+/** One thing PowerPoint cannot keep as it is: on which slide (from 1), which part (its id), and what, in words. */
+export interface RichFeature {
+  slide: number;
+  el?: string;
+  what: string;
+}
+
+/**
+ * What of a deck PowerPoint cannot keep as it is, slide by slide: the web format's parts, effects, transitions,
+ * moving backgrounds, shining text, frosted glass, pointer effects and taps. For the editor's warning when a deck
+ * is made PowerPoint-compatible, and the PowerPoint file's note. (Workstream C1 fills it in.)
+ */
+export function richFeatures(_d: Deck): RichFeature[] {
+  return [];
+}
+
+/**
+ * The deck with only what PowerPoint has: the web format's parts become pictures (their posters; the PowerPoint
+ * export takes a picture of each where it can), its effects and transitions the nearest of PowerPoint's, the rest
+ * left out; `format` becomes "pptx". (Workstream C1 fills it in.)
+ */
+export function toPowerPoint(d: Deck): Deck {
+  return { ...d, format: 'pptx' };
+}

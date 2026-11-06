@@ -14,7 +14,7 @@ import { findEl, setSlide } from './ops';
 type Change = (d: Deck | ((d: Deck) => Deck), key?: string) => void;
 
 /** What a part is, in a word the app's language translates. */
-const KIND: Record<El['type'], string> = { text: 'Text box', shape: 'Shape', image: 'Picture', line: 'Line', table: 'Table', chart: 'Chart', icon: 'Icon', math: 'Equation', video: 'Video', group: 'Group' };
+const KIND: Record<El['type'], string> = { text: 'Text box', shape: 'Shape', image: 'Picture', line: 'Line', table: 'Table', chart: 'Chart', icon: 'Icon', math: 'Equation', video: 'Video', code: 'Code', html: 'Custom code', embed: 'Web page', quiz: 'Quiz', score: 'Quiz score', scene3d: '3D', group: 'Group' };
 
 /** A part's own words to know it by (its name, its words, a chart's title…), as written. */
 function wordsOf(e: El): string {
