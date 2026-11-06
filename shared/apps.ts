@@ -402,7 +402,7 @@ export const APP_COLORS: Record<string, string> = {
 };
 
 /** Addresses the app's own routes use, which no app may take as its name. */
-export const RESERVED_SLUGS = new Set(['runs', 'batches', 'tools', 'draft', 'models', 'new', 't', 'templates', 'run', 'test', 'check', 'install', 'export', 'data', 'connected', 'media', 'assets']);
+export const RESERVED_SLUGS = new Set(['runs', 'batches', 'tools', 'draft', 'models', 'new', 't', 'templates', 'run', 'test', 'check', 'install', 'export', 'data', 'connected', 'media', 'assets', 'pins']);
 
 // ---- names -----------------------------------------------------------------------------------------
 
