@@ -477,6 +477,14 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
             composeInsert(text, key);
             if (layout === 'sheet') onClose();
           }}
+          onRequest={
+            saveModel
+              ? (prompt) => {
+                  composeInsert(prompt, key);
+                  if (layout === 'sheet') onClose();
+                }
+              : undefined
+          }
           live={live}
         />
       </>
@@ -504,6 +512,14 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
         // Over everything on a phone: the message box is under it.
         if (layout === 'sheet') onClose();
       }}
+      onRequest={
+        loaded?.pageId
+          ? (prompt) => {
+              composeInsert(prompt, key);
+              if (layout === 'sheet') onClose();
+            }
+          : undefined
+      }
     />
     </>
   );

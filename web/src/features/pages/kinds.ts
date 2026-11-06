@@ -53,6 +53,11 @@ export interface ModelEditorProps<M> {
   onDirty?: (dirty: boolean) => void;
   /** "Ask the agent about it" on what is picked: the words that say what it is ("In the section “Pricing”: "). */
   onAsk?: (text: string) => void;
+  /**
+   * A whole request about it, ready to send (a slide made with AI, from the gallery): Pages sends it through its Ask
+   * panel at once; beside a conversation it goes in the message box. Left out, the editor offers none.
+   */
+  onRequest?: (prompt: string) => void;
   /** What an agent asked now could be about, most specific last: told as what is in view or picked changes. */
   onScopes?: (scopes: AskScope[]) => void;
   /** Saves now, if there are changes (before an agent is asked about it): false when it did not. */
