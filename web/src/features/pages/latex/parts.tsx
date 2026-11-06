@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, CircleAlert, ScrollText, Sparkles, TriangleAlert } from 'lucide-react';
 import type { TexCompiled, TexHeading, TexIssue } from '@shared/latex';
-import { Button, cx, Dialog, inputCls } from '../../../components/ui';
+import { Button, cx, Dialog, inputCls, Throbber } from '../../../components/ui';
 
 /** Where an error or a warning is, in a few characters: "main.tex:12" (`name`: a file's name as the tabs show it). */
 export const where = (x: TexIssue, name: (file: string) => string = (f) => f) => (x.file ? `${name(x.file)}${x.line ? `:${x.line}` : ''}` : x.line ? `line ${x.line}` : '');
@@ -75,6 +75,7 @@ export function Problems({
   onLog,
   onAsk,
   name,
+  ai,
 }: {
   result: TexCompiled | null;
   open: boolean;
@@ -84,6 +85,8 @@ export function Problems({
   /** A file's name as the tabs show it. */
   name?: (file: string) => string;
   onAsk?: () => void;
+  /** AI beside each: Explain (in plain words, under it) and Fix (a change to accept); none for an older version. */
+  ai?: { help: (x: TexIssue) => { busy?: boolean; text?: string; error?: string } | undefined; explain: (x: TexIssue, warning: boolean) => void; fix?: (x: TexIssue) => void };
 }) {
   const errors = result?.errors ?? [];
   const warnings = result?.warnings ?? [];
@@ -133,24 +136,43 @@ export function Problems({
       </div>
       {open && items.length > 0 && (
         <ul className="max-h-[min(40vh,320px)] overflow-y-auto overscroll-contain border-t border-line py-1">
-          {items.map(({ x, err }, i) => (
-            <li key={i}>
-              <button type="button" onClick={() => onGo(x)} disabled={!x.file && !x.line} className="flex w-full items-start gap-2 px-3 py-1.5 text-left transition-colors hover:bg-bg-2 disabled:hover:bg-transparent">
-                {err ? <CircleAlert size={14} className="mt-0.5 shrink-0 text-err" /> : <TriangleAlert size={14} className="mt-0.5 shrink-0 text-warn" />}
-                <span className="min-w-0 flex-1 text-[12.5px] leading-snug">
-                  {where(x, name) && (
-                    <span translate="no" className="mr-1.5 font-mono text-[11.5px] text-fg-3">
-                      {where(x, name)}
+          {items.map(({ x, err }, i) => {
+            const got = ai?.help(x);
+            return (
+              <li key={i} className="group/problem">
+                <div className="flex items-start transition-colors hover:bg-bg-2">
+                  <button type="button" onClick={() => onGo(x)} disabled={!x.file && !x.line} className="flex min-w-0 flex-1 items-start gap-2 py-1.5 pl-3 text-left">
+                    {err ? <CircleAlert size={14} className="mt-0.5 shrink-0 text-err" /> : <TriangleAlert size={14} className="mt-0.5 shrink-0 text-warn" />}
+                    <span className="min-w-0 flex-1 text-[12.5px] leading-snug">
+                      {where(x, name) && (
+                        <span translate="no" className="mr-1.5 font-mono text-[11.5px] text-fg-3">
+                          {where(x, name)}
+                        </span>
+                      )}
+                      <span translate="no" className="text-fg">
+                        {x.message}
+                      </span>
+                      {x.hint && <span className="block text-fg-3">{x.hint}</span>}
+                    </span>
+                  </button>
+                  {ai && (
+                    <span className="flex shrink-0 items-center gap-0.5 py-1 pr-2 pl-1 opacity-70 group-hover/problem:opacity-100 pointer-coarse:opacity-100">
+                      <button type="button" onClick={() => ai.explain(x, !err)} className={cx('h-6 rounded-md px-1.5 text-[12px] text-fg-2 transition-colors hover:bg-bg-3 hover:text-fg', got?.text && 'text-accent')}>
+                        {got?.busy ? <Throbber className="h-3 w-3" /> : 'Explain'}
+                      </button>
+                      {err && ai.fix && (
+                        <button type="button" onClick={() => ai.fix!(x)} className="flex h-6 items-center gap-1 rounded-md px-1.5 text-[12px] text-fg-2 transition-colors hover:bg-bg-3 hover:text-fg">
+                          <Sparkles size={12} className="text-accent" />
+                          Fix
+                        </button>
+                      )}
                     </span>
                   )}
-                  <span translate="no" className="text-fg">
-                    {x.message}
-                  </span>
-                  {x.hint && <span className="block text-fg-3">{x.hint}</span>}
-                </span>
-              </button>
-            </li>
-          ))}
+                </div>
+                {(got?.text || got?.error) && <p className={cx('mx-3 mb-1.5 ml-[34px] rounded-lg px-2.5 py-1.5 text-[12.5px] leading-relaxed', got.error ? 'text-err' : 'bg-bg-2 text-fg-2')}>{got.text ?? got.error}</p>}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

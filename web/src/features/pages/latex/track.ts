@@ -20,7 +20,7 @@ export interface Tracked {
   text: string;
   /** For words taken out, as the document keeps them: the characters before them, to find the place again. */
   before?: string;
-  by: 'user' | 'agent';
+  by: 'user' | 'agent' | 'ai';
   at: number;
 }
 
@@ -30,6 +30,8 @@ export const setTracked = StateEffect.define<Tracked[]>({ map: (v, m) => mapTrac
 export const untracked = Annotation.define<boolean>();
 /** The changes set as the document has them, when the file's editor starts: nothing changed, nothing to tell. */
 export const loaded = Annotation.define<boolean>();
+/** Who made an edit, when it is not the user typing (AI in the editor); `force`: recorded even while Track changes is off. */
+export const trackAs = Annotation.define<{ by: Tracked['by']; force?: boolean }>();
 const trackOn = Facet.define<boolean, boolean>({ combine: (v) => v.some(Boolean) });
 const setActive = StateEffect.define<string | null>();
 
@@ -54,7 +56,7 @@ function mapTracked(list: Tracked[], m: ChangeDesc): Tracked[] {
  * is deleted outside words put in becomes words taken out (with those taken out already in that stretch, in their
  * order); what is typed becomes words put in, or grows the words put in it touches.
  */
-export function recordEdit(old: Tracked[], changes: ChangeSet, start: Text, by: 'user' | 'agent', at: number): Tracked[] {
+export function recordEdit(old: Tracked[], changes: ChangeSet, start: Text, by: Tracked['by'], at: number): Tracked[] {
   const absorbed = new Set<string>();
   const dels: { pos: number; text: string }[] = [];
   const grow: { id: string; from: number; to: number }[] = [];
@@ -124,7 +126,7 @@ const activeField = StateField.define<string | null>({
 function tip(c: Tracked): string {
   const s = Math.max(0, (Date.now() - c.at) / 1000);
   const when = s < 60 ? tr('just now') : s < 3600 ? tr(`${Math.floor(s / 60)} min ago`) : s < 86400 ? tr(`${Math.floor(s / 3600)} h ago`) : new Date(c.at).toLocaleDateString();
-  const what = c.kind === 'ins' ? (c.by === 'agent' ? 'Put in by an agent' : 'Put in by you') : c.by === 'agent' ? 'Taken out by an agent' : 'Taken out by you';
+  const what = c.kind === 'ins' ? (c.by === 'agent' ? 'Put in by an agent' : c.by === 'ai' ? 'Put in by AI' : 'Put in by you') : c.by === 'agent' ? 'Taken out by an agent' : c.by === 'ai' ? 'Taken out by AI' : 'Taken out by you';
   return `${tr(what)} · ${when}`;
 }
 
@@ -183,8 +185,9 @@ const theme = EditorView.baseTheme({
 /** Records the edits made while it is on; the history keeps the marks before each edit, for Undo. */
 const recorder = [
   EditorState.transactionExtender.of((t) => {
-    if (!t.docChanged || !t.startState.facet(trackOn) || t.annotation(untracked) || t.isUserEvent('undo') || t.isUserEvent('redo')) return null;
-    return { effects: setTracked.of(recordEdit(t.startState.field(trackField), t.changes, t.startState.doc, 'user', Date.now())) };
+    const as = t.annotation(trackAs);
+    if (!t.docChanged || !(t.startState.facet(trackOn) || as?.force) || t.annotation(untracked) || t.isUserEvent('undo') || t.isUserEvent('redo')) return null;
+    return { effects: setTracked.of(recordEdit(t.startState.field(trackField), t.changes, t.startState.doc, as?.by ?? 'user', Date.now())) };
   }),
   invertedEffects.of((t) => {
     const was = t.startState.field(trackField, false);
