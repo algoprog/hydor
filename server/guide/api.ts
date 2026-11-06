@@ -56,9 +56,9 @@ const RULES: Rule[] = [
   // The editors' own AI tools: agents have tools of their own for each, which save into their folder and ask the user as needed.
   [
     '*',
-    /^\/api\/(images\/(make|edit|svg|cutout|erase)|plots\/make|videos\/make(\/[^/]+)?|mediaedit\/.*)$/,
+    /^\/api\/(images\/(make|edit|svg|cutout|erase)|plots\/make|videos\/make(\/[^/]+)?|mediaedit\/.*|photos\/.*)$/,
     'refuse',
-    'Use your own tools for that: generate_image (pictures, and changes to one), make_svg (drawings), remove_background, erase_from_image, make_plot, generate_video, edit_image and edit_video. They save what they make in your folder (they also take the pictures already in a deck or document, named naget-asset:…), and you put it in with save_slides, save_doc or save_page.',
+    'Use your own tools for that: generate_image (pictures, and changes to one), make_svg (drawings), remove_background, erase_from_image, make_plot, generate_video, edit_image, edit_video and find_photos (free photos). They save what they make in your folder (they also take the pictures already in a deck or document, named naget-asset:…), and you put it in with save_slides, save_doc or save_page.',
   ],
   // Changes that change nothing, or only look something up.
   ['POST', /^\/api\/(update-check|knowledge\/search|models\/inspect|automations\/next|automations\/watch\/test|apps\/draft|apps\/check|apps\/install\/check|automations\/draft)$/, 'free'],
