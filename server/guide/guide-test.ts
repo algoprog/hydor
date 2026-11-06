@@ -27,6 +27,7 @@ import { createSpace } from '../spaces/index.ts';
 import { appApi, forgetAllowed, ruleFor } from './api.ts';
 import { findByWords, guideTopics } from './content.ts';
 import { askForm } from './form.ts';
+import { answersText, keepForm, standAll, standingForm, standingForms } from '../openForms.ts';
 import { guide, GUIDE_INSTRUCTIONS, helpInstructions } from './index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -313,7 +314,7 @@ function ctxOf(app: Awaited<ReturnType<typeof testApp>>, s: ReturnType<typeof se
   const deps = {
     app,
     db,
-    sessions: { adapterByRun: () => s.adapter, summary: (k: string) => ({ key: k, title: 'Other work' }) },
+    sessions: { adapterByRun: () => s.adapter, summary: (k: string) => ({ key: k, title: 'Other work' }), formsChanged: (k: string) => s.sent.push({ formsChanged: k }) },
     toSubscribers: (key: string, e: unknown) => s.sent.push({ key, e }),
     publicBase: () => 'https://agent.example',
   } as unknown as Deps;
@@ -486,6 +487,28 @@ test('ask_form: the fields as a card; the answers come back in their types; clos
   const no = session('default', () => ({ decision: 'decline' }));
   assert.match((await askForm({ title: 'X', fields: { a: { type: 'string' } } }, ctxOf(app, no))).text, /closed the form/);
   assert.equal((await askForm({ title: 'X', fields: {} }, ctxOf(app, no))).isError, true);
+  await app.close();
+});
+
+test('ask_form never expires: a form not answered by the end of its step stays, and its answers come as a message', async () => {
+  const app = await testApp();
+  assert.deepEqual(standingForms(db, 'claude:own'), [], 'answered and closed forms leave nothing open');
+  // Its step is over without an answer (its time is up, the turn ended): it stays, and the agent is told to end its turn.
+  const s = session('default', () => null);
+  const r = await askForm({ title: 'Your trip', fields: { from: { type: 'string', format: 'date', title: 'From' }, nights: { type: 'integer', title: 'Nights' }, pets: { type: 'boolean', title: 'Pets' } } }, ctxOf(app, s));
+  assert.equal(r.isError, undefined, r.text);
+  assert.match(r.text, /stays open in the conversation[\s\S]*next message: end your turn now/);
+  const [card] = standingForms(db, 'claude:own');
+  assert.equal(card?.title, 'Your trip');
+  assert.deepEqual(s.sent, [{ formsChanged: 'claude:own' }], 'the pages hear of it');
+  assert.equal(standingForm(db, 'claude:other', card.id), undefined, 'only in its own session');
+  // Its answers, as the user's message.
+  assert.equal(answersText(standingForm(db, 'claude:own', card.id)!, { from: '2027-03-26', nights: 4, pets: true }), 'My answers to “Your trip”:\n- From: 2027-03-26\n- Nights: 4\n- Pets: yes');
+  // One still answered through its step when the app stopped stands after the next start.
+  keepForm(db, { key: 'claude:own', card: { ...card, id: 'form-live1' }, schema: { type: 'object', properties: {}, required: [] }, live: true });
+  assert.equal(standingForms(db, 'claude:own').length, 1, 'answered through its step meanwhile, not shown twice');
+  assert.deepEqual(standAll(db), ['claude:own']);
+  assert.equal(standingForms(db, 'claude:own').length, 2);
   await app.close();
 });
 
