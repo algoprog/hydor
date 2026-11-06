@@ -48,6 +48,7 @@ import { BLOCKS, type BlockKind } from './blocks';
 import { Choice } from './fields';
 import { MEDIA_BLOCKS } from './BlockAsks';
 import type { Cmd } from './Inspector';
+import type { Where } from './place';
 
 const ICONS: Record<string, ReactNode> = {
   heading: <Heading size={17} />,
@@ -107,14 +108,7 @@ function appBlocks(app: AppInfo): { id: string; label: string; icon: ReactNode; 
   return out;
 }
 
-export type Where = 'after' | 'inside' | 'end';
-
-/** Where a block made with AI goes, in words for the agent: after the part picked, inside it, or at the end of the page. */
-export function blockPlace(where: Where, sel: EdSel | null): string {
-  if (!sel || sel.tag === 'body' || where === 'end') return 'at the end of the page';
-  const part = `the ${sel.name.toLowerCase()}${sel.snippet ? ` “${sel.snippet}”` : ''} (\`${sel.selector}\`)`;
-  return where === 'inside' && sel.holds ? `inside ${part}, at its end` : `after ${part}`;
-}
+export { blockPlace, type Where } from './place';
 
 export function AddPanel({
   anchor,
