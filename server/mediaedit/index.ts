@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { MediaItem } from '../../shared/media.ts';
-import { boxToUpright, colorOf, FILTERS, IMAGE_FORMATS, LIMITS, normalizeRecipe, toUpright, type Box, type ImageFormat, type ImageRecipe, type Mark, type Quarter, type SaveImageAnswer } from '../../shared/mediaedit.ts';
+import { ADJUSTMENTS, autoEnhance, boxToUpright, colorOf, FILTERS, histogramOf, HSL_RANGES, IMAGE_FORMATS, LIMITS, normalizeRecipe, toUpright, type Box, type ImageFormat, type ImageRecipe, type Mark, type Quarter, type SaveImageAnswer } from '../../shared/mediaedit.ts';
 import { ASSET } from '../../shared/slides.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
@@ -167,6 +167,10 @@ async function saveEdited(d: Deps, b: Record<string, unknown>): Promise<SaveImag
 // ---- edit_image --------------------------------------------------------------------------------------------------
 
 const XY = { x: { type: 'number' }, y: { type: 'number' } };
+const CURVE = { type: 'array', items: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }, maxItems: 16 };
+const LEVELS = { type: 'object', properties: { black: { type: 'number' }, white: { type: 'number' }, gamma: { type: 'number' }, outBlack: { type: 'number' }, outWhite: { type: 'number' } } };
+const SHIFT = { type: 'object', properties: { h: { type: 'number' }, s: { type: 'number' }, l: { type: 'number' } } };
+const TRIPLE = { type: 'array', items: { type: 'number' }, minItems: 3, maxItems: 3 };
 const BOX = { type: 'object', properties: { ...XY, w: { type: 'number' }, h: { type: 'number' } }, required: ['x', 'y', 'w', 'h'] };
 
 const flipOf = (v: unknown) => (v === 'horizontal' || v === 'h' || v === 'mirror' ? { flipH: true } : v === 'vertical' || v === 'v' ? { flipV: true } : v === 'both' ? { flipH: true, flipV: true } : {});
@@ -196,7 +200,15 @@ function saying(a: Record<string, any>, r: ImageRecipe, n: { words: number; arro
   if (r.flipH && r.flipV) s.push('flipped both ways');
   else if (r.flipH) s.push('flipped left to right');
   else if (r.flipV) s.push('flipped upside down');
+  if (a.auto_enhance === true) s.push('auto enhanced');
   for (const [k, v] of Object.entries(r.adjust ?? {})) s.push(`${k} ${v > 0 ? '+' : ''}${v}`);
+  if (r.levels) s.push('levels');
+  if (r.curves) s.push('curves');
+  if (r.hsl) s.push(`hue and saturation of ${Object.keys(r.hsl).join(', ')}`);
+  if (r.balance) s.push('colour balance');
+  if (r.invert) s.push('inverted');
+  if (r.posterize) s.push(`posterized to ${r.posterize} levels`);
+  if (r.threshold) s.push(`black and white at ${r.threshold}`);
   if (r.filter) s.push(`the ${FILTERS.find((f) => f.id === r.filter!.id)?.label ?? r.filter.id} filter${r.filter.strength !== undefined ? ` at ${r.filter.strength}%` : ''}`);
   if (n.hidden) s.push(`${n.hidden} area${n.hidden === 1 ? '' : 's'} hidden`);
   if (n.boxes) s.push(`${n.boxes} box${n.boxes === 1 ? '' : 'es'}`);
@@ -212,7 +224,7 @@ export function editImageTool(d: Deps): RunTool {
     name: 'edit_image',
     annotations: { readOnlyHint: false, openWorldHint: false },
     description: [
-      'Quick edits to a picture, for slides, documents and pages or for the user: crop, turn, flip, resize, adjust (brightness, contrast, saturation, warmth, exposure, sharpness, blur…), a filter, words, arrows and boxes drawn on it, and areas blurred or pixelated to hide faces, names or numbers.',
+      'Quick edits to a picture, for slides, documents and pages or for the user: crop, turn, flip, resize, adjust (brightness, contrast, saturation, warmth, exposure, clarity, dehaze, sharpness, noise reduction, grain, blur…), curves, levels, hue and saturation by colour range, colour balance, invert, posterize, threshold, auto enhance, a filter, words, arrows and boxes drawn on it, and areas blurred or pixelated to hide faces, names or numbers.',
       'It runs on this computer (ffmpeg, or the picture tools’ Python), costs nothing and takes a second or two; the picture is never sent anywhere.',
       'It gives back a new file in the session’s images/ folder (the original stays as it was), shown to the user with your reply.',
       'Every coordinate (crop, words, arrows, boxes, areas) is in the picture’s own pixels as it was given, before cropping or turning: open the picture first to see where things are.',
@@ -234,9 +246,33 @@ export function editImageTool(d: Deps): RunTool {
         },
         adjust: {
           type: 'object',
-          description: 'Each from −100 to 100 (0 leaves it), sharpness and blur from 0 to 100.',
-          properties: Object.fromEntries(['exposure', 'brightness', 'contrast', 'highlights', 'shadows', 'saturation', 'vibrance', 'warmth', 'tint', 'sharpness', 'blur', 'vignette'].map((k) => [k, { type: 'number' }])),
+          description: 'Each from −100 to 100 (0 leaves it); sharpness, blur, noise (noise reduction) and grain from 0 to 100.',
+          properties: Object.fromEntries(ADJUSTMENTS.map((x) => [x.id, { type: 'number' }])),
         },
+        auto_enhance: { type: 'boolean', description: 'Auto enhance: each colour stretched to the full range, the picture neither too dark nor too light, a little more colour (as the editor’s Auto enhance). Other adjustments go on top.' },
+        curves: {
+          type: 'object',
+          description: 'Curves, as Photoshop’s: for rgb (all) or r, g, b, points [x, y] from 0 to 255 (what comes in, what goes out), left to right; [[0,0],[64,48],[192,212],[255,255]] adds contrast, [[0,24],[255,255]] lifts the blacks.',
+          properties: { rgb: CURVE, r: CURVE, g: CURVE, b: CURVE },
+        },
+        levels: {
+          type: 'object',
+          description: 'Levels, as Photoshop’s: for rgb or r, g, b: black and white (what becomes black and white, 0 to 255), gamma (the middle grey: above 1 lightens, 0.1 to 9.99), outBlack and outWhite.',
+          properties: { rgb: LEVELS, r: LEVELS, g: LEVELS, b: LEVELS },
+        },
+        hsl: {
+          type: 'object',
+          description: `Hue, saturation and lightness by colour range, as Lightroom’s HSL: for all or ${HSL_RANGES.map((x) => x.id).join(', ')}, { h, s, l } each from −100 to 100 (greens: { s: -60 } mutes the greens; blues: { l: -30 } darkens a sky).`,
+          properties: Object.fromEntries(['all', ...HSL_RANGES.map((x) => x.id)].map((k) => [k, SHIFT])),
+        },
+        balance: {
+          type: 'object',
+          description: 'Colour balance: for shadows, midtones and highlights, [cyan to red, magenta to green, yellow to blue], each from −100 to 100; each pixel keeps its lightness.',
+          properties: { shadows: TRIPLE, midtones: TRIPLE, highlights: TRIPLE },
+        },
+        invert: { type: 'boolean', description: 'A negative: every colour turned to its opposite.' },
+        posterize: { type: 'integer', minimum: 2, maximum: 32, description: 'Only this many levels of each colour: flat bands, as a poster.' },
+        threshold: { type: 'integer', minimum: 1, maximum: 255, description: 'Pure black and white: lighter than this (0 to 255) becomes white, the rest black.' },
         filter: { type: 'string', enum: FILTERS.map((f) => f.id), description: `A look: ${FILTERS.map((f) => `${f.id} (${f.label})`).join(', ')}.` },
         filter_strength: { type: 'number', minimum: 0, maximum: 100, description: 'How strong the filter is, 0 to 100 (default 100).' },
         text: {
@@ -300,6 +336,13 @@ export function editImageTool(d: Deps): RunTool {
       try {
         if (a.crop) r.crop = upBox(boxOf(a.crop, 'crop'));
         if (a.adjust && typeof a.adjust === 'object') r.adjust = a.adjust;
+        for (const k of ['curves', 'levels', 'hsl', 'balance', 'invert', 'posterize', 'threshold'] as const) if (a[k] !== undefined && a[k] !== null) (r as Record<string, unknown>)[k] = a[k];
+        if (a.auto_enhance === true) {
+          // Measured on the picture as it is (a pixel in four is enough to tell).
+          const e = autoEnhance(histogramOf(src.px, 4));
+          if (e.levels && !r.levels) r.levels = e.levels;
+          r.adjust = { vibrance: e.vibrance, ...(e.contrast ? { contrast: e.contrast } : {}), ...(r.adjust ?? {}) };
+        }
         if (a.filter) {
           if (!FILTERS.some((f) => f.id === a.filter)) throw new Error(`filter: one of ${FILTERS.map((f) => f.id).join(', ')}.`);
           r.filter = { id: a.filter, ...(num(a.filter_strength) !== undefined ? { strength: num(a.filter_strength) } : {}) };

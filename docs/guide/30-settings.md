@@ -229,7 +229,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Making images**](/settings?s=images&find=Making%20images): Let agents make images.
 - [**For most pictures (Best)**](/settings?s=images&find=For%20most%20pictures%20%28Best%29): The model that makes most pictures, and every change to one.
 - [**For simple pictures (Quick)**](/settings?s=images&find=For%20simple%20pictures%20%28Quick%29): A cheaper, quicker model for icons, backgrounds, textures and simple pictures.
-- [**Picture tools on this computer**](/settings?s=images&find=Picture%20tools%20on%20this%20computer): Take a picture’s background out, or erase part of it, here: free, and your pictures stay on this computer.
+- [**Picture tools on this computer**](/settings?s=images&find=Picture%20tools%20on%20this%20computer): Take a picture’s background out, erase part of it, or make it larger, here: free, and your pictures stay on this computer.
 - [**Making videos**](/settings?s=images&find=Making%20videos): Let agents make videos.
 - [**Video model**](/settings?s=images&find=Video%20model): The model that makes videos.
 - [**Making audio**](/settings?s=images&find=Making%20audio): Let agents make audio.

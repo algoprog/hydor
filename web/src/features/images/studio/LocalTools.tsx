@@ -1,6 +1,6 @@
-// The picture tools on this computer: taking a picture's background out and erasing part of it here, for nothing and
-// in private, instead of through OpenRouter (plots run in the same Python). Set up once (about 145 MB); each tool's
-// model downloads the first time it is used (about 200 MB). While it sets up or a tool works, its state is asked for
+// The picture tools on this computer: taking a picture's background out, erasing part of it and making it larger here,
+// for nothing and in private, instead of through OpenRouter (plots run in the same Python). Set up once (about 145 MB);
+// each tool's model downloads the first time it is used (about 200 MB each, the upscaler's 5 MB). While it sets up or a tool works, its state is asked for
 // every second, to show what it is doing. The card offers it where a tool would use it, with the other way beside it.
 import { useCallback, useEffect, useState } from 'react';
 import { Cpu, HardDriveDownload } from 'lucide-react';
@@ -64,16 +64,18 @@ export function useLocalTools(watch = false): LocalTools {
 export function localStatus(s: LocalToolsState): string[] {
   if (s.installing) return [s.step || 'Setting up'];
   if (!s.ready) return [s.canInstall ? 'Not set up.' : (s.why ?? 'This computer cannot set them up.')];
-  const out = [
-    s.downloaded.length === 2
-      ? 'Ready, with both models downloaded.'
-      : s.downloaded[0] === 'cutout'
-        ? 'Ready, with the cutout model downloaded.'
-        : s.downloaded[0] === 'erase'
-          ? 'Ready, with the eraser’s model downloaded.'
-          : 'Ready. Each tool downloads its model the first time it is used.',
-  ];
-  if (s.loaded.length) out.push(s.loaded.length === 2 ? 'Both models are in memory now; each goes after a few idle minutes.' : 'One model is in memory now; it goes after a few idle minutes.');
+  const d = s.downloaded;
+  const out: string[] = [];
+  if (!d.length) out.push('Ready. Each tool downloads its model the first time it is used.');
+  else if (d.length >= 3) out.push('Ready, with all three models downloaded.');
+  else {
+    out.push('Ready.');
+    if (d.includes('cutout')) out.push('The background remover is downloaded.');
+    if (d.includes('erase')) out.push('The eraser is downloaded.');
+    if (d.includes('upscale')) out.push('The upscaler is downloaded.');
+  }
+  const n = s.loaded.length;
+  if (n) out.push(n >= 3 ? 'All three models are in memory now; each goes after a few idle minutes.' : n === 2 ? 'Two models are in memory now; each goes after a few idle minutes.' : 'One model is in memory now; it goes after a few idle minutes.');
   return out;
 }
 
@@ -86,7 +88,7 @@ export function LocalToolsCard({ tools, instead }: { tools: LocalTools; instead?
         <Cpu size={16} className="mt-0.5 shrink-0 text-fg-3" />
         <div className="min-w-0 flex-1 space-y-1">
           <div className="text-[13.5px] font-medium text-fg">The picture tools on this computer</div>
-          <p className="text-[12.5px] leading-snug text-fg-3">They take backgrounds out and erase parts of pictures here: for nothing, and your pictures stay on this computer.</p>
+          <p className="text-[12.5px] leading-snug text-fg-3">They take backgrounds out, erase parts of pictures and make pictures larger here: for nothing, and your pictures stay on this computer.</p>
           {!s ? <Working>Looking</Working> : s.installing ? <Working>{s.step || 'Setting up'}</Working> : !s.canInstall ? <p className="text-[12.5px] leading-snug text-fg-2">{s.why ?? 'This computer cannot set them up.'}</p> : null}
           {(tools.error || s?.error) && <p className="text-[12.5px] leading-snug text-err">{tools.error || s?.error}</p>}
         </div>

@@ -140,6 +140,13 @@ export interface EraseAsk {
   prompt?: string;
 }
 
+/** POST /api/images/upscale: the picture made 2× or 4× larger on this computer (the answer is the PNG itself). */
+export interface UpscaleAsk {
+  /** A kept picture (naget-asset:…) or a data: address. */
+  src: string;
+  scale: 2 | 4;
+}
+
 /** What a drawing (SVG) is: on Auto, simple kinds are written by a model, illustrations drawn by a vector model. */
 export type DrawingKind = 'icon' | 'illustration' | 'diagram' | 'pattern' | 'logo' | 'shape';
 
@@ -189,10 +196,10 @@ export interface LocalToolsState {
   why?: string;
   /** About how much the set-up downloads, in MB (the environment; each model downloads the first time its tool is used). */
   sizeMb: number;
-  /** The models already downloaded (cutout: about 190 MB, erase: about 210 MB). */
-  downloaded: ('cutout' | 'erase')[];
+  /** The models already downloaded (cutout: about 190 MB, erase: about 210 MB, upscale: about 5 MB). */
+  downloaded: ('cutout' | 'erase' | 'upscale')[];
   /** The models in memory now (each loads when needed and unloads after a few idle minutes). */
-  loaded: ('cutout' | 'erase')[];
+  loaded: ('cutout' | 'erase' | 'upscale')[];
 }
 
 /** GET /api/images/tiers: what the editors' AI tools would use now, for their price lines. */

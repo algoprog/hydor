@@ -176,11 +176,13 @@ agents that speak ACP and take MCP servers.
   version that answers the pointer for web decks. Free photos (find_photos) come from Openverse (Wikimedia Commons
   when it cannot answer), only those free to change and use commercially, saved with their credits. The picture
   tools on this computer (Settings → Images, video and audio → Set up: a private Python with ONNX Runtime and a
-  portable ffmpeg, about 145 MB, and two models downloaded when first used, BiRefNet-lite and LaMa) take
-  backgrounds out (remove_background) and erase parts of pictures (erase_from_image) for nothing and in private,
+  portable ffmpeg, about 145 MB, and three models downloaded when first used, BiRefNet-lite, LaMa and Real-ESRGAN)
+  take backgrounds out (remove_background), erase parts of pictures (erase_from_image) and make pictures 2× or 4×
+  larger (upscale_image, a tile at a time) for nothing and in private,
   each model loaded only while used, put away after a few idle minutes and never loaded without the memory for it;
   a poor cutout, and a large or detailed area to erase, go to an image model, and how: "ai" asks for one.
-  edit_image crops, turns, sizes, adjusts, filters, marks up and blurs pictures, edit_video trims, cuts, crops,
+  edit_image crops, turns, sizes, adjusts (curves, levels, hue and saturation by colour, colour balance, clarity,
+  dehaze, noise, grain, Auto enhance too), filters, marks up and blurs pictures, edit_video trims, cuts, crops,
   speeds up, captions and sets music to videos, and edit_audio trims, cuts, silences, shortens pauses, takes out
   filler words, cleans up (noise reduction, equalizer, compressor, loudness for podcasts or streaming), adds echo or
   reverb and mixes music or sound effects into sounds (a Library sound put back in its place or beside it), all for
@@ -516,12 +518,22 @@ agents that speak ACP and take MCP servers.
   page you came from first, a dot on a tab with changes not saved, Open editors on a phone), from a picture shown
   large (Edit), the Library's picture and video pages, Files (Edit, and Edit the picture or Edit the video in a
   file's menu), slides (Edit picture, Edit video), documents and pages (Edit picture) and an agent's video. The
-  picture editor crops (eight shapes, turns, mirror, straighten), adjusts (exposure, brightness, contrast,
-  highlights, shadows, saturation, vibrance, warmth, tint, sharpness, blur, vignette), filters (thirteen, with
-  their strength), marks up (pen, highlighter, arrows, lines, boxes, ovals, words in five fonts, blurred or
-  pixelated areas, emoji; marks stay movable) and has AI (remove the background, erase, change in words, expand to
-  a new shape), with undo, hold to compare and back to the original; it saves at a size and as PNG, JPEG or WebP,
-  over the original (the old file to the Trash) or as a copy. The video editor trims, splits and cuts parts out,
+  picture editor is laid out as Photoshop is (menus with their keys, the tool's options, a rail of tools in groups,
+  dockable panels, a status bar; on a phone, tools along the bottom and panels in a sheet) and works in layers: pixel
+  layers, words and shapes, and adjustment layers, each shown or hidden, locked, renamed, reordered by dragging, with
+  sixteen blend modes and an opacity; duplicate, layer via copy or cut, merge down, merge visible, flatten, free
+  transform (move, size, turn). Selections (rectangle, ellipse, lasso, polygon lasso, magic wand, the subject found
+  by AI, all, invert, feather, grow, shrink; marching ants) keep painting, fills, adjustments and the AI tools inside
+  them, and cut, copy and paste to new layers. Painting and retouching: brush, eraser, clone stamp, spot healing
+  brush, gradient, paint bucket, dodge and burn, eyedropper, foreground and background colours. Adjustments on
+  layers: light and colour, curves, levels, hue, saturation and lightness by colour range, colour balance, clarity,
+  dehaze, sharpness, noise reduction, blur, vignette, grain, invert, posterize, threshold, thirteen looks and Auto
+  enhance, with a live histogram. Crop (eight shapes, straighten, turns, mirror), crop to the selection, image size
+  and canvas size, rulers, guides and a grid, history with every step by name, Photoshop's keys (a list in
+  Edit → Keyboard shortcuts), pictures added as layers (a file, the Library, the clipboard, dropped). Its AI: remove
+  the background, erase, change with AI (a new layer, inside the selection), expand, make it 2× or 4× larger and
+  select the subject, free on this computer where the picture tools can do it. It saves at a size and as PNG, JPEG
+  or WebP, over the original (the old file to the Trash) or as a copy, and exports to this device. The video editor trims, splits and cuts parts out,
   changes the speed (its sound keeping its pitch), crops to a shape, turns and mirrors, puts words on it at the
   times you pick, adjusts its colour, fades it, mutes it or sets its volume, lays music from the Library under it,
   takes a frame as a picture or as its still, and saves it as MP4, WebM or a GIF, rendered with ffmpeg here (the

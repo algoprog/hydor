@@ -1,22 +1,9 @@
-// The picture editor's drawing, in the browser: a picture loaded to work on (from wherever it is: kept by the app, a
-// Library item, a file, the web), its upright frame (turned, flipped, straightened), its look and hidden areas
-// (shared/mediaedit's applyLook and hideArea, the same code the server runs), its marks drawn over it, and the file
-// made at the end, at its size and of its kind. The screen works on a smaller copy; the file is made from the whole.
-import { applyLook, arrowHead, hideArea, MARK_FONTS, textMetrics, uprightMap, type ImageFormat, type ImageRecipe, type Mark } from '@shared/mediaedit';
+// The picture editor's pieces of drawing in the browser: a picture loaded to work on (from wherever it is: kept by the
+// app, a Library item, a file, the web), made smaller only when the device cannot hold it; marks (words, shapes, lines,
+// arrows, emoji, hidden areas) measured, drawn and found under a point, as the server draws them (server/mediaedit/
+// raster.ts); and a canvas as a data: address. The layers are put together in picture/compose.ts.
+import { arrowHead, MARK_FONTS, textMetrics, type Mark } from '@shared/mediaedit';
 import { mu } from '../../lib/machine';
-
-/** A picture to work on: the whole of it, drawn once (its turn as the file says, for a photo). */
-export interface Base {
-  id: number;
-  canvas: HTMLCanvasElement;
-  w: number;
-  h: number;
-  /** Kept by the app already ("naget-asset:…"), to send to the AI tools as it is. */
-  src?: string;
-}
-
-let ids = 0;
-export const newBaseId = () => ++ids;
 
 export const canvasOf = (w: number, h: number) => {
   const c = document.createElement('canvas');
@@ -91,56 +78,6 @@ export async function loadSource(src: string): Promise<{ canvas: HTMLCanvasEleme
   }
 }
 
-/** A smaller copy of a canvas, at most `side` pixels on its longer side (itself when it is that small). */
-export function shrink(c: HTMLCanvasElement, side: number): HTMLCanvasElement {
-  const k = Math.min(1, side / Math.max(c.width, c.height));
-  if (k >= 1) return c;
-  // Halved step by step, so a much smaller copy stays smooth.
-  let cur = c;
-  while (cur.width * 0.5 > c.width * k * 1.01) {
-    const half = canvasOf(cur.width / 2, cur.height / 2);
-    const g = ctx2d(half);
-    g.imageSmoothingQuality = 'high';
-    g.drawImage(cur, 0, 0, half.width, half.height);
-    cur = half;
-  }
-  const out = canvasOf(c.width * k, c.height * k);
-  const g = ctx2d(out);
-  g.imageSmoothingQuality = 'high';
-  g.drawImage(cur, 0, 0, out.width, out.height);
-  return out;
-}
-
-/**
- * The picture in its upright frame (turned, flipped, straightened), and with `crop` only the part kept, at `k` times
- * the whole picture's size. `src` may be a smaller copy of the picture: it is drawn as the whole picture's `w` × `h`.
- */
-export function uprightCanvas(src: CanvasImageSource, w: number, h: number, r: ImageRecipe, k: number, crop: boolean): HTMLCanvasElement {
-  const u = uprightMap(r, w, h, { crop });
-  const c = canvasOf(u.w * k, u.h * k);
-  const g = ctx2d(c, true);
-  g.imageSmoothingEnabled = true;
-  g.imageSmoothingQuality = 'high';
-  const m = u.map;
-  g.setTransform(m[0] * k, m[1] * k, m[2] * k, m[3] * k, m[4] * k, m[5] * k);
-  g.drawImage(src, 0, 0, w, h);
-  return c;
-}
-
-/**
- * The look (adjustments, filter) and the hidden areas put on a canvas in place. `k`: its pixels per frame pixel;
- * `at`: the frame's point at its top left (the crop's corner), so the hidden areas land where they were drawn.
- */
-export function putLook(c: HTMLCanvasElement, r: ImageRecipe, k: number, at: { x: number; y: number }) {
-  const hidden = (r.marks ?? []).filter((m) => m.type === 'blur' || m.type === 'pixelate');
-  if (!r.adjust && !r.filter && !hidden.length) return;
-  const g = ctx2d(c, true);
-  const d = g.getImageData(0, 0, c.width, c.height);
-  applyLook(d.data, c.width, c.height, r.adjust, r.filter);
-  for (const m of hidden) if (m.type === 'blur' || m.type === 'pixelate') hideArea(d.data, c.width, c.height, { x: (m.x - at.x) * k, y: (m.y - at.y) * k, w: m.w * k, h: m.h * k }, m.type, m.strength);
-  g.putImageData(d, 0, 0);
-}
-
 // ---- marks --------------------------------------------------------------------------------------------------
 
 const EMOJI_FONT = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
@@ -192,9 +129,6 @@ export function markBox(m: Mark): { x: number; y: number; w: number; h: number }
     }
   }
 }
-
-/** The size of a mark's box (for words and emoji, which turn by their middle). */
-export const markSize = (m: Mark) => (m.type === 'text' || m.type === 'emoji' ? markBox(m) : null);
 
 const roundRect = (g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
   g.beginPath();
@@ -341,18 +275,7 @@ function segDist(px: number, py: number, ax: number, ay: number, bx: number, by:
   return Math.hypot(px - ax - t * dx, py - ay - t * dy);
 }
 
-// ---- the file -------------------------------------------------------------------------------------------------
-
-/** The picture as it is now, at its whole size, without its marks: what the AI tools are given (turned, cropped, its look and hidden areas in). */
-export function flatten(base: Base, r: ImageRecipe): HTMLCanvasElement {
-  const c = uprightCanvas(base.canvas, base.w, base.h, r, 1, true);
-  putLook(c, r, 1, { x: r.crop?.x ?? 0, y: r.crop?.y ?? 0 });
-  return c;
-}
-
-const MIME: Record<ImageFormat, string> = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp' };
-
-const toBlob = (c: HTMLCanvasElement, mime: string, quality?: number) => new Promise<Blob | null>((ok) => c.toBlob(ok, mime, quality));
+// ---- files -------------------------------------------------------------------------------------------------
 
 export const blobData = (b: Blob): Promise<string> =>
   new Promise((ok, fail) => {
@@ -361,49 +284,6 @@ export const blobData = (b: Blob): Promise<string> =>
     r.onerror = () => fail(new Error('The picture could not be read'));
     r.readAsDataURL(b);
   });
-
-/**
- * The file the recipe makes of the whole picture: turned and cropped, its look, its hidden areas and marks, at its size
- * (made smaller in halves, so it stays smooth), of its kind (a JPEG on white where the picture is see-through). A browser
- * that cannot make the kind asked (WebP, in some) makes a PNG, and says so (`made`).
- */
-export async function makeFile(base: Base, r: ImageRecipe, format: ImageFormat, quality = 90): Promise<{ blob: Blob; w: number; h: number; mime: string; made: ImageFormat }> {
-  let c = flatten(base, r);
-  if (r.marks?.length) {
-    const g = ctx2d(c);
-    g.setTransform(1, 0, 0, 1, -(r.crop?.x ?? 0), -(r.crop?.y ?? 0));
-    drawMarks(g, r.marks);
-    g.setTransform(1, 0, 0, 1, 0, 0);
-  }
-  if (r.resize && (r.resize.w !== c.width || r.resize.h !== c.height)) {
-    let cur = c;
-    while (cur.width * 0.5 >= r.resize.w && cur.height * 0.5 >= r.resize.h) {
-      const half = canvasOf(cur.width / 2, cur.height / 2);
-      const g = ctx2d(half);
-      g.imageSmoothingQuality = 'high';
-      g.drawImage(cur, 0, 0, half.width, half.height);
-      cur = half;
-    }
-    const out = canvasOf(r.resize.w, r.resize.h);
-    const g = ctx2d(out);
-    g.imageSmoothingQuality = 'high';
-    g.drawImage(cur, 0, 0, out.width, out.height);
-    c = out;
-  }
-  if (format === 'jpeg') {
-    const white = canvasOf(c.width, c.height);
-    const g = ctx2d(white);
-    g.fillStyle = '#ffffff';
-    g.fillRect(0, 0, white.width, white.height);
-    g.drawImage(c, 0, 0);
-    c = white;
-  }
-  const mime = MIME[format];
-  const blob = await toBlob(c, mime, format === 'png' ? undefined : Math.max(0.01, Math.min(1, quality / 100)));
-  if (!blob) throw new Error('The picture could not be made: it may be too large for this browser');
-  const made = blob.type === mime ? format : blob.type === 'image/jpeg' ? 'jpeg' : blob.type === 'image/webp' ? 'webp' : 'png';
-  return { blob, w: c.width, h: c.height, mime: blob.type || mime, made };
-}
 
 /** Whether a canvas has see-through parts (looked at small, which is enough to tell). */
 export function seeThrough(c: HTMLCanvasElement): boolean {
