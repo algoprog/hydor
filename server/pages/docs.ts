@@ -66,7 +66,7 @@ import { rels } from '../documents/ooxml.ts';
 import { all, att, isEl, kid, kids, parseXml, patt, path as xpath, type El } from '../documents/xml.ts';
 import { Zip } from '../documents/zip.ts';
 import { assetDataUrl, getAsset, pictureType, putAsset, takeIn } from './assets.ts';
-import { authorOf, docxFile, MONO_DOC, type DocBlock as WordBlock, type DocCell, type DocLook, type DocRev, type DocRun as WordRun, type DocSpace } from './docx.ts';
+import { authorOf, docxFile, editorStylesXml, MONO_DOC, type DocBlock as WordBlock, type DocCell, type DocLook, type DocRev, type DocRun as WordRun, type DocSpace } from './docx.ts';
 import { katexStyle, texToHtml } from './math.ts';
 import { DOC_EDITS_HELP } from '../../shared/doc-edits.ts';
 import { texOfOmml } from './omml.ts';
@@ -1863,6 +1863,7 @@ function wordDoc(buf: Buffer): Doc {
     notes,
     ...(sources.length ? { sources } : {}),
     ...(mark ? { mark } : {}),
+    styles: wordStyles(zip, sroot, font, ctx.size),
   });
   // Each comment's quote: the words it is on, as they read.
   if (!doc.comments?.length) return doc;
@@ -1875,6 +1876,75 @@ function wordDoc(buf: Buffer): Doc {
     else if (b.type === 'table') for (const row of b.rows) for (const c of row) take(c.runs);
   }
   return { ...doc, comments: doc.comments.map((c) => (quotes.get(c.id)?.trim() ? { ...c, quote: quotes.get(c.id)!.replace(/\s+/g, ' ').trim().slice(0, 500) } : c)) };
+}
+
+/** What a Word style says of a paragraph's look: its size (pt), colour, font, weight, slant, alignment and spacing. */
+function styleFacts(s: El | undefined) {
+  const rPr = kid(s, 'rPr');
+  const pPr = kid(s, 'pPr');
+  const sp = kid(pPr, 'spacing');
+  const sz = Number(att(kid(rPr, 'sz'), 'val'));
+  const flag = (el: El | undefined) => (el ? !['0', 'false', 'off'].includes(att(el, 'val') ?? '') : undefined);
+  const line = att(sp, 'line');
+  const rule = att(sp, 'lineRule');
+  return {
+    size: sz > 0 ? sz / 2 : undefined,
+    color: att(kid(rPr, 'color'), 'val')?.toLowerCase(),
+    font: att(kid(rPr, 'rFonts'), 'ascii'),
+    b: flag(kid(rPr, 'b')),
+    i: flag(kid(rPr, 'i')),
+    jc: att(kid(pPr, 'jc'), 'val'),
+    before: att(sp, 'before') !== undefined ? Number(att(sp, 'before')) / 20 : undefined,
+    after: att(sp, 'after') !== undefined ? Number(att(sp, 'after')) / 20 : undefined,
+    line: line && (rule === 'atLeast' || rule === 'exact') ? Number(line) / 20 : undefined,
+  };
+}
+
+/**
+ * A document's own paragraph styles, read back from a Word file this app wrote: each style's look where it is not the
+ * one the app writes for a document of the same font and size (a style changed in Word comes in too).
+ */
+function wordStyles(zip: Zip, sroot: El | undefined, font: string, size: number): Doc['styles'] | undefined {
+  if (!sroot || !/<Application>Hydor<\/Application>/.test(zip.text('docProps/app.xml') ?? '')) return undefined;
+  const base = parseXml(editorStylesXml({ font, size, editor: {} }, false)).root;
+  const byId = (root: El, id: string) => kids(root, 'style').find((x) => att(x, 'styleId') === id);
+  const ids: [ParaStyle, string][] = [
+    ['title', 'Title'],
+    ['subtitle', 'Subtitle'],
+    ['h1', 'Heading1'],
+    ['h2', 'Heading2'],
+    ['h3', 'Heading3'],
+    ['h4', 'Heading4'],
+    ['quote', 'Quote'],
+    ['code', 'Code'],
+  ];
+  const out: Record<string, Record<string, unknown>> = {};
+  const near = (a: number | undefined, b: number | undefined) => a === undefined || b === undefined || Math.abs(a - b) < 0.6;
+  for (const [k, id] of ids) {
+    const f = styleFacts(byId(sroot, id));
+    const d = styleFacts(byId(base, id));
+    const x: Record<string, unknown> = {};
+    if (f.size && !near(f.size, d.size)) x.size = f.size;
+    if (f.color && f.color !== d.color) x.color = `#${f.color}`;
+    if (f.font && f.font !== d.font) x.font = f.font;
+    if ((f.b ?? false) !== (d.b ?? false)) x.b = !!f.b;
+    if ((f.i ?? false) !== (d.i ?? false)) x.i = !!f.i;
+    if (f.jc && f.jc !== d.jc) x.align = f.jc === 'both' ? 'justify' : f.jc;
+    if (!near(f.before, d.before)) x.sb = f.before;
+    if (!near(f.after, d.after)) x.sa = f.after;
+    if (f.line && !near(f.line, d.line)) x.lh = Math.round((f.line / (1.15 * (f.size ?? d.size ?? size))) * 100) / 100;
+    if (Object.keys(x).length) out[k] = x;
+  }
+  // Normal text: its colour (the file's default words' colour), weight, slant and alignment.
+  const n = styleFacts(byId(sroot, 'Normal'));
+  const dc = att(kid(kid(all(sroot, 'rPrDefault')[0], 'rPr'), 'color'), 'val')?.toLowerCase();
+  const normal: Record<string, unknown> = {};
+  if (dc && dc !== '1f2328') normal.color = `#${dc}`;
+  if (n.b) normal.b = true;
+  if (n.i) normal.i = true;
+  if (n.jc) normal.align = n.jc === 'both' ? 'justify' : n.jc;
+  if (Object.keys(normal).length) out.normal = normal;
+  return Object.keys(out).length ? (out as Doc['styles']) : undefined;
 }
 
 /** A Word file's watermark (in its default header): its words, or its picture inside the document. */

@@ -1690,7 +1690,7 @@ function spacingVs(sp: DocSpace | undefined, style: Space | undefined): string {
 }
 
 /** A document's styles as the editor draws them: its font, sizes, colours, each style's spacing and lines in points, and the boxes of quotes and code. */
-function editorStylesXml(look: DocLook, cjk: boolean): string {
+export function editorStylesXml(look: DocLook, cjk: boolean): string {
   const S = look.size ?? 11;
   const F = look.font ?? 'Arial';
   const half = (pt: number) => Math.max(2, Math.round(pt * 2));
