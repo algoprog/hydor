@@ -527,6 +527,13 @@ setWriteForTests({
   ok(/left out a picture[\s\S]*also had a picture that is not the slide’s/.test(problem(good('cards').replace(`{"id":"pic","type":"image","src":"${PIC}"`, `{"type":"image","src":"${PIC2}"`))), 'one in its picture’s place: said so');
   ok(/left out the slide’s html/.test(problem(good('cards').replace(/\{"id":"code1"[^}]*\},/, ''))), 'its custom code left out');
   ok(problem('{"name":"x","els":[]}') === 'it had no parts.', 'nothing at all');
+  // A picture or a live part by another name ("picture", "iframe"): held to the slide all the same.
+  const alias = holdIdea(
+    deck,
+    1,
+    JSON.parse(good('cards').replace('"els":[', `"els":[{"type":"picture","src":"https://example.com/made-up.png","x":0,"y":0,"w":100,"h":100},{"type":"iframe","url":"https://example.com","x":0,"y":0,"w":100,"h":100},`)),
+  );
+  ok('slide' in alias && !everyEl(alias.slide.els).some((e) => (e.type === 'image' && e.src.includes('made-up')) || e.type === 'embed'), 'a made-up picture or web page by another name is left out');
   // Never JSON, twice: none hold, said in words.
   script = () => 'I would rather not.';
   const r3 = await req('/api/write/design-ideas', { deck, slide: 1, count: 2 });
