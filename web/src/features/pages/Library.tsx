@@ -15,7 +15,7 @@
 // Addresses: /library?project=<id>|none, &folder=<id>, &kind=<kind> (image, video and audio each, media pictures and
 // videos both: the old Media tab's ?tab=media too), ?tab=published; ?new=page|slides|doc|sheet|tex|notebook opens New
 // with that kind, ?new=folder New → Folder and ?new=import New → Import a folder.
-import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode, type RefObject } from 'react';
 import { useSearch } from 'wouter';
 import {
   AppWindow,
@@ -52,7 +52,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { TURN_INTO, turnAsk } from '@shared/content-asks';
+import { TURN_INTO } from '@shared/content-asks';
 import type { MediaItem } from '@shared/media';
 import type { LibFolder, PageInfo, SiteInfo } from '@shared/pages';
 import type { SpaceView } from '@shared/spaces';
@@ -65,7 +65,8 @@ import { Button, cx, Empty, IconButton, MenuBack, MenuItem, MenuLabel, MenuSep, 
 import { PageHeader } from '../layout/PageHeader';
 import { downloadMedia, recaption, SoundTile, startSessionWithMedia, Still } from '../media/parts';
 import { useMedia } from '../media/state';
-import { SpaceMark, startInSpace } from '../spaces/parts';
+import { useAskRun } from '../guide/ask';
+import { SpaceMark } from '../spaces/parts';
 import { SpaceMenu } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
 import { preloadEditors } from './editors';
@@ -74,6 +75,8 @@ import { EXPORTS } from './exports';
 import { NewPageDialog, PublishDialog, RenameDialog, SiteRow, Thumb, type NewKind } from './parts';
 import { CAN_DRAG, dragThing, FolderCrumbs, folderChain, FolderMenu, FolderNameDialog, FolderTile, ImportFolderDialog, moveToFolder, placeFolders, placeTopName } from './folders';
 import { usePagesStore } from './state';
+import { turnRequest } from './types/requests';
+import { startMaking } from './types/start';
 import { addToLibrary, dragsFiles, droppedFiles, dropMoves, pickFiles } from './uploads';
 import { DropHint } from './UploadTray';
 
@@ -166,13 +169,31 @@ const TURN: Record<'slides' | 'doc' | 'page', { label: string; icon: ReactNode }
   page: { label: 'A page', icon: <AppWindow size={14} /> },
 };
 
-/** Turn it into: the start page, with the request to make the other kind from it in its box, in its project (what is made lands there, in its folder). */
-function turnInto(p: PageInfo, to: 'slides' | 'doc' | 'page', folders: LibFolder[] | null, spaces: SpaceView[] | null) {
-  const names = p.folder ? folderChain(folders, p.folder).map((f) => f.name) : [];
-  const prompt = turnAsk({ from: p.kind ?? 'page', to, id: p.id, title: p.title, folder: names.join('/') || undefined });
-  const sp = p.space ? spaces?.find((s) => s.id === p.space) : undefined;
-  if (sp) startInSpace(sp, prompt);
-  else go(`/?prompt=${enc(prompt)}`);
+/**
+ * Turn it into, where the menu was (its first row goes back to it): a session starts at once to make the other kind
+ * from it, its message "Turn “Bakery plan” into slides", its agent told the rest; in its project, what is made landing
+ * there, in its folder. Mounted while open, so the cards do not each ask which agent would run it.
+ */
+function TurnMenu({ p, anchor, onClose, onBack }: { p: PageInfo; anchor: RefObject<HTMLButtonElement | null>; onClose: () => void; onBack: () => void }) {
+  const run = useAskRun();
+  const folders = usePagesStore((s) => s.folders);
+  const spaces = useSpaces();
+  const turn = (to: 'slides' | 'doc' | 'page') => {
+    onClose();
+    const names = p.folder ? folderChain(folders, p.folder).map((f) => f.name) : [];
+    const r = turnRequest({ from: p.kind ?? 'page', to, id: p.id, title: p.title, folder: names.join('/') || undefined });
+    startMaking(run, { prompt: r.prompt, make: r.make, space: p.space ? spaces?.find((s) => s.id === p.space) : null });
+  };
+  return (
+    <Popover anchor={anchor} open onClose={onClose} align="end" width={240}>
+      <MenuBack onClick={onBack}>Turn it into</MenuBack>
+      {TURN_INTO[p.kind ?? 'page'].map((to) => (
+        <MenuItem key={to} icon={TURN[to].icon} onClick={() => turn(to)}>
+          {TURN[to].label}
+        </MenuItem>
+      ))}
+    </Popover>
+  );
 }
 
 /** Moves an item to a space (or out of one), saying where it went. */
@@ -359,17 +380,7 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
           Delete
         </MenuItem>
       </Popover>
-      {/* Turn it into: the kinds an agent can make from it, where the menu was (its first row goes back to it). */}
-      {p && (
-        <Popover anchor={anchor} open={turning} onClose={() => setTurning(false)} align="end" width={240}>
-          <MenuBack onClick={() => (setTurning(false), setMenu(true))}>Turn it into</MenuBack>
-          {TURN_INTO[p.kind ?? 'page'].map((to) => (
-            <MenuItem key={to} icon={TURN[to].icon} onClick={() => (setTurning(false), turnInto(p, to, folders, spaces))}>
-              {TURN[to].label}
-            </MenuItem>
-          ))}
-        </Popover>
-      )}
+      {p && turning && <TurnMenu p={p} anchor={anchor} onClose={() => setTurning(false)} onBack={() => (setTurning(false), setMenu(true))} />}
       <SpaceMenu anchor={anchor} open={moving} onClose={() => setMoving(false)} title="Move it to" value={it.space ?? null} onPick={(s) => s !== (it.space ?? null) && void moveTo(it, s, spaces)} />
       <FolderMenu
         anchor={anchor}

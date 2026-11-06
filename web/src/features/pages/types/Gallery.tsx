@@ -6,16 +6,15 @@
 // size and place as they are filtered; on a phone it is a sheet from the bottom. Nothing fades or moves in.
 import { useMemo, useRef, useState } from 'react';
 import { Search, Sparkles, X } from 'lucide-react';
-import { composeAsk } from '@shared/content-asks';
 import { CONTENT_GROUPS, findTypes, typesOf, type ContentKind, type ContentType } from '@shared/content-types';
-import { enc } from '../../../lib/api';
-import { go } from '../../../lib/nav';
 import { Button, cx, Dialog, inputCls, useIsMobile } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
-import { startInSpace } from '../../spaces/parts';
+import { useAskRun } from '../../guide/ask';
 import { useSpaces } from '../../spaces/state';
 import { appLanguage, closeTypes, type TypesOpts } from './index';
 import { TYPE_ICONS } from './icons';
+import { madeRequest } from './requests';
+import { startMaking } from './start';
 
 const TITLE: Record<ContentKind, string> = {
   slide: 'Add a slide made with AI',
@@ -53,6 +52,7 @@ function TypeCard({ t, on, note, onClick }: { t: ContentType; on: boolean; note?
 export default function Gallery({ o }: { o: TypesOpts & { n: number } }) {
   const mobile = useIsMobile();
   const spaces = useSpaces();
+  const run = useAskRun();
   const [find, setFind] = useState('');
   const [group, setGroup] = useState('all');
   const [picked, setPicked] = useState<ContentType | null>(null);
@@ -68,18 +68,16 @@ export default function Gallery({ o }: { o: TypesOpts & { n: number } }) {
   const free = !!q && !shown.length && !picker;
 
   const send = (t: ContentType | null, w: string) => {
-    const prompt = composeAsk(t, w, { kind: o.kind, after: o.after, at: o.at, webDeck: o.webDeck, lang: appLanguage() });
-    if (!prompt) return;
+    const r = madeRequest(t, w, { kind: o.kind, after: o.after, at: o.at, webDeck: o.webDeck, lang: appLanguage() });
+    if (!r) return;
     closeTypes();
-    if (o.onDone) return o.onDone(prompt);
+    if (o.onDone) return o.onDone(r);
     if (o.pageId) {
       const page = o.pageId;
-      return void import('../AskPage').then((m) => m.askNow(prompt, { page }));
+      return void import('../AskPage').then((m) => m.askNow(r.prompt, { page, make: r.make }));
     }
-    // Something new: the start page, with the request in its box, in the project picked.
-    const sp = o.space ? spaces?.find((s) => s.id === o.space) : undefined;
-    if (sp) startInSpace(sp, prompt);
-    else go(`/?prompt=${enc(prompt)}`);
+    // Something new: its session starts at once, in the project picked.
+    startMaking(run, { prompt: r.prompt, make: r.make, space: o.space ? spaces?.find((s) => s.id === o.space) : null });
   };
   const pick = (t: ContentType) => {
     if (picker) {

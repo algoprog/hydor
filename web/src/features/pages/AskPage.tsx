@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { ArrowUp, ArrowUpRight, Eye, SquarePen, Sparkles, X } from 'lucide-react';
+import type { MakeExtra } from '@shared/content-asks';
 import type { PageInfo } from '@shared/pages';
 import { post } from '../../lib/api';
 import { composeInsert } from '../../lib/featureEvents';
@@ -36,8 +37,8 @@ interface AskState {
   draft: string;
   /** The scope picked, by its id. */
   scope: string;
-  /** A request to send at once, without the box (askNow), for the panel of its page. */
-  now: { page: string; prompt: string; scope?: string; n: number } | null;
+  /** A request to send at once, without the box (askNow), for the panel of its page, with what it asks to make. */
+  now: { page: string; prompt: string; scope?: string; make?: MakeExtra; n: number } | null;
 }
 
 export const usePageAsk = create<AskState>(() => ({ open: false, folded: false, byPage: {}, draft: '', scope: '', now: null }));
@@ -50,10 +51,12 @@ export const closePageAsk = () => usePageAsk.setState({ open: false });
 
 /**
  * Sends a request about the page open at once, without the box: the panel opens with it on its way, as a new
- * conversation (one open goes on in Sessions). `scope`: one of the panel's scopes, whose words start the request.
+ * conversation (one open goes on in Sessions). `scope`: one of the panel's scopes, whose words start the request;
+ * `make`: what it asks to make from the gallery (a slide made with AI), which the agent hears in full (`extra.make`)
+ * while the message stays short.
  */
-export function askNow(prompt: string, o: { page: string; scope?: string }) {
-  usePageAsk.setState({ open: true, folded: false, now: { page: o.page, prompt, scope: o.scope, n: ++askedNow } });
+export function askNow(prompt: string, o: { page: string; scope?: string; make?: MakeExtra }) {
+  usePageAsk.setState({ open: true, folded: false, now: { page: o.page, prompt, scope: o.scope, make: o.make, n: ++askedNow } });
 }
 
 /** How many requests askNow was given, and the last one sent: each is sent once, however often the panel shows. */
@@ -65,7 +68,7 @@ function useStartAsk(page: PageInfo, beforeSend: () => Promise<boolean>) {
   const mobile = useIsMobile();
   const run = useAskRun();
   const cwd = useSessions((x) => (page.sessionKey ? x.byKey[page.sessionKey]?.cwd : undefined));
-  return async (prompt: string, back: string) => {
+  return async (prompt: string, back: string, make?: MakeExtra) => {
     try {
       if (!(await beforeSend())) return;
       usePageAsk.setState((s) => ({ byPage: { ...s.byPage, [page.id]: { key: null, pending: prompt } }, draft: '' }));
@@ -76,7 +79,7 @@ function useStartAsk(page: PageInfo, beforeSend: () => Promise<boolean>) {
         model: run.model ?? undefined,
         account: run.account,
         cwd,
-        extra: { page: page.id },
+        extra: { page: page.id, ...(make ? { make } : {}) },
       });
       usePageAsk.setState((s) => ({ byPage: { ...s.byPage, [page.id]: { key: r.key } }, folded: mobile }));
     } catch (e) {
@@ -234,7 +237,7 @@ export function PageAskPanel({ page, scopes, beforeSend, className }: { page: Pa
     usePageAsk.setState({ now: null });
     if (now.page !== page.id) return;
     const lead = now.scope ? (scopes.find((s) => s.id === now.scope)?.lead ?? '') : '';
-    void start(`${lead}${now.prompt}`, now.prompt);
+    void start(`${lead}${now.prompt}`, now.prompt, now.make);
   }, [now?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className={cx('flex h-full min-h-0 flex-col bg-bg', className)}>

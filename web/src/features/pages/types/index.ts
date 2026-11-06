@@ -1,14 +1,16 @@
 // The gallery of kinds an agent makes (shared/content-types.ts): a slide for the deck open, a section for the document
 // open, a part for the page open, or a new deck, document, page or spreadsheet. openTypes opens it from anywhere (the
 // editors' "made with AI" items, New in the Library); it shows over everything, mounted in <body> on its own the first
-// time, and its code and the catalog load then, so no page carries them before. What its Make it asks goes through the
-// Ask panel of the page open (askNow), so the person watches it being made; to `onDone` when the caller sends it
-// itself; or, for something new, to the start page with the request in its box, in the project picked, as New's
-// "Or describe it" does. `onPick` makes it a picker only: the type picked goes back, and nothing is asked here.
+// time, and its code and the catalog load then, so no page carries them before. What its Make it asks (a short line,
+// and what to make, told to the agent in full: requests.ts) goes to `onDone`, the editor's host sending it on (Pages,
+// through the Ask panel at once, so the person watches it being made); through the Ask panel of the page `pageId`; or,
+// for something new, into a session started at once in the project picked. `onPick` makes it a picker only: the type
+// picked goes back, and nothing is asked here.
 import { createElement, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { create } from 'zustand';
 import type { ContentKind, ContentType } from '@shared/content-types';
+import type { MadeRequest } from './requests';
 import { LANGS } from '@shared/i18n';
 import { currentLang } from '../../../i18n/locale';
 
@@ -24,8 +26,8 @@ export interface TypesOpts {
   webDeck?: boolean;
   /** Something new: the project it goes in (the start page opens in it). */
   space?: string | null;
-  /** Gets the request rather than it being sent from here. */
-  onDone?(prompt: string): void;
+  /** Gets the request (its short line, what to make, the whole of it) rather than it being sent from here. */
+  onDone?(r: MadeRequest): void;
   /** Picks a kind only: no words are asked for, and nothing is sent. */
   onPick?(t: ContentType): void;
 }

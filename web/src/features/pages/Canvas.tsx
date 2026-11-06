@@ -479,8 +479,9 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
           }}
           onRequest={
             saveModel
-              ? (prompt) => {
-                  composeInsert(prompt, key);
+              ? (r) => {
+                  // A conversation goes on here: its message box takes the whole request, to send as it is or changed.
+                  composeInsert(r.full, key);
                   if (layout === 'sheet') onClose();
                 }
               : undefined
@@ -514,8 +515,8 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
       }}
       onRequest={
         loaded?.pageId
-          ? (prompt) => {
-              composeInsert(prompt, key);
+          ? (r) => {
+              composeInsert(r.full, key);
               if (layout === 'sheet') onClose();
             }
           : undefined
