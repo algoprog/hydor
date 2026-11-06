@@ -6,18 +6,28 @@
 // with the settings the model takes (shape, resolution, quality, length, sound, voice…) and what it costs
 // (settings.ts), unless the agent gave them all, the user answered it earlier in the session, or nobody is there
 // to answer (a scheduled task, an app's run). What they make is saved in the session's folder (images/, videos/,
-// audio/) and shown with the reply, where the user can keep it in the Library (server/media).
-//   GET/PUT /api/images/settings   on or off, and the model (ImagesState)
+// audio/) and shown with the reply, where the user can keep it in the Library (server/media). Pictures come in two
+// tiers (tiers.ts): Quick for simple ones, Best for the rest; make_svg makes drawings (svg.ts), cleaned (svg-clean.ts).
+// The editors' AI tools make and change pictures and drawings without a form (their dialogs show the price first),
+// and keep them as the editors' uploads are (make.ts).
+//   GET/PUT /api/images/settings   on or off, the image model (Best) and the Quick model (ImagesState)
 //   GET     /api/images/models     OpenRouter's image models, by name, newest or cheapest first
+//   GET     /api/images/tiers      what the editors' AI tools would use now, and about what it costs (TiersInfo)
+//   POST    /api/images/make       new pictures from words, kept (MakeImageAsk → MakeImageAnswer)
+//   POST    /api/images/edit       a picture changed as words say, with a mask only there (EditImageAsk → PictureAnswer)
+//   POST    /api/images/svg        a drawing (SVG) from words, cleaned and kept (SvgAsk → SvgAnswer)
 //   GET/PUT /api/videos/settings   on or off, and the model (VideosState)
 //   GET     /api/videos/models     OpenRouter's video models, by name, newest or cheapest first
 //   GET/PUT /api/audio/settings    on or off, the music model and the voice and sound model (AudioState)
 //   GET     /api/audio/models      OpenRouter's models that make music or speak, by name, newest or cheapest first
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ImageModel, ImagesState } from '../../shared/images.ts';
+import type { FastifyReply } from 'fastify';
+import type { ImageModel, ImagesState, SvgAnswer } from '../../shared/images.ts';
+import { drawingTierFor, tierFor } from '../../shared/image-tier.ts';
 import type { AudioModel, AudioState, VideoModel, VideosState } from '../../shared/media.ts';
-import { OPENROUTER_PICKS, type OpenRouterRole } from '../../shared/model-picks.ts';
+import { OPENROUTER_PICKS, QUICK_PICKS, type OpenRouterRole } from '../../shared/model-picks.ts';
+import { ASSET } from '../../shared/slides.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Feature, RunCtx, RunTool } from '../features/types.ts';
 import { inSession } from '../documents/index.ts';
@@ -26,6 +36,7 @@ import { probe } from '../media/frames.ts';
 import { loadConfig } from '../models/config.ts';
 import { OPENROUTER_URL } from '../models/openrouter.ts';
 import { appWords } from '../language/index.ts';
+import { putAsset } from '../pages/assets.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import {
   audioCost,
@@ -47,13 +58,16 @@ import {
   type MadeAudio,
   type Turn,
 } from './audio.ts';
-import { generate, imageModels, PREFERRED, readReferences, saveImages, type Reference } from './openrouter.ts';
+import { localTools } from './hooks.ts';
+import { aspectsOf, colours, editPicture, makePictures, nearestAspect, readEditAsk, readMakeAsk, worded } from './make.ts';
+import { generate, imageModels, readReferences, saveImages, type Made, type Reference } from './openrouter.ts';
 import {
   audioAnswers,
   audioDefaults,
   audioForm,
   audioMismatch,
   audioPriceLine,
+  cutoutLine,
   FORM,
   insteadLine,
   imageAnswers,
@@ -77,6 +91,8 @@ import {
   type ImageChoice,
   type VideoChoice,
 } from './settings.ts';
+import { drawSvg, DRAWING_KINDS, readSvgAsk, vectorModel, type Drawing } from './svg.ts';
+import { imageList, imagesSettings, saveImagesSettings, tierId, tierModel, tiersInfo } from './tiers.ts';
 import { DONE, follow, followedJob, pollVideo, PREFERRED_VIDEO, submitVideo, videoModels, type Followed, type SavedVideo } from './video.ts';
 
 interface Settings {
@@ -84,7 +100,8 @@ interface Settings {
   model: string;
 }
 
-function settings(db: DB, what: 'images' | 'videos' = 'images'): Settings {
+/** The videos setting (the images one, with its Quick model, is tiers.ts'). */
+function settings(db: DB, what: 'videos'): Settings {
   try {
     const s = JSON.parse(kvGet(db, what) ?? '{}');
     return { enabled: s.enabled !== false, model: typeof s.model === 'string' ? s.model : '' };
@@ -98,13 +115,6 @@ const MODEL_ID = /^[\w.~:/-]{1,120}$/;
 const models = () => imageModels(OPENROUTER_URL);
 const vmodels = () => videoModels(OPENROUTER_URL);
 
-/** The model in use: the one asked for, the one picked, or the first of the app's choices OpenRouter still lists. */
-async function using(s: Settings, asked?: string): Promise<{ id: string; info?: ImageModel }> {
-  const list = await models().catch(() => [] as ImageModel[]);
-  const id = asked || s.model || PREFERRED.find((p) => list.some((m) => m.id === p)) || PREFERRED[0];
-  return { id, info: list.find((m) => m.id === id) };
-}
-
 async function usingVideo(s: Settings, asked?: string): Promise<{ id: string; info?: VideoModel }> {
   const list = await vmodels().catch(() => [] as VideoModel[]);
   const id = asked || s.model || PREFERRED_VIDEO.find((p) => list.some((m) => m.id === p)) || PREFERRED_VIDEO[0];
@@ -112,10 +122,20 @@ async function usingVideo(s: Settings, asked?: string): Promise<{ id: string; in
 }
 
 async function state(db: DB): Promise<ImagesState> {
-  const s = settings(db);
-  const u = await using(s);
-  // The Quick model (workstream A1 makes it a setting of its own).
-  return { enabled: s.enabled, model: s.model, using: u.id, usingInfo: u.info, quick: '', usingQuick: u.id, usingQuickInfo: u.info, keySet: !!loadConfig().openrouter.apiKey };
+  const s = imagesSettings(db);
+  const list = await imageList();
+  const best = tierId(s, 'best', list);
+  const quick = tierId(s, 'quick', list);
+  return {
+    enabled: s.enabled,
+    model: s.model,
+    using: best,
+    usingInfo: list.find((m) => m.id === best),
+    quick: s.quick,
+    usingQuick: quick,
+    usingQuickInfo: list.find((m) => m.id === quick),
+    keySet: !!loadConfig().openrouter.apiKey,
+  };
 }
 
 async function videoState(db: DB): Promise<VideosState> {
@@ -159,7 +179,9 @@ function imageTool(db: DB): RunTool {
     // It writes files and asks a service outside, at a cost.
     annotations: { readOnlyHint: false, openWorldHint: true },
     description: [
-      'Make an image from a description, or change pictures the user has, with an image model through OpenRouter (the one picked in Settings → Images, video and audio, or the one model names).',
+      'Make an image from a description, or change pictures the user has, with an image model through OpenRouter: the Quick model for simple pictures, the image model (Best) for the rest, as picked in Settings → Images, video and audio, or the one model names.',
+      'detail picks between them: simple (Quick: cheaper and faster) for backgrounds, textures, patterns, icons and simple pictures; complex (Best) for scenes, photos, people, words inside the picture, diagrams and every change to a picture. Left out, it is decided from the prompt.',
+      'For drawings that must stay sharp at any size (icons, logos, simple diagrams, shapes in a deck’s colours), make_svg is often better.',
       'Before it makes anything, the user sees a short form in the conversation with the settings that model takes (shape, resolution, quality, how many) and what it costs, filled in with what you give: they change what they like and confirm, or close it, and then nothing is made.',
       'So give only the settings the user asked for and leave the rest to the form; it comes once per model in a session (later images use the same settings unless you give others; ask: true shows it again).',
       'Set ask: false only when the user said to choose for them or to go ahead without asking.',
@@ -176,7 +198,8 @@ function imageTool(db: DB): RunTool {
         resolution: { type: 'string', description: 'If the user said: 1K, 2K or 4K (sharper, slower and dearer), where the model offers a choice.' },
         quality: { type: 'string', enum: ['auto', 'low', 'medium', 'high'], description: 'If the user said, for models with a quality setting.' },
         count: { type: 'integer', minimum: 1, maximum: 4, description: 'How many images, if the user said (models that make several).' },
-        transparent: { type: 'boolean', description: 'A transparent background, for a logo or an icon (models that can).' },
+        transparent: { type: 'boolean', description: 'A transparent background, for a logo or an icon: a model that cannot make one hands it to one that can, or its background is taken out on this computer when the picture tools are set up.' },
+        detail: { type: 'string', enum: ['simple', 'complex'], description: 'simple: the Quick model (backgrounds, textures, icons, simple pictures); complex: the Best one (scenes, photos, words in a picture, diagrams, edits). Left out: decided from the prompt.' },
         model: { type: 'string', description: 'OpenRouter’s id of another image model, only when the user asks for it ("black-forest-labs/flux.2-pro").' },
         name: { type: 'string', description: 'A short file name, without extension (default: from the prompt).' },
         ask: { type: 'boolean', description: 'true: show the settings form even if answered before; false: make it without the form.' },
@@ -191,17 +214,26 @@ function imageTool(db: DB): RunTool {
       const asked = str(a.model);
       if (asked && !MODEL_ID.test(asked)) throw new Error('model: an OpenRouter id, like black-forest-labs/flux.2-pro.');
       const refs = await readReferences((Array.isArray(a.images) ? a.images : []).map((p: unknown) => inSession(ctx.cwd, String(p))).slice(0, 8));
-      const s = settings(db);
-      const { id, info } = await using(s, asked);
+      const detail = a.detail === 'simple' ? 'quick' : a.detail === 'complex' ? 'best' : 'auto';
+      const tier = tierFor(detail, { prompt, refs: refs.length, edit: refs.length > 0 });
+      const clear = bool(a.transparent) === true;
+      const pick = await tierModel(db, tier, { model: asked, transparent: clear, refs: refs.length });
+      const { id, info } = pick;
       if (asked && !info && (await models().catch(() => [])).length) throw new Error(`OpenRouter has no image model ${asked}. The user can see the ones there are in Settings → Images, video and audio.`);
       if (refs.length && info && !info.edits) throw new Error(`${info.label} does not take pictures to work from. Describe the change in words, or the user can pick a model that edits pictures in Settings → Images, video and audio.`);
       if (info?.maxRefs && refs.length > info.maxRefs) throw new Error(`${info.label} takes at most ${info.maxRefs} pictures to work from.`);
+      if (pick.opaque)
+        return {
+          isError: true,
+          text: `${info?.label ?? id} does not make transparent backgrounds, and no model that does is at hand: leave transparent out, or the user can pick a model that does in Settings → Images, video and audio, or set up the picture tools there to take backgrounds out.`,
+        };
       const given: ImageChoice = {
         ...(str(a.aspect_ratio) ? { aspect: str(a.aspect_ratio) } : {}),
         ...(str(a.resolution ?? a.size) ? { size: str(a.resolution ?? a.size)!.toUpperCase() } : {}),
         ...(str(a.quality) ? { quality: str(a.quality) } : {}),
         ...(int(a.count) ? { count: Math.max(1, Math.min(4, int(a.count)!)) } : {}),
-        ...(bool(a.transparent) !== undefined ? { background: bool(a.transparent) ? 'transparent' : undefined } : {}),
+        // Taken out here afterwards (cutout): the model makes it on a plain background.
+        ...(bool(a.transparent) !== undefined ? { background: clear && !pick.cutout ? 'transparent' : undefined } : {}),
       };
       const memo = pickedKey(ctx.key, 'image', id);
       let v: ImageChoice = { ...imageDefaults(info), ...pickedFor<ImageChoice>(memo), ...given };
@@ -212,7 +244,12 @@ function imageTool(db: DB): RunTool {
       if ((ask === true || (ask === undefined && left && !pickedFor(memo))) && Object.keys(fields).length && attended(ctx)) {
         const r = await fillForm(ctx, {
           title: tr(refs.length ? FORM.imageChanged : FORM.image),
-          message: [priceLine('image', info, id, tr), promptQuote(prompt)].join('\n\n'),
+          message: [
+            priceLine('image', info, id, tr),
+            ...(pick.instead && info ? [insteadLine(pick.instead, info.label, tr)] : []),
+            ...(pick.cutout ? [cutoutLine(tr)] : []),
+            promptQuote(prompt),
+          ].join('\n\n'),
           schema: { properties: fields },
           submit: tr(FORM.submit),
         });
@@ -228,16 +265,129 @@ function imageTool(db: DB): RunTool {
         if (wrong) return { isError: true, text: wrong };
       }
       v = imageFits(info, v);
-      const r = await generate({ base: OPENROUTER_URL, key, model: id, prompt, refs, aspect: v.aspect, size: v.size, quality: v.quality, background: v.background, count: v.count, textOut: info?.textOut });
+      const r = await generate({
+        base: OPENROUTER_URL,
+        key,
+        model: id,
+        prompt: pick.cutout ? worded({ prompt, background: 'plain' }) : prompt,
+        refs,
+        aspect: v.aspect,
+        size: v.size,
+        quality: v.quality,
+        background: v.background,
+        count: v.count,
+        textOut: info?.textOut,
+        signal: ctx.signal,
+      });
       if (!r.images.length) return { isError: true, text: `${id} answered without an image${r.text ? `: “${r.text.slice(0, 600)}”` : '.'} Try describing it differently.` };
-      const saved = await saveImages(r.images, path.join(ctx.cwd, 'images'), String(a.name ?? '').trim() || prompt);
+      let images: Made[] = r.images;
+      if (pick.cutout) {
+        const tools = localTools();
+        if (!tools?.ready()) return { isError: true, text: 'The picture tools on this computer stopped before the background could be taken out: nothing was saved. Try again.' };
+        images = [];
+        for (const im of r.images) images.push({ mime: 'image/png', data: await tools.cutout(im.data, ctx.signal) });
+      }
+      const saved = await saveImages(images, path.join(ctx.cwd, 'images'), String(a.name ?? '').trim() || prompt);
       const lines = saved.map((f) => `${f.path} (${f.w && f.h ? `${f.w}×${f.h}, ` : ''}${size(f.bytes)})`);
-      const how = [v.aspect, v.size, v.quality && v.quality !== 'auto' ? `${v.quality} quality` : '', v.background === 'transparent' ? 'transparent background' : ''].filter(Boolean).join(', ');
+      const how = [v.aspect, v.size, v.quality && v.quality !== 'auto' ? `${v.quality} quality` : '', v.background === 'transparent' || pick.cutout ? 'transparent background' : ''].filter(Boolean).join(', ');
       return [
         `Made ${saved.length === 1 ? 'an image' : `${saved.length} images`} with ${id}${r.cost ? ` (${money(r.cost)})` : ''}${how ? `, ${how}` : ''}:`,
         ...lines,
         'The user sees it with your reply, a tap away from full size, download and keeping it in their Library: don’t repeat it or its path. To look at it yourself, open the file.',
+        ...(pick.instead && info ? [`${pick.instead} cannot make this, so ${info.label} made it.`] : []),
+        ...(pick.cutout ? ['Its background was taken out on this computer.'] : []),
+        ...(!asked && tier === 'quick' ? ['It was made with the Quick model, for simple pictures: for more detail, call again with detail: "complex".'] : []),
         ...(r.text ? [`The model said: ${r.text.slice(0, 600)}`] : []),
+      ].join('\n');
+    },
+  };
+}
+
+// ---- make_svg ------------------------------------------------------------------------------------------
+
+const NO_KEY_DRAWING =
+  'Detailed drawings are drawn by a vector model through OpenRouter, and no OpenRouter key is set. Call again with detail: "simple" (written as SVG, no key needed), or tell the user to add a key in Settings → Models → OpenRouter.';
+
+function svgTool(db: DB): RunTool {
+  return {
+    name: 'make_svg',
+    // It writes a file, and a detailed drawing asks a service outside, at a cost.
+    annotations: { readOnlyHint: false, openWorldHint: true },
+    description: [
+      'Make a drawing as SVG (shapes, not pixels): an icon, a logo, a diagram, a pattern, a shape or a flat illustration, saved as a cleaned .svg in the session’s folder (images/).',
+      'Prefer it to generate_image for what must stay sharp at any size or match given colours: icons and logos, simple diagrams and arrows, patterns and shapes for slides, anything in a deck’s or a document’s own colours (give them in colors). Photos, scenes and detailed pictures are generate_image’s.',
+      'detail: simple has it written as SVG by Claude (or the helper model picked in Settings → Models), with no picture model to pay, in under a minute; complex has it drawn by Recraft’s vector model through OpenRouter, about $0.08 a drawing, and then the user first sees a short form with the price, once per model in a session (ask: true shows it again; ask: false only when the user said to go ahead).',
+      'Left out, illustrations are complex and the rest simple. Scripts, links and anything loaded from elsewhere are taken out of every drawing.',
+      'It is shown to the user with your reply: do not repeat it or its path. To put it in a page, a deck or a document, give its path as the picture.',
+    ].join(' '),
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'What to draw: the subject, its parts and how they are laid out, and any words in it, word for word.' },
+        kind: { type: 'string', enum: DRAWING_KINDS, description: 'icon, logo, diagram, pattern (a tile that repeats seamlessly), shape, or illustration.' },
+        colors: { type: 'array', items: { type: 'string' }, maxItems: 12, description: 'Colours to draw with, as #hex (a deck’s or a document’s theme): only these, with white, black or none.' },
+        detail: { type: 'string', enum: ['simple', 'complex'], description: 'simple: written as SVG (no OpenRouter cost); complex: drawn by Recraft’s vector model (about $0.08). Left out: illustrations are complex, the rest simple.' },
+        aspect_ratio: { type: 'string', description: 'Its shape: 1:1 (the default), 16:9, 4:3, 3:4, 9:16.' },
+        name: { type: 'string', description: 'A short file name, without extension (default: from the prompt).' },
+        ask: { type: 'boolean', description: 'For complex drawings: true shows the price form even if answered before; false makes it without the form.' },
+      },
+      required: ['prompt'],
+    },
+    async run(a, ctx) {
+      const prompt = String(a.prompt ?? '').trim();
+      if (!prompt) throw new Error('Say what to draw in prompt.');
+      if (a.kind !== undefined && !DRAWING_KINDS.includes(a.kind)) throw new Error(`kind: one of ${DRAWING_KINDS.join(', ')}.`);
+      let colors: string[] | undefined;
+      try {
+        colors = colours(a.colors);
+      } catch (e) {
+        throw new Error(`${(e as Error).message}.`);
+      }
+      const tier = drawingTierFor(a.detail === 'simple' ? 'quick' : a.detail === 'complex' ? 'best' : 'auto', { prompt, kind: a.kind });
+      let aspect = str(a.aspect_ratio);
+      let model: string | undefined;
+      if (tier === 'best') {
+        if (!loadConfig().openrouter.apiKey) return { isError: true, text: NO_KEY_DRAWING };
+        const { id, info } = await vectorModel();
+        model = id;
+        // The user says yes to the price once per model in a session, as for pictures; the shape is the one setting asked.
+        const memo = pickedKey(ctx.key, 'image', id);
+        const shape = aspect ? (nearestAspect(aspect, aspectsOf(info)) ?? aspect) : undefined;
+        let v: ImageChoice = { aspect: imageDefaults(info).aspect, ...pickedFor<ImageChoice>(memo), ...(shape ? { aspect: shape } : {}) };
+        const tr = appWords(db);
+        const fields = imageForm(info, v, tr);
+        for (const f of Object.keys(fields)) if (f !== 'aspect') delete fields[f];
+        const ask = askOf(a);
+        if ((ask === true || (ask === undefined && !pickedFor(memo))) && Object.keys(fields).length && attended(ctx)) {
+          const r = await fillForm(ctx, {
+            title: tr(FORM.drawing),
+            message: [priceLine('drawing', info, id, tr), promptQuote(prompt)].join('\n\n'),
+            schema: { properties: fields },
+            submit: tr(FORM.submit),
+          });
+          if (!r.ok && r.why === 'declined') return CLOSED('drawing');
+          if (!r.ok && r.why === 'timeout') return { isError: true, text: NO_ANSWER('drawing') };
+          if (!r.ok && r.why === 'withdrawn') return { isError: true, text: WITHDRAWN('drawing') };
+          if (r.ok) {
+            v = imageAnswers(r.content, v);
+            rememberPicked(memo, { aspect: v.aspect });
+          }
+        }
+        aspect = v.aspect;
+      }
+      let d: Drawing;
+      try {
+        d = await drawSvg(db, { prompt, ...(a.kind ? { kind: a.kind } : {}), ...(colors ? { colors } : {}), ...(aspect ? { aspect } : {}), tier }, { model, signal: ctx.signal });
+      } catch (e) {
+        if (ctx.signal?.aborted) return { isError: true, text: 'Stopped before the drawing was made.' };
+        return { isError: true, text: `The drawing was not made: ${String((e as Error).message ?? e).replace(/\.?$/, '.')}` };
+      }
+      const [f] = await saveImages([{ mime: 'image/svg+xml', data: Buffer.from(d.svg, 'utf8') }], path.join(ctx.cwd, 'images'), str(a.name) ?? prompt);
+      return [
+        `Made a drawing with ${d.model}${d.cost ? ` (${money(d.cost)})` : ''}${aspect && aspect !== '1:1' ? `, ${aspect}` : ''}:`,
+        `${f.path} (${d.w}×${d.h}, ${size(f.bytes)})`,
+        'The user sees it with your reply, a tap away from full size and download: don’t repeat it or its path. It is SVG, cleaned of scripts, links and anything loaded from elsewhere; to put it in a page, a deck or a document, give this path as the picture.',
+        ...(d.tier === 'quick' ? ['It was written as SVG: for a richer illustration, call again with detail: "complex".'] : []),
       ].join('\n');
     },
   };
@@ -723,16 +873,31 @@ const searchWords = (q: unknown) =>
     .split(/\s+/)
     .filter(Boolean);
 
+/** The model list's order with Quick's suggestions first, as listed (shared/model-picks.ts), then the newest. */
+function quickFirst(x: ImageModel, y: ImageModel): number {
+  const ids = QUICK_PICKS.map((p) => p.id);
+  const rank = (m: ImageModel) => (ids.includes(m.id) ? ids.indexOf(m.id) : ids.length);
+  return rank(x) - rank(y) || (y.created ?? 0) - (x.created ?? 0);
+}
+
+/** Aborted when the person asking goes before the answer (the editor's dialog closed): a drawing being written stops. */
+function goneSignal(reply: FastifyReply): AbortSignal {
+  const gone = new AbortController();
+  reply.raw.on('close', () => reply.raw.writableFinished || gone.abort());
+  return gone.signal;
+}
+
 export const images: Feature = {
   id: 'images',
   routes({ app, db }) {
     app.get('/api/images/settings', async () => state(db));
     app.put('/api/images/settings', async (req) => {
-      const b = (req.body ?? {}) as { enabled?: unknown; model?: unknown };
-      const s = settings(db);
+      const b = (req.body ?? {}) as { enabled?: unknown; model?: unknown; quick?: unknown };
+      const s = imagesSettings(db);
       if (typeof b.enabled === 'boolean') s.enabled = b.enabled;
       if (typeof b.model === 'string' && (b.model === '' || MODEL_ID.test(b.model))) s.model = b.model;
-      kvSet(db, 'images', JSON.stringify(s));
+      if (typeof b.quick === 'string' && (b.quick === '' || MODEL_ID.test(b.quick))) s.quick = b.quick;
+      saveImagesSettings(db, s);
       return state(db);
     });
     app.get('/api/images/models', async (req) => {
@@ -740,8 +905,18 @@ export const images: Feature = {
       const words = searchWords(q.q);
       const list = (await models()).filter((m) => words.every((w) => `${m.id} ${m.label} ${m.org ?? ''}`.toLowerCase().includes(w)));
       const newer = (x: ImageModel, y: ImageModel) => (y.created ?? 0) - (x.created ?? 0);
-      list.sort(q.sort === 'price' ? (x, y) => (x.perImage ?? Infinity) - (y.perImage ?? Infinity) || newer(x, y) : q.sort === 'picks' ? suggestedFirst<ImageModel>('image') : newer);
+      // sort=picks&for=quick: the Quick model's suggestions first.
+      const picks = q.for === 'quick' ? quickFirst : suggestedFirst<ImageModel>('image');
+      list.sort(q.sort === 'price' ? (x, y) => (x.perImage ?? Infinity) - (y.perImage ?? Infinity) || newer(x, y) : q.sort === 'picks' ? picks : newer);
       return { models: list.slice(0, 100) };
+    });
+    app.get('/api/images/tiers', async () => tiersInfo(db));
+    app.post('/api/images/make', { bodyLimit: 64 * 1024 * 1024 }, async (req, reply) => makePictures(db, readMakeAsk(req.body), goneSignal(reply)));
+    app.post('/api/images/edit', async (req, reply) => editPicture(db, readEditAsk(req.body), goneSignal(reply)));
+    app.post('/api/images/svg', async (req, reply) => {
+      const d = await drawSvg(db, readSvgAsk(req.body), { signal: goneSignal(reply) });
+      const answer: SvgAnswer = { src: ASSET + putAsset(db, Buffer.from(d.svg, 'utf8')), w: d.w, h: d.h, mime: 'image/svg+xml', svg: d.svg, model: d.model, tier: d.tier, ...(d.cost ? { cost: d.cost } : {}) };
+      return answer;
     });
     app.get('/api/videos/settings', async () => videoState(db));
     app.put('/api/videos/settings', async (req) => {
@@ -785,7 +960,7 @@ export const images: Feature = {
     });
   },
   tools: ({ deps }) => [
-    ...(settings(deps.db).enabled ? [imageTool(deps.db)] : []),
+    ...(imagesSettings(deps.db).enabled ? [imageTool(deps.db), svgTool(deps.db)] : []),
     ...(settings(deps.db, 'videos').enabled ? [videoTool(deps.db)] : []),
     ...(audioSettings(deps.db).enabled ? [audioTool(deps.db)] : []),
   ],

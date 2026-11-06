@@ -9,7 +9,7 @@ import type { EdPage } from '../frame';
 import { CharPicker } from '../common/CharPicker';
 import { Choice, ColorField, Group, hexOf, NumField, Row, Select, splitNum, Typed } from './fields';
 import { FONTS, fontOf, fontOptions } from './fonts';
-import { CoverChoices } from './Inserts';
+import { aiCover, CoverChoices } from './Inserts';
 import { MEDIA_NOTE, WEIGHTS, type Cmd, type Media } from './Inspector';
 
 /** The page kit's colours (and corners), in plain words. */
@@ -132,7 +132,13 @@ export function PagePanel({ page, palette, cmd, media, onError }: { page: EdPage
         </Row>
         <Row label="Cover" top hint="A band of colour or a picture across the page's top">
           <div className="min-w-0 flex-1 pt-1">
-            <CoverChoices current={page.cover?.kind === 'gradient' ? page.cover.value : undefined} onPick={(c) => cmd('cover', c)} onRemove={page.cover ? () => cmd('cover', null) : undefined} onError={onError} />
+            <CoverChoices
+              current={page.cover?.kind === 'gradient' ? page.cover.value : undefined}
+              onPick={(c) => cmd('cover', c)}
+              onRemove={page.cover ? () => cmd('cover', null) : undefined}
+              onAi={() => void aiCover().then((src) => src && cmd('cover', { src }), onError)}
+              onError={onError}
+            />
           </div>
         </Row>
       </Group>

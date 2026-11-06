@@ -3,6 +3,7 @@
 // picture, a table's size, zoom, line spacing, a table's cells…) open in the menu's place. What a menu does is the
 // engine's, or the editor's (a dialog, a panel): this file only says what is where.
 import {
+  ChartScatter,
   CheckCheck,
   GitCompareArrows,
   FilePenLine,
@@ -35,6 +36,7 @@ import {
   Omega,
   PaintRoller,
   PanelTop,
+  PenTool,
   Pilcrow,
   Printer,
   Redo2,
@@ -52,6 +54,7 @@ import {
   Trash2,
   Type,
   Undo2,
+  WandSparkles,
   WholeWord,
   ZoomIn,
 } from 'lucide-react';
@@ -102,6 +105,11 @@ export interface DocMenuCtx {
   comment: () => void;
   picture: () => void;
   pictureUrl: () => void;
+  /** Insert → Picture → A picture made with AI, and A drawing (SVG). */
+  aiPicture: () => void;
+  drawing: () => void;
+  /** Insert → Plot: from the table the caret is in, if it is in one. */
+  plot: () => void;
   /** Insert → Signature: a saved one, or one drawn there. */
   signature: () => void;
   link: () => void;
@@ -196,10 +204,13 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
       items: [
         { label: 'A picture from this device', icon: <ImageIcon size={15} />, run: c.picture },
         { label: 'A picture from the web', icon: <Link2 size={15} />, run: c.pictureUrl },
+        { label: 'A picture made with AI', icon: <WandSparkles size={15} />, also: 'generate ai image illustration icon background photo', disabled: c.readOnly, run: c.aiPicture },
+        { label: 'A drawing (SVG)', icon: <PenTool size={15} />, also: 'svg vector icon logo diagram', disabled: c.readOnly, run: c.drawing },
       ],
     },
     { label: 'Signature', icon: <Signature size={15} />, also: 'sign signing initials autograph handwriting', disabled: c.readOnly, run: c.signature },
     { label: 'Table', icon: <Table2 size={15} />, also: 'grid', items: tableSizes },
+    { label: 'Plot', icon: <ChartScatter size={15} />, also: 'chart graph data matplotlib histogram scatter', disabled: c.readOnly, run: c.plot },
     { label: 'Link', icon: <Link2 size={15} />, keys: 'Ctrl+K', run: c.link },
     { label: 'Comment', icon: <MessageSquarePlus size={15} />, keys: 'Ctrl+Alt+M', disabled: !st.text.trim(), run: c.comment },
     '-',
@@ -275,6 +286,7 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
           ],
         },
         { label: 'Header row', checked: !!t.head, run: () => e.table('head') },
+        { label: 'Make a plot of this table', icon: <ChartScatter size={15} />, also: 'chart graph', disabled: c.readOnly, run: c.plot },
         '-',
         { label: 'Delete the row', run: () => e.table('delRow') },
         { label: 'Delete the column', run: () => e.table('delCol') },
