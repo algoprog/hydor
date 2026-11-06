@@ -50,7 +50,7 @@ import {
 } from 'lucide-react';
 import { DESIGN_FONTS, FONT_CATS, FONT_PAIRS, firstFont, fontByName, fontStack } from '@shared/design-fonts';
 import { FRAME_IDS, FRAME_NAMES, SHAPE_IDS, SHAPE_NAMES, frameCss, shapePath } from '@shared/design-shapes';
-import { hexColour } from '@shared/design';
+import { hexColour, PALETTES } from '@shared/design';
 import type { BrandKit } from '@shared/design-brand';
 import type { RewriteAnswer } from '@shared/write';
 import { post } from '../../../lib/api';
@@ -66,6 +66,7 @@ import { pictureData } from '../studio/Inspector';
 import { ColorField, Group as Fold, NumField, Row } from '../studio/fields';
 import { applyBrand, loadFontPreviews } from './AddPanel';
 import { MediaPick } from './dialogs';
+import { coloursOf } from './colours';
 import { deviceVideo, type DCmd, type DEl, type DSel } from './DesignEdit';
 import { EFFECTS, effectCss, filterCss, iconHtml, LOOKS, NO_ADJUST, qrHtml, readFilter, shapeHtml, type Effect, type Look } from './elements';
 
@@ -305,6 +306,9 @@ export function DesignInspector({
             </div>
           </Fold>
         )}
+        <Fold id="d-palette" title="New colours">
+          <NewColours cmd={cmd} />
+        </Fold>
         <Fold id="d-fonts" title="Fonts" start>
           <p className="pb-1.5 text-[11.5px] leading-snug text-fg-3">{tr('A pair for the whole design: the first for its big words, the second for the rest.')}</p>
           <div className="grid grid-cols-2 gap-1.5">
@@ -937,3 +941,62 @@ function QrFields({ text, dark, light, palette, onChange }: { text: string; dark
   );
 }
 
+
+/** A whole new palette for the design: a ready one, one read from a picture, or one suggested from a mood. */
+function NewColours({ cmd }: { cmd: DCmd }) {
+  const [mood, setMood] = useState('');
+  const [busy, setBusy] = useState(false);
+  const file = useRef<HTMLInputElement>(null);
+  const apply = (colours: string[]) => {
+    if (colours.length) cmd('brandColours', { colours });
+  };
+  const suggest = async () => {
+    if (!mood.trim()) return;
+    setBusy(true);
+    try {
+      apply((await post<{ colours: string[] }>('/api/write/palette', { mood })).colours);
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="space-y-2">
+      <p className="text-[11.5px] leading-snug text-fg-3">{tr('Its colourful colours take a palette’s; its whites, greys and blacks stay. Undo takes it back.')}</p>
+      <div className="grid grid-cols-4 gap-1.5">
+        {PALETTES.map((p) => (
+          <button key={p.id} type="button" title={tr(p.label)} onClick={() => apply(p.colours)} className="flex h-7 overflow-hidden rounded-md border border-line">
+            {p.colours.map((c) => (
+              <span key={c} className="h-full flex-1" style={{ background: c }} />
+            ))}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <input value={mood} onChange={(e) => setMood(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void suggest()} placeholder={tr('A mood: warm and earthy…')} className={cx(fieldCls, 'min-w-0 flex-1')} />
+        <Button size="sm" variant="secondary" icon={busy ? <Throbber size={13} /> : <Sparkles size={14} />} disabled={!mood.trim() || busy} onClick={() => void suggest()} title="By the helper model (Settings → Models)">
+          Suggest
+        </Button>
+      </div>
+      <Button size="sm" variant="ghost" icon={<ImageUp size={14} />} onClick={() => file.current?.click()} title="Read here: the picture goes nowhere">
+        From a picture
+      </Button>
+      <input
+        ref={file}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = '';
+          if (f)
+            void pictureData(f)
+              .then((src) => coloursOf(src, 5))
+              .then(apply)
+              .catch(toastError);
+        }}
+      />
+    </div>
+  );
+}
