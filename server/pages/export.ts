@@ -1,6 +1,6 @@
 // Pages as files to keep or send: a page of HTML as a PDF (Chromium prints it as it shows, with its data) or a Word
 // document (docx.ts reads what it shows into paragraphs, lists, tables and pictures); the other kinds (kinds.ts)
-// as their own files, made from the model itself (a deck as PowerPoint, a document as Word or Markdown, a
+// as their own files, made from the model itself (a deck as PowerPoint, a document as Word, OpenDocument, Markdown, EPUB or text, a
 // spreadsheet as Excel or CSV, a notebook as its .ipynb or a Python script), and as a PDF printed from their own page; any of them as a web page that works on
 // its own; a deck's slides as pictures (PNG). PDFs, pictures, and a page's Word document, need the browser pictures
 // are taken with (Settings → Browser).
@@ -38,10 +38,13 @@ export type { ExportFormat };
 export const EXPORT_TYPES: Record<ExportFormat, string> = {
   pdf: 'application/pdf',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  odt: 'application/vnd.oasis.opendocument.text',
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   csv: 'text/csv; charset=utf-8',
   md: 'text/markdown; charset=utf-8',
+  epub: 'application/epub+zip',
+  txt: 'text/plain; charset=utf-8',
   tex: 'application/x-tex; charset=utf-8',
   zip: 'application/zip',
   html: 'text/html; charset=utf-8',
@@ -182,6 +185,8 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
       const size = k.still(src.text);
       const data = await withTab({ html, width: size.width, height: size.height, settleMs: 400, blockPrivate: true }, async (tab) => {
         await tab.evaluate('document.fonts.ready.then(() => new Promise((ok) => setTimeout(() => ok(true), 120)))');
+        // A document laid out page by page in the page itself (its footnotes, its columns): once it is.
+        await tab.evaluate("new Promise((ok) => { const t = Date.now(); const w = () => (!document.querySelector('script[data-paginate]') || document.documentElement.dataset.paged || Date.now() - t > 15000 ? ok(true) : setTimeout(w, 50)); w(); })").catch(() => {});
         return printPdf(tab.s, { paperWidth: paper.w, paperHeight: paper.h, margin: 0, cssPageSize: true });
       });
       return out(data, 'pdf');
@@ -203,9 +208,11 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
     // Office files want their pictures ready (PNG, JPEG or GIF), and slides how much their text was fitted.
     const pics = new Map<string, Picture | null>();
     let scales: ExportHelp['scales'];
-    if (o.format === 'pptx' || o.format === 'docx') {
+    if (o.format === 'pptx' || o.format === 'docx' || o.format === 'odt') {
       for (const s of new Set(k.sources(text))) pics.set(s, await pictureFor(db, s));
     }
+    // An e-book takes every kind of picture as it is: only those on the web are fetched.
+    if (o.format === 'epub') for (const s of new Set(k.sources(text))) if (/^https?:/i.test(s)) pics.set(s, await pictureFor(db, s));
     let renders: ExportHelp['renders'];
     // A document's fonts go inside its Word file (the faces it uses, from Google once).
     const wordFontsOf = o.format === 'docx' && src.kind === 'doc' ? await wordFonts(docFaces(readDoc(src.text))) : undefined;

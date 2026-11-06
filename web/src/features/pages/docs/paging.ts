@@ -8,7 +8,7 @@
 // over the words (PaperSheets.tsx). Laid out again after a pause in typing, from the page of the first block that
 // changed; meanwhile a block the editor draws anew keeps what the last layout gave it (a paragraph cut is cut again at
 // once, for its own lines). The rules are the PDF's (server/pages/docs.ts printCss), so the pages come out close to it.
-import { PAPERS, type Block, type Doc, type TableBlock } from '@shared/docs';
+import { COLUMN_GAP, columnMm, paperOf, type Block, type Doc, type TableBlock } from '@shared/docs';
 import type { Pos } from './ops';
 
 /** The gap between two sheets, in the paper's own pixels. */
@@ -25,6 +25,16 @@ export interface Layout {
   margin: number;
   /** Changes with each layout (for what is drawn over the page to measure again). */
   n: number;
+  /** The footnotes at each page's foot (by page), and the room they take there (pixels, the line over them too). */
+  notes: Map<number, { ids: string[]; h: number }>;
+}
+
+/** What the layout needs of a document's footnotes: which a block brings to its page (their first marks are in it), and how tall each is drawn. */
+export interface NoteRoom {
+  ids: (b: Block) => string[];
+  height: (id: string) => number;
+  /** The line over a page's footnotes and the room around it. */
+  sep: number;
 }
 
 /** What the engine gives the layout: its page, its model, its blocks' elements and its places. */
@@ -43,6 +53,9 @@ interface Plan {
   push?: number;
   /** Where it is cut, top to bottom. */
   cuts?: Cut[];
+  /** In columns: how far it is moved, across and up, from where the flow has it to its column on its page. */
+  dx?: number;
+  dy?: number;
 }
 
 /** Whether a kind of block may be cut between its lines: always, only when it is longer than a page, or never. */
@@ -89,7 +102,7 @@ export class Paging {
 
   constructor(
     private eng: PagedEngine,
-    private o: { zoom: () => number; onLayout: (l: Layout | null) => void },
+    private o: { zoom: () => number; onLayout: (l: Layout | null) => void; notes?: () => NoteRoom | null },
   ) {
     // A picture's height is known once it has loaded: the pages from there on move.
     eng.root.addEventListener('load', this.imgs, true);
@@ -124,11 +137,12 @@ export class Paging {
     }
   }
 
-  private geometry(doc: Doc) {
-    const pageH = PAPERS[doc.page.size].h * MM;
+  private geometry(doc: Doc, room?: Map<number, { ids: string[]; h: number }>, vis: (p: number) => number = (p) => p) {
+    const pageH = paperOf(doc.page).h * MM;
     const margin = doc.page.margin * MM;
     const step = pageH + GAP;
-    return { pageH, margin, step, top: (p: number) => p * step + margin, bottom: (p: number) => p * step + pageH - margin, contentH: pageH - 2 * margin };
+    // A page's words end over its footnotes (in columns, every column of the page).
+    return { pageH, margin, step, top: (p: number) => p * step + margin, bottom: (p: number) => p * step + pageH - margin - (room?.get(vis(p))?.h ?? 0), contentH: pageH - 2 * margin };
   }
 
   /** The model changed: laid out again soon, from the first block that changed. */
@@ -163,6 +177,7 @@ export class Paging {
       const el = this.eng.elementOf(id);
       if (!plan || !el) continue;
       if (plan.push) this.applyPush(el, plan.push);
+      if (plan.dx || plan.dy) this.applyMove(el, plan.dx ?? 0, plan.dy ?? 0);
       if (plan.cuts?.length) {
         const i = doc.blocks.findIndex((b) => b.id === id);
         if (i >= 0) this.recut(doc.blocks[i], el);
@@ -191,8 +206,15 @@ export class Paging {
     if (!this.on) return;
     const doc = this.eng.doc;
     const blocks = doc.blocks;
-    const g = this.geometry(doc);
-    const changed = from ?? this.dirty ?? 0;
+    // In columns, each of the flow's pages is a column: the walk lays the flow out in them, whole blocks each.
+    const cols = doc.page.cols ?? 1;
+    this.cols = cols;
+    const vis = (p: number) => Math.floor(p / cols);
+    // The footnotes each page holds, as the walk puts their blocks on pages (those before where it starts, as they were).
+    const nr = this.o.notes?.() ?? null;
+    const room = new Map<number, { ids: string[]; h: number }>();
+    const g = this.geometry(doc, room, vis);
+    const changed = cols > 1 ? 0 : (from ?? this.dirty ?? 0);
     this.dirty = null;
     const index = new Map(blocks.map((b, i) => [b.id, i]));
     // Where to start: the first block of the page the first changed block was on (those before it stay where they are).
@@ -217,6 +239,20 @@ export class Paging {
     const plans = new Map<string, Plan>();
     const pages = new Map<string, number>();
     for (const [id, pg] of this.pageOf) if ((index.get(id) ?? Infinity) < start) pages.set(id, pg);
+    /** A block's footnotes onto a page's foot (or off it again, `sign` -1). */
+    const notesOf = (b: Block) => (nr ? nr.ids(b) : []);
+    const addNotes = (p: number, ids: string[], sign: 1 | -1) => {
+      if (!ids.length || !nr) return;
+      const cur = room.get(p) ?? { ids: [], h: 0 };
+      const h = ids.reduce((n, id) => n + nr.height(id), 0);
+      const list = sign > 0 ? [...cur.ids, ...ids] : cur.ids.filter((x) => !ids.includes(x));
+      if (!list.length) room.delete(p);
+      else room.set(p, { ids: list, h: Math.max(0, cur.h + sign * h + (sign > 0 && !cur.ids.length ? nr.sep : 0) - (sign < 0 && !list.length ? nr.sep : 0)) });
+    };
+    for (let i = 0; i < start; i++) {
+      const pg = pages.get(blocks[i].id);
+      if (pg !== undefined) addNotes(vis(pg), notesOf(blocks[i]), 1);
+    }
     // Each block's walk starts from where the one before left off: how far blocks are moved down from where they lie
     // (`shift`), where the last one ends, and the page it ended on. Kept per block, to walk a heading again.
     const states: { shift: number; prevBottom: number; page: number }[] = [];
@@ -233,6 +269,9 @@ export class Paging {
       const plan: Plan = {};
       let top = nat.top + shift;
       let bottom = nat.bottom + shift;
+      // Its footnotes go at the foot of the page it starts on (and move with it).
+      const ids = notesOf(b);
+      let notesAt = -1;
       const moveTo = (p: number) => {
         const target = g.top(p);
         plan.push = Math.max(0, target - prevBottom);
@@ -240,8 +279,14 @@ export class Paging {
         top = target;
         bottom = nat.bottom + shift;
         page = p;
+        if (notesAt >= 0 && vis(notesAt) !== vis(p)) {
+          addNotes(vis(notesAt), ids, -1);
+          addNotes(vis(p), ids, 1);
+        }
+        if (notesAt >= 0) notesAt = p;
       };
-      const how = cutting(b);
+      // In columns a block stays whole (moved to the next column when it does not fit), as the PDF and Word keep it.
+      const how = cols > 1 ? 'no' : cutting(b);
       const long = nat.bottom - nat.top > g.contentH + 0.5;
       const cut = (first: boolean) => {
         if (!(how === 'yes' || (how === 'long' && long))) return false;
@@ -261,6 +306,10 @@ export class Paging {
       }
       // Starting above its page's words (in a margin, or between two sheets): moved down to them.
       if (top < g.top(page) - 0.5) moveTo(page);
+      if (ids.length) {
+        addNotes(vis(page), ids, 1);
+        notesAt = page;
+      }
       if (b.type === 'pagebreak') {
         breakPage = page;
       } else if (bottom > g.bottom(page) + 0.5) {
@@ -288,7 +337,17 @@ export class Paging {
         }
       }
       pages.set(b.id, page);
-      if (plan.push !== undefined || plan.cuts) plans.set(b.id, plan);
+      // In columns: shown in its column of its page, from where the flow has it.
+      if (cols > 1) {
+        const k = page % cols;
+        const dx = k * this.colStep(doc);
+        const dy = (vis(page) - page) * g.step;
+        if (dx || dy) {
+          plan.dx = dx;
+          plan.dy = dy;
+        }
+      }
+      if (plan.push !== undefined || plan.cuts || plan.dx || plan.dy) plans.set(b.id, plan);
       prevBottom = bottom;
       // A block that hangs over its page's end (it could not be cut): what follows starts after it.
       while (bottom > g.bottom(page) + g.margin + GAP / 2) page++;
@@ -303,18 +362,25 @@ export class Paging {
       if (!plan || !el) continue;
       if (plan.push !== undefined) this.applyPush(el, plan.push);
       if (plan.cuts) this.applyCuts(blocks[i], el, plan.cuts);
+      if (plan.dx || plan.dy) this.applyMove(el, plan.dx ?? 0, plan.dy ?? 0);
     }
     for (const id of [...this.plans.keys()]) if (!index.has(id)) this.plans.delete(id);
     this.pageOf = pages;
     this.laid = blocks;
     let count = Math.max(1, page + 1);
     while (prevBottom > g.bottom(count - 1) + g.margin + 1) count++;
-    this.layout = { count, pageH: g.pageH, margin: g.margin, n: ++this.n };
+    count = Math.max(1, Math.ceil(count / cols));
+    this.layout = { count, pageH: g.pageH, margin: g.margin, n: ++this.n, notes: room };
     this.o.onLayout(this.layout);
   }
 
   /** The page a block is on (0 first), as the last layout put it. */
-  pageOfBlock = (id: string) => this.pageOf.get(id);
+  pageOfBlock = (id: string) => {
+    const p = this.pageOf.get(id);
+    return p === undefined ? p : Math.floor(p / this.cols);
+  };
+  /** Columns on each page: the flow is a column wide, each column of it a page of the flow ("a slot"), shown in its place on its page. */
+  private cols = 1;
 
   /** Where a block is cut, by its kind. */
   private cutsOf(b: Block, el: HTMLElement, g: ReturnType<Paging['geometry']>, page: number, shift: number, y: (v: number) => number, first: boolean) {
@@ -487,6 +553,17 @@ export class Paging {
     return [...el.querySelectorAll<HTMLTableRowElement>(':scope > thead > tr, :scope > tbody > tr')].filter((r) => !r.hasAttribute(CUT));
   }
 
+  /** How far apart columns stand, in the paper's pixels (a column and the gap after it). */
+  private colStep(doc: Doc): number {
+    return (columnMm(doc.page) + COLUMN_GAP) * MM;
+  }
+
+  /** A block shown in its column of its page (the flow keeps its place). */
+  private applyMove(el: HTMLElement, dx: number, dy: number) {
+    el.classList.add('nd-moved');
+    el.style.transform = `translate(${Math.round(dx * 100) / 100}px,${Math.round(dy * 100) / 100}px)`;
+  }
+
   private applyPush(el: HTMLElement, px: number) {
     el.classList.add('nd-push');
     el.style.setProperty('--nd-push', `${Math.round(px * 100) / 100}px`);
@@ -568,6 +645,10 @@ export class Paging {
     if (el.classList.contains('nd-push')) {
       el.classList.remove('nd-push');
       el.style.removeProperty('--nd-push');
+    }
+    if (el.classList.contains('nd-moved')) {
+      el.classList.remove('nd-moved');
+      el.style.removeProperty('transform');
     }
     this.clearCuts(el);
   }

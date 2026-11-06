@@ -33,6 +33,7 @@ import { latexWriteRoutes } from './latex.ts';
 import { pageAiRoutes } from './page-ai.ts';
 import { sheetAiRoutes } from './sheets.ts';
 import { designWriteRoutes } from './design.ts';
+import { docAiRoutes } from './doc-ai.ts';
 
 // ---- stand-ins, for the tests --------------------------------------------------------------------------------------
 
@@ -290,5 +291,7 @@ export const write: Feature = {
     sheetAiRoutes(app, db);
     // A design's words and a palette from a mood (design.ts).
     designWriteRoutes(app, db, goneSignal);
+    // The document editor's AI that writes with you (doc-ai.ts).
+    docAiRoutes(app, db);
   },
 };

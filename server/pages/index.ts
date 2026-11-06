@@ -58,7 +58,7 @@ import { getVideo, sendVideo, takeVideoPiece, videoAddressOk } from './videos.ts
 import { videoSrc } from '../../shared/slides.ts';
 import { exportPage, EXPORT_TYPES, type ExportFormat } from './export.ts';
 import { fontFile, fontsCss } from './fonts.ts';
-import { agentDoc, docPage, readDoc, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
+import { agentDoc, docPage, paginateOptions, readDoc, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
 import { applyDocEdits } from '../../shared/doc-edits.ts';
 import { applyDeckEdits, changesSlides } from '../../shared/deck-edits.ts';
 import { applyBookEdits } from '../../shared/sheet-edits.ts';
@@ -540,7 +540,7 @@ const SAVE_DOC: RunTool = {
     const { doc, notes } = await agentDoc(ctx.deps.db, rest, ctx.cwd, prev);
     const p = keepModel(ctx, id, 'doc', a.title, doc, { project: a.project, folder: a.libraryFolder, description: a.description });
     return [
-      `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Word or Google Docs and export it as a Word document, a PDF or Markdown.`,
+      `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Word or Google Docs and export it as a Word or OpenDocument file, a PDF, Markdown, an EPUB book or plain text.`,
       ...foldNote(p),
       ...p.describeNote,
       ...notes,
@@ -650,7 +650,7 @@ const EXPORT_PAGE: RunTool = {
   name: 'export_page',
   description: [
     'Save a page, slide deck, document, spreadsheet, LaTeX document or notebook of the user’s Library as a file, to hand over with present_files: a page as a PDF or a Word document (docx),',
-    'a deck as PowerPoint (pptx), a PDF (a slide a page) or its slides as pictures (png: a zip of them, or one slide with slide), a document as Word (docx), PDF or Markdown (md), a spreadsheet as Excel (xlsx), CSV (its first sheet) or PDF,',
+    'a deck as PowerPoint (pptx), a PDF (a slide a page) or its slides as pictures (png: a zip of them, or one slide with slide), a document as Word (docx), OpenDocument (odt), PDF, Markdown (md), EPUB (epub) or plain text (txt), a spreadsheet as Excel (xlsx), CSV (its first sheet) or PDF,',
     'a LaTeX document as its typeset PDF, its main source (tex) or the whole project (zip), a notebook as its .ipynb file (ipynb), a Python script of its cells (py) or a PDF; any of them as a web page (html) that works on its own.',
     'A deck’s web page (html) is one small file that opens in any browser and works offline (its pictures, videos and fonts inside it), but for its 3D parts, embedded web pages and the libraries its custom code loads; its PowerPoint file (pptx) turns what PowerPoint lacks into pictures or PowerPoint’s nearest effects, and says what changed.',
     'A design (a poster, a post, a card: a page of artboards) as pictures exactly its size (png or jpg, scale 1 to 3, twice its size unless asked; a zip of them for several pages, or one page with slide) or a PDF to print, each page its own size on paper.',
@@ -660,7 +660,7 @@ const EXPORT_PAGE: RunTool = {
     type: 'object',
     properties: {
       id: { type: 'string', description: 'The page’s or deck’s id (get_page lists them).' },
-      format: { type: 'string', enum: ['pdf', 'docx', 'pptx', 'xlsx', 'csv', 'md', 'tex', 'zip', 'html', 'ipynb', 'py', 'png', 'jpg'] },
+      format: { type: 'string', enum: ['pdf', 'docx', 'odt', 'pptx', 'xlsx', 'csv', 'md', 'epub', 'txt', 'tex', 'zip', 'html', 'ipynb', 'py', 'png', 'jpg'] },
       slide: { type: 'number', description: 'With png (or a design’s jpg): that slide, or that page of a design, alone (from 1), as a picture.' },
       scale: { type: 'number', description: 'A design’s png or jpg: 1, 2 or 3 times its size (2 when left out).' },
       transparent: { type: 'boolean', description: 'A design’s png: without its background (see-through).' },
@@ -731,7 +731,7 @@ const PUBLISH_SITE: RunTool = {
  * keep" wrote an HTML file that never reached Pages.
  */
 const INSTRUCTIONS =
-  `Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, and a Jupyter notebook to read, run and come back to (a lesson, an analysis to show) with save_notebook, unless they ask for a file made another way or it belongs with a project’s code and data in a folder. get_page lists all of these, to change one, with the Library folder each is in, and its query finds the ones that fit what you look for; the save tools’ libraryFolder puts one in a folder of the Library (by its name or a path, made when missing), and their description says what it is (under ${DESCRIPTION_WORDS} words, given with each new one): the Library shows it, and its search finds things by it. page_action does to a saved one what its editor does in a click to the whole of it (every slide animated, the accessibility check’s fixes, PowerPoint compatible, a theme; suggested changes accepted; a table sorted, duplicates removed, rows and columns put in or taken out with formulas following; a LaTeX project’s files renamed; a notebook’s outputs cleared; a copy), rather than writing it all out with the save tool. export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown, LaTeX, a notebook or a Python script). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how. When the user asks for a known kind of slide, deck, document, section, page part, page or spreadsheet by name (a SWOT slide, a pitch deck, a cover letter, an executive summary, a habit tracker, a pricing table, a budget), read how to make it well with how_to_make before you make it.`;
+  `Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, and a Jupyter notebook to read, run and come back to (a lesson, an analysis to show) with save_notebook, unless they ask for a file made another way or it belongs with a project’s code and data in a folder. get_page lists all of these, to change one, with the Library folder each is in, and its query finds the ones that fit what you look for; the save tools’ libraryFolder puts one in a folder of the Library (by its name or a path, made when missing), and their description says what it is (under ${DESCRIPTION_WORDS} words, given with each new one): the Library shows it, and its search finds things by it. page_action does to a saved one what its editor does in a click to the whole of it (every slide animated, the accessibility check’s fixes, PowerPoint compatible, a theme; suggested changes accepted; a table sorted, duplicates removed, rows and columns put in or taken out with formulas following; a LaTeX project’s files renamed; a notebook’s outputs cleared; a copy), rather than writing it all out with the save tool. export_page saves one as a file to hand over (PDF, Word, OpenDocument, PowerPoint, Excel, CSV, Markdown, EPUB, plain text, LaTeX, a notebook or a Python script). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how. When the user asks for a known kind of slide, deck, document, section, page part, page or spreadsheet by name (a SWOT slide, a pitch deck, a cover letter, an executive summary, a habit tracker, a pricing table, a budget), read how to make it well with how_to_make before you make it.`;
 
 /** The tools that make and change pictures and videos, for the agent beside a deck, a document or a page. */
 const PICTURES =
@@ -919,7 +919,7 @@ function routes(d: Deps) {
     // PowerPoint's old binary files are another format altogether.
     if (/\.(ppt|pps|pot)$/i.test(name)) throw new HttpError(415, 'PowerPoint 97–2003 files (.ppt) cannot be opened here: save it as a .pptx in PowerPoint (or LibreOffice) and open that.');
     if (!kind || (!from && typeof b.data !== 'string')) {
-      throw new HttpError(400, 'Send a file’s path, or its name and its data (base64): a .docx, .md, .txt or .html document, an .xlsx, .ods, .csv or .tsv spreadsheet, a PowerPoint deck (.pptx), a .tex file or a LaTeX project’s .zip, or a Jupyter notebook (.ipynb).');
+      throw new HttpError(400, 'Send a file’s path, or its name and its data (base64): a .docx, .pdf, .md, .txt or .html document, an .xlsx, .ods, .csv or .tsv spreadsheet, a PowerPoint deck (.pptx), a .tex file or a LaTeX project’s .zip, or a Jupyter notebook (.ipynb).');
     }
     let data: Buffer;
     if (from) {
@@ -1123,7 +1123,9 @@ function routes(d: Deps) {
     } catch (e) {
       throw new HttpError(400, (e as Error).message);
     }
-    return { html: docPage(db, doc, typeof b.title === 'string' ? b.title.slice(0, 300) : 'Document', 'print') };
+    const html = docPage(db, doc, typeof b.title === 'string' ? b.title.slice(0, 300) : 'Document', 'print');
+    // Pages with footnotes at their foot, or in columns, are laid out by the editor in its frame (which runs no script of the page's).
+    return { html, ...(html.includes('<script data-paginate>') ? { paginate: paginateOptions(doc) } : {}) };
   });
 
   // ---- a deck's pictures and fonts ---------------------------------------------------------------

@@ -448,7 +448,7 @@ agents that speak ACP and take MCP servers.
   its own address, menus with Search the menus, find and replace, a list of its keyboard shortcuts, and an agent that
   changes it on request, whose work you watch as it writes (slides too: the agent's caret where its words arrive, the
   page read-only meanwhile, your unsaved changes never overwritten), in steps (a section, some slides, some cells) as
-  well as whole, its saves in one turn kept as one version. Documents (save_doc, written in Markdown, or opened from a Word, Markdown, text or HTML file)
+  well as whole, its saves in one turn kept as one version. Documents (save_doc, written in Markdown, or opened from a Word, PDF (its title, headings, paragraphs and lists, two columns read in order, page numbers and running headers left out), Markdown, text or HTML file)
   are edited as in Word or Google Docs on real pages of their paper (what does not fit goes on to the next page, a long
   table's header row again, each page with its own header, footer and number): paragraph styles, fonts, sizes, colours and
   highlights, links, alignment, line and paragraph spacing, bullets, numbers and checklists, callouts, tables (column
@@ -461,10 +461,23 @@ agents that speak ACP and take MCP servers.
   printing, pictures, drawings and plots made with AI (Insert, "/", and a table's Make a plot of this table), free
   photos with their credit as the caption, a picked picture changed with AI (in words, its background taken out,
   part of it erased) or edited in the picture editor, Rewrite of the words picked, and a Section made with AI (an
-  executive summary, a table of risks…); a picture, table or line put in from a table's cell goes after the table;
+  executive summary, a table of risks…); AI that writes with you, by the helper model: Write with AI at the caret
+  (Ctrl+J, or Space on an empty line: a paragraph about…, continue writing, a summary of what is above, a conclusion,
+  a list or a table of…; for words picked, explained, summed up or made a table), kept, tried again or discarded,
+  a suggestion while suggesting; Proofread, a new tone or a translation of the whole document as suggestions by AI
+  (a translation as a copy too); suggestions as you type (Tab takes them); and a panel that answers questions from the
+  document with links to the passages they rest on; footnotes at the foot of their page, citations found by DOI,
+  arXiv id or title in APA, MLA, Chicago or IEEE with a bibliography that keeps up, numbered captions of pictures,
+  tables and equations with cross-references that keep up, bookmarks and links to headings and bookmarks, page setup
+  (landscape, one to three columns, a page colour, a watermark of words or a picture), paragraph styles of the
+  document's own (Update to match, Reset), voice typing with the app's dictation and reading aloud with the sentence
+  marked; all of them kept in the PDF and the Word file as Word's own (footnotes, citations with their sources and the
+  bibliography, captions, cross-references and bookmarks, sections, the page's colour, a watermark, styles) and read
+  back from Word files, and done by agents too (save_doc, page_action); a picture, table or line put in from a table's
+  cell goes after the table;
   they export as Word (styles, lists, tables, pictures, comments, tracked changes, equations, the table of
   contents and headers and footers as Word's own; laid out so Word's pages break where the editor's do, the
-  document's fonts inside the file), PDF on their paper, Markdown or a web page. Spreadsheets (save_sheet, with
+  document's fonts inside the file), OpenDocument for LibreOffice (its page, styles, lists, tables, pictures, footnotes and table of contents as LibreOffice's own), PDF on their paper, Markdown, EPUB (a chapter at each Heading 1, its footnotes, pictures and maths inside), plain text or a web page. Spreadsheets (save_sheet, with
   formulas, or opened from an Excel, ODS, CSV or TSV file) work as in Excel, Google Sheets or Airtable: a grid that
   stays quick with thousands of rows, frozen and hidden rows and columns, sizes to drag, about three hundred of
   Excel's functions worked out as you type (lookups, criteria, dates, text, loans, FILTER, SORT, UNIQUE and
