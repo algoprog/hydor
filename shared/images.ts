@@ -96,6 +96,8 @@ export interface EditImageAsk {
   mask?: string;
   tier?: TierChoice;
   model?: string;
+  /** The answer with a see-through background (a model that can make one is used). */
+  transparent?: boolean;
 }
 
 /** A picture made from another one (edited, its background taken out, part of it erased). */
@@ -169,8 +171,10 @@ export interface LocalToolsState {
   canInstall: boolean;
   /** Why it cannot, in words. */
   why?: string;
-  /** About how much the set-up downloads, in MB. */
+  /** About how much the set-up downloads, in MB (the environment; each model downloads the first time its tool is used). */
   sizeMb: number;
+  /** The models already downloaded (cutout: about 220 MB, erase: about 210 MB). */
+  downloaded: ('cutout' | 'erase')[];
   /** The models in memory now (each loads when needed and unloads after a few idle minutes). */
   loaded: ('cutout' | 'erase')[];
 }
