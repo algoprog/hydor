@@ -29,7 +29,6 @@ import {
   type VideoShape,
   type VideoTurn,
 } from '@shared/mediaedit-video';
-import type { Saved } from '@shared/mediaedit';
 import { Button, cx, Empty, IconButton, MenuItem, MenuSep, Popover, Segmented, Throbber, useIsMobile } from '../../components/ui';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
@@ -43,9 +42,6 @@ import { Stage, type ShownText } from './video/Stage';
 import { drawText } from './video/text';
 import { partAt, Timeline } from './video/Timeline';
 import { usePlayer } from './video/usePlayer';
-
-/** What the editor hands back: a video (a slide's with its still), or the still alone. */
-type VideoSaved = Saved;
 
 const TOOLS: { id: Tool; label: string; icon: ReactNode }[] = [
   { id: 'trim', label: 'Trim', icon: <Scissors size={15} /> },
