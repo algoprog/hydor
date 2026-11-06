@@ -33,7 +33,7 @@ import {
   Underline,
   Undo2,
 } from 'lucide-react';
-import { FONTS, HL_COLORS, PARA_STYLES, STYLES, styleOf, TEXT_COLORS, type Doc } from '@shared/docs';
+import { docHeadings, FONTS, HL_COLORS, PARA_STYLES, STYLES, styleOf, TEXT_COLORS, type Doc } from '@shared/docs';
 import { Button, cx, inputCls, MenuItem, MenuSep, Popover } from '../../../components/ui';
 import { NumInput, Tool } from '../slides/controls';
 import { RewriteButton } from '../slides/Rewrite';
@@ -146,6 +146,8 @@ export function Toolbar({
   const shownSize = st.look.size ?? Math.round(doc.size * styleOf(doc, st.style).k * 2) / 2;
   const t = st.block?.type === 'table' ? st.block : null;
   const openLink = () => setLinking({ url: st.link ?? '', text: '' });
+  // Headings and bookmarks, for a link to a place in the document.
+  const places = linking ? [...docHeadings(doc).filter((h) => h.level).map((h) => ({ id: h.id, label: h.text })), ...doc.blocks.flatMap((b) => ((b.type === 'p' || b.type === 'li') && b.bm ? [{ id: b.id, label: b.bm }] : []))] : [];
   return (
     <div className="flex shrink-0 items-center gap-0.5" data-keeps-editing>
       {!slim && (
@@ -320,11 +322,22 @@ export function Toolbar({
               const u = linking.url.trim();
               setLinking(null);
               if (!u) return;
+              // A place in the document: a heading or a bookmark (its words, where none are picked).
+              const place = places.find((x) => `#${x.id}` === u);
+              if (place) return engine.link(u, linking.text || place.label);
               engine.link(/^(https?:|mailto:|tel:)/i.test(u) ? u : /^[^\s@/]+@[^\s@]+\.[^\s@]+$/.test(u) ? `mailto:${u}` : `https://${u}`, linking.text);
             }}
           >
             {st.collapsed && !st.link && <input value={linking.text} onChange={(e) => setLinking({ ...linking, text: e.target.value })} placeholder="The words to show" className={inputCls} />}
-            <input autoFocus value={linking.url} onChange={(e) => setLinking({ ...linking, url: e.target.value })} placeholder="https://… or an e-mail address" className={inputCls} />
+            <input autoFocus value={linking.url.startsWith('#') ? '' : linking.url} onChange={(e) => setLinking({ ...linking, url: e.target.value })} placeholder="https://… or an e-mail address" className={inputCls} />
+            {places.length > 0 && (
+              <Select
+                value={linking.url.startsWith('#') ? linking.url : ''}
+                title="Or a place in this document"
+                onChange={(v) => setLinking({ ...linking, url: v })}
+                options={[{ value: '', label: 'Or a heading or bookmark in this document' }, ...places.map((x) => ({ value: `#${x.id}`, label: x.label }))]}
+              />
+            )}
             <div className="flex justify-end gap-2">
               {st.link && (
                 <Button
