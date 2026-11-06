@@ -7,7 +7,7 @@
 // offers, and the editor's keyboard shortcuts.
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ImageUp, PenTool, Trash2, WandSparkles } from 'lucide-react';
+import { Images, ImageUp, PenTool, Trash2, WandSparkles } from 'lucide-react';
 import { videoEmbed } from '@shared/app-media';
 import { post } from '../../../lib/api';
 import { makeDrawing, makePicture, pageData } from '../../images/studio';
@@ -17,6 +17,7 @@ import { CharPicker } from '../common/CharPicker';
 import { loadKatex, texHtml, useTexHtml } from '../common/katex';
 import type { ShortcutGroup } from '../common/Shortcuts';
 import { pictureData } from './Inspector';
+import { choosePhoto } from '../FreePhotos';
 
 /** Covers of a few colours, light and dark alike. */
 export const COVER_GRADIENTS: { css: string; name: string }[] = [
@@ -119,6 +120,12 @@ export async function aiCover(): Promise<string | null> {
 export async function aiPicture(tool: 'picture' | 'drawing'): Promise<{ src: string; alt: string } | null> {
   const p = tool === 'picture' ? await makePicture({ kind: 'picture' }) : await makeDrawing({ kind: 'illustration' });
   return p ? { src: await pageData(p.src), alt: (p.prompt ?? '').replace(/\s+/g, ' ').slice(0, 300) } : null;
+}
+
+/** A free photo for the page: its picture inside it, its title as its description, its credit under it where its licence asks. */
+async function freePhoto(): Promise<{ src: string; alt: string; credit?: string } | null> {
+  const u = await choosePhoto();
+  return u ? { src: await pageData(u.src), alt: u.photo.title.slice(0, 300), ...(u.photo.attribution ? { credit: u.credit } : {}) } : null;
 }
 
 /** The covers to choose from: gradients, a picture from this device, one made with AI (`onAi`), one from the web, and none. */
@@ -282,6 +289,9 @@ export function InsertPopover({
           </Button>
           <Button size="sm" variant="secondary" icon={<PenTool size={14} />} onClick={() => later(() => aiPicture('drawing'))}>
             A drawing (SVG)
+          </Button>
+          <Button size="sm" variant="secondary" icon={<Images size={14} />} onClick={() => later(freePhoto)}>
+            Free photos
           </Button>
         </div>
         <AddressRow autoFocus placeholder="https://… a picture on the web" label="A picture's address" onSend={(src) => done({ src })} />

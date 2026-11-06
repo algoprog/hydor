@@ -431,7 +431,7 @@ export const SlideCanvas = forwardRef<
     const r = running ? elById(running) : undefined;
     if (r && isLive(r)) el.querySelector(`.ns-el[data-id="${CSS.escape(r.id)}"]`)?.replaceWith(RT.part(deck, slide, r, { edit: true, ...PICS, ...liveOpts(offline) }));
     RT.fit(el);
-  }, [slide, deck.theme, deck.ratio, deck.footer, index, fonts, editing, running, offline]);
+  }, [slide, deck.theme, deck.ratio, deck.footer, deck.logo, index, fonts, editing, running, offline]);
 
   const nodeOf = (id: string) => content.current?.querySelector<HTMLElement>(`.ns-el[data-id="${CSS.escape(id)}"]`) ?? null;
 
@@ -637,7 +637,7 @@ export const SlideCanvas = forwardRef<
     const picked = pickedParas(box);
     const place = caretPlace(box);
     const next = f(RT.read(box, el), picked.length ? picked : [0]);
-    RT.words(box, deck, { ...el, paras: next });
+    RT.words(box, slide?.theme ? { ...deck, theme: slide.theme } : deck, { ...el, paras: next });
     if (place) placeCaret(box, place);
   };
 
