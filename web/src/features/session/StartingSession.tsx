@@ -1,14 +1,15 @@
 // A session's page while the session starts (lib/starting.ts): shown the moment you send from the start page as the
 // session's own page shows a turn under way (its header, your message, the agent at work, the message box), nothing
 // of its own in between, so it simply becomes the session once the server has started it. Should the session not
-// start, it says why, and the start page has your message back.
+// start, it says why, and the start page has your message back. Should the app not answer (a lost connection), it says
+// so, and Try again asks the app what came of the start: the session opens if it started, and starts only once.
 import { useEffect } from 'react';
-import { ArrowLeft, ArrowUp, ChevronRight, FileText, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ChevronRight, FileText, RotateCw, TriangleAlert } from 'lucide-react';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx } from '../../components/ui';
 import { basename, clockTime, tildify } from '../../lib/format';
 import { go, sessionPath } from '../../lib/nav';
-import { forget, useStarting } from '../../lib/starting';
+import { forget, retryStart, useStarting } from '../../lib/starting';
 import { useApp } from '../../lib/store';
 import { NavButton } from '../layout/PageHeader';
 import { isTouch, workingPlaceholder } from './Composer';
@@ -25,6 +26,8 @@ export function StartingSession({ id }: { id: string }) {
   }, [st]);
   if (!st) return null;
   const failed = !!st.error;
+  // The app could not be reached: whether the session started is not known here.
+  const lost = failed && !!st.lost;
   const pictures = st.atts.filter((a) => a.image && a.url);
   const files = st.atts.filter((a) => !(a.image && a.url));
   return (
@@ -40,9 +43,9 @@ export function StartingSession({ id }: { id: string }) {
               </span>
             </div>
             <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-3">
-              <span className={cx('inline-flex h-5.5 max-w-[60%] min-w-0 shrink-0 items-center gap-1.5 rounded-full bg-bg-2 px-2 text-[12px] font-medium', failed ? 'text-err' : 'text-busy')}>
-                <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', failed ? 'bg-err' : 'breathe bg-busy')} />
-                <span className="truncate">{failed ? 'Did not start' : 'Working'}</span>
+              <span className={cx('inline-flex h-5.5 max-w-[60%] min-w-0 shrink-0 items-center gap-1.5 rounded-full bg-bg-2 px-2 text-[12px] font-medium', failed ? 'text-err' : st.reconnecting ? 'text-warn' : 'text-busy')}>
+                <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', failed ? 'bg-err' : st.reconnecting ? 'breathe bg-warn' : 'breathe bg-busy')} />
+                <span className="truncate">{lost ? 'No connection' : failed ? 'Did not start' : st.reconnecting ? 'Reconnecting…' : 'Working'}</span>
               </span>
               {st.cwd && (
                 <span translate="no" className="min-w-0 truncate" title={st.cwd}>
@@ -95,10 +98,15 @@ export function StartingSession({ id }: { id: string }) {
                 <div className="rounded-2xl border border-err/30 bg-err/8 px-4 py-3">
                   <div className="flex items-center gap-2 text-[13.5px] font-medium text-fg">
                     <TriangleAlert size={15} className="shrink-0 text-err" />
-                    The session did not start
+                    {lost ? 'The app could not be reached' : 'The session did not start'}
                   </div>
                   <div className="mt-1 text-[13px] leading-relaxed break-words text-fg-2">{st.error}</div>
-                  <div className="mt-3">
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {st.lost === 'retry' && (
+                      <Button size="sm" variant="secondary" icon={<RotateCw size={14} />} onClick={() => retryStart(id)}>
+                        Try again
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="secondary"
@@ -134,7 +142,7 @@ export function StartingSession({ id }: { id: string }) {
               disabled
               rows={1}
               aria-label="Message"
-              placeholder={failed ? 'The session did not start' : workingPlaceholder(isTouch())}
+              placeholder={lost ? 'The app could not be reached' : failed ? 'The session did not start' : workingPlaceholder(isTouch())}
               className="block min-h-[48px] w-full resize-none bg-transparent px-5 pt-3.5 pb-1 text-[15px] leading-relaxed outline-none placeholder:text-fg-3 disabled:cursor-not-allowed"
             />
             <div className="flex items-center gap-1 px-2.5 pt-0.5 pb-2.5">

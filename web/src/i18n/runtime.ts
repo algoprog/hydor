@@ -27,6 +27,16 @@ const writtenAttr = new WeakMap<Element, Map<string, string>>();
 
 const skipped = (el: Element | null) => !el || !!el.closest(SKIP);
 
+/**
+ * The part of the app a word is in (the closest data-i18n: "media", "doc", "sheet", "tex", "pages", "design"), for the
+ * words that mean something else there: "Speed" in the video editor is a clip's, not a voice's. A dictionary may hold an
+ * entry for that part ("media::Speed"), used first; else the word's own.
+ */
+function inPart(s: string, el: Element | null, split?: boolean): string | null {
+  const part = el?.closest('[data-i18n]')?.getAttribute('data-i18n');
+  return (part ? translate(`${part}::${s}`, split) : null) ?? translate(s, split);
+}
+
 function put(node: Text, value: string) {
   if (node.nodeValue === value) return;
   written.set(node, value);
@@ -49,25 +59,25 @@ function onText(node: Text) {
   if (skipped(node.parentElement)) return;
   const run = runAround(node);
   if (run.length > 1) return onSentence(run);
-  const t = translate(v);
+  const t = inPart(v, node.parentElement);
   if (t != null) put(node, t);
 }
 
 /** A sentence in pieces (beside an icon, say): whole into its first piece when the dictionary has it, else piece by piece. */
 function onSentence(run: Text[]) {
   for (const k of run) if (!source.has(k)) source.set(k, k.nodeValue ?? '');
-  const t = translate(run.map((k) => source.get(k)!).join(''), false);
+  const t = inPart(run.map((k) => source.get(k)!).join(''), run[0].parentElement, false);
   if (t != null) return run.forEach((k, i) => put(k, i === 0 ? t : ''));
   for (const k of run) {
     const v = source.get(k)!;
-    put(k, translate(v) ?? v);
+    put(k, inPart(v, k.parentElement) ?? v);
   }
 }
 
 function onAttr(el: Element, name: string) {
   const v = el.getAttribute(name);
   if (v == null || writtenAttr.get(el)?.get(name) === v || el.closest(NO_ATTRS)) return;
-  const t = translate(v);
+  const t = inPart(v, el);
   if (t == null) return;
   let m = writtenAttr.get(el);
   if (!m) writtenAttr.set(el, (m = new Map()));

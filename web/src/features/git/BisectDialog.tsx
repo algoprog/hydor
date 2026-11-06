@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { SearchCode } from 'lucide-react';
 import { bisectRequest } from '@shared/engineering';
 import type { Agent, GitCommit, GitRepoDetail } from '@shared/types';
-import { api, post } from '../../lib/api';
+import { api } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
 import { agentKey, lastAgent, startSettings } from '../../lib/start';
 import { startSession } from '../../lib/starting';
@@ -120,19 +120,16 @@ export function BisectDialog({ repo, open, good: from, onClose }: { repo: GitRep
     // The session's page opens at once; should it not start, the request waits in the start page's box.
     startSession(
       { agent: who.agent, acpName: run.acpName, title: prompt.slice(0, 300), text: prompt, atts: [], cwd: repo.path },
-      async () =>
-        (
-          await post<{ key: string }>('/api/sessions', {
-            agent: who.agent,
-            acpAgent: who.agent === 'acp' ? who.acp : undefined,
-            prompt,
-            model: run.model ?? undefined,
-            mode: run.mode ?? undefined,
-            account: run.account,
-            cwd: repo.path,
-            worktree: true,
-          })
-        ).key,
+      async () => ({
+        agent: who.agent,
+        acpAgent: who.agent === 'acp' ? who.acp : undefined,
+        prompt,
+        model: run.model ?? undefined,
+        mode: run.mode ?? undefined,
+        account: run.account,
+        cwd: repo.path,
+        worktree: true,
+      }),
       { text: prompt, files: [], extra: {}, folder: { cwd: repo.path, over: JSON.stringify([s.cwd ?? null, s.task ?? null, s.space ?? null]) }, from: '' },
     );
   };
