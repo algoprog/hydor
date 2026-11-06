@@ -57,6 +57,10 @@ export function editorCss(doc: Doc, o: { narrow: boolean; hints: { title: string
     `${s} .nd-toc a{cursor:pointer}${s} .nd-toc a:hover{color:#1a5fd8;text-decoration:underline}`,
     `${s} .nd-toc.nd-picked,${s} .nd-math.nd-picked{outline:2px solid #1a73e8;outline-offset:2px}`,
     `${s} .nd-m{cursor:pointer;border-radius:3px}${s} .nd-m:hover{background:rgba(26,115,232,.08)}`,
+    // Footnotes' marks, citations and cross-references (each clicked to change); a table's caption; a bookmark's ribbon in the margin.
+    `${s} .nd-x{cursor:pointer;border-radius:3px}${s} .nd-x:hover{background:rgba(26,115,232,.1)}`,
+    `${s} caption.nd-cap{cursor:pointer}${s} caption.nd-cap:hover{color:#1a5fd8}`,
+    `${s} .nd-b[data-bm]{position:relative}${s} .nd-b[data-bm]::after{content:"";position:absolute;left:-18px;top:.3em;width:9px;height:12px;background:#1a73e8;opacity:.75;clip-path:polygon(0 0,100% 0,100% 100%,50% 72%,0 100%)}`,
     `${s} ::selection{background:rgba(26,115,232,.22)}`,
     `${s} a{cursor:text}`,
     // Hints in a document that has nothing in it yet.

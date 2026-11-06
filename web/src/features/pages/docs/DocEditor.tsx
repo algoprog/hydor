@@ -61,9 +61,11 @@ import { Toolbar } from './Toolbar';
 import { EndNotes, NoteBox, noteRoom, PageNotes } from './Notes';
 import { CiteBox, CiteDialog, withSource } from './Citations';
 import { matchStyle, StylesDialog } from './StylesDialog';
+import { BookmarkBox, CaptionBox, XrefDialog } from './References';
 import { putAfter } from './ai/WriteBox';
 import { BIB_TITLES } from '@shared/doc-cite';
 import { citeItems, citeOf, normalizeBlocks, type CiteStyle, type Source } from '@shared/docs';
+import * as ops from './ops';
 import type { Pos as DocPos } from './ops';
 import { useDocAi } from './ai/useDocAi';
 
@@ -238,6 +240,10 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   // A citation's box (clicked), and the dialog that finds a source to cite (`add`: for the citation clicked).
   const [cite, setCite] = useState<{ at: DocPos; t: string } | null>(null);
   const [citeFind, setCiteFind] = useState<{ add?: { at: DocPos; t: string } } | null>(null);
+  // A cross-reference to put in (or the one clicked, to point elsewhere), a bookmark's name, a table's or equation's caption.
+  const [xref, setXref] = useState<{ at?: DocPos; t?: string } | null>(null);
+  const [bmBox, setBmBox] = useState<string | null>(null);
+  const [capBox, setCapBox] = useState<{ id: string; kind: 'table' | 'math' } | null>(null);
   /** Words being typed beside the page (a comment, a reply, an edit of one). */
   const [noting, setNoting] = useState(false);
   // The picture editors opened from this document: once it closes, what they save goes to the Library instead.
@@ -246,7 +252,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   // An agent's version being written shows in place of this one (read-only, its words arriving where its mark is),
   // unless there are changes here not saved: those are left as they are. A comment, an equation, a link or another
   // change still being made here holds it back until it is done.
-  const making = noting || !!note || !!cite || !!citeFind || !!draft || !!eq || !!chars || !!linking || menu === 'page' || menu === 'url' || dialog === 'bands' || dialog === 'spacing';
+  const making = noting || !!note || !!cite || !!citeFind || !!xref || !!bmBox || !!capBox || !!draft || !!eq || !!chars || !!linking || menu === 'page' || menu === 'url' || dialog === 'bands' || dialog === 'spacing';
   const liveDoc = live && !making && !(!!model && !!saved && model !== saved) ? live.model : null;
   const liveOn = !!liveDoc;
   /** What the page shows: the document, or the agent's version being written. */
@@ -711,6 +717,10 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       spotAt(a.rect);
       if (a.k === 'fn') setNote({ id: a.t });
       else if (a.k === 'cite') setCite({ at: a.at, t: a.t });
+      else setXref({ at: a.at, t: a.t });
+    } else if (a.kind === 'caption') {
+      spotAt(en.elementOf(a.id)?.getBoundingClientRect());
+      setCapBox({ id: a.id, kind: 'table' });
     } else if (a.kind === 'icon') {
       spotAt(en.elementOf(a.id)?.getBoundingClientRect());
       setChars({ kind: 'icon', id: a.id });
@@ -743,6 +753,32 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       en.setAtom(add.at, citeOf(items), d);
     } else en.insertRun({ t: key, cite: true }, () => d);
     en.refocusSoon();
+  };
+  /** Insert → Caption: a picture's, a table's or an equation's, numbered. */
+  const addCaption = () => {
+    const en = engine.current;
+    if (!en || readOnlyRef.current) return;
+    const s = en.state();
+    const b = s.picked ?? s.block;
+    if (b?.type === 'image') {
+      if (!b.label) en.image(b.id, { label: tr('Figure') });
+      return void toast(tr('Its caption is numbered: write it with the picture’s Caption.'), 'ok');
+    }
+    if (b?.type === 'table' || b?.type === 'math') {
+      spotAt(en.elementOf(b.id)?.getBoundingClientRect());
+      setCapBox({ id: b.id, kind: b.type });
+      return;
+    }
+    toast(tr('Pick a picture, a table or an equation first.'));
+  };
+  /** Insert → Bookmark: the caret's paragraph named, for links and cross-references. */
+  const addBookmark = () => {
+    const en = engine.current;
+    if (!en || readOnlyRef.current) return;
+    const s = en.state();
+    if (!s.block || (s.block.type !== 'p' && s.block.type !== 'li') || s.cell) return void toast(tr('Put the caret in a paragraph first.'));
+    spotAt(en.elementOf(s.block.id)?.getBoundingClientRect());
+    setBmBox(s.block.id);
   };
   /** Format → Citation style: every citation and the bibliography in it. */
   const citeStyle = (c: CiteStyle) => {
@@ -1076,6 +1112,9 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
             reset: () => engine.current && engine.current.change((({ styles: _s, ...rest }) => rest)(engine.current.doc)),
           },
           citation: () => setCiteFind({}),
+          xref: () => setXref({}),
+          bookmark: addBookmark,
+          caption: addCaption,
           bibliography: addBibliography,
           citeStyle,
           link: () => setLinking({ url: st.link ?? '', text: '' }),
@@ -1700,6 +1739,80 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
             onRemove={() => (e?.setAtom(cite.at, null), setCite(null), e?.refocusSoon())}
           />
         )}
+      </Popover>
+      <XrefDialog
+        open={!!xref && !!e}
+        doc={model}
+        refs={e?.refs ?? ({} as never)}
+        title={xref?.at ? 'Point the cross-reference at' : 'Cross-reference'}
+        onClose={() => (setXref(null), e?.refocusSoon())}
+        onPick={(id) => {
+          if (xref?.at) e?.setAtom(xref.at, id);
+          else e?.insertRun({ t: id, xref: true });
+          setXref(null);
+          e?.refocusSoon();
+        }}
+        onRemove={xref?.at ? () => (e?.setAtom(xref.at!, null), setXref(null), e?.refocusSoon()) : undefined}
+      />
+      <Popover anchor={spotRef} open={!!bmBox} onClose={() => (setBmBox(null), e?.refocusSoon())} width={300} title="Bookmark">
+        {bmBox && (
+          <BookmarkBox
+            name={(() => {
+              const b = model.blocks.find((x) => x.id === bmBox);
+              return b && (b.type === 'p' || b.type === 'li') ? (b.bm ?? '') : '';
+            })()}
+            onDone={(name) => {
+              if (e) e.change(ops.patchBlock(e.doc, bmBox, (b) => (b.type === 'p' || b.type === 'li' ? { ...b, bm: name } : b)));
+              setBmBox(null);
+              e?.refocusSoon();
+            }}
+            onRemove={
+              (() => {
+                const b = model.blocks.find((x) => x.id === bmBox);
+                return b && (b.type === 'p' || b.type === 'li') && b.bm;
+              })()
+                ? () => {
+                    if (e) e.change(ops.patchBlock(e.doc, bmBox, (b) => (b.type === 'p' || b.type === 'li' ? (({ bm: _b, ...x }) => x)(b) : b)));
+                    setBmBox(null);
+                    e?.refocusSoon();
+                  }
+                : undefined
+            }
+          />
+        )}
+      </Popover>
+      <Popover anchor={spotRef} open={!!capBox} onClose={() => (setCapBox(null), e?.refocusSoon())} width={320} title={capBox?.kind === 'math' ? 'The equation’s number' : 'The table’s caption'}>
+        {capBox &&
+          (() => {
+            const b = model.blocks.find((x) => x.id === capBox.id);
+            if (!b || (b.type !== 'table' && b.type !== 'math')) return null;
+            const label = b.label ?? tr(b.type === 'table' ? 'Table' : 'Equation');
+            return (
+              <CaptionBox
+                caption={b.type === 'table' ? (b.caption ?? '') : ''}
+                numbered={!!b.label}
+                label={label}
+                words={b.type === 'table'}
+                onDone={(v) => {
+                  if (e)
+                    e.change(
+                      ops.patchBlock(e.doc, b.id, (x) => {
+                        if (x.type !== 'table' && x.type !== 'math') return x;
+                        const { label: _l, ...rest } = x as typeof x & { caption?: string };
+                        const out: typeof x = { ...rest, ...(v.numbered ? { label } : {}) } as typeof x;
+                        if (out.type === 'table') {
+                          if (v.caption) out.caption = v.caption;
+                          else delete out.caption;
+                        }
+                        return out;
+                      }),
+                    );
+                  setCapBox(null);
+                  e?.refocusSoon();
+                }}
+              />
+            );
+          })()}
       </Popover>
       <CiteDialog open={!!citeFind} doc={model} onClose={() => (setCiteFind(null), e?.refocusSoon())} onCite={citeSource} onStyle={citeStyle} />
       <Popover anchor={spotRef} open={!!chars} onClose={() => (setChars(null), e?.refocusSoon())} width={340} title={chars?.kind === 'icon' ? 'The callout’s emoji' : 'Special characters'}>

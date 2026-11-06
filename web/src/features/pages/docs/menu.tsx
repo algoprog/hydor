@@ -32,6 +32,8 @@ import {
   ListOrdered,
   ListTree,
   Lightbulb,
+  Bookmark,
+  Captions,
   BookMarked,
   Quote,
   Footprints,
@@ -133,6 +135,10 @@ export interface DocMenuCtx {
   /** Insert → Citation (the dialog that finds a source), Insert → Bibliography, and Format → Citation style. */
   citation?: () => void;
   bibliography?: () => void;
+  /** Insert → Cross-reference, Bookmark and Caption. */
+  xref?: () => void;
+  bookmark?: () => void;
+  caption?: () => void;
   citeStyle?: (c: CiteStyle) => void;
   link: () => void;
   equation: (inline: boolean) => void;
@@ -247,6 +253,9 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     !!c.footnote && { label: 'Footnote', icon: <Footprints size={15} />, keys: 'Ctrl+Alt+F', also: 'footnote note reference endnote', disabled: c.readOnly || !!st.picked, run: c.footnote },
     !!c.citation && { label: 'Citation', icon: <Quote size={15} />, also: 'cite citation reference source doi arxiv paper book apa mla chicago ieee', disabled: c.readOnly || !!st.picked, run: c.citation },
     !!c.bibliography && { label: 'Bibliography', icon: <BookMarked size={15} />, also: 'references works cited sources list', disabled: c.readOnly, run: c.bibliography },
+    !!c.caption && { label: 'Caption', icon: <Captions size={15} />, also: 'caption figure table equation number numbered label', disabled: c.readOnly, run: c.caption },
+    !!c.xref && { label: 'Cross-reference', icon: <Link2 size={15} />, also: 'cross reference figure table heading bookmark see refer', disabled: c.readOnly || !!st.picked, run: c.xref },
+    !!c.bookmark && { label: 'Bookmark', icon: <Bookmark size={15} />, also: 'bookmark anchor name place link', disabled: c.readOnly, run: c.bookmark },
     '-',
     {
       label: 'Equation',
