@@ -372,7 +372,7 @@ export function snap(t: number, times: number[], pps: number, px = 8): { t: numb
 /** The clip, overlay, sound or text picked, if it is still there. */
 export function pickedThing(r: VideoRecipe, p: Picked): VideoClip | VideoOverlay | VideoAudio | VideoText | null {
   if (!p) return null;
-  if (p.kind === 'clip' || p.kind === 'transition') return r.clips?.find((c) => c.id === p.id) ?? null;
+  if (p.kind === 'clip' || p.kind === 'clipsound' || p.kind === 'transition') return r.clips?.find((c) => c.id === p.id) ?? null;
   if (p.kind === 'overlay') return r.overlays?.find((o) => o.id === p.id) ?? null;
   if (p.kind === 'audio') return r.audio?.find((a) => a.id === p.id) ?? null;
   return r.texts?.find((t) => t.id === p.id) ?? null;
