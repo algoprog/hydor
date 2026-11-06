@@ -1,4 +1,11 @@
 {
+"{0} words: keep it under {1}":"{0} 个词：请控制在 {1} 个词以内",
+"Finds notes, what the Library holds and more by what they mean as well as by their words, with a model that runs on this computer. It sets itself up once: about 2 GB (6 GB with an NVIDIA GPU).":"不只按字词，也按含义查找笔记、资料库中的内容等，使用在这台电脑上运行的模型。它会自行完成一次性设置：约占 2 GB（有 NVIDIA GPU 时约 6 GB）。",
+"Nothing here matches “{0}”.":"这里没有与“{0}”相符的内容。",
+"Python 3 is not installed on this computer, and search by meaning needs it (python.org, or Homebrew: brew install python).":"这台电脑上没有安装 Python 3，而按含义搜索需要它（python.org，或者 Homebrew：brew install python）。",
+"Search by name or description":"按名称或说明搜索",
+"Send its new title, its description, the project to move it to (space: an id, or null), or the folder to put it in (folder: an id, or null)":"请发送它的新标题、它的说明、要移到的项目（space：一个 id，或 null），或者要放入的文件夹（folder：一个 id，或 null）",
+"What it is and what it is for. The Library’s search finds it by these words and what they mean.":"它是什么、用来做什么。资料库的搜索会按这些字词及其含义找到它。",
 "Python 3 is not installed on this computer, and search by meaning needs it (python.org, or: winget install Python.Python.3.12).":"这台电脑上没有安装 Python 3，而按含义搜索需要它（python.org，或者：winget install Python.Python.3.12）。",
 "Could not add Hydor to the programs Windows opens when you sign in: {0}":"无法把 Hydor 加入登录 Windows 时打开的程序：{0}",
 "Does not open by itself when you log in.":"登录时不会自行打开。",

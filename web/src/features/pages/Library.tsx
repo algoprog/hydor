@@ -56,7 +56,7 @@ import { TURN_INTO } from '@shared/content-asks';
 import type { MediaItem } from '@shared/media';
 import type { LibFolder, PageInfo, SiteInfo } from '@shared/pages';
 import type { SpaceView } from '@shared/spaces';
-import { del, enc, patch, post } from '../../lib/api';
+import { api, del, enc, patch, post } from '../../lib/api';
 import { ago, bytes } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
@@ -154,6 +154,38 @@ function useItems(): Item[] | null {
     });
     return all.sort((a, b) => b.at - a.at);
   }, [pages, folders, media, spaces]);
+}
+
+/**
+ * What the Library's search finds for the words (GET /api/library/search): its items' keys, best first, by their titles
+ * and descriptions, by words and by meaning. Asked a moment after the words change, and again when the Library does;
+ * when meaning's model was starting, once more a few seconds later, to find by meaning too. Null until it answers.
+ */
+function useLibrarySearch(q: string, version: string): { q: string; keys: string[] } | null {
+  const [found, setFound] = useState<{ q: string; keys: string[] } | null>(null);
+  useEffect(() => {
+    if (!q) {
+      setFound(null);
+      return;
+    }
+    let gone = false;
+    let again: ReturnType<typeof setTimeout> | undefined;
+    const ask = (retry: boolean) =>
+      api<{ hits: { id: string }[]; starting?: boolean }>(`/api/library/search?q=${enc(q)}&limit=200`)
+        .then((r) => {
+          if (gone) return;
+          setFound({ q, keys: r.hits.map((h) => h.id.replace(/^page:/, 'p:').replace(/^media:/, 'm:')) });
+          if (r.starting && retry) again = setTimeout(() => void ask(false), 3000);
+        })
+        .catch(() => {});
+    const t = setTimeout(() => void ask(true), 200);
+    return () => {
+      gone = true;
+      clearTimeout(t);
+      clearTimeout(again);
+    };
+  }, [q, version]);
+  return found;
 }
 
 function sorted(list: Item[], sort: Sort): Item[] {
@@ -287,7 +319,7 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
       )}
       <div className="flex min-w-0 items-start gap-1 py-2 pr-1 pl-3">
         <button type="button" onClick={() => open()} className="min-w-0 flex-1 text-left">
-          <span translate="no" className="block truncate text-[13.5px] leading-5 font-medium text-fg">
+          <span translate="no" title={(p ? p.description : m?.description) || undefined} className="block truncate text-[13.5px] leading-5 font-medium text-fg">
             {it.title}
           </span>
           <span className="flex min-w-0 items-center gap-1.5 text-[12px] leading-4 text-fg-3">
@@ -331,7 +363,7 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
               </MenuItem>
             )}
             <MenuItem icon={<Pencil size={14} />} onClick={() => (close(), setRename(true))}>
-              Rename
+              Edit the title and description
             </MenuItem>
           </>
         ) : (
@@ -672,13 +704,24 @@ export function Library() {
   const here = useMemo(() => (items ?? []).filter((it) => place.kind === 'all' || (place.kind === 'none' ? !it.space : place.kind === 'space' && it.space === place.id)), [items, search]);
   const kinds = useMemo(() => SHOWS.filter((s) => s.value === 'all' || here.some((it) => s.has(it.kind))), [here]);
   const words = find.trim().toLowerCase();
+  // Found by the server (search.ts) best first, then what has the words in its title or description and the server
+  // left out (a word half typed); until it answers, those alone.
+  const version = useMemo(() => `${items?.length ?? 0}:${items?.[0]?.at ?? 0}:${(items ?? []).reduce((n, it) => n + (it.page?.description ?? it.media?.description ?? '').length, 0)}`, [items]);
+  const ranked = useLibrarySearch(find.trim(), version);
   const shown = useMemo(() => {
     const has = showOf(show).has;
-    return sorted(
-      here.filter((it) => has(it.kind) && (!words || `${it.title} ${it.media?.description ?? ''}`.toLowerCase().includes(words))),
+    const kept = here.filter((it) => has(it.kind));
+    if (!words) return sorted(kept, sort);
+    const local = sorted(
+      kept.filter((it) => `${it.title} ${it.page?.description ?? it.media?.description ?? ''}`.toLowerCase().includes(words)),
       sort,
     );
-  }, [here, show, words, sort]);
+    if (ranked?.q !== find.trim()) return local;
+    const byKey = new Map(kept.map((it) => [it.key, it]));
+    const first = ranked.keys.flatMap((k) => byKey.get(k) ?? []);
+    const seen = new Set(first.map((it) => it.key));
+    return [...first, ...local.filter((it) => !seen.has(it.key))];
+  }, [here, show, words, sort, ranked]);
   // In a place, finding nothing and showing every kind: its folders, and what is in the folder open (or at its top).
   const folderView = placeSpace !== undefined && !words && show === 'all';
   const known = useMemo(() => new Set(placeList.map((f) => f.id)), [placeList]);
@@ -799,7 +842,7 @@ export function Library() {
         </Empty>
       );
     if (!shown.length)
-      return <p className="py-8 text-center text-[13px] text-fg-3">{words ? tr(`Nothing here has “${find.trim()}” in its name.`) : 'Nothing of that kind here.'}</p>;
+      return <p className="py-8 text-center text-[13px] text-fg-3">{words ? tr(`Nothing here matches “${find.trim()}”.`) : 'Nothing of that kind here.'}</p>;
     if (sections)
       return (
         <div className="space-y-9">
@@ -864,7 +907,7 @@ export function Library() {
                 <span className="flex-1 max-lg:hidden" />
                 <label className="flex h-8.5 min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-line bg-bg-1 px-2.5 lg:max-w-[280px]">
                   <Search size={14} className="shrink-0 text-fg-3" />
-                  <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find by name" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-3" />
+                  <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Search by name or description" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-3" />
                   {find && (
                     <button type="button" onClick={() => setFind('')} className="text-fg-3 hover:text-fg" aria-label="Clear">
                       <X size={13} />

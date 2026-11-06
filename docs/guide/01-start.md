@@ -148,7 +148,7 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 - On a wide screen, a preview beside the list says more about the result you are on, and where opening it goes.
 - ↑ and ↓ move, Enter opens. Esc clears what you typed, and a second Esc closes the box (with the **Search in** list open, Esc closes the list first).
 - With nothing typed, it lists **Recent sessions** and **Suggestions**: the places you use most (a few useful ones until it knows). With places picked in **Search in**, it lists what they hold instead.
-- The bottom line says **Words** or **Words and meaning**. With [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) turned on in Settings → Capabilities → Memory, results also match what you mean in other words, and in other languages.
+- The bottom line says **Words** or **Words and meaning**. With [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) on (it is, unless you turn it off in Settings → Capabilities → Memory), results also match what you mean in other words, and in other languages.
 
 ### It learns what you use
 

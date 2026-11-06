@@ -112,23 +112,25 @@ Everything about memory is in [Settings → Capabilities → Memory](/settings?s
 
 ### Search by meaning
 
-[Search by meaning](/settings?s=memory&find=Search%20by%20meaning) "finds notes by what they mean, not only their words, with a model that runs on this computer": LightOn's mDenseOn, which reads nine languages. The model runs here, so your notes aren't sent to a service to be searched. Without it, notes are found by their words alone. With it on:
+[Search by meaning](/settings?s=memory&find=Search%20by%20meaning) "finds notes, what the Library holds and more by what they mean as well as by their words, with a model that runs on this computer": LightOn's mDenseOn, which reads nine languages. It is on unless you turn it off, so notes and the Library are found by hybrid search: by their words and by what they mean, the two lists merged by rank. The model runs here, so your notes aren't sent to a service to be searched. With it off, notes are found by their words alone. With it on:
 
 - Agents start with the notes that bear on your request even when the notes use other words than you did.
 - Agents looking notes up, and the search field in the Notes list, find them by meaning as well as by words.
 - A note that says the same as one already kept, in other words, isn't saved again, and the tidy-up groups notes by meaning.
+- The Library's search finds pages, documents, pictures and the rest by what their titles and descriptions mean (see [Find your pages](/guide/library#find-your-pages)).
 - The search box (Ctrl+K) finds pages, settings, sessions, apps and more by what they mean, and knowledge bases are searched by meaning too (see [Projects and knowledge](/guide/projects)).
 
-**Turn it on**:
+**How it gets ready**, once:
 
-1. In Settings → Memory, turn on **Search by meaning** (memory itself must be on).
-2. The app sets up a private Python environment in its data folder, with PyTorch (its smaller CPU build when there is no NVIDIA GPU) and Transformers. This takes a few minutes, and the line under the switch shows each step, such as "Making a private Python environment" and "Installing PyTorch (CPU build): a few minutes".
-3. The first time the model starts, it downloads: "Downloading the model (1.2 GB, once)". After that, starting says "Loading the model".
-4. Every note gets its vector (the numbers search by meaning compares) in the background. The line counts them: "all 120 notes found by meaning", or "80 of 120 notes found by meaning (the rest soon)".
+1. A minute after the app first starts, the app sets up a private Python environment in its data folder, with PyTorch (its smaller CPU build when there is no NVIDIA GPU) and Transformers; if you turned it off, it does this as soon as you turn **Search by meaning** back on (memory itself must be on). This takes a few minutes, and the line under the switch shows each step, such as "Making a private Python environment" and "Installing PyTorch (CPU build): a few minutes".
+2. The first time the model starts, it downloads: "Downloading the model (1.2 GB, once)". After that, starting says "Loading the model".
+3. Every note gets its vector (the numbers search by meaning compares) in the background, and so does everything in the Library. The line counts the notes: "all 120 notes found by meaning", or "80 of 120 notes found by meaning (the rest soon)".
+
+**Turn it off** with the same switch: the model stops, and everything is found by its words alone. A computer short of disk space or memory can do without it.
 
 **What it needs**:
 
-- Python 3.10 or newer on this computer, unless the uv tool is installed, which gets its own. If neither is there, setting up stops and says so, with the command to install Python on Debian or Ubuntu (`sudo apt install python3 python3-venv`).
+- Python 3.10 or newer on this computer, unless the uv tool is installed, which gets its own. If neither is there, setting up stops and says so, with how to install Python: on Debian or Ubuntu `sudo apt install python3 python3-venv`, on a Mac from python.org or with Homebrew (`brew install python`). On a Mac, Apple's own Python counts only when its developer tools are installed, so the app never asks you to install them.
 - Disk space: PyTorch takes about 1 GB, or about 5 GB with an NVIDIA GPU, and the model 1.2 GB. Setting up stops with "Not enough disk space" when less than about 3 GB is free (9 GB with an NVIDIA GPU).
 - An internet connection, once, for the downloads.
 - Free memory to start the model: about 2.5 GB on the CPU, or 1.5 GB with a GPU. Until there is enough, it says "Waiting for memory" and notes are found by their words.
@@ -241,7 +243,7 @@ You can search past sessions yourself with the search box (Ctrl+K, or ⌘K on a 
 - "Add to my profile that I'm a nurse and like answers in bullet points."
 - "Show me my profile, and shorten it to about 300 words."
 - "Start every session with 20 notes instead of 10."
-- "Turn on search by meaning, and keep it on the CPU."
+- "Keep search by meaning on the CPU, so the graphics card stays free."
 - "Tidy up memory now, then tell me what it merged."
 - "Which notes has no agent needed for months? Delete the ones about the old website."
 - "The note about my trip to Lisbon is only true until 12 May: give it that end date."

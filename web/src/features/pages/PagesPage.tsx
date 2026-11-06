@@ -422,7 +422,7 @@ function PageView({ id }: { id: string }) {
       <IconButton label="The Library" onClick={() => (closePageAsk(), go('/library'))}>
         <ArrowLeft size={18} />
       </IconButton>
-      <button type="button" className="ml-0.5 min-w-0 text-left" onClick={() => page && setDialog('rename')} title="Rename">
+      <button type="button" className="ml-0.5 min-w-0 text-left" onClick={() => page && setDialog('rename')} title="Edit the title and description">
         <h1 translate="no" className="truncate text-[15px] font-semibold tracking-tight">
           {title}
         </h1>
@@ -608,7 +608,7 @@ function PageView({ id }: { id: string }) {
               </MenuItem>
             )}
             <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(null), setDialog('rename'))}>
-              Rename
+              Edit the title and description
             </MenuItem>
             <MenuItem icon={<Copy size={14} />} onClick={duplicate}>
               Duplicate
