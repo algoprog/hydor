@@ -179,7 +179,7 @@ export interface LocalToolsState {
   why?: string;
   /** About how much the set-up downloads, in MB (the environment; each model downloads the first time its tool is used). */
   sizeMb: number;
-  /** The models already downloaded (cutout: about 220 MB, erase: about 210 MB). */
+  /** The models already downloaded (cutout: about 190 MB, erase: about 210 MB). */
   downloaded: ('cutout' | 'erase')[];
   /** The models in memory now (each loads when needed and unloads after a few idle minutes). */
   loaded: ('cutout' | 'erase')[];

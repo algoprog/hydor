@@ -34,7 +34,7 @@ import { readPng, writePng, type Rgba } from '../signatures/png.ts';
 import { judgeCutout } from './cutout.ts';
 import { boxesMask, planErase, putBackInBoxes, readBoxes } from './erase.ts';
 import { localTools, setCloudTools } from './hooks.ts';
-import { localState, pictureTools, pictureWorkerPid, runPython, setPictureToolsForTests, stopPictureTools } from './local.ts';
+import { localState, memoryNeeded, pictureTools, pictureWorkerPeak, pictureWorkerPid, runPython, setPictureToolsForTests, stopPictureTools } from './local.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -382,6 +382,9 @@ for line in sys.stdin:
   // ---- the first use of each tool: its model downloads, one at a time ----------------------------------------------
 
   {
+    // An earlier version's model, and a download of it never finished: they go.
+    fs.mkdirSync(path.join(pictures, 'models'), { recursive: true });
+    for (const old of ['birefnet-lite.onnx', 'birefnet-lite.onnx.part']) fs.writeFileSync(path.join(pictures, 'models', old), 'old');
     const steps = new Set<string>();
     let watching = true;
     void (async () => {
@@ -405,7 +408,11 @@ for line in sys.stdin:
     ok([...steps].includes('Taking the background out on this computer') && [...steps].includes('Erasing on this computer') && [...steps].some((x) => /^Loading the/.test(x)), `and what it does: ${[...steps].join(' / ')}`);
     const s = await state();
     ok(s.downloaded.join() === 'cutout,erase' && s.loaded.join() === 'cutout,erase' && !s.step, `downloaded and loaded: ${JSON.stringify(s)}`);
-    ok(fs.readFileSync(path.join(pictures, 'models', 'birefnet-lite.onnx')).equals(blobs['cutout.onnx']) && !fs.readdirSync(path.join(pictures, 'models')).some((f) => f.endsWith('.part')), 'the model kept, no part left');
+    ok(fs.readFileSync(path.join(pictures, 'models', 'birefnet-lite-512.onnx')).equals(blobs['cutout.onnx']) && !fs.readdirSync(path.join(pictures, 'models')).some((f) => f.endsWith('.part')), 'the model kept, no part left');
+    ok(fs.readdirSync(path.join(pictures, 'models')).sort().join() === 'birefnet-lite-512.onnx,lama.onnx', 'an earlier version’s model gone');
+    fs.writeFileSync(path.join(pictures, 'models', 'birefnet-lite.onnx'), 'old');
+    pictureTools.start!(deps);
+    ok(!fs.existsSync(path.join(pictures, 'models', 'birefnet-lite.onnx')) && fs.existsSync(path.join(pictures, 'models', 'lama.onnx')), 'and when the app starts');
     const j = jobs();
     ok(j.length === 2 && j[0].op === 'cutout' && j[0].max === 12 * 1024 * 1024 && j[1].op === 'erase' && j[1].mask && /lama\.onnx$/.test(j[1].model), `the worker’s jobs: ${JSON.stringify(j)}`);
     ok(!fs.readdirSync(path.join(pictures, 'jobs')).length, 'each job’s folder goes once done');
@@ -921,9 +928,13 @@ for line in sys.stdin:
     console.log(`  steps: ${[...steps].join(' / ')}`);
     if (!seed)
       ok(
-        [...steps].some((x) => /^Downloading the background remover \(224 MB, once\): \d+%$/.test(x)),
+        [...steps].some((x) => /^Downloading the background remover \(192 MB, once\): \d+%$/.test(x)),
         'its model downloaded, with progress',
       );
+    const peak = pictureWorkerPeak() ?? 0;
+    const need = memoryNeeded('cutout', W * H);
+    console.log(`  the cutout's worker held at most ${peak} MB; it asks for ${Math.round(need)} MB free`);
+    ok(peak > 0 && peak < need, `what it asks to be free covers what it took (${peak} MB < ${Math.round(need)} MB)`);
     if (r.statusCode === 200) {
       const k = keptPng(a.src);
       const src = readPng(plain);
@@ -998,9 +1009,10 @@ for line in sys.stdin:
     ok(pictureWorkerPid() === pid, 'the worker still there');
     ok(await until(() => pictureWorkerPid() === undefined && !alive(pid), 9000), 'then it quits');
   }
-  setPictureToolsForTests({ freeMb: () => 3000 });
+  setPictureToolsForTests({ freeMb: () => 1500 });
   const low = await req('POST', '/api/images/cutout', { src: dataUrl(plain) });
-  ok(low.statusCode === 503 && /it needs about 6\.\d GB free, and 2\.9 GB is/.test(low.json().error), `not enough memory: ${low.json().error}`);
+  const needs = (memoryNeeded('cutout', W * H) / 1024).toFixed(1);
+  ok(low.statusCode === 503 && low.json().error.includes(`it needs about ${needs} GB free, and 1.5 GB is`), `not enough memory: ${low.json().error}`);
   setPictureToolsForTests({ freeMb: null });
   const gone = (await req('DELETE', '/api/images/local')).json() as LocalToolsState;
   ok(!gone.ready && !fs.existsSync(pictures), 'removed');

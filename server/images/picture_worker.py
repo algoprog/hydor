@@ -23,8 +23,8 @@ import time
 THREADS = max(1, min(4, int(os.environ.get('HYDOR_PICTURES_THREADS') or 0) or (os.cpu_count() or 2)))
 # The largest picture taken, in pixels (8,000 × 6,000 or so): what is in memory while it is worked on grows with it.
 MAX_PIXELS = 50_000_000
-# BiRefNet's input: 1024 × 1024, scaled to 0..1, then ImageNet's mean and spread (its preprocessor_config.json).
-CUTOUT_SIZE = 1024
+# BiRefNet's input: its side as the model says (the 512 × 512 export), scaled to 0..1, then ImageNet's mean and spread.
+CUTOUT_SIZE = 512
 MEAN = (0.485, 0.456, 0.406)
 STD = (0.229, 0.224, 0.225)
 # LaMa's input: 512 × 512, the picture in 0..1 and the mask as 0 or 1; it answers in 0..255.
@@ -86,9 +86,9 @@ def session(what, path, rid):
     so.enable_cpu_mem_arena = False
     so.enable_mem_pattern = False
     so.log_severity_level = 3
-    # Measured on a CPU: BiRefNet left unoptimised peaks near 6 GB rather than 6.8 GB for a picture, at the cost of
-    # 3 more seconds to load; LaMa loads fastest with the basic optimisations, at the same peak.
-    so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL if what == 'cutout' else ort.GraphOptimizationLevel.ORT_ENABLE_BASIC
+    # Measured on a CPU: both load fastest with the basic optimisations (BiRefNet at 512 in 1.4 s, not 7 s unoptimised),
+    # at about the same peak (BiRefNet 1.9 GB for a picture, LaMa 0.9 GB).
+    so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_BASIC
     try:
         s = ort.InferenceSession(path, sess_options=so, providers=['CPUExecutionProvider'])
     except Exception as e:  # noqa: BLE001
@@ -169,12 +169,15 @@ def cutout(req, rid):
     t = time.time()
     # A picture with see-through parts is shown to the model on white, as a person would see it.
     view = Image.alpha_composite(Image.new('RGBA', im.size, (255, 255, 255, 255)), im).convert('RGB') if im.mode == 'RGBA' else im
-    x = np.asarray(view.resize((CUTOUT_SIZE, CUTOUT_SIZE), Image.Resampling.BILINEAR), dtype=np.float32) / 255.0
+    shape = s.get_inputs()[0].shape
+    side = shape[-1] if isinstance(shape[-1], int) else CUTOUT_SIZE
+    x = np.asarray(view.resize((side, side), Image.Resampling.BILINEAR), dtype=np.float32) / 255.0
     del view
     x = ((x - np.array(MEAN, dtype=np.float32)) / np.array(STD, dtype=np.float32)).transpose(2, 0, 1)[None]
-    logits = s.run(None, {s.get_inputs()[0].name: np.ascontiguousarray(x, dtype=np.float32)})[0][0, 0]
+    logits = s.run(None, {s.get_inputs()[0].name: np.ascontiguousarray(x, dtype=np.float32)})[0][0, 0].astype(np.float32)
     del x
-    mask = (1.0 / (1.0 + np.exp(-logits.astype(np.float32)))).astype(np.float32)
+    # Logits (the export's): made 0 to 1; a model that answers 0 to 1 already is taken as it is.
+    mask = logits if logits.min() >= 0 and logits.max() <= 1 else (1.0 / (1.0 + np.exp(-logits))).astype(np.float32)
     # The mask back to the picture's size; the faintest and the nearly whole made exact, so the background is clear.
     alpha = np.asarray(Image.fromarray(mask, 'F').resize(im.size, Image.Resampling.BILINEAR), dtype=np.float32) * 255.0
     alpha = np.clip(alpha + 0.5, 0, 255).astype(np.uint8)
