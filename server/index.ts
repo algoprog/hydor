@@ -71,6 +71,7 @@ import { appWords } from './language/index.ts';
 import { noteEvents, notesOf } from './notes.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import { isConfidential } from '../shared/confidential.ts';
+import { makeOf } from '../shared/content-asks.ts';
 import { checkExtraChange, confidentialKey, privateHelper, privateNotice } from './confidential/index.ts';
 import { localNow, setUserTimezone, userTimezone } from './userPrefs.ts';
 import { codexFolderNames } from './codex-projects.ts';
@@ -357,6 +358,8 @@ app.post('/api/sessions', async (req) => {
   if (b?.agent !== 'claude' && b?.agent !== 'codex' && b?.agent !== 'acp') throw new HttpError(400, 'Pick an agent');
   if (b.agent === 'acp' && typeof b.acpAgent !== 'string') throw new HttpError(400, 'Pick which agent');
   const extra = b.extra && typeof b.extra === 'object' && !Array.isArray(b.extra) ? (b.extra as SessionExtra) : undefined;
+  // What it is asked to make (Pages' gallery, Turn it into), kept as checked: kinds, places and words of their sizes.
+  if (extra && 'make' in extra) extra.make = makeOf(extra.make) ?? undefined;
   const prompt = typeof b.prompt === 'string' ? b.prompt : undefined;
   // Other models picked for the arena: the same prompt goes to each, in a match (server/arena).
   const others = arenaOf(extra);
