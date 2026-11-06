@@ -2,7 +2,7 @@
 // picture, a change, a drawing or a video costs in words, the kinds of picture and drawing with their examples, the
 // shapes, a table's cells as CSV, what a piece of data holds, and how long a video has been on its way.
 import type { DrawingKind, ImageTier, PictureKind, TierChoice, TierModel, TiersInfo } from '@shared/images';
-import { tierFor } from '@shared/image-tier';
+import { drawingTierFor, tierFor } from '@shared/image-tier';
 
 /** Dollars as the app writes prices: two decimals from ten cents, else two figures ("$0.04", "$0.012"). */
 export const money = (n: number) => (n >= 0.095 ? `$${n.toFixed(2)}` : `$${Number(n.toPrecision(2))}`);
@@ -15,20 +15,25 @@ export interface Price {
   button: string;
   /** The button's words once something was made: to make it again, at the same price. */
   again?: string;
+  /** It cannot be made as asked now (the line says why, and what to do). */
+  blocked?: boolean;
 }
 
 /** The tier a picture gets: the one picked, or on Auto the one its words and kind call for. */
 export const pictureTier = (choice: TierChoice, o: { prompt: string; kind?: PictureKind; refs?: number }): ImageTier => tierFor(choice, { prompt: o.prompt, kind: o.kind, refs: o.refs });
 
 /**
- * New pictures: the tier's model, so many of them; a see-through background from the model that makes them when the
- * tier's own cannot, or (the picture tools set up here) the tier's own on a plain background, taken out here for nothing.
+ * New pictures: the tier's model, so many of them. A see-through background comes from what the tier says makes one
+ * (`seeThrough`): its own model, another that can, or its own on a plain background with the background then taken
+ * out on this computer for nothing; nothing at all, and it cannot be made so now.
  */
 export function picturePrice(t: TiersInfo, o: { tier: ImageTier; count: number; transparent?: boolean }): Price {
-  const here = !!o.transparent && t.local.ready;
-  const m: TierModel = o.transparent && !here ? t.transparent : t[o.tier];
   const n = Math.max(1, Math.min(4, o.count));
   const verb = n > 1 ? 'Make them' : 'Make it';
+  const see = o.transparent ? t[o.tier].seeThrough : undefined;
+  if (o.transparent && !see) return { line: 'Nothing here makes see-through backgrounds now: set up the picture tools in Settings → Images, video and audio, or turn it off.', button: verb, again: 'Make again', blocked: true };
+  const here = !!see?.cutout;
+  const m: TierModel = see ?? t[o.tier];
   if (m.perImage == null) return { line: `With ${m.label}, through OpenRouter: it does not list its price`, button: verb, again: 'Make again' };
   const cost = m.perImage * n;
   const line =
@@ -63,17 +68,29 @@ export function toolPrice(t: TiersInfo, tool: 'cutout' | 'erase', how: 'local' |
       button: `${button} (free)`,
     };
   }
-  // A cutout is a change that keeps the subject on a see-through background; erasing, a change only under the paint.
-  const m = tool === 'cutout' ? t.transparent : t.best;
+  const m = cloudModel(t, tool);
   if (m.perImage == null) return { line: `Through OpenRouter with ${m.label}: it does not list its price`, button };
   return { cost: m.perImage, line: `Through OpenRouter: about ${money(m.perImage)} with ${m.label}`, button: `${button} (about ${money(m.perImage)})` };
 }
 
+/**
+ * The model a tool goes to through OpenRouter: a cutout is a change that keeps the subject on a see-through background
+ * (Best's maker of those, when it is a model), erasing a change only under the paint (Best's own).
+ */
+function cloudModel(t: TiersInfo, tool: 'cutout' | 'erase'): TierModel {
+  if (tool === 'erase') return t.best;
+  const see = t.best.seeThrough;
+  return see && !see.cutout ? see : t.transparent;
+}
+
 /** "Use OpenRouter instead: about $0.01", for a tool the picture tools would do here. */
 export function insteadLine(t: TiersInfo, tool: 'cutout' | 'erase'): string {
-  const m = tool === 'cutout' ? t.transparent : t.best;
+  const m = cloudModel(t, tool);
   return m.perImage == null ? 'Use OpenRouter instead' : `Use OpenRouter instead: about ${money(m.perImage)}`;
 }
+
+/** The tier a drawing gets on Auto: Best (a vector model) for illustrations and detailed asks, else Quick (written as SVG). */
+export const drawingTier = (choice: TierChoice, o: { prompt: string; kind?: DrawingKind }): ImageTier => drawingTierFor(choice, o);
 
 /** A drawing: Quick is written as SVG by a model (Claude, or the helper model), Best drawn by a vector model, priced. */
 export function drawingPrice(t: TiersInfo, tier: ImageTier): Price {
@@ -129,6 +146,11 @@ export const DRAWING_KINDS: { value: DrawingKind; label: string; hint: string; e
   { value: 'logo', label: 'Logo', hint: 'A simple mark', examples: ['A leaf in a circle', 'The letter N as a mountain', 'A cup and a book'] },
   { value: 'shape', label: 'Shape', hint: 'A badge, a banner, a frame', examples: ['A ribbon banner', 'A rounded badge with a star', 'A speech bubble'] },
 ];
+
+/** The kind of drawing nearest to what a picture was for (a picture made as a drawing instead). */
+export function drawingKindOf(k: PictureKind): DrawingKind {
+  return k === 'icon' || k === 'logo' || k === 'diagram' ? k : k === 'background' || k === 'texture' ? 'pattern' : 'illustration';
+}
 
 /** Colours to draw with when the editor has none of its own. */
 export const DEFAULT_COLORS = ['#1f3a5f', '#2a78d6', '#f2a541', '#f4f1ea'];
