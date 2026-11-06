@@ -32,6 +32,7 @@ import { opinion } from '../opinion/index.ts';
 import { pages } from '../pages/index.ts';
 import { papers } from '../papers/index.ts';
 import { pdfNotes } from '../pdfnotes/index.ts';
+import { photos } from '../photos/index.ts';
 import { plugins } from '../plugins/index.ts';
 import { releaseNotes } from '../releases/index.ts';
 import { research } from '../research/index.ts';
@@ -49,4 +50,4 @@ import type { Feature } from './types.ts';
 
 // The user's guidelines lead what an agent is told, their profile right after them, then what a confidential session
 // may not do; how to format replies follows the pages it may show instead.
-export const FEATURES: Feature[] = [guidelines, profile, confidential, pages, formatting, shots, search, browser, computer, memory, knowledge, spaces, sharing, children, swarm, research, opinion, commits, budget, documents, fileAsk, pdfNotes, images, plots, pictureTools, media, connections, signatures, automations, experiments, voice, assistants, apps, papers, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];
+export const FEATURES: Feature[] = [guidelines, profile, confidential, pages, formatting, shots, search, browser, computer, memory, knowledge, spaces, sharing, children, swarm, research, opinion, commits, budget, documents, fileAsk, pdfNotes, images, plots, pictureTools, photos, media, connections, signatures, automations, experiments, voice, assistants, apps, papers, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];
