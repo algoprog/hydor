@@ -7,7 +7,7 @@ import type { SessionExtra } from '@shared/features';
 import { usd } from '@shared/budget';
 import { arenaOf } from '@shared/arena';
 import { isConfidential } from '@shared/confidential';
-import { api, post } from '../../lib/api';
+import { api } from '../../lib/api';
 import { activityOf } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
 import { keepStartDraft, startDraft } from '../../lib/drafts';
@@ -319,7 +319,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
         atts,
         cwd: inTask ? '' : cwd,
       },
-      async () => (await post<{ key: string }>('/api/sessions', { ...body, cwd: inTask ? await taskFolderFor(prompt) : cwd })).key,
+      async () => ({ ...body, cwd: inTask ? await taskFolderFor(prompt) : cwd }),
       draft,
     );
   };

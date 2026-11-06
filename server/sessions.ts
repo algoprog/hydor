@@ -948,6 +948,40 @@ export class SessionManager extends EventEmitter {
     return l;
   }
 
+  /** Starts the page sent that are being made now, by the id it gave each (`startOnce`). */
+  private starts = new Map<string, Promise<string>>();
+
+  /**
+   * Makes a session once for a start the page sends (`id`, its own for each press of Start). Sent again because its
+   * answer was lost on the way (a phone that slept, a network that changed), the start gets the session it made, or
+   * waits for the one being made, rather than making another. Without an id, `make` simply runs.
+   */
+  startOnce(id: string | undefined, make: () => Promise<string>): Promise<string> {
+    if (!id) return make();
+    const made = this.startedBy(id);
+    if (made) return Promise.resolve(made);
+    const going = this.starts.get(id);
+    if (going) return going;
+    // Kept on the session once made in full (its message sent), so a server restarted meanwhile still knows it.
+    const p = make()
+      .then((key) => {
+        this.db.prepare('update app_sessions set start_id = ? where key = ?').run(id, key);
+        return key;
+      })
+      .finally(() => this.starts.delete(id));
+    this.starts.set(id, p);
+    return p;
+  }
+
+  /** What came of a start the page sent (`startOnce`): the session it made, or whether it is being made now. */
+  startState(id: string): { key: string | null; starting: boolean } {
+    return { key: this.startedBy(id), starting: this.starts.has(id) };
+  }
+
+  private startedBy(id: string): string | null {
+    return (this.db.prepare('select key from app_sessions where start_id = ?').get(id) as { key: string } | undefined)?.key ?? null;
+  }
+
   async create(o: CreateOpts): Promise<string> {
     // A confidential session (or a child of one): Custom with a local model, memory off (server/confidential).
     o = confidentialStart(this.db, o);

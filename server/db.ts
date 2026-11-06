@@ -180,12 +180,17 @@ export function openDb(file = paths.db): DB {
     ['account', 'text'],
     ['acp_agent', 'text'],
     ['extra', 'text'],
+    // The start the page sent that made it, so the same start sent again gets this session (SessionManager.startOnce).
+    ['start_id', 'text'],
   ]) {
     if (appCols.has(col)) continue;
     try {
       db.exec(`alter table app_sessions add column ${col} ${type}`);
     } catch {}
   }
+  try {
+    db.exec('create index if not exists app_sessions_start_id on app_sessions (start_id) where start_id is not null');
+  } catch {} // the indexer's connection got there first
   // Notes the app adds to conversations (server/notes.ts).
   db.exec(`create table if not exists session_notes (
     id text primary key, key text not null, kind text not null, at integer not null, anchor text, data text not null

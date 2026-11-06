@@ -12,8 +12,11 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   write in a message box, with the files you attach, waits there while you look at other pages. Pressing
   Start opens the session's page at once with your message and the agent at work on it (Working), as the
   session shows it, and it becomes the session as soon as the agent is up, with no loading in between; if it
-  can't start, the page says why and your message goes back in the start page's box. Pages, tabs, menus and
-  dialogs open at once, with no fade.
+  can't start, the page says why and your message goes back in the start page's box. If the connection drops
+  before the app answers (a phone gone to sleep, a change of network), the page says Reconnecting… and asks the
+  app what came of the start once it can: the session opens if it started, and one press of Start never makes two
+  sessions (after a minute out of reach, the page says so, with Try again). Pages, tabs, menus and dialogs open at
+  once, with no fade.
 - Sessions name themselves: a moment after one starts with a request, the helper model gives it a title of a few
   words ("Weekend trip to Lisbon"), shown in the sidebar, the header and the search box instead of the start of the
   message, and passed to Claude Code and Codex for their own lists. Nothing shows in the conversation; sessions
