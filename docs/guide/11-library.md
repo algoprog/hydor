@@ -20,6 +20,8 @@ In a narrower window, on a phone, or with the panel beside the conversation clos
 
 A page runs in a frame of its own, apart from the app: it can't reach the app, your files or your sign-in. It can load charting and other libraries from the web.
 
+Pictures an agent makes for a page (a picture, a drawing, a plot, a free photo) go inside the page itself, made smaller where this computer can (a page may be up to 2 MB in all), so they show wherever the page opens. A video doesn't go inside a page: a page shows YouTube and Vimeo videos by their address.
+
 Pages look like part of the app: agents make them in its theme, light or dark as the app is, in your theme's colours (your own ones too) and the app's font, and an open page changes with it when you switch. A page written with light and dark looks of its own shows the one the app is in, whatever your device is set to. Ask for another look when you want one: "in our brand's colours", "a dark page with neon accents".
 
 Slides an agent makes show in the conversation as a slideshow: click the slide or its arrows to go through it, the grid button to see every slide, and the full screen button to present it ([Slides](#slides)).
@@ -951,6 +953,16 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "Make slide 4 a copy of slide 3 where the chart moves to the right and grows, with Morph between them."
 - "Answer the comments on my 'Launch plan' slides, make the changes they ask for, and resolve them."
 - "On slide 4 of my 'Launch plan', join the steps with elbow connectors, and put my demo.mp4 on slide 6."
+- "Add a quiz on the planets after slide 5 of my 'Space' slides, and a slide with the score at the end."
+- "Make my 'Launch plan' slides PowerPoint compatible, then send me the PowerPoint file."
+- "Send me my 'Launch plan' slides as one web page I can open anywhere."
+- "Put a picture of a lighthouse at dawn on my title slide, and take the background out of the logo on slide 2."
+- "Plot the monthly totals from my 'Sales' spreadsheet on slide 5 of my 'Review' slides, as a plot that moves in the slideshow."
+- "Narrate every slide of my 'Launch plan' from its speaker notes, in a calm voice."
+- "Add a SWOT analysis slide after slide 3 of my 'Bakery plan' slides."
+- "Turn my 'Bakery plan' document into slides."
+- "Crop the photo on slide 2 of my 'Trip' slides to a square and make it warmer."
+- "Find a free photo of a mountain lake for the cover of my trip page, with its credit under it."
 - "Write me a cover letter for this job ad and keep it in my Library: I'll change it myself."
 - "Write me a 20-page report on our first year, a section at a time, so I can watch it come in."
 - "In my 'Field report' document, rewrite only the section 'Results' and add a summary at the end."

@@ -375,6 +375,35 @@ agents that speak ACP and take MCP servers.
   in its Header & Footer boxes, charts with their data for Edit Data), PDF, pictures of the slides
   (PNG) or a web page that presents itself, and open as a slideshow at their own address or a published link. PowerPoint files (.pptx) open as decks to edit,
   their layouts, text, pictures, tables, charts, groups, connectors, videos, notes and comments brought in.
+  Decks are made for the web unless made PowerPoint compatible (Theme → Made for, or Tools → PowerPoint compatible,
+  which first lists what changes, slide by slide; a deck opened from a .pptx starts so). The web format adds
+  interactive parts (Insert → Interactive: custom code, a small web page of HTML, CSS and JavaScript in a sandboxed
+  frame, from four starters or written by an agent; a web page or a site's embed code; quizzes and polls with what
+  is said for each choice, and a quiz score; 3D shapes, words or your own .glb or .gltf models, with materials,
+  lighting, turning and viewers turning them; and code shown coloured, in both formats), seventeen more effects
+  (Typewriter, Count up, Draw the lines, Confetti burst…), started by a click on a part, word by word or letter by
+  letter, kept going, with springs and bounces; cube, flip, dissolve, circle, blinds and glitch transitions; moving
+  backgrounds and a video behind a slide; text effects, frosted glass and effects when the pointer is on a part;
+  and a progress bar. Live parts run in the slideshow, the presenter's and audience's windows and the deck's own
+  page, and show their picture in the editor until Run; the deck's web page is one small file with its fonts,
+  pictures, 3D models and videos inside; its PowerPoint file has live parts as pictures of them running (a quiz as
+  text boxes, its answer in the notes) and effects as PowerPoint's nearest, with a note of what changed. Pictures go
+  in shapes (fourteen) or device frames (an instant photo, a phone, a laptop, a browser window); free photos come
+  from Openverse (Wikimedia Commons when it cannot answer), their credits in the notes and a caption where the
+  licence asks; QR codes; slides from another deck (their look kept or this deck's); charts from a Library
+  spreadsheet that update from it; My themes (colours, fonts and a logo on every slide, also in New → Slides); a
+  video's end as well as its start; and an eyedropper in the colour pickers. Design ideas lay the slide out anew
+  from its own words, pictures and numbers (thirteen designs, by the helper model); Rewrite makes picked words
+  shorter, longer, simpler, more formal, friendlier, correct or in another language; Animate every slide is
+  Subtle, Lively or Striking; Check accessibility lists missing titles, reading order, pictures without a
+  description (written with AI on request), low contrast, small words, videos with sound that start by themselves
+  and tables without a header row, fixing what it can; Translate the slides asks the agent. Each slide may have a
+  narration, recorded from its notes or made with AI (priced first), played by a narrated show that goes on by
+  itself and kept in the PowerPoint file; Rehearse with coach times each slide, hears the pace, filler words (in six
+  languages) and slides read out, and can give each slide its rehearsed time; Record a video records the slideshow
+  with your voice and a camera bubble (Keep in the Library or Download); the camera bubble (V) shows in the
+  slideshow, the presenter's view and the audience's window; and a phone opened from a QR code is the remote (next,
+  back, any slide, a black screen, notes, a timer and the next slide).
 - **Documents, spreadsheets and LaTeX**: kept in the Library beside slides, each with versions, a picture in the list,
   its own address, menus with Search the menus, find and replace, a list of its keyboard shortcuts, and an agent that
   changes it on request, whose work you watch as it writes (slides too: the agent's caret where its words arrive, the
@@ -389,7 +418,11 @@ agents that speak ACP and take MCP servers.
   that agents read, answer and resolve (a Word file's keep their authors), Suggesting as Word's track changes and
   Google Docs' suggestions (accepted or rejected one by one or all at once, kept as Word's tracked changes both ways,
   and made by agents too), a comparison with any earlier version, paste from Word and Google Docs cleaned, an outline, zoom, a word count and
-  printing; they export as Word (styles, lists, tables, pictures, comments, tracked changes, equations, the table of
+  printing, pictures, drawings and plots made with AI (Insert, "/", and a table's Make a plot of this table), free
+  photos with their credit as the caption, a picked picture changed with AI (in words, its background taken out,
+  part of it erased) or edited in the picture editor, Rewrite of the words picked, and a Section made with AI (an
+  executive summary, a table of risks…); a picture, table or line put in from a table's cell goes after the table;
+  they export as Word (styles, lists, tables, pictures, comments, tracked changes, equations, the table of
   contents and headers and footers as Word's own; laid out so Word's pages break where the editor's do, the
   document's fonts inside the file), PDF on their paper, Markdown or a web page. Spreadsheets (save_sheet, with
   formulas, or opened from an Excel, ODS, CSV or TSV file) work as in Excel, Google Sheets or Airtable: a grid that
