@@ -158,6 +158,10 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Site up check**](/settings?s=tasks&find=Site%20up%20check): A ready-made scheduled task.
 - [**Disk space alert**](/settings?s=tasks&find=Disk%20space%20alert): A ready-made scheduled task.
 - [**Review new pull requests**](/settings?s=tasks&find=Review%20new%20pull%20requests): A ready-made scheduled task.
+- [**CI doctor**](/settings?s=tasks&find=CI%20doctor): A ready-made scheduled task.
+- [**Issue triage**](/settings?s=tasks&find=Issue%20triage): A ready-made scheduled task.
+- [**Dependency gardener**](/settings?s=tasks&find=Dependency%20gardener): A ready-made scheduled task.
+- [**Incident first responder**](/settings?s=tasks&find=Incident%20first%20responder): A ready-made scheduled task.
 - [**New files in a folder**](/settings?s=tasks&find=New%20files%20in%20a%20folder): A ready-made scheduled task.
 - [**Reminder**](/settings?s=tasks&find=Reminder): A ready-made scheduled task.
 
@@ -216,14 +220,16 @@ You don’t have to know where an option lives: type what you want in the search
 [Settings → Child sessions](/settings?s=children): agents handing parts of a job to other agents, and swarms for hard problems. More in [Deep research, second opinions and several agents](/guide/research).
 
 - [**Working at once, per session**](/settings?s=children&find=Working%20at%20once%2C%20per%20session): How many child sessions one session runs at once.
-- [**Swarm size**](/settings?s=children&find=Swarm%20size): How many agents of a swarm work at once.
+- [**Swarm size**](/settings?s=children&find=Swarm%20size): How many agents of a swarm or campaign work at once.
 
 ### Images, video and audio
 
 [Settings → Images, video and audio](/settings?s=images): pictures, videos, music and voices agents make for you through OpenRouter, and who writes their captions in the Library. More in [Documents, images, videos and voice](/guide/documents-voice).
 
 - [**Making images**](/settings?s=images&find=Making%20images): Let agents make images.
-- [**Image model**](/settings?s=images&find=Image%20model): The model that makes them.
+- [**For most pictures (Best)**](/settings?s=images&find=For%20most%20pictures%20%28Best%29): The model that makes most pictures, and every change to one.
+- [**For simple pictures (Quick)**](/settings?s=images&find=For%20simple%20pictures%20%28Quick%29): A cheaper, quicker model for icons, backgrounds, textures and simple pictures.
+- [**Picture tools on this computer**](/settings?s=images&find=Picture%20tools%20on%20this%20computer): Take a picture’s background out, or erase part of it, here: free, and your pictures stay on this computer.
 - [**Making videos**](/settings?s=images&find=Making%20videos): Let agents make videos.
 - [**Video model**](/settings?s=images&find=Video%20model): The model that makes videos.
 - [**Making audio**](/settings?s=images&find=Making%20audio): Let agents make audio.
