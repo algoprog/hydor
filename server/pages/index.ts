@@ -36,7 +36,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
 import type { FastifyRequest } from 'fastify';
-import type { PagesEvent, PublishRequest } from '../../shared/pages.ts';
+import type { PageInfo, PagesEvent, PublishRequest } from '../../shared/pages.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { resolvePath } from '../files.ts';
@@ -100,6 +100,7 @@ import {
   changeComments,
   storageMap,
   renamePage,
+  describePage,
   resetPageLink,
   setPageSpace,
   restoreVersion,
@@ -111,7 +112,10 @@ import {
 import { dropThumbs, enableThumbs, refreshThumbs, thumbFile } from './thumbs.ts';
 import { agentPlace, changeFolder, deleteFolder, folderPath, listFolders, makeFolder, placeFor, putInFolder } from './folders.ts';
 import { importFolder } from './import-folder.ts';
-import type { LibFolder } from '../../shared/pages.ts';
+import { describeLater, enableDescriptions } from './describe.ts';
+import { searchLibrary } from './search.ts';
+import { meaningStarting } from '../memory/embed.ts';
+import { DESCRIPTION_WORDS, type LibFolder } from '../../shared/pages.ts';
 
 export { MAX_PAGE } from './store.ts';
 
@@ -126,6 +130,41 @@ const FOLDER_PROP = {
   description: 'A folder of the user’s Library to put it in: its name ("Thesis"), or a path ("Thesis/Drafts"); made when missing. Left out, something new goes at the top of the session’s project, and one you change stays where it is.',
 };
 const withFolder = <S extends { properties?: Record<string, unknown> }>(schema: S): S => ({ ...schema, properties: { ...schema.properties, libraryFolder: FOLDER_PROP } });
+
+/** The save tools' description: what the Library shows of it besides its title, and what its search finds it by. */
+const DESCRIPTION_PROP = {
+  type: 'string',
+  description: `What it is, in two or three sentences (under ${DESCRIPTION_WORDS} words): what it holds or covers and what it is for, with the names, topics and dates someone would look for it by. The Library shows it, and its search (and the user's and agents' searches) find it by it. Give it whenever you make one; on a new version, only when what it is has changed (left out, it keeps the one it has). With id and nothing else to save, it changes the description (and title) alone, as no new version.`,
+};
+const withDescription = <S extends { properties?: Record<string, unknown> }>(schema: S): S => ({ ...schema, properties: { ...schema.properties, description: DESCRIPTION_PROP } });
+
+/** What a save may carry besides what it saves: with an id and nothing else, it changes these alone (describeOnly). */
+const NAMING = new Set(['id', 'title', 'description', 'project', 'libraryFolder']);
+const given = (v: unknown) => v !== undefined && v !== null && v !== '';
+
+/**
+ * A save of a page the agent names that gives only its title and description (and folder), and nothing to save: they
+ * change, and no new version is made. The answer for the agent, or null for any other save.
+ */
+function describeOnly(ctx: RunCtx, a: Record<string, unknown>, kind: PageKind | 'page'): string | null {
+  const id = typeof a.id === 'string' && a.id.trim() ? a.id.trim() : null;
+  if (!id || !(given(a.description) || given(a.title)) || Object.entries(a).some(([k, v]) => !NAMING.has(k) && given(v))) return null;
+  const db = ctx.deps.db;
+  const cur = mustPage(db, id);
+  if ((cur.kind ?? 'page') !== kind) return null;
+  if (given(a.title)) renamePage(db, id, a.title);
+  if (given(a.description)) describePage(db, id, a.description);
+  moveForAgent(db, id, a.libraryFolder, ctx.key);
+  tell(ctx.deps, { what: 'pages' });
+  // No new version: the draft the user may have watched come in gives way to the page as it is.
+  if (kind !== 'page') settleDraft(ctx.deps, ctx.key, mustKind(kind).tool, id, { failed: true });
+  const p = mustPage(db, id);
+  const changed = [given(a.title) && 'title', given(a.description) && 'description'].filter(Boolean).join(' and ');
+  return `Changed the ${changed} of "${p.title}" (page ${p.id}); it is otherwise as it was (still version ${p.version}).${p.description ? ` Its description: ${p.description}` : ''}`;
+}
+
+/** For the agent, about a new page it saved without a description. */
+const DESCRIBE_NOTE = `It had no description, so one is being written from what it holds; give description (under ${DESCRIPTION_WORDS} words: what it is and what it is for) whenever you save something new.`;
 
 /** A kind a request names, checked. */
 const mustKindName = (k: string): PageKind => {
@@ -183,6 +222,7 @@ const SAVE_PAGE: RunTool = {
     'The user can leave comments on a page’s blocks in its editor; get_page shows them, and comments answers, resolves or adds them (with id; leave html out to only answer them).',
     'A database block’s rows are the page’s own data: get_page shows them, and databases adds, changes or removes them (with id; leave html out to only change them).',
     'Pictures: name a picture file of your folder (one generate_image, make_svg or make_plot made: images/…) as an img’s src or in CSS url(): it goes inside the page (made smaller where this computer can); a page with its pictures may be up to 2 MB.',
+    `Give each new page a description (under ${DESCRIPTION_WORDS} words): the Library shows it and its search finds the page by it.`,
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -203,6 +243,7 @@ const SAVE_PAGE: RunTool = {
       },
       project: { type: 'string', description: 'The project (by its name) to keep it in; left out, this session’s project.' },
       libraryFolder: FOLDER_PROP,
+      description: DESCRIPTION_PROP,
     },
     required: ['title'],
   },
@@ -211,6 +252,8 @@ const SAVE_PAGE: RunTool = {
     const id = typeof a.id === 'string' && a.id.trim() ? a.id.trim() : null;
     const other = id ? kindOf(mustPage(db, id).kind) : null;
     if (other) throw new Error(`Page ${id} is a ${other.noun}: change it with ${other.tool}.`);
+    const named = describeOnly(ctx, a, 'page');
+    if (named) return named;
     const answering = a.comments !== undefined && a.comments !== null;
     const rows = a.databases && typeof a.databases === 'object' && !Array.isArray(a.databases) ? (a.databases as Record<string, unknown>) : null;
     if ((a.html === undefined || a.html === null || a.html === '') && !(id && (answering || rows)))
@@ -255,17 +298,22 @@ const SAVE_PAGE: RunTool = {
       return [` Its comments: ${open} open, ${r.list.length - open} resolved.`, ...r.notes].join(' ');
     };
     if (a.html === undefined || a.html === null || a.html === '') {
+      if (given(a.description)) describePage(db, id!, a.description);
       const page = mustPage(db, id!);
-      const done = [answering && 'answered its comments', rows && 'changed its databases'].filter(Boolean).join(' and ');
+      const done = [answering && 'answered its comments', rows && 'changed its databases', given(a.description) && 'changed its description'].filter(Boolean).join(' and ');
       return `Saved "${page.title}" (page ${page.id}): ${done}; the page itself is as it was.${await fill(page.id)}${comment(page.id)}`;
     }
     // Pictures from the session's folder (and the app's kept ones) go inside the page.
     const pictured = typeof a.html === 'string' ? pagePictures(db, a.html, ctx.cwd) : { html: a.html, notes: [] };
-    const p = id ? addVersion(db, id, { title: a.title, html: pictured.html, by: 'agent' }) : createPage(db, { title: a.title, html: pictured.html, by: 'agent', ...placeOf(ctx, a.project, a.libraryFolder) });
+    const p = id
+      ? addVersion(db, id, { title: a.title, html: pictured.html, by: 'agent', description: a.description })
+      : createPage(db, { title: a.title, html: pictured.html, by: 'agent', description: a.description, ...placeOf(ctx, a.project, a.libraryFolder) });
     if (id) moveForAgent(db, id, a.libraryFolder, ctx.key);
     tell(ctx.deps, { what: 'pages' });
     refreshThumbs(ctx.deps, [p.id]);
-    return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.${pictured.notes.length ? ` ${pictured.notes.join(' ')}` : ''}${await fill(p.id)}${comment(p.id)}`;
+    const unnamed = !p.description;
+    if (unnamed) describeLater(ctx.deps, p.id);
+    return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.${pictured.notes.length ? ` ${pictured.notes.join(' ')}` : ''}${unnamed && !id ? ` ${DESCRIBE_NOTE}` : ''}${await fill(p.id)}${comment(p.id)}`;
   },
 };
 
@@ -276,11 +324,13 @@ const GET_PAGE: RunTool = {
   name: 'get_page',
   annotations: { readOnlyHint: true },
   description:
-    'The user’s saved pages, slide decks, documents, spreadsheets, LaTeX documents and Jupyter notebooks (Pages). With no id: each one’s id, title, kind, project and Library folder, version and last change. With an id: a page’s current HTML, the data it stores and the comments on its blocks (to change it, or answer them, with save_page), or a deck’s slides, a document, a spreadsheet, a LaTeX project or a notebook’s cells and outputs as it is kept (to change it with save_slides, save_doc, save_sheet, save_latex or save_notebook), or to answer questions about it. With path instead: a LaTeX file of this computer (as Files opens it in its editor): the comments the user wrote on the words of its project’s files, which the app keeps beside them (answer them with save_latex’s path and comments).',
+    'The user’s saved pages, slide decks, documents, spreadsheets, LaTeX documents and Jupyter notebooks (Pages). With no id: each one’s id, title, kind, project and Library folder, version and last change (and its description, when there are few). With query: the ones that fit it best, found by their titles and descriptions, by words and by meaning, each with its description: to find the one the user means among many. With an id: its description, then a page’s current HTML, the data it stores and the comments on its blocks (to change it, or answer them, with save_page), or a deck’s slides, a document, a spreadsheet, a LaTeX project or a notebook’s cells and outputs as it is kept (to change it with save_slides, save_doc, save_sheet, save_latex or save_notebook), or to answer questions about it. With path instead: a LaTeX file of this computer (as Files opens it in its editor): the comments the user wrote on the words of its project’s files, which the app keeps beside them (answer them with save_latex’s path and comments).',
   inputSchema: {
     type: 'object',
     properties: {
       id: { type: 'string', description: 'A saved page’s id.' },
+      query: { type: 'string', description: 'Instead of id: what to look for ("the budget for the Lisbon trip", "thesis slides"): the pages that fit it best, best first.' },
+      limit: { type: 'number', description: 'With query: how many, at most (10 unless set, up to 50).' },
       path: { type: 'string', description: 'Instead of id: a .tex file of this computer, for the comments kept on its project.' },
     },
   },
@@ -292,21 +342,29 @@ const GET_PAGE: RunTool = {
       const list = listPages(db).filter((p) => !outOfReach(ctx, p));
       const names = new Map(allSpaces(db).map((x) => [x.id, x.name]));
       const folders = new Map<string, LibFolder>(listFolders(db).map((f) => [f.id, f]));
+      const line = (p: PageInfo, described: boolean) =>
+        `- ${p.id} · ${p.title}${p.kind ? ` · ${kindOf(p.kind)?.noun ?? p.kind}` : ''}${p.space && names.has(p.space) ? ` · in the project “${names.get(p.space)}”` : ''}${p.folder && folders.has(p.folder) ? ` · in the folder “${folderPath(db, p.folder, folders)}”` : ''} · version ${p.version} · changed ${new Date(p.updatedAt).toISOString()}${described && p.description ? `\n  ${p.description}` : ''}`;
+      // Looking for one: the best by their titles and descriptions, by words and by meaning (search.ts).
+      const query = typeof a.query === 'string' ? a.query.trim() : '';
+      if (query) {
+        const limit = Math.max(1, Math.min(50, Math.round(Number(a.limit)) || 10));
+        const r = await searchLibrary(db, query, { pages: list, media: false, limit, wait: 15_000, min: 0.3 });
+        if (!r.hits.length) return `Nothing in the Library fits “${query}”${r.meaning ? '' : ' by its words'}. Without query, get_page lists everything.`;
+        return [`The ${r.hits.length === 1 ? 'one' : `${r.hits.length}`} that fit “${query}” best${r.meaning ? ' (by words and by meaning)' : ' (by words: search by meaning is not running)'}, best first:`, ...r.hits.map((h) => line(h.page!, true))].join('\n');
+      }
+      // Few: each with its description too; many: their titles, and query finds one by what it is.
+      const few = list.length <= 30;
       return list.length
-        ? list
-            .map(
-              (p) =>
-                `- ${p.id} · ${p.title}${p.kind ? ` · ${kindOf(p.kind)?.noun ?? p.kind}` : ''}${p.space && names.has(p.space) ? ` · in the project “${names.get(p.space)}”` : ''}${p.folder && folders.has(p.folder) ? ` · in the folder “${folderPath(db, p.folder, folders)}”` : ''} · version ${p.version} · changed ${new Date(p.updatedAt).toISOString()}`,
-            )
-            .join('\n')
+        ? [...list.map((p) => line(p, few)), ...(few ? [] : [`(${list.length} in all: get_page with query finds the ones that fit what you look for, with their descriptions.)`])].join('\n')
         : 'No saved pages yet.';
     }
     const p = mustPage(db, id);
     if (outOfReach(ctx, p)) throw new HttpError(404, 'No saved page with that id');
     const k = kindOf(p.kind);
+    const about = p.description ? ` Its description: ${p.description}` : ' It has no description yet.';
     if (k) {
       const by = p.who ? ` It was last changed by ${p.who}, someone the user shared the project with: keep their changes.` : p.by === 'edit' || p.by === 'made' ? ` It was last changed by the user in its editor: keep their changes.` : '';
-      return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${by} ${k.forAgent(pageSource(db, id)!.text)}`;
+      return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${about}${by} ${k.forAgent(pageSource(db, id)!.text)}`;
     }
     const html = (await pageHtml(db, id))!.html;
     const data = storageText(db, id);
@@ -315,7 +373,7 @@ const GET_PAGE: RunTool = {
     const cut = html.length > 100_000 ? `${html.slice(0, 100_000)}\n… (cut: the page is ${Math.round(html.length / 1024)} KB; write the whole page anew to change it)` : html;
     const notes = commentsForAgent(pageComments(db, id));
     const dbs = dbsForAgent(html, storageMap(db, id));
-    return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${by}\n\n${data ? `Stored data:\n${data}\n\n` : 'It stores no data yet.\n\n'}${dbs ? `${dbs}\n\n` : ''}${notes ? `${notes}\n\n` : ''}HTML:\n${cut}`;
+    return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${about}${by}\n\n${data ? `Stored data:\n${data}\n\n` : 'It stores no data yet.\n\n'}${dbs ? `${dbs}\n\n` : ''}${notes ? `${notes}\n\n` : ''}HTML:\n${cut}`;
   },
 };
 
@@ -371,19 +429,21 @@ const newTurn = (key: string) => {
  * project it names, else its session's). Its saves of a page in a row, in one turn, are kept as one version (store.ts
  * addVersion), so working in steps does not fill the Versions list.
  */
-function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknown, model: unknown, project?: unknown, folder?: unknown) {
+function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknown, model: unknown, o: { project?: unknown; folder?: unknown; description?: unknown } = {}) {
   const db = ctx.deps.db;
   const turn = turns.get(ctx.key) ?? newTurn(ctx.key);
   let folded: number | undefined;
   const p = id
-    ? addVersion(db, id, { title, model, by: 'agent', turn, onFold: (v) => (folded = v) })
-    : createPage(db, { title, kind, model, by: 'agent', turn, ...placeOf(ctx, project, folder) });
-  if (id) moveForAgent(db, id, folder, ctx.key);
+    ? addVersion(db, id, { title, model, by: 'agent', turn, description: o.description, onFold: (v) => (folded = v) })
+    : createPage(db, { title, kind, model, by: 'agent', turn, description: o.description, ...placeOf(ctx, o.project, o.folder) });
+  if (id) moveForAgent(db, id, o.folder, ctx.key);
   tell(ctx.deps, { what: 'pages' });
   refreshThumbs(ctx.deps, [p.id]);
   // The draft the user watched while the call came in gives way to this version.
   settleDraft(ctx.deps, ctx.key, mustKind(kind).tool, id, { saved: { pageId: p.id, version: p.version } });
-  return { ...p, folded };
+  // Without a description (an agent's that left it out, or one kept from before descriptions): the helper writes one.
+  if (!p.description) describeLater(ctx.deps, p.id);
+  return { ...p, folded, describeNote: !id && !p.description ? [DESCRIBE_NOTE] : [] };
 }
 
 /** A saved page an agent changed, put in the folder it names (made when missing), when it names one. */
@@ -413,9 +473,11 @@ const watched = (tool: RunTool): RunTool => ({
 const SAVE_SLIDES: RunTool = {
   name: 'save_slides',
   description: SAVE_SLIDES_DESCRIPTION,
-  inputSchema: withProject(withFolder(SAVE_SLIDES_SCHEMA)),
+  inputSchema: withDescription(withProject(withFolder(SAVE_SLIDES_SCHEMA))),
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'slides');
+    const named = describeOnly(ctx, a, 'slides');
+    if (named) return named;
     const prev = id ? pageSource(ctx.deps.db, id)?.text : undefined;
     // Its format and progress bar stay as they were unless the call says (a PowerPoint compatible deck stays one).
     let kept: ReturnType<typeof readDeck> | null = null;
@@ -438,11 +500,12 @@ const SAVE_SLIDES: RunTool = {
     const made = await agentDeck(ctx.deps.db, input, ctx.cwd, prev);
     const notes = made.notes;
     const deck = withSheetsAndLogo(ctx.deps.db, made.deck, { logo: a.logo }, notes);
-    const p = keepModel(ctx, id, 'slides', a.title, deck, a.project, a.libraryFolder);
+    const p = keepModel(ctx, id, 'slides', a.title, deck, { project: a.project, folder: a.libraryFolder, description: a.description });
     const n = deck.slides.length;
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} slide${n === 1 ? '' : 's'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it, present it and export it to PowerPoint or PDF.`,
       ...foldNote(p),
+      ...p.describeNote,
       ...notes,
     ].join(' ');
   },
@@ -451,10 +514,12 @@ const SAVE_SLIDES: RunTool = {
 const SAVE_DOC: RunTool = {
   name: 'save_doc',
   description: SAVE_DOC_DESCRIPTION,
-  inputSchema: withProject(withFolder(SAVE_DOC_SCHEMA)),
+  inputSchema: withDescription(withProject(withFolder(SAVE_DOC_SCHEMA))),
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'doc');
-    const { id: _id, title: _title, project: _project, edits, libraryFolder: _into, ...rest } = a;
+    const named = describeOnly(ctx, a, 'doc');
+    if (named) return named;
+    const { id: _id, title: _title, project: _project, edits, libraryFolder: _into, description: _description, ...rest } = a;
     const prev = id ? pageSource(ctx.deps.db, id)?.text : undefined;
     // Small changes: made on its Markdown as get_page gives it, then saved as the whole document sent back would be.
     if (edits !== undefined && edits !== null) {
@@ -465,10 +530,11 @@ const SAVE_DOC: RunTool = {
     }
     // The version it changes: what the agent leaves out (paper, font) stays, and unchanged blocks keep their ids.
     const { doc, notes } = await agentDoc(ctx.deps.db, rest, ctx.cwd, prev);
-    const p = keepModel(ctx, id, 'doc', a.title, doc, a.project, a.libraryFolder);
+    const p = keepModel(ctx, id, 'doc', a.title, doc, { project: a.project, folder: a.libraryFolder, description: a.description });
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Word or Google Docs and export it as a Word document, a PDF or Markdown.`,
       ...foldNote(p),
+      ...p.describeNote,
       ...notes,
     ].join(' ');
   },
@@ -477,10 +543,12 @@ const SAVE_DOC: RunTool = {
 const SAVE_SHEET: RunTool = {
   name: 'save_sheet',
   description: SAVE_SHEET_DESCRIPTION,
-  inputSchema: withProject(withFolder(SAVE_SHEET_SCHEMA)),
+  inputSchema: withDescription(withProject(withFolder(SAVE_SHEET_SCHEMA))),
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'sheet');
-    const { id: _id, title: _title, project: _project, update, libraryFolder: _into, ...rest } = a;
+    const named = describeOnly(ctx, a, 'sheet');
+    if (named) return named;
+    const { id: _id, title: _title, project: _project, update, libraryFolder: _into, description: _description, ...rest } = a;
     const prev = id ? readBook(pageSource(ctx.deps.db, id)!.text) : undefined;
     // Some cells changed: on top of the sheets they name, the others as they are.
     if (update !== undefined && update !== null) {
@@ -491,11 +559,12 @@ const SAVE_SHEET: RunTool = {
     }
     // The version it changes: its comments' threads stay as they are, changed only by the comments asked for.
     const { book, notes } = await agentBook(rest, ctx.cwd, prev);
-    const p = keepModel(ctx, id, 'sheet', a.title, book, a.project, a.libraryFolder);
+    const p = keepModel(ctx, id, 'sheet', a.title, book, { project: a.project, folder: a.libraryFolder, description: a.description });
     const n = book.sheets.length;
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} sheet${n === 1 ? '' : 's'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Excel or Google Sheets and export it as an Excel file, a CSV or a PDF.`,
       ...foldNote(p),
+      ...p.describeNote,
       ...notes,
     ].join(' ');
   },
@@ -504,7 +573,7 @@ const SAVE_SHEET: RunTool = {
 const SAVE_LATEX: RunTool = {
   name: 'save_latex',
   description: SAVE_LATEX_DESCRIPTION,
-  inputSchema: withProject(withFolder(SAVE_LATEX_SCHEMA)),
+  inputSchema: withDescription(withProject(withFolder(SAVE_LATEX_SCHEMA))),
   async run(a, ctx) {
     const db = ctx.deps.db;
     // A file of this computer's: its comments only (the app keeps them); the file the agent changes itself.
@@ -516,7 +585,9 @@ const SAVE_LATEX: RunTool = {
       return r.text;
     }
     const id = changing(db, a, 'tex');
-    const { id: _id, project: _project, edits, libraryFolder: _into, ...rest } = a;
+    const named = describeOnly(ctx, a, 'tex');
+    if (named) return named;
+    const { id: _id, project: _project, edits, libraryFolder: _into, description: _description, ...rest } = a;
     const prev = id ? readTex(pageSource(db, id)!.text) : undefined;
     // Small changes in its files: made on them as get_page gives them, the files they change then sent as written.
     if (edits !== undefined && edits !== null) {
@@ -535,11 +606,12 @@ const SAVE_LATEX: RunTool = {
     const { doc, notes } = await agentTex(db, rest, ctx.cwd, prev);
     // Typeset first: the agent hears of errors to fix, and the picture in the list comes from this run.
     const r = await compileTex(db, doc);
-    const p = keepModel(ctx, id, 'tex', a.title, doc, a.project, a.libraryFolder);
+    const p = keepModel(ctx, id, 'tex', a.title, doc, { project: a.project, folder: a.libraryFolder, description: a.description });
     return [
       [
         `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit the source beside its typeset pages and export it as a PDF, its .tex source or the project as a .zip.`,
         ...foldNote(p),
+        ...p.describeNote,
         ...notes,
       ].join(' '),
       compileSummary(r),
@@ -550,14 +622,19 @@ const SAVE_LATEX: RunTool = {
 const SAVE_NOTEBOOK: RunTool = {
   name: 'save_notebook',
   description: SAVE_NOTEBOOK_DESCRIPTION,
-  inputSchema: withFolder(SAVE_NOTEBOOK_SCHEMA),
+  inputSchema: withDescription(withFolder(SAVE_NOTEBOOK_SCHEMA)),
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'notebook');
+    const named = describeOnly(ctx, a, 'notebook');
+    if (named) return named;
     const nb = agentNotebook(a, (p) => fromSession(ctx.cwd, p));
-    const p = keepModel(ctx, id, 'notebook', a.title, nb, a.libraryFolder);
+    const p = keepModel(ctx, id, 'notebook', a.title, nb, { folder: a.libraryFolder, description: a.description });
     const cells = Array.isArray(nb.cells) ? nb.cells : [];
     const outs = cells.filter((c: { outputs?: unknown[] }) => c.outputs?.length).length;
-    return `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${cells.length} cell${cells.length === 1 ? '' : 's'}, ${outs ? `${outs} with outputs` : 'no outputs yet'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can read it, edit and run its cells, ask an agent about it, and export it as an .ipynb file, a Python script, a PDF or a web page.`;
+    return [
+      `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${cells.length} cell${cells.length === 1 ? '' : 's'}, ${outs ? `${outs} with outputs` : 'no outputs yet'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can read it, edit and run its cells, ask an agent about it, and export it as an .ipynb file, a Python script, a PDF or a web page.`,
+      ...p.describeNote,
+    ].join(' ');
   },
 };
 
@@ -643,7 +720,7 @@ const PUBLISH_SITE: RunTool = {
  * keep" wrote an HTML file that never reached Pages.
  */
 const INSTRUCTIONS =
-  'Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, and a Jupyter notebook to read, run and come back to (a lesson, an analysis to show) with save_notebook, unless they ask for a file made another way or it belongs with a project’s code and data in a folder. get_page lists all of these, to change one, with the Library folder each is in; the save tools’ libraryFolder puts one in a folder of the Library (by its name or a path, made when missing). export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown, LaTeX, a notebook or a Python script). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how. When the user asks for a known kind of slide, deck, document, section, page part, page or spreadsheet by name (a SWOT slide, a pitch deck, a cover letter, an executive summary, a habit tracker, a pricing table, a budget), read how to make it well with how_to_make before you make it.';
+  `Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, and a Jupyter notebook to read, run and come back to (a lesson, an analysis to show) with save_notebook, unless they ask for a file made another way or it belongs with a project’s code and data in a folder. get_page lists all of these, to change one, with the Library folder each is in, and its query finds the ones that fit what you look for; the save tools’ libraryFolder puts one in a folder of the Library (by its name or a path, made when missing), and their description says what it is (under ${DESCRIPTION_WORDS} words, given with each new one): the Library shows it, and its search finds things by it. export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown, LaTeX, a notebook or a Python script). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how. When the user asks for a known kind of slide, deck, document, section, page part, page or spreadsheet by name (a SWOT slide, a pitch deck, a cover letter, an executive summary, a habit tracker, a pricing table, a budget), read how to make it well with how_to_make before you make it.`;
 
 /** A request made from a page or deck open in Pages (`extra.page`: its id): the session is about changing it. */
 function askInstructions(db: Deps['db'], v: unknown): string | null {
@@ -748,6 +825,8 @@ function routes(d: Deps) {
     const r = await importFolder(db, b.path, { space, folder: typeof b.folder === 'string' && b.folder ? b.folder : null, sessionKey: key(b.sessionKey) });
     if (r.pages.length || r.folders) tell(d, { what: 'pages' });
     if (r.pages.length) refreshThumbs(d, r.pages.map((p) => p.id));
+    // Each gets a description, from what it holds.
+    for (const p of r.pages) describeLater(d, p.id);
     return r;
   });
   app.get('/api/pages/kept', async (req) => ({ items: keptIn(db, String((req.query as { key?: string }).key ?? '')) }));
@@ -776,8 +855,8 @@ function routes(d: Deps) {
       const place = placeFor(db, b.folder, spaceChoice(db, b.space, sessionSpace(db, sessionKey)));
       page =
         typeof b.kind === 'string' && b.kind !== 'page'
-          ? createPage(db, { title: b.title, kind: mustKindName(b.kind), model: b.model ?? mustKind(b.kind).fresh(typeof b.title === 'string' && b.title.trim() ? b.title.trim() : ''), by: 'made', sessionKey, ...place })
-          : createPage(db, { title: b.title, html: b.html, by: item ? 'user' : 'made', sessionKey, sourceItem: item, ...place });
+          ? createPage(db, { title: b.title, kind: mustKindName(b.kind), model: b.model ?? mustKind(b.kind).fresh(typeof b.title === 'string' && b.title.trim() ? b.title.trim() : ''), by: 'made', sessionKey, description: b.description, ...place })
+          : createPage(db, { title: b.title, html: b.html, by: item ? 'user' : 'made', sessionKey, sourceItem: item, description: b.description, ...place });
       try {
         if (data.length) putValues(db, page.id, data.filter(([, v]) => v !== undefined));
       } catch (e) {
@@ -791,6 +870,8 @@ function routes(d: Deps) {
       noteEdit(db, [sessionKey], page.id, from, page.version, fresh && !!item);
     }
     changed(page.id);
+    // A page kept from a conversation says what it is (one made empty, to fill in, waits for its maker).
+    if (item && !page.description) describeLater(d, page.id);
     return { page: pageInfo(db, page.id) };
   });
   app.get('/api/pages/:id', async (req) => {
@@ -833,16 +914,23 @@ function routes(d: Deps) {
       model: got.model,
       by: 'made',
       sessionKey: key(b.sessionKey),
+      description: b.description,
       ...placeFor(db, b.folder, spaceChoice(db, b.space, sessionSpace(db, key(b.sessionKey)))),
     });
     changed(page.id);
+    // A file brought in says what it is: the helper reads it.
+    if (!page.description) describeLater(d, page.id);
     return { page, notes: got.notes ?? [] };
   });
-  /** Renames a page ({ title }), moves it to a space ({ space: a space's id, or null for none }), or into a Library folder ({ folder: an id, or null for none }). */
+  /**
+   * Renames a page ({ title }), gives it a description ({ description }: '' takes it away), moves it to a space ({ space: a
+   * space's id, or null for none }), or into a Library folder ({ folder: an id, or null for none }).
+   */
   app.patch('/api/pages/:id', async (req) => {
     const b = B(req);
     const id = P(req).id;
-    if (b.title === undefined && b.space === undefined && b.folder === undefined) throw new HttpError(400, 'Send its new title, the project to move it to (space: an id, or null), or the folder to put it in (folder: an id, or null)');
+    if (b.title === undefined && b.description === undefined && b.space === undefined && b.folder === undefined)
+      throw new HttpError(400, 'Send its new title, its description, the project to move it to (space: an id, or null), or the folder to put it in (folder: an id, or null)');
     let page = mustPage(db, id);
     if (b.space !== undefined) page = setPageSpace(db, id, spaceChoice(db, b.space));
     if (b.folder !== undefined) {
@@ -850,8 +938,23 @@ function routes(d: Deps) {
       page = mustPage(db, id);
     }
     if (b.title !== undefined) page = renamePage(db, id, b.title);
+    if (b.description !== undefined) page = describePage(db, id, b.description);
     tell(d, { what: 'pages' });
     return { page };
+  });
+  /**
+   * What the Library holds that fits the words, best first (search.ts): pages of every kind and the pictures, videos and
+   * sounds kept, by their titles and descriptions, by words and (search by meaning on) by meaning. `starting`: meaning's
+   * model is starting, so the same search in a few seconds finds by meaning too.
+   */
+  app.get('/api/library/search', async (req) => {
+    const q = req.query as { q?: string; limit?: string };
+    const r = await searchLibrary(db, String(q.q ?? ''), { limit: Number(q.limit) || 50 });
+    return {
+      hits: r.hits.map((h) => ({ id: h.id, score: h.score, by: h.by, ...(h.meaning !== undefined ? { meaning: h.meaning } : {}) })),
+      meaning: r.meaning,
+      ...(!r.meaning && meaningStarting(db) ? { starting: true } : {}),
+    };
   });
   app.delete('/api/pages/:id', async (req) => {
     const id = P(req).id;
@@ -1167,6 +1270,8 @@ export const pages: Feature = {
       turns.delete(key);
     });
     enableThumbs();
+    // What comes in without a description gets one from the helper model (describe.ts).
+    enableDescriptions();
     setTimeout(() => refreshThumbs(d), 30_000).unref();
     // Pictures no deck shows any more, once a day.
     setInterval(() => sweepAssets(d.db), 86_400_000).unref();

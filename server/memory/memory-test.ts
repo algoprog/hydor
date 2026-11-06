@@ -13,7 +13,7 @@ import Database from 'better-sqlite3';
 import { runHead } from '../../shared/automations.ts';
 import type { MemoryNoteData } from '../../shared/memory.ts';
 import type { TimelineItem, ToolInfo } from '../../shared/types.ts';
-import { openDb } from '../db.ts';
+import { kvSet, openDb } from '../db.ts';
 import type { RunCtx } from '../features/types.ts';
 import { notesOf } from '../notes.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
@@ -695,11 +695,24 @@ test('topic groups by words when there are no vectors', () => {
 
 // ---- search by meaning's switches ----------------------------------------------------------------
 
-test('search by meaning: off unless turned on, and then nothing waits for it', async () => {
+test('search by meaning: on unless turned off (or HYDOR_EMBED=off while never set), and nothing waits for it while it is not set up', async () => {
   setEmbedderForTests(null);
-  assert.equal(meaningState(db).on, false);
+  const was = process.env.HYDOR_EMBED;
+  delete process.env.HYDOR_EMBED;
+  db.prepare("delete from kv where k = 'memory.meaning'").run();
+  assert.equal(meaningState(db).on, true, 'on by default');
+  assert.equal(await embed(db, ['hello'], 'query'), null, 'not set up here: no vector, and no wait');
+  process.env.HYDOR_EMBED = 'off';
+  assert.equal(meaningState(db).on, false, 'a test’s or demo’s app keeps it off');
+  kvSet(db, 'memory.meaning', '1');
+  assert.equal(meaningState(db).on, true, 'unless it was turned on');
+  kvSet(db, 'memory.meaning', '0');
+  delete process.env.HYDOR_EMBED;
+  assert.equal(meaningState(db).on, false, 'turned off, it stays off');
   assert.equal(meaningState(db).status, 'off');
   assert.equal(await embed(db, ['hello'], 'query'), null);
+  if (was === undefined) delete process.env.HYDOR_EMBED;
+  else process.env.HYDOR_EMBED = was;
   assert.ok(freeMemoryMb() > 0);
 });
 

@@ -117,7 +117,7 @@ function Meaning({ st, set }: { st: MemoryState; set: (p: Record<string, unknown
   return (
     <Row
       label="Search by meaning"
-      hint="Finds notes by what they mean, not only their words, with a model that runs on this computer. Setting it up takes about 2 GB, once (6 GB with an NVIDIA GPU)."
+      hint="Finds notes, what the Library holds and more by what they mean as well as by their words, with a model that runs on this computer. It sets itself up once: about 2 GB (6 GB with an NVIDIA GPU)."
       control={<Switch on={st.enabled && m.on} disabled={!st.enabled} label="Search by meaning" onChange={(on) => set({ meaning: on })} />}
     >
       {st.enabled && m.on && (

@@ -5,6 +5,8 @@
 // apps), whose vectors are made the moment they are made or changed (index.ts). The guide's sections ship too.
 import type { FindPlace } from '../../shared/find.ts';
 import { catalogItems, catalogText } from '../../shared/find-catalog.ts';
+import type { MediaItem } from '../../shared/media.ts';
+import type { PageInfo } from '../../shared/pages.ts';
 import { isGroup } from '../../shared/spaces.ts';
 import type { SessionSummary } from '../../shared/types.ts';
 import { listApps } from '../apps/store.ts';
@@ -45,13 +47,29 @@ export const KIND_PLACES: Record<Kind, FindPlace[]> = {
 /** Sessions given vectors: the latest. */
 export const MAX_SESSIONS = 3000;
 
-const text = (...parts: (string | undefined)[]) =>
-  parts
+const text = (...parts: (string | undefined)[]) => joined(400, parts);
+
+function joined(max: number, parts: (string | undefined)[]): string {
+  return parts
     .filter(Boolean)
     .join('. ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 400);
+    .slice(0, max);
+}
+
+/** What each kind of the Library's pages is called in its text. */
+const PAGE_KIND: Record<string, string> = { slides: 'A slide deck', doc: 'A document', sheet: 'A spreadsheet', tex: 'A LaTeX document', notebook: 'A Jupyter notebook' };
+
+/**
+ * A page of the Library (of any kind) as the search box finds it by meaning, and the Library's own search
+ * (pages/search.ts) by the same vector: its title, its kind and its description, whole (a description has at most
+ * 100 words).
+ */
+export const pageItemText = (p: Pick<PageInfo, 'title' | 'kind' | 'description'>) => joined(1000, [p.title, PAGE_KIND[p.kind ?? ''] ?? 'A page', p.description]);
+/** A picture, a video or a sound of the Library, the same way. */
+export const mediaItemText = (m: Pick<MediaItem, 'title' | 'kind' | 'description'>) =>
+  joined(1000, [m.title, m.kind === 'video' ? 'A video' : m.kind === 'audio' ? 'A sound' : 'An image', m.description]);
 
 export const sessionItem = (s: Pick<SessionSummary, 'key' | 'title' | 'firstPrompt'>): Item => ({ id: `s:${s.key}`, text: text(s.title, s.firstPrompt && s.firstPrompt !== s.title ? s.firstPrompt : undefined) });
 
@@ -88,11 +106,8 @@ export function itemsOf(kind: Kind, d: Pick<Deps, 'db' | 'sessions' | 'scheduler
     case 'skills':
       return libraryView(db).map(skill);
     case 'pages':
-      // The Library: its pages, and the images and videos kept there.
-      return [
-        ...listPages(db).map((p) => ({ id: `page:${p.id}`, text: text(p.title, 'A page') })),
-        ...listMedia(db).map((m) => ({ id: `media:${m.id}`, text: text(m.title, m.kind === 'video' ? 'A video' : m.kind === 'audio' ? 'A sound' : 'An image', m.description) })),
-      ];
+      // The Library: its pages of every kind, and the images, videos and sounds kept there, with their descriptions.
+      return [...listPages(db).map((p) => ({ id: `page:${p.id}`, text: pageItemText(p) })), ...listMedia(db).map((m) => ({ id: `media:${m.id}`, text: mediaItemText(m) }))];
     case 'connections':
       return connections(db).map((c) => ({ id: `conn:${c.id}`, text: text(connectionView(db, c).name, 'A connected account', c.entry.name, c.entry.description) }));
   }
