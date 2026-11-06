@@ -367,7 +367,7 @@ export function Scene3dLook({
   el: Scene3dEl;
   theme: Theme;
   set: Set;
-  /** A GLB file from this device, kept by the app: its source. */
+  /** A 3D model from this device (.glb, or .gltf with its files), kept by the app: its source. */
   pickModel: () => Promise<string | null>;
   pickPicture: () => Promise<{ src: string } | null>;
 }) {
@@ -398,7 +398,7 @@ export function Scene3dLook({
         </Field>
         {el.model ? (
           <div className="space-y-1.5">
-            <p className={note}>A 3D model (a GLB file), kept with the deck.</p>
+            <p className={note}>A 3D model, kept with the deck.</p>
             <Button size="sm" variant="secondary" icon={<Upload size={14} />} disabled={busy} onClick={() => void model()}>
               {busy ? 'Adding the model…' : 'Another model'}
             </Button>
@@ -422,7 +422,7 @@ export function Scene3dLook({
                 <input value={el.text ?? ''} onChange={(e) => set({ text: e.target.value.slice(0, 40) || undefined } as Partial<El>, 'text3d')} onKeyDown={(e) => e.stopPropagation()} placeholder="Hello" aria-label="Its words" className={field} />
               </Field>
             )}
-            <p className={note}>Or a model of your own: a GLB file, from a 3D app or a site of free models.</p>
+            <p className={note}>Or a model of your own, from a 3D app or a site of free models: a .glb file, or a .gltf picked together with its files.</p>
           </>
         )}
         <Field label="Material">

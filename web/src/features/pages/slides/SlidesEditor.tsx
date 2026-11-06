@@ -799,13 +799,13 @@ export function SlidesEditor({
       setSending(null);
     }
   };
-  /** A 3D model (a GLB file) from this device, kept with the deck: its source (null: none, or it failed). */
+  /** A 3D model (a .glb, or a .gltf with its files) from this device, kept with the deck: its source (null: none, or it failed). */
   const pickModel = async (): Promise<string | null> => {
-    const f = await chooseModel();
-    if (!f) return null;
+    const files = await chooseModel();
+    if (!files.length) return null;
     try {
       toast('Adding the model…');
-      return await uploadModel(f);
+      return await uploadModel(files);
     } catch (e) {
       toastError(e);
       return null;
