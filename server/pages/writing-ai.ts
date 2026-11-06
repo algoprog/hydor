@@ -751,7 +751,7 @@ export function writingAi(X: ExtraCore): Extra {
         else field.focus({ preventScroll: true });
         return true;
       }
-      if (!canAi) return false;
+      if (!canAi || e.isComposing || e.keyCode === 229) return false;
       const mod = e.metaKey || e.ctrlKey;
       if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'j') {
         open();
