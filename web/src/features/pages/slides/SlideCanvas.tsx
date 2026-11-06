@@ -11,12 +11,15 @@
 // The slide itself is drawn by the runtime as it shows anywhere; this draws what is picked over it, and moves parts
 // while they are dragged without drawing the slide again. The marks of the slide's comments sit over it, at their
 // parts' corners (the editor's alone), and, while an agent writes the slide, a box round the part its words arrive in.
+// A live part (custom code, a web page, 3D) shows its picture here; picked, it has Run, and runs in place until
+// something else is picked. While a part is being picked for something (the part a click on which starts an
+// animation), a click on the slide picks it.
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { elbowPoints, everyEl, reconnect, scaleEls, SIDES, sidePoint, turnedBox, type Crop, type Deck, type El, type GroupEl, type ImageEl, type LineEl, type Para, type Slide, type Stick, type TableEl, type TextProps } from '@shared/slides';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, Play, Square } from 'lucide-react';
 import { cx } from '../../../components/ui';
-import { boxOf, heightOf, mergeAt, setEls, W } from './ops';
-import { PICS, RT } from './rt';
+import { boxOf, heightOf, isLive, mergeAt, setEls, W } from './ops';
+import { LIVE, PICS, RT } from './rt';
 
 export interface CanvasHandle {
   /** The words being changed in place, read back now (null when none are). */
@@ -289,6 +292,12 @@ export const SlideCanvas = forwardRef<
     /** The slide's comments' marks (the editor's alone: never drawn in the slideshow), and a click on one. */
     pins?: CommentPin[];
     onPin?: (ids: string[]) => void;
+    /** The live part running in place, and Run or Stop on it. */
+    running?: string | null;
+    onRun?: (id: string | null) => void;
+    /** A part is being picked for something: a click picks the part under it (null: none). */
+    picking?: boolean;
+    onPick?: (id: string | null) => void;
     children?: ReactNode;
   }
 >(function SlideCanvas(
@@ -323,6 +332,10 @@ export const SlideCanvas = forwardRef<
     onCellSel,
     pins,
     onPin,
+    running,
+    onRun,
+    picking,
+    onPick,
     children,
   },
   handle,
@@ -410,8 +423,11 @@ export const SlideCanvas = forwardRef<
     host.textContent = '';
     const el = RT.slide(deck, index, { edit: true, ...PICS });
     host.appendChild(el);
+    // The live part run in place: drawn again, running, where it was.
+    const r = running ? elById(running) : undefined;
+    if (r && isLive(r)) el.querySelector(`.ns-el[data-id="${CSS.escape(r.id)}"]`)?.replaceWith(RT.part(deck, slide, r, { edit: true, ...PICS, ...LIVE }));
     RT.fit(el);
-  }, [slide, deck.theme, deck.ratio, deck.footer, index, fonts, editing]);
+  }, [slide, deck.theme, deck.ratio, deck.footer, index, fonts, editing, running]);
 
   const nodeOf = (id: string) => content.current?.querySelector<HTMLElement>(`.ns-el[data-id="${CSS.escape(id)}"]`) ?? null;
 
@@ -881,6 +897,10 @@ export const SlideCanvas = forwardRef<
       onSel(id ? [id] : []);
       return;
     }
+    if (picking) {
+      onPick?.(id);
+      return;
+    }
     if (painting) {
       onPaint?.(id);
       if (id) return;
@@ -1279,7 +1299,7 @@ export const SlideCanvas = forwardRef<
         onCropping(el.id);
       } else onReplaceImage?.(el.id);
     } else if (el.type === 'chart') onChartData?.(el.id);
-    else if (el.type === 'math' || el.type === 'icon' || el.type === 'video') onOpen?.(el.id);
+    else if (el.type === 'math' || el.type === 'icon' || el.type === 'video' || el.type === 'code' || el.type === 'html' || el.type === 'embed' || el.type === 'quiz' || el.type === 'score' || el.type === 'scene3d') onOpen?.(el.id);
     else if (el.type === 'table') {
       const td = (document.elementsFromPoint(e.clientX, e.clientY).find((n) => n.tagName === 'TD') as HTMLElement | undefined) ?? null;
       if (td) editCell(el, td);
@@ -1388,6 +1408,29 @@ export const SlideCanvas = forwardRef<
           style={{ top: -27 }}
         />
       </div>
+    );
+  };
+
+  /** Run (or Stop) under a live part picked: it runs in place, in its frame, until something else is picked. */
+  const runPill = (e: El) => {
+    if (!onRun || !isLive(e)) return null;
+    const on = running === e.id;
+    return (
+      <button
+        type="button"
+        title={on ? 'Stop it' : 'Run it here'}
+        onPointerDown={(ev) => ev.stopPropagation()}
+        onDoubleClick={(ev) => ev.stopPropagation()}
+        onClick={(ev) => {
+          ev.stopPropagation();
+          onRun(on ? null : e.id);
+        }}
+        className="pointer-events-auto absolute z-[5] flex h-7 items-center gap-1 rounded-full border border-line bg-elevated px-2.5 text-[12px] font-medium text-fg shadow-md hover:bg-bg-2 pointer-coarse:h-8"
+        style={{ left: S(e.x), top: S(e.y + e.h) + 8 }}
+      >
+        {on ? <Square size={10} className="fill-current" /> : <Play size={11} className="fill-current" />}
+        {on ? 'Stop' : 'Run'}
+      </button>
     );
   };
 
@@ -1516,7 +1559,7 @@ export const SlideCanvas = forwardRef<
       tabIndex={-1}
       data-slide-canvas
       data-k={k}
-      className={cx('relative h-full w-full touch-none bg-bg-2 outline-none select-none', zoomed ? 'overflow-auto' : 'overflow-hidden', painting && 'cursor-copy')}
+      className={cx('relative h-full w-full touch-none bg-bg-2 outline-none select-none', zoomed ? 'overflow-auto' : 'overflow-hidden', painting && 'cursor-copy', picking && 'cursor-crosshair')}
       onScroll={pinRulers}
       onPointerDown={onDown}
       onPointerMove={onMove}
@@ -1595,6 +1638,7 @@ export const SlideCanvas = forwardRef<
             <Nest frames={frames} k={k}>
               {!crop && picked.map((e) => outline(e, picked.length === 1))}
               {one && handles(one)}
+              {one && !readOnly && runPill(one)}
               {guides.x.map((x) => (
                 <div key={`sx${x}`} className="pointer-events-none absolute w-px" style={{ left: Math.round(S(x)), top: S(span.y0), height: S(span.y1 - span.y0), background: SNAP }} />
               ))}

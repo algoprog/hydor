@@ -6,7 +6,9 @@
 // theme (Inspector); speaker notes under the slide; Find and replace across the slides and notes; every slide at once
 // (Grid); and Present: the slideshow, or the presenter's view with the audience's window. Changes stay unsaved until
 // Save (Ctrl+S), as a page's do; Undo and Redo go back and forth. While an agent writes a new version (live.ts), it
-// shows as it comes, read-only: the slide being written on view, a box round the part its words arrive in.
+// shows as it comes, read-only: the slide being written on view, a box round the part its words arrive in. A deck is
+// in the web format (custom code, web pages, quizzes, 3D, the web's effects) unless File → PowerPoint compatible is
+// ticked; its live parts run in frames of their own, in the slideshow, and here once Run is pressed.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ChevronDown,
@@ -42,7 +44,7 @@ import {
   Undo2,
   Ungroup,
 } from 'lucide-react';
-import { newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type Deck, type El, type ImageEl, type LayoutId, type TextEl } from '@shared/slides';
+import { isWebDeck, newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type Deck, type El, type ImageEl, type LayoutId, type TextEl } from '@shared/slides';
 import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
 import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, useConfirm } from '../../../components/ui';
@@ -56,13 +58,17 @@ import {
   addSlide,
   align,
   chart,
+  codePart,
   connector,
   copies,
   distribute,
   duplicateSlides,
+  embedAddress,
+  embedPart,
   findEl,
   groupEls,
   HISTORY_MAX,
+  htmlPart,
   image,
   line,
   lookOf,
@@ -70,15 +76,20 @@ import {
   onSlide,
   partName,
   pickedOf,
+  quizPart,
   removeEls,
   removeSlides,
   restack,
+  scene3dPart,
+  scorePart,
+  setAnim,
   setEls,
   setSlide,
   shape,
   table,
   textBox,
   topOf,
+  toWebFormat,
   ungroup,
   withLook,
   W,
@@ -94,13 +105,14 @@ import { useDeckFonts } from './rt';
 import { SlideCanvas, type CanvasHandle, type CellSel, type CommentPin, type FindMark, type GridOpts } from './SlideCanvas';
 import { LayoutGrid, Strip } from './Strip';
 import { textActions, TextBar } from './TextBar';
-import { slidesMenus } from './SlidesMenus';
+import { slidesMenus, type RichKind } from './SlidesMenus';
+import { FormatDialog } from './FormatDialog';
 import { IconPicker, type IconDef } from './IconPicker';
 import { FooterDialog } from './FooterDialog';
 import { NotesField } from './Notes';
 import { findInDeck, replaceAllInDeck, replaceHit } from './find';
 import { exportFile } from '../exportFile';
-import { chooseVideo, fetchVideoStill, firstFrame, isVideoFile, uploadVideo } from './media';
+import { chooseModel, chooseVideo, fetchVideoStill, firstFrame, isVideoFile, uploadModel, uploadVideo } from './media';
 import { SlideComments } from './SlideComments';
 
 export type SlidesDoc = ModelDoc<Deck>;
@@ -263,6 +275,15 @@ export function SlidesEditor({
   const [iconAsk, setIconAsk] = useState<{ replace?: string; start: 'icons' | 'emoji' } | null>(null);
   const [videoAsk, setVideoAsk] = useState(false);
   const [videoUrl, setVideoUrl] = useState('');
+  /** Asked for a web page's address (Insert → Interactive → Web page). */
+  const [embedAsk, setEmbedAsk] = useState<{ web?: boolean } | null>(null);
+  const [embedUrl, setEmbedUrl] = useState('');
+  /** The dialog before the deck is made PowerPoint compatible. */
+  const [compatAsk, setCompatAsk] = useState(false);
+  /** The live part (custom code, a web page, 3D) running in place, until something else is picked. */
+  const [running, setRunning] = useState<string | null>(null);
+  /** An animation whose starting part (a click on which plays it) is being picked on the slide. */
+  const [pickFor, setPickFor] = useState<string | null>(null);
   /** A video from this device on its way to the app: how much of it went (0–1), shown over the slide. */
   const [sending, setSending] = useState<number | null>(null);
   /** The thread picked in the Comments tab. */
@@ -490,11 +511,12 @@ export function SlidesEditor({
   };
 
   // ---- adding things -------------------------------------------------------------------------------------
-  const put = (els: El[]) => {
+  const put = (els: El[], o: { web?: boolean } = {}) => {
     if (!deck) return;
     canvas.current?.stopEditing();
     setScope([]);
-    change((d) => addEls(d, index, els));
+    // A part of the web format put in a PowerPoint compatible deck takes it to the web format, in the same step.
+    change((d) => addEls(o.web ? toWebFormat(d) : d, index, els));
     setSel(els.map((e) => e.id));
     setTab('format');
     setView('edit');
@@ -606,6 +628,93 @@ export function SlidesEditor({
     if (!f) return;
     if (!isVideoFile(f)) return toast('That is not a video a slide takes: an MP4, MOV or WebM file');
     await putVideoFile(f);
+  };
+
+  // ---- the web format ------------------------------------------------------------------------------------------
+  /** A web format part: in a PowerPoint compatible deck, it asks first (the deck then leaves PowerPoint compatibility). */
+  const putRich = async (kind: RichKind) => {
+    if (!deck) return;
+    const toWeb = !isWebDeck(deck);
+    if (
+      toWeb &&
+      !(await confirm({
+        title: 'Use the web format?',
+        body: 'Custom code, web pages, quizzes and 3D are the web format’s. The deck stops being PowerPoint compatible: its PowerPoint file gets them as pictures.',
+        confirm: 'Use the web format',
+      }))
+    )
+      return;
+    const d = live.current ?? deck;
+    if (kind === 'embed') return setEmbedAsk({ web: toWeb });
+    if (kind === 'html') {
+      put([htmlPart(d)], { web: toWeb });
+      // Its code, to change, in the side panel.
+      if (!wide) setDrawer('open');
+      return;
+    }
+    put([kind === 'quiz' ? quizPart(d, tr) : kind === 'score' ? scorePart(d, tr) : scene3dPart(d)], { web: toWeb });
+  };
+  const putEmbed = () => {
+    const url = embedAddress(embedUrl);
+    if (!url || !live.current) return;
+    const web = !!embedAsk?.web;
+    setEmbedAsk(null);
+    setEmbedUrl('');
+    put([embedPart(live.current, url)], { web });
+  };
+  /** PowerPoint compatible on (after the dialog), or off: back to the web format, which loses nothing. */
+  const setCompatible = (on: boolean) => {
+    if (on) return setCompatAsk(true);
+    change((d) => toWebFormat(d));
+    toast('The deck is in the web format: Insert → Interactive has custom code, web pages, quizzes and 3D', 'ok');
+  };
+  // Something else picked, another slide: the live part running in place stops.
+  useEffect(() => {
+    if (running && !(sel.length === 1 && sel[0] === running)) setRunning(null);
+  }, [sel, index, running]);
+  // Another slide, or the panel's other tabs: no part is being picked for an animation.
+  useEffect(() => setPickFor(null), [index, tab]);
+  /** The part clicked on the slide starts the animation being set up (not the part it moves). */
+  const pickTrigger = (id: string | null) => {
+    const anim = pickFor;
+    setPickFor(null);
+    const s = live.current?.slides[index];
+    const a = s?.anims?.find((x) => x.id === anim);
+    if (!anim || !id || !a) return;
+    const top = topOf(s!, id)?.id ?? id;
+    if (top === a.el) return toast('That is the part it moves: pick the part to click');
+    change((d) => setAnim(d, index, anim, { on: 'tap', trigger: top }));
+  };
+  /** A video from this device for a slide's background, kept with the deck: its source (null: none, or it failed). */
+  const pickBgVideo = async (): Promise<string | null> => {
+    const f = await chooseVideo();
+    if (!f) return null;
+    if (!isVideoFile(f)) {
+      toast('That is not a video a slide takes: an MP4, MOV or WebM file');
+      return null;
+    }
+    if (sending !== null) return null;
+    setSending(0);
+    try {
+      return await uploadVideo(f, setSending);
+    } catch (e) {
+      toastError(e);
+      return null;
+    } finally {
+      setSending(null);
+    }
+  };
+  /** A 3D model (a GLB file) from this device, kept with the deck: its source (null: none, or it failed). */
+  const pickModel = async (): Promise<string | null> => {
+    const f = await chooseModel();
+    if (!f) return null;
+    try {
+      toast('Adding the model…');
+      return await uploadModel(f);
+    } catch (e) {
+      toastError(e);
+      return null;
+    }
   };
 
   // ---- copy and paste ---------------------------------------------------------------------------------------
@@ -812,7 +921,8 @@ export function SlidesEditor({
       return;
     }
     if (e.key === 'Escape') {
-      if (painter) setPainter(null);
+      if (pickFor) setPickFor(null);
+      else if (painter) setPainter(null);
       else if (cellSel) setCellSel(null);
       else if (scope.length) {
         // Out of the group: it is picked.
@@ -969,8 +1079,15 @@ export function SlidesEditor({
     else pins.push({ key, x: at.x, y: at.y, ids: [c.id], active: false });
   }
   for (const p of pins) p.active = !!activeComment && p.ids.includes(activeComment);
+  const web = isWebDeck(deck);
   const menus = slidesMenus({
     readOnly,
+    web,
+    progress: !!deck.progress,
+    canSave: dirty && !!onSave && !saving,
+    save: () => void save(),
+    setCompatible,
+    setProgress: (on) => change((d) => ({ ...d, progress: on || undefined })),
     wide,
     pageLayout: layout === 'page',
     picked,
@@ -1026,6 +1143,10 @@ export function SlidesEditor({
     icon: () => setIconAsk({ start: 'icons' }),
     emoji: () => setIconAsk({ start: 'emoji' }),
     equation: putEquation,
+    code: () => put([codePart(deck)]),
+    rich: (kind) => void putRich(kind),
+    running: !!one && running === one.id,
+    run: () => one && setRunning(running === one.id ? null : one.id),
     video: () => setVideoAsk(true),
     videoFile: () => void pickVideoFile(),
     footer: () => setFooterOpen(true),
@@ -1161,6 +1282,10 @@ export function SlidesEditor({
             setActiveComment(ids[0]);
             openPanel('comments' as InspectorTab);
           }}
+          running={running}
+          onRun={(id) => setRunning(id)}
+          picking={!!pickFor}
+          onPick={pickTrigger}
         />
         {zoom !== 'fit' && (
           <button
@@ -1174,11 +1299,13 @@ export function SlidesEditor({
             <Shrink size={12} />
           </button>
         )}
-        {(sending !== null || painter || scope.length > 0 || cropping) && (
+        {(sending !== null || painter || scope.length > 0 || cropping || pickFor) && (
           <div className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full border border-line bg-elevated px-3 py-1 text-[12px] text-fg-2 tabular-nums shadow-sm">
             {sending !== null
               ? `Adding the video… ${Math.round(sending * 100)}%`
-              : cropping
+              : pickFor
+                ? 'Click the part that starts it; Esc to stop'
+                : cropping
                 ? 'Cropping: Enter keeps it, Esc does not'
                 : painter
                   ? painter.keep
@@ -1246,6 +1373,12 @@ export function SlidesEditor({
       cellSel={cellSel}
       onCellSel={setCellSel}
       texFocus={texFocus}
+      running={running}
+      onRun={setRunning}
+      pickVideo={pickBgVideo}
+      pickModel={pickModel}
+      picking={pickFor}
+      onPickTrigger={setPickFor}
     />
   );
 
@@ -1607,6 +1740,54 @@ export function SlidesEditor({
           {videoUrl.trim() && !videoSrc(videoUrl.trim()) && <p className="text-[12px] text-err">That is not a YouTube or Vimeo address.</p>}
         </form>
       </Dialog>
+      <Dialog
+        open={!!embedAsk}
+        onClose={() => setEmbedAsk(null)}
+        title="A web page"
+        width={460}
+        footer={
+          <Button size="sm" variant="primary" disabled={!embedAddress(embedUrl)} onClick={putEmbed}>
+            Add it
+          </Button>
+        }
+      >
+        <form
+          className="space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            putEmbed();
+          }}
+        >
+          <p className="text-[12.5px] text-fg-3">A page’s address, or the embed code a site gives (maps, forms, CodePen). It shows on the slide and takes clicks in the slideshow. Only sites that let others show them in a frame appear.</p>
+          <input
+            autoFocus
+            value={embedUrl}
+            onChange={(e) => setEmbedUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              putEmbed();
+            }}
+            placeholder="https://…"
+            aria-label="The page’s address"
+            translate="no"
+            className={inputCls}
+          />
+          {embedUrl.trim() && !embedAddress(embedUrl) && <p className="text-[12px] text-err">A web address that starts with https://.</p>}
+        </form>
+      </Dialog>
+      <FormatDialog
+        open={compatAsk}
+        deck={deck}
+        onClose={() => setCompatAsk(false)}
+        onConfirm={(next) => {
+          setCompatAsk(false);
+          canvas.current?.stopEditing();
+          setRunning(null);
+          change(next);
+          toast('The deck is PowerPoint compatible', 'ok');
+        }}
+      />
       <FooterDialog open={footerOpen} onClose={() => setFooterOpen(false)} deck={deck} index={index} change={change} />
       <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={SHORTCUTS} />
       {present && !present.presenter && <Slideshow deck={deck} from={present.from} onClose={() => setPresent(null)} />}
