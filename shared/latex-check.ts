@@ -106,3 +106,32 @@ export function texCheck(s: string): TexCheck[] {
   for (const b of braces) if (out.length < MAX) out.push({ from: b, to: b + 1, message: 'This { is never closed.' });
   return out.sort((a, b) => a.from - b.from);
 }
+
+/** Whether s[at] is in a comment (a % before it on its line, not an escaped one). */
+const commented = (s: string, at: number) => /(^|[^\\])(\\\\)*%/.test(s.slice(s.lastIndexOf('\n', at - 1) + 1, at));
+
+/**
+ * References that point nowhere, as you type: a \ref (\eqref, \autoref, \cref…) to a label no file of the document
+ * defines (`labels`: theirs, shared/latex-ai.ts docLabels), and, when `keys` is given (the document's bibliographies
+ * are all its own), a \cite of a key none of them has. A label made of a macro's argument (#1) is passed over.
+ */
+export function texRefCheck(s: string, labels: Set<string>, keys?: Set<string> | null): TexCheck[] {
+  const out: TexCheck[] = [];
+  const each = (re: RegExp, known: Set<string>, say: (k: string) => string) => {
+    for (const m of s.matchAll(re)) {
+      if (out.length >= MAX || commented(s, m.index!)) continue;
+      const open = m.index! + m[0].lastIndexOf('{') + 1;
+      let at = open;
+      for (const part of m[1].split(',')) {
+        const k = part.trim();
+        const from = at + (part.length - part.trimStart().length);
+        at += part.length + 1;
+        if (!k || k === '*' || /[#\\]/.test(k) || known.has(k)) continue;
+        out.push({ from, to: from + k.length, message: say(k) });
+      }
+    }
+  };
+  each(/\\(?:ref|eqref|pageref|autoref|Autoref|cref|Cref|vref|Vref|nameref|labelcref|cpageref|Cpageref|crefrange|subref)\*?\s*\{([^{}]*)\}/g, labels, (k) => `There is no \\label{${k}} in the document.`);
+  if (keys) each(/\\(?:[A-Za-z]*cite[A-Za-z]*|nocite)\*?\s*(?:\[[^\]]*\]\s*){0,2}\{([^{}]*)\}/g, keys, (k) => `No entry ${k} in the bibliography.`);
+  return out;
+}

@@ -65,7 +65,8 @@ export interface TexChange {
   to: number;
   text: string;
   before?: string;
-  by: 'user' | 'agent';
+  /** Who made it: the user, an agent (its save), or AI in the editor (a rewrite or a proofreading accepted). */
+  by: 'user' | 'agent' | 'ai';
   at: number;
 }
 
@@ -139,6 +140,10 @@ export interface TexSetup {
    * is typeset, so every template is offered. Missing when nothing is (and on older servers).
    */
   add?: { cmd?: string; auto?: boolean };
+  /** The longest one typesetting may take, in seconds (missing on older servers). */
+  timeLimit?: number;
+  /** The words of the typeset pages can be read (poppler's pdftotext): find in the pages, text picked on them. */
+  words?: boolean;
 }
 
 export const TEX_LIMITS = { main: 2 * 1024 * 1024, file: 2 * 1024 * 1024, total: 4 * 1024 * 1024, files: 50, pictures: 200, name: 120, depth: 6 };
@@ -375,7 +380,7 @@ export function cleanTexChanges(v: unknown, d: TexDoc): TexChange[] {
     const id = typeof raw.id === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(raw.id) && !seen.has(raw.id) ? raw.id : newChangeId();
     seen.add(id);
     const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? Math.max(0, Math.min(text.length, Math.round(x))) : 0);
-    const by = raw.by === 'agent' ? 'agent' : 'user';
+    const by = raw.by === 'agent' ? 'agent' : raw.by === 'ai' ? 'ai' : 'user';
     const at = typeof raw.at === 'number' && Number.isFinite(raw.at) && raw.at > 0 && raw.at < 1e14 ? Math.round(raw.at) : Date.now();
     const words = cleanText(raw.text).slice(0, TEX_CHANGE_LIMITS.text);
     let from = num(raw.from);
