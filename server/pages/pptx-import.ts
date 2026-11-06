@@ -705,6 +705,9 @@ function pictureData(c: SlideCtx, rid: string | undefined): string | null {
 function linkOf(c: SlideCtx, el: X | undefined): string | undefined {
   if (!el) return undefined;
   const rid = patt(el, 'id') ?? '';
+  // PowerPoint's own jumps: to the next slide, the one before, the first or the last.
+  const jump = /hlinkshowjump\?jump=(nextslide|previousslide|firstslide|lastslide)/.exec(att(el, 'action') ?? '')?.[1];
+  if (jump) return ({ nextslide: '#next', previousslide: '#prev', firstslide: '#first', lastslide: '#last' } as Record<string, string>)[jump];
   if (att(el, 'action')?.includes('hlinksldjump')) {
     const t = c.rels.get(rid)?.target;
     const n = t ? c.slideNos.get(t) : undefined;
@@ -1675,7 +1678,8 @@ export async function deckFromPptx(buf: Buffer, db?: DB): Promise<DeckFromFile> 
     fs.rmSync(tmp, { recursive: true, force: true });
   }
   if (targets.length > SLIDE_LIMITS.slides) notes.add(`The first ${SLIDE_LIMITS.slides} of its ${targets.length} slides came in.`);
-  const model: Obj = { v: 1, ratio, theme, slides };
+  // A deck opened from PowerPoint stays PowerPoint compatible: its file keeps everything it has.
+  const model: Obj = { v: 1, ratio, format: 'pptx', theme, slides };
   // The footer: the deck's, on the slides that showed it (not on the title slide when only it went without).
   if (footer) {
     model.footer = { ...(footer.sldNum ? { num: true } : {}), ...(footer.ftr ? { text: footer.ftr } : {}), ...(footer.dt ? { date: footer.dt } : {}) };
