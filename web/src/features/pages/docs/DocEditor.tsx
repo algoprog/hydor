@@ -3,7 +3,9 @@
 // and Search the menus) beside its title and the toolbar over it (menu.tsx, Toolbar.tsx), its headings beside it on a wide screen
 // (folded away on a narrow one) to go to, and the words it has in a quiet corner (a click there counts them all). A
 // page break shows as a gap between two sheets, the header and footer on each sheet's margins. A picture picked gets
-// handles to size it and a bar for its alignment, caption and description (Picture.tsx); a table, handles on its
+// handles to size it and a bar for its alignment, caption and description, and changes with AI (Picture.tsx); Insert and
+// "/" put in pictures made with AI, drawings (SVG) and plots (a table's cells their data), the app's AI tools' dialogs
+// (features/images/studio) asking what to make and showing what it costs; a table, handles on its
 // columns' borders. Words picked offer to comment on them or ask the agent about them; comments show beside the page
 // on a wide screen, level with their words, or in a panel (CommentsView.tsx). "/" at a line's start opens a menu of
 // what to put there (Slash.tsx); Ctrl+F finds and Ctrl+H replaces (finding.ts); equations are written in a box with
@@ -13,7 +15,7 @@
 // with the agent's caret where its words arrive, kept in view (AgentCaret.tsx).
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, FileCog, Link2, ListTree, MessageSquare, MessageSquarePlus, Sparkles, Unlink } from 'lucide-react';
-import { docHeadings, docWords, FONTS, MARGINS, PAPERS, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type TableBlock } from '@shared/docs';
+import { docHeadings, docWords, FONTS, MARGINS, PAPERS, runsText, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type TableBlock } from '@shared/docs';
 import { newCommentId, openComments, type Comment } from '@shared/comments';
 import { changesOf, compareDocs, suggestionColor } from '@shared/doc-changes';
 import { api, post } from '../../../lib/api';
@@ -26,6 +28,7 @@ import { loadModelVersion, type AskScope, type ModelEditorProps } from '../kinds
 import type { PageVersion } from '@shared/pages';
 import { SIGNATURE_WIDTH_MM } from '@shared/signatures';
 import { choosePicture, pictureFromUrl, uploadPicture } from '../pictures';
+import { csvOf, editPicture, makeDrawing, makePicture, makePlot } from '../../images/studio';
 import { NumInput } from '../slides/controls';
 import { Select } from '../studio/fields';
 import { CharPicker } from '../common/CharPicker';
@@ -570,7 +573,21 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   if (!model) return <div className="flex h-full items-center justify-center text-fg-3">…</div>;
 
   const e = engine.current;
-  const slashList = e && slash ? slashMatches(slashItems(e, { picture: () => void pickPicture(), signature: () => setDialog('signature'), equation: () => openEquation(false), today: () => today() }), slash.query) : [];
+  const slashList =
+    e && slash
+      ? slashMatches(
+          slashItems(e, {
+            picture: () => void pickPicture(),
+            aiPicture: () => void aiPicture(),
+            drawing: () => void drawing(),
+            plot: () => void plot(),
+            signature: () => setDialog('signature'),
+            equation: () => openEquation(false),
+            today: () => today(),
+          }),
+          slash.query,
+        )
+      : [];
   const slashOpen = !!slash && slashList.length > 0 && !!slashPos;
   const slashBox = slashLayout(slashList.length, (host.current?.clientWidth ?? width) - 8);
 
@@ -697,6 +714,42 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     } catch (err) {
       toastError(err);
     }
+  };
+  /** How wide a picture made with AI goes in: a wide one across the text, another half as wide (its handles size it after). */
+  const madeWidth = (p: { w: number; h: number }) => {
+    const d = engine.current?.doc ?? model;
+    const text = d ? ((PAPERS[d.page.size].w - 2 * d.page.margin) * 96) / 25.4 : 600;
+    return p.w / Math.max(1, p.h) >= 1.3 ? text : text / 2;
+  };
+  /** A picture made with AI, a drawing or a plot, put in at the caret (after the table it is in: a cell holds only words). */
+  const putMade = (p: { src: string; w: number; h: number; prompt?: string } | null, o: { after?: string; px?: number } = {}) => {
+    const en = engine.current;
+    if (!p || !en) return;
+    const b = en.state().block;
+    const t = o.after ?? (b?.type === 'table' ? b.id : undefined);
+    if (t && en.doc.blocks.some((x) => x.id === t)) en.setPicked(t);
+    const pic = en.picture(p.src, o.px ?? madeWidth(p));
+    en.insert([p.prompt ? { ...pic, alt: p.prompt.replace(/\s+/g, ' ').slice(0, 300) } : pic]);
+  };
+  const aiPicture = async () => putMade(await makePicture({ kind: 'picture' }));
+  const drawing = async () => putMade(await makeDrawing({ kind: 'illustration' }));
+  /** A plot: of the table the caret is in (its cells the data, the plot after it), else of data given in the dialog. */
+  const plot = async () => {
+    const en = engine.current;
+    if (!en) return;
+    const b = en.state().block;
+    const t = b?.type === 'table' ? b : null;
+    const data = t ? csvOf(t.rows.map((r) => r.map((c) => runsText(c.runs)))) : undefined;
+    const p = await makePlot({ data, dataFrom: t ? 'From the table' : undefined, theme: { font: en.doc.font, fg: '#202124' }, w: 720 });
+    // As wide as it was drawn for (it was made for the text's width).
+    putMade(p, { after: t?.id, px: p?.w });
+  };
+  /** The picture changed with AI, its background taken out or part of it erased, in its place (one step to undo). */
+  const changePicture = async (id: string, mode: 'change' | 'cutout' | 'erase') => {
+    const b = engine.current?.doc.blocks.find((x) => x.id === id);
+    if (b?.type !== 'image') return;
+    const p = await editPicture({ src: b.src, mode });
+    if (p && engine.current?.doc.blocks.some((x) => x.id === id)) engine.current.image(id, { src: p.src });
   };
   const askPicture = () => {
     if (!onAsk || !st || !model) return;
@@ -867,6 +920,9 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           comment: startComment,
           picture: () => void pickPicture(),
           pictureUrl: () => setMenu('url'),
+          aiPicture: () => void aiPicture(),
+          drawing: () => void drawing(),
+          plot: () => void plot(),
           signature: () => setDialog('signature'),
           link: () => setLinking({ url: st.link ?? '', text: '' }),
           equation: openEquation,
@@ -1105,6 +1161,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
             slim={!phone && width < 820}
             suggesting={mode === 'suggest'}
             onSuggesting={(on) => setMode(on ? 'suggest' : 'edit')}
+            onPlot={readOnly ? undefined : () => void plot()}
           />
         </div>
       )}
@@ -1140,7 +1197,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
               />
               {!narrow && pageLayout && <Bands layout={pageLayout} zoom={zoom} doc={shownDoc ?? model} readOnly={readOnly || liveOn} onOpen={() => setDialog('bands')} />}
               {st?.picked && e && st.picked.type !== 'math' && (
-                <Picked engine={e} block={st.picked} host={host} tick={tick} readOnly={readOnly} onReplace={(id) => void replacePicture(id)} onAsk={onAsk ? askPicture : undefined} />
+                <Picked engine={e} block={st.picked} host={host} tick={tick} readOnly={readOnly} onReplace={(id) => void replacePicture(id)} onAi={(id, mode) => void changePicture(id, mode)} onAsk={onAsk ? askPicture : undefined} />
               )}
               {handlesFor && e && <ColumnHandles engine={e} table={handlesFor} host={host} tick={`${tick}:${model.blocks.length}`} />}
               {e && !readOnly && !liveOn && !narrow && <BlockHandle engine={e} host={host} paper={paper} tick={model.blocks} />}
