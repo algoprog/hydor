@@ -807,7 +807,7 @@ They need Python 3.10 or later on this computer, or uv; without either, the sect
 
 ## Edit pictures and videos
 
-Pictures, videos and sounds open in editors of their own, inside the app: work on a picture in layers as in Photoshop (select, paint and retouch, adjust, crop and size it, put words and shapes on it), or take its background out, erase things, change it or make it larger with AI; trim, cut, crop, caption, colour and set music to a video; cut, clean up, mix and record sound. They open from:
+Pictures, videos and sounds open in editors of their own, inside the app: work on a picture in layers as in Photoshop (select, paint and retouch, adjust, crop and size it, put words and shapes on it), or take its background out, erase things, change it or make it larger with AI; edit a video as in DaVinci Resolve or Premiere (clips and pictures on a timeline with transitions, overlays and green screens, words and captions, colour, sound, and export on the graphics card); cut, clean up, mix and record sound. They open from:
 
 - **A picture shown large** (in a conversation, a reply or an app's result): **Edit** at its top. What you save goes into your Library as a new picture.
 - **The Library**: **Edit** at the top of a picture's, a video's or a sound's page, and **Edit its sound** in a video's **More** (⋯). **Save** puts the edited one in its place (its title, description, project and folder stay); **Save a copy** keeps a new one beside it, "… (edited)".
@@ -816,7 +816,7 @@ Pictures, videos and sounds open in editors of their own, inside the app: work o
 - **A video an agent made or edited**: **Edit** over it. What you save goes into your Library.
 - **A sound an agent made or edited**: **Edit** beside its name, in its player. What you save goes into your Library.
 
-The arrow beside **Save**, **How it is saved**, says where each goes.
+In the picture editor, the arrow beside **Save**, **How it is saved**, says where each goes; in the video editor, the **Export** workspace does.
 
 ### Editors in tabs
 
@@ -856,17 +856,52 @@ The foreground and background colours are at the rail's foot: click either to pi
 
 ### The video editor
 
-At the top: **Trim**, **Crop**, **Text**, **Adjust** and **Sound**, then **Undo**, **Redo**, **More**, **Save a copy** and **Save**. Under the picture: play and pause (Space), the time, **Split** (S), **Delete this part** (Delete; on a part taken out, **Put it back**) and **Take this frame as a picture**. Under them, the timeline: the video's frames, a handle at each end of the part kept, the parts taken out hatched, a lane for the words (drag them, or their ends) and one for the music, and **Its still** for a slide's video.
+The video editor is laid out as DaVinci Resolve's or Premiere's: a menu bar (**File**, **Edit**, **Clip**, **Timeline**, **View**, each command with its keys), the workspaces **Edit**, **Colour**, **Audio** and **Export** (Alt+1 to Alt+4), then **Undo**, **Redo**, **Save a copy** and **Save**; a status line along the bottom says the video's size, frames a second, length and clips. Drag the lines between the panels to size them: the editor keeps their sizes for next time. Everything shows as it will be made: the colour exactly, the rest as near as a browser can.
 
-- **Trim**: **The part kept** (**Starts at** and **Ends at**, each with **At the playhead**, or drag the timeline's handles), **Parts cut out** (each with **Put back**; to take a part out, split at its start and its end, then delete it) and the **Playback speed** (0.25× to 4×; its sound keeps its pitch).
-- **Crop**: **Shape** (**Any shape**, 16:9, 9:16, **Square (1:1)** or 4:5; drag the box), **Turn and mirror** (**Turn left**, **Turn right**, **Mirror**, **Upside down**) and **The whole picture, as it was**.
-- **Text**: **Add words at the playhead**, then **The words**, **Size of the words**, **Colour**, what is **Behind them** (**Nothing**, **A dark box** or **A light box**), **Bold**, **Where** (**Top**, **Middle** or **Bottom**, or drag them on the picture) and **When they show** (**From** and **To**); **Delete these words**. Up to 30 sets of words.
-- **Adjust**: **Brightness**, **Contrast** and **Saturation**, **Fade in** and **Fade out** (the picture and the sound, up to 5 seconds), and **Back to the original colour**.
-- **Sound**: its own sound (**Without its sound**, or its **Volume**, up to 200%) and **Music** from your Library's sounds (**Listen**, **Use it**; then **Its volume**, **Starts at** and **Take the music out**).
+**Edit** has four panels:
 
-**More** has **Take this frame as a picture**, **Use this frame as its still** (for a slide's video), **Save as a GIF** (up to 60 seconds, without sound) and **Back to the original**. **How it is saved**: the **Size** (as it is, or 1080p, 720p or 480p) and the **Kind of file**: MP4, which plays everywhere, or WebM, smaller, for the web (saved over a file or a Library video, it keeps the kind it was). A frame or a GIF goes beside the file, or into your Library. While it is made, a line says how far it has got, and **Stop** ends it, saving nothing. An edited video can be up to 30 minutes long.
+- **Media** (top left): the videos, pictures and sounds of this edit, each with its length. **Add** brings more **From this device…**, **From the Library…** or **From Files…**; **Record** records a voice-over with the microphone (it goes on the A3 track at the playhead). Drag one onto a track of the timeline, or double-click it to put it at the end of the clips (a sound: under the video as music).
+- **The viewer**: the video at the playhead. Under it: play and pause (Space), a frame back or on (← and →, with Shift a second), the start and the end (Home, End), the timecode, **Mark In** and **Mark Out** (I and O), **Safe areas**, **Grid of thirds**, and **Fit** or **100%**. J, K and L play backwards, stop and play forwards, faster each press. Picked words or an overlay can be dragged on it, and an overlay sized by its corner.
+- **Inspector** (right): what can be set of what you picked, in sections that fold (described below); with nothing picked, the whole video: its **Shape** (**First clip’s**, 16:9, 9:16, 1:1 or 4:5), its fades from and to black, **Add words at the playhead** and **Make captions from what is said**.
+- **The timeline**, across the bottom: a ruler of timecode (In and Out shaded, markers flagged; drag along it to move the playhead), then the tracks: **T1** words and captions, **V3** and **V2** overlays (V3 shows over V2), **V1** the clips one after another, **A1** their own sound with its shape, **A2** music and **A3** voice-over. Each track's header shows or hides it (or mutes it, **M**, and plays it alone, **S**, for sound), locks it, and makes it taller. The main track (V1) has no gaps: deleting or trimming a clip moves the ones after it up.
 
-The video editor needs ffmpeg on the computer the app runs on: its own, or the one the [picture tools](#the-picture-tools-on-this-computer) bring. Without one it says "Video editing needs ffmpeg", with **Open Settings → Images, video and audio**. It opens MP4, MOV, M4V and WebM videos. ← and → step a frame (with Shift, a second); Home and End go to the ends of the part kept.
+The tools, over the timeline: **Select** (A) picks, moves (a clip to another place on V1, anything else in time and between V2 and V3 or A2 and A3) and trims by the ends; **Blade** (B) cuts what you click where you click; **Trim** (T) rolls the cut between two clips (one gets longer as the other gets shorter); **Hand** (H) moves the view. **Snapping** (N) pulls to the playhead, the ends of things, markers, In and Out. Zoom with the slider, + and −, Ctrl and the wheel, or **Zoom to fit** (Shift+Z). S splits what is picked (or the clip at the playhead) at the playhead; Delete takes it out, and Shift+Delete takes it out and moves what follows up (**Ripple delete**). M adds a marker (click one to go there, right-click to remove it). A right-click on a clip has **Split at the playhead**, **Delete**, **Ripple delete**, its speed, **Play it backwards**, **Hold this frame**, **Steady it (stabilize)**, **Detach the sound**, **Edit the sound…**, **Fill the frame with it** and **Colour…**.
+
+### Clips, transitions, overlays and words
+
+A clip picked shows in the inspector:
+
+- its part (**In** and **Out**, in its own video; or drag its ends), its **Speed** (0.25× to 4×), whether **Its sound keeps its pitch**, **Play it backwards** (kept whole in memory: at most about 13 seconds at 1080p), **Steady it (stabilize)** and **Hold this frame for 2 seconds** (the clip is split at the playhead with the frame held between); a picture has its **Length** and a **Zoom and pan** (**Still**, **Zoom in**, **Zoom out**, **Pan left**, **Pan right**, **Pan up**, **Pan down**, and **How far**);
+- **Frame**: **Fitted** (all of it shows, with bars where its shape differs from the video's) or **Filling** (its edges cut off), **Crop** to a shape (**Any**, 16:9, 9:16, 1:1, 4:5), **Crop on the viewer** to drag the box, turned and mirrored, **Whole frame**;
+- **Colour**: **Exposure**, **Contrast**, **Saturation** and **Temperature**, and the **Colour page** for the rest;
+- **Sound**: **Without its sound**, **Volume** (up to 200%), **Its sound** (its own, or one of the edit's sounds in its place, with the same timing), **Edit the sound…** (it opens in the sound editor, and what you save there plays in its place) and **Detach the sound** (onto A3, to move and trim on its own);
+- **Into the next clip**: a cut, or a transition (**Cross dissolve**, **Fade through black**, **Fade through white**, wipes and slides left, right, up and down, **Circle open**, **Circle close**, **Zoom in**) and its **Length**. A transition overlaps the clips it joins (the video gets shorter by its length), at most half as long as the shorter one. A + at a cut on V1 (or Ctrl+T, at the cut nearest the playhead) adds a cross dissolve; click a transition to change it.
+
+An overlay (a picture or a video on V2 or V3: a logo, a watermark, a video in a corner) has **X**, **Y** and **Width**, **Opacity**, when it **Starts** and its **Length**, its track, places (**Top left**, **Top right**, **Middle**, **Bottom left**, **Bottom right**, **Full frame**), **Green screen** (**Take a colour out**: the colour, **How near a colour goes** and **Soft edges**) and **Fades**. Words have what they say, their **Look** (size, colour, **Nothing behind**, **Dark box** or **Light box**, **An edge around the letters**, **Bold**) and **Where and when**.
+
+**Make captions from what is said** (in the inspector with nothing picked, or the **Clip** menu) listens to the clips' sound and the voice-over with the speech recognition of [Settings → Voice](/settings?s=voice) on this computer (whisper.cpp), and puts each line on T1 as a caption you can change, move and time. A caption picked has **Captions**: a style for all of them (**Classic**, **Bold yellow**, **White outline**, **Big, in the middle**, **Dark on light**), **Save as .srt** and **Delete them**.
+
+### Colour, sound and export
+
+**Colour** is as Resolve's Color page, simpler. Pick the clip in the strip at the top (or on the timeline). **Before and after** splits the viewer with a line to drag; **Use on every clip** copies the clip's colour to all; **Reset the colour** takes it off. Under the viewer:
+
+- **Wheels**: **Lift (shadows)**, **Gamma (midtones)**, **Gain (highlights)** and **Offset (everything)**: drag the point towards a colour (with Shift, finer; double-click to centre it), and set its **Level**;
+- **Primaries**: **Exposure**, **Temperature**, **Tint**, **Contrast**, **Brightness**, **Highlights**, **Shadows**, **Saturation** and **Vibrance**;
+- **Curves**: **All**, **Red**, **Green** and **Blue**: click to add a point, drag it, double-click to take it away;
+- **Looks**, each shown on the clip's own frame (**Cinematic (teal and orange)**, **Warm**, **Cool**, **Black and white**, **Vintage**, **Bleach bypass**, **Faded film**, **Vivid**, **Noir**, **Golden hour**, **Matte**, **Day for night**), with their **Strength**;
+- **Effects**: **Vignette**, **Sharpen**, **Denoise** and **Film grain**.
+
+**Scopes** at the right read the viewer's picture: **Waveform** (brightness across the picture), **Vectorscope** (its colours, with the line skin tones fall on) and **Histogram**.
+
+**Audio** has a mixer: for **A1** (the clips' sound), **A2** (music) and **A3** (voice-over), a level meter while it plays, a fader, its pan, **M** (mute) and **S** (solo), and the meter of the whole (**Out**). **Quick fixes** for the whole video: **Clean up the voices** (noise and rumble taken out of the clips' sound and the voice-over), **Even out the loudness** (**Web**, for YouTube and phones, or **Broadcast**), **Lower the music under speech** and **Fade the music in and out**. The fixes are heard in the saved video. **Edit the sound…** opens the picked clip's or sound's sound in the sound editor.
+
+**Export** has ready-made settings (**YouTube 1080p**, **YouTube 4K**, **Reels, TikTok and Shorts**, **Square post**, **Portrait post (4:5)**: each sets the shape and the size), then the **Kind of file** (MP4, MOV, WebM or GIF), the **Codec** (H.264 plays everywhere; H.265 and AV1, where this computer's ffmpeg has them, make smaller files that not every player plays), **Made on** (**The graphics card when it can**, saying which was found, or **The processor**), the **Size** (larger than the clips if you pick so), **Frames a second**, **Quality** (**Smaller file**, **Standard**, **High**) and **What is made** (**All of it**, or **In to Out**). **Save** and **Save a copy** go where the editor says under them; while it is made, a bar says how far it has got and the time left, with **Stop** (nothing is saved). Then it says how it was made ("Made on the graphics card (NVIDIA NVENC)" or "on the processor"). On a graphics card that fails, the processor makes it again at once, and the card is not used again until the app starts again. Whether the card is used at all is [Settings → Images, video and audio → Use the graphics card for videos](/settings?s=images&find=Use%20the%20graphics%20card%20for%20videos).
+
+**File** also has **Take this frame as a picture**, **Save as a GIF** (up to 60 seconds, without sound), **Use this frame as its still** (a slide's video) and **Save the captions as .srt**; **Edit** has **Back to the original**. A frame or a GIF goes beside the file, or into your Library. An edited video can be up to an hour long.
+
+On a phone the editor shows the viewer and the main track, and **Add**, **Edit**, **Colour**, **Audio** and **Export** open each as a sheet from the bottom.
+
+The video editor needs ffmpeg on the computer the app runs on: its own, or the one the [picture tools](#the-picture-tools-on-this-computer) bring. Without one it says "Video editing needs ffmpeg", with **Open Settings → Images, video and audio**. It opens MP4, MOV, M4V and WebM videos, and takes PNG, JPEG, WebP and GIF pictures and MP3, WAV, M4A, OGG, OPUS and FLAC sounds.
 
 ### The sound editor
 
@@ -1115,6 +1150,8 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "Clean up interview.m4a: less background noise, a clearer voice, the long pauses shorter, and podcast loudness."
 - "Put my 'Morning' music from the Library under voiceover.mp3, quietly, fading out at the end."
 - "Make the old photo of the harbour in my Library twice as large, then darken its sky with curves and mute the greens."
+- "Join tram.mp4, the harbour photo and boat.mp4 into one vertical video for Reels, with cross dissolves, a warm look and captions of what is said."
+- "Put my logo in the top right corner of the boat video, lower the music while I speak, and even out the loudness for YouTube."
 - "Find a free photo of a mountain lake for the cover of my trip page, with its credit under it."
 - "Write me a cover letter for this job ad and keep it in my Library: I'll change it myself."
 - "Write me a 20-page report on our first year, a section at a time, so I can watch it come in."

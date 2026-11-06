@@ -12,9 +12,8 @@ import { handsFree } from './handsfree.ts';
 import { MAX_AUDIO, VoiceService } from './service.ts';
 
 let svc: VoiceService | null = null;
-/** The voice service, for the sound editor's words (null while the app starts). */
-export const voiceService = () => svc;
-
+/** Speech recognition on the server, once the routes are up (the sound editor's words and the video editor's captions use it); null before. */
+export const voiceService = (): VoiceService | null => svc;
 const service = () => {
   if (!svc) throw new HttpError(503, 'The app is still starting');
   return svc;

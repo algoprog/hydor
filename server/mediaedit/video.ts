@@ -1,13 +1,20 @@
-// The video editor's work on the server: an edit (shared/mediaedit-video.ts) made with ffmpeg as one command
-// (video-plan.ts), as a job: in line (two are made at once, the rest wait their turn), made with its progress, stopped
-// when asked, then put where it was asked to go: kept as a deck's video (its first frame a kept picture, for the
-// slide's still), as a deck's picture (a frame, a GIF), as a Library item's file or a new item, over a file (the old
-// one to the Trash) or as a copy beside it. A job is kept in memory for an hour after it ends. Without ffmpeg on this
-// computer, the picture tools' portable one does it (server/media/frames.ts); without either, the routes say how to get one.
+// The video editor's work on the server: an edit (shared/mediaedit-video.ts, a timeline of clips, overlays, sounds and
+// words) made with ffmpeg as one command (video-plan.ts), as a job: in line (two are made at once, the rest wait their
+// turn), made with its progress, stopped when asked, then put where it was asked to go: kept as a deck's video (its
+// first frame a kept picture, for the slide's still), as a deck's picture (a frame, a GIF), as a Library item's file or
+// a new item, over a file (the old one to the Trash) or as a copy beside it. A video is made on the graphics card when
+// there is one that works (video-gpu.ts); when the card fails, it is made again on the processor at once. A job is kept
+// in memory for an hour after it ends. Without ffmpeg on this computer, the picture tools' portable one does it
+// (server/media/frames.ts); without either, the routes say how to get one.
 //
 // Routes, signed in (agents have edit_video instead, video-tool.ts):
-//   GET    /api/mediaedit/video/info?src=          VideoFacts: its length, size and sound, and whether ffmpeg is here
-//   GET    /api/mediaedit/video/strip?src=&n=&h=   n of its frames side by side, h pixels tall (a JPEG), for the timeline
+//   GET    /api/mediaedit/video/info?src=          VideoFacts: a video's, a picture's or a sound's length, size and sound, and whether ffmpeg is here
+//   GET    /api/mediaedit/video/strip?src=&n=&h=&from=&to=   n of its frames side by side (from and to: seconds of it), h pixels tall (a JPEG)
+//   GET    /api/mediaedit/video/peaks?src=&n=      { peaks }: how loud its sound is along its length, for the timeline
+//   GET    /api/mediaedit/video/encoders           what this ffmpeg can make, and the graphics card
+//   POST   /api/mediaedit/video/sound              a sound from this device or the microphone (its bytes) → { src: "naget-sound:…", duration }
+//   GET    /api/mediaedit/video/sound/:sha         that sound
+//   POST   /api/mediaedit/video/captions           { src, recipe, lang? } → { captions, srt }: what is said, with its times
 //   POST   /api/mediaedit/video                    VideoEditAsk → VideoEditJob
 //   GET    /api/mediaedit/video/:job               VideoEditJob
 //   DELETE /api/mediaedit/video/:job               stops it → VideoEditJob
@@ -16,8 +23,25 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import type { Readable } from 'node:stream';
 import type { MediaItem } from '../../shared/media.ts';
-import { editedLength, keptParts, normalizeVideoRecipe, toEdited, MAX_GIF_SECONDS, type VideoEditAsk, type VideoEditJob, type VideoFacts, type VideoOut, type VideoRecipe, type VideoSaveTo } from '../../shared/mediaedit-video.ts';
+import {
+  captionsSrt,
+  clipSpans,
+  MAX_GIF_SECONDS,
+  normalizeVideoRecipe,
+  outputSize,
+  type VideoCodec,
+  type VideoEditAsk,
+  type VideoEditJob,
+  type VideoFacts,
+  type VideoFactsOf,
+  type VideoOut,
+  type VideoQuality,
+  type VideoRecipe,
+  type VideoSaveTo,
+  type VideoSize,
+} from '../../shared/mediaedit-video.ts';
 import { ASSET, VIDEO } from '../../shared/slides.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
@@ -27,35 +51,45 @@ import type { Deps, Feature } from '../features/types.ts';
 import { claimName, fileHash, moveWhole } from '../filemove.ts';
 import { deletePath, resolvePath, trashCopy } from '../files.ts';
 import { slug } from '../images/openrouter.ts';
-import { ffmpegInfo, ffmpegTools, frameGrid, NO_FFMPEG, still } from '../media/frames.ts';
+import { ffmpegInfo, ffmpegTools, frameGrid, NO_FFMPEG, still, waveform } from '../media/frames.ts';
 import { keepFile } from '../media/index.ts';
 import { filesOf, getMedia, initMedia, MEDIA_DIR, mustMedia } from '../media/store.ts';
 import { putInFolder } from '../pages/folders.ts';
-import { MAX_ASSET, putAsset } from '../pages/assets.ts';
-import { getVideo, keepVideoFile, videoType } from '../pages/videos.ts';
+import { getAsset, MAX_ASSET, pictureType, putAsset } from '../pages/assets.ts';
+import { getVideo, keepVideoFile, sendVideo, videoType } from '../pages/videos.ts';
+import { voiceService } from '../voice/index.ts';
 import { fontFor } from './video-fonts.ts';
-import { checkPlan, planVideo, type DrawHere, type Plan } from './video-plan.ts';
+import { gpuEncoder, gpuRoutes, gpuState, HW_NAMES, markBroken } from './video-gpu.ts';
+import { checkPlan, planVideo, type DrawHere, type Encoders, type Plan, type TextHow } from './video-plan.ts';
 import { editVideoTool } from './video-tool.ts';
 
 /** How many are made at once, how many may wait, how long one may take, and how long one is kept after it ends. */
 const AT_ONCE = 2;
 const WAITING = 8;
-const LIMIT_MS = 30 * 60_000;
+const LIMIT_MS = 45 * 60_000;
 const KEEP_MS = 3600_000;
 /** The longest edited video made, in seconds. */
-const MAX_SECONDS = 30 * 60;
+const MAX_SECONDS = 60 * 60;
+/** The most files an edit reads at once (each a decoder in memory). */
+const MAX_INPUTS = 120;
 
 const tmpRoot = () => path.join(config.dataDir, 'mediaedit', 'tmp');
 const stripDir = () => path.join(config.dataDir, 'mediaedit', 'strips');
+const soundDir = () => path.join(config.dataDir, 'mediaedit', 'sounds');
+const pictureDir = () => path.join(config.dataDir, 'mediaedit', 'pictures');
 
 const VIDEO_EXT: Record<string, true> = { mp4: true, m4v: true, mov: true, webm: true };
-const SOUND_EXT: Record<string, true> = { mp3: true, wav: true, m4a: true, aac: true, ogg: true, oga: true, opus: true, flac: true };
+const PICTURE_EXT: Record<string, true> = { png: true, jpg: true, jpeg: true, webp: true, gif: true, bmp: true };
+const SOUND_EXT: Record<string, true> = { mp3: true, wav: true, m4a: true, aac: true, ogg: true, oga: true, opus: true, flac: true, webm: true, weba: true };
 
-// ---- what is edited, and the music under it --------------------------------------------------------------------
+// ---- what is edited: videos, pictures and sounds ---------------------------------------------------------------------
 
-/** A video to edit: its file, and what it is in the app (a deck's kept video, a Library item, a file). */
+export type SourceKind = 'video' | 'picture' | 'sound';
+
+/** A video, a picture or a sound an edit reads: its file, and what it is in the app (a deck's, a Library item, a file). */
 export interface Source {
   file: string;
+  kind: SourceKind;
   /** A deck's video ("naget-video:<sha>"). */
   kept?: string;
   media?: MediaItem;
@@ -67,6 +101,8 @@ export interface Source {
 
 const MEDIA_ID = /^(?:media:|\/api\/media\/)([a-f0-9]{10})(?:\/file)?(?:[?#].*)?$/;
 const KEPT_VIDEO = /^(?:naget-video:|\/api\/pages\/videos\/)([a-f0-9]{16,64})(?:[?#].*)?$/;
+const KEPT_PICTURE = /^(?:naget-asset:|\/api\/pages\/assets\/)([a-f0-9]{16,64})(?:[?#].*)?$/;
+const KEPT_SOUND = /^(?:naget-sound:|\/api\/mediaedit\/video\/sound\/)([a-f0-9]{16,64})(?:[?#].*)?$/;
 
 async function headOf(file: string): Promise<Buffer> {
   const fd = await fs.promises.open(file, 'r');
@@ -88,42 +124,66 @@ function pathOf(p: string, cwd?: string): string {
   return s === '~' || s.startsWith('~/') ? path.join(os.homedir(), s.slice(1)) : path.resolve(cwd, s);
 }
 
-/** The video `src` names: a deck's kept video, a Library item, or a file (an MP4, MOV or WebM); throws what is wrong. */
-export async function sourceOf(db: DB, src: unknown, o: { cwd?: string } = {}): Promise<Source> {
+const KIND_WORDS: Record<SourceKind, string> = { video: 'a video (MP4, MOV or WebM)', picture: 'a picture (PNG, JPEG, WebP or GIF)', sound: 'a sound (MP3, WAV, M4A, OGG, OPUS or FLAC)' };
+
+/** A deck's picture as a file the edit can read (kept beside the editor's other files, made once). */
+function pictureFile(db: DB, sha: string): string {
+  const a = getAsset(db, sha);
+  if (!a) throw new HttpError(404, 'That picture is no longer kept by the app');
+  const ext = a.mime === 'image/png' ? 'png' : a.mime === 'image/webp' ? 'webp' : a.mime === 'image/gif' ? 'gif' : 'jpg';
+  const file = path.join(pictureDir(), `${sha}.${ext}`);
+  if (!fs.existsSync(file)) {
+    fs.mkdirSync(pictureDir(), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(file, a.data);
+  }
+  return file;
+}
+
+/** What `src` names (a deck's video or picture, a Library item, a sound kept by the editor, or a file), if it is one of `kinds`; throws what is wrong. */
+export async function sourceOf(db: DB, src: unknown, o: { cwd?: string; kinds?: SourceKind[] } = {}): Promise<Source> {
+  const kinds = o.kinds ?? ['video'];
   const s = typeof src === 'string' ? src.trim() : '';
   if (!s) throw new HttpError(400, 'src: the video to edit');
+  const want = (kind: SourceKind, x: Source): Source => {
+    if (!kinds.includes(kind)) throw new HttpError(400, `That is not ${kinds.map((k) => KIND_WORDS[k]).join(' or ')}`);
+    return x;
+  };
   const kept = KEPT_VIDEO.exec(s);
   if (kept) {
     const v = getVideo(db, kept[1]);
     if (!v) throw new HttpError(404, 'That video is no longer kept by the app');
-    return { file: v.file, kept: VIDEO + kept[1], name: 'video' };
+    return want('video', { file: v.file, kind: 'video', kept: VIDEO + kept[1], name: 'video' });
+  }
+  const pic = KEPT_PICTURE.exec(s);
+  if (pic) return want('picture', { file: pictureFile(db, pic[1]), kind: 'picture', name: 'picture' });
+  const snd = KEPT_SOUND.exec(s);
+  if (snd) {
+    const file = fs.existsSync(soundDir()) ? fs.readdirSync(soundDir()).find((n) => n.startsWith(`${snd[1]}.`)) : undefined;
+    if (!file) throw new HttpError(404, 'That sound is no longer kept by the app');
+    return want('sound', { file: path.join(soundDir(), file), kind: 'sound', name: 'sound' });
   }
   const media = MEDIA_ID.exec(s);
   if (media) {
     const m = mustMedia(db, media[1]);
-    if (m.kind !== 'video') throw new HttpError(400, 'That Library item is not a video');
-    return { file: m.file, media: m, name: m.title };
+    const kind: SourceKind = m.kind === 'video' ? 'video' : m.kind === 'image' ? 'picture' : 'sound';
+    if (!kinds.includes(kind)) throw new HttpError(400, m.kind === 'video' ? 'That Library item is a video' : m.kind === 'image' ? 'That Library item is a picture, not a video' : 'That Library item is a sound, not a video');
+    return { file: m.file, kind, media: m, name: m.title };
   }
   const file = pathOf(s, o.cwd);
   const st = await fs.promises.stat(file).catch(() => null);
-  if (!st?.isFile()) throw new HttpError(404, `No such video: ${file}`);
-  if (!VIDEO_EXT[path.extname(file).slice(1).toLowerCase()] || !videoType(await headOf(file))) throw new HttpError(400, `${path.basename(file)} is not a video this editor takes: an MP4, MOV or WebM file`);
-  return { file, path: file, name: path.basename(file).replace(/\.[^.]+$/, '') };
+  if (!st?.isFile()) throw new HttpError(404, `No such file: ${file}`);
+  const ext = path.extname(file).slice(1).toLowerCase();
+  const name = path.basename(file).replace(/\.[^.]+$/, '');
+  const head = await headOf(file);
+  if (VIDEO_EXT[ext] && videoType(head) && kinds.includes('video')) return { file, kind: 'video', path: file, name };
+  if (PICTURE_EXT[ext] && (pictureType(head) || ext === 'bmp') && kinds.includes('picture')) return { file, kind: 'picture', path: file, name };
+  if (SOUND_EXT[ext] && kinds.includes('sound')) return { file, kind: 'sound', path: file, name };
+  throw new HttpError(400, `${path.basename(file)} is not ${kinds.map((k) => KIND_WORDS[k]).join(' or ')}`);
 }
 
-/** The music `src` names: a sound of the Library's, or a sound file. */
+/** The music `src` names: a sound of the Library's, a sound kept by the editor, or a sound file. */
 export async function musicOf(db: DB, src: string, o: { cwd?: string } = {}): Promise<string> {
-  const media = MEDIA_ID.exec(src.trim());
-  if (media) {
-    const m = mustMedia(db, media[1]);
-    if (m.kind !== 'audio') throw new HttpError(400, 'The music is not a sound of the Library’s');
-    return m.file;
-  }
-  const file = pathOf(src, o.cwd);
-  const st = await fs.promises.stat(file).catch(() => null);
-  if (!st?.isFile()) throw new HttpError(404, `No such sound: ${file}`);
-  if (!SOUND_EXT[path.extname(file).slice(1).toLowerCase()]) throw new HttpError(400, `${path.basename(file)} is not a sound (MP3, WAV, M4A, AAC, OGG, OPUS or FLAC)`);
-  return file;
+  return (await sourceOf(db, src, { ...o, kinds: ['sound'] })).file;
 }
 
 /** What ffmpeg says of a video, as the editor needs it: its length, its size as it shows, its sound and frames a second. */
@@ -135,12 +195,25 @@ export async function factsOf(file: string): Promise<Required<Pick<VideoFacts, '
   return { duration: i.duration, width: side ? i.height : i.width, height: side ? i.width : i.height, audio: i.audio, ...(i.fps ? { fps: i.fps } : {}) };
 }
 
-// ---- ffmpeg's encoders, and fonts for words drawn here ----------------------------------------------------------
+/** A source's facts as the timeline needs them: a video's, a picture's size, a sound's length. */
+export async function sizeOf(s: Source): Promise<VideoSize> {
+  if (s.kind === 'video') return factsOf(s.file);
+  const i = await ffmpegInfo(s.file);
+  if (s.kind === 'picture') {
+    if (!i?.width || !i.height) throw new HttpError(422, `ffmpeg could not read the picture ${path.basename(s.file)}`);
+    const side = i.rotation === 90 || i.rotation === 270;
+    return { duration: 0, width: side ? i.height : i.width, height: side ? i.width : i.height, picture: true };
+  }
+  if (!i?.duration) throw new HttpError(422, `The sound’s length could not be read: ${path.basename(s.file)}`);
+  return { duration: i.duration, width: 0, height: 0, audio: true };
+}
 
-const encoders = new Map<string, Promise<{ h264?: string; vp9?: string; vp8?: string; opus?: boolean }>>();
+// ---- ffmpeg's encoders ------------------------------------------------------------------------------------------------
 
-/** The encoders an ffmpeg has, asked once: H.264 (x264 first), VP9, VP8, Opus. */
-function encodersOf(bin: string) {
+const encoders = new Map<string, Promise<Encoders>>();
+
+/** The encoders an ffmpeg has, asked once: H.264 (x264 first), H.265, AV1, VP9, VP8, Opus. */
+export function encodersOf(bin: string): Promise<Encoders> {
   let e = encoders.get(bin);
   if (!e) {
     e = new Promise((resolve) => {
@@ -148,12 +221,13 @@ function encodersOf(bin: string) {
         const have = new Set(
           String(stdout ?? '')
             .split('\n')
-            .map((l) => /^\s*V[^\s]*\s+(\S+)|^\s*A[^\s]*\s+(\S+)/.exec(l))
-            .filter((m) => !!m)
-            .map((m) => (m![1] ?? m![2]) as string),
+            .map((l) => /^\s*[VA]\S*\s+(\S+)/.exec(l)?.[1])
+            .filter((x): x is string => !!x),
         );
         resolve({
           h264: ['libx264', 'libopenh264', 'h264_videotoolbox', 'h264_mf'].find((x) => have.has(x)),
+          h265: ['libx265'].find((x) => have.has(x)),
+          av1: ['libsvtav1', 'libaom-av1', 'librav1e'].find((x) => have.has(x)),
           vp9: have.has('libvpx-vp9') ? 'libvpx-vp9' : undefined,
           vp8: have.has('libvpx') ? 'libvpx' : undefined,
           opus: have.has('libopus'),
@@ -187,18 +261,31 @@ export type SaveTo = VideoSaveTo | { into: string; name: string };
 /** An edit checked and ready to make. */
 export interface Prepared {
   d: Deps;
+  /** The video being edited (where it is saved, and its clips without a src). */
   source: Source;
-  facts: { duration: number; width: number; height: number; audio: boolean; fps?: number };
+  facts: VideoSize;
+  /** Every source of the edit, by its src. */
+  sources: Map<string, { source: Source; facts: VideoSize }>;
+  factsOf: VideoFactsOf;
   recipe: VideoRecipe;
   format: VideoOut;
   frame?: number;
+  range?: [number, number];
   size?: number;
-  /** A deck's video: the moment its still is taken at (seconds of the original). */
+  exactSize?: boolean;
+  fps?: number;
+  codec?: VideoCodec;
+  quality?: VideoQuality;
+  /** Made on the processor even with a graphics card that could. */
+  cpu?: boolean;
+  /** A deck's video: the moment its still is taken at (seconds of the timeline). */
   still?: number;
   to: SaveTo;
-  music?: string;
   /** The editor's drawings of the texts (PNG), by the recipe's order; null where it drew none. */
   drawn: (Buffer | null)[];
+  /** The timeline's length, and what is made of it. */
+  length: number;
+  seconds: number;
 }
 
 interface Job {
@@ -303,9 +390,11 @@ function ffmpegWords(tail: string): string {
   return last ? `ffmpeg could not make it: ${last}` : 'ffmpeg could not make it';
 }
 
-function runFfmpeg(bin: string, plan: Plan, cwd: string, j: Job): Promise<void> {
+/** Runs a plan in the job's folder, its progress told to the job. The graphics card is hidden from it unless it uses it. */
+function runFfmpeg(bin: string, plan: Plan, cwd: string, j: Job, gpu: boolean): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(bin, plan.args, { cwd, env: { ...agentBaseEnv(), CUDA_VISIBLE_DEVICES: '' }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    const env = gpu ? agentBaseEnv() : { ...agentBaseEnv(), CUDA_VISIBLE_DEVICES: '' };
+    const proc = spawn(bin, plan.args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     j.proc = proc;
     let tail = '';
     let buf = '';
@@ -356,6 +445,57 @@ async function fontInto(dir: string, i: number, text: string, bold: boolean): Pr
   return name;
 }
 
+/** The words over it: the editor's drawings (written into the job's folder), or drawn here in a font of this computer's. */
+async function textsFor(p: Prepared, dir: string): Promise<(TextHow | null)[]> {
+  const out: (TextHow | null)[] = [];
+  for (const [i, t] of (p.recipe.texts ?? []).entries()) {
+    const png = p.drawn[i];
+    const size = png ? pngSize(png) : null;
+    if (png && size) {
+      const file = path.join(dir, `drawn${i}.png`);
+      await fs.promises.writeFile(file, png);
+      out.push({ png: file, ...size });
+      continue;
+    }
+    const font = await fontInto(dir, i, t.text, !!t.bold);
+    if (!font) throw new Error('No font was found on this computer to draw the words with');
+    out.push({
+      font,
+      lines: t.text
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .slice(0, 12),
+    } satisfies DrawHere);
+  }
+  return out;
+}
+
+/** The plan for a prepared edit, on the graphics card's encoder or the processor's. */
+async function planFor(p: Prepared, dir: string, output: string, bin: string, hw: Awaited<ReturnType<typeof gpuEncoder>>): Promise<Plan> {
+  const fileOf = (src: string | undefined) => (src === undefined ? p.source.file : p.sources.get(src)!.source.file);
+  return planVideo({
+    recipe: p.recipe,
+    factsOf: p.factsOf,
+    clipFiles: (p.recipe.clips ?? []).map((c) => ({ file: fileOf(c.src), ...(c.sound ? { sound: fileOf(c.sound) } : {}) })),
+    overlayFiles: (p.recipe.overlays ?? []).map((o) => fileOf(o.src)),
+    audioFiles: (p.recipe.audio ?? []).map((a) => fileOf(a.src)),
+    output,
+    format: p.format,
+    container: containerOf(p),
+    frame: p.frame,
+    range: p.range,
+    size: p.size,
+    exactSize: p.exactSize,
+    fps: p.fps,
+    codec: p.codec,
+    quality: p.quality,
+    texts: p.format === 'wav' ? [] : await textsFor(p, dir),
+    encoders: await encodersOf(bin),
+    ...(hw ? { hw: { api: hw.api, encoder: hw.encoder, ...(hw.device ? { device: hw.device } : {}) } } : {}),
+  });
+}
+
 async function make(j: Job): Promise<void> {
   if (isEnded(j.view.status)) return;
   const p = j.prep;
@@ -366,47 +506,30 @@ async function make(j: Job): Promise<void> {
   try {
     const tools = await ffmpegTools();
     if (!tools) throw new Error(NO_FFMPEG);
-    // The words over it: the editor's drawings, or drawn here in a font of this computer's.
-    const texts: ({ png: string; w: number; h: number } | DrawHere | null)[] = [];
-    for (const [i, t] of (p.recipe.texts ?? []).entries()) {
-      const png = p.drawn[i];
-      const size = png ? pngSize(png) : null;
-      if (png && size) {
-        const file = path.join(dir, `drawn${i}.png`);
-        await fs.promises.writeFile(file, png);
-        texts.push({ png: file, ...size });
-        continue;
-      }
-      const font = await fontInto(dir, i, t.text, !!t.bold);
-      if (!font) throw new Error('No font was found on this computer to draw the words with');
-      texts.push({
-        font,
-        lines: t.text
-          .split('\n')
-          .map((l) => l.trim())
-          .filter(Boolean)
-          .slice(0, 12),
-      });
-    }
-    const ext = p.format === 'webm' ? 'webm' : p.format === 'gif' ? 'gif' : p.format === 'jpg' ? 'jpg' : p.format === 'png' ? 'png' : containerOf(p) === 'mov' ? 'mov' : 'mp4';
+    const ext = p.format === 'mp4' || p.format === 'mov' ? (containerOf(p) === 'mov' ? 'mov' : 'mp4') : p.format;
     const output = path.join(dir, `out.${ext}`);
-    const plan = planVideo({
-      recipe: p.recipe,
-      video: p.facts,
-      input: p.source.file,
-      output,
-      format: p.format,
-      container: containerOf(p),
-      frame: p.frame,
-      size: p.size,
-      music: p.music,
-      texts,
-      encoders: await encodersOf(tools.ffmpeg),
-    });
+    // The graphics card for MP4 and MOV, when there is one that works and it is not turned off.
+    const video = p.format === 'mp4' || p.format === 'mov';
+    const hw = video && !p.cpu ? await gpuEncoder(p.d.db, tools.ffmpeg, p.codec ?? 'h264') : null;
+    let plan = await planFor(p, dir, output, tools.ffmpeg, hw);
     checkPlan(plan);
     for (const [name, text] of Object.entries(plan.files)) await fs.promises.writeFile(path.join(dir, name), text);
     if (j.stopping) throw new Error('stopped');
-    await runFfmpeg(tools.ffmpeg, plan, dir, j);
+    j.view.made = hw ? { gpu: true, by: `${hw.name.startsWith('NVIDIA') ? 'NVIDIA' : hw.name.split(' ')[0]} ${HW_NAMES[hw.api]}` } : { gpu: false, by: 'processor' };
+    try {
+      await runFfmpeg(tools.ffmpeg, plan, dir, j, !!hw);
+    } catch (e) {
+      if (!hw || j.stopping || j.late) throw e;
+      // The card failed: not used again until the app starts again, and this one made on the processor at once.
+      markBroken(hw.encoder);
+      j.view.made = { gpu: false, by: 'processor' };
+      j.view.note = `The graphics card (${HW_NAMES[hw.api]}) could not make it, so the processor did`;
+      j.view.progress = 0;
+      await fs.promises.rm(output, { force: true });
+      plan = await planFor(p, dir, output, tools.ffmpeg, null);
+      checkPlan(plan);
+      await runFfmpeg(tools.ffmpeg, plan, dir, j, false);
+    }
     const st = await fs.promises.stat(output).catch(() => null);
     if (!st?.size) throw new Error('ffmpeg made nothing');
     Object.assign(j.view, { w: plan.w, h: plan.h, bytes: st.size, ...(plan.seconds ? { seconds: Math.round(plan.seconds * 10) / 10 } : {}) });
@@ -420,9 +543,10 @@ async function make(j: Job): Promise<void> {
   }
 }
 
-/** The kind of file a video is written as: a .mov written over stays a .mov, a .webm a WebM, the rest MP4. */
+/** The kind of file a video is written as: a .mov written over stays a .mov, a .webm a WebM, the rest MP4 (or MOV, asked). */
 function containerOf(p: Prepared): 'mp4' | 'mov' | 'webm' {
   if (p.format === 'webm') return 'webm';
+  if (p.format === 'mov') return 'mov';
   const over = 'file' in p.to && p.to.as === 'replace' ? p.to.file : 'media' in p.to && p.to.as === 'replace' ? getMedia(p.d.db, p.to.media)?.file : undefined;
   return over && /\.mov$/i.test(over) ? 'mov' : 'mp4';
 }
@@ -452,7 +576,7 @@ async function deliver(j: Job, out: string, ext: string, dir: string): Promise<v
     // The slide's still: the moment picked, else its first frame (or the end of its fade in from black).
     let frame = kept.frame;
     const seconds = j.view.seconds ?? 1;
-    const when = p.still !== undefined ? toEdited(p.still, keptParts(p.recipe, p.facts.duration), p.recipe.speed ?? 1) : p.recipe.fadeIn ? p.recipe.fadeIn + 0.05 : 0;
+    const when = p.still !== undefined ? p.still - (p.range?.[0] ?? 0) : p.recipe.fadeIn ? p.recipe.fadeIn + 0.05 : 0;
     if (when > 0) {
       const at = path.join(dir, 'still.jpg');
       if (await still(out, at, { at: Math.min(when, Math.max(0, seconds - 0.05)), width: 1280 })) frame = await fs.promises.readFile(at);
@@ -552,7 +676,7 @@ export async function replaceMediaFile(d: Deps, m: MediaItem, from: string, ext:
 
 // ---- checking what is asked -------------------------------------------------------------------------------------
 
-const FORMATS: VideoOut[] = ['mp4', 'webm', 'gif', 'jpg', 'png'];
+const FORMATS: VideoOut[] = ['mp4', 'mov', 'webm', 'gif', 'jpg', 'png'];
 const PNG_DATA = /^data:image\/png;base64,([A-Za-z0-9+/=\s]+)$/;
 
 /** Where the result may go, as the route takes it. */
@@ -567,37 +691,76 @@ function saveToOf(v: unknown): VideoSaveTo {
   throw new HttpError(400, 'to: where it goes ({ video: true }, { asset: true }, { library: true }, { media: id, as: "replace" | "copy" } or { file: path, as: "replace" | "copy" })');
 }
 
+/** Every src an edit names, with the kinds each may be: clips (videos, pictures), overlays (the same), sounds (sounds, or a video's sound). */
+function sourcesNamed(raw: unknown): Map<string, Set<'clip' | 'sound'>> {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, any>;
+  const out = new Map<string, Set<'clip' | 'sound'>>();
+  const add = (s: unknown, as: 'clip' | 'sound') => {
+    if (typeof s !== 'string' || !s.trim()) return;
+    const k = s.trim().slice(0, 4096);
+    if (!out.has(k)) out.set(k, new Set());
+    out.get(k)!.add(as);
+  };
+  for (const c of Array.isArray(r.clips) ? r.clips : []) {
+    add(c?.src, 'clip');
+    add(c?.sound, 'sound');
+  }
+  for (const o of Array.isArray(r.overlays) ? r.overlays : []) add(o?.src, 'clip');
+  for (const a of Array.isArray(r.audio) ? r.audio : []) add(a?.src, 'sound');
+  if (r.music && typeof r.music === 'object') add(r.music.src, 'sound');
+  return out;
+}
+
+/** The sources an edit names, each read once: their files and facts. */
+async function readSources(db: DB, raw: unknown, o: { cwd?: string }): Promise<Map<string, { source: Source; facts: VideoSize }>> {
+  const out = new Map<string, { source: Source; facts: VideoSize }>();
+  const named = sourcesNamed(raw);
+  if (named.size > MAX_INPUTS) throw new HttpError(400, `This edit uses ${named.size} files: at most ${MAX_INPUTS}`);
+  for (const [src, as] of named) {
+    const kinds: SourceKind[] = as.has('clip') ? ['video', 'picture'] : ['sound', 'video'];
+    const source = await sourceOf(db, src, { ...o, kinds });
+    out.set(src, { source, facts: await sizeOf(source) });
+  }
+  return out;
+}
+
 /**
- * An ask (the route's, or edit_video's) checked against the video: its source read, its recipe made to fit, the format
- * and where it goes agreeing, the music found, the editor's drawings read. Throws, in words a person can act on.
+ * An ask (the route's, or edit_video's) checked against its sources: each read, the recipe made to fit them, the format
+ * and where it goes agreeing, the editor's drawings read. Throws, in words a person can act on.
  */
-export async function prepare(d: Deps, b: Partial<VideoEditAsk> & { to?: unknown }, o: { cwd?: string; to?: SaveTo } = {}): Promise<Prepared> {
+export async function prepare(d: Deps, b: Partial<VideoEditAsk> & { to?: unknown }, o: { cwd?: string; to?: SaveTo; forCaptions?: boolean } = {}): Promise<Prepared> {
   if (!(await ffmpegTools())) throw new HttpError(400, NO_FFMPEG);
-  const source = await sourceOf(d.db, b.src, o);
-  const facts = await factsOf(source.file);
+  const source = await sourceOf(d.db, b.src, { ...o, kinds: o.cwd !== undefined ? ['video', 'picture'] : ['video'] });
+  const facts = await sizeOf(source);
+  const sources = await readSources(d.db, b.recipe, o);
+  const factsOf_: VideoFactsOf = (src) => (src === undefined ? facts : sources.get(src)?.facts);
   let recipe: VideoRecipe;
   try {
-    recipe = normalizeVideoRecipe(b.recipe ?? {}, facts);
+    recipe = normalizeVideoRecipe(b.recipe ?? {}, factsOf_);
   } catch (e) {
     throw new HttpError(400, (e as Error).message);
   }
-  const to = o.to ?? saveToOf(b.to);
-  let format: VideoOut = FORMATS.includes(b.format as VideoOut) ? (b.format as VideoOut) : b.frame !== undefined ? 'jpg' : 'mp4';
+  const length = clipSpans(recipe.clips ?? [], factsOf_).length;
+  const to: SaveTo = o.forCaptions ? { library: true } : (o.to ?? saveToOf(b.to));
+  let format: VideoOut = o.forCaptions ? 'wav' : FORMATS.includes(b.format as VideoOut) ? (b.format as VideoOut) : b.frame !== undefined ? 'jpg' : 'mp4';
   const picture = format === 'jpg' || format === 'png';
   const frame = b.frame === undefined || b.frame === null ? undefined : Number(b.frame);
-  if (picture && (frame === undefined || !Number.isFinite(frame) || frame < 0 || frame > facts.duration)) throw new HttpError(400, `frame: the moment to take, in seconds of the video (0 to ${Math.floor(facts.duration * 10) / 10})`);
+  if (picture && (frame === undefined || !Number.isFinite(frame) || frame < 0 || frame > length + 0.001)) throw new HttpError(400, `frame: the moment to take, in seconds of the edited video (0 to ${Math.floor(length * 10) / 10})`);
   if ('file' in to && appsOwn(pathOf(to.file))) throw new HttpError(403, 'That file is part of the app’s own data: it is not written from here.');
   // Written over a video, it stays the kind it was.
   const over = 'file' in to && to.as === 'replace' ? to.file : 'media' in to && to.as === 'replace' ? mustMedia(d.db, to.media).file : null;
   if (over && (picture || format === 'gif')) throw new HttpError(400, `A ${picture ? 'picture of a frame' : 'GIF'} is saved as a copy, not over the video`);
-  if (over) format = /\.webm$/i.test(over) ? 'webm' : 'mp4';
+  if (over) format = /\.webm$/i.test(over) ? 'webm' : /\.mov$/i.test(over) ? 'mov' : 'mp4';
   if ('video' in to && (picture || format === 'gif')) throw new HttpError(400, 'A frame or a GIF is kept as a picture: to: { asset: true }');
+  if ('video' in to && format === 'mov') format = 'mp4';
   if ('asset' in to && !(picture || format === 'gif')) throw new HttpError(400, 'A video is kept as a deck’s video: to: { video: true }');
   if ('media' in to && to.as === 'replace' && mustMedia(d.db, to.media).kind !== 'video') throw new HttpError(400, 'That Library item is not a video');
-  const length = editedLength(recipe, facts.duration);
-  if (!picture && length > MAX_SECONDS) throw new HttpError(400, `The edited video would be over ${MAX_SECONDS / 60} minutes: cut it shorter`);
-  if (format === 'gif' && length > MAX_GIF_SECONDS) throw new HttpError(400, `A GIF can be at most ${MAX_GIF_SECONDS} seconds: cut it shorter, or save it as a video`);
-  const music = recipe.music && !picture && format !== 'gif' ? await musicOf(d.db, recipe.music.src, o) : undefined;
+  const pair = Array.isArray(b.range) && b.range.length === 2 ? [Number(b.range[0]), Number(b.range[1])] : null;
+  if (pair && pair.every(Number.isFinite) && Math.min(length, pair[1]) - Math.max(0, pair[0]) < 0.05) throw new HttpError(400, 'The part between In and Out is too short: mark a longer part');
+  const range: [number, number] | undefined = pair && pair.every(Number.isFinite) && (pair[0] > 0.001 || pair[1] < length - 0.001) ? [Math.max(0, pair[0]), Math.min(length, pair[1])] : undefined;
+  const seconds = picture ? 0 : range ? range[1] - range[0] : length;
+  if (!picture && seconds > MAX_SECONDS) throw new HttpError(400, `The edited video would be over ${MAX_SECONDS / 60} minutes: cut it shorter`);
+  if (format === 'gif' && seconds > MAX_GIF_SECONDS) throw new HttpError(400, `A GIF can be at most ${MAX_GIF_SECONDS} seconds: cut it shorter, or save it as a video`);
   const drawn = (recipe.texts ?? []).map((_, i) => {
     const raw = Array.isArray(b.drawn) ? b.drawn[i] : undefined;
     const m = typeof raw === 'string' ? PNG_DATA.exec(raw) : null;
@@ -608,74 +771,192 @@ export async function prepare(d: Deps, b: Partial<VideoEditAsk> & { to?: unknown
     return data;
   });
   const size = Number(b.size);
+  const fps = Number(b.fps);
   const stillAt = Number(b.still);
+  const codec = b.codec === 'h265' || b.codec === 'av1' ? b.codec : undefined;
+  const quality = b.quality === 'small' || b.quality === 'high' ? b.quality : undefined;
   return {
     d,
     source,
     facts,
+    sources,
+    factsOf: factsOf_,
     recipe,
     format,
     ...(frame !== undefined && picture ? { frame } : {}),
-    ...(Number.isFinite(size) && size >= 120 ? { size: Math.round(Math.min(4320, size)) } : {}),
-    ...(b.still !== undefined && b.still !== null && Number.isFinite(stillAt) && 'video' in to ? { still: Math.min(facts.duration, Math.max(0, stillAt)) } : {}),
+    ...(range && !picture ? { range } : {}),
+    ...(Number.isFinite(size) && size >= 120 ? { size: Math.round(Math.min(4320, size)), ...(b.exactSize === true ? { exactSize: true } : {}) } : {}),
+    ...(Number.isFinite(fps) && fps >= 1 ? { fps: Math.min(60, fps) } : {}),
+    ...(codec ? { codec } : {}),
+    ...(quality ? { quality } : {}),
+    ...(b.encoder === 'cpu' ? { cpu: true } : {}),
+    ...(b.still !== undefined && b.still !== null && Number.isFinite(stillAt) && 'video' in to ? { still: Math.min(length, Math.max(0, stillAt)) } : {}),
     to,
-    ...(music ? { music } : {}),
     drawn,
+    length,
+    seconds,
   };
 }
 
-// ---- the timeline's frames ----------------------------------------------------------------------------------------
+// ---- captions: what is said, with its times ----------------------------------------------------------------------------
 
-/** `n` frames of a video side by side, each `h` pixels tall (a JPEG, kept for next time): its path, or null without ffmpeg. */
-export async function frameStrip(file: string, n: number, h: number): Promise<string | null> {
+/** The voices of an edit (its clips' sound and its voice-over) as 16 kHz WAV, then turned into words with their times. */
+export async function captionsOf(prep: Prepared, lang: string, signal?: AbortSignal): Promise<{ from: number; to: number; text: string }[]> {
+  const voice = voiceService();
+  if (!voice) throw new HttpError(503, 'The app is still starting');
+  const tools = await ffmpegTools();
+  if (!tools) throw new HttpError(400, NO_FFMPEG);
+  await fs.promises.mkdir(tmpRoot(), { recursive: true, mode: 0o700 });
+  const dir = await fs.promises.mkdtemp(path.join(tmpRoot(), 'words-'));
+  try {
+    const out = path.join(dir, 'voices.wav');
+    const plan = await planFor({ ...prep, format: 'wav', range: undefined }, dir, out, tools.ffmpeg, null);
+    checkPlan(plan);
+    const j = { view: { job: 'captions', status: 'running', format: 'wav', startedAt: Date.now() }, prep, ended: Promise.resolve(), end: () => {} } as Job;
+    signal?.addEventListener('abort', () => j.proc?.kill('SIGKILL'), { once: true });
+    await runFfmpeg(tools.ffmpeg, plan, dir, j, false);
+    const said = await voice.transcribeTimed(out, lang);
+    return said.map((s) => ({ from: Math.max(0, Math.min(prep.length, s.from)), to: Math.max(0, Math.min(prep.length, s.to)), text: s.text })).filter((s) => s.to - s.from >= 0.1);
+  } finally {
+    await fs.promises.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+// ---- the timeline's frames and sound shapes --------------------------------------------------------------------------
+
+/** `n` frames of a video (from and to: seconds of it) side by side, each `h` pixels tall (a JPEG, kept for next time): its path, or null without ffmpeg. */
+export async function frameStrip(file: string, n: number, h: number, range?: [number, number]): Promise<string | null> {
   const tools = await ffmpegTools();
   if (!tools) return null;
   const st = await fs.promises.stat(file);
-  const key = crypto.createHash('sha256').update(`${file}\0${st.size}\0${st.mtimeMs}\0${n}\0${h}`).digest('hex').slice(0, 32);
+  const facts = await factsOf(file);
+  const a = Math.max(0, Math.min(facts.duration, range?.[0] ?? 0));
+  const b = Math.max(a, Math.min(facts.duration, range?.[1] ?? facts.duration));
+  const key = crypto.createHash('sha256').update(`${file}\0${st.size}\0${st.mtimeMs}\0${n}\0${h}\0${a.toFixed(2)}\0${b.toFixed(2)}`).digest('hex').slice(0, 32);
   const out = path.join(stripDir(), `${key}.jpg`);
   if (fs.existsSync(out)) return out;
-  const facts = await factsOf(file);
   await fs.promises.mkdir(stripDir(), { recursive: true, mode: 0o700 });
-  // Each frame read on its own (a seek, not the whole video), in the middle of its share of the length.
-  const at = Array.from({ length: n }, (_, i) => Math.min(facts.duration - 0.05, ((i + 0.5) * facts.duration) / n));
+  // Each frame read on its own (a seek, not the whole video), in the middle of its share of the part.
+  const len = Math.max(0.05, b - a);
+  const at = Array.from({ length: n }, (_, i) => Math.min(facts.duration - 0.05, a + ((i + 0.5) * len) / n));
   const args = ['-hide_banner', '-nostdin', '-y', '-v', 'error'];
   for (const t of at) args.push('-protocol_whitelist', 'file', '-ss', Math.max(0, t).toFixed(3), '-i', `file:${file}`);
   const scaled = at.map((_, i) => `[${i}:V]scale=-2:${h},setsar=1[f${i}]`).join(';');
   const graph = n > 1 ? `${scaled};${at.map((_, i) => `[f${i}]`).join('')}hstack=inputs=${n}[out]` : `[0:V]scale=-2:${h},setsar=1[out]`;
   const tmp = `${out}.${process.pid}.tmp.jpg`;
   await new Promise<void>((resolve, reject) =>
-    execFile(tools.ffmpeg, [...args, '-filter_complex', graph, '-map', '[out]', '-frames:v', '1', '-q:v', '5', '-update', '1', '-f', 'image2', `file:${tmp}`], { timeout: 120_000, maxBuffer: 8 << 20, env: agentBaseEnv() }, (err, _o, stderr) =>
+    execFile(tools.ffmpeg, [...args, '-filter_complex', graph, '-map', '[out]', '-frames:v', '1', '-q:v', '5', '-update', '1', '-f', 'image2', `file:${tmp}`], { timeout: 120_000, maxBuffer: 8 << 20, env: { ...agentBaseEnv(), CUDA_VISIBLE_DEVICES: '' } }, (err, _o, stderr) =>
       err ? reject(new Error(ffmpegWords(String(stderr)))) : resolve(),
     ),
   );
   await fs.promises.rename(tmp, out);
-  // The newest sixty are kept.
+  // The newest two hundred are kept.
   const all = fs.readdirSync(stripDir()).map((f) => ({ f, t: fs.statSync(path.join(stripDir(), f)).mtimeMs }));
-  for (const x of all.sort((a, b) => b.t - a.t).slice(60)) fs.rmSync(path.join(stripDir(), x.f), { force: true });
+  for (const x of all.sort((x, y) => y.t - x.t).slice(200)) fs.rmSync(path.join(stripDir(), x.f), { force: true });
   return out;
 }
+
+const peaksKept = new Map<string, number[] | null>();
+
+/** How loud a file's sound is along its length, `n` levels (0 to 1), kept in memory once read. */
+async function peaksOf(file: string, n: number): Promise<number[] | null> {
+  const st = await fs.promises.stat(file);
+  const key = `${file}\0${st.size}\0${st.mtimeMs}\0${n}`;
+  if (peaksKept.has(key)) return peaksKept.get(key)!;
+  const p = await waveform(file, n);
+  peaksKept.set(key, p);
+  if (peaksKept.size > 300) peaksKept.delete(peaksKept.keys().next().value!);
+  return p;
+}
+
+/** A sound sent from this device or recorded with the microphone, kept for the editor: its source and length. */
+async function keepSound(body: Readable): Promise<{ src: string; duration: number }> {
+  const dir = soundDir();
+  await fs.promises.mkdir(dir, { recursive: true, mode: 0o700 });
+  const tmp = path.join(dir, `.in-${crypto.randomBytes(6).toString('hex')}`);
+  const hash = crypto.createHash('sha256');
+  let bytes = 0;
+  const MAX = 200 * 1024 * 1024;
+  try {
+    const w = fs.createWriteStream(tmp);
+    for await (const c of body) {
+      bytes += (c as Buffer).length;
+      if (bytes > MAX) throw new HttpError(413, 'That sound is over 200 MB');
+      hash.update(c as Buffer);
+      if (!w.write(c)) await new Promise<void>((r) => w.once('drain', () => r()));
+    }
+    await new Promise<void>((r, f) => w.end((e?: Error | null) => (e ? f(e) : r())));
+    if (bytes < 64) throw new HttpError(400, 'That sound is empty');
+    const i = await ffmpegInfo(tmp);
+    if (!i?.audio || !i.duration) throw new HttpError(422, 'That is not a sound ffmpeg can read');
+    const head = await headOf(tmp);
+    const ext = head.toString('latin1', 0, 4) === 'RIFF' ? 'wav' : head.toString('latin1', 0, 4) === 'fLaC' ? 'flac' : head.toString('latin1', 0, 4) === 'OggS' ? 'ogg' : head[0] === 0x1a && head[1] === 0x45 ? 'webm' : head.toString('latin1', 4, 8) === 'ftyp' ? 'm4a' : 'mp3';
+    const sha = hash.digest('hex').slice(0, 40);
+    for (const n of fs.readdirSync(dir)) if (n.startsWith(`${sha}.`)) fs.rmSync(path.join(dir, n), { force: true });
+    await fs.promises.rename(tmp, path.join(dir, `${sha}.${ext}`));
+    return { src: `naget-sound:${sha}`, duration: i.duration };
+  } finally {
+    await fs.promises.rm(tmp, { force: true }).catch(() => {});
+  }
+}
+
+const SOUND_MIME: Record<string, string> = { mp3: 'audio/mpeg', wav: 'audio/wav', flac: 'audio/flac', ogg: 'audio/ogg', webm: 'audio/webm', m4a: 'audio/mp4' };
 
 // ---- routes ---------------------------------------------------------------------------------------------------------
 
 const JOB = /^[a-f0-9]{16}$/;
+const ANY: SourceKind[] = ['video', 'picture', 'sound'];
 
 export function videoEditRoutes(d: Deps) {
   const { app, db } = d;
   app.get('/api/mediaedit/video/info', async (req): Promise<VideoFacts> => {
     const src = (req.query as Record<string, string>).src;
     if (!(await ffmpegTools())) return { ffmpeg: false, why: NO_FFMPEG };
-    const s = await sourceOf(db, src);
-    return { ffmpeg: true, ...(await factsOf(s.file)) };
+    const s = await sourceOf(db, src, { kinds: ANY });
+    const f = await sizeOf(s);
+    return { ffmpeg: true, ...(s.kind === 'picture' ? { picture: true } : s.kind === 'sound' ? { sound: true } : {}), duration: f.duration, width: f.width, height: f.height, audio: !!f.audio, ...(f.fps ? { fps: f.fps } : {}) };
   });
   app.get('/api/mediaedit/video/strip', async (req, reply) => {
     const q = req.query as Record<string, string>;
     const s = await sourceOf(db, q.src);
     const n = Math.max(1, Math.min(40, Math.round(Number(q.n) || 12)));
     const h = Math.max(24, Math.min(160, Math.round(Number(q.h) || 64) & ~1));
-    const file = await frameStrip(s.file, n, h);
+    const from = Number(q.from);
+    const to = Number(q.to);
+    const file = await frameStrip(s.file, n, h, Number.isFinite(from) && Number.isFinite(to) && to > from ? [from, to] : undefined);
     if (!file) throw new HttpError(400, NO_FFMPEG);
     reply.header('Content-Type', 'image/jpeg').header('Cache-Control', 'private, max-age=3600');
     return reply.send(fs.createReadStream(file));
+  });
+  app.get('/api/mediaedit/video/peaks', async (req) => {
+    const q = req.query as Record<string, string>;
+    const s = await sourceOf(db, q.src, { kinds: ['video', 'sound'] });
+    const n = Math.max(16, Math.min(4000, Math.round(Number(q.n) || 400)));
+    return { peaks: await peaksOf(s.file, n) };
+  });
+  app.get('/api/mediaedit/video/encoders', async () => {
+    const tools = await ffmpegTools();
+    const e = tools ? await encodersOf(tools.ffmpeg) : {};
+    return { ffmpeg: !!tools, h264: !!e.h264, h265: !!e.h265, av1: !!e.av1, webm: !!(e.vp9 ?? e.vp8), gpu: gpuState(db) };
+  });
+  app.post('/api/mediaedit/video/sound', async (req) => {
+    const body = req.body as Readable | undefined;
+    if (!body || typeof body.pipe !== 'function') throw new HttpError(400, 'Send the sound’s bytes (application/octet-stream)');
+    if (!(await ffmpegTools())) throw new HttpError(400, NO_FFMPEG);
+    return keepSound(body);
+  });
+  app.get('/api/mediaedit/video/sound/:sha', async (req, reply) => {
+    const sha = String((req.params as { sha?: string }).sha ?? '');
+    const s = /^[a-f0-9]{16,64}$/.test(sha) ? await sourceOf(db, `naget-sound:${sha}`, { kinds: ['sound'] }).catch(() => null) : null;
+    return sendVideo(req, reply, s ? { file: s.file, mime: SOUND_MIME[path.extname(s.file).slice(1)] ?? 'application/octet-stream' } : null);
+  });
+  app.post('/api/mediaedit/video/captions', async (req) => {
+    const b = (req.body ?? {}) as Partial<VideoEditAsk> & { lang?: unknown };
+    const prep = await prepare(d, b, { forCaptions: true });
+    const ac = new AbortController();
+    req.raw.on('close', () => req.raw.destroyed && ac.abort());
+    const captions = await captionsOf(prep, typeof b.lang === 'string' ? b.lang : '', ac.signal);
+    return { captions, srt: captionsSrt(captions) };
   });
   app.post('/api/mediaedit/video', async (req) => startVideoEdit(await prepare(d, (req.body ?? {}) as Partial<VideoEditAsk>)));
   app.get('/api/mediaedit/video/:job', async (req) => {
@@ -691,17 +972,23 @@ export function videoEditRoutes(d: Deps) {
     if (!v) throw new HttpError(404, 'No such edit');
     return v;
   });
+  gpuRoutes(d);
 }
 
-/** Job folders left by a run that ended with the app (it stopped mid-edit), a day on. */
+/** Job folders left by a run that ended with the app (it stopped mid-edit), a day on; sounds and pictures the editor kept, a week on. */
 function sweepJobs() {
-  try {
-    const old = Date.now() - 86_400_000;
-    for (const n of fs.readdirSync(tmpRoot())) {
-      const p = path.join(tmpRoot(), n);
-      if (fs.statSync(p).mtimeMs < old) fs.rmSync(p, { recursive: true, force: true });
-    }
-  } catch {}
+  const sweep = (dir: string, age: number) => {
+    try {
+      const old = Date.now() - age;
+      for (const n of fs.readdirSync(dir)) {
+        const p = path.join(dir, n);
+        if (fs.statSync(p).mtimeMs < old) fs.rmSync(p, { recursive: true, force: true });
+      }
+    } catch {}
+  };
+  sweep(tmpRoot(), 86_400_000);
+  sweep(soundDir(), 7 * 86_400_000);
+  sweep(pictureDir(), 7 * 86_400_000);
 }
 
 /** Agents get edit_video while Settings → Images, video and audio has videos on. */
@@ -712,6 +999,9 @@ function videosOn(db: DB): boolean {
     return true;
   }
 }
+
+/** The output's size for an edit, as the editor and edit_video say it. */
+export const outputOf = (p: Prepared) => outputSize(p.recipe, p.factsOf, { size: p.size, exact: p.exactSize });
 
 export const videoEdit: Feature = {
   id: 'mediaedit-video',
