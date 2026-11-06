@@ -286,6 +286,8 @@ export interface VideoEditAsk {
   range?: [number, number];
   /** The output's shorter side at most, in pixels (2160, 1080, 720, 480). */
   size?: number;
+  /** The shorter side exactly `size`, larger than the clips if need be (the editor's sizes and ready-made settings). */
+  exactSize?: boolean;
   /** Frames a second (none: the first video clip's, at most 60). */
   fps?: number;
   /** MP4's and MOV's codec (H.264 when left out). */
@@ -614,7 +616,7 @@ export function viewAt(m: VideoMotion | undefined, u: number, length: number): V
 }
 
 /** The output's size: its shape, the first clip's shorter side (at most 4K), no larger than `size` on its shorter side; even. */
-export function outputSize(r: Pick<VideoRecipe, 'clips' | 'shape'>, factsOf: VideoFactsOf, o: { size?: number } = {}): { w: number; h: number } {
+export function outputSize(r: Pick<VideoRecipe, 'clips' | 'shape'>, factsOf: VideoFactsOf, o: { size?: number; exact?: boolean } = {}): { w: number; h: number } {
   const c = r.clips?.[0];
   const f = c ? factsOf(c.src) : undefined;
   let base = c && f ? editedSize(c, f.width, f.height) : { w: 1920, h: 1080 };
@@ -627,7 +629,7 @@ export function outputSize(r: Pick<VideoRecipe, 'clips' | 'shape'>, factsOf: Vid
     const short = Math.min(base.w, base.h);
     [w, h] = ratio >= 1 ? [short * ratio, short] : [short, short / ratio];
   }
-  if (o.size && Math.min(w, h) > o.size) {
+  if (o.size && (o.exact || Math.min(w, h) > o.size)) {
     const k = o.size / Math.min(w, h);
     w *= k;
     h *= k;

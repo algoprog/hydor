@@ -421,6 +421,14 @@ function Scopes({ canvas, engine }: { canvas: () => HTMLCanvasElement | null; en
   );
 }
 
+/** A CSS colour ("#e9edf5", "rgb(…)") as red, green and blue. */
+function rgbOf(c: string): [number, number, number] {
+  const h = /^#([0-9a-f]{6})$/i.exec(c.trim());
+  if (h) return [parseInt(h[1].slice(0, 2), 16), parseInt(h[1].slice(2, 4), 16), parseInt(h[1].slice(4, 6), 16)];
+  const m = /(\d+)\D+(\d+)\D+(\d+)/.exec(c);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [230, 236, 245];
+}
+
 /** One scope of the picture's pixels (RGBA, `w`×`h`), drawn on `cv`. */
 function paintScope(kind: ScopeKind, cv: HTMLCanvasElement, px: Uint8ClampedArray, w: number, h: number, fg: string) {
   const g = cv.getContext('2d')!;
@@ -438,13 +446,21 @@ function paintScope(kind: ScopeKind, cv: HTMLCanvasElement, px: Uint8ClampedArra
   };
   for (let i = 3; i < out.length; i += 4) out[i] = 255;
   if (kind === 'waveform') {
-    const k = Math.max(4, Math.round(2400 / h));
+    const n = new Float32Array(W * H);
     for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
         const i = (y * w + x) * 4;
         const l = 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
-        add(Math.floor((x / w) * W), H - 1 - Math.floor((l / 255) * (H - 1)), k, k + 2, k);
+        n[(H - 1 - Math.floor((l / 255) * (H - 1))) * W + Math.floor((x / w) * W)]++;
       }
+    const [fr, fgc, fb] = rgbOf(fg);
+    for (let j = 0; j < n.length; j++) {
+      if (!n[j]) continue;
+      const v = Math.min(1, 0.25 + Math.log2(1 + n[j]) / 4);
+      out[j * 4] = fr * v;
+      out[j * 4 + 1] = fgc * v;
+      out[j * 4 + 2] = fb * v;
+    }
   } else if (kind === 'vector') {
     for (let i = 0; i < px.length; i += 4) {
       const r = px[i];

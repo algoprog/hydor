@@ -119,6 +119,7 @@ function PoolCard({ it, onUse }: { it: PoolItem; onUse: () => void }) {
   return (
     <div
       draggable
+      data-src={it.src}
       onDragStart={(e) => {
         e.dataTransfer.setData('application/x-hydor-media', it.src);
         e.dataTransfer.effectAllowed = 'copy';
