@@ -22,7 +22,7 @@ import { cleanColor, cleanFont, COLOR_REFS, fontCss, FONTS, hexColor, newId, THE
 export { FONTS, fontCss, newId };
 export type { Comment, CommentReply };
 
-export const DOC_LIMITS = { blocks: 20000, runs: 4000, text: 200_000, rows: 500, cols: 30, caption: 1000, levels: 5, tex: 20_000, band: 500, suggestions: 2000 };
+export const DOC_LIMITS = { blocks: 20000, runs: 4000, text: 200_000, rows: 500, cols: 30, caption: 1000, levels: 5, tex: 20_000, band: 500, suggestions: 2000, notes: 2000, note: 20_000, sources: 2000, source: 2000 };
 
 /** A picture kept by the app (server/pages/assets.ts), by its content's hash: "naget-asset:<sha>". */
 export const ASSET = 'naget-asset:';
@@ -51,6 +51,15 @@ export interface Run {
   link?: string;
   /** Maths among the words: `t` is LaTeX, drawn as an equation (a run of its own, never joined to its neighbours). */
   math?: boolean;
+  /** A footnote's mark: `t` is its note's id (the document's notes), drawn as the note's number (a run of its own, as maths is). */
+  fn?: boolean;
+  /**
+   * A citation: `t` is what it cites, the sources' keys (the document's sources) with ";" between them, each with what
+   * part of it after a comma if it says ("smith2020; jones2019, p. 4"); drawn in the document's citation style.
+   */
+  cite?: boolean;
+  /** A cross-reference: `t` is the id of the block it points to (a heading, a numbered picture, table or equation, a bookmark's paragraph), drawn as what that is called ("Figure 2"). */
+  xref?: boolean;
   /** The comments on these words: their ids in the document's comments. */
   cm?: string[];
   /** A suggestion (its id in the document's suggestions): these words are suggested to be added, */
@@ -105,6 +114,8 @@ export interface ParaBlock extends Spacing, Suggested {
   /** A callout's emoji (💡 when left out) and the colour behind it (#rrggbb). */
   icon?: string;
   tint?: string;
+  /** A bookmark on it, by its name: links and cross-references go to it. */
+  bm?: string;
   runs: Run[];
 }
 
@@ -117,6 +128,7 @@ export interface ItemBlock extends Spacing, Suggested {
   /** How deep in the list, 0–4. */
   lvl?: number;
   align?: Align;
+  bm?: string;
   runs: Run[];
 }
 
@@ -140,6 +152,9 @@ export interface TableBlock extends Suggested {
   head?: boolean;
   /** The columns' widths, as shares of the table's (they add up to 1). */
   cols?: number[];
+  /** Its caption, over it; with `label`, numbered as the document's tables are ("Table 2: …"). */
+  caption?: string;
+  label?: string;
   rows: Cell[][];
 }
 
@@ -152,6 +167,8 @@ export interface ImageBlock extends Suggested {
   /** Centred when left out. */
   align?: 'left' | 'center' | 'right';
   caption?: string;
+  /** Its caption's label: numbered in the document by itself, among the blocks of the same label ("Figure 1: …"). */
+  label?: string;
   /** What it shows, for those who cannot see it. */
   alt?: string;
 }
@@ -172,14 +189,21 @@ export interface TocBlock extends Suggested {
   type: 'toc';
 }
 
-/** An equation on a line of its own, in LaTeX. */
+/** An equation on a line of its own, in LaTeX; with `label`, numbered ("(3)" at its right, "Equation 3" where it is referred to). */
 export interface MathBlock extends Suggested {
   id: string;
   type: 'math';
   tex: string;
+  label?: string;
 }
 
-export type Block = ParaBlock | ItemBlock | TableBlock | ImageBlock | RuleBlock | BreakBlock | TocBlock | MathBlock;
+/** A bibliography: the sources the document cites, in its citation style, drawn from them wherever it shows. */
+export interface BibBlock extends Suggested {
+  id: string;
+  type: 'bib';
+}
+
+export type Block = ParaBlock | ItemBlock | TableBlock | ImageBlock | RuleBlock | BreakBlock | TocBlock | MathBlock | BibBlock;
 export type TextBlock = ParaBlock | ItemBlock;
 export type BlockType = Block['type'];
 
@@ -187,6 +211,74 @@ export interface Page {
   size: PaperSize;
   /** Millimetres, on every side. */
   margin: number;
+  /** The paper on its side. */
+  orient?: 'landscape';
+  /** The words in two or three columns on every page. */
+  cols?: 2 | 3;
+  /** The paper's colour (#rrggbb); white when left out. */
+  color?: string;
+}
+
+/** Words (DRAFT) or a picture, faint, across the middle of every page. */
+export interface Watermark {
+  text?: string;
+  src?: string;
+}
+
+/** A footnote: its words, at the foot of the page its mark is on (its number, the place of its mark among the others). */
+export interface Note {
+  id: string;
+  runs: Run[];
+}
+
+/** A person, as a source names its authors and editors. */
+export interface Person {
+  family: string;
+  given?: string;
+}
+
+export type SourceKind = 'article' | 'book' | 'chapter' | 'conference' | 'thesis' | 'report' | 'web' | 'other';
+
+/** A source the document cites: a paper, a book, a web page… (its key is what citations name it by). */
+export interface Source {
+  /** Its key ("vaswani2017attention"). */
+  id: string;
+  kind: SourceKind;
+  title: string;
+  authors?: Person[];
+  editors?: Person[];
+  /** The year it came out ("2017"); "n.d." when none is known is left out. */
+  year?: string;
+  /** Where it appeared: a journal, the book a chapter is in, a conference, a website. */
+  in?: string;
+  volume?: string;
+  issue?: string;
+  pages?: string;
+  publisher?: string;
+  doi?: string;
+  url?: string;
+  /** When a web page was read (YYYY-MM-DD). */
+  accessed?: string;
+}
+
+/** How citations and the bibliography are written: APA (7th), MLA (9th), Chicago (author-date, 17th) or IEEE. */
+export type CiteStyle = 'apa' | 'mla' | 'chicago' | 'ieee';
+export const CITE_STYLES: CiteStyle[] = ['apa', 'mla', 'chicago', 'ieee'];
+
+/** A paragraph style's look changed in a document (Format → Paragraph styles): what it sets, as Word's styles do. */
+export interface StyleLook {
+  font?: string;
+  /** Points. */
+  size?: number;
+  /** #rrggbb. */
+  color?: string;
+  b?: boolean;
+  i?: boolean;
+  /** Line spacing (lines), and the space before and after (points). */
+  lh?: number;
+  sb?: number;
+  sa?: number;
+  align?: Align;
 }
 
 /** A header or a footer: a line of words on every page's top or bottom margin; {page} and {pages} are the page's number and how many there are. */
@@ -211,6 +303,15 @@ export interface Doc {
   comments?: Comment[];
   /** The changes suggested in it (runs and blocks say where each is, by its id). */
   suggestions?: Suggestion[];
+  /** Its footnotes (runs mark where each is, by its id). */
+  notes?: Note[];
+  /** The sources it cites, and how citations are written (APA when left out). */
+  sources?: Source[];
+  cite?: CiteStyle;
+  /** Its paragraph styles' own looks (Format → Paragraph styles), where they differ from the app's. */
+  styles?: Partial<Record<ParaStyle, StyleLook>>;
+  /** A watermark on every page. */
+  mark?: Watermark;
 }
 
 // ---- how documents look --------------------------------------------------------------------------------
@@ -220,6 +321,22 @@ export const PAPERS: Record<PaperSize, { w: number; h: number; label: string }> 
   a4: { w: 210, h: 297, label: 'A4' },
   letter: { w: 215.9, h: 279.4, label: 'US Letter' },
 };
+
+/** A document's sheet as it lies, in millimetres: its paper, on its side when landscape. */
+export function paperOf(page: Page): { w: number; h: number } {
+  const p = PAPERS[page.size] ?? PAPERS.a4;
+  return page.orient === 'landscape' ? { w: p.h, h: p.w } : { w: p.w, h: p.h };
+}
+
+/** The gap between a document's columns, in millimetres (Word's half an inch). */
+export const COLUMN_GAP = 12.7;
+
+/** The width of a column of words (the text's width when there is one column), in millimetres. */
+export function columnMm(page: Page): number {
+  const text = paperOf(page).w - 2 * page.margin;
+  const n = page.cols ?? 1;
+  return n > 1 ? (text - (n - 1) * COLUMN_GAP) / n : text;
+}
 
 export const MARGINS: { mm: number; label: string }[] = [
   { mm: 12.7, label: 'Narrow' },
@@ -259,6 +376,45 @@ export const STYLES: Record<ParaStyle, { label: string; k: number; bold?: boolea
 };
 
 export const PARA_STYLES: ParaStyle[] = ['normal', 'title', 'subtitle', 'h1', 'h2', 'h3', 'h4', 'quote', 'code', 'callout'];
+
+/** A paragraph style's look in a document, as STYLES says one: the app's, with the document's own changes to it. */
+export interface StyleOf {
+  label: string;
+  k: number;
+  bold?: boolean;
+  italic?: boolean;
+  color: string;
+  lh: number;
+  before: number;
+  after: number;
+  font?: string;
+  align?: Align;
+}
+
+/**
+ * A paragraph style as a document draws it: the app's (STYLES), changed by the document's own look for it (its size
+ * in points as a share of the document's, its spacing in points as ems of its own size, its lines as the editor's).
+ * Normal text's font and size are the document's own (Page setup), so it takes only the rest.
+ */
+export function styleOf(d: Pick<Doc, 'size' | 'styles'>, k: ParaStyle): StyleOf {
+  const s = STYLES[k];
+  const o = d.styles?.[k];
+  if (!o) return s;
+  const kk = k !== 'normal' && o.size ? Math.round((o.size / d.size) * 1000) / 1000 : s.k;
+  const pt = d.size * kk;
+  return {
+    ...s,
+    k: kk,
+    bold: o.b ?? s.bold,
+    italic: o.i ?? s.italic,
+    color: o.color ?? s.color,
+    lh: o.lh !== undefined ? cssLine(o.lh) : s.lh,
+    before: o.sb !== undefined ? Math.round((o.sb / pt) * 1000) / 1000 : s.before,
+    after: o.sa !== undefined ? Math.round((o.sa / pt) * 1000) / 1000 : s.after,
+    ...(o.font && k !== 'normal' ? { font: o.font } : {}),
+    ...(o.align ? { align: o.align } : {}),
+  };
+}
 
 /** A callout's emoji and tint, unless it has its own; and the tints the editor offers (light, as words in ink read on them). */
 export const CALLOUT = { icon: '💡', tint: '#fef7e0' };
@@ -363,10 +519,11 @@ export function docColor(v: unknown): string | null {
   return h.alpha < 0.05 ? null : `#${h.hex.toLowerCase()}`;
 }
 
-/** An address words may open: the web, mail, a phone number (www. is the web). */
+/** An address words may open: the web, mail, a phone number (www. is the web), or a place in the document (#a block's id: a heading, a bookmark). */
 export function docLink(v: unknown): string | undefined {
   if (typeof v !== 'string') return undefined;
   let s = v.trim();
+  if (/^#[A-Za-z0-9_-]{1,24}$/.test(s)) return s;
   if (/^www\.[^\s<>"']+$/i.test(s)) s = `https://${s}`;
   if (s.length > 2000) return undefined;
   return /^(https?:\/\/[^\s<>"']+|mailto:[^\s<>"']+|tel:[+\d][\d\s().-]*)$/i.test(s) ? s : undefined;
@@ -418,8 +575,16 @@ const cmKey = (l: Look) => l.cm?.join(' ') ?? '';
 /** What a run's suggestion marks are, as one key. */
 const sgKey = (l: Look) => (l.ins || l.del || l.fmt ? `${l.ins ?? ''}|${l.del ?? ''}|${l.fmt ?? ''}|${l.was ? JSON.stringify(l.was) : ''}` : '');
 
+/**
+ * Whether a run is one thing of its own among the words, never words to type in: maths, a footnote's mark, a citation
+ * or a cross-reference (`t` says what it is; the caret goes before or after it, and it is never joined to another run).
+ */
+export const isAtom = (r: Look) => !!(r.math || r.fn || r.cite || r.xref);
+/** Which kind of thing of its own a run is ('' for words). */
+export const atomKind = (r: Look): '' | 'math' | 'fn' | 'cite' | 'xref' => (r.math ? 'math' : r.fn ? 'fn' : r.cite ? 'cite' : r.xref ? 'xref' : '');
+
 /** Whether two runs look the same (and carry the same comments and suggestions). */
-export const sameLook = (a: Look, b: Look) => LOOK_KEYS.every((k) => a[k] === b[k]) && !!a.math === !!b.math && cmKey(a) === cmKey(b) && sgKey(a) === sgKey(b);
+export const sameLook = (a: Look, b: Look) => LOOK_KEYS.every((k) => a[k] === b[k]) && atomKind(a) === atomKind(b) && cmKey(a) === cmKey(b) && sgKey(a) === sgKey(b);
 
 /** A run's look alone. */
 export function lookOf(r: Run): Look {
@@ -433,8 +598,9 @@ export function mergeRuns(runs: Run[]): Run[] {
   for (const r of runs) {
     if (!r.t) continue;
     const last = out[out.length - 1];
-    // Two equations side by side stay two: their LaTeX joined could read as another one (\alpha and b as \alphab).
-    if (last && sameLook(last, r) && !r.math) out[out.length - 1] = { ...last, t: last.t + r.t };
+    // Two equations side by side stay two: their LaTeX joined could read as another one (\alpha and b as \alphab); so
+    // do two footnotes' marks, citations and cross-references.
+    if (last && sameLook(last, r) && !isAtom(r)) out[out.length - 1] = { ...last, t: last.t + r.t };
     else out.push(r);
   }
   return out;
@@ -475,6 +641,26 @@ function lookOfRun(r: Run): Look {
   return out;
 }
 
+const NOTE_ID = /^[A-Za-z0-9_-]{1,40}$/;
+const BLOCK_ID = /^[A-Za-z0-9_-]{1,24}$/;
+/** A source's key, as BibTeX's keys are written ("vaswani2017attention", "doe:2020"). */
+export const SOURCE_KEY = /^[A-Za-z0-9_:.+/-]{1,80}$/;
+
+/** What a citation cites: each source's key and, if it says, which part of it ("p. 4"). */
+export function citeItems(t: string): { key: string; loc?: string }[] {
+  const out: { key: string; loc?: string }[] = [];
+  for (const part of t.split(';')) {
+    const m = /^\s*@?([^\s,;]+)\s*(?:,\s*(.*?))?\s*$/.exec(part);
+    if (!m || !SOURCE_KEY.test(m[1]) || out.length >= 30) continue;
+    const loc = (m[2] ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    out.push(loc ? { key: m[1], loc } : { key: m[1] });
+  }
+  return out;
+}
+
+/** A citation's items as its run keeps them: "key1; key2, p. 4". */
+export const citeOf = (items: { key: string; loc?: string }[]) => items.map((x) => (x.loc ? `${x.key}, ${x.loc}` : x.key)).join('; ');
+
 /** A run checked: its words and its look, every value of a known form. */
 function cleanRun(r: Obj, t: string): Run {
   const cm = cleanCm(r.cm ?? r.comments);
@@ -482,6 +668,20 @@ function cleanRun(r: Obj, t: string): Run {
   if (r.math === true || typeof r.tex === 'string') {
     const tex = oneLine(typeof r.tex === 'string' ? r.tex : t, DOC_LIMITS.tex);
     return tex ? { t: tex, math: true, ...(cm ? { cm } : {}), ...runMarks(r, true) } : { t: '' };
+  }
+  // A footnote's mark (its note's id), a citation (the keys it cites) and a cross-reference (the block it points to)
+  // are, as maths is, one thing each with no look of its own.
+  if (r.fn === true || typeof r.note === 'string') {
+    const id = String(typeof r.note === 'string' ? r.note : t).trim();
+    return NOTE_ID.test(id) ? { t: id, fn: true, ...(cm ? { cm } : {}), ...runMarks(r, true) } : { t: '' };
+  }
+  if (r.cite === true) {
+    const c = citeOf(citeItems(t));
+    return c ? { t: c, cite: true, ...(cm ? { cm } : {}), ...runMarks(r, true) } : { t: '' };
+  }
+  if (r.xref === true || typeof r.ref === 'string') {
+    const id = String(typeof r.ref === 'string' ? r.ref : t).trim();
+    return BLOCK_ID.test(id) ? { t: id, xref: true, ...(cm ? { cm } : {}), ...runMarks(r, true) } : { t: '' };
   }
   const out: Run = { t };
   if (cm) out.cm = cm;
@@ -533,6 +733,8 @@ export function cleanRuns(v: unknown): Run[] {
 export interface NormalizeOpts {
   /** Picture sources that are not of a kept form (a file of the agent's): what they become; null leaves them out. */
   src?: (s: string) => string | null;
+  /** Footnotes written among the blocks (Markdown's [^1]: … lines), by their ids: where they go (left out when not given). */
+  notes?: Map<string, Run[]>;
 }
 
 /** A block before it is checked: as kept, or one of the shorthands agents write. */
@@ -633,6 +835,8 @@ function para(v: Obj, style: ParaStyle, used: Set<string>, words: unknown): Para
     const tint = docColor(v.tint ?? v.color ?? v.background);
     if (tint && tint !== CALLOUT.tint) b.tint = tint;
   }
+  const bm = bookmarkOf(v.bm ?? v.bookmark);
+  if (bm) b.bm = bm;
   b.runs = wordsOf(words, style === 'code');
   // A paragraph whose words are a single space (as Markdown writes an empty one) is empty.
   if (b.runs.length === 1 && /^[\s\u00a0]+$/.test(b.runs[0].t) && !b.runs[0].t.includes('\n') && style !== 'code') b.runs = [];
@@ -647,6 +851,8 @@ function item(v: Obj, list: ListKind, used: Set<string>, words: unknown): ItemBl
   const align = alignOf(v.align);
   if (align && align !== 'left') b.align = align;
   spacingOf(v, b);
+  const bm = bookmarkOf(v.bm ?? v.bookmark);
+  if (bm) b.bm = bm;
   b.runs = cleanRuns(words);
   // "[x] Done" written into a checklist's item.
   if (list === 'check' && b.runs[0]) {
@@ -740,6 +946,10 @@ function table(v: Obj, rowsIn: unknown, used: Set<string>, headDefault: boolean)
   fixMerges(rows);
   const t = { id: cleanId(v.id, used), type: 'table' } as TableBlock;
   if (v.head === true || v.header === true || (v.head === undefined && v.header === undefined && headDefault)) t.head = true;
+  const caption = oneLine(v.caption, DOC_LIMITS.caption);
+  if (caption) t.caption = caption;
+  const label = labelOf(v.label);
+  if (label) t.label = label;
   if (Array.isArray(v.cols) && v.cols.length === width) {
     const ws = v.cols.map((c) => (typeof c === 'number' && Number.isFinite(c) && c > 0 ? Math.min(1e6, c) : 0));
     const sum = ws.reduce((a, b) => a + b, 0);
@@ -775,6 +985,8 @@ function image(v: Obj, srcIn: unknown, used: Set<string>, o: NormalizeOpts): Ima
   if (align && align !== 'center') b.align = align;
   const caption = oneLine(v.caption, DOC_LIMITS.caption);
   if (caption) b.caption = caption;
+  const label = labelOf(v.label);
+  if (label) b.label = label;
   const alt = oneLine(v.alt, DOC_LIMITS.caption);
   if (alt) b.alt = alt;
   return b;
@@ -787,7 +999,22 @@ function mathBlock(v: Obj, texIn: unknown, used: Set<string>): MathBlock | null 
     .replace(/^\$\$([\s\S]*)\$\$$/, '$1')
     .replace(/^\\\[([\s\S]*)\\\]$/, '$1')
     .trim();
-  return tex ? { id: cleanId(v.id, used), type: 'math', tex } : null;
+  if (!tex) return null;
+  const label = labelOf(v.label);
+  return { id: cleanId(v.id, used), type: 'math', tex, ...(label ? { label } : {}) };
+}
+
+/** A caption's label ("Figure", "Table", "Equation", in the document's words): one or two words, no markup. */
+export function labelOf(v: unknown): string | undefined {
+  if (v === true) return undefined;
+  const s = oneLine(v, 40);
+  return s && /^[\p{L}][\p{L}\p{M} .'-]{0,39}$/u.test(s) ? s : undefined;
+}
+
+/** A bookmark's name: a few words on one line. */
+export function bookmarkOf(v: unknown): string | undefined {
+  const s = oneLine(v, 80).replace(/[<>"`{}]/g, '');
+  return s || undefined;
 }
 
 /** Blocks from what was written for one: none, one, or (Markdown, a list) several. */
@@ -810,6 +1037,12 @@ function blocksOf(v: unknown, used: Set<string>, o: NormalizeOpts, out: Block[])
     out.push(b);
   };
   if (type) {
+    // A footnote written among the blocks (Markdown's [^1]: …): kept for the document's notes, no block of its own.
+    if (type === 'footnote') {
+      const id = typeof v.id === 'string' ? v.id : '';
+      if (o.notes && NOTE_ID.test(id) && !o.notes.has(id)) o.notes.set(id, cleanRuns(v.runs ?? v.text ?? '').filter((r) => !r.fn));
+      return;
+    }
     if (type === 'markdown' || type === 'md') return void mdBlocks(str(v.markdown ?? v.text, 4_000_000)).forEach((r) => blocksOf(r, used, o, out));
     if (type === 'heading') return push(para(v, (`h${Math.round(num(v.level ?? v.lvl, 1, 4, 1))}` as ParaStyle), used, words));
     const styled = own(STYLE_OF, type);
@@ -827,6 +1060,7 @@ function blocksOf(v: unknown, used: Set<string>, o: NormalizeOpts, out: Block[])
     if (type === 'hr' || type === 'rule' || type === 'line' || type === 'divider' || type === 'separator') return push({ id: cleanId(v.id, used), type: 'hr' });
     if (type === 'pagebreak' || type === 'page-break' || type === 'break' || type === 'newpage') return push({ id: cleanId(v.id, used), type: 'pagebreak' });
     if (type === 'toc' || type === 'contents' || type === 'table-of-contents') return push({ id: cleanId(v.id, used), type: 'toc' });
+    if (type === 'bib' || type === 'bibliography' || type === 'references' || type === 'works-cited') return push({ id: cleanId(v.id, used), type: 'bib' });
     if (type === 'math' || type === 'equation' || type === 'formula') return push(mathBlock(v, v.tex ?? v.latex ?? words, used));
     if (type === 'callout' || type === 'note') return push(para(v, 'callout', used, words));
     return;
@@ -838,6 +1072,7 @@ function blocksOf(v: unknown, used: Set<string>, o: NormalizeOpts, out: Block[])
   if (v.hr === true || v.rule === true || v.line === true || v.divider === true) return push({ id: cleanId(v.id, used), type: 'hr' });
   if (v.pagebreak === true || v.pageBreak === true || v.newpage === true) return push({ id: cleanId(v.id, used), type: 'pagebreak' });
   if (v.toc === true || v.contents === true) return push({ id: cleanId(v.id, used), type: 'toc' });
+  if (v.bibliography === true || v.bib === true || v.references === true) return push({ id: cleanId(v.id, used), type: 'bib' });
   if (typeof v.math === 'string' || typeof v.equation === 'string' || typeof v.tex === 'string') return push(mathBlock(v, v.math ?? v.equation ?? v.tex, used));
   if (v.callout !== undefined && (typeof v.callout === 'string' || Array.isArray(v.callout))) return push(para(v, 'callout', used, v.callout));
   if (typeof v.markdown === 'string') return void mdBlocks(v.markdown).forEach((r) => blocksOf(r, used, o, out));
@@ -885,15 +1120,173 @@ export function normalizeDoc(input: unknown, o: NormalizeOpts = {}): Doc {
   const size = pick(String(pg.size ?? pg.paper ?? v.paper ?? '').toLowerCase(), ['a4', 'letter'] as const) ?? DOC_DEFAULTS.page.size;
   const margin = Math.min(60, Math.max(5, Math.round((mmOf(pg.margin ?? v.margin) ?? DOC_DEFAULTS.page.margin) * 10) / 10));
   const used = new Set<string>();
-  const blocks = typeof v.markdown === 'string' && !Array.isArray(v.blocks) ? normalizeBlocks(mdBlocks(v.markdown), o, used) : normalizeBlocks(v.blocks as unknown[], o, used);
+  // Footnotes written in the Markdown or among the blocks, then those given as notes.
+  const written = new Map<string, Run[]>();
+  const opts: NormalizeOpts = { ...o, notes: written };
+  const blocks = typeof v.markdown === 'string' && !Array.isArray(v.blocks) ? normalizeBlocks(mdBlocks(v.markdown), opts, used) : normalizeBlocks(v.blocks as unknown[], opts, used);
   if (!blocks.length) blocks.push({ id: cleanId(undefined, used), type: 'p', runs: [] });
-  const d: Doc = { v: 1, page: { size, margin }, font: docFont(v.font) ?? DOC_DEFAULTS.font, size: ptOf(v.size, 6, 72) ?? DOC_DEFAULTS.size, blocks };
+  const page: Page = { size, margin };
+  if (/^land/i.test(String(pg.orient ?? pg.orientation ?? v.orientation ?? ''))) page.orient = 'landscape';
+  const cols = Math.round(num(pg.cols ?? pg.columns ?? v.columns, 1, 3, 1));
+  if (cols > 1) page.cols = cols as 2 | 3;
+  const color = docColor(pg.color ?? pg.background ?? v.pageColor);
+  if (color && color !== '#ffffff') page.color = color;
+  const d: Doc = { v: 1, page, font: docFont(v.font) ?? DOC_DEFAULTS.font, size: ptOf(v.size, 6, 72) ?? DOC_DEFAULTS.size, blocks };
   const header = bandOf(v.header);
   if (header) d.header = header;
   const footer = bandOf(v.footer);
   if (footer) d.footer = footer;
   if (v.titlePage === true && (header || footer)) d.titlePage = true;
-  return withSuggestions(withComments(d, v.comments), v.suggestions);
+  const mark = markOf(v.mark ?? v.watermark, o);
+  if (mark) d.mark = mark;
+  const sources = cleanSources(v.sources);
+  if (sources.length) d.sources = sources;
+  const cite = pick(String(v.cite ?? v.citeStyle ?? '').toLowerCase(), CITE_STYLES);
+  if (cite && cite !== 'apa') d.cite = cite;
+  const styles = cleanStyles(v.styles);
+  if (styles) d.styles = styles;
+  const given = Array.isArray(v.notes) ? v.notes : [];
+  return withNotes(withSuggestions(withComments(d, v.comments), v.suggestions), [...[...written].map(([id, runs]) => ({ id, runs })), ...given]);
+}
+
+/** A watermark: its words (a string, or { text }) or a picture ({ src }); none when it has neither. */
+function markOf(v: unknown, o: NormalizeOpts): Watermark | undefined {
+  const x = typeof v === 'string' ? { text: v } : isObj(v) ? v : null;
+  if (!x) return undefined;
+  const text = oneLine(x.text, 60);
+  const raw = typeof x.src === 'string' ? x.src.trim() : '';
+  const src = raw ? (docSrc(raw) ?? (o.src ? o.src(raw) : null)) : null;
+  return src ? { src } : text ? { text } : undefined;
+}
+
+const SOURCE_KINDS: SourceKind[] = ['article', 'book', 'chapter', 'conference', 'thesis', 'report', 'web', 'other'];
+
+/** People as a source names them: { family, given }, or "Family, Given" and "Given Family" (BibTeX's "and" between them). */
+function peopleOf(v: unknown): Person[] {
+  const list = typeof v === 'string' ? v.split(/\s+and\s+|;/) : Array.isArray(v) ? v : [];
+  const out: Person[] = [];
+  for (const x of list.slice(0, 100)) {
+    if (typeof x === 'string') {
+      const s = oneLine(x.replace(/[{}]/g, ''), 200);
+      if (!s) continue;
+      if (s.includes(',')) {
+        const [family, given] = s.split(',').map((y) => y.trim());
+        if (family) out.push(given ? { family, given } : { family });
+      } else {
+        const words = s.split(' ');
+        out.push(words.length > 1 ? { family: words[words.length - 1], given: words.slice(0, -1).join(' ') } : { family: s });
+      }
+    } else if (isObj(x)) {
+      const family = oneLine(x.family ?? x.last ?? x.name, 200);
+      const given = oneLine(x.given ?? x.first, 200);
+      if (family) out.push(given ? { family, given } : { family });
+    }
+  }
+  return out;
+}
+
+/** The sources a document cites, checked: a key of a known form (once each), a kind, a title, the rest a line each. */
+export function cleanSources(v: unknown): Source[] {
+  if (!Array.isArray(v)) return [];
+  const out: Source[] = [];
+  const seen = new Set<string>();
+  for (const x of v.slice(0, DOC_LIMITS.sources)) {
+    if (!isObj(x)) continue;
+    const id = String(x.id ?? x.key ?? '').trim();
+    const title = oneLine(x.title, DOC_LIMITS.source);
+    if (!SOURCE_KEY.test(id) || seen.has(id.toLowerCase()) || !title) continue;
+    seen.add(id.toLowerCase());
+    const s: Source = { id, kind: pick(x.kind ?? x.type, SOURCE_KINDS) ?? 'other', title };
+    const authors = peopleOf(x.authors ?? x.author);
+    if (authors.length) s.authors = authors;
+    const editors = peopleOf(x.editors ?? x.editor);
+    if (editors.length) s.editors = editors;
+    for (const k of ['year', 'in', 'volume', 'issue', 'pages', 'publisher', 'accessed'] as const) {
+      const val = oneLine(x[k] ?? (k === 'in' ? (x.journal ?? x.container ?? x.booktitle) : undefined), k === 'in' || k === 'publisher' ? 500 : 60);
+      if (val) s[k] = val;
+    }
+    const doi = oneLine(x.doi, 200).replace(/^(https?:\/\/(dx\.)?doi\.org\/|doi:\s*)/i, '');
+    if (/^10\.\d{4,9}\/\S+$/.test(doi)) s.doi = doi;
+    const url = docLink(x.url);
+    if (url && /^https?:/i.test(url)) s.url = url;
+    out.push(s);
+  }
+  return out;
+}
+
+const STYLE_KEYS = ['font', 'size', 'color', 'b', 'i', 'lh', 'sb', 'sa', 'align'] as const;
+
+/** A document's own looks of its paragraph styles, checked (none when it changes none). */
+export function cleanStyles(v: unknown): Doc['styles'] | undefined {
+  if (!isObj(v)) return undefined;
+  const out: Partial<Record<ParaStyle, StyleLook>> = {};
+  for (const k of PARA_STYLES) {
+    const x = own(v, k);
+    if (!isObj(x)) continue;
+    const s: StyleLook = {};
+    const font = docFont(x.font);
+    if (font) s.font = font;
+    const size = x.size !== undefined ? ptOf(x.size, 4, 200) : null;
+    if (size) s.size = size;
+    const color = docColor(x.color);
+    if (color) s.color = color;
+    if (typeof x.b === 'boolean') s.b = x.b;
+    else if (typeof x.bold === 'boolean') s.b = x.bold;
+    if (typeof x.i === 'boolean') s.i = x.i;
+    else if (typeof x.italic === 'boolean') s.i = x.italic;
+    const sp: Spacing = {};
+    spacingOf(x, sp);
+    Object.assign(s, sp);
+    const align = alignOf(x.align);
+    if (align) s.align = align;
+    if (STYLE_KEYS.some((key) => s[key] !== undefined)) out[k] = s;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * A document with its footnotes checked (`list`; none given: the ones it has): each note's words (no footnote in a
+ * footnote), only those a mark in the document is for, in the order their marks come; a mark whose note is gone goes too.
+ */
+export function withNotes(d: Doc, list: unknown = d.notes): Doc {
+  const given = new Map<string, Run[]>();
+  if (Array.isArray(list))
+    for (const x of list.slice(0, DOC_LIMITS.notes)) {
+      if (!isObj(x)) continue;
+      const id = typeof x.id === 'string' ? x.id.trim() : '';
+      if (!NOTE_ID.test(id) || given.has(id)) continue;
+      let chars = 0;
+      given.set(
+        id,
+        cleanRuns(x.runs ?? x.text ?? x.t ?? '').filter((r) => !r.fn && (chars += r.t.length) <= DOC_LIMITS.note),
+      );
+    }
+  const order: string[] = [];
+  const seen = new Set<string>();
+  const fix = (runs: Run[]): Run[] => {
+    if (!runs.some((r) => r.fn)) return runs;
+    const out = runs.filter((r) => {
+      if (!r.fn) return true;
+      if (!given.has(r.t)) return false;
+      if (!seen.has(r.t)) {
+        seen.add(r.t);
+        order.push(r.t);
+      }
+      return true;
+    });
+    return out.length === runs.length ? runs : mergeRuns(out);
+  };
+  const blocks = d.blocks.map((b): Block => {
+    if (b.type === 'p' || b.type === 'li') {
+      const runs = fix(b.runs);
+      return runs === b.runs ? b : { ...b, runs };
+    }
+    if (b.type === 'table' && b.rows.some((r) => r.some((c) => c.runs.some((x) => x.fn)))) return { ...b, rows: b.rows.map((r) => r.map((c) => ({ ...c, runs: fix(c.runs) }))) };
+    return b;
+  });
+  const { notes: _n, ...rest } = d;
+  const notes = order.map((id) => ({ id, runs: given.get(id)! }));
+  return notes.length ? { ...rest, blocks, notes } : { ...rest, blocks };
 }
 
 /** A header or footer from its words (a string) or { text, align }; none when it has no words. */
@@ -1117,7 +1510,8 @@ export function newDoc(title = ''): Doc {
  */
 export function docText(d: Doc): string {
   const bands = `${d.header ? `,"header":${JSON.stringify(d.header)}` : ''}${d.footer ? `,"footer":${JSON.stringify(d.footer)}` : ''}${d.titlePage ? ',"titlePage":true' : ''}`;
-  const out: string[] = [`{"v":1,"page":${JSON.stringify(d.page)},"font":${JSON.stringify(d.font)},"size":${d.size}${bands},"blocks":[`];
+  const more = `${d.mark ? `,"mark":${JSON.stringify(d.mark)}` : ''}${d.cite ? `,"cite":${JSON.stringify(d.cite)}` : ''}${d.styles ? `,"styles":${JSON.stringify(d.styles)}` : ''}`;
+  const out: string[] = [`{"v":1,"page":${JSON.stringify(d.page)},"font":${JSON.stringify(d.font)},"size":${d.size}${bands}${more},"blocks":[`];
   d.blocks.forEach((b, i) => {
     const end = i < d.blocks.length - 1 ? ',' : '';
     if (b.type === 'table') {
@@ -1135,6 +1529,8 @@ export function docText(d: Doc): string {
   };
   list('comments', d.comments);
   list('suggestions', d.suggestions);
+  list('notes', d.notes);
+  list('sources', d.sources);
   out.push(']}');
   return out.join('\n');
 }
@@ -1145,7 +1541,7 @@ export const isDocText = (s: string) => /^\s*\{\s*"v"\s*:\s*1\s*,\s*"page"/.test
 /** A block's words as plain text (a table's, a cell a tab and a row a line; a picture's caption). */
 export function blockText(b: Block): string {
   if (b.type === 'p' || b.type === 'li') return wordsText(b.runs);
-  if (b.type === 'table') return b.rows.map((r) => r.map((c) => wordsText(c.runs).replace(/\n/g, ' ')).join('\t')).join('\n');
+  if (b.type === 'table') return [b.caption ?? '', ...b.rows.map((r) => r.map((c) => wordsText(c.runs).replace(/\n/g, ' ')).join('\t'))].filter(Boolean).join('\n');
   if (b.type === 'image') return b.caption ?? b.alt ?? '';
   return '';
 }
@@ -1154,7 +1550,7 @@ export function blockText(b: Block): string {
  * Runs' words, an equation among them as a mark that stands for it (its LaTeX is not words to count or read); words
  * suggested to be taken out are left out (they are counted as gone).
  */
-export const wordsText = (runs: Run[]) => runs.map((r) => (r.del ? '' : r.math ? '\u2063' : r.t)).join('');
+export const wordsText = (runs: Run[]) => runs.map((r) => (r.del || r.fn ? '' : isAtom(r) ? '\u2063' : r.t)).join('');
 
 /** The headings (and the title), in order: for an outline. */
 export function docHeadings(d: Doc): { id: string; index: number; level: number; text: string }[] {
@@ -1217,13 +1613,16 @@ export function docFonts(d: Doc): string[] {
   for (const b of d.blocks) {
     if (b.type === 'p' || b.type === 'li') add(b.runs);
     else if (b.type === 'table') for (const r of b.rows) for (const c of r) add(c.runs);
-    if (b.type === 'p' && b.style === 'code') names.add(MONO_FONT);
+    if (b.type === 'p' && b.style === 'code' && !d.styles?.code?.font) names.add(MONO_FONT);
   }
+  for (const n of d.notes ?? []) add(n.runs);
+  // The fonts its paragraph styles have of their own.
+  for (const s of Object.values(d.styles ?? {})) if (s?.font) names.add(s.font);
   return [...names];
 }
 
 /** The pictures a document shows. */
-export const docSources = (d: Doc) => d.blocks.flatMap((b) => (b.type === 'image' && b.src ? [b.src] : []));
+export const docSources = (d: Doc) => [...d.blocks.flatMap((b) => (b.type === 'image' && b.src ? [b.src] : [])), ...(d.mark?.src ? [d.mark.src] : [])];
 
 /** The document with each picture's source changed by `f` (to put pictures inside it, say); '' leaves one out. */
 export function mapDocSources(d: Doc, f: (src: string) => string): Doc {
@@ -1234,6 +1633,13 @@ export function mapDocSources(d: Doc, f: (src: string) => string): Doc {
       const src = f(b.src);
       if (src) blocks.push(src === b.src ? b : { ...b, src });
     }
+  }
+  // The watermark's picture too (none left, it goes).
+  if (d.mark?.src) {
+    const src = f(d.mark.src);
+    if (src === d.mark.src) return { ...d, blocks };
+    const { mark: _m, ...rest } = d;
+    return src ? { ...rest, blocks, mark: { src } } : { ...rest, blocks };
   }
   return { ...d, blocks };
 }
@@ -1298,10 +1704,12 @@ export function carryIds(prev: Doc, next: Doc): Doc {
 interface Attrs {
   cls: string[];
   kv: Record<string, string>;
+  /** {#id}: the block's id (what links and cross-references to it name). */
+  id?: string;
 }
 
 const KNOWN_CLS = new Set(['title', 'subtitle', 'left', 'center', 'centre', 'right', 'justify', 'callout']);
-const KNOWN_KV = new Set(['indent', 'align', 'width', 'w', 'line', 'before', 'after', 'tint', 'icon', 'ins', 'del']);
+const KNOWN_KV = new Set(['indent', 'align', 'width', 'w', 'line', 'before', 'after', 'tint', 'icon', 'ins', 'del', 'label', 'bookmark']);
 
 function parseAttrs(body: string): Attrs | null {
   const a: Attrs = { cls: [], kv: {} };
@@ -1315,10 +1723,12 @@ function parseAttrs(body: string): Attrs | null {
       return null;
     }
     if (m[1]) a.cls.push(m[1].toLowerCase());
+    else if (m[2]) a.id = m[2];
     else if (m[3]) a.kv[m[3].toLowerCase()] = m[4] ?? m[5] ?? m[6] ?? '';
     i = re.lastIndex;
   }
-  return a.cls.some((c) => KNOWN_CLS.has(c)) || Object.keys(a.kv).some((k) => KNOWN_KV.has(k)) ? a : null;
+  if (a.id && !BLOCK_ID.test(a.id)) delete a.id;
+  return a.id || a.cls.some((c) => KNOWN_CLS.has(c)) || Object.keys(a.kv).some((k) => KNOWN_KV.has(k)) ? a : null;
 }
 
 /** A block's words and the attributes written at their end, if any. */
@@ -1477,7 +1887,9 @@ function tagLook(name: string, at: Record<string, string>, looks: boolean): Look
       m.hl = HL;
       break;
     case 'a': {
-      const link = docLink(at.href);
+      // A place in this app's own page (#nd-<id>) is that block's; another page's place (#top) is none of this document's.
+      const href = at.href ?? '';
+      const link = /^#nd-[A-Za-z0-9_-]{1,24}$/.test(href) ? `#${href.slice(4)}` : href.startsWith('#') ? undefined : docLink(href);
       if (link) m.link = link;
       break;
     }
@@ -1722,6 +2134,24 @@ function inlineToks(s: string, depth: number): Tok[] {
         continue;
       }
     }
+    // A footnote's mark ([^1]) and a citation ([@key; @key2, p. 4]), as Pandoc writes them.
+    if (c === '[' && (s[i + 1] === '^' || s[i + 1] === '@')) {
+      const e = s.indexOf(']', i);
+      const body = e > 0 ? s.slice(i + 2, e) : '';
+      if (s[i + 1] === '^' && NOTE_ID.test(body) && s[e + 1] !== ':') {
+        flush();
+        toks.push({ k: 't', t: body, m: { fn: true } });
+        i = e + 1;
+        continue;
+      }
+      const items = s[i + 1] === '@' && e > 0 && !body.includes('\n') ? citeItems(`@${body}`) : [];
+      if (items.length && `@${body}`.split(';').every((x) => /^\s*@/.test(x) || !x.trim())) {
+        flush();
+        toks.push({ k: 't', t: citeOf(items), m: { cite: true } });
+        i = e + 1;
+        continue;
+      }
+    }
     if (c === '[' && depth < 3) {
       const l = linkAt(s, i);
       if (l) {
@@ -1763,6 +2193,17 @@ function inlineToks(s: string, depth: number): Tok[] {
           const at = tagAttrs(tag[3]);
           flush();
           toks.push({ k: 'img', img: true, src: at.src ?? '', alt: at.alt ?? '', title: at.title ?? '', attrs: null, width: at.width });
+        } else if (name === 'ref') {
+          // A cross-reference: <ref to="id"/> (what it says between, if anything, is drawn anew from what it points to).
+          const to = tagAttrs(tag[3]).to ?? '';
+          if (!tag[1] && BLOCK_ID.test(to)) {
+            flush();
+            toks.push({ k: 't', t: to, m: { xref: true } });
+            if (!/\/>$/.test(tag[0])) {
+              const e = s.toLowerCase().indexOf('</ref>', i);
+              if (e >= 0 && e - i < 300) i = e + 6;
+            }
+          }
         } else {
           const look = tagLook(name, tagAttrs(tag[3]), true);
           // Other tags are left out, their words kept.
@@ -1836,7 +2277,7 @@ function flatten(toks: Tok[]): Piece[] {
   };
   const push = (t: string, m: Look) => {
     if (!t) return;
-    if (m.link || m.code || m.math || !/https?:\/\/|www\./.test(t)) return void out.push({ t, ...m });
+    if (m.link || m.code || isAtom(m) || !/https?:\/\/|www\./.test(t)) return void out.push({ t, ...m });
     // Addresses written out are links.
     let at = 0;
     for (const u of t.matchAll(URL_RE)) {
@@ -1974,6 +2415,10 @@ function textBlocks(text: string, base: Raw, out: Raw[]) {
     // A suggested change of its break.
     if (attrs.kv.ins) b.ins = attrs.kv.ins;
     if (attrs.kv.del) b.del = attrs.kv.del;
+    if (attrs.id) b.id = attrs.id;
+    if (attrs.kv.bookmark) b.bm = attrs.kv.bookmark;
+    // A caption's label, on a table's caption line (Table: …).
+    if (attrs.kv.label) b.label = attrs.kv.label;
   }
   // A callout's emoji is the first thing in its words.
   if (b.style === 'callout' && !b.icon && runs[0]) {
@@ -1986,7 +2431,7 @@ function textBlocks(text: string, base: Raw, out: Raw[]) {
   if (!alone && (runs.some((r) => r.t) || !imgs.length)) out.push({ ...b, runs });
   for (const im of imgs) {
     const a = alone ? attrs : im.attrs;
-    out.push({ type: 'image', src: im.src, alt: im.alt, caption: im.title, w: a?.kv.width ?? a?.kv.w ?? im.width, align: attrsAlign(a), ins: a?.kv.ins, del: a?.kv.del });
+    out.push({ type: 'image', src: im.src, alt: im.alt, caption: im.title, w: a?.kv.width ?? a?.kv.w ?? im.width, align: attrsAlign(a), ins: a?.kv.ins, del: a?.kv.del, label: a?.kv.label, ...(a?.id ? { id: a.id } : {}) });
   }
 }
 
@@ -2029,15 +2474,19 @@ export function mdBlocks(md: string, depth = 0): Raw[] {
     }
     // An equation: $$ on a line of its own (or $$…$$ alone on one), its LaTeX between.
     const dd = /^ {0,3}\$\$(.*)$/.exec(line);
-    const one = dd ? /^(.*?)\$\$\s*$/.exec(dd[1]) : null;
+    // Its end may say its number's label and its id ({#eq1 label=Equation}).
+    const END = /\$\$\s*(\{[^{}\n]*\})?\s*$/;
+    const one = dd ? /^(.*?)\$\$\s*(\{[^{}\n]*\})?\s*$/.exec(dd[1]) : null;
     // Its end: on the same line, or a line ending in $$ not far below (else the line is words that start with $$).
     let ddEnd = one && one[1].trim() ? i : -1;
-    if (dd && ddEnd < 0) for (let j = i + 1; j < Math.min(lines.length, i + 300) && ddEnd < 0; j++) if (/\$\$\s*$/.test(lines[j])) ddEnd = j;
+    if (dd && ddEnd < 0) for (let j = i + 1; j < Math.min(lines.length, i + 300) && ddEnd < 0; j++) if (END.test(lines[j])) ddEnd = j;
     if (dd && ddEnd >= 0) {
       endPara();
       stack = [];
-      const body = ddEnd === i ? [one![1]] : [dd[1], ...lines.slice(i + 1, ddEnd), lines[ddEnd].replace(/\$\$\s*$/, '')];
-      if (body.join('').trim()) out.push({ type: 'math', tex: body.join('\n').trim() });
+      const body = ddEnd === i ? [one![1]] : [dd[1], ...lines.slice(i + 1, ddEnd), lines[ddEnd].replace(END, '')];
+      const at = ddEnd === i ? one![2] : END.exec(lines[ddEnd])?.[1];
+      const attrs = at ? parseAttrs(at.slice(1, -1)) : null;
+      if (body.join('').trim()) out.push({ type: 'math', tex: body.join('\n').trim(), ...(attrs?.kv.label ? { label: attrs.kv.label } : {}), ...(attrs?.id ? { id: attrs.id } : {}) });
       i = ddEnd + 1;
       continue;
     }
@@ -2046,6 +2495,38 @@ export function mdBlocks(md: string, depth = 0): Raw[] {
       stack = [];
       out.push({ type: 'toc' });
       i++;
+      continue;
+    }
+    // The bibliography: [BIBLIOGRAPHY] (or [REFERENCES]) alone on a line.
+    if (/^ {0,3}\[(?:BIBLIOGRAPHY|REFERENCES|WORKS CITED)\]\s*$/i.test(line)) {
+      endPara();
+      stack = [];
+      out.push({ type: 'bib' });
+      i++;
+      continue;
+    }
+    // A footnote: [^1]: its words, and the lines after it that are indented (or follow it with no blank line).
+    const fnDef = /^ {0,3}\[\^([A-Za-z0-9_-]{1,40})\]:[ \t]?(.*)$/.exec(line);
+    if (fnDef && depth === 0) {
+      endPara();
+      stack = [];
+      const body = [fnDef[2]];
+      let j = i + 1;
+      for (; j < lines.length; j++) {
+        const l = lines[j];
+        if (/^ {0,3}\[\^[A-Za-z0-9_-]{1,40}\]:/.test(l)) break;
+        if (!l.trim()) {
+          if (j + 1 < lines.length && /^( {2,}|\t)\S/.test(lines[j + 1])) {
+            body.push('');
+            continue;
+          }
+          break;
+        }
+        if (/^( {2,}|\t)/.test(l) || (body[body.length - 1] !== '' && !startsBlock(l))) body.push(l.trim());
+        else break;
+      }
+      out.push({ type: 'footnote', id: fnDef[1], runs: mdRuns(joinLines(body.filter((x, k) => x || k < body.length - 1))) });
+      i = j;
       continue;
     }
     // A table written in HTML (as docMarkdown writes one with merged or filled cells).
@@ -2212,7 +2693,30 @@ export function mdBlocks(md: string, depth = 0): Raw[] {
     i++;
   }
   endPara();
-  return out;
+  return depth ? out : tableCaptions(out);
+}
+
+/** A table's caption: a paragraph "Table: …" right before it (or right after it), as Pandoc writes one ({label=Table} numbers it). */
+function tableCaptions(list: Raw[]): Raw[] {
+  const caption = (b: Raw | undefined) => {
+    if (!b || b.type !== 'p' || (b.style && b.style !== 'normal') || !Array.isArray(b.runs)) return null;
+    const m = /^\s*Table:\s*([\s\S]*)$/.exec((b.runs as Run[]).map((r) => r.t).join(''));
+    return m ? m[1].replace(/\s+/g, ' ').trim() : null;
+  };
+  const gone = new Set<number>();
+  list.forEach((t, k) => {
+    if (t.type !== 'table' || t.caption) return;
+    for (const j of [k - 1, k + 1]) {
+      const words = gone.has(j) ? null : caption(list[j]);
+      if (words === null) continue;
+      t.caption = words;
+      if (list[j].label) t.label = list[j].label;
+      if (list[j].id && t.id === undefined) t.id = list[j].id;
+      gone.add(j);
+      break;
+    }
+  });
+  return gone.size ? list.filter((_, k) => !gone.has(k)) : list;
 }
 
 // ---- Markdown out ---------------------------------------------------------------------------------------------
@@ -2285,7 +2789,7 @@ function shiftSpaces(runs: Run[]): Run[] {
     return m;
   };
   runs.forEach((r, i) => {
-    if (r.code || r.math) return void out.push(r);
+    if (r.code || isAtom(r)) return void out.push(r);
     const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(r.t)!;
     if (!m[2]) return void out.push({ ...common(r, runs[i - 1] ?? runs[i + 1]), t: r.t });
     if (m[1]) out.push({ ...common(r, runs[i - 1]), t: m[1] });
@@ -2339,6 +2843,21 @@ function writeRuns(runs: Run[], o: { table: boolean; nl: string; tags: boolean; 
       out += `$${r.t.replace(/\n/g, ' ')}$`;
       continue;
     }
+    // A footnote's mark, a citation and a cross-reference, as Pandoc writes the first two.
+    if (r.fn) {
+      out += `[^${r.t}]`;
+      continue;
+    }
+    if (r.cite) {
+      out += `[${citeItems(r.t)
+        .map((x) => `@${x.key}${x.loc ? `, ${x.loc.replace(/[\]\[;]/g, '')}` : ''}`)
+        .join('; ')}]`;
+      continue;
+    }
+    if (r.xref) {
+      out += `<ref to="${r.t}"/>`;
+      continue;
+    }
     const lines = r.t.split('\n');
     lines.forEach((line, j) => {
       if (j) out += o.table ? '<br>' : o.nl;
@@ -2357,7 +2876,7 @@ function writeRuns(runs: Run[], o: { table: boolean; nl: string; tags: boolean; 
 const sameRuns = (a: Run[], b: Run[]) => a.length === b.length && a.every((r, i) => r.t === b[i].t && sameLook(r, b[i]));
 
 /** A block's runs as Markdown that reads back as the same runs: marks as * and ~~ where they can be, as tags where not. */
-function runsMd(runs: Run[], o: { table?: boolean; nl?: string; cm?: boolean } = {}): string {
+function runsMdOf(runs: Run[], o: { table?: boolean; nl?: string; cm?: boolean } = {}): string {
   const rs = shiftSpaces(mergeRuns(o.cm ? runs : runs.some((r) => r.cm) ? runs.map(({ cm: _cm, ...r }) => r) : runs));
   const opts = { table: !!o.table, nl: o.nl ?? '\\\n', tags: false, cm: !!o.cm };
   const md = writeRuns(rs, opts);
@@ -2367,8 +2886,9 @@ function runsMd(runs: Run[], o: { table?: boolean; nl?: string; cm?: boolean } =
   return sameRuns(back(tagged), rs) ? tagged : writeRuns(rs, { ...opts, tags: true, dollars: true });
 }
 
-function attrsMd(a: { cls?: string[]; kv?: Record<string, string | number> }): string {
-  const parts = [...(a.cls ?? []).map((c) => `.${c}`), ...Object.entries(a.kv ?? {}).map(([k, v]) => `${k}=${v}`)];
+function attrsMd(a: { id?: string; cls?: string[]; kv?: Record<string, string | number> }): string {
+  const val = (v: string | number) => (typeof v === 'number' || /^[\w.%#-]+$/u.test(v) ? String(v) : `"${String(v).replace(/"/g, "'")}"`);
+  const parts = [...(a.id ? [`#${a.id}`] : []), ...(a.cls ?? []).map((c) => `.${c}`), ...Object.entries(a.kv ?? {}).map(([k, v]) => `${k}=${val(v)}`)];
   return parts.length ? ` {${parts.join(' ')}}` : '';
 }
 
@@ -2397,21 +2917,74 @@ export function tableHtml(t: TableBlock, o: { cm?: boolean } = {}): string {
   return `<table${marks}>${cols}${head}<tbody>${t.rows.map((r, ri) => (t.head && ri === 0 ? '' : row(r, ri, false))).join('')}</tbody></table>`;
 }
 
-/** Runs as HTML that htmlBlocks reads back (maths as its LaTeX in a marked span; comments' marks for an agent). */
+/** Runs as HTML that htmlBlocks reads back (maths, footnotes' marks, citations and cross-references as what they keep, in a marked span; comments' marks for an agent). */
 function runsInline(runs: Run[], o: { cm?: boolean }): string {
   return runs
     .map((r) => {
-      const h = r.math ? `<span data-tex="${escHtml(r.t)}">${escHtml(r.t)}</span>` : runHtml({ ...r, cm: undefined }, { view: true });
+      const k = atomKind(r);
+      const h = k ? `<span data-tex="${escHtml(r.t)}"${k !== 'math' ? ` data-k="${k}"` : ''}>${escHtml(r.t)}</span>` : runHtml({ ...r, cm: undefined }, { view: true });
       return o.cm && r.cm ? `<span data-comment="${r.cm.join(' ')}">${h}</span>` : h;
     })
     .join('');
 }
 
+/**
+ * What a document's marks show where they are, worked out from the whole of it (doc-refs.ts): footnotes' numbers,
+ * citations in the document's style, cross-references and numbered captions' labels, the bibliography's entries.
+ */
+export interface DocRefs {
+  /** A footnote's number, by its note's id (0 when it has none). */
+  note(id: string): number;
+  /** What a citation or a cross-reference shows ("(Vaswani et al., 2017)", "[3]", "Figure 2", a heading's words). */
+  text(r: Run): string;
+  /** A numbered block's label and number ("Figure 2"), by its id; null for one that is not numbered. */
+  label(id: string): string | null;
+  /** The bibliography's entries, in its order, each as runs (titles in italics…). */
+  bib(): Run[][];
+}
+
 export interface MarkdownOpts {
   /** For an agent: the words comments are on, marked (<span data-comment="id">), to keep or answer. */
   comments?: boolean;
-  /** For a file: a table of contents as a list of links to its headings (as GitHub names them), not [TOC]. */
+  /**
+   * For a file: a table of contents as a list of links to its headings (as GitHub names them), not [TOC]; with `refs`,
+   * citations and cross-references as their words, numbered captions with their labels, and the bibliography's
+   * entries (else they are written as an agent writes them, to read back).
+   */
   tocLinks?: boolean;
+  refs?: DocRefs;
+}
+
+/** Each footnote's number: where its first mark comes among the others. */
+export function noteNumbers(d: Doc): Map<string, number> {
+  const out = new Map<string, number>();
+  const take = (runs: Run[]) => {
+    for (const r of runs) if (r.fn && !out.has(r.t)) out.set(r.t, out.size + 1);
+  };
+  for (const b of d.blocks) {
+    if (b.type === 'p' || b.type === 'li') take(b.runs);
+    else if (b.type === 'table') for (const row of b.rows) for (const c of row) take(c.runs);
+  }
+  return out;
+}
+
+/** The blocks a document points to: by a cross-reference, a link to a place in it, or a bookmark. */
+function targetsOf(d: Doc): Set<string> {
+  const out = new Set<string>();
+  const take = (runs: Run[]) => {
+    for (const r of runs) {
+      if (r.xref) out.add(r.t);
+      if (r.link?.startsWith('#')) out.add(r.link.slice(1));
+    }
+  };
+  for (const b of d.blocks) {
+    if (b.type === 'p' || b.type === 'li') {
+      take(b.runs);
+      if (b.bm) out.add(b.id);
+    } else if (b.type === 'table') for (const row of b.rows) for (const c of row) take(c.runs);
+  }
+  for (const n of d.notes ?? []) take(n.runs);
+  return out;
 }
 
 /** A heading's anchor as GitHub makes it from its words: lower case, words joined by dashes, others left out. */
@@ -2449,6 +3022,31 @@ export function docMarkdown(d: Doc, o: MarkdownOpts = {}): string {
   const { counts } = listInfo(d.blocks);
   const parts: string[] = [];
   const cm = !!o.comments;
+  // Footnotes' marks by their numbers ([^1]), and (for a file) citations and cross-references as their words.
+  const nums = noteNumbers(d);
+  const refs = o.tocLinks ? o.refs : undefined;
+  const marks = (runs: Run[]): Run[] =>
+    runs.some((r) => r.fn || (refs && (r.cite || r.xref)))
+      ? runs.map((r) => {
+          if (r.fn) return { ...r, t: String(nums.get(r.t) ?? r.t) };
+          if (refs && (r.cite || r.xref)) {
+            const { cite: _c, xref: _x, ...rest } = r;
+            return { ...rest, t: refs.text(r) };
+          }
+          return r;
+        })
+      : runs;
+  const runsMd = (runs: Run[], x: { table?: boolean; nl?: string; cm?: boolean } = {}) => runsMdOf(marks(runs), x);
+  // The blocks something points to keep their ids ({#id}), for an agent.
+  const targets = cm ? targetsOf(d) : new Set<string>();
+  const idOf = (b: Block) => (targets.has(b.id) ? b.id : undefined);
+  const bmKv = (b: { bm?: string }): Record<string, string> => (b.bm && !refs ? { bookmark: b.bm } : {});
+  // A numbered caption: for a file, its label and number before its words.
+  const captioned = (b: { id: string; label?: string; caption?: string }) => {
+    const lab = refs && b.label ? refs.label(b.id) : null;
+    return lab ? `${lab}${b.caption ? `: ${b.caption}` : ''}` : (b.caption ?? '');
+  };
+  const labelKv = (b: { label?: string }): Record<string, string> => (b.label && !refs ? { label: b.label } : {});
   // Where each level's item's words start, for the items under it.
   const content: number[] = [];
   let prev: Block | undefined;
@@ -2458,21 +3056,23 @@ export function docMarkdown(d: Doc, o: MarkdownOpts = {}): string {
       const style = b.style ?? 'normal';
       const align = b.align ? [b.align] : [];
       const kv = { ...(b.lvl ? { indent: b.lvl } : {}), ...spacingKv(b), ...marksKv(b, cm) };
+      Object.assign(kv, bmKv(b));
+      const id = idOf(b);
       if (style === 'code') {
         const text = runsText(b.runs);
         const fence = '`'.repeat(Math.max(3, ...(text.match(/`{3,}/g) ?? []).map((x) => x.length + 1)));
         s = `${fence}\n${text}\n${fence}`;
       } else if (style === 'quote') {
         const body = runsMd(b.runs, { nl: '\\\n> ', cm }) || '&nbsp;';
-        s = `> ${body}${attrsMd({ cls: align, kv })}`;
+        s = `> ${body}${attrsMd({ id, cls: align, kv })}`;
       } else if (style === 'callout') {
         const body = runsMd(b.runs, { nl: '\\\n> ', cm }) || '&nbsp;';
-        s = `> ${b.icon ?? CALLOUT.icon} ${body}${attrsMd({ cls: ['callout', ...align], kv: { ...kv, ...(b.tint ? { tint: b.tint } : {}) } })}`;
+        s = `> ${b.icon ?? CALLOUT.icon} ${body}${attrsMd({ id, cls: ['callout', ...align], kv: { ...kv, ...(b.tint ? { tint: b.tint } : {}) } })}`;
       } else {
         const lvl = headingLevel(style);
         const cls = [...(style === 'title' || style === 'subtitle' ? [style] : []), ...align];
         const body = runsMd(b.runs, { nl: '\\\n', cm });
-        s = `${lvl ? `${'#'.repeat(lvl)} ` : ''}${body || (lvl ? '' : '&nbsp;')}${attrsMd({ cls, kv })}`;
+        s = `${lvl ? `${'#'.repeat(lvl)} ` : ''}${body || (lvl ? '' : '&nbsp;')}${attrsMd({ id, cls, kv })}`;
       }
       content.length = 0;
     } else if (b.type === 'li') {
@@ -2482,10 +3082,10 @@ export function docMarkdown(d: Doc, o: MarkdownOpts = {}): string {
       const lead = `${' '.repeat(ind)}${mark} ${b.list === 'check' ? (b.checked ? '[x] ' : '[ ] ') : ''}`;
       content.length = L;
       content[L] = ind + mark.length + 1;
-      s = `${lead}${runsMd(b.runs, { nl: `\\\n${' '.repeat(ind + mark.length + 1)}`, cm })}${attrsMd({ cls: b.align ? [b.align] : [], kv: { ...spacingKv(b), ...marksKv(b, cm) } })}`;
+      s = `${lead}${runsMd(b.runs, { nl: `\\\n${' '.repeat(ind + mark.length + 1)}`, cm })}${attrsMd({ id: idOf(b), cls: b.align ? [b.align] : [], kv: { ...spacingKv(b), ...marksKv(b, cm), ...bmKv(b) } })}`;
     } else if (b.type === 'table' && (htmlTable(b) || (cm && (b.ins || b.del)))) {
       content.length = 0;
-      s = tableHtml(b, { cm });
+      s = `${tableCaption(b)}${tableHtml(b.rows.some((r) => r.some((c) => c.runs.some((x) => x.fn || (refs && (x.cite || x.xref))))) ? { ...b, rows: b.rows.map((r) => r.map((c) => ({ ...c, runs: marks(c.runs) }))) } : b, { cm })}`;
     } else if (b.type === 'table') {
       content.length = 0;
       const n = b.rows[0]?.length ?? 0;
@@ -2514,23 +3114,31 @@ export function docMarkdown(d: Doc, o: MarkdownOpts = {}): string {
       }
       const delim = `| ${dashes.map((x, c) => (aligns[c] === 'center' ? `:${'-'.repeat(Math.max(1, x - 2))}:` : aligns[c] === 'right' ? `${'-'.repeat(Math.max(1, x - 1))}:` : '-'.repeat(x))).join(' | ')} |`;
       const header = b.head ? b.rows[0] : Array.from({ length: n }, () => ({ runs: [] }) as Cell);
-      s = [row(header), delim, ...body.map(row)].join('\n');
+      s = tableCaption(b) + [row(header), delim, ...body.map(row)].join('\n');
     } else if (b.type === 'image') {
       content.length = 0;
       const alt = (b.alt ?? '').replace(/([\\[\]])/g, '\\$1');
       const src = /[()\s<>]/.test(b.src) ? `<${b.src}>` : b.src;
-      const title = b.caption ? ` "${b.caption.replace(/(["\\])/g, '\\$1')}"` : '';
-      const kv: Record<string, string> = { ...(b.w < 1 ? { width: `${Math.round(b.w * 1000) / 10}%` } : {}), ...marksKv(b, cm) };
-      s = `![${alt}](${src}${title})${attrsMd({ cls: b.align ? [b.align] : [], kv }).trimStart()}`;
+      const cap = captioned(b);
+      const title = cap ? ` "${cap.replace(/(["\\])/g, '\\$1')}"` : '';
+      const kv: Record<string, string> = { ...(b.w < 1 ? { width: `${Math.round(b.w * 1000) / 10}%` } : {}), ...marksKv(b, cm), ...labelKv(b) };
+      s = `![${alt}](${src}${title})${attrsMd({ id: idOf(b), cls: b.align ? [b.align] : [], kv }).trimStart()}`;
     } else if (b.type === 'hr') {
       content.length = 0;
       s = '---';
     } else if (b.type === 'toc') {
       content.length = 0;
       s = o.tocLinks ? tocList(d) : '[TOC]';
+    } else if (b.type === 'bib') {
+      content.length = 0;
+      // For a file, its entries as they read; for an agent, where it goes (drawn from the sources it cites).
+      s = refs ? refs.bib().map((e) => runsMdOf(e)).filter(Boolean).join('\n\n') || '&nbsp;' : '[BIBLIOGRAPHY]';
     } else if (b.type === 'math') {
       content.length = 0;
-      s = `$$\n${b.tex.replace(/\$\$/g, '$ $')}\n$$`;
+      // For a file, a numbered equation's number as LaTeX's \tag (which KaTeX and MathJax draw at its right).
+      const lab = refs && b.label ? refs.label(b.id) : null;
+      const n = lab ? /\d+$/.exec(lab)?.[0] : undefined;
+      s = `$$\n${b.tex.replace(/\$\$/g, '$ $')}${n ? ` \\tag{${n}}` : ''}\n$$${refs ? '' : attrsMd({ id: idOf(b), kv: labelKv(b) })}`;
     } else {
       content.length = 0;
       s = '\\pagebreak';
@@ -2539,7 +3147,20 @@ export function docMarkdown(d: Doc, o: MarkdownOpts = {}): string {
     parts.push(s);
     prev = b;
   });
+  // The footnotes, after the document: [^1]: their words (a line that goes on, indented).
+  const notes = [...nums].flatMap(([id, n]) => {
+    const note = d.notes?.find((x) => x.id === id);
+    return note ? [`[^${n}]: ${runsMd(note.runs, { nl: '\\\n    ', cm }) || '&nbsp;'}`] : [];
+  });
+  if (notes.length) parts.push('\n\n', notes.join('\n'));
   return `${parts.join('')}\n`;
+
+  /** A table's caption, a line before it (Table: …), and its label to number it. */
+  function tableCaption(t: TableBlock): string {
+    const cap = captioned(t);
+    if (!cap && !idOf(t) && !t.label) return '';
+    return `Table: ${escText(cap, false, false)}${refs ? '' : attrsMd({ id: idOf(t), kv: labelKv(t) })}\n\n`;
+  }
 }
 
 // ---- HTML in -------------------------------------------------------------------------------------------------------
@@ -2795,7 +3416,7 @@ export function htmlBlocks(input: string | HNode[], o: HtmlOpts = {}): Raw[] {
         out.push({ type: 'math', tex });
       } else {
         if (!cur) cur = { runs: [], props: ctx.props(), keep: false };
-        cur.runs.push({ t: tex, math: true });
+        cur.runs.push(atomRun(tex, n.at['data-k']));
       }
       return;
     }
@@ -3018,6 +3639,9 @@ function wasOf(v: string | undefined): Look {
   }
 }
 
+/** A thing of its own among the words, as the editor and runsInline draw one: maths, or (data-k) a footnote's mark, a citation, a cross-reference. */
+const atomRun = (t: string, k: string | undefined): Run => (k === 'fn' ? { t, fn: true } : k === 'cite' ? { t, cite: true } : k === 'xref' ? { t, xref: true } : { t, math: true });
+
 /** The runs of a paragraph's HTML (the editor's own, read back), its spaces and line breaks as written. */
 export function htmlRuns(html: string): Run[] {
   const runs: Run[] = [];
@@ -3032,7 +3656,7 @@ export function htmlRuns(html: string): Run[] {
     }
     // An equation drawn among the words: its LaTeX, not what KaTeX drew.
     if (n.at['data-tex']) {
-      runs.push({ t: n.at['data-tex'], math: true, ...(look.cm ? { cm: look.cm } : {}), ...(look.ins ? { ins: look.ins } : {}), ...(look.del ? { del: look.del } : {}) });
+      runs.push({ ...atomRun(n.at['data-tex'], n.at['data-k']), ...(look.cm ? { cm: look.cm } : {}), ...(look.ins ? { ins: look.ins } : {}), ...(look.del ? { del: look.del } : {}) });
       return;
     }
     if (RAW.has(n.tag) || n.tag === 'img') return;
@@ -3075,11 +3699,27 @@ function suggestedHtml(r: Run, h: string, view: boolean): string {
   return h;
 }
 
-function runHtml(r: Run, o: { view: boolean; math?: MathDraw }): string {
+/** What a footnote's mark, a citation or a cross-reference shows, without the whole document to work it out from. */
+const atomFallback = (r: Run) => (r.fn ? '*' : r.cite ? `(${citeItems(r.t).map((x) => x.key).join('; ')})` : '?');
+
+function runHtml(r: Run, o: { view: boolean; math?: MathDraw; refs?: DocRefs }): string {
   if (r.math) {
     // Its LaTeX stays on it (what the editor reads back); in the editor it is one thing, not words to type in.
     const drawn = o.math ? o.math(r.t, false) : `<code>${escHtml(r.t)}</code>`;
     const h = suggestedHtml(r, `<span class="nd-m" data-tex="${escHtml(r.t)}"${o.view ? '' : ' contenteditable="false"'}>${drawn}</span>`, o.view);
+    return !o.view && r.cm ? `<span data-cm="${escHtml(r.cm.join(' '))}">${h}</span>` : h;
+  }
+  // A footnote's mark (its number), a citation and a cross-reference (their words, worked out from the whole document):
+  // what they keep on them (data-tex, as maths keeps its LaTeX) is what the editor reads back.
+  const k = atomKind(r);
+  if (k) {
+    const text = k === 'fn' ? String(o.refs?.note(r.t) || '*') : (o.refs?.text(r) ?? atomFallback(r));
+    let inner = escHtml(text);
+    if (o.view && k === 'fn') inner = `<a href="#nd-fn-${escHtml(r.t)}">${inner}</a>`;
+    else if (o.view && k === 'xref') inner = `<a href="#nd-${escHtml(r.t)}">${inner}</a>`;
+    if (k === 'fn') inner = `<sup>${inner}</sup>`;
+    const back = o.view && k === 'fn' ? ` id="nd-fn-${escHtml(r.t)}-ref"` : '';
+    const h = suggestedHtml(r, `<span class="nd-x nd-${k}"${back} data-tex="${escHtml(r.t)}" data-k="${k}"${o.view ? '' : ' contenteditable="false"'}>${inner}</span>`, o.view);
     return !o.view && r.cm ? `<span data-cm="${escHtml(r.cm.join(' '))}">${h}</span>` : h;
   }
   let h = escHtml(r.t).replace(/\n/g, '<br>');
@@ -3096,7 +3736,9 @@ function runHtml(r: Run, o: { view: boolean; math?: MathDraw }): string {
   if (r.size) st.push(`font-size:${r.size}pt`);
   if (r.font) st.push(`font-family:${fontCss(r.font)}`);
   if (st.length) h = `<span style="${escHtml(st.join(';'))}">${h}</span>`;
-  if (r.link) h = `<a href="${escHtml(r.link)}"${o.view ? ' target="_blank" rel="noopener noreferrer"' : ''}>${h}</a>`;
+  // A link to a place in the document (a heading, a bookmark) leads to its block's element there.
+  if (r.link?.startsWith('#')) h = `<a href="#nd-${escHtml(r.link.slice(1))}">${h}</a>`;
+  else if (r.link) h = `<a href="${escHtml(r.link)}"${o.view ? ' target="_blank" rel="noopener noreferrer"' : ''}>${h}</a>`;
   h = suggestedHtml(r, h, o.view);
   // The comments on the words, marked in the editor (which shows the open ones' highlights); never on the page.
   if (!o.view && r.cm) h = `<span data-cm="${escHtml(r.cm.join(' '))}">${h}</span>`;
@@ -3104,12 +3746,12 @@ function runHtml(r: Run, o: { view: boolean; math?: MathDraw }): string {
 }
 
 /** Runs as HTML; an empty paragraph (or a line break at its end) keeps its line with a <br> (marked, in the editor). */
-export function runsHtml(runs: Run[], o: { view?: boolean; math?: MathDraw } = {}): string {
+export function runsHtml(runs: Run[], o: { view?: boolean; math?: MathDraw; refs?: DocRefs } = {}): string {
   const view = !!o.view;
   const ph = view ? '<br>' : '<br data-ph="">';
   if (!runs.length) return ph;
-  const h = runs.map((r) => runHtml(r, { view, math: o.math })).join('');
-  return runs[runs.length - 1].t.endsWith('\n') && !runs[runs.length - 1].math ? h + ph : h;
+  const h = runs.map((r) => runHtml(r, { view, math: o.math, refs: o.refs })).join('');
+  return runs[runs.length - 1].t.endsWith('\n') && !isAtom(runs[runs.length - 1]) ? h + ph : h;
 }
 
 export interface DrawOpts {
@@ -3125,6 +3767,10 @@ export interface DrawOpts {
   toc?: TocEntry[];
   /** What a table of contents says while there are no headings (in the editor). */
   tocHint?: string;
+  /** Footnotes' numbers, citations, cross-references, numbered captions and the bibliography (doc-refs.ts docRefs). */
+  refs?: DocRefs;
+  /** What a bibliography says while the document cites nothing (in the editor). */
+  bibHint?: string;
 }
 
 export interface TocEntry {
@@ -3161,19 +3807,23 @@ export function blockHtml(b: Block, label: string, o: DrawOpts): string {
   const id = (o.edit ? ` data-b="${escHtml(b.id)}"` : '') + (sb ? ` data-s="${escHtml(sb)}"` : '');
   const sc = `${b.ins ? ' nd-sins' : ''}${b.del ? ' nd-sdel' : ''}`;
   const atom = o.edit ? ' contenteditable="false"' : '';
-  const ro = { view, math: o.math };
+  const ro = { view, math: o.math, refs: o.refs };
+  // On the document's own page, what links and cross-references lead to has an id: headings, bookmarks, numbered captions.
+  const target = (yes: boolean) => (view && yes ? ` id="nd-${escHtml(b.id)}"` : '');
+  // A bookmark's name, on its paragraph (the editor marks it beside it).
+  const bm = (b.type === 'p' || b.type === 'li') && b.bm ? ` data-bm="${escHtml(b.bm)}"` : '';
   if (b.type === 'p') {
     const style = b.style ?? 'normal';
     const callout = style === 'callout';
     const st = [b.align ? `text-align:${b.align}` : '', b.lvl ? `--lvl:${b.lvl}` : '', ...spacingCss(b), callout && b.tint ? `--tint:${b.tint}` : ''].filter(Boolean).join(';');
     // Headings are where a table of contents' links lead, on the document's own page.
-    const anchor = view && (headingLevel(style) || style === 'title') ? ` id="nd-${escHtml(b.id)}"` : '';
+    const anchor = target(!!(headingLevel(style) || style === 'title' || b.bm));
     const icon = callout ? ` data-icon="${escHtml(b.icon ?? CALLOUT.icon)}"` : '';
-    return `<${TAG[style]} class="nd-b nd-${style}${b.lvl ? ' nd-in' : ''}${sc}"${id}${anchor}${icon}${o.edit ? ' data-t=""' : ''}${st ? ` style="${st}"` : ''}>${runsHtml(b.runs, ro)}</${TAG[style]}>`;
+    return `<${TAG[style]} class="nd-b nd-${style}${b.lvl ? ' nd-in' : ''}${sc}"${id}${anchor}${bm}${icon}${o.edit ? ' data-t=""' : ''}${st ? ` style="${st}"` : ''}>${runsHtml(b.runs, ro)}</${TAG[style]}>`;
   }
   if (b.type === 'li') {
     const st = [b.align ? `text-align:${b.align}` : '', `--lvl:${b.lvl ?? 0}`, ...spacingCss(b)].filter(Boolean).join(';');
-    return `<p class="nd-b nd-li nd-${b.list}${b.checked ? ' nd-on' : ''}${sc}"${id}${o.edit ? ' data-t=""' : ''} data-n="${escHtml(label)}" style="${st}">${runsHtml(b.runs, ro)}</p>`;
+    return `<p class="nd-b nd-li nd-${b.list}${b.checked ? ' nd-on' : ''}${sc}"${id}${target(!!b.bm)}${bm}${o.edit ? ' data-t=""' : ''} data-n="${escHtml(label)}" style="${st}">${runsHtml(b.runs, ro)}</p>`;
   }
   if (b.type === 'table') {
     const n = b.rows[0]?.length ?? 0;
@@ -3195,12 +3845,16 @@ export function blockHtml(b: Block, label: string, o: DrawOpts): string {
         .join('')}</tr>`;
     const head = b.head && b.rows.length ? `<thead>${row(b.rows[0], 0, true)}</thead>` : '';
     const body = b.rows.map((r, ri) => (b.head && ri === 0 ? '' : row(r, ri, false))).join('');
-    return `<table class="nd-b nd-table${sc}"${id}><colgroup>${cols.map((w) => `<col style="width:${Math.round(w * 10000) / 100}%">`).join('')}</colgroup>${head}<tbody>${body}</tbody></table>`;
+    // Its caption over it (with its label and number: "Table 2: …"), a thing of its own in the editor (clicked to change).
+    const words = captionWords(b, o.refs);
+    const cap = words ? `<caption class="nd-cap"${atom}>${escHtml(words)}</caption>` : '';
+    return `<table class="nd-b nd-table${sc}"${id}${target(!!b.label)}>${cap}<colgroup>${cols.map((w) => `<col style="width:${Math.round(w * 10000) / 100}%">`).join('')}</colgroup>${head}<tbody>${body}</tbody></table>`;
   }
   if (b.type === 'image') {
-    const cap = b.caption ? `<figcaption>${escHtml(b.caption)}</figcaption>` : '';
+    const words = captionWords(b, o.refs);
+    const cap = words ? `<figcaption>${escHtml(words)}</figcaption>` : '';
     const img = `<img src="${escHtml(o.src(b.src))}" alt="${escHtml(b.alt ?? '')}" style="width:${Math.round(b.w * 1000) / 10}%"${o.edit ? ' draggable="false"' : ''}>`;
-    return `<figure class="nd-b nd-img nd-${b.align ?? 'center'}${sc}"${id}${atom}>${img}${cap}</figure>`;
+    return `<figure class="nd-b nd-img nd-${b.align ?? 'center'}${sc}"${id}${target(!!b.label)}${atom}>${img}${cap}</figure>`;
   }
   if (b.type === 'hr') return `<div class="nd-b nd-hr${sc}"${id}${atom}><hr></div>`;
   if (b.type === 'toc') {
@@ -3209,8 +3863,45 @@ export function blockHtml(b: Block, label: string, o: DrawOpts): string {
     const lines = list.map((h) => `<a class="nd-toc-${h.level}"${view ? ` href="#nd-${escHtml(h.id)}"` : ''} data-h="${escHtml(h.id)}">${escHtml(h.text)}</a>`).join('');
     return `<nav class="nd-b nd-toc${sc}"${id}${atom}>${lines || (o.tocHint ? `<span class="nd-toc-hint">${escHtml(o.tocHint)}</span>` : '')}</nav>`;
   }
-  if (b.type === 'math') return `<div class="nd-b nd-math${sc}"${id}${atom}>${o.math ? o.math(b.tex, true) : `<code>${escHtml(b.tex)}</code>`}</div>`;
+  if (b.type === 'math') {
+    // A numbered equation's number, at its right: "(3)".
+    const n = b.label ? /\d+$/.exec(o.refs?.label(b.id) ?? '')?.[0] : undefined;
+    const num = n ? `<span class="nd-eqn">(${n})</span>` : '';
+    return `<div class="nd-b nd-math${n ? ' nd-numbered' : ''}${sc}"${id}${target(!!b.label)}${atom}>${o.math ? o.math(b.tex, true) : `<code>${escHtml(b.tex)}</code>`}${num}</div>`;
+  }
+  if (b.type === 'bib') {
+    // The bibliography's entries, each a paragraph that hangs (or, numbered, its number in a column of its own).
+    const entries = o.refs?.bib() ?? [];
+    const num = (e: Run[]) => /^\[\d+\]$/.test(e[0]?.t ?? '');
+    const lines = entries.map((e) => (num(e) ? `<p class="nd-bib-e nd-bib-n"><span>${escHtml(e[0].t)}</span><span>${runsHtml(e.slice(1).map((r, k) => (k === 0 ? { ...r, t: r.t.replace(/^\s+/, '') } : r)), { view: true })}</span></p>` : `<p class="nd-bib-e">${runsHtml(e, { view: true })}</p>`));
+    return `<div class="nd-b nd-bib${sc}"${id}${atom}>${lines.join('') || (o.bibHint ? `<span class="nd-toc-hint">${escHtml(o.bibHint)}</span>` : '')}</div>`;
+  }
   return `<div class="nd-b nd-pb${sc}"${id}${atom}${o.breakLabel ? ` data-label="${escHtml(o.breakLabel)}"` : ''}></div>`;
+}
+
+/** A picture's or table's caption as it reads: its label and number first when it is numbered ("Figure 2: …"). */
+export function captionWords(b: ImageBlock | TableBlock, refs?: DocRefs): string {
+  const lab = b.label ? (refs?.label(b.id) ?? b.label) : '';
+  return lab ? (b.caption ? `${lab}: ${b.caption}` : lab) : (b.caption ?? '');
+}
+
+/**
+ * A document's footnotes as HTML, in their marks' order: each its number and words (on the document's own page, with
+ * a link back to its mark). `ids`: their elements say which note they are (the editor's notes at a page's foot).
+ */
+export function notesHtml(d: Doc, refs: DocRefs | undefined, o: { view?: boolean; math?: MathDraw; ids?: string[] } = {}): string {
+  const list = (o.ids ?? (d.notes ?? []).map((n) => n.id)).flatMap((id) => {
+    const n = d.notes?.find((x) => x.id === id);
+    return n ? [n] : [];
+  });
+  if (!list.length) return '';
+  const view = !!o.view;
+  const items = list.map((n) => {
+    const num = refs?.note(n.id) || '';
+    const back = view ? `<a href="#nd-fn-${escHtml(n.id)}-ref" aria-label="Back">${num}</a>` : String(num);
+    return `<p class="nd-note"${view ? ` id="nd-fn-${escHtml(n.id)}"` : ''} data-note="${escHtml(n.id)}"><span class="nd-note-n">${back}</span><span class="nd-note-t">${runsHtml(n.runs, { view: true, math: o.math, refs })}</span></p>`;
+  });
+  return `<div class="nd-notes">${items.join('')}</div>`;
 }
 
 const CHECK_SVG =
@@ -3229,15 +3920,25 @@ export function docCss(d: Doc, scope = '.nd-doc'): string {
       .map((x) => `${scope} ${x.trim()}`)
       .join(',');
   const rule = (sel: string, body: string) => `${s(sel)}{${body}}`;
+  // Each style as the document has it: the app's, with the document's own changes (styleOf).
   const styleRules = (Object.keys(STYLES) as ParaStyle[])
     .filter((k) => k !== 'normal')
     .map((k) => {
-      const v = STYLES[k];
-      return rule(`.nd-${k}`, `font-size:${v.k}em;line-height:${v.lh};margin:${v.before}em 0 ${v.after}em;color:${v.color};font-weight:${v.bold ? 700 : 400}${v.italic ? ';font-style:italic' : ''}`);
+      const v = styleOf(d, k);
+      const own = d.styles?.[k];
+      const more = `${v.font ? `;font-family:${k === 'code' ? `${fontCss(v.font)},${MONO}` : fontCss(v.font)}` : ''}${own?.align ? `;text-align:${own.align}` : ''}${own?.i === false ? ';font-style:normal' : ''}`;
+      return rule(`.nd-${k}`, `font-size:${v.k}em;line-height:${v.lh};margin:${v.before}em 0 ${v.after}em;color:${v.color};font-weight:${v.bold ? 700 : 400}${v.italic ? ';font-style:italic' : ''}${more}`);
     });
+  // Normal text's own look: its colour and lines for all the words; its spacing, weight, slant and alignment for its paragraphs.
+  const normal = d.styles?.normal;
+  const N = styleOf(d, 'normal');
+  const normalRule = normal
+    ? [rule('.nd-normal', [`margin:${N.before}em 0 ${N.after}em`, normal.b ? 'font-weight:700' : '', normal.i ? 'font-style:italic' : '', normal.align ? `text-align:${normal.align}` : ''].filter(Boolean).join(';'))]
+    : [];
   return [
-    `${scope}{font-family:${fontCss(d.font)};font-size:${d.size}pt;line-height:${STYLES.normal.lh};color:${INK};--nd-step:36pt;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-kerning:normal}`,
+    `${scope}{font-family:${fontCss(d.font)};font-size:${d.size}pt;line-height:${N.lh};color:${normal?.color ?? INK};--nd-step:36pt;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-kerning:normal}`,
     rule('.nd-b', `margin:0 0 ${STYLES.normal.after}em;white-space:pre-wrap;overflow-wrap:break-word;tab-size:4`),
+    ...normalRule,
     rule('.nd-b:first-child', 'margin-top:0'),
     rule('.nd-in', 'margin-left:calc(var(--lvl,0)*var(--nd-step))'),
     ...styleRules,
@@ -3286,6 +3987,21 @@ export function docCss(d: Doc, scope = '.nd-doc'): string {
     rule('del.nd-del', 'color:var(--sc,#c5221f);text-decoration:line-through;text-decoration-thickness:1px'),
     rule('.nd-fmt', 'text-decoration:underline dotted;text-decoration-color:var(--sc,#1a73e8);text-underline-offset:3px'),
     rule('.nd-sins, .nd-sdel', 'box-shadow:-7px 0 0 -4px var(--sc,#1a73e8)'),
+    // Footnotes' marks, citations and cross-references; a table's caption over it, an equation's number at its right,
+    // the bibliography's entries (hanging, or numbered in a column), and the footnotes at a page's foot (or the end).
+    rule('.nd-x', 'white-space:nowrap'),
+    rule('.nd-x a', 'color:inherit;text-decoration:none'),
+    rule('.nd-table caption.nd-cap', 'caption-side:top;text-align:left;font-size:.88em;line-height:1.35;color:#5f6368;padding:0 0 .4em;white-space:pre-wrap;overflow-wrap:break-word'),
+    rule('.nd-math.nd-numbered', 'position:relative;padding:0 3.2em'),
+    rule('.nd-eqn', 'position:absolute;right:0;top:50%;transform:translateY(-50%)'),
+    rule('.nd-bib', 'margin:.2em 0 1em'),
+    rule('.nd-bib-e', 'margin:0 0 .6em;padding-left:2.2em;text-indent:-2.2em;white-space:pre-wrap;overflow-wrap:anywhere'),
+    rule('.nd-bib-n', 'display:grid;grid-template-columns:2.8em 1fr;padding-left:0;text-indent:0'),
+    rule('.nd-notes', 'font-size:.82em;line-height:1.4;color:#3c4043'),
+    rule('.nd-note', 'display:flex;gap:.4em;margin:0 0 .3em;white-space:pre-wrap;overflow-wrap:break-word'),
+    rule('.nd-note-n', 'flex:none;min-width:1.2em;text-align:right;font-size:.8em;line-height:1.9'),
+    rule('.nd-note-n a', 'color:inherit;text-decoration:none'),
+    rule('.nd-note-t', 'min-width:0;flex:1'),
     rule('figure.nd-sdel, table.nd-sdel, .nd-hr.nd-sdel, .nd-toc.nd-sdel, .nd-math.nd-sdel, .nd-pb.nd-sdel', 'opacity:.5'),
   ].join('\n');
 }
