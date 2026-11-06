@@ -1016,4 +1016,24 @@ export const images: Feature = {
     ...(settings(deps.db, 'videos').enabled ? [videoTool(deps.db)] : []),
     ...(audioSettings(deps.db).enabled ? [audioTool(deps.db)] : []),
   ],
+  // Tools alone are not enough for agents to reach for them unasked: what to use when, as they make slides, documents and pages.
+  spawn(s, d) {
+    if (s.extra?.confidential) return undefined;
+    return { instructions: [pictureInstructions(imagesSettings(d.db).enabled, settings(d.db, 'videos').enabled)] };
+  },
 };
+
+/** What agents are told of making and changing pictures for what they make (the tools that are on, by name). */
+function pictureInstructions(pictures: boolean, videos: boolean): string {
+  return [
+    'Pictures for what you make: when you make or change slides, a document or a page, illustrate it where a picture adds something (a title slide, a section, an idea; not every slide), in its colours and look, as a designer would.',
+    pictures
+      ? 'generate_image with detail "simple" (the cheaper Quick model) for backgrounds, textures, icons and simple pictures, "complex" (the Best model) for scenes, photos, words inside a picture and diagrams; make_svg for icons, logos, diagrams, shapes and patterns that must stay sharp at any size, in the theme’s colours; make_plot for plots of data (a slide’s chart part already draws simple columns, bars, lines and pies; in a web deck the plot’s interactive version).'
+      : '',
+    'find_photos for real photos free to use (their credit in the slide’s notes or a caption); edit_image to crop, straighten, adjust, filter, mark up or blur parts of a picture; remove_background to cut a subject out and erase_from_image to take something out (free on this computer once its picture tools are set up, else through OpenRouter; look at the result, and if it is not right, ask again with how: "ai").',
+    videos ? 'generate_video for a short clip when one is wanted, edit_video to trim, cut, crop, caption or add music to a video.' : 'edit_video to trim, cut, crop, caption or add music to a video.',
+    'They all take the files of your folder and the pictures a deck, document or page already has (naget-asset:…, as get_page shows them); put what they make in by its path (save_slides, save_doc and save_page take the files of your folder). What costs money (pictures, drawings at Best, videos) is priced to the user before it is made: keep to what helps.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
