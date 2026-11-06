@@ -86,6 +86,17 @@ Quick drawing written by a model; the picture tools on this computer). The edito
 false, show the key field in place (saved with `PUT /api/models` `{ openrouterKey }`, as Settings → Models does) beside
 **Skip**, and offer what needs no key.
 
+**Every tool for agents too** (the owner, 6 November): each thing the editors do has an agent's way (generate_image,
+make_svg, remove_background, erase_from_image, make_plot, generate_video, save_slides' web format, export_page,
+publish_site, app_api for settings and the picture tools' set-up), the tools take pictures already in a deck or
+document (`naget-asset:<sha>`) as well as files, and a spawn instruction tells agents to use them unprompted when they
+make slides, documents and pages. The editors' own routes are refused to agents (app_api points them to their tools).
+
+**AI when the local tools fall short** (the owner, 6 November): cutouts and erasing take `how: auto | local | ai`; on
+auto a cutout whose mask looks poor is redone by an image model, a large area to erase goes to AI fill; the answers
+tell agents to look and redo with `how: "ai"` (or generate_image) when it is not right; the editors offer **Do it with
+AI instead** under a result made on this computer.
+
 Prices: every route that spends says what it cost (`cost`, US dollars, when OpenRouter says); the dialogs show an
 estimate before (`TiersInfo`). Without an OpenRouter key, routes that need one answer 400 with
 "Add an OpenRouter key in Settings → Models" (and the dialogs show that with a link, `/settings?s=models`).
@@ -164,3 +175,12 @@ All types in `shared/slides.ts`: `DeckFormat`, `Deck.format`, `Deck.progress`, p
    B's dialogs into the slides editor once the lead says they are merged.
 3. Lead merges each branch as it is ready (`mr/int`), runs the tests and typecheck, then the guide, translations,
    vectors, release notes; one release.
+
+## More asks the same day, and their workstreams
+
+| | What | Owns |
+|---|---|---|
+| **D** | **Made by AI from a type**: a gallery of slide (45+), deck (25+), document (40+), document section (15+), page (35+), page block (15+) and spreadsheet (12+) types; pick one, say what it is about if you like, and an agent makes it from what is there (the deck so far, the document); **Turn into…** slides, a document or a page from the Library | `shared/content-types.ts`, `web/src/features/pages/types/*`, `AskPage.tsx`, `parts.tsx` (New page), `Library.tsx` (an item's menu); the editors' entry points after B and C2 are merged |
+| **F1** | **The image editor**, opened in a tab of its own inside the app from anywhere (a slide's, a document's or a page's picture, the Library, Files, any picture shown full size): crop, rotate, straighten, adjust, filters, markup, blur areas, the AI tools; saved back where it came from or as a copy; `edit_image` for agents | `shared/mediaedit.ts`, `web/src/features/mediaedit/*` (the tab host), `server/mediaedit/*`, Lightbox, Library and Files entry points |
+| **F2** | **The video editor**, in the same tabs: trim, split and cut, speed, crop to a shape, rotate, text and captions, adjust, fades, music, a frame as a picture, GIF; rendered by ffmpeg on the server (a portable ffmpeg from the picture tools when there is none); `edit_video` for agents | `VideoEditor.tsx`, `server/mediaedit/video*.ts`, `server/media/frames.ts` (finding ffmpeg) |
+| **E1–E3** (after C1/C2 are merged) | Slides features from PowerPoint, Google Slides, Canva and Keynote: **E1** design ideas, rewriting picked words, translating a deck, animating in one click, an accessibility check; **E2** AI narration and a narrated show, recording a video of the slideshow with camera and voice, a camera bubble, rehearsing with a coach, a phone as the remote; **E3** free photos (Openverse), pictures in shapes and frames, reusing slides of another deck, charts from a Library spreadsheet, my themes and logo, QR codes, trimming videos, an eyedropper | the slides editor, once C2's work is in |

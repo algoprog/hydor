@@ -153,7 +153,8 @@ test('the guide covers the app: every Settings section by its name', () => {
 });
 
 /** Routes agents are never to use, which the API topic leaves out (app_api refuses them too). */
-const UNDOCUMENTED = /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads|auth)\/|^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)$|^\/api\/(browser|computer)\/sessions\/|^\/api\/(push\/(subscribe|unsubscribe)|me\/timezone|find\/usage|tour|health)$|^\/api\/voice\/(transcribe|command|cancel)$/;
+const UNDOCUMENTED =
+  /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads|auth)\/|^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)$|^\/api\/(browser|computer)\/sessions\/|^\/api\/(push\/(subscribe|unsubscribe)|me\/timezone|find\/usage|tour|health)$|^\/api\/voice\/(transcribe|command|cancel)$|^\/api\/(images\/(make|edit|svg|cutout|erase)|plots\/make|videos\/make(\/:job)?)$/;
 
 test('the guide covers the app: every API route is in the API topic, or one agents never use', () => {
   const api = byId.get('api')!.body;
@@ -251,8 +252,16 @@ test('rules: reading is free; changes ask; risky ones every time; some are never
     ['PUT', '/api/budget/claude:x'],
     ['POST', '/api/accounts/claude/login'],
     ['POST', '/api/sites'],
+    // The editors' AI tools: agents have their own.
+    ['POST', '/api/images/make'],
+    ['POST', '/api/images/cutout'],
+    ['POST', '/api/plots/make'],
+    ['GET', '/api/videos/make/j1'],
   ])
     assert.equal(lv(m, p), 'refuse', `${m} ${p}`);
+  assert.equal(lv('GET', '/api/images/tiers'), 'free');
+  assert.equal(lv('POST', '/api/images/local/setup'), 'always');
+  assert.equal(lv('DELETE', '/api/images/local'), 'always');
   // Listing and revoking tokens is fine; deleting a key in the vault asks.
   assert.equal(lv('GET', '/api/mcp/tokens'), 'free');
   assert.equal(lv('DELETE', '/api/connections/secrets/BRAVE'), 'always');
@@ -430,6 +439,8 @@ test('app_api: never the user’s own things, nor raising a cap, nor changing pe
     ['POST', '/api/sessions/claude:own/config', { mode: 'bypassPermissions' }, /permissions are the user’s/],
     ['PATCH', '/api/sessions/claude:other/extra', { capUsd: 500 }, /Spending caps/],
     ['POST', '/api/sessions/claude:own/message', { text: 'hi' }, /That is this session/],
+    ['PUT', '/api/models', { openrouterKey: 'sk-or-v1-x' }, /never passes through an agent/],
+    ['POST', '/api/images/make', { prompt: 'a cat' }, /generate_image/],
     ['GET', 'https://evil.example/m/x/api/projects', {}, /path:/],
   ] as const) {
     const r = await appApi({ method, path: p, body }, ctx);

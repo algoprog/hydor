@@ -852,5 +852,31 @@ const deck = normalizeDeck({
   );
 }
 
+// ---- the web format's code, slide jumps, and decks opened from PowerPoint ------------------------------------------------
+{
+  const d = normalizeDeck({
+    slides: [
+      {
+        els: [
+          { id: 'k', type: 'code', lang: 'python', code: 'def f():\n    return 1  # one\nprint(f())', lineNumbers: true, highlight: '2', size: 20, look: 'light' },
+          { id: 'n', type: 'text', text: 'Next', link: '#next', x: 0, y: 600, w: 200, h: 60 },
+          { id: 'f', type: 'text', text: 'Start', link: '#first', x: 300, y: 600, w: 200, h: 60 },
+        ],
+      },
+      { els: [{ type: 'text', text: 'Back', link: '#prev' }, { type: 'text', text: 'End', link: '#last', y: 300 }] },
+    ],
+  });
+  const file = pptxFile(d, { title: 'T', picture: () => null, scales: new Map([['k', 0.8]]) });
+  const x1 = part(file, 'ppt/slides/slide1.xml');
+  const code = /<p:sp><p:nvSpPr><p:cNvPr id="\d+" name="Code[\s\S]*?<\/p:sp>/.exec(x1)?.[0] ?? '';
+  ok(code.includes('<a:bodyPr wrap="none"') && code.includes('<a:normAutofit fontScale="80000"/>') && code.includes('<a:srgbClr val="F6F8FA"></a:srgbClr>'), 'code: a box in its look’s colour, its lines never wrapped, as small as the slide made it');
+  ok((code.match(/<a:p>/g) ?? []).length === 3 && code.includes('<a:t>1  </a:t>') && code.includes('<a:t>def</a:t>') && /val="CF222E"/.test(code), 'a line a paragraph, numbered, its keywords in their colour');
+  ok(/i="1"[^>]*><a:solidFill><a:srgbClr val="6E7781"><\/a:srgbClr>[\s\S]*?<a:t># one<\/a:t>/.test(code) && /<a:t>print<\/a:t>/.test(code) && /<a:srgbClr val="[0-9A-F]{6}"><a:alpha val="36000"\/><\/a:srgbClr><\/a:solidFill><a:latin typeface="JetBrains Mono"/.test(code), 'its comment in italics, the lines not lit dimmed, in its monospaced font');
+  ok(x1.includes('action="ppaction://hlinkshowjump?jump=nextslide"') && x1.includes('jump=firstslide') && part(file, 'ppt/slides/slide2.xml').includes('jump=previousslide') && part(file, 'ppt/slides/slide2.xml').includes('jump=lastslide'), 'links to the next, first, previous and last slide are PowerPoint’s own jumps');
+  const back = normalizeDeck((await deckFromPptx(file)).model);
+  ok(back.format === 'pptx' && back.slides[0].els.some((e) => e.link === '#next') && back.slides[0].els.some((e) => e.link === '#first') && back.slides[1].els.some((e) => e.link === '#prev') && back.slides[1].els.some((e) => e.link === '#last'), 'a deck opened from PowerPoint is PowerPoint compatible, its jumps as they were');
+  ok(deckFaces(d).some((f) => f.family === 'JetBrains Mono' && !f.italic) && deckFaces(d).some((f) => f.family === 'JetBrains Mono' && f.italic), 'code’s font goes inside the file (its italics for comments)');
+}
+
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
