@@ -6,7 +6,7 @@
 // material, light and background, how it turns and where it is seen from. For every part of a web deck, what it does
 // when the pointer is on it.
 import { useState } from 'react';
-import { Check, ImagePlus, Play, Plus, Sparkles, Square, Upload, X } from 'lucide-react';
+import { Check, Circle, ImagePlus, Play, Plus, Sparkles, Square, Upload, X } from 'lucide-react';
 import {
   FONTS,
   HOVERS,
@@ -32,7 +32,7 @@ import { Button, cx, Switch } from '../../../components/ui';
 import { Choice, Select } from '../studio/fields';
 import { CodeField, fileFor } from './CodeField';
 import { ColorButton, Field, NumInput, Section, Tool } from './controls';
-import { embedAddress } from './ops';
+import { CODE_LANGS, embedAddress } from './ops';
 import { STARTERS } from './starters';
 
 type Set = (patch: Partial<El>, key?: string) => void;
@@ -54,28 +54,7 @@ const fontOptions = (theme: Theme) => [{ value: '', label: `Body (${theme.font})
 
 // ---- code -----------------------------------------------------------------------------------------------------
 
-const LANGS: { value: string; label: string }[] = [
-  { value: 'python', label: 'Python' },
-  { value: 'javascript', label: 'JavaScript' },
-  { value: 'typescript', label: 'TypeScript' },
-  { value: 'html', label: 'HTML' },
-  { value: 'css', label: 'CSS' },
-  { value: 'json', label: 'JSON' },
-  { value: 'bash', label: 'Shell (Bash)' },
-  { value: 'sql', label: 'SQL' },
-  { value: 'rust', label: 'Rust' },
-  { value: 'go', label: 'Go' },
-  { value: 'java', label: 'Java' },
-  { value: 'c', label: 'C' },
-  { value: 'cpp', label: 'C++' },
-  { value: 'csharp', label: 'C#' },
-  { value: 'php', label: 'PHP' },
-  { value: 'ruby', label: 'Ruby' },
-  { value: 'swift', label: 'Swift' },
-  { value: 'kotlin', label: 'Kotlin' },
-  { value: 'yaml', label: 'YAML' },
-  { value: '', label: 'Plain text' },
-];
+const LANGS: { value: string; label: string }[] = [...Object.entries(CODE_LANGS).map(([value, label]) => ({ value, label })), { value: '', label: 'Plain text' }];
 
 export function CodeLook({ el, set }: { el: CodeEl; set: Set }) {
   return (
@@ -258,7 +237,7 @@ export function QuizLook({ el, theme, set }: { el: QuizEl; theme: Theme; set: Se
             <div key={i} className={cx('space-y-1 rounded-lg border p-1.5', c.correct ? 'border-ok/50 bg-ok/5' : 'border-line')}>
               <div className="flex items-center gap-1">
                 <Tool label={c.correct ? 'A right answer: click to unmark it' : 'Mark it as right'} on={!!c.correct} onClick={() => mark(i)} className={cx('h-7 min-w-7', c.correct && 'bg-ok/15 text-ok hover:bg-ok/15 hover:text-ok')}>
-                  <Check size={14} strokeWidth={2.5} />
+                  {c.correct ? <Check size={14} strokeWidth={2.75} /> : <Circle size={14} />}
                 </Tool>
                 <input
                   value={c.text}
@@ -374,7 +353,7 @@ export function ScoreLook({ el, theme, set }: { el: ScoreEl; theme: Theme; set: 
 
 // ---- 3D -------------------------------------------------------------------------------------------------------------
 
-const SHAPE_3D: Record<Shape3d, string> = { cube: 'Cube', sphere: 'Ball', torus: 'Ring', knot: 'Knot', cone: 'Cone', cylinder: 'Cylinder', icosahedron: 'Twenty sides', text: 'Words' };
+const SHAPE_3D: Record<Shape3d, string> = { cube: 'Cube', sphere: 'Ball', torus: 'Ring', knot: 'Knot', cone: 'Cone', cylinder: 'Cylinder', icosahedron: 'Gem', text: 'Words' };
 const MATERIAL: Record<Material3d, string> = { matte: 'Matte', glossy: 'Glossy', metal: 'Metal', glass: 'Glass', wire: 'Wireframe', toon: 'Cartoon' };
 const LIGHT: Record<Light3d, string> = { studio: 'Studio lights', soft: 'Soft light', dramatic: 'Dramatic light', neon: 'Neon lights' };
 

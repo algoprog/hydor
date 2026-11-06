@@ -1150,7 +1150,7 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview, picking, onPic
                     change((d) => addAnim(d, index, { el: target.id, type, fx, on: 'click', dur: effectDur(fx), delay: 0, ...(ANIM_DIR.includes(fx) ? { dir: fx === 'float' ? 'up' : 'left' } : {}), ...(text && type === 'in' && fx !== 'typewriter' ? { byPara: true } : {}) }, id));
                     setOpen(id);
                   }}
-                  className="min-h-8 truncate rounded-lg border border-line px-1 text-[12px] text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-fg"
+                  className="min-h-8 rounded-lg border border-line px-1 py-1 text-[12px] leading-tight text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-fg"
                 >
                   {FX_NAMES[fx]}
                 </button>
@@ -1268,14 +1268,15 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview, picking, onPic
                     )}
                     {web && words && (
                       <Field label="Words">
-                        <Choice
-                          value={a.by ?? 'all'}
-                          onChange={(by) => set({ by: by === 'all' ? undefined : by, ...(by !== 'all' ? { byPara: undefined } : {}) })}
+                        <Select
+                          value={a.by ?? ''}
+                          onChange={(by) => set({ by: (by || undefined) as Anim['by'], ...(by ? { byPara: undefined } : {}) })}
                           options={[
-                            { value: 'all', label: 'All at once' },
+                            { value: '', label: 'All at once' },
                             { value: 'word', label: 'Word by word' },
                             { value: 'letter', label: 'Letter by letter' },
                           ]}
+                          title="How the words come"
                         />
                       </Field>
                     )}
@@ -1405,7 +1406,7 @@ function SlideTab({ deck, index, change, pickPicture, onFooter, pickVideo, fonts
                   className={cx('overflow-hidden rounded-md border text-left transition-colors', bg.fx === fx ? 'border-accent ring-2 ring-accent/30' : 'border-line hover:border-line-2')}
                 >
                   <BgFxThumb deck={deck} fx={fx} fonts={fonts} />
-                  <span className="block truncate px-1 py-0.5 text-[10.5px] text-fg-2">{fx ? BG_FX_NAMES[fx] : 'None'}</span>
+                  <span className="line-clamp-2 block min-h-[2.4em] px-1 py-0.5 text-[10.5px] leading-tight text-fg-2">{fx ? BG_FX_NAMES[fx] : 'None'}</span>
                 </button>
               ))}
             </div>
