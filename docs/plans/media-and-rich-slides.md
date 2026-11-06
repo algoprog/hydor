@@ -175,3 +175,12 @@ All types in `shared/slides.ts`: `DeckFormat`, `Deck.format`, `Deck.progress`, p
    B's dialogs into the slides editor once the lead says they are merged.
 3. Lead merges each branch as it is ready (`mr/int`), runs the tests and typecheck, then the guide, translations,
    vectors, release notes; one release.
+
+## More asks the same day, and their workstreams
+
+| | What | Owns |
+|---|---|---|
+| **D** | **Made by AI from a type**: a gallery of slide (45+), deck (25+), document (40+), document section (15+), page (35+), page block (15+) and spreadsheet (12+) types; pick one, say what it is about if you like, and an agent makes it from what is there (the deck so far, the document); **Turn into…** slides, a document or a page from the Library | `shared/content-types.ts`, `web/src/features/pages/types/*`, `AskPage.tsx`, `parts.tsx` (New page), `Library.tsx` (an item's menu); the editors' entry points after B and C2 are merged |
+| **F1** | **The image editor**, opened in a tab of its own inside the app from anywhere (a slide's, a document's or a page's picture, the Library, Files, any picture shown full size): crop, rotate, straighten, adjust, filters, markup, blur areas, the AI tools; saved back where it came from or as a copy; `edit_image` for agents | `shared/mediaedit.ts`, `web/src/features/mediaedit/*` (the tab host), `server/mediaedit/*`, Lightbox, Library and Files entry points |
+| **F2** | **The video editor**, in the same tabs: trim, split and cut, speed, crop to a shape, rotate, text and captions, adjust, fades, music, a frame as a picture, GIF; rendered by ffmpeg on the server (a portable ffmpeg from the picture tools when there is none); `edit_video` for agents | `VideoEditor.tsx`, `server/mediaedit/video*.ts`, `server/media/frames.ts` (finding ffmpeg) |
+| **E1–E3** (after C1/C2 are merged) | Slides features from PowerPoint, Google Slides, Canva and Keynote: **E1** design ideas, rewriting picked words, translating a deck, animating in one click, an accessibility check; **E2** AI narration and a narrated show, recording a video of the slideshow with camera and voice, a camera bubble, rehearsing with a coach, a phone as the remote; **E3** free photos (Openverse), pictures in shapes and frames, reusing slides of another deck, charts from a Library spreadsheet, my themes and logo, QR codes, trimming videos, an eyedropper | the slides editor, once C2's work is in |
