@@ -79,14 +79,23 @@ export function which(cmd: string): string | null {
   return null;
 }
 
+/** How a command ended: its exit code (137 when a signal ended it), its output (both streams), and whether `timeout` ended it. */
+export interface RunResult {
+  code: number;
+  out: string;
+  err: string;
+  timedOut?: boolean;
+}
+
 /** Runs a command to its end: its exit code and output (both streams), killed after `timeout`. */
-export function run(cmd: string, args: string[], o: { timeout?: number; cwd?: string; signal?: AbortSignal; env?: NodeJS.ProcessEnv; onLine?: (line: string) => void } = {}): Promise<{ code: number; out: string; err: string }> {
+export function run(cmd: string, args: string[], o: { timeout?: number; cwd?: string; signal?: AbortSignal; env?: NodeJS.ProcessEnv; onLine?: (line: string) => void } = {}): Promise<RunResult> {
   return new Promise((resolve, reject) => {
     if (o.signal?.aborted) return reject(new Error('Cancelled'));
     const p = spawn(cmd, args, { cwd: o.cwd, env: o.env ?? process.env, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
     let err = '';
     let rest = '';
+    let timedOut = false;
     const line = (s: string) => {
       if (!o.onLine) return;
       rest += s;
@@ -104,7 +113,12 @@ export function run(cmd: string, args: string[], o: { timeout?: number; cwd?: st
       if (err.length < 4 << 20) err += s;
       line(s);
     });
-    const timer = o.timeout ? setTimeout(() => p.kill('SIGKILL'), o.timeout) : null;
+    const timer = o.timeout
+      ? setTimeout(() => {
+          timedOut = true;
+          p.kill('SIGKILL');
+        }, o.timeout)
+      : null;
     const abort = () => p.kill('SIGKILL');
     o.signal?.addEventListener('abort', abort, { once: true });
     p.on('error', (e) => {
@@ -115,7 +129,7 @@ export function run(cmd: string, args: string[], o: { timeout?: number; cwd?: st
       if (timer) clearTimeout(timer);
       o.signal?.removeEventListener('abort', abort);
       if (o.signal?.aborted) return reject(new Error('Cancelled'));
-      resolve({ code: code ?? (sig ? 137 : 1), out, err });
+      resolve({ code: code ?? (sig ? 137 : 1), out, err, timedOut });
     });
   });
 }

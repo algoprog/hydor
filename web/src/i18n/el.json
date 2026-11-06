@@ -17724,5 +17724,22 @@
 "Loading the model":"Φόρτωση του μοντέλου",
 "Search by meaning is setting itself up on this computer: {0}. The passages get their vectors once it is ready.":"Η αναζήτηση βάσει νοήματος ρυθμίζεται σε αυτόν τον υπολογιστή: {0}. Τα αποσπάσματα παίρνουν τα διανύσματά τους μόλις είναι έτοιμη.",
 "Search by meaning is setting itself up on this computer:":"Η αναζήτηση βάσει νοήματος ρυθμίζεται σε αυτόν τον υπολογιστή:",
-". The passages get their vectors once it is ready.":". Τα αποσπάσματα παίρνουν τα διανύσματά τους μόλις είναι έτοιμη."
+". The passages get their vectors once it is ready.":". Τα αποσπάσματα παίρνουν τα διανύσματά τους μόλις είναι έτοιμη.",
+". Your voice stays here.":". Η φωνή σας μένει εδώ.",
+"(built here for {0})":"(φτιάχτηκε εδώ για {0})",
+"Building whisper.cpp for the NVIDIA GPU (CUDA)":"Δόμηση του whisper.cpp για την GPU της NVIDIA (CUDA)",
+"Building whisper.cpp for this Mac’s GPU (Metal)":"Δόμηση του whisper.cpp για την GPU αυτού του Mac (Metal)",
+"Building whisper.cpp here":"Δόμηση του whisper.cpp εδώ",
+"Dictation works on the processor meanwhile. The build takes 5 to 20 minutes, then dictation runs on the GPU.":"Στο μεταξύ η υπαγόρευση δουλεύει στον επεξεργαστή. Το build διαρκεί 5 έως 20 λεπτά· μετά η υπαγόρευση τρέχει στην GPU.",
+"Getting CMake to build whisper.cpp":"Λήψη του CMake για το build του whisper.cpp",
+"Getting whisper.cpp’s source":"Λήψη του πηγαίου κώδικα του whisper.cpp",
+"It runs on the GPU ({0}).":"Τρέχει στην GPU ({0}).",
+"It runs on the GPU: {0} ({1}).":"Τρέχει στην GPU: {0} ({1}).",
+"It runs on the processor for now: the GPU failed ({0}). The GPU is tried again in a few minutes.":"Προς το παρόν τρέχει στον επεξεργαστή: η GPU απέτυχε ({0}). Η GPU θα δοκιμαστεί ξανά σε λίγα λεπτά.",
+"It runs on the processor: whisper.cpp found no GPU it can use.":"Τρέχει στον επεξεργαστή: το whisper.cpp δεν βρήκε GPU που να μπορεί να χρησιμοποιήσει.",
+"It runs on this machine’s processor.":"Τρέχει στον επεξεργαστή αυτού του μηχανήματος.",
+"Preparing the build":"Προετοιμασία του build",
+"Ready: {0} with the {1} model{2}. Your voice stays here.{3}":"Έτοιμο: {0} με το μοντέλο {1}{2}. Η φωνή σας μένει εδώ.{3}",
+"This computer has an NVIDIA GPU, and whisper.cpp has no ready-made build for it on Linux. With NVIDIA’s CUDA toolkit installed (nvcc), the app builds one, and dictation runs on the GPU.":"Αυτός ο υπολογιστής έχει GPU της NVIDIA, και το whisper.cpp δεν έχει έτοιμο build για αυτήν σε Linux. Με εγκατεστημένο το CUDA toolkit της NVIDIA (nvcc), η εφαρμογή φτιάχνει ένα, και η υπαγόρευση τρέχει στην GPU.",
+"whisper.cpp could not be built for the NVIDIA GPU, so dictation runs on the processor: {0}":"Το whisper.cpp δεν μπόρεσε να γίνει build για την GPU της NVIDIA, οπότε η υπαγόρευση τρέχει στον επεξεργαστή: {0}"
 }
