@@ -57,7 +57,7 @@ export function PageNotes({ layout, zoom, doc, refs, textW, onOpen }: { layout: 
   if (!layout.notes.size) return null;
   const step = layout.pageH + GAP;
   return (
-    <div className="nd-ed nd-doc pointer-events-none absolute top-0 left-0" style={{ zoom, width: 0, minHeight: 0, padding: 0, background: 'none' }}>
+    <div className="nd-ed nd-doc pointer-events-none" style={{ position: 'absolute', top: 0, left: 0, zoom, width: 0, minHeight: 0, padding: 0, margin: 0, background: 'none' }}>
       {[...layout.notes].map(([p, n]) => (
         <div
           key={p}
