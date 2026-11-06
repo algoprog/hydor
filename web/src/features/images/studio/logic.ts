@@ -180,7 +180,7 @@ export const DEFAULT_COLORS = ['#1f3a5f', '#2a78d6', '#f2a541', '#f4f1ea'];
 // ---- shapes ------------------------------------------------------------------------------------------------------
 
 export const SHAPES: { value: string; label: string }[] = [
-  { value: '1:1', label: 'Square' },
+  { value: '1:1', label: 'Square (1:1)' },
   { value: '3:2', label: 'Landscape' },
   { value: '16:9', label: 'Wide' },
   { value: '2:3', label: 'Portrait' },
