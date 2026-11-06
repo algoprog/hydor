@@ -560,17 +560,20 @@ agents that speak ACP and take MCP servers.
   overlays, V1 clips with transitions, A1 their sound with its shape, A2 music, A3 voice; show, mute, solo, lock;
   Select, Blade, Trim and Hand tools, snapping, markers, right-click menus). Clips have their own part, speed (pitch
   kept or not), backwards, steadied, held frames, crop and turn, fitted or filling the output's shape (16:9, 9:16,
-  1:1, 4:5), a picture's slow zoom and pan, their own sound or another in its place, detached; fourteen transitions;
-  overlays placed, sized, see-through, keyed (green screen) and faded; words and captions made from what is said
-  (whisper.cpp here), in five styles, saved as .srt. Colour as Resolve's Color page: wheels (lift, gamma, gain,
-  offset), primaries, curves, twelve looks, vignette, sharpen, denoise, grain, before and after, and scopes (waveform,
-  vectorscope, histogram), the preview exactly as made (one 3D table for the browser and ffmpeg). Audio: a mixer
-  (levels, meters, pan, mute, solo) and quick fixes (clean up voices, even out the loudness, lower the music under
-  speech, fade the music). Export: ready-made settings (YouTube, Reels and TikTok, square and portrait posts), MP4,
-  MOV, WebM or GIF, H.264, H.265 or AV1, size, frames a second, quality, In to Out, with progress and time left. Made
-  with ffmpeg here (the picture tools bring one), on the graphics card when there is one that works (NVENC, VA-API,
-  Quick Sync, VideoToolbox, AMF, Media Foundation; Settings → Images, video and audio), the processor taking over at
-  once if it fails. Agents have edit_image and edit_video.
+  1:1, 4:5), a picture's slow zoom and pan, their own sound or another in its place, unlinked (J and L cuts) and
+  linked again; every sound (clips' own, music, voice-over) with its shape, trimmed, cut, silenced in parts, faded by
+  handles (crossfades where two overlap), a volume line to click and drag, its channels (left or right only, one side
+  on both, mono, swapped: a lapel microphone) and its own clean-up, evening out and normalizing, the sound editor for
+  the rest; fourteen transitions; overlays placed, sized, see-through, keyed (green screen) and faded; words and
+  captions made from what is said (whisper.cpp here), in five styles, saved as .srt. Colour as Resolve's Color page:
+  wheels (lift, gamma, gain, offset), primaries, curves, twelve looks, vignette, sharpen, denoise, grain, before and
+  after, and scopes (waveform, vectorscope, histogram), the preview exactly as made (one 3D table for the browser and
+  ffmpeg). Audio: a mixer (levels, meters, pan, mute, solo) and quick fixes (clean up voices, even out the loudness,
+  lower the music under speech, fade the music). Export: ready-made settings (YouTube, Reels and TikTok, square and
+  portrait posts), MP4, MOV, WebM or GIF, H.264, H.265 or AV1, size, frames a second, quality, In to Out, with
+  progress and time left. Made with ffmpeg here (the picture tools bring one), on the graphics card when there is one
+  that works (NVENC, VA-API, Quick Sync, VideoToolbox, AMF, Media Foundation; Settings → Images, video and audio), the
+  processor taking over at once if it fails. Agents have edit_image and edit_video.
 - **The sound editor**: sounds open in an editor of their own, in a tab like the others ("Sound · its name"), laid
   out as Audition or Audacity lay theirs: menus (File, Edit, Effects, Generate, View, with their shortcuts), a
   transport (play, stop, record, loop, the time, the part picked to type or drag, snapping, zoom, a meter of peaks

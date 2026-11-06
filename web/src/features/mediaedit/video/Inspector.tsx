@@ -5,7 +5,7 @@
 // when, a green screen keyed out, its fades. Words: what they say, how they look, where and when; captions all styled
 // at once and saved as .srt. A sound: its level, where it starts, its part, its fades. Nothing picked: the whole video.
 import type { ReactNode } from 'react';
-import { AudioWaveform, Captions, Download, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, Palette, Plus, RotateCcw, RotateCw, Snowflake, Trash2, Unlink } from 'lucide-react';
+import { AudioWaveform, Captions, Download, Link2, Wand2, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, Palette, Plus, RotateCcw, RotateCw, Snowflake, Trash2, Unlink } from 'lucide-react';
 import {
   audioLength,
   CAPTION_STYLES,
@@ -21,7 +21,9 @@ import {
   VIDEO_OUT_SHAPES,
   VIDEO_SHAPES,
   VIDEO_TRANSITIONS,
+  SOUND_CHANNELS,
   videoClock,
+  type SoundChannels,
   type VideoAudio,
   type VideoClip,
   type VideoFactsOf,
@@ -32,8 +34,10 @@ import {
   type VideoTurn,
 } from '@shared/mediaedit-video';
 import { Button, cx, inputCls } from '../../../components/ui';
+import { post } from '../../../lib/api';
+import { toastError } from '../../../lib/store';
 import type { Change } from './Timeline';
-import { canDetach, detachSound, freezeFrame, pickedThing, setAudio, setClip, setOverlay, setText, spansOf, type Picked, type PoolItem } from './model';
+import { canDetach, detachSound, freezeFrame, linkSound, pickedThing, setAudio, setClip, setOverlay, setText, spansOf, type Picked, type PoolItem } from './model';
 import { Choices, Fold, ScrubField, SliderField, Toggle } from './shell';
 import { soundEditor } from './soundHook';
 
@@ -77,7 +81,7 @@ const clock = (v: number) => videoClock(v);
 export function Inspector(p: InspectorProps) {
   const thing = pickedThing(p.recipe, p.picked);
   const body =
-    p.picked?.kind === 'clip' && thing ? (
+    (p.picked?.kind === 'clip' || p.picked?.kind === 'clipsound') && thing ? (
       <ClipProps {...p} c={thing as VideoClip} />
     ) : p.picked?.kind === 'transition' && thing ? (
       <TransitionProps {...p} c={thing as VideoClip} />
@@ -232,7 +236,14 @@ function ClipProps(p: InspectorProps & { c: VideoClip }) {
           {f?.audio || c.sound ? (
             <>
               <Toggle label="Without its sound" on={!!c.mute} onChange={(on) => set({ mute: on || undefined, volume: on ? undefined : c.volume, sound: on ? undefined : c.sound })} />
-              {!c.mute && <SliderField label="Volume" value={Math.round((c.volume ?? 1) * 100)} min={0} max={200} step={5} zero={100} show={(v) => `${v}%`} onChange={(v) => set({ volume: v === 100 ? undefined : v / 100 })} />}
+              {!c.mute && (
+                <SoundControls
+                  x={{ volume: c.volume, channels: c.channels, levels: c.levels, silence: c.silence, clean: c.clean, even: c.even, fadeIn: c.soundFadeIn, fadeOut: c.soundFadeOut }}
+                  length={spansOf(p.recipe, p.factsOf).spans[i]?.length ?? 1}
+                  measure={{ src: c.sound ?? c.src ?? p.main, from: a, to: b }}
+                  set={(m) => set({ ...m, ...('fadeIn' in m ? { soundFadeIn: m.fadeIn, fadeIn: undefined } : {}), ...('fadeOut' in m ? { soundFadeOut: m.fadeOut, fadeOut: undefined } : {}) } as Partial<VideoClip>)}
+                />
+              )}
             </>
           ) : (
             <Note>This clip has no sound of its own.</Note>
@@ -266,8 +277,8 @@ function ClipProps(p: InspectorProps & { c: VideoClip }) {
             >
               Edit the sound…
             </Button>
-            <Button size="sm" variant="ghost" icon={<Unlink size={13} />} disabled={!canDetach(c, f)} title="Puts its sound on the voice track (A3), to move and trim on its own" onClick={() => p.change((r) => detachSound(r, p.factsOf, id, p.main))}>
-              Detach the sound
+            <Button size="sm" variant="ghost" icon={<Unlink size={13} />} disabled={!canDetach(c, f)} title="Puts its sound on the voice track (A3), to move, trim and cut on its own (a J or an L cut)" onClick={() => p.change((r) => detachSound(r, p.factsOf, id, p.main))}>
+              Unlink the sound
             </Button>
           </div>
         </Fold>
@@ -485,18 +496,105 @@ function AudioProps(p: InspectorProps & { a: VideoAudio }) {
     <>
       <Fold id="sound" title={<span translate="no">{a.name ?? 'Sound'}</span>}>
         <Choices<string> value={a.track} onChange={(v) => set({ track: v === 'voice' ? 'voice' : 'music' })} options={[{ value: 'music', label: 'Music (A2)' }, { value: 'voice', label: 'Voice-over (A3)' }]} />
-        <SliderField label="Volume" value={Math.round((a.volume ?? 1) * 100)} min={0} max={200} step={5} zero={100} show={(v) => `${v}%`} onChange={(v) => set({ volume: v === 100 ? undefined : v / 100 })} />
+
         <ScrubField label="Starts at" value={a.start} min={0} step={0.1} show={clock} read={readSecs} onChange={(v) => set({ start: Math.round(v * 1000) / 1000 })} />
         <Row>
           <ScrubField label="In" value={x} min={0} max={y - 0.1} step={0.1} show={clock} read={readSecs} onChange={(v) => set({ trim: [Math.round(v * 1000) / 1000, y] })} />
           <ScrubField label="Out" value={y} min={x + 0.1} max={d} step={0.1} show={clock} read={readSecs} onChange={(v) => set({ trim: [x, Math.round(v * 1000) / 1000] })} />
         </Row>
-        <SliderField label="Fade in" value={a.fadeIn ?? 0} min={0} max={Math.max(0.1, Math.floor((len / 2) * 10) / 10)} step={0.1} show={secs} onChange={(v) => set({ fadeIn: v || undefined })} />
-        <SliderField label="Fade out" value={a.fadeOut ?? 0} min={0} max={Math.max(0.1, Math.floor((len / 2) * 10) / 10)} step={0.1} show={secs} onChange={(v) => set({ fadeOut: v || undefined })} />
-        <Button size="sm" variant="secondary" icon={<AudioWaveform size={13} />} disabled={!editSound} title={editSound ? 'Opens it in the sound editor; what you save there plays in its place' : 'The sound editor opens here'} onClick={() => p.onEditSound({ src: a.src, title: a.name ?? 'Sound', from: x, to: y, save: (src) => set({ src }) })} className="w-full">
-          Edit the sound…
-        </Button>
+        <SoundControls x={a} length={len} measure={{ src: a.src, from: x, to: y }} set={(m) => set(m)} />
+        <div className="flex flex-wrap gap-1.5">
+          <Button size="sm" variant="secondary" icon={<AudioWaveform size={13} />} disabled={!editSound} title={editSound ? 'Opens it in the sound editor (effects, a spectral view, cuts by the words); what you save there plays in its place' : 'The sound editor opens here'} onClick={() => p.onEditSound({ src: a.src, title: a.name ?? 'Sound', from: x, to: y, save: (src) => set({ src }) })}>
+            Edit the sound…
+          </Button>
+          {a.clip && p.recipe.clips?.some((c) => c.id === a.clip) && (
+            <Button size="sm" variant="ghost" icon={<Link2 size={13} />} title="Puts it back as its clip’s own sound, in time with the picture" onClick={() => p.change((r) => linkSound(r, a.id!))}>
+              Link it to its clip again
+            </Button>
+          )}
+        </div>
       </Fold>
+    </>
+  );
+}
+
+// ---- a sound's channels, level, fades, volume line, silenced parts and fixes ---------------------------------------------
+
+type SoundBits = { volume?: number; channels?: SoundChannels; levels?: [number, number][]; silence?: [number, number][]; clean?: number; even?: boolean; fadeIn?: number; fadeOut?: number };
+
+const dbOf = (g?: number) => (g === undefined ? 0 : g <= 0.001 ? -60 : 20 * Math.log10(g));
+
+function SoundControls({ x, length, measure, set }: { x: SoundBits; length: number; measure: { src: string; from?: number; to?: number }; set: (m: Partial<SoundBits>) => void }) {
+  const most = Math.max(0.1, Math.floor((length / 2) * 10) / 10);
+  const normalize = async () => {
+    try {
+      const { peak } = await post<{ peak: number }>('/api/mediaedit/video/peak', measure);
+      if (peak <= -99) return;
+      const g = Math.min(4, Math.pow(10, (-1 - peak) / 20));
+      set({ volume: Math.abs(g - 1) < 0.005 ? undefined : Math.round(g * 1000) / 1000 });
+    } catch (e) {
+      toastError(e);
+    }
+  };
+  return (
+    <>
+      <label className="block space-y-1 text-[12px] text-fg-2">
+        <span>Channels</span>
+        <select value={x.channels ?? 'stereo'} onChange={(e) => set({ channels: e.target.value === 'stereo' ? undefined : (e.target.value as SoundChannels) })} className={cx(inputCls, 'h-7 px-1.5 text-[12px]')} aria-label="Channels">
+          {SOUND_CHANNELS.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <ScrubField
+        label="Volume"
+        value={Math.round(dbOf(x.volume) * 10) / 10}
+        min={-60}
+        max={12}
+        step={0.5}
+        zero={0}
+        show={(v) => (v <= -59.9 ? '−∞ dB' : `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`)}
+        read={(s2) => {
+          const v = Number(s2.replace(/dB/i, '').replace('−', '-').replace(',', '.').trim());
+          return Number.isFinite(v) ? v : null;
+        }}
+        onChange={(v) => set({ volume: Math.abs(v) < 0.05 ? undefined : v <= -59.9 ? 0 : Math.round(Math.pow(10, v / 20) * 1000) / 1000 })}
+      />
+      <SliderField label="Fade in" value={Math.min(most, x.fadeIn ?? 0)} min={0} max={most} step={0.1} show={secs} onChange={(v) => set({ fadeIn: v || undefined })} />
+      <SliderField label="Fade out" value={Math.min(most, x.fadeOut ?? 0)} min={0} max={most} step={0.1} show={secs} onChange={(v) => set({ fadeOut: v || undefined })} />
+      {x.levels?.length ? (
+        <div className="flex items-center gap-2 text-[12px] text-fg-2">
+          <span className="min-w-0 flex-1">{`Volume line: ${x.levels.length} point${x.levels.length === 1 ? '' : 's'}`}</span>
+          <Button size="sm" variant="ghost" onClick={() => set({ levels: undefined })}>
+            Flatten it
+          </Button>
+        </div>
+      ) : (
+        <Note>Click the line on it in the timeline to add a point; drag a part of it up or down.</Note>
+      )}
+      {x.silence?.length ? (
+        <div className="space-y-1">
+          <div className="text-[12px] text-fg-2">Silenced</div>
+          {x.silence.map(([a, b], i) => (
+            <div key={i} className="flex items-center gap-2 rounded-md bg-bg-2 py-0.5 pr-0.5 pl-2 text-[12px]">
+              <span className="tnum min-w-0 flex-1 text-fg-2">{`${videoClock(a)} to ${videoClock(b)}`}</span>
+              <Button size="sm" variant="ghost" onClick={() => set({ silence: x.silence!.filter((_, j) => j !== i) })}>
+                Hear it again
+              </Button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div className="space-y-1 border-t border-line pt-2">
+        <Toggle label="Clean up the voice" on={!!x.clean} onChange={(on) => set({ clean: on ? 0.5 : undefined })} title="Takes out background noise and rumble; heard in the saved video" />
+        {x.clean !== undefined && <SliderField label="How much" value={Math.round(x.clean * 100)} min={5} max={100} zero={50} show={(v) => `${v}%`} onChange={(v) => set({ clean: v / 100 })} />}
+        <Toggle label="Even out the loudness" on={!!x.even} onChange={(on) => set({ even: on || undefined })} title="Quiet and loud parts brought nearer (-16 LUFS); heard in the saved video" />
+        <Button size="sm" variant="secondary" icon={<Wand2 size={13} />} className="w-full" onClick={() => void normalize()} title="Its level set so its loudest moment is at -1 dB">
+          Normalize
+        </Button>
+      </div>
     </>
   );
 }
