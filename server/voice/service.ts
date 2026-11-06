@@ -9,9 +9,9 @@ import path from 'node:path';
 import type { VoiceEngine, VoicePatch, VoiceProgress, VoiceState, WhisperSize } from '../../shared/voice.ts';
 import { WHISPER_MODELS, whisperLang } from '../../shared/voice.ts';
 import { HttpError } from '../auth.ts';
-import { ffmpegPath, readable, sniff, toWav, viaEndpoint } from './audio.ts';
+import { ffmpegPath, readable, sniff, toWav, viaEndpoint, viaEndpointTimed } from './audio.ts';
 import { dirSize, fetchFile, freeBytes } from './fetch.ts';
-import { findProgram, installProgram, layout, localModels, modelFile, programBytes, SOURCES, transcribe, VAD_FILE, type Program, type Sources } from './whisper.ts';
+import { findProgram, installProgram, layout, localModels, modelFile, programBytes, SOURCES, transcribe, transcribeTimed, VAD_FILE, type Program, type Sources, type Spoken } from './whisper.ts';
 
 interface Config {
   engine: VoiceEngine;
@@ -313,6 +313,23 @@ export class VoiceService {
       fs.rmSync(raw, { force: true });
       fs.rmSync(wav, { force: true });
     }
+  }
+
+  /**
+   * The speech in a 16 kHz WAV file with its times, from the engine that is on (the video editor's captions). `lang` is
+   * whisper's code or the browser's ("de-DE"), or '' to tell by ear.
+   */
+  async transcribeTimed(file: string, lang: string): Promise<Spoken[]> {
+    const c = this.cfg;
+    const code = whisperLang(lang) || 'auto';
+    if (c.engine === 'endpoint' && c.endpoint) {
+      const audio = fs.readFileSync(file);
+      if (audio.length > MAX_AUDIO) throw new HttpError(413, 'The sound is too long for the transcription service in one go (about 13 minutes at most): use whisper.cpp on this computer (Settings → Voice), or make captions for a shorter part');
+      return viaEndpointTimed(c.endpoint, audio, code);
+    }
+    if (c.engine !== 'local') throw new HttpError(409, 'Captions need speech recognition on this computer: turn it on in Settings → Voice → Speech recognition on the server (whisper.cpp, downloaded once).');
+    if (!this.prog || !this.complete()) throw new HttpError(409, this.job ? 'whisper.cpp is still downloading: try again in a moment.' : 'whisper.cpp is not ready: see Settings → Voice.');
+    return transcribeTimed(this.prog, { model: this.modelPath(), vad: this.vadPath(), file, lang: c.english ? 'en' : code, timeout: 30 * 60_000 });
   }
 
   /** A second of silence through the engine that is on: whether it answers, and how fast. */

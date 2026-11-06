@@ -67,3 +67,29 @@ export async function viaEndpoint(e: { url: string; model: string; apiKey?: stri
   // Servers built on whisper mark silence as it does ("[BLANK_AUDIO]").
   return clean(String(d ? (d.text ?? '') : body));
 }
+
+/** The speech in a recording with its times, from an OpenAI-compatible endpoint (verbose_json gives its segments). */
+export async function viaEndpointTimed(e: { url: string; model: string; apiKey?: string }, audio: Buffer, lang: string): Promise<{ from: number; to: number; text: string }[]> {
+  const kind = sniff(audio);
+  const fd = new FormData();
+  fd.append('file', new Blob([new Uint8Array(audio)], { type: MIME[kind] }), `speech.${EXT[kind]}`);
+  fd.append('model', e.model || 'whisper-1');
+  if (lang && lang !== 'auto') fd.append('language', lang);
+  fd.append('response_format', 'verbose_json');
+  fd.append('timestamp_granularities[]', 'segment');
+  let r: Response;
+  try {
+    r = await fetch(`${endpointBase(e.url)}/audio/transcriptions`, { method: 'POST', headers: e.apiKey ? { authorization: `Bearer ${e.apiKey}` } : {}, body: fd, signal: AbortSignal.timeout(600_000) });
+  } catch (err) {
+    throw new HttpError(502, `Could not reach the transcription service at ${endpointBase(e.url)}: ${(err as Error).message}`);
+  }
+  const body = await r.text();
+  let d: any = null;
+  try {
+    d = JSON.parse(body);
+  } catch {}
+  if (!r.ok) throw new HttpError(502, `The transcription service answered ${r.status}${d?.error?.message ? `: ${String(d.error.message).trim()}` : ''}`);
+  const segs: any[] = Array.isArray(d?.segments) ? d.segments : [];
+  if (!segs.length && typeof d?.text === 'string' && d.text.trim()) throw new HttpError(502, 'The transcription service gave the words without their times, so they cannot be captions: use whisper.cpp on this computer (Settings → Voice)');
+  return segs.map((s) => ({ from: Number(s.start) || 0, to: Number(s.end) || 0, text: clean(String(s.text ?? '')) })).filter((s) => s.text && s.to > s.from);
+}

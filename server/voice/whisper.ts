@@ -259,3 +259,40 @@ export function clean(out: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/** A stretch of speech with its times, in seconds: what captions are made of. */
+export interface Spoken {
+  from: number;
+  to: number;
+  text: string;
+}
+
+/** whisper-cli's lines with times ("[00:00:01.200 --> 00:00:03.900]  Hello there."), as stretches of speech. */
+export function readTimed(out: string): Spoken[] {
+  const at = (h: string, m: string, s: string) => Number(h) * 3600 + Number(m) * 60 + Number(s);
+  const said: Spoken[] = [];
+  for (const line of out.split('\n')) {
+    const m = /^\s*\[(\d+):(\d{2}):(\d{2}(?:\.\d+)?)\s*-->\s*(\d+):(\d{2}):(\d{2}(?:\.\d+)?)\]\s*(.*)$/.exec(line);
+    if (!m) continue;
+    const text = clean(m[7]);
+    if (text) said.push({ from: at(m[1], m[2], m[3]), to: at(m[4], m[5], m[6]), text });
+  }
+  return said;
+}
+
+/**
+ * The speech in a WAV, MP3 or FLAC file with its times, in short stretches (about `maxLen` characters, split between
+ * words), for captions. In line with the other transcriptions.
+ */
+export function transcribeTimed(p: Program, o: { model: string; vad?: string; file: string; lang: string; timeout: number; maxLen?: number }): Promise<Spoken[]> {
+  const job = queue.then(async () => {
+    const args = ['-m', o.model, '-f', o.file, '-l', o.lang || 'auto', '-t', String(threads()), '-np', '-ml', String(o.maxLen ?? 42), '-sow'];
+    if (p.sns) args.push('-sns');
+    if (p.vad && o.vad && fs.existsSync(o.vad)) args.push('--vad', '-vm', o.vad);
+    const r = await run(p.path, args, { timeout: o.timeout });
+    if (r.code !== 0) throw new Error(`whisper.cpp could not read the sound: ${tail(r.err || r.out) || `exit ${r.code}`}`);
+    return readTimed(r.out);
+  });
+  queue = job.catch(() => {});
+  return job;
+}
