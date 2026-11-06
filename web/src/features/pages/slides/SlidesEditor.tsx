@@ -117,6 +117,7 @@ import {
 import type { AskScope, ModelDoc, ModelEditorProps } from '../kinds';
 import { tr } from '../../../i18n/runtime';
 import { Presenter, Slideshow } from './Present';
+import { presentMoreMenu, PresentMoreItems, ShowAs, type ShowHow } from './PresentMore';
 import { choosePicture as chooseFile, uploadPicture as upload } from '../pictures';
 import { useDeckFonts } from './rt';
 import { SlideCanvas, type CanvasHandle, type CellSel, type CommentPin, type FindMark, type GridOpts } from './SlideCanvas';
@@ -239,6 +240,8 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['P', 'Pen'],
       ['E', 'Erase the drawings'],
       ['C', 'Live captions'],
+      ['V', 'Your camera'],
+      ['K', 'Pause or play the narration'],
       ['Esc', 'End the slideshow'],
     ],
   },
@@ -288,7 +291,7 @@ export function SlidesEditor({
   const [scope, setScope] = useState<string[]>([]);
   const [tab, setTab] = useState<InspectorTab>('format');
   const [view, setView] = useState<'edit' | 'grid'>('edit');
-  const [present, setPresent] = useState<{ from: number; presenter: boolean } | null>(startPresent ? { from: 0, presenter: false } : null);
+  const [present, setPresent] = useState<{ from: number; presenter: boolean; how?: ShowHow } | null>(startPresent ? { from: 0, presenter: false } : null);
   const [menu, setMenu] = useState<'slide' | 'shape' | 'line' | 'picture' | 'present' | 'context' | null>(null);
   const [ctxAt, setCtxAt] = useState<{ x: number; y: number } | null>(null);
   /** The right-click menu shows a picture's AI tools in its place (Change it with AI ›). */
@@ -1392,6 +1395,7 @@ export function SlidesEditor({
             await exportFile(pageId, 'png', { slide: index + 1 });
           })().catch(toastError),
     present: (from) => setPresent({ from: from === 'start' ? 0 : index, presenter: from === 'presenter' }),
+    presentMore: presentMoreMenu(deck, (how) => setPresent({ from: 0, presenter: false, how })),
     shortcuts: () => setKeysOpen(true),
     ask: onAsk ? () => onAsk(`On slide ${index + 1}${slideTitle(slide) ? ` (“${slideTitle(slide)}”)` : ''}: `) : undefined,
     designIdeas: readOnlyProp ? undefined : () => openSide('ideas'),
@@ -1867,6 +1871,7 @@ export function SlidesEditor({
         <MenuItem icon={<MonitorPlay size={14} />} onClick={() => (setMenu(null), setPresent({ from: index, presenter: true }))}>
           Presenter view, with notes
         </MenuItem>
+        <PresentMoreItems deck={deck} onPick={(how) => (setMenu(null), setPresent({ from: 0, presenter: false, how }))} />
       </Popover>
       <div ref={ctxRef} className="pointer-events-none fixed h-px w-px" style={{ left: ctxAt?.x ?? -10, top: ctxAt?.y ?? -10 }} />
       <Popover anchor={ctxRef} open={menu === 'context'} onClose={() => (setMenu(null), setCtxAi(false))} width={230}>
@@ -2088,8 +2093,9 @@ export function SlidesEditor({
       <FooterDialog open={footerOpen} onClose={() => setFooterOpen(false)} deck={deck} index={index} change={change} />
       <TranslateDialog open={langAsk} onClose={() => setLangAsk(false)} />
       <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={SHORTCUTS} />
-      {present && !present.presenter && <Slideshow deck={deck} from={present.from} onClose={() => setPresent(null)} />}
-      {present?.presenter && <Presenter deck={deck} from={present.from} pageId={pageId} onClose={() => setPresent(null)} />}
+      {present && !present.presenter && !present.how && <Slideshow deck={deck} from={present.from} pageId={pageId} title={doc?.title} onClose={() => setPresent(null)} />}
+      {present?.how && <ShowAs how={present.how} deck={deck} from={present.from} pageId={pageId} title={doc?.title} change={change} onClose={() => setPresent(null)} />}
+      {present?.presenter && <Presenter deck={deck} from={present.from} pageId={pageId} title={doc?.title} onClose={() => setPresent(null)} />}
       {confirmNode}
     </div>
   );

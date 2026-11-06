@@ -3,17 +3,21 @@
 // laser pointer, P a pen, E erases its lines, C live captions; Escape ends it). The presenter's view: the slide, the
 // next one, the speaker notes and a timer, with a second window for the audience (on another screen or a projector)
 // that follows it, and that it follows in turn; the presenter's laser, pen and captions show in it too. Live parts
-// (custom code, web pages, 3D) run in each, in frames of their own; quizzes are answered there.
-import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+// (custom code, web pages, 3D) run in each, in frames of their own; quizzes are answered there. In each, your camera in
+// a bubble (V) and your phone as the remote (ShowTools.tsx); the slideshow narrated (each slide's narration plays, and
+// it goes on when it ends; K pauses it), and the slideshow a coach (Coach.tsx) or a recording (Record.tsx) follows.
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Minus, MonitorUp, Pause, Play, Plus, RotateCcw, X } from 'lucide-react';
 import type { Deck } from '@shared/slides';
 import { api, enc } from '../../../lib/api';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../../components/ui';
-import type { Marks, Show } from '@shared/slides-runtime';
+import type { Marks, Show, ShowExtra } from '@shared/slides-runtime';
+import { mu } from '../../../lib/machine';
 import { OfflineFrames } from '../frame';
 import { liveOpts, PICS, RT, useDeckFonts } from './rt';
+import { useShowTools } from './ShowTools';
 import { SlideThumb } from './Thumb';
 
 /** The slideshow's controls in the user's language. */
@@ -30,37 +34,129 @@ const words = () => ({
   captions: tr('Live captions (C)'),
   noCaptions: tr('Live captions need a browser that turns speech into words, such as Chrome.'),
   listening: tr('Listening…'),
+  voiceClick: tr('Click to hear the narration.'),
 });
 
+/** Where the slideshow fetches a slide's narration. */
+const sound = (sha: string) => mu(`/api/slides/sounds/${sha}`);
+
 /** The slideshow over everything, from slide `from`. */
-export function Slideshow({ deck, from, onClose }: { deck: Deck; from: number; onClose: () => void }) {
+export function Slideshow({
+  deck,
+  from,
+  onClose,
+  pageId,
+  title,
+  narrate,
+  camera,
+  onShow,
+  onMove,
+  over,
+  controls,
+  stage,
+}: {
+  deck: Deck;
+  from: number;
+  onClose: () => void;
+  /** The deck's page and its title, for the phone remote. */
+  pageId?: string;
+  title?: string;
+  /** Narrated: each slide's narration plays, its build spread over it, and the slideshow goes on when it ends. */
+  narrate?: boolean;
+  /** The camera's bubble shows from the start. */
+  camera?: boolean;
+  /** The slideshow once made, and null as it goes (a coach or a recording follows it). */
+  onShow?: (s: Show | null) => void;
+  onMove?: (i: number, step: number) => void;
+  /** Over the slides, in what goes full screen (and into a recording of them). */
+  over?: ReactNode;
+  /** Over everything, but kept out of a recording of the slides where the browser can (a recording's own controls). */
+  controls?: ReactNode;
+  /** The slides and what is over them: what a recording takes. */
+  stage?: RefObject<HTMLDivElement | null>;
+}) {
+  const wrap = useRef<HTMLDivElement>(null);
+  const own = useRef<HTMLDivElement>(null);
+  const box = stage ?? own;
   const host = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
+  const moved = useRef(onMove);
+  moved.current = onMove;
+  const shown = useRef(onShow);
+  shown.current = onShow;
   // Beside a confidential session, its live parts load nothing from anywhere.
   const offline = useContext(OfflineFrames);
   useDeckFonts(deck);
+  const tools = useShowTools({ deck, pageId, title, camera });
+  const [paused, setPaused] = useState(false);
+  const pause = useRef<() => void>(() => {});
   useEffect(() => {
     const el = host.current;
     if (!el) return;
-    const show = RT.show(el, deck, { mode: 'full', at: from, keys: true, onExit: () => close.current(), words: words(), ...PICS, ...liveOpts(offline) });
-    void el.requestFullscreen?.().catch(() => {});
+    // The narration's pause (K), beside the camera and the remote.
+    const voice: ShowExtra[] = narrate ? [{ id: 'voice', icon: 'voice', label: tr('Pause the narration (K)'), key: 'k', run: () => pause.current() }] : [];
+    const show = RT.show(el, deck, {
+      mode: 'full',
+      at: from,
+      keys: true,
+      onExit: () => close.current(),
+      onMove: (i, step) => {
+        tools.moved();
+        moved.current?.(i, step);
+      },
+      onBlank: tools.blanked,
+      extras: [...tools.extras, ...voice],
+      ...(narrate ? { narrate: { sound, onVoice: (v: { paused: boolean } | null) => setPaused(!!v?.paused) } } : {}),
+      words: words(),
+      ...PICS,
+      ...liveOpts(offline),
+    });
+    let off = false;
+    pause.current = () => {
+      off = !off;
+      show.pauseVoice(off);
+      show.extra('voice', off);
+    };
+    tools.attach(show);
+    shown.current?.(show);
+    void wrap.current?.requestFullscreen?.().catch(() => {});
     // Leaving full screen (Escape, the browser's own) ends it too.
     const onFs = () => !document.fullscreenElement && close.current();
     const t = window.setTimeout(() => document.addEventListener('fullscreenchange', onFs), 400);
     return () => {
       window.clearTimeout(t);
       document.removeEventListener('fullscreenchange', onFs);
+      tools.attach(null);
+      shown.current?.(null);
       show.destroy();
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     };
     // The deck as it was when the slideshow started.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return createPortal(<div ref={host} className="fixed inset-0 z-[90] bg-black" />, document.body);
+  return createPortal(
+    <div ref={wrap} className="fixed inset-0 z-[90] bg-black">
+      <div ref={box} className="absolute inset-0 isolate overflow-hidden bg-black">
+        <div ref={host} className="absolute inset-0" />
+        {tools.overlays}
+        {narrate && paused && <div className="pointer-events-none absolute top-4 left-4 z-[5] rounded-full bg-black/70 px-3 py-1 text-[12.5px] text-white/85">{tr('The narration is paused: K plays it again')}</div>}
+        {over}
+      </div>
+      {controls}
+    </div>,
+    document.body,
+  );
 }
 
-type Msg = { t: 'hello' } | { t: 'deck'; deck: Deck; i: number; step: number } | { t: 'go'; i: number; step: number } | { t: 'moved'; i: number; step: number } | { t: 'marks'; m: Marks } | { t: 'bye' };
+type Msg =
+  | { t: 'hello' }
+  | { t: 'deck'; deck: Deck; i: number; step: number }
+  | { t: 'go'; i: number; step: number }
+  | { t: 'moved'; i: number; step: number }
+  | { t: 'marks'; m: Marks }
+  | { t: 'blank'; c: 'black' | 'white' | null }
+  | { t: 'bye' };
 
 const channelOf = (id: string) => `naget-show:${id}`;
 
@@ -73,7 +169,7 @@ function clock(ms: number) {
 }
 
 /** The presenter's view, over everything: the slide, the next, the notes, a timer, and the audience's window. */
-export function Presenter({ deck, from, pageId, onClose }: { deck: Deck; from: number; pageId: string; onClose: () => void }) {
+export function Presenter({ deck, from, pageId, title, onClose }: { deck: Deck; from: number; pageId: string; title?: string; onClose: () => void }) {
   const fonts = useDeckFonts(deck);
   const host = useRef<HTMLDivElement>(null);
   const show = useRef<Show | null>(null);
@@ -98,6 +194,7 @@ export function Presenter({ deck, from, pageId, onClose }: { deck: Deck; from: n
   close.current = onClose;
   const offline = useContext(OfflineFrames);
   const visible = deck.slides.map((s, i) => ({ s, i })).filter((x) => !x.s.hidden);
+  const tools = useShowTools({ deck, pageId, title });
 
   useEffect(() => {
     const t = window.setInterval(() => tick((x) => x + 1), 1000);
@@ -117,14 +214,21 @@ export function Presenter({ deck, from, pageId, onClose }: { deck: Deck; from: n
         const now = { i, step, steps: show.current?.at().steps ?? 0 };
         setAt(now);
         bc.postMessage({ t: 'go', i, step } satisfies Msg);
+        tools.moved();
       },
-      // The laser, the pen's lines and the captions show in the audience's window too.
+      // The laser, the pen's lines and the captions show in the audience's window too; so does a black or white screen.
       onMarks: (m) => bc.postMessage({ t: 'marks', m } satisfies Msg),
+      onBlank: (c) => {
+        bc.postMessage({ t: 'blank', c } satisfies Msg);
+        tools.blanked(c);
+      },
+      extras: tools.extras,
       words: words(),
       ...PICS,
       ...liveOpts(offline),
     });
     show.current = s;
+    tools.attach(s);
     setAt(s.at());
     bc.onmessage = (e: MessageEvent<Msg>) => {
       const m = e.data;
@@ -138,6 +242,7 @@ export function Presenter({ deck, from, pageId, onClose }: { deck: Deck; from: n
     };
     return () => {
       bc.postMessage({ t: 'bye' } satisfies Msg);
+      tools.attach(null);
       s.destroy();
       bc.close();
       show.current = null;
@@ -193,7 +298,10 @@ export function Presenter({ deck, from, pageId, onClose }: { deck: Deck; from: n
         </button>
       </div>
       <div className="flex min-h-0 flex-1 gap-3 p-3 max-md:flex-col">
-        <div ref={host} className="relative min-h-0 flex-[1.6] overflow-hidden rounded-xl bg-black" />
+        <div className="relative isolate min-h-0 flex-[1.6] overflow-hidden rounded-xl bg-black">
+          <div ref={host} className="absolute inset-0" />
+          {tools.overlays}
+        </div>
         <div className="flex min-h-0 flex-1 flex-col gap-3">
           <div ref={nextBox} className="shrink-0">
             <div className="mb-1 text-[12px] font-medium tracking-wide text-white/50 uppercase">{next ? 'Next' : at.step < at.steps ? 'Next: more on this slide' : 'Next'}</div>
@@ -247,6 +355,8 @@ export function AudienceView({ id }: { id: string }) {
   const katex = useDeckFonts(deck) >= 0 && !!PICS.katex;
   const pos = useRef(start);
   pos.current = pos.current.i || pos.current.step ? pos.current : start;
+  // Its own camera (the presenter's view has the remote).
+  const tools = useShowTools({ deck });
   useEffect(() => {
     let alive = true;
     bc.onmessage = (e: MessageEvent<Msg>) => {
@@ -284,10 +394,12 @@ export function AudienceView({ id }: { id: string }) {
         pos.current = { i, step };
         if (!echo) bc.postMessage({ t: 'moved', i, step } satisfies Msg);
       },
+      extras: tools.extras,
       words: words(),
       ...PICS,
       ...liveOpts(false),
     });
+    tools.attach(s);
     const prev = bc.onmessage;
     bc.onmessage = (e: MessageEvent<Msg>) => {
       prev?.call(bc, e);
@@ -299,9 +411,11 @@ export function AudienceView({ id }: { id: string }) {
         s.go(m.i, m.step);
         echo = false;
       } else if (m.t === 'marks') s.marks(m.m);
+      else if (m.t === 'blank') s.blank(m.c);
     };
     return () => {
       bc.onmessage = prev;
+      tools.attach(null);
       s.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -309,6 +423,7 @@ export function AudienceView({ id }: { id: string }) {
   return createPortal(
     <div className="fixed inset-0 z-[90] bg-black" onDoubleClick={() => void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.())}>
       <div ref={host} className="absolute inset-0" />
+      {tools.overlays}
       {!deck && <div className="absolute inset-0 grid place-items-center text-[14px] text-white/60">{tr('Waiting for the slides…')}</div>}
       {ended && <div className="absolute top-3 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 text-[12.5px] text-white/70">{tr('The presenter’s view was closed')}</div>}
     </div>,
