@@ -51,6 +51,9 @@ import { clearChanges, commentsAfterSort, fillChanges, guessSeparator, hasHeader
 import { sheetNamed } from '../../shared/sheet-edits.ts';
 import { AI_BATCH } from '../../shared/sheet-ai.ts';
 import { aiCells } from '../write/sheets.ts';
+import { quoteSheet } from '../../shared/sheets.ts';
+import { pivotSheet } from '../../shared/sheet-pivot.ts';
+import { goalSeek } from '../../shared/sheet-whatif.ts';
 import { cleanTexName, TEX_MAIN, type TexDoc } from '../../shared/latex.ts';
 import { texMoveFiles } from '../../shared/latex-files.ts';
 
@@ -791,6 +794,42 @@ const askAi: Act<Workbook> = async (book, a, x) => {
   return { model: { ...book, ai }, said: `asked the helper model for ${plural(got, 'AI cell')}${failed ? ` (${failed} got no answer)` : ''}${want.size > list.length ? `; ${want.size - list.length} more still wait: run it again` : ''}: their answers are kept with the sheet.` };
 };
 
+/** Data → Pivot table (shared/sheet-pivot.ts): a sheet of formulas summing the table up by columns for its rows (and across), its filters leaving values out. */
+const pivotTable: Act<Workbook> = (book, a, x) => {
+  const at = sheetAt(book, a.sheet);
+  if (book.sheets.length >= SHEET_LIMITS.sheets) throw new Error(`The spreadsheet has ${SHEET_LIMITS.sheets} sheets, as many as it may hold: delete one first.`);
+  const t = tableOf(at, a.range);
+  const head = headerOf(at, t.x, t.around, a.header_row);
+  if (!head || t.x.r2 <= t.x.r1) throw new Error(`pivot_table needs a table with a header row and rows under it; ${rangeName(t.x)} of “${at.sh.name}” has ${t.x.r2 <= t.x.r1 ? 'one row' : 'no header row'}.`);
+  const colOf = (v: unknown, what: string) => colName(columnIn(at, t.x, head, v, what));
+  const rows = (Array.isArray(a.rows) ? a.rows : [a.rows ?? a.by]).slice(0, 2).map((v) => colOf(v, 'rows'));
+  const values = listOf(a.values).map((v) => (isObj(v) ? { col: colOf(v.column ?? v.col, 'values'), fn: (['sum', 'count', 'average', 'min', 'max'].includes(str(v.fn)) ? str(v.fn) : 'sum') as 'sum' } : { col: colOf(v, 'values'), fn: 'sum' as const }));
+  if (!values.length) throw new Error('values: [{column, fn: sum|count|average|min|max}], the columns it sums up.');
+  const filters = listOf(a.filters).flatMap((f) => (isObj(f) ? [{ col: colOf(f.column ?? f.col, 'filters'), hide: listOf(f.hide).map((h) => str(h)) }] : []));
+  const def = { source: `${quoteSheet(at.sh.name)}!${rangeName(t.x)}`, rows, ...(a.across !== undefined ? { cols: colOf(a.across, 'across') } : {}), values, ...(filters.length ? { filters } : {}) };
+  const name = uniqueSheetName(str(a.name) || `Pivot of ${at.sh.name}`.slice(0, 31), book.sheets.map((s) => s.name));
+  const made = pivotSheet(book, at.calc, def, name);
+  if (!made) throw new Error('That table cannot be summed up: give a range with a header row, and columns of it for the rows and values.');
+  const { id: _id, ...sheet } = made;
+  void x;
+  return { model: { ...book, sheets: [...book.sheets.slice(0, at.si + 1), { ...sheet, name } as Sheet, ...book.sheets.slice(at.si + 1)] }, said: `added the pivot table “${name}” after “${at.sh.name}”, of formulas that keep up with ${rangeName(t.x)}; the user changes it with Data → Edit the pivot table.` };
+};
+
+/** Tools → Goal seek (shared/sheet-whatif.ts): the value of a cell that makes a formula give the result wanted, put in. */
+const goalSeekAct: Act<Workbook> = (book, a) => {
+  const at = sheetAt(book, a.sheet);
+  const set = str(a.cell ?? a.set).toUpperCase();
+  const by = str(a.changing ?? a.by_changing ?? a.by).toUpperCase();
+  const to = Number(a.to ?? a.value);
+  if (!/^[A-Z]{1,3}\d+$/.test(set) || at.sh.cells[set]?.f === undefined) throw new Error('cell: the cell of the formula to set ("C10").');
+  if (!/^[A-Z]{1,3}\d+$/.test(by) || at.sh.cells[by]?.f !== undefined) throw new Error('changing: a cell of a number the formula uses ("B2"), not a formula.');
+  if (!Number.isFinite(to)) throw new Error('to: the number the formula is to give.');
+  const r = goalSeek(book, at.si, set, to, by);
+  if (!r) throw new Error(`${set} gives no number with any value of ${by}.`);
+  const cells = { ...at.sh.cells, [by]: { ...(at.sh.cells[by] ?? {}), v: r.value } };
+  return { model: withSheet(book, at.si, { cells }), said: r.reached ? `set ${by} to ${r.value}: ${set} gives ${Number(r.result.toPrecision(12))} now.` : `found no value of ${by} that makes ${set} give ${to}; the nearest, ${r.value} (${set} gives ${Number(r.result.toPrecision(12))}), was put in.` };
+};
+
 // ---- LaTeX ------------------------------------------------------------------------------------------------------------
 
 /** The files tree's Rename and moves (shared/latex-files.ts texMoveFiles): every reference to a file follows it. */
@@ -875,6 +914,8 @@ const ACTIONS: { [K in PageKind]: Record<string, Act<any>> } = {
     delete_sheet: deleteTab,
     move_sheet: moveTab,
     ask_ai: askAi,
+    pivot_table: pivotTable,
+    goal_seek: goalSeekAct,
   },
   tex: { move_files: moveFiles },
   notebook: { clear_outputs: clearOutputs },
@@ -945,6 +986,8 @@ const DESCRIPTION = [
   '- insert_rows {at: a row number, count?}, insert_columns {at: a column’s letters, count?}: empty rows or columns put in there; every formula that points past them follows.',
   '- delete_rows {rows: "5", "5:7" or a list}, delete_columns {columns: "C", "C:D" or a list}: taken out; formulas follow, and a reference to a cell that went becomes #REF!.',
   '- rename_sheet {sheet, name} (the formulas that name it follow), duplicate_sheet {sheet, name?}, delete_sheet {sheet}, move_sheet {sheet, to: its place from 1}: the sheet tabs’ menu.',
+  '- pivot_table {rows: a column or two (letters or header words), across?: a column, values: [{column, fn: sum|count|average|min|max}], filters?: [{column, hide: [values left out]}], range?, name?}: a new sheet after it summing the table up, as formulas that keep up with it (Data → Pivot table; the user changes it there).',
+  '- goal_seek {cell: a formula’s cell, to: the number it is to give, changing: a cell of a number it uses}: the value of that cell that makes the formula give it, put in (Tools → Goal seek).',
   '- ask_ai {again?}: the AI cells (=AI(…)) that wait for an answer asked of the helper model, many at once, their answers kept with the sheet (it costs a little, as any question to it does); again: true asks every AI cell again (Refresh AI cells).',
   'LaTeX documents.',
   '- move_files {moves: [{from, to}]}: rename or move files, pictures and folders ("figures/" to "img/"), every \\input, \\include and \\includegraphics that names them following, their comments and tracked changes along; it is typeset again.',
@@ -999,6 +1042,9 @@ const SCHEMA = {
     cells: { type: 'array', items: { type: ['number', 'string'] }, description: 'clear_outputs: cells by number or id.' },
     title: { type: 'string', description: 'duplicate: the copy’s title.' },
     again: { type: 'boolean', description: 'ask_ai: every AI cell asked again.' },
+    filters: { type: 'array', items: { type: 'object' }, description: 'pivot_table: [{column, hide: [values]}].' },
+    cell: { type: 'string', description: 'goal_seek: the formula’s cell.' },
+    changing: { type: 'string', description: 'goal_seek: the cell of a number it changes.' },
   },
   required: ['id', 'action'],
 };

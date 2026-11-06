@@ -401,7 +401,7 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
   const wb = new Zip(xlsxOfBook(b, 'P')).text('xl/workbook.xml') ?? '';
   ok(sx.includes('orientation="landscape"') && sx.includes('fitToHeight="1"') && !sx.includes('gridLines="1"') && wb.includes('_xlnm.Print_Area') && wb.includes('P!$A$2:$B$3'), 'Excel: its page setup and print area');
   const back = importBook(xlsxOfBook(b, 'P'), 'P.xlsx').book.sheets[0].print;
-  ok(back?.orient === 'landscape' && back.area === 'A2:B3' && back.grid === false && back.fit === 'page', 'and read back', back);
+  ok(back?.orient === 'landscape' && back.area === 'A2:B3' && back.grid === false && back.fit === 'page', 'and read back');
 }
 
 console.log(`${passed} passed, ${failed} failed`);
