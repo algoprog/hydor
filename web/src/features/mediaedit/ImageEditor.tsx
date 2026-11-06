@@ -426,7 +426,8 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
   const swatches = <ColorSwatches fg={ed.fg} bg={ed.bg} onFg={(c, d) => ed.setFg(c, d)} onBg={(c, d) => ed.setBg(c, d)} onSwap={() => ed.swapColors()} onReset={() => ed.resetColors()} swatches={ed.recent} />;
   const tool = ALL_TOOLS.find((t) => t.id === ed.tool);
   const kind = format === 'jpeg' ? 'JPEG' : format === 'webp' ? 'WebP' : 'PNG';
-  const zoom = ed.view ? Math.round(ed.view.zoom() * 100) : 100;
+  const [zoomZ, setZoomZ] = useState(1);
+  const zoom = Math.round(zoomZ * 100);
   const status = (
     <StatusBar>
       <StatusItem title="Fit on screen" onClick={() => ed.view?.fit()}>
@@ -468,7 +469,7 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
   );
   const stage = (
     <>
-      <View ed={ed} className="absolute inset-0" onCursor={(p, c) => setCursor({ p, c })} bigHeal={bigHeal} />
+      <View ed={ed} className="absolute inset-0" onCursor={(p, c) => setCursor({ p, c })} onZoom={setZoomZ} bigHeal={bigHeal} />
       {start.note && <p className="pointer-events-none absolute top-2 left-1/2 max-w-[80%] -translate-x-1/2 rounded-lg bg-black/65 px-2.5 py-1 text-center text-[12px] text-white">{start.note}</p>}
     </>
   );
@@ -508,19 +509,17 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
         dock={<Dock id="picture" panels={panels} groups={[['histogram', 'colour'], ['adjust', 'properties', 'ai'], ['layers', 'history']]} focus={ed.focus} defaultWeights={[0.9, 2.2, 1.7]} defaultFolded={{ 0: true }} />}
         status={status}
         phoneTools={
-          <ToolRail
-            horizontal
-            groups={TOOL_GROUPS}
-            active={ed.tool}
-            onPick={(t) => ed.setTool(t as ToolId)}
-            picks={picks}
-            setPicks={setPicks}
-            foot={
+          <div className="flex items-center">
+            <div className="min-w-0 flex-1">
+              <ToolRail horizontal groups={TOOL_GROUPS} active={ed.tool} onPick={(t) => ed.setTool(t as ToolId)} picks={picks} setPicks={setPicks} />
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5 border-l border-line pr-2 pl-1.5">
+              {swatches}
               <Button size="sm" variant="secondary" icon={<LayersIcon size={14} />} onClick={() => setSheet(sheet ? null : 'layers')}>
                 Panels
               </Button>
-            }
-          />
+            </div>
+          </div>
         }
         phoneSheet={sheet && <PanelSheet panels={panels} tab={sheet} onTab={setSheet} onClose={() => setSheet(null)} />}
       />
