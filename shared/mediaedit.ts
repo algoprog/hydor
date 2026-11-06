@@ -11,7 +11,10 @@
 // the picture as it was given and puts them in that frame (toUpright).
 //
 // The editors in tabs (openEditor) hand back what they made as `Saved`; POST /api/mediaedit/image keeps a picture the
-// editor made where it belongs (`SaveImageAsk`).
+// editor made where it belongs (`SaveImageAsk`). The further adjustments (curves, levels, hue and saturation by range,
+// colour balance, clarity, dehaze, noise reduction, grain, invert, posterize, threshold) are in mediaedit-look.ts.
+import { compileMore, clarity as clarityOf, dehaze as dehazeOf, grain as grainOf, normalizeMore, reduceNoise, shadeMore, hasMore, type LookFrame, type LookMore } from './mediaedit-look.ts';
+export * from './mediaedit-look.ts';
 
 // ---- the editors and where they save -------------------------------------------------------------------------
 
@@ -103,6 +106,10 @@ export const ADJUSTMENTS = [
   { id: 'sharpness', label: 'Sharpness', min: 0 },
   { id: 'blur', label: 'Blur', min: 0 },
   { id: 'vignette', label: 'Vignette', min: -100 },
+  { id: 'clarity', label: 'Clarity', min: -100 },
+  { id: 'dehaze', label: 'Dehaze', min: -100 },
+  { id: 'noise', label: 'Noise reduction', min: 0 },
+  { id: 'grain', label: 'Grain', min: 0 },
 ] as const;
 export type AdjustKey = (typeof ADJUSTMENTS)[number]['id'];
 export type Adjust = Partial<Record<AdjustKey, number>>;
@@ -177,6 +184,14 @@ export interface ImageRecipe {
   crop?: Box;
   adjust?: Adjust;
   filter?: FilterPick;
+  /** What the look adds: curves, levels, hue and saturation by range, colour balance, invert, posterize, threshold. */
+  curves?: LookMore['curves'];
+  levels?: LookMore['levels'];
+  hsl?: LookMore['hsl'];
+  balance?: LookMore['balance'];
+  invert?: boolean;
+  posterize?: number;
+  threshold?: number;
   marks?: Mark[];
   /** The size of the file, last (the crop's, else the picture's, when left out). */
   resize?: { w: number; h: number };
@@ -333,6 +348,7 @@ export function normalizeRecipe(raw: unknown, w: number, h: number): ImageRecipe
     const strength = Math.round(clamp(s ?? 100, 0, 100));
     if (strength > 0) out.filter = strength === 100 ? { id: r.filter.id } : { id: r.filter.id, strength };
   }
+  Object.assign(out, normalizeMore(r));
   if (Array.isArray(r.marks)) {
     const marks = r.marks
       .slice(0, LIMITS.marks)
@@ -372,10 +388,24 @@ export function cropSize(r: ImageRecipe, w: number, h: number): { w: number; h: 
 export const outputSize = (r: ImageRecipe, w: number, h: number) => r.resize ?? cropSize(r, w, h);
 
 /** Whether a recipe changes nothing (the picture would come out as it went in, but for its kind of file). */
-export const isPlain = (r: ImageRecipe) => !r.rotate && !r.flipH && !r.flipV && !r.straighten && !r.crop && !r.adjust && !r.filter && !r.marks?.length && !r.resize;
+export const isPlain = (r: ImageRecipe) => !r.rotate && !r.flipH && !r.flipV && !r.straighten && !r.crop && !hasLook(r) && !r.marks?.length && !r.resize;
 
 /** Whether its look changes anything. */
-export const hasLook = (r: ImageRecipe) => !!r.adjust || !!r.filter;
+export const hasLook = (r: ImageRecipe | LookSettings) => !!r.adjust || !!r.filter || hasMore(r);
+
+/** A look on its own: the adjustments, the filter and what the look adds (an adjustment layer's, in the editor). */
+export type LookSettings = Pick<ImageRecipe, 'adjust' | 'filter' | 'curves' | 'levels' | 'hsl' | 'balance' | 'invert' | 'posterize' | 'threshold'>;
+
+/** A look made safe and plain, as a recipe's is. */
+export function normalizeLook(raw: unknown): LookSettings {
+  const r = normalizeRecipe(raw && typeof raw === 'object' ? { adjust: (raw as LookSettings).adjust, filter: (raw as LookSettings).filter, ...normalizeMore(raw) } : {}, 1, 1);
+  const out: LookSettings = {};
+  for (const k of ['adjust', 'filter', 'curves', 'levels', 'hsl', 'balance', 'invert', 'posterize', 'threshold'] as const) if (r[k] !== undefined) (out as Record<string, unknown>)[k] = r[k];
+  return out;
+}
+
+/** A look put on pixels in place (applyLook, with what it adds). */
+export const applyLookSettings = (px: Uint8ClampedArray, w: number, h: number, l: LookSettings, frame?: LookFrame) => applyLook(px, w, h, l.adjust, l.filter, l, frame);
 
 // ---- where things are -------------------------------------------------------------------------------------------
 
@@ -736,17 +766,24 @@ function shade(c: Compiled, r: number, g: number, b: number) {
 }
 
 /**
- * A picture's look changed in place (RGBA, 0 to 255): the filter at its strength, then the adjustments on top of it,
- * then blur or sharpness, then the vignette. Sizes (blur, sharpness, vignette) go by the picture's own size, so a small
- * copy looks as the whole picture will.
+ * A picture's look changed in place (RGBA, 0 to 255): noise taken out first, then the filter at its strength, the
+ * adjustments on top of it and what the look adds (levels and curves, hue and saturation by range, colour balance,
+ * invert, posterize, threshold), then dehaze, clarity, blur or sharpness, the vignette and grain. Sizes (blur,
+ * sharpness, vignette, grain) go by the picture's own size, so a small copy looks as the whole picture will; `frame`
+ * says when the pixels are a part of a larger picture (its size and their place in it, in the same pixels).
  */
-export function applyLook(px: Uint8ClampedArray, w: number, h: number, adjust: Adjust = {}, filter?: FilterPick | null): void {
+export function applyLook(px: Uint8ClampedArray, w: number, h: number, adjust: Adjust = {}, filter?: FilterPick | null, more?: LookMore | null, frame?: LookFrame): void {
+  const F = frame ?? { W: w, H: h, x: 0, y: 0 };
+  const long = Math.max(F.W, F.H);
   const own = compile(adjust);
   const fl = filter && FILTER_LOOKS[filter.id] ? FILTER_LOOKS[filter.id] : null;
   const fc = fl ? compile(fl) : null;
   const fs = fl ? clamp(filter!.strength ?? 100, 0, 100) / 100 : 0;
+  const extra = compileMore(more);
   const n = w * h * 4;
-  if ((fc && fs) || own) {
+  if (adjust.noise) reduceNoise(px, w, h, adjust.noise, long);
+  if ((fc && fs) || own || extra) {
+    const rgb = new Float32Array(3);
     for (let i = 0; i < n; i += 4) {
       let r = px[i] / 255;
       let g = px[i + 1] / 255;
@@ -763,18 +800,29 @@ export function applyLook(px: Uint8ClampedArray, w: number, h: number, adjust: A
         g = OUT[1];
         b = OUT[2];
       }
+      if (extra) {
+        rgb[0] = r;
+        rgb[1] = g;
+        rgb[2] = b;
+        shadeMore(extra, rgb);
+        r = rgb[0];
+        g = rgb[1];
+        b = rgb[2];
+      }
       px[i] = r * 255 + 0.5;
       px[i + 1] = g * 255 + 0.5;
       px[i + 2] = b * 255 + 0.5;
     }
   }
-  const long = Math.max(w, h);
+  if (adjust.dehaze) dehazeOf(px, w, h, adjust.dehaze, long);
+  if (adjust.clarity) clarityOf(px, w, h, adjust.clarity, long);
   const blur = clamp(adjust.blur ?? 0, 0, 100);
   if (blur > 0) boxBlur(px, w, h, Math.max(1, Math.round((blur / 100) * long * 0.012)), 3);
   const sharp = clamp(adjust.sharpness ?? 0, 0, 100);
   if (sharp > 0) sharpen(px, w, h, (sharp / 100) * 1.3, Math.max(1, Math.round(long / 1400)));
   const vig = clamp((adjust.vignette ?? 0) + (fl?.vignette ?? 0) * fs, -100, 100);
-  if (vig) vignette(px, w, h, vig / 100);
+  if (vig) vignette(px, w, h, vig / 100, F);
+  if (adjust.grain) grainOf(px, w, h, adjust.grain, F);
 }
 
 /** Blurs RGBA pixels in place: box blurs `passes` times over (three come near a Gaussian), `r` pixels each way. */
@@ -823,14 +871,14 @@ function sharpen(px: Uint8ClampedArray, w: number, h: number, amount: number, r:
   }
 }
 
-/** Darkens the edges (`v` > 0) or lightens them (`v` < 0), most in the corners. */
-function vignette(px: Uint8ClampedArray, w: number, h: number, v: number) {
-  const cx = w / 2;
-  const cy = h / 2;
+/** Darkens the edges (`v` > 0) or lightens them (`v` < 0), most in the corners (of the whole picture, `f`). */
+function vignette(px: Uint8ClampedArray, w: number, h: number, v: number, f: LookFrame) {
+  const cx = f.W / 2;
+  const cy = f.H / 2;
   for (let y = 0; y < h; y++) {
-    const dy = (y + 0.5 - cy) / cy;
+    const dy = (y + f.y + 0.5 - cy) / cy;
     for (let x = 0; x < w; x++) {
-      const dx = (x + 0.5 - cx) / cx;
+      const dx = (x + f.x + 0.5 - cx) / cx;
       const t = smooth(0.3, 1.15, Math.sqrt((dx * dx + dy * dy) / 2));
       if (!t) continue;
       const i = (y * w + x) * 4;

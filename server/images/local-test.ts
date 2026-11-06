@@ -1,4 +1,4 @@
-// Script tests for the picture tools on this computer (local.ts, cutout.ts, erase.ts, picture_worker.py).
+// Script tests for the picture tools on this computer (local.ts, cutout.ts, erase.ts, upscale.ts, picture_worker.py).
 //
 // Always: the set-up's states with a stand-in for uv (its steps, a failure and its words, ready); the models'
 // downloads from a stand-in server (progress, going on from a part, a damaged one thrown away, one at a time); the
@@ -35,6 +35,7 @@ import { judgeCutout } from './cutout.ts';
 import { boxesMask, planErase, putBackInBoxes, readBoxes } from './erase.ts';
 import { localTools, setCloudTools } from './hooks.ts';
 import { localState, memoryNeeded, pictureTools, pictureWorkerPeak, pictureWorkerPid, runPython, setPictureToolsForTests, stopPictureTools } from './local.ts';
+import { tilePlan, tooLarge } from './upscale.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -113,6 +114,35 @@ const savedPath = (text: string) => /^(\/.+?\.png) \((\d+)×(\d+), [^)]*\)$/m.ex
 
 ok(localTools() && localTools()!.runPython === runPython, 'the picture tools are lent to the rest (hooks)');
 
+// ---- the upscaler's tiles ---------------------------------------------------------------------------------------------
+{
+  for (const [w, h, t, pad] of [
+    [64, 48, 256, 16],
+    [600, 400, 256, 16],
+    [513, 257, 256, 16],
+    [1000, 30, 128, 8],
+  ]) {
+    const tiles = tilePlan(w, h, t, pad);
+    const seen = new Uint8Array(w * h);
+    let inside = true;
+    for (const x of tiles) {
+      for (let y = x.y; y < x.y + x.h; y++) for (let xx = x.x; xx < x.x + x.w; xx++) seen[y * w + xx]++;
+      if (x.px < 0 || x.py < 0 || x.px + x.pw > w || x.py + x.ph > h || x.px > x.x || x.py > x.y || x.px + x.pw < x.x + x.w || x.py + x.ph < x.y + x.h) inside = false;
+      if (x.w > t || x.h > t) inside = false;
+    }
+    ok(
+      seen.every((v) => v === 1),
+      `the tiles of ${w}×${h} cover every pixel once`,
+    );
+    ok(inside, `each tile shown with its margin, inside the picture (${w}×${h})`);
+  }
+  const t = tilePlan(600, 400, 256, 16);
+  ok(t.length === 6 && t[1].px === 240 && t[1].pw === 256 + 32 && t[2].pw === 600 - 496 && t[0].px === 0 && t[0].pw === 256 + 16, `a margin on each side but the picture's edge: ${JSON.stringify(t.slice(0, 3))}`);
+  ok(tooLarge(2048, 1200, 4) === null && tooLarge(2000, 1500, 2) === null, 'a picture whose result fits is not too large');
+  ok(/^Made 4× larger it would be 12000 × 8000 pixels: at most 8192 on a side and 40 million in all\. Make it 2× larger instead, or crop it first\.$/.test(tooLarge(3000, 2000, 4) ?? ''), `too large, with the scale that fits: ${tooLarge(3000, 2000, 4)}`);
+  ok(/Crop it first, or make it smaller\.$/.test(tooLarge(5000, 4000, 2) ?? ''), 'too large either way');
+}
+
 if (!REAL) {
   // ---- a stand-in for uv, models and the worker ----------------------------------------------------------------
 
@@ -135,7 +165,7 @@ if (!REAL) {
   process.env.PATH = `${bin}:${process.env.PATH}`;
 
   // The models: random bytes served in pieces, with ranges, each request noted.
-  const blobs: Record<string, Buffer> = { 'cutout.onnx': crypto.randomBytes(300_000), 'erase.onnx': crypto.randomBytes(200_000) };
+  const blobs: Record<string, Buffer> = { 'cutout.onnx': crypto.randomBytes(300_000), 'erase.onnx': crypto.randomBytes(200_000), 'upscale.onnx': crypto.randomBytes(60_000) };
   const hits: { file: string; range?: string; start: number; end: number }[] = [];
   let ignoreRange = false;
   const srv = http.createServer(async (rq, rs) => {
@@ -164,6 +194,7 @@ if (!REAL) {
   const fakeModels = () => ({
     cutout: { url: `${base}/cutout.onnx`, bytes: blobs['cutout.onnx'].length, sha256: sha(blobs['cutout.onnx']) },
     erase: { url: `${base}/erase.onnx`, bytes: blobs['erase.onnx'].length, sha256: sha(blobs['erase.onnx']) },
+    upscale: { url: `${base}/upscale.onnx`, bytes: blobs['upscale.onnx'].length, sha256: sha(blobs['upscale.onnx']) },
   });
 
   // The worker: the same lines in and out, PNGs of the picture's size, each job noted; a 13×13 picture makes it crash.
@@ -222,9 +253,13 @@ for line in sys.stdin:
     if op not in loaded:
         say({'id': rid, 'status': 'loading'}); time.sleep(0.08); loaded.append(op)
     say({'id': rid, 'status': 'working'})
-    log(json.dumps({'id': rid, 'op': op, 'model': req['model'], 'boxes': req.get('boxes'), 'mask': 'mask' in req, 'max': req.get('max_bytes')}))
+    log(json.dumps({'id': rid, 'op': op, 'model': req['model'], 'boxes': req.get('boxes'), 'mask': 'mask' in req, 'max': req.get('max_bytes'), 'scale': req.get('scale'), 'tiles': len(req.get('tiles') or [])}))
     c = ctl()
     time.sleep(c['workMs'] / 1000)
+    if op == 'upscale':
+        n = len(req['tiles'])
+        for i in range(n): say({'id': rid, 'status': 'working', 'done': i + 1, 'of': n}); time.sleep(0.02)
+        w, h = w * req['scale'], h * req['scale']
     open(req['output'], 'wb').write(png(w, h, (200, 30, 40, 128) if op == 'cutout' else (10, 200, 10, 255)))
     small = None
     if req.get('small'):
@@ -279,6 +314,10 @@ for line in sys.stdin:
     ok(l.statusCode === 400 && /set them up in Settings → Images, video and audio/.test(l.json().error), 'on this computer, asked for, before setting up');
     const cl = await req('POST', '/api/images/cutout', { src: dataUrl(photo), how: 'cloud' });
     ok(cl.statusCode === 400 && cl.json().error === 'Add an OpenRouter key in Settings → Models', 'through OpenRouter without a key');
+    const up = await req('POST', '/api/images/upscale', { src: dataUrl(photo), scale: 2 });
+    ok(up.statusCode === 400 && /^Making a picture larger needs the picture tools on this computer: set them up in Settings → Images, video and audio/.test(up.json().error), `making it larger, before setting up: ${up.body}`);
+    const ut = await run('upscale_image', { path: 'photo.png' });
+    ok(ut.isError && /the user can set them up in Settings → Images, video and audio \(free and private: about 145 MB once, and about 5 MB for this model the first time\)/.test(ut.text), `upscale_image before setting up: ${ut.text}`);
 
     // No key: a run nobody watches gets words for the user; a watched one a card, and skipped, nothing runs.
     const t = await run('remove_background', { path: 'photo.png' });
@@ -476,6 +515,44 @@ for line in sys.stdin:
     ok(nk.statusCode === 400 && /takes an image model through OpenRouter: add an OpenRouter key in Settings → Models, or leave the words out/.test(nk.json().error), 'nor without a key');
   }
 
+  // ---- making a picture larger ------------------------------------------------------------------------------------
+
+  {
+    const steps = new Set<string>();
+    let watching = true;
+    void (async () => {
+      while (watching) {
+        const x = localState();
+        if (x.step) steps.add(x.step);
+        await sleep(5);
+      }
+    })();
+    hits.length = 0;
+    const strip = picture(520, 40, (x, y) => [x % 256, y * 6, 128, 255]);
+    const r = await req('POST', '/api/images/upscale', { src: dataUrl(strip), scale: 2 });
+    watching = false;
+    ok(r.statusCode === 200 && r.headers['content-type'] === 'image/png' && r.headers['x-width'] === '1040' && r.headers['x-height'] === '80' && r.headers['x-model'] === 'Real-ESRGAN', `made 2× larger, a PNG back: ${r.statusCode} ${JSON.stringify(r.headers)}`);
+    const big = readPng(r.rawPayload);
+    ok(big.width === 1040 && big.height === 80, 'its pixels are the size it says');
+    const j = jobs().filter((x) => x.op === 'upscale');
+    ok(j.length === 1 && j[0].scale === 2 && j[0].tiles === tilePlan(520, 40).length && j[0].tiles === 3 && /realesr-general-x4v3\.onnx$/.test(j[0].model) && !j[0].max, `the worker’s job, in tiles, not made smaller: ${JSON.stringify(j)}`);
+    ok(hits.filter((h) => h.file === 'upscale.onnx').length === 1 && (await state()).downloaded.includes('upscale'), 'its model downloaded the first time');
+    ok([...steps].some((x) => /^Downloading the upscaler \(0 MB, once\): \d+%$/.test(x)) && [...steps].some((x) => /^Making it larger on this computer: \d+%$/.test(x)), `with its progress: ${[...steps].join(' / ')}`);
+    const four = await req('POST', '/api/images/upscale', { src: ASSET + putAsset(db, photo), scale: 4 });
+    ok(four.statusCode === 200 && four.headers['x-width'] === '256', 'a kept picture, 4× larger');
+    ok((await req('POST', '/api/images/upscale', { src: dataUrl(photo), scale: 3 })).statusCode === 400, 'only 2× or 4×');
+    // A picture whose header says 3,000 × 2,000: too large made 4×, said before any work.
+    const head = Buffer.from(picture(1, 1, () => [0, 0, 0, 255]));
+    head.writeUInt32BE(3000, 16);
+    head.writeUInt32BE(2000, 20);
+    const huge = await req('POST', '/api/images/upscale', { src: dataUrl(head), scale: 4 });
+    ok(huge.statusCode === 413 && /Make it 2× larger instead/.test(huge.json().error), `too large: ${huge.body}`);
+    const t = await run('upscale_image', { path: 'photo.png', scale: 4 });
+    const m = savedPath(t.text);
+    ok(!t.isError && m && m[2] === '256' && m[3] === '192' && /^Made the picture 4× larger \(64×48 to 256×192\) with Real-ESRGAN on this computer \(free and private\):/.test(t.text), `upscale_image: ${t.text}`);
+    ok((await run('upscale_image', { path: 'photo.png', scale: 8 })).isError, 'upscale_image: only 2× or 4×');
+  }
+
   // ---- the agents' tools ----------------------------------------------------------------------------------------
 
   {
@@ -570,7 +647,7 @@ for line in sys.stdin:
     ok(
       pictureTools.tools!(ctx)
         .map((t) => t.name)
-        .join() === 'remove_background,erase_from_image',
+        .join() === 'remove_background,erase_from_image,upscale_image',
       'and back',
     );
   }
@@ -1001,8 +1078,20 @@ for line in sys.stdin:
     const far = await run('erase_from_image', { path: 'textured.png', boxes: [{ x: 900, y: 900, w: 10, h: 10 }] });
     ok(far.isError && /The boxes are outside the picture, which is 480×360 pixels\./.test(far.text), `a box outside the picture: ${far.text}`);
   }
+  // Made 2× larger, for real: the same picture, twice the size, its colours where they were.
+  {
+    const t = Date.now();
+    const r = await req('POST', '/api/images/upscale', { src: dataUrl(plain), scale: 2 });
+    ok(r.statusCode === 200 && r.headers['x-width'] === String(W * 2) && r.headers['x-height'] === String(H * 2) && r.headers['x-model'] === 'Real-ESRGAN', `made 2× larger in ${Math.round((Date.now() - t) / 1000)} s: ${r.statusCode}`);
+    if (r.statusCode === 200) {
+      const big = readPng(r.rawPayload);
+      const px = (x: number, y: number) => [...big.data.subarray((y * W * 2 + x) * 4, (y * W * 2 + x) * 4 + 3)];
+      const near = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]) <= 12);
+      ok(near(px(480, 360), [200, 30, 40]) && near(px(20, 20), [238, 236, 230]) && near(px(610, 470), [20, 40, 120]), `the disc, the background and the square where they were: ${px(480, 360)} ${px(20, 20)} ${px(610, 470)}`);
+    }
+  }
   s = await state();
-  ok(s.downloaded.join() === 'cutout,erase' && s.loaded.includes('erase'), `both models here, the eraser in memory: ${JSON.stringify(s)}`);
+  ok(s.downloaded.join() === 'cutout,erase,upscale' && s.loaded.includes('upscale'), `the three models here, the upscaler in memory: ${JSON.stringify(s)}`);
   {
     const pid = pictureWorkerPid()!;
     ok(await until(() => localState().loaded.length === 0, 6000), 'unloaded when idle');

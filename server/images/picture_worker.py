@@ -1,5 +1,6 @@
 # Hydor's picture worker, for the picture tools on this computer (server/images/local.ts starts it): it takes the
-# background out of pictures (BiRefNet-lite) and erases parts of them (LaMa), with ONNX Runtime on the CPU. It reads
+# background out of pictures (BiRefNet-lite), erases parts of them (LaMa) and makes them larger (Real-ESRGAN), with ONNX
+# Runtime on the CPU. It reads
 # requests as JSON lines on stdin and answers each on stdout. Pictures come and go as files in a folder the server
 # makes for each job, never through the pipe:
 #   {"id": 1, "op": "cutout", "model": ".../cutout.onnx", "input": ".../in", "output": ".../out.png"}
@@ -8,7 +9,9 @@
 #   {"id": 2, "op": "erase", "model": ".../erase.onnx", "input": ..., "mask": ".../mask.png" or "boxes": [[x, y, w, h]], "output": ...}
 #   {"id": 3, "op": "measure", "input": ..., "mask" or "boxes", "small": ".../hole.bin"}  ->  how large the hole is, how
 #     detailed things are around it, and the hole at most 256 pixels across (raw bytes, row after row) in "small"
-#   {"id": 4, "op": "unload", "what": "cutout"}  ->  {"id": 4, "ok": true, "loaded": []}
+#   {"id": 4, "op": "upscale", "model": ..., "input": ..., "output": ..., "scale": 2, "tiles": [[x, y, w, h, px, py, pw, ph], ...]}
+#     -> {"id": 4, "status": "working", "done": 3, "of": 12} after each tile, then {"id": 4, "ok": true, "w": ..., "h": ...}
+#   {"id": 5, "op": "unload", "what": "cutout"}  ->  {"id": 5, "ok": true, "loaded": []}
 # "max_bytes" (optional) keeps the PNG under that size: it is made smaller when it would be over. A cutout given
 # "small" also writes its mask there, at most 512 pixels across, for the server to judge how sure it was.
 # Each model loads when it is first asked for and stays until the server says to unload it (after a few idle
@@ -321,6 +324,68 @@ def erase(req, rid):
     return {'w': w, 'h': h, 'scaled': scaled, 'ms': round(run * 1000), 'box': [x0, y0, x1 - x0 + 1, y1 - y0 + 1]}
 
 
+def bleed(im):
+    """A picture with see-through parts as RGB, the colour under its see-through pixels taken from the kept ones nearby
+    (their colour spread out, as much as they are there), so the upscaler draws no dark fringe round its edges."""
+    import numpy as np
+    from PIL import Image, ImageFilter
+
+    a = np.asarray(im.getchannel('A'), dtype=np.float32) / 255.0
+    rgb = np.asarray(im.convert('RGB'), dtype=np.float32)
+    if a.min() >= 0.999:
+        return im.convert('RGB')
+    r = max(4, round(max(im.size) / 64))
+    pre = Image.fromarray(np.clip(rgb * a[..., None] + 0.5, 0, 255).astype(np.uint8), 'RGB').filter(ImageFilter.GaussianBlur(r))
+    cover = Image.fromarray(np.clip(a * 255 + 0.5, 0, 255).astype(np.uint8), 'L').filter(ImageFilter.GaussianBlur(r))
+    pa = np.asarray(cover, dtype=np.float32)[..., None] / 255.0
+    spread = np.asarray(pre, dtype=np.float32) / np.maximum(pa, 1e-3)
+    mean = (rgb * a[..., None]).sum(axis=(0, 1)) / max(1e-3, float(a.sum()))
+    spread = np.where(pa > 0.01, spread, mean)
+    out = rgb * a[..., None] + spread * (1.0 - a[..., None])
+    return Image.fromarray(np.clip(out + 0.5, 0, 255).astype(np.uint8), 'RGB')
+
+
+def upscale(req, rid):
+    """The picture made `scale` (2 or 4) times larger, a tile at a time (each shown to the model with a margin that is
+    then dropped, so no seam shows); see-through parts made larger smoothly. Real-ESRGAN's general model makes 4×; for
+    2× each tile's answer is brought down by averaging its pixels in twos."""
+    import numpy as np
+    from PIL import Image
+
+    im, icc = open_picture(req['input'])
+    scale = int(req.get('scale') or 2)
+    if scale not in (2, 4):
+        raise Fail('The picture can be made 2× or 4× larger.')
+    W, H = im.size
+    alpha = im.getchannel('A') if im.mode == 'RGBA' else None
+    src = np.asarray(bleed(im) if alpha is not None else im.convert('RGB'), dtype=np.uint8)
+    del im
+    s = session('upscale', req['model'], rid)
+    name = s.get_inputs()[0].name
+    tiles = req.get('tiles') or [[0, 0, W, H, 0, 0, W, H]]
+    out = np.zeros((H * scale, W * scale, 3), dtype=np.uint8)
+    t = time.time()
+    say({'id': rid, 'status': 'working', 'done': 0, 'of': len(tiles)})
+    for i, (x, y, w, h, px, py, pw, ph) in enumerate(tiles):
+        part = src[py : py + ph, px : px + pw].astype(np.float32) / 255.0
+        got = s.run(None, {name: np.ascontiguousarray(part.transpose(2, 0, 1)[None])})[0][0]
+        got = np.clip(got, 0.0, 1.0).transpose(1, 2, 0)
+        if scale == 2:
+            got = got.reshape(got.shape[0] // 2, 2, got.shape[1] // 2, 2, 3).mean(axis=(1, 3))
+        k = scale
+        cx, cy = (x - px) * k, (y - py) * k
+        out[y * k : (y + h) * k, x * k : (x + w) * k] = (got[cy : cy + h * k, cx : cx + w * k] * 255.0 + 0.5).astype(np.uint8)
+        del part, got
+        say({'id': rid, 'status': 'working', 'done': i + 1, 'of': len(tiles)})
+    run = time.time() - t
+    big = Image.fromarray(out, 'RGB')
+    del out, src
+    if alpha is not None:
+        big.putalpha(alpha.resize(big.size, Image.Resampling.LANCZOS))
+    (w, h), scaled = save_png(big, req['output'], icc, req.get('max_bytes'))
+    return {'w': w, 'h': h, 'scaled': scaled, 'ms': round(run * 1000)}
+
+
 def main():
     import numpy  # noqa: F401 - what every job needs, loaded once
     import onnxruntime
@@ -346,6 +411,8 @@ def main():
                 out = erase(req, rid)
             elif op == 'measure':
                 out = measure(req, rid)
+            elif op == 'upscale':
+                out = upscale(req, rid)
             elif op == 'ping':
                 out = {}
             else:
