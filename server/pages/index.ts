@@ -725,7 +725,7 @@ const INSTRUCTIONS =
 
 /** The tools that make and change pictures and videos, for the agent beside a deck, a document or a page. */
 const PICTURES =
-  'Pictures: generate_image makes one, or changes one it already shows (give its naget-asset: source); make_svg draws one, make_plot draws a chart from data; remove_background and erase_from_image take things out of one; edit_image crops, turns, adjusts or marks one up; generate_video and edit_video make and edit videos (one it shows by its naget-video: source). They save into your folder: put what they make in its place with the save tool.';
+  'Pictures: generate_image makes one, or changes one it already shows (give its naget-asset: source); make_svg draws one, make_plot draws a chart from data; remove_background and erase_from_image take things out of one; upscale_image makes one 2× or 4× larger; edit_image crops, turns, adjusts (curves, levels, colours by range, colour balance too) or marks one up; generate_video and edit_video make and edit videos (one it shows by its naget-video: source). They save into your folder: put what they make in its place with the save tool.';
 
 /** A request made from a page or deck open in Pages (`extra.page`: its id): the session is about changing it. */
 function askInstructions(db: Deps['db'], v: unknown): string | null {
