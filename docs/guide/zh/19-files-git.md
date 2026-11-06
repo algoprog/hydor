@@ -98,6 +98,7 @@
 每一行都有一个菜单。把鼠标指向这一行并点击行末的**更多**（⋯），或右键点击它；在手机上，轻点它的 ⋯。菜单里有：
 
 - **打开**。
+- **编辑图片**或**编辑视频**（图片或视频）：在图片或视频编辑器中打开它，在那里**保存**会覆盖这个文件（它的旧版本会进入废纸篓），**另存副本**则会在它旁边放一个“名称 (edited)”（见[编辑图片和视频](/guide/library#edit-pictures-and-videos)）。
 - **用它开始会话**（文件；见[用文件开始会话](/guide/files-git#start-a-session-with-files)），或**在此文件夹中新建会话**（文件夹：打开开始页，并已选好那个文件夹）。
 - **添加到项目**（见[把文件添加到项目](/guide/files-git#add-files-to-a-project)）。
 - **在“位置”中置顶**或**从“位置”中取消置顶**（文件夹）。
@@ -285,9 +286,9 @@ PowerPoint 文件、较旧的 Office 文件（.doc、.xls、.ppt）、OpenDocume
 
 文件查看器按文件本来的样子显示它们：
 
-- **图片**（PNG、JPEG、GIF、WebP、SVG、ICO、BMP、AVIF）：完整显示，透明的部分衬着棋盘格。
+- **图片**（PNG、JPEG、GIF、WebP、SVG、ICO、BMP、AVIF）：完整显示，透明的部分衬着棋盘格。顶部的 **编辑** 会在图片编辑器中打开它（[编辑图片和视频](/guide/library#edit-pictures-and-videos)）。
 - **PDF**：在浏览器自带的 PDF 查看器中显示，顶部有 **突出显示**，可以在应用自己的阅读器中阅读它们、高亮它们，并在旁边记备注（见[阅读和高亮 PDF](#read-and-highlight-a-pdf)），还有 **填写和签名**，可以填写和签署它们（见[填写和签署 PDF](#fill-in-and-sign-a-pdf)）。你高亮过的 PDF 会在阅读器中打开。
-- **视频**（MP4、WebM、MOV 和 M4V；浏览器支持时还有 MKV 和 OGV）：在应用自带的播放器中播放（见下文的[观看视频](#watch-a-video)）。**音频**（MP3、WAV、OGG）就地播放。
+- **视频**（MP4、WebM、MOV 和 M4V；浏览器支持时还有 MKV 和 OGV）：在应用自带的播放器中播放（见下文的[观看视频](#watch-a-video)）；对于 MP4、MOV、M4V 或 WebM 视频，顶部的 **编辑** 会在视频编辑器中打开它。**音频**（MP3、WAV、OGG）就地播放。
 - **Office 文档**：PowerPoint（.pptx、.ppt）、较旧的 Word 和 Excel 文件（.doc、.xls 等）、OpenDocument（.odt、.ods、.odp）、RTF 和 EPUB；Word（.docx）和 Excel（.xlsx）文件则在它们的编辑器中通过 **更多**（⋯）→ **以预览显示** 查看。顶部的切换开关用来选择视图：
   - **页面**：LibreOffice 排版后的文档，一页一页显示（第一次会显示“正在排版页面…”）。只有这台电脑上安装了 LibreOffice 时才有这个视图，EPUB 电子书也没有。
   - **文本**：应用读出的文字、工作表和幻灯片。
