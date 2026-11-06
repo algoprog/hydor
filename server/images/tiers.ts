@@ -48,7 +48,14 @@ export function tierId(s: ImagesSettings, tier: ImageTier, list: ImageModel[]): 
   const best = s.model || firstListed(PREFERRED, list) || PREFERRED[0];
   if (tier === 'best') return best;
   // None of Quick's choices listed, while others are: the Best one makes them.
-  return s.quick || firstListed(QUICK_PICKS.map((p) => p.id), list) || (list.length ? best : QUICK_PICKS[0].id);
+  return (
+    s.quick ||
+    firstListed(
+      QUICK_PICKS.map((p) => p.id),
+      list,
+    ) ||
+    (list.length ? best : QUICK_PICKS[0].id)
+  );
 }
 
 /** The vector model for Best drawings. */

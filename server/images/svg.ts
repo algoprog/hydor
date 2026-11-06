@@ -70,14 +70,7 @@ export interface Drawing {
 /** Written as SVG by the writer: asked once more when the first answer leaves nothing to keep. */
 async function written(db: DB, ask: SvgAsk, signal?: AbortSignal): Promise<Drawing> {
   const b = boxFor(ask.aspect);
-  const lines = [
-    `Draw: ${ask.prompt.trim()}`,
-    ask.kind ? WRITE_KIND[ask.kind] : '',
-    `viewBox: 0 0 ${b.w} ${b.h}`,
-    ask.colors?.length ? `Colours: ${ask.colors.join(', ')}` : 'Colours: your choice',
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const lines = [`Draw: ${ask.prompt.trim()}`, ask.kind ? WRITE_KIND[ask.kind] : '', `viewBox: 0 0 ${b.w} ${b.h}`, ask.colors?.length ? `Colours: ${ask.colors.join(', ')}` : 'Colours: your choice'].filter(Boolean).join('\n');
   for (let attempt = 0; attempt < 2; attempt++) {
     const r = await writeWith(db, {
       system: SYSTEM,
