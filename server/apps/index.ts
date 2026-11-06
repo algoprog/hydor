@@ -2,8 +2,9 @@
 // as Templates. One agent does an app's task, or the app follows steps (flow.ts), keeps data between
 // runs (data.ts) and, when it remembers, a memory of its own; an app travels as one file (package.ts).
 //
-//   /api/apps…                 the gallery, apps and their runs (and follow-ups to them), keys, runs over
-//                              CSV rows, the data apps keep, installing from a file (signed in)
+//   /api/apps…                 the gallery (with the apps pinned to its top and those used lately), apps and
+//                              their runs (and follow-ups to them), keys, runs over CSV rows, the data apps
+//                              keep, installing from a file (signed in)
 //   POST /api/apps/:slug/run   a program runs an app with its API key (Authorization: Bearer napp_…),
 //                              waiting up to `wait` seconds: {status, result, reply, session, steps}
 //   /a-api/:slug…              the public page's form and the visitor's own runs (public.ts)
@@ -83,8 +84,9 @@ import { appHint, findAppsTool, tellAsker, useAppTool, useNote } from './use.ts'
 import { sessionExtra } from '../sessionExtra.ts';
 import { setModelsHere } from './models.ts';
 import { hasMedia, mediaRoutes, putAsset, takeInAnswer } from './media.ts';
-import { saveAppSecrets, secretsOf } from './secrets.ts';
+import { missingSecrets, saveAppSecrets, secretsOf } from './secrets.ts';
 import { dropDaily, homeOf, saveHome } from './home.ts';
+import { pinsOf, recentApps, setPins, unpin, useCounts } from './pins.ts';
 import { WORK_LOG } from './worklog.ts';
 
 const keyLimiter = new Limiter();
@@ -283,18 +285,40 @@ function routes(d: Deps) {
 
   app.get('/api/apps', async () => {
     const today = dayStart();
-    // When each last ran (its runs, not its steps' or its conversations).
+    // When each last ran (its runs, not its steps' or its conversations), and how often it ran all told (the page's Most used).
     const last = new Map((db.prepare("select app_id as id, max(created_at) as at from app_runs where source not in ('step', 'chat') group by app_id").all() as { id: string; at: number }[]).map((r) => [r.id, r.at]));
-    const apps = listApps(db).map((a) => ({ ...a, usage: usageShown(a.id, today), ...(last.get(a.id) ? { lastRunAt: last.get(a.id) } : {}) }));
+    const uses = useCounts(db);
+    // A key it cannot run without that the vault does not have yet: its card says so (a mark that never keeps the page from loading).
+    const keyed = (r: AppRecipe) => {
+      try {
+        return missingSecrets(db, r).length ? { needsKey: true } : {};
+      } catch {
+        return {};
+      }
+    };
+    const apps = listApps(db).map((a) => ({ ...a, usage: usageShown(a.id, today), ...(last.get(a.id) ? { lastRunAt: last.get(a.id) } : {}), ...(uses.get(a.id) ? { uses: uses.get(a.id) } : {}), ...keyed(a) }));
     // Not those of an app that opens on its own page (Explore): its page shows its latest, and its daily runs would crowd the rest out.
     const recent = listRuns(db, { limit: 30 })
       .filter((r) => r.source !== 'batch' && r.source !== 'public' && !pagesFor(r.recipe.ui, 'app').length)
       .slice(0, 6)
       .map(runView);
     // The ready-made apps, each installed or not, whether agents may run it, and when it last ran.
-    const templates = builtinsOf(db).map((t) => ({ ...t, ...(last.get(`tpl:${t.id}`) ? { lastRunAt: last.get(`tpl:${t.id}`) } : {}) }));
-    return { apps, templates, recent };
+    const templates = builtinsOf(db).map((t) => ({ ...t, ...(last.get(`tpl:${t.id}`) ? { lastRunAt: last.get(`tpl:${t.id}`) } : {}), ...keyed(t) }));
+    // At the top of the page: the apps pinned there, and the ones you ran lately (each once, with its latest run).
+    return { apps, templates, recent, pins: pinsOf(db), used: recentApps(db) };
   });
+
+  /** The apps pinned to the top of the Apps page, in their order: yours by id, ready-made ones as "tpl:<id>". */
+  app.get('/api/apps/pins', async () => ({ ids: pinsOf(db) }));
+
+  /** Pins these apps to the top of the Apps page, in this order, in place of those pinned before (every device shows the same). */
+  app.put('/api/apps/pins', async (req) => {
+    const ids = setPins(db, (req.body as { ids?: unknown } | undefined)?.ids);
+    d.broadcast({ t: 'feature', id: 'apps', data: { pins: ids } });
+    return { ids };
+  });
+  /** An app gone, or uninstalled, leaves the pins: the pages hear of it. */
+  const unpinned = (id: string) => unpin(db, id) && d.broadcast({ t: 'feature', id: 'apps', data: { pins: pinsOf(db) } });
 
   /** The tools of the app's own MCP server an app may allow (from every capability), for the builder. */
   app.get('/api/apps/tools', async () => {
@@ -434,6 +458,7 @@ function routes(d: Deps) {
     deleteApp(db, a.id);
     deleteRuns(db, a.id);
     clearData(db, a.id);
+    unpinned(a.id);
     return { ok: true };
   });
 
@@ -453,6 +478,7 @@ function routes(d: Deps) {
     const t = builtinOf(P(req).id);
     setInstalled(db, t.id, false);
     dropDaily(d.scheduler, `tpl:${t.id}`);
+    unpinned(`tpl:${t.id}`);
     return { template: t, installed: false, agents: agentsMay(db, t.id) };
   });
 
