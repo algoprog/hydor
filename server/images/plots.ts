@@ -17,7 +17,7 @@ import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { KIT_LIBS, LIB_CDN } from '../../shared/app-media.ts';
 import type { PlotAnswer, PlotAsk } from '../../shared/images.ts';
-import { ASSET } from '../../shared/slides.ts';
+import { ASSET, SLIDE_LIMITS } from '../../shared/slides.ts';
 import { HttpError } from '../auth.ts';
 import { kvGet, type DB } from '../db.ts';
 import { inSession } from '../documents/index.ts';
@@ -37,8 +37,8 @@ export const plotTiming = { runMs: 60_000, writeMs: 150_000 };
 const TRIES = 3;
 /** The most of the data the writer is shown: its columns and first rows. */
 const PREVIEW = 3000;
-/** The interactive page's most: it goes inside a deck, whose text is at most 3 MB. */
-const MAX_HTML = 1024 * 1024;
+/** The interactive page's most: what a slide's custom code part keeps. */
+const MAX_HTML = SLIDE_LIMITS.html;
 /** A drawing heavier than this (many thousands of points) is kept as a picture instead. */
 const MAX_SVG = 4 * 1024 * 1024;
 /** Plots drawn at once; more wait their turn. */
@@ -399,7 +399,7 @@ const basePt = (p: Plotting) => Math.max(8, Math.min(28, Math.round(Math.min(p.w
 const INTERACTIVE = [
   "- Also writes plot.json, the same plot for plotly.js 4, with `json.dump({'data': traces, 'layout': layout}, open('plot.json', 'w'), default=lambda o: o.tolist() if hasattr(o, 'tolist') else str(o))`:",
   '  the same data, colours, title and axis titles as the matplotlib plot; titles as {"text": …} (plotly.js takes no plain-string titles, and no titlefont); no width or height in the layout (it fills its frame);',
-  '  at most about 5,000 points a trace (sample evenly when there are more); None where a value is missing, never NaN.',
+  '  at most about 3,000 points in all (sample evenly when there are more), numbers rounded to 4 significant digits, None where a value is missing (never NaN): it must stay under 150 KB.',
 ].join('\n');
 
 /** What the writer is told once: what the script must do, and what makes a plot read well. */
@@ -707,7 +707,7 @@ async function runScript(tools: LocalTools, code: string, p: Plotting, signal: A
       notes.push(`No interactive version: ${fig}`);
     } else {
       const page = plotlyPage(fig, p.theme);
-      if (Buffer.byteLength(page) > MAX_HTML) notes.push(`No interactive version: with its data it is over ${MAX_HTML / 1024 / 1024} MB, too much for a slide; ask for fewer points.`);
+      if (page.length > MAX_HTML) notes.push(`No interactive version: with its data it is over ${Math.round(MAX_HTML / 1000)},000 characters, too much for a slide; ask for fewer points.`);
       else html = page;
     }
   }
