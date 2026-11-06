@@ -17,6 +17,7 @@ import { BoxModel, Choice, ColorField, Group, hexOf, NumField, Row, Select, spli
 import { FONTS, fontOf, fontOptions } from './fonts';
 import { aspectOf, editPicture, makePicture, pageData } from '../../images/studio';
 import { editKept } from '../../mediaedit/open';
+import { PageVideoFields } from '../design/pageMedia';
 
 export type Cmd = (cmd: string, arg?: unknown) => void;
 export type Media = '' | 'tablet' | 'phone';
@@ -326,6 +327,11 @@ export function PartPanel({
         <p className="mb-2 rounded-xl bg-accent-soft px-2.5 py-2 text-[12px] leading-snug text-fg-2">{`${sel.multi} blocks picked: the changes below, and Delete, Duplicate, Move, Turn into and Colour in their ⋮⋮ menu, go to all of them.`}</p>
       )}
 
+      {sel.tag === 'video' && (
+        <Group id="video" title="Video" start>
+          <PageVideoFields sel={sel} cmd={cmd} title={title ?? ''} />
+        </Group>
+      )}
       {(sel.words !== undefined || isLink || isImg || isField || !!sel.kind || sel.tex !== undefined) && (
         <Group id="content" title="Content" start summary={sel.snippet}>
           {sel.words !== undefined && (

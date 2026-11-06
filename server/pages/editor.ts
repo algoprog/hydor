@@ -264,6 +264,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     colour: '<path d="M6 16 12 4l6 12"/><path d="M8.5 11h7"/><path d="M4 20h16" stroke-width="3"/>',
     chev: '<path d="m6 9 6 6 6-6"/>',
     comment: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    media: '<path d="M21 4 3 22"/><path d="m14 4 6 6"/><path d="M5 9 9 5"/>',
   };
   const svg = (k: string) => `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
   const dark = cfg.theme === 'dark';
@@ -341,6 +342,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     <button class="drag" data-a="drag" title="${attr(L('gripTip', 'Drag to move it, click for its menu'))}">${svg('drag')}</button>
     <button data-a="parent" title="${L('parentTip', 'Pick the part around it (Esc)')}">${svg('parent')}</button>
     <button data-a="edit" title="${L('editTip', 'Change the words (click again)')}">${svg('edit')}</button>
+    <button data-a="media" title="${attr(L('mediaTip', 'Edit picture'))}">${svg('media')}</button>
     <span class="sep"></span>
     <button data-a="up" title="${L('upTip', 'Move up')}">${svg('up')}</button>
     <button data-a="down" title="${L('downTip', 'Move down')}">${svg('down')}</button>
@@ -517,6 +519,11 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     (bar.querySelector('[data-a=drag]') as HTMLElement).hidden = isBody;
     (bar.querySelector('[data-a=parent]') as HTMLElement).hidden = isBody;
     (bar.querySelector('[data-a=edit]') as HTMLElement).hidden = !wordy(sel);
+    // A picture, or a video the app keeps: its editor (pages/design/pageMedia.tsx), from here.
+    const media = sel.tagName === 'IMG' ? 'Picture' : sel.tagName === 'VIDEO' && /\/pg\/video\//.test(sel.getAttribute('src') ?? '') ? 'Video' : '';
+    const mb = bar.querySelector('[data-a=media]') as HTMLElement;
+    mb.hidden = !media;
+    if (media) mb.title = media === 'Video' ? L('mediaVideoTip', 'Edit video') : L('mediaTip', 'Edit picture');
     (bar.querySelector('[data-a=up]') as HTMLElement).hidden = isBody || !sel.previousElementSibling;
     (bar.querySelector('[data-a=down]') as HTMLElement).hidden = isBody || !nextPart(sel);
     (bar.querySelector('[data-a=dup]') as HTMLElement).hidden = isBody;
@@ -1726,6 +1733,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     const b = (e.target as Element).closest?.('button');
     e.preventDefault();
     e.stopPropagation();
+    if (b?.dataset.a === 'media') return send({ type: 'wa-ed-design', what: 'action', action: sel?.tagName === 'VIDEO' ? 'editVideo' : 'editPicture' });
     if (b && b.dataset.a !== 'drag') act(b.dataset.a!);
   });
 
