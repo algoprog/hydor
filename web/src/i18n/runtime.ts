@@ -14,6 +14,9 @@ let translate: (s: string, split?: boolean) => string | null = () => null;
 /** Words the page says rather than shows (hands-free mode), in the user's language when the dictionary has them. */
 export const tr = (s: string) => translate(s) ?? s;
 
+/** As tr, for words of one part of the app drawn where no element can say which (a page's frame): that part's entry first ("pages::Open"). */
+export const trIn = (part: string, s: string) => translate(`${part}::${s}`) ?? translate(s) ?? s;
+
 /** Where nothing is translated: what people and agents wrote, and code. Text boxes keep their own text, but their hints are translated. */
 const SKIP = 'pre, code, kbd, textarea, script, style, .md, .cm-editor, .xterm, [contenteditable="true"], [translate="no"]';
 const NO_ATTRS = '.md, .cm-editor, .xterm, [contenteditable="true"], [translate="no"]';

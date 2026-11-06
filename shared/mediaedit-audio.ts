@@ -245,7 +245,7 @@ export const EFFECTS: Record<SoundEffectType, EffectInfo> = {
     hint: 'Takes out steady noise: hiss, hum, a fan, traffic.',
     params: [db('amount', 'Reduction', 4, 40, 12, 1)],
     presets: [
-      { label: 'Light', p: { amount: 8 } },
+      { label: 'Gentle', p: { amount: 8 } },
       { label: 'Medium', p: { amount: 14 } },
       { label: 'Strong', p: { amount: 24 } },
     ],

@@ -274,11 +274,13 @@ export function Popover({
   }, [open, place, bottomSheet]);
   usePopoverDismiss(ref, anchor as RefObject<HTMLElement | null>, onClose, open);
   if (!open) return null;
+  // The part of the app it opened from (an editor's data-i18n), so its words are translated as they mean there.
+  const part = anchor.current?.closest('[data-i18n]')?.getAttribute('data-i18n') ?? undefined;
   if (bottomSheet) {
     // The dimmed page belongs to the sheet: a tap there closes this one, not one it was opened from.
     const kb = !!room && room.bottom > 0;
     return createPortal(
-      <div ref={ref} role="dialog" aria-modal className="fixed inset-0 z-50" style={z ? { zIndex: z } : undefined}>
+      <div ref={ref} role="dialog" aria-modal data-i18n={part} className="fixed inset-0 z-50" style={z ? { zIndex: z } : undefined}>
         <div className="absolute inset-0 touch-none bg-black/40" onClick={onClose} aria-hidden />
         <div
           style={{ bottom: room?.bottom ?? 0, maxHeight: room ? `calc(${room.height}px - var(--safe-top) - 12px)` : undefined }}
@@ -304,6 +306,7 @@ export function Popover({
       <div
         ref={ref}
         role="dialog"
+        data-i18n={part}
         style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width: pos?.width ?? width, maxHeight: pos?.maxH, zIndex: z }}
         className={cx('fixed z-50 overflow-y-auto rounded-xl border border-line bg-elevated p-1 shadow-lg', className)}
       >
