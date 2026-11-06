@@ -26,6 +26,7 @@ import {
   Image as ImageIcon,
   ImageMinus,
   Images,
+  Layers,
   LayoutTemplate,
   Link2,
   MessageSquare,
@@ -39,6 +40,7 @@ import {
   Play,
   Plus,
   Presentation,
+  QrCode,
   Redo2,
   Scissors,
   Shapes,
@@ -1694,6 +1696,13 @@ export function SlidesEditor({
 
       <Popover anchor={anchors.slide} open={menu === 'slide'} onClose={() => setMenu(null)} width={380} title="A new slide">
         <LayoutGrid deck={deck} fonts={fonts} onPick={(l) => newSlide(l)} />
+        {!readOnly && (
+          <div className="border-t border-line p-1">
+            <MenuItem icon={<Layers size={14} />} onClick={() => (setMenu(null), setReuseOpen(true))}>
+              Slides from another deck
+            </MenuItem>
+          </div>
+        )}
       </Popover>
       <Popover anchor={anchors.shape} open={menu === 'shape'} onClose={() => setMenu(null)} width={244} title="Shape">
         <div className="grid grid-cols-5 gap-1 p-1.5">
@@ -1745,6 +1754,10 @@ export function SlidesEditor({
         </MenuItem>
         <MenuItem icon={<PenTool size={14} />} onClick={() => (setMenu(null), void aiPicture('drawing'))}>
           Drawing (SVG)
+        </MenuItem>
+        <MenuSep />
+        <MenuItem icon={<QrCode size={14} />} onClick={() => (setMenu(null), setQrOpen(true))}>
+          QR code
         </MenuItem>
       </Popover>
       <Popover anchor={anchors.present} open={menu === 'present'} onClose={() => setMenu(null)} align="end" width={250}>
