@@ -386,6 +386,9 @@ else {
   ok(asks.length === 2 && /The picture is right, but: It saved no plot\.json/.test(asks[1].prompt) && typeof r12.html === 'string', 'no plot.json: asked again');
   const r13 = (await req('POST', '/api/plots/make', { code: MATHS, interactive: true })).json();
   ok(!r13.html && /No interactive version: It saved no plot\.json/.test(r13.notes), 'code alone without it: a note');
+  const BIG = `${MATHS}import json, random\njson.dump({'data': [{'type': 'scatter', 'x': [random.random() for _ in range(30000)], 'y': [random.random() for _ in range(30000)]}]}, open('plot.json', 'w'))\n`;
+  const r14 = (await req('POST', '/api/plots/make', { code: BIG, interactive: true })).json();
+  ok(r14.mime === 'image/png' && !r14.html && /No interactive version: with its data it is over 200,000 characters, too much for a slide/.test(r14.notes), `an interactive version too big for a slide: a note (${r14.notes})`);
 
   // A request that is stopped (the dialog closed) stops the writer.
   const ac = new AbortController();
