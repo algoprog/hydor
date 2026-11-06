@@ -163,7 +163,7 @@ export function Splitter({ width, min, max, onSize, side = 'left' }: { width: nu
 export function DockPanel({ id, title, icon, aside, children, grow }: { id: string; title: string; icon?: ReactNode; aside?: ReactNode; children: ReactNode; grow?: boolean }) {
   const [open, setOpen] = useRemembered(`panel:${id}`, true);
   return (
-    <section className={cx('flex min-h-0 flex-col border-b border-line', open && grow && 'flex-1')}>
+    <section className={cx('flex flex-col border-b border-line', open && grow ? 'min-h-0 flex-1' : 'shrink-0')}>
       <div className="flex h-8 shrink-0 items-center gap-1 pr-1.5 pl-2">
         <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[12px] font-semibold tracking-wide text-fg-2 hover:text-fg">
           <ChevronDown size={13} className={cx('shrink-0 text-fg-3 transition-transform', !open && '-rotate-90')} />
