@@ -6,7 +6,7 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { closestCenter, DndContext, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { horizontalListSortingStrategy, rectSortingStrategy, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Copy, Ellipsis, EyeOff, Eye, Plus, Trash2 } from 'lucide-react';
+import { Copy, Ellipsis, EyeOff, Eye, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { layoutSlide, LAYOUTS, type Deck, type LayoutId } from '@shared/slides';
 import { cx, MenuItem, MenuSep, Popover } from '../../../components/ui';
 import { SlideThumb } from './Thumb';
@@ -128,6 +128,8 @@ export interface StripActions {
   duplicate(i: number): void;
   remove(i: number): void;
   toggleHidden(i: number): void;
+  /** A slide made with AI after this one (the gallery of kinds), where the editor can ask an agent. */
+  aiAfter?(i: number): void;
 }
 
 /** The slides' menu and layouts, opened from a slide (its … or a right-click). */
@@ -150,6 +152,11 @@ function SlideMenu({ deck, at, fonts, onClose, act }: { deck: Deck; at: { i: num
           <MenuItem icon={<Plus size={14} />} onClick={() => setLayouts(true)}>
             A new slide after it
           </MenuItem>
+          {act.aiAfter && (
+            <MenuItem icon={<Sparkles size={14} />} onClick={() => (act.aiAfter!(at.i), close())}>
+              A slide made with AI after it
+            </MenuItem>
+          )}
           <MenuItem icon={<Copy size={14} />} onClick={() => (act.duplicate(at.i), close())}>
             Duplicate
           </MenuItem>

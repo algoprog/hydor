@@ -28,6 +28,8 @@ import {
   Group as GroupIcon,
   Image as ImageIcon,
   ImageMinus,
+  Images,
+  Layers,
   LayoutTemplate,
   Lightbulb,
   Link2,
@@ -42,6 +44,7 @@ import {
   Play,
   Plus,
   Presentation,
+  QrCode,
   Redo2,
   Scissors,
   Shapes,
@@ -130,8 +133,14 @@ import { FooterDialog } from './FooterDialog';
 import { NotesField } from './Notes';
 import { findInDeck, replaceAllInDeck, replaceHit } from './find';
 import { exportFile } from '../exportFile';
+import { openTypes } from '../types';
 import { chooseModel, chooseVideo, fetchVideoStill, firstFrame, isVideoFile, uploadModel, uploadVideo } from './media';
 import { SlideComments } from './SlideComments';
+import { choosePhoto } from '../FreePhotos';
+import { photoParts, withPhoto, withSlidesAfter } from './inserts';
+import { ReuseSlidesDialog } from './ReuseSlides';
+import { SheetChartDialog } from './SheetChart';
+import { QrDialog } from './QrCode';
 import { DesignIdeas } from './DesignIdeas';
 import { AccessibilityPanel } from './Accessibility';
 import { askToTranslate, TranslateDialog } from './Translate';
@@ -259,6 +268,7 @@ export function SlidesEditor({
   savedNote,
   onDirty,
   onAsk,
+  onRequest,
   onScopes,
   saveNowRef,
   startPresent,
@@ -323,6 +333,10 @@ export function SlidesEditor({
   /** The thread picked in the Comments tab. */
   const [activeComment, setActiveComment] = useState<string | null>(null);
   const [footerOpen, setFooterOpen] = useState(false);
+  /** Insert → Slides from another deck, and Chart → From a spreadsheet. */
+  const [reuseOpen, setReuseOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   /** A writing helper in the side panel's place (Design ideas, Check accessibility), and a language to type for Translate the slides. */
   const [side, setSide] = useState<'ideas' | 'check' | null>(null);
   const [langAsk, setLangAsk] = useState(false);
@@ -665,6 +679,31 @@ export function SlidesEditor({
     if (!f) return;
     if (!isVideoFile(f)) return toast('That is not a video a slide takes: an MP4, MOV or WebM file');
     await putVideoFile(f);
+  };
+  /** A free photo on the slide, its credit in the speaker notes (and under it, where its licence asks for one). */
+  const freePhoto = async () => {
+    setMenu(null);
+    const use = await choosePhoto();
+    const d = live.current;
+    if (!use || !d) return;
+    const els = photoParts(d, use);
+    canvas.current?.stopEditing();
+    setScope([]);
+    change((x) => withPhoto(x, index, els, use));
+    setSel([els[0].id]);
+    setTab('format');
+    setView('edit');
+  };
+  /** Slides from another deck, after the one on view. */
+  const insertSlides = (slides: Slide[]) => {
+    setReuseOpen(false);
+    if (!slides.length) return;
+    canvas.current?.stopEditing();
+    change((d) => withSlidesAfter(d, index, slides));
+    setCur(index + 1);
+    setSel([]);
+    setView('edit');
+    toast(slides.length === 1 ? '1 slide put in' : `${slides.length} slides put in`, 'ok');
   };
 
   // ---- the AI tools -------------------------------------------------------------------------------------------
@@ -1223,7 +1262,10 @@ export function SlidesEditor({
 
   if (!deck || !slide) return <div className="flex h-full items-center justify-center text-fg-3">…</div>;
 
+  // A slide made with AI after a slide (Insert and the New slide menu: the one on view; a slide's own menu: that one).
+  const aiSlideAfter = onRequest && !readOnly ? (i: number) => openTypes({ kind: 'slide', after: { index: i, title: slideTitle(deck.slides[i]) }, webDeck: isWebDeck(deck), onDone: onRequest }) : null;
   const stripAct = {
+    aiAfter: aiSlideAfter ?? undefined,
     pick: (i: number) => {
       canvas.current?.stopEditing();
       pickedAt.current = performance.now();
@@ -1290,6 +1332,7 @@ export function SlidesEditor({
     else pins.push({ key, x: at.x, y: at.y, ids: [c.id], active: false });
   }
   for (const p of pins) p.active = !!activeComment && p.ids.includes(activeComment);
+  const aiSlide = aiSlideAfter ? () => aiSlideAfter(index) : null;
   const web = isWebDeck(deck);
   const menus = slidesMenus({
     readOnly,
@@ -1359,11 +1402,16 @@ export function SlidesEditor({
     aiEdit: readOnly ? undefined : (mode) => one && void aiEdit(one.id, mode),
     editPicture: readOnly ? undefined : () => one && openPicture(one.id),
     aiPlotChart: readOnly ? undefined : () => one && void aiPlot(one.id),
+    aiSlide: aiSlide ?? undefined,
     editVideo: readOnly ? undefined : () => one && editVideo(one.id),
     running: !!one && running === one.id,
     run: () => one && setRunning(running === one.id ? null : one.id),
     video: () => setVideoAsk(true),
     videoFile: () => void pickVideoFile(),
+    freePhoto: readOnly ? undefined : () => void freePhoto(),
+    sheetChart: readOnly ? undefined : () => setSheetOpen(true),
+    reuseSlides: readOnly ? undefined : () => setReuseOpen(true),
+    qr: readOnly ? undefined : () => setQrOpen(true),
     footer: () => setFooterOpen(true),
     comment: startComment,
     crop: () => one && crop(one.id),
@@ -1810,7 +1858,22 @@ export function SlidesEditor({
       )}
 
       <Popover anchor={anchors.slide} open={menu === 'slide'} onClose={() => setMenu(null)} width={380} title="A new slide">
+        {aiSlide && (
+          <>
+            <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), aiSlide())}>
+              Slide made with AI
+            </MenuItem>
+            <MenuSep />
+          </>
+        )}
         <LayoutGrid deck={deck} fonts={fonts} onPick={(l) => newSlide(l)} />
+        {!readOnly && (
+          <div className="border-t border-line p-1">
+            <MenuItem icon={<Layers size={14} />} onClick={() => (setMenu(null), setReuseOpen(true))}>
+              Slides from another deck
+            </MenuItem>
+          </div>
+        )}
       </Popover>
       <Popover anchor={anchors.shape} open={menu === 'shape'} onClose={() => setMenu(null)} width={244} title="Shape">
         <div className="grid grid-cols-5 gap-1 p-1.5">
@@ -1853,12 +1916,19 @@ export function SlidesEditor({
         <MenuItem icon={<Link2 size={14} />} onClick={() => (setMenu(null), setUrlAsk({}))}>
           From a web address
         </MenuItem>
+        <MenuItem icon={<Images size={14} />} onClick={() => void freePhoto()}>
+          Free photos
+        </MenuItem>
         <MenuSep />
         <MenuItem icon={<WandSparkles size={14} />} onClick={() => (setMenu(null), void aiPicture('picture'))}>
           Make with AI
         </MenuItem>
         <MenuItem icon={<PenTool size={14} />} onClick={() => (setMenu(null), void aiPicture('drawing'))}>
           Drawing (SVG)
+        </MenuItem>
+        <MenuSep />
+        <MenuItem icon={<QrCode size={14} />} onClick={() => (setMenu(null), setQrOpen(true))}>
+          QR code
         </MenuItem>
       </Popover>
       <Popover anchor={anchors.present} open={menu === 'present'} onClose={() => setMenu(null)} align="end" width={250}>
@@ -2091,6 +2161,9 @@ export function SlidesEditor({
         }}
       />
       <FooterDialog open={footerOpen} onClose={() => setFooterOpen(false)} deck={deck} index={index} change={change} />
+      <ReuseSlidesDialog open={reuseOpen} deck={deck} pageId={pageId} onClose={() => setReuseOpen(false)} onInsert={insertSlides} />
+      <SheetChartDialog open={sheetOpen} deck={deck} onClose={() => setSheetOpen(false)} onInsert={(el) => (setSheetOpen(false), put([el]))} />
+      <QrDialog open={qrOpen} deck={deck} onClose={() => setQrOpen(false)} onInsert={(el) => (setQrOpen(false), put([el]))} />
       <TranslateDialog open={langAsk} onClose={() => setLangAsk(false)} />
       <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={SHORTCUTS} />
       {present && !present.presenter && !present.how && <Slideshow deck={deck} from={present.from} pageId={pageId} title={doc?.title} onClose={() => setPresent(null)} />}

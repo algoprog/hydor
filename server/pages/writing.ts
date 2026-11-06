@@ -2151,6 +2151,14 @@ export function writing(E: Core): Writing {
         else if (later) later.before(img);
         else placeBlock(img, where);
         if (group) group.done[n] = img;
+        // A free photo's credit, as its licence asks: small words under it (its text, never markup).
+        if (typeof arg.credit === 'string' && arg.credit.trim()) {
+          const credit = make('p');
+          const small = make('small');
+          small.textContent = arg.credit.slice(0, 600);
+          credit.append(small);
+          img.after(credit);
+        }
         return { pick: img };
       });
       return;

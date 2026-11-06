@@ -69,8 +69,11 @@ import { agentTex, compileSummary, compileTex, readTex, SAVE_LATEX_DESCRIPTION, 
 import { arxivRoutes, dropPaperFolder } from './latex-arxiv.ts';
 import { checkRoutes, LATEX_CHECK } from './latex-check.ts';
 import { actionsLine, pageActionTool } from './actions.ts';
+import { HOW_TO_MAKE, makeInstructions } from './content-types.ts';
 import { agentBook, readBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
 import { agentDeck, readDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
+import { myThemeByName } from './my-themes.ts';
+import { withSheetsAndLogo } from './slides-sources.ts';
 import { agentFileComments, openFile, openFileComments, saveFile, texFileForAgent } from './filemodel.ts';
 import { kindForFile, kindOf, mustKind, type PageKind } from './kinds.ts';
 import { shellManifest, shellPage } from './shell.ts';
@@ -420,16 +423,22 @@ const SAVE_SLIDES: RunTool = {
     try {
       kept = prev ? readDeck(prev) : null;
     } catch {}
-    let input: Record<string, unknown> = { ratio: a.ratio, theme: a.theme, slides: a.slides, footer: a.footer, guides: a.guides, comments: a.comments, format: a.format ?? kept?.format, progress: a.progress ?? kept?.progress };
+    // One of the user's own themes by its name brings its colours, fonts and logo; the logo stays as it was unless said.
+    const mine = myThemeByName(ctx.deps.db, a.theme);
+    const logo = a.logo !== undefined ? a.logo : (mine?.logo ?? kept?.logo);
+    let input: Record<string, unknown> = { ratio: a.ratio, theme: mine?.theme ?? a.theme, logo, slides: a.slides, footer: a.footer, guides: a.guides, comments: a.comments, format: a.format ?? kept?.format, progress: a.progress ?? kept?.progress };
     // Some slides changed, added or taken out: the deck they make, its look as it was unless said.
     if (changesSlides(a)) {
       if (!id || !prev) throw new Error('change, add and remove change a saved deck: give its id (get_page lists them), or send the whole deck as slides.');
       if (a.slides !== undefined) throw new Error('Give slides (the whole deck) or change, add and remove (some of its slides), not both.');
       const was = readDeck(prev);
-      input = { ratio: a.ratio ?? was.ratio, theme: a.theme ?? was.theme, footer: a.footer ?? was.footer, guides: a.guides ?? was.guides, comments: a.comments, format: a.format ?? was.format, progress: a.progress ?? was.progress, slides: applyDeckEdits(was, a).slides };
+      input = { ratio: a.ratio ?? was.ratio, theme: mine?.theme ?? a.theme ?? was.theme, logo: a.logo !== undefined ? a.logo : (mine?.logo ?? was.logo), footer: a.footer ?? was.footer, guides: a.guides ?? was.guides, comments: a.comments, format: a.format ?? was.format, progress: a.progress ?? was.progress, slides: applyDeckEdits(was, a).slides };
     }
-    // The version it changes: the parts it sends back as they were keep their look.
-    const { deck, notes } = await agentDeck(ctx.deps.db, input, ctx.cwd, prev);
+    // The version it changes: the parts it sends back as they were keep their look; its logo takes its picture's shape, and
+    // its charts from spreadsheets their numbers.
+    const made = await agentDeck(ctx.deps.db, input, ctx.cwd, prev);
+    const notes = made.notes;
+    const deck = withSheetsAndLogo(ctx.deps.db, made.deck, { logo: a.logo }, notes);
     const p = keepModel(ctx, id, 'slides', a.title, deck, a.project, a.libraryFolder);
     const n = deck.slides.length;
     return [
@@ -635,7 +644,7 @@ const PUBLISH_SITE: RunTool = {
  * keep" wrote an HTML file that never reached Pages.
  */
 const INSTRUCTIONS =
-  'Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, and a Jupyter notebook to read, run and come back to (a lesson, an analysis to show) with save_notebook, unless they ask for a file made another way or it belongs with a project’s code and data in a folder. get_page lists all of these, to change one, with the Library folder each is in; the save tools’ libraryFolder puts one in a folder of the Library (by its name or a path, made when missing). export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown, LaTeX, a notebook or a Python script). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how.';
+  'Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, and a Jupyter notebook to read, run and come back to (a lesson, an analysis to show) with save_notebook, unless they ask for a file made another way or it belongs with a project’s code and data in a folder. get_page lists all of these, to change one, with the Library folder each is in; the save tools’ libraryFolder puts one in a folder of the Library (by its name or a path, made when missing). export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown, LaTeX, a notebook or a Python script). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how. When the user asks for a known kind of slide, deck, document, section, page part, page or spreadsheet by name (a SWOT slide, a pitch deck, a cover letter, an executive summary, a habit tracker, a pricing table, a budget), read how to make it well with how_to_make before you make it.';
 
 /** The tools that make and change pictures and videos, for the agent beside a deck, a document or a page. */
 const PICTURES =
@@ -1149,10 +1158,12 @@ function routes(d: Deps) {
 export const pages: Feature = {
   id: 'pages',
   routes,
-  tools: () => [SHOW_HTML, SAVE_PAGE, watched(SAVE_SLIDES), watched(SAVE_DOC), watched(SAVE_SHEET), watched(SAVE_LATEX), SAVE_NOTEBOOK, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE, LATEX_CHECK, pageActionTool({ keep: keepModel, hidden: outOfReach })],
+  tools: () => [SHOW_HTML, SAVE_PAGE, watched(SAVE_SLIDES), watched(SAVE_DOC), watched(SAVE_SHEET), watched(SAVE_LATEX), SAVE_NOTEBOOK, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE, LATEX_CHECK, HOW_TO_MAKE, pageActionTool({ keep: keepModel, hidden: outOfReach })],
   spawn: (s, d) => {
     const ask = s.extra?.page ? askInstructions(d.db, s.extra.page) : null;
-    return { instructions: ask ? [INSTRUCTIONS, ask] : [INSTRUCTIONS] };
+    // Something asked for from the gallery or Turn it into (`extra.make`): the request in full, the message being short.
+    const make = s.extra?.make ? makeInstructions(s.extra.make) : null;
+    return { instructions: [INSTRUCTIONS, ...(ask ? [ask] : []), ...(make ? [make] : [])] };
   },
   // The pages the user changed in the editor, with their next message (which starts a new turn of saves).
   beforeMessage: (key, d) => {

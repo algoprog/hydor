@@ -19,6 +19,7 @@ import { cleanFont, iconNodes, LAYOUTS, SLIDE_LIMITS, THEMES, videoSrc, type Lay
 import { texOfOmml } from './omml.ts';
 import { shapeOutline } from './pptx.ts';
 import { keepVideoFile } from './videos.ts';
+import { videoSeconds } from './video-length.ts';
 
 type Obj = Record<string, unknown>;
 
@@ -962,7 +963,7 @@ function picture(c: SlideCtx, pic: X, space: Space, depth: number): Obj | null {
   if (geom === 'roundRect') {
     const adj = Number(/val (\d+)/.exec(att(xpath(spPr, 'prstGeom', 'avLst', 'gd'), 'fmla') ?? '')?.[1] ?? 16667);
     el.radius = Math.round((Math.min(50000, adj) / 100000) * Math.min(box.w, box.h) * 100) / 100;
-  } else if (geom === 'ellipse') el.radius = Math.round((Math.min(box.w, box.h) / 2) * 100) / 100;
+  } else if (geom && PIC_MASKS[geom]) el.mask = Math.abs(box.w - box.h) < 1 && geom === 'ellipse' ? 'circle' : PIC_MASKS[geom];
   const line = lineOf(f, spPr, kid(pic, 'style'));
   if (line.line) Object.assign(el, { line: line.line, lineW: line.lineW });
   if (hasShadow(spPr, kid(pic, 'style'))) el.shadow = true;
@@ -972,6 +973,9 @@ function picture(c: SlideCtx, pic: X, space: Space, depth: number): Obj | null {
   if (depth === 0) c.kinds.set(att(cNvPr, 'id') ?? '', { kind: 'rect', box });
   return el;
 }
+
+/** PowerPoint's shapes a picture is cropped to (Crop to Shape), as the slide's own. */
+const PIC_MASKS: Record<string, string> = { ellipse: 'ellipse', hexagon: 'hexagon', star5: 'star', heart: 'heart', triangle: 'triangle', diamond: 'diamond', pentagon: 'pentagon', octagon: 'octagon' };
 
 const alphaOf = (blip: X | undefined) => {
   const a = att(kid(blip, 'alphaModFix'), 'amt');
@@ -1025,6 +1029,10 @@ function video(c: SlideCtx, pic: X, box: Box, media: X | undefined, videoFile: X
     c.f.notes.add('Videos kept outside the file were left out.');
     return poster ? { type: 'image', ...at, src: poster, alt: 'Video' } : null;
   }
+  // Trimmed at its end: PowerPoint keeps the time cut off it, the slide where it stops (its length less that).
+  const cut = Number(att(kid(media, 'trim'), 'end') ?? 0);
+  const length = cut > 0 ? videoSeconds(data) : null;
+  if (length && length - cut / 1000 > Number(el.start ?? 0)) el.end = Math.round((length - cut / 1000) * 10) / 10;
   // Kept by the app's video store when the import has it (a temporary file it copies), else left as their still.
   return { ...el, src: '', __video: data, __ext: path.extname(inner!.target).slice(1) || 'mp4' };
 }

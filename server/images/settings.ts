@@ -333,6 +333,34 @@ export const insteadLine = (picked: string, used: string, tr: Tr = same) => tr(`
 /** The line on an image form when the see-through background is made by taking the background out on this computer. */
 export const cutoutLine = (tr: Tr = same) => tr('Its background is then taken out on this computer, at no cost.');
 
+/**
+ * What the card asking for an OpenRouter key says the model is for and about what it costs (`cost`: money() of a
+ * picture, a drawing, a second of video, or this piece of sound), in plain words and the user's language.
+ */
+export function keyWhy(kind: 'image' | 'drawing' | 'video' | 'music' | 'speech', label: string, tr: Tr = same, cost?: string): string {
+  const first =
+    kind === 'image'
+      ? cost
+        ? tr(`Pictures are made by ${label} through OpenRouter, about ${cost} each.`)
+        : tr(`Pictures are made by ${label} through OpenRouter.`)
+      : kind === 'drawing'
+        ? cost
+          ? tr(`Detailed drawings are drawn by ${label} through OpenRouter, about ${cost} each.`)
+          : tr(`Detailed drawings are drawn by ${label} through OpenRouter.`)
+        : kind === 'video'
+          ? cost
+            ? tr(`Videos are made by ${label} through OpenRouter, about ${cost} a second.`)
+            : tr(`Videos are made by ${label} through OpenRouter.`)
+          : kind === 'music'
+            ? cost
+              ? tr(`Music is made by ${label} through OpenRouter, about ${cost} for this one.`)
+              : tr(`Music is made by ${label} through OpenRouter.`)
+            : cost
+              ? tr(`Voices and sounds are made by ${label} through OpenRouter, about ${cost} for this one.`)
+              : tr(`Voices and sounds are made by ${label} through OpenRouter.`);
+  return `${first} ${tr('You pay OpenRouter for what is made.')}`;
+}
+
 /** How much of what is made a form quotes: all of it, unless it is longer than a card can show (a long script). */
 const QUOTE_ROOM = 4000;
 /** What Markdown, or the app's maths, would read as marks: anywhere in a line, and at its start. */

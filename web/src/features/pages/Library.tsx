@@ -3,7 +3,9 @@
 // (an agent's save goes in its session's space; you pick when you keep something yourself) or in none. On a wide
 // screen the places are a list beside it: Everything (each space's things together, under its name), each space,
 // Not in a space, and Published (the sites published from pages or a project's build); on a phone, a row of chips.
-// Kinds filter what a place shows, a box finds things by name, and each card's More moves it to another space.
+// Kinds filter what a place shows, a box finds things by name, and each card's More moves it to another space, or
+// turns it into another kind (slides from a document, a page from a spreadsheet…): an agent makes that from it, in its
+// project and folder, and it stays as it is.
 // Files dropped anywhere on it (folders too) are added as what they are (uploads.ts): onto a project in the list of
 // places, into that project; elsewhere, into the place open (none on Everything); a line says where while they are
 // dragged. Upload files, beside a project's name (and in New), picks them on a device without a mouse.
@@ -13,7 +15,7 @@
 // Addresses: /library?project=<id>|none, &folder=<id>, &kind=<kind> (image, video and audio each, media pictures and
 // videos both: the old Media tab's ?tab=media too), ?tab=published; ?new=page|slides|doc|sheet|tex|notebook opens New
 // with that kind, ?new=folder New → Folder and ?new=import New → Import a folder.
-import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode, type RefObject } from 'react';
 import { useSearch } from 'wouter';
 import {
   AppWindow,
@@ -45,10 +47,12 @@ import {
   Search,
   Sheet,
   Sigma,
+  Sparkles,
   Trash2,
   Upload,
   X,
 } from 'lucide-react';
+import { TURN_INTO } from '@shared/content-asks';
 import type { MediaItem } from '@shared/media';
 import type { LibFolder, PageInfo, SiteInfo } from '@shared/pages';
 import type { SpaceView } from '@shared/spaces';
@@ -57,10 +61,11 @@ import { ago, bytes } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
-import { Button, cx, Empty, IconButton, MenuItem, MenuLabel, MenuSep, Popover, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
+import { Button, cx, Empty, IconButton, MenuBack, MenuItem, MenuLabel, MenuSep, Popover, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 import { downloadMedia, recaption, SoundTile, startSessionWithMedia, Still } from '../media/parts';
 import { useMedia } from '../media/state';
+import { useAskRun } from '../guide/ask';
 import { SpaceMark } from '../spaces/parts';
 import { SpaceMenu } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
@@ -70,6 +75,8 @@ import { EXPORTS } from './exports';
 import { NewPageDialog, PublishDialog, RenameDialog, SiteRow, Thumb, type NewKind } from './parts';
 import { CAN_DRAG, dragThing, FolderCrumbs, folderChain, FolderMenu, FolderNameDialog, FolderTile, ImportFolderDialog, moveToFolder, placeFolders, placeTopName } from './folders';
 import { usePagesStore } from './state';
+import { turnRequest } from './types/requests';
+import { startMaking } from './types/start';
 import { addToLibrary, dragsFiles, droppedFiles, dropMoves, pickFiles } from './uploads';
 import { DropHint } from './UploadTray';
 
@@ -155,6 +162,40 @@ function sorted(list: Item[], sort: Sort): Item[] {
   return list;
 }
 
+/** What "Turn it into" offers, by what an agent makes. */
+const TURN: Record<'slides' | 'doc' | 'page', { label: string; icon: ReactNode }> = {
+  slides: { label: 'Slides', icon: <Presentation size={14} /> },
+  doc: { label: 'A document', icon: <FileText size={14} /> },
+  page: { label: 'A page', icon: <AppWindow size={14} /> },
+};
+
+/**
+ * Turn it into, where the menu was (its first row goes back to it): a session starts at once to make the other kind
+ * from it, its message "Turn “Bakery plan” into slides", its agent told the rest; in its project, what is made landing
+ * there, in its folder. Mounted while open, so the cards do not each ask which agent would run it.
+ */
+function TurnMenu({ p, anchor, onClose, onBack }: { p: PageInfo; anchor: RefObject<HTMLButtonElement | null>; onClose: () => void; onBack: () => void }) {
+  const run = useAskRun();
+  const folders = usePagesStore((s) => s.folders);
+  const spaces = useSpaces();
+  const turn = (to: 'slides' | 'doc' | 'page') => {
+    onClose();
+    const names = p.folder ? folderChain(folders, p.folder).map((f) => f.name) : [];
+    const r = turnRequest({ from: p.kind ?? 'page', to, id: p.id, title: p.title, folder: names.join('/') || undefined });
+    startMaking(run, { prompt: r.prompt, make: r.make, space: p.space ? spaces?.find((s) => s.id === p.space) : null });
+  };
+  return (
+    <Popover anchor={anchor} open onClose={onClose} align="end" width={240}>
+      <MenuBack onClick={onBack}>Turn it into</MenuBack>
+      {TURN_INTO[p.kind ?? 'page'].map((to) => (
+        <MenuItem key={to} icon={TURN[to].icon} onClick={() => turn(to)}>
+          {TURN[to].label}
+        </MenuItem>
+      ))}
+    </Popover>
+  );
+}
+
 /** Moves an item to a space (or out of one), saying where it went. */
 async function moveTo(it: Item, space: string | null, spaces: SpaceView[] | null) {
   try {
@@ -177,6 +218,8 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
   const spaces = useSpaces();
   const folders = usePagesStore((s) => s.folders);
   const [menu, setMenu] = useState(false);
+  // What it can be turned into, shown where the menu was.
+  const [turning, setTurning] = useState(false);
   const [moving, setMoving] = useState(false);
   const [filing, setFiling] = useState(false);
   // The folders of its place, for Move to a folder; the one it is in, to say where it is in a list of the whole place.
@@ -271,7 +314,7 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
             {!!p?.storageBytes && <Database size={11} className="shrink-0" aria-label={tr(`Keeps ${bytes(p.storageBytes)}`)} />}
           </span>
         </button>
-        <IconButton ref={anchor} label="More" size="sm" onClick={() => setMenu((x) => !x)} active={menu || moving || filing}>
+        <IconButton ref={anchor} label="More" size="sm" onClick={() => setMenu((x) => !x)} active={menu || moving || filing || turning}>
           <Ellipsis size={15} />
         </IconButton>
       </div>
@@ -311,6 +354,9 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
             <MenuItem icon={<Copy size={14} />} onClick={duplicate}>
               Duplicate
             </MenuItem>
+            <MenuItem icon={<Sparkles size={14} />} submenu onClick={() => (close(), setTurning(true))}>
+              Turn it into
+            </MenuItem>
             <MenuSep />
             <MenuLabel>Download as</MenuLabel>
             {EXPORTS(p.kind).map((x) => (
@@ -334,6 +380,7 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
           Delete
         </MenuItem>
       </Popover>
+      {p && turning && <TurnMenu p={p} anchor={anchor} onClose={() => setTurning(false)} onBack={() => (setTurning(false), setMenu(true))} />}
       <SpaceMenu anchor={anchor} open={moving} onClose={() => setMoving(false)} title="Move it to" value={it.space ?? null} onPick={(s) => s !== (it.space ?? null) && void moveTo(it, s, spaces)} />
       <FolderMenu
         anchor={anchor}

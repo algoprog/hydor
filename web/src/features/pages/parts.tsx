@@ -1,9 +1,11 @@
 // The Library's shared parts: a page's picture (or its first letter until the picture is ready), and the dialogs
 // to rename a page, publish one (or a folder), and make a new page, deck, document, spreadsheet or LaTeX document
-// (from a starting point, a file, or by asking an agent), in a space or in none, or upload files of yours into the
-// Library (each made what it is: uploads.ts); and a published site's row.
-import { useEffect, useState, type ReactNode } from 'react';
-import { AppWindow, FileText, Globe, GlobeLock, NotebookText, Presentation, Sheet, Sigma, Sparkles, Upload } from 'lucide-react';
+// (from a starting point, a file, or by asking an agent, from a kind picked in the gallery or in their own words), in
+// a space or in none, or upload files of yours into the Library (each made what it is: uploads.ts); and a published
+// site's row.
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { AppWindow, FileText, Globe, GlobeLock, LayoutGrid, NotebookText, Presentation, Sheet, Sigma, Sparkles, Upload, X } from 'lucide-react';
+import type { ContentKind, ContentType } from '@shared/content-types';
 import type { PageInfo, SiteInfo, SiteVisibility } from '@shared/pages';
 import { newDeck, THEMES, type Ratio } from '@shared/slides';
 import { texFromTemplate, texTemplate, type TexTemplateId } from '@shared/latex-templates';
@@ -15,14 +17,20 @@ import { toast, toastError, useApp } from '../../lib/store';
 import { FolderPicker } from '../../components/FolderPicker';
 import { Button, cx, Dialog, inputCls, Segmented, useConfirm } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
+import { useAskRun } from '../guide/ask';
 import { startInSpace } from '../spaces/parts';
 import { SpaceSelect } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
 import { SiteLink, VISIBILITY } from './cards';
+import { folderChain } from './folders';
 import { usePagesStore } from './state';
 import { STARTERS } from './templates';
+import { appLanguage, openTypes, preloadTypes } from './types';
+import { madeRequest } from './types/requests';
+import { startMaking } from './types/start';
 import { pickFiles } from './uploads';
 import { SlideThumb } from './slides/Thumb';
+import { MyThemeChoices, myThemeDeck, useMyThemes } from './slides/MyThemes';
 import { TexTemplatePicker } from './latex/TemplatePicker';
 
 const TONES = ['from-accent/25 to-accent/5 text-accent', 'from-info/25 to-info/5 text-info', 'from-ok/25 to-ok/5 text-ok', 'from-warn/25 to-warn/5 text-warn', 'from-claude/25 to-claude/5 text-claude', 'from-codex/25 to-codex/5 text-codex'];
@@ -177,6 +185,8 @@ const ASK_FOR: Record<NewKind, string> = {
   tex: 'Write me a LaTeX document and keep it in my Library: ',
   notebook: 'Make me a Jupyter notebook, run it, and keep it in my Library: ',
 };
+/** The kinds the gallery has for each: Choose a kind picks one of them, which the request is then made from. */
+const TYPES_FOR: Partial<Record<NewKind, ContentKind>> = { page: 'page', slides: 'deck', doc: 'doc', sheet: 'sheet' };
 const OPENS: Partial<Record<NewKind, string>> = { slides: '.pptx,.ppsx,.potx,.pptm', doc: '.docx,.docm,.dotx,.md,.markdown,.txt,.html,.htm', sheet: '.xlsx,.ods,.csv,.tsv', tex: '.tex,.ltx,.zip', notebook: '.ipynb' };
 const KIND_TILES: { value: NewKind; label: string; icon: ReactNode }[] = [
   { value: 'page', label: 'A page', icon: <AppWindow size={16} /> },
@@ -196,6 +206,12 @@ const base64Of = (f: File) =>
     r.readAsDataURL(f);
   });
 
+/** A new deck in a ready-made theme, or in one of the user's own ("my:<id>", its logo on it). */
+function deckIn(theme: string, title: string, ratio: Ratio) {
+  const mine = theme.startsWith('my:') ? useMyThemes.getState().list?.find((t) => `my:${t.id}` === theme) : undefined;
+  return mine ? myThemeDeck(mine, title, ratio) : newDeck(title, theme, ratio);
+}
+
 /** New in the Library: a page, slides, a document… made in the space it shows (`space`), in its folder open (`folder`) unless another project is picked. */
 export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, folder }: { open: boolean; onClose: () => void; kind?: NewKind; space?: string | null; folder?: string }) {
   const [kind, setKind] = useState<NewKind>(startKind);
@@ -207,9 +223,15 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
   const [tpl, setTpl] = useState<TexTemplateId>('article');
   const tplTitle = (id: TexTemplateId) => (id === 'article' ? NEW_TITLE.tex : (texTemplate(id)?.title ?? NEW_TITLE.tex));
   const [ask, setAsk] = useState('');
+  // A kind picked in the gallery (a pitch deck, a cover letter): the request is made from it and the words, if any.
+  const [type, setType] = useState<ContentType | null>(null);
+  const askBox = useRef<HTMLInputElement>(null);
+  // Who makes it when a kind is picked: the agent and model picked last on the start page, as the editors' Ask does.
+  const run = useAskRun();
   const [busy, setBusy] = useState(false);
   // Where it goes: the space the Library shows now, or none; asked only when there are spaces.
   const spaces = useSpaces();
+  const folders = usePagesStore((s) => s.folders);
   const [where, setWhere] = useState<string | null>(space ?? null);
   useEffect(() => {
     if (!open) return;
@@ -218,6 +240,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
     setTitle(NEW_TITLE[startKind] || STARTERS[0].title);
     setTpl('article');
     setAsk('');
+    setType(null);
     setWhere(space ?? null);
   }, [open, startKind, space]);
   const starter = STARTERS.find((s) => s.id === pick)!;
@@ -231,7 +254,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
       const at = { space: where, folder: inFolder };
       const r =
         kind === 'slides'
-          ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind: 'slides', model: newDeck(t, theme, ratio), ...at })
+          ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind: 'slides', model: deckIn(theme, t, ratio), ...at })
           : kind === 'page'
             ? await post<{ page: PageInfo }>('/api/pages', { title: t, html: starter.html(t), ...at })
             : kind === 'tex'
@@ -269,7 +292,47 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
   };
   const switchKind = (k: NewKind) => {
     if (title === defaultTitle || !title.trim()) setTitle(NEW_TITLE[k] || starter.title);
+    if (k !== kind) setType(null);
     setKind(k);
+  };
+  const typesFor = TYPES_FOR[kind];
+  const chooseKind = () =>
+    typesFor &&
+    openTypes({
+      kind: typesFor,
+      onPick: (t) => {
+        setType(t);
+        if (window.matchMedia('(min-width: 768px)').matches) requestAnimationFrame(() => askBox.current?.focus());
+      },
+    });
+  /**
+   * Or describe it: an agent makes it. A kind picked: its session starts at once, the message a short line in the
+   * person's words, the agent told the rest (the kind's request, the name, the theme and shape, the folder). Words
+   * alone: the start page, with the request in its box. In a space, either starts there, so what it saves lands in it.
+   */
+  const describe = () => {
+    if (!ask.trim() && !type) return;
+    const sp = spaces?.find((x) => x.id === where) ?? null;
+    if (type) {
+      const t = title.trim();
+      const names = inFolder ? folderChain(folders, inFolder).map((f) => f.name) : [];
+      const th = kind === 'slides' ? THEMES.find((x) => x.id === theme) : undefined;
+      const r = madeRequest(type, ask, {
+        kind: type.kind,
+        title: t && t !== defaultTitle ? t : undefined,
+        theme: th ? { id: th.id, label: th.label } : undefined,
+        ratio: kind === 'slides' ? ratio : undefined,
+        folder: names.join('/') || undefined,
+        lang: appLanguage(),
+      });
+      if (!r) return;
+      onClose();
+      return startMaking(run, { prompt: r.prompt, make: r.make, space: sp });
+    }
+    onClose();
+    const prompt = `${tr(ASK_FOR[kind])}${ask.trim()}`;
+    if (sp) startInSpace(sp, prompt);
+    else go(`/?prompt=${enc(prompt)}`);
   };
   return (
     <Dialog
@@ -280,15 +343,28 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
       footer={
         <>
           {/* Files of yours instead, as many as you pick, each made what it is, in the project picked below. */}
-          <Button variant="ghost" icon={<Upload size={14} />} onClick={() => pickFiles(where, onClose)} title="Add files of yours: documents, spreadsheets, slides, pictures, videos and sounds" className="mr-auto">
+          {/* A kind picked: on a phone its two buttons only (the sheet closes by its X), so they fit across it. */}
+          <Button variant="ghost" icon={<Upload size={14} />} onClick={() => pickFiles(where, onClose)} title="Add files of yours: documents, spreadsheets, slides, pictures, videos and sounds" className={cx('mr-auto', type && 'max-sm:hidden')}>
             Upload files
           </Button>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose} className={type ? 'max-sm:hidden' : undefined}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={busy} onClick={make}>
-            Make it
-          </Button>
+          {/* A kind picked: making it with AI is what the dialog is for now; an empty one stays a click away. */}
+          {type ? (
+            <>
+              <Button variant="secondary" disabled={busy} onClick={make}>
+                Make an empty one
+              </Button>
+              <Button variant="primary" icon={<Sparkles size={14} />} onClick={describe}>
+                Make it with AI
+              </Button>
+            </>
+          ) : (
+            <Button variant="primary" disabled={busy} onClick={make}>
+              Make it
+            </Button>
+          )}
         </>
       }
     >
@@ -360,6 +436,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
                   </button>
                 );
               })}
+              <MyThemeChoices value={theme} onPick={setTheme} title={title.trim() || 'Slides'} ratio={ratio} />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Segmented<Ratio>
@@ -402,41 +479,56 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
           className="space-y-1.5 border-t border-line pt-3.5"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!ask.trim()) return;
-            onClose();
-            // In a space, the session that makes it starts there, so what it saves lands in that space.
-            const sp = spaces?.find((x) => x.id === where);
-            const prompt = `${tr(ASK_FOR[kind])}${ask.trim()}`;
-            if (sp) startInSpace(sp, prompt);
-            else go(`/?prompt=${enc(prompt)}`);
+            describe();
           }}
         >
-          <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-fg-2">
-            <Sparkles size={13} className="text-accent" />
-            Or describe it, and an agent makes it
-          </span>
+          <div className="flex items-center gap-1.5 text-[12.5px] font-medium text-fg-2">
+            <Sparkles size={13} className="shrink-0 text-accent" />
+            <span className="min-w-0 flex-1">Or describe it, and an agent makes it</span>
+            {typesFor && (
+              <button type="button" onPointerEnter={preloadTypes} onFocus={preloadTypes} onClick={chooseKind} className="flex shrink-0 items-center gap-1 rounded-md px-1 font-medium text-accent hover:underline">
+                <LayoutGrid size={13} />
+                Choose a kind
+              </button>
+            )}
+          </div>
           <div className="flex gap-2">
-            <input
-              value={ask}
-              onChange={(e) => setAsk(e.target.value)}
-              placeholder={
-                kind === 'slides'
-                  ? 'A 10-minute talk on our first year'
-                  : kind === 'doc'
-                    ? 'A cover letter for a design job'
-                    : kind === 'sheet'
-                      ? 'A monthly budget for two'
-                      : kind === 'tex'
-                        ? 'A two-page paper on my results, with equations'
-                        : kind === 'notebook'
-                          ? 'A notebook that charts my monthly spending from a CSV'
-                          : 'A packing list for a week of hiking'
-              }
-              className={cx(inputCls, 'min-w-0 flex-1')}
-            />
-            <Button type="submit" variant="secondary" disabled={!ask.trim()}>
-              Ask
-            </Button>
+            {/* The kind picked goes before the words, as a chip; the words are then what it is about. */}
+            <label className={cx(inputCls, 'flex min-w-0 flex-1 cursor-text items-center gap-1.5 focus-within:border-accent/60 focus-within:ring-3 focus-within:ring-accent/15', type && 'pl-1.5')}>
+              {type && (
+                <span className="flex h-6.5 max-w-[45%] shrink-0 items-center gap-0.5 rounded-md bg-accent-soft pr-0.5 pl-2 text-[12.5px] font-medium text-fg">
+                  <span className="truncate">{type.label}</span>
+                  <button type="button" aria-label="Not this kind" onClick={() => setType(null)} className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-fg-3 hover:text-fg">
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
+              <input
+                ref={askBox}
+                value={ask}
+                onChange={(e) => setAsk(e.target.value)}
+                placeholder={
+                  type?.hint ??
+                  (kind === 'slides'
+                    ? 'A 10-minute talk on our first year'
+                    : kind === 'doc'
+                      ? 'A cover letter for a design job'
+                      : kind === 'sheet'
+                        ? 'A monthly budget for two'
+                        : kind === 'tex'
+                          ? 'A two-page paper on my results, with equations'
+                          : kind === 'notebook'
+                            ? 'A notebook that charts my monthly spending from a CSV'
+                            : 'A packing list for a week of hiking')
+                }
+                className="h-full min-w-0 flex-1 bg-transparent outline-none placeholder:text-fg-3"
+              />
+            </label>
+            {!type && (
+              <Button type="submit" variant="secondary" disabled={!ask.trim()}>
+                Ask
+              </Button>
+            )}
           </div>
         </form>
       </div>

@@ -12,6 +12,11 @@
 // app gives its own; a deck's page has each drawn by the server's), else shown as their LaTeX. While presenting, a laser pointer, a pen
 // and live captions (the browser's speech recognition, where it has one) are on the keys L, P and C.
 //
+// Pictures cut to a shape (a clip path of the outline PowerPoint gets too) and in frames (a card, a phone, a laptop, a
+// browser window: their pieces drawn round the picture), QR codes from the squares kept with them, a slide's own theme
+// (a slide taken from another deck), the deck's logo in a corner of each slide, and videos stopping where they are
+// trimmed draw here as well.
+//
 // The web format's parts draw here too: code coloured by a small tokenizer of the runtime's own; quizzes answered in
 // the slideshow (their answers kept for the show, the score counted for its score parts); and the live parts (custom
 // code, web pages, 3D), each a page of its own in a sandboxed frame (the app's frame at /partframe, else a srcdoc
@@ -173,6 +178,10 @@ export interface SlidesRuntime {
   tokens(code: string, lang?: string): [string, string][];
   /** A code part's colours in a look (dark, light, the deck's): its background, its words, and each kind of word's. */
   codeLook(look: string | undefined, t: Theme): CodeLook;
+  /** The outline a picture is cut to (its `mask`) in a box: SVG path data of absolute M, L, C, Q and Z; '' for none. */
+  maskPath(mask: string, w: number, h: number): string;
+  /** A picture's frame in a box: its screen and the pieces drawn under and over the picture (lighter edges on a dark slide). */
+  framePlan(frame: string, w: number, h: number, dark: boolean): FramePlan;
 }
 
 /** The colours code shows in: its box, its plain words, each kind of word's (CodeLook[kind]), its line numbers, a lit line's band. */
@@ -180,6 +189,27 @@ export type CodeLook = Record<'bg' | 'fg' | 'k' | 's' | 'c' | 'n' | 'f' | 't' | 
 
 /** Names of fonts with their CSS families, which the runtime is given (it cannot import). */
 export type FontTable = Record<string, { css: string; google?: boolean }>;
+
+/** A piece of a picture's frame: a box in its frame's pixels, its corners rounded by r (or round), a colour, an edge, a soft shadow. */
+export interface FramePiece {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  r?: number;
+  round?: boolean;
+  fill: string;
+  line?: string;
+  lw?: number;
+  shadow?: boolean;
+}
+
+/** A picture's frame: the screen the picture shows in (`bottom`: only its bottom corners rounded), and the pieces under and over it. */
+export interface FramePlan {
+  screen: { x: number; y: number; w: number; h: number; r: number; bottom?: boolean };
+  under: FramePiece[];
+  over: FramePiece[];
+}
 
 /** Where the runtime loads what its live parts need: three.js (its folder on jsDelivr, at a pinned version). */
 export interface RuntimeLibs {
@@ -275,6 +305,10 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
     '.ns-chart{position:absolute;inset:0;width:100%;height:100%;overflow:visible}',
     '.ns-imgbox,.ns-flip{position:absolute;inset:0;overflow:hidden}',
     '.ns-flip{overflow:visible}',
+    // A picture's frame (a card, a phone, a laptop, a browser window) and its outline cut to a shape; the deck's logo.
+    '.ns-chrome,.ns-ring{position:absolute;pointer-events:none}',
+    '.ns-ring{inset:0;width:100%;height:100%;overflow:visible}',
+    '.ns-logo{position:absolute;display:block;object-fit:contain;pointer-events:none;-webkit-user-drag:none;user-select:none}',
     '.ns-icon{position:absolute;inset:0;width:100%;height:100%;overflow:visible}',
     '.ns-math{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:visible}',
     '.ns-math[data-align=left]{justify-content:flex-start}.ns-math[data-align=right]{justify-content:flex-end}',
@@ -465,6 +499,139 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       }
     }
     return '';
+  };
+
+  // ---- pictures cut to a shape, and in frames ------------------------------------------------------------------
+  const MASKS = new Set(['circle', 'ellipse', 'arch', 'blob', 'flower', 'hexagon', 'star', 'heart', 'triangle', 'diamond', 'pentagon', 'octagon']);
+  const FRAMES = new Set(['polaroid', 'phone', 'laptop', 'browser']);
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  /** A closed curve through points, smooth (Catmull-Rom's, as cubic Béziers). */
+  const smooth = (pts: number[][]) => {
+    const k = pts.length;
+    let d = `M${r2(pts[0][0])},${r2(pts[0][1])}`;
+    for (let i = 0; i < k; i++) {
+      const [a, b, c, e] = [pts[(i - 1 + k) % k], pts[i], pts[(i + 1) % k], pts[(i + 2) % k]];
+      d += `C${r2(b[0] + (c[0] - a[0]) / 6)},${r2(b[1] + (c[1] - a[1]) / 6)} ${r2(c[0] - (e[0] - b[0]) / 6)},${r2(c[1] - (e[1] - b[1]) / 6)} ${r2(c[0])},${r2(c[1])}`;
+    }
+    return `${d}Z`;
+  };
+  /** An ellipse round (cx, cy) as four cubic Béziers. */
+  const oval = (cx: number, cy: number, rx: number, ry: number) => {
+    const kx = rx * 0.5523;
+    const ky = ry * 0.5523;
+    return `M${r2(cx - rx)},${r2(cy)}C${r2(cx - rx)},${r2(cy - ky)} ${r2(cx - kx)},${r2(cy - ry)} ${r2(cx)},${r2(cy - ry)}C${r2(cx + kx)},${r2(cy - ry)} ${r2(cx + rx)},${r2(cy - ky)} ${r2(cx + rx)},${r2(cy)}C${r2(cx + rx)},${r2(cy + ky)} ${r2(cx + kx)},${r2(cy + ry)} ${r2(cx)},${r2(cy + ry)}C${r2(cx - kx)},${r2(cy + ry)} ${r2(cx - rx)},${r2(cy + ky)} ${r2(cx - rx)},${r2(cy)}Z`;
+  };
+  /**
+   * The outline a picture is cut to in its box (w×h): SVG path data of absolute M, L, C, Q and Z alone, so the PowerPoint
+   * file can have it as its own geometry. A circle is the box's middle as wide as its shorter side; the rest fill the box.
+   */
+  const maskPath = (mask: string, w: number, h: number): string => {
+    if (mask === 'circle') return oval(w / 2, h / 2, Math.min(w, h) / 2, Math.min(w, h) / 2);
+    if (mask === 'ellipse') return oval(w / 2, h / 2, w / 2, h / 2);
+    if (mask === 'arch') {
+      // A half ellipse over a box: a half circle when the box is tall enough.
+      const ry = Math.min(h, w / 2);
+      const kx = (w / 2) * 0.5523;
+      const ky = ry * 0.5523;
+      return `M0,${r2(h)}L0,${r2(ry)}C0,${r2(ry - ky)} ${r2(w / 2 - kx)},0 ${r2(w / 2)},0C${r2(w / 2 + kx)},0 ${r2(w)},${r2(ry - ky)} ${r2(w)},${r2(ry)}L${r2(w)},${r2(h)}Z`;
+    }
+    if (mask === 'blob') {
+      const f = [0.97, 0.84, 0.95, 0.8, 0.93, 0.87, 0.97, 0.82];
+      return smooth(f.map((k, i) => [w / 2 + (w / 2) * k * Math.cos(-Math.PI / 2 + (i * Math.PI) / 4), h / 2 + (h / 2) * k * Math.sin(-Math.PI / 2 + (i * Math.PI) / 4)]));
+    }
+    if (mask === 'flower') {
+      // Eight round petals: from point to point on an inner ring, each bulging out to the box's edge.
+      const ri = 0.82;
+      const step = Math.PI / 4;
+      const rc = 2 - ri * Math.cos(step / 2);
+      const at = (r: number, a: number) => `${r2(w / 2 + (w / 2) * r * Math.cos(a))},${r2(h / 2 + (h / 2) * r * Math.sin(a))}`;
+      let d = `M${at(ri, -Math.PI / 2)}`;
+      for (let i = 0; i < 8; i++) d += `Q${at(rc, -Math.PI / 2 + (i + 0.5) * step)} ${at(ri, -Math.PI / 2 + (i + 1) * step)}`;
+      return `${d}Z`;
+    }
+    return MASKS.has(mask) ? shapePath(mask, w, h) : '';
+  };
+  /** Whether a slide's background is dark (its own colour, else the theme's): frames take lighter edges there. */
+  const darkSlide = (deck: Deck, s: Slide) => lightness(color(s.bg?.color ?? 'bg', deck.theme, '#fff')) < 0.45;
+  /**
+   * A picture's frame in its box (w×h): the screen the picture shows in (its corners' radius; `bottom`: only its bottom
+   * corners are), and the frame's pieces under it and over it (boxes with their corners' radius, or round), in colours of
+   * their own, lighter edges on a dark slide. The PowerPoint file draws the same pieces as shapes.
+   */
+  const framePlan = (frame: string, w: number, h: number, dark: boolean): FramePlan => {
+    const s = Math.min(w, h);
+    if (frame === 'polaroid') {
+      const pad = s * 0.06;
+      const foot = s * 0.24;
+      return { screen: { x: pad, y: pad, w: Math.max(1, w - 2 * pad), h: Math.max(1, h - pad - foot), r: 0 }, under: [{ x: 0, y: 0, w, h, r: s * 0.012, fill: '#fbfaf6', shadow: true }], over: [] };
+    }
+    if (frame === 'phone') {
+      const r = s * 0.16;
+      const rim = s * 0.014;
+      const b = s * 0.046;
+      const tall = h >= w;
+      const iw = s * 0.3;
+      const ih = s * 0.085;
+      const gap = b + s * 0.035;
+      return {
+        screen: { x: b, y: b, w: Math.max(1, w - 2 * b), h: Math.max(1, h - 2 * b), r: Math.max(0, r - b) },
+        under: [
+          { x: 0, y: 0, w, h, r, fill: dark ? '#6b7079' : '#3a3d43', shadow: true },
+          { x: rim, y: rim, w: w - 2 * rim, h: h - 2 * rim, r: r - rim, fill: '#0b0b0d' },
+        ],
+        // The island at the top of its screen (at its left side, on its side).
+        over: [tall ? { x: (w - iw) / 2, y: gap, w: iw, h: ih, r: ih / 2, fill: '#0b0b0d' } : { x: gap, y: (h - iw) / 2, w: ih, h: iw, r: ih / 2, fill: '#0b0b0d' }],
+      };
+    }
+    if (frame === 'laptop') {
+      const baseH = Math.max(4, h * 0.055);
+      const lidW = w * 0.8;
+      const lidX = (w - lidW) / 2;
+      const lidH = h - baseH;
+      const side = lidW * 0.03;
+      const top = lidW * 0.038;
+      return {
+        screen: { x: lidX + side, y: top, w: Math.max(1, lidW - 2 * side), h: Math.max(1, lidH - top - side), r: 0 },
+        under: [
+          { x: lidX, y: 0, w: lidW, h: lidH + baseH * 0.2, r: lidW * 0.022, fill: dark ? '#4a4e56' : '#2b2d32', shadow: true },
+          { x: lidX + lidW * 0.004, y: lidW * 0.004, w: lidW * 0.992, h: lidH - lidW * 0.004, r: lidW * 0.02, fill: '#0c0c0e' },
+          { x: w / 2 - top * 0.13, y: top / 2 - top * 0.13, w: top * 0.26, h: top * 0.26, round: true, fill: '#3b3e45' },
+          { x: 0, y: lidH, w, h: baseH, r: baseH * 0.45, fill: dark ? '#d9dce1' : '#c5c9cf', shadow: true },
+          { x: w / 2 - w * 0.075, y: lidH, w: w * 0.15, h: baseH * 0.38, r: baseH * 0.19, fill: dark ? '#b3b8c0' : '#a2a7af' },
+        ],
+        over: [],
+      };
+    }
+    // A browser window: its bar (three dots, the address field) over the page.
+    const bar = Math.max(12, s * 0.085);
+    const r = s * 0.022;
+    const lw = Math.max(1, s * 0.002);
+    const dot = bar * 0.26;
+    const x0 = bar * 0.45;
+    const addr = x0 + 3 * dot * 1.75 + bar * 0.35;
+    return {
+      screen: { x: lw, y: bar, w: Math.max(1, w - 2 * lw), h: Math.max(1, h - bar - lw), r: Math.max(0, r - lw), bottom: true },
+      under: [
+        { x: 0, y: 0, w, h, r, fill: dark ? '#2b2d31' : '#e8eaed', line: dark ? '#45484f' : '#d0d3d8', lw, shadow: true },
+        ...[0, 1, 2].map((i) => ({ x: x0 + i * dot * 1.75, y: bar / 2 - dot / 2, w: dot, h: dot, round: true, fill: ['#ff5f57', '#febc2e', '#28c840'][i] })),
+        { x: addr, y: bar * 0.22, w: Math.max(1, w - addr - x0), h: bar * 0.56, r: bar * 0.28, fill: dark ? '#1c1d20' : '#ffffff' },
+      ],
+      over: [],
+    };
+  };
+  /** A piece of a frame, drawn. */
+  const pieceEl = (p: FramePiece) => {
+    const x = el('div', 'ns-chrome');
+    x.style.left = px(p.x);
+    x.style.top = px(p.y);
+    x.style.width = px(Math.max(0, p.w));
+    x.style.height = px(Math.max(0, p.h));
+    x.style.background = p.fill;
+    if (p.round) x.style.borderRadius = '50%';
+    else if (p.r) x.style.borderRadius = px(Math.max(0, p.r));
+    const shadows = [p.line ? `inset 0 0 0 ${px(p.lw ?? 1)} ${p.line}` : '', p.shadow ? '0 8px 22px rgba(0,0,0,.24)' : ''].filter(Boolean);
+    if (shadows.length) x.style.boxShadow = shadows.join(',');
+    return x;
   };
 
   // ---- text ---------------------------------------------------------------------------------------------------
@@ -1132,9 +1299,33 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
     f.playsInline = true;
     f.preload = 'auto';
     if (v.muted) f.muted = true;
-    if (v.loop) f.loop = true;
     const start = n(v.start, 0);
+    // Trimmed (Ends at): it stops there, or goes round from its start again; played again from its end, from its start.
+    const end = n(v.end, 0) > start ? n(v.end, 0) : 0;
+    if (v.loop && !end) f.loop = true;
     if (start > 0) f.addEventListener('loadedmetadata', () => (f.currentTime = start), { once: true });
+    if (end) {
+      // The player tells where it is a few times a second: the last stretch is timed, to stop on the moment.
+      let timer = 0;
+      const check = () => {
+        win.clearTimeout(timer);
+        if (f.paused) return;
+        const left = (end - f.currentTime) / (f.playbackRate || 1);
+        if (left <= 0.02) {
+          if (v.loop) f.currentTime = start;
+          else f.pause();
+        } else if (left < 0.6) timer = win.setTimeout(check, left * 1000);
+      };
+      f.addEventListener('timeupdate', check);
+      f.addEventListener('ended', () => {
+        if (!v.loop) return;
+        f.currentTime = start;
+        void f.play?.()?.catch(() => {});
+      });
+      f.addEventListener('play', () => {
+        if (f.currentTime >= end - 0.05) f.currentTime = start;
+      });
+    }
     box.textContent = '';
     box.appendChild(f);
     void f.play?.()?.catch(() => {});
@@ -1149,6 +1340,8 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       ...(v.muted ? (yt ? { mute: '1' } : { muted: '1' }) : {}),
       ...(v.loop ? (yt ? { loop: '1', playlist: v.src.split('/').pop() ?? '' } : { loop: '1' }) : {}),
       ...(v.start ? (yt ? { start: String(v.start) } : {}) : {}),
+      // YouTube's player stops at its end (whole seconds); Vimeo's has no such setting.
+      ...(yt && n(v.end, 0) > n(v.start, 0) ? { end: String(Math.ceil(n(v.end, 0))) } : {}),
       ...(yt ? { rel: '0', modestbranding: '1' } : {}),
     });
     // The players cannot run in a page of its own origin (a deck's page, sandboxed): there it opens on its site.
@@ -1755,8 +1948,36 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
     return box;
   };
 
+  // ---- QR codes ------------------------------------------------------------------------------------------------
+  /** A QR code: its squares (kept with it) as one path, square in the middle of its box, a quiet margin of two round them. */
+  const qrBox = (deck: Deck, e: Extract<El, { type: 'qr' }>) => {
+    const t = deck.theme;
+    const k = Math.max(0, Math.min(177, Math.round(n(e.n, 0))));
+    let bin = '';
+    try {
+      bin = win.atob(typeof e.cells === 'string' ? e.cells : '');
+    } catch {}
+    const on = (i: number) => ((bin.charCodeAt(i >> 3) || 0) & (0x80 >> (i & 7))) !== 0;
+    let d = '';
+    for (let y = 0; y < k; y++)
+      for (let x = 0; x < k; x++) {
+        if (!on(y * k + x)) continue;
+        let run = 1;
+        while (x + run < k && on(y * k + x + run)) run++;
+        d += `M${x} ${y}h${run}v1h-${run}z`;
+        x += run - 1;
+      }
+    const q = 2;
+    const g = svg('svg', { class: 'ns-icon', viewBox: `${-q} ${-q} ${k + 2 * q} ${k + 2 * q}`, preserveAspectRatio: 'xMidYMid meet', 'shape-rendering': 'crispEdges', 'aria-hidden': 'true' });
+    const light = color(e.bg, t, '#ffffff');
+    if (light !== 'transparent') g.appendChild(svg('rect', { x: -q, y: -q, width: k + 2 * q, height: k + 2 * q, fill: light }));
+    g.appendChild(svg('path', { d, fill: color(e.color, t, '#000000') }));
+    return g;
+  };
+
   // ---- a part --------------------------------------------------------------------------------------------------
   const part = (deck: Deck, s: Slide, e: El, o: DrawOpts = {}): HTMLElement => {
+    if (s?.theme && typeof s.theme === 'object' && deck.theme !== s.theme) deck = { ...deck, theme: s.theme };
     const t = deck.theme;
     const d = el('div', 'ns-el');
     d.dataset.id = e.id;
@@ -1825,6 +2046,8 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       }
       if (e.textFx) shine(box, e.textFx, t);
       d.appendChild(box);
+    } else if (e.type === 'qr') {
+      d.appendChild(qrBox(deck, e));
     } else if (e.type === 'code') {
       d.appendChild(codeBox(deck, e));
     } else if (e.type === 'quiz') {
@@ -1835,10 +2058,26 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       d.appendChild(livePart(deck, s, e, o));
     } else if (e.type === 'image') {
       const url = src(e.src, o);
+      // In a frame: its pieces under the picture, the picture in its screen, the pieces over it; else cut to its shape.
+      const framed = typeof e.frame === 'string' && FRAMES.has(e.frame) ? framePlan(e.frame, w, h, darkSlide(deck, s)) : null;
+      const cut = !framed && typeof e.mask === 'string' && MASKS.has(e.mask) ? maskPath(e.mask, w, h) : '';
+      if (framed) for (const p of framed.under) d.appendChild(pieceEl(p));
+      const inScreen = (x: HTMLElement) => {
+        if (!framed) return x;
+        const sc = framed.screen;
+        x.style.inset = 'auto';
+        x.style.left = px(sc.x);
+        x.style.top = px(sc.y);
+        x.style.width = px(sc.w);
+        x.style.height = px(sc.h);
+        if (sc.r) x.style.borderRadius = sc.bottom ? `0 0 ${px(sc.r)} ${px(sc.r)}` : px(sc.r);
+        return x;
+      };
       if (url) {
         // The box holds the corners, the border and the shadow; inside it the picture, flipped, cropped, its colours changed.
-        const box = el('div', 'ns-imgbox');
-        if (e.radius) box.style.borderRadius = px(n(e.radius, 0));
+        const box = inScreen(el('div', 'ns-imgbox'));
+        if (cut) box.style.clipPath = `path("${cut}")`;
+        else if (e.radius && !framed) box.style.borderRadius = px(n(e.radius, 0));
         if (e.shadow) d.style.filter = 'drop-shadow(0 10px 18px rgba(0,0,0,.25))';
         const flip = el('div', 'ns-flip');
         if (e.flipH || e.flipV) flip.style.scale = `${e.flipH ? -1 : 1} ${e.flipV ? -1 : 1}`;
@@ -1870,18 +2109,26 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
         }
         flip.appendChild(img);
         box.appendChild(flip);
-        if (e.line) {
+        if (e.line && !cut) {
           const ring = el('div', 'ns-imgbox');
           ring.style.border = `${px(n(e.lineW, 2))} solid ${color(e.line, t, 'transparent')}`;
           ring.style.borderRadius = 'inherit';
           box.appendChild(ring);
         }
         d.appendChild(box);
+        // A border round a shape follows its outline (centred on it, as PowerPoint draws one).
+        if (e.line && cut) {
+          const ring = svg('svg', { class: 'ns-ring', viewBox: `0 0 ${r2(w)} ${r2(h)}`, 'aria-hidden': 'true' });
+          ring.appendChild(svg('path', { d: cut, fill: 'none', stroke: color(e.line, t, 'transparent'), 'stroke-width': n(e.lineW, 2), 'stroke-linejoin': 'round' }));
+          d.appendChild(ring);
+        }
       } else if (o.edit) {
-        const ph = el('div', 'ns-noimg');
+        const ph = inScreen(el('div', 'ns-noimg'));
         ph.textContent = hintOf(e.src ? 'This picture can’t be shown here' : 'Double-click to add a picture');
+        if (cut) ph.style.clipPath = `path("${cut}")`;
         d.appendChild(ph);
       }
+      if (framed) for (const p of framed.over) d.appendChild(pieceEl(p));
     } else if (e.type === 'table') {
       const tb = el('table', 'ns-table');
       const rows = Array.isArray(e.rows) ? e.rows : [];
@@ -2072,9 +2319,10 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
 
   /** How light a colour is (0 black, 1 white), for #hex ones; others count as light. */
   const lightness = (c: string) => {
-    const m = /^#([0-9a-f]{3}|[0-9a-f]{6})/i.exec(c);
+    // Its red, green and blue whatever its digits ("#f0f6fa" is not "#f0f"; an alpha's are left out).
+    const m = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(c);
     if (!m) return 1;
-    const h = m[1].length === 3 ? [...m[1]].map((x) => x + x).join('') : m[1];
+    const h = m[1].length <= 4 ? [...m[1].slice(0, 3)].map((x) => x + x).join('') : m[1].slice(0, 6);
     const [r, g, bl] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
     return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
   };
@@ -2206,9 +2454,40 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
     if (f.num) put(String(i + 1), W - 64 - 200, 200, 'right');
   };
 
+  /** The deck's logo on slide i, in its corner, above the footer's band where that shows; none on the title slide when it says so. */
+  const logo = (deck: Deck, i: number, root: HTMLElement, o: DrawOpts) => {
+    const g = deck.logo;
+    const s = deck.slides[i];
+    const titled = i === 0 || s?.layout === 'title';
+    if (!g || typeof g !== 'object' || !s || (g.skipTitle && titled)) return;
+    const url = src(g.src, o);
+    if (!url) return;
+    const w = Math.max(8, Math.min(640, n(g.w, 120)));
+    const h = Math.max(8, Math.min(640, n(g.h, 60)));
+    const m = Math.max(0, Math.min(200, n(g.margin, 32)));
+    const at = g.at === 'tl' || g.at === 'bl' || g.at === 'br' ? g.at : 'tr';
+    const f = deck.footer;
+    const foot = !!f && typeof f === 'object' && (!!f.num || !!f.text || !!f.date) && !s.nofooter && !(f.skipTitle && titled);
+    const below = at[0] === 'b' && foot ? Math.max(m, 60) : m;
+    const img = el('img', 'ns-logo');
+    img.src = url;
+    img.alt = '';
+    img.draggable = false;
+    img.decoding = 'async';
+    img.style.left = px(at[1] === 'l' ? m : W - m - w);
+    img.style.top = px(at[0] === 't' ? m : H(deck) - below - h);
+    img.style.width = px(w);
+    img.style.height = px(h);
+    // Snug in its corner whatever its picture's shape.
+    img.style.objectPosition = `${at[1] === 'l' ? 'left' : 'right'} ${at[0] === 't' ? 'top' : 'bottom'}`;
+    root.appendChild(img);
+  };
+
   const slide = (deck: Deck, i: number, o: DrawOpts = {}): HTMLElement => {
     if (o.hint) hintOf = o.hint;
     const s = deck.slides[i];
+    // A slide with a theme of its own (from another deck, keeping its look) is drawn in it.
+    if (s?.theme && typeof s.theme === 'object') deck = { ...deck, theme: s.theme };
     const root = el('div', 'ns-slide');
     // A deck's words are its own: never translated with the app's.
     root.setAttribute('translate', 'no');
@@ -2220,6 +2499,7 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
     root.dataset.slide = s.id;
     background(deck, s, root, o);
     for (const e of s.els ?? []) root.appendChild(part(deck, s, e, o));
+    logo(deck, i, root, o);
     footer(deck, i, root, o);
     if (o.play) {
       root.classList.add('ns-canplay');
@@ -4111,7 +4391,7 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
     });
   };
 
-  return { css, style, slide, part, words, fit, read, show, print, steps, morphPairs, boot, maths, tokens, codeLook };
+  return { css, style, slide, part, words, fit, read, show, print, steps, morphPairs, boot, maths, tokens, codeLook, maskPath, framePlan };
 }
 
 let quiet: SlidesRuntime | null = null;
@@ -4128,4 +4408,16 @@ export function codeTokens(code: string, lang?: string): [string, string][] {
 export function codeLookOf(look: string | undefined, t: Theme): CodeLook {
   quiet ??= slidesRuntime({ document: {} } as unknown as Window, {});
   return quiet.codeLook(look, t);
+}
+
+/** A picture's shape's outline as the slide cuts it, outside a browser (the PowerPoint file's geometry). */
+export function pictureMaskPath(mask: string, w: number, h: number): string {
+  quiet ??= slidesRuntime({ document: {} } as unknown as Window, {});
+  return quiet.maskPath(mask, w, h);
+}
+
+/** A picture's frame as the slide draws it, outside a browser (the PowerPoint file's shapes round the picture). */
+export function pictureFramePlan(frame: string, w: number, h: number, dark: boolean): FramePlan {
+  quiet ??= slidesRuntime({ document: {} } as unknown as Window, {});
+  return quiet.framePlan(frame, w, h, dark);
 }

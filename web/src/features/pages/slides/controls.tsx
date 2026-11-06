@@ -1,8 +1,8 @@
 // The slides editor's small controls: a colour from the deck's theme (which follows the theme when it changes) or
-// any other, as swatches or a button that opens them; a number to type, step with the arrow keys or nudge; the side
-// panel's sections and rows.
+// any other, as swatches or a button that opens them (and, where the browser can, one picked from the screen with a
+// dropper); a number to type, step with the arrow keys or nudge; the side panel's sections and rows.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import { Minus, Pipette, Plus } from 'lucide-react';
 import { cssColor, type Theme } from '@shared/slides';
 import { cx, Popover } from '../../../components/ui';
 
@@ -27,6 +27,21 @@ const toHex = (c: string) => {
   const m = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(c);
   return m ? `#${[m[1], m[2], m[3]].map((x) => Number(x).toString(16).padStart(2, '0')).join('')}` : '#000000';
 };
+
+/** The browser's dropper (Chrome, Edge), which picks a colour from anywhere on the screen; none elsewhere. */
+type Dropper = { open(o?: { signal?: AbortSignal }): Promise<{ sRGBHex: string }> };
+const DROPPER = typeof window !== 'undefined' && 'EyeDropper' in window ? (window as unknown as { EyeDropper: new () => Dropper }).EyeDropper : null;
+
+/** A colour picked from the screen, as #rrggbb; null when the dropper was put away. */
+export async function colourFromScreen(): Promise<string | null> {
+  if (!DROPPER) return null;
+  try {
+    const hex = (await new DROPPER().open()).sRGBHex;
+    return /^#[0-9a-f]{6}$/i.test(hex) ? hex.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
 
 /** The theme's colours to pick from, any other, and (with `none`) none. */
 export function Swatches({ value, theme, onChange, none }: { value: string | undefined; theme: Theme; onChange: (v: string | undefined) => void; none?: string }) {
@@ -63,6 +78,17 @@ export function Swatches({ value, theme, onChange, none }: { value: string | und
       >
         <input type="color" value={toHex(cssColor(value, theme, '#000000'))} onChange={(e) => onChange(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" />
       </label>
+      {DROPPER && (
+        <button
+          type="button"
+          title="Pick a colour from the screen"
+          aria-label="Pick a colour from the screen"
+          onClick={() => void colourFromScreen().then((c) => c && onChange(c))}
+          className="grid h-6 w-6 place-items-center rounded-full border border-line-2 text-fg-2 hover:border-accent/60 hover:text-fg"
+        >
+          <Pipette size={12} />
+        </button>
+      )}
     </div>
   );
 }

@@ -444,8 +444,11 @@ const accept =
 // ---- generate_audio ------------------------------------------------------------------------------------
 
 {
+  // No key, and nobody to ask for one on a card (a scheduled task's run): it says where to add one.
+  present = false;
   const none = await run({ kind: 'music', prompt: 'A jingle' });
-  ok(none.isError && /no OpenRouter key/.test(none.text), 'no key: says where to add one');
+  present = true;
+  ok(!none.isError && /no OpenRouter key is set/.test(none.text), 'no key: says where to add one');
   const c = loadConfig();
   c.openrouter.apiKey = 'sk-or-test';
   saveConfig(c);
