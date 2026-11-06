@@ -28,19 +28,22 @@ function Loading() {
   return <div className="flex h-full min-h-40 flex-1 items-center justify-center text-fg-3">{show && <Throbber size={30} />}</div>;
 }
 
-function lazyEditor(load: Load): ComponentType<EditorProps> {
+function lazyEditor(load: Load, kind: string): ComponentType<EditorProps> {
   const Editor = lazy(load);
   return function KindEditor(p: EditorProps) {
     return (
       <Suspense fallback={<Loading />}>
-        <Editor {...p} />
+        {/* Its kind, for the words that mean something else in it (i18n/runtime.ts). */}
+        <div data-i18n={kind} className="contents">
+          <Editor {...p} />
+        </div>
       </Suspense>
     );
   };
 }
 
 export const EDITORS: Partial<Record<Kind, ComponentType<EditorProps>>> = Object.fromEntries(
-  Object.entries(LOADS).map(([k, load]) => [k, lazyEditor(load)]),
+  Object.entries(LOADS).map(([k, load]) => [k, lazyEditor(load, k)]),
 );
 
 let preloaded = false;

@@ -109,6 +109,16 @@ export interface MeaningState {
   total: number;
 }
 
+/** Why search by meaning cannot make vectors now: it is setting itself up, its model is starting (downloading the first time), too little memory is free, or it stopped. */
+export interface MeaningHeld {
+  why: 'setting-up' | 'starting' | 'memory' | 'failed';
+  /** What it is doing (setting up, starting), or why it stopped. */
+  detail?: string;
+  /** Too little memory: how much is free, and how much it needs to start (MB). */
+  freeMb?: number;
+  needMb?: number;
+}
+
 /** The latest tidy-up: what it changed (each can be undone), or why it stopped. */
 export interface TidyReport {
   at: number;
