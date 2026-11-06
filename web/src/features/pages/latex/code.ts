@@ -16,7 +16,8 @@ import { gotoLine } from '@codemirror/search';
 import { lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint';
 import { Compartment, EditorSelection, EditorState, Prec, StateEffect, StateField, Transaction } from '@codemirror/state';
 import { Decoration, EditorView, keymap, WidgetType, type DecorationSet } from '@codemirror/view';
-import { texCheck } from '@shared/latex-check';
+import { texCheck, texRefCheck } from '@shared/latex-check';
+import { keysExtension, saverFor, type KeysMode } from './keys';
 import { tr } from '../../../i18n/runtime';
 import { createEditor, type EditorHandle } from '../../../lib/codemirror';
 import { commandSource, environmentSource, packageSource, type DocDefs } from './complete';
@@ -24,7 +25,7 @@ import { texFolding } from './fold';
 import { mathPreview } from './mathpreview';
 import { braced, inMathAt } from './scan';
 import { spellCheck } from './spell';
-import { acceptTracked, loaded, loadTracked, pickTracked, rejectTracked, trackChanges, trackedNow, trackField, untracked, type Tracked } from './track';
+import { acceptTracked, loaded, loadTracked, pickTracked, rejectTracked, trackAs, trackChanges, trackedNow, trackField, untracked, type Tracked } from './track';
 import { visualMode } from './visual';
 
 /** What the document offers to complete with. */
@@ -58,6 +59,12 @@ export interface CodeHooks {
   onComment: () => void;
   /** The tracked changes moved or changed (an edit recorded, one accepted or rejected, Undo): the file's, as they are now. */
   onTracked: (list: Tracked[]) => void;
+  /** Ctrl+K: Write with AI at the cursor. */
+  onWrite?: () => void;
+  /** Pictures pasted into the source: true when they were taken (the editor asks what they become). */
+  onPictures?: (files: File[]) => boolean;
+  /** The labels the document defines, and the keys of its bibliographies when they are all its own (else null), for the quick check of references. */
+  refs?: () => { labels: Set<string>; keys: Set<string> | null } | null;
 }
 
 /** Where a comment's words are in the file; `active`: the one picked. */
@@ -118,6 +125,13 @@ export interface Code {
   select: (from: number, to: number) => void;
   /** A part of the text changed, the focus left where it is (the find bar's Replace). */
   replaceQuiet: (from: number, to: number, text: string) => void;
+  /**
+   * Changes at once (in the text's present places), one step to undo: `by` AI marks them as AI's while Track changes is
+   * on (`force`: even while it is off); `quiet`: never tracked (spaces Tidy changes); `select`: then picked.
+   */
+  edit: (changes: { from: number; to: number; insert: string }[], o?: { by?: 'ai'; force?: boolean; quiet?: boolean; select?: [number, number] }) => void;
+  /** The keys: Normal, Vim or Emacs. */
+  setKeys: (mode: KeysMode) => void;
   setVisual: (on: boolean) => void;
   setSpell: (on: boolean) => void;
   /** Track changes on or off: while on, what is typed and deleted is marked. */
@@ -321,7 +335,7 @@ function differs(a: string, b: string): { from: number; to: number; insert: stri
   return { from: i, to: a.length - j, insert: b.slice(i, b.length - j) };
 }
 
-export async function mountCode(parent: HTMLElement, o: { text: string; name: string; dark: boolean; phone: boolean; readOnly?: boolean; visual?: boolean; spell?: boolean; hooks: CodeHooks }): Promise<Code> {
+export async function mountCode(parent: HTMLElement, o: { text: string; name: string; dark: boolean; phone: boolean; readOnly?: boolean; visual?: boolean; spell?: boolean; keys?: KeysMode; hooks: CodeHooks }): Promise<Code> {
   const hooks = o.hooks;
   // The file as it was while an agent's version shows in its place (setLive), else null: brought back whole when that
   // version is not kept (its comments' places, tracked changes and undo with it, which the agent's text would move).
@@ -332,7 +346,14 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
   const visualC = new Compartment();
   const spellC = new Compartment();
   const liveC = new Compartment();
+  const keysC = new Compartment();
   const track = trackChanges();
+  saverFor(view, () => hooks.onSave());
+  let keysAsked: KeysMode = o.keys ?? 'normal';
+  const setKeys = (mode: KeysMode) => {
+    keysAsked = mode;
+    void keysExtension(mode).then((ext) => keysAsked === mode && view.dispatch({ effects: keysC.reconfigure(ext) }));
+  };
   const visualExt = () => visualMode({ macros: hooks.macros, picture: hooks.picture });
 
   const picked = () => {
@@ -469,7 +490,11 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
       const l = doc.line(x.line);
       diags.push({ from: l.from, to: Math.max(l.from, l.to), severity: x.severity, message: x.message });
     }
-    if (tex && doc.length < 3_000_000) for (const c of texCheck(doc.toString())) diags.push({ from: c.from, to: Math.min(doc.length, c.to), severity: 'warning', message: tr(c.message) });
+    if (tex && doc.length < 3_000_000) {
+      const text = doc.toString();
+      const refs = hooks.refs?.();
+      for (const c of [...texCheck(text), ...(refs ? texRefCheck(text, refs.labels, refs.keys) : [])]) diags.push({ from: c.from, to: Math.min(doc.length, c.to), severity: 'warning', message: tr(c.message) });
+    }
     view.dispatch(setDiagnostics(view.state, diags));
   };
 
@@ -498,9 +523,21 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
 
   const extra = [
     onPhone,
+    // Vim's or Emacs's keys, before the editor's own.
+    keysC.of([]),
+    // A picture pasted: the editor asks what it becomes (a figure, or its LaTeX).
+    EditorView.domEventHandlers({
+      paste: (e) => {
+        const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));
+        if (!files.length || o.readOnly || !hooks.onPictures?.(files)) return false;
+        e.preventDefault();
+        return true;
+      },
+    }),
     Prec.highest(
       keymap.of([
         { key: 'Mod-Enter', preventDefault: true, run: () => (hooks.onCompile(), true) },
+        ...(tex && hooks.onWrite ? [{ key: 'Mod-k', preventDefault: true, run: () => (o.readOnly ? false : (hooks.onWrite!(), true)) }] : []),
         { key: 'Mod-b', preventDefault: true, run: () => (toggle('textbf', 'bold'), true) },
         { key: 'Mod-i', preventDefault: true, run: () => (toggle('textit', 'italic'), true) },
         { key: 'Mod-f', preventDefault: true, run: () => (hooks.onFind(false), true) },
@@ -544,6 +581,7 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     }),
   ];
   view.dispatch({ effects: StateEffect.appendConfig.of(extra) });
+  if (keysAsked !== 'normal') setKeys(keysAsked);
 
   return {
     handle,
@@ -584,6 +622,20 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     replaceQuiet: (from, to, text) => {
       if (!o.readOnly) view.dispatch({ changes: { from, to, insert: text }, userEvent: 'input.replace' });
     },
+    edit: (changes, e = {}) => {
+      if (o.readOnly || !changes.length) return;
+      const len = view.state.doc.length;
+      const list = changes.filter((c) => c.from >= 0 && c.to >= c.from && c.to <= len).sort((a, b) => a.from - b.from);
+      const set = view.state.changes(list);
+      view.dispatch({
+        changes: set,
+        ...(e.select ? { selection: EditorSelection.range(set.mapPos(e.select[0], -1), set.mapPos(e.select[1], 1)) } : {}),
+        annotations: e.quiet ? [untracked.of(true)] : e.by ? [trackAs.of({ by: e.by, force: e.force })] : [],
+        scrollIntoView: true,
+        userEvent: 'input',
+      });
+    },
+    setKeys,
     replacePicked: (text) => {
       if (o.readOnly) return;
       const r = view.state.selection.main;

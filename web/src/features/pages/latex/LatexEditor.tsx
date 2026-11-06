@@ -115,6 +115,11 @@ import { TableEditor } from './TableEditor';
 import { ToolRow, type RowTool } from './ToolRow';
 import { MAX_VISUAL } from './visual';
 import { WordCountDialog } from './WordCount';
+import { useLatexAi } from './ai';
+import { savedKeys, saveKeys, type KeysMode } from './keys';
+import { docLabels } from '@shared/latex-ai';
+import { bibKeys } from '@shared/latex-bib';
+import { tidyTex } from '@shared/latex-tidy';
 
 const AUTO_KEY = 'wa.tex.auto';
 /** The left panel: Files or Outline, or none ('none'); not set: the files of a document of more than one, else none. */
@@ -157,6 +162,7 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+I', 'Italic, or plain again'],
       ['Ctrl+/', 'Comment lines out, or back in'],
       ['Ctrl+Alt+M', 'A comment on the words picked'],
+      ['Ctrl+K', 'Write with AI at the cursor'],
       ['Ctrl+Space', 'Show what can be typed here'],
       ['Tab', 'The next place to fill in'],
       ['Enter', 'After a \\begin{…}: its \\end{…} goes in too'],
@@ -290,6 +296,12 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   const spellRef = useRef(spell);
   spellRef.current = spell;
   const [darkPages, setDarkPages] = useState(() => localStorage.getItem(DARK_PAGES_KEY) === '1');
+  // View → Keys: Normal, Vim or Emacs, kept on this device.
+  const [keys, setKeys] = useState<KeysMode>(savedKeys);
+  const keysRef = useRef(keys);
+  keysRef.current = keys;
+  /** The editor's AI (ai.tsx), for what the files' editors ask of it (Ctrl+K, a picture pasted). */
+  const aiRef = useRef<ReturnType<typeof useLatexAi> | null>(null);
   const [dark, setDark] = useState(isDark);
   const [presentAsk, setPresentAsk] = useState(0);
   const [dialog, setDialog] = useState<'refs' | 'count' | 'compare' | 'keys' | null>(null);
@@ -383,6 +395,10 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     localStorage.setItem(DARK_PAGES_KEY, darkPages ? '1' : '0');
   }, [darkPages]);
   useEffect(() => {
+    saveKeys(keys);
+    for (const c of codes.current.values()) c.setKeys(keys);
+  }, [keys]);
+  useEffect(() => {
     texSetup().then(setSetup, () => {});
   }, []);
 
@@ -420,17 +436,32 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   };
 
   // ---- what the editors ask of the document (worked out once a change) -------------------------------------------
-  const defsCache = useRef<{ d: TexDoc | null; defs: DocDefs; macros: Record<string, string> }>({ d: null, defs: NO_DEFS, macros: {} });
+  const defsCache = useRef<{ d: TexDoc | null; defs: DocDefs; macros: Record<string, string>; refs: { labels: Set<string>; keys: Set<string> | null } | null }>({ d: null, defs: NO_DEFS, macros: {}, refs: null });
   const known = () => {
     const d = live.current;
     if (d && defsCache.current.d !== d) {
       const texts = [{ name: TEX_MAIN, text: d.main }, ...d.files];
-      defsCache.current = { d, defs: docDefs(texts), macros: texMacros(texts.filter((f) => /\.(tex|ltx|sty|cls)$/i.test(f.name)).map((f) => f.text)) };
+      const tex = texts.filter((f) => /\.(tex|ltx)$/i.test(f.name)).map((f) => f.text);
+      defsCache.current = { d, defs: docDefs(texts), macros: texMacros(texts.filter((f) => /\.(tex|ltx|sty|cls)$/i.test(f.name)).map((f) => f.text)), refs: refsOf(d, tex) };
     }
     return defsCache.current;
   };
   const defsOf = () => known().defs;
   const macrosOf = () => known().macros;
+  /**
+   * What the quick check of references knows: every label of the document's files, and its bibliographies' keys when
+   * they are all its own (\bibliography names only its .bib files, or \bibitem makes them); none when sources TeX takes
+   * from the folder may define more.
+   */
+  function refsOf(d: TexDoc, tex: string[]): { labels: Set<string>; keys: Set<string> | null } | null {
+    if (diskUses.some((u) => u.kind === 'tex')) return null;
+    const names = tex.flatMap((t) => [...t.matchAll(/\\(?:bibliography|addbibresource)\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}/g)].flatMap((m) => m[1].split(',').map((x) => x.trim().replace(/^\.\//, ''))));
+    const bibs = names.map((n) => (n.endsWith('.bib') ? n : `${n}.bib`));
+    const own = bibs.length > 0 && bibs.every((b) => d.files.some((f) => f.name === b));
+    const items = tex.flatMap((t) => [...t.matchAll(/\\bibitem\s*(?:\[[^\]]*\])?\s*\{([^{}]+)\}/g)].map((m) => m[1].trim()));
+    const keys = own || (!bibs.length && items.length) ? new Set([...items, ...bibs.flatMap((b) => bibKeys(d.files.find((f) => f.name === b)?.text ?? ''))]) : null;
+    return { labels: docLabels(tex), keys };
+  }
   const installedRef = useRef<Set<string> | null>(null);
   installedRef.current = useMemo(() => (setup?.installed ? new Set(setup.installed) : null), [setup]);
   /** A picture of the document by the name \includegraphics gives it (its extension may be left out). */
@@ -515,9 +546,13 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
               const next = [...(d.changes ?? []).filter((c) => c.file !== name), ...list.map((c) => ({ ...c, file: name }))];
               return next.length || d.changes ? { ...d, changes: next.length ? next : undefined } : d;
             }),
+          onWrite: () => aiRef.current?.openWrite(),
+          onPictures: (files) => !!aiRef.current?.pictures(files),
+          refs: () => known().refs,
         },
         visual: modeRef.current === 'visual',
         spell: spellRef.current,
+        keys: keysRef.current,
       }).then((c) => {
         mounting.current.delete(name);
         if (at !== epochRef.current || !hosts.current.get(name)?.isConnected) return c.destroy();
@@ -1190,7 +1225,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     setRefsTarget({ ...bibTarget(), cite: !file.endsWith('.bib') });
     setDialog('refs');
   };
-  const addReference = (e: TexReference, cite: boolean) => {
+  /** A reference added to the bibliography (and cited at the cursor): its key, '' when the entry could not be read. */
+  const addReference = (e: TexReference, cite: boolean): string => {
     const t = bibTarget();
     if (t.fresh) {
       change((d) => ({ ...d, files: [...d.files, { name: t.name, text: '' }] }));
@@ -1202,7 +1238,10 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       key = r.key;
       return r.text;
     });
-    if (!key) return toast('That entry could not be read');
+    if (!key) {
+      toast('That entry could not be read');
+      return '';
+    }
     setRefsTarget((x) => ({ ...x, name: t.name, fresh: false }));
     if (cite) {
       withCode(target(), (c) => {
@@ -1211,6 +1250,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       });
       toast(`Cited ${key}, added to ${t.name}`, 'ok');
     } else toast(`Added ${key} to ${t.name}`, 'ok');
+    return key;
   };
 
   // ---- files and pictures ----------------------------------------------------------------------------------------------
@@ -1339,7 +1379,9 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     const pics = list.filter((f) => f.type.startsWith('image/') || /\.pdf$/i.test(f.name));
     const texts = list.filter((f) => !pics.includes(f));
     const onCode = !!(e.target as HTMLElement).closest?.('.cm-editor');
-    const added = await addPictures(pics);
+    // Pictures dropped on the source: a figure each (under figures/), or their LaTeX (it asks which).
+    if (onCode && pics.length && pics.every((f) => f.type.startsWith('image/')) && aiRef.current?.pictures(pics)) return void (await addFiles(texts));
+    const added = await addPictures(pics, onCode ? 'figures/' : '');
     if (onCode) for (const p of added) await insert('figure', { picture: p });
     if (added.length && !onCode) toast(added.length === 1 ? (multi ? `${added[0]} added` : `${added[0]} added under Pictures`) : `${added.length} pictures added`, 'ok');
     await addFiles(texts);
@@ -1363,6 +1405,32 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     onMove: moveInto,
     onDropFiles: (list, folder) => void dropInto(list, folder),
   };
+
+  // ---- AI (ai.tsx) --------------------------------------------------------------------------------------------------------
+  const ai = useLatexAi({
+    readOnly,
+    target,
+    codeOf: (name) => codes.current.get(name) ?? null,
+    withCode,
+    editFile,
+    live: () => live.current,
+    tracking: tracking && canTrack,
+    canTrack,
+    picked: cursor.picked && !isView(file),
+    heading,
+    label,
+    macros: macrosOf,
+    result: () => resultRef.current,
+    addReference,
+    showChanges: () => setCommentsOpen(true),
+    asFigures: async (files) => {
+      // A picture pasted from the clipboard is "image.png": it goes in as pasted.png (pasted-2.png…).
+      const named = files.map((f) => (/^image\.\w+$/i.test(f.name) ? new File([f], f.name.replace(/^image/i, 'pasted'), { type: f.type }) : f));
+      const added = await addPictures(named, 'figures/');
+      for (const p of added) await insert('figure', { picture: p });
+    },
+  });
+  aiRef.current = ai;
 
   // ---- the layout ---------------------------------------------------------------------------------------------------------
   const onDividerDown = (e: React.PointerEvent) => {
@@ -1453,6 +1521,25 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       c.replacePicked(`\\begin{${env}}\n${lines}\n\\end{${env}}`);
     });
   const fmt = (cmd: string) => () => onCode((c) => c.toggle(cmd, 'words'));
+  /** Edit → Tidy the source (shared/latex-tidy.ts): the lines picked, or the whole file; line by line, never tracked. */
+  const tidySource = () => {
+    const c = codes.current.get(file);
+    if (!c || readOnly) return;
+    const text = c.text();
+    const p = c.pickedLines();
+    const r = tidyTex(text, p.empty ? {} : { from: p.from, to: p.to });
+    if (!r.lines) return toast('The source is tidy already');
+    const before = text.split('\n');
+    const after = r.text.split('\n');
+    const edits: { from: number; to: number; insert: string }[] = [];
+    let pos = 0;
+    before.forEach((l, i) => {
+      if (l !== after[i]) edits.push({ from: pos, to: pos + l.length, insert: after[i] });
+      pos += l.length + 1;
+    });
+    c.edit(edits, { quiet: true });
+    toast(r.tables ? tr(`Tidied ${r.lines} line${r.lines === 1 ? '' : 's'}; ${r.tables} table${r.tables === 1 ? '' : 's'} lined up`) : tr(`Tidied ${r.lines} line${r.lines === 1 ? '' : 's'}`), 'ok');
+  };
   const canCompare = !onDisk && !!pageId;
   // Documents in the Library keep their comments; a file of this computer has its comments kept by the app.
   const canComment = true;
@@ -1469,6 +1556,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         { label: 'Select all', keys: 'Ctrl+A', disabled: !code, run: () => code?.selectAll() },
         '-',
         { label: 'Comment or uncomment', keys: 'Ctrl+/', also: 'percent', disabled: !code || readOnly, run: () => code?.comment() },
+        { label: 'Tidy the source', also: 'format indent align table columns latexindent prettify', disabled: !code || readOnly || !/\.(tex|ltx|sty|cls)$/i.test(file), run: tidySource },
+        ...(ai.editItems.length ? ['-' as const, ...ai.editItems] : []),
       ],
     },
     {
@@ -1503,6 +1592,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
             { label: 'Citation', icon: <BookOpen size={14} />, also: 'cite', run: () => void insert('cite') },
             { label: 'Cross-reference', icon: <LocateFixed size={14} />, also: 'ref label', run: () => void insert('ref') },
             canComment && { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'note review', disabled: isView(file), run: addComment },
+            '-',
+            ...ai.insertItems,
             {
               label: 'More',
               items: [
@@ -1582,6 +1673,18 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         { label: 'Outline', icon: <ListTree size={14} />, checked: wide ? panel === 'outline' : undefined, also: 'sections headings', run: () => (wide ? togglePanel('outline') : setMenu('outline')) },
         canComment && { label: 'Comments', icon: <MessageSquare size={14} />, checked: commentsOpen, also: 'review notes', run: () => setCommentsOpen((x) => !x) },
         { label: 'Check spelling', icon: <SpellCheck size={14} />, checked: spell, also: 'spell', run: () => setSpell((x) => !x) },
+        {
+          label: 'Keys',
+          icon: <Keyboard size={14} />,
+          also: 'vim emacs keybindings keymap',
+          items: (
+            [
+              ['normal', 'Normal'],
+              ['vim', 'Vim'],
+              ['emacs', 'Emacs'],
+            ] as const
+          ).map(([id, label]) => ({ label, checked: keys === id, run: () => setKeys(id) })),
+        },
         { label: 'Fold all', icon: <FoldVertical size={14} />, keys: 'Ctrl+Alt+[', disabled: !code, also: 'collapse', run: () => code?.foldAll() },
         { label: 'Unfold all', icon: <UnfoldVertical size={14} />, keys: 'Ctrl+Alt+]', disabled: !code, also: 'expand', run: () => code?.unfoldAll() },
         '-',
@@ -1599,6 +1702,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         '-',
         ...paperItems({ ask: setPaperAsk, readOnly, canAsk: !!onAsk, canArxiv: !!pageId && !onDisk }),
         '-',
+        ...ai.toolsItems,
         { label: 'Word count', icon: <WholeWord size={14} />, also: 'words texcount', run: () => setDialog('count') },
         canCompare && { label: 'Compare versions', icon: <History size={14} />, also: 'diff history changes', run: () => setDialog('compare') },
         '-',
@@ -1776,6 +1880,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
           </IconButton>
         ),
       },
+    !overPages && ai.toolbar,
   ] as (RowTool | false)[]).filter((t): t is RowTool => !!t);
   const toolbar = (
     // While an agent's version shows, the toolbar stays where it is, out of use.
@@ -1971,9 +2076,12 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
               <FindBar find={find} count={found.list.length} index={found.current} onNext={() => findGo(1)} onPrev={() => findGo(-1)} onReplace={readOnly ? undefined : replaceOne} onReplaceAll={readOnly ? undefined : replaceAll} />
             </div>
           )}
+          {/* What AI made, to accept or leave (a rewrite, LaTeX written or read from a picture, a fix). */}
+          {!isView(file) && ai.card}
         </div>
-        {/* Comments beside the source where there is room (a sheet on a phone, below). */}
-        {canComment && commentsOpen && roomy && !isView(file) && commentsPanel('w-64 shrink-0 border-l border-line bg-panel')}
+        {/* Proofreading, or the comments, beside the source where there is room (a sheet on a phone, below). */}
+        {roomy && !isView(file) && ai.side()}
+        {canComment && commentsOpen && roomy && !isView(file) && !ai.proofOpen && commentsPanel('w-64 shrink-0 border-l border-line bg-panel')}
       </div>
       <Problems
         result={result}
@@ -1983,6 +2091,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         onLog={() => setLogOpen(true)}
         onAsk={onAsk && !readOnly ? askFix : undefined}
         name={label}
+        ai={{ help: ai.problems.help, explain: ai.problems.explain, fix: readOnly ? undefined : ai.problems.fix }}
       />
     </div>
   );
@@ -2256,6 +2365,9 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         />
       )}
       <ShortcutsDialog open={dialog === 'keys'} onClose={() => setDialog(null)} groups={SHORTCUTS} />
+      {ai.dialogs}
+      {/* Proofreading on a phone: a sheet from the bottom. */}
+      {!roomy && ai.proofOpen && <div className="fixed inset-x-0 bottom-0 z-40 flex h-[60dvh] border-t border-line pb-[var(--safe-bottom)] shadow-[0_-8px_30px_rgba(0,0,0,0.25)]">{ai.side('w-full')}</div>}
       <PaperTools
         ask={paperAsk}
         onClose={() => setPaperAsk(null)}
