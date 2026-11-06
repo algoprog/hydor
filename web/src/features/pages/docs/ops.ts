@@ -6,6 +6,7 @@
 // maps the browser's selection to places and draws what they return.
 import {
   docText,
+  isAtom,
   fixMerges,
   listInfo,
   lookOf,
@@ -144,7 +145,7 @@ export function lookAt(runs: Run[], o: number): Look {
     const end = at + r.t.length;
     if (o > at && o <= end) {
       // Words typed after an equation are words.
-      if (r.math) return {};
+      if (isAtom(r)) return {};
       const look = typedLook(r);
       if (o === end) {
         const next = runs[k + 1];
@@ -157,7 +158,7 @@ export function lookAt(runs: Run[], o: number): Look {
     }
     at = end;
   }
-  const first = runs[0] && !runs[0].math ? typedLook(runs[0]) : {};
+  const first = runs[0] && !isAtom(runs[0]) ? typedLook(runs[0]) : {};
   delete first.link;
   delete first.cm;
   return first;
@@ -185,7 +186,7 @@ export function snapOut(runs: Run[], o: number, after?: boolean): number {
   let at = 0;
   for (const r of runs) {
     const end = at + r.t.length;
-    if (r.math && o > at && o < end) return after === undefined ? (o - at < end - o ? at : end) : after ? end : at;
+    if (isAtom(r) && o > at && o < end) return after === undefined ? (o - at < end - o ? at : end) : after ? end : at;
     at = end;
   }
   return o;
@@ -196,7 +197,7 @@ export function charStep(runs: Run[], o: number, back: boolean): number {
   let at = 0;
   for (const r of runs) {
     const end = at + r.t.length;
-    if (r.math && (back ? o > at && o <= end : o >= at && o < end)) return back ? at : end;
+    if (isAtom(r) && (back ? o > at && o <= end : o >= at && o < end)) return back ? at : end;
     at = end;
   }
   const text = runsText(runs);
@@ -604,7 +605,7 @@ export const valueFn =
 
 /** A run with no look of its own but its link (an equation stays one; comments and suggestions stay on their words). */
 export const clearFn = (r: Run): Run => {
-  if (r.math) return r;
+  if (isAtom(r)) return r;
   const { t, link, cm, ins, del, fmt, was } = r;
   return { t, ...(link ? { link } : {}), ...(cm ? { cm } : {}), ...(ins ? { ins } : {}), ...(del ? { del } : {}), ...(fmt ? { fmt, was } : {}) };
 };
@@ -982,7 +983,7 @@ export interface Found {
 }
 
 /** The text of a box to search: an equation counts as marks no query matches (its LaTeX is not words). */
-export const searchText = (runs: Run[]) => runs.map((r) => (r.math || r.del ? '\u0000'.repeat(r.t.length) : r.t)).join('');
+export const searchText = (runs: Run[]) => runs.map((r) => (isAtom(r) || r.del ? '\u0000'.repeat(r.t.length) : r.t)).join('');
 
 /** Words put in place of a stretch of one box's words, looking as its first character does. */
 export function replaceIn(doc: Doc, f: Found, text: string): Doc {
@@ -992,6 +993,9 @@ export function replaceIn(doc: Doc, f: Found, text: string): Doc {
   const [mid, r] = splitAt(rest, f.e - f.s);
   const look = mid[0] ? typedLook(mid[0]) : lookAt(runs, f.s);
   delete look.math;
+  delete look.fn;
+  delete look.cite;
+  delete look.xref;
   return setBox(doc, f.b, f.c, mergeRuns([...l, ...(text ? [{ ...look, t: text }] : []), ...r]));
 }
 
@@ -1020,7 +1024,7 @@ export function setCase(doc: Doc, s: Pos, e: Pos, k: Case): Doc {
     }
     let o = 0;
     const next = runs.map((r) => {
-      const t = r.math ? r.t : out.slice(o, o + r.t.length);
+      const t = isAtom(r) ? r.t : out.slice(o, o + r.t.length);
       o += r.t.length;
       return { ...r, t };
     });

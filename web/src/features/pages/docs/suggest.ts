@@ -7,7 +7,7 @@
 // block taken out is marked to go; a new look (bold, a colour…) is suggested with the old one kept. Your own suggested
 // words change as they are (deleted, they go at once). A paragraph's own look (its style, a list, alignment, spacing)
 // changes as when editing. Pure functions of the model, as ops.ts's are.
-import { mergeRuns, runsText, type Block, type Doc, type Look, type Run, type Suggestion } from '@shared/docs';
+import { isAtom, mergeRuns, runsText, type Block, type Doc, type Look, type Run, type Suggestion } from '@shared/docs';
 import * as ops from './ops';
 import type { Edit, Pos } from './ops';
 
@@ -150,7 +150,7 @@ export function insert(doc: Doc, s: Pos, e: Pos, text: string, look: Look, me: M
     id = r.id;
   } else ({ doc: d, id } = near(d, s, me));
   if (!text) return { doc: d, at };
-  const { ins: _i, del: _d, fmt: _f, was: _w, cm: _c, math: _m, ...plain } = look;
+  const { ins: _i, del: _d, fmt: _f, was: _w, cm: _c, math: _m, fn: _n, cite: _ci, xref: _x, ...plain } = look;
   return ops.insertRuns(d, at, [{ ...plain, t: text, ins: id }]);
 }
 
@@ -311,7 +311,7 @@ export function look(doc: Doc, s: Pos, e: Pos, f: (r: Run) => Run, me: Me): Doc 
   let used = false;
   const d = ops.mapLook(opened.doc, s, e, (r) => {
     const n = f(r);
-    if (r.math || r.del || mine(r.ins)) return n;
+    if (isAtom(r) || r.del || mine(r.ins)) return n;
     const was = r.fmt ? (r.was ?? {}) : plainLook(r);
     if (sameLooks(plainLook(n), was)) {
       const { fmt: _f, was: _w, ...rest } = n;
