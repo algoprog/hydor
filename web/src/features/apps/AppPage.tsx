@@ -871,7 +871,7 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
                 <MoreHorizontal size={17} />
               </IconButton>
               <Popover anchor={more} open={menu} onClose={() => setMenu(false)} align="end" width={220}>
-                <PinMenuItem id={id} onDone={() => setMenu(false)} />
+                <PinMenuItem id={d?.app?.id ?? id} onDone={() => setMenu(false)} />
                 <MenuItem
                   icon={<Copy size={15} />}
                   onClick={async () => {
