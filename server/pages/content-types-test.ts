@@ -16,7 +16,7 @@ import { howToMakeStep } from '../../web/src/features/pages/types/step.ts';
 import { slidesMenus, type MenuArgs } from '../../web/src/features/pages/slides/SlidesMenus.tsx';
 import { docMenus, type DocMenuCtx } from '../../web/src/features/pages/docs/menu.tsx';
 import type { MenuAction, MenuDef, MenuEntry } from '../../web/src/features/pages/common/menus.tsx';
-import { blockPlace } from '../../web/src/features/pages/studio/AddPanel.tsx';
+import { blockPlace } from '../../web/src/features/pages/studio/place.ts';
 import type { EdSel } from '../../web/src/features/pages/frame.tsx';
 import { madeRequest, turnRequest } from '../../web/src/features/pages/types/requests.ts';
 import type { Deps, RunCtx, SpawnInfo } from '../features/types.ts';
