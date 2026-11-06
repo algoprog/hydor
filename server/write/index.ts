@@ -27,6 +27,7 @@ import { still } from '../media/frames.ts';
 import { getAsset } from '../pages/assets.ts';
 import { pageSource } from '../pages/store.ts';
 import { deckOf, holdIdea, IDEAS_SYSTEM, ideaPrompt, jsonOf, waysFor, type Way } from './ideas.ts';
+import { sheetAiRoutes } from './sheets.ts';
 
 // ---- stand-ins, for the tests --------------------------------------------------------------------------------------
 
@@ -276,5 +277,7 @@ export const write: Feature = {
     });
     app.post('/api/write/rewrite', async (req, reply) => rewrite(db, readRewrite(req.body), goneSignal(reply)));
     app.post('/api/write/describe', async (req, reply) => describe(db, { models }, req.body, goneSignal(reply)));
+    // The spreadsheet editor's AI helpers (sheets.ts).
+    sheetAiRoutes(app, db);
   },
 };
