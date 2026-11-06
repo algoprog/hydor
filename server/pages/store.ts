@@ -6,7 +6,7 @@
 // (slides, a document, a spreadsheet: kinds.ts) keeps its model's text in place of HTML, and its own page is made
 // from it when it shows; its pictures are kept apart (assets.ts).
 import crypto from 'node:crypto';
-import { STORAGE_LIMITS, VERSION_LIMITS, type PageDataEntry, type PageInfo, type PageVersion } from '../../shared/pages.ts';
+import { cleanDescription, STORAGE_LIMITS, VERSION_LIMITS, type PageDataEntry, type PageInfo, type PageVersion } from '../../shared/pages.ts';
 import { applyCommentOps, cleanPageComments, type PageComment } from '../../shared/page-comments.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -68,6 +68,8 @@ export function initPages(db: DB) {
   if (!(db.prepare('pragma table_info(page_versions)').all() as { name: string }[]).some((c) => c.name === 'who')) db.exec('alter table page_versions add column who text');
   // The Library folder it is in (folders.ts), or none: at its space's top.
   if (!cols.includes('folder')) db.exec('alter table pages add column folder text');
+  // What it is, in a few sentences (shared/pages.ts cleanDescription): the Library's search finds it by it.
+  if (!cols.includes('description')) db.exec('alter table pages add column description text');
   initFolders(db);
   // A page's icon (the emoji the page editor puts at its top), for links to it in other pages: kept as each version is
   // saved, and read once from the pages saved before ('' for none).
@@ -123,6 +125,7 @@ interface Row {
   space: string | null;
   folder: string | null;
   icon: string | null;
+  description: string | null;
   versions: number;
   bytes: number;
   by: PageVersion['by'] | null;
@@ -154,6 +157,7 @@ const toInfo = (r: Row): PageInfo => ({
   ...(r.space ? { space: r.space } : {}),
   ...(r.folder ? { folder: r.folder } : {}),
   ...(r.icon ? { icon: r.icon } : {}),
+  ...(r.description ? { description: r.description } : {}),
 });
 
 /** The library's pages: a template's screens stay with their template. */
@@ -254,10 +258,26 @@ const safeJson = (s: string) => {
 
 const DEFAULT_TITLE: Record<string, string> = { slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', notebook: 'Notebook' };
 
-/** A new page. `folder`: the Library folder it goes in, of its `space` (folders.ts placeFor makes the two agree). */
+/**
+ * A new page. `folder`: the Library folder it goes in, of its `space` (folders.ts placeFor makes the two agree).
+ * `description`: what it is, in a few sentences (cut to DESCRIPTION_WORDS words).
+ */
 export function createPage(
   db: DB,
-  p: { title: unknown; html?: unknown; kind?: PageKind; model?: unknown; by: PageVersion['by']; sessionKey?: string; sourceItem?: string; app?: string; space?: string | null; folder?: string | null; turn?: string },
+  p: {
+    title: unknown;
+    html?: unknown;
+    kind?: PageKind;
+    model?: unknown;
+    by: PageVersion['by'];
+    sessionKey?: string;
+    sourceItem?: string;
+    app?: string;
+    space?: string | null;
+    folder?: string | null;
+    turn?: string;
+    description?: unknown;
+  },
 ): PageInfo {
   const kind = p.kind ?? 'page';
   const { text: html, sources } = contentOf(db, kind, p);
@@ -267,7 +287,7 @@ export function createPage(
   let id = newId();
   while (db.prepare('select 1 from pages where id = ?').get(id)) id = newId();
   db.transaction(() => {
-    db.prepare('insert into pages (id, title, version, created_at, updated_at, session_key, source_item, link_nonce, kind, app, space, folder) values (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+    db.prepare('insert into pages (id, title, version, created_at, updated_at, session_key, source_item, link_nonce, kind, app, space, folder, description) values (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
       id,
       title,
       now,
@@ -279,6 +299,7 @@ export function createPage(
       p.app ?? null,
       p.app ? null : (p.space ?? null),
       p.app ? null : (p.folder ?? null),
+      cleanDescription(p.description) || null,
     );
     db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by, turn) values (?, 1, ?, ?, ?, ?, ?, ?)').run(id, title, html, Buffer.byteLength(html), now, p.by, p.turn ?? null);
     if (kind === 'page') db.prepare('update pages set icon = ? where id = ?').run(iconOf(html), id);
@@ -296,11 +317,12 @@ export const FOLD_MS = 5 * 60_000;
  * same turn less than FOLD_MS ago: saves in a row are one version (the last), its number still the next one, so an
  * editor holding the one before hears that a newer one is there. A version the user made, kept or brought back is never
  * folded into. `onFold` hears which version went. `who`: someone the project is shared with made it (their name).
+ * `description`, when given, takes the place of the page's (left out, it keeps the one it has).
  */
 export function addVersion(
   db: DB,
   id: string,
-  p: { title?: unknown; html?: unknown; model?: unknown; by: PageVersion['by']; turn?: string; onFold?: (version: number) => void; who?: string },
+  p: { title?: unknown; html?: unknown; model?: unknown; by: PageVersion['by']; turn?: string; onFold?: (version: number) => void; who?: string; description?: unknown },
 ): PageInfo {
   const cur = mustPage(db, id);
   const { text: html, sources } = contentOf(db, cur.kind ?? 'page', p);
@@ -326,6 +348,8 @@ export function addVersion(
       p.who ?? null,
     );
     db.prepare('update pages set title = ?, version = ?, updated_at = ? where id = ?').run(title, next, now, id);
+    const description = cleanDescription(p.description);
+    if (description) db.prepare('update pages set description = ? where id = ?').run(description, id);
     if (!cur.kind) db.prepare('update pages set icon = ? where id = ?').run(iconOf(html), id);
     noteRefs(db, id, next, sources);
     if (fold) {
@@ -351,13 +375,20 @@ export function copyPage(db: DB, id: string): PageInfo {
   const p = mustPage(db, id);
   const cur = pageSource(db, id)!;
   const title = cleanTitle(`${p.title} (copy)`);
-  const place = { space: p.space, folder: p.folder };
+  const place = { space: p.space, folder: p.folder, description: p.description };
   return createPage(db, cur.kind === 'page' ? { title, html: cur.text, by: 'made', ...place } : { title, kind: cur.kind, model: mustKind(cur.kind).read(cur.text), by: 'made', ...place });
 }
 
 export function renamePage(db: DB, id: string, title: unknown): PageInfo {
   mustPage(db, id);
   db.prepare('update pages set title = ?, updated_at = ? where id = ?').run(cleanTitle(title), Date.now(), id);
+  return pageInfo(db, id)!;
+}
+
+/** Gives a page its description (cut to DESCRIPTION_WORDS words; empty takes it away). Not a change to the page itself. */
+export function describePage(db: DB, id: string, description: unknown): PageInfo {
+  mustPage(db, id);
+  db.prepare('update pages set description = ? where id = ?').run(cleanDescription(description) || null, id);
   return pageInfo(db, id)!;
 }
 

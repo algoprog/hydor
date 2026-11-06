@@ -15,6 +15,36 @@ export const STORAGE_LIMITS = {
 /** Versions a page keeps (the oldest go first), and at most this many bytes of them. */
 export const VERSION_LIMITS = { count: 40, bytes: 24 * 1024 * 1024 };
 
+/** The most words a description of something in the Library may have (more are cut off). */
+export const DESCRIPTION_WORDS = 100;
+
+/** Chinese, Japanese and Korean characters: written without spaces, two of them count as a word. */
+const CJK = '\\u3040-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff\\uac00-\\ud7af';
+const WORD = new RegExp(`[${CJK}]|[^\\s${CJK}]+`, 'gu');
+const isCjk = new RegExp(`^[${CJK}]$`, 'u');
+
+/** A text's words, each with where it starts and what it counts for (a CJK character half a word). */
+function wordsOf(text: string): { at: number; w: number }[] {
+  return [...text.matchAll(WORD)].map((m) => ({ at: m.index ?? 0, w: isCjk.test(m[0]) ? 0.5 : 1 }));
+}
+
+/** How many words a text has (in Chinese, Japanese or Korean, two characters make one). */
+export const wordCount = (text: string) => Math.ceil(wordsOf(text).reduce((n, x) => n + x.w, 0));
+
+/** A description as it is kept: on one line, without control characters, at most DESCRIPTION_WORDS words ('' for none). */
+export function cleanDescription(v: unknown): string {
+  const s = String(v ?? '')
+    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  let n = 0;
+  for (const x of wordsOf(s)) {
+    n += x.w;
+    if (n > DESCRIPTION_WORDS) return s.slice(0, x.at).trim().slice(0, 1500);
+  }
+  return s.slice(0, 1500);
+}
+
 export interface PageInfo {
   id: string;
   title: string;
@@ -46,6 +76,12 @@ export interface PageInfo {
   folder?: string;
   /** A page of HTML's icon: the emoji the page editor puts at its top (links to it in other pages show it). */
   icon?: string;
+  /**
+   * What it is, in a few sentences (at most DESCRIPTION_WORDS words): written by the agent that saved it, by the helper
+   * model for what came in without one (a file added, a page kept from a conversation), or by the user. The Library's
+   * search, the search box and agents find it by it.
+   */
+  description?: string;
 }
 
 /**

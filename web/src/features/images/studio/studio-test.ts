@@ -92,7 +92,7 @@ test('taking a background out or erasing: free here (the first use downloads its
   const first = toolPrice(tiers({ local: { ready: true } }), 'cutout', 'local');
   assert.equal(first.cost, 0);
   assert.equal(first.button, 'Remove the background (free)');
-  assert.match(first.line, /downloads its model \(about 220 MB\)/);
+  assert.match(first.line, /downloads its model \(about 190 MB\)/);
   const again = toolPrice(tiers({ local: { ready: true, downloaded: ['erase'] } }), 'erase', 'local');
   assert.equal(again.line, 'On this computer, for nothing, and the picture stays here.');
   assert.equal(again.button, 'Erase it (free)');

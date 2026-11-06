@@ -129,8 +129,8 @@ export function CropPanel({
       </Group>
       <Group title="Turn">
         <div className="grid grid-cols-4 gap-1.5">
-          <Choice onClick={() => onTurn(-1)} icon={<RotateCcw size={16} />} label="Left" title="Rotate left" />
-          <Choice onClick={() => onTurn(1)} icon={<RotateCw size={16} />} label="Right" title="Rotate right" />
+          <Choice onClick={() => onTurn(-1)} icon={<RotateCcw size={16} />} label="Turn left" title="Rotate left" />
+          <Choice onClick={() => onTurn(1)} icon={<RotateCw size={16} />} label="Turn right" title="Rotate right" />
           {/* By what they draw: lucide's FlipHorizontal2 and FlipVertical2 are drawn the other way round. */}
           <Choice onClick={() => onFlip('h')} icon={<TrianglesCenterlineDashedVertical size={16} />} label="Mirror" title="Flip left to right" />
           <Choice onClick={() => onFlip('v')} icon={<TrianglesCenterlineDashedHorizontal size={16} />} label="Upside down" title="Flip upside down" />

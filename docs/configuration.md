@@ -20,6 +20,7 @@ for the service and the desktop apps; on Windows `%USERPROFILE%\.config\hydor.en
 | `DISABLE_AUTOUPDATER` | unset (`1` in Docker) | Claude Code's own: `1` turns its updates off, and the app's daily update then leaves your Claude Code alone too (**Update now** in Settings → Accounts → Agent programs still updates it) |
 | `CLAUDE_CONFIG_DIR` | `~/.claude` | Where Claude Code keeps its data |
 | `CODEX_HOME` | `~/.codex` | Where Codex keeps its data |
+| `HYDOR_EMBED` | `on` | `off`: search by meaning starts off on a new install, so the app never sets it up on its own (a test's or a demo's copy); Settings → Memory still turns it on. Once Settings has turned it on or off, that wins |
 | `HYDOR_EMBED_DEVICE` | the GPU with the most free memory, else `cpu` | Where memory's search by meaning runs (`cpu`, `cuda:1`…); Settings → Memory can also keep it on the CPU |
 | `HYDOR_EMBED_THREADS` | half the CPU's cores, at most 4 | Threads it uses on the CPU |
 | `HYDOR_EMBED_PYTHON` | a private environment the app sets up | A Python with PyTorch and Transformers 5.6+ to run it with instead |
@@ -31,8 +32,8 @@ for the service and the desktop apps; on Windows `%USERPROFILE%\.config\hydor.en
 In `DATA_DIR`: the password hash (`auth.json`), the session index and search database (`hydor.db`; `naget-agent.db` or `web-agent.db` in older installs),
 the agents' programs the app installed (`clients/`), logs of running agents (`runs/`), attachments waiting to be sent (`uploads/`), files deleted in the file
 browser (`trash/`), the Library's images, videos and sounds with their stills and frames (`media/`), the folders the Library's
-notebooks run in (`notebooks/`), notebook kernels and the terminal server, and, once search by meaning is turned on in
-Settings → Memory, its private Python environment (`memory/venv`). Its model goes to Hugging Face's cache
+notebooks run in (`notebooks/`), notebook kernels and the terminal server, and search by meaning's private Python
+environment (`memory/venv`: set up a minute after the app first starts, unless it was turned off in Settings → Memory). Its model goes to Hugging Face's cache
 (`~/.cache/huggingface`, or `memory/hf` in Docker). Conversations themselves stay where the agents
 write them (`~/.claude/projects`, `~/.codex/sessions`); the app only reads them.
 

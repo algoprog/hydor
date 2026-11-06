@@ -92,8 +92,9 @@ agents that speak ACP and take MCP servers.
   answers) that every agent gets once, at the start of a session, after your guidelines: agents add to it only
   when you say something lasting, you edit it in Settings, and past its length (1,000 words unless changed) the
   helper model shortens it. Each agent starts with the notes that bear most on what you asked, 10 unless changed: a
-  top-k by hybrid search, by words (BM25) and, once you turn it on, by meaning, with LightOn's mDenseOn model on your
-  own computer (on a GPU, or on the CPU in about 1.5 GB, only while needed), then the latest. Each night the helper
+  top-k by hybrid search, by words (BM25) and by meaning (on unless you turn it off; it sets itself up once), with
+  LightOn's mDenseOn model on your own computer (on a GPU, or on the CPU in about 1.5 GB, only while needed), then the
+  latest. Each night the helper
   model tidies memory up: it merges notes that say the same thing and, when there are more than fit, sums related
   ones up in topics and, for a project, a short profile; every change can be undone.
   Settings → Memory lists every note with when it was written, changed and last needed (each place its three
@@ -213,8 +214,13 @@ agents that speak ACP and take MCP servers.
   link. The Library is sorted by project: what an agent saves goes in its session's project, Keep and Save to Library
   ask which project when there are projects (the session's first), New makes it in the project you look at, and More →
   Move to a project moves anything; its places (Everything, each project's things under its name, Not in a project,
-  Published) sit beside the cards, with Find by name, sorting and kind chips (Pages, Slides, Documents,
-  Spreadsheets, LaTeX, Pictures, Videos, Audio). Drop files or whole folders on the Library, on a project in its list
+  Published) sit beside the cards, with a search field, sorting and kind chips (Pages, Slides, Documents,
+  Spreadsheets, LaTeX, Pictures, Videos, Audio). Everything in it has a description (at most 100 words): the agent that
+  saves something writes one (save_page and the other save tools' description, changed alone with an id), the helper
+  model writes one for files added and pages kept from a conversation, models that see images write those of
+  pictures and videos, and you can write your own (Edit the title and description). The Library's search, the search
+  box and agents (get_page's query) find things by title and description with hybrid search: by words (BM25) and by
+  meaning, joined by rank. Drop files or whole folders on the Library, on a project in its list
   or on a project's card, and each becomes what it is (Word, Markdown, text or HTML a document; Excel, OpenDocument or
   CSV a spreadsheet; PowerPoint slides; LaTeX a LaTeX document; a notebook a notebook; pictures, videos and sounds the
   Library's media, kept once; anything else a file in the project's folder), sent in pieces up to 1 GB with a tray of
@@ -754,7 +760,7 @@ programs shows each program's version and what is out, with Check now, Update no
   every setting, sessions and what was said in them, memory notes, projects, apps, scheduled tasks, assistants,
   skills, plugins, the Library's pages, images and videos, connections, themes and files, as you type. Opening a result goes where it is: a setting opens its
   page and points at it, a message opens its session at the words. With search by meaning on (Settings →
-  Memory) things also match what they mean, in nine languages; what ships with the app has its vectors made
+  Memory; on unless you turn it off) things also match what they mean, in nine languages; what ships with the app has its vectors made
   ahead of time, and what you make gets them as you make it. Search in, beside the field, looks only in the
   places you pick (sessions, messages, projects, pages, files, settings…), the same on every device; with nothing
   typed it lists what those places hold. `Ctrl+F` finds within a conversation.
