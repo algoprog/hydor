@@ -3,6 +3,30 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.32.1 · 6 November 2026
+
+Knowledge bases get ready to search by meaning on a Mac, say what they wait for when they wait, and read big text
+files instead of refusing them; Claude Code starts where its temporary folder is closed to it.
+
+- **Search by meaning gets going on a Mac**: a knowledge base could stay at "0% ready to search by meaning" for good,
+  because the app counted a Mac's free memory without what macOS gives back at once, and so never found enough to
+  start the model. It now counts it as Activity Monitor does, for search by meaning, the picture tools and Settings →
+  Models alike.
+- **You see it get there**: the percentage goes up as the passages get ready (1% as soon as any are), without
+  reloading the page. When the model can't run yet, it tries again every two minutes rather than an hour later, and a
+  line above the knowledge bases says why it waits: it is setting itself up, starting, waiting for memory (how much is
+  free and how much it needs), or it stopped, with **Try again**.
+- **Big text files are read**: of a text file over 4 MB, such as a big log or data file, the first 4 MB are read, and
+  its last passage says where it was cut, rather than "too big to read here". **Read again now**, and the first
+  reading after the app starts, try again the documents that couldn't be read, so one an older version refused is
+  read now.
+- A knowledge base's line says "read 25m ago" rather than "read 25m".
+- **Claude Code starts where its temporary folder is closed to it**: where it can't make its folder in /tmp (one
+  another user made, say), new sessions said "Claude Code did not start" and the model menu was an empty box. Claude
+  Code now keeps its temporary files in Hydor's data folder there; when it still doesn't start, the model menu says
+  why, with **Try again**, and the usage report gives the same reason rather than "signed out?".
+- The picture tools' setup card gives their real sizes: about 145 MB, and about 200 MB a model.
+
 ## 0.32.0 · 6 November 2026
 
 Slides, documents and pages you make with AI: pictures, drawings, plots and videos made and changed right in the

@@ -13,10 +13,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
-import type { MeaningState } from '../../shared/memory.ts';
+import type { MeaningHeld, MeaningState } from '../../shared/memory.ts';
 import { APP_ROOT, config } from '../config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { which } from '../documents/tools.ts';
+import { availableMemory } from '../models/machine.ts';
 import { onEntriesChanged } from './store.ts';
 import { DIM, MODEL, missingVectors, setVectors, vectorCounts } from './vectors.ts';
 
@@ -56,12 +57,6 @@ function readText(f: string): string | null {
   } catch {
     return null;
   }
-}
-
-/** Memory the system could give a new program now, in MB. */
-export function freeMemoryMb(): number {
-  const m = /MemAvailable:\s+(\d+) kB/.exec(readText('/proc/meminfo') ?? '');
-  return m ? Number(m[1]) / 1024 : os.freemem() / 2 ** 20;
 }
 
 function freeDiskGb(p: string): number {
@@ -135,19 +130,34 @@ function workerEnv(db: DB): NodeJS.ProcessEnv {
   return env;
 }
 
+/** Too little memory was free the last time the worker was wanted: how much, and how much it needs (MB). */
+let short: { free: number; need: number } | null = null;
+
 /** The worker, started when it is not running (and memory allows); null when it cannot be now. */
 function ensureWorker(db: DB): Promise<Worker | null> {
   if (worker?.ready) return Promise.resolve(worker);
   if (starting) return starting;
   if (!meaningOn(db) || !envReady() || status === 'failed') return Promise.resolve(null);
-  const cpu = meaningDevice(db) === 'cpu' || !hasNvidia();
-  const need = cpu ? NEED_CPU_MB : NEED_GPU_MB;
-  const free = freeMemoryMb();
-  if (free < need) {
-    detail = `Waiting for memory: ${(free / 1024).toFixed(1)} GB free, it needs ${(need / 1024).toFixed(1)} GB. Until then notes are found by their words.`;
-    return Promise.resolve(null);
-  }
-  starting = new Promise<Worker | null>((resolve) => {
+  starting = (async () => {
+    const cpu = meaningDevice(db) === 'cpu' || !hasNvidia();
+    const need = cpu ? NEED_CPU_MB : NEED_GPU_MB;
+    const free = (await availableMemory()) / 2 ** 20;
+    if (free < need) {
+      short = { free, need };
+      detail = `Waiting for memory: ${(free / 1024).toFixed(1)} GB free, it needs ${(need / 1024).toFixed(1)} GB. Until then notes are found by their words.`;
+      return null;
+    }
+    short = null;
+    return startWorker(db);
+  })().finally(() => {
+    starting = null;
+  });
+  return starting;
+}
+
+/** Starts the worker, which answers once its model is loaded (downloaded the first time); null when it could not. */
+function startWorker(db: DB): Promise<Worker | null> {
+  return new Promise<Worker | null>((resolve) => {
     const first = !modelCached();
     status = 'starting';
     detail = first ? 'Downloading the model (1.2 GB, once)' : 'Loading the model';
@@ -192,10 +202,7 @@ function ensureWorker(db: DB): Promise<Worker | null> {
       fail(w, signal === 'SIGTERM' ? null : `The model's worker stopped (${signal ?? `exit ${code}`})${stderrTail.length ? `: ${stderrTail.slice(-2).join(' ')}` : ''}`, was);
       resolve(null);
     });
-  }).finally(() => {
-    starting = null;
   });
-  return starting;
 }
 
 function vectorsOf(b64: string, dim: number): Float32Array[] {
@@ -493,6 +500,7 @@ export function setMeaning(db: DB, p: { on?: boolean; device?: MeaningDevice; re
       stopWorker();
       status = 'off';
       detail = undefined;
+      short = null;
     }
   }
   if (p.retry || p.on) {
@@ -512,6 +520,20 @@ export function meaningState(db: DB): MeaningState {
   let d = detail;
   if (on && s === 'ready' && !d) d = worker?.ready ? `Loaded on ${worker.name ?? worker.device}` : meaningDevice(db) === 'cpu' || !hasNvidia() ? 'Starts on the CPU when needed, and stops after a few idle minutes' : 'Loads when needed';
   return { on, status: s, detail: d, model: MODEL, where: meaningDevice(db), device: worker?.name ?? lastDevice, ...counted.v };
+}
+
+/**
+ * Why search by meaning cannot make vectors now, for what waits on them (a knowledge base's passages): it is setting
+ * itself up, its model is starting (downloading the first time), too little memory is free, or it stopped. Nothing when
+ * it can (or it is off).
+ */
+export function meaningHeld(db: DB): MeaningHeld | undefined {
+  if (!meaningOn(db) || stub || worker?.ready) return undefined;
+  if (status === 'failed') return { why: 'failed', detail };
+  if (settingUp || !envReady()) return { why: 'setting-up', detail: settingUp ? detail : undefined };
+  if (status === 'starting' && (starting || worker)) return { why: 'starting', detail };
+  if (short) return { why: 'memory', freeMb: Math.round(short.free), needMb: short.need };
+  return undefined;
 }
 
 /** For a clean exit (tests). */

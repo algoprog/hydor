@@ -343,7 +343,7 @@ The files come from the device you are using. On a phone, **choose files** opens
 1. On a knowledge base, click **Add a folder on this computer**.
 2. In the menu that opens ("A folder to read, and keep up to date"), type a folder's name to find it among the folders you used lately and those in your home folder, or type its path, such as `~/Documents/Manuals`. Pick it.
 
-The folder is read where it is: nothing is copied. It shows as a chip on the base, and the base keeps up with it. A minute after the app starts, and every hour after that, the app reads what is new or changed in the folder and drops what was deleted. To read it at once, pick **Read again now** in the base's menu.
+The folder is read where it is: nothing is copied. It shows as a chip on the base, and the base keeps up with it. A minute after the app starts, and every hour after that, the app reads what is new or changed in the folder and drops what was deleted; after a start, it also tries again the documents that couldn't be read, which a newer version may read. To read it at once, pick **Read again now** in the base's menu.
 
 "This computer" is the one Hydor runs on, which may not be the device in front of you.
 
@@ -354,13 +354,20 @@ To stop reading a folder, click the × on its chip. Its documents leave the base
 - **Documents**: PDF, Word, Excel, PowerPoint, OpenDocument, EPUB, CSV and RTF; old .doc, .xls and .ppt files too when LibreOffice is installed on this computer.
 - **Text**: plain text and Markdown, web pages (their text, without the markup), and code and data files such as JSON, YAML, Python or JavaScript.
 
-Left out: pictures; files and folders whose names start with a dot (hidden ones); and the folders tools make, such as `node_modules`, `.git`, `dist`, `build`, `target` and `venv`. A folder is read up to 20,000 files and 12 levels deep. Text files over 4 MB and documents over 300 MB aren't read. A scanned PDF without a text layer has no text to search.
+Left out: pictures; files and folders whose names start with a dot (hidden ones); and the folders tools make, such as `node_modules`, `.git`, `dist`, `build`, `target` and `venv`. A folder is read up to 20,000 files and 12 levels deep. Of a text file over 4 MB, such as a big log or data file, the first 4 MB are read, and its last passage says where it was cut. Documents over 300 MB aren't read. A scanned PDF without a text layer has no text to search.
 
 Each document is cut into passages of up to about 1,400 characters, each keeping the page, slide, sheet or heading it came from, so agents can cite it.
 
 ## See what a knowledge base holds
 
-Each knowledge base is a card. Under its name, a line counts what it holds: its documents and passages, how much of it is ready to search by meaning (when that is on: "ready to search by meaning", or a percentage while it gets ready), and how long ago it was last read. While it is being read, the line starts "Reading 12 of 40…".
+Each knowledge base is a card. Under its name, a line counts what it holds: its documents and passages, how much of it is ready to search by meaning (when that is on: "ready to search by meaning", or a percentage while it gets ready, going up as it goes), and how long ago it was last read ("read 25m ago"). While it is being read, the line starts "Reading 12 of 40…".
+
+While search by meaning is on but can't get the passages ready now, a line above the knowledge bases says why, and agents find passages by their words until then:
+
+- **Search by meaning is setting itself up on this computer**, with what it is doing (installing PyTorch, say): once, the first time.
+- **Search by meaning is starting**: loading its model (downloading it, the first time).
+- **Search by meaning is waiting for memory**, with how much is free and how much it needs. It tries again every few minutes; closing a few programs helps.
+- **Search by meaning stopped**, with why. Click **Try again** once you have seen to it (installed Python, say), or try again in [Settings → Memory](/settings?s=memory&find=Search%20by%20meaning).
 
 - **Show the documents** lists every document: its name or path, then how many passages it has and its size. **no text** marks a document with nothing to read in it, and **could not read** one that failed; point at it to see why. Click a document to open it. **Hide the documents** folds the list.
 - When some documents couldn't be read, a red line says how many, with the first few and the reason for each.
@@ -370,7 +377,7 @@ Each knowledge base is a card. Under its name, a line counts what it holds: its 
 
 The ⋯ button (**More**) at the top right of a knowledge base opens its menu:
 
-- **Read again now**: reads its files and folders again at once, for files just added or a folder that changed.
+- **Read again now**: reads its files and folders again at once, for files just added or a folder that changed, and tries again the documents that couldn't be read.
 - **Rename**: opens **Rename the knowledge base**. Type the new name (up to 60 characters) and click **Save**.
 - **Move to**: **Shared knowledge**, or one of your projects; a check marks where the base is now. In a project, only that project's sessions search it; in the shared knowledge, every session does. This item shows once you have projects.
 - **Delete**: asks "Delete *name*?" Its passages go, and the files dropped into it with them; folders on this computer stay as they are. Click **Delete** to go ahead.
