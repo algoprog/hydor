@@ -324,6 +324,9 @@ const DB_WORDS: Record<string, string> = {
   chartNoData: 'Nothing to draw yet.',
   chartNoDb: 'The database this chart is drawn from is not on the page.',
   chartCount: 'Count',
+  pdfOpen: 'Open',
+  pdfPages: '{n} pages',
+  pdfFailed: 'This PDF could not be shown here: open it instead.',
   // a new database's first columns and options
   colName0: 'Name',
   todo: 'To do',
