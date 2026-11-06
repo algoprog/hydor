@@ -207,7 +207,7 @@ const ASK_FOR: Record<NewKind, string> = {
 };
 /** The kinds the gallery has for each: Choose a kind picks one of them, which the request is then made from. */
 const TYPES_FOR: Partial<Record<NewKind, ContentKind>> = { page: 'page', slides: 'deck', doc: 'doc', sheet: 'sheet' };
-const OPENS: Partial<Record<NewKind, string>> = { slides: '.pptx,.ppsx,.potx,.pptm', doc: '.docx,.docm,.dotx,.md,.markdown,.txt,.html,.htm', sheet: '.xlsx,.ods,.csv,.tsv', tex: '.tex,.ltx,.zip', notebook: '.ipynb' };
+const OPENS: Partial<Record<NewKind, string>> = { slides: '.pptx,.ppsx,.potx,.pptm', doc: '.docx,.docm,.dotx,.pdf,.md,.markdown,.txt,.html,.htm', sheet: '.xlsx,.ods,.csv,.tsv', tex: '.tex,.ltx,.zip', notebook: '.ipynb' };
 const KIND_TILES: { value: NewKind; label: string; icon: ReactNode }[] = [
   { value: 'page', label: 'A page', icon: <AppWindow size={16} /> },
   { value: 'slides', label: 'Slides', icon: <Presentation size={16} /> },
@@ -288,7 +288,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
       setBusy(false);
     }
   };
-  /** A PowerPoint deck, a Word document, a spreadsheet or a CSV opened as a page of its kind. */
+  /** A PowerPoint deck, a Word document or a PDF, a spreadsheet or a CSV opened as a page of its kind. */
   const openFile = () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -419,7 +419,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
                     : 'LaTeX source beside its typeset pages, as in Overleaf, to save as a PDF or the .tex project.'}
             </span>
             <Button size="sm" variant="secondary" icon={<Upload size={14} />} disabled={busy} onClick={openFile}>
-              {kind === 'doc' ? 'Open a Word or text file' : kind === 'sheet' ? 'Open an Excel or CSV file' : kind === 'notebook' ? 'Open a notebook (.ipynb)' : 'Open a .tex or .zip file'}
+              {kind === 'doc' ? 'Open a Word, PDF or text file' : kind === 'sheet' ? 'Open an Excel or CSV file' : kind === 'notebook' ? 'Open a notebook (.ipynb)' : 'Open a .tex or .zip file'}
             </Button>
           </div>
         ) : kind === 'page' ? (

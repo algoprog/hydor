@@ -2,7 +2,8 @@
 // pictures apart (assets.ts). Wherever a page's HTML is needed (the frame in the conversation, its own address, a
 // published copy, its picture in Pages, a PDF), the document's own page is made from it: its sheets of paper with
 // the pictures inside (viewer), its pages as they print (print), or the top of its first page (still). It exports
-// as Word (docx.ts writes the file) and Markdown, and is made from Word, Markdown, text and HTML files.
+// as Word (docx.ts writes the file), Markdown, and OpenDocument, EPUB and text (doc-files.ts), and is made from Word,
+// PDF, Markdown, text and HTML files.
 //
 // save_doc is how agents make and change documents; get_page gives one back as Markdown, which says all a
 // document holds but its blocks' ids (carried over from the version it changes when it comes back). Agents answer the
@@ -69,6 +70,7 @@ import { assetDataUrl, getAsset, pictureType, putAsset, takeIn } from './assets.
 import { authorOf, docxFile, editorStylesXml, MONO_DOC, type DocBlock as WordBlock, type DocCell, type DocLook, type DocRev, type DocRun as WordRun, type DocSpace } from './docx.ts';
 import { katexStyle, texToHtml } from './math.ts';
 import { DOC_EDITS_HELP } from '../../shared/doc-edits.ts';
+import { docFromPdf } from './doc-files.ts';
 import { texOfOmml } from './omml.ts';
 import { imageSize } from './ooxml.ts';
 import type { Picture } from './pptx.ts';
@@ -929,18 +931,20 @@ function textDoc(text: string): Doc {
 /**
  * A document from a file someone opens: a Word file (.docx: headings, paragraphs with their bold, italic,
  * underline, colours, highlights, sizes and links, lists, checklists, tables, pictures, page breaks, its paper and
- * margins), Markdown, plain text, or a web page (.html, its words and pictures; nothing of it runs). Pictures come
- * inside it as data: addresses (keepDoc keeps them apart). Throws, in words a person can act on, for any other file.
+ * margins), a PDF (its text, headings and paragraphs: doc-files.ts), Markdown, plain text, or a web page (.html, its
+ * words and pictures; nothing of it runs). Pictures come inside it as data: addresses (keepDoc keeps them apart).
+ * Throws, in words a person can act on, for any other file.
  */
 export function docFromFile(buf: Buffer, name: string): Doc {
   const ext = (name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? '').replace(/^(docm|dotx|dotm)$/, 'docx');
   if (ext === 'docx') return wordDoc(buf);
+  if (ext === 'pdf') return docFromPdf(buf);
   if (ext === 'doc' || ext === 'odt' || ext === 'rtf' || ext === 'pages') throw new Error(`A .${ext} file opens here once it is saved as a Word document (.docx)`);
   const text = decodeText(buf);
   if (ext === 'md' || ext === 'markdown' || ext === 'mdown' || ext === 'mkd') return normalizeDoc({ markdown: text });
   if (ext === 'txt' || ext === 'text' || ext === 'log' || ext === '') return textDoc(text);
   if (ext === 'html' || ext === 'htm' || ext === 'xhtml') return normalizeDoc({ blocks: htmlBlocks(text, { looks: true }) });
-  throw new Error('A document is made from a Word file (.docx), Markdown (.md), text (.txt) or a web page (.html)');
+  throw new Error('A document is made from a Word file (.docx), a PDF (.pdf), Markdown (.md), text (.txt) or a web page (.html)');
 }
 
 // A Word file read for what a document keeps. Word keeps a paragraph's look in its style (and the styles it is
@@ -2100,7 +2104,7 @@ export function wordLosses(buf: Buffer, doc: Doc): { loses: string[]; cut: boole
 // ---- the agent's tool ---------------------------------------------------------------------------------------------
 
 const DOC_HELP = [
-  'Make or change a document, kept in the user’s Library: they read it in the conversation and in the Library, edit it there as in Word or Google Docs, print it, and export it as Word (.docx), PDF or Markdown. Use it for letters, reports, CVs, essays, notes, contracts, handouts, minutes, plans and anything else the user will read, edit or print, rather than writing a .docx file (unless they ask for a file, or work on one they have).',
+  'Make or change a document, kept in the user’s Library: they read it in the conversation and in the Library, edit it there as in Word or Google Docs, print it, and export it as Word (.docx), OpenDocument (.odt), PDF, Markdown, EPUB or plain text. Use it for letters, reports, CVs, essays, notes, contracts, handouts, minutes, plans and anything else the user will read, edit or print, rather than writing a .docx file (unless they ask for a file, or work on one they have).',
   'Write it as markdown: # Heading 1 to #### Heading 4, paragraphs, **bold**, *italic*, <u>underline</u>, ~~struck~~, `code`, [links](https://…), ==highlighted==, H<sub>2</sub>O and x<sup>2</sup>; - bullets, 1. numbers, - [ ] and - [x] checklists (two more spaces before the marker for a level deeper); > quotes; ``` code blocks; tables as | a | b | over | --- | --- | (:---: centres a column, wider dashes make a wider column); --- for a line across; \\pagebreak alone on a line to start a new page.',
   'Braces at the end of a paragraph or heading say what Markdown cannot: {.title} makes it the document’s title, {.subtitle} its subtitle, {.center}, {.right} or {.justify} aligns it, {indent=1} indents it a step. Colours, sizes and fonts: <span style="color:#c5221f; background-color:#fde68a; font-size:14pt; font-family:Georgia">words</span>.',
   'Pictures: ![what it shows](src "its caption"){width=50% .left} on a line of their own (centred, the text’s width, unless said); src is a file of this session (a picture you made), a public https address, or a picture the document has already (naget-asset:…).',
