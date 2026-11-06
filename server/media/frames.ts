@@ -101,7 +101,8 @@ export const forgetFfmpeg = () => void (known = null);
 /** Whether ffmpeg is here: this computer's, or the picture tools' own. */
 export const hasFfmpeg = async (): Promise<boolean> => !!(await ffmpegTools());
 
-const ffmpegBin = async () => (await ffmpegTools())?.ffmpeg ?? null;
+/** The ffmpeg to run for the editors' own work (a picture edited, a video cut): this computer's or the picture tools' own; null without either. */
+export const ffmpegBin = async (): Promise<string | null> => (await ffmpegTools())?.ffmpeg ?? null;
 
 export interface Probed {
   width?: number;

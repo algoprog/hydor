@@ -29,10 +29,12 @@ import {
   type VideoShape,
   type VideoTurn,
 } from '@shared/mediaedit-video';
+import type { Saved } from '@shared/mediaedit';
 import { Button, cx, Empty, IconButton, MenuItem, MenuSep, Popover, Segmented, Throbber, useIsMobile } from '../../components/ui';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
+import type { EditorProps, OpenEditor } from './host';
 import { makeEdit, playUrl, stopEdit, stripUrl, videoFacts } from './video/api';
 import { makeClock, useClock, type Clock } from './video/clock';
 import { useHistory } from './video/history';
@@ -42,43 +44,8 @@ import { drawText } from './video/text';
 import { partAt, Timeline } from './video/Timeline';
 import { usePlayer } from './video/usePlayer';
 
-/** Where the editor was opened from, as the tabs give it (host.tsx's OpenEditor). */
-export interface VideoOpened {
-  kind: 'image' | 'video';
-  src: string;
-  title: string;
-  from: { label: string; back?: () => void };
-  /** Where Save writes: a slide's video (kept by the app), a Library item, a file; none: the Library, as a new item. */
-  to?: { asset: true } | { media: string } | { file: string };
-  save: (r: VideoSaved) => Promise<void> | void;
-  copy?: boolean;
-  /** The session a video of the conversation is from (a copy in the Library is noted as from it). */
-  session?: string;
-}
-
-/** What the editor hands back (host.tsx's Saved, with a video's still). */
-export interface VideoSaved {
-  kind: 'image' | 'video';
-  src?: string;
-  /** A slide's video: its still (a kept picture). */
-  poster?: string;
-  media?: string;
-  path?: string;
-  w?: number;
-  h?: number;
-  mime?: string;
-  replaced?: boolean;
-}
-
-export interface VideoEditorProps {
-  o: VideoOpened;
-  active: boolean;
-  detached: boolean;
-  setDirty(dirty: boolean): void;
-  done(r: VideoSaved): Promise<void>;
-  close(): void;
-  lead: ReactNode | null;
-}
+/** What the editor hands back: a video (a slide's with its still), or the still alone. */
+type VideoSaved = Saved;
 
 const TOOLS: { id: Tool; label: string; icon: ReactNode }[] = [
   { id: 'trim', label: 'Trim', icon: <Scissors size={15} /> },
@@ -100,7 +67,7 @@ const nameOf = (p: string) => p.split(/[\\/]/).pop() ?? p;
 const stemOf = (p: string) => nameOf(p).replace(/\.[^.]+$/, '');
 
 /** What Save does (and Save a copy, when offered), for a video opened as `o`. */
-function savePlans(o: VideoOpened, detached: boolean): { main: { label: string; to: VideoSaveTo; says: string; fixed?: string }; copy: { label: string; to: VideoSaveTo; says: string } | null; beside: VideoSaveTo } {
+function savePlans(o: OpenEditor, detached: boolean): { main: { label: string; to: VideoSaveTo; says: string; fixed?: string }; copy: { label: string; to: VideoSaveTo; says: string } | null; beside: VideoSaveTo } {
   const lib = { label: 'Save to Library', to: { library: true, ...(o.session ? { session: o.session } : {}) } as VideoSaveTo, says: 'It is kept in your Library as a new video.' };
   const to = o.to;
   if (detached || !to) return { main: detached ? { ...lib, says: 'Where it came from is closed, so it is kept in your Library as a new video.' } : lib, copy: null, beside: lib.to };
@@ -131,7 +98,7 @@ function wentTo(j: VideoEditJob, what: string): string {
   return tr(`${what} is in your Library`);
 }
 
-export function VideoEditor(p: VideoEditorProps) {
+export function VideoEditor(p: EditorProps) {
   const [facts, setFacts] = useState<VideoFacts | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   useEffect(() => {
@@ -180,7 +147,7 @@ export function VideoEditor(p: VideoEditorProps) {
   return <Editing {...p} facts={facts as Required<Pick<VideoFacts, 'duration' | 'width' | 'height'>> & VideoFacts} />;
 }
 
-function Editing({ o, active, detached, setDirty, done, lead, facts }: VideoEditorProps & { facts: Required<Pick<VideoFacts, 'duration' | 'width' | 'height'>> & VideoFacts }) {
+function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorProps & { facts: Required<Pick<VideoFacts, 'duration' | 'width' | 'height'>> & VideoFacts }) {
   const mobile = useIsMobile();
   const duration = facts.duration;
   const h = useHistory<Edit>({ recipe: {}, splits: [] });
