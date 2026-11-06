@@ -5,7 +5,7 @@
 // the Library under it. Everything shows in the browser as it will be; Save has the server make it exactly (ffmpeg,
 // server/mediaedit/video.ts), with its progress and a way to stop, then puts it back where it came from (a slide's video
 // and its still, a Library item, a file), or keeps a copy, a GIF or one frame as a picture. Undo and redo for every step.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Camera, ChevronDown, Clapperboard, Crop, Ellipsis, Film, Image as ImageIcon, Pause, Play, Redo2, RotateCcw, Scissors, SlidersHorizontal, Trash2, Type, Undo2, Volume2, X } from 'lucide-react';
 import {
   cropToShape,
@@ -148,7 +148,21 @@ export function VideoEditor(p: EditorProps) {
 }
 
 function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorProps & { facts: Required<Pick<VideoFacts, 'duration' | 'width' | 'height'>> & VideoFacts }) {
-  const mobile = useIsMobile();
+  // A phone, or an editor squeezed narrow (the sidebar open on a small window): the panel under the picture, the tools
+  // along the bottom, and the buttons without their words.
+  const phone = useIsMobile();
+  const root = useRef<HTMLDivElement>(null);
+  const [narrow, setNarrow] = useState(false);
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const m = () => setNarrow(el.clientWidth > 0 && el.clientWidth < 760);
+    m();
+    const ro = new ResizeObserver(m);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const mobile = phone || narrow;
   const duration = facts.duration;
   const h = useHistory<Edit>({ recipe: {}, splits: [] });
   const e = h.now;
@@ -164,7 +178,6 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
   const [vs, setVs] = useState({ w: facts.width, h: facts.height });
   const clock = useMemo(() => makeClock(), []);
   const video = useRef<HTMLVideoElement>(null);
-  const root = useRef<HTMLDivElement>(null);
   const url = useMemo(() => playUrl(o.src), [o.src]);
   const parts = useMemo(() => keptParts(r, duration), [r, duration]);
   const length = editedLength(r, duration);
