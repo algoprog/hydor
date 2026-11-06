@@ -361,7 +361,7 @@ function glb(): Buffer {
   // What agents are told.
   const help = String(tools.save_slides.description);
   ok(
-    ['the web format unless it has "format": "pptx"', 'quiz {question', 'window.deck', 'deck.next()', 'trigger', 'file: an .html file', 'make_plot', 'scene3d {model', 'textFx', 'hover', 'cube|flip|dissolve|circle|blinds|glitch', 'aurora', 'progress: true', '"#next"'].every((w) => help.includes(w)),
+    ['the web format is the default (no "format")', '"format": "pptx" keeps to what PowerPoint has', 'quiz {question', 'window.deck', 'deck.next()', 'trigger', 'file: an .html file', 'make_plot', 'scene3d {model', 'textFx', 'hover', 'cube|flip|dissolve|circle|blinds|glitch', 'aurora', 'progress: true', '"#next"'].every((w) => help.includes(w)),
     'save_slides tells agents of the web format, its parts, files, effects and examples',
   );
   const schema = tools.save_slides.inputSchema as { properties: Record<string, { enum?: string[] }> };
