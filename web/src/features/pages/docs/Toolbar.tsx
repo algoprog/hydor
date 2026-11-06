@@ -1,6 +1,7 @@
 // The documents editor's toolbar, the most used of what the menus hold, in one row that fits a laptop's screen
 // (sideways on a phone): undo and redo; the paragraph's style; the words' font and size; bold, italic, underline;
-// their colour and highlight; a link (Ctrl+K); a comment on the words picked (Ctrl+Alt+M); the format painter (a
+// their colour and highlight; a link (Ctrl+K); a comment on the words picked (Ctrl+Alt+M); Rewrite (the words picked
+// rewritten with AI: slides/Rewrite.tsx); the format painter (a
 // click carries the look of the words at the caret to the next words picked, a double click keeps it on until Esc);
 // alignment, in a menu; bullets, numbers and a checklist; the table's rows and columns (and a plot of it) when the caret is in one; and at
 // its end Editing or Suggesting (Ctrl+Alt+Shift+X), named while suggesting. It acts on what is selected in the
@@ -34,6 +35,8 @@ import {
 import { FONTS, HL_COLORS, PARA_STYLES, STYLES, TEXT_COLORS, type Doc } from '@shared/docs';
 import { Button, cx, inputCls, MenuItem, MenuSep, Popover } from '../../../components/ui';
 import { NumInput, Tool } from '../slides/controls';
+import { RewriteButton } from '../slides/Rewrite';
+import { docsTarget } from './rewrite';
 import { Select } from '../studio/fields';
 import type { DocEngine, SelState } from './engine';
 
@@ -196,6 +199,7 @@ export function Toolbar({
           <MessageSquarePlus size={15} />
         </Tool>
       )}
+      <RewriteButton target={() => docsTarget(engine)} label={!slim} disabled={st.collapsed || !st.text.trim() || !!st.picked} />
       <button
         type="button"
         title="Format painter (a double click keeps it on until Esc)"

@@ -7,7 +7,7 @@ import { HttpError } from '../auth.ts';
 import { ASSET, asAccepted, docMarkdown, docSources, mapDocSources, newDoc } from '../../shared/docs.ts';
 import { newTex, texSources } from '../../shared/latex.ts';
 import { newBook } from '../../shared/sheets.ts';
-import { deckSources, deckVideos, newDeck } from '../../shared/slides.ts';
+import { deckSounds, deckSources, deckVideos, newDeck } from '../../shared/slides.ts';
 import { assetDataUrl } from './assets.ts';
 import { docForAgent, docFromFile, docPage, docxOfDoc, keepDoc, MAX_DOC, readDoc } from './docs.ts';
 import { importTex, keepTex, MAX_TEX, readTex, TEX_OPENS, texForAgent, texPage, texPdf, texSource, texZip } from './latex.ts';
@@ -16,6 +16,7 @@ import { deckFontFiles } from './pptx-fonts.ts';
 import { deckFromPptx } from './pptx-import.ts';
 import { bookForAgent, bookPage, csvOfBook, importBook, keepBook, MAX_BOOK, readBook, xlsxOfBook } from './sheets.ts';
 import { deckForAgent, deckPage, keepDeck, MAX_DECK, readDeck } from './slides.ts';
+import { soundFileFor } from './sounds.ts';
 import { videoFileFor } from './videos.ts';
 import type { EmbeddedFont } from './word-fonts.ts';
 import { freshNotebook, keepNotebook, MAX_NOTEBOOK, notebookForAgent, notebookFromFile, notebookPage, notebookScript, readNotebook } from './notebooks.ts';
@@ -79,8 +80,8 @@ KINDS.set('slides', {
   max: MAX_DECK,
   keep: (db, input) => {
     const { deck, text } = keepDeck(db, input);
-    // Its kept videos stay while a version shows them, as its pictures do.
-    return { text, sources: [...deckSources(deck), ...deckVideos(deck)] };
+    // Its kept videos (and its slides' narrations) stay while a version shows them, as its pictures do.
+    return { text, sources: [...deckSources(deck), ...deckVideos(deck), ...deckSounds(deck)] };
   },
   read: readDeck,
   page: (db, text, title, mode) => deckPage(db, readDeck(text), title, mode),
@@ -96,7 +97,7 @@ KINDS.set('slides', {
       const deck = readDeck(text);
       // The faces of the app's fonts it shows go inside it (no Office computer has them; none offline).
       const fonts = await deckFontFiles(deck);
-      return pptxFile(deck, { title, picture: help.picture, scales: help.scales, renders: help.renders, video, fonts, note: help.note });
+      return pptxFile(deck, { title, picture: help.picture, scales: help.scales, renders: help.renders, video, sound: (src) => soundFileFor(db, src), fonts, note: help.note });
     },
     html: (db, text, title) => deckPage(db, readDeck(text), title, 'viewer', { videosInside: true }),
   },

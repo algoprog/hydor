@@ -10,6 +10,7 @@ import { exportPageStep, PublishCard, ReadPageRow, readPageStep, SavedPageCard, 
 import { latexCheckStep } from './checkStep';
 import { PageEditNoteView } from './notes';
 import { PagesRoute } from './PagesPage';
+import { RemotePage } from './slides/Remote';
 import { savedPageOf } from './state';
 
 const saved = { place: 'answer', Row: SavedPageCard, same: savedPageOf, step: savedPageStep } satisfies ToolView;
@@ -37,7 +38,11 @@ export const pagesFeature: WebFeature = {
     latex_check: { place: 'work', Row: ReadPageRow, step: latexCheckStep },
   },
   noteViews: { 'page-edit': PageEditNoteView },
-  routes: [{ match: isPages, Page: PagesRoute }],
+  // A slideshow's phone remote (slides/Remote.tsx) too.
+  routes: [
+    { match: isPages, Page: PagesRoute },
+    { match: (p) => p.startsWith('/remote/'), Page: RemotePage },
+  ],
   nav: [{ id: 'pages', path: '/library', label: 'Library', icon: <LibraryBig size={17} />, match: inLibrary }],
   sessionSide: { useOpen: useCanvasOpen, close: closeCanvas, Panel: CanvasSide },
   // A page opened to change over everything (a phone, a narrow window).
