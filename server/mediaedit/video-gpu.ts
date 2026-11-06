@@ -87,6 +87,8 @@ export interface GpuProbe {
   test(bin: string, api: HwApi, encoder: string, device?: string): Promise<boolean>;
   /** The card's name, or null. */
   name(api: HwApi, device?: string): Promise<string | null>;
+  /** The kind of computer, when not this one's (tests). */
+  platform?: NodeJS.Platform;
 }
 
 function run(bin: string, args: string[], timeout: number): Promise<{ ok: boolean; out: string }> {
@@ -199,7 +201,7 @@ export function gpuMode(db: DB): GpuMode {
 /** Tries each way this ffmpeg has, the best first: the first whose test encode works is the card used. */
 async function tryCard(bin: string): Promise<GpuFound | null> {
   const have = await probe.encoders(bin);
-  for (const api of hwOrder(process.platform)) {
+  for (const api of hwOrder(probe.platform ?? process.platform)) {
     const encs = Object.entries(HW_ENCODERS[api]).filter(([, e]) => have.has(e!)) as [VideoCodec, string][];
     if (!encs.length) continue;
     const device = api === 'vaapi' ? probe.renderNodes()[0] : undefined;

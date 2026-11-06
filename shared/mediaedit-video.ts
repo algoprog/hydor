@@ -821,7 +821,7 @@ function audioOf(raw: unknown, factsOf: VideoFactsOf, length: number): VideoAudi
   const src = str(a.src, 4096);
   const f = src ? factsOf(src) : undefined;
   if (!src || !f || !f.duration) return null;
-  const start = num(a.start, 0, Math.max(0, length - MIN_PART)) ?? 0;
+  const start = num(a.start, 0, Math.max(0, length - 0.1)) ?? 0;
   const out: VideoAudio = { src, track: a.track === 'voice' ? 'voice' : 'music', start: ms(start) };
   if (typeof a.id === 'string' && ID.test(a.id)) out.id = a.id;
   const name = str(a.name, 200);

@@ -754,7 +754,8 @@ export async function prepare(d: Deps, b: Partial<VideoEditAsk> & { to?: unknown
   if ('asset' in to && !(picture || format === 'gif')) throw new HttpError(400, 'A video is kept as a deck’s video: to: { video: true }');
   if ('media' in to && to.as === 'replace' && mustMedia(d.db, to.media).kind !== 'video') throw new HttpError(400, 'That Library item is not a video');
   const pair = Array.isArray(b.range) && b.range.length === 2 ? [Number(b.range[0]), Number(b.range[1])] : null;
-  const range: [number, number] | undefined = pair && pair.every(Number.isFinite) && pair[1] - pair[0] >= 0.05 && (pair[0] > 0.001 || pair[1] < length - 0.001) ? [Math.max(0, pair[0]), Math.min(length, pair[1])] : undefined;
+  if (pair && pair.every(Number.isFinite) && Math.min(length, pair[1]) - Math.max(0, pair[0]) < 0.05) throw new HttpError(400, 'The part between In and Out is too short: mark a longer part');
+  const range: [number, number] | undefined = pair && pair.every(Number.isFinite) && (pair[0] > 0.001 || pair[1] < length - 0.001) ? [Math.max(0, pair[0]), Math.min(length, pair[1])] : undefined;
   const seconds = picture ? 0 : range ? range[1] - range[0] : length;
   if (!picture && seconds > MAX_SECONDS) throw new HttpError(400, `The edited video would be over ${MAX_SECONDS / 60} minutes: cut it shorter`);
   if (format === 'gif' && seconds > MAX_GIF_SECONDS) throw new HttpError(400, `A GIF can be at most ${MAX_GIF_SECONDS} seconds: cut it shorter, or save it as a video`);
