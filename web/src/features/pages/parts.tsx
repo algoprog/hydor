@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppWindow, FileText, Globe, GlobeLock, LayoutGrid, NotebookText, Presentation, Sheet, Sigma, Sparkles, Upload, X } from 'lucide-react';
 import { composeAsk } from '@shared/content-asks';
-import { NEW_START, type ContentKind, type ContentType } from '@shared/content-types';
+import type { ContentKind, ContentType } from '@shared/content-types';
 import type { PageInfo, SiteInfo, SiteVisibility } from '@shared/pages';
 import { newDeck, THEMES, type Ratio } from '@shared/slides';
 import { texFromTemplate, texTemplate, type TexTemplateId } from '@shared/latex-templates';
@@ -175,10 +175,10 @@ export function PublishDialog({ page, open, onClose }: { page?: { id: string; ti
 export type NewKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
 const NEW_TITLE: Record<NewKind, string> = { page: '', slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', tex: 'LaTeX document', notebook: 'Notebook' };
 const ASK_FOR: Record<NewKind, string> = {
-  page: NEW_START.page,
-  slides: NEW_START.deck,
-  doc: NEW_START.doc,
-  sheet: NEW_START.sheet,
+  page: 'Make me a page and keep it in my Library: ',
+  slides: 'Make me slides and keep them in my Library: ',
+  doc: 'Write me a document and keep it in my Library: ',
+  sheet: 'Make me a spreadsheet and keep it in my Library: ',
   tex: 'Write me a LaTeX document and keep it in my Library: ',
   notebook: 'Make me a Jupyter notebook, run it, and keep it in my Library: ',
 };

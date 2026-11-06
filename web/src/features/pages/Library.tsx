@@ -52,8 +52,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { turnAsk } from '@shared/content-asks';
-import { TURN_INTO } from '@shared/content-types';
+import { TURN_INTO, turnAsk } from '@shared/content-asks';
 import type { MediaItem } from '@shared/media';
 import type { LibFolder, PageInfo, SiteInfo } from '@shared/pages';
 import type { SpaceView } from '@shared/spaces';

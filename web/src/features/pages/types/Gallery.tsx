@@ -20,7 +20,7 @@ import { TYPE_ICONS } from './icons';
 const TITLE: Record<ContentKind, string> = {
   slide: 'Add a slide made with AI',
   section: 'Add a section made with AI',
-  block: 'Add a part made with AI',
+  block: 'Add a block made with AI',
   deck: 'Slides made with AI',
   doc: 'A document made with AI',
   page: 'A page made with AI',
@@ -181,7 +181,7 @@ export default function Gallery({ o }: { o: TypesOpts & { n: number } }) {
         )}
         <div className="-mx-1 min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-1">
           {shown.length ? (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2 min-[480px]:grid-cols-2 sm:grid-cols-3">
               {shown.map((t) => (
                 <TypeCard key={t.id} t={t} on={picked?.id === t.id} note={pptx && t.web ? 'Web format' : undefined} onClick={() => pick(t)} />
               ))}

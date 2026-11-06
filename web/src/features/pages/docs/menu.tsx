@@ -231,8 +231,16 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     { label: 'Callout', icon: <Lightbulb size={15} />, also: 'note box', run: () => e.style('callout') },
     { label: 'Table of contents', icon: <TableOfContents size={15} />, also: 'toc headings', run: () => e.insertToc() },
     '-',
-    { label: 'A line across', icon: <Minus size={15} />, also: 'horizontal rule divider', run: () => e.insertAtom('hr') },
-    { label: 'A page break', icon: <SeparatorHorizontal size={15} />, keys: 'Ctrl+Enter', run: () => e.insertAtom('pagebreak') },
+    // One row for the two ways across the page, so Insert fits a small window with Section made with AI in it.
+    {
+      label: 'A line or a page break',
+      icon: <SeparatorHorizontal size={15} />,
+      also: 'horizontal rule divider page break',
+      items: [
+        { label: 'A line across', icon: <Minus size={15} />, also: 'horizontal rule divider', run: () => e.insertAtom('hr') },
+        { label: 'A page break', icon: <SeparatorHorizontal size={15} />, keys: 'Ctrl+Enter', run: () => e.insertAtom('pagebreak') },
+      ],
+    },
     { label: "Today's date", icon: <CalendarDays size={15} />, run: c.today },
     '-',
     { label: 'Header and footer', icon: <PanelTop size={15} />, also: 'header footer', run: c.bands },

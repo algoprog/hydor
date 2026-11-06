@@ -4,8 +4,8 @@
 // like, and the request is made from its `ask`, their words and where it goes (content-asks.ts); agents asked for one
 // by name read the same `ask` with how_to_make (server/pages/content-types.ts). An `ask` says what goes in it, in what
 // order, how it looks and where a picture, a drawing or a chart helps; it is English for the agent, never shown as
-// the app's words (the i18n extractor leaves it out), while labels, blurbs and hints are shown and translated.
-// Also: the kinds of page "Turn it into" in the Library makes from each.
+// the app's words (the i18n extractor leaves it out), while labels, blurbs and hints are shown and translated. Only
+// the gallery (and the agents' tool) loads this list: what other pages need is in content-asks.ts, which has no list.
 
 export type ContentKind = 'slide' | 'deck' | 'doc' | 'section' | 'page' | 'block' | 'sheet';
 
@@ -2560,26 +2560,3 @@ export function findTypes(words: string, o: { kind?: ContentKind; shown?: (t: Co
   });
   return scored.sort((a, b) => b.score - a.score || a.at - b.at).map((x) => x.t);
 }
-
-// ---- what is asked -----------------------------------------------------------------------------------------------------
-
-/** How a request for something new starts, as New in the Library's "Or describe it" does. */
-export const NEW_START: Record<'deck' | 'doc' | 'page' | 'sheet', string> = {
-  page: 'Make me a page and keep it in my Library: ',
-  deck: 'Make me slides and keep them in my Library: ',
-  doc: 'Write me a document and keep it in my Library: ',
-  sheet: 'Make me a spreadsheet and keep it in my Library: ',
-};
-
-/** The kinds of page the Library holds, as "Turn it into" names them. */
-export type PageKindName = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
-
-/** What each kind can be turned into, from the Library: the others of slides, a document and a page. */
-export const TURN_INTO: Record<PageKindName, ('slides' | 'doc' | 'page')[]> = {
-  page: ['slides', 'doc'],
-  slides: ['doc', 'page'],
-  doc: ['slides', 'page'],
-  sheet: ['slides', 'doc', 'page'],
-  tex: ['slides', 'doc', 'page'],
-  notebook: ['slides', 'doc', 'page'],
-};

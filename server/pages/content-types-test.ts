@@ -9,8 +9,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { CONTENT_GROUPS, CONTENT_MIN, CONTENT_TYPES, contentType, findTypes, NEW_START, TURN_INTO, typesOf, type ContentKind, type PageKindName } from '../../shared/content-types.ts';
-import { composeAsk, turnAsk } from '../../shared/content-asks.ts';
+import { CONTENT_GROUPS, CONTENT_MIN, CONTENT_TYPES, contentType, findTypes, typesOf, type ContentKind } from '../../shared/content-types.ts';
+import { composeAsk, NEW_START, TURN_INTO, turnAsk, type PageKindName } from '../../shared/content-asks.ts';
 import { TYPE_ICONS } from '../../web/src/features/pages/types/icons.ts';
 import { howToMakeStep } from '../../web/src/features/pages/types/step.ts';
 import { slidesMenus, type MenuArgs } from '../../web/src/features/pages/slides/SlidesMenus.tsx';
@@ -276,7 +276,16 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
   const docs = actions(insertOf(docMenus(docCtx({ aiSection: noop }))));
   ok(docs[0]?.label === 'Section made with AI' && !!docs[0].run, 'documents: Insert → Section made with AI, first');
   ok(!actions(insertOf(docMenus(docCtx({ aiSection: undefined })))).some((x) => x.label === 'Section made with AI'), 'documents: none where no request can be sent');
-  console.log(`(documents: Insert is ${height(insertOf(docMenus(docCtx({ aiSection: noop }))))} px with the row going back, ${height(insertOf(docMenus(docCtx({ aiSection: noop })))) - 43} px without)`);
+  const docInsert = insertOf(docMenus(docCtx({ aiSection: noop })));
+  ok(height(docInsert) <= 667 - 49 - 10, `documents: Insert still fits 811×667, where its menus fold (${height(docInsert)} px)`);
+  const across = actions(docInsert).find((x) => x.label === 'A line or a page break');
+  ok(
+    actions(across?.items ?? [])
+      .map((x) => `${x.label}${x.keys ? ` ${x.keys}` : ''}`)
+      .join() === 'A line across,A page break Ctrl+Enter',
+    'Insert → A line or a page break: a line across, and a page break (Ctrl+Enter)',
+  );
+  ok(!!actions(docInsert).find((x) => x.label === 'Header and footer') && !!actions(docInsert).find((x) => x.label === 'Page numbers'), 'Header and footer, and Page numbers, as they were');
 
   const sel = { tag: 'section', name: 'Section', snippet: 'Our menu', selector: 'section#menu', holds: true } as EdSel;
   ok(blockPlace('after', sel) === 'after the section “Our menu” (`section#menu`)', 'pages: a block made with AI goes after the part picked');
@@ -293,6 +302,10 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
   ok(/NO_WORDS = new Set\(\[[^\]]*'shared\/content-asks\.ts'/.test(x), 'and the requests made from them');
   const asks = fs.readFileSync(path.join(ROOT, 'shared/content-asks.ts'), 'utf8');
   ok(!/\b(label|blurb|hint): '/.test(asks), 'the requests’ file holds nothing the pages show');
+  ok(!/^import (?!type )[^\n]*content-types/m.test(asks), 'and takes only types from the list of kinds, so the pages that use it do not load the list');
+  // New's Or describe it starts the same, in the app's language (its own words, translated where it shows them).
+  const parts = fs.readFileSync(path.join(ROOT, 'web/src/features/pages/parts.tsx'), 'utf8');
+  for (const [k, start] of Object.entries(NEW_START)) ok(parts.includes(`${k === 'deck' ? 'slides' : k}: '${start}'`), `New’s Or describe it starts a new ${k} as the gallery does`);
 }
 
 console.log(`${passed} passed, ${failed} failed`);
