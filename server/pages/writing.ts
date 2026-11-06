@@ -1351,7 +1351,8 @@ export function writing(E: Core): Writing {
   };
   const lastBlock = (f: Element) => {
     let x = f.lastElementChild;
-    while (x && (skip(x) || /^(FOOTER)$/.test(x.tagName))) x = x.previousElementSibling;
+    // (a block the AI's answer stands in for, while it is shown, is not the last one: writing-ai.ts)
+    while (x && (skip(x) || /^(FOOTER)$/.test(x.tagName) || x.hasAttribute('data-n-ai-hide'))) x = x.previousElementSibling;
     return x;
   };
 
