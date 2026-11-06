@@ -2084,6 +2084,8 @@ export function wordLosses(buf: Buffer, doc: Doc): { loses: string[]; cut: boole
   if (r.some((x) => x.type === 'diagramData')) loses.add('diagrams');
   if (r.some((x) => x.type === 'oleObject' || x.type === 'package') || /<o:OLEObject[\s/>]/.test(xml)) loses.add('objects');
   if (/<w:txbxContent[\s>]/.test(xml)) loses.add('boxes');
+  // Footnotes and endnotes come in as the document's footnotes, but for marks whose notes the file does not have.
+  if (/<w:(?:footnote|endnote)Reference[\s/>]/.test(xml) && !r.some((x) => x.type === 'footnotes' || x.type === 'endnotes')) loses.add('footnotes');
   // Columns, and pages on their side, are the document's own when its sections all have them alike.
   const colsSeen = new Set([...xml.matchAll(/<w:cols\b[^>]*?\/?>/g)].map((m) => /w:num="(\d+)"/.exec(m[0])?.[1] ?? '1'));
   if (colsSeen.size > 1 || [...colsSeen].some((n) => Number(n) > 3)) loses.add('columns');
