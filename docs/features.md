@@ -240,7 +240,11 @@ agents that speak ACP and take MCP servers.
   phones only), move, size, copy, wrap or delete it, pick it from its layers, add parts and ready-made sections,
   set the whole page's colours, fonts, width and the look of its headings, links and buttons, ask the agent about
   a part, or edit its HTML with the page beside it; the agent hears of your changes with your next message.
-  HTML files an agent writes open the same way. Make pages of your own from a blank page, notes, a checklist or
+  HTML files an agent writes open the same way. Pictures go into a page made with AI (Make with AI, A drawing (SVG)),
+  as free photos with their credit under them, or as a cover made with AI; a picked picture is changed with AI or
+  edited in the picture editor; Add has Add a block made with AI (a pricing table, questions and answers…); and
+  pictures an agent saves into a page from its folder (a picture, a drawing, a plot) go inside it, made smaller where
+  this computer can (a page up to 2 MB). Make pages of your own from a blank page, notes, a checklist or
   a tracker, and see or clear the data a page keeps. Export a page as a PDF, a Word document (headings, lists,
   tables, links, charts as pictures) or a web page; ask an agent to change the page, slides, document, spreadsheet
   or LaTeX you have open (this slide, every slide, a section, the cells picked, the part picked, all of it) and
@@ -457,6 +461,42 @@ agents that speak ACP and take MCP servers.
   with their outputs: cells edited and run in a kernel of the Python environment picked, in a folder of their own in
   the app's data folder, Ask on the whole notebook or a cell, and versions with their outputs; they export as the
   .ipynb, a Python script with # %% cells, a PDF or a web page.
+- **Pictures, drawings, plots and videos in the editors**: slides, documents and pages make them where you put one
+  in (Insert → Picture, "/", a page's picture and cover, a slide's background, a table's or a chart's Make a plot of
+  this), each in a dialog that shows the price before anything is spent and the result before it is used, a sheet on
+  a phone. A picture: what it is for (a picture, photo, illustration, background, icon, diagram, texture or logo,
+  each asked for in its own way), a look, a shape, Quick or Best (Auto picks by what is asked), how many, a
+  see-through background, a deck's colours, a picked picture to follow. A change: in words (everywhere, or only
+  where you paint), the background taken out, or part of it erased with a brush, shown before and after, with Do it
+  with AI instead under a result made on this computer. A drawing (SVG): what it is, its shape and colours, Quick
+  (written by Claude or the helper model, free) or Best (Recraft's vector model). A plot: its data from the table or
+  the chart it comes from, a file or pasted, its Python written by the same writer and run on this computer, changed
+  in words or by editing its code (Run again), and in a web deck also a Plotly version that answers the pointer. A
+  video (slides): its length, shape, sound and a picture to start from, its price range first, made while you work
+  on (a note with Insert when it is done). Without an OpenRouter key the dialog asks for one in place, with Skip and
+  a way that needs none (a drawing instead, or Quick). Settings → Images, video and audio has the Best and Quick
+  models and the picture tools on this computer (Set up, what they are doing, Remove).
+- **The picture and video editors**: pictures and videos open in editors of their own, in tabs inside the app (the
+  page you came from first, a dot on a tab with changes not saved, Open editors on a phone), from a picture shown
+  large (Edit), the Library's picture and video pages, Files (Edit, and Edit the picture or Edit the video in a
+  file's menu), slides (Edit picture, Edit video), documents and pages (Edit picture) and an agent's video. The
+  picture editor crops (eight shapes, turns, mirror, straighten), adjusts (exposure, brightness, contrast,
+  highlights, shadows, saturation, vibrance, warmth, tint, sharpness, blur, vignette), filters (thirteen, with
+  their strength), marks up (pen, highlighter, arrows, lines, boxes, ovals, words in five fonts, blurred or
+  pixelated areas, emoji; marks stay movable) and has AI (remove the background, erase, change in words, expand to
+  a new shape), with undo, hold to compare and back to the original; it saves at a size and as PNG, JPEG or WebP,
+  over the original (the old file to the Trash) or as a copy. The video editor trims, splits and cuts parts out,
+  changes the speed (its sound keeping its pitch), crops to a shape, turns and mirrors, puts words on it at the
+  times you pick, adjusts its colour, fades it, mutes it or sets its volume, lays music from the Library under it,
+  takes a frame as a picture or as its still, and saves it as MP4, WebM or a GIF, rendered with ffmpeg here (the
+  picture tools bring one). Agents have edit_image and edit_video.
+- **Made with AI from a kind**: 216 kinds the app knows how to make well (56 slides, 29 decks, 43 documents, 19
+  sections, 39 pages, 17 blocks of a page, 13 spreadsheets), in a gallery with a find box and chips by group: Insert
+  → Slide made with AI (and a slide's own menu, A slide made with AI after it), Insert → Section made with AI, Add a
+  block made with AI, Choose a kind in New (then Make it with AI or Make an empty one), and Turn it into in the
+  Library (slides, a document or a page from what you have). Say what it is about, and an agent makes it from what
+  is there, as you watch; web-only slides are marked Web format in a deck made for PowerPoint. Agents read the same
+  instructions with how_to_make (free) before they make a known kind of thing by name.
 - **Skills**: every skill agents can use on one page (Settings → Skills), grouped by what it is for: more than
   sixty that come with the app for every agent (ways of working, writing, documents, research and the web,
   planning, data, design and pictures, coding, AI models, this app), yours, those your plugins bring, Claude
