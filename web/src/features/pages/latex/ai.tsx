@@ -998,7 +998,7 @@ function ProofPanel({
 }) {
   const open = proof.items.filter((k) => k.state === 'open');
   return (
-    <div className={cx("flex min-h-0 shrink-0 flex-col bg-panel", className ?? "w-72 border-l border-line")}>
+    <div className={cx("flex min-h-0 shrink-0 flex-col bg-panel", className ?? "w-64 border-l border-line")}>
       <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-line pr-1 pl-3">
         <SpellCheck size={14} className="text-accent" />
         <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-fg">
