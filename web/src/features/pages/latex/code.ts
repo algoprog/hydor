@@ -7,7 +7,9 @@
 // Environments, sections, the preamble and { groups fold. The formula the cursor is in shows drawn in a card by its
 // line. Visual mode (visual.ts) shows the source as a document, and Check spelling has the browser check its words
 // (spell.ts). The typesetting's errors and warnings are marked at their lines, and what is sure to fail
-// (a \begin without its \end, a brace or a $ left open: shared/latex-check.ts) where it is, a moment after typing.
+// (a \begin without its \end, a brace or a $ left open, a \ref to no label, a \cite of no entry: shared/latex-check.ts)
+// where it is, a moment after typing. Ctrl+K asks the editor's AI to write at the cursor, a picture pasted asks what it
+// becomes; Vim's or Emacs's keys go before the editor's own (keys.ts), and edit() makes changes AI's for Track changes.
 // While an agent writes a new version of the file, that shows in its place read-only, with the agent's caret (setLive).
 import { autocompletion, closeCompletion, completionStatus, snippet, startCompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
 import { redo, selectAll, toggleComment, undo } from '@codemirror/commands';
