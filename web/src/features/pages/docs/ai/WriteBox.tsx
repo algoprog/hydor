@@ -35,7 +35,7 @@ interface Asked {
   ask: string;
 }
 
-type Phase = { k: 'ask' } | { k: 'busy'; asked: Asked } | { k: 'done'; asked: Asked; mark: Doc; ids: string[]; by: string } | { k: 'said'; asked: Asked; text: string; by: string };
+type Phase = { k: 'ask' } | { k: 'busy'; asked: Asked } | { k: 'done'; asked: Asked; mark: Doc; after: Doc; ids: string[]; by: string } | { k: 'said'; asked: Asked; text: string; by: string };
 
 const QUICK: { kind: ComposeKind; label: string; icon: React.ReactNode; also?: string }[] = [
   { kind: 'continue', label: 'Continue writing', icon: <PenLine size={14} /> },
@@ -95,7 +95,7 @@ export function WriteBox({
       putAfter(engine, blocks, words ? z : s);
       const ids = engine.doc.blocks.filter((b) => !had.has(b.id)).map((b) => b.id);
       onTint(ids);
-      setPhase({ k: 'done', asked, mark, ids, by });
+      setPhase({ k: 'done', asked, mark, after: engine.mark(), ids, by });
     } catch (err) {
       if (ac.signal.aborted) return;
       toastError(err);
@@ -103,10 +103,10 @@ export function WriteBox({
     }
   };
 
-  /** What the AI put in, taken out again (undone, or its blocks taken out if more changed since). */
+  /** What the AI put in, taken out again (undone while nothing else changed since; else its blocks taken out, the rest kept). */
   const takeBack = (p: Extract<Phase, { k: 'done' }>) => {
     onTint([]);
-    if (engine.undoTo(p.mark)) return;
+    if (engine.mark() === p.after && engine.undoTo(p.mark)) return;
     let d = engine.doc;
     for (const id of p.ids) d = ops.removeBlock(d, id).doc;
     engine.change(d);
