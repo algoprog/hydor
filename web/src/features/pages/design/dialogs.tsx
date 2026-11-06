@@ -93,7 +93,12 @@ export function DownloadDialog({ open, onClose, html, title, boards, current }: 
             <p className="text-[12px] text-fg-3 tabular-nums">{`${Math.round(b.w * k)} × ${Math.round(b.h * k)} px`}</p>
           </div>
         )}
-        {format === 'png' && <Switch on={clear} onChange={setClear} label={tr('See-through background')} />}
+        {format === 'png' && (
+          <div className="flex items-center gap-2.5">
+            <Switch on={clear} onChange={setClear} label={tr('See-through background')} />
+            <span className="text-[13px] text-fg-2">{tr('See-through background')}</span>
+          </div>
+        )}
         {many && (
           <div className="space-y-1.5">
             <div className="text-[12.5px] font-medium text-fg-2">Pages</div>
