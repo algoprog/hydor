@@ -236,8 +236,8 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
   ].map(([r, k]) => ({ label: `${k} × ${r}`, also: 'table grid', run: () => e.insertTable(r, k) }));
 
   const insert: MenuEntry[] = [
-    !!c.ai && { label: 'Write with AI', icon: <Sparkles size={15} />, keys: 'Ctrl+J', also: 'ai write generate paragraph continue summarize summary conclusion list table help me write', disabled: c.readOnly, run: c.ai.write },
     !!c.aiSection && { label: 'Section made with AI', icon: <Sparkles size={15} />, also: 'ai agent write generate section summary introduction conclusion faq glossary references table', disabled: c.readOnly, run: c.aiSection },
+    !!c.ai && { label: 'Write with AI', icon: <WandSparkles size={15} />, keys: 'Ctrl+J', also: 'ai write generate paragraph continue summarize summary conclusion list table help me write', disabled: c.readOnly, run: c.ai.write },
     {
       label: 'Picture',
       icon: <ImageIcon size={15} />,
@@ -247,19 +247,14 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
         ...(c.freePhoto ? [{ label: 'Free photos', icon: <Images size={15} />, also: 'photo photos stock free search openverse creative commons wikimedia', disabled: c.readOnly, run: c.freePhoto }] : []),
         { label: 'A picture made with AI', icon: <WandSparkles size={15} />, also: 'generate ai image illustration icon background photo', disabled: c.readOnly, run: c.aiPicture },
         { label: 'A drawing (SVG)', icon: <PenTool size={15} />, also: 'svg vector icon logo diagram', disabled: c.readOnly, run: c.drawing },
+        // A plot is a picture too (one row fewer, so Insert fits a small window).
+        { label: 'A plot', icon: <ChartScatter size={15} />, also: 'plot chart graph data matplotlib histogram scatter', disabled: c.readOnly, run: c.plot },
       ],
     },
     { label: 'Signature', icon: <Signature size={15} />, also: 'sign signing initials autograph handwriting', disabled: c.readOnly, run: c.signature },
     { label: 'Table', icon: <Table2 size={15} />, also: 'grid', items: tableSizes },
-    { label: 'Plot', icon: <ChartScatter size={15} />, also: 'chart graph data matplotlib histogram scatter', disabled: c.readOnly, run: c.plot },
     { label: 'Link', icon: <Link2 size={15} />, keys: 'Ctrl+K', run: c.link },
     { label: 'Comment', icon: <MessageSquarePlus size={15} />, keys: 'Ctrl+Alt+M', disabled: !st.text.trim(), run: c.comment },
-    !!c.footnote && { label: 'Footnote', icon: <Footprints size={15} />, keys: 'Ctrl+Alt+F', also: 'footnote note reference endnote', disabled: c.readOnly || !!st.picked, run: c.footnote },
-    !!c.citation && { label: 'Citation', icon: <Quote size={15} />, also: 'cite citation reference source doi arxiv paper book apa mla chicago ieee', disabled: c.readOnly || !!st.picked, run: c.citation },
-    !!c.bibliography && { label: 'Bibliography', icon: <BookMarked size={15} />, also: 'references works cited sources list', disabled: c.readOnly, run: c.bibliography },
-    !!c.caption && { label: 'Caption', icon: <Captions size={15} />, also: 'caption figure table equation number numbered label', disabled: c.readOnly, run: c.caption },
-    !!c.xref && { label: 'Cross-reference', icon: <Link2 size={15} />, also: 'cross reference figure table heading bookmark see refer', disabled: c.readOnly || !!st.picked, run: c.xref },
-    !!c.bookmark && { label: 'Bookmark', icon: <Bookmark size={15} />, also: 'bookmark anchor name place link', disabled: c.readOnly, run: c.bookmark },
     '-',
     {
       label: 'Equation',
@@ -272,7 +267,21 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     },
     { label: 'Special characters', icon: <Omega size={15} />, also: 'emoji symbols', run: c.chars },
     { label: 'Callout', icon: <Lightbulb size={15} />, also: 'note box', run: () => e.style('callout') },
-    { label: 'Table of contents', icon: <TableOfContents size={15} />, also: 'toc headings', run: () => e.insertToc() },
+    // Word's References: footnotes, citations, a bibliography, captions, cross-references, bookmarks and the table of contents.
+    {
+      label: 'References',
+      icon: <BookMarked size={15} />,
+      also: 'footnote citation bibliography caption cross-reference bookmark table of contents toc',
+      items: [
+        ...(c.footnote ? [{ label: 'Footnote', icon: <Footprints size={15} />, keys: 'Ctrl+Alt+F', also: 'footnote note reference endnote', disabled: c.readOnly || !!st.picked, run: c.footnote }] : []),
+        ...(c.citation ? [{ label: 'Citation', icon: <Quote size={15} />, also: 'cite citation reference source doi arxiv paper book apa mla chicago ieee', disabled: c.readOnly || !!st.picked, run: c.citation }] : []),
+        ...(c.bibliography ? [{ label: 'Bibliography', icon: <BookMarked size={15} />, also: 'references works cited sources list', disabled: c.readOnly, run: c.bibliography }] : []),
+        ...(c.caption ? [{ label: 'Caption', icon: <Captions size={15} />, also: 'caption figure table equation number numbered label', disabled: c.readOnly, run: c.caption }] : []),
+        ...(c.xref ? [{ label: 'Cross-reference', icon: <Link2 size={15} />, also: 'cross reference figure table heading bookmark see refer', disabled: c.readOnly || !!st.picked, run: c.xref }] : []),
+        ...(c.bookmark ? [{ label: 'Bookmark', icon: <Bookmark size={15} />, also: 'bookmark anchor name place link', disabled: c.readOnly, run: c.bookmark }] : []),
+        { label: 'Table of contents', icon: <TableOfContents size={15} />, also: 'toc headings', run: () => e.insertToc() },
+      ],
+    },
     '-',
     // One row for the two ways across the page, so Insert fits a small window with Section made with AI in it.
     {
@@ -359,7 +368,7 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
         ...(c.styles
           ? ([
               '-',
-              { label: `Update “${STYLES[st.style].label}” to match`, disabled: c.readOnly || !!st.list || !!st.cell || st.block?.type !== 'p', also: 'style match update heading look', run: c.styles.match },
+              { label: `Update “${(STYLES[st.style] ?? STYLES.normal).label}” to match`, disabled: c.readOnly || !!st.list || !!st.cell || st.block?.type !== 'p', also: 'style match update heading look', run: c.styles.match },
               { label: 'Change the styles', also: 'style styles font size colour heading look modify', disabled: c.readOnly, run: c.styles.open },
               { label: 'Reset the styles', also: 'style styles default', disabled: c.readOnly || !c.doc.styles, run: c.styles.reset },
             ] as MenuEntry[])

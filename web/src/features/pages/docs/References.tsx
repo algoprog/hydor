@@ -51,7 +51,7 @@ export function XrefDialog({ open, doc, refs, title = 'Cross-reference', onPick,
           <Search size={14} className="absolute top-1/2 left-2.5 -translate-y-1/2 text-fg-3" />
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a figure, a table, a heading…" aria-label="Find" className={`${inputCls} pl-8`} />
         </div>
-        {!all.length && <p className="text-[12.5px] leading-relaxed text-fg-3">Nothing to point to yet: number a picture’s or a table’s caption (Insert → Caption), add headings, or put a bookmark on a paragraph (Insert → Bookmark).</p>}
+        {!all.length && <p className="text-[12.5px] leading-relaxed text-fg-3">Nothing to point to yet: number a picture’s or a table’s caption (Insert → References → Caption), add headings, or put a bookmark on a paragraph (Insert → References → Bookmark).</p>}
         <div className="max-h-[50vh] space-y-2 overflow-y-auto">
           {groups.map(([k, name]) => {
             const items = list.filter((t) => t.kind === k);
