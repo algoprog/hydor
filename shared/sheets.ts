@@ -331,6 +331,19 @@ export interface SheetProtect {
   note?: string;
 }
 
+/**
+ * A pivot table's settings, kept with the sheet it made (Data → Pivot table), to change it again: the table it sums up
+ * ("'Sales'!A1:F200", its header row first), the columns its rows and its columns are by, the columns it sums (counts,
+ * averages…), and the values of columns it leaves out (filters); columns by their letters.
+ */
+export interface PivotDef {
+  source: string;
+  rows: string[];
+  cols?: string;
+  values: { col: string; fn: 'sum' | 'count' | 'average' | 'min' | 'max' }[];
+  filters?: { col: string; hide: string[] }[];
+}
+
 /** Rows ("3:7") or columns ("C:E") grouped under an outline's bracket, folded away (hidden) or not. */
 export interface SheetGroup {
   range: string;
@@ -377,6 +390,8 @@ export interface Sheet {
   print?: PrintSetup;
   /** The grid's lines hidden in the editor (View → Gridlines), as Excel's showGridLines. */
   noGrid?: boolean;
+  /** The pivot table this sheet holds (made by Data → Pivot table). */
+  pivot?: PivotDef;
 }
 
 export interface Workbook {
@@ -1966,6 +1981,23 @@ function cleanGroups(v: unknown): SheetGroup[] {
   return out;
 }
 
+/** A pivot table's settings as kept: a range to sum up, one or two columns for its rows, values, filters; undefined when unusable. */
+export function cleanPivot(v: unknown): PivotDef | undefined {
+  if (!isObj(v)) return undefined;
+  const source = cleanSource(v.source);
+  const col = (x: unknown) => (typeof x === 'string' && /^[A-Za-z]{1,3}$/.test(x.trim()) ? x.trim().toUpperCase() : null);
+  const rows = (Array.isArray(v.rows) ? v.rows : [v.rows]).map(col).filter((c): c is string => !!c).slice(0, 2);
+  const FNS2 = ['sum', 'count', 'average', 'min', 'max'];
+  const values = (Array.isArray(v.values) ? v.values : []).flatMap((x) => (isObj(x) && col(x.col) ? [{ col: col(x.col)!, fn: (FNS2.includes(String(x.fn)) ? x.fn : 'sum') as PivotDef['values'][number]['fn'] }] : [])).slice(0, 10);
+  if (!source || !rows.length || !values.length) return undefined;
+  const out: PivotDef = { source, rows, values };
+  const cc = col(v.cols);
+  if (cc && !rows.includes(cc)) out.cols = cc;
+  const filters = (Array.isArray(v.filters) ? v.filters : []).flatMap((x) => (isObj(x) && col(x.col) && Array.isArray(x.hide) ? [{ col: col(x.col)!, hide: x.hide.slice(0, 500).map((h) => cleanText(String(h)).slice(0, 255)) }] : [])).slice(0, 10);
+  if (filters.length) out.filters = filters;
+  return out;
+}
+
 /** How a sheet prints, as kept; undefined when it says nothing of its own. */
 function cleanPrint(v: unknown): PrintSetup | undefined {
   if (!isObj(v)) return undefined;
@@ -2196,6 +2228,8 @@ function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], bud
   if (groups.length) sheet.groups = groups;
   const print = cleanPrint(pick('print', 'pageSetup'));
   if (print) sheet.print = print;
+  const pivot = cleanPivot(pick('pivot'));
+  if (pivot) sheet.pivot = pivot;
   // The grid's lines hidden: noGrid: true, or gridlines: false (an agent's words), else as the file had them.
   const noGrid = raw.noGrid ?? (raw.gridlines === undefined ? undefined : raw.gridlines === false) ?? base?.noGrid;
   if (noGrid === true) sheet.noGrid = true;
@@ -2270,6 +2304,7 @@ export function bookText(b: Workbook): string {
     if (sh.groups?.length) head.groups = sh.groups;
     if (sh.print) head.print = sh.print;
     if (sh.noGrid) head.noGrid = true;
+    if (sh.pivot) head.pivot = sh.pivot;
     out.push(` ${JSON.stringify(head).slice(0, -1)},"cells":{`);
     const byRow = new Map<number, string[]>();
     const keys = Object.keys(sh.cells)
@@ -2810,8 +2845,13 @@ function moveSizes<T>(m: Record<number, T> | undefined, f: (i: number) => number
  * (null: it went); `corner` moves a chart's corners (on the sheet whose rows or columns went in or out).
  */
 function mapSheetRefs(sh: Sheet, f: (text: string) => string, col?: (c: number) => number | null, corner?: (k: ChartCorner) => ChartCorner): Sheet {
-  if (!sh.merges && !sh.filter && !sh.conditional && !sh.validation && !sh.charts && !sh.board && !sh.comments && !sh.protect && !sh.groups && !sh.print?.area) return sh;
+  if (!sh.merges && !sh.filter && !sh.conditional && !sh.validation && !sh.charts && !sh.board && !sh.comments && !sh.protect && !sh.groups && !sh.print?.area && !sh.pivot) return sh;
   const out: Sheet = { ...sh };
+  // A pivot table's table follows its cells (its sheet renamed, rows put in); one whose cells all went keeps its settings.
+  if (sh.pivot) {
+    const source = f(sh.pivot.source);
+    if (!source.includes('#REF!') && cleanSource(source)) out.pivot = { ...sh.pivot, source: cleanSource(source)! };
+  }
   // Protected ranges, groups and the print area follow their cells; one whose cells all went goes too.
   if (sh.protect) {
     const list = sh.protect.flatMap((p) => {

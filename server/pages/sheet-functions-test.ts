@@ -25,6 +25,8 @@ import {
 import { importBook, xlsxOfBook } from './sheets.ts';
 import { addGroup, foldGroup, guardOf, protectionAt, removeGroup, spansOf } from '../../shared/sheet-groups.ts';
 import { chartData, chartSvg, histogramOf } from '../../shared/sheet-chart.ts';
+import { dependents, goalSeek, precedents } from '../../shared/sheet-whatif.ts';
+import { pivotSheet, pivotValues } from '../../shared/sheet-pivot.ts';
 import { Zip } from '../documents/zip.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -353,6 +355,40 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
   const cb = back.find((c) => c.kind === 'combo');
   ok(cb?.series?.[1]?.type === 'line' && cb.series[1].axis === 2 && cb.series[1].trend === 'linear' && cb.values && cb.max === 250, 'and the combo’s options');
   ok(back.find((c) => c.kind === 'column')?.percent === true, 'and 100% stacked');
+}
+
+// ---- goal seek, traces, pivot tables ---------------------------------------------------------------------------------
+{
+  // A loan: what rate makes the payment 500?
+  const g = sheet({ A1: 0.05, A2: 60, A3: 25000, B1: '=-PMT(A1/12, A2, A3)', C1: '=B1*A2', D1: '=SUM(A1:A3)' });
+  const r = goalSeek(g.book, 0, 'B1', 500, 'A1');
+  ok(!!r && r.reached && Math.abs(r.value - 0.07420) < 1e-4, `goal seek finds the rate (${r?.value})`);
+  const sq = goalSeek(sheet({ A1: 1, B1: '=A1*A1' }).book, 0, 'B1', 49, 'A1');
+  ok(!!sq && sq.reached && Math.abs(Math.abs(sq.value) - 7) < 1e-6, 'goal seek: a square');
+  ok(precedents(g.book, 0, 'B1').length === 3 && precedents(g.book, 0, 'D1')[0].x.r2 === 2, 'trace precedents: the cells a formula uses');
+  const deps = dependents(g.book, 0, 'A2').map((d) => d.cell).sort();
+  ok(same(deps, ['B1', 'C1', 'D1']), 'trace dependents: the formulas that use a cell');
+  const t = sheet({
+    A1: 'Region', B1: 'Kind', C1: 'Sales',
+    A2: 'North', B2: 'Tea', C2: 10,
+    A3: 'South', B3: 'Tea', C3: 20,
+    A4: 'North', B4: 'Coffee', C4: 5,
+    A5: 'North', B5: 'Tea', C5: 7,
+    A6: 'West', B6: 'Coffee', C6: 100,
+  });
+  const def = { source: 'Sheet1!A1:C6', rows: ['A'], cols: 'B', values: [{ col: 'C', fn: 'sum' as const }], filters: [{ col: 'A', hide: ['West'] }] };
+  const p = pivotSheet(t.book, t.calc, def, 'Pivot');
+  ok(!!p && p.pivot?.cols === 'B' && p.cells.A2.v === 'North' && p.cells.A3.v === 'South' && p.cells.A4.v === 'Total', 'a pivot table: a row a region, then the totals');
+  const both = normalizeBook({ sheets: [t.book.sheets[0], { ...p!, id: 'pv' }] });
+  const pc = computeBook(both);
+  const val = (cell: string) => pc.get('pv', cell);
+  // Columns: Coffee then Tea; West left out by the filter (its row stays, with nothing counted).
+  ok(p!.cells.B1.v === 'Sum of Sales · Coffee' && val('B2') === 5 && val('C2') === 17 && val('C3') === 20, 'its values, by region and kind');
+  const westRow = Object.entries(p!.cells).find(([, c]) => c.v === 'West')?.[0];
+  ok(!westRow && val('B4') === 5, 'the filter leaves West out, and its sales from the totals');
+  ok(same(pivotValues(t.book, t.calc, def, 'A'), ['North', 'South', 'West']), 'a column’s values, for its filter');
+  const kept = normalizeBook(JSON.parse(bookText(both)));
+  ok(kept.sheets[1].pivot?.filters?.[0].hide[0] === 'West', 'its settings are kept with its sheet');
 }
 
 console.log(`${passed} passed, ${failed} failed`);
