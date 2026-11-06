@@ -112,7 +112,7 @@ export function sourcesFromXml(xml: string): Source[] | null {
     return null;
   }
   if (root.n !== 'Sources') return null;
-  const text = (el: El | undefined) => (el ? el.c.map((x) => (typeof x === 'string' ? x : isEl(x) ? text(x) : '')).join('').trim() : '');
+  const text = (el: El | undefined): string => (el ? el.c.map((x): string => (typeof x === 'string' ? x : isEl(x) ? text(x) : '')).join('').trim() : '');
   const people = (el: El | undefined): Person[] =>
     all(el, 'Person').flatMap((p) => {
       const family = text(kid(p, 'Last'));

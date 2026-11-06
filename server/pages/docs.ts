@@ -54,9 +54,10 @@ import {
   type Run,
 } from '../../shared/docs.ts';
 import { FONTS, googleFamilies } from '../../shared/slides.ts';
-import { docRefs } from '../../shared/doc-refs.ts';
+import { docRefs, type Refs } from '../../shared/doc-refs.ts';
+import { bookmarkName } from './docx-parts.ts';
 import { paginateDoc } from '../../shared/doc-paginate.ts';
-import { COLUMN_GAP, notesHtml, paperOf } from '../../shared/docs.ts';
+import { citeItems, COLUMN_GAP, notesHtml, paperOf } from '../../shared/docs.ts';
 import { scriptSafe } from './kit.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -579,14 +580,30 @@ const revOf = (sgs: Map<string, Suggestion>, id: string | undefined, kind: 'ins'
   return x ? { kind, author: authorOf(x.by, x.author).name, at: x.at } : undefined;
 };
 
-const wordRun = (r: Run, sgs: Map<string, Suggestion> = new Map()): WordRun => {
+/** What a document's Word file needs to say of its marks: what each shows, and the bookmark each place it points to has. */
+interface WordRefs {
+  refs: Refs;
+  /** A block's bookmark in the file (a bookmark of the document's by its name, else one Word hides). */
+  mark: (id: string) => string;
+}
+
+const wordRun = (r: Run, sgs: Map<string, Suggestion> = new Map(), wr?: WordRefs): WordRun => {
+  // A footnote's mark (its number), a citation (Word's own) and a cross-reference (a REF field), showing what they show here.
+  if (wr && (r.fn || r.cite || r.xref)) {
+    const w: WordRun = r.fn ? { t: '', fn: wr.refs.note(r.t) || 1 } : r.cite ? { t: wr.refs.text(r), cite: citeItems(r.t) } : { t: wr.refs.text(r), fld: `REF ${wr.mark(r.t)} \\h` };
+    if (r.cm) w.cm = r.cm;
+    const rev = revOf(sgs, r.del, 'del') ?? revOf(sgs, r.ins, 'ins');
+    if (rev) w.rev = rev;
+    return w;
+  }
   const w: WordRun = { t: r.t };
   for (const k of ['b', 'i', 'u', 's', 'code', 'sup', 'sub', 'math'] as const) if (r[k]) w[k] = true;
   if (r.color) w.color = r.color;
   if (r.hl) w.hl = r.hl;
   if (r.size) w.size = r.size;
   if (r.font) w.font = r.font;
-  if (r.link) w.link = r.link;
+  if (r.link) w.link = r.link.startsWith('#') ? (wr ? `#${wr.mark(r.link.slice(1))}` : undefined) : r.link;
+  if (!w.link) delete w.link;
   if (r.cm) w.cm = r.cm;
   // Its suggested change, as a tracked change (words taken out over words added: those are Word's deleted text).
   const rev = revOf(sgs, r.del, 'del') ?? revOf(sgs, r.ins, 'ins');
@@ -597,7 +614,7 @@ const wordRun = (r: Run, sgs: Map<string, Suggestion> = new Map()): WordRun => {
 };
 
 /** A table's rows for Word: a cell merged across columns spans them, one merged down starts a run of cells Word joins. */
-function wordRows(t: TableBlock, sgs: Map<string, Suggestion>): { cells: DocCell[] }[] {
+function wordRows(t: TableBlock, sgs: Map<string, Suggestion>, wr?: WordRefs): { cells: DocCell[] }[] {
   const under = fixMerges(t.rows.map((r) => r.map((c) => ({ ...c }))));
   return t.rows.map((r, ri) => {
     const cells: DocCell[] = [];
@@ -611,7 +628,7 @@ function wordRows(t: TableBlock, sgs: Map<string, Suggestion>): { cells: DocCell
         }
         return;
       }
-      const cell: DocCell = { runs: c.runs.map((r) => wordRun(r, sgs)) };
+      const cell: DocCell = { runs: c.runs.map((r) => wordRun(r, sgs, wr)) };
       if (t.head && ri === 0) cell.head = true;
       if (c.align && JC[c.align]) cell.align = JC[c.align];
       if (c.fill) cell.fill = c.fill;
@@ -689,6 +706,38 @@ export function wordSpaces(doc: Doc, blocks: Block[] = doc.blocks): (DocSpace & 
  */
 export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: string) => Picture | null, fonts?: Map<string, EmbeddedFont>): Buffer {
   const { groups } = listInfo(doc.blocks);
+  // Footnotes' numbers, citations' and cross-references' words, numbered captions, the bibliography; and the places
+  // the document points to (cross-references, links to a place in it) and its own bookmarks, each a bookmark.
+  const refs = docRefs(doc);
+  const used = new Set<string>();
+  const names = new Map<string, string>();
+  for (const b of doc.blocks) {
+    if ((b.type !== 'p' && b.type !== 'li') || !b.bm) continue;
+    let n = b.bm.replace(/[^\p{L}\p{N}_]+/gu, '_').replace(/^[^\p{L}]+/u, '').slice(0, 40) || 'Bookmark';
+    for (let k = 2; used.has(n.toLowerCase()); k++) n = `${n.slice(0, 36)}_${k}`;
+    used.add(n.toLowerCase());
+    names.set(b.id, n);
+  }
+  const wr: WordRefs = { refs, mark: (id) => names.get(id) ?? bookmarkName(id) };
+  const targets = new Set<string>([...names.keys()]);
+  const take = (runs: Run[]) => {
+    for (const r of runs) {
+      if (r.xref) targets.add(r.t);
+      if (r.link?.startsWith('#')) targets.add(r.link.slice(1));
+    }
+  };
+  for (const b of doc.blocks) {
+    if (b.type === 'p' || b.type === 'li') take(b.runs);
+    else if (b.type === 'table') for (const row of b.rows) for (const c of row) take(c.runs);
+  }
+  for (const n of doc.notes ?? []) take(n.runs);
+  /** A block's bookmark, where something points to it. */
+  const bmOf = (id: string) => (targets.has(id) ? { bm: wr.mark(id) } : {});
+  /** A numbered caption's label and number. */
+  const numOf = (b: { id: string; label?: string }) => {
+    const n = b.label ? Number(/\d+$/.exec(refs.label(b.id) ?? '')?.[0]) : 0;
+    return n ? { label: b.label!, num: n } : {};
+  };
   const blocks: WordBlock[] = [];
   const pictures: Buffer[] = [];
   const spaces = wordSpaces(doc);
@@ -713,11 +762,11 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
   function blockOf(b: (typeof doc.blocks)[number], i: number) {
     const { sep, ...space } = spaces[i];
     if (b.type === 'p') {
-      const runs = b.runs.map((r) => wordRun(r, sgs));
+      const runs = b.runs.map((r) => wordRun(r, sgs, wr));
       const align = b.align ? JC[b.align] : undefined;
       const style = b.style ?? 'normal';
       const lvl = headingLevel(style);
-      if (lvl) blocks.push({ k: 'h', lvl: lvl as 1 | 2 | 3 | 4, runs, keep: true, space, ...(align ? { align } : {}), ...(anchors.has(b.id) ? { anchor: anchors.get(b.id) } : {}) });
+      if (lvl) blocks.push({ k: 'h', lvl: lvl as 1 | 2 | 3 | 4, runs, keep: true, space, ...(align ? { align } : {}), ...(anchors.has(b.id) ? { anchor: anchors.get(b.id) } : {}), ...bmOf(b.id) });
       else if (style === 'code') blocks.push({ k: 'pre', text: b.runs.map((r) => r.t).join('') || ' ', space });
       else
         blocks.push({
@@ -730,6 +779,7 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
           ...(style === 'title' || style === 'subtitle' ? { style } : {}),
           ...(style === 'callout' ? { shade: b.tint ?? CALLOUT.tint, icon: b.icon ?? CALLOUT.icon } : {}),
           ...(b.lvl ? { indent: b.lvl } : {}),
+          ...bmOf(b.id),
         });
     } else if (b.type === 'li') {
       const align = b.align ? JC[b.align] : undefined;
@@ -738,19 +788,22 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
         ordered: b.list === 'number',
         lvl: b.lvl ?? 0,
         list: groups[i],
-        runs: b.runs.map((r) => wordRun(r, sgs)),
+        runs: b.runs.map((r) => wordRun(r, sgs, wr)),
         keep: true,
         space,
         ...(b.list === 'check' ? { check: true, ...(b.checked ? { checked: true } : {}) } : {}),
         ...(align ? { align } : {}),
+        ...bmOf(b.id),
       });
     } else if (b.type === 'table') {
       const rev = revOf(sgs, b.del, 'del') ?? revOf(sgs, b.ins, 'ins');
-      blocks.push({ k: 'table', rows: wordRows(b, sgs), ...(b.cols ? { cols: b.cols } : {}), ...(rev ? { rev } : {}), ...(sep !== undefined ? { sep } : {}) });
+      blocks.push({ k: 'table', rows: wordRows(b, sgs, wr), ...(b.cols ? { cols: b.cols } : {}), ...(rev ? { rev } : {}), ...(sep !== undefined ? { sep } : {}), ...(b.caption ? { caption: b.caption } : {}), ...numOf(b), ...bmOf(b.id) });
     } else if (b.type === 'toc') {
       blocks.push({ k: 'toc', entries: toc.map((e) => ({ lvl: e.level, text: e.text, anchor: anchors.get(e.id)! })), space });
     } else if (b.type === 'math') {
-      blocks.push({ k: 'math', tex: b.tex, space });
+      blocks.push({ k: 'math', tex: b.tex, space, ...numOf(b), ...bmOf(b.id) });
+    } else if (b.type === 'bib') {
+      blocks.push({ k: 'bib', entries: refs.bib().map((e) => e.map((r) => wordRun(r))), space });
     } else if (b.type === 'image') {
       const pic = picture?.(b.src) ?? keptPicture(db, b.src);
       if (!pic || pic.ext === 'webp') {
@@ -760,7 +813,7 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
       const w = Math.max(16, Math.round(PX_PER_TEXT(doc) * b.w));
       pictures.push(pic.data);
       const rev = revOf(sgs, b.del, 'del') ?? revOf(sgs, b.ins, 'ins');
-      blocks.push({ k: 'img', shot: pictures.length - 1, w, h: Math.round((w * pic.h) / Math.max(1, pic.w)), share: b.w, align: b.align ?? 'center', space, ...(b.alt ? { alt: b.alt } : {}), ...(b.caption ? { caption: b.caption } : {}), ...(rev ? { rev } : {}) });
+      blocks.push({ k: 'img', shot: pictures.length - 1, w, h: Math.round((w * pic.h) / Math.max(1, pic.w)), share: b.w, align: b.align ?? 'center', space, ...(b.alt ? { alt: b.alt } : {}), ...(b.caption ? { caption: b.caption } : {}), ...(rev ? { rev } : {}), ...numOf(b), ...bmOf(b.id) });
     } else if (b.type === 'hr') blocks.push({ k: 'hr', space });
     else blocks.push({ k: 'pb' });
   }
@@ -784,7 +837,20 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
     // Someone the project is shared with goes into the file by their name, as other people's comments do.
     comments: doc.comments?.map((c) => ({ id: c.id, by: c.by === 'person' ? 'user' : c.by, author: c.by === 'person' ? c.name : c.author, text: c.text, at: c.at, resolved: c.resolved, replies: c.replies?.map((r) => ({ by: r.by === 'person' ? 'user' : r.by, author: r.by === 'person' ? r.name : r.author, text: r.text, at: r.at })) })),
     fonts,
+    // Footnotes by their numbers; the sources citations cite; the page set up.
+    notes: (doc.notes ?? []).flatMap((n) => (refs.note(n.id) ? [{ n: refs.note(n.id), runs: n.runs.map((r) => wordRun(r, sgs, wr)) }] : [])).sort((a, b) => a.n - b.n),
+    ...(doc.sources?.length ? { sources: doc.sources, cite: doc.cite ?? 'apa' } : {}),
+    ...(doc.page.orient === 'landscape' ? { landscape: true } : {}),
+    ...(doc.page.cols ? { cols: doc.page.cols } : {}),
+    ...(doc.page.color ? { color: doc.page.color } : {}),
+    ...(doc.mark ? { watermark: doc.mark.src ? { picture: markPicture(db, doc.mark.src, picture) } : { text: doc.mark.text } } : {}),
   });
+}
+
+/** A watermark's picture for Word (PNG or JPEG), or none. */
+function markPicture(db: DB, src: string, picture?: (src: string) => Picture | null): { data: Buffer; ext: string; w: number; h: number } | undefined {
+  const p = picture?.(src) ?? keptPicture(db, src);
+  return p && (p.ext === 'png' || p.ext === 'jpeg') ? { data: p.data, ext: p.ext, w: p.w, h: p.h } : undefined;
 }
 
 // ---- made from a file ---------------------------------------------------------------------------------------------
