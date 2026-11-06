@@ -2614,7 +2614,7 @@ export const CONTENT_TYPES: ContentType[] = [
     blurb: 'An Instagram, Facebook or TikTok story, tall and quick',
     icon: 'image',
     hint: 'What the story says',
-    also: 'story reel tiktok instagram vertical 9:16',
+    also: 'story reel tiktok instagram vertical tall',
     ask: 'a story (1080×1920): one idea, a picture filling most of it (generate_image, tall) or a bold colour, the message in large words in the middle third (the top and bottom 250 pixels kept clear for the app’s own buttons), a sticker or an arrow drawing the eye to a call to act; readable in two seconds.',
   },
   {
