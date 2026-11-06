@@ -98,6 +98,7 @@ Inside a git repository (a folder whose history git keeps), files with changes s
 Every row has a menu. Point at the row and click **More** (⋯) at its end, or right-click it; on a phone, tap its ⋯. It holds:
 
 - **Open**.
+- **Edit the picture** or **Edit the video** (a picture or a video): it opens in the picture or video editor, where **Save** writes over the file (its old version goes to the Trash) and **Save a copy** puts "name (edited)" beside it (see [Edit pictures and videos](/guide/library#edit-pictures-and-videos)).
 - **Start a session with it** (a file; see [Start a session with files](/guide/files-git#start-a-session-with-files)), or **New session in this folder** (a folder: the start page, with that folder picked).
 - **Add to a project** (see [Add files to a project](/guide/files-git#add-files-to-a-project)).
 - **Pin to Places** or **Unpin from Places** (a folder).
@@ -285,9 +286,9 @@ PowerPoint files, older Office files (.doc, .xls, .ppt), OpenDocument files, RTF
 
 The file viewer shows files as they look:
 
-- **Images** (PNG, JPEG, GIF, WebP, SVG, ICO, BMP, AVIF): shown whole, on a checkerboard where they are see-through.
+- **Images** (PNG, JPEG, GIF, WebP, SVG, ICO, BMP, AVIF): shown whole, on a checkerboard where they are see-through. **Edit** at the top opens one in the picture editor ([Edit pictures and videos](/guide/library#edit-pictures-and-videos)).
 - **PDFs**: in your browser's own PDF viewer, with **Highlight** at the top to read them in the app's own reader, highlight them and keep notes beside them (see [Read and highlight a PDF](#read-and-highlight-a-pdf)), and **Fill & sign** to fill them in and sign them (see [Fill in and sign a PDF](#fill-in-and-sign-a-pdf)). A PDF you highlighted opens in the reader.
-- **Video** (MP4, WebM, MOV and M4V; MKV and OGV where your browser plays them): in the app's own player (see [Watch a video](#watch-a-video) below). **Audio** (MP3, WAV, OGG) plays in place.
+- **Video** (MP4, WebM, MOV and M4V; MKV and OGV where your browser plays them): in the app's own player (see [Watch a video](#watch-a-video) below); **Edit** at the top opens an MP4, MOV, M4V or WebM one in the video editor. **Audio** (MP3, WAV, OGG) plays in place.
 - **Office documents**: PowerPoint (.pptx, .ppt), older Word and Excel files (.doc, .xls and the like), OpenDocument (.odt, .ods, .odp), RTF and EPUB; and Word (.docx) and Excel (.xlsx) files from **More** (⋯) → **Show as a preview** in their editors. A switch at the top picks the view:
   - **Pages**: the document as LibreOffice lays it out, page by page ("Laying out the pages…" the first time). This view is there only when LibreOffice is installed on this computer, and not for EPUB books.
   - **Text**: its text, sheets and slides as the app reads them.

@@ -430,6 +430,8 @@ It stops listening to say these, then listens again. Sessions on your other mach
 - "Find three free photos of Lisbon's trams for my travel slides, with their credits."
 - "Take the background out of ~/Pictures/mug.jpg."
 - "Erase the man on the left from beach.jpg; if it looks smudged, have an image model do it."
+- "Crop ~/Pictures/team.jpg to 16:9, make it a little brighter and blur the faces in the background."
+- "Trim demo.mp4 to the part from 0:12 to 0:40, put 'Our new app' over its start, and make a GIF of it too."
 - "Stop agents from making images."
 - "Which video models make sound, and what does a second cost with each?"
 - "Make agents use Kling for videos."
