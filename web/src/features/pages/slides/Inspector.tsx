@@ -47,6 +47,7 @@ import {
   BG_FX,
   CHART_KINDS,
   EASES,
+  everyEl,
   FONTS,
   isWebDeck,
   RICH_ANIM_FX,
@@ -1369,7 +1370,7 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview, picking, onPic
 
 /** What a video the deck keeps is called: the name of a video part that plays it. */
 const videoName = (d: Deck, src: string) => {
-  for (const s of d.slides) for (const e of s.els) if (e.type === 'video' && e.src === src && e.name) return e.name;
+  for (const s of d.slides) for (const e of everyEl(s.els)) if (e.type === 'video' && e.src === src && e.name) return e.name;
   return undefined;
 };
 
@@ -1391,7 +1392,7 @@ function SlideTab({ deck, index, change, pickPicture, onFooter, pickVideo, fonts
   const web = isWebDeck(deck);
   const [sending, setSending] = useState(false);
   // The videos the deck keeps already (its video parts'), to put one behind a slide too.
-  const kept = [...new Set(deck.slides.flatMap((s) => s.els.flatMap((e) => (e.type === 'video' && e.src.startsWith('naget-video:') ? [e.src] : []))).concat(deck.slides.flatMap((s) => (s.bg?.video ? [s.bg.video] : []))))];
+  const kept = [...new Set(deck.slides.flatMap((s) => everyEl(s.els).flatMap((e) => (e.type === 'video' && e.src.startsWith('naget-video:') ? [e.src] : []))).concat(deck.slides.flatMap((s) => (s.bg?.video ? [s.bg.video] : []))))];
   const bg = slide.bg ?? {};
   const setBg = (patch: Partial<NonNullable<Slide['bg']>> | null) =>
     change((d) =>
