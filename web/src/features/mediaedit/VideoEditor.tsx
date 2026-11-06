@@ -89,9 +89,12 @@ function savePlans(o: OpenEditor, detached: boolean): { main: { label: string; t
 }
 
 /** Where a copy, a GIF or a frame went, in words. */
-function wentTo(j: VideoEditJob, what: string): string {
-  if (j.path) return tr(`${what} is saved beside it: ${nameOf(j.path)}`);
-  return tr(`${what} is in your Library`);
+function wentTo(j: VideoEditJob, what: 'copy' | 'gif' | 'frame'): string {
+  if (j.path) {
+    const name = nameOf(j.path);
+    return what === 'frame' ? tr(`The frame is saved beside it: ${name}`) : what === 'gif' ? tr(`The GIF is saved beside it: ${name}`) : tr(`A copy is saved beside it: ${name}`);
+  }
+  return what === 'frame' ? tr('The frame is in your Library') : what === 'gif' ? tr('The GIF is in your Library') : tr('A copy is in your Library');
 }
 
 export function VideoEditor(p: EditorProps) {
@@ -319,9 +322,9 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
       });
       if (j.status === 'stopped') return toast(tr('Stopped: nothing was saved'), 'info');
       if (j.status !== 'done') return toastError(new Error(j.error ?? 'The video could not be made'));
-      if (what === 'frame') return toast(wentTo(j, 'The frame'), 'ok');
-      if (what === 'gif') return toast(wentTo(j, 'The GIF'), 'ok');
-      if (what === 'copy') return toast(wentTo(j, 'A copy'), 'ok');
+      if (what === 'frame') return toast(wentTo(j, 'frame'), 'ok');
+      if (what === 'gif') return toast(wentTo(j, 'gif'), 'ok');
+      if (what === 'copy') return toast(wentTo(j, 'copy'), 'ok');
       // Only the still changed: the slide keeps its video, with this frame as its still.
       if (ask.format === 'jpg') return await done({ kind: 'video', src: o.src, poster: j.src, w: vs.w, h: vs.h });
       const mime = j.format === 'webm' ? 'video/webm' : 'video/mp4';
