@@ -731,7 +731,11 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     const pic = en.picture(p.src, o.px ?? madeWidth(p));
     en.insert([p.prompt ? { ...pic, alt: p.prompt.replace(/\s+/g, ' ').slice(0, 300) } : pic]);
   };
-  const aiPicture = async () => putMade(await makePicture({ kind: 'picture' }));
+  /** A picture made with AI; a picture picked is offered to follow (the dialog can drop it). */
+  const aiPicture = async () => {
+    const b = engine.current?.state().picked;
+    putMade(await makePicture({ kind: 'picture', refs: b?.type === 'image' && b.src.startsWith('naget-asset:') ? [b.src] : undefined }));
+  };
   const drawing = async () => putMade(await makeDrawing({ kind: 'illustration' }));
   /** A plot: of the table the caret is in (its cells the data, the plot after it), else of data given in the dialog. */
   const plot = async () => {

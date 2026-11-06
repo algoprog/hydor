@@ -12,7 +12,7 @@ import { openTool, type DrawingOpts, type EditOpts, type MadeDrawing, type MadeF
 export { StudioHost } from './Host';
 export type { DrawingOpts, EditOpts, MadeDrawing, MadeFromWords, MadePlot, MadeVideo, PictureOpts, PlotOpts, VideoOpts } from './store';
 export { keepPicture, pageData, shownSrc } from './pictures';
-export { csvOf } from './logic';
+export { aspectOf, csvOf } from './logic';
 
 let ownRoot = false;
 /** A page without the app's frame around it (none has asked yet) gets a host of its own, once. */
