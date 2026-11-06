@@ -1,10 +1,12 @@
 // The slides editor's menus, as Google Slides and PowerPoint have them: Edit, View (zoom, the grid, the rulers and
 // guides), Insert (every kind of part, pictures, drawings, plots and videos made with AI, the web format's interactive
 // parts, a comment), Format (the words' look, the format painter, a picture's crop and its changes with AI, a chart
-// made a plot, running a live part in place), Arrange (groups, the stacking order, lining up, turning), Slide, and Tools
-// (PowerPoint compatible or the web format too, which the Theme tab has beside the slides' shape). Each action with its
-// keys; what does not apply to what is picked is greyed. Search the menus (Alt+/) finds any of them.
+// made a plot, running a live part in place), Arrange (groups, the stacking order, lining up, turning), Slide (design
+// ideas for it too), and Tools (PowerPoint compatible or the web format too, which the Theme tab has beside the slides'
+// shape; checking accessibility; the slides translated by the agent). Each action with its keys; what does not apply to
+// what is picked is greyed. Search the menus (Alt+/) finds any of them.
 import {
+  Accessibility,
   AlignCenter,
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -40,7 +42,9 @@ import {
   IndentIncrease,
   Italic,
   Keyboard,
+  Languages,
   LayoutTemplate,
+  Lightbulb,
   List,
   ListChecks,
   ListOrdered,
@@ -83,6 +87,7 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import type { El, ElType } from '@shared/slides';
+import { WRITE_LANGS } from '@shared/write';
 import type { MenuDef } from '../common/menus';
 import type { AlignHow } from './ops';
 import type { TextActions } from './TextBar';
@@ -187,6 +192,10 @@ export interface MenuArgs {
   present(from: 'start' | 'here' | 'presenter'): void;
   shortcuts(): void;
   ask?: () => void;
+  /** The writing helpers: design ideas for the slide on view, the accessibility check, every slide translated by the agent (null: a language typed in). */
+  designIdeas?: () => void;
+  checkAccess?: () => void;
+  translate?: (lang: string | null) => void;
 }
 
 const ZOOMS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
@@ -420,6 +429,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         { label: 'Duplicate slide', icon: <Copy size={14} />, disabled: ro, run: a.duplicateSlide },
         { label: 'Delete slide', icon: <Trash2 size={14} />, danger: true, disabled: ro, run: a.deleteSlide },
         { label: 'Skip this slide', checked: a.hidden, also: 'hide hidden', disabled: ro, run: a.skipSlide },
+        !!a.designIdeas && { label: 'Design ideas', icon: <Lightbulb size={14} />, also: 'designer design ideas layout redesign look ai magic', disabled: ro, run: a.designIdeas },
         '-',
         { label: 'Background', disabled: ro, also: 'slide background colour picture', run: () => a.openTab('slide') },
         { label: 'Transition', disabled: ro, also: 'transition morph fade push', run: () => a.openTab('slide') },
@@ -441,6 +451,15 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         { label: 'Keyboard shortcuts', icon: <Keyboard size={14} />, keys: 'Ctrl+/', also: 'keys help', run: a.shortcuts },
         '-',
         { label: 'PowerPoint compatible', icon: <Presentation size={14} />, checked: !a.web, also: 'powerpoint pptx keynote google slides format compatible web format made for', disabled: ro, run: () => a.setCompatible(a.web) },
+        '-',
+        !!a.checkAccess && { label: 'Check accessibility', icon: <Accessibility size={14} />, also: 'accessibility checker alt text description contrast screen reader small text', run: a.checkAccess },
+        !!a.translate && {
+          label: 'Translate the slides',
+          icon: <Languages size={14} />,
+          also: 'translate language translation',
+          disabled: ro,
+          items: [...WRITE_LANGS.map((l) => ({ label: l, also: 'translate language', run: () => a.translate!(l) })), '-', { label: 'Another language', also: 'translate language', run: () => a.translate!(null) }],
+        },
         a.ask && '-',
         a.ask && { label: 'Ask the agent about this slide', icon: <Sparkles size={14} />, run: a.ask },
       ],
