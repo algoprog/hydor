@@ -61,7 +61,8 @@ export function columnsOf(sh: Sheet, calc: Calc, si: number, x: Rect, header: bo
     } else if (words.size) {
       kind = 'words';
       const top = [...words.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
-      about = `words: ${[...words.values()].reduce((a, b) => a + b, 0)} values, ${words.size} different (most: ${top.map(([w, n]) => `“${w.slice(0, 30)}” ×${n}`).join(', ')})`;
+      const count = [...words.values()].reduce((a, b) => a + b, 0);
+      about = words.size === count ? `words: ${count} values, all different` : `words: ${count} values, ${words.size} different (most: ${top.map(([w, n]) => `“${w.slice(0, 30)}” ×${n}`).join(', ')})`;
     } else if (checks) {
       kind = 'checks';
       about = `TRUE or FALSE: ${ticked} of ${checks} TRUE`;
@@ -75,7 +76,8 @@ export function columnsOf(sh: Sheet, calc: Calc, si: number, x: Rect, header: bo
 function localIdeas(cols: ColumnInfo[]): AnalyzeIdea[] {
   const out: AnalyzeIdea[] = [];
   const nums = cols.filter((c) => c.kind === 'number');
-  const cats = cols.filter((c) => c.kind === 'words' && c.distinct >= 2 && c.distinct <= 30);
+  // Columns of categories, those whose values repeat most first.
+  const cats = cols.filter((c) => c.kind === 'words' && c.distinct >= 2 && c.distinct <= 30).sort((a, b) => a.distinct - b.distinct);
   const dates = cols.filter((c) => c.kind === 'date');
   if (cats[0] && nums[0]) {
     out.push({ kind: 'chart', title: `${nums[0].name} by ${cats[0].name}`, why: 'A column chart of the table’s rows.', chart: 'column', x: cats[0].letter, ys: [nums[0].letter] });
