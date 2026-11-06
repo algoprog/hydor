@@ -11,6 +11,16 @@
 // the parts two slides share from where they were to where they are. Equations are drawn by KaTeX where it is (the
 // app gives its own; a deck's page has each drawn by the server's), else shown as their LaTeX. While presenting, a laser pointer, a pen
 // and live captions (the browser's speech recognition, where it has one) are on the keys L, P and C.
+//
+// The web format's parts draw here too: code coloured by a small tokenizer of the runtime's own; quizzes answered in
+// the slideshow (their answers kept for the show, the score counted for its score parts); and the live parts (custom
+// code, web pages, 3D), each a page of its own in a sandboxed frame (the app's frame at /partframe, else a srcdoc
+// frame with scripts and no origin of its own), its poster where they do not run. A live part's page gets the deck's
+// colours and fonts as CSS variables and `window.deck`, a bridge over postMessage: told when its slide comes and
+// goes and its build steps on, it may go to the next slide, the one before or any. Effects that tell words or
+// letters, draw lines, count numbers up and burst confetti, taps (a click on a part runs effects of its own),
+// transitions that turn and open the slides, backgrounds that move in the theme's colours, shining text, frosted glass,
+// parts that answer the pointer and a progress bar are the slideshow's too.
 import type { Anim, Deck, El, IconNode, Para, Run, Slide, TextProps, Theme } from './slides.ts';
 
 /** What the runtime needs of KaTeX (the app's own, or the one a deck's page loads). */
@@ -42,8 +52,38 @@ export interface DrawOpts {
   katex?: KatexLike;
   /** The language dates are written in (the footer's "today"). */
   locale?: string;
-  /** Videos play when clicked (the slideshow). */
+  /** Videos play when clicked, quizzes are answered, parts answer the pointer and taps run (the slideshow). */
   play?: boolean;
+  /**
+   * The web format's live parts (custom code, web pages, 3D) run, each in a frame of its own (the slideshow, the
+   * deck's page, a part the editor runs); without, their posters show (or a calm placeholder that says what they are).
+   */
+  live?: boolean;
+  /**
+   * Makes a live part's frame for its page (`html`, a whole document): the app's, an iframe at /partframe sent the
+   * page by postMessage once it says it is ready. Returns the iframe (or an element holding one). Without it the
+   * runtime makes a sandboxed srcdoc frame (sandbox="allow-scripts", no origin of its own).
+   */
+  frame?: (html: string, part: El) => HTMLElement;
+  /** Moving backgrounds move (the slideshow's do; an editor's preview of one may). */
+  motion?: boolean;
+  /** The slideshow's quiz answers, kept while it lasts (the score parts count them). */
+  answers?: QuizAnswers;
+}
+
+/** One quiz's answer in a slideshow: the choices picked (by their place), whether it is answered (checked), and right. */
+export interface QuizAnswer {
+  picks: number[];
+  done: boolean;
+  right: boolean;
+}
+
+/** A slideshow's quiz answers by the quiz's id, and its score. */
+export interface QuizAnswers {
+  get(id: string): QuizAnswer | undefined;
+  set(id: string, a: QuizAnswer): void;
+  /** How many quizzes were answered right, and how many count. */
+  score(): { right: number; total: number };
 }
 
 export interface ShowOpts extends Omit<DrawOpts, 'edit' | 'step' | 'play'> {
@@ -105,12 +145,27 @@ export interface SlidesRuntime {
   boot(cfg: { mode: 'viewer' | 'print' | 'still' }): void;
   /** The equations the server drew into the page (#n-math: each formula's KaTeX, by its LaTeX), as what draws them; none without. */
   maths(): KatexLike | undefined;
+  /** Code as runs of words, each with what it is ('k' keyword, 's' string, 'c' comment, 'n' number, 'f' function, 't' type, 'g' tag, 'a' attribute or key; '' plain). */
+  tokens(code: string, lang?: string): [string, string][];
+  /** A code part's colours in a look (dark, light, the deck's): its background, its words, and each kind of word's. */
+  codeLook(look: string | undefined, t: Theme): CodeLook;
 }
+
+/** The colours code shows in: its box, its plain words, each kind of word's (CodeLook[kind]), its line numbers, a lit line's band. */
+export type CodeLook = Record<'bg' | 'fg' | 'k' | 's' | 'c' | 'n' | 'f' | 't' | 'g' | 'a' | 'gutter' | 'lit', string>;
 
 /** Names of fonts with their CSS families, which the runtime is given (it cannot import). */
 export type FontTable = Record<string, { css: string; google?: boolean }>;
 
-export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
+/** Where the runtime loads what its live parts need: three.js (its folder on jsDelivr, at a pinned version). */
+export interface RuntimeLibs {
+  three?: string;
+}
+
+/** three.js for 3D parts when the runtime is given none (shared/app-media.ts pins the same; a test checks they agree). */
+export const THREE_DEFAULT = 'https://cdn.jsdelivr.net/npm/three@0.187.0/';
+
+export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs = {}): SlidesRuntime {
   const doc = win.document;
   const W = 1280;
   const NS = 'http://www.w3.org/2000/svg';
@@ -143,6 +198,8 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     return '';
   };
   const href = (s: unknown): string => (typeof s === 'string' && /^(https?:\/\/[^\s<>"']+|mailto:[^\s<>"']+|tel:[+\d][\d\s().-]*)$/i.test(s) ? s : '');
+  /** A link to a slide of the deck: by its number, or the next, the one before, the first, the last. */
+  const SLIDE_LINK = /^#(\d{1,3}|next|prev|first|last)$/;
   const n = (v: unknown, def: number) => (typeof v === 'number' && Number.isFinite(v) ? v : def);
   const px = (v: number) => `${Math.round(v * 100) / 100}px`;
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string) => {
@@ -210,6 +267,56 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     '.ns-canplay .ns-video{cursor:pointer}',
     '.ns-foot{position:absolute;bottom:0;height:56px;display:flex;align-items:center;font-size:17px;line-height:1.2;white-space:nowrap;overflow:hidden;pointer-events:none}',
     '.ns-hidden{visibility:hidden!important}',
+    // Code: its lines as an editor shows them, numbered and lit where asked.
+    '.ns-code{position:absolute;inset:0;overflow:hidden;padding:.85em 1.1em;line-height:1.5;white-space:pre;tab-size:4;-moz-tab-size:4;font-variant-ligatures:none;text-align:left}',
+    '.ns-cl{min-height:1.5em;position:relative}.ns-cl.ns-dim{opacity:.36}.ns-cl.ns-lit::before{content:"";position:absolute;left:-1.1em;right:-1.1em;top:0;bottom:0;background:var(--lit);z-index:-1}',
+    '.ns-code{isolation:isolate}.ns-ln{display:inline-block;min-width:2em;margin-right:1.1em;text-align:right;user-select:none;-webkit-user-select:none}',
+    // A quiz: its question, its choices (a column, or a grid of two), and once answered what was right.
+    '.ns-quiz{position:absolute;inset:0;display:flex;flex-direction:column;gap:.5em;line-height:1.25;text-align:left}',
+    '.ns-qq{font-weight:700;white-space:pre-wrap;overflow-wrap:break-word}',
+    '.ns-qcs{display:grid;grid-template-columns:1fr;gap:.35em;font-size:.78em}.ns-qcs[data-layout=grid]{grid-template-columns:1fr 1fr}',
+    '.ns-qc{display:flex;align-items:center;gap:.75em;min-height:2.35em;padding:.5em .8em;border-radius:.5em;border:2px solid transparent;font:inherit;color:inherit;text-align:left;background:var(--qfill);position:relative;box-sizing:border-box;width:100%;margin:0;line-height:1.25}',
+    'button.ns-qc{cursor:pointer;appearance:none;-webkit-appearance:none}button.ns-qc:disabled{cursor:default}',
+    '.ns-ql{flex:none;display:inline-flex;align-items:center;justify-content:center;width:1.7em;height:1.7em;border-radius:50%;font-weight:700;font-size:.85em;background:var(--qmark);color:var(--qmarkfg)}',
+    '.ns-qt{flex:1;min-width:0;white-space:pre-wrap;overflow-wrap:break-word}',
+    '.ns-qc.ns-pick{border-color:var(--qmark)}.ns-qc.ns-right{border-color:#1f9d55;background:color-mix(in srgb,#1f9d55 18%,var(--qfill))}.ns-qc.ns-right .ns-ql{background:#1f9d55;color:#fff}',
+    '.ns-qc.ns-wrong{border-color:#d64545;background:color-mix(in srgb,#d64545 16%,var(--qfill))}.ns-qc.ns-wrong .ns-ql{background:#d64545;color:#fff}.ns-qc.ns-missed{border-color:#1f9d55;border-style:dashed}',
+    '.ns-qc.ns-key::after{content:"✓";position:absolute;right:.7em;font-weight:700;color:#1f9d55}',
+    '.ns-qf{font-size:.66em;white-space:pre-wrap;opacity:.9;min-height:0}.ns-qf:empty{display:none}.ns-qf b{font-weight:700}',
+    '.ns-qcheck{align-self:flex-start;font:inherit;font-size:.66em;font-weight:600;padding:.4em 1.1em;border-radius:999px;border:0;cursor:pointer;background:var(--qmark);color:var(--qmarkfg)}',
+    '.ns-score{position:absolute;inset:0;display:flex;align-items:center;white-space:pre-wrap;overflow-wrap:break-word;line-height:1.2}',
+    // The web format's live parts: their frame, or their poster (or a quiet placeholder) where they do not run.
+    '.ns-live{position:absolute;inset:0;overflow:hidden}',
+    '.ns-live>iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;color-scheme:normal}',
+    '.ns-liveph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border-radius:inherit;font:500 20px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;padding:12px;overflow:hidden}',
+    '.ns-liveph svg{width:44px;height:44px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:.8}',
+    '.ns-liveph span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    // A part's words split to come one by one, confetti over the slide, a video behind it, the progress bar.
+    '.ns-w,.ns-ch{display:inline-block;white-space:pre}',
+    '.ns-gt .ns-p::before{-webkit-text-fill-color:var(--gt0)}',
+    '.ns-confetti{position:absolute;left:0;top:0;pointer-events:none;z-index:3}',
+    '.ns-bgvideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}',
+    '.ns-prog{position:absolute;left:0;top:0;height:6px;z-index:4;pointer-events:none}',
+    // Parts that answer the pointer, in the slideshow (on devices with one).
+    '@media (hover:hover){.ns-canplay .ns-el[data-hover]{transition:transform .22s cubic-bezier(.2,.7,.3,1),filter .22s}',
+    '.ns-canplay .ns-el[data-hover=lift]:hover{transform:translateY(-8px);filter:drop-shadow(0 14px 18px rgba(0,0,0,.25))}',
+    '.ns-canplay .ns-el[data-hover=grow]:hover{transform:scale(1.06)}',
+    '.ns-canplay .ns-el[data-hover=glow]:hover{filter:drop-shadow(0 0 14px var(--n-glow,#7aa2ff)) drop-shadow(0 0 4px var(--n-glow,#7aa2ff))}',
+    '.ns-canplay .ns-el[data-hover=tilt]{transition:transform .12s ease-out}}',
+    // Backgrounds that move, in the theme's colours: still unless the slide is the slideshow's (and slower for those who ask for less motion).
+    '.ns-bgfx{position:absolute;inset:0;overflow:hidden;pointer-events:none;--k:1}',
+    '.ns-bgfx>*{position:absolute;will-change:transform}',
+    '.ns-bgfx:not(.ns-moving) *{animation:none!important}',
+    '@media (prefers-reduced-motion:reduce){.ns-bgfx{--k:4}}',
+    '@keyframes ns-drift1{from{transform:translate(0,0) scale(1)}to{transform:translate(18%,12%) scale(1.25)}}',
+    '@keyframes ns-drift2{from{transform:translate(0,0) scale(1.1) rotate(0)}to{transform:translate(-20%,8%) scale(.9) rotate(25deg)}}',
+    '@keyframes ns-drift3{from{transform:translate(0,0) scale(1)}to{transform:translate(10%,-18%) scale(1.2)}}',
+    '@keyframes ns-turn{from{transform:rotate(0) scale(1)}to{transform:rotate(30deg) scale(1.18)}}',
+    '@keyframes ns-up{from{transform:translateY(0)}to{transform:translateY(-50%)}}',
+    '@keyframes ns-twinkle{from{opacity:.25}to{opacity:1}}',
+    '@keyframes ns-side{from{transform:translateX(0)}to{transform:translateX(-50%)}}',
+    '@keyframes ns-cell{from{transform:translateY(0)}to{transform:translateY(64px)}}',
+    '@keyframes ns-float{0%{transform:translate(0,0)}50%{transform:translate(4%,-9%)}100%{transform:translate(-3%,-16%)}}',
     // The slideshow.
     '.ns-show{position:relative;display:flex;flex-direction:column;width:100%;height:100%;background:#000;color:#fff;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;user-select:none;-webkit-user-select:none;outline:none;overflow:hidden}',
     '.ns-show.ns-viewer{background:transparent;color:var(--n-fg,#333);height:auto}',
@@ -365,7 +472,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       s.style.fontSize = r.size ? `calc(${px(n(r.size, 24) * 0.65)} * var(--fs, 1))` : '0.65em';
       s.dataset.v = r.sup ? 'sup' : 'sub';
     }
-    const link = r.link ? (/^#\d{1,3}$/.test(r.link) ? r.link : href(r.link)) : '';
+    const link = r.link ? (SLIDE_LINK.test(r.link) ? r.link : href(r.link)) : '';
     if (link) {
       const a = el('a');
       a.href = link;
@@ -428,6 +535,261 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     words(box, deck, e);
     const empty = !(e.paras ?? []).some((p) => (p.runs ?? []).some((r) => r.t));
     return { box, empty };
+  };
+
+  // ---- code: its words told apart, as an editor colours them ---------------------------------------------------
+  // Each language: its keywords, what starts a comment to the end of the line and what goes round one, its quotes,
+  // and whether its strings may be triple-quoted (Python), its keywords in any case (SQL), $names (the shell's) or
+  // @decorators are names of their own.
+  interface Lang {
+    kw: string;
+    line: string[];
+    block: [string, string][];
+    quotes: string;
+    triple?: boolean;
+    ci?: boolean;
+    dollar?: boolean;
+    at?: boolean;
+  }
+  const CONST = ' true false null undefined NaN Infinity nil None True False self this super';
+  const JS = 'as async await break case catch class const continue debugger default delete do else export extends finally for from function get if import in instanceof let new of return set static switch throw try typeof var void while with yield';
+  const TS = ' abstract any boolean declare enum implements interface keyof namespace never number private protected public readonly satisfies string symbol type unknown infer';
+  const C = 'auto break case char const continue default do double else enum extern float for goto if inline int long register return short signed sizeof static struct switch typedef union unsigned void volatile while bool';
+  const CL = (kw: string, extra: Partial<Lang> = {}): Lang => ({ kw: kw + CONST, line: ['//'], block: [['/*', '*/']], quotes: '"\'', ...extra });
+  const LANGS: Record<string, Lang> = {
+    javascript: CL(JS, { quotes: '"\'`' }),
+    typescript: CL(JS + TS, { quotes: '"\'`', at: true }),
+    java: CL(`${C} abstract boolean byte catch class extends final finally implements import instanceof interface native new package private protected public synchronized throw throws transient try var record`, { at: true }),
+    kotlin: CL('as break class continue do else for fun if in interface is object package return throw try typealias val var when while import data sealed override open private public internal lateinit companion suspend', { at: true }),
+    csharp: CL(`${C} abstract as base bool byte catch class decimal delegate event explicit finally fixed foreach implicit in interface internal is lock namespace new object operator out override params private protected public readonly ref sbyte sealed string throw try uint ulong ushort using var virtual async await record`),
+    c: CL(C),
+    cpp: CL(`${C} class namespace template typename public private protected virtual override new delete try catch throw using constexpr nullptr auto noexcept std`),
+    go: CL('break case chan const continue default defer else fallthrough for func go goto if import interface map package range return select struct switch type var string int bool error byte rune float64', { quotes: '"\'`' }),
+    rust: CL('as async await break const continue crate dyn else enum extern fn for if impl in let loop match mod move mut pub ref return Self static struct trait type unsafe use where while i32 i64 u8 u32 u64 usize f64 str String Vec Option Some Result Ok Err'),
+    swift: CL('as break case catch class continue default defer do else enum extension fallthrough for func guard if import in init inout internal is let private protected public repeat return static struct switch throw throws try var where while'),
+    php: CL('abstract and array as break case catch class clone const continue declare default do echo else elseif empty extends final finally fn for foreach function global if implements include interface isset list namespace new or print private protected public require return static switch throw trait try unset use var while yield', { line: ['//', '#'], dollar: true }),
+    dart: CL('abstract as async await break case catch class const continue default do else enum extends final finally for if import in is late new required return static super switch this throw try var void while with'),
+    scala: CL('abstract case catch class def do else extends final finally for if implicit import lazy match new object override package private protected return sealed throw trait try type val var while with yield'),
+    python: { kw: 'and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield match case print' + CONST, line: ['#'], block: [], quotes: '"\'', triple: true, at: true },
+    ruby: { kw: 'alias and begin break case class def defined do else elsif end ensure for if in module next not or redo rescue retry return then undef unless until when while yield require puts attr_accessor' + CONST, line: ['#'], block: [['=begin', '=end']], quotes: '"\'', at: true },
+    bash: { kw: 'if then else elif fi for while until do done case esac function in return export local readonly echo exit source alias unset set shift cd sudo', line: ['#'], block: [], quotes: '"\'', dollar: true },
+    powershell: { kw: 'begin break catch class continue data do dynamicparam else elseif end exit filter finally for foreach function if in param process return switch throw trap try until while', line: ['#'], block: [['<#', '#>']], quotes: '"\'', dollar: true, ci: true },
+    sql: { kw: 'select from where and or not insert into values update set delete create table alter drop index view join left right inner outer full cross on as is null in exists group by order having limit offset union all distinct case when then else end primary key foreign references default with returning asc desc count sum avg min max like between begin commit rollback grant', line: ['--'], block: [['/*', '*/']], quotes: '\'"', ci: true },
+    lua: { kw: 'and break do else elseif end for function goto if in local not or repeat return then until while' + CONST, line: ['--'], block: [['--[[', ']]']], quotes: '"\'' },
+    r: { kw: 'if else repeat while function for in next break TRUE FALSE NULL Inf NaN NA library return', line: ['#'], block: [], quotes: '"\'' },
+    julia: { kw: 'abstract baremodule begin break catch const continue do else elseif end export finally for function global if import let local macro module quote return struct try using while' + CONST, line: ['#'], block: [['#=', '=#']], quotes: '"' },
+    haskell: { kw: 'case class data default deriving do else if import in infix instance let module newtype of then type where', line: ['--'], block: [['{-', '-}']], quotes: '"' },
+    yaml: { kw: 'true false null yes no on off', line: ['#'], block: [], quotes: '"\'' },
+    toml: { kw: 'true false', line: ['#'], block: [], quotes: '"\'', triple: true },
+  };
+  const GENERIC: Lang = { kw: 'if else for while do return function def class import from export const let var new public private static void int' + CONST, line: ['//', '#'], block: [['/*', '*/']], quotes: '"\'`' };
+  const kwSets = new Map<string, Set<string>>();
+  const kwOf = (name: string, l: Lang) => {
+    let set = kwSets.get(name);
+    if (!set) kwSets.set(name, (set = new Set(l.kw.split(/\s+/).filter(Boolean).map((w) => (l.ci ? w.toLowerCase() : w)))));
+    return set;
+  };
+  const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  /** A language of code's words, in runs: a scanner of comments, strings, numbers and words, the language's keywords. */
+  const scan = (code: string, name: string, l: Lang): [string, string][] => {
+    const out: [string, string][] = [];
+    const push = (k: string, t: string) => {
+      if (!t) return;
+      const last = out[out.length - 1];
+      if (last && last[0] === k) last[1] += t;
+      else out.push([k, t]);
+    };
+    const kws = kwOf(name, l);
+    const alts: string[] = [];
+    for (const [a, b] of l.block) alts.push(`${escRe(a)}[\\s\\S]*?(?:${escRe(b)}|$)`);
+    for (const m of l.line) alts.push(`${escRe(m)}[^\\n]*`);
+    const com = alts.length;
+    const strs: string[] = [];
+    if (l.triple) strs.push(`[rRbBfFuU]{0,2}"""[\\s\\S]*?(?:"""|$)`, `[rRbBfFuU]{0,2}'''[\\s\\S]*?(?:'''|$)`);
+    for (const q of l.quotes) strs.push(q === '`' ? '`(?:[^`\\\\]|\\\\[\\s\\S])*`?' : `${l.triple ? '[rRbBfFuU]{0,2}' : ''}${escRe(q)}(?:[^${escRe(q)}\\\\\\n]|\\\\.)*${escRe(q)}?`);
+    const re = new RegExp(`(${alts.join('|') || '(?!)'})|(${strs.join('|') || '(?!)'})|(\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b)|(${l.dollar ? '\\$\\{?[A-Za-z_][\\w]*\\}?|\\$[0-9#?@!*-]|' : ''}${l.at ? '@[A-Za-z_][\\w.]*|' : ''}[A-Za-z_][\\w]*${name === 'ruby' ? '[!?]?' : ''})`, 'g');
+    let at = 0;
+    for (let m = re.exec(code); m; m = re.exec(code)) {
+      if (!m[0]) {
+        re.lastIndex++;
+        continue;
+      }
+      push('', code.slice(at, m.index));
+      at = m.index + m[0].length;
+      if (com && m[1]) push('c', m[0]);
+      else if (m[2]) push('s', m[0]);
+      else if (m[3]) push('n', m[0]);
+      else {
+        const w = m[4] ?? m[0];
+        if (w[0] === '$') push('a', w);
+        else if (w[0] === '@') push('f', w);
+        else if (kws.has(l.ci ? w.toLowerCase() : w)) push('k', w);
+        else if (/^\s*\(/.test(code.slice(at, at + 40))) push('f', w);
+        else if (/^[A-Z][a-z0-9]+[A-Za-z0-9]*$/.test(w) && name !== 'sql') push('t', w);
+        else push('', w);
+      }
+    }
+    push('', code.slice(at));
+    return out;
+  };
+
+  /** HTML (and XML): tags, their attributes and values, comments; what is inside <script> and <style> as JavaScript and CSS. */
+  const scanHtml = (code: string): [string, string][] => {
+    const out: [string, string][] = [];
+    const re = /<!--[\s\S]*?(?:-->|$)|<\/?[A-Za-z][\w:.-]*|<!doctype[^>]*>/gi;
+    let at = 0;
+    for (let m = re.exec(code); m; m = re.exec(code)) {
+      if (m.index > at) out.push(['', code.slice(at, m.index)]);
+      if (m[0].startsWith('<!--') || /^<!doctype/i.test(m[0])) {
+        out.push(['c', m[0]]);
+        at = m.index + m[0].length;
+        continue;
+      }
+      out.push(['g', m[0]]);
+      // The tag's attributes up to its end.
+      const attrs = /\s*([^\s=>"'/]+)(\s*=\s*("[^"]*"?|'[^']*'?|[^\s>]+))?|\s*\/?>/gy;
+      attrs.lastIndex = m.index + m[0].length;
+      let end = attrs.lastIndex;
+      for (let a = attrs.exec(code); a; a = attrs.exec(code)) {
+        end = attrs.lastIndex;
+        if (/^\s*\/?>$/.test(a[0])) {
+          out.push(['g', a[0]]);
+          break;
+        }
+        const lead = /^\s*/.exec(a[0])![0];
+        out.push(['', lead], ['a', a[1]]);
+        if (a[2]) {
+          const eq = a[2].slice(0, a[2].length - a[3].length);
+          out.push(['', eq], ['s', a[3]]);
+        }
+      }
+      at = end;
+      re.lastIndex = Math.max(re.lastIndex, at);
+      // Inside <script> and <style>: their own languages, to their end tag.
+      const inner = /^<(script|style)$/i.exec(m[0]);
+      if (inner && code[at - 1] === '>') {
+        const close = code.toLowerCase().indexOf(`</${inner[1].toLowerCase()}`, at);
+        const stop = close < 0 ? code.length : close;
+        out.push(...(inner[1].toLowerCase() === 'script' ? scan(code.slice(at, stop), 'javascript', LANGS.javascript) : scanCss(code.slice(at, stop))));
+        at = stop;
+        re.lastIndex = stop;
+      }
+    }
+    if (at < code.length) out.push(['', code.slice(at)]);
+    return out;
+  };
+
+  /** CSS: comments, strings, numbers with their units, colours, at-rules, and properties' names. */
+  const scanCss = (code: string): [string, string][] => {
+    const out: [string, string][] = [];
+    const re = /(\/\*[\s\S]*?(?:\*\/|$))|("(?:[^"\\\n]|\\.)*"?|'(?:[^'\\\n]|\\.)*'?)|(#[0-9a-fA-F]{3,8}\b|-?\b\d*\.?\d+(?:%|[a-zA-Z]+)?)|(@[\w-]+)|([\w-]+)(?=\s*:(?!:))/g;
+    let at = 0;
+    for (let m = re.exec(code); m; m = re.exec(code)) {
+      if (m.index > at) out.push(['', code.slice(at, m.index)]);
+      out.push([m[1] ? 'c' : m[2] ? 's' : m[3] ? 'n' : m[4] ? 'k' : 'a', m[0]]);
+      at = m.index + m[0].length;
+    }
+    if (at < code.length) out.push(['', code.slice(at)]);
+    return out;
+  };
+
+  /** JSON: keys, strings, numbers, true, false and null. */
+  const scanJson = (code: string): [string, string][] => {
+    const out: [string, string][] = [];
+    const re = /("(?:[^"\\\n]|\\.)*"?)(\s*:)?|(-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|\b(true|false|null)\b|(\/\/[^\n]*)/g;
+    let at = 0;
+    for (let m = re.exec(code); m; m = re.exec(code)) {
+      if (m.index > at) out.push(['', code.slice(at, m.index)]);
+      if (m[1]) {
+        out.push([m[2] ? 'a' : 's', m[1]]);
+        if (m[2]) out.push(['', m[2]]);
+      } else out.push([m[3] ? 'n' : m[4] ? 'k' : 'c', m[0]]);
+      at = m.index + m[0].length;
+    }
+    if (at < code.length) out.push(['', code.slice(at)]);
+    return out;
+  };
+
+  const tokens = (code: string, lang?: string): [string, string][] => {
+    const text = typeof code === 'string' ? code.slice(0, 40000) : '';
+    const name = typeof lang === 'string' ? lang.toLowerCase() : '';
+    try {
+      if (name === 'html' || name === 'xml' || name === 'svg' || name === 'vue') return scanHtml(text);
+      if (name === 'css' || name === 'scss' || name === 'less') return scanCss(text);
+      if (name === 'json' || name === 'jsonc') return scanJson(text);
+      if (name === 'markdown' || name === 'text' || name === 'plain' || name === 'txt') return [['', text]];
+      return scan(text, LANGS[name] ? name : 'generic', LANGS[name] ?? GENERIC);
+    } catch {
+      return [['', text]];
+    }
+  };
+
+  /** A code part's colours: dark and light as editors show code; the deck's from its theme. */
+  const codeLook = (look: string | undefined, t: Theme): CodeLook => {
+    if (look === 'light') return { bg: '#f6f8fa', fg: '#1f2328', k: '#cf222e', s: '#0a3069', c: '#6e7781', n: '#0550ae', f: '#8250df', t: '#953800', g: '#116329', a: '#0550ae', gutter: '#8c959f', lit: 'rgba(84,174,255,.16)' };
+    if (look === 'deck') {
+      const c = (i: number) => color(t.colors?.[i], t, color('accent', t, '#2f6fec'));
+      return { bg: color('soft', t, '#f1f4f9'), fg: color('fg', t, '#222'), k: color('accent', t, '#2f6fec'), s: c(1), c: color('muted', t, '#777'), n: c(2), f: c(4), t: c(3), g: c(1), a: c(5), gutter: color('muted', t, '#777'), lit: `color-mix(in srgb, ${color('accent', t, '#2f6fec')} 16%, transparent)` };
+    }
+    return { bg: '#0d1117', fg: '#e6edf3', k: '#ff7b72', s: '#a5d6ff', c: '#8b949e', n: '#79c0ff', f: '#d2a8ff', t: '#ffa657', g: '#7ee787', a: '#79c0ff', gutter: '#6e7681', lit: 'rgba(56,139,253,.18)' };
+  };
+
+  /** The lines a code part lights ("2-4,7"), by their number from 1. */
+  const litLines = (v: unknown): Set<number> => {
+    const out = new Set<number>();
+    if (typeof v !== 'string') return out;
+    for (const part of v.split(',').slice(0, 100)) {
+      const m = /^\s*(\d{1,4})\s*(?:-\s*(\d{1,4}))?\s*$/.exec(part);
+      if (!m) continue;
+      const a = Number(m[1]);
+      const b = Math.min(a + 2000, Number(m[2] ?? m[1]));
+      for (let i = a; i <= b; i++) out.add(i);
+    }
+    return out;
+  };
+
+  /** A code part: its lines coloured, numbered and lit as it says, in the monospaced font, made smaller to fit its box (fit). */
+  const codeBox = (deck: Deck, e: Extract<El, { type: 'code' }>) => {
+    const look = codeLook(e.look, deck.theme);
+    const box = el('div', 'ns-code');
+    box.dataset.fit = '1';
+    box.style.background = look.bg;
+    box.style.color = look.fg;
+    box.style.setProperty('--lit', look.lit);
+    box.style.fontFamily = font('JetBrains Mono', deck.theme);
+    box.style.fontSize = sizeCss(n(e.size, 20));
+    box.style.borderRadius = px(n(e.radius, 12));
+    const lit = litLines(e.highlight);
+    const lines: [string, string][][] = [[]];
+    for (const [k, t] of tokens(typeof e.code === 'string' ? e.code.replace(/\t/g, '    ') : '', e.lang)) {
+      const bits = t.split('\n');
+      bits.forEach((b, i) => {
+        if (i) lines.push([]);
+        if (b) lines[lines.length - 1].push([k, b]);
+      });
+    }
+    const width = String(lines.length).length;
+    lines.forEach((ln, i) => {
+      const row = el('div', 'ns-cl');
+      if (lit.size) row.classList.add(lit.has(i + 1) ? 'ns-lit' : 'ns-dim');
+      if (e.lineNumbers) {
+        const g = el('span', 'ns-ln');
+        g.textContent = String(i + 1).padStart(width, ' ');
+        g.style.color = look.gutter;
+        row.appendChild(g);
+      }
+      for (const [k, t] of ln) {
+        const s = el('span');
+        s.textContent = t;
+        if (k && k in look) s.style.color = look[k as keyof CodeLook];
+        if (k === 'c') s.style.fontStyle = 'italic';
+        row.appendChild(s);
+      }
+      if (!ln.length) row.appendChild(doc.createTextNode(''));
+      box.appendChild(row);
+    });
+    return box;
   };
 
   // ---- pictures, tables, charts, lines ------------------------------------------------------------------------
@@ -782,6 +1144,575 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     box.appendChild(f);
   };
 
+  // ---- quizzes and their scores ------------------------------------------------------------------------------------
+  const LETTERS = 'ABCDEFGH';
+  /** Whether picks answer a quiz right: one of its right choices (all of them, and only them, when several are to be picked). */
+  const rightOf = (q: Extract<El, { type: 'quiz' }>, picks: number[]) => {
+    const right = (q.choices ?? []).map((c, i) => (c.correct ? i : -1)).filter((i) => i >= 0);
+    if (!right.length) return false;
+    if (q.multi) return picks.length === right.length && picks.every((p) => right.includes(p));
+    return picks.length === 1 && right.includes(picks[0]);
+  };
+  /** The quizzes that count towards a deck's score: those with a right choice, on the slides the slideshow shows. */
+  const scored = (deck: Deck) => deck.slides.filter((s) => !s.hidden).reduce((k, s) => k + everyPart(s.els).filter((e) => e.type === 'quiz' && (e.choices ?? []).some((c) => c.correct)).length, 0);
+  const everyPart = (els: El[], out: El[] = []): El[] => {
+    for (const e of els ?? []) {
+      out.push(e);
+      if (e.type === 'group') everyPart(e.els, out);
+    }
+    return out;
+  };
+  /** A slideshow's store of answers (only for the slideshow: a new one each time it starts). */
+  const answersFor = (deck: Deck): QuizAnswers => {
+    const kept = new Map<string, QuizAnswer>();
+    const total = scored(deck);
+    return {
+      get: (id) => kept.get(id),
+      set: (id, a) => void kept.set(id, a),
+      score: () => ({ right: [...kept.values()].filter((a) => a.right).length, total }),
+    };
+  };
+  const scoreText = (tpl: string, sc: { right: number; total: number }) =>
+    tpl
+      .replace(/\{right\}/g, String(sc.right))
+      .replace(/\{total\}/g, String(sc.total))
+      .replace(/\{percent\}/g, String(sc.total ? Math.round((sc.right / sc.total) * 100) : 0));
+
+  /**
+   * A quiz: its question and its lettered choices. In the slideshow its choices are picked (several, then Check, when
+   * several are right): right and wrong show at once, with what each pick says and the explanation, and the answer is
+   * kept for the show (back on its slide it shows answered). The editor marks the right ones; prints mark none.
+   */
+  const quizBox = (deck: Deck, q: Extract<El, { type: 'quiz' }>, o: DrawOpts) => {
+    const t = deck.theme;
+    const box = el('div', 'ns-quiz');
+    box.style.fontSize = sizeCss(n(q.size, 32));
+    box.style.fontFamily = font(q.font, t);
+    const ink = color(q.color, t, color('fg', t, '#222'));
+    box.style.color = ink;
+    box.style.setProperty('--qfill', color(q.fill, t, color('soft', t, '#f1f4f9')));
+    box.style.setProperty('--qmark', color('accent', t, '#2f6fec'));
+    box.style.setProperty('--qmarkfg', color('accentFg', t, '#fff'));
+    const qq = el('div', 'ns-qq');
+    qq.textContent = q.question || (o.edit ? hintOf('Your question') : '');
+    qq.style.color = q.color ? ink : color('head', t, ink);
+    if (!q.question) qq.style.opacity = '.45';
+    const list = el('div', 'ns-qcs');
+    if (q.layout === 'grid') list.dataset.layout = 'grid';
+    const play = !!o.play && !o.edit;
+    const choices = Array.isArray(q.choices) ? q.choices.slice(0, 8) : [];
+    const items = choices.map((c, i) => {
+      const b = el(play ? 'button' : 'div', 'ns-qc');
+      if (play) b.setAttribute('type', 'button');
+      const l = el('span', 'ns-ql');
+      l.textContent = LETTERS[i];
+      const tx = el('span', 'ns-qt');
+      tx.textContent = typeof c.text === 'string' && c.text ? c.text : o.edit ? hintOf('Empty choice') : '';
+      b.append(l, tx);
+      if (o.edit && c.correct) b.classList.add('ns-key');
+      list.appendChild(b);
+      return b;
+    });
+    box.append(qq, list);
+    if (!play) return box;
+    const fb = el('div', 'ns-qf');
+    const check = el('button', 'ns-qcheck');
+    check.type = 'button';
+    check.textContent = hintOf('Check the answers');
+    const poll = !choices.some((c) => c.correct);
+    let a: QuizAnswer = o.answers?.get(q.id) ?? { picks: [], done: false, right: false };
+    const paint = () => {
+      items.forEach((b, i) => {
+        const picked = a.picks.includes(i);
+        const c = choices[i];
+        b.classList.toggle('ns-pick', picked && (!a.done || poll));
+        b.classList.toggle('ns-right', a.done && !poll && !!c.correct && (picked || !q.multi));
+        b.classList.toggle('ns-wrong', a.done && !poll && picked && !c.correct);
+        b.classList.toggle('ns-missed', a.done && !poll && !!q.multi && !!c.correct && !picked);
+        (b as HTMLButtonElement).disabled = a.done;
+      });
+      fb.textContent = '';
+      if (a.done) {
+        const said = [...new Set(a.picks.map((i) => choices[i]?.why).filter((w): w is string => typeof w === 'string' && !!w))];
+        for (const w of [...said, ...(typeof q.explain === 'string' && q.explain ? [q.explain] : [])]) {
+          const p = el('div');
+          p.textContent = w;
+          fb.appendChild(p);
+        }
+      }
+      check.style.display = q.multi && !a.done && a.picks.length ? '' : 'none';
+    };
+    const answer = (picks: number[], done: boolean) => {
+      a = { picks, done, right: done && rightOf(q, picks) };
+      if (done || q.multi) o.answers?.set(q.id, a);
+      paint();
+      // The score parts on this slide count it at once.
+      const sc = o.answers?.score();
+      if (done && sc) for (const x of Array.from(box.closest('.ns-slide')?.querySelectorAll<HTMLElement>('.ns-score[data-tpl]') ?? [])) x.textContent = scoreText(x.dataset.tpl ?? '', sc);
+    };
+    items.forEach((b, i) =>
+      b.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        if (a.done || b.closest('.ns-pening')) return;
+        if (q.multi) answer(a.picks.includes(i) ? a.picks.filter((x) => x !== i) : [...a.picks, i].sort((x, y) => x - y), false);
+        else answer([i], true);
+      }),
+    );
+    check.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      if (!a.done && a.picks.length) answer(a.picks, true);
+    });
+    // A click on the quiz (between its choices too) is the quiz's, not the slideshow's.
+    box.addEventListener('click', (ev) => ev.stopPropagation());
+    box.append(check, fb);
+    paint();
+    return box;
+  };
+
+  /** A score part: its words with the slideshow's score in them ({right}, {total}, {percent}); none answered yet elsewhere. */
+  const scoreBox = (deck: Deck, e: Extract<El, { type: 'score' }>, o: DrawOpts) => {
+    const t = deck.theme;
+    const box = el('div', 'ns-score');
+    box.style.fontSize = sizeCss(n(e.size, 40));
+    box.style.fontFamily = font(e.font, t, 'title');
+    box.style.color = color(e.color, t, color('head', t, '#222'));
+    if (e.bold) box.style.fontWeight = '700';
+    const al = e.align ?? 'center';
+    box.style.textAlign = al;
+    box.style.justifyContent = al === 'right' ? 'flex-end' : al === 'left' ? 'flex-start' : 'center';
+    const tpl = typeof e.text === 'string' && e.text ? e.text : hintOf('You got {right} of {total}');
+    box.dataset.tpl = tpl;
+    box.textContent = scoreText(tpl, o.answers?.score() ?? { right: 0, total: scored(deck) });
+    return box;
+  };
+
+  // ---- the web format's live parts: custom code, web pages, 3D ----------------------------------------------------
+  /** Their icons where they do not run (the runtime's own markup). */
+  const LIVE_ICONS: Record<string, string> = {
+    html: '<path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/>',
+    embed: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.9 5.6 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.6-3.9-9S9.4 5.6 12 3z"/>',
+    scene3d: '<path d="M12 2.8l8 4.6v9.2l-8 4.6-8-4.6V7.4z"/><path d="M4 7.4l8 4.6 8-4.6M12 12v9.2"/>',
+  };
+  const THREE = typeof libs?.three === 'string' && /^https:\/\/[^\s"'<>]+\/$/.test(libs.three) ? libs.three : 'https://cdn.jsdelivr.net/npm/three@0.187.0/';
+  const attr = (s: string) => s.replace(/[&"<>]/g, (c) => `&#${c.charCodeAt(0)};`);
+  const scriptJs = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  /** The frames of live parts this runtime made (each frame's part, and where its 3D model is fetched from). */
+  const liveFrames = new Map<HTMLIFrameElement, { e: El; o: DrawOpts }>();
+  /** Each slideshow's stage, and what it does when one of its frames asks (deck.next(), prev(), go(n), a key it left). */
+  const shows = new Set<{ stage: HTMLElement; act: (d: { act: string; n?: unknown; key?: unknown }) => void }>();
+
+  /**
+   * `window.deck` in a live part's page: its slide (from 1) and the deck's slides, the step its build is at, whether
+   * its slide shows; on('enter' | 'leave' | 'step', f); next(), prev(), go(n). It tells the slideshow by postMessage
+   * (its parent only), and passes on the keys that move a slideshow when the page itself does nothing with them.
+   * Its own source goes into each part's page: it uses nothing outside itself.
+   */
+  function bridge(cfg: { id: string; slide: number; slides: number; step: number; active: boolean; ready: boolean }) {
+    const on: Record<string, ((d: unknown) => void)[]> = {};
+    const st = { slide: cfg.slide, slides: cfg.slides, step: cfg.step || 0, active: !!cfg.active };
+    const post = (m: Record<string, unknown>) => {
+      try {
+        parent.postMessage({ ...m, ns: 'n-deck', id: cfg.id }, '*');
+      } catch {}
+    };
+    const fire = (t: string, d: unknown) => {
+      for (const f of (on[t] ?? []).slice())
+        try {
+          f(d);
+        } catch (e) {
+          console.error(e);
+        }
+    };
+    const deck = {
+      get slide() {
+        return st.slide;
+      },
+      get slides() {
+        return st.slides;
+      },
+      get step() {
+        return st.step;
+      },
+      get active() {
+        return st.active;
+      },
+      on(t: string, f: (d: unknown) => void) {
+        if (typeof f !== 'function') return;
+        (on[t] = on[t] ?? []).push(f);
+        if (t === 'enter' && st.active) setTimeout(() => f({ slide: st.slide, step: st.step }), 0);
+      },
+      off(t: string, f: (d: unknown) => void) {
+        on[t] = (on[t] ?? []).filter((x) => x !== f);
+      },
+      next: () => post({ act: 'next' }),
+      prev: () => post({ act: 'prev' }),
+      go: (n: number) => {
+        if (typeof n === 'number' && isFinite(n)) post({ act: 'go', n: Math.round(n) });
+      },
+    };
+    try {
+      Object.defineProperty(window, 'deck', { value: deck });
+    } catch {}
+    addEventListener('message', (e) => {
+      const d = e.data;
+      if (e.source !== parent || !d || d.ns !== 'n-deck' || typeof d.ev !== 'string') return;
+      if (d.ev === 'enter') {
+        st.active = true;
+        st.step = Number(d.step) || 0;
+        fire('enter', { slide: st.slide, step: st.step });
+      } else if (d.ev === 'leave') {
+        st.active = false;
+        fire('leave', { slide: st.slide });
+      } else if (d.ev === 'step') {
+        st.step = Number(d.step) || 0;
+        fire('step', { slide: st.slide, step: st.step });
+      }
+    });
+    if (cfg.ready) addEventListener('load', () => post({ act: 'ready' }));
+    const NAV = ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Escape'];
+    addEventListener('keydown', (e) => {
+      if (!NAV.includes(e.key) || e.metaKey || e.ctrlKey || e.altKey) return;
+      setTimeout(() => {
+        if (!e.defaultPrevented) post({ act: 'key', key: e.key });
+      }, 0);
+    });
+  }
+
+  /**
+   * A 3D part's page: three.js (with its loaders and controls) from jsDelivr at a pinned version, the model (asked of
+   * the slideshow, which fetches it as the app keeps it or has it inside the deck's page; one on the web loaded here)
+   * or a shape of its own, in its material and light, turning by itself, turned by the pointer where it may be.
+   * Transparent behind unless it has a colour. Its own source goes into the page: it uses nothing outside itself.
+   */
+  async function scene(cfg: { shape: string; text: string; color: string; material: string; light: string; spin: number; orbit: boolean; turn: number; tilt: number; zoom: number; bg: string; model: string; accent: string; second: string; font: string }) {
+    const ready = () => parent.postMessage({ ns: 'n-deck', act: 'ready' }, '*');
+    // three.js comes from the page's import map, never from the app's own bundle (nor its types): what it loads is the
+    // frame's alone.
+    const load = (spec: string): Promise<any> => import(/* @vite-ignore */ spec);
+    let T: any;
+    try {
+      T = await load('three');
+    } catch {
+      return;
+    }
+    const addons = (p: string) => load(`three/addons/${p}`);
+    const renderer = new T.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(Math.min(2.5, window.devicePixelRatio || 1));
+    renderer.outputColorSpace = T.SRGBColorSpace;
+    renderer.toneMapping = T.ACESFilmicToneMapping;
+    document.body.appendChild(renderer.domElement);
+    const sc = new T.Scene();
+    if (cfg.bg) sc.background = new T.Color(cfg.bg);
+    const cam = new T.PerspectiveCamera(30, 1, 0.01, 200);
+    // Light: a room around it to shine in, and lamps as the light says.
+    try {
+      const { RoomEnvironment } = await addons('environments/RoomEnvironment.js');
+      const pm = new T.PMREMGenerator(renderer);
+      sc.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+      sc.environmentIntensity = ({ studio: 0.65, soft: 1, dramatic: 0.22, neon: 0.12 } as Record<string, number>)[cfg.light] ?? 0.65;
+    } catch {}
+    const dir = (c: number | string, i: number, x: number, y: number, z: number) => {
+      const l = new T.DirectionalLight(c, i);
+      l.position.set(x, y, z);
+      sc.add(l);
+    };
+    if (cfg.light === 'soft') {
+      sc.add(new T.HemisphereLight(0xffffff, 0x8a8a8a, 1.2));
+      dir(0xffffff, 0.6, 2, 5, 4);
+    } else if (cfg.light === 'dramatic') {
+      sc.add(new T.AmbientLight(0xffffff, 0.06));
+      const s = new T.SpotLight(0xffffff, 60, 0, 0.55, 0.6, 2);
+      s.position.set(3.5, 4.5, 2.5);
+      sc.add(s);
+      dir(cfg.accent, 1.4, -3, 2, -4);
+    } else if (cfg.light === 'neon') {
+      sc.add(new T.AmbientLight(0xffffff, 0.05));
+      const a = new T.PointLight(cfg.accent, 45, 0, 2);
+      a.position.set(2.4, 1.6, 2.6);
+      const b = new T.PointLight(cfg.second, 45, 0, 2);
+      b.position.set(-2.6, -1.2, 2.2);
+      sc.add(a, b);
+    } else {
+      sc.add(new T.HemisphereLight(0xffffff, 0x404040, 0.55));
+      dir(0xffffff, 1.7, 3, 4, 5);
+      dir(0xffffff, 0.5, -4, 1, 2);
+      dir(0xffffff, 0.9, 0, 3, -5);
+    }
+    const material = () => {
+      const c = new T.Color(cfg.color);
+      const flat = cfg.shape === 'icosahedron';
+      if (cfg.material === 'matte') return new T.MeshStandardMaterial({ color: c, roughness: 0.85, metalness: 0, flatShading: flat });
+      if (cfg.material === 'metal') return new T.MeshStandardMaterial({ color: c, roughness: 0.22, metalness: 1, flatShading: flat });
+      if (cfg.material === 'glass') return new T.MeshPhysicalMaterial({ color: c, roughness: 0.04, metalness: 0, transmission: 1, thickness: 0.8, ior: 1.45, flatShading: flat });
+      if (cfg.material === 'wire') return new T.MeshBasicMaterial({ color: c, wireframe: true });
+      if (cfg.material === 'toon') return new T.MeshToonMaterial({ color: c });
+      return new T.MeshPhysicalMaterial({ color: c, roughness: 0.28, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.12, flatShading: flat });
+    };
+    let obj: any;
+    try {
+      if (cfg.model) {
+        const { GLTFLoader } = await addons('loaders/GLTFLoader.js');
+        const data = await new Promise<ArrayBuffer | string>((ok, no) => {
+          if (cfg.model !== 'ask') return ok(cfg.model);
+          const on = (e: MessageEvent) => {
+            if (e.source !== parent || !e.data || e.data.ns !== 'n-deck' || e.data.ev !== 'model') return;
+            removeEventListener('message', on);
+            if (e.data.data) ok(e.data.data);
+            else no(new Error('No model'));
+          };
+          addEventListener('message', on);
+          parent.postMessage({ ns: 'n-deck', act: 'model' }, '*');
+        });
+        const loader = new GLTFLoader();
+        const gltf = await (typeof data === 'string' ? loader.loadAsync(data) : loader.parseAsync(data, ''));
+        obj = gltf.scene;
+        if (cfg.material)
+          obj.traverse((m: any) => {
+            if (m.isMesh) m.material = material();
+          });
+      } else {
+        let geo: any;
+        if (cfg.shape === 'text') {
+          const { FontLoader } = await addons('loaders/FontLoader.js');
+          const { TextGeometry } = await addons('geometries/TextGeometry.js');
+          const f = await new FontLoader().loadAsync(cfg.font);
+          geo = new TextGeometry(cfg.text || '3D', { font: f, size: 1, depth: 0.32, curveSegments: 8, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.025, bevelSegments: 3 });
+        } else if (cfg.shape === 'sphere') geo = new T.SphereGeometry(1, 64, 32);
+        else if (cfg.shape === 'torus') geo = new T.TorusGeometry(0.78, 0.32, 48, 128);
+        else if (cfg.shape === 'knot') geo = new T.TorusKnotGeometry(0.7, 0.24, 220, 32);
+        else if (cfg.shape === 'cone') geo = new T.ConeGeometry(0.9, 1.6, 64);
+        else if (cfg.shape === 'cylinder') geo = new T.CylinderGeometry(0.8, 0.8, 1.5, 64);
+        else if (cfg.shape === 'icosahedron') geo = new T.IcosahedronGeometry(1, 0);
+        else {
+          const { RoundedBoxGeometry } = await addons('geometries/RoundedBoxGeometry.js');
+          geo = new RoundedBoxGeometry(1.3, 1.3, 1.3, 5, 0.14);
+        }
+        geo.center();
+        obj = new T.Mesh(geo, material());
+      }
+    } catch {
+      return;
+    }
+    // Fitted to a ball of 1 around the middle, which the camera frames.
+    const ball = new T.Box3().setFromObject(obj).getBoundingSphere(new T.Sphere());
+    const pivot = new T.Group();
+    obj.position.sub(ball.center);
+    pivot.add(obj);
+    pivot.scale.setScalar(1 / Math.max(1e-6, ball.radius));
+    sc.add(pivot);
+    let controls: any = null;
+    const frame = () => {
+      const w = Math.max(1, innerWidth);
+      const h = Math.max(1, innerHeight);
+      renderer.setSize(w, h, false);
+      cam.aspect = w / h;
+      const v = ((cam.fov / 2) * Math.PI) / 180;
+      const d = 1.06 / Math.sin(Math.min(v, Math.atan(Math.tan(v) * cam.aspect))) / Math.max(0.2, cfg.zoom || 1);
+      const a = (cfg.turn * Math.PI) / 180;
+      const b = (cfg.tilt * Math.PI) / 180;
+      if (!controls) cam.position.set(d * Math.cos(b) * Math.sin(a), d * Math.sin(b), d * Math.cos(b) * Math.cos(a));
+      cam.lookAt(0, 0, 0);
+      cam.updateProjectionMatrix();
+      if (controls) {
+        controls.minDistance = d * 0.4;
+        controls.maxDistance = d * 3;
+      }
+    };
+    frame();
+    if (cfg.orbit) {
+      const { OrbitControls } = await addons('controls/OrbitControls.js');
+      controls = new OrbitControls(cam, renderer.domElement);
+      controls.enableDamping = true;
+      controls.enablePan = false;
+      frame();
+    }
+    const spin = ((cfg.spin || 0) * Math.PI) / 180;
+    let raf = 0;
+    let last = performance.now();
+    let on = true;
+    const draw = (now: number) => {
+      raf = 0;
+      const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
+      last = now;
+      pivot.rotation.y += spin * dt;
+      controls?.update();
+      renderer.render(sc, cam);
+      if (on && (spin || controls)) raf = requestAnimationFrame(draw);
+    };
+    draw(last);
+    ready();
+    new ResizeObserver(() => {
+      frame();
+      if (!raf) draw(performance.now());
+    }).observe(document.body);
+    // Still while its slide does not show; again as it comes.
+    const w = window as unknown as { deck?: { on(t: string, f: () => void): void } };
+    w.deck?.on('leave', () => {
+      on = false;
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+    });
+    w.deck?.on('enter', () => {
+      if (on) return;
+      on = true;
+      last = performance.now();
+      if (!raf) draw(last);
+    });
+  }
+
+  /** A font stylesheet for a live part's page: the deck's page's own fonts (inside it, #n-fonts), else Google's for the theme's fonts. */
+  const fontsTag = (t: Theme) => {
+    const inside = doc.getElementById('n-fonts')?.textContent;
+    if (inside) return `<style>${inside.replace(/<\/style/gi, '')}</style>`;
+    const fams = [...new Set([t.font, t.headFont])].filter((f) => fonts[f]?.google).map((f) => `family=${encodeURIComponent(f).replace(/%20/g, '+')}:ital,wght@0,400;0,600;0,700;1,400`);
+    return fams.length ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?${attr(fams.join('&'))}&amp;display=swap">` : '';
+  };
+
+  /** A live part's page: the deck's colours and fonts as CSS variables, `window.deck`, and the part itself. */
+  const partPage = (deck: Deck, s: Slide, e: Extract<El, { type: 'html' | 'embed' | 'scene3d' }>, o: DrawOpts): string => {
+    const t = deck.theme;
+    const cv = (k: string, c: string) => `--n-${k}:${c};`;
+    const vars = [
+      cv('bg', color('bg', t, '#fff')),
+      cv('fg', color('fg', t, '#222')),
+      cv('head', color('head', t, '#111')),
+      cv('muted', color('muted', t, '#777')),
+      cv('accent', color('accent', t, '#2f6fec')),
+      cv('accent-fg', color('accentFg', t, '#fff')),
+      cv('soft', color('soft', t, '#f1f4f9')),
+      ...[0, 1, 2, 3, 4, 5].map((i) => cv(`c${i + 1}`, color(t.colors?.[i], t, color('accent', t, '#2f6fec')))),
+      `--n-font:${font('body', t)};`,
+      `--n-head-font:${font('head', t)};`,
+    ].join('');
+    const cfg = { id: e.id, slide: Math.max(1, deck.slides.indexOf(s) + 1), slides: deck.slides.length, step: Number.isFinite(o.step) ? n(o.step, 0) : 0, active: true, ready: e.type !== 'scene3d' };
+    const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{${vars}}html,body{margin:0;padding:0;background:transparent;color:var(--n-fg);font-family:var(--n-font)}</style>${fontsTag(t)}<script>(${bridge.toString()})(${scriptJs(cfg)})</script>`;
+    if (e.type === 'html') {
+      const h = typeof e.html === 'string' ? e.html : '';
+      const dt = /^(?:\s|<!--[\s\S]*?-->)*<!doctype[^>]*>/i.exec(h);
+      return dt ? dt[0] + head + h.slice(dt[0].length) : `<!doctype html>${head}${h}`;
+    }
+    if (e.type === 'embed') {
+      const url = typeof e.url === 'string' && /^https:\/\/[^\s<>"'\\]+$/i.test(e.url) ? e.url : 'about:blank';
+      return `<!doctype html><html><head>${head}<style>html,body{height:100%;overflow:hidden}iframe{position:absolute;inset:0;width:100%;height:100%;border:0}</style></head><body><iframe src="${attr(url)}" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></body></html>`;
+    }
+    const model = !e.model ? '' : /^https:\/\//.test(e.model) ? e.model : 'ask';
+    const release = /three@0\.(\d+)\./.exec(THREE)?.[1] ?? '187';
+    const sc = {
+      shape: e.model ? '' : (e.shape ?? 'cube'),
+      text: typeof e.text === 'string' ? e.text.slice(0, 60) : '',
+      color: color(e.color, t, color('accent', t, '#2f6fec')),
+      material: e.material ?? (e.model ? '' : 'glossy'),
+      light: e.light ?? 'studio',
+      spin: n(e.spin, 0),
+      orbit: !!e.orbit,
+      turn: n(e.turn, 30),
+      tilt: n(e.tilt, 18),
+      zoom: n(e.zoom, 1),
+      bg: e.bg ? color(e.bg, t, '') : '',
+      model,
+      accent: color('accent', t, '#2f6fec'),
+      second: color(t.colors?.[1], t, color('accent', t, '#2f6fec')),
+      font: `https://cdn.jsdelivr.net/gh/mrdoob/three.js@r${release}/examples/fonts/helvetiker_bold.typeface.json`,
+    };
+    const map = { imports: { three: `${THREE}build/three.module.min.js`, 'three/addons/': `${THREE}examples/jsm/` } };
+    return `<!doctype html><html><head>${head}<style>html,body{width:100%;height:100%;overflow:hidden}canvas{display:block;width:100%;height:100%;outline:none;touch-action:${e.orbit ? 'none' : 'auto'}}</style><script type="importmap">${scriptJs(map)}</script></head><body><script type="module">(${scene.toString()})(${scriptJs(sc)})</script></body></html>`;
+  };
+
+  /** A live part's model, sent to its frame as it asked: fetched as the app keeps it, or as the deck's page has it inside. */
+  const sendModel = (f: HTMLIFrameElement, info: { e: El; o: DrawOpts }) => {
+    const reply = (data: ArrayBuffer | string | null) => f.contentWindow?.postMessage({ ns: 'n-deck', ev: 'model', data }, '*', data instanceof ArrayBuffer ? [data] : []);
+    const m = info.e.type === 'scene3d' ? info.e.model : undefined;
+    if (!m) return reply(null);
+    const kept = /^naget-asset:([a-f0-9]{16,64})$/.exec(m);
+    const url = kept ? (info.o.asset ? info.o.asset(kept[1]) : '') : /^data:model\/gltf-binary;base64,[A-Za-z0-9+/=]+$/.test(m) ? m : '';
+    if (!url) return reply(null);
+    if (url.startsWith('data:')) return reply(url);
+    void win
+      .fetch(url, { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .then((b) => reply(b))
+      .catch(() => reply(null));
+  };
+
+  /** What a live part's frame says to its slideshow: it has started (its poster goes), its model, a move. */
+  let listening = false;
+  const listen = () => {
+    if (listening) return;
+    listening = true;
+    win.addEventListener('message', (ev) => {
+      const d = ev.data as { ns?: string; act?: string; n?: unknown; key?: unknown } | null;
+      if (!d || d.ns !== 'n-deck' || typeof d.act !== 'string') return;
+      let f: HTMLIFrameElement | null = null;
+      for (const x of Array.from(liveFrames.keys())) {
+        if (!x.isConnected) liveFrames.delete(x);
+        else if (x.contentWindow === ev.source) f = x;
+      }
+      if (!f) return;
+      if (d.act === 'ready') {
+        for (const u of Array.from(f.closest('.ns-live')?.querySelectorAll(':scope > .ns-img, :scope > .ns-liveph') ?? [])) u.remove();
+        return;
+      }
+      if (d.act === 'model') return sendModel(f, liveFrames.get(f)!);
+      for (const sh of shows) if (sh.stage.contains(f)) sh.act(d as { act: string });
+    });
+  };
+
+  /** Tells a slide's live parts something (their slide comes or goes, its build steps on). */
+  const tellFrames = (root: Element | null, m: Record<string, unknown>) => {
+    for (const f of Array.from(root?.querySelectorAll('iframe') ?? [])) if (liveFrames.has(f)) f.contentWindow?.postMessage({ ...m, ns: 'n-deck' }, '*');
+  };
+
+  /** A live part: running in its frame (live), else its poster, else a quiet placeholder that says what it is. */
+  const livePart = (deck: Deck, s: Slide, e: Extract<El, { type: 'html' | 'embed' | 'scene3d' }>, o: DrawOpts) => {
+    const t = deck.theme;
+    const box = el('div', 'ns-live');
+    if (e.type === 'embed' && e.radius) box.style.borderRadius = px(n(e.radius, 0));
+    if (e.type === 'scene3d' && e.bg) box.style.background = color(e.bg, t, 'transparent');
+    const poster = e.poster ? src(e.poster, o) : '';
+    if (poster) {
+      const img = el('img', 'ns-img');
+      img.src = poster;
+      img.alt = '';
+      img.draggable = false;
+      img.style.objectFit = 'cover';
+      box.appendChild(img);
+    } else if (!o.live) {
+      const ph = el('div', 'ns-liveph');
+      const ink = color('fg', t, '#333');
+      ph.style.background = `color-mix(in srgb, ${ink} 6%, transparent)`;
+      ph.style.boxShadow = `inset 0 0 0 1.5px color-mix(in srgb, ${ink} 16%, transparent)`;
+      ph.style.color = color('muted', t, '#777');
+      const ic = svg('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' });
+      ic.innerHTML = LIVE_ICONS[e.type];
+      const label = el('span');
+      label.textContent = e.type === 'html' ? hintOf('Custom code') : e.type === 'embed' ? `${hintOf('Web page')} · ${/^https:\/\/([^/?#]+)/.exec(e.url ?? '')?.[1] ?? ''}` : hintOf('3D');
+      ph.append(ic, label);
+      box.appendChild(ph);
+    }
+    if (o.live) {
+      const made = o.frame ? o.frame(partPage(deck, s, e, o), e) : el('iframe');
+      const f = made.tagName === 'IFRAME' ? (made as HTMLIFrameElement) : made.querySelector('iframe');
+      if (!o.frame && f) {
+        f.setAttribute('sandbox', 'allow-scripts');
+        f.srcdoc = partPage(deck, s, e, o);
+      }
+      if (f) {
+        f.title = e.type === 'html' ? 'Custom code' : e.type === 'embed' ? 'Web page' : '3D';
+        f.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media');
+        liveFrames.set(f, { e, o });
+        listen();
+      }
+      const takes = e.type === 'scene3d' ? !!e.orbit : !!e.interactive;
+      if (!takes) {
+        made.style.pointerEvents = 'none';
+        if (f) f.style.pointerEvents = 'none';
+      }
+      made.classList.add('ns-frame-live');
+      box.appendChild(made);
+    }
+    return box;
+  };
+
   // ---- a part --------------------------------------------------------------------------------------------------
   const part = (deck: Deck, s: Slide, e: El, o: DrawOpts = {}): HTMLElement => {
     const t = deck.theme;
@@ -818,8 +1749,17 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
         if (stroke) f.style.border = `${px(lw)} ${e.dash === 'dash' ? 'dashed' : e.dash === 'dot' ? 'dotted' : 'solid'} ${stroke}`;
         f.style.borderRadius = kind === 'ellipse' ? '50%' : kind === 'round' ? px(n(e.radius, Math.min(w, h) * 0.16)) : e.radius ? px(n(e.radius, 0)) : '0';
         if (e.shadow) f.style.boxShadow = '0 10px 28px rgba(0,0,0,.22)';
+        if (e.glass) frost(f, fill, fill2 && fill !== 'transparent' ? paint : '');
         d.appendChild(f);
       } else {
+        // Frosted glass behind a drawn shape: the blur cut to its outline, under its own fill made see-through.
+        if (e.glass) {
+          const pane = el('div', 'ns-fill');
+          pane.style.clipPath = `path("${shapePath(kind, w, h)}")`;
+          frost(pane, 'transparent', '');
+          pane.style.border = '0';
+          d.appendChild(pane);
+        }
         const g = svg('svg', { class: 'ns-shape', viewBox: `0 0 ${w} ${h}`, preserveAspectRatio: 'none' });
         let fillRef = fill;
         if (fill2 && fill !== 'transparent') {
@@ -832,7 +1772,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
           g.appendChild(defs);
           fillRef = `url(#${id})`;
         }
-        g.appendChild(svg('path', { d: shapePath(kind, w, h), fill: fillRef, ...(stroke ? { stroke, 'stroke-width': lw, 'stroke-linejoin': 'round', ...(e.dash === 'dash' ? { 'stroke-dasharray': `${lw * 3} ${lw * 2}` } : e.dash === 'dot' ? { 'stroke-dasharray': `${lw} ${lw}` } : {}) } : {}) }));
+        g.appendChild(svg('path', { d: shapePath(kind, w, h), fill: fillRef, ...(e.glass ? { 'fill-opacity': 0.5 } : {}), ...(stroke ? { stroke, 'stroke-width': lw, 'stroke-linejoin': 'round', ...(e.dash === 'dash' ? { 'stroke-dasharray': `${lw * 3} ${lw * 2}` } : e.dash === 'dot' ? { 'stroke-dasharray': `${lw} ${lw}` } : {}) } : {}) }));
         if (e.shadow) g.style.filter = 'drop-shadow(0 8px 16px rgba(0,0,0,.22))';
         d.appendChild(g);
       }
@@ -841,7 +1781,16 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
         if (o.edit && e.ph) d.classList.add('ns-ph');
         if (!o.edit) box.style.visibility = 'hidden';
       }
+      if (e.textFx) shine(box, e.textFx, t);
       d.appendChild(box);
+    } else if (e.type === 'code') {
+      d.appendChild(codeBox(deck, e));
+    } else if (e.type === 'quiz') {
+      d.appendChild(quizBox(deck, e, o));
+    } else if (e.type === 'score') {
+      d.appendChild(scoreBox(deck, e, o));
+    } else if (e.type === 'html' || e.type === 'embed' || e.type === 'scene3d') {
+      d.appendChild(livePart(deck, s, e, o));
     } else if (e.type === 'image') {
       const url = src(e.src, o);
       if (url) {
@@ -990,12 +1939,55 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     } else if (e.type === 'group') {
       for (const c of Array.isArray(e.els) ? e.els : []) d.appendChild(part(deck, s, c, o));
     }
-    const link = e.link ? (/^#\d{1,3}$/.test(e.link) ? e.link : href(e.link)) : '';
+    const link = e.link ? (SLIDE_LINK.test(e.link) ? e.link : href(e.link)) : '';
     if (link && !o.edit) {
       d.dataset.link = link;
       d.style.cursor = 'pointer';
     }
+    // How it answers the pointer (the slideshow's stylesheet moves it; tilting follows the pointer).
+    if (e.hover && !o.edit && /^(lift|grow|glow|tilt)$/.test(e.hover)) d.dataset.hover = e.hover;
     return d;
+  };
+
+  /**
+   * Frosted glass: what is under the box shows through it blurred, its own fill made see-through over that (a faint
+   * white where it has none), with a fine light edge.
+   */
+  const frost = (f: HTMLElement, fill: string, gradient: string) => {
+    f.style.setProperty('backdrop-filter', 'blur(18px) saturate(1.6)');
+    f.style.setProperty('-webkit-backdrop-filter', 'blur(18px) saturate(1.6)');
+    const tint = (c: string) => (c && c !== 'transparent' ? `color-mix(in srgb, ${c} 45%, transparent)` : 'rgba(255,255,255,.14)');
+    f.style.background = gradient ? gradient : tint(fill);
+    if (gradient) f.style.opacity = '.75';
+    if (!f.style.border) f.style.border = '1.5px solid rgba(255,255,255,.32)';
+  };
+
+  /** Words that shine: a gradient of the theme's colours, a glow, an outline, neon, a long shadow. */
+  const shine = (box: HTMLElement, fx: string, t: Theme) => {
+    const ink = box.style.color || color('fg', t, '#222');
+    const acc = color('accent', t, '#2f6fec');
+    const c = (i: number) => color(t.colors?.[i], t, acc);
+    if (fx === 'gradient') {
+      // Each paragraph its own (a paragraph is a box of its own, which its box's clip to its words would not see); bullets in the first colour.
+      box.classList.add('ns-gt');
+      box.style.setProperty('--gt0', acc);
+      for (const p of Array.from(box.querySelectorAll<HTMLElement>(':scope > .ns-p'))) {
+        p.style.backgroundImage = `linear-gradient(100deg, ${acc}, ${c(1)} 55%, ${c(4)})`;
+        p.style.setProperty('-webkit-background-clip', 'text');
+        p.style.setProperty('background-clip', 'text');
+        p.style.setProperty('-webkit-text-fill-color', 'transparent');
+      }
+    } else if (fx === 'glow') box.style.textShadow = `0 0 .12em color-mix(in srgb, ${acc} 85%, transparent), 0 0 .45em color-mix(in srgb, ${acc} 60%, transparent)`;
+    else if (fx === 'outline') {
+      box.style.setProperty('-webkit-text-stroke', `.035em ${ink}`);
+      box.style.setProperty('-webkit-text-fill-color', 'transparent');
+    } else if (fx === 'neon') {
+      // A tube lit white on a dark slide; on a light one the words keep their colour and glow in the accent.
+      if (lightness(color('bg', t, '#fff')) < 0.45) {
+        box.style.setProperty('-webkit-text-fill-color', `color-mix(in srgb, ${ink} 30%, #fff)`);
+        box.style.textShadow = `0 0 .04em #fff, 0 0 .14em ${ink}, 0 0 .38em ${ink}, 0 0 .8em ${ink}`;
+      } else box.style.textShadow = `0 0 .06em color-mix(in srgb, ${acc} 70%, transparent), 0 0 .22em color-mix(in srgb, ${acc} 55%, transparent), 0 0 .55em color-mix(in srgb, ${acc} 40%, transparent)`;
+    } else if (fx === 'shadow') box.style.textShadow = [1, 2, 3, 4, 5, 6, 7, 8].map((i) => `${(i * 0.022).toFixed(3)}em ${(i * 0.022).toFixed(3)}em 0 rgba(0,0,0,${(0.2 - i * 0.018).toFixed(3)})`).join(', ');
   };
 
   // ---- a slide ---------------------------------------------------------------------------------------------------
@@ -1009,12 +2001,136 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       const i = el('div', 'ns-bgimg');
       i.style.backgroundImage = `url("${url}")`;
       root.appendChild(i);
-      if (b.dim) {
-        const dim = el('div', 'ns-dim');
-        dim.style.opacity = String(Math.max(0, Math.min(0.8, n(b.dim, 0))));
-        root.appendChild(dim);
-      }
     }
+    // A video behind it: playing without sound, over and over, in the slideshow; its first picture in the editor; none
+    // in thumbnails and prints (its colour or picture shows there).
+    const vurl = b.video && (o.play || o.edit) ? keptUrl(b.video, o) : '';
+    if (vurl) {
+      const v = el('video', 'ns-bgvideo');
+      v.muted = true;
+      v.defaultMuted = true;
+      v.loop = true;
+      v.playsInline = true;
+      v.setAttribute('muted', '');
+      v.preload = o.play ? 'auto' : 'metadata';
+      v.src = o.play || vurl.startsWith('data:') ? vurl : `${vurl}#t=0.1`;
+      if (o.play) {
+        v.autoplay = true;
+        void v.play?.()?.catch(() => {});
+      }
+      root.appendChild(v);
+    }
+    if (b.fx) root.appendChild(movingBg(b.fx, t, !!(o.play || o.motion)));
+    if ((url || vurl) && b.dim) {
+      const dim = el('div', 'ns-dim');
+      dim.style.opacity = String(Math.max(0, Math.min(0.8, n(b.dim, 0))));
+      root.appendChild(dim);
+    }
+  };
+
+  /** How light a colour is (0 black, 1 white), for #hex ones; others count as light. */
+  const lightness = (c: string) => {
+    const m = /^#([0-9a-f]{3}|[0-9a-f]{6})/i.exec(c);
+    if (!m) return 1;
+    const h = m[1].length === 3 ? [...m[1]].map((x) => x + x).join('') : m[1];
+    const [r, g, bl] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+
+  /**
+   * A background that moves, in the theme's colours: northern lights, drifting particles, twinkling stars, waves, a slow
+   * gradient mesh, a grid running to the horizon, soft floating lights. CSS alone (layers that only move, so the browser
+   * hardly works for them); still unless `moving` (the slideshow's slide), slower for those who ask for less motion.
+   */
+  const movingBg = (fx: string, t: Theme, moving: boolean): HTMLElement => {
+    const layer = el('div', 'ns-bgfx');
+    if (moving) layer.classList.add('ns-moving');
+    const dark = lightness(color('bg', t, '#fff')) < 0.45;
+    const acc = color('accent', t, '#2f6fec');
+    const c = (i: number) => color(t.colors?.[i], t, acc);
+    const mix = (col: string, k: number) => `color-mix(in srgb, ${col} ${Math.round(k * 100)}%, transparent)`;
+    const go = (name: string, secs: number, how = 'ease-in-out infinite alternate') => `${name} calc(${secs}s * var(--k)) ${how}`;
+    const add = (css: Record<string, string>) => {
+      const x = el('div');
+      for (const [k, v] of Object.entries(css)) x.style.setProperty(k, v);
+      layer.appendChild(x);
+      return x;
+    };
+    if (fx === 'aurora') {
+      const blob = (col: string, pos: Record<string, string>, anim: string) =>
+        add({ ...pos, width: '78%', height: '115%', 'border-radius': '50%', background: `radial-gradient(closest-side, ${mix(col, dark ? 0.75 : 0.5)}, transparent)`, animation: anim });
+      blob(acc, { left: '-18%', top: '-35%' }, go('ns-drift1', 19));
+      blob(c(1), { right: '-22%', top: '-12%' }, go('ns-drift2', 25));
+      blob(c(4), { left: '18%', bottom: '-50%' }, go('ns-drift3', 31));
+    } else if (fx === 'mesh') {
+      const k = dark ? 0.7 : 0.5;
+      add({
+        inset: '-35%',
+        background: `radial-gradient(at 22% 28%, ${mix(acc, k)} 0, transparent 45%), radial-gradient(at 78% 22%, ${mix(c(1), k)} 0, transparent 45%), radial-gradient(at 72% 78%, ${mix(c(2), k)} 0, transparent 45%), radial-gradient(at 26% 82%, ${mix(c(4), k)} 0, transparent 45%)`,
+        animation: go('ns-turn', 38),
+      });
+    } else if (fx === 'particles' || fx === 'stars') {
+      // Dots in layers of their own sizes, each repeating every 60, 80 or 120 pixels down (so they run on without a seam).
+      const ink = fx === 'stars' ? (dark ? '#ffffff' : color('muted', t, '#777')) : '';
+      const sets: [string, number, string, number, number][] =
+        fx === 'stars'
+          ? [
+              [ink, 1, '97px 60px', 3.2, 260],
+              [ink, 1.4, '151px 80px', 4.6, 340],
+              [ink, 2, '223px 120px', 6.1, 420],
+            ]
+          : [
+              [acc, 1.8, '97px 60px', 0, 70],
+              [c(1), 2.4, '151px 80px', 0, 100],
+              [dark ? '#ffffff' : color('muted', t, '#777'), 1.4, '223px 120px', 0, 140],
+            ];
+      sets.forEach(([col, r, size, tw, up], i) =>
+        add({
+          left: '0',
+          top: '0',
+          width: '100%',
+          height: '200%',
+          'background-image': `radial-gradient(circle, ${mix(col, fx === 'stars' ? 0.9 : 0.55)} 0 ${r}px, transparent ${r + 1}px)`,
+          'background-size': size,
+          'background-position': `${(i * 37) % 97}px ${(i * 23) % 60}px`,
+          animation: tw ? `${go('ns-twinkle', tw)}, ${go('ns-up', up, 'linear infinite')}` : go('ns-up', up, 'linear infinite'),
+        }),
+      );
+    } else if (fx === 'waves') {
+      // A wave that starts and ends at the same height, a slide wide, repeated across a layer twice as wide that slides by one.
+      const wave = (col: string, k: number) =>
+        `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'><path d='M0 60 C200 0 400 0 600 60 C800 120 1000 120 1200 60 V120 H0 Z' fill='${col}' fill-opacity='${k}'/></svg>`)}")`;
+      const band = (col: string, k: number, h: string, secs: number) => add({ left: '0', bottom: '0', width: '200%', height: h, background: `${wave(col, k)} repeat-x 0 100% / 50% 100%`, animation: go('ns-side', secs, 'linear infinite') });
+      band(acc, dark ? 0.32 : 0.22, '42%', 26);
+      band(c(1), dark ? 0.36 : 0.26, '32%', 18);
+      band(c(4), dark ? 0.42 : 0.3, '22%', 12);
+    } else if (fx === 'grid') {
+      const line = mix(acc, dark ? 0.55 : 0.4);
+      add({ inset: '0', background: `radial-gradient(ellipse 75% 32% at 50% 64%, ${mix(acc, dark ? 0.32 : 0.18)}, transparent)` });
+      const floor = add({ left: '-50%', right: '-50%', bottom: '0', height: '62%', transform: 'perspective(420px) rotateX(58deg)', 'transform-origin': '50% 100%', overflow: 'hidden', '-webkit-mask-image': 'linear-gradient(to top, #000 35%, transparent)', 'mask-image': 'linear-gradient(to top, #000 35%, transparent)' });
+      const cells = el('div');
+      for (const [k, v] of Object.entries({ position: 'absolute', left: '0', right: '0', top: '-64px', bottom: '0', 'background-image': `linear-gradient(${line} 2px, transparent 2px), linear-gradient(90deg, ${line} 2px, transparent 2px)`, 'background-size': '64px 64px', animation: go('ns-cell', 1.8, 'linear infinite') }))
+        cells.style.setProperty(k, v);
+      floor.appendChild(cells);
+    } else {
+      // Bokeh: soft lights, placed the same each time (so a slide's picture is always the same), floating slowly.
+      const lights: [number, number, number, number, number][] = [
+        [8, 18, 16, 0, 23],
+        [70, 10, 22, 1, 29],
+        [40, 55, 12, 4, 19],
+        [82, 60, 18, 2, 26],
+        [18, 70, 20, 1, 31],
+        [55, 28, 9, 0, 17],
+        [90, 32, 10, 4, 21],
+        [30, 8, 8, 2, 24],
+        [62, 80, 14, 0, 27],
+      ];
+      lights.forEach(([x, y, size, ci, secs], i) => {
+        const col = ci === 0 ? acc : c(ci);
+        add({ left: `${x}%`, top: `${y}%`, width: `${size}%`, 'aspect-ratio': '1', 'border-radius': '50%', background: `radial-gradient(circle, ${mix(col, dark ? 0.55 : 0.38)} 0, ${mix(col, dark ? 0.22 : 0.15)} 55%, transparent 70%)`, animation: go('ns-float', secs), 'animation-delay': `-${(i * 3.7).toFixed(1)}s` });
+      });
+    }
+    return layer;
   };
 
   /** The deck's footer on slide i: the date at the left, its words in the middle, the slide's number at the right. */
@@ -1063,7 +2179,15 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     background(deck, s, root, o);
     for (const e of s.els ?? []) root.appendChild(part(deck, s, e, o));
     footer(deck, i, root, o);
-    if (o.play) root.classList.add('ns-canplay');
+    if (o.play) {
+      root.classList.add('ns-canplay');
+      root.style.setProperty('--n-glow', color('accent', deck.theme, '#7aa2ff'));
+      // The parts a click on which runs effects of their own (taps) say so to the pointer.
+      for (const a of s.anims ?? []) {
+        const tr = a.on === 'tap' && a.trigger ? root.querySelector<HTMLElement>(`.ns-el[data-id="${CSS.escape(a.trigger)}"]`) : null;
+        if (tr) tr.style.cursor = 'pointer';
+      }
+    }
     if (!o.edit && o.step !== undefined) applyState(root, s, o.step);
     return root;
   };
@@ -1104,6 +2228,20 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       if (box.clientHeight > 0) {
         if (fitCache.size > 2000) fitCache.clear();
         fitCache.set(key, k);
+      }
+    }
+    // Code as large as its size, or smaller to fit its box: its letters are all as wide, so it scales by what overflows.
+    for (const box of Array.from(root.querySelectorAll<HTMLElement>('.ns-code[data-fit]'))) {
+      box.style.removeProperty('--fs');
+      const cw = box.clientWidth;
+      const ch = box.clientHeight;
+      if (!cw || !ch) continue;
+      const k = Math.min(1, cw / Math.max(1, box.scrollWidth), ch / Math.max(1, box.scrollHeight));
+      if (k < 0.999) {
+        box.style.setProperty('--fs', String(Math.max(0.2, Math.floor(k * 100) / 100)));
+        // Lines laid out again at the smaller size may still be a little over: one more step.
+        const k2 = Math.min(1, cw / Math.max(1, box.scrollWidth), ch / Math.max(1, box.scrollHeight));
+        if (k2 < 0.999) box.style.setProperty('--fs', String(Math.max(0.2, Math.floor(k * k2 * 100) / 100)));
       }
     }
     // Equations as large as their boxes allow.
@@ -1262,7 +2400,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       }
       if (tag === 'A') {
         const h = x.getAttribute('href') ?? '';
-        if (/^#\d{1,3}$/.test(h) || href(h)) n2.link = h;
+        if (SLIDE_LINK.test(h) || href(h)) n2.link = h;
       }
       const cs = x.style;
       const fw = cs.fontWeight;
@@ -1319,6 +2457,8 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
   const plan = (s: Slide): { fx: Fx[]; groups: number; auto: boolean } => {
     const list: { a: Anim; para?: number; on: Anim['on'] }[] = [];
     for (const a of s.anims ?? []) {
+      // A tap's effects run when their part is clicked, outside the build.
+      if (a.on === 'tap') continue;
       const target = s.els.find((e) => e.id === a.el);
       if (!target) continue;
       if (a.byPara && (target.type === 'text' || target.type === 'shape')) {
@@ -1371,6 +2511,13 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
         else if (f.a.type === 'out') t.classList.add('ns-hidden');
         else if (f.a.fx === 'grow') t.style.scale = '1.2';
       }
+    }
+    // What a tap brings in waits for its click (printed, as the build's end, it shows).
+    if (step === Infinity) return;
+    for (const a of s.anims ?? []) {
+      if (a.on !== 'tap' || a.type !== 'in' || seen.has(`${a.el}:`)) continue;
+      seen.add(`${a.el}:`);
+      root.querySelector<HTMLElement>(`.ns-el[data-id="${CSS.escape(a.el)}"]`)?.classList.add('ns-hidden');
     }
   };
 
@@ -1426,10 +2573,310 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       case 'shake':
         k = [{ translate: '0 0' }, { translate: '-14px 0' }, { translate: '14px 0' }, { translate: '-10px 0' }, { translate: '10px 0' }, { translate: '-4px 0' }, { translate: '0 0' }];
         break;
+      // The web format's own.
+      case 'blur':
+        k = [{ opacity: 0, filter: 'blur(18px)' }, { opacity: 1, filter: 'blur(0px)' }];
+        break;
+      case 'rise':
+        k = [{ opacity: 0, translate: '0 64px' }, { opacity: 1, translate: '0 0' }];
+        break;
+      case 'drop':
+        k = [
+          { opacity: 0, translate: `0 ${-Math.min(260, elData.y + elData.h + 40)}px`, offset: 0 },
+          { opacity: 1, translate: '0 0', offset: 0.62, easing: 'ease-out' },
+          { translate: '0 -16px', offset: 0.8, easing: 'ease-in' },
+          { translate: '0 0', offset: 1 },
+        ];
+        break;
+      case 'flip':
+        k = [{ opacity: 0, transform: 'perspective(900px) rotateY(90deg)' }, { opacity: 1, transform: 'perspective(900px) rotateY(0deg)' }];
+        break;
+      case 'swing':
+        k = [
+          { opacity: 0, transform: 'perspective(700px) rotateX(-90deg)', transformOrigin: '50% 0', offset: 0 },
+          { opacity: 1, transform: 'perspective(700px) rotateX(18deg)', transformOrigin: '50% 0', offset: 0.55 },
+          { transform: 'perspective(700px) rotateX(-8deg)', transformOrigin: '50% 0', offset: 0.8 },
+          { transform: 'perspective(700px) rotateX(0deg)', transformOrigin: '50% 0', offset: 1 },
+        ];
+        break;
+      case 'roll':
+        k = [{ opacity: 0, translate: `${-Math.min(320, elData.x + elData.w + 40)}px 0`, transform: 'rotate(-180deg)' }, { opacity: 1, translate: '0 0', transform: 'rotate(0deg)' }];
+        break;
+      case 'pop':
+        k = [
+          { opacity: 0, transform: 'scale(.35)', offset: 0 },
+          { opacity: 1, transform: 'scale(1.12)', offset: 0.65 },
+          { transform: 'scale(1)', offset: 1 },
+        ];
+        break;
+      case 'typewriter':
+        // A part with no words to type: shown from left to right, a step at a time.
+        k = [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)' }];
+        break;
+      case 'draw':
+        k = [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)' }];
+        break;
+      case 'count':
+        k = [{ opacity: 0 }, { opacity: 1 }];
+        break;
+      case 'glow': {
+        const g = color('accent', deck.theme, '#7aa2ff');
+        k = [{ filter: `drop-shadow(0 0 0px ${g})` }, { filter: `drop-shadow(0 0 22px ${g}) drop-shadow(0 0 6px ${g})` }, { filter: `drop-shadow(0 0 0px ${g})` }];
+        break;
+      }
+      case 'wiggle':
+        k = [{ transform: 'rotate(0deg)' }, { transform: 'rotate(7deg)' }, { transform: 'rotate(-7deg)' }, { transform: 'rotate(5deg)' }, { transform: 'rotate(-4deg)' }, { transform: 'rotate(2deg)' }, { transform: 'rotate(0deg)' }];
+        break;
+      case 'heartbeat':
+        k = [
+          { transform: 'scale(1)', offset: 0 },
+          { transform: 'scale(1.16)', offset: 0.14 },
+          { transform: 'scale(1)', offset: 0.28 },
+          { transform: 'scale(1.12)', offset: 0.42 },
+          { transform: 'scale(1)', offset: 0.7 },
+          { transform: 'scale(1)', offset: 1 },
+        ];
+        break;
+      case 'jello':
+        k = [
+          { transform: 'skew(0deg, 0deg)', offset: 0 },
+          { transform: 'skew(-12.5deg, -12.5deg)', offset: 0.22 },
+          { transform: 'skew(6.25deg, 6.25deg)', offset: 0.33 },
+          { transform: 'skew(-3.1deg, -3.1deg)', offset: 0.44 },
+          { transform: 'skew(1.6deg, 1.6deg)', offset: 0.55 },
+          { transform: 'skew(-0.8deg, -0.8deg)', offset: 0.66 },
+          { transform: 'skew(0deg, 0deg)', offset: 1 },
+        ];
+        break;
+      case 'flash':
+        k = [{ opacity: 1 }, { opacity: 0.1 }, { opacity: 1 }, { opacity: 0.1 }, { opacity: 1 }];
+        break;
+      case 'bob':
+        k = [{ translate: '0 0' }, { translate: '0 -14px' }, { translate: '0 0' }];
+        break;
       default:
         k = [{ opacity: 1 }, { opacity: 1 }];
     }
     return a.type === 'out' ? k.slice().reverse().map((x, i, all) => ({ ...x, offset: x.offset !== undefined ? 1 - (x.offset as number) : i / Math.max(1, all.length - 1) })) : k;
+  };
+
+  /** Easings by name: their own curve where the browser draws one (linear()), else the nearest it has. */
+  const EASES: Record<string, [string, string]> = {
+    smooth: ['cubic-bezier(.2,.7,.3,1)', 'cubic-bezier(.2,.7,.3,1)'],
+    spring: ['linear(0, 0.009, 0.035 2.1%, 0.141, 0.281 6.7%, 0.723 12.9%, 0.938 16.7%, 1.017, 1.077, 1.121, 1.149 24.3%, 1.159, 1.163, 1.161, 1.154 29.9%, 1.129 32.8%, 1.051 39.6%, 1.017 43.1%, 0.991, 0.977 51%, 0.975 57.1%, 0.997 69.8%, 1.003 76.9%, 1)', 'cubic-bezier(.34,1.56,.64,1)'],
+    bounce: ['linear(0, 0.004, 0.016, 0.035, 0.063, 0.098, 0.141 13.6%, 0.25, 0.391, 0.563, 0.765, 1, 0.891 40.9%, 0.848, 0.813, 0.785, 0.766, 0.754, 0.75, 0.754, 0.766, 0.785, 0.813, 0.848, 0.891 68.2%, 1 72.7%, 0.973, 0.953, 0.941, 0.938, 0.941, 0.953, 0.973, 1, 0.988, 0.984, 0.988, 1)', 'cubic-bezier(.68,-0.55,.27,1.55)'],
+    linear: ['linear', 'linear'],
+    snap: ['cubic-bezier(.85,0,.15,1)', 'cubic-bezier(.85,0,.15,1)'],
+  };
+  /** The effects whose keyframes have their own shape: they keep time evenly unless the animation says otherwise. */
+  const SHAPED = new Set(['bounce', 'drop', 'pop', 'swing', 'heartbeat', 'jello', 'wiggle', 'flash', 'bob', 'shake', 'pulse', 'glow']);
+  const easeOf = (a: Anim): [string, string] => (a.ease && EASES[a.ease] ? EASES[a.ease] : SHAPED.has(a.fx) ? EASES.linear : EASES.smooth);
+  /** Web Animations, with a plainer easing where the browser does not know the one asked for. */
+  const animate = (t: Element, k: Keyframe[], o: KeyframeAnimationOptions, alt: string): Animation => {
+    try {
+      return t.animate(k, o);
+    } catch {
+      return t.animate(k, { ...o, easing: alt });
+    }
+  };
+
+  /**
+   * A text's words (or its letters) as pieces that move one by one: each a span (letters in their word's, so lines
+   * still break between words). The words of a paragraph, a text part or a shape, a code part's code; none for others,
+   * and none for so many that one by one would take too long.
+   */
+  const split = (t: HTMLElement, by: 'word' | 'letter'): HTMLElement[] => {
+    const root = t.classList.contains('ns-p') ? t : t.querySelector<HTMLElement>(':scope > .ns-txt, :scope > .ns-code');
+    if (!root) return [];
+    const texts: Text[] = [];
+    const walker = doc.createTreeWalker(root, 4);
+    for (let x = walker.nextNode(); x; x = walker.nextNode()) if (x.nodeValue?.trim() && !x.parentElement?.closest('.ns-ln')) texts.push(x as Text);
+    const letters = texts.reduce((k, x) => k + (x.nodeValue ?? '').replace(/\s+/g, '').length, 0);
+    const mode = by === 'letter' && letters > 1500 ? 'word' : by;
+    if (mode === 'word' && texts.reduce((k, x) => k + (x.nodeValue ?? '').split(/\s+/).length, 0) > 1500) return [];
+    const out: HTMLElement[] = [];
+    for (const tn of texts) {
+      const frag = doc.createDocumentFragment();
+      for (const bit of (tn.nodeValue ?? '').split(/(\s+)/)) {
+        if (!bit) continue;
+        if (/^\s+$/.test(bit)) {
+          frag.appendChild(doc.createTextNode(bit));
+          continue;
+        }
+        const w = el('span', 'ns-w');
+        if (mode === 'letter')
+          for (const ch of Array.from(bit)) {
+            const c = el('span', 'ns-ch');
+            c.textContent = ch;
+            w.appendChild(c);
+            out.push(c);
+          }
+        else {
+          w.textContent = bit;
+          out.push(w);
+        }
+        frag.appendChild(w);
+      }
+      tn.replaceWith(frag);
+    }
+    return out;
+  };
+
+  /** Lines, shapes' outlines and icons drawn as a pen would, their fills and words coming after; other parts shown from the left. */
+  const drawFx = (t: HTMLElement, dur: number, ease: string, alt: string): Animation[] => {
+    const wipe = (x: Element, d: number) => animate(x, [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)' }], { duration: d, easing: ease }, alt);
+    const geo = Array.from(t.querySelectorAll<SVGGeometryElement>(':scope > svg.ns-shape > :not(defs), :scope > svg.ns-icon > *')).filter((x) => typeof x.getTotalLength === 'function');
+    if (!geo.length) return [wipe(t, dur)];
+    const out: Animation[] = [];
+    for (const x of geo) {
+      let len = 0;
+      try {
+        len = x.getTotalLength();
+      } catch {}
+      if (!(len > 0)) len = 1000;
+      const cs = win.getComputedStyle(x);
+      const stroked = !!cs.stroke && cs.stroke !== 'none';
+      const filled = !!cs.fill && cs.fill !== 'none' && !/,\s*0\)$/.test(cs.fill);
+      // A shape with no outline is drawn with one of its fill's colour, which goes once it is filled.
+      const pen: Keyframe = stroked ? {} : { stroke: cs.fill, strokeWidth: '3px' };
+      out.push(animate(x, [{ ...pen, strokeDasharray: `${len} ${len}`, strokeDashoffset: `${len}` }, { ...pen, strokeDasharray: `${len} ${len}`, strokeDashoffset: '0' }], { duration: dur * (filled ? 0.7 : 1), easing: ease }, alt));
+      if (filled) out.push(animate(x, [{ fillOpacity: 0 }, { fillOpacity: 0, offset: 0.55 }, { fillOpacity: 1 }], { duration: dur, easing: 'linear' }, 'linear'));
+    }
+    const words = t.querySelector<HTMLElement>(':scope > .ns-txt');
+    if (words) out.push(animate(words, [{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], { duration: dur, easing: 'linear' }, 'linear'));
+    return out;
+  };
+
+  /** The numbers in a part's words counting up from nothing to theirs, as they are written (decimals, thousands' commas). */
+  const countFx = (t: HTMLElement, dur: number): Animation[] => {
+    const re = /\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g;
+    const items: { node: Text; text: string }[] = [];
+    const walker = doc.createTreeWalker(t, 4);
+    for (let x = walker.nextNode(); x; x = walker.nextNode()) {
+      re.lastIndex = 0;
+      if (re.test(x.nodeValue ?? '') && !x.parentElement?.closest('.ns-ln')) items.push({ node: x as Text, text: x.nodeValue ?? '' });
+    }
+    const carrier = animate(t, [{ opacity: 1 }, { opacity: 1 }], { duration: dur, easing: 'linear' }, 'linear');
+    if (!items.length) return [carrier];
+    const fmt = (v: number, as: string) => {
+      const dec = /\.(\d+)$/.exec(as)?.[1].length ?? 0;
+      let s = v.toFixed(dec);
+      if (as.includes(',')) {
+        const [i, f] = s.split('.');
+        s = i.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (f ? `.${f}` : '');
+      }
+      return s;
+    };
+    const paint = (p: number) => {
+      const k = 1 - Math.pow(1 - p, 3);
+      for (const it of items) it.node.nodeValue = it.text.replace(re, (m) => fmt(Number(m.replace(/,/g, '')) * k, m));
+    };
+    const was = t.style.fontVariantNumeric;
+    t.style.fontVariantNumeric = 'tabular-nums';
+    paint(0);
+    const tick = () => {
+      if (carrier.playState !== 'running') return;
+      paint(Math.min(1, (Number(carrier.currentTime) || 0) / dur));
+      win.requestAnimationFrame(tick);
+    };
+    win.requestAnimationFrame(tick);
+    const done = () => {
+      for (const it of items) it.node.nodeValue = it.text;
+      t.style.fontVariantNumeric = was;
+    };
+    carrier.addEventListener('finish', done);
+    carrier.addEventListener('cancel', done);
+    return [carrier];
+  };
+
+  /** Confetti bursting from a part, in the theme's colours, drawn on a canvas over its slide while it falls. */
+  const confettiFx = (t: HTMLElement, dur: number, deck: Deck): Animation[] => {
+    const slideEl = t.closest<HTMLElement>('.ns-slide');
+    if (!slideEl) return [];
+    const SW = parseFloat(slideEl.style.width) || W;
+    const SHh = parseFloat(slideEl.style.height) || H(deck);
+    const sr = slideEl.getBoundingClientRect();
+    const r = t.getBoundingClientRect();
+    const k = sr.width / SW || 1;
+    const cx = (r.left + r.width / 2 - sr.left) / k;
+    const cy = (r.top + r.height / 2 - sr.top) / k;
+    const cv = el('canvas', 'ns-confetti');
+    cv.width = SW;
+    cv.height = SHh;
+    cv.style.width = px(SW);
+    cv.style.height = px(SHh);
+    const g = cv.getContext('2d');
+    if (!g) return [];
+    slideEl.appendChild(cv);
+    const t0 = deck.theme;
+    const cols = [color('accent', t0, '#2f6fec'), ...(t0.colors ?? []).map((c) => color(c, t0, '#f2a93b')), '#ffd43b'];
+    const bits = Array.from({ length: 150 }, () => {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.1;
+      const v = 9 + Math.random() * 13;
+      return { x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.5, w: 9 + Math.random() * 9, h: 5 + Math.random() * 6, c: cols[Math.floor(Math.random() * cols.length)] };
+    });
+    const carrier = animate(cv, [{ opacity: 1 }, { opacity: 1, offset: 0.72 }, { opacity: 0 }], { duration: dur, fill: 'forwards', easing: 'linear' }, 'linear');
+    let last = 0;
+    const tick = () => {
+      if (!cv.isConnected || carrier.playState !== 'running') return;
+      const now = Number(carrier.currentTime) || 0;
+      const dt = Math.min(3, Math.max(0, now - last) / 16.7);
+      last = now;
+      g.clearRect(0, 0, SW, SHh);
+      for (const b of bits) {
+        b.vy += 0.42 * dt;
+        b.vx *= Math.pow(0.985, dt);
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        b.r += b.vr * dt;
+        g.save();
+        g.translate(b.x, b.y);
+        g.rotate(b.r);
+        g.fillStyle = b.c;
+        g.fillRect(-b.w / 2, -b.h / 2, b.w, b.h * Math.max(0.15, Math.abs(Math.cos(b.r * 1.7))));
+        g.restore();
+      }
+      win.requestAnimationFrame(tick);
+    };
+    win.requestAnimationFrame(tick);
+    const done = () => cv.remove();
+    carrier.addEventListener('finish', done);
+    carrier.addEventListener('cancel', done);
+    return [carrier];
+  };
+
+  /**
+   * One effect on its part (or paragraph): its animations, each tracked by the slideshow. Words or letters one by one
+   * (`by`, a typewriter's letters), drawn lines, numbers counting, confetti, or the effect's keyframes; again and
+   * again for an emphasis that keeps going.
+   */
+  const effectOf = (f: Fx, t: HTMLElement, deck: Deck): Animation[] => {
+    const a = f.a;
+    const dur = Math.max(1, n(a.dur, 500));
+    const out = a.type === 'out';
+    const [ease, alt] = easeOf(a);
+    const iterations = a.loop && a.type === 'em' ? Infinity : 1;
+    const by = a.by ?? (a.fx === 'typewriter' ? 'letter' : undefined);
+    if (by && a.fx !== 'confetti' && a.fx !== 'count' && a.fx !== 'draw') {
+      const pieces = split(t, by);
+      if (pieces.length > 1) {
+        const type = a.fx === 'typewriter';
+        const each = type ? Math.max(16, Math.min(160, dur / pieces.length)) : Math.max(180, dur * 0.55);
+        const gap = Math.max(0, (dur - each) / (pieces.length - 1));
+        return pieces.map((p, i) =>
+          animate(
+            p,
+            type ? (out ? [{ opacity: 1 }, { opacity: 0 }] : [{ opacity: 0 }, { opacity: 1 }]) : keyframes(f, p, deck),
+            { duration: each, delay: (out ? pieces.length - 1 - i : i) * gap, easing: type ? 'steps(1, end)' : ease, fill: out ? 'forwards' : 'backwards', iterations },
+            alt,
+          ),
+        );
+      }
+    }
+    if (a.fx === 'draw' && !out) return drawFx(t, dur, ease, alt);
+    if (a.fx === 'count' && !out) return countFx(t, dur);
+    if (a.fx === 'confetti') return confettiFx(t, dur, deck);
+    return [animate(t, keyframes(f, t, deck), { duration: dur, easing: ease, iterations, fill: out || a.fx === 'grow' ? 'forwards' : 'none' }, alt)];
   };
 
   // ---- the slideshow -----------------------------------------------------------------------------------------------
@@ -1478,8 +2925,10 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       listening: 'Listening…',
       ...(o.words ?? {}),
     };
-    // What every slide is drawn with here: videos play when clicked.
-    const pass: DrawOpts = { asset: o.asset, web: o.web, video: o.video, hint: o.hint, katex: o.katex, locale: o.locale, play: true };
+    // What every slide is drawn with here: videos play when clicked, quizzes are answered (the answers kept for the
+    // show), live parts run where the slideshow says they do.
+    const answers = o.answers ?? answersFor(deck);
+    const pass: DrawOpts = { asset: o.asset, web: o.web, video: o.video, hint: o.hint, katex: o.katex, locale: o.locale, play: true, live: o.live, frame: o.frame, answers };
     const order = deck.slides.map((s, i) => ({ s, i })).filter((x) => o.withHidden || !x.s.hidden);
     const list = order.length ? order : deck.slides.map((s, i) => ({ s, i }));
     const root = el('div', `ns-show ${o.mode === 'full' ? 'ns-full' : 'ns-viewer'}`);
@@ -1533,13 +2982,28 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     } else bar.appendChild(button('exit', words.exit, () => o.onExit?.()));
     root.append(stage, gridEl, bar);
     host.appendChild(root);
+    // The deck's progress bar: a thin line across the top of its slides, as far as the slideshow has come.
+    const prog = deck.progress ? el('div', 'ns-prog') : null;
+    if (prog) {
+      prog.style.background = color('accent', deck.theme, '#2f6fec');
+      frame.appendChild(prog);
+    }
 
     let pos = Math.max(0, list.findIndex((x) => x.i === (o.at ?? list[0].i)));
     let step = 0;
     let layer: HTMLElement | null = null;
-    /** Effects waiting for their start (a timer each), and those moving now. */
+    /** Effects waiting for their start (a timer each), those moving now, and those that keep going (until the slide goes). */
     let pending: { timer: number; done: () => void }[] = [];
     let running: Animation[] = [];
+    let loops: Animation[] = [];
+    const stopLoops = () => {
+      const all = loops;
+      loops = [];
+      for (const a of all)
+        try {
+          a.cancel();
+        } catch {}
+    };
     let autoTimer = 0;
     let ended = false;
     let endEl: HTMLElement | null = null;
@@ -1602,6 +3066,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     const tell = () => {
       const cur = list[pos];
       count.textContent = `${pos + 1} / ${list.length}`;
+      if (prog) prog.style.width = px((W * (pos + 1)) / list.length);
       prevB.disabled = pos === 0 && step === 0;
       nextB.disabled = ended;
       for (const th of Array.from(gridEl.children)) th.classList.toggle('ns-cur', (th as HTMLElement).dataset.i === String(cur.i));
@@ -1618,47 +3083,70 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       }, t * 1000);
     };
     const reduced = () => !!win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    /** One effect at its time: its part shown (an entrance), moved, then hidden (an exit) or left grown; one that keeps going goes on. */
+    const startFx = (f: Fx, at: number) => {
+      const t = layer ? targetOf(layer, f) : null;
+      if (!t) return;
+      const out = f.a.type === 'out';
+      const grow = f.a.fx === 'grow';
+      const end = () => {
+        if (out) t.classList.add('ns-hidden');
+        if (grow) t.style.scale = '1.2';
+      };
+      const run = () => {
+        if (f.a.type === 'in') t.classList.remove('ns-hidden');
+        if (f.a.fx === 'appear' || reduced()) return end();
+        const made = effectOf(f, t, deck);
+        if (!made.length) return end();
+        if (f.a.loop && f.a.type === 'em') {
+          loops.push(...made);
+          return;
+        }
+        running.push(...made);
+        let left = made.length;
+        let over = false;
+        const finish = () => {
+          if (over) return;
+          over = true;
+          end();
+          running = running.filter((x) => !made.includes(x));
+          if (out || grow)
+            for (const x of made)
+              try {
+                x.cancel();
+              } catch {}
+          if (!running.length && !pending.length) scheduleAuto();
+        };
+        for (const an of made) {
+          an.addEventListener('finish', () => --left <= 0 && finish(), { once: true });
+          an.addEventListener('cancel', finish, { once: true });
+        }
+      };
+      if (at <= 0) run();
+      else {
+        const p = { timer: 0, done: () => (f.a.type === 'in' && t.classList.remove('ns-hidden'), end()) };
+        p.timer = win.setTimeout(() => {
+          pending = pending.filter((x) => x !== p);
+          run();
+        }, at);
+        pending.push(p);
+      }
+    };
     const playGroup = (g: number) => {
       const s = list[pos].s;
       const { fx } = plan(s);
-      for (const f of fx.filter((x) => x.group === g)) {
-        const t = layer ? targetOf(layer, f) : null;
-        if (!t) continue;
-        const out = f.a.type === 'out';
-        const grow = f.a.fx === 'grow';
-        const end = () => {
-          if (out) t.classList.add('ns-hidden');
-          if (grow) t.style.scale = '1.2';
-        };
-        const run = () => {
-          if (f.a.type === 'in') t.classList.remove('ns-hidden');
-          if (f.a.fx === 'appear' || reduced()) return end();
-          const an = t.animate(keyframes(f, t, deck), { duration: Math.max(1, n(f.a.dur, 500)), easing: f.a.fx === 'bounce' ? 'linear' : 'cubic-bezier(.2,.7,.3,1)', fill: out || grow ? 'forwards' : 'none' });
-          running.push(an);
-          let over = false;
-          const finish = () => {
-            if (over) return;
-            over = true;
-            end();
-            running = running.filter((x) => x !== an);
-            if (out || grow) an.cancel();
-            if (!running.length && !pending.length) scheduleAuto();
-          };
-          an.onfinish = finish;
-          an.oncancel = finish;
-        };
-        const at = f.begin + n(f.a.delay, 0);
-        if (at <= 0) run();
-        else {
-          const p = { timer: 0, done: () => (f.a.type === 'in' && t.classList.remove('ns-hidden'), end()) };
-          p.timer = win.setTimeout(() => {
-            pending = pending.filter((x) => x !== p);
-            run();
-          }, at);
-          pending.push(p);
-        }
-      }
+      for (const f of fx.filter((x) => x.group === g)) startFx(f, f.begin + n(f.a.delay, 0));
       if (!running.length && !pending.length) scheduleAuto();
+    };
+    /** A click on a part that runs effects of its own (a tap): they run, together, each time. Whether there were any. */
+    const tap = (target: Element | null): boolean => {
+      const s = list[pos]?.s;
+      if (!s || !layer || !target) return false;
+      const ids = new Set<string>();
+      for (let x = target.closest<HTMLElement>('.ns-el'); x && layer.contains(x); x = x.parentElement?.closest<HTMLElement>('.ns-el') ?? null) ids.add(x.dataset.id ?? '');
+      const taps = (s.anims ?? []).filter((a) => a.on === 'tap' && !!a.trigger && ids.has(a.trigger));
+      for (const a of taps) startFx({ a, group: -1, begin: 0, end: 0 }, n(a.delay, 0));
+      return taps.length > 0;
     };
     /** Videos that play by themselves, as their slide shows. */
     const autoplay = (root: HTMLElement, s: Slide) => {
@@ -1696,7 +3184,8 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       for (const [ea, eb] of morphPairs(a, b)) {
         const na = top(oldRoot, ea.id);
         const nb = top(newRoot, eb.id);
-        if (!na || !nb) continue;
+        // A live part's frame cannot be copied as it runs: it comes in as the rest do.
+        if (!na || !nb || na.querySelector('iframe') || nb.querySelector('iframe')) continue;
         matched.add(nb);
         const ga = geo(na);
         const gb = geo(nb);
@@ -1742,6 +3231,81 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       last.onfinish = finish;
       last.oncancel = finish;
     };
+    /**
+     * The web format's transitions, from the slide that goes (`old`) to the one that comes (`l`): the two turn as a
+     * cube's sides, flip over as a card, dissolve, open in a circle, through blinds, or glitch in.
+     */
+    const turn = (old: HTMLElement, l: HTMLElement, fx: string, side: string, dur: number) => {
+      const opts: KeyframeAnimationOptions = { duration: dur, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'both' };
+      const made: Animation[] = [];
+      const across = side === 'left' || side === 'right';
+      // From the right (or below), the slides turn to the left (or up).
+      const sign = side === 'right' || side === 'down' ? 1 : -1;
+      const rot = (deg: number) => (across ? `rotateY(${-sign * deg}deg)` : `rotateX(${sign * deg}deg)`);
+      const tidy: (() => void)[] = [];
+      const hold = (x: HTMLElement, css: Record<string, string>) => {
+        for (const [k, v] of Object.entries(css)) x.style.setProperty(k, v);
+        tidy.push(() => {
+          for (const k of Object.keys(css)) x.style.removeProperty(k);
+        });
+      };
+      if (fx === 'cube' || fx === 'flip') {
+        hold(frame, { perspective: `${Math.round(W * (fx === 'cube' ? 1.6 : 2.2))}px` });
+        const depth = fx === 'cube' ? (across ? W : SH) / 2 : 0;
+        for (const x of [old, l]) hold(x, { 'transform-origin': `50% 50% -${depth}px`, 'backface-visibility': 'hidden', '-webkit-backface-visibility': 'hidden' });
+        const deg = fx === 'cube' ? 90 : 180;
+        made.push(old.animate([{ transform: rot(0) }, { transform: rot(deg) }], opts));
+        made.push(l.animate([{ transform: rot(-deg) }, { transform: rot(0) }], opts));
+      } else if (fx === 'dissolve') {
+        made.push(l.animate([{ opacity: 0, filter: 'blur(14px) saturate(1.4)' }, { opacity: 1, filter: 'blur(0px) saturate(1)' }], { ...opts, easing: 'ease-out' }));
+      } else if (fx === 'circle') {
+        made.push(l.animate([{ clipPath: 'circle(0% at 50% 50%)' }, { clipPath: 'circle(75% at 50% 50%)' }], opts));
+      } else if (fx === 'blinds') {
+        // Eight bands across, each opening downwards: one shape of eight boxes (joined along the left edge).
+        const bands = 8;
+        const shape = (k: number) =>
+          `polygon(${Array.from({ length: bands }, (_, i) => {
+            const y0 = (i * 100) / bands;
+            const y1 = y0 + (k * 100) / bands;
+            return `0% ${y0}%, 100% ${y0}%, 100% ${y1}%, 0% ${y1}%, 0% ${y0}%`;
+          }).join(', ')})`;
+        made.push(l.animate([{ clipPath: shape(0) }, { clipPath: shape(1) }], { ...opts, easing: 'cubic-bezier(.3,0,.2,1)' }));
+      } else {
+        // Glitch: the new slide arrives in slices, shifted and off colour, then settles.
+        made.push(
+          l.animate(
+            [
+              { opacity: 0, transform: 'translate(0,0)', clipPath: 'inset(0 0 0 0)', filter: 'none', offset: 0 },
+              { opacity: 1, transform: 'translate(-26px,6px)', clipPath: 'inset(12% 0 58% 0)', filter: 'hue-rotate(90deg) saturate(2.2)', offset: 0.14 },
+              { transform: 'translate(20px,-5px)', clipPath: 'inset(44% 0 22% 0)', filter: 'hue-rotate(-70deg) contrast(1.5)', offset: 0.28 },
+              { transform: 'translate(-12px,3px)', clipPath: 'inset(70% 0 4% 0)', filter: 'hue-rotate(40deg)', offset: 0.42 },
+              { transform: 'translate(9px,0)', clipPath: 'inset(0 0 0 0)', filter: 'contrast(1.3)', offset: 0.58 },
+              { transform: 'translate(-4px,0)', clipPath: 'inset(0 0 0 0)', filter: 'none', offset: 0.76 },
+              { opacity: 1, transform: 'translate(0,0)', clipPath: 'inset(0 0 0 0)', filter: 'none', offset: 1 },
+            ],
+            { duration: dur, easing: 'linear', fill: 'both' },
+          ),
+        );
+        made.push(old.animate([{ opacity: 1, transform: 'translate(0,0)' }, { opacity: 1, transform: 'translate(14px,0)', offset: 0.2 }, { opacity: 0, transform: 'translate(-10px,0)', offset: 0.5 }, { opacity: 0 }], { duration: dur, easing: 'linear', fill: 'both' }));
+      }
+      running.push(...made);
+      let over = false;
+      const finish = () => {
+        if (over) return;
+        over = true;
+        running = running.filter((x) => !made.includes(x));
+        old.remove();
+        for (const x of made)
+          try {
+            x.cancel();
+          } catch {}
+        for (const t of tidy) t();
+        if (!running.length && !pending.length) scheduleAuto();
+      };
+      const lastOne = made[made.length - 1];
+      for (const x of made) x.addEventListener('cancel', finish, { once: true });
+      lastOne.addEventListener('finish', finish, { once: true });
+    };
     const draw = (animateFrom: HTMLElement | null, drawStep: number) => {
       const s = list[pos].s;
       const fromAt = layerAt;
@@ -1752,13 +3316,19 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       fit(next);
       layer = l;
       layerAt = list[pos].i;
-      for (const old of Array.from(frame.querySelectorAll(':scope > .ns-layer'))) if (old !== l && old !== animateFrom) old.remove();
+      // The slide that goes: its live parts are told, its effects that kept going stop.
+      for (const old of Array.from(frame.querySelectorAll(':scope > .ns-layer'))) {
+        if (old === l) continue;
+        tellFrames(old, { ev: 'leave' });
+        if (old !== animateFrom) old.remove();
+      }
       autoplay(next, s);
       if (!animateFrom) return;
       const tr = s.transition;
       const old = animateFrom;
       if (!tr || tr.fx === 'none' || reduced()) return old.remove();
       if (tr.fx === 'morph') return morph(old, l, deck.slides[fromAt], s, Math.max(1, n(tr.dur, 1000)));
+      if (tr.fx === 'cube' || tr.fx === 'flip' || tr.fx === 'dissolve' || tr.fx === 'circle' || tr.fx === 'blinds' || tr.fx === 'glitch') return turn(old, l, tr.fx, tr.dir ?? 'right', Math.max(1, n(tr.dur, 800)));
       const side = tr.dir ?? 'right';
       const off = side === 'right' ? '100% 0' : side === 'left' ? '-100% 0' : side === 'up' ? '0 -100%' : '0 100%';
       const back = side === 'right' ? '-100% 0' : side === 'left' ? '100% 0' : side === 'up' ? '0 100%' : '0 -100%';
@@ -1788,6 +3358,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     };
     const go = (i: number, st = 0, animate = false) => {
       settle();
+      stopLoops();
       win.clearTimeout(autoTimer);
       endEl?.remove();
       endEl = null;
@@ -1815,6 +3386,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       if (step < plan(s).groups) {
         step++;
         playGroup(step);
+        tellFrames(layer, { ev: 'step', step });
         tell();
         return;
       }
@@ -1833,6 +3405,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       if (step > 0) {
         step--;
         if (layer) applyState(layer.firstElementChild as HTMLElement, list[pos].s, step);
+        tellFrames(layer, { ev: 'step', step });
         tell();
         return;
       }
@@ -2055,6 +3628,12 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     stage.addEventListener('click', (e) => {
       // The pen draws: its clicks are not the slideshow's.
       if (tool === 'pen') return;
+      // A part that runs effects of its own when clicked (a tap): that, not the next step.
+      if (tap(e.target as Element)) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       const linkEl = (e.target as HTMLElement).closest<HTMLElement>('[data-link], a[href]');
       if (linkEl) {
         const h = linkEl.dataset.link ?? linkEl.getAttribute('href') ?? '';
@@ -2064,7 +3643,8 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
         if (m) {
           const target = deck.slides[Number(m[1]) - 1];
           if (target) go(deck.slides.indexOf(target), 0, true);
-        } else if (href(h)) win.open(h, '_blank', 'noopener,noreferrer');
+        } else if (h === '#next' || h === '#prev' || h === '#first' || h === '#last') jump(h);
+        else if (href(h)) win.open(h, '_blank', 'noopener,noreferrer');
         return;
       }
       if (o.mode === 'viewer' || !(e as PointerEvent).pointerType || (e as PointerEvent).pointerType === 'mouse') {
@@ -2096,12 +3676,54 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
         else next();
       }
     });
+    /** A link to the next slide, the one before, the first or the last (past what is left of this one's build). */
+    const jump = (h: string) => {
+      const to = h === '#next' ? list[pos + 1] : h === '#prev' ? list[pos - 1] : h === '#first' ? list[0] : list[list.length - 1];
+      if (to && to !== list[pos]) go(to.i, 0, true);
+    };
+    /** What a live part's page asks of the slideshow: the next step or slide, the one before, a slide by its number, a key it left. */
+    const act = (d: { act: string; n?: unknown; key?: unknown }) => {
+      if (d.act === 'next') next();
+      else if (d.act === 'prev') prev();
+      else if (d.act === 'go' && typeof d.n === 'number') {
+        const target = deck.slides[Math.round(d.n) - 1];
+        if (target) go(deck.slides.indexOf(target), 0, true);
+      } else if (d.act === 'key') {
+        const k = String(d.key);
+        if (k === 'ArrowRight' || k === 'ArrowDown' || k === 'PageDown') next();
+        else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp') prev();
+        else if (k === 'Home') go(list[0].i);
+        else if (k === 'End') go(list[list.length - 1].i, Infinity);
+        else if (k === 'Escape' && o.mode === 'full') o.onExit?.();
+      }
+    };
+    const mine = { stage, act };
+    shows.add(mine);
+    // Parts that tilt towards the pointer follow it.
+    let tilted: HTMLElement | null = null;
+    const untilt = () => {
+      if (tilted) tilted.style.transform = '';
+      tilted = null;
+    };
+    stage.addEventListener('pointermove', (e) => {
+      const p = e.pointerType === 'mouse' && !tool ? (e.target as HTMLElement).closest?.<HTMLElement>('.ns-el[data-hover=tilt]') : null;
+      if (tilted && tilted !== p) untilt();
+      if (!p) return;
+      const r = p.getBoundingClientRect();
+      const x = (e.clientX - r.left) / Math.max(1, r.width) - 0.5;
+      const y = (e.clientY - r.top) / Math.max(1, r.height) - 0.5;
+      p.style.transform = `perspective(900px) rotateY(${(x * 16).toFixed(2)}deg) rotateX(${(-y * 16).toFixed(2)}deg) scale(1.02)`;
+      tilted = p;
+    });
+    stage.addEventListener('pointerleave', untilt);
     let typed = '';
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.isContentEditable) return;
       const k = e.key;
+      // A quiz's choice (or its Check) takes Enter and Space as a click.
+      if (tag === 'BUTTON' && (k === 'Enter' || k === ' ') && (e.target as HTMLElement).closest('.ns-quiz')) return;
       // Space on a video that was clicked plays or pauses it (its own controls'), and the slideshow stays.
       if (tag === 'VIDEO' && k === ' ') return;
       let hit = true;
@@ -2168,6 +3790,9 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       grid,
       marks,
       destroy: () => {
+        shows.delete(mine);
+        stopLoops();
+        if (layer) tellFrames(layer, { ev: 'leave' });
         captions(false);
         win.clearTimeout(flashTimer);
         if (marksFrame) win.cancelAnimationFrame(marksFrame);
@@ -2267,7 +3892,8 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     const wrap = el('div', 'ns-wrap');
     body.appendChild(wrap);
     if ((win as unknown as { hydor?: { fill?: boolean } }).hydor?.fill ?? win.parent === win) body.classList.add('ns-filled');
-    const s = show(wrap, deck, { mode: 'viewer', keys: true, katex });
+    // Its live parts run here, each in a sandboxed frame of its own.
+    const s = show(wrap, deck, { mode: 'viewer', keys: true, katex, live: true });
     // Printing from the page: every slide, a page each.
     let printed = false;
     win.addEventListener('beforeprint', () => {
@@ -2295,5 +3921,21 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     });
   };
 
-  return { css, style, slide, part, words, fit, read, show, print, steps, morphPairs, boot, maths };
+  return { css, style, slide, part, words, fit, read, show, print, steps, morphPairs, boot, maths, tokens, codeLook };
+}
+
+let quiet: SlidesRuntime | null = null;
+/**
+ * Code's words told apart as the slides' runtime tells them (its own tokenizer), outside a browser: the PowerPoint file
+ * colours code as the slide does. A runtime of no window: its tokenizer and looks need none.
+ */
+export function codeTokens(code: string, lang?: string): [string, string][] {
+  quiet ??= slidesRuntime({ document: {} } as unknown as Window, {});
+  return quiet.tokens(code, lang);
+}
+
+/** A code part's colours in a look, outside a browser (the PowerPoint file's). */
+export function codeLookOf(look: string | undefined, t: Theme): CodeLook {
+  quiet ??= slidesRuntime({ document: {} } as unknown as Window, {});
+  return quiet.codeLook(look, t);
 }
