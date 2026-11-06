@@ -195,7 +195,7 @@ function MathForm({ tex: start, onDone }: { tex: string; onDone: (tex: string) =
   );
 }
 
-const TITLES: Record<EdAsk['what'], string> = {
+const TITLES: Partial<Record<EdAsk['what'], string>> = {
   emoji: 'Emoji',
   icon: 'The page’s icon',
   'callout-icon': 'The callout’s icon',
@@ -204,7 +204,7 @@ const TITLES: Record<EdAsk['what'], string> = {
   video: 'A video from YouTube or Vimeo',
   math: 'Maths',
 };
-const WIDTHS: Record<EdAsk['what'], number> = { emoji: 336, icon: 336, 'callout-icon': 336, cover: 320, picture: 340, video: 360, math: 420 };
+const WIDTHS: Partial<Record<EdAsk['what'], number>> = { emoji: 336, icon: 336, 'callout-icon': 336, cover: 320, picture: 340, video: 360, math: 420 };
 
 /**
  * What the editor asked for, beside where it was asked: its answer goes to the editor (`answer`, which puts it in
@@ -236,7 +236,8 @@ export function InsertPopover({
     const r = ask.rect ?? { x: 0, y: 0, w: f.offsetWidth, h: 0 };
     setBox({ left: fr.left + r.x * k, top: fr.top + r.y * k, width: Math.max(1, r.w * k), height: Math.max(1, r.h * k) });
   }, [ask, frame]);
-  if (!ask) return null;
+  // (the newer blocks' own asks are BlockAsks.tsx's)
+  if (!ask || !TITLES[ask.what]) return null;
   const id = ask.id;
   const done = (payload: Record<string, unknown>) => {
     answer({ id, ...payload });

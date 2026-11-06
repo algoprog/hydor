@@ -15,6 +15,8 @@ import type { DB } from '../db.ts';
 import { pageMimeFor } from '../files.ts';
 import { inside, signWithKey } from '../links.ts';
 import { injectHead, kitHead, storageShim } from './kit.ts';
+import { getAsset } from './assets.ts';
+import { thumbFile } from './thumbs.ts';
 import { cleanTitle, dbSeed, pageHtml, pageInfo, pageSource } from './store.ts';
 
 /** A folder to publish holds at most this much. */
@@ -52,6 +54,17 @@ export function initSites(db: DB) {
       decided_at integer
     );
   `);
+  // A published page's description and social picture (og:image): its own picture, one of the user's, or none.
+  const cols = (db.prepare('pragma table_info(sites)').all() as { name: string }[]).map((c) => c.name);
+  if (!cols.includes('description')) db.exec('alter table sites add column description text');
+  if (!cols.includes('image')) db.exec('alter table sites add column image text');
+}
+
+/** What a published page says of itself where it is shared: words (at most 300), and its picture. */
+function socialOf(p: { description?: unknown; image?: unknown }): { description: string | null; image: string | null } {
+  const description = typeof p.description === 'string' ? p.description.replace(/\s+/g, ' ').trim().slice(0, 300) || null : null;
+  const image = p.image === 'none' ? 'none' : typeof p.image === 'string' && /^naget-asset:[a-f0-9]{16,64}$/.test(p.image) ? p.image : 'thumb';
+  return { description, image };
 }
 
 const newId = () => crypto.randomBytes(5).toString('hex');
@@ -104,6 +117,8 @@ interface SiteRow {
   nonce: string;
   created_at: number;
   session_key: string | null;
+  description?: string | null;
+  image?: string | null;
 }
 
 const sig = (r: { id: string; nonce: string }) => signWithKey(`site:${r.id}:${r.nonce}`).slice(0, 32);
@@ -123,7 +138,18 @@ function toSite(db: DB, r: SiteRow): SiteInfo {
     path: pathOf(r),
     createdAt: r.created_at,
     sessionKey: r.session_key ?? undefined,
+    ...(r.description ? { description: r.description } : {}),
+    ...(r.kind === 'page' ? { image: r.image ?? 'thumb' } : {}),
   };
+}
+
+/** A published page's description and social picture, changed. */
+export function setSocial(db: DB, id: string, p: { description?: unknown; image?: unknown }): SiteInfo {
+  const r = db.prepare('select * from sites where id = ?').get(id) as SiteRow | undefined;
+  if (!r) throw new HttpError(404, 'No such published site');
+  const s = socialOf(p);
+  db.prepare('update sites set description = ?, image = ? where id = ?').run(s.description, s.image, id);
+  return toSite(db, { ...r, ...s });
 }
 
 export function listSites(db: DB): SiteInfo[] {
@@ -146,7 +172,7 @@ function slugFor(db: DB, name: string): string {
   return slug;
 }
 
-export function publish(db: DB, p: { name: unknown; visibility: unknown; folder?: string; pageId?: string; sessionKey?: string }): SiteInfo {
+export function publish(db: DB, p: { name: unknown; visibility: unknown; folder?: string; pageId?: string; sessionKey?: string; description?: unknown; image?: unknown }): SiteInfo {
   const visibility: SiteVisibility = p.visibility === 'public' ? 'public' : 'private';
   const name = cleanTitle(p.name, 'Site').slice(0, 60);
   if ((db.prepare('select count(*) as n from sites').get() as { n: number }).n >= MAX_SITES) throw new HttpError(409, `At most ${MAX_SITES} sites can be published; unpublish some first.`);
@@ -179,6 +205,7 @@ export function publish(db: DB, p: { name: unknown; visibility: unknown; folder?
     row.created_at,
     row.session_key,
   );
+  if (p.pageId && (p.description !== undefined || p.image !== undefined)) return setSocial(db, row.id, p);
   return toSite(db, row);
 }
 
@@ -343,14 +370,39 @@ export async function serveSite(db: DB, req: FastifyRequest, reply: FastifyReply
   if (site.visibility === 'private') reply.header('X-Robots-Tag', 'noindex, nofollow');
   const rest = prm['*'] ?? '';
   if (site.kind === 'page') {
+    // Its picture where it is shared (og:image): the page's own picture, or one of the user's.
+    if (rest === 'social-picture') {
+      const img = site.image ?? 'thumb';
+      if (img.startsWith('naget-asset:')) {
+        const a = getAsset(db, img.slice('naget-asset:'.length));
+        return a ? reply.header('Cache-Control', 'public, max-age=3600').type(a.mime).send(a.data) : text(reply, 404, 'Not found');
+      }
+      const f = img === 'thumb' && site.page_id ? thumbFile(db, site.page_id) : null;
+      return f ? reply.header('Cache-Control', 'public, max-age=3600').type('image/webp').send(fs.createReadStream(f)) : text(reply, 404, 'Not found');
+    }
     if (rest && rest !== 'index.html') return text(reply, 404, 'Not found');
     const page = site.page_id ? await pageHtml(db, site.page_id) : null;
     if (!page) return text(reply, 404, 'The page this site showed was deleted.');
     reply.header('Cache-Control', 'no-cache');
+    // What it says of itself where its link is shared: its name, its description, its picture.
+    const info = pageInfo(db, site.page_id!);
+    const desc = site.description ?? info?.description ?? '';
+    const proto = String(req.headers['x-forwarded-proto'] ?? req.protocol ?? 'https').split(',')[0].trim();
+    const host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? '').split(',')[0].trim();
+    const at = /^[\w.:-]+$/.test(host) ? `${proto === 'http' ? 'http' : 'https'}://${host}/site/${prm.token}/` : '';
+    const attr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const pic = (site.image ?? 'thumb') !== 'none' && at && (site.image?.startsWith('naget-asset:') || (site.page_id && thumbFile(db, site.page_id)));
+    const meta = [
+      `<meta property="og:title" content="${attr(site.name)}">`,
+      `<meta property="og:type" content="website">`,
+      at ? `<meta property="og:url" content="${attr(at)}">` : '',
+      desc ? `<meta name="description" content="${attr(desc)}"><meta property="og:description" content="${attr(desc)}">` : '',
+      pic ? `<meta property="og:image" content="${attr(`${at}social-picture`)}"><meta name="twitter:card" content="summary_large_image">` : '<meta name="twitter:card" content="summary">',
+    ].join('');
     // (its databases show what they hold, as they are: a published copy keeps no change)
     return reply
       .type('text/html; charset=utf-8')
-      .send(injectHead(page.html, kitHead({ n: '', theme: 'auto', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, seed: dbSeed(db, site.page_id!) }, page.html)));
+      .send(injectHead(page.html, meta + kitHead({ n: '', theme: 'auto', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, seed: dbSeed(db, site.page_id!) }, page.html)));
   }
   // Never a dot file or folder (.env, .git), never a way out.
   const segs = rest.split('/');

@@ -11,8 +11,9 @@ import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, 
 import { KIT_CSS } from '@shared/page-kit';
 import { codeColoursScript, hasCode } from '@shared/code-colours';
 import { cleanAnchor, type PageAnchor } from '@shared/page-comments';
-import { pageDbScript } from '@shared/page-db';
+import { hasDbParts, pageDbScript } from '@shared/page-db';
 import { dbLabels } from './studio/blocks';
+import { BLOCK_ASKS, type BlockAsk } from './studio/BlockAsks';
 import { STORAGE_LIMITS } from '@shared/pages';
 import type { AppRun } from '@shared/apps';
 import type { AppInfo } from '@shared/app-manifest';
@@ -366,7 +367,7 @@ function useThemeChange(f: () => void) {
  * opened, light or dark as that device is, and the script that colours its code blocks.
  */
 export function pageFile(html: string): string {
-  const head = `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${hasCode(html) ? codeColoursScript() : ''}${/\bn-db\b/.test(html) ? pageDbScript() : ''}`;
+  const head = `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${hasCode(html) ? codeColoursScript() : ''}${hasDbParts(html) ? pageDbScript() : ''}`;
   const d = /^(?:\s|<!--[\s\S]*?-->)*<!doctype[^>]*>/i.exec(html);
   return d ? d[0] + head + html.slice(d[0].length) : head + html;
 }
@@ -457,6 +458,7 @@ export function PageFrame({
     let appBusy = 0;
     let picks: number[] = [];
     let opened = 0;
+    let saved = 0;
     const onMessage = (e: MessageEvent) => {
       const w = ref.current?.contentWindow;
       // Only this frame: a sandboxed page's origin is opaque ("null").
@@ -471,7 +473,7 @@ export function PageFrame({
         const uiInfo = v ? { def: v.def, ctx: v.ctx, can: v.can, labels: uiLabels(), lang: v.lang ?? 'en', ...(v.start ? { start: v.start } : {}), ...(v.libs ? { libs: v.libs } : {}) } : undefined;
         if (v) sentCtx.current = v.ctx;
         // (a page with databases: their words in the app's language)
-        const db = /\bn-db\b/.test(cb.current.html) ? dbLabels() : undefined;
+        const db = hasDbParts(cb.current.html) ? dbLabels() : undefined;
         w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill, play: true, open: true, app: appInfo, ui: uiInfo, db }, '*');
         return;
       }
@@ -527,6 +529,12 @@ export function PageFrame({
             (err) => reply({ error: String((err as Error)?.message ?? err) }),
           )
           .finally(() => appBusy--);
+      } else if (d.type === 'wa-download') {
+        const now = Date.now();
+        if (now - saved > 1000 && isStr(d.name, 200) && isStr(d.mime, 100) && isStr(d.text, 20_000_000)) {
+          saved = now;
+          saveFile(d.name, d.mime, d.text);
+        }
       } else if (d.type === 'wa-video') {
         // A video's still in the page (the page editor's): its player cannot run in the sandbox, so it plays over the page.
         if (isStr(d.src, 300)) openVideo(d.src, isStr(d.title, 200) ? d.title : '');
@@ -537,6 +545,13 @@ export function PageFrame({
         if (isStr(d.id, 40) && /^[\w-]+$/.test(d.id) && now - opened > 1000) {
           opened = now;
           go(`/pages/${d.id}`);
+        }
+      } else if (d.type === 'wa-go') {
+        // A place of the Library (a page's breadcrumbs), clicked: that place, in the app; once a second at most.
+        const now = Date.now();
+        if (isStr(d.path, 260) && /^\/(library|projects)(\/[\w-]{1,40})?(\?[\w=&%-]{0,200})?$/.test(d.path) && now - opened > 1000) {
+          opened = now;
+          go(d.path);
         }
       } else if (d.type === 'wa-ui-top') {
         // A view went to another page: its top comes into sight when it was scrolled past.
@@ -575,6 +590,20 @@ export function PageFrame({
       className={cx(FRAME_CLS, className)}
     />
   );
+}
+
+/** A file a page asks to save (a database's CSV, a file in its cells): words, or a data: address. */
+export function saveFile(name: string, mime: string, text: string) {
+  const blob = (): Promise<Blob> => (text.startsWith('data:') ? fetch(text).then((r) => r.blob()) : Promise.resolve(new Blob([text], { type: /^[\w.+-]+\/[\w.+-]+(;[\w=-]+)?$/.test(mime) ? mime : 'text/plain' })));
+  void blob().then((b) => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = name.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').trim() || 'file';
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30_000);
+  });
 }
 
 /** A slide deck's own page (server/pages/slides.ts), by its marker. */
@@ -725,7 +754,7 @@ export interface EdPage {
 
 /** What the editor in the page asks the app for (writing.ts `ask`): chosen in the app, then put where it was asked. */
 export interface EdAsk {
-  what: 'emoji' | 'icon' | 'callout-icon' | 'cover' | 'picture' | 'video' | 'math';
+  what: 'emoji' | 'icon' | 'callout-icon' | 'cover' | 'picture' | 'video' | 'math' | BlockAsk;
   id: string;
   /** Where it was asked, in the frame's own pixels. */
   rect: { x: number; y: number; w: number; h: number } | null;
@@ -733,8 +762,12 @@ export interface EdAsk {
   has?: boolean;
   /** A formula's TeX, to change it. */
   tex?: string;
+  /** A newer block's own value, to change it: an embed's or a bookmark's address, a diagram's code, a chart's settings. */
+  value?: string;
+  /** A chart's sources: the page's databases, their names, titles and columns. */
+  dbs?: { name: string; title: string; cols: { name: string; kind: string }[] }[];
 }
-const ASKS = new Set(['emoji', 'icon', 'callout-icon', 'cover', 'picture', 'video', 'math']);
+const ASKS = new Set<string>(['emoji', 'icon', 'callout-icon', 'cover', 'picture', 'video', 'math', ...BLOCK_ASKS]);
 const rectOf = (v: unknown): EdAsk['rect'] => {
   const r = v as Record<string, unknown> | null;
   return r && typeof r === 'object' && ['x', 'y', 'w', 'h'].every((k) => typeof r[k] === 'number' && Number.isFinite(r[k])) ? { x: r.x as number, y: r.y as number, w: r.w as number, h: r.h as number } : null;
@@ -794,13 +827,19 @@ export const EditFrame = forwardRef<
     onAgent?: () => void;
     /** Ctrl+Shift+/ in the page: the keyboard shortcuts. */
     onKeys?: () => void;
+    /** The AI on the page (writing-ai.ts): a request for the helper model (answered with cmd('aiAnswer')), and one stopped. */
+    onAi?: (id: string, ask: Record<string, unknown>) => void;
+    onAiStop?: (id: string) => void;
+    /** A database's AI cell and a file for it (answered with cmd('answer')), and a CSV to save. */
+    onDbAi?: (id: number, ask: Record<string, unknown>) => void;
+    onUpload?: (id: number, file: File) => void;
     className?: string;
   }
->(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, className }, handle) {
+>(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload, className }, handle) {
   const ref = useRef<HTMLIFrameElement>(null);
   const offline = useContext(OfflineFrames);
-  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys });
-  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys };
+  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload });
+  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload };
   const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>(), anchorWaits: new Map<number, (list: { id: string; on: PageAnchor }[]) => void>() });
   const send = (m: Record<string, unknown>) => ref.current?.contentWindow?.postMessage({ ...m, type: 'wa-ed', n: ch.current.n }, '*');
   useThemeChange(() => ch.current.n && send({ cmd: 'theme', arg: { theme: themeNow(), css: themeCss() } }));
@@ -878,9 +917,14 @@ export const EditFrame = forwardRef<
         done?.(d.list.flatMap((x: { id?: unknown; on?: unknown }) => (isStr(x?.id, 40) && cleanAnchor(x.on) ? [{ id: x.id, on: cleanAnchor(x.on)! }] : [])).slice(0, 500));
       }
       else if (d.type === 'wa-ed-save') c.onSave?.();
-      else if (d.type === 'wa-ed-ask' && ASKS.has(d.what) && isStr(d.id, 20)) c.onAsk?.({ what: d.what, id: d.id, rect: rectOf(d.rect), has: d.has === true, tex: isStr(d.tex, 5000) ? d.tex : undefined });
+      else if (d.type === 'wa-ed-ask' && ASKS.has(d.what) && isStr(d.id, 20)) c.onAsk?.({ what: d.what, id: d.id, rect: rectOf(d.rect), has: d.has === true, tex: isStr(d.tex, 5000) ? d.tex : undefined, value: isStr(d.value, 40_000) ? d.value : undefined, dbs: Array.isArray(d.dbs) ? d.dbs.slice(0, 20) : undefined });
       else if (d.type === 'wa-ed-file' && isStr(d.id, 20) && d.file instanceof File && d.file.size <= 40_000_000 && /^image\//.test(d.file.type)) c.onFile?.(d.id, d.file);
       else if (d.type === 'wa-ed-agent') c.onAgent?.();
+      else if (d.type === 'wa-ed-ai' && isStr(d.id, 20) && d.ask && typeof d.ask === 'object' && !Array.isArray(d.ask) && JSON.stringify(d.ask).length < 600_000) c.onAi?.(d.id, d.ask);
+      else if (d.type === 'wa-ed-ai-stop' && isStr(d.id, 20)) c.onAiStop?.(d.id);
+      else if (d.type === 'wa-ed-db-ai' && Number.isInteger(d.id) && d.ask && typeof d.ask === 'object' && !Array.isArray(d.ask) && JSON.stringify(d.ask).length < 200_000) c.onDbAi?.(d.id, d.ask);
+      else if (d.type === 'wa-ed-upload' && Number.isInteger(d.id) && d.file instanceof File) c.onUpload?.(d.id, d.file);
+      else if (d.type === 'wa-ed-download' && isStr(d.name, 200) && isStr(d.mime, 100) && isStr(d.text, 20_000_000)) saveFile(d.name, d.mime, d.text);
       else if (d.type === 'wa-ed-keys') c.onKeys?.();
       else if (d.type === 'wa-ed-html' && typeof d.html === 'string') {
         const done = ch.current.waits.get(d.id);

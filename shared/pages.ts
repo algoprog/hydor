@@ -82,6 +82,8 @@ export interface PageInfo {
    * search, the search box and agents find it by it.
    */
   description?: string;
+  /** Locked by its owner, so it doesn't change by accident: no new version until it is unlocked. */
+  locked?: boolean;
 }
 
 /**
@@ -180,6 +182,9 @@ export interface PageDraft {
 export type SiteVisibility = 'private' | 'public';
 
 export interface SiteInfo {
+  /** A published page's description where its link is shared, and its picture there: 'thumb' (its own picture), 'none', or one of the user's (naget-asset:…). */
+  description?: string;
+  image?: string;
   id: string;
   name: string;
   visibility: SiteVisibility;
