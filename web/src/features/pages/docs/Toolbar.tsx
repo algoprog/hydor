@@ -33,7 +33,7 @@ import {
   Underline,
   Undo2,
 } from 'lucide-react';
-import { FONTS, HL_COLORS, PARA_STYLES, STYLES, TEXT_COLORS, type Doc } from '@shared/docs';
+import { FONTS, HL_COLORS, PARA_STYLES, STYLES, styleOf, TEXT_COLORS, type Doc } from '@shared/docs';
 import { Button, cx, inputCls, MenuItem, MenuSep, Popover } from '../../../components/ui';
 import { NumInput, Tool } from '../slides/controls';
 import { RewriteButton } from '../slides/Rewrite';
@@ -143,7 +143,7 @@ export function Toolbar({
   const clicks = useRef(0);
   const AlignIcon = ALIGNS.find((a) => a.value === st.align)?.icon ?? AlignLeft;
   const act = (f: () => void) => () => (setMenu(null), f());
-  const shownSize = st.look.size ?? Math.round(doc.size * STYLES[st.style].k * 2) / 2;
+  const shownSize = st.look.size ?? Math.round(doc.size * styleOf(doc, st.style).k * 2) / 2;
   const t = st.block?.type === 'table' ? st.block : null;
   const openLink = () => setLinking({ url: st.link ?? '', text: '' });
   return (

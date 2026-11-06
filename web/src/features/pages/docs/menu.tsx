@@ -128,6 +128,8 @@ export interface DocMenuCtx {
   signature: () => void;
   /** Insert → Footnote: a mark at the caret, its words in a box. */
   footnote?: () => void;
+  /** Format → Paragraph styles: update the caret's style to match it, change the styles (a dialog), or reset them. */
+  styles?: { match: () => void; open: () => void; reset: () => void };
   /** Insert → Citation (the dialog that finds a source), Insert → Bibliography, and Format → Citation style. */
   citation?: () => void;
   bibliography?: () => void;
@@ -336,7 +338,21 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
 
   const format: MenuEntry[] = [
     { label: 'Text', icon: <Type size={15} />, items: text },
-    { label: 'Paragraph styles', icon: <Heading size={15} />, items: PARA_STYLES.map((k) => ({ label: STYLES[k].label, checked: st.style === k && !st.list, run: () => e.style(k) })) },
+    {
+      label: 'Paragraph styles',
+      icon: <Heading size={15} />,
+      items: [
+        ...PARA_STYLES.map((k) => ({ label: STYLES[k].label, checked: st.style === k && !st.list, run: () => e.style(k) })),
+        ...(c.styles
+          ? ([
+              '-',
+              { label: `Update “${STYLES[st.style].label}” to match`, disabled: c.readOnly || !!st.list || !!st.cell || st.block?.type !== 'p', also: 'style match update heading look', run: c.styles.match },
+              { label: 'Change the styles', also: 'style styles font size colour heading look modify', disabled: c.readOnly, run: c.styles.open },
+              { label: 'Reset the styles', also: 'style styles default', disabled: c.readOnly || !c.doc.styles, run: c.styles.reset },
+            ] as MenuEntry[])
+          : []),
+      ],
+    },
     {
       label: 'Align and indent',
       icon: <AlignLeft size={15} />,

@@ -60,6 +60,7 @@ import { ColumnHandles, printDoc } from './TableTools';
 import { Toolbar } from './Toolbar';
 import { EndNotes, NoteBox, noteRoom, PageNotes } from './Notes';
 import { CiteBox, CiteDialog, withSource } from './Citations';
+import { matchStyle, StylesDialog } from './StylesDialog';
 import { putAfter } from './ai/WriteBox';
 import { BIB_TITLES } from '@shared/doc-cite';
 import { citeItems, citeOf, normalizeBlocks, type CiteStyle, type Source } from '@shared/docs';
@@ -215,7 +216,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const [width, setWidth] = useState(1200);
   const [words, setWords] = useState(0);
   const [float, setFloat] = useState<{ ask?: { x: number; y: number }; link?: { x: number; y: number } } | null>(null);
-  const [dialog, setDialog] = useState<'count' | 'spacing' | 'bands' | 'keys' | 'signature' | null>(null);
+  const [dialog, setDialog] = useState<'count' | 'spacing' | 'bands' | 'keys' | 'signature' | 'styles' | null>(null);
   const [counts, setCounts] = useState<Counts & { picked: boolean }>({ words: 0, chars: 0, charsNoSpaces: 0, paragraphs: 0, pages: 1, picked: false });
   const [panel, setPanel] = useState(false);
   const [active, setActive] = useState<string | null>(null);
@@ -516,7 +517,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   // The words on pages of the paper (not on a phone or in a narrow window): laid out again whole when what they are
   // laid out with changes (fonts arrive, maths is drawn, the paper, its margins, the document's font or size).
   zoomRef.current = zoom;
-  const geometry = `${narrow}:${zoom}:${fonts}:${math}:${shownDoc?.page.size}:${shownDoc?.page.margin}:${shownDoc?.font}:${shownDoc?.size}`;
+  const geometry = `${narrow}:${zoom}:${fonts}:${math}:${JSON.stringify(shownDoc?.page)}:${shownDoc?.font}:${shownDoc?.size}:${JSON.stringify(shownDoc?.styles ?? '')}`;
   useLayoutEffect(() => {
     const pg = paging.current;
     if (!pg) return;
@@ -598,7 +599,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const found = useDocFind(engine.current, model, find, host.current, tick);
   const heads = useMemo(() => (shownDoc ? docHeadings(shownDoc) : []), [shownDoc?.blocks]);
   const current = model && st ? sectionOf(model, st.index)?.id : undefined;
-  const css = useMemo(() => (shownDoc ? editorCss(shownDoc, { narrow, hints: { title: tr('Title'), body: tr('Start writing') } }) : ''), [shownDoc?.page, shownDoc?.font, shownDoc?.size, narrow]);
+  const css = useMemo(() => (shownDoc ? editorCss(shownDoc, { narrow, hints: { title: tr('Title'), body: tr('Start writing') } }) : ''), [shownDoc?.page, shownDoc?.font, shownDoc?.size, shownDoc?.styles, narrow]);
   // The comments' marks: open ones in yellow, the one picked stronger; resolved ones not at all.
   // The suggestions' marks in the colour of who suggested each, the one picked shaded.
   const marks = useMemo(
@@ -1066,6 +1067,14 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           aiSection: onRequest && !readOnly ? () => openTypes({ kind: 'section', at: sectionPlace(model, st.index), onDone: onRequest }) : undefined,
           signature: () => setDialog('signature'),
           footnote: () => addFootnote(),
+          styles: {
+            match: () => {
+              const name = engine.current && matchStyle(engine.current);
+              if (name) toast(`${tr(name)}: ${tr('every paragraph of it looks so now.')}`, 'ok');
+            },
+            open: () => setDialog('styles'),
+            reset: () => engine.current && engine.current.change((({ styles: _s, ...rest }) => rest)(engine.current.doc)),
+          },
           citation: () => setCiteFind({}),
           bibliography: addBibliography,
           citeStyle,
@@ -1711,6 +1720,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       <BandsDialog open={dialog === 'bands'} onClose={() => (setDialog(null), e?.refocusSoon())} header={model.header} footer={model.footer} titlePage={model.titlePage} onApply={(v) => e?.setBands(v)} />
       <VersionsDialog open={versions} pageId={pageId} onClose={() => (setVersions(false), e?.refocusSoon())} onPick={(v) => void compareWith(v)} />
       {ai.dialogs}
+      <StylesDialog open={dialog === 'styles'} onClose={() => (setDialog(null), e?.refocusSoon())} engine={e} doc={model} />
       <ShortcutsDialog open={dialog === 'keys'} onClose={() => (setDialog(null), e?.refocusSoon())} groups={SHORTCUTS} />
       {dialog === 'signature' && (
         <Suspense fallback={null}>

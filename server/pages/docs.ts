@@ -57,7 +57,7 @@ import { FONTS, googleFamilies } from '../../shared/slides.ts';
 import { docRefs, type Refs } from '../../shared/doc-refs.ts';
 import { bookmarkName, citationOf, sourcesFromXml, watermarkOf } from './docx-parts.ts';
 import { paginateDoc } from '../../shared/doc-paginate.ts';
-import { citeItems, citeOf, cleanSources, COLUMN_GAP, notesHtml, paperOf, type Source } from '../../shared/docs.ts';
+import { citeItems, citeOf, cleanSources, COLUMN_GAP, notesHtml, paperOf, styleOf, type Source } from '../../shared/docs.ts';
 import { CITE_STYLE_NAMES, sourceFromBibtex, sourceLine } from '../../shared/doc-cite.ts';
 import { scriptSafe } from './kit.ts';
 import { HttpError } from '../auth.ts';
@@ -715,7 +715,8 @@ export function docFaces(doc: Doc): FontFace[] {
     if (blk.type === 'p') {
       const st = blk.style ?? 'normal';
       if (st === 'code') add(MONO_DOC, false, false);
-      else words(blk.runs, !!STYLES[st].bold, !!STYLES[st].italic);
+      else words(blk.runs, !!styleOf(doc, st).bold, !!styleOf(doc, st).italic);
+      if (st !== 'code' && st !== 'normal' && styleOf(doc, st).font) add(styleOf(doc, st).font!, !!styleOf(doc, st).bold, !!styleOf(doc, st).italic);
     } else if (blk.type === 'li') words(blk.runs, false, false);
     else if (blk.type === 'table') blk.rows.forEach((r, ri) => r.forEach((c) => words(c.runs, !!blk.head && ri === 0, false)));
     else if (blk.type === 'toc' && tocEntries(doc).some((e) => e.level === 1)) add(doc.font, true, false);
@@ -867,9 +868,10 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
   const look: DocLook = {
     font: doc.font,
     size: doc.size,
-    title: Math.round(doc.size * STYLES.title.k * 2) / 2,
-    subtitle: Math.round(doc.size * STYLES.subtitle.k * 2) / 2,
-    heads: (['h1', 'h2', 'h3', 'h4', 'h4', 'h4'] as ParaStyle[]).map((s) => Math.round(doc.size * STYLES[s].k * 2) / 2),
+    title: Math.round(doc.size * styleOf(doc, 'title').k * 2) / 2,
+    subtitle: Math.round(doc.size * styleOf(doc, 'subtitle').k * 2) / 2,
+    heads: (['h1', 'h2', 'h3', 'h4', 'h4', 'h4'] as ParaStyle[]).map((s) => Math.round(doc.size * styleOf(doc, s).k * 2) / 2),
+    ...(doc.styles ? { styles: doc.styles } : {}),
     editor: { cjk },
   };
   return docxFile({ title, lang: '', blocks, shots: pictures.map(() => ({ x: 0, y: 0, w: 1, h: 1 })) }, pictures, {
