@@ -37,7 +37,7 @@ export function SizePicker({ value, onPick, columns = 2 }: { value: DesignSize |
       {DESIGN_GROUPS.map((g) => (
         <div key={g.id}>
           <div className="pb-1 text-[11.5px] font-semibold tracking-wide text-fg-3 uppercase">{tr(g.label)}</div>
-          <div className={cx('grid gap-1', columns === 3 ? 'grid-cols-1 min-[480px]:grid-cols-2 sm:grid-cols-3' : 'grid-cols-1 min-[420px]:grid-cols-2')}>
+          <div className={cx('grid gap-1', columns === 3 ? 'grid-cols-1 min-[480px]:grid-cols-2 sm:grid-cols-3' : columns === 1 ? 'grid-cols-1' : 'grid-cols-1 min-[420px]:grid-cols-2')}>
             {DESIGN_SIZES.filter((s) => s.group === g.id).map((s) => {
               const on = value?.id === s.id;
               return (

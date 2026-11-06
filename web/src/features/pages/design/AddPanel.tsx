@@ -155,7 +155,7 @@ export function DesignAdd({ cmd, board, look, palette, brand, onFont, onDone }: 
           ))}
         </div>
         <Title>Stickers</Title>
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
           {STICKERS.map((s) => (
             <Wide key={s.id} icon={<Sparkles size={14} />} onClick={() => insert(stickerHtml(s.id, W, look), [look.head])}>
               {tr(s.label)}
