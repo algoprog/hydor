@@ -22,7 +22,9 @@
 // only its argument and the browser's own globals.
 import { codeColours, type CodeColours } from '../../shared/code-colours.ts';
 import { pageDatabases, type PageDatabases } from '../../shared/page-db.ts';
-import { writing, type At, type Core, type Next, type Writing } from './writing.ts';
+import { writing, type At, type Core, type Extra, type ExtraCore, type Next, type Writing } from './writing.ts';
+import { writingAi } from './writing-ai.ts';
+import { writingBlocks } from './writing-blocks.ts';
 
 export interface EditorCfg {
   n: string;
@@ -33,7 +35,7 @@ export interface EditorCfg {
   labels: Record<string, string>;
 }
 
-function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: () => CodeColours, pageDatabases: () => PageDatabases) {
+function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: () => CodeColours, pageDatabases: () => PageDatabases, extras: ((x: ExtraCore) => Extra)[] = []) {
   const P = window.parent;
   const L = (k: string, fallback: string) => (typeof cfg.labels?.[k] === 'string' ? cfg.labels[k] : fallback);
   const send = (m: Record<string, unknown>) => {
@@ -264,6 +266,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     colour: '<path d="M6 16 12 4l6 12"/><path d="M8.5 11h7"/><path d="M4 20h16" stroke-width="3"/>',
     chev: '<path d="m6 9 6 6 6-6"/>',
     comment: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    ai: '<path d="m12 3-1.9 5.8L4 10.6l5.6 2.1L12 19l2-6.3 6-2.1-6-1.8z"/><path d="M5 3v4"/><path d="M3 5h4"/>',
   };
   const svg = (k: string) => `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
   const dark = cfg.theme === 'dark';
@@ -324,6 +327,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     .cmds{flex-wrap:wrap}
     .rtb button.kind{width:auto;gap:3px;padding:0 6px 0 8px;font:500 12.5px system-ui,sans-serif;display:flex;align-items:center;white-space:nowrap}
     .rtb button.kind[hidden],.rtb .sep[hidden],.rtb button[hidden]{display:none}
+    .rtb button.askai{width:auto;gap:4px;padding:0 8px 0 6px;font:600 12.5px system-ui,sans-serif;display:flex;align-items:center;white-space:nowrap;color:${dark ? '#c7b8ff' : '#6b4fd8'}}
     .pal{display:none;flex-direction:column;gap:4px;padding:3px 4px}
     .rtb.colouring .pal{display:flex}
     .rtb.colouring .cmds{display:none}
@@ -349,6 +353,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
   </div>
   <div class="rtb" role="toolbar">
     <span class="cmds">
+      <button class="askai" data-c="ai" title="${attr(L('aiTip', 'Ask AI (Ctrl+J)'))}">${svg('ai')}${attr(L('askAi', 'Ask AI'))}</button>
+      <span class="sep"></span>
       <button class="kind" data-c="turn" title="${attr(L('turnTip', 'Turn into (Ctrl+/)'))}"><span class="kn"></span>${svg('chev')}</button>
       <span class="sep ks"></span>
       <button data-c="bold" title="${L('boldTip', 'Bold (Ctrl+B)')}">${svg('bold')}</button>
@@ -1364,6 +1370,10 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       return redraw();
     }
     if (c === 'done') return finishEditing();
+    if (c === 'ai') {
+      W.act('aiOpen', null);
+      return;
+    }
     if (c === 'turn') {
       const r = b.getBoundingClientRect();
       W.act('menu', { at: { left: r.left, top: r.top, bottom: r.bottom }, view: 'turn' });
@@ -1853,6 +1863,22 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     else w[0](a.value ?? null);
   };
   const dbStore = { get: (k: string) => storeAsk('get', k), set: (k: string, v: unknown) => storeAsk('set', k, v) };
+  /** Something asked of the app that answers later (an AI column's cell, a file kept for a database): `answer` brings it. */
+  const appWaits = new Map<number, [(v: any) => void, (e: Error) => void]>();
+  const appAsk = (type: string, payload: Record<string, unknown>, wait = 180_000) =>
+    new Promise<any>((ok, fail) => {
+      const id = ++storeSeq;
+      appWaits.set(id, [ok, fail]);
+      send({ type, id, ...payload });
+      setTimeout(() => appWaits.has(id) && (appWaits.delete(id), fail(new Error('The app did not answer'))), wait);
+    });
+  const appAnswer = (a: any) => {
+    const w = appWaits.get(Number(a?.id));
+    if (!w) return;
+    appWaits.delete(Number(a.id));
+    if (typeof a.error === 'string') w[1](new Error(a.error));
+    else w[0](a.value ?? null);
+  };
 
   // ---- writing as in Notion (writing.ts), handed what it needs -------------------------------------------------
   const core: Core = {
@@ -1885,6 +1911,12 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     canComment: () => canComment,
     db: pageDatabases(),
     store: dbStore,
+    dbHooks: {
+      ai: (ask) => appAsk('wa-ed-db-ai', { ask }),
+      download: (name, mime, text) => send({ type: 'wa-ed-download', name, mime, text }),
+      upload: (file) => appAsk('wa-ed-upload', { file }, 600_000),
+    },
+    extras,
   };
   // A paste event (Ctrl+V of the part copied waits for it, below): any one, a picture's too, which writing.ts takes.
   let pasteTimer = 0;
@@ -2153,6 +2185,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       return state();
     }
     if (d.cmd === 'store') return storeAnswer(d.arg);
+    if (d.cmd === 'answer') return appAnswer(d.arg);
     act(String(d.cmd), d.arg);
   });
 
@@ -2185,4 +2218,4 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
 const scriptSafe = (src: string) => src.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 
 /** The editor, with the writing it hands its insides to, the code blocks' colours and the databases (all run in the page, as one script). */
-export const EDITOR_SRC = scriptSafe(`(cfg) => (${editor.toString()})(cfg, ${writing.toString()}, ${codeColours.toString()}, ${pageDatabases.toString()})`);
+export const EDITOR_SRC = scriptSafe(`(cfg) => (${editor.toString()})(cfg, ${writing.toString()}, ${codeColours.toString()}, ${pageDatabases.toString()}, [${writingAi.toString()}, ${writingBlocks.toString()}])`);
