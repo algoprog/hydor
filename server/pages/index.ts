@@ -68,6 +68,7 @@ import { dbBlocks, dbKey, dbsForAgent, pageDatabases } from '../../shared/page-d
 import { agentTex, compileSummary, compileTex, readTex, SAVE_LATEX_DESCRIPTION, SAVE_LATEX_SCHEMA, texRoutes } from './latex.ts';
 import { arxivRoutes, dropPaperFolder } from './latex-arxiv.ts';
 import { checkRoutes, LATEX_CHECK } from './latex-check.ts';
+import { actionsLine, pageActionTool } from './actions.ts';
 import { agentBook, readBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
 import { agentDeck, readDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
 import { agentFileComments, openFile, openFileComments, saveFile, texFileForAgent } from './filemodel.ts';
@@ -636,6 +637,10 @@ const PUBLISH_SITE: RunTool = {
 const INSTRUCTIONS =
   'Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, and a Jupyter notebook to read, run and come back to (a lesson, an analysis to show) with save_notebook, unless they ask for a file made another way or it belongs with a project’s code and data in a folder. get_page lists all of these, to change one, with the Library folder each is in; the save tools’ libraryFolder puts one in a folder of the Library (by its name or a path, made when missing). export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown, LaTeX, a notebook or a Python script). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how.';
 
+/** The tools that make and change pictures and videos, for the agent beside a deck, a document or a page. */
+const PICTURES =
+  'Pictures: generate_image makes one, or changes one it already shows (give its naget-asset: source); make_svg draws one, make_plot draws a chart from data; remove_background and erase_from_image take things out of one; edit_image crops, turns, adjusts or marks one up; generate_video and edit_video make and edit videos (one it shows by its naget-video: source). They save into your folder: put what they make in its place with the save tool.';
+
 /** A request made from a page or deck open in Pages (`extra.page`: its id): the session is about changing it. */
 function askInstructions(db: Deps['db'], v: unknown): string | null {
   const id = typeof v === 'string' ? v : v && typeof v === 'object' ? String((v as { id?: unknown }).id ?? '') : '';
@@ -643,17 +648,25 @@ function askInstructions(db: Deps['db'], v: unknown): string | null {
   if (!p) return null;
   const k = kindOf(p.kind);
   const how: Record<string, string> = {
-    slides: 'Read it with get_page (each slide and part has its id; slides are numbered from 1 in the order they show), change what they ask, and save it with save_slides and that id: only the slides that change (change, add, remove) when the rest stays as it is. "This slide" or "slide 3" means the one they name; "every slide" means all of them.',
-    doc: 'Read it with get_page, change what they ask (a section is a heading and what follows it, up to the next heading of its level), and save it with save_doc and that id: edits for a few changes (a section, words found and replaced), else the whole document.',
-    sheet: 'Read it with get_page, change what they ask (cells and ranges as A1 or B2:D9, on the sheet they name), and save it with save_sheet and that id: update for the cells that change, else the whole workbook; keep formulas as formulas.',
-    tex: 'Read it with get_page (its files, and the errors of its last typesetting), change what they ask (lines are numbered from 1 in each file, as its editor shows them), and save it with save_latex and that id, sending what changes (edits for small changes in a file; what you leave out stays); it is typeset again, and you hear of any errors: fix them.',
-    notebook: 'Read it with get_page (its cells in order, numbered from 1, each with its id and what its last run showed), change what they ask ("cell 3" is the third, as the notebook shows them), and save the whole notebook with save_notebook and that id, keeping the cells, ids and outputs you do not change. To run code and keep real outputs, export it (export_page, ipynb) into your folder, run it there, and save it back with save_notebook and path. To answer a question about it, read it and answer.',
+    slides:
+      'Read it with get_page (each slide and part has its id; slides are numbered from 1 in the order they show), change what they ask, and save it with save_slides and that id: only the slides that change (change, add, remove) when the rest stays as it is. "This slide" or "slide 3" means the one they name; "every slide" means all of them; a message that starts with a slide or a part and its id is about exactly that one. For the whole deck at once (animating every slide, putting right what the accessibility check finds, describing its pictures, PowerPoint compatible, a ready-made theme, the slides’ shape) use page_action. Free through app_api: POST /api/write/design-ideas {deck: its id, slide: its place from 0} gives three layouts of a slide’s own words to choose from, and POST /api/write/rewrite {text, how} rewrites words.',
+    doc: 'Read it with get_page, change what they ask (a section is a heading and what follows it, up to the next heading of its level), and save it with save_doc and that id: edits for a few changes (a section, words found and replaced), else the whole document. A message that starts with the words or the picture they picked (by its source) is about exactly those. page_action accepts or rejects the suggested changes (all, or by id), sets the page up (paper, margins, font) and the header and footer, without sending the document back. Free through app_api: POST /api/write/rewrite {text, how} rewrites words.',
+    sheet:
+      'Read it with get_page, change what they ask (cells and ranges as A1 or B2:D9, on the sheet they name; a message that starts with the cells they picked is about those), and save it with save_sheet and that id: update for the cells that change, else the whole workbook; keep formulas as formulas. page_action does what the Data, Edit and sheet tabs’ menus do in one call: sort, take out duplicate rows, fill down, clear, trim spaces, split text into columns, summarize a table, put in or take out rows and columns (formulas following), and rename, copy, delete or move sheets.',
+    tex: 'Read it with get_page (its files, and the errors of its last typesetting), change what they ask (lines are numbered from 1 in each file, as its editor shows them), and save it with save_latex and that id, sending what changes (edits for small changes in a file; what you leave out stays); it is typeset again, and you hear of any errors: fix them. page_action move_files renames or moves files, pictures and folders, every reference to them following.',
+    notebook:
+      'Read it with get_page (its cells in order, numbered from 1, each with its id and what its last run showed), change what they ask ("cell 3" is the third, as the notebook shows them; a message that starts with a cell and its id is about that one), and save the whole notebook with save_notebook and that id, keeping the cells, ids and outputs you do not change. To run code and keep real outputs, export it (export_page, ipynb) into your folder, run it there, and save it back with save_notebook and path. page_action clear_outputs clears outputs. To answer a question about it, read it and answer.',
   };
   return [
     `The user is asking from their ${k?.noun ?? 'page'} "${p.title}" (saved page ${p.id}), open in front of them in the Library: their messages are about changing it.`,
-    k ? how[p.kind!] : 'Read it with get_page and save the whole changed page with save_page and that id. When they name a part, change that part, and the rest only as needed.',
+    k ? how[p.kind!] : 'Read it with get_page and save the whole changed page with save_page and that id. When they name a part (its words, or its CSS selector), change that part, and the rest only as needed.',
+    actionsLine(k ? p.kind! : 'page'),
+    p.kind === 'sheet' || p.kind === 'tex' || p.kind === 'notebook' ? '' : PICTURES,
+    'When they ask, export_page gives its files (PowerPoint, Word, Excel, PDF, a web page…) and publish_site puts it at a link, once they confirm.',
     'What they look at shows your changes as you write them, and updates as soon as you save; keep their own changes, and answer in a sentence or two what you changed. Do not make a new page or a file unless they ask.',
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 /** What the agent hears once the user decided on its publish_site card. */
@@ -1136,7 +1149,7 @@ function routes(d: Deps) {
 export const pages: Feature = {
   id: 'pages',
   routes,
-  tools: () => [SHOW_HTML, SAVE_PAGE, watched(SAVE_SLIDES), watched(SAVE_DOC), watched(SAVE_SHEET), watched(SAVE_LATEX), SAVE_NOTEBOOK, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE, LATEX_CHECK],
+  tools: () => [SHOW_HTML, SAVE_PAGE, watched(SAVE_SLIDES), watched(SAVE_DOC), watched(SAVE_SHEET), watched(SAVE_LATEX), SAVE_NOTEBOOK, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE, LATEX_CHECK, pageActionTool({ keep: keepModel, hidden: outOfReach })],
   spawn: (s, d) => {
     const ask = s.extra?.page ? askInstructions(d.db, s.extra.page) : null;
     return { instructions: ask ? [INSTRUCTIONS, ask] : [INSTRUCTIONS] };
