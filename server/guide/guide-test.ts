@@ -154,7 +154,7 @@ test('the guide covers the app: every Settings section by its name', () => {
 
 /** Routes agents are never to use, which the API topic leaves out (app_api refuses them too). */
 const UNDOCUMENTED =
-  /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads|auth)\/|^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)$|^\/api\/(browser|computer)\/sessions\/|^\/api\/(push\/(subscribe|unsubscribe)|me\/timezone|find\/usage|tour|health)$|^\/api\/voice\/(transcribe|command|cancel)$|^\/api\/(images\/(make|edit|svg|cutout|erase)|plots\/make|videos\/make(\/:job)?)$/;
+  /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads|auth)\/|^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)$|^\/api\/(browser|computer)\/sessions\/|^\/api\/(push\/(subscribe|unsubscribe)|me\/timezone|find\/usage|tour|health)$|^\/api\/voice\/(transcribe|command|cancel)$|^\/api\/(images\/(make|edit|svg|cutout|erase)|plots\/make|videos\/make(\/:job)?)$|^\/api\/mediaedit\//;
 
 test('the guide covers the app: every API route is in the API topic, or one agents never use', () => {
   const api = byId.get('api')!.body;
@@ -257,9 +257,12 @@ test('rules: reading is free; changes ask; risky ones every time; some are never
     ['POST', '/api/images/cutout'],
     ['POST', '/api/plots/make'],
     ['GET', '/api/videos/make/j1'],
+    ['POST', '/api/mediaedit/video'],
+    ['POST', '/api/mediaedit/image'],
   ])
     assert.equal(lv(m, p), 'refuse', `${m} ${p}`);
   assert.equal(lv('GET', '/api/images/tiers'), 'free');
+  assert.equal(lv('POST', '/api/write/rewrite'), 'free');
   assert.equal(lv('POST', '/api/images/local/setup'), 'always');
   assert.equal(lv('DELETE', '/api/images/local'), 'always');
   // Listing and revoking tokens is fine; deleting a key in the vault asks.
