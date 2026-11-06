@@ -83,6 +83,22 @@ function cloudModel(t: TiersInfo, tool: 'cutout' | 'erase'): TierModel {
   return see && !see.cutout ? see : t.transparent;
 }
 
+/** "Do it with AI instead (about $0.01)": a cutout or erasing made here, done again by an image model through OpenRouter. */
+export function aiInsteadButton(t: TiersInfo, tool: 'cutout' | 'erase'): string {
+  const m = cloudModel(t, tool);
+  return m.perImage == null ? 'Do it with AI instead' : `Do it with AI instead (about ${money(m.perImage)})`;
+}
+
+/** A model's name as the app shows it: its label where the tiers know it, else its id without its maker. */
+export function modelLabel(t: TiersInfo | null, id: string | undefined): string {
+  if (!id) return 'OpenRouter';
+  const known = t && [t.quick, t.best, t.quick.seeThrough, t.best.seeThrough, t.transparent, t.vector].find((m) => m?.id === id);
+  return known ? known.label : id.includes('/') ? id.slice(id.indexOf('/') + 1) : id;
+}
+
+/** What a picture made through OpenRouter says of itself: "Made with GPT Image 1 Mini, $0.01". */
+export const madeWith = (t: TiersInfo | null, model: string | undefined, cost?: number) => (cost != null ? `Made with ${modelLabel(t, model)}, ${money(cost)}` : `Made with ${modelLabel(t, model)}`);
+
 /** "Use OpenRouter instead: about $0.01", for a tool the picture tools would do here. */
 export function insteadLine(t: TiersInfo, tool: 'cutout' | 'erase'): string {
   const m = cloudModel(t, tool);

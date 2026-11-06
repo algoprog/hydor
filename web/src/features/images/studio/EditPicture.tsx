@@ -3,8 +3,9 @@
 // computer, for nothing, once the picture tools are set up here (the card offers it, with OpenRouter as the other
 // way, priced); the first use of each downloads its model, its progress shown. The result shows beside the picture
 // as it was (drag across to compare); Keep hands it to the editor, Try again goes back. A model's whole picture made
-// for a painted part is put in only where it was painted, its edge softened, then kept. What goes through OpenRouter
-// with no key set asks for it in place (KeyAsk); skipped, it does not run.
+// for a painted part is put in only where it was painted, its edge softened, then kept. A cutout or erasing done here
+// can be done again by AI (Do it with AI instead, priced), and Change with AI takes any result further in words. What
+// goes through OpenRouter with no key set asks for it in place (KeyAsk); skipped, it does not run.
 import { useEffect, useRef, useState } from 'react';
 import type { MadePicture, PictureAnswer, TiersInfo } from '@shared/images';
 import { Button, Dialog, Switch, Tabs } from '../../../components/ui';
@@ -13,7 +14,7 @@ import { asPng, maskData, painted, putInPainted, type Stroke } from './canvas';
 import { Compare } from './Compare';
 import { LocalToolsCard, useLocalTools } from './LocalTools';
 import { KeyAsk } from './KeyAsk';
-import { changePrice, insteadLine, money, needsKey, toolPrice } from './logic';
+import { aiInsteadButton, changePrice, insteadLine, madeWith, needsKey, toolPrice } from './logic';
 import { Painter } from './Painter';
 import { PriceLine, Problem, Shown, Words, Working } from './parts';
 import { keepPicture, shownSrc } from './pictures';
@@ -35,7 +36,12 @@ interface Result {
   how: PictureAnswer['how'];
   model?: string;
   cost?: number;
+  /** Why it was made by AI when this computer was asked first (the server's words), if it says. */
+  why?: string;
 }
+
+/** What the server may say of an answer made by AI when the picture tools were asked first. */
+const whyOf = (r: PictureAnswer & { why?: unknown; note?: unknown }) => (typeof r.why === 'string' && r.why.trim() ? r.why : typeof r.note === 'string' && r.note.trim() ? r.note : undefined);
 
 export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePicture | null) => void }) {
   const [pic, setPic] = useState<MadePicture | null>(null);
@@ -85,7 +91,7 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
         setBusy({ what: 'Putting it in where you painted', how: 'cloud' });
         out = await keepPicture(await putInPainted(shownSrc(pic.src), shownSrc(r.src), own, pic.w, pic.h));
       }
-      if (!sig.aborted) setResult({ pic: out, how: r.how, model: r.model, cost: r.cost });
+      if (!sig.aborted) setResult({ pic: out, how: r.how, model: r.model, cost: r.cost, why: whyOf(r) });
     } catch (e) {
       const m = (e as Error).message;
       if (!stop.current.signal.aborted) !here && needsKey(m) ? setAskKey(mode) : setError({ text: m, local: here });
@@ -101,17 +107,38 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
   const needsPaint = mode === 'erase' || (mode === 'change' && part);
   const paintMissing = needsPaint && !painted(own);
 
+  /** Change with AI, from what was made: the result becomes the picture to change. */
+  const changeMore = () => {
+    if (!result) return;
+    setPic(result.pic);
+    setResult(null);
+    setMode('change');
+    setPart(false);
+    setStrokes((s) => ({ ...s, change: [] }));
+  };
+  const tool = mode === 'cutout' || mode === 'erase' ? mode : null;
+
   let footer;
   if (result)
     footer = (
-      <>
-        <Button variant="ghost" onClick={() => setResult(null)}>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {tool && (
+          <Button variant="ghost" disabled={!!busy || !!askKey} onClick={changeMore}>
+            Change with AI
+          </Button>
+        )}
+        {tool && result.how === 'local' && tiers && (
+          <Button variant="secondary" disabled={!!busy || !!askKey} onClick={() => void run('cloud')}>
+            {aiInsteadButton(tiers, tool)}
+          </Button>
+        )}
+        <Button variant="ghost" disabled={!!busy} onClick={() => setResult(null)}>
           Try again
         </Button>
-        <Button variant="primary" onClick={() => onDone(result.pic)}>
+        <Button variant="primary" disabled={!!busy} onClick={() => onDone(result.pic)}>
           Keep
         </Button>
-      </>
+      </div>
     );
   else
     footer = (
@@ -144,14 +171,30 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
     !error && <Working className="py-10 justify-center">Opening the picture</Working>
   );
 
+  const keyAsk = askKey === mode && (
+    <KeyAsk
+      onSaved={() =>
+        void getTiers().then(
+          (t) => {
+            setTiers(t);
+            if (t.keySet) void run('cloud', true);
+          },
+          (e: Error) => setError({ text: e.message, local: false }),
+        )
+      }
+      onSkip={() => setAskKey(null)}
+    />
+  );
+
   return (
     <Dialog open onClose={() => onDone(null)} title="Change a picture" width={600} footer={footer}>
       {result && pic ? (
         <div className="space-y-2.5">
           <Compare before={shownSrc(pic.src)} after={shownSrc(result.pic.src)} />
-          <p className="text-center text-[12.5px] text-fg-3">
-            {result.how === 'local' ? 'Done on this computer, for nothing' : result.cost != null ? `Done with ${result.model ?? 'OpenRouter'}: ${money(result.cost)}` : `Done with ${result.model ?? 'OpenRouter'}`}
-          </p>
+          <p className="text-center text-[12.5px] text-fg-3">{result.how === 'local' ? 'Done on this computer, for nothing' : madeWith(tiers, result.model, result.cost)}</p>
+          {result.why && <p className="text-center text-[12.5px] leading-snug text-fg-3">{result.why}</p>}
+          {error && <Problem error={error.text} onLeave={() => onDone(null)} />}
+          {keyAsk || (busy && <Working className="justify-center">{busy.what}</Working>)}
         </div>
       ) : (
         <div className="space-y-3">
@@ -188,19 +231,8 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
               )}
             </Problem>
           )}
-          {askKey === mode ? (
-            <KeyAsk
-              onSaved={() =>
-                void getTiers().then(
-                  (t) => {
-                    setTiers(t);
-                    if (t.keySet) void run('cloud', true);
-                  },
-                  (e: Error) => setError({ text: e.message, local: false }),
-                )
-              }
-              onSkip={() => setAskKey(null)}
-            />
+          {keyAsk ? (
+            keyAsk
           ) : busy ? (
             <Working>{busy.how === 'local' && local?.step ? local.step : busy.what}</Working>
           ) : mode === 'change' ? (
