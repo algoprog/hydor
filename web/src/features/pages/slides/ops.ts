@@ -239,6 +239,29 @@ export function chart(d: Deck): ChartEl {
 type Words = (s: string) => string;
 const same: Words = (s) => s;
 
+/** The languages a code part is coloured for, by their names. */
+export const CODE_LANGS: Record<string, string> = {
+  python: 'Python',
+  javascript: 'JavaScript',
+  typescript: 'TypeScript',
+  html: 'HTML',
+  css: 'CSS',
+  json: 'JSON',
+  bash: 'Shell (Bash)',
+  sql: 'SQL',
+  rust: 'Rust',
+  go: 'Go',
+  java: 'Java',
+  c: 'C',
+  cpp: 'C++',
+  csharp: 'C#',
+  php: 'PHP',
+  ruby: 'Ruby',
+  swift: 'Swift',
+  kotlin: 'Kotlin',
+  yaml: 'YAML',
+};
+
 /** Code shown with its colours: a short example to write over. */
 export function codePart(d: Deck): CodeEl {
   return { id: newId(), type: 'code', ...centred(d, 760, 300), code: 'def greet(name):\n    return f"Hello, {name}!"\n\nprint(greet("world"))', lang: 'python', size: 24, look: 'dark', lineNumbers: true, radius: 12 };
@@ -743,7 +766,7 @@ export function partName(e: El): string {
   if (e.type === 'math') return `Equation: ${e.tex.length > 24 ? `${e.tex.slice(0, 23)}…` : e.tex}`;
   if (e.type === 'video') return 'Video';
   if (e.type === 'group') return `Group of ${e.els.length}`;
-  if (e.type === 'code') return e.lang ? `Code: ${e.lang}` : 'Code';
+  if (e.type === 'code') return e.lang ? `Code: ${CODE_LANGS[e.lang] ?? e.lang}` : 'Code';
   if (e.type === 'html') return 'Custom code';
   if (e.type === 'embed') return 'Web page';
   if (e.type === 'quiz') return e.question ? `Quiz: ${e.question.length > 24 ? `${e.question.slice(0, 23)}…` : e.question}` : 'Quiz';
