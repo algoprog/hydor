@@ -31,6 +31,8 @@ import { PartPanel, pictureData, type Ctx, type Media } from './Inspector';
 import { LayersPanel } from './Layers';
 import { PageComments } from './PageComments';
 import { PagePanel } from './PagePanel';
+import { isDesignHtml } from '@shared/design';
+import { DesignEdit } from '../design/DesignEdit';
 
 export type StudioMode = 'view' | 'edit' | 'code';
 
@@ -267,6 +269,8 @@ export function Studio({
   const [confirm, confirmNode] = useConfirm();
   const writing = !!draft && !draft.done;
   const html = pending ?? doc?.html ?? '';
+  // A design (fixed-size artboards: shared/design.ts) is edited as in Canva, by the design editor.
+  const design = useMemo(() => isDesignHtml(html), [html]);
   const dirty = (pending !== null && pending !== doc?.html) || (mode === 'edit' && ed.dirty) || (mode === 'code' && code !== (pending ?? doc?.html ?? ''));
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
@@ -417,6 +421,28 @@ export function Studio({
       <div className="flex h-full items-center justify-center text-fg-3">
         <Throbber size={28} />
       </div>
+    );
+  } else if (mode === 'edit' && design) {
+    body = (
+      <DesignEdit
+        key={epoch}
+        editRef={editRef}
+        html={html}
+        base={doc.base}
+        title={doc.title}
+        store={doc.store}
+        onState={setEd}
+        onSave={() => void saveRef.current()}
+        onAsk={
+          onAsk
+            ? (text) =>
+                void (async () => {
+                  if (dirtyRef.current && !(await saveRef.current())) return;
+                  onAsk(text);
+                })()
+            : undefined
+        }
+      />
     );
   } else if (mode === 'edit') {
     const crumbs = tab === 'part' && sel && (
@@ -629,10 +655,10 @@ export function Studio({
             />
           )
         )}
-        {layout === 'page' && roomy && (
+        {layout === 'page' && roomy && !design && (
           <Segmented size="sm" value={device} onChange={setDevice} options={DEVICES.map((d) => ({ value: d.value, label: <span title={d.label}>{d.icon}</span> }))} />
         )}
-        {(layout === 'panel' || (layout === 'page' && !roomy)) && (
+        {(layout === 'panel' || (layout === 'page' && !roomy)) && !design && (
           <>
             <IconButton ref={deviceRef} label={`As on a ${DEVICES.find((d) => d.value === device)!.label.toLowerCase()}`} size="sm" active={deviceMenu} onClick={() => setDeviceMenu((o) => !o)}>
               {DEVICES.find((d) => d.value === device)!.icon}
@@ -649,7 +675,7 @@ export function Studio({
         {tail}
       </div>
       {band}
-      {mode === 'edit' && doc && !writing && (
+      {mode === 'edit' && doc && !writing && !design && (
         <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line bg-panel px-2">
           <Button ref={addRef} size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setAdding((a) => !a)}>
             Add
