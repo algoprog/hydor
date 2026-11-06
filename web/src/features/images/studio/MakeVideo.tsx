@@ -10,7 +10,7 @@ import type { TiersInfo, VideoJob } from '@shared/images';
 import type { VideosState } from '@shared/media';
 import { Button, Dialog, Switch } from '../../../components/ui';
 import { getTiers, startVideo, videoJob, videoSettings } from './api';
-import { elapsed, money, nearestAspect, needsKey, SHAPES, videoPrice } from './logic';
+import { elapsed, errorWords, money, nearestAspect, needsKey, SHAPES, videoPrice } from './logic';
 import { KeyAsk } from './KeyAsk';
 import { Choice, PriceLine, Problem, ShapeMark, Words, Working } from './parts';
 import { shownSrc } from './pictures';
@@ -48,7 +48,7 @@ export function MakeVideo({ o, onDone, onLetGo }: { o: VideoOpts; onDone: (v: Ma
   useTick(running || (!!before && !finished(before.job)));
 
   useEffect(() => {
-    getTiers().then(setTiers, (e: Error) => setError(e.message));
+    getTiers().then(setTiers, (e: Error) => setError(errorWords(e)));
     videoSettings().then(setVs, () => {});
   }, []);
 
@@ -64,7 +64,7 @@ export function MakeVideo({ o, onDone, onLetGo }: { o: VideoOpts; onDone: (v: Ma
   useEffect(() => {
     if (!job || finished(job)) return;
     const t = window.setTimeout(() => {
-      videoJob(job.job).then(setJob, (e: Error) => setError(e.message));
+      videoJob(job.job).then(setJob, (e: Error) => setError(errorWords(e)));
     }, POLL_OPEN);
     return () => window.clearTimeout(t);
   }, [job]);
@@ -81,7 +81,7 @@ export function MakeVideo({ o, onDone, onLetGo }: { o: VideoOpts; onDone: (v: Ma
       setAsked(prompt.trim());
       setJob(j);
     } catch (e) {
-      const m = (e as Error).message;
+      const m = errorWords(e);
       if (needsKey(m)) setAskKey(true);
       else setError(m);
     } finally {
@@ -200,7 +200,7 @@ export function MakeVideo({ o, onDone, onLetGo }: { o: VideoOpts; onDone: (v: Ma
                     setTiers(t);
                     if (t.keySet) void make(true);
                   },
-                  (e: Error) => setError(e.message),
+                  (e: Error) => setError(errorWords(e)),
                 )
               }
               onSkip={() => onDone(null)}
