@@ -22,7 +22,9 @@ import type { EditorHandle } from '../../../lib/codemirror';
 import { DeviceStage, EditFrame, PageFrame, StreamFrame, withBase, type AppBridge, type Device, type EdAsk, type EdLayer, type EdPage, type EdSel, type EditHandle, type EdState, type Pick, type Store } from '../frame';
 import { ShortcutsDialog } from '../common/Shortcuts';
 import { usePagesStore } from '../state';
-import { AddPanel } from './AddPanel';
+import { openTypes } from '../types';
+import type { MadeRequest } from '../types/requests';
+import { AddPanel, blockPlace } from './AddPanel';
 import { editorLabels } from './blocks';
 import { InsertPopover, PAGE_SHORTCUTS } from './Inserts';
 import { PartPanel, pictureData, type Ctx, type Media } from './Inspector';
@@ -152,6 +154,7 @@ export function Studio({
   onDirty,
   initialMode,
   onAsk,
+  onRequest,
   saveNowRef,
   pageId,
 }: {
@@ -177,6 +180,8 @@ export function Studio({
   initialMode?: StudioMode;
   /** Puts a note on the part picked in the message box: the editor's "Ask the agent". */
   onAsk?: (text: string) => void;
+  /** A request about the page made in the gallery (a block made with AI): Add offers it when this is given. */
+  onRequest?: (r: MadeRequest) => void;
   /** Saves now, if there are changes (before an agent is asked about the page): false when it did not. */
   saveNowRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
   /** A page of the Library: comments on its blocks (kept by the app, outside the page) show in Edit's Comments tab. */
@@ -669,7 +674,7 @@ export function Studio({
           <IconButton label="Keyboard shortcuts (Ctrl+Shift+/)" size="sm" onClick={() => setKeysOpen(true)} className="ml-auto">
             <Keyboard size={15} />
           </IconButton>
-          <AddPanel anchor={addRef} open={adding} onClose={() => setAdding(false)} sel={sel} cmd={cmd} app={doc.app?.info} />
+          <AddPanel anchor={addRef} open={adding} onClose={() => setAdding(false)} sel={sel} cmd={cmd} app={doc.app?.info} onAi={onRequest && !readOnly ? (where) => openTypes({ kind: 'block', at: blockPlace(where, sel), onDone: onRequest }) : undefined} />
           <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={PAGE_SHORTCUTS} />
         </div>
       )}

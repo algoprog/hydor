@@ -101,13 +101,13 @@ function literals(js, shown = []) {
         i = e < 0 ? n : e + 2;
       } else if (c === '"' || c === "'") {
         const s = quoted();
-        if (!quiet && !(prev === ':' && QUIET.has(key))) {
+        if (!quiet && !(prev === ':' && quietHere.has(key))) {
           out.push(s);
           if (inside && !depth && !nest && ['', '?', ':', '|', '&'].includes(prev) && !/^\s*([=!]=|[.([])/.test(js.slice(i, i + 4))) values.push(s);
         }
         prev = 'str';
       } else if (c === '`') {
-        const mute = prev === ':' && QUIET.has(key);
+        const mute = prev === ':' && quietHere.has(key);
         quiet += mute;
         const s = template();
         quiet -= mute;
@@ -137,7 +137,7 @@ function literals(js, shown = []) {
           i++;
           return;
         } else if (c === '(' || c === '[') {
-          if (prev === ':' && QUIET.has(key)) muted.push(nest), quiet++;
+          if (prev === ':' && quietHere.has(key)) muted.push(nest), quiet++;
           nest++;
         } else if (c === ')' || c === ']') {
           nest--;
@@ -157,6 +157,10 @@ function literals(js, shown = []) {
  * extra English words an editor's menu action is found by in Search the menus (`also`), which never show.
  */
 const QUIET = new Set(['prompt', 'command', 'also']);
+/** Keys quiet in one file only: the requests the kinds an agent makes ask for (`ask`), which elsewhere is a question shown. */
+const QUIET_IN = { 'shared/content-types.ts': ['ask'] };
+/** The quiet keys of the file being read. */
+let quietHere = QUIET;
 
 /** Utilities that are bare words. */
 const UTILITIES = /^(flex|grid|block|inline|inline-flex|inline-block|hidden|contents|relative|absolute|fixed|sticky|static|truncate|italic|underline|uppercase|lowercase|capitalize|grow|shrink|border|rounded|shadow|ring|outline|transition|transform|group|peer|container|prose|tnum|ico|isolate|invisible|visible|antialiased|select-none|resize|break-words)$/;
@@ -291,13 +295,14 @@ const add = (s, where, jsx = false) => {
 };
 
 // Files with no words the pages show: the code highlighter's keyword lists (its languages' names are the same in every
-// language), which read as words.
-const NO_WORDS = new Set(['shared/code-colours.ts']);
+// language), which read as words, and the requests the kinds an agent makes send it.
+const NO_WORDS = new Set(['shared/code-colours.ts', 'shared/content-asks.ts']);
 for (const f of [...files(path.join(ROOT, 'web/src'), /\.(tsx|ts)$/), ...files(path.join(ROOT, 'shared'), /\.ts$/)]) {
   if (f.includes(`${path.sep}i18n${path.sep}`) || NO_WORDS.has(path.relative(ROOT, f).split(path.sep).join('/'))) continue;
   const src = fs.readFileSync(f, 'utf8');
   const js = transformSync(src, { loader: f.endsWith('x') ? 'tsx' : 'ts', jsx: 'automatic', minifyWhitespace: false, legalComments: 'none' }).code;
   const where = path.relative(ROOT, f);
+  quietHere = new Set([...QUIET, ...(QUIET_IN[where.split(path.sep).join('/')] ?? [])]);
   const shown = [];
   for (const s of literals(js, shown)) add(s, where);
   for (const s of shown) add(s, where, true);
@@ -309,6 +314,7 @@ for (const f of [...files(path.join(ROOT, 'web/src'), /\.(tsx|ts)$/), ...files(p
   }
   // An element's only text ("utilization", "now"), and words pushed onto a list the page joins: words even when single.
   for (const m of js.matchAll(/children: ((["'])(?:(?!\2)[^\\]|\\.)*\2)(?=\s*[,}])|\.push\(((["'])(?:(?!\4)[^\\]|\\.)*\4)\)/g)) add(literals(m[1] ?? m[3])[0], where, true);
+  quietHere = QUIET;
 }
 // The server's messages that show in the pages: errors (in toasts), except those its tools give agents, and the
 // names and lines of what ships.
