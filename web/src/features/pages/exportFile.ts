@@ -85,4 +85,8 @@ export async function exportFile(id: string, format: ExportFormat, o: { version?
     throw new ApiError(j?.error ?? `${res.status} ${res.statusText}`, res.status);
   }
   saveBlob(await res.blob(), nameOf(res, `page.${format}`));
+  // A web-format deck made PowerPoint's says what changed on the way (its parts as pictures, its effects as PowerPoint's).
+  const note = res.headers.get('X-Export-Note') ?? '';
+  const changed = /Made for PowerPoint: [^]*/.exec(note)?.[0];
+  if (changed) toast(changed);
 }
