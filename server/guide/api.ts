@@ -66,6 +66,8 @@ const RULES: Rule[] = [
   ['POST', /^\/api\/plugins\/inspect$/, 'free'],
   // Words rewritten, a picture described, a slide's design ideas: answers, nothing changed.
   ['POST', /^\/api\/write\/(rewrite|describe|design-ideas)$/, 'free'],
+  // A LaTeX reference looked up, a LaTeX document typeset, a document's pages printed: answers, nothing kept changed.
+  ['POST', /^\/api\/pages\/(tex\/(reference|compile)|docs\/print)$/, 'free'],
   // Ask every time: risky, costly or hard to undo.
   ['DELETE', /./, 'always'],
   ['W', /\/(remove|delete|discard|clear|reset|rotate|branch-delete|stop|interrupt|cancel)(\/|$)/, 'always'],

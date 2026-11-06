@@ -77,7 +77,7 @@ function savePlans(o: OpenEditor, detached: boolean): { main: { label: string; t
   }
   if ('media' in to)
     return {
-      main: { label: 'Save', to: { media: to.media, as: 'replace' }, says: 'Save puts it in the Library in place of the video it was.' },
+      main: { label: 'Save', to: { media: to.media, as: 'replace' }, says: 'Save puts it in the Library in place of the video it was.', fixed: o.fileKind ?? 'MP4' },
       copy: o.copy === false ? null : { label: 'Save a copy', to: { media: to.media, as: 'copy' }, says: 'Save a copy keeps it in your Library as a new video.' },
       beside: { media: to.media, as: 'copy' },
     };

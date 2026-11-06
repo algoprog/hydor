@@ -36,6 +36,8 @@ export interface OpenEditor {
   copy?: boolean;
   /** The session it is from (a video of the conversation): a copy kept in the Library is noted as from it. */
   session?: string;
+  /** A Library video's kind of file (MP4, WebM, MOV): saved over it, it stays so. */
+  fileKind?: string;
 }
 
 export interface EditorHandle {
