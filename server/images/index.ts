@@ -38,7 +38,7 @@ import { probe } from '../media/frames.ts';
 import { loadConfig } from '../models/config.ts';
 import { OPENROUTER_URL } from '../models/openrouter.ts';
 import { appWords } from '../language/index.ts';
-import { putAsset } from '../pages/assets.ts';
+import { getAsset, putAsset } from '../pages/assets.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import {
   audioCost,
@@ -194,7 +194,12 @@ function imageTool(db: DB): RunTool {
       type: 'object',
       properties: {
         prompt: { type: 'string', description: 'What to make, or what to change in the given images.' },
-        images: { type: 'array', items: { type: 'string' }, maxItems: 8, description: 'Paths of pictures to edit or take after (PNG, JPEG, WebP, GIF), up to 4 for most models.' },
+        images: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: 8,
+          description: 'Pictures to edit or take after (PNG, JPEG, WebP, GIF), up to 4 for most models: paths of files, or a deck’s, document’s or page’s own pictures as get_page shows them (naget-asset:…); put the new file in its place with the save tool.',
+        },
         aspect_ratio: { type: 'string', description: 'The shape, if the user said: 1:1 square, 16:9 wide, 9:16 tall, 4:3, 3:4, 3:2, 2:3, 21:9 (what the model takes).' },
         resolution: { type: 'string', description: 'If the user said: 1K, 2K or 4K (sharper, slower and dearer), where the model offers a choice.' },
         quality: { type: 'string', enum: ['auto', 'low', 'medium', 'high'], description: 'If the user said, for models with a quality setting.' },
@@ -212,7 +217,7 @@ function imageTool(db: DB): RunTool {
       if (!prompt) throw new Error('Say what to make in prompt.');
       const asked = str(a.model);
       if (asked && !MODEL_ID.test(asked)) throw new Error('model: an OpenRouter id, like black-forest-labs/flux.2-pro.');
-      const refs = await readReferences((Array.isArray(a.images) ? a.images : []).map((p: unknown) => inSession(ctx.cwd, String(p))).slice(0, 8));
+      const refs = await picturesFrom(db, ctx.cwd, Array.isArray(a.images) ? a.images : []);
       const detail = a.detail === 'simple' ? 'quick' : a.detail === 'complex' ? 'best' : 'auto';
       const tier = tierFor(detail, { prompt, refs: refs.length, edit: refs.length > 0 });
       const clear = bool(a.transparent) === true;
@@ -427,7 +432,27 @@ async function readVideo(file: string): Promise<{ mime: string; data: Buffer }> 
   return { mime, data: await fs.promises.readFile(file) };
 }
 
-const oneImage = async (cwd: string, p: unknown): Promise<Reference | undefined> => (str(p) ? (await readReferences([inSession(cwd, str(p)!)]))[0] : undefined);
+/**
+ * Pictures to work from: files of the session's folder, or pictures a deck, document or page keeps ("naget-asset:<sha>",
+ * as get_page shows them), in the order given; at most four.
+ */
+async function picturesFrom(db: DB, cwd: string, list: unknown[]): Promise<Reference[]> {
+  const out: Reference[] = [];
+  for (const raw of list.slice(0, 8)) {
+    const it = String(raw ?? '').trim();
+    if (!it) continue;
+    if (it.startsWith(ASSET)) {
+      const a = getAsset(db, it.slice(ASSET.length));
+      if (!a) throw new Error(`${it} is not a picture this app keeps (get_page shows the pictures of a deck, document or page).`);
+      if (a.mime === 'image/svg+xml') throw new Error(`${it} is a drawing (SVG); models work from PNG, JPEG, WebP or GIF pictures.`);
+      out.push({ name: `${it.slice(ASSET.length, ASSET.length + 12)}.${a.mime.split('/')[1]}`, mime: a.mime, data: a.data });
+    } else out.push(...(await readReferences([inSession(cwd, it)])));
+  }
+  if (out.length > 4) throw new Error('Give at most 4 images to work from.');
+  return out;
+}
+
+const oneImage = async (db: DB, cwd: string, p: unknown): Promise<Reference | undefined> => (str(p) ? (await picturesFrom(db, cwd, [str(p)]))[0] : undefined);
 
 /** The answer for videos that were made: their paths, sizes and lengths, as the conversation's card reads them. */
 async function madeText(model: string, files: SavedVideo[], cost: number | undefined, how: string): Promise<string> {
@@ -486,9 +511,9 @@ function videoTool(db: DB): RunTool {
         aspect_ratio: { type: 'string', description: 'Its shape, if the user said: 16:9 wide, 9:16 tall, 1:1 square…' },
         resolution: { type: 'string', description: 'If the user said: 480p, 720p, 1080p, 4K (what the model makes).' },
         audio: { type: 'boolean', description: 'Sound with it (voices, music, noises), if the user said; models that make sound.' },
-        first_frame: { type: 'string', description: 'The path of a picture for the video to start on.' },
-        last_frame: { type: 'string', description: 'The path of a picture for it to end on (models that take one).' },
-        references: { type: 'array', items: { type: 'string' }, maxItems: 4, description: 'Paths of pictures for it to follow (a character, a product, a style), not as frames.' },
+        first_frame: { type: 'string', description: 'A picture for the video to start on: a file’s path, or a deck’s or document’s picture (naget-asset:…).' },
+        last_frame: { type: 'string', description: 'A picture for it to end on (models that take one), as first_frame.' },
+        references: { type: 'array', items: { type: 'string' }, maxItems: 4, description: 'Pictures for it to follow (a character, a product, a style), not as frames: paths, or naget-asset:… pictures.' },
         video: { type: 'string', description: 'The path of a video to change (MP4, WebM or MOV, up to 40 MB), for models that edit, extend or sharpen videos.' },
         model: { type: 'string', description: 'OpenRouter’s id of another video model, only when the user asks for it ("google/veo-3.1").' },
         name: { type: 'string', description: 'A short file name, without extension (default: from the prompt).' },
@@ -524,9 +549,9 @@ function videoTool(db: DB): RunTool {
       const s = settings(db, 'videos');
       const { id, info } = await usingVideo(s, asked);
       if (asked && !info && (await vmodels().catch(() => [])).length) throw new Error(`OpenRouter has no video model ${asked}. The user can see the ones there are in Settings → Images, video and audio.`);
-      const first = await oneImage(ctx.cwd, a.first_frame);
-      const last = await oneImage(ctx.cwd, a.last_frame);
-      const refs = await readReferences((Array.isArray(a.references) ? a.references : []).map((p: unknown) => inSession(ctx.cwd, String(p))).slice(0, 4));
+      const first = await oneImage(db, ctx.cwd, a.first_frame);
+      const last = await oneImage(db, ctx.cwd, a.last_frame);
+      const refs = await picturesFrom(db, ctx.cwd, (Array.isArray(a.references) ? a.references : []).slice(0, 4));
       const video = str(a.video) ? await readVideo(inSession(ctx.cwd, str(a.video)!)) : undefined;
       if (!prompt && !first && !video) throw new Error('Say what the video shows in prompt.');
       if (info) {
