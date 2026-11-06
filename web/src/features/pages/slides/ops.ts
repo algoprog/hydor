@@ -37,6 +37,7 @@ import {
   type ShapeEl,
   type ShapeKind,
   sidePoint,
+  slideTitle,
   type Slide,
   type Stick,
   type TableEl,
@@ -777,6 +778,21 @@ export function partName(e: El): string {
   if (e.route === 'elbow') return 'Elbow connector';
   if (e.from || e.to) return 'Connector';
   return e.end === 'arrow' || e.start === 'arrow' ? 'Arrow' : 'Straight line';
+}
+
+/** The words that start a request to an agent about a slide: its number, title and id ("On slide 3 (“Pricing”, id k2…): "), for it to change exactly that one. */
+export function slideLead(index: number, slide: Slide): string {
+  const title = slideTitle(slide);
+  return `On slide ${index + 1} (${title ? `“${title.length > 40 ? `${title.slice(0, 39)}…` : title}”, ` : ''}id ${slide.id}): `;
+}
+
+/** …and about parts of it: each by its name, its kind and id, and a picture or a video by its source (for the picture and video tools). */
+export function partsLead(index: number, slide: Slide, parts: El[]): string {
+  const one = (e: El) => {
+    const src = (e.type === 'image' || e.type === 'video') && /^naget-(asset|video):/.test(e.src) ? `, ${e.src}` : '';
+    return `the ${partName(e).replace(/^(\w)/, (c) => c.toLowerCase())} (${e.type} part ${e.id}${src})`;
+  };
+  return `On slide ${index + 1} (id ${slide.id}), ${parts.map(one).join(' and ')}: `;
 }
 
 // ---- undo ----------------------------------------------------------------------------------------------

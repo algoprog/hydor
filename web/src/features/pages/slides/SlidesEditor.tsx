@@ -114,6 +114,8 @@ import {
   withLook,
   W,
   heightOf,
+  partsLead,
+  slideLead,
   type History,
   type Look,
 } from './ops';
@@ -165,21 +167,6 @@ function scopesFor(index: number, slide: Slide, parts: El[]): AskScope[] {
   ];
   if (parts.length) out.push({ id: 'part', label: `${tr('What’s picked')}: ${parts.map(partName).join(', ')}`, lead: partsLead(index, slide, parts) });
   return out;
-}
-
-/** The words that start a request about a slide: its number, title and id ("On slide 3 (“Pricing”, id k2…): "), for the agent to change exactly that one. */
-function slideLead(index: number, slide: Slide): string {
-  const title = slideTitle(slide);
-  return `On slide ${index + 1} (${title ? `“${title.length > 40 ? `${title.slice(0, 39)}…` : title}”, ` : ''}id ${slide.id}): `;
-}
-
-/** …and about parts of it: each by its name, its kind and id, and a picture or video by its source (for the picture and video tools). */
-function partsLead(index: number, slide: Slide, parts: El[]): string {
-  const one = (e: El) => {
-    const src = (e.type === 'image' || e.type === 'video') && /^naget-(asset|video):/.test(e.src) ? `, ${e.src}` : '';
-    return `the ${partName(e).replace(/^(\w)/, (c) => c.toLowerCase())} (${e.type} part ${e.id}${src})`;
-  };
-  return `On slide ${index + 1} (id ${slide.id}), ${parts.map(one).join(' and ')}: `;
 }
 
 /** A deck's colours as the AI tools take them (#hex): its accent, then its charts' colours. */
