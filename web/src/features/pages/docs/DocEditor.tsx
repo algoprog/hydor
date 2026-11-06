@@ -59,6 +59,11 @@ import { slashAt, slashItems, slashLayout, slashMatches, SlashMenu } from './Sla
 import { ColumnHandles, printDoc } from './TableTools';
 import { Toolbar } from './Toolbar';
 import { EndNotes, NoteBox, noteRoom, PageNotes } from './Notes';
+import { CiteBox, CiteDialog, withSource } from './Citations';
+import { putAfter } from './ai/WriteBox';
+import { BIB_TITLES } from '@shared/doc-cite';
+import { citeItems, citeOf, normalizeBlocks, type CiteStyle, type Source } from '@shared/docs';
+import type { Pos as DocPos } from './ops';
 import { useDocAi } from './ai/useDocAi';
 
 // Insert → Signature: the saved signatures and the pad, loaded when first opened.
@@ -229,6 +234,9 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const [chars, setChars] = useState<{ kind: 'insert' } | { kind: 'icon'; id: string } | null>(null);
   // A footnote's words being changed in their box (`undo`: a new one's mark goes again when it is left empty).
   const [note, setNote] = useState<{ id: string; undo?: Doc } | null>(null);
+  // A citation's box (clicked), and the dialog that finds a source to cite (`add`: for the citation clicked).
+  const [cite, setCite] = useState<{ at: DocPos; t: string } | null>(null);
+  const [citeFind, setCiteFind] = useState<{ add?: { at: DocPos; t: string } } | null>(null);
   /** Words being typed beside the page (a comment, a reply, an edit of one). */
   const [noting, setNoting] = useState(false);
   // The picture editors opened from this document: once it closes, what they save goes to the Library instead.
@@ -237,7 +245,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   // An agent's version being written shows in place of this one (read-only, its words arriving where its mark is),
   // unless there are changes here not saved: those are left as they are. A comment, an equation, a link or another
   // change still being made here holds it back until it is done.
-  const making = noting || !!note || !!draft || !!eq || !!chars || !!linking || menu === 'page' || menu === 'url' || dialog === 'bands' || dialog === 'spacing';
+  const making = noting || !!note || !!cite || !!citeFind || !!draft || !!eq || !!chars || !!linking || menu === 'page' || menu === 'url' || dialog === 'bands' || dialog === 'spacing';
   const liveDoc = live && !making && !(!!model && !!saved && model !== saved) ? live.model : null;
   const liveOn = !!liveDoc;
   /** What the page shows: the document, or the agent's version being written. */
@@ -701,6 +709,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     } else if (a.kind === 'mark') {
       spotAt(a.rect);
       if (a.k === 'fn') setNote({ id: a.t });
+      else if (a.k === 'cite') setCite({ at: a.at, t: a.t });
     } else if (a.kind === 'icon') {
       spotAt(en.elementOf(a.id)?.getBoundingClientRect());
       setChars({ kind: 'icon', id: a.id });
@@ -718,6 +727,35 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     spotAt(en.caretRect());
     setNote({ id, undo });
   }
+  /** A source cited at the caret (a new one goes into the document's sources), or added to the citation clicked. */
+  const citeSource = (s: Source | string) => {
+    const en = engine.current;
+    if (!en) return;
+    let d = en.doc;
+    let key = typeof s === 'string' ? s : '';
+    if (typeof s !== 'string') ({ doc: d, key } = withSource(en.doc, s));
+    const add = citeFind?.add;
+    setCiteFind(null);
+    if (add) {
+      const items = citeItems(add.t);
+      if (!items.some((x) => x.key === key)) items.push({ key });
+      en.setAtom(add.at, citeOf(items), d);
+    } else en.insertRun({ t: key, cite: true }, () => d);
+    en.refocusSoon();
+  };
+  /** Format → Citation style: every citation and the bibliography in it. */
+  const citeStyle = (c: CiteStyle) => {
+    const en = engine.current;
+    if (!en) return;
+    const { cite: _c, ...rest } = en.doc;
+    en.change(c === 'apa' ? rest : { ...rest, cite: c });
+  };
+  /** Insert → Bibliography: its heading and its list (drawn from the sources cited), after the caret's paragraph. */
+  const addBibliography = () => {
+    const en = engine.current;
+    if (!en || readOnlyRef.current) return;
+    putAfter(en, normalizeBlocks([{ h1: tr(BIB_TITLES[en.doc.cite ?? 'apa']) }, { type: 'bib' }], {}, new Set(en.doc.blocks.map((b) => b.id))));
+  };
   /** A footnote's words kept (none: a new one goes again), or the footnote taken out. */
   const noteDone = (runs: Run[]) => {
     const en = engine.current;
@@ -1028,6 +1066,9 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           aiSection: onRequest && !readOnly ? () => openTypes({ kind: 'section', at: sectionPlace(model, st.index), onDone: onRequest }) : undefined,
           signature: () => setDialog('signature'),
           footnote: () => addFootnote(),
+          citation: () => setCiteFind({}),
+          bibliography: addBibliography,
+          citeStyle,
           link: () => setLinking({ url: st.link ?? '', text: '' }),
           equation: openEquation,
           chars: () => {
@@ -1531,6 +1572,19 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           />
         )}
       </Popover>
+      <Popover anchor={spotRef} open={!!cite} onClose={() => (setCite(null), e?.refocusSoon())} width={360} title="Citation">
+        {cite && (
+          <CiteBox
+            key={`${cite.at.b}:${cite.at.o}`}
+            t={cite.t}
+            doc={model}
+            onChange={(t) => (e?.setAtom(cite.at, t), setCite(null), e?.refocusSoon())}
+            onAdd={() => (setCiteFind({ add: cite }), setCite(null))}
+            onRemove={() => (e?.setAtom(cite.at, null), setCite(null), e?.refocusSoon())}
+          />
+        )}
+      </Popover>
+      <CiteDialog open={!!citeFind} doc={model} onClose={() => (setCiteFind(null), e?.refocusSoon())} onCite={citeSource} onStyle={citeStyle} />
       <Popover anchor={spotRef} open={!!chars} onClose={() => (setChars(null), e?.refocusSoon())} width={340} title={chars?.kind === 'icon' ? 'The callout’s emoji' : 'Special characters'}>
         {chars && (
           <CharPicker

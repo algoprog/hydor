@@ -32,6 +32,8 @@ import {
   ListOrdered,
   ListTree,
   Lightbulb,
+  BookMarked,
+  Quote,
   Footprints,
   Languages,
   MessageCircleQuestion,
@@ -65,7 +67,8 @@ import {
   WholeWord,
   ZoomIn,
 } from 'lucide-react';
-import { CALLOUT_TINTS, LINE_SPACINGS, PARA_STYLES, STYLES, type Doc } from '@shared/docs';
+import { CALLOUT_TINTS, CITE_STYLES, LINE_SPACINGS, PARA_STYLES, STYLES, type CiteStyle, type Doc } from '@shared/docs';
+import { CITE_STYLE_NAMES } from '@shared/doc-cite';
 import type { MenuDef, MenuEntry } from '../common/menus';
 import type { DocEngine, SelState } from './engine';
 
@@ -125,6 +128,10 @@ export interface DocMenuCtx {
   signature: () => void;
   /** Insert → Footnote: a mark at the caret, its words in a box. */
   footnote?: () => void;
+  /** Insert → Citation (the dialog that finds a source), Insert → Bibliography, and Format → Citation style. */
+  citation?: () => void;
+  bibliography?: () => void;
+  citeStyle?: (c: CiteStyle) => void;
   link: () => void;
   equation: (inline: boolean) => void;
   chars: () => void;
@@ -236,6 +243,8 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     { label: 'Link', icon: <Link2 size={15} />, keys: 'Ctrl+K', run: c.link },
     { label: 'Comment', icon: <MessageSquarePlus size={15} />, keys: 'Ctrl+Alt+M', disabled: !st.text.trim(), run: c.comment },
     !!c.footnote && { label: 'Footnote', icon: <Footprints size={15} />, keys: 'Ctrl+Alt+F', also: 'footnote note reference endnote', disabled: c.readOnly || !!st.picked, run: c.footnote },
+    !!c.citation && { label: 'Citation', icon: <Quote size={15} />, also: 'cite citation reference source doi arxiv paper book apa mla chicago ieee', disabled: c.readOnly || !!st.picked, run: c.citation },
+    !!c.bibliography && { label: 'Bibliography', icon: <BookMarked size={15} />, also: 'references works cited sources list', disabled: c.readOnly, run: c.bibliography },
     '-',
     {
       label: 'Equation',
@@ -360,6 +369,12 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
         '-' as const,
         ...CALLOUT_TINTS.map((v) => ({ label: TINTS[v] ?? v, checked: (inCallout.tint ?? CALLOUT_TINTS[0]) === v, also: 'callout colour tint', run: () => e.callout(inCallout.id, { tint: v }) })),
       ],
+    },
+    !!c.citeStyle && {
+      label: 'Citation style',
+      icon: <Quote size={15} />,
+      also: 'apa mla chicago ieee references bibliography',
+      items: CITE_STYLES.map((k) => ({ label: CITE_STYLE_NAMES[k], checked: (c.doc.cite ?? 'apa') === k, disabled: c.readOnly, run: () => c.citeStyle!(k) })),
     },
     '-',
     { label: 'Format painter', icon: <PaintRoller size={15} />, checked: !!e.paint, also: 'copy formatting', run: c.painter },
