@@ -1,7 +1,30 @@
 // The requests made from the kinds an agent makes (content-types.ts), as they go to the agent: a kind's ask, the
-// person's words and where it goes (composeAsk), and what "Turn it into" in the Library asks (turnAsk). Words for the
-// agent, in English, never shown as the app's own (the i18n extractor leaves this file out).
-import { NEW_START, type ContentKind, type ContentType, type PageKindName } from './content-types.ts';
+// person's words and where it goes (composeAsk), and what "Turn it into" in the Library asks (turnAsk), with the kinds
+// each can be turned into. Words for the agent, in English, never shown as the app's own (the i18n extractor leaves
+// this file out; New's own "Or describe it" says the same starts in the app's language). It takes only types from the
+// list of kinds, so the pages that use it do not load the list.
+import type { ContentKind, ContentType } from './content-types.ts';
+
+/** How a request for something new starts, as New in the Library's "Or describe it" does (its ASK_FOR, in English). */
+export const NEW_START: Record<'deck' | 'doc' | 'page' | 'sheet', string> = {
+  page: 'Make me a page and keep it in my Library: ',
+  deck: 'Make me slides and keep them in my Library: ',
+  doc: 'Write me a document and keep it in my Library: ',
+  sheet: 'Make me a spreadsheet and keep it in my Library: ',
+};
+
+/** The kinds of page the Library holds, as "Turn it into" names them. */
+export type PageKindName = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
+
+/** What each kind can be turned into, from the Library: the others of slides, a document and a page. */
+export const TURN_INTO: Record<PageKindName, ('slides' | 'doc' | 'page')[]> = {
+  page: ['slides', 'doc'],
+  slides: ['doc', 'page'],
+  doc: ['slides', 'page'],
+  sheet: ['slides', 'doc', 'page'],
+  tex: ['slides', 'doc', 'page'],
+  notebook: ['slides', 'doc', 'page'],
+};
 
 /** Where it goes and what it is made for: as much of it as the editor or the New dialog knows. */
 export interface ComposeContext {
