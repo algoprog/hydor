@@ -172,10 +172,17 @@ export function SliderRow({
 }
 
 /** A part of a panel under a title that folds it away; folded or not is remembered by `id`. */
-export function Section({ id, title, children, actions, defaultOpen = true, className }: { id: string; title: ReactNode; children: ReactNode; actions?: ReactNode; defaultOpen?: boolean; className?: string }) {
+export function Section({ id, title, children, actions, defaultOpen = true, className, openSignal }: { id: string; title: ReactNode; children: ReactNode; actions?: ReactNode; defaultOpen?: boolean; className?: string; openSignal?: number }) {
   const [open, setOpen] = usePersisted(`section.${id}`, defaultOpen);
+  const box = useRef<HTMLElement>(null);
+  // Asked to show (a menu item that opens it): unfolded and brought into view.
+  useEffect(() => {
+    if (!openSignal) return;
+    setOpen(true);
+    requestAnimationFrame(() => box.current?.scrollIntoView({ block: 'start' }));
+  }, [openSignal]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <section className={cx('border-b border-line last:border-b-0', className)}>
+    <section ref={box} className={cx('border-b border-line last:border-b-0', className)}>
       <div className="flex h-8 items-center gap-1 pr-1.5">
         <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex h-8 min-w-0 flex-1 items-center gap-1 pl-2 text-left text-[12px] font-semibold text-fg-2 hover:text-fg">
           {open ? <ChevronDown size={13} className="shrink-0 text-fg-3" /> : <ChevronRight size={13} className="shrink-0 text-fg-3" />}
