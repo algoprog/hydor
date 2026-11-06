@@ -1208,6 +1208,7 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       l.textContent = LETTERS[i];
       const tx = el('span', 'ns-qt');
       tx.textContent = typeof c.text === 'string' && c.text ? c.text : o.edit ? hintOf('Empty choice') : '';
+      if (!c.text) tx.style.opacity = '.45';
       b.append(l, tx);
       if (o.edit && c.correct) b.classList.add('ns-key');
       list.appendChild(b);
@@ -3140,14 +3141,14 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       for (const f of fx.filter((x) => x.group === g)) startFx(f, f.begin + n(f.a.delay, 0));
       if (!running.length && !pending.length) scheduleAuto();
     };
-    /** A click on a part that runs effects of its own (a tap): they run, together, each time. Whether there were any. */
-    const tap = (target: Element | null): boolean => {
+    /** A click on a part that runs effects of its own (a tap): they run, together, each time (unless `only` asks). Whether there were any. */
+    const tap = (target: Element | null, only = false): boolean => {
       const s = list[pos]?.s;
       if (!s || !layer || !target) return false;
       const ids = new Set<string>();
       for (let x = target.closest<HTMLElement>('.ns-el'); x && layer.contains(x); x = x.parentElement?.closest<HTMLElement>('.ns-el') ?? null) ids.add(x.dataset.id ?? '');
       const taps = (s.anims ?? []).filter((a) => a.on === 'tap' && !!a.trigger && ids.has(a.trigger));
-      for (const a of taps) startFx({ a, group: -1, begin: 0, end: 0 }, n(a.delay, 0));
+      if (!only) for (const a of taps) startFx({ a, group: -1, begin: 0, end: 0 }, n(a.delay, 0));
       return taps.length > 0;
     };
     /** Videos that play by themselves, as their slide shows. */
@@ -3672,6 +3673,9 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
         if (dx < 0) next();
         else prev();
       } else if (o.mode === 'full' && Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+        // A tap on something of the slide's own (a quiz, a link, a video, a part a click runs effects of) is its click.
+        const tg = e.target as HTMLElement | null;
+        if (tg?.closest?.('.ns-quiz, [data-link], a[href], [data-video]') || tap(tg, true)) return;
         e.preventDefault();
         const r = stage.getBoundingClientRect();
         if (t.clientX - r.left < r.width * 0.3) prev();
