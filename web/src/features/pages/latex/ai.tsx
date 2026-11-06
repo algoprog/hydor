@@ -198,16 +198,19 @@ export function useLatexAi(host: AiHost) {
   const hostRef = useRef(host);
   hostRef.current = host;
   const h = () => hostRef.current;
+  // Each of the card, the citations and proofreading has its own: starting one stops only what it replaces.
+  const stopCite = useRef<AbortController | null>(null);
+  const stopProof = useRef<AbortController | null>(null);
   useEffect(
     () => () => {
-      stop.current?.abort();
+      for (const s of [stop, stopCite, stopProof]) s.current?.abort();
     },
     [],
   );
-  const fresh = () => {
-    stop.current?.abort();
-    stop.current = new AbortController();
-    return stop.current.signal;
+  const fresh = (which = stop) => {
+    which.current?.abort();
+    which.current = new AbortController();
+    return which.current.signal;
   };
   const failed = (e: unknown) => ((e as Error)?.name === 'AbortError' ? null : (e as Error)?.message || String(e));
   const askReader = () => {
@@ -412,7 +415,7 @@ export function useLatexAi(host: AiHost) {
     const context = text.slice(ps < 0 ? 0 : ps + 2, pe < 0 ? text.length : pe).slice(0, 1200);
     const claim = p.text.slice(0, 1500);
     setCite({ claim, file, from: p.from, to: p.to, busy: true, cited: [] });
-    void aiCite({ claim, context }, fresh()).then(
+    void aiCite({ claim, context }, fresh(stopCite)).then(
       (got) => setCite((k) => (k && k.claim === claim ? { ...k, busy: false, got } : k)),
       (e) => {
         const why = failed(e);
@@ -482,7 +485,7 @@ export function useLatexAi(host: AiHost) {
     });
     if (cur.length) parts.push(cur);
     if (parts.length > 40) return toast('That is too much to proofread at once: pick a part of it');
-    const signal = fresh();
+    const signal = fresh(stopProof);
     setProof({ file, items: [], busy: { done: 0, of: parts.length } });
     let n = 0;
     for (let i = 0; i < parts.length; i++) {
@@ -667,10 +670,10 @@ export function useLatexAi(host: AiHost) {
       label={host.label}
       canTrack={host.canTrack}
       onClose={() => {
-        stop.current?.abort();
+        stopProof.current?.abort();
         setProof(null);
       }}
-      onStop={() => stop.current?.abort()}
+      onStop={() => stopProof.current?.abort()}
       onAccept={(id) => accept([id])}
       onDismiss={(id) => setProof((p) => (p ? { ...p, items: p.items.map((k) => (k.id === id ? { ...k, state: 'done' } : k)) } : p))}
       onAll={(force) => accept(null, force)}
@@ -733,7 +736,7 @@ export function useLatexAi(host: AiHost) {
           </div>
         )}
       </Dialog>
-      {cite && <CiteDialog cite={cite} onClose={() => (stop.current?.abort(), setCite(null))} onCite={(p, c) => void citePaper(p, c)} />}
+      {cite && <CiteDialog cite={cite} onClose={() => (stopCite.current?.abort(), setCite(null))} onCite={(p, c) => void citePaper(p, c)} />}
     </>
   );
 
