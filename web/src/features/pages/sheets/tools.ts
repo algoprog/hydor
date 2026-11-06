@@ -4,10 +4,11 @@
 // columns, trim spaces, a summary of a table as a sheet of formulas), sorting by several columns, and finding words in
 // the cells and putting others in their place.
 import { findIn, replaceAllIn, replacementOf, type FindOptions, type Match } from '../common/find';
-import { colName, formatValue, inputText, parseInput, quoteSheet, rangeName, refName, shiftFormula, typedCell, type Calc, type Cell, type Rect, type Scalar, type Sheet, type Workbook } from '@shared/sheets';
+import { formatValue, inputText, parseInput, rangeName, refName, shiftFormula, typedCell, type Calc, type Cell, type Rect, type Scalar, type Sheet, type Workbook } from '@shared/sheets';
 import { Merges } from '@shared/sheet-rules';
 import { tr } from '../../../i18n/runtime';
-import { cellsIn, holds, tidyCell, withStyle, type Clip } from './ops';
+import { holds, tidyCell, withStyle, type Clip } from './ops';
+import { guessSeparator, removeDuplicates, sortByKeys, splitColumn, summarySheet as summaryOf, trimChanges, type SummaryFn, type SummaryWords } from '@shared/sheet-tools';
 
 // ---- borders ------------------------------------------------------------------------------------------------------
 
@@ -219,222 +220,17 @@ export function pasteTextValues(sh: Sheet, target: Rect, rows: string[][]): { ch
 
 // ---- data tools ------------------------------------------------------------------------------------------------------
 
-/** Rows of a block with the same values in the columns chosen as a row above them taken out (the rest move up); how many went. */
-export function removeDuplicates(sh: Sheet, calc: Calc, si: number, x: Rect, header: boolean, cols: number[]): { changes: Record<string, Cell | null>; removed: number } {
-  const out: Record<string, Cell | null> = {};
-  const seen = new Set<string>();
-  const keep: number[] = [];
-  const first = header ? x.r1 + 1 : x.r1;
-  for (let r = first; r <= x.r2; r++) {
-    const key = cols
-      .map((c) =>
-        formatValue(calc.value(si, r, c), sh.cells[refName(r, c)]?.s)
-          .trim()
-          .toLowerCase(),
-      )
-      .join('\u0001');
-    if (cols.every((c) => !holds(sh.cells[refName(r, c)]))) {
-      keep.push(r);
-      continue;
-    }
-    if (seen.has(key)) continue;
-    seen.add(key);
-    keep.push(r);
-  }
-  const removed = x.r2 - first + 1 - keep.length;
-  if (!removed) return { changes: out, removed };
-  keep.forEach((from, i) => {
-    const to = first + i;
-    for (let c = x.c1; c <= x.c2; c++) {
-      const cell = sh.cells[refName(from, c)];
-      out[refName(to, c)] = cell ? (cell.f !== undefined ? { ...cell, f: shiftFormula(cell.f, to - from, 0) } : cell) : null;
-    }
-  });
-  for (let r = first + keep.length; r <= x.r2; r++) for (let c = x.c1; c <= x.c2; c++) out[refName(r, c)] = null;
-  return { changes: out, removed };
-}
+// The data tools agents use too (shared/sheet-tools.ts): removing duplicates, splitting words into columns, trimming
+// spaces, sorting by several columns, and a summary of a table, its headers in the language the app is read in.
+export { guessSeparator, removeDuplicates, sortByKeys, splitColumn, trimChanges, type SummaryFn };
 
-/** The separator most of a column's words split by: a comma, a semicolon, a tab, a space, or none. */
-export function guessSeparator(texts: string[]): string {
-  let best = ',';
-  let score = 0;
-  for (const s of ['\t', ';', ',', '|', ' ']) {
-    const counts = texts.map((t) => t.split(s).length - 1);
-    const hits = counts.filter((n) => n > 0).length;
-    if (hits > score) [best, score] = [s, hits];
-  }
-  return best;
-}
-
-/** A column's words split into the columns to its right, by a separator. */
-export function splitColumn(sh: Sheet, calc: Calc, si: number, x: Rect, sep: string): { changes: Record<string, Cell | null>; cols: number } {
-  const out: Record<string, Cell | null> = {};
-  let most = 1;
-  for (let r = x.r1; r <= x.r2; r++) {
-    const cell = sh.cells[refName(r, x.c1)];
-    if (!holds(cell) || cell!.f !== undefined) continue;
-    const text = formatValue(calc.value(si, r, x.c1), cell!.s);
-    if (!sep || !text.includes(sep)) continue;
-    const parts = (sep === ' ' ? text.trim().split(/ +/) : text.split(sep)).map((p) => p.trim());
-    most = Math.max(most, parts.length);
-    parts.forEach((p, j) => {
-      const k = refName(r, x.c1 + j);
-      const old = sh.cells[k];
-      out[k] = p === '' ? (old?.s ? { s: old.s } : null) : typedCell(parseInput(p, old?.s?.fmt), j === 0 ? cell!.s : old?.s);
-    });
-  }
-  return { changes: out, cols: most };
-}
-
-/** Spaces at the ends of words taken off, and runs of them made one; how many cells changed. */
-export function trimChanges(sh: Sheet, calc: Calc, si: number, x: Rect): { changes: Record<string, Cell | null>; count: number } {
-  const out: Record<string, Cell | null> = {};
-  let count = 0;
-  for (const [k] of cellsIn(sh, calc, si, x)) {
-    const cell = sh.cells[k];
-    if (typeof cell.v !== 'string') continue;
-    const t = cell.v.replace(/[  ]+/g, ' ').trim();
-    if (t === cell.v) continue;
-    out[k] = tidyCell({ ...cell, v: t || undefined });
-    count++;
-  }
-  return { changes: out, count };
-}
-
-/** The rows of a block sorted by several columns in turn, each A to Z or Z to A: whole rows move (their formulas along). */
-export function sortByKeys(sh: Sheet, calc: Calc, si: number, x: Rect, keys: { c: number; asc: boolean }[], moved?: Map<number, number>): Record<string, Cell | null> {
-  const rows: { r: number; vals: Scalar[]; cells: (Cell | undefined)[] }[] = [];
-  for (let r = x.r1; r <= x.r2; r++) {
-    const cells: (Cell | undefined)[] = [];
-    for (let c = x.c1; c <= x.c2; c++) cells.push(sh.cells[refName(r, c)]);
-    rows.push({ r, vals: keys.map((k) => calc.value(si, r, k.c)), cells });
-  }
-  const blank = (v: Scalar) => v === null || v === '';
-  const err = (v: Scalar) => typeof v === 'object' && v !== null;
-  const cmp = (a: Scalar, b: Scalar): number => {
-    if (blank(a) || blank(b)) return blank(a) === blank(b) ? 0 : blank(a) ? 1 : -1;
-    if (err(a) || err(b)) return err(a) === err(b) ? 0 : err(a) ? 1 : -1;
-    const rank = (v: Scalar) => (typeof v === 'number' ? 0 : typeof v === 'string' ? 1 : 2);
-    if (rank(a) !== rank(b)) return rank(a) - rank(b);
-    if (typeof a === 'string' && typeof b === 'string') return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-    return a! < b! ? -1 : a! > b! ? 1 : 0;
-  };
-  const sorted = [...rows].sort((p, q) => {
-    for (let i = 0; i < keys.length; i++) {
-      const a = p.vals[i];
-      const b = q.vals[i];
-      const k = cmp(a, b);
-      if (!k) continue;
-      // Blanks and errors stay last either way.
-      return blank(a) || blank(b) || err(a) || err(b) ? k : keys[i].asc ? k : -k;
-    }
-    return p.r - q.r;
-  });
-  const out: Record<string, Cell | null> = {};
-  sorted.forEach((row, i) => {
-    const r = x.r1 + i;
-    // Where each row went (its comments go along).
-    moved?.set(row.r, r);
-    row.cells.forEach((cell, j) => {
-      out[refName(r, x.c1 + j)] = !cell ? null : cell.f !== undefined ? { ...cell, f: shiftFormula(cell.f, r - row.r, 0) } : cell;
-    });
-  });
-  return out;
-}
-
-// ---- summarize by ---------------------------------------------------------------------------------------------------------
-
-export type SummaryFn = 'sum' | 'count' | 'average' | 'min' | 'max';
-const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-const SUMMARY_FNS: Record<SummaryFn, { ifs: string; whole: string }> = {
-  sum: { ifs: 'SUMIFS', whole: 'SUM' },
-  count: { ifs: 'COUNTIFS', whole: 'COUNTA' },
-  average: { ifs: 'AVERAGEIFS', whole: 'AVERAGE' },
-  min: { ifs: 'MINIFS', whole: 'MIN' },
-  max: { ifs: 'MAXIFS', whole: 'MAX' },
+const SUMMARY_WORDS: SummaryWords = {
+  title: (fn, of) => ({ sum: tr(`Sum of ${of}`), count: tr(`Count of ${of}`), average: tr(`Average of ${of}`), min: tr(`Lowest of ${of}`), max: tr(`Highest of ${of}`) })[fn],
+  total: () => tr('Total'),
 };
 
-/**
- * A summary of a table, as a pivot table gives one but made of formulas that keep up with the table: a row for each
- * value of one column (and a column for each value of another, when asked), each value column summed, counted,
- * averaged or its lowest or highest, and a total. The table's first row is its header; its columns are read whole when
- * it starts at the sheet's top, so rows added under it count too.
- */
-export function summarySheet(sh: Sheet, calc: Calc, si: number, x: Rect, by: number, across: number | null, values: { c: number; fn: SummaryFn }[], name: string): Sheet {
-  const cells: Record<string, Cell> = {};
-  const head = (c: number) => formatValue(calc.value(si, x.r1, c), sh.cells[refName(x.r1, c)]?.s) || colName(c);
-  const whole = x.r1 === 0;
-  const ref = (c: number) => `${quoteSheet(sh.name)}!$${colName(c)}${whole ? '' : `$${x.r1 + 2}`}:$${colName(c)}${whole ? '' : `$${x.r2 + 1}`}`;
-  // The values a column has, once each, in order: numbers by size, words A to Z.
-  const distinct = (c: number) => {
-    const seen = new Map<string, Scalar>();
-    for (let r = x.r1 + 1; r <= x.r2; r++) {
-      const v = calc.value(si, r, c);
-      if (v === null || v === '' || typeof v === 'object') continue;
-      const k = typeof v === 'string' ? v.trim().toLowerCase() : `${typeof v}:${v}`;
-      if (!seen.has(k)) seen.set(k, typeof v === 'string' ? v.trim() : v);
-    }
-    const list = [...seen.values()];
-    // Months and weekdays go in the calendar's order; other words A to Z, numbers by size.
-    const cycle = [MONTHS, DAYS].find((names) => list.length > 1 && list.every((v) => typeof v === 'string' && names.some((n) => n.startsWith(v.toLowerCase()) && v.length >= 3)));
-    const at = (v: Scalar) => cycle!.findIndex((n) => n.startsWith(String(v).toLowerCase()));
-    return list.sort((a, b) => (cycle ? at(a) - at(b) : typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' })));
-  };
-  const keys = distinct(by).slice(0, 2000);
-  const cols = across !== null ? distinct(across).slice(0, 200) : [];
-  // Its headers in the language the app is read in (they are the sheet's words from then on).
-  const title = (fn: SummaryFn, of: string) => ({ sum: tr(`Sum of ${of}`), count: tr(`Count of ${of}`), average: tr(`Average of ${of}`), min: tr(`Lowest of ${of}`), max: tr(`Highest of ${of}`) })[fn];
-  const bold = { b: true };
-  const put = (r: number, c: number, cell: Cell) => (cells[refName(r, c)] = cell);
-  const lit = (v: Scalar) => (typeof v === 'number' || typeof v === 'boolean' ? { v } : { v: String(v) });
-  const fmtOf = (c: number) => {
-    const s = sh.cells[refName(x.r1 + 1, c)]?.s;
-    return s?.fmt || s?.code ? { ...(s.fmt ? { fmt: s.fmt } : {}), ...(s.dp !== undefined ? { dp: s.dp } : {}), ...(s.cur ? { cur: s.cur } : {}), ...(s.code ? { code: s.code } : {}) } : undefined;
-  };
-  put(0, 0, { v: head(by), s: bold });
-  const n = keys.length;
-  if (across === null) {
-    values.forEach((v, j) => put(0, 1 + j, { v: title(v.fn, head(v.c)), s: bold }));
-    keys.forEach((k, i) => {
-      put(1 + i, 0, lit(k));
-      values.forEach((v, j) => {
-        const f = SUMMARY_FNS[v.fn];
-        const body = v.fn === 'count' ? `${f.ifs}(${ref(by)},$A${i + 2})` : `${f.ifs}(${ref(v.c)},${ref(by)},$A${i + 2})`;
-        put(1 + i, 1 + j, { f: body, ...(v.fn !== 'count' && fmtOf(v.c) ? { s: fmtOf(v.c) } : {}) });
-      });
-    });
-    put(n + 1, 0, { v: tr('Total'), s: bold });
-    values.forEach((v, j) => {
-      const col = colName(1 + j);
-      const body = v.fn === 'sum' || v.fn === 'count' ? `SUM(${col}2:${col}${n + 1})` : `${SUMMARY_FNS[v.fn].whole}(${ref(v.c)})`;
-      put(n + 1, 1 + j, { f: body, s: { ...bold, ...(v.fn !== 'count' ? (fmtOf(v.c) ?? {}) : {}) } });
-    });
-  } else {
-    // A cross table: the first value's summary for each pair of the two columns' values.
-    const v = values[0];
-    const f = SUMMARY_FNS[v.fn];
-    cols.forEach((k, j) => put(0, 1 + j, { ...lit(k), s: bold }));
-    put(0, cols.length + 1, { v: tr('Total'), s: bold });
-    keys.forEach((k, i) => {
-      put(1 + i, 0, lit(k));
-      cols.forEach((_, j) => {
-        const cc = colName(1 + j);
-        const body = v.fn === 'count' ? `${f.ifs}(${ref(by)},$A${i + 2},${ref(across)},${cc}$1)` : `${f.ifs}(${ref(v.c)},${ref(by)},$A${i + 2},${ref(across)},${cc}$1)`;
-        put(1 + i, 1 + j, { f: body, ...(v.fn !== 'count' && fmtOf(v.c) ? { s: fmtOf(v.c) } : {}) });
-      });
-      const body = v.fn === 'count' ? `${f.ifs}(${ref(by)},$A${i + 2})` : `${f.ifs}(${ref(v.c)},${ref(by)},$A${i + 2})`;
-      put(1 + i, cols.length + 1, { f: body, s: { ...bold, ...(v.fn !== 'count' ? (fmtOf(v.c) ?? {}) : {}) } });
-    });
-    put(n + 1, 0, { v: tr('Total'), s: bold });
-    for (let j = 0; j <= cols.length; j++) {
-      const col = colName(1 + j);
-      const body = v.fn === 'sum' || v.fn === 'count' ? `SUM(${col}2:${col}${n + 1})` : j === cols.length ? `${f.whole}(${ref(v.c)})` : `${f.ifs}(${ref(v.c)},${ref(across)},${col}$1)`;
-      put(n + 1, 1 + j, { f: body, s: { ...bold, ...(v.fn !== 'count' ? (fmtOf(v.c) ?? {}) : {}) } });
-    }
-  }
-  return { id: '', name, cells, freeze: { rows: 1 }, cols: { 0: { w: 160 } } };
-}
+/** A summary of a table as a sheet of formulas (shared/sheet-tools.ts summarySheet), its headers in the app's language. */
+export const summarySheet = (sh: Sheet, calc: Calc, si: number, x: Rect, by: number, across: number | null, values: { c: number; fn: SummaryFn }[], name: string): Sheet => summaryOf(sh, calc, si, x, by, across, values, name, SUMMARY_WORDS);
 
 // ---- find and replace ---------------------------------------------------------------------------------------------------
 
