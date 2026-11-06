@@ -3,6 +3,18 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.33.1 · 6 November 2026
+
+Forms agents ask never expire, and a long form opens at its top.
+
+- **A form waits as long as you need**: a form an agent shows you (its questions in one card) used to go away when you
+  had not answered it within about nine minutes. Now it stays in the conversation: the agent ends its turn there, and
+  the form stays even when the agent stops or the app restarts. When you fill it in, your answers go to the agent as
+  your next message, and it carries on; if they can't reach it, the form stays for you to send again. **Not now** puts
+  it away.
+- **A long form opens at its top**: a form taller than the screen shows its title, what it asks and its first fields,
+  with **Latest** to go to its end, rather than its buttons alone.
+
 ## 0.33.0 · 6 November 2026
 
 The models that run on your own computer use its graphics card by default, a Mac's too: search by meaning, the
