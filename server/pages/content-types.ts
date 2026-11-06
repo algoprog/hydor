@@ -6,8 +6,11 @@
 import { makeOf, makeRequest } from '../../shared/content-asks.ts';
 import { contentType, CONTENT_TYPES, findTypes, typesOf, type ContentKind, type ContentType } from '../../shared/content-types.ts';
 import type { RunTool } from '../features/types.ts';
+import { brandForAgent } from '../../shared/design-brand.ts';
+import { designHow } from './design-agent.ts';
+import { readBrand } from './design-routes.ts';
 
-const KINDS: ContentKind[] = ['slide', 'deck', 'doc', 'section', 'page', 'block', 'sheet'];
+const KINDS: ContentKind[] = ['slide', 'deck', 'doc', 'section', 'page', 'block', 'sheet', 'design'];
 
 /** What each kind is, as the answers name it. */
 const NOUN: Record<ContentKind, string> = {
@@ -18,6 +21,7 @@ const NOUN: Record<ContentKind, string> = {
   page: 'a new page',
   block: 'a part added to a page',
   sheet: 'a new spreadsheet',
+  design: 'a new design',
 };
 const LIST_NAME: Record<ContentKind, string> = {
   slide: 'Slides added to a deck',
@@ -27,6 +31,7 @@ const LIST_NAME: Record<ContentKind, string> = {
   page: 'New pages',
   block: 'Parts added to a page',
   sheet: 'New spreadsheets',
+  design: 'New designs (posters, flyers, social posts, cards)',
 };
 
 /** How it goes where it belongs. */
@@ -39,6 +44,7 @@ const HOW: Record<ContentKind, string> = {
   page: 'Make it with save_page.',
   block: 'Adding it: read the page with get_page, make the part in the page’s own look (its colours, fonts and spacing) and language, working on a phone too, keep the rest as it is, and save the whole page with save_page and its id.',
   sheet: 'Make it with save_sheet.',
+  design: 'Make it with save_page as a design (how_to_make “design” says how to write one).',
 };
 
 const isKind = (v: unknown): v is ContentKind => typeof v === 'string' && (KINDS as string[]).includes(v);
@@ -61,7 +67,8 @@ export const HOW_TO_MAKE: RunTool = {
   name: 'how_to_make',
   annotations: { readOnlyHint: true },
   description: [
-    'How to make a known kind of thing well, as the app’s gallery asks for it: a slide added to a deck (a SWOT analysis, a timeline, a quiz), a new deck (a pitch deck, a lecture, a thesis defence), a document (a cover letter, a CV, meeting minutes, a grant proposal), a section added to one (an executive summary, a risks table), a page (a habit tracker, a landing page, a loan calculator), a part added to a page (a pricing table, a FAQ), or a spreadsheet (a budget, a loan schedule).',
+    'How to make a known kind of thing well, as the app’s gallery asks for it: a slide added to a deck (a SWOT analysis, a timeline, a quiz), a new deck (a pitch deck, a lecture, a thesis defence), a document (a cover letter, a CV, meeting minutes, a grant proposal), a section added to one (an executive summary, a risks table), a page (a habit tracker, a landing page, a loan calculator), a part added to a page (a pricing table, a FAQ), a spreadsheet (a budget, a loan schedule), or a design (an event poster, a sale flyer, a quote post, a YouTube thumbnail, an invitation, a business card, a certificate, a menu, a logo).',
+    'With "design" alone: how a design is written (its artboards, sizes and elements), and the user’s brand kit when they have one.',
     'It says what goes in it, in what order, how it should look and where pictures help, and how to add it to what is open. Use it when the user asks for one of these by name, before you make it: it is free and instant. With no words, it lists every kind it knows.',
   ].join(' '),
   inputSchema: {
@@ -71,19 +78,23 @@ export const HOW_TO_MAKE: RunTool = {
       kind: {
         type: 'string',
         enum: KINDS,
-        description: 'Which it is, when known: a slide added to a deck, a new deck, a document (doc), a section added to a document, a page, a part added to a page (block), a spreadsheet (sheet).',
+        description: 'Which it is, when known: a slide added to a deck, a new deck, a document (doc), a section added to a document, a page, a part added to a page (block), a spreadsheet (sheet), a design (a poster, a flyer, a social post, a card).',
       },
     },
   },
-  async run(a) {
+  async run(a, ctx) {
     const kind = isKind(a.kind) ? a.kind : undefined;
     const what = typeof a.what === 'string' ? a.what.trim().slice(0, 200) : '';
+    // A design: how one is written, with the user's brand kit; a design's kind also gets them after its ask.
+    const brand = () => brandForAgent(ctx ? readBrand(ctx.deps.db) : null);
+    if (/^(a |the )?designs?( format)?$/i.test(what)) return [designHow(), brand(), listAll('design')].filter(Boolean).join('\n');
     if (!what) return listAll(kind);
     const found = findTypes(what, { kind });
     if (!found.length) return `No kind the app knows matches “${what}”${kind ? ` among ${LIST_NAME[kind].toLowerCase()}` : ''}: make it as the user asks. how_to_make with no words lists the kinds it knows.`;
     const [best, ...rest] = found;
     const others = rest.slice(0, 3).map((t) => `${t.label} (${NOUN[t.kind]})`);
-    return `${whole(best)}${others.length ? `\nOthers close to it: ${others.join('; ')}.` : ''}`;
+    const extra = best.kind === 'design' ? [designHow(), brand()].filter(Boolean).join('\n') : '';
+    return `${whole(best)}${extra ? `\n${extra}` : ''}${others.length ? `\nOthers close to it: ${others.join('; ')}.` : ''}`;
   },
 };
 

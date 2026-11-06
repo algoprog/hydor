@@ -78,6 +78,8 @@ import { agentFileComments, openFile, openFileComments, saveFile, texFileForAgen
 import { kindForFile, kindOf, mustKind, type PageKind } from './kinds.ts';
 import { shellManifest, shellPage } from './shell.ts';
 import { uploadRoutes } from './uploads.ts';
+import { designRoutes } from './design-routes.ts';
+import { DESIGN_SAVE_NOTE, designForSave } from './design-agent.ts';
 import { createRequest, decideRequest, getRequest, initSites, listSites, publish, serveSite, unpublish, unpublishPage } from './sites.ts';
 import {
   addVersion,
@@ -224,6 +226,7 @@ const SAVE_PAGE: RunTool = {
     'A database block’s rows are the page’s own data: get_page shows them, and databases adds, changes or removes them (with id; leave html out to only change them).',
     'Pictures: name a picture file of your folder (one generate_image, make_svg or make_plot made: images/…) as an img’s src or in CSS url(): it goes inside the page (made smaller where this computer can); a page with its pictures may be up to 2 MB.',
     `Give each new page a description (under ${DESCRIPTION_WORDS} words): the Library shows it and its search finds the page by it.`,
+    DESIGN_SAVE_NOTE,
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -305,7 +308,8 @@ const SAVE_PAGE: RunTool = {
       return `Saved "${page.title}" (page ${page.id}): ${done}; the page itself is as it was.${await fill(page.id)}${comment(page.id)}`;
     }
     // Pictures from the session's folder (and the app's kept ones) go inside the page.
-    const pictured = typeof a.html === 'string' ? pagePictures(db, a.html, ctx.cwd) : { html: a.html, notes: [] };
+    // A design carries its stylesheet and script; its videos (files of the session) are kept and play in it.
+    const pictured = typeof a.html === 'string' ? await designForSave(db, pagePictures(db, a.html, ctx.cwd), ctx.cwd) : { html: a.html, notes: [] };
     const p = id
       ? addVersion(db, id, { title: a.title, html: pictured.html, by: 'agent', description: a.description })
       : createPage(db, { title: a.title, html: pictured.html, by: 'agent', description: a.description, ...placeOf(ctx, a.project, a.libraryFolder) });
@@ -787,6 +791,8 @@ function routes(d: Deps) {
   arxivRoutes(app, db);
   // Files dropped on the Library or picked with Upload files, and files the desktop app moves in by their path.
   uploadRoutes(d);
+  // Designs: their files (PNG, JPG, PDF), their videos, and the brand kit (design-routes.ts).
+  designRoutes(app, db);
   const P = (req: FastifyRequest) => req.params as Record<string, string>;
   const B = (req: FastifyRequest) => (req.body ?? {}) as Record<string, unknown>;
   const key = (v: unknown) => (typeof v === 'string' && v ? v.slice(0, 300) : undefined);
@@ -1079,10 +1085,10 @@ function routes(d: Deps) {
   app.post('/api/pages/:id/link', async (req) => ({ link: `/pg/${resetPageLink(db, P(req).id)}` }));
   /** The page as a file: a PDF, a Word document or (a deck) a PowerPoint file, or a web page that works on its own. */
   app.get('/api/pages/:id/export', async (req, reply) => {
-    const q = req.query as { format?: string; v?: string; paper?: string; slide?: string };
+    const q = req.query as { format?: string; v?: string; paper?: string; slide?: string; scale?: string; transparent?: string };
     const format = String(q.format ?? '') as ExportFormat;
     if (!EXPORT_TYPES[format]) throw new HttpError(400, `format is one of ${Object.keys(EXPORT_TYPES).join(', ')}`);
-    const f = await exportPage(db, P(req).id, { format, version: q.v ? Number(q.v) : undefined, paper: q.paper === 'letter' ? 'letter' : 'a4', slide: q.slide ? Number(q.slide) : undefined });
+    const f = await exportPage(db, P(req).id, { format, version: q.v ? Number(q.v) : undefined, paper: q.paper === 'letter' ? 'letter' : 'a4', slide: q.slide ? Number(q.slide) : undefined, scale: q.scale ? Number(q.scale) : undefined, transparent: q.transparent === '1' });
     // What there is to say of it (a PowerPoint file's fonts inside it, and which compressed), beside it.
     if (f.note) reply.header('X-Export-Note', f.note.replace(/[^\x20-\x7e]/g, '?'));
     return reply

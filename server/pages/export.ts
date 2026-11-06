@@ -29,6 +29,9 @@ import { deckFile, readDeck } from './slides.ts';
 import { deckPictures, deckRenders, liveRenders } from './slides-render.ts';
 import { dbSeed, mustPage, pageSource, storageMap } from './store.ts';
 import { wordFonts } from './word-fonts.ts';
+import { isDesignHtml } from '../../shared/design.ts';
+import { exportDesign } from './design-export.ts';
+import { videosInside } from './page-videos.ts';
 
 export type { ExportFormat };
 
@@ -45,6 +48,7 @@ export const EXPORT_TYPES: Record<ExportFormat, string> = {
   ipynb: 'application/x-ipynb+json',
   py: 'text/x-python; charset=utf-8',
   png: 'image/png',
+  jpg: 'image/jpeg',
 };
 
 export type Paper = 'a4' | 'letter';
@@ -143,13 +147,17 @@ async function fitScales(db: DB, k: KindDef, text: string, title: string): Promi
 export const formatsOf = (k: KindDef): ExportFormat[] => [...new Set([...(Object.keys(k.files) as ExportFormat[]), 'pdf', 'html'] as ExportFormat[])];
 
 /** A page, deck, document or spreadsheet (its current version, or `version`) as a file. */
-export async function exportPage(db: DB, id: string, o: { format: ExportFormat; version?: number; paper?: Paper; slide?: number }): Promise<{ data: Buffer; type: string; name: string; note?: string }> {
+export async function exportPage(db: DB, id: string, o: { format: ExportFormat; version?: number; paper?: Paper; slide?: number; scale?: number; transparent?: boolean }): Promise<{ data: Buffer; type: string; name: string; note?: string }> {
   mustPage(db, id);
   const src = pageSource(db, id, Number.isInteger(o.version) && o.version! > 0 ? o.version : undefined);
   if (!src) throw new HttpError(404, 'That version is no longer kept');
   const title = src.title;
   const out = (data: Buffer | string, ext: string) => ({ data: Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8'), type: EXPORT_TYPES[o.format], name: fileName(title, ext) });
   const paper = PAPER[o.paper ?? 'a4'];
+
+  // A design (shared/design.ts): its artboards exactly their size, as pictures or a PDF of their own size.
+  if (src.kind === 'page' && isDesignHtml(src.text) && (o.format === 'png' || o.format === 'jpg' || o.format === 'pdf'))
+    return exportDesign(src.text, { title, format: o.format, scale: o.scale ?? 2, transparent: o.transparent, board: o.slide ? o.slide - 1 : undefined, name: fileName });
 
   // A deck's slides as pictures: one (by its number), or every one the slideshow shows, in a zip.
   if (o.format === 'png') {
@@ -213,7 +221,8 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
     return notes.length ? { ...made, note: notes.join(' ') } : made;
   }
 
-  if (o.format === 'html') return out(pageFileHtml(src.text, dbSeed(db, id)), 'html');
+  // Its videos inside it, those small enough to carry.
+  if (o.format === 'html') return out(pageFileHtml(videosInside(db, src.text), dbSeed(db, id)), 'html');
   if (o.format === 'pdf') {
     if (!canCapture()) throw noBrowser();
     const html = injectHead(src.text, pageHead(db, id));

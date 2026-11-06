@@ -48,6 +48,9 @@ export interface DEl {
   qr?: string;
   empty?: boolean;
   arrow?: boolean;
+  effect?: string;
+  qrDark?: string;
+  qrLight?: string;
   src?: string;
   alt?: string;
   imgFilter?: string;
