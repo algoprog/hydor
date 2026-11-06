@@ -66,8 +66,10 @@ These names are fixed so the workstreams fit when merged. Add fields if you need
   one, else Claude's Sonnet through `oneShot`, else Codex); Best: a Recraft vector model through OpenRouter
   (`recraft/recraft-v4.1-vector`, then `-pro-vector`); cleaned by `cleanSvg` (`server/images/svg-clean.ts`): an allow
   list of elements and attributes, no scripts, `on*`, `foreignObject`, `<image>` or `href`s out, no `url(` but `#ids`.
-- `GET /api/images/local` → `LocalToolsState`; `POST /api/images/local/setup` starts the set-up (progress in the
-  state, and a `{ type: 'images.local' }` broadcast as it moves); `DELETE /api/images/local` removes it (A2).
+- `GET /api/images/local` → `LocalToolsState`; `POST /api/images/local/setup` starts the set-up (the app asks
+  again every second or so while `installing`); `DELETE /api/images/local` removes it (A2). The set-up makes the
+  environment (about 120 MB); each model downloads the first time its tool is used (about 220 MB each), its
+  progress in `step`.
 - `POST /api/images/cutout` `CutoutAsk` → `PictureAnswer` (PNG with see-through parts) (A2).
 - `POST /api/images/erase` `EraseAsk` → `PictureAnswer` (A2; cloud answers may be `whole: true`).
 - `POST /api/plots/make` `PlotAsk` → `PlotAnswer` (A3).
@@ -80,16 +82,19 @@ estimate before (`TiersInfo`). Without an OpenRouter key, routes that need one a
 
 ### Server functions shared between workstreams
 
-- A2 exports from `server/images/local.ts`:
-  `localState(): LocalToolsState`, `localReady(): boolean`,
-  `runPython(code: string, o: { cwd: string; timeoutMs: number; files?: Record<string, Buffer> }): Promise<{ ok: boolean; stdout: string; stderr: string; files: Record<string, Buffer> }>`
-  (runs in the picture tools' Python when set up, else a Python on this computer that has matplotlib; throws a
-  person-readable error when there is none), `cutoutLocal(png: Buffer): Promise<Buffer>`, `eraseLocal(img: Buffer, mask: Buffer): Promise<Buffer>`.
-- A1 exports from `server/images/make.ts`: `makeImages(db, ask: MakeImageAsk, signal?): Promise<MakeImageAnswer>`,
-  `editImage(db, ask: EditImageAsk & { refs?: Reference[] }, signal?): Promise<PictureAnswer>`, and from
-  `tiers.ts`: `tierModel(db, tier, o?: { transparent?: boolean; vector?: boolean }): Promise<TierModel>`. A2's cloud
-  paths use `editImage`.
-- A1 exports `cleanSvg(text: string): string | null` from `server/images/svg-clean.ts` (A3 cleans plots' SVG with it).
+The workstreams reach each other only through `server/images/hooks.ts` (on `mr/int`), so no branch imports a file
+another branch is writing:
+
+- A2's `server/images/local.ts` calls `setLocalTools({ state, ready, cutout, erase, runPython })` when it loads
+  (`runPython` runs in the picture tools' Python when set up, else a Python on this computer that has matplotlib,
+  and throws words a person can act on when there is none).
+- A1's `server/images/make.ts` calls `setCloudTools({ edit, cleanSvg })` when it loads (`cleanSvg` lives in
+  `server/images/svg-clean.ts`). A2's cloud cutouts and erasing use `cloudTools().edit`; A3 cleans plots' SVG
+  with `cloudTools().cleanSvg`.
+- `server/images/writer.ts` (on `mr/int`): `writeWith(db, { system, prompt })` and `writerName(db)`: the model that
+  writes drawings' SVG (A1) and plots' code (A3).
+- A2 and A3 each export a `Feature` of their own (`pictureTools` from `server/images/local.ts`, `plots` from
+  `server/images/plots.ts`) and add it to `server/features/index.ts` (one line each); A1 keeps `images`.
 
 ### Agents' tools (on each session's own MCP server, while Settings → Images, video and audio has images on)
 
