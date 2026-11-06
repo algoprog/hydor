@@ -2,7 +2,7 @@
 // is apart from the app, so the app's translations don't reach it: the words go there already translated.
 // The blocks use the page kit's classes and colours (with their own colours to fall back on, for a page
 // saved as a file), and fill the width they get.
-import { tr } from '../../../i18n/runtime';
+import { trIn } from '../../../i18n/runtime';
 
 export type BlockKind = 'basic' | 'layout' | 'section';
 
@@ -335,7 +335,7 @@ const DB_WORDS: Record<string, string> = {
 };
 
 /** A database's words in the app's language, for a page in Use (the kit draws its databases). */
-export const dbLabels = (): Record<string, string> => Object.fromEntries(Object.entries(DB_WORDS).map(([k, v]) => [k, tr(v)]));
+export const dbLabels = (): Record<string, string> => Object.fromEntries(Object.entries(DB_WORDS).map(([k, v]) => [k, trIn('pages', v)]));
 
 /** The words of the editor's bars and its names for parts, in the app's language. */
 export function editorLabels(): Record<string, string> {
@@ -516,5 +516,5 @@ export function editorLabels(): Record<string, string> {
     aiTip: 'Ask AI (Ctrl+J)',
     askAi: 'Ask AI',
   };
-  return { ...Object.fromEntries(Object.entries(words).map(([k, v]) => [k, tr(v)])), ...Object.fromEntries(Object.entries(DB_WORDS).map(([k, v]) => [`db.${k}`, tr(v)])) };
+  return { ...Object.fromEntries(Object.entries(words).map(([k, v]) => [k, trIn('pages', v)])), ...Object.fromEntries(Object.entries(DB_WORDS).map(([k, v]) => [`db.${k}`, trIn('pages', v)])) };
 }
