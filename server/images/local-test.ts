@@ -24,6 +24,8 @@ import Fastify from 'fastify';
 import type { LocalToolsState, PictureAnswer } from '../../shared/images.ts';
 import { ASSET } from '../../shared/slides.ts';
 import { config } from '../config.ts';
+import { keyGiven, keySkipped, OPENROUTER_REQUEST } from '../connections/openrouter-key.ts';
+import { latestRequest, vaultTables } from '../connections/vault.ts';
 import { kvSet, openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { loadConfig, saveConfig } from '../models/config.ts';
@@ -85,9 +87,12 @@ const keptPng = (src: string): Rgba => readPng(getAsset(db, src.slice(ASSET.leng
 
 const db = openDb(path.join(tmp, 'test.db'));
 initAssets(db);
+vaultTables(db);
 const app = Fastify({ bodyLimit: 40 * 1024 * 1024 });
 app.setErrorHandler((err: Error & { status?: number; statusCode?: number }, _req, reply) => reply.code(err.status ?? err.statusCode ?? 500).send({ error: err.message }));
-const deps = { app, db, sessions: { adapterByRun: () => null }, broadcast: () => {}, toSubscribers() {}, publicBase: () => 'https://hydor.example' } as unknown as Deps;
+/** Whether someone watches the session's run (and so can answer a card asking for the OpenRouter key). */
+let watched = false;
+const deps = { app, db, sessions: { adapterByRun: () => (watched ? {} : null) }, broadcast: () => {}, toSubscribers() {}, publicBase: () => 'https://hydor.example' } as unknown as Deps;
 pictureTools.routes!(deps);
 await app.ready();
 const ctx = { runId: 'run1', key: 'claude:p1', agent: 'claude', cwd: tmp, deps } as RunCtx;
@@ -208,6 +213,17 @@ for line in sys.stdin:
       : [];
   setPictureToolsForTests({ models: fakeModels(), worker: fakeWorker, freeMb: () => 64_000 });
 
+  // OpenRouter's way (make.ts's edit), stood in for: what it was asked, and a green picture back.
+  const asked: any[] = [];
+  const green = picture(32, 24, () => [0, 255, 0, 255]);
+  setCloudTools({
+    async edit(_db, ask) {
+      asked.push(ask);
+      return { src: ASSET + putAsset(db, green), w: 32, h: 24, mime: 'image/png', how: 'cloud', model: 'test/painter', cost: 0.012, ...(ask.mask ? { whole: true } : {}) };
+    },
+    cleanSvg: () => null,
+  });
+
   const photo = picture(64, 48, (x, y) => [x * 4, y * 5, 128, 255]);
   fs.writeFileSync(path.join(tmp, 'photo.png'), photo);
   const mask = picture(64, 48, (x, y) => (x >= 10 && x < 30 && y >= 10 && y < 30 ? [255, 255, 255, 255] : [0, 0, 0, 255]));
@@ -234,8 +250,57 @@ for line in sys.stdin:
     ok(l.statusCode === 400 && /set them up in Settings → Images, video and audio/.test(l.json().error), 'on this computer, asked for, before setting up');
     const cl = await req('POST', '/api/images/cutout', { src: dataUrl(photo), how: 'cloud' });
     ok(cl.statusCode === 400 && cl.json().error === 'Add an OpenRouter key in Settings → Models', 'through OpenRouter without a key');
+
+    // No key: a run nobody watches gets words for the user; a watched one a card, and skipped, nothing runs.
     const t = await run('remove_background', { path: 'photo.png' });
-    ok(t.isError && /neither is set up\. Tell the user/.test(t.text), 'the agent hears what the user can do');
+    ok(
+      !t.isError &&
+        /^The image model that would take the background out runs through OpenRouter, and no OpenRouter key is set\. Tell the user to add one in Settings → Models → OpenRouter/.test(t.text) &&
+        /The picture tools on this computer would do this free and in private once the user sets them up \(Settings → Images, video and audio\)/.test(t.text) &&
+        !asked.length,
+      `a run nobody watches: no card, words for the user: ${t.text}`,
+    );
+    watched = true;
+    const pending = run('remove_background', { path: 'photo.png' });
+    ok(await until(() => latestRequest(db, ctx.key, OPENROUTER_REQUEST)?.state === 'pending'), 'a watched run asks for the key on a card');
+    const card = latestRequest(db, ctx.key, OPENROUTER_REQUEST);
+    ok(
+      /^Taking the background out of a picture through OpenRouter costs about \$0\.01 to \$0\.05: an image model draws it again without its background\. Or skip this and set up the picture tools in Settings → Images, video and audio: they do it free and in private on this computer\.$/.test(
+        card?.why ?? '',
+      ),
+      `the card says what it costs, and the free way: ${card?.why}`,
+    );
+    keySkipped(ctx.key);
+    const sk = await pending;
+    ok(
+      !sk.isError &&
+        /^The user chose not to add an OpenRouter key, so the image model that would take the background out did not run: nothing was made and nothing was spent\./.test(sk.text) &&
+        /would do this free and in private/.test(sk.text) &&
+        !asked.length,
+      `skipped: it does not run: ${sk.text}`,
+    );
+    db.prepare("update conn_requests set state = 'dismissed' where key = ?").run(ctx.key);
+    const again = await run('erase_from_image', { path: 'photo.png', boxes: [{ x: 1, y: 1, w: 5, h: 5 }] });
+    ok(!again.isError && /^The user chose earlier in this session not to add an OpenRouter key, so the image model that would erase it did not run/.test(again.text), `not asked again: ${again.text}`);
+    // Given on the card (its route keeps it in Settings → Models first): the tool goes on.
+    const ctx2 = { ...ctx, key: 'claude:p2', runId: 'run2', cwd: path.join(tmp, 'p2') } as RunCtx;
+    fs.mkdirSync(ctx2.cwd);
+    fs.writeFileSync(path.join(ctx2.cwd, 'photo.png'), photo);
+    const given = pictureTools.tools!(ctx2)
+      .find((x) => x.name === 'remove_background')!
+      .run({ path: 'photo.png' }, ctx2);
+    ok(await until(() => latestRequest(db, 'claude:p2', OPENROUTER_REQUEST)?.state === 'pending'), 'another session gets its card');
+    const conf = loadConfig();
+    conf.openrouter.apiKey = 'sk-or-given';
+    saveConfig(conf);
+    keyGiven('claude:p2', 'sk-or-given');
+    const g = await given;
+    const gt = typeof g === 'string' ? g : g.text;
+    ok(/^Took the background out with test\/painter through OpenRouter \(\$0\.012\):/.test(gt) && asked.length === 1, `a key given: it goes on: ${gt}`);
+    delete conf.openrouter.apiKey;
+    saveConfig(conf);
+    asked.length = 0;
+    watched = false;
   }
 
   // ---- setting up ----------------------------------------------------------------------------------------------
@@ -429,6 +494,8 @@ for line in sys.stdin:
       `how much it needs: ${low.json().error}`,
     );
     ok(jobs().filter((j) => j.op === 'erase').length === erases && (await state()).error === low.json().error, 'nothing loaded, and the state says why');
+    const lowTool = await run('erase_from_image', { path: 'photo.png', boxes: [{ x: 1, y: 1, w: 5, h: 5 }] });
+    ok(lowTool.isError && /not enough free memory/.test(lowTool.text) && /call again with openrouter: true, if the user agrees\.$/.test(lowTool.text), `an agent hears how to go on: ${lowTool.text}`);
     // Short of memory with the other model in it: that one goes first, then there is room.
     setPictureToolsForTests({ freeMb: () => 64_000 });
     ok((await req('POST', '/api/images/cutout', { src: dataUrl(photo) })).statusCode === 200 && localState().loaded.join() === 'cutout', 'the cutout model is in memory');
@@ -507,15 +574,6 @@ for line in sys.stdin:
   // ---- through OpenRouter (a stand-in for make.ts) ---------------------------------------------------------------------
 
   {
-    const asked: any[] = [];
-    const green = picture(32, 24, () => [0, 255, 0, 255]);
-    setCloudTools({
-      async edit(_db, ask) {
-        asked.push(ask);
-        return { src: ASSET + putAsset(db, green), w: 32, h: 24, mime: 'image/png', how: 'cloud', model: 'test/painter', cost: 0.012, ...(ask.mask ? { whole: true } : {}) };
-      },
-      cleanSvg: () => null,
-    });
     const c = loadConfig();
     c.openrouter.apiKey = 'sk-or-test';
     saveConfig(c);
@@ -533,9 +591,14 @@ for line in sys.stdin:
 
     const t = await run('erase_from_image', { path: 'photo.png', prompt: 'the cat' });
     ok(!t.isError && /^Took away the cat with test\/painter through OpenRouter \(\$0\.012\):/.test(t.text) && /the cat from the picture/.test(asked[3].prompt) && !asked[3].mask, `words alone: ${t.text}`);
+    const forced = await run('remove_background', { path: 'photo.png', openrouter: true });
+    ok(!forced.isError && /through OpenRouter/.test(forced.text) && asked.length === 5 && !/would do this free/.test(forced.text), `through OpenRouter when asked, though the picture tools are here: ${forced.text}`);
     await req('DELETE', '/api/images/local');
     const rb = await run('remove_background', { path: 'photo.png' });
-    ok(!rb.isError && /^Took the background out with test\/painter through OpenRouter \(\$0\.012\):/.test(rb.text) && /small details may differ/.test(rb.text), `remove_background through OpenRouter: ${rb.text}`);
+    ok(
+      !rb.isError && /^Took the background out with test\/painter through OpenRouter \(\$0\.012\):/.test(rb.text) && /small details may differ/.test(rb.text) && /The picture tools on this computer would do this free/.test(rb.text),
+      `remove_background through OpenRouter, the free way mentioned: ${rb.text}`,
+    );
     const eb = await run('erase_from_image', { path: 'photo.png', boxes: [{ x: 10, y: 10, w: 20, h: 20 }] });
     const saved = savedPath(eb.text);
     ok(!eb.isError && saved && /^Erased the box with test\/painter through OpenRouter/.test(eb.text) && !/whole picture/.test(eb.text), `boxes through OpenRouter: ${eb.text}`);
