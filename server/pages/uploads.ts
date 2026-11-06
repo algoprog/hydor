@@ -109,7 +109,8 @@ const refused = (status: number, message: string, why: FileRefused) => new HttpE
  * become a page); out of a project, anything else is refused.
  */
 function planFor(name: string, size: number, space: string | null): Plan {
-  const kind = kindForFile(name) ?? (isPptx(name) ? 'slides' : null);
+  // A PDF stays the file it is (in a project's folder): it becomes a document only when opened as one (New → Document).
+  const kind = /\.pdf$/i.test(name) ? null : (kindForFile(name) ?? (isPptx(name) ? 'slides' : null));
   if (kind && size <= importMax(kind)) return { as: 'page', kind };
   const media = mediaTypeOf(name);
   if (media && size <= MAX_MEDIA) return { as: media.kind };
