@@ -20160,5 +20160,8 @@
 "design::Light":"Λεπτά",
 "Light and shadow":"Φως και σκιά",
 "Mix":"Μίξη",
-"How bright, all colours together":"Πόσο φωτεινό, όλα τα χρώματα μαζί"
+"How bright, all colours together":"Πόσο φωτεινό, όλα τα χρώματα μαζί",
+"media::Linear":"Γραμμική",
+"media::Filled":"Γεμισμένο",
+"media::End":"Τέλος"
 }
