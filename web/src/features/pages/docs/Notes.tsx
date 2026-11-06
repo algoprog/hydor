@@ -85,7 +85,8 @@ export function EndNotes({ doc, refs, onOpen }: { doc: Doc; refs: DocRefs; onOpe
   const ids = (doc.notes ?? []).map((n) => n.id).filter((id) => refs.note(id) > 0).sort((a, b) => refs.note(a) - refs.note(b));
   if (!ids.length) return null;
   return (
-    <div className="nd-ed nd-doc" style={{ minHeight: 0, paddingTop: 0, paddingBottom: 32, background: '#fff' }} data-keeps-editing>
+    // Over the room the words keep under them for scrolling (45vh), that room kept under the notes instead.
+    <div className="nd-ed nd-doc" style={{ position: 'relative', minHeight: 0, marginTop: 'calc(24px - 45vh)', paddingTop: 0, paddingBottom: '45vh', background: '#fff' }} data-keeps-editing>
       <div style={{ width: '33%', borderTop: '1px solid #c8ccd1', margin: '0 0 8px' }} />
       <div
         className="cursor-pointer"
