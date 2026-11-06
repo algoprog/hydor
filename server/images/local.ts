@@ -1,7 +1,7 @@
 // The picture tools on this computer: taking the background out of a picture (BiRefNet-lite) and erasing part of one
 // (LaMa), free and private, and the Python that draws plots. Setting them up (Settings → Images, video and audio) makes
-// a private Python environment in the data folder once (ONNX Runtime, NumPy, Pillow, Matplotlib and pandas: about 80 MB
-// to download); each model downloads the first time its tool is used (about 220 MB each), checked by its SHA-256.
+// a private Python environment in the data folder once (ONNX Runtime, NumPy, Pillow, Matplotlib, pandas, and a
+// portable ffmpeg for computers without one: about 145 MB to download); each model downloads the first time its tool is used (about 220 MB each), checked by its SHA-256.
 //
 // A worker (picture_worker.py) runs the models on the CPU, one picture at a time (others wait in line). Each model
 // loads only when its tool is used and unloads after a few idle minutes; the worker quits after a few more; nothing
@@ -42,13 +42,13 @@ const modelsDir = () => path.join(dir(), 'models');
 const jobsDir = () => path.join(dir(), 'jobs');
 /** The Python that runs the worker: one given (HYDOR_PICTURES_PYTHON, with these packages), else the private one. */
 const python = () => process.env.HYDOR_PICTURES_PYTHON || path.join(venv(), ...(WIN ? ['Scripts', 'python.exe'] : ['bin', 'python']));
-const PACKAGE_LIST = ['onnxruntime>=1.20', 'numpy>=1.26', 'pillow>=10.1', 'matplotlib>=3.8', 'pandas>=2.0'];
+const PACKAGE_LIST = ['onnxruntime>=1.20', 'numpy>=1.26', 'pillow>=10.1', 'matplotlib>=3.8', 'pandas>=2.0', 'imageio-ffmpeg>=0.5'];
 /** What the environment holds: another list means setting it up again. */
 const PACKAGES = PACKAGE_LIST.join(' ');
-/** What setting up downloads, in MB (measured: 78 MB of wheels for Linux; about 250 MB once installed). */
-const SETUP_MB = 80;
+/** What setting up downloads, in MB (measured for Linux: 146 MB of wheels, 68 MB of them ffmpeg's; about 410 MB once installed). */
+const SETUP_MB = 145;
 /** Free disk needed to set up: the environment and both models, with room to spare. */
-const DISK_MB = 1024;
+const DISK_MB = 1300;
 const HF = () => (process.env.HF_ENDPOINT || 'https://huggingface.co').replace(/\/+$/, '');
 
 export interface ModelInfo {
@@ -228,6 +228,7 @@ function install(cmd: string, args: string[], label: string): Promise<void> {
 export function setupLocal(): Promise<void> {
   if (settingUp) return settingUp;
   lastError = undefined;
+  const removed = life.signal;
   settingUp = (async () => {
     setupStep = 'Getting ready';
     try {
@@ -235,7 +236,7 @@ export function setupLocal(): Promise<void> {
       const disk = freeDiskMb(dir());
       if (disk < DISK_MB) throw new Error(`Not enough disk space: ${gb(disk)} GB free, and the picture tools need about ${gb(DISK_MB)} GB (the environment and the two models).`);
       const uv = findUv();
-      const label = `Installing ONNX Runtime, NumPy, Pillow, Matplotlib and pandas (about ${SETUP_MB} MB)`;
+      const label = `Installing ONNX Runtime, NumPy, Pillow, Matplotlib, pandas and ffmpeg (about ${SETUP_MB} MB)`;
       if (uv) {
         if (!fs.existsSync(python())) await install(uv, ['venv', '--quiet', '--python', '>=3.10,<3.15', venv()], 'Making a private Python environment');
         await install(uv, ['pip', 'install', '--quiet', '--python', python(), ...PACKAGE_LIST], label);
@@ -249,7 +250,7 @@ export function setupLocal(): Promise<void> {
       fs.writeFileSync(path.join(venv(), '.packages'), PACKAGES);
       probe = null;
     } catch (e) {
-      lastError = life.signal.aborted ? undefined : (e as Error).message;
+      lastError = removed.aborted ? undefined : (e as Error).message;
     } finally {
       setupStep = undefined;
     }
@@ -286,10 +287,11 @@ async function download(t: ToolName): Promise<void> {
   let start = fs.statSync(part, { throwIfNoEntry: false })?.size ?? 0;
   if (start > m.bytes) (fs.rmSync(part, { force: true }), (start = 0));
   const disk = freeDiskMb(modelsDir());
-  if (disk < (m.bytes - start) / 2 ** 20 + 64) throw new HttpError(507, `Not enough disk space to download ${m.label}: it needs ${Math.round(m.bytes / 2 ** 20)} MB, and ${Math.round(disk)} MB is free.`);
+  if (disk < (m.bytes - start) / 2 ** 20 + 64) throw new HttpError(507, `Not enough disk space to download ${m.label}: it needs ${Math.round(m.bytes / 1e6)} MB, and ${Math.round((disk * 2 ** 20) / 1e6)} MB is free.`);
   const idle = new AbortController();
   let timer = setTimeout(() => idle.abort(), IDLE_DOWNLOAD_MS);
-  const signal = AbortSignal.any([idle.signal, life.signal]);
+  const removed = life.signal;
+  const signal = AbortSignal.any([idle.signal, removed]);
   const total = Math.round(m.bytes / 1e6);
   const say = (done: number) => (jobStep = `Downloading ${m.label} (${total} MB, once): ${Math.floor((done / m.bytes) * 100)}%`);
   say(start);
@@ -326,7 +328,7 @@ async function download(t: ToolName): Promise<void> {
     fs.renameSync(part, final);
   } catch (e) {
     if (e instanceof HttpError) throw e;
-    if (life.signal.aborted) throw new HttpError(409, 'The picture tools were removed.');
+    if (removed.aborted) throw new HttpError(409, 'The picture tools were removed.');
     const why = idle.signal.aborted ? 'nothing came for a minute' : (e as Error).message;
     throw new HttpError(502, `The download of ${m.label} stopped (${why}). Try again: it goes on from where it stopped.`);
   } finally {
@@ -904,6 +906,10 @@ function whileAsked(reply: { raw: NodeJS.EventEmitter & { writableFinished: bool
 
 export const pictureTools: Feature = {
   id: 'pictureTools',
+  start() {
+    // Set up before for an older list of packages: again, as it was asked for then.
+    if (!process.env.HYDOR_PICTURES_PYTHON && fs.existsSync(python()) && fs.existsSync(path.join(venv(), '.packages')) && !envReady()) void setupLocal();
+  },
   routes({ app, db }) {
     app.get('/api/images/local', async () => localState());
     app.post('/api/images/local/setup', async () => {

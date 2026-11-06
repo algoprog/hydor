@@ -261,7 +261,7 @@ for line in sys.stdin:
 
   {
     const s = await state();
-    ok(!s.ready && !s.installing && s.canInstall && s.sizeMb === 80 && !s.downloaded.length && !s.loaded.length && !s.error, `nothing set up: ${JSON.stringify(s)}`);
+    ok(!s.ready && !s.installing && s.canInstall && s.sizeMb === 145 && !s.downloaded.length && !s.loaded.length && !s.error, `nothing set up: ${JSON.stringify(s)}`);
     const hasMpl = (() => {
       try {
         execFileSync('python3', ['-I', '-c', 'import matplotlib'], { stdio: 'ignore' });
@@ -340,7 +340,7 @@ for line in sys.stdin:
     ok(s.installing && !s.ready, 'setting up starts');
     ok(await until(() => !localState().installing), 'and ends');
     s = await state();
-    ok(!s.ready && /^Installing ONNX Runtime, NumPy, Pillow, Matplotlib and pandas \(about 80 MB\) failed: error: no wheels for onnxruntime/.test(s.error ?? ''), `a failure in words: ${s.error}`);
+    ok(!s.ready && /^Installing ONNX Runtime, NumPy, Pillow, Matplotlib, pandas and ffmpeg \(about 145 MB\) failed: error: no wheels for onnxruntime/.test(s.error ?? ''), `a failure in words: ${s.error}`);
     fs.rmSync(uvFail);
     const steps = new Set<string>();
     s = (await req('POST', '/api/images/local/setup')).json();
@@ -353,16 +353,30 @@ for line in sys.stdin:
     s = await state();
     ok(s.ready && !s.installing && !s.error && !s.step, `ready: ${JSON.stringify(s)}`);
     ok(
-      [...steps].some((x) => /^Installing ONNX Runtime, NumPy, Pillow, Matplotlib and pandas \(about 80 MB\)$/.test(x)),
+      [...steps].some((x) => /^Installing ONNX Runtime, NumPy, Pillow, Matplotlib, pandas and ffmpeg \(about 145 MB\)$/.test(x)),
       `its steps shown: ${[...steps].join(' / ')}`,
     );
     const log = fs.readFileSync(uvLog, 'utf8');
     ok(
-      /venv --quiet --python >=3\.10,<3\.15 .*pictures\/venv/.test(log) && /pip install --quiet --python .*pictures\/venv\/bin\/python onnxruntime>=1\.20 numpy>=1\.26 pillow>=10\.1 matplotlib>=3\.8 pandas>=2\.0/.test(log),
+      /venv --quiet --python >=3\.10,<3\.15 .*pictures\/venv/.test(log) && /pip install --quiet --python .*pictures\/venv\/bin\/python onnxruntime>=1\.20 numpy>=1\.26 pillow>=10\.1 matplotlib>=3\.8 pandas>=2\.0 imageio-ffmpeg>=0\.5/.test(log),
       `uv made the environment and installed: ${log}`,
     );
-    ok(fs.readFileSync(path.join(pictures, 'venv', '.packages'), 'utf8') === 'onnxruntime>=1.20 numpy>=1.26 pillow>=10.1 matplotlib>=3.8 pandas>=2.0', 'what it holds is noted');
+    ok(fs.readFileSync(path.join(pictures, 'venv', '.packages'), 'utf8') === 'onnxruntime>=1.20 numpy>=1.26 pillow>=10.1 matplotlib>=3.8 pandas>=2.0 imageio-ffmpeg>=0.5', 'what it holds is noted');
     ok((await req('POST', '/api/images/local/setup')).json().ready, 'setting up again when ready does nothing');
+
+    // Set up before for an older list of packages: it sets itself up again when the app starts.
+    const marker = path.join(pictures, 'venv', '.packages');
+    fs.writeFileSync(marker, 'onnxruntime>=1.20 numpy>=1.26 pillow>=10.1 matplotlib>=3.8');
+    ok(!(await state()).ready, 'an older environment is not ready');
+    pictureTools.start!(deps);
+    ok(localState().installing && (await until(() => !localState().installing)) && (await state()).ready && fs.readFileSync(marker, 'utf8').endsWith('imageio-ffmpeg>=0.5'), 'it sets itself up again on start');
+
+    // Removed while it sets up: it stops, and no failure is left behind.
+    fs.writeFileSync(marker, 'old');
+    const again = (await req('POST', '/api/images/local/setup')).json() as LocalToolsState;
+    const gone = (await req('DELETE', '/api/images/local')).json() as LocalToolsState;
+    ok(again.installing && !gone.ready && !gone.installing && !gone.error && !fs.existsSync(pictures), `removed while setting up: ${JSON.stringify(gone)}`);
+    ok((await req('POST', '/api/images/local/setup')).json().installing && (await until(() => !localState().installing)) && (await state()).ready, 'and set up again');
   }
 
   // ---- the first use of each tool: its model downloads, one at a time ----------------------------------------------
@@ -461,7 +475,7 @@ for line in sys.stdin:
     fs.rmSync(workerLog, { force: true });
     const c = await run('remove_background', { path: 'photo.png' });
     const m = savedPath(c.text);
-    ok(!c.isError && /^Took the background out with BiRefNet-lite, on this computer \(free and private\):/.test(c.text) && m && m[1] === path.join(tmp, 'images', 'photo-cutout.png') && m[2] === '64', `remove_background: ${c.text}`);
+    ok(!c.isError && /^Took the background out with BiRefNet-lite on this computer \(free and private\):/.test(c.text) && m && m[1] === path.join(tmp, 'images', 'photo-cutout.png') && m[2] === '64', `remove_background: ${c.text}`);
     ok(fs.readFileSync(path.join(tmp, 'images', 'photo-cutout.png')).readUInt32BE(0) === 0x89504e47, 'its PNG in images/');
     ok(savedPath((await run('remove_background', { path: 'photo.png', name: 'Logo, clean!' })).text)?.[1] === path.join(tmp, 'images', 'logo-clean.png'), 'a name of its own');
     ok(savedPath((await run('remove_background', { path: 'photo.png' })).text)?.[1] === path.join(tmp, 'images', 'photo-cutout-2.png'), 'never over a file that is there');
@@ -472,7 +486,7 @@ for line in sys.stdin:
         { x: 40.5, y: 0, w: 100, h: 5 },
       ],
     });
-    ok(!e.isError && /^Erased 2 boxes with LaMa, on this computer \(free and private\):/.test(e.text) && savedPath(e.text)?.[1] === path.join(tmp, 'images', 'photo-erased.png'), `erase_from_image: ${e.text}`);
+    ok(!e.isError && /^Erased 2 boxes with LaMa on this computer \(free and private\):/.test(e.text) && savedPath(e.text)?.[1] === path.join(tmp, 'images', 'photo-erased.png'), `erase_from_image: ${e.text}`);
     const sent = jobs().find((x) => x.op === 'erase');
     ok(
       JSON.stringify(sent?.boxes) ===
@@ -520,7 +534,7 @@ for line in sys.stdin:
     const poorTool = await run('remove_background', { path: 'photo.png' });
     ok(
       !poorTool.isError &&
-        /^Took the background out with BiRefNet-lite, on this computer \(free and private\), though it found almost nothing to keep; an image model did not do it again: no OpenRouter key is set \(the user can add one in Settings → Models\):/.test(
+        /^Took the background out with BiRefNet-lite on this computer \(free and private\), though it found almost nothing to keep; an image model did not do it again: no OpenRouter key is set \(the user can add one in Settings → Models\):/.test(
           poorTool.text,
         ) &&
         savedPath(poorTool.text),
@@ -537,9 +551,7 @@ for line in sys.stdin:
     const bigTool = await run('erase_from_image', { path: 'photo.png', boxes: [{ x: 10, y: 8, w: 40, h: 30 }] });
     ok(
       !bigTool.isError &&
-        /^Erased the box with LaMa, on this computer \(free and private\), though the area is large \(39% of the picture\), and the eraser on this computer smears large areas; an image model did not do it: no OpenRouter key is set/.test(
-          bigTool.text,
-        ),
+        /^Erased the box with LaMa on this computer \(free and private\), though the area is large \(39% of the picture\), and the eraser on this computer smears large areas; an image model did not do it: no OpenRouter key is set/.test(bigTool.text),
       `and for an agent: ${bigTool.text}`,
     );
     ok(/^measure large \[\[8, 6, 44, 34\]\]$/m.test(fs.readFileSync(workerLog, 'utf8')), 'the boxes measured first');
@@ -937,7 +949,7 @@ for line in sys.stdin:
   {
     const t = await run('erase_from_image', { path: 'textured.png', boxes: [{ x: 200, y: 150, w: 60, h: 60 }] });
     const m = savedPath(t.text);
-    ok(!t.isError && m && /^Erased the box with LaMa, on this computer/.test(t.text), `erase_from_image here: ${t.text}`);
+    ok(!t.isError && m && /^Erased the box with LaMa on this computer/.test(t.text), `erase_from_image here: ${t.text}`);
     if (m) {
       const k = readPng(fs.readFileSync(m[1]));
       const src = readPng(textured);
@@ -948,7 +960,9 @@ for line in sys.stdin:
     const wide = picture(W, H, (x, y) => (x >= 20 && x < 460 && y >= 100 && y < 260 ? [255, 255, 255, 255] : [0, 0, 0, 255]));
     const large = await req('POST', '/api/images/erase', { src: dataUrl(textured), mask: dataUrl(wide) });
     ok(
-      large.statusCode === 200 && large.json().how === 'local' && /^Erased on this computer, though the area is large \(4\d% of the picture\), and the eraser on this computer smears large areas: look at it\. An image model would do it better/.test(large.json().why ?? ''),
+      large.statusCode === 200 &&
+        large.json().how === 'local' &&
+        /^Erased on this computer, though the area is large \(4\d% of the picture\), and the eraser on this computer smears large areas: look at it\. An image model would do it better/.test(large.json().why ?? ''),
       `a large hole measured for real: an image model would do better (no key here): ${large.json().why}`,
     );
     const far = await run('erase_from_image', { path: 'textured.png', boxes: [{ x: 900, y: 900, w: 10, h: 10 }] });
