@@ -238,8 +238,15 @@ export interface Validation {
   reject?: boolean;
 }
 
-export type SheetChartKind = 'column' | 'bar' | 'line' | 'area' | 'pie' | 'doughnut' | 'scatter';
-export const SHEET_CHART_KINDS: SheetChartKind[] = ['column', 'bar', 'line', 'area', 'pie', 'doughnut', 'scatter'];
+export type SheetChartKind = 'column' | 'bar' | 'line' | 'area' | 'pie' | 'doughnut' | 'scatter' | 'combo' | 'histogram' | 'bubble' | 'radar';
+export const SHEET_CHART_KINDS: SheetChartKind[] = ['column', 'bar', 'line', 'area', 'pie', 'doughnut', 'scatter', 'combo', 'histogram', 'bubble', 'radar'];
+
+/** A series' own way of being drawn: as columns or a line (a combo chart), on the second axis at the right, with a trendline. */
+export interface ChartSeriesOpts {
+  type?: 'column' | 'line';
+  axis?: 2;
+  trend?: 'linear' | 'exp';
+}
 
 /** A corner of a chart: the cell it is on, and where in that cell (px from its top-left corner, at 100%). */
 export interface ChartCorner {
@@ -268,6 +275,17 @@ export interface SheetChart {
   yTitle?: string;
   colors?: string[];
   stacked?: boolean;
+  /** 100% stacked: each label's values as shares of its total. */
+  percent?: boolean;
+  /** The values written on the points, columns and slices. */
+  values?: boolean;
+  /** The value axis's lowest and highest (worked out when not said). */
+  min?: number;
+  max?: number;
+  /** Each series' own way, by its place (columns or a line, the second axis, a trendline). */
+  series?: ChartSeriesOpts[];
+  /** A histogram's bins (worked out when not said). */
+  bins?: number;
   from: ChartCorner;
   to: ChartCorner;
 }
@@ -1595,7 +1613,7 @@ function cleanValidation(x: unknown): Validation | null {
 
 const cleanValidations = (v: unknown): Validation[] => (Array.isArray(v) ? v.slice(0, SHEET_LIMITS.rules).flatMap((x) => cleanValidation(x) ?? []) : []);
 
-const CHART_ALIAS: Record<string, SheetChartKind> = { col: 'column', columns: 'column', bars: 'bar', lines: 'line', donut: 'doughnut', ring: 'doughnut', xy: 'scatter', points: 'scatter' };
+const CHART_ALIAS: Record<string, SheetChartKind> = { col: 'column', columns: 'column', bars: 'bar', lines: 'line', donut: 'doughnut', ring: 'doughnut', xy: 'scatter', points: 'scatter', 'column-line': 'combo', mixed: 'combo', distribution: 'histogram', frequency: 'histogram', bubbles: 'bubble', spider: 'radar', web: 'radar' };
 
 // ---- charts: their ranges and where they sit -------------------------------------------------------------------
 
@@ -1756,7 +1774,28 @@ function cleanCharts(v: unknown, g: SheetSizes): SheetChart[] {
     if (yt) c.yTitle = yt;
     const colors = Array.isArray(x.colors) ? x.colors.slice(0, 12).flatMap((col) => cleanColor(col) ?? []) : [];
     if (colors.length) c.colors = colors;
-    if (x.stacked === true) c.stacked = true;
+    if (x.stacked === true || x.stacked === 'percent' || x.percent === true) c.stacked = true;
+    if (x.percent === true || x.stacked === 'percent') c.percent = true;
+    if (x.values === true || x.dataLabels === true || x.labelsOnPoints === true) c.values = true;
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() && Number.isFinite(Number(v)) ? Number(v) : undefined);
+    const lo = num(x.min ?? x.yMin);
+    const hi = num(x.max ?? x.yMax);
+    if (lo !== undefined && (hi === undefined || lo < hi)) c.min = lo;
+    if (hi !== undefined && (lo === undefined || lo < hi)) c.max = hi;
+    if (Array.isArray(x.series)) {
+      const opts = x.series.slice(0, 50).map((o): ChartSeriesOpts => {
+        const s: ChartSeriesOpts = {};
+        if (!isObj(o)) return s;
+        if (o.type === 'line' || o.type === 'column') s.type = o.type;
+        if (o.axis === 2 || o.axis === '2' || o.axis === 'right' || o.right === true) s.axis = 2;
+        if (o.trend === 'linear' || o.trend === 'exp' || o.trendline === 'linear' || o.trendline === 'exp' || o.trend === true) s.trend = o.trend === 'exp' || o.trendline === 'exp' ? 'exp' : 'linear';
+        return s;
+      });
+      while (opts.length && !Object.keys(opts[opts.length - 1]).length) opts.pop();
+      if (opts.length) c.series = opts;
+    }
+    const bins = intIn(x.bins, 2, 100);
+    if (bins && kind === 'histogram') c.bins = bins;
     out.push(c);
   }
   return out;

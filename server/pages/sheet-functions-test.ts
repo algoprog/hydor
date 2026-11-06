@@ -24,6 +24,7 @@ import {
 } from '../../shared/sheets.ts';
 import { importBook, xlsxOfBook } from './sheets.ts';
 import { addGroup, foldGroup, guardOf, protectionAt, removeGroup, spansOf } from '../../shared/sheet-groups.ts';
+import { chartData, chartSvg, histogramOf } from '../../shared/sheet-chart.ts';
 import { Zip } from '../documents/zip.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -308,6 +309,50 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
   const back = importBook(x, 'G.xlsx').book.sheets[0];
   ok(back.groups?.some((g) => g.range === '2:9') && back.groups?.some((g) => g.range === '4:5' && g.hidden) && back.groups?.some((g) => g.range === 'C:E'), 'and read back: the groups, folded or not');
   ok(back.protect?.[0]?.except === 'B2:B9' && !back.protect[0].range, 'and the sheet’s protection');
+}
+
+// ---- charts: combo, histogram, bubble, radar, 100% stacked, trendlines, labels, axis limits, a second axis ----------------
+{
+  const rows = [['Month', 'Sales', 'Margin', 'Size'], ['Jan', 120, 0.2, 5], ['Feb', 150, 0.25, 9], ['Mar', 90, 0.15, 3], ['Apr', 200, 0.3, 12]];
+  const b = normalizeBook({
+    sheets: [
+      {
+        name: 'C',
+        rows,
+        charts: [
+          { kind: 'combo', range: 'A1:C5', at: 'F2:L16', series: [{}, { type: 'line', axis: 2, trend: 'linear' }], values: true, min: 0, max: 250 },
+          { kind: 'histogram', range: 'B1:B5', at: 'F18:L30', bins: 3 },
+          { kind: 'bubble', range: 'B1:D5', at: 'N2:T16' },
+          { kind: 'radar', range: 'A1:B5', at: 'N18:T30' },
+          { kind: 'column', range: 'A1:C5', at: 'F32:L44', stacked: 'percent' },
+        ],
+      },
+    ],
+  });
+  const ch = b.sheets[0].charts!;
+  ok(ch[0].kind === 'combo' && ch[0].series?.[1]?.type === 'line' && ch[0].series[1].axis === 2 && ch[0].series[1].trend === 'linear' && ch[0].values && ch[0].min === 0 && ch[0].max === 250, 'a combo chart’s options kept');
+  ok(ch[1].kind === 'histogram' && ch[1].bins === 3 && ch[4].percent && ch[4].stacked, 'a histogram’s bins, a 100% stacked chart');
+  const calc = computeBook(b);
+  const svg = (i: number) => chartSvg(ch[i], chartData(b, calc, 0, ch[i]), 480, 300);
+  const combo = svg(0);
+  ok((combo.match(/<rect /g) ?? []).length >= 4 && combo.includes('stroke-dasharray="5 4"') && combo.includes('>150<'), 'combo: columns, a line, its trendline dashed, the values written');
+  const hg = histogramOf([1, 2, 2, 3, 9, 10], 3);
+  ok(same(hg.counts, [4, 0, 2]) && hg.labels.length === 3, 'a histogram’s bins');
+  ok((svg(1).match(/<rect /g) ?? []).length >= 3, 'a histogram drawn');
+  ok((svg(2).match(/<circle /g) ?? []).length === 4, 'a bubble chart: a bubble a row');
+  ok(svg(3).includes('Z" fill=') && svg(3).includes('>Feb<'), 'a radar chart: a shape round its labels');
+  ok(svg(4).includes('>100%<'), 'a 100% stacked chart’s axis in percents');
+  const x = new Zip(xlsxOfBook(b, 'C'));
+  const part = (n: number) => x.text(`xl/charts/chart${n}.xml`) ?? '';
+  ok(part(1).includes('<c:barChart>') && part(1).includes('<c:lineChart>') && part(1).includes('<c:axId val="50010004"/>') && part(1).includes('<c:trendlineType val="linear"/>') && part(1).includes('<c:showVal val="1"/>') && part(1).includes('<c:max val="250"/>'), 'Excel: a combo with a second axis, a trendline, values and an axis maximum');
+  ok(part(2).includes('<c:gapWidth val="0"/>') && part(2).includes('<c:numLit>'), 'Excel: a histogram as columns of its bins');
+  ok(part(3).includes('<c:bubbleChart>') && part(3).includes('<c:bubbleSize>') && part(4).includes('<c:radarChart>') && part(5).includes('percentStacked'), 'Excel: bubbles, radar, 100% stacked');
+  const back = importBook(xlsxOfBook(b, 'C'), 'C.xlsx').book.sheets[0].charts ?? [];
+  const k = back.map((c) => c.kind).join(',');
+  ok(k.includes('combo') && k.includes('bubble') && k.includes('radar'), `read back: ${k}`);
+  const cb = back.find((c) => c.kind === 'combo');
+  ok(cb?.series?.[1]?.type === 'line' && cb.series[1].axis === 2 && cb.series[1].trend === 'linear' && cb.values && cb.max === 250, 'and the combo’s options');
+  ok(back.find((c) => c.kind === 'column')?.percent === true, 'and 100% stacked');
 }
 
 console.log(`${passed} passed, ${failed} failed`);
