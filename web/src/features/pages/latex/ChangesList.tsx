@@ -76,7 +76,7 @@ export function ChangesList({
             <span className={cx('flex h-5 w-5 shrink-0 items-center justify-center rounded-full', c.kind === 'ins' ? 'bg-ok/15 text-ok' : 'bg-err/15 text-err')}>{c.kind === 'ins' ? <Plus size={12} /> : <Minus size={12} />}</span>
             <span className="min-w-0 flex-1 truncate text-[12px] text-fg-3">
               <span className="inline-flex align-middle">
-                <Who by={c.by} />
+                <Who by={c.by === 'ai' ? 'agent' : c.by} author={c.by === 'ai' ? 'AI' : undefined} />
               </span>{' '}
               · {ago(c.at)}
             </span>
