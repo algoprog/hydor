@@ -3,6 +3,34 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.33.0 · 6 November 2026
+
+The models that run on your own computer use its graphics card by default, a Mac's too: search by meaning, the
+picture tools, dictation, Speech to text and Text from pictures. Each says where it runs, and goes back to the
+processor, saying why, when the card fails.
+
+- **Search by meaning on a Mac's GPU**: on a Mac with Apple silicon, search by meaning (memory, the Library, knowledge
+  bases) runs on the Mac's own GPU instead of its processor, so a big knowledge base gets ready far sooner; on an NVIDIA
+  card as before. Its vectors are the same as the processor's, so nothing is made again. Settings → Memory says where it
+  runs (the chip's name), and when the GPU fails its first try, it runs on the processor and says why.
+- **Picture tools on the graphics card**: taking backgrounds out and erasing things run on an NVIDIA card (CUDA) or a
+  Mac's GPU (Core ML), and on the processor when the card fails, one model at a time. With an NVIDIA card their setup
+  is bigger (about 2.1 GB rather than 145 MB) and runs once more after this update. Settings → Images, video and audio
+  says where they run. Erasing also starts faster on the processor.
+- **Dictation on the GPU**: on a Mac, speech recognition on this computer runs on the Mac's GPU (Metal), now asked for
+  in so many words. On Linux with an NVIDIA card and NVIDIA's CUDA toolkit, a build for the card is made in the
+  background while dictation already works on the processor; without the toolkit, Settings → Voice says what it needs.
+  When the GPU fails, the recording is done again on the processor. Settings → Voice says where it runs.
+- **Speech to text and Text from pictures** (plugins) run on an NVIDIA card by default, their setup adding NVIDIA's
+  libraries there; Text from pictures uses a Mac's GPU too. Speech to text stays on a Mac's processor: its Whisper has
+  no Apple GPU support. Each says in its answer where it ran.
+- **Plugins can ask for what an NVIDIA GPU needs**: `requires.pipNvidia` in a plugin's plugin.json adds Python packages
+  only on a computer with an NVIDIA GPU (CUDA's libraries, a GPU build), and a failure there never fails its setup.
+  The plugin editor keeps them, and a plugin's Python version, when it saves.
+- **Starting a session on a shaky connection**: when a phone sleeps or its network changes while a session starts, the
+  page no longer says the session did not start when the server made it: it asks what came of the start and opens the
+  session, saying Reconnecting… meanwhile. One press of Start never makes two sessions.
+
 ## 0.32.1 · 6 November 2026
 
 Knowledge bases get ready to search by meaning on a Mac, say what they wait for when they wait, and read big text
