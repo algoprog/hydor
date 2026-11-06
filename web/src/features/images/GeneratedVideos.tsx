@@ -13,6 +13,7 @@ import { VideoPlayer } from '../../components/VideoPlayer';
 import { download } from '../documents/FileCards';
 import { FileMore } from '../files/SpaceMenu';
 import { KeepButton } from '../media/Keep';
+import { OpenRouterKeyCard } from '../connections/OpenRouterKeyCard';
 
 interface Clip {
   path: string;
@@ -83,7 +84,14 @@ export function GeneratedVideos({ item, sessionKey }: { item: ToolItem; sessionK
   const prompt = typeof input.prompt === 'string' ? input.prompt : undefined;
   const aspect = typeof input.aspect_ratio === 'string' ? input.aspect_ratio : undefined;
   const clips = clipsOf(t.output);
-  if (t.status === 'running' || t.status === 'pending' || t.status === 'waiting') return <Working since={item.ts} aspect={aspect} prompt={prompt} />;
+  // While it runs it may be waiting for an OpenRouter key: the card to give one (or skip) shows above it.
+  if (t.status === 'running' || t.status === 'pending' || t.status === 'waiting')
+    return (
+      <>
+        <OpenRouterKeyCard sessionKey={sessionKey} />
+        <Working since={item.ts} aspect={aspect} prompt={prompt} />
+      </>
+    );
   if (!clips.length) {
     const text = (t.output || t.error || 'No video was made.').trim();
     if (/no OpenRouter key/i.test(text))
