@@ -77,7 +77,7 @@ const runPython: LocalTools['runPython'] = async (code, o) => {
   });
 };
 const tools: LocalTools = {
-  state: () => ({ ready: true, installing: false, canInstall: true, sizeMb: 120, downloaded: [], loaded: [] }),
+  state: () => ({ ready: true, installing: false, canInstall: true, sizeMb: 120, downloaded: [], loaded: [], device: 'cpu' }),
   ready: () => true,
   cutout: async () => {
     throw new Error('not in this test');

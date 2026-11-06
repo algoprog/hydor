@@ -41,7 +41,10 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 process.env.CUDA_VISIBLE_DEVICES = '';
+// A computer without an NVIDIA GPU, whatever this one has (the stand-ins say otherwise where they test it; for real,
+// HYDOR_PICTURES_REAL_GPU=1 sets up the GPU build and runs it with the GPUs hidden, so it falls back to the CPU).
 const REAL = process.env.HYDOR_PICTURES_REAL === '1';
+process.env.HYDOR_TEST_NVIDIA = REAL && process.env.HYDOR_PICTURES_REAL_GPU === '1' ? '1' : '0';
 
 let failed = 0;
 let passed = 0;
@@ -120,6 +123,7 @@ if (!REAL) {
   fs.mkdirSync(bin);
   const uvLog = path.join(tmp, 'uv.log');
   const uvFail = path.join(tmp, 'uv-fail');
+  const gpuFail = path.join(tmp, 'uv-gpu-fail');
   // It makes a "venv" whose Python is this computer's, and pretends to install (or fails, when told).
   fs.writeFileSync(
     path.join(bin, 'uv'),
@@ -127,6 +131,7 @@ if (!REAL) {
       '#!/bin/bash',
       `echo "$@" >> ${uvLog}`,
       'if [ "$1" = venv ]; then dir="${@: -1}"; mkdir -p "$dir/bin"; ln -sf "$(command -v python3)" "$dir/bin/python"; exit 0; fi',
+      `if [ "$1" = pip ] && [ "$2" = install ] && [ -f ${gpuFail} ] && echo "$@" | grep -q onnxruntime-gpu; then echo "error: no wheels for onnxruntime-gpu on this platform" >&2; exit 2; fi`,
       `if [ "$1" = pip ]; then sleep 0.4; if [ -f ${uvFail} ]; then echo "error: no wheels for onnxruntime on this platform" >&2; exit 2; fi; exit 0; fi`,
       'exit 1',
     ].join('\n'),
@@ -171,7 +176,7 @@ if (!REAL) {
   // its control file.
   const workerLog = path.join(tmp, 'worker.log');
   const workerCtl = path.join(tmp, 'worker.json');
-  const control = (c: { workMs?: number; cutout?: string; hole?: string; detail?: number }) => fs.writeFileSync(workerCtl, JSON.stringify({ workMs: 40, cutout: 'good', hole: 'small', detail: 0, ...c }));
+  const control = (c: { workMs?: number; cutout?: string; hole?: string; detail?: number; fellBack?: string }) => fs.writeFileSync(workerCtl, JSON.stringify({ workMs: 40, cutout: 'good', hole: 'small', detail: 0, ...c }));
   control({});
   const fakeWorker = path.join(tmp, 'fake_worker.py');
   fs.writeFileSync(
@@ -222,14 +227,16 @@ for line in sys.stdin:
     if op not in loaded:
         say({'id': rid, 'status': 'loading'}); time.sleep(0.08); loaded.append(op)
     say({'id': rid, 'status': 'working'})
-    log(json.dumps({'id': rid, 'op': op, 'model': req['model'], 'boxes': req.get('boxes'), 'mask': 'mask' in req, 'max': req.get('max_bytes')}))
+    log(json.dumps({'id': rid, 'op': op, 'model': req['model'], 'boxes': req.get('boxes'), 'mask': 'mask' in req, 'max': req.get('max_bytes'), 'device': req.get('device'), 'cache': req.get('cache'), 'told': os.environ.get('HYDOR_PICTURES_DEVICE'), 'cvd': os.environ.get('CUDA_VISIBLE_DEVICES')}))
     c = ctl()
     time.sleep(c['workMs'] / 1000)
     open(req['output'], 'wb').write(png(w, h, (200, 30, 40, 128) if op == 'cutout' else (10, 200, 10, 255)))
     small = None
     if req.get('small'):
         open(req['small'], 'wb').write(cut_mask(c['cutout'], w, h)); small = [w, h]
-    say({'id': rid, 'ok': True, 'w': w, 'h': h, 'scaled': False, 'loaded': loaded, 'rss': 50, **({'small': small} if small else {})})
+    told = os.environ.get('HYDOR_PICTURES_DEVICE', 'cpu')
+    fell = c.get('fellBack') if told != 'cpu' and req.get('device') != 'cpu' else None
+    say({'id': rid, 'ok': True, 'w': w, 'h': h, 'scaled': False, 'loaded': loaded, 'rss': 50, 'device': 'cpu' if fell or req.get('device') == 'cpu' else told, **({'fell_back': fell} if fell else {}), **({'small': small} if small else {})})
 `,
   );
   const jobs = () =>
@@ -261,7 +268,7 @@ for line in sys.stdin:
 
   {
     const s = await state();
-    ok(!s.ready && !s.installing && s.canInstall && s.sizeMb === 145 && !s.downloaded.length && !s.loaded.length && !s.error, `nothing set up: ${JSON.stringify(s)}`);
+    ok(!s.ready && !s.installing && s.canInstall && s.sizeMb === 145 && s.device === 'cpu' && !s.downloaded.length && !s.loaded.length && !s.error, `nothing set up: ${JSON.stringify(s)}`);
     const hasMpl = (() => {
       try {
         execFileSync('python3', ['-I', '-c', 'import matplotlib'], { stdio: 'ignore' });
@@ -855,6 +862,86 @@ for line in sys.stdin:
     ok(putBackInBoxes(Buffer.from('not a png'), photo, []) === null, 'only PNGs are put back');
   }
 
+  // ---- where they run: an NVIDIA GPU, a Mac's, the CPU -------------------------------------------------------------
+
+  {
+    stopPictureTools();
+    fs.rmSync(workerLog, { force: true });
+    const marker = path.join(pictures, 'venv', '.packages');
+    const GPU = 'onnxruntime-gpu[cuda,cudnn]>=1.21,<1.27 numpy>=1.26 pillow>=10.1 matplotlib>=3.8 pandas>=2.0 imageio-ffmpeg>=0.5';
+    const CPU = 'onnxruntime>=1.20 numpy>=1.26 pillow>=10.1 matplotlib>=3.8 pandas>=2.0 imageio-ffmpeg>=0.5';
+    // Set up as on a computer without one; then with an NVIDIA GPU, that CPU's build is not what it wants, and the GPU
+    // build goes in its place.
+    (await req('POST', '/api/images/local/setup')).json();
+    await until(() => !localState().installing);
+    ok((await state()).ready && fs.readFileSync(marker, 'utf8') === CPU, 'set up with the CPU’s build');
+    process.env.HYDOR_TEST_NVIDIA = '1';
+    let s = await state();
+    ok(!s.ready && s.device === 'cuda' && s.sizeMb === 2100 && s.canInstall, `with an NVIDIA GPU, the CPU's build is set up again: ${JSON.stringify(s)}`);
+    fs.writeFileSync(uvLog, '');
+    const steps = new Set<string>();
+    (await req('POST', '/api/images/local/setup')).json();
+    await until(() => {
+      const x = localState();
+      if (x.step) steps.add(x.step);
+      return !x.installing;
+    });
+    s = await state();
+    const log = fs.readFileSync(uvLog, 'utf8');
+    ok(s.ready && s.device === 'cuda' && !s.gpuBuildFailed && !s.onCpu && fs.readFileSync(marker, 'utf8') === GPU, `the GPU build set up: ${JSON.stringify(s)}`);
+    ok(/pip uninstall --quiet --python \S+ onnxruntime onnxruntime-gpu\n[^]*pip install --quiet --python \S+ onnxruntime-gpu\[cuda,cudnn\]>=1\.21,<1\.27 numpy/.test(log), `the CPU's build taken away first, then the GPU's: ${log}`);
+    ok([...steps].includes('Installing ONNX Runtime for the NVIDIA GPU (with CUDA and cuDNN), NumPy, Pillow, Matplotlib, pandas and ffmpeg (about 2.1 GB)'), `its step says what and how much: ${[...steps].join(' / ')}`);
+
+    // The worker is told to run on the GPU, with the GPUs the app was given (here none, as in every test).
+    control({ fellBack: 'on cuda: RuntimeError: CUDA failure 100: no CUDA-capable device is detected' });
+    ok((await req('POST', '/api/images/cutout', { src: dataUrl(photo) })).statusCode === 200, 'a cutout on the GPU that fell back to the CPU still comes back');
+    let j = jobs().at(-1);
+    ok(j.told === 'cuda' && j.cvd === '' && j.device == null && j.cache == null, `the worker told: ${JSON.stringify(j)}`);
+    s = await state();
+    ok(s.device === 'cuda' && s.onCpu?.join() === 'cutout' && /CUDA failure 100/.test(s.gpuWhy ?? ''), `the model the GPU failed runs on the CPU, and the state says why: ${JSON.stringify(s)}`);
+    ok((await req('POST', '/api/images/cutout', { src: dataUrl(photo) })).statusCode === 200 && jobs().at(-1).device === 'cpu', 'from then on it is asked for on the CPU');
+    control({});
+    ok((await req('POST', '/api/images/erase', { src: dataUrl(photo), mask: dataUrl(mask) })).statusCode === 200 && jobs().at(-1).device == null, 'the other model still on the GPU');
+    ok((await state()).onCpu?.join() === 'cutout', 'which the state says');
+
+    // The GPU build will not install here: the CPU's is, and the state says so.
+    stopPictureTools();
+    fs.writeFileSync(gpuFail, '');
+    fs.writeFileSync(marker, 'old');
+    fs.writeFileSync(uvLog, '');
+    (await req('POST', '/api/images/local/setup')).json();
+    await until(() => !localState().installing);
+    s = await state();
+    ok(s.ready && s.device === 'cpu' && s.gpuBuildFailed && !s.onCpu && /no wheels for onnxruntime-gpu/.test(s.gpuWhy ?? '') && fs.readFileSync(marker, 'utf8') === CPU, `no GPU build here: the CPU's: ${JSON.stringify(s)}`);
+    ok(/onnxruntime-gpu\[cuda,cudnn\][^\n]*\n[^]*pip install --quiet --python \S+ onnxruntime>=1\.20 numpy/.test(fs.readFileSync(uvLog, 'utf8')), 'tried, then the CPU build');
+    ok((await req('POST', '/api/images/cutout', { src: dataUrl(photo) })).statusCode === 200 && jobs().at(-1).told === 'cpu', 'and the worker runs on the CPU');
+    pictureTools.start!(deps);
+    ok(!localState().installing && (await state()).ready, 'not set up again each time the app starts');
+    fs.rmSync(gpuFail);
+
+    // Kept on the CPU (HYDOR_PICTURES_DEVICE=cpu): the CPU's build, and the CPU.
+    process.env.HYDOR_PICTURES_DEVICE = 'cpu';
+    s = await state();
+    ok(s.ready && s.device === 'cpu' && s.sizeMb === 145 && !s.gpuBuildFailed, `kept on the CPU: ${JSON.stringify(s)}`);
+    delete process.env.HYDOR_PICTURES_DEVICE;
+
+    // A Mac: the CPU's build, which has Core ML; the worker is told to use it, with a folder per model for what it compiles.
+    stopPictureTools();
+    process.env.HYDOR_TEST_NVIDIA = '0';
+    setPictureToolsForTests({ apple: true });
+    s = await state();
+    ok(s.ready && s.device === 'coreml' && s.sizeMb === 145, `a Mac: ${JSON.stringify(s)}`);
+    ok((await req('POST', '/api/images/cutout', { src: dataUrl(photo) })).statusCode === 200, 'a cutout on a Mac');
+    j = jobs().at(-1);
+    ok(j.told === 'coreml' && j.cvd === '' && j.cache === path.join(pictures, 'coreml', fakeModels().cutout.sha256.slice(0, 16)), `told to use Core ML, with its cache: ${JSON.stringify(j)}`);
+    fs.mkdirSync(path.join(pictures, 'coreml', 'old0123456789abc'), { recursive: true });
+    pictureTools.start!(deps);
+    ok(!fs.existsSync(path.join(pictures, 'coreml', 'old0123456789abc')), 'what Core ML compiled of a model no longer used goes');
+    stopPictureTools();
+    setPictureToolsForTests({ apple: null });
+    ok((await state()).device === 'cpu', 'and elsewhere, the CPU');
+  }
+
   // ---- removing ----------------------------------------------------------------------------------------------------
 
   {
@@ -879,10 +966,12 @@ for line in sys.stdin:
   ok(await until(() => !localState().installing, 15 * 60_000), 'set up');
   s = await state();
   ok(s.ready && !s.error, `ready in ${Math.round((Date.now() - t0) / 1000)} s: ${JSON.stringify(s)}`);
+  const gpu = process.env.HYDOR_TEST_NVIDIA === '1';
+  ok(s.device === (gpu ? 'cuda' : 'cpu') && !s.gpuBuildFailed, `where they run: ${s.device}`);
   if (seed) {
     fs.mkdirSync(path.join(pictures, 'models'), { recursive: true });
     for (const [from, to] of [
-      ['cutout.onnx', 'birefnet-lite.onnx'],
+      ['cutout.onnx', 'birefnet-lite-512.onnx'],
       ['erase.onnx', 'lama.onnx'],
     ])
       fs.copyFileSync(path.join(seed, from), path.join(pictures, 'models', to));
@@ -1003,6 +1092,8 @@ for line in sys.stdin:
   }
   s = await state();
   ok(s.downloaded.join() === 'cutout,erase' && s.loaded.includes('erase'), `both models here, the eraser in memory: ${JSON.stringify(s)}`);
+  // The GPU build with the GPUs hidden: each model's session falls back to the CPU, and the state says so.
+  if (gpu) ok(s.onCpu?.join() === 'cutout,erase' && /CUDAExecutionProvider did not start/.test(s.gpuWhy ?? ''), `with no GPU to be had, both on the CPU: ${JSON.stringify(s)}`);
   {
     const pid = pictureWorkerPid()!;
     ok(await until(() => localState().loaded.length === 0, 6000), 'unloaded when idle');

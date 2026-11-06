@@ -181,8 +181,10 @@ agents that speak ACP and take MCP servers.
   version that answers the pointer for web decks. Free photos (find_photos) come from Openverse (Wikimedia Commons
   when it cannot answer), only those free to change and use commercially, saved with their credits. The picture
   tools on this computer (Settings → Images, video and audio → Set up: a private Python with ONNX Runtime and a
-  portable ffmpeg, about 145 MB, and two models downloaded when first used, BiRefNet-lite and LaMa) take
-  backgrounds out (remove_background) and erase parts of pictures (erase_from_image) for nothing and in private,
+  portable ffmpeg, about 145 MB, or 2.1 GB with ONNX Runtime's build for an NVIDIA GPU, and two models downloaded
+  when first used, BiRefNet-lite and LaMa) take backgrounds out (remove_background) and erase parts of pictures
+  (erase_from_image) for nothing and in private, on the graphics card when there is one they can use (an NVIDIA GPU
+  through CUDA, a Mac's through Core ML; a model the card fails runs on the CPU, and Settings says so) else on the CPU,
   each model loaded only while used, put away after a few idle minutes and never loaded without the memory for it;
   a poor cutout, and a large or detailed area to erase, go to an image model, and how: "ai" asks for one.
   edit_image crops, turns, sizes, adjusts, filters, marks up and blurs pictures, and edit_video trims, cuts, crops,
