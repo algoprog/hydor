@@ -61,3 +61,45 @@ export async function fontFile(p: string): Promise<{ data: Buffer; type: string 
   fs.writeFileSync(file, data);
   return { data, type: TYPES[m[1]] };
 }
+
+/** Whether a font file's unicode-range ("U+0000-00FF, U+0131, …") covers any of `chars`. */
+function covers(range: string, chars: Set<number>): boolean {
+  for (const part of range.split(',')) {
+    const m = /U\+([0-9A-F?]+)(?:-([0-9A-F]+))?/i.exec(part.trim());
+    if (!m) continue;
+    const lo = parseInt(m[1].replace(/\?/g, '0'), 16);
+    const hi = m[2] ? parseInt(m[2], 16) : m[1].includes('?') ? parseInt(m[1].replace(/\?/g, 'F'), 16) : lo;
+    for (const c of chars) if (c >= lo && c <= hi) return true;
+  }
+  return false;
+}
+
+/**
+ * The fonts named in `list` as a stylesheet with their files inside it (data: addresses), for a page that is a file of
+ * its own and must show the same with no network: only the faces `faces` says it uses (weights, italics) and only the
+ * files of the alphabets its words are written in (`text`). Fetched from Google once and kept (as fontsCss keeps
+ * them); '' when none can be had (offline, never fetched).
+ */
+export async function fontsInside(list: string[], text: string, faces: { weights: number[]; italic: boolean }): Promise<string> {
+  const css = await fontsCss(list.join(','));
+  if (!css) return '';
+  const chars = new Set<number>([0x20, 0x30, 0x41, 0x61]);
+  for (const ch of text.slice(0, 400_000)) chars.add(ch.codePointAt(0)!);
+  const out: string[] = [];
+  let bytes = 0;
+  for (const block of css.match(/@font-face\s*\{[^}]*\}/g) ?? []) {
+    const weight = Number(/font-weight:\s*(\d+)/.exec(block)?.[1] ?? 400);
+    const italic = /font-style:\s*italic/.test(block);
+    if (!faces.weights.includes(weight) || (italic && !faces.italic)) continue;
+    const range = /unicode-range:\s*([^;}]+)/.exec(block)?.[1];
+    if (range && !covers(range, chars)) continue;
+    const at = /url\(\/api\/pages\/fonts\/([^)]+)\)/.exec(block);
+    const f = at ? await fontFile(at[1]) : null;
+    if (!f) continue;
+    // A page carries a few hundred kilobytes of fonts at most (past three megabytes the rest are left out).
+    bytes += f.data.length;
+    if (bytes > 3 * 1024 * 1024) break;
+    out.push(block.replace(/url\([^)]+\)/, `url(data:${f.type};base64,${f.data.toString('base64')})`).replace(/\s+/g, ' '));
+  }
+  return out.join('');
+}

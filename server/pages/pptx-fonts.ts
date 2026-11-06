@@ -11,7 +11,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { everyEl, FONTS, fontName, footerOn, type Deck } from '../../shared/slides.ts';
+import { CODE_FONT, everyEl, FONTS, fontName, footerOn, type Deck } from '../../shared/slides.ts';
 import { config } from '../config.ts';
 import { fontOfMtx, mtxOf, sameFont } from './pptx-mtx.ts';
 
@@ -102,6 +102,10 @@ export function deckFaces(d: Deck): Face[] {
         const f = fontName(e.font, t);
         add(f, false, false);
         if (e.title) add(f, true, false);
+      } else if (e.type === 'code' && e.code.trim()) {
+        // Code in its monospaced font, its comments in italics.
+        add(CODE_FONT, false, false);
+        add(CODE_FONT, false, true);
       }
     }
     if (footerOn(d, i)) add(fontName('body', t), false, false);
