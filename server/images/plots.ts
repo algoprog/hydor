@@ -851,7 +851,7 @@ function plotTool(db: DB): RunTool {
       'Give the data inline in data (CSV, TSV or JSON text, up to 200 KB) or as data_file (the path of a CSV, TSV or JSON file, up to 20 MB): the model sees its columns and first rows, the script reads all of it. Without data, request says what to draw (a function, a distribution).',
       'Say in request what to plot and the point it makes; theme gives the colours, text colour, background and font to draw in (a deck’s theme), width and height its size in pixels (default 960×540).',
       'Free (Python runs here), apart from the model’s answer; it takes about half a minute.',
-      'It saves images/<name>.svg (format png: .png) and its code, images/<name>.py; with interactive: true also images/<name>.html, the same plot with Plotly, that moves and answers the pointer, for a custom code part in a web-format deck (its picture as the poster).',
+      'It saves images/<name>.svg (format png: .png) and its code, images/<name>.py; with interactive: true also images/<name>.html, the same plot with Plotly, that moves and answers the pointer, for a custom code part in a web-format deck (its picture as the poster). The user sees the plot with your reply; its answer says how to put each file in a deck, a document or a page by its path.',
       'To change a plot, give code (its .py path) and change (what to change), with the same data; code alone draws that code again as it is.',
     ].join(' '),
     inputSchema: {
@@ -953,12 +953,16 @@ function plotTool(db: DB): RunTool {
       if (dataCopy) await fs.promises.writeFile(dataCopy, data!.bytes);
       const page = made.html ? path.join(dir, `${stem}.html`) : '';
       if (page) await fs.promises.writeFile(page, made.html!);
+      const script = path.join(dir, `${stem}.py`);
       return [
-        made.model ? `Made a plot with Python here, its code written by ${made.model}:` : 'Drew the plot with Python here, from the code as it was given:',
+        made.model ? `Made a plot with ${made.model} (it wrote the Python, run on this computer):` : 'Drew the plot with Python on this computer (its code as it was given):',
         `${pic} (${made.w}×${made.h}, ${size(made.picture.length)})`,
-        `Its code: ${path.join(dir, `${stem}.py`)}${data ? ` (it reads its data as ${fileOf(data)}${dataCopy ? `; that data is beside it: ${dataCopy}` : ''})` : ''}.`,
-        ...(page ? [`Its interactive version: ${page} (Plotly; for a custom code part in a web-format deck, with the picture above as its poster).`] : []),
-        `Use it by its path in a slide, a document or a page, or show it to the user with present_files. To change it, call make_plot with code: "${path.join(dir, `${stem}.py`)}" and change${dataCopy ? '' : ', with the same data'}.`,
+        'The user sees it with your reply, a tap away from full size: don’t show it again or repeat its path.',
+        `Use it by its path, without pasting it: in save_slides, an image part’s src ({"type": "image", "src": "${pic}"}); in save_doc, a picture (![what it shows](${pic})); in save_page, an img’s src (the server puts the picture inside the page).`,
+        ...(page
+          ? [`Its interactive version (Plotly: it moves and answers the pointer): ${page}. In a web-format deck, a part {"type": "html", "file": "${page}", "poster": "${pic}", "interactive": true}; PowerPoint and print show its poster.`]
+          : []),
+        `Its code: ${script}${data ? ` (it reads its data as ${fileOf(data)}${dataCopy ? `, kept beside it: ${dataCopy}` : ''})` : ''}. To change the plot, call make_plot with code: "${script}" and change: what to change${dataCopy ? '' : ', with the same data'}.`,
         ...(made.notes ? [`Notes: ${made.notes}`] : []),
       ].join('\n');
     },

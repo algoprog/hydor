@@ -433,7 +433,7 @@ else {
   const images = path.join(tmp, 'images');
   answers = [say(GOOD)];
   const t1 = await run({ request: 'Monthly sales, spring doubled', data: CSV, theme: { colors: ['#2563eb'] }, width: 800, height: 450, interactive: true, name: 'Sales by month' });
-  ok(!t1.isError && /^Made a plot with Python here, its code written by the test writer:/.test(t1.text), `made: ${t1.text.split('\n')[0]}`);
+  ok(!t1.isError && /^Made a plot with the test writer \(it wrote the Python, run on this computer\):/.test(t1.text), `made: ${t1.text.split('\n')[0]}`);
   const line = t1.text.split('\n')[1];
   ok(
     /^(\/.+?\.(?:png|jpe?g|webp|gif|svg|avif))(?: \((?:(\d+)×(\d+), )?[^)]*\))?$/i.test(line) && line.startsWith(path.join(images, 'sales-by-month.svg')) && /\(800×450, \d+ KB\)$/.test(line),
@@ -444,7 +444,13 @@ else {
     `its files: ${fs.readdirSync(images).join(', ')}`,
   );
   ok(fs.readFileSync(path.join(images, 'sales-by-month.py'), 'utf8') === GOOD && fs.readFileSync(path.join(images, 'sales-by-month.data.csv'), 'utf8') === CSV, 'its code and its data, beside it');
-  ok(/reads its data as data\.csv; that data is beside it/.test(t1.text) && /Its interactive version: .*sales-by-month\.html/.test(t1.text) && /present_files/.test(t1.text), 'where everything is, and how to change it');
+  const svgPath = path.join(images, 'sales-by-month.svg');
+  ok(/reads its data as data\.csv, kept beside it/.test(t1.text) && /The user sees it with your reply/.test(t1.text), 'where its code and data are; the user sees the plot');
+  ok(
+    t1.text.includes(`in save_slides, an image part’s src ({"type": "image", "src": "${svgPath}"}); in save_doc, a picture (![what it shows](${svgPath})); in save_page, an img’s src`),
+    'how to put the picture in a deck, a document or a page, by its path',
+  );
+  ok(t1.text.includes(`a part {"type": "html", "file": "${path.join(images, 'sales-by-month.html')}", "poster": "${svgPath}", "interactive": true}`), 'and the interactive version in a web-format deck, its picture the poster');
 
   // Changed by its .py path: its data found beside it, a new name.
   asks.length = 0;
