@@ -166,8 +166,12 @@ interface Ctx {
   phs: Map<string, Ph>;
 }
 
+/** The slides a link may jump to by their place, as PowerPoint names them. */
+const JUMPS: Record<string, string> = { '#next': 'nextslide', '#prev': 'previousslide', '#first': 'firstslide', '#last': 'lastslide' };
+
 function link(c: Ctx, href: string | undefined, tag: 'hlinkClick' = 'hlinkClick'): string {
   if (!href) return '';
+  if (JUMPS[href]) return `<a:${tag} r:id="" action="ppaction://hlinkshowjump?jump=${JUMPS[href]}"/>`;
   const m = /^#(\d{1,3})$/.exec(href);
   if (m) {
     const f = c.slideFile(Number(m[1]));
