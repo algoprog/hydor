@@ -206,7 +206,7 @@ Agents can also change a page you kept: ask "add a notes column to my habit trac
 
 ## Find your pages
 
-**Library** in the sidebar ([/library](/library)) holds everything you kept, made and published. On a phone, open the sidebar with **Menu** (≡) first. You can also find a page, a picture or a video by its words in the search box (Ctrl+K, ⌘K on a Mac).
+**Library** in the sidebar ([/library](/library)) holds everything you kept, made and published. On a phone, open the sidebar with **Menu** (≡) first. You can also find a page, a picture or a video by its title or its description in the search box (Ctrl+K, ⌘K on a Mac).
 
 Beside the cards are the Library's places, each with how many things it holds (in a narrower window or on a phone, a row of chips above the cards):
 
@@ -217,17 +217,26 @@ Beside the cards are the Library's places, each with how many things it holds (i
 
 With no projects yet, a note under the places says what projects do for the Library, with a way to **Projects**.
 
-Each thing is a card with a picture of it (a page as it opens, with its data; slides by their first slide; a document, a spreadsheet or LaTeX by the top of its first page or sheet; a picture or a video by a still; until the picture is taken, its first letter shows), its kind on the picture (**Slides**, **Document**, **Spreadsheet**, **LaTeX** or **Picture**; a video shows its length), its title and when it last changed, with a globe when it is published and a cylinder when it keeps data. While you search Everything, each card names its project too. Click a card to open it. Its **More** (⋯) has **Edit** (**Present** for slides), **Rename**, **Move to a project**, **Move to a folder** (when its place has folders), **Duplicate** (a copy without its data), **Download as** (see [Export to a file](#export-to-a-file)) and **Delete**; a picture's or a video's has **Start a session with it**, **Move to a project**, **Move to a folder**, **Download**, **Write its title and description again** and **Delete**.
+Each thing is a card with a picture of it (a page as it opens, with its data; slides by their first slide; a document, a spreadsheet or LaTeX by the top of its first page or sheet; a picture or a video by a still; until the picture is taken, its first letter shows), its kind on the picture (**Slides**, **Document**, **Spreadsheet**, **LaTeX** or **Picture**; a video shows its length), its title and when it last changed, with a globe when it is published and a cylinder when it keeps data. While you search Everything, each card names its project too. Click a card to open it. Its **More** (⋯) has **Edit** (**Present** for slides), **Edit the title and description**, **Move to a project**, **Move to a folder** (when its place has folders), **Duplicate** (a copy without its data), **Download as** (see [Export to a file](#export-to-a-file)) and **Delete**; a picture's or a video's has **Start a session with it**, **Move to a project**, **Move to a folder**, **Download**, **Write its title and description again** and **Delete**.
 
 A project, and **Not in a project**, can hold folders too: they show first, as tiles, before the cards (see [Folders](#folders)).
 
 Above the cards:
 
-- **Find by name** narrows them by their titles (and a picture's description). It looks through the whole place, every folder of it, and each card then says the folder it is in.
+- **Search by name or description** finds what fits your words, the best first: by their titles and descriptions (see [Descriptions](#descriptions)), and, with [search by meaning](/guide/memory#search-by-meaning) on, by what they mean, so "costs of the Lisbon trip" finds a spreadsheet called "Four days away" whose description says so. What has your words in its title or description shows at once, as you type. It looks through the whole place, every folder of it, and each card then says the folder it is in.
 - The button beside it sorts them by **Last changed**, **Name** or **Newest made**. The app remembers the order on this device.
 - When a place holds more than one kind, **All**, **Pages**, **Slides**, **Documents**, **Spreadsheets**, **LaTeX**, **Pictures** and **Videos** show one kind at a time. [Show the pictures](/library?kind=image).
 
 With nothing kept yet, the Library says "Your Library is empty", that files dropped there are added, and has **New page** and **New slides**.
+
+## Descriptions
+
+Besides its title, each thing in the Library has a description: two or three sentences, at most 100 words, on what it is and what it is for. The Library's search, the search box and agents find things by their descriptions as well as their titles, so you can look for what something is about rather than what it is called.
+
+- **Agents write one** with everything they save for you, and a new one when what it is changes.
+- **Files you add** (dropped on the Library, picked with **Upload files**, opened in **New**, or a folder imported) and **pages you keep** from a conversation get one from the helper model (see [Settings → Models](/settings?s=models)), which reads the start of each in the background, one at a time. What a confidential session saved is read only by a helper model that runs on this computer. A page you make empty with **New** gets none until you write one.
+- **Pictures, videos and sounds** get theirs with their title (see [Titles and descriptions](#titles-and-descriptions)).
+- **Write or change it yourself**: **Edit the title and description** in a card's **More** (⋯), or click the title of what you have open. A card shows its description when you hold the pointer over its title.
 
 ## Sort it by project
 
@@ -251,7 +260,7 @@ Folders sort what a place holds: a project, or **Not in a project** (with no pro
 - **A folder's More** (⋯): **Rename**, **Move to a folder** (into another folder, or to the top of the place; on a computer, drag its tile onto another), **Move to a project** (with everything in it) and **Delete**. Deleting a folder deletes nothing in it: what it held goes up a level, to the folder it was in, or to the top.
 - **Between projects**: something moved to another project leaves its folder; something put in a folder of another project moves to that project. Deleting a project keeps its folders, and what is in them, outside any project.
 
-**Find by name** and the kinds above the cards (**Documents**, **LaTeX**…) look through the whole place, every folder of it, and each card says the folder it is in.
+**Search by name or description** and the kinds above the cards (**Documents**, **LaTeX**…) look through the whole place, every folder of it, and each card says the folder it is in.
 
 ### Import a folder
 
@@ -317,7 +326,7 @@ Drop files from your computer anywhere on the Library to add them: as many as yo
 - Dropped on a project in the list of places beside the cards (its chip, on a phone), they go in that project; on **Everything**, **Not in a project** or **Published**, in none.
 - Dropped on the cards, they go in the place you have open: the project you are looking at, or none on **Everything** and **Not in a project**.
 - You can also drop them on a project's card on the [Projects page](/projects), or on what a project holds in the Library on its own page (its **Overview** and **Library** tabs): they go in that project.
-- Without a mouse, on a phone or a tablet: **Upload files** opens your device's file chooser, to pick several at once. It is in **New**, at the bottom left (the files go in the project picked under **In a project**), and beside a project's name when its place is open (on a phone, the upload button beside **Find by name**), for that project.
+- Without a mouse, on a phone or a tablet: **Upload files** opens your device's file chooser, to pick several at once. It is in **New**, at the bottom left (the files go in the project picked under **In a project**), and beside a project's name when its place is open (on a phone, the upload button beside **Search by name or description**), for that project.
 
 Each file becomes what it is:
 
@@ -343,13 +352,13 @@ The tray says of each file where it went, and where its original is. In a browse
 A page opens full screen inside the app, at its own place in the Library. The bar at the top has:
 
 - the back arrow (**The Library**) to the list;
-- the page's title, and under it its version, when it last changed and how much data it keeps. Click the title to rename the page;
+- the page's title, and under it its version, when it last changed and how much data it keeps. Click the title to change its title and description;
 - **Use**, **Edit** and **Code**, and the **Computer**, **Tablet** and **Phone** sizes (see [Change a page yourself](#change-a-page-yourself));
 - **Versions** (the clock): its earlier versions (see [Go back to an earlier version](#go-back-to-an-earlier-version));
 - **Export**: the page as a PDF, a Word document or a web page (see [Export to a file](#export-to-a-file));
 - **Share**: its own address for your phone, and publishing it at a link (see [Use a page on your phone](#use-a-page-on-your-phone) and [Publish a page](#publish-a-page));
 - **Ask**: an agent changes the page while you watch (see [Change it by asking an agent](#change-it-by-asking-an-agent));
-- **More** (⋯): **What it keeps** (see [The data a page keeps](#the-data-a-page-keeps)), **Rename**, **Duplicate**, **Move to a project** (with projects; the project it is in shows beside it), **Open in a new tab** (opens the page at its own address) and **Delete**.
+- **More** (⋯): **What it keeps** (see [The data a page keeps](#the-data-a-page-keeps)), **Edit the title and description**, **Duplicate**, **Move to a project** (with projects; the project it is in shows beside it), **Open in a new tab** (opens the page at its own address) and **Delete**.
 
 On a phone, **Use**, **Edit** and **Code** are icons, **Share** is the share icon, **Ask** is the sparkles icon, **Export** is under **More** (⋯) as **Download as**, and the sizes are left out (the phone is the size).
 
@@ -620,7 +629,7 @@ Say more in the panel's message box; the buttons above it put which slide or par
 
 ## Rename a page
 
-Click the page's title at the top, or use **More** (⋯) → **Rename** in the page or in the list. Type the new name (up to 120 characters) and click **Rename**. The page's name is also the name it gets when you add it to a phone's home screen.
+Click the page's title at the top, or use **More** (⋯) → **Edit the title and description** in the page or in the list. Type the new name (up to 120 characters), change its description if you like (see [Descriptions](#descriptions)), and click **Save**. The page's name is also the name it gets when you add it to a phone's home screen.
 
 ## Go back to an earlier version
 
@@ -753,6 +762,8 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "My budget tracker looked better yesterday: bring back the version from before your last change."
 - "What did I log in my habit tracker this week? Sum it up."
 - "Rename the page 'Untitled checklist' to 'Moving house'."
+- "Find the spreadsheet where I worked out what the Lisbon trip costs."
+- "Give my 'Garden plan' page a description that says it covers the raised beds and the watering days."
 - "I sent my packing list's address to the wrong person: give it a new address."
 - "Publish the trip plan at a private link", or "unpublish the site we made last week."
 - "Make the headings on my landing page smaller on phones, and its buttons rounder."

@@ -1,4 +1,11 @@
 {
+"{0} words: keep it under {1}":"{0} λέξεις: κρατήστε την κάτω από {1}",
+"Finds notes, what the Library holds and more by what they mean as well as by their words, with a model that runs on this computer. It sets itself up once: about 2 GB (6 GB with an NVIDIA GPU).":"Βρίσκει σημειώσεις, ό,τι περιέχει η Βιβλιοθήκη και άλλα, βάσει του νοήματός τους αλλά και των λέξεών τους, με ένα μοντέλο που τρέχει σε αυτόν τον υπολογιστή. Εγκαθίσταται μόνη της, μία φορά: περίπου 2 GB (6 GB με GPU της NVIDIA).",
+"Nothing here matches “{0}”.":"Τίποτα εδώ δεν ταιριάζει με «{0}».",
+"Python 3 is not installed on this computer, and search by meaning needs it (python.org, or Homebrew: brew install python).":"Η Python 3 δεν είναι εγκατεστημένη σε αυτόν τον υπολογιστή, και η αναζήτηση με βάση το νόημα τη χρειάζεται (python.org, ή Homebrew: brew install python).",
+"Search by name or description":"Αναζήτηση με όνομα ή περιγραφή",
+"Send its new title, its description, the project to move it to (space: an id, or null), or the folder to put it in (folder: an id, or null)":"Στείλτε τον νέο τίτλο του, την περιγραφή του, το έργο όπου θα μετακινηθεί (space: ένα id ή null) ή τον φάκελο όπου θα μπει (folder: ένα id ή null)",
+"What it is and what it is for. The Library’s search finds it by these words and what they mean.":"Τι είναι και σε τι χρησιμεύει. Η αναζήτηση της Βιβλιοθήκης το βρίσκει από αυτές τις λέξεις και από το νόημά τους.",
 "Python 3 is not installed on this computer, and search by meaning needs it (python.org, or: winget install Python.Python.3.12).":"Η Python 3 δεν είναι εγκατεστημένη σε αυτόν τον υπολογιστή, και η αναζήτηση με βάση το νόημα τη χρειάζεται (python.org, ή: winget install Python.Python.3.12).",
 "Could not add Hydor to the programs Windows opens when you sign in: {0}":"Δεν ήταν δυνατή η προσθήκη του Hydor στα προγράμματα που ανοίγουν τα Windows όταν συνδέεστε: {0}",
 "Does not open by itself when you log in.":"Δεν ανοίγει μόνη της όταν συνδέεστε.",

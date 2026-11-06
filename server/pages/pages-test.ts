@@ -23,6 +23,7 @@ import { normalizeDeck } from '../../shared/slides.ts';
 import { draftsOf, endDrafts, feedDraft, JsonFields } from './drafts.ts';
 import { zipParts } from './ooxml.ts';
 import { takeEdits } from './edits.ts';
+import { describeNow } from './describe.ts';
 import { pages } from './index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -118,6 +119,54 @@ const tick = () => new Promise((r) => setTimeout(r, 10));
   ok((await run('save_page', { id: '0000000000', title: 'x', html: page(1) })).error?.includes('No saved page'), 'saving to an unknown id is refused');
   ok((await run('get_page', {})).text?.includes(id), 'get_page lists the pages');
   ok((await run('get_page', { id })).text?.includes('version 45'), 'get_page reads one');
+}
+
+// ---- descriptions -----------------------------------------------------------------------------------
+{
+  const long = Array.from({ length: 130 }, (_, i) => `w${i}`).join(' ');
+  const made = await run('save_page', { title: 'Garden plan', html: page(3), description: `Which vegetables go in which raised bed, and the watering days. ${long}` });
+  const g = idOf(made.text);
+  let p = (await req('GET', `/api/pages/${g}`)).json().page;
+  ok(p.description?.startsWith('Which vegetables') && p.description.split(' ').length === 100, `a description is kept, cut to 100 words: ${p.description?.split(' ').length}`);
+  ok(!/no description/.test(made.text ?? ''), 'a page saved with one is not asked for one');
+  await run('save_page', { id: g, title: 'Garden plan', html: page(4) });
+  ok((await req('GET', `/api/pages/${g}`)).json().page.description?.startsWith('Which vegetables'), 'a new version that leaves it out keeps it');
+  const only = await run('save_page', { id: g, description: 'Tomatoes, beans and squash in three raised beds, and when to water them.' });
+  p = (await req('GET', `/api/pages/${g}`)).json().page;
+  ok(/Changed the description/.test(only.text ?? '') && p.version === 2 && p.description.startsWith('Tomatoes'), `an id and a description alone change it, and make no version: ${only.text ?? only.error}`);
+  const doc = await run('save_doc', { title: 'Boiler letter', markdown: '# To the landlord\n\nThe boiler has not worked since Monday.' });
+  ok(/no description/.test(doc.text ?? ''), 'a new one saved without a description: the agent is told to give one');
+  const did = idOf(doc.text);
+  const named = await run('save_doc', { id: did, title: 'Letter about the boiler', description: 'A letter to the landlord asking for the broken boiler to be repaired this week.' });
+  p = (await req('GET', `/api/pages/${did}`)).json().page;
+  ok(p.title === 'Letter about the boiler' && p.description.startsWith('A letter to the landlord') && p.version === 1, `its title and description, alone: ${named.text ?? named.error}`);
+  const both = await run('save_doc', { id: did, title: 'Letter about the boiler', markdown: '# To the landlord\n\nThe boiler is still broken.', description: 'A second letter to the landlord about the boiler, still broken.' });
+  p = (await req('GET', `/api/pages/${did}`)).json().page;
+  ok(p.version === 2 && p.description.startsWith('A second letter'), `a new version with a new description: ${both.text ?? both.error}`);
+  ok((await run('get_page', { id: g })).text?.includes('Its description: Tomatoes'), 'get_page says what it is');
+  ok((await run('get_page', {})).text?.includes('\n  Tomatoes, beans'), 'a short list has each one’s description');
+  const found = await run('get_page', { query: 'squash beds' });
+  ok(found.text?.split('\n')[1]?.includes(g), `get_page’s query finds a page by the words of its description: ${found.text}`);
+  ok(/Nothing in the Library fits/.test((await run('get_page', { query: 'zeppelin' })).text ?? ''), 'and says when nothing fits');
+  const r = (await req('GET', '/api/library/search?q=landlord%20boiler')).json();
+  ok(r.hits[0]?.id === `page:${did}` && r.hits[0].by.includes('words'), `the Library’s search finds it by its description: ${JSON.stringify(r.hits.slice(0, 2))}`);
+  ok((await req('GET', '/api/library/search?q=')).json().hits.length === 0, 'no words, nothing');
+  await req('PATCH', `/api/pages/${did}`, { description: '' });
+  ok(!(await req('GET', `/api/pages/${did}`)).json().page.description, 'the user can take it away');
+  await req('PATCH', `/api/pages/${did}`, { description: 'My own words about it.' });
+  ok((await req('GET', `/api/pages/${did}`)).json().page.description === 'My own words about it.', 'or write their own');
+  // Written by the helper for what came without one (a stand-in: a test's saves never reach a model, describe.ts).
+  const asked: string[] = [];
+  const helper = async (_db: unknown, q: { prompt: string }) => {
+    asked.push(q.prompt);
+    return 'Description: “A page of notes on the boiler’s repairs and the landlord’s answers.”';
+  };
+  const bare = idOf((await run('save_page', { title: 'Boiler notes', html: '<!doctype html><p>Called the landlord on Monday; the plumber comes Thursday.</p>' })).text);
+  const wrote = await describeNow(deps, bare, helper);
+  ok(wrote === 'A page of notes on the boiler’s repairs and the landlord’s answers.', `the helper’s description, as it is kept: ${wrote}`);
+  ok((await req('GET', `/api/pages/${bare}`)).json().page.description === wrote, 'and the page has it');
+  ok(asked.some((x) => x.includes('Boiler notes') && x.includes('plumber comes Thursday')), 'the helper reads its title and what it holds');
+  ok((await describeNow(deps, bare, helper)) === null && (await describeNow(deps, did, helper)) === null && asked.length === 1, 'one that has a description keeps it, and the helper is not asked');
 }
 
 // ---- storage limits ---------------------------------------------------------------------------------
