@@ -643,6 +643,13 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
   useEffect(() => {
     if (active) root.current?.focus({ preventScroll: true });
   }, [active]);
+  // The keys stay the editor's: a press anywhere in it (but in a field) and a menu closing give it the keyboard again.
+  const keepFocus = (ev: React.PointerEvent) => {
+    if (!(ev.target as HTMLElement).closest('input, textarea, select, [contenteditable="true"]')) root.current?.focus({ preventScroll: true });
+  };
+  useEffect(() => {
+    if (!menu && active) root.current?.focus({ preventScroll: true });
+  }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- the parts ------------------------------------------------------------------------------------------------------
   const onCrop = (c: { x: number; y: number; w: number; h: number }, phase: 'begin' | 'move' | 'end') => {
@@ -830,7 +837,7 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
   if (mobile)
     return (
       <StepsContext.Provider value={change}>
-        <div ref={root} tabIndex={-1} onKeyDown={onKeyDown} className="flex h-full min-h-0 flex-col bg-bg outline-none">
+        <div ref={root} tabIndex={-1} onKeyDown={onKeyDown} onPointerDownCapture={keepFocus} className="flex h-full min-h-0 flex-col bg-bg outline-none">
           <header className="flex h-12 shrink-0 items-center gap-1 border-b border-line px-1.5 pt-[var(--safe-top)]">
             {lead}
             <span translate="no" className="min-w-0 flex-1 truncate px-1 text-[14px] font-semibold">
@@ -906,7 +913,7 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
   // ---- a computer: the workspaces ---------------------------------------------------------------------------------------
   return (
     <StepsContext.Provider value={change}>
-      <div ref={root} tabIndex={-1} onKeyDown={onKeyDown} className="flex h-full min-h-0 flex-col bg-bg outline-none">
+      <div ref={root} tabIndex={-1} onKeyDown={onKeyDown} onPointerDownCapture={keepFocus} className="flex h-full min-h-0 flex-col bg-bg outline-none">
         <header className="flex h-10 shrink-0 items-center gap-2 border-b border-line bg-bg px-2 pt-[var(--safe-top)]">
           {lead}
           <Clapperboard size={15} className="shrink-0 text-accent" />
