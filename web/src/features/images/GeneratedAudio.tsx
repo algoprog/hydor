@@ -13,6 +13,7 @@ import { AudioPlayer } from '../../components/AudioPlayer';
 import { download } from '../documents/FileCards';
 import { FileMore } from '../files/SpaceMenu';
 import { KeepButton } from '../media/Keep';
+import { OpenRouterKeyCard } from '../connections/OpenRouterKeyCard';
 
 interface Sound {
   path: string;
@@ -163,7 +164,14 @@ export function GeneratedAudio({ item, sessionKey }: { item: ToolItem; sessionKe
   const turns = Array.isArray(input.turns) ? (input.turns as { text?: unknown }[]).map((x) => (typeof x?.text === 'string' ? x.text : '')).filter(Boolean) : [];
   const prompt = typeof input.prompt === 'string' && input.prompt.trim() ? input.prompt : turns.join(' ') || undefined;
   const sounds = soundsOf(t.output);
-  if (t.status === 'running' || t.status === 'pending' || t.status === 'waiting') return <Working since={item.ts} kind={kind} prompt={prompt} />;
+  // While it runs it may be waiting for an OpenRouter key: the card to give one (or skip) shows above it.
+  if (t.status === 'running' || t.status === 'pending' || t.status === 'waiting')
+    return (
+      <>
+        <OpenRouterKeyCard sessionKey={sessionKey} />
+        <Working since={item.ts} kind={kind} prompt={prompt} />
+      </>
+    );
   if (!sounds.length) {
     const text = (t.output || t.error || 'No sound was made.').trim();
     if (/no OpenRouter key/i.test(text))

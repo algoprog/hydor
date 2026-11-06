@@ -1,14 +1,16 @@
 // A drawing (SVG): what to draw (a few examples to start from), what it is, its shape, the colours to draw with (the
 // deck's or the document's, each one changed with a click, more added, any taken away), and how: Quick, written as SVG
 // by Claude (or the helper model), or Best, drawn by a vector model through OpenRouter, priced. The drawing is shown
-// as a picture (never as the app's own markup), then Draw again or Use it.
+// as a picture (never as the app's own markup), then Draw again or Use it. Best without an OpenRouter key asks for it in
+// place (KeyAsk), with Quick, which needs none, beside it.
 import { useEffect, useRef, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import type { DrawingKind, ImageTier, SvgAnswer, TiersInfo } from '@shared/images';
 import { Button, Dialog, Segmented } from '../../../components/ui';
 import { getTiers, makeSvg } from './api';
-import { DEFAULT_COLORS, DRAWING_KINDS, drawingPrice, money, SHAPES } from './logic';
-import { Choice, Label, NoKey, PriceLine, Problem, ShapeMark, Shown, Words, Working } from './parts';
+import { KeyAsk } from './KeyAsk';
+import { DEFAULT_COLORS, DRAWING_KINDS, drawingPrice, drawingTier, money, needsKey, SHAPES } from './logic';
+import { Choice, Label, PriceLine, Problem, ShapeMark, Shown, Words, Working } from './parts';
 import { shownSrc } from './pictures';
 import type { DrawingOpts, MadeDrawing } from './store';
 
@@ -22,17 +24,19 @@ export function MakeDrawing({ o, onDone }: { o: DrawingOpts; onDone: (d: MadeDra
     .map(long)
     .filter((c) => HEX.test(c))
     .slice(0, 6);
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState(o.prompt ?? '');
   const [kind, setKind] = useState<DrawingKind>(o.kind ?? 'icon');
   const [aspect, setAspect] = useState(o.aspect ?? shapeFor(o.kind ?? 'icon'));
   const [aspectSet, setAspectSet] = useState(!!o.aspect);
   const [colors, setColors] = useState<string[]>(given.length ? given : DEFAULT_COLORS);
-  const [tier, setTier] = useState<ImageTier>(o.kind === 'illustration' ? 'best' : 'quick');
-  const [tierSet, setTierSet] = useState(false);
+  // Picked, or (null) as the kind and the words call for: Best for illustrations and detailed asks.
+  const [picked, setPicked] = useState<ImageTier | null>(null);
   const [tiers, setTiers] = useState<TiersInfo | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [made, setMade] = useState<SvgAnswer | null>(null);
+  // Best was pressed with no OpenRouter key: it is asked for here.
+  const [askKey, setAskKey] = useState(false);
   const stop = useRef(new AbortController());
 
   useEffect(() => {
@@ -42,19 +46,24 @@ export function MakeDrawing({ o, onDone }: { o: DrawingOpts; onDone: (d: MadeDra
   }, []);
 
   const info = DRAWING_KINDS.find((k) => k.value === kind) ?? DRAWING_KINDS[0];
+  const tier = picked ?? drawingTier('auto', { prompt, kind });
   const price = tiers ? drawingPrice(tiers, tier) : null;
-  const noKey = !!tiers && !tiers.keySet && tier === 'best';
   const shapes = [...(o.aspect && !SHAPES.some((s) => s.value === o.aspect) ? [{ value: o.aspect, label: `As where it goes (${o.aspect})` }] : []), ...SHAPES].map((s) => ({ ...s, icon: <ShapeMark aspect={s.value} /> }));
 
-  const draw = async () => {
-    if (!prompt.trim() || busy || noKey) return;
-    setBusy(true);
+  /** Draws it, at the tier shown or the one given (`keyed`: the key was just saved, so the tiers read before are out of date). */
+  const draw = async (o: { tier?: ImageTier; keyed?: boolean } = {}) => {
+    const t = o.tier ?? tier;
+    if (!prompt.trim() || busy) return;
     setError(null);
+    if (t === 'best' && !o.keyed && tiers && !tiers.keySet) return setAskKey(true);
+    setAskKey(false);
+    setBusy(true);
     try {
-      const r = await makeSvg({ prompt: prompt.trim(), kind, aspect, tier, colors }, stop.current.signal);
+      const r = await makeSvg({ prompt: prompt.trim(), kind, aspect, tier: t, colors }, stop.current.signal);
       setMade(r);
     } catch (e) {
-      if (!stop.current.signal.aborted) setError((e as Error).message);
+      const m = (e as Error).message;
+      if (!stop.current.signal.aborted) t === 'best' && needsKey(m) ? setAskKey(true) : setError(m);
     } finally {
       setBusy(false);
     }
@@ -62,7 +71,7 @@ export function MakeDrawing({ o, onDone }: { o: DrawingOpts; onDone: (d: MadeDra
 
   const footer = made ? (
     <>
-      <Button variant="secondary" disabled={busy} onClick={() => void draw()}>
+      <Button variant="secondary" disabled={busy || askKey} onClick={() => void draw()}>
         {busy ? 'Drawing it' : (price?.again ?? 'Draw again')}
       </Button>
       <Button variant="primary" disabled={busy} onClick={() => onDone({ src: made.src, w: made.w, h: made.h, mime: made.mime, svg: made.svg, prompt: prompt.trim() })}>
@@ -74,10 +83,35 @@ export function MakeDrawing({ o, onDone }: { o: DrawingOpts; onDone: (d: MadeDra
       <Button variant="ghost" onClick={() => onDone(null)}>
         Cancel
       </Button>
-      <Button variant="primary" disabled={busy || !prompt.trim() || !tiers || noKey} onClick={() => void draw()}>
+      <Button variant="primary" disabled={busy || askKey || !prompt.trim() || !tiers} onClick={() => void draw()}>
         {busy ? 'Drawing it' : (price?.button ?? 'Draw it')}
       </Button>
     </>
+  );
+
+  const keyAsk = askKey && (
+    <KeyAsk
+      onSaved={() =>
+        void getTiers().then(
+          (t) => {
+            setTiers(t);
+            if (t.keySet) void draw({ tier: 'best', keyed: true });
+          },
+          (e: Error) => setError(e.message),
+        )
+      }
+      onSkip={() => {
+        setAskKey(false);
+        setPicked('quick');
+      }}
+      instead={{
+        label: 'Draw it Quick',
+        run: () => {
+          setPicked('quick');
+          void draw({ tier: 'quick' });
+        },
+      }}
+    />
   );
 
   return (
@@ -93,6 +127,7 @@ export function MakeDrawing({ o, onDone }: { o: DrawingOpts; onDone: (d: MadeDra
           </div>
           {busy && <Working>Drawing it again</Working>}
           {error && <Problem error={error} onLeave={() => onDone(null)} />}
+          {keyAsk}
         </div>
       ) : (
         <div className="space-y-3">
@@ -105,7 +140,6 @@ export function MakeDrawing({ o, onDone }: { o: DrawingOpts; onDone: (d: MadeDra
               onChange={(k) => {
                 setKind(k);
                 if (!aspectSet) setAspect(shapeFor(k));
-                if (!tierSet) setTier(k === 'illustration' ? 'best' : 'quick');
               }}
               width={280}
               disabled={busy}
@@ -162,10 +196,7 @@ export function MakeDrawing({ o, onDone }: { o: DrawingOpts; onDone: (d: MadeDra
             <Segmented
               size="sm"
               value={tier}
-              onChange={(t) => {
-                setTier(t);
-                setTierSet(true);
-              }}
+              onChange={setPicked}
               options={[
                 { value: 'quick', label: 'Quick' },
                 { value: 'best', label: 'Best' },
@@ -173,9 +204,8 @@ export function MakeDrawing({ o, onDone }: { o: DrawingOpts; onDone: (d: MadeDra
             />
             <span className="text-[12.5px] text-fg-3">{tier === 'quick' ? `Written as SVG by ${tiers?.writer ?? 'Claude'}` : `Drawn by ${tiers?.vector.label ?? 'a vector model'}`}</span>
           </div>
-          {noKey && <NoKey what="Best drawings are made through OpenRouter, and no key is set yet. Quick ones need none." onLeave={() => onDone(null)} />}
           {error && <Problem error={error} onLeave={() => onDone(null)} />}
-          {busy ? <Working>{tier === 'quick' ? 'Drawing it: this takes up to a minute' : 'Drawing it: it takes a few seconds'}</Working> : price && <PriceLine>{price.line}</PriceLine>}
+          {keyAsk || (busy ? <Working>{tier === 'quick' ? 'Drawing it: this takes up to a minute' : 'Drawing it: it takes a few seconds'}</Working> : price && <PriceLine>{price.line}</PriceLine>)}
         </div>
       )}
     </Dialog>
