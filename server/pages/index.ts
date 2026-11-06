@@ -70,6 +70,8 @@ import { arxivRoutes, dropPaperFolder } from './latex-arxiv.ts';
 import { checkRoutes, LATEX_CHECK } from './latex-check.ts';
 import { agentBook, readBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
 import { agentDeck, readDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
+import { myThemeByName } from './my-themes.ts';
+import { withSheetsAndLogo } from './slides-sources.ts';
 import { agentFileComments, openFile, openFileComments, saveFile, texFileForAgent } from './filemodel.ts';
 import { kindForFile, kindOf, mustKind, type PageKind } from './kinds.ts';
 import { shellManifest, shellPage } from './shell.ts';
@@ -419,16 +421,22 @@ const SAVE_SLIDES: RunTool = {
     try {
       kept = prev ? readDeck(prev) : null;
     } catch {}
-    let input: Record<string, unknown> = { ratio: a.ratio, theme: a.theme, slides: a.slides, footer: a.footer, guides: a.guides, comments: a.comments, format: a.format ?? kept?.format, progress: a.progress ?? kept?.progress };
+    // One of the user's own themes by its name brings its colours, fonts and logo; the logo stays as it was unless said.
+    const mine = myThemeByName(ctx.deps.db, a.theme);
+    const logo = a.logo !== undefined ? a.logo : (mine?.logo ?? kept?.logo);
+    let input: Record<string, unknown> = { ratio: a.ratio, theme: mine?.theme ?? a.theme, logo, slides: a.slides, footer: a.footer, guides: a.guides, comments: a.comments, format: a.format ?? kept?.format, progress: a.progress ?? kept?.progress };
     // Some slides changed, added or taken out: the deck they make, its look as it was unless said.
     if (changesSlides(a)) {
       if (!id || !prev) throw new Error('change, add and remove change a saved deck: give its id (get_page lists them), or send the whole deck as slides.');
       if (a.slides !== undefined) throw new Error('Give slides (the whole deck) or change, add and remove (some of its slides), not both.');
       const was = readDeck(prev);
-      input = { ratio: a.ratio ?? was.ratio, theme: a.theme ?? was.theme, footer: a.footer ?? was.footer, guides: a.guides ?? was.guides, comments: a.comments, format: a.format ?? was.format, progress: a.progress ?? was.progress, slides: applyDeckEdits(was, a).slides };
+      input = { ratio: a.ratio ?? was.ratio, theme: mine?.theme ?? a.theme ?? was.theme, logo: a.logo !== undefined ? a.logo : (mine?.logo ?? was.logo), footer: a.footer ?? was.footer, guides: a.guides ?? was.guides, comments: a.comments, format: a.format ?? was.format, progress: a.progress ?? was.progress, slides: applyDeckEdits(was, a).slides };
     }
-    // The version it changes: the parts it sends back as they were keep their look.
-    const { deck, notes } = await agentDeck(ctx.deps.db, input, ctx.cwd, prev);
+    // The version it changes: the parts it sends back as they were keep their look; its logo takes its picture's shape, and
+    // its charts from spreadsheets their numbers.
+    const made = await agentDeck(ctx.deps.db, input, ctx.cwd, prev);
+    const notes = made.notes;
+    const deck = withSheetsAndLogo(ctx.deps.db, made.deck, { logo: a.logo }, notes);
     const p = keepModel(ctx, id, 'slides', a.title, deck, a.project, a.libraryFolder);
     const n = deck.slides.length;
     return [
