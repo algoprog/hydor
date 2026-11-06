@@ -447,7 +447,7 @@ function PictureTools() {
       <div className="min-w-[min(100%,15rem)] flex-1 space-y-1">
         <div className="text-[12.5px] font-medium text-fg-2">Picture tools on this computer</div>
         <p className="text-[12.5px] leading-snug text-fg-3">
-          Take a picture’s background out, or erase part of it, here: for nothing, and your pictures stay on this computer. About {s?.sizeMb ?? 120} MB once, and each tool’s model (about 220 MB) the first time it is used.
+          Take a picture’s background out, or erase part of it, here: for nothing, and your pictures stay on this computer. About {s?.sizeMb ?? 120} MB once, and each tool’s model (about 200 MB) the first time it is used.
         </p>
         {!s ? (
           <div className="flex items-center gap-2 text-[12.5px] text-fg-3">
