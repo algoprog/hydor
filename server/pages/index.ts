@@ -50,6 +50,7 @@ import { draftsOf, draftsOfPage, endDrafts, feedDraft, settleDraft, type ToolStr
 import { agentNotebook, dropWorkFolder, SAVE_NOTEBOOK_DESCRIPTION, SAVE_NOTEBOOK_SCHEMA, workFile, writeWorkFile } from './notebooks.ts';
 import { dropEdits, initEdits, noteEdit, noteFileEdit, takeEdits } from './edits.ts';
 import { getAsset, MAX_ASSET, putAsset, sweepAssets, takeIn } from './assets.ts';
+import { pagePictures } from './page-pictures.ts';
 import { videoStillOf } from './video-still.ts';
 import { getVideo, sendVideo, takeVideoPiece, videoAddressOk } from './videos.ts';
 import { videoSrc } from '../../shared/slides.ts';
@@ -178,6 +179,7 @@ const SAVE_PAGE: RunTool = {
     'older versions stay restorable, and its stored data stays.',
     'The user can leave comments on a page’s blocks in its editor; get_page shows them, and comments answers, resolves or adds them (with id; leave html out to only answer them).',
     'A database block’s rows are the page’s own data: get_page shows them, and databases adds, changes or removes them (with id; leave html out to only change them).',
+    'Pictures: name a picture file of your folder (one generate_image, make_svg or make_plot made: images/…) as an img’s src or in CSS url(): it goes inside the page (made smaller where this computer can); a page with its pictures may be up to 2 MB.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -254,11 +256,13 @@ const SAVE_PAGE: RunTool = {
       const done = [answering && 'answered its comments', rows && 'changed its databases'].filter(Boolean).join(' and ');
       return `Saved "${page.title}" (page ${page.id}): ${done}; the page itself is as it was.${await fill(page.id)}${comment(page.id)}`;
     }
-    const p = id ? addVersion(db, id, { title: a.title, html: a.html, by: 'agent' }) : createPage(db, { title: a.title, html: a.html, by: 'agent', ...placeOf(ctx, a.project, a.libraryFolder) });
+    // Pictures from the session's folder (and the app's kept ones) go inside the page.
+    const pictured = typeof a.html === 'string' ? pagePictures(db, a.html, ctx.cwd) : { html: a.html, notes: [] };
+    const p = id ? addVersion(db, id, { title: a.title, html: pictured.html, by: 'agent' }) : createPage(db, { title: a.title, html: pictured.html, by: 'agent', ...placeOf(ctx, a.project, a.libraryFolder) });
     if (id) moveForAgent(db, id, a.libraryFolder, ctx.key);
     tell(ctx.deps, { what: 'pages' });
     refreshThumbs(ctx.deps, [p.id]);
-    return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.${await fill(p.id)}${comment(p.id)}`;
+    return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.${pictured.notes.length ? ` ${pictured.notes.join(' ')}` : ''}${await fill(p.id)}${comment(p.id)}`;
   },
 };
 
