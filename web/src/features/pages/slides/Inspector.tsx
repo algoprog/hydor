@@ -60,7 +60,6 @@ import {
   TRANSITIONS,
   newId,
   scaleEls,
-  slideH,
   videoSrc,
   videoStart,
   type Adjust,
@@ -84,6 +83,7 @@ import {
   type TransitionFx,
   type VideoEl,
 } from '@shared/slides';
+import { reshapeDeck } from '@shared/deck-shape';
 import { Button, cx, MenuItem, Popover, Switch } from '../../../components/ui';
 import { useTexHtml } from '../common/katex';
 import { Choice, Select } from '../studio/fields';
@@ -1660,8 +1660,7 @@ function ThemeTab({ deck, change, fonts, onCompatible }: Props) {
   const ratio = (r: Deck['ratio']) =>
     change((d) => {
       if (d.ratio === r) return d;
-      const k = slideH(r) / slideH(d.ratio);
-      return { ...d, ratio: r, slides: d.slides.map((s) => ({ ...s, els: s.els.map((e) => ({ ...e, y: Math.round(e.y * k), h: Math.round(e.h * k) })) })) };
+      return reshapeDeck(d, r);
     });
   return (
     <>
