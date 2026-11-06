@@ -15,6 +15,7 @@ import { toastError } from '../../lib/store';
 import { Button, cx, Dialog, inputCls, OptionRow, Picker, Section, Segmented, Switch, Throbber, useConfirm } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
 import { localStatus, useLocalTools } from './studio/LocalTools';
+import { GpuSetting } from '../mediaedit/video/GpuSetting';
 
 const DAY = 86_400_000;
 const usd = (n: number) => (n >= 0.095 ? n.toFixed(2) : String(Number(n.toPrecision(1))));
@@ -547,6 +548,9 @@ export function ImagesSettings() {
         <ModelLine label="Video model" picked={!!vid.model} onChange={() => setDialog('video')} onAuto={() => void saveVid({ model: '' })}>
           {vidModel ? <VideoRow m={vidModel} /> : <div className="px-3 py-2.5 font-mono text-[12.5px] text-fg-2">{vid.using}</div>}
         </ModelLine>
+      </Section>
+      <Section title="Editing videos" sub="The video editor and agents’ edits make videos with ffmpeg on this computer.">
+        <GpuSetting />
       </Section>
       <Section
         title="Making audio"
