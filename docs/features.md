@@ -448,7 +448,7 @@ agents that speak ACP and take MCP servers.
   its own address, menus with Search the menus, find and replace, a list of its keyboard shortcuts, and an agent that
   changes it on request, whose work you watch as it writes (slides too: the agent's caret where its words arrive, the
   page read-only meanwhile, your unsaved changes never overwritten), in steps (a section, some slides, some cells) as
-  well as whole, its saves in one turn kept as one version. Documents (save_doc, written in Markdown, or opened from a Word, Markdown, text or HTML file)
+  well as whole, its saves in one turn kept as one version. Documents (save_doc, written in Markdown, or opened from a Word, PDF (its title, headings, paragraphs and lists, two columns read in order, page numbers and running headers left out), Markdown, text or HTML file)
   are edited as in Word or Google Docs on real pages of their paper (what does not fit goes on to the next page, a long
   table's header row again, each page with its own header, footer and number): paragraph styles, fonts, sizes, colours and
   highlights, links, alignment, line and paragraph spacing, bullets, numbers and checklists, callouts, tables (column
@@ -461,10 +461,23 @@ agents that speak ACP and take MCP servers.
   printing, pictures, drawings and plots made with AI (Insert, "/", and a table's Make a plot of this table), free
   photos with their credit as the caption, a picked picture changed with AI (in words, its background taken out,
   part of it erased) or edited in the picture editor, Rewrite of the words picked, and a Section made with AI (an
-  executive summary, a table of risks…); a picture, table or line put in from a table's cell goes after the table;
+  executive summary, a table of risks…); AI that writes with you, by the helper model: Write with AI at the caret
+  (Ctrl+J, or Space on an empty line: a paragraph about…, continue writing, a summary of what is above, a conclusion,
+  a list or a table of…; for words picked, explained, summed up or made a table), kept, tried again or discarded,
+  a suggestion while suggesting; Proofread, a new tone or a translation of the whole document as suggestions by AI
+  (a translation as a copy too); suggestions as you type (Tab takes them); and a panel that answers questions from the
+  document with links to the passages they rest on; footnotes at the foot of their page, citations found by DOI,
+  arXiv id or title in APA, MLA, Chicago or IEEE with a bibliography that keeps up, numbered captions of pictures,
+  tables and equations with cross-references that keep up, bookmarks and links to headings and bookmarks, page setup
+  (landscape, one to three columns, a page colour, a watermark of words or a picture), paragraph styles of the
+  document's own (Update to match, Reset), voice typing with the app's dictation and reading aloud with the sentence
+  marked; all of them kept in the PDF and the Word file as Word's own (footnotes, citations with their sources and the
+  bibliography, captions, cross-references and bookmarks, sections, the page's colour, a watermark, styles) and read
+  back from Word files, and done by agents too (save_doc, page_action); a picture, table or line put in from a table's
+  cell goes after the table;
   they export as Word (styles, lists, tables, pictures, comments, tracked changes, equations, the table of
   contents and headers and footers as Word's own; laid out so Word's pages break where the editor's do, the
-  document's fonts inside the file), PDF on their paper, Markdown or a web page. Spreadsheets (save_sheet, with
+  document's fonts inside the file), OpenDocument for LibreOffice (its page, styles, lists, tables, pictures, footnotes and table of contents as LibreOffice's own), PDF on their paper, Markdown, EPUB (a chapter at each Heading 1, its footnotes, pictures and maths inside), plain text or a web page. Spreadsheets (save_sheet, with
   formulas, or opened from an Excel, ODS, CSV or TSV file) work as in Excel, Google Sheets or Airtable: a grid that
   stays quick with thousands of rows, frozen and hidden rows and columns, sizes to drag, about three hundred of
   Excel's functions worked out as you type (lookups, criteria, dates, text, loans, FILTER, SORT, UNIQUE and
@@ -536,31 +549,35 @@ agents that speak ACP and take MCP servers.
 - **The picture and video editors**: pictures and videos open in editors of their own, in tabs inside the app (the
   page you came from first, a dot on a tab with changes not saved, Open editors on a phone), from a picture shown
   large (Edit), the Library's picture and video pages, Files (Edit, and Edit the picture or Edit the video in a
-  file's menu), slides (Edit picture, Edit video), documents and pages (Edit picture) and an agent's video. The
-  picture editor is laid out as Photoshop is (menus with their keys, the tool's options, a rail of tools in groups,
-  dockable panels, a status bar; on a phone, tools along the bottom and panels in a sheet) and works in layers: pixel
-  layers, words and shapes, and adjustment layers, each shown or hidden, locked, renamed, reordered by dragging, with
-  sixteen blend modes and an opacity; duplicate, layer via copy or cut, merge down, merge visible, flatten, free
-  transform (move, size, turn). Selections (rectangle, ellipse, lasso, polygon lasso, magic wand, the subject found by
-  AI, all, invert, feather, grow, shrink; marching ants) keep painting, fills, adjustments and the AI tools inside
-  them, and cut, copy and paste to new layers. Painting and retouching: brush, eraser, clone stamp, spot healing
-  brush, gradient, paint bucket, dodge and burn, eyedropper, foreground and background colours. Adjustments on layers:
-  light and colour, curves, levels, hue, saturation and lightness by colour range, colour balance, clarity, dehaze,
-  sharpness, noise reduction, blur, vignette, grain, invert, posterize, threshold, thirteen looks and Auto enhance,
-  with a live histogram. Crop (eight shapes, straighten, turns, mirror), crop to the selection, image size and canvas
-  size, rulers, guides and a grid, history with every step by name, Photoshop's keys (a list in Edit → Keyboard
-  shortcuts), pictures added as layers (a file, the Library, the clipboard, dropped). Its AI: remove the background,
-  erase, change with AI (a new layer, inside the selection), expand, make it 2× or 4× larger and select the subject,
-  free on this computer where the picture tools can do it. It saves at a size and as PNG, JPEG or WebP, over the
-  original (the old file to the Trash) or as a copy, and exports to this device. The video editor is laid out as a
-  professional one (a menu bar with shortcuts, the workspaces Edit, Colour, Audio and Export, panels sized and
-  remembered): a media panel (videos, pictures and sounds from this device, the Library or Files, a voice-over
-  recorded), a WebGL viewer (timecode, In and Out, safe areas and a grid, J/K/L), an inspector, and a multi-track
-  timeline (T1 words, V3 and V2 overlays, V1 clips with transitions, A1 their sound with its shape, A2 music, A3
-  voice; show, mute, solo, lock; Select, Blade, Trim and Hand tools, snapping, markers, right-click menus). Clips have
-  their own part, speed (pitch kept or not), backwards, steadied, held frames, crop and turn, fitted or filling the
-  output's shape (16:9, 9:16, 1:1, 4:5), a picture's slow zoom and pan, their own sound or another in its place,
-  detached; fourteen transitions; overlays placed, sized, see-through, keyed (green screen) and faded; words and
+  file's menu), slides (Edit picture, Edit video), documents (Edit picture), pages (Edit picture on a picked picture's
+  bar and in its Part tab, Edit video), designs (Edit picture, Edit video) and an agent's video. The picture editor is
+  laid out as Photoshop is (menus with their keys, the tool's options, a rail of tools in groups, dockable panels, a
+  status bar; on a phone, tools along the bottom and panels in a sheet) and works in layers: pixel layers, words and
+  shapes, and adjustment layers, each shown or hidden, locked, renamed, reordered by dragging, with sixteen blend
+  modes and an opacity; duplicate, layer via copy or cut, merge down, merge visible, flatten, free transform (move,
+  size, turn). Selections (rectangle, ellipse, lasso, polygon lasso, magic wand, the subject found by AI, all, invert,
+  feather, grow, shrink; marching ants) keep painting, fills, adjustments and the AI tools inside them, and cut, copy
+  and paste to new layers. Painting and retouching: brush, eraser, clone stamp, spot healing brush, gradient, paint
+  bucket, dodge and burn, eyedropper, foreground and background colours. Adjustments on layers: light and colour,
+  curves, levels, hue, saturation and lightness by colour range, colour balance, clarity, dehaze, sharpness, noise
+  reduction, blur, vignette, grain, invert, posterize, threshold, thirteen looks and Auto enhance, with a live
+  histogram. Crop (eight shapes, straighten, turns, mirror), crop to the selection, image size and canvas size,
+  rulers, guides and a grid, history with every step by name, Photoshop's keys (a list in Edit → Keyboard shortcuts),
+  pictures added as layers (a file, the Library, the clipboard, dropped). Its AI: remove the background, erase, change
+  with AI (a new layer, inside the selection), expand, make it 2× or 4× larger and select the subject, free on this
+  computer where the picture tools can do it. It saves at a size and as PNG, JPEG or WebP, over the original (the old
+  file to the Trash) or as a copy, and exports to this device. The video editor is laid out as a professional one (a
+  menu bar with shortcuts, the workspaces Edit, Colour, Audio and Export, panels sized and remembered): a media panel
+  (videos, pictures and sounds from this device, the Library or Files, a voice-over recorded), a WebGL viewer
+  (timecode, In and Out, safe areas and a grid, J/K/L), an inspector, and a multi-track timeline (T1 words, V3 and V2
+  overlays, V1 clips with transitions, A1 their sound with its shape, A2 music, A3 voice; show, mute, solo, lock;
+  Select, Blade, Trim and Hand tools, snapping, markers, right-click menus). Clips have their own part, speed (pitch
+  kept or not), backwards, steadied, held frames, crop and turn, fitted or filling the output's shape (16:9, 9:16,
+  1:1, 4:5), a picture's slow zoom and pan, their own sound or another in its place, unlinked (J and L cuts) and
+  linked again; every sound (clips' own, music, voice-over) with its shape, trimmed, cut, silenced in parts, faded by
+  handles (crossfades where two overlap), a volume line to click and drag, its channels (left or right only, one side
+  on both, mono, swapped: a lapel microphone) and its own clean-up, evening out and normalizing, the sound editor for
+  the rest; fourteen transitions; overlays placed, sized, see-through, keyed (green screen) and faded; words and
   captions made from what is said (whisper.cpp here), in five styles, saved as .srt. Colour as Resolve's Color page:
   wheels (lift, gamma, gain, offset), primaries, curves, twelve looks, vignette, sharpen, denoise, grain, before and
   after, and scopes (waveform, vectorscope, histogram), the preview exactly as made (one 3D table for the browser and
@@ -590,8 +607,30 @@ agents that speak ACP and take MCP servers.
   step. Saved with ffmpeg as MP3, M4A, Ogg Opus, WAV or FLAC (quality, bits, mono or stereo, sample rate), over the
   original (the old file to the Trash), in the Library in its place, or as a copy; a video's sound keeps the video's
   length (a deletion leaves silence) and goes back to the video. Agents have edit_audio.
-- **Made with AI from a kind**: 216 kinds the app knows how to make well (56 slides, 29 decks, 43 documents, 19
-  sections, 39 pages, 17 blocks of a page, 13 spreadsheets), in a gallery with a find box and chips by group: Insert
+- **Designs, as in Canva or Adobe Express**: New → Design makes a poster (A4, A3, US Letter, 18 × 24 in), a flyer, an
+  Instagram post (square or portrait), a story, reel or TikTok, a Facebook post or cover, an X post, a LinkedIn
+  banner, a YouTube thumbnail or banner, an invitation, a business card, a certificate, a menu, a postcard, a logo or
+  any size in pixels, millimetres or inches, from 22 ready-made designs drawn for its size (with words and picture
+  places to replace, in their own colours, your theme's, your brand's or a palette's), blank, or described for an
+  agent (19 design kinds). Still a page of the Library (versions, its own address fitted to the screen, publishing),
+  of one or several fixed-size artboards. Its editor places anything anywhere: drag with smart guides that snap to
+  the page's edges and middle and to the other parts (equal gaps shown), resize by handles (Shift keeps proportions),
+  turn, nudge with the arrows, pick several (Shift+click, a box), group and ungroup, line up and spread out, bring
+  forward and send back, lock, duplicate, copy and paste the look, flip, see-through, zoom from 25% to 400%, pages to
+  add, move and duplicate, undo of every step. It adds words (heading, subheading, body, twelve font pairings, 54
+  Google fonts), shapes (27 and boxes), lines and arrows, frames for pictures (14 shapes), stickers, icons and
+  emoji, QR codes, collages, pictures from this device, the Library, free photos or made with AI, drawings, videos
+  (from this device, the Library or made with AI, moving and silent or with controls) and backgrounds (colours,
+  gradients, patterns, a picture, one made with AI). Words get effects (shadow, lift, hollow, outline, glow, neon,
+  echo, splice, gradient), a highlight, a curve, spacing and capitals, and new words written by the helper model;
+  pictures get frames, crop inside their frame, ten looks, brightness, contrast, saturation and blur, corners,
+  borders and shadows, Edit picture, and changes with AI. A brand kit (colours, chosen or read from a picture or
+  suggested from a mood, a heading and a body font, logos) is offered first and put on a whole design in a click;
+  Resize makes a copy at another size, its parts placed to fit (Magic resize); Download makes a PNG (see-through if
+  you like), a JPG at 1×, 2× or 3×, or a PDF to print at its own size. Agents make designs with save_page
+  (how_to_make "design" says how, with the brand kit) and export them with export_page.
+- **Made with AI from a kind**: 235 kinds the app knows how to make well (56 slides, 29 decks, 43 documents, 19
+  sections, 39 pages, 17 blocks of a page, 13 spreadsheets, 19 designs), in a gallery with a find box and chips by group: Insert
   → Slide made with AI (and a slide's own menu, A slide made with AI after it), Insert → Section made with AI, Add a
   block made with AI, Choose a kind in New (then Make it with AI or Make an empty one), and Turn it into in the
   Library (slides, a document or a page from what you have). Say what it is about, and an agent makes it from what

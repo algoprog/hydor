@@ -57,6 +57,7 @@ import { useLiveDraft, usePageDraft } from './live';
 import { EDITORS } from './editors';
 import { exportFile, type ExportFormat } from './exportFile';
 import { EXPORTS } from './exports';
+import { isDesignHtml } from '@shared/design';
 import { AudienceView } from './slides/Present';
 
 export function PagesRoute() {
@@ -585,7 +586,7 @@ function PageView({ id }: { id: string }) {
             </div>
           </Popover>
           <Popover anchor={exportRef} open={menu === 'export'} onClose={() => setMenu(null)} align="end" width={240}>
-            {EXPORTS(kind).map((x) => (
+            {EXPORTS(kind, isDesignHtml(doc?.html ?? '')).map((x) => (
               <MenuItem key={x.format} icon={x.icon} onClick={() => void download(x.format)}>
                 {x.label}
               </MenuItem>
@@ -607,7 +608,7 @@ function PageView({ id }: { id: string }) {
             {mobile && (
               <>
                 <MenuLabel>Download as</MenuLabel>
-                {EXPORTS(kind).map((x) => (
+                {EXPORTS(kind, isDesignHtml(doc?.html ?? '')).map((x) => (
                   <MenuItem key={x.format} icon={x.icon} onClick={() => void download(x.format)}>
                     {x.label}
                   </MenuItem>

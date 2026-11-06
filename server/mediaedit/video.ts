@@ -936,6 +936,20 @@ export function videoEditRoutes(d: Deps) {
     const n = Math.max(16, Math.min(4000, Math.round(Number(q.n) || 400)));
     return { peaks: await peaksOf(s.file, n) };
   });
+  // Normalize: how loud the loudest moment of a sound's part is (dB below full scale), for a level that brings it to -1 dB.
+  app.post('/api/mediaedit/video/peak', async (req) => {
+    const b = (req.body ?? {}) as { src?: unknown; from?: unknown; to?: unknown };
+    const s = await sourceOf(db, b.src, { kinds: ['video', 'sound'] });
+    const tools = await ffmpegTools();
+    if (!tools) throw new HttpError(400, NO_FFMPEG);
+    const from = Math.max(0, Number(b.from) || 0);
+    const to = Number(b.to);
+    const args = ['-hide_banner', '-nostdin', '-v', 'info', '-protocol_whitelist', 'file', '-ss', from.toFixed(3), ...(Number.isFinite(to) && to > from ? ['-t', (to - from).toFixed(3)] : []), '-i', `file:${s.file}`, '-map', '0:a:0', '-af', 'volumedetect', '-f', 'null', '-'];
+    const said = await new Promise<string>((resolve) => execFile(tools.ffmpeg, args, { timeout: 120_000, maxBuffer: 8 << 20, env: { ...agentBaseEnv(), CUDA_VISIBLE_DEVICES: '' } }, (_e, _o, stderr) => resolve(String(stderr))));
+    const m = /max_volume:\s*(-?[\d.]+|-inf) dB/.exec(said);
+    if (!m) throw new HttpError(422, 'Its sound could not be measured');
+    return { peak: m[1] === '-inf' ? -100 : Number(m[1]) };
+  });
   app.get('/api/mediaedit/video/encoders', async () => {
     const tools = await ffmpegTools();
     const e = tools ? await encodersOf(tools.ffmpeg) : {};

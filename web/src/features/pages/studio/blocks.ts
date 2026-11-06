@@ -381,6 +381,8 @@ export function editorLabels(): Record<string, string> {
     box: 'Block',
     parentTip: 'Pick the part around it (Esc)',
     editTip: 'Change the words (click again)',
+    mediaTip: 'Edit picture',
+    mediaVideoTip: 'Edit video',
     upTip: 'Move up',
     downTip: 'Move down',
     dupTip: 'Duplicate (Ctrl+D)',

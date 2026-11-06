@@ -4,7 +4,7 @@
 // a space or in none, or upload files of yours into the Library (each made what it is: uploads.ts); and a published
 // site's row.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AppWindow, FileText, Globe, GlobeLock, LayoutGrid, NotebookText, Presentation, Sheet, Sigma, Sparkles, Upload, X } from 'lucide-react';
+import { AppWindow, FileText, Globe, GlobeLock, LayoutGrid, NotebookText, Palette, Presentation, Sheet, Sigma, Sparkles, Upload, X } from 'lucide-react';
 import type { ContentKind, ContentType } from '@shared/content-types';
 import { DESCRIPTION_WORDS, wordCount, type PageInfo, type SiteInfo, type SiteVisibility } from '@shared/pages';
 import { newDeck, THEMES, type Ratio } from '@shared/slides';
@@ -32,6 +32,10 @@ import { pickFiles } from './uploads';
 import { SlideThumb } from './slides/Thumb';
 import { MyThemeChoices, myThemeDeck, useMyThemes } from './slides/MyThemes';
 import { TexTemplatePicker } from './latex/TemplatePicker';
+import { designSize, sizeText, type DesignSize } from '@shared/design';
+import { templateById, templatePage, templatesFor } from '@shared/design-templates';
+import { fontsOf, NewDesign, paletteOf, type Colours } from './design/NewDesign';
+import { useBrand } from './design/brand';
 
 const TONES = ['from-accent/25 to-accent/5 text-accent', 'from-info/25 to-info/5 text-info', 'from-ok/25 to-ok/5 text-ok', 'from-warn/25 to-warn/5 text-warn', 'from-claude/25 to-claude/5 text-claude', 'from-codex/25 to-codex/5 text-codex'];
 export const toneOf = (id: string) => TONES[parseInt(id.slice(0, 6), 16) % TONES.length];
@@ -241,10 +245,11 @@ export function PublishDialog({ page, open, onClose }: { page?: { id: string; ti
   );
 }
 
-export type NewKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
-const NEW_TITLE: Record<NewKind, string> = { page: '', slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', tex: 'LaTeX document', notebook: 'Notebook' };
+export type NewKind = 'page' | 'design' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
+const NEW_TITLE: Record<NewKind, string> = { page: '', design: 'Design', slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', tex: 'LaTeX document', notebook: 'Notebook' };
 const ASK_FOR: Record<NewKind, string> = {
   page: 'Make me a page and keep it in my Library: ',
+  design: 'Make me a design and keep it in my Library: ',
   slides: 'Make me slides and keep them in my Library: ',
   doc: 'Write me a document and keep it in my Library: ',
   sheet: 'Make me a spreadsheet and keep it in my Library: ',
@@ -252,10 +257,11 @@ const ASK_FOR: Record<NewKind, string> = {
   notebook: 'Make me a Jupyter notebook, run it, and keep it in my Library: ',
 };
 /** The kinds the gallery has for each: Choose a kind picks one of them, which the request is then made from. */
-const TYPES_FOR: Partial<Record<NewKind, ContentKind>> = { page: 'page', slides: 'deck', doc: 'doc', sheet: 'sheet' };
-const OPENS: Partial<Record<NewKind, string>> = { slides: '.pptx,.ppsx,.potx,.pptm', doc: '.docx,.docm,.dotx,.md,.markdown,.txt,.html,.htm', sheet: '.xlsx,.ods,.csv,.tsv', tex: '.tex,.ltx,.zip', notebook: '.ipynb' };
+const TYPES_FOR: Partial<Record<NewKind, ContentKind>> = { page: 'page', design: 'design', slides: 'deck', doc: 'doc', sheet: 'sheet' };
+const OPENS: Partial<Record<NewKind, string>> = { slides: '.pptx,.ppsx,.potx,.pptm', doc: '.docx,.docm,.dotx,.pdf,.md,.markdown,.txt,.html,.htm', sheet: '.xlsx,.ods,.csv,.tsv', tex: '.tex,.ltx,.zip', notebook: '.ipynb' };
 const KIND_TILES: { value: NewKind; label: string; icon: ReactNode }[] = [
   { value: 'page', label: 'A page', icon: <AppWindow size={16} /> },
+  { value: 'design', label: 'Design', icon: <Palette size={16} /> },
   { value: 'slides', label: 'Slides', icon: <Presentation size={16} /> },
   { value: 'doc', label: 'Document', icon: <FileText size={16} /> },
   { value: 'sheet', label: 'Spreadsheet', icon: <Sheet size={16} /> },
@@ -299,6 +305,17 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
   const spaces = useSpaces();
   const folders = usePagesStore((s) => s.folders);
   const [where, setWhere] = useState<string | null>(space ?? null);
+  // A design: its size, the template it starts from (none: blank) and its colours.
+  const brand = useBrand();
+  const [dSize, setDSize] = useState<DesignSize>(() => designSize('instagram-post')!);
+  const [dTpl, setDTpl] = useState<string | null>(() => templatesFor(designSize('instagram-post')!)[0]?.id ?? null);
+  const [dColours, setDColours] = useState<Colours>('own');
+  const pickSize = (s: DesignSize) => {
+    if (kind === 'design' && (title === tr(dSize.label) || title === NEW_TITLE.design || !title.trim())) setTitle(tr(s.label));
+    setDSize(s);
+    const list = templatesFor(s);
+    if (dTpl && !list.some((t) => t.id === dTpl)) setDTpl(list[0]?.id ?? null);
+  };
   useEffect(() => {
     if (!open) return;
     setKind(startKind);
@@ -318,8 +335,11 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
     try {
       const t = title.trim() || defaultTitle;
       const at = { space: where, folder: inFolder };
+      const tpl = dTpl ? (templateById(dTpl) ?? null) : null;
       const r =
-        kind === 'slides'
+        kind === 'design'
+          ? await post<{ page: PageInfo }>('/api/pages', { title: t, html: templatePage(tpl, dSize, { title: t, palette: paletteOf(dColours, brand), fonts: fontsOf(tpl, dColours, brand) }), ...at })
+          : kind === 'slides'
           ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind: 'slides', model: deckIn(theme, t, ratio), ...at })
           : kind === 'page'
             ? await post<{ page: PageInfo }>('/api/pages', { title: t, html: starter.html(t), ...at })
@@ -327,14 +347,14 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
               ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind, model: texFromTemplate(tpl, t), ...at })
               : await post<{ page: PageInfo }>('/api/pages', { title: t, kind, ...at });
       onClose();
-      go(kind === 'page' ? `/pages/${r.page.id}?mode=${pick === 'blank' ? 'edit' : 'view'}` : `/pages/${r.page.id}`);
+      go(kind === 'design' ? `/pages/${r.page.id}?mode=edit` : kind === 'page' ? `/pages/${r.page.id}?mode=${pick === 'blank' ? 'edit' : 'view'}` : `/pages/${r.page.id}`);
     } catch (e) {
       toastError(e);
     } finally {
       setBusy(false);
     }
   };
-  /** A PowerPoint deck, a Word document, a spreadsheet or a CSV opened as a page of its kind. */
+  /** A PowerPoint deck, a Word document or a PDF, a spreadsheet or a CSV opened as a page of its kind. */
   const openFile = () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -410,6 +430,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
         title: t && t !== defaultTitle ? t : undefined,
         theme: th ? { id: th.id, label: th.label } : undefined,
         ratio: kind === 'slides' ? ratio : undefined,
+        size: kind === 'design' ? { label: dSize.label, w: dSize.w, h: dSize.h } : undefined,
         folder: names.join('/') || undefined,
         lang: appLanguage(),
       });
@@ -418,7 +439,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
       return startMaking(run, { prompt: r.prompt, make: r.make, space: sp });
     }
     onClose();
-    const prompt = `${tr(ASK_FOR[kind])}${ask.trim()}`;
+    const prompt = `${tr(ASK_FOR[kind])}${ask.trim()}${kind === 'design' ? ` (${tr(dSize.label)}, ${sizeText(dSize)})` : ''}`;
     if (sp) startInSpace(sp, prompt);
     else go(`/?prompt=${enc(prompt)}`);
   };
@@ -426,8 +447,8 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
     <Dialog
       open={open}
       onClose={onClose}
-      title={kind === 'slides' ? 'New slides' : kind === 'doc' ? 'A new document' : kind === 'sheet' ? 'A new spreadsheet' : kind === 'tex' ? 'A new LaTeX document' : kind === 'notebook' ? 'A new notebook' : 'A new page'}
-      width={600}
+      title={kind === 'design' ? 'A new design' : kind === 'slides' ? 'New slides' : kind === 'doc' ? 'A new document' : kind === 'sheet' ? 'A new spreadsheet' : kind === 'tex' ? 'A new LaTeX document' : kind === 'notebook' ? 'A new notebook' : 'A new page'}
+      width={kind === 'design' ? 860 : 600}
       footer={
         <>
           {/* Files of yours instead, as many as you pick, each made what it is, in the project picked below. */}
@@ -457,7 +478,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
       }
     >
       <div className="space-y-4 text-[13.5px]">
-        <div className="grid grid-cols-6 gap-1.5 max-sm:grid-cols-3" role="radiogroup" aria-label="What to make">
+        <div className="grid grid-cols-7 gap-1.5 max-sm:grid-cols-4" role="radiogroup" aria-label="What to make">
           {KIND_TILES.map((t) => (
             <button
               key={t.value}
@@ -487,9 +508,11 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
                     : 'LaTeX source beside its typeset pages, as in Overleaf, to save as a PDF or the .tex project.'}
             </span>
             <Button size="sm" variant="secondary" icon={<Upload size={14} />} disabled={busy} onClick={openFile}>
-              {kind === 'doc' ? 'Open a Word or text file' : kind === 'sheet' ? 'Open an Excel or CSV file' : kind === 'notebook' ? 'Open a notebook (.ipynb)' : 'Open a .tex or .zip file'}
+              {kind === 'doc' ? 'Open a Word, PDF or text file' : kind === 'sheet' ? 'Open an Excel or CSV file' : kind === 'notebook' ? 'Open a notebook (.ipynb)' : 'Open a .tex or .zip file'}
             </Button>
           </div>
+        ) : kind === 'design' ? (
+          <NewDesign size={dSize} onSize={pickSize} tpl={dTpl} onTpl={setDTpl} colours={dColours} onColours={setDColours} brand={brand} />
         ) : kind === 'page' ? (
           <>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -605,7 +628,9 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
                 onChange={(e) => setAsk(e.target.value)}
                 placeholder={
                   type?.hint ??
-                  (kind === 'slides'
+                  (kind === 'design'
+                    ? 'A poster for our summer street party'
+                    : kind === 'slides'
                     ? 'A 10-minute talk on our first year'
                     : kind === 'doc'
                       ? 'A cover letter for a design job'

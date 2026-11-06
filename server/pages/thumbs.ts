@@ -12,6 +12,8 @@ import type { Deps } from '../features/types.ts';
 import { injectHead, kitHead } from './kit.ts';
 import { dataStamp, pageHtml, pageInfo, pageSource, storageMap } from './store.ts';
 import { mustKind } from './kinds.ts';
+import { isDesignHtml } from '../../shared/design.ts';
+import { designThumbHtml } from './design-export.ts';
 
 const DIR = path.join(config.dataDir, 'pages', 'thumbs');
 const fileOf = (id: string, stamp: string) => path.join(DIR, `${id}-${stamp}.webp`);
@@ -86,7 +88,9 @@ async function take(d: Deps, id: string) {
     const page = (await pageHtml(db, id))!;
     // The kit with the page's data to read, nothing to write it to, and no parent to talk to.
     const head = kitHead({ n: '', theme: 'light', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, seed: storageMap(db, id) });
-    shot = await capture({ html: injectHead(page.html, head), width: 880, height: 550, outWidth: 528, format: 'webp', quality: 74, settleMs: 700, blockPrivate: true, offline });
+    // A design: its first artboard whole.
+    const design = isDesignHtml(page.html) ? designThumbHtml(page.html) : null;
+    shot = await capture({ html: design ?? injectHead(page.html, head), width: 880, height: 550, outWidth: 528, format: 'webp', quality: 74, settleMs: 700, blockPrivate: true, offline });
   }
   fs.mkdirSync(DIR, { recursive: true, mode: 0o700 });
   // Only one picture per page: the others are out of date.
