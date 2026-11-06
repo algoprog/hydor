@@ -22,7 +22,7 @@ import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { setHelperModel } from '../helper.ts';
 import { loadConfig, saveConfig, writeAgentModels } from '../models/config.ts';
-import { getAsset, initAssets } from '../pages/assets.ts';
+import { getAsset, initAssets, putAsset } from '../pages/assets.ts';
 import { readPng, writePng, type Rgba } from '../signatures/png.ts';
 import { featherOf, putTogether, resample, soften, weights } from './blend.ts';
 import { cloudTools, setLocalTools } from './hooks.ts';
@@ -644,6 +644,14 @@ const setKey = (k?: string) => {
   localReady = false;
   const opaque = await run('generate_image', { prompt: 'A fox logo', transparent: true, model: 'bytedance-seed/seedream-5-0-pro', ask: false });
   ok(opaque.isError && /does not make transparent backgrounds/.test(opaque.text), 'a model asked for that cannot, and nothing to cut it out: says so');
+
+  // A deck's, document's or page's own picture to work from, as get_page shows it (naget-asset:…).
+  const kept = `naget-asset:${putAsset(db, CLEAR)}`;
+  const fromDeck = await run('generate_image', { prompt: 'The same fox, in winter', images: [kept], ask: false });
+  const sent = lastImages()?.input_references ?? [];
+  ok(!fromDeck.isError && sent.length === 1 && sent[0].image_url.url === `data:image/png;base64,${CLEAR.toString('base64')}`, `a kept picture is sent as it is kept: ${fromDeck.text.slice(0, 200)}`);
+  const gone = await run('generate_image', { prompt: 'The same fox', images: ['naget-asset:00000000000000000000'], ask: false });
+  ok(gone.isError && /is not a picture this app keeps/.test(gone.text), `one the app does not keep is said so: ${gone.text}`);
 
   // make_svg: written, or drawn after the form with its price.
   calls.length = 0;
