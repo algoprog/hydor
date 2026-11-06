@@ -86,6 +86,17 @@ Quick drawing written by a model; the picture tools on this computer). The edito
 false, show the key field in place (saved with `PUT /api/models` `{ openrouterKey }`, as Settings → Models does) beside
 **Skip**, and offer what needs no key.
 
+**Every tool for agents too** (the owner, 6 November): each thing the editors do has an agent's way (generate_image,
+make_svg, remove_background, erase_from_image, make_plot, generate_video, save_slides' web format, export_page,
+publish_site, app_api for settings and the picture tools' set-up), the tools take pictures already in a deck or
+document (`naget-asset:<sha>`) as well as files, and a spawn instruction tells agents to use them unprompted when they
+make slides, documents and pages. The editors' own routes are refused to agents (app_api points them to their tools).
+
+**AI when the local tools fall short** (the owner, 6 November): cutouts and erasing take `how: auto | local | ai`; on
+auto a cutout whose mask looks poor is redone by an image model, a large area to erase goes to AI fill; the answers
+tell agents to look and redo with `how: "ai"` (or generate_image) when it is not right; the editors offer **Do it with
+AI instead** under a result made on this computer.
+
 Prices: every route that spends says what it cost (`cost`, US dollars, when OpenRouter says); the dialogs show an
 estimate before (`TiersInfo`). Without an OpenRouter key, routes that need one answer 400 with
 "Add an OpenRouter key in Settings → Models" (and the dialogs show that with a link, `/settings?s=models`).
