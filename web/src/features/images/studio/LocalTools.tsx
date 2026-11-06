@@ -8,6 +8,7 @@ import type { LocalToolsState } from '@shared/images';
 import { Button } from '../../../components/ui';
 import { localState, removeLocal, setUpLocal } from './api';
 import { Working } from './parts';
+import { errorWords } from './logic';
 
 export interface LocalTools {
   state: LocalToolsState | null;
@@ -25,7 +26,7 @@ export function useLocalTools(watch = false): LocalTools {
     () =>
       localState().then(
         (s) => (setState(s), setError(null)),
-        (e: Error) => setError(e.message),
+        (e: Error) => setError(errorWords(e)),
       ),
     [],
   );
@@ -44,7 +45,7 @@ export function useLocalTools(watch = false): LocalTools {
       const s = await setUpLocal();
       setState(s && typeof s === 'object' && 'ready' in s ? s : await localState());
     } catch (e) {
-      setError((e as Error).message);
+      setError(errorWords(e));
     }
   };
   const remove = async () => {
@@ -53,7 +54,7 @@ export function useLocalTools(watch = false): LocalTools {
       const s = await removeLocal();
       setState(s && typeof s === 'object' && 'ready' in s ? s : await localState());
     } catch (e) {
-      setError((e as Error).message);
+      setError(errorWords(e));
     }
   };
   return { state, error, setUp, remove, refresh };

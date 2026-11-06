@@ -9,7 +9,7 @@ import type { DrawingKind, ImageTier, SvgAnswer, TiersInfo } from '@shared/image
 import { Button, Dialog, Segmented } from '../../../components/ui';
 import { getTiers, makeSvg } from './api';
 import { KeyAsk } from './KeyAsk';
-import { DEFAULT_COLORS, DRAWING_KINDS, drawingPrice, drawingTier, madeWith, needsKey, SHAPES } from './logic';
+import { DEFAULT_COLORS, DRAWING_KINDS, drawingPrice, drawingTier, errorWords, madeWith, needsKey, SHAPES } from './logic';
 import { Choice, Label, PriceLine, Problem, ShapeMark, Shown, Words, Working } from './parts';
 import { shownSrc } from './pictures';
 import type { DrawingOpts, MadeDrawing } from './store';
@@ -40,7 +40,7 @@ export function MakeDrawing({ o, onDone }: { o: DrawingOpts; onDone: (d: MadeDra
   const stop = useRef(new AbortController());
 
   useEffect(() => {
-    getTiers().then(setTiers, (e: Error) => setError(e.message));
+    getTiers().then(setTiers, (e: Error) => setError(errorWords(e)));
     const c = stop.current;
     return () => c.abort();
   }, []);
@@ -63,7 +63,7 @@ export function MakeDrawing({ o, onDone }: { o: DrawingOpts; onDone: (d: MadeDra
       const r = await makeSvg({ prompt: prompt.trim(), kind, aspect, tier: t, colors }, stop.current.signal);
       setMade(r);
     } catch (e) {
-      const m = (e as Error).message;
+      const m = errorWords(e);
       if (!stop.current.signal.aborted) t === 'best' && needsKey(m) ? setAskKey(true) : setError(m);
     } finally {
       setBusy(false);
@@ -98,7 +98,7 @@ export function MakeDrawing({ o, onDone }: { o: DrawingOpts; onDone: (d: MadeDra
             setTiers(t);
             if (t.keySet) void draw({ tier: 'best', keyed: true });
           },
-          (e: Error) => setError(e.message),
+          (e: Error) => setError(errorWords(e)),
         )
       }
       onSkip={() => {

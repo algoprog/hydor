@@ -16,6 +16,7 @@ import {
   drawingPrice,
   drawingTier,
   elapsed,
+  errorWords,
   insteadLine,
   madeWith,
   modelLabel,
@@ -121,6 +122,8 @@ test('what AI made says so, by the model’s name; the tiers name the ones they 
   assert.equal(modelLabel(null, undefined), 'OpenRouter');
   assert.equal(needsKey('Add an OpenRouter key in Settings → Models'), true);
   assert.equal(needsKey('That picture is over 12 MB'), false);
+  assert.equal(errorWords(new TypeError('Failed to fetch')), 'The app could not be reached: check the connection, then try again.');
+  assert.equal(errorWords(new Error('That picture is over 12 MB')), 'That picture is over 12 MB');
 });
 
 test('Auto picks Quick for simple pictures and Best for scenes, words and changes; drawings go Best for illustrations', () => {

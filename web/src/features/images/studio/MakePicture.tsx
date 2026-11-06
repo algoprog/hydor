@@ -9,7 +9,7 @@ import type { MakeImageAnswer, PictureKind, TierChoice, TiersInfo } from '@share
 import { Button, cx, Dialog, Switch } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
 import { getTiers, makeImages } from './api';
-import { drawingKindOf, LOOKS, madeWith, needsKey, PICTURE_KINDS, picturePrice, pictureTier, SHAPES } from './logic';
+import { drawingKindOf, errorWords, LOOKS, madeWith, needsKey, PICTURE_KINDS, picturePrice, pictureTier, SHAPES } from './logic';
 import { KeyAsk } from './KeyAsk';
 import { Choice, PriceLine, Problem, ShapeMark, Shown, Words, Working, type Option } from './parts';
 import { shownSrc } from './pictures';
@@ -43,7 +43,7 @@ export function MakePicture({ o, onDone, onDraw }: { o: PictureOpts; onDone: (p:
   const stop = useRef(new AbortController());
 
   useEffect(() => {
-    getTiers().then(setTiers, (e: Error) => setError(e.message));
+    getTiers().then(setTiers, (e: Error) => setError(errorWords(e)));
     const c = stop.current;
     return () => c.abort();
   }, []);
@@ -76,7 +76,7 @@ export function MakePicture({ o, onDone, onDraw }: { o: PictureOpts; onDone: (p:
       setMade(r);
       setPick(0);
     } catch (e) {
-      const m = (e as Error).message;
+      const m = errorWords(e);
       if (!stop.current.signal.aborted) needsKey(m) ? setAskKey(true) : setError(m);
     } finally {
       setBusy(false);
@@ -111,7 +111,7 @@ export function MakePicture({ o, onDone, onDraw }: { o: PictureOpts; onDone: (p:
             setTiers(t);
             if (t.keySet) void make(true);
           },
-          (e: Error) => setError(e.message),
+          (e: Error) => setError(errorWords(e)),
         )
       }
       onSkip={() => onDone(null)}
