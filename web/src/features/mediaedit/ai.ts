@@ -137,9 +137,10 @@ export function expansionAsk(full: HTMLCanvasElement, ratio: number | 'all', sid
   const mg = ctx(mask);
   mg.fillStyle = '#fff';
   mg.fillRect(0, 0, mask.width, mask.height);
-  const inset = Math.round(Math.min(full.width, full.height) * k * 0.03);
+  // Only the sides that meet the new part reach into the original.
+  const e = edges(full, place, Math.round(Math.min(full.width, full.height) * 0.03));
   mg.fillStyle = '#000';
-  mg.fillRect(place.x * k + inset, place.y * k + inset, full.width * k - 2 * inset, full.height * k - 2 * inset);
+  mg.fillRect((place.x + e.l) * k, (place.y + e.t) * k, (full.width - e.l - e.r) * k, (full.height - e.t - e.b) * k);
   return { picture: pic, mask: mask.toDataURL('image/png'), place };
 }
 
@@ -148,13 +149,18 @@ export function expansionResult(full: HTMLCanvasElement, answer: CanvasImageSour
   const out = sized(answer, place.W, place.H);
   const part = sized(full, full.width, full.height);
   const pg = ctx(part);
-  const inset = Math.round(Math.min(full.width, full.height) * 0.02);
+  const e = edges(full, place, Math.round(Math.min(full.width, full.height) * 0.02));
   pg.globalCompositeOperation = 'destination-in';
   pg.drawImage(
-    softened(full.width, full.height, (g, k) => g.fillRect(inset * k, inset * k, (full.width - 2 * inset) * k, (full.height - 2 * inset) * k)),
+    softened(full.width, full.height, (g, k) => g.fillRect(e.l * k, e.t * k, (full.width - e.l - e.r) * k, (full.height - e.t - e.b) * k)),
     0,
     0,
   );
   ctx(out).drawImage(part, place.x, place.y);
   return out;
+}
+
+/** How far in from each side the original gives way to the new part: `d` where a side meets it, nothing at the picture's own edge. */
+function edges(full: { width: number; height: number }, place: { W: number; H: number; x: number; y: number }, d: number) {
+  return { l: place.x > 0 ? d : 0, t: place.y > 0 ? d : 0, r: place.x + full.width < place.W ? d : 0, b: place.y + full.height < place.H ? d : 0 };
 }

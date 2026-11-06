@@ -136,8 +136,8 @@ function Editing({ o, active, detached, setDirty, done, lead, start }: EditorPro
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const mobile = phone || (width > 0 && width < 680);
-  const compact = !mobile && width > 0 && width < 1040;
+  const mobile = phone || (width > 0 && width < 640);
+  const compact = !mobile && width > 0 && width < 860;
   const view = useRef<ViewHandle>(null);
   // The steps, kept in a ref too, so a step and what follows it read the newest at once.
   const hist = useRef<{ list: Snap[]; at: number }>({ list: [{ base: start.base, recipe: {} }], at: 0 });
@@ -214,8 +214,13 @@ function Editing({ o, active, detached, setDirty, done, lead, start }: EditorPro
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const setTool = (t: Tool) => {
+    // Words being written are kept (or, with none, dropped) before the tool changes.
+    if (writing) {
+      const id = writing;
+      setWriting(null);
+      endWriting(id);
+    }
     flush();
-    if (writing) setWriting(null);
     setPicked(null);
     ai.setStrokes([]);
     setToolState(t);
@@ -607,7 +612,17 @@ function Editing({ o, active, detached, setDirty, done, lead, start }: EditorPro
         />
       )}
       {tool === 'markup' && (
-        <MarkupPanel tool={markTool} onTool={(t) => (setMarkTool(t), setPicked(null))} style={style} onStyle={setStyle} picked={pickedMark} onDelete={() => picked && removeMark(picked)} long={Math.max(base.w, base.h)} hint={HINTS[markTool]} />
+        <MarkupPanel
+          wide={mobile}
+          tool={markTool}
+          onTool={(t) => (setMarkTool(t), setPicked(null))}
+          style={style}
+          onStyle={setStyle}
+          picked={pickedMark}
+          onDelete={() => picked && removeMark(picked)}
+          long={Math.max(base.w, base.h)}
+          hint={HINTS[markTool]}
+        />
       )}
       {tool === 'ai' && <AiPanel ai={ai} host={aiHost} onBusy={setAiBusy} />}
     </>
