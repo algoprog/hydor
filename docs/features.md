@@ -442,18 +442,34 @@ agents that speak ACP and take MCP servers.
   contents and headers and footers as Word's own; laid out so Word's pages break where the editor's do, the
   document's fonts inside the file), PDF on their paper, Markdown or a web page. Spreadsheets (save_sheet, with
   formulas, or opened from an Excel, ODS, CSV or TSV file) work as in Excel, Google Sheets or Airtable: a grid that
-  stays quick with thousands of rows, frozen and hidden rows and columns, sizes to drag, about two hundred of
-  Excel's functions worked out as you type (lookups, criteria, dates, text, loans, and FILTER, SORT, UNIQUE and
-  SEQUENCE that spill) with each function's arguments shown, references that move as cells are copied, filled,
-  inserted and deleted, the fill handle with its series, number formats with Excel's own codes, borders, merged
-  cells, filters, sorting by several columns, conditional formatting (rules, colour scales, data bars), dropdowns
-  with coloured chips, checkboxes, star ratings and a calendar for dates, notes and comment threads that agents answer, charts (seven kinds) that sit on their cells and move with them,
-  of one range or of several (Ctrl+click), Paste special,
-  removing duplicates, splitting text into columns, summaries as a pivot table makes them, a row opened as a card,
-  a Kanban board kept with its sheet (what it groups by, its cards' fields, its lanes' order), several sheets, copy and paste with Excel and Google Sheets, and the sum, average and count of what
-  is picked; they export as Excel (formulas, formats, filters, conditional formatting, dropdowns and checkboxes,
-  long lists of options among them, merged cells, notes, threaded comments and charts on their cells kept, with
-  the editor's column widths, row heights and print layout), CSV or PDF. LaTeX documents (save_latex, from nine templates, a conference
+  stays quick with thousands of rows, frozen and hidden rows and columns, sizes to drag, about three hundred of
+  Excel's functions worked out as you type (lookups, criteria, dates, text, loans, FILTER, SORT, UNIQUE and
+  SEQUENCE that spill, and the newer ones: LET and LAMBDA with MAP, REDUCE, SCAN, BYROW and MAKEARRAY, VSTACK,
+  HSTACK, TAKE, DROP, CHOOSECOLS, TOCOL and WRAPROWS, TEXTSPLIT, TEXTBEFORE and TEXTAFTER, regular expressions,
+  TREND, LINEST, FORECAST and the statistics, Google Sheets' SPLIT, JOIN and ARRAYFORMULA, HYPERLINK, IMAGE and
+  SPARKLINE drawn in the cell) with each function's arguments shown, named ranges (and named LAMBDAs) in formulas
+  and the name box, references that move as cells are copied, filled, inserted and deleted, the fill handle with
+  its series, number formats with Excel's own codes, borders, merged cells, filters, sorting by several columns,
+  conditional formatting (rules, colour scales, data bars), dropdowns with coloured chips, checkboxes, star ratings
+  and a calendar for dates, links on cells, protected ranges and sheets that warn or refuse changes, groups of rows
+  and columns folded with + and −, gridlines on or off, notes and comment threads that agents answer, charts (eleven
+  kinds, combo, histogram, bubble and radar among them, with 100% stacking, trendlines, data labels, a second axis
+  and the axis's limits) that sit on their cells and move with them, of one range or of several (Ctrl+click), Paste
+  special, removing duplicates, splitting text into columns, summaries and a pivot table editor (rows, columns,
+  values, filters) of formulas that keep up, Goal seek, Trace precedents and dependents, a row opened as a card,
+  a Kanban board kept with its sheet (what it groups by, its cards' fields, its lanes' order), several sheets, copy
+  and paste with Excel and Google Sheets, and the sum, average and count of what is picked. AI in them uses the
+  helper model, saying what it costs: the AI function (=AI(prompt, cells…), as Google Sheets has it: each answer
+  worked out once and kept with the sheet, cells asked together, asked again only when they change or with
+  Refresh, never just by opening the sheet), Write a formula from words, Explain this formula, Fill with AI
+  (Ctrl+E: a pattern found in a few examples, for nothing, else the helper model), Analyze the data (questions
+  answered, charts and pivot tables put in with a click), Clean up the data (spaces, numbers and dates kept as
+  words, different spellings, duplicate and empty rows, each fixed with a click, for nothing) and a table made
+  with AI. They print and export as PDF with their own setup (orientation, fitting, a print area, header rows
+  repeated on each page, gridlines), and as Excel (formulas, the newer functions as Excel writes them, formats,
+  filters, conditional formatting, dropdowns and checkboxes, long lists of options among them, merged cells, groups,
+  named ranges, links, a sheet's protection, notes, threaded comments, the print setup and charts on their cells
+  kept, with the editor's column widths and row heights) or CSV. LaTeX documents (save_latex, from nine templates, a conference
   paper as IEEE, ACM or Springer LNCS ask among them, or opened from a .tex file or a project's .zip) keep their source files and pictures, typeset on this computer (pdfLaTeX, XeLaTeX
   or LuaLaTeX, with BibTeX) as you type, beside the pages: a Visual mode that shows the source as a document while
   you type, formulas drawn as you write them, completion of commands, environments, packages, citations, labels and
