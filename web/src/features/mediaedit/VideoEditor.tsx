@@ -764,7 +764,12 @@ function SaveOptions({
         </div>
       )}
       {plans.main.fixed && <p className="text-[12.5px] leading-snug text-fg-2">{`Saved over it, it keeps its kind (${plans.main.fixed}).`}</p>}
-      <p className="border-t border-line pt-2.5 text-[12px] leading-snug text-fg-3">{[plans.main.says, plans.copy?.says].filter(Boolean).join(' ')} MP4 plays everywhere; WebM is smaller, for the web.</p>
+      <div className="space-y-1 border-t border-line pt-2.5 text-[12px] leading-snug text-fg-3">
+        {[plans.main.says, plans.copy?.says].filter(Boolean).map((t) => (
+          <p key={t}>{t}</p>
+        ))}
+        <p>MP4 plays everywhere; WebM is smaller, for the web.</p>
+      </div>
     </div>
   );
 }

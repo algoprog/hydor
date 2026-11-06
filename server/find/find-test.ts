@@ -20,6 +20,8 @@ import { kvSet, openDb } from '../db.ts';
 import { setEmbedderForTests } from '../memory/embed.ts';
 import * as store from '../memory/store.ts';
 import * as vec from '../memory/vectors.ts';
+import { searchLibrary } from '../pages/search.ts';
+import { createPage, describePage, initPages } from '../pages/store.ts';
 import { createSpace } from '../spaces/index.ts';
 import { dropLists, findAll, findScope, hashOf, makeWaiting, onEvent, setFindScope, setShippedForTests, shippedVectors } from './index.ts';
 import { shippedItems } from './sources.ts';
@@ -225,6 +227,38 @@ test('with search by meaning: what ships found in other words; sessions and task
   assert.ok(!(await findAll(d, 'holiday plans')).sessions.some((x) => x.meaning));
   setEmbedderForTests(null);
   kvSet(db, 'memory.meaning', '0');
+});
+
+test('the Library: its pages by their titles and descriptions, by words and by meaning, the vectors made as the pages hear of them', async () => {
+  kvSet(db, 'memory.meaning', '1');
+  setEmbedderForTests(async (texts) => texts.map(fake));
+  vec.setCodebookForTests(new Float32Array(vec.DIM * 16).map((_, i) => -0.12 + ((i % 16) * 0.24) / 15));
+  initPages(db);
+  const garden = createPage(db, { title: 'Garden plan', html: '<p>Beds</p>', by: 'agent', description: 'Which vegetables go in each raised bed, and the watering days.' });
+  const trip = createPage(db, { title: 'Four days away', kind: 'sheet', model: { sheets: [{ name: 'Costs', cells: {} }] }, by: 'agent', description: 'What the trip to Lisbon costs: flights, the hotel and meals.' });
+  onEvent({ t: 'feature', id: 'pages', data: { what: 'pages' } } as never, d);
+  await sleep(400);
+  await makeWaiting(db);
+  const words = await searchLibrary(db, 'raised bed watering', { media: false });
+  assert.equal(words.hits[0]?.id, `page:${garden.id}`);
+  assert.ok(words.hits[0].by.includes('words') && words.meaning, 'by its description’s words, and by meaning too');
+  const meant = await searchLibrary(db, 'holiday', { media: false });
+  assert.equal(meant.hits[0]?.id, `page:${trip.id}`, 'in other words: a holiday is about the trip');
+  assert.deepEqual(meant.hits[0].by, ['meaning']);
+  assert.ok(!meant.hits.some((h) => h.id === `page:${garden.id}`), 'what is not alike stays out');
+  // A description changed: found by its new words and meaning once the pages hear of it.
+  describePage(db, garden.id, 'The groceries to buy this week.');
+  onEvent({ t: 'feature', id: 'pages', data: { what: 'pages' } } as never, d);
+  await sleep(400);
+  await makeWaiting(db);
+  assert.equal((await searchLibrary(db, 'shopping', { media: false })).hits[0]?.id, `page:${garden.id}`);
+  // Search by meaning off: by words alone.
+  kvSet(db, 'memory.meaning', '0');
+  const off = await searchLibrary(db, 'holiday', { media: false });
+  assert.equal(off.meaning, false);
+  assert.equal(off.hits.length, 0);
+  assert.equal((await searchLibrary(db, 'groceries', { media: false })).hits[0]?.id, `page:${garden.id}`);
+  setEmbedderForTests(null);
 });
 
 test('use: picks (with what was typed) and visits, worth half after their half-life, kept apart', () => {

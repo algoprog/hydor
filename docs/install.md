@@ -14,6 +14,10 @@ date. [Back to the README](../README.md).
   Linux with the installer: Node.js 22.12 or newer, `git`, `tmux`, a C/C++ toolchain for the native modules
   (`build-essential` and `python3` on Debian or Ubuntu), and
   [Claude Code](https://docs.anthropic.com/en/docs/claude-code) if you want it (Codex is installed with the app).
+- Search by meaning (memory and the Library found by what they mean, as well as by their words) is on unless you turn
+  it off in Settings → Memory, and sets itself up a minute after the app first starts: it needs Python 3.10 or newer
+  (or [uv](https://docs.astral.sh/uv/), which brings its own; the Docker image has Python), about 2 GB of disk (6 GB
+  with an NVIDIA GPU) and a 1.2 GB model download, once. Without them, everything is found by its words alone.
 - Optional: [TeX Live](https://tug.org/texlive/) to typeset LaTeX documents in Pages, with bubblewrap to keep it
   in a sandbox of its own (on Debian or Ubuntu `sudo apt install texlive-latex-extra texlive-xetex latexmk
   poppler-utils bubblewrap`; LuaLaTeX runs only in that sandbox). The Docker image leaves TeX out; build it with

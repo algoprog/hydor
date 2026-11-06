@@ -24,7 +24,7 @@ const home = path.join(tmp, 'home');
 fs.mkdirSync(home);
 const readyFile = path.join(tmp, 'ready.json');
 const traceFile = path.join(tmp, 'trace.log');
-const env = { ...process.env, PORT: String(port), DATA_DIR: path.join(tmp, 'data'), HYDOR_DESKTOP_READY_FILE: readyFile, HYDOR_DESKTOP_TRACE: traceFile, ELECTRON_ENABLE_LOGGING: '1' };
+const env = { ...process.env, PORT: String(port), DATA_DIR: path.join(tmp, 'data'), HYDOR_DESKTOP_READY_FILE: readyFile, HYDOR_DESKTOP_TRACE: traceFile, ELECTRON_ENABLE_LOGGING: '1', HYDOR_EMBED: 'off' };
 // (Windows: the app's runtime copies go in its own LOCALAPPDATA; the profile stays the runner's, whose folders Windows
 // works out from it, and a fresh runner is a first start all the same.)
 if (WIN) Object.assign(env, { LOCALAPPDATA: path.join(home, 'Local') });

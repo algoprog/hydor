@@ -398,7 +398,7 @@ In the conversation, a search shows as a step: **Searched your documents**, what
 Agents search in three ways:
 
 - **By words**: passages that hold the words of the question, the best matches first. Always available.
-- **By meaning**: passages that mean what the question asks, even in other words or another language. This needs **Search by meaning**, turned on in [Settings → Memory](/settings?s=memory&find=Search%20by%20meaning). It runs on this computer, and once it is on, every base gets ready for it in the background (see [Memory](/guide/memory#search-by-meaning)). While it is off, the Shared knowledge tab and each project's Knowledge tab say where to turn it on, and agents find passages by their words.
+- **By meaning**: passages that mean what the question asks, even in other words or another language. This needs **Search by meaning**, which is on unless you turn it off in [Settings → Memory](/settings?s=memory&find=Search%20by%20meaning). It runs on this computer, and while it is on, every base gets ready for it in the background (see [Memory](/guide/memory#search-by-meaning)). While it is off, the Shared knowledge tab and each project's Knowledge tab say where to turn it on, and agents find passages by their words.
 - **The exact text**: a phrase in quotes ("notice period") or a pattern between slashes (a regular expression, such as `/INV-\d+/`), found as the grep command would find it: for names, numbers and codes. These passages come in the order they appear in the documents.
 
 An agent searches by words and by meaning together unless it asks for one, and a question in quotes or between slashes is searched for exactly. It gets 8 passages at a time unless it asks for more (up to 25), and it can search one knowledge base by its name.
