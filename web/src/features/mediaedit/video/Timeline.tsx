@@ -38,15 +38,15 @@ interface Row {
 }
 
 const ROWS: Row[] = [
-  { id: 't1', name: 'T1', title: 'Titles and captions', kind: 'text', h: [26, 40] },
+  { id: 't1', name: 'T1', title: 'Words', kind: 'text', h: [26, 40] },
   { id: 'v3', name: 'V3', title: 'Overlays', kind: 'overlay', h: [32, 52] },
   { id: 'v2', name: 'V2', title: 'Overlays', kind: 'overlay', h: [32, 52] },
   { id: 'v1', name: 'V1', title: 'Clips', kind: 'clip', h: [50, 78] },
-  { id: 'a1', name: 'A1', title: 'Clips’ sound', kind: 'clipsound', h: [34, 58] },
+  { id: 'a1', name: 'A1', title: 'Sound', kind: 'clipsound', h: [34, 58] },
   { id: 'a2', name: 'A2', title: 'Music', kind: 'audio', h: [32, 52] },
-  { id: 'a3', name: 'A3', title: 'Voice-over', kind: 'audio', h: [32, 52] },
+  { id: 'a3', name: 'A3', title: 'Voice', kind: 'audio', h: [32, 52] },
 ];
-const HEAD = 124;
+const HEAD = 164;
 const PAD = 10;
 const RULER = 24;
 
@@ -114,6 +114,13 @@ export function Timeline(p: TimelineProps) {
   const width = Math.max(view.w - (p.compact ? 0 : HEAD), PAD * 2 + (length + 8) * pps);
   const rows = p.compact ? ROWS.filter((row) => row.id === 'v1' || row.id === 'a1') : ROWS;
   const [snapLine, setSnapLine] = useState<number | null>(null);
+  // The first view shows the whole timeline.
+  const fitted = useRef(false);
+  useEffect(() => {
+    if (fitted.current || view.w < 100 || length <= 0) return;
+    fitted.current = true;
+    p.onPps(Math.max(2, Math.min(200, (view.w - (p.compact ? 0 : HEAD) - PAD * 3) / Math.max(4, length))));
+  }, [view.w, length]); // eslint-disable-line react-hooks/exhaustive-deps
   const [insertAt, setInsertAt] = useState<number | null>(null);
 
   /** Seconds at a pointer's x. */
@@ -356,6 +363,7 @@ export function Timeline(p: TimelineProps) {
             <div key={row.id} className={cx('relative flex border-b border-line', row.id === 'v1' && 'border-b-line-2')} style={{ height: ph(row) }}>
               {!p.compact && <TrackHead row={row} {...p} />}
               <div
+                data-track={row.id}
                 className={cx('relative min-w-0 flex-1', row.kind === 'clip' ? 'bg-bg-1' : 'bg-bg', locked(row.id) && 'opacity-60')}
                 style={{ width }}
                 onPointerDown={(e) => {
@@ -535,7 +543,7 @@ function Ruler(p: TimelineProps & { width: number; length: number; x: (t: number
     el.addEventListener('pointerup', up);
   };
   return (
-    <div className="relative min-w-0 flex-1 cursor-pointer border-b border-line bg-bg-1" style={{ width: p.width }} onPointerDown={scrub}>
+    <div data-ruler className="relative min-w-0 flex-1 cursor-pointer border-b border-line bg-bg-1" style={{ width: p.width }} onPointerDown={scrub}>
       {(a !== null || b !== null) && <div className="pointer-events-none absolute inset-y-0 bg-accent/20" style={{ left: p.x(a ?? 0), width: Math.max(2, p.x(b ?? p.length) - p.x(a ?? 0)) }} />}
       {Array.from({ length: n }, (_, i) => {
         const t = i * step;
@@ -591,7 +599,7 @@ function TrackHead({ row, ...p }: TimelineProps & { row: Row }) {
   const audio = row.kind === 'clipsound' || row.kind === 'audio';
   return (
     <div className="sticky left-0 z-10 flex shrink-0 items-center gap-1 border-r border-line bg-panel px-1.5" style={{ width: HEAD }}>
-      <span className={cx('flex h-5 w-7 shrink-0 items-center justify-center rounded text-[10.5px] font-semibold', audio ? 'bg-ok/15 text-ok' : row.kind === 'text' ? 'bg-warn/15 text-warn' : 'bg-accent-soft text-accent')}>{row.name}</span>
+      <span className={cx('flex h-5 w-6 shrink-0 items-center justify-center rounded text-[10.5px] font-semibold', audio ? 'bg-ok/15 text-ok' : row.kind === 'text' ? 'bg-warn/15 text-warn' : 'bg-accent-soft text-accent')}>{row.name}</span>
       <span className="min-w-0 flex-1 truncate text-[11px] text-fg-3" title={row.title}>
         {row.title}
       </span>
@@ -621,7 +629,7 @@ function TrackHead({ row, ...p }: TimelineProps & { row: Row }) {
 
 function HeadButton({ label, on, onClick, children }: { label: string; on?: boolean; onClick: () => void; children: ReactNode }) {
   return (
-    <button type="button" title={label} aria-label={label} aria-pressed={on} onClick={onClick} className={cx('flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-bold', on ? 'bg-accent text-accent-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg')}>
+    <button type="button" title={label} aria-label={label} aria-pressed={on} onClick={onClick} className={cx('flex h-5 w-[18px] shrink-0 items-center justify-center rounded text-[10px] font-bold', on ? 'bg-accent text-accent-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg')}>
       {children}
     </button>
   );
@@ -710,7 +718,8 @@ const ClipItem = memo(function ClipItem({
 }) {
   const f = factsOf(c.src);
   const src = c.src ?? main;
-  const w = span.length * pps;
+  const from = span.start + span.tin / 2;
+  const w = (span.length - span.tin / 2 - span.tout / 2) * pps;
   const fh = h - 18;
   const aspect = f && f.width && f.height ? f.width / f.height : 16 / 9;
   // As many frames as fit, asked again only when that changes by much.
@@ -718,12 +727,15 @@ const ClipItem = memo(function ClipItem({
   const n = want <= 2 ? want : want <= 4 ? 4 : want <= 8 ? 8 : want <= 16 ? 16 : 24;
   const [a, b] = c.trim ?? [0, f?.duration ?? 0];
   const still = c.picture || f?.picture;
-  const thumb = still ? playUrl(src) : c.still !== undefined ? stripUrl(src, 1, 96, c.still, c.still + 0.1) : stripUrl(src, n, 96, a, b);
+  const s0 = sourceAt(c, f, span.tin / 2);
+  const s1 = sourceAt(c, f, span.length - span.tout / 2);
+  const thumb = still ? playUrl(src) : c.still !== undefined ? stripUrl(src, 1, 96, c.still, c.still + 0.1) : stripUrl(src, n, 96, Math.min(s0, s1, b), Math.max(Math.min(s0, s1) + 0.05, Math.max(s0, s1)));
   const badges = [c.speed ? `${c.speed}×` : '', c.reverse ? 'Reversed' : '', c.stabilize ? 'Steadied' : '', c.still !== undefined ? 'Held' : '', c.grade ? 'Colour' : ''].filter(Boolean);
   return (
     <div
+      data-clip
       className={cx('absolute inset-y-[3px] flex cursor-grab flex-col overflow-hidden rounded-[6px] border', TONES.clip, picked && 'ring-2 ring-accent ring-inset', hidden && 'opacity-40')}
-      style={{ left: x(span.start), width: Math.max(4, w), touchAction: 'none' }}
+      style={{ left: x(from), width: Math.max(4, w), touchAction: 'none' }}
       onPointerDown={onPress}
       onContextMenu={onMenu}
     >
@@ -790,7 +802,7 @@ function ClipSound({ c, span, x, pps, h, main, factsOf, muted, picked, onPick, o
   return (
     <div
       className={cx('absolute inset-y-[3px] overflow-hidden rounded-[5px] border', silent ? 'border-line bg-[repeating-linear-gradient(135deg,transparent_0_5px,var(--line)_5px_6px)]' : TONES.music, picked && 'ring-2 ring-accent ring-inset', muted && 'opacity-40')}
-      style={{ left: x(span.start), width: Math.max(4, span.length * pps) }}
+      style={{ left: x(span.start + span.tin / 2), width: Math.max(4, (span.length - span.tin / 2 - span.tout / 2) * pps) }}
       onPointerDown={(e) => {
         e.stopPropagation();
         onPick();

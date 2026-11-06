@@ -191,8 +191,9 @@ export interface PlanInput {
   frame?: number;
   /** Only this part of the timeline, in seconds. */
   range?: [number, number];
-  /** The output's shorter side at most, in pixels. */
+  /** The output's shorter side at most, in pixels (exactly, with `exactSize`). */
   size?: number;
+  exactSize?: boolean;
   fps?: number;
   codec?: VideoCodec;
   quality?: VideoQuality;
@@ -284,7 +285,7 @@ export function planVideo(p: PlanInput): Plan {
   const cut = win.offset > 0.0005 || win.length < span - 0.0005;
 
   // ---- the output's size --------------------------------------------------------------------------------------------
-  let { w: W, h: H } = outputSize(full, p.factsOf, { size: p.size });
+  let { w: W, h: H } = outputSize(full, p.factsOf, { size: p.size, exact: p.exactSize && !gif });
   if (gif) ({ w: W, h: H } = scaledSize(W, H, { size: p.size, gif: true }));
 
   const inputs: string[] = [];

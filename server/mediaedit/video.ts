@@ -272,6 +272,7 @@ export interface Prepared {
   frame?: number;
   range?: [number, number];
   size?: number;
+  exactSize?: boolean;
   fps?: number;
   codec?: VideoCodec;
   quality?: VideoQuality;
@@ -485,6 +486,7 @@ async function planFor(p: Prepared, dir: string, output: string, bin: string, hw
     frame: p.frame,
     range: p.range,
     size: p.size,
+    exactSize: p.exactSize,
     fps: p.fps,
     codec: p.codec,
     quality: p.quality,
@@ -783,7 +785,7 @@ export async function prepare(d: Deps, b: Partial<VideoEditAsk> & { to?: unknown
     format,
     ...(frame !== undefined && picture ? { frame } : {}),
     ...(range && !picture ? { range } : {}),
-    ...(Number.isFinite(size) && size >= 120 ? { size: Math.round(Math.min(4320, size)) } : {}),
+    ...(Number.isFinite(size) && size >= 120 ? { size: Math.round(Math.min(4320, size)), ...(b.exactSize === true ? { exactSize: true } : {}) } : {}),
     ...(Number.isFinite(fps) && fps >= 1 ? { fps: Math.min(60, fps) } : {}),
     ...(codec ? { codec } : {}),
     ...(quality ? { quality } : {}),
@@ -999,7 +1001,7 @@ function videosOn(db: DB): boolean {
 }
 
 /** The output's size for an edit, as the editor and edit_video say it. */
-export const outputOf = (p: Prepared) => outputSize(p.recipe, p.factsOf, { size: p.size });
+export const outputOf = (p: Prepared) => outputSize(p.recipe, p.factsOf, { size: p.size, exact: p.exactSize });
 
 export const videoEdit: Feature = {
   id: 'mediaedit-video',

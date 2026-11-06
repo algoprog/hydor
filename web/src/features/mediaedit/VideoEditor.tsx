@@ -210,7 +210,7 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
   const [picked, setPicked] = useState<Picked>(null);
   const [tool, setTool] = useState<TimelineTool>('select');
   const [snapOn, setSnapOn] = useRemembered('snap', true);
-  const [pps, setPps] = useRemembered('pps', 40);
+  const [pps, setPps] = useState(40);
   const [trackUi, setTrackUi] = useRemembered<Partial<Record<VideoTrackId, TrackUi>>>('tracks', {});
   const [safe, setSafe] = useRemembered('safe', false);
   const [grid, setGrid] = useRemembered('grid', false);
@@ -230,7 +230,7 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busy = !!making;
   const out = outputSize(r, factsOf);
-  const made = outputSize(r, factsOf, { size: settings.size });
+  const made = outputSize(r, factsOf, { size: settings.size, exact: true });
   const firstVideo = (r.clips ?? []).find((c) => !isStill(c) && !factsOf(c.src)?.picture);
   const ownFps = firstVideo ? factsOf(firstVideo.src)?.fps : undefined;
   const fps = settings.fps ?? (ownFps ? Math.min(60, ownFps) : 30);
@@ -343,10 +343,10 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
       return toastError(err);
     }
     const size = what === 'frame' ? undefined : settings.size;
-    const box = outputSize(recipe, factsOf, { size });
+    const box = outputSize(recipe, factsOf, { size, exact: true });
     const drawn = (recipe.texts ?? []).map((t) => drawText(t, box.w, box.h).toDataURL('image/png'));
     const range: [number, number] | undefined = settings.range === 'inout' && (inOut[0] !== null || inOut[1] !== null) ? [inOut[0] ?? 0, inOut[1] ?? length] : undefined;
-    const common = { src: o.src, recipe, drawn, ...(size ? { size } : {}), ...(settings.fps ? { fps: settings.fps } : {}), codec: settings.codec, quality: settings.quality, encoder: settings.encoder };
+    const common = { src: o.src, recipe, drawn, ...(size ? { size, exactSize: true } : {}), ...(settings.fps ? { fps: settings.fps } : {}), codec: settings.codec, quality: settings.quality, encoder: settings.encoder };
     let ask: VideoEditAsk;
     if (what === 'frame') ask = { src: o.src, recipe, drawn, format: 'jpg', frame: clock.get(), to: plans.beside };
     else if (what === 'gif') ask = { ...common, ...(range ? { range } : {}), format: 'gif', to: plans.beside };
@@ -848,7 +848,6 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
           <MenuBar menus={menus} />
           <span translate="no" className="min-w-0 flex-1 truncate text-center text-[12.5px] text-fg-3">
             {o.title}
-            {changed ? ' ·' : ''}
           </span>
           <WorkspaceTabs value={workspace} tabs={WORKSPACES} onChange={setWorkspace} />
           <span className="mx-1 h-5 w-px bg-line" />

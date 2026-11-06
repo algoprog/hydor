@@ -169,19 +169,19 @@ export function ExportPage(p: ExportProps) {
                 aria-label="Size"
               >
                 <option value="">{`As the edit (${p.out.w} × ${p.out.h})`}</option>
-                {[2160, 1440, 1080, 720, 480].filter((x) => x < short).map((x) => (
+                {[2160, 1440, 1080, 720, 480].filter((x) => x !== short).map((x) => (
                   <option key={x} value={x}>
                     {x === 2160 ? '4K (2160p)' : `${x}p`}
                   </option>
                 ))}
               </select>
-              <p className="tnum text-[11.5px] text-fg-3">{`${p.made.w} × ${p.made.h}`}</p>
+              <p className="tnum text-[11.5px] text-fg-3">{`${p.made.w} × ${p.made.h}${Math.min(p.made.w, p.made.h) > short ? ' · larger than the clips: they may look soft' : ''}`}</p>
             </Group>
             <Group title="Frames a second">
               <Choices<string>
                 value={s.fps ? String(s.fps) : 'own'}
                 onChange={(v) => set({ fps: v === 'own' ? undefined : Number(v) })}
-                options={[{ value: 'own', label: p.ownFps ? `${Math.round(p.ownFps * 100) / 100}` : 'Own', title: 'As the first video' }, ...VIDEO_FPS.filter((x) => x !== 50).map((x) => ({ value: String(x), label: String(x) }))]}
+                options={[{ value: 'own', label: p.ownFps ? `As made (${Math.round(p.ownFps * 100) / 100})` : 'As made', title: 'As the first video' }, ...VIDEO_FPS.filter((x) => x !== 50 && x !== Math.round(p.ownFps ?? 0)).map((x) => ({ value: String(x), label: String(x) }))]}
               />
             </Group>
           </div>

@@ -398,8 +398,8 @@ export function Choices<T extends string | number>({ value, options, onChange, c
 /** A small switch with its words, in a panel's row. */
 export function Toggle({ label, on, onChange, title }: { label: ReactNode; on: boolean; onChange: (on: boolean) => void; title?: string }) {
   return (
-    <label className="flex h-7 cursor-pointer items-center gap-2 text-[12px] text-fg-2" title={title}>
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+    <label className="flex min-h-7 cursor-pointer items-center gap-2 text-[12px] leading-snug text-fg-2" title={title}>
+      <span className="min-w-0 flex-1">{label}</span>
       <button
         type="button"
         role="switch"

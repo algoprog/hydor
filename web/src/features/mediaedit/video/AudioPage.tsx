@@ -33,7 +33,7 @@ const STRIPS = [
 const useLevels = (e: Engine): TrackLevels => useSyncExternalStore(e.onLevels, () => e.levels);
 
 export function AudioPage(p: AudioProps) {
-  const [mixW, setMixW] = useRemembered('audio.mixer', 520);
+  const [mixW, setMixW] = useRemembered('audio.mixer', 600);
   const [timeH, setTimeH] = useRemembered('audio.timeline', 300);
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -125,9 +125,9 @@ function Strip({
   }, [fill]);
   return (
     <div className="flex w-[78px] shrink-0 flex-col items-center gap-1.5 rounded-lg bg-bg-1 px-1.5 py-2" title={title}>
-      <div className="flex w-full items-center justify-between">
-        <span className="text-[11px] font-semibold text-ok">{name}</span>
-        <span className="truncate text-[10px] text-fg-3">{title}</span>
+      <div className="w-full text-center leading-tight">
+        <div className="text-[11px] font-semibold text-ok">{name}</div>
+        <div className="truncate text-[10px] text-fg-3">{title}</div>
       </div>
       {onPan && (
         <input type="range" min={-100} max={100} value={Math.round((pan ?? 0) * 100)} onPointerDown={change?.begin} onPointerUp={change?.end} onChange={(e) => onPan(Number(e.target.value) / 100)} onDoubleClick={() => onPan(0)} aria-label={`${title}: pan`} title={`Pan: ${pan ? (pan < 0 ? `${Math.round(-pan * 100)}% left` : `${Math.round(pan * 100)}% right`) : 'middle'}`} className="w-full accent-[var(--accent)]" />
@@ -202,8 +202,8 @@ function Fixes(p: AudioProps) {
           onChange={(v) => set({ loudness: v === 'off' ? undefined : v })}
           options={[
             { value: 'off', label: 'Off' },
-            { value: 'web', label: 'For the web', title: '-14 LUFS: YouTube, social media, phones' },
-            { value: 'broadcast', label: 'For broadcast', title: '-23 LUFS (EBU R128)' },
+            { value: 'web', label: 'Web', title: 'For the web: -14 LUFS (YouTube, social media, phones)' },
+            { value: 'broadcast', label: 'Broadcast', title: 'For broadcast: -23 LUFS (EBU R128)' },
           ]}
         />
       </div>

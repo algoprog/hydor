@@ -626,9 +626,9 @@ export function Transport({
       <Tool label="Go to the end" keys="End" onClick={() => engine.seek(length)}>
         <ChevronLast size={15} />
       </Tool>
-      <div className="tnum ml-2 min-w-0 font-mono text-[15px] font-medium tracking-tight text-fg" translate="no">
-        {timecode(t, fps)}
-        {!compact && <span className="ml-2 text-[12px] font-normal text-fg-3">{`/ ${timecode(length, fps)}`}</span>}
+      <div className="tnum ml-2 flex min-w-0 items-baseline gap-2 font-mono whitespace-nowrap" translate="no">
+        <span className="text-[15px] font-medium tracking-tight text-fg">{timecode(t, fps)}</span>
+        {!compact && <span className="truncate text-[11.5px] text-fg-3 max-lg:hidden">{timecode(length, fps)}</span>}
       </div>
       <span className="min-w-1 flex-1" />
       {extra}
@@ -651,10 +651,9 @@ export function Transport({
             onChange={(v) => onZoom(v === 'fit' ? 'fit' : Number(v))}
             options={[
               { value: 'fit', label: 'Fit' },
-              { value: '0.5', label: '50%' },
               { value: '1', label: '100%' },
             ]}
-            className="w-[136px]"
+            className="w-[96px] shrink-0"
           />
         </>
       )}
