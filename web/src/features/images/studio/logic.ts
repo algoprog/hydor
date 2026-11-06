@@ -55,22 +55,25 @@ export function changePrice(t: TiersInfo): Price {
 }
 
 /** The models the picture tools on this computer download the first time each is used, about so large. */
-export const LOCAL_MODEL_MB: Record<'cutout' | 'erase', number> = { cutout: 220, erase: 210 };
+export const LOCAL_MODEL_MB: Record<'cutout' | 'erase', number> = { cutout: 190, erase: 210 };
 
 /** Taking a picture's background out, or erasing part of it: on this computer for nothing, or through OpenRouter. */
 export function toolPrice(t: TiersInfo, tool: 'cutout' | 'erase', how: 'local' | 'cloud'): Price {
-  const button = tool === 'cutout' ? 'Remove the background' : 'Erase it';
+  const cut = tool === 'cutout';
+  // Each button's words whole, so the dictionaries find them as they are (a word put in a sentence is not translated).
+  const button = cut ? 'Remove the background' : 'Erase it';
   if (how === 'local') {
     const first = !t.local.downloaded.includes(tool);
     return {
       cost: 0,
       line: first ? `On this computer, for nothing, and the picture stays here. The first time, it downloads its model (about ${LOCAL_MODEL_MB[tool]} MB).` : 'On this computer, for nothing, and the picture stays here.',
-      button: `${button} (free)`,
+      button: cut ? 'Remove the background (free)' : 'Erase it (free)',
     };
   }
   const m = cloudModel(t, tool);
   if (m.perImage == null) return { line: `Through OpenRouter with ${m.label}: it does not list its price`, button };
-  return { cost: m.perImage, line: `Through OpenRouter: about ${money(m.perImage)} with ${m.label}`, button: `${button} (about ${money(m.perImage)})` };
+  const about = money(m.perImage);
+  return { cost: m.perImage, line: `Through OpenRouter: about ${about} with ${m.label}`, button: cut ? `Remove the background (about ${about})` : `Erase it (about ${about})` };
 }
 
 /**
