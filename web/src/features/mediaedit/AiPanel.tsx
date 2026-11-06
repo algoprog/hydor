@@ -29,7 +29,7 @@ const MODES: { id: AiMode; label: string; line: string; icon: React.ReactNode }[
 const EXPAND_SHAPES: { id: string; label: string; ratio: number | 'all' }[] = [
   { id: '16:9', label: '16:9', ratio: 16 / 9 },
   { id: '4:3', label: '4:3', ratio: 4 / 3 },
-  { id: '1:1', label: 'Square', ratio: 1 },
+  { id: '1:1', label: 'Square (1:1)', ratio: 1 },
   { id: '4:5', label: '4:5', ratio: 4 / 5 },
   { id: '9:16', label: '9:16', ratio: 9 / 16 },
   { id: 'all', label: 'All round', ratio: 'all' },

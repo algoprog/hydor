@@ -149,8 +149,9 @@ export function TrimPanel({ r, change, duration, clock }: { r: VideoRecipe; chan
       <Group title="The part kept">
         <TimeField label="Starts at" value={a} max={b - 0.2} onChange={(t) => setTrim([t, b])} clock={clock} />
         <TimeField label="Ends at" value={b} min={a + 0.2} max={duration} onChange={(t) => setTrim([a, t])} clock={clock} />
+        <p className="text-[12px] leading-snug text-fg-3">Drag the handles at the ends of the timeline, or type the times (of the whole video).</p>
         <p className="text-[12px] leading-snug text-fg-3">
-          Drag the handles at the ends of the timeline, or type the times (of the whole video). The edited video is <span className="tnum font-medium text-fg-2">{videoClock(length)}</span> long.
+          <span>Its length once edited:</span> <span className="tnum font-medium text-fg-2">{videoClock(length)}</span>
         </p>
       </Group>
       <Group title="Parts cut out">
@@ -191,7 +192,7 @@ export function TrimPanel({ r, change, duration, clock }: { r: VideoRecipe; chan
 
 // ---- Crop ---------------------------------------------------------------------------------------------------------
 
-const SHAPE_NAMES: Record<VideoShape, string> = { free: 'Free', '16:9': '16:9', '9:16': '9:16', '1:1': 'Square', '4:5': '4:5' };
+const SHAPE_NAMES: Record<VideoShape, string> = { free: 'Free', '16:9': '16:9', '9:16': '9:16', '1:1': 'Square (1:1)', '4:5': '4:5' };
 
 function ShapeIcon({ shape }: { shape: VideoShape }) {
   if (shape === 'free') return <span className="h-3.5 w-4.5 rounded-[3px] border-[1.5px] border-dashed border-current" />;
