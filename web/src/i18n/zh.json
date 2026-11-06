@@ -17705,5 +17705,7 @@
 "remove background cutout cut out erase eraser object removal take out local private free offline python onnx plots matplotlib ffmpeg set up remove":"去掉背景 抠图 擦除 橡皮擦 移除物体 本地 私密 免费 离线 python onnx 数据图 matplotlib ffmpeg 安装 移除",
 "the {0} ({1} part {2}{3})":"{0}（{1}部分 {2}{3}）",
 "Things drop, pop and flip in; the slides turn as a cube (zoom in a PowerPoint compatible deck)":"元素落下、弹出、翻转进入；幻灯片像立方体一样转动（在兼容 PowerPoint 的演示文稿中为缩放）",
-"This browser cannot turn speech into words (Chrome, Edge and Safari can), so the coach times your slides only.":"这个浏览器无法把语音转成文字（Chrome、Edge 和 Safari 可以），所以教练只能为你的幻灯片计时。"
+"This browser cannot turn speech into words (Chrome, Edge and Safari can), so the coach times your slides only.":"这个浏览器无法把语音转成文字（Chrome、Edge 和 Safari 可以），所以教练只能为你的幻灯片计时。",
+"Playback speed":"播放速度",
+"Said after it is answered":"答完后显示"
 }
