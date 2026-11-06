@@ -32,6 +32,10 @@ import {
   Eraser as Broom,
   ChartNoAxesCombined,
   Grid3x3,
+  Table2,
+  Target,
+  ArrowRightToLine,
+  ArrowRightFromLine,
   Link2,
   ListTree,
   Lock,
@@ -138,6 +142,13 @@ export interface MenuCtx {
   boardOpen(): void;
   /** Data → Named ranges, Protect sheets and ranges, Group and Ungroup (rows, or columns when whole columns are picked); Insert → Link; View → Gridlines. */
   names(): void;
+  /** Data → Pivot table (to change the sheet's own, when it holds one); Tools → Goal seek, Trace precedents and dependents. */
+  pivot(): void;
+  pivotHere: boolean;
+  goalSeek(): void;
+  trace(what: 'pre' | 'dep'): void;
+  traced: boolean;
+  untrace(): void;
   protect(): void;
   group(): void;
   ungroup(): void;
@@ -365,6 +376,7 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
           { label: 'Split text to columns', icon: <Split size={14} />, also: 'separate comma', run: m.split },
           { label: 'Trim spaces', also: 'whitespace', run: m.trim },
           { label: 'Summarize by', icon: <Sigma size={14} />, also: 'pivot table group totals', run: m.summary },
+          { label: m.pivotHere ? 'Edit the pivot table' : 'Pivot table', icon: <Table2 size={14} />, also: 'pivot summary rows columns values filters crosstab', run: m.pivot },
           m.ai && '-',
           m.ai && { label: 'Fill with AI', icon: <Sparkles size={14} />, keys: 'Ctrl+E', also: 'flash fill pattern examples autofill', run: m.ai.fill },
           m.ai && { label: 'Clean up the data', icon: <Broom size={14} />, also: 'tidy spaces duplicates spellings dates numbers as text', run: m.ai.clean },
@@ -379,6 +391,11 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
       { label: 'Expand row', also: 'record card form', keys: 'Space', run: m.expand },
       !ro && m.ai && { label: 'Analyze the data', icon: <ChartNoAxesCombined size={14} />, also: 'explore insights questions ai', run: m.ai.analyze },
       m.ai?.explain && { label: 'Explain this formula', icon: <MessageCircleQuestionMark size={14} />, also: 'what does it do ai', run: m.ai.explain },
+      !ro && { label: 'Goal seek', icon: <Target size={14} />, also: 'what if analysis solve find value', run: m.goalSeek },
+      { label: 'Trace precedents', icon: <ArrowRightToLine size={14} />, also: 'cells this formula uses audit', run: () => m.trace('pre') },
+      { label: 'Trace dependents', icon: <ArrowRightFromLine size={14} />, also: 'formulas that use this cell audit', run: () => m.trace('dep') },
+      m.traced && { label: 'Remove traces', run: m.untrace },
+      '-',
       { label: 'Keyboard shortcuts', icon: <Keyboard size={14} />, keys: 'Ctrl+/', run: m.shortcuts },
       m.onAsk && '-',
       m.onAsk && { label: 'Ask the agent about it', icon: <Sparkles size={14} />, run: m.onAsk },
