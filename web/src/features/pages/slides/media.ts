@@ -109,7 +109,7 @@ export async function uploadModel(file: File): Promise<string> {
     r.onerror = () => fail(new Error('The model could not be read'));
     r.readAsDataURL(file);
   });
-  return (await post<{ src: string }>('/api/pages/assets', { data, kind: 'model' })).src;
+  return (await post<{ src: string }>('/api/pages/assets', { data, model: true })).src;
 }
 
 /** One piece of an upload, sent as it is, with how much of it went. */
