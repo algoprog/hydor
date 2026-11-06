@@ -6,12 +6,14 @@
 // towards white where the browser's multiplies them, and PowerPoint itself keeps corrected pictures as their pixels).
 // Without a browser there are none of these: icons then go as SVG alone, equations as their LaTeX, pictures with
 // PowerPoint's nearest effects. And its slides as pictures (the PNG export): taken from the deck's own page as it
-// prints, twice its size.
-import { everyEl, type Deck, type El, type ImageEl } from '../../shared/slides.ts';
+// prints, twice its size. And, for a web deck's PowerPoint file, its live parts (custom code, web pages, 3D) as they run,
+// each a picture at twice its size: what PowerPoint has of them (else their posters).
+import { ASSET, everyEl, mapSources, type Deck, type El, type ImageEl } from '../../shared/slides.ts';
 import { canCapture, withTab } from '../capture/index.ts';
 import { iconSvgText, type Picture } from './pptx.ts';
 import type { DB } from '../db.ts';
-import { deckPage, FONTS_JSON, mathTags, RUNTIME_SRC } from './slides.ts';
+import { assetDataUrl } from './assets.ts';
+import { deckPage, FONTS_JSON, mathTags, RUNTIME_LIBS, RUNTIME_SRC } from './slides.ts';
 
 interface Item {
   n: number;
@@ -161,4 +163,63 @@ export async function deckPictures(db: DB, deck: Deck, title: string, only?: num
     }
     return out;
   });
+}
+
+/**
+ * A web deck's live parts (custom code, web pages, 3D) as they run, each a PNG at twice its size (at most 2400 pixels
+ * across) by "part:<id>": drawn by the runtime in the browser pictures are taken with, its pictures and models inside
+ * the page, each given a few seconds to start (a part that does not, or a browser that cannot draw it, has none: its
+ * poster stands in). None without that browser.
+ */
+export async function liveRenders(db: DB, deck: Deck): Promise<Map<string, Picture>> {
+  const out = new Map<string, Picture>();
+  if (!canCapture()) return out;
+  // Its pictures and models inside the page: the browser reaches nothing of the app's.
+  const inside = mapSources(deck, (src) => (src.startsWith(ASSET) ? (assetDataUrl(db, src.slice(ASSET.length)) ?? '') : src));
+  const items: { n: number; key: string; w: number; h: number; s: number; el: El }[] = [];
+  inside.slides.forEach((s, si) => {
+    for (const e of everyEl(s.els)) {
+      if (items.length >= 40) return;
+      if (e.type !== 'html' && e.type !== 'embed' && e.type !== 'scene3d') continue;
+      // Drawn as it is, unturned and solid, without its poster: the file turns it and makes it see-through itself.
+      const el = { ...e, x: 0, y: 0, rot: undefined, opacity: undefined, link: undefined, poster: undefined } as El;
+      items.push({ n: items.length, key: `part:${e.id}`, w: Math.max(4, Math.abs(e.w)), h: Math.max(4, Math.abs(e.h)), s: si, el });
+    }
+  });
+  if (!items.length) return out;
+  const json = JSON.stringify({ deck: { ...inside, slides: inside.slides.map((s) => ({ ...s, els: [] })) }, items })
+    .replace(/</g, '\\u003c')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+  const script = `(function (RT) {
+  var c = JSON.parse(document.getElementById('n-r').textContent);
+  RT.style();
+  var y = 0;
+  c.items.forEach(function (it) {
+    var b = document.createElement('div');
+    b.className = 'it';
+    b.style.top = y + 'px';
+    b.style.width = it.w + 'px';
+    b.style.height = it.h + 'px';
+    b.appendChild(RT.part(c.deck, c.deck.slides[it.s], it.el, { live: true }));
+    document.body.appendChild(b);
+    y += Math.ceil(it.h) + 8;
+  });
+})((${RUNTIME_SRC})(window, ${FONTS_JSON}, ${RUNTIME_LIBS}))`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent}.it{position:absolute;left:0;overflow:hidden}</style></head><body><script type="application/json" id="n-r">${json}</script><script>${script}</script></body></html>`;
+  const width = Math.min(4000, Math.ceil(Math.max(800, ...items.map((i) => i.w))));
+  return withTab({ html, width, height: 900, settleMs: 300, blockPrivate: true }, async (tab) => {
+    // Until each part says it has started (its frame is ready), or ten seconds at most.
+    await tab.evaluate('new Promise((ok) => { const end = Date.now() + 10000; const go = () => { const all = Array.from(document.querySelectorAll(".ns-live")); if (all.every((x) => x.dataset.ready) || Date.now() > end) setTimeout(() => ok(true), 400); else setTimeout(go, 150); }; go(); })');
+    await tab.s.send('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: 0 } }).catch(() => {});
+    const boxes = await tab.evaluate<[number, number, number, number, boolean][]>('Array.from(document.querySelectorAll(".it")).map((b) => { const r = b.getBoundingClientRect(); const l = b.querySelector(".ns-live"); return [r.left + scrollX, r.top + scrollY, r.width, r.height, !!(l && l.dataset.ready)]; })');
+    for (const it of items) {
+      const r = boxes?.[it.n];
+      if (!r || !r[4]) continue;
+      const k = Math.max(0.25, Math.min(2, 2400 / Math.max(r[2], r[3])));
+      const shot = await tab.s.send('Page.captureScreenshot', { format: 'png', clip: { x: r[0], y: r[1], width: r[2], height: r[3], scale: k }, captureBeyondViewport: true }, 30_000).catch(() => null);
+      if (shot?.data) out.set(it.key, { data: Buffer.from(shot.data, 'base64'), ext: 'png', w: Math.round(r[2] * k), h: Math.round(r[3] * k) });
+    }
+    return out;
+  }).catch(() => out);
 }

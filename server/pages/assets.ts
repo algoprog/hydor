@@ -6,7 +6,8 @@
 // swept with its pictures, their files kept apart (videos.ts).
 //
 // Pictures come in as the editor's uploads, as data: addresses, as files of an agent's session, or from the web
-// (public addresses only, bounded in time and size).
+// (public addresses only, bounded in time and size). 3D parts' models (glTF binary, .glb) are kept the same way, but
+// only where a deck asks for a model: nothing else is taken in as one.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -54,11 +55,18 @@ export function pictureType(b: Buffer): string | null {
   return null;
 }
 
-/** Keeps a picture; its sha. One kept already counts as just added again (a file opened in an editor shows it). */
-export function putAsset(db: DB, data: Buffer): string {
-  if (data.length > MAX_ASSET) throw new HttpError(413, `That picture is over ${MAX_ASSET / 1024 / 1024} MB`);
-  const mime = pictureType(data);
-  if (!mime) throw new HttpError(415, 'That is not a picture (PNG, JPEG, GIF, WebP or SVG)');
+/** A 3D model's type by its first bytes: glTF binary (a .glb file), or null. */
+export const modelType = (b: Buffer): string | null => (b.length > 20 && b.toString('latin1', 0, 4) === 'glTF' && b.readUInt32LE(4) === 2 ? 'model/gltf-binary' : null);
+
+/**
+ * Keeps a picture (or, with `model`, a 3D model: a glTF binary file, for a deck's 3D part); its sha. One kept already
+ * counts as just added again (a file opened in an editor shows it).
+ */
+export function putAsset(db: DB, data: Buffer, o: { model?: boolean } = {}): string {
+  const what = o.model ? 'model' : 'picture';
+  if (data.length > MAX_ASSET) throw new HttpError(413, `That ${what} is over ${MAX_ASSET / 1024 / 1024} MB`);
+  const mime = o.model ? modelType(data) : pictureType(data);
+  if (!mime) throw new HttpError(415, o.model ? 'That is not a 3D model in glTF binary (a .glb file)' : 'That is not a picture (PNG, JPEG, GIF, WebP or SVG)');
   const sha = crypto.createHash('sha256').update(data).digest('hex').slice(0, 40);
   db.prepare('insert into page_assets (sha, mime, data, bytes, created_at) values (?, ?, ?, ?, ?) on conflict(sha) do update set created_at = excluded.created_at').run(sha, mime, data, data.length, Date.now());
   return sha;
@@ -105,31 +113,34 @@ const fromSession = (cwd: string | undefined, p: string) => (p === '~' || p.star
  * A picture's source as a deck keeps it: one the app keeps already, or a picture taken in (a data: address, a file
  * of the session's when `cwd` is given, a public address on the web). What could not be taken in is said in `notes`
  * and leaves the source empty, unless it is an address on the web, which stays as it is (shown where the web is reachable).
+ * With `model`, a 3D part's model the same way (a glTF binary file, .glb).
  */
-export async function takeIn(db: DB, src: string, o: { cwd?: string; notes: string[] }): Promise<string> {
+export async function takeIn(db: DB, src: string, o: { cwd?: string; notes: string[]; model?: boolean }): Promise<string> {
   const s = src.trim();
   if (!s) return '';
+  const what = o.model ? 'model' : 'picture';
+  const keep = (b: Buffer) => ASSET + putAsset(db, b, { model: o.model });
   if (s.startsWith(ASSET)) {
     if (getAsset(db, s.slice(ASSET.length))) return s;
-    o.notes.push(`${s} is not a picture this app keeps; it was left out.`);
+    o.notes.push(`${s} is not a ${what} this app keeps; it was left out.`);
     return '';
   }
   try {
     if (s.startsWith('data:')) {
-      const m = /^data:image\/[a-z0-9.+-]+;base64,([A-Za-z0-9+/=\s]+)$/i.exec(s);
-      if (!m) throw new Error('a data: address that is not a base64 picture');
-      return ASSET + putAsset(db, Buffer.from(m[1], 'base64'));
+      const m = (o.model ? /^data:(?:model\/gltf-binary|application\/octet-stream);base64,([A-Za-z0-9+/=\s]+)$/i : /^data:image\/[a-z0-9.+-]+;base64,([A-Za-z0-9+/=\s]+)$/i).exec(s);
+      if (!m) throw new Error(`a data: address that is not a base64 ${what}`);
+      return keep(Buffer.from(m[1], 'base64'));
     }
     if (/^https?:\/\//i.test(s)) {
       try {
         const r = await fetchPage(s, { maxBytes: MAX_ASSET + 1, timeoutMs: 20_000 });
         if (r.status >= 400) throw new Error(`the site answered ${r.status}`);
-        const body = r.body ?? (/svg/i.test(r.contentType) ? Buffer.from(r.text, 'utf8') : null);
-        if (!body) throw new Error(`it is ${r.contentType || 'not a picture'}`);
+        const body = r.body ?? (!o.model && /svg/i.test(r.contentType) ? Buffer.from(r.text, 'utf8') : null);
+        if (!body) throw new Error(`it is ${r.contentType || `not a ${what}`}`);
         if (r.truncated) throw new Error(`it is over ${MAX_ASSET / 1024 / 1024} MB`);
-        return ASSET + putAsset(db, body);
+        return keep(body);
       } catch (e) {
-        o.notes.push(`The picture at ${s} could not be fetched (${(e as Error).message}); the deck shows it from the web where it can, but exports may leave it out.`);
+        o.notes.push(`The ${what} at ${s} could not be fetched (${(e as Error).message}); the deck shows it from the web where it can, but exports may leave it out.`);
         return s;
       }
     }
@@ -138,11 +149,11 @@ export async function takeIn(db: DB, src: string, o: { cwd?: string; notes: stri
       const st = fs.statSync(file, { throwIfNoEntry: false });
       if (!st?.isFile()) throw new Error('no such file');
       if (st.size > MAX_ASSET) throw new Error(`it is over ${MAX_ASSET / 1024 / 1024} MB`);
-      return ASSET + putAsset(db, fs.readFileSync(file));
+      return keep(fs.readFileSync(file));
     }
-    throw new Error('not a picture’s address');
+    throw new Error(`not a ${what}’s address`);
   } catch (e) {
-    o.notes.push(`The picture "${s.length > 120 ? `${s.slice(0, 120)}…` : s}" was left out: ${(e as Error).message}.`);
+    o.notes.push(`The ${what} "${s.length > 120 ? `${s.slice(0, 120)}…` : s}" was left out: ${(e as Error).message}.`);
     return '';
   }
 }
