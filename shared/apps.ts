@@ -353,6 +353,12 @@ export interface AppBatch {
 export const ACTIVE: RunStatus[] = ['queued', 'starting', 'running', 'waiting'];
 export const isActive = (s: RunStatus) => ACTIVE.includes(s);
 
+/** The runs that count as using an app (the Apps page's Recently used, and agents' find_apps): from its form, from its own page or screen, and those an agent ran for you in a chat. */
+export const USED_SOURCES: RunSource[] = ['web', 'screen', 'session'];
+/** How many apps may be pinned to the top of the Apps page, and how many of those used lately it shows. */
+export const MAX_PINS = 12;
+export const RECENT_APPS = 8;
+
 export const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'text', label: 'Short text' },
   { value: 'long', label: 'Long text' },
@@ -402,7 +408,7 @@ export const APP_COLORS: Record<string, string> = {
 };
 
 /** Addresses the app's own routes use, which no app may take as its name. */
-export const RESERVED_SLUGS = new Set(['runs', 'batches', 'tools', 'draft', 'models', 'new', 't', 'templates', 'run', 'test', 'check', 'install', 'export', 'data', 'connected', 'media', 'assets']);
+export const RESERVED_SLUGS = new Set(['runs', 'batches', 'tools', 'draft', 'models', 'new', 't', 'templates', 'run', 'test', 'check', 'install', 'export', 'data', 'connected', 'media', 'assets', 'pins']);
 
 // ---- names -----------------------------------------------------------------------------------------
 

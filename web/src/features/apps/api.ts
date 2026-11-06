@@ -13,12 +13,23 @@ export interface Usage {
 }
 
 /** A ready-made app as the Apps page lists it: installed (all are until you uninstall one), and whether agents may run it. */
-export type ReadyApp = AppTemplate & { installed: boolean; agents: boolean; lastRunAt?: number };
+export type ReadyApp = AppTemplate & { installed: boolean; agents: boolean; lastRunAt?: number; needsKey?: true };
+
+/** One of the apps you ran lately: its id ("tpl:<id>" for a ready-made one) and its latest run. */
+export interface UsedApp {
+  app: string;
+  run: AppRun;
+}
 
 export interface Gallery {
-  apps: (AppDef & { usage: Usage; lastRunAt?: number })[];
+  /** Yours, each with today's use, when it last ran, how often it ran all told, and whether it lacks a key it cannot run without. */
+  apps: (AppDef & { usage: Usage; lastRunAt?: number; uses?: number; needsKey?: true })[];
   templates: ReadyApp[];
   recent: AppRun[];
+  /** The apps pinned to the top of the page, in their order. */
+  pins?: string[];
+  /** The apps you ran lately, newest first, each once. */
+  used?: UsedApp[];
 }
 
 export interface AppKey {
