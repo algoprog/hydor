@@ -33,7 +33,7 @@ import { PageComments } from './PageComments';
 import { PagePanel } from './PagePanel';
 import { usePageAi } from './pageAi';
 import { BlockAskPopover } from './BlockAsks';
-import { useCrumbs } from './pageTools';
+import { importInto, useCrumbs } from './pageTools';
 
 export type StudioMode = 'view' | 'edit' | 'code';
 
@@ -692,7 +692,7 @@ export function Studio({
           <IconButton label="Keyboard shortcuts (Ctrl+Shift+/)" size="sm" onClick={() => setKeysOpen(true)} className="ml-auto">
             <Keyboard size={15} />
           </IconButton>
-          <AddPanel anchor={addRef} open={adding} onClose={() => setAdding(false)} sel={sel} cmd={cmd} app={doc.app?.info} onAi={onRequest && !readOnly ? (where) => openTypes({ kind: 'block', at: blockPlace(where, sel), onDone: onRequest }) : undefined} />
+          <AddPanel anchor={addRef} open={adding} onClose={() => setAdding(false)} sel={sel} cmd={cmd} app={doc.app?.info} onAi={onRequest && !readOnly ? (where) => openTypes({ kind: 'block', at: blockPlace(where, sel), onDone: onRequest }) : undefined} onImport={readOnly ? undefined : (where) => importInto(cmd, where)} />
           <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={PAGE_SHORTCUTS} />
         </div>
       )}

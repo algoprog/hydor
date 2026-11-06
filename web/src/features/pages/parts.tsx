@@ -310,6 +310,28 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
     };
     input.click();
   };
+  /** A page made from a file (Markdown, a Notion export, a Word file, a web page): it opens in Edit. */
+  const importPage = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.md,.markdown,.txt,.zip,.docx,.html,.htm,.csv';
+    input.onchange = async () => {
+      const f = input.files?.[0];
+      if (!f) return;
+      setBusy(true);
+      try {
+        const r = await post<{ page: PageInfo; notes?: string[] }>('/api/pages/import-page', { name: f.name, data: await base64Of(f), space: where, folder: inFolder });
+        onClose();
+        go(`/pages/${r.page.id}?mode=edit`);
+        if (r.notes?.length) toast(r.notes.join(' '));
+      } catch (e) {
+        toastError(e);
+      } finally {
+        setBusy(false);
+      }
+    };
+    input.click();
+  };
   const switchKind = (k: NewKind) => {
     if (title === defaultTitle || !title.trim()) setTitle(NEW_TITLE[k] || starter.title);
     if (k !== kind) setType(null);
@@ -423,7 +445,8 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
             </Button>
           </div>
         ) : kind === 'page' ? (
-          <div className="grid grid-cols-2 gap-2">
+          <>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {STARTERS.map((s) => (
               <button
                 key={s.id}
@@ -439,6 +462,13 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
               </button>
             ))}
           </div>
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-bg-1 px-3 py-2.5">
+            <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-fg-2">Or bring a page in: Markdown, a Notion export (.zip, with its databases), a Word file or a web page.</span>
+            <Button size="sm" variant="secondary" icon={<Upload size={14} />} disabled={busy} onClick={importPage}>
+              Import a page
+            </Button>
+          </div>
+          </>
         ) : (
           <>
             <div className="grid grid-cols-4 gap-2">
