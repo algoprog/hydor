@@ -1187,6 +1187,7 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
   const quizBox = (deck: Deck, q: Extract<El, { type: 'quiz' }>, o: DrawOpts) => {
     const t = deck.theme;
     const box = el('div', 'ns-quiz');
+    box.dataset.fit = '1';
     box.style.fontSize = sizeCss(n(q.size, 32));
     box.style.fontFamily = font(q.font, t);
     const ink = color(q.color, t, color('fg', t, '#222'));
@@ -1251,6 +1252,8 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       // The score parts on this slide count it at once.
       const sc = o.answers?.score();
       if (done && sc) for (const x of Array.from(box.closest('.ns-slide')?.querySelectorAll<HTMLElement>('.ns-score[data-tpl]') ?? [])) x.textContent = scoreText(x.dataset.tpl ?? '', sc);
+      // What it says once answered takes room: made smaller again to fit, where it must.
+      if (box.parentElement) fit(box.parentElement);
     };
     items.forEach((b, i) =>
       b.addEventListener('click', (ev) => {
@@ -1311,7 +1314,7 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
    */
   function bridge(cfg: { id: string; slide: number; slides: number; step: number; active: boolean; ready: boolean }) {
     const on: Record<string, ((d: unknown) => void)[]> = {};
-    const st = { slide: cfg.slide, slides: cfg.slides, step: cfg.step || 0, active: !!cfg.active };
+    const st = { slide: cfg.slide, slides: cfg.slides, step: cfg.step || 0, active: !!cfg.active, scale: 1 };
     const post = (m: Record<string, unknown>) => {
       try {
         parent.postMessage({ ...m, ns: 'n-deck', id: cfg.id }, '*');
@@ -1337,6 +1340,10 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       },
       get active() {
         return st.active;
+      },
+      /** How much the slideshow enlarges the slide (above 1 on a large screen): a canvas drawn that much finer stays sharp. */
+      get scale() {
+        return st.scale;
       },
       on(t: string, f: (d: unknown) => void) {
         if (typeof f !== 'function') return;
@@ -1368,6 +1375,9 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       } else if (d.ev === 'step') {
         st.step = Number(d.step) || 0;
         fire('step', { slide: st.slide, step: st.step });
+      } else if (d.ev === 'scale' && Number(d.k) > 0 && Math.abs(Number(d.k) - st.scale) > 0.01) {
+        st.scale = Math.min(8, Number(d.k));
+        fire('scale', st.scale);
       }
     });
     if (cfg.ready) addEventListener('load', () => post({ act: 'ready' }));
@@ -1547,8 +1557,14 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       frame();
       if (!raf) draw(performance.now());
     }).observe(document.body);
-    // Still while its slide does not show; again as it comes.
-    const w = window as unknown as { deck?: { on(t: string, f: () => void): void } };
+    // Still while its slide does not show; again as it comes; finer when the slideshow enlarges it.
+    const w = window as unknown as { deck?: { on(t: string, f: (d?: unknown) => void): void; scale?: number } };
+    const sharpen = () => renderer.setPixelRatio(Math.min(3, (window.devicePixelRatio || 1) * Math.max(1, Number(w.deck?.scale) || 1)));
+    w.deck?.on('scale', () => {
+      sharpen();
+      frame();
+      if (!raf) draw(performance.now());
+    });
     w.deck?.on('leave', () => {
       on = false;
       if (raf) cancelAnimationFrame(raf);
@@ -1654,7 +1670,6 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
         const box = f.closest<HTMLElement>('.ns-live');
         for (const u of Array.from(box?.querySelectorAll(':scope > .ns-img, :scope > .ns-liveph') ?? [])) u.remove();
         if (box) box.dataset.ready = '1';
-        return;
       }
       if (d.act === 'model') return sendModel(f, liveFrames.get(f)!);
       for (const sh of shows) if (sh.stage.contains(f)) sh.act(d as { act: string });
@@ -2233,6 +2248,21 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
         if (fitCache.size > 2000) fitCache.clear();
         fitCache.set(key, k);
       }
+    }
+    // Quizzes as large as their size, or smaller to fit their boxes (the reasons and explanation shown once answered too).
+    for (const box of Array.from(root.querySelectorAll<HTMLElement>('.ns-quiz[data-fit]'))) {
+      box.style.removeProperty('--fs');
+      const over = () => box.scrollHeight > box.clientHeight + 1;
+      if (!box.clientHeight || !over()) continue;
+      let lo = 0.3;
+      let hi = 1;
+      for (let i = 0; i < 6; i++) {
+        const mid = (lo + hi) / 2;
+        box.style.setProperty('--fs', String(mid));
+        if (over()) hi = mid;
+        else lo = mid;
+      }
+      box.style.setProperty('--fs', String(Math.floor(lo * 100) / 100));
     }
     // Code as large as its size, or smaller to fit its box: its letters are all as wide, so it scales by what overflows.
     for (const box of Array.from(root.querySelectorAll<HTMLElement>('.ns-code[data-fit]'))) {
@@ -3039,6 +3069,7 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
         stage.style.margin = '0 auto';
       }
       const k = Math.min(w / W, h / SH) || 0.01;
+      if (Math.abs(k - fk) > 0.01) tellFrames(frame, { ev: 'scale', k });
       frame.style.transform = `scale(${k})`;
       frame.style.left = px((w - W * k) / 2);
       frame.style.top = px((h - SH * k) / 2);
@@ -3690,7 +3721,8 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
     };
     /** What a live part's page asks of the slideshow: the next step or slide, the one before, a slide by its number, a key it left. */
     const act = (d: { act: string; n?: unknown; key?: unknown }) => {
-      if (d.act === 'next') next();
+      if (d.act === 'ready') tellFrames(frame, { ev: 'scale', k: fk });
+      else if (d.act === 'next') next();
       else if (d.act === 'prev') prev();
       else if (d.act === 'go' && typeof d.n === 'number') {
         const target = deck.slides[Math.round(d.n) - 1];
