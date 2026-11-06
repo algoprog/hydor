@@ -2,7 +2,7 @@
 // (sideways on a phone): undo and redo; the paragraph's style; the words' font and size; bold, italic, underline;
 // their colour and highlight; a link (Ctrl+K); a comment on the words picked (Ctrl+Alt+M); the format painter (a
 // click carries the look of the words at the caret to the next words picked, a double click keeps it on until Esc);
-// alignment, in a menu; bullets, numbers and a checklist; the table's rows and columns when the caret is in one; and at
+// alignment, in a menu; bullets, numbers and a checklist; the table's rows and columns (and a plot of it) when the caret is in one; and at
 // its end Editing or Suggesting (Ctrl+Alt+Shift+X), named while suggesting. It acts on what is selected in the
 // document, which keeps its selection meanwhile.
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
@@ -13,6 +13,7 @@ import {
   AlignRight,
   Baseline,
   Bold,
+  ChartScatter,
   ChevronDown,
   FilePenLine,
   PencilLine,
@@ -111,6 +112,7 @@ export function Toolbar({
   slim,
   suggesting,
   onSuggesting,
+  onPlot,
 }: {
   engine: DocEngine;
   st: SelState;
@@ -124,6 +126,8 @@ export function Toolbar({
   /** Edits are suggestions (Suggesting), and the switch between that and Editing. */
   suggesting?: boolean;
   onSuggesting?: (on: boolean) => void;
+  /** A plot of the table the caret is in (a dialog), put in after it. */
+  onPlot?: () => void;
 }) {
   const [menu, setMenu] = useState<'table' | 'align' | null>(null);
   const tableRef = useRef<HTMLButtonElement>(null);
@@ -282,6 +286,11 @@ export function Toolbar({
         <MenuItem checked={!!t?.head} onClick={() => (setMenu(null), engine.table('head'))}>
           Header row
         </MenuItem>
+        {onPlot && (
+          <MenuItem icon={<ChartScatter size={14} />} onClick={() => (setMenu(null), onPlot())}>
+            Make a plot of this table
+          </MenuItem>
+        )}
         <MenuSep />
         <MenuItem onClick={() => (setMenu(null), engine.table('delRow'))}>Delete the row</MenuItem>
         <MenuItem onClick={() => (setMenu(null), engine.table('delCol'))}>Delete the column</MenuItem>
