@@ -307,8 +307,9 @@ export function proseParagraphs(s: string, from = 0, to = s.length): ProseParagr
   const out: ProseParagraph[] = [];
   const re = /\n[ \t]*\n/g;
   let start = 0;
+  const pre = spans[0]?.kind === 'preamble' ? spans[0].to : 0;
   const push = (a: number, b: number) => {
-    const x = Math.max(a, from);
+    const x = Math.max(a, from, pre);
     const y = Math.min(b, to);
     if (y <= x) return;
     // Its words: what no span covers, with letters in it.

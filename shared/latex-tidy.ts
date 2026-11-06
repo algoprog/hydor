@@ -41,10 +41,10 @@ export function indentOf(text: string): string {
   for (const l of text.split('\n')) {
     if (!l.trim()) continue;
     const lead = /^[ \t]*/.exec(l)![0];
+    const n = lead.length;
     if (lead.includes('\t')) tabs++;
-    const n = lead.replace(/\t/g, '    ').length;
-    if (n > prev) steps.set(n - prev, (steps.get(n - prev) ?? 0) + 1);
-    prev = n;
+    else if (n > prev) steps.set(n - prev, (steps.get(n - prev) ?? 0) + 1);
+    prev = lead.includes('\t') ? 0 : n;
   }
   const best = [...steps.entries()].filter(([n]) => n >= 2 && n <= 8).sort((a, b) => b[1] - a[1])[0];
   if (tabs > (best?.[1] ?? 0)) return '\t';
@@ -116,14 +116,18 @@ function indentLines(lines: string[], step: string, braces: boolean, inRange: (n
   const stack: Ctx[] = [];
   const kept = new Set<number>();
   let verbatim: string | null = null;
+  // Something closed that was not open, or left open inside what closed: the braces and environments do not pair.
+  let broken = false;
   const depth = () => new Set(stack.filter((c) => c.indents).map((c) => c.line)).size;
   const top = () => stack[stack.length - 1];
   const popEnv = (name: string) => {
     for (let k = stack.length - 1; k >= 0; k--)
       if (stack[k].kind === 'env' && stack[k].name === name) {
+        if (stack.slice(k + 1).some((c) => c.kind !== 'item')) broken = true;
         stack.length = k;
         return;
       }
+    broken = true;
   };
   for (let n = 0; n < lines.length; n++) {
     const line = lines[n];
@@ -162,16 +166,18 @@ function indentLines(lines: string[], step: string, braces: boolean, inRange: (n
       else if (t.t === 'open') stack.push({ kind: 'brace', indents: braces, line: n });
       else if (t.t === 'close') {
         if (top()?.kind === 'brace') stack.pop();
+        else broken = true;
       } else if (t.t === 'dopen') stack.push({ kind: 'display', indents: true, line: n });
       else if (t.t === 'dclose') {
         if (top()?.kind === 'display') stack.pop();
+        else broken = true;
       } else if (t.t === 'item') {
         if (top()?.kind === 'item') stack.pop();
         if (top()?.kind === 'env' && LISTS.has(top().name!)) stack.push({ kind: 'item', indents: true, line: n });
       }
     }
   }
-  return { out, balanced: !stack.some((c) => c.kind !== 'item') && verbatim === null, verbatim: kept };
+  return { out, balanced: !broken && !stack.some((c) => c.kind !== 'item') && verbatim === null, verbatim: kept };
 }
 
 /** A row's cells split at its & (not an escaped one, not one inside braces), and what follows its \\; null when it is no row. */

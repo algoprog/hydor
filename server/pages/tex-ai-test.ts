@@ -205,7 +205,8 @@ const eq = (a: unknown, b: unknown, what: string) => ok(JSON.stringify(a) === JS
   eq(tidyTex('\\begin{abstract}\n\tWords.\n\\end{abstract}').text, '\\begin{abstract}\n\tWords.\n\\end{abstract}', 'the file’s own step (a tab) is kept');
   eq(tidyTex('a & b \\\\\nc & d \\\\').text, 'a & b \\\\\nc & d \\\\', 'rows outside a table are not lined up');
   eq(tidyTex('\\begin{pmatrix}\n1 & 22 \\\\\n333 & 4\n\\end{pmatrix}', { indent: '  ' }).text, '\\begin{pmatrix}\n  1 & 22 \\\\\n  333 & 4\n\\end{pmatrix}', 'a last row without \\\\ is left as it is (one row is no table to line up)');
-  eq(tidyTex('\\begin{tabular}{ll}\na & b \\\\ % note\ncc & d \\\\\n\\end{tabular}', { indent: '  ' }).text, '\\begin{tabular}{ll}\n  a & b \\\\ % note\n  cc & d \\\\\n\\end{tabular}', 'a row with a comment is left as it is');
+  eq(tidyTex('\\begin{tabular}{ll}\na & b \\\\ % note\ncc & d \\\\\n\\end{tabular}', { indent: '  ' }).text, '\\begin{tabular}{ll}\n  a  & b \\\\ % note\n  cc & d \\\\\n\\end{tabular}', 'a comment after a row’s \\\\ stays after it');
+  eq(tidyTex('\\begin{tabular}{ll}\na & b % note\n\\\\\ncc & d \\\\\n\\end{tabular}', { indent: '  ' }).text, '\\begin{tabular}{ll}\n  a & b % note\n  \\\\\n  cc & d \\\\\n\\end{tabular}', 'a row that goes on over lines is left as it is');
 }
 
 // ---- references that point nowhere --------------------------------------------------------------------------------------
@@ -235,7 +236,7 @@ const eq = (a: unknown, b: unknown, what: string) => ok(JSON.stringify(a) === JS
     '  author = {Zeta, Z.},',
     '  title = {Zeta things},',
     '  year = 2020,',
-    '  doi = {10.1/zeta}',
+    '  doi = {10.1234/zeta}',
     '}',
     '',
     '@inproceedings{alpha2019, title = {Alpha paper about many things}, author = {Alpha, A.}, year = {2019}, booktitle = {Proc. A}}',
@@ -257,7 +258,7 @@ const eq = (a: unknown, b: unknown, what: string) => ok(JSON.stringify(a) === JS
   );
   const cited = citedKeys(['\\cite{zeta2020,Alpha2019b} \\cite{ALPHA2019} \\cite{bad key} \\cite{dup}']);
   const fill = new Map([['zeta2020', fillEntry('@article{x, author = {Zeta, Z.}, title = {Zeta things}, journal = {J. Z}, volume = {3}, number = {2}, pages = {1--9}, year = {2020}}')!]]);
-  eq(bibNeedsFill(bib).map((x) => [x.key, x.doi, x.missing]), [['zeta2020', '10.1/zeta', ['journal', 'volume', 'number', 'pages']]], 'what to ask doi.org for');
+  eq(bibNeedsFill(bib).map((x) => [x.key, x.doi, x.missing]), [["zeta2020", "10.1234/zeta", ['journal', 'volume', 'number', 'pages']]], 'what to ask doi.org for');
   const r = tidyBib(bib, cited, { sort: true, unused: true, duplicates: true, keys: true }, fill);
   const keys = splitBib(r.text)
     .filter((b) => b.entry)
@@ -268,7 +269,7 @@ const eq = (a: unknown, b: unknown, what: string) => ok(JSON.stringify(a) === JS
   ok(/journal\s*= \{J\. Z\}/.test(r.text) && /pages\s*= \{1--9\}/.test(r.text), 'fields filled from the DOI');
   ok(!/doi\s*=.*\n[\s\S]*doi\s*=/.test(r.text.slice(r.text.indexOf('zeta2020'), r.text.indexOf('zeta2020') + 400)), 'no field twice');
   ok(r.text.includes('@inproceedings{alpha2019, title = {Alpha paper about many things}'), 'an entry nothing changed keeps its own text');
-  eq(r.renames, { 'bad key': 'badkey', Alpha2019b: 'alpha2019', ALPHA2019: 'alpha2019' }, 'citations to change');
+  eq(Object.fromEntries(Object.entries(r.renames).sort()), { ALPHA2019: 'alpha2019', Alpha2019b: 'alpha2019', 'bad key': 'badkey' }, 'citations to change');
   ok(r.changes.some((c) => c.kind === 'merged' && c.what.includes('the same title and year')), 'the merge is said');
   ok(r.changes.some((c) => c.kind === 'removed' && c.key === 'unused2000'), 'the unused one is said');
   ok(r.changes.some((c) => c.kind === 'filled' && c.what.includes('journal')), 'the fields filled are said');
@@ -279,7 +280,7 @@ const eq = (a: unknown, b: unknown, what: string) => ok(JSON.stringify(a) === JS
   const f = tidyBib('@article{a,title={A},year=2001}', null, { format: true });
   ok(f.text === '@article{a,\n  title = {A},\n  year  = 2001\n}\n' && f.changes.some((c) => c.kind === 'formatted'), 'every entry written one field a line');
   eq(renameCites('\\cite{a, Alpha2019b,alpha2019} % \\cite{Alpha2019b}\n\\citep[see][]{bad key}', r.renames), '\\cite{a, alpha2019} % \\cite{Alpha2019b}\n\\citep[see][]{badkey}', 'citations renamed (a key named twice once; comments as they are)');
-  const byDoi = tidyBib('@article{a, doi={10.1/X}, title={One}}\n@article{b, doi={https://doi.org/10.1/x}, title={Other title}, pages={1--2}}\n', citedKeys(['\\cite{b}']), { duplicates: true });
+  const byDoi = tidyBib('@article{a, doi={10.1234/X}, title={One}}\n@article{b, doi={https://doi.org/10.1234/x}, title={Other title}, pages={1--2}}\n', citedKeys(['\\cite{b}']), { duplicates: true });
   ok(byDoi.text.includes('@article{b') && !byDoi.text.includes('@article{a') && byDoi.renames.a === 'b', 'the same DOI: the cited one kept');
 }
 
