@@ -25,6 +25,8 @@ import { pageVideoSources } from './page-videos.ts';
 import { initAssets } from './assets.ts';
 import { videoAddress } from './videos.ts';
 import type { RunCtx } from '../features/types.ts';
+import Fastify from 'fastify';
+import { cleanWords, designWriteRoutes, readColours, setDesignHelperForTests } from '../write/design.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -140,6 +142,28 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const sha = 'a'.repeat(40);
   const url = videoAddress(sha);
   ok(pageVideoSources(`<video src="${url}"></video><video src="/pg/video/${sha}/${'0'.repeat(32)}"></video>`).join() === `naget-video:${sha}`, 'a page keeps the videos it shows at their signed addresses (and only those)');
+}
+
+// ---- writing a design's words, and colours from a mood (the helper model, a stand-in here) ---------------------------------
+{
+  ok(cleanWords('Here is a heading:\n"Summer Sale!"', 'heading') === 'Summer Sale!' && cleanWords('Big news\nmore', 'heading') === 'Big news', 'the words alone, a heading on one line');
+  ok(readColours('{"colours": ["#FFF8E7", "#2B2118", "#e4572e", "#e4572e", "nope"]}').join() === '#fff8e7,#2b2118,#e4572e' && readColours('try #112233 and #445566').length === 2, 'colours read from the answer, each once');
+  const app = Fastify();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-design-write-'));
+  const db = openDb(path.join(dir, 'w.db'));
+  const asked: string[] = [];
+  setDesignHelperForTests(async (q) => (asked.push(q.prompt), q.system.includes('palette') ? '{"colours":["#fdf6ec","#3b2f2f","#c8553d","#588157","#e9d8a6"]}' : '“Fresh bread, every morning”'));
+  designWriteRoutes(app, db, () => new AbortController().signal);
+  await app.ready();
+  const w = (await app.inject({ method: 'POST', url: '/api/write/design-words', payload: { about: 'a bakery opening', role: 'heading', design: 'Opening day' } })).json();
+  ok(w.text === 'Fresh bread, every morning' && w.model === 'the test helper' && /heading of a design called “Opening day”/.test(asked[0]), 'words written for a heading');
+  const c = (await app.inject({ method: 'POST', url: '/api/write/palette', payload: { mood: 'warm and earthy' } })).json();
+  ok(c.colours?.length === 5 && c.colours[0] === '#fdf6ec', 'a palette from a mood');
+  ok((await app.inject({ method: 'POST', url: '/api/write/palette', payload: {} })).statusCode === 400, 'no mood, no palette');
+  setDesignHelperForTests(null);
+  await app.close();
+  db.close();
+  fs.rmSync(dir, { recursive: true, force: true });
 }
 
 // ---- the design editor in a browser, and the files a design makes ------------------------------------------------------

@@ -6,6 +6,7 @@
 //   POST /api/write/rewrite       {text, how, lang?, ask?, context?} → {text, model}: by the helper model (quick: Claude's
 //     Haiku through Claude Code on Automatic), shorter, longer, simpler, more formal, friendlier, spelling and grammar
 //     fixed, translated, or as the user says; facts, names and numbers kept, a paragraph a line as it came.
+//   POST /api/write/design-words, POST /api/write/palette: a design's words and colours (design.ts).
 //   POST /api/write/describe      {src, context?} → {alt, by}: by the model that writes the Library's titles and
 //     descriptions (Settings → Images, video and audio), in the language of the slide's words.
 import fs from 'node:fs';
@@ -27,6 +28,7 @@ import { still } from '../media/frames.ts';
 import { getAsset } from '../pages/assets.ts';
 import { pageSource } from '../pages/store.ts';
 import { deckOf, holdIdea, IDEAS_SYSTEM, ideaPrompt, jsonOf, waysFor, type Way } from './ideas.ts';
+import { designWriteRoutes } from './design.ts';
 
 // ---- stand-ins, for the tests --------------------------------------------------------------------------------------
 
@@ -276,5 +278,7 @@ export const write: Feature = {
     });
     app.post('/api/write/rewrite', async (req, reply) => rewrite(db, readRewrite(req.body), goneSignal(reply)));
     app.post('/api/write/describe', async (req, reply) => describe(db, { models }, req.body, goneSignal(reply)));
+    // A design's words and a palette from a mood (design.ts).
+    designWriteRoutes(app, db, goneSignal);
   },
 };
