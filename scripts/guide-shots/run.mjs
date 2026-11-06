@@ -83,6 +83,9 @@ async function startServer() {
     PREVIEW_PORT: process.env.PREVIEW_PORT ?? '0',
     // Search by meaning stays off: the demo sets up no PyTorch (in /dev/shm) and downloads no model.
     HYDOR_EMBED: 'off',
+    // The graphics card left alone when asked (HYDOR_VIDEO_GPU=off: videos made on the processor, the card never tried).
+    ...(process.env.HYDOR_VIDEO_GPU ? { HYDOR_VIDEO_GPU: process.env.HYDOR_VIDEO_GPU } : {}),
+    ...(process.env.CUDA_VISIBLE_DEVICES !== undefined ? { CUDA_VISIBLE_DEVICES: process.env.CUDA_VISIBLE_DEVICES } : {}),
   };
   const log = fs.openSync(path.join(demo, 'server.log'), 'a');
   server = spawn(process.execPath, [path.join(o.root, 'dist/server/index.js')], { cwd: home, env, stdio: ['ignore', log, log] });
