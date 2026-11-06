@@ -16,6 +16,7 @@ import { deckFontFiles } from './pptx-fonts.ts';
 import { deckFromPptx } from './pptx-import.ts';
 import { bookForAgent, bookPage, csvOfBook, importBook, keepBook, MAX_BOOK, readBook, xlsxOfBook } from './sheets.ts';
 import { deckForAgent, deckPage, keepDeck, MAX_DECK, readDeck } from './slides.ts';
+import { soundFileFor } from './sounds.ts';
 import { videoFileFor } from './videos.ts';
 import type { EmbeddedFont } from './word-fonts.ts';
 import { freshNotebook, keepNotebook, MAX_NOTEBOOK, notebookForAgent, notebookFromFile, notebookPage, notebookScript, readNotebook } from './notebooks.ts';
@@ -96,7 +97,7 @@ KINDS.set('slides', {
       const deck = readDeck(text);
       // The faces of the app's fonts it shows go inside it (no Office computer has them; none offline).
       const fonts = await deckFontFiles(deck);
-      return pptxFile(deck, { title, picture: help.picture, scales: help.scales, renders: help.renders, video, fonts, note: help.note });
+      return pptxFile(deck, { title, picture: help.picture, scales: help.scales, renders: help.renders, video, sound: (src) => soundFileFor(db, src), fonts, note: help.note });
     },
     html: (db, text, title) => deckPage(db, readDeck(text), title, 'viewer', { videosInside: true }),
   },

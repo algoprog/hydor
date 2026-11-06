@@ -32,7 +32,7 @@ export interface RemoteShow {
 }
 
 /** What a page hears on a slideshow's channel (feature "slides-show"). */
-export type ShowNews = { show: string; state: RemoteState } | { show: string; cmd: RemoteCmd } | { show: string; ended: true };
+export type ShowNews = { show: string; state: RemoteState } | { show: string; cmd: RemoteCmd } | { show: string; ended: true } | { show: string; phone: true };
 
 const shows = new Map<string, ShowRec>();
 /** At most this many at once (the oldest goes); each goes after this long unheard of. */
@@ -78,8 +78,10 @@ export function startShow(body: unknown): { id: string } {
   return { id };
 }
 
-export function readShow(id: string): RemoteShow {
+/** The slideshow, for its phone: the window hears that a phone opened it (its code's card then goes). */
+export function readShow(d: Pick<Deps, 'toSubscribers'>, id: string): RemoteShow {
   const s = get(id);
+  tell(d, id, { show: id, phone: true });
   return { id: s.id, page: s.page, title: s.title, deck: s.deck, state: s.state, live: Date.now() - s.seen < LIVE_MS };
 }
 
