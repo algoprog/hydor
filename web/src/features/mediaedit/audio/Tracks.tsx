@@ -432,7 +432,7 @@ const TrackRow = memo(function TrackRow(p: TracksProps & { track: SoundTrack; in
         <canvas ref={cv} className="absolute inset-0" style={{ width: p.w, height: h }} />
         {sel && <div className="pointer-events-none absolute inset-y-0 border-x border-accent bg-accent/20" style={{ left: xOf(p.view, sel.a), width: Math.max(1, (sel.b - sel.a) * p.view.pps) }} />}
         {rec && <RecordingClip rec={rec} view={p.view} h={h} />}
-        {p.mobile && (
+        {p.mobile && p.recipe.tracks.length > 1 && (
           <span translate="no" className="pointer-events-none absolute top-0.5 right-1.5 rounded bg-bg/70 px-1 text-[10px] text-fg-3">
             {t.name}
           </span>

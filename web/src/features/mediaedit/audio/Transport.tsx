@@ -124,7 +124,7 @@ export function Transport(p: TransportProps) {
           <div className="mx-1 h-6 w-px bg-line" />
         </>
       )}
-      <Meter player={p.player} playing={p.playing} />
+      {!p.mobile && <Meter player={p.player} playing={p.playing} />}
     </div>
   );
 }

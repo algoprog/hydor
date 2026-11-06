@@ -258,7 +258,7 @@ export function ScrubField({
           {label}
         </span>
       )}
-      <span className="flex h-7 min-w-0 items-center rounded-md border border-line bg-bg-1 focus-within:border-accent" style={{ width }}>
+      <span className="flex h-7 min-w-0 shrink-0 items-center rounded-md border border-line bg-bg-1 focus-within:border-accent" style={{ width }}>
         <input
           value={draft ?? text}
           onChange={(e) => setDraft(e.target.value)}
