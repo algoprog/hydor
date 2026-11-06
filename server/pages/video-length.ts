@@ -12,7 +12,7 @@ export function videoSeconds(b: Buffer): number | null {
 /** The movie header's duration over its time scale, from the top-level boxes (the movie's box may come after its data). */
 function mp4Seconds(b: Buffer): number | null {
   const box = (from: number, to: number, type: string): { at: number; end: number } | null => {
-    for (let i = from; i + 8 <= to; ) {
+    for (let i = from; i + 8 <= to;) {
       let size = b.readUInt32BE(i);
       let head = 8;
       if (size === 1) {
@@ -43,7 +43,7 @@ function vint(b: Buffer, i: number, id: boolean): { v: number; n: number; unknow
   while (n <= 8 && !(first & (0x80 >> (n - 1)))) n++;
   if (n > 8 || i + n > b.length) return null;
   let v = id ? first : first & (0xff >> n);
-  let ones = v === (0xff >> n);
+  let ones = v === 0xff >> n;
   for (let k = 1; k < n; k++) {
     v = v * 256 + b[i + k];
     if (b[i + k] !== 0xff) ones = false;
@@ -58,7 +58,7 @@ function matroskaSeconds(b: Buffer): number | null {
   const SCALE = 0x2ad7b1;
   const DURATION = 0x4489;
   const walk = (from: number, to: number, want: number): { at: number; end: number } | null => {
-    for (let i = from; i < to; ) {
+    for (let i = from; i < to;) {
       const id = vint(b, i, true);
       const size = id && vint(b, i + id.n, false);
       if (!id || !size) return null;
@@ -77,7 +77,7 @@ function matroskaSeconds(b: Buffer): number | null {
   if (!info) return null;
   let scale = 1_000_000;
   let ticks: number | null = null;
-  for (let i = info.at; i < info.end; ) {
+  for (let i = info.at; i < info.end;) {
     const id = vint(b, i, true);
     const size = id && vint(b, i + id.n, false);
     if (!id || !size || size.unknown) break;
