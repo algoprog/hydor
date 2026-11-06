@@ -26,7 +26,7 @@
 // the browser's own globals.
 
 import type { CodeColours } from '../../shared/code-colours.ts';
-import type { DbStore, PageDatabases } from '../../shared/page-db.ts';
+import type { DbAppHooks, DbStore, PageDatabases } from '../../shared/page-db.ts';
 
 /** What a block is, for writing in it. */
 export type Kind = 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'bullet' | 'number' | 'todo' | 'quote' | 'code' | 'toggle' | 'callout';
@@ -81,6 +81,10 @@ export interface Core {
   /** The databases (shared/page-db.ts), and the page's own data they are kept in, through the app. */
   db: PageDatabases;
   store: DbStore;
+  /** What the app does for a database beyond keeping it: an AI column's cells, a CSV to save, files kept for it. */
+  dbHooks?: DbAppHooks;
+  /** Parts of the editor in files of their own (writing-ai.ts, writing-blocks.ts), each made with what the writing hands it. */
+  extras?: ((x: ExtraCore) => Extra)[];
 }
 
 /** What the writing does for the editor. */
@@ -104,9 +108,79 @@ export interface Writing {
   css: string;
 }
 
+/** What a part of the editor in a file of its own is handed: the editor's core, and the writing's own insides it builds on. */
+export interface ExtraCore {
+  E: Core;
+  esc: (s: string) => string;
+  svg: (k: string, size?: number) => string;
+  make: <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string) => HTMLElementTagNameMap[K];
+  placeAt: (el: HTMLElement, r: { left: number; top: number; bottom: number }, gap?: number) => void;
+  unitOf: (h: Element) => Element;
+  kindOf: (u: Element | null | undefined) => Kind | null;
+  hostOf: (u: Element, mk?: boolean) => HTMLElement | null;
+  emptyHost: (h: Element) => boolean;
+  newUnit: (kind: Kind, words?: DocumentFragment | null) => { unit: HTMLElement; host: HTMLElement };
+  putAfter: (nu: HTMLElement, u: Element, kind?: Kind) => void;
+  holderOf: (b: Element) => HTMLElement | null;
+  firstHostIn: (el: Element | null) => HTMLElement | null;
+  lastHostIn: (el: Element | null) => HTMLElement | null;
+  blockOf: (t: Element | null) => Element | null;
+  blocksNow: () => Element[];
+  inOrder: (list: Element[]) => Element[];
+  flow: () => Element;
+  lastBlock: (f: Element) => Element | null;
+  caretBox: () => DOMRect | null;
+  writeIn: (h: HTMLElement | null, at?: At) => Next;
+  closeMenu: () => void;
+  closeSlash: () => void;
+  /** Asks the app for something (it opens beside `r`); its answer comes to `fill` with `where`. */
+  ask: (what: string, r: DOMRect | null, where?: Record<string, unknown>, extra?: Record<string, unknown>) => string;
+  /** Puts a block where it was asked for: after a block, in an empty block's place, inside one, or at the end. */
+  placeBlock: (el: HTMLElement, where: Record<string, unknown>) => HTMLElement;
+  sanitize: (html: string) => string;
+  hint: (h: HTMLElement) => void;
+  picked: () => Element[];
+  coarse: boolean;
+  stop: (e: Event) => void;
+}
+
+/** What such a part does for the editor: blocks for the "/" list, rows for a block's menu, keys, presses, what the app sends. */
+export interface Extra {
+  /** Blocks the "/" list offers after the writing's own (id, the label's key and English words, words it is also found by, an icon). */
+  items?: { id: string; key: string; en: string; also: string; icon: string; mark?: string }[];
+  /** Icons by name (an SVG's insides, 24 by 24). */
+  icons?: Record<string, string>;
+  /** CSS selectors of its blocks: each picked, moved and deleted whole. */
+  blocks?: string;
+  /** One of its "/" list's blocks picked, in block `u` written in at `h` (`drop` takes out the "/…" typed): true when done. */
+  pick?(id: string, at: { h: HTMLElement; u: Element; empty: boolean; drop: () => void }): boolean;
+  /** Rows of the block menu (⋮⋮) for these blocks, at its top. */
+  menu?(blocks: Element[]): { icon: string; label: string; keys?: string; run: () => void }[];
+  /** A key pressed in the page: true when it was this part's (the editor stops it). */
+  key?(e: KeyboardEvent): boolean;
+  /** A press or a click in the page: true when it was this part's. */
+  press?(e: PointerEvent): boolean;
+  click?(e: MouseEvent): boolean;
+  /** What the app answered: true when it was asked by this part. */
+  fill?(what: string, arg: any, where: Record<string, unknown>): boolean;
+  act?(a: string, arg: any): boolean;
+  /** The words an empty block shows (else the writing's own). */
+  hint?(h: Element): string | null;
+  draw?(): void;
+  ready?(): void;
+  prepare?(node: Element): void;
+  changed?(): void;
+  restored?(): void;
+  clean?(root: Element): void;
+  info?(el: Element): Record<string, unknown> | undefined;
+  css?: string;
+}
+
 export function writing(E: Core): Writing {
   const L = E.L;
   const doc = document;
+  /** The parts of the editor in files of their own (made at the end, once all the writing is). */
+  let XS: Extra[] = [];
   const stop = (e: Event) => {
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -1051,6 +1125,10 @@ export function writing(E: Core): Writing {
   // ---- hints in an empty block -----------------------------------------------------------------------------------------
   const hintOf = (h: Element): string => {
     const k = kindOf(unitOf(h));
+    for (const x of XS) {
+      const t = x.hint?.(h);
+      if (t) return t;
+    }
     if (k === 'p') return L('phText', 'Type ‘/’ for commands');
     if (k === 'h1' || k === 'h2' || k === 'h3') return L(k, `Heading ${k[1]}`);
     if (k === 'todo') return L('phTodo', 'To-do');
@@ -1225,7 +1303,7 @@ export function writing(E: Core): Writing {
   const rectJson = (r: DOMRect | null) => (r ? { x: r.left, y: r.top, w: r.width, h: r.height } : null);
 
   // ---- the blocks in the page, for handles, dragging and picking ---------------------------------------------------
-  const COMPONENT = '.n-callout,.n-video,.n-math,.n-toc,.n-cover,.n-icon,.n-db,pre,figure';
+  let COMPONENT = '.n-callout,.n-video,.n-math,.n-toc,.n-cover,.n-icon,.n-db,pre,figure';
   /** The block a part belongs to: the item, the paragraph, the callout, the table, the card… */
   const blockOf = (t: Element | null): Element | null => {
     for (let x = t; x && x !== doc.body && x !== doc.documentElement; x = x.parentElement) {
@@ -1273,7 +1351,8 @@ export function writing(E: Core): Writing {
   };
   const lastBlock = (f: Element) => {
     let x = f.lastElementChild;
-    while (x && (skip(x) || /^(FOOTER)$/.test(x.tagName))) x = x.previousElementSibling;
+    // (a block the AI's answer stands in for, while it is shown, is not the last one: writing-ai.ts)
+    while (x && (skip(x) || /^(FOOTER)$/.test(x.tagName) || x.hasAttribute('data-n-ai-hide'))) x = x.previousElementSibling;
     return x;
   };
 
@@ -1479,6 +1558,7 @@ export function writing(E: Core): Writing {
     const n = list.length;
     return [
       { head: n > 1 ? L('nBlocks', '{n} blocks').replace('{n}', String(n)) : E.nameOf(list[0]) },
+      ...XS.flatMap((x) => x.menu?.(list) ?? []).map((r): Row => ({ icon: r.icon, label: r.label, keys: r.keys, run: () => (closeMenu(), r.run()) })),
       ...(texty ? [{ icon: svg('turn'), label: L('turnInto', 'Turn into'), to: 'turn' as const, keys: 'Ctrl+/' }] : []),
       ...(n === 1 && codeOf(list[0]) ? [{ icon: svg('code'), label: L('language', 'Language'), to: 'lang' as const }] : []),
       ...(n === 1 && E.canComment() ? [{ icon: svg('comment'), label: L('comment', 'Comment'), keys: 'Ctrl+Alt+M', run: () => (closeMenu(), askComment()) }] : []),
@@ -1940,6 +2020,7 @@ export function writing(E: Core): Writing {
       const t = s.node;
       if (s.at > 0 && s.at === t.length && t.data[s.at - 1] === ' ') t.replaceData(s.at - 1, 1, '\u00a0');
     };
+    for (const x of XS) if (x.pick?.(it.id, { h, u, empty: emptyHost(h), drop: dropTyped })) return;
     if (it.id === 'link') {
       // The pages to link to, as "@" opens them: the "/…" typed goes, an "@" in its place (the caret where the "/" was:
       // keeping a space before it moved the caret).
@@ -2110,6 +2191,7 @@ export function writing(E: Core): Writing {
     if (!where) return;
     asked.delete(id);
     const what = where.what;
+    if (XS.some((x) => x.fill?.(String(what), arg, where))) return;
     if (what === 'emoji') {
       const ch = typeof arg.char === 'string' ? arg.char.slice(0, 16) : '';
       const h = E.byPath(where.host);
@@ -2445,7 +2527,7 @@ export function writing(E: Core): Writing {
   /** The database's own words: the editor's labels of theirs (db.…), without the prefix. */
   const dbLabels = (() => {
     const out: Record<string, string> = {};
-    for (const k of ['untitled', 'table', 'board', 'sort', 'filter', 'newRow', 'oneRow', 'nRows', 'nOfRows', 'kText', 'kNumber', 'kSelect', 'kMulti', 'kDate', 'kCheck', 'kLink', 'colName', 'kind', 'options', 'addOption', 'newOption', 'sortAsc', 'sortDesc', 'noSort', 'filterBy', 'moveLeft', 'moveRight', 'delCol', 'addCol', 'newCol', 'delRow', 'addFilter', 'remove', 'clear', 'groupBy', 'noValue', 'needSelect', 'addSelect', 'status', 'untitledRow', 'open', 'full', 'failed', 'unread', 'inUse', 'opContains', 'opNotContains', 'opIs', 'opIsNot', 'opHas', 'opHasNot', 'opEmpty', 'opFilled', 'opBefore', 'opAfter', 'opChecked', 'opUnchecked', 'cDefault', 'cGrey', 'cBrown', 'cOrange', 'cYellow', 'cGreen', 'cBlue', 'cPurple', 'cPink', 'cRed']) {
+    for (const k of Object.keys(E.db.words)) {
       const v = L(`db.${k}`, '');
       if (v) out[k] = v;
     }
@@ -2470,7 +2552,9 @@ export function writing(E: Core): Writing {
       }
       named.add(el.getAttribute('data-db'));
     }
-    for (const el of all) E.db.mount(el, { store: E.store, labels: dbLabels, edit: true });
+    for (const el of all) E.db.mount(el, { store: E.store, labels: dbLabels, edit: true, ...(E.dbHooks ?? {}) });
+    // Charts, drawn from the page's databases (or a small table of their own).
+    for (const el of doc.body.querySelectorAll('.n-chart')) E.db.mount(el, { store: E.store, labels: dbLabels, edit: true });
   };
 
   // ---- comments on blocks (kept by the app, outside the page: shared/page-comments.ts) -----------------------------------
@@ -2889,6 +2973,7 @@ export function writing(E: Core): Writing {
     drawPicked();
     drawLang();
     drawComments();
+    for (const x of XS) x.draw?.();
     if (menu) {
       if (menu.blocks.some((b) => !b.isConnected)) closeMenu();
     }
@@ -2905,6 +2990,7 @@ export function writing(E: Core): Writing {
       if (menu && menuKey(e)) return stop(e);
       if (slash && slashKey(e)) return stop(e);
       if (mention && mentionKey(e)) return stop(e);
+      if (XS.some((x) => x.key?.(e))) return stop(e);
       if (e.isComposing || e.keyCode === 229) return;
       const mod = isMod(e);
       const h = E.editing();
@@ -3153,6 +3239,7 @@ export function writing(E: Core): Writing {
     'pointerdown',
     (e) => {
       if (fromUi(e) || fromDb(e)) return;
+      if (XS.some((x) => x.press?.(e))) return;
       if (menu) closeMenu();
       if (slash) closeSlash();
       if (mention) closeMention();
@@ -3173,6 +3260,7 @@ export function writing(E: Core): Writing {
       const e = ev as MouseEvent;
       if (fromUi(e) || fromDb(e)) return;
       if (noClick) return stop(e);
+      if (XS.some((x) => x.click?.(e))) return;
       const t = e.target as Element;
       const w = E.editing();
       // A to-do's box ticks, in Edit too: the state is kept in the page.
@@ -3479,13 +3567,54 @@ export function writing(E: Core): Writing {
     getSelection()?.addRange(s);
   };
 
+  // ---- the parts in files of their own, made now that all the writing is ----------------------------------------------------
+  const XC: ExtraCore = {
+    E,
+    esc,
+    svg,
+    make,
+    placeAt,
+    unitOf,
+    kindOf,
+    hostOf,
+    emptyHost,
+    newUnit,
+    putAfter,
+    holderOf,
+    firstHostIn,
+    lastHostIn,
+    blockOf,
+    blocksNow,
+    inOrder,
+    flow,
+    lastBlock,
+    caretBox,
+    writeIn,
+    closeMenu,
+    closeSlash,
+    ask,
+    placeBlock,
+    sanitize,
+    hint,
+    picked: () => picked.filter((x) => x.isConnected),
+    coarse,
+    stop,
+  };
+  XS = (E.extras ?? []).map((f) => f(XC));
+  for (const x of XS) {
+    if (x.icons) Object.assign(ICONS, x.icons);
+    if (x.blocks) COMPONENT += `,${x.blocks}`;
+    for (const it of x.items ?? []) ITEMS.push({ id: it.id, label: L(it.key, it.en), en: it.en, also: it.also, icon: it.icon, key: it.mark ?? '' });
+  }
+
   return {
-    css: `[data-n-ph]::before{content:attr(data-n-ph);float:left;height:0;pointer-events:none;opacity:.4;white-space:nowrap}nav.n-toc:empty::before{content:"${L('tocEmpty', 'The headings of the page show here').replace(/["\\\n<]/g, '')}";opacity:.45}iframe{pointer-events:none}`,
+    css: `${XS.map((x) => x.css ?? '').join('')}[data-n-ph]::before{content:attr(data-n-ph);float:left;height:0;pointer-events:none;opacity:.4;white-space:nowrap}nav.n-toc:empty::before{content:"${L('tocEmpty', 'The headings of the page show here').replace(/["\\\n<]/g, '')}";opacity:.45}iframe{pointer-events:none}`,
     draw,
     ready() {
       refreshToc();
       paintAll();
       mountDbs();
+      for (const x of XS) x.ready?.();
     },
     prepare(node) {
       // A database from Add ("new"): a name of its own in the page, and its first columns in the app's words.
@@ -3495,6 +3624,7 @@ export function writing(E: Core): Writing {
         el.setAttribute('data-db', fresh.getAttribute('data-db')!);
         if (!el.hasAttribute('data-schema')) el.setAttribute('data-schema', fresh.getAttribute('data-schema')!);
       }
+      for (const x of XS) x.prepare?.(node);
     },
     act(a: string, arg: any): boolean {
       switch (a) {
@@ -3609,7 +3739,7 @@ export function writing(E: Core): Writing {
           if (a === 'many:cut') removeBlocks(picked);
           return true;
         default:
-          return false;
+          return XS.some((x) => x.act?.(a, arg));
       }
     },
     started(h) {
@@ -3648,6 +3778,7 @@ export function writing(E: Core): Writing {
       paintAll();
       mountDbs();
       placeComments();
+      for (const x of XS) x.restored?.();
     },
     clean(root) {
       // Code is kept as plain text: its colours are put on as it shows (a plain block's too, as its agent wrote it: only
@@ -3661,11 +3792,13 @@ export function writing(E: Core): Writing {
         const n = x.nextSibling;
         if (n && n.nodeType === 3 && (n as Text).data.startsWith('\u200b')) (n as Text).data = (n as Text).data.slice(1);
       }
+      for (const x of XS) x.clean?.(root);
     },
     changed() {
       refreshToc();
       paintAll();
       mountDbs();
+      for (const x of XS) x.changed?.();
       // A comment's block changed or was made anew (Turn into): it is found again where it was, by its words.
       for (const c of comments) {
         const el = anchored.get(c.id);
@@ -3689,6 +3822,7 @@ export function writing(E: Core): Writing {
         tex: el.classList.contains('n-math') ? (el.getAttribute('data-tex') ?? '') : undefined,
         colour: colourOf(u, 'tc') ?? undefined,
         fill: colourOf(u, 'hl') ?? undefined,
+        ...Object.assign({}, ...XS.map((x) => x.info?.(el) ?? {})),
       };
     },
     page() {

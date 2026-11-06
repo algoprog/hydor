@@ -220,8 +220,8 @@ agents that speak ACP and take MCP servers.
   rounds and how many searches in all are yours to set; a bar in the session says what it is doing and the
   searches used, and opens the report once it is ready.
 - **Pages and apps**: pages the agents show can answer back (pick an option, fill in a form), stay in the
-  Library with pictures, storage of their own and an address for a phone's home screen, and folders publish at a
-  link. The Library is sorted by project: what an agent saves goes in its session's project, Keep and Save to Library
+  Library with pictures, storage of their own and an address for a phone's home screen, and pages and folders publish at a
+  link (a published page with a description and a social picture where its link is shared). The Library is sorted by project: what an agent saves goes in its session's project, Keep and Save to Library
   ask which project when there are projects (the session's first), New makes it in the project you look at, and More →
   Move to a project moves anything; its places (Everything, each project's things under its name, Not in a project,
   Published) sit beside the cards, with a search field, sorting and kind chips (Pages, Slides, Documents,
@@ -239,13 +239,25 @@ agents that speak ACP and take MCP servers.
   looks like part of the app (its theme, light or dark as the app is, your colours and the app's font, unless you
   ask for another look), and you can change it in a visual editor that works on a phone too, written in as in Notion:
   Enter makes the next block, "/" adds headings, lists, to-dos, toggles, callouts, quotes, code, tables, pictures,
-  videos, columns, cards, maths, a table of contents or a button, Markdown turns into blocks as you type, a ⋮⋮ beside
+  videos, columns, cards, maths, a table of contents, a button, an embed (maps, Google Docs and Sheets, Figma, Spotify,
+  CodePen, Loom… or any page that may be framed), a bookmark card (its title, description and picture read by the
+  server), a file to download, a sound, a PDF shown in the page, a Mermaid diagram drawn as you type, a chart of a
+  database's numbers or a small table, breadcrumbs or tabs, and blocks come in from Markdown, a web page, a Word file,
+  a CSV or a Notion export (its databases with their rows' pages); AI on the page as Notion AI (Space on an empty line,
+  /ai, Ctrl+J, Ask AI in a block's menu or over picked words) continues, writes about a topic, summarizes, makes shorter
+  or longer, improves, fixes spelling and grammar, simplifies, changes the tone, translates, explains, makes a table or a
+  list, brainstorms or finds action items, its answer shown in place as blocks to replace or insert below, try again,
+  change in words or discard, one step to undo; Markdown turns into blocks as you type, a ⋮⋮ beside
   each block drags it or turns it into another kind and colours it, several blocks are picked at once (with a drag from
   either margin, as in Notion), an item of a nested list turned into another block keeps its place under its parent,
   code blocks are coloured in about twenty languages (a language picker, or Auto; agents' plain code blocks too), "@"
   links to another page of the Library, databases as in Notion (a table of typed columns: text, number, select,
-  multi-select, date, checkbox and link, sorted and filtered, or a board of cards dragged between lanes, its rows kept
-  with the page's own data on every device and changed in Use and Edit, by agents too), blocks and words take comments with replies that agents answer (kept beside the page, not in it), and a
+  multi-select, date, checkbox, URL, email, phone, files and pictures, a formula over the row's other columns, created
+  and last edited time, and an AI column the helper model fills from each row when asked; sorted, filtered, grouped,
+  a calculation under each column (sum, average, median, count, percent checked, earliest date…), shown as a table, a
+  board of cards dragged between lanes, a gallery with pictures, a list, a calendar by a date column or a timeline of
+  bars from a start to an end date; each row opens as a page of its own with blocks; rows in from a CSV and out as one;
+  its rows kept with the page's own data on every device and changed in Use and Edit, by agents too), blocks and words take comments with replies that agents answer (kept beside the page, not in it), and a
   page gets an icon and a cover; click or tap a part to rewrite its words (bold, italic, code, links, colours), restyle it (this part, every part of its kind or class, on hover, or for tablets and
   phones only), move, size, copy, wrap or delete it, pick it from its layers, add parts and ready-made sections,
   set the whole page's colours, fonts, width and the look of its headings, links and buttons, ask the agent about
@@ -254,8 +266,11 @@ agents that speak ACP and take MCP servers.
   as free photos with their credit under them, or as a cover made with AI; a picked picture is changed with AI or
   edited in the picture editor; Add has Add a block made with AI (a pricing table, questions and answers…); and
   pictures an agent saves into a page from its folder (a picture, a drawing, a plot) go inside it, made smaller where
-  this computer can (a page up to 2 MB). Make pages of your own from a blank page, notes, a checklist or
-  a tracker, and see or clear the data a page keeps. Export a page as a PDF, a Word document (headings, lists,
+  this computer can (a page up to 2 MB). Make pages of your own from a blank page, notes, a checklist, a tracker
+  or a template made of blocks and databases (meeting notes, a project plan, a wiki, a journal, a reading list, a
+  trip plan, a habit tracker), or import one (Markdown, a Notion export, a Word file, a web page); lock a page so
+  it doesn't change by accident, see the pages that link to it and how many words it has, and see or clear the
+  data a page keeps. Export a page as a PDF, a Word document (headings, lists,
   tables, links, charts as pictures) or a web page; ask an agent to change the page, slides, document, spreadsheet
   or LaTeX you have open (this slide, every slide, a section, the cells picked, the part picked, all of it) and
   watch it change as it saves. Apps are small tools for one job that find things out and show them clearly, each

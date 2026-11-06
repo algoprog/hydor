@@ -8,6 +8,7 @@
 //     fixed, translated, or as the user says; facts, names and numbers kept, a paragraph a line as it came.
 //   POST /api/write/describe      {src, context?} → {alt, by}: by the model that writes the Library's titles and
 //     descriptions (Settings → Images, video and audio), in the language of the slide's words.
+// And the page editor's AI (Notion AI's) and a database's AI column: page-ai.ts (POST /api/write/page-ai, /api/write/db-ai).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -28,6 +29,7 @@ import { getAsset } from '../pages/assets.ts';
 import { pageSource } from '../pages/store.ts';
 import { deckOf, holdIdea, IDEAS_SYSTEM, ideaPrompt, jsonOf, waysFor, type Way } from './ideas.ts';
 import { latexWriteRoutes } from './latex.ts';
+import { pageAiRoutes } from './page-ai.ts';
 
 // ---- stand-ins, for the tests --------------------------------------------------------------------------------------
 
@@ -279,5 +281,7 @@ export const write: Feature = {
     app.post('/api/write/describe', async (req, reply) => describe(db, { models }, req.body, goneSignal(reply)));
     // The LaTeX editor's: rewrite, write, a picture read, an error explained or fixed, a citation found, proofreading.
     latexWriteRoutes(app, db);
+    // AI on a page (Notion AI's) and a database's AI column: page-ai.ts.
+    pageAiRoutes(app, db);
   },
 };
