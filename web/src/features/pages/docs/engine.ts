@@ -11,6 +11,8 @@
 // An agent's version being written shows in place of the document (preview), drawn only where it differs, the
 // document and its history kept underneath.
 import {
+  isAtom,
+  citeItems,
   asAccepted,
   blockHtml,
   CALLOUT,
@@ -19,7 +21,7 @@ import {
   htmlRuns,
   listInfo,
   normalizeBlocks,
-  PAPERS,
+  columnMm,
   runsHtml,
   resolveSuggestion,
   runsText,
@@ -38,6 +40,7 @@ import {
   type Spacing,
   type TocEntry,
 } from '@shared/docs';
+import { docRefs, refsKey, type Refs } from '@shared/doc-refs';
 import * as ops from './ops';
 import type { Pos, TableOp } from './ops';
 import { CUT, htmlWithoutCuts } from './paging';
@@ -82,8 +85,13 @@ export interface SelState {
   canRedo: boolean;
 }
 
-/** What a click on a thing of its own in the page asks the editor for. */
-export type AtomClick = { kind: 'math'; id: string } | { kind: 'mathRun'; at: Pos; tex: string } | { kind: 'icon'; id: string };
+/** What a click on a thing of its own in the page asks the editor for (a footnote's mark, a citation or a cross-reference: `mark`, where it starts; a table's caption: `caption`). */
+export type AtomClick =
+  | { kind: 'math'; id: string }
+  | { kind: 'mathRun'; at: Pos; tex: string }
+  | { kind: 'icon'; id: string }
+  | { kind: 'mark'; k: 'fn' | 'cite' | 'xref'; at: Pos; t: string; rect: DOMRect }
+  | { kind: 'caption'; id: string };
 
 /** The look and the paragraph's style the format painter carries to the next words picked. */
 export interface Paint {
@@ -112,6 +120,8 @@ export interface EngineOpts {
   math?: MathDraw;
   /** What a table of contents says while there are no headings. */
   tocHint?: string;
+  /** What a bibliography says while the document cites nothing. */
+  bibHint?: string;
   /** A click on an equation, or on a callout's emoji. */
   onAtom?: (a: AtomClick) => void;
   /** The format painter carried its look to words (and, unless it stays on, is off now). */
@@ -172,8 +182,8 @@ function cutAfter(x: Node, box: Element): Element | null {
 const b64 = (s: string) => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
 const unb64 = (s: string) => new TextDecoder().decode(Uint8Array.from(atob(s), (c) => c.charCodeAt(0)));
 
-/** Blocks as HTML for another app to paste (lists as lists, a checklist's boxes as boxes), and as themselves for this one. */
-function copyHtml(blocks: Block[], src: (s: string) => string): string {
+/** Blocks as HTML for another app to paste (lists as lists, a checklist's boxes as boxes), and as themselves for this one (with the footnotes and sources their marks are of). */
+function copyHtml(blocks: Block[], src: (s: string) => string, extra: { notes?: Doc['notes']; sources?: Doc['sources'] } = {}): string {
   const { labels } = listInfo(blocks);
   let out = '';
   const open: { tag: 'ul' | 'ol'; lvl: number; kind: ListKind }[] = [];
@@ -204,7 +214,8 @@ function copyHtml(blocks: Block[], src: (s: string) => string): string {
     out += `<li${b.align ? ` style="text-align:${b.align}"` : ''}>${box}${runsHtml(b.runs, { view: true })}</li>`;
   });
   close(0);
-  return `<meta charset="utf-8"><!--naget-doc:${b64(JSON.stringify(blocks))}--><div>${out}</div>`;
+  const more = extra.notes?.length || extra.sources?.length ? `<!--naget-doc-more:${b64(JSON.stringify(extra))}-->` : '';
+  return `<meta charset="utf-8"><!--naget-doc:${b64(JSON.stringify(blocks))}-->${more}<div>${out}</div>`;
 }
 
 export class DocEngine {
@@ -337,17 +348,20 @@ export class DocEngine {
   // ---- drawing --------------------------------------------------------------------------------------------
 
   private toc: TocEntry[] = [];
+  /** Footnotes' numbers, citations, cross-references, numbered captions and the bibliography, as last drawn. */
+  refs: Refs = docRefs({ v: 1, page: { size: 'a4', margin: 25 }, font: '', size: 11, blocks: [] });
+  private refKeys = new Map<string, string>();
 
   private make(b: Block, label: string): HTMLElement {
     const t = document.createElement('template');
-    t.innerHTML = blockHtml(b, label, { src: this.o.src, edit: true, breakLabel: this.o.breakLabel, math: this.o.math, toc: this.toc, tocHint: this.o.tocHint });
+    t.innerHTML = blockHtml(b, label, { src: this.o.src, edit: true, breakLabel: this.o.breakLabel, math: this.o.math, toc: this.toc, tocHint: this.o.tocHint, refs: this.refs, bibHint: this.o.bibHint });
     const el = t.content.firstElementChild as HTMLElement;
     if (b.type === 'image') el.querySelector('img')?.setAttribute('draggable', 'false');
     return el;
   }
 
-  /** Runs as the editor draws them (its equations too). */
-  private runsHtml = (runs: Run[]) => runsHtml(runs, { math: this.o.math });
+  /** Runs as the editor draws them (its equations, footnotes' marks, citations and cross-references too). */
+  private runsHtml = (runs: Run[]) => runsHtml(runs, { math: this.o.math, refs: this.refs });
 
   /** Maths drawn again (KaTeX has loaded): the blocks that have any. */
   redrawMath() {
@@ -367,6 +381,7 @@ export class DocEngine {
     if (all) {
       this.els.clear();
       this.drawn.clear();
+      this.refKeys.clear();
       this.root.replaceChildren();
     }
     const fresh: string[] = [];
@@ -377,12 +392,17 @@ export class DocEngine {
     const tocKey = hasToc ? JSON.stringify(this.toc) : '';
     const tocChanged = tocKey !== this.tocKey;
     this.tocKey = tocKey;
+    // What the whole document decides of a block (its marks' numbers and words, its caption's number): drawn again when it changes.
+    this.refs = docRefs(this.doc);
     const mine = new Set<Node>();
     this.doc.blocks.forEach((b, i) => {
       let el = this.els.get(b.id);
       const was = this.drawn.get(b.id);
-      if (loose && el && was && was !== b && !(tocChanged && b.type === 'toc') && JSON.stringify(was) === JSON.stringify(b)) this.drawn.set(b.id, b);
-      if (!el || this.drawn.get(b.id) !== b || (tocChanged && b.type === 'toc')) {
+      const rk = refsKey(b, this.refs);
+      const refsChanged = (this.refKeys.get(b.id) ?? '') !== rk;
+      this.refKeys.set(b.id, rk);
+      if (loose && el && was && was !== b && !(tocChanged && b.type === 'toc') && !refsChanged && JSON.stringify(was) === JSON.stringify(b)) this.drawn.set(b.id, b);
+      if (!el || this.drawn.get(b.id) !== b || (tocChanged && b.type === 'toc') || refsChanged) {
         const made = this.make(b, labels[i]);
         el?.remove();
         el = made;
@@ -397,6 +417,7 @@ export class DocEngine {
         el.remove();
         this.els.delete(id);
         this.drawn.delete(id);
+        this.refKeys.delete(id);
       }
     // Anything else in the page (the browser's doing) goes; the blocks stand in their order.
     for (const n of Array.from(this.root.childNodes)) if (!mine.has(n)) n.remove();
@@ -750,7 +771,7 @@ export class DocEngine {
       const before = collapsed ? ops.runAt(boxRuns, s.o) : undefined;
       const want = collapsed ? ops.lookAt(boxRuns, s.o) : null;
       // So too beside a suggestion's words: words typed while editing are no suggestion's.
-      const edge = !!before && !!want && !before.math && ((before.cm?.join() ?? '') !== (want.cm?.join() ?? '') || (before.link ?? '') !== (want.link ?? '') || !!(before.ins || before.del || before.fmt));
+      const edge = !!before && !!want && !isAtom(before) && ((before.cm?.join() ?? '') !== (want.cm?.join() ?? '') || (before.link ?? '') !== (want.link ?? '') || !!(before.ins || before.del || before.fmt));
       if (oneBox && !edge && !(collapsed && this.pending && t === 'insertText')) return;
       e.preventDefault();
       const look = this.pending ?? ops.lookAt(ops.boxRuns(this.doc, s.b, s.c) ?? [], collapsed ? s.o : s.o + 1);
@@ -1077,6 +1098,26 @@ export class DocEngine {
       if (atom.classList.contains('nd-math') && atom.dataset.b) this.o.onAtom?.({ kind: 'math', id: atom.dataset.b });
       return;
     }
+    // A footnote's mark, a citation or a cross-reference: its box (the caret goes after it).
+    const x = t.closest('.nd-x[data-tex]') as HTMLElement | null;
+    if (x && this.root.contains(x) && !this.o.readOnly) {
+      e.preventDefault();
+      const after = x.closest('[data-t]') ? this.posOf(x.parentNode!, indexIn(x) + 1) : null;
+      const k = x.dataset.k as 'fn' | 'cite' | 'xref';
+      if (after) {
+        this.place({ a: after, f: after }, false);
+        this.o.onAtom?.({ kind: 'mark', k, at: { ...after, o: after.o - x.dataset.tex!.length }, t: x.dataset.tex!, rect: x.getBoundingClientRect() });
+      }
+      return;
+    }
+    // A table's caption: changed in its box.
+    const cap = t.closest('caption.nd-cap') as HTMLElement | null;
+    if (cap && this.root.contains(cap) && !this.o.readOnly) {
+      e.preventDefault();
+      const tb = cap.closest('[data-b]') as HTMLElement | null;
+      if (tb?.dataset.b) this.o.onAtom?.({ kind: 'caption', id: tb.dataset.b });
+      return;
+    }
     // An equation among words: changed in its box (the caret goes after it).
     const m = t.closest('.nd-m[data-tex]') as HTMLElement | null;
     if (m && this.root.contains(m) && !this.o.readOnly) {
@@ -1118,7 +1159,9 @@ export class DocEngine {
     const a = t.closest('a[href]') as HTMLAnchorElement | null;
     if (a && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      window.open(a.href, '_blank', 'noopener,noreferrer');
+      const to = /^#nd-([A-Za-z0-9_-]{1,24})$/.exec(a.getAttribute('href') ?? '')?.[1];
+      if (to) this.focusBlock(to);
+      else window.open(a.href, '_blank', 'noopener,noreferrer');
     }
   }
 
@@ -1135,6 +1178,14 @@ export class DocEngine {
     if (ours) {
       try {
         const list = ops.withoutComments(normalizeBlocks(JSON.parse(unb64(ours[1])) as unknown[], {}, this.ids()));
+        // The footnotes and sources the copy's marks are of, where this document has none of the same: they come along.
+        const more = /<!--naget-doc-more:([A-Za-z0-9+/=]+)-->/.exec(html);
+        if (more && list.length) {
+          const x = JSON.parse(unb64(more[1])) as { notes?: Doc['notes']; sources?: Doc['sources'] };
+          const notes = (x.notes ?? []).filter((n) => !this.doc.notes?.some((m) => m.id === n.id));
+          const sources = (x.sources ?? []).filter((n) => !this.doc.sources?.some((m) => m.id.toLowerCase() === n.id.toLowerCase()));
+          if (notes.length || sources.length) this.doc = { ...this.doc, ...(notes.length ? { notes: [...(this.doc.notes ?? []), ...notes] } : {}), ...(sources.length ? { sources: [...(this.doc.sources ?? []), ...sources] } : {}) };
+        }
         if (list.length) return list;
       } catch {}
     }
@@ -1267,8 +1318,8 @@ export class DocEngine {
 
   /** A picture block of `px` pixels wide, as a share of the text's width (no wider than it). */
   picture(src: string, px: number): ImageBlock {
-    const paper = PAPERS[this.doc.page.size];
-    const text = ((paper.w - 2 * this.doc.page.margin) * 96) / 25.4;
+    // As wide as a column of words at most.
+    const text = (columnMm(this.doc.page) * 96) / 25.4;
     return { id: ops.freshId(this.doc), type: 'image', src, w: Math.max(0.05, Math.min(1, Math.round((px / text) * 1000) / 1000)) };
   }
 
@@ -1279,7 +1330,16 @@ export class DocEngine {
     e.preventDefault();
     // What is copied is as the suggestions would make it (words marked to go left out).
     const blocks = asAccepted(ops.asDoc(this.doc, picked ? [{ ...picked }] : ops.sliceBlocks(this.doc, s, en))).blocks;
-    e.clipboardData?.setData('text/html', copyHtml(blocks, this.o.src));
+    // The footnotes and sources the copied marks are of go along (pasted into another document, they come with them).
+    const ids = new Set<string>();
+    const keys = new Set<string>();
+    const scan = (runs: Run[]) => runs.forEach((r) => (r.fn ? ids.add(r.t) : r.cite ? citeItems(r.t).forEach((x) => keys.add(x.key)) : null));
+    for (const b of blocks) {
+      if (b.type === 'p' || b.type === 'li') scan(b.runs);
+      else if (b.type === 'table') b.rows.forEach((row) => row.forEach((c) => scan(c.runs)));
+    }
+    const extra = { notes: (this.doc.notes ?? []).filter((n) => ids.has(n.id)), sources: (this.doc.sources ?? []).filter((x) => keys.has(x.id)) };
+    e.clipboardData?.setData('text/html', copyHtml(blocks, this.o.src, extra));
     e.clipboardData?.setData('text/plain', ops.blocksPlain(blocks));
     if (!cut || this.o.readOnly) return;
     if (picked) return this.removePicked();
@@ -1686,6 +1746,84 @@ export class DocEngine {
     this.commit(ops.setBox(this.doc, at.b, at.c, next), { a: end, f: end });
   }
 
+  /** A document made elsewhere (by the AI, a dialog) put in place of this one, as one change to undo. */
+  change(next: Doc, key?: string) {
+    this.before = this.sel;
+    this.commit(next, this.sel, { key, pick: this.picked && ops.blockOf(next, this.picked) ? this.picked : null });
+  }
+
+  /** Where the history is now, to come back to (undoTo) while nothing else changed since. */
+  mark(): Doc {
+    return this.doc;
+  }
+
+  /** Undone back to a mark (true), unless the document has changed in another way since (false: left as it is). */
+  undoTo(mark: Doc): boolean {
+    if (this.doc === mark) return true;
+    const at = this.past.findIndex((p) => p.doc === mark);
+    if (at < 0) return false;
+    while (this.past.length > at && this.doc !== mark) this.undo();
+    return this.doc === mark;
+  }
+
+  /** A footnote's mark, a citation or a cross-reference at the caret (in place of what is picked; `prep`, what else changes with it: its note, its source); where it starts. */
+  insertRun(run: Run, prep?: (d: Doc) => Doc): Pos | null {
+    if (this.picked) return null;
+    this.before = this.sel;
+    const [s, e] = this.range();
+    const base = prep ? prep(this.doc) : this.doc;
+    if (this.suggesting) {
+      const r = ops.samePos(s, e) ? { doc: base, end: s } : sg.remove(base, s, e, this.suggesting);
+      this.apply(sg.insertRuns(r.doc, r.end, [run], this.suggesting));
+      return r.end;
+    }
+    const cut = ops.deleteRange(base, s, e);
+    this.apply(ops.insertRuns(cut.doc, cut.at, [run]));
+    return cut.at;
+  }
+
+  /** Where a thing of its own of a kind is first among the words (a footnote's mark, by its note's id), or null. */
+  findAtom(k: 'fn' | 'cite' | 'xref', t: string): Pos | null {
+    for (const b of this.doc.blocks) {
+      const look = (runs: Run[], c?: [number, number]): Pos | null => {
+        let o = 0;
+        for (const r of runs) {
+          if (r[k] && r.t === t) return { b: b.id, ...(c ? { c } : {}), o };
+          o += r.t.length;
+        }
+        return null;
+      };
+      if (b.type === 'p' || b.type === 'li') {
+        const p = look(b.runs);
+        if (p) return p;
+      } else if (b.type === 'table')
+        for (let ri = 0; ri < b.rows.length; ri++)
+          for (let ci = 0; ci < b.rows[ri].length; ci++) {
+            const p = look(b.rows[ri][ci].runs, [ri, ci]);
+            if (p) return p;
+          }
+    }
+    return null;
+  }
+
+  /** A thing of its own among the words, found where it starts, changed (`t`: what it keeps) or taken out (null). */
+  setAtom(at: Pos, t: string | null, doc?: Doc) {
+    const base = doc ?? this.doc;
+    const runs = ops.boxRuns(base, at.b, at.c);
+    if (!runs) return;
+    let o = 0;
+    const i = runs.findIndex((r) => {
+      const hit = isAtom(r) && o === at.o;
+      o += r.t.length;
+      return hit;
+    });
+    if (i < 0) return;
+    this.before = this.sel;
+    const next = t ? runs.map((r, k) => (k === i ? { ...r, t } : r)) : runs.filter((_, k) => k !== i);
+    const end: Pos = { ...at, o: at.o + (t ? t.length : 0) };
+    this.commit(ops.setBox(base, at.b, at.c, next), { a: end, f: end });
+  }
+
   /** A block moved before the block now at `to` (dragged by its handle). */
   moveBlock(id: string, to: number) {
     this.before = this.sel;
@@ -1743,7 +1881,7 @@ export class DocEngine {
   startPaint(sticky: boolean) {
     const [s] = this.range();
     const runs = ops.boxRuns(this.doc, s.b, s.c) ?? [];
-    const { link: _l, cm: _c, math: _m, ...look } = this.pending ?? ops.lookAt(runs, s.o);
+    const { link: _l, cm: _c, math: _m, fn: _n, cite: _ci, xref: _x, ...look } = this.pending ?? ops.lookAt(runs, s.o);
     const b = ops.blockOf(this.doc, s.b);
     const para = !s.c && b && ops.isText(b) ? { style: b.type === 'p' ? (b.style ?? 'normal') : ('normal' as ParaStyle), align: b.align, lh: b.lh, sb: b.sb, sa: b.sa } : null;
     this.paint = { look, para, sticky };
@@ -1765,7 +1903,7 @@ export class DocEngine {
     const [s, e] = this.range();
     if (ops.samePos(s, e)) return;
     this.before = this.sel;
-    let d = this.relook(this.doc, s, e, (r) => (r.math ? r : { t: r.t, ...p.look, ...(r.link ? { link: r.link } : {}), ...(r.cm ? { cm: r.cm } : {}), ...(r.ins ? { ins: r.ins } : {}), ...(r.del ? { del: r.del } : {}), ...(r.fmt ? { fmt: r.fmt, was: r.was } : {}) }));
+    let d = this.relook(this.doc, s, e, (r) => (isAtom(r) ? r : { t: r.t, ...p.look, ...(r.link ? { link: r.link } : {}), ...(r.cm ? { cm: r.cm } : {}), ...(r.ins ? { ins: r.ins } : {}), ...(r.del ? { del: r.del } : {}), ...(r.fmt ? { fmt: r.fmt, was: r.was } : {}) }));
     if (p.para && !s.c) {
       const para = p.para;
       d = ops.setStyle(d, s, e, para.style);

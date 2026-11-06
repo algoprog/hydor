@@ -48,7 +48,11 @@ function shortLine(kind: ContentKind, t: ContentType | null, words: string, c: C
                 ? t
                   ? tr(`Make a spreadsheet: ${what}`)
                   : tr('Make a spreadsheet')
-                : t
+                : kind === 'design'
+                  ? t
+                    ? tr(`Make a design: ${what}`)
+                    : tr('Make a design')
+                  : t
                   ? tr(`Make a page: ${what}`)
                   : tr('Make a page');
   const w = words.trim().slice(0, 2000);

@@ -8,7 +8,7 @@
 // far taller than a browser's (Merriweather's 1.73 of its size against 1.26), so a multiple of Word's line would not
 // be the editor's line. docs.ts writes Word files with this, and reads them back with it (what spacing is a block's
 // own, what the layout's).
-import { cssLine, STYLES, type Block, type Doc } from '../../shared/docs.ts';
+import { cssLine, STYLES, styleOf, type Block, type Doc } from '../../shared/docs.ts';
 import { wordLine } from './word-fonts.ts';
 
 /** One step of indent (paragraphs, list levels), in points (the editor's --nd-step). */
@@ -42,7 +42,7 @@ export function boxOf(doc: Doc, b: Block, prev: Block | undefined, top: boolean)
   const S = doc.size;
   const box: Box = { size: S, line: STYLES.normal.lh * S, mt: 0, mb: STYLES.normal.after * S, pt: 0, pb: 0 };
   if (b.type === 'p') {
-    const st = STYLES[b.style ?? 'normal'];
+    const st = styleOf(doc, b.style ?? 'normal');
     box.size = S * st.k;
     box.line = st.lh * box.size;
     box.mt = st.before * box.size;

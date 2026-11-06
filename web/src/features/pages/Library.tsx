@@ -13,7 +13,7 @@
 // folder opens with the way back over it, and things go in folders by More → Move to a folder or, on a computer, by
 // dragging them onto one. Finding by name and the kind chips look through the whole place and say where each thing is.
 // Addresses: /library?project=<id>|none, &folder=<id>, &kind=<kind> (image, video and audio each, media pictures and
-// videos both: the old Media tab's ?tab=media too), ?tab=published; ?new=page|slides|doc|sheet|tex|notebook opens New
+// videos both: the old Media tab's ?tab=media too), ?tab=published; ?new=page|design|slides|doc|sheet|tex|notebook opens New
 // with that kind, ?new=folder New → Folder and ?new=import New → Import a folder.
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode, type RefObject } from 'react';
 import { useSearch } from 'wouter';
@@ -38,6 +38,7 @@ import {
   LibraryBig,
   MessageSquarePlus,
   NotebookText,
+  Palette,
   PenLine,
   Pencil,
   Play,
@@ -652,7 +653,7 @@ export function Library() {
     if (!newAsked) return;
     if (newAsked === 'folder') setFolderAsk(true);
     else if (newAsked === 'import') setImporting(true);
-    else setMaking(newAsked === 'slides' || newAsked === 'doc' || newAsked === 'sheet' || newAsked === 'tex' || newAsked === 'notebook' ? newAsked : 'page');
+    else setMaking(newAsked === 'design' || newAsked === 'slides' || newAsked === 'doc' || newAsked === 'sheet' || newAsked === 'tex' || newAsked === 'notebook' ? newAsked : 'page');
     go('/library', true);
   }, [newAsked]);
   // A space that is gone: everything again.
@@ -746,6 +747,7 @@ export function Library() {
 
   const newKinds: [NewKind, string, ReactNode][] = [
     ['page', 'Page', <AppWindow size={14} />],
+    ['design', 'Design', <Palette size={14} />],
     ['slides', 'Slides', <Presentation size={14} />],
     ['doc', 'Document', <FileText size={14} />],
     ['sheet', 'Spreadsheet', <Sheet size={14} />],

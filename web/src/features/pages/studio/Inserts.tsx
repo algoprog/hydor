@@ -6,6 +6,7 @@
 // a picture made with AI goes in as a data: address, as a page keeps its pictures. Also the covers the Page tab
 // offers, and the editor's keyboard shortcuts.
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { PageVideoButtons } from '../design/pageMedia';
 import { createPortal } from 'react-dom';
 import { Images, ImageUp, PenTool, Trash2, WandSparkles } from 'lucide-react';
 import { videoEmbed } from '@shared/app-media';
@@ -316,6 +317,7 @@ export function InsertPopover({
           }}
         />
         <p className="text-[11.5px] leading-snug text-fg-3">The page shows its still; a click plays it.</p>
+        <PageVideoButtons onDone={(v) => done({ ...v })} onError={onError} />
       </div>
     );
   } else if (ask.what === 'math') {

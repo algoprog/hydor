@@ -6,7 +6,8 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { AlignCenter, AlignLeft, AlignRight, Captions, Eraser, FileText, ImageMinus, RefreshCw, SlidersHorizontal, Sparkles, Trash2, Wand, WandSparkles } from 'lucide-react';
 import type { Block, ImageBlock } from '@shared/docs';
-import { Button, cx, inputCls, MenuItem, Popover } from '../../../components/ui';
+import { Button, cx, inputCls, MenuItem, Popover, Switch } from '../../../components/ui';
+import { tr } from '../../../i18n/runtime';
 import { Tool } from '../slides/controls';
 import type { DocEngine } from './engine';
 
@@ -224,6 +225,14 @@ export function Picked({
         >
           <p className="text-[12px] text-fg-3">{edit === 'alt' ? 'What the picture shows, for those who cannot see it.' : 'Shown under the picture.'}</p>
           <input autoFocus value={text} onChange={(e) => setText(e.target.value)} translate="no" className={inputCls} />
+          {edit === 'caption' && img && (
+            <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-fg">
+              <Switch on={!!img.label} onChange={(on) => engine.image(img.id, { label: on ? tr('Figure') : undefined })} label="Numbered" />
+              <span>
+                Numbered <span className="text-fg-3">({img.label ?? tr('Figure')} 1, 2, 3…)</span>
+              </span>
+            </label>
+          )}
           <div className="flex justify-end">
             <Button size="sm" variant="primary" type="submit">
               Done

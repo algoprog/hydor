@@ -123,9 +123,18 @@ export interface VideoClip {
   fit?: 'fill';
   /** A picture's (or a held frame's) slow zoom and pan. */
   motion?: VideoMotion;
-  /** Its sound: how loud, 0 to 2 (1 as it is), or none at all. */
+  /** Its sound: how loud, 0 to 4 (1 as it is: up to +12 dB), or none at all. */
   volume?: number;
   mute?: boolean;
+  /** Its sound's channels, volume line, silenced parts and fixes (in seconds of the clip on the timeline). */
+  channels?: SoundChannels;
+  levels?: [number, number][];
+  silence?: [number, number][];
+  clean?: number;
+  even?: boolean;
+  /** Seconds its sound fades in and out (its picture does not). */
+  soundFadeIn?: number;
+  soundFadeOut?: number;
   /**
    * A sound in place of its own (a Library sound "media:<id>", "naget-sound:…" or a sound file), with the same timing:
    * its second t stands for the source's second t, so the clip's trim, speed and direction apply to it too.
@@ -174,10 +183,117 @@ export interface VideoAudio {
   start: number;
   /** The part of it kept, in seconds of the sound. */
   trim?: [number, number];
-  /** 0 to 2 (1 as it is). */
+  /** 0 to 4 (1 as it is: up to +12 dB). */
   volume?: number;
   fadeIn?: number;
   fadeOut?: number;
+  /** Its channels, volume line, silenced parts and fixes (in seconds of it on the timeline). */
+  channels?: SoundChannels;
+  levels?: [number, number][];
+  silence?: [number, number][];
+  clean?: number;
+  even?: boolean;
+  /** The clip whose own sound it was (detached), to put it back. */
+  clip?: string;
+}
+
+/** Which channels a sound is heard from, and where: a lapel microphone on one channel is the usual case. */
+export const SOUND_CHANNELS = [
+  { id: 'stereo', label: 'Stereo', badge: '' },
+  { id: 'left', label: 'Left only', badge: 'L' },
+  { id: 'right', label: 'Right only', badge: 'R' },
+  { id: 'left-both', label: 'Left on both sides', badge: 'LL' },
+  { id: 'right-both', label: 'Right on both sides', badge: 'RR' },
+  { id: 'mono', label: 'Mix to mono', badge: 'M' },
+  { id: 'swap', label: 'Swap left and right', badge: 'RL' },
+] as const;
+export type SoundChannels = Exclude<(typeof SOUND_CHANNELS)[number]['id'], 'stereo'>;
+
+/** Each way as ffmpeg's pan filter mixes it (the only values the plan lets pan have). */
+export const PAN_LAYOUTS: Record<SoundChannels, string> = {
+  left: 'stereo|c0=c0|c1=0*c1',
+  right: 'stereo|c0=0*c0|c1=c1',
+  'left-both': 'stereo|c0=c0|c1=c0',
+  'right-both': 'stereo|c0=c1|c1=c1',
+  mono: 'stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1',
+  swap: 'stereo|c0=c1|c1=c0',
+};
+
+/** The same as how much of the left (l) and the right (r) goes to each side: [ll, rl, lr, rr] (from-to). */
+export const CHANNEL_MATRIX: Record<SoundChannels | 'stereo', [number, number, number, number]> = {
+  stereo: [1, 0, 0, 1],
+  left: [1, 0, 0, 0],
+  right: [0, 0, 0, 1],
+  'left-both': [1, 0, 1, 0],
+  'right-both': [0, 1, 0, 1],
+  mono: [0.5, 0.5, 0.5, 0.5],
+  swap: [0, 1, 1, 0],
+};
+
+/** The lowest and highest a volume line goes, in dB. */
+export const LEVEL_MIN = -60;
+export const LEVEL_MAX = 12;
+
+/** A volume line's dB at `t` seconds into it: flat before its first point and after its last, straight between. */
+export function levelAt(levels: [number, number][] | undefined, t: number): number {
+  if (!levels?.length) return 0;
+  if (t <= levels[0][0]) return levels[0][1];
+  for (let i = 0; i < levels.length - 1; i++) {
+    const [t0, d0] = levels[i];
+    const [t1, d1] = levels[i + 1];
+    if (t < t1) return d0 + ((d1 - d0) * (t - t0)) / Math.max(1e-6, t1 - t0);
+  }
+  return levels[levels.length - 1][1];
+}
+
+/** Whether `t` seconds into a sound is in a part silenced. */
+export const silencedAt = (silence: [number, number][] | undefined, t: number) => !!silence?.some(([a, b]) => t >= a && t <= b);
+
+const exprNum = (x: number) => {
+  const v = Math.round(x * 1000) / 1000;
+  return v < 0 ? `(0-${-v})` : String(v);
+};
+
+/**
+ * ffmpeg's volume expression (eval=frame) for a volume line and the parts silenced: the dB straight between the points,
+ * as a gain; times the silenced parts' zero. null when there is neither.
+ */
+export function volumeExpr(levels: [number, number][] | undefined, silence: [number, number][] | undefined): string | null {
+  const parts: string[] = [];
+  if (levels?.length) {
+    let e = exprNum(levels[levels.length - 1][1]);
+    for (let i = levels.length - 2; i >= 0; i--) {
+      const [t0, d0] = levels[i];
+      const [t1, d1] = levels[i + 1];
+      const seg = Math.abs(d1 - d0) < 1e-6 ? exprNum(d0) : `${exprNum(d0)}+${exprNum(d1 - d0)}*(t-${exprNum(t0)})/${exprNum(Math.max(0.001, t1 - t0))}`;
+      e = `if(lt(t,${exprNum(t1)}),${seg},${e})`;
+    }
+    e = `if(lt(t,${exprNum(levels[0][0])}),${exprNum(levels[0][1])},${e})`;
+    parts.push(`pow(10,(${e})/20)`);
+  }
+  for (const [a, b] of silence ?? []) parts.push(`(1-between(t,${exprNum(a)},${exprNum(b)}))`);
+  return parts.length ? parts.join('*') : null;
+}
+
+/** The fades the overlap of two sounds on one track makes (a crossfade): each sound's id and its fade in and out, in seconds. */
+export function overlapFades(items: VideoAudio[], lengthOf: (a: VideoAudio) => number): Map<string, { in: number; out: number }> {
+  const out = new Map<string, { in: number; out: number }>();
+  for (const track of ['music', 'voice'] as const) {
+    const xs = items.filter((a) => a.track === track).sort((a, b) => a.start - b.start);
+    for (let i = 0; i < xs.length; i++)
+      for (let j = i + 1; j < xs.length; j++) {
+        const a = xs[i];
+        const b = xs[j];
+        const over = a.start + lengthOf(a) - b.start;
+        if (over <= 0.01) continue;
+        const d = Math.min(over, lengthOf(b) / 2, lengthOf(a) / 2);
+        const ka = a.id ?? String(i);
+        const kb = b.id ?? String(j);
+        out.set(ka, { in: out.get(ka)?.in ?? 0, out: Math.max(out.get(ka)?.out ?? 0, d) });
+        out.set(kb, { in: Math.max(out.get(kb)?.in ?? 0, d), out: out.get(kb)?.out ?? 0 });
+      }
+  }
+  return out;
 }
 
 /** The tracks, as the timeline names them: V1 the clips, V2 and V3 overlays, T1 words, A1 the clips' sound, A2 music, A3 voice. */
@@ -668,6 +784,37 @@ export function overlayLength(o: VideoOverlay, f: VideoSize | undefined): number
 
 // ---- reading and checking an edit -------------------------------------------------------------------------------------
 
+/** A sound's channels, volume line, silenced parts and fixes, made to fit a sound `len` seconds long. */
+function soundShapeOf(raw: Record<string, any>, len: number): Pick<VideoAudio, 'channels' | 'levels' | 'silence' | 'clean' | 'even'> {
+  const out: Pick<VideoAudio, 'channels' | 'levels' | 'silence' | 'clean' | 'even'> = {};
+  if (typeof raw.channels === 'string' && raw.channels !== 'stereo' && raw.channels in PAN_LAYOUTS) out.channels = raw.channels as SoundChannels;
+  const pts: [number, number][] = [];
+  for (const p of Array.isArray(raw.levels) ? raw.levels : []) {
+    if (!Array.isArray(p) || p.length !== 2) continue;
+    const t = num(p[0], 0, len);
+    const d = num(p[1], LEVEL_MIN, LEVEL_MAX);
+    if (t !== undefined && d !== undefined) pts.push([ms(t), Math.round(d * 10) / 10]);
+  }
+  pts.sort((a, b) => a[0] - b[0]);
+  const levels = pts.filter((p, i) => !i || p[0] - pts[i - 1][0] >= 0.01).slice(0, 64);
+  if (levels.some(([, d]) => Math.abs(d) >= 0.05)) out.levels = levels;
+  const sil = (Array.isArray(raw.silence) ? raw.silence : [])
+    .map((p: unknown) => pairIn(p, 0, len))
+    .filter((p: [number, number] | null): p is [number, number] => !!p)
+    .sort((a: [number, number], b: [number, number]) => a[0] - b[0]);
+  const merged: [number, number][] = [];
+  for (const [a, b] of sil) {
+    const last = merged[merged.length - 1];
+    if (last && a <= last[1] + 0.001) last[1] = Math.max(last[1], b);
+    else merged.push([a, b]);
+  }
+  if (merged.length) out.silence = merged.slice(0, 100);
+  const clean = num(raw.clean, 0, 1);
+  if (clean !== undefined && clean >= 0.01) out.clean = r2(clean);
+  if (raw.even === true) out.even = true;
+  return out;
+}
+
 function pairIn(p: unknown, lo: number, hi: number): [number, number] | null {
   if (!Array.isArray(p) || p.length !== 2) return null;
   const a = num(p[0], lo, hi);
@@ -737,10 +884,18 @@ function clipOf(raw: unknown, factsOf: VideoFactsOf): VideoClip | null {
   }
   if (!isStill(out)) {
     if (c.mute === true) out.mute = true;
-    const vol = num(c.volume, 0, 2);
+    const vol = num(c.volume, 0, 4);
     if (!out.mute && vol !== undefined && Math.abs(vol - 1) > 0.005) out.volume = r2(vol);
     const sound = str(c.sound, 4096);
     if (sound && !out.mute) out.sound = sound;
+    if (!out.mute) {
+      const len = clipLength(out, f);
+      Object.assign(out, soundShapeOf(c, len));
+      for (const k of ['soundFadeIn', 'soundFadeOut'] as const) {
+        const n = num(c[k], 0, len / 2);
+        if (n !== undefined && n >= 0.05) out[k] = r2(n);
+      }
+    }
   }
   const grade = normalizeGrade(c.grade);
   if (grade) out.grade = grade;
@@ -833,13 +988,15 @@ function audioOf(raw: unknown, factsOf: VideoFactsOf, length: number): VideoAudi
   if (trim[1] - trim[0] > length - start) trim = [trim[0], ms(trim[0] + (length - start))];
   if (trim[1] - trim[0] < MIN_PART) return null;
   if (trim[0] > 0.001 || trim[1] < f.duration - 0.001) out.trim = trim;
-  const vol = num(a.volume, 0, 2);
+  const vol = num(a.volume, 0, 4);
   if (vol !== undefined && Math.abs(vol - 1) > 0.005) out.volume = r2(vol);
   const len = trim[1] - trim[0];
   for (const key of ['fadeIn', 'fadeOut'] as const) {
     const n = num(a[key], 0, len / 2);
     if (n !== undefined && n >= 0.05) out[key] = r2(n);
   }
+  Object.assign(out, soundShapeOf(a, len));
+  if (typeof a.clip === 'string' && ID.test(a.clip)) out.clip = a.clip;
   return out;
 }
 

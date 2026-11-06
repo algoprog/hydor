@@ -16,7 +16,7 @@ import { howToMakeStep } from '../../web/src/features/pages/types/step.ts';
 import { slidesMenus, type MenuArgs } from '../../web/src/features/pages/slides/SlidesMenus.tsx';
 import { docMenus, type DocMenuCtx } from '../../web/src/features/pages/docs/menu.tsx';
 import type { MenuAction, MenuDef, MenuEntry } from '../../web/src/features/pages/common/menus.tsx';
-import { blockPlace } from '../../web/src/features/pages/studio/AddPanel.tsx';
+import { blockPlace } from '../../web/src/features/pages/studio/place.ts';
 import type { EdSel } from '../../web/src/features/pages/frame.tsx';
 import { madeRequest, turnRequest } from '../../web/src/features/pages/types/requests.ts';
 import type { Deps, RunCtx, SpawnInfo } from '../features/types.ts';
@@ -49,7 +49,7 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
   ok(new Set(ids).size === ids.length, `every kind has an id of its own (${ids.filter((x, i) => ids.indexOf(x) !== i).join(', ')})`);
   for (const t of CONTENT_TYPES) ok(new RegExp(`^${t.kind}\\.[a-z0-9]+(-[a-z0-9]+)*$`).test(t.id), `${t.id}: its id is its kind and a name`);
   for (const k of KINDS) ok(typesOf(k).length >= CONTENT_MIN[k], `${k}: at least ${CONTENT_MIN[k]} (${typesOf(k).length})`);
-  ok(KINDS.length === 7 && KINDS.every((k) => CONTENT_GROUPS[k]?.length), 'seven kinds, each with its groups');
+  ok(KINDS.length === 8 && KINDS.every((k) => CONTENT_GROUPS[k]?.length), 'eight kinds, each with its groups');
   for (const k of KINDS)
     for (const g of CONTENT_GROUPS[k])
       ok(

@@ -22,6 +22,7 @@ import {
   SeparatorHorizontal,
   Sigma,
   Signature,
+  Sparkles,
   Table2,
   TableOfContents,
   WandSparkles,
@@ -39,8 +40,9 @@ export interface SlashItem {
 }
 
 /** What the "/" menu offers. */
-export function slashItems(e: DocEngine, more: { picture: () => void; aiPicture: () => void; drawing: () => void; plot: () => void; signature: () => void; equation: () => void; today: () => void }): SlashItem[] {
+export function slashItems(e: DocEngine, more: { picture: () => void; aiPicture: () => void; drawing: () => void; plot: () => void; signature: () => void; equation: () => void; today: () => void; ai?: () => void; more?: SlashItem[] }): SlashItem[] {
   return [
+    ...(more.ai ? [{ label: 'Write with AI', icon: <Sparkles size={16} />, also: 'ai write generate continue summarize conclusion help me write', run: more.ai }] : []),
     { label: 'Heading 1', icon: <Heading1 size={16} />, also: 'h1 title big', run: () => e.style('h1') },
     { label: 'Heading 2', icon: <Heading2 size={16} />, also: 'h2', run: () => e.style('h2') },
     { label: 'Heading 3', icon: <Heading3 size={16} />, also: 'h3', run: () => e.style('h3') },
@@ -61,6 +63,7 @@ export function slashItems(e: DocEngine, more: { picture: () => void; aiPicture:
     { label: 'A page break', icon: <SeparatorHorizontal size={16} />, also: 'new page', run: () => e.insertAtom('pagebreak') },
     { label: 'Table of contents', icon: <TableOfContents size={16} />, also: 'toc outline headings', run: () => e.insertToc() },
     { label: "Today's date", icon: <CalendarDays size={16} />, also: 'date now day', run: more.today },
+    ...(more.more ?? []),
   ];
 }
 
