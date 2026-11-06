@@ -1962,6 +1962,7 @@ const LATEX_HELP = [
   'The answer says whether it typeset, with each error’s file, line and what it most likely means: fix them and save again with the same id.',
   'To change a document: get_page with its id gives every file; send save_latex with that id and only what changes (source for main.tex, files to add or replace, an empty text or remove: [names] to take one out, pictures to add, or edits for small changes in them); what you leave out stays as it is. Each save is a new version, the older ones restorable. Keep what the user changed.',
   TEX_EDITS_HELP,
+  'To rename or move files, pictures or folders, page_action move_files does it with every \\input, \\include and \\includegraphics that names them following.',
 ].join(' ');
 
 export const SAVE_LATEX_DESCRIPTION = LATEX_HELP;

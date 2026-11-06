@@ -319,7 +319,7 @@ export const SAVE_NOTEBOOK_DESCRIPTION = [
   'ask an agent about it, and export it as an .ipynb file, a Python script, a PDF or a web page. Give one of: path, an .ipynb file you wrote and ran (its outputs come along:',
   'run it from the top first, so they match its code); notebook, the .ipynb’s object or text; or cells, a list of { type: "markdown" | "code" | "raw", source } (no outputs yet).',
   'With id, the notebook replaces that one’s content as a new version (read it with get_page first, and keep the cells, ids and outputs you do not change).',
-  'A notebook that belongs with a project’s code or data in a folder stays a file there instead (present_files hands it over).',
+  'A notebook that belongs with a project’s code or data in a folder stays a file there instead (present_files hands it over). page_action clear_outputs clears a kept one’s outputs.',
 ].join(' ');
 
 export const SAVE_NOTEBOOK_SCHEMA = {

@@ -114,6 +114,8 @@ import {
   withLook,
   W,
   heightOf,
+  partsLead,
+  slideLead,
   type History,
   type Look,
 } from './ops';
@@ -157,14 +159,13 @@ const GRID_KEY = 'wa.slides.grid';
 const RULERS_KEY = 'wa.slides.rulers';
 
 /** What an agent asked now could be about: this slide, every slide, the parts picked. */
-function scopesFor(index: number, title: string, parts: string[]): AskScope[] {
+function scopesFor(index: number, slide: Slide, parts: El[]): AskScope[] {
   const n = index + 1;
-  const t = title ? ` (“${title.length > 40 ? `${title.slice(0, 39)}…` : title}”)` : '';
   const out: AskScope[] = [
-    { id: 'slide', label: `${tr('This slide')} · ${n}`, lead: `On slide ${n}${t}: ` },
+    { id: 'slide', label: `${tr('This slide')} · ${n}`, lead: slideLead(index, slide) },
     { id: 'all', label: tr('Every slide'), lead: 'On every slide: ' },
   ];
-  if (parts.length) out.push({ id: 'part', label: `${tr('What’s picked')}: ${parts.join(', ')}`, lead: `On slide ${n}, the ${parts.map((x) => x.replace(/^(\w)/, (c) => c.toLowerCase())).join(' and the ')}: ` });
+  if (parts.length) out.push({ id: 'part', label: `${tr('What’s picked')}: ${parts.map(partName).join(', ')}`, lead: partsLead(index, slide, parts) });
   return out;
 }
 
@@ -421,7 +422,7 @@ export function SlidesEditor({
 
   useEffect(() => {
     if (!deck || !slide) return;
-    onScopes?.(scopesFor(index, slideTitle(slide), pickedOf(slide, sel).map(partName)));
+    onScopes?.(scopesFor(index, slide, pickedOf(slide, sel)));
   }, [deck, index, sel]);
 
   /** A change to the deck: kept for Undo (changes of one kind in a row go back together). */
@@ -1445,7 +1446,7 @@ export function SlidesEditor({
     present: (from) => setPresent({ from: from === 'start' ? 0 : index, presenter: from === 'presenter' }),
     presentMore: presentMoreMenu(deck, (how) => setPresent({ from: 0, presenter: false, how })),
     shortcuts: () => setKeysOpen(true),
-    ask: onAsk ? () => onAsk(`On slide ${index + 1}${slideTitle(slide) ? ` (“${slideTitle(slide)}”)` : ''}: `) : undefined,
+    ask: onAsk ? () => onAsk(slideLead(index, slide)) : undefined,
     designIdeas: readOnlyProp ? undefined : () => openSide('ideas'),
     checkAccess: readOnlyProp ? undefined : () => openSide('check'),
     translate: onAsk && !readOnly ? (lang) => (lang ? askToTranslate(lang) : setLangAsk(true)) : undefined,
@@ -2022,7 +2023,7 @@ export function SlidesEditor({
                   </MenuItem>
                 )}
                 {onAsk && picked.length === 1 && (
-                  <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(`On slide ${index + 1}, the ${partName(picked[0]).replace(/^(\w)/, (c) => c.toLowerCase())}: `))}>
+                  <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(partsLead(index, slide, [picked[0]])))}>
                     Ask the agent about it
                   </MenuItem>
                 )}
@@ -2045,7 +2046,7 @@ export function SlidesEditor({
                   </MenuItem>
                 )}
                 {onAsk && (
-                  <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(`On slide ${index + 1}${slideTitle(slide) ? ` (“${slideTitle(slide)}”)` : ''}: `))}>
+                  <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(slideLead(index, slide)))}>
                     Ask the agent about this slide
                   </MenuItem>
                 )}

@@ -2,7 +2,8 @@
 // other parts: sizes, hidden rows, merges, its filter, rules and charts; or the whole workbook) were before and after,
 // so Undo and Redo replay it either way. The editor keeps one workbook it changes in place, patch by patch. Here too:
 // typing into cells, styles over a selection, clearing, copying and pasting (tab-separated text, as Excel and Google
-// Sheets exchange it), filling down and right, sorting, and where Ctrl+arrow goes (tools.ts and fill.ts have the rest).
+// Sheets exchange it), filling down and right, sorting, and where Ctrl+arrow goes (tools.ts and fill.ts have the rest;
+// clearing, filling and sorting are shared/sheet-tools.ts's, which agents use too).
 import {
   adjustForDelete,
   adjustForInsert,
@@ -10,7 +11,6 @@ import {
   COL_W,
   computeBook,
   formatValue,
-  MAX_COLS,
   cleanStyle,
   parseDelimited,
   parseInput,
@@ -20,7 +20,6 @@ import {
   SHEET_LIMITS,
   shiftFormula,
   typedCell,
-  compare,
   type Calc,
   type Cell,
   type CellStyle,
@@ -29,6 +28,10 @@ import {
   type Sheet,
   type Workbook,
 } from '@shared/sheets';
+import { cellsIn, clearChanges, commentsAfterSort, fillChanges, hasHeader, holds, regionAround, sortChanges, styleChanges, tidyCell } from '@shared/sheet-tools';
+
+// The data tools agents use too (shared/sheet-tools.ts), as the editor has always taken them from here.
+export { cellsIn, clearChanges, fillChanges, hasHeader, holds, regionAround, sortChanges, styleChanges, tidyCell };
 
 /** A selection: the active cell (r, c), and the range from where it started (ar, ac) to its far corner (fr, fc). */
 export interface Sel {
@@ -136,74 +139,10 @@ export function applyPatch(book: Workbook, p: Patch, back: boolean): Workbook {
   return book;
 }
 
-/** Whether a cell holds something (a value or a formula), not only a look. */
-export const holds = (c: Cell | undefined) => !!c && (c.v !== undefined || c.f !== undefined);
-
 /** A cell typed into: its words as a value or a formula, its look and note kept (a number typed as 12% becomes a percent). */
 export function typedInto(cell: Cell | undefined, text: string): Cell | null {
   const typed = text === '' ? (cell?.s ? { s: cell.s } : null) : typedCell(parseInput(text, cell?.s?.fmt), cell?.s);
   return cell?.note ? { ...(typed ?? {}), note: cell.note } : typed;
-}
-
-/** A cell with only what remains of it: null when it holds nothing, no look and no note. */
-export const tidyCell = (c: Cell): Cell | null => (c.v === undefined && c.f === undefined && !c.s && !c.note ? null : c);
-
-/** The cells of a rectangle that exist, by name, row by row (a big rectangle is looked through by the sheet's own cells). */
-export function cellsIn(sh: Sheet, calc: Calc, si: number, x: Rect): [string, number, number][] {
-  const out: [string, number, number][] = [];
-  const area = (x.r2 - x.r1 + 1) * (x.c2 - x.c1 + 1);
-  const keys = calc.keys(si);
-  if (area <= keys.length * 2) {
-    for (let r = x.r1; r <= x.r2; r++)
-      for (let c = x.c1; c <= x.c2; c++) {
-        const k = refName(r, c);
-        if (sh.cells[k]) out.push([k, r, c]);
-      }
-    return out;
-  }
-  for (const n of keys) {
-    const r = Math.floor(n / MAX_COLS);
-    const c = n % MAX_COLS;
-    if (r >= x.r1 && r <= x.r2 && c >= x.c1 && c <= x.c2) out.push([refName(r, c), r, c]);
-  }
-  return out;
-}
-
-/** The selection's contents emptied; their looks and notes kept unless `all`. */
-export function clearChanges(sh: Sheet, calc: Calc, si: number, x: Rect, all = false): Record<string, Cell | null> {
-  const out: Record<string, Cell | null> = {};
-  for (const [k] of cellsIn(sh, calc, si, x)) {
-    const c = sh.cells[k];
-    out[k] = all ? null : tidyCell({ ...(c.s ? { s: c.s } : {}), ...(c.note ? { note: c.note } : {}) });
-  }
-  return out;
-}
-
-/**
- * A style changed over a selection: on every cell it has, and on the empty ones too when it is small (so a fill
- * shows on empty cells), else on the empty ones within what the sheet holds.
- */
-export function styleChanges(sh: Sheet, calc: Calc, si: number, x: Rect, f: (s: CellStyle | undefined) => CellStyle | undefined): Record<string, Cell | null> {
-  const out: Record<string, Cell | null> = {};
-  const put = (k: string) => {
-    const c = sh.cells[k];
-    const s = f(c?.s);
-    const next: Cell = { ...(c ?? {}) };
-    if (s && Object.keys(s).length) next.s = s;
-    else delete next.s;
-    out[k] = tidyCell(next);
-  };
-  const area = (x.r2 - x.r1 + 1) * (x.c2 - x.c1 + 1);
-  if (area <= 10_000) {
-    for (let r = x.r1; r <= x.r2; r++) for (let c = x.c1; c <= x.c2; c++) put(refName(r, c));
-    return out;
-  }
-  const e = calc.extent(si);
-  const inner: Rect = { r1: x.r1, c1: x.c1, r2: Math.min(x.r2, e.rows - 1), c2: Math.min(x.c2, e.cols - 1) };
-  if ((inner.r2 - inner.r1 + 1) * (inner.c2 - inner.c1 + 1) <= 50_000) {
-    for (let r = inner.r1; r <= inner.r2; r++) for (let c = inner.c1; c <= inner.c2; c++) put(refName(r, c));
-  } else for (const [k] of cellsIn(sh, calc, si, x)) put(k);
-  return out;
 }
 
 /** A style with some of its values set (undefined clears one), checked and kept in its order. */
@@ -338,120 +277,12 @@ export function pasteChanges(sh: Sheet, target: Rect, src: { clip: Clip } | { te
   return { changes: out, x, cut };
 }
 
-/** The first row (Ctrl+D) or column (Ctrl+R) of a selection copied over the rest of it; one cell takes the one above or left. */
-export function fillChanges(sh: Sheet, x: Rect, down: boolean): Record<string, Cell | null> {
-  const out: Record<string, Cell | null> = {};
-  const r0 = down ? (x.r1 === x.r2 ? x.r1 - 1 : x.r1) : -1;
-  const c0 = !down ? (x.c1 === x.c2 ? x.c1 - 1 : x.c1) : -1;
-  if (down ? r0 < 0 : c0 < 0) return out;
-  for (let r = down ? r0 + 1 : x.r1; r <= x.r2; r++)
-    for (let c = down ? x.c1 : c0 + 1; c <= x.c2; c++) {
-      const src = sh.cells[refName(down ? r0 : r, down ? c : c0)];
-      if (!src) {
-        out[refName(r, c)] = null;
-        continue;
-      }
-      const next: Cell = { ...src };
-      if (next.f !== undefined) next.f = shiftFormula(next.f, down ? r - r0 : 0, down ? 0 : c - c0);
-      out[refName(r, c)] = next;
-    }
-  return out;
-}
-
 // ---- sorting --------------------------------------------------------------------------------------------------------
-
-/** Values in sort order: numbers, words (in any case, numbers in them by value), TRUE and FALSE; errors and blanks last. */
-function sortKey(a: Scalar, b: Scalar): number {
-  const blank = (v: Scalar) => v === null || v === '';
-  if (blank(a) || blank(b)) return blank(a) === blank(b) ? 0 : blank(a) ? 1 : -1;
-  const err = (v: Scalar) => typeof v === 'object';
-  if (err(a) || err(b)) return err(a) === err(b) ? 0 : err(a) ? 1 : -1;
-  if (typeof a === 'string' && typeof b === 'string') return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-  return compare(a, b);
-}
-
-/** The block of filled cells around a cell, as far as it reaches in every direction (Excel's current region). */
-export function regionAround(sh: Sheet, r: number, c: number, maxR: number, maxC: number): Rect {
-  const x: Rect = { r1: r, c1: c, r2: r, c2: c };
-  const filled = (rr: number, cc: number) => rr >= 0 && cc >= 0 && rr < maxR && cc < maxC && holds(sh.cells[refName(rr, cc)]);
-  for (let grew = true, n = 0; grew && n < 10_000; n++) {
-    grew = false;
-    const rowHas = (rr: number) => {
-      for (let cc = x.c1 - 1; cc <= x.c2 + 1; cc++) if (filled(rr, cc)) return true;
-      return false;
-    };
-    const colHas = (cc: number) => {
-      for (let rr = x.r1 - 1; rr <= x.r2 + 1; rr++) if (filled(rr, cc)) return true;
-      return false;
-    };
-    if (x.r1 > 0 && rowHas(x.r1 - 1)) (x.r1--, (grew = true));
-    if (x.r2 < maxR - 1 && rowHas(x.r2 + 1)) (x.r2++, (grew = true));
-    if (x.c1 > 0 && colHas(x.c1 - 1)) (x.c1--, (grew = true));
-    if (x.c2 < maxC - 1 && colHas(x.c2 + 1)) (x.c2++, (grew = true));
-  }
-  return x;
-}
-
-/** Whether a block's first row is a header: words over rows of which some hold numbers or dates, or bold over plain. */
-export function hasHeader(sh: Sheet, calc: Calc, si: number, x: Rect): boolean {
-  if (x.r2 <= x.r1) return false;
-  if (sh.freeze?.rows && x.r1 < sh.freeze.rows) return true;
-  let words = 0;
-  for (let c = x.c1; c <= x.c2; c++) {
-    const v = calc.value(si, x.r1, c);
-    if (v === null || v === '') continue;
-    if (typeof v !== 'string') return false;
-    words++;
-  }
-  if (!words) return false;
-  const bold = (r: number) => [...Array(x.c2 - x.c1 + 1).keys()].some((j) => sh.cells[refName(r, x.c1 + j)]?.s?.b);
-  if (bold(x.r1) && !bold(x.r1 + 1)) return true;
-  for (let c = x.c1; c <= x.c2; c++) if (typeof calc.value(si, x.r1 + 1, c) === 'number') return true;
-  return false;
-}
-
-/** The rows of a block sorted by one column's values: whole rows move (their formulas along with them); `moved`: where each row went. */
-export function sortChanges(sh: Sheet, calc: Calc, si: number, x: Rect, col: number, asc: boolean, moved?: Map<number, number>): Record<string, Cell | null> {
-  const rows: { r: number; key: Scalar; cells: (Cell | undefined)[] }[] = [];
-  for (let r = x.r1; r <= x.r2; r++) {
-    const cells: (Cell | undefined)[] = [];
-    for (let c = x.c1; c <= x.c2; c++) cells.push(sh.cells[refName(r, c)]);
-    rows.push({ r, key: calc.value(si, r, col), cells });
-  }
-  const sorted = [...rows].sort((a, b) => {
-    const k = sortKey(a.key, b.key);
-    const blankOrErr = (v: Scalar) => v === null || v === '' || typeof v === 'object';
-    // Blanks and errors stay last either way.
-    if (blankOrErr(a.key) || blankOrErr(b.key)) return k;
-    return asc ? k : -k;
-  });
-  const out: Record<string, Cell | null> = {};
-  sorted.forEach((row, i) => {
-    const r = x.r1 + i;
-    moved?.set(row.r, r);
-    row.cells.forEach((cell, j) => {
-      const c = x.c1 + j;
-      if (!cell) out[refName(r, c)] = null;
-      else out[refName(r, c)] = cell.f !== undefined ? { ...cell, f: shiftFormula(cell.f, r - row.r, 0) } : cell;
-    });
-  });
-  return out;
-}
 
 /** A sheet's comments after the rows of a block were sorted (`moved`: where each row went), each with its cell's row; null when none moved. */
 export function commentsMoved(sh: Sheet, x: Rect, moved: Map<number, number>): Patch | null {
-  if (!sh.comments?.length) return null;
-  let any = false;
-  const comments = sh.comments
-    .map((cm) => {
-      const p = parseRef(cm.cell);
-      const to = p && p.c >= x.c1 && p.c <= x.c2 ? moved.get(p.r) : undefined;
-      if (!p || to === undefined || to === p.r) return cm;
-      any = true;
-      return { ...cm, cell: refName(to, p.c) };
-    })
-    .sort((a, b) => (parseRef(a.cell)!.r - parseRef(b.cell)!.r) * MAX_COLS + parseRef(a.cell)!.c - parseRef(b.cell)!.c);
-  return any ? metaPatch(sh, { comments }) : null;
+  const comments = commentsAfterSort(sh, x, moved);
+  return comments ? metaPatch(sh, { comments }) : null;
 }
 
 // ---- rows and columns ------------------------------------------------------------------------------------------------

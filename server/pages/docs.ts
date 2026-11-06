@@ -1683,6 +1683,7 @@ const DOC_HELP = [
   'Good documents start with a title, have short headings that say what follows, short paragraphs, lists for steps and options, and tables for what is compared.',
   'To change a document, get_page with its id gives it as markdown; send the whole document back with save_doc and the same id, or only what changes with edits: a new version, the older ones restorable. Keep what the user changed, and what you were not asked to change, as it is.',
   DOC_EDITS_HELP,
+  'page_action accepts or rejects suggested changes (all, or by id), sets the page up (paper, margins, font and size) and the header and footer, without sending the document back.',
 ].join(' ');
 
 export const SAVE_DOC_DESCRIPTION = DOC_HELP;

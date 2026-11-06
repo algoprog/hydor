@@ -361,6 +361,7 @@ const SHEET_HELP = [
   'At most 50 sheets, 200,000 cells, 20,000 rows and 500 columns a sheet. Good sheets have a header row, one kind of value per column, and totals as formulas (=SUM(B2:B20)) rather than typed numbers, so they stay right when the user changes one.',
   'To change a spreadsheet, get_page with its id gives it whole (each sheet with its id and cells, and what its formulas give); send the whole workbook back with the same id, or only the cells that change with update: a new version, the older ones restorable. Keep what the user changed.',
   SHEET_EDITS_HELP,
+  'page_action does what the editor’s Data, Edit and sheet tabs’ menus do, without writing the cells yourself: sort (rows move whole, with their formulas and comments), remove_duplicates, fill, clear, trim_spaces, split_text, summarize, insert_rows, insert_columns, delete_rows, delete_columns (every formula that points there follows), rename_sheet (formulas that name it follow), duplicate_sheet, delete_sheet, move_sheet.',
 ].join(' ');
 
 export const SAVE_SHEET_DESCRIPTION = SHEET_HELP;

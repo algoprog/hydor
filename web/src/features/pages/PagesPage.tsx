@@ -219,8 +219,15 @@ const BY: Record<PageVersion['by'], string> = { agent: 'by the agent', user: 'ke
  * Where a request to an agent is for: what the open editor offers (this slide, the section the caret is in, the
  * cells picked…), then the part "Ask the agent about it" named; a page of HTML: the whole page, or the part picked.
  */
+/** A request's words as its chip shows them: without the ids and sources it carries for the agent ("On slide 3, the title: Pricing"). */
+const chipOf = (lead: string) =>
+  lead
+    .replace(/\s*\(([^()]*?),\s*id [\w-]+\)/g, ' ($1)')
+    .replace(/\s*\((?:id [\w-]+|\w+ part [^()]*|naget-(?:asset|video):[\w]+)\)/g, '')
+    .replace(/: $/, '');
+
 function scopesOf(page: PageInfo, fromEditor: AskScope[], part: string | null): AskScope[] {
-  if (page.kind) return part ? [...fromEditor, { id: 'asked', label: part.replace(/: $/, ''), lead: part }] : fromEditor;
+  if (page.kind) return part ? [...fromEditor, { id: 'asked', label: chipOf(part), lead: part }] : fromEditor;
   const out: AskScope[] = [{ id: 'page', label: tr('The whole page'), lead: '' }];
   if (part) out.push({ id: 'part', label: `${tr('The part picked')}: ${part.replace(/^On the page “[^”]*”, the /, '').replace(/ \(`[^`]*`\): $/, '')}`, lead: part });
   return out;

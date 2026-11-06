@@ -41,6 +41,8 @@ export function pageCall(t: ToolInfo | undefined): PageCall | null {
   if (bare === 'show_html' || bare === 'save_page') return bare;
   // A deck, a document or a spreadsheet is a saved page too, opened by its id.
   if (bare === 'save_slides' || bare === 'save_doc' || bare === 'save_sheet' || bare === 'save_latex') return 'save_page';
+  // A change page_action saved: the page it changed, as a save of it.
+  if (bare === 'page_action' && savedRef(t.output)) return 'save_page';
   const p = (t.input as { file_path?: unknown } | undefined)?.file_path;
   return t.name === 'Write' && typeof p === 'string' && /\.html?$/i.test(p) ? 'file' : null;
 }
