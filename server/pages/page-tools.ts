@@ -17,7 +17,9 @@ import type { Deps } from '../features/types.ts';
 import { fetchPage } from '../web/fetch.ts';
 import { assetDataUrl } from './assets.ts';
 import { docFromFile } from './docs.ts';
-import { createPage, mustPage } from './store.ts';
+import { createPage, mustPage, pageHtml, putValues, storageMap } from './store.ts';
+import { dbAi } from '../write/page-ai.ts';
+import { dbBlocks, dbKey } from '../../shared/page-db.ts';
 
 const httpsOnly = (v: unknown) => (typeof v === 'string' && /^https:\/\/[^\s"'<>\\]{1,1800}$/i.test(v) ? v : undefined);
 const line = (v: unknown, n: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
@@ -240,6 +242,65 @@ export function setLocked(db: DB, id: string, locked: boolean) {
   db.prepare('update pages set locked = ? where id = ?').run(locked ? 1 : null, id);
   return mustPage(db, id);
 }
+
+// ---- what agents do to a page of HTML in a click (page_action) ---------------------------------------------------------------
+/** An AI column's cells filled by the helper model, as the editor's Fill every row or Fill the empty rows does. */
+export async function fillColumn(d: Pick<Deps, 'db' | 'broadcast'>, pageId: string, a: Record<string, unknown>): Promise<string> {
+  const db = d.db;
+  const html = (await pageHtml(db, pageId))?.html ?? '';
+  const blocks = dbBlocks(html);
+  const want = typeof a.database === 'string' ? a.database.trim() : '';
+  const b = blocks.find((x) => x.name === want || x.title.toLowerCase() === want.toLowerCase()) ?? (want ? undefined : blocks[0]);
+  if (!b) throw new Error(blocks.length ? `database: one of ${blocks.map((x) => x.name).join(', ')}` : 'This page has no database.');
+  const D = pageDatabases();
+  let raw: unknown = b.schema;
+  const stored = storageMap(db, pageId)[dbKey(b.name)];
+  try {
+    if (stored) raw = JSON.parse(stored);
+  } catch {}
+  const s = D.normalize(raw, b.title);
+  const colName = typeof a.column === 'string' ? a.column.trim().toLowerCase() : '';
+  const col = s.cols.find((c) => c.kind === 'ai' && (!colName || c.name.toLowerCase() === colName || c.id === colName));
+  if (!col) throw new Error(`column: an AI column of “${s.title || b.name}” (${s.cols.filter((c) => c.kind === 'ai').map((c) => c.name).join(', ') || 'it has none: add one with save_page’s databases cols, kind "ai"'}).`);
+  const which = a.rows;
+  const rows = Array.isArray(which) ? s.rows.filter((r) => which.map(String).includes(r.id)) : which === 'all' ? s.rows : s.rows.filter((r) => !String(r.cells[col.id] ?? '').trim());
+  const cfg = col.ai ?? { how: 'summarize' as const };
+  let n = 0;
+  let cost = 0;
+  const failed: string[] = [];
+  for (const r of rows.slice(0, 300)) {
+    const cells = Object.fromEntries(s.cols.filter((c) => c !== col).map((c) => [c.name, D.cellText(s, r, c)]).filter(([, v]) => v));
+    try {
+      const got = await dbAi(db, { how: cfg.how, prompt: cfg.prompt, lang: cfg.lang, options: cfg.options?.split(',').map((x) => x.trim()).filter(Boolean), column: col.name, row: cells, pageId }, AbortSignal.timeout(120_000));
+      if (got.value) r.cells[col.id] = got.value;
+      else delete r.cells[col.id];
+      r.edited = Date.now();
+      cost += got.cost ?? 0;
+      n++;
+    } catch (e) {
+      failed.push(`${r.id}: ${(e as Error).message}`);
+      if (failed.length >= 3) break;
+    }
+  }
+  putValues(db, pageId, [[dbKey(b.name), JSON.stringify(s)]]);
+  d.broadcast({ t: 'feature', id: 'pages', data: { what: 'pages' } });
+  return `Filled ${n} of ${rows.length} cells of the AI column “${col.name}” in “${s.title || b.name}”${cost > 0 ? ` (about $${cost.toFixed(3)})` : ''}; the page shows them at once.${failed.length ? ` Not filled: ${failed.join('; ')}.` : ''}`;
+}
+
+/** page_action on a page of HTML: lock or unlock it, fill an AI column. */
+export const HTML_ACTIONS: Record<string, (d: Pick<Deps, 'db' | 'broadcast'>, page: { id: string; title: string }, a: Record<string, unknown>) => Promise<string> | string> = {
+  lock: (d, p) => {
+    setLocked(d.db, p.id, true);
+    d.broadcast({ t: 'feature', id: 'pages', data: { what: 'pages' } });
+    return `Locked “${p.title}”: it makes no new version until it is unlocked (its databases still take rows).`;
+  },
+  unlock: (d, p) => {
+    setLocked(d.db, p.id, false);
+    d.broadcast({ t: 'feature', id: 'pages', data: { what: 'pages' } });
+    return `Unlocked “${p.title}”: it can be changed again.`;
+  },
+  fill_column: (d, p, a) => fillColumn(d, p.id, a),
+};
 
 export function pageToolsRoutes(d: Deps) {
   const { app } = d;
