@@ -15,15 +15,11 @@ const MAX_DEPTH = 120;
 /** The most shapes drawn once <use> has repeated what it points at: more, and every <use> goes. */
 const MAX_DRAWN = 250_000;
 
-const ELEMENT_NAMES = [
-  'svg', 'g', 'defs', 'symbol', 'use', 'title', 'desc',
-  'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon',
-  'text', 'tspan', 'textPath',
-  'linearGradient', 'radialGradient', 'stop', 'pattern', 'clipPath', 'mask', 'marker',
-  'filter', 'feBlend', 'feColorMatrix', 'feComponentTransfer', 'feFuncR', 'feFuncG', 'feFuncB', 'feFuncA', 'feComposite',
-  'feConvolveMatrix', 'feDiffuseLighting', 'feDisplacementMap', 'feDistantLight', 'feDropShadow', 'feFlood', 'feGaussianBlur',
-  'feMerge', 'feMergeNode', 'feMorphology', 'feOffset', 'fePointLight', 'feSpecularLighting', 'feSpotLight', 'feTile', 'feTurbulence',
-];
+const ELEMENT_NAMES = (
+  'svg g defs symbol use title desc path rect circle ellipse line polyline polygon text tspan textPath linearGradient radialGradient stop pattern clipPath mask marker ' +
+  'filter feBlend feColorMatrix feComponentTransfer feFuncR feFuncG feFuncB feFuncA feComposite feConvolveMatrix feDiffuseLighting feDisplacementMap feDistantLight ' +
+  'feDropShadow feFlood feGaussianBlur feMerge feMergeNode feMorphology feOffset fePointLight feSpecularLighting feSpotLight feTile feTurbulence'
+).split(' ');
 /** The elements kept, by their name in lower case (models write "lineargradient" too). */
 const ELEMENTS = new Map(ELEMENT_NAMES.map((n) => [n.toLowerCase(), n]));
 /** Left out themselves, what is inside them kept: a link's shapes. */
@@ -37,33 +33,25 @@ const HREF_ON = new Set(['use', 'textPath', 'linearGradient', 'radialGradient', 
 
 const ATTR_NAMES = [
   // where, how big, what shape
-  'x', 'y', 'width', 'height', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'fx', 'fy', 'fr', 'd', 'points', 'pathLength',
-  'viewBox', 'preserveAspectRatio', 'transform', 'xml:space',
+  'x y width height x1 y1 x2 y2 cx cy r rx ry fx fy fr d points pathLength viewBox preserveAspectRatio transform xml:space',
   // gradients, patterns, clips, masks, markers
-  'offset', 'gradientUnits', 'gradientTransform', 'spreadMethod', 'patternUnits', 'patternContentUnits', 'patternTransform',
-  'clipPathUnits', 'maskUnits', 'maskContentUnits', 'markerUnits', 'markerWidth', 'markerHeight', 'refX', 'refY', 'orient',
+  'offset gradientUnits gradientTransform spreadMethod patternUnits patternContentUnits patternTransform clipPathUnits maskUnits maskContentUnits markerUnits markerWidth markerHeight refX refY orient',
   // words
-  'dx', 'dy', 'rotate', 'textLength', 'lengthAdjust', 'startOffset', 'method', 'spacing', 'side',
+  'dx dy rotate textLength lengthAdjust startOffset method spacing side',
   // filters
-  'filterUnits', 'primitiveUnits', 'in', 'in2', 'result', 'stdDeviation', 'mode', 'type', 'values', 'operator', 'k1', 'k2', 'k3', 'k4',
-  'radius', 'scale', 'xChannelSelector', 'yChannelSelector', 'baseFrequency', 'numOctaves', 'seed', 'stitchTiles', 'tableValues',
-  'slope', 'intercept', 'amplitude', 'exponent', 'surfaceScale', 'diffuseConstant', 'specularConstant', 'specularExponent',
-  'kernelUnitLength', 'azimuth', 'elevation', 'pointsAtX', 'pointsAtY', 'pointsAtZ', 'z', 'limitingConeAngle', 'order', 'kernelMatrix',
-  'divisor', 'bias', 'targetX', 'targetY', 'edgeMode', 'preserveAlpha',
+  'filterUnits primitiveUnits in in2 result stdDeviation mode type values operator k1 k2 k3 k4 radius scale xChannelSelector yChannelSelector baseFrequency numOctaves seed stitchTiles tableValues',
+  'slope intercept amplitude exponent surfaceScale diffuseConstant specularConstant specularExponent kernelUnitLength azimuth elevation pointsAtX pointsAtY pointsAtZ z limitingConeAngle order kernelMatrix',
+  'divisor bias targetX targetY edgeMode preserveAlpha',
   // what it says to people who cannot see it
-  'role', 'aria-label', 'aria-hidden', 'lang', 'xml:lang',
-];
+  'role aria-label aria-hidden lang xml:lang',
+].flatMap((x) => x.split(' '));
 /** The properties that are attributes too (fill="…" or style="fill: …"). */
-const PRESENTATION = [
-  'fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-linecap', 'stroke-linejoin',
-  'stroke-miterlimit', 'stroke-dasharray', 'stroke-dashoffset', 'opacity', 'color', 'display', 'visibility', 'overflow',
-  'clip', 'clip-path', 'clip-rule', 'mask', 'filter', 'marker-start', 'marker-mid', 'marker-end',
-  'font-family', 'font-size', 'font-size-adjust', 'font-weight', 'font-style', 'font-variant', 'font-stretch', 'text-anchor',
-  'dominant-baseline', 'alignment-baseline', 'baseline-shift', 'letter-spacing', 'word-spacing', 'text-decoration',
-  'writing-mode', 'direction', 'unicode-bidi', 'stop-color', 'stop-opacity', 'flood-color', 'flood-opacity', 'lighting-color',
-  'color-interpolation', 'color-interpolation-filters', 'color-rendering', 'paint-order', 'vector-effect', 'shape-rendering',
-  'text-rendering', 'image-rendering', 'pointer-events',
-];
+const PRESENTATION = (
+  'fill fill-opacity fill-rule stroke stroke-width stroke-opacity stroke-linecap stroke-linejoin stroke-miterlimit stroke-dasharray stroke-dashoffset opacity color display visibility ' +
+  'overflow clip clip-path clip-rule mask filter marker-start marker-mid marker-end font-family font-size font-size-adjust font-weight font-style font-variant font-stretch text-anchor ' +
+  'dominant-baseline alignment-baseline baseline-shift letter-spacing word-spacing text-decoration writing-mode direction unicode-bidi stop-color stop-opacity flood-color flood-opacity ' +
+  'lighting-color color-interpolation color-interpolation-filters color-rendering paint-order vector-effect shape-rendering text-rendering image-rendering pointer-events'
+).split(' ');
 const PRESENTS = new Set(PRESENTATION);
 /** CSS that only draws but is no attribute: kept in style="…". */
 const CSS_ONLY = new Set(['font', 'marker', 'mix-blend-mode', 'isolation', 'transform', 'transform-origin', 'transform-box']);
@@ -71,18 +59,19 @@ const CSS_ONLY = new Set(['font', 'marker', 'mix-blend-mode', 'isolation', 'tran
 const ATTRS = new Map([...ATTR_NAMES, ...PRESENTATION].map((n) => [n.toLowerCase(), n]));
 
 /** The functions a value may call: colours, sizes, transforms, CSS filters, and url() to the drawing's own #ids. */
-const FUNCTIONS = new Set([
-  'url', 'rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color', 'calc', 'min', 'max', 'clamp',
-  'matrix', 'translate', 'translatex', 'translatey', 'scale', 'scalex', 'scaley', 'rotate', 'skew', 'skewx', 'skewy',
-  'drop-shadow', 'blur', 'brightness', 'contrast', 'grayscale', 'hue-rotate', 'invert', 'opacity', 'saturate', 'sepia',
-]);
+const FUNCTIONS = new Set(
+  (
+    'url rgb rgba hsl hsla hwb lab lch oklab oklch color calc min max clamp matrix translate translatex translatey scale scalex scaley rotate skew skewx skewy ' +
+    'drop-shadow blur brightness contrast grayscale hue-rotate invert opacity saturate sepia'
+  ).split(' '),
+);
 
 /** Stands for the drawing's id prefix while it is cleaned (control characters are taken out of everything read). */
 const P = '\u0001';
 /** A prefix this file gave before: taken off, so cleaning again gives the same drawing. */
 const OURS = /^h[0-9a-f]{6}-/;
 const ID_OK = /^[A-Za-z_][\w.-]{0,80}$/;
-const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f￾￿]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
+const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\ufffe\uffff]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
 
 // ---- reading -------------------------------------------------------------------------------------------------
 
@@ -97,17 +86,19 @@ type Node = Elem | string;
 class Refused extends Error {}
 
 /** The few named characters models write, beyond XML's five; any other named entity is left out. */
-const NAMED: Record<string, string> = {
-  lt: '<', gt: '>', amp: '&', quot: '"', apos: "'", nbsp: ' ', copy: '©', reg: '®', trade: '™', hellip: '…', mdash: '—',
-  ndash: '–', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', laquo: '«', raquo: '»', bull: '•', middot: '·', deg: '°', times: '×',
-  divide: '÷', plusmn: '±', minus: '−', euro: '€', pound: '£', yen: '¥', cent: '¢', sect: '§', para: '¶', micro: 'µ', frac12: '½',
-  frac14: '¼', frac34: '¾', larr: '←', rarr: '→', uarr: '↑', darr: '↓', harr: '↔', check: '✓', hearts: '♥', star: '☆',
-};
+const NAMED: Record<string, string> = Object.fromEntries(
+  (
+    'lt < gt > amp & quot " apos \' nbsp \u00a0 copy © reg ® trade ™ hellip … mdash — ndash – lsquo ‘ rsquo ’ ldquo “ rdquo ” laquo « raquo » bull • middot · deg ° times × ' +
+    'divide ÷ plusmn ± minus − euro € pound £ yen ¥ cent ¢ sect § para ¶ micro µ frac12 ½ frac14 ¼ frac34 ¾ larr ← rarr → uarr ↑ darr ↓ harr ↔ check ✓ hearts ♥ star ☆'
+  )
+    .split(' ')
+    .flatMap((x, i, all) => (i % 2 ? [] : [[x, all[i + 1]]])),
+);
 
 function decode(t: string): string {
   if (!t.includes('&')) return t.replace(CONTROL, '');
   return t
-    .replace(/&(#x[0-9a-f]{1,6}|#[0-9]{1,7}|[a-z][a-z0-9]{1,31});/gi, (_m, e: string) => {
+    .replace(/&(#x[0-9a-f]{1,6}|#[0-9]{1,7}|[a-z][a-z0-9]{0,31});/gi, (_m, e: string) => {
       if (e[0] !== '#') return NAMED[e] ?? NAMED[e.toLowerCase()] ?? '';
       const cp = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
       return cp > 0 && cp <= 0x10ffff && !(cp >= 0xd800 && cp <= 0xdfff) ? String.fromCodePoint(cp) : '';
