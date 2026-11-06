@@ -5,7 +5,7 @@ import { VIDEO } from '../../shared/slides.ts';
 import type { DB } from '../db.ts';
 import { videoAddress, videoAddressOk, videoDataUrl, VIDEO_INSIDE } from './videos.ts';
 
-const ADDRESS = /\/pg\/video\/([a-f0-9]{16,64})\/([a-f0-9]{16,64})/g;
+const ADDRESS = /\/pg\/video\/([a-f0-9]{16,64})\/([\w-]{16,64})/g;
 
 /** The kept videos a page shows, as sources ("naget-video:<sha>"), so the version that shows them keeps them. */
 export function pageVideoSources(html: string): string[] {

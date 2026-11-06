@@ -2165,7 +2165,7 @@ export function writing(E: Core): Writing {
     }
     if (what === 'video') {
       // A video the app keeps (from this device, the Library, or made with AI: pages/design/pageMedia.tsx), played in the page.
-      const file = typeof arg.file === 'string' && /^\/pg\/video\/[a-f0-9]{16,64}\/[a-f0-9]{16,64}$/.test(arg.file) ? arg.file : '';
+      const file = typeof arg.file === 'string' && /^\/pg\/video\/[a-f0-9]{16,64}\/[\w-]{16,64}$/.test(arg.file) ? arg.file : '';
       if (file) {
         const poster = safeSrc(arg.poster);
         E.change(() => {
