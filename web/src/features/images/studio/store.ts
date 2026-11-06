@@ -18,9 +18,10 @@ export interface EditOpts {
   src: string;
   mode?: 'change' | 'cutout' | 'erase';
 }
-/** A drawing (SVG): what it is, its shape, the colours to draw with. */
+/** A drawing (SVG): what it is, its shape, the colours to draw with, words to start from. */
 export interface DrawingOpts {
   kind?: DrawingKind;
+  prompt?: string;
   aspect?: string;
   colors?: string[];
 }

@@ -2,15 +2,17 @@
 // and the picture picked to start on (when it can); what it would cost, said plainly (videos cost far more than
 // pictures). It takes minutes: the dialog shows how long it has been on its way, and may be closed meanwhile (the
 // video goes on being made, and a note with Insert shows when it is done). A video asked for before and still
-// waiting shows at the top, to take it back here. Then the video, to watch, and Use it.
+// waiting shows at the top, to take it back here. Then the video, to watch, and Use it. With no OpenRouter key,
+// pressing Make asks for it in place (KeyAsk); skipped, no video is made.
 import { useEffect, useState } from 'react';
 import { Film } from 'lucide-react';
 import type { TiersInfo, VideoJob } from '@shared/images';
 import type { VideosState } from '@shared/media';
 import { Button, Dialog, Switch } from '../../../components/ui';
 import { getTiers, startVideo, videoJob, videoSettings } from './api';
-import { elapsed, money, nearestAspect, videoPrice } from './logic';
-import { Choice, NoKey, PriceLine, Problem, ShapeMark, Words, Working } from './parts';
+import { elapsed, money, nearestAspect, needsKey, videoPrice } from './logic';
+import { KeyAsk } from './KeyAsk';
+import { Choice, PriceLine, Problem, ShapeMark, Words, Working } from './parts';
 import { shownSrc } from './pictures';
 import type { MadeVideo, VideoOpts } from './store';
 import { finished, madeOf, POLL_OPEN, takeBack, useFollowed } from './videoJobs';
@@ -37,6 +39,8 @@ export function MakeVideo({ o, onDone, onLetGo }: { o: VideoOpts; onDone: (v: Ma
   const [vs, setVs] = useState<VideosState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // Make was pressed with no OpenRouter key: it is asked for here.
+  const [askKey, setAskKey] = useState(false);
   const [job, setJob] = useState<VideoJob | null>(null);
   const [asked, setAsked] = useState('');
   const before = useFollowed((s) => s.list[s.list.length - 1] ?? null);
@@ -55,7 +59,6 @@ export function MakeVideo({ o, onDone, onLetGo }: { o: VideoOpts; onDone: (v: Ma
   const shape = aspect ?? nearestAspect(o.aspect ?? '16:9', shapes) ?? '16:9';
   const fromPicture = !!o.first && (!m || m.frames.includes('first_frame'));
   const price = tiers ? videoPrice(tiers, secs, m?.perSecondMax) : null;
-  const noKey = !!tiers && !tiers.keySet;
 
   // Followed while open.
   useEffect(() => {
@@ -66,16 +69,21 @@ export function MakeVideo({ o, onDone, onLetGo }: { o: VideoOpts; onDone: (v: Ma
     return () => window.clearTimeout(t);
   }, [job]);
 
-  const make = async () => {
-    if (!prompt.trim() || sending || noKey) return;
-    setSending(true);
+  /** Sends it to be made (`keyed`: the key was just saved, so the tiers read before are out of date). */
+  const make = async (keyed = false) => {
+    if (!prompt.trim() || sending) return;
     setError(null);
+    if (!keyed && tiers && !tiers.keySet) return setAskKey(true);
+    setAskKey(false);
+    setSending(true);
     try {
       const j = await startVideo({ prompt: prompt.trim(), duration: secs, aspect: shape, audio: m?.audio ? audio : undefined, first: fromPicture && useFirst ? o.first : undefined });
       setAsked(prompt.trim());
       setJob(j);
     } catch (e) {
-      setError((e as Error).message);
+      const m = (e as Error).message;
+      if (needsKey(m)) setAskKey(true);
+      else setError(m);
     } finally {
       setSending(false);
     }
@@ -107,7 +115,7 @@ export function MakeVideo({ o, onDone, onLetGo }: { o: VideoOpts; onDone: (v: Ma
         <Button variant="ghost" onClick={close}>
           Cancel
         </Button>
-        <Button variant="primary" disabled={sending || !prompt.trim() || !tiers || noKey} onClick={() => void make()}>
+        <Button variant="primary" disabled={sending || askKey || !prompt.trim() || !tiers} onClick={() => void make()}>
           {sending ? 'Sending it' : (price?.button ?? 'Make the video')}
         </Button>
       </>
@@ -158,7 +166,6 @@ export function MakeVideo({ o, onDone, onLetGo }: { o: VideoOpts; onDone: (v: Ma
               </Button>
             </div>
           )}
-          {noKey && <NoKey what="Videos are made through OpenRouter, and no key is set yet." onLeave={() => onDone(null)} />}
           <Words value={prompt} onChange={setPrompt} label="What happens" placeholder="What happens in it: what is seen, how it moves, how the camera moves" examples={EXAMPLES} disabled={sending} />
           <div className="-mx-2 flex flex-wrap items-center gap-x-0.5 gap-y-0.5">
             <Choice label="Length" value={String(secs)} options={lengths.map((d) => ({ value: String(d), label: `${d} second${d === 1 ? '' : 's'}` }))} onChange={(v) => setSeconds(Number(v))} width={180} disabled={sending} />
@@ -185,7 +192,24 @@ export function MakeVideo({ o, onDone, onLetGo }: { o: VideoOpts; onDone: (v: Ma
             </div>
           )}
           {error && <Problem error={error} onLeave={() => onDone(null)} />}
-          {sending ? <Working>Sending it</Working> : price && <PriceLine>{price.line}</PriceLine>}
+          {askKey ? (
+            <KeyAsk
+              onSaved={() =>
+                void getTiers().then(
+                  (t) => {
+                    setTiers(t);
+                    if (t.keySet) void make(true);
+                  },
+                  (e: Error) => setError(e.message),
+                )
+              }
+              onSkip={() => onDone(null)}
+            />
+          ) : sending ? (
+            <Working>Sending it</Working>
+          ) : (
+            price && <PriceLine>{price.line}</PriceLine>
+          )}
         </div>
       )}
     </Dialog>

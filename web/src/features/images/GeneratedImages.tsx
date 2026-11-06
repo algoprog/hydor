@@ -12,6 +12,7 @@ import { Button, cx, IconButton } from '../../components/ui';
 import { download } from '../documents/FileCards';
 import { FileMore } from '../files/SpaceMenu';
 import { KeepButton, KeepIcon } from '../media/Keep';
+import { OpenRouterKeyCard } from '../connections/OpenRouterKeyCard';
 
 interface Pic {
   path: string;
@@ -61,7 +62,14 @@ export function GeneratedImages({ item, sessionKey }: { item: ToolItem; sessionK
   const aspect = typeof input.aspect_ratio === 'string' ? input.aspect_ratio : undefined;
   const pics = picsOf(t.output);
   const [broken, setBroken] = useState<Set<string>>(new Set());
-  if (t.status === 'running' || t.status === 'pending' || t.status === 'waiting') return <Working since={item.ts} aspect={aspect} prompt={prompt} />;
+  // While it runs it may be waiting for an OpenRouter key: the card to give one (or skip) shows above it.
+  if (t.status === 'running' || t.status === 'pending' || t.status === 'waiting')
+    return (
+      <>
+        <OpenRouterKeyCard sessionKey={sessionKey} />
+        <Working since={item.ts} aspect={aspect} prompt={prompt} />
+      </>
+    );
   if (!pics.length) {
     const text = (t.output || t.error || 'No image was made.').trim();
     const noKey = /no OpenRouter key/i.test(text);

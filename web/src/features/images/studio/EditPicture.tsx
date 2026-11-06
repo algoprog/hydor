@@ -3,7 +3,8 @@
 // computer, for nothing, once the picture tools are set up here (the card offers it, with OpenRouter as the other
 // way, priced); the first use of each downloads its model, its progress shown. The result shows beside the picture
 // as it was (drag across to compare); Keep hands it to the editor, Try again goes back. A model's whole picture made
-// for a painted part is put in only where it was painted, its edge softened, then kept.
+// for a painted part is put in only where it was painted, its edge softened, then kept. What goes through OpenRouter
+// with no key set asks for it in place (KeyAsk); skipped, it does not run.
 import { useEffect, useRef, useState } from 'react';
 import type { MadePicture, PictureAnswer, TiersInfo } from '@shared/images';
 import { Button, Dialog, Switch, Tabs } from '../../../components/ui';
@@ -11,9 +12,10 @@ import { cutout, editImage, erase, getTiers } from './api';
 import { asPng, maskData, painted, putInPainted, type Stroke } from './canvas';
 import { Compare } from './Compare';
 import { LocalToolsCard, useLocalTools } from './LocalTools';
-import { changePrice, insteadLine, money, toolPrice } from './logic';
+import { KeyAsk } from './KeyAsk';
+import { changePrice, insteadLine, money, needsKey, toolPrice } from './logic';
 import { Painter } from './Painter';
-import { NoKey, PriceLine, Problem, Shown, Words, Working } from './parts';
+import { PriceLine, Problem, Shown, Words, Working } from './parts';
 import { keepPicture, shownSrc } from './pictures';
 import type { EditOpts } from './store';
 
@@ -46,6 +48,8 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
   const [busy, setBusy] = useState<{ what: string; how: 'local' | 'cloud' } | null>(null);
   const [error, setError] = useState<{ text: string; local: boolean } | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  // What went to OpenRouter with no key set: the key is asked for here, then it goes on.
+  const [askKey, setAskKey] = useState<Mode | null>(null);
   const tools = useLocalTools(busy?.how === 'local');
   const stop = useRef(new AbortController());
 
@@ -64,11 +68,14 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
   const own = strokes[mode];
   const setOwn = (s: Stroke[]) => setStrokes((all) => ({ ...all, [mode]: s }));
 
-  const run = async (how: 'local' | 'cloud') => {
+  /** Does it, here or through OpenRouter (`keyed`: the key was just saved, so the tiers read before are out of date). */
+  const run = async (how: 'local' | 'cloud', keyed = false) => {
     if (!pic || busy) return;
     const mask = mode !== 'cutout' && painted(own) && (mode === 'erase' || part) ? maskData(own, pic.w, pic.h) : undefined;
     setError(null);
     const here = mode !== 'change' && how === 'local';
+    if (!here && !keyed && tiers && !tiers.keySet) return setAskKey(mode);
+    setAskKey(null);
     setBusy({ what: mode === 'change' ? 'Changing it: it takes a few seconds' : mode === 'cutout' ? 'Taking the background out' : 'Erasing', how: here ? 'local' : 'cloud' });
     try {
       const sig = stop.current.signal;
@@ -80,7 +87,8 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
       }
       if (!sig.aborted) setResult({ pic: out, how: r.how, model: r.model, cost: r.cost });
     } catch (e) {
-      if (!stop.current.signal.aborted) setError({ text: (e as Error).message, local: here });
+      const m = (e as Error).message;
+      if (!stop.current.signal.aborted) !here && needsKey(m) ? setAskKey(mode) : setError({ text: m, local: here });
     } finally {
       setBusy(null);
       void tools.refresh();
@@ -112,7 +120,7 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
           Cancel
         </Button>
         {mode === 'change' ? (
-          <Button variant="primary" disabled={!pic || !!busy || !words.trim() || paintMissing || !tiers?.keySet} onClick={() => void run('cloud')}>
+          <Button variant="primary" disabled={!pic || !!busy || !!askKey || !words.trim() || paintMissing || !tiers} onClick={() => void run('cloud')}>
             {busy ? 'Changing it' : (change?.button ?? 'Change it')}
           </Button>
         ) : (
@@ -161,7 +169,6 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
           {picture}
           {mode === 'change' && (
             <>
-              {tiers && !tiers.keySet && <NoKey what="Changes with AI are made through OpenRouter, and no key is set yet." onLeave={() => onDone(null)} />}
               <Words value={words} onChange={setWords} label="What to change" placeholder="What to change: “make the sky a sunset”, “add a red scarf”, “take the cup away”" rows={2} disabled={!!busy} />
               <label className="flex items-center gap-2.5 text-[13px] text-fg-2">
                 <Switch on={part} onChange={setPart} label="Only where I paint" disabled={!!busy} />
@@ -171,7 +178,7 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
             </>
           )}
           {mode === 'erase' && paintMissing && <PriceLine>Paint over what to take away.</PriceLine>}
-          {(mode === 'cutout' || mode === 'erase') && tiers && !ready && <LocalToolsCard tools={tools} instead={{ label: insteadLine(tiers, mode), disabled: !pic || !!busy || paintMissing, run: () => void run('cloud') }} />}
+          {(mode === 'cutout' || mode === 'erase') && tiers && !ready && <LocalToolsCard tools={tools} instead={{ label: insteadLine(tiers, mode), disabled: !pic || !!busy || paintMissing || !!askKey, run: () => void run('cloud') }} />}
           {error && (
             <Problem error={error.text} onLeave={() => onDone(null)}>
               {error.local && tiers && (mode === 'cutout' || mode === 'erase') && (
@@ -181,10 +188,23 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
               )}
             </Problem>
           )}
-          {busy ? (
+          {askKey === mode ? (
+            <KeyAsk
+              onSaved={() =>
+                void getTiers().then(
+                  (t) => {
+                    setTiers(t);
+                    if (t.keySet) void run('cloud', true);
+                  },
+                  (e: Error) => setError({ text: e.message, local: false }),
+                )
+              }
+              onSkip={() => setAskKey(null)}
+            />
+          ) : busy ? (
             <Working>{busy.how === 'local' && local?.step ? local.step : busy.what}</Working>
           ) : mode === 'change' ? (
-            change && tiers?.keySet && <PriceLine>{change.line}</PriceLine>
+            change && <PriceLine>{change.line}</PriceLine>
           ) : ready ? (
             viaLocal && <PriceLine>{viaLocal.line}</PriceLine>
           ) : (

@@ -1,24 +1,26 @@
 // Make a picture with AI: what to make (a few examples to start from), what it is for, a look, its shape (the one of
 // where it goes, else one picked), Quick or Best (Auto says which it would use), a see-through background for icons
 // and logos, how many (one to four), the colours around it and the picture picked to follow; what it would cost,
-// before anything is spent; then the pictures made, to pick one, make them again, or use it.
+// before anything is spent; then the pictures made, to pick one, make them again, or use it. Without an OpenRouter
+// key, pressing Make asks for it in place (KeyAsk), offering a drawing instead, which needs none.
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import type { MakeImageAnswer, PictureKind, TierChoice, TiersInfo } from '@shared/images';
 import { Button, cx, Dialog, Switch } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
 import { getTiers, makeImages } from './api';
-import { LOOKS, money, PICTURE_KINDS, picturePrice, pictureTier, SHAPES } from './logic';
-import { Choice, NoKey, PriceLine, Problem, ShapeMark, Shown, Words, Working, type Option } from './parts';
+import { drawingKindOf, LOOKS, money, needsKey, PICTURE_KINDS, picturePrice, pictureTier, SHAPES } from './logic';
+import { KeyAsk } from './KeyAsk';
+import { Choice, PriceLine, Problem, ShapeMark, Shown, Words, Working, type Option } from './parts';
 import { shownSrc } from './pictures';
-import type { MadeFromWords, PictureOpts } from './store';
+import type { DrawingOpts, MadeFromWords, PictureOpts } from './store';
 
 /** Kinds whose pictures usually want a see-through background. */
 const SEE_THROUGH: PictureKind[] = ['icon', 'logo'];
 const shapeFor = (k: PictureKind) => (k === 'icon' || k === 'logo' || k === 'texture' ? '1:1' : k === 'background' ? '16:9' : '3:2');
 const tierName = (t: 'quick' | 'best') => (t === 'quick' ? 'Quick' : 'Best');
 
-export function MakePicture({ o, onDone }: { o: PictureOpts; onDone: (p: MadeFromWords | null) => void }) {
+export function MakePicture({ o, onDone, onDraw }: { o: PictureOpts; onDone: (p: MadeFromWords | null) => void; onDraw?: (d: DrawingOpts) => void }) {
   const [prompt, setPrompt] = useState(o.prompt ?? '');
   const [kind, setKind] = useState<PictureKind>(o.kind ?? 'picture');
   const [look, setLook] = useState('');
@@ -36,6 +38,8 @@ export function MakePicture({ o, onDone }: { o: PictureOpts; onDone: (p: MadeFro
   const [error, setError] = useState<string | null>(null);
   const [made, setMade] = useState<MakeImageAnswer | null>(null);
   const [pick, setPick] = useState(0);
+  // Make was pressed with no OpenRouter key: it is asked for here.
+  const [askKey, setAskKey] = useState(false);
   const stop = useRef(new AbortController());
 
   useEffect(() => {
@@ -49,7 +53,6 @@ export function MakePicture({ o, onDone }: { o: PictureOpts; onDone: (p: MadeFro
   const transparent = canClear && (clear ?? SEE_THROUGH.includes(kind));
   const tier = pictureTier(choice, { prompt, kind, refs: refs.length });
   const price = tiers ? picturePrice(tiers, { tier, count, transparent }) : null;
-  const noKey = !!tiers && !tiers.keySet;
 
   const shapes: Option<string>[] = [
     ...(o.aspect && !SHAPES.some((s) => s.value === o.aspect) ? [{ value: o.aspect, label: `As where it goes (${o.aspect})` }] : []),
@@ -57,27 +60,33 @@ export function MakePicture({ o, onDone }: { o: PictureOpts; onDone: (p: MadeFro
   ].map((s) => ({ ...s, icon: <ShapeMark aspect={s.value} /> }));
   const shapeShown = SHAPES.find((s) => s.value === aspect)?.label ?? aspect;
 
-  const make = async () => {
-    if (!prompt.trim() || busy || noKey) return;
-    setBusy(true);
+  /** Makes them (`keyed`: the key was just saved, so the tiers read before are out of date). */
+  const make = async (keyed = false) => {
+    if (!prompt.trim() || busy || price?.blocked) return;
     setError(null);
+    if (!keyed && tiers && !tiers.keySet) return setAskKey(true);
+    setAskKey(false);
+    setBusy(true);
     try {
-      const colours = inColours && themeColors.length ? `in these colours: ${themeColors.join(', ')}` : '';
-      const r = await makeImages({ prompt: prompt.trim(), kind, style: [look, colours].filter(Boolean).join('; ') || undefined, aspect, tier, transparent: transparent || undefined, count, refs: refs.length ? refs : undefined }, stop.current.signal);
+      const r = await makeImages(
+        { prompt: prompt.trim(), kind, style: look || undefined, colors: inColours && themeColors.length ? themeColors : undefined, aspect, tier, transparent: transparent || undefined, count, refs: refs.length ? refs : undefined },
+        stop.current.signal,
+      );
       if (!r.pictures?.length) throw new Error('The model made no picture this time: try other words, or Best');
       setMade(r);
       setPick(0);
     } catch (e) {
-      if (!stop.current.signal.aborted) setError((e as Error).message);
+      const m = (e as Error).message;
+      if (!stop.current.signal.aborted) needsKey(m) ? setAskKey(true) : setError(m);
     } finally {
       setBusy(false);
     }
   };
 
-  const modelName = (id: string) => (tiers ? ([tiers.quick, tiers.best, tiers.transparent].find((m) => m.id === id)?.label ?? id) : id);
+  const modelName = (id: string) => (tiers ? ([tiers.quick, tiers.best, tiers.quick.seeThrough, tiers.best.seeThrough, tiers.transparent].find((m) => m?.id === id)?.label ?? id) : id);
   const footer = made ? (
     <>
-      <Button variant="secondary" disabled={busy} onClick={() => void make()}>
+      <Button variant="secondary" disabled={busy || askKey} onClick={() => void make()}>
         {busy ? 'Making them' : (price?.again ?? 'Make again')}
       </Button>
       <Button variant="primary" disabled={busy} onClick={() => onDone({ ...(made.pictures[pick] ?? made.pictures[0]), prompt: prompt.trim() })}>
@@ -89,10 +98,26 @@ export function MakePicture({ o, onDone }: { o: PictureOpts; onDone: (p: MadeFro
       <Button variant="ghost" onClick={() => onDone(null)}>
         Cancel
       </Button>
-      <Button variant="primary" disabled={busy || !prompt.trim() || !tiers || noKey} onClick={() => void make()}>
+      <Button variant="primary" disabled={busy || askKey || !prompt.trim() || !tiers || !!price?.blocked} onClick={() => void make()}>
         {busy ? 'Making it' : (price?.button ?? 'Make it')}
       </Button>
     </>
+  );
+
+  const keyAsk = askKey && (
+    <KeyAsk
+      onSaved={() =>
+        void getTiers().then(
+          (t) => {
+            setTiers(t);
+            if (t.keySet) void make(true);
+          },
+          (e: Error) => setError(e.message),
+        )
+      }
+      onSkip={() => onDone(null)}
+      instead={onDraw ? { label: 'Draw it instead (SVG)', run: () => onDraw({ prompt: prompt.trim(), kind: drawingKindOf(kind), aspect }) } : undefined}
+    />
   );
 
   return (
@@ -112,7 +137,10 @@ export function MakePicture({ o, onDone }: { o: PictureOpts; onDone: (p: MadeFro
             ))}
           </div>
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[12.5px] text-fg-3">
-            <span>{made.cost != null ? `Made with ${modelName(made.model)}: ${money(made.cost)}` : `Made with ${modelName(made.model)}`}</span>
+            <span>
+              {made.cost != null ? `Made with ${modelName(made.model)}: ${money(made.cost)}` : `Made with ${modelName(made.model)}`}
+              {made.cutout && <> · {made.pictures.length > 1 ? 'Their backgrounds were taken out on this computer' : 'Its background was taken out on this computer'}</>}
+            </span>
             <button type="button" disabled={busy} className="text-accent hover:underline disabled:opacity-50" onClick={() => setMade(null)}>
               Change the words
             </button>
@@ -124,10 +152,10 @@ export function MakePicture({ o, onDone }: { o: PictureOpts; onDone: (p: MadeFro
           )}
           {busy && <Working>Making them again</Working>}
           {error && <Problem error={error} onLeave={() => onDone(null)} />}
+          {keyAsk}
         </div>
       ) : (
         <div className="space-y-3">
-          {noKey && <NoKey what="Pictures are made through OpenRouter, and no key is set yet." onLeave={() => onDone(null)} />}
           <Words value={prompt} onChange={setPrompt} label="What to make" placeholder="Describe the picture: what is in it, the mood, the colours" examples={info.examples} disabled={busy} />
           <div className="-mx-2 flex flex-wrap items-center gap-x-0.5 gap-y-0.5">
             <Choice
@@ -211,7 +239,7 @@ export function MakePicture({ o, onDone }: { o: PictureOpts; onDone: (p: MadeFro
             </div>
           )}
           {error && <Problem error={error} onLeave={() => onDone(null)} />}
-          {busy ? <Working>{count > 1 ? 'Making them: it takes a few seconds' : 'Making it: it takes a few seconds'}</Working> : price && <PriceLine>{price.line}</PriceLine>}
+          {keyAsk || (busy ? <Working>{count > 1 ? 'Making them: it takes a few seconds' : 'Making it: it takes a few seconds'}</Working> : price && <PriceLine>{price.line}</PriceLine>)}
         </div>
       )}
     </Dialog>
