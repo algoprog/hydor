@@ -65,9 +65,9 @@ const line = (v: unknown, max: number) => str(v, max * 2).replace(/\s+/g, ' ').t
 /** An answer without what models put around it: a fence, a line before it ("Here is…"), quotes. */
 export function cleanAnswer(raw: string): string {
   let s = raw.replace(/\r\n?/g, '\n').trim();
+  s = s.replace(/^(?:here(?:'s| is| are)\b[^\n]*|sure\b[^\n]*|certainly\b[^\n]*|of course\b[^\n]*)[:：]\s*\n+/i, '');
   const fence = /^```(?:markdown|md|text)?\n([\s\S]*?)\n?```$/i.exec(s);
   if (fence) s = fence[1].trim();
-  s = s.replace(/^(?:here(?:'s| is| are)\b[^\n]*|sure\b[^\n]*|certainly\b[^\n]*|of course\b[^\n]*)[:：]\s*\n+/i, '');
   return s.trim();
 }
 
