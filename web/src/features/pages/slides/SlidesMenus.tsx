@@ -63,8 +63,8 @@ import {
   Scissors,
   Search,
   Shapes,
-  SlidersHorizontal,
   Sigma,
+  SlidersHorizontal,
   Smile,
   Sparkles,
   Spline,
@@ -83,7 +83,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import type { El, ElType } from '@shared/slides';
+import { keptVideo, type El, type ElType } from '@shared/slides';
 import type { MenuDef } from '../common/menus';
 import type { AlignHow } from './ops';
 import type { TextActions } from './TextBar';
@@ -162,6 +162,8 @@ export interface MenuArgs {
   /** The picture picked in the picture editor, in a tab of its own. */
   editPicture?: () => void;
   aiPlotChart?: () => void;
+  /** The video picked (one the app keeps) in the video editor, in a tab of its own. */
+  editVideo?: () => void;
   video(): void;
   /** A video from this device. */
   videoFile(): void;
@@ -366,6 +368,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Change with AI', icon: <WandSparkles size={14} />, also: 'edit picture ai', disabled: ro, run: () => a.aiEdit!('change') },
         one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Remove the background', icon: <ImageMinus size={14} />, also: 'cut out background transparent', disabled: ro, run: () => a.aiEdit!('cutout') },
         one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Erase part of it', icon: <Eraser size={14} />, also: 'erase remove object', disabled: ro, run: () => a.aiEdit!('erase') },
+        one?.type === 'video' && !!keptVideo(one.src) && !!a.editVideo && { label: 'Edit video', icon: <SlidersHorizontal size={14} />, also: 'edit video trim cut crop speed text music gif frame', disabled: ro, run: a.editVideo },
         one?.type === 'chart' && !!a.aiPlotChart && { label: 'Make a plot of this', icon: <ChartScatter size={14} />, also: 'plot chart graph matplotlib', disabled: ro, run: a.aiPlotChart },
         one?.type === 'math' && { label: 'Edit the equation', icon: <Sigma size={14} />, disabled: ro, run: a.editTex },
         one?.type === 'icon' && { label: 'Another icon', icon: <Star size={14} />, disabled: ro, run: a.replaceIcon },
