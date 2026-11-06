@@ -22,6 +22,7 @@ import {
   CheckCheck,
   ChevronDown,
   Copy,
+  Eraser,
   ExternalLink,
   FilePen,
   FoldVertical,
@@ -54,10 +55,12 @@ import {
   Sparkles,
   SpellCheck,
   SquareFunction,
+  Tag,
   Table2,
   Trash2,
   Underline,
   Undo2,
+  WandSparkles,
   UnfoldVertical,
   WholeWord,
   X,
@@ -96,7 +99,9 @@ import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
 import { useOwnScroll } from '../live';
 import { mu } from '../../../lib/machine';
-import { addFileFromDevice, addPicture, assetUrl, chooseFiles, FILE_ACCEPT, freeName, pdfUrl, PICTURE_ACCEPT, placeOf, texSetup, typeset } from './api';
+import { addFileFromDevice, addPicture, assetUrl, chooseFiles, clearTypesetting, FILE_ACCEPT, freeName, nameVersion, pdfUrl, PICTURE_ACCEPT, placeOf, texSetup, typeset } from './api';
+import { api, enc } from '../../../lib/api';
+import { VERSION_NAME_MAX, type PageVersion } from '@shared/pages';
 import { ChangesList } from './ChangesList';
 import { mountCode, type Code } from './code';
 import { CommentsPanel, type CommentDraft } from './CommentsPanel';
@@ -120,8 +125,12 @@ import { savedKeys, saveKeys, type KeysMode } from './keys';
 import { docLabels } from '@shared/latex-ai';
 import { bibKeys } from '@shared/latex-bib';
 import { tidyTex } from '@shared/latex-tidy';
+import { renameCites } from '@shared/latex-bibtidy';
+import { BibTidyDialog } from './BibTidy';
 
 const AUTO_KEY = 'wa.tex.auto';
+const DRAFT_KEY = 'wa.tex.draft';
+const HALT_KEY = 'wa.tex.halt';
 /** The left panel: Files or Outline, or none ('none'); not set: the files of a document of more than one, else none. */
 const PANEL_KEY = 'wa.tex.panel';
 /** Before the panel had Files: whether the Outline showed. */
@@ -273,6 +282,10 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   resultRef.current = result;
   const [busy, setBusy] = useState(false);
   const [auto, setAuto] = useState(() => localStorage.getItem(AUTO_KEY) !== '0');
+  // Draft (pictures as boxes) and Stop on the first error: typesetting's options, kept on this device.
+  const [opts, setOpts] = useState(() => ({ draft: localStorage.getItem(DRAFT_KEY) === '1', halt: localStorage.getItem(HALT_KEY) === '1' }));
+  const optsRef = useRef(opts);
+  optsRef.current = opts;
   const [setup, setSetup] = useState<TexSetup | null>(null);
   const [pane, setPane] = useState<'source' | 'preview'>('source');
   // The left panel, Files or Outline: as last chosen on this device; never chosen, the files of a document of more than one.
@@ -304,7 +317,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   const aiRef = useRef<ReturnType<typeof useLatexAi> | null>(null);
   const [dark, setDark] = useState(isDark);
   const [presentAsk, setPresentAsk] = useState(0);
-  const [dialog, setDialog] = useState<'refs' | 'count' | 'compare' | 'keys' | null>(null);
+  const [dialog, setDialog] = useState<'refs' | 'count' | 'compare' | 'keys' | 'bib' | null>(null);
+  const [nameAsk, setNameAsk] = useState(false);
   // Tools → Check before submitting and Your paper.
   const [paperAsk, setPaperAsk] = useState<PaperAsk>(null);
   // Comments: the panel beside the source (remembered), the one picked, and a new one being written.
@@ -685,7 +699,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     typesetFor.current = m;
     setBusy(true);
     try {
-      const r = await typeset(m, lastGood.current, onDisk?.folder);
+      const r = await typeset(m, lastGood.current, onDisk?.folder, undefined, { draft: optsRef.current.draft, halt: optsRef.current.halt });
       if (!alive.current) return;
       setResult(r);
       if (r.pdf && !r.errors.length) lastGood.current = r.key;
@@ -702,6 +716,28 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   };
   const runRef = useRef(run);
   runRef.current = run;
+  // Draft or Stop on the first error changed: kept on this device, and typeset again at once.
+  const optsFirst = useRef(true);
+  useEffect(() => {
+    localStorage.setItem(DRAFT_KEY, opts.draft ? '1' : '0');
+    localStorage.setItem(HALT_KEY, opts.halt ? '1' : '0');
+    if (optsFirst.current) optsFirst.current = false;
+    else void runRef.current(true);
+  }, [opts]);
+  /** Clear the cached files: what was kept of the typesettings goes, and the next starts afresh (no .aux or .bbl carried). */
+  const clearCache = async () => {
+    setMenu(null);
+    const keys = [resultRef.current?.key, lastGood.current].filter((k): k is string => !!k);
+    lastGood.current = undefined;
+    typesetFor.current = null;
+    try {
+      if (keys.length) await clearTypesetting(keys);
+      toast('The cached files are cleared: it typesets afresh', 'ok');
+    } catch (e) {
+      toastError(e);
+    }
+    void runRef.current(true);
+  };
   // As you type: a moment after you stop (at once for a document just opened or an engine just picked).
   const quick = useRef(true);
   useEffect(() => {
@@ -1541,6 +1577,28 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     toast(r.tables ? tr(`Tidied ${r.lines} line${r.lines === 1 ? '' : 's'}; ${r.tables} table${r.tables === 1 ? '' : 's'} lined up`) : tr(`Tidied ${r.lines} line${r.lines === 1 ? '' : 's'}`), 'ok');
   };
   const canCompare = !onDisk && !!pageId;
+  /** Tidy the bibliography: the .bib in view, else the one the document reads. */
+  const [bibTidy, setBibTidy] = useState('');
+  const openBibTidy = () => {
+    setMenu(null);
+    const t = file.endsWith('.bib') ? { name: file, fresh: false } : bibTarget();
+    if (t.fresh) return toast('The document has no bibliography of its own yet');
+    setBibTidy(t.name);
+    setDialog('bib');
+  };
+  /** Tools → Name this version: the latest version (saved first when there are changes) named, for Compare versions and Versions. */
+  const nameThisVersion = async (name: string) => {
+    setNameAsk(false);
+    if (!pageId || (dirty && !(await save()))) return;
+    try {
+      const v = (await api<{ versions: PageVersion[] }>(`/api/pages/${enc(pageId)}`)).versions[0]?.version;
+      if (!v) return;
+      await nameVersion(pageId, v, name);
+      toast(tr(`Version ${v} is named “${name}”`), 'ok');
+    } catch (e) {
+      toastError(e);
+    }
+  };
   // Documents in the Library keep their comments; a file of this computer has its comments kept by the app.
   const canComment = true;
 
@@ -1698,13 +1756,18 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       items: [
         { label: 'Recompile now', icon: <Play size={14} />, keys: 'Ctrl+Enter', also: 'typeset compile', run: () => void run(true) },
         { label: 'Recompile as you type', checked: auto, also: 'auto compile', run: () => setAuto((a) => !a) },
+        { label: 'Draft: pictures as boxes', checked: opts.draft, also: 'fast compile draft mode images', run: () => setOpts((o) => ({ ...o, draft: !o.draft })) },
+        { label: 'Stop on the first error', checked: opts.halt, also: 'halt on error compile', run: () => setOpts((o) => ({ ...o, halt: !o.halt })) },
+        { label: 'Clear the cached files', also: 'aux bbl cache fresh compile', run: () => void clearCache() },
         { label: 'Typeset with', also: 'engine', disabled: readOnly, items: TEX_ENGINES.map((x) => ({ label: x.label, checked: engine === x.id, run: () => pickEngine(x.id) })) },
         '-',
         ...paperItems({ ask: setPaperAsk, readOnly, canAsk: !!onAsk, canArxiv: !!pageId && !onDisk }),
         '-',
         ...ai.toolsItems,
+        { label: 'Tidy the bibliography', icon: <BookPlus size={14} />, disabled: readOnly || !model.files.some((f) => f.name.endsWith('.bib')), also: 'bibtex sort duplicates keys doi unused clean', run: openBibTidy },
         { label: 'Word count', icon: <WholeWord size={14} />, also: 'words texcount', run: () => setDialog('count') },
         canCompare && { label: 'Compare versions', icon: <History size={14} />, also: 'diff history changes', run: () => setDialog('compare') },
+        canCompare && { label: 'Name this version', icon: <Tag size={14} />, disabled: readOnly, also: 'history named version milestone label', run: () => setNameAsk(true) },
         '-',
         canTrack && { label: 'Track changes', icon: <FilePen size={14} />, checked: tracking, disabled: readOnly, also: 'review suggest suggestions tracked revisions', run: toggleTrack },
         canTrack && { label: 'Accept all changes', icon: <CheckCheck size={14} />, disabled: readOnly || !changeCount, also: 'tracked review', run: () => decide(null, true) },
@@ -2052,6 +2115,10 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
           <Button size="sm" variant="ghost" icon={<BookPlus size={14} />} className="h-7 min-w-0 px-2 text-[12.5px]" onClick={openRefs}>
             <span className="truncate">Find a reference by DOI, arXiv id or title</span>
           </Button>
+          <span className="flex-1" />
+          <Button size="sm" variant="ghost" icon={<WandSparkles size={14} />} className="h-7 shrink-0 px-2 text-[12.5px]" onClick={openBibTidy}>
+            Tidy
+          </Button>
         </div>
       )}
       <div className="flex min-h-0 flex-1">
@@ -2218,12 +2285,21 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
           );
         })}
       </Popover>
-      <Popover anchor={anchors.compile} open={menu === 'compile'} onClose={() => setMenu(null)} align="end" width={260} title="Typesetting">
+      <Popover anchor={anchors.compile} open={menu === 'compile'} onClose={() => setMenu(null)} align="end" width={270} title="Typesetting">
         <MenuItem icon={<Play size={14} />} hint="Ctrl+Enter" onClick={() => (setMenu(null), void run(true))}>
           Recompile now
         </MenuItem>
         <MenuItem icon={<span className="h-3.5 w-3.5" />} checked={auto} onClick={() => setAuto((a) => !a)}>
           Recompile as you type
+        </MenuItem>
+        <MenuItem icon={<span className="h-3.5 w-3.5" />} checked={opts.draft} onClick={() => setOpts((o) => ({ ...o, draft: !o.draft }))}>
+          Draft: pictures as boxes
+        </MenuItem>
+        <MenuItem icon={<span className="h-3.5 w-3.5" />} checked={opts.halt} onClick={() => setOpts((o) => ({ ...o, halt: !o.halt }))}>
+          Stop on the first error
+        </MenuItem>
+        <MenuItem icon={<Eraser size={14} />} onClick={() => void clearCache()}>
+          Clear the cached files
         </MenuItem>
         <MenuSep />
         <MenuItem icon={<ScrollText size={14} />} disabled={!result?.log} onClick={() => (setMenu(null), setLogOpen(true))}>
@@ -2232,6 +2308,10 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         <MenuItem icon={<ExternalLink size={14} />} disabled={!result?.pdf} onClick={openPdf}>
           Open the PDF
         </MenuItem>
+        {/* How long the last one took, and the most one may take. */}
+        <p className="px-2.5 pt-1.5 pb-1 text-[11.5px] text-fg-3">
+          {[result?.ms ? tr(`Typeset in ${(result.ms / 1000).toFixed(1)} s`) : '', setup?.timeLimit ? tr(`at most ${setup.timeLimit} s`) : ''].filter(Boolean).join(' · ')}
+        </p>
       </Popover>
       <Popover anchor={anchors.file} open={menu === 'file' && !!fileMenuName} onClose={() => setMenu(null)} width={200}>
         <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(null), setNaming({ kind: 'rename-file', from: fileMenuName! }))}>
@@ -2366,6 +2446,30 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       )}
       <ShortcutsDialog open={dialog === 'keys'} onClose={() => setDialog(null)} groups={SHORTCUTS} />
       {ai.dialogs}
+      {dialog === 'bib' && (
+        <BibTidyDialog
+          open
+          onClose={() => setDialog(null)}
+          doc={model}
+          bib={bibTidy}
+          label={label}
+          onApply={(text, renames) => {
+            setDialog(null);
+            editFile(bibTidy, () => text);
+            if (Object.keys(renames).length) for (const n of [TEX_MAIN, ...model.files.filter((f) => /\.(tex|ltx)$/i.test(f.name)).map((f) => f.name)]) editFile(n, (t) => renameCites(t, renames));
+            toast(tr(`${label(bibTidy)} is tidy`), 'ok');
+          }}
+        />
+      )}
+      <NameDialog
+        open={nameAsk}
+        title="Name this version"
+        initial=""
+        hint={dirty ? 'Your changes are saved first. The name shows in Compare versions and Versions, and a named version is kept past the newest 40.' : 'The name shows in Compare versions and Versions, and a named version is kept past the newest 40.'}
+        check={(n) => (n.length > VERSION_NAME_MAX ? tr(`At most ${VERSION_NAME_MAX} characters`) : null)}
+        onClose={() => setNameAsk(false)}
+        onDone={(n) => void nameThisVersion(n)}
+      />
       {/* Proofreading on a phone: a sheet from the bottom. */}
       {!roomy && ai.proofOpen && <div className="fixed inset-x-0 bottom-0 z-40 flex h-[60dvh] border-t border-line pb-[var(--safe-bottom)] shadow-[0_-8px_30px_rgba(0,0,0,0.25)]">{ai.side('w-full')}</div>}
       <PaperTools
