@@ -1,6 +1,6 @@
 // The picture tools on this computer: taking a picture's background out and erasing part of it here, for nothing and
 // in private, instead of through OpenRouter (plots run in the same Python). Set up once (about 120 MB); each tool's
-// model downloads the first time it is used (about 220 MB). While it sets up or a tool works, its state is asked for
+// model downloads the first time it is used (about 200 MB). While it sets up or a tool works, its state is asked for
 // every second, to show what it is doing. The card offers it where a tool would use it, with the other way beside it.
 import { useCallback, useEffect, useState } from 'react';
 import { Cpu, HardDriveDownload } from 'lucide-react';
