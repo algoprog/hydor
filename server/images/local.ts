@@ -28,7 +28,7 @@ import { APP_ROOT, config } from '../config.ts';
 import { kvGet, type DB } from '../db.ts';
 import { which } from '../documents/tools.ts';
 import type { Feature } from '../features/types.ts';
-import { freeMemoryMb } from '../memory/embed.ts';
+import { availableMemory } from '../models/machine.ts';
 import { cutoutPicture, MAX_PNG, removeBackgroundTool, type Here } from './cutout.ts';
 import { erasePicture, eraseTool } from './erase.ts';
 import { setLocalTools, type PythonRun } from './hooks.ts';
@@ -147,23 +147,11 @@ function freeDiskMb(p: string): number {
   }
 }
 
-/** On a Mac, free memory counts what the system would give back at once (inactive, purgeable), as Activity Monitor does. */
-function macAvailableMb(): Promise<number | null> {
-  return new Promise((resolve) => {
-    execFile('vm_stat', { timeout: 5000 }, (err, out) => {
-      if (err) return resolve(null);
-      const page = Number(/page size of (\d+) bytes/.exec(out)?.[1] ?? 4096);
-      const pages = (k: string) => Number(new RegExp(`Pages ${k}:\\s+(\\d+)`).exec(out)?.[1] ?? 0);
-      resolve(((pages('free') + pages('inactive') + pages('speculative') + pages('purgeable')) * page) / 2 ** 20);
-    });
-  });
-}
-
 let freeForTests: (() => number) | null = null;
+/** Free memory in MB (on a Mac counting what the system gives back at once, as Activity Monitor does). */
 async function freeMb(): Promise<number> {
   if (freeForTests) return freeForTests();
-  if (process.platform === 'darwin') return (await macAvailableMb()) ?? freeMemoryMb();
-  return freeMemoryMb();
+  return (await availableMemory()) / 2 ** 20;
 }
 
 // ---- what this computer can do ------------------------------------------------------------------------------

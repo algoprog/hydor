@@ -17705,5 +17705,19 @@
 "did not start, so its models are not known yet:":"δεν ξεκίνησε, οπότε τα μοντέλα του δεν είναι ακόμη γνωστά:",
 "{0} has not listed its models yet.":"Το {0} δεν έχει δώσει ακόμη τη λίστα των μοντέλων του.",
 "has not listed its models yet.":"δεν έχει δώσει ακόμη τη λίστα των μοντέλων του.",
-"Claude Code did not start: {0}":"Το Claude Code δεν ξεκίνησε: {0}"
+"Claude Code did not start: {0}":"Το Claude Code δεν ξεκίνησε: {0}",
+"Search by meaning stopped, so agents find these passages by their words alone: {0}":"Η αναζήτηση βάσει νοήματος σταμάτησε, οπότε οι πράκτορες βρίσκουν αυτά τα αποσπάσματα μόνο από τις λέξεις τους: {0}",
+"Search by meaning stopped, so agents find these passages by their words alone:":"Η αναζήτηση βάσει νοήματος σταμάτησε, οπότε οι πράκτορες βρίσκουν αυτά τα αποσπάσματα μόνο από τις λέξεις τους:",
+"it could not start":"δεν μπόρεσε να ξεκινήσει",
+"Search by meaning is waiting for memory: {0} GB free, it needs {1} GB. Until then agents find these passages by their words; it tries again every few minutes.":"Η αναζήτηση βάσει νοήματος περιμένει μνήμη: {0} GB ελεύθερα, χρειάζεται {1} GB. Ως τότε οι πράκτορες βρίσκουν αυτά τα αποσπάσματα από τις λέξεις τους· ξαναδοκιμάζει κάθε λίγα λεπτά.",
+"Search by meaning is waiting for memory:":"Η αναζήτηση βάσει νοήματος περιμένει μνήμη:",
+"GB free, it needs":"GB ελεύθερα, χρειάζεται",
+"GB. Until then agents find these passages by their words; it tries again every few minutes.":"GB. Ως τότε οι πράκτορες βρίσκουν αυτά τα αποσπάσματα από τις λέξεις τους· ξαναδοκιμάζει κάθε λίγα λεπτά.",
+"Search by meaning is starting: {0}. The passages get their vectors next.":"Η αναζήτηση βάσει νοήματος ξεκινά: {0}. Μετά τα αποσπάσματα παίρνουν τα διανύσματά τους.",
+"Search by meaning is starting:":"Η αναζήτηση βάσει νοήματος ξεκινά:",
+". The passages get their vectors next.":". Μετά τα αποσπάσματα παίρνουν τα διανύσματά τους.",
+"Loading the model":"Φόρτωση του μοντέλου",
+"Search by meaning is setting itself up on this computer: {0}. The passages get their vectors once it is ready.":"Η αναζήτηση βάσει νοήματος ρυθμίζεται σε αυτόν τον υπολογιστή: {0}. Τα αποσπάσματα παίρνουν τα διανύσματά τους μόλις είναι έτοιμη.",
+"Search by meaning is setting itself up on this computer:":"Η αναζήτηση βάσει νοήματος ρυθμίζεται σε αυτόν τον υπολογιστή:",
+". The passages get their vectors once it is ready.":". Τα αποσπάσματα παίρνουν τα διανύσματά τους μόλις είναι έτοιμη."
 }

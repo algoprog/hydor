@@ -146,7 +146,8 @@ agents that speak ACP and take MCP servers.
 - **Knowledge bases**: drop documents or a folder in once, and agents can search them: by their words (a
   full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning on) or for exact
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and
-  kept up to date. Shared knowledge (Projects → Shared knowledge) is searched by every session; a project's own
+  kept up to date (of a text file over 4 MB, its first 4 MB). The page shows how far search by meaning has come,
+  live, and why it waits when it does (setting itself up, starting, short of memory, stopped). Shared knowledge (Projects → Shared knowledge) is searched by every session; a project's own
   documents (its Knowledge tab) by its sessions alone, which search the shared knowledge too unless the project
   turns that off.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the

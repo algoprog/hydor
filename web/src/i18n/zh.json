@@ -17712,5 +17712,19 @@
 "did not start, so its models are not known yet:":"未能启动，所以还不知道它有哪些模型：",
 "{0} has not listed its models yet.":"{0} 还没有列出它的模型。",
 "has not listed its models yet.":"还没有列出它的模型。",
-"Claude Code did not start: {0}":"Claude Code 未能启动：{0}"
+"Claude Code did not start: {0}":"Claude Code 未能启动：{0}",
+"Search by meaning stopped, so agents find these passages by their words alone: {0}":"按含义搜索已停止，所以智能体只按字词查找这些段落：{0}",
+"Search by meaning stopped, so agents find these passages by their words alone:":"按含义搜索已停止，所以智能体只按字词查找这些段落：",
+"it could not start":"它无法启动",
+"Search by meaning is waiting for memory: {0} GB free, it needs {1} GB. Until then agents find these passages by their words; it tries again every few minutes.":"按含义搜索正在等待内存：可用 {0} GB，它需要 {1} GB。在此之前，智能体按字词查找这些段落；它每隔几分钟会再试一次。",
+"Search by meaning is waiting for memory:":"按含义搜索正在等待内存：",
+"GB free, it needs":"GB 可用，它需要",
+"GB. Until then agents find these passages by their words; it tries again every few minutes.":"GB。在此之前，智能体按字词查找这些段落；它每隔几分钟会再试一次。",
+"Search by meaning is starting: {0}. The passages get their vectors next.":"按含义搜索正在启动：{0}。接下来这些段落就会得到向量。",
+"Search by meaning is starting:":"按含义搜索正在启动：",
+". The passages get their vectors next.":"。接下来这些段落就会得到向量。",
+"Loading the model":"正在加载模型",
+"Search by meaning is setting itself up on this computer: {0}. The passages get their vectors once it is ready.":"按含义搜索正在这台电脑上自行设置：{0}。准备好后，这些段落就会得到向量。",
+"Search by meaning is setting itself up on this computer:":"按含义搜索正在这台电脑上自行设置：",
+". The passages get their vectors once it is ready.":"。准备好后，这些段落就会得到向量。"
 }

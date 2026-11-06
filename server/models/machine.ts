@@ -28,12 +28,34 @@ function nvidiaSmi(): Promise<MachineInfo['gpus']> {
   );
 }
 
+/** Linux's own count of what it could give a new program (MemAvailable); elsewhere what Node.js reports free. */
 function memAvailable(): number {
   try {
     const m = /MemAvailable:\s+(\d+) kB/.exec(fs.readFileSync('/proc/meminfo', 'utf8'));
     if (m) return Number(m[1]) * 1024;
   } catch {}
   return os.freemem();
+}
+
+/**
+ * A Mac's free memory as Activity Monitor counts it: the free pages and those the system gives back at once (inactive,
+ * speculative, purgeable). Node.js counts only the free ones there, often a few hundred MB on a Mac with gigabytes to spare.
+ */
+function macAvailable(): Promise<number | null> {
+  return new Promise((resolve) =>
+    execFile('vm_stat', { timeout: 5000 }, (err, out) => {
+      if (err) return resolve(null);
+      const page = Number(/page size of (\d+) bytes/.exec(out)?.[1] ?? 4096);
+      const pages = (k: string) => Number(new RegExp(`Pages ${k}:\\s+(\\d+)`).exec(out)?.[1] ?? 0);
+      resolve((pages('free') + pages('inactive') + pages('speculative') + pages('purgeable')) * page);
+    }),
+  );
+}
+
+/** Memory the system could give a new program now, in bytes (what a model or a worker checks before it starts). */
+export async function availableMemory(): Promise<number> {
+  if (process.platform === 'darwin') return (await macAvailable()) ?? os.freemem();
+  return memAvailable();
 }
 
 function diskFree(dir: string): number {
@@ -63,7 +85,7 @@ export async function machine(modelsDir: string): Promise<MachineInfo> {
   return {
     gpus: gpuCache.gpus,
     ramBytes: os.totalmem(),
-    ramFreeBytes: memAvailable(),
+    ramFreeBytes: await availableMemory(),
     diskFreeBytes: diskFree(modelsDir),
     cpus: os.cpus().length,
     ...(isAppleSilicon() ? { apple: { chip: await appleChip() } } : {}),
