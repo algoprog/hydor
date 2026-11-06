@@ -179,8 +179,11 @@ agents that speak ACP and take MCP servers.
   backgrounds out (remove_background) and erase parts of pictures (erase_from_image) for nothing and in private,
   each model loaded only while used, put away after a few idle minutes and never loaded without the memory for it;
   a poor cutout, and a large or detailed area to erase, go to an image model, and how: "ai" asks for one.
-  edit_image crops, turns, sizes, adjusts, filters, marks up and blurs pictures, and edit_video trims, cuts, crops,
-  speeds up, captions and sets music to videos, both for nothing on this computer (ffmpeg). A tool that needs an
+  edit_image crops, turns, sizes, adjusts, filters, marks up and blurs pictures, edit_video trims, cuts, crops,
+  speeds up, captions and sets music to videos, and edit_audio trims, cuts, silences, shortens pauses, takes out
+  filler words, cleans up (noise reduction, equalizer, compressor, loudness for podcasts or streaming), adds echo or
+  reverb and mixes music or sound effects into sounds (a Library sound put back in its place or beside it), all for
+  nothing on this computer (ffmpeg). A tool that needs an
   OpenRouter key and finds none asks for it on a card in the conversation (it goes straight to Settings → Models,
   checked with OpenRouter; Skip and nothing runs or is spent, and the session is not asked again for six hours).
   When agents make slides, documents and pages they illustrate them by themselves where a picture helps, with
@@ -496,6 +499,26 @@ agents that speak ACP and take MCP servers.
   times you pick, adjusts its colour, fades it, mutes it or sets its volume, lays music from the Library under it,
   takes a frame as a picture or as its still, and saves it as MP4, WebM or a GIF, rendered with ffmpeg here (the
   picture tools bring one). Agents have edit_image and edit_video.
+- **The sound editor**: sounds open in an editor of their own, in a tab like the others ("Sound · its name"), laid
+  out as Audition or Audacity lay theirs: menus (File, Edit, Effects, Generate, View, with their shortcuts), a
+  transport (play, stop, record, loop, the time, the part picked to type or drag, snapping, zoom, a meter of peaks
+  and loudness), the tracks as lanes (a header each with mute, solo, record, volume and pan; stereo waveforms or a
+  spectrogram; clips to move, trim and fade by their handles; a ruler with markers; zoom along and up), a dock of
+  panels that fold and size (Effects, Properties, History, AI) and a status line. It opens MP3, WAV, M4A, AAC, OGG,
+  Opus, FLAC and WebM sounds, and the sound of a video, from the Library (Edit; a video's Edit its sound), Files
+  (Edit, Edit the sound or Edit its sound in a file's menu) and a sound an agent made (Edit). Edits: cut, copy,
+  paste (between sound editors too), delete (closing the gap) or silence, duplicate, split, trim to the part picked,
+  insert silence, change speed with the pitch kept, shorten long pauses; tracks to mix in a Library sound, one from
+  the device, a recording (record at the playhead, on an armed track or a new one) or music, a voice or a sound
+  effect made with AI (its price first, the OpenRouter key asked for in place). Effects in a rack, each a card with
+  its settings and presets, on and off, in order, on a track or the whole sound, on all of it or a part: volume,
+  fades, normalize, loudness (podcast −16 LUFS, streaming −14, broadcast −23), noise reduction, equalizer (Clearer
+  voice, Telephone, Radio and more), high- and low-pass, compressor, limiter, pitch, reverse, echo, reverb (four
+  rooms, the same in the browser and in the file) and mono, heard as you edit. Speech recognition on this computer
+  shows the words under the waveform, to cut by the word and to take out filler words. Undo and History go back any
+  step. Saved with ffmpeg as MP3, M4A, Ogg Opus, WAV or FLAC (quality, bits, mono or stereo, sample rate), over the
+  original (the old file to the Trash), in the Library in its place, or as a copy; a video's sound keeps the video's
+  length (a deletion leaves silence) and goes back to the video. Agents have edit_audio.
 - **Made with AI from a kind**: 216 kinds the app knows how to make well (56 slides, 29 decks, 43 documents, 19
   sections, 39 pages, 17 blocks of a page, 13 spreadsheets), in a gallery with a find box and chips by group: Insert
   → Slide made with AI (and a slide's own menu, A slide made with AI after it), Insert → Section made with AI, Add a
