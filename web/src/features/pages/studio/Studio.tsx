@@ -32,6 +32,8 @@ import { LayersPanel } from './Layers';
 import { PageComments } from './PageComments';
 import { PagePanel } from './PagePanel';
 import { usePageAi } from './pageAi';
+import { BlockAskPopover } from './BlockAsks';
+import { useCrumbs } from './pageTools';
 
 export type StudioMode = 'view' | 'edit' | 'code';
 
@@ -395,6 +397,13 @@ export function Studio({
   const cmd = (c: string, arg?: unknown) => editRef.current?.cmd(c, arg);
   // The AI on the page, and a database's AI column and files (pageAi.ts).
   const ai = usePageAi(cmd, pageId);
+  // Where the page is in the Library, for its breadcrumbs (pageTools.ts).
+  const crumbs = useCrumbs(pageId, doc?.title ?? '');
+  const crumbsRef = useRef(crumbs);
+  crumbsRef.current = crumbs;
+  useEffect(() => {
+    if (mode === 'edit') editRef.current?.cmd('crumbs', crumbs);
+  }, [crumbs, mode]);
   const side = layout === 'page';
 
   /** The agent is told which part is meant, in the message box; changes not saved yet are saved first, so it sees them. */
@@ -509,6 +518,7 @@ export function Studio({
                 editRef.current?.cmd('caps', { ask: !!onAsk, comment: !!pageId && !readOnly, ai: !readOnly });
                 editRef.current?.cmd('comments', marksRef.current);
                 editRef.current?.cmd('pages', pageRefsRef.current);
+                editRef.current?.cmd('crumbs', crumbsRef.current);
                 if (clipboard) editRef.current?.cmd('clip', { html: clipboard.html });
               }}
               onLayers={setLayers}
@@ -544,6 +554,7 @@ export function Studio({
             />
           </DeviceStage>
           <InsertPopover ask={asking} frame={() => editRef.current?.frame() ?? null} answer={(payload) => cmd('fill', payload)} cmd={cmd} onClose={() => setAsking(null)} onError={toastError} />
+          <BlockAskPopover ask={asking} frame={() => editRef.current?.frame() ?? null} answer={(payload) => cmd('fill', payload)} onClose={() => setAsking(null)} onError={toastError} />
         </div>
         <aside className={cx('flex min-h-0 shrink-0 flex-col bg-panel', beside ? 'w-[320px] border-l border-line' : cx('border-t border-line', folded ? 'pb-[var(--safe-bottom)]' : 'h-[min(48%,440px)] min-h-[200px]'))}>
           <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-1">

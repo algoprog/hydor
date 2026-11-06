@@ -51,6 +51,7 @@ import { agentNotebook, dropWorkFolder, SAVE_NOTEBOOK_DESCRIPTION, SAVE_NOTEBOOK
 import { dropEdits, initEdits, noteEdit, noteFileEdit, takeEdits } from './edits.ts';
 import { getAsset, MAX_ASSET, putAsset, sweepAssets, takeIn } from './assets.ts';
 import { pageFilesRoutes, sweepPageFiles } from './page-files.ts';
+import { pageToolsRoutes } from './page-tools.ts';
 import { pagePictures } from './page-pictures.ts';
 import { videoStillOf } from './video-still.ts';
 import { getVideo, sendVideo, takeVideoPiece, videoAddressOk } from './videos.ts';
@@ -790,6 +791,8 @@ function routes(d: Deps) {
   uploadRoutes(d);
   // Files for pages' blocks and databases (page-files.ts).
   pageFilesRoutes(app, db);
+  // The page editor's tools that need the server: bookmarks (page-tools.ts).
+  pageToolsRoutes(d);
   const P = (req: FastifyRequest) => req.params as Record<string, string>;
   const B = (req: FastifyRequest) => (req.body ?? {}) as Record<string, unknown>;
   const key = (v: unknown) => (typeof v === 'string' && v ? v.slice(0, 300) : undefined);

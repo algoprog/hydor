@@ -46,6 +46,7 @@ import { cx, Popover, SheetsOnPhone } from '../../../components/ui';
 import type { EdSel } from '../frame';
 import { BLOCKS, type BlockKind } from './blocks';
 import { Choice } from './fields';
+import { MEDIA_BLOCKS } from './BlockAsks';
 import type { Cmd } from './Inspector';
 
 const ICONS: Record<string, ReactNode> = {
@@ -82,9 +83,10 @@ const ICONS: Record<string, ReactNode> = {
   footer: <PanelBottom size={17} />,
 };
 
-const KINDS: { value: BlockKind; label: string }[] = [
+const KINDS: { value: BlockKind | 'media'; label: string }[] = [
   { value: 'basic', label: 'Basics' },
   { value: 'layout', label: 'Layout' },
+  { value: 'media', label: 'Media' },
   { value: 'section', label: 'Sections' },
 ];
 
@@ -133,10 +135,11 @@ export function AddPanel({
   onAi?: (where: Where) => void;
 }) {
   // A template's screen opens on its App parts, also when what the template has arrives after the editor.
-  const [chosen, setKind] = useState<BlockKind | 'app' | null>(null);
+  const [chosen, setKind] = useState<BlockKind | 'app' | 'media' | null>(null);
   const kind = chosen === 'app' && !app ? 'basic' : (chosen ?? (app ? 'app' : 'basic'));
-  const kinds: { value: BlockKind | 'app'; label: string }[] = app ? [{ value: 'app', label: 'App' }, ...KINDS] : KINDS;
-  const blocks = kind === 'app' && app ? appBlocks(app).map((b) => ({ ...b, edit: false })) : BLOCKS.filter((b) => b.kind === kind).map((b) => ({ ...b, icon: ICONS[b.id] ?? <Square size={17} /> }));
+  const kinds: { value: BlockKind | 'app' | 'media'; label: string }[] = app ? [{ value: 'app', label: 'App' }, ...KINDS] : KINDS;
+  // (Media: blocks the editor asks the app for, or makes itself: an embed, a bookmark, a file, a chart, tabs…)
+  const blocks = kind === 'app' && app ? appBlocks(app).map((b) => ({ ...b, edit: false, ask: false })) : kind === 'media' ? MEDIA_BLOCKS.map((b) => ({ ...b, html: '', edit: false, ask: true })) : BLOCKS.filter((b) => b.kind === kind).map((b) => ({ ...b, icon: ICONS[b.id] ?? <Square size={17} />, ask: false }));
   const picked = !!sel && sel.tag !== 'body';
   const [where, setWhere] = useState<Where>('after');
   const at: Where = !picked ? 'end' : where === 'inside' && !sel.holds ? 'after' : where;
@@ -165,7 +168,8 @@ export function AddPanel({
                 type="button"
                 onClick={() => {
                   onClose();
-                  cmd('insert', { html: b.html, edit: b.edit, where: at });
+                  if (b.ask) cmd('askBlock', { id: b.id, where: at });
+                  else cmd('insert', { html: b.html, edit: b.edit, where: at });
                 }}
                 className="flex h-[68px] flex-col items-center justify-center gap-1.5 rounded-xl border border-line px-1 text-center text-[12px] leading-tight text-fg-2 transition-colors hover:border-line-2 hover:bg-bg-2 hover:text-fg max-md:h-[76px]"
               >
