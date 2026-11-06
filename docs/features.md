@@ -103,7 +103,8 @@ agents that speak ACP and take MCP servers.
   when you say something lasting, you edit it in Settings, and past its length (1,000 words unless changed) the
   helper model shortens it. Each agent starts with the notes that bear most on what you asked, 10 unless changed: a
   top-k by hybrid search, by words (BM25) and by meaning (on unless you turn it off; it sets itself up once), with
-  LightOn's mDenseOn model on your own computer (on a GPU, or on the CPU in about 1.5 GB, only while needed), then the
+  LightOn's mDenseOn model on your own computer (on a GPU, an NVIDIA one or a Mac's own, or on the CPU in about 1.5 GB,
+  only while needed), then the
   latest. Each night the helper
   model tidies memory up: it merges notes that say the same thing and, when there are more than fit, sums related
   ones up in topics and, for a project, a short profile; every change can be undone.

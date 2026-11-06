@@ -31,7 +31,7 @@ import type { DB } from '../db.ts';
 import { Zip } from '../documents/zip.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { isPluginFolder, readPlugin, requiresOf, serverOf, type Manifest } from './manifest.ts';
-import { needsSetup, runSetup, setupOf } from './setup.ts';
+import { needsSetup, runSetup, setupHash, setupOf } from './setup.ts';
 import {
   activePlugins,
   agentKind,
@@ -598,6 +598,7 @@ function saveDraft(db: DB, name: string, body: Record<string, any>): { m: Manife
   if (requires.plugins.length) req.plugins = Object.fromEntries(requires.plugins.map((r) => [r.name, r.range]));
   if (Object.keys(requires.npm).length) req.npm = requires.npm;
   if (requires.pip.length) req.pip = requires.pip;
+  if (requires.pipNvidia?.length) req.pipNvidia = requires.pipNvidia;
   if (requires.python) req.python = requires.python;
   if (requires.commands.length) req.commands = requires.commands.map((c) => (c.hint || c.optional ? c : c.name));
   if (requires.files.length) req.files = requires.files;
@@ -629,8 +630,7 @@ function saveDraft(db: DB, name: string, body: Record<string, any>): { m: Manife
   if (!fs.existsSync(path.join(root, 'README.md'))) writeAtomic(path.join(root, 'README.md'), `# ${title}\n\n${description || 'A plugin for Hydor.'}\n`);
   forgetRead();
   const now = readPlugin(root);
-  const key = (r: typeof before) => JSON.stringify({ npm: r.npm, pip: r.pip, python: r.python ?? '', files: r.files });
-  return { m: now, setupChanged: key(before) !== key(now.requires) && needsSetup(now.requires) };
+  return { m: now, setupChanged: setupHash(before) !== setupHash(now.requires) && needsSetup(now.requires) };
 }
 
 /** A new plugin of your own, in plugins/mine/<name>, added and turned on. */

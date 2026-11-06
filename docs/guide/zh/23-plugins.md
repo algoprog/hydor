@@ -47,7 +47,7 @@
 - **Library docs**（库文档）：来自 Context7 服务的编程库和框架的最新文档和代码示例，让智能体按你用的版本写代码。不会安装任何东西；问题会发送给 Context7。
 - **Meeting recordings**（会议录音）：把会议、通话或采访的录音整理成笔记：摘要、决定、带负责人和日期的待办事项、未解决的问题和一封跟进邮件，每一条都附上说出它的时间点。它会一并带来 **Speech to text**。
 - **Python for data**（Python 数据分析）：一个独立的 Python，带有 pandas、NumPy、SciPy、Matplotlib、openpyxl 和 PyArrow，用来分析表格和制作图表，不会往你自己的 Python 里安装任何东西。
-- **Speech to text**（语音转文字）：在这台电脑上用 Whisper 把录音、语音备忘和视频转成文字和字幕，支持约 100 种语言。它会一并带来 **Audio and video**；它的模型在第一次用到时各下载一次。
+- **Speech to text**（语音转文字）：在这台电脑上用 Whisper 把录音、语音备忘和视频转成文字和字幕，支持约 100 种语言：有 NVIDIA 显卡时在显卡上运行（这时它的设置会加装 NVIDIA 的 CUDA 库，约 1.3 GB），否则在 CPU 上运行；显卡出错时也改在 CPU 上运行，并说明原因。Mac 用它的 CPU 转写：这个 Whisper 不支持 Apple 的 GPU。它会一并带来 **Audio and video**；它的模型在第一次用到时各下载一次。
 - **SQLite databases**（SQLite 数据库）：用来查看 SQLite 数据库内部、安全地查询、一次性完成修改，以及在数据库和 CSV 文件之间导入导出数据的工具。它只需要 Python 3。
 - **Text from pictures**（图片转文字）：在这台电脑上读取图片、文档照片、截图、收据和扫描版 PDF 中的文字。
 
@@ -69,7 +69,7 @@
 
 当插件需要软件包或下载内容时，添加它会在它自己的数据文件夹中把这些配置好，绝不会为整台电脑安装：
 
-- Python 软件包装进它自己的 Python 环境（这台电脑上有 uv 时用 uv 创建，否则用 Python 自带的工具）。
+- Python 软件包装进它自己的 Python 环境（这台电脑上有 uv 时用 uv 创建，否则用 Python 自带的工具）。在有 NVIDIA GPU 的电脑上，插件可以加装它在 GPU 上运行所需的软件包，例如 NVIDIA 的 CUDA 库；如果这些装不上，它就在 CPU 上运行。
 - Node 软件包装进它自己的文件夹，安装时不运行它们的安装脚本。
 - 文件下载到它的数据文件夹中；如果插件给出了文件的指纹，还会用指纹核对。
 

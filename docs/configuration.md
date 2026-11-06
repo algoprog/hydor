@@ -22,7 +22,7 @@ for the service and the desktop apps; on Windows `%USERPROFILE%\.config\hydor.en
 | `CLAUDE_CODE_TMPDIR` | your `TMPDIR`, else `/tmp` | Claude Code's own: where it keeps its temporary files (in `claude-<your user id>`). Set here or in your shell, the agents' Claude Code uses it. Unset and where Claude Code can't make that folder (`/tmp` closed to you), the app points it at `tmp/` in `DATA_DIR`, since Claude Code does not start without it |
 | `CODEX_HOME` | `~/.codex` | Where Codex keeps its data |
 | `HYDOR_EMBED` | `on` | `off`: search by meaning starts off on a new install, so the app never sets it up on its own (a test's or a demo's copy); Settings → Memory still turns it on. Once Settings has turned it on or off, that wins |
-| `HYDOR_EMBED_DEVICE` | the GPU with the most free memory, else `cpu` | Where memory's search by meaning runs (`cpu`, `cuda:1`…); Settings → Memory can also keep it on the CPU |
+| `HYDOR_EMBED_DEVICE` | the NVIDIA GPU with the most free memory, else a Mac's own GPU (`mps`), else `cpu` | Where memory's search by meaning runs (`cpu`, `cuda:1`, `mps`…); Settings → Memory can also keep it on the CPU |
 | `HYDOR_EMBED_THREADS` | half the CPU's cores, at most 4 | Threads it uses on the CPU |
 | `HYDOR_EMBED_PYTHON` | a private environment the app sets up | A Python with PyTorch and Transformers 5.6+ to run it with instead |
 | `HYDOR_FFMPEG`, `HYDOR_FFPROBE` | `ffmpeg`, `ffprobe` on the `PATH` | The ffmpeg programs the Library takes videos' frames and stills and sounds' lengths and shapes with, and voice samples are read with |
