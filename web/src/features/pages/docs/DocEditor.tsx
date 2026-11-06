@@ -30,6 +30,8 @@ import { SIGNATURE_WIDTH_MM } from '@shared/signatures';
 import { choosePicture, pictureFromUrl, uploadPicture } from '../pictures';
 import { choosePhoto } from '../FreePhotos';
 import { csvOf, editPicture, makeDrawing, makePicture, makePlot } from '../../images/studio';
+import type { EditorHandle } from '../../mediaedit/host';
+import { editKept } from '../../mediaedit/open';
 import { NumInput } from '../slides/controls';
 import { Select } from '../studio/fields';
 import { CharPicker } from '../common/CharPicker';
@@ -210,6 +212,9 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const [chars, setChars] = useState<{ kind: 'insert' } | { kind: 'icon'; id: string } | null>(null);
   /** Words being typed beside the page (a comment, a reply, an edit of one). */
   const [noting, setNoting] = useState(false);
+  // The picture editors opened from this document: once it closes, what they save goes to the Library instead.
+  const pictureEditors = useRef(new Set<EditorHandle>());
+  useEffect(() => () => pictureEditors.current.forEach((h) => h.detach()), []);
   // An agent's version being written shows in place of this one (read-only, its words arriving where its mark is),
   // unless there are changes here not saved: those are left as they are. A comment, an equation, a link or another
   // change still being made here holds it back until it is done.
@@ -766,6 +771,19 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     const p = await editPicture({ src: b.src, mode });
     if (p && engine.current?.doc.blocks.some((x) => x.id === id)) engine.current.image(id, { src: p.src });
   };
+  /** Edit picture: the picture in the picture editor, in a tab of its own; saved, the new picture takes its place (one step to undo). */
+  const openPicture = (id: string) => {
+    const b = engine.current?.doc.blocks.find((x) => x.id === id);
+    if (b?.type !== 'image' || !b.src) return;
+    const h = editKept(b.src, {
+      title: b.alt || b.caption || 'Picture',
+      label: doc?.title || 'The document',
+      put: (r) => {
+        if (r.src && engine.current?.doc.blocks.some((x) => x.id === id)) engine.current.image(id, { src: r.src });
+      },
+    });
+    pictureEditors.current.add(h);
+  };
   const askPicture = () => {
     if (!onAsk || !st || !model) return;
     const s = scopesOf(model, st).find((x) => x.id === 'picture');
@@ -1213,7 +1231,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
               />
               {!narrow && pageLayout && <Bands layout={pageLayout} zoom={zoom} doc={shownDoc ?? model} readOnly={readOnly || liveOn} onOpen={() => setDialog('bands')} />}
               {st?.picked && e && st.picked.type !== 'math' && (
-                <Picked engine={e} block={st.picked} host={host} tick={tick} readOnly={readOnly} onReplace={(id) => void replacePicture(id)} onAi={(id, mode) => void changePicture(id, mode)} onAsk={onAsk ? askPicture : undefined} />
+                <Picked engine={e} block={st.picked} host={host} tick={tick} readOnly={readOnly} onReplace={(id) => void replacePicture(id)} onAi={(id, mode) => void changePicture(id, mode)} onEdit={openPicture} onAsk={onAsk ? askPicture : undefined} />
               )}
               {handlesFor && e && <ColumnHandles engine={e} table={handlesFor} host={host} tick={`${tick}:${model.blocks.length}`} />}
               {e && !readOnly && !liveOn && !narrow && <BlockHandle engine={e} host={host} paper={paper} tick={model.blocks} />}

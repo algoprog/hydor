@@ -1,10 +1,10 @@
 // One image, video or sound in the Library (/media/<id>): the picture (a tap away from full size), the video or the
 // sound to play (a sound's shape to seek along), its title and description (written by a model, or by you: Edit),
 // what it was made from and with, its size, length and file, the session it came from, for a video the frames the
-// model saw, and for a sound its words. Download, write the title and description again, start a new session with
-// it in the message box, or delete it.
+// model saw, and for a sound its words. Edit a picture or a video in its editor (saved over it, or as a copy), download
+// it, write the title and description again, start a new session with it in the message box, or delete it.
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Download, Ellipsis, FolderInput, MessageSquarePlus, MessagesSquare, Pencil, RefreshCw, Settings2, Trash2, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, Download, Ellipsis, FolderInput, MessageSquarePlus, MessagesSquare, Pencil, RefreshCw, Settings2, SlidersHorizontal, Trash2, TriangleAlert } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { clipLength, type MediaItem } from '@shared/media';
 import { api, del, enc, patch } from '../../lib/api';
@@ -19,10 +19,12 @@ import { VideoPlayer } from '../../components/VideoPlayer';
 import { Button, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Throbber, useConfirm, useIsMobile } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
 import { NavButton } from '../layout/PageHeader';
+import { openEditor } from '../mediaedit/host';
+import { editLibraryVideo } from '../mediaedit/video/open';
 import { SpaceMenu } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
 import { downloadMedia, recaption, startSessionWithMedia } from './parts';
-import { mediaUrl, useMedia } from './state';
+import { mediaUrl, useMedia, withDownload } from './state';
 
 export function MediaRoute() {
   const [loc] = useLocation();
@@ -101,6 +103,28 @@ function MediaView({ id }: { id: string }) {
     }
   };
   const src = mu(mediaUrl(m));
+  /** The picture in the picture editor: saved over this item (its place, title and folder kept), or as a new one beside it. */
+  const editPicture = () =>
+    openEditor({
+      kind: 'image',
+      src,
+      title: m.title,
+      from: { label: m.title },
+      to: { media: m.id },
+      copy: true,
+      save: (r) => {
+        // A copy is a new item: it opens; the item written over shows itself again, as the Library hears.
+        if (r.media && r.media !== m.id) go(`/media/${r.media}`);
+      },
+    });
+  /** The video in the video editor: saved over this item (its place, title and folder kept), or as a new one beside it. */
+  const editVideo = () =>
+    editLibraryVideo(m, {
+      src: mediaUrl(m),
+      label: m.title,
+      // A copy is a new item: it opens; the item written over shows itself again, as the Library hears.
+      after: (r) => void (r.media && r.media !== m.id && go(`/media/${r.media}`)),
+    });
   const size = m.width && m.height ? `${m.width} × ${m.height}` : undefined;
   const ratio = m.width && m.height ? m.width / m.height : 16 / 9;
   const shape = m.width && m.height ? `${m.width} / ${m.height}` : '16 / 9';
@@ -123,6 +147,16 @@ function MediaView({ id }: { id: string }) {
           <Button size="sm" variant="primary" icon={<MessageSquarePlus size={14} />} onClick={() => startSessionWithMedia(m)} title="Start a session with it" aria-label="Start a session with it">
             <span className="max-sm:hidden">Start a session with it</span>
           </Button>
+          {m.kind === 'image' && (
+            <Button size="sm" variant="secondary" icon={<SlidersHorizontal size={14} />} onClick={editPicture} title="Edit the picture" aria-label="Edit the picture">
+              <span className="max-sm:hidden">Edit</span>
+            </Button>
+          )}
+          {m.kind === 'video' && (
+            <Button size="sm" variant="secondary" icon={<SlidersHorizontal size={14} />} onClick={editVideo} title="Edit the video" aria-label="Edit the video">
+              <span className="max-sm:hidden">Edit</span>
+            </Button>
+          )}
           <Button size="sm" variant="secondary" icon={<Download size={14} />} onClick={() => downloadMedia(m)}>
             <span className="max-sm:hidden">Download</span>
           </Button>
@@ -176,15 +210,15 @@ function MediaView({ id }: { id: string }) {
             {m.kind === 'video' ? (
               // As tall as the screen allows, as wide as its shape then is.
               <div className="overflow-hidden rounded-2xl border border-line bg-black" style={{ aspectRatio: shape, width: `min(100%, calc(72dvh * ${ratio}))` }}>
-                <VideoPlayer src={src} name={m.title} downloadUrl={`${src}?download=1`} poster={mu(mediaUrl(m, 'still'))} />
+                <VideoPlayer src={src} name={m.title} downloadUrl={withDownload(src)} poster={mu(mediaUrl(m, 'still'))} />
               </div>
             ) : m.kind === 'audio' ? (
               // Its shape as kept (read from the file when there is none), on a soft wash of the accent.
               <div className="w-full rounded-2xl border border-line bg-gradient-to-br from-accent-soft via-panel to-panel px-4 py-6 sm:px-6 sm:py-8">
-                <AudioPlayer src={src} peaks={m.peaks ?? undefined} downloadUrl={`${src}?download=1`} large />
+                <AudioPlayer src={src} peaks={m.peaks ?? undefined} downloadUrl={withDownload(src)} large />
               </div>
             ) : (
-              <button type="button" className="cursor-zoom-in" onClick={() => openLightbox([{ src, name: m.title }])} aria-label="Show it full size">
+              <button type="button" className="cursor-zoom-in" onClick={() => openLightbox([{ src, name: m.title, edit: { to: { media: m.id }, from: m.title, save: (r) => void (r.media && r.media !== m.id && go(`/media/${r.media}`)) } }])} aria-label="Show it full size">
                 <img src={src} alt={m.description || m.title} className="max-h-[72dvh] max-w-full rounded-2xl border border-line bg-bg-2 object-contain" />
               </button>
             )}
@@ -285,7 +319,7 @@ function MediaView({ id }: { id: string }) {
             {m.kind === 'video' && (
               <div className="rounded-2xl border border-line bg-panel p-3">
                 <div className="mb-2 px-1 text-[12.5px] font-medium text-fg-2">The frames its description was written from</div>
-                <button type="button" className="block w-full cursor-zoom-in" onClick={() => openLightbox([{ src: mu(mediaUrl(m, 'frames')), name: `${m.title}: 10 frames` }])} aria-label="Show the frames full size">
+                <button type="button" className="block w-full cursor-zoom-in" onClick={() => openLightbox([{ src: mu(mediaUrl(m, 'frames')), name: `${m.title}: 10 frames`, edit: false }])} aria-label="Show the frames full size">
                   <img src={mu(mediaUrl(m, 'frames'))} alt="" loading="lazy" className="w-full rounded-lg border border-line bg-bg-2" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} />
                 </button>
               </div>

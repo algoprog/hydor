@@ -29,6 +29,8 @@ export const SLIDE_LIMITS = { slides: 300, els: 150, anims: 120, paras: 200, run
 export const ASSET = 'naget-asset:';
 /** A video kept by the app (server/pages/videos.ts), one from someone's device or an agent's session: "naget-video:<sha>". */
 export const VIDEO = 'naget-video:';
+/** A sound kept by the app (server/pages/sounds.ts), a slide's narration recorded, made with AI or an agent's: "naget-audio:<sha>". */
+export const AUDIO = 'naget-audio:';
 
 export type Align = 'left' | 'center' | 'right' | 'justify';
 export type VAlign = 'top' | 'middle' | 'bottom';
@@ -603,6 +605,8 @@ export interface Transition {
   dur?: number;
   /** Goes on to the next slide by itself after this many seconds (once its animations are done). */
   auto?: number;
+  /** Each click of its build comes by itself, this many seconds after the slide came (timings from a rehearsal). */
+  steps?: number[];
 }
 
 export interface Bg {
@@ -639,6 +643,20 @@ export interface Slide {
   comments?: SlideComment[];
   /** A theme of its own, in place of the deck's (a slide taken from another deck keeping its look, as PowerPoint keeps its master). */
   theme?: Theme;
+  /** A voice for the slide, recorded or made with AI: the slideshow plays it when asked to, and goes on when it ends. */
+  narration?: Narration;
+}
+
+/** A slide's narration: a sound the app keeps, how long it is, and the words it says where they are known. */
+export interface Narration {
+  /** "naget-audio:<sha>". */
+  src: string;
+  /** Its length in seconds (0 when not known: the slideshow takes the sound's own). */
+  seconds: number;
+  /** What it says: the words it was made from with AI, or the notes read while it was recorded. */
+  text?: string;
+  /** Made with AI (else recorded, or an agent's sound). */
+  ai?: boolean;
 }
 
 /** A comment on a slide: on one of its parts (`el`), or on the slide itself, its mark at `x`, `y` (the slide's pixels). */
@@ -1261,6 +1279,9 @@ export function videoSrc(v: unknown): string | null {
 /** A video the app keeps, as a deck names it (naget-video:<sha>), or null. */
 export const keptVideo = (v: unknown): string | null => (typeof v === 'string' && /^naget-video:[a-f0-9]{16,64}$/.test(v.trim()) ? v.trim() : null);
 
+/** A sound the app keeps, as a deck names it (naget-audio:<sha>), or null. */
+export const keptSound = (v: unknown): string | null => (typeof v === 'string' && /^naget-audio:[a-f0-9]{16,64}$/.test(v.trim()) ? v.trim() : null);
+
 /** A 3D model's source: one the app keeps (naget-asset:<sha>, glTF), one inside the deck (data:), or a .glb or .gltf on the web. */
 export function cleanModel(v: unknown): string | null {
   if (typeof v !== 'string') return null;
@@ -1546,6 +1567,8 @@ export interface NormalizeOpts {
   video?: SrcHook;
   /** A 3D model's source that is not of a kept form yet (a .glb file of an agent's session): what it becomes. */
   model?: SrcHook;
+  /** A narration's sound that is not kept yet (a file of an agent's session): what it becomes, or null to leave the narration out. */
+  audio?: SrcHook;
 }
 
 const ALIGNS = ['left', 'center', 'right', 'justify'] as const;
@@ -2292,11 +2315,15 @@ function transition(v: unknown): Transition | undefined {
   if (!isObj(v)) return undefined;
   const fx = pick(v.fx ?? v.effect, [...TRANSITIONS, ...RICH_TRANSITIONS], 'none');
   const auto = v.auto !== undefined ? num(v.auto, 0, 3600, 0) : 0;
-  if (fx === 'none' && !auto) return undefined;
+  // Rehearsed: when each click of the build comes, in order.
+  const steps = (Array.isArray(v.steps) ? v.steps : []).slice(0, SLIDE_LIMITS.anims).map((x) => num(x, 0, 3600, -1)).filter((x) => x >= 0);
+  const timed = steps.every((x, i) => !i || x >= steps[i - 1]) ? steps : [];
+  if (fx === 'none' && !auto && !timed.length) return undefined;
   const t: Transition = { fx };
   if (fx === 'push' || fx === 'wipe' || fx === 'cover' || fx === 'cube' || fx === 'flip') t.dir = pick(v.dir, DIRS, 'right');
   if (fx !== 'none') t.dur = num(v.dur, 100, 5000, TR_DUR[fx] ?? 600);
   if (auto) t.auto = auto;
+  if (timed.length) t.steps = timed;
   return t;
 }
 
@@ -2372,10 +2399,26 @@ function slide(v: unknown, used: Set<string>, ratio: Ratio, o: NormalizeOpts, ci
   if (notes) s.notes = notes;
   if (v.hidden === true) s.hidden = true;
   if (v.nofooter === true) s.nofooter = true;
+  const voice = narration(v.narration, o);
+  if (voice) s.narration = voice;
   const comments = slideComments(v.comments, new Set(everyEl(els).map((e) => e.id)), H, cids);
   if (comments.length) s.comments = comments;
   if (isObj(v.theme)) s.theme = theme(v.theme, THEMES[0]);
   return reconnect(s);
+}
+
+/** A slide's narration: a kept sound (or one an agent's file becomes), its length, its words; a source alone does too. */
+function narration(v: unknown, o: NormalizeOpts): Narration | undefined {
+  if (typeof v === 'string') v = { src: v };
+  if (!isObj(v)) return undefined;
+  const raw = typeof v.src === 'string' ? v.src.trim() : typeof v.file === 'string' ? v.file.trim() : '';
+  const src = keptSound(raw) ?? (raw && o.audio ? o.audio(raw) : null);
+  if (!src) return undefined;
+  const out: Narration = { src, seconds: num(v.seconds, 0, 3600, 0) };
+  const text = str(v.text, SLIDE_LIMITS.notes).trim();
+  if (text) out.text = text;
+  if (v.ai === true) out.ai = true;
+  return out;
 }
 
 function footer(v: unknown): Footer | undefined {
@@ -2509,6 +2552,13 @@ export function deckVideos(d: Deck): string[] {
   return out;
 }
 
+/** The sounds the app keeps that a deck plays (its slides' narrations, "naget-audio:<sha>"). */
+export function deckSounds(d: Deck): string[] {
+  const out: string[] = [];
+  for (const s of d.slides) if (s.narration?.src.startsWith(AUDIO)) out.push(s.narration.src);
+  return out;
+}
+
 /** The deck with each kept video's source changed by `f` (to where a page fetches it, say): its parts', and those behind its slides. */
 export function mapVideoSources(d: Deck, f: (src: string) => string): Deck {
   const map = (els: El[]): El[] => els.map((e) => (e.type === 'group' ? { ...e, els: map(e.els) } : e.type === 'video' && e.src.startsWith(VIDEO) ? { ...e, src: f(e.src) } : e));
@@ -2568,7 +2618,7 @@ export function deckOutline(d: Deck): string {
       const kinds = s.els.map((e) => (e.type === 'shape' ? `shape:${e.shape}` : e.type === 'group' ? `group of ${e.els.length}` : e.type));
       const what = [...new Set(kinds)].map((k) => `${kinds.filter((x) => x === k).length}× ${k}`).join(', ');
       const open = (s.comments ?? []).filter((c) => !c.resolved).length;
-      return `${i + 1}. ${slideTitle(s) || '(no title)'} [${s.id}]${s.hidden ? ' (hidden)' : ''}: ${what || 'empty'}${s.anims?.length ? `, ${s.anims.length} animation${s.anims.length === 1 ? '' : 's'}` : ''}${s.notes ? ', notes' : ''}${open ? `, ${open} open comment${open === 1 ? '' : 's'}` : ''}`;
+      return `${i + 1}. ${slideTitle(s) || '(no title)'} [${s.id}]${s.hidden ? ' (hidden)' : ''}: ${what || 'empty'}${s.anims?.length ? `, ${s.anims.length} animation${s.anims.length === 1 ? '' : 's'}` : ''}${s.notes ? ', notes' : ''}${s.narration ? `, narration (${Math.round(s.narration.seconds)} s)` : ''}${open ? `, ${open} open comment${open === 1 ? '' : 's'}` : ''}`;
     })
     .join('\n');
 }
