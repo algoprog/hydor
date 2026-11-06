@@ -424,7 +424,7 @@ agents that speak ACP and take MCP servers.
   its own address, menus with Search the menus, find and replace, a list of its keyboard shortcuts, and an agent that
   changes it on request, whose work you watch as it writes (slides too: the agent's caret where its words arrive, the
   page read-only meanwhile, your unsaved changes never overwritten), in steps (a section, some slides, some cells) as
-  well as whole, its saves in one turn kept as one version. Documents (save_doc, written in Markdown, or opened from a Word, Markdown, text or HTML file)
+  well as whole, its saves in one turn kept as one version. Documents (save_doc, written in Markdown, or opened from a Word, PDF (its title, headings, paragraphs and lists, two columns read in order, page numbers and running headers left out), Markdown, text or HTML file)
   are edited as in Word or Google Docs on real pages of their paper (what does not fit goes on to the next page, a long
   table's header row again, each page with its own header, footer and number): paragraph styles, fonts, sizes, colours and
   highlights, links, alignment, line and paragraph spacing, bullets, numbers and checklists, callouts, tables (column
@@ -440,7 +440,7 @@ agents that speak ACP and take MCP servers.
   executive summary, a table of risks…); a picture, table or line put in from a table's cell goes after the table;
   they export as Word (styles, lists, tables, pictures, comments, tracked changes, equations, the table of
   contents and headers and footers as Word's own; laid out so Word's pages break where the editor's do, the
-  document's fonts inside the file), PDF on their paper, Markdown or a web page. Spreadsheets (save_sheet, with
+  document's fonts inside the file), OpenDocument for LibreOffice (its page, styles, lists, tables, pictures, footnotes and table of contents as LibreOffice's own), PDF on their paper, Markdown, EPUB (a chapter at each Heading 1, its footnotes, pictures and maths inside), plain text or a web page. Spreadsheets (save_sheet, with
   formulas, or opened from an Excel, ODS, CSV or TSV file) work as in Excel, Google Sheets or Airtable: a grid that
   stays quick with thousands of rows, frozen and hidden rows and columns, sizes to drag, about two hundred of
   Excel's functions worked out as you type (lookups, criteria, dates, text, loans, and FILTER, SORT, UNIQUE and
