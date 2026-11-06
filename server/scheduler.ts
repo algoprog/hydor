@@ -193,7 +193,8 @@ export function cleanExtra(x: unknown): TaskExtra | undefined {
   if (!x || typeof x !== 'object' || Array.isArray(x)) return undefined;
   const out: TaskExtra = {};
   for (const [k, v] of Object.entries(x as Record<string, unknown>)) {
-    if (v === null || v === undefined || k === 'parent' || k === 'automations') continue;
+    // Never another session's link, nor what one session was asked to make (Pages' extra.make: its runs make their own).
+    if (v === null || v === undefined || k === 'parent' || k === 'automations' || k === 'make') continue;
     if (k === 'capUsd') {
       const n = Number(v);
       if (Number.isFinite(n) && n > 0) out.capUsd = Math.round(n * 100) / 100;
