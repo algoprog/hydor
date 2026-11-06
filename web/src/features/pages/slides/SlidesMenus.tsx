@@ -63,6 +63,7 @@ import {
   Scissors,
   Search,
   Shapes,
+  SlidersHorizontal,
   Sigma,
   Smile,
   Sparkles,
@@ -158,6 +159,8 @@ export interface MenuArgs {
   aiPlot?: () => void;
   aiVideo?: () => void;
   aiEdit?: (mode: 'change' | 'cutout' | 'erase') => void;
+  /** The picture picked in the picture editor, in a tab of its own. */
+  editPicture?: () => void;
   aiPlotChart?: () => void;
   video(): void;
   /** A video from this device. */
@@ -357,6 +360,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           ],
         },
         '-',
+        one?.type === 'image' && !!one.src && !!a.editPicture && { label: 'Edit picture', icon: <SlidersHorizontal size={14} />, also: 'edit picture crop turn adjust filter markup words blur', disabled: ro, run: a.editPicture },
         one?.type === 'image' && !!one.src && { label: 'Crop the picture', icon: <Crop size={14} />, disabled: ro, run: a.crop },
         one?.type === 'image' && (!!one.crop || !!one.adjust) && { label: 'Reset the picture', also: 'uncrop colours', disabled: ro, run: a.resetPicture },
         one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Change with AI', icon: <WandSparkles size={14} />, also: 'edit picture ai', disabled: ro, run: () => a.aiEdit!('change') },

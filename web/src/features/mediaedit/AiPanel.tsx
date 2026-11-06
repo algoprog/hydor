@@ -79,7 +79,9 @@ export function AiPanel({ ai, host, onBusy }: { ai: AiTools; host: AiHost; onBus
     getTiers().then(setTiers, (e: Error) => setError({ text: e.message, local: false }));
     return () => stop.current?.abort();
   }, []);
-  useEffect(() => onBusy(!!busy), [busy, onBusy]);
+  useEffect(() => {
+    onBusy(!!busy);
+  }, [busy, onBusy]);
   const ready = !!(tools.state ?? tiers?.local)?.ready;
   const { mode, strokes } = ai;
   const painted = strokes.some((s) => s.pts.length >= 2);
@@ -202,7 +204,11 @@ export function AiPanel({ ai, host, onBusy }: { ai: AiTools; host: AiHost; onBus
         ) : (
           tiers && (
             <>
-              <LocalToolsCard tools={tools} instead={{ label: insteadLine(tiers, tool), disabled: !!busy || blocked || !!askKey, run: () => void run(tool, 'cloud') }} />
+              <LocalToolsCard tools={tools} />
+              {/* The other way, under the card: its words wrap in a narrow panel. */}
+              <Button variant="secondary" className="h-auto min-h-9 w-full py-1.5 whitespace-normal" disabled={!!busy || blocked || !!askKey} onClick={() => void run(tool, 'cloud')}>
+                {insteadLine(tiers, tool)}
+              </Button>
               {viaCloud && <PriceLine>{viaCloud.line}</PriceLine>}
             </>
           )

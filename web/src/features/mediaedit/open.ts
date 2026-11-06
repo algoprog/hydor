@@ -30,6 +30,6 @@ export function editFile(path: string, o: { label?: string; after?: (r: Saved) =
  * A picture of a deck, a document or a page in the editor: Save keeps the new picture (naget-asset:…) and `put` puts it
  * in place of the old one (one step to undo there). `label`: the deck's or document's name, for the first tab.
  */
-export function editKept(src: string, o: { title?: string; label: string; put: (r: Saved) => void }): EditorHandle {
+export function editKept(src: string, o: { title?: string; label: string; put: (r: Saved) => void | Promise<void> }): EditorHandle {
   return openEditor({ kind: 'image', src, title: o.title || 'Picture', from: { label: o.label }, to: { asset: true }, copy: true, save: (r) => o.put(r) });
 }

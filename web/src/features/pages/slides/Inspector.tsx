@@ -33,6 +33,7 @@ import {
   Play,
   Plus,
   Pointer,
+  SlidersHorizontal,
   Sparkles,
   Trash2,
   Ungroup as UngroupIcon,
@@ -144,6 +145,8 @@ interface Props {
   onAiEdit?: (id: string, mode: 'change' | 'cutout' | 'erase') => void;
   onPlotChart?: (id: string) => void;
   onAiBackground?: () => void;
+  /** The picture in the picture editor, in a tab of its own (the new picture takes its place). */
+  onEditPicture?: (id: string) => void;
 }
 
 const SHAPE_NAMES: Record<ShapeKind, string> = {
@@ -526,6 +529,7 @@ function PictureLook({
   cropping,
   onCrop,
   onAi,
+  onEdit,
 }: {
   el: ImageEl;
   theme: Theme;
@@ -534,6 +538,7 @@ function PictureLook({
   cropping?: boolean;
   onCrop?: (id: string | null, keep?: boolean) => void;
   onAi?: (id: string, mode: 'change' | 'cutout' | 'erase') => void;
+  onEdit?: (id: string) => void;
 }) {
   const aiRef = useRef<HTMLButtonElement>(null);
   const [ai, setAi] = useState(false);
@@ -543,6 +548,11 @@ function PictureLook({
         <Button size="sm" variant="secondary" icon={<ImagePlus size={14} />} onClick={onReplace}>
           Another picture
         </Button>
+        {onEdit && el.src && !cropping && (
+          <Button size="sm" variant="secondary" icon={<SlidersHorizontal size={14} />} onClick={() => onEdit(el.id)}>
+            Edit picture
+          </Button>
+        )}
         {onAi && el.src && !cropping && (
           <Button ref={aiRef} size="sm" variant="secondary" icon={<WandSparkles size={14} />} onClick={() => setAi((o) => !o)}>
             Change it with AI
@@ -1043,7 +1053,7 @@ function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: s
   );
 }
 
-function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cropping, onCrop, onIcon, onGroup, onUngroup, cellSel, onCellSel, texFocus, running, onRun, pickPicture, pickModel, onAiEdit, onPlotChart }: Props) {
+function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cropping, onCrop, onIcon, onGroup, onUngroup, cellSel, onCellSel, texFocus, running, onRun, pickPicture, pickModel, onAiEdit, onPlotChart, onEditPicture }: Props) {
   const slide = deck.slides[index];
   const web = isWebDeck(deck);
   const els = pickedOf(slide, sel);
@@ -1124,7 +1134,7 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cro
       )}
       {(el.type === 'text' || el.type === 'shape') && <TextLook el={el} theme={deck.theme} set={set} web={web} />}
       {(el.type === 'text' || el.type === 'shape') && <BoxLook el={el} theme={deck.theme} set={set} web={web} />}
-      {el.type === 'image' && <PictureLook el={el} theme={deck.theme} set={set} onReplace={() => onReplaceImage(el.id)} cropping={cropping === el.id} onCrop={onCrop} onAi={onAiEdit} />}
+      {el.type === 'image' && <PictureLook el={el} theme={deck.theme} set={set} onReplace={() => onReplaceImage(el.id)} cropping={cropping === el.id} onCrop={onCrop} onAi={onAiEdit} onEdit={onEditPicture} />}
       {el.type === 'image' && el.src && <PictureColours el={el} set={set} />}
       {el.type === 'line' && <LineLook el={el} theme={deck.theme} set={set} />}
       {el.type === 'table' && <TableLook el={el} theme={deck.theme} set={set} cellSel={cellSel} onCellSel={onCellSel} />}

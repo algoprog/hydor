@@ -110,10 +110,14 @@ export const PictureView = forwardRef<
   const t: ViewT = view.z === 'fit' ? { z: fitZ, ox: (size.w - frame.w * fitZ) / 2, oy: (size.h - frame.h * fitZ) / 2 } : { z: view.z, ox: view.ox, oy: view.oy };
   const tRef = useRef(t);
   tRef.current = t;
-  useEffect(() => onZoom?.(t.z), [t.z, onZoom]);
+  useEffect(() => {
+    onZoom?.(t.z);
+  }, [t.z, onZoom]);
   // A new frame (cropped, turned, another tool) is fitted again.
   const shape = `${Math.round(frame.w)}x${Math.round(frame.h)}`;
-  useEffect(() => setView({ z: 'fit', ox: 0, oy: 0 }), [shape]);
+  useEffect(() => {
+    setView({ z: 'fit', ox: 0, oy: 0 });
+  }, [shape]);
 
   const zoomAt = useCallback((f: number, sx: number, sy: number) => {
     const c = tRef.current;
@@ -334,7 +338,7 @@ export const PictureView = forwardRef<
   return (
     <div
       ref={box}
-      className={cx('relative min-h-0 touch-none overflow-hidden bg-bg-1 select-none', className)}
+      className={cx('min-h-0 touch-none overflow-hidden bg-bg-1 select-none', className ?? 'relative')}
       style={{ cursor: brush ? 'none' : panning.current ? 'grabbing' : cursor }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -362,7 +366,7 @@ export const PictureView = forwardRef<
               onClick={onDelete}
               aria-label="Delete the mark"
               title="Delete the mark"
-              className="pointer-events-auto absolute -top-3 -right-3 flex h-6 w-6 items-center justify-center rounded-full border border-line bg-elevated text-fg shadow-md hover:bg-bg-2"
+              className="pointer-events-auto absolute -top-9 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border border-line bg-elevated text-fg shadow-md hover:bg-bg-2"
             >
               <X size={13} />
             </button>
