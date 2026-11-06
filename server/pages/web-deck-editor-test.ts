@@ -2,8 +2,8 @@
 // a web page, a quiz, its score, 3D) as the deck keeps them; the ready-made pages a custom code part starts from; a web
 // page's address as the editor takes it (https only, an embed code's address, nothing of this computer's network);
 // a deck made PowerPoint compatible and back, and what the dialog lists by slide; the lengths new effects and
-// transitions start with, as the deck's own; and the menus as each format has them (Insert → Interactive, File →
-// PowerPoint compatible and the progress bar, Run on a live part). Build and run with a scratch folder:
+// transitions start with, as the deck's own; and the menus as each format has them (Insert → Interactive, Tools →
+// PowerPoint compatible, Run on a live part; no File menu, so the menu bar fits as it did). Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/web-deck-editor-test.ts
 //   DATA_DIR=/tmp/hydor-test-web-deck-editor node dist/dev/web-deck-editor-test.js
 import { ANIM_FX, newDeck, normalizeDeck, RICH_ANIM_FX, RICH_TRANSITIONS, RICH_TYPES, richFeatures, SLIDE_LIMITS, toPowerPoint, TRANSITIONS, everyEl, type Anim, type Deck, type El, type QuizEl } from '../../shared/slides.ts';
@@ -177,7 +177,7 @@ const partOf = (d: Deck, id: string) => everyEl(d.slides[0].els).find((e) => e.i
 {
   const noop = () => {};
   const args = (o: Partial<MenuArgs>): MenuArgs =>
-    new Proxy({ web: true, progress: false, canSave: false, wide: true, pageLayout: true, picked: [], canUndo: false, canRedo: false, canPaste: false, hasLook: false, painting: false, zoom: 'fit', grid: { show: false, snap: false, size: 40 }, rulers: false, notesOpen: true, gridView: false, hidden: false, text: null, hasGuides: false, running: false, ...o } as MenuArgs, {
+    new Proxy({ web: true, wide: true, pageLayout: true, picked: [], canUndo: false, canRedo: false, canPaste: false, hasLook: false, painting: false, zoom: 'fit', grid: { show: false, snap: false, size: 40 }, rulers: false, notesOpen: true, gridView: false, hidden: false, text: null, hasGuides: false, running: false, ...o } as MenuArgs, {
       get: (t, k) => (k in t ? (t as unknown as Record<string | symbol, unknown>)[k] : noop),
     });
   const items = (m: MenuEntry[]) => m.filter((x): x is MenuAction => !!x && x !== '-');
@@ -185,10 +185,10 @@ const partOf = (d: Deck, id: string) => everyEl(d.slides[0].els).find((e) => e.i
   const find = (a: MenuArgs, label: string, item: string) => menu(a, label).find((x) => x.label === item);
   const web = args({});
   const pptx = args({ web: false });
-  ok(slidesMenus(web)[0]?.label === 'File', 'File is the first menu');
-  ok(find(web, 'File', 'PowerPoint compatible')?.checked === false && find(pptx, 'File', 'PowerPoint compatible')?.checked === true, 'File → PowerPoint compatible is ticked only for a PowerPoint compatible deck');
-  ok(!!find(web, 'File', 'Progress bar in the slideshow') && !find(pptx, 'File', 'Progress bar in the slideshow'), 'the progress bar is the web format’s');
-  ok(find(args({ progress: true }), 'File', 'Progress bar in the slideshow')?.checked === true, 'ticked when the deck has it');
+  // The menu bar as it was: seven menus, so it folds into one button no sooner than before (the format is in the Theme tab).
+  ok(slidesMenus(web).map((m) => m.label).join() === 'Edit,View,Insert,Format,Arrange,Slide,Tools', 'the menus are Edit, View, Insert, Format, Arrange, Slide and Tools: no File menu');
+  ok(find(web, 'Tools', 'PowerPoint compatible')?.checked === false && find(pptx, 'Tools', 'PowerPoint compatible')?.checked === true, 'Tools → PowerPoint compatible is ticked only for a PowerPoint compatible deck (Search the menus finds it)');
+  ok(!slidesMenus(web).some((m) => items(m.items).some((x) => x.label === 'Progress bar in the slideshow' || x.label === 'Save')), 'the progress bar is the Theme tab’s and saving the bar’s and Ctrl+S’s, not the menus’');
   const inter = find(web, 'Insert', 'Interactive');
   ok(items(inter?.items ?? []).map((x) => x.label).join() === 'Custom code,Web page,Quiz,Quiz score,3D', 'Insert → Interactive: custom code, a web page, a quiz, its score, 3D');
   ok(!!find(pptx, 'Insert', 'Interactive'), 'a PowerPoint compatible deck still offers them (asking first)');
@@ -197,7 +197,7 @@ const partOf = (d: Deck, id: string) => everyEl(d.slides[0].els).find((e) => e.i
   const html = htmlPart(newDeck('x'));
   ok(!find(args({ picked: [quiz] }), 'Format', 'Run it here') && find(args({ picked: [html] }), 'Format', 'Run it here')?.label === 'Run it here', 'Format → Run it here for a live part alone');
   ok(!!find(args({ picked: [html], running: true }), 'Format', 'Stop it'), 'and Stop it while it runs');
-  ok(find(args({ readOnly: true }), 'Insert', 'Interactive')?.disabled === true && find(args({ readOnly: true }), 'File', 'PowerPoint compatible')?.disabled === true, 'nothing to change in a version looked at');
+  ok(find(args({ readOnly: true }), 'Insert', 'Interactive')?.disabled === true && find(args({ readOnly: true }), 'Tools', 'PowerPoint compatible')?.disabled === true, 'nothing to change in a version looked at');
   // The AI tools, where the editor has them.
   const pic = menu(web, 'Insert').find((x) => x.label === 'Picture');
   ok(items(pic?.items ?? []).map((x) => x.label).join() === 'From this device,From a web address,Make with AI,Drawing (SVG)', 'Insert → Picture: from this device, a web address, made with AI, a drawing (SVG)');

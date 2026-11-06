@@ -72,7 +72,7 @@ export function FormatDialog({ open, deck, onClose, onConfirm }: { open: boolean
                 );
               })}
             </div>
-            <p className="text-[12.5px] text-fg-3">Undo brings them back. Unticking File → PowerPoint compatible later gives the web format again, without them.</p>
+            <p className="text-[12.5px] text-fg-3">Undo brings them back. Made for → The web (in the Theme tab) later gives the web format again, without them.</p>
           </>
         )}
       </div>
