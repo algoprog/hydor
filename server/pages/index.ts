@@ -415,7 +415,10 @@ const SAVE_SLIDES: RunTool = {
     const id = changing(ctx.deps.db, a, 'slides');
     const prev = id ? pageSource(ctx.deps.db, id)?.text : undefined;
     // Its format and progress bar stay as they were unless the call says (a PowerPoint compatible deck stays one).
-    const kept = prev ? readDeck(prev) : null;
+    let kept: ReturnType<typeof readDeck> | null = null;
+    try {
+      kept = prev ? readDeck(prev) : null;
+    } catch {}
     let input: Record<string, unknown> = { ratio: a.ratio, theme: a.theme, slides: a.slides, footer: a.footer, guides: a.guides, comments: a.comments, format: a.format ?? kept?.format, progress: a.progress ?? kept?.progress };
     // Some slides changed, added or taken out: the deck they make, its look as it was unless said.
     if (changesSlides(a)) {
