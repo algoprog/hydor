@@ -489,6 +489,12 @@ const LOOKS: Record<El['type'], string[]> = {
   video: ['radius', 'opacity'],
   table: ['size', 'color', 'font', 'fill', 'headColor', 'line', 'head', 'band', 'opacity'],
   chart: ['size', 'color', 'font', 'opacity'],
+  code: ['size', 'look', 'lineNumbers', 'radius', 'opacity'],
+  html: ['opacity'],
+  embed: ['radius', 'opacity'],
+  quiz: ['size', 'color', 'font', 'fill', 'layout', 'opacity'],
+  score: ['size', 'color', 'font', 'bold', 'align', 'opacity'],
+  scene3d: ['color', 'material', 'light', 'bg', 'opacity'],
   group: ['opacity'],
 };
 
@@ -630,6 +636,12 @@ export function partName(e: El): string {
   if (e.type === 'math') return `Equation: ${e.tex.length > 24 ? `${e.tex.slice(0, 23)}…` : e.tex}`;
   if (e.type === 'video') return 'Video';
   if (e.type === 'group') return `Group of ${e.els.length}`;
+  if (e.type === 'code') return e.lang ? `Code: ${e.lang}` : 'Code';
+  if (e.type === 'html') return 'Custom code';
+  if (e.type === 'embed') return 'Web page';
+  if (e.type === 'quiz') return e.question ? `Quiz: ${e.question.length > 24 ? `${e.question.slice(0, 23)}…` : e.question}` : 'Quiz';
+  if (e.type === 'score') return 'Quiz score';
+  if (e.type === 'scene3d') return '3D';
   if (e.route === 'elbow') return 'Elbow connector';
   if (e.from || e.to) return 'Connector';
   return e.end === 'arrow' || e.start === 'arrow' ? 'Arrow' : 'Straight line';

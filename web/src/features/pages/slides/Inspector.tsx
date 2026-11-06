@@ -1061,9 +1061,38 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cro
 
 // ---- Animate -----------------------------------------------------------------------------------------------
 
-const FX_NAMES: Record<AnimFx, string> = { appear: 'Appear', fade: 'Fade', fly: 'Fly', float: 'Float', zoom: 'Zoom', wipe: 'Wipe', bounce: 'Bounce', pulse: 'Pulse', spin: 'Spin', grow: 'Grow', shake: 'Shake' };
+const FX_NAMES: Record<AnimFx, string> = {
+  appear: 'Appear',
+  fade: 'Fade',
+  fly: 'Fly',
+  float: 'Float',
+  zoom: 'Zoom',
+  wipe: 'Wipe',
+  bounce: 'Bounce',
+  pulse: 'Pulse',
+  spin: 'Spin',
+  grow: 'Grow',
+  shake: 'Shake',
+  blur: 'Blur',
+  rise: 'Rise',
+  drop: 'Drop in',
+  flip: 'Flip over',
+  swing: 'Swing',
+  roll: 'Roll in',
+  pop: 'Pop in',
+  typewriter: 'Typewriter',
+  draw: 'Draw the lines',
+  count: 'Count up',
+  glow: 'Glow',
+  wiggle: 'Wiggle',
+  heartbeat: 'Heartbeat',
+  jello: 'Jelly wobble',
+  flash: 'Flash',
+  bob: 'Bob up and down',
+  confetti: 'Confetti burst',
+};
 const TYPE_NAMES: Record<Anim['type'], string> = { in: 'Comes in', em: 'Stands out', out: 'Goes out' };
-const ON_NAMES: Record<Anim['on'], string> = { click: 'On a click', with: 'With the one before', after: 'After the one before' };
+const ON_NAMES: Record<Anim['on'], string> = { click: 'On a click', with: 'With the one before', after: 'After the one before', tap: 'When a part is clicked' };
 // The side a part comes in from, or goes out to.
 const DIR_NAMES: Record<Dir, string> = { left: 'The left', right: 'The right', up: 'The top', down: 'The bottom' };
 
@@ -1194,7 +1223,7 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview }: Props) {
 
 // ---- Slide ----------------------------------------------------------------------------------------------------
 
-const TR_NAMES: Record<TransitionFx, string> = { none: 'None', fade: 'Fade', push: 'Push in', wipe: 'Wipe', cover: 'Cover', zoom: 'Zoom', split: 'Split', morph: 'Morph' };
+const TR_NAMES: Record<TransitionFx, string> = { none: 'None', fade: 'Fade', push: 'Push in', wipe: 'Wipe', cover: 'Cover', zoom: 'Zoom', split: 'Split', morph: 'Morph', cube: 'Cube', flip: 'Flip over', dissolve: 'Dissolve', circle: 'Circle', blinds: 'Blinds', glitch: 'Glitch' };
 
 function SlideTab({ deck, index, change, pickPicture, onFooter }: Props) {
   const slide = deck.slides[index];

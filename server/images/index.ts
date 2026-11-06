@@ -114,7 +114,8 @@ async function usingVideo(s: Settings, asked?: string): Promise<{ id: string; in
 async function state(db: DB): Promise<ImagesState> {
   const s = settings(db);
   const u = await using(s);
-  return { enabled: s.enabled, model: s.model, using: u.id, usingInfo: u.info, keySet: !!loadConfig().openrouter.apiKey };
+  // The Quick model (workstream A1 makes it a setting of its own).
+  return { enabled: s.enabled, model: s.model, using: u.id, usingInfo: u.info, quick: '', usingQuick: u.id, usingQuickInfo: u.info, keySet: !!loadConfig().openrouter.apiKey };
 }
 
 async function videoState(db: DB): Promise<VideosState> {
