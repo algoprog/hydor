@@ -2,7 +2,7 @@
 // editors' AI tools and generate_image decide by what the picture is for and what is asked: backgrounds, textures,
 // patterns, icons and simple flat pictures go to Quick; photos, scenes, illustrations with detail, diagrams, words
 // inside a picture, and every change to a picture go to Best.
-import type { ImageTier, PictureKind, TierChoice } from './images.ts';
+import type { DrawingKind, ImageTier, PictureKind, TierChoice } from './images.ts';
 
 /** Kinds that are simple whatever their words say. */
 const QUICK_KINDS: PictureKind[] = ['background', 'texture', 'icon'];
@@ -26,4 +26,18 @@ export function tierFor(choice: TierChoice | undefined, o: { prompt: string; kin
   if (SIMPLE_WORDS.test(p)) return 'quick';
   // A short ask with nothing complex in it is a simple picture.
   return p.trim().split(/\s+/).length <= 8 ? 'quick' : 'best';
+}
+
+/** Words that ask a drawing for detail a vector model draws better than written SVG. */
+const DETAILED_DRAWING = /\b(illustrat(ion|ed)|scene|landscape|detailed|intricate|realistic|portrait|character|mascot|poster)\b/i;
+
+/**
+ * The tier for a drawing (SVG): the one asked for, else Best (drawn by a vector model) for illustrations and
+ * detailed asks, Quick (written as SVG by a model) for icons, logos, diagrams, patterns and shapes.
+ */
+export function drawingTierFor(choice: TierChoice | undefined, o: { prompt: string; kind?: DrawingKind }): ImageTier {
+  if (choice === 'quick' || choice === 'best') return choice;
+  if (o.kind === 'illustration') return 'best';
+  if (o.kind) return 'quick';
+  return DETAILED_DRAWING.test(o.prompt ?? '') ? 'best' : 'quick';
 }
