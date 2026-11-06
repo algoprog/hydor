@@ -7,16 +7,18 @@
 // and a hint in an empty title and first paragraph. And the Google fonts a document uses, loaded through this server
 // (the app's pages load no font from elsewhere).
 import { useEffect, useState } from 'react';
-import { docCss, docFonts, FONTS, INK, PAPERS, type Doc } from '@shared/docs';
+import { columnMm, docCss, docFonts, FONTS, INK, paperOf, type Doc } from '@shared/docs';
 
 /** A CSS string of words. */
 const cssString = (s: string) => `"${s.replace(/["\\]/g, '\\$&').replace(/[\n\r]/g, ' ')}"`;
 
 /** The width of a document's paper, in CSS pixels. */
-export const paperPx = (doc: Doc) => Math.round((PAPERS[doc.page.size].w * 96) / 25.4);
+export const paperPx = (doc: Doc) => Math.round((paperOf(doc.page).w * 96) / 25.4);
 
 export function editorCss(doc: Doc, o: { narrow: boolean; hints: { title: string; body: string } }): string {
-  const paper = PAPERS[doc.page.size];
+  const paper = paperOf(doc.page);
+  // In columns, the words are one column wide (paging.ts sets each block in its column).
+  const cols = !o.narrow && (doc.page.cols ?? 1) > 1 ? `padding-right:calc(${doc.page.margin}mm + ${Math.round((paper.w - 2 * doc.page.margin - columnMm(doc.page)) * 100) / 100}mm);` : '';
   const m = o.narrow ? '18px' : `${doc.page.margin}mm`;
   const s = '.nd-ed';
   return [
@@ -25,7 +27,7 @@ export function editorCss(doc: Doc, o: { narrow: boolean; hints: { title: string
       (o.narrow
         ? 'width:100%;min-height:100%;padding:20px 18px 45vh;--nd-step:22pt}'
         : // On pages, the sheets are drawn behind the words: the words' own element is clear.
-          `width:${paper.w}mm;min-height:${paper.h}mm;padding:${m};background:transparent}`),
+          `width:${paper.w}mm;min-height:${paper.h}mm;padding:${m};${cols}background:transparent}`),
     // A page break: on a narrow screen the paper cut, a gap of the page around it between the two sheets.
     `${s} .nd-pb{position:relative;height:28px;margin:calc(var(--m) * .7) calc(var(--m) * -1);background:var(--bg-2,#eceae6);box-shadow:inset 0 7px 6px -7px rgba(0,0,0,.25),inset 0 -7px 6px -7px rgba(0,0,0,.25);cursor:pointer;user-select:none}`,
     ...(o.narrow

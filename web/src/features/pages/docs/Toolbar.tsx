@@ -27,6 +27,7 @@ import {
   MessageSquarePlus,
   PaintRoller,
   Redo2,
+  Sparkles,
   Table2,
   Trash2,
   Underline,
@@ -116,6 +117,7 @@ export function Toolbar({
   suggesting,
   onSuggesting,
   onPlot,
+  onAi,
 }: {
   engine: DocEngine;
   st: SelState;
@@ -131,6 +133,8 @@ export function Toolbar({
   onSuggesting?: (on: boolean) => void;
   /** A plot of the table the caret is in (a dialog), put in after it. */
   onPlot?: () => void;
+  /** Write with AI: at the caret, or for the words picked (explain, summarize, a table of them). */
+  onAi?: () => void;
 }) {
   const [menu, setMenu] = useState<'table' | 'align' | null>(null);
   const tableRef = useRef<HTMLButtonElement>(null);
@@ -197,6 +201,11 @@ export function Toolbar({
       {!slim && (
         <Tool label="Comment (Ctrl+Alt+M)" disabled={st.collapsed || !st.text.trim()} onClick={onComment}>
           <MessageSquarePlus size={15} />
+        </Tool>
+      )}
+      {onAi && (
+        <Tool label={st.collapsed ? 'Write with AI (Ctrl+J)' : 'Explain, summarize or make a table of the words picked, with AI (Ctrl+J)'} disabled={!!st.picked} onClick={onAi}>
+          <Sparkles size={15} />
         </Tool>
       )}
       <RewriteButton target={() => docsTarget(engine)} label={!slim} disabled={st.collapsed || !st.text.trim() || !!st.picked} />

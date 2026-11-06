@@ -8,7 +8,7 @@
 // over the words (PaperSheets.tsx). Laid out again after a pause in typing, from the page of the first block that
 // changed; meanwhile a block the editor draws anew keeps what the last layout gave it (a paragraph cut is cut again at
 // once, for its own lines). The rules are the PDF's (server/pages/docs.ts printCss), so the pages come out close to it.
-import { PAPERS, type Block, type Doc, type TableBlock } from '@shared/docs';
+import { paperOf, type Block, type Doc, type TableBlock } from '@shared/docs';
 import type { Pos } from './ops';
 
 /** The gap between two sheets, in the paper's own pixels. */
@@ -25,6 +25,16 @@ export interface Layout {
   margin: number;
   /** Changes with each layout (for what is drawn over the page to measure again). */
   n: number;
+  /** The footnotes at each page's foot (by page), and the room they take there (pixels, the line over them too). */
+  notes: Map<number, { ids: string[]; h: number }>;
+}
+
+/** What the layout needs of a document's footnotes: which a block brings to its page (their first marks are in it), and how tall each is drawn. */
+export interface NoteRoom {
+  ids: (b: Block) => string[];
+  height: (id: string) => number;
+  /** The line over a page's footnotes and the room around it. */
+  sep: number;
 }
 
 /** What the engine gives the layout: its page, its model, its blocks' elements and its places. */
@@ -89,7 +99,7 @@ export class Paging {
 
   constructor(
     private eng: PagedEngine,
-    private o: { zoom: () => number; onLayout: (l: Layout | null) => void },
+    private o: { zoom: () => number; onLayout: (l: Layout | null) => void; notes?: () => NoteRoom | null },
   ) {
     // A picture's height is known once it has loaded: the pages from there on move.
     eng.root.addEventListener('load', this.imgs, true);
@@ -124,11 +134,12 @@ export class Paging {
     }
   }
 
-  private geometry(doc: Doc) {
-    const pageH = PAPERS[doc.page.size].h * MM;
+  private geometry(doc: Doc, room?: Map<number, { ids: string[]; h: number }>) {
+    const pageH = paperOf(doc.page).h * MM;
     const margin = doc.page.margin * MM;
     const step = pageH + GAP;
-    return { pageH, margin, step, top: (p: number) => p * step + margin, bottom: (p: number) => p * step + pageH - margin, contentH: pageH - 2 * margin };
+    // A page's words end over its footnotes.
+    return { pageH, margin, step, top: (p: number) => p * step + margin, bottom: (p: number) => p * step + pageH - margin - (room?.get(p)?.h ?? 0), contentH: pageH - 2 * margin };
   }
 
   /** The model changed: laid out again soon, from the first block that changed. */
@@ -191,7 +202,10 @@ export class Paging {
     if (!this.on) return;
     const doc = this.eng.doc;
     const blocks = doc.blocks;
-    const g = this.geometry(doc);
+    // The footnotes each page holds, as the walk puts their blocks on pages (those before where it starts, as they were).
+    const nr = this.o.notes?.() ?? null;
+    const room = new Map<number, { ids: string[]; h: number }>();
+    const g = this.geometry(doc, room);
     const changed = from ?? this.dirty ?? 0;
     this.dirty = null;
     const index = new Map(blocks.map((b, i) => [b.id, i]));
@@ -217,6 +231,20 @@ export class Paging {
     const plans = new Map<string, Plan>();
     const pages = new Map<string, number>();
     for (const [id, pg] of this.pageOf) if ((index.get(id) ?? Infinity) < start) pages.set(id, pg);
+    /** A block's footnotes onto a page's foot (or off it again, `sign` -1). */
+    const notesOf = (b: Block) => (nr ? nr.ids(b) : []);
+    const addNotes = (p: number, ids: string[], sign: 1 | -1) => {
+      if (!ids.length || !nr) return;
+      const cur = room.get(p) ?? { ids: [], h: 0 };
+      const h = ids.reduce((n, id) => n + nr.height(id), 0);
+      const list = sign > 0 ? [...cur.ids, ...ids] : cur.ids.filter((x) => !ids.includes(x));
+      if (!list.length) room.delete(p);
+      else room.set(p, { ids: list, h: Math.max(0, cur.h + sign * h + (sign > 0 && !cur.ids.length ? nr.sep : 0) - (sign < 0 && !list.length ? nr.sep : 0)) });
+    };
+    for (let i = 0; i < start; i++) {
+      const pg = pages.get(blocks[i].id);
+      if (pg !== undefined) addNotes(pg, notesOf(blocks[i]), 1);
+    }
     // Each block's walk starts from where the one before left off: how far blocks are moved down from where they lie
     // (`shift`), where the last one ends, and the page it ended on. Kept per block, to walk a heading again.
     const states: { shift: number; prevBottom: number; page: number }[] = [];
@@ -233,6 +261,9 @@ export class Paging {
       const plan: Plan = {};
       let top = nat.top + shift;
       let bottom = nat.bottom + shift;
+      // Its footnotes go at the foot of the page it starts on (and move with it).
+      const ids = notesOf(b);
+      let notesAt = -1;
       const moveTo = (p: number) => {
         const target = g.top(p);
         plan.push = Math.max(0, target - prevBottom);
@@ -240,6 +271,11 @@ export class Paging {
         top = target;
         bottom = nat.bottom + shift;
         page = p;
+        if (notesAt >= 0 && notesAt !== p) {
+          addNotes(notesAt, ids, -1);
+          addNotes(p, ids, 1);
+          notesAt = p;
+        }
       };
       const how = cutting(b);
       const long = nat.bottom - nat.top > g.contentH + 0.5;
@@ -261,6 +297,10 @@ export class Paging {
       }
       // Starting above its page's words (in a margin, or between two sheets): moved down to them.
       if (top < g.top(page) - 0.5) moveTo(page);
+      if (ids.length) {
+        addNotes(page, ids, 1);
+        notesAt = page;
+      }
       if (b.type === 'pagebreak') {
         breakPage = page;
       } else if (bottom > g.bottom(page) + 0.5) {
@@ -309,7 +349,7 @@ export class Paging {
     this.laid = blocks;
     let count = Math.max(1, page + 1);
     while (prevBottom > g.bottom(count - 1) + g.margin + 1) count++;
-    this.layout = { count, pageH: g.pageH, margin: g.margin, n: ++this.n };
+    this.layout = { count, pageH: g.pageH, margin: g.margin, n: ++this.n, notes: room };
     this.o.onLayout(this.layout);
   }
 

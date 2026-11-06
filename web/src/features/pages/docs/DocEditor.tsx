@@ -15,7 +15,7 @@
 // with the agent's caret where its words arrive, kept in view (AgentCaret.tsx).
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, FileCog, Link2, ListTree, MessageSquare, MessageSquarePlus, Sparkles, Unlink } from 'lucide-react';
-import { docHeadings, docWords, FONTS, MARGINS, PAPERS, runsText, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type TableBlock } from '@shared/docs';
+import { columnMm, docHeadings, docWords, FONTS, MARGINS, PAPERS, runsText, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type TableBlock } from '@shared/docs';
 import { newCommentId, openComments, type Comment } from '@shared/comments';
 import { changesOf, compareDocs, suggestionColor } from '@shared/doc-changes';
 import { api, post } from '../../../lib/api';
@@ -58,6 +58,7 @@ import { SuggestionCard } from './Suggestions';
 import { slashAt, slashItems, slashLayout, slashMatches, SlashMenu } from './Slash';
 import { ColumnHandles, printDoc } from './TableTools';
 import { Toolbar } from './Toolbar';
+import { useDocAi } from './ai/useDocAi';
 
 // Insert → Signature: the saved signatures and the pad, loaded when first opened.
 const InsertSignature = lazy(() => import('../../signatures/InsertSignature').then((m) => ({ default: m.InsertSignature })));
@@ -109,15 +110,17 @@ interface ViewPrefs {
   spell: boolean;
   count: boolean;
   comments: boolean;
+  /** Suggest as I type (the helper model's next words, grey after the caret): off unless turned on. */
+  ghost: boolean;
 }
 
 function loadView(): ViewPrefs {
   try {
     const v = JSON.parse(localStorage.getItem(VIEW_KEY) ?? 'null');
     if (v && typeof v === 'object')
-      return { zoom: v.zoom === 'fit' || (typeof v.zoom === 'number' && v.zoom >= 0.25 && v.zoom <= 4) ? v.zoom : 1, spell: v.spell !== false, count: v.count !== false, comments: v.comments !== false };
+      return { zoom: v.zoom === 'fit' || (typeof v.zoom === 'number' && v.zoom >= 0.25 && v.zoom <= 4) ? v.zoom : 1, spell: v.spell !== false, count: v.count !== false, comments: v.comments !== false, ghost: v.ghost === true };
   } catch {}
-  return { zoom: 1, spell: true, count: true, comments: true };
+  return { zoom: 1, spell: true, count: true, comments: true, ghost: false };
 }
 
 /** The editor's keys, for the shortcuts dialog. */
@@ -147,6 +150,7 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+.', 'Superscript'],
       ['Ctrl+,', 'Subscript'],
       ['Ctrl+K', 'Link'],
+      ['Ctrl+J', 'Write with AI (Space on an empty line too)'],
       ['Ctrl+\\', 'Clear the formatting'],
       ['Ctrl+Alt+M', 'Comment'],
       ['Ctrl+Alt+Shift+X', 'Suggesting, or editing again'],
@@ -209,6 +213,8 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const [panel, setPanel] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [showResolved, setShowResolved] = useState(false);
+  // Whether the Ask about this document panel shows (the AI hook's, mirrored for the layout worked out before it runs).
+  const [askOpen, setAskOpen] = useState(false);
   // Editing (changes are made) or Suggesting (changes are suggested, as Google Docs' Suggesting and Word's Track changes).
   const [mode, setMode] = useState<'edit' | 'suggest'>('edit');
   // The document compared with a version (Tools → Compare with a version, or an older version opened from the
@@ -282,10 +288,11 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const changes = useMemo(() => (model?.suggestions?.length ? changesOf(model) : []), [model]);
   const ppx = shownDoc ? paperPx(shownDoc) : 794;
   // The comments beside the page where there is room for them, else in a panel.
-  const columnFits = !phone && width - outlineW >= ppx * (typeof view.zoom === 'number' ? Math.min(1, view.zoom) : 1) + COLUMN + 24 + 48;
+  const columnFits = !phone && width - outlineW - (askOpen ? 340 : 0) >= ppx * (typeof view.zoom === 'number' ? Math.min(1, view.zoom) : 1) + COLUMN + 24 + 48;
   const column = columnFits && view.comments && (shownComments.length > 0 || changes.length > 0 || !!draft);
   const panelW = !phone && panel && !columnFits ? 320 : 0;
-  const room = width - outlineW - panelW - (column ? COLUMN + 24 : 0) - 48;
+  const askW = !phone && askOpen ? 340 : 0;
+  const room = width - outlineW - panelW - askW - (column ? COLUMN + 24 : 0) - 48;
   // Fit the width: the paper as wide as there is room for; else as large as asked, or (no room for it) the words
   // filling the width, as on a phone.
   const want = view.zoom === 'fit' ? Math.min(3, room / ppx) : view.zoom;
@@ -344,6 +351,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       src: pictureSrc,
       breakLabel: tr('Page break'),
       tocHint: tr('Headings you add show here, to go to them.'),
+      bibHint: tr('The sources the document cites show here, in its citation style.'),
       math: drawMath,
       onChange: (d) => {
         setModel(d);
@@ -585,6 +593,10 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     [comments, active, showResolved, model?.suggestions],
   );
 
+  // The AI that writes with you: its box at the caret, its runs over the whole document, its suggestions as you type, its panel.
+  const ai = useDocAi({ engine: engine.current, st, doc: model, title: doc?.title ?? '', host, width, readOnly: !!readOnly || liveOn || !!compare, ghostOn: view.ghost, tick });
+  useEffect(() => setAskOpen(ai.ask), [ai.ask]);
+
   if (!model) return <div className="flex h-full items-center justify-center text-fg-3">…</div>;
 
   const e = engine.current;
@@ -599,6 +611,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
             signature: () => setDialog('signature'),
             equation: () => openEquation(false),
             today: () => today(),
+            ai: readOnly ? undefined : () => ai.write(),
           }),
           slash.query,
         )
@@ -655,6 +668,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
         return true;
       }
     }
+    if (ai.onKey(ev)) return true;
     if (globalKey(ev)) {
       ev.preventDefault();
       return true;
@@ -733,7 +747,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   /** How wide a picture made with AI goes in: a wide one across the text, another half as wide (its handles size it after). */
   const madeWidth = (p: { w: number; h: number }) => {
     const d = engine.current?.doc ?? model;
-    const text = d ? ((PAPERS[d.page.size].w - 2 * d.page.margin) * 96) / 25.4 : 600;
+    const text = d ? (columnMm(d.page) * 96) / 25.4 : 600;
     return p.w / Math.max(1, p.h) >= 1.3 ? text : text / 2;
   };
   /** A picture made with AI, a drawing or a plot, put in at the caret (after the table it is in: a cell holds only words). */
@@ -1022,6 +1036,9 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           resolveAll: (accept) => e.resolve(null, accept),
           compare: () => setVersions(true),
           readOnly: !!readOnly || !!compare || liveOn,
+          ai: readOnly ? undefined : ai,
+          ghost: view.ghost,
+          setGhost: readOnly ? undefined : (on) => setPrefs({ ghost: on }),
         })
       : [];
 
@@ -1151,7 +1168,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
 
   return (
     <div ref={root} className="flex h-full min-h-0 flex-col bg-bg">
-      <style>{`${css}\n${marks}\n.nd-ed.nd-painting,.nd-ed.nd-painting *{cursor:copy!important}\n::highlight(nd-find){background-color:rgba(255,213,79,.55)}\n::highlight(nd-find-now){background-color:#ff9632;color:#000}\n.nd-math-wait{font-family:${'ui-monospace,monospace'};color:#80868b;font-size:.9em}`}</style>
+      <style>{`${css}\n${marks}\n${ai.css}\n.nd-ed.nd-painting,.nd-ed.nd-painting *{cursor:copy!important}\n::highlight(nd-find){background-color:rgba(255,213,79,.55)}\n::highlight(nd-find-now){background-color:#ff9632;color:#000}\n.nd-math-wait{font-family:${'ui-monospace,monospace'};color:#80868b;font-size:.9em}`}</style>
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
@@ -1206,6 +1223,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
             suggesting={mode === 'suggest'}
             onSuggesting={(on) => setMode(on ? 'suggest' : 'edit')}
             onPlot={readOnly ? undefined : () => void plot()}
+            onAi={readOnly ? undefined : () => ai.write()}
           />
         </div>
       )}
@@ -1229,7 +1247,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
               }}
             >
               {/* The sheets behind the words, on pages; each one's header and footer over them. */}
-              {!narrow && pageLayout && <Sheets layout={pageLayout} zoom={zoom} width={ppx * zoom} />}
+              {!narrow && pageLayout && <Sheets layout={pageLayout} zoom={zoom} width={ppx * zoom} doc={shownDoc ?? model} src={pictureSrc} />}
               <div
                 ref={paper}
                 className="nd-ed nd-doc"
@@ -1245,6 +1263,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
               )}
               {handlesFor && e && <ColumnHandles engine={e} table={handlesFor} host={host} tick={`${tick}:${model.blocks.length}`} />}
               {e && !readOnly && !liveOn && !narrow && <BlockHandle engine={e} host={host} paper={paper} tick={model.blocks} />}
+              {ai.overlay}
               {liveOn && e && <AgentCaret engine={e} mark={live!.mark} host={host} scroller={scroller} tick={`${drawnLive}:${pageLayout?.n ?? 0}:${zoom}:${narrow}`} />}
               {found.boxes.map((b, k) => (
                 <span key={k} className="pointer-events-none absolute rounded-[2px]" style={{ left: b.x, top: b.y, width: b.w, height: b.h, background: b.now ? 'rgba(255,150,50,.55)' : 'rgba(255,213,79,.45)' }} />
@@ -1333,6 +1352,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           </div>
         </div>
         {panelW > 0 && <aside className="w-[320px] shrink-0 border-l border-line bg-panel">{panelBody}</aside>}
+        {ai.panel && (phone ? <div className="absolute inset-0 z-30 bg-panel">{ai.panel}</div> : <aside className="w-[340px] shrink-0 border-l border-line bg-panel">{ai.panel}</aside>)}
         {compare && (
           <CompareView
             merged={compare.merged}
@@ -1347,6 +1367,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           />
         )}
         {phone && panel && <div className="absolute inset-0 z-30 bg-panel">{panelBody}</div>}
+        {ai.bar && <div className={cx('absolute right-3 z-30', find.open ? 'top-14' : 'top-2')}>{ai.bar}</div>}
         {find.open && (
           <div className="absolute top-2 right-3 z-30 max-w-[calc(100%-24px)]" data-keeps-editing>
             <FindBar
@@ -1458,6 +1479,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       <SpacingDialog open={dialog === 'spacing'} onClose={() => (setDialog(null), e?.refocusSoon())} value={{ lh: sp?.lh, sb: sp?.sb, sa: sp?.sa }} onApply={(v) => e?.spacing(v)} />
       <BandsDialog open={dialog === 'bands'} onClose={() => (setDialog(null), e?.refocusSoon())} header={model.header} footer={model.footer} titlePage={model.titlePage} onApply={(v) => e?.setBands(v)} />
       <VersionsDialog open={versions} pageId={pageId} onClose={() => (setVersions(false), e?.refocusSoon())} onPick={(v) => void compareWith(v)} />
+      {ai.dialogs}
       <ShortcutsDialog open={dialog === 'keys'} onClose={() => (setDialog(null), e?.refocusSoon())} groups={SHORTCUTS} />
       {dialog === 'signature' && (
         <Suspense fallback={null}>

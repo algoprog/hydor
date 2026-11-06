@@ -20,7 +20,7 @@ import {
   htmlRuns,
   listInfo,
   normalizeBlocks,
-  PAPERS,
+  columnMm,
   runsHtml,
   resolveSuggestion,
   runsText,
@@ -1308,8 +1308,8 @@ export class DocEngine {
 
   /** A picture block of `px` pixels wide, as a share of the text's width (no wider than it). */
   picture(src: string, px: number): ImageBlock {
-    const paper = PAPERS[this.doc.page.size];
-    const text = ((paper.w - 2 * this.doc.page.margin) * 96) / 25.4;
+    // As wide as a column of words at most.
+    const text = (columnMm(this.doc.page) * 96) / 25.4;
     return { id: ops.freshId(this.doc), type: 'image', src, w: Math.max(0.05, Math.min(1, Math.round((px / text) * 1000) / 1000)) };
   }
 
