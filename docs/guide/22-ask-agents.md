@@ -39,7 +39,7 @@ Then you choose:
 - **Allow for this session** makes it, and lets this session make more changes of the same everyday kind without asking again. Changes that ask every time (below) still ask.
 - **Don’t** (or **Decline**) changes nothing. You can say why, or what to do instead, and the agent reads it.
 
-Some changes ask every time, even after **Allow for this session**: deleting anything, starting a session or a scheduled task's run, sending a message to another session, adding an MCP server, adding, turning on or changing a plugin, changing what agents may do in Custom or the browser, adding a machine or an account, downloading a model, updating the app. For a deletion the button says **Delete**.
+Some changes ask every time, even after **Allow for this session**: deleting anything, starting a session or a scheduled task's run, sending a message to another session, adding an MCP server, adding, turning on or changing a plugin, changing what agents may do in Custom or the browser, adding a machine or an account, downloading a model, setting up the picture tools on this computer, updating the app. For a deletion the button says **Delete**.
 
 A card waits about nine minutes. If you don't answer by then, it goes away and the agent asks you in its reply instead.
 
@@ -54,11 +54,12 @@ A card for a change can carry a form too: "Make a project" can show the name, de
 Some things stay yours. An agent that tries gets told where you do it:
 
 - your password and signing in and out ([Settings → Password](/settings?s=security), [Accounts](/settings?s=accounts));
-- the values of keys and sign-ins: an agent asks for them with a card where you type them into the vault, and never sees them ([Connected apps, keys and tools](/guide/connections));
+- the values of keys and sign-ins: an agent asks for them with a card where you type them into the vault, and never sees them ([Connected apps, keys and tools](/guide/connections)); the OpenRouter key has a card of its own, which puts it straight into Settings → Models ([When an agent needs the OpenRouter key](/guide/documents-voice#when-an-agent-needs-the-openrouter-key));
 - making access tokens for other machines or agents, and an app's API keys;
 - answering approval cards, its own or another session's, and deciding on cards that ask you (a proposed skill, a scheduled task, publishing);
 - a session's permissions and its spending cap;
-- files, commands, terminals and git through the app: agents use their own tools for those, which ask you as the session's permissions say.
+- files, commands, terminals and git through the app: agents use their own tools for those, which ask you as the session's permissions say;
+- the editors' own AI tools and the picture and video editors: agents make, find, change and edit pictures, drawings, plots and videos with tools of their own, which save what they make in the session's folder ([Documents, images, videos and voice](/guide/documents-voice)), and narrate slides with a voice-over of each slide's notes.
 
 ## Permissions and the cards
 

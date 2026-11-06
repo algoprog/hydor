@@ -157,7 +157,28 @@ agents that speak ACP and take MCP servers.
   cryptographic digital signature).
 - **Images, videos and audio**: agents make pictures (or change yours), short videos (from words, from a picture
   to start or end on, or by changing a video) and sound with OpenRouter's image, video and audio models, the ones
-  picked in Settings → Images, video and audio or one you name. The app's choices are ByteDance's Seedream 5.0 for
+  picked in Settings → Images, video and audio or one you name. Pictures come in two tiers, each a model of its
+  own: Best (Seedream 5.0 Pro unless you pick another) for scenes, photos, words in a picture, diagrams and every
+  change, and Quick (Seedream 5.0 Flash, or other quick ones) for icons, backgrounds and textures, picked by what is
+  asked (generate_image's detail); a see-through background asked of a model that cannot make one goes to one that
+  can, or is cut out here. Drawings (make_svg: icons, logos, diagrams, patterns, shapes, in given colours) are
+  written as SVG by Claude or the helper model for nothing, or drawn by Recraft's vector model at Best (about
+  $0.08), every one cleaned of scripts, links and what it would load. Plots (make_plot: scatter plots, histograms,
+  error bars, several axes, heat maps, functions) are written in Python with matplotlib by the same writer and run
+  on this computer, errors going back to it (three tries), with their code beside them to change, and a Plotly
+  version that answers the pointer for web decks. Free photos (find_photos) come from Openverse (Wikimedia Commons
+  when it cannot answer), only those free to change and use commercially, saved with their credits. The picture
+  tools on this computer (Settings → Images, video and audio → Set up: a private Python with ONNX Runtime and a
+  portable ffmpeg, about 145 MB, and two models downloaded when first used, BiRefNet-lite and LaMa) take
+  backgrounds out (remove_background) and erase parts of pictures (erase_from_image) for nothing and in private,
+  each model loaded only while used, put away after a few idle minutes and never loaded without the memory for it;
+  a poor cutout, and a large or detailed area to erase, go to an image model, and how: "ai" asks for one.
+  edit_image crops, turns, sizes, adjusts, filters, marks up and blurs pictures, and edit_video trims, cuts, crops,
+  speeds up, captions and sets music to videos, both for nothing on this computer (ffmpeg). A tool that needs an
+  OpenRouter key and finds none asks for it on a card in the conversation (it goes straight to Settings → Models,
+  checked with OpenRouter; Skip and nothing runs or is spent, and the session is not asked again for six hours).
+  When agents make slides, documents and pages they illustrate them by themselves where a picture helps, with
+  these tools. The app's choices are ByteDance's Seedream 5.0 for
   pictures and Seedance 2.5 for videos, Google's Lyria 3 for music (whole songs with or without singing, from the
   agent's description and lyrics) and ByteDance's Seed Audio for voices and sounds (voice-overs in a voice described
   or copied from 1–3 recordings, conversations, sound effects and ambience); any of OpenRouter's speech models
@@ -219,24 +240,33 @@ agents that speak ACP and take MCP servers.
   phones only), move, size, copy, wrap or delete it, pick it from its layers, add parts and ready-made sections,
   set the whole page's colours, fonts, width and the look of its headings, links and buttons, ask the agent about
   a part, or edit its HTML with the page beside it; the agent hears of your changes with your next message.
-  HTML files an agent writes open the same way. Make pages of your own from a blank page, notes, a checklist or
+  HTML files an agent writes open the same way. Pictures go into a page made with AI (Make with AI, A drawing (SVG)),
+  as free photos with their credit under them, or as a cover made with AI; a picked picture is changed with AI or
+  edited in the picture editor; Add has Add a block made with AI (a pricing table, questions and answers…); and
+  pictures an agent saves into a page from its folder (a picture, a drawing, a plot) go inside it, made smaller where
+  this computer can (a page up to 2 MB). Make pages of your own from a blank page, notes, a checklist or
   a tracker, and see or clear the data a page keeps. Export a page as a PDF, a Word document (headings, lists,
   tables, links, charts as pictures) or a web page; ask an agent to change the page, slides, document, spreadsheet
   or LaTeX you have open (this slide, every slide, a section, the cells picked, the part picked, all of it) and
   watch it change as it saves. Apps are small tools for one job that find things out and show them clearly, each
   with a form and a view of its answer: ready-made or your own (described to the App builder, built from scratch,
-  or installed from a file, all under one New app menu). The Apps page says what apps are in three parts (open one
-  here, or just ask in any chat; one job each) until you put the note away, finds apps by name, description and
-  kind, and lists the runs to pick up again, your own apps, the ready-made ones under their kinds (each card saying
-  whether it has its own view and works in chats) and the ready-made apps you uninstalled, to install again. They run
+  or installed from a file, all under one New app menu). The Apps page has the apps you pin at its very top (big
+  tiles in your order, dragged or moved from a tile's menu, up to 12, the same on every device; Pin to the top and
+  Unpin in each card's menu and an app's own page's), a find box that stays at the top and finds any app as you type
+  (its name, kind and what it does, plurals too; Enter opens the best fit), its kinds as chips with their counts, the
+  apps you ran lately (each once, up to 8: how its last run went and when, Open the result or Answer it, Run again
+  with the same answers; the latest runs folded beside them), four ready-made apps to start with for someone new,
+  your own apps (Most used, A to Z or Newest), the ready-made ones under their kinds (cards of one size, with what
+  each asks for and marks for its own view, working in chats and a key it needs) and the ready-made apps you
+  uninstalled, to install again; on a phone, one column, the pinned and recent apps scrolling sideways. They run
   from the Apps page, the API, MCP, a public page, or once for each row of a CSV. Ready-made apps come installed; Uninstall puts one aside, and Install brings it back after a card
-  that says in plain words what it asks, gives and does. A session is told of the few apps run most with what they
-  do and of the others by name (up to 40 in all), and a message one app clearly does tells the agent which, with its
+  that says in plain words what it asks, gives and does. A session is told of the few apps pinned or run most with
+  what they do (the pinned ones first) and of the others by name (up to 40 in all), and a message one app clearly does tells the agent which, with its
   form (a clear lead by words, so "best upcoming games for switch 2" runs the Game finder); past 40, agents find the
   right one with find_apps: a few words on what the user wants, searched by
   words (BM25 over names, kinds, descriptions and form questions, plurals and word starts matching) and by meaning
   (the search box's vectors), fused by rank, the user's own and those run lately lifted, the best twenty with
-  their forms. An app that needs a model through OpenRouter asks for OpenRouter's key with its other keys (kept
+  their forms, those pinned on the Apps page first and those used lately next, each marked so. An app that needs a model through OpenRouter asks for OpenRouter's key with its other keys (kept
   in Settings → Models) and adds the model by itself when it first runs; one for Ollama, vLLM or an endpoint is
   refused until it is set up. Agents in any session run your apps for you (use_app):
   ask to plan a trip and the Trip planner runs there, the questions your message left out asked on the app's own
@@ -355,6 +385,35 @@ agents that speak ACP and take MCP servers.
   in its Header & Footer boxes, charts with their data for Edit Data), PDF, pictures of the slides
   (PNG) or a web page that presents itself, and open as a slideshow at their own address or a published link. PowerPoint files (.pptx) open as decks to edit,
   their layouts, text, pictures, tables, charts, groups, connectors, videos, notes and comments brought in.
+  Decks are made for the web unless made PowerPoint compatible (Theme → Made for, or Tools → PowerPoint compatible,
+  which first lists what changes, slide by slide; a deck opened from a .pptx starts so). The web format adds
+  interactive parts (Insert → Interactive: custom code, a small web page of HTML, CSS and JavaScript in a sandboxed
+  frame, from four starters or written by an agent; a web page or a site's embed code; quizzes and polls with what
+  is said for each choice, and a quiz score; 3D shapes, words or your own .glb or .gltf models, with materials,
+  lighting, turning and viewers turning them; and code shown coloured, in both formats), seventeen more effects
+  (Typewriter, Count up, Draw the lines, Confetti burst…), started by a click on a part, word by word or letter by
+  letter, kept going, with springs and bounces; cube, flip, dissolve, circle, blinds and glitch transitions; moving
+  backgrounds and a video behind a slide; text effects, frosted glass and effects when the pointer is on a part;
+  and a progress bar. Live parts run in the slideshow, the presenter's and audience's windows and the deck's own
+  page, and show their picture in the editor until Run; the deck's web page is one small file with its fonts,
+  pictures, 3D models and videos inside; its PowerPoint file has live parts as pictures of them running (a quiz as
+  text boxes, its answer in the notes) and effects as PowerPoint's nearest, with a note of what changed. Pictures go
+  in shapes (fourteen) or device frames (an instant photo, a phone, a laptop, a browser window); free photos come
+  from Openverse (Wikimedia Commons when it cannot answer), their credits in the notes and a caption where the
+  licence asks; QR codes; slides from another deck (their look kept or this deck's); charts from a Library
+  spreadsheet that update from it; My themes (colours, fonts and a logo on every slide, also in New → Slides); a
+  video's end as well as its start; and an eyedropper in the colour pickers. Design ideas lay the slide out anew
+  from its own words, pictures and numbers (thirteen designs, by the helper model); Rewrite makes picked words
+  shorter, longer, simpler, more formal, friendlier, correct or in another language; Animate every slide is
+  Subtle, Lively or Striking; Check accessibility lists missing titles, reading order, pictures without a
+  description (written with AI on request), low contrast, small words, videos with sound that start by themselves
+  and tables without a header row, fixing what it can; Translate the slides asks the agent. Each slide may have a
+  narration, recorded from its notes or made with AI (priced first), played by a narrated show that goes on by
+  itself and kept in the PowerPoint file; Rehearse with coach times each slide, hears the pace, filler words (in six
+  languages) and slides read out, and can give each slide its rehearsed time; Record a video records the slideshow
+  with your voice and a camera bubble (Keep in the Library or Download); the camera bubble (V) shows in the
+  slideshow, the presenter's view and the audience's window; and a phone opened from a QR code is the remote (next,
+  back, any slide, a black screen, notes, a timer and the next slide).
 - **Documents, spreadsheets and LaTeX**: kept in the Library beside slides, each with versions, a picture in the list,
   its own address, menus with Search the menus, find and replace, a list of its keyboard shortcuts, and an agent that
   changes it on request, whose work you watch as it writes (slides too: the agent's caret where its words arrive, the
@@ -369,7 +428,11 @@ agents that speak ACP and take MCP servers.
   that agents read, answer and resolve (a Word file's keep their authors), Suggesting as Word's track changes and
   Google Docs' suggestions (accepted or rejected one by one or all at once, kept as Word's tracked changes both ways,
   and made by agents too), a comparison with any earlier version, paste from Word and Google Docs cleaned, an outline, zoom, a word count and
-  printing; they export as Word (styles, lists, tables, pictures, comments, tracked changes, equations, the table of
+  printing, pictures, drawings and plots made with AI (Insert, "/", and a table's Make a plot of this table), free
+  photos with their credit as the caption, a picked picture changed with AI (in words, its background taken out,
+  part of it erased) or edited in the picture editor, Rewrite of the words picked, and a Section made with AI (an
+  executive summary, a table of risks…); a picture, table or line put in from a table's cell goes after the table;
+  they export as Word (styles, lists, tables, pictures, comments, tracked changes, equations, the table of
   contents and headers and footers as Word's own; laid out so Word's pages break where the editor's do, the
   document's fonts inside the file), PDF on their paper, Markdown or a web page. Spreadsheets (save_sheet, with
   formulas, or opened from an Excel, ODS, CSV or TSV file) work as in Excel, Google Sheets or Airtable: a grid that
@@ -398,6 +461,42 @@ agents that speak ACP and take MCP servers.
   with their outputs: cells edited and run in a kernel of the Python environment picked, in a folder of their own in
   the app's data folder, Ask on the whole notebook or a cell, and versions with their outputs; they export as the
   .ipynb, a Python script with # %% cells, a PDF or a web page.
+- **Pictures, drawings, plots and videos in the editors**: slides, documents and pages make them where you put one
+  in (Insert → Picture, "/", a page's picture and cover, a slide's background, a table's or a chart's Make a plot of
+  this), each in a dialog that shows the price before anything is spent and the result before it is used, a sheet on
+  a phone. A picture: what it is for (a picture, photo, illustration, background, icon, diagram, texture or logo,
+  each asked for in its own way), a look, a shape, Quick or Best (Auto picks by what is asked), how many, a
+  see-through background, a deck's colours, a picked picture to follow. A change: in words (everywhere, or only
+  where you paint), the background taken out, or part of it erased with a brush, shown before and after, with Do it
+  with AI instead under a result made on this computer. A drawing (SVG): what it is, its shape and colours, Quick
+  (written by Claude or the helper model, free) or Best (Recraft's vector model). A plot: its data from the table or
+  the chart it comes from, a file or pasted, its Python written by the same writer and run on this computer, changed
+  in words or by editing its code (Run again), and in a web deck also a Plotly version that answers the pointer. A
+  video (slides): its length, shape, sound and a picture to start from, its price range first, made while you work
+  on (a note with Insert when it is done). Without an OpenRouter key the dialog asks for one in place, with Skip and
+  a way that needs none (a drawing instead, or Quick). Settings → Images, video and audio has the Best and Quick
+  models and the picture tools on this computer (Set up, what they are doing, Remove).
+- **The picture and video editors**: pictures and videos open in editors of their own, in tabs inside the app (the
+  page you came from first, a dot on a tab with changes not saved, Open editors on a phone), from a picture shown
+  large (Edit), the Library's picture and video pages, Files (Edit, and Edit the picture or Edit the video in a
+  file's menu), slides (Edit picture, Edit video), documents and pages (Edit picture) and an agent's video. The
+  picture editor crops (eight shapes, turns, mirror, straighten), adjusts (exposure, brightness, contrast,
+  highlights, shadows, saturation, vibrance, warmth, tint, sharpness, blur, vignette), filters (thirteen, with
+  their strength), marks up (pen, highlighter, arrows, lines, boxes, ovals, words in five fonts, blurred or
+  pixelated areas, emoji; marks stay movable) and has AI (remove the background, erase, change in words, expand to
+  a new shape), with undo, hold to compare and back to the original; it saves at a size and as PNG, JPEG or WebP,
+  over the original (the old file to the Trash) or as a copy. The video editor trims, splits and cuts parts out,
+  changes the speed (its sound keeping its pitch), crops to a shape, turns and mirrors, puts words on it at the
+  times you pick, adjusts its colour, fades it, mutes it or sets its volume, lays music from the Library under it,
+  takes a frame as a picture or as its still, and saves it as MP4, WebM or a GIF, rendered with ffmpeg here (the
+  picture tools bring one). Agents have edit_image and edit_video.
+- **Made with AI from a kind**: 216 kinds the app knows how to make well (56 slides, 29 decks, 43 documents, 19
+  sections, 39 pages, 17 blocks of a page, 13 spreadsheets), in a gallery with a find box and chips by group: Insert
+  → Slide made with AI (and a slide's own menu, A slide made with AI after it), Insert → Section made with AI, Add a
+  block made with AI, Choose a kind in New (then Make it with AI or Make an empty one), and Turn it into in the
+  Library (slides, a document or a page from what you have). Say what it is about, and an agent makes it from what
+  is there, as you watch; web-only slides are marked Web format in a deck made for PowerPoint. Agents read the same
+  instructions with how_to_make (free) before they make a known kind of thing by name.
 - **Skills**: every skill agents can use on one page (Settings → Skills), grouped by what it is for: more than
   sixty that come with the app for every agent (ways of working, writing, documents, research and the web,
   planning, data, design and pictures, coding, AI models, this app), yours, those your plugins bring, Claude
