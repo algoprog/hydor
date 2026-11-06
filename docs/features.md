@@ -219,18 +219,23 @@ agents that speak ACP and take MCP servers.
   or LaTeX you have open (this slide, every slide, a section, the cells picked, the part picked, all of it) and
   watch it change as it saves. Apps are small tools for one job that find things out and show them clearly, each
   with a form and a view of its answer: ready-made or your own (described to the App builder, built from scratch,
-  or installed from a file, all under one New app menu). The Apps page says what apps are in three parts (open one
-  here, or just ask in any chat; one job each) until you put the note away, finds apps by name, description and
-  kind, and lists the runs to pick up again, your own apps, the ready-made ones under their kinds (each card saying
-  whether it has its own view and works in chats) and the ready-made apps you uninstalled, to install again. They run
+  or installed from a file, all under one New app menu). The Apps page has the apps you pin at its very top (big
+  tiles in your order, dragged or moved from a tile's menu, up to 12, the same on every device; Pin to the top and
+  Unpin in each card's menu and an app's own page's), a find box that stays at the top and finds any app as you type
+  (its name, kind and what it does, plurals too; Enter opens the best fit), its kinds as chips with their counts, the
+  apps you ran lately (each once, up to 8: how its last run went and when, Open the result or Answer it, Run again
+  with the same answers; the latest runs folded beside them), four ready-made apps to start with for someone new,
+  your own apps (Most used, A to Z or Newest), the ready-made ones under their kinds (cards of one size, with what
+  each asks for and marks for its own view, working in chats and a key it needs) and the ready-made apps you
+  uninstalled, to install again; on a phone, one column, the pinned and recent apps scrolling sideways. They run
   from the Apps page, the API, MCP, a public page, or once for each row of a CSV. Ready-made apps come installed; Uninstall puts one aside, and Install brings it back after a card
-  that says in plain words what it asks, gives and does. A session is told of the few apps run most with what they
-  do and of the others by name (up to 40 in all), and a message one app clearly does tells the agent which, with its
+  that says in plain words what it asks, gives and does. A session is told of the few apps pinned or run most with
+  what they do (the pinned ones first) and of the others by name (up to 40 in all), and a message one app clearly does tells the agent which, with its
   form (a clear lead by words, so "best upcoming games for switch 2" runs the Game finder); past 40, agents find the
   right one with find_apps: a few words on what the user wants, searched by
   words (BM25 over names, kinds, descriptions and form questions, plurals and word starts matching) and by meaning
   (the search box's vectors), fused by rank, the user's own and those run lately lifted, the best twenty with
-  their forms. An app that needs a model through OpenRouter asks for OpenRouter's key with its other keys (kept
+  their forms, those pinned on the Apps page first and those used lately next, each marked so. An app that needs a model through OpenRouter asks for OpenRouter's key with its other keys (kept
   in Settings → Models) and adds the model by itself when it first runs; one for Ollama, vLLM or an endpoint is
   refused until it is set up. Agents in any session run your apps for you (use_app):
   ask to plan a trip and the Trip planner runs there, the questions your message left out asked on the app's own

@@ -54,10 +54,10 @@ the ones you start in VS Code or a terminal show up too.
   research that ends in a cited report. In the desktop apps, agents can also use your computer itself, its screen,
   mouse and keyboard in any app, once you allow it: a glow lines the screen while they work, and Esc stops them.
 - **Apps**: small tools for one job (a trip plan, a product comparison, the weather, a quiz) whose answers open in
-  views of their own, with maps, charts, pictures and videos. Use the ready-made ones or make your own; agents
-  run them for you in any chat. **Explore**, at the top right of the start page, is a magazine made for you:
-  articles and recent news on what you work on and care about, picked from your profile and your sessions, and
-  updated every day if you like.
+  views of their own, with maps, charts, pictures and videos. Use the ready-made ones or make your own, the ones you
+  use most pinned at the top of the Apps page; agents run them for you in any chat. **Explore**, at the top right of
+  the start page, is a magazine made for you: articles and recent news on what you work on and care about, picked
+  from your profile and your sessions, and updated every day if you like.
 - **Things to keep**: pages you write in as in Notion, databases too; slides, documents, spreadsheets and LaTeX you edit as in
   PowerPoint, Word, Excel and Airtable, and Overleaf, with menus you can search, comments agents answer, suggestions
   and tracked changes you accept or reject (an agent's edits too), documents on real pages, equations, charts that sit
