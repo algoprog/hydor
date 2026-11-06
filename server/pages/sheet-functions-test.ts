@@ -23,6 +23,7 @@ import {
   type Workbook,
 } from '../../shared/sheets.ts';
 import { importBook, xlsxOfBook } from './sheets.ts';
+import { addGroup, foldGroup, guardOf, protectionAt, removeGroup, spansOf } from '../../shared/sheet-groups.ts';
 import { Zip } from '../documents/zip.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -279,6 +280,34 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
   const c = back.sheets[0].cells;
   ok(back.names?.[0]?.name === 'Rate' && c.B1.f === 'LET(x, A1, x*Rate)' && c.A2.link === 'https://example.com/a?b=1&c=2' && c.A3.link === "#'Sheet1'!A1" && back.sheets[0].noGrid === true, 'and read back: names, LET, links, hidden grid lines');
   ok(near(computeBook(back).get(back.sheets[0].id, 'B1'), 0.04), 'the name works in the file read back');
+}
+
+// ---- groups of rows and columns, protected cells ---------------------------------------------------------------------
+{
+  const b = normalizeBook({ sheets: [{ name: 'G', cells: { A1: 1 }, groups: [{ range: '2:9' }, '4:5', { range: 'C:E' }, { range: '9x' }], protect: [{ range: 'A1:B2' }, { range: 'D1', warn: true, note: 'Totals' }] }] });
+  const sh = b.sheets[0];
+  ok(sh.groups?.length === 3 && sh.groups[1].range === '4:5', 'groups as kept: rows and columns, a broken one left out');
+  const sp = spansOf(sh);
+  ok(sp.rows.length === 2 && sp.rows.find((x) => x.a === 3)?.level === 2 && sp.cols[0].a === 2 && sp.cols[0].b === 4, 'a group inside another is a level deeper');
+  ok(addGroup(sh, 'row', 2, 3) === null && addGroup(sh, 'row', 5, 7)?.length === 4, 'a group may not cross another, but may sit inside one');
+  ok(removeGroup(sh, 'row', 3, 4)?.length === 2, 'ungrouped: the group there');
+  const folded = foldGroup(sh, 0, true);
+  ok(folded.rows?.[1]?.hidden && folded.rows?.[8]?.hidden && folded.groups?.[0].hidden, 'folded: its rows hidden');
+  const inner = foldGroup({ ...sh, ...folded, groups: folded.groups!.map((g, i) => (i === 1 ? { ...g, hidden: true } : g)) }, 0, false);
+  ok(!inner.rows?.[1]?.hidden && inner.rows?.[3]?.hidden && inner.rows?.[4]?.hidden, 'shown again: but the rows of a folded group inside it');
+  const down = adjustForInsert(b, sh.id, 'row', 0, 1).sheets[0];
+  ok(down.groups?.[0].range === '3:10' && down.protect?.[0].range === 'A2:B3', 'rows put in above: groups and protected ranges follow');
+  ok(protectionAt(sh, 0, 0)?.range === 'A1:B2' && protectionAt(sh, 0, 3)?.warn && protectionAt(sh, 5, 5) === null, 'which cells are protected');
+  ok(!!guardOf(sh, [[1, 1]]).refuse && !!guardOf(sh, [[0, 3]]).warn && !guardOf(sh, [[9, 9]]).refuse, 'a change refused, warned of, or let through');
+  const whole = { ...sh, protect: [{ except: 'B2:B9' }] };
+  ok(protectionAt(whole, 0, 0) !== null && protectionAt(whole, 3, 1) === null, 'a whole sheet but the cells it leaves open');
+  const x = xlsxOfBook({ v: 1, sheets: [{ ...sh, groups: [{ range: '2:9' }, { range: '4:5', hidden: true }, { range: 'C:E' }], rows: { 3: { hidden: true }, 4: { hidden: true } }, protect: [{ except: 'B2:B9' }] }] }, 'G');
+  const sx = new Zip(x).text('xl/worksheets/sheet1.xml') ?? '';
+  ok(/<row r="4"[^>]*hidden="1"[^>]*outlineLevel="2"/.test(sx) && sx.includes('outlineLevelRow="2"') && /<col min="3" max="3"[^>]*outlineLevel="1"/.test(sx), 'Excel: rows and columns with their outline levels');
+  ok(sx.includes('<sheetProtection sheet="1"') && sx.includes('<protectedRange sqref="B2:B9"'), 'Excel: a protected sheet, its open cells as ranges to edit');
+  const back = importBook(x, 'G.xlsx').book.sheets[0];
+  ok(back.groups?.some((g) => g.range === '2:9') && back.groups?.some((g) => g.range === '4:5' && g.hidden) && back.groups?.some((g) => g.range === 'C:E'), 'and read back: the groups, folded or not');
+  ok(back.protect?.[0]?.except === 'B2:B9' && !back.protect[0].range, 'and the sheet’s protection');
 }
 
 console.log(`${passed} passed, ${failed} failed`);

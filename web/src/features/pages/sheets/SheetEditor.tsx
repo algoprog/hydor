@@ -65,7 +65,13 @@ import {
   type CellValue,
   adjustForDelete,
   normalizeBook,
+  quoteSheet,
+  renameName,
+  sourceOf,
+  type NamedRange,
+  type SheetProtect,
 } from '@shared/sheets';
+import { addGroup, foldGroup, guardOf, removeGroup, spansOf } from '@shared/sheet-groups';
 import type { AnalyzeIdea, FillAnswer, TableAnswer } from '@shared/sheet-ai';
 import { findIssues, type CleanIssue } from '@shared/sheet-clean';
 import { flashFill } from '@shared/sheet-flash';
@@ -158,6 +164,8 @@ import { CHIP_COLORS, ValidPanel } from './ValidPanel';
 import { asksAi, contextFor, costOnce, useAiCells } from './ai';
 import { AnalyzePanel, CleanPanel } from './AiPanels';
 import { askAi, ExplainAi, FormulaAi, TableAi } from './AiTools';
+import { NamesPanel, ProtectPanel } from './RangesPanel';
+import { LinkDialog } from './LinkDialog';
 
 /** Cells copied or cut, to paste in this or another spreadsheet while the app is open (their formulas and looks). */
 let clip: Clip | null = null;
@@ -227,8 +235,8 @@ function codeDecimals(code: string, d: 1 | -1): string {
 
 const clone = (b: Workbook): Workbook => structuredClone(b);
 
-type PanelState = { kind: 'cf' } | { kind: 'dv'; start?: Validation } | { kind: 'chart'; id: string } | { kind: 'comments'; draft?: boolean } | { kind: 'analyze'; block: Rect; header: boolean } | { kind: 'clean'; block: Rect; header: boolean } | null;
-type DialogState = 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | 'summary' | 'table-ai' | null;
+type PanelState = { kind: 'cf' } | { kind: 'dv'; start?: Validation } | { kind: 'chart'; id: string } | { kind: 'comments'; draft?: boolean } | { kind: 'analyze'; block: Rect; header: boolean } | { kind: 'clean'; block: Rect; header: boolean } | { kind: 'names' } | { kind: 'protect' } | null;
+type DialogState = 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | 'summary' | 'table-ai' | 'link' | null;
 type PickState = { kind: 'list' | 'date' | 'note' | 'chars'; r: number; c: number; at: DOMRect } | null;
 
 /** Where an agent's words are arriving: its cell, boxed in the app's busy colour with a small flag (as a collaborator's in Google Sheets). */
@@ -393,6 +401,35 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   }, [sheet, calc, sheetIx, rev]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- changes, Undo and Redo ----------------------------------------------------------------------------------------
+  const warnedUntil = useRef(0);
+  /** The protection a change would go against: of the cells it changes, on the sheets that have some. */
+  const guarded = (b: Workbook, p: Patch): { refuse?: SheetProtect; warn?: SheetProtect } => {
+    if (!b.sheets.some((s) => s.protect?.length)) return {};
+    if (p.k === 'multi') {
+      let warn: SheetProtect | undefined;
+      for (const q of p.list) {
+        const g = guarded(b, q);
+        if (g.refuse) return g;
+        warn ??= g.warn;
+      }
+      return warn ? { warn } : {};
+    }
+    if (p.k === 'cells') {
+      const sh = b.sheets.find((s) => s.id === p.sheet);
+      return sh ? guardOf(sh, Object.keys(p.after).flatMap((k) => (parseRef(k) ? [[parseRef(k)!.r, parseRef(k)!.c] as [number, number]] : []))) : {};
+    }
+    if (p.k === 'book') {
+      // Rows or columns put in or taken out, a sort: the protected sheets whose cells it changes.
+      for (const sh of p.after.sheets) {
+        const was = p.before.sheets.find((s) => s.id === sh.id);
+        if (!was?.protect?.length || was.cells === sh.cells) continue;
+        const keys = new Set([...Object.keys(was.cells), ...Object.keys(sh.cells)].filter((k) => JSON.stringify(was.cells[k]) !== JSON.stringify(sh.cells[k])));
+        const g = guardOf(was, [...keys].flatMap((k) => (parseRef(k) ? [[parseRef(k)!.r, parseRef(k)!.c] as [number, number]] : [])));
+        if (g.refuse || g.warn) return g;
+      }
+    }
+    return {};
+  };
   /** The calculator brought up to date after a patch (done either way). */
   const sync = (p: Patch) => {
     const b = bookRef.current!;
@@ -411,6 +448,17 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   const change = (p: Patch | null, at?: Sel, key?: string) => {
     const b = bookRef.current;
     if (!p || readOnly || !b) return;
+    // Protected cells (Data → Protect sheets and ranges): refused, or a warning first (then none for five minutes).
+    const g = guarded(b, p);
+    if (g.refuse) return void toast(tr(g.refuse.note ? `Those cells are protected: ${g.refuse.note}. Data → Protect sheets and ranges takes it off.` : 'Those cells are protected: Data → Protect sheets and ranges takes it off.'));
+    if (g.warn && Date.now() > warnedUntil.current) {
+      void confirm({ title: tr('Change protected cells?'), body: g.warn.note ? tr(`They are protected so they warn first: ${g.warn.note}.`) : tr('They are protected so they warn before they change.'), confirm: tr('Change them') }).then((yes) => {
+        if (!yes) return;
+        warnedUntil.current = Date.now() + 5 * 60_000;
+        change(p, at, key);
+      });
+      return;
+    }
     p.at = { sheet: b.sheets[sheetIx]?.id ?? '', sel: at ?? selRef.current };
     bookRef.current = applyPatch(b, p, false);
     sync(p);
@@ -769,9 +817,12 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     const e = editRef.current;
     if (!e) return;
     const pos = caretRef.current;
-    const m = /([A-Za-z][A-Za-z0-9.]*)$/.exec(e.text.slice(0, pos));
+    const m = /([A-Za-z_][A-Za-z0-9._]*)$/.exec(e.text.slice(0, pos));
     const start = m ? pos - m[1].length : pos;
-    setText(`${e.text.slice(0, start)}${n}(${e.text.slice(pos)}`, start + n.length + 1, true);
+    // A named range goes in as it is; a function (or a named LAMBDA) with its bracket.
+    const range = bookRef.current?.names?.find((x) => x.name === n);
+    const open = range && !/^\s*LAMBDA\s*\(/i.test(range.ref) ? '' : '(';
+    setText(`${e.text.slice(0, start)}${n}${open}${e.text.slice(pos)}`, start + n.length + open.length, true);
   };
 
   /** Words put in the active cell (a date, a function to fill in, a character): at the caret while typing; else typing begins with them, after what the cell holds when `after`. */
@@ -1702,6 +1753,44 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   };
   const activeFormula = !edit && sheet?.cells[refName(sel.r, sel.c)]?.f;
 
+  // ---- named ranges, protection, groups, links, grid lines ------------------------------------------------------------------
+  /** The cells picked as a name's range or a protection's: on this sheet, fixed ("'Sheet 1'!$B$2:$B$9"). */
+  const pickedRef = () => (sheet ? `${quoteSheet(sheet.name)}!${selRange().replace(/([A-Z]+)(\d+)/g, '$$$1$$$2')}` : '');
+  const setNames = (names: NamedRange[]) => book && swap({ ...book, names: names.length ? names : undefined });
+  const setProtect = (list: SheetProtect[]) => sheet && change(metaPatch(sheet, { protect: list.length ? list : undefined }));
+  const outline = useMemo(() => (sheet?.groups?.length ? spansOf(sheet) : undefined), [sheet, sheet?.groups, rev]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Data → Group rows (or columns: when whole columns are picked), and Ungroup. */
+  const group = (undo = false) => {
+    if (!sheet || readOnly) return;
+    const axis = wholeCols && !wholeRows ? 'col' : 'row';
+    const [a, b] = axis === 'row' ? [x.r1, x.r2] : [x.c1, x.c2];
+    const next = undo ? removeGroup(sheet, axis, a, b) : addGroup(sheet, axis, a, b);
+    if (!next) return void toast(tr(undo ? 'There is no group there to ungroup.' : 'A group must be inside another or around it, not across it.'));
+    change(metaPatch(sheet, { groups: next.length ? next : undefined }));
+  };
+  const fold = (i: number, hide: boolean) => sheet && change(metaPatch(sheet, foldGroup(sheet, i, hide)));
+  const applyLink = (link: string | null, text: string) => {
+    if (!book || !sheet) return;
+    const k = refName(sel.r, sel.c);
+    const cur = sheet.cells[k];
+    const words = cur?.f === undefined && text.trim() && text !== formatValue(calc!.value(sheetIx, sel.r, sel.c), cur?.s) ? typedInto(cur, text.startsWith('=') ? `'${text}` : text) : (cur ?? null);
+    const next: Cell = { ...(words ?? {}) };
+    if (link) next.link = link;
+    else delete next.link;
+    change(cellsPatch(book, sheetIx, { [k]: tidyCell(next) }));
+  };
+  const toggleGrid = () => sheet && change(metaPatch(sheet, { noGrid: sheet.noGrid ? undefined : true }));
+  /** The named ranges formulas may use here, and the name of the cells picked when they are one. */
+  const rangeNames = (book?.names ?? []).filter((n) => !n.sheet || n.sheet === sheet?.id).map((n) => n.name);
+  const selName = (() => {
+    for (const n of book?.names ?? []) {
+      if (!sheet || (n.sheet && n.sheet !== sheet.id)) continue;
+      const src = sourceOf(n.ref.replace(/\$/g, ''));
+      if (src && (src.sheet ?? sheet.name).toLowerCase() === sheet.name.toLowerCase() && src.x.r1 === x.r1 && src.x.c1 === x.c1 && src.x.r2 === x.r2 && src.x.c2 === x.c2) return n.name;
+    }
+    return null;
+  })();
+
   // ---- find and replace -----------------------------------------------------------------------------------------------------------
   const how: FindHow = { ...find.options, ...findHow };
   const matches = useMemo(
@@ -1918,7 +2007,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     }
     if (e.key === 'Tab') {
       e.preventDefault();
-      const help = formulaHelp(ed.text, caretRef.current);
+      const help = formulaHelp(ed.text, caretRef.current, rangeNames);
       if (help.names.length && !e.shiftKey) return suggest(help.names[0]);
       return commitEdit([0, e.shiftKey ? -1 : 1]);
     }
@@ -1984,6 +2073,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     if (mod && e.shiftKey && lower === 'v' && !readOnly) return void (e.preventDefault(), pasteHow('values'));
     if (mod && !readOnly && (lower === 'd' || lower === 'r')) return void (e.preventDefault(), fill(lower === 'd'));
     if (mod && !readOnly && lower === 'e' && !e.shiftKey) return void (e.preventDefault(), void fillAi());
+    if (mod && !readOnly && lower === 'k') return void (e.preventDefault(), setDialog('link'));
+    if (e.altKey && e.shiftKey && !readOnly && (k === 'ArrowRight' || k === 'ArrowLeft')) return void (e.preventDefault(), group(k === 'ArrowLeft'));
     if (mod && !readOnly && (k === ';' || k === ':')) {
       // Ctrl+; today's date, Ctrl+Shift+; the time now.
       e.preventDefault();
@@ -2298,6 +2389,14 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     toggleBoard,
     boardOpens: board ? !!keptBoard?.open && !boardLocal : undefined,
     boardOpen: () => board && setBoardModel({ open: keptBoard?.open && !boardLocal ? undefined : true }),
+    names: () => setPanel({ kind: 'names' }),
+    protect: () => setPanel({ kind: 'protect' }),
+    group: () => group(false),
+    ungroup: () => group(true),
+    groupWhat: wholeCols && !wholeRows ? 'columns' : 'rows',
+    link: () => setDialog('link'),
+    gridlines: !sheet.noGrid,
+    toggleGridlines: toggleGrid,
     ai: {
       formula: () => setAiPop('formula'),
       explain: activeFormula ? () => setAiPop('explain') : undefined,
@@ -2351,6 +2450,9 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
         ['Ctrl+D', 'Fill down'],
         ['Ctrl+R', 'Fill right'],
         ['Ctrl+E', 'Fill with AI'],
+        ['Ctrl+K', 'Link'],
+        ['Alt+Shift+Right', 'Group rows or columns'],
+        ['Alt+Shift+Left', 'Ungroup'],
         ['Delete', 'Clear'],
         ['Ctrl+Z', 'Undo'],
         ['Ctrl+Shift+Z', 'Redo'],
@@ -2418,7 +2520,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       </div>
       {!board && (
         <FormulaBar
-          name={rectLabel(x, size.rows, size.cols) === 'the whole sheet' ? `${refName(0, 0)}:${refName(size.rows - 1, size.cols - 1)}` : rectLabel(x, size.rows, size.cols)}
+          name={selName ?? (rectLabel(x, size.rows, size.cols) === 'the whole sheet' ? `${refName(0, 0)}:${refName(size.rows - 1, size.cols - 1)}` : rectLabel(x, size.rows, size.cols))}
           onName={goName}
           text={edit ? edit.text : inputText(active)}
           editing={!!edit}
@@ -2434,6 +2536,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
           ghost={spillFormula}
           cellAnchor={edit?.where === 'cell' ? () => grid.current?.input()?.getBoundingClientRect() ?? null : null}
           aiRef={aiAnchor}
+          ranges={rangeNames}
           onAi={readOnly ? undefined : () => setAiPop(aiPop === 'formula' ? null : 'formula')}
           onExplain={activeFormula ? () => setAiPop(aiPop === 'explain' ? null : 'explain') : undefined}
         />
@@ -2531,6 +2634,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
             }}
             ai={(cell) => aiCells.stateOf(sheet.id, cell)}
             onOpenLink={openLink}
+            outline={outline}
+            onFold={readOnly ? undefined : fold}
           />
         )}
         {find.open && (
@@ -2588,6 +2693,20 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
           />
         )}
         {panel?.kind === 'analyze' && <AnalyzePanel sheet={sheet} calc={calc} si={sheetIx} block={panel.block} header={panel.header} narrow={narrow} onIdea={(idea) => applyIdea(idea, panel.block)} onClose={() => setPanel(null)} />}
+        {panel?.kind === 'names' && (
+          <NamesPanel
+            names={book.names ?? []}
+            sheetId={sheet.id}
+            sheetName={sheet.name}
+            picked={pickedRef()}
+            narrow={narrow}
+            onChange={setNames}
+            onRename={(from, to) => swap(renameName(book, from, to))}
+            onGo={(n) => goName(n)}
+            onClose={() => setPanel(null)}
+          />
+        )}
+        {panel?.kind === 'protect' && <ProtectPanel list={sheet.protect ?? []} picked={selRange()} narrow={narrow} onChange={setProtect} onClose={() => setPanel(null)} />}
         {panel?.kind === 'clean' && <CleanPanel issues={issues} narrow={narrow} onFix={fixIssues} onShow={showIssue} onClose={() => setPanel(null)} />}
         {panelChart && <ChartPanel key={panelChart.id} book={book} chart={panelChart} narrow={narrow} onChange={(c) => updateChart(c, `chart:${c.id}`)} onDelete={() => deleteChart(panelChart.id)} onClose={() => setPanel(null)} />}
       </div>
@@ -2925,6 +3044,15 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       {dialog === 'format' && <FormatDialog code={active?.s?.code ?? ''} sample={calc.value(sheetIx, sel.r, sel.c)} style={active?.s} onApply={(c) => setCode(c)} onClose={() => setDialog(null)} />}
       <ShortcutsDialog open={dialog === 'shortcuts'} onClose={() => setDialog(null)} groups={shortcutGroups} />
       {dialog === 'table-ai' && <TableAi onInsert={insertAiTable} onClose={() => setDialog(null)} />}
+      {dialog === 'link' && (
+        <LinkDialog
+          link={active?.link}
+          text={formatValue(calc.value(sheetIx, sel.r, sel.c), active?.s)}
+          places={[...book.sheets.map((s) => `${quoteSheet(s.name)}!A1`), ...(book.names ?? []).map((n) => n.name)]}
+          onApply={applyLink}
+          onClose={() => setDialog(null)}
+        />
+      )}
       <FormulaAi anchor={aiAnchor} open={aiPop === 'formula'} context={aiContext} onInsert={insertFormula} onClose={() => setAiPop(null)} />
       <ExplainAi anchor={aiAnchor} open={aiPop === 'explain' && !!activeFormula} formula={activeFormula ? `=${activeFormula}` : ''} context={aiContext} onClose={() => setAiPop(null)} />
       {confirmNode}

@@ -71,6 +71,7 @@ import { authorForAgent, newCommentId } from '../../shared/comments.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { all, att, decode, kid, kids, parseXml, patt, scan, textOf, type El } from '../documents/xml.ts';
+import { spansOf } from '../../shared/sheet-groups.ts';
 import { resolvePart, Zip } from '../documents/zip.ts';
 import { chartData, chartProblem, chartSvg } from '../../shared/sheet-chart.ts';
 import { CondFormats, hiddenCols, hiddenRows, isTicked, listOptions, Merges, Rules } from '../../shared/sheet-rules.ts';
@@ -669,12 +670,22 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
   for (const list of rows.values()) if (ghosts.length) list.sort((x, y) => (order.get(x) ?? 0) - (order.get(y) ?? 0));
   for (const k of Object.keys(sh.rows ?? {})) if (!rows.has(Number(k))) rows.set(Number(k), []);
   for (const r of hidden) if (!rows.has(r)) rows.set(r, []);
+  // Groups of rows and columns: each row's (column's) outline level, the deepest group it is in.
+  const spans = spansOf(sh);
+  const levelOf = (list: typeof spans.rows) => {
+    const m = new Map<number, number>();
+    for (const s of list) for (let k = s.a; k <= Math.min(s.b, s.a + 20_000); k++) m.set(k, Math.max(m.get(k) ?? 0, s.level));
+    return m;
+  };
+  const rowLevel = levelOf(spans.rows);
+  const colLevel = levelOf(spans.cols);
+  for (const r of rowLevel.keys()) if (!rows.has(r)) rows.set(r, []);
   const body = [...rows.keys()]
     .sort((a, b) => a - b)
     .map((r) => {
       const h = sh.rows?.[r]?.h;
       const cells = rows.get(r)!;
-      const attrs = `r="${r + 1}"${h ? ` ht="${xlHeight(h)}" customHeight="1"` : ''}${hidden.has(r) ? ' hidden="1"' : ''}`;
+      const attrs = `r="${r + 1}"${h ? ` ht="${xlHeight(h)}" customHeight="1"` : ''}${hidden.has(r) ? ' hidden="1"' : ''}${rowLevel.get(r) ? ` outlineLevel="${Math.min(7, rowLevel.get(r)!)}"` : ''}`;
       return cells.length ? `<row ${attrs}>${cells.join('')}</row>` : `<row ${attrs}/>`;
     })
     .join('');
@@ -686,11 +697,19 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
     const which = fr && fc ? 'bottomRight' : fr ? 'bottomLeft' : 'topRight';
     pane = `<pane${fc ? ` xSplit="${fc}"` : ''}${fr ? ` ySplit="${fr}"` : ''} topLeftCell="${top}" activePane="${which}" state="frozen"/><selection pane="${which}" activeCell="${top}" sqref="${top}"/>`;
   }
-  const widths = Object.entries(sh.cols ?? {})
-    .map(([k, v]) => [Number(k), v.w, !!v.hidden] as const)
-    .filter(([, w, hid]) => w || hid)
+  const colKeys = new Set([...Object.keys(sh.cols ?? {}).map(Number), ...colLevel.keys()]);
+  const widths = [...colKeys]
+    .map((c) => [c, sh.cols?.[c]?.w, !!sh.cols?.[c]?.hidden, colLevel.get(c) ?? 0] as const)
+    .filter(([, w, hid, lv]) => w || hid || lv)
     .sort((a, b) => a[0] - b[0]);
-  const cols = widths.length ? `<cols>${widths.map(([c, w, hid]) => `<col min="${c + 1}" max="${c + 1}" width="${xlWidth(w ?? COL_W)}"${hid ? ' hidden="1"' : ''}${w ? ' customWidth="1"' : ''}/>`).join('')}</cols>` : '';
+  const cols = widths.length ? `<cols>${widths.map(([c, w, hid, lv]) => `<col min="${c + 1}" max="${c + 1}" width="${xlWidth(w ?? COL_W)}"${hid ? ' hidden="1"' : ''}${w ? ' customWidth="1"' : ''}${lv ? ` outlineLevel="${Math.min(7, lv)}"` : ''}/>`).join('')}</cols>` : '';
+  const outlineRow = Math.min(7, Math.max(0, ...rowLevel.values()));
+  const outlineCol = Math.min(7, Math.max(0, ...colLevel.values()));
+  // A whole sheet protected from changes (no password: the app has none), the cells it leaves open as ranges to edit.
+  const guard = sh.protect?.find((p) => !p.range && !p.warn);
+  const protection = guard
+    ? `<sheetProtection sheet="1" objects="1" scenarios="1"/>${guard.except ? `<protectedRanges>${guard.except.split(',').map((x, i) => `<protectedRange sqref="${x}" name="Open${i + 1}"/>`).join('')}</protectedRanges>` : ''}`
+    : '';
   // Printed as the app prints it: across the page when its columns are wider than an upright one holds, made smaller
   // to fit the page's width when they are wider than that too, 12 mm margins, its name at the top.
   const across = Array.from({ length: e.cols }, (_, c) => (sh.cols?.[c]?.hidden ? 0 : (sh.cols?.[c]?.w ?? COL_W))).reduce((a, b) => a + b, 0);
@@ -703,8 +722,9 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
     `<dimension ref="${e.rows ? `A1:${refName(e.rows - 1, Math.max(0, e.cols - 1))}` : 'A1'}"/>` +
     `<sheetViews><sheetView workbookViewId="0"${sh.noGrid ? ' showGridLines="0"' : ''}${si === 0 && !ofLists ? ' tabSelected="1"' : ''}>${pane}</sheetView></sheetViews>` +
     // Rows as tall as the editor's (24 px) unless they say.
-    `<sheetFormatPr defaultColWidth="${xlWidth(COL_W)}" defaultRowHeight="${xlHeight(ROW_H)}" customHeight="1"/>${cols}` +
+    `<sheetFormatPr defaultColWidth="${xlWidth(COL_W)}" defaultRowHeight="${xlHeight(ROW_H)}" customHeight="1"${outlineRow ? ` outlineLevelRow="${outlineRow}"` : ''}${outlineCol ? ` outlineLevelCol="${outlineCol}"` : ''}/>${cols}` +
     `<sheetData>${body}</sheetData>` +
+    protection +
     filterXml(sh, si, calc) +
     mergesXml(sh) +
     condXml(sh, st.dxfs, names) +
@@ -918,6 +938,43 @@ interface Rel {
 }
 
 /** A part's relationships, by id, their targets made paths in the package. */
+/** Groups of rows (or columns) a sheet's part has: for each outline level, each run of rows at it or deeper; folded away when all its rows are hidden. */
+function groupsIn(xml: string, kind: 'row' | 'col'): { range: string; hidden?: boolean }[] {
+  const level = new Map<number, number>();
+  const hidden = new Set<number>();
+  const re = kind === 'row' ? /<(?:\w+:)?row\b([^>]*)>/g : /<(?:\w+:)?col\b([^>]*?)\/?>/g;
+  for (const m of xml.matchAll(re)) {
+    const lv = Number(/\boutlineLevel="(\d)"/.exec(m[1])?.[1] ?? 0);
+    if (!lv) continue;
+    const hid = /\bhidden="(?:1|true)"/.test(m[1]);
+    const [a, b] = kind === 'row' ? [Number(/\br="(\d+)"/.exec(m[1])?.[1] ?? 0), 0] : [Number(/\bmin="(\d+)"/.exec(m[1])?.[1] ?? 0), Number(/\bmax="(\d+)"/.exec(m[1])?.[1] ?? 0)];
+    for (let k = a; k <= Math.max(a, b) && k - a < 20_000; k++) {
+      if (k < 1) continue;
+      level.set(k - 1, lv);
+      if (hid) hidden.add(k - 1);
+    }
+  }
+  const out: { range: string; hidden?: boolean }[] = [];
+  const keys = [...level.keys()].sort((x, y) => x - y);
+  for (let lv = 1; lv <= 7 && out.length < 200; lv++) {
+    let start = -1;
+    for (let i = 0; i <= keys.length; i++) {
+      const k = keys[i];
+      const on = k !== undefined && level.get(k)! >= lv && (start < 0 || k === keys[i - 1] + 1);
+      if (on && start < 0) start = k;
+      if (!on && start >= 0) {
+        const end = keys[i - 1];
+        let all = true;
+        for (let j = start; j <= end && all; j++) all = hidden.has(j);
+        const range = kind === 'row' ? `${start + 1}:${end + 1}` : `${colName(start)}:${colName(end)}`;
+        out.push(all ? { range, hidden: true } : { range });
+        start = k !== undefined && level.get(k)! >= lv ? k : -1;
+      }
+    }
+  }
+  return out;
+}
+
 /** A part's relationships to the web (its links' addresses), by id. */
 function webTargets(z: Zip, part: string): Map<string, string> {
   const i = part.lastIndexOf('/');
@@ -1163,10 +1220,10 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     // What a sheet has that a workbook here does not keep.
     // Links to other files' places, or of a range of cells, are not kept (a cell's link to the web or this workbook is).
     if (/<(?:\w+:)?hyperlink\b[^>]*\bref="[A-Z]+\d+:/.test(xml)) loses.add('hyperlinks');
-    if (/<(?:\w+:)?(?:row|col)\b[^>]*\boutlineLevel="[1-9]/.test(xml)) loses.add('groups');
     if (/<(?:\w+:)?sparklineGroups?[\s>]/.test(xml)) loses.add('sparklines');
     if (/<(?:\w+:)?cfRule\b[^>]*\btype="iconSet"/.test(xml) || /<x14:iconSet\b/.test(xml)) loses.add('icons');
-    if (/<(?:\w+:)?sheetProtection\b/.test(xml)) loses.add('protection');
+    // A sheet's protection is kept (refusing changes, the ranges it leaves open), but not its password.
+    if (/<(?:\w+:)?sheetProtection\b[^>]*\b(?:password|hashValue)=/.test(xml)) loses.add('protection');
     // A header or footer (but the sheet's name at the top, as the app prints it and its own files say).
     if (/<(?:\w+:)?(?:odd|even|first)(?:Header|Footer)>\s*[^<\s]/.test(xml.replace(/<(?:\w+:)?oddHeader>&amp;L&amp;(?:"|&quot;)-,Bold(?:"|&quot;)&amp;12&amp;A<\/(?:\w+:)?oddHeader>/, ''))) loses.add('print');
     const sheet = readWorksheet(xml, name, shared, styles, date1904, state, names);
@@ -1182,6 +1239,12 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     }
     // The grid's lines hidden.
     if (/<(?:\w+:)?sheetView\b[^>]*\bshowGridLines="(?:0|false)"/.test(xml)) base.noGrid = true;
+    // Groups of rows and columns: runs of rows (columns) at an outline level or deeper, each a group of that level.
+    base.groups = [...groupsIn(xml, 'row'), ...groupsIn(xml, 'col')];
+    if (/<(?:\w+:)?sheetProtection\b[^>]*\bsheet="(?:1|true)"/.test(xml)) {
+      const open = [...xml.matchAll(/<(?:\w+:)?protectedRange\b[^>]*\bsqref="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/)).join(',');
+      base.protect = [open ? { except: open } : {}];
+    }
     if (isListsSheet(name) && /^(hidden|veryHidden)$/.test(att(s, 'state') ?? '')) {
       listSheets.push({ name, cells: base.cells });
       continue;

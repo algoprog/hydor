@@ -18,6 +18,7 @@ import { cx } from '../../../components/ui';
 import { colW, indexAt, offsets, rectOf, rowH, type Sel } from './ops';
 import { asksAi, type AiState } from './ai';
 import { AiMark, aiLabel, CellImage, LinkCard, Sparkline } from './CellExtras';
+import type { Span } from '@shared/sheet-groups';
 
 export const HEAD_H = 24;
 export const NUM_W = 46;
@@ -132,6 +133,9 @@ interface Props {
   /** What an AI cell of this sheet without its answer shows (by its name), and a cell's link opened. */
   ai?: (cell: string) => AiState | null;
   onOpenLink?: (url: string) => void;
+  /** Groups of rows and columns (their brackets, with − and + to fold and show them), and a group's fold asked for. */
+  outline?: { rows: Span[]; cols: Span[] };
+  onFold?: (i: number, hide: boolean) => void;
 }
 
 // ---- measuring words ----------------------------------------------------------------------------------------------
@@ -237,8 +241,13 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   const composing = useRef(false);
   const cb = useRef(p);
   cb.current = p;
-  const HH = Math.round(HEAD_H * z);
-  const NW = Math.round(NUM_W * z);
+  // Groups' brackets in a gutter left of the row numbers (rows) and over the column letters (columns), a step a level.
+  const rowLevels = p.outline?.rows.length ? Math.max(...p.outline.rows.map((s) => s.level)) : 0;
+  const colLevels = p.outline?.cols.length ? Math.max(...p.outline.cols.map((s) => s.level)) : 0;
+  const GW = rowLevels ? Math.round((6 + rowLevels * 13) * z) : 0;
+  const GH = colLevels ? Math.round((4 + colLevels * 13) * z) : 0;
+  const HH = Math.round(HEAD_H * z) + GH;
+  const NW = Math.round(NUM_W * z) + GW;
 
   const fr = Math.min(sheet.freeze?.rows ?? 0, rows - 1);
   const fc = Math.min(sheet.freeze?.cols ?? 0, cols - 1);
@@ -709,8 +718,8 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     return (
       <div
         key={c}
-        className={cx('absolute top-0 flex items-center justify-center border-r border-b border-line select-none', selCols(c) ? (wholeCols ? 'bg-accent text-accent-fg' : 'bg-accent-soft font-semibold text-accent') : 'bg-panel text-fg-3')}
-        style={{ left: NW + colOff[c], width: w, height: HH, fontSize: 11 * Math.min(z, 1.4) }}
+        className={cx('absolute flex items-center justify-center border-r border-b border-line select-none', selCols(c) ? (wholeCols ? 'bg-accent text-accent-fg' : 'bg-accent-soft font-semibold text-accent') : 'bg-panel text-fg-3')}
+        style={{ left: NW + colOff[c], top: GH, width: w, height: HH - GH, fontSize: 11 * Math.min(z, 1.4) }}
       >
         <span translate="no">{colName(c)}</span>
         {!readOnly && <span data-sizer onPointerDown={startSize('col', c)} onDoubleClick={() => cb.current.onFit('col', c)} className="absolute top-0 -right-[4px] z-10 h-full w-[8px] cursor-col-resize hover:bg-accent/40" />}
@@ -738,10 +747,10 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
       <div
         key={r}
         className={cx(
-          'group absolute left-0 flex items-center justify-center border-r border-b border-line tabular-nums select-none',
+          'group absolute flex items-center justify-center border-r border-b border-line tabular-nums select-none',
           selRows(r) ? (wholeRows ? 'bg-accent text-accent-fg' : 'bg-accent-soft font-semibold text-accent') : filtered ? 'bg-panel text-accent' : 'bg-panel text-fg-3',
         )}
-        style={{ top: region === 'left' ? rowOff[r] - FH : HH + rowOff[r], width: NW, height: h, fontSize: 11 * Math.min(z, 1.4) }}
+        style={{ top: region === 'left' ? rowOff[r] - FH : HH + rowOff[r], left: GW, width: NW - GW, height: h, fontSize: 11 * Math.min(z, 1.4) }}
       >
         {/* The number makes room for the button that expands the row (its cells as a card, as Airtable opens a record). */}
         <span translate="no" className={cx(h >= 16 && (sel.r === r ? 'pl-3.5' : 'group-hover:pl-3.5'))}>
@@ -952,6 +961,50 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     );
   }
 
+  // Groups' brackets and buttons: a line along each group's rows (columns), a level a step in, with − at the row
+  // (column) after it to fold it away, + to show it again; those in view only.
+  const foldBtn = (s: Span, style: React.CSSProperties) => (
+    <button
+      key={`f${s.i}`}
+      type="button"
+      data-own
+      title={s.hidden ? 'Show the group' : 'Fold the group away'}
+      aria-label={s.hidden ? 'Show the group' : 'Fold the group away'}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={() => p.onFold?.(s.i, !s.hidden)}
+      className="absolute z-10 grid place-items-center rounded-[3px] border border-fg-3 bg-bg text-[10px] leading-none font-semibold text-fg-2 hover:border-accent hover:text-accent"
+      style={{ width: Math.round(11 * z), height: Math.round(11 * z), ...style }}
+    >
+      {s.hidden ? '+' : '−'}
+    </button>
+  );
+  const outlineRows = (p.outline?.rows ?? [])
+    .filter((s) => s.b + 1 >= stableRange.r1 && s.a <= stableRange.r2 + 1 && s.a >= fr)
+    .flatMap((s) => {
+      const x = Math.round((4 + (s.level - 1) * 13) * z);
+      const y0 = rowOff[s.a] - FH;
+      const y1 = rowOff[Math.min(s.b + 1, rows)] - FH;
+      const after = Math.min(s.b + 1, rows - 1);
+      const btnY = rowOff[after] - FH + (rowOff[after + 1] - rowOff[after]) / 2 - Math.round(5.5 * z);
+      return [
+        !s.hidden && y1 > y0 ? <div key={`l${s.i}`} aria-hidden className="pointer-events-none absolute border-t border-l border-fg-3" style={{ left: x + Math.round(5 * z), top: y0 + 3, width: Math.round(4 * z), height: Math.max(0, y1 - y0 - 3) }} /> : null,
+        foldBtn(s, { left: x, top: btnY }),
+      ];
+    });
+  const outlineCols = (p.outline?.cols ?? [])
+    .filter((s) => s.b + 1 >= stableRange.c1 && s.a <= stableRange.c2 + 1 && s.a >= fc)
+    .flatMap((s) => {
+      const y = Math.round((3 + (s.level - 1) * 13) * z);
+      const x0 = NW + colOff[s.a];
+      const x1 = NW + colOff[Math.min(s.b + 1, cols)];
+      const after = Math.min(s.b + 1, cols - 1);
+      const btnX = NW + colOff[after] + (colOff[after + 1] - colOff[after]) / 2 - Math.round(5.5 * z);
+      return [
+        !s.hidden && x1 > x0 ? <div key={`l${s.i}`} aria-hidden className="pointer-events-none absolute border-t border-l border-fg-3" style={{ left: x0 + 3, top: y + Math.round(5 * z), width: Math.max(0, x1 - x0 - 3), height: Math.round(4 * z) }} /> : null,
+        foldBtn(s, { left: btnX, top: y }),
+      ];
+    });
+
   // A link's card under the active cell (HYPERLINK, Insert → Link), while nothing is typed.
   const link = !edit && p.onOpenLink ? calc.special(si, am.r1, am.c1) : null;
   const linkCard =
@@ -999,6 +1052,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
             {fr > 0 && <div className="pointer-events-none absolute left-0 z-20 bg-fg-3/50" style={{ top: HH + FH - 1, height: 2, width: NW + FW }} />}
           </div>
           {heads}
+          {outlineCols}
           {fr > 0 && gridLines('top')}
           {cellsTop}
           {fr > 0 && overlay('top')}
@@ -1007,6 +1061,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
         {/* The numbers down the side, with the frozen columns beside them: they stay at the left. */}
         <div className="sticky left-0 z-20 bg-bg" style={{ width: NW + FW, height: H - HH - FH }}>
           {nums}
+          {outlineRows}
           {fc > 0 && gridLines('left')}
           {cellsLeft}
           {fc > 0 && overlay('left')}
