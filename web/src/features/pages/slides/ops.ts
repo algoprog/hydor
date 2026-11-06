@@ -15,7 +15,9 @@ import {
   SLIDE_W,
   slideH,
   ungroupEls,
+  cleanEmbedUrl,
   type Anim,
+  type AnimFx,
   type ChartEl,
   type CodeEl,
   type Deck,
@@ -39,6 +41,7 @@ import {
   type Stick,
   type TableEl,
   type TextEl,
+  type TransitionFx,
 } from '@shared/slides';
 import { STARTERS } from './starters';
 
@@ -281,8 +284,8 @@ export function scene3dPart(d: Deck): Scene3dEl {
 }
 
 /**
- * A web page's address for a Web page part, or null: https only (an address typed without one gets it); a pasted
- * embed code (<iframe src="…">, as maps, forms and CodePen give) gives its address.
+ * A web page's address for a Web page part, or null: https only (an address typed without one gets it), not this
+ * computer's or its network's; a pasted embed code (<iframe src="…">, as maps, forms and CodePen give) gives its address.
  */
 export function embedAddress(v: string): string | null {
   let s = v.trim();
@@ -290,14 +293,17 @@ export function embedAddress(v: string): string | null {
   if (m) s = m[1].replace(/&amp;/g, '&').trim();
   if (s.startsWith('//')) s = `https:${s}`;
   else if (!/^[a-z][\w+.-]*:/i.test(s)) s = `https://${s}`;
-  if (!s || s.length > 2000 || /[\s<>"'\\]/.test(s)) return null;
-  try {
-    const u = new URL(s);
-    return u.protocol === 'https:' && u.hostname.includes('.') ? u.href : null;
-  } catch {
-    return null;
-  }
+  // As the deck keeps it: https only, not this computer's or its network's (a YouTube or Vimeo video: its player).
+  return cleanEmbedUrl(s);
 }
+
+/** How long a new animation of an effect takes, as a deck takes it when one does not say (those that tell words or numbers take longer). */
+const FX_DUR: Partial<Record<AnimFx, number>> = { appear: 1, typewriter: 1600, count: 1500, draw: 1200, confetti: 1500, heartbeat: 1000, jello: 900, wiggle: 700, flash: 800, bob: 1200, glow: 1200, swing: 800, roll: 700 };
+export const effectDur = (fx: AnimFx) => FX_DUR[fx] ?? 500;
+
+/** How long a transition takes when a slide does not say, as a deck takes it. */
+const TR_DUR: Partial<Record<TransitionFx, number>> = { morph: 1000, cube: 900, flip: 800, dissolve: 800, circle: 700, blinds: 800, glitch: 600 };
+export const transitionDur = (fx: TransitionFx) => TR_DUR[fx] ?? 600;
 
 /** The parts that run in a frame of their own (in the slideshow; in the editor once Run is pressed). */
 export const LIVE_TYPES: El['type'][] = ['html', 'embed', 'scene3d'];
@@ -318,34 +324,6 @@ export function featuresBySlide(list: RichFeature[]): { slide: number; items: Ri
   const by = new Map<number, RichFeature[]>();
   for (const f of list) by.set(f.slide, [...(by.get(f.slide) ?? []), f]);
   return [...by.entries()].sort((a, b) => a[0] - b[0]).map(([slide, items]) => ({ slide, items }));
-}
-
-/**
- * What one thing PowerPoint cannot keep becomes in the PowerPoint compatible deck (`after`, from toPowerPoint): a
- * picture of the part, the nearest effect PowerPoint has, or nothing; null when it cannot be told.
- */
-export function becomes(before: Deck, after: Deck, f: RichFeature): 'picture' | 'nearest' | 'gone' | null {
-  const s0 = before.slides[f.slide - 1];
-  const s1 = after.slides[f.slide - 1];
-  if (!s0 || !s1) return null;
-  if (!f.el) {
-    // The slide's own: its transition (the nearest one) or its moving background and video (left out).
-    const t0 = s0.transition?.fx;
-    const t1 = s1.transition?.fx;
-    if (t0 && t0 !== t1) return t1 && t1 !== 'none' ? 'nearest' : 'gone';
-    if ((s0.bg?.fx && !s1.bg?.fx) || (s0.bg?.video && !s1.bg?.video)) return 'gone';
-    return null;
-  }
-  const a = findEl(s0.els, f.el);
-  const b = findEl(s1.els, f.el);
-  if (!a) return null;
-  if (!b) return 'gone';
-  if (a.type !== b.type) return b.type === 'image' ? 'picture' : 'nearest';
-  // Its animations: the nearest of PowerPoint's, or none.
-  const fx0 = (s0.anims ?? []).filter((x) => x.el === f.el).map((x) => x.fx);
-  const fx1 = (s1.anims ?? []).filter((x) => x.el === f.el).map((x) => x.fx);
-  if (fx0.join() !== fx1.join()) return fx1.length ? 'nearest' : 'gone';
-  return null;
 }
 
 /** Parts added to a slide (on top), selected after. */

@@ -674,16 +674,13 @@ export function SlidesEditor({
   }, [sel, index, running]);
   // Another slide, or the panel's other tabs: no part is being picked for an animation.
   useEffect(() => setPickFor(null), [index, tab]);
-  /** The part clicked on the slide starts the animation being set up (not the part it moves). */
+  /** The part clicked on the slide starts the animation being set up (the part it moves may start its own). */
   const pickTrigger = (id: string | null) => {
     const anim = pickFor;
     setPickFor(null);
     const s = live.current?.slides[index];
-    const a = s?.anims?.find((x) => x.id === anim);
-    if (!anim || !id || !a) return;
-    const top = topOf(s!, id)?.id ?? id;
-    if (top === a.el) return toast('That is the part it moves: pick the part to click');
-    change((d) => setAnim(d, index, anim, { on: 'tap', trigger: top }));
+    if (!anim || !id || !s?.anims?.some((x) => x.id === anim)) return;
+    change((d) => setAnim(d, index, anim, { on: 'tap', trigger: topOf(s, id)?.id ?? id }));
   };
   /** A video from this device for a slide's background, kept with the deck: its source (null: none, or it failed). */
   const pickBgVideo = async (): Promise<string | null> => {

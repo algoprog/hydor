@@ -81,11 +81,12 @@ import { Button, cx, Switch } from '../../../components/ui';
 import { useTexHtml } from '../common/katex';
 import { Choice, Select } from '../studio/fields';
 import { ColorButton, Field, NumInput, Section, Swatches, Tool } from './controls';
-import { addAnim, align, distribute, dropMergesPast, fillCells, heightOf, mergeAt, mergeCells, moveAnim, onSlide, partName, pathTo, pickedOf, removeAnim, removeEls, restack, setAnim, setEls, setSlide, topOf, unmergeCell, W } from './ops';
+import { addAnim, align, distribute, effectDur, transitionDur, dropMergesPast, fillCells, heightOf, mergeAt, mergeCells, moveAnim, onSlide, partName, pathTo, pickedOf, removeAnim, removeEls, restack, setAnim, setEls, setSlide, topOf, unmergeCell, W } from './ops';
 import type { CellSel } from './SlideCanvas';
 import { SlideThumb } from './Thumb';
 import { fetchVideoStill } from './media';
 import { CodeLook, EmbedLook, HoverField, HtmlLook, QuizLook, Scene3dLook, ScoreLook, TEXT_FX_NAMES } from './WebParts';
+import { FX_NAMES, TR_NAMES } from './names';
 
 export type InspectorTab = 'format' | 'animate' | 'slide' | 'theme';
 export const INSPECTOR_TABS: { value: InspectorTab; label: string }[] = [
@@ -1101,36 +1102,6 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cro
 
 // ---- Animate -----------------------------------------------------------------------------------------------
 
-const FX_NAMES: Record<AnimFx, string> = {
-  appear: 'Appear',
-  fade: 'Fade',
-  fly: 'Fly',
-  float: 'Float',
-  zoom: 'Zoom',
-  wipe: 'Wipe',
-  bounce: 'Bounce',
-  pulse: 'Pulse',
-  spin: 'Spin',
-  grow: 'Grow',
-  shake: 'Shake',
-  blur: 'Blur',
-  rise: 'Rise',
-  drop: 'Drop in',
-  flip: 'Flip over',
-  swing: 'Swing',
-  roll: 'Roll in',
-  pop: 'Pop in',
-  typewriter: 'Typewriter',
-  draw: 'Draw the lines',
-  count: 'Count up',
-  glow: 'Glow',
-  wiggle: 'Wiggle',
-  heartbeat: 'Heartbeat',
-  jello: 'Jelly wobble',
-  flash: 'Flash',
-  bob: 'Bob up and down',
-  confetti: 'Confetti burst',
-};
 const TYPE_NAMES: Record<Anim['type'], string> = { in: 'Comes in', em: 'Stands out', out: 'Goes out' };
 const ON_NAMES: Record<Anim['on'], string> = { click: 'On a click', with: 'With the one before', after: 'After the one before', tap: 'When a part is clicked' };
 // The side a part comes in from, or goes out to.
@@ -1176,7 +1147,7 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview, picking, onPic
                   title={FX_NAMES[fx]}
                   onClick={() => {
                     const id = newId();
-                    change((d) => addAnim(d, index, { el: target.id, type, fx, on: 'click', dur: fx === 'appear' ? 1 : fx === 'typewriter' || fx === 'draw' || fx === 'count' ? 1500 : 500, delay: 0, ...(ANIM_DIR.includes(fx) ? { dir: fx === 'float' ? 'up' : 'left' } : {}), ...(text && type === 'in' && fx !== 'typewriter' ? { byPara: true } : {}) }, id));
+                    change((d) => addAnim(d, index, { el: target.id, type, fx, on: 'click', dur: effectDur(fx), delay: 0, ...(ANIM_DIR.includes(fx) ? { dir: fx === 'float' ? 'up' : 'left' } : {}), ...(text && type === 'in' && fx !== 'typewriter' ? { byPara: true } : {}) }, id));
                     setOpen(id);
                   }}
                   className="min-h-8 truncate rounded-lg border border-line px-1 text-[12px] text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-fg"
@@ -1209,8 +1180,8 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview, picking, onPic
             const set = (patch: Partial<Anim>) => change((d) => setAnim(d, index, a.id, patch), `anim:${a.id}`);
             const trigger = a.on === 'tap' && a.trigger ? slide.els.find((e) => e.id === a.trigger) : undefined;
             const words = !!el && (el.type === 'text' || el.type === 'shape');
-            // The parts a click on which could start it: the slide's own, but the one it moves.
-            const triggers = slide.els.filter((e) => e.id !== a.el);
+            // The parts a click on which could start it: the one it moves first (a click on it runs its own), then the slide's others.
+            const triggers = [...slide.els.filter((e) => e.id === a.el), ...slide.els.filter((e) => e.id !== a.el)];
             return (
               <div key={a.id} className={cx('rounded-lg border', isOpen ? 'border-accent/40 bg-bg-1' : 'border-line')}>
                 <div className="flex items-center gap-1 py-1 pr-1 pl-2">
@@ -1264,7 +1235,7 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview, picking, onPic
                     <Field label="Starts">
                       <Select
                         value={a.on}
-                        onChange={(on) => set(on === 'tap' ? { on: 'tap', trigger: a.trigger && triggers.some((e) => e.id === a.trigger) ? a.trigger : triggers[triggers.length - 1]?.id } : { on: on as Anim['on'], trigger: undefined })}
+                        onChange={(on) => set(on === 'tap' ? { on: 'tap', byPara: undefined, trigger: a.trigger && triggers.some((e) => e.id === a.trigger) ? a.trigger : (triggers.find((e) => e.id !== a.el) ?? triggers[0])?.id } : { on: on as Anim['on'], trigger: undefined })}
                         options={(web || a.on === 'tap' ? (['click', 'with', 'after', 'tap'] as const) : (['click', 'with', 'after'] as const)).map((x) => ({ value: x, label: ON_NAMES[x] }))}
                       />
                     </Field>
@@ -1274,7 +1245,7 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview, picking, onPic
                           <Select
                             value={a.trigger ?? ''}
                             onChange={(trigger) => set({ trigger: trigger || undefined })}
-                            options={[{ value: '', label: 'Pick one' }, ...triggers.map((e) => ({ value: e.id, label: partName(e) }))]}
+                            options={[{ value: '', label: 'Pick one' }, ...triggers.map((e) => ({ value: e.id, label: e.id === a.el ? `${partName(e)} (itself)` : partName(e) }))]}
                             title="The part a click on which starts it"
                           />
                           {onPickTrigger && (
@@ -1314,7 +1285,7 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview, picking, onPic
                         <Switch label="Keep going, again and again" on={!!a.loop} onChange={(loop) => set({ loop: loop || undefined })} />
                       </label>
                     )}
-                    {el && (el.type === 'text' || el.type === 'shape') && el.paras.length > 1 && !a.by && (
+                    {el && (el.type === 'text' || el.type === 'shape') && el.paras.length > 1 && !a.by && a.on !== 'tap' && (
                       <label className="flex min-h-8 items-center gap-2 text-[12.5px] text-fg-2">
                         <span className="min-w-0 flex-1">A paragraph at a time</span>
                         <Switch label="A paragraph at a time" on={!!a.byPara} onChange={(byPara) => set({ byPara: byPara || undefined })} />
@@ -1333,7 +1304,6 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview, picking, onPic
 
 // ---- Slide ----------------------------------------------------------------------------------------------------
 
-const TR_NAMES: Record<TransitionFx, string> = { none: 'None', fade: 'Fade', push: 'Push in', wipe: 'Wipe', cover: 'Cover', zoom: 'Zoom', split: 'Split', morph: 'Morph', cube: 'Cube', flip: 'Flip over', dissolve: 'Dissolve', circle: 'Circle', blinds: 'Blinds', glitch: 'Glitch' };
 
 /** What a video the deck keeps is called: the name of a video part that plays it. */
 const videoName = (d: Deck, src: string) => {
@@ -1415,7 +1385,7 @@ function SlideTab({ deck, index, change, pickPicture, onFooter, pickVideo, fonts
             </Button>
           )}
         </div>
-        {bg.image && (
+        {(bg.image || (web && bg.video)) && (
           <Field label="Darker">
             <input type="range" min={0} max={0.8} step={0.05} value={bg.dim ?? 0} onChange={(e) => setBg({ dim: Number(e.target.value) || undefined })} className="w-full accent-[var(--accent)]" aria-label="Darker" />
           </Field>
@@ -1497,7 +1467,7 @@ function SlideTab({ deck, index, change, pickPicture, onFooter, pickVideo, fonts
             <button
               key={fx}
               type="button"
-              onClick={() => setTr({ fx, ...(fx === 'push' || fx === 'wipe' || fx === 'cover' ? { dir: tr.dir ?? 'right' } : { dir: undefined }), dur: fx === 'none' ? undefined : fx === 'morph' ? Math.max(tr.dur ?? 1000, 800) : (tr.dur ?? 600) })}
+              onClick={() => setTr({ fx, ...(fx === 'push' || fx === 'wipe' || fx === 'cover' ? { dir: tr.dir ?? 'right' } : { dir: undefined }), dur: fx === 'none' ? undefined : fx === 'morph' ? Math.max(tr.dur ?? 1000, 800) : (tr.dur ?? transitionDur(fx)) })}
               title={TR_NAMES[fx]}
               className={cx('h-8 truncate rounded-lg border px-1 text-[12px] transition-colors', tr.fx === fx ? 'border-accent/60 bg-accent-soft text-fg' : 'border-line text-fg-2 hover:border-line-2 hover:bg-bg-1')}
             >
