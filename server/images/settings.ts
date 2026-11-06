@@ -58,6 +58,7 @@ const COMMON = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '21:9', '9:21
 export const FORM = {
   image: 'Your picture',
   imageChanged: 'Your picture, changed',
+  drawing: 'Your drawing',
   video: 'Your video',
   videoChanged: 'Your video, changed',
   music: 'Your music',
@@ -292,11 +293,12 @@ export function videoCost(m: VideoModel | undefined, v: VideoChoice): number | u
 }
 
 /** The line above the form: the model, and what it costs (with these settings, for a video), in the user's language. */
-export function priceLine(kind: 'image' | 'video', m: ImageModel | VideoModel | undefined, id: string, tr: Tr = same, cost?: number): string {
+export function priceLine(kind: 'image' | 'drawing' | 'video', m: ImageModel | VideoModel | undefined, id: string, tr: Tr = same, cost?: number): string {
   const name = m ? `**${m.label}**${m.org ? ` (${m.org})` : ''}` : `**${id}**`;
-  if (kind === 'image') {
+  if (kind === 'image' || kind === 'drawing') {
     const per = (m as ImageModel | undefined)?.perImage;
-    return per ? tr(`${name}, through OpenRouter: about ${money(per)} an image.`) : tr(`${name}, through OpenRouter.`);
+    if (!per) return tr(`${name}, through OpenRouter.`);
+    return kind === 'drawing' ? tr(`${name}, through OpenRouter: about ${money(per)} a drawing.`) : tr(`${name}, through OpenRouter: about ${money(per)} an image.`);
   }
   const vm = m as VideoModel | undefined;
   const then = cost ? ` ${tr(`With the settings below, about ${money(cost)}.`)}` : '';
@@ -327,6 +329,9 @@ export function audioPriceLine(m: AudioModel | undefined, id: string, tr: Tr = s
 
 /** The line on an audio form when the model picked cannot make what is asked: the one that makes it instead. */
 export const insteadLine = (picked: string, used: string, tr: Tr = same) => tr(`${picked} cannot make this, so it is made with ${used}.`);
+
+/** The line on an image form when the see-through background is made by taking the background out on this computer. */
+export const cutoutLine = (tr: Tr = same) => tr('Its background is then taken out on this computer, at no cost.');
 
 /** How much of what is made a form quotes: all of it, unless it is longer than a card can show (a long script). */
 const QUOTE_ROOM = 4000;

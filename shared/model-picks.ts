@@ -107,3 +107,30 @@ export const OPENROUTER_PICKS: OpenRouterPick[] = [
   { id: 'bytedance-seed/seed-audio-1-0', role: 'speech', note: 'Voices and sounds' },
   { id: 'bytedance/seedance-2.5', role: 'video', note: 'Short videos' },
 ];
+
+/** A picture model suggested for one kind of picture, and why. */
+export interface ImagePick {
+  id: string;
+  note: string;
+}
+
+/**
+ * The models suggested for Quick pictures (icons, backgrounds, textures, simple pictures), cheapest kinds first: with
+ * no Quick model picked in Settings → Images, video and audio, the first of these OpenRouter still lists is used.
+ */
+export const QUICK_PICKS: ImagePick[] = [
+  { id: 'bytedance-seed/seedream-5-0-flash', note: 'Quick and cheap, and it changes pictures too' },
+  { id: 'google/gemini-3.1-flash-lite-image', note: 'Quick, and good with words in a picture' },
+  { id: 'recraft/recraft-v4.1-flash', note: 'Flat, clean pictures for very little' },
+  { id: 'black-forest-labs/flux-3-image-klein', note: 'Quick, photo-like pictures' },
+  { id: 'openai/gpt-image-1-mini', note: 'See-through backgrounds' },
+];
+
+/** For a see-through background when the tier's own model cannot make one: the first of these OpenRouter still lists. */
+export const SEE_THROUGH_PICKS: Record<'quick' | 'best', string[]> = {
+  quick: ['openai/gpt-image-1-mini', 'sourceful/riverflow-v2.5-fast'],
+  best: ['openai/gpt-image-2.6-flare', 'sourceful/riverflow-v2.5-fast'],
+};
+
+/** Drawings (SVG) at Best: Recraft's vector models, the first OpenRouter still lists. */
+export const VECTOR_PICKS = ['recraft/recraft-v4.1-vector', 'recraft/recraft-v4.1-pro-vector', 'recraft/recraft-v4-vector'];
