@@ -1526,6 +1526,10 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     },
   });
   aiRef.current = ai;
+  // Proofreading's panel takes room from the source, as the comments do: it gets more of the width while it shows.
+  useEffect(() => {
+    if (ai.proofOpen) setSplit((x) => Math.max(x, 0.62));
+  }, [ai.proofOpen]);
 
   // ---- the layout ---------------------------------------------------------------------------------------------------------
   const onDividerDown = (e: React.PointerEvent) => {
