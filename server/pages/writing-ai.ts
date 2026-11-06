@@ -447,7 +447,11 @@ export function writingAi(X: ExtraCore): Extra {
     const s = S;
     const q = field.value.trim();
     if (s.state === 'answer') {
-      if (!q) return;
+      if (!q) {
+        const r = shown()[s.i];
+        if (r && pressable(r)) r.run();
+        return;
+      }
       field.value = '';
       s.append = false;
       return send({ ...(s.last ?? base()), action: (s.last?.action as string) ?? 'ask', answer: s.markdown, ask: q });
