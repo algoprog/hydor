@@ -30,8 +30,10 @@ import {
   type VideoSaveTo,
   type VideoText,
   type VideoTrackId,
+  SOUND_CHANNELS,
 } from '@shared/mediaedit-video';
 import { Button, cx, Empty, IconButton, Throbber, useIsMobile } from '../../components/ui';
+import { post } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
@@ -51,6 +53,10 @@ import {
   clipFor,
   deleteClip,
   deleteItem,
+  linkSound,
+  silenceClips,
+  silencePart,
+  type SoundRange,
   detachSound,
   freezeFrame,
   insertClip,
@@ -222,6 +228,7 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
   const [making, setMaking] = useState<Making | null>(null);
   const [last, setLast] = useState<VideoEditJob | null>(null);
   const [captionsBusy, setCaptionsBusy] = useState<string | null>(null);
+  const [range, setRange] = useState<SoundRange>(null);
   const [menu, setMenu] = useState<{ at: { x: number; y: number }; items: MenuEntry[] } | null>(null);
   const [sheet, setSheet] = useState<'inspector' | 'media' | 'colour' | 'audio' | 'export' | null>(null);
   const [mediaW, setMediaW] = useRemembered('media', 260);
@@ -238,6 +245,9 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
   const main = o.src;
   const now = () => clock.get();
 
+  useEffect(() => {
+    if (range && !(picked && (picked.kind === 'audio' || picked.kind === 'clipsound') && picked.id === range.id)) setRange(null);
+  }, [picked]); // eslint-disable-line react-hooks/exhaustive-deps
   // A picked thing that is gone is no longer picked; nothing is cropped once its clip is gone.
   useEffect(() => {
     if (picked && !pickedThing(r, picked)) setPicked(null);
@@ -267,12 +277,18 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
   // ---- the commands ---------------------------------------------------------------------------------------------------
   const splitHere = () => {
     const t = clock.get();
-    if (picked && picked.kind !== 'clip' && picked.kind !== 'transition') return change((x) => splitItem(x, factsOf, picked.kind as 'overlay' | 'text' | 'audio', picked.id, t));
+    if (picked && picked.kind !== 'clip' && picked.kind !== 'clipsound' && picked.kind !== 'transition') return change((x) => splitItem(x, factsOf, picked.kind as 'overlay' | 'text' | 'audio', picked.id, t));
     const at = clipAtTime(r, factsOf, t, true);
     if (at) change((x) => splitClip(x, factsOf, at.clip.id!, t));
   };
   const remove = (ripple: boolean) => {
+    // A part of a sound picked: silenced, the picture kept.
+    if (range) {
+      change((x) => silencePart(x, factsOf, range.kind, range.id, range.from, range.to));
+      return setRange(null);
+    }
     if (!picked) return;
+    if (picked.kind === 'clipsound') return change((x) => setClip(x, picked.id, (c) => ({ ...c, mute: true, volume: undefined, sound: undefined })));
     if (picked.kind === 'clip') {
       if ((r.clips ?? []).length < 2) return toast(tr('That is the only clip: add another first, or split it and delete a part'), 'info');
       change((x) => deleteClip(x, factsOf, picked.id, { ripple }));
@@ -410,9 +426,54 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
       { label: 'Colour…', onClick: () => setWorkspace('colour') },
     ];
   };
+  /** What a right-click on a sound offers: its channels, its fixes, a part silenced, its volume line, linked or not. */
+  const soundMenu = (kind: 'clip' | 'audio', id: string): MenuEntry[] => {
+    const x = kind === 'clip' ? (r.clips ?? []).find((c) => c.id === id) : (r.audio ?? []).find((a) => a.id === id);
+    if (!x) return [];
+    const set = (m: Record<string, unknown>) => change((rr) => (kind === 'clip' ? setClip(rr, id, (c) => ({ ...c, ...m })) : { ...rr, audio: (rr.audio ?? []).map((a) => (a.id === id ? { ...a, ...m } : a)) }));
+    const inOutSet = inOut[0] !== null || inOut[1] !== null;
+    const a = kind === 'audio' ? (x as NonNullable<VideoRecipe['audio']>[number]) : null;
+    return [
+      ...SOUND_CHANNELS.map((c, i) => ({ label: c.label, sep: i === 0, checked: (x.channels ?? 'stereo') === c.id, onClick: () => set({ channels: c.id === 'stereo' ? undefined : c.id }) })),
+      { label: 'Clean up the voice', sep: true, checked: !!x.clean, onClick: () => set({ clean: x.clean ? undefined : 0.5 }) },
+      { label: 'Even out the loudness', checked: !!x.even, onClick: () => set({ even: x.even ? undefined : true }) },
+      { label: 'Normalize', onClick: () => void normalizeSound(kind, id) },
+      { label: 'Silence the part picked', keys: 'Del', sep: true, disabled: !range || range.id !== id, onClick: () => range && (change((rr) => silencePart(rr, factsOf, range.kind, range.id, range.from, range.to)), setRange(null)) },
+      { label: 'Silence from In to Out', disabled: !inOutSet, onClick: () => change((rr) => silencePart(rr, factsOf, kind, id, inOut[0] ?? 0, inOut[1] ?? length)) },
+      { label: 'Flatten the volume line', disabled: !x.levels?.length, onClick: () => set({ levels: undefined }) },
+      ...(kind === 'clip'
+        ? [{ label: 'Unlink the sound', sep: true, disabled: !canDetach(x as NonNullable<typeof pc>, factsOf((x as NonNullable<typeof pc>).src)), onClick: () => change((rr) => detachSound(rr, factsOf, id, main)) }]
+        : a?.clip && (r.clips ?? []).some((c) => c.id === a.clip)
+          ? [{ label: 'Link it to its clip again', sep: true, onClick: () => change((rr) => linkSound(rr, id)) }]
+          : []),
+    ];
+  };
+  const normalizeSound = async (kind: 'clip' | 'audio', id: string) => {
+    const c = kind === 'clip' ? (r.clips ?? []).find((x) => x.id === id) : undefined;
+    const a = kind === 'audio' ? (r.audio ?? []).find((x) => x.id === id) : undefined;
+    const measure = c ? { src: c.sound ?? c.src ?? main, from: c.trim?.[0], to: c.trim?.[1] } : a ? { src: a.src, from: a.trim?.[0], to: a.trim?.[1] } : null;
+    if (!measure) return;
+    try {
+      const { peak } = await post<{ peak: number }>('/api/mediaedit/video/peak', measure);
+      if (peak <= -99) return;
+      const g = Math.min(4, Math.round(Math.pow(10, (-1 - peak) / 20) * 1000) / 1000);
+      change((rr) => (c ? setClip(rr, id, (y) => ({ ...y, volume: Math.abs(g - 1) < 0.005 ? undefined : g })) : { ...rr, audio: (rr.audio ?? []).map((y) => (y.id === id ? { ...y, volume: Math.abs(g - 1) < 0.005 ? undefined : g } : y)) }));
+    } catch (err) {
+      toastError(err);
+    }
+  };
   const onMenu = (at: { x: number; y: number }, p: Picked, t: number) => {
     let items: MenuEntry[] = [];
-    if (p?.kind === 'clip') {
+    if (p?.kind === 'clipsound') {
+      const c = (r.clips ?? []).find((x) => x.id === p.id);
+      if (c)
+        items = [
+          { label: 'Split at the playhead', keys: 'S', onClick: () => change((x) => splitClip(x, factsOf, c.id!, clock.get())) },
+          { label: 'Without its sound', keys: 'Del', onClick: () => change((x) => setClip(x, c.id!, (y) => ({ ...y, mute: true, volume: undefined, sound: undefined }))) },
+          ...soundMenu('clip', c.id!),
+          { label: 'Edit the sound…', sep: true, disabled: !soundEditor(), onClick: () => editSound({ src: c.sound ?? c.src ?? main, title: c.name ?? 'Clip', from: c.trim?.[0], to: c.trim?.[1], save: (src) => change((x) => setClip(x, c.id!, (y) => ({ ...y, sound: src, mute: undefined }))) }) },
+        ];
+    } else if (p?.kind === 'clip') {
       const c = (r.clips ?? []).find((x) => x.id === p.id);
       if (c) items = clipMenu(c);
     } else if (p?.kind === 'transition')
@@ -430,6 +491,7 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
       }
       if (kind === 'audio') {
         const a = (r.audio ?? []).find((x) => x.id === p.id);
+        if (a) items.push(...soundMenu('audio', a.id!));
         if (a) items.push({ label: 'Edit the sound…', sep: true, disabled: !soundEditor(), onClick: () => editSound({ src: a.src, title: a.name ?? 'Sound', from: a.trim?.[0], to: a.trim?.[1], save: (src) => change((x) => ({ ...x, audio: (x.audio ?? []).map((y) => (y.id === a.id ? { ...y, src } : y)) })) }) });
       }
     } else
@@ -484,6 +546,7 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
         { label: 'Mark In', keys: 'I', onClick: () => setInOut([clock.get(), inOut[1]]) },
         { label: 'Mark Out', keys: 'O', onClick: () => setInOut([inOut[0], clock.get()]) },
         { label: 'Clear In and Out', keys: 'Alt+X', disabled: inOut[0] === null && inOut[1] === null, onClick: () => setInOut([null, null]) },
+        { label: 'Silence the clips’ sound from In to Out', disabled: inOut[0] === null && inOut[1] === null, onClick: () => change((x) => silenceClips(x, factsOf, inOut[0] ?? 0, inOut[1] ?? length)) },
         { label: 'Add a transition at the nearest cut', keys: 'Ctrl+T', sep: true, onClick: addTransition },
         { label: 'Add words at the playhead', onClick: addText },
         { label: 'Snapping', keys: 'N', sep: true, checked: snapOn, onClick: () => setSnapOn(!snapOn) },
@@ -657,6 +720,8 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
       onTrackUi={(id, u) => setTrackUi({ ...trackUi, [id]: u })}
       onMenu={onMenu}
       onDrop={(it, row, t, index) => use(it, row, t, index)}
+      range={range}
+      onRange={setRange}
       pool={pool}
       compact={compact}
     />
