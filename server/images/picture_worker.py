@@ -6,8 +6,11 @@
 #     -> {"id": 1, "status": "loading"} (when the model was not in memory), {"id": 1, "status": "working"},
 #        then {"id": 1, "ok": true, "w": 800, "h": 600, "loaded": ["cutout"], ...}
 #   {"id": 2, "op": "erase", "model": ".../erase.onnx", "input": ..., "mask": ".../mask.png" or "boxes": [[x, y, w, h]], "output": ...}
-#   {"id": 3, "op": "unload", "what": "cutout"}  ->  {"id": 3, "ok": true, "loaded": []}
-# "max_bytes" (optional) keeps the PNG under that size: it is made smaller when it would be over.
+#   {"id": 3, "op": "measure", "input": ..., "mask" or "boxes", "small": ".../hole.bin"}  ->  how large the hole is, how
+#     detailed things are around it, and the hole at most 256 pixels across (raw bytes, row after row) in "small"
+#   {"id": 4, "op": "unload", "what": "cutout"}  ->  {"id": 4, "ok": true, "loaded": []}
+# "max_bytes" (optional) keeps the PNG under that size: it is made smaller when it would be over. A cutout given
+# "small" also writes its mask there, at most 512 pixels across, for the server to judge how sure it was.
 # Each model loads when it is first asked for and stays until the server says to unload it (after a few idle
 # minutes); the worker ends when its input closes. ONNX Runtime runs on the CPU only, on at most 4 threads, with its
 # memory arena off, so what a picture took while it was worked on goes back once it is done.
@@ -122,6 +125,20 @@ def open_picture(path):
     return im.convert('RGBA' if see_through else 'RGB'), icc
 
 
+def write_small(arr, path, side):
+    """A mask made small (its long side at most `side` pixels), written as raw bytes row after row; its size."""
+    import numpy as np
+    from PIL import Image
+
+    h, w = arr.shape
+    s = min(1.0, side / max(w, h))
+    mw, mh = max(1, round(w * s)), max(1, round(h * s))
+    small = np.asarray(Image.fromarray(arr, 'L').resize((mw, mh), Image.Resampling.BILINEAR), dtype=np.uint8)
+    with open(path, 'wb') as f:
+        f.write(small.tobytes())
+    return [mw, mh]
+
+
 def save_png(im, path, icc, max_bytes):
     """Saves the PNG; over max_bytes, it is squeezed harder, then made smaller until it fits. Its size, and whether it was made smaller."""
     from PIL import Image
@@ -168,10 +185,11 @@ def cutout(req, rid):
         alpha = (alpha.astype(np.uint16) * np.asarray(im.getchannel('A'), dtype=np.uint16) // 255).astype(np.uint8)
     # The picture's own pixels as they were; only how see-through each is changes.
     out.putalpha(Image.fromarray(alpha, 'L'))
+    small = write_small(alpha, req['small'], 512) if req.get('small') else None
     del mask, alpha, logits
     run = time.time() - t
     (w, h), scaled = save_png(out, req['output'], icc, req.get('max_bytes'))
-    return {'w': w, 'h': h, 'scaled': scaled, 'ms': round(run * 1000)}
+    return {'w': w, 'h': h, 'scaled': scaled, 'ms': round(run * 1000), **({'small': small} if small else {})}
 
 
 def read_mask(req, size):
@@ -205,6 +223,33 @@ def read_mask(req, size):
             raise Fail(f'The mask is not the picture’s shape ({src.size[0]}×{src.size[1]} for a picture of {w}×{h}): draw it over the picture as it is shown.')
         src = src.resize((w, h), Image.Resampling.BILINEAR)
     return np.asarray(src, dtype=np.uint8)
+
+
+def measure(req, rid):
+    """How large the hole to fill is, and how detailed things are around it (the share of strong edges in a ring around
+    it, the picture seen at most 512 pixels across): what the server needs to choose between LaMa and an image model."""
+    import numpy as np
+    from PIL import Image, ImageFilter
+
+    im, _ = open_picture(req['input'])
+    W, H = im.size
+    hole = (read_mask(req, (W, H)) >= 16).astype(np.uint8) * 255
+    if not hole.any():
+        raise Fail(f'The boxes are outside the picture, which is {W}×{H} pixels.' if req.get('boxes') else 'The mask is empty: paint over what to take away.')
+    small = write_small(hole, req['small'], 256)
+    s = min(1.0, 512 / max(W, H))
+    gw, gh = max(1, round(W * s)), max(1, round(H * s))
+    a = np.asarray(im.convert('L').resize((gw, gh), Image.Resampling.BILINEAR).filter(ImageFilter.GaussianBlur(1)), dtype=np.int16)
+    g = np.zeros_like(a)
+    g[:, 1:] = np.abs(np.diff(a, axis=1))
+    g[1:, :] = np.maximum(g[1:, :], np.abs(np.diff(a, axis=0)))
+    inside = np.asarray(Image.fromarray(hole, 'L').resize((gw, gh), Image.Resampling.BILINEAR)) > 0
+    r = max(3, round(0.04 * max(gw, gh)))
+    near = np.asarray(Image.fromarray(inside.astype(np.uint8) * 255, 'L').filter(ImageFilter.BoxBlur(r))) > 0
+    ring = near & ~inside
+    # Measured: words around a hole come to about 0.15; walls, sky, grass, bricks, noise and a photo's edges under 0.02.
+    detail = float((g[ring] > 24).mean()) if ring.sum() >= 16 else 0.0
+    return {'small': small, 'area': round(float(hole.mean()) / 255, 5), 'detail': round(detail, 4), 'size': [W, H]}
 
 
 def inpaint(s, crop, hole):
@@ -296,6 +341,8 @@ def main():
                 out = cutout(req, rid)
             elif op == 'erase':
                 out = erase(req, rid)
+            elif op == 'measure':
+                out = measure(req, rid)
             elif op == 'ping':
                 out = {}
             else:

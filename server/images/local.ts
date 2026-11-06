@@ -1,7 +1,7 @@
 // The picture tools on this computer: taking the background out of a picture (BiRefNet-lite) and erasing part of one
 // (LaMa), free and private, and the Python that draws plots. Setting them up (Settings → Images, video and audio) makes
-// a private Python environment in the data folder once (ONNX Runtime, NumPy, Pillow and Matplotlib: about 65 MB to
-// download); each model downloads the first time its tool is used (about 220 MB each), checked by its SHA-256.
+// a private Python environment in the data folder once (ONNX Runtime, NumPy, Pillow, Matplotlib and pandas: about 80 MB
+// to download); each model downloads the first time its tool is used (about 220 MB each), checked by its SHA-256.
 //
 // A worker (picture_worker.py) runs the models on the CPU, one picture at a time (others wait in line). Each model
 // loads only when its tool is used and unloads after a few idle minutes; the worker quits after a few more; nothing
@@ -42,11 +42,11 @@ const modelsDir = () => path.join(dir(), 'models');
 const jobsDir = () => path.join(dir(), 'jobs');
 /** The Python that runs the worker: one given (HYDOR_PICTURES_PYTHON, with these packages), else the private one. */
 const python = () => process.env.HYDOR_PICTURES_PYTHON || path.join(venv(), ...(WIN ? ['Scripts', 'python.exe'] : ['bin', 'python']));
-const PACKAGE_LIST = ['onnxruntime>=1.20', 'numpy>=1.26', 'pillow>=10.1', 'matplotlib>=3.8'];
+const PACKAGE_LIST = ['onnxruntime>=1.20', 'numpy>=1.26', 'pillow>=10.1', 'matplotlib>=3.8', 'pandas>=2.0'];
 /** What the environment holds: another list means setting it up again. */
 const PACKAGES = PACKAGE_LIST.join(' ');
-/** What setting up downloads, in MB (measured: 63 MB of wheels for Linux; about 200 MB once installed). */
-const SETUP_MB = 65;
+/** What setting up downloads, in MB (measured: 78 MB of wheels for Linux; about 250 MB once installed). */
+const SETUP_MB = 80;
 /** Free disk needed to set up: the environment and both models, with room to spare. */
 const DISK_MB = 1024;
 const HF = () => (process.env.HF_ENDPOINT || 'https://huggingface.co').replace(/\/+$/, '');
@@ -235,7 +235,7 @@ export function setupLocal(): Promise<void> {
       const disk = freeDiskMb(dir());
       if (disk < DISK_MB) throw new Error(`Not enough disk space: ${gb(disk)} GB free, and the picture tools need about ${gb(DISK_MB)} GB (the environment and the two models).`);
       const uv = findUv();
-      const label = `Installing ONNX Runtime, NumPy, Pillow and Matplotlib (about ${SETUP_MB} MB)`;
+      const label = `Installing ONNX Runtime, NumPy, Pillow, Matplotlib and pandas (about ${SETUP_MB} MB)`;
       if (uv) {
         if (!fs.existsSync(python())) await install(uv, ['venv', '--quiet', '--python', '>=3.10,<3.15', venv()], 'Making a private Python environment');
         await install(uv, ['pip', 'install', '--quiet', '--python', python(), ...PACKAGE_LIST], label);
@@ -341,6 +341,7 @@ let workerScript = WORKER_SCRIPT;
 
 interface Answer {
   ok?: boolean;
+  small?: unknown;
   error?: string;
   memory?: boolean;
   w?: number;
@@ -537,6 +538,13 @@ function inLine<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   return job;
 }
 
+/** A mask made small: one byte a pixel (0 to 255), row after row. */
+export interface Small {
+  data: Uint8Array;
+  w: number;
+  h: number;
+}
+
 export interface MadeHere {
   png: Buffer;
   w: number;
@@ -545,7 +553,18 @@ export interface MadeHere {
   scaled: boolean;
   /** The model's name (BiRefNet-lite, LaMa). */
   model: string;
+  /** A cutout's mask, at most 512 pixels across: how sure it was can be judged from it (cutout.ts). */
+  small?: Small;
 }
+
+/** A hole to fill, as the worker measured it: its share of the picture, how detailed things are around it, and itself at most 256 pixels across. */
+export interface HoleHere {
+  area: number;
+  detail: number;
+  hole: Small;
+}
+
+type Where = { mask: Buffer } | { boxes: { x: number; y: number; w: number; h: number }[] };
 
 /** Enough memory for the job (the other model unloaded first if that makes room), or words saying how much it needs. */
 async function roomFor(t: ToolName, pixels: number): Promise<void> {
@@ -563,26 +582,24 @@ async function roomFor(t: ToolName, pixels: number): Promise<void> {
   throw new HttpError(503, `There is not enough free memory to ${WHAT[t].verb} on this computer now: it needs about ${gb(need())} GB free, and ${gb(free)} GB is. Close some programs and try again, or do it through OpenRouter instead.`);
 }
 
-/** One picture through a model in the worker: the input (and mask) as files in a folder of the job's own, the PNG back. */
-async function work(t: ToolName, files: { input: Buffer; mask?: Buffer }, o: { boxes?: number[][]; maxBytes?: number; signal?: AbortSignal }): Promise<MadeHere> {
-  if (!envReady()) throw new HttpError(400, 'The picture tools on this computer are not set up: set them up in Settings → Images, video and audio.');
+const NOT_SET_UP = 'The picture tools on this computer are not set up: set them up in Settings → Images, video and audio.';
+
+/**
+ * A job for the worker, in line behind the others: `before` (downloads, memory) first, then the worker started when it
+ * is not running, and a folder of the job's own with the picture (and mask) in it as files, gone once it is done.
+ */
+function inWorker<T>(files: { input: Buffer; mask?: Buffer }, o: { signal?: AbortSignal; before?: () => Promise<void> }, fn: (w: Worker, job: string, input: string, mask?: string) => Promise<T>): Promise<T> {
+  if (!envReady()) return Promise.reject(new HttpError(400, NOT_SET_UP));
   const size = dimensions(files.input);
-  if (size && size.w * size.h > 50_000_000) throw new HttpError(413, `The picture is ${size.w}×${size.h}: over 50 megapixels, too large to work on here. Make it smaller first.`);
-  const pixels = size ? size.w * size.h : 12_000_000;
+  if (size && size.w * size.h > 50_000_000) return Promise.reject(new HttpError(413, `The picture is ${size.w}×${size.h}: over 50 megapixels, too large to work on here. Make it smaller first.`));
   return inLine(async () => {
     lastError = undefined;
     try {
       // Removed while this waited in line.
-      if (!envReady()) throw new HttpError(400, 'The picture tools on this computer are not set up: set them up in Settings → Images, video and audio.');
-      if (!modelReady(t)) {
-        // Not a long download for nothing: the memory first, and again once it is here.
-        await roomFor(t, pixels);
-        await download(t);
-      }
+      if (!envReady()) throw new HttpError(400, NOT_SET_UP);
+      await o.before?.();
       if (o.signal?.aborted) throw aborted();
-      await roomFor(t, pixels);
-      if (o.signal?.aborted) throw aborted();
-      let w = worker && !worker.gone ? worker : (worker = startWorker());
+      const w = worker && !worker.gone ? worker : (worker = startWorker());
       await w.ready;
       const job = path.join(jobsDir(), crypto.randomBytes(8).toString('hex'));
       fs.mkdirSync(job, { recursive: true });
@@ -591,12 +608,7 @@ async function work(t: ToolName, files: { input: Buffer; mask?: Buffer }, o: { b
         fs.writeFileSync(input, files.input);
         const mask = files.mask ? path.join(job, 'mask.png') : undefined;
         if (mask) fs.writeFileSync(mask, files.mask!);
-        const output = path.join(job, 'out.png');
-        jobStep = `${WHAT[t].doing} on this computer`;
-        const a = await send(w, { op: t, model: modelPath(t), input, output, ...(mask ? { mask } : {}), ...(o.boxes ? { boxes: o.boxes } : {}), ...(o.maxBytes ? { max_bytes: o.maxBytes } : {}) }, t, t === 'cutout' ? 5 * 60_000 : 3 * 60_000);
-        if (!w.gone) idleLater(w, t);
-        if (a.error) throw new HttpError(a.memory ? 503 : 400, a.memory ? `${a.error} Close some programs and try again, or do it through OpenRouter instead.` : a.error);
-        return { png: fs.readFileSync(output), w: a.w!, h: a.h!, scaled: !!a.scaled, model: models[t].name };
+        return await fn(w, job, input, mask);
       } finally {
         fs.rmSync(job, { recursive: true, force: true });
       }
@@ -609,19 +621,72 @@ async function work(t: ToolName, files: { input: Buffer; mask?: Buffer }, o: { b
   }, o.signal);
 }
 
+/** A mask the worker made small, read from its file; null when it is not what it said. */
+function readSmall(file: string, dims: unknown): Small | null {
+  if (!Array.isArray(dims) || dims.length !== 2) return null;
+  const [w, h] = dims.map(Number);
+  const data = fs.existsSync(file) ? new Uint8Array(fs.readFileSync(file)) : null;
+  return data && w > 0 && h > 0 && data.length === w * h ? { data, w, h } : null;
+}
+
+/** One picture through a model in the worker: the PNG back. */
+function work(t: ToolName, files: { input: Buffer; mask?: Buffer }, o: { boxes?: number[][]; maxBytes?: number; signal?: AbortSignal }): Promise<MadeHere> {
+  const size = dimensions(files.input);
+  const pixels = size ? size.w * size.h : 12_000_000;
+  const before = async () => {
+    if (!modelReady(t)) {
+      // Not a long download for nothing: the memory first, and again once it is here.
+      await roomFor(t, pixels);
+      await download(t);
+    }
+    if (o.signal?.aborted) throw aborted();
+    await roomFor(t, pixels);
+  };
+  return inWorker(files, { signal: o.signal, before }, async (w, job, input, mask) => {
+    const output = path.join(job, 'out.png');
+    const small = t === 'cutout' ? path.join(job, 'small.bin') : undefined;
+    jobStep = w.loaded.includes(t) ? `${WHAT[t].doing} on this computer` : `Loading ${models[t].label}`;
+    const a = await send(
+      w,
+      { op: t, model: modelPath(t), input, output, ...(mask ? { mask } : {}), ...(o.boxes ? { boxes: o.boxes } : {}), ...(o.maxBytes ? { max_bytes: o.maxBytes } : {}), ...(small ? { small } : {}) },
+      t,
+      t === 'cutout' ? 5 * 60_000 : 3 * 60_000,
+    );
+    if (!w.gone) idleLater(w, t);
+    if (a.error) throw new HttpError(a.memory ? 503 : 400, a.memory ? `${a.error} Close some programs and try again, or do it through OpenRouter instead.` : a.error);
+    const judged = small ? readSmall(small, a.small) : null;
+    return { png: fs.readFileSync(output), w: a.w!, h: a.h!, scaled: !!a.scaled, model: models[t].name, ...(judged ? { small: judged } : {}) };
+  });
+}
+
 /** The picture with its background taken out on this computer: a PNG with see-through parts, the picture's own pixels kept. */
 export const cutoutHere = (img: Buffer, o: { maxBytes?: number; signal?: AbortSignal } = {}) => work('cutout', { input: img }, o);
 
+const boxesOf = (where: Where) => ('boxes' in where ? where.boxes.map((b) => [b.x, b.y, b.w, b.h]) : undefined);
+
 /** The picture with what is under the mask (white) or in the boxes erased and filled in from around it, on this computer: a PNG. */
-export function eraseHere(img: Buffer, where: { mask: Buffer } | { boxes: { x: number; y: number; w: number; h: number }[] }, o: { maxBytes?: number; signal?: AbortSignal } = {}) {
-  if ('mask' in where) return work('erase', { input: img, mask: where.mask }, o);
-  return work('erase', { input: img }, { ...o, boxes: where.boxes.map((b) => [b.x, b.y, b.w, b.h]) });
+export function eraseHere(img: Buffer, where: Where, o: { maxBytes?: number; signal?: AbortSignal } = {}) {
+  return work('erase', { input: img, ...('mask' in where ? { mask: where.mask } : {}) }, { ...o, boxes: boxesOf(where) });
+}
+
+/** How large a hole to fill is and how detailed things are around it (no model loads for this). */
+export function measureHere(img: Buffer, where: Where, o: { signal?: AbortSignal } = {}): Promise<HoleHere> {
+  return inWorker({ input: img, ...('mask' in where ? { mask: where.mask } : {}) }, o, async (w, job, input, mask) => {
+    const small = path.join(job, 'hole.bin');
+    jobStep = 'Looking at the picture';
+    const boxes = boxesOf(where);
+    const a = (await send(w, { op: 'measure', input, small, ...(mask ? { mask } : {}), ...(boxes ? { boxes } : {}) }, undefined, 60_000)) as Answer & { area?: number; detail?: number; small?: unknown };
+    if (a.error) throw new HttpError(400, a.error);
+    const hole = readSmall(small, a.small);
+    if (!hole) throw new HttpError(500, 'The picture tools could not measure what to erase.');
+    return { area: Number(a.area) || 0, detail: Number(a.detail) || 0, hole };
+  });
 }
 
 // ---- Python for plots ---------------------------------------------------------------------------------------
 
-/** What a run gives back: the end of what it printed, and files of up to 20 MB each, 60 MB in all. */
-const MAX_PRINTED = 64 * 1024;
+/** What a run gives back: the last 1 MB of what it printed (a plot's checks print a line of all the fonts), and files of up to 20 MB each, 60 MB in all. */
+const MAX_PRINTED = 1024 * 1024;
 const MAX_FILE = 20 * 1024 * 1024;
 const MAX_FILES_BYTES = 60 * 1024 * 1024;
 const MAX_FILES = 64;
@@ -727,9 +792,12 @@ export async function runPython(code: string, o: { cwd: string; timeoutMs: numbe
       const p = spawn(py, ['-I', '-B', '-u', '-X', 'utf8', script], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: !WIN, windowsHide: true });
       let stdout = '';
       let stderr = '';
-      const keep = (s: string, b: Buffer) => (s + b.toString('utf8')).slice(-MAX_PRINTED);
-      p.stdout!.on('data', (b: Buffer) => (stdout = keep(stdout, b)));
-      p.stderr!.on('data', (b: Buffer) => (stderr = keep(stderr, b)));
+      // Read as UTF-8 across the pieces it comes in, so no letter is cut in two.
+      p.stdout!.setEncoding('utf8');
+      p.stderr!.setEncoding('utf8');
+      const keep = (s: string, more: string) => (s.length + more.length > MAX_PRINTED ? (s + more).slice(-MAX_PRINTED) : s + more);
+      p.stdout!.on('data', (t: string) => (stdout = keep(stdout, t)));
+      p.stderr!.on('data', (t: string) => (stderr = keep(stderr, t)));
       let late = false;
       const timer = setTimeout(() => ((late = true), kill(p)), Math.max(1000, o.timeoutMs));
       const stop = () => kill(p);
@@ -789,7 +857,7 @@ export function localState(): LocalToolsState {
 export const localReady = () => envReady() && !settingUp;
 
 /** What the routes and tools of cutout.ts and erase.ts are lent. */
-const here: Here = { ready: localReady, canSetUp: () => envReady() || installable().canInstall, cutout: cutoutHere, erase: eraseHere };
+const here: Here = { ready: localReady, canSetUp: () => envReady() || installable().canInstall, cutout: cutoutHere, erase: eraseHere, measure: measureHere };
 
 setLocalTools({
   state: localState,
