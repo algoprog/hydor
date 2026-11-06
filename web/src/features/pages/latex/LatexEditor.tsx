@@ -224,6 +224,41 @@ function withText(d: TexDoc, name: string, text: string): TexDoc {
   return { ...d, files };
 }
 
+/**
+ * Where words picked on a typeset page are in the source, near `line` (SyncTeX's): their first words in order, with
+ * whatever is between them in the source (commands, braces, a line break, a comment, a word broken by a hyphen in the
+ * PDF); the nearest such place within 40 lines, or null.
+ */
+function locateText(src: string, line: number, text: string): [number, number] | null {
+  const words = text
+    .normalize('NFKC')
+    .split(/\s+/)
+    .map((w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ''))
+    .filter(Boolean)
+    .slice(0, 8);
+  if (!words.length) return null;
+  const esc = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const between = '(?:\\\\[A-Za-z]+\\*?|[^\\p{L}\\p{N}])*?';
+  const re = new RegExp(words.map(esc).join(between), 'giu');
+  const lines = src.split('\n');
+  const first = Math.max(0, line - 41);
+  const last = Math.min(lines.length, line + 40);
+  let start = 0;
+  for (let i = 0; i < first; i++) start += lines[i].length + 1;
+  const part = lines.slice(first, last).join('\n');
+  let best: [number, number] | null = null;
+  let bestDist = Infinity;
+  for (const m of part.matchAll(re)) {
+    const at = start + m.index!;
+    const dist = Math.abs(first + part.slice(0, m.index!).split('\n').length - line);
+    if (dist < bestDist) {
+      best = [at, at + m[0].length];
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
 /** The smallest change that turns `a` into `b` (so the cursor and what is picked stay where they were). */
 function diff(a: string, b: string) {
   let s = 0;
@@ -317,6 +352,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   const aiRef = useRef<ReturnType<typeof useLatexAi> | null>(null);
   const [dark, setDark] = useState(isDark);
   const [presentAsk, setPresentAsk] = useState(0);
+  const [pdfFindAsk, setPdfFindAsk] = useState(0);
   const [dialog, setDialog] = useState<'refs' | 'count' | 'compare' | 'keys' | 'bib' | null>(null);
   const [nameAsk, setNameAsk] = useState(false);
   // Tools → Check before submitting and Your paper.
@@ -665,6 +701,25 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     const known = name === TEX_MAIN || live.current?.files.some((f) => f.name === name);
     if (known) withCode(name, (c) => c.goto(line));
   };
+  /** A line of the source picked and brought into view, the focus left where it is (Find in the pages). */
+  const goQuiet = (name: string, line: number) => {
+    const known = name === TEX_MAIN || live.current?.files.some((f) => f.name === name);
+    if (!known) return;
+    withCode(name, (c) => {
+      const l = c.view.state.doc.line(Math.max(1, Math.min(line, c.view.state.doc.lines)));
+      c.select(l.from, l.to);
+    });
+  };
+  /** Words picked on a typeset page: found in the source near the line SyncTeX gives, and picked there (else that line). */
+  const goToText = (name: string, line: number, text: string) => {
+    const known = name === TEX_MAIN || live.current?.files.some((f) => f.name === name);
+    if (!known) return;
+    withCode(name, (c) => {
+      const at = locateText(c.text(), line, text);
+      if (at) c.select(at[0], at[1]);
+      else c.goto(line);
+    });
+  };
   /** A file changed by the editor (in its editor when it has one, so Undo takes it back). */
   const editFile = (name: string, f: (text: string) => string) => {
     const c = codes.current.get(name);
@@ -789,6 +844,10 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       if (mod && e.key.toLowerCase() === 's') {
         e.preventDefault();
         void saveRef.current();
+      } else if (mod && e.key.toLowerCase() === 'f' && a?.closest('[data-tex-preview]')) {
+        // Over the typeset pages: Find in the pages.
+        e.preventDefault();
+        setPdfFindAsk((n) => n + 1);
       } else if (mod && (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'h')) {
         e.preventDefault();
         findRef.current.show(e.key.toLowerCase() === 'h');
@@ -2180,6 +2239,12 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       }}
       darkPages={darkPages && dark}
       presentAsk={presentAsk}
+      findAsk={pdfFindAsk}
+      onFound={(f, line) => wide && goQuiet(f, line)}
+      onPicked={(f, line, text) => {
+        if (!wide) setPane('source');
+        goToText(f, line, text);
+      }}
     />
   );
 

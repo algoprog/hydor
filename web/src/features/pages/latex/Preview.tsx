@@ -7,12 +7,13 @@
 // pages can be presented one at a time over the whole screen (Present.tsx). Without TeX here, a note says what to
 // install; without poppler, the PDF shows in the browser's own viewer.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ExternalLink, Minus, MoveHorizontal, Plus, Presentation, TriangleAlert } from 'lucide-react';
+import { ExternalLink, Minus, MoveHorizontal, Plus, Presentation, Search, TriangleAlert } from 'lucide-react';
 import type { TexCompiled, TexSetup } from '@shared/latex';
 import { Button, cx, IconButton, Throbber } from '../../../components/ui';
 import { toastError } from '../../../lib/store';
 import { pageUrl, pdfUrl, sourceAt } from './api';
 import { Present } from './Present';
+import { Marks, PdfFindBar, TextLayer, usePdfFind, usePdfWords } from './PdfText';
 
 const ZOOMS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 3];
 const PAD = 16;
@@ -38,8 +39,17 @@ export function Preview({
   onProblems,
   darkPages,
   presentAsk,
+  findAsk,
+  onFound,
+  onPicked,
   className,
 }: {
+  /** Changes when Find in the pages is asked for (Ctrl+F over them). */
+  findAsk?: number;
+  /** A match of Find in the pages: its place in the source. */
+  onFound?: (file: string, line: number) => void;
+  /** Words picked on a page: their place in the source, and the words. */
+  onPicked?: (file: string, line: number, text: string) => void;
   /** The latest typesetting (with pages or not). */
   result: TexCompiled | null;
   busy: boolean;
@@ -66,6 +76,13 @@ export function Preview({
   const [typed, setTyped] = useState<string | null>(null);
   const [presenting, setPresenting] = useState<number | null>(null);
   const dpr = typeof window === 'undefined' ? 1 : Math.min(3, window.devicePixelRatio || 1);
+  // The pages' words: picked on a page, found with Find in the pages.
+  const words = usePdfWords(shown?.key ?? null, !!setup?.words && setup.pictures !== false);
+  const find = usePdfFind(words);
+  useEffect(() => {
+    if (findAsk && shown && setup?.words) find.setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [findAsk]);
 
   useLayoutEffect(() => {
     const el = box.current;
@@ -188,6 +205,39 @@ export function Preview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flash?.n]);
 
+  /** A match of Find in the pages scrolled to, and its place in the source shown. */
+  const goMatch = (i: number) => {
+    const m = find.matches[i];
+    const el = box.current;
+    if (!m || !shown || !el) return;
+    const b = m.boxes[0];
+    const k = pageW / sizeOf(shown, m.page - 1).w;
+    el.scrollTo({ top: Math.max(0, topOf(shown, m.page) + b.y * k - el.clientHeight / 3) });
+    if (onFound) void sourceAt(shown.key, m.page, b.x + b.w / 2, b.y + b.h / 2).then((at) => at && onFound(at.file, at.line), () => {});
+  };
+  // The first match, as it is typed.
+  useEffect(() => {
+    if (find.open && find.matches.length) goMatch(find.cur);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [find.q, words]);
+  /** Words picked on a page: where the first is, in the source. */
+  const picked = async () => {
+    const s = window.getSelection();
+    const text = s?.toString().replace(/\s+/g, ' ').trim();
+    if (!s || !s.rangeCount || !text || !shown || !onPicked || !words) return;
+    const start = s.getRangeAt(0).startContainer;
+    const el = (start.nodeType === 3 ? start.parentElement : (start as Element))?.closest?.('[data-i]');
+    const layer = el?.closest('[data-pdf-text]');
+    if (!el || !layer) return;
+    const p = Number(layer.getAttribute('data-pdf-text'));
+    const w = words[p - 1]?.words[Number(el.getAttribute('data-i'))];
+    if (!w) return;
+    try {
+      const at = await sourceAt(shown.key, p, w[1] + w[3] / 2, w[2] + w[4] / 2);
+      if (at) onPicked(at.file, at.line, text);
+    } catch {}
+  };
+
   const toSource = async (e: React.MouseEvent<HTMLDivElement>, r: TexCompiled, page: number) => {
     if (!onSource) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -212,7 +262,7 @@ export function Preview({
             Typesetting…
           </>
         ) : shown ? (
-          <span className="truncate">{`${shown.pages} page${shown.pages === 1 ? '' : 's'} typeset`}</span>
+          <span className="truncate">{`${shown.pages} page${shown.pages === 1 ? '' : 's'} typeset${shown.ms ? ` in ${(shown.ms / 1000).toFixed(1)} s` : ''}`}</span>
         ) : null}
       </span>
       {shown && setup?.pictures !== false && shown.pages > 1 && (
@@ -257,6 +307,11 @@ export function Preview({
             <Plus size={14} />
           </IconButton>
         </>
+      )}
+      {shown && setup?.pictures !== false && setup?.words && (
+        <IconButton label="Find in the pages (Ctrl+F)" size="sm" active={find.open} onClick={() => find.setOpen(!find.open)}>
+          <Search size={14} />
+        </IconButton>
       )}
       {shown && setup?.pictures !== false && (
         <IconButton label="Present the pages" size="sm" onClick={() => setPresenting(page)}>
@@ -309,6 +364,9 @@ export function Preview({
                 style={darkPages ? { filter: 'invert(0.89) hue-rotate(180deg)' } : undefined}
               />
               {m && <div className="pointer-events-none absolute rounded-sm bg-accent/25 ring-2 ring-accent/60" style={{ left: m.x * k - 4, top: m.y * k - 3, width: Math.max(24, m.w * k) + 8, height: Math.max(10, m.h * k) + 6 }} />}
+              {find.open && find.matches.length > 0 && <Marks list={find.matches.filter((x) => x.page === n)} current={find.matches[find.cur] ?? null} k={k} />}
+              {/* The words, invisible, on the pages near the one in view: to pick them. */}
+              {words?.[i] && Math.abs(n - page) <= 2 && <TextLayer words={words[i]} page={n} k={k} />}
             </div>
           );
         })}
@@ -339,7 +397,7 @@ export function Preview({
   }
 
   return (
-    <div className={cx('flex min-h-0 min-w-0 flex-col bg-bg-2', className)}>
+    <div data-tex-preview className={cx('flex min-h-0 min-w-0 flex-col bg-bg-2', className)}>
       {bar}
       {failed && shown && (
         <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel px-3 py-1.5 text-[12.5px] text-fg-2">
@@ -354,8 +412,11 @@ export function Preview({
           )}
         </div>
       )}
-      <div ref={box} className="relative min-h-0 flex-1 overflow-auto overscroll-contain">
-        {body}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div ref={box} tabIndex={-1} onMouseUp={() => void picked()} className="relative min-h-0 flex-1 overflow-auto overscroll-contain outline-none">
+          {body}
+        </div>
+        {find.open && shown && <PdfFindBar find={find} loading={!words} onGo={goMatch} />}
       </div>
       {presenting !== null && shown && <Present result={shown} start={presenting} onClose={() => setPresenting(null)} />}
     </div>
