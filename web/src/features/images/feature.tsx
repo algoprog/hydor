@@ -1,5 +1,5 @@
 // Images, drawings, videos and audio made through OpenRouter, in the conversation (generate_image, make_svg,
-// generate_video, generate_audio; and videos edit_video edited), and Settings → Images, video and audio (the models, and the one that writes
+// generate_video, generate_audio; and videos edit_video edited, sounds edit_audio edited), and Settings → Images, video and audio (the models, and the one that writes
 // captions in the Library).
 import { ImageIcon } from 'lucide-react';
 import type { WebFeature } from '../registry';
@@ -8,6 +8,7 @@ import { GeneratedImages } from './GeneratedImages';
 import { GeneratedVideos } from './GeneratedVideos';
 import { ImagesSettings } from './ImagesSettings';
 import { EditedVideo } from '../mediaedit/video/EditedVideo';
+import { EditedSound } from '../mediaedit/audio/EditedSound';
 
 export const imagesFeature: WebFeature = {
   id: 'images',
@@ -22,6 +23,7 @@ export const imagesFeature: WebFeature = {
     generate_video: { place: 'answer', Row: GeneratedVideos },
     generate_audio: { place: 'answer', Row: GeneratedAudio },
     edit_video: { place: 'answer', Row: EditedVideo },
+    edit_audio: { place: 'answer', Row: EditedSound },
   },
   settings: [
     {
