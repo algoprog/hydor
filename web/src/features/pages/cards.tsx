@@ -57,6 +57,19 @@ export function exportPageStep(t: { status: string; input?: unknown }) {
   };
 }
 
+/** How page_action reads as a step: what it did to which page (the editor's action, by its name). */
+export function pageActionStep(t: ToolInfo) {
+  const a = (t.input ?? {}) as { id?: unknown; action?: unknown };
+  const title = /^Saved "(.+?)" \(page /.exec(t.output ?? '')?.[1] ?? (typeof a.id === 'string' ? usePagesStore.getState().pages?.find((p) => p.id === a.id)?.title : undefined);
+  const what = typeof a.action === 'string' ? a.action.replace(/_/g, ' ') : 'a change';
+  const running = t.status === 'running' || t.status === 'pending';
+  return {
+    category: 'edit' as const,
+    verb: running ? 'Changing' : savedRef(t.output) ? 'Changed' : t.status === 'error' ? 'Could not change' : 'Looked at',
+    title: `${title ? `“${title}”` : 'a page'} · ${what}`,
+  };
+}
+
 /** A step of the work, opening to what it read. */
 export function ReadPageRow({ item, sessionKey }: { item: ToolItem; sessionKey: string }) {
   const [open, setOpen] = useState(false);
@@ -144,7 +157,8 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
   const writing = !ref && item.tool.status !== 'error' && (!draft || !draft.done || running);
   const title = info?.title ?? (page && page !== 'gone' ? page.title : undefined) ?? draft?.title ?? 'Page';
 
-  const kind = /save_slides$/.test(item.tool.name) ? 'slides' : /save_doc$/.test(item.tool.name) ? 'doc' : /save_sheet$/.test(item.tool.name) ? 'sheet' : /save_latex$/.test(item.tool.name) ? 'tex' : /save_notebook$/.test(item.tool.name) ? 'notebook' : null;
+  // A save names its kind; page_action's is the page's own, as the Library has it.
+  const kind = /save_slides$/.test(item.tool.name) ? 'slides' : /save_doc$/.test(item.tool.name) ? 'doc' : /save_sheet$/.test(item.tool.name) ? 'sheet' : /save_latex$/.test(item.tool.name) ? 'tex' : /save_notebook$/.test(item.tool.name) ? 'notebook' : /page_action$/.test(item.tool.name) ? (info?.kind ?? null) : null;
   const deck = kind !== null;
   // A deck stands whole: its slide is as tall as the card's width makes it (16:9), its buttons under it.
   const max = kind === 'slides' ? Math.max(fit, 900) : fit;
