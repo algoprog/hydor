@@ -6,7 +6,7 @@ import type { IconNode } from '@shared/slides';
 import { mix, type Palette } from '@shared/design';
 import { fontStack } from '@shared/design-fonts';
 import { tBox, tLine, tPic, tShape, tText } from '@shared/design-templates';
-import { tr } from '../../../i18n/runtime';
+import { tr, trIn } from '../../../i18n/runtime';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -290,7 +290,7 @@ export const fontCss = (name: string) => fontStack(name);
 
 /** The design editor's own words (on its bars, over its artboards), in the app's language. */
 export const designLabels = (): Record<string, string> => ({
-  dGroup: tr('Group'),
+  dGroup: trIn('design', 'Group'),
   dCurved: tr('Curved words'),
   dText: tr('Text'),
   dPicture: tr('Picture'),
@@ -310,7 +310,7 @@ export const designLabels = (): Record<string, string> => ({
   dEditVideo: tr('Edit video'),
   dEditVideoTip: tr('Open it in the video editor'),
   dWriteTip: tr('Change the words (double-click)'),
-  dGroupIt: tr('Group'),
+  dGroupIt: trIn('design', 'Group'),
   dGroupTip: tr('Group (Ctrl+G)'),
   dUngroup: tr('Ungroup'),
   dUngroupTip: tr('Ungroup (Ctrl+Shift+G)'),

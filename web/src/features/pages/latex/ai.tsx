@@ -15,7 +15,7 @@ import { diffWords } from '@shared/latex-diff';
 import { TEX_MAIN, type TexCompiled, type TexDoc, type TexHeading, type TexIssue } from '@shared/latex';
 import { cleanLang, WRITE_LANGS } from '@shared/write';
 import { Button, cx, Dialog, IconButton, inputCls, MenuBack, MenuItem, MenuSep, Popover, Throbber } from '../../../components/ui';
-import { tr } from '../../../i18n/runtime';
+import { tr, trIn } from '../../../i18n/runtime';
 import { toast, toastError } from '../../../lib/store';
 import { money } from '../../images/studio/logic';
 import { useTexHtml } from '../common/katex';
@@ -147,7 +147,7 @@ async function shrink(file: Blob): Promise<string> {
 }
 
 /** Who made it and what it cost, in a line. */
-const byLine = (b?: TexAiBy) => (b?.model ? `${tr('By')} ${b.model}${b.cost ? ` · ${money(b.cost)}` : ''}` : '');
+const byLine = (b?: TexAiBy) => (b?.model ? `${trIn('tex', 'By')} ${b.model}${b.cost ? ` · ${money(b.cost)}` : ''}` : '');
 
 /** The new words over the old, word by word: taken out struck through, put in marked. */
 function WordDiff({ a, b }: { a: string; b: string }) {

@@ -229,9 +229,10 @@
 - [**图片生成**](/settings?s=images&find=Making%20images)：允许智能体生成图片。
 - [**用于大多数图片（最佳）**](/settings?s=images&find=For%20most%20pictures%20%28Best%29)：生成大多数图片、并负责每次修改图片的模型。
 - [**用于简单图片（快速）**](/settings?s=images&find=For%20simple%20pictures%20%28Quick%29)：更便宜、更快的模型，用于图标、背景、纹理和简单图片。
-- [**这台电脑上的图片工具**](/settings?s=images&find=Picture%20tools%20on%20this%20computer)：在这里去掉图片的背景或擦除其中一部分：免费，你的图片也始终留在这台电脑上。
+- [**这台电脑上的图片工具**](/settings?s=images&find=Picture%20tools%20on%20this%20computer)：在这里去掉图片背景、擦除其中一部分或把它放大：免费，你的图片也留在这台电脑上。
 - [**视频生成**](/settings?s=images&find=Making%20videos)：允许智能体生成视频。
 - [**视频模型**](/settings?s=images&find=Video%20model)：生成视频的模型。
+- [**用显卡生成视频**](/settings?s=images&find=Use%20the%20graphics%20card%20for%20videos)：有显卡时用显卡生成编辑后的视频：更快，处理器也能空出来。
 - [**音频生成**](/settings?s=images&find=Making%20audio)：允许智能体生成音频。
 - [**音乐模型**](/settings?s=images&find=Music%20model)：生成音乐的模型。
 - [**语音和声音模型**](/settings?s=images&find=Voice%20and%20sound%20model)：生成语音和声音的模型。
