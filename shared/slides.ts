@@ -192,7 +192,19 @@ export interface ImageEl extends Base {
   crop?: Crop;
   /** Its colours changed. */
   adjust?: Adjust;
+  /** Its shape (PowerPoint's Crop to Shape, Canva's frames): the picture cut to a circle, a hexagon, a heart, a blob… (left out: its box, its corners `radius`). */
+  mask?: PictureMask;
+  /** A frame round it: the part is the whole frame (an instant photo's white card, a phone, a laptop, a browser window), the picture in its screen. */
+  frame?: PictureFrame;
 }
+
+/** The shapes a picture may be cut to, beside its box (rectangle, or rounded by `radius`). */
+export type PictureMask = 'circle' | 'ellipse' | 'arch' | 'blob' | 'flower' | 'hexagon' | 'star' | 'heart' | 'triangle' | 'diamond' | 'pentagon' | 'octagon';
+export const PICTURE_MASKS: PictureMask[] = ['circle', 'ellipse', 'arch', 'blob', 'flower', 'hexagon', 'star', 'heart', 'triangle', 'diamond', 'pentagon', 'octagon'];
+
+/** The frames a picture may show in: an instant photo's card, a phone, a laptop, a browser window (a screenshot in its device). */
+export type PictureFrame = 'polaroid' | 'phone' | 'laptop' | 'browser';
+export const PICTURE_FRAMES: PictureFrame[] = ['polaroid', 'phone', 'laptop', 'browser'];
 
 /** The shares cut off a picture's left, top, right and bottom (0–0.95; left and right together at most 0.95). */
 export interface Crop {
@@ -294,6 +306,22 @@ export interface ChartEl extends Base {
   size: number;
   color?: string;
   font?: string;
+  /** Where its numbers came from: a spreadsheet of the Library (its Format panel's Update reads them again). */
+  source?: ChartSource;
+}
+
+/** A spreadsheet's cells a chart was made from: the spreadsheet (its page), a sheet of it by name, and the range. */
+export interface ChartSource {
+  page: string;
+  sheet: string;
+  /** "A1:D7"; the first column the labels, the first row the series' names (when they are words). */
+  range: string;
+  /** The series along the rows rather than down the columns. */
+  by?: 'rows';
+  /** The spreadsheet's name when it was read, to show. */
+  title?: string;
+  /** When its numbers were read (ms since 1970). */
+  at?: number;
 }
 
 /** One of an icon's lines, as an SVG element on a 24×24 grid: its tag and attributes. */
@@ -326,6 +354,8 @@ export interface VideoEl extends Base {
   poster?: string;
   /** Seconds into the video it starts at. */
   start?: number;
+  /** Seconds into the video it stops at (PowerPoint's Trim Video); left out: its end. */
+  end?: number;
   /** Plays by itself when its slide shows in the slideshow. */
   autoplay?: boolean;
   muted?: boolean;
@@ -641,7 +671,23 @@ export interface Deck {
   slides: Slide[];
   footer?: Footer;
   guides?: Guides;
+  /** A picture on every slide (a brand's logo), in a corner. */
+  logo?: Logo;
 }
+
+/** A logo on every slide: its picture, its corner, its size in slide pixels (w×h, its own shape), not on the title slide if asked. */
+export interface Logo {
+  src: string;
+  /** Top left, top right, bottom left, bottom right. */
+  at: 'tl' | 'tr' | 'bl' | 'br';
+  w: number;
+  h: number;
+  /** How far from the slide's edges, in pixels (32 when left out). */
+  margin?: number;
+  /** Not on the title slide (the first, and any made from the Title layout). */
+  skipTitle?: boolean;
+}
+export const LOGO_CORNERS: Logo['at'][] = ['tl', 'tr', 'bl', 'br'];
 
 // ---- themes and fonts ------------------------------------------------------------------------------------
 
@@ -1682,6 +1728,44 @@ export function cleanAdjust(v: unknown): Adjust | undefined {
   return Object.keys(a).length ? a : undefined;
 }
 
+/** The other names agents give a picture's frames. */
+const FRAME_ALIASES: Record<string, PictureFrame> = { instant: 'polaroid', photo: 'polaroid', mobile: 'phone', iphone: 'phone', smartphone: 'phone', macbook: 'laptop', computer: 'laptop', notebook: 'laptop', window: 'browser', screenshot: 'browser', web: 'browser' };
+
+/** A range of cells as a chart's source takes it: "A1:D7", "B2", parts split by commas ("A1:A7,C1:C7"), `$` signs dropped. */
+const RANGE = /^[A-Z]{1,3}[0-9]{1,7}(:[A-Z]{1,3}[0-9]{1,7})?(,[A-Z]{1,3}[0-9]{1,7}(:[A-Z]{1,3}[0-9]{1,7})?){0,7}$/;
+
+/** A chart's source, checked: a page's id, a sheet's name and a range of its cells; undefined for anything else. */
+export function chartSource(v: unknown): ChartSource | undefined {
+  if (!isObj(v)) return undefined;
+  const page = typeof v.page === 'string' ? v.page.trim() : '';
+  const range = typeof v.range === 'string' ? v.range.replace(/[\s$]/g, '').toUpperCase() : '';
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(page) || !RANGE.test(range)) return undefined;
+  const s: ChartSource = { page, sheet: str(v.sheet, 100).trim(), range };
+  if (v.by === 'rows') s.by = 'rows';
+  const title = str(v.title, 200).trim();
+  if (title) s.title = title;
+  if (typeof v.at === 'number' && Number.isFinite(v.at) && v.at > 0) s.at = Math.round(v.at);
+  return s;
+}
+
+/** A deck's logo, checked: a picture's source (as `src` makes of one not kept yet), a corner, a size; undefined without a picture. */
+function logo(v: unknown, o: NormalizeOpts): Logo | undefined {
+  if (typeof v === 'string') v = { src: v };
+  if (!isObj(v)) return undefined;
+  const raw = typeof v.src === 'string' ? v.src.trim() : '';
+  const src = cleanSrc(raw) ?? (raw && o.src ? o.src(raw) : null);
+  if (!src) return undefined;
+  const at = opt(LOGO_ALIASES[String(v.at ?? v.corner ?? '').trim().toLowerCase()] ?? v.at ?? v.corner, LOGO_CORNERS) ?? 'tr';
+  // Its width, and its height from its shape when only one is given.
+  const w = num(v.w ?? v.width, 16, 640, 0);
+  const h = num(v.h ?? v.height, 16, 640, 0);
+  const g: Logo = { src, at, w: w || (h ? h * 2 : 120), h: h || (w ? w / 2 : 60) };
+  if (v.margin !== undefined) g.margin = num(v.margin, 0, 200, 32);
+  if (v.skipTitle === true) g.skipTitle = true;
+  return g;
+}
+const LOGO_ALIASES: Record<string, Logo['at']> = { 'top-left': 'tl', 'top left': 'tl', 'top-right': 'tr', 'top right': 'tr', 'bottom-left': 'bl', 'bottom left': 'bl', 'bottom-right': 'br', 'bottom right': 'br' };
+
 /** What a part may hold at most: parts in all, groups within groups. */
 interface Budget {
   n: number;
@@ -1795,6 +1879,15 @@ function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts, dep
     if (crop) img.crop = crop;
     const adjust = cleanAdjust(e.adjust);
     if (adjust) img.adjust = adjust;
+    // Its frame, else its shape (agents write either as "shape" too: "rounded" is its corners, "oval" an ellipse).
+    const frame = opt(FRAME_ALIASES[String(e.frame ?? '').trim().toLowerCase()] ?? e.frame, PICTURE_FRAMES);
+    const shapeOf = String(e.mask ?? e.shape ?? '')
+      .trim()
+      .toLowerCase();
+    const mask = opt(shapeOf === 'oval' ? 'ellipse' : shapeOf, PICTURE_MASKS);
+    if (frame) img.frame = frame;
+    else if (mask) img.mask = mask;
+    else if ((shapeOf === 'round' || shapeOf === 'rounded') && img.radius === undefined) img.radius = Math.round(Math.min(img.w, img.h) * 0.16);
     return img;
   }
   if (type === 'line') {
@@ -1883,6 +1976,8 @@ function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts, dep
     if (color) c.color = color;
     const font = cleanFont(e.font);
     if (font) c.font = font;
+    const source = chartSource(e.source);
+    if (source) c.source = source;
     return c;
   }
   if (type === 'icon') {
@@ -1926,6 +2021,9 @@ function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts, dep
     if (poster) v.poster = poster;
     const start = e.start !== undefined ? Math.round(num(e.start, 0, 86400, 0)) : videoStart(raw);
     if (start) v.start = start;
+    // Where it stops: a tenth of a second after it starts at the soonest.
+    const end = e.end !== undefined ? Math.round(num(e.end, 0, 86400, 0) * 10) / 10 : 0;
+    if (end > (start || 0)) v.end = end;
     if (e.autoplay === true) v.autoplay = true;
     if (e.muted === true) v.muted = true;
     if (e.loop === true) v.loop = true;
@@ -2300,6 +2398,8 @@ export function normalizeDeck(input: unknown, o: NormalizeOpts = {}): Deck {
   if (f) d.footer = f;
   const g = guides(v.guides, slideH(ratio));
   if (g) d.guides = g;
+  const lg = logo(v.logo, o);
+  if (lg) d.logo = lg;
   // PowerPoint compatible: what only the web format has becomes what PowerPoint has.
   const pptx = typeof v.format === 'string' && /^(pptx|powerpoint|ppt)$/i.test(v.format.trim());
   return pptx ? toPowerPoint(d) : d;
@@ -2320,7 +2420,7 @@ const posterPart = (e: El): e is VideoEl | HtmlEl | EmbedEl | Scene3dEl => e.typ
  * YouTube's own stills too.
  */
 export function deckSources(d: Deck, stills = false): string[] {
-  const out: string[] = [];
+  const out: string[] = d.logo?.src ? [d.logo.src] : [];
   for (const s of d.slides) {
     if (s.bg?.image) out.push(s.bg.image);
     for (const e of everyEl(s.els)) {
@@ -2371,6 +2471,7 @@ function mapEls(els: El[], f: (src: string) => string): El[] {
 export function mapSources(d: Deck, f: (src: string) => string): Deck {
   return {
     ...d,
+    ...(d.logo ? { logo: { ...d.logo, src: f(d.logo.src) } } : {}),
     slides: d.slides.map((s) => ({
       ...s,
       ...(s.bg?.image ? { bg: { ...s.bg, image: f(s.bg.image) } } : {}),
@@ -2384,7 +2485,7 @@ export function mapSources(d: Deck, f: (src: string) => string): Deck {
  * versions read as a diff of lines.
  */
 export function deckText(d: Deck): string {
-  const extra = `${d.footer ? `,"footer":${JSON.stringify(d.footer)}` : ''}${d.guides ? `,"guides":${JSON.stringify(d.guides)}` : ''}`;
+  const extra = `${d.footer ? `,"footer":${JSON.stringify(d.footer)}` : ''}${d.guides ? `,"guides":${JSON.stringify(d.guides)}` : ''}${d.logo ? `,"logo":${JSON.stringify(d.logo)}` : ''}`;
   const kind = `${d.format ? `,"format":${JSON.stringify(d.format)}` : ''}${d.progress ? ',"progress":true' : ''}`;
   const out: string[] = [`{"v":1,"ratio":${JSON.stringify(d.ratio)}${kind},"theme":${JSON.stringify(d.theme)}${extra},"slides":[`];
   d.slides.forEach((s, i) => {

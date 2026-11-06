@@ -24,10 +24,11 @@
 //
 // A slide is 1280 px wide: 1 px is 9525 EMU (12192000 across, PowerPoint's widescreen) and a font's px is 0.75 pt.
 import type { Anim, ChartEl, CodeEl, Deck, El, GroupEl, IconEl, ImageEl, LayoutId, LineEl, MathEl, Para, Ratio, Run, Side, Slide, Stick, TableEl, TextEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
-import { CODE_FONT, everyEl, fontName, FONTS, footerOn, hexColor, LAYOUTS, layoutSlide, mixColor, plainText, slideH, VIDEO, videoStill } from '../../shared/slides.ts';
-import { codeLookOf, codeTokens } from '../../shared/slides-runtime.ts';
+import { CODE_FONT, everyEl, fontName, FONTS, footerOn, hexColor, isTitleSlide, LAYOUTS, layoutSlide, mixColor, plainText, SLIDE_W, slideH, VIDEO, videoStill } from '../../shared/slides.ts';
+import { codeLookOf, codeTokens, pictureFramePlan, pictureMaskPath, type FramePiece } from '../../shared/slides-runtime.ts';
 import { coreXml, esc, relsXml, XML_HEAD, zipParts, type ZipPart } from './ooxml.ts';
 import { eotCompressed, eotOf, fontAttrs, fontsSaid } from './pptx-fonts.ts';
+import { videoSeconds } from './video-length.ts';
 
 /** A picture ready for the file: PNG, JPEG or GIF bytes and its size in pixels. */
 export interface Picture {
@@ -459,10 +460,88 @@ function boxXml(c: Ctx, e: Extract<El, { type: 'text' | 'shape' }>): string {
   return `<p:sp>${nv}<p:spPr>${xfrm(e.x, e.y, e.w, e.h, e.rot)}${geom}${fill}${lnXml(e.line, e.lineW, e.dash, t, op)}${e.shadow ? (boxy ? BOX_SHADOW : SHAPE_SHADOW) : ''}</p:spPr>${txBody(c, e, op, 'p:txBody', inset)}</p:sp>`;
 }
 
-function imageXml(c: Ctx, e: ImageEl, href?: string): string {
+// ---- pictures cut to a shape, and in frames ------------------------------------------------------------------
+
+/** SVG path data of absolute M, L, C, Q and Z (the runtime's outline of a picture's shape) as an outline's commands. */
+export function pathCmds(d: string): Cmd[] {
+  const out: Cmd[] = [];
+  for (const m of d.matchAll(/([MLCQZ])([^MLCQZ]*)/g)) {
+    const v = (m[2].match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi) ?? []).map(Number);
+    if (m[1] === 'Z') out.push(['Z']);
+    else if (m[1] === 'C') for (let i = 0; i + 5 < v.length; i += 6) out.push(['C', v[i], v[i + 1], v[i + 2], v[i + 3], v[i + 4], v[i + 5]]);
+    else if (m[1] === 'Q') for (let i = 0; i + 3 < v.length; i += 4) out.push(['Q', v[i], v[i + 1], v[i + 2], v[i + 3]]);
+    else for (let i = 0; i + 1 < v.length; i += 2) out.push([i === 0 ? (m[1] as 'M' | 'L') : 'L', v[i], v[i + 1]]);
+  }
+  return out;
+}
+
+/** An outline as DrawingML's custom geometry in a w×h box. */
+function outlineXml(cmds: Cmd[], w: number, h: number): string {
+  const n = (v: number) => Math.round(v * E);
+  const pt = (x: number, y: number) => `<a:pt x="${n(x)}" y="${n(y)}"/>`;
+  const path = cmds
+    .map((k) => (k[0] === 'M' ? `<a:moveTo>${pt(k[1], k[2])}</a:moveTo>` : k[0] === 'L' ? `<a:lnTo>${pt(k[1], k[2])}</a:lnTo>` : k[0] === 'C' ? `<a:cubicBezTo>${pt(k[1], k[2])}${pt(k[3], k[4])}${pt(k[5], k[6])}</a:cubicBezTo>` : k[0] === 'Q' ? `<a:quadBezTo>${pt(k[1], k[2])}${pt(k[3], k[4])}</a:quadBezTo>` : '<a:close/>'))
+    .join('');
+  return `<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="l" t="t" r="r" b="b"/><a:pathLst><a:path w="${n(Math.max(1, w))}" h="${n(Math.max(1, h))}">${path}</a:path></a:pathLst></a:custGeom>`;
+}
+
+/** A rounded rectangle's geometry: its corners' radius as PowerPoint's adjustment. */
+const roundGeom = (r: number, w: number, h: number) => `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.round(Math.min(50000, (r / Math.max(1, Math.min(w, h))) * 100000))}"/></a:avLst></a:prstGeom>`;
+
+/** A picture's geometry: the shape it is cut to (an ellipse as PowerPoint's own, the others as their outlines), else its box. */
+function picGeom(e: ImageEl, w: number, h: number): string {
+  if (e.mask === 'ellipse' || (e.mask === 'circle' && Math.abs(w - h) < 0.5)) return '<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>';
+  const d = e.mask ? pictureMaskPath(e.mask, Math.max(1, w), Math.max(1, h)) : '';
+  if (d) {
+    // PowerPoint flips a flipped picture's outline with it; the slide keeps the shape as it is: mirrored first, it comes back.
+    const fx = (x: number) => (e.flipH ? w - x : x);
+    const fy = (y: number) => (e.flipV ? h - y : y);
+    const cmds = pathCmds(d).map((k): Cmd => (k[0] === 'Z' ? k : k[0] === 'C' ? ['C', fx(k[1]), fy(k[2]), fx(k[3]), fy(k[4]), fx(k[5]), fy(k[6])] : k[0] === 'Q' ? ['Q', fx(k[1]), fy(k[2]), fx(k[3]), fy(k[4])] : [k[0], fx(k[1]), fy(k[2])]));
+    return outlineXml(cmds, w, h);
+  }
+  return e.radius ? roundGeom(e.radius, w, h) : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
+}
+
+/** Whether a slide's background is dark (its colour, else the theme's), as the runtime tells: frames take lighter edges there. */
+const darkSlide = (c: Ctx, s: Slide) => {
+  const { hex } = hexColor(s.bg?.color ?? 'bg', c.t, 'ffffff');
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.45;
+};
+
+/** A piece of a picture's frame as a shape of the group round it (its colour, edge and soft shadow as the slide draws them). */
+function pieceXml(c: Ctx, p: FramePiece, op: number, shadow: boolean): string {
+  const geom = p.round ? '<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>' : p.r ? roundGeom(p.r, p.w, p.h) : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
+  const ln = p.line ? `<a:ln w="${emu(p.lw ?? 1)}">${fillXml(p.line, c.t, op)}</a:ln>` : '<a:ln><a:noFill/></a:ln>';
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${c.next++}" name="Frame"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(p.x, p.y, Math.max(0, p.w), Math.max(0, p.h))}${geom}${fillXml(p.fill, c.t, op)}${ln}${p.shadow || shadow ? shadowXml(8, 22, 0.24) : ''}</p:spPr></p:sp>`;
+}
+
+/**
+ * A picture in a frame (a card, a phone, a laptop, a browser window): a group of the frame's pieces as shapes, the picture
+ * in its screen between them, as the slide draws it. The group is the part (its animations, links and connectors).
+ */
+function framedXml(c: Ctx, e: ImageEl, s: Slide): string {
+  const plan = pictureFramePlan(e.frame!, Math.max(1, Math.abs(e.w)), Math.max(1, Math.abs(e.h)), darkSlide(c, s));
+  const op = e.opacity ?? 1;
+  const { id: gid, cNvPr } = nvPr(c, e, 'Picture');
+  const sc = plan.screen;
+  // Its screen's corners: all rounded, or only the bottom ones (a browser window's).
+  const geom = sc.r && sc.bottom ? outlineXml(pathCmds(`M0,0L${sc.w},0L${sc.w},${sc.h - sc.r}Q${sc.w},${sc.h} ${sc.w - sc.r},${sc.h}L${sc.r},${sc.h}Q0,${sc.h} 0,${sc.h - sc.r}Z`), sc.w, sc.h) : sc.r ? roundGeom(sc.r, sc.w, sc.h) : undefined;
+  const inner: ImageEl = { ...e, id: `${e.id}~screen`, x: sc.x, y: sc.y, w: sc.w, h: sc.h, rot: undefined, link: undefined, frame: undefined, mask: undefined, radius: undefined, shadow: undefined, name: 'Screen' };
+  const under = plan.under.map((p, i) => pieceXml(c, p, op, !!e.shadow && i === 0)).join('');
+  const pic = imageXml(c, inner, undefined, { geom, renders: e.id });
+  const over = plan.over.map((p) => pieceXml(c, p, op, false)).join('');
+  // The group is the part: what refers to it by its id (animations, connectors) finds the group.
+  c.ids.set(e.id, gid);
+  return `<p:grpSp><p:nvGrpSpPr>${cNvPr}<p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr>${grpXfrm(e)}</p:grpSpPr>${under}${pic}${over}</p:grpSp>`;
+}
+
+function imageXml(c: Ctx, e: ImageEl, href?: string, own: { geom?: string; renders?: string } = {}): string {
+  if (e.frame) return framedXml(c, e, c.deck.slides[c.n - 1] ?? { id: '', els: [] });
   // A picture whose colours were changed goes changed, as the editor shows it (slides-render.ts), where a browser made it;
   // a web deck's live part as it ran (else its poster).
-  const baked = c.o.renders?.get(`adjust:${e.id}`) ?? c.o.renders?.get(`part:${e.id}`);
+  const key = own.renders ?? e.id;
+  const baked = c.o.renders?.get(`adjust:${key}`) ?? c.o.renders?.get(`part:${key}`);
   const pic = baked ?? (e.src ? c.o.picture(e.src) : null);
   const ph = c.depth ? undefined : c.phs.get(e.id);
   if (!pic) {
@@ -499,7 +578,8 @@ function imageXml(c: Ctx, e: ImageEl, href?: string): string {
     a?.blur ? `<a:blur rad="${emu(a.blur)}" grow="0"/>` : '',
   ].join('');
   const flip = `${e.flipH ? ' flipH="1"' : ''}${e.flipV ? ' flipV="1"' : ''}`;
-  const geom = e.radius ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.round(Math.min(50000, (e.radius / Math.max(1, Math.min(w, h))) * 100000))}"/></a:avLst></a:prstGeom>` : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
+  // Its shape (Crop to Shape), its box's rounded corners, or its box; a framed picture's screen's own.
+  const geom = own.geom ?? picGeom(e, w, h);
   const nv = ph ? `<p:cNvPicPr><a:picLocks noGrp="1" noChangeAspect="1"/></p:cNvPicPr><p:nvPr>${phXml(ph)}</p:nvPr>` : '<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/>';
   return `<p:pic><p:nvPicPr>${cNvPr}${nv}</p:nvPicPr><p:blipFill><a:blip r:embed="${rid}">${alpha}</a:blip>${crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(x, y, w, h, e.rot, flip)}${geom}${e.line ? lnXml(e.line, e.lineW, undefined, c.t, op) : ''}${e.shadow ? PICTURE_SHADOW : ''}</p:spPr></p:pic>`;
 }
@@ -656,7 +736,10 @@ function movieXml(c: Ctx, e: VideoEl, file: { data: Buffer; ext: string }): stri
   c.played.push({ id, muted: !!e.muted, loop: !!e.loop });
   const op = e.opacity ?? 1;
   const alpha = op < 1 ? `<a:alphaModFix amt="${Math.round(op * 100000)}"/>` : '';
-  const trim = e.start ? `<p14:trim st="${Math.round(e.start * 1000)}"/>` : '';
+  // Trimmed as PowerPoint keeps it: the time cut off its start, and off its end (its length less where it stops).
+  const length = e.end ? videoSeconds(file.data) : null;
+  const cutEnd = length && e.end && e.end < length ? Math.round((length - e.end) * 1000) : 0;
+  const trim = e.start || cutEnd ? `<p14:trim${e.start ? ` st="${Math.round(e.start * 1000)}"` : ''}${cutEnd ? ` end="${cutEnd}"` : ''}/>` : '';
   const geom = e.radius ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.round(Math.min(50000, (e.radius / Math.max(1, Math.min(e.w, e.h))) * 100000))}"/></a:avLst></a:prstGeom>` : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
   return `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="${esc(c.morph.get(e.id) ?? e.name ?? 'Video')}"><a:hlinkClick r:id="" action="ppaction://media"/></p:cNvPr><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr><a:videoFile r:link="${link}"/><p:extLst><p:ext uri="{DAA4B4D4-6D71-4841-9C94-3DE7FCFB9230}"><p14:media xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" r:embed="${media}">${trim}</p14:media></p:ext></p:extLst></p:nvPr></p:nvPicPr><p:blipFill><a:blip r:embed="${pic}">${alpha}</a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(e.x, e.y, e.w, e.h, e.rot)}${geom}</p:spPr></p:pic>`;
 }
@@ -1215,6 +1298,27 @@ function bgXml(c: Ctx, s: Slide): { bg: string; under: string } {
   return { bg: `<p:bg><p:bgPr>${fill}<a:effectLst/></p:bgPr></p:bg>`, under };
 }
 
+/** The deck's logo on slide i, as the slide shows it: its picture in its corner (above the footer's band where that shows). */
+function logoXml(c: Ctx, i: number): string {
+  const g = c.deck.logo;
+  const s = c.deck.slides[i];
+  if (!g || !s || (g.skipTitle && isTitleSlide(c.deck, i))) return '';
+  const pic = c.o.picture(g.src);
+  if (!pic || !(pic.w > 0) || !(pic.h > 0)) return '';
+  const m = g.margin ?? 32;
+  const below = g.at[0] === 'b' && footerOn(c.deck, i) ? Math.max(m, 60) : m;
+  const bx = g.at[1] === 'l' ? m : SLIDE_W - m - g.w;
+  const by = g.at[0] === 't' ? m : slideH(c.deck.ratio) - below - g.h;
+  // The picture as large as its box allows, snug in the corner (as the slide's object-fit: contain does).
+  const k = Math.min(g.w / pic.w, g.h / pic.h);
+  const w = pic.w * k;
+  const h = pic.h * k;
+  const x = g.at[1] === 'l' ? bx : bx + g.w - w;
+  const y = g.at[0] === 't' ? by : by + g.h - h;
+  const rid = c.media.add(pic);
+  return `<p:pic><p:nvPicPr><p:cNvPr id="${c.next++}" name="Logo" descr="Logo"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(x, y, w, h)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+}
+
 function slideXml(c: Ctx, s: Slide): string {
   const { bg, under } = bgXml(c, s);
   // The parts that fill its layout's placeholders (a slide with a title placeholder filled has its title).
@@ -1222,7 +1326,7 @@ function slideXml(c: Ctx, s: Slide): string {
   c.titled = [...c.phs.values()].some((p) => p.type === 'title' || p.type === 'ctrTitle');
   // Connectors' ends: the parts they are stuck to by their ids in the file, written by now, at the sites PowerPoint knows.
   const all = everyEl(s.els);
-  const parts = (s.els.map((e) => partXml(c, e)).join('') + footerXml(c, c.n - 1)).replace(/@@(stCxn|endCxn)\|([A-Za-z0-9_-]+)\|([trbl])@@/g, (_m, tag: string, el: string, at: Side) => {
+  const parts = (s.els.map((e) => partXml(c, e)).join('') + logoXml(c, c.n - 1) + footerXml(c, c.n - 1)).replace(/@@(stCxn|endCxn)\|([A-Za-z0-9_-]+)\|([trbl])@@/g, (_m, tag: string, el: string, at: Side) => {
     const id = c.ids.get(el);
     const site = siteOf(all.find((x) => x.id === el), at);
     return id !== undefined && site !== null ? `<a:${tag} id="${id}" idx="${site}"/>` : '';
