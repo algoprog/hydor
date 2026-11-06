@@ -47,7 +47,7 @@ A plugin that needs other plugins brings them along: they are added first, and t
 - **Library docs**: current documentation and code examples for programming libraries and frameworks, from Context7's service, so agents write code for the version you use. Nothing is installed; the questions go to Context7.
 - **Meeting recordings**: from a recording of a meeting, call or interview to notes: a summary, decisions, action items with owners and dates, open questions and a follow-up email, each with the time it was said. It brings **Speech to text** along.
 - **Python for data**: a Python of its own with pandas, NumPy, SciPy, Matplotlib, openpyxl and PyArrow, to analyse tables and make charts without installing anything into your own Python.
-- **Speech to text**: recordings, voice notes and videos become text and subtitles on this computer, with Whisper, in about 100 languages. It brings **Audio and video** along; its models download once, the first time each is used.
+- **Speech to text**: recordings, voice notes and videos become text and subtitles on this computer, with Whisper, in about 100 languages: on an NVIDIA graphics card when there is one (its setup then adds NVIDIA's CUDA libraries, about 1.3 GB), else on the CPU, and on the CPU too when the card fails, saying why. A Mac transcribes on its CPU: this Whisper has no Apple GPU support. It brings **Audio and video** along; its models download once, the first time each is used.
 - **SQLite databases**: tools to look inside SQLite databases, query them safely, change them in one go, and move data in and out of CSV files. It needs only Python 3.
 - **Text from pictures**: reads the text in pictures, photos of documents, screenshots, receipts and scanned PDFs, on this computer.
 
@@ -69,7 +69,7 @@ A plugin you added has a **⋯** menu at the bottom: **Change it** (for plugins 
 
 When a plugin needs packages or downloads, adding it sets them up in a data folder of its own, never for the whole computer:
 
-- Python packages go in a Python environment of its own (made with uv when this computer has it, otherwise with Python's own tools).
+- Python packages go in a Python environment of its own (made with uv when this computer has it, otherwise with Python's own tools). On a computer with an NVIDIA GPU, a plugin can add the packages it needs to run there, such as NVIDIA's CUDA libraries; if those fail to install, it works on the CPU.
 - Node packages go in a folder of its own, installed without running their install scripts.
 - Files are downloaded into its data folder, and checked against their fingerprint when the plugin gives one.
 

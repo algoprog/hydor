@@ -2,7 +2,10 @@
 
 Audio is decoded with ffmpeg (from the Audio and video plugin this one needs) into 16 kHz mono samples,
 so any format ffmpeg reads works. Models download once into the plugin's data folder (HF_HOME) on first
-use. It runs on the CPU unless asked otherwise; a model stays loaded between calls.
+use. It runs on an NVIDIA graphics card when there is one (CUDA's libraries come with the plugin's setup
+there: cuBLAS and cuDNN, found through LD_LIBRARY_PATH), else on the CPU, and on the CPU too when the card
+fails (its libraries missing, out of memory), saying why. CTranslate2 has no Apple GPU support, so a Mac
+transcribes on its CPU. A model stays loaded between calls.
 """
 
 import os
@@ -17,22 +20,41 @@ from mcp_server import Server, ToolError  # noqa: E402
 MODELS = ["tiny", "base", "small", "medium", "large-v3", "turbo"]
 REAL = {"turbo": "large-v3-turbo"}
 loaded = {}
+# Why the graphics card failed, once it has: the CPU from then on.
+gpu_failed = None
 
 server = Server(
     "transcribe",
     "1.0.0",
-    instructions="Speech to text on this computer. Give full paths. The first use of a model downloads it (tiny 75 MB, base 145 MB, small 480 MB, turbo 1.6 GB). For recordings over 20 minutes, use the base model or transcribe in parts with start and end.",
+    instructions="Speech to text on this computer, on an NVIDIA graphics card when there is one, else the CPU. Give full paths. The first use of a model downloads it (tiny 75 MB, base 145 MB, small 480 MB, turbo 1.6 GB). For recordings over 20 minutes, use the base model or transcribe in parts with start and end.",
 )
 
 
 def model_for(size, device):
+    """A model on "cuda" (as it was made, float16) or the "cpu" (int8)."""
     from faster_whisper import WhisperModel
 
     key = (size, device)
     if key not in loaded:
-        dev = device if device in ("cpu", "cuda") else "auto"
-        loaded[key] = WhisperModel(REAL.get(size, size), device=dev, compute_type="int8" if dev == "cpu" else "default")
+        loaded[key] = WhisperModel(REAL.get(size, size), device=device, compute_type="int8" if device == "cpu" else "default")
     return loaded[key]
+
+
+def has_cuda():
+    """An NVIDIA graphics card CTranslate2 can see."""
+    try:
+        import ctranslate2
+
+        return ctranslate2.get_cuda_device_count() > 0
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def run_model(size, device, audio, language):
+    """The segments (start, end, text) and the info; the work happens as the segments are read."""
+    m = model_for(size, device)
+    segments, info = m.transcribe(audio, language=language or None, vad_filter=True, beam_size=5)
+    return [(s.start, s.end, s.text.strip()) for s in segments], info
 
 
 def load_audio(src, start=None, end=None):
@@ -73,12 +95,13 @@ def stamp(t, sep=","):
             "out_dir": {"type": "string", "description": "Folder for the files (default: beside the recording)."},
             "start": {"type": "number", "description": "Only from this second."},
             "end": {"type": "number", "description": "Only up to this second."},
-            "device": {"type": "string", "enum": ["cpu", "auto"], "description": "cpu (default) or auto (a graphics card when there is one)."},
+            "device": {"type": "string", "enum": ["auto", "cpu"], "description": "auto (default): an NVIDIA graphics card when there is one, else the CPU; cpu: the CPU, leaving the card to other work."},
         },
         "required": ["path"],
     },
 )
-def transcribe(path, language=None, model="small", formats=None, out_dir=None, start=None, end=None, device="cpu"):
+def transcribe(path, language=None, model="small", formats=None, out_dir=None, start=None, end=None, device="auto"):
+    global gpu_failed
     src = os.path.expanduser(str(path or "").strip())
     if not os.path.isabs(src):
         raise ToolError(f"Give the full path (from /), not {path!r}.")
@@ -92,15 +115,27 @@ def transcribe(path, language=None, model="small", formats=None, out_dir=None, s
         raise ToolError("out_dir must be a full path.")
     os.makedirs(dest, exist_ok=True)
     began = time.time()
-    m = model_for(model, device)
     audio = load_audio(src, start, end)
     if not len(audio):
         raise ToolError("The file has no sound to transcribe (or that part of it is empty).")
     offset = float(start or 0)
-    segments, info = m.transcribe(audio, language=language or None, vad_filter=True, beam_size=5)
-    segs = [(s.start + offset, s.end + offset, s.text.strip()) for s in segments]
+    # The graphics card when there is one (and it has not failed); when it fails, the CPU, saying why.
+    used = "cuda" if device != "cpu" and not gpu_failed and has_cuda() else "cpu"
+    note = None
+    try:
+        found, info = run_model(model, used, audio, language)
+    except Exception as e:  # noqa: BLE001
+        if used != "cuda":
+            raise
+        gpu_failed = f"{type(e).__name__}: {e}"[:300]
+        loaded.pop((model, "cuda"), None)
+        used = "cpu"
+        found, info = run_model(model, used, audio, language)
+    if device != "cpu" and gpu_failed and used == "cpu":
+        note = f"The graphics card did not work ({gpu_failed}), so it ran on the CPU."
+    segs = [(a + offset, b + offset, t) for a, b, t in found]
     if not segs:
-        return {"language": info.language, "duration_seconds": round(info.duration, 1), "text": "", "note": "No speech was found."}
+        return {"language": info.language, "duration_seconds": round(info.duration, 1), "device": "NVIDIA GPU (CUDA)" if used == "cuda" else "CPU", "text": "", "note": "No speech was found." + (f" {note}" if note else "")}
     stem = os.path.splitext(os.path.basename(src))[0]
     written = []
     text = "\n".join(t for _, _, t in segs)
@@ -128,6 +163,8 @@ def transcribe(path, language=None, model="small", formats=None, out_dir=None, s
         "language_probability": round(info.language_probability, 2),
         "duration_seconds": round(info.duration, 1),
         "model": model,
+        "device": "NVIDIA GPU (CUDA)" if used == "cuda" else "CPU",
+        **({"note": note} if note else {}),
         "took_seconds": round(time.time() - began, 1),
         "words": words,
         "files": written,

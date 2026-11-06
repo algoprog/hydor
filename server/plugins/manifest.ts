@@ -115,7 +115,9 @@ export function requiresOf(v: unknown, problems: string[]): PluginRequires {
       else problems.push(`requires.plugins: ${s} is not a plugin name`);
     }
   if (stringMap(v.npm)) for (const [n, ver] of Object.entries(v.npm)) /^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/i.test(n) ? (r.npm[n] = ver || '*') : problems.push(`requires.npm: ${n} is not a package name`);
-  if (strings(v.pip)) for (const p of v.pip) /^[A-Za-z0-9][\w.\-[\],]*\s*([<>=!~^].*)?$/.test(p.trim()) && !/\s-|^-/.test(p) ? r.pip.push(p.trim()) : problems.push(`requires.pip: ${p} is not a package`);
+  const pkg = (p: string) => /^[A-Za-z0-9][\w.\-[\],]*\s*([<>=!~^].*)?$/.test(p.trim()) && !/\s-|^-/.test(p);
+  if (strings(v.pip)) for (const p of v.pip) pkg(p) ? r.pip.push(p.trim()) : problems.push(`requires.pip: ${p} is not a package`);
+  if (strings(v.pipNvidia)) for (const p of v.pipNvidia) pkg(p) ? (r.pipNvidia ??= []).push(p.trim()) : problems.push(`requires.pipNvidia: ${p} is not a package`);
   if (str(v.python)) r.python = str(v.python);
   if (Array.isArray(v.commands))
     for (const c of v.commands) {

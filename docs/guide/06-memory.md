@@ -122,7 +122,7 @@ Everything about memory is in [Settings → Capabilities → Memory](/settings?s
 
 **How it gets ready**, once:
 
-1. A minute after the app first starts, the app sets up a private Python environment in its data folder, with PyTorch (its smaller CPU build when there is no NVIDIA GPU) and Transformers; if you turned it off, it does this as soon as you turn **Search by meaning** back on (memory itself must be on). This takes a few minutes, and the line under the switch shows each step, such as "Making a private Python environment" and "Installing PyTorch (CPU build): a few minutes".
+1. A minute after the app first starts, the app sets up a private Python environment in its data folder, with PyTorch (its smaller CPU build when there is no NVIDIA GPU; on a Mac its usual build, which uses the Mac's GPU) and Transformers; if you turned it off, it does this as soon as you turn **Search by meaning** back on (memory itself must be on). This takes a few minutes, and the line under the switch shows each step, such as "Making a private Python environment" and "Installing PyTorch (CPU build): a few minutes".
 2. The first time the model starts, it downloads: "Downloading the model (1.2 GB, once)". After that, starting says "Loading the model".
 3. Every note gets its vector (the numbers search by meaning compares) in the background, and so does everything in the Library. The line counts the notes: "all 120 notes found by meaning", or "80 of 120 notes found by meaning (the rest soon)".
 
@@ -133,11 +133,11 @@ Everything about memory is in [Settings → Capabilities → Memory](/settings?s
 - Python 3.10 or newer on this computer, unless the uv tool is installed, which gets its own. If neither is there, setting up stops and says so, with how to install Python: on Debian or Ubuntu `sudo apt install python3 python3-venv`, on a Mac from python.org or with Homebrew (`brew install python`). On a Mac, Apple's own Python counts only when its developer tools are installed, so the app never asks you to install them.
 - Disk space: PyTorch takes about 1 GB, or about 5 GB with an NVIDIA GPU, and the model 1.2 GB. Setting up stops with "Not enough disk space" when less than about 3 GB is free (9 GB with an NVIDIA GPU).
 - An internet connection, once, for the downloads.
-- Free memory to start the model: about 2.5 GB on the CPU, or 1.5 GB with a GPU. Until there is enough, it says "Waiting for memory" and notes are found by their words.
+- Free memory to start the model: about 2.5 GB on the CPU or a Mac's GPU (which shares the computer's memory), or 1.5 GB with an NVIDIA GPU. Until there is enough, it says "Waiting for memory" and notes are found by their words.
 
 **Where it runs**: under the switch, pick **Automatic** or **CPU only**.
 
-- **Automatic** runs it on the NVIDIA GPU with the most free memory, when one has more than 2 GB free; otherwise on the CPU. On a GPU it loads at once and stays loaded ("Loaded on" and the GPU's name).
+- **Automatic** runs it on a GPU when there is one: the NVIDIA GPU with the most free memory, when one has more than 2 GB free, or a Mac's own GPU (Apple silicon); otherwise on the CPU. On an NVIDIA GPU it loads at once and stays loaded; on a Mac's GPU, which shares the computer's memory, it starts when needed and stops after a few idle minutes, as on the CPU. The line says where it runs ("Loaded on" and the GPU's name). A GPU that fails its first try leaves it on the CPU, and the line says why.
 - **CPU only** keeps it off the GPUs, to leave them to other work, such as models you run on this computer.
 - On the CPU it starts only when needed, takes about 1.4 GB of memory while it runs, and stops after a few idle minutes: "Starts on the CPU when needed, and stops after a few idle minutes". Starting takes a few seconds; what comes up before then is found by its words. A computer with 8 GB of memory is enough.
 
