@@ -30,7 +30,7 @@ function themeColors() {
   return { c1: v('--bg-2', '#1b1f27'), c2: v('--bg-3', '#242a34'), line: v('--line-2', '#3a4150'), fg3: v('--fg-3', '#8f99ab'), accent: v('--accent', '#8aa8ff'), panel: v('--bg-1', '#13161c') };
 }
 
-export function View({ ed, onCursor, bigHeal, className }: { ed: PictureEd; onCursor?: (p: Pt | null, color: string | null) => void; bigHeal?: Parameters<PictureEd['endStroke']>[0]; className?: string }) {
+export function View({ ed, onCursor, onZoom, bigHeal, className }: { ed: PictureEd; onCursor?: (p: Pt | null, color: string | null) => void; onZoom?: (z: number) => void; bigHeal?: Parameters<PictureEd['endStroke']>[0]; className?: string }) {
   useEd(ed);
   const box = useRef<HTMLDivElement>(null);
   const base = useRef<HTMLCanvasElement>(null);
@@ -61,6 +61,7 @@ export function View({ ed, onCursor, bigHeal, className }: { ed: PictureEd; onCu
   const t: ViewT = view.z === 'fit' ? { z: fitZ, ox: r + (W - doc.w * fitZ) / 2, oy: r + (H - doc.h * fitZ) / 2 } : { z: view.z, ox: view.ox, oy: view.oy };
   const tRef = useRef(t);
   tRef.current = t;
+  useEffect(() => onZoom?.(t.z), [t.z, onZoom]);
   // A new canvas size is fitted again.
   const shape = `${doc.w}x${doc.h}`;
   useEffect(() => setView({ z: 'fit', ox: 0, oy: 0 }), [shape]);
