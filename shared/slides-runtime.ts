@@ -1649,7 +1649,9 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       }
       if (!f) return;
       if (d.act === 'ready') {
-        for (const u of Array.from(f.closest('.ns-live')?.querySelectorAll(':scope > .ns-img, :scope > .ns-liveph') ?? [])) u.remove();
+        const box = f.closest<HTMLElement>('.ns-live');
+        for (const u of Array.from(box?.querySelectorAll(':scope > .ns-img, :scope > .ns-liveph') ?? [])) u.remove();
+        if (box) box.dataset.ready = '1';
         return;
       }
       if (d.act === 'model') return sendModel(f, liveFrames.get(f)!);
