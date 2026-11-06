@@ -1155,6 +1155,22 @@ export class DocEngine {
   insert(blocks: Block[]) {
     if (!blocks.length) return;
     let e: ops.Edit;
+    // A table's cell holds words only: a picture, a table or a line asked for in one goes right after the table.
+    const [at] = this.range();
+    if (!this.picked && at.c && blocks.some((b) => !ops.isText(b))) {
+      const i = ops.indexOf(this.doc, at.b);
+      const next = this.doc.blocks[i + 1];
+      if (this.suggesting) {
+        if (!ops.isText(next)) return this.o.onError(new Error('Put the caret after the table to add this there.'));
+        this.sel = { a: { b: next.id, o: 0 }, f: { b: next.id, o: 0 } };
+      } else {
+        this.before = this.sel;
+        const np: Block = { id: ops.freshId(this.doc), type: 'p', runs: [] };
+        this.apply(ops.insertBlocks(ops.splice(this.doc, i + 1, 0, [np]), { b: np.id, o: 0 }, blocks));
+        void this.takeInPictures(blocks);
+        return;
+      }
+    }
     if (this.suggesting) {
       // After a picked block, at the start of what follows it.
       if (this.picked) {
