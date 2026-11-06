@@ -116,6 +116,9 @@ function topicTitle(lang, id) {
   return id;
 }
 
+/** The words to point at, for a link: brackets too are %-encoded, or a Markdown link would end at the first ). */
+const findParam = (words) => encodeURIComponent(words).replace(/[()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+
 const PROPER = /^(CLAUDE|Gemini|GitHub|Claude|Codex|OpenRouter|Ollama|MCP|ACP|Naget|Hydor)/;
 const lower = (s, lang) => (PROPER.test(s) || lang === 'zh' ? s : s[0].toLocaleLowerCase(lang) + s.slice(1));
 
@@ -135,7 +138,7 @@ for (const lang of ['en', 'zh', 'el']) {
       for (const [sid, words, , text] of OPTIONS) {
         if (sid !== id) continue;
         const x = tr(text).replace(/[.。]$/, '');
-        out.push(`- [**${tr(words)}**](/settings?s=${id}&find=${encodeURIComponent(words)})${t.colon}${x}${t.stop}`);
+        out.push(`- [**${tr(words)}**](/settings?s=${id}&find=${findParam(words)})${t.colon}${x}${t.stop}`);
       }
       out.push('');
     }
