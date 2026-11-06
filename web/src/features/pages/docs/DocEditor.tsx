@@ -1191,10 +1191,113 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           <NumInput value={model.size} onChange={(v) => e?.setDoc({ size: v })} min={6} max={72} step={0.5} unit="pt" label="The document’s size" className="w-full" />
         </div>
       </div>
+      <div className="flex gap-3">
+        <div className="space-y-1.5">
+          <div className="text-[12px] text-fg-3">Orientation</div>
+          <Segmented
+            size="sm"
+            value={model.page.orient ?? 'portrait'}
+            onChange={(v) => {
+              const { orient: _o, ...page } = model.page;
+              e?.setDoc({ page: v === 'landscape' ? { ...page, orient: 'landscape' } : page });
+            }}
+            options={[
+              { value: 'portrait', label: 'Portrait' },
+              { value: 'landscape', label: 'Landscape' },
+            ]}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <div className="text-[12px] text-fg-3">Columns</div>
+          <Segmented
+            size="sm"
+            value={String(model.page.cols ?? 1)}
+            onChange={(v) => {
+              const { cols: _c, ...page } = model.page;
+              e?.setDoc({ page: v === '1' ? page : { ...page, cols: Number(v) as 2 | 3 } });
+            }}
+            options={['1', '2', '3'].map((k) => ({ value: k, label: k }))}
+          />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <div className="text-[12px] text-fg-3">Page colour</div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {['#ffffff', '#fffdf5', '#fef7e0', '#f1f3f4', '#e8f0fe', '#e6f4ea', '#fce8e6'].map((c) => (
+            <button
+              key={c}
+              type="button"
+              title={c === '#ffffff' ? tr('White') : c}
+              aria-label={c === '#ffffff' ? tr('White') : c}
+              onClick={() => {
+                const { color: _c, ...page } = model.page;
+                e?.setDoc({ page: c === '#ffffff' ? page : { ...page, color: c } });
+              }}
+              style={{ background: c }}
+              className={cx('h-6 w-6 rounded-full border border-black/15', (model.page.color ?? '#ffffff') === c && 'ring-2 ring-accent ring-offset-1 ring-offset-elevated')}
+            />
+          ))}
+          <label className="relative h-6 w-6 cursor-pointer overflow-hidden rounded-full border border-line-2 bg-[conic-gradient(#f44,#fd4,#4d4,#4df,#44f,#f4f,#f44)]" title={tr('Another colour')}>
+            <input type="color" value={model.page.color ?? '#ffffff'} onChange={(ev) => e?.setDoc({ page: { ...model.page, color: ev.target.value } })} className="absolute inset-0 cursor-pointer opacity-0" />
+          </label>
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <div className="text-[12px] text-fg-3">Watermark</div>
+        <div className="flex gap-1.5">
+          <input
+            value={model.mark?.text ?? ''}
+            onChange={(ev) => {
+              const en = engine.current;
+              if (!en) return;
+              const { mark: _m, ...rest } = en.doc;
+              const text = ev.target.value.slice(0, 60);
+              en.change(text.trim() ? { ...rest, mark: { text } } : rest, 'mark');
+            }}
+            placeholder={model.mark?.src ? tr('A picture') : 'DRAFT'}
+            aria-label="The watermark's words"
+            className={cx(inputCls, 'h-8 min-w-0 flex-1')}
+          />
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() =>
+              void (async () => {
+                const f = await choosePicture();
+                const en = engine.current;
+                if (!f || !en) return;
+                try {
+                  const p = await uploadPicture(f);
+                  const { mark: _m, ...rest } = en.doc;
+                  en.change({ ...rest, mark: { src: p.src } });
+                } catch (err) {
+                  toastError(err);
+                }
+              })()
+            }
+          >
+            Picture
+          </Button>
+          {model.mark && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                const en = engine.current;
+                if (!en) return;
+                const { mark: _m, ...rest } = en.doc;
+                en.change(rest);
+              }}
+            >
+              None
+            </Button>
+          )}
+        </div>
+      </div>
       <Button size="sm" variant="ghost" onClick={() => (setMenu(null), setDialog('bands'))} className="w-full justify-start">
         Header and footer
       </Button>
-      <p className="text-[11.5px] leading-relaxed text-fg-3">Headings and the title are sized from the document’s size. The PDF and Word files use this paper.</p>
+      <p className="text-[11.5px] leading-relaxed text-fg-3">Headings and the title are sized from the document’s size. The PDF and Word files are set up the same way.</p>
     </div>
   );
 
@@ -1341,7 +1444,12 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
                 style={
                   narrow
                     ? undefined
-                    : { ...(zoom !== 1 ? { zoom } : {}), ...(column ? { marginLeft: 0 } : {}), ...(pageLayout ? { minHeight: pageLayout.count * pageLayout.pageH + (pageLayout.count - 1) * GAP } : {}) }
+                    : {
+                        ...(zoom !== 1 ? { zoom } : {}),
+                        ...(column ? { marginLeft: 0 } : {}),
+                        // In columns the flow is longer than its pages (each column a page of it, shown in its place): the pages' height is the editor's.
+                        ...(pageLayout ? { minHeight: pageLayout.count * pageLayout.pageH + (pageLayout.count - 1) * GAP, ...((model.page.cols ?? 1) > 1 ? { height: pageLayout.count * pageLayout.pageH + (pageLayout.count - 1) * GAP } : {}) } : {}),
+                      }
                 }
               />
               {!narrow && pageLayout && <Bands layout={pageLayout} zoom={zoom} doc={shownDoc ?? model} readOnly={readOnly || liveOn} onOpen={() => setDialog('bands')} />}
@@ -1511,7 +1619,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           </Button>
         </div>
       )}
-      <Popover anchor={phone ? spotRef : pageRef} open={menu === 'page'} onClose={() => (setMenu(null), e?.refocusSoon())} align="end" width={300} title="Page setup">
+      <Popover anchor={phone ? spotRef : pageRef} open={menu === 'page'} onClose={() => (setMenu(null), e?.refocusSoon())} align="end" width={340} title="Page setup">
         {pageSetup}
       </Popover>
       <Popover anchor={phone ? spotRef : outlineRef} open={menu === 'outline' && !wideOutline} onClose={() => (setMenu(null), e?.refocusSoon())} align="end" width={280} title="Outline">
