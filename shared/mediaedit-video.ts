@@ -3,6 +3,10 @@
 // words over it. The server makes it with ffmpeg (server/mediaedit/video.ts); the editor shows the same in the browser
 // while it is being made. Times are seconds of the original video, so a cut or a title stays with the picture it was put
 // on when other parts are cut; the edited video's own time (after the cuts and the speed) is worked out from them.
+//
+// The picture is turned first, then mirrored, then cropped: the crop is in the "upright frame" (the video's own pixels
+// once turned and mirrored), as the picture editor's is (shared/mediaedit.ts), and words go where they show on the
+// cropped picture. edit_video takes a crop in the pixels of the video as it was given and puts it in that frame.
 
 /** Turned clockwise, in degrees. */
 export type VideoTurn = 0 | 90 | 180 | 270;
@@ -51,12 +55,13 @@ export interface VideoRecipe {
   cuts?: [number, number][];
   /** How fast it plays, 0.25 to 4. */
   speed?: number;
-  /** The part of the picture kept, in pixels of the original (before it is turned). */
-  crop?: VideoCrop;
+  /** Quarter turns clockwise, first. */
   rotate?: VideoTurn;
-  /** Mirrored left to right, and upside down (as it shows, turned). */
+  /** Then mirrored left to right, or upside down. */
   flipH?: boolean;
   flipV?: boolean;
+  /** Then the part of the picture kept, in the upright frame (its pixels once turned and mirrored). */
+  crop?: VideoCrop;
   /** -1 to 1 (0 as it is). */
   brightness?: number;
   contrast?: number;
@@ -173,15 +178,14 @@ export function shapeRatio(shape: string): number {
 /** The size of the picture `w`×`h` turned by `rotate`. */
 export const turnedSize = (w: number, h: number, rotate?: VideoTurn) => (rotate === 90 || rotate === 270 ? { w: h, h: w } : { w, h });
 
-/** The edited picture's size: its crop's (or the whole picture's), turned. */
+/** The edited picture's size: its crop's, or the whole picture's turned. */
 export function editedSize(r: Pick<VideoRecipe, 'crop' | 'rotate'>, w: number, h: number): { w: number; h: number } {
-  const c = r.crop ?? { x: 0, y: 0, w, h };
-  return turnedSize(c.w, c.h, r.rotate);
+  return r.crop ? { w: r.crop.w, h: r.crop.h } : turnedSize(w, h, r.rotate);
 }
 
 type Turning = Pick<VideoRecipe, 'rotate' | 'flipH' | 'flipV'>;
 
-/** A point of the original picture (`w`×`h`), where it shows once turned and mirrored. */
+/** A point of the picture as given (`w`×`h`), in the upright frame (turned and mirrored). */
 export function shownPoint(x: number, y: number, w: number, h: number, t: Turning): [number, number] {
   let [px, py] = t.rotate === 90 ? [h - y, x] : t.rotate === 180 ? [w - x, h - y] : t.rotate === 270 ? [y, w - x] : [x, y];
   const s = turnedSize(w, h, t.rotate);
@@ -190,7 +194,7 @@ export function shownPoint(x: number, y: number, w: number, h: number, t: Turnin
   return [px, py];
 }
 
-/** A point as it shows (turned and mirrored), back in the original picture (`w`×`h`). */
+/** A point of the upright frame, back in the picture as given (`w`×`h`). */
 export function originalPoint(px: number, py: number, w: number, h: number, t: Turning): [number, number] {
   const s = turnedSize(w, h, t.rotate);
   if (t.flipH) px = s.w - px;
@@ -200,23 +204,22 @@ export function originalPoint(px: number, py: number, w: number, h: number, t: T
 
 const box = (a: [number, number], b: [number, number]): VideoCrop => ({ x: Math.min(a[0], b[0]), y: Math.min(a[1], b[1]), w: Math.abs(a[0] - b[0]), h: Math.abs(a[1] - b[1]) });
 
-/** A part of the original picture, where it shows once turned and mirrored. */
+/** A part of the picture as given, in the upright frame. */
 export const shownRect = (c: VideoCrop, w: number, h: number, t: Turning) => box(shownPoint(c.x, c.y, w, h, t), shownPoint(c.x + c.w, c.y + c.h, w, h, t));
-/** A part of the picture as it shows, in the original's pixels. */
+/** A part of the upright frame, in the picture as given. */
 export const originalRect = (c: VideoCrop, w: number, h: number, t: Turning) => box(originalPoint(c.x, c.y, w, h, t), originalPoint(c.x + c.w, c.y + c.h, w, h, t));
 
-/** The largest part of the picture in its middle that has this shape once turned ("9:16"), in the original's pixels; null for 'free'. */
+/** The largest part in the middle of the picture `w`×`h` (turned by `rotate`) that has this shape ("9:16"), in the upright frame; null for 'free'. */
 export function cropToShape(shape: string, w: number, h: number, rotate?: VideoTurn): VideoCrop | null {
   const ratio = shapeRatio(shape);
   if (!Number.isFinite(ratio)) return null;
-  // The shape as the original stands: turned sideways, it is the other way round.
-  const want = rotate === 90 || rotate === 270 ? 1 / ratio : ratio;
-  let cw = w;
-  let ch = w / want;
-  if (ch > h) [cw, ch] = [h * want, h];
-  cw = Math.min(w, even(cw));
-  ch = Math.min(h, even(ch));
-  return { x: Math.floor((w - cw) / 4) * 2, y: Math.floor((h - ch) / 4) * 2, w: cw, h: ch };
+  const u = turnedSize(w, h, rotate);
+  let cw = u.w;
+  let ch = u.w / ratio;
+  if (ch > u.h) [cw, ch] = [u.h * ratio, u.h];
+  cw = Math.min(u.w, even(cw));
+  ch = Math.min(u.h, even(ch));
+  return { x: Math.floor((u.w - cw) / 4) * 2, y: Math.floor((u.h - ch) / 4) * 2, w: cw, h: ch };
 }
 
 /** The parts of the original kept, in order: the trim less the cuts, each at least MIN_PART long. */
@@ -301,13 +304,14 @@ export function normalizeVideoRecipe(raw: unknown, v: VideoSize): VideoRecipe {
   if (Number.isFinite(rot) && turn) out.rotate = turn as VideoTurn;
   if (r.flipH === true) out.flipH = true;
   if (r.flipV === true) out.flipV = true;
-  if (r.crop && typeof r.crop === 'object' && v.width >= 16 && v.height >= 16) {
-    // Its size as asked (even, as H.264 needs), moved inside the picture where it reaches past an edge.
-    const w = Math.min(even(v.width), even(num(r.crop.w, 16, v.width) ?? v.width));
-    const h = Math.min(even(v.height), even(num(r.crop.h, 16, v.height) ?? v.height));
-    const x = Math.max(0, Math.min(v.width - w, Math.round(num(r.crop.x, 0, v.width) ?? 0)));
-    const y = Math.max(0, Math.min(v.height - h, Math.round(num(r.crop.y, 0, v.height) ?? 0)));
-    if (x > 0 || y > 0 || w < even(v.width) || h < even(v.height)) out.crop = { x, y, w, h };
+  // The crop in the upright frame: its size as asked (even, as H.264 needs), moved inside where it reaches past an edge.
+  const u = turnedSize(v.width, v.height, out.rotate);
+  if (r.crop && typeof r.crop === 'object' && u.w >= 16 && u.h >= 16) {
+    const w = Math.min(even(u.w), even(num(r.crop.w, 16, u.w) ?? u.w));
+    const h = Math.min(even(u.h), even(num(r.crop.h, 16, u.h) ?? u.h));
+    const x = Math.max(0, Math.min(u.w - w, Math.round(num(r.crop.x, 0, u.w) ?? 0)));
+    const y = Math.max(0, Math.min(u.h - h, Math.round(num(r.crop.y, 0, u.h) ?? 0)));
+    if (x > 0 || y > 0 || w < even(u.w) || h < even(u.h)) out.crop = { x, y, w, h };
   }
   for (const k of ['brightness', 'contrast', 'saturation'] as const) {
     const n = num(r[k], -1, 1);

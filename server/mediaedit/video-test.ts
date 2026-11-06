@@ -86,7 +86,7 @@ const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-video-t
     `cuts in order, overlapping ones merged, ones outside the trim dropped: ${JSON.stringify(r.cuts)}`,
   );
   ok(r.speed === 2 && r.rotate === 270 && r.brightness === 0.3 && r.contrast === undefined && r.volume === undefined, 'speed, a turn the other way round, colour; what changes nothing left out');
-  ok(r.crop && r.crop.x === 0 && r.crop.w === 1000 && r.crop.h === 300 && r.crop.y === 780, `the crop inside the picture, its sides even: ${JSON.stringify(r.crop)}`);
+  ok(r.crop && r.crop.x === 0 && r.crop.w === 1000 && r.crop.h === 300 && r.crop.y === 1000, `the crop inside the upright frame (1080 × 1920, turned), its sides even: ${JSON.stringify(r.crop)}`);
   const len = editedLength(r, 10);
   ok(near(len, (8 - 1.5 - 1) / 2, 0.001), `the edited length: ${len}`);
   ok(r.fadeIn === Math.floor((len / 2) * 100) / 100, `a fade no longer than half of it: ${r.fadeIn}`);
@@ -115,7 +115,7 @@ const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-video-t
   const tall = cropToShape('9:16', 1920, 1080)!;
   ok(tall.h === 1080 && tall.w === 606 && tall.x === 656 && tall.y === 0, `9:16 from the middle: ${JSON.stringify(tall)}`);
   const turned = cropToShape('9:16', 1920, 1080, 90)!;
-  ok(turned.w === 1920 && turned.h === 1080, 'a wide video turned a quarter is already tall');
+  ok(turned.w === 1080 && turned.h === 1920 && turned.x === 0 && turned.y === 0, `a wide video turned a quarter is already tall: ${JSON.stringify(turned)}`);
   ok(cropToShape('free', 100, 100) === null, 'free is no shape');
   const c = { x: 100, y: 50, w: 400, h: 200 };
   for (const t of [{}, { rotate: 90 as const }, { rotate: 180 as const }, { rotate: 270 as const, flipH: true }, { rotate: 90 as const, flipV: true, flipH: true }]) {
@@ -123,7 +123,7 @@ const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-video-t
     ok(JSON.stringify(back) === JSON.stringify(c), `a part of the picture, shown turned and back (${JSON.stringify(t)}): ${JSON.stringify(back)}`);
   }
   ok(JSON.stringify(shownRect(c, 1920, 1080, { rotate: 90 })) === JSON.stringify({ x: 830, y: 100, w: 200, h: 400 }), 'a quarter turn clockwise');
-  ok(JSON.stringify(editedSize({ crop: c, rotate: 90 }, 1920, 1080)) === JSON.stringify({ w: 200, h: 400 }), 'the edited picture’s size');
+  ok(JSON.stringify(editedSize({ crop: c, rotate: 90 }, 1920, 1080)) === JSON.stringify({ w: 400, h: 200 }) && JSON.stringify(editedSize({ rotate: 90 }, 1920, 1080)) === JSON.stringify({ w: 1080, h: 1920 }), 'the edited picture’s size');
 }
 
 // ---- the command --------------------------------------------------------------------------------------------------
@@ -151,7 +151,7 @@ const base = (recipe: VideoRecipe, more: Partial<PlanInput> = {}): PlanInput => 
   const q = planVideo(
     base(
       {
-        crop: { x: 100, y: 0, w: 202, h: 360 },
+        crop: { x: 0, y: 100, w: 360, h: 202 },
         rotate: 90,
         flipH: true,
         contrast: 0.5,
@@ -174,8 +174,8 @@ const base = (recipe: VideoRecipe, more: Partial<PlanInput> = {}): PlanInput => 
       },
     ),
   );
-  ok(q.graph.startsWith('[0:V]crop=w=202:h=360:x=100:y=0,transpose=dir=clock,hflip,colorchannelmixer='), `cropped, turned, mirrored, coloured: ${q.graph.slice(0, 120)}`);
-  ok(q.w === 360 && q.h === 202, 'its size turned');
+  ok(q.graph.startsWith('[0:V]transpose=dir=clock,hflip,crop=w=360:h=202:x=0:y=100,colorchannelmixer='), `turned, mirrored, cropped, coloured: ${q.graph.slice(0, 120)}`);
+  ok(q.w === 360 && q.h === 202, 'its size');
   ok(q.graph.includes("[p0][1:v]overlay=x=130:y=81:enable='between(t,1,3)'[p1]"), `the editor's drawing laid on, centred where it goes, while it shows: ${q.graph}`);
   ok(
     q.graph.includes('drawtext=fontfile=font1.ttf:textfile=text1-0.txt:expansion=none:fontsize=10') && q.graph.includes('text1-1.txt') && q.graph.includes('boxcolor=0x000000@1') && q.files['text1-1.txt'] === 'C',
@@ -498,6 +498,8 @@ if (ff) {
     const text = pixel(m![1], 1, 50, 90);
     const plain = pixel(m![1], 1.8, 50, 90);
     ok(text.join() !== plain.join(), 'the words shown at their time of the edited video, gone after');
+    const turned = await run({ path: 'take.mp4', crop: { x: 0, y: 0, w: 160, h: 180 }, rotate: 90, trim: [0, 0.5], name: 'left half turned' });
+    ok(!turned.isError && /left-half-turned\.mp4 \(180×160, /.test(turned.text), `an agent's crop in the video as given, then turned: ${turned.text.split('\n')[1]}`);
     const fr = await run({ path: 'take.mp4', speed: 2, frame: 1 });
     ok(!fr.isError && /^\/.+images\/take-frame\.jpg \(320×180, \d+ KB\)$/.test(fr.text.split('\n')[1]), `a frame of the edited video in images/: ${fr.text}`);
     const gif = await run({ path: path.join(cwd, 'take.mp4'), format: 'gif', size: 120 });
