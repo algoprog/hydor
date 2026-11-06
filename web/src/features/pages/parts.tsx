@@ -367,7 +367,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
                   </button>
                 );
               })}
-              <MyThemeChoices value={theme} onPick={setTheme} />
+              <MyThemeChoices value={theme} onPick={setTheme} title={title.trim() || 'Slides'} ratio={ratio} />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Segmented<Ratio>
