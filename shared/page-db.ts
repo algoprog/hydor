@@ -349,6 +349,10 @@ export function pageDatabases(): PageDatabases {
     chartNoData: 'Nothing to draw yet.',
     chartNoDb: 'The database this chart is drawn from is not on the page.',
     chartCount: 'Count',
+    // a PDF in the page
+    pdfOpen: 'Open',
+    pdfPages: '{n} pages',
+    pdfFailed: 'This PDF could not be shown here: open it instead.',
   };
 
   // ---- what a database is, checked -----------------------------------------------------------------------------------
@@ -2022,6 +2026,7 @@ textarea.in{height:auto;min-height:64px;padding:6px 8px;font-family:var(--n-mono
   const mount: PageDatabases['mount'] = (host, o) => {
     if (mounted.has(host) || !(host as HTMLElement).attachShadow) return;
     if (host.classList.contains('n-chart')) return chart(host, o);
+    if (host.classList.contains('n-pdf')) return pdf(host, o);
     mounted.add(host);
     const labels = o.labels ?? {};
     const L = (k: string) => (typeof labels[k] === 'string' ? labels[k] : WORDS[k]);
@@ -3964,6 +3969,62 @@ textarea.in{height:auto;min-height:64px;padding:6px 8px;font-family:var(--n-mono
     load();
   };
 
+  // ---- a PDF shown in the page: its pages drawn by PDF.js (from jsDelivr), as they come into sight ---------------------------
+  const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.624/build/';
+  let pdfLib: Promise<any> | null = null;
+  const loadPdf = () =>
+    (pdfLib ??= (new Function('u', 'return import(u)') as (u: string) => Promise<any>)(`${PDFJS}pdf.min.mjs`).then((lib) => {
+      // (its worker from a module of its own: a page's frame may not start a worker from another site's address)
+      const w = new Worker(URL.createObjectURL(new Blob([`import "${PDFJS}pdf.worker.min.mjs";`], { type: 'text/javascript' })), { type: 'module' });
+      lib.GlobalWorkerOptions.workerPort = w;
+      return lib;
+    }));
+  const PDF_STYLE = `:host{display:block}.pf{font:inherit;color:inherit;border:1px solid color-mix(in srgb,currentColor 14%,transparent);border-radius:12px;overflow:hidden}.ph{display:flex;align-items:center;gap:8px;padding:7px 12px;font-size:.86em;border-bottom:1px solid color-mix(in srgb,currentColor 14%,transparent)}.ph b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.ph a{color:inherit;opacity:.7}.pp{max-height:640px;overflow-y:auto;background:color-mix(in srgb,currentColor 6%,transparent);padding:10px;display:flex;flex-direction:column;align-items:center;gap:10px}.pp canvas{display:block;width:100%;max-width:820px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.18)}.nt{padding:18px;opacity:.65;font-size:.9em;text-align:center}`;
+  const pdf = (host: Element, o: { labels?: Record<string, string> | null }) => {
+    mounted.add(host);
+    const labels = o.labels ?? {};
+    const L = (k: string) => (typeof labels[k] === 'string' ? labels[k] : WORDS[k]);
+    const src = host.getAttribute('data-src') ?? '';
+    const name = host.getAttribute('data-name') ?? 'PDF';
+    const root = (host as HTMLElement).attachShadow({ mode: 'open' });
+    const style = document.createElement('style');
+    style.textContent = PDF_STYLE;
+    const count = h('span', {});
+    const pages = h('div', { class: 'pp' });
+    const ok = /^\/pg\/file\/[a-f0-9]{64}\/[\w-]{8,64}\//.test(src);
+    root.append(style, h('div', { class: 'pf' }, h('div', { class: 'ph' }, icon('files', 14), h('b', {}, name), count, ok ? h('a', { href: src, target: '_blank', rel: 'noopener' }, L('pdfOpen')) : null), pages));
+    if (!ok) return void pages.append(h('div', { class: 'nt' }, L('pdfFailed')));
+    loadPdf()
+      .then((lib) => lib.getDocument({ url: new URL(src, location.href).href }).promise)
+      .then((d: any) => {
+        count.textContent = L('pdfPages').replace('{n}', String(d.numPages));
+        const io = new IntersectionObserver((list) => {
+          for (const x of list) {
+            if (!x.isIntersecting) continue;
+            const c = x.target as HTMLCanvasElement;
+            io.unobserve(c);
+            d.getPage(Number(c.dataset.p)).then((pg: any) => {
+              const v0 = pg.getViewport({ scale: 1 });
+              const k = Math.min(2.5, ((pages.clientWidth || 700) / v0.width) * (window.devicePixelRatio || 1));
+              const v = pg.getViewport({ scale: k });
+              c.width = Math.round(v.width);
+              c.height = Math.round(v.height);
+              pg.render({ canvasContext: c.getContext('2d'), viewport: v });
+            });
+          }
+        }, { root: pages, rootMargin: '400px' });
+        for (let i = 1; i <= Math.min(d.numPages, 300); i++) {
+          const c = h('canvas', { 'data-p': String(i), 'aria-label': `${name} · ${i}` }) as HTMLCanvasElement;
+          c.style.aspectRatio = '0.7727';
+          pages.append(c);
+          io.observe(c);
+        }
+      })
+      .catch(() => {
+        pages.replaceChildren(h('div', { class: 'nt' }, L('pdfFailed')));
+      });
+  };
+
   const runAll: PageDatabases['run'] = (labels, seed, o = {}) => {
     const W = window as unknown as { hydor?: { storage?: { get(k: string): Promise<unknown>; set(k: string, v: unknown): Promise<unknown> }; download?: (name: string, mime: string, text: string) => void } };
     // The page's storage as the kit gave it, taken before the page's own scripts could take the name; else the seed.
@@ -3981,13 +4042,13 @@ textarea.in{height:auto;min-height:64px;padding:6px 8px;font-family:var(--n-mono
     const all = () => {
       for (const el of document.querySelectorAll('.n-db')) mount(el, { store, labels, readOnly, ...(download ? { download } : {}) });
       // (charts after the databases they are drawn from)
-      for (const el of document.querySelectorAll('.n-chart')) mount(el, { store, labels, readOnly });
+      for (const el of document.querySelectorAll('.n-chart,.n-pdf')) mount(el, { store, labels, readOnly });
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', all);
     else all();
     // Databases a page's own script puts in later.
     new MutationObserver((ms) => {
-      if (ms.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && ((n as Element).matches('.n-db,.n-chart') || (n as Element).querySelector('.n-db,.n-chart'))))) all();
+      if (ms.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && ((n as Element).matches('.n-db,.n-chart,.n-pdf') || (n as Element).querySelector('.n-db,.n-chart,.n-pdf'))))) all();
     }).observe(document.documentElement, { childList: true, subtree: true });
   };
 
@@ -4011,7 +4072,7 @@ const scriptSafe = (src: string) => src.replace(/<\/(script)/gi, '<\\/$1').repla
 export const PAGE_DB_SRC = scriptSafe(pageDatabases.toString());
 
 /** Whether a page has parts the databases' script draws: a database, or a chart. */
-export const hasDbParts = (html: string) => /\bn-(db|chart)\b/.test(html);
+export const hasDbParts = (html: string) => /\bn-(db|chart|pdf)\b/.test(html);
 
 /** The script that draws a page's databases and charts (in Use, in a picture of it, a PDF, a published copy, a page saved as a file). */
 export const pageDbScript = (labels?: Record<string, string> | null, seed?: Record<string, string> | null) =>
