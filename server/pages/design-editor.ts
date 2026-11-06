@@ -2185,6 +2185,32 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
           }
         return changed();
       }
+      case 'brandColours': {
+        // The design's colourful colours become the brand's, the most used first; its greys, whites and blacks stay,
+        // but its darkest words take the brand's darkest colour when that is dark enough.
+        const brand = (Array.isArray(arg?.colours) ? arg.colours : []).map((c: unknown) => hexOf(String(c))).filter((c: string | null): c is string => !!c);
+        if (!brand.length) return;
+        const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+        const chroma = (h: string) => Math.max(...rgb(h)) - Math.min(...rgb(h));
+        const light = (h: string) => {
+          const [r, g, b2] = rgb(h);
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b2;
+        };
+        const mine = used().colours;
+        const vivid = brand.filter((c) => chroma(c) >= 0.18);
+        const pool = vivid.length ? vivid : brand;
+        const map: Record<string, string> = {};
+        let i = 0;
+        for (const c of mine)
+          if (chroma(c) >= 0.18) {
+            map[c] = pool[i % pool.length];
+            i++;
+          }
+        const darkest = [...brand].sort((x, y) => light(x) - light(y))[0];
+        const ink = mine.filter((c) => chroma(c) < 0.18 && light(c) < 0.12)[0];
+        if (ink && darkest && light(darkest) < 0.12) map[ink] = darkest;
+        return act('recolour', { map });
+      }
       case 'meta':
         if (typeof arg?.title === 'string') {
           remember();
