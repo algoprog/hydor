@@ -55,7 +55,7 @@ export interface LibraryNotebook {
 /** The words that start a request about a cell, and its name on the Ask panel's chip. */
 function cellScope(c: Cell, i: number): NotebookScope {
   const kind = c.type === 'markdown' ? 'text' : c.type;
-  return { id: 'cell', label: tr(`Cell ${i + 1}`), lead: `In cell ${i + 1} (${kind}): ` };
+  return { id: 'cell', label: tr(`Cell ${i + 1}`), lead: `In cell ${i + 1} (${kind}, id ${c.id}): ` };
 }
 
 interface FileData {

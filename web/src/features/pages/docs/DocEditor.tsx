@@ -97,7 +97,9 @@ function scopesOf(doc: Doc, st: SelState): AskScope[] {
   if (st.picked?.type === 'image') {
     const p = st.picked as ImageBlock;
     const what = p.caption || p.alt;
-    out.push({ id: 'picture', label: tr('The picture picked'), lead: `About the picture${what ? ` “${short(what, 80)}”` : ''}${where}: ` });
+    // Its source too, for the picture tools (edit_image, generate_image…) to work from it.
+    const src = p.src?.startsWith('naget-asset:') ? ` (${p.src})` : '';
+    out.push({ id: 'picture', label: tr('The picture picked'), lead: `About the picture${what ? ` “${short(what, 80)}”` : ''}${src}${where}: ` });
   } else if (st.text.trim()) out.push({ id: 'words', label: tr('The words picked'), lead: `About the words “${short(st.text, 160)}”${where}: ` });
   return out;
 }

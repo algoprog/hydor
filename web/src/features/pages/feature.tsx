@@ -6,15 +6,19 @@ import { LibraryBig } from 'lucide-react';
 import { HtmlPage } from '../session/HtmlPage';
 import type { ToolView, WebFeature } from '../registry';
 import { CanvasSide, closeCanvas, PageOver, useCanvasOpen } from './Canvas';
-import { exportPageStep, PublishCard, ReadPageRow, readPageStep, SavedPageCard, savedPageStep } from './cards';
+import { exportPageStep, pageActionStep, PublishCard, ReadPageRow, readPageStep, SavedPageCard, savedPageStep } from './cards';
 import { latexCheckStep } from './checkStep';
 import { howToMakeStep } from './types/step';
 import { PageEditNoteView } from './notes';
 import { PagesRoute } from './PagesPage';
 import { RemotePage } from './slides/Remote';
-import { savedPageOf } from './state';
+import { savedPageOf, savedRef } from './state';
+import { nagetTool } from '../registry';
 
 const saved = { place: 'answer', Row: SavedPageCard, same: savedPageOf, step: savedPageStep } satisfies ToolView;
+/** page_action: a version it saved shows as the saves' card does (one card for a page's saves in a turn); else a step of the work. */
+const actionSaved = { ...saved, step: pageActionStep } satisfies ToolView;
+const actionWork = { place: 'work', Row: ReadPageRow, step: pageActionStep } satisfies ToolView;
 
 const isPages = (p: string) => p === '/library' || p === '/pages' || p.startsWith('/pages/');
 /** The Library's own pages, a page's and an image's or video's among them. */
@@ -39,6 +43,7 @@ export const pagesFeature: WebFeature = {
     latex_check: { place: 'work', Row: ReadPageRow, step: latexCheckStep },
     how_to_make: { place: 'work', Row: ReadPageRow, step: howToMakeStep },
   },
+  matchTool: (t) => (nagetTool(t.name) === 'page_action' ? (savedRef(t.output) ? actionSaved : actionWork) : undefined),
   noteViews: { 'page-edit': PageEditNoteView },
   // A slideshow's phone remote (slides/Remote.tsx) too.
   routes: [

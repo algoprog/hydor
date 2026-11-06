@@ -5,7 +5,7 @@
 // made and on Update; save_slides when an agent gives a chart a source and no numbers.
 import { chartData } from './sheet-chart.ts';
 import { Calc, colName, type Workbook } from './sheets.ts';
-import { SLIDE_LIMITS, type ChartKind, type ChartSource, type Series } from './slides.ts';
+import { SLIDE_LIMITS, type ChartEl, type ChartKind, type ChartSource, type Series } from './slides.ts';
 
 /** A block of filled cells: its sheet, its range, its size, and its first row's words (its columns' names, when it has them). */
 export interface SheetTable {
@@ -91,4 +91,21 @@ export function chartFromSheet(book: Workbook, src: Pick<ChartSource, 'sheet' | 
     .slice(0, SLIDE_LIMITS.series)
     .map((s, i) => ({ name: String(s.name || `Series ${i + 1}`).slice(0, 120), values: s.values.slice(0, labels.length).map((v) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-1e12, Math.min(1e12, Math.round(v * 100) / 100)) : 0)) }));
   return { labels, series };
+}
+
+/**
+ * A chart's numbers read again from its spreadsheet's workbook (Update from the spreadsheet; agents' page_action
+ * update_charts): the chart as it is to be, each series keeping the colour it was given (by its name, else its place),
+ * or why it cannot be read.
+ */
+export function chartRefreshed(el: ChartEl, book: Workbook, title: string): ChartEl | { error: string } {
+  const src = el.source;
+  if (!src) return el;
+  const r = chartFromSheet(book, src, el.kind);
+  if ('error' in r) return r;
+  const series = r.series.map((s, i) => {
+    const was = el.series.find((x) => x.name === s.name) ?? el.series[i];
+    return was?.color ? { ...s, color: was.color } : s;
+  });
+  return { ...el, labels: r.labels, series, source: { ...src, title, at: Date.now() } };
 }
