@@ -1,4 +1,4 @@
-// A page or a deck as a file, downloaded: a PDF, a Word document, a PowerPoint deck, a deck's slides as pictures or a
+// A page or a deck as a file, downloaded: a PDF, a Word or OpenDocument file, an EPUB book, a PowerPoint deck, a deck's slides as pictures or a
 // web page, made by the server (GET /api/pages/:id/export). Paper is Letter where people use it, else A4. Without the
 // browser the server makes PDFs with, a deck still prints from here: every slide on a page, through the device's own Print.
 // A LaTeX document's arXiv package opens its dialog first (what goes in, ticked), which then downloads it.
@@ -9,7 +9,7 @@ import { toast } from '../../lib/store';
 import { askArxiv } from './latex/arxivAsk';
 import { PICS, RT } from './slides/rt';
 
-export type ExportFormat = 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png' | 'arxiv';
+export type ExportFormat = 'pdf' | 'docx' | 'odt' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'epub' | 'txt' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png' | 'arxiv';
 
 const LETTER = /^(en-US|en-CA|es-US|es-MX|fr-CA|en-PH|es-CO|es-CL|es-VE|es-GT|es-CR|es-PA)$/i;
 
@@ -56,10 +56,13 @@ export function printDeck(deck: Deck) {
 const WHAT: Record<ExportFormat, string> = {
   pdf: 'the PDF',
   docx: 'the Word document',
+  odt: 'the OpenDocument file',
   pptx: 'the PowerPoint file',
   xlsx: 'the Excel file',
   csv: 'the CSV file',
   md: 'the Markdown file',
+  epub: 'the EPUB book',
+  txt: 'the text file',
   tex: 'the LaTeX file',
   zip: 'the LaTeX project',
   arxiv: 'the arXiv package',
@@ -73,7 +76,7 @@ const WHAT: Record<ExportFormat, string> = {
 export async function exportFile(id: string, format: ExportFormat, o: { version?: number; deck?: Deck; slide?: number } = {}) {
   if (format === 'arxiv') return askArxiv(id, o.version);
   const paper = LETTER.test(navigator.language) ? 'letter' : 'a4';
-  if (format !== 'html' && format !== 'csv' && format !== 'md' && format !== 'tex' && format !== 'ipynb' && format !== 'py') toast(o.slide ? 'Making the picture…' : `Making ${WHAT[format]}…`);
+  if (format !== 'html' && format !== 'csv' && format !== 'md' && format !== 'txt' && format !== 'tex' && format !== 'ipynb' && format !== 'py') toast(o.slide ? 'Making the picture…' : `Making ${WHAT[format]}…`);
   const res = await fetch(mu(`/api/pages/${enc(id)}/export?format=${format}&paper=${paper}${o.version ? `&v=${o.version}` : ''}${o.slide ? `&slide=${o.slide}` : ''}`), { credentials: 'same-origin' });
   if (!res.ok) {
     const j = (await res.json().catch(() => null)) as { error?: string } | null;
