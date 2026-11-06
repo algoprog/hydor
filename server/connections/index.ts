@@ -34,6 +34,7 @@ import { revoke } from './oauth.ts';
 import { launchSocket, relayRoutes, startLaunchSocket, sweepLinks } from './relay.ts';
 import { listNames } from './run.ts';
 import { howToUse, onRequestChange, sessionTools } from './tools.ts';
+import { keyGiven, keySkipped, keyWorks, OPENROUTER_REQUEST } from './openrouter-key.ts';
 import { deleteSecret, getRequest, latestRequest, pendingRequests, listSecrets, redact, saveSecret, secretView, setRequestDomains, settleRequests, useMaskDb, vaultTables } from './vault.ts';
 
 const BRIDGE = path.join(APP_ROOT, 'dist/server/connbridge.js');
@@ -243,6 +244,21 @@ function routes(d: Deps) {
   app.post('/api/connections/requests/:id', async (req) => {
     const r = getRequest(db, (req.params as { id: string }).id);
     if (!r) throw new HttpError(404, 'That request is gone');
+    // The OpenRouter key a tool asked for (openrouter-key.ts): it goes to Settings → Models, not the vault.
+    if (r.name === OPENROUTER_REQUEST) {
+      const value = String((req.body as { value?: unknown } | undefined)?.value ?? '').trim();
+      if (!value || /\s/.test(value) || value.length > 300) throw new HttpError(400, 'Paste the whole key, as OpenRouter shows it (it starts with sk-or-)');
+      if (!(await keyWorks(value))) throw new HttpError(400, 'OpenRouter does not take this key: check it at openrouter.ai/keys');
+      await d.models.configure({ openrouterKey: value });
+      settleRequests(db, r.key, r.name, 'saved');
+      changed('secrets');
+      d.toSubscribers(r.key, { t: 'feature', id: 'connections', key: r.key, data: { changed: 'request' } });
+      if (!keyGiven(r.key, value))
+        await d.sessions
+          .deliverOrQueue(r.key, 'I added my OpenRouter key in Settings → Models: the models that run through OpenRouter (pictures, drawings, videos, sounds) can be used now.')
+          .catch((e) => console.warn(`[connections] could not tell ${r.key} that the OpenRouter key was saved: ${(e as Error).message}`));
+      return { request: getRequest(db, r.id) };
+    }
     const b = (req.body ?? {}) as { value?: string; values?: Record<string, unknown>; domains?: unknown; commands?: unknown };
     const domains = cleanDomains(b.domains ?? r.domains);
     const commands = typeof b.commands === 'boolean' ? b.commands : undefined;
@@ -297,6 +313,8 @@ function routes(d: Deps) {
     if (!r) throw new HttpError(404, 'That request is gone');
     settleRequests(db, r.key, r.name, 'dismissed');
     d.toSubscribers(r.key, { t: 'feature', id: 'connections', key: r.key, data: { changed: 'request' } });
+    // A tool waiting for the OpenRouter key hears it was skipped and says so itself.
+    if (r.name === OPENROUTER_REQUEST && keySkipped(r.key)) return { request: getRequest(db, r.id) };
     const what = r.fields?.length ? listNames(r.fields.filter((f) => f.secret).map((f) => f.key)) : r.name;
     await d.sessions.deliverOrQueue(r.key, `I'd rather not give ${what} now. Carry on without it, or tell me what else would work.`).catch(() => {});
     return { request: getRequest(db, r.id) };
