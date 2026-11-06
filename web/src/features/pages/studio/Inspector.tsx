@@ -15,7 +15,7 @@ import type { EdSel } from '../frame';
 import { loadKatex, texHtml } from '../common/katex';
 import { BoxModel, Choice, ColorField, Group, hexOf, NumField, Row, Select, splitNum, Typed } from './fields';
 import { FONTS, fontOf, fontOptions } from './fonts';
-import { editPicture, pageData } from '../../images/studio';
+import { aspectOf, editPicture, makePicture, pageData } from '../../images/studio';
 
 export type Cmd = (cmd: string, arg?: unknown) => void;
 export type Media = '' | 'tablet' | 'phone';
@@ -213,6 +213,20 @@ export function PartPanel({
     if (at?.startsWith(head)) return at;
     return [...d.querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '').find((s) => s.startsWith(head)) ?? src;
   };
+  /** A picture made with AI in this one's place (a placeholder's, say), its shape as the part's. */
+  const makeInstead = async () => {
+    try {
+      const [pw] = splitNum(c.width);
+      const [ph] = splitNum(c.height);
+      const p = await makePicture({ kind: 'picture', aspect: Number(pw) > 0 && Number(ph) > 0 ? aspectOf(Number(pw), Number(ph)) : undefined });
+      if (p) {
+        cmd('attr', { name: 'src', value: await pageData(p.src) });
+        if (!a.alt && p.prompt) cmd('attr', { name: 'alt', value: p.prompt.replace(/\s+/g, ' ').slice(0, 300) });
+      }
+    } catch (e) {
+      onError(e);
+    }
+  };
   /** The picture changed with AI (a dialog), then put in its place as the page keeps it. */
   const changeWithAi = async (mode: 'change' | 'cutout' | 'erase') => {
     try {
@@ -335,6 +349,9 @@ export function PartPanel({
                   label="Picture"
                 />
                 <PictureButton onPicture={(src) => cmd('attr', { name: 'src', value: src })} onError={onError} />
+                <button type="button" title="A picture made with AI" aria-label="A picture made with AI" onClick={() => void makeInstead()} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-fg-2 hover:bg-bg-2">
+                  <WandSparkles size={14} />
+                </button>
               </Row>
               <Row label="With AI" hint="Change it in words, take its background out, or erase part of it">
                 <Button ref={aiRef} size="sm" variant="secondary" icon={<WandSparkles size={14} />} disabled={!a.src} onClick={() => setAi((o) => !o)} className="min-w-0 flex-1 justify-start">
