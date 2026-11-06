@@ -1,12 +1,13 @@
 // The visual editor's Part tab: the part picked in the page. At its top, what it does (ask an agent about
-// it, copy, paste, wrap). Then its words, the kind of block it is (Turn into), a code block's language, its address, picture or maths;
+// it, copy, paste, wrap). Then its words, the kind of block it is (Turn into), a code block's language, its address, picture
+// (changed with AI, its background taken out or part of it erased, as the page keeps it: a data: address) or maths;
 // where changes go: this part alone or every part of its kind or class, as it is or under the pointer, and
 // (with a tablet or phone picked above the page) at that size and smaller; and its look in groups that fold.
 // The ones most people use stay open (text, fill and border), with the commonest choices first; space, size,
 // layout and its class, name and CSS wait until opened. With several blocks picked, changes go to them all.
 // A change goes to the editor in the page's frame at once.
 import { useRef, useState, type ReactNode } from 'react';
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ClipboardPaste, Copy, ImageUp, Italic, MessageSquarePlus, MoreHorizontal, Strikethrough, Type, Underline } from 'lucide-react';
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ClipboardPaste, Copy, Eraser, ImageMinus, ImageUp, Italic, MessageSquarePlus, MoreHorizontal, Strikethrough, Type, Underline, WandSparkles } from 'lucide-react';
 import { Button, cx, IconButton, MenuItem, MenuSep, Popover, Switch } from '../../../components/ui';
 import { codeColours } from '@shared/code-colours';
 import { tr } from '../../../i18n/runtime';
@@ -14,6 +15,7 @@ import type { EdSel } from '../frame';
 import { loadKatex, texHtml } from '../common/katex';
 import { BoxModel, Choice, ColorField, Group, hexOf, NumField, Row, Select, splitNum, Typed } from './fields';
 import { FONTS, fontOf, fontOptions } from './fonts';
+import { aspectOf, editPicture, makePicture, pageData } from '../../images/studio';
 
 export type Cmd = (cmd: string, arg?: unknown) => void;
 export type Media = '' | 'tablet' | 'phone';
@@ -130,6 +132,8 @@ export function PartPanel({
   onAsk,
   onError,
   onPageTab,
+  base,
+  pageHtml,
 }: {
   sel: EdSel;
   palette: string[];
@@ -143,9 +147,15 @@ export function PartPanel({
   onAsk?: () => void;
   onError: (e: unknown) => void;
   onPageTab: () => void;
+  /** The page's folder, for a picture's relative address. */
+  base?: string;
+  /** The page's HTML as it is now, for a picture inside it (the editor says only the start of so long an address). */
+  pageHtml?: () => Promise<string>;
 }) {
   const moreRef = useRef<HTMLButtonElement>(null);
   const [more, setMore] = useState(false);
+  const aiRef = useRef<HTMLButtonElement>(null);
+  const [ai, setAi] = useState(false);
   const c = sel.computed;
   const d = sel.declared;
   const get = (p: string) => d[p] ?? c[p] ?? '';
@@ -191,6 +201,44 @@ export function PartPanel({
   const [w] = splitNum(c.width);
   const [h] = splitNum(c.height);
   const bgImage = /url\(["']?([^"')]*)/.exec(get('background-image'))?.[1] ?? '';
+  /** The picked picture's whole address: a long one (a picture inside the page) comes cut short, so it is read from the page. */
+  const fullSrc = async (): Promise<string> => {
+    const src = a.src ?? '';
+    if (!src.endsWith('…') || !pageHtml) return src;
+    const head = src.slice(0, -1);
+    const d = new DOMParser().parseFromString(await pageHtml(), 'text/html');
+    let x: Element | null = d.documentElement;
+    for (const i of sel.path) x = x?.children[i] ?? null;
+    const at = x?.getAttribute('src');
+    if (at?.startsWith(head)) return at;
+    return [...d.querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '').find((s) => s.startsWith(head)) ?? src;
+  };
+  /** A picture made with AI in this one's place (a placeholder's, say), its shape as the part's. */
+  const makeInstead = async () => {
+    try {
+      const [pw] = splitNum(c.width);
+      const [ph] = splitNum(c.height);
+      const p = await makePicture({ kind: 'picture', aspect: Number(pw) > 0 && Number(ph) > 0 ? aspectOf(Number(pw), Number(ph)) : undefined });
+      if (p) {
+        cmd('attr', { name: 'src', value: await pageData(p.src) });
+        if (!a.alt && p.prompt) cmd('attr', { name: 'alt', value: p.prompt.replace(/\s+/g, ' ').slice(0, 300) });
+      }
+    } catch (e) {
+      onError(e);
+    }
+  };
+  /** The picture changed with AI (a dialog), then put in its place as the page keeps it. */
+  const changeWithAi = async (mode: 'change' | 'cutout' | 'erase') => {
+    try {
+      const src = await fullSrc();
+      if (!src || src.endsWith('…')) throw new Error('That picture could not be read from the page');
+      const abs = /^(data:|https?:)/i.test(src) ? src : new URL(src, new URL(base ?? '', location.href)).href;
+      const p = await editPicture({ src: abs, mode });
+      if (p) cmd('attr', { name: 'src', value: await pageData(p.src) });
+    } catch (e) {
+      onError(e);
+    }
+  };
 
   return (
     <div className="px-3 pb-4">
@@ -301,6 +349,34 @@ export function PartPanel({
                   label="Picture"
                 />
                 <PictureButton onPicture={(src) => cmd('attr', { name: 'src', value: src })} onError={onError} />
+                <button type="button" title="A picture made with AI" aria-label="A picture made with AI" onClick={() => void makeInstead()} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-fg-2 hover:bg-bg-2">
+                  <WandSparkles size={14} />
+                </button>
+              </Row>
+              <Row label="With AI" hint="Change it in words, take its background out, or erase part of it">
+                <Button ref={aiRef} size="sm" variant="secondary" icon={<WandSparkles size={14} />} disabled={!a.src} onClick={() => setAi((o) => !o)} className="min-w-0 flex-1 justify-start">
+                  Change it with AI
+                </Button>
+                <Popover anchor={aiRef} open={ai} onClose={() => setAi(false)} width={240} title="Change it with AI">
+                  {(
+                    [
+                      ['change', 'Change with AI', <WandSparkles key="c" size={14} />],
+                      ['cutout', 'Remove the background', <ImageMinus key="b" size={14} />],
+                      ['erase', 'Erase part of it', <Eraser key="e" size={14} />],
+                    ] as const
+                  ).map(([mode, label, icon]) => (
+                    <MenuItem
+                      key={mode}
+                      icon={icon}
+                      onClick={() => {
+                        setAi(false);
+                        void changeWithAi(mode);
+                      }}
+                    >
+                      {label}
+                    </MenuItem>
+                  ))}
+                </Popover>
               </Row>
               <Row label="Description" hint="Read out by screen readers, and shown when the picture can't load">
                 <Typed value={a.alt ?? ''} onChange={(v) => cmd('attr', { name: 'alt', value: v })} placeholder="What it shows" label="Description" />

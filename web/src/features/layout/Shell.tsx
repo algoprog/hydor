@@ -8,6 +8,7 @@ import { QuickOpen } from '../files/FileSearch';
 import { UploadTrays } from '../pages/UploadTray';
 import { FilePeek } from '../files/FilePeek';
 import { ArxivHost } from '../pages/latex/ArxivHost';
+import { StudioHost } from '../images/studio';
 import { GitPage } from '../git/GitPage';
 import { HomePage } from '../home/HomePage';
 import { InboxPage } from '../inbox/InboxPage';
@@ -265,6 +266,7 @@ export function Shell() {
         <WhatsNew />
         <FilePeek />
         <ArxivHost />
+        <StudioHost />
         <Lightbox />
         <VideoBox />
         <Tour />
@@ -302,6 +304,7 @@ export function Shell() {
       <WhatsNew />
       <FilePeek />
       <ArxivHost />
+      <StudioHost />
       <Lightbox />
       <VideoBox />
       {!sideOpen && roomy && !panelOpen && loc !== '/terminal' && <HelpButton />}

@@ -414,13 +414,15 @@ const SAVE_SLIDES: RunTool = {
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'slides');
     const prev = id ? pageSource(ctx.deps.db, id)?.text : undefined;
-    let input: Record<string, unknown> = { ratio: a.ratio, theme: a.theme, slides: a.slides, footer: a.footer, guides: a.guides, comments: a.comments };
+    // Its format and progress bar stay as they were unless the call says (a PowerPoint compatible deck stays one).
+    const kept = prev ? readDeck(prev) : null;
+    let input: Record<string, unknown> = { ratio: a.ratio, theme: a.theme, slides: a.slides, footer: a.footer, guides: a.guides, comments: a.comments, format: a.format ?? kept?.format, progress: a.progress ?? kept?.progress };
     // Some slides changed, added or taken out: the deck they make, its look as it was unless said.
     if (changesSlides(a)) {
       if (!id || !prev) throw new Error('change, add and remove change a saved deck: give its id (get_page lists them), or send the whole deck as slides.');
       if (a.slides !== undefined) throw new Error('Give slides (the whole deck) or change, add and remove (some of its slides), not both.');
       const was = readDeck(prev);
-      input = { ratio: a.ratio ?? was.ratio, theme: a.theme ?? was.theme, footer: a.footer ?? was.footer, guides: a.guides ?? was.guides, comments: a.comments, slides: applyDeckEdits(was, a).slides };
+      input = { ratio: a.ratio ?? was.ratio, theme: a.theme ?? was.theme, footer: a.footer ?? was.footer, guides: a.guides ?? was.guides, comments: a.comments, format: a.format ?? was.format, progress: a.progress ?? was.progress, slides: applyDeckEdits(was, a).slides };
     }
     // The version it changes: the parts it sends back as they were keep their look.
     const { deck, notes } = await agentDeck(ctx.deps.db, input, ctx.cwd, prev);
@@ -553,6 +555,7 @@ const EXPORT_PAGE: RunTool = {
     'Save a page, slide deck, document, spreadsheet, LaTeX document or notebook of the user’s Library as a file, to hand over with present_files: a page as a PDF or a Word document (docx),',
     'a deck as PowerPoint (pptx), a PDF (a slide a page) or its slides as pictures (png: a zip of them, or one slide with slide), a document as Word (docx), PDF or Markdown (md), a spreadsheet as Excel (xlsx), CSV (its first sheet) or PDF,',
     'a LaTeX document as its typeset PDF, its main source (tex) or the whole project (zip), a notebook as its .ipynb file (ipynb), a Python script of its cells (py) or a PDF; any of them as a web page (html) that works on its own.',
+    'A deck’s web page (html) is one small file that opens in any browser and works offline (its pictures, videos and fonts inside it), but for its 3D parts, embedded web pages and the libraries its custom code loads; its PowerPoint file (pptx) turns what PowerPoint lacks into pictures or PowerPoint’s nearest effects, and says what changed.',
     'The file goes in this session’s folder unless you give a path.',
   ].join(' '),
   inputSchema: {
@@ -973,9 +976,14 @@ function routes(d: Deps) {
   });
 
   // ---- a deck's pictures and fonts ---------------------------------------------------------------
-  /** A picture for a deck (the editor's upload, or one at an address on the web): kept, and its source. */
+  /** A picture for a deck (the editor's upload, or one at an address on the web), or a 3D part's model (a .glb, model: true): kept, and its source. */
   app.post('/api/pages/assets', { bodyLimit: Math.ceil(MAX_ASSET * 1.4) + 4096 }, async (req) => {
     const b = B(req);
+    if (typeof b.data === 'string' && b.model === true) {
+      const m = /^data:(?:model\/gltf-binary|model\/gltf\+json|application\/octet-stream);base64,([A-Za-z0-9+/=]+)$/i.exec(b.data);
+      if (!m) throw new HttpError(400, 'data is a data: address of a 3D model (a .glb file, or a .gltf with its files inside it)');
+      return { src: `naget-asset:${putAsset(db, Buffer.from(m[1], 'base64'), { model: true })}` };
+    }
     if (typeof b.data === 'string') {
       const m = /^data:image\/[a-z0-9.+-]+;base64,([A-Za-z0-9+/=]+)$/i.exec(b.data);
       if (!m) throw new HttpError(400, 'data is a data: address of a picture');

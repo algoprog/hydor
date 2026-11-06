@@ -1,13 +1,16 @@
 // What the page editor asks the app for while you write (writing.ts asks, the frame passes it on): an emoji, a
-// page's icon or a callout's, a cover (a gradient, or a picture from this device or the web), a picture, a video from
-// YouTube or Vimeo (Vimeo's still asked of the server), maths in LaTeX (drawn with KaTeX, whose look the page then
-// loads from jsDelivr). Each opens beside where it was asked in the page (a sheet from the bottom on a phone) and its
-// answer goes back to its place. Also the covers the Page tab offers, and the editor's keyboard shortcuts.
+// page's icon or a callout's, a cover (a gradient, a picture from this device or the web, or one made with AI), a
+// picture (from this device or the web, made with AI, or a drawing), a video from YouTube or Vimeo (Vimeo's still
+// asked of the server), maths in LaTeX (drawn with KaTeX, whose look the page then loads from jsDelivr). Each opens
+// beside where it was asked in the page (a sheet from the bottom on a phone) and its answer goes back to its place;
+// a picture made with AI goes in as a data: address, as a page keeps its pictures. Also the covers the Page tab
+// offers, and the editor's keyboard shortcuts.
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ImageUp, Trash2 } from 'lucide-react';
+import { ImageUp, PenTool, Trash2, WandSparkles } from 'lucide-react';
 import { videoEmbed } from '@shared/app-media';
 import { post } from '../../../lib/api';
+import { makeDrawing, makePicture, pageData } from '../../images/studio';
 import { Button, cx, Popover, SheetsOnPhone } from '../../../components/ui';
 import type { EdAsk } from '../frame';
 import { CharPicker } from '../common/CharPicker';
@@ -106,8 +109,20 @@ const asWritten = (css: string) => {
   return el.style.backgroundImage.replace(/\s/g, '');
 };
 
-/** The covers to choose from: gradients, a picture from this device, one from the web, and none. */
-export function CoverChoices({ onPick, onRemove, onError, current }: { onPick: (c: { gradient: string } | { src: string }) => void; onRemove?: () => void; onError: (e: unknown) => void; current?: string }) {
+/** A cover made with AI: a calm, wide background, made small enough to live in the page; null when none was made. */
+export async function aiCover(): Promise<string | null> {
+  const p = await makePicture({ kind: 'background', aspect: '21:9' });
+  return p ? pageData(p.src) : null;
+}
+
+/** A picture made with AI, or a drawing (SVG), as a page keeps it (a data: address) with its words for a description; null when none was made. */
+export async function aiPicture(tool: 'picture' | 'drawing'): Promise<{ src: string; alt: string } | null> {
+  const p = tool === 'picture' ? await makePicture({ kind: 'picture' }) : await makeDrawing({ kind: 'illustration' });
+  return p ? { src: await pageData(p.src), alt: (p.prompt ?? '').replace(/\s+/g, ' ').slice(0, 300) } : null;
+}
+
+/** The covers to choose from: gradients, a picture from this device, one made with AI (`onAi`), one from the web, and none. */
+export function CoverChoices({ onPick, onRemove, onAi, onError, current }: { onPick: (c: { gradient: string } | { src: string }) => void; onRemove?: () => void; onAi?: () => void; onError: (e: unknown) => void; current?: string }) {
   return (
     <div className="space-y-2.5">
       <div className="grid grid-cols-4 gap-1.5">
@@ -127,6 +142,11 @@ export function CoverChoices({ onPick, onRemove, onError, current }: { onPick: (
         <DeviceButton onPicture={(src) => onPick({ src })} onError={onError}>
           A picture from this device
         </DeviceButton>
+        {onAi && (
+          <Button size="sm" variant="secondary" icon={<WandSparkles size={14} />} onClick={onAi}>
+            Make with AI
+          </Button>
+        )}
         {onRemove && (
           <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} onClick={onRemove}>
             Remove the cover
@@ -210,9 +230,15 @@ export function InsertPopover({
     setBox({ left: fr.left + r.x * k, top: fr.top + r.y * k, width: Math.max(1, r.w * k), height: Math.max(1, r.h * k) });
   }, [ask, frame]);
   if (!ask) return null;
+  const id = ask.id;
   const done = (payload: Record<string, unknown>) => {
-    answer(payload);
+    answer({ id, ...payload });
     onClose();
+  };
+  /** Made in a dialog of its own: this closes first, and the answer goes to its place when (and if) something is made. */
+  const later = (make: () => Promise<Record<string, unknown> | null>) => {
+    onClose();
+    make().then((payload) => payload && answer({ id, ...payload }), onError);
   };
   let body: ReactNode = null;
   if (ask.what === 'emoji' || ask.what === 'icon' || ask.what === 'callout-icon') {
@@ -231,15 +257,33 @@ export function InsertPopover({
   } else if (ask.what === 'cover') {
     body = (
       <div className="p-2">
-        <CoverChoices onPick={(c) => done({ cover: c })} onRemove={ask.has ? () => (cmd('cover', null), onClose()) : undefined} onError={onError} />
+        <CoverChoices
+          onPick={(c) => done({ cover: c })}
+          onRemove={ask.has ? () => (cmd('cover', null), onClose()) : undefined}
+          onAi={() =>
+            later(async () => {
+              const src = await aiCover();
+              return src ? { cover: { src } } : null;
+            })
+          }
+          onError={onError}
+        />
       </div>
     );
   } else if (ask.what === 'picture') {
     body = (
       <div className="space-y-2.5 p-2">
-        <DeviceButton onPicture={(src) => done({ src })} onError={onError}>
-          A picture from this device
-        </DeviceButton>
+        <div className="flex flex-wrap gap-1.5">
+          <DeviceButton onPicture={(src) => done({ src })} onError={onError}>
+            A picture from this device
+          </DeviceButton>
+          <Button size="sm" variant="secondary" icon={<WandSparkles size={14} />} onClick={() => later(() => aiPicture('picture'))}>
+            Make with AI
+          </Button>
+          <Button size="sm" variant="secondary" icon={<PenTool size={14} />} onClick={() => later(() => aiPicture('drawing'))}>
+            A drawing (SVG)
+          </Button>
+        </div>
         <AddressRow autoFocus placeholder="https://… a picture on the web" label="A picture's address" onSend={(src) => done({ src })} />
         <p className="text-[11.5px] leading-snug text-fg-3">You can also drop a picture on the page, or paste one.</p>
       </div>
