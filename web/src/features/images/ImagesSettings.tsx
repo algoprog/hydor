@@ -14,7 +14,7 @@ import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
 import { Button, cx, Dialog, inputCls, OptionRow, Picker, Section, Segmented, Switch, Throbber, useConfirm } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
-import { localStatus, useLocalTools } from './studio/LocalTools';
+import { localStatus, sizeWords, useLocalTools, whereTheyRun } from './studio/LocalTools';
 
 const DAY = 86_400_000;
 const usd = (n: number) => (n >= 0.095 ? n.toFixed(2) : String(Number(n.toPrecision(1))));
@@ -447,7 +447,7 @@ function PictureTools() {
       <div className="min-w-[min(100%,15rem)] flex-1 space-y-1">
         <div className="text-[12.5px] font-medium text-fg-2">Picture tools on this computer</div>
         <p className="text-[12.5px] leading-snug text-fg-3">
-          Take a picture’s background out, or erase part of it, here: for nothing, and your pictures stay on this computer. About {s?.sizeMb ?? 120} MB once, and each tool’s model (about 200 MB) the first time it is used.
+          Take a picture’s background out, or erase part of it, here: for nothing, and your pictures stay on this computer. About {sizeWords(s?.sizeMb ?? 145)} once, and each tool’s model (about 200 MB) the first time it is used.
         </p>
         {!s ? (
           <div className="flex items-center gap-2 text-[12.5px] text-fg-3">
@@ -461,10 +461,15 @@ function PictureTools() {
         ) : (
           <div className={cx('flex flex-wrap gap-x-1.5 text-[12.5px]', s.ready ? 'text-fg-2' : 'text-fg-3')}>
             {s.ready && <Check size={14} className="mt-px shrink-0 text-ok" strokeWidth={2.6} />}
-            {localStatus(s).map((x) => (
+            {[...localStatus(s), ...(!s.ready && s.canInstall ? whereTheyRun(s) : [])].map((x) => (
               <span key={x}>{x}</span>
             ))}
           </div>
+        )}
+        {s?.gpuWhy && !s.installing && (
+          <p className="text-[12px] leading-snug text-fg-3" translate="no">
+            {s.gpuWhy}
+          </p>
         )}
         {(tools.error || s?.error) && <p className="text-[12.5px] leading-snug text-err">{tools.error || s?.error}</p>}
       </div>

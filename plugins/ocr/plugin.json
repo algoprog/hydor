@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "ocr",
-  "version": "1.0.0",
-  "description": "Reads the text in pictures, photos of documents, screenshots and scanned PDFs on this computer (RapidOCR), so agents can use what a scan or a receipt says.",
+  "version": "1.1.0",
+  "description": "Reads the text in pictures, photos of documents, screenshots and scanned PDFs on this computer (RapidOCR), so agents can use what a scan or a receipt says. It reads on the graphics card when there is one (an NVIDIA GPU, or a Mac's), else on the CPU.",
   "author": { "name": "Hydor Devs", "url": "https://hydor.app" },
   "license": "Apache-2.0",
   "keywords": ["ocr", "scans", "receipts", "images", "pdf"],
@@ -13,7 +13,8 @@
       "icon": "scan",
       "requires": {
         "python": ">=3.10",
-        "pip": ["rapidocr>=3,<4", "onnxruntime>=1.18", "pypdfium2>=4,<6"]
+        "pip": ["rapidocr>=3,<4", "onnxruntime>=1.18,<1.27", "pypdfium2>=4,<6"],
+        "pipNvidia": ["onnxruntime-gpu[cuda,cudnn]>=1.21,<1.27"]
       }
     }
   }
