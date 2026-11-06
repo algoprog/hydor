@@ -12,6 +12,7 @@
 // document and its history kept underneath.
 import {
   isAtom,
+  citeItems,
   asAccepted,
   blockHtml,
   CALLOUT,
@@ -181,8 +182,8 @@ function cutAfter(x: Node, box: Element): Element | null {
 const b64 = (s: string) => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
 const unb64 = (s: string) => new TextDecoder().decode(Uint8Array.from(atob(s), (c) => c.charCodeAt(0)));
 
-/** Blocks as HTML for another app to paste (lists as lists, a checklist's boxes as boxes), and as themselves for this one. */
-function copyHtml(blocks: Block[], src: (s: string) => string): string {
+/** Blocks as HTML for another app to paste (lists as lists, a checklist's boxes as boxes), and as themselves for this one (with the footnotes and sources their marks are of). */
+function copyHtml(blocks: Block[], src: (s: string) => string, extra: { notes?: Doc['notes']; sources?: Doc['sources'] } = {}): string {
   const { labels } = listInfo(blocks);
   let out = '';
   const open: { tag: 'ul' | 'ol'; lvl: number; kind: ListKind }[] = [];
@@ -213,7 +214,8 @@ function copyHtml(blocks: Block[], src: (s: string) => string): string {
     out += `<li${b.align ? ` style="text-align:${b.align}"` : ''}>${box}${runsHtml(b.runs, { view: true })}</li>`;
   });
   close(0);
-  return `<meta charset="utf-8"><!--naget-doc:${b64(JSON.stringify(blocks))}--><div>${out}</div>`;
+  const more = extra.notes?.length || extra.sources?.length ? `<!--naget-doc-more:${b64(JSON.stringify(extra))}-->` : '';
+  return `<meta charset="utf-8"><!--naget-doc:${b64(JSON.stringify(blocks))}-->${more}<div>${out}</div>`;
 }
 
 export class DocEngine {
@@ -1176,6 +1178,14 @@ export class DocEngine {
     if (ours) {
       try {
         const list = ops.withoutComments(normalizeBlocks(JSON.parse(unb64(ours[1])) as unknown[], {}, this.ids()));
+        // The footnotes and sources the copy's marks are of, where this document has none of the same: they come along.
+        const more = /<!--naget-doc-more:([A-Za-z0-9+/=]+)-->/.exec(html);
+        if (more && list.length) {
+          const x = JSON.parse(unb64(more[1])) as { notes?: Doc['notes']; sources?: Doc['sources'] };
+          const notes = (x.notes ?? []).filter((n) => !this.doc.notes?.some((m) => m.id === n.id));
+          const sources = (x.sources ?? []).filter((n) => !this.doc.sources?.some((m) => m.id.toLowerCase() === n.id.toLowerCase()));
+          if (notes.length || sources.length) this.doc = { ...this.doc, ...(notes.length ? { notes: [...(this.doc.notes ?? []), ...notes] } : {}), ...(sources.length ? { sources: [...(this.doc.sources ?? []), ...sources] } : {}) };
+        }
         if (list.length) return list;
       } catch {}
     }
@@ -1320,7 +1330,16 @@ export class DocEngine {
     e.preventDefault();
     // What is copied is as the suggestions would make it (words marked to go left out).
     const blocks = asAccepted(ops.asDoc(this.doc, picked ? [{ ...picked }] : ops.sliceBlocks(this.doc, s, en))).blocks;
-    e.clipboardData?.setData('text/html', copyHtml(blocks, this.o.src));
+    // The footnotes and sources the copied marks are of go along (pasted into another document, they come with them).
+    const ids = new Set<string>();
+    const keys = new Set<string>();
+    const scan = (runs: Run[]) => runs.forEach((r) => (r.fn ? ids.add(r.t) : r.cite ? citeItems(r.t).forEach((x) => keys.add(x.key)) : null));
+    for (const b of blocks) {
+      if (b.type === 'p' || b.type === 'li') scan(b.runs);
+      else if (b.type === 'table') b.rows.forEach((row) => row.forEach((c) => scan(c.runs)));
+    }
+    const extra = { notes: (this.doc.notes ?? []).filter((n) => ids.has(n.id)), sources: (this.doc.sources ?? []).filter((x) => keys.has(x.id)) };
+    e.clipboardData?.setData('text/html', copyHtml(blocks, this.o.src, extra));
     e.clipboardData?.setData('text/plain', ops.blocksPlain(blocks));
     if (!cut || this.o.readOnly) return;
     if (picked) return this.removePicked();
