@@ -103,7 +103,7 @@ export async function keepSoundStream(body: Readable | undefined): Promise<{ src
     for await (const c of body as AsyncIterable<Buffer>) {
       n += c.length;
       if (n > MAX_KEPT) throw new HttpError(413, `That sound is over ${Math.round(MAX_KEPT / 1024 / 1024)} MB`);
-      if (!out.write(c)) await new Promise((r) => out.once('drain', r));
+      if (!out.write(c)) await new Promise<void>((r) => out.once('drain', () => r()));
     }
     await new Promise<void>((resolve, reject) => out.end((e?: Error | null) => (e ? reject(e) : resolve())));
     if (n < 16) throw new HttpError(400, 'The sound is empty');
