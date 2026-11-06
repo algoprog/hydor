@@ -75,9 +75,8 @@ export const canvasOf = (w: number, h: number) => {
 export class Pixels {
   readonly id = ++pxIds;
   version = 0;
-  /** A smaller copy, for the screen, and the parts of it to draw again. */
-  private small: { k: number; c: HTMLCanvasElement; version: number } | null = null;
-  private dirty: Box | null = null;
+  /** Smaller copies (for the screen, the layers' thumbnails, the histogram), each with the part of it to draw again. */
+  private smalls: { k: number; c: HTMLCanvasElement; version: number; dirty: Box | null }[] = [];
   constructor(public canvas: HTMLCanvasElement) {}
   get w() {
     return this.canvas.width;
@@ -94,17 +93,18 @@ export class Pixels {
   /** Changed (in `r`, or all of it). */
   touch(r?: Box) {
     this.version++;
-    if (!this.small) return;
-    if (!r) this.small = null;
-    else this.dirty = this.dirty ? union(this.dirty, r) : r;
+    if (!r) this.smalls = [];
+    else for (const s of this.smalls) s.dirty = s.dirty ? union(s.dirty, r) : r;
   }
-  /** A copy `k` times its size (itself at 1 or more), kept and brought up to date where it changed. */
+  /** A copy `k` times its size (itself at 1 or more), kept (a few sizes at once) and brought up to date where it changed. */
   at(k: number): HTMLCanvasElement {
     if (k >= 0.999) return this.canvas;
-    const s = this.small;
-    if (s && Math.abs(s.k - k) < 1e-6) {
-      if (s.version !== this.version && this.dirty) {
-        const d = this.dirty;
+    const i = this.smalls.findIndex((x) => Math.abs(x.k - k) < 1e-6);
+    const s = i >= 0 ? this.smalls[i] : null;
+    if (s) {
+      if (s.version === this.version) return s.c;
+      if (s.dirty) {
+        const d = s.dirty;
         const x0 = Math.max(0, Math.floor(d.x * k) - 1);
         const y0 = Math.max(0, Math.floor(d.y * k) - 1);
         const x1 = Math.min(s.c.width, Math.ceil((d.x + d.w) * k) + 1);
@@ -114,14 +114,13 @@ export class Pixels {
         g.imageSmoothingQuality = 'high';
         g.drawImage(this.canvas, x0 / k, y0 / k, (x1 - x0) / k, (y1 - y0) / k, x0, y0, x1 - x0, y1 - y0);
         s.version = this.version;
-        this.dirty = null;
+        s.dirty = null;
         return s.c;
       }
-      if (s.version === this.version) return s.c;
     }
-    this.small = { k, c: shrinkTo(this.canvas, k), version: this.version };
-    this.dirty = null;
-    return this.small.c;
+    const made = { k, c: shrinkTo(this.canvas, k), version: this.version, dirty: null };
+    this.smalls = [made, ...this.smalls.filter((x) => x !== s)].slice(0, 4);
+    return made.c;
   }
 }
 
