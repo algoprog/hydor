@@ -24,7 +24,9 @@ import type { SessionManager } from '../sessions.ts';
 import { librarySkills, setFolders, viewSkills } from '../skillpack/library.ts';
 import { ManifestError, readPlugin } from './manifest.ts';
 import { parseGitLink, plugins, setPluginRoots } from './index.ts';
-import { setupTesting } from './setup.ts';
+import { gpuPip, runSetup, setupEnv, setupHash, setupOf, setupTesting } from './setup.ts';
+import { requiresOf } from './manifest.ts';
+import { noRequires, type PluginRequires } from '../../shared/plugins.ts';
 
 let passed = 0;
 const failures: string[] = [];
@@ -331,6 +333,43 @@ await test('setup: packages in its own folder; not given to agents until it is r
     assert.match((await additions('claude'))!.instructions!.join('\n'), /The With setup plugin is set up: its Python \(with tinypkg\)/);
   } finally {
     setupTesting.run = null;
+  }
+});
+
+await test('setup for an NVIDIA GPU: its packages only where there is one, its servers finding their libraries; failing there leaves the CPU', async () => {
+  const problems: string[] = [];
+  const r: PluginRequires = requiresOf({ pip: ['faster-whisper>=1.1,<2'], pipNvidia: ['nvidia-cublas-cu12>=12,<13', '--index-url x'] }, problems);
+  assert.deepEqual(r.pipNvidia, ['nvidia-cublas-cu12>=12,<13']);
+  assert.deepEqual(problems, ['requires.pipNvidia: --index-url x is not a package']);
+  const was = process.env.HYDOR_TEST_NVIDIA;
+  const data = path.join(root, 'data', 'gpu-test');
+  try {
+    process.env.HYDOR_TEST_NVIDIA = '0';
+    const plain = setupHash(r);
+    assert.equal(plain, setupHash({ ...noRequires(), pip: r.pip }), 'without an NVIDIA GPU: as if it asked for none, so nothing is set up again');
+    assert.deepEqual(gpuPip(r), []);
+    process.env.HYDOR_TEST_NVIDIA = '1';
+    assert.notEqual(setupHash(r), plain, 'with one: set up again, with them');
+    const ran: string[] = [];
+    const steps: string[] = [];
+    setupTesting.run = async (cmd, args) => {
+      ran.push(`${path.basename(cmd)} ${args.join(' ')}`);
+      return args.includes('nvidia-cublas-cu12>=12,<13') ? { code: 1, out: 'no wheel for this system' } : { code: 0, out: 'ok' };
+    };
+    await runSetup('gpu-test', r, data, { step: (x) => steps.push(x), log: () => {} });
+    assert.ok(ran.findIndex((x) => x.includes('faster-whisper')) < ran.findIndex((x) => x.includes('nvidia-cublas')), 'after its packages');
+    assert.ok(steps.includes('Installing what it needs to run on the NVIDIA GPU: nvidia-cublas-cu12'), steps.join('; '));
+    assert.equal(setupOf(r, data, false).state, 'ready', 'a failure there leaves it working, on the CPU');
+    const lib = path.join(data, 'venv', 'lib', 'python3.12', 'site-packages', 'nvidia', 'cublas', 'lib');
+    fs.mkdirSync(lib, { recursive: true });
+    assert.equal(setupEnv(r, root, data).LD_LIBRARY_PATH?.split(path.delimiter)[0], lib, 'its servers find CUDA’s libraries');
+    process.env.HYDOR_TEST_NVIDIA = '0';
+    assert.equal(setupEnv(r, root, data).LD_LIBRARY_PATH, undefined);
+  } finally {
+    setupTesting.run = null;
+    if (was === undefined) delete process.env.HYDOR_TEST_NVIDIA;
+    else process.env.HYDOR_TEST_NVIDIA = was;
+    fs.rmSync(data, { recursive: true, force: true });
   }
 });
 

@@ -46,6 +46,10 @@ extension for what the format leaves to each app. It also reads Claude Code's la
   - `agents`: which agents get it (all four by default).
   - `requires.plugins`: other plugins by name with a semver range; built-in ones are added first.
   - `requires.pip` and `requires.python`: Python packages, in an environment at `${PLUGIN_DATA}/venv`.
+  - `requires.pipNvidia`: Python packages added after `pip` only on a computer with an NVIDIA GPU, such as
+    `nvidia-cublas-cu12` and `nvidia-cudnn-cu12` for CTranslate2 or `onnxruntime-gpu`; its servers find the CUDA
+    libraries they bring (`LD_LIBRARY_PATH`, or `PATH` on Windows). If they fail to install, it still works, on the CPU,
+    so a server should try the GPU and fall back to the CPU.
   - `requires.npm`: Node packages, in `${PLUGIN_DATA}/node/node_modules` (installed without their
     install scripts).
   - `requires.commands`: programs looked for on the computer; missing ones are shown with their hint.

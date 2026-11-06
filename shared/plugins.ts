@@ -26,6 +26,12 @@ export interface PluginRequires {
   npm: Record<string, string>;
   /** Python packages, installed in its own environment ("pandas>=2.2,<3"). */
   pip: string[];
+  /**
+   * Python packages added to that environment after `pip`, only on a computer with an NVIDIA GPU: CUDA's libraries
+   * or a GPU build ("nvidia-cublas-cu12"), so its models run on the GPU there. Its servers find the libraries those
+   * packages bring. When they fail to install, the plugin still works, on the CPU.
+   */
+  pipNvidia?: string[];
   /** The Python version for that environment (">=3.10"). */
   python?: string;
   /** Programs it needs on this computer (ffmpeg), with how to get them. */

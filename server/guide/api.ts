@@ -76,7 +76,7 @@ const RULES: Rule[] = [
   ['W', /^\/api\/computer\/settings$/, 'always', 'This lets agents see this Mac’s screen and use its mouse and keyboard (each session still asks before its agent starts).'],
   ['W', /^\/api\/(update|update\/auto|startup|machines|scm\/accounts|acp-agents|agent-accounts|clients)(\/|$)/, 'always'],
   ['W', /^\/api\/models\/(install|start)$/, 'always', 'This downloads or starts a model on this computer.'],
-  ['POST', /^\/api\/images\/local\/setup$/, 'always', 'This sets up the picture tools on this computer: a private Python with what they need (about 145 MB), and each tool’s model (about 200 MB) the first time it is used.'],
+  ['POST', /^\/api\/images\/local\/setup$/, 'always', 'This sets up the picture tools on this computer: a private Python with what they need (about 145 MB, or about 2.1 GB with an NVIDIA graphics card, to run on it), and each tool’s model (about 200 MB) the first time it is used.'],
   ['POST', /^\/api\/apps\/install$|^\/api\/apps\/[^/]+\/env$/, 'always', 'This installs an app on this computer, with the apps and the Node or Python packages it needs.'],
   ['W', /^\/api\/plugins\/(install|new|[^/]+\/(enable|setup|update|draft|files))$/, 'always', 'A plugin runs programs on this computer, installs what it needs, and gives every agent its skills, tools and instructions.'],
   ['W', /^\/api\/voice$/, 'confirm'],

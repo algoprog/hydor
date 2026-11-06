@@ -15,6 +15,29 @@ export const WHISPER_MODELS: { size: WhisperSize; label: string; bytes: number; 
 /** Where the server turns speech into text: nowhere, here with whisper.cpp, or at a service. */
 export type VoiceEngine = 'off' | 'local' | 'endpoint';
 
+/** The GPUs the app builds whisper.cpp for: a Mac's (Metal), and an NVIDIA one (CUDA). */
+export type WhisperGpu = 'metal' | 'cuda';
+export const GPU_API: Record<WhisperGpu, string> = { metal: 'Metal', cuda: 'CUDA' };
+
+/** What whisper.cpp ran on, as it said: a GPU (by its interface and name) or the processor. */
+export interface VoiceDevice {
+  on: 'gpu' | 'cpu';
+  /** The GPU's interface: "Metal", "CUDA", "Vulkan"… */
+  api?: string;
+  /** The GPU, as its driver names it ("Apple M2 Pro", "NVIDIA GeForce RTX 4090"). */
+  name?: string;
+}
+
+/** What a build of whisper.cpp says it is doing, shown with its progress. */
+export const BUILD_SAYS = {
+  cmake: 'Getting CMake to build whisper.cpp',
+  source: 'Getting whisper.cpp’s source',
+  prepare: 'Preparing the build',
+  cpu: 'Building whisper.cpp for this machine',
+  metal: 'Building whisper.cpp for this Mac’s GPU (Metal)',
+  cuda: 'Building whisper.cpp for the NVIDIA GPU (CUDA)',
+} as const;
+
 /** A download (or build) under way. */
 export interface VoiceProgress {
   /** Getting whisper.cpp, building it from its source (when no ready-made copy runs here), or getting the model. */
@@ -38,8 +61,23 @@ export interface VoiceState {
     status: 'off' | 'installing' | 'ready' | 'failed';
     progress?: VoiceProgress;
     error?: string;
-    /** whisper.cpp: a ready-made copy the app downloaded, one it built here, or your own. */
-    program?: { version?: string; source: 'prebuilt' | 'built' | 'yours'; sizeBytes: number };
+    /** whisper.cpp: a ready-made copy the app downloaded, one it built here, or your own. It runs on the GPU when it can. */
+    program?: {
+      version?: string;
+      source: 'prebuilt' | 'built' | 'yours';
+      sizeBytes: number;
+      /** The GPU the app's copy is built for; none: the processor only (the ready-made one). Not known for your own. */
+      gpu?: WhisperGpu;
+      /** What it ran on the last time it was used or tested; not known before. */
+      runsOn?: VoiceDevice;
+      /** The GPU failed the last time (out of its memory, say): it runs on the processor until the GPU is tried again, a few minutes later. */
+      gpuError?: string;
+    };
+    /**
+     * whisper.cpp for this machine's NVIDIA GPU, which has no ready-made copy for Linux: being built (it runs on the
+     * processor meanwhile), the build failed, or building it needs NVIDIA's CUDA toolkit.
+     */
+    gpuBuild?: { status: 'building' | 'failed' | 'needs-toolkit'; percent?: number; detail?: string; error?: string };
     /** Models on this machine. */
     models: { size: WhisperSize; english: boolean; sizeBytes: number }[];
     /** What turning it on downloads now, in bytes (0 when everything is here). */

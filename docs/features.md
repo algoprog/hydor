@@ -103,7 +103,8 @@ agents that speak ACP and take MCP servers.
   when you say something lasting, you edit it in Settings, and past its length (1,000 words unless changed) the
   helper model shortens it. Each agent starts with the notes that bear most on what you asked, 10 unless changed: a
   top-k by hybrid search, by words (BM25) and by meaning (on unless you turn it off; it sets itself up once), with
-  LightOn's mDenseOn model on your own computer (on a GPU, or on the CPU in about 1.5 GB, only while needed), then the
+  LightOn's mDenseOn model on your own computer (on a GPU, an NVIDIA one or a Mac's own, or on the CPU in about 1.5 GB,
+  only while needed), then the
   latest. Each night the helper
   model tidies memory up: it merges notes that say the same thing and, when there are more than fit, sums related
   ones up in topics and, for a project, a short profile; every change can be undone.
@@ -180,9 +181,11 @@ agents that speak ACP and take MCP servers.
   version that answers the pointer for web decks. Free photos (find_photos) come from Openverse (Wikimedia Commons
   when it cannot answer), only those free to change and use commercially, saved with their credits. The picture
   tools on this computer (Settings → Images, video and audio → Set up: a private Python with ONNX Runtime and a
-  portable ffmpeg, about 145 MB, and three models downloaded when first used, BiRefNet-lite, LaMa and Real-ESRGAN)
-  take backgrounds out (remove_background), erase parts of pictures (erase_from_image) and make pictures 2× or 4×
-  larger (upscale_image, a tile at a time) for nothing and in private,
+  portable ffmpeg, about 145 MB, or 2.1 GB with ONNX Runtime's build for an NVIDIA GPU, and three models downloaded
+  when first used, BiRefNet-lite, LaMa and Real-ESRGAN) take backgrounds out (remove_background), erase parts of
+  pictures (erase_from_image) and make pictures 2× or 4× larger (upscale_image, a tile at a time) for nothing and in
+  private, on the graphics card when there is one they can use (an NVIDIA GPU through CUDA, a Mac's through Core ML; a
+  model the card fails runs on the CPU, and Settings says so) else on the CPU,
   each model loaded only while used, put away after a few idle minutes and never loaded without the memory for it;
   a poor cutout, and a large or detailed area to erase, go to an image model, and how: "ai" asks for one.
   edit_image crops, turns, sizes, adjusts (curves, levels, hue and saturation by colour, colour balance, clarity,
@@ -658,9 +661,10 @@ agents that speak ACP and take MCP servers.
   (skills, tools, needs, files, instructions), or have an agent make one, and pack it into a .zip to share.
   Claude Code's and Codex's own plugins and marketplaces have a tab each.
 - **Voice**: dictate into the message box, with the browser's own recognition or, when you turn it on, a model
-  on this machine; replies can be read aloud. Hands-free mode (the headphones by the message box) is for
-  walking: say what you want, and it starts, steers and checks sessions, answers approvals and reads you the
-  results, telling you when the session it follows finishes or needs you.
+  on this machine (whisper.cpp, on its GPU when it has one: Metal on a Mac, CUDA on an NVIDIA GPU, built for it in
+  the background; else, or when the GPU fails, on the processor); replies can be read aloud. Hands-free mode (the
+  headphones by the message box) is for walking: say what you want, and it starts, steers and checks sessions,
+  answers approvals and reads you the results, telling you when the session it follows finishes or needs you.
 - **Your language**: the app in English, Chinese (Simplified) or Greek (Settings → General → Language), with
   dates and times written that way and notifications in it too, and agents write to you in it. Translations
   live in `web/src/i18n`: `npm run i18n:extract` lists every string, the server's messages and what ships with

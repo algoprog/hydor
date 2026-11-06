@@ -1,7 +1,9 @@
 // The picture tools on this computer: taking a picture's background out, erasing part of it and making it larger here,
-// for nothing and in private, instead of through OpenRouter (plots run in the same Python). Set up once (about 145 MB);
-// each tool's model downloads the first time it is used (about 200 MB each, the upscaler's 5 MB). While it sets up or a tool works, its state is asked for
-// every second, to show what it is doing. The card offers it where a tool would use it, with the other way beside it.
+// for nothing and in private, instead of through OpenRouter (plots run in the same Python). Set up once (about 145 MB,
+// or 2.1 GB with an NVIDIA GPU, for running on it); each tool's model downloads the first time it is used (about 200 MB
+// each, the upscaler's 5 MB). They run on the graphics card when there is one they can use (an NVIDIA GPU, or a Mac's),
+// else on the CPU. While it sets up or a tool works, its state is asked for every second, to show what it is doing.
+// The card offers it where a tool would use it, with the other way beside it.
 import { useCallback, useEffect, useState } from 'react';
 import { Cpu, HardDriveDownload } from 'lucide-react';
 import type { LocalToolsState } from '@shared/images';
@@ -60,6 +62,32 @@ export function useLocalTools(watch = false): LocalTools {
   return { state, error, setUp, remove, refresh };
 }
 
+/** About how much, in the words people read sizes in: 145 MB, 2.1 GB. */
+export const sizeWords = (mb: number) => (mb >= 1000 ? `${(mb / 1000).toFixed(1)} GB` : `${mb} MB`);
+
+/** Where they run, each a whole sentence (so each is translated). */
+export function whereTheyRun(s: LocalToolsState): string[] {
+  const out = [
+    s.gpuBuildFailed
+      ? 'Where they run: the CPU (the GPU build of ONNX Runtime could not be installed here).'
+      : s.device === 'cuda'
+        ? 'Where they run: the NVIDIA GPU (CUDA).'
+        : s.device === 'coreml'
+          ? 'Where they run: the Apple GPU (Core ML).'
+          : 'Where they run: the CPU.',
+  ];
+  const off = s.onCpu ?? [];
+  if (off.length)
+    out.push(
+      off.length === 2
+        ? 'Both models run on the CPU for now: the GPU failed them.'
+        : off[0] === 'cutout'
+          ? 'The background remover runs on the CPU for now: the GPU failed it.'
+          : 'The eraser runs on the CPU for now: the GPU failed it.',
+    );
+  return out;
+}
+
 /** What they are doing now, or why they are not there: a sentence or two, each whole (so each is translated). */
 export function localStatus(s: LocalToolsState): string[] {
   if (s.installing) return [s.step || 'Setting up'];
@@ -76,7 +104,7 @@ export function localStatus(s: LocalToolsState): string[] {
   }
   const n = s.loaded.length;
   if (n) out.push(n >= 3 ? 'All three models are in memory now; each goes after a few idle minutes.' : n === 2 ? 'Two models are in memory now; each goes after a few idle minutes.' : 'One model is in memory now; it goes after a few idle minutes.');
-  return out;
+  return [...out, ...whereTheyRun(s)];
 }
 
 /** Offered where a tool would use them: what they are, Set up (with its progress), and the other way (`instead`, through OpenRouter). */
@@ -96,7 +124,7 @@ export function LocalToolsCard({ tools, instead }: { tools: LocalTools; instead?
       <div className="mt-2.5 flex flex-wrap gap-2 pl-7">
         {s?.canInstall && !s.installing && !s.ready && (
           <Button size="sm" variant="primary" icon={<HardDriveDownload size={14} />} onClick={() => void tools.setUp()}>
-            {`Set up (about ${s.sizeMb} MB, once)`}
+            {`Set up (about ${sizeWords(s.sizeMb)}, once)`}
           </Button>
         )}
         {instead && (

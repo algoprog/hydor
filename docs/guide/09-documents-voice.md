@@ -345,17 +345,18 @@ The language and **Recognize with** are kept in this browser, so each of your de
 **[Speech recognition on the server](/settings?s=voice&find=Speech%20recognition%20on%20the%20server)** is for browsers that can't recognize speech themselves, or to keep your voice on your machine. It is off until you turn it on, and nothing is downloaded before. It is set once for the app, on every device. Pick one of three:
 
 - **Off**.
-- **On this machine**: whisper.cpp runs on the computer that runs Hydor, on its processor, and your voice stays there.
+- **On this machine**: whisper.cpp runs on the computer that runs Hydor, on its GPU when it has one whisper.cpp can use (a Mac's, or an NVIDIA GPU) and else on its processor, and your voice stays there.
   - **Model**: **Tiny** (74 MB; the fastest, it mishears a word now and then), **Base** (141 MB; quick and good enough for most dictation, the default), **Small** (465 MB; hears better, a few seconds per sentence on a CPU) or **Medium** (1.4 GB; hears best, slow without a fast CPU).
   - **Languages**: **Any language** (it follows the language you speak) or **English only** (a little more accurate in English).
-  - **Turn on · download …** says how much it downloads: the model, and whisper.cpp itself the first time (when everything is already there, picking **On this machine** turns it on at once). A bar shows the download; **Cancel** stops it and turns recognition on the server off. On Linux the app downloads a ready-made whisper.cpp; where that doesn't run, it builds whisper.cpp on this computer, which needs a C++ compiler (on Debian or Ubuntu: `sudo apt install build-essential cmake`). A whisper.cpp of your own on the computer (one built for your GPU, say) is used as it is.
-  - When it is ready: "Ready: whisper.cpp … with the Base model, on this machine's processor. Your voice stays here." **Test** checks that it answers and how fast. If something failed, the reason shows with **Try again**.
+  - **Turn on · download …** says how much it downloads: the model, and whisper.cpp itself the first time (when everything is already there, picking **On this machine** turns it on at once). A bar shows the download; **Cancel** stops it and turns recognition on the server off. On Linux the app downloads a ready-made whisper.cpp, which runs on the processor; on a Mac, and where the ready-made one doesn't run, it builds whisper.cpp on this computer, which needs a C++ compiler and CMake (on Debian or Ubuntu: `sudo apt install build-essential cmake`; on a Mac: `xcode-select --install`, then `brew install cmake`). On a Mac it is built for the Mac's GPU (Metal). A whisper.cpp of your own on the computer (one built for your GPU, say) is used as it is.
+  - **An NVIDIA GPU** on Linux: whisper.cpp has no ready-made build for it, so once dictation works on the processor, the app builds one for the GPU in the background, with NVIDIA's CUDA toolkit (`nvcc`). A bar shows how far it is (it takes 5 to 20 minutes); dictation works on the processor meanwhile, and on the GPU after. Without the toolkit, a note says so, with **Check again** for once you have installed it; if the build fails, the reason shows with **Try again**, and dictation stays on the processor.
+  - When it is ready: "Ready: whisper.cpp … with the Base model. Your voice stays here.", and under it what it runs on, as whisper.cpp said the last time it ran (it tries a second of silence as soon as it is ready): "It runs on the GPU: Apple M2 Pro (Metal)." or "It runs on this machine's processor." If the GPU fails (out of its memory, say), that recording is done on the processor, the note says why, and the GPU is tried again a few minutes later. **Test** checks that it answers and how fast. If something failed, the reason shows with **Try again**.
   - Picking another model while it is on downloads that model.
 - **A service**: any service with OpenAI's speech-to-text address (`/audio/transcriptions`): OpenAI itself, or a server on your network (Speaches, LocalAI, whisper.cpp's server, one on a GPU). Recordings are sent to it.
   - **Address** (like `https://api.openai.com/v1`), **API key** (most servers on your network need none) and **Model** (`whisper-1` unless you give another).
   - **Save and turn on** (then **Save**), **Test**, and **Remove the key** once a key is saved. Once a service is saved, picking **A service** again switches to it at once.
 
-Under **On this machine · …** the section lists what whisper.cpp left on this computer: whisper.cpp itself and each model with its size, the one in use marked "in use". The bin beside a model removes it (removing the one in use turns recognition on the server off, after you confirm). **Remove all** removes whisper.cpp and its models; it shows while recognition on the server is off or uses a service.
+Under **On this machine · …** the section lists what whisper.cpp left on this computer: whisper.cpp itself ("built here for Metal" or "for CUDA" when the app built it for a GPU) and each model with its size, the one in use marked "in use". The bin beside a model removes it (removing the one in use turns recognition on the server off, after you confirm). **Remove all** removes whisper.cpp and its models; it shows while recognition on the server is off or uses a service.
 
 ### Read aloud
 
@@ -425,10 +426,12 @@ It stops listening to say these, then listens again. Sessions on your other mach
 - "Turn on speech recognition on this computer, with the Small model."
 - "Use my speech server at http://192.168.1.20:8000/v1 for dictation, with the model whisper-large-v3."
 - "Which whisper models are on this computer, and how much space do they take? Remove the ones not in use."
+- "Does dictation run on my GPU? If it doesn't, why not?"
 - "Which image models do agents use now for most pictures and for simple ones, and about what does one image cost with each?"
 - "Switch the image model for most pictures to the cheapest one that can edit pictures."
 - "Use Recraft V4.1 Flash for simple pictures."
 - "Set up the picture tools on this computer."
+- "Do the picture tools run on the graphics card here? If one runs on the CPU, why?"
 - "Make a flat icon of a bicycle in #0f766e and #f59e0b, as a drawing that stays sharp."
 - "Plot ~/data/sales.csv as monthly bars, 2025 against 2026, and label the spring jump."
 - "Find three free photos of Lisbon's trams for my travel slides, with their credits."

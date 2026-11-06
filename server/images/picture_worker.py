@@ -1,11 +1,11 @@
 # Hydor's picture worker, for the picture tools on this computer (server/images/local.ts starts it): it takes the
 # background out of pictures (BiRefNet-lite), erases parts of them (LaMa) and makes them larger (Real-ESRGAN), with ONNX
-# Runtime on the CPU. It reads
+# Runtime. It reads
 # requests as JSON lines on stdin and answers each on stdout. Pictures come and go as files in a folder the server
 # makes for each job, never through the pipe:
 #   {"id": 1, "op": "cutout", "model": ".../cutout.onnx", "input": ".../in", "output": ".../out.png"}
 #     -> {"id": 1, "status": "loading"} (when the model was not in memory), {"id": 1, "status": "working"},
-#        then {"id": 1, "ok": true, "w": 800, "h": 600, "loaded": ["cutout"], ...}
+#        then {"id": 1, "ok": true, "w": 800, "h": 600, "device": "cuda", "loaded": ["cutout"], "devices": {...}, ...}
 #   {"id": 2, "op": "erase", "model": ".../erase.onnx", "input": ..., "mask": ".../mask.png" or "boxes": [[x, y, w, h]], "output": ...}
 #   {"id": 3, "op": "measure", "input": ..., "mask" or "boxes", "small": ".../hole.bin"}  ->  how large the hole is, how
 #     detailed things are around it, and the hole at most 256 pixels across (raw bytes, row after row) in "small"
@@ -15,15 +15,31 @@
 # "max_bytes" (optional) keeps the PNG under that size: it is made smaller when it would be over. A cutout given
 # "small" also writes its mask there, at most 512 pixels across, for the server to judge how sure it was.
 # Each model loads when it is first asked for and stays until the server says to unload it (after a few idle
-# minutes); the worker ends when its input closes. ONNX Runtime runs on the CPU only, on at most 4 threads, with its
-# memory arena off, so what a picture took while it was worked on goes back once it is done.
+# minutes); the worker ends when its input closes.
+#
+# Where the models run: on the graphics card the server names (HYDOR_PICTURES_DEVICE: "cuda", an NVIDIA GPU with ONNX
+# Runtime's GPU build; "coreml", a Mac's GPU and Neural Engine through Core ML, given a "cache" folder per model for
+# what Core ML compiles), else on the CPU; a job's "device": "cpu" keeps its model there. A model the graphics card
+# fails (its provider missing, its session not made, an error while it works, numbers that are not finite) is made
+# again on the CPU at once and stays there; its answer says so ("fell_back": why). Answers say where each model ran
+# ("device", and "devices" for those in memory). On the CPU, ONNX Runtime uses at most 4 threads, with its memory arena
+# off, so what a picture took while it was worked on goes back once it is done.
 import gc
 import json
 import os
 import sys
 import time
 
+# The answers go out on a copy of stdout, and stdout itself goes to stderr: whatever a library prints (ONNX Runtime
+# saying it fell back from a GPU, NVIDIA's libraries loading) never mixes with them.
+OUT = os.fdopen(os.dup(1), 'w', encoding='utf-8')
+os.dup2(2, 1)
+sys.stdout = sys.stderr
+
 THREADS = max(1, min(4, int(os.environ.get('HYDOR_PICTURES_THREADS') or 0) or (os.cpu_count() or 2)))
+DEVICE = os.environ.get('HYDOR_PICTURES_DEVICE') or 'cpu'
+GPU_PROVIDERS = {'cuda': 'CUDAExecutionProvider', 'coreml': 'CoreMLExecutionProvider'}
+DEVICE_OF = {'CUDAExecutionProvider': 'cuda', 'CoreMLExecutionProvider': 'coreml'}
 # The largest picture taken, in pixels (8,000 × 6,000 or so): what is in memory while it is worked on grows with it.
 MAX_PIXELS = 50_000_000
 # BiRefNet's input: its side as the model says (the 512 × 512 export), scaled to 0..1, then ImageNet's mean and spread.
@@ -34,6 +50,10 @@ STD = (0.229, 0.224, 0.225)
 ERASE_SIZE = 512
 
 sessions = {}
+# Where each model in memory runs ("cuda", "coreml" or "cpu"), and why the graphics card failed one, until it is said.
+where = {}
+moved = {}
+cuda_ready = False
 
 
 class Fail(Exception):
@@ -41,8 +61,8 @@ class Fail(Exception):
 
 
 def say(obj):
-    sys.stdout.write(json.dumps(obj) + '\n')
-    sys.stdout.flush()
+    OUT.write(json.dumps(obj) + '\n')
+    OUT.flush()
 
 
 def rss_mb():
@@ -75,13 +95,9 @@ def give_back():
             pass
 
 
-def session(what, path, rid):
-    s = sessions.get(what)
-    if s is not None:
-        return s
+def options():
     import onnxruntime as ort
 
-    say({'id': rid, 'status': 'loading'})
     so = ort.SessionOptions()
     so.intra_op_num_threads = THREADS
     so.inter_op_num_threads = 1
@@ -92,15 +108,108 @@ def session(what, path, rid):
     # Measured on a CPU: both load fastest with the basic optimisations (BiRefNet at 512 in 1.4 s, not 7 s unoptimised),
     # at about the same peak (BiRefNet 1.9 GB for a picture, LaMa 0.9 GB).
     so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_BASIC
+    # LaMa's export leaves its batch size free; fixed at 1 (all it is ever given), its shapes are known and far more of
+    # it folds away: measured on a CPU, 2,841 operations rather than 7,917, loaded in 1.5 s rather than 8 at a lower
+    # peak (0.7 GB, not 0.9), with exactly the same output; and a graphics card gets it in far fewer pieces.
+    so.add_free_dimension_override_by_name('batch', 1)
+    return so
+
+
+def prepare_cuda():
+    """NVIDIA's CUDA and cuDNN libraries, from the packages that came with ONNX Runtime's GPU build, loaded once."""
+    global cuda_ready
+    if cuda_ready:
+        return
+    cuda_ready = True
+    import onnxruntime as ort
+
     try:
-        s = ort.InferenceSession(path, sess_options=so, providers=['CPUExecutionProvider'])
-    except Exception as e:  # noqa: BLE001
-        raise Fail(f'The model would not load ({type(e).__name__}: {str(e)[:200]}). Removing the picture tools and setting them up again downloads it afresh.') from e
+        if hasattr(ort, 'preload_dlls'):
+            ort.preload_dlls()
+    except Exception as e:  # noqa: BLE001 - the session then fails, and the model runs on the CPU
+        sys.stderr.write(f'preloading CUDA: {type(e).__name__}: {e}\n')
+
+
+def providers_for(device, cache):
+    """The providers to ask for, the graphics card's first (with what it is asked to do), or why not."""
+    import onnxruntime as ort
+
+    want = GPU_PROVIDERS.get(device)
+    if not want:
+        return ['CPUExecutionProvider'], None
+    if want not in ort.get_available_providers():
+        return ['CPUExecutionProvider'], f'this ONNX Runtime ({ort.__version__}) has no {want}'
+    if device == 'cuda':
+        prepare_cuda()
+        # Memory taken as asked rather than in doubling steps, and quick choices of how to convolve (this model loads
+        # for a few minutes at a time, so a long search for the fastest way would be paid again and again).
+        return [('CUDAExecutionProvider', {'device_id': 0, 'arena_extend_strategy': 'kSameAsRequested', 'cudnn_conv_algo_search': 'HEURISTIC'}), 'CPUExecutionProvider'], None
+    # Core ML's newer model format, on everything it has (GPU, Neural Engine, CPU); what it compiles is kept in the
+    # data folder (from ONNX Runtime 1.21), so a model compiles once rather than each time it loads.
+    opts = {'ModelFormat': 'MLProgram', 'MLComputeUnits': 'ALL'}
+    try:
+        newer = tuple(int(x) for x in ort.__version__.split('.')[:2]) >= (1, 21)
+    except ValueError:
+        newer = False
+    if cache and newer:
+        os.makedirs(cache, exist_ok=True)
+        opts['ModelCacheDirectory'] = cache
+    return [('CoreMLExecutionProvider', opts), 'CPUExecutionProvider'], None
+
+
+def session(what, req, rid):
+    s = sessions.get(what)
+    if s is not None:
+        return s
+    import onnxruntime as ort
+
+    say({'id': rid, 'status': 'loading'})
+    path = req['model']
+    providers, why = providers_for('cpu' if req.get('device') == 'cpu' else DEVICE, req.get('cache'))
+    s = None
+    if providers[0] != 'CPUExecutionProvider':
+        try:
+            s = ort.InferenceSession(path, sess_options=options(), providers=providers)
+            # ONNX Runtime goes on with the CPU by itself when a provider cannot start.
+            if s.get_providers()[0] not in DEVICE_OF:
+                why = f'{providers[0][0]} did not start'
+        except Exception as e:  # noqa: BLE001
+            s = None
+            why = f'{type(e).__name__}: {str(e)[:200]}'
+    if why:
+        moved[what] = why
+    if s is None:
+        try:
+            s = ort.InferenceSession(path, sess_options=options(), providers=['CPUExecutionProvider'])
+        except Exception as e:  # noqa: BLE001
+            raise Fail(f'The model would not load ({type(e).__name__}: {str(e)[:200]}). Removing the picture tools and setting them up again downloads it afresh.') from e
     sessions[what] = s
+    where[what] = DEVICE_OF.get(s.get_providers()[0], 'cpu')
     return s
 
 
+def infer(what, req, rid, feeds):
+    """The model's outputs for these inputs; when the graphics card fails it, it is made again on the CPU and runs there."""
+    import numpy as np
+
+    s = session(what, req, rid)
+    if where.get(what) == 'cpu':
+        return s.run(None, feeds)
+    try:
+        out = s.run(None, feeds)
+        if all(np.isfinite(o).all() for o in out):
+            return out
+        why = 'it gave numbers that are not finite'
+    except Exception as e:  # noqa: BLE001
+        why = f'{type(e).__name__}: {str(e)[:200]}'
+    moved[what] = f'on {where[what]}: {why}'
+    del s
+    unload(what)
+    return session(what, {**req, 'device': 'cpu'}, rid).run(None, feeds)
+
+
 def unload(what):
+    where.pop(what, None)
     if sessions.pop(what, None) is not None:
         give_back()
 
@@ -167,17 +276,19 @@ def cutout(req, rid):
     from PIL import Image
 
     im, icc = open_picture(req['input'])
-    s = session('cutout', req['model'], rid)
+    s = session('cutout', req, rid)
     say({'id': rid, 'status': 'working'})
     t = time.time()
     # A picture with see-through parts is shown to the model on white, as a person would see it.
     view = Image.alpha_composite(Image.new('RGBA', im.size, (255, 255, 255, 255)), im).convert('RGB') if im.mode == 'RGBA' else im
     shape = s.get_inputs()[0].shape
     side = shape[-1] if isinstance(shape[-1], int) else CUTOUT_SIZE
+    name = s.get_inputs()[0].name
+    del s
     x = np.asarray(view.resize((side, side), Image.Resampling.BILINEAR), dtype=np.float32) / 255.0
     del view
     x = ((x - np.array(MEAN, dtype=np.float32)) / np.array(STD, dtype=np.float32)).transpose(2, 0, 1)[None]
-    logits = s.run(None, {s.get_inputs()[0].name: np.ascontiguousarray(x, dtype=np.float32)})[0][0, 0].astype(np.float32)
+    logits = infer('cutout', req, rid, {name: np.ascontiguousarray(x, dtype=np.float32)})[0][0, 0].astype(np.float32)
     del x
     # Logits (the export's): made 0 to 1; a model that answers 0 to 1 already is taken as it is.
     mask = logits if logits.min() >= 0 and logits.max() <= 1 else (1.0 / (1.0 + np.exp(-logits))).astype(np.float32)
@@ -258,8 +369,9 @@ def measure(req, rid):
     return {'small': small, 'area': round(float(hole.mean()) / 255, 5), 'detail': round(detail, 4), 'size': [W, H]}
 
 
-def inpaint(s, crop, hole):
-    """LaMa on a square crop (any size): the crop at 512, the hole (True: to fill) at 512, the answer back at the crop's size."""
+def inpaint(run, crop, hole):
+    """LaMa (`run`: its inputs to its outputs) on a square crop (any size): the crop at 512, the hole (True: to fill)
+    at 512, the answer back at the crop's size."""
     import numpy as np
     from PIL import Image
 
@@ -268,7 +380,7 @@ def inpaint(s, crop, hole):
     m = np.asarray(Image.fromarray(hole.astype(np.uint8) * 255, 'L').resize((ERASE_SIZE, ERASE_SIZE), Image.Resampling.BILINEAR), dtype=np.float32) > 0
     m = m.astype(np.float32)
     x = x * (1.0 - m[..., None])
-    out = s.run(None, {'image': np.ascontiguousarray(x.transpose(2, 0, 1)[None]), 'mask': np.ascontiguousarray(m[None, None])})[0][0]
+    out = run({'image': np.ascontiguousarray(x.transpose(2, 0, 1)[None]), 'mask': np.ascontiguousarray(m[None, None])})[0][0]
     fill = np.clip(out.transpose(1, 2, 0) + 0.5, 0, 255).astype(np.uint8)
     return np.asarray(Image.fromarray(fill, 'RGB').resize((n, n), Image.Resampling.LANCZOS if n > ERASE_SIZE else Image.Resampling.BICUBIC), dtype=np.uint8)
 
@@ -286,9 +398,13 @@ def erase(req, rid):
         raise Fail(f'The boxes are outside the picture, which is {W}×{H} pixels.' if req.get('boxes') else 'The mask is empty: paint over what to take away.')
     y0, y1 = int(np.argmax(rows)), int(H - 1 - np.argmax(rows[::-1]))
     x0, x1 = int(np.argmax(cols)), int(W - 1 - np.argmax(cols[::-1]))
-    s = session('erase', req['model'], rid)
+    session('erase', req, rid)
     say({'id': rid, 'status': 'working'})
     t = time.time()
+
+    def run(feeds):
+        return infer('erase', req, rid, feeds)
+
     # A square around the hole with room for what surrounds it (LaMa fills from what it sees), within the picture.
     side = max(x1 - x0 + 1, y1 - y0 + 1)
     want = side + 2 * max(32, round(side * 0.4))
@@ -302,12 +418,12 @@ def erase(req, rid):
     py, px = ((n - ch) // 2, n - ch - (n - ch) // 2), ((n - cw) // 2, n - cw - (n - cw) // 2)
     sq = np.pad(region[..., :3], (py, px, (0, 0)), mode='symmetric')
     sq_hole = np.pad(hole[top : top + ch, left : left + cw], (py, px), mode='constant')
-    fill = inpaint(s, sq, sq_hole)[py[0] : py[0] + ch, px[0] : px[0] + cw]
+    fill = inpaint(run, sq, sq_hole)[py[0] : py[0] + ch, px[0] : px[0] + cw]
     a_fill = None
     if pix.shape[2] == 4 and (region[..., 3] < 255).any():
         # See-through parts: how see-through is filled in from around it too.
         a_sq = np.pad(region[..., 3], (py, px), mode='symmetric')
-        a_fill = inpaint(s, np.repeat(a_sq[..., None], 3, axis=2), sq_hole)[py[0] : py[0] + ch, px[0] : px[0] + cw].mean(axis=2)
+        a_fill = inpaint(run, np.repeat(a_sq[..., None], 3, axis=2), sq_hole)[py[0] : py[0] + ch, px[0] : px[0] + cw].mean(axis=2)
     # Only where the mask is: its edge softened inward, so nothing outside it changes.
     r = max(1, min(4, round(min(W, H) / 400)))
     m = soft[top : top + ch, left : left + cw]
@@ -360,15 +476,15 @@ def upscale(req, rid):
     alpha = im.getchannel('A') if im.mode == 'RGBA' else None
     src = np.asarray(bleed(im) if alpha is not None else im.convert('RGB'), dtype=np.uint8)
     del im
-    s = session('upscale', req['model'], rid)
-    name = s.get_inputs()[0].name
+    # Opened as the other models are (on the graphics card when there is one); infer() takes a tile to the CPU if the card fails it.
+    name = session('upscale', req, rid).get_inputs()[0].name
     tiles = req.get('tiles') or [[0, 0, W, H, 0, 0, W, H]]
     out = np.zeros((H * scale, W * scale, 3), dtype=np.uint8)
     t = time.time()
     say({'id': rid, 'status': 'working', 'done': 0, 'of': len(tiles)})
     for i, (x, y, w, h, px, py, pw, ph) in enumerate(tiles):
         part = src[py : py + ph, px : px + pw].astype(np.float32) / 255.0
-        got = s.run(None, {name: np.ascontiguousarray(part.transpose(2, 0, 1)[None])})[0][0]
+        got = infer('upscale', req, rid, {name: np.ascontiguousarray(part.transpose(2, 0, 1)[None])})[0][0]
         got = np.clip(got, 0.0, 1.0).transpose(1, 2, 0)
         if scale == 2:
             got = got.reshape(got.shape[0] // 2, 2, got.shape[1] // 2, 2, 3).mean(axis=(1, 3))
@@ -392,12 +508,13 @@ def main():
     import PIL
 
     onnxruntime.set_default_logger_severity(3)
-    say({'ready': True, 'threads': THREADS, 'rss': rss_mb(), 'onnxruntime': onnxruntime.__version__, 'pillow': PIL.__version__})
+    say({'ready': True, 'threads': THREADS, 'rss': rss_mb(), 'onnxruntime': onnxruntime.__version__, 'pillow': PIL.__version__, 'device': DEVICE, 'providers': onnxruntime.get_available_providers()})
     for line in sys.stdin:
         line = line.strip()
         if not line:
             continue
         rid = None
+        op = None
         try:
             req = json.loads(line)
             rid = req.get('id')
@@ -418,17 +535,29 @@ def main():
             else:
                 raise Fail(f'No such job: {op}')
             give_back()
-            say({'id': rid, 'ok': True, **out, 'loaded': sorted(sessions), 'rss': rss_mb(), 'peak': peak_mb()})
+            say({'id': rid, 'ok': True, **out, **ran_on(op), 'rss': rss_mb(), 'peak': peak_mb()})
         except Fail as e:
             give_back()
-            say({'id': rid, 'error': str(e)[:400], 'loaded': sorted(sessions), 'rss': rss_mb()})
+            say({'id': rid, 'error': str(e)[:400], **ran_on(op), 'rss': rss_mb()})
         except MemoryError:
             give_back()
-            say({'id': rid, 'error': 'There was not enough memory for it on this computer.', 'memory': True, 'loaded': sorted(sessions), 'rss': rss_mb()})
+            say({'id': rid, 'error': 'There was not enough memory for it on this computer.', 'memory': True, **ran_on(op), 'rss': rss_mb()})
         except Exception as e:  # noqa: BLE001 - every failure goes back to the server as an answer
             give_back()
             text = f'{type(e).__name__}: {e}'
-            say({'id': rid, 'error': text[:400], 'memory': 'allocat' in text.lower() or 'bad_alloc' in text, 'loaded': sorted(sessions), 'rss': rss_mb()})
+            say({'id': rid, 'error': text[:400], 'memory': 'allocat' in text.lower() or 'bad_alloc' in text, **ran_on(op), 'rss': rss_mb()})
+
+
+def ran_on(op):
+    """What an answer says of where the models run: the models in memory and where each is, where this job's model
+    ran, and why the graphics card failed it, when it did."""
+    out = {'loaded': sorted(sessions), 'devices': {k: where.get(k, 'cpu') for k in sessions}}
+    if op in ('cutout', 'erase', 'upscale'):
+        if op in where:
+            out['device'] = where[op]
+        if op in moved:
+            out['fell_back'] = moved.pop(op)
+    return out
 
 
 if __name__ == '__main__':

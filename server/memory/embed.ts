@@ -1,12 +1,14 @@
 // Search by meaning: a Python worker (embed_worker.py) runs the embedding model, lightonai/mDenseOn, on this
-// computer: on a GPU in fp16 when one has room, else on the CPU (Settings can keep it on the CPU, to leave
-// the GPUs to other work). It is on unless Settings → Memory turns it off (or, never set there, HYDOR_EMBED=off),
+// computer: on a GPU in fp16 when there is one (an NVIDIA GPU with room, or a Mac's own, Apple silicon's, through
+// Metal), else on the CPU, and on the CPU too when the GPU fails its first try, saying why (Settings can keep it on
+// the CPU, to leave the GPUs to other work). It is on unless Settings → Memory turns it off (or, never set there, HYDOR_EMBED=off),
 // so memory, the Library and the rest are searched by words and meaning together. It sets up a private
 // environment in the data folder once (PyTorch, its CPU build when there is no NVIDIA GPU, and Transformers): on
 // its own a minute after the app first starts, at once when someone turns it on; the model downloads on first
 // start (1.2 GB).
-// On a GPU the worker stays loaded. On a CPU it starts when needed, only when enough memory is free, and
-// quits after a few idle minutes, so a computer with 8 GB is never short. Until it answers, memory is
+// On an NVIDIA GPU the worker stays loaded. On a CPU, and on a Mac's GPU (which shares the computer's memory), it
+// starts when needed, only when enough memory is free, and quits after a few idle minutes, so a computer with 8 GB
+// is never short. Until it answers, memory is
 // searched by words alone, and notes get their vectors in the background once it does.
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
@@ -49,6 +51,8 @@ const meaningChosen = (db: DB): boolean | null => {
 export const meaningOn = (db: DB) => meaningChosen(db) ?? process.env.HYDOR_EMBED !== 'off';
 export const meaningDevice = (db: DB): MeaningDevice => (kvGet(db, 'memory.meaning.device') === 'cpu' ? 'cpu' : 'auto');
 const hasNvidia = () => fs.existsSync('/proc/driver/nvidia/version');
+/** A Mac with Apple silicon, whose own GPU the model runs on. */
+const appleSilicon = () => process.platform === 'darwin' && process.arch === 'arm64';
 const envReady = () => (process.env.HYDOR_EMBED_PYTHON ? fs.existsSync(python()) : fs.existsSync(python()) && readText(path.join(venv(), '.packages')) === PACKAGES);
 
 function readText(f: string): string | null {
@@ -98,6 +102,8 @@ interface Worker {
   device?: string;
   name?: string;
   rss?: number;
+  /** Why it runs on the CPU though a GPU was there: the GPU failed its first try. */
+  fallback?: string;
   pending: Map<number, Pending>;
   seq: number;
   idle?: NodeJS.Timeout;
@@ -178,7 +184,7 @@ function startWorker(db: DB): Promise<Worker | null> {
       }
       if (m.ready) {
         clearTimeout(giveUp);
-        Object.assign(w, { ready: true, device: m.device, name: m.name, rss: m.rss });
+        Object.assign(w, { ready: true, device: m.device, name: m.name, rss: m.rss, fallback: typeof m.fallback === 'string' ? m.fallback : undefined });
         lastDevice = m.name;
         status = 'ready';
         detail = undefined;
@@ -430,10 +436,11 @@ function setup(db: DB): Promise<void> {
       if (disk < (gpu ? DISK_GPU_GB : DISK_CPU_GB)) throw new Error(`Not enough disk space: ${disk.toFixed(1)} GB free, setting up needs about ${gpu ? DISK_GPU_GB : DISK_CPU_GB} GB.`);
       const uv = which('uv', [path.join(os.homedir(), '.local/bin/uv'), path.join(os.homedir(), '.cargo/bin/uv')]);
       if (uv) {
-        // (On a Mac, a Python of uv's own: Apple's stand-in asks to install its developer tools.)
+        // (On a Mac, a Python of uv's own: Apple's stand-in asks to install its developer tools. PyTorch's CPU index
+        // has the very same Mac builds as PyPI, which run on the Mac's GPU through Metal.)
         const own = process.platform === 'darwin' ? ['--python-preference', 'only-managed'] : [];
         if (!fs.existsSync(python())) await run(uv, ['venv', '--quiet', ...own, '--python', '>=3.10', venv()], 'Making a private Python environment');
-        await run(uv, ['pip', 'install', '--quiet', '--python', python(), `--torch-backend=${gpu ? 'auto' : 'cpu'}`, 'torch', 'transformers>=5.6,<6'], `Installing PyTorch${gpu ? '' : ' (CPU build)'} and Transformers: a few minutes`);
+        await run(uv, ['pip', 'install', '--quiet', '--python', python(), `--torch-backend=${gpu ? 'auto' : 'cpu'}`, 'torch', 'transformers>=5.6,<6'], `Installing PyTorch${gpu || process.platform === 'darwin' ? '' : ' (CPU build)'} and Transformers: a few minutes`);
       } else {
         // Windows: python.exe from python.org, else its py launcher.
         const sys = systemPython();
@@ -442,7 +449,7 @@ function setup(db: DB): Promise<void> {
         if (!sys) throw new Error('Python 3 is not installed on this computer, and search by meaning needs it (Debian/Ubuntu: sudo apt install python3 python3-venv).');
         if (!fs.existsSync(python())) await run(sys, ['-c', 'import sys, venv; sys.exit(0 if sys.version_info >= (3, 10) else 1)'], 'Checking Python (3.10 or newer)');
         if (!fs.existsSync(python())) await run(sys, ['-m', 'venv', venv()], 'Making a private Python environment');
-        await run(python(), ['-m', 'pip', 'install', '--quiet', 'torch', ...(gpu ? [] : ['--index-url', 'https://download.pytorch.org/whl/cpu'])], `Installing PyTorch${gpu ? '' : ' (CPU build)'}: a few minutes`);
+        await run(python(), ['-m', 'pip', 'install', '--quiet', 'torch', ...(gpu ? [] : ['--index-url', 'https://download.pytorch.org/whl/cpu'])], `Installing PyTorch${gpu || process.platform === 'darwin' ? '' : ' (CPU build)'}: a few minutes`);
         await run(python(), ['-m', 'pip', 'install', '--quiet', 'transformers>=5.6,<6'], 'Installing Transformers');
       }
       fs.writeFileSync(path.join(venv(), '.packages'), PACKAGES);
@@ -518,7 +525,14 @@ export function meaningState(db: DB): MeaningState {
   const on = meaningOn(db);
   const s: MeaningState['status'] = !on ? 'off' : status === 'off' ? (envReady() ? 'ready' : 'setting-up') : status;
   let d = detail;
-  if (on && s === 'ready' && !d) d = worker?.ready ? `Loaded on ${worker.name ?? worker.device}` : meaningDevice(db) === 'cpu' || !hasNvidia() ? 'Starts on the CPU when needed, and stops after a few idle minutes' : 'Loads when needed';
+  if (on && s === 'ready' && !d)
+    d = worker?.ready
+      ? `Loaded on ${worker.name ?? worker.device}${worker.fallback ? ` (the GPU failed its first try: ${worker.fallback})` : ''}`
+      : meaningDevice(db) !== 'cpu' && appleSilicon()
+        ? 'Starts on this Mac’s GPU when needed, and stops after a few idle minutes'
+        : meaningDevice(db) === 'cpu' || !hasNvidia()
+          ? 'Starts on the CPU when needed, and stops after a few idle minutes'
+          : 'Loads when needed';
   return { on, status: s, detail: d, model: MODEL, where: meaningDevice(db), device: worker?.name ?? lastDevice, ...counted.v };
 }
 
