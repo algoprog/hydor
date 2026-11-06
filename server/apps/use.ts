@@ -4,8 +4,9 @@
 // then it runs. Its card in the conversation (an "app-run" note, AppRunNote in the pages) follows the run and shows
 // its answer as the app shows it. The call waits for the answer; a longer run carries on, and its answer comes to
 // the session as a message when it ends. Which apps: those installed whose page lets agents use them, made for it.
-// There may be very many: agents are told of the few the user runs most, and find the others with find_apps
-// (search.ts: the best twenty for a few words on what the user wants, by words and by meaning).
+// There may be very many: agents are told of the few the user pinned to the top of the Apps page or runs most, and
+// find the others with find_apps (search.ts: the best twenty for a few words on what the user wants, by words and by
+// meaning; pins.ts: the pinned ones first, then those used lately).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -25,6 +26,7 @@ import { byWords, FIND_K, FIND_MAX, findApps } from './search.ts';
 import { words } from '../memory/store.ts';
 import { getApp, getRun, listApps, updateRun, type RunRecord } from './store.ts';
 import { missingSecrets } from './secrets.ts';
+import { pinsOf, theirsFirst } from './pins.ts';
 
 /** One app agents may run: the name they give it by, its run's app ("tpl:<id>" for a ready-made one), and what it is. */
 export interface Usable {
@@ -54,28 +56,31 @@ function findApp(list: Usable[], want: string): Usable | null {
 const typeWord = (f: AppField) => (f.type === 'choice' ? (f.options ?? []).join(' | ') : f.type === 'yesno' ? 'yes/no' : f.type === 'long' ? 'long text' : f.type === 'file' ? 'a file’s path' : f.type);
 const clipLine = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : s);
 
-/** One app, for the tools and the notes: how to name it, what it does, and what its form asks. */
-function appText(u: Usable, asks: boolean): string {
-  const head = `"${u.ref}": ${u.recipe.name}${u.own ? '' : ' (ready-made)'}${u.recipe.description ? ` — ${clipLine(u.recipe.description, 150)}` : ''}`;
+/** One app, for the tools and the notes: how to name it, what it does, and what its form asks; `marks`: what else to say of it (pinned, used lately). */
+function appText(u: Usable, asks: boolean, marks: string[] = []): string {
+  const tags = [...(u.own ? [] : ['ready-made']), ...marks];
+  const head = `"${u.ref}": ${u.recipe.name}${tags.length ? ` (${tags.join(', ')})` : ''}${u.recipe.description ? ` — ${clipLine(u.recipe.description, 150)}` : ''}`;
   const form = asks && u.recipe.fields.length ? ` Asks ${u.recipe.fields.map((f) => `${f.id}${f.required && !f.default ? '' : '?'}: ${typeWord(f)}`).join(', ')}.` : '';
   return `${head}${form && !/[.!?…]$/.test(head) ? '.' : ''}${form}`;
 }
 
 /** One app in a line of a list. */
-const appLine = (u: Usable, asks: boolean) => `- ${appText(u, asks)}`;
+const appLine = (u: Usable, asks: boolean, marks: string[] = []) => `- ${appText(u, asks, marks)}`;
 
 /** Up to this many apps, the start-up note names them all with what each does; past it, the ones run most lately. */
 const NAMED = 10;
 /** Up to this many, the others are named too (by name alone); past it, find_apps finds them. */
 const LISTED = 40;
 
-/** The apps by when they last ran (the user's own first among those never run). */
+/** The apps by when they last ran (the user's own first among those never run), those pinned to the top of the Apps page before all, as they are pinned. */
 function byUse(db: DB, list: Usable[]): Usable[] {
   let last = new Map<string, number>();
   try {
     last = new Map((db.prepare("select app_id as id, max(created_at) as at from app_runs where source not in ('step', 'chat') group by app_id").all() as { id: string; at: number }[]).map((r) => [r.id, r.at]));
   } catch {}
-  return [...list].sort((a, b) => (last.get(b.app) ?? 0) - (last.get(a.app) ?? 0) || Number(b.own) - Number(a.own));
+  const pins = pinsOf(db);
+  const pinned = (u: Usable) => (pins.includes(u.app) ? pins.indexOf(u.app) : pins.length);
+  return [...list].sort((a, b) => pinned(a) - pinned(b) || (last.get(b.app) ?? 0) - (last.get(a.app) ?? 0) || Number(b.own) - Number(a.own));
 }
 
 /** What every session (not an app's own run) is told of the apps it may run, when there are some. */
@@ -86,18 +91,21 @@ export function useNote(db: DB): string | null {
     "The user's apps (the Apps page) do jobs for them: small tools that look things up, work them out and show the answer in a view of their own (a forecast, a trip plan, a comparison, a quiz…). When the user asks for something an app does, run it with use_app instead of doing that work yourself: it asks them for what is missing on the app's own card and shows its answer in the conversation as the app shows it. Prefer their own apps to the ready-made ones that do the same.";
   if (list.length <= NAMED) return [head, ...list.map((u) => appLine(u, false))].join('\n');
   const used = byUse(db, list);
-  const top = used.slice(0, 6).map((u) => appLine(u, false));
+  // Those they pinned to the top of their Apps page come first, and say so.
+  const pins = pinsOf(db);
+  const top = used.slice(0, 6).map((u) => appLine(u, false, pins.includes(u.app) ? ['pinned'] : []));
+  const most = used.slice(0, 6).some((u) => pins.includes(u.app)) ? 'Those they pinned, then those they run most:' : 'Those they run most:';
   // Not too many: the others by name too, so a request one of them does is not missed for want of a search.
   if (list.length <= LISTED)
     return [
-      `${head} Before you look something up, pick, plan or compare for them yourself, see whether one of their ${list.length} apps does it; find_apps gives each one's form. Those they run most:`,
+      `${head} Before you look something up, pick, plan or compare for them yourself, see whether one of their ${list.length} apps does it; find_apps gives each one's form. ${most}`,
       ...top,
       `The others: ${used
         .slice(6)
         .map((u) => `"${u.ref}" (${u.recipe.name})`)
         .join(', ')}.`,
     ].join('\n');
-  return [`${head} There are ${list.length}: when a request might be one of their jobs, call find_apps with a few words on what the user wants to get the best fits (with their forms), then pick one. Those they run most:`, ...top].join('\n');
+  return [`${head} There are ${list.length}: when a request might be one of their jobs, call find_apps with a few words on what the user wants to get the best fits (with their forms), then pick one. ${most}`, ...top].join('\n');
 }
 
 // ---- the app a message asks for -----------------------------------------------------------------------------------
@@ -364,7 +372,10 @@ async function waitAndSay(ctx: RunCtx, id: string, ms: number): Promise<string> 
 
 // ---- the tool -------------------------------------------------------------------------------------------------
 
-/** find_apps: the apps most likely to do what the user asks, best first, with their forms, for use_app. */
+/**
+ * find_apps: the apps most likely to do what the user asks, with their forms, for use_app: the best fits, those the user
+ * pinned to the top of their Apps page first, then those they used lately, then the others, best first.
+ */
 export function findAppsTool(ctx: RunCtx): RunTool | null {
   const { db } = ctx.deps;
   if (!usableApps(db).length) return null;
@@ -372,8 +383,9 @@ export function findAppsTool(ctx: RunCtx): RunTool | null {
     name: 'find_apps',
     annotations: { readOnlyHint: true },
     description: [
-      "Finds the user's apps that may do what they ask (a weather outlook, a recipe from what is in the fridge, a trip plan, a comparison, a quiz…), best first, each with what its form asks, so you can run the best fit with use_app.",
+      "Finds the user's apps that may do what they ask (a weather outlook, a recipe from what is in the fridge, a trip plan, a comparison, a quiz…), each with what its form asks, so you can run the best fit with use_app.",
       `Give query: what the user wants, in a few words with a synonym or two, in English (the ready-made apps' language) and in the user's own words too if they wrote in another language ("weather forecast rain this weekend Lisbon"). It searches by words and, when search by meaning is on, by meaning; you get the best ${FIND_K} (k for more or fewer). If none fits, do the work yourself.`,
+      'Of those, the ones the user pinned to the top of their Apps page come first (as they pinned them), then the ones they used lately (newest first), each marked so, then the others, best first: when a pinned or recent one does the job as well, run that one.',
     ].join(' '),
     inputSchema: {
       type: 'object',
@@ -387,12 +399,16 @@ export function findAppsTool(ctx: RunCtx): RunTool | null {
       const list = usableApps(db);
       const query = String(args.query ?? '').trim();
       if (!query) return { text: 'Give query: what the user wants, in a few words.', isError: true };
-      const { found, matched } = await findApps(db, list, query, Number(args.k) || FIND_K);
+      const want = Math.max(1, Math.min(FIND_MAX, Math.round(Number(args.k)) || FIND_K));
+      const { found, matched } = await findApps(db, list, query, want);
       if (!found.length) return 'The user has no apps agents can run.';
-      const lines = found.map((f) => appLine(f.u, true));
+      // The best fits, those the user pinned first, then those they used lately; nothing matched: all of theirs so.
+      const theirs = theirsFirst(db, matched ? found.map((f) => f.u) : byUse(db, list), (u) => u.app);
+      const shown = theirs.list.slice(0, want);
+      const lines = shown.map((u) => appLine(u, true, theirs.pinned.has(u.app) ? ['pinned'] : theirs.used.has(u.app) ? ['used lately'] : []));
       const head = matched
-        ? `The apps that may do it, best first (${found.length} of ${list.length}; ? marks a question an app can do without). Run the one that fits with use_app; if none does, do the work yourself.`
-        : `No app's words or meaning matched “${query}”. The user's apps, the ones run lately first (${found.length} of ${list.length}): run one with use_app only if it does what they asked; otherwise do the work yourself.`;
+        ? `The apps that may do it (${shown.length} of ${list.length}; ? marks a question an app can do without): those the user pinned first, then those they used lately, then the others, best first. Run the one that fits with use_app; if none does, do the work yourself.`
+        : `No app's words or meaning matched “${query}”. The user's apps, those they pinned first, then the ones run lately (${shown.length} of ${list.length}): run one with use_app only if it does what they asked; otherwise do the work yourself.`;
       return [head, ...lines].join('\n');
     },
   };
