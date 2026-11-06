@@ -1300,11 +1300,18 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
     if (v.loop && !end) f.loop = true;
     if (start > 0) f.addEventListener('loadedmetadata', () => (f.currentTime = start), { once: true });
     if (end) {
-      f.addEventListener('timeupdate', () => {
-        if (f.currentTime < end) return;
-        if (v.loop) f.currentTime = start;
-        else f.pause();
-      });
+      // The player tells where it is a few times a second: the last stretch is timed, to stop on the moment.
+      let timer = 0;
+      const check = () => {
+        win.clearTimeout(timer);
+        if (f.paused) return;
+        const left = (end - f.currentTime) / (f.playbackRate || 1);
+        if (left <= 0.02) {
+          if (v.loop) f.currentTime = start;
+          else f.pause();
+        } else if (left < 0.6) timer = win.setTimeout(check, left * 1000);
+      };
+      f.addEventListener('timeupdate', check);
       f.addEventListener('ended', () => {
         if (!v.loop) return;
         f.currentTime = start;
