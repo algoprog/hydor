@@ -25,7 +25,7 @@ import { XML_HEAD, coreXml, esc, imageSize, relsXml, zipParts, type ZipPart } fr
 import { altNameOf, fontInfo, fontKey, obfuscate, wordLine, type EmbeddedFont } from './word-fonts.ts';
 import { CAPTION, CELL, LIST_TEXT, STEP, TOC_PAD, wordLineOf, type WordLine } from './word-layout.ts';
 import { bookmarked, citationXml, fieldXml, footnoteRefXml, footnotesXml, notesStylesXml, seqName, sourcesPropsXml, sourcesXml, watermarkRun } from './docx-parts.ts';
-import type { CiteStyle, Source } from '../../shared/docs.ts';
+import { styleOf, type CiteStyle, type Doc, type Source } from '../../shared/docs.ts';
 
 export interface DocRun {
   t: string;
@@ -147,6 +147,8 @@ export interface DocLook {
   subtitle?: number;
   /** Headings 1 to 6. */
   heads?: number[];
+  /** A document's paragraph styles' own looks (Format → Paragraph styles). */
+  styles?: Doc['styles'];
   line?: number;
   /** Space after a paragraph. */
   after?: number;
@@ -1645,7 +1647,7 @@ function editorStyleSpace(look: DocLook): Record<string, Space> {
   // A style's lines: the editor's height, at least or exactly as Word's own line for the font compares.
   const lines = (h: number, size: number, font = F) => wordLineOf(h, wordLine(font) * size, false);
   const st = (k: ParaStyle): Space => {
-    const v = STYLES[k];
+    const v = styleOf({ size: S, styles: look.styles }, k);
     const sz = S * v.k;
     return { before: v.before * sz, after: v.after * sz, line: lines(v.lh * sz, sz, k === 'code' ? MONO_DOC : F) };
   };
@@ -1695,10 +1697,26 @@ function editorStylesXml(look: DocLook, cjk: boolean): string {
   const box = editorBoxes(S);
   const space = editorStyleSpace(look);
   const spOf = (id: string) => spacingOf(space[id].before, space[id].after, space[id].line);
-  const st = (k: Exclude<ParaStyle, 'normal' | 'callout'>) => ({ sz: S * STYLES[k].k, spacing: spOf(k === 'title' ? 'Title' : k === 'subtitle' ? 'Subtitle' : k === 'quote' ? 'Quote' : k === 'code' ? 'Code' : `Heading${k.slice(1)}`) });
+  const st = (k: Exclude<ParaStyle, 'normal' | 'callout'>) => ({ sz: S * styleOf({ size: S, styles: look.styles }, k).k, spacing: spOf(k === 'title' ? 'Title' : k === 'subtitle' ? 'Subtitle' : k === 'quote' ? 'Quote' : k === 'code' ? 'Code' : `Heading${k.slice(1)}`) });
+  // A style's own font, colour, weight, slant and alignment, where the document changed them.
+  const own = (k: ParaStyle, base: { color?: string; b?: boolean; i?: boolean }) => {
+    const o = look.styles?.[k];
+    if (!o) return '';
+    const f = o.font && /^[A-Za-z0-9][A-Za-z0-9 -]{0,39}$/.test(o.font) ? o.font : '';
+    if (f) namedFonts.add(f);
+    return [
+      f ? fonts(esc(f)) : '',
+      o.b !== undefined && o.b !== base.b ? (o.b ? '<w:b/><w:bCs/>' : '<w:b w:val="0"/><w:bCs w:val="0"/>') : '',
+      o.i !== undefined && o.i !== base.i ? (o.i ? '<w:i/><w:iCs/>' : '<w:i w:val="0"/><w:iCs w:val="0"/>') : '',
+      o.color ? `<w:color w:val="${o.color.slice(1).toUpperCase()}"/>` : '',
+    ].join('');
+  };
+  const jcOwn = (k: ParaStyle) => (look.styles?.[k]?.align ? `<w:jc w:val="${look.styles[k]!.align === 'justify' ? 'both' : look.styles[k]!.align}"/>` : '');
   const heading = (n: number, k: 'h1' | 'h2' | 'h3' | 'h4') => {
     const { sz, spacing } = st(k);
-    return paraStyle(`Heading${n}`, `heading ${n}`, pPrXml({ keepNext: true, keepLines: true, spacing }) + `<w:outlineLvl w:val="${n - 1}"/>`, `<w:b/><w:bCs/><w:color w:val="${k === 'h4' ? ED.h4 : ED.ink}"/>${size(half(sz))}`, 9);
+    const o = look.styles?.[k];
+    const rPr = o ? `${own(k, { b: true })}${o.b === false ? '' : '<w:b/><w:bCs/>'}${o.color ? '' : `<w:color w:val="${k === 'h4' ? ED.h4 : ED.ink}"/>`}${size(half(sz))}` : `<w:b/><w:bCs/><w:color w:val="${k === 'h4' ? ED.h4 : ED.ink}"/>${size(half(sz))}`;
+    return paraStyle(`Heading${n}`, `heading ${n}`, pPrXml({ keepNext: true, keepLines: true, spacing, jc: jcOwn(k) }) + `<w:outlineLvl w:val="${n - 1}"/>`, rPr.replace('<w:b w:val="0"/><w:bCs w:val="0"/><w:b/><w:bCs/>', '<w:b w:val="0"/><w:bCs w:val="0"/>'), 9);
   };
   const title = st('title');
   const subtitle = st('subtitle');
@@ -1708,17 +1726,17 @@ function editorStylesXml(look: DocLook, cjk: boolean): string {
   const wide = Math.round(-0.01 * title.sz * 20);
   return (
     `${XML_HEAD}<w:styles xmlns:w="${W_NS}" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14">` +
-    `<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${esc(F)}" w:hAnsi="${esc(F)}" w:cs="${esc(F)}"${cjk ? ` w:eastAsia="${EAST_ASIAN}"` : ''}/><w:color w:val="${ED.ink}"/><w:kern w:val="2"/>${size(half(S))}` +
+    `<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${esc(F)}" w:hAnsi="${esc(F)}" w:cs="${esc(F)}"${cjk ? ` w:eastAsia="${EAST_ASIAN}"` : ''}/><w:color w:val="${(look.styles?.normal?.color ?? `#${ED.ink}`).slice(1).toUpperCase()}"/><w:kern w:val="2"/>${size(half(S))}` +
     '<w14:ligatures w14:val="standardContextual"/></w:rPr></w:rPrDefault>' +
     `<w:pPrDefault><w:pPr><w:widowControl/>${spOf('Normal')}</w:pPr></w:pPrDefault></w:docDefaults>` +
-    `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>` +
+    `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/>${jcOwn('normal') ? `<w:pPr>${jcOwn('normal')}</w:pPr>` : ''}${look.styles?.normal?.b || look.styles?.normal?.i ? `<w:rPr>${look.styles.normal.b ? '<w:b/><w:bCs/>' : ''}${look.styles.normal.i ? '<w:i/><w:iCs/>' : ''}</w:rPr>` : ''}</w:style>` +
     `<w:style w:type="character" w:default="1" w:styleId="DefaultParagraphFont"><w:name w:val="Default Paragraph Font"/><w:uiPriority w:val="1"/><w:semiHidden/><w:unhideWhenUsed/></w:style>` +
     `<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:uiPriority w:val="99"/><w:semiHidden/><w:unhideWhenUsed/>` +
     `<w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/>` +
     `<w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style>` +
     `<w:style w:type="numbering" w:default="1" w:styleId="NoList"><w:name w:val="No List"/><w:uiPriority w:val="99"/><w:semiHidden/><w:unhideWhenUsed/></w:style>` +
-    paraStyle('Title', 'Title', pPrXml({ keepNext: true, keepLines: true, spacing: title.spacing }), `<w:spacing w:val="${wide}"/>${size(half(title.sz))}`) +
-    paraStyle('Subtitle', 'Subtitle', pPrXml({ keepNext: true, keepLines: true, spacing: subtitle.spacing }), `<w:color w:val="${ED.muted}"/>${size(half(subtitle.sz))}`, 11) +
+    paraStyle('Title', 'Title', pPrXml({ keepNext: true, keepLines: true, spacing: title.spacing, jc: jcOwn('title') }), `${own('title', {})}<w:spacing w:val="${wide}"/>${size(half(title.sz))}`) +
+    paraStyle('Subtitle', 'Subtitle', pPrXml({ keepNext: true, keepLines: true, spacing: subtitle.spacing, jc: jcOwn('subtitle') }), `${own('subtitle', {})}${look.styles?.subtitle?.color ? '' : `<w:color w:val="${ED.muted}"/>`}${size(half(subtitle.sz))}`, 11) +
     heading(1, 'h1') +
     heading(2, 'h2') +
     heading(3, 'h3') +
@@ -1728,8 +1746,8 @@ function editorStylesXml(look: DocLook, cjk: boolean): string {
     paraStyle(
       'Quote',
       'Quote',
-      pPrXml({ pBdr: border('left', 18, ED.cell, box.quote.space), spacing: quote.spacing, ind: `<w:ind w:left="${tw(box.quote.indent)}" w:right="0"/>` }),
-      `<w:i/><w:iCs/><w:color w:val="${ED.h4}"/>`,
+      pPrXml({ pBdr: border('left', 18, ED.cell, box.quote.space), spacing: quote.spacing, ind: `<w:ind w:left="${tw(box.quote.indent)}" w:right="0"/>`, jc: jcOwn('quote') }),
+      look.styles?.quote ? `${own('quote', { i: true })}${look.styles.quote.i === false ? '' : '<w:i/><w:iCs/>'}${look.styles.quote.color ? '' : `<w:color w:val="${ED.h4}"/>`}${look.styles.quote.size ? size(half(quote.sz)) : ''}` : `<w:i/><w:iCs/><w:color w:val="${ED.h4}"/>`,
       29,
     ) +
     paraStyle(
