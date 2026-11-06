@@ -209,47 +209,53 @@ export function EditorHost({ children }: { children: ReactNode }) {
           ))}
         </div>
       )}
-      {/* The page, hidden while an editor shows (its safe area above taken by the strip on a phone). */}
-      <div className={cx('min-h-0 flex-1', showing && 'hidden')} style={strip ? ({ '--safe-top': '0px' } as React.CSSProperties) : undefined}>
-        {children}
+      {/*
+        The page and the editors, one over the other, each the area's whole size: what does not show is unseen and out of
+        reach (inert), but laid out as it was, so the page keeps its scroll, its sizes and everything open in it. The page's
+        safe area above is the strip's on a phone.
+      */}
+      <div className="relative min-h-0 flex-1">
+        <div className={cx('absolute inset-0', showing && 'invisible')} inert={!!showing} style={strip ? ({ '--safe-top': '0px' } as React.CSSProperties) : undefined}>
+          {children}
+        </div>
+        {tabs.map((t) => {
+          const Editor = EDITORS[t.o.kind];
+          const on = t.id === showing;
+          const lead = mobile ? <PhoneLead t={t} tabs={tabs} label={label} onPage={showPage} onClose={(x) => void close(x)} /> : null;
+          return (
+            <div key={t.id} className={cx('absolute inset-0', !on && 'invisible')} inert={!on}>
+              {Editor ? (
+                <Suspense
+                  fallback={
+                    <div className="flex h-full items-center justify-center text-fg-3">
+                      <Throbber size={28} />
+                    </div>
+                  }
+                >
+                  <Editor
+                    o={t.o}
+                    active={on}
+                    detached={t.detached}
+                    setDirty={(d) => void (t.dirty !== d && setTab(t.id, { dirty: d }))}
+                    done={async (r) => {
+                      await t.o.save(r);
+                      drop(t.id);
+                      if (!t.detached) t.o.from.back?.();
+                    }}
+                    close={() => void close(t)}
+                    lead={lead}
+                  />
+                </Suspense>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-[13.5px] text-fg-3">
+                  {lead}
+                  That editor is not here yet.
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
-      {tabs.map((t) => {
-        const Editor = EDITORS[t.o.kind];
-        const on = t.id === showing;
-        const lead = mobile ? <PhoneLead t={t} tabs={tabs} label={label} onPage={showPage} onClose={(x) => void close(x)} /> : null;
-        return (
-          <div key={t.id} className={cx('min-h-0 flex-1', !on && 'hidden')}>
-            {Editor ? (
-              <Suspense
-                fallback={
-                  <div className="flex h-full items-center justify-center text-fg-3">
-                    <Throbber size={28} />
-                  </div>
-                }
-              >
-                <Editor
-                  o={t.o}
-                  active={on}
-                  detached={t.detached}
-                  setDirty={(d) => void (t.dirty !== d && setTab(t.id, { dirty: d }))}
-                  done={async (r) => {
-                    await t.o.save(r);
-                    drop(t.id);
-                    if (!t.detached) t.o.from.back?.();
-                  }}
-                  close={() => void close(t)}
-                  lead={lead}
-                />
-              </Suspense>
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-[13.5px] text-fg-3">
-                {lead}
-                That editor is not here yet.
-              </div>
-            )}
-          </div>
-        );
-      })}
       {confirmNode}
     </div>
   );

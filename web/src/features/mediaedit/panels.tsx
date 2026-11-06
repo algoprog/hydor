@@ -3,7 +3,7 @@
 // picture, with its strength) and Markup (what to draw with, its colour and size; words' font and what is behind them;
 // how much an area is hidden; an emoji to put down). A picked mark takes the colour and size changed here.
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { ArrowUpRight, Droplets, FlipHorizontal2, FlipVertical2, Grid3x3, Hand, Highlighter, Minus, Pen, RotateCcw, RotateCw, Smile, Square, Circle, Trash2, Type } from 'lucide-react';
+import { ArrowUpRight, Droplets, Grid3x3, Hand, Highlighter, Minus, Pen, RotateCcw, RotateCw, Smile, Square, Circle, Trash2, TrianglesCenterlineDashedHorizontal, TrianglesCenterlineDashedVertical, Type } from 'lucide-react';
 import { ADJUSTMENTS, applyLook, CROP_SHAPES, FILTERS, MARK_FONTS, type Adjust, type AdjustKey, type CropShape, type FilterId, type FilterPick, type FontId, type Mark } from '@shared/mediaedit';
 import { Button, cx } from '../../components/ui';
 import { canvasOf } from './render';
@@ -131,8 +131,9 @@ export function CropPanel({
         <div className="grid grid-cols-4 gap-1.5">
           <Choice onClick={() => onTurn(-1)} icon={<RotateCcw size={16} />} label="Left" title="Rotate left" />
           <Choice onClick={() => onTurn(1)} icon={<RotateCw size={16} />} label="Right" title="Rotate right" />
-          <Choice onClick={() => onFlip('h')} icon={<FlipHorizontal2 size={16} />} label="Mirror" title="Flip left to right" />
-          <Choice onClick={() => onFlip('v')} icon={<FlipVertical2 size={16} />} label="Upside down" title="Flip upside down" />
+          {/* By what they draw: lucide's FlipHorizontal2 and FlipVertical2 are drawn the other way round. */}
+          <Choice onClick={() => onFlip('h')} icon={<TrianglesCenterlineDashedVertical size={16} />} label="Mirror" title="Flip left to right" />
+          <Choice onClick={() => onFlip('v')} icon={<TrianglesCenterlineDashedHorizontal size={16} />} label="Upside down" title="Flip upside down" />
         </div>
       </Group>
       <Slider label="Straighten" value={straighten} min={-45} max={45} step={0.5} unit="°" onChange={onStraighten} />
