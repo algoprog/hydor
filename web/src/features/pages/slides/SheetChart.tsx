@@ -177,7 +177,14 @@ export function SheetChartDialog({ open, deck, onClose, onInsert }: { open: bool
               </Field>
             )}
             <Field label="Cells">
-              <input value={range} onChange={(e) => setRange(e.target.value)} placeholder="A1:D7" aria-label="The cells, as A1:D7" translate="no" className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-bg-1 px-2 font-mono text-[12.5px] outline-none focus:border-accent/60" />
+              <input
+                value={range}
+                onChange={(e) => setRange(e.target.value)}
+                placeholder="A1:D7"
+                aria-label="The cells, as A1:D7"
+                translate="no"
+                className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-bg-1 px-2 font-mono text-[12.5px] outline-none focus:border-accent/60"
+              />
             </Field>
             <Field label="Series">
               <Choice
