@@ -8,18 +8,23 @@
 // Save (Ctrl+S), as a page's do; Undo and Redo go back and forth. While an agent writes a new version (live.ts), it
 // shows as it comes, read-only: the slide being written on view, a box round the part its words arrive in. A deck is
 // in the web format (custom code, web pages, quizzes, 3D, the web's effects) unless File → PowerPoint compatible is
-// ticked; its live parts run in frames of their own, in the slideshow, and here once Run is pressed.
+// ticked; its live parts run in frames of their own, in the slideshow, and here once Run is pressed. The AI tools
+// (images/studio) make pictures, drawings, plots and videos for it, change a picture picked, make a chart a plot and
+// a slide's background: each result lands as an uploaded one does, or takes the place of what it changed, one step to undo.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  ChartScatter,
   ChevronDown,
   ChevronUp,
   Clipboard,
   Copy,
   CornerDownRight,
   Crop,
+  Eraser,
   Grid2x2,
   Group as GroupIcon,
   Image as ImageIcon,
+  ImageMinus,
   LayoutTemplate,
   Link2,
   MessageSquare,
@@ -28,6 +33,7 @@ import {
   MonitorPlay,
   MoveRight,
   Paintbrush,
+  PenTool,
   PieChart,
   Play,
   Plus,
@@ -43,8 +49,10 @@ import {
   Type,
   Undo2,
   Ungroup,
+  WandSparkles,
 } from 'lucide-react';
-import { isWebDeck, newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type Deck, type El, type ImageEl, type LayoutId, type TextEl } from '@shared/slides';
+import { hexColor, isWebDeck, newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type ChartEl, type Deck, type El, type ImageEl, type LayoutId, type TextEl } from '@shared/slides';
+import { csvOf, editPicture, makeDrawing, makePicture, makePlot, makeVideo } from '../../images/studio';
 import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
 import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, useConfirm } from '../../../components/ui';
@@ -137,6 +145,15 @@ function scopesFor(index: number, title: string, parts: string[]): AskScope[] {
   if (parts.length) out.push({ id: 'part', label: `${tr('What’s picked')}: ${parts.join(', ')}`, lead: `On slide ${n}, the ${parts.map((x) => x.replace(/^(\w)/, (c) => c.toLowerCase())).join(' and the ')}: ` });
   return out;
 }
+
+/** A deck's colours as the AI tools take them (#hex): its accent, then its charts' colours. */
+const colorsOf = (d: Deck) => [...new Set([d.theme.accent, ...d.theme.colors].map((c) => `#${hexColor(c, d.theme).hex}`))].slice(0, 6);
+
+/** The look a plot is drawn in: the deck's colours and font. */
+const plotTheme = (d: Deck) => ({ colors: colorsOf(d), fg: `#${hexColor(d.theme.fg, d.theme).hex}`, bg: `#${hexColor(d.theme.bg, d.theme).hex}`, font: d.theme.font });
+
+/** A chart's numbers as CSV: its labels down the side, a column for each series. */
+const chartCsv = (c: ChartEl) => csvOf([['', ...c.series.map((s) => s.name)], ...c.labels.map((l, i) => [l, ...c.series.map((s) => String(s.values[i] ?? ''))])]);
 
 const savedGrid = (): GridOpts => {
   try {
@@ -628,6 +645,86 @@ export function SlidesEditor({
     if (!f) return;
     if (!isVideoFile(f)) return toast('That is not a video a slide takes: an MP4, MOV or WebM file');
     await putVideoFile(f);
+  };
+
+  // ---- the AI tools -------------------------------------------------------------------------------------------
+  // A tool's dialog may stay open a while (a video takes minutes): what it made lands where the editor is then.
+  const putRef = useRef(put);
+  putRef.current = put;
+  /** The slide a part is on now (it may have moved since the tool was opened), or -1. */
+  const slideOf = (d: Deck, id: string) => d.slides.findIndex((s) => !!findEl(s.els, id));
+  /** A picture made with AI, or a drawing (SVG): on the slide as an uploaded picture lands, its words its description. */
+  const aiPicture = async (tool: 'picture' | 'drawing') => {
+    const d = live.current;
+    if (!d) return;
+    const p = tool === 'picture' ? await makePicture({ kind: 'picture', theme: { colors: colorsOf(d) } }) : await makeDrawing({ kind: 'illustration', colors: colorsOf(d) });
+    if (!p || !live.current) return;
+    const img = image(live.current, p.src, p.w, p.h);
+    putRef.current([p.prompt ? { ...img, alt: p.prompt.replace(/\s+/g, ' ').slice(0, 300) } : img]);
+  };
+  /**
+   * A plot: of the chart picked (its series the data; the plot takes its place), or of data given in the dialog. In a
+   * web deck, the version that moves goes in as custom code, its picture shown where it cannot run.
+   */
+  const aiPlot = async (chartId?: string) => {
+    const d = live.current;
+    if (!d) return;
+    const at = chartId ? slideOf(d, chartId) : -1;
+    const found = at >= 0 && chartId ? findEl(d.slides[at].els, chartId) : undefined;
+    const chart = found?.type === 'chart' ? found : undefined;
+    const web = isWebDeck(d);
+    const box = chart ? { w: Math.round(chart.w), h: Math.round(chart.h) } : { w: 800, h: 480 };
+    const p = await makePlot({ data: chart ? chartCsv(chart) : undefined, dataFrom: chart ? 'From the chart' : undefined, theme: plotTheme(d), ...box, interactive: web || undefined });
+    const now = live.current;
+    if (!p || !now) return;
+    const img = image(now, p.src, p.w, p.h);
+    const made = (place: { x: number; y: number; w: number; h: number }, id = newId()): El =>
+      web && p.html ? { id, type: 'html', html: p.html, poster: p.src, name: 'Plot', ...place } : { ...img, id, ...place, fit: 'contain', ...(p.prompt ? { alt: p.prompt.replace(/\s+/g, ' ').slice(0, 300) } : {}) };
+    if (chart) {
+      // In the chart's place, by its id: its animations and comments stay with it.
+      return change((d2) => {
+        const i = slideOf(d2, chart.id);
+        return i < 0 ? d2 : setEls(d2, i, [chart.id], (e) => made({ x: e.x, y: e.y, w: e.w, h: e.h }, e.id));
+      });
+    }
+    putRef.current([made({ x: img.x, y: img.y, w: img.w, h: img.h })]);
+  };
+  /** A video made with AI (from the picture picked, if one is), on the slide on view when it is done and inserted. */
+  const aiVideo = async () => {
+    const d = live.current;
+    if (!d) return;
+    const pic = picked.length === 1 && picked[0].type === 'image' && picked[0].src.startsWith('naget-asset:') ? picked[0].src : undefined;
+    const v = await makeVideo({ aspect: d.ratio, first: pic });
+    if (!v || !live.current) return;
+    const k = v.w && v.h ? Math.min(800 / v.w, 450 / v.h) : 1;
+    const w = v.w && v.h ? Math.max(40, Math.round(v.w * k)) : 800;
+    const h = v.w && v.h ? Math.max(40, Math.round(v.h * k)) : 450;
+    putRef.current([{ id: newId(), type: 'video', src: v.src, ...(v.poster ? { poster: v.poster } : {}), ...centred(w, h) }]);
+  };
+  /** The picture changed with AI, its background taken out, or part of it erased: in its place, one step to undo. */
+  const aiEdit = async (id: string, mode: 'change' | 'cutout' | 'erase') => {
+    const d = live.current;
+    const at = d ? slideOf(d, id) : -1;
+    const el = d && at >= 0 ? findEl(d.slides[at].els, id) : undefined;
+    if (el?.type !== 'image' || !el.src) return;
+    const p = await editPicture({ src: el.src, mode });
+    if (!p) return;
+    change((d2) => {
+      const i = slideOf(d2, id);
+      return i < 0 ? d2 : setEls(d2, i, [id], (e) => ({ ...e, src: p.src }) as El);
+    });
+  };
+  /** A background made with AI for the slide on view, in its shape. */
+  const aiBackground = async () => {
+    const d = live.current;
+    if (!d) return;
+    const sid = d.slides[index]?.id;
+    const p = await makePicture({ kind: 'background', aspect: d.ratio, theme: { colors: colorsOf(d) } });
+    if (!p || !sid) return;
+    change((d2) => {
+      const i = d2.slides.findIndex((s) => s.id === sid);
+      return i < 0 ? d2 : setSlide(d2, i, (s) => ({ ...s, bg: { ...(s.bg ?? {}), image: p.src } }));
+    });
   };
 
   // ---- the web format ------------------------------------------------------------------------------------------
@@ -1142,6 +1239,12 @@ export function SlidesEditor({
     equation: putEquation,
     code: () => put([codePart(deck)]),
     rich: (kind) => void putRich(kind),
+    aiPicture: readOnly ? undefined : () => void aiPicture('picture'),
+    aiDrawing: readOnly ? undefined : () => void aiPicture('drawing'),
+    aiPlot: readOnly ? undefined : () => void aiPlot(),
+    aiVideo: readOnly ? undefined : () => void aiVideo(),
+    aiEdit: readOnly ? undefined : (mode) => one && void aiEdit(one.id, mode),
+    aiPlotChart: readOnly ? undefined : () => one && void aiPlot(one.id),
     running: !!one && running === one.id,
     run: () => one && setRunning(running === one.id ? null : one.id),
     video: () => setVideoAsk(true),
@@ -1374,6 +1477,9 @@ export function SlidesEditor({
       onRun={setRunning}
       pickVideo={pickBgVideo}
       pickModel={pickModel}
+      onAiEdit={(id, mode) => void aiEdit(id, mode)}
+      onPlotChart={(id) => void aiPlot(id)}
+      onAiBackground={() => void aiBackground()}
       picking={pickFor}
       onPickTrigger={setPickFor}
     />
@@ -1591,6 +1697,13 @@ export function SlidesEditor({
         <MenuItem icon={<Link2 size={14} />} onClick={() => (setMenu(null), setUrlAsk({}))}>
           From a web address
         </MenuItem>
+        <MenuSep />
+        <MenuItem icon={<WandSparkles size={14} />} onClick={() => (setMenu(null), void aiPicture('picture'))}>
+          Make with AI
+        </MenuItem>
+        <MenuItem icon={<PenTool size={14} />} onClick={() => (setMenu(null), void aiPicture('drawing'))}>
+          Drawing (SVG)
+        </MenuItem>
       </Popover>
       <Popover anchor={anchors.present} open={menu === 'present'} onClose={() => setMenu(null)} align="end" width={250}>
         <MenuItem icon={<Play size={14} />} onClick={() => (setMenu(null), setPresent({ from: 0, presenter: false }))}>
@@ -1636,8 +1749,24 @@ export function SlidesEditor({
               </MenuItem>
             )}
             {one?.type === 'image' && !!(one as ImageEl).src && (
-              <MenuItem icon={<Crop size={14} />} onClick={() => (setMenu(null), crop(one.id))}>
-                Crop the picture
+              <>
+                <MenuItem icon={<Crop size={14} />} onClick={() => (setMenu(null), crop(one.id))}>
+                  Crop the picture
+                </MenuItem>
+                <MenuItem icon={<WandSparkles size={14} />} onClick={() => (setMenu(null), void aiEdit(one.id, 'change'))}>
+                  Change with AI
+                </MenuItem>
+                <MenuItem icon={<ImageMinus size={14} />} onClick={() => (setMenu(null), void aiEdit(one.id, 'cutout'))}>
+                  Remove the background
+                </MenuItem>
+                <MenuItem icon={<Eraser size={14} />} onClick={() => (setMenu(null), void aiEdit(one.id, 'erase'))}>
+                  Erase part of it
+                </MenuItem>
+              </>
+            )}
+            {one?.type === 'chart' && (
+              <MenuItem icon={<ChartScatter size={14} />} onClick={() => (setMenu(null), void aiPlot(one.id))}>
+                Make a plot of this
               </MenuItem>
             )}
             <MenuItem icon={<Paintbrush size={14} />} disabled={!one} onClick={() => (setMenu(null), startPainter(false))}>

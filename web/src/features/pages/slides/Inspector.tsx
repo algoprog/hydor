@@ -20,10 +20,13 @@ import {
   ArrowDownToLine,
   ArrowUp,
   ArrowUpToLine,
+  ChartScatter,
   Crop as CropIcon,
+  Eraser,
   FlipHorizontal2,
   FlipVertical2,
   Group as GroupIcon,
+  ImageMinus,
   ImagePlus,
   Lock,
   MousePointerClick,
@@ -35,6 +38,7 @@ import {
   Ungroup as UngroupIcon,
   Unlock,
   Video as VideoIcon,
+  WandSparkles,
   X,
 } from 'lucide-react';
 import {
@@ -77,7 +81,7 @@ import {
   type TransitionFx,
   type VideoEl,
 } from '@shared/slides';
-import { Button, cx, Switch } from '../../../components/ui';
+import { Button, cx, MenuItem, Popover, Switch } from '../../../components/ui';
 import { useTexHtml } from '../common/katex';
 import { Choice, Select } from '../studio/fields';
 import { ColorButton, Field, NumInput, Section, Swatches, Tool } from './controls';
@@ -133,6 +137,10 @@ interface Props {
   /** The part that starts an animation is picked on the slide: for that animation (null: none is being picked). */
   picking?: string | null;
   onPickTrigger?: (anim: string | null) => void;
+  /** The AI tools: a picture changed (with AI, its background out, part of it erased), a chart made a plot, the slide's background made. */
+  onAiEdit?: (id: string, mode: 'change' | 'cutout' | 'erase') => void;
+  onPlotChart?: (id: string) => void;
+  onAiBackground?: () => void;
 }
 
 const SHAPE_NAMES: Record<ShapeKind, string> = {
@@ -507,13 +515,36 @@ function PictureColours({ el, set }: { el: ImageEl; set: (patch: Partial<El>, ke
   );
 }
 
-function PictureLook({ el, theme, set, onReplace, cropping, onCrop }: { el: ImageEl; theme: Theme; set: (patch: Partial<El>, key?: string) => void; onReplace: () => void; cropping?: boolean; onCrop?: (id: string | null, keep?: boolean) => void }) {
+function PictureLook({
+  el,
+  theme,
+  set,
+  onReplace,
+  cropping,
+  onCrop,
+  onAi,
+}: {
+  el: ImageEl;
+  theme: Theme;
+  set: (patch: Partial<El>, key?: string) => void;
+  onReplace: () => void;
+  cropping?: boolean;
+  onCrop?: (id: string | null, keep?: boolean) => void;
+  onAi?: (id: string, mode: 'change' | 'cutout' | 'erase') => void;
+}) {
+  const aiRef = useRef<HTMLButtonElement>(null);
+  const [ai, setAi] = useState(false);
   return (
     <Section title="Picture">
       <div className="flex flex-wrap gap-1.5">
         <Button size="sm" variant="secondary" icon={<ImagePlus size={14} />} onClick={onReplace}>
           Another picture
         </Button>
+        {onAi && el.src && !cropping && (
+          <Button ref={aiRef} size="sm" variant="secondary" icon={<WandSparkles size={14} />} onClick={() => setAi((o) => !o)}>
+            Change it with AI
+          </Button>
+        )}
         {onCrop && el.src && !cropping && (
           <Button size="sm" variant="secondary" icon={<CropIcon size={14} />} onClick={() => onCrop(el.id)}>
             Crop
@@ -525,6 +556,28 @@ function PictureLook({ el, theme, set, onReplace, cropping, onCrop }: { el: Imag
           </Button>
         )}
       </div>
+      {onAi && (
+        <Popover anchor={aiRef} open={ai} onClose={() => setAi(false)} width={240} title="Change it with AI">
+          {(
+            [
+              ['change', 'Change with AI', <WandSparkles key="c" size={14} />],
+              ['cutout', 'Remove the background', <ImageMinus key="b" size={14} />],
+              ['erase', 'Erase part of it', <Eraser key="e" size={14} />],
+            ] as const
+          ).map(([mode, label, icon]) => (
+            <MenuItem
+              key={mode}
+              icon={icon}
+              onClick={() => {
+                setAi(false);
+                onAi(el.id, mode);
+              }}
+            >
+              {label}
+            </MenuItem>
+          ))}
+        </Popover>
+      )}
       {cropping && onCrop && (
         <div className="space-y-2 rounded-lg bg-bg-1 p-2 text-[12px] text-fg-3">
           <p>Drag the frame’s edges and corners, or the picture under it.</p>
@@ -706,7 +759,7 @@ function TableLook({ el, theme, set, cellSel, onCellSel }: { el: TableEl; theme:
   );
 }
 
-function ChartLook({ el, theme, set }: { el: ChartEl; theme: Theme; set: (patch: Partial<El>, key?: string) => void }) {
+function ChartLook({ el, theme, set, onPlot }: { el: ChartEl; theme: Theme; set: (patch: Partial<El>, key?: string) => void; onPlot?: (id: string) => void }) {
   const KINDS: Record<string, string> = { column: 'Column chart', bar: 'Bar chart', line: 'Line chart', area: 'Area chart', pie: 'Pie chart', doughnut: 'Doughnut chart' };
   const pie = el.kind === 'pie' || el.kind === 'doughnut';
   const series = pie ? el.series.slice(0, 1) : el.series;
@@ -817,6 +870,14 @@ function ChartLook({ el, theme, set }: { el: ChartEl; theme: Theme; set: (patch:
             </Button>
           )}
         </div>
+        {onPlot && (
+          <>
+            <Button size="sm" variant="secondary" icon={<ChartScatter size={14} />} onClick={() => onPlot(el.id)}>
+              Make a plot of this
+            </Button>
+            <p className="text-[11.5px] leading-snug text-fg-3">Any kind of plot of these numbers, drawn by code an agent writes; it takes the chart’s place.</p>
+          </>
+        )}
       </Section>
     </>
   );
@@ -979,7 +1040,7 @@ function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: s
   );
 }
 
-function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cropping, onCrop, onIcon, onGroup, onUngroup, cellSel, onCellSel, texFocus, running, onRun, pickPicture, pickModel }: Props) {
+function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cropping, onCrop, onIcon, onGroup, onUngroup, cellSel, onCellSel, texFocus, running, onRun, pickPicture, pickModel, onAiEdit, onPlotChart }: Props) {
   const slide = deck.slides[index];
   const web = isWebDeck(deck);
   const els = pickedOf(slide, sel);
@@ -1060,11 +1121,11 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cro
       )}
       {(el.type === 'text' || el.type === 'shape') && <TextLook el={el} theme={deck.theme} set={set} web={web} />}
       {(el.type === 'text' || el.type === 'shape') && <BoxLook el={el} theme={deck.theme} set={set} web={web} />}
-      {el.type === 'image' && <PictureLook el={el} theme={deck.theme} set={set} onReplace={() => onReplaceImage(el.id)} cropping={cropping === el.id} onCrop={onCrop} />}
+      {el.type === 'image' && <PictureLook el={el} theme={deck.theme} set={set} onReplace={() => onReplaceImage(el.id)} cropping={cropping === el.id} onCrop={onCrop} onAi={onAiEdit} />}
       {el.type === 'image' && el.src && <PictureColours el={el} set={set} />}
       {el.type === 'line' && <LineLook el={el} theme={deck.theme} set={set} />}
       {el.type === 'table' && <TableLook el={el} theme={deck.theme} set={set} cellSel={cellSel} onCellSel={onCellSel} />}
-      {el.type === 'chart' && <ChartLook el={el} theme={deck.theme} set={set} />}
+      {el.type === 'chart' && <ChartLook el={el} theme={deck.theme} set={set} onPlot={onPlotChart} />}
       {el.type === 'icon' && <IconLook el={el} theme={deck.theme} set={set} onIcon={onIcon} />}
       {el.type === 'math' && <MathLook el={el} theme={deck.theme} set={set} focus={texFocus} />}
       {el.type === 'video' && <VideoLook key={el.id} el={el} set={set} />}
@@ -1324,7 +1385,7 @@ function BgFxThumb({ deck, fx, fonts }: { deck: Deck; fx: BgFx | undefined; font
   return <SlideThumb deck={d} index={0} slide={d.slides[0]} theme={deck.theme} width={60} fonts={fonts} />;
 }
 
-function SlideTab({ deck, index, change, pickPicture, onFooter, pickVideo, fonts }: Props) {
+function SlideTab({ deck, index, change, pickPicture, onFooter, pickVideo, fonts, onAiBackground }: Props) {
   const slide = deck.slides[index];
   const t = deck.theme;
   const web = isWebDeck(deck);
@@ -1380,6 +1441,11 @@ function SlideTab({ deck, index, change, pickPicture, onFooter, pickVideo, fonts
           >
             {bg.image ? 'Another picture' : 'A picture'}
           </Button>
+          {onAiBackground && (
+            <Button size="sm" variant="secondary" icon={<WandSparkles size={14} />} onClick={onAiBackground}>
+              Make with AI
+            </Button>
+          )}
           {bg.image && (
             <Button size="sm" variant="ghost" onClick={() => setBg({ image: undefined, dim: undefined })}>
               No picture

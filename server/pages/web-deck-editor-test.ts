@@ -170,6 +170,18 @@ const partOf = (d: Deck, id: string) => everyEl(d.slides[0].els).find((e) => e.i
   ok(!find(args({ picked: [quiz] }), 'Format', 'Run it here') && find(args({ picked: [html] }), 'Format', 'Run it here')?.label === 'Run it here', 'Format → Run it here for a live part alone');
   ok(!!find(args({ picked: [html], running: true }), 'Format', 'Stop it'), 'and Stop it while it runs');
   ok(find(args({ readOnly: true }), 'Insert', 'Interactive')?.disabled === true && find(args({ readOnly: true }), 'File', 'PowerPoint compatible')?.disabled === true, 'nothing to change in a version looked at');
+  // The AI tools, where the editor has them.
+  const pic = menu(web, 'Insert').find((x) => x.label === 'Picture');
+  ok(items(pic?.items ?? []).map((x) => x.label).join() === 'From this device,From a web address,Make with AI,Drawing (SVG)', 'Insert → Picture: from this device, a web address, made with AI, a drawing (SVG)');
+  ok(!!find(web, 'Insert', 'Plot'), 'Insert → Plot');
+  ok(items(find(web, 'Insert', 'Video')?.items ?? []).some((x) => x.label === 'Make with AI'), 'Insert → Video → Make with AI');
+  const photo = { id: 'im', type: 'image', src: 'naget-asset:0123456789abcdef', x: 0, y: 0, w: 10, h: 10 } as El;
+  ok(['Change with AI', 'Remove the background', 'Erase part of it'].every((l) => !!find(args({ picked: [photo] }), 'Format', l)), 'Format: a picture picked is changed with AI, its background removed, part of it erased');
+  ok(!find(args({ picked: [{ ...photo, src: '' } as El] }), 'Format', 'Change with AI'), 'not an empty picture frame');
+  const chart = { id: 'ch', type: 'chart', kind: 'column', labels: ['a'], series: [{ name: 's', values: [1] }], size: 18, x: 0, y: 0, w: 10, h: 10 } as El;
+  ok(!!find(args({ picked: [chart] }), 'Format', 'Make a plot of this'), 'Format: a chart picked is made a plot');
+  const bare = args({ aiPicture: undefined, aiDrawing: undefined, aiPlot: undefined, aiVideo: undefined, aiEdit: undefined, aiPlotChart: undefined });
+  ok(!find(bare, 'Insert', 'Plot') && items(bare && (menu(bare, 'Insert').find((x) => x.label === 'Picture')?.items ?? [])).length === 2, 'without the tools (a version looked at), none of them');
   // Every menu fits a small laptop's window (811×667) without scrolling: its rows (34 px), lines (9 px) and its edges under the menu bar.
   for (const m of slidesMenus(web)) {
     const list = m.items.filter(Boolean);
