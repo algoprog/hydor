@@ -8,6 +8,7 @@ import type { ToolView, WebFeature } from '../registry';
 import { CanvasSide, closeCanvas, PageOver, useCanvasOpen } from './Canvas';
 import { exportPageStep, PublishCard, ReadPageRow, readPageStep, SavedPageCard, savedPageStep } from './cards';
 import { latexCheckStep } from './checkStep';
+import { howToMakeStep } from './types/step';
 import { PageEditNoteView } from './notes';
 import { PagesRoute } from './PagesPage';
 import { savedPageOf } from './state';
@@ -35,6 +36,7 @@ export const pagesFeature: WebFeature = {
     get_page: { place: 'work', Row: ReadPageRow, step: readPageStep },
     export_page: { place: 'work', Row: ReadPageRow, step: exportPageStep },
     latex_check: { place: 'work', Row: ReadPageRow, step: latexCheckStep },
+    how_to_make: { place: 'work', Row: ReadPageRow, step: howToMakeStep },
   },
   noteViews: { 'page-edit': PageEditNoteView },
   routes: [{ match: isPages, Page: PagesRoute }],
