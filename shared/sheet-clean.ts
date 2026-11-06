@@ -111,7 +111,7 @@ export function findIssues(sh: Sheet, calc: Calc, si: number, x: Rect, header: b
     if (rest.length >= 4) {
       const counts = new Map<string, number>();
       for (const [, v] of rest) counts.set(v.trim(), (counts.get(v.trim()) ?? 0) + 1);
-      if (counts.size <= Math.max(3, rest.length * 0.6) && counts.size <= 60) {
+      if (counts.size < rest.length && counts.size <= 60) {
         const variants = [...counts.entries()].sort((a, b) => b[1] - a[1]);
         const to = new Map<string, string>();
         for (const [v, k] of variants) {

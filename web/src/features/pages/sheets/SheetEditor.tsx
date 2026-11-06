@@ -1829,7 +1829,10 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     if (b.r2 <= b.r1) return void toast(tr('Pick a cell in a table with a header row and rows under it.'));
     const cols = Array.from({ length: b.c2 - b.c1 + 1 }, (_, j) => b.c1 + j);
     const num = cols.find((c) => typeof calc.value(sheetIx, b.r1 + 1, c) === 'number');
-    const word = cols.find((c) => typeof calc.value(sheetIx, b.r1 + 1, c) === 'string') ?? b.c1;
+    // Rows by the column of words whose values repeat most (fewest different ones), as a pivot table is for.
+    const distinct = (c: number) => new Set(Array.from({ length: b.r2 - b.r1 }, (_, i) => String(calc.value(sheetIx, b.r1 + 1 + i, c) ?? '').trim().toLowerCase())).size;
+    const words = cols.filter((c) => typeof calc.value(sheetIx, b.r1 + 1, c) === 'string');
+    const word = words.sort((p, q) => distinct(p) - distinct(q))[0] ?? b.c1;
     setPanel({ kind: 'pivot', editing: false, start: { source: `${quoteSheet(sheet.name)}!${rangeName(b)}`, rows: [colName(word)], values: [{ col: colName(num ?? word), fn: num !== undefined ? 'sum' : 'count' }] } });
   };
   const makePivot = (def: PivotDef, editing: boolean) => {

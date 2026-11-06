@@ -175,7 +175,7 @@ export function PivotPanel({
         <div className="space-y-1.5">
           {def.values.map((v, i) => (
             <div key={i} className="flex items-center gap-1.5">
-              <select value={v.fn} onChange={(e) => setDef({ ...def, values: def.values.map((x, j) => (j === i ? { ...x, fn: e.target.value as typeof v.fn } : x)) })} aria-label="Summed up as" className={cx(smallInput, 'w-[96px]')}>
+              <select value={v.fn} onChange={(e) => setDef({ ...def, values: def.values.map((x, j) => (j === i ? { ...x, fn: e.target.value as typeof v.fn } : x)) })} aria-label="Summed up as" className={smallInput} style={{ width: 104, flex: 'none' }}>
                 {FNS.map((f) => (
                   <option key={f.fn} value={f.fn}>
                     {f.label}
