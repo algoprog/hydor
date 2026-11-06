@@ -560,7 +560,10 @@ agents that speak ACP and take MCP servers.
   voice; show, mute, solo, lock; Select, Blade, Trim and Hand tools, snapping, markers, right-click menus). Clips have
   their own part, speed (pitch kept or not), backwards, steadied, held frames, crop and turn, fitted or filling the
   output's shape (16:9, 9:16, 1:1, 4:5), a picture's slow zoom and pan, their own sound or another in its place,
-  detached; fourteen transitions; overlays placed, sized, see-through, keyed (green screen) and faded; words and
+  unlinked (J and L cuts) and linked again; every sound (clips' own, music, voice-over) with its shape, trimmed, cut,
+  silenced in parts, faded by handles (crossfades where two overlap), a volume line to click and drag, its channels
+  (left or right only, one side on both, mono, swapped: a lapel microphone) and its own clean-up, evening out and
+  normalizing, the sound editor for the rest; fourteen transitions; overlays placed, sized, see-through, keyed (green screen) and faded; words and
   captions made from what is said (whisper.cpp here), in five styles, saved as .srt. Colour as Resolve's Color page:
   wheels (lift, gamma, gain, offset), primaries, curves, twelve looks, vignette, sharpen, denoise, grain, before and
   after, and scopes (waveform, vectorscope, histogram), the preview exactly as made (one 3D table for the browser and
