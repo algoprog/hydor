@@ -62,6 +62,7 @@ import { EndNotes, NoteBox, noteRoom, PageNotes } from './Notes';
 import { CiteBox, CiteDialog, withSource } from './Citations';
 import { matchStyle, StylesDialog } from './StylesDialog';
 import { BookmarkBox, CaptionBox, XrefDialog } from './References';
+import { useDocVoice } from './Voice';
 import { putAfter } from './ai/WriteBox';
 import { BIB_TITLES } from '@shared/doc-cite';
 import { citeItems, citeOf, normalizeBlocks, type CiteStyle, type Source } from '@shared/docs';
@@ -163,6 +164,7 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+\\', 'Clear the formatting'],
       ['Ctrl+Alt+M', 'Comment'],
       ['Ctrl+Alt+F', 'Footnote'],
+      ['Ctrl+Shift+S', 'Voice typing'],
       ['Ctrl+Alt+Shift+X', 'Suggesting, or editing again'],
     ],
   },
@@ -623,6 +625,8 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   // The AI that writes with you: its box at the caret, its runs over the whole document, its suggestions as you type, its panel.
   const ai = useDocAi({ engine: engine.current, st, doc: model, title: doc?.title ?? '', host, width, readOnly: !!readOnly || liveOn || !!compare, ghostOn: view.ghost, tick });
   useEffect(() => setAskOpen(ai.ask), [ai.ask]);
+  // Voice typing and Read aloud.
+  const voice = useDocVoice(engine.current, !!readOnly || liveOn || !!compare);
 
   if (!model) return <div className="flex h-full items-center justify-center text-fg-3">…</div>;
 
@@ -824,6 +828,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     if (ev.code === 'KeyC' && ev.shiftKey && !ev.altKey) return openCount(), true;
     if (ev.code === 'KeyM' && ev.altKey && !ro) return startComment(), true;
     if (ev.code === 'KeyF' && ev.altKey && !ev.shiftKey && !ro) return addFootnote(), true;
+    if (ev.code === 'KeyS' && ev.shiftKey && !ev.altKey && !ro) return voice.dictate(), true;
     if (ev.code === 'KeyX' && ev.altKey && ev.shiftKey && !ro) return setMode((m) => (m === 'suggest' ? 'edit' : 'suggest')), true;
     if (k === 'k' && !ev.shiftKey && !ev.altKey && !ro && engine.current?.root.contains(document.activeElement)) {
       setLinking({ url: stRef.current?.link ?? '', text: '' });
@@ -1172,6 +1177,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           compare: () => setVersions(true),
           readOnly: !!readOnly || !!compare || liveOn,
           ai: readOnly ? undefined : ai,
+          voice,
           ghost: view.ghost,
           setGhost: readOnly ? undefined : (on) => setPrefs({ ghost: on }),
         })
@@ -1406,7 +1412,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
 
   return (
     <div ref={root} className="flex h-full min-h-0 flex-col bg-bg">
-      <style>{`${css}\n${marks}\n${ai.css}\n.nd-ed.nd-painting,.nd-ed.nd-painting *{cursor:copy!important}\n::highlight(nd-find){background-color:rgba(255,213,79,.55)}\n::highlight(nd-find-now){background-color:#ff9632;color:#000}\n.nd-math-wait{font-family:${'ui-monospace,monospace'};color:#80868b;font-size:.9em}`}</style>
+      <style>{`${css}\n${marks}\n${ai.css}\n.nd-ed.nd-painting,.nd-ed.nd-painting *{cursor:copy!important}\n::highlight(nd-find){background-color:rgba(255,213,79,.55)}\n::highlight(nd-find-now){background-color:#ff9632;color:#000}\n::highlight(nd-read){background-color:rgba(26,115,232,.2)}\n.nd-math-wait{font-family:${'ui-monospace,monospace'};color:#80868b;font-size:.9em}`}</style>
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
@@ -1562,7 +1568,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
                   <a href={st.link} target="_blank" rel="noopener noreferrer" translate="no" className="min-w-0 truncate text-[12.5px] text-accent hover:underline">
                     {st.link.replace(/^mailto:/i, '')}
                   </a>
-                  <IconButton label="Open the link" size="sm" onClick={() => window.open(st.link!, '_blank', 'noopener,noreferrer')}>
+                  <IconButton label="Open the link" size="sm" onClick={() => (st.link!.startsWith('#') ? e?.focusBlock(st.link!.slice(1)) : window.open(st.link!, '_blank', 'noopener,noreferrer'))}>
                     <ExternalLink size={14} />
                   </IconButton>
                   <IconButton label="Change the link" size="sm" onClick={() => setLinking({ url: st.link ?? '', text: '' })}>
@@ -1621,7 +1627,12 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           />
         )}
         {phone && panel && <div className="absolute inset-0 z-30 bg-panel">{panelBody}</div>}
-        {ai.bar && <div className={cx('absolute right-3 z-30', find.open ? 'top-14' : 'top-2')}>{ai.bar}</div>}
+        {(ai.bar || voice.bar) && (
+          <div className={cx('absolute right-3 z-30 flex flex-col items-end gap-2', find.open ? 'top-14' : 'top-2')}>
+            {ai.bar}
+            {voice.bar}
+          </div>
+        )}
         {find.open && (
           <div className="absolute top-2 right-3 z-30 max-w-[calc(100%-24px)]" data-keeps-editing>
             <FindBar

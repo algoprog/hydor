@@ -32,6 +32,8 @@ import {
   ListOrdered,
   ListTree,
   Lightbulb,
+  Mic,
+  Volume2,
   Bookmark,
   Captions,
   BookMarked,
@@ -169,6 +171,8 @@ export interface DocMenuCtx {
   ai?: { write: () => void; proofread: () => void; tone: () => void; translate: () => void; ask: boolean; toggleAsk: () => void; busy: boolean };
   ghost?: boolean;
   setGhost?: (on: boolean) => void;
+  /** Tools → Voice typing and Read aloud. */
+  voice?: { dictate: () => void; typing: boolean; read: () => void; reading: boolean; canDictate: boolean; canRead: boolean };
 }
 
 /** The editor's menus, for what is where the caret is now. */
@@ -420,6 +424,12 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
         ] as MenuEntry[])
       : []),
     { label: 'Keyboard shortcuts', icon: <Keyboard size={15} />, keys: 'Ctrl+/', run: c.shortcuts },
+    ...(c.voice
+      ? ([
+          { label: 'Voice typing', icon: <Mic size={15} />, keys: 'Ctrl+Shift+S', checked: c.voice.typing, also: 'dictate dictation speak microphone speech to text', disabled: c.readOnly, run: c.voice.dictate },
+          { label: 'Read aloud', icon: <Volume2 size={15} />, checked: c.voice.reading, also: 'speak read text to speech listen', disabled: !c.voice.canRead, run: c.voice.read },
+        ] as MenuEntry[])
+      : []),
     '-',
     { label: 'Accept all suggestions', icon: <CheckCheck size={15} />, disabled: !c.suggestions || c.readOnly, also: 'track changes review', run: () => c.resolveAll(true) },
     { label: 'Reject all suggestions', icon: <ListX size={15} />, disabled: !c.suggestions || c.readOnly, also: 'track changes review', run: () => c.resolveAll(false) },
