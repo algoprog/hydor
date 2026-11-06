@@ -95,6 +95,7 @@ import { FX_NAMES, TR_NAMES } from './names';
 import { PictureShapeFields } from './PictureShape';
 import { ChartSourceRow } from './SheetChart';
 import { LogoSection, MyThemesSection, SlideLookNote } from './MyThemes';
+import { QrLook } from './QrCode';
 
 export type InspectorTab = 'format' | 'animate' | 'slide' | 'theme';
 export const INSPECTOR_TABS: { value: InspectorTab; label: string }[] = [
@@ -1155,6 +1156,7 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cro
       {el.type === 'quiz' && <QuizLook el={el} theme={deck.theme} set={set} />}
       {el.type === 'score' && <ScoreLook el={el} theme={deck.theme} set={set} />}
       {el.type === 'scene3d' && <Scene3dLook el={el} theme={deck.theme} set={set} pickModel={pickModel ?? (async () => null)} pickPicture={pickPicture} />}
+      {el.type === 'qr' && <QrLook el={el} theme={deck.theme} set={set} />}
       <Place el={el} slide={slide} set={set} H={H} />
       <Arrange deck={deck} index={index} ids={[el.id]} change={change} />
       {web && <HoverField el={el} set={set} />}

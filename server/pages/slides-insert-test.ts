@@ -16,7 +16,8 @@ import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { Zip } from '../documents/zip.ts';
 import { writePng } from '../signatures/png.ts';
-import { chartSource, deckSources, deckText, everyEl, mapSources, normalizeDeck, PICTURE_MASKS, type ChartEl, type Deck, type ImageEl, type VideoEl } from '../../shared/slides.ts';
+import { chartSource, deckSources, deckText, everyEl, mapSources, normalizeDeck, PICTURE_MASKS, qrCells, type ChartEl, type Deck, type ImageEl, type QrEl, type VideoEl } from '../../shared/slides.ts';
+import { qrCode } from '../../shared/qr.ts';
 import { pictureFramePlan, pictureMaskPath } from '../../shared/slides-runtime.ts';
 import { reuseSlides, sameLook } from '../../shared/slides-reuse.ts';
 import { chartFromSheet, sheetTables } from '../../shared/slides-sheet.ts';
@@ -358,6 +359,36 @@ const slideXml = (buf: Buffer, n: number) => new Zip(buf).text(`ppt/slides/slide
   const c = deck.slides[0].els[0] as ChartEl;
   ok(c.labels.join() === 'North,South' && c.series.length === 2 && c.source?.title === 'Sales 2026' && !!c.source.at, `save_slides reads a chart's numbers from its source (${JSON.stringify(c).slice(0, 240)})`);
   ok(/not a spreadsheet of the Library/.test(saved.text ?? ''), 'and says when a source is not one');
+}
+
+// ---- QR codes ------------------------------------------------------------------------------------------------------
+
+{
+  const d = normalizeDeck({
+    slides: [
+      {
+        els: [
+          { id: 'q', type: 'qrcode', text: ' https://hydor.app/demo ', bg: 'none', color: 'accent', x: 100, y: 100, w: 300, h: 200 },
+          { id: 'r', type: 'qr', text: '' },
+          { id: 's', type: 'qr', url: 'x'.repeat(5000) },
+        ],
+      },
+    ],
+  });
+  const q = d.slides[0].els[0] as QrEl;
+  ok(d.slides[0].els.length === 2 && q.type === 'qr' && q.text === 'https://hydor.app/demo' && q.bg === 'transparent' && q.color === 'accent', 'a QR code by another name; none without words');
+  const code = qrCode('https://hydor.app/demo', { level: 'M' });
+  ok(q.n === code.size && JSON.stringify(qrCells(q)) === JSON.stringify(code.modules), 'its squares kept with it are the encoder’s');
+  ok((d.slides[0].els[1] as QrEl).text === 'x'.repeat(1000) || d.slides[0].els.length === 2, 'its words at most 1000 letters');
+  const forged = normalizeDeck({ slides: [{ els: [{ id: 'q', type: 'qr', text: 'hello', n: 21, cells: 'AAAA' }] }] }).slides[0].els[0] as QrEl;
+  ok(JSON.stringify(qrCells(forged)) === JSON.stringify(qrCode('hello', { level: 'M' }).modules), 'its squares made again from its words, whatever was sent');
+  const buf = pptxFile(d, { title: 'QR', picture });
+  const xml = slideXml(buf, 1);
+  ok(/<p:pic><p:nvPicPr><p:cNvPr id="\d+" name="QR code \d+" descr="QR code: https:\/\/hydor\.app\/demo"\/>.*?<asvg:svgBlip/.test(xml), 'PowerPoint: a picture of it, its words its description, its SVG beside it');
+  ok(/<a:off x="1428750" y="952500"\/><a:ext cx="1905000" cy="1905000"\/>/.test(xml), 'square in the middle of its box');
+  const zip = new Zip(buf);
+  const pngName = zip.names().find((n) => /^ppt\/media\/image\d+\.png$/.test(n));
+  ok(!!pngName && (zip.read(pngName!)?.length ?? 0) > 100, 'its PNG in the file');
 }
 
 // ---- my themes ------------------------------------------------------------------------------------------------------
