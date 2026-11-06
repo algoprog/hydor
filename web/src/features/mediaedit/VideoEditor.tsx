@@ -737,24 +737,21 @@ function SaveOptions({
           options={[{ value: 'as', label: `${out.w} × ${out.h}` }, ...sizes.map((s) => ({ value: String(s), label: `${s}p` }))]}
         />
       </div>
-      <div className="space-y-1.5">
-        <div className="text-[12px] font-medium text-fg-3">Kind of file</div>
-        {plans.main.fixed ? (
-          <p className="text-[12.5px] leading-snug text-fg-2">
-            {`Saved over it, it stays ${plans.main.fixed}${plans.copy ? '; a copy is' : ''}`}
-            {plans.copy ? <> {kind === 'webm' ? 'WebM' : 'MP4'}.</> : '.'}
-          </p>
-        ) : null}
-        <Segmented<'mp4' | 'webm'>
-          size="sm"
-          value={kind}
-          onChange={onKind}
-          options={[
-            { value: 'mp4', label: 'MP4' },
-            { value: 'webm', label: 'WebM' },
-          ]}
-        />
-      </div>
+      {(!plans.main.fixed || plans.copy) && (
+        <div className="space-y-1.5">
+          <div className="text-[12px] font-medium text-fg-3">{plans.main.fixed ? 'Kind of file, for a copy' : 'Kind of file'}</div>
+          <Segmented<'mp4' | 'webm'>
+            size="sm"
+            value={kind}
+            onChange={onKind}
+            options={[
+              { value: 'mp4', label: 'MP4' },
+              { value: 'webm', label: 'WebM' },
+            ]}
+          />
+        </div>
+      )}
+      {plans.main.fixed && <p className="text-[12.5px] leading-snug text-fg-2">{`Saved over it, it keeps its kind (${plans.main.fixed}).`}</p>}
       <p className="border-t border-line pt-2.5 text-[12px] leading-snug text-fg-3">{[plans.main.says, plans.copy?.says].filter(Boolean).join(' ')} MP4 plays everywhere; WebM is smaller, for the web.</p>
     </div>
   );

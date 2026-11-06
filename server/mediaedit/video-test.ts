@@ -476,6 +476,8 @@ if (ff) {
     await bad({ src: song, recipe: {}, to: { video: true } }, /not a video/, 'a sound is not a video');
     await bad({ src: clip, recipe: { music: { src: clip } }, to: { video: true } }, /not a sound/, 'a video is not music');
     await bad({ src: clip, recipe: {}, to: { asset: true } }, /deck’s video/, 'a video is no picture');
+    const own = path.join(config.dataDir, 'media', 'x.mp4');
+    await bad({ src: clip, recipe: {}, to: { file: own, as: 'copy' } }, /app’s own data/, 'nothing written into the app’s own data');
   }
 
   // edit_video: an agent's edits, its files listed as the conversation's cards read them.
