@@ -291,6 +291,61 @@ ok(
   ok((mc.match(/<text:note /g) ?? []).length === 1 && /<text:note-ref text:note-class="footnote" text:reference-format="text" text:ref-name="ftn1">1<\/text:note-ref>/.test(mc), 'a note marked twice: its words once, a reference to them after');
 }
 
+// ---- the other kinds of block, in both ------------------------------------------------------------------------------------
+{
+  const SVG = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"><rect width="40" height="20" fill="#1a73e8"/></svg>').toString('base64')}`;
+  const variety = normalizeDoc({
+    markdown: [
+      'Variety {.title}',
+      '',
+      '[TOC]',
+      '',
+      '# One',
+      '',
+      '> 💡 A tip, with $x^2$ among its words {.callout}',
+      '',
+      '> A quote, and [a link to Two](#two1).',
+      '',
+      '```',
+      'let a = 1 < 2 && 3;',
+      '```',
+      '',
+      `![](${SVG}){width=40% .left}`,
+      '',
+      '| a | b[^c] |',
+      '| --- | --- |',
+      '| 1 | 2 |',
+      '',
+      '---',
+      '',
+      '# Two {#two1}',
+      '',
+      '### Deeper',
+      '',
+      'End.',
+      '',
+      '[^c]: In a cell.',
+    ].join('\n'),
+  });
+  const e = new Zip(epubOfDoc(db, variety, 'Variety'));
+  kept('variety.epub', epubOfDoc(db, variety, 'Variety'));
+  const one = e.text('OEBPS/chapter-02.xhtml') ?? '';
+  ok(e.names().filter((n) => n.endsWith('.xhtml')).every((n) => !xmlProblem(e.text(n) ?? '', true)), 'every part well formed', e.names().map((n) => (n.endsWith('.xhtml') ? xmlProblem(e.text(n) ?? '', true) : '')));
+  ok(/<div class="callout" style="background-color:#fef7e0"><p><span class="icon">💡<\/span>A tip, with <span class="nd-m" data-tex="x\^2"><span class="katex"><math /.test(one), 'a callout, maths among its words as MathML', /<div class="callout"[^]*?<\/div>/.exec(one)?.[0]);
+  ok(/<blockquote class="quote"><p>A quote, and <a href="chapter-03\.xhtml#nd-two1">a link to Two<\/a>\.<\/p><\/blockquote>/.test(one) && /<pre class="code">let a = 1 &#60; 2 &#38;&#38; 3;<\/pre>/.test(one), 'a quote with a link to another chapter, and code');
+  ok(e.names().includes('OEBPS/images/picture-1.svg') && /<figure class="left"><img src="images\/picture-1\.svg" alt="" style="width:40%"\/><\/figure>/.test(one), 'an SVG picture as it is');
+  ok(/<aside id="nd-fn-c"/.test(one) && /<hr\/>/.test(one), "a footnote in a table's cell, a line across");
+  ok(/<div class="toc"><p class="toc-1"><a href="chapter-02\.xhtml#nd-[\w-]+">One<\/a><\/p><p class="toc-1"><a href="chapter-03\.xhtml#nd-two1">Two<\/a><\/p><p class="toc-3"><a href="chapter-03\.xhtml#nd-[\w-]+">Deeper<\/a><\/p><\/div>/.test(e.text('OEBPS/chapter-01.xhtml') ?? ''), 'the table of contents, its links to the chapters', e.text('OEBPS/chapter-01.xhtml'));
+  ok(/<li><a href="chapter-03\.xhtml#nd-two1">Two<\/a><ol><li><a [^>]+>Deeper<\/a><\/li><\/ol><\/li>/.test(e.text('OEBPS/nav.xhtml') ?? ''), 'a heading two levels down sits one level down in the contents');
+  const ob = odtOfDoc(db, variety, 'Variety');
+  kept('variety.odt', ob);
+  const oc = new Zip(ob).text('content.xml') ?? '';
+  ok(!xmlProblem(oc), 'the OpenDocument file is well formed', xmlProblem(oc));
+  ok(/<text:table-of-content [^>]*><text:table-of-content-source text:outline-level="3">/.test(oc) && /<text:p text:style-name="Contents_20_3"><text:a xlink:type="simple" xlink:href="#nd-[\w-]+">Deeper<\/text:a><\/text:p>/.test(oc), 'the table of contents as LibreOffice’s own');
+  ok(/<draw:image xlink:href="Pictures\/1\.svg"/.test(oc) && /svg:width="[\d.]+mm" svg:height="[\d.]+mm"/.test(oc), 'the SVG inside it, sized by its viewBox');
+  ok(oc.includes('let a = 1 &lt; 2 &amp;&amp; 3;') && /💡 A tip, with <text:span text:style-name="T\d+">x\^2<\/text:span>/.test(oc) && /<text:a [^>]*xlink:href="#nd-two1"/.test(oc) && /<text:bookmark text:name="nd-two1"\/>Two/.test(oc), 'code, a callout with maths, a link to a heading and its bookmark');
+}
+
 // ---- registered as the document's files ------------------------------------------------------------------------------------
 {
   const k = kindOf('doc')!;
