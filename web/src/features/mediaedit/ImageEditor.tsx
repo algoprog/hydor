@@ -278,6 +278,19 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
     const el = root.current;
     if (el && !el.contains(document.activeElement)) el.focus({ preventScroll: true });
   }, [active]);
+  // Keys pressed with nothing focused (after words were written, a dialog closed, a panel's field left) are the editor's.
+  const keyRef = useRef<(e: React.KeyboardEvent) => void>(() => {});
+  useEffect(() => {
+    if (!active) return;
+    const k = (e: KeyboardEvent) => {
+      if (e.target !== document.body || document.querySelector('[role=dialog]')) return;
+      root.current?.focus({ preventScroll: true });
+      keyRef.current(e as unknown as React.KeyboardEvent);
+    };
+    // Heard as it starts down: the tabs' host keeps such keys from the page under the editor.
+    window.addEventListener('keydown', k, true);
+    return () => window.removeEventListener('keydown', k, true);
+  }, [active]);
   const onKeyDown = (e: React.KeyboardEvent) => {
     const typing = !!(e.target as HTMLElement).closest?.('input, textarea, select, [contenteditable="true"]');
     const mod = isMod(e);
@@ -340,6 +353,7 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
     }
     keepKeys(e);
   };
+  keyRef.current = onKeyDown;
 
   // ---- panels ----
   const panels: DockPanel[] = [

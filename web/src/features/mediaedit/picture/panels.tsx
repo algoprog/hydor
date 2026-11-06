@@ -59,7 +59,7 @@ export function LayersPanel({ ed, onAddPicture }: { ed: PictureEd; onAddPicture:
     <div className="flex h-full min-h-0 flex-col text-[12.5px]">
       <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-line px-2 py-1.5">
         <MiniSelect label="Blend mode" value={a?.blend ?? 'normal'} options={blendOptions} onChange={(v) => a && ed.setLayer(a.id, { blend: v as BlendMode }, 'Blend mode')} width={118} />
-        <ScrubNumber label="Opacity" value={Math.round((a?.opacity ?? 1) * 100)} min={0} max={100} unit="%" width={54} onChange={(v, done) => a && ed.setLayer(a.id, { opacity: v / 100 }, 'Opacity', done)} disabled={!a} />
+        <ScrubNumber label="Opacity" value={Math.round((a?.opacity ?? 1) * 100)} min={0} max={100} unit="%" width={60} onChange={(v, done) => a && ed.setLayer(a.id, { opacity: v / 100 }, 'Opacity', done)} disabled={!a} />
         <IconButton label={a?.locked ? 'Unlock the layer' : 'Lock the layer'} size="sm" active={!!a?.locked} disabled={!a} onClick={() => a && ed.setLayer(a.id, { locked: !a.locked }, a.locked ? 'Unlock layer' : 'Lock layer')}>
           {a?.locked ? <Lock size={13} /> : <LockOpen size={13} />}
         </IconButton>

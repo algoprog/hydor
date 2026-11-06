@@ -130,10 +130,15 @@ export function Dock({ id, panels, groups, focus, defaultWidth = 300, defaultWei
 /** On a phone: the panels in a sheet from the bottom, their tabs along its top; the picture stays in view above it. */
 export function PanelSheet({ panels, tab, onTab, onClose }: { panels: DockPanel[]; tab: string; onTab: (id: string) => void; onClose: () => void }) {
   const p = panels.find((x) => x.id === tab) ?? panels[0];
+  const strip = useRef<HTMLDivElement>(null);
+  // The tab shown is in view along the strip.
+  useEffect(() => {
+    strip.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [p.id]);
   return (
     <div role="dialog" aria-label="Panels" className="absolute inset-x-0 bottom-0 z-30 flex max-h-[58%] min-h-[40%] flex-col rounded-t-[18px] border border-b-0 border-line bg-elevated shadow-lg">
       <div className="flex shrink-0 items-center gap-1 border-b border-line px-2 pt-2 pb-1.5">
-        <div role="tablist" className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+        <div ref={strip} role="tablist" className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
           {panels.map((x) => (
             <button key={x.id} type="button" role="tab" aria-selected={x.id === p.id} onClick={() => onTab(x.id)} className={cx('flex h-8 shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium whitespace-nowrap', x.id === p.id ? 'bg-bg-2 text-fg' : 'text-fg-3')}>
               {x.icon}
