@@ -15,6 +15,8 @@ import { makeVideo, pageData } from '../../images/studio';
 import { chooseVideo } from '../slides/media';
 import { MediaPick } from './dialogs';
 import { deviceVideo, videoAddress, videoSrcOf } from './DesignEdit';
+import { filterCss, LOOKS, readFilter } from './elements';
+import { FRAME_IDS, FRAME_NAMES, frameCss, shapePath } from '@shared/design-shapes';
 
 type Cmd = (c: string, arg?: unknown) => void;
 
@@ -179,6 +181,86 @@ export function PageVideoFields({ sel, cmd, title }: { sel: EdSel; cmd: Cmd; tit
           ]}
         />
       </div>
+    </div>
+  );
+}
+
+/**
+ * A page's picture, its look in the Part tab: a filter and its light and colours, a shape it is cut to, and which part
+ * of it shows when it fills its box (its crop inside its own frame). Each a change of its style, one step to undo.
+ */
+export function PagePictureFields({ sel, cmd }: { sel: EdSel; cmd: Cmd }) {
+  const st = (k: string) => sel.declared[k] ?? sel.inline[k] ?? sel.computed[k] ?? '';
+  const f = readFilter(st('filter') === 'none' ? '' : st('filter'));
+  const style = (props: Record<string, string | null>) => cmd('style', props);
+  const fit = st('object-fit');
+  const pos = /([\d.]+)%\s+([\d.]+)%/.exec(st('object-position')) ?? [];
+  const px = Number(pos[1] ?? 50);
+  const py = Number(pos[2] ?? 50);
+  const slider = (label: string, value: number, min: number, max: number, on: (v: number) => void, unit = '%') => (
+    <label className="flex min-h-8 items-center gap-2">
+      <span className="w-[84px] shrink-0 text-[12px] text-fg-3">{tr(label)}</span>
+      <input type="range" min={min} max={max} value={value} onChange={(e) => on(Number(e.target.value))} className="h-1.5 min-w-0 flex-1 cursor-pointer accent-[var(--accent)]" aria-label={tr(label)} />
+      <span className="w-9 shrink-0 text-right text-[11.5px] text-fg-3 tabular-nums">{`${value}${unit}`}</span>
+    </label>
+  );
+  const adjust = (k: keyof typeof f.adjust, v: number) => style({ filter: filterCss(f.look, { ...f.adjust, [k]: v }) || null });
+  return (
+    <div className="space-y-1 pb-2">
+      <div className="grid grid-cols-5 gap-1 pb-1">
+        {LOOKS.map((l) => (
+          <button key={l.id} type="button" title={tr(l.label)} onClick={() => style({ filter: filterCss(l.id, f.adjust) || null })} className={`truncate rounded-md border px-1 py-1 text-[11px] ${f.look === l.id ? 'border-accent bg-accent-soft text-fg' : 'border-line text-fg-2 hover:bg-bg-2'}`}>
+            {tr(l.label)}
+          </button>
+        ))}
+      </div>
+      {slider('Brightness', f.adjust.brightness, 0, 200, (v) => adjust('brightness', v))}
+      {slider('Contrast', f.adjust.contrast, 0, 200, (v) => adjust('contrast', v))}
+      {slider('Saturation', f.adjust.saturate, 0, 200, (v) => adjust('saturate', v))}
+      {slider('Blur', f.adjust.blur, 0, 30, (v) => adjust('blur', v), 'px')}
+      <div className="flex items-center gap-2 pt-1">
+        <span className="w-[84px] shrink-0 text-[12px] text-fg-3">{tr('Shape')}</span>
+        <div className="grid min-w-0 flex-1 grid-cols-7 gap-1">
+          {FRAME_IDS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              title={tr(FRAME_NAMES[id])}
+              onClick={() => {
+                const props: Record<string, string | null> = { '-webkit-mask': null, mask: null, 'border-radius': null };
+                for (const part of frameCss(id).split(/;(?![^(]*\))/)) {
+                  const i = part.indexOf(':');
+                  if (i > 0) props[part.slice(0, i).trim()] = part.slice(i + 1).trim();
+                }
+                style(props);
+              }}
+              className="grid aspect-square place-items-center rounded-md border border-line bg-bg-1 hover:bg-bg-2"
+            >
+              <svg viewBox="0 0 100 100" className="h-[70%] w-[70%]" aria-hidden>
+                {id === 'rect' ? <rect width="100" height="100" fill="currentColor" opacity=".5" /> : id === 'rounded' ? <rect width="100" height="100" rx="18" fill="currentColor" opacity=".5" /> : id === 'circle' ? <circle cx="50" cy="50" r="50" fill="currentColor" opacity=".5" /> : <path d={shapePath(id)} fill="currentColor" opacity=".5" />}
+              </svg>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 pt-1">
+        <span className="w-[84px] shrink-0 text-[12px] text-fg-3">{tr('In its box')}</span>
+        <Segmented
+          size="sm"
+          value={fit === 'cover' ? 'cover' : 'whole'}
+          onChange={(v) => style(v === 'cover' ? { 'object-fit': 'cover', 'aspect-ratio': st('aspect-ratio') && st('aspect-ratio') !== 'auto' ? null : '4 / 3' } : { 'object-fit': null, 'object-position': null, 'aspect-ratio': null })}
+          options={[
+            { value: 'whole', label: tr('Whole') },
+            { value: 'cover', label: tr('Cropped to fill it') },
+          ]}
+        />
+      </div>
+      {fit === 'cover' && (
+        <>
+          {slider('Across', px, 0, 100, (v) => style({ 'object-position': `${v}% ${py}%` }))}
+          {slider('Up and down', py, 0, 100, (v) => style({ 'object-position': `${px}% ${v}%` }))}
+        </>
+      )}
     </div>
   );
 }

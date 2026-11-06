@@ -17,7 +17,7 @@ import { BoxModel, Choice, ColorField, Group, hexOf, NumField, Row, Select, spli
 import { FONTS, fontOf, fontOptions } from './fonts';
 import { aspectOf, editPicture, makePicture, pageData } from '../../images/studio';
 import { editKept } from '../../mediaedit/open';
-import { PageVideoFields } from '../design/pageMedia';
+import { PagePictureFields, PageVideoFields } from '../design/pageMedia';
 
 export type Cmd = (cmd: string, arg?: unknown) => void;
 export type Media = '' | 'tablet' | 'phone';
@@ -432,6 +432,11 @@ export function PartPanel({
         </Group>
       )}
 
+      {sel.tag === 'img' && !sel.multi && (
+        <Group id="picture-look" title="Picture’s look" summary={sel.attrs.alt}>
+          <PagePictureFields sel={sel} cmd={cmd} />
+        </Group>
+      )}
       <div className="my-1 space-y-1.5 rounded-xl bg-bg-1 p-2">
         <div className="flex items-center gap-1.5">
           <Select value={ctx.scope} options={scopes} onChange={(v) => onCtx({ ...ctx, scope: v })} title="Which parts the changes below are for" />
