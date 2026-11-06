@@ -115,13 +115,18 @@ export interface PictureAnswer extends MadePicture {
    * as it was (the editors put it in on a canvas with a softened edge, then keep the result). Not set: it is the result.
    */
   whole?: boolean;
+  /** Why it went the way it did, or what to look at (on auto: "The background remover on this computer was unsure where the subject ends, so an image model did it."). */
+  why?: string;
 }
 
 /** POST /api/images/cutout: the picture with its background taken out (a PNG with see-through parts). */
 export interface CutoutAsk {
   src: string;
-  /** auto: on this computer when the picture tools are set up, else through OpenRouter. */
-  how?: 'auto' | 'local' | 'cloud';
+  /**
+   * auto: on this computer when the picture tools are set up and the result looks right, else by an image model through
+   * OpenRouter; local; ai (cloud: the same as ai).
+   */
+  how?: 'auto' | 'local' | 'ai' | 'cloud';
 }
 
 /** POST /api/images/erase: what is under the mask taken away, the rest of the picture as it was. */
@@ -129,7 +134,8 @@ export interface EraseAsk {
   src: string;
   /** A PNG data: address: white where to erase. */
   mask: string;
-  how?: 'auto' | 'local' | 'cloud';
+  /** auto: a small area on this computer when the picture tools are set up, a large one (or one among detailed things) by an image model; local; ai (cloud: the same as ai). */
+  how?: 'auto' | 'local' | 'ai' | 'cloud';
   /** What to put there instead (through OpenRouter only): "grass", "a calm sea". */
   prompt?: string;
 }
@@ -183,7 +189,7 @@ export interface LocalToolsState {
   why?: string;
   /** About how much the set-up downloads, in MB (the environment; each model downloads the first time its tool is used). */
   sizeMb: number;
-  /** The models already downloaded (cutout: about 220 MB, erase: about 210 MB). */
+  /** The models already downloaded (cutout: about 190 MB, erase: about 210 MB). */
   downloaded: ('cutout' | 'erase')[];
   /** The models in memory now (each loads when needed and unloads after a few idle minutes). */
   loaded: ('cutout' | 'erase')[];
