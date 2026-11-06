@@ -11,7 +11,7 @@
 // Changes stay unsaved until Save (Ctrl+S), as a page's do; Undo and Redo step through them. While an agent writes a
 // new version (live.ts), it shows as it comes, read-only, the cell its words arrive in boxed and kept in view.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { BetweenHorizontalStart, BetweenVerticalStart, ClipboardPaste, Copy, Eraser, EyeOff, Maximize2, MessageSquarePlus, Scissors, Sparkles, StickyNote, Trash2, ArrowDownAZ, ArrowDownZA, Eye } from 'lucide-react';
+import { BetweenHorizontalStart, BetweenVerticalStart, ClipboardPaste, Copy, Eraser, EyeOff, Maximize2, MessageSquarePlus, Scissors, Sparkles, StickyNote, Trash2, ArrowDownAZ, ArrowDownZA, Eye, MessageCircleQuestionMark, RefreshCw } from 'lucide-react';
 import { newCommentId } from '@shared/comments';
 import {
   cleanBorder,
@@ -62,7 +62,22 @@ import {
   type SheetComment,
   type Validation,
   type Workbook,
+  type CellValue,
+  adjustForDelete,
+  normalizeBook,
+  quoteSheet,
+  renameName,
+  sourceOf,
+  type NamedRange,
+  type PivotDef,
+  type SheetProtect,
 } from '@shared/sheets';
+import { addGroup, foldGroup, guardOf, removeGroup, spansOf } from '@shared/sheet-groups';
+import { pivotSheet } from '@shared/sheet-pivot';
+import { dependents, goalSeek, precedents, rectWords } from '@shared/sheet-whatif';
+import type { AnalyzeIdea, FillAnswer, TableAnswer } from '@shared/sheet-ai';
+import { findIssues, type CleanIssue } from '@shared/sheet-clean';
+import { flashFill } from '@shared/sheet-flash';
 import { allowed, columnValues, CondFormats, filterHidden, listOptions, Merges, Rules } from '@shared/sheet-rules';
 import { toast, toastError } from '../../../lib/store';
 import { tr } from '../../../i18n/runtime';
@@ -149,6 +164,13 @@ import {
   type SummaryFn,
 } from './tools';
 import { CHIP_COLORS, ValidPanel } from './ValidPanel';
+import { asksAi, contextFor, costOnce, useAiCells } from './ai';
+import { AnalyzePanel, CleanPanel } from './AiPanels';
+import { askAi, ExplainAi, FormulaAi, TableAi } from './AiTools';
+import { NamesPanel, ProtectPanel } from './RangesPanel';
+import { LinkDialog } from './LinkDialog';
+import { GoalSeekDialog, PivotPanel } from './WhatIf';
+import { PrintDialog } from './PrintDialog';
 
 /** Cells copied or cut, to paste in this or another spreadsheet while the app is open (their formulas and looks). */
 let clip: Clip | null = null;
@@ -218,8 +240,8 @@ function codeDecimals(code: string, d: 1 | -1): string {
 
 const clone = (b: Workbook): Workbook => structuredClone(b);
 
-type PanelState = { kind: 'cf' } | { kind: 'dv'; start?: Validation } | { kind: 'chart'; id: string } | { kind: 'comments'; draft?: boolean } | null;
-type DialogState = 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | 'summary' | null;
+type PanelState = { kind: 'cf' } | { kind: 'dv'; start?: Validation } | { kind: 'chart'; id: string } | { kind: 'comments'; draft?: boolean } | { kind: 'analyze'; block: Rect; header: boolean } | { kind: 'clean'; block: Rect; header: boolean } | { kind: 'names' } | { kind: 'protect' } | { kind: 'pivot'; start: PivotDef; editing: boolean } | null;
+type DialogState = 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | 'summary' | 'table-ai' | 'link' | 'goal' | 'print' | null;
 type PickState = { kind: 'list' | 'date' | 'note' | 'chars'; r: number; c: number; at: DOMRect } | null;
 
 /** Where an agent's words are arriving: its cell, boxed in the app's busy colour with a small flag (as a collaborator's in Google Sheets). */
@@ -243,6 +265,9 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   const savedRef = useRef<Workbook | null>(doc ? clone(doc.model) : null);
   const calcRef = useRef<Calc | null>(bookRef.current ? computeBook(bookRef.current) : null);
   const hist = useRef<{ past: Patch[]; future: Patch[]; saved: number; last?: { key: string; at: number } }>({ past: [], future: [], saved: 0 });
+  // The AI function's answers (=AI(…)): kept apart from Undo's steps, and given to the workbook after each of them.
+  const aiAnswers = useRef<Record<string, CellValue>>({ ...(doc?.model.ai ?? {}) });
+  const aiDirty = useRef(false);
   const [rev, setRev] = useState(0);
   const [si, setSi] = useState(0);
   const [sel, setSelState] = useState<Sel>(cellSel(0, 0));
@@ -306,7 +331,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   // The menus' names go in the title bar where there is room for them, as Google Docs has them; else one button holds them.
 
   const h = hist.current;
-  const dirty = !!bookRef.current && h.saved !== h.past.length;
+  const dirty = !!bookRef.current && (h.saved !== h.past.length || aiDirty.current);
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
   useEffect(() => onDirty?.(dirty), [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -322,6 +347,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     savedRef.current = clone(doc.model);
     calcRef.current = computeBook(bookRef.current);
     hist.current = { past: [], future: [], saved: 0 };
+    aiAnswers.current = { ...(doc.model.ai ?? {}) };
+    aiDirty.current = false;
     setSi((i) => Math.min(i, doc.model.sheets.length - 1));
     setEdit(null);
     setRev((r) => r + 1);
@@ -379,10 +406,42 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   }, [sheet, calc, sheetIx, rev]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- changes, Undo and Redo ----------------------------------------------------------------------------------------
+  const warnedUntil = useRef(0);
+  /** The protection a change would go against: of the cells it changes, on the sheets that have some. */
+  const guarded = (b: Workbook, p: Patch): { refuse?: SheetProtect; warn?: SheetProtect } => {
+    if (!b.sheets.some((s) => s.protect?.length)) return {};
+    if (p.k === 'multi') {
+      let warn: SheetProtect | undefined;
+      for (const q of p.list) {
+        const g = guarded(b, q);
+        if (g.refuse) return g;
+        warn ??= g.warn;
+      }
+      return warn ? { warn } : {};
+    }
+    if (p.k === 'cells') {
+      const sh = b.sheets.find((s) => s.id === p.sheet);
+      return sh ? guardOf(sh, Object.keys(p.after).flatMap((k) => (parseRef(k) ? [[parseRef(k)!.r, parseRef(k)!.c] as [number, number]] : []))) : {};
+    }
+    if (p.k === 'book') {
+      // Rows or columns put in or taken out, a sort: the protected sheets whose cells it changes.
+      for (const sh of p.after.sheets) {
+        const was = p.before.sheets.find((s) => s.id === sh.id);
+        if (!was?.protect?.length || was.cells === sh.cells) continue;
+        const keys = new Set([...Object.keys(was.cells), ...Object.keys(sh.cells)].filter((k) => JSON.stringify(was.cells[k]) !== JSON.stringify(sh.cells[k])));
+        const g = guardOf(was, [...keys].flatMap((k) => (parseRef(k) ? [[parseRef(k)!.r, parseRef(k)!.c] as [number, number]] : [])));
+        if (g.refuse || g.warn) return g;
+      }
+    }
+    return {};
+  };
   /** The calculator brought up to date after a patch (done either way). */
   const sync = (p: Patch) => {
     const b = bookRef.current!;
     const c = calcRef.current!;
+    // A workbook a step brought back has the AI answers as they are now.
+    if (Object.keys(aiAnswers.current).length) b.ai = aiAnswers.current;
+    else delete b.ai;
     if (swapsBook(p)) return c.reset(b);
     for (const [id, keys] of touched(p)) c.update(b.sheets.findIndex((s) => s.id === id), keys);
   };
@@ -394,6 +453,17 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   const change = (p: Patch | null, at?: Sel, key?: string) => {
     const b = bookRef.current;
     if (!p || readOnly || !b) return;
+    // Protected cells (Data → Protect sheets and ranges): refused, or a warning first (then none for five minutes).
+    const g = guarded(b, p);
+    if (g.refuse) return void toast(tr(g.refuse.note ? `Those cells are protected: ${g.refuse.note}. Data → Protect sheets and ranges takes it off.` : 'Those cells are protected: Data → Protect sheets and ranges takes it off.'));
+    if (g.warn && Date.now() > warnedUntil.current) {
+      void confirm({ title: tr('Change protected cells?'), body: g.warn.note ? tr(`They are protected so they warn first: ${g.warn.note}.`) : tr('They are protected so they warn before they change.'), confirm: tr('Change them') }).then((yes) => {
+        if (!yes) return;
+        warnedUntil.current = Date.now() + 5 * 60_000;
+        change(p, at, key);
+      });
+      return;
+    }
     p.at = { sheet: b.sheets[sheetIx]?.id ?? '', sel: at ?? selRef.current };
     bookRef.current = applyPatch(b, p, false);
     sync(p);
@@ -458,8 +528,14 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     setSaving(true);
     try {
       const copy = clone(bookRef.current);
+      if (copy.ai) {
+        const used = aiCells.used();
+        copy.ai = Object.fromEntries(Object.entries(copy.ai).filter(([k]) => used.has(k)));
+        if (!Object.keys(copy.ai).length) delete copy.ai;
+      }
       if (await onSave(copy)) {
         savedRef.current = clone(copy);
+        aiDirty.current = false;
         hist.current.saved = hist.current.past.length;
         hist.current.last = undefined;
         setRev((r) => r + 1);
@@ -483,6 +559,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     bookRef.current = clone(savedRef.current);
     calcRef.current = computeBook(bookRef.current);
     hist.current = { past: [], future: [], saved: 0 };
+    aiAnswers.current = { ...(savedRef.current.ai ?? {}) };
+    aiDirty.current = false;
     setSi((i) => Math.min(i, bookRef.current!.sheets.length - 1));
     setRev((r) => r + 1);
   };
@@ -744,9 +822,12 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     const e = editRef.current;
     if (!e) return;
     const pos = caretRef.current;
-    const m = /([A-Za-z][A-Za-z0-9.]*)$/.exec(e.text.slice(0, pos));
+    const m = /([A-Za-z_][A-Za-z0-9._]*)$/.exec(e.text.slice(0, pos));
     const start = m ? pos - m[1].length : pos;
-    setText(`${e.text.slice(0, start)}${n}(${e.text.slice(pos)}`, start + n.length + 1, true);
+    // A named range goes in as it is; a function (or a named LAMBDA) with its bracket.
+    const range = bookRef.current?.names?.find((x) => x.name === n);
+    const open = range && !/^\s*LAMBDA\s*\(/i.test(range.ref) ? '' : '(';
+    setText(`${e.text.slice(0, start)}${n}${open}${e.text.slice(pos)}`, start + n.length + open.length, true);
   };
 
   /** Words put in the active cell (a date, a function to fill in, a character): at the caret while typing; else typing begins with them, after what the cell holds when `after`. */
@@ -1159,7 +1240,12 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       t = m[3];
     }
     const rg = parseRange(t.toUpperCase());
-    if (!rg) return void toast(tr('Type a cell such as C12, or a range such as B2:D9.')), false;
+    if (!rg) {
+      // A named range: where it is (one that is no range of cells, a value or a formula, is nowhere to go).
+      const nm = (book.names ?? []).find((n) => n.name.toLowerCase() === t.toLowerCase() && (!n.sheet || n.sheet === book.sheets[target].id));
+      if (nm && /^(?:'(?:[^']|'')+'|[^'!(]+)![$A-Za-z0-9:]+$|^[$A-Za-z]+[$0-9]+(?::[$A-Za-z]+[$0-9]+)?$/.test(nm.ref)) return goName(nm.ref.replace(/\$/g, ''));
+      return void toast(tr(nm ? `${nm.name} is a value or a formula, not a range of cells.` : 'Type a cell such as C12, a range such as B2:D9, or a named range.')), false;
+    }
     // Within that sheet's grid (another sheet's may be longer).
     const sz = target === sheetIx ? size : gridSize(calc!, target);
     const s = rectSel({ r1: Math.min(rg.r1, sz.rows - 1), c1: Math.min(rg.c1, sz.cols - 1), r2: Math.min(rg.r2, sz.rows - 1), c2: Math.min(rg.c2, sz.cols - 1) });
@@ -1170,6 +1256,12 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     } else setSel(s, true);
     requestAnimationFrame(() => grid.current?.focus());
     return true;
+  };
+
+  /** A cell's link opened: a web address in a new tab, a place in the workbook gone to. */
+  const openLink = (url: string) => {
+    if (url.startsWith('#')) return void goName(url.slice(1));
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // ---- the filter ---------------------------------------------------------------------------------------------------------------
@@ -1460,6 +1552,311 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     toast(got.count ? `${got.count} cell${got.count === 1 ? '' : 's'} trimmed` : tr('No extra spaces were found.'));
   };
 
+  // ---- AI: its cells, a formula written or explained, Fill with AI, a table made, Analyze and Clean up -----------------------------
+  const aiCells = useAiCells({
+    book: () => bookRef.current,
+    calc: () => calcRef.current,
+    rev,
+    docKey: doc?.key,
+    readOnly,
+    onAnswers: (answers) => {
+      if (!bookRef.current || !Object.keys(answers).length) return;
+      aiAnswers.current = { ...aiAnswers.current, ...answers };
+      bookRef.current.ai = aiAnswers.current;
+      calcRef.current?.aiChanged();
+      aiDirty.current = true;
+      setRev((r) => r + 1);
+    },
+    onForget: (keys) => {
+      if (!bookRef.current) return;
+      const next = { ...aiAnswers.current };
+      for (const k of keys) delete next[k];
+      aiAnswers.current = next;
+      if (Object.keys(next).length) bookRef.current.ai = next;
+      else delete bookRef.current.ai;
+      calcRef.current?.aiChanged();
+      setRev((r) => r + 1);
+    },
+  });
+  const [aiPop, setAiPop] = useState<'formula' | 'explain' | null>(null);
+  const aiAnchor = useRef<HTMLButtonElement>(null);
+  const aiContext = () => contextFor(bookRef.current!, bookRef.current!.sheets[sheetIx], calcRef.current!, sheetIx, selRef.current.r, selRef.current.c);
+  /** A formula the helper model wrote, in the active cell (what it held replaced). */
+  const insertFormula = (f: string) => {
+    if (!book || !sheet || readOnly) return;
+    const k = refName(sel.r, sel.c);
+    const next = typedInto(sheet.cells[k], f);
+    if (refused(sel.r, sel.c, next)) return;
+    change(cellsPatch(book, sheetIx, { [k]: next }));
+    grid.current?.focus();
+  };
+  /** The table a column is in, for Fill with AI: around the active cell, or around the cell beside it when its column is empty. */
+  const columnTable = (): Rect | null => {
+    if (!sheet || !calc) return null;
+    const e = calc.extent(sheetIx);
+    const around = (r: number, c: number) => regionAround(sheet, r, c, Math.max(e.rows, r + 1), Math.max(e.cols, c + 1));
+    let b = around(sel.r, sel.c);
+    if (b.c1 === b.c2 && sel.c > 0) b = around(sel.r, sel.c - 1);
+    if (b.c1 === b.c2 && b.r1 === b.r2) return null;
+    return { r1: b.r1, c1: Math.min(b.c1, sel.c), r2: b.r2, c2: Math.max(b.c2, sel.c) };
+  };
+  /** Fill with AI (Flash fill, Ctrl+E): the rest of the active column from the cells filled in it, by a pattern found here, else by the helper model. */
+  const fillAi = async () => {
+    if (!book || !sheet || !calc || readOnly) return;
+    const b = columnTable();
+    if (!b) return void toast(tr('Put Fill with AI in a column of a table, beside the values it is to work from.'));
+    const c = sel.c;
+    const head = hasHeader(sheet, calc, sheetIx, b);
+    const r0 = head ? b.r1 + 1 : b.r1;
+    const cols = Array.from({ length: b.c2 - b.c1 + 1 }, (_, j) => b.c1 + j).filter((cc) => cc !== c);
+    const text = (r: number, cc: number) => {
+      const v = calc.value(sheetIx, r, cc);
+      return v === null ? '' : formatValue(v, sheet.cells[refName(r, cc)]?.s);
+    };
+    const inputs = (r: number) => cols.map((cc) => text(r, cc));
+    const examples: { inputs: string[]; output: string }[] = [];
+    const targets: number[] = [];
+    for (let r = r0; r <= b.r2; r++) {
+      const own = sheet.cells[refName(r, c)];
+      if (own?.v !== undefined && own.f === undefined) examples.push({ inputs: inputs(r), output: text(r, c) });
+      else if (!own?.f && own?.v === undefined && inputs(r).some(Boolean)) targets.push(r);
+    }
+    if (!examples.length) return void toast(tr('Type what you want in the first cells of the column, then Fill with AI fills the rest.'));
+    if (!targets.length) return void toast(tr('The column is filled already.'));
+    const local = flashFill(examples, targets.map(inputs));
+    let outputs = local?.outputs;
+    let how = local ? tr('a pattern found in your examples (free)') : '';
+    if (!local) {
+      const rows = targets.slice(0, 200);
+      toast(tr(`Asking the helper model to fill ${rows.length} cells`));
+      try {
+        const got = await askAi<FillAnswer>('/api/write/sheet-fill', { headers: cols.map((cc) => (head ? text(b.r1, cc) : '') || colName(cc)), target: head ? text(b.r1, c) : undefined, examples: examples.slice(0, 20), rows: rows.map(inputs) });
+        outputs = got.outputs;
+        how = got.model ? tr(`the examples, by ${got.model}`) : tr('the examples, by the helper model');
+      } catch (e) {
+        return void toastError(e);
+      }
+    }
+    const cur = bookRef.current!.sheets[sheetIx];
+    const changes: Record<string, Cell | null> = {};
+    targets.forEach((r, i) => {
+      const v = outputs?.[i];
+      const k = refName(r, c);
+      if (v === null || v === undefined || v === '' || cur.cells[k]?.v !== undefined || cur.cells[k]?.f !== undefined) return;
+      changes[k] = typedInto(cur.cells[k], v.startsWith('=') ? `'${v}` : v);
+    });
+    const n = Object.keys(changes).length;
+    if (!n) return void toast(tr('No pattern fits your examples: fill in a few more cells, then try again.'));
+    change(cellsPatch(bookRef.current!, sheetIx, changes));
+    toast(tr(`Filled ${n} cells from ${how}.`));
+  };
+  /** A table made with AI, here (at the active cell) or on a sheet of its own: its header row, its formats, checkboxes, dropdowns and stars. */
+  const insertAiTable = (t: TableAnswer, where: 'here' | 'sheet') => {
+    if (!book || !sheet || !calc || readOnly) return;
+    const r0 = where === 'here' ? sel.r : 0;
+    const c0 = where === 'here' ? sel.c : 0;
+    const h = t.rows.length + 1;
+    const w = t.columns.length;
+    if (where === 'here') {
+      for (let r = r0; r < r0 + h; r++)
+        for (let c = c0; c < c0 + w; c++)
+          if (calc.value(sheetIx, r, c) !== null) {
+            toast(tr('Those cells hold something: the table went on a sheet of its own.'));
+            return insertAiTable(t, 'sheet');
+          }
+    }
+    const formats: Record<string, unknown> = {};
+    const validation: unknown[] = [];
+    t.columns.forEach((col, j) => {
+      const letter = colName(c0 + j);
+      const range = `${letter}${r0 + 2}:${letter}${r0 + h}`;
+      if (col.type === 'currency') formats[letter] = 'currency';
+      else if (col.type === 'percent') formats[letter] = 'percent';
+      else if (col.type === 'date') formats[letter] = 'date';
+      else if (col.type === 'checkbox') validation.push({ range, checkbox: true });
+      else if (col.type === 'rating') validation.push({ range, rating: 5 });
+      else if (col.type === 'list' && col.options?.length) validation.push({ range, list: col.options });
+    });
+    const rows = t.rows.map((r) => r.map((v, j) => (t.columns[j]?.type === 'percent' && typeof v === 'number' ? v / 100 : t.columns[j]?.type === 'text' && typeof v === 'string' && v.startsWith('=') ? `'${v}` : v)));
+    const made = normalizeBook({ sheets: [{ name: t.title || tr('Table'), start: refName(r0, c0), rows: [t.columns.map((c) => c.name), ...rows], header: true, formats, validation, ...(where === 'sheet' ? { widths: Object.fromEntries(t.columns.map((c, j) => [colName(j), Math.min(260, Math.max(90, c.name.length * 9 + 24))])) } : {}) }] }).sheets[0];
+    if (where === 'sheet') return addSheet({ ...made, id: newId(), freeze: { rows: 1 } });
+    // Here: the header's look only (not freezing the sheet), the rules after the sheet's own.
+    const cells: Record<string, Cell | null> = {};
+    for (const [k, cell] of Object.entries(made.cells)) cells[k] = cell;
+    change(together([cellsPatch(book, sheetIx, cells), made.validation?.length ? metaPatch(sheet, { validation: [...(sheet.validation ?? []), ...made.validation] }) : null]));
+    setSel(rectSel({ r1: r0, c1: c0, r2: r0 + h - 1, c2: c0 + w - 1 }), true);
+  };
+  /** An idea from Analyze the data put in: a chart beside the table, a pivot table on a sheet of its own, or a formula under the table. */
+  const applyIdea = (idea: AnalyzeIdea, b: Rect) => {
+    if (!book || !sheet || !calc || readOnly) return;
+    if (idea.kind === 'chart') {
+      if ((sheet.charts?.length ?? 0) >= SHEET_LIMITS.charts) return void toast(tr('A sheet holds at most 20 charts.'));
+      const cols = [idea.x, ...idea.ys].map((l) => colIndex(l)).filter((c) => c >= 0);
+      const range = cols.map((c) => rangeName({ r1: b.r1, c1: c, r2: b.r2, c2: c })).join(',');
+      const e = calc.shownExtent(sheetIx);
+      const at = Math.min(SHEET_LIMITS.cols - 1, Math.max(b.c2 + 1, e.cols));
+      const g = sheetSizes(sheet, view.hidR);
+      // Charts already beside the table: the new one under them.
+      const below = (sheet.charts ?? []).reduce((y, ch) => Math.max(y, cornerXY(ch.to, g).y), 0);
+      const from = below ? cornerAt(cornerXY({ cell: refName(b.r1, at) }, g).x + 20, below + 16, g.colW, g.rowH) : { cell: refName(b.r1, at), dx: 20 };
+      const p0 = cornerXY(from, g);
+      const chart: SheetChart = { id: newId(), kind: idea.chart, range, title: idea.title.slice(0, 200), from, to: cornerAt(p0.x + 480, p0.y + 300, g.colW, g.rowH) };
+      setCharts([...(sheet.charts ?? []), chart]);
+      setChartSel(chart.id);
+      requestAnimationFrame(() => grid.current?.reveal(parseRef(from.cell)!.r, Math.min(size.cols - 1, at + 3)));
+    } else if (idea.kind === 'pivot') {
+      const by = colIndex(idea.by);
+      if (by < b.c1 || by > b.c2) return void toast(tr('That column is not in the table.'));
+      const made = summarySheet(sheet, calc, sheetIx, b, by, idea.across ? colIndex(idea.across) : null, idea.values.map((v) => ({ c: colIndex(v.col), fn: v.fn })), idea.title.slice(0, 31));
+      addSheet({ ...made, id: newId() });
+    } else {
+      // Under the table, a row apart: its name, and the formula beside it.
+      const r = Math.min(SHEET_LIMITS.rows - 1, b.r2 + 2);
+      const changes: Record<string, Cell | null> = { [refName(r, b.c1)]: { v: idea.title.slice(0, 200), s: { b: true } }, [refName(r, b.c1 + 1)]: typedInto(undefined, idea.formula) };
+      change(cellsPatch(book, sheetIx, changes));
+      setSel(cellSel(r, b.c1 + 1), true);
+    }
+  };
+  /** Clean up the data: the issues found in the panel's table, each fixed on the workbook as the one before left it, all one step. */
+  const cleanBlock = panel?.kind === 'clean' && sheet && calc ? (() => {
+    const e = calc.extent(sheetIx);
+    return regionAround(sheet, panel.block.r1, panel.block.c1, Math.max(e.rows, panel.block.r1 + 1), Math.max(e.cols, panel.block.c1 + 1));
+  })() : null;
+  const issues = useMemo(() => (cleanBlock && sheet && calc && panel?.kind === 'clean' ? findIssues(sheet, calc, sheetIx, cleanBlock, panel.header) : []), [rev, sheetIx, panel, cleanBlock?.r2, cleanBlock?.c2]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fixIssues = (list: CleanIssue[]) => {
+    if (!book || !sheet || !cleanBlock || panel?.kind !== 'clean' || readOnly) return;
+    const want = new Set(list.map((i) => i.id));
+    let b: Workbook = structuredClone(book);
+    let block = cleanBlock;
+    for (let pass = 0; pass < 10 && want.size; pass++) {
+      const sh = b.sheets[sheetIx];
+      const found = findIssues(sh, computeBook(b), sheetIx, block, panel.header).find((i) => want.has(i.id));
+      if (!found) break;
+      want.delete(found.id);
+      for (const [k, cell] of Object.entries(found.changes ?? {})) {
+        if (cell) sh.cells[k] = cell;
+        else delete sh.cells[k];
+      }
+      for (const r of found.rows ?? []) {
+        b = adjustForDelete(b, sh.id, 'row', r, 1);
+        block = { ...block, r2: block.r2 - 1 };
+      }
+    }
+    change({ k: 'book', before: book, after: b });
+  };
+  const showIssue = (it: CleanIssue) => {
+    const ps = it.cells.slice(0, 200).flatMap((k) => parseRef(k) ?? []);
+    if (!ps.length) return;
+    setSel(cellSel(ps[0].r, ps[0].c), true);
+    setMore(ps.slice(1).map((p) => ({ r1: p.r, c1: p.c, r2: p.r, c2: p.c })));
+  };
+  const openAiPanel = (kind: 'analyze' | 'clean') => {
+    if (!sheet || !calc) return;
+    const b = blockOf();
+    if (b.r1 === b.r2 && b.c1 === b.c2) return void toast(tr('Pick a cell in a table first.'));
+    setPanel({ kind, block: b, header: hasHeader(sheet, calc, sheetIx, b) });
+  };
+  const activeFormula = !edit && sheet?.cells[refName(sel.r, sel.c)]?.f;
+
+  // ---- named ranges, protection, groups, links, grid lines ------------------------------------------------------------------
+  /** The cells picked as a name's range or a protection's: on this sheet, fixed ("'Sheet 1'!$B$2:$B$9"). */
+  const pickedRef = () => (sheet ? `${quoteSheet(sheet.name)}!${selRange().replace(/([A-Z]+)(\d+)/g, '$$$1$$$2')}` : '');
+  const setNames = (names: NamedRange[]) => book && swap({ ...book, names: names.length ? names : undefined });
+  const setProtect = (list: SheetProtect[]) => sheet && change(metaPatch(sheet, { protect: list.length ? list : undefined }));
+  const outline = useMemo(() => (sheet?.groups?.length ? spansOf(sheet) : undefined), [sheet, sheet?.groups, rev]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Data → Group rows (or columns: when whole columns are picked), and Ungroup. */
+  const group = (undo = false) => {
+    if (!sheet || readOnly) return;
+    const axis = wholeCols && !wholeRows ? 'col' : 'row';
+    const [a, b] = axis === 'row' ? [x.r1, x.r2] : [x.c1, x.c2];
+    const next = undo ? removeGroup(sheet, axis, a, b) : addGroup(sheet, axis, a, b);
+    if (!next) return void toast(tr(undo ? 'There is no group there to ungroup.' : 'A group must be inside another or around it, not across it.'));
+    change(metaPatch(sheet, { groups: next.length ? next : undefined }));
+  };
+  const fold = (i: number, hide: boolean) => sheet && change(metaPatch(sheet, foldGroup(sheet, i, hide)));
+  const applyLink = (link: string | null, text: string) => {
+    if (!book || !sheet) return;
+    const k = refName(sel.r, sel.c);
+    const cur = sheet.cells[k];
+    const words = cur?.f === undefined && text.trim() && text !== formatValue(calc!.value(sheetIx, sel.r, sel.c), cur?.s) ? typedInto(cur, text.startsWith('=') ? `'${text}` : text) : (cur ?? null);
+    const next: Cell = { ...(words ?? {}) };
+    if (link) next.link = link;
+    else delete next.link;
+    change(cellsPatch(book, sheetIx, { [k]: tidyCell(next) }));
+  };
+  const toggleGrid = () => sheet && change(metaPatch(sheet, { noGrid: sheet.noGrid ? undefined : true }));
+
+  // ---- goal seek, traces, pivot tables -----------------------------------------------------------------------------------------
+  /** Trace precedents and dependents: the cells outlined (blue: what the formula uses; green: what uses the cell). */
+  const [traces, setTraces] = useState<{ sheet: string; boxes: RefBox[] } | null>(null);
+  const trace = (what: 'pre' | 'dep') => {
+    if (!book || !sheet) return;
+    const cell = refName(sel.r, sel.c);
+    if (what === 'pre') {
+      if (sheet.cells[cell]?.f === undefined) return void toast(tr('This cell holds no formula: it uses no cells.'));
+      const list = precedents(book, sheetIx, cell);
+      const here = list.filter((p) => p.sheet === sheetIx).map((p) => ({ ...p.x, r2: Math.min(p.x.r2, size.rows - 1), c2: Math.min(p.x.c2, size.cols - 1), color: '#1a73e8' }));
+      const away = list.filter((p) => p.sheet !== sheetIx);
+      setTraces({ sheet: sheet.id, boxes: here });
+      if (!list.length) toast(tr('Its formula uses no cells.'));
+      else if (away.length) toast(tr(`It also uses ${away.map((p) => `${book.sheets[p.sheet].name}!${rectWords(p.x)}`).slice(0, 4).join(', ')}.`));
+    } else {
+      const list = dependents(book, sheetIx, cell);
+      const here = list.filter((d) => d.sheet === sheetIx).flatMap((d) => (parseRef(d.cell) ? [{ r1: parseRef(d.cell)!.r, c1: parseRef(d.cell)!.c, r2: parseRef(d.cell)!.r, c2: parseRef(d.cell)!.c, color: '#188038' }] : []));
+      const away = list.filter((d) => d.sheet !== sheetIx);
+      setTraces({ sheet: sheet.id, boxes: here });
+      if (!list.length) toast(tr('No formula uses this cell.'));
+      else if (away.length) toast(tr(`Formulas on other sheets use it too: ${away.map((d) => `${book.sheets[d.sheet].name}!${d.cell}`).slice(0, 4).join(', ')}.`));
+    }
+  };
+  const seek = (set: string, to: number, by: string) => {
+    if (!book || !sheet) return tr('There is no sheet.');
+    if (sheet.cells[set]?.f === undefined) return tr(`${set} holds no formula: pick the cell of the formula to set.`);
+    if (sheet.cells[by]?.f !== undefined) return tr(`${by} holds a formula: pick a cell of a number the formula uses.`);
+    const got = goalSeek(book, sheetIx, set, to, by);
+    return got ?? tr('The formula gives no number with any value of that cell.');
+  };
+  const applyGoal = (by: string, value: number) => {
+    if (!book || !sheet) return;
+    const cur = sheet.cells[by];
+    change(cellsPatch(book, sheetIx, { [by]: { ...(cur ?? {}), v: value } }));
+  };
+  /** Data → Pivot table: a new one of the table picked, or the sheet's own to change. */
+  const openPivot = () => {
+    if (!sheet || !calc) return;
+    if (sheet.pivot) return setPanel({ kind: 'pivot', start: sheet.pivot, editing: true });
+    const b = blockOf();
+    if (b.r2 <= b.r1) return void toast(tr('Pick a cell in a table with a header row and rows under it.'));
+    const cols = Array.from({ length: b.c2 - b.c1 + 1 }, (_, j) => b.c1 + j);
+    const num = cols.find((c) => typeof calc.value(sheetIx, b.r1 + 1, c) === 'number');
+    // Rows by the column of words whose values repeat most (fewest different ones), as a pivot table is for.
+    const distinct = (c: number) => new Set(Array.from({ length: b.r2 - b.r1 }, (_, i) => String(calc.value(sheetIx, b.r1 + 1 + i, c) ?? '').trim().toLowerCase())).size;
+    const words = cols.filter((c) => {
+      const v = calc.value(sheetIx, b.r1 + 1, c);
+      return typeof v === 'string' && v.trim() !== '' && distinct(c) >= 2;
+    });
+    const word = words.sort((p, q) => distinct(p) - distinct(q))[0] ?? b.c1;
+    setPanel({ kind: 'pivot', editing: false, start: { source: `${quoteSheet(sheet.name)}!${rangeName(b)}`, rows: [colName(word)], values: [{ col: colName(num ?? word), fn: num !== undefined ? 'sum' : 'count' }] } });
+  };
+  const makePivot = (def: PivotDef, editing: boolean) => {
+    if (!book || !calc || !sheet) return;
+    const made = pivotSheet(book, calc, def, editing ? sheet.name : tr(`Pivot table ${book.sheets.filter((s) => s.pivot).length + 1}`).slice(0, 31));
+    if (!made) return void toast(tr('That table cannot be summed up: give a range with a header row, and columns of it for the rows and values.'));
+    if (editing) swap({ ...book, sheets: book.sheets.map((s, i) => (i === sheetIx ? { ...made, id: s.id, name: s.name } : s)) });
+    else addSheet({ ...made, id: newId() });
+    setPanel(null);
+  };
+  /** The named ranges formulas may use here, and the name of the cells picked when they are one. */
+  const rangeNames = (book?.names ?? []).filter((n) => !n.sheet || n.sheet === sheet?.id).map((n) => n.name);
+  const selName = (() => {
+    for (const n of book?.names ?? []) {
+      if (!sheet || (n.sheet && n.sheet !== sheet.id)) continue;
+      const src = sourceOf(n.ref.replace(/\$/g, ''));
+      if (src && (src.sheet ?? sheet.name).toLowerCase() === sheet.name.toLowerCase() && src.x.r1 === x.r1 && src.x.c1 === x.c1 && src.x.r2 === x.r2 && src.x.c2 === x.c2) return n.name;
+    }
+    return null;
+  })();
+
   // ---- find and replace -----------------------------------------------------------------------------------------------------------
   const how: FindHow = { ...find.options, ...findHow };
   const matches = useMemo(
@@ -1676,7 +2073,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     }
     if (e.key === 'Tab') {
       e.preventDefault();
-      const help = formulaHelp(ed.text, caretRef.current);
+      const help = formulaHelp(ed.text, caretRef.current, rangeNames);
       if (help.names.length && !e.shiftKey) return suggest(help.names[0]);
       return commitEdit([0, e.shiftKey ? -1 : 1]);
     }
@@ -1741,6 +2138,9 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     if (mod && e.shiftKey && lower === 'l' && !readOnly) return void (e.preventDefault(), toggleFilter());
     if (mod && e.shiftKey && lower === 'v' && !readOnly) return void (e.preventDefault(), pasteHow('values'));
     if (mod && !readOnly && (lower === 'd' || lower === 'r')) return void (e.preventDefault(), fill(lower === 'd'));
+    if (mod && !readOnly && lower === 'e' && !e.shiftKey) return void (e.preventDefault(), void fillAi());
+    if (mod && !readOnly && lower === 'k') return void (e.preventDefault(), setDialog('link'));
+    if (e.altKey && e.shiftKey && !readOnly && (k === 'ArrowRight' || k === 'ArrowLeft')) return void (e.preventDefault(), group(k === 'ArrowLeft'));
     if (mod && !readOnly && (k === ';' || k === ':')) {
       // Ctrl+; today's date, Ctrl+Shift+; the time now.
       e.preventDefault();
@@ -1921,16 +2321,18 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   if (!book || !sheet || !calc) return <div className="flex h-full items-center justify-center text-fg-3">…</div>;
 
   // References outlined while a formula is typed (those on this sheet).
-  const refs: RefBox[] = edit?.text.startsWith('=')
-    ? formulaRefs(edit.text.slice(1)).flatMap((f, i) => {
+  const refs: RefBox[] = !edit?.text.startsWith('=')
+    ? traces?.sheet === sheet.id
+      ? traces.boxes
+      : []
+    : formulaRefs(edit.text.slice(1)).flatMap((f, i) => {
         if (f.ref.sheet !== undefined && f.ref.sheet.toLowerCase() !== sheet.name.toLowerCase()) return [];
         const a = f.ref.a;
         const b = f.ref.b ?? a;
         const [ra, rb] = [a.r ?? 0, b.r ?? size.rows - 1];
         const [ca, cb] = [a.c ?? 0, b.c ?? size.cols - 1];
         return [{ r1: Math.min(ra, rb), c1: Math.min(ca, cb), r2: Math.max(ra, rb), c2: Math.max(ca, cb), color: REF_COLORS[i % REF_COLORS.length] }];
-      })
-    : [];
+      });
   // The array the active cell's formula spilled, or that spilled into it, outlined as spreadsheets outline it.
   let spillFormula: string | undefined;
   for (const { r, c, sp } of calc.spillsOf(sheetIx))
@@ -2055,6 +2457,33 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     toggleBoard,
     boardOpens: board ? !!keptBoard?.open && !boardLocal : undefined,
     boardOpen: () => board && setBoardModel({ open: keptBoard?.open && !boardLocal ? undefined : true }),
+    names: () => setPanel({ kind: 'names' }),
+    pivot: openPivot,
+    pivotHere: !!sheet.pivot,
+    goalSeek: () => setDialog('goal'),
+    printSetup: () => setDialog('print'),
+    trace,
+    traced: traces?.sheet === sheet.id,
+    untrace: () => setTraces(null),
+    protect: () => setPanel({ kind: 'protect' }),
+    group: () => group(false),
+    ungroup: () => group(true),
+    groupWhat: wholeCols && !wholeRows ? 'columns' : 'rows',
+    link: () => setDialog('link'),
+    gridlines: !sheet.noGrid,
+    toggleGridlines: toggleGrid,
+    ai: {
+      formula: () => setAiPop('formula'),
+      explain: activeFormula ? () => setAiPop('explain') : undefined,
+      fill: () => void fillAi(),
+      table: () => setDialog('table-ai'),
+      analyze: () => openAiPanel('analyze'),
+      clean: () => openAiPanel('clean'),
+      cells: Object.values(book.sheets).some((s) => Object.values(s.cells).some((c) => asksAi(c.f))),
+      refresh: () => aiCells.refresh(more.length || !single(sel) ? undefined : [{ sheet: sheet.id, cell: refName(sel.r, sel.c) }]),
+      waiting: aiCells.waiting,
+      askWaiting: aiCells.askWaiting,
+    },
   };
   const menus = sheetMenus(menuCtx);
 
@@ -2095,6 +2524,10 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
         ['Ctrl+Shift+V', 'Paste values only'],
         ['Ctrl+D', 'Fill down'],
         ['Ctrl+R', 'Fill right'],
+        ['Ctrl+E', 'Fill with AI'],
+        ['Ctrl+K', 'Link'],
+        ['Alt+Shift+Right', 'Group rows or columns'],
+        ['Alt+Shift+Left', 'Ungroup'],
         ['Delete', 'Clear'],
         ['Ctrl+Z', 'Undo'],
         ['Ctrl+Shift+Z', 'Redo'],
@@ -2162,7 +2595,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       </div>
       {!board && (
         <FormulaBar
-          name={rectLabel(x, size.rows, size.cols) === 'the whole sheet' ? `${refName(0, 0)}:${refName(size.rows - 1, size.cols - 1)}` : rectLabel(x, size.rows, size.cols)}
+          name={selName ?? (rectLabel(x, size.rows, size.cols) === 'the whole sheet' ? `${refName(0, 0)}:${refName(size.rows - 1, size.cols - 1)}` : rectLabel(x, size.rows, size.cols))}
           onName={goName}
           text={edit ? edit.text : inputText(active)}
           editing={!!edit}
@@ -2177,6 +2610,10 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
           barRef={barRef}
           ghost={spillFormula}
           cellAnchor={edit?.where === 'cell' ? () => grid.current?.input()?.getBoundingClientRect() ?? null : null}
+          aiRef={aiAnchor}
+          ranges={rangeNames}
+          onAi={readOnly ? undefined : () => setAiPop(aiPop === 'formula' ? null : 'formula')}
+          onExplain={activeFormula ? () => setAiPop(aiPop === 'explain' ? null : 'explain') : undefined}
         />
       )}
       <div className="relative flex min-h-0 flex-1">
@@ -2270,6 +2707,10 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
               setSel(cellSel(r, c));
               openComments(false);
             }}
+            ai={(cell) => aiCells.stateOf(sheet.id, cell)}
+            onOpenLink={openLink}
+            outline={outline}
+            onFold={readOnly ? undefined : fold}
           />
         )}
         {find.open && (
@@ -2326,8 +2767,38 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
             onClose={() => setPanel(null)}
           />
         )}
-        {panelChart && <ChartPanel key={panelChart.id} book={book} chart={panelChart} narrow={narrow} onChange={(c) => updateChart(c, `chart:${c.id}`)} onDelete={() => deleteChart(panelChart.id)} onClose={() => setPanel(null)} />}
+        {panel?.kind === 'analyze' && <AnalyzePanel sheet={sheet} calc={calc} si={sheetIx} block={panel.block} header={panel.header} narrow={narrow} onIdea={(idea) => applyIdea(idea, panel.block)} onClose={() => setPanel(null)} />}
+        {panel?.kind === 'names' && (
+          <NamesPanel
+            names={book.names ?? []}
+            sheetId={sheet.id}
+            sheetName={sheet.name}
+            picked={pickedRef()}
+            narrow={narrow}
+            onChange={setNames}
+            onRename={(from, to) => swap(renameName(book, from, to))}
+            onGo={(n) => goName(n)}
+            onClose={() => setPanel(null)}
+          />
+        )}
+        {panel?.kind === 'pivot' && <PivotPanel key={`${panel.editing}`} book={book} calc={calc} start={panel.start} editing={panel.editing} narrow={narrow} onMake={(def) => makePivot(def, panel.editing)} onClose={() => setPanel(null)} />}
+        {panel?.kind === 'protect' && <ProtectPanel list={sheet.protect ?? []} picked={selRange()} narrow={narrow} onChange={setProtect} onClose={() => setPanel(null)} />}
+        {panel?.kind === 'clean' && <CleanPanel issues={issues} narrow={narrow} onFix={fixIssues} onShow={showIssue} onClose={() => setPanel(null)} />}
+        {panelChart && <ChartPanel key={panelChart.id} book={book} calc={calc} si={sheetIx} chart={panelChart} narrow={narrow} onChange={(c) => updateChart(c, `chart:${c.id}`)} onDelete={() => deleteChart(panelChart.id)} onClose={() => setPanel(null)} />}
       </div>
+      {!readOnly && (aiCells.waiting > 0 || aiCells.asking > 0) && (
+        <div className="flex shrink-0 items-center gap-2 border-t border-line bg-panel px-3 py-1.5 text-[12.5px] text-fg-2">
+          <Sparkles size={13} className="shrink-0 text-accent" />
+          <span className="min-w-0 flex-1 truncate">
+            {aiCells.asking > 0 ? (aiCells.asking === 1 ? 'Asking the helper model for an AI cell' : `Asking the helper model for ${aiCells.asking} AI cells`) : aiCells.waiting === 1 ? 'An AI cell waits for its answer' : `${aiCells.waiting} AI cells wait for their answers`}
+          </span>
+          {aiCells.waiting > 0 && aiCells.asking === 0 && (
+            <Button size="sm" variant="ghost" onClick={aiCells.askWaiting}>
+              Ask now
+            </Button>
+          )}
+        </div>
+      )}
       <SheetTabs
         names={book.sheets.map((s) => s.name)}
         active={sheetIx}
@@ -2472,6 +2943,16 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
                 {ctx.on === 'cell' && (
                   <MenuItem icon={<MessageSquarePlus size={14} />} hint="Ctrl+Alt+M" onClick={() => (setCtx(null), openComments(!readOnly))}>
                     Comment
+                  </MenuItem>
+                )}
+                {ctx.on === 'cell' && activeFormula && (
+                  <MenuItem icon={<MessageCircleQuestionMark size={14} />} onClick={() => (setCtx(null), setAiPop('explain'))}>
+                    Explain this formula
+                  </MenuItem>
+                )}
+                {ctx.on === 'cell' && !readOnly && asksAi(activeFormula || undefined) && (
+                  <MenuItem icon={<RefreshCw size={14} />} onClick={() => (setCtx(null), aiCells.refresh([{ sheet: sheet.id, cell: refName(sel.r, sel.c) }]))}>
+                    Refresh the AI answer
                   </MenuItem>
                 )}
                 {ctx.on !== 'col' && (
@@ -2638,6 +3119,20 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       {dialog === 'split' && <SplitDialog guess={splitGuess()} onSplit={(sp) => void splitText(sp)} onClose={() => setDialog(null)} />}
       {dialog === 'format' && <FormatDialog code={active?.s?.code ?? ''} sample={calc.value(sheetIx, sel.r, sel.c)} style={active?.s} onApply={(c) => setCode(c)} onClose={() => setDialog(null)} />}
       <ShortcutsDialog open={dialog === 'shortcuts'} onClose={() => setDialog(null)} groups={shortcutGroups} />
+      {dialog === 'table-ai' && <TableAi onInsert={insertAiTable} onClose={() => setDialog(null)} />}
+      {dialog === 'print' && <PrintDialog setup={sheet.print} picked={selRange()} onApply={(p) => change(metaPatch(sheet, { print: p }))} onClose={() => setDialog(null)} />}
+      {dialog === 'goal' && <GoalSeekDialog setCell={sheet.cells[refName(sel.r, sel.c)]?.f !== undefined ? refName(sel.r, sel.c) : ''} byCell="" onSeek={seek} onApply={applyGoal} onClose={() => setDialog(null)} />}
+      {dialog === 'link' && (
+        <LinkDialog
+          link={active?.link}
+          text={formatValue(calc.value(sheetIx, sel.r, sel.c), active?.s)}
+          places={[...book.sheets.map((s) => `${quoteSheet(s.name)}!A1`), ...(book.names ?? []).map((n) => n.name)]}
+          onApply={applyLink}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      <FormulaAi anchor={aiAnchor} open={aiPop === 'formula'} context={aiContext} onInsert={insertFormula} onClose={() => setAiPop(null)} />
+      <ExplainAi anchor={aiAnchor} open={aiPop === 'explain' && !!activeFormula} formula={activeFormula ? `=${activeFormula}` : ''} context={aiContext} onClose={() => setAiPop(null)} />
       {confirmNode}
     </div>
   );

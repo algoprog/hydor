@@ -50,6 +50,11 @@ import {
 } from '../../shared/sheets.ts';
 import { clearChanges, commentsAfterSort, fillChanges, guessSeparator, hasHeader, holds, regionAround, removeDuplicates, sortByKeys, sortChanges, splitColumn, styleChanges, summarySheet, trimChanges, type SummaryFn } from '../../shared/sheet-tools.ts';
 import { sheetNamed } from '../../shared/sheet-edits.ts';
+import { AI_BATCH } from '../../shared/sheet-ai.ts';
+import { aiCells } from '../write/sheets.ts';
+import { quoteSheet } from '../../shared/sheets.ts';
+import { pivotSheet } from '../../shared/sheet-pivot.ts';
+import { goalSeek } from '../../shared/sheet-whatif.ts';
 import { cleanTexName, TEX_MAIN, texFileText, type TexDoc } from '../../shared/latex.ts';
 import { texMoveFiles } from '../../shared/latex-files.ts';
 import { citedKeys } from '../../shared/latex-ai.ts';
@@ -769,6 +774,68 @@ const moveTab: Act<Workbook> = (book, a) => {
   return { model: { ...book, sheets: list }, said: `moved “${at.sh.name}” to be sheet ${to} of ${list.length}.` };
 };
 
+/** The AI cells that wait for an answer (=AI(…) an agent wrote, or whose cells changed): the helper model asked for them, many at once. */
+const askAi: Act<Workbook> = async (book, a, x) => {
+  const calc = computeBook(book);
+  calc.all();
+  const want = new Map(calc.aiAsks().map((q) => [q.key, q]));
+  // Asked again: the answers of the cells named (or all) forgotten first.
+  if (a.again === true) {
+    const bare = computeBook({ ...book, ai: undefined });
+    bare.all();
+    for (const q of bare.aiAsks()) want.set(q.key, q);
+  }
+  if (!want.size) return { said: 'No AI cell waits for an answer.' };
+  const list = [...want.values()].slice(0, 400);
+  const ai = { ...(book.ai ?? {}) };
+  let got = 0;
+  let failed = 0;
+  for (let i = 0; i < list.length; i += AI_BATCH) {
+    const r = await aiCells(x.ctx.deps.db, { asks: list.slice(i, i + AI_BATCH) }, AbortSignal.timeout(600_000));
+    Object.assign(ai, r.answers);
+    got += Object.keys(r.answers).length;
+    failed += Object.keys(r.failed ?? {}).length;
+  }
+  if (!got) return { said: `The helper model gave no answers for the ${plural(list.length, 'AI cell')}: try again.` };
+  return { model: { ...book, ai }, said: `asked the helper model for ${plural(got, 'AI cell')}${failed ? ` (${failed} got no answer)` : ''}${want.size > list.length ? `; ${want.size - list.length} more still wait: run it again` : ''}: their answers are kept with the sheet.` };
+};
+
+/** Data → Pivot table (shared/sheet-pivot.ts): a sheet of formulas summing the table up by columns for its rows (and across), its filters leaving values out. */
+const pivotTable: Act<Workbook> = (book, a, x) => {
+  const at = sheetAt(book, a.sheet);
+  if (book.sheets.length >= SHEET_LIMITS.sheets) throw new Error(`The spreadsheet has ${SHEET_LIMITS.sheets} sheets, as many as it may hold: delete one first.`);
+  const t = tableOf(at, a.range);
+  const head = headerOf(at, t.x, t.around, a.header_row);
+  if (!head || t.x.r2 <= t.x.r1) throw new Error(`pivot_table needs a table with a header row and rows under it; ${rangeName(t.x)} of “${at.sh.name}” has ${t.x.r2 <= t.x.r1 ? 'one row' : 'no header row'}.`);
+  const colOf = (v: unknown, what: string) => colName(columnIn(at, t.x, head, v, what));
+  const rows = (Array.isArray(a.rows) ? a.rows : [a.rows ?? a.by]).slice(0, 2).map((v) => colOf(v, 'rows'));
+  const values = listOf(a.values).map((v) => (isObj(v) ? { col: colOf(v.column ?? v.col, 'values'), fn: (['sum', 'count', 'average', 'min', 'max'].includes(str(v.fn)) ? str(v.fn) : 'sum') as 'sum' } : { col: colOf(v, 'values'), fn: 'sum' as const }));
+  if (!values.length) throw new Error('values: [{column, fn: sum|count|average|min|max}], the columns it sums up.');
+  const filters = listOf(a.filters).flatMap((f) => (isObj(f) ? [{ col: colOf(f.column ?? f.col, 'filters'), hide: listOf(f.hide).map((h) => str(h)) }] : []));
+  const def = { source: `${quoteSheet(at.sh.name)}!${rangeName(t.x)}`, rows, ...(a.across !== undefined ? { cols: colOf(a.across, 'across') } : {}), values, ...(filters.length ? { filters } : {}) };
+  const name = uniqueSheetName(str(a.name) || `Pivot of ${at.sh.name}`.slice(0, 31), book.sheets.map((s) => s.name));
+  const made = pivotSheet(book, at.calc, def, name);
+  if (!made) throw new Error('That table cannot be summed up: give a range with a header row, and columns of it for the rows and values.');
+  const { id: _id, ...sheet } = made;
+  void x;
+  return { model: { ...book, sheets: [...book.sheets.slice(0, at.si + 1), { ...sheet, name } as Sheet, ...book.sheets.slice(at.si + 1)] }, said: `added the pivot table “${name}” after “${at.sh.name}”, of formulas that keep up with ${rangeName(t.x)}; the user changes it with Data → Edit the pivot table.` };
+};
+
+/** Tools → Goal seek (shared/sheet-whatif.ts): the value of a cell that makes a formula give the result wanted, put in. */
+const goalSeekAct: Act<Workbook> = (book, a) => {
+  const at = sheetAt(book, a.sheet);
+  const set = str(a.cell ?? a.set).toUpperCase();
+  const by = str(a.changing ?? a.by_changing ?? a.by).toUpperCase();
+  const to = Number(a.to ?? a.value);
+  if (!/^[A-Z]{1,3}\d+$/.test(set) || at.sh.cells[set]?.f === undefined) throw new Error('cell: the cell of the formula to set ("C10").');
+  if (!/^[A-Z]{1,3}\d+$/.test(by) || at.sh.cells[by]?.f !== undefined) throw new Error('changing: a cell of a number the formula uses ("B2"), not a formula.');
+  if (!Number.isFinite(to)) throw new Error('to: the number the formula is to give.');
+  const r = goalSeek(book, at.si, set, to, by);
+  if (!r) throw new Error(`${set} gives no number with any value of ${by}.`);
+  const cells = { ...at.sh.cells, [by]: { ...(at.sh.cells[by] ?? {}), v: r.value } };
+  return { model: withSheet(book, at.si, { cells }), said: r.reached ? `set ${by} to ${r.value}: ${set} gives ${Number(r.result.toPrecision(12))} now.` : `found no value of ${by} that makes ${set} give ${to}; the nearest, ${r.value} (${set} gives ${Number(r.result.toPrecision(12))}), was put in.` };
+};
+
 // ---- LaTeX ------------------------------------------------------------------------------------------------------------
 
 /** The files tree's Rename and moves (shared/latex-files.ts texMoveFiles): every reference to a file follows it. */
@@ -922,6 +989,9 @@ const ACTIONS: { [K in PageKind]: Record<string, Act<any>> } = {
     duplicate_sheet: duplicateTab,
     delete_sheet: deleteTab,
     move_sheet: moveTab,
+    ask_ai: askAi,
+    pivot_table: pivotTable,
+    goal_seek: goalSeekAct,
   },
   tex: { move_files: moveFiles, tidy_source: tidySource, tidy_bibliography: tidyBibliography },
   notebook: { clear_outputs: clearOutputs },
@@ -967,7 +1037,7 @@ function duplicate(x: Here, a: Args): string {
 const DESCRIPTION = [
   'Do to a saved page of the user’s Library what its editor does with one click to the whole of it, where a save tool (save_slides, save_doc, save_sheet, save_latex, save_notebook) would have you write it all out yourself.',
   'Each runs the editor’s own code on the version kept now and keeps a new version (the older ones restorable; the user’s changes and comments stay), which the editor open on it shows at once; it answers what changed.',
-  'Free and instant, but describe_pictures (a model looks at each picture). Give id (get_page lists them) and action, with its fields:',
+  'Free and instant, but describe_pictures (a model looks at each picture) and ask_ai (the helper model answers each AI cell). Give id (get_page lists them) and action, with its fields:',
   'Slide decks.',
   '- animate {style: subtle|lively|bold|none, slides?}: animate every slide (or the slides listed, by number or id) as Animate → Animate every slide does: the title first, then the words a row at a time, bullets one by one, pictures after; Morph between slides that share parts; none takes every animation and transition off.',
   '- fix_accessibility {slides?}: put right what Tools → Check accessibility can (small words, colours that stand out too little, titles and the order they are read in, videos that start with their sound, tables without a header row); it lists what is left.',
@@ -992,6 +1062,9 @@ const DESCRIPTION = [
   '- insert_rows {at: a row number, count?}, insert_columns {at: a column’s letters, count?}: empty rows or columns put in there; every formula that points past them follows.',
   '- delete_rows {rows: "5", "5:7" or a list}, delete_columns {columns: "C", "C:D" or a list}: taken out; formulas follow, and a reference to a cell that went becomes #REF!.',
   '- rename_sheet {sheet, name} (the formulas that name it follow), duplicate_sheet {sheet, name?}, delete_sheet {sheet}, move_sheet {sheet, to: its place from 1}: the sheet tabs’ menu.',
+  '- pivot_table {rows: a column or two (letters or header words), across?: a column, values: [{column, fn: sum|count|average|min|max}], filters?: [{column, hide: [values left out]}], range?, name?}: a new sheet after it summing the table up, as formulas that keep up with it (Data → Pivot table; the user changes it there).',
+  '- goal_seek {cell: a formula’s cell, to: the number it is to give, changing: a cell of a number it uses}: the value of that cell that makes the formula give it, put in (Tools → Goal seek).',
+  '- ask_ai {again?}: the AI cells (=AI(…)) that wait for an answer asked of the helper model, many at once, their answers kept with the sheet (it costs a little, as any question to it does); again: true asks every AI cell again (Refresh AI cells).',
   'LaTeX documents.',
   '- move_files {moves: [{from, to}]}: rename or move files, pictures and folders ("figures/" to "img/"), every \\input, \\include and \\includegraphics that names them following, their comments and tracked changes along; it is typeset again.',
   '- tidy_source {files?, align?}: Edit → Tidy the source on its .tex files (or those listed): each line indented by the environments, items and groups it is in, and tables’ cells lined up at their & (align: false leaves them); no line’s own text changes.',
@@ -1060,6 +1133,10 @@ const SCHEMA = {
     title: { type: 'string', description: 'duplicate: the copy’s title.' },
     database: { type: 'string', description: 'fill_column: the database (its name or title).' },
     column: { type: 'string', description: 'fill_column: the AI column’s name.' },
+    again: { type: 'boolean', description: 'ask_ai: every AI cell asked again.' },
+    filters: { type: 'array', items: { type: 'object' }, description: 'pivot_table: [{column, hide: [values]}].' },
+    cell: { type: 'string', description: 'goal_seek: the formula’s cell.' },
+    changing: { type: 'string', description: 'goal_seek: the cell of a number it changes.' },
   },
   required: ['id', 'action'],
 };

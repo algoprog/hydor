@@ -5,9 +5,9 @@
 // in columns or rows, the first row and column as names and labels, its title, legend, axes' titles and colours. A range
 // it cannot draw from says why, in the chart's place and under its range in the panel.
 import { memo, useMemo, useRef, useState } from 'react';
-import { ChartArea, ChartBar, ChartColumn, ChartLine, ChartPie, ChartScatter, Donut, Trash2 } from 'lucide-react';
+import { ChartArea, ChartBar, ChartColumn, ChartColumnBig, ChartLine, ChartNoAxesColumnIncreasing, ChartPie, ChartScatter, Donut, Hexagon, Orbit, Trash2 } from 'lucide-react';
 import { chartBox, cleanChartRange, chartParts, COL_W, ROW_H, type Calc, type ChartCorner, type SheetChart, type SheetChartKind, type Workbook } from '@shared/sheets';
-import { chartData, chartProblem, chartSvg, CHART_COLORS } from '@shared/sheet-chart';
+import { chartData, chartProblem, chartSvg, CHART_COLORS, seriesAxis, seriesType } from '@shared/sheet-chart';
 import { tr } from '../../../i18n/runtime';
 import { Button, cx, Segmented, Switch } from '../../../components/ui';
 import type { GridGeo } from './Grid';
@@ -23,6 +23,10 @@ export const KINDS: { kind: SheetChartKind; label: string; icon: React.ReactNode
   { kind: 'pie', label: 'Pie chart', icon: <ChartPie size={18} /> },
   { kind: 'doughnut', label: 'Doughnut chart', icon: <Donut size={18} /> },
   { kind: 'scatter', label: 'Scatter chart', icon: <ChartScatter size={18} /> },
+  { kind: 'combo', label: 'Combo chart (columns and a line)', icon: <ChartColumnBig size={18} /> },
+  { kind: 'histogram', label: 'Histogram', icon: <ChartNoAxesColumnIncreasing size={18} /> },
+  { kind: 'bubble', label: 'Bubble chart', icon: <Orbit size={18} /> },
+  { kind: 'radar', label: 'Radar chart', icon: <Hexagon size={18} /> },
 ];
 
 /** One chart drawn at its size (px at 100%): its SVG made again only when the chart, its size or the workbook changes. */
@@ -173,7 +177,7 @@ export function ChartLayer({
 }
 
 /** The chart panel: what a chart draws and how. */
-export function ChartPanel({ book, chart, narrow, onChange, onDelete, onClose }: { book: Workbook; chart: SheetChart; narrow: boolean; onChange: (c: SheetChart) => void; onDelete: () => void; onClose: () => void }) {
+export function ChartPanel({ book, calc, si, chart, narrow, onChange, onDelete, onClose }: { book: Workbook; calc?: Calc; si?: number; chart: SheetChart; narrow: boolean; onChange: (c: SheetChart) => void; onDelete: () => void; onClose: () => void }) {
   const [range, setRange] = useState(chart.range);
   // Words typed that are no range are not taken; a range in parts that cannot be drawn is, and says why.
   const typed = cleanChartRange(range);
@@ -199,7 +203,7 @@ export function ChartPanel({ book, chart, narrow, onChange, onDelete, onClose }:
     >
       <div className="py-1.5">
         <Row label="Kind">
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-6 gap-1">
             {KINDS.map((k) => (
               <button
                 key={k.kind}
@@ -253,13 +257,38 @@ export function ChartPanel({ book, chart, narrow, onChange, onDelete, onClose }:
             {chart.kind === 'scatter' ? (chart.by === 'rows' ? 'First row as X values' : 'First column as X values') : chart.by === 'rows' ? 'First row as labels' : 'First column as labels'}
             <Switch label="Labels" on={chart.labels !== false} onChange={(on) => set({ labels: on })} />
           </label>
-          {(chart.kind === 'column' || chart.kind === 'bar' || chart.kind === 'area') && (
+          {(chart.kind === 'column' || chart.kind === 'bar' || chart.kind === 'area' || chart.kind === 'combo') && (
+            <>
+              <label className="mt-2 flex items-center justify-between gap-2 text-[13px]">
+                Stacked
+                <Switch label="Stacked" on={!!chart.stacked} onChange={(on) => set({ stacked: on || undefined, percent: on ? chart.percent : undefined })} />
+              </label>
+              <label className="mt-2 flex items-center justify-between gap-2 text-[13px]">
+                100% stacked
+                <Switch label="100% stacked" on={!!chart.percent} onChange={(on) => set({ percent: on || undefined, stacked: on || chart.stacked || undefined })} />
+              </label>
+            </>
+          )}
+          <label className="mt-2 flex items-center justify-between gap-2 text-[13px]">
+            Data labels
+            <Switch label="Data labels" on={!!chart.values} onChange={(on) => set({ values: on || undefined })} />
+          </label>
+          {chart.kind === 'histogram' && (
             <label className="mt-2 flex items-center justify-between gap-2 text-[13px]">
-              Stacked
-              <Switch label="Stacked" on={!!chart.stacked} onChange={(on) => set({ stacked: on || undefined })} />
+              Bins
+              <input type="number" min={2} max={100} value={chart.bins ?? ''} placeholder="Automatic" onChange={(e) => set({ bins: e.target.value ? Math.max(2, Math.min(100, Math.round(Number(e.target.value)))) : undefined })} aria-label="Bins" className={cx(smallInput, 'w-[110px]')} />
             </label>
           )}
         </Row>
+        {!pie && chart.kind !== 'histogram' && <SeriesOpts book={book} calc={calc} si={si} chart={chart} set={set} />}
+        {!pie && (
+          <Row label="Axis minimum and maximum">
+            <div className="flex gap-1.5">
+              <input type="number" value={chart.min ?? ''} placeholder="Automatic" onChange={(e) => set({ min: e.target.value === '' ? undefined : Number(e.target.value) })} aria-label="Axis minimum" className={cx(smallInput, 'min-w-0 flex-1')} />
+              <input type="number" value={chart.max ?? ''} placeholder="Automatic" onChange={(e) => set({ max: e.target.value === '' ? undefined : Number(e.target.value) })} aria-label="Axis maximum" className={cx(smallInput, 'min-w-0 flex-1')} />
+            </div>
+          </Row>
+        )}
         <Row label="Title">
           <input value={chart.title ?? ''} onChange={(e) => set({ title: e.target.value })} placeholder="No title" aria-label="Title" translate="no" className={smallInput} />
         </Row>
@@ -300,5 +329,54 @@ export function ChartPanel({ book, chart, narrow, onChange, onDelete, onClose }:
         </Row>
       </div>
     </SidePanel>
+  );
+}
+
+/** Each series' own way: columns or a line (combo), the second axis at the right, a trendline. */
+function SeriesOpts({ book, calc, si, chart, set }: { book: Workbook; calc?: Calc; si?: number; chart: SheetChart; set: (patch: Partial<SheetChart>) => void }) {
+  const names = useMemo(() => (calc && si !== undefined ? (chartData(book, calc, si, chart)?.series.map((x) => x.name) ?? []) : []), [book, calc, si, chart]);
+  if (!names.length) return null;
+  const xy = chart.kind === 'scatter' || chart.kind === 'bubble' || chart.kind === 'radar';
+  const setOne = (i: number, patch: Partial<NonNullable<SheetChart['series']>[number]>) => {
+    const list = Array.from({ length: Math.max(names.length, chart.series?.length ?? 0) }, (_, j) => ({ ...(chart.series?.[j] ?? {}) }));
+    const next = { ...list[i], ...patch };
+    for (const k of Object.keys(patch) as (keyof typeof next)[]) if (patch[k] === undefined) delete next[k];
+    list[i] = next;
+    while (list.length && !Object.keys(list[list.length - 1]).length) list.pop();
+    set({ series: list.length ? list : undefined });
+  };
+  return (
+    <Row label="Each series">
+      <div className="space-y-2">
+        {names.slice(0, 12).map((n, i) => (
+          <div key={i} className="rounded-lg border border-line p-2">
+            <div translate="no" className="mb-1.5 truncate text-[12.5px] font-medium">
+              {n}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(chart.kind === 'combo' || chart.kind === 'column' || chart.kind === 'line') && (
+                <select value={seriesType(chart, i)} onChange={(e) => setOne(i, { type: e.target.value as 'column' | 'line' })} aria-label="Drawn as" className={cx(smallInput, 'h-7.5 w-auto text-[12px]')}>
+                  <option value="column">Columns</option>
+                  <option value="line">Line</option>
+                </select>
+              )}
+              {!xy && chart.kind !== 'bar' && (
+                <select value={seriesAxis(chart, i)} onChange={(e) => setOne(i, { axis: e.target.value === '2' ? 2 : undefined })} aria-label="Axis" className={cx(smallInput, 'h-7.5 w-auto text-[12px]')}>
+                  <option value="1">Left axis</option>
+                  <option value="2">Right axis</option>
+                </select>
+              )}
+              {chart.kind !== 'radar' && chart.kind !== 'bubble' && (
+                <select value={chart.series?.[i]?.trend ?? ''} onChange={(e) => setOne(i, { trend: (e.target.value || undefined) as 'linear' | 'exp' | undefined })} aria-label="Trendline" className={cx(smallInput, 'h-7.5 w-auto text-[12px]')}>
+                  <option value="">No trendline</option>
+                  <option value="linear">Linear trendline</option>
+                  <option value="exp">Exponential trendline</option>
+                </select>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Row>
   );
 }

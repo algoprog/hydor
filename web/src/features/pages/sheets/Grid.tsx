@@ -16,6 +16,9 @@ import { accountingParts, borderOf, CELL_FONTS, codeColor, colName, formatValue,
 import { allowed, isTicked, listOptions, type CondFormats, type Merges, type Rules } from '@shared/sheet-rules';
 import { cx } from '../../../components/ui';
 import { colW, indexAt, offsets, rectOf, rowH, type Sel } from './ops';
+import { asksAi, type AiState } from './ai';
+import { AiMark, aiLabel, CellImage, LinkCard, Sparkline } from './CellExtras';
+import type { Span } from '@shared/sheet-groups';
 
 export const HEAD_H = 24;
 export const NUM_W = 46;
@@ -127,6 +130,12 @@ interface Props {
   onExpand: (r: number) => void;
   /** A comment's card clicked: its thread opens, to read and answer. */
   onComment?: (r: number, c: number) => void;
+  /** What an AI cell of this sheet without its answer shows (by its name), and a cell's link opened. */
+  ai?: (cell: string) => AiState | null;
+  onOpenLink?: (url: string) => void;
+  /** Groups of rows and columns (their brackets, with − and + to fold and show them), and a group's fold asked for. */
+  outline?: { rows: Span[]; cols: Span[] };
+  onFold?: (i: number, hide: boolean) => void;
 }
 
 // ---- measuring words ----------------------------------------------------------------------------------------------
@@ -232,8 +241,13 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   const composing = useRef(false);
   const cb = useRef(p);
   cb.current = p;
-  const HH = Math.round(HEAD_H * z);
-  const NW = Math.round(NUM_W * z);
+  // Groups' brackets in a gutter left of the row numbers (rows) and over the column letters (columns), a step a level.
+  const rowLevels = p.outline?.rows.length ? Math.max(...p.outline.rows.map((s) => s.level)) : 0;
+  const colLevels = p.outline?.cols.length ? Math.max(...p.outline.cols.map((s) => s.level)) : 0;
+  const GW = rowLevels ? Math.round((6 + rowLevels * 13) * z) : 0;
+  const GH = colLevels ? Math.round((4 + colLevels * 13) * z) : 0;
+  const HH = Math.round(HEAD_H * z) + GH;
+  const NW = Math.round(NUM_W * z) + GW;
 
   const fr = Math.min(sheet.freeze?.rows ?? 0, rows - 1);
   const fc = Math.min(sheet.freeze?.cols ?? 0, cols - 1);
@@ -681,7 +695,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   // ---- drawing --------------------------------------------------------------------------------------------------------
   const allRows = useMemo(() => ({ r1: 0, r2: fr - 1 }), [fr]);
   const allCols = useMemo(() => ({ c1: 0, c2: fc - 1 }), [fc]);
-  const common = { sheet, si, calc, rev, fc, place, colOff, rowOff, view: gv, z, formulas: !!p.formulas };
+  const common = { sheet, si, calc, rev, fc, place, colOff, rowOff, view: gv, z, formulas: !!p.formulas, ai: p.ai };
   const cellsBody = <Cells {...common} rows={stableRange} cols={stableRange} region="body" />;
   const cellsTop = fr > 0 && <Cells {...common} rows={allRows} cols={stableRange} region="top" />;
   const cellsLeft = fc > 0 && <Cells {...common} rows={stableRange} cols={allCols} region="left" />;
@@ -704,8 +718,8 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     return (
       <div
         key={c}
-        className={cx('absolute top-0 flex items-center justify-center border-r border-b border-line select-none', selCols(c) ? (wholeCols ? 'bg-accent text-accent-fg' : 'bg-accent-soft font-semibold text-accent') : 'bg-panel text-fg-3')}
-        style={{ left: NW + colOff[c], width: w, height: HH, fontSize: 11 * Math.min(z, 1.4) }}
+        className={cx('absolute flex items-center justify-center border-r border-b border-line select-none', selCols(c) ? (wholeCols ? 'bg-accent text-accent-fg' : 'bg-accent-soft font-semibold text-accent') : 'bg-panel text-fg-3')}
+        style={{ left: NW + colOff[c], top: GH, width: w, height: HH - GH, fontSize: 11 * Math.min(z, 1.4) }}
       >
         <span translate="no">{colName(c)}</span>
         {!readOnly && <span data-sizer onPointerDown={startSize('col', c)} onDoubleClick={() => cb.current.onFit('col', c)} className="absolute top-0 -right-[4px] z-10 h-full w-[8px] cursor-col-resize hover:bg-accent/40" />}
@@ -733,10 +747,10 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
       <div
         key={r}
         className={cx(
-          'group absolute left-0 flex items-center justify-center border-r border-b border-line tabular-nums select-none',
+          'group absolute flex items-center justify-center border-r border-b border-line tabular-nums select-none',
           selRows(r) ? (wholeRows ? 'bg-accent text-accent-fg' : 'bg-accent-soft font-semibold text-accent') : filtered ? 'bg-panel text-accent' : 'bg-panel text-fg-3',
         )}
-        style={{ top: region === 'left' ? rowOff[r] - FH : HH + rowOff[r], width: NW, height: h, fontSize: 11 * Math.min(z, 1.4) }}
+        style={{ top: region === 'left' ? rowOff[r] - FH : HH + rowOff[r], left: GW, width: NW - GW, height: h, fontSize: 11 * Math.min(z, 1.4) }}
       >
         {/* The number makes room for the button that expands the row (its cells as a card, as Airtable opens a record). */}
         <span translate="no" className={cx(h >= 16 && (sel.r === r ? 'pl-3.5' : 'group-hover:pl-3.5'))}>
@@ -880,6 +894,8 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
 
   /** The grid's lines in a band, at the right and bottom edge of each column and row in view. */
   const gridLines = (region: Region) => {
+    // View → Gridlines off: none drawn.
+    if (sheet.noGrid) return null;
     const rs = region === 'corner' || region === 'top' ? allRows : stableRange;
     const cs = region === 'corner' || region === 'left' ? allCols : stableRange;
     const out = [];
@@ -945,6 +961,57 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     );
   }
 
+  // Groups' brackets and buttons: a line along each group's rows (columns), a level a step in, with − at the row
+  // (column) after it to fold it away, + to show it again; those in view only.
+  const foldBtn = (s: Span, style: React.CSSProperties) => (
+    <button
+      key={`f${s.i}`}
+      type="button"
+      data-own
+      title={s.hidden ? 'Show the group' : 'Fold the group away'}
+      aria-label={s.hidden ? 'Show the group' : 'Fold the group away'}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={() => p.onFold?.(s.i, !s.hidden)}
+      className="absolute z-10 grid place-items-center rounded-[3px] border border-fg-3 bg-bg text-[10px] leading-none font-semibold text-fg-2 hover:border-accent hover:text-accent"
+      style={{ width: Math.round(11 * z), height: Math.round(11 * z), ...style }}
+    >
+      {s.hidden ? '+' : '−'}
+    </button>
+  );
+  const outlineRows = (p.outline?.rows ?? [])
+    .filter((s) => s.b + 1 >= stableRange.r1 && s.a <= stableRange.r2 + 1 && s.a >= fr)
+    .flatMap((s) => {
+      const x = Math.round((4 + (s.level - 1) * 13) * z);
+      const y0 = rowOff[s.a] - FH;
+      const y1 = rowOff[Math.min(s.b + 1, rows)] - FH;
+      const after = Math.min(s.b + 1, rows - 1);
+      const btnY = rowOff[after] - FH + (rowOff[after + 1] - rowOff[after]) / 2 - Math.round(5.5 * z);
+      return [
+        !s.hidden && y1 > y0 ? <div key={`l${s.i}`} aria-hidden className="pointer-events-none absolute border-t border-l border-fg-3" style={{ left: x + Math.round(5 * z), top: y0 + 3, width: Math.round(4 * z), height: Math.max(0, y1 - y0 - 3) }} /> : null,
+        foldBtn(s, { left: x, top: btnY }),
+      ];
+    });
+  const outlineCols = (p.outline?.cols ?? [])
+    .filter((s) => s.b + 1 >= stableRange.c1 && s.a <= stableRange.c2 + 1 && s.a >= fc)
+    .flatMap((s) => {
+      const y = Math.round((3 + (s.level - 1) * 13) * z);
+      const x0 = NW + colOff[s.a];
+      const x1 = NW + colOff[Math.min(s.b + 1, cols)];
+      const after = Math.min(s.b + 1, cols - 1);
+      const btnX = NW + colOff[after] + (colOff[after + 1] - colOff[after]) / 2 - Math.round(5.5 * z);
+      return [
+        !s.hidden && x1 > x0 ? <div key={`l${s.i}`} aria-hidden className="pointer-events-none absolute border-t border-l border-fg-3" style={{ left: x0 + 3, top: y + Math.round(5 * z), width: Math.max(0, x1 - x0 - 3), height: Math.round(4 * z) }} /> : null,
+        foldBtn(s, { left: btnX, top: y }),
+      ];
+    });
+
+  // A link's card under the active cell (HYPERLINK, Insert → Link), while nothing is typed.
+  const link = !edit && p.onOpenLink ? calc.special(si, am.r1, am.c1) : null;
+  const linkCard =
+    link?.kind === 'link' ? (
+      <LinkCard url={link.url} left={NW + colOff[am.c1] + (am.c1 < fc ? view.left : 0)} top={HH + rowOff[am.r2 + 1] + (am.r1 < fr ? view.top : 0) + 4} onOpen={(u) => p.onOpenLink?.(u)} />
+    ) : null;
+
   return (
     <div
       ref={scroller}
@@ -985,6 +1052,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
             {fr > 0 && <div className="pointer-events-none absolute left-0 z-20 bg-fg-3/50" style={{ top: HH + FH - 1, height: 2, width: NW + FW }} />}
           </div>
           {heads}
+          {outlineCols}
           {fr > 0 && gridLines('top')}
           {cellsTop}
           {fr > 0 && overlay('top')}
@@ -993,6 +1061,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
         {/* The numbers down the side, with the frozen columns beside them: they stay at the left. */}
         <div className="sticky left-0 z-20 bg-bg" style={{ width: NW + FW, height: H - HH - FH }}>
           {nums}
+          {outlineRows}
           {fc > 0 && gridLines('left')}
           {cellsLeft}
           {fc > 0 && overlay('left')}
@@ -1009,6 +1078,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
           )}
         </div>
         {noteCard}
+        {!noteCard && linkCard}
         {box}
       </div>
     </div>
@@ -1035,13 +1105,16 @@ interface CellsProps {
   view: GridView;
   z: number;
   formulas: boolean;
+  ai?: (cell: string) => AiState | null;
 }
 
 /**
  * The cells of a band in view: filled ones, those its rules draw on (checkboxes, stars, conditional looks) and merged
  * ones; words run on over empty cells to their right, as in a spreadsheet.
  */
-const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, place, colOff, rowOff, view: gv, z, formulas }: CellsProps) {
+const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, place, colOff, rowOff, view: gv, z, formulas, ai }: CellsProps) {
+  // View → Gridlines off: cells draw no lines of their own either.
+  const line = sheet.noGrid ? 'border-transparent' : 'border-line';
   const out: React.ReactNode[] = [];
   const lines: React.ReactNode[] = [];
   // Each list's options once per drawing (a list from a range reads its cells).
@@ -1156,6 +1229,22 @@ const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, pla
       );
       text = '';
     }
+    // An AI cell: its mark, and in place of #BUSY! what it waits for. A link's words in a link's colour; a picture; a sparkline.
+    const isAi = !ghost && !formulas && asksAi(cell.f);
+    let title: string | undefined;
+    if (isAi && isError(v) && v.code === '#BUSY!') {
+      const st = ai?.(k);
+      const lab = aiLabel(st ?? { state: 'waiting' });
+      text = lab.text;
+      look.cls = lab.cls;
+      title = lab.title;
+    }
+    const extra = !ghost && !formulas && (cell.link || (cell.f && /HYPERLINK|IMAGE|SPARKLINE/i.test(cell.f))) ? calc.special(si, r, c) : null;
+    if (extra?.kind === 'link' && !cell.s?.color) {
+      style.color = 'var(--link, #3b82f6)';
+      style.textDecoration = 'underline';
+    } else if (extra?.kind === 'image') content = <CellImage spec={extra} />;
+    else if (extra?.kind === 'spark') content = <Sparkline spec={extra} w={Math.max(0, (colOff[(m ? m.c2 : c) + 1] - colOff[c]) - 4)} h={Math.max(0, rowOff[(m ? m.r2 : r) + 1] - rowOff[r] - 4)} />;
     // Words that do not fit: numbers become ###, words run on over empty cells to the right.
     if (!content && text && !cell.s?.wrap && !cell.s?.rot && !m) {
       const need = textWidth(text, cell.s) * z + 9;
@@ -1177,7 +1266,7 @@ const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, pla
       rule.rule.type !== 'checkbox' &&
       (rule.rule.type === 'list' ? !!look.text.trim() && !optionsOf(rule.rule).some((o) => o.v.toLowerCase() === look.text.trim().toLowerCase()) : !allowed(calc, si, rule.rule, v, look.text, { r, c, r0: rule.r0, c0: rule.c0 }));
     out.push(
-      <div key={`${r}:${c}`} translate="no" className={cx('absolute flex overflow-hidden border-r border-b border-line px-[4px] whitespace-nowrap', look.cls, !style.background && 'bg-bg')} style={{ left: pos.left, top: pos.top, width: w, height: h, ...style }}>
+      <div key={`${r}:${c}`} translate="no" title={title} className={cx('absolute flex overflow-hidden border-r border-b px-[4px] whitespace-nowrap', line, look.cls, !style.background && 'bg-bg', extra && extra.kind !== 'link' && 'items-center justify-center px-[2px]')} style={{ left: pos.left, top: pos.top, width: w, height: h, ...style }}>
         {cfLook?.bar && <span className="pointer-events-none absolute top-[3px] bottom-[3px] rounded-sm opacity-60" style={{ left: `${cfLook.bar.from * 100}%`, width: `${(cfLook.bar.to - cfLook.bar.from) * 100}%`, background: cfLook.bar.color }} />}
         {look.sign && <span className="relative mr-auto pr-1">{look.sign}</span>}
         {content ?? (
@@ -1189,6 +1278,7 @@ const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, pla
         {open.has(k) && <span className="pointer-events-none absolute top-0 right-0 border-t-[9px] border-l-[9px] border-t-[#a142f4] border-l-transparent" />}
         {cell.note && <span className="pointer-events-none absolute top-0 right-0 border-t-[7px] border-l-[7px] border-t-[#e37400] border-l-transparent" />}
         {invalid && <span className="pointer-events-none absolute top-0 left-0 border-t-[7px] border-r-[7px] border-t-err border-r-transparent" title="This value is not one its rule allows" />}
+        {isAi && <AiMark z={z} />}
       </div>,
     );
     // Borders: drawn on the grid's lines, each side as the style says.
