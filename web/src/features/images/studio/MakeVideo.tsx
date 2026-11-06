@@ -10,7 +10,7 @@ import type { TiersInfo, VideoJob } from '@shared/images';
 import type { VideosState } from '@shared/media';
 import { Button, Dialog, Switch } from '../../../components/ui';
 import { getTiers, startVideo, videoJob, videoSettings } from './api';
-import { elapsed, money, nearestAspect, needsKey, videoPrice } from './logic';
+import { elapsed, money, nearestAspect, needsKey, SHAPES, videoPrice } from './logic';
 import { KeyAsk } from './KeyAsk';
 import { Choice, PriceLine, Problem, ShapeMark, Words, Working } from './parts';
 import { shownSrc } from './pictures';
@@ -169,7 +169,7 @@ export function MakeVideo({ o, onDone, onLetGo }: { o: VideoOpts; onDone: (v: Ma
           <Words value={prompt} onChange={setPrompt} label="What happens" placeholder="What happens in it: what is seen, how it moves, how the camera moves" examples={EXAMPLES} disabled={sending} />
           <div className="-mx-2 flex flex-wrap items-center gap-x-0.5 gap-y-0.5">
             <Choice label="Length" value={String(secs)} options={lengths.map((d) => ({ value: String(d), label: `${d} second${d === 1 ? '' : 's'}` }))} onChange={(v) => setSeconds(Number(v))} width={180} disabled={sending} />
-            <Choice label="Shape" value={shape} options={shapes.map((a) => ({ value: a, label: a, icon: <ShapeMark aspect={a} /> }))} onChange={setAspect} width={180} disabled={sending} />
+            <Choice label="Shape" value={shape} options={shapes.map((a) => ({ value: a, label: SHAPES.find((s) => s.value === a)?.label ?? a, icon: <ShapeMark aspect={a} /> }))} onChange={setAspect} width={200} disabled={sending} />
           </div>
           {(m?.audio || o.first) && (
             <div className="space-y-2">

@@ -8,7 +8,7 @@
 // goes through OpenRouter with no key set asks for it in place (KeyAsk); skipped, it does not run.
 import { useEffect, useRef, useState } from 'react';
 import type { MadePicture, PictureAnswer, TiersInfo } from '@shared/images';
-import { Button, Dialog, Switch, Tabs } from '../../../components/ui';
+import { Button, cx, Dialog, Switch } from '../../../components/ui';
 import { cutout, editImage, erase, getTiers } from './api';
 import { asPng, maskData, painted, putInPainted, type Stroke } from './canvas';
 import { Compare } from './Compare';
@@ -187,7 +187,7 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
   );
 
   return (
-    <Dialog open onClose={() => onDone(null)} title="Change a picture" width={600} footer={footer}>
+    <Dialog open onClose={() => onDone(null)} title="Change a picture" width={660} footer={footer}>
       {result && pic ? (
         <div className="space-y-2.5">
           <Compare before={shownSrc(pic.src)} after={shownSrc(result.pic.src)} />
@@ -198,17 +198,27 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
         </div>
       ) : (
         <div className="space-y-3">
-          <Tabs
-            value={mode}
-            options={MODES}
-            onChange={(m) => {
-              if (busy) return;
-              setMode(m);
-              setError(null);
-            }}
-            dense
-            className="-mx-1.5 border-b border-line"
-          />
+          {/* The three ways, side by side as tabs, each whole on a phone too (a long one takes two lines). */}
+          <div role="tablist" className="grid grid-cols-3 border-b border-line">
+            {MODES.map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                role="tab"
+                aria-selected={mode === m.value}
+                disabled={!!busy && mode !== m.value}
+                onClick={() => {
+                  if (busy) return;
+                  setMode(m.value);
+                  setError(null);
+                }}
+                className={cx('relative px-1 pt-1 pb-2 text-center text-[13.5px] leading-tight font-medium transition-colors', mode === m.value ? 'text-fg' : 'text-fg-3 hover:text-fg-2')}
+              >
+                {m.label}
+                {mode === m.value && <span className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-fg" />}
+              </button>
+            ))}
+          </div>
           {picture}
           {mode === 'change' && (
             <>
