@@ -248,7 +248,7 @@ export function EditorHost({ children }: { children: ReactNode }) {
           const on = t.id === showing;
           const lead = mobile ? <PhoneLead t={t} tabs={tabs} label={label} onPage={showPage} onClose={(x) => void close(x)} /> : null;
           return (
-            <div key={t.id} className={cx('absolute inset-0', !on && 'invisible')} inert={!on}>
+            <div key={t.id} data-i18n="media" className={cx('absolute inset-0', !on && 'invisible')} inert={!on}>
               {Editor ? (
                 <Suspense
                   fallback={
