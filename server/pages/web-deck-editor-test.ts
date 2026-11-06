@@ -200,7 +200,9 @@ const partOf = (d: Deck, id: string) => everyEl(d.slides[0].els).find((e) => e.i
   ok(find(args({ readOnly: true }), 'Insert', 'Interactive')?.disabled === true && find(args({ readOnly: true }), 'Tools', 'PowerPoint compatible')?.disabled === true, 'nothing to change in a version looked at');
   // The AI tools, where the editor has them.
   const pic = menu(web, 'Insert').find((x) => x.label === 'Picture');
-  ok(items(pic?.items ?? []).map((x) => x.label).join() === 'From this device,From a web address,Make with AI,Drawing (SVG)', 'Insert → Picture: from this device, a web address, made with AI, a drawing (SVG)');
+  ok(items(pic?.items ?? []).map((x) => x.label).join() === 'From this device,From a web address,Free photos,Make with AI,Drawing (SVG),QR code', 'Insert → Picture: from this device, a web address, free photos, made with AI, a drawing (SVG), a QR code');
+  ok(items(find(web, 'Insert', 'New slide')?.items ?? []).map((x) => x.label).join() === 'From a layout,Slides from another deck', 'Insert → New slide: from a layout, or slides from another deck');
+  ok(items(find(web, 'Insert', 'Chart')?.items ?? []).map((x) => x.label).join() === 'New chart,From a spreadsheet', 'Insert → Chart: a new one, or from a spreadsheet');
   ok(!!find(web, 'Insert', 'Plot'), 'Insert → Plot');
   ok(items(find(web, 'Insert', 'Video')?.items ?? []).some((x) => x.label === 'Make with AI'), 'Insert → Video → Make with AI');
   const photo = { id: 'im', type: 'image', src: 'naget-asset:0123456789abcdef', x: 0, y: 0, w: 10, h: 10 } as El;
@@ -208,7 +210,7 @@ const partOf = (d: Deck, id: string) => everyEl(d.slides[0].els).find((e) => e.i
   ok(!find(args({ picked: [{ ...photo, src: '' } as El] }), 'Format', 'Change with AI'), 'not an empty picture frame');
   const chart = { id: 'ch', type: 'chart', kind: 'column', labels: ['a'], series: [{ name: 's', values: [1] }], size: 18, x: 0, y: 0, w: 10, h: 10 } as El;
   ok(!!find(args({ picked: [chart] }), 'Format', 'Make a plot of this'), 'Format: a chart picked is made a plot');
-  const bare = args({ aiPicture: undefined, aiDrawing: undefined, aiPlot: undefined, aiVideo: undefined, aiEdit: undefined, aiPlotChart: undefined });
+  const bare = args({ aiPicture: undefined, aiDrawing: undefined, aiPlot: undefined, aiVideo: undefined, aiEdit: undefined, aiPlotChart: undefined, freePhoto: undefined, qr: undefined, sheetChart: undefined, reuseSlides: undefined });
   ok(!find(bare, 'Insert', 'Plot') && items(bare && (menu(bare, 'Insert').find((x) => x.label === 'Picture')?.items ?? [])).length === 2, 'without the tools (a version looked at), none of them');
   // Every menu fits a small laptop's window (811×667) without scrolling: there the menus are behind one button, and a
   // menu opens in its place under a row that goes back. Its rows (34 px), lines (9 px), edges, below the editor's bar.

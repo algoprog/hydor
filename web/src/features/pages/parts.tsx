@@ -30,6 +30,7 @@ import { madeRequest } from './types/requests';
 import { startMaking } from './types/start';
 import { pickFiles } from './uploads';
 import { SlideThumb } from './slides/Thumb';
+import { MyThemeChoices, myThemeDeck, useMyThemes } from './slides/MyThemes';
 import { TexTemplatePicker } from './latex/TemplatePicker';
 
 const TONES = ['from-accent/25 to-accent/5 text-accent', 'from-info/25 to-info/5 text-info', 'from-ok/25 to-ok/5 text-ok', 'from-warn/25 to-warn/5 text-warn', 'from-claude/25 to-claude/5 text-claude', 'from-codex/25 to-codex/5 text-codex'];
@@ -205,6 +206,12 @@ const base64Of = (f: File) =>
     r.readAsDataURL(f);
   });
 
+/** A new deck in a ready-made theme, or in one of the user's own ("my:<id>", its logo on it). */
+function deckIn(theme: string, title: string, ratio: Ratio) {
+  const mine = theme.startsWith('my:') ? useMyThemes.getState().list?.find((t) => `my:${t.id}` === theme) : undefined;
+  return mine ? myThemeDeck(mine, title, ratio) : newDeck(title, theme, ratio);
+}
+
 /** New in the Library: a page, slides, a document… made in the space it shows (`space`), in its folder open (`folder`) unless another project is picked. */
 export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, folder }: { open: boolean; onClose: () => void; kind?: NewKind; space?: string | null; folder?: string }) {
   const [kind, setKind] = useState<NewKind>(startKind);
@@ -247,7 +254,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
       const at = { space: where, folder: inFolder };
       const r =
         kind === 'slides'
-          ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind: 'slides', model: newDeck(t, theme, ratio), ...at })
+          ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind: 'slides', model: deckIn(theme, t, ratio), ...at })
           : kind === 'page'
             ? await post<{ page: PageInfo }>('/api/pages', { title: t, html: starter.html(t), ...at })
             : kind === 'tex'
@@ -429,6 +436,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
                   </button>
                 );
               })}
+              <MyThemeChoices value={theme} onPick={setTheme} title={title.trim() || 'Slides'} ratio={ratio} />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Segmented<Ratio>

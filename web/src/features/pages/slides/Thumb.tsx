@@ -29,5 +29,14 @@ function ThumbInner({ deck, index, width, className, edit }: { deck: Deck; index
 /** One slide, small. */
 export const SlideThumb = memo(
   ThumbInner,
-  (a, b) => a.slide === b.slide && a.theme === b.theme && a.width === b.width && a.fonts === b.fonts && a.deck.ratio === b.deck.ratio && a.deck.footer === b.deck.footer && (!a.deck.footer || a.index === b.index) && a.className === b.className,
+  (a, b) =>
+    a.slide === b.slide &&
+    a.theme === b.theme &&
+    a.width === b.width &&
+    a.fonts === b.fonts &&
+    a.deck.ratio === b.deck.ratio &&
+    a.deck.footer === b.deck.footer &&
+    a.deck.logo === b.deck.logo &&
+    (!(a.deck.footer || a.deck.logo) || a.index === b.index) &&
+    a.className === b.className,
 );
