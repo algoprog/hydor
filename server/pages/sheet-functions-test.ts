@@ -22,6 +22,8 @@ import {
   type Scalar,
   type Workbook,
 } from '../../shared/sheets.ts';
+import { importBook, xlsxOfBook } from './sheets.ts';
+import { Zip } from '../documents/zip.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -247,6 +249,36 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
   ok(excelFormula('AI("x",A1)', sh) === null && excelFormula('SPARKLINE(A1:A3)', sh) === null, 'AI and SPARKLINE: none in Excel');
   ok(excelFormula('VSTACK(A1:A2,B1:B2)+Other!A1', sh) === '_xlfn.VSTACK(A1:A2,B1:B2)+#REF!', 'newer functions prefixed; a sheet not there #REF!');
   ok(formulaFromFile('_xlfn.LET(_xlpm.x,1,_xlpm.x+1)') === 'LET(x,1,x+1)' && formulaFromFile('_xlfn.LET(_xlpm.f,_xlfn.LAMBDA(_xlpm.x,_xlpm.x+1),_xlpm.f(2))') === 'LET(f,LAMBDA(x,x+1),f(2))', 'and read back without them');
+}
+
+// ---- Excel files: names, links, AI cells, the newer functions --------------------------------------------------------
+{
+  const s = sheet(
+    {
+      A1: 0.2,
+      A2: { v: 'Site', link: 'https://example.com/a?b=1&c=2' },
+      A3: { v: 'There', link: "#'Sheet1'!A1" },
+      B1: '=LET(x, A1, x*Rate)',
+      B2: '=AI("Say hi", A1)',
+      B3: '=VSTACK(1, 2)',
+      C1: '=JOIN("-", A1, A1)',
+    },
+    { names: [{ name: 'Rate', ref: 'Sheet1!$A$1' }], ai: { [aiKey('Say hi', ['0.2'])]: 'Hi' } },
+  );
+  s.book.sheets[0].noGrid = true;
+  const buf = xlsxOfBook(s.book, 'T', s.calc);
+  const z = new Zip(buf);
+  const sx = z.text('xl/worksheets/sheet1.xml') ?? '';
+  const wb = z.text('xl/workbook.xml') ?? '';
+  ok(sx.includes('_xlfn.LET(_xlpm.x, A1, _xlpm.x*Rate)'), 'LET written as Excel writes it, the name Rate as it is');
+  ok(/<c r="B2"[^>]*t="s"><v>\d+<\/v><\/c>/.test(sx) && !sx.includes('AI('), 'an AI cell written as its answer');
+  ok(sx.includes('_xlfn.TEXTJOIN(&quot;-&quot;,FALSE, A1, A1)') && sx.includes('_xlfn.VSTACK'), 'JOIN as TEXTJOIN, VSTACK prefixed');
+  ok(/<definedName name="Rate">Sheet1!\$A\$1<\/definedName>/.test(wb), 'the named range in the workbook');
+  ok(sx.includes('showGridLines="0"') && /<hyperlink ref="A2" r:id="rId\d+"\/>/.test(sx) && sx.includes(`location="'Sheet1'!A1"`), 'links and hidden grid lines in the sheet');
+  const back = importBook(buf, 'T.xlsx').book;
+  const c = back.sheets[0].cells;
+  ok(back.names?.[0]?.name === 'Rate' && c.B1.f === 'LET(x, A1, x*Rate)' && c.A2.link === 'https://example.com/a?b=1&c=2' && c.A3.link === "#'Sheet1'!A1" && back.sheets[0].noGrid === true, 'and read back: names, LET, links, hidden grid lines');
+  ok(near(computeBook(back).get(back.sheets[0].id, 'B1'), 0.04), 'the name works in the file read back');
 }
 
 console.log(`${passed} passed, ${failed} failed`);

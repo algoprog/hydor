@@ -23,6 +23,8 @@ import {
   COL_W,
   computeBook,
   CellError,
+  excelFormula,
+  cleanLink,
   cleanStyle,
   fileFormula,
   fmtCode,
@@ -33,6 +35,7 @@ import {
   formulaFromFile,
   keyOf,
   formulaProblem,
+  isRangeName,
   isError,
   replaceNames,
   normalizeBook,
@@ -67,7 +70,7 @@ import {
 import { authorForAgent, newCommentId } from '../../shared/comments.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
-import { all, att, kid, kids, parseXml, patt, scan, textOf, type El } from '../documents/xml.ts';
+import { all, att, decode, kid, kids, parseXml, patt, scan, textOf, type El } from '../documents/xml.ts';
 import { resolvePart, Zip } from '../documents/zip.ts';
 import { chartData, chartProblem, chartSvg } from '../../shared/sheet-chart.ts';
 import { CondFormats, hiddenCols, hiddenRows, isTicked, listOptions, Merges, Rules } from '../../shared/sheet-rules.ts';
@@ -188,6 +191,13 @@ export async function agentBook(input: unknown, cwd: string, prev?: Workbook): P
     const was = prev?.sheets.find((x) => x.id === sh.id) ?? prev?.sheets.find((x) => x.name.toLowerCase() === sh.name.toLowerCase());
     if (was?.comments?.length) sh.comments = was.comments;
   }
+  // The AI function's answers come from the version this changes (an agent never writes them); its named ranges too,
+  // unless the agent sends names of its own.
+  if (prev?.ai) book.ai = prev.ai;
+  else delete book.ai;
+  if (prev?.names?.length && !(isObj(v) && (v as Obj).names !== undefined)) book.names = prev.names;
+  const waiting = aiWaiting(book);
+  if (waiting) notes.push(`${waiting} AI cell${waiting === 1 ? ' waits' : 's wait'} for an answer: page_action ask_ai asks the helper model for them now, or the user does with Ask now in the editor.`);
   commentOps(book, ops, notes);
   const bad = formulaIssues(book);
   if (bad.length) notes.push(`These formulas cannot be read and show #ERROR!: ${bad.join('; ')}.`);
@@ -281,7 +291,8 @@ export function bookForAgent(text: string): string {
   const book = readBook(text);
   const calc = computeBook(book);
   const n = book.sheets.length;
-  let body = text;
+  // Without the AI function's answers (the cells show them).
+  let body = book.ai ? bookText({ ...book, ai: undefined }) : text;
   let cut = '';
   if (text.length > SHOW) {
     // Each sheet's first rows, as far as there is room.
@@ -319,6 +330,11 @@ export function bookForAgent(text: string): string {
     bookOutline(book, calc),
     ...(results.length ? ['', `What its formulas give${size > 20_000 ? ' (the first ones)' : ''}: ${results.join('; ')}`] : []),
     ...commentsForAgent(book),
+    ...(book.names?.length ? ['', `Named ranges: ${book.names.map((nm) => `${nm.name} = ${nm.ref}${nm.sheet ? ` (for “${book.sheets.find((s) => s.id === nm.sheet)?.name ?? '?'}” only)` : ''}`).join('; ')}`] : []),
+    ...(() => {
+      const waiting = calc.aiAsks().length;
+      return waiting ? ['', `${waiting} AI cell${waiting === 1 ? ' waits' : 's wait'} for an answer (they show #BUSY!): page_action ask_ai asks the helper model for them.`] : [];
+    })(),
     ...(() => {
       // Charts that cannot draw from their ranges, and why (each is kept, saying so in its place).
       const why = book.sheets.flatMap((sh) => (sh.charts ?? []).flatMap((ch) => (chartProblem(book, ch) ? [`“${sh.name}” ${ch.range}: ${chartProblem(book, ch)}`] : [])));
@@ -331,6 +347,14 @@ export function bookForAgent(text: string): string {
 }
 
 const when = (at: number) => new Date(at).toISOString().slice(0, 16).replace('T', ' ');
+
+/** How many of a workbook's AI cells wait for an answer. */
+export function aiWaiting(book: Workbook): number {
+  if (!book.sheets.some((sh) => Object.values(sh.cells).some((c) => c.f !== undefined && /(^|[^A-Za-z0-9_.])AI\s*\(/i.test(c.f)))) return 0;
+  const calc = computeBook(book);
+  calc.all();
+  return calc.aiAsks().length;
+}
 
 /** The comments' threads, by sheet and cell, and how to answer them. */
 function commentsForAgent(book: Workbook): string[] {
@@ -353,8 +377,9 @@ function commentsForAgent(book: Workbook): string[] {
 const SHEET_HELP = [
   'Make or change a spreadsheet, kept in the user’s Library, where they edit it as in Excel or Google Sheets (formulas, formats, sorting, several sheets) and export it to Excel (.xlsx), CSV or PDF. Use it whenever the user wants a spreadsheet, a budget, a tracker, a schedule, an invoice, a plan or any table of numbers they will work with, rather than writing an .xlsx or .csv file (unless they ask for a file, or work on one they have). It shows in the conversation as a table.',
   'The workbook: { title, sheets: [{ name, rows: [[…], …] }] }. rows fill the sheet from A1 (or from start: "B2"), an array per row; a value is a number, words, true or false, null for an empty cell, or a formula: "=SUM(B2:B9)". Words are read as a person types them: "12%" is a percent, "$1,200" an amount, "2026-01-31" a date, "007" stays words; start with \' to keep words as they are. Cells by name, instead or as well: cells: { "B2": 12, "C2": "=B2*2", "D2": { "v": "Paid", "s": { "b": true } } } (as an object, v is taken as it is and f holds a formula, without "=").',
-  "Formulas work as in Excel: + - * / ^ & = <> < > <= >=, 50%, references (A1, $A$1, A1:B5, A:A, Sheet2!A1, 'My sheet'!A1:B2) and functions: SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, COUNTBLANK, COUNTIF(S), SUMIF(S), AVERAGEIF(S), MAXIFS, MINIFS, SUMPRODUCT, PRODUCT, MEDIAN, STDEV, LARGE, SMALL, RANK, ROUND, ROUNDUP, ROUNDDOWN, INT, ABS, SQRT, POWER, MOD, IF, IFS, IFERROR, IFNA, AND, OR, NOT, SWITCH, CHOOSE, VLOOKUP, HLOOKUP, XLOOKUP, INDEX, MATCH, XMATCH, OFFSET, INDIRECT, CONCAT, TEXTJOIN, LEFT, RIGHT, MID, LEN, UPPER, LOWER, PROPER, TRIM, SUBSTITUTE, FIND, SEARCH, TEXT, VALUE, TODAY, NOW, DATE, YEAR, MONTH, DAY, WEEKDAY, EOMONTH, EDATE, DATEDIF, NETWORKDAYS, WORKDAY, PMT, FV, PV, NPER, RATE, NPV, IRR and more. Dates are Excel’s day numbers. FILTER, SORT, SORTBY, UNIQUE and SEQUENCE spill their results into the cells below and beside them, which must be empty (else #SPILL!).",
+  "Formulas work as in Excel: + - * / ^ & = <> < > <= >=, 50%, references (A1, $A$1, A1:B5, A:A, Sheet2!A1, 'My sheet'!A1:B2) and functions: SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, COUNTBLANK, COUNTIF(S), SUMIF(S), AVERAGEIF(S), MAXIFS, MINIFS, SUMPRODUCT, PRODUCT, MEDIAN, STDEV, LARGE, SMALL, RANK, ROUND, ROUNDUP, ROUNDDOWN, INT, ABS, SQRT, POWER, MOD, IF, IFS, IFERROR, IFNA, AND, OR, NOT, SWITCH, CHOOSE, VLOOKUP, HLOOKUP, XLOOKUP, INDEX, MATCH, XMATCH, OFFSET, INDIRECT, CONCAT, TEXTJOIN, LEFT, RIGHT, MID, LEN, UPPER, LOWER, PROPER, TRIM, SUBSTITUTE, FIND, SEARCH, TEXT, VALUE, TODAY, NOW, DATE, YEAR, MONTH, DAY, WEEKDAY, EOMONTH, EDATE, DATEDIF, NETWORKDAYS, WORKDAY, PMT, FV, PV, NPER, RATE, NPV, IRR and more. Dates are Excel’s day numbers. FILTER, SORT, SORTBY, UNIQUE and SEQUENCE spill their results into the cells below and beside them, which must be empty (else #SPILL!). So do the newer ones: LET, LAMBDA (with MAP, REDUCE, SCAN, BYROW, BYCOL, MAKEARRAY; =LAMBDA(x, x*2)(A1) calls one), VSTACK, HSTACK, TAKE, DROP, CHOOSECOLS, CHOOSEROWS, TOCOL, TOROW, WRAPROWS, WRAPCOLS, EXPAND, TRANSPOSE, TEXTSPLIT, TEXTBEFORE, TEXTAFTER, REGEXTEST, REGEXEXTRACT, REGEXREPLACE, Google Sheets’ REGEXMATCH, SPLIT, JOIN and ARRAYFORMULA (ARRAYFORMULA(LEFT(A2:A9, 3)) works LEFT on each), TREND, LINEST, FORECAST, CORREL, SLOPE, PERCENTILE.EXC, RANK.AVG, STDEVA and the other statistics, NETWORKDAYS.INTL and WORKDAY.INTL. HYPERLINK(url, label) is a link, IMAGE(url, alt) a picture in the cell, SPARKLINE(B2:M2, {\"charttype\",\"column\"}) a small chart in it (line, column, bar or winloss). =AI(\"Which country is this city in?\", A2) puts the helper model’s answer in the cell, as Google Sheets’ AI function does: worked out once and kept with the sheet, asked again only when its prompt or cells change; cells you write wait for page_action ask_ai (or the user’s Ask now), as asking costs a little.",
   'How it looks: header: true makes the first row bold and keeps it in view as the sheet scrolls; formats per column: { "B": "currency", "C:D": "percent", "E": "date", "F": { "fmt": "number", "dp": 1 }, "G": "dd/mm/yyyy" } (general, number, percent, currency with cur: "€", accounting, scientific, date, time, datetime, duration, text, or an Excel code: "#,##0.0;[Red]-#,##0.0", "d mmm yyyy", "h:mm AM/PM"; dp: decimals); widths: { "A": 180 } in px (100 otherwise); heights: { "1": 32 } by row number; freeze: { rows: 1, cols: 1 }; styles over ranges: { "A10:D10": { "b": true, "fill": "#fff3cd", "border": "thin" }, "A1:D10": { "outline": "medium" } } (outline: a border round the range). A style: b, i, u, s (struck through), color and fill (#hex), align (left, center, right), valign (top, middle, bottom), wrap, fmt, dp, cur, size (pt), font (Arial, Calibri, Cambria, Courier New, Georgia, Times New Roman, Trebuchet MS, Verdana), rot (degrees, -90 to 90), border on all four sides or bt, br, bb, bl for one ("thin", "medium", "thick", "dashed", "dotted" or "double", a colour after it: "thin #999999").',
+  'Named ranges, beside sheets: names: [{ name: "TaxRate", ref: "Budget!$B$1" }, { name: "Sales", ref: "Budget!$C$2:$C$40" }, { name: "Net", ref: "LAMBDA(x, x/1.2)" }] (a range, a value or a LAMBDA, used in formulas by its name, =C2*TaxRate, =SUM(Sales), =Net(B2); sheet: a sheet’s name, for that sheet only); they follow their cells as rows, columns and sheets change, and stay as they are when you leave names out. A cell’s link: { "v": "Our site", "link": "https://example.com" } (or "#Sheet2!A1", a place in the workbook). noGrid: true hides a sheet’s grid lines.',
   'More a sheet may have: merges: ["A1:D1"] (cells merged into one; its first cell holds what it shows); hidden: { rows: [5, "8:9"], cols: ["C"] }; notes: { "B2": "Checked by Sam" } (or note on a cell object); filter: { range: "A1:D40", cols: { "C": { when: { op: "gt", a: "100" } }, "D": { hide: ["Done"] } } } (buttons on the header row; the rows it hides are hidden, not removed, and formulas still count them); conditional: [{ range: "C2:C40", when: { op: "gt", a: "100" }, style: { fill: "#fce8e6", color: "#c5221f", b: true } }, { range: "D2:D40", scale: ["#f8696b", "#ffeb84", "#63be7b"] }, { range: "E2:E40", bar: "#638ec6" }] (a condition’s op: empty, notEmpty, contains, notContains, starts, ends, is, eq, neq, gt, gte, lt, lte, between and notBetween with a and b, dateIs, before and after with a date or today, tomorrow, yesterday, week, month, year, formula with a: "=$C2>100" written for the range’s first cell; for conditional formatting also dup, unique, top and bottom with a: how many (b: "%" for a share), above and below the average; rules in order, the first that holds gives its look); validation: [{ range: "D2:D40", list: ["Open", { "v": "Done", "color": "#d9ead3" }] }, { range: "E2:E40", checkbox: true }, { range: "F2:F40", rating: 5 }, { range: "G2:G40", type: "number", when: { op: "between", a: "0", b: "100" }, reject: true }, { range: "H2:H40", source: "Lists!A1:A9" }] (lists show coloured chips and a dropdown, checkboxes hold TRUE or FALSE, ratings 0 to 5 stars; type also date, length and formula; reject refuses other input, else it is kept with a warning); charts: [{ kind: "line", range: "A1:C13", title: "Sales", at: "E2:J16" }] (kind: column, bar, line, area, pie, doughnut or scatter; range: the cells it draws, or several ranges split by commas read as if side by side, each as long as the others: "A1:A13,D1:D13" takes the labels from A and the values from D; series down the columns, or by: "rows"; the first column as labels and the first row as names when they hold words, or labels and names: true or false; legend: bottom, right, top or none; xTitle, yTitle, colors, stacked; where it sits: at: "E2:J16", the cells it covers, or at: "E2" with w and h in px; it is kept as from and to, the cells its corners are on, so it moves and stretches with them as rows and columns go in or out; a range it cannot draw from is kept and says why); board: { by: "Status", fields: ["Owner", "Hours"], lanes: ["Open", "Doing", "Done"], open: true } (the table’s rows as a Kanban board, as the user sees them in View → Kanban board: by, the column it groups by, a dropdown column; fields, the columns its cards show under their first cell; lanes, the options’ order; open: the sheet opens on it; columns by their header’s words or their letters; at: the table’s first cell, A1 unless said).',
   'Comments: the user’s and agents’ threads on cells (beside notes), which get_page lists with their ids. Answer them with comments at the top: [{ "id": "c1", "reply": "Done: the totals are formulas now", "resolve": true }] (reply, resolve or reopen, delete), and add one of your own with { "sheet": "Budget", "cell": "B3", "text": "Is this the right rate?" }; comments inside the sheets you send are left as they were.',
   'A sheet may come from a file of this session instead: file: "data.csv" (CSV, TSV, .xlsx or .ods; from the session’s folder, ~ or absolute; sheet: which of an Excel file’s sheets), with rows, cells and formats given too going on top. file beside title (no sheets) makes the whole workbook from an .xlsx or .ods file.',
@@ -549,10 +574,14 @@ class XlStrings {
   }
 }
 
-/** The relationships a sheet's part points at: its charts' drawing and its notes' VML drawing. */
+/** The relationships a sheet's part points at: its charts' drawing and its notes' VML drawing; its cells' links. */
 interface SheetLinks {
   drawing?: string;
   legacy?: string;
+  /** Cells' links: a web address by its relationship, a place in the workbook as it is. */
+  hyperlinks?: { ref: string; rid?: string; location?: string }[];
+  /** The workbook's named ranges (lower case): formulas keep them as they are. */
+  defined?: Set<string>;
 }
 
 /**
@@ -579,12 +608,23 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
     const cell = sh.cells[ref];
     if (!cell) continue;
     let xml: string;
-    if (cell.f !== undefined && !formulaProblem(cell.f)) {
+    // A formula as Excel writes it; null for one Excel has nothing to work out with (AI, SPARKLINE): its value alone.
+    const xf = cell.f !== undefined && !formulaProblem(cell.f) ? excelFormula(cell.f, names, links.defined) : undefined;
+    if (xf === null) {
+      const v = calc.value(si, r, c);
+      const s = st.index(cell.s, v);
+      const a = `r="${ref}"${s ? ` s="${s}"` : ''}`;
+      if (typeof v === 'number') xml = `<c ${a}><v>${xnum(v)}</v></c>`;
+      else if (typeof v === 'string' && v) xml = `<c ${a} t="s"><v>${ss.add(v)}</v></c>`;
+      else if (typeof v === 'boolean') xml = `<c ${a} t="b"><v>${v ? 1 : 0}</v></c>`;
+      else if (s) xml = `<c ${a}/>`;
+      else continue;
+    } else if (xf !== undefined) {
       const v = calc.value(si, r, c);
       const s = st.index(cell.s, v);
       const a = `r="${ref}"${s ? ` s="${s}"` : ''}`;
       const arrayRef = spilt.get(k);
-      const f = arrayRef ? `<f t="array" ref="${arrayRef}">${xesc(fileFormula(cell.f, names))}</f>` : `<f>${xesc(fileFormula(cell.f, names))}</f>`;
+      const f = arrayRef ? `<f t="array" ref="${arrayRef}">${xesc(xf)}</f>` : `<f>${xesc(xf)}</f>`;
       if (typeof v === 'number') xml = `<c ${a}>${f}<v>${xnum(v)}</v></c>`;
       else if (typeof v === 'string') xml = `<c ${a} t="str">${f}<v>${xesc(v)}</v></c>`;
       else if (typeof v === 'boolean') xml = `<c ${a} t="b">${f}<v>${v ? 1 : 0}</v></c>`;
@@ -661,7 +701,7 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
     `${XML_HEAD}<worksheet xmlns="${NS_MAIN}" xmlns:r="${NS_R}">` +
     (fit ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '') +
     `<dimension ref="${e.rows ? `A1:${refName(e.rows - 1, Math.max(0, e.cols - 1))}` : 'A1'}"/>` +
-    `<sheetViews><sheetView workbookViewId="0"${si === 0 && !ofLists ? ' tabSelected="1"' : ''}>${pane}</sheetView></sheetViews>` +
+    `<sheetViews><sheetView workbookViewId="0"${sh.noGrid ? ' showGridLines="0"' : ''}${si === 0 && !ofLists ? ' tabSelected="1"' : ''}>${pane}</sheetView></sheetViews>` +
     // Rows as tall as the editor's (24 px) unless they say.
     `<sheetFormatPr defaultColWidth="${xlWidth(COL_W)}" defaultRowHeight="${xlHeight(ROW_H)}" customHeight="1"/>${cols}` +
     `<sheetData>${body}</sheetData>` +
@@ -669,6 +709,7 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
     mergesXml(sh) +
     condXml(sh, st.dxfs, names) +
     validationXml(sh, names, lists) +
+    (links.hyperlinks?.length ? `<hyperlinks>${links.hyperlinks.map((h) => `<hyperlink ref="${h.ref}"${h.rid ? ` r:id="${h.rid}"` : ''}${h.location ? ` location="${xesc(h.location)}"` : ''}/>`).join('')}</hyperlinks>` : '') +
     // The cells' lines, as the app prints round its table's cells (not across the empty ones charts stand over).
     (sh.charts?.length ? '' : '<printOptions gridLines="1"/>') +
     `<pageMargins left="${mm12}" right="${mm12}" top="${mm12}" bottom="${mm12}" header="0.2" footer="0.2"/>` +
@@ -683,6 +724,7 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
 /** The workbook as an Excel file (.xlsx) that opens in Excel, LibreOffice and Google Sheets: formulas kept, with what they give; filters, merged cells, conditional formatting, rules for cells, notes and charts too. */
 export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBook(book)): Buffer {
   const names = new Set(book.sheets.map((s) => s.name.toLowerCase()));
+  const defined = new Set((book.names ?? []).map((n) => n.name.toLowerCase()));
   // Lists a rule cannot hold in its own words, and lists whose chips have colours: on a hidden sheet the rules point at.
   const lists = listsSheet(book);
   if (lists.sheet) names.add(lists.sheet.name.toLowerCase());
@@ -697,7 +739,8 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
   let threads = 0;
   const sheets = book.sheets.map((sh, si) => {
     const links: SheetLinks = {};
-    const rels: [string, string, string][] = [];
+    const rels: [string, string, string, boolean?][] = [];
+    links.defined = defined;
     // Charts that cannot draw from their ranges are left out (the workbook keeps them, saying why).
     const drawn = (sh.charts ?? []).filter((ch) => !chartProblem(book, ch));
     if (drawn.length) {
@@ -732,6 +775,18 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
         rels.push([`rId${rels.length + 1}`, 'http://schemas.microsoft.com/office/2017/10/relationships/threadedComment', `../threadedComments/threadedComment${k}.xml`]);
       }
     }
+    // Links on cells (Insert → Link): a web address through the sheet's relationships, a place in the workbook as it is.
+    const hl: { ref: string; rid?: string; location?: string }[] = [];
+    for (const [ref, cell] of Object.entries(sh.cells)) {
+      if (!cell.link) continue;
+      if (cell.link.startsWith('#')) hl.push({ ref, location: cell.link.slice(1) });
+      else {
+        const rid = `rId${rels.length + 1}`;
+        rels.push([rid, 'hyperlink', cell.link, true]);
+        hl.push({ ref, rid });
+      }
+    }
+    if (hl.length) links.hyperlinks = hl;
     if (rels.length) extra.push({ name: `xl/worksheets/_rels/sheet${si + 1}.xml.rels`, data: relsXml(rels) });
     return sheetXml(sh, si, calc, st, ss, names, links, lists.ref);
   });
@@ -768,10 +823,18 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
       );
     })
     .join('');
+  // The workbook's named ranges (and named values and LAMBDAs), a sheet's own with its place.
+  const ownNames = (book.names ?? [])
+    .map((n) => {
+      const f = excelFormula(n.ref, names, defined);
+      const local = n.sheet ? book.sheets.findIndex((s) => s.id === n.sheet) : -1;
+      return f === null ? '' : `<definedName name="${xesc(n.name)}"${local >= 0 ? ` localSheetId="${local}"` : ''}>${xesc(f)}</definedName>`;
+    })
+    .join('');
   const workbook =
     `${XML_HEAD}<workbook xmlns="${NS_MAIN}" xmlns:r="${NS_R}"><workbookPr/><bookViews><workbookView activeTab="0"/></bookViews>` +
     `<sheets>${titles.map((t, i) => `<sheet name="${xesc(t)}" sheetId="${i + 1}"${i >= book.sheets.length ? ' state="hidden"' : ''} r:id="rId${i + 1}"/>`).join('')}</sheets>` +
-    (filterNames ? `<definedNames>${filterNames}</definedNames>` : '') +
+    (filterNames || ownNames ? `<definedNames>${filterNames}${ownNames}</definedNames>` : '') +
     '<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>';
   const wbRels = relsXml([
     ...sheets.map((_, i) => [`rId${i + 1}`, 'worksheet', `worksheets/sheet${i + 1}.xml`] as [string, string, string]),
@@ -855,6 +918,15 @@ interface Rel {
 }
 
 /** A part's relationships, by id, their targets made paths in the package. */
+/** A part's relationships to the web (its links' addresses), by id. */
+function webTargets(z: Zip, part: string): Map<string, string> {
+  const i = part.lastIndexOf('/');
+  const xml = z.text(`${part.slice(0, i + 1)}_rels/${part.slice(i + 1)}.rels`);
+  const out = new Map<string, string>();
+  for (const r of xml ? all(parseXml(xml).root, 'Relationship') : []) if (att(r, 'TargetMode') === 'External' && /\/hyperlink$/.test(att(r, 'Type') ?? '')) out.set(att(r, 'Id') ?? '', att(r, 'Target') ?? '');
+  return out;
+}
+
 function relsOf(z: Zip, part: string): Map<string, Rel> {
   const i = part.lastIndexOf('/');
   const file = part ? `${part.slice(0, i + 1)}_rels/${part.slice(i + 1)}.rels` : '_rels/.rels';
@@ -1041,17 +1113,28 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
   const stylesXml = z.text(of('styles') ?? 'xl/styles.xml');
   const styles = stylesOf(stylesXml, theme);
   const dxfs = readDxfs(stylesXml, (el) => colorOf(el, theme));
-  // Names the workbook defines for cells or ranges (TaxRate: Sheet1!$B$1): formulas get the reference in their place.
+  // Names the workbook defines (TaxRate: Sheet1!$B$1, a value, a LAMBDA): kept as named ranges, formulas using them as
+  // they are. One that cannot be kept (pointing into another file, say) has formulas get what it stands for, where it is
+  // a plain reference.
   const names = new Map<string, string>();
+  const kept: { name: string; ref: string; sheet?: string }[] = [];
+  const listedSheets = all(kid(wb, 'sheets'), 'sheet').map((s) => att(s, 'name') ?? '');
   // What a workbook here does not hold, for a file to be saved again: their keys (importBook says which).
   const loses = new Set<string>();
   for (const d of all(kid(wb, 'definedNames'), 'definedName')) {
     const name = att(d, 'name') ?? '';
     const ref = textOf(d).trim();
-    if (!name.startsWith('_xlnm.') && /^(?:'[^']+'|[A-Za-z_][\w.]*)!\$?[A-Z]{1,3}\$?\d+(?::\$?[A-Z]{1,3}\$?\d+)?$/.test(ref)) names.set(name.toLowerCase(), ref);
-    // Names go (formulas that use them get what they stand for), and so do print areas and titles (but the first rows
-    // repeated on each page, as the app prints a sheet's header rows anyway, as its own files say).
-    if (!name.startsWith('_xlnm.') && att(d, 'hidden') !== '1') loses.add('names');
+    if (!name.startsWith('_xlnm.') && att(d, 'hidden') !== '1') {
+      const f = formulaFromFile(ref);
+      const local = att(d, 'localSheetId');
+      if (isRangeName(name) && !formulaProblem(f) && !/\[\d+\]/.test(ref)) kept.push({ name, ref: f, ...(local !== undefined && listedSheets[Number(local)] ? { sheet: listedSheets[Number(local)] } : {}) });
+      else {
+        if (/^(?:'[^']+'|[A-Za-z_][\w.]*)!\$?[A-Z]{1,3}\$?\d+(?::\$?[A-Z]{1,3}\$?\d+)?$/.test(ref)) names.set(name.toLowerCase(), ref);
+        loses.add('names');
+      }
+    }
+    // Print areas and titles go (but the first rows repeated on each page, as the app prints a sheet's header rows
+    // anyway, as its own files say).
     if (name === '_xlnm.Print_Area' || (name === '_xlnm.Print_Titles' && !/^(?:'(?:[^']|'')+'|[^!',]+)!\$1:\$[1-5]$/.test(ref))) loses.add('print');
   }
   if (rich) loses.add('rich');
@@ -1078,7 +1161,8 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     if (parts.some((r) => /\/pivotTable$/.test(r.type))) loses.add('pivots');
     if (parts.some((r) => /\/table$/.test(r.type))) loses.add('tables');
     // What a sheet has that a workbook here does not keep.
-    if (/<(?:\w+:)?hyperlinks?[\s>]/.test(xml)) loses.add('hyperlinks');
+    // Links to other files' places, or of a range of cells, are not kept (a cell's link to the web or this workbook is).
+    if (/<(?:\w+:)?hyperlink\b[^>]*\bref="[A-Z]+\d+:/.test(xml)) loses.add('hyperlinks');
     if (/<(?:\w+:)?(?:row|col)\b[^>]*\boutlineLevel="[1-9]/.test(xml)) loses.add('groups');
     if (/<(?:\w+:)?sparklineGroups?[\s>]/.test(xml)) loses.add('sparklines');
     if (/<(?:\w+:)?cfRule\b[^>]*\btype="iconSet"/.test(xml) || /<x14:iconSet\b/.test(xml)) loses.add('icons');
@@ -1087,6 +1171,17 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     if (/<(?:\w+:)?(?:odd|even|first)(?:Header|Footer)>\s*[^<\s]/.test(xml.replace(/<(?:\w+:)?oddHeader>&amp;L&amp;(?:"|&quot;)-,Bold(?:"|&quot;)&amp;12&amp;A<\/(?:\w+:)?oddHeader>/, ''))) loses.add('print');
     const sheet = readWorksheet(xml, name, shared, styles, date1904, state, names);
     const base = sheet.base as { cells: Record<string, Cell>; cols: Record<number, { w?: number; hidden?: boolean }>; rows: Record<number, { h?: number; hidden?: boolean }> } & Obj;
+    // Cells' links: to the web (by the sheet's relationships) or to a place in the workbook.
+    for (const m of xml.matchAll(/<(?:\w+:)?hyperlink\b([^>]*)\/?>/g)) {
+      const ref = /\bref="([A-Z]{1,3}\d{1,7})"/.exec(m[1])?.[1];
+      const rid = /\br:id="([^"]+)"/.exec(m[1])?.[1];
+      const location = /\blocation="([^"]*)"/.exec(m[1])?.[1];
+      const target = rid ? webTargets(z, rel.target).get(rid) : undefined;
+      const link = cleanLink(target ?? (location ? `#${decode(location)}` : ''));
+      if (ref && link) base.cells[ref] = { ...(base.cells[ref] ?? {}), link };
+    }
+    // The grid's lines hidden.
+    if (/<(?:\w+:)?sheetView\b[^>]*\bshowGridLines="(?:0|false)"/.test(xml)) base.noGrid = true;
     if (isListsSheet(name) && /^(hidden|veryHidden)$/.test(att(s, 'state') ?? '')) {
       listSheets.push({ name, cells: base.cells });
       continue;
@@ -1144,7 +1239,7 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
   if (cutSheets) notes.push(`Only the first ${SHEET_LIMITS.sheets} sheets were taken in.`);
   if (state.bad) loses.add('formulas');
   if (z.names().some((n) => n.startsWith('xl/externalLinks/'))) loses.add('links');
-  return { book: plainCharts(normalizeBook({ sheets }, { notes })), notes, loses: [...loses], cut: state.cutRows || state.cutCells || cutSheets };
+  return { book: plainCharts(normalizeBook({ sheets, names: kept }, { notes })), notes, loses: [...loses], cut: state.cutRows || state.cutCells || cutSheets };
 }
 
 /**
