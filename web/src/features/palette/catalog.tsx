@@ -201,7 +201,18 @@ export async function liveEntries(): Promise<Entry[]> {
       run: () => go(`/settings?s=plugins&plugin=${encodeURIComponent(p.name)}`),
     });
   for (const p of pages?.pages ?? [])
-    out.push({ id: `page:${p.id}`, group: 'Pages', icon: <AppWindow size={15} />, title: p.title, keywords: 'page published', where: 'Library', body: `Version ${p.version}`, opens: 'Opens the page', run: () => go(`/pages/${encodeURIComponent(p.id)}`) });
+    out.push({
+      id: `page:${p.id}`,
+      group: 'Pages',
+      icon: <AppWindow size={15} />,
+      title: p.title,
+      keywords: 'page published',
+      text: p.description,
+      where: 'Library',
+      body: p.description || `Version ${p.version}`,
+      opens: 'Opens the page',
+      run: () => go(`/pages/${encodeURIComponent(p.id)}`),
+    });
   for (const m of media?.items ?? [])
     out.push({
       id: `media:${m.id}`,
