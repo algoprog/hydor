@@ -16,6 +16,7 @@ import { copyPaths, goFolder, itemOf, startSession } from './actions';
 import { useSpaceMenu } from './SpaceMenu';
 import { useWatchMs } from './FileAsk';
 import { EDITABLE, editFile } from '../mediaedit/open';
+import { EDITABLE_VIDEO, editVideoFile } from '../mediaedit/video/open';
 
 // Word, Excel, PowerPoint and other documents open as a preview (features/documents).
 const OfficePreview = lazy(() => import('../documents/OfficePreview').then((m) => ({ default: m.OfficePreview })));
@@ -293,9 +294,10 @@ export function FileEditor({
   }, [path, media]);
 
   const raw = mu(`/api/fs/raw?path=${encodeURIComponent(path)}`);
-  // A picture opens in the picture editor (not from a dialog, which would cover it): saved over, it shows anew here.
-  const canEdit = media === 'image' && !!file && !embedded && EDITABLE.test(path);
-  const editPicture = () => editFile(path, { label: basename(path), after: (r) => (r.replaced ? void load() : r.path && showInFiles(r.path)) });
+  // A picture opens in the picture editor, a video in the video editor (not from a dialog, which would cover it): saved
+  // over, it shows anew here.
+  const canEdit = (media === 'image' && !!file && !embedded && EDITABLE.test(path)) || (media === 'video' && !!file && !embedded && EDITABLE_VIDEO.test(path));
+  const editPicture = () => (media === 'video' ? editVideoFile : editFile)(path, { label: basename(path), after: (r) => (r.replaced ? void load() : r.path && showInFiles(r.path)) });
   const crumbs = tildify(path, home).split(isWinPath(path) ? /[\\/]/ : '/');
   const text = !!file && !file.binary && !file.tooLarge;
   const togglePreview = () => setMode((m) => (m === 'preview' ? 'edit' : 'preview'));
@@ -362,7 +364,7 @@ export function FileEditor({
               </IconButton>
             )}
             {canEdit && (
-              <IconButton label="Edit the picture" onClick={editPicture}>
+              <IconButton label={media === 'video' ? 'Edit the video' : 'Edit the picture'} onClick={editPicture}>
                 <SlidersHorizontal size={17} />
               </IconButton>
             )}

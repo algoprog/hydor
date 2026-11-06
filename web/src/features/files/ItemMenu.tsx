@@ -16,6 +16,7 @@ import { copyInto, copyPaths, download, duplicate, goFolder, moveInto, newSessio
 import { setPinned, usePinned } from './prefs';
 import { useSpaceMenu } from './SpaceMenu';
 import { EDITABLE, editFile } from '../mediaedit/open';
+import { EDITABLE_VIDEO, editVideoFile } from '../mediaedit/video/open';
 
 /** The spaces and pinned folders, first in a folder menu (a space by its mark and name). */
 export function useFolderLead(pick: (path: string) => void, at?: string | null): FolderChoice[] {
@@ -113,6 +114,11 @@ export function ItemMenu({
               {one && !one.dir && EDITABLE.test(one.name) && (
                 <MenuItem icon={<SlidersHorizontal size={14} />} onClick={act(() => void editFile(one.path, { after: () => after?.() }))}>
                   Edit the picture
+                </MenuItem>
+              )}
+              {one && !one.dir && EDITABLE_VIDEO.test(one.name) && (
+                <MenuItem icon={<SlidersHorizontal size={14} />} onClick={act(() => void editVideoFile(one.path, { after: () => after?.() }))}>
+                  Edit the video
                 </MenuItem>
               )}
               {showFolder && one && (

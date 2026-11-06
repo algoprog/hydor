@@ -36,6 +36,8 @@ export interface Saved {
   replaced?: boolean;
   /** A picture: its data: address, for a page that keeps its pictures inside it. */
   data?: string;
+  /** A slide's video: its still, a picture kept by the app ("naget-asset:<sha>"). */
+  poster?: string;
 }
 
 /** POST /api/mediaedit/image: a picture the editor made, kept where it belongs. */
@@ -895,3 +897,8 @@ export function hideArea(px: Uint8ClampedArray, w: number, h: number, box: Box, 
   boxBlur(part, bw, bh, Math.max(3, Math.round(size * (0.04 + 0.12 * s))), 4);
   for (let y = 0; y < bh; y++) px.set(part.subarray(y * bw * 4, (y + 1) * bw * 4), ((y0 + y) * w + x0) * 4);
 }
+
+// ---- videos ---------------------------------------------------------------------------------------------------------
+
+// The video editor's recipe (its parts kept, speed, crop, turn, colour, fades, sound, music and words), in a file of its own.
+export * from './mediaedit-video.ts';

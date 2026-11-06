@@ -34,6 +34,8 @@ export interface OpenEditor {
   save: (r: Saved) => Promise<void> | void;
   /** Offer "Save a copy" (to the Library; for a file, beside it). */
   copy?: boolean;
+  /** The session it is from (a video of the conversation): a copy kept in the Library is noted as from it. */
+  session?: string;
 }
 
 export interface EditorHandle {
@@ -64,6 +66,7 @@ export interface EditorProps {
 /** The editor of each kind, loaded the first time one is opened. */
 const EDITORS: Partial<Record<EditKind, LazyExoticComponent<ComponentType<EditorProps>>>> = {
   image: lazy(() => import('./ImageEditor').then((m) => ({ default: m.ImageEditor }))),
+  video: lazy(() => import('./VideoEditor').then((m) => ({ default: m.VideoEditor }))),
 };
 
 interface Tab {
