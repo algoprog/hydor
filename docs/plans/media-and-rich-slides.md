@@ -76,6 +76,16 @@ These names are fixed so the workstreams fit when merged. Add fields if you need
 - `POST /api/videos/make` `MakeVideoAsk` → `VideoJob`; `GET /api/videos/make/:job` → `VideoJob` (A3). Done videos are
   kept as decks' are (`keepVideoFile`-like, in `server/pages/videos.ts`), their first frame a kept picture.
 
+**No OpenRouter key** (the owner's ask, 6 November): a tool that needs a model through OpenRouter asks for the key
+when it needs it, and if the user skips, that model does not run. Agents' tools call
+`openRouterKey(ctx, { why })` from `server/connections/openrouter-key.ts` (on `mr/int`): it returns the key, or after a
+card in the conversation (the key goes from the browser straight to Settings → Models, checked with OpenRouter; never
+through the conversation) the key or why there is none; `noKeyText(answer, what)` is what to tell the agent (a normal
+answer, not an error: skipping is the user's choice). Where a way without a key exists, take it instead of failing (a
+Quick drawing written by a model; the picture tools on this computer). The editors' dialogs, when `TiersInfo.keySet` is
+false, show the key field in place (saved with `PUT /api/models` `{ openrouterKey }`, as Settings → Models does) beside
+**Skip**, and offer what needs no key.
+
 Prices: every route that spends says what it cost (`cost`, US dollars, when OpenRouter says); the dialogs show an
 estimate before (`TiersInfo`). Without an OpenRouter key, routes that need one answer 400 with
 "Add an OpenRouter key in Settings → Models" (and the dialogs show that with a link, `/settings?s=models`).
