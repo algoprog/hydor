@@ -8,7 +8,7 @@ import path from 'node:path';
 import type { KnowledgeState } from '../../shared/knowledge.ts';
 import { HttpError } from '../auth.ts';
 import type { Deps, Feature } from '../features/types.ts';
-import { meaningOn } from '../memory/embed.ts';
+import { meaningHeld, meaningOn } from '../memory/embed.ts';
 import { dropVectorBlocks, fillSoon, onIndexed, progress, scanAll, scanSoon } from './indexer.ts';
 import { basesFor, spaceOfSession } from './scope.ts';
 import { searchKnowledge, type SearchMode } from './search.ts';
@@ -16,7 +16,10 @@ import { addSource, baseRow, baseRows, baseView, createBase, deleteBase, docById
 import { knowledgeInstructions, knowledgeTools } from './tools.ts';
 
 function state(d: Deps): KnowledgeState {
-  return { bases: baseRows(d.db).map((r) => baseView(d.db, r, progress.get(r.id))), meaning: meaningOn(d.db) };
+  const bases = baseRows(d.db).map((r) => baseView(d.db, r, progress.get(r.id)));
+  // Why passages wait for their vectors, while some do.
+  const waiting = bases.some((b) => b.embedded < b.passages);
+  return { bases, meaning: meaningOn(d.db), meaningHeld: waiting ? meaningHeld(d.db) : undefined };
 }
 
 function routes(d: Deps) {
@@ -36,8 +39,8 @@ function routes(d: Deps) {
     dropVectorBlocks();
     changed();
   });
-  const rescan = (base: string) => {
-    scanSoon(db, base);
+  const rescan = (base: string, o: { failed?: boolean } = {}) => {
+    scanSoon(db, base, o);
     changed();
   };
 
@@ -73,10 +76,10 @@ function routes(d: Deps) {
     changed();
     return { ok: true };
   });
-  /** Reads the base again: files just dropped into it, a folder that changed. */
+  /** Reads the base again: files just dropped into it, a folder that changed, and what could not be read before. */
   app.post('/api/knowledge/:id/scan', async (req) => {
     baseRow(db, id(req));
-    rescan(id(req));
+    rescan(id(req), { failed: true });
     return { ok: true };
   });
   app.get('/api/knowledge/:id/docs', async (req) => ({ docs: docsOf(db, baseRow(db, id(req)).id, { limit: 2000 }).map(toDoc) }));
@@ -116,8 +119,9 @@ export const knowledge: Feature = {
     if (e.t === 'feature' && e.id === 'memory') fillSoon(d.db, 10_000);
   },
   start(d) {
-    // Folders change while nobody looks: read again a minute after the start, then every hour.
-    setTimeout(() => scanAll(d.db), 60_000).unref();
+    // Folders change while nobody looks: read again a minute after the start (trying again what could not be read:
+    // this version may read it), then every hour.
+    setTimeout(() => scanAll(d.db, { failed: true }), 60_000).unref();
     setInterval(() => scanAll(d.db), 3600_000).unref();
     // Files dropped while the server was down, in a base nothing has read yet.
     for (const b of baseRows(d.db)) if (sourcesOf(d.db, b.id).length && !b.indexed_at) scanSoon(d.db, b.id);

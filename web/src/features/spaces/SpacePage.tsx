@@ -21,7 +21,7 @@ import { tr } from '../../i18n/runtime';
 import { AssistantIcon } from '../assistants/icons';
 import { useAssistantsState } from '../assistants/state';
 import { goFolder } from '../files/actions';
-import { addFiles, BaseCard, DropFiles, MeaningHint, TrySearch, useKnowledge } from '../knowledge/parts';
+import { addFiles, BaseCard, DropFiles, MeaningHint, MeaningWait, TrySearch, useKnowledge } from '../knowledge/parts';
 import { BackButton, NavButton, PageHeader } from '../layout/PageHeader';
 import { SpaceLibrary } from '../pages/Library';
 import { ActivityText } from '../sessions/SessionList';
@@ -437,6 +437,7 @@ function KnowledgeTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void
         <>
           <TrySearch space={s.id} />
           {!st.meaning && <MeaningHint />}
+          <MeaningWait st={st} bases={own} />
           {own.map((b) => (
             <BaseCard key={b.id} b={b} meaning={st.meaning} />
           ))}
