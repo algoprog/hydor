@@ -42,7 +42,7 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
 
   // ---- the design's parts ---------------------------------------------------------------------------------------
   const boards = () => [...document.querySelectorAll<HTMLElement>('.n-artboard')];
-  const isBoard = (x: Element | null): x is HTMLElement => !!x && x.classList?.contains('n-artboard');
+  const isBoard = (x: Element | null): boolean => !!x && !!x.classList?.contains('n-artboard');
   const isGroup = (x: Element | null) => !!x && x.classList?.contains('n-group');
   const boardOf = (el: Element | null): HTMLElement | null => (el ? (el.closest('.n-artboard') as HTMLElement | null) : null);
   const typeOf = (el: Element): string => {
@@ -2191,7 +2191,7 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
       case 'brandColours': {
         // The design's colourful colours become the brand's, the most used first; its greys, whites and blacks stay,
         // but its darkest words take the brand's darkest colour when that is dark enough.
-        const brand = (Array.isArray(arg?.colours) ? arg.colours : []).map((c: unknown) => hexOf(String(c))).filter((c: string | null): c is string => !!c);
+        const brand: string[] = (Array.isArray(arg?.colours) ? (arg.colours as unknown[]) : []).map((c) => hexOf(String(c))).filter((c): c is string => !!c);
         if (!brand.length) return;
         const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
         const chroma = (h: string) => Math.max(...rgb(h)) - Math.min(...rgb(h));
