@@ -1,7 +1,7 @@
 // Ready-made designs (New → Design): for each kind of size (square, portrait, story, landscape, banner, card), designs
 // drawn from its width and height, with words and picture places to replace, painted in a palette's roles (its own, or
 // the user's theme or brand) and set in a pair of fonts. Each makes the HTML of one artboard of a design (design.ts).
-import { designPage, mix, px, type DesignShape, type DesignSize, type Palette } from './design.ts';
+import { curveGeom, designPage, mix, px, type DesignShape, type DesignSize, type Palette } from './design.ts';
 import { fontsHref, fontStack, nearestWeight } from './design-fonts.ts';
 import { frameCss, shapePath } from './design-shapes.ts';
 
@@ -164,30 +164,18 @@ export function tIcon(name: string, o: { x: number; y: number; size: number; col
  * Words on an arc (a badge's ring, a curved title): an SVG path the words follow, as wide as the element. `curve` from
  * -100 (bent down, a smile) to 100 (a half circle, bent up).
  */
-export function curvedSvg(text: string, o: { w: number; size: number; curve: number; color?: string; font?: string; weight?: number; ls?: number; id?: string }): { svg: string; h: number } {
-  const c = Math.max(-100, Math.min(100, o.curve)) || 1;
-  const theta = (Math.abs(c) / 100) * Math.PI;
-  const R = o.w / 2 / Math.sin(Math.min(theta, Math.PI) / 2);
-  const sag = R * (1 - Math.cos(theta / 2));
-  const pad = o.size * 1.15;
-  const h = Math.round(sag + pad * 1.4);
-  const cx = o.w / 2;
-  const id = o.id ?? `n-c${Math.abs(Math.round(o.w * 7 + o.size * 13 + c * 17)) % 100000}`;
+export function curvedSvg(text: string, o: { w: number; size: number; curve: number; ls?: number; id?: string }): { svg: string; h: number } {
+  const { d, h } = curveGeom(o.w, o.size, o.curve);
   const r = (v: number) => Math.round(v * 10) / 10;
-  // Up: the circle's top arc, the words outside it; down: its bottom arc, read left to right.
-  const d =
-    c > 0
-      ? `M${r(cx - o.w / 2)},${r(pad + sag)} A${r(R)},${r(R)} 0 0 1 ${r(cx + o.w / 2)},${r(pad + sag)}`
-      : `M${r(cx - o.w / 2)},${r(pad * 0.85)} A${r(R)},${r(R)} 0 0 0 ${r(cx + o.w / 2)},${r(pad * 0.85)}`;
-  const font = o.font ? ` font-family="${fontStack(o.font).replace(/"/g, "'")}"` : '';
-  const svg = `<svg viewBox="0 0 ${r(o.w)} ${h}" preserveAspectRatio="xMidYMid meet"><path id="${id}" d="${d}" fill="none"/><text text-anchor="middle" fill="${o.color ?? 'currentColor'}" font-size="${r(o.size)}"${font}${o.weight ? ` font-weight="${o.weight}"` : ''}${o.ls ? ` letter-spacing="${r(o.ls * o.size)}"` : ''}><textPath href="#${id}" startOffset="50%">${esc(text)}</textPath></text></svg>`;
+  const id = o.id ?? `n-c${Math.abs(Math.round(o.w * 7 + o.size * 13 + o.curve * 17)) % 100000}`;
+  const svg = `<svg viewBox="0 0 ${r(o.w)} ${h}" preserveAspectRatio="xMidYMid meet"><path id="${id}" d="${d}" fill="none"/><text text-anchor="middle" fill="currentColor" font-size="${r(o.size)}"${o.ls ? ` letter-spacing="${r(o.ls * o.size)}"` : ''}><textPath href="#${id}" startOffset="50%">${esc(text)}</textPath></text></svg>`;
   return { svg, h };
 }
 
 /** Curved words as an element. */
 export function tCurve(text: string, o: { x: number; y: number; w: number; size: number; curve: number; color: string; font: string; weight?: number; ls?: number; upper?: boolean; rot?: number }): string {
   const t = o.upper ? text.toUpperCase() : text;
-  const { svg, h } = curvedSvg(t, { ...o, color: 'currentColor', font: undefined, weight: undefined });
+  const { svg, h } = curvedSvg(t, { w: o.w, size: o.size, curve: o.curve, ls: o.ls });
   const st = `left:${px(o.x)};top:${px(o.y)};width:${px(o.w)};height:${px(h)};color:${o.color};font-family:${fontStack(o.font).replace(/"/g, "'")};font-size:${px(o.size)};font-weight:${nearestWeight(o.font, o.weight ?? 400)}${o.ls ? `;letter-spacing:${o.ls}em` : ''}`;
   return `<div class="n-el n-text n-curve" data-curve="${Math.round(o.curve)}" data-text="${esc(t)}" style="${st}${deg(o.rot)}">${svg}</div>`;
 }
