@@ -1,7 +1,8 @@
 // Videos for slides: a YouTube or Vimeo video's still, which the server fetches and keeps as a picture so it shows
 // everywhere the slide does (the editor, the slideshow, a deck's own page, PowerPoint's file) without the web; and a
 // video from this device, sent to the app in pieces (so no proxy's limit on a request's size stops it) and kept with
-// the deck, its first frame taken here as its still.
+// the deck, its first frame taken here as its still. And 3D models for the web format's 3D parts: a GLB file from this
+// device, kept with the deck as its pictures are.
 import { post } from '../../../lib/api';
 import { mu } from '../../../lib/machine';
 
@@ -78,6 +79,37 @@ export function firstFrame(file: Blob): Promise<{ data: string; w: number; h: nu
     };
     v.src = url;
   });
+}
+
+/** The largest 3D model the app keeps with a deck, as its pictures. */
+export const MAX_MODEL = 12 * 1024 * 1024;
+
+/** Asks for a 3D model (a GLB file); null when none was picked. */
+export function chooseModel(): Promise<File | null> {
+  return new Promise((ok) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.glb,model/gltf-binary';
+    input.onchange = () => ok(input.files?.[0] ?? null);
+    input.oncancel = () => ok(null);
+    input.click();
+  });
+}
+
+/** A GLB file from this device kept by the app: its source ("naget-asset:<sha>"). */
+export async function uploadModel(file: File): Promise<string> {
+  if (!/\.glb$/i.test(file.name) && file.type !== 'model/gltf-binary') throw new Error('That is not a GLB file (a 3D model in one file)');
+  if (file.size > MAX_MODEL) throw new Error(`That model is over ${MAX_MODEL / 1024 / 1024} MB`);
+  // A GLB starts with "glTF".
+  const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+  if (String.fromCharCode(...head) !== 'glTF') throw new Error('That file is not a GLB model');
+  const data = await new Promise<string>((ok, fail) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).replace(/^data:[^;,]*/, 'data:model/gltf-binary'));
+    r.onerror = () => fail(new Error('The model could not be read'));
+    r.readAsDataURL(file);
+  });
+  return (await post<{ src: string }>('/api/pages/assets', { data, kind: 'model' })).src;
 }
 
 /** One piece of an upload, sent as it is, with how much of it went. */
