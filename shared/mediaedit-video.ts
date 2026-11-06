@@ -77,9 +77,10 @@ export type VideoOut = 'mp4' | 'webm' | 'gif' | 'jpg' | 'png';
 /**
  * Where the result goes: kept as a deck's video ("naget-video:<sha>", with its first frame as a kept picture), as a
  * deck's picture ("naget-asset:<sha>": a frame, a GIF), a Library item's file replaced or a new item beside it, a new
- * item in the Library, or a file written over or a copy beside it.
+ * item in the Library (from a session's video: that session's), or a file written over (the old one to the Trash) or a
+ * copy beside it.
  */
-export type VideoSaveTo = { video: true } | { asset: true } | { media: string; as: 'replace' | 'copy' } | { library: true } | { file: string; as: 'replace' | 'copy' };
+export type VideoSaveTo = { video: true } | { asset: true } | { media: string; as: 'replace' | 'copy' } | { library: true; session?: string } | { file: string; as: 'replace' | 'copy' };
 
 /** POST /api/mediaedit/video. */
 export interface VideoEditAsk {
@@ -314,8 +315,9 @@ export function normalizeVideoRecipe(raw: unknown, v: VideoSize): VideoRecipe {
   }
   const length = editedLength(out, d);
   for (const k of ['fadeIn', 'fadeOut'] as const) {
+    // To the hundredth, rounded down: never longer than half of it.
     const n = num(r[k], 0, Math.min(10, length / 2));
-    if (n !== undefined && n >= 0.05) out[k] = r2(n);
+    if (n !== undefined && n >= 0.05) out[k] = Math.floor(n * 100) / 100;
   }
   if (r.mute === true) out.mute = true;
   const vol = num(r.volume, 0, 2);
@@ -332,7 +334,11 @@ export function normalizeVideoRecipe(raw: unknown, v: VideoSize): VideoRecipe {
   const texts: VideoText[] = [];
   for (const t of Array.isArray(r.texts) ? r.texts : []) {
     if (!t || typeof t !== 'object' || typeof t.text !== 'string') continue;
-    const text = t.text.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').trim().slice(0, 300);
+    const text = t.text
+      .replace(/\r\n?/g, '\n')
+      .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '')
+      .trim()
+      .slice(0, 300);
     if (!text) continue;
     const from = num(t.from, 0, d) ?? 0;
     const to = num(t.to, 0, d) ?? d;
