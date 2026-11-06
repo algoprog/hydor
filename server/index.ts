@@ -52,6 +52,7 @@ import { moveFileComments } from './pages/filecomments.ts';
 import { PART_FRAME_HTML } from './pages/slides.ts';
 import { movedPdfNotes } from './pdfnotes/index.ts';
 import * as setup from './setup.ts';
+import { standAll } from './openForms.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
 import { onDesktop, tellDesktop } from './desktop.ts';
 import { isAbsPath, trimSep, within } from './platform.ts';
@@ -1880,6 +1881,8 @@ await sessions.restore();
 await kernels.restore().catch((e) => console.error('[kernels] could not reattach:', e));
 // Added accounts' history folders join the default ones before the indexer looks.
 syncRoots(db);
+// Forms agents asked that were still open when the app last stopped: their steps went with it, so they stand now.
+standAll(db);
 indexer.start();
 terms.ensureTmuxConf();
 setInterval(() => files.sweepParts([config.home]), 6 * 3600_000).unref();

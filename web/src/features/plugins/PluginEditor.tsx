@@ -244,6 +244,9 @@ export function PluginEditor({ name, onClose, onSaved }: { name: string; onClose
           }),
         ),
         pip: lines(pip),
+        // What the editor has no field for stays as plugin.json has it: the Python version, the packages for an NVIDIA GPU.
+        ...(d.requires.python ? { python: d.requires.python } : {}),
+        ...(d.requires.pipNvidia?.length ? { pipNvidia: d.requires.pipNvidia } : {}),
         npm: npmMap,
         commands: lines(commands),
         keys: lines(keys).map((k) => k.toUpperCase()),

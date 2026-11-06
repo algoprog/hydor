@@ -120,7 +120,7 @@ const ASK_FORM: RunTool = {
   description: [
     'Ask the user for several details at once with a form in the conversation (a trip’s dates and budget, a report’s audience and length…) instead of a list of questions in text.',
     'fields: a JSON schema’s properties, in order: string (format date, email or uri; maxLength 300 or more for a long text), number or integer (minimum, maximum), boolean (yes or no), enum (or oneOf of const and title) for one choice, an array of enum strings for several; each with title, description and a default when you can guess it.',
-    'required: the ones you need. It waits for the answer, up to about nine minutes, and returns the values; the user may close it instead. For a change in the app itself, put the form on app_api’s card instead.',
+    'required: the ones you need. It waits for the answer and returns the values; the user may close it instead. A form not answered within about nine minutes stays open in the conversation, and the tool says so: then end your turn, as their answers come to you as their next message. For a change in the app itself, put the form on app_api’s card instead.',
   ].join(' '),
   inputSchema: {
     type: 'object',

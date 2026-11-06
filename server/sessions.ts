@@ -13,6 +13,8 @@ import { HttpError } from './auth.ts';
 import { config, paths } from './config.ts';
 import type { DB } from './db.ts';
 import { kvGet, kvSet } from './db.ts';
+import { answersText, dropForm, standingForm, standingForms } from './openForms.ts';
+import { formContent } from '../shared/forms.ts';
 import { agentBaseEnv } from './env.ts';
 import { ExternalWatcher } from './external.ts';
 import { keptOfTranscript, type Indexer } from './indexer/index.ts';
@@ -697,7 +699,17 @@ export class SessionManager extends EventEmitter {
   liveSnapshot(key: string): { live: LiveState | null; overlay: LiveOverlay } {
     const l = this.lives.get(key);
     if (l) this.dateTasks(l);
-    return l ? { live: { ...l.adapter.state }, overlay: l.adapter.overlay() } : { live: null, overlay: { items: [], patches: {}, approvals: [] } };
+    const snap = l ? { live: { ...l.adapter.state }, overlay: l.adapter.overlay() } : { live: null, overlay: { items: [], patches: {}, approvals: [] } };
+    // Forms an agent asked that outlived its step: the same cards, until answered or put away (openForms.ts).
+    const standing = standingForms(this.db, key).filter((f) => !snap.overlay.approvals.some((a) => a.id === f.id));
+    if (standing.length) snap.overlay = { ...snap.overlay, approvals: [...snap.overlay.approvals, ...standing] };
+    return snap;
+  }
+
+  /** A session's standing forms changed: its pages hear it. */
+  formsChanged(key: string) {
+    const snap = this.liveSnapshot(key);
+    this.emit('live', key, snap.live, snap.overlay);
   }
 
   /**
@@ -1843,6 +1855,23 @@ export class SessionManager extends EventEmitter {
   }
 
   async answer(key: string, approvalId: string, a: ApprovalAnswer) {
+    // A standing form: its answers go to the session as your message (the agent reads them in its next turn).
+    const f = standingForm(this.db, key, approvalId);
+    if (f) {
+      if (a.decision === 'accept') {
+        const r = formContent(f.schema, a.form ?? {});
+        const [field, why] = Object.entries(r.errors)[0] ?? [];
+        if (field) throw new HttpError(400, `${f.card.form?.fields.find((x) => x.id === field)?.label ?? field}: ${why}`);
+        // Sent first: should the message not get through, the form stays, to send again.
+        await this.send(key, answersText(f, r.content), [], []);
+        dropForm(this.db, approvalId);
+        this.formsChanged(key);
+      } else {
+        dropForm(this.db, approvalId);
+        this.formsChanged(key);
+      }
+      return;
+    }
     const ad = this.live(key).adapter;
     if (ad.answerAside(approvalId, a)) return;
     await ad.answer(approvalId, a);

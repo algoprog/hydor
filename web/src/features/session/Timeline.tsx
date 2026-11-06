@@ -774,6 +774,16 @@ export function Timeline({
     if (Math.abs(sc.scrollTop - want) > 0.5) setTop(want);
   };
   const textEl = (id: string) => content.current?.querySelector<HTMLElement>(`[data-text="${CSS.escape(id)}"]`) ?? null;
+  // A card to answer (a form, a question) that the end would cut off at its top shows from its top instead: its title,
+  // what it asks and its first fields in view, the rest a scroll away. Not one the reader went past with Latest.
+  const pastCard = useRef<string | null>(null);
+  const cardTop = (sc: HTMLElement): number | null => {
+    if (!turn.current.asks) return null;
+    const card = content.current?.querySelector<HTMLElement>('[id^="approval-"]');
+    if (!card || card.id === pastCard.current) return null;
+    const at = Math.max(0, topIn(card, sc) - HOLD_AT);
+    return sc.scrollHeight - sc.clientHeight > at ? at : null;
+  };
   // While following: the text the view holds stays in place, or the end stays in view. `came`, a text that just
   // came, becomes the one held (near the top if it starts below the top third, else where it is), unless the reader
   // may still be in the one held now: it runs on below the screen.
@@ -813,7 +823,13 @@ export function Timeline({
       }
       lead.current = null;
     }
-    // The end.
+    // The end, or the top of a card to answer that the end would cut off.
+    const at = cardTop(sc);
+    if (at != null) {
+      setTop(at);
+      setShowLatest(true);
+      return;
+    }
     setTop(sc.scrollHeight);
     setShowLatest(false);
   };
@@ -832,6 +848,8 @@ export function Timeline({
     dir.current = 1;
     anchor.current = null;
     lead.current = null;
+    // Latest goes to the very end, past a card shown from its top.
+    pastCard.current = content.current?.querySelector<HTMLElement>('[id^="approval-"]')?.id ?? null;
     const el = scroller.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
   };
@@ -904,7 +922,7 @@ export function Timeline({
     armed.current = false;
     requestAnimationFrame(() => {
       const el = scroller.current;
-      if (el) setTop(el.scrollHeight);
+      if (el) setTop(cardTop(el) ?? el.scrollHeight);
     });
   }, [sessionKey, tl?.loading]);
 

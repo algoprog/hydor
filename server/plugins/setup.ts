@@ -2,7 +2,9 @@
 // folder (PLUGIN_DATA, kept across updates as Agent Plugins §9.1 asks), never for the whole computer; and
 // the programs it needs looked for on this computer. npm installs without the packages' own install
 // scripts. Python packages go in an environment of the plugin's own made by uv (python3 -m venv and pip
-// when uv is not here). What its servers get: its environment's commands first on PATH, VIRTUAL_ENV, NODE_PATH.
+// when uv is not here); on a computer with an NVIDIA GPU, its `pipNvidia` packages too (CUDA's libraries, a GPU
+// build), whose libraries its servers then find. What its servers get: its environment's commands first on PATH,
+// VIRTUAL_ENV, NODE_PATH.
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -14,13 +16,29 @@ export { hasCommand };
 
 const SETUP_FILE = '.naget-setup.json';
 
+/** An NVIDIA GPU with its driver: Linux's driver says its version; elsewhere nvidia-smi is there. A Mac never has one. */
+let nvidia: boolean | undefined;
+export function hasNvidia(): boolean {
+  if (process.env.HYDOR_TEST_NVIDIA) return process.env.HYDOR_TEST_NVIDIA === '1';
+  if (nvidia !== undefined) return nvidia;
+  if (process.platform === 'linux') nvidia = fs.existsSync('/proc/driver/nvidia/version');
+  else if (process.platform === 'win32') nvidia = fs.existsSync(path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'nvidia-smi.exe')) || hasCommand('nvidia-smi');
+  else nvidia = false;
+  return nvidia;
+}
+
+/** The packages a plugin gets for an NVIDIA GPU on this computer: its `pipNvidia` when there is one, else none. */
+export const gpuPip = (r: PluginRequires): string[] => (r.pip.length && r.pipNvidia?.length && hasNvidia() ? r.pipNvidia : []);
+
 export const needsSetup = (r: PluginRequires) => !!(Object.keys(r.npm).length || r.pip.length || r.files.length);
-export const setupHash = (r: PluginRequires) =>
-  crypto
+export const setupHash = (r: PluginRequires) => {
+  const gpu = gpuPip(r);
+  return crypto
     .createHash('sha256')
-    .update(JSON.stringify({ npm: r.npm, pip: r.pip, python: r.python ?? '', files: r.files }))
+    .update(JSON.stringify({ npm: r.npm, pip: r.pip, python: r.python ?? '', files: r.files, ...(gpu.length ? { pipNvidia: gpu } : {}) }))
     .digest('hex')
     .slice(0, 16);
+};
 
 interface Saved {
   hash: string;
@@ -66,12 +84,37 @@ export function setupEnv(r: PluginRequires, root: string, data: string): Record<
   if (r.pip.length) {
     out.VIRTUAL_ENV = venvDir(data);
     bins.push(path.join(venvDir(data), 'bin'));
+    // CUDA's libraries from its pipNvidia packages (nvidia/<lib>/lib, on Windows nvidia/<lib>/bin), found first.
+    const libs = gpuPip(r).length ? nvidiaLibs(venvDir(data)) : [];
+    if (libs.length && process.platform === 'win32') bins.push(...libs);
+    else if (libs.length) out.LD_LIBRARY_PATH = [...libs, process.env.LD_LIBRARY_PATH ?? ''].filter(Boolean).join(path.delimiter);
   }
   if (Object.keys(r.npm).length) {
     out.NODE_PATH = path.join(nodeDir(data), 'node_modules');
     bins.push(path.join(nodeDir(data), 'node_modules', '.bin'));
   }
   out.PATH = [...bins, process.env.PATH ?? ''].filter(Boolean).join(path.delimiter);
+  return out;
+}
+
+/** The folders of CUDA's libraries that NVIDIA's pip packages put in an environment (nvidia/cublas/lib…). */
+export function nvidiaLibs(venv: string): string[] {
+  const sites: string[] = [];
+  try {
+    if (process.platform === 'win32') sites.push(path.join(venv, 'Lib', 'site-packages'));
+    else for (const v of fs.readdirSync(path.join(venv, 'lib'))) if (v.startsWith('python')) sites.push(path.join(venv, 'lib', v, 'site-packages'));
+  } catch {}
+  const out: string[] = [];
+  for (const site of sites) {
+    let names: string[] = [];
+    try {
+      names = fs.readdirSync(path.join(site, 'nvidia'));
+    } catch {}
+    for (const n of names.sort()) {
+      const dir = path.join(site, 'nvidia', n, process.platform === 'win32' ? 'bin' : 'lib');
+      if (fs.existsSync(dir)) out.push(dir);
+    }
+  }
   return out;
 }
 
@@ -194,12 +237,24 @@ export async function runSetup(name: string, r: PluginRequires, data: string, re
       const venv = venvDir(data);
       const py = path.join(venv, 'bin', 'python');
       const pkgs = r.pip.map((p) => p.split(/[<>=!~\s[;]/)[0]).join(', ');
-      if (hasCommand('uv') || setupTesting.run) {
+      const uv = hasCommand('uv') || setupTesting.run;
+      if (uv) {
         if (!fs.existsSync(py)) await step('Making its Python environment', 'uv', ['venv', '--allow-existing', ...(r.python ? ['--python', r.python] : []), venv], data);
         await step(`Installing Python packages: ${pkgs}`, 'uv', ['pip', 'install', '--python', py, ...r.pip], data);
       } else {
         if (!fs.existsSync(py)) await step('Making its Python environment', 'python3', ['-m', 'venv', venv], data);
         await step(`Installing Python packages: ${pkgs}`, py, ['-m', 'pip', 'install', ...r.pip], data);
+      }
+      // For the NVIDIA GPU: when this fails, the plugin still works, on the CPU, and the log says why.
+      const gpu = gpuPip(r);
+      if (gpu.length) {
+        const names = gpu.map((p) => p.split(/[<>=!~\s[;]/)[0]).join(', ');
+        try {
+          if (uv) await step(`Installing what it needs to run on the NVIDIA GPU: ${names}`, 'uv', ['pip', 'install', '--python', py, ...gpu], data);
+          else await step(`Installing what it needs to run on the NVIDIA GPU: ${names}`, py, ['-m', 'pip', 'install', ...gpu], data);
+        } catch (e) {
+          out(`${(e as Error).message}: it runs on the CPU.\n`);
+        }
       }
     }
     for (const f of r.files) {

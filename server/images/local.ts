@@ -1,14 +1,19 @@
 // The picture tools on this computer: taking the background out of a picture (BiRefNet-lite), erasing part of one
 // (LaMa) and making one larger (Real-ESRGAN, upscale.ts), free and private, and the Python that draws plots. Setting
 // them up (Settings → Images, video and audio) makes a private Python environment in the data folder once (ONNX Runtime,
-// NumPy, Pillow, Matplotlib, pandas, and a portable ffmpeg for computers without one: about 145 MB to download); each
-// model downloads the first time its tool is used (192 MB, 208 MB and 5 MB), checked by its SHA-256; a model's file the
-// app no longer uses goes.
+// NumPy, Pillow, Matplotlib, pandas, and a portable ffmpeg for computers without one: about 145 MB to download; with an
+// NVIDIA GPU, ONNX Runtime's build for it with NVIDIA's CUDA and cuDNN libraries instead, about 2.1 GB); each model
+// downloads the first time its tool is used (192 MB, 208 MB and 5 MB), checked by its SHA-256; a model's file the app
+// no longer uses goes.
 //
-// A worker (picture_worker.py) runs the models on the CPU, one picture at a time (others wait in line). Each model
-// loads only when its tool is used and unloads after a few idle minutes; the worker quits after a few more; nothing
-// loads unless enough memory is free, and when it is not the person is told how much is needed. Plots' Python runs
-// apart from it, in a short-lived process of its own (runPython), with a time limit.
+// A worker (picture_worker.py) runs the models one picture at a time (others wait in line), on the graphics card when
+// this computer has one they can use: an NVIDIA GPU through CUDA, a Mac's (Apple silicon) through Core ML, which the
+// stock ONNX Runtime has; else on the CPU (and with HYDOR_PICTURES_DEVICE=cpu). A model the graphics card fails runs on
+// the CPU from then on, until the app starts again or they are set up again; when the GPU build will not install, the
+// CPU one is. Each model loads only when its tool is used and unloads after a few idle minutes; the worker quits after
+// a few more; nothing loads unless enough memory is free (counted as for the CPU wherever they run: a model the GPU
+// fails runs on the CPU at once, and a Mac's GPU shares its memory), and when it is not the person is told how much is
+// needed. Plots' Python runs apart from it, in a short-lived process of its own (runPython), with a time limit.
 //   GET    /api/images/local         what is set up, downloaded and in memory (LocalToolsState)
 //   POST   /api/images/local/setup   sets them up (the app asks GET again every second or so while it installs)
 //   DELETE /api/images/local         removes them: the environment and the models
@@ -25,13 +30,14 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import type { CutoutAsk, EraseAsk, LocalToolsState } from '../../shared/images.ts';
+import type { CutoutAsk, EraseAsk, LocalDevice, LocalToolsState } from '../../shared/images.ts';
 import { HttpError } from '../auth.ts';
 import { APP_ROOT, config } from '../config.ts';
 import { kvGet, type DB } from '../db.ts';
 import { which } from '../documents/tools.ts';
 import type { Feature } from '../features/types.ts';
-import { availableMemory } from '../models/machine.ts';
+import { availableMemory, isAppleSilicon } from '../models/machine.ts';
+import { hasNvidia, nvidiaLibs } from '../plugins/setup.ts';
 import { cutoutPicture, MAX_PNG, removeBackgroundTool, type Here } from './cutout.ts';
 import { erasePicture, eraseTool } from './erase.ts';
 import { upscalePicture, upscaleTool, type Tile } from './upscale.ts';
@@ -45,16 +51,39 @@ const WIN = process.platform === 'win32';
 const dir = () => path.join(config.dataDir, 'pictures');
 const venv = () => path.join(dir(), 'venv');
 const modelsDir = () => path.join(dir(), 'models');
+/** What Core ML compiles of each model, in a folder per model (by its SHA-256), so it compiles once. */
+const coremlDir = () => path.join(dir(), 'coreml');
 const jobsDir = () => path.join(dir(), 'jobs');
 /** The Python that runs the worker: one given (HYDOR_PICTURES_PYTHON, with these packages), else the private one. */
 const python = () => process.env.HYDOR_PICTURES_PYTHON || path.join(venv(), ...(WIN ? ['Scripts', 'python.exe'] : ['bin', 'python']));
-const PACKAGE_LIST = ['onnxruntime>=1.20', 'numpy>=1.26', 'pillow>=10.1', 'matplotlib>=3.8', 'pandas>=2.0', 'imageio-ffmpeg>=0.5'];
-/** What the environment holds: another list means setting it up again. */
-const PACKAGES = PACKAGE_LIST.join(' ');
+const REST = ['numpy>=1.26', 'pillow>=10.1', 'matplotlib>=3.8', 'pandas>=2.0', 'imageio-ffmpeg>=0.5'];
+/** ONNX Runtime for the CPU; on a Mac it has Core ML too, for the GPU there. */
+const CPU_LIST = ['onnxruntime>=1.20', ...REST];
+/**
+ * With an NVIDIA GPU: ONNX Runtime's build for it, with NVIDIA's CUDA and cuDNN libraries from pip. Its CUDA 12 builds
+ * (1.21 to 1.26: from 1.27 they are CUDA 13's), which work with every driver from 525 (2022) on and with the older cards
+ * CUDA 13 left out; ONNX Runtime finds the libraries itself (preload_dlls).
+ */
+const GPU_LIST = ['onnxruntime-gpu[cuda,cudnn]>=1.21,<1.27', ...REST];
+const CPU_PACKAGES = CPU_LIST.join(' ');
 /** What setting up downloads, in MB (measured for Linux: 146 MB of wheels, 68 MB of them ffmpeg's; about 410 MB once installed). */
 const SETUP_MB = 145;
-/** Free disk needed to set up: the environment and the models, with room to spare. */
+/** With the GPU build (measured for Linux: 2,099 MB of wheels, cuDNN's 717 MB and cuBLAS's 581; about 3.4 GB once installed; Windows' about 1.95 GB). */
+const GPU_SETUP_MB = 2100;
+/** Free disk needed to set up: the environment and the models, with room to spare (and with the GPU build, pip's copy of what it downloaded). */
 const DISK_MB = 1300;
+const GPU_DISK_MB = 6144;
+
+let appleForTests: boolean | null = null;
+const apple = () => appleForTests ?? isAppleSilicon();
+/** ONNX Runtime's GPU build is wanted here: an NVIDIA GPU, and the models not kept to the CPU (HYDOR_PICTURES_DEVICE=cpu). */
+const wantGpu = () => process.env.HYDOR_PICTURES_DEVICE !== 'cpu' && !apple() && hasNvidia();
+/** What the environment should hold here: another list means setting it up again. */
+const packageList = () => (wantGpu() ? GPU_LIST : CPU_LIST);
+const marker = () => readText(path.join(venv(), '.packages'));
+/** Why the GPU build would not install, when it would not (the CPU one was installed instead). */
+const gpuBuildFailed = () => readText(path.join(venv(), '.gpu-failed'));
+const mbWords = (mb: number) => (mb >= 1000 ? `${(mb / 1000).toFixed(1)} GB` : `${mb} MB`);
 const HF = () => (process.env.HF_ENDPOINT || 'https://huggingface.co').replace(/\/+$/, '');
 
 export interface ModelInfo {
@@ -130,6 +159,12 @@ function sweepModels() {
     return;
   }
   for (const n of names) if (!keep.has(n)) fs.rmSync(path.join(modelsDir(), n), { recursive: true, force: true });
+  const compiled = new Set(Object.values(models).map((m) => m.sha256.slice(0, 16)));
+  let kept: string[] = [];
+  try {
+    kept = fs.readdirSync(coremlDir());
+  } catch {}
+  for (const n of kept) if (!compiled.has(n)) fs.rmSync(path.join(coremlDir(), n), { recursive: true, force: true });
 }
 /** Memory kept free beside what a job needs, in MB. */
 const SPARE_MB = 256;
@@ -155,7 +190,27 @@ function readText(f: string): string | null {
   }
 }
 
-const envReady = () => (process.env.HYDOR_PICTURES_PYTHON ? fs.existsSync(python()) : fs.existsSync(python()) && readText(path.join(venv(), '.packages')) === PACKAGES);
+/** Set up as this computer wants: its list of packages, or the CPU's where the GPU build would not install. */
+function envReady(): boolean {
+  if (process.env.HYDOR_PICTURES_PYTHON) return fs.existsSync(python());
+  if (!fs.existsSync(python())) return false;
+  const m = marker();
+  return m === packageList().join(' ') || (wantGpu() && m === CPU_PACKAGES && gpuBuildFailed() != null);
+}
+
+/**
+ * Where the models run: on an NVIDIA GPU with the GPU build (or once it is set up), on a Mac's GPU through Core ML, else on
+ * the CPU. A Python of one's own (HYDOR_PICTURES_PYTHON) is tried on the graphics card too: the worker says when it cannot.
+ */
+function device(): LocalDevice {
+  if (process.env.HYDOR_PICTURES_DEVICE === 'cpu') return 'cpu';
+  if (apple()) return 'coreml';
+  if (!wantGpu()) return 'cpu';
+  return !process.env.HYDOR_PICTURES_PYTHON && envReady() && marker() === CPU_PACKAGES ? 'cpu' : 'cuda';
+}
+
+/** Models the graphics card failed (from the worker's answers), with why: they run on the CPU until the app starts again or the tools are set up again. */
+let gpuFailed: Partial<Record<ToolName, string>> = {};
 const modelReady = (t: ToolName) => fs.statSync(modelPath(t), { throwIfNoEntry: false })?.size === models[t].bytes;
 const gb = (mb: number) => (mb / 1024).toFixed(1);
 
@@ -248,7 +303,10 @@ function install(cmd: string, args: string[], label: string): Promise<void> {
   });
 }
 
-/** Makes the private environment (once; again when the list of packages changes). */
+/**
+ * Makes the private environment (once; again when the list of packages changes): with an NVIDIA GPU, ONNX Runtime's GPU
+ * build, and when that will not install (no build for this computer, say), the CPU's, noting why.
+ */
 export function setupLocal(): Promise<void> {
   if (settingUp) return settingUp;
   lastError = undefined;
@@ -257,21 +315,41 @@ export function setupLocal(): Promise<void> {
     setupStep = 'Getting ready';
     try {
       fs.mkdirSync(dir(), { recursive: true });
+      const gpu = wantGpu();
+      const need = gpu ? GPU_DISK_MB : DISK_MB;
       const disk = freeDiskMb(dir());
-      if (disk < DISK_MB) throw new Error(`Not enough disk space: ${gb(disk)} GB free, and the picture tools need about ${gb(DISK_MB)} GB (the environment and the two models).`);
+      if (disk < need) throw new Error(`Not enough disk space: ${gb(disk)} GB free, and the picture tools need about ${gb(need)} GB (the environment and the two models).`);
       const uv = findUv();
-      const label = `Installing ONNX Runtime, NumPy, Pillow, Matplotlib, pandas and ffmpeg (about ${SETUP_MB} MB)`;
+      const cpuLabel = `Installing ONNX Runtime, NumPy, Pillow, Matplotlib, pandas and ffmpeg (about ${SETUP_MB} MB)`;
+      const label = gpu ? `Installing ONNX Runtime for the NVIDIA GPU (with CUDA and cuDNN), NumPy, Pillow, Matplotlib, pandas and ffmpeg (about ${mbWords(GPU_SETUP_MB)})` : cpuLabel;
+      const pip = (list: string[], what: string) => (uv ? install(uv, ['pip', 'install', '--quiet', '--python', python(), ...list], what) : install(python(), ['-m', 'pip', 'install', '--quiet', ...list], what));
       if (uv) {
         if (!fs.existsSync(python())) await install(uv, ['venv', '--quiet', '--python', '>=3.10,<3.15', venv()], 'Making a private Python environment');
-        await install(uv, ['pip', 'install', '--quiet', '--python', python(), ...PACKAGE_LIST], label);
       } else {
         const sys = systemPython();
         if (!sys) throw new Error(NO_PYTHON);
         if (!fs.existsSync(python())) await install(sys, ['-c', 'import sys, venv, ensurepip; sys.exit(0 if sys.version_info >= (3, 10) else 1)'], 'Checking Python (3.10 or newer)');
         if (!fs.existsSync(python())) await install(sys, ['-m', 'venv', venv()], 'Making a private Python environment');
-        await install(python(), ['-m', 'pip', 'install', '--quiet', ...PACKAGE_LIST], label);
       }
-      fs.writeFileSync(path.join(venv(), '.packages'), PACKAGES);
+      // The other build of ONNX Runtime goes first: both are the same module, and one over the other leaves a mix of the two.
+      const before = marker();
+      if (before != null && before.startsWith('onnxruntime-gpu') !== gpu) {
+        const both = ['onnxruntime', 'onnxruntime-gpu'];
+        await (uv ? install(uv, ['pip', 'uninstall', '--quiet', '--python', python(), ...both], 'Taking the other ONNX Runtime away') : install(python(), ['-m', 'pip', 'uninstall', '--quiet', '-y', ...both], 'Taking the other ONNX Runtime away'));
+      }
+      fs.rmSync(path.join(venv(), '.gpu-failed'), { force: true });
+      let list = gpu ? GPU_LIST : CPU_LIST;
+      try {
+        await pip(list, label);
+      } catch (e) {
+        if (!gpu || removed.aborted) throw e;
+        // No GPU build for this computer (or it would not come): the CPU's, and the state says why.
+        list = CPU_LIST;
+        await pip(list, cpuLabel);
+        fs.writeFileSync(path.join(venv(), '.gpu-failed'), (e as Error).message.slice(0, 600));
+      }
+      fs.writeFileSync(path.join(venv(), '.packages'), list.join(' '));
+      gpuFailed = {};
       probe = null;
     } catch (e) {
       lastError = removed.aborted ? undefined : (e as Error).message;
@@ -291,11 +369,11 @@ export async function removeLocal(): Promise<void> {
   stopWorker('The picture tools were removed');
   if (settingUp) await settingUp.catch(() => {});
   if (process.env.HYDOR_PICTURES_PYTHON) {
-    fs.rmSync(modelsDir(), { recursive: true, force: true });
-    fs.rmSync(jobsDir(), { recursive: true, force: true });
+    for (const d of [modelsDir(), coremlDir(), jobsDir()]) fs.rmSync(d, { recursive: true, force: true });
   } else fs.rmSync(dir(), { recursive: true, force: true });
   lastError = undefined;
   jobStep = undefined;
+  gpuFailed = {};
 }
 
 // ---- the models ---------------------------------------------------------------------------------------------
@@ -375,6 +453,9 @@ interface Answer {
   h?: number;
   scaled?: boolean;
   loaded?: ToolName[];
+  /** Where this job's model ran, and why the graphics card failed it, when it did (it runs on the CPU from then on). */
+  device?: LocalDevice;
+  fell_back?: string;
   rss?: number;
   peak?: number;
   ms?: number;
@@ -395,6 +476,8 @@ interface Worker {
   pending: Map<number, Pending>;
   seq: number;
   loaded: ToolName[];
+  /** Where it was told to run the models. */
+  device: LocalDevice;
   /** The most memory it has held, in MB, as it says. */
   peak?: number;
   idle?: NodeJS.Timeout;
@@ -407,20 +490,30 @@ interface Worker {
 
 let worker: Worker | null = null;
 
-function workerEnv(): NodeJS.ProcessEnv {
+function workerEnv(dev: LocalDevice): NodeJS.ProcessEnv {
   const keep = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TMPDIR', 'SystemRoot', 'SYSTEMROOT', 'windir', 'HYDOR_PICTURES_THREADS'];
   const env: NodeJS.ProcessEnv = Object.fromEntries(keep.filter((k) => process.env[k] != null).map((k) => [k, process.env[k]]));
-  // The CPU only, on at most 4 threads (ONNX Runtime's are set by the worker; these are for NumPy's and OpenMP's).
+  // On the CPU, at most 4 threads (ONNX Runtime's are set by the worker; these are for NumPy's and OpenMP's).
   const threads = String(Math.max(1, Math.min(4, Number(process.env.HYDOR_PICTURES_THREADS) || os.cpus().length || 2)));
-  return { ...env, CUDA_VISIBLE_DEVICES: '', OMP_NUM_THREADS: threads, OPENBLAS_NUM_THREADS: threads, MKL_NUM_THREADS: threads };
+  Object.assign(env, { HYDOR_PICTURES_DEVICE: dev, OMP_NUM_THREADS: threads, OPENBLAS_NUM_THREADS: threads, MKL_NUM_THREADS: threads });
+  if (dev !== 'cuda') env.CUDA_VISIBLE_DEVICES = '';
+  else {
+    // The GPUs the app was given, when it was given some; CUDA's libraries from the environment's NVIDIA packages
+    // (ONNX Runtime also loads them itself).
+    if (process.env.CUDA_VISIBLE_DEVICES != null) env.CUDA_VISIBLE_DEVICES = process.env.CUDA_VISIBLE_DEVICES;
+    const libs = process.platform === 'linux' && !process.env.HYDOR_PICTURES_PYTHON ? nvidiaLibs(venv()) : [];
+    if (libs.length) env.LD_LIBRARY_PATH = [...libs, process.env.LD_LIBRARY_PATH ?? ''].filter(Boolean).join(path.delimiter);
+  }
+  return env;
 }
 
 function startWorker(): Worker {
   fs.rmSync(jobsDir(), { recursive: true, force: true });
-  const proc = spawn(python(), ['-I', '-B', '-u', workerScript], { stdio: ['pipe', 'pipe', 'pipe'], env: workerEnv(), windowsHide: true });
+  const dev = device();
+  const proc = spawn(python(), ['-I', '-B', '-u', workerScript], { stdio: ['pipe', 'pipe', 'pipe'], env: workerEnv(dev), windowsHide: true });
   let ready!: () => void;
   let failed!: (e: Error) => void;
-  const w: Worker = { proc, ready: new Promise<void>((res, rej) => ((ready = res), (failed = rej))), pending: new Map(), seq: 0, loaded: [], unload: {}, used: {}, stderr: [], gone: false };
+  const w: Worker = { proc, ready: new Promise<void>((res, rej) => ((ready = res), (failed = rej))), pending: new Map(), seq: 0, loaded: [], device: dev, unload: {}, used: {}, stderr: [], gone: false };
   w.ready.catch(() => {});
   // Writing to a worker that has just gone fails; its exit says why.
   proc.stdin!.on('error', () => {});
@@ -681,6 +774,8 @@ function work(t: ToolName, files: { input: Buffer; mask?: Buffer }, o: { boxes?:
     const output = path.join(job, 'out.png');
     const small = t === 'cutout' ? path.join(job, 'small.bin') : undefined;
     jobStep = w.loaded.includes(t) ? `${WHAT[t].doing} on this computer` : `Loading ${models[t].label}`;
+    // A model the graphics card failed stays on the CPU; Core ML keeps what it compiles for each model (by its SHA-256).
+    const where = { ...(gpuFailed[t] ? { device: 'cpu' } : {}), ...(w.device === 'coreml' ? { cache: path.join(coremlDir(), models[t].sha256.slice(0, 16)) } : {}) };
     const a = await send(
       w,
       {
@@ -688,6 +783,7 @@ function work(t: ToolName, files: { input: Buffer; mask?: Buffer }, o: { boxes?:
         model: modelPath(t),
         input,
         output,
+        ...where,
         ...(mask ? { mask } : {}),
         ...(o.boxes ? { boxes: o.boxes } : {}),
         ...(o.maxBytes ? { max_bytes: o.maxBytes } : {}),
@@ -696,7 +792,15 @@ function work(t: ToolName, files: { input: Buffer; mask?: Buffer }, o: { boxes?:
       },
       t,
       t === 'upscale' ? 15 * 60_000 : t === 'cutout' ? 5 * 60_000 : 3 * 60_000,
-    );
+    ).catch((e: Error) => {
+      // Too long on the graphics card (Core ML compiling it the first time, a card that hangs): the CPU next time.
+      if (e instanceof HttpError && e.status === 504 && w.device !== 'cpu' && !gpuFailed[t]) gpuFailed[t] = `on ${w.device}: it took too long`;
+      throw e;
+    });
+    if (a.fell_back && w.device !== 'cpu' && !gpuFailed[t]) {
+      gpuFailed[t] = a.fell_back.slice(0, 400);
+      console.warn(`[pictures] ${models[t].name} runs on the CPU from now on: ${gpuFailed[t]}`);
+    }
     if (!w.gone) idleLater(w, t);
     if (a.error) throw new HttpError(a.memory ? 503 : 400, a.memory ? `${a.error} Close some programs and try again, or do it through OpenRouter instead.` : a.error);
     const judged = small ? readSmall(small, a.small) : null;
@@ -889,6 +993,10 @@ export async function runPython(code: string, o: { cwd: string; timeoutMs: numbe
 export function localState(): LocalToolsState {
   const ready = envReady();
   const can = ready ? { canInstall: true } : installable();
+  const dev = device();
+  // Set up with the CPU's build on a computer with an NVIDIA GPU: the GPU's would not install.
+  const buildWhy = ready && wantGpu() && !process.env.HYDOR_PICTURES_PYTHON && marker() === CPU_PACKAGES ? gpuBuildFailed() : null;
+  const onCpu = dev === 'cpu' ? [] : TOOL_NAMES.filter((t) => gpuFailed[t]);
   return {
     ready,
     installing: !!settingUp,
@@ -896,9 +1004,13 @@ export function localState(): LocalToolsState {
     ...(lastError ? { error: lastError } : {}),
     canInstall: can.canInstall,
     ...(can.why ? { why: can.why } : {}),
-    sizeMb: SETUP_MB,
+    sizeMb: wantGpu() ? GPU_SETUP_MB : SETUP_MB,
     downloaded: TOOL_NAMES.filter(modelReady),
     loaded: worker && !worker.gone ? [...worker.loaded] : [],
+    device: dev,
+    ...(buildWhy != null ? { gpuBuildFailed: true } : {}),
+    ...(onCpu.length ? { onCpu } : {}),
+    ...(buildWhy || onCpu.length ? { gpuWhy: buildWhy || gpuFailed[onCpu[0]] } : {}),
   };
 }
 
@@ -918,10 +1030,11 @@ setLocalTools({
 // ---- for tests ----------------------------------------------------------------------------------------------
 
 /** Tests use models and a worker of their own, and say how much memory is free. */
-export function setPictureToolsForTests(o: { models?: Partial<Record<ToolName, Partial<ModelInfo>>>; worker?: string | null; freeMb?: (() => number) | null }) {
+export function setPictureToolsForTests(o: { models?: Partial<Record<ToolName, Partial<ModelInfo>>>; worker?: string | null; freeMb?: (() => number) | null; apple?: boolean | null }) {
   if (o.models) models = { cutout: { ...MODELS_AT.cutout, ...o.models.cutout }, erase: { ...MODELS_AT.erase, ...o.models.erase }, upscale: { ...MODELS_AT.upscale, ...o.models.upscale } };
   if (o.worker !== undefined) workerScript = o.worker ?? WORKER_SCRIPT;
   if (o.freeMb !== undefined) freeForTests = o.freeMb;
+  if (o.apple !== undefined) appleForTests = o.apple;
 }
 
 /** The worker's process, while it runs, and the most memory it has held in MB (for tests). */

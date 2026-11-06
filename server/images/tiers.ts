@@ -115,7 +115,7 @@ export async function tierModel(db: DB, tier: ImageTier, o: { model?: string; tr
   return { ...base, opaque: true };
 }
 
-const NOT_HERE: LocalToolsState = { ready: false, installing: false, canInstall: false, why: 'The picture tools are not part of this copy of the app.', sizeMb: 120, downloaded: [], loaded: [] };
+const NOT_HERE: LocalToolsState = { ready: false, installing: false, canInstall: false, why: 'The picture tools are not part of this copy of the app.', sizeMb: 145, downloaded: [], loaded: [], device: 'cpu' };
 
 /** The picture tools on this computer as they are now. */
 export const localState = (): LocalToolsState => localTools()?.state() ?? NOT_HERE;
