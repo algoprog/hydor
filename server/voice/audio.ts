@@ -27,10 +27,10 @@ export const readable = (k: AudioKind) => k === 'wav' || k === 'mp3' || k === 'f
 export const ffmpegPath = () => which('ffmpeg');
 
 /** Turns a recording into 16 kHz mono WAV with ffmpeg. */
-export async function toWav(input: string, output: string): Promise<void> {
+export async function toWav(input: string, output: string, timeout = 120_000): Promise<void> {
   const ff = ffmpegPath();
   if (!ff) throw new HttpError(415, 'This recording is in a format the server reads only with ffmpeg, which is not installed here (on Debian or Ubuntu: sudo apt install ffmpeg).');
-  const r = await run(ff, ['-nostdin', '-hide_banner', '-loglevel', 'error', '-y', '-i', input, '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', '-f', 'wav', output], { timeout: 120_000 });
+  const r = await run(ff, ['-nostdin', '-hide_banner', '-loglevel', 'error', '-y', '-i', input, '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', '-f', 'wav', output], { timeout });
   if (r.code !== 0 || !fs.existsSync(output)) throw new HttpError(422, `ffmpeg could not read the recording: ${(r.err || r.out).trim().split('\n').pop() ?? ''}`);
 }
 
