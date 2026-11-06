@@ -17,6 +17,7 @@ export const imagesFeature: WebFeature = {
     make_plot: { place: 'answer', Row: GeneratedImages },
     remove_background: { place: 'answer', Row: GeneratedImages },
     erase_from_image: { place: 'answer', Row: GeneratedImages },
+    upscale_image: { place: 'answer', Row: GeneratedImages },
     edit_image: { place: 'answer', Row: GeneratedImages },
     find_photos: { place: 'answer', Row: GeneratedImages },
     generate_video: { place: 'answer', Row: GeneratedVideos },
