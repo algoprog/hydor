@@ -401,6 +401,14 @@ function glb(): Buffer {
   if (canCapture()) {
     const rels = new Zip(px.rawPayload).read('ppt/slides/_rels/slide1.xml.rels')?.toString() ?? '';
     ok(/media\/image\d+\.png/.test(rels) && x1.includes('descr="Custom code"'), 'with a browser here, custom code goes to PowerPoint as a picture of it running');
+    // 3D needs three.js from jsDelivr and the browser's WebGL: where both are here, a picture of it too.
+    const three = idOf((await run('save_slides', { title: '3D', slides: [{ els: [{ id: 'g', type: 'scene3d', shape: 'torus', x: 100, y: 100, w: 400, h: 400 }] }] })).text);
+    const p3 = (await req('GET', `/api/pages/${three}/export?format=pptx`)).rawPayload;
+    if (slideXml(p3, 1).includes('descr="3D"')) {
+      const z = new Zip(p3);
+      const pic = [...(z.read('ppt/slides/_rels/slide1.xml.rels')?.toString() ?? '').matchAll(/media\/(image\d+\.png)/g)].map((m) => z.read(`ppt/media/${m[1]}`)).find(Boolean);
+      ok(!!pic && pic.length > 2000, 'with a browser here, a 3D part goes to PowerPoint as a picture of it drawn');
+    } else console.log('(3D could not be drawn here, no network or no WebGL: PowerPoint gets its poster)');
   }
 }
 
