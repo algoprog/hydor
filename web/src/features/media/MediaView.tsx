@@ -2,9 +2,10 @@
 // sound to play (a sound's shape to seek along), its title and description (written by a model, or by you: Edit),
 // what it was made from and with, its size, length and file, the session it came from, for a video the frames the
 // model saw, and for a sound its words. Edit a picture or a video in its editor (saved over it, or as a copy), download
-// it, write the title and description again, start a new session with it in the message box, or delete it.
+// it, write the title and description again, start a new session with it in the message box, or delete it. A sound
+// opens in the sound editor, and so does a video's sound (its More menu).
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Download, Ellipsis, FolderInput, MessageSquarePlus, MessagesSquare, Pencil, RefreshCw, Settings2, SlidersHorizontal, Trash2, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, AudioLines, Download, Ellipsis, FolderInput, MessageSquarePlus, MessagesSquare, Pencil, RefreshCw, Settings2, SlidersHorizontal, Trash2, TriangleAlert } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { clipLength, type MediaItem } from '@shared/media';
 import { api, del, enc, patch } from '../../lib/api';
@@ -21,6 +22,7 @@ import { LOCALE } from '../../i18n/locale';
 import { NavButton } from '../layout/PageHeader';
 import { openEditor } from '../mediaedit/host';
 import { editLibraryVideo } from '../mediaedit/video/open';
+import { editLibrarySound } from '../mediaedit/audio/open';
 import { SpaceMenu } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
 import { downloadMedia, recaption, startSessionWithMedia } from './parts';
@@ -125,6 +127,13 @@ function MediaView({ id }: { id: string }) {
       // A copy is a new item: it opens; the item written over shows itself again, as the Library hears.
       after: (r) => void (r.media && r.media !== m.id && go(`/media/${r.media}`)),
     });
+  /** The sound in the sound editor (a video's: its sound, saved as a new sound): saved over this item, or as a new one beside it. */
+  const editSound = () =>
+    editLibrarySound(m, {
+      src: mediaUrl(m),
+      label: m.title,
+      after: (r) => void (r.media && r.media !== m.id && go(`/media/${r.media}`)),
+    });
   const size = m.width && m.height ? `${m.width} × ${m.height}` : undefined;
   const ratio = m.width && m.height ? m.width / m.height : 16 / 9;
   const shape = m.width && m.height ? `${m.width} / ${m.height}` : '16 / 9';
@@ -152,6 +161,11 @@ function MediaView({ id }: { id: string }) {
               <span className="max-sm:hidden">Edit</span>
             </Button>
           )}
+          {m.kind === 'audio' && (
+            <Button size="sm" variant="secondary" icon={<SlidersHorizontal size={14} />} onClick={editSound} title="Edit the sound" aria-label="Edit the sound">
+              <span className="max-sm:hidden">Edit</span>
+            </Button>
+          )}
           {m.kind === 'video' && (
             <Button size="sm" variant="secondary" icon={<SlidersHorizontal size={14} />} onClick={editVideo} title="Edit the video" aria-label="Edit the video">
               <span className="max-sm:hidden">Edit</span>
@@ -167,6 +181,11 @@ function MediaView({ id }: { id: string }) {
             <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(false), startEdit())}>
               Edit the title and description
             </MenuItem>
+            {m.kind === 'video' && (
+              <MenuItem icon={<AudioLines size={14} />} onClick={() => (setMenu(false), editSound())}>
+                Edit its sound
+              </MenuItem>
+            )}
             <MenuItem icon={<RefreshCw size={14} />} onClick={() => (setMenu(false), void recaption(m))}>
               Write them again
             </MenuItem>

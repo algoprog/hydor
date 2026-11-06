@@ -1,9 +1,9 @@
 // Sound an agent made (generate_audio), with its reply: while the model works a card that says what it makes and
 // for how long it has been at it (a song takes a minute or two); then the sound in the app's own player (its shape
-// to seek along), its title from its file's name, download, the files and keeping it in the Library, the lyrics a
+// to seek along), its title from its file's name, Edit (the sound editor), download, the files and keeping it in the Library, the lyrics a
 // song came with under it. Without an OpenRouter key, a way to Settings.
 import { useEffect, useState } from 'react';
-import { AudioLines, ChevronRight, Download, FolderOpen, KeyRound, Mic, Music, VolumeX } from 'lucide-react';
+import { AudioLines, ChevronRight, Download, FolderOpen, KeyRound, Mic, Music, SlidersHorizontal, VolumeX } from 'lucide-react';
 import type { ToolItem } from '@shared/types';
 import { basename, duration } from '../../lib/format';
 import { mu } from '../../lib/machine';
@@ -14,6 +14,7 @@ import { download } from '../documents/FileCards';
 import { FileMore } from '../files/SpaceMenu';
 import { KeepButton } from '../media/Keep';
 import { OpenRouterKeyCard } from '../connections/OpenRouterKeyCard';
+import { editSessionSound } from '../mediaedit/audio/open';
 
 interface Sound {
   path: string;
@@ -209,6 +210,9 @@ export function GeneratedAudio({ item, sessionKey }: { item: ToolItem; sessionKe
                 downloadUrl={`${src}&download=1`}
                 actions={
                   <span className="flex shrink-0 items-center gap-0.5">
+                    <IconButton label="Edit" size="sm" className={ICON} onClick={() => editSessionSound(s.path, sessionKey)}>
+                      <SlidersHorizontal size={14} />
+                    </IconButton>
                     <IconButton label="Show in the files" size="sm" className={ICON} onClick={() => showInFiles(s.path)}>
                       <FolderOpen size={14} />
                     </IconButton>

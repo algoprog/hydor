@@ -15,10 +15,13 @@
 
 // ---- the editors and where they save -------------------------------------------------------------------------
 
-export type EditKind = 'image' | 'video';
+export type EditKind = 'image' | 'video' | 'audio';
 
-/** Where an editor's Save writes what it made: a picture kept for a deck, document or page, over a Library item, or over a file. */
-export type SaveTo = { asset: true } | { media: string } | { file: string };
+/**
+ * Where an editor's Save writes what it made: a picture kept for a deck, document or page, over a Library item, over a
+ * file, or (a video's sound) a sound kept for the video ("naget-sound:…").
+ */
+export type SaveTo = { asset: true } | { media: string } | { file: string } | { sound: true };
 
 /** What an editor hands back to where it was opened from. */
 export interface Saved {
@@ -38,6 +41,8 @@ export interface Saved {
   data?: string;
   /** A slide's video: its still, a picture kept by the app ("naget-asset:<sha>"). */
   poster?: string;
+  /** A sound: how long it is, in seconds. */
+  seconds?: number;
 }
 
 /** POST /api/mediaedit/image: a picture the editor made, kept where it belongs. */

@@ -6,7 +6,7 @@
 // you come back. On a phone an editor takes the whole screen, with an arrow back to the page and, with more than one
 // open, a switcher. Each kind of editor is loaded the first time one is opened (EDITORS).
 import { lazy, Suspense, useEffect, useRef, useState, type ComponentType, type LazyExoticComponent, type ReactNode } from 'react';
-import { ArrowLeft, Clapperboard, Copy, Image as ImageIcon, PanelTop, X } from 'lucide-react';
+import { ArrowLeft, AudioLines, Clapperboard, Copy, Image as ImageIcon, PanelTop, X } from 'lucide-react';
 import { create } from 'zustand';
 import type { EditKind, Saved, SaveTo } from '@shared/mediaedit';
 import { useLocation } from 'wouter';
@@ -38,6 +38,8 @@ export interface OpenEditor {
   session?: string;
   /** A Library video's kind of file (MP4, WebM, MOV): saved over it, it stays so. */
   fileKind?: string;
+  /** A video's sound: it keeps this length (seconds), whatever is cut or moved. */
+  length?: number;
 }
 
 export interface EditorHandle {
@@ -69,6 +71,7 @@ export interface EditorProps {
 const EDITORS: Partial<Record<EditKind, LazyExoticComponent<ComponentType<EditorProps>>>> = {
   image: lazy(() => import('./ImageEditor').then((m) => ({ default: m.ImageEditor }))),
   video: lazy(() => import('./VideoEditor').then((m) => ({ default: m.VideoEditor }))),
+  audio: lazy(() => import('./audio/SoundEditor').then((m) => ({ default: m.SoundEditor }))),
 };
 
 interface Tab {
@@ -130,7 +133,8 @@ export function pageName(): string {
   return tr('Back');
 }
 
-const kindWord = (k: EditKind) => (k === 'video' ? 'Video' : 'Picture');
+const kindWord = (k: EditKind) => (k === 'video' ? 'Video' : k === 'audio' ? 'Sound' : 'Picture');
+const kindIcon = (k: EditKind, size: number) => (k === 'video' ? <Clapperboard size={size} /> : k === 'audio' ? <AudioLines size={size} /> : <ImageIcon size={size} />);
 
 function TabName({ t }: { t: Tab }) {
   // A picture with no name of its own is simply "Picture".
@@ -220,7 +224,7 @@ export function EditorHost({ children }: { children: ReactNode }) {
               key={t.id}
               active={t.id === showing}
               onClick={() => useTabs.setState({ active: t.id })}
-              icon={t.o.kind === 'video' ? <Clapperboard size={13} /> : <ImageIcon size={13} />}
+              icon={kindIcon(t.o.kind, 13)}
               dirty={t.dirty}
               onClose={() => void close(t)}
               closeLabel={`Close “${t.o.title}”`}
@@ -338,7 +342,7 @@ function PhoneLead({ t, tabs, label, onPage, onClose }: { t: Tab; tabs: Tab[]; l
             {tabs.map((x) => (
               <div key={x.id} className="flex items-center gap-0.5">
                 <div className="min-w-0 flex-1">
-                  <MenuItem icon={x.o.kind === 'video' ? <Clapperboard size={14} /> : <ImageIcon size={14} />} checked={x.id === t.id} onClick={() => (setOpen(false), useTabs.setState({ active: x.id }))}>
+                  <MenuItem icon={kindIcon(x.o.kind, 14)} checked={x.id === t.id} onClick={() => (setOpen(false), useTabs.setState({ active: x.id }))}>
                     <span className="flex min-w-0">
                       <TabName t={x} />
                     </span>
