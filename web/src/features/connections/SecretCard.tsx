@@ -10,6 +10,7 @@ import { toastError } from '../../lib/store';
 import { useFeatureEvent } from '../../lib/featureEvents';
 import { Button, cx, inputCls, Switch, Throbber } from '../../components/ui';
 import { SecretInput } from './ConnectDialog';
+import { OpenRouterKeyCard, OPENROUTER_REQUEST } from './OpenRouterKeyCard';
 
 function FieldInput({ f, value, onChange, saved, onEnter }: { f: SecretField; value: string; onChange: (v: string) => void; saved?: string; onEnter: () => void }) {
   if (f.type === 'password') return <SecretInput value={value} onChange={onChange} placeholder={saved ? `Saved ${saved}: leave empty to keep it` : undefined} onEnter={onEnter} />;
@@ -56,6 +57,8 @@ export function SecretCard({ item, sessionKey }: { item: ToolItem; sessionKey: s
   }, [r, hosts, commands]);
 
   if (!name) return null;
+  // The OpenRouter key goes to Settings → Models, not the vault: its own card.
+  if (name === OPENROUTER_REQUEST) return <OpenRouterKeyCard sessionKey={sessionKey} always />;
   const shell = (body: ReactNode, tone?: 'ok' | 'muted') => (
     <div className={cx('tl-item my-1.5 rounded-2xl border px-3.5 py-3', tone === 'ok' ? 'border-ok/25 bg-ok/6' : tone === 'muted' ? 'border-line bg-bg-1' : 'border-accent/35 bg-accent-soft')}>{body}</div>
   );
