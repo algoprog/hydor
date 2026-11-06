@@ -31,7 +31,8 @@ import type { Deps, RunCtx } from '../features/types.ts';
 import { loadConfig, saveConfig } from '../models/config.ts';
 import { getAsset, initAssets, putAsset } from '../pages/assets.ts';
 import { readPng, writePng, type Rgba } from '../signatures/png.ts';
-import { boxesMask, putBackInBoxes, readBoxes } from './erase.ts';
+import { judgeCutout } from './cutout.ts';
+import { boxesMask, planErase, putBackInBoxes, readBoxes } from './erase.ts';
 import { localTools, setCloudTools } from './hooks.ts';
 import { localState, pictureTools, pictureWorkerPid, runPython, setPictureToolsForTests, stopPictureTools } from './local.ts';
 
@@ -166,9 +167,12 @@ if (!REAL) {
   });
 
   // The worker: the same lines in and out, PNGs of the picture's size, each job noted; a 13×13 picture makes it crash.
+  // What a cutout's mask looks like (good, empty, full, fuzzy) and the hole measured (small, large, wide) are told it in
+  // its control file.
   const workerLog = path.join(tmp, 'worker.log');
   const workerCtl = path.join(tmp, 'worker.json');
-  fs.writeFileSync(workerCtl, JSON.stringify({ workMs: 40 }));
+  const control = (c: { workMs?: number; cutout?: string; hole?: string; detail?: number }) => fs.writeFileSync(workerCtl, JSON.stringify({ workMs: 40, cutout: 'good', hole: 'small', detail: 0, ...c }));
+  control({});
   const fakeWorker = path.join(tmp, 'fake_worker.py');
   fs.writeFileSync(
     fakeWorker,
@@ -185,6 +189,22 @@ def size(p):
     return struct.unpack('>II', b[16:24])
 def log(s):
     with open(${JSON.stringify(workerLog)}, 'a') as f: f.write(s + '\\n')
+def ctl():
+    return json.load(open(${JSON.stringify(workerCtl)}))
+def cut_mask(kind, w, h):
+    out = bytearray(w * h)
+    cx, cy, r = w / 2, h / 2, min(w, h) / 3
+    for y in range(h):
+        for x in range(w):
+            d = ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5
+            out[y * w + x] = 255 if kind == 'full' else (255 if d < r else 0) if kind == 'good' else max(0, min(255, int(255 * (1.5 * r - d) / r))) if kind == 'fuzzy' else 0
+    return bytes(out)
+def hole(kind, w, h):
+    out = bytearray(w * h)
+    x0, y0, x1, y1 = {'large': (10, 8, 50, 38), 'wide': (2, 20, 62, 23)}.get(kind, (20, 20, 26, 26))
+    for y in range(y0, y1):
+        for x in range(x0, x1): out[y * w + x] = 255
+    return bytes(out)
 say({'ready': True})
 for line in sys.stdin:
     req = json.loads(line); rid = req.get('id'); op = req['op']
@@ -194,13 +214,22 @@ for line in sys.stdin:
         say({'id': rid, 'ok': True, 'loaded': loaded}); continue
     w, h = size(req['input'])
     if (w, h) == (13, 13): os._exit(9)
+    if op == 'measure':
+        c = ctl(); data = hole(c['hole'], w, h)
+        open(req['small'], 'wb').write(data)
+        log(f'measure {c["hole"]} {json.dumps(req.get("boxes"))}')
+        say({'id': rid, 'ok': True, 'small': [w, h], 'area': sum(1 for b in data if b) / (w * h), 'detail': c['detail'], 'loaded': loaded}); continue
     if op not in loaded:
         say({'id': rid, 'status': 'loading'}); time.sleep(0.08); loaded.append(op)
     say({'id': rid, 'status': 'working'})
     log(json.dumps({'id': rid, 'op': op, 'model': req['model'], 'boxes': req.get('boxes'), 'mask': 'mask' in req, 'max': req.get('max_bytes')}))
-    time.sleep(json.load(open(${JSON.stringify(workerCtl)}))['workMs'] / 1000)
+    c = ctl()
+    time.sleep(c['workMs'] / 1000)
     open(req['output'], 'wb').write(png(w, h, (200, 30, 40, 128) if op == 'cutout' else (10, 200, 10, 255)))
-    say({'id': rid, 'ok': True, 'w': w, 'h': h, 'scaled': False, 'loaded': loaded, 'rss': 50})
+    small = None
+    if req.get('small'):
+        open(req['small'], 'wb').write(cut_mask(c['cutout'], w, h)); small = [w, h]
+    say({'id': rid, 'ok': True, 'w': w, 'h': h, 'scaled': False, 'loaded': loaded, 'rss': 50, **({'small': small} if small else {})})
 `,
   );
   const jobs = () =>
@@ -232,7 +261,7 @@ for line in sys.stdin:
 
   {
     const s = await state();
-    ok(!s.ready && !s.installing && s.canInstall && s.sizeMb === 65 && !s.downloaded.length && !s.loaded.length && !s.error, `nothing set up: ${JSON.stringify(s)}`);
+    ok(!s.ready && !s.installing && s.canInstall && s.sizeMb === 80 && !s.downloaded.length && !s.loaded.length && !s.error, `nothing set up: ${JSON.stringify(s)}`);
     const hasMpl = (() => {
       try {
         execFileSync('python3', ['-I', '-c', 'import matplotlib'], { stdio: 'ignore' });
@@ -265,7 +294,7 @@ for line in sys.stdin:
     ok(await until(() => latestRequest(db, ctx.key, OPENROUTER_REQUEST)?.state === 'pending'), 'a watched run asks for the key on a card');
     const card = latestRequest(db, ctx.key, OPENROUTER_REQUEST);
     ok(
-      /^Taking the background out of a picture through OpenRouter costs about \$0\.01 to \$0\.05: an image model draws it again without its background\. Or skip this and set up the picture tools in Settings → Images, video and audio: they do it free and in private on this computer\.$/.test(
+      /^Taking the background out of a picture through OpenRouter costs about \$0\.01 to \$0\.04: an image model draws it again without its background\. Or skip this and set up the picture tools in Settings → Images, video and audio: they do it free and in private on this computer\.$/.test(
         card?.why ?? '',
       ),
       `the card says what it costs, and the free way: ${card?.why}`,
@@ -311,7 +340,7 @@ for line in sys.stdin:
     ok(s.installing && !s.ready, 'setting up starts');
     ok(await until(() => !localState().installing), 'and ends');
     s = await state();
-    ok(!s.ready && /^Installing ONNX Runtime, NumPy, Pillow and Matplotlib \(about 65 MB\) failed: error: no wheels for onnxruntime/.test(s.error ?? ''), `a failure in words: ${s.error}`);
+    ok(!s.ready && /^Installing ONNX Runtime, NumPy, Pillow, Matplotlib and pandas \(about 80 MB\) failed: error: no wheels for onnxruntime/.test(s.error ?? ''), `a failure in words: ${s.error}`);
     fs.rmSync(uvFail);
     const steps = new Set<string>();
     s = (await req('POST', '/api/images/local/setup')).json();
@@ -324,15 +353,15 @@ for line in sys.stdin:
     s = await state();
     ok(s.ready && !s.installing && !s.error && !s.step, `ready: ${JSON.stringify(s)}`);
     ok(
-      [...steps].some((x) => /^Installing ONNX Runtime, NumPy, Pillow and Matplotlib \(about 65 MB\)$/.test(x)),
+      [...steps].some((x) => /^Installing ONNX Runtime, NumPy, Pillow, Matplotlib and pandas \(about 80 MB\)$/.test(x)),
       `its steps shown: ${[...steps].join(' / ')}`,
     );
     const log = fs.readFileSync(uvLog, 'utf8');
     ok(
-      /venv --quiet --python >=3\.10,<3\.15 .*pictures\/venv/.test(log) && /pip install --quiet --python .*pictures\/venv\/bin\/python onnxruntime>=1\.20 numpy>=1\.26 pillow>=10\.1 matplotlib>=3\.8/.test(log),
+      /venv --quiet --python >=3\.10,<3\.15 .*pictures\/venv/.test(log) && /pip install --quiet --python .*pictures\/venv\/bin\/python onnxruntime>=1\.20 numpy>=1\.26 pillow>=10\.1 matplotlib>=3\.8 pandas>=2\.0/.test(log),
       `uv made the environment and installed: ${log}`,
     );
-    ok(fs.readFileSync(path.join(pictures, 'venv', '.packages'), 'utf8') === 'onnxruntime>=1.20 numpy>=1.26 pillow>=10.1 matplotlib>=3.8', 'what it holds is noted');
+    ok(fs.readFileSync(path.join(pictures, 'venv', '.packages'), 'utf8') === 'onnxruntime>=1.20 numpy>=1.26 pillow>=10.1 matplotlib>=3.8 pandas>=2.0', 'what it holds is noted');
     ok((await req('POST', '/api/images/local/setup')).json().ready, 'setting up again when ready does nothing');
   }
 
@@ -423,7 +452,7 @@ for line in sys.stdin:
     const lp = await req('POST', '/api/images/erase', { src: kept, mask: dataUrl(mask), how: 'local', prompt: 'a calm sea' });
     ok(lp.statusCode === 400 && /On this computer it can only erase/.test(lp.json().error), 'what to put there instead is not for this computer');
     const nk = await req('POST', '/api/images/erase', { src: kept, mask: dataUrl(mask), prompt: 'a calm sea' });
-    ok(nk.statusCode === 400 && /goes through OpenRouter: add an OpenRouter key in Settings → Models, or leave the words out/.test(nk.json().error), 'nor without a key');
+    ok(nk.statusCode === 400 && /takes an image model through OpenRouter: add an OpenRouter key in Settings → Models, or leave the words out/.test(nk.json().error), 'nor without a key');
   }
 
   // ---- the agents' tools ----------------------------------------------------------------------------------------
@@ -456,10 +485,66 @@ for line in sys.stdin:
     ok(/Give boxes around what to take away, or say what it is in prompt/.test((await run('erase_from_image', { path: 'photo.png' })).text), 'boxes or words');
     ok(/boxes\[0\]: x and y/.test((await run('erase_from_image', { path: 'photo.png', boxes: [{ x: 1, y: 1, w: 0, h: 3 }] })).text), 'a box without a size');
     const w = await run('erase_from_image', { path: 'photo.png', prompt: 'the cat' });
-    ok(w.isError && /goes through OpenRouter, and no OpenRouter key is set: give boxes/.test(w.text), `words alone need OpenRouter: ${w.text}`);
+    ok(w.isError && /takes an image model through OpenRouter, and no OpenRouter key is set: give boxes/.test(w.text), `words alone need OpenRouter: ${w.text}`);
     ok((await run('remove_background', { path: 'nope.png' })).text.startsWith('No such picture'), 'a picture that is not there');
     fs.writeFileSync(path.join(tmp, 'notes.txt'), 'hello');
     ok(/notes\.txt is not a picture/.test((await run('remove_background', { path: 'notes.txt' })).text), 'a file that is not a picture');
+    ok(
+      c.text.endsWith(
+        'Look at the result: if it is not right (edges cut into the subject, background left behind), call again with how: "ai" to have an image model do it (about $0.01 to $0.04), or use generate_image with the picture and words to change it.',
+      ),
+      'the answer ends with what to do when the result is not right',
+    );
+    ok(/a smear or a ghost where something was erased\), call again with how: "ai"/.test(e.text), 'for an erase too');
+
+    // A picture of a deck, document or page, as get_page shows it.
+    const kept = ASSET + putAsset(db, photo);
+    const fromDeck = await run('remove_background', { path: kept });
+    ok(
+      !fromDeck.isError && savedPath(fromDeck.text)?.[1] === path.join(tmp, 'images', 'picture-cutout.png') && fromDeck.text.includes(`To put it in place of the old picture, give this path to save_slides, save_doc or save_page where ${kept} was.`),
+      `a kept picture, and how to put the cutout in its place: ${fromDeck.text}`,
+    );
+    const erasedDeck = await run('erase_from_image', { path: kept, boxes: [{ x: 4, y: 4, w: 8, h: 8 }] });
+    ok(!erasedDeck.isError && savedPath(erasedDeck.text)?.[1] === path.join(tmp, 'images', 'picture-erased.png') && erasedDeck.text.includes(`where ${kept} was.`), `erased from a kept picture: ${erasedDeck.text}`);
+    ok(/naget-asset:0123456789abcdef0123 is not a picture this app keeps/.test((await run('remove_background', { path: 'naget-asset:0123456789abcdef0123' })).text), 'one the app does not keep');
+
+    // Auto without a key: a poor cutout, or a large hole, stays made here, and says why.
+    control({ cutout: 'empty' });
+    const poor = await req('POST', '/api/images/cutout', { src: dataUrl(photo) });
+    ok(
+      poor.statusCode === 200 &&
+        poor.json().how === 'local' &&
+        poor.json().why === 'The background remover on this computer found almost nothing to keep: look at the edges. An image model would do it better: add an OpenRouter key in Settings → Models.',
+      `a poor cutout, no key: kept, with why: ${poor.body.slice(0, 300)}`,
+    );
+    const poorTool = await run('remove_background', { path: 'photo.png' });
+    ok(
+      !poorTool.isError &&
+        /^Took the background out with BiRefNet-lite, on this computer \(free and private\), though it found almost nothing to keep; an image model did not do it again: no OpenRouter key is set \(the user can add one in Settings → Models\):/.test(
+          poorTool.text,
+        ) &&
+        savedPath(poorTool.text),
+      `and for an agent: ${poorTool.text}`,
+    );
+    control({ hole: 'large' });
+    const big = await req('POST', '/api/images/erase', { src: dataUrl(photo), mask: dataUrl(mask) });
+    ok(
+      big.statusCode === 200 &&
+        big.json().how === 'local' &&
+        big.json().why === 'Erased on this computer, though the area is large (39% of the picture), and the eraser on this computer smears large areas: look at it. An image model would do it better: add an OpenRouter key in Settings → Models.',
+      `a large hole, no key: erased here, with why: ${big.body.slice(0, 300)}`,
+    );
+    const bigTool = await run('erase_from_image', { path: 'photo.png', boxes: [{ x: 10, y: 8, w: 40, h: 30 }] });
+    ok(
+      !bigTool.isError &&
+        /^Erased the box with LaMa, on this computer \(free and private\), though the area is large \(39% of the picture\), and the eraser on this computer smears large areas; an image model did not do it: no OpenRouter key is set/.test(
+          bigTool.text,
+        ),
+      `and for an agent: ${bigTool.text}`,
+    );
+    ok(/^measure large \[\[8, 6, 44, 34\]\]$/m.test(fs.readFileSync(workerLog, 'utf8')), 'the boxes measured first');
+    control({});
+
     kvSet(db, 'images', JSON.stringify({ enabled: false }));
     ok(pictureTools.tools!(ctx).length === 0, 'no tools while images are off in Settings');
     kvSet(db, 'images', JSON.stringify({ enabled: true }));
@@ -495,7 +580,7 @@ for line in sys.stdin:
     );
     ok(jobs().filter((j) => j.op === 'erase').length === erases && (await state()).error === low.json().error, 'nothing loaded, and the state says why');
     const lowTool = await run('erase_from_image', { path: 'photo.png', boxes: [{ x: 1, y: 1, w: 5, h: 5 }] });
-    ok(lowTool.isError && /not enough free memory/.test(lowTool.text) && /call again with openrouter: true, if the user agrees\.$/.test(lowTool.text), `an agent hears how to go on: ${lowTool.text}`);
+    ok(lowTool.isError && /not enough free memory/.test(lowTool.text) && /call again with how: \"ai\", if the user agrees\.$/.test(lowTool.text), `an agent hears how to go on: ${lowTool.text}`);
     // Short of memory with the other model in it: that one goes first, then there is room.
     setPictureToolsForTests({ freeMb: () => 64_000 });
     ok((await req('POST', '/api/images/cutout', { src: dataUrl(photo) })).statusCode === 200 && localState().loaded.join() === 'cutout', 'the cutout model is in memory');
@@ -568,8 +653,10 @@ for line in sys.stdin:
     ok(big.ok && !big.files['big.bin'] && big.files['small.txt'] && /big\.bin was left out: it is too large/.test(big.stderr), 'files too large to come back are named');
     const out = await runPython('print("x")', { cwd: path.join(tmp, 'plot6'), timeoutMs: 10_000, files: { '../escape.txt': Buffer.from('no') } }).catch((e: Error) => e);
     ok(out instanceof Error && /files go inside the folder/.test(out.message) && !fs.existsSync(path.join(tmp, 'escape.txt')), 'files go only inside its folder');
-    const loud = await runPython("print('y' * 200_000)", { cwd: path.join(tmp, 'plot7'), timeoutMs: 10_000 });
-    ok(loud.ok && loud.stdout.length <= 64 * 1024, 'what it prints is kept short');
+    const loud = await runPython("print('y' * 2_000_000)\nprint('é' * 100_000)\nimport json\nprint(json.dumps({'fonts': ['DejaVu Sans %d' % i for i in range(3000)]}))", { cwd: path.join(tmp, 'plot7'), timeoutMs: 20_000 });
+    const last = loud.stdout.trim().split('\n').pop() ?? '';
+    ok(loud.ok && loud.stdout.length <= 1024 * 1024 && JSON.parse(last).fonts.length === 3000, `what it prints is kept to its last 1 MB, a long last line whole (${loud.stdout.length})`);
+    ok(loud.stdout.includes('é'.repeat(100_000)) && !loud.stdout.includes('\ufffd'), 'no letter cut in two');
   }
   // ---- through OpenRouter (a stand-in for make.ts) ---------------------------------------------------------------------
 
@@ -591,7 +678,35 @@ for line in sys.stdin:
 
     const t = await run('erase_from_image', { path: 'photo.png', prompt: 'the cat' });
     ok(!t.isError && /^Took away the cat with test\/painter through OpenRouter \(\$0\.012\):/.test(t.text) && /the cat from the picture/.test(asked[3].prompt) && !asked[3].mask, `words alone: ${t.text}`);
-    const forced = await run('remove_background', { path: 'photo.png', openrouter: true });
+    control({ cutout: 'empty' });
+    const redo = await req('POST', '/api/images/cutout', { src: dataUrl(photo) });
+    ok(
+      redo.statusCode === 200 && redo.json().how === 'cloud' && redo.json().why === 'The background remover on this computer found almost nothing to keep, so an image model did it.',
+      `a poor cutout done again by an image model: ${redo.body.slice(0, 300)}`,
+    );
+    const asLocal = await req('POST', '/api/images/cutout', { src: dataUrl(photo), how: 'local' });
+    ok(asLocal.json().how === 'local' && asLocal.json().why === 'The background remover on this computer found almost nothing to keep: look at the edges, or try it with AI.', 'asked for here: kept, with what to look at');
+    control({ cutout: 'fuzzy' });
+    const redoTool = await run('remove_background', { path: 'photo.png' });
+    ok(
+      !redoTool.isError && /^Took the background out with test\/painter through OpenRouter \(\$0\.012\): The background remover on this computer was unsure where the subject ends, so an image model did it\./.test(redoTool.text),
+      `and for an agent: ${redoTool.text}`,
+    );
+    ok(/Look at the result: if it is not right, call again \(an image model answers differently each time\), or with how: "local" to do it on this computer/.test(redoTool.text), 'what to do when it is not right');
+    control({ hole: 'large' });
+    const fill = await req('POST', '/api/images/erase', { src: dataUrl(photo), mask: dataUrl(mask) });
+    ok(fill.json().how === 'cloud' && fill.json().why === 'An image model filled it: the area is large (39% of the picture), and the eraser on this computer smears large areas.', `a large hole: an image model: ${fill.body.slice(0, 300)}`);
+    control({ hole: 'wide' });
+    const wide = await run('erase_from_image', { path: 'photo.png', boxes: [{ x: 2, y: 20, w: 60, h: 3 }] });
+    ok(/^Erased the box with test\/painter through OpenRouter \(\$0\.012\): Part of it reaches across 94% of the picture, and the eraser on this computer smears large areas, so an image model did it\./.test(wide.text), `a long one: ${wide.text}`);
+    control({ detail: 0.2 });
+    const words = await req('POST', '/api/images/erase', { src: dataUrl(photo), mask: dataUrl(mask) });
+    ok(words.json().how === 'cloud' && /detailed things around it \(such as words\)/.test(words.json().why), 'among detailed things: an image model');
+    control({});
+    const small = await req('POST', '/api/images/erase', { src: dataUrl(photo), mask: dataUrl(mask) });
+    ok(small.json().how === 'local' && !small.json().why, 'a small one: here');
+    asked.length = 4;
+    const forced = await run('remove_background', { path: 'photo.png', how: 'ai' });
     ok(!forced.isError && /through OpenRouter/.test(forced.text) && asked.length === 5 && !/would do this free/.test(forced.text), `through OpenRouter when asked, though the picture tools are here: ${forced.text}`);
     await req('DELETE', '/api/images/local');
     const rb = await run('remove_background', { path: 'photo.png' });
@@ -614,6 +729,77 @@ for line in sys.stdin:
   // ---- the pieces --------------------------------------------------------------------------------------------------
 
   {
+    // Judging a cutout's mask (at most 512 across): sharp, empty, full, fuzzy, scattered.
+    const W = 320;
+    const H = 240;
+    const mk = (f: (x: number, y: number) => number) => {
+      const a = new Uint8Array(W * H);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) a[y * W + x] = Math.max(0, Math.min(255, Math.round(f(x, y))));
+      return a;
+    };
+    const d = (x: number, y: number) => Math.hypot(x - 160, y - 120);
+    const good = judgeCutout(
+      mk((x, y) => (d(x, y) < 70 ? 255 : 0)),
+      W,
+      H,
+    );
+    ok(good.ok && good.pieces === 1 && good.band < 2 && Math.abs(good.kept - 0.2) < 0.01, `a sharp subject: right (${JSON.stringify(good)})`);
+    const soft = judgeCutout(
+      mk((x, y) => 255 * Math.min(1, Math.max(0, 72 - d(x, y)) / 3)),
+      W,
+      H,
+    );
+    ok(soft.ok, `a softly drawn edge (hair, fur): right (${JSON.stringify(soft)})`);
+    ok(
+      judgeCutout(
+        mk(() => 0),
+        W,
+        H,
+      ).why === 'found almost nothing to keep',
+      'empty',
+    );
+    ok(
+      judgeCutout(
+        mk(() => 255),
+        W,
+        H,
+      ).why === 'kept almost the whole picture',
+      'full',
+    );
+    const fuzzy = judgeCutout(
+      mk((x, y) => (255 * (100 - d(x, y))) / 60),
+      W,
+      H,
+    );
+    ok(!fuzzy.ok && fuzzy.why === 'was unsure where the subject ends' && fuzzy.band > 6, `fuzzy (${JSON.stringify(fuzzy)})`);
+    const dots = judgeCutout(
+      mk((x, y) => (Math.hypot((x % 64) - 32, (y % 60) - 30) < 8 ? 255 : 0)),
+      W,
+      H,
+    );
+    ok(!dots.ok && dots.why === 'found the subject in 20 scattered pieces', `scattered (${JSON.stringify(dots)})`);
+    const lines = judgeCutout(
+      mk((x, y) => (Math.abs(y - 120) < 2 || Math.abs(x - 160) < 2 || Math.abs(x - y) < 2 ? 255 : 0)),
+      W,
+      H,
+    );
+    ok(lines.ok, `thin lines, sharp: right (${JSON.stringify(lines)})`);
+
+    // Planning an erase: here for a small hole; an image model for a large one, a long one, one among words.
+    const hole = (f: (x: number, y: number) => boolean, w = 256, h = 192) => {
+      const a = new Uint8Array(w * h);
+      let n = 0;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (f(x, y)) ((a[y * w + x] = 255), n++);
+      return { area: n / (w * h), detail: 0, hole: { data: a, w, h } };
+    };
+    const smallHole = hole((x, y) => x > 100 && x < 130 && y > 80 && y < 110);
+    ok(planErase(smallHole).way === 'local' && !planErase(smallHole).why, 'a small hole: here');
+    const large = planErase(hole((x, y) => x > 20 && x < 120 && y > 20 && y < 90));
+    ok(large.way === 'ai' && large.why === 'the area is large (14% of the picture), and the eraser on this computer smears large areas', `a large one: ${large.why}`);
+    const long = planErase(hole((x, y) => x > 10 && x < 240 && y > 90 && y < 96));
+    ok(long.way === 'ai' && /^part of it reaches across 89% of the picture/.test(long.why ?? ''), `a long one: ${long.why}`);
+    ok(planErase({ ...smallHole, detail: 0.15 }).why === 'there are detailed things around it (such as words), which the eraser on this computer cannot continue', 'among words');
+    ok(planErase({ ...smallHole, detail: 0.02 }).way === 'local', 'a photo’s edges are not details enough');
     ok(JSON.stringify(readBoxes([{ x: 100, y: 50, w: 200, h: 100 }])) === JSON.stringify([{ x: 94, y: 44, w: 212, h: 112 }]), 'a box gets room in proportion');
     ok(readBoxes(undefined).length === 0 && readBoxes([]).length === 0, 'no boxes');
     let threw = '';
@@ -697,7 +883,7 @@ for line in sys.stdin:
     const r = await req('POST', '/api/images/cutout', { src: dataUrl(plain), how: 'local' });
     watching = false;
     const a = r.json() as PictureAnswer;
-    ok(r.statusCode === 200 && a.how === 'local' && a.w === W && a.h === H, `a cutout in ${Math.round((Date.now() - t) / 1000)} s: ${r.body.slice(0, 200)}`);
+    ok(r.statusCode === 200 && a.how === 'local' && a.w === W && a.h === H && !a.why, `a cutout in ${Math.round((Date.now() - t) / 1000)} s, judged right: ${r.body.slice(0, 200)}`);
     console.log(`  steps: ${[...steps].join(' / ')}`);
     if (!seed)
       ok(
@@ -725,9 +911,9 @@ for line in sys.stdin:
   {
     const mask = picture(W, H, (x, y) => (inMask(x, y) ? [255, 255, 255, 255] : [0, 0, 0, 255]));
     const t = Date.now();
-    const r = await req('POST', '/api/images/erase', { src: dataUrl(textured), mask: dataUrl(mask), how: 'local' });
+    const r = await req('POST', '/api/images/erase', { src: dataUrl(textured), mask: dataUrl(mask) });
     const a = r.json() as PictureAnswer;
-    ok(r.statusCode === 200 && a.how === 'local' && a.model === 'LaMa', `an erase in ${Math.round((Date.now() - t) / 1000)} s: ${r.body.slice(0, 200)}`);
+    ok(r.statusCode === 200 && a.how === 'local' && a.model === 'LaMa' && !a.why, `an erase on auto, measured as small, in ${Math.round((Date.now() - t) / 1000)} s: ${r.body.slice(0, 200)}`);
     if (r.statusCode === 200) {
       const k = keptPng(a.src);
       const src = readPng(textured);
@@ -759,6 +945,12 @@ for line in sys.stdin:
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!(x >= 198 && x < 262 && y >= 148 && y < 212)) for (let c = 0; c < 4; c++) if (k.data[(y * W + x) * 4 + c] !== src.data[(y * W + x) * 4 + c]) outside = false;
       ok(outside, 'outside the box (and its room) as it was');
     }
+    const wide = picture(W, H, (x, y) => (x >= 20 && x < 460 && y >= 100 && y < 260 ? [255, 255, 255, 255] : [0, 0, 0, 255]));
+    const large = await req('POST', '/api/images/erase', { src: dataUrl(textured), mask: dataUrl(wide) });
+    ok(
+      large.statusCode === 200 && large.json().how === 'local' && /^Erased on this computer, though the area is large \(4\d% of the picture\), and the eraser on this computer smears large areas: look at it\. An image model would do it better/.test(large.json().why ?? ''),
+      `a large hole measured for real: an image model would do better (no key here): ${large.json().why}`,
+    );
     const far = await run('erase_from_image', { path: 'textured.png', boxes: [{ x: 900, y: 900, w: 10, h: 10 }] });
     ok(far.isError && /The boxes are outside the picture, which is 480×360 pixels\./.test(far.text), `a box outside the picture: ${far.text}`);
   }
