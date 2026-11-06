@@ -5,7 +5,7 @@
 // listed as generate_video and generate_image list theirs, so the conversation shows it the same way. It waits up to
 // about nine minutes, then hands back the job to wait for again.
 import path from 'node:path';
-import { cropToShape, editedLength, keptParts, MAX_TEXTS, toOriginal, videoClock, type VideoOut, type VideoRecipe } from '../../shared/mediaedit-video.ts';
+import { cropToShape, editedLength, keptParts, MAX_TEXTS, shownRect, toOriginal, videoClock, type VideoOut, type VideoRecipe, type VideoTurn } from '../../shared/mediaedit-video.ts';
 import type { RunTool } from '../features/types.ts';
 import { prepare, startVideoEdit, videoJob, waitForJob, factsOf, sourceOf } from './video.ts';
 
@@ -146,13 +146,15 @@ export function editVideoTool(): RunTool {
         const speed = Math.min(4, Math.max(0.25, num(a.speed) ?? 1));
         const length = editedLength({ ...r, speed }, facts.duration);
         const orig = (s: number) => toOriginal(Math.max(0, Math.min(length, s)), parts, speed);
-        const rotate = num(a.rotate);
-        if (rotate !== undefined) r.rotate = rotate;
+        const turn = ((((Math.round((num(a.rotate) ?? 0) / 90) * 90) % 360) + 360) % 360) as VideoTurn;
+        if (turn) r.rotate = turn;
         if (a.flip === 'horizontal' || a.flip === 'both') r.flipH = true;
         if (a.flip === 'vertical' || a.flip === 'both') r.flipV = true;
-        if (a.crop && typeof a.crop === 'object') r.crop = a.crop;
+        // An agent's crop is in the video as it was given: the recipe's is in the upright frame (turned, mirrored).
+        if (a.crop && typeof a.crop === 'object' && [a.crop.x, a.crop.y, a.crop.w, a.crop.h].every((x) => Number.isFinite(Number(x))))
+          r.crop = shownRect({ x: Number(a.crop.x), y: Number(a.crop.y), w: Number(a.crop.w), h: Number(a.crop.h) }, facts.width, facts.height, { rotate: turn, flipH: r.flipH, flipV: r.flipV });
         else if (typeof a.aspect === 'string' && a.aspect.trim()) {
-          const c = cropToShape(a.aspect, facts.width, facts.height, ((((Math.round((rotate ?? 0) / 90) * 90) % 360) + 360) % 360) as 0 | 90 | 180 | 270);
+          const c = cropToShape(a.aspect, facts.width, facts.height, turn);
           if (!c) return { isError: true, text: `aspect: a shape such as "16:9", "9:16", "1:1" or "4:5", not "${a.aspect}".` };
           r.crop = c;
         }

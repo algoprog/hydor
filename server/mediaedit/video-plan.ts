@@ -1,5 +1,5 @@
 // A video's edit (shared/mediaedit-video.ts) as one ffmpeg command: the input read from the first part kept to the
-// last, the picture cropped, turned, mirrored and coloured, the words put over it (as the editor drew them, or drawn
+// last, the picture turned, mirrored, cropped and coloured, the words put over it (as the editor drew them, or drawn
 // here with a font of this computer's), the parts kept joined, played faster or slower with the sound kept in tune,
 // faded in and out, the music mixed under it, and written as MP4 (H.264 and AAC), WebM, a GIF, or one frame as a
 // picture. Pure: it only plans (video.ts runs it), so it can be tested without ffmpeg.
@@ -211,11 +211,18 @@ export function planVideo(p: PlanInput): Plan {
   const chains: Chain[] = [];
   const files: Record<string, string> = {};
 
-  // ---- the picture: cropped (even sides, as H.264 needs), turned, mirrored, coloured -------------------------
-  const crop = r.crop ?? { x: 0, y: 0, w: v.width - (v.width % 2), h: v.height - (v.height % 2) };
-  const size = editedSize({ crop, rotate: r.rotate }, v.width, v.height);
+  // ---- the picture: turned, mirrored, cropped (even sides, as H.264 needs), coloured ---------------------------
+  const upright = { w: r.rotate === 90 || r.rotate === 270 ? v.height : v.width, h: r.rotate === 90 || r.rotate === 270 ? v.width : v.height };
+  const crop = r.crop ?? { x: 0, y: 0, w: upright.w - (upright.w % 2), h: upright.h - (upright.h % 2) };
+  const size = editedSize({ crop }, v.width, v.height);
   const pre: Filter[] = [];
-  if (r.crop || v.width % 2 || v.height % 2)
+  if (r.rotate === 90) pre.push({ name: 'transpose', args: [['dir', 'clock']] });
+  if (r.rotate === 270) pre.push({ name: 'transpose', args: [['dir', 'cclock']] });
+  // Half a turn is mirrored both ways; a mirror on top of it undoes one of them.
+  const half = r.rotate === 180;
+  if (!!r.flipH !== half) pre.push({ name: 'hflip' });
+  if (!!r.flipV !== half) pre.push({ name: 'vflip' });
+  if (r.crop || upright.w % 2 || upright.h % 2)
     pre.push({
       name: 'crop',
       args: [
@@ -225,12 +232,6 @@ export function planVideo(p: PlanInput): Plan {
         ['y', crop.y],
       ],
     });
-  if (r.rotate === 90) pre.push({ name: 'transpose', args: [['dir', 'clock']] });
-  if (r.rotate === 270) pre.push({ name: 'transpose', args: [['dir', 'cclock']] });
-  // Half a turn is mirrored both ways; a mirror on top of it undoes one of them.
-  const half = r.rotate === 180;
-  if (!!r.flipH !== half) pre.push({ name: 'hflip' });
-  if (!!r.flipV !== half) pre.push({ name: 'vflip' });
   const colour = colourMath(r);
   if (colour) {
     const k = ['rr', 'rg', 'rb', 'gr', 'gg', 'gb', 'br', 'bg', 'bb'];
