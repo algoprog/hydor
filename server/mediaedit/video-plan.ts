@@ -8,7 +8,7 @@
 // colours, time ranges and the names of files the job made in its own folder, nothing that could close a quote or
 // start another filter. The command reads only the inputs it was given and writes only its output.
 import type { VideoOut, VideoRecipe } from '../../shared/mediaedit-video.ts';
-import { editedLength, editedSize, keptParts } from '../../shared/mediaedit-video.ts';
+import { cssBrightness, cssContrast, cssSaturate, editedLength, editedSize, keptParts } from '../../shared/mediaedit-video.ts';
 
 /** The filters an edit uses: none that reads a file or an address, runs commands, or listens for them. */
 export const ALLOWED_FILTERS = new Set([
@@ -123,10 +123,6 @@ export function colourMath(r: Pick<VideoRecipe, 'brightness' | 'contrast' | 'sat
   return { m: sat.map((x) => x * b * c), add: 0.5 * (1 - c) };
 }
 
-/** The editor's sliders (-1 to 1) as the browser's filter amounts: brightness 0.4 to 1.6, contrast 0.4 to 1.6, saturation 0 to 2. */
-export const cssBrightness = (v = 0) => 1 + v * 0.6;
-export const cssContrast = (v = 0) => 1 + v * 0.6;
-export const cssSaturate = (v = 0) => 1 + v;
 
 /** atempo takes 0.5 to 2 at a time on older ffmpeg: a speed as a few of them. */
 export function tempos(speed: number): number[] {
