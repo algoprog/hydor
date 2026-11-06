@@ -6,8 +6,9 @@
 import type { ContentKind, ContentType } from './content-types.ts';
 
 /** How a request for something new starts, as New in the Library's "Or describe it" does (its ASK_FOR, in English). */
-export const NEW_START: Record<'deck' | 'doc' | 'page' | 'sheet', string> = {
+export const NEW_START: Record<'deck' | 'doc' | 'page' | 'sheet' | 'design', string> = {
   page: 'Make me a page and keep it in my Library: ',
+  design: 'Make me a design and keep it in my Library: ',
   deck: 'Make me slides and keep them in my Library: ',
   doc: 'Write me a document and keep it in my Library: ',
   sheet: 'Make me a spreadsheet and keep it in my Library: ',
@@ -45,6 +46,8 @@ export interface ComposeContext {
   folder?: string;
   /** Something new: the language the app is shown in, when not English ("Greek"). */
   lang?: string;
+  /** A design: its size, as picked (a size of shared/design.ts, by its name and pixels). */
+  size?: { label: string; w: number; h: number };
 }
 
 const sentence = (s: string) => (/[.!?…”"’)]$/.test(s) ? s : `${s}.`);
@@ -84,13 +87,14 @@ export function composeAsk(t: ContentType | null, words: string, c: ComposeConte
     const where = c.at?.trim() ? c.at.trim() : 'where it fits best';
     return `Add a part to the page ${where}: ${what} Read the page with get_page first, and make the part in the page’s own look (its colours, fonts and spacing), in its language, working on a phone too. Keep everything else on the page as it is, and save the whole page with save_page and its id.`;
   }
-  const start = NEW_START[kind === 'deck' ? 'deck' : kind === 'doc' ? 'doc' : kind === 'sheet' ? 'sheet' : 'page'];
+  const start = NEW_START[kind === 'deck' ? 'deck' : kind === 'doc' ? 'doc' : kind === 'sheet' ? 'sheet' : kind === 'design' ? 'design' : 'page'];
   const named = c.title?.trim() ? ` Call it “${quoted(c.title)}”.` : '';
   const look =
     kind === 'deck' && (c.theme || c.ratio) ? ` Make it${c.theme ? ` in the ${c.theme.label} theme (the preset “${c.theme.id}”)` : ''}${c.ratio ? `${c.theme ? ',' : ''} with ${c.ratio === '4:3' ? 'standard 4:3' : 'wide 16:9'} slides` : ''}.` : '';
   const into = c.folder?.trim() ? ` Keep it in my Library folder “${quoted(c.folder)}”.` : '';
   const lang = c.lang && c.lang !== 'English' ? ` Write it in ${c.lang}.` : '';
-  return `${start}${what}${named}${look}${into}${lang}`;
+  const design = kind === 'design' ? ` Make it ${c.size ? `a ${quoted(c.size.label)}, ${Math.round(c.size.w)}×${Math.round(c.size.h)} pixels` : 'the size that suits it'}, as a design (how_to_make “design” says how), so I can change it as in Canva.` : '';
+  return `${start}${what}${named}${look}${design}${into}${lang}`;
 }
 
 const NOUN: Record<PageKindName, string> = { page: 'page', slides: 'deck', doc: 'document', sheet: 'spreadsheet', tex: 'LaTeX document', notebook: 'notebook' };
@@ -138,9 +142,11 @@ export interface MakeExtra {
   lang?: string;
   /** Turn it into: the page of the Library it is made from, and what it becomes. */
   turn?: { from: PageKindName; to: 'slides' | 'doc' | 'page'; id: string; title: string };
+  /** A design: its size. */
+  size?: { label: string; w: number; h: number };
 }
 
-const KINDS: ContentKind[] = ['slide', 'deck', 'doc', 'section', 'page', 'block', 'sheet'];
+const KINDS: ContentKind[] = ['slide', 'deck', 'doc', 'section', 'page', 'block', 'sheet', 'design'];
 const text = (v: unknown, most: number) => (typeof v === 'string' && v.trim() ? v.replace(/\s+/g, ' ').trim().slice(0, most) : undefined);
 const record = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 
@@ -173,6 +179,9 @@ export function makeOf(v: unknown): MakeExtra | null {
   if (folder) out.folder = folder;
   const lang = text(x.lang, 40);
   if (lang && /^[A-Za-z ()-]+$/.test(lang)) out.lang = lang;
+  const size = record(x.size);
+  const sizeLabel = text(size?.label, 60);
+  if (size && sizeLabel && Number(size.w) >= 16 && Number(size.h) >= 16 && Number(size.w) <= 8000 && Number(size.h) <= 8000) out.size = { label: sizeLabel, w: Math.round(Number(size.w)), h: Math.round(Number(size.h)) };
   const turn = record(x.turn);
   const from = turn?.from as PageKindName;
   const id = text(turn?.id, 40);
@@ -183,5 +192,5 @@ export function makeOf(v: unknown): MakeExtra | null {
 /** The whole request `extra.make` stands for, as composeAsk or turnAsk writes it (`t`: its kind picked, found by its id). */
 export function makeRequest(m: MakeExtra, t: ContentType | null): string {
   if (m.turn) return turnAsk({ ...m.turn, folder: m.folder });
-  return composeAsk(t, m.words ?? '', { kind: t?.kind ?? m.kind, after: m.after, at: m.at, webDeck: m.webDeck, title: m.title, theme: m.theme, ratio: m.ratio, folder: m.folder, lang: m.lang });
+  return composeAsk(t, m.words ?? '', { kind: t?.kind ?? m.kind, after: m.after, at: m.at, webDeck: m.webDeck, title: m.title, theme: m.theme, ratio: m.ratio, folder: m.folder, lang: m.lang, size: m.size });
 }

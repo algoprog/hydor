@@ -6,12 +6,13 @@
 // Snapping (N) pulls to the playhead, ends, markers, In and Out. Things of the media panel are dropped on a track.
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeftRight, Eye, EyeOff, Hand, Lock, LockOpen, Magnet, MousePointer2, Plus, Scissors, SeparatorHorizontal, UnfoldHorizontal, ZoomIn, ZoomOut } from 'lucide-react';
-import { audioLength, isStill, overlayLength, sourceAt, timecode, VIDEO_TRANSITIONS, type ClipSpan, type VideoClip, type VideoFactsOf, type VideoRecipe, type VideoTrackId } from '@shared/mediaedit-video';
+import { audioLength, isStill, overlapFades, overlayLength, sourceAt, timecode, VIDEO_TRANSITIONS, type ClipSpan, type VideoClip, type VideoFactsOf, type VideoRecipe, type VideoTrackId } from '@shared/mediaedit-video';
 import { cx } from '../../../components/ui';
 import { playUrl, soundShape, stripUrl } from './api';
 import { useClock, type Clock } from './clock';
 import type { Engine } from './engine';
-import { deleteClip, moveClip, setAudio, setClip, setOverlay, setText, snap, snapTimes, splitClip, splitItem, spansOf, trimClip, type Picked, type PoolItem } from './model';
+import { deleteClip, moveClip, setAudio, setClip, setOverlay, setText, shiftSound, snap, snapTimes, splitClip, splitItem, spansOf, trimClip, type Picked, type PoolItem, type SoundRange } from './model';
+import { SoundItem, Wave, type Phase as SoundPhase } from './SoundItem';
 import { Tool } from './shell';
 
 type Phase = 'begin' | 'move' | 'end';
@@ -74,6 +75,9 @@ export interface TimelineProps {
   onTrackUi(id: VideoTrackId, u: TrackUi): void;
   onMenu(at: { x: number; y: number }, p: Picked, t: number): void;
   onDrop(item: PoolItem, row: VideoTrackId, t: number, index: number): void;
+  /** A part of one sound picked (Shift and a drag on it): Delete silences it. */
+  range: SoundRange;
+  onRange(r: SoundRange): void;
   pool: PoolItem[];
   /** A phone: the main track alone, no headers' buttons. */
   compact?: boolean;
@@ -109,6 +113,7 @@ export function Timeline(p: TimelineProps) {
   }, []);
   const r = p.recipe;
   const { spans, length } = useMemo(() => spansOf(r, p.factsOf), [r, p.factsOf]);
+  const cross = useMemo(() => overlapFades(r.audio ?? [], (a) => Math.min(audioLength(a, p.factsOf(a.src)), length - a.start)), [r.audio, p.factsOf, length]);
   const pps = p.pps;
   const x = (t: number) => PAD + t * pps;
   const width = Math.max(view.w - (p.compact ? 0 : HEAD), PAD * 2 + (length + 8) * pps);
@@ -175,6 +180,11 @@ export function Timeline(p: TimelineProps) {
   };
 
   const locked = (id: VideoTrackId) => !!p.trackUi[id]?.locked;
+  const soundStep = (phase: SoundPhase, apply: () => void) => {
+    if (phase === 'begin') return p.change.begin();
+    apply();
+    if (phase === 'end') p.change.end();
+  };
 
   /** What a press on a thing does, by the tool in use: pick it and move it, cut it, or move the view. */
   const press = (pk: NonNullable<Picked>, row: VideoTrackId, moveBy: (dt: number, t0: number, phase: Phase, t: number) => void) => (e: React.PointerEvent) => {
@@ -185,7 +195,7 @@ export function Timeline(p: TimelineProps) {
       if (locked(row)) return;
       const t = snapped(tAt(e.clientX));
       setSnapLine(null);
-      p.change((x0) => (pk.kind === 'clip' ? splitClip(x0, p.factsOf, pk.id, t) : pk.kind === 'transition' ? x0 : splitItem(x0, p.factsOf, pk.kind, pk.id, t)));
+      p.change((x0) => (pk.kind === 'clip' || pk.kind === 'clipsound' ? splitClip(x0, p.factsOf, pk.id, t) : pk.kind === 'transition' ? x0 : splitItem(x0, p.factsOf, pk.kind, pk.id, t)));
       return;
     }
     p.onPick(pk);
@@ -299,7 +309,7 @@ export function Timeline(p: TimelineProps) {
         if (kind === 'overlay' && (first.picture || f?.picture)) return setOverlay(x0, id, (o) => ({ ...o, start: ms(first.start + d), length: ms(len - d) }));
         const na = Math.max(0, a + d);
         const nd = na - a;
-        return kind === 'overlay' ? setOverlay(x0, id, (o) => ({ ...o, start: ms(first.start + nd), trim: [ms(na), b] })) : setAudio(x0, id, (m) => ({ ...m, start: ms(first.start + nd), trim: [ms(na), b] }));
+        return kind === 'overlay' ? setOverlay(x0, id, (o) => ({ ...o, start: ms(first.start + nd), trim: [ms(na), b] })) : setAudio(x0, id, () => ({ ...first, ...shiftSound(first, -nd, len - nd), start: ms(first.start + nd), trim: [ms(na), b] }));
       });
       if (phase === 'end') p.change.end();
     })(e);
@@ -414,7 +424,50 @@ export function Timeline(p: TimelineProps) {
                   )}
                 {row.kind === 'clip' && insertAt !== null && <div className="pointer-events-none absolute inset-y-0 z-20 w-0.5 bg-accent" style={{ left: x(insertAt < spans.length ? spans[insertAt].start : length) - 1 }} />}
                 {row.kind === 'clipsound' &&
-                  clips.map((c, i) => <ClipSound key={c.id} c={c} span={spans[i]} x={x} pps={pps} h={ph(row)} main={p.main} factsOf={p.factsOf} muted={!!r.tracks?.a1?.mute} picked={p.picked?.kind === 'clip' && p.picked.id === c.id} onPick={() => p.onPick({ kind: 'clip', id: c.id! })} onMenu={menu({ kind: 'clip', id: c.id! })} />)}
+                  clips.map((c, i) => {
+                    const f = p.factsOf(c.src);
+                    const sp = spans[i];
+                    const silent = isStill(c) || !!f?.picture || !!c.mute || (!f?.audio && !c.sound);
+                    const [a, b] = c.trim ?? [0, f?.duration ?? 0];
+                    const s0 = sourceAt(c, f, 0);
+                    const s1 = sourceAt(c, f, sp.length);
+                    const id = c.id!;
+                    const set = (patch: Partial<VideoClip>) => p.change((x0) => setClip(x0, id, (y) => ({ ...y, ...patch })));
+                    return (
+                      <SoundItem
+                        key={id}
+                        left={x(sp.start + sp.tin / 2)}
+                        width={(sp.length - sp.tin / 2 - sp.tout / 2) * pps}
+                        pps={pps}
+                        h={ph(row)}
+                        offset={sp.tin / 2}
+                        length={sp.length}
+                        wave={f ? { src: c.sound ?? c.src ?? p.main, from: Math.min(s0, s1, b), to: Math.max(s0, s1, a), duration: f.duration, reverse: c.reverse } : undefined}
+                        silent={silent}
+                        volume={c.volume}
+                        levels={c.levels}
+                        silence={c.silence}
+                        fadeIn={c.soundFadeIn}
+                        fadeOut={c.soundFadeOut}
+                        channels={c.channels}
+                        picked={(p.picked?.kind === 'clipsound' || p.picked?.kind === 'clip') && p.picked.id === id}
+                        dim={!!r.tracks?.a1?.mute}
+                        tone="clip"
+                        locked={locked('a1')}
+                        range={p.range?.kind === 'clip' && p.range.id === id ? [p.range.from - sp.start, p.range.to - sp.start] : null}
+                        onPress={press({ kind: 'clipsound', id }, 'a1', () => {})}
+                        onStart={trimEdge(id, 'start')}
+                        onEnd={trimEdge(id, 'end')}
+                        onMenu={menu({ kind: 'clipsound', id })}
+                        onFade={(edge, sec, phase) => soundStep(phase, () => set(edge === 'in' ? { soundFadeIn: sec || undefined } : { soundFadeOut: sec || undefined }))}
+                        onLine={(next, phase) => soundStep(phase, () => set(next))}
+                        onRange={(from, to, phase) => {
+                          p.onPick({ kind: 'clipsound', id });
+                          p.onRange(to - from >= 0.02 || phase !== 'end' ? { kind: 'clip', id, from: sp.start + from, to: sp.start + to } : null);
+                        }}
+                      />
+                    );
+                  })}
                 {row.kind === 'overlay' &&
                   (r.overlays ?? [])
                     .filter((o) => (o.track === 3 ? 'v3' : 'v2') === row.id)
@@ -458,19 +511,41 @@ export function Timeline(p: TimelineProps) {
                     .map((a) => {
                       const f = p.factsOf(a.src);
                       const len = audioLength(a, f);
+                      const id = a.id!;
+                      const set = (patch: Partial<NonNullable<VideoRecipe['audio']>[number]>) => p.change((x0) => setAudio(x0, id, (y) => ({ ...y, ...patch })));
                       return (
-                        <Block
-                          key={a.id}
+                        <SoundItem
+                          key={id}
                           left={x(a.start)}
                           width={len * pps}
-                          tone={a.track === 'voice' ? 'voice' : 'music'}
-                          picked={p.picked?.kind === 'audio' && p.picked.id === a.id}
-                          label={<span translate="no">{a.name ?? 'Sound'}</span>}
+                          pps={pps}
+                          h={ph(row)}
+                          offset={0}
+                          length={len}
                           wave={f ? { src: a.src, from: a.trim?.[0] ?? 0, to: a.trim?.[1] ?? f.duration, duration: f.duration } : undefined}
-                          onPress={press({ kind: 'audio', id: a.id! }, row.id, moveItem('audio', a.id!))}
-                          onStart={itemEdge('audio', a.id!, 'start', row.id)}
-                          onEnd={itemEdge('audio', a.id!, 'end', row.id)}
-                          onMenu={menu({ kind: 'audio', id: a.id! })}
+                          volume={a.volume}
+                          levels={a.levels}
+                          silence={a.silence}
+                          fadeIn={a.fadeIn}
+                          fadeOut={a.fadeOut}
+                          cross={cross.get(id)}
+                          channels={a.channels}
+                          picked={p.picked?.kind === 'audio' && p.picked.id === id}
+                          dim={!!r.tracks?.[row.id]?.mute}
+                          tone={a.track === 'voice' ? 'voice' : 'music'}
+                          label={<span translate="no">{a.name ?? 'Sound'}</span>}
+                          locked={locked(row.id)}
+                          range={p.range?.kind === 'audio' && p.range.id === id ? [p.range.from - a.start, p.range.to - a.start] : null}
+                          onPress={press({ kind: 'audio', id }, row.id, moveItem('audio', id))}
+                          onStart={itemEdge('audio', id, 'start', row.id)}
+                          onEnd={itemEdge('audio', id, 'end', row.id)}
+                          onMenu={menu({ kind: 'audio', id })}
+                          onFade={(edge, sec, phase) => soundStep(phase, () => set(edge === 'in' ? { fadeIn: sec || undefined } : { fadeOut: sec || undefined }))}
+                          onLine={(next, phase) => soundStep(phase, () => set(next))}
+                          onRange={(from, to, phase) => {
+                            p.onPick({ kind: 'audio', id });
+                            p.onRange(to - from >= 0.02 || phase !== 'end' ? { kind: 'audio', id, from: a.start + from, to: a.start + to } : null);
+                          }}
                         />
                       );
                     })}
@@ -790,63 +865,6 @@ function Junction({ c, next, x, pps, h, picked, onPick, onAdd, onMenu }: { c: Vi
       <span className="truncate px-0.5">{t.length * pps > 60 ? label : '⧓'}</span>
     </button>
   );
-}
-
-/** A clip's own sound under it: the shape of the part it plays, flat for a picture or with it taken out. */
-function ClipSound({ c, span, x, pps, h, main, factsOf, muted, picked, onPick, onMenu }: { c: VideoClip; span: ClipSpan; x: (t: number) => number; pps: number; h: number; main: string; factsOf: VideoFactsOf; muted: boolean; picked: boolean; onPick: () => void; onMenu: (e: React.MouseEvent) => void }) {
-  const f = factsOf(c.src);
-  const silent = isStill(c) || !!f?.picture || c.mute || (!f?.audio && !c.sound);
-  const [a, b] = c.trim ?? [0, f?.duration ?? 0];
-  const from = c.reverse ? b : a;
-  const to = sourceAt(c, f, span.length);
-  return (
-    <div
-      className={cx('absolute inset-y-[3px] overflow-hidden rounded-[5px] border', silent ? 'border-line bg-[repeating-linear-gradient(135deg,transparent_0_5px,var(--line)_5px_6px)]' : TONES.music, picked && 'ring-2 ring-accent ring-inset', muted && 'opacity-40')}
-      style={{ left: x(span.start + span.tin / 2), width: Math.max(4, (span.length - span.tin / 2 - span.tout / 2) * pps) }}
-      onPointerDown={(e) => {
-        e.stopPropagation();
-        onPick();
-      }}
-      onContextMenu={onMenu}
-    >
-      {!silent && f && <Wave src={c.sound ?? c.src ?? main} from={Math.min(from, to)} to={Math.max(from, to)} duration={f.duration} reverse={c.reverse} className="absolute inset-0 text-ok/70" />}
-      {c.volume !== undefined && !silent && <span className="absolute top-0.5 right-1 rounded bg-black/40 px-1 text-[9.5px] text-white">{`${Math.round(c.volume * 100)}%`}</span>}
-      {c.sound && <span className="absolute top-0.5 left-1 rounded bg-black/40 px-1 text-[9.5px] text-white">Its own sound replaced</span>}
-    </div>
-  );
-}
-
-/** The shape of a sound from `from` to `to` (seconds of it), drawn in the colour of the text it is in. */
-function Wave({ src, from, to, duration, reverse, className }: { src: string; from: number; to: number; duration: number; reverse?: boolean; className?: string }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const [peaks, setPeaks] = useState<number[] | null>(null);
-  const n = Math.max(64, Math.min(4000, Math.round(duration * 25)));
-  useEffect(() => {
-    let live = true;
-    void soundShape(src, n).then((pk) => live && setPeaks(pk));
-    return () => {
-      live = false;
-    };
-  }, [src, n]);
-  useLayoutEffect(() => {
-    const cv = ref.current;
-    if (!cv || !peaks) return;
-    const w = (cv.width = Math.max(1, Math.round(cv.clientWidth * Math.min(2, devicePixelRatio || 1))));
-    const h = (cv.height = Math.max(1, Math.round(cv.clientHeight * Math.min(2, devicePixelRatio || 1))));
-    const g = cv.getContext('2d')!;
-    g.clearRect(0, 0, w, h);
-    g.fillStyle = getComputedStyle(cv).color;
-    const a = (from / Math.max(1e-6, duration)) * peaks.length;
-    const b = (to / Math.max(1e-6, duration)) * peaks.length;
-    for (let px = 0; px < w; px++) {
-      let i = Math.floor(a + ((b - a) * px) / w);
-      if (reverse) i = Math.floor(b - ((b - a) * px) / w);
-      const v = peaks[Math.max(0, Math.min(peaks.length - 1, i))] ?? 0;
-      const bh = Math.max(1, v * h * 0.9);
-      g.fillRect(px, (h - bh) / 2, 1, bh);
-    }
-  });
-  return <canvas ref={ref} className={cx('h-full w-full', className)} />;
 }
 
 /** A clip or an item removed by the keyboard's Delete (and Shift for a ripple), as the timeline's menu does. */

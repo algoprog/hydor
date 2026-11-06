@@ -24,6 +24,8 @@ import { ommlOf } from './omml.ts';
 import { XML_HEAD, coreXml, esc, imageSize, relsXml, zipParts, type ZipPart } from './ooxml.ts';
 import { altNameOf, fontInfo, fontKey, obfuscate, wordLine, type EmbeddedFont } from './word-fonts.ts';
 import { CAPTION, CELL, LIST_TEXT, STEP, TOC_PAD, wordLineOf, type WordLine } from './word-layout.ts';
+import { bookmarked, citationXml, fieldXml, footnoteRefXml, footnotesXml, notesStylesXml, seqName, sourcesPropsXml, sourcesXml, watermarkRun } from './docx-parts.ts';
+import { styleOf, type CiteStyle, type Doc, type Source } from '../../shared/docs.ts';
 
 export interface DocRun {
   t: string;
@@ -53,6 +55,12 @@ export interface DocRun {
   rev?: DocRev;
   /** A tracked change of their formatting: who, when, and how they looked before. */
   fmtRev?: { author: string; at: number; was: DocLookOf };
+  /** A footnote's mark: the footnote's number in the file (its words are the file's `notes`). */
+  fn?: number;
+  /** A field Word works out (a cross-reference: REF and a bookmark); `t` is what it shows until it does. */
+  fld?: string;
+  /** A citation (Word's own: a CITATION field over the file's sources), its sources by key; `t` is what it shows. */
+  cite?: { key: string; loc?: string }[];
 }
 
 /** A tracked change: inserted or deleted, by whom (a name) and when (ms since 1970). */
@@ -90,12 +98,14 @@ export interface DocCell {
 // `keep`: an empty one keeps its place (a document's empty lines; a page's are left out). `mark`: a tracked change of
 // the paragraph's own mark, its end (inserted: the paragraph was broken there; deleted: it joins the next).
 export type DocBlock =
-  /** `anchor`: a name a table of contents' line leads to. */
-  | { k: 'h'; lvl: 1 | 2 | 3 | 4 | 5 | 6; runs: DocRun[]; align?: Jc; keep?: boolean; space?: DocSpace; anchor?: string; mark?: DocRev }
+  /** `anchor`: a name a table of contents' line leads to; `bm`: a bookmark around its words (links and cross-references lead to it). */
+  | { k: 'h'; lvl: 1 | 2 | 3 | 4 | 5 | 6; runs: DocRun[]; align?: Jc; keep?: boolean; space?: DocSpace; anchor?: string; mark?: DocRev; bm?: string }
   /** `style`: the document's title or subtitle; `indent`: steps of half an inch; `shade`: a callout's tint (`icon` its emoji). */
-  | { k: 'p'; runs: DocRun[]; align?: Jc; quote?: boolean; style?: 'title' | 'subtitle'; indent?: number; keep?: boolean; space?: DocSpace; shade?: string; icon?: string; mark?: DocRev }
+  | { k: 'p'; runs: DocRun[]; align?: Jc; quote?: boolean; style?: 'title' | 'subtitle'; indent?: number; keep?: boolean; space?: DocSpace; shade?: string; icon?: string; mark?: DocRev; bm?: string }
   /** `list`: which list it belongs to (numbering restarts per list); `check`: a checklist's item (ticked: `checked`). */
-  | { k: 'li'; ordered: boolean; lvl: number; list: number; runs: DocRun[]; check?: boolean; checked?: boolean; align?: Jc; keep?: boolean; space?: DocSpace; mark?: DocRev }
+  | { k: 'li'; ordered: boolean; lvl: number; list: number; runs: DocRun[]; check?: boolean; checked?: boolean; align?: Jc; keep?: boolean; space?: DocSpace; mark?: DocRev; bm?: string }
+  /** A bibliography: its entries (Word's BIBLIOGRAPHY field, showing them until it works them out again). */
+  | { k: 'bib'; entries: DocRun[][]; space?: DocSpace }
   | { k: 'pre'; text: string; space?: DocSpace }
   | { k: 'hr'; space?: DocSpace }
   /** A page break. */
@@ -104,13 +114,13 @@ export type DocBlock =
    * `shot`: an index into shots; w and h in CSS pixels, as shown (`share`: its width as a share of the text's, for a
    * document's); `rev`: added or taken out as a tracked change; `space`: before it and after it (or its caption).
    */
-  | { k: 'img'; shot: number; w: number; h: number; share?: number; alt?: string; align?: 'left' | 'center' | 'right'; caption?: string; rev?: DocRev; space?: DocSpace }
-  /** `cols`: the columns' widths, as shares of the table's; `rev`: every row added or taken out as a tracked change; `sep`: points between it and a table right before it. */
-  | { k: 'table'; rows: { cells: DocCell[] }[]; cols?: number[]; rev?: DocRev; sep?: number }
+  | { k: 'img'; shot: number; w: number; h: number; share?: number; alt?: string; align?: 'left' | 'center' | 'right'; caption?: string; rev?: DocRev; space?: DocSpace; label?: string; num?: number; bm?: string }
+  /** `cols`: the columns' widths, as shares of the table's; `rev`: every row added or taken out as a tracked change; `sep`: points between it and a table right before it; its caption over it (`label` and `num`: "Table 2"). */
+  | { k: 'table'; rows: { cells: DocCell[] }[]; cols?: number[]; rev?: DocRev; sep?: number; caption?: string; label?: string; num?: number; bm?: string }
   /** A table of contents: its lines as Word shows them until it fills it in (its headings' `anchor`s). */
   | { k: 'toc'; entries: { lvl: number; text: string; anchor: string }[]; space?: DocSpace }
-  /** An equation on a line of its own, in LaTeX. */
-  | { k: 'math'; tex: string; space?: DocSpace };
+  /** An equation on a line of its own, in LaTeX (numbered: `label` and `num`, "(3)" at its right). */
+  | { k: 'math'; tex: string; space?: DocSpace; label?: string; num?: number; bm?: string };
 
 /** A header or footer of a document's pages: {page} and {pages} in its words are the page's number and how many. */
 export interface DocBand {
@@ -137,6 +147,8 @@ export interface DocLook {
   subtitle?: number;
   /** Headings 1 to 6. */
   heads?: number[];
+  /** A document's paragraph styles' own looks (Format → Paragraph styles). */
+  styles?: Doc['styles'];
   line?: number;
   /** Space after a paragraph. */
   after?: number;
@@ -1270,14 +1282,24 @@ function cleanRuns(v: unknown): DocRun[] {
     const r = obj(x);
     const run: DocRun = { t: str(r.t, 100_000) };
     for (const k of ['b', 'i', 'u', 's', 'code', 'sup', 'sub', 'br'] as const) if (r[k] === true) run[k] = true;
-    if (!run.t && !run.br) continue;
+    if (!run.t && !run.br && !(typeof r.fn === 'number')) continue;
     if (typeof r.color === 'string' && /^#[0-9a-f]{6}$/i.test(r.color)) run.color = r.color;
     if (typeof r.hl === 'string' && /^#[0-9a-f]{6}$/i.test(r.hl)) run.hl = r.hl;
     if (typeof r.size === 'number' && Number.isFinite(r.size) && r.size >= 1 && r.size <= 400) run.size = Math.round(r.size * 2) / 2;
     if (typeof r.font === 'string' && /^[A-Za-z0-9][A-Za-z0-9 -]{0,39}$/.test(r.font)) run.font = r.font;
-    const link = safeUrl(r.link);
+    // A place in the file (a bookmark's name), or an address.
+    const link = typeof r.link === 'string' && /^#[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(r.link) ? r.link : safeUrl(r.link);
     if (link) run.link = link;
     if (r.math === true) run.math = true;
+    if (typeof r.fn === 'number' && Number.isInteger(r.fn) && r.fn > 0 && r.fn < 100_000) run.fn = r.fn;
+    if (typeof r.fld === 'string' && /^[ -~]{1,300}$/.test(r.fld)) run.fld = r.fld;
+    if (Array.isArray(r.cite)) {
+      const items = r.cite.flatMap((x) => {
+        const o2 = obj(x);
+        return typeof o2.key === 'string' && /^[A-Za-z0-9_:.+/-]{1,80}$/.test(o2.key) ? [{ key: o2.key, ...(typeof o2.loc === 'string' && o2.loc ? { loc: o2.loc.slice(0, 60) } : {}) }] : [];
+      });
+      if (items.length) run.cite = items.slice(0, 30);
+    }
     if (Array.isArray(r.cm)) {
       const cm = r.cm.filter((x): x is string => typeof x === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(x)).slice(0, 20);
       if (cm.length) run.cm = cm;
@@ -1296,6 +1318,13 @@ function cleanRuns(v: unknown): DocRun[] {
 }
 
 const hex = (v: unknown) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : undefined);
+/** A bookmark's name, as Word allows one. */
+const bmName = (v: unknown) => (typeof v === 'string' && /^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(v) ? v : undefined);
+/** A caption's label and number, and a bookmark. */
+const numbered = (b: Record<string, unknown>) => ({
+  ...(typeof b.label === 'string' && /^[\p{L}][\p{L}\p{M} .'-]{0,39}$/u.test(b.label) && typeof b.num === 'number' && Number.isInteger(b.num) && b.num > 0 ? { label: b.label, num: b.num } : {}),
+  ...(bmName(b.bm) ? { bm: bmName(b.bm) } : {}),
+});
 
 /** A tracked change, checked: its kind, a name of one line, a time. */
 function cleanRev(v: unknown): DocRev | undefined {
@@ -1343,6 +1372,7 @@ function cleanDoc(v: unknown): Extracted {
         if (space) h.space = space;
         if (typeof b.anchor === 'string' && /^_Toc\d{1,9}$/.test(b.anchor)) h.anchor = b.anchor;
         if (cleanRev(b.mark)) h.mark = cleanRev(b.mark);
+        if (bmName(b.bm)) h.bm = bmName(b.bm);
         blocks.push(h);
       } else if (b.k === 'li') {
         const li: Extract<DocBlock, { k: 'li' }> = { k: 'li', ordered: b.ordered === true, lvl: int(b.lvl, 0, 8, 0), list: int(b.list, 0, 1e9, 0), runs };
@@ -1353,6 +1383,7 @@ function cleanDoc(v: unknown): Extracted {
         if (align) li.align = align;
         if (space) li.space = space;
         if (cleanRev(b.mark)) li.mark = cleanRev(b.mark);
+        if (bmName(b.bm)) li.bm = bmName(b.bm);
         blocks.push(li);
       } else {
         const p: Extract<DocBlock, { k: 'p' }> = { k: 'p', runs };
@@ -1368,6 +1399,7 @@ function cleanDoc(v: unknown): Extracted {
           if (typeof b.icon === 'string' && b.icon.length <= 16) p.icon = b.icon;
         }
         if (cleanRev(b.mark)) p.mark = cleanRev(b.mark);
+        if (bmName(b.bm)) p.bm = bmName(b.bm);
         blocks.push(p);
       }
     } else if (b.k === 'pb') blocks.push({ k: 'pb' });
@@ -1391,7 +1423,7 @@ function cleanDoc(v: unknown): Extracted {
       const caption = str(b.caption, 1000).replace(/\s+/g, ' ').trim();
       if (caption) img.caption = caption;
       if (cleanRev(b.rev)) img.rev = cleanRev(b.rev);
-      blocks.push(img);
+      blocks.push({ ...img, ...numbered(b) });
     } else if (b.k === 'table') {
       const rows: Extract<DocBlock, { k: 'table' }>['rows'] = [];
       for (const r of (Array.isArray(b.rows) ? b.rows : []).slice(0, 2000)) {
@@ -1412,7 +1444,8 @@ function cleanDoc(v: unknown): Extracted {
       }
       const cols = Array.isArray(b.cols) && b.cols.every((w) => typeof w === 'number' && Number.isFinite(w) && w > 0) ? (b.cols as number[]).slice(0, 63) : undefined;
       const sep = typeof b.sep === 'number' && Number.isFinite(b.sep) ? Math.min(400, Math.max(0, b.sep)) : undefined;
-      if (rows.length) blocks.push({ k: 'table', rows, ...(cols ? { cols } : {}), ...(cleanRev(b.rev) ? { rev: cleanRev(b.rev) } : {}), ...(sep !== undefined ? { sep } : {}) });
+      const caption = str(b.caption, 1000).replace(/\s+/g, ' ').trim();
+      if (rows.length) blocks.push({ k: 'table', rows, ...(cols ? { cols } : {}), ...(cleanRev(b.rev) ? { rev: cleanRev(b.rev) } : {}), ...(sep !== undefined ? { sep } : {}), ...(caption ? { caption } : {}), ...numbered(b) });
     } else if (b.k === 'toc') {
       const entries = (Array.isArray(b.entries) ? b.entries : []).slice(0, 2000).flatMap((x) => {
         const e = obj(x);
@@ -1424,7 +1457,11 @@ function cleanDoc(v: unknown): Extracted {
     } else if (b.k === 'math') {
       const tex = str(b.tex, 20_000).trim();
       const space = cleanSpace(b.space);
-      if (tex) blocks.push({ k: 'math', tex, ...(space ? { space } : {}) });
+      if (tex) blocks.push({ k: 'math', tex, ...(space ? { space } : {}), ...numbered(b) });
+    } else if (b.k === 'bib') {
+      const entries = (Array.isArray(b.entries) ? b.entries : []).slice(0, 2000).map(cleanRuns).filter((e) => e.length);
+      const space = cleanSpace(b.space);
+      blocks.push({ k: 'bib', entries, ...(space ? { space } : {}) });
     }
   }
   return { title: str(d.title, 300), lang: str(d.lang, 35), blocks, shots };
@@ -1610,7 +1647,7 @@ function editorStyleSpace(look: DocLook): Record<string, Space> {
   // A style's lines: the editor's height, at least or exactly as Word's own line for the font compares.
   const lines = (h: number, size: number, font = F) => wordLineOf(h, wordLine(font) * size, false);
   const st = (k: ParaStyle): Space => {
-    const v = STYLES[k];
+    const v = styleOf({ size: S, styles: look.styles }, k);
     const sz = S * v.k;
     return { before: v.before * sz, after: v.after * sz, line: lines(v.lh * sz, sz, k === 'code' ? MONO_DOC : F) };
   };
@@ -1653,17 +1690,33 @@ function spacingVs(sp: DocSpace | undefined, style: Space | undefined): string {
 }
 
 /** A document's styles as the editor draws them: its font, sizes, colours, each style's spacing and lines in points, and the boxes of quotes and code. */
-function editorStylesXml(look: DocLook, cjk: boolean): string {
+export function editorStylesXml(look: DocLook, cjk: boolean): string {
   const S = look.size ?? 11;
   const F = look.font ?? 'Arial';
   const half = (pt: number) => Math.max(2, Math.round(pt * 2));
   const box = editorBoxes(S);
   const space = editorStyleSpace(look);
   const spOf = (id: string) => spacingOf(space[id].before, space[id].after, space[id].line);
-  const st = (k: Exclude<ParaStyle, 'normal' | 'callout'>) => ({ sz: S * STYLES[k].k, spacing: spOf(k === 'title' ? 'Title' : k === 'subtitle' ? 'Subtitle' : k === 'quote' ? 'Quote' : k === 'code' ? 'Code' : `Heading${k.slice(1)}`) });
+  const st = (k: Exclude<ParaStyle, 'normal' | 'callout'>) => ({ sz: S * styleOf({ size: S, styles: look.styles }, k).k, spacing: spOf(k === 'title' ? 'Title' : k === 'subtitle' ? 'Subtitle' : k === 'quote' ? 'Quote' : k === 'code' ? 'Code' : `Heading${k.slice(1)}`) });
+  // A style's own font, colour, weight, slant and alignment, where the document changed them.
+  const own = (k: ParaStyle, base: { color?: string; b?: boolean; i?: boolean }) => {
+    const o = look.styles?.[k];
+    if (!o) return '';
+    const f = o.font && /^[A-Za-z0-9][A-Za-z0-9 -]{0,39}$/.test(o.font) ? o.font : '';
+    if (f) namedFonts.add(f);
+    return [
+      f ? fonts(esc(f)) : '',
+      o.b !== undefined && o.b !== base.b ? (o.b ? '<w:b/><w:bCs/>' : '<w:b w:val="0"/><w:bCs w:val="0"/>') : '',
+      o.i !== undefined && o.i !== base.i ? (o.i ? '<w:i/><w:iCs/>' : '<w:i w:val="0"/><w:iCs w:val="0"/>') : '',
+      o.color ? `<w:color w:val="${o.color.slice(1).toUpperCase()}"/>` : '',
+    ].join('');
+  };
+  const jcOwn = (k: ParaStyle) => (look.styles?.[k]?.align ? `<w:jc w:val="${look.styles[k]!.align === 'justify' ? 'both' : look.styles[k]!.align}"/>` : '');
   const heading = (n: number, k: 'h1' | 'h2' | 'h3' | 'h4') => {
     const { sz, spacing } = st(k);
-    return paraStyle(`Heading${n}`, `heading ${n}`, pPrXml({ keepNext: true, keepLines: true, spacing }) + `<w:outlineLvl w:val="${n - 1}"/>`, `<w:b/><w:bCs/><w:color w:val="${k === 'h4' ? ED.h4 : ED.ink}"/>${size(half(sz))}`, 9);
+    const o = look.styles?.[k];
+    const rPr = o ? `${own(k, { b: true })}${o.b === false ? '' : '<w:b/><w:bCs/>'}${o.color ? '' : `<w:color w:val="${k === 'h4' ? ED.h4 : ED.ink}"/>`}${size(half(sz))}` : `<w:b/><w:bCs/><w:color w:val="${k === 'h4' ? ED.h4 : ED.ink}"/>${size(half(sz))}`;
+    return paraStyle(`Heading${n}`, `heading ${n}`, pPrXml({ keepNext: true, keepLines: true, spacing, jc: jcOwn(k) }) + `<w:outlineLvl w:val="${n - 1}"/>`, rPr.replace('<w:b w:val="0"/><w:bCs w:val="0"/><w:b/><w:bCs/>', '<w:b w:val="0"/><w:bCs w:val="0"/>'), 9);
   };
   const title = st('title');
   const subtitle = st('subtitle');
@@ -1673,17 +1726,17 @@ function editorStylesXml(look: DocLook, cjk: boolean): string {
   const wide = Math.round(-0.01 * title.sz * 20);
   return (
     `${XML_HEAD}<w:styles xmlns:w="${W_NS}" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14">` +
-    `<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${esc(F)}" w:hAnsi="${esc(F)}" w:cs="${esc(F)}"${cjk ? ` w:eastAsia="${EAST_ASIAN}"` : ''}/><w:color w:val="${ED.ink}"/><w:kern w:val="2"/>${size(half(S))}` +
+    `<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${esc(F)}" w:hAnsi="${esc(F)}" w:cs="${esc(F)}"${cjk ? ` w:eastAsia="${EAST_ASIAN}"` : ''}/><w:color w:val="${(look.styles?.normal?.color ?? `#${ED.ink}`).slice(1).toUpperCase()}"/><w:kern w:val="2"/>${size(half(S))}` +
     '<w14:ligatures w14:val="standardContextual"/></w:rPr></w:rPrDefault>' +
     `<w:pPrDefault><w:pPr><w:widowControl/>${spOf('Normal')}</w:pPr></w:pPrDefault></w:docDefaults>` +
-    `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>` +
+    `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/>${jcOwn('normal') ? `<w:pPr>${jcOwn('normal')}</w:pPr>` : ''}${look.styles?.normal?.b || look.styles?.normal?.i ? `<w:rPr>${look.styles.normal.b ? '<w:b/><w:bCs/>' : ''}${look.styles.normal.i ? '<w:i/><w:iCs/>' : ''}</w:rPr>` : ''}</w:style>` +
     `<w:style w:type="character" w:default="1" w:styleId="DefaultParagraphFont"><w:name w:val="Default Paragraph Font"/><w:uiPriority w:val="1"/><w:semiHidden/><w:unhideWhenUsed/></w:style>` +
     `<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:uiPriority w:val="99"/><w:semiHidden/><w:unhideWhenUsed/>` +
     `<w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/>` +
     `<w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style>` +
     `<w:style w:type="numbering" w:default="1" w:styleId="NoList"><w:name w:val="No List"/><w:uiPriority w:val="99"/><w:semiHidden/><w:unhideWhenUsed/></w:style>` +
-    paraStyle('Title', 'Title', pPrXml({ keepNext: true, keepLines: true, spacing: title.spacing }), `<w:spacing w:val="${wide}"/>${size(half(title.sz))}`) +
-    paraStyle('Subtitle', 'Subtitle', pPrXml({ keepNext: true, keepLines: true, spacing: subtitle.spacing }), `<w:color w:val="${ED.muted}"/>${size(half(subtitle.sz))}`, 11) +
+    paraStyle('Title', 'Title', pPrXml({ keepNext: true, keepLines: true, spacing: title.spacing, jc: jcOwn('title') }), `${own('title', {})}<w:spacing w:val="${wide}"/>${size(half(title.sz))}`) +
+    paraStyle('Subtitle', 'Subtitle', pPrXml({ keepNext: true, keepLines: true, spacing: subtitle.spacing, jc: jcOwn('subtitle') }), `${own('subtitle', {})}${look.styles?.subtitle?.color ? '' : `<w:color w:val="${ED.muted}"/>`}${size(half(subtitle.sz))}`, 11) +
     heading(1, 'h1') +
     heading(2, 'h2') +
     heading(3, 'h3') +
@@ -1693,8 +1746,8 @@ function editorStylesXml(look: DocLook, cjk: boolean): string {
     paraStyle(
       'Quote',
       'Quote',
-      pPrXml({ pBdr: border('left', 18, ED.cell, box.quote.space), spacing: quote.spacing, ind: `<w:ind w:left="${tw(box.quote.indent)}" w:right="0"/>` }),
-      `<w:i/><w:iCs/><w:color w:val="${ED.h4}"/>`,
+      pPrXml({ pBdr: border('left', 18, ED.cell, box.quote.space), spacing: quote.spacing, ind: `<w:ind w:left="${tw(box.quote.indent)}" w:right="0"/>`, jc: jcOwn('quote') }),
+      look.styles?.quote ? `${own('quote', { i: true })}${look.styles.quote.i === false ? '' : '<w:i/><w:iCs/>'}${look.styles.quote.color ? '' : `<w:color w:val="${ED.h4}"/>`}${look.styles.quote.size ? size(half(quote.sz)) : ''}` : `<w:i/><w:iCs/><w:color w:val="${ED.h4}"/>`,
       29,
     ) +
     paraStyle(
@@ -1734,6 +1787,7 @@ function editorStylesXml(look: DocLook, cjk: boolean): string {
     `<w:rPr><w:color w:val="${ED.link}"/><w:u w:val="single"/></w:rPr></w:style>` +
     `<w:style w:type="character" w:styleId="${DONE_STYLE}"><w:name w:val="Done item"/><w:basedOn w:val="DefaultParagraphFont"/><w:uiPriority w:val="1"/>` +
     `<w:rPr><w:strike/><w:color w:val="${ED.done}"/></w:rPr></w:style>` +
+    notesStylesXml(half, S, ED.h4) +
     `<w:style w:type="table" w:styleId="PageTable"><w:name w:val="Page Table"/><w:basedOn w:val="TableNormal"/><w:uiPriority w:val="59"/>` +
     `<w:tblPr><w:tblBorders>${editorTableBorders}</w:tblBorders><w:tblCellMar>${editorCellMargins(S)}</w:tblCellMar></w:tblPr>` +
     `<w:tblStylePr w:type="firstRow"><w:rPr><w:b/><w:bCs/></w:rPr><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="${ED.head}"/></w:tcPr></w:tblStylePr></w:style>` +
@@ -1778,8 +1832,9 @@ function numberingXml(numbered: number, S?: number): string {
 }
 
 /** settings.xml: Word 2013's layout; `embedded`, the file carries fonts Word is to use. */
-const settingsXml = (embedded = false) =>
-  `${XML_HEAD}<w:settings xmlns:w="${W_NS}"><w:zoom w:percent="100"/>${embedded ? '<w:embedTrueTypeFonts/>' : ''}<w:defaultTabStop w:val="720"/><w:characterSpacingControl w:val="doNotCompress"/>` +
+const settingsXml = (embedded = false, o: { background?: boolean; notes?: boolean } = {}) =>
+  `${XML_HEAD}<w:settings xmlns:w="${W_NS}"><w:zoom w:percent="100"/>${o.background ? '<w:displayBackgroundShape/>' : ''}${embedded ? '<w:embedTrueTypeFonts/>' : ''}<w:defaultTabStop w:val="720"/><w:characterSpacingControl w:val="doNotCompress"/>` +
+  (o.notes ? '<w:footnotePr><w:footnote w:id="-1"/><w:footnote w:id="0"/></w:footnotePr>' : '') +
   '<w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>';
 
 /**
@@ -1836,7 +1891,7 @@ function contentTypes(pictures: Set<string>, parts: [string, string][] = [], fon
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
     [...pictures].map((e) => `<Default Extension="${e}" ContentType="image/${e}"/>`).join('') +
     (fonts ? '<Default Extension="odttf" ContentType="application/vnd.openxmlformats-officedocument.obfuscatedFont"/>' : '') +
-    parts.map(([part, kind]) => ov(part, `${ml}.${kind}+xml`)).join('') +
+    parts.map(([part, kind]) => ov(part, kind.includes('/') ? kind : `${ml}.${kind}+xml`)).join('') +
     ov('/word/document.xml', `${ml}.document.main+xml`) +
     ov('/word/styles.xml', `${ml}.styles+xml`) +
     ov('/word/numbering.xml', `${ml}.numbering+xml`) +
@@ -1916,7 +1971,28 @@ const JC = { center: 'center', right: 'right', justify: 'both' } as const;
 export function docxFile(
   doc: Extracted,
   pictures: (Buffer | null)[],
-  o: { title: string; paper: 'a4' | 'letter'; margin?: number; look?: DocLook; titled?: boolean; header?: DocBand; footer?: DocBand; titlePage?: boolean; comments?: DocComment[]; fonts?: Map<string, EmbeddedFont> },
+  o: {
+    title: string;
+    paper: 'a4' | 'letter';
+    margin?: number;
+    look?: DocLook;
+    titled?: boolean;
+    header?: DocBand;
+    footer?: DocBand;
+    titlePage?: boolean;
+    comments?: DocComment[];
+    fonts?: Map<string, EmbeddedFont>;
+    /** Footnotes, by their numbers (the runs' `fn`). */
+    notes?: { n: number; runs: DocRun[] }[];
+    /** The sources citations cite (the file's bibliography part), and the style Word shows them in. */
+    sources?: Source[];
+    cite?: CiteStyle;
+    /** The paper on its side, the words in columns, the paper's colour (#rrggbb), and a watermark (words, or a picture: PNG or JPEG). */
+    landscape?: boolean;
+    cols?: number;
+    color?: string;
+    watermark?: { text?: string; picture?: { data: Buffer; ext: string; w: number; h: number } };
+  },
 ): Buffer {
   const d = cleanDoc(doc);
   revs = 0;
@@ -1929,9 +2005,13 @@ export function docxFile(
   const ed = editor ? editorBoxes(S) : null;
   const cjk = !!look.editor?.cjk;
   if (editor) namedFonts.add(look.font ?? 'Arial');
-  const page = o.paper === 'letter' ? { w: 12240, h: 15840 } : { w: 11906, h: 16838 };
+  const paper = o.paper === 'letter' ? { w: 12240, h: 15840 } : { w: 11906, h: 16838 };
+  const page = o.landscape ? { w: paper.h, h: paper.w } : paper;
+  // In columns, pictures and tables are a column wide at most.
+  const ncols = o.cols && o.cols > 1 ? Math.min(3, o.cols) : 1;
   const margin = o.margin !== undefined && Number.isFinite(o.margin) ? Math.round(Math.min(60, Math.max(5, o.margin)) * 56.6929) : MARGIN;
-  const textW = page.w - 2 * margin;
+  const fullW = page.w - 2 * margin;
+  const textW = ncols > 1 ? Math.round((fullW - (ncols - 1) * 720) / ncols) : fullW;
   const maxW = textW * EMU_TWIP;
   // A picture and the line it sits on fit on one page.
   const maxH = Math.round((page.h - 2 * margin) * EMU_TWIP * 0.9);
@@ -1982,8 +2062,13 @@ export function docxFile(
   /** An equation's runs at a size (a document's maths is drawn larger than its words, as the editor's is). */
   const mathSized = (omml: string, pt: number) => (editor ? omml.replace(/<m:r>(<m:rPr>[\s\S]*?<\/m:rPr>)?/g, (m) => `${m}<w:rPr>${size(half(pt))}</w:rPr>`) : omml);
   /** A run as Word's: maths as an equation (or, where it does not convert, its LaTeX in a maths font), the comments on it marked around it. */
+  let cites = 0;
   const oneRun = (r: DocRun, base: number, done?: boolean) => {
     const at = written++;
+    // A footnote's mark; a cross-reference or a citation, a field Word works out, showing what the editor shows.
+    if (r.fn) return cmMarks(r, at, 'first') + revWrap(r.rev, footnoteRefXml(r.fn)) + cmMarks(r, at, 'last');
+    if (r.cite?.length) return cmMarks(r, at, 'first') + citationXml(r.cite, runXml({ t: r.t }), ++cites) + cmMarks(r, at, 'last');
+    if (r.fld) return cmMarks(r, at, 'first') + fieldXml(r.fld, runXml({ ...r, fld: undefined })) + cmMarks(r, at, 'last');
     if (r.math) namedFonts.add('Cambria Math');
     const omml = r.math ? ommlOf(r.t) : null;
     const body = r.math ? (omml ? mathSized(omml, (r.size ?? base) * 1.1) : runXml({ t: r.t, i: true, font: 'Cambria Math', rev: r.rev })) : runXml(r, done ? DONE_STYLE : undefined);
@@ -2000,6 +2085,11 @@ export function docxFile(
       }
       let inner = '';
       for (; i < list.length && list[i].link === link; i++) inner += oneRun(bold ? { ...list[i], b: true } : list[i], base, done);
+      // A place in the file: its bookmark.
+      if (link.startsWith('#')) {
+        out += `<w:hyperlink w:anchor="${link.slice(1)}" w:history="1">${inner}</w:hyperlink>`;
+        continue;
+      }
       let id = linkIds.get(link);
       if (!id) linkIds.set(link, (id = rel('hyperlink', link, true)));
       out += `<w:hyperlink r:id="${id}" w:history="1">${inner}</w:hyperlink>`;
@@ -2046,7 +2136,7 @@ export function docxFile(
     // A document's picture says left too (its file read back knows it from one that says nothing, which is centred).
     const jc = b.align === 'center' || b.align === 'right' || (editor && b.align === 'left') ? `<w:jc w:val="${b.align}"/>` : '';
     const sp = b.space;
-    const caption = b.caption ? para(pPrXml({ style: 'Caption', spacing: editor ? spaceXml({ after: sp?.after }, 'Caption') : '', jc }), runXml({ t: b.caption })) : '';
+    const caption = b.caption || b.label ? para(pPrXml({ style: 'Caption', spacing: editor ? spaceXml({ after: sp?.after }, 'Caption') : '', jc }), captionRuns(b)) : '';
     return (
       para(
         pPrXml({ style: 'Picture', keepNext: !!caption, pageBreak, spacing: editor ? spaceXml({ before: sp?.before, after: caption ? 0 : sp?.after }, 'Picture') : '', jc }),
@@ -2062,6 +2152,13 @@ export function docxFile(
       ) + caption
     );
   };
+
+  /** A caption's words: numbered ("Figure " and its number, a SEQ field Word counts, then ": " and the words), its label and number in a bookmark (what cross-references show). */
+  function captionRuns(b: { caption?: string; label?: string; num?: number; bm?: string }): string {
+    if (!b.label || !b.num) return runXml({ t: b.caption ?? '' });
+    const lab = runXml({ t: `${b.label} ` }) + `<w:fldSimple w:instr=" SEQ ${seqName(b.label)} \\* ARABIC "><w:r><w:t>${b.num}</w:t></w:r></w:fldSimple>`;
+    return (b.bm ? bookmarked(++bookmarks, b.bm, lab) : lab) + (b.caption ? runXml({ t: `: ${b.caption}` }) : '');
+  }
 
   const table = (b: Extract<DocBlock, { k: 'table' }>): string => {
     const span = (c: { span?: number }) => c.span ?? 1;
@@ -2121,7 +2218,10 @@ export function docxFile(
       const rowRev = b.rev ? `<w:${b.rev.kind} ${revAttrs(b.rev.author, b.rev.at)}/>` : '';
       return `<w:tr><w:trPr><w:cantSplit/>${head ? '<w:tblHeader/>' : ''}${rowRev}</w:trPr>${out}</w:tr>`;
     });
+    // Its caption over it, kept with it.
+    const cap = b.caption || b.label ? para(pPrXml({ style: 'Caption', keepNext: true, spacing: editor ? spacingOf(0, 4) : '' }), captionRuns(b)) : '';
     return (
+      cap +
       `<w:tbl><w:tblPr><w:tblStyle w:val="PageTable"/><w:tblW w:w="${textW}" w:type="dxa"/><w:tblBorders>${editor ? editorTableBorders : TABLE_BORDERS}</w:tblBorders><w:tblLayout w:type="fixed"/>` +
       `<w:tblCellMar>${editor ? editorCellMargins(S) : CELL_MARGINS}</w:tblCellMar>` +
       `<w:tblLook w:val="04A0" w:firstRow="${heads ? 1 : 0}" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="1" w:noVBand="1"/></w:tblPr>` +
@@ -2171,7 +2271,8 @@ export function docxFile(
     if (b.k === 'h') {
       // A table of contents' line leads to its heading's bookmark.
       const mark = b.anchor ? ++bookmarks : 0;
-      const words = runs(b.runs, false, look.heads?.[b.lvl - 1] ?? S);
+      const words0 = runs(b.runs, false, look.heads?.[b.lvl - 1] ?? S);
+      const words = b.bm ? bookmarked(++bookmarks, b.bm, words0) : words0;
       const inner = mark ? `<w:bookmarkStart w:id="${mark}" w:name="${b.anchor}"/>${words}<w:bookmarkEnd w:id="${mark}"/>` : words;
       body.push(para(pPrXml({ style: `Heading${b.lvl}`, pageBreak, spacing: spaceXml(b.space, `Heading${b.lvl}`), jc: jcOf(b.align), rPr: markXml(b.mark) }), inner));
     } else if (b.k === 'p' && b.shade && ed) {
@@ -2208,15 +2309,15 @@ export function docxFile(
       const style = b.style === 'title' ? 'Title' : b.style === 'subtitle' ? 'Subtitle' : b.quote ? 'Quote' : '';
       // Indented a step (36pt) a level; a quote's own room for its line on the left kept.
       const left = b.indent ? b.indent * STEP + (b.quote && ed ? ed.quote.indent : 0) : 0;
-      body.push(para(pPrXml({ style, pageBreak, spacing: spaceXml(b.space, style || 'Normal'), ind: left ? `<w:ind w:left="${tw(left)}"/>` : '', jc: jcOf(b.align), rPr: markXml(b.mark) }), runs(b.runs)));
+      body.push(para(pPrXml({ style, pageBreak, keepLines: ncols > 1, spacing: spaceXml(b.space, style || 'Normal'), ind: left ? `<w:ind w:left="${tw(left)}"/>` : '', jc: jcOf(b.align), rPr: markXml(b.mark) }), b.bm ? bookmarked(++bookmarks, b.bm, runs(b.runs)) : runs(b.runs)));
     } else if (b.k === 'li' && b.check) {
       const ind = ed ? `<w:ind w:left="${tw(STEP * b.lvl + ed.list.text)}" w:hanging="${tw(ed.list.text)}"/>` : `<w:ind w:left="${720 + 360 * b.lvl}" w:hanging="360"/>`;
       body.push(para(pPrXml({ style: 'ListParagraph', pageBreak, spacing: spaceXml(b.space, 'ListParagraph'), ind, jc: jcOf(b.align), rPr: markXml(b.mark) }), box(!!b.checked) + runs(b.runs, false, S, editor && !!b.checked)));
     } else if (b.k === 'li')
       body.push(
         para(
-          pPrXml({ style: 'ListParagraph', pageBreak, numPr: `<w:numPr><w:ilvl w:val="${b.lvl}"/><w:numId w:val="${b.ordered ? numOf(b.list) : 1}"/></w:numPr>`, spacing: spaceXml(b.space, 'ListParagraph'), jc: jcOf(b.align), rPr: markXml(b.mark) }),
-          runs(b.runs),
+          pPrXml({ style: 'ListParagraph', pageBreak, keepLines: ncols > 1, numPr: `<w:numPr><w:ilvl w:val="${b.lvl}"/><w:numId w:val="${b.ordered ? numOf(b.list) : 1}"/></w:numPr>`, spacing: spaceXml(b.space, 'ListParagraph'), jc: jcOf(b.align), rPr: markXml(b.mark) }),
+          b.bm ? bookmarked(++bookmarks, b.bm, runs(b.runs)) : runs(b.runs),
         ),
       );
     else if (b.k === 'toc') {
@@ -2235,11 +2336,28 @@ export function docxFile(
         const link = `<w:hyperlink w:anchor="${e.anchor}" w:history="1">${runXml({ t: e.text })}</w:hyperlink>`;
         body.push(para(pPrXml({ style: `TOC${Math.min(3, e.lvl)}`, pageBreak: pageBreak && k === 0, tabs, spacing: sp(k) }), (k === 0 ? begin : '') + link + (k === b.entries.length - 1 ? end : '')));
       });
+    } else if (b.k === 'math' && b.label && b.num) {
+      // A numbered equation: in the middle of its line, its number at the line's end ("(3)", a SEQ field), on tab stops.
+      const omml = ommlOf(b.tex);
+      namedFonts.add('Cambria Math');
+      const tabs = `<w:tabs><w:tab w:val="center" w:pos="${Math.round(textW / 2)}"/><w:tab w:val="right" w:pos="${textW}"/></w:tabs>`;
+      const num = `<w:r><w:tab/><w:t>(</w:t></w:r><w:fldSimple w:instr=" SEQ ${seqName(b.label)} \\* ARABIC "><w:r><w:t>${b.num}</w:t></w:r></w:fldSimple><w:r><w:t>)</w:t></w:r>`;
+      const eq = omml ? mathSized(omml, S * 1.21) : runXml({ t: b.tex, i: true, font: 'Cambria Math' });
+      body.push(para(pPrXml({ keepLines: true, pageBreak, tabs, spacing: editor ? spaceXml(b.space) : '' }), `<w:r><w:tab/></w:r>${eq}${b.bm ? bookmarked(++bookmarks, b.bm, num) : num}`));
     } else if (b.k === 'math') {
       const omml = ommlOf(b.tex);
       namedFonts.add('Cambria Math');
       const pPr = pPrXml({ keepLines: true, pageBreak, spacing: editor ? spaceXml(b.space) : '', jc: '<w:jc w:val="center"/>' });
       body.push(omml ? para(pPr, `<m:oMathPara>${mathSized(omml, S * 1.21)}</m:oMathPara>`) : para(pPr, runXml({ t: b.tex, i: true, font: 'Cambria Math' })));
+    } else if (b.k === 'bib') {
+      // Word's own bibliography: a BIBLIOGRAPHY field over the file's sources, its entries shown until Word works them out.
+      const list = b.entries.length ? b.entries : [[{ t: ' ' }]];
+      list.forEach((e, k) => {
+        const words = runs(e);
+        const begin = k === 0 ? '<w:r><w:fldChar w:fldCharType="begin" w:dirty="false"/></w:r><w:r><w:instrText xml:space="preserve"> BIBLIOGRAPHY </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>' : '';
+        const end = k === list.length - 1 ? '<w:r><w:fldChar w:fldCharType="end"/></w:r>' : '';
+        body.push(para(pPrXml({ style: 'Bibliography', pageBreak: pageBreak && k === 0 }), begin + words + end));
+      });
     } else if (b.k === 'pb') {
       // A page break after another: the empty page between them holds a paragraph a point high.
       if (editor && breakNext) body.push(tiny({ pageBreak: true }));
@@ -2287,21 +2405,52 @@ export function docxFile(
     const n = extra.filter((x) => x.name.startsWith(`word/${kind}`)).length + 1;
     const name = `${kind}${n}.xml`;
     const tag = kind === 'header' ? 'hdr' : 'ftr';
-    const words = b ? bandXml(b) : '';
+    const words = (b ? bandXml(b) : '') + (kind === 'header' && mark ? mark : '');
     const style = kind === 'header' ? 'Header' : 'Footer';
-    extra.push({ name: `word/${name}`, data: `${XML_HEAD}<w:${tag} xmlns:w="${W_NS}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${para(`<w:pStyle w:val="${style}"/>${b?.align ? `<w:jc w:val="${b.align}"/>` : ''}`, words)}</w:${tag}>` });
+    extra.push({
+      name: `word/${name}`,
+      data: `${XML_HEAD}<w:${tag} xmlns:w="${W_NS}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">${para(`<w:pStyle w:val="${style}"/>${b?.align ? `<w:jc w:val="${b.align}"/>` : ''}`, words)}</w:${tag}>`,
+    });
+    if (kind === 'header' && mark && markRels) extra.push({ name: `word/_rels/${name}.rels`, data: markRels });
     types.push([`/word/${name}`, kind]);
     refs += `<w:${kind}Reference w:type="${which}" r:id="${rel(kind, name)}"/>`;
   };
-  if (o.header) band('header', o.header, 'default');
-  if (o.titlePage && o.header) band('header', undefined, 'first');
+  // A watermark sits in the header, behind the words (a header with only it, where the document has none).
+  let mark = '';
+  if (o.watermark?.picture) {
+    const pic = o.watermark.picture;
+    const name = `watermark.${pic.ext === 'jpeg' ? 'jpeg' : 'png'}`;
+    media.push({ name: `word/media/${name}`, data: pic.data });
+    kinds.add(pic.ext === 'jpeg' ? 'jpeg' : 'png');
+    const ratio = pic.h / Math.max(1, pic.w);
+    mark = watermarkRun({ pic: { rid: 'rIdWm1', w: textW / 20, h: (textW / 20) * ratio } }, textW / 20);
+  } else if (o.watermark?.text) mark = watermarkRun({ text: o.watermark.text }, textW / 20);
+  const markRels = o.watermark?.picture ? relsXml([['rIdWm1', 'image', `media/watermark.${o.watermark.picture.ext === 'jpeg' ? 'jpeg' : 'png'}`]]) : '';
+  if (o.header || mark) band('header', o.header ?? { text: '' }, 'default');
+  if (o.titlePage && (o.header || mark)) band('header', undefined, 'first');
   if (o.footer) band('footer', o.footer, 'default');
   if (o.titlePage && o.footer) band('footer', undefined, 'first');
   const titlePg = o.titlePage && (o.header || o.footer) ? '<w:titlePg/>' : '';
   const bandAt = ed ? Math.max(0, Math.round((margin - tw(ed.band.line)) / 2)) : 567;
   const sect =
-    `<w:sectPr>${refs}<w:pgSz w:w="${page.w}" w:h="${page.h}"/><w:pgMar w:top="${margin}" w:right="${margin}" w:bottom="${margin}" w:left="${margin}" w:header="${bandAt}" w:footer="${bandAt}" w:gutter="0"/>` +
-    `<w:cols w:space="708"/>${titlePg}<w:docGrid w:linePitch="360"/></w:sectPr>`;
+    `<w:sectPr>${refs}<w:pgSz w:w="${page.w}" w:h="${page.h}"${o.landscape ? ' w:orient="landscape"' : ''}/><w:pgMar w:top="${margin}" w:right="${margin}" w:bottom="${margin}" w:left="${margin}" w:header="${bandAt}" w:footer="${bandAt}" w:gutter="0"/>` +
+    `${ncols > 1 ? `<w:cols w:num="${ncols}" w:space="720"/>` : '<w:cols w:space="708"/>'}${titlePg}<w:docGrid w:linePitch="360"/></w:sectPr>`;
+  // Footnotes, a part of their own (their words' runs as the document's).
+  if (o.notes?.length) {
+    extra.push({ name: 'word/footnotes.xml', data: footnotesXml(o.notes.map((x) => ({ n: x.n, runs: runs(x.runs) }))) });
+    types.push(['/word/footnotes.xml', 'footnotes']);
+    rel('footnotes', 'footnotes.xml');
+  }
+  // The sources citations cite: Word's bibliography part.
+  if (o.sources?.length) {
+    extra.push(
+      { name: 'customXml/item1.xml', data: sourcesXml(o.sources, o.cite ?? 'apa') },
+      { name: 'customXml/itemProps1.xml', data: sourcesPropsXml() },
+      { name: 'customXml/_rels/item1.xml.rels', data: relsXml([['rId1', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps', 'itemProps1.xml']]) },
+    );
+    types.push(['/customXml/itemProps1.xml', 'application/vnd.openxmlformats-officedocument.customXmlProperties+xml']);
+    rel('customXml', '../customXml/item1.xml');
+  }
   // Comments, Word's way: each a comment of its own, its replies after it (commentsExtended says whose reply each
   // is, and which threads were resolved).
   if (comments.length) {
@@ -2352,7 +2501,7 @@ export function docxFile(
     'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
     'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" ' +
     'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" ' +
-    `xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14"><w:body>${body.join('')}${sect}</w:body></w:document>`;
+    `xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14">${o.color ? `<w:background w:color="${o.color.slice(1).toUpperCase()}"/>` : ''}<w:body>${body.join('')}${sect}</w:body></w:document>`;
 
   return zipParts([
     { name: '[Content_Types].xml', data: contentTypes(kinds, types, fontsUsed) },
@@ -2370,7 +2519,7 @@ export function docxFile(
     { name: 'word/_rels/document.xml.rels', data: relsXml(rels) },
     { name: 'word/styles.xml', data: editor ? editorStylesXml(look, cjk) : stylesXml(d.lang, look) },
     { name: 'word/numbering.xml', data: numberingXml(Math.min(numIds.size, 1000), editor ? S : undefined) },
-    { name: 'word/settings.xml', data: settingsXml(fontsUsed) },
+    { name: 'word/settings.xml', data: settingsXml(fontsUsed, { background: !!o.color, notes: !!o.notes?.length }) },
     ...extra,
     ...media,
   ]);

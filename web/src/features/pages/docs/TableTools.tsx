@@ -4,6 +4,7 @@
 import { useLayoutEffect, useState, type RefObject } from 'react';
 import type { Doc, TableBlock } from '@shared/docs';
 import { post } from '../../../lib/api';
+import { paginateDoc } from '@shared/doc-paginate';
 import type { DocEngine } from './engine';
 
 /** The handles on a table's column borders, for the table `id` (the caret's, or the one under the pointer). */
@@ -70,7 +71,7 @@ export function ColumnHandles({ engine, table, host, tick }: { engine: DocEngine
 
 /** The document printed as it prints from its PDF: its pages in a frame of their own, the browser's print asked for. */
 export async function printDoc(doc: Doc, title: string): Promise<void> {
-  const { html } = await post<{ html: string }>('/api/pages/docs/print', { model: doc, title });
+  const { html, paginate } = await post<{ html: string; paginate?: Parameters<typeof paginateDoc>[0] }>('/api/pages/docs/print', { model: doc, title });
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
   frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
@@ -83,6 +84,11 @@ export async function printDoc(doc: Doc, title: string): Promise<void> {
   if (!w) return frame.remove();
   // Its fonts first (Google's, KaTeX's), so the pages print as they look.
   await Promise.race([w.document.fonts?.ready, new Promise((ok) => setTimeout(ok, 2500))]);
+  // Footnotes at their pages' foot, columns page by page: laid out here (the frame runs no script of the page's own).
+  if (paginate) {
+    await Promise.race([Promise.all(Array.from(w.document.images).map((i) => (i.complete ? 0 : new Promise((ok) => (i.onload = i.onerror = ok))))), new Promise((ok) => setTimeout(ok, 4000))]);
+    paginateDoc(paginate, w.document);
+  }
   const done = () => setTimeout(() => frame.remove(), 500);
   w.addEventListener('afterprint', done, { once: true });
   w.focus();

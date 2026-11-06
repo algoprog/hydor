@@ -2,7 +2,7 @@
 // line, the paragraph they are in for the sense; the new words go in their place looking as the first of the old did,
 // a line in each paragraph it stands for, as one change to undo (a suggestion while suggesting). An equation among them
 // is not words to rewrite: the words around it are picked instead.
-import { runsText } from '@shared/docs';
+import { isAtom, runsText } from '@shared/docs';
 import type { RewriteTarget } from '../slides/Rewrite';
 import type { DocEngine } from './engine';
 import * as ops from './ops';
@@ -15,7 +15,7 @@ export function docsTarget(engine: DocEngine): RewriteTarget | null {
   if (!boxes.length) return null;
   const textOf = (d: typeof doc, b: (typeof boxes)[number]) => ops.textBetween(d, { b: b.b, ...(b.c ? { c: b.c } : {}), o: b.from }, { b: b.b, ...(b.c ? { c: b.c } : {}), o: b.to });
   // An equation is not words: it stays out of what is rewritten.
-  const mathIn = boxes.some((b) => (ops.boxRuns(doc, b.b, b.c) ?? []).some((r, i, all) => r.math && runsLen(all.slice(0, i)) < b.to && runsLen(all.slice(0, i + 1)) > b.from));
+  const mathIn = boxes.some((b) => (ops.boxRuns(doc, b.b, b.c) ?? []).some((r, i, all) => isAtom(r) && runsLen(all.slice(0, i)) < b.to && runsLen(all.slice(0, i + 1)) > b.from));
   if (mathIn) return null;
   const texts = boxes.map((b) => textOf(doc, b));
   const around = runsText(ops.boxRuns(doc, boxes[0].b, boxes[0].c) ?? [])

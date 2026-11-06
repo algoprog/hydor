@@ -3,22 +3,30 @@
 // margins, {page} and {pages} as the sheet's number and how many there are ("Page 3 of 9"), none on the first page of
 // a document with a title page. A click on a header or footer changes them. All in the editor's own coordinates (the
 // words' element at the host's top left), at the zoom the page is shown at.
-import { FONTS, PAPERS, type Doc } from '@shared/docs';
+import { FONTS, paperOf, type Doc } from '@shared/docs';
 import { GAP, type Layout } from './paging';
 
 const MM = 96 / 25.4;
 
-/** The sheets, behind the words (`width`: the paper's, as shown). */
-export function Sheets({ layout, zoom, width }: { layout: Layout; zoom: number; width: number }) {
+/** The sheets, behind the words (`width`: the paper's, as shown): in the paper's colour, with the watermark across each. */
+export function Sheets({ layout, zoom, width, doc, src }: { layout: Layout; zoom: number; width: number; doc?: Doc; src?: (s: string) => string }) {
   const step = (layout.pageH + GAP) * zoom;
+  const mark = doc?.mark;
   return (
     <div aria-hidden className="pointer-events-none absolute top-0 left-0" style={{ width }}>
       {Array.from({ length: layout.count }, (_, i) => (
         <div
           key={i}
-          className="absolute left-0 w-full rounded-[2px] bg-white"
-          style={{ top: i * step, height: layout.pageH * zoom, boxShadow: '0 1px 3px rgba(0,0,0,.12),0 8px 28px rgba(0,0,0,.08)' }}
-        />
+          className="absolute left-0 flex w-full items-center justify-center overflow-hidden rounded-[2px]"
+          style={{ top: i * step, height: layout.pageH * zoom, background: doc?.page.color ?? '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.12),0 8px 28px rgba(0,0,0,.08)' }}
+        >
+          {mark?.text && (
+            <span translate="no" className="font-bold whitespace-nowrap select-none" style={{ transform: 'rotate(-45deg)', fontSize: Math.min(width / Math.max(4, mark.text.length * 0.62), width / 4), color: 'rgba(0,0,0,.075)', fontFamily: 'Arial, sans-serif', letterSpacing: '.04em' }}>
+              {mark.text}
+            </span>
+          )}
+          {mark?.src && src && <img src={src(mark.src)} alt="" className="max-h-[55%] max-w-[60%] object-contain" style={{ opacity: 0.16 }} />}
+        </div>
       ))}
     </div>
   );
@@ -29,7 +37,7 @@ export function Bands({ layout, zoom, doc, readOnly, onOpen }: { layout: Layout;
   if (!doc.header && !doc.footer) return null;
   const step = (layout.pageH + GAP) * zoom;
   const m = layout.margin * zoom;
-  const w = (PAPERS[doc.page.size].w * MM - 2 * layout.margin) * zoom;
+  const w = (paperOf(doc.page).w * MM - 2 * layout.margin) * zoom;
   const font = FONTS.find((f) => f.name === doc.font)?.css;
   const out: { key: string; kind: 'head' | 'foot'; y: number; text: string; align?: 'center' | 'right' }[] = [];
   for (let i = 0; i < layout.count; i++) {

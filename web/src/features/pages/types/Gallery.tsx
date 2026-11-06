@@ -24,8 +24,9 @@ const TITLE: Record<ContentKind, string> = {
   doc: 'A document made with AI',
   page: 'A page made with AI',
   sheet: 'A spreadsheet made with AI',
+  design: 'A design made with AI',
 };
-const PICK_TITLE: Partial<Record<ContentKind, string>> = { deck: 'What kind of slides?', doc: 'What kind of document?', page: 'What kind of page?', sheet: 'What kind of spreadsheet?' };
+const PICK_TITLE: Partial<Record<ContentKind, string>> = { deck: 'What kind of slides?', doc: 'What kind of document?', page: 'What kind of page?', sheet: 'What kind of spreadsheet?', design: 'What kind of design?' };
 
 function TypeCard({ t, on, note, onClick }: { t: ContentType; on: boolean; note?: string; onClick: () => void }) {
   const Icon = TYPE_ICONS[t.icon];

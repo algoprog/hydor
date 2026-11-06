@@ -12,13 +12,17 @@
 // Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/mediaedit/video-test.ts
 //   CUDA_VISIBLE_DEVICES= HYDOR_VIDEO_GPU= DATA_DIR=/tmp/hydor-test-video node dist/dev/video-test.js
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import {
   captionsSrt,
+  levelAt,
+  overlapFades,
+  PAN_LAYOUTS,
+  volumeExpr,
   clipsAt,
   clipSpans,
   cropToShape,
@@ -51,7 +55,7 @@ import { getVideo } from '../pages/videos.ts';
 import { voice } from '../voice/index.ts';
 import { readTimed } from '../voice/whisper.ts';
 import { encoderArgs, gpuEncoder, gpuState, hwOrder, setGpuProbe, type GpuProbe } from './video-gpu.ts';
-import { checkChain, checkPlan, graphText, planVideo, REVERSE_BYTES, scaledSize, tempos, type PlanInput } from './video-plan.ts';
+import { checkChain, checkPlan, graphText, isVolumeExpr, planVideo, REVERSE_BYTES, scaledSize, tempos, type PlanInput } from './video-plan.ts';
 import { pngSize, videoEdit } from './video.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -330,6 +334,34 @@ const plan = (recipe: VideoRecipe, more: Partial<PlanInput> = {}) => {
   ok(REVERSE_BYTES > 0 && J(tempos(0.25)) === '[0.5,0.5]' && J(tempos(3)) === '[2,1.5]' && tempos(1).length === 0, 'speeds as atempo takes them');
   ok(J(scaledSize(1920, 1080, { gif: true })) === '{"w":480,"h":270}' && J(scaledSize(1080, 1920, { size: 720 })) === '{"w":720,"h":1280}', 'sizes made smaller');
 
+  // Sound: channels, a volume line, parts silenced, fades, fixes; sounds overlapping on a track cross-fade.
+  const sn = normalizeVideoRecipe(
+    {
+      clips: [{ trim: [0, 6], channels: 'left-both', levels: [[4, -6], [1, 0], [99, 3], [2, -99]], silence: [[3, 4], [1, 2], [3.5, 5]], soundFadeIn: 9, clean: 0.5, even: true, volume: 9 }],
+      audio: [
+        { id: 'm1', src: 'song.mp3', track: 'music', start: 0, trim: [0, 4], channels: 'swap', fadeOut: 0.5 },
+        { id: 'm2', src: 'song.mp3', track: 'music', start: 3, channels: 'nope' },
+      ],
+    },
+    facts,
+  );
+  const c0 = sn.clips![0];
+  ok(c0.channels === 'left-both' && J(c0.levels) === J([[1, 0], [2, -60], [4, -6], [6, 3]]) && J(c0.silence) === J([[1, 2], [3, 5]]) && c0.soundFadeIn === 3 && c0.clean === 0.5 && c0.even && c0.volume === 4, `a clip's sound made to fit: ${J(c0)}`);
+  ok(sn.audio?.[0].channels === 'swap' && !sn.audio?.[1].channels, 'channels only of the choices');
+  ok(levelAt(c0.levels, 0) === 0 && levelAt(c0.levels, 1.5) === -30 && levelAt(c0.levels, 3) === -33 && levelAt(c0.levels, 9) === 3, 'the volume line: flat at its ends, straight between');
+  ok(J(Object.fromEntries(overlapFades(sn.audio!, (a) => (a.trim ? a.trim[1] - a.trim[0] : 6)))) === J({ m1: { in: 0, out: 1 }, m2: { in: 1, out: 0 } }), 'two sounds overlapping cross-fade over the overlap');
+  const e = volumeExpr([[1, 0], [2, -6]], [[3, 4]])!;
+  ok(e === 'pow(10,(if(lt(t,1),0,if(lt(t,2),0+(0-6)*(t-1)/1,(0-6))))/20)*(1-between(t,3,4))' && isVolumeExpr(e), `a volume line as ffmpeg reads it: ${e}`);
+  ok(!isVolumeExpr("1';movie=x") && !isVolumeExpr('st(0,1)') && !isVolumeExpr('a'.repeat(9000)) && !isVolumeExpr('ld(0)'), 'nothing else passes as a volume expression');
+  const sp = plan(sn as VideoRecipe);
+  ok(sp.graph.includes("pan=args='stereo|c0=c0|c1=c0'") && sp.graph.includes("pan=args='stereo|c0=c1|c1=c0'"), `the channels as ffmpeg's pan: ${sp.graph.match(/pan=[^,;]*/g)}`);
+  ok(sp.graph.includes("eval=frame") && sp.graph.includes("volume=volume='pow(10,(if(lt(t,1),0,"), 'the volume line evaluated each frame');
+  ok(sp.graph.includes('afade=t=in:st=0:d=3') && sp.graph.includes('loudnorm=i=-16') && sp.graph.includes('afftdn=nr=15'), 'the clip’s sound faded in, evened out and cleaned up');
+  ok(sp.graph.includes('afade=t=out:st=3:d=1:curve=qsin') && sp.graph.includes('afade=t=in:st=0:d=1:curve=qsin'), 'the overlapping music cross-fades');
+  throws(() => checkChain({ ins: ['0:a'], filters: [{ name: 'pan', args: [['args', 'stereo|c0=c0|c1=c0;movie=x']] }], outs: ['o'] }), /pan may only be one of the channel choices/, 'pan only as the channel choices make it');
+  throws(() => checkChain({ ins: ['0:a'], filters: [{ name: 'volume', args: [['volume', "1'[x];[y]movie"]] }], outs: ['o'] }), /volume has an expression/, 'a volume value that would close its quote is refused');
+  ok(Object.values(PAN_LAYOUTS).length === 6, 'six ways to route the channels, and stereo');
+
   // The graphics card: its decoding, its encoder and its last step.
   const nv = plan({ clips: [{ trim: [0, 2] }, { src: 'pic.png', length: 1 }], overlays: [{ src: 'b.mp4', start: 0, x: 0.5, y: 0.5, w: 0.3 }] }, { hw: { api: 'nvenc', encoder: 'h264_nvenc' } });
   const nvArgs = nv.args.join(' ');
@@ -454,6 +486,10 @@ const finished = async (id: string) => {
   await until(async () => ['done', 'failed', 'stopped'].includes((j = await jobOf(id)).status));
   return j;
 };
+/** What ffmpeg says (on its error output) measuring one channel of a file's sound. */
+function require_ffmpeg_words(f: string, ch: number, from: number, len: number): string {
+  return String(spawnSync('ffmpeg', ['-hide_banner', '-nostdin', '-ss', String(from), '-t', String(len), '-i', f, '-af', `pan=mono|c0=c${ch},volumedetect`, '-f', 'null', '-'], { encoding: 'utf8' }).stderr ?? '');
+}
 const ffprobe = (f: string) => JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type,codec_name,width,height', '-of', 'json', f], { encoding: 'utf8' }));
 /** The colour of one pixel of a video at a moment (or of a picture). */
 const pixel = (f: string, t: number, x: number, y: number) => [...execFileSync('ffmpeg', ['-v', 'error', '-ss', String(t), '-i', f, '-frames:v', '1', '-vf', `format=rgb24,crop=1:1:${x}:${y}`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'])];
@@ -556,6 +592,29 @@ if (ff) {
     const keyed = pixel(j.path, 0.5, 100, 60);
     ok(centre.every((x) => x > 200), `the overlay's white square in the middle: ${centre}`);
     ok(Math.abs(keyed[0] - keyed[1]) < 30 && Math.abs(keyed[1] - keyed[2]) < 30, `its green taken out: the grey video under it shows (${keyed})`);
+  }
+
+  // Sound for real: a lapel microphone on the left only, heard on both sides; a part silenced; the loudest moment measured.
+  {
+    const lapel = path.join(tmp, 'lapel.mp4');
+    mk(['-f', 'lavfi', '-i', 'testsrc2=size=160x90:rate=25:duration=3', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3', '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=mono', '-filter_complex', '[1:a][2:a]amerge=inputs=2,aformat=channel_layouts=stereo[a]', '-map', '0:v', '-map', '[a]', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-t', '3', lapel]);
+    /** How loud one channel (0 left, 1 right) of a file is, on average, in dB, from `from` for `len` seconds. */
+    const meanOf = (f: string, ch: number, from = 0, len = 9) => {
+      const r = require_ffmpeg_words(f, ch, from, len);
+      const m = /mean_volume:\s*(-?[\d.]+|-inf) dB/.exec(r);
+      return m ? (m[1] === '-inf' ? -100 : Number(m[1])) : NaN;
+    };
+    ok(meanOf(lapel, 1) < -80 && meanOf(lapel, 0) > -30, `the test sound: the left only (${meanOf(lapel, 0)}, ${meanOf(lapel, 1)})`);
+    const both = await finished((await req('POST', '/api/mediaedit/video', { src: lapel, recipe: { clips: [{ channels: 'left-both', silence: [[1, 2]] }] }, encoder: 'cpu', to: { file: lapel, as: 'copy' } })).json().job);
+    ok(both.status === 'done', `made: ${J(both)}`);
+    const right = meanOf(both.path, 1, 0.1, 0.8);
+    const hushed = meanOf(both.path, 1, 1.15, 0.7);
+    ok(right > -30, `the left heard on the right too: ${right} dB`);
+    ok(hushed < -70, `the part silenced is silent, the picture kept (${hushed} dB; ${J(ffprobe(both.path).format.duration)} s)`);
+    const rOnly = await finished((await req('POST', '/api/mediaedit/video', { src: lapel, recipe: { clips: [{ channels: 'right', levels: [[0, -6]] }] }, encoder: 'cpu', to: { file: lapel, as: 'copy' } })).json().job);
+    ok(rOnly.status === 'done' && meanOf(rOnly.path, 0) < -70 && meanOf(rOnly.path, 1) < -70, 'the right only: nothing heard (the sound was on the left)');
+    const pk = await req('POST', '/api/mediaedit/video/peak', { src: lapel, from: 0.5, to: 2.5 });
+    ok(pk.statusCode === 200 && pk.json().peak < -10 && pk.json().peak > -25, `its loudest moment measured, for Normalize: ${pk.body}`);
   }
 
   // The graphics card failing an edit (a make-believe one, an encoder no ffmpeg has): made again on the processor at once.

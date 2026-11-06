@@ -1,6 +1,6 @@
 // Pages as files to keep or send: a page of HTML as a PDF (Chromium prints it as it shows, with its data) or a Word
 // document (docx.ts reads what it shows into paragraphs, lists, tables and pictures); the other kinds (kinds.ts)
-// as their own files, made from the model itself (a deck as PowerPoint, a document as Word or Markdown, a
+// as their own files, made from the model itself (a deck as PowerPoint, a document as Word, OpenDocument, Markdown, EPUB or text, a
 // spreadsheet as Excel or CSV, a notebook as its .ipynb or a Python script), and as a PDF printed from their own page; any of them as a web page that works on
 // its own; a deck's slides as pictures (PNG). PDFs, pictures, and a page's Word document, need the browser pictures
 // are taken with (Settings → Browser).
@@ -29,22 +29,29 @@ import { deckFile, readDeck } from './slides.ts';
 import { deckPictures, deckRenders, liveRenders } from './slides-render.ts';
 import { dbSeed, mustPage, pageSource, storageMap } from './store.ts';
 import { wordFonts } from './word-fonts.ts';
+import { isDesignHtml } from '../../shared/design.ts';
+import { exportDesign } from './design-export.ts';
+import { videosInside } from './page-videos.ts';
 
 export type { ExportFormat };
 
 export const EXPORT_TYPES: Record<ExportFormat, string> = {
   pdf: 'application/pdf',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  odt: 'application/vnd.oasis.opendocument.text',
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   csv: 'text/csv; charset=utf-8',
   md: 'text/markdown; charset=utf-8',
+  epub: 'application/epub+zip',
+  txt: 'text/plain; charset=utf-8',
   tex: 'application/x-tex; charset=utf-8',
   zip: 'application/zip',
   html: 'text/html; charset=utf-8',
   ipynb: 'application/x-ipynb+json',
   py: 'text/x-python; charset=utf-8',
   png: 'image/png',
+  jpg: 'image/jpeg',
 };
 
 export type Paper = 'a4' | 'letter';
@@ -143,13 +150,17 @@ async function fitScales(db: DB, k: KindDef, text: string, title: string): Promi
 export const formatsOf = (k: KindDef): ExportFormat[] => [...new Set([...(Object.keys(k.files) as ExportFormat[]), 'pdf', 'html'] as ExportFormat[])];
 
 /** A page, deck, document or spreadsheet (its current version, or `version`) as a file. */
-export async function exportPage(db: DB, id: string, o: { format: ExportFormat; version?: number; paper?: Paper; slide?: number }): Promise<{ data: Buffer; type: string; name: string; note?: string }> {
+export async function exportPage(db: DB, id: string, o: { format: ExportFormat; version?: number; paper?: Paper; slide?: number; scale?: number; transparent?: boolean }): Promise<{ data: Buffer; type: string; name: string; note?: string }> {
   mustPage(db, id);
   const src = pageSource(db, id, Number.isInteger(o.version) && o.version! > 0 ? o.version : undefined);
   if (!src) throw new HttpError(404, 'That version is no longer kept');
   const title = src.title;
   const out = (data: Buffer | string, ext: string) => ({ data: Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8'), type: EXPORT_TYPES[o.format], name: fileName(title, ext) });
   const paper = PAPER[o.paper ?? 'a4'];
+
+  // A design (shared/design.ts): its artboards exactly their size, as pictures or a PDF of their own size.
+  if (src.kind === 'page' && isDesignHtml(src.text) && (o.format === 'png' || o.format === 'jpg' || o.format === 'pdf'))
+    return exportDesign(src.text, { title, format: o.format, scale: o.scale ?? 2, transparent: o.transparent, board: o.slide ? o.slide - 1 : undefined, name: fileName });
 
   // A deck's slides as pictures: one (by its number), or every one the slideshow shows, in a zip.
   if (o.format === 'png') {
@@ -174,6 +185,8 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
       const size = k.still(src.text);
       const data = await withTab({ html, width: size.width, height: size.height, settleMs: 400, blockPrivate: true }, async (tab) => {
         await tab.evaluate('document.fonts.ready.then(() => new Promise((ok) => setTimeout(() => ok(true), 120)))');
+        // A document laid out page by page in the page itself (its footnotes, its columns): once it is.
+        await tab.evaluate("new Promise((ok) => { const t = Date.now(); const w = () => (!document.querySelector('script[data-paginate]') || document.documentElement.dataset.paged || Date.now() - t > 15000 ? ok(true) : setTimeout(w, 50)); w(); })").catch(() => {});
         return printPdf(tab.s, { paperWidth: paper.w, paperHeight: paper.h, margin: 0, cssPageSize: true });
       });
       return out(data, 'pdf');
@@ -195,9 +208,11 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
     // Office files want their pictures ready (PNG, JPEG or GIF), and slides how much their text was fitted.
     const pics = new Map<string, Picture | null>();
     let scales: ExportHelp['scales'];
-    if (o.format === 'pptx' || o.format === 'docx') {
+    if (o.format === 'pptx' || o.format === 'docx' || o.format === 'odt') {
       for (const s of new Set(k.sources(text))) pics.set(s, await pictureFor(db, s));
     }
+    // An e-book takes every kind of picture as it is: only those on the web are fetched.
+    if (o.format === 'epub') for (const s of new Set(k.sources(text))) if (/^https?:/i.test(s)) pics.set(s, await pictureFor(db, s));
     let renders: ExportHelp['renders'];
     // A document's fonts go inside its Word file (the faces it uses, from Google once).
     const wordFontsOf = o.format === 'docx' && src.kind === 'doc' ? await wordFonts(docFaces(readDoc(src.text))) : undefined;
@@ -213,7 +228,8 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
     return notes.length ? { ...made, note: notes.join(' ') } : made;
   }
 
-  if (o.format === 'html') return out(pageFileHtml(src.text, dbSeed(db, id)), 'html');
+  // Its videos inside it, those small enough to carry.
+  if (o.format === 'html') return out(pageFileHtml(videosInside(db, src.text), dbSeed(db, id)), 'html');
   if (o.format === 'pdf') {
     if (!canCapture()) throw noBrowser();
     const html = injectHead(src.text, pageHead(db, id));

@@ -6,6 +6,8 @@ import zlib from 'node:zlib';
 export interface ZipPart {
   name: string;
   data: Buffer | string;
+  /** Kept as it is, not deflated (an OpenDocument's or an EPUB's mimetype, which readers look for first). */
+  store?: boolean;
 }
 
 /** DOS date and time of `d`, as zip headers keep them. */
@@ -27,7 +29,7 @@ export function zipParts(parts: ZipPart[], when = new Date()): Buffer {
     const raw = typeof p.data === 'string' ? Buffer.from(p.data, 'utf8') : p.data;
     const crc = zlib.crc32(raw) >>> 0;
     // Pictures and videos are packed already: stored, they open faster and lose nothing.
-    const packed = /\.(png|jpe?g|gif|webp|mp4|m4v|mov|webm)$/i.test(p.name) ? null : zlib.deflateRawSync(raw, { level: 6 });
+    const packed = p.store || /\.(png|jpe?g|gif|webp|mp4|m4v|mov|webm)$/i.test(p.name) ? null : zlib.deflateRawSync(raw, { level: 6 });
     const data = packed && packed.length < raw.length ? packed : raw;
     const method = data === raw ? 0 : 8;
     const head = Buffer.alloc(30);
