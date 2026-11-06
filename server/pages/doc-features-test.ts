@@ -14,7 +14,7 @@ import { canCapture, closeCapture, withTab } from '../capture/index.ts';
 import { openDb } from '../db.ts';
 import { parseXml } from '../documents/xml.ts';
 import { Zip } from '../documents/zip.ts';
-import { docFromFile, docPage, docxOfDoc, wordLosses } from './docs.ts';
+import { agentDoc, docForAgent, docFromFile, docPage, docxOfDoc, wordLosses } from './docs.ts';
 import { blockHtml, citeItems, docMarkdown, docText, normalizeDoc, notesHtml, paperOf, runsText, styleOf, columnMm, type Doc, type Run, type Source } from '../../shared/docs.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -245,6 +245,16 @@ ok(back.blocks.some((b) => b.type === 'p' && b.runs.some((x) => x.link?.startsWi
 ok(back.blocks.some((b) => b.type === 'bib'), 'the bibliography comes back as one', back.blocks.map((b) => b.type));
 ok(back.page.orient === 'landscape' && back.page.cols === 2 && back.page.color === '#fef7e0' && back.mark?.text === 'DRAFT', 'the page set up comes back', [back.page, back.mark]);
 ok(!wordLosses(buf, back).loses.length, 'nothing of it is lost', wordLosses(buf, back));
+
+// ---- agents: sources from BibTeX, styles and the watermark kept, get_page's account --------------------------------------------
+{
+  const prev = docText(normalizeDoc({ markdown: 'Hi', styles: { h1: { size: 20 } }, watermark: 'DRAFT', sources: [{ id: 'a1', kind: 'book', title: 'Old book' }] }));
+  const r = await agentDoc(db, { markdown: 'As said [@lecun2015deep].\n\n[BIBLIOGRAPHY]', bibtex: '@article{lecun2015deep, author = {LeCun, Yann}, title = {Deep learning}, journal = {Nature}, year = {2015}}', cite: 'ieee' }, tmp, prev);
+  ok(r.doc.sources?.map((x) => x.id).join() === 'a1,lecun2015deep' && r.doc.cite === 'ieee', 'an agent adds sources from BibTeX and sets the style', r.doc.sources);
+  ok(r.doc.styles?.h1?.size === 20 && r.doc.mark?.text === 'DRAFT', 'what it leaves out stays as it was');
+  const said = docForAgent(r.text);
+  ok(said.includes('[@lecun2015deep]') && said.includes('- lecun2015deep: LeCun · 2015 · Deep learning') && said.includes('watermark'), "get_page lists the sources and the page's setup", said.slice(-600));
+}
 
 // ---- printed: footnotes at the foot of their pages ------------------------------------------------------------------------
 if (canCapture()) {

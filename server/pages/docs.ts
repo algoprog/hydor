@@ -57,7 +57,8 @@ import { FONTS, googleFamilies } from '../../shared/slides.ts';
 import { docRefs, type Refs } from '../../shared/doc-refs.ts';
 import { bookmarkName, citationOf, sourcesFromXml, watermarkOf } from './docx-parts.ts';
 import { paginateDoc } from '../../shared/doc-paginate.ts';
-import { citeItems, citeOf, COLUMN_GAP, notesHtml, paperOf, type Source } from '../../shared/docs.ts';
+import { citeItems, citeOf, cleanSources, COLUMN_GAP, notesHtml, paperOf, type Source } from '../../shared/docs.ts';
+import { CITE_STYLE_NAMES, sourceFromBibtex, sourceLine } from '../../shared/doc-cite.ts';
 import { scriptSafe } from './kit.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -153,6 +154,11 @@ export async function agentDoc(db: DB, input: unknown, cwd: string, prev?: strin
         titlePage: given('titlePage') ? v.titlePage : base?.titlePage,
         comments: comments.list,
         suggestions,
+        // Its sources (those sent added to the ones it had, by key), citation style, styles and watermark, as they were unless sent.
+        sources: agentSources(base?.sources ?? [], v.sources, v.bibtex, notes),
+        cite: v.cite ?? v.citeStyle ?? base?.cite,
+        styles: given('styles') ? v.styles : base?.styles,
+        watermark: given('watermark') ? v.watermark : base?.mark,
       },
       { src: (s) => (s.length <= 4096 ? s : null) },
     );
@@ -170,6 +176,25 @@ export async function agentDoc(db: DB, input: unknown, cwd: string, prev?: strin
   const text = docText(doc);
   if (Buffer.byteLength(text) > MAX_DOC) throw new Error(`The document is over ${MAX_DOC / 1024 / 1024} MB without its pictures; make it smaller.`);
   return { doc, text, notes };
+}
+
+/** The sources an agent sends (objects, or BibTeX entries: a string, or a list), added to those the document has, by key. */
+function agentSources(had: Source[], given: unknown, bibtex: unknown, notes: string[]): Source[] {
+  const add: unknown[] = [];
+  const bib = (t: string) => {
+    for (const e of t.split(/(?=@[A-Za-z]+\s*[{(])/)) {
+      if (!e.trim()) continue;
+      const src = sourceFromBibtex(e);
+      if (src) add.push(src);
+      else notes.push(`A BibTeX entry could not be read: “${e.trim().slice(0, 60)}…”.`);
+    }
+  };
+  if (typeof bibtex === 'string') bib(bibtex);
+  for (const x of Array.isArray(given) ? given : []) typeof x === 'string' ? bib(x) : add.push(x);
+  const fresh = cleanSources(add);
+  if (add.length > fresh.length) notes.push('Some sources were left out: each needs a key (id), a title and a kind (article, book, chapter, conference, thesis, report, web or other).');
+  const keys = new Set(fresh.map((x) => x.id.toLowerCase()));
+  return [...had.filter((x) => !keys.has(x.id.toLowerCase())), ...fresh];
 }
 
 /**
@@ -503,8 +528,19 @@ export function docForAgent(text: string): string {
   const bands = [doc.header ? `Header: “${doc.header.text}”${doc.header.align ? ` (${doc.header.align})` : ''}.` : '', doc.footer ? `Footer: “${doc.footer.text}”${doc.footer.align ? ` (${doc.footer.align})` : ''}.` : '', doc.titlePage ? 'The first page is a title page, without them.' : '']
     .filter(Boolean)
     .join(' ');
+  const setup = [
+    doc.page.orient === 'landscape' ? 'landscape' : '',
+    doc.page.cols ? `${doc.page.cols} columns` : '',
+    doc.page.color ? `page colour ${doc.page.color}` : '',
+    doc.mark ? `a watermark (${doc.mark.text ? `“${doc.mark.text}”` : 'a picture'})` : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+  const styles = Object.entries(doc.styles ?? {})
+    .map(([k, x]) => `${k} ${JSON.stringify(x)}`)
+    .join('; ');
   return [
-    `A document of about ${docWords(doc)} words, ${doc.blocks.length} block${doc.blocks.length === 1 ? '' : 's'} (${paper} paper, ${doc.page.margin} mm margins; ${doc.font} ${doc.size} pt).${bands ? ` ${bands}` : ''}`,
+    `A document of about ${docWords(doc)} words, ${doc.blocks.length} block${doc.blocks.length === 1 ? '' : 's'} (${paper} paper, ${doc.page.margin} mm margins; ${doc.font} ${doc.size} pt${setup ? `; ${setup}` : ''}).${bands ? ` ${bands}` : ''}${styles ? ` Its paragraph styles' own looks: ${styles}.` : ''}`,
     '',
     'Outline:',
     docOutline(doc),
@@ -512,9 +548,20 @@ export function docForAgent(text: string): string {
     'The document as Markdown. To change it, send it back whole with save_doc and this id (markdown; page, font, size, header and footer only to change them), or make small changes with edits (find and replace, a section, after or before a heading, append). Keep what you do not mean to change as it is: the attributes in braces ({.title}, {.center}, {line=1.5}…), <u>, <span style>, ==highlights==, $maths$, the comments’ <span data-comment> marks, the suggested changes’ marks (<ins data-s>, <del data-s>, <span data-s data-was>, {ins=…} and {del=…}), and the pictures’ naget-asset: sources.',
     '',
     body,
+    ...sourcesForAgent(doc),
     ...commentsForAgent(doc),
     ...suggestionsForAgent(doc),
   ].join('\n');
+}
+
+/** The sources a document has, after it: each by its key, to cite as [@key]. */
+function sourcesForAgent(doc: Doc): string[] {
+  if (!doc.sources?.length) return [];
+  return [
+    '',
+    `Sources (${doc.sources.length}; citations in ${CITE_STYLE_NAMES[doc.cite ?? 'apa']} style), each cited as [@key] (several: [@a; @b, p. 4]); [BIBLIOGRAPHY] lists those cited:`,
+    ...doc.sources.map((x) => `- ${x.id}: ${sourceLine(x)}${x.in ? ` · ${x.in}` : ''}${x.doi ? ` · doi:${x.doi}` : ''}`),
+  ];
 }
 
 const when = (at: number) => new Date(at).toISOString().slice(0, 16).replace('T', ' ');
@@ -1984,15 +2031,17 @@ const DOC_HELP = [
   'Braces at the end of a paragraph or heading say what Markdown cannot: {.title} makes it the document’s title, {.subtitle} its subtitle, {.center}, {.right} or {.justify} aligns it, {indent=1} indents it a step. Colours, sizes and fonts: <span style="color:#c5221f; background-color:#fde68a; font-size:14pt; font-family:Georgia">words</span>.',
   'Pictures: ![what it shows](src "its caption"){width=50% .left} on a line of their own (centred, the text’s width, unless said); src is a file of this session (a picture you made), a public https address, or a picture the document has already (naget-asset:…).',
   'Instead of markdown you may give blocks: [{"title": "…"}, {"h1": "…"}, {"p": "…"}, {"bullet": "…", "lvl": 1}, {"number": "…"}, {"check": "…", "checked": true}, {"bullets": ["…", ["a level deeper"]]}, {"quote": "…"}, {"code": "…"}, {"table": [["Head", "Head"], ["a", "b"]], "head": true}, {"image": "src", "caption": "…", "width": 0.5}, {"hr": true}, {"pagebreak": true}]; their words are markdown too.',
-  'page: {"size": "a4" or "letter", "margin": millimetres} (A4 and 25.4 mm unless said); font: the body text’s (Arial unless said; others: Georgia, Times New Roman, Inter, Roboto, Open Sans, Lato, Merriweather, Lora, Source Serif 4…); size: the body text’s in points (11). Headings and the title are sized from it.',
+  'page: {"size": "a4" or "letter", "margin": millimetres, "orient": "landscape" (portrait unless said), "cols": 2 or 3 (columns of words on every page), "color": "#fef7e0" (the paper’s colour)} (A4 and 25.4 mm unless said); watermark: "DRAFT" (words across every page, faint) or {"src": a picture}, "" for none; styles: the paragraph styles’ own looks, {"h1": {"font": "Georgia", "size": 20, "color": "#1a73e8", "bold": true, "italic": false, "line": 1.15, "before": 18, "after": 6, "align": "center"}, "normal": {…}, "title": …, "subtitle", "h2"–"h4", "quote", "code", "callout"} (sizes and spaces in points, lines in lines), as Format → Paragraph styles sets them; font: the body text’s (Arial unless said; others: Georgia, Times New Roman, Inter, Roboto, Open Sans, Lato, Merriweather, Lora, Source Serif 4…); size: the body text’s in points (11). Headings and the title are sized from it.',
   'More in markdown: > 💡 words {.callout} is a callout, a tinted box with its emoji (tint=#e8f0fe for another tint; GitHub’s > [!NOTE], [!TIP], [!WARNING] work too); {line=1.5 before=12 after=6} at a paragraph’s end sets its line spacing (in lines) and the space before and after it (in points); $$ on lines of their own around LaTeX is an equation, and $x^2$ is maths among words (write a dollar sign as \\$); [TOC] alone on a line is a table of contents, made from the headings and kept up to date. A table with merged or shaded cells is written as HTML: <table><tr><td colspan="2" rowspan="2" style="background-color:#e8f0fe; vertical-align:middle">…</td></tr></table>.',
+  'Footnotes: a mark [^1] in the words and, after the document, [^1]: its words (a line that goes on, indented); they are numbered and printed at the foot of their page. Citations: [@key] or [@key1; @key2, p. 4], each key a source in sources (objects {id, kind: article|book|chapter|conference|thesis|report|web|other, title, authors: [{family, given}] or "Family, Given and …", year, in: the journal, book or site, volume, issue, pages, publisher, doi, url}, or BibTeX entries in bibtex), written in the citation style cite: apa (unless said), mla, chicago or ieee; [BIBLIOGRAPHY] alone on a line lists the sources cited, kept up to date (put a heading such as # References before it). Sources sent are added to those the document has (by key).',
+  'Numbered captions and cross-references: a picture’s caption numbered as a figure with {label=Figure} after it (![…](src "Its caption"){label=Figure}); a table’s with a line Table: its caption {label=Table} before it; an equation’s with $$ … $$ {label=Equation}. Give what you refer to an id with {#id} (on a heading, a picture, a Table: line, an equation, a paragraph) and refer to it with <ref to="id"/>, which shows “Figure 2”, “Table 1”, “Equation 3” or the heading’s words; [words](#id) links to it; {bookmark="Name"} at a paragraph’s end makes it a bookmark of the document.',
   'header and footer: a line of words on every page’s top and bottom margin, {page} and {pages} for the page’s number and how many there are: "footer": {"text": "Page {page} of {pages}", "align": "center"} (align left unless said); "titlePage": true leaves them off the first page. Left out, they stay as they were; "" removes one.',
   'Comments: get_page lists the user’s comments after the document, each on the words marked <span data-comment="id">. Answer with comments: [{"id": "c1", "reply": "…", "resolve": true}] beside the document (make the change asked for, too); {"id": "c1", "reopen": true} reopens one, {"id": "c1", "delete": true} takes it out. To add one of your own, mark its words <span data-comment="new1">…</span> and add {"id": "new1", "text": "…"}. Comments you do not mention stay as they are; keep their marks where they are.',
   'Suggested changes (as Word’s tracked changes): get_page lists them after the comments, each marked with its id: <ins data-s="s1">words to add</ins>, <del data-s="s1">words to take out</del>, <span data-s="s2" data-was="…">a new look</span>, {ins=s3} or {del=s3} at a paragraph’s end for its break. Answer with suggestions: [{"id": "s1", "accept": true}], {"id": "s1", "reject": true} or {"id": "s1", "reply": "…"}; keep the marks of the others as they are. To suggest your own changes instead of making them (when the user asks you to suggest, review or propose edits), send the whole document as you would have it with "suggest": true: each difference becomes a suggestion of yours, which the user accepts or rejects. Or mark them yourself: <ins data-s="new1">…</ins> and <del data-s="new1">…</del> with an id of your own.',
   'Good documents start with a title, have short headings that say what follows, short paragraphs, lists for steps and options, and tables for what is compared.',
   'To change a document, get_page with its id gives it as markdown; send the whole document back with save_doc and the same id, or only what changes with edits: a new version, the older ones restorable. Keep what the user changed, and what you were not asked to change, as it is.',
   DOC_EDITS_HELP,
-  'page_action accepts or rejects suggested changes (all, or by id), sets the page up (paper, margins, font and size) and the header and footer, without sending the document back.',
+  'page_action accepts or rejects suggested changes (all, or by id), sets the page up (paper, margins, font and size, landscape, columns, the page’s colour, a watermark), the header and footer, a paragraph style’s look (or every style as the app has them) and the citation style, without sending the document back.',
 ].join(' ');
 
 export const SAVE_DOC_DESCRIPTION = DOC_HELP;
@@ -2004,7 +2053,12 @@ export const SAVE_DOC_SCHEMA = {
     title: { type: 'string', description: 'The document’s name in the Library: "Offer letter".' },
     markdown: { type: 'string', description: 'The whole document, in Markdown (as above).' },
     blocks: { type: 'array', items: { anyOf: [{ type: 'string' }, { type: 'object' }] }, description: 'Instead of markdown: the document’s blocks, in order.' },
-    page: { description: '{"size": "a4" | "letter", "margin": mm}, or "a4" or "letter".', anyOf: [{ type: 'string' }, { type: 'object' }] },
+    page: { description: '{"size": "a4" | "letter", "margin": mm, "orient"?: "landscape", "cols"?: 2 | 3, "color"?: "#rrggbb"}, or "a4" or "letter".', anyOf: [{ type: 'string' }, { type: 'object' }] },
+    sources: { type: 'array', items: { anyOf: [{ type: 'object' }, { type: 'string' }] }, description: 'Sources to cite as [@key]: {"id": "smith2020", "kind": "article", "title": "…", "authors": [{"family": "Smith", "given": "Jo"}], "year": "2020", "in": "Nature", "volume", "issue", "pages", "publisher", "doi", "url"}, or BibTeX entries. Added to the document’s (by key).' },
+    bibtex: { type: 'string', description: 'Instead of sources: BibTeX entries to cite as [@key].' },
+    cite: { type: 'string', enum: ['apa', 'mla', 'chicago', 'ieee'], description: 'The citation style (APA unless said).' },
+    watermark: { description: 'Words across every page ("DRAFT"), or {"src": a picture}; "" removes it.', anyOf: [{ type: 'string' }, { type: 'object' }] },
+    styles: { type: 'object', description: 'The paragraph styles’ own looks: {"h1": {"font", "size", "color", "bold", "italic", "line", "before", "after", "align"}, "normal": …}. Left out, they stay as they were; {} resets them.' },
     font: { type: 'string', description: 'The body text’s font: "Arial", "Georgia"…' },
     size: { type: 'number', description: 'The body text’s size in points: 11.' },
     header: { description: 'Words on every page’s top margin ({page}, {pages} for page numbers): a string, or {"text": "…", "align": "left" | "center" | "right"}; "" removes it.', anyOf: [{ type: 'string' }, { type: 'object' }] },

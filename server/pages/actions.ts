@@ -24,7 +24,7 @@ import { reuseSlides } from '../../shared/slides-reuse.ts';
 import { chartRefreshed } from '../../shared/slides-sheet.ts';
 import { TURN_INTO, turnAsk } from '../../shared/content-asks.ts';
 import { ASSET, everyEl, isWebDeck, plainText, powerPointNote, richFeatures, slideTitle, THEMES, toPowerPoint, type ChartEl, type Deck, type El, type Theme } from '../../shared/slides.ts';
-import { docFont, PAPERS, ptOf, resolveSuggestion, type Band, type Doc } from '../../shared/docs.ts';
+import { cleanStyles, CITE_STYLES, docColor, docFont, PAPERS, PARA_STYLES, ptOf, resolveSuggestion, STYLES as DOC_STYLES, type Band, type CiteStyle, type Doc, type ParaStyle } from '../../shared/docs.ts';
 import {
   adjustForDelete,
   adjustForInsert,
@@ -385,9 +385,63 @@ const pageSetup: Act<Doc> = (doc, a) => {
     if (!s) throw new Error('size: the body text’s size in points, 6 to 72.');
     d.size = s;
   }
-  if (a.paper === undefined && a.margin === undefined && a.font === undefined && a.size === undefined) throw new Error('Give what to change: paper, margin, font or size.');
-  if (JSON.stringify([d.page, d.font, d.size]) === JSON.stringify([doc.page, doc.font, doc.size])) return { said: 'The page is set up so already.' };
-  return { model: d, said: `set the page up: ${PAPERS[d.page.size].label} paper, ${d.page.margin} mm margins, ${d.font} ${d.size} pt.` };
+  // The paper on its side, columns, its colour, a watermark (Page setup's).
+  if (a.orientation !== undefined) {
+    const o = str(a.orientation).toLowerCase();
+    if (o !== 'portrait' && o !== 'landscape') throw new Error('orientation: portrait or landscape.');
+    if (o === 'landscape') d.page.orient = 'landscape';
+    else delete d.page.orient;
+  }
+  if (a.columns !== undefined) {
+    const n = Number(a.columns);
+    if (![1, 2, 3].includes(n)) throw new Error('columns: 1, 2 or 3.');
+    if (n > 1) d.page.cols = n as 2 | 3;
+    else delete d.page.cols;
+  }
+  if (a.color !== undefined) {
+    const c = a.color === null || /^(none|white|#?fff(fff)?)$/i.test(str(a.color)) ? null : docColor(a.color);
+    if (c === null && a.color !== null && !/^(none|white|#?fff(fff)?)$/i.test(str(a.color))) throw new Error('color: the paper’s colour (#fef7e0, "light blue"…), or none.');
+    if (c) d.page.color = c;
+    else delete d.page.color;
+  }
+  if (a.watermark !== undefined) {
+    const t = a.watermark === null ? '' : str(a.watermark).slice(0, 60);
+    if (t) d.mark = { text: t };
+    else delete d.mark;
+  }
+  if ([a.paper, a.margin, a.font, a.size, a.orientation, a.columns, a.color, a.watermark].every((x) => x === undefined)) throw new Error('Give what to change: paper, margin, font, size, orientation, columns, color or watermark.');
+  if (JSON.stringify([d.page, d.font, d.size, d.mark]) === JSON.stringify([doc.page, doc.font, doc.size, doc.mark])) return { said: 'The page is set up so already.' };
+  const more = [d.page.orient ? 'landscape' : '', d.page.cols ? `${d.page.cols} columns` : '', d.page.color ? `a ${d.page.color} page` : '', d.mark?.text ? `the watermark “${d.mark.text}”` : ''].filter(Boolean).join(', ');
+  return { model: d, said: `set the page up: ${PAPERS[d.page.size].label} paper, ${d.page.margin} mm margins, ${d.font} ${d.size} pt${more ? `, ${more}` : ''}.` };
+};
+
+/** Format → Paragraph styles: a style's look (its font, size, colour, weight, slant, spacing, alignment), or the app's again. */
+const styleLook: Act<Doc> = (doc, a) => {
+  const key = str(a.style).toLowerCase().replace(/^heading\s*/, 'h').replace(/^normal( text)?$/, 'normal');
+  if (a.reset === true && !a.style) {
+    if (!doc.styles) return { said: 'The styles are the app’s already.' };
+    const { styles: _s, ...rest } = doc;
+    return { model: rest, said: 'reset every paragraph style to the app’s.' };
+  }
+  if (!(PARA_STYLES as string[]).includes(key)) throw new Error(`style: one of ${PARA_STYLES.join(', ')}.`);
+  const k = key as ParaStyle;
+  const look = a.reset === true ? undefined : cleanStyles({ [k]: { font: a.font, size: a.size, color: a.color, bold: a.bold, italic: a.italic, line: a.line, before: a.before, after: a.after, align: a.align } })?.[k];
+  if (a.reset !== true && !look) throw new Error('Give what the style looks like: font, size (pt), color, bold, italic, line (lines), before and after (pt), align; or reset: true.');
+  const styles = { ...(doc.styles ?? {}) };
+  if (look) styles[k] = { ...(styles[k] ?? {}), ...look };
+  else delete styles[k];
+  const { styles: _s, ...rest } = doc;
+  const d: Doc = Object.keys(styles).length ? { ...rest, styles } : rest;
+  return { model: d, said: look ? `${DOC_STYLES[k].label} now looks so: ${JSON.stringify(styles[k])}.` : `${DOC_STYLES[k].label} looks as the app has it again.` };
+};
+
+/** Format → Citation style: every citation and the bibliography in APA, MLA, Chicago or IEEE. */
+const citationStyle: Act<Doc> = (doc, a) => {
+  const c = str(a.style).toLowerCase() as CiteStyle;
+  if (!CITE_STYLES.includes(c)) throw new Error('style: apa, mla, chicago or ieee.');
+  if ((doc.cite ?? 'apa') === c) return { said: `Citations are in ${c.toUpperCase()} style already.` };
+  const { cite: _c, ...rest } = doc;
+  return { model: c === 'apa' ? rest : { ...rest, cite: c }, said: `every citation and the bibliography are in ${c === 'chicago' ? 'Chicago' : c.toUpperCase()} style now.` };
 };
 
 /** A header or footer as given: {text, align}, words alone, or null (none). */
@@ -829,7 +883,7 @@ const clearOutputs: Act<Json> = (nb, a) => {
 
 const ACTIONS: { [K in PageKind]: Record<string, Act<any>> } = {
   slides: { animate, fix_accessibility: fixAccessibility, describe_pictures: describePictures, powerpoint, theme, slide_shape: slideShape, reuse_slides: reuse, update_charts: updateCharts },
-  doc: { accept_suggestions: suggestions(true), reject_suggestions: suggestions(false), page_setup: pageSetup, header_footer: headerFooter },
+  doc: { accept_suggestions: suggestions(true), reject_suggestions: suggestions(false), page_setup: pageSetup, header_footer: headerFooter, paragraph_style: styleLook, citation_style: citationStyle },
   sheet: {
     sort,
     remove_duplicates: dedupe,
@@ -903,7 +957,9 @@ const DESCRIPTION = [
   '- update_charts {slides?}: every chart made from a spreadsheet of the Library read again from its cells (Update from the spreadsheet), each series keeping its colour.',
   'Documents.',
   '- accept_suggestions, reject_suggestions {ids?}: accept or reject the suggested changes listed (get_page lists them), or every one.',
-  '- page_setup {paper?: a4|letter, margin?: mm, font?, size?: pt}: the paper, margins and body text (Page setup).',
+  '- page_setup {paper?: a4|letter, margin?: mm, font?, size?: pt, orientation?: portrait|landscape, columns?: 1|2|3, color?: the paper’s colour or none, watermark?: words (DRAFT) or null}: the paper, margins, body text, columns, colour and watermark (Page setup).',
+  '- paragraph_style {style: normal|title|subtitle|h1…h4|quote|code|callout, font?, size?: pt, color?, bold?, italic?, line?: lines, before?: pt, after?: pt, align?, reset?: true}: a style’s look in this document, as Format → Paragraph styles (reset: true alone, every style as the app has them).',
+  '- citation_style {style: apa|mla|chicago|ieee}: every citation and the bibliography in that style.',
   '- header_footer {header?, footer?: {text, align?: center|right} or null, title_page?}: the line at the top and foot of each page ({page} its number, {pages} how many), as Insert → Header and footer and Page numbers; title_page: none on the first page.',
   'Spreadsheets (sheet: its name or id, the first when left out; range: "A1:D40", columns "C:E", or a cell for the table around it; left out, the table around A1, its header row told as the editor tells it, or header_row: true|false):',
   '- sort {by: a column (its letter or its header’s words) or a list of them, each a column or {column, descending}, descending?, range?, header_row?}: the table’s rows in that order; formulas and comments move with their rows.',
@@ -931,7 +987,6 @@ const SCHEMA = {
   properties: {
     id: { type: 'string', description: 'The saved page’s id (get_page lists them).' },
     action: { type: 'string', enum: PAGE_ACTIONS, description: 'What to do; its fields as the description says.' },
-    style: { type: 'string', enum: ['subtle', 'lively', 'bold', 'none'], description: 'animate.' },
     slides: { type: 'array', items: { type: ['number', 'string'] }, description: 'Slides by number (from 1) or id; all when left out.' },
     parts: { type: 'array', items: { type: 'string' }, description: 'describe_pictures: pictures by part id.' },
     on: { type: 'boolean', description: 'powerpoint.' },
@@ -942,6 +997,16 @@ const SCHEMA = {
     ratio: { type: 'string', enum: ['16:9', '4:3'], description: 'slide_shape.' },
     ids: { type: 'array', items: { type: 'string' }, description: 'accept_suggestions, reject_suggestions: suggestions by id; all when left out.' },
     paper: { type: 'string', enum: ['a4', 'letter'] },
+    orientation: { type: 'string', enum: ['portrait', 'landscape'], description: 'page_setup.' },
+    color: { type: ['string', 'null'], description: 'page_setup: the paper’s colour, or none; paragraph_style: the words’ colour.' },
+    watermark: { type: ['string', 'null'], description: 'page_setup: words across every page, or null for none.' },
+    style: { type: 'string', description: 'animate: subtle|lively|bold|none; paragraph_style: the style; citation_style: apa|mla|chicago|ieee.' },
+    bold: { type: 'boolean' },
+    italic: { type: 'boolean' },
+    line: { type: 'number', description: 'paragraph_style: line spacing in lines.' },
+    before: { type: 'number', description: 'paragraph_style: points before.' },
+    align: { type: 'string', enum: ['left', 'center', 'right', 'justify'] },
+    reset: { type: 'boolean', description: 'paragraph_style: back to the app’s look.' },
     margin: { type: 'number', description: 'page_setup: millimetres, 5 to 60.' },
     font: { type: 'string' },
     size: { type: 'number', description: 'page_setup: the body text in points.' },
@@ -953,7 +1018,7 @@ const SCHEMA = {
     header_row: { type: 'boolean', description: 'Whether the table’s first row is its header (told from it when left out).' },
     by: { type: ['string', 'array'], description: 'sort: a column (letters or header words), or a list of them or of {column, descending}; summarize: the column to sum up by.' },
     descending: { type: 'boolean', description: 'sort: Z to A, largest first.' },
-    columns: { type: ['string', 'array'], description: 'remove_duplicates: the columns that must match (all when left out); delete_columns: "C", "C:D" or a list.' },
+    columns: { type: ['string', 'array', 'number'], description: 'remove_duplicates: the columns that must match (all when left out); delete_columns: "C", "C:D" or a list; page_setup: 1, 2 or 3 columns of words.' },
     rows: { type: ['string', 'number', 'array'], description: 'delete_rows: "5", "5:7" or a list.' },
     direction: { type: 'string', enum: ['down', 'right'] },
     what: { type: 'string', enum: ['contents', 'formatting', 'all'] },
