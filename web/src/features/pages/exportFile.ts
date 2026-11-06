@@ -9,7 +9,7 @@ import { toast } from '../../lib/store';
 import { askArxiv } from './latex/arxivAsk';
 import { PICS, RT } from './slides/rt';
 
-export type ExportFormat = 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png' | 'arxiv';
+export type ExportFormat = 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png' | 'jpg' | 'arxiv';
 
 const LETTER = /^(en-US|en-CA|es-US|es-MX|fr-CA|en-PH|es-CO|es-CL|es-VE|es-GT|es-CR|es-PA)$/i;
 
@@ -67,6 +67,7 @@ const WHAT: Record<ExportFormat, string> = {
   ipynb: 'the notebook',
   py: 'the Python script',
   png: 'the pictures',
+  jpg: 'the picture',
 };
 
 /** Downloads the page (or its version `version`) as a file; a deck's PDF prints here when the server cannot make it. */

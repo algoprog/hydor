@@ -12,6 +12,7 @@ import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { signWithKey } from '../links.ts';
 import { dropRefs, initAssets, noteRefs } from './assets.ts';
+import { pageVideoSources } from './page-videos.ts';
 import { fitFolder, initFolders } from './folders.ts';
 import { kindOf, mustKind, type PageKind, type PageMode } from './kinds.ts';
 
@@ -267,7 +268,9 @@ function prune(db: DB, id: string) {
 function contentOf(db: DB, kind: 'page' | PageKind, p: { html?: unknown; model?: unknown }): { text: string; sources: string[] } {
   if (kind === 'page') {
     if (p.model !== undefined && p.html === undefined) throw new HttpError(400, 'This is a page of HTML: send its html.');
-    return { text: checkHtml(p.html), sources: [] };
+    // Its videos (at their signed addresses) stay while a version shows them.
+    const html = checkHtml(p.html);
+    return { text: html, sources: pageVideoSources(html) };
   }
   const k = mustKind(kind);
   if (p.model === undefined) throw new HttpError(400, `This page is a ${k.noun}: send its model.`);

@@ -833,13 +833,15 @@ export const EditFrame = forwardRef<
     /** A database's AI cell and a file for it (answered with cmd('answer')), and a CSV to save. */
     onDbAi?: (id: number, ask: Record<string, unknown>) => void;
     onUpload?: (id: number, file: File) => void;
+    /** A design's editor (design-editor.ts) says something of its own: its zoom, its artboards, a file dropped… */
+    onDesign?: (d: Record<string, unknown>) => void;
     className?: string;
   }
->(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload, className }, handle) {
+>(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload, onDesign, className }, handle) {
   const ref = useRef<HTMLIFrameElement>(null);
   const offline = useContext(OfflineFrames);
-  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload });
-  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload };
+  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload, onDesign });
+  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload, onDesign };
   const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>(), anchorWaits: new Map<number, (list: { id: string; on: PageAnchor }[]) => void>() });
   const send = (m: Record<string, unknown>) => ref.current?.contentWindow?.postMessage({ ...m, type: 'wa-ed', n: ch.current.n }, '*');
   useThemeChange(() => ch.current.n && send({ cmd: 'theme', arg: { theme: themeNow(), css: themeCss() } }));
@@ -925,6 +927,7 @@ export const EditFrame = forwardRef<
       else if (d.type === 'wa-ed-db-ai' && Number.isInteger(d.id) && d.ask && typeof d.ask === 'object' && !Array.isArray(d.ask) && JSON.stringify(d.ask).length < 200_000) c.onDbAi?.(d.id, d.ask);
       else if (d.type === 'wa-ed-upload' && Number.isInteger(d.id) && d.file instanceof File) c.onUpload?.(d.id, d.file);
       else if (d.type === 'wa-ed-download' && isStr(d.name, 200) && isStr(d.mime, 100) && isStr(d.text, 20_000_000)) saveFile(d.name, d.mime, d.text);
+      else if (d.type === 'wa-ed-design' && typeof d.what === 'string') c.onDesign?.(d as Record<string, unknown>);
       else if (d.type === 'wa-ed-keys') c.onKeys?.();
       else if (d.type === 'wa-ed-html' && typeof d.html === 'string') {
         const done = ch.current.waits.get(d.id);
