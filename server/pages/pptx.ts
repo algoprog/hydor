@@ -1,11 +1,12 @@
 // A slide deck as a PowerPoint file (.pptx), written from the deck itself: each part a shape of its own that
 // stays editable in PowerPoint, Keynote, Google Slides and LibreOffice. Text boxes and shapes with their words
 // (paragraphs, bullets and numbers, runs' bold, colours, fonts and links), pictures (cropped as they show, their
-// colours adjusted), lines and arrows, connectors (stuck to the shapes they join, straight or elbowed, as PowerPoint's
+// colours adjusted, cut to their shape as their own geometry, a frame's pieces as shapes round them), QR codes as
+// pictures of them, the deck's logo on each slide, lines and arrows, connectors (stuck to the shapes they join, straight or elbowed, as PowerPoint's
 // own), tables (merged cells, cells' fills), charts as real charts with their numbers,
 // groups as groups, icons as pictures that stay sharp (SVG, with a PNG beside it for older programs), equations as
 // pictures (their LaTeX as words where no picture could be made), videos from a device inside the file as PowerPoint's
-// own (with their still, played on a click), YouTube's and Vimeo's as their still linked to the video; the
+// own (with their still, played on a click, trimmed as they are), YouTube's and Vimeo's as their still linked to the video; the
 // slide's background, its title as the slide's title, the footer and slide number as fields, speaker notes, comments
 // (PowerPoint's own, replies threaded, the open ones), the transition (Morph as PowerPoint's own, a fade where it has
 // none) and the animations in their order (on a click, with or after the one before, a paragraph at a time). The
