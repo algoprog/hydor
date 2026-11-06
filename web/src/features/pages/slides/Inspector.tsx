@@ -33,6 +33,7 @@ import {
   Play,
   Plus,
   Pointer,
+  SlidersHorizontal,
   Sparkles,
   Trash2,
   Ungroup as UngroupIcon,
@@ -143,6 +144,8 @@ interface Props {
   /** The AI tools: a picture changed (with AI, its background out, part of it erased), a chart made a plot, the slide's background made. */
   onAiEdit?: (id: string, mode: 'change' | 'cutout' | 'erase') => void;
   onPlotChart?: (id: string) => void;
+  /** The video picked (one the app keeps) in the video editor, in a tab of its own. */
+  onEditVideo?: (id: string) => void;
   onAiBackground?: () => void;
 }
 
@@ -990,7 +993,7 @@ function MathLook({ el, theme, set, focus }: { el: MathEl; theme: Theme; set: (p
   );
 }
 
-function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: string) => void }) {
+function VideoLook({ el, set, onEdit }: { el: VideoEl; set: (patch: Partial<El>, key?: string) => void; onEdit?: (id: string) => void }) {
   // A video the app keeps (from a device) has no address to change; an online one is changed by its address.
   const kept = !videoSrc(el.src);
   const [url, setUrl] = useState(kept ? '' : el.src.includes('vimeo') ? `https://vimeo.com/${el.src.split('/').pop()}` : `https://www.youtube.com/watch?v=${el.src.split('/').pop()}`);
@@ -1000,7 +1003,14 @@ function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: s
   return (
     <Section title="Video">
       {kept ? (
-        <p className="text-[12px] leading-snug text-fg-3">A video from a device, kept with the deck.</p>
+        <>
+          <p className="text-[12px] leading-snug text-fg-3">A video from a device, kept with the deck.</p>
+          {onEdit && (
+            <Button size="sm" variant="secondary" icon={<SlidersHorizontal size={14} />} onClick={() => onEdit(el.id)}>
+              Edit video
+            </Button>
+          )}
+        </>
       ) : (
         <input
           value={url}
@@ -1043,7 +1053,7 @@ function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: s
   );
 }
 
-function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cropping, onCrop, onIcon, onGroup, onUngroup, cellSel, onCellSel, texFocus, running, onRun, pickPicture, pickModel, onAiEdit, onPlotChart }: Props) {
+function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cropping, onCrop, onIcon, onGroup, onUngroup, cellSel, onCellSel, texFocus, running, onRun, pickPicture, pickModel, onAiEdit, onPlotChart, onEditVideo }: Props) {
   const slide = deck.slides[index];
   const web = isWebDeck(deck);
   const els = pickedOf(slide, sel);
@@ -1131,7 +1141,7 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cro
       {el.type === 'chart' && <ChartLook el={el} theme={deck.theme} set={set} onPlot={onPlotChart} />}
       {el.type === 'icon' && <IconLook el={el} theme={deck.theme} set={set} onIcon={onIcon} />}
       {el.type === 'math' && <MathLook el={el} theme={deck.theme} set={set} focus={texFocus} />}
-      {el.type === 'video' && <VideoLook key={el.id} el={el} set={set} />}
+      {el.type === 'video' && <VideoLook key={el.id} el={el} set={set} onEdit={onEditVideo} />}
       {el.type === 'code' && <CodeLook el={el} set={set} />}
       {el.type === 'html' && (
         <HtmlLook
