@@ -220,7 +220,7 @@ const numbers = (text: string) => (text.match(/\d[\d.,]*/g) ?? []).map((n) => n.
 /** A word's stem, so "grew" and "growth" are not the same but "points" and "point" are. */
 const stem = (w: string) => w.replace(/['’]s$/, '').replace(/(ies|es|s|ed|ing|ly)$/, '');
 
-/** The words a slide shows: its parts' words, its tables' cells, its charts' titles, labels and series' names, its quizzes'. */
+/** The words a slide shows: its parts' words, its tables' cells, its charts' titles, labels and series' names, its quizzes' (not its pictures' descriptions, which do not show). */
 export function visibleWords(els: El[]): string {
   const out: string[] = [];
   for (const e of everyEl(els)) {
@@ -229,7 +229,6 @@ export function visibleWords(els: El[]): string {
     else if (e.type === 'chart') out.push([e.title ?? '', ...e.labels, ...e.series.map((x) => x.name)].join(' '));
     else if (e.type === 'quiz') out.push([e.question, ...e.choices.map((c) => c.text), e.explain ?? ''].join(' '));
     else if (e.type === 'score') out.push(e.text ?? '');
-    else if (e.type === 'image' && e.alt) out.push(e.alt);
   }
   return out.join('\n');
 }
@@ -337,6 +336,22 @@ export function holdIdea(d: Deck, i: number, raw: Obj): { slide: Slide } | { pro
   } catch (e) {
     return { problem: `it was not a slide (${(e as Error).message}).` };
   }
+  // Whatever the idea called its parts ("picture", "equation", "iframe"…): a picture is one of the slide's, and a chart,
+  // a table or a live part is the slide's own (by its id), else it is left out.
+  const real = (list: El[]): El[] =>
+    list.flatMap((e): El[] => {
+      if (e.type === 'group') return [{ ...e, els: real(e.els) }];
+      if (e.type === 'image' && !pictures.has(e.src)) {
+        notes.push(`a picture that is not the slide’s (${e.src.slice(0, 60) || 'no src'})`);
+        return [];
+      }
+      if (OWN_ONLY.has(e.type) && mine.get(e.id)?.type !== e.type) {
+        notes.push(`a ${e.type} that is not the slide’s`);
+        return [];
+      }
+      return [e];
+    });
+  made = { ...made, els: real(made.els) };
   // Its background: a colour, or one of the slide's own pictures.
   if (made.bg?.image && !pictures.has(made.bg.image)) {
     const { image: _i, dim: _d, ...bg } = made.bg;
