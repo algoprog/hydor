@@ -8,6 +8,7 @@ import {
   clipSpans,
   clampView,
   isStill,
+  levelAt,
   MIN_PART,
   overlayLength,
   PICTURE_SECONDS,
@@ -32,8 +33,73 @@ export interface Edit {
   stillAt?: number;
 }
 
-/** What is picked: a clip of the main track, an overlay, words, a sound, or the transition after a clip. */
-export type Picked = { kind: 'clip' | 'overlay' | 'text' | 'audio' | 'transition'; id: string } | null;
+/** What is picked: a clip of the main track, its sound (A1), an overlay, words, a sound, or the transition after a clip. */
+export type Picked = { kind: 'clip' | 'clipsound' | 'overlay' | 'text' | 'audio' | 'transition'; id: string } | null;
+
+/** A part of one sound picked on its track (seconds of the timeline): Delete silences it. */
+export type SoundRange = { kind: 'clip' | 'audio'; id: string; from: number; to: number } | null;
+
+type SoundBits = Pick<VideoAudio, 'levels' | 'silence'>;
+
+/** A sound's volume line and silenced parts moved `by` seconds (its start trimmed), what falls before 0 or after `len` cut. */
+export function shiftSound<T extends SoundBits>(x: T, by: number, len: number): T {
+  if (!x.levels && !x.silence) return x;
+  const out = { ...x };
+  if (x.levels) {
+    const at0 = levelAt(x.levels, -by);
+    const pts = x.levels.map(([t, d]) => [ms(t + by), d] as [number, number]).filter(([t]) => t >= 0 && t <= len);
+    if (by < 0 && x.levels.some(([t]) => t + by < 0)) pts.unshift([0, at0]);
+    out.levels = pts.length ? pts : undefined;
+  }
+  if (x.silence) {
+    const sil = x.silence.map(([a, b]) => [ms(Math.max(0, a + by)), ms(Math.min(len, b + by))] as [number, number]).filter(([a, b]) => b - a >= 0.02);
+    out.silence = sil.length ? sil : undefined;
+  }
+  return out;
+}
+
+/** A sound's volume line and silenced parts cut at `u` seconds into it: the parts before and after (the after's from 0). */
+function splitSound<T extends SoundBits>(x: T, u: number, len: number): [T, T] {
+  const a = { ...x };
+  const b = { ...x };
+  if (x.levels) {
+    const at = levelAt(x.levels, u);
+    a.levels = [...x.levels.filter(([t]) => t < u), [ms(u), at]];
+    b.levels = [[0, at], ...x.levels.filter(([t]) => t > u).map(([t, d]) => [ms(t - u), d] as [number, number])];
+  }
+  if (x.silence) {
+    const sa = x.silence.map(([p, q]) => [p, Math.min(q, u)] as [number, number]).filter(([p, q]) => q - p >= 0.02);
+    const sb = x.silence.map(([p, q]) => [Math.max(0, p - u), Math.min(len - u, q - u)] as [number, number]).filter(([p, q]) => q - p >= 0.02);
+    a.silence = sa.length ? sa : undefined;
+    b.silence = sb.length ? sb : undefined;
+  }
+  return [a, b];
+}
+
+/** A part of a sound silenced (seconds of the timeline), the picture kept: a clip's own sound, or a sound of A2 or A3. */
+export function silencePart(r: VideoRecipe, f: VideoFactsOf, kind: 'clip' | 'audio', id: string, from: number, to: number): VideoRecipe {
+  const add = (x: SoundBits, start: number, len: number): SoundBits => {
+    const a = Math.max(0, from - start);
+    const b = Math.min(len, to - start);
+    if (b - a < 0.02) return x;
+    return { ...x, silence: [...(x.silence ?? []), [ms(a), ms(b)] as [number, number]].sort((p, q) => p[0] - q[0]) };
+  };
+  if (kind === 'clip') {
+    const { spans } = spansOf(r, f);
+    return { ...r, clips: (r.clips ?? []).map((c, i) => (c.id === id ? ({ ...c, ...add(c, spans[i].start, spans[i].length) } as VideoClip) : c)) };
+  }
+  return setAudio(r, id, (a) => ({ ...a, ...add(a, a.start, audioLength(a, f(a.src))) }) as VideoAudio);
+}
+
+/** The clips' own sound silenced from `from` to `to` (In to Out) wherever it crosses them, the picture kept. */
+export function silenceClips(r: VideoRecipe, f: VideoFactsOf, from: number, to: number): VideoRecipe {
+  let out = r;
+  const { spans } = spansOf(r, f);
+  (r.clips ?? []).forEach((c, i) => {
+    if (spans[i].end > from && spans[i].start < to) out = silencePart(out, f, 'clip', c.id!, from, to);
+  });
+  return out;
+}
 
 /** Something in the media panel: a video, a picture or a sound, with its facts. */
 export interface PoolItem {
@@ -123,6 +189,9 @@ export function splitClip(r: VideoRecipe, f: VideoFactsOf, id: string, t: number
     a = { ...c, trim: c.reverse ? [s, y] : [x, s] };
     b = { ...c, id: videoId(), trim: c.reverse ? [x, s] : [s, y] };
   }
+  const [sa, sb] = splitSound(c, u, span.length);
+  a = { ...a, ...sa, soundFadeOut: undefined };
+  b = { ...b, ...sb, soundFadeIn: undefined };
   delete a.transition;
   const out = [...clips];
   out.splice(i, 1, a, b);
@@ -166,7 +235,10 @@ export function trimClip(c: VideoClip, facts: VideoSize | undefined, edge: 'star
   const s = by * sp;
   if (edge === 'start' !== !!c.reverse) x = Math.max(0, Math.min(y - MIN_PART * 2, x + (c.reverse ? -s : s)));
   else y = Math.min(d, Math.max(x + MIN_PART * 2, y + (c.reverse ? -s : s)));
-  return { ...c, trim: x <= 0.001 && y >= d - 0.001 ? undefined : [ms(x), ms(y)] };
+  const next: VideoClip = { ...c, trim: x <= 0.001 && y >= d - 0.001 ? undefined : [ms(x), ms(y)] };
+  if (edge !== 'start') return next;
+  const moved = (clipLength(next, facts) - clipLength(c, facts));
+  return { ...next, ...shiftSound(c, moved, clipLength(next, facts)) };
 }
 
 /** The frame at a moment held for `seconds`: the clip split there, the held frame between its halves. */
@@ -195,8 +267,33 @@ export function detachSound(r: VideoRecipe, f: VideoFactsOf, id: string, mainSrc
   const facts = f(c.src);
   if (isStill(c) || facts?.picture || c.reverse || (c.speed ?? 1) !== 1 || !facts?.audio || c.mute) return r;
   const span = spansOf(r, f).spans[i];
-  const item: VideoAudio = { id: videoId(), src: c.sound ?? c.src ?? mainSrc, name: c.name ?? 'Sound', track: 'voice', start: ms(span.start), trim: c.trim ?? [0, ms(facts.duration)], ...(c.volume !== undefined ? { volume: c.volume } : {}) };
-  return { ...setClip(r, id, (x) => ({ ...x, mute: true, volume: undefined, sound: undefined })), audio: [...(r.audio ?? []), item] };
+  const item: VideoAudio = {
+    id: videoId(),
+    src: c.sound ?? c.src ?? mainSrc,
+    name: c.name ?? 'Sound',
+    track: 'voice',
+    start: ms(span.start),
+    trim: c.trim ?? [0, ms(facts.duration)],
+    clip: c.id,
+    ...(c.volume !== undefined ? { volume: c.volume } : {}),
+    ...(c.channels ? { channels: c.channels } : {}),
+    ...(c.levels ? { levels: c.levels } : {}),
+    ...(c.silence ? { silence: c.silence } : {}),
+    ...(c.clean ? { clean: c.clean } : {}),
+    ...(c.even ? { even: true } : {}),
+    ...(c.soundFadeIn ? { fadeIn: c.soundFadeIn } : {}),
+    ...(c.soundFadeOut ? { fadeOut: c.soundFadeOut } : {}),
+  };
+  const bare = { mute: true, volume: undefined, sound: undefined, channels: undefined, levels: undefined, silence: undefined, clean: undefined, even: undefined, soundFadeIn: undefined, soundFadeOut: undefined };
+  return { ...setClip(r, id, (x) => ({ ...x, ...bare })), audio: [...(r.audio ?? []), item] };
+}
+
+/** A sound detached from a clip put back as the clip's own (what was set of it goes with it; where it was moved is not kept). */
+export function linkSound(r: VideoRecipe, audioId: string): VideoRecipe {
+  const a = r.audio?.find((x) => x.id === audioId);
+  if (!a?.clip || !r.clips?.some((c) => c.id === a.clip)) return r;
+  const back = { mute: undefined, volume: a.volume, channels: a.channels, levels: a.levels, silence: a.silence, clean: a.clean, even: a.even, soundFadeIn: a.fadeIn, soundFadeOut: a.fadeOut };
+  return { ...setClip(r, a.clip, (c) => ({ ...c, ...back })), audio: r.audio!.filter((x) => x.id !== audioId) };
 }
 
 /** Whether a clip's sound can be detached (a video with sound, forwards at its own speed). */
@@ -229,7 +326,8 @@ export function splitItem(r: VideoRecipe, f: VideoFactsOf, kind: 'overlay' | 'te
   const u = t - x.start;
   if (u <= MIN_PART || u >= len - MIN_PART) return r;
   const [p, q] = x.trim ?? [0, facts?.duration ?? 0];
-  return { ...r, audio: r.audio!.flatMap((y) => (y.id === id ? [{ ...x, trim: [p, ms(p + u)] as [number, number], fadeOut: undefined }, { ...x, id: videoId(), start: ms(t), trim: [ms(p + u), q] as [number, number], fadeIn: undefined }] : [y])) };
+  const [sa, sb] = splitSound(x, u, len);
+  return { ...r, audio: r.audio!.flatMap((y) => (y.id === id ? [{ ...x, ...sa, trim: [p, ms(p + u)] as [number, number], fadeOut: undefined }, { ...x, ...sb, id: videoId(), start: ms(t), trim: [ms(p + u), q] as [number, number], fadeIn: undefined }] : [y])) };
 }
 
 /** An overlay, a text or a sound taken out; with `ripple`, what starts after it on its track moves up. */

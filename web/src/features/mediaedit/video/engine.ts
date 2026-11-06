@@ -6,7 +6,7 @@
 // element's own level (its volume, fades, a transition's crossfade), then its track's (A1 the clips' sound, A2 music,
 // A3 voice: level, pan, mute and solo), with a meter on each track and on the whole. J, K and L shuttle backwards and
 // forwards at up to four times.
-import { audioLength, clipSpans, heard, isStill, overlayLength, sourceAt, type ClipSpan, type VideoFactsOf, type VideoRecipe } from '@shared/mediaedit-video';
+import { audioLength, CHANNEL_MATRIX, clipSpans, heard, isStill, levelAt, overlapFades, overlayLength, silencedAt, sourceAt, type ClipSpan, type SoundChannels, type VideoFactsOf, type VideoRecipe } from '@shared/mediaedit-video';
 import type { Clock } from './clock';
 
 type Bus = { gain: GainNode; pan: StereoPannerNode; meter: AnalyserNode };
@@ -37,6 +37,9 @@ export class Engine {
   private buses: Record<'a1' | 'a2' | 'a3', Bus> | null = null;
   private master: { gain: GainNode; meter: AnalyserNode } | null = null;
   private gains = new Map<HTMLMediaElement, GainNode>();
+  /** Each element's channels: how much of the left and the right goes to each side ([ll, rl, lr, rr]). */
+  private matrices = new Map<HTMLMediaElement, GainNode[]>();
+  private cross = new Map<string, { in: number; out: number }>();
   private raf = 0;
   private t0 = 0;
   private at0 = 0;
@@ -59,6 +62,7 @@ export class Engine {
     const s = clipSpans(r.clips ?? [], f);
     this.spans = s.spans;
     this.length = s.length;
+    this.cross = overlapFades(r.audio ?? [], (a) => Math.min(audioLength(a, f(a.src)), s.length - a.start));
     // What is gone from the edit lets its element go.
     const ids = new Set([...(r.clips ?? []).flatMap((c) => [`c:${c.id}`, `s:${c.id}`]), ...(r.overlays ?? []).map((o) => `o:${o.id}`), ...(r.audio ?? []).map((a) => `a:${a.id}`)]);
     for (const [k, el] of this.media) if (!ids.has(k.split('|')[0])) this.drop(k, el);
@@ -138,8 +142,23 @@ export class Engine {
   private connect(el: HTMLMediaElement, key: string) {
     if (!this.ctx || !this.buses || this.gains.has(el)) return;
     try {
-      const g = this.ctx.createGain();
-      this.ctx.createMediaElementSource(el).connect(g);
+      const ctx = this.ctx;
+      const g = ctx.createGain();
+      // Its channels as the edit routes them: made stereo (a mono sound on both sides), split, mixed, merged again.
+      const up = ctx.createGain();
+      up.channelCount = 2;
+      up.channelCountMode = 'explicit';
+      up.channelInterpretation = 'speakers';
+      const split = ctx.createChannelSplitter(2);
+      const merge = ctx.createChannelMerger(2);
+      const m = [0, 1, 2, 3].map(() => ctx.createGain());
+      ctx.createMediaElementSource(el).connect(up).connect(split);
+      split.connect(m[0], 0).connect(merge, 0, 0);
+      split.connect(m[1], 1).connect(merge, 0, 0);
+      split.connect(m[2], 0).connect(merge, 0, 1);
+      split.connect(m[3], 1).connect(merge, 0, 1);
+      merge.connect(g);
+      this.matrices.set(el, m);
       const id = key.split('|')[0];
       const track = id.startsWith('a:') ? ((this.recipe.audio ?? []).find((a) => `a:${a.id}` === id)?.track === 'voice' ? 'a3' : 'a2') : 'a1';
       g.connect(id.startsWith('o:') ? this.ctx.createGain() : this.buses[track].gain);
@@ -147,10 +166,12 @@ export class Engine {
     } catch {}
   }
 
-  private setGain(el: HTMLMediaElement, v: number) {
+  private setGain(el: HTMLMediaElement, v: number, channels?: SoundChannels) {
     const g = this.gains.get(el);
-    if (g) g.gain.value = v;
+    if (g) g.gain.setTargetAtTime(v, this.ctx!.currentTime, 0.008);
     else el.volume = Math.max(0, Math.min(1, v));
+    const m = this.matrices.get(el);
+    if (m) CHANNEL_MATRIX[channels ?? 'stereo'].forEach((x, i) => (m[i].gain.value = x));
   }
 
   // ---- time ---------------------------------------------------------------------------------------------------------
@@ -195,12 +216,14 @@ export class Engine {
           if (!m.seeking && Math.abs(m.currentTime - want) > (play ? 0.06 : 0.001)) m.currentTime = want;
         }
       }
-      // The sound: its volume, a transition's crossfade, the fades of the whole.
-      let level = c.mute || !a1 || !fwd ? 0 : (c.volume ?? 1) * (1 - dark);
+      // The sound: its volume and volume line, the parts silenced, its fades, a transition's crossfade, the whole's fades.
+      let level = c.mute || !a1 || !fwd ? 0 : (c.volume ?? 1) * dbToGain(levelAt(c.levels, u)) * (silencedAt(c.silence, u) ? 0 : 1) * (1 - dark);
+      if (c.soundFadeIn && u < c.soundFadeIn) level *= u / c.soundFadeIn;
+      if (c.soundFadeOut && u > s.length - c.soundFadeOut) level *= Math.max(0, (s.length - u) / c.soundFadeOut);
       if (active && s.tin && u < s.tin) level *= u / s.tin;
       if (active && s.tout && u > s.length - s.tout) level *= (s.length - u) / s.tout;
-      this.setGain(el, c.sound ? 0 : level);
-      if (sound) this.setGain(sound, level);
+      this.setGain(el, c.sound ? 0 : level, c.channels);
+      if (sound) this.setGain(sound, level, c.channels);
     });
     for (const o of r.overlays ?? []) {
       const facts = f(o.src);
@@ -241,10 +264,13 @@ export class Engine {
         if (!el.paused) el.pause();
         if (!el.seeking && Math.abs(el.currentTime - want) > 0.05) el.currentTime = want;
       }
-      let level = (a.volume ?? 1) * (1 - dark);
-      if (a.fadeIn && u < a.fadeIn) level *= u / a.fadeIn;
-      if (a.fadeOut && u > len - a.fadeOut) level *= Math.max(0, (len - u) / a.fadeOut);
-      this.setGain(el, level);
+      let level = (a.volume ?? 1) * dbToGain(levelAt(a.levels, u)) * (silencedAt(a.silence, u) ? 0 : 1) * (1 - dark);
+      const x = this.cross.get(a.id ?? '');
+      const fi = Math.max(a.fadeIn ?? 0, x?.in ?? 0);
+      const fo = Math.max(a.fadeOut ?? 0, x?.out ?? 0);
+      if (fi && u < fi) level *= u / fi;
+      if (fo && u > len - fo) level *= Math.max(0, (len - u) / fo);
+      this.setGain(el, fwd ? level : 0, a.channels);
     }
     // The tracks' levels, pans, mutes and solos.
     if (this.buses) {
@@ -401,6 +427,9 @@ export class Engine {
     void this.ctx?.close().catch(() => {});
   }
 }
+
+/** A gain from decibels. */
+export const dbToGain = (db: number) => (db <= -59.9 ? 0 : Math.pow(10, db / 20));
 
 /** Whether a fraction of a decibel scale: a level (0–1 and more) as dB, for the meters. */
 export const toDb = (v: number) => (v <= 0.00001 ? -100 : 20 * Math.log10(v));
