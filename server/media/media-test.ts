@@ -258,8 +258,11 @@ const until = async (cond: () => boolean, ms = 8000) => {
 // ---- generate_image ------------------------------------------------------------------------------------
 
 {
+  // No key, and nobody to ask for one on a card (a scheduled task's run): it says where to add one, and makes nothing.
+  present = false;
   const none = await run('generate_image', { prompt: 'a red boat' });
-  ok(none.isError && /no OpenRouter key/.test(none.text), 'no key: says where to add one');
+  present = true;
+  ok(!none.isError && /no OpenRouter key is set/.test(none.text) && !calls.some((x) => x.path === '/api/v1/images'), 'no key: says where to add one');
   const c = loadConfig();
   c.openrouter.apiKey = 'sk-or-test';
   saveConfig(c);

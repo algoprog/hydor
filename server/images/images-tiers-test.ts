@@ -4,8 +4,9 @@
 // its shapes); a change put together where its mask is white (blend.ts); POST /api/images/make, /edit and /svg
 // against a stand-in for OpenRouter (the words a model is asked, the nearest shape, several pictures from a model
 // that makes one at a time, see-through backgrounds from a model that makes them or cut out on this computer,
-// refusals, a mask sent and the answer put in); and the agents' generate_image (detail) and make_svg. The model that
-// writes drawings is a helper model pointed at the stand-in. Build and run with a scratch folder:
+// refusals, a mask sent and the answer put in); the agents' generate_image (detail) and make_svg; and with no
+// OpenRouter key, the key asked for on a card (nobody there to ask, skipped, given). The model that writes drawings
+// is a helper model pointed at the stand-in. Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/images/images-tiers-test.ts
 //   DATA_DIR=/tmp/hydor-test-tiers node dist/dev/images-tiers-test.js
 import fs from 'node:fs';
@@ -15,6 +16,8 @@ import Fastify from 'fastify';
 import { drawingTierFor, tierFor } from '../../shared/image-tier.ts';
 import type { LocalToolsState } from '../../shared/images.ts';
 import { QUICK_PICKS } from '../../shared/model-picks.ts';
+import { keyGiven, keySkipped, OPENROUTER_REQUEST } from '../connections/openrouter-key.ts';
+import { latestRequest, vaultTables } from '../connections/vault.ts';
 import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { setHelperModel } from '../helper.ts';
@@ -113,7 +116,7 @@ const WRITTEN = 'Here it is:\n```svg\n<svg viewBox="0 0 512 512"><rect width="51
 
 /** What the images API answers next: a picture, a refusal, nothing. */
 let answer: 'png' | 'red-same' | 'red-big' | 'red-wide' | 'clear' | 'refuse' | 'empty' = 'png';
-const calls: { path: string; body?: any }[] = [];
+const calls: { path: string; body?: any; auth?: string }[] = [];
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
   const url = String(input instanceof Request ? input.url : input);
@@ -121,7 +124,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   const u = new URL(url);
   const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
   const p = u.pathname.replace(/^\/api\/v1/, '');
-  calls.push({ path: p, body });
+  calls.push({ path: p, body, auth: (init?.headers as Record<string, string> | undefined)?.Authorization });
   const json = (j: unknown, status = 200) => new Response(JSON.stringify(j), { status, headers: { 'content-type': 'application/json' } });
   if (p === '/models') return json({ data: u.searchParams.get('output_modalities') === 'image' ? CATALOG : [] });
   if (p === '/images/models') return json({ data: IMAGE_API });
@@ -165,6 +168,7 @@ setLocalTools({
 
 const db = openDb(path.join(tmp, 'test.db'));
 initAssets(db);
+vaultTables(db);
 const app = Fastify({ bodyLimit: 40 * 1024 * 1024 });
 app.removeContentTypeParser('application/json');
 app.addContentTypeParser('application/json', { parseAs: 'string' }, (_r, b, done) => {
@@ -183,10 +187,12 @@ const adapter = {
     return decide(card);
   },
 };
+/** Someone is there to answer cards (false: a scheduled task's run). */
+let present = true;
 const deps = {
   app,
   db,
-  sessions: { adapterByRun: () => adapter },
+  sessions: { adapterByRun: () => (present ? adapter : null) },
   models: { agentModels: () => [], ensure: async () => null },
   broadcast() {},
   toSubscribers() {},
@@ -196,13 +202,19 @@ images.routes!(deps);
 await app.ready();
 const ctx = { runId: 'run1', key: 'claude:t1', agent: 'claude', cwd: tmp, deps } as RunCtx;
 const tool = (name: string) => images.tools!(ctx).find((t) => t.name === name);
-const run = async (name: string, args: Record<string, unknown>): Promise<{ text: string; isError?: boolean }> => {
+const runIn = async (c: RunCtx, name: string, args: Record<string, unknown>): Promise<{ text: string; isError?: boolean }> => {
   try {
-    const r = await tool(name)!.run(args, ctx);
+    const r = await images.tools!(c).find((t) => t.name === name)!.run(args, c);
     return typeof r === 'string' ? { text: r } : r;
   } catch (e) {
     return { text: String((e as Error).message), isError: true };
   }
+};
+const run = (name: string, args: Record<string, unknown>) => runIn(ctx, name, args);
+const until = async (cond: () => boolean, ms = 5000) => {
+  const end = Date.now() + ms;
+  while (!cond() && Date.now() < end) await new Promise((r) => setTimeout(r, 20));
+  return cond();
 };
 const req = (method: 'GET' | 'POST' | 'PUT', url: string, body?: unknown) => app.inject({ method, url, payload: body === undefined ? undefined : JSON.stringify(body), headers: { 'content-type': 'application/json' } });
 const lastImages = () => calls.filter((c) => c.path === '/images').pop()?.body;
@@ -661,9 +673,57 @@ const setKey = (k?: string) => {
   const next = await run('make_svg', { prompt: 'A deer', detail: 'complex' });
   ok(!next.isError && !cards.length && lastImages().aspect_ratio === '16:9', 'the next one without the form, at the shape picked');
   ok((await run('make_svg', { prompt: 'x', colors: ['blue'] })).isError && (await run('make_svg', { prompt: 'x', kind: 'poster' })).isError, 'what it takes is checked');
+}
+
+// ---- no OpenRouter key: asked for on a card --------------------------------------------------------------------
+
+{
   setKey();
-  const noKey = await run('make_svg', { prompt: 'A fox', detail: 'complex' });
-  ok(noKey.isError && /no OpenRouter key/.test(noKey.text) && /detail: "simple"/.test(noKey.text), 'no key: says how to do without one');
+  calls.length = 0;
+  cards.length = 0;
+  // Nobody there to answer a card (a scheduled task's run): told where to add one, nothing made, no error.
+  present = false;
+  const nobody = await run('generate_image', { prompt: 'A red apple' });
+  ok(!nobody.isError && /^Seedream 5\.0 Flash runs through OpenRouter, and no OpenRouter key is set\./.test(nobody.text) && !calls.some((c) => c.path === '/images') && !cards.length, `nobody to ask: ${nobody.text}`);
+  const alone = await run('make_svg', { prompt: 'A fox', detail: 'complex' });
+  ok(!alone.isError && /^Recraft V4\.1 Vector runs through OpenRouter, and no OpenRouter key is set/.test(alone.text) && /detail: "simple" needs no key/.test(alone.text), `a detailed drawing: the simple one needs no key: ${alone.text}`);
+  const auto = await run('make_svg', { prompt: 'A fox in a forest', kind: 'illustration' });
+  ok(!auto.isError && /^Made a drawing with Test Writer:/.test(auto.text) && auto.text.includes('No OpenRouter key was given, so it was written as SVG rather than drawn by Recraft V4.1 Vector.'), `left to it, written instead: ${auto.text}`);
+  ok(!latestRequest(db, ctx.key, OPENROUTER_REQUEST), 'no card for a run nobody watches');
+  present = true;
+
+  // Someone there: a card asks for the key before any form; skipped, nothing is made and the session is not asked again.
+  const sk = { ...ctx, key: 'claude:skip', runId: 'run-skip' } as RunCtx;
+  const pending = runIn(sk, 'generate_image', { prompt: 'A red apple' });
+  ok(await until(() => latestRequest(db, 'claude:skip', OPENROUTER_REQUEST)?.state === 'pending'), 'a card asks for the key');
+  const card = latestRequest(db, 'claude:skip', OPENROUTER_REQUEST);
+  ok(card?.why === 'Pictures are made by Seedream 5.0 Flash through OpenRouter, about $0.018 each. You pay OpenRouter for what is made.' && !cards.length, `what it is for and what it costs, the form not yet: ${card?.why}`);
+  keySkipped('claude:skip');
+  const skipped = await pending;
+  ok(!skipped.isError && /^The user chose not to add an OpenRouter key, so Seedream 5\.0 Flash did not run: nothing was made/.test(skipped.text) && !calls.some((c) => c.path === '/images') && !cards.length, `skipped: ${skipped.text}`);
+  const video = await runIn(sk, 'generate_video', { prompt: 'Waves on a beach' });
+  ok(!video.isError && /chose earlier in this session not to add an OpenRouter key, so Seedance 2\.5 did not run/.test(video.text), `not asked again in that session: ${video.text}`);
+  const written = await runIn(sk, 'make_svg', { prompt: 'A fox in a forest', kind: 'illustration' });
+  ok(/^Made a drawing with Test Writer:/.test(written.text) && /No OpenRouter key was given/.test(written.text), 'a drawing left to it is written instead');
+  const sound = await runIn(sk, 'generate_audio', { kind: 'music', prompt: 'A jingle' });
+  ok(!sound.isError && /did not run/.test(sound.text), 'sound neither');
+
+  // Given on the card: it goes on with that key, and the form comes after it.
+  const gv = { ...ctx, key: 'claude:give', runId: 'run-give' } as RunCtx;
+  const waiting = runIn(gv, 'generate_image', { prompt: 'A red apple', ask: true });
+  ok(await until(() => latestRequest(db, 'claude:give', OPENROUTER_REQUEST)?.state === 'pending') && !cards.length, 'no form before the key');
+  keyGiven('claude:give', 'sk-or-given');
+  const made = await waiting;
+  ok(!made.isError && /^Made an image with bytedance-seed\/seedream-5-0-flash/.test(made.text) && cards.length === 1 && calls.filter((c) => c.path === '/images').pop()?.auth === 'Bearer sk-or-given', `made with the key given, after its form: ${made.text.split('\n')[0]}`);
+  const gd = { ...ctx, key: 'claude:give-drawing', runId: 'run-give-drawing' } as RunCtx;
+  cards.length = 0;
+  const drawing = runIn(gd, 'make_svg', { prompt: 'A heron', detail: 'complex', ask: false });
+  ok(await until(() => latestRequest(db, 'claude:give-drawing', OPENROUTER_REQUEST)?.state === 'pending'), 'a detailed drawing asks too');
+  ok(/^Detailed drawings are drawn by Recraft V4\.1 Vector through OpenRouter, about \$0\.078 each\./.test(latestRequest(db, 'claude:give-drawing', OPENROUTER_REQUEST)?.why ?? ''), 'what it is for and what it costs');
+  keyGiven('claude:give-drawing', 'sk-or-given');
+  const d = await drawing;
+  ok(!d.isError && /^Made a drawing with recraft\/recraft-v4\.1-vector/.test(d.text) && calls.filter((c) => c.path === '/images').pop()?.auth === 'Bearer sk-or-given', `drawn with the key given: ${d.text.split('\n')[0]}`);
+  setKey('sk-or-test');
 }
 
 await app.close();
