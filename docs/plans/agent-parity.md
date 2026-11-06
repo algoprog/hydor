@@ -4,8 +4,8 @@
 from the UI", and "especially the agent right next to them when users click Ask the agent". For each kind the Library
 keeps (slides, documents, spreadsheets, pages of HTML, LaTeX, notebooks, its pictures, videos and sounds, the Library
 itself), every action its editor offers in its menus, toolbars, panels and right-click menus, and how an agent does it.
-Workstream H of `media-and-rich-slides.md`, written against `mr/int` with E1, E2, E3, D, F1 and F2 merged; G (the Apps
-page) has no page kind of its own.*
+Workstream H of `media-and-rich-slides.md`, written against `mr/int` with every builder of the round merged (A1–A3, B,
+C1, C2, D, E1–E3, F1, F2, G) and main's page descriptions.*
 
 ## How an agent does things
 
@@ -267,6 +267,20 @@ Sounds have no editor: `generate_audio` makes them, and their title, description
 
 A person's: Present and Edit (opening it), Start a session with it, finding, sorting and the kinds filter (`get_page`
 lists everything).
+
+## The Apps page (G)
+
+Not a kind of page, but a place with actions of its own (`apps/Gallery.tsx`, `Recent.tsx`): every one has its agent's way.
+
+| In the page | An agent |
+|---|---|
+| Pin an app to the top, unpin, put the pinned in another order | `PUT /api/apps/pins` {ids} (a card); `GET /api/apps/pins` (free) |
+| The find box, the kinds and their counts | `find_apps` (the pinned and the lately used first) |
+| The apps run lately: how it went, Open the result, Run again | `GET /api/apps/:id/runs`, `GET /api/apps/runs/:runId` (free); `use_app` runs one in the session |
+| Start with (for someone new), a card's marks (its own view, agents may run it, it needs a key) | `GET /api/apps` (free) |
+| Uninstall, install again, delete; an app file dropped on the page | `POST /api/apps/:id/uninstall`, `…/install`, `DELETE /api/apps/:id`; `POST /api/apps/install` (asks every time) |
+
+A person's: dragging the pinned tiles, the cards' sorting, opening an app's view.
 
 ## page_action, by kind
 
