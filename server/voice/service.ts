@@ -11,7 +11,7 @@ import { WHISPER_MODELS, whisperLang } from '../../shared/voice.ts';
 import { HttpError } from '../auth.ts';
 import { ffmpegPath, readable, sniff, toWav, viaEndpoint } from './audio.ts';
 import { dirSize, fetchFile, freeBytes } from './fetch.ts';
-import { findProgram, installProgram, layout, localModels, modelFile, programBytes, SOURCES, transcribe, VAD_FILE, type Program, type Sources } from './whisper.ts';
+import { findProgram, installProgram, layout, localModels, modelFile, programBytes, SOURCES, transcribe, transcribeWords, VAD_FILE, type Program, type Sources, type TimedWord } from './whisper.ts';
 
 interface Config {
   engine: VoiceEngine;
@@ -311,6 +311,26 @@ export class VoiceService {
       return { text, ms: Date.now() - t0 };
     } finally {
       fs.rmSync(raw, { force: true });
+      fs.rmSync(wav, { force: true });
+    }
+  }
+
+  /**
+   * The words of a sound file and when each is said, with whisper.cpp on this computer (the sound editor's words):
+   * read into a 16 kHz WAV first with ffmpeg. Throws, in words a person can act on, when it is not set up.
+   */
+  async words(file: string, o: { onProgress?: (f: number) => void; signal?: AbortSignal } = {}): Promise<{ words: TimedWord[]; lang: string }> {
+    const c = this.cfg;
+    if (c.engine !== 'local') throw new HttpError(409, c.engine === 'endpoint' ? 'Words over the sound need speech recognition on this computer (whisper.cpp): pick it in Settings → Voice.' : 'Speech recognition on the server is off: turn it on in Settings → Voice.');
+    if (!this.prog || !this.complete()) throw new HttpError(409, this.job ? 'whisper.cpp is still downloading: try again in a moment.' : 'whisper.cpp is not ready: see Settings → Voice.');
+    const tmp = layout(this.dir).tmp;
+    fs.mkdirSync(tmp, { recursive: true });
+    const wav = path.join(tmp, `${crypto.randomUUID()}.words.wav`);
+    try {
+      await toWav(file, wav, 4 * 3600_000);
+      const lang = c.english ? 'en' : 'auto';
+      return { words: await transcribeWords(this.prog, { model: this.modelPath(), file: wav, lang, timeout: 4 * 3600_000, onProgress: o.onProgress, signal: o.signal }), lang };
+    } finally {
       fs.rmSync(wav, { force: true });
     }
   }

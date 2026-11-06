@@ -12,6 +12,9 @@ import { handsFree } from './handsfree.ts';
 import { MAX_AUDIO, VoiceService } from './service.ts';
 
 let svc: VoiceService | null = null;
+/** The voice service, for the sound editor's words (null while the app starts). */
+export const voiceService = () => svc;
+
 const service = () => {
   if (!svc) throw new HttpError(503, 'The app is still starting');
   return svc;
