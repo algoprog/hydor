@@ -497,8 +497,8 @@ export function SlidesEditor({
         setDrawer('open');
       }
     }
-    // In a chart or an equation: it is picked, so the side panel shows its numbers or its LaTeX.
-    if ((hit.where === 'chart' || hit.where === 'tex') && hit.id && deck) {
+    // In a chart, an equation, a quiz, a score or code: it is picked, so the side panel shows its numbers, its LaTeX or its words.
+    if ((hit.where === 'chart' || hit.where === 'tex' || hit.where === 'words') && hit.id && deck) {
       setSel([topOf(deck.slides[hit.slide], hit.id)?.id ?? hit.id]);
       setTab('format');
     }
@@ -507,7 +507,7 @@ export function SlidesEditor({
   const marks: FindMark[] = hits
     .map((h, i) => ({ h, i }))
     .filter(({ h }) => h.slide === index && h.where !== 'notes')
-    .map(({ h, i }) => ({ id: h.id!, para: h.para, cell: h.cell, chart: h.where === 'chart' ? h.t : undefined, tex: h.where === 'tex' || undefined, s: h.s, e: h.e, current: i === findAt }));
+    .map(({ h, i }) => ({ id: h.id!, para: h.para, cell: h.cell, chart: h.where === 'chart' ? h.t : undefined, tex: h.where === 'tex' || undefined, whole: h.where === 'words' || undefined, s: h.s, e: h.e, current: i === findAt }));
   const noteMarks = hits
     .map((h, i) => ({ h, i }))
     .filter(({ h }) => h.slide === index && h.where === 'notes')
@@ -1433,6 +1433,8 @@ export function SlidesEditor({
                   <span className="text-fg-3">This one is in a chart.</span>
                 ) : hit?.where === 'tex' ? (
                   <span className="text-fg-3">This one is in an equation’s LaTeX.</span>
+                ) : hit?.where === 'words' ? (
+                  <span className="text-fg-3">{hit.field === 'code' ? 'This one is in code.' : hit.field === 'score' ? 'This one is in a quiz score.' : 'This one is in a quiz.'}</span>
                 ) : undefined
               }
             />
