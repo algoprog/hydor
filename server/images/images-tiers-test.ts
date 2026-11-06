@@ -204,7 +204,9 @@ const ctx = { runId: 'run1', key: 'claude:t1', agent: 'claude', cwd: tmp, deps }
 const tool = (name: string) => images.tools!(ctx).find((t) => t.name === name);
 const runIn = async (c: RunCtx, name: string, args: Record<string, unknown>): Promise<{ text: string; isError?: boolean }> => {
   try {
-    const r = await images.tools!(c).find((t) => t.name === name)!.run(args, c);
+    const r = await images.tools!(c)
+      .find((t) => t.name === name)!
+      .run(args, c);
     return typeof r === 'string' ? { text: r } : r;
   } catch (e) {
     return { text: String((e as Error).message), isError: true };
@@ -711,10 +713,13 @@ const setKey = (k?: string) => {
   // Given on the card: it goes on with that key, and the form comes after it.
   const gv = { ...ctx, key: 'claude:give', runId: 'run-give' } as RunCtx;
   const waiting = runIn(gv, 'generate_image', { prompt: 'A red apple', ask: true });
-  ok(await until(() => latestRequest(db, 'claude:give', OPENROUTER_REQUEST)?.state === 'pending') && !cards.length, 'no form before the key');
+  ok((await until(() => latestRequest(db, 'claude:give', OPENROUTER_REQUEST)?.state === 'pending')) && !cards.length, 'no form before the key');
   keyGiven('claude:give', 'sk-or-given');
   const made = await waiting;
-  ok(!made.isError && /^Made an image with bytedance-seed\/seedream-5-0-flash/.test(made.text) && cards.length === 1 && calls.filter((c) => c.path === '/images').pop()?.auth === 'Bearer sk-or-given', `made with the key given, after its form: ${made.text.split('\n')[0]}`);
+  ok(
+    !made.isError && /^Made an image with bytedance-seed\/seedream-5-0-flash/.test(made.text) && cards.length === 1 && calls.filter((c) => c.path === '/images').pop()?.auth === 'Bearer sk-or-given',
+    `made with the key given, after its form: ${made.text.split('\n')[0]}`,
+  );
   const gd = { ...ctx, key: 'claude:give-drawing', runId: 'run-give-drawing' } as RunCtx;
   cards.length = 0;
   const drawing = runIn(gd, 'make_svg', { prompt: 'A heron', detail: 'complex', ask: false });
