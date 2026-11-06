@@ -103,6 +103,12 @@ Each sync after the first moves only what changed since the last one. A paper yo
 
 It reads three papers at a time (the whole paper from an open copy, or its abstract when there is none), has a quick model fill in each row, writes what the papers say together, and keeps the matrix as a spreadsheet in your [Library](/guide/library#spreadsheets), with a second sheet that lists the papers. Its view has **The matrix** (how many it read, **Open in the Library**, **Copy as a table**, the matrix itself, the papers it could not read and why, and **Another column**: name one, and **Make it again with it** runs it again with that column too), **Papers** (each with what it does in a sentence, and what it was read from) and **Across the papers** (where they agree and disagree and what is still open, with **Copy it**).
 
+### Papers that back a claim
+
+Writing in the [LaTeX editor](/guide/library#latex-documents), pick a sentence that needs a citation and choose **Insert → Find a citation for this**. The helper model turns the claim into searches of OpenAlex and arXiv and reads the abstracts of what they find; the dialog lists the papers that back the claim, strongly or partly, each with why in a line, its authors, year and venue, and its abstract. **Cite** adds the paper's BibTeX to your bibliography (doi.org's or arXiv's own entry, under a key it has not got) and puts the `\cite` after the claim, a second one joining the first; **Add** only adds it. Only the claim and the words around it are sent, never the rest of the paper.
+
+The same editor proofreads your paper (**Tools → Proofread with AI**), rewrites the words you pick while it keeps every command, formula, `\cite` and `\ref` (**Edit → Rewrite with AI**), writes an equation, a table or an algorithm you describe (Ctrl+K), reads one from a picture, explains and fixes TeX's errors, and tidies the bibliography; see [LaTeX documents](/guide/library#latex-documents).
+
 ### Reproduce a paper
 
 [Reproduce a paper](/apps/t/reproduce-paper) runs a paper's own code to see whether its numbers hold: it finds the code, builds its environment, gets its data and checkpoints, runs its evaluation, compares the numbers with the paper's table, and says what it took.
@@ -302,6 +308,7 @@ Two ready-made apps, under **Work** on the [Apps](/apps) page, write up what you
 - "Fix the plots in ~/papers/colbert/plots for an ACL paper, one column wide, in Times."
 - "Check my paper for ACL before I submit it, and fix what you safely can."
 - "Are all the references in my LaTeX paper real, with the right authors and years? Correct the ones that are not."
+- "Merge the duplicate entries in my paper's bibliography and fill in what their DOIs know."
 - "Has any preprint my paper cites been published since? Cite the published versions."
 - "Make my NeurIPS paper anonymous for review: names, links, acknowledgements, the PDF's own fields."
 - "Is my paper within EMNLP's page limit? If it is over, tighten it to fit."
