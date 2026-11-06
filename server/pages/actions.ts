@@ -49,8 +49,13 @@ import {
 } from '../../shared/sheets.ts';
 import { clearChanges, commentsAfterSort, fillChanges, guessSeparator, hasHeader, holds, regionAround, removeDuplicates, sortByKeys, sortChanges, splitColumn, styleChanges, summarySheet, trimChanges, type SummaryFn } from '../../shared/sheet-tools.ts';
 import { sheetNamed } from '../../shared/sheet-edits.ts';
-import { cleanTexName, TEX_MAIN, type TexDoc } from '../../shared/latex.ts';
+import { cleanTexName, TEX_MAIN, texFileText, type TexDoc } from '../../shared/latex.ts';
 import { texMoveFiles } from '../../shared/latex-files.ts';
+import { citedKeys } from '../../shared/latex-ai.ts';
+import type { BibEntry } from '../../shared/latex-bib.ts';
+import { bibNeedsFill, fillEntry, renameCites, tidyBib } from '../../shared/latex-bibtidy.ts';
+import { tidyTex } from '../../shared/latex-tidy.ts';
+import { bibtexForDois } from './latex-refs.ts';
 
 type Args = Record<string, unknown>;
 type Json = Record<string, any>;
@@ -802,6 +807,76 @@ const moveFiles: Act<TexDoc> = (d, a) => {
   return { model: next, said: `moved ${moves.map(([f, t]) => `${f} → ${t}`).join(', ')}${changed ? `; the references to them in ${plural(changed, 'file')} name them where they are now` : ''}, and their comments and tracked changes went with them.` };
 };
 
+/** A LaTeX document's .tex files by name (all of them when none are given). */
+function texFilesOf(d: TexDoc, given: unknown): string[] {
+  const all = [TEX_MAIN, ...d.files.filter((f) => /\.(tex|ltx)$/i.test(f.name)).map((f) => f.name)];
+  const names = listOf(given).map(str).filter(Boolean);
+  for (const n of names) if (!all.includes(n)) throw new Error(`There is no .tex file “${n}” in the document; it has ${all.join(', ')}.`);
+  return names.length ? names : all;
+}
+
+const setText = (d: TexDoc, name: string, text: string): TexDoc => (name === TEX_MAIN ? { ...d, main: text } : { ...d, files: d.files.map((f) => (f.name === name ? { ...f, text } : f)) });
+
+/** Edit → Tidy the source (shared/latex-tidy.ts): lines indented by what they are in, tables' cells lined up at their &. */
+const tidySource: Act<TexDoc> = (d, a) => {
+  let next = d;
+  let lines = 0;
+  let tables = 0;
+  const touched: string[] = [];
+  for (const name of texFilesOf(d, a.files)) {
+    const r = tidyTex(texFileText(d, name) ?? '', { align: a.align !== false });
+    if (!r.lines) continue;
+    next = setText(next, name, r.text);
+    lines += r.lines;
+    tables += r.tables;
+    touched.push(name);
+  }
+  if (!touched.length) return { said: 'The source is tidy already: nothing changed.' };
+  return { model: next, said: `tidied ${touched.join(', ')}: ${plural(lines, 'line')} indented anew${tables ? `, the cells of ${plural(tables, 'table')} lined up` : ''}; no line’s own text changed.` };
+};
+
+/** Tools → Tidy the bibliography (shared/latex-bibtidy.ts): sorted, duplicates merged, keys fixed, fields filled from DOIs, unused out. */
+const tidyBibliography: Act<TexDoc> = async (d, a, x) => {
+  const bibs = d.files.filter((f) => f.name.endsWith('.bib')).map((f) => f.name);
+  const name = str(a.file) || bibs[0];
+  if (!name || !bibs.includes(name)) throw new Error(bibs.length ? `file: one of the document’s bibliographies, ${bibs.join(', ')}.` : 'The document has no .bib file of its own to tidy.');
+  const texs = [d.main, ...d.files.filter((f) => /\.(tex|ltx)$/i.test(f.name)).map((f) => f.text)];
+  const cited = citedKeys(texs);
+  const bib = texFileText(d, name) ?? '';
+  const on = (k: string, dflt: boolean) => (a[k] === undefined ? dflt : a[k] === true);
+  let fill: Map<string, BibEntry> | undefined;
+  const notes: string[] = [];
+  if (on('fill', true)) {
+    const need = bibNeedsFill(bib).slice(0, 60);
+    if (need.length) {
+      const got = await bibtexForDois(
+        need.map((n) => n.doi),
+        x.ctx.signal,
+      ).catch((e) => (notes.push(`The DOIs could not be looked up: ${(e as Error).message}`), null));
+      fill = new Map();
+      for (const n of need) {
+        const e = got?.entries[n.doi] ? fillEntry(got.entries[n.doi]) : null;
+        if (e) fill.set(n.key, e);
+      }
+      if (got?.missing.length) notes.push(`doi.org had no record for ${plural(got.missing.length, 'DOI')}: ${got.missing.slice(0, 6).join(', ')}.`);
+    }
+  }
+  const r = tidyBib(bib, cited, { sort: on('sort', true), duplicates: on('duplicates', true), keys: on('keys', true), unused: on('unused', false), format: on('format', false) }, fill);
+  if (r.text === bib && !Object.keys(r.renames).length) return { said: `${name} is tidy already: nothing changed.`, notes };
+  let next = setText(d, name, r.text);
+  let cites = 0;
+  for (const f of [TEX_MAIN, ...d.files.filter((y) => /\.(tex|ltx)$/i.test(y.name)).map((y) => y.name)]) {
+    const before = texFileText(next, f) ?? '';
+    const after = renameCites(before, r.renames);
+    if (after !== before) {
+      next = setText(next, f, after);
+      cites++;
+    }
+  }
+  const what = r.changes.map((c) => `- ${c.what}`).join('\n');
+  return { model: next, said: `tidied ${name}${cites ? ` (and the citations in ${plural(cites, 'file')})` : ''}:\n${what || '- its entries written anew.'}`, notes };
+};
+
 // ---- notebooks --------------------------------------------------------------------------------------------------------
 
 /** Clear all outputs (as the notebook's own: each code cell's outputs and run count), or those of the cells named. */
@@ -847,7 +922,7 @@ const ACTIONS: { [K in PageKind]: Record<string, Act<any>> } = {
     delete_sheet: deleteTab,
     move_sheet: moveTab,
   },
-  tex: { move_files: moveFiles },
+  tex: { move_files: moveFiles, tidy_source: tidySource, tidy_bibliography: tidyBibliography },
   notebook: { clear_outputs: clearOutputs },
 };
 
@@ -918,6 +993,8 @@ const DESCRIPTION = [
   '- rename_sheet {sheet, name} (the formulas that name it follow), duplicate_sheet {sheet, name?}, delete_sheet {sheet}, move_sheet {sheet, to: its place from 1}: the sheet tabs’ menu.',
   'LaTeX documents.',
   '- move_files {moves: [{from, to}]}: rename or move files, pictures and folders ("figures/" to "img/"), every \\input, \\include and \\includegraphics that names them following, their comments and tracked changes along; it is typeset again.',
+  '- tidy_source {files?, align?}: Edit → Tidy the source on its .tex files (or those listed): each line indented by the environments, items and groups it is in, and tables’ cells lined up at their & (align: false leaves them); no line’s own text changes.',
+  '- tidy_bibliography {file?, sort?, duplicates?, keys?, fill?, unused?, format?}: Tidy on a .bib (its first when left out): sorted by key, duplicates (same DOI, or title and year) merged with their citations pointed at the one kept, keys fixed, the fields an entry lacks filled from its DOI (doi.org), all on unless false; unused: true also takes out the entries nothing cites; format: true writes every entry one field a line. It answers what changed.',
   'Notebooks.',
   '- clear_outputs {cells?}: clear the outputs of every code cell (or of the cells listed, by number or id).',
   'Any of them.',
@@ -966,6 +1043,15 @@ const SCHEMA = {
     name: { type: 'string', description: 'rename_sheet, duplicate_sheet: the sheet’s name.' },
     to: { type: ['number', 'string'], description: 'move_sheet: its place from 1; turn_into: slides, doc or page.' },
     moves: { type: 'array', items: { type: 'object' }, description: 'move_files: [{from, to}].' },
+    files: { type: 'array', items: { type: 'string' }, description: 'tidy_source: the .tex files (all when left out).' },
+    file: { type: 'string', description: 'tidy_bibliography: the .bib file (the first when left out).' },
+    align: { type: 'boolean', description: 'tidy_source: false to leave tables’ cells as they are.' },
+    sort: { type: 'boolean', description: 'tidy_bibliography: sort by key (on unless false).' },
+    duplicates: { type: 'boolean', description: 'tidy_bibliography: merge duplicates (on unless false).' },
+    keys: { type: 'boolean', description: 'tidy_bibliography: fix keys (on unless false).' },
+    fill: { type: 'boolean', description: 'tidy_bibliography: fill missing fields from DOIs (on unless false).' },
+    unused: { type: 'boolean', description: 'tidy_bibliography: true to take out the entries nothing cites.' },
+    format: { type: 'boolean', description: 'tidy_bibliography: true to write every entry one field a line.' },
     cells: { type: 'array', items: { type: ['number', 'string'] }, description: 'clear_outputs: cells by number or id.' },
     title: { type: 'string', description: 'duplicate: the copy’s title.' },
   },

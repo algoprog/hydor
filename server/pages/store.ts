@@ -6,7 +6,7 @@
 // (slides, a document, a spreadsheet: kinds.ts) keeps its model's text in place of HTML, and its own page is made
 // from it when it shows; its pictures are kept apart (assets.ts).
 import crypto from 'node:crypto';
-import { cleanDescription, STORAGE_LIMITS, VERSION_LIMITS, type PageDataEntry, type PageInfo, type PageVersion } from '../../shared/pages.ts';
+import { cleanDescription, STORAGE_LIMITS, VERSION_LIMITS, VERSION_NAME_MAX, type PageDataEntry, type PageInfo, type PageVersion } from '../../shared/pages.ts';
 import { applyCommentOps, cleanPageComments, type PageComment } from '../../shared/page-comments.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -66,6 +66,8 @@ export function initPages(db: DB) {
   if (!cols.includes('space')) db.exec('alter table pages add column space text');
   // Who made a version, when it was someone the project is shared with (server/spaces/share.ts): their name.
   if (!(db.prepare('pragma table_info(page_versions)').all() as { name: string }[]).some((c) => c.name === 'who')) db.exec('alter table page_versions add column who text');
+  // A name the user gave a version ("Sent to ICML"): kept past the newest 40.
+  if (!(db.prepare('pragma table_info(page_versions)').all() as { name: string }[]).some((c) => c.name === 'name')) db.exec('alter table page_versions add column name text');
   // The Library folder it is in (folders.ts), or none: at its space's top.
   if (!cols.includes('folder')) db.exec('alter table pages add column folder text');
   // What it is, in a few sentences (shared/pages.ts cleanDescription): the Library's search finds it by it.
@@ -183,7 +185,7 @@ export function mustPage(db: DB, id: string): PageInfo {
 
 export function versionsOf(db: DB, id: string): PageVersion[] {
   return (
-    db.prepare('select version, title, bytes, created_at, by, steps, who from page_versions where page_id = ? order by version desc').all(id) as {
+    db.prepare('select version, title, bytes, created_at, by, steps, who, name from page_versions where page_id = ? order by version desc').all(id) as {
       version: number;
       title: string;
       bytes: number;
@@ -191,8 +193,28 @@ export function versionsOf(db: DB, id: string): PageVersion[] {
       by: PageVersion['by'];
       steps: number | null;
       who: string | null;
+      name: string | null;
     }[]
-  ).map((v) => ({ version: v.version, title: v.title, bytes: v.bytes, createdAt: v.created_at, by: v.by, ...(v.steps && v.steps > 1 ? { steps: v.steps } : {}), ...(v.who ? { who: v.who } : {}) }));
+  ).map((v) => ({
+    version: v.version,
+    title: v.title,
+    bytes: v.bytes,
+    createdAt: v.created_at,
+    by: v.by,
+    ...(v.steps && v.steps > 1 ? { steps: v.steps } : {}),
+    ...(v.who ? { who: v.who } : {}),
+    ...(v.name ? { name: v.name } : {}),
+  }));
+}
+
+/** A version named ("Sent to ICML"), or its name taken away (an empty name); its page's versions as they are now. */
+export function nameVersion(db: DB, id: string, version: number, raw: unknown): PageVersion[] {
+  mustPage(db, id);
+  const name = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
+  if (name.length > VERSION_NAME_MAX) throw new HttpError(400, `A version's name is at most ${VERSION_NAME_MAX} characters`);
+  const r = db.prepare('update page_versions set name = ? where page_id = ? and version = ?').run(name || null, id, version);
+  if (!r.changes) throw new HttpError(404, 'That version is no longer kept');
+  return versionsOf(db, id);
 }
 
 /** A version as it is kept: a page's HTML, or another kind's text (the current version when `version` is left out). */
@@ -222,13 +244,15 @@ export function pageModel(db: DB, id: string, version?: number): unknown {
   return mustKind(src.kind).read(src.text);
 }
 
-/** Keeps the newest versions within the limits; the current one always stays. */
+/** Keeps the newest versions within the limits (a named one past their number, within their size); the current one always stays. */
 function prune(db: DB, id: string) {
-  const list = db.prepare('select version, bytes from page_versions where page_id = ? order by version desc').all(id) as { version: number; bytes: number }[];
+  const list = db.prepare('select version, bytes, name from page_versions where page_id = ? order by version desc').all(id) as { version: number; bytes: number; name: string | null }[];
   let total = 0;
+  let unnamed = 0;
   const drop = list.filter((v, i) => {
     total += v.bytes;
-    return i > 0 && (i >= VERSION_LIMITS.count || total > VERSION_LIMITS.bytes);
+    if (!v.name || i === 0) unnamed++;
+    return i > 0 && ((!v.name && unnamed > VERSION_LIMITS.count) || total > VERSION_LIMITS.bytes);
   });
   const del = db.prepare('delete from page_versions where page_id = ? and version = ?');
   for (const v of drop) del.run(id, v.version);

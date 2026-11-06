@@ -133,7 +133,12 @@ export interface PageVersion {
   who?: string;
   /** An agent's saves in a row kept as this one version (left out for one). */
   steps?: number;
+  /** The name the user gave it ("Sent to ICML"): a named version is kept past the newest 40. */
+  name?: string;
 }
+
+/** The longest a version's name may be. */
+export const VERSION_NAME_MAX = 80;
 
 /** One of a page's stored values (window.hydor.storage), as the Data view lists them. */
 export interface PageDataEntry {

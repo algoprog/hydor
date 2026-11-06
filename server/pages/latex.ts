@@ -60,7 +60,8 @@ import type { DB } from '../db.ts';
 import { which } from '../documents/tools.ts';
 import { Zip } from '../documents/zip.ts';
 import { getAsset, putAsset, takeIn } from './assets.ts';
-import { findReferences } from './latex-refs.ts';
+import { bibtexForDois, findReferences } from './latex-refs.ts';
+import { readBboxLayout, type PdfPageWords } from '../../shared/latex-pdfwords.ts';
 import { zipParts } from './ooxml.ts';
 import { TEX_EDITS_HELP } from '../../shared/tex-edits.ts';
 
@@ -78,7 +79,10 @@ const PICS = path.join(ROOT, 'pics');
 const RECIPE = 'tex-1';
 const KEEP = 30;
 const KEEP_PICS = 40;
+/** The longest one typesetting may take: the editor says so (TexSetup.timeLimit). */
 const TIME_MS = 45_000;
+/** Draft mode's line: graphicx draws each picture as a box with its name. */
+const DRAFT = '\\PassOptionsToPackage{draft}{graphicx}\\PassOptionsToPackage{draft}{graphics}';
 /** What a typesetting may write into its folder, all files together. */
 const MAX_OUT = 300 * 1024 * 1024;
 /** The most pages shown as pictures (the PDF has them all). */
@@ -749,13 +753,15 @@ export function cachedTex(doc: TexDoc): TexResult | null {
  * Typesets a document (or gives back how it was typeset, kept): its PDF, pages, errors and warnings with their files
  * and lines, and TeX's log. `base`: the key of an earlier typesetting of it, whose cross-references and bibliography
  * start this one (fewer runs). `folder`: a document of a file on this computer (texFolderOk), typeset among the
- * files of its folder (its figures, styles, data), which TeX may read but not change. Never fails for what is in
- * the document: its errors are in the result.
+ * files of its folder (its figures, styles, data), which TeX may read but not change. `draft`: quick, its pictures
+ * as boxes (graphicx's draft option); `halt`: stop at the first error. Never fails for what is in the document: its
+ * errors are in the result.
  */
-export async function compileTex(db: DB, doc: TexDoc, o: { base?: string; direct?: boolean; folder?: string } = {}): Promise<TexResult> {
+export async function compileTex(db: DB, doc: TexDoc, o: { base?: string; direct?: boolean; folder?: string; draft?: boolean; halt?: boolean } = {}): Promise<TexResult> {
   const plan = o.folder ? folderPlan(o.folder) : null;
-  // A folder's files change what comes of it: its listing (names, sizes, times) is part of the key.
-  const key = plan ? crypto.createHash('sha256').update(`${keyOf(doc)}\0${o.folder}\0${plan.sig}`).digest('hex').slice(0, 40) : keyOf(doc);
+  // A folder's files change what comes of it: its listing (names, sizes, times) is part of the key; so do the options.
+  let key = plan ? crypto.createHash('sha256').update(`${keyOf(doc)}\0${o.folder}\0${plan.sig}`).digest('hex').slice(0, 40) : keyOf(doc);
+  if (o.draft || o.halt) key = crypto.createHash('sha256').update(`${key}\0${o.draft ? 'draft' : ''}\0${o.halt ? 'halt' : ''}`).digest('hex').slice(0, 40);
   const k = keptResult(key);
   if (k) return withPdf(k);
   const t = tools();
@@ -791,7 +797,7 @@ function inside(dir: string, name: string): string {
   return p;
 }
 
-async function typeset(db: DB, doc: TexDoc, key: string, t: Tools, o: { base?: string; direct?: boolean; folder?: string; plan?: FolderPlan | null }): Promise<TexResult> {
+async function typeset(db: DB, doc: TexDoc, key: string, t: Tools, o: { base?: string; direct?: boolean; folder?: string; plan?: FolderPlan | null; draft?: boolean; halt?: boolean }): Promise<TexResult> {
   const t0 = Date.now();
   const box = await sandbox(t);
   if (doc.engine === 'lualatex' && !box) return { key, ok: false, pages: 0, log: '', errors: [], warnings: [], engine: doc.engine, missing: LUA_UNSAFE };
@@ -823,7 +829,8 @@ async function typeset(db: DB, doc: TexDoc, key: string, t: Tools, o: { base?: s
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p, data);
   };
-  write(TEX_MAIN, doc.main);
+  // Draft: the pictures as boxes, put before the first line on the same line (its lines keep their numbers).
+  write(TEX_MAIN, o.draft ? DRAFT + doc.main : doc.main);
   for (const f of doc.files) write(f.name, f.text);
   for (const p of doc.pictures) {
     const data = pictureBytes(db, p);
@@ -840,7 +847,7 @@ async function typeset(db: DB, doc: TexDoc, key: string, t: Tools, o: { base?: s
   const read = o.folder && o.plan ? (mirror(o.folder, dir, o.plan), [o.folder]) : undefined;
 
   const env = texEnv(t, dir);
-  const flags = ['-interaction=nonstopmode', '-file-line-error', '-no-shell-escape', '-no-parse-first-line', '-synctex=1'];
+  const flags = ['-interaction=nonstopmode', '-file-line-error', '-no-shell-escape', '-no-parse-first-line', '-synctex=1', ...(o.halt ? ['-halt-on-error'] : [])];
   const lua = doc.engine === 'lualatex';
   let out = '';
   let killed: Ran['killed'];
@@ -848,13 +855,14 @@ async function typeset(db: DB, doc: TexDoc, key: string, t: Tools, o: { base?: s
   const left = () => Math.max(1000, deadline - Date.now());
   if (t.latexmk && !o.direct) {
     // latexmk runs TeX (and BibTeX, makeindex) as often as the cross-references need. -norc: no rc file of anyone's
-    // (one in the folder would be Perl code); -f: on past errors TeX recovers from, for the pages it can make.
+    // (one in the folder would be Perl code); -f: on past errors TeX recovers from, for the pages it can make (not
+    // when it is to stop at the first error).
     const r = await runHeld(
       [
         t.latexmk,
         '-norc',
         doc.engine === 'xelatex' ? '-xelatex' : lua ? '-lualatex' : '-pdf',
-        '-f',
+        ...(o.halt ? [] : ['-f']),
         '-bibtex-cond',
         ...(lua ? [`-pdflualatex=${t.lualatex} --nosocket %O %S`] : []),
         ...flags,
@@ -1903,7 +1911,7 @@ export function texChangesForAgent(d: TexDoc): string {
   const out = [
     `Track changes: ${d.track ? 'on (what the user types and deletes is marked, and so is what you change when you save)' : 'off'}. ${cs.length ? `${cs.length} tracked change${cs.length === 1 ? '' : 's'} to accept or reject` : 'No tracked changes waiting'}; the files below read as if all were accepted. Decide them with save_latex’s changes: [{"id", "accept": true}] or [{"id", "reject": true}] (rejecting words put in takes them out, rejecting words taken out puts them back), or "accept all" / "reject all"; track: true or false switches it.`,
   ];
-  for (const c of cs.slice(0, 80)) out.push(`- ${c.id}: ${c.kind === 'ins' ? 'put in' : 'taken out'} by ${c.by === 'agent' ? 'an agent' : 'the user'} in ${c.file}:${lineOf(c)}: “${c.text.slice(0, 200)}${c.text.length > 200 ? '…' : ''}”`);
+  for (const c of cs.slice(0, 80)) out.push(`- ${c.id}: ${c.kind === 'ins' ? 'put in' : 'taken out'} by ${c.by === 'agent' ? 'an agent' : c.by === 'ai' ? 'AI in the editor (a rewrite or proofreading the user accepted as a change to review)' : 'the user'} in ${c.file}:${lineOf(c)}: “${c.text.slice(0, 200)}${c.text.length > 200 ? '…' : ''}”`);
   if (cs.length > 80) out.push(`- … and ${cs.length - 80} more`);
   return out.join('\n');
 }
@@ -2094,7 +2102,52 @@ export async function texSetup(): Promise<TexSetup> {
     notes,
     installed,
     add: installed ? addFor(t, TEMPLATE_NEEDS.filter((n) => !installed.includes(n))) : undefined,
+    timeLimit: TIME_MS / 1000,
+    words: !!which('pdftotext'),
   };
+}
+
+/** Typesettings kept (by their keys) thrown away, so the next one starts afresh (Clear the cached files): how many went. */
+export function clearTex(keys: unknown): number {
+  let n = 0;
+  for (const key of Array.isArray(keys) ? keys.slice(0, 20) : []) {
+    if (typeof key !== 'string' || !isKey(key) || running.has(key)) continue;
+    const dir = path.join(ROOT, key);
+    if (!fs.existsSync(dir) && !kept.has(key)) continue;
+    fs.rmSync(dir, { recursive: true, force: true });
+    kept.delete(key);
+    n++;
+  }
+  return n;
+}
+
+/**
+ * A typesetting's words and where each is on its page (shared/latex-pdfwords.ts), read by poppler's pdftotext held in
+ * as TeX is, and kept beside it; null when there is no such PDF or no pdftotext here.
+ */
+export async function texPdfWords(key: string): Promise<PdfPageWords[] | null> {
+  const k = keptResult(key);
+  const bin = which('pdftotext');
+  if (!k?.pdf || !bin) return null;
+  const dir = path.join(ROOT, key);
+  const keptFile = path.join(dir, 'words.json');
+  try {
+    return JSON.parse(fs.readFileSync(keptFile, 'utf8')) as PdfPageWords[];
+  } catch {}
+  const t = tools();
+  const out = path.join(dir, 'main.words.html');
+  fs.rmSync(out, { force: true });
+  const box = await sandbox(t);
+  await slot(() => runHeld([bin, '-q', '-bbox-layout', '-enc', 'UTF-8', '-l', String(MAX_SHOWN), 'main.pdf', 'main.words.html'], { cwd: dir, env: texEnv(t, dir), box, timeout: 60_000 }));
+  try {
+    const pages = readBboxLayout(fs.readFileSync(out, 'utf8').slice(0, 40_000_000), MAX_SHOWN);
+    fs.writeFileSync(keptFile, JSON.stringify(pages));
+    return pages;
+  } catch {
+    return null;
+  } finally {
+    fs.rmSync(out, { force: true });
+  }
 }
 
 /** A typesetting as the editor gets it: everything but the PDF itself. */
@@ -2123,23 +2176,26 @@ export function texPdfFile(key: string): string | null {
 
 /**
  * The editor's live preview, signed in:
- *   GET  /api/pages/tex/setup — what this computer has: { engines, latexmk, bibtex, pictures, sync, sandbox, missing?, notes, installed?, add? }
- *   POST /api/pages/tex/compile { model, base? } — typesets the editor's model as it is (saved or not):
+ *   GET  /api/pages/tex/setup — what this computer has: { engines, latexmk, bibtex, pictures, sync, sandbox, missing?, notes, installed?, add?, timeLimit, words }
+ *   POST /api/pages/tex/compile { model, base?, folder?, draft?, halt? } — typesets the editor's model as it is (saved or not):
  *        { key, ok, pdf, pages, sizes, errors, warnings, log, engine, missing?, ms }
+ *   POST /api/pages/tex/clear { keys } — typesettings thrown away, the next to start afresh: { cleared }
  *   GET  /api/pages/tex/:key/:page?w= — a page's picture (PNG), w pixels wide
  *   GET  /api/pages/tex/:key/pdf — the PDF
+ *   GET  /api/pages/tex/:key/words — its pages' words and where they are: { pages: [{ w, h, words: [[text, x, y, w, h, line]] }] }
  *   GET  /api/pages/tex/:key/sync?page=&x=&y= — the source of a point of a page (points from its top left): { file, line } or {}
  *   GET  /api/pages/tex/:key/place?file=&line= — where a line shows: { page, x, y, w, h } or {}
  *   POST /api/pages/tex/picture { name, data } — a picture for a document (PNG, JPEG, or PDF made into PNG): { name, src }
  *   POST /api/pages/tex/reference { query } — BibTeX for a DOI, an arXiv paper, or words of a title or authors (Crossref
  *        and arXiv): { kind, entries: [{ key, bibtex, title, authors, year, venue }] }
+ *   POST /api/pages/tex/bib-fill { dois } — doi.org's BibTeX for each DOI (Tidy's fields filled): { entries: { doi: bibtex }, missing }
  * Keys are typesettings' hashes; nothing outside their folders is ever served.
  */
 export function texRoutes(app: FastifyInstance, db: DB) {
   const P = (req: { params: unknown }) => req.params as Record<string, string>;
   app.get('/api/pages/tex/setup', async () => texSetup());
   app.post('/api/pages/tex/compile', { bodyLimit: 24 * 1024 * 1024 }, async (req) => {
-    const b = (req.body ?? {}) as { model?: unknown; base?: unknown; folder?: unknown };
+    const b = (req.body ?? {}) as { model?: unknown; base?: unknown; folder?: unknown; draft?: unknown; halt?: unknown };
     let doc: TexDoc;
     try {
       doc = normalizeTex(b.model);
@@ -2148,9 +2204,16 @@ export function texRoutes(app: FastifyInstance, db: DB) {
     }
     // A file's document (opened from Files): typeset in its folder, when that may be read.
     const folder = typeof b.folder === 'string' && b.folder ? path.resolve(b.folder) : undefined;
-    const r = await compileTex(db, doc, { base: typeof b.base === 'string' ? b.base : undefined, folder: folder && texFolderOk(folder) ? folder : undefined });
+    const r = await compileTex(db, doc, { base: typeof b.base === 'string' ? b.base : undefined, folder: folder && texFolderOk(folder) ? folder : undefined, draft: b.draft === true, halt: b.halt === true });
     return forEditor(r);
   });
+  app.post('/api/pages/tex/clear', async (req) => ({ cleared: clearTex(((req.body ?? {}) as { keys?: unknown }).keys) }));
+  app.get('/api/pages/tex/:key/words', async (req, reply) => {
+    const pages = await texPdfWords(P(req).key);
+    if (!pages) return reply.code(404).send({ error: 'No words of that typesetting here' });
+    return reply.header('Cache-Control', 'private, max-age=31536000, immutable').send({ pages });
+  });
+  app.post('/api/pages/tex/bib-fill', async (req) => bibtexForDois(((req.body ?? {}) as { dois?: unknown }).dois));
   app.get('/api/pages/tex/:key/pdf', async (req, reply) => {
     const key = P(req).key;
     const k = keptResult(key);
