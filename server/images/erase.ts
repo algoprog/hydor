@@ -2,7 +2,8 @@
 // the rest of the picture as it was. On this computer when the picture tools are set up (LaMa, local.ts: free and
 // private, every pixel outside the mask kept), else through OpenRouter: an image model is shown where to change
 // (make.ts), and its answer is put in only there (here for an agent's boxes, by the editors for a painted mask).
-// POST /api/images/erase for the editors, and the agents' erase_from_image.
+// POST /api/images/erase for the editors, and the agents' erase_from_image (which asks for the OpenRouter key on a card
+// when it has to go that way and none is set; skipped, it does not run).
 import path from 'node:path';
 import type { EraseAsk, PictureAnswer } from '../../shared/images.ts';
 import { HttpError } from '../auth.ts';
@@ -10,7 +11,7 @@ import type { DB } from '../db.ts';
 import type { RunTool } from '../features/types.ts';
 import { loadConfig } from '../models/config.ts';
 import { isPng, readPng, writePng, type Rgba } from '../signatures/png.ts';
-import { checkPicture, dataUrl, doneHow, fromDataUrl, keepMade, keptBytes, MAX_PNG, NEITHER, readPicture, saveForAgent, savedLines, sessionPicture, wayFor, type Here, type Way } from './cutout.ts';
+import { checkPicture, dataUrl, doneHow, failedHere, fromDataUrl, keepMade, keptBytes, keyForCloud, localNote, MAX_PNG, readPicture, saveForAgent, savedLines, sessionPicture, viaOpenRouter, wayFor, type Here, type Way } from './cutout.ts';
 import { cloudTools } from './hooks.ts';
 import { dimensions } from './openrouter.ts';
 
@@ -125,7 +126,7 @@ export function eraseTool(db: DB, here: Here): RunTool {
       'Erase things from a picture (a person in the background, a sign, a watermark, a stain, a cable): what is in the boxes you give is taken away and filled in as the surroundings continue, and the rest of the picture stays as it was. A PNG saved in the session’s folder (images/).',
       'Give boxes in the picture’s pixels, from its top-left corner (open the picture first to see where things are; its size is in the answers of the tools that made it).',
       'On this computer, once the user has set up the picture tools (Settings → Images, video and audio), it is free and private: a few seconds, and the first time it downloads its model (about 210 MB).',
-      'Otherwise, or when you only say what to take away in prompt (no boxes), it goes through OpenRouter at a small cost (about $0.01 to $0.05), where an image model finds it and draws the picture again, so small details may differ.',
+      'Otherwise, or when you only say what to take away in prompt (no boxes), it goes through OpenRouter at a small cost (about $0.01 to $0.05), where an image model finds it and draws the picture again, so small details may differ; without an OpenRouter key the user is asked for one, and if they skip it, nothing is done.',
       'The picture is shown to the user with your reply.',
     ].join(' '),
     inputSchema: {
@@ -149,6 +150,7 @@ export function eraseTool(db: DB, here: Here): RunTool {
         },
         prompt: { type: 'string', description: 'What to take away, in words ("the man on the left", "the watermark"), when you give no boxes: then it goes through OpenRouter. With boxes, what is in them.' },
         name: { type: 'string', description: 'A short file name for the result, without extension (default: the picture’s name and "-erased").' },
+        openrouter: { type: 'boolean', description: 'true: through OpenRouter even though the picture tools are set up here, only when the user asks for that (when this computer is short of memory, say).' },
       },
       required: ['path'],
     },
@@ -159,27 +161,33 @@ export function eraseTool(db: DB, here: Here): RunTool {
       if (!boxes.length && !what) throw new Error('Give boxes around what to take away, or say what it is in prompt.');
       const name = (typeof a.name === 'string' && a.name.trim()) || `${path.basename(file, path.extname(file))}-erased`;
       const n = boxes.length;
-      let way: Way;
-      try {
-        way = wayFor(boxes.length ? 'auto' : 'cloud', here, 'Erasing');
-      } catch {
-        if (boxes.length) return { isError: true, text: NEITHER('Erasing') };
-        return {
-          isError: true,
-          text: here.ready() ? 'Erasing by a description goes through OpenRouter, and no OpenRouter key is set: give boxes around what to take away instead, to erase it on this computer.' : NEITHER('Erasing'),
-        };
-      }
-      try {
-        if (way === 'local') {
+      const onThisComputer = here.ready() && !viaOpenRouter(a);
+      if (n && onThisComputer) {
+        try {
           const made = await here.erase(data, { boxes }, { maxBytes: MAX_PNG, signal: ctx.signal });
           const f = await saveForAgent(ctx, made.png, name);
           return [`Erased ${n === 1 ? 'the box' : `${n} boxes`} ${doneHow('local', made.model)}:`, ...savedLines(f, made.scaled ? 'It was made smaller to stay under 12 MB.' : undefined)].join('\n');
+        } catch (e) {
+          if (ctx.signal?.aborted) return { isError: true, text: 'Stopped before anything was erased.' };
+          return { isError: true, text: failedHere(e, 'Nothing was erased') };
         }
+      }
+      // Words alone need a model to find what they say: with the picture tools here and no key, boxes do it free instead.
+      if (!n && onThisComputer && !loadConfig().openrouter.apiKey)
+        return { isError: true, text: 'Erasing by a description goes through OpenRouter, and no OpenRouter key is set: give boxes around what to take away instead, to erase it on this computer, free.' };
+      const key = await keyForCloud(ctx, here, {
+        why: 'Erasing something from a picture through OpenRouter costs about $0.01 to $0.05: an image model draws the picture again without it.',
+        what: 'the image model that would erase it',
+        doing: 'Erasing',
+      });
+      if (!key.ok) return key.answer;
+      const free = localNote(here);
+      try {
         const cloud = cloudTools()!;
         if (!n) {
           const r = await cloud.edit(db, { src: dataUrl(data), prompt: takeAwayPrompt(what) }, ctx.signal);
           const f = await saveForAgent(ctx, keptBytes(db, r.src), name);
-          return [`Took away ${what} ${doneHow('cloud', r.model, r.cost)}:`, ...savedLines(f, 'The model drew the picture again, so small details may differ from the original.')].join('\n');
+          return [`Took away ${what} ${doneHow('cloud', r.model, r.cost)}:`, ...savedLines(f, ['The model drew the picture again, so small details may differ from the original.', free].filter(Boolean).join(' '))].join('\n');
         }
         const size = dimensions(data);
         if (!size) throw new Error('its size could not be read');
@@ -193,7 +201,7 @@ export function eraseTool(db: DB, here: Here): RunTool {
           else note = 'The model’s answer is its whole picture: outside the boxes it may differ slightly from the original.';
         }
         const f = await saveForAgent(ctx, made, name);
-        return [`Erased ${n === 1 ? 'the box' : `${n} boxes`} ${doneHow('cloud', r.model, r.cost)}:`, ...savedLines(f, note)].join('\n');
+        return [`Erased ${n === 1 ? 'the box' : `${n} boxes`} ${doneHow('cloud', r.model, r.cost)}:`, ...savedLines(f, [note, free].filter(Boolean).join(' ') || undefined)].join('\n');
       } catch (e) {
         if (ctx.signal?.aborted) return { isError: true, text: 'Stopped before anything was erased.' };
         return { isError: true, text: `Nothing was erased: ${(e as Error).message}` };

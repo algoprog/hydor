@@ -1,8 +1,9 @@
 // Taking the background out of a picture: on this computer when the picture tools are set up (local.ts: free, private,
 // the picture's own pixels kept, only how see-through each is changes), else through OpenRouter, where an image model
 // draws it again on a see-through background (make.ts, at a small cost). POST /api/images/cutout for the editors, and
-// the agents' remove_background. Also what erase.ts shares with it: reading the picture to work on, choosing the way,
-// keeping what was made, and saving it in a session's folder.
+// the agents' remove_background, which asks for the OpenRouter key on a card when it has to go that way and none is
+// set (skipped, it does not run). Also what erase.ts shares with it: reading the picture to work on, choosing the
+// way, keeping what was made, and saving it in a session's folder.
 import fs from 'node:fs';
 import path from 'node:path';
 import type { CutoutAsk, PictureAnswer } from '../../shared/images.ts';
@@ -10,7 +11,8 @@ import { ASSET } from '../../shared/slides.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { inSession } from '../documents/index.ts';
-import type { RunCtx, RunTool } from '../features/types.ts';
+import { noKeyText, openRouterKey } from '../connections/openrouter-key.ts';
+import type { RunCtx, RunTool, ToolOutput } from '../features/types.ts';
 import { loadConfig } from '../models/config.ts';
 import { getAsset, pictureType, putAsset } from '../pages/assets.ts';
 import { cloudTools } from './hooks.ts';
@@ -21,6 +23,8 @@ import { money } from './settings.ts';
 /** The picture tools on this computer, as local.ts lends them to the routes and tools here. */
 export interface Here {
   ready(): boolean;
+  /** This computer can set them up (uv, or a Python 3.10 or later). */
+  canSetUp(): boolean;
   cutout(img: Buffer, o: { maxBytes?: number; signal?: AbortSignal }): Promise<MadeHere>;
   erase(img: Buffer, where: { mask: Buffer } | { boxes: { x: number; y: number; w: number; h: number }[] }, o: { maxBytes?: number; signal?: AbortSignal }): Promise<MadeHere>;
 }
@@ -145,8 +149,36 @@ export function savedLines(f: Saved, note?: string): string[] {
 /** How it was done, for the first line of an answer. */
 export const doneHow = (way: Way, model: string | undefined, cost?: number) => (way === 'local' ? `with ${model}, on this computer (free and private)` : `with ${model ?? 'an image model'} through OpenRouter${cost ? ` (${money(cost)})` : ''}`);
 
-export const NEITHER = (what: string) =>
-  `${what} needs the picture tools on this computer or an OpenRouter key, and neither is set up. Tell the user they can set up the picture tools in Settings → Images, video and audio (free and private: about 65 MB, and a model of about 220 MB the first time each tool is used), or add an OpenRouter key in Settings → Models.`;
+/** For the agent, when the picture tools are not set up and this computer could set them up: they would do it free. */
+export const localNote = (here: Here) => (here.ready() || !here.canSetUp() ? '' : 'The picture tools on this computer would do this free and in private once the user sets them up (Settings → Images, video and audio): you may tell them.');
+
+const sentence = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+/**
+ * Before an agent's picture goes through OpenRouter: the key, asked for on a card in the conversation when none is set
+ * (`why`, what it costs, also says the picture tools could do it free here when this computer can set them up). Without
+ * one, what to tell the agent: a plain answer when the user skipped it, an error when this app cannot go that way.
+ */
+export async function keyForCloud(ctx: RunCtx, here: Here, o: { why: string; what: string; doing: string }): Promise<{ ok: true } | { ok: false; answer: string | ToolOutput }> {
+  if (!cloudTools())
+    return {
+      ok: false,
+      answer: {
+        isError: true,
+        text: `${o.doing} needs the picture tools on this computer here. Tell the user they can set them up in Settings → Images, video and audio (free and private: about 65 MB, and a model of about 220 MB the first time each tool is used).`,
+      },
+    };
+  const free = !here.ready() && here.canSetUp() ? ' Or skip this and set up the picture tools in Settings → Images, video and audio: they do it free and in private on this computer.' : '';
+  const k = await openRouterKey(ctx, { why: o.why + free });
+  if (k.key !== null) return { ok: true };
+  return { ok: false, answer: [sentence(noKeyText(k, o.what)), localNote(here)].filter(Boolean).join(' ') };
+}
+
+/** An agent's job on this computer failed: what to tell it (short of memory, the way through OpenRouter, if the user agrees). */
+export const failedHere = (e: unknown, start: string) => `${start}: ${(e as Error).message}${e instanceof HttpError && e.status === 503 ? ' To do it through OpenRouter instead, call again with openrouter: true, if the user agrees.' : ''}`;
+
+/** The agent asked to go through OpenRouter even though the picture tools are here. */
+export const viaOpenRouter = (a: Record<string, unknown>) => a.openrouter === true || a.openrouter === 'true';
 
 /** A kept picture's bytes (what OpenRouter's model made, kept by make.ts). */
 export function keptBytes(db: DB, src: string): Buffer {
@@ -164,7 +196,7 @@ export function removeBackgroundTool(db: DB, here: Here): RunTool {
     description: [
       'Take the background out of a picture, leaving its subject (a person, a product, an animal, a logo, an object) on a see-through background: a PNG saved in the session’s folder (images/), to put on slides, documents and pages.',
       'On this computer, once the user has set up the picture tools (Settings → Images, video and audio), it is free and private, and keeps the subject’s pixels exactly; it takes a few seconds to half a minute, and the first time it downloads its model (about 220 MB).',
-      'Otherwise it goes through OpenRouter at a small cost (about $0.01 to $0.05): an image model draws the picture again without its background, so small details may differ.',
+      'Otherwise it goes through OpenRouter at a small cost (about $0.01 to $0.05): an image model draws the picture again without its background, so small details may differ; without an OpenRouter key the user is asked for one, and if they skip it, nothing is done.',
       'The picture is shown to the user with your reply.',
     ].join(' '),
     inputSchema: {
@@ -172,27 +204,34 @@ export function removeBackgroundTool(db: DB, here: Here): RunTool {
       properties: {
         path: { type: 'string', description: 'The picture (PNG, JPEG, WebP or GIF), in the session’s folder.' },
         name: { type: 'string', description: 'A short file name for the result, without extension (default: the picture’s name and "-cutout").' },
+        openrouter: { type: 'boolean', description: 'true: through OpenRouter even though the picture tools are set up here, only when the user asks for that (when this computer is short of memory, say).' },
       },
       required: ['path'],
     },
     async run(a, ctx) {
       const { file, data } = sessionPicture(ctx, a.path);
       const name = (typeof a.name === 'string' && a.name.trim()) || `${path.basename(file, path.extname(file))}-cutout`;
-      let way: Way;
-      try {
-        way = wayFor('auto', here, 'Taking the background out');
-      } catch {
-        return { isError: true, text: NEITHER('Taking the background out') };
-      }
-      try {
-        if (way === 'local') {
+      if (here.ready() && !viaOpenRouter(a)) {
+        try {
           const made = await here.cutout(data, { maxBytes: MAX_PNG, signal: ctx.signal });
           const f = await saveForAgent(ctx, made.png, name);
           return [`Took the background out ${doneHow('local', made.model)}:`, ...savedLines(f, made.scaled ? 'It was made smaller to stay under 12 MB.' : undefined)].join('\n');
+        } catch (e) {
+          if (ctx.signal?.aborted) return { isError: true, text: 'Stopped before the background was taken out.' };
+          return { isError: true, text: failedHere(e, 'The background was not taken out') };
         }
+      }
+      const key = await keyForCloud(ctx, here, {
+        why: 'Taking the background out of a picture through OpenRouter costs about $0.01 to $0.05: an image model draws it again without its background.',
+        what: 'the image model that would take the background out',
+        doing: 'Taking the background out',
+      });
+      if (!key.ok) return key.answer;
+      try {
         const r = await cloudTools()!.edit(db, { src: dataUrl(data), prompt: CUTOUT_PROMPT, transparent: true }, ctx.signal);
         const f = await saveForAgent(ctx, keptBytes(db, r.src), name);
-        return [`Took the background out ${doneHow('cloud', r.model, r.cost)}:`, ...savedLines(f, 'The model drew the picture again, so small details may differ from the original.')].join('\n');
+        const note = ['The model drew the picture again, so small details may differ from the original.', localNote(here)].filter(Boolean).join(' ');
+        return [`Took the background out ${doneHow('cloud', r.model, r.cost)}:`, ...savedLines(f, note)].join('\n');
       } catch (e) {
         if (ctx.signal?.aborted) return { isError: true, text: 'Stopped before the background was taken out.' };
         return { isError: true, text: `The background was not taken out: ${(e as Error).message}` };

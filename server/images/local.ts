@@ -789,7 +789,7 @@ export function localState(): LocalToolsState {
 export const localReady = () => envReady() && !settingUp;
 
 /** What the routes and tools of cutout.ts and erase.ts are lent. */
-const here: Here = { ready: localReady, cutout: cutoutHere, erase: eraseHere };
+const here: Here = { ready: localReady, canSetUp: () => envReady() || installable().canInstall, cutout: cutoutHere, erase: eraseHere };
 
 setLocalTools({
   state: localState,
