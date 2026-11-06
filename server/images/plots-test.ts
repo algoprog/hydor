@@ -285,7 +285,7 @@ ok(plots.id === 'plots' && /\bimages, plots,/.test(fs.readFileSync(path.join(APP
   const fig = figureOf(
     Buffer.from(JSON.stringify({ data: [{ type: 'bar', y: [1], name: '</script><script>alert(1)</script>', marker: { colorbar: { title: 'Units' } } }], layout: { title: 'T', width: 9, height: 9, xaxis: { title: 'X', titlefont: { size: 12 } } } })),
   );
-  const page = plotlyPage(fig as Exclude<typeof fig, string>, themeOf({ colors: ['#2563EB'], fg: '#111111', bg: '#fafafa', font: 'Inter' }));
+  const page = plotlyPage(fig as Exclude<typeof fig, string>, themeOf({ colors: ['#2563EB'], fg: '#111111', bg: '#fafafa', font: 'Inter' }), { w: 800, h: 450 });
   const json = JSON.parse(/<script type="application\/json" id="figure">(.*?)<\/script>/.exec(page)![1]);
   ok(page.includes(`https://cdn.jsdelivr.net/npm/plotly.js-dist-min@${KIT_LIBS.plotly.version}/plotly.min.js`), 'Plotly from jsDelivr, at the version views use');
   ok(!page.includes('</script><script>alert') && json.data[0].name === '</script><script>alert(1)</script>', 'what the data says stays data: nothing in it ends its element');
@@ -295,7 +295,7 @@ ok(plots.id === 'plots' && /\bimages, plots,/.test(fs.readFileSync(path.join(APP
   );
   ok(!('width' in json.layout) && !('height' in json.layout), 'no fixed size: it fills its frame');
   ok(
-    /showSendToCloud: false/.test(page) && /'--n-c' \+ \(i \+ 1\)/.test(page) && /--n-font/.test(page) && /"colors":\["#2563eb"\],"fg":"#111111","bg":"#fafafa","font":"Inter"/.test(page),
+    /showSendToCloud: false/.test(page) && /'--n-c' \+ \(i \+ 1\)/.test(page) && /--n-font/.test(page) && /"colors":\["#2563eb"\],"fg":"#111111","bg":"#fafafa","font":"Inter","w":800,"h":450/.test(page) && /displayModeBar: false/.test(page),
     'the deck’s colours and font take the place of those it was made in; nothing goes to Plotly’s cloud',
   );
 }

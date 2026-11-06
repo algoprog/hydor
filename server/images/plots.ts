@@ -549,7 +549,8 @@ const inScript = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c');
 const PLOTLY = `${LIB_CDN}${KIT_LIBS.plotly.pkg}@${KIT_LIBS.plotly.version}/${KIT_LIBS.plotly.js}`;
 
 // The page's own script: the deck's colours (--n-c1… --n-c6, --n-fg, --n-bg) take the place of those it was made in,
-// its font (--n-font) is used, and the plot fills its frame; Plotly's button that sends a plot to its cloud stays off.
+// its font (--n-font) is used, and the plot fills its frame, its words and margins in step with the frame's size as a
+// picture's would be. No buttons over it (a box dragged zooms, a double click goes back), and nothing goes to Plotly's cloud.
 const PAGE_SCRIPT = `(function () {
   var fig = JSON.parse(document.getElementById('figure').textContent);
   var made = JSON.parse(document.getElementById('made-in').textContent);
@@ -581,13 +582,13 @@ const PAGE_SCRIPT = `(function () {
   };
   var data = recolour(fig.data), layout = recolour(fig.layout);
   layout.autosize = true;
-  layout.font = Object.assign({ color: ink }, layout.font);
+  layout.font = Object.assign({ color: ink, size: 12 }, layout.font);
   if (fg) layout.font.color = fg;
   layout.font.family = font || layout.font.family || (made.font ? made.font + ', ' : '') + 'system-ui, sans-serif';
+  if (layout.title && typeof layout.title === 'object') layout.title.font = Object.assign({ size: Math.round(layout.font.size * 1.4) }, layout.title.font);
   if (!('paper_bgcolor' in layout)) layout.paper_bgcolor = 'rgba(0,0,0,0)';
   if (!('plot_bgcolor' in layout)) layout.plot_bgcolor = 'rgba(0,0,0,0)';
   layout.legend = Object.assign({ bgcolor: 'rgba(0,0,0,0)' }, layout.legend);
-  layout.modebar = Object.assign({ bgcolor: 'rgba(0,0,0,0)', color: tint(ink, 0.45), activecolor: ink }, layout.modebar);
   layout.margin = Object.assign({ l: 56, r: 24, t: layout.title ? 56 : 24, b: 48 }, layout.margin);
   if (!layout.xaxis) layout.xaxis = {};
   if (!layout.yaxis) layout.yaxis = {};
@@ -599,17 +600,34 @@ const PAGE_SCRIPT = `(function () {
     if (!ax.linecolor) ax.linecolor = tint(ink, 0.35);
     if (!ax.zerolinecolor) ax.zerolinecolor = tint(ink, 0.25);
   });
-  Plotly.newPlot(box, data, layout, {
-    responsive: true,
-    displaylogo: false,
-    showSendToCloud: false,
-    plotlyServerURL: '',
-    modeBarButtonsToRemove: ['sendDataToCloud', 'sendChartToCloud', 'toImage', 'select2d', 'lasso2d'],
+  // Every font's size and the margins, times k: the plot as large in its frame as it was made.
+  var FONTS = /^(font|tickfont|textfont|insidetextfont|outsidetextfont)$/;
+  var times = function (v, k) {
+    if (Array.isArray(v)) return v.map(function (x) { return times(x, k); });
+    if (!v || typeof v !== 'object') return v;
+    var o = {};
+    Object.keys(v).forEach(function (key) {
+      var x = times(v[key], k);
+      if (FONTS.test(key) && x && typeof x === 'object' && typeof x.size === 'number') x.size = Math.round(x.size * k * 10) / 10;
+      if (key === 'margin' && x && typeof x === 'object') ['l', 'r', 't', 'b'].forEach(function (s) { if (typeof x[s] === 'number') x[s] = Math.round(x[s] * k); });
+      o[key] = x;
+    });
+    return o;
+  };
+  var scale = function () { return Math.max(0.5, Math.min(2, Math.min(innerWidth / made.w, innerHeight / made.h))); };
+  var config = { responsive: true, displayModeBar: false, displaylogo: false, showSendToCloud: false, plotlyServerURL: '', doubleClick: 'reset' };
+  var now = scale();
+  Plotly.newPlot(box, data, times(layout, now), config);
+  addEventListener('resize', function () {
+    var k = scale();
+    if (Math.abs(k - now) < 0.02) return;
+    now = k;
+    Plotly.react(box, data, times(layout, k), config);
   });
 })();`;
 
 /** The plot that moves and answers the pointer: one small page that loads Plotly (jsDelivr, the version views use), its data inside it. */
-export function plotlyPage(fig: Figure, theme: Theme): string {
+export function plotlyPage(fig: Figure, theme: Theme, size: { w: number; h: number }): string {
   const layout = plotlyTitles(fig.layout) as Record<string, unknown>;
   delete layout.width;
   delete layout.height;
@@ -621,7 +639,7 @@ export function plotlyPage(fig: Figure, theme: Theme): string {
     `<script src="${PLOTLY}"></script>`,
     '</head><body><div id="plot"></div>',
     `<script type="application/json" id="figure">${inScript(figure)}</script>`,
-    `<script type="application/json" id="made-in">${inScript({ colors: theme.colors, fg: theme.fg, bg: theme.bg, font: theme.font ?? '' })}</script>`,
+    `<script type="application/json" id="made-in">${inScript({ colors: theme.colors, fg: theme.fg, bg: theme.bg, font: theme.font ?? '', w: size.w, h: size.h })}</script>`,
     `<script>${PAGE_SCRIPT}</script>`,
     '</body></html>',
   ].join('\n');
@@ -706,7 +724,7 @@ async function runScript(tools: LocalTools, code: string, p: Plotting, signal: A
       if (!last) return { ok: false, error: `The picture is right, but: ${fig}` };
       notes.push(`No interactive version: ${fig}`);
     } else {
-      const page = plotlyPage(fig, p.theme);
+      const page = plotlyPage(fig, p.theme, size ?? { w: p.w, h: p.h });
       if (page.length > MAX_HTML) notes.push(`No interactive version: with its data it is over ${Math.round(MAX_HTML / 1000)},000 characters, too much for a slide; ask for fewer points.`);
       else html = page;
     }
