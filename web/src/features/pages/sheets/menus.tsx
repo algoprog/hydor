@@ -31,6 +31,11 @@ import {
   WandSparkles,
   Eraser as Broom,
   ChartNoAxesCombined,
+  Grid3x3,
+  Link2,
+  ListTree,
+  Lock,
+  Tag,
   Split,
   SquareCheck,
   SquareChevronDown,
@@ -131,6 +136,15 @@ export interface MenuCtx {
   /** While the board shows: whether the sheet opens on it, and the switch for that (kept with the sheet). */
   boardOpens?: boolean;
   boardOpen(): void;
+  /** Data → Named ranges, Protect sheets and ranges, Group and Ungroup (rows, or columns when whole columns are picked); Insert → Link; View → Gridlines. */
+  names(): void;
+  protect(): void;
+  group(): void;
+  ungroup(): void;
+  groupWhat: 'rows' | 'columns';
+  link(): void;
+  gridlines: boolean;
+  toggleGridlines(): void;
   /** The AI tools: a formula written or explained, Fill with AI, a table made, Analyze and Clean up, and the AI cells. */
   ai?: {
     formula(): void;
@@ -202,6 +216,7 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
         items: ZOOMS.map((z) => ({ label: `${z}%`, checked: Math.round(m.zoom * 100) === z, run: () => m.setZoom(z / 100) })),
       },
       { label: 'Show formulas', icon: <Sigma size={14} />, keys: 'Ctrl+`', checked: m.formulas, run: () => m.setFormulas(!m.formulas) },
+      !ro && { label: 'Gridlines', icon: <Grid3x3 size={14} />, also: 'grid lines cell borders show hide', checked: m.gridlines, run: m.toggleGridlines },
       { label: 'Comments', icon: <MessagesSquare size={14} />, also: 'discussion threads resolve', run: m.comments },
       { label: 'Kanban board', icon: <SquareKanban size={14} />, also: 'cards lanes group by status', checked: m.board, run: m.toggleBoard },
       m.board && !ro && { label: 'Open the sheet on its board', also: 'kanban view start', checked: !!m.boardOpens, run: m.boardOpen },
@@ -225,6 +240,7 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
       !ro && { label: 'Date', icon: <Calendar size={14} />, also: 'calendar picker', run: m.date },
       !ro && { label: m.note ? 'Edit note' : 'Note', icon: <StickyNote size={14} />, keys: 'Shift+F2', also: 'memo', run: m.noteEdit },
       !ro && { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'discussion thread reply', run: m.comment },
+      !ro && { label: 'Link', icon: <Link2 size={14} />, keys: 'Ctrl+K', also: 'hyperlink url web address', run: m.link },
       !ro && { label: 'Function', icon: <Sigma size={14} />, also: 'formula', items: FUNCS.map((f) => ({ label: f, run: () => m.func(f) })) },
       !ro && m.ai && { label: 'Formula with AI', icon: <Sparkles size={14} />, also: 'write a formula ai assistant describe words', run: m.ai.formula },
       !ro && m.ai && { label: 'Table made with AI', icon: <WandSparkles size={14} />, also: 'generate table ai list template', run: m.ai.table },
@@ -340,6 +356,10 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
           '-',
           { label: m.filtered ? 'Remove the filter' : 'Create a filter', icon: <ListFilter size={14} />, keys: 'Ctrl+Shift+L', run: m.toggleFilter },
           { label: 'Data validation', icon: <SquareCheck size={14} />, also: 'rules dropdown list checkbox allowed values', run: m.validation },
+          { label: 'Named ranges', icon: <Tag size={14} />, also: 'name manager define names', run: m.names },
+          { label: 'Protect sheets and ranges', icon: <Lock size={14} />, also: 'lock protection read only warn', run: m.protect },
+          { label: m.groupWhat === 'columns' ? 'Group columns' : 'Group rows', icon: <ListTree size={14} />, keys: 'Alt+Shift+Right', also: 'outline collapse expand fold', run: m.group },
+          { label: m.groupWhat === 'columns' ? 'Ungroup columns' : 'Ungroup rows', keys: 'Alt+Shift+Left', also: 'outline remove group', run: m.ungroup },
           '-',
           { label: 'Remove duplicates', also: 'unique', run: m.dups },
           { label: 'Split text to columns', icon: <Split size={14} />, also: 'separate comma', run: m.split },

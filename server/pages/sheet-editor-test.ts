@@ -385,7 +385,8 @@ const sh = book.sheets[0];
   const got = importBook(zipParts(more), 'Work.xlsm');
   const lost = got.loses ?? [];
   ok(got.book.names?.some((n) => n.name === 'Rate' && n.ref === 'Work!$C$2') && !got.book.names?.some((n) => n.name === 'Ext'), 'a name of the workbook is kept; one pointing into another file is not');
-  ok(['groups', 'hyperlinks', 'names', 'rich', 'shapes', 'macros'].every((k) => lost.includes(k)) && !lost.includes('charts') && !lost.includes('pictures'), `what an Excel file loses is said: ${lost.join(', ')}`);
+  ok(['hyperlinks', 'names', 'rich', 'shapes', 'macros'].every((k) => lost.includes(k)) && !lost.includes('groups') && !lost.includes('charts') && !lost.includes('pictures'), `what an Excel file loses is said: ${lost.join(', ')}`);
+  ok(got.book.sheets[0].groups?.[0]?.range === '2:2', 'its groups of rows are kept');
   void calc;
 }
 

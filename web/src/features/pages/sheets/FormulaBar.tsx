@@ -21,17 +21,19 @@ const rank = (n: string) => {
  * What to offer while a formula is typed: functions starting with the word before the caret, and the one being filled
  * in (its name, and which of its arguments the caret is in: the commas before it in the call).
  */
-export function formulaHelp(text: string, caret: number): { word: string; names: string[]; inside: { name: string; arg: number } | null } {
+export function formulaHelp(text: string, caret: number, ranges: string[] = []): { word: string; names: string[]; inside: { name: string; arg: number } | null } {
   if (!text.startsWith('=')) return { word: '', names: [], inside: null };
   const before = text.slice(0, caret);
   // Not inside quoted words.
   if ((before.match(/"/g)?.length ?? 0) % 2) return { word: '', names: [], inside: null };
   const m = /(?:^=|[=(,;+\-*/^&<>:\s%])([A-Za-z][A-Za-z0-9.]*)$/.exec(before);
   const word = m ? m[1].toUpperCase() : '';
+  // Functions first, then the workbook's named ranges.
   const names = word
-    ? FUNCTION_NAMES.filter((n) => n.startsWith(word) && n !== word)
-        .sort((a, b) => rank(a) - rank(b) || a.length - b.length || (a < b ? -1 : 1))
-        .slice(0, 6)
+    ? [
+        ...FUNCTION_NAMES.filter((n) => n.startsWith(word) && n !== word).sort((a, b) => rank(a) - rank(b) || a.length - b.length || (a < b ? -1 : 1)),
+        ...ranges.filter((n) => n.toUpperCase().startsWith(word) && n.toUpperCase() !== word),
+      ].slice(0, 6)
     : [];
   // The innermost function whose ( is still open before the caret, and the commas of its own before the caret.
   let depth = 0;
@@ -95,6 +97,7 @@ export function FormulaBar({
   aiRef,
   onAi,
   onExplain,
+  ranges,
 }: {
   /** The selection's name ("B2", "B2:D9"). */
   name: string;
@@ -120,13 +123,15 @@ export function FormulaBar({
   aiRef?: React.RefObject<HTMLButtonElement | null>;
   onAi?: () => void;
   onExplain?: () => void;
+  /** The workbook's named ranges, offered while a formula is typed. */
+  ranges?: string[];
 }) {
   const [box, setBox] = useState(name);
   const [boxFocus, setBoxFocus] = useState(false);
   useEffect(() => {
     if (!boxFocus) setBox(name);
   }, [name, boxFocus]);
-  const help = editing ? formulaHelp(text, caret) : null;
+  const help = editing ? formulaHelp(text, caret, ranges) : null;
   const lines = Math.min(4, text.split('\n').length);
   const nameRef = useRef<HTMLInputElement>(null);
   const list =
@@ -145,7 +150,7 @@ export function FormulaBar({
                 {n}
               </span>
               <span translate="no" className="min-w-0 truncate font-mono text-[11.5px] text-fg-3">
-                {FUNCTION_INFO[n]?.[0].replace(/^[^(]*/, '') ?? '(…)'}
+                {FUNCTION_INFO[n]?.[0].replace(/^[^(]*/, '') ?? (ranges?.includes(n) ? 'named range' : '(…)')}
               </span>
               {i === 0 && <span className="ml-auto shrink-0 text-[11px] text-fg-3">Tab</span>}
             </span>
