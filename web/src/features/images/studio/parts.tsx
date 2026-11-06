@@ -1,7 +1,7 @@
 // The pieces the editors' AI tools share: the words box with a few examples to start from, a setting that names itself
 // and opens a short list ("For  Picture ⌄"), a shape's little outline, the price line, a problem in words with its way
-// out (no OpenRouter key: Settings → Models), work going on, and a picture shown over a quiet checkerboard so its
-// see-through parts show as such.
+// out (no OpenRouter key: Settings → Models, where a tool did not ask for it in place), work going on, and a picture
+// shown over a quiet checkerboard so its see-through parts show as such.
 import type { CSSProperties, ReactNode } from 'react';
 import { KeyRound, TriangleAlert } from 'lucide-react';
 import { Button, cx, OptionRow, Picker, Throbber } from '../../../components/ui';
@@ -105,19 +105,6 @@ export function Problem({ error, onLeave, children }: { error: string; onLeave: 
         </Button>
       )}
       {children}
-    </div>
-  );
-}
-
-/** Before anything: OpenRouter has no key here, so what goes through it cannot be made yet. */
-export function NoKey({ what, onLeave }: { what: string; onLeave: () => void }) {
-  return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/40 bg-warn/10 px-3 py-2.5">
-      <KeyRound size={16} className="shrink-0 text-warn" />
-      <div className="min-w-[12rem] flex-1 text-[12.5px] leading-snug text-fg-2">{what}</div>
-      <Button size="sm" variant="primary" onClick={() => addKey(onLeave)}>
-        Add the key
-      </Button>
     </div>
   );
 }
