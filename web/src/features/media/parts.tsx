@@ -11,7 +11,7 @@ import { toastError } from '../../lib/store';
 import { cx } from '../../components/ui';
 import { PlayButton, SoundIcon, useSound, Waveform } from '../../components/AudioPlayer';
 import { clock } from '../../components/VideoPlayer';
-import { mediaUrl } from './state';
+import { mediaUrl, withDownload } from './state';
 
 /** A still of an item: the picture itself (or its smaller copy), a video's still, a sound's shape. */
 export function Still({ m, className }: { m: MediaItem; className?: string }) {
@@ -84,7 +84,7 @@ export const startSessionWithMedia = (m: MediaItem) => startSessionWith([{ path:
 
 export function downloadMedia(m: MediaItem) {
   const a = document.createElement('a');
-  a.href = mu(`${mediaUrl(m)}?download=1`);
+  a.href = mu(withDownload(mediaUrl(m)));
   a.download = '';
   document.body.appendChild(a);
   a.click();

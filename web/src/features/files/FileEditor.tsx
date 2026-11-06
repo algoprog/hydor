@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
-import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileDiff, FolderOpen, Highlighter, MessageSquarePlus, RotateCcw, Save, Search, Signature, SquareTerminal, WrapText } from 'lucide-react';
+import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileDiff, FolderOpen, Highlighter, MessageSquarePlus, RotateCcw, Save, Search, Signature, SlidersHorizontal, SquareTerminal, WrapText } from 'lucide-react';
 import { api, ApiError, post, put } from '../../lib/api';
 import type { EditorHandle } from '../../lib/codemirror';
 import { basename, bytes, dirname, isWinPath, tildify } from '../../lib/format';
@@ -15,6 +15,7 @@ import { isPreviewable } from '@shared/documents';
 import { copyPaths, goFolder, itemOf, startSession } from './actions';
 import { useSpaceMenu } from './SpaceMenu';
 import { useWatchMs } from './FileAsk';
+import { EDITABLE, editFile } from '../mediaedit/open';
 
 // Word, Excel, PowerPoint and other documents open as a preview (features/documents).
 const OfficePreview = lazy(() => import('../documents/OfficePreview').then((m) => ({ default: m.OfficePreview })));
@@ -292,6 +293,9 @@ export function FileEditor({
   }, [path, media]);
 
   const raw = mu(`/api/fs/raw?path=${encodeURIComponent(path)}`);
+  // A picture opens in the picture editor (not from a dialog, which would cover it): saved over, it shows anew here.
+  const canEdit = media === 'image' && !!file && !embedded && EDITABLE.test(path);
+  const editPicture = () => editFile(path, { label: basename(path), after: (r) => (r.replaced ? void load() : r.path && showInFiles(r.path)) });
   const crumbs = tildify(path, home).split(isWinPath(path) ? /[\\/]/ : '/');
   const text = !!file && !file.binary && !file.tooLarge;
   const togglePreview = () => setMode((m) => (m === 'preview' ? 'edit' : 'preview'));
@@ -355,6 +359,11 @@ export function FileEditor({
             {text && (isMd || isHtml) && (
               <IconButton label={isHtml ? 'Show as a page' : 'Preview'} active={mode === 'preview'} onClick={togglePreview}>
                 <Eye size={17} />
+              </IconButton>
+            )}
+            {canEdit && (
+              <IconButton label="Edit the picture" onClick={editPicture}>
+                <SlidersHorizontal size={17} />
               </IconButton>
             )}
             {media === 'pdf' && file && !fill && !read && (
@@ -440,6 +449,11 @@ export function FileEditor({
               </IconButton>
             </>
           )}
+          {canEdit && (
+            <Button size="sm" variant="ghost" icon={<SlidersHorizontal size={14} />} onClick={editPicture}>
+              Edit
+            </Button>
+          )}
           {media === 'pdf' && file && !fill && !read && (
             <Button size="sm" variant="ghost" icon={<Highlighter size={14} />} onClick={() => setRead(true)}>
               Highlight
@@ -520,7 +534,7 @@ export function FileEditor({
           </Suspense>
         ) : media && (file.binary || file.tooLarge || ext === 'svg') ? (
           <div className={cx('flex h-full items-center justify-center overflow-auto bg-bg-1', media === 'video' ? 'p-0 sm:p-3' : 'p-4')}>
-            {media === 'image' && <img src={raw} alt={basename(path)} className="max-h-full max-w-full rounded-lg border border-line bg-[repeating-conic-gradient(var(--bg-2)_0%_25%,var(--bg)_0%_50%)] [background-size:16px_16px] object-contain" />}
+            {media === 'image' && <img src={`${raw}&v=${file.mtime}`} alt={basename(path)} className="max-h-full max-w-full rounded-lg border border-line bg-[repeating-conic-gradient(var(--bg-2)_0%_25%,var(--bg)_0%_50%)] [background-size:16px_16px] object-contain" />}
             {media === 'pdf' && <iframe src={`${raw}&v=${file.mtime}`} title={basename(path)} className="h-full w-full rounded-lg border border-line bg-white" />}
             {media === 'video' && <VideoPlayer key={`${path}:${file.mtime}`} src={raw} name={basename(path)} downloadUrl={`${raw}&download=1`} />}
             {media === 'audio' && <audio src={raw} controls />}
