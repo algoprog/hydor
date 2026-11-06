@@ -79,7 +79,7 @@ async function oneIdea(db: DB, d: Deck, i: number, way: Way, signal: AbortSignal
       continue;
     }
     const got = holdIdea(d, i, raw);
-    if ('slide' in got) return { ...got, name: got.name || way.name, model };
+    if ('slide' in got) return { slide: got.slide, name: way.name, model };
     problem = got.problem;
   }
   return { problem: problem ?? 'it did not hold.' };

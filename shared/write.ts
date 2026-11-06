@@ -65,7 +65,7 @@ export interface IdeasAsk {
 export interface IdeasAnswer {
   /** Each idea: the slide laid out anew (its id, notes, transition and comments its own). */
   ideas: Slide[];
-  /** Each idea's name ("Big number"), and the way it was asked for (for More ideas' `avoid`). */
+  /** Each idea's way, by its name ("Big number") and its id (for More ideas' `avoid`). */
   names: string[];
   ways: string[];
   /** The model that drew them up. */
