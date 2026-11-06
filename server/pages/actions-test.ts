@@ -207,7 +207,7 @@ let deckId = '';
 let docId = '';
 {
   const md = '# Allotment rules\n\nPlots are given out in March.\n\nEvery member keeps their plot tidy.\n';
-  docId = idOf((await run('save_doc', { title: 'Allotment rules', markdown: md })).text);
+  docId = idOf((await run('save_doc', { title: 'Allotment rules', markdown: md, description: 'The allotment society’s rules: when plots are given out and how members keep them.' })).text);
   pages.beforeMessage!(ctx.key, deps);
   await run('save_doc', { id: docId, title: 'Allotment rules', markdown: md.replace('in March', 'in April').replace('tidy', 'neat'), suggest: true, comments: [{ text: 'Is April right?', on: 'Plots are given out' }] });
   let m = await model<Doc>(docId);
@@ -383,6 +383,7 @@ let docId = '';
   const cid = idOf(copy.text);
   const m = await model<Doc>(cid);
   ok(cid && cid !== docId && m.page.title === 'Allotment rules (copy)' && m.page.kind === 'doc' && m.versions[0].by === 'agent', 'a copy of a document beside it, made by the agent');
+  ok((m.page as { description?: string }).description?.startsWith('The allotment society’s rules'), 'the copy says what it is, as the first does');
   const html = idOf((await run('save_page', { title: 'Tracker', html: '<!doctype html><html><body><h1>Tracker</h1></body></html>' })).text);
   const pc = await act({ id: html, action: 'duplicate', title: 'Tracker two' });
   ok((await model<unknown>(idOf(pc.text))).page.title === 'Tracker two', 'a page of HTML copied, under the title given');
