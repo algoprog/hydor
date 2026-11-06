@@ -55,8 +55,51 @@ export function pictureType(b: Buffer): string | null {
   return null;
 }
 
-/** A 3D model's type by its first bytes: glTF binary (a .glb file), or null. */
-export const modelType = (b: Buffer): string | null => (b.length > 20 && b.toString('latin1', 0, 4) === 'glTF' && b.readUInt32LE(4) === 2 ? 'model/gltf-binary' : null);
+/**
+ * A 3D model's type by its bytes: glTF binary (a .glb file), or glTF's text (a .gltf) with everything it needs inside
+ * it (its buffers and pictures as data: addresses); null for anything else.
+ */
+export function modelType(b: Buffer): string | null {
+  if (b.length > 20 && b.toString('latin1', 0, 4) === 'glTF' && b.readUInt32LE(4) === 2) return 'model/gltf-binary';
+  if (b.length > MAX_ASSET || !/^\s*\{/.test(b.subarray(0, 64).toString('utf8'))) return null;
+  try {
+    const j = JSON.parse(b.toString('utf8')) as { asset?: { version?: unknown }; buffers?: { uri?: unknown }[]; images?: { uri?: unknown }[] };
+    if (String(j?.asset?.version ?? '').split('.')[0] !== '2') return null;
+    const inside = (list: { uri?: unknown }[] | undefined) => (Array.isArray(list) ? list : []).every((x) => x?.uri === undefined || (typeof x.uri === 'string' && x.uri.startsWith('data:')));
+    return inside(j.buffers) && inside(j.images) ? 'model/gltf+json' : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A .gltf's text with the files it points at (its buffers, its pictures) put inside it as data: addresses, each read
+ * by `load` (null when one cannot be had: the model then is not kept). A .glb, or what is not glTF, as it is.
+ */
+async function withFilesInside(b: Buffer, load: (uri: string) => Promise<Buffer | null>): Promise<Buffer> {
+  if (modelType(b) || !/^\s*\{/.test(b.subarray(0, 64).toString('utf8'))) return b;
+  let j: { asset?: { version?: unknown }; buffers?: { uri?: unknown }[]; images?: { uri?: unknown; mimeType?: unknown }[] };
+  try {
+    j = JSON.parse(b.toString('utf8'));
+  } catch {
+    return b;
+  }
+  if (String(j?.asset?.version ?? '').split('.')[0] !== '2') return b;
+  let total = b.length;
+  for (const [list, picture] of [
+    [j.buffers ?? [], false],
+    [j.images ?? [], true],
+  ] as const)
+    for (const x of list) {
+      if (typeof x?.uri !== 'string' || x.uri.startsWith('data:')) continue;
+      const data = await load(x.uri);
+      if (!data) throw new Error(`its file ${x.uri.slice(0, 80)} could not be had (a .glb carries its files inside it)`);
+      total += data.length * 1.34;
+      if (total > MAX_ASSET) throw new Error(`with its files it is over ${MAX_ASSET / 1024 / 1024} MB`);
+      x.uri = `data:${picture ? (pictureType(data) ?? 'image/png') : 'application/octet-stream'};base64,${data.toString('base64')}`;
+    }
+  return Buffer.from(JSON.stringify(j));
+}
 
 /**
  * Keeps a picture (or, with `model`, a 3D model: a glTF binary file, for a deck's 3D part); its sha. One kept already
@@ -66,7 +109,7 @@ export function putAsset(db: DB, data: Buffer, o: { model?: boolean } = {}): str
   const what = o.model ? 'model' : 'picture';
   if (data.length > MAX_ASSET) throw new HttpError(413, `That ${what} is over ${MAX_ASSET / 1024 / 1024} MB`);
   const mime = o.model ? modelType(data) : pictureType(data);
-  if (!mime) throw new HttpError(415, o.model ? 'That is not a 3D model in glTF binary (a .glb file)' : 'That is not a picture (PNG, JPEG, GIF, WebP or SVG)');
+  if (!mime) throw new HttpError(415, o.model ? 'That is not a 3D model in glTF (a .glb file, or a .gltf with its files inside it)' : 'That is not a picture (PNG, JPEG, GIF, WebP or SVG)');
   const sha = crypto.createHash('sha256').update(data).digest('hex').slice(0, 40);
   db.prepare('insert into page_assets (sha, mime, data, bytes, created_at) values (?, ?, ?, ?, ?) on conflict(sha) do update set created_at = excluded.created_at').run(sha, mime, data, data.length, Date.now());
   return sha;
@@ -120,6 +163,25 @@ export async function takeIn(db: DB, src: string, o: { cwd?: string; notes: stri
   if (!s) return '';
   const what = o.model ? 'model' : 'picture';
   const keep = (b: Buffer) => ASSET + putAsset(db, b, { model: o.model });
+  // A .gltf's files beside it: those in its own folder (never above it), or at public addresses beside its own.
+  const besideFile = (file: string) => async (uri: string) => {
+    const dir = path.dirname(file);
+    const at = path.resolve(dir, decodeURIComponent(uri.split(/[?#]/)[0]));
+    if (/^[a-z][a-z0-9+.-]*:/i.test(uri) || !at.startsWith(dir + path.sep)) return null;
+    const st = fs.statSync(at, { throwIfNoEntry: false });
+    return st?.isFile() && st.size <= MAX_ASSET ? fs.readFileSync(at) : null;
+  };
+  const besideUrl = (base: string) => async (uri: string) => {
+    let u: URL;
+    try {
+      u = new URL(uri, base);
+    } catch {
+      return null;
+    }
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+    const r = await fetchPage(u.href, { maxBytes: MAX_ASSET + 1, timeoutMs: 20_000 }).catch(() => null);
+    return r && r.status < 400 && r.body && !r.truncated ? r.body : null;
+  };
   if (s.startsWith(ASSET)) {
     if (getAsset(db, s.slice(ASSET.length))) return s;
     o.notes.push(`${s} is not a ${what} this app keeps; it was left out.`);
@@ -127,7 +189,7 @@ export async function takeIn(db: DB, src: string, o: { cwd?: string; notes: stri
   }
   try {
     if (s.startsWith('data:')) {
-      const m = (o.model ? /^data:(?:model\/gltf-binary|application\/octet-stream);base64,([A-Za-z0-9+/=\s]+)$/i : /^data:image\/[a-z0-9.+-]+;base64,([A-Za-z0-9+/=\s]+)$/i).exec(s);
+      const m = (o.model ? /^data:(?:model\/gltf-binary|model\/gltf\+json|application\/octet-stream);base64,([A-Za-z0-9+/=\s]+)$/i : /^data:image\/[a-z0-9.+-]+;base64,([A-Za-z0-9+/=\s]+)$/i).exec(s);
       if (!m) throw new Error(`a data: address that is not a base64 ${what}`);
       return keep(Buffer.from(m[1], 'base64'));
     }
@@ -135,10 +197,10 @@ export async function takeIn(db: DB, src: string, o: { cwd?: string; notes: stri
       try {
         const r = await fetchPage(s, { maxBytes: MAX_ASSET + 1, timeoutMs: 20_000 });
         if (r.status >= 400) throw new Error(`the site answered ${r.status}`);
-        const body = r.body ?? (!o.model && /svg/i.test(r.contentType) ? Buffer.from(r.text, 'utf8') : null);
+        const body = r.body ?? (/svg/i.test(r.contentType) && !o.model ? Buffer.from(r.text, 'utf8') : o.model && r.text ? Buffer.from(r.text, 'utf8') : null);
         if (!body) throw new Error(`it is ${r.contentType || `not a ${what}`}`);
         if (r.truncated) throw new Error(`it is over ${MAX_ASSET / 1024 / 1024} MB`);
-        return keep(body);
+        return keep(o.model ? await withFilesInside(body, besideUrl(s)) : body);
       } catch (e) {
         o.notes.push(`The ${what} at ${s} could not be fetched (${(e as Error).message}); the deck shows it from the web where it can, but exports may leave it out.`);
         return s;
@@ -149,7 +211,7 @@ export async function takeIn(db: DB, src: string, o: { cwd?: string; notes: stri
       const st = fs.statSync(file, { throwIfNoEntry: false });
       if (!st?.isFile()) throw new Error('no such file');
       if (st.size > MAX_ASSET) throw new Error(`it is over ${MAX_ASSET / 1024 / 1024} MB`);
-      return keep(fs.readFileSync(file));
+      return keep(o.model ? await withFilesInside(fs.readFileSync(file), besideFile(file)) : fs.readFileSync(file));
     }
     throw new Error(`not a ${what}’s address`);
   } catch (e) {
