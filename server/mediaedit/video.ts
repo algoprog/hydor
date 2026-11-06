@@ -58,6 +58,7 @@ import { putInFolder } from '../pages/folders.ts';
 import { getAsset, MAX_ASSET, pictureType, putAsset } from '../pages/assets.ts';
 import { getVideo, keepVideoFile, sendVideo, videoType } from '../pages/videos.ts';
 import { voiceService } from '../voice/index.ts';
+import { keptSoundFile, sweepKeptSounds } from './audio-store.ts';
 import { fontFor } from './video-fonts.ts';
 import { gpuEncoder, gpuRoutes, gpuState, HW_NAMES, markBroken } from './video-gpu.ts';
 import { checkPlan, planVideo, type DrawHere, type Encoders, type Plan, type TextHow } from './video-plan.ts';
@@ -158,9 +159,10 @@ export async function sourceOf(db: DB, src: unknown, o: { cwd?: string; kinds?: 
   if (pic) return want('picture', { file: pictureFile(db, pic[1]), kind: 'picture', name: 'picture' });
   const snd = KEPT_SOUND.exec(s);
   if (snd) {
-    const file = fs.existsSync(soundDir()) ? fs.readdirSync(soundDir()).find((n) => n.startsWith(`${snd[1]}.`)) : undefined;
+    // The sound editor's store (audio-store.ts) and this editor's uploads are one folder; finding one keeps it 30 days more.
+    const file = keptSoundFile(snd[1]);
     if (!file) throw new HttpError(404, 'That sound is no longer kept by the app');
-    return want('sound', { file: path.join(soundDir(), file), kind: 'sound', name: 'sound' });
+    return want('sound', { file, kind: 'sound', name: 'sound' });
   }
   const media = MEDIA_ID.exec(s);
   if (media) {
@@ -987,7 +989,8 @@ function sweepJobs() {
     } catch {}
   };
   sweep(tmpRoot(), 86_400_000);
-  sweep(soundDir(), 7 * 86_400_000);
+  // Kept sounds go 30 days after their last use, as the sound editor keeps them.
+  sweepKeptSounds();
   sweep(pictureDir(), 7 * 86_400_000);
 }
 
