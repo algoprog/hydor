@@ -650,14 +650,17 @@ const EXPORT_PAGE: RunTool = {
     'a deck as PowerPoint (pptx), a PDF (a slide a page) or its slides as pictures (png: a zip of them, or one slide with slide), a document as Word (docx), PDF or Markdown (md), a spreadsheet as Excel (xlsx), CSV (its first sheet) or PDF,',
     'a LaTeX document as its typeset PDF, its main source (tex) or the whole project (zip), a notebook as its .ipynb file (ipynb), a Python script of its cells (py) or a PDF; any of them as a web page (html) that works on its own.',
     'A deck’s web page (html) is one small file that opens in any browser and works offline (its pictures, videos and fonts inside it), but for its 3D parts, embedded web pages and the libraries its custom code loads; its PowerPoint file (pptx) turns what PowerPoint lacks into pictures or PowerPoint’s nearest effects, and says what changed.',
+    'A design (a poster, a post, a card: a page of artboards) as pictures exactly its size (png or jpg, scale 1 to 3, twice its size unless asked; a zip of them for several pages, or one page with slide) or a PDF to print, each page its own size on paper.',
     'The file goes in this session’s folder unless you give a path.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       id: { type: 'string', description: 'The page’s or deck’s id (get_page lists them).' },
-      format: { type: 'string', enum: ['pdf', 'docx', 'pptx', 'xlsx', 'csv', 'md', 'tex', 'zip', 'html', 'ipynb', 'py', 'png'] },
-      slide: { type: 'number', description: 'With png: that slide alone (from 1), as a picture.' },
+      format: { type: 'string', enum: ['pdf', 'docx', 'pptx', 'xlsx', 'csv', 'md', 'tex', 'zip', 'html', 'ipynb', 'py', 'png', 'jpg'] },
+      slide: { type: 'number', description: 'With png (or a design’s jpg): that slide, or that page of a design, alone (from 1), as a picture.' },
+      scale: { type: 'number', description: 'A design’s png or jpg: 1, 2 or 3 times its size (2 when left out).' },
+      transparent: { type: 'boolean', description: 'A design’s png: without its background (see-through).' },
       path: { type: 'string', description: 'Where to write it: a file name or a path, from the session’s folder or absolute.' },
     },
     required: ['id', 'format'],
@@ -665,7 +668,7 @@ const EXPORT_PAGE: RunTool = {
   async run(a, ctx) {
     const format = String(a.format) as ExportFormat;
     if (!EXPORT_TYPES[format]) throw new Error(`format is one of ${Object.keys(EXPORT_TYPES).join(', ')}.`);
-    const f = await exportPage(ctx.deps.db, String(a.id ?? ''), { format, slide: Number(a.slide) || undefined });
+    const f = await exportPage(ctx.deps.db, String(a.id ?? ''), { format, slide: Number(a.slide) || undefined, scale: Number(a.scale) || undefined, transparent: a.transparent === true });
     const dest = typeof a.path === 'string' && a.path.trim() ? fromSession(ctx.cwd, a.path.trim()) : path.join(ctx.cwd || config.defaultCwd, f.name);
     const file = fs.existsSync(dest) && fs.statSync(dest).isDirectory() ? path.join(dest, f.name) : dest;
     fs.mkdirSync(path.dirname(file), { recursive: true });
