@@ -1,10 +1,10 @@
 // What is picked in a document, over the page: a picture's frame with a handle at each corner to make it wider or
 // narrower (as a share of the text's width, its proportions kept), and a bar by it for its alignment, its caption,
-// its description (for those who cannot see it), another picture in its place, changing it with AI (a short menu:
-// Change with AI, Remove the background, Erase part of it), asking an agent about it, and taking it out. A line
-// across, a page break or a table of contents picked has the bar's last button alone.
+// its description (for those who cannot see it), editing it in the picture editor, another picture in its place,
+// changing it with AI (a short menu: Change with AI, Remove the background, Erase part of it), asking an agent about
+// it, and taking it out. A line across, a page break or a table of contents picked has the bar's last button alone.
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, Captions, Eraser, FileText, ImageMinus, RefreshCw, Sparkles, Trash2, Wand, WandSparkles } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, Captions, Eraser, FileText, ImageMinus, RefreshCw, SlidersHorizontal, Sparkles, Trash2, Wand, WandSparkles } from 'lucide-react';
 import type { Block, ImageBlock } from '@shared/docs';
 import { Button, cx, inputCls, MenuItem, Popover } from '../../../components/ui';
 import { Tool } from '../slides/controls';
@@ -39,6 +39,7 @@ export function Picked({
   readOnly,
   onReplace,
   onAi,
+  onEdit,
   onAsk,
 }: {
   engine: DocEngine;
@@ -50,6 +51,8 @@ export function Picked({
   onReplace: (id: string) => void;
   /** The picture changed with AI, its background taken out, or part of it erased (a dialog), then put in its place. */
   onAi?: (id: string, mode: 'change' | 'cutout' | 'erase') => void;
+  /** The picture in the picture editor, in a tab of its own; saved, it takes this one's place. */
+  onEdit?: (id: string) => void;
   onAsk?: () => void;
 }) {
   const [box, setBox] = useState<Rect | null>(null);
@@ -155,6 +158,11 @@ export function Picked({
               <button ref={altRef} type="button" title="Description" aria-label="Description" onClick={() => (setText(img.alt ?? ''), setEdit('alt'))} className={cx('flex h-8 w-8 items-center justify-center rounded-lg text-fg-2 hover:bg-bg-2 hover:text-fg', img.alt && 'text-accent')}>
                 <FileText size={15} />
               </button>
+              {onEdit && !readOnly && img.src && (
+                <Tool label="Edit picture" onClick={() => onEdit(img.id)}>
+                  <SlidersHorizontal size={15} />
+                </Tool>
+              )}
               <Tool label="Another picture" onClick={() => onReplace(img.id)}>
                 <RefreshCw size={15} />
               </Tool>

@@ -128,6 +128,8 @@ export function pageName(): string {
 const kindWord = (k: EditKind) => (k === 'video' ? 'Video' : 'Picture');
 
 function TabName({ t }: { t: Tab }) {
+  // A picture with no name of its own is simply "Picture".
+  if (!t.o.title || t.o.title === kindWord(t.o.kind)) return <span className="min-w-0 truncate">{kindWord(t.o.kind)}</span>;
   return (
     <>
       <span className="shrink-0">{kindWord(t.o.kind)} · </span>
@@ -176,7 +178,7 @@ export function EditorHost({ children }: { children: ReactNode }) {
   };
   const close = async (t: Tab) => {
     if (t.dirty) {
-      const ok = await confirm({ title: tr(`Close ${t.o.title} without saving?`), body: 'Your changes to it are not saved.', confirm: 'Close without saving', danger: true });
+      const ok = await confirm({ title: `Close “${t.o.title}” without saving?`, body: 'Your changes to it are not saved.', confirm: 'Close without saving', danger: true });
       if (!ok) return;
     }
     drop(t.id);
@@ -200,7 +202,7 @@ export function EditorHost({ children }: { children: ReactNode }) {
               icon={t.o.kind === 'video' ? <Clapperboard size={13} /> : <ImageIcon size={13} />}
               dirty={t.dirty}
               onClose={() => void close(t)}
-              closeLabel={tr(`Close ${t.o.title}`)}
+              closeLabel={`Close “${t.o.title}”`}
             >
               <TabName t={t} />
             </StripTab>
@@ -229,7 +231,7 @@ export function EditorHost({ children }: { children: ReactNode }) {
                   o={t.o}
                   active={on}
                   detached={t.detached}
-                  setDirty={(d) => t.dirty !== d && setTab(t.id, { dirty: d })}
+                  setDirty={(d) => void (t.dirty !== d && setTab(t.id, { dirty: d }))}
                   done={async (r) => {
                     await t.o.save(r);
                     drop(t.id);
@@ -285,7 +287,7 @@ function PhoneLead({ t, tabs, label, onPage, onClose }: { t: Tab; tabs: Tab[]; l
   const ref = useRef<HTMLButtonElement>(null);
   return (
     <>
-      <IconButton label={tr(`Back to ${label}`)} onClick={onPage}>
+      <IconButton label={`Back to “${label}”`} onClick={onPage}>
         <ArrowLeft size={18} />
       </IconButton>
       {tabs.length > 1 && (
@@ -315,7 +317,7 @@ function PhoneLead({ t, tabs, label, onPage, onClose }: { t: Tab; tabs: Tab[]; l
                     </span>
                   </MenuItem>
                 </div>
-                <IconButton label={tr(`Close ${x.o.title}`)} size="sm" onClick={() => (setOpen(false), onClose(x))}>
+                <IconButton label={`Close “${x.o.title}”`} size="sm" onClick={() => (setOpen(false), onClose(x))}>
                   <X size={14} />
                 </IconButton>
               </div>

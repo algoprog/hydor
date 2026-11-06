@@ -72,12 +72,12 @@ function Choice({ on, onClick, icon, label, title, disabled }: { on?: boolean; o
       aria-pressed={on}
       disabled={disabled}
       className={cx(
-        'flex min-w-0 flex-col items-center justify-center gap-1 rounded-[10px] border px-1 py-1.5 text-[11.5px] leading-tight transition-colors disabled:opacity-40',
+        'flex min-w-0 flex-col items-center justify-start gap-1 rounded-[10px] border px-1 py-1.5 text-[11.5px] leading-tight transition-colors disabled:opacity-40',
         on ? 'border-accent bg-accent-soft text-fg' : 'border-line text-fg-2 hover:bg-bg-2 hover:text-fg',
       )}
     >
       <span className="flex h-5 items-center justify-center">{icon}</span>
-      <span className="max-w-full truncate">{label}</span>
+      <span className="line-clamp-2 max-w-full text-center">{label}</span>
     </button>
   );
 }
@@ -163,7 +163,7 @@ export function AdjustPanel({ adjust, onChange, onReset }: { adjust: Adjust; onC
 // ---- Filters ---------------------------------------------------------------------------------------------------
 
 /** Each filter on a small copy of the picture (as it is turned and cropped, with the adjustments over the filter). */
-export function FiltersPanel({ thumb, adjust, filter, onPick, onStrength }: { thumb: HTMLCanvasElement | null; adjust: Adjust; filter?: FilterPick; onPick: (id: FilterId | null) => void; onStrength: (v: number) => void }) {
+export function FiltersPanel({ thumb, adjust, filter, onPick, onStrength, row }: { thumb: HTMLCanvasElement | null; adjust: Adjust; filter?: FilterPick; onPick: (id: FilterId | null) => void; onStrength: (v: number) => void; row?: boolean }) {
   const looks = useMemo(() => {
     if (!thumb) return null;
     const g0 = thumb.getContext('2d', { willReadFrequently: true })!;
@@ -184,7 +184,7 @@ export function FiltersPanel({ thumb, adjust, filter, onPick, onStrength }: { th
       type="button"
       onClick={() => onPick(id)}
       aria-pressed={picked === id}
-      className={cx('group flex min-w-0 flex-col items-stretch gap-1 rounded-[10px] p-1 text-[11.5px] transition-colors', picked === id ? 'bg-accent-soft text-fg' : 'text-fg-2 hover:bg-bg-2 hover:text-fg')}
+      className={cx('group flex min-w-0 flex-col items-stretch gap-1 rounded-[10px] p-1 text-[11.5px] transition-colors', row && 'w-[76px] shrink-0', picked === id ? 'bg-accent-soft text-fg' : 'text-fg-2 hover:bg-bg-2 hover:text-fg')}
     >
       <span className={cx('block aspect-square overflow-hidden rounded-[7px] border bg-bg-2', picked === id ? 'border-accent ring-2 ring-accent/40' : 'border-line')}>
         {looks && <img src={looks[id ?? 'none']} alt="" draggable={false} className="h-full w-full object-cover" />}
@@ -194,7 +194,8 @@ export function FiltersPanel({ thumb, adjust, filter, onPick, onStrength }: { th
   );
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-1.5">
+      {/* Below the picture they are a row to swipe along; beside it, a grid. */}
+      <div className={cx('gap-1.5', row ? '-mx-3 flex overflow-x-auto px-3 [&::-webkit-scrollbar]:hidden' : 'grid grid-cols-3')}>
         {cell(null, 'None')}
         {FILTERS.map((f) => cell(f.id, f.label))}
       </div>
@@ -309,6 +310,7 @@ export function MarkupPanel({
   onDelete,
   long,
   hint,
+  wide,
 }: {
   tool: MarkTool;
   onTool: (t: MarkTool) => void;
@@ -318,6 +320,8 @@ export function MarkupPanel({
   onDelete: () => void;
   long: number;
   hint: string;
+  /** Across the screen, below the picture: its tools four to a row. */
+  wide?: boolean;
 }) {
   // What the controls are for: the picked mark's kind, else the tool's.
   const kind: string = picked ? picked.type : tool;
@@ -330,7 +334,7 @@ export function MarkupPanel({
   }, [maxWidth]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className={cx('grid gap-1.5', wide ? 'grid-cols-4' : 'grid-cols-3')}>
         {MARK_TOOLS.map((t) => (
           <Choice key={t.id} on={tool === t.id} onClick={() => onTool(t.id)} icon={t.icon} label={t.label} title={t.label} />
         ))}

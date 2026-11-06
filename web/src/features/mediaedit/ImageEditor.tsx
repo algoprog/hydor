@@ -4,7 +4,7 @@
 // erased, changed with words, the picture expanded). Every step can be undone and done again; holding Compare shows
 // the picture as it was opened. Save puts it back where it came from (or into the Library), at the size and kind of
 // file picked; Save a copy keeps it as well. The screen works on a smaller copy; the file is made from the whole.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, Crop, Ellipsis, Maximize, Minus, Palette, PenLine, Plus, Redo2, RotateCcw, SlidersHorizontal, Sparkles, SplitSquareHorizontal, Undo2 } from 'lucide-react';
 import {
   cropOfShape,
@@ -122,8 +122,22 @@ const lookKey = (r: ImageRecipe) => JSON.stringify([r.adjust ?? null, r.filter ?
 const geoKey = (r: ImageRecipe) => `${r.rotate ?? 0}|${r.flipH ? 1 : 0}|${r.flipV ? 1 : 0}|${r.straighten ?? 0}`;
 
 function Editing({ o, active, detached, setDirty, done, lead, start }: EditorProps & { start: Start }) {
-  const mobile = useIsMobile();
+  const phone = useIsMobile();
   const root = useRef<HTMLDivElement>(null);
+  // Laid out by its own width: narrow (a phone, or a small window beside the sidebar) has its panel below the picture
+  // and its tools along the bottom; compact names its tools by their icons alone.
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const r = () => setWidth(el.clientWidth);
+    r();
+    const ro = new ResizeObserver(r);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const mobile = phone || (width > 0 && width < 680);
+  const compact = !mobile && width > 0 && width < 1040;
   const view = useRef<ViewHandle>(null);
   // The steps, kept in a ref too, so a step and what follows it read the newest at once.
   const hist = useRef<{ list: Snap[]; at: number }>({ list: [{ base: start.base, recipe: {} }], at: 0 });
@@ -194,7 +208,9 @@ function Editing({ o, active, detached, setDirty, done, lead, start }: EditorPro
   const canUndo = hist.current.at > 0;
   const canRedo = hist.current.at < hist.current.list.length - 1;
   const dirty = cur !== saved.current || !!live;
-  useEffect(() => setDirty(dirty), [dirty, setDirty]);
+  useEffect(() => {
+    setDirty(dirty);
+  }, [dirty, setDirty]);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const setTool = (t: Tool) => {
@@ -579,6 +595,7 @@ function Editing({ o, active, detached, setDirty, done, lead, start }: EditorPro
       {tool === 'adjust' && <AdjustPanel adjust={recipe.adjust ?? {}} onChange={setAdjust} onReset={() => commit({ ...now(), adjust: undefined })} />}
       {tool === 'filters' && (
         <FiltersPanel
+          row={mobile}
           thumb={thumb}
           adjust={recipe.adjust ?? {}}
           filter={recipe.filter}
@@ -678,10 +695,12 @@ function Editing({ o, active, detached, setDirty, done, lead, start }: EditorPro
                     aria-selected={tool === t.id}
                     disabled={busy && tool !== t.id}
                     onClick={() => setTool(t.id)}
-                    className={cx('flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium transition-colors disabled:opacity-40', tool === t.id ? 'bg-bg-2 text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg')}
+                    title={compact ? t.label : undefined}
+                    aria-label={compact ? t.label : undefined}
+                    className={cx('flex h-8 items-center gap-1.5 rounded-lg text-[13px] font-medium transition-colors disabled:opacity-40', compact ? 'px-2' : 'px-2.5', tool === t.id ? 'bg-bg-2 text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg')}
                   >
                     {t.icon}
-                    {t.label}
+                    {!compact && t.label}
                   </button>
                 ))}
               </div>
@@ -690,7 +709,7 @@ function Editing({ o, active, detached, setDirty, done, lead, start }: EditorPro
           )}
           {undoRedo}
           {!mobile && <MoreMenu onFit={() => view.current?.fit()} onActual={() => view.current?.actual()} onReset={() => (setCropShape('free'), commit({}, start.base))} canReset={!(cur.base === start.base && isPlain(cur.recipe))} busy={busy} />}
-          {!mobile && plans.copy && (
+          {!mobile && !compact && plans.copy && (
             <Button size="sm" variant="secondary" className="ml-1" disabled={busy} onClick={() => void save('copy')}>
               {saving === 'copy' ? 'Saving' : plans.copy.label}
             </Button>
@@ -710,7 +729,7 @@ function Editing({ o, active, detached, setDirty, done, lead, start }: EditorPro
                 quality={quality}
                 onQuality={setQuality}
                 says={[plans.main.says, plans.copy?.says].filter(Boolean).join(' ')}
-                copy={mobile && plans.copy ? { label: plans.copy.label, run: () => void save('copy') } : null}
+                copy={(mobile || compact) && plans.copy ? { label: plans.copy.label, run: () => void save('copy') } : null}
                 busy={busy}
               />
             }
@@ -764,7 +783,7 @@ function Editing({ o, active, detached, setDirty, done, lead, start }: EditorPro
           )}
           {comparing && <span className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-lg bg-black/65 px-2.5 py-1 text-[12px] font-medium text-white">The original</span>}
         </div>
-        {!mobile && <aside className="w-[312px] shrink-0 overflow-y-auto border-l border-line bg-panel p-4">{panel}</aside>}
+        {!mobile && <aside className={cx('shrink-0 overflow-y-auto border-l border-line bg-panel p-4', compact ? 'w-[280px]' : 'w-[312px]')}>{panel}</aside>}
       </div>
       {mobile && (
         <>
@@ -795,10 +814,14 @@ function Editing({ o, active, detached, setDirty, done, lead, start }: EditorPro
 function Words({ t, mark, at, onChange, onDone }: { t: ViewT; mark: Extract<Mark, { type: 'text' }>; at: { x: number; y: number }; onChange: (text: string) => void; onDone: () => void }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.focus({ preventScroll: true });
-    el.setSelectionRange(el.value.length, el.value.length);
+    // After the press that made it has done with the focus (it would take it back to the editor).
+    const t = window.setTimeout(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.focus({ preventScroll: true });
+      el.setSelectionRange(el.value.length, el.value.length);
+    }, 0);
+    return () => window.clearTimeout(t);
   }, []);
   const f = MARK_FONTS.find((x) => x.id === (mark.font ?? 'sans')) ?? MARK_FONTS[0];
   const { line, pad } = textMetrics(mark.size);
