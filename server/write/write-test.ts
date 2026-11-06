@@ -16,8 +16,9 @@ import path from 'node:path';
 import Fastify from 'fastify';
 import { checkDeck, checkSlide, contrast, deckCheckText, fixAll, fixIssue, MIN_TEXT, type DeckIssue } from '../../shared/deck-check.ts';
 import { animateDeck, animateSlide, isNumber, morphShared } from '../../shared/deck-animate.ts';
-import { ANIM_FX, everyEl, LAYOUTS, layoutSlide, normalizeDeck, plainText, RICH_ANIM_FX, RICH_TRANSITIONS, richFeatures, THEMES, TRANSITIONS, type Deck, type El, type Slide, type TextEl } from '../../shared/slides.ts';
+import { ANIM_FX, everyEl, LAYOUTS, layoutSlide, normalizeDeck, plainText, RICH_ANIM_FX, RICH_TRANSITIONS, richFeatures, THEMES, TRANSITIONS, type Deck, type El, type Para, type Slide, type TextEl } from '../../shared/slides.ts';
 import { slidesRuntime } from '../../shared/slides-runtime.ts';
+import { emptyRange, lineRuns, rangeText, replaceRange, wholeRange } from '../../web/src/features/pages/slides/rewriteText.ts';
 import { openDb } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import { setCaptionChoice } from '../media/caption.ts';
@@ -48,6 +49,18 @@ const PIC = 'naget-asset:0123456789abcdef0123456789abcdef01234567';
 const PIC2 = 'naget-asset:89abcdef0123456789abcdef0123456789abcdef';
 const deckOf = (slides: unknown[], o: Record<string, unknown> = {}): Deck => normalizeDeck({ theme: 'paper', slides, ...o });
 const kinds = (list: DeckIssue[]) => list.map((x) => x.kind).sort();
+/** Two values the same, whatever the order of their keys. */
+const sorted = (v: unknown): unknown =>
+  Array.isArray(v)
+    ? v.map(sorted)
+    : v && typeof v === 'object'
+      ? Object.fromEntries(
+          Object.entries(v)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([k, x]) => [k, sorted(x)]),
+        )
+      : v;
+const same = (a: unknown, b: unknown) => JSON.stringify(sorted(a)) === JSON.stringify(sorted(b));
 const byId = (s: Slide, id: string) => everyEl(s.els).find((e) => e.id === id);
 
 // ---- the accessibility check ----------------------------------------------------------------------------------------
@@ -479,7 +492,7 @@ setWriteForTests({
     'and the deck around it',
   );
   const [behind, , split] = j.ideas as Slide[];
-  ok(j.names[2] === 'Half and half' && j.names[0] === 'Picture behind', 'each named: its own name, else its way’s');
+  ok(j.names.join() === 'Picture behind,Big number,Split', `each named by its way: ${j.names}`);
   ok(behind.bg?.image === PIC && behind.bg.dim === 0.45 && !behind.els.some((e) => e.type === 'image'), 'the picture behind the words');
   ok(split.id === 's2' && split.notes === 'Say it slowly.' && split.transition?.fx === 'fade', 'the slide keeps its id, notes and transition');
   ok((byId(split, 'code1') as { html: string }).html === slide.els[3].html, 'its custom code put back as it was');
@@ -586,6 +599,36 @@ setWriteForTests({
   setCaptionChoice(db, { provider: 'ollama' });
   const none = await req('/api/write/describe', { src: `naget-asset:${sha}` });
   ok(none.statusCode === 400 && /No model with Ollama sees images/.test(none.json().error), `without a model that sees pictures, said so: ${none.body}`);
+}
+
+{
+  // A slide's words picked, and the answer put back in their place looking as they did.
+  const paras: Para[] = [{ runs: [{ t: 'Hello ' }, { t: 'big', b: true }, { t: ' world', color: 'accent' }] }, { runs: [{ t: 'Second line' }], list: 'bullet', lvl: 1 }, { runs: [{ t: 'Third' }], align: 'center' }];
+  const all = wholeRange(paras);
+  ok(rangeText(paras, all) === 'Hello **big** world\nSecond line\nThird', `all of a box, a paragraph a line, its bold marked: ${JSON.stringify(rangeText(paras, all))}`);
+  const back = replaceRange(paras, all, 'Hi **huge** earth\nLine two\nThree', {});
+  ok(same(back[0].runs, [{ t: 'Hi ' }, { t: 'huge', b: true }, { t: ' earth' }]) && back[1].list === 'bullet' && back[1].lvl === 1 && back[2].align === 'center', `each line in its paragraph, bold where marked: ${JSON.stringify(back)}`);
+  const one = { p0: 0, o0: 6, p1: 0, o1: 9 };
+  ok(rangeText(paras, one) === 'big' && !emptyRange(one) && emptyRange({ p0: 1, o0: 2, p1: 1, o1: 2 }), 'words within a paragraph: no marks when they are all bold');
+  const mid = replaceRange(paras, one, 'large\nand more', {});
+  ok(same(mid[0].runs, [{ t: 'Hello ' }, { t: 'large and more', b: true }, { t: ' world', color: 'accent' }]) && mid.length === 3, `in their look, the lines of an answer joined within a paragraph: ${JSON.stringify(mid[0].runs)}`);
+  const two = replaceRange(paras, { p0: 1, o0: 7, p1: 2, o1: 5 }, 'row\nIII\nmore', {});
+  ok(
+    two.length === 4 && plainText(two.slice(1)) === 'Second row\nIII\nmore' && two[2].align === 'center' && two[3].align === 'center' && two[1].list === 'bullet',
+    `across paragraphs: each line in the one it stands for, more in the last one's look: ${JSON.stringify(two.slice(1))}`,
+  );
+  ok(replaceRange(paras, all, 'Just one line', {}).length === 1, 'fewer lines, fewer paragraphs');
+  ok(
+    same(lineRuns('a **b** *c* d', { color: 'fg' }, { b: true, i: true }), [
+      { color: 'fg', t: 'a ' },
+      { color: 'fg', b: true, t: 'b' },
+      { color: 'fg', t: ' ' },
+      { color: 'fg', i: true, t: 'c' },
+      { color: 'fg', t: ' d' },
+    ]),
+    'marks read back as bold and italic',
+  );
+  ok(rangeText([{ runs: [{ t: 'All bold' }] }], wholeRange([{ runs: [{ t: 'All bold' }] }]), { bold: true }) === 'All bold', 'a bold box: no marks');
 }
 
 // ---- live checks, with the real models ---------------------------------------------------------------------------------

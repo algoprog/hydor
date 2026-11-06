@@ -185,7 +185,7 @@ export const IDEAS_SYSTEM = [
   'Keep its content exactly: the same words (you may drop a few words to shorten a line, split a paragraph over parts, or move words between parts, but never add facts, numbers, names, claims or words of your own beyond a short label such as “Step 1”), the same pictures (their src exactly as given; a picture may grow, be cropped, sit beside the words or become the slide’s background), its charts and tables with their data as they are, and its other parts (custom code, videos, quizzes, equations, code) as they are: keep their ids and fields, you may move and size them.',
   'Keep each part’s id when you keep the part (its words or picture), so its animations and comments stay with it; new parts (cards, lines, icons) take new ids.',
   'Design well: a clear visual hierarchy (a title that stands out, then the rest), generous margins (at least 48 px from the slide’s edges), parts lined up on a few edges, nothing overlapping unless it is meant to (words on a card or over a dimmed picture), text never under 20 px (titles 40 to 64, body 22 to 30), at most a few colours, all the theme’s by name (accent, soft, head, muted, fg, bg, accentFg, c1 to c6), fonts "head" or "body".',
-  'Answer with JSON only, no words around it: {"name": "a name for the design in two words", "bg": the slide’s background or null, "els": [the slide’s parts, back to front]}.',
+  'Answer with JSON only, no words around it: {"bg": the slide’s background or null, "els": [the slide’s parts, back to front]}.',
 ].join(' ');
 
 /** What the writer is asked: the deck's look, the slide as it is, and the way to lay it out. */
@@ -296,7 +296,7 @@ const KEPT: Partial<Record<El['type'], string[]>> = {
 const OWN_ONLY = new Set<El['type']>(['html', 'code', 'quiz', 'score', 'video', 'embed', 'scene3d', 'math', 'chart', 'table']);
 
 /** Why an idea does not hold to its slide, or null when it does; and the idea put right where it can be. */
-export function holdIdea(d: Deck, i: number, raw: Obj): { slide: Slide; name: string } | { problem: string } {
+export function holdIdea(d: Deck, i: number, raw: Obj): { slide: Slide } | { problem: string } {
   const orig = d.slides[i];
   const H = slideH(d.ratio);
   const mine = new Map(everyEl(orig.els).map((e) => [e.id, e]));
@@ -441,8 +441,7 @@ export function holdIdea(d: Deck, i: number, raw: Obj): { slide: Slide; name: st
   const comments = (orig.comments ?? []).map((c) => (c.el && !now.has(c.el) ? (({ el: _e, ...rest }) => rest)(c) : c));
   if (comments.length) slide.comments = comments;
   else delete slide.comments;
-  const name = typeof raw.name === 'string' && raw.name.trim() ? raw.name.replace(/\s+/g, ' ').trim().slice(0, 40) : '';
-  return { slide, name };
+  return { slide };
 }
 
 /** The deck an idea's ask is about: the editor's own model, or a saved deck's by its id (read by `read`). */

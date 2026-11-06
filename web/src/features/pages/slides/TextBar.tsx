@@ -1,6 +1,7 @@
-// How words look, in the slides editor's toolbar: the font, its size, bold, italic, underline and strike, colour,
-// alignment, bullets and numbers, indent, a link. While words are changed in place it acts on the words selected;
-// otherwise on the whole of each text box or shape picked. The same actions are the Format menu's (textActions).
+// How words look, in the slides editor's toolbar: Rewrite first (the words rewritten with AI: Rewrite.tsx), then the
+// font, its size, bold, italic, underline and strike, colour, alignment, bullets and numbers, indent, a link. While words
+// are changed in place it acts on the words selected; otherwise on the whole of each text box or shape picked. The same
+// actions are the Format menu's (textActions).
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import {
   AlignCenter,
@@ -23,6 +24,7 @@ import { cssColor, FONTS, fontName, type Align, type Deck, type El, type Para, t
 import { Button, inputCls, Popover } from '../../../components/ui';
 import { ColorButton, NumInput, Tool } from './controls';
 import { dropRunField, eachRun, listAll, setEls } from './ops';
+import { RewriteButton, slidesTarget } from './Rewrite';
 import type { CanvasHandle } from './SlideCanvas';
 
 type TextEl = Extract<El, { type: 'text' | 'shape' }>;
@@ -220,6 +222,12 @@ export function TextBar(args: TextArgs) {
   const shown = fontName(first.font, t, first.role as TextProps['role']);
   return (
     <div className="flex shrink-0 items-center gap-0.5" data-keeps-editing>
+      {els.length === 1 && (
+        <>
+          <RewriteButton target={() => slidesTarget(args)} />
+          <span className="mx-1 h-5 w-px shrink-0 bg-line" />
+        </>
+      )}
       <span className="relative flex h-8 w-[136px] shrink-0">
         <select
           value={curFont}
