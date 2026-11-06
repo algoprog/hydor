@@ -556,6 +556,8 @@ export interface AgentCatalog {
   commands?: { name: string; description?: string; argumentHint?: string }[];
   /** Something to know when picking a mode here (Codex inside a container: no sandbox). */
   modeNote?: string;
+  /** Why there are no models to pick: the agent did not start when asked, in its own words. */
+  modelsError?: string;
 }
 
 export interface UsageWindow {

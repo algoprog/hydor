@@ -337,6 +337,8 @@ export class ClaudeControl extends EventEmitter {
   private initCache: { at: number; init: Json } | null = null;
   private usageCache: AgentUsage | null = null;
   private inflight: Promise<{ init: Json | null; usage: Json | null }> | null = null;
+  /** Why the last probe got no answer, in Claude Code's own words (EACCES: permission denied, mkdir …). */
+  private probeError: string | null = null;
   flows = new Map<string, LoginFlow & { term?: pty.IPty; buf?: string }>();
 
   /** Runs a throwaway stream-json CLI: initialize (models, account) then get_usage. No model turn. */
@@ -346,20 +348,27 @@ export class ClaudeControl extends EventEmitter {
       const proc = spawnProgram(
         config.claudeBin,
         ['--output-format', 'stream-json', '--verbose', '--input-format', 'stream-json', '--strict-mcp-config', '--permission-prompt-tool', 'stdio'],
-        { cwd: paths.probe, env: this.env(), stdio: ['pipe', 'pipe', 'ignore'] },
+        { cwd: paths.probe, env: this.env(), stdio: ['pipe', 'pipe', 'pipe'] },
       );
       let init: Json | null = null;
       let usage: Json | null = null;
-      const done = () => {
+      let err = '';
+      let settled = false;
+      const done = (why?: string) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
         try {
           proc.stdin.end();
         } catch {}
         setTimeout(() => proc.kill('SIGTERM'), 1500);
         this.inflight = null;
+        this.probeError = init ? null : (why ?? (err.trim().split('\n').slice(-2).join(' ').slice(0, 300) || 'it stopped without answering'));
         resolve({ init, usage });
       };
-      const timer = setTimeout(done, 45_000);
+      const timer = setTimeout(() => done('it did not answer within 45 seconds'), 45_000);
+      // Its last words say why it stopped.
+      proc.stderr.on('data', (buf: Buffer) => (err = (err + buf.toString('utf8')).slice(-16_384)));
       const lines = new LineSplitter();
       proc.stdout.on('data', (buf: Buffer) =>
         lines.push(buf, (line) => {
@@ -373,6 +382,7 @@ export class ClaudeControl extends EventEmitter {
           const r = m.response ?? {};
           if (r.request_id === 'init') {
             init = r.subtype === 'success' ? r.response : null;
+            if (!init) err = `${r.error ?? 'it refused to start'}\n`;
             proc.stdin.write(JSON.stringify({ type: 'control_request', request_id: 'usage', request: { subtype: 'get_usage', skip_behaviors: true } }) + '\n');
           } else if (r.request_id === 'usage') {
             usage = r.subtype === 'success' ? r.response : null;
@@ -381,10 +391,10 @@ export class ClaudeControl extends EventEmitter {
         }),
       );
       proc.stdin.on('error', () => {});
-      proc.on('error', () => done());
-      proc.on('exit', () => {
-        if (this.inflight) done();
-      });
+      proc.on('error', (e) => done(e.message));
+      // Settled once all it printed is in; a moment after it ends at most (something it started may hold its output open).
+      proc.on('close', () => done());
+      proc.on('exit', () => setTimeout(() => done(), 500));
       proc.stdin.write(JSON.stringify({ type: 'control_request', request_id: 'init', request: { subtype: 'initialize' } }) + '\n');
     });
     return this.inflight;
@@ -411,6 +421,11 @@ export class ClaudeControl extends EventEmitter {
     return claudeModels(this.initCache?.init);
   }
 
+  /** Why its models aren't known: Claude Code did not start when last asked (null once it has answered). */
+  get modelsError(): string | null {
+    return this.initCache ? null : this.probeError;
+  }
+
   /** A usage report from fresh numbers; resets and the account carry over from the last one. */
   private report(raw: Json): AgentUsage {
     const prev = this.usageCache;
@@ -433,6 +448,7 @@ export class ClaudeControl extends EventEmitter {
         if (init) this.initCache = { at: Date.now(), init };
         raw = usage;
       }
+      if (!raw && this.probeError) throw new Error(`Claude Code did not start: ${this.probeError}`);
       if (!raw) throw new Error('Claude Code did not report usage (signed out?)');
       const prev = this.usageCache;
       const u = this.report(raw);

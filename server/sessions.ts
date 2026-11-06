@@ -2070,6 +2070,9 @@ export class SessionManager extends EventEmitter {
     }
     if (agent === 'claude') {
       const models = await this.claude.models().catch(() => []);
+      // No models: Claude Code did not start (asking for its commands would only start it again), and the menu says why.
+      const why = models.length ? null : this.claude.modelsError;
+      if (why) return { models, modes: CLAUDE_MODES, defaultMode: this.defaults('claude').mode ?? 'default', commands: [], modelsError: why };
       const commands = await this.claude.commands().catch(() => []);
       return { models, modes: CLAUDE_MODES, defaultMode: this.defaults('claude').mode ?? 'default', commands };
     }
