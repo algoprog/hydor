@@ -19,6 +19,7 @@ import { everyEl, type Deck } from '../../shared/slides.ts';
 import type { Doc } from '../../shared/docs.ts';
 import type { Workbook } from '../../shared/sheets.ts';
 import type { TexDoc } from '../../shared/latex.ts';
+import { partsLead, slideLead } from '../../web/src/features/pages/slides/ops.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -411,6 +412,12 @@ let docId = '';
   ok(deck.includes('page_action') && deck.includes('fix_accessibility') && deck.includes('reuse_slides'), 'beside a deck: its page_action actions');
   ok(deck.includes('/api/write/design-ideas') && deck.includes('edit_image') && deck.includes('naget-asset:'), 'and design ideas, and the picture tools for the part picked');
   ok(deck.includes('a slide or a part and its id'), 'and that a message starting with what was picked is about exactly that');
+  // What the editor puts before the request: the slide's id, a part's kind and id, a picture's source.
+  const d = (await model<Deck>(deckId)).model;
+  const at = d.slides.findIndex((s) => everyEl(s.els).some((e) => e.type === 'image'));
+  const pic = everyEl(d.slides[at].els).find((e) => e.type === 'image')!;
+  ok(slideLead(at, d.slides[at]) === `On slide ${at + 1} (“Our plots”, id ${d.slides[at].id}): `, 'a slide’s lead names it by its number, title and id');
+  ok(pic.type === 'image' && partsLead(at, d.slides[at], [pic]).includes(`(image part ${pic.id}, ${pic.src})`), 'a picture’s lead gives its kind, its id and its source, for the picture tools');
   const doc = await told(docId);
   ok(doc.includes('accept_suggestions') && doc.includes('/api/write/rewrite') && doc.includes('generate_image'), 'beside a document: its actions, rewriting and pictures');
   const sheet = idOf((await run('save_sheet', { title: 'Tiny', sheets: [{ name: 'S', rows: [[1]] }] })).text);
