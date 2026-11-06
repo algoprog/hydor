@@ -331,7 +331,7 @@ export function DesignEdit({
 
   const pct = `${Math.round(zoom.zoom * 100)}%`;
   return (
-    <div ref={shell} className="flex h-full min-h-0 flex-col">
+    <div ref={shell} data-i18n="design" className="flex h-full min-h-0 flex-col">
       <div className="flex h-11 shrink-0 items-center gap-1 border-b border-line bg-panel px-2">
         {wide ? (
           <IconButton label={addShown ? 'Hide the Add panel' : 'Show the Add panel'} size="sm" onClick={() => setAddShown((x) => !x)}>

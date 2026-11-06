@@ -12,8 +12,11 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   write in a message box, with the files you attach, waits there while you look at other pages. Pressing
   Start opens the session's page at once with your message and the agent at work on it (Working), as the
   session shows it, and it becomes the session as soon as the agent is up, with no loading in between; if it
-  can't start, the page says why and your message goes back in the start page's box. Pages, tabs, menus and
-  dialogs open at once, with no fade.
+  can't start, the page says why and your message goes back in the start page's box. If the connection drops
+  before the app answers (a phone gone to sleep, a change of network), the page says Reconnecting… and asks the
+  app what came of the start once it can: the session opens if it started, and one press of Start never makes two
+  sessions (after a minute out of reach, the page says so, with Try again). Pages, tabs, menus and dialogs open at
+  once, with no fade.
 - Sessions name themselves: a moment after one starts with a request, the helper model gives it a title of a few
   words ("Weekend trip to Lisbon"), shown in the sidebar, the header and the search box instead of the start of the
   message, and passed to Claude Code and Codex for their own lists. Nothing shows in the conversation; sessions
@@ -146,7 +149,8 @@ agents that speak ACP and take MCP servers.
 - **Knowledge bases**: drop documents or a folder in once, and agents can search them: by their words (a
   full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning on) or for exact
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and
-  kept up to date. Shared knowledge (Projects → Shared knowledge) is searched by every session; a project's own
+  kept up to date (of a text file over 4 MB, its first 4 MB). The page shows how far search by meaning has come,
+  live, and why it waits when it does (setting itself up, starting, short of memory, stopped). Shared knowledge (Projects → Shared knowledge) is searched by every session; a project's own
   documents (its Knowledge tab) by its sessions alone, which search the shared knowledge too unless the project
   turns that off.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the

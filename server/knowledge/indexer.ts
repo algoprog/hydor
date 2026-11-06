@@ -7,14 +7,14 @@ import path from 'node:path';
 import { TEXT_EXTS } from '../../shared/knowledge.ts';
 import type { DB } from '../db.ts';
 import { canRead, extractText } from '../documents/extract.ts';
-import { embed, meaningOn } from '../memory/embed.ts';
+import { embed, meaningHeld, meaningOn } from '../memory/embed.ts';
 import { quantize, VECTOR_MODEL } from '../memory/vectors.ts';
 import { htmlMarkdown } from '../web/fetch.ts';
 import { baseRow, baseRows, docsOf, dropDoc, knowledgeSchema, saveDoc, sourcesOf } from './store.ts';
 
 /** Folders never read: tools' caches, dependencies, version control. */
 const SKIP_DIRS = new Set(['node_modules', '.git', '.hg', '.svn', '__pycache__', '.venv', 'venv', 'dist', 'build', '.next', '.cache', 'target', '.idea', '.vscode']);
-/** Most files read from one folder, and the largest text file (documents have their own limit). */
+/** Most files read from one folder, and most of a text file read (of a bigger one, its beginning; documents have their own limits). */
 const MAX_FILES = 20_000;
 const MAX_TEXT = 4 * 1024 * 1024;
 const TEXT = new Set(TEXT_EXTS);
@@ -127,11 +127,29 @@ export async function fileText(file: string): Promise<{ text: string; format: st
   }
   if (!isText(file)) return null;
   const st = fs.statSync(file);
-  if (st.size > MAX_TEXT) throw new Error(`${Math.round(st.size / 1048576)} MB of text: too big to read here`);
-  const raw = fs.readFileSync(file, 'utf8');
+  const big = st.size > MAX_TEXT;
+  const raw = big ? textStart(file) : fs.readFileSync(file, 'utf8');
   if (raw.includes('\u0000')) throw new Error('Not a text file');
-  if (ext === 'html' || ext === 'htm') return { text: htmlMarkdown(raw).markdown, format: 'html' };
-  return { text: raw, format: ext || 'text' };
+  // A very big one (a log, a data file): its beginning, saying so at its end as a long document's text does.
+  const mb = (n: number) => (n / 1048576).toFixed(n < 10 * 1048576 ? 1 : 0).replace(/\.0$/, '');
+  const cut = big ? `\n\n… (cut here: the first ${mb(MAX_TEXT)} MB of ${mb(st.size)} MB were read)` : '';
+  if (ext === 'html' || ext === 'htm') return { text: htmlMarkdown(raw).markdown + cut, format: 'html' };
+  return { text: raw + cut, format: ext || 'text' };
+}
+
+/** The first MAX_TEXT bytes of a text file, to the end of its last whole line (of one long line, its last whole character). */
+function textStart(file: string): string {
+  const buf = Buffer.alloc(MAX_TEXT);
+  const fd = fs.openSync(file, 'r');
+  let n: number;
+  try {
+    n = fs.readSync(fd, buf, 0, MAX_TEXT, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
+  const end = buf.lastIndexOf(0x0a, n - 1);
+  // Streaming, the decoder keeps back a character whose last bytes did not fit.
+  return new TextDecoder().decode(buf.subarray(0, end > 0 ? end : n), { stream: true });
 }
 
 // ---- reading the sources ---------------------------------------------------------------------------------
@@ -143,8 +161,16 @@ let busy = false;
 let tell: (base: string) => void = () => {};
 export const onIndexed = (fn: (base: string) => void) => (tell = fn);
 
-/** Reads a base again soon: what is new or changed in its sources, and forgets what is gone. */
-export function scanSoon(db: DB, base: string) {
+/** Bases whose documents that could not be read are tried again too, when next read. */
+const retry = new Set<string>();
+
+/**
+ * Reads a base again soon: what is new or changed in its sources, and forgets what is gone. With `failed`, the
+ * documents that could not be read are tried again too (Read again now, and the first reading after the app starts:
+ * a newer version may read them).
+ */
+export function scanSoon(db: DB, base: string, o: { failed?: boolean } = {}) {
+  if (o.failed) retry.add(base);
   if (!queue.includes(base)) queue.push(base);
   if (!busy) void drain(db);
 }
@@ -181,9 +207,10 @@ async function scan(db: DB, base: string) {
   const seen = new Set(found.map((f) => f.file));
   // Gone from the folder (or the folder is gone): out of the base.
   for (const [p, d] of known) if (!seen.has(p)) dropDoc(db, d.id);
+  const failed = retry.delete(base);
   const todo = found.filter(({ file }) => {
     const d = known.get(file);
-    if (!d) return true;
+    if (!d || (failed && d.status === 'error')) return true;
     try {
       const st = fs.statSync(file);
       return st.size !== d.size || Math.abs(st.mtimeMs - d.mtime) > 1;
@@ -223,15 +250,17 @@ async function indexFile(db: DB, base: string, source: string, file: string) {
   }
 }
 
-/** Reads every base again (folders change while nobody looks). */
-export function scanAll(db: DB) {
-  for (const b of baseRows(db)) scanSoon(db, b.id);
+/** Reads every base again (folders change while nobody looks); with `failed`, trying again what could not be read. */
+export function scanAll(db: DB, o: { failed?: boolean } = {}) {
+  for (const b of baseRows(db)) scanSoon(db, b.id, o);
 }
 
 // ---- vectors -------------------------------------------------------------------------------------------
 
 let filling = false;
 let fillTimer: NodeJS.Timeout | undefined;
+/** When the model cannot run (setting itself up, starting, short of memory), how soon to try again. */
+const RETRY_MS = 2 * 60_000;
 
 /** Soon: vectors for the passages without one, while search by meaning is on. */
 export function fillSoon(db: DB, ms = 3000) {
@@ -247,6 +276,8 @@ export async function fillVectors(db: DB): Promise<number> {
   if (filling || !meaningOn(db)) return 0;
   filling = true;
   let made = 0;
+  let held = false;
+  let told = Date.now();
   try {
     knowledgeSchema(db);
     const next = db.prepare(
@@ -257,19 +288,31 @@ export async function fillVectors(db: DB): Promise<number> {
     for (;;) {
       const rows = next.all(VECTOR_MODEL) as { id: number; part: string | null; text: string; title: string }[];
       if (!rows.length) break;
-      // Starts the worker when memory allows; null when it cannot run now (tried again after the next reading).
+      // Starts the worker when memory allows; null when it cannot run now (tried again in a while).
       const vecs = await embed(db, rows.map(vectorText), 'document', { wait: true, timeoutMs: 180_000 });
-      if (!vecs || vecs.length !== rows.length) break;
+      if (!vecs || vecs.length !== rows.length) {
+        held = true;
+        break;
+      }
       db.transaction(() => rows.forEach((r, i) => put.run(r.id, VECTOR_MODEL, Buffer.from(quantize(vecs[i])))))();
       made += rows.length;
       dropVectorBlocks();
+      // The pages hear how far it got every few seconds: a big base takes a while on a CPU.
+      if (Date.now() - told > 3000) {
+        told = Date.now();
+        tell('');
+      }
     }
   } catch (e) {
+    held = true;
     console.warn(`[knowledge] vectors: ${(e as Error).message}`);
   } finally {
     filling = false;
   }
-  if (made) tell('');
+  // The pages hear the end, or why it waits (setting itself up, short of memory…), and it tries again in a while;
+  // stopped, once Try again in Settings → Memory starts it again (the memory feature's event).
+  if (made || held) tell('');
+  if (held && meaningHeld(db)?.why !== 'failed') fillSoon(db, RETRY_MS);
   return made;
 }
 

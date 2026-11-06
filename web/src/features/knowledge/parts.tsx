@@ -3,13 +3,13 @@
 // where they are and kept up to date, its documents, what could not be read, moving it to a space), and a
 // search the way agents do.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BookOpen, FileText, FolderInput, FolderPlus, Library, MoreHorizontal, RefreshCw, Search, Trash2, Upload, X } from 'lucide-react';
+import { BookOpen, FileText, FolderInput, FolderPlus, Library, MemoryStick, MoreHorizontal, RefreshCw, RotateCw, Search, Trash2, TriangleAlert, Upload, X } from 'lucide-react';
 import type { KnowledgeBase, KnowledgeDoc, KnowledgeHit, KnowledgeState } from '@shared/knowledge';
 import { citation } from '@shared/knowledge';
 import { FolderFinder } from '../../components/FolderPicker';
 import { Button, cx, Dialog, IconButton, inputCls, MenuBack, MenuItem, Popover, Throbber, useConfirm } from '../../components/ui';
-import { api, del, enc, patch, post } from '../../lib/api';
-import { bytes, tildify, timeAgo } from '../../lib/format';
+import { api, del, enc, patch, post, put } from '../../lib/api';
+import { ago, bytes, tildify } from '../../lib/format';
 import { useFeatureEvent } from '../../lib/featureEvents';
 import { go, openFile } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
@@ -23,6 +23,13 @@ export function useKnowledge(): [KnowledgeState | null, () => void] {
   const load = useCallback(() => void api<KnowledgeState>('/api/knowledge').then(setSt, toastError), []);
   useEffect(load, [load]);
   useFeatureEvent('knowledge', load);
+  // While search by meaning sets itself up or starts, look again every few seconds: nothing else says how far it got.
+  const busy = st?.meaningHeld?.why === 'setting-up' || st?.meaningHeld?.why === 'starting';
+  useEffect(() => {
+    if (!busy) return;
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
+  }, [busy, load]);
   return [st, load];
 }
 
@@ -91,7 +98,9 @@ export function DropFiles({ onFiles, big }: { onFiles: (p: PickedFile[]) => void
 /** What a base holds, in a line: documents, passages, how far search by meaning has come, or how far reading has. */
 function Counts({ b, meaning }: { b: KnowledgeBase; meaning: boolean }) {
   const parts = [`${b.docs} document${b.docs === 1 ? '' : 's'}`, `${b.passages.toLocaleString()} passage${b.passages === 1 ? '' : 's'}`];
-  if (meaning && b.passages) parts.push(b.embedded >= b.passages ? 'ready to search by meaning' : `${Math.floor((b.embedded / b.passages) * 100)}% ready to search by meaning`);
+  // 0% only while none has its vector yet: the first of a big base's passages show as 1%.
+  const pct = b.embedded ? Math.max(1, Math.floor((b.embedded / b.passages) * 100)) : 0;
+  if (meaning && b.passages) parts.push(b.embedded >= b.passages ? 'ready to search by meaning' : `${pct}% ready to search by meaning`);
   return (
     <div className="text-[12.5px] text-fg-3">
       {b.indexing ? (
@@ -100,7 +109,7 @@ function Counts({ b, meaning }: { b: KnowledgeBase; meaning: boolean }) {
         </span>
       ) : null}
       {parts.join(' · ')}
-      {b.indexedAt && !b.indexing ? ` · read ${timeAgo(b.indexedAt)}` : ''}
+      {b.indexedAt && !b.indexing ? ` · read ${ago(b.indexedAt)}` : ''}
     </div>
   );
 }
@@ -328,6 +337,42 @@ export function TrySearch({ space }: { space: string | null }) {
         ) : (
           <div className="px-1 text-[12.5px] text-fg-3">Nothing matches that.</div>
         ))}
+    </div>
+  );
+}
+
+/**
+ * Search by meaning is on, but these bases' passages wait for their vectors: why (it is setting itself up, starting,
+ * short of memory, or it stopped), so a percentage that does not move says what it waits for.
+ */
+export function MeaningWait({ st, bases }: { st: KnowledgeState; bases: KnowledgeBase[] }) {
+  const h = st.meaningHeld;
+  if (!st.meaning || !h || !bases.some((b) => b.embedded < b.passages)) return null;
+  const gb = (mb?: number) => ((mb ?? 0) / 1024).toFixed(1);
+  return (
+    <div className={cx('flex items-start gap-2 rounded-lg bg-bg-2 px-3 py-2 text-[12.5px] leading-snug', h.why === 'failed' ? 'text-warn' : 'text-fg-2')}>
+      {h.why === 'failed' ? <TriangleAlert size={14} className="mt-0.5 shrink-0" /> : h.why === 'memory' ? <MemoryStick size={14} className="mt-0.5 shrink-0 text-fg-3" /> : <Throbber size={14} className="mt-0.5 shrink-0" />}
+      <div className="min-w-0">
+        {h.why === 'failed' ? (
+          <span>Search by meaning stopped, so agents find these passages by their words alone: {h.detail ?? 'it could not start'}</span>
+        ) : h.why === 'memory' ? (
+          <span>
+            Search by meaning is waiting for memory: {gb(h.freeMb)} GB free, it needs {gb(h.needMb)} GB. Until then agents find these passages by their words; it tries again every few minutes.
+          </span>
+        ) : h.why === 'starting' ? (
+          <span>Search by meaning is starting: {h.detail ?? 'Loading the model'}. The passages get their vectors next.</span>
+        ) : (
+          <span>Search by meaning is setting itself up on this computer: {h.detail ?? 'Getting ready'}. The passages get their vectors once it is ready.</span>
+        )}
+        {h.why === 'failed' && (
+          <>
+            {' '}
+            <button type="button" onClick={() => void put('/api/memory', { retry: true }).catch(toastError)} className="inline-flex items-center gap-1 font-medium text-fg-2 underline-offset-2 hover:underline">
+              <RotateCw size={12} /> Try again
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

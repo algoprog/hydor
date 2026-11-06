@@ -15,9 +15,10 @@ import type { MemoryNoteData } from '../../shared/memory.ts';
 import type { TimelineItem, ToolInfo } from '../../shared/types.ts';
 import { kvSet, openDb } from '../db.ts';
 import type { RunCtx } from '../features/types.ts';
+import { availableMemory } from '../models/machine.ts';
 import { notesOf } from '../notes.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
-import { backfill, embed, freeMemoryMb, meaningState, requestVector, setEmbedderForTests } from './embed.ts';
+import { backfill, embed, meaningState, requestVector, setEmbedderForTests } from './embed.ts';
 import { noteChanges, turnsAfter } from './extract.ts';
 import { MEMORY_BUDGET, memoryInstructions } from './inject.ts';
 import { fitProfile, profile as profileFeature, profileBlock, profileFit, saveProfile, userProfile } from './profile.ts';
@@ -713,7 +714,7 @@ test('search by meaning: on unless turned off (or HYDOR_EMBED=off while never se
   assert.equal(await embed(db, ['hello'], 'query'), null);
   if (was === undefined) delete process.env.HYDOR_EMBED;
   else process.env.HYDOR_EMBED = was;
-  assert.ok(freeMemoryMb() > 0);
+  assert.ok((await availableMemory()) > 0);
 });
 
 // ---- secrets -------------------------------------------------------------------------------------

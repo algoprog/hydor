@@ -41,6 +41,15 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   return data as T;
 }
 
+/** What a proxy in front of the app answers while the app restarts or cannot be reached (Cloudflare's 52x among them). */
+const GATEWAY = new Set([502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527, 530]);
+
+/**
+ * Whether a call was lost on the way, so it may or may not have been done: no answer at all (the connection dropped,
+ * a phone went to sleep, the network changed: "Load failed", "Failed to fetch") or a proxy's answer in the app's place.
+ */
+export const lostOnTheWay = (e: unknown) => e instanceof TypeError || (e instanceof ApiError && GATEWAY.has(e.status) && !e.data?.error);
+
 export const post = <T = any>(path: string, body: unknown = {}) => api<T>(path, { method: 'POST', body });
 export const del = <T = any>(path: string, body?: unknown) => api<T>(path, { method: 'DELETE', body });
 export const put = <T = any>(path: string, body: unknown) => api<T>(path, { method: 'PUT', body });

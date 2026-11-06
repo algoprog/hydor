@@ -352,6 +352,9 @@ app.get('/api/search', async (req) => {
   return { hits: q ? searchSessions(db, q) : [] };
 });
 
+/** A start's id, as the page makes one for each press of Start (web/src/lib/starting.ts). */
+const START_ID = /^new-[a-z0-9]{8,40}$/;
+
 app.post('/api/sessions', async (req) => {
   const b = req.body as any;
   noteUserMessage();
@@ -382,9 +385,20 @@ app.post('/api/sessions', async (req) => {
     // A question asked on Help (or from a page in Pages, or a file in Files) leaves the agent's remembered model, effort and permissions as they were.
     remember: extra?.help || extra?.page || extra?.file ? false : undefined,
   };
-  const key = await sessions.create(opts);
-  if (others) await startMatch({ db, sessions, broadcast }, { key, agent: b.agent, ...(opts.acpAgent ? { acpAgent: opts.acpAgent } : {}), ...(opts.model ? { model: opts.model } : {}) }, opts, others);
+  // The page's own id for this press of Start: sent again (its answer lost on the way), it makes no second session.
+  const startId = typeof b.startId === 'string' && START_ID.test(b.startId) ? b.startId : undefined;
+  const key = await sessions.startOnce(startId, async () => {
+    const key = await sessions.create(opts);
+    if (others) await startMatch({ db, sessions, broadcast }, { key, agent: b.agent, ...(opts.acpAgent ? { acpAgent: opts.acpAgent } : {}), ...(opts.model ? { model: opts.model } : {}) }, opts, others);
+    return key;
+  });
   return { key };
+});
+/** What came of a start whose answer the page never got: the session it made, or whether it is still being made. */
+app.get('/api/sessions/start/:id', async (req) => {
+  const id = String((req.params as { id: string }).id);
+  if (!START_ID.test(id)) throw new HttpError(400, 'Bad start id');
+  return sessions.startState(id);
 });
 /** Whether a folder is in a git repository (and on which branch): the home page offers a worktree then. */
 app.get('/api/git/repo-info', async (req) => ({ info: await repoInfo(files.resolvePath(String((req.query as Record<string, string>).path ?? ''))).catch(() => null) }));
