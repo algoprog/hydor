@@ -46,6 +46,7 @@ import {
   Scissors,
   Shapes,
   Shrink,
+  SlidersHorizontal,
   Sparkles,
   Spline,
   Table2,
@@ -56,11 +57,14 @@ import {
   WandSparkles,
   X,
 } from 'lucide-react';
-import { hexColor, isWebDeck, newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type ChartEl, type Deck, type El, type ImageEl, type LayoutId, type Slide, type TextEl } from '@shared/slides';
-import { csvOf, editPicture, makeDrawing, makePicture, makePlot, makeVideo } from '../../images/studio';
+import { hexColor, isWebDeck, keptVideo, newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type ChartEl, type Deck, type El, type ImageEl, type LayoutId, type Slide, type TextEl, type VideoEl } from '@shared/slides';
+import { csvOf, editPicture, makeDrawing, makePicture, makePlot, makeVideo, shownSrc } from '../../images/studio';
+import type { EditorHandle } from '../../mediaedit/host';
+import { editKept } from '../../mediaedit/open';
+import { editKeptVideo } from '../../mediaedit/video/open';
 import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
-import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, useConfirm } from '../../../components/ui';
+import { Button, cx, Dialog, IconButton, inputCls, MenuBack, MenuItem, MenuSep, Popover, Segmented, useConfirm } from '../../../components/ui';
 import { FindBar, useFind } from '../common/FindBar';
 import { isMod, keyLabel } from '../common/keys';
 import { MenuBar } from '../common/menus';
@@ -287,6 +291,8 @@ export function SlidesEditor({
   const [present, setPresent] = useState<{ from: number; presenter: boolean } | null>(startPresent ? { from: 0, presenter: false } : null);
   const [menu, setMenu] = useState<'slide' | 'shape' | 'line' | 'picture' | 'present' | 'context' | null>(null);
   const [ctxAt, setCtxAt] = useState<{ x: number; y: number } | null>(null);
+  /** The right-click menu shows a picture's AI tools in its place (Change it with AI ›). */
+  const [ctxAi, setCtxAi] = useState(false);
   const [notesOpen, setNotesOpen] = useState(() => localStorage.getItem(PRESET_KEY) !== '0');
   const [drawer, setDrawer] = useState<'open' | 'closed'>('closed');
   const [saving, setSaving] = useState(false);
@@ -713,6 +719,45 @@ export function SlidesEditor({
     const h = v.w && v.h ? Math.max(40, Math.round(v.h * k)) : 450;
     putRef.current([{ id: newId(), type: 'video', src: v.src, ...(v.poster ? { poster: v.poster } : {}), ...centred(w, h) }]);
   };
+  // The picture editors opened from this deck: once it closes, what they save goes to the Library instead.
+  const pictureEditors = useRef(new Set<EditorHandle>());
+  useEffect(() => () => pictureEditors.current.forEach((h) => h.detach()), []);
+  /**
+   * Edit picture: the picture in the picture editor, in a tab of its own (this deck stays as it is under its tab). Saved,
+   * the new picture takes its place, one step to undo; one of another shape keeps the part's width, its height following.
+   */
+  const openPicture = (id: string) => {
+    const d = live.current;
+    const at = d ? slideOf(d, id) : -1;
+    const el = d && at >= 0 ? findEl(d.slides[at].els, id) : undefined;
+    if (el?.type !== 'image' || !el.src) return;
+    // The picture's own shape, to tell whether the editor changed it.
+    let was = 0;
+    const probe = new Image();
+    probe.onload = () => (was = probe.naturalWidth / Math.max(1, probe.naturalHeight));
+    probe.src = shownSrc(el.src);
+    const h = editKept(el.src, {
+      title: el.alt || el.name || `Slide ${at + 1}`,
+      label: doc?.title || 'The deck',
+      put: (r) => {
+        const src = r.src;
+        if (!src) return;
+        const now = r.w && r.h ? r.w / r.h : 0;
+        const reshaped = !!was && !!now && Math.abs(now / was - 1) > 0.02;
+        change((d2) => {
+          const i = slideOf(d2, id);
+          if (i < 0) return d2;
+          return setEls(d2, i, [id], (e) => {
+            if (e.type !== 'image') return e;
+            if (!reshaped) return { ...e, src } as El;
+            const nh = Math.max(8, Math.round(e.w / now));
+            return { ...e, src, crop: undefined, h: nh, y: Math.round(e.y + (e.h - nh) / 2) } as El;
+          });
+        });
+      },
+    });
+    pictureEditors.current.add(h);
+  };
   /** The picture changed with AI, its background taken out, or part of it erased: in its place, one step to undo. */
   const aiEdit = async (id: string, mode: 'change' | 'cutout' | 'erase') => {
     const d = live.current;
@@ -725,6 +770,41 @@ export function SlidesEditor({
       const i = slideOf(d2, id);
       return i < 0 ? d2 : setEls(d2, i, [id], (e) => ({ ...e, src: p.src }) as El);
     });
+  };
+  /** Video editors opened from this deck: told when it closes, so their Save keeps the video in the Library instead. */
+  const videoTabs = useRef<EditorHandle[]>([]);
+  useEffect(() => () => videoTabs.current.forEach((t) => t.detach()), []);
+  const changeRef = useRef(change);
+  changeRef.current = change;
+  /**
+   * The video picked (one the app keeps) in the video editor, in a tab of its own: the new video and its still take its
+   * place, one step to undo; one of a new shape (cropped to 9:16, turned) as large as fits in its box, in the middle.
+   */
+  const editVideo = (id: string) => {
+    const d = live.current;
+    const at = d ? slideOf(d, id) : -1;
+    const el = d && at >= 0 ? findEl(d.slides[at].els, id) : undefined;
+    if (el?.type !== 'video' || !keptVideo(el.src)) return;
+    const tab = editKeptVideo(el.src, {
+      title: el.name || tr(`Slide ${at + 1}`),
+      label: doc?.title || tr('The deck'),
+      put: (r) => {
+        if (!r.src && !r.poster) return;
+        changeRef.current((d2) => {
+          const i = slideOf(d2, id);
+          return i < 0
+            ? d2
+            : setEls(d2, i, [id], (e) => {
+                const v = e as VideoEl;
+                const ratio = r.w && r.h ? r.w / r.h : 0;
+                const fit = ratio && r.src && r.src !== v.src && Math.abs(ratio - v.w / v.h) > 0.02 ? Math.min(v.w, v.h * ratio) : 0;
+                const box = fit ? { x: Math.round(v.x + (v.w - fit) / 2), y: Math.round(v.y + (v.h - fit / ratio) / 2), w: Math.round(fit), h: Math.round(fit / ratio) } : {};
+                return { ...v, ...(r.src ? { src: r.src } : {}), ...(r.poster ? { poster: r.poster } : {}), ...box } as El;
+              });
+        });
+      },
+    });
+    videoTabs.current = [...videoTabs.current.filter((t) => t.id !== tab.id), tab];
   };
   /** A background made with AI for the slide on view, in its shape. */
   const aiBackground = async () => {
@@ -1274,7 +1354,9 @@ export function SlidesEditor({
     aiPlot: readOnly ? undefined : () => void aiPlot(),
     aiVideo: readOnly ? undefined : () => void aiVideo(),
     aiEdit: readOnly ? undefined : (mode) => one && void aiEdit(one.id, mode),
+    editPicture: readOnly ? undefined : () => one && openPicture(one.id),
     aiPlotChart: readOnly ? undefined : () => one && void aiPlot(one.id),
+    editVideo: readOnly ? undefined : () => one && editVideo(one.id),
     running: !!one && running === one.id,
     run: () => one && setRunning(running === one.id ? null : one.id),
     video: () => setVideoAsk(true),
@@ -1525,7 +1607,9 @@ export function SlidesEditor({
       pickModel={pickModel}
       onCompatible={setCompatible}
       onAiEdit={(id, mode) => void aiEdit(id, mode)}
+      onEditPicture={readOnly ? undefined : openPicture}
       onPlotChart={(id) => void aiPlot(id)}
+      onEditVideo={readOnly ? undefined : (id) => editVideo(id)}
       onAiBackground={() => void aiBackground()}
       picking={pickFor}
       onPickTrigger={setPickFor}
@@ -1785,97 +1869,116 @@ export function SlidesEditor({
         </MenuItem>
       </Popover>
       <div ref={ctxRef} className="pointer-events-none fixed h-px w-px" style={{ left: ctxAt?.x ?? -10, top: ctxAt?.y ?? -10 }} />
-      <Popover anchor={ctxRef} open={menu === 'context'} onClose={() => setMenu(null)} width={230}>
-        {picked.length > 0 && !readOnly && (
+      <Popover anchor={ctxRef} open={menu === 'context'} onClose={() => (setMenu(null), setCtxAi(false))} width={230}>
+        {ctxAi && one?.type === 'image' ? (
           <>
-            <MenuItem icon={<Scissors size={14} />} hint={keyLabel('Ctrl+X')} onClick={() => (setMenu(null), cut())}>
-              Cut
+            <MenuBack onClick={() => setCtxAi(false)}>Change it with AI</MenuBack>
+            <MenuItem icon={<WandSparkles size={14} />} onClick={() => (setMenu(null), setCtxAi(false), void aiEdit(one.id, 'change'))}>
+              Change with AI
             </MenuItem>
-            <MenuItem icon={<Copy size={14} />} hint={keyLabel('Ctrl+C')} onClick={() => (setMenu(null), copy())}>
-              Copy
+            <MenuItem icon={<ImageMinus size={14} />} onClick={() => (setMenu(null), setCtxAi(false), void aiEdit(one.id, 'cutout'))}>
+              Remove the background
+            </MenuItem>
+            <MenuItem icon={<Eraser size={14} />} onClick={() => (setMenu(null), setCtxAi(false), void aiEdit(one.id, 'erase'))}>
+              Erase part of it
             </MenuItem>
           </>
-        )}
-        {clip && !readOnly && (
-          <MenuItem icon={<Clipboard size={14} />} hint={keyLabel('Ctrl+V')} onClick={() => (setMenu(null), paste())}>
-            Paste
-          </MenuItem>
-        )}
-        {picked.length > 0 && !readOnly && (
+        ) : (
           <>
-            <MenuItem icon={<Copy size={14} />} hint={keyLabel('Ctrl+D')} onClick={() => (setMenu(null), duplicate())}>
-              Duplicate
-            </MenuItem>
-            {picked.length > 1 && (
-              <MenuItem icon={<GroupIcon size={14} />} hint={keyLabel('Ctrl+G')} onClick={() => (setMenu(null), group())}>
-                Group
-              </MenuItem>
-            )}
-            {one?.type === 'group' && (
-              <MenuItem icon={<Ungroup size={14} />} hint={keyLabel('Ctrl+Shift+G')} onClick={() => (setMenu(null), unGroup())}>
-                Ungroup
-              </MenuItem>
-            )}
-            {one?.type === 'image' && !!(one as ImageEl).src && (
+            {picked.length > 0 && !readOnly && (
               <>
-                <MenuItem icon={<Crop size={14} />} onClick={() => (setMenu(null), crop(one.id))}>
-                  Crop the picture
+                <MenuItem icon={<Scissors size={14} />} hint={keyLabel('Ctrl+X')} onClick={() => (setMenu(null), cut())}>
+                  Cut
                 </MenuItem>
-                <MenuItem icon={<WandSparkles size={14} />} onClick={() => (setMenu(null), void aiEdit(one.id, 'change'))}>
-                  Change with AI
-                </MenuItem>
-                <MenuItem icon={<ImageMinus size={14} />} onClick={() => (setMenu(null), void aiEdit(one.id, 'cutout'))}>
-                  Remove the background
-                </MenuItem>
-                <MenuItem icon={<Eraser size={14} />} onClick={() => (setMenu(null), void aiEdit(one.id, 'erase'))}>
-                  Erase part of it
+                <MenuItem icon={<Copy size={14} />} hint={keyLabel('Ctrl+C')} onClick={() => (setMenu(null), copy())}>
+                  Copy
                 </MenuItem>
               </>
             )}
-            {one?.type === 'chart' && (
-              <MenuItem icon={<ChartScatter size={14} />} onClick={() => (setMenu(null), void aiPlot(one.id))}>
-                Make a plot of this
+            {clip && !readOnly && (
+              <MenuItem icon={<Clipboard size={14} />} hint={keyLabel('Ctrl+V')} onClick={() => (setMenu(null), paste())}>
+                Paste
               </MenuItem>
             )}
-            <MenuItem icon={<Paintbrush size={14} />} disabled={!one} onClick={() => (setMenu(null), startPainter(false))}>
-              Format painter
-            </MenuItem>
-            {picked.length === 1 && (
-              <MenuItem icon={<MessageSquarePlus size={14} />} hint={keyLabel('Ctrl+Alt+M')} onClick={() => (setMenu(null), startComment())}>
-                Comment
-              </MenuItem>
+            {picked.length > 0 && !readOnly && (
+              <>
+                <MenuItem icon={<Copy size={14} />} hint={keyLabel('Ctrl+D')} onClick={() => (setMenu(null), duplicate())}>
+                  Duplicate
+                </MenuItem>
+                {picked.length > 1 && (
+                  <MenuItem icon={<GroupIcon size={14} />} hint={keyLabel('Ctrl+G')} onClick={() => (setMenu(null), group())}>
+                    Group
+                  </MenuItem>
+                )}
+                {one?.type === 'group' && (
+                  <MenuItem icon={<Ungroup size={14} />} hint={keyLabel('Ctrl+Shift+G')} onClick={() => (setMenu(null), unGroup())}>
+                    Ungroup
+                  </MenuItem>
+                )}
+                {one?.type === 'image' && !!(one as ImageEl).src && (
+                  <>
+                    <MenuItem icon={<SlidersHorizontal size={14} />} onClick={() => (setMenu(null), openPicture(one.id))}>
+                      Edit picture
+                    </MenuItem>
+                    <MenuItem icon={<Crop size={14} />} onClick={() => (setMenu(null), crop(one.id))}>
+                      Crop the picture
+                    </MenuItem>
+                    <MenuItem icon={<WandSparkles size={14} />} submenu onClick={() => setCtxAi(true)}>
+                      Change it with AI
+                    </MenuItem>
+                  </>
+                )}
+                {one?.type === 'video' && !!keptVideo((one as VideoEl).src) && (
+                  <MenuItem icon={<SlidersHorizontal size={14} />} onClick={() => (setMenu(null), editVideo(one.id))}>
+                    Edit video
+                  </MenuItem>
+                )}
+                {one?.type === 'chart' && (
+                  <MenuItem icon={<ChartScatter size={14} />} onClick={() => (setMenu(null), void aiPlot(one.id))}>
+                    Make a plot of this
+                  </MenuItem>
+                )}
+                <MenuItem icon={<Paintbrush size={14} />} disabled={!one} onClick={() => (setMenu(null), startPainter(false))}>
+                  Format painter
+                </MenuItem>
+                {picked.length === 1 && (
+                  <MenuItem icon={<MessageSquarePlus size={14} />} hint={keyLabel('Ctrl+Alt+M')} onClick={() => (setMenu(null), startComment())}>
+                    Comment
+                  </MenuItem>
+                )}
+                {onAsk && picked.length === 1 && (
+                  <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(`On slide ${index + 1}, the ${partName(picked[0]).replace(/^(\w)/, (c) => c.toLowerCase())}: `))}>
+                    Ask the agent about it
+                  </MenuItem>
+                )}
+                <MenuSep />
+                <MenuItem icon={<Trash2 size={14} />} danger onClick={() => (setMenu(null), remove())}>
+                  Delete
+                </MenuItem>
+              </>
             )}
-            {onAsk && picked.length === 1 && (
-              <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(`On slide ${index + 1}, the ${partName(picked[0]).replace(/^(\w)/, (c) => c.toLowerCase())}: `))}>
-                Ask the agent about it
-              </MenuItem>
+            {!picked.length && (
+              <>
+                {!readOnly && (
+                  <MenuItem icon={<LayoutTemplate size={14} />} onClick={() => setMenu('slide')}>
+                    A new slide
+                  </MenuItem>
+                )}
+                {!readOnly && (
+                  <MenuItem icon={<MessageSquarePlus size={14} />} hint={keyLabel('Ctrl+Alt+M')} onClick={() => (setMenu(null), startComment())}>
+                    Comment
+                  </MenuItem>
+                )}
+                {onAsk && (
+                  <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(`On slide ${index + 1}${slideTitle(slide) ? ` (“${slideTitle(slide)}”)` : ''}: `))}>
+                    Ask the agent about this slide
+                  </MenuItem>
+                )}
+                <MenuItem icon={<Play size={14} />} onClick={() => (setMenu(null), setPresent({ from: index, presenter: false }))}>
+                  Present from this slide
+                </MenuItem>
+              </>
             )}
-            <MenuSep />
-            <MenuItem icon={<Trash2 size={14} />} danger onClick={() => (setMenu(null), remove())}>
-              Delete
-            </MenuItem>
-          </>
-        )}
-        {!picked.length && (
-          <>
-            {!readOnly && (
-              <MenuItem icon={<LayoutTemplate size={14} />} onClick={() => setMenu('slide')}>
-                A new slide
-              </MenuItem>
-            )}
-            {!readOnly && (
-              <MenuItem icon={<MessageSquarePlus size={14} />} hint={keyLabel('Ctrl+Alt+M')} onClick={() => (setMenu(null), startComment())}>
-                Comment
-              </MenuItem>
-            )}
-            {onAsk && (
-              <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(`On slide ${index + 1}${slideTitle(slide) ? ` (“${slideTitle(slide)}”)` : ''}: `))}>
-                Ask the agent about this slide
-              </MenuItem>
-            )}
-            <MenuItem icon={<Play size={14} />} onClick={() => (setMenu(null), setPresent({ from: index, presenter: false }))}>
-              Present from this slide
-            </MenuItem>
           </>
         )}
       </Popover>

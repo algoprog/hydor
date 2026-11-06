@@ -68,6 +68,7 @@ import {
   Search,
   Shapes,
   Sigma,
+  SlidersHorizontal,
   Smile,
   Sparkles,
   Spline,
@@ -86,7 +87,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import type { El, ElType } from '@shared/slides';
+import { keptVideo, type El, type ElType } from '@shared/slides';
 import { WRITE_LANGS } from '@shared/write';
 import type { MenuDef } from '../common/menus';
 import type { AlignHow } from './ops';
@@ -163,7 +164,11 @@ export interface MenuArgs {
   aiPlot?: () => void;
   aiVideo?: () => void;
   aiEdit?: (mode: 'change' | 'cutout' | 'erase') => void;
+  /** The picture picked in the picture editor, in a tab of its own. */
+  editPicture?: () => void;
   aiPlotChart?: () => void;
+  /** The video picked (one the app keeps) in the video editor, in a tab of its own. */
+  editVideo?: () => void;
   video(): void;
   /** A video from this device. */
   videoFile(): void;
@@ -366,11 +371,13 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           ],
         },
         '-',
+        one?.type === 'image' && !!one.src && !!a.editPicture && { label: 'Edit picture', icon: <SlidersHorizontal size={14} />, also: 'edit picture crop turn adjust filter markup words blur', disabled: ro, run: a.editPicture },
         one?.type === 'image' && !!one.src && { label: 'Crop the picture', icon: <Crop size={14} />, disabled: ro, run: a.crop },
         one?.type === 'image' && (!!one.crop || !!one.adjust) && { label: 'Reset the picture', also: 'uncrop colours', disabled: ro, run: a.resetPicture },
         one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Change with AI', icon: <WandSparkles size={14} />, also: 'edit picture ai', disabled: ro, run: () => a.aiEdit!('change') },
         one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Remove the background', icon: <ImageMinus size={14} />, also: 'cut out background transparent', disabled: ro, run: () => a.aiEdit!('cutout') },
         one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Erase part of it', icon: <Eraser size={14} />, also: 'erase remove object', disabled: ro, run: () => a.aiEdit!('erase') },
+        one?.type === 'video' && !!keptVideo(one.src) && !!a.editVideo && { label: 'Edit video', icon: <SlidersHorizontal size={14} />, also: 'edit video trim cut crop speed text music gif frame', disabled: ro, run: a.editVideo },
         one?.type === 'chart' && !!a.aiPlotChart && { label: 'Make a plot of this', icon: <ChartScatter size={14} />, also: 'plot chart graph matplotlib', disabled: ro, run: a.aiPlotChart },
         one?.type === 'math' && { label: 'Edit the equation', icon: <Sigma size={14} />, disabled: ro, run: a.editTex },
         one?.type === 'icon' && { label: 'Another icon', icon: <Star size={14} />, disabled: ro, run: a.replaceIcon },
