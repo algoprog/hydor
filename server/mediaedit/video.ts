@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { MediaItem } from '../../shared/media.ts';
-import { editedLength, normalizeVideoRecipe, MAX_GIF_SECONDS, type VideoEditAsk, type VideoEditJob, type VideoFacts, type VideoOut, type VideoRecipe, type VideoSaveTo } from '../../shared/mediaedit-video.ts';
+import { editedLength, keptParts, normalizeVideoRecipe, toEdited, MAX_GIF_SECONDS, type VideoEditAsk, type VideoEditJob, type VideoFacts, type VideoOut, type VideoRecipe, type VideoSaveTo } from '../../shared/mediaedit-video.ts';
 import { ASSET, VIDEO } from '../../shared/slides.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
@@ -179,6 +179,8 @@ export interface Prepared {
   format: VideoOut;
   frame?: number;
   size?: number;
+  /** A deck's video: the moment its still is taken at (seconds of the original). */
+  still?: number;
   to: SaveTo;
   music?: string;
   /** The editor's drawings of the texts (PNG), by the recipe's order; null where it drew none. */
@@ -413,14 +415,14 @@ function containerOf(p: Prepared): 'mp4' | 'mov' | 'webm' {
 
 const MIME: Record<string, string> = { mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', gif: 'image/gif', jpg: 'image/jpeg', png: 'image/png' };
 
-/** A name for what is made of `source` ("boat edited.mp4", "boat at 3.2 s.jpg"). */
+/** A name for what is made of `source` ("boat (edited).mp4", "boat (at 3.2 s).jpg"), as the picture editor names its copies. */
 function madeName(p: Prepared, ext: string): string {
   const stem =
     (p.source.name || 'video')
       .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
       .trim()
       .slice(0, 80) || 'video';
-  return p.frame !== undefined ? `${stem} at ${Math.round(p.frame * 10) / 10} s.${ext}` : `${stem} edited.${ext}`;
+  return p.frame !== undefined ? `${stem} (at ${Math.round(p.frame * 10) / 10} s).${ext}` : `${stem} (edited).${ext}`;
 }
 
 /** Puts what was made where it was asked to go, and says so in the job's view. */
@@ -433,11 +435,13 @@ async function deliver(j: Job, out: string, ext: string, dir: string): Promise<v
       throw new Error(`It was made but could not be kept: ${e.message}`);
     });
     j.view.src = kept.src;
-    // The slide's still: its first frame, or the end of its fade in from black.
+    // The slide's still: the moment picked, else its first frame (or the end of its fade in from black).
     let frame = kept.frame;
-    if (p.recipe.fadeIn) {
+    const seconds = j.view.seconds ?? 1;
+    const when = p.still !== undefined ? toEdited(p.still, keptParts(p.recipe, p.facts.duration), p.recipe.speed ?? 1) : p.recipe.fadeIn ? p.recipe.fadeIn + 0.05 : 0;
+    if (when > 0) {
       const at = path.join(dir, 'still.jpg');
-      if (await still(out, at, { at: Math.min(p.recipe.fadeIn + 0.05, (j.view.seconds ?? 1) / 2), width: 1280 })) frame = await fs.promises.readFile(at);
+      if (await still(out, at, { at: Math.min(when, Math.max(0, seconds - 0.05)), width: 1280 })) frame = await fs.promises.readFile(at);
     }
     try {
       if (frame) j.view.poster = ASSET + putAsset(db, frame);
@@ -588,6 +592,7 @@ export async function prepare(d: Deps, b: Partial<VideoEditAsk> & { to?: unknown
     return data;
   });
   const size = Number(b.size);
+  const stillAt = Number(b.still);
   return {
     d,
     source,
@@ -596,6 +601,7 @@ export async function prepare(d: Deps, b: Partial<VideoEditAsk> & { to?: unknown
     format,
     ...(frame !== undefined && picture ? { frame } : {}),
     ...(Number.isFinite(size) && size >= 120 ? { size: Math.round(Math.min(4320, size)) } : {}),
+    ...(b.still !== undefined && b.still !== null && Number.isFinite(stillAt) && 'video' in to ? { still: Math.min(facts.duration, Math.max(0, stillAt)) } : {}),
     to,
     ...(music ? { music } : {}),
     drawn,

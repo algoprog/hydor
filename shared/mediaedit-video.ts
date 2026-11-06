@@ -98,6 +98,8 @@ export interface VideoEditAsk {
   frame?: number;
   /** The edited picture's shorter side at most, in pixels (1080, 720, 480): a smaller, lighter file. */
   size?: number;
+  /** A deck's video: its still taken at this moment (seconds of the original) rather than at its start. */
+  still?: number;
   to: VideoSaveTo;
   /** The editor's texts as it draws them: a PNG (a data: address) for each of the recipe's texts, in its order, at the edited picture's size. */
   drawn?: string[];
@@ -364,6 +366,14 @@ export function normalizeVideoRecipe(raw: unknown, v: VideoSize): VideoRecipe {
   if (texts.length) out.texts = texts;
   return out;
 }
+
+/**
+ * The colour sliders (-1 to 1) as the browser's filter amounts, which the editor shows and the export makes the same:
+ * brightness() 0.4 to 1.6, contrast() 0.4 to 1.6, saturate() 0 to 2.
+ */
+export const cssBrightness = (v = 0) => 1 + v * 0.6;
+export const cssContrast = (v = 0) => 1 + v * 0.6;
+export const cssSaturate = (v = 0) => 1 + v;
 
 /** Whether an edit changes anything at all. */
 export const changesVideo = (r: VideoRecipe) => Object.keys(r).length > 0;

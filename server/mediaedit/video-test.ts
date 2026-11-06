@@ -354,7 +354,7 @@ if (ff) {
     });
     ok(r.statusCode === 200 && ['queued', 'running'].includes(r.json().status) && /^[a-f0-9]{16}$/.test(r.json().job), `a job: ${r.body}`);
     const j = await finished(r.json().job);
-    ok(j.status === 'done' && j.path === path.join(tmp, 'clip edited.mp4') && j.w === 180 && j.h === 180 && j.seconds === 2 && j.bytes > 1000, `made beside it: ${JSON.stringify(j)}`);
+    ok(j.status === 'done' && j.path === path.join(tmp, 'clip (edited).mp4') && j.w === 180 && j.h === 180 && j.seconds === 2 && j.bytes > 1000, `made beside it: ${JSON.stringify(j)}`);
     const pr = ffprobe(j.path);
     const v = pr.streams.find((s: any) => s.codec_type === 'video');
     ok(
@@ -367,7 +367,7 @@ if (ff) {
     const outside = apart(lit, bare, 180, 0, 0, 30, 30);
     ok(inside > 40 && outside < 10, `the words drawn in its middle, nowhere else: ${Math.round(inside)} there, ${Math.round(outside)} in a corner`);
     const again = await finished((await req('POST', '/api/mediaedit/video', { src: clip, recipe: { trim: [0, 1] }, to: { file: clip, as: 'copy' } })).json().job);
-    ok(plain.path === path.join(tmp, 'clip edited copy.mp4') && again.path === path.join(tmp, 'clip edited copy 2.mp4'), `each copy beside it gets a name of its own: ${again.path}`);
+    ok(plain.path === path.join(tmp, 'clip (edited) copy.mp4') && again.path === path.join(tmp, 'clip (edited) copy 2.mp4'), `each copy beside it gets a name of its own: ${again.path}`);
   }
 
   // A part cut, twice as fast, the editor's drawing laid on, music under it, faded out; and its frame as a picture.
@@ -395,7 +395,7 @@ if (ff) {
       ).json().job,
     );
     const fp = ffprobe(f.path).streams[0];
-    ok(f.status === 'done' && f.path.endsWith('clip at 1.5 s.png') && fp.width === 180 && fp.height === 320 && isRed(pixel(f.path, 0, 90, 160)), `a frame, turned, as a PNG beside it, the drawing on it: ${f.path} ${fp.width}×${fp.height}`);
+    ok(f.status === 'done' && f.path.endsWith('clip (at 1.5 s).png') && fp.width === 180 && fp.height === 320 && isRed(pixel(f.path, 0, 90, 160)), `a frame, turned, as a PNG beside it, the drawing on it: ${f.path} ${fp.width}×${fp.height}`);
   }
 
   // Where results go: a deck's video and its still, a deck's picture, the Library, a Library item's file, a file over.
@@ -459,7 +459,7 @@ if (ff) {
     ok(ja.status === 'stopped' && !ja.path, 'stopped, nothing saved');
     await req('DELETE', `/api/mediaedit/video/${b.job}`);
     await finished(b.job);
-    ok(!fs.readdirSync(tmp).some((n) => n.startsWith('long edited')), 'no file left of them');
+    ok(!fs.readdirSync(tmp).some((n) => n.startsWith('long (edited)')), 'no file left of them');
     ok(fs.readdirSync(path.join(config.dataDir, 'mediaedit', 'tmp')).length === 0, 'their folders gone');
     ok((await req('GET', '/api/mediaedit/video/0123456789abcdef')).statusCode === 404 && (await req('GET', '/api/mediaedit/video/x')).statusCode === 400, 'an unknown job');
   }
