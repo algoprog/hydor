@@ -18,9 +18,14 @@
 // out where the app draws them, and pictures whose colours were changed go changed (slides-render.ts). Every part is
 // valid against the ECMA-376 schemas (scripts/office-check/pptx-check.mjs checks them, and the pictures side by side).
 //
+// Code goes as coloured words in its monospaced font, coloured by the slides' runtime's own tokenizer (as the slide
+// shows it), its lines numbered and lit as it says. A web deck comes here made PowerPoint's (toPowerPoint): its live
+// parts as pictures of them running (renders "part:<id>", where the browser could take one) or their posters.
+//
 // A slide is 1280 px wide: 1 px is 9525 EMU (12192000 across, PowerPoint's widescreen) and a font's px is 0.75 pt.
-import type { Anim, ChartEl, Deck, El, GroupEl, IconEl, ImageEl, LayoutId, LineEl, MathEl, Para, Ratio, Run, Side, Slide, Stick, TableEl, TextEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
-import { everyEl, fontName, FONTS, footerOn, hexColor, LAYOUTS, layoutSlide, mixColor, plainText, slideH, VIDEO, videoStill } from '../../shared/slides.ts';
+import type { Anim, ChartEl, CodeEl, Deck, El, GroupEl, IconEl, ImageEl, LayoutId, LineEl, MathEl, Para, Ratio, Run, Side, Slide, Stick, TableEl, TextEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
+import { CODE_FONT, everyEl, fontName, FONTS, footerOn, hexColor, LAYOUTS, layoutSlide, mixColor, plainText, slideH, VIDEO, videoStill } from '../../shared/slides.ts';
+import { codeLookOf, codeTokens } from '../../shared/slides-runtime.ts';
 import { coreXml, esc, relsXml, XML_HEAD, zipParts, type ZipPart } from './ooxml.ts';
 import { eotCompressed, eotOf, fontAttrs, fontsSaid } from './pptx-fonts.ts';
 
@@ -38,7 +43,7 @@ export interface PptxOpts {
   picture: (src: string) => Picture | null;
   /** How much text boxes were made smaller to fit (by part id), as the app showed them. */
   scales?: Map<string, number>;
-  /** Pictures made of parts in a browser: "icon:<id>" (its PNG beside its SVG), "math:<id>" (an equation). */
+  /** Pictures made of parts in a browser: "icon:<id>" (its PNG beside its SVG), "math:<id>" (an equation), "part:<id>" (a web deck's live part, running). */
   renders?: Map<string, Picture>;
   /** A video the app keeps ("naget-video:<sha>"): its bytes and kind, to go inside the file; null when it is not there. */
   video?: (src: string) => { data: Buffer; ext: string; mime: string } | null;
@@ -166,8 +171,12 @@ interface Ctx {
   phs: Map<string, Ph>;
 }
 
+/** The slides a link may jump to by their place, as PowerPoint names them. */
+const JUMPS: Record<string, string> = { '#next': 'nextslide', '#prev': 'previousslide', '#first': 'firstslide', '#last': 'lastslide' };
+
 function link(c: Ctx, href: string | undefined, tag: 'hlinkClick' = 'hlinkClick'): string {
   if (!href) return '';
+  if (JUMPS[href]) return `<a:${tag} r:id="" action="ppaction://hlinkshowjump?jump=${JUMPS[href]}"/>`;
   const m = /^#(\d{1,3})$/.exec(href);
   if (m) {
     const f = c.slideFile(Number(m[1]));
@@ -451,8 +460,9 @@ function boxXml(c: Ctx, e: Extract<El, { type: 'text' | 'shape' }>): string {
 }
 
 function imageXml(c: Ctx, e: ImageEl, href?: string): string {
-  // A picture whose colours were changed goes changed, as the editor shows it (slides-render.ts), where a browser made it.
-  const baked = c.o.renders?.get(`adjust:${e.id}`);
+  // A picture whose colours were changed goes changed, as the editor shows it (slides-render.ts), where a browser made it;
+  // a web deck's live part as it ran (else its poster).
+  const baked = c.o.renders?.get(`adjust:${e.id}`) ?? c.o.renders?.get(`part:${e.id}`);
   const pic = baked ?? (e.src ? c.o.picture(e.src) : null);
   const ph = c.depth ? undefined : c.phs.get(e.id);
   if (!pic) {
@@ -692,8 +702,56 @@ function groupXml(c: Ctx, e: GroupEl): string {
   return `<p:grpSp><p:nvGrpSpPr>${cNvPr}<p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr>${grpXfrm(e)}</p:grpSpPr>${inner}</p:grpSp>`;
 }
 
+/** The lines a code part lights ("2-4,7"), by their number from 1 (as the runtime reads them). */
+function litLines(v: string | undefined): Set<number> {
+  const out = new Set<number>();
+  for (const part of (v ?? '').split(',').slice(0, 100)) {
+    const m = /^\s*(\d{1,4})\s*(?:-\s*(\d{1,4}))?\s*$/.exec(part);
+    if (!m) continue;
+    for (let i = Number(m[1]); i <= Math.min(Number(m[1]) + 2000, Number(m[2] ?? m[1])); i++) out.add(i);
+  }
+  return out;
+}
+
+/**
+ * Code as PowerPoint's own words: a box in the look's colour, a line a paragraph (never wrapped), each word in its
+ * colour (comments in italics) in the monospaced font, its lines numbered, those not lit dimmed; as small as the slide
+ * made it to fit (`scales`).
+ */
+function codeXml(c: Ctx, e: CodeEl): string {
+  const look = codeLookOf(e.look, c.t);
+  const { cNvPr } = nvPr(c, e, 'Code');
+  const op = e.opacity ?? 1;
+  const k = c.o.scales?.get(e.id) ?? 1;
+  const lines: [string, string][][] = [[]];
+  for (const [kind, t] of codeTokens(e.code.replace(/\t/g, '    '), e.lang)) t.split('\n').forEach((bit, i) => {
+    if (i) lines.push([]);
+    if (bit) lines[lines.length - 1].push([kind, bit]);
+  });
+  const lit = litLines(e.highlight);
+  const width = String(lines.length).length;
+  const fonts = fontsXml(CODE_FONT);
+  const hex = (col: string) => hexColor(col, c.t, '000000').hex;
+  const run = (t: string, col: string, alpha: number, italic = false) => `<a:r><a:rPr lang="en-US" sz="${sz(e.size)}" b="0" i="${italic ? 1 : 0}" dirty="0"><a:solidFill><a:srgbClr val="${hex(col)}">${alpha < 1 ? `<a:alpha val="${Math.round(alpha * 100000)}"/>` : ''}</a:srgbClr></a:solidFill>${fonts}</a:rPr><a:t>${esc(t)}</a:t></a:r>`;
+  const paras = lines
+    .map((ln, i) => {
+      const a = (lit.size && !lit.has(i + 1) ? 0.36 : 1) * op;
+      const num = e.lineNumbers ? run(`${String(i + 1).padStart(width, ' ')}  `, look.gutter, a) : '';
+      const words = ln.map(([kind, t]) => run(t, kind && kind in look ? look[kind as keyof typeof look] : look.fg, a, kind === 'c')).join('');
+      return `<a:p><a:pPr algn="l"><a:lnSpc><a:spcPct val="125000"/></a:lnSpc><a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="0"/></a:spcAft><a:buNone/></a:pPr>${num}${words}<a:endParaRPr lang="en-US" sz="${sz(e.size)}" dirty="0">${fonts}</a:endParaRPr></a:p>`;
+    })
+    .join('');
+  const padX = emu(e.size * 1.1 * k);
+  const padY = emu(e.size * 0.85 * k);
+  const fit = k < 0.999 ? `<a:normAutofit fontScale="${Math.round(Math.max(0.01, k) * 100000)}"/>` : '<a:noAutofit/>';
+  const r = Math.min(e.radius ?? 12, Math.min(e.w, e.h) / 2);
+  const geom = r ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.round(Math.min(50000, (r / Math.max(1, Math.min(e.w, e.h))) * 100000))}"/></a:avLst></a:prstGeom>` : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
+  return `<p:sp><p:nvSpPr>${cNvPr}<p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(e.x, e.y, e.w, e.h, e.rot)}${geom}${fillXml(look.bg, c.t, op)}<a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr wrap="none" lIns="${padX}" tIns="${padY}" rIns="${padX}" bIns="${padY}" anchor="t" rtlCol="0">${fit}</a:bodyPr><a:lstStyle/>${paras}</p:txBody></p:sp>`;
+}
+
 function partXml(c: Ctx, e: El): string {
   if (e.type === 'text' || e.type === 'shape') return boxXml(c, e);
+  if (e.type === 'code') return codeXml(c, e);
   if (e.type === 'image') return imageXml(c, e);
   if (e.type === 'line') return lineXml(c, e);
   if (e.type === 'table') return tableXml(c, e);

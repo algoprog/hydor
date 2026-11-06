@@ -6,18 +6,25 @@
 // theme (Inspector); speaker notes under the slide; Find and replace across the slides and notes; every slide at once
 // (Grid); and Present: the slideshow, or the presenter's view with the audience's window. Changes stay unsaved until
 // Save (Ctrl+S), as a page's do; Undo and Redo go back and forth. While an agent writes a new version (live.ts), it
-// shows as it comes, read-only: the slide being written on view, a box round the part its words arrive in.
+// shows as it comes, read-only: the slide being written on view, a box round the part its words arrive in. A deck is
+// made for the web (custom code, web pages, quizzes, 3D, the web's effects) unless it is made PowerPoint compatible
+// (Theme → Made for, or Tools); its live parts run in frames of their own, in the slideshow, and here once Run is pressed. The AI tools
+// (images/studio) make pictures, drawings, plots and videos for it, change a picture picked, make a chart a plot and
+// a slide's background: each result lands as an uploaded one does, or takes the place of what it changed, one step to undo.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  ChartScatter,
   ChevronDown,
   ChevronUp,
   Clipboard,
   Copy,
   CornerDownRight,
   Crop,
+  Eraser,
   Grid2x2,
   Group as GroupIcon,
   Image as ImageIcon,
+  ImageMinus,
   LayoutTemplate,
   Link2,
   MessageSquare,
@@ -26,6 +33,7 @@ import {
   MonitorPlay,
   MoveRight,
   Paintbrush,
+  PenTool,
   PieChart,
   Play,
   Plus,
@@ -41,8 +49,10 @@ import {
   Type,
   Undo2,
   Ungroup,
+  WandSparkles,
 } from 'lucide-react';
-import { newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type Deck, type El, type ImageEl, type LayoutId, type TextEl } from '@shared/slides';
+import { hexColor, isWebDeck, newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type ChartEl, type Deck, type El, type ImageEl, type LayoutId, type TextEl } from '@shared/slides';
+import { csvOf, editPicture, makeDrawing, makePicture, makePlot, makeVideo } from '../../images/studio';
 import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
 import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, useConfirm } from '../../../components/ui';
@@ -56,13 +66,17 @@ import {
   addSlide,
   align,
   chart,
+  codePart,
   connector,
   copies,
   distribute,
   duplicateSlides,
+  embedAddress,
+  embedPart,
   findEl,
   groupEls,
   HISTORY_MAX,
+  htmlPart,
   image,
   line,
   lookOf,
@@ -70,15 +84,20 @@ import {
   onSlide,
   partName,
   pickedOf,
+  quizPart,
   removeEls,
   removeSlides,
   restack,
+  scene3dPart,
+  scorePart,
+  setAnim,
   setEls,
   setSlide,
   shape,
   table,
   textBox,
   topOf,
+  toWebFormat,
   ungroup,
   withLook,
   W,
@@ -94,13 +113,14 @@ import { useDeckFonts } from './rt';
 import { SlideCanvas, type CanvasHandle, type CellSel, type CommentPin, type FindMark, type GridOpts } from './SlideCanvas';
 import { LayoutGrid, Strip } from './Strip';
 import { textActions, TextBar } from './TextBar';
-import { slidesMenus } from './SlidesMenus';
+import { slidesMenus, type RichKind } from './SlidesMenus';
+import { FormatDialog } from './FormatDialog';
 import { IconPicker, type IconDef } from './IconPicker';
 import { FooterDialog } from './FooterDialog';
 import { NotesField } from './Notes';
 import { findInDeck, replaceAllInDeck, replaceHit } from './find';
 import { exportFile } from '../exportFile';
-import { chooseVideo, fetchVideoStill, firstFrame, isVideoFile, uploadVideo } from './media';
+import { chooseModel, chooseVideo, fetchVideoStill, firstFrame, isVideoFile, uploadModel, uploadVideo } from './media';
 import { SlideComments } from './SlideComments';
 
 export type SlidesDoc = ModelDoc<Deck>;
@@ -125,6 +145,15 @@ function scopesFor(index: number, title: string, parts: string[]): AskScope[] {
   if (parts.length) out.push({ id: 'part', label: `${tr('What’s picked')}: ${parts.join(', ')}`, lead: `On slide ${n}, the ${parts.map((x) => x.replace(/^(\w)/, (c) => c.toLowerCase())).join(' and the ')}: ` });
   return out;
 }
+
+/** A deck's colours as the AI tools take them (#hex): its accent, then its charts' colours. */
+const colorsOf = (d: Deck) => [...new Set([d.theme.accent, ...d.theme.colors].map((c) => `#${hexColor(c, d.theme).hex}`))].slice(0, 6);
+
+/** The look a plot is drawn in: the deck's colours and font. */
+const plotTheme = (d: Deck) => ({ colors: colorsOf(d), fg: `#${hexColor(d.theme.fg, d.theme).hex}`, bg: `#${hexColor(d.theme.bg, d.theme).hex}`, font: d.theme.font });
+
+/** A chart's numbers as CSV: its labels down the side, a column for each series. */
+const chartCsv = (c: ChartEl) => csvOf([[c.title?.trim() || 'Label', ...c.series.map((s) => s.name)], ...c.labels.map((l, i) => [l, ...c.series.map((s) => String(s.values[i] ?? ''))])]);
 
 const savedGrid = (): GridOpts => {
   try {
@@ -263,6 +292,15 @@ export function SlidesEditor({
   const [iconAsk, setIconAsk] = useState<{ replace?: string; start: 'icons' | 'emoji' } | null>(null);
   const [videoAsk, setVideoAsk] = useState(false);
   const [videoUrl, setVideoUrl] = useState('');
+  /** Asked for a web page's address (Insert → Interactive → Web page). */
+  const [embedAsk, setEmbedAsk] = useState<{ web?: boolean } | null>(null);
+  const [embedUrl, setEmbedUrl] = useState('');
+  /** The dialog before the deck is made PowerPoint compatible. */
+  const [compatAsk, setCompatAsk] = useState(false);
+  /** The live part (custom code, a web page, 3D) running in place, until something else is picked. */
+  const [running, setRunning] = useState<string | null>(null);
+  /** An animation whose starting part (a click on which plays it) is being picked on the slide. */
+  const [pickFor, setPickFor] = useState<string | null>(null);
   /** A video from this device on its way to the app: how much of it went (0–1), shown over the slide. */
   const [sending, setSending] = useState<number | null>(null);
   /** The thread picked in the Comments tab. */
@@ -459,8 +497,8 @@ export function SlidesEditor({
         setDrawer('open');
       }
     }
-    // In a chart or an equation: it is picked, so the side panel shows its numbers or its LaTeX.
-    if ((hit.where === 'chart' || hit.where === 'tex') && hit.id && deck) {
+    // In a chart, an equation, a quiz, a score or code: it is picked, so the side panel shows its numbers, its LaTeX or its words.
+    if ((hit.where === 'chart' || hit.where === 'tex' || hit.where === 'words') && hit.id && deck) {
       setSel([topOf(deck.slides[hit.slide], hit.id)?.id ?? hit.id]);
       setTab('format');
     }
@@ -469,7 +507,7 @@ export function SlidesEditor({
   const marks: FindMark[] = hits
     .map((h, i) => ({ h, i }))
     .filter(({ h }) => h.slide === index && h.where !== 'notes')
-    .map(({ h, i }) => ({ id: h.id!, para: h.para, cell: h.cell, chart: h.where === 'chart' ? h.t : undefined, tex: h.where === 'tex' || undefined, s: h.s, e: h.e, current: i === findAt }));
+    .map(({ h, i }) => ({ id: h.id!, para: h.para, cell: h.cell, chart: h.where === 'chart' ? h.t : undefined, tex: h.where === 'tex' || undefined, whole: h.where === 'words' || undefined, s: h.s, e: h.e, current: i === findAt }));
   const noteMarks = hits
     .map((h, i) => ({ h, i }))
     .filter(({ h }) => h.slide === index && h.where === 'notes')
@@ -490,11 +528,12 @@ export function SlidesEditor({
   };
 
   // ---- adding things -------------------------------------------------------------------------------------
-  const put = (els: El[]) => {
+  const put = (els: El[], o: { web?: boolean } = {}) => {
     if (!deck) return;
     canvas.current?.stopEditing();
     setScope([]);
-    change((d) => addEls(d, index, els));
+    // A part of the web format put in a PowerPoint compatible deck takes it to the web format, in the same step.
+    change((d) => addEls(o.web ? toWebFormat(d) : d, index, els));
     setSel(els.map((e) => e.id));
     setTab('format');
     setView('edit');
@@ -606,6 +645,171 @@ export function SlidesEditor({
     if (!f) return;
     if (!isVideoFile(f)) return toast('That is not a video a slide takes: an MP4, MOV or WebM file');
     await putVideoFile(f);
+  };
+
+  // ---- the AI tools -------------------------------------------------------------------------------------------
+  // A tool's dialog may stay open a while (a video takes minutes): what it made lands where the editor is then.
+  const putRef = useRef(put);
+  putRef.current = put;
+  /** The slide a part is on now (it may have moved since the tool was opened), or -1. */
+  const slideOf = (d: Deck, id: string) => d.slides.findIndex((s) => !!findEl(s.els, id));
+  /** A picture made with AI, or a drawing (SVG): on the slide as an uploaded picture lands, its words its description. */
+  const aiPicture = async (tool: 'picture' | 'drawing') => {
+    const d = live.current;
+    if (!d) return;
+    const p = tool === 'picture' ? await makePicture({ kind: 'picture', theme: { colors: colorsOf(d) } }) : await makeDrawing({ kind: 'illustration', colors: colorsOf(d) });
+    if (!p || !live.current) return;
+    const img = image(live.current, p.src, p.w, p.h);
+    putRef.current([p.prompt ? { ...img, alt: p.prompt.replace(/\s+/g, ' ').slice(0, 300) } : img]);
+  };
+  /**
+   * A plot: of the chart picked (its series the data; the plot takes its place), or of data given in the dialog. In a
+   * web deck, the version that moves goes in as custom code, its picture shown where it cannot run.
+   */
+  const aiPlot = async (chartId?: string) => {
+    const d = live.current;
+    if (!d) return;
+    const at = chartId ? slideOf(d, chartId) : -1;
+    const found = at >= 0 && chartId ? findEl(d.slides[at].els, chartId) : undefined;
+    const chart = found?.type === 'chart' ? found : undefined;
+    const web = isWebDeck(d);
+    const box = chart ? { w: Math.round(chart.w), h: Math.round(chart.h) } : { w: 800, h: 480 };
+    const p = await makePlot({ data: chart ? chartCsv(chart) : undefined, dataFrom: chart ? 'From the chart' : undefined, theme: plotTheme(d), ...box, interactive: web || undefined });
+    const now = live.current;
+    if (!p || !now) return;
+    const img = image(now, p.src, p.w, p.h);
+    const made = (place: { x: number; y: number; w: number; h: number }, id = newId()): El =>
+      // The plot that moves answers the pointer (its values on hover), so it takes it in the slideshow.
+      web && p.html ? { id, type: 'html', html: p.html, poster: p.src, name: 'Plot', interactive: true, ...place } : { ...img, id, ...place, fit: 'contain', ...(p.prompt ? { alt: p.prompt.replace(/\s+/g, ' ').slice(0, 300) } : {}) };
+    if (chart) {
+      // In the chart's place, by its id: its animations and comments stay with it.
+      return change((d2) => {
+        const i = slideOf(d2, chart.id);
+        return i < 0 ? d2 : setEls(d2, i, [chart.id], (e) => made({ x: e.x, y: e.y, w: e.w, h: e.h }, e.id));
+      });
+    }
+    putRef.current([made({ x: img.x, y: img.y, w: img.w, h: img.h })]);
+  };
+  /** A video made with AI (from the picture picked, if one is), on the slide on view when it is done and inserted. */
+  const aiVideo = async () => {
+    const d = live.current;
+    if (!d) return;
+    const pic = picked.length === 1 && picked[0].type === 'image' && picked[0].src.startsWith('naget-asset:') ? picked[0].src : undefined;
+    const v = await makeVideo({ aspect: d.ratio, first: pic });
+    if (!v || !live.current) return;
+    const k = v.w && v.h ? Math.min(800 / v.w, 450 / v.h) : 1;
+    const w = v.w && v.h ? Math.max(40, Math.round(v.w * k)) : 800;
+    const h = v.w && v.h ? Math.max(40, Math.round(v.h * k)) : 450;
+    putRef.current([{ id: newId(), type: 'video', src: v.src, ...(v.poster ? { poster: v.poster } : {}), ...centred(w, h) }]);
+  };
+  /** The picture changed with AI, its background taken out, or part of it erased: in its place, one step to undo. */
+  const aiEdit = async (id: string, mode: 'change' | 'cutout' | 'erase') => {
+    const d = live.current;
+    const at = d ? slideOf(d, id) : -1;
+    const el = d && at >= 0 ? findEl(d.slides[at].els, id) : undefined;
+    if (el?.type !== 'image' || !el.src) return;
+    const p = await editPicture({ src: el.src, mode });
+    if (!p) return;
+    change((d2) => {
+      const i = slideOf(d2, id);
+      return i < 0 ? d2 : setEls(d2, i, [id], (e) => ({ ...e, src: p.src }) as El);
+    });
+  };
+  /** A background made with AI for the slide on view, in its shape. */
+  const aiBackground = async () => {
+    const d = live.current;
+    if (!d) return;
+    const sid = d.slides[index]?.id;
+    const p = await makePicture({ kind: 'background', aspect: d.ratio, theme: { colors: colorsOf(d) } });
+    if (!p || !sid) return;
+    change((d2) => {
+      const i = d2.slides.findIndex((s) => s.id === sid);
+      return i < 0 ? d2 : setSlide(d2, i, (s) => ({ ...s, bg: { ...(s.bg ?? {}), image: p.src } }));
+    });
+  };
+
+  // ---- the web format ------------------------------------------------------------------------------------------
+  /** A web format part: in a PowerPoint compatible deck, it asks first (the deck then leaves PowerPoint compatibility). */
+  const putRich = async (kind: RichKind) => {
+    if (!deck) return;
+    const toWeb = !isWebDeck(deck);
+    if (
+      toWeb &&
+      !(await confirm({
+        title: 'Use the web format?',
+        body: 'Custom code, web pages, quizzes and 3D are the web format’s. The deck stops being PowerPoint compatible: its PowerPoint file gets them as pictures.',
+        confirm: 'Use the web format',
+      }))
+    )
+      return;
+    const d = live.current ?? deck;
+    if (kind === 'embed') return setEmbedAsk({ web: toWeb });
+    if (kind === 'html') {
+      put([htmlPart(d)], { web: toWeb });
+      // Its code, to change, in the side panel.
+      if (!wide) setDrawer('open');
+      return;
+    }
+    put([kind === 'quiz' ? quizPart(d, tr) : kind === 'score' ? scorePart(d, tr) : scene3dPart(d)], { web: toWeb });
+  };
+  const putEmbed = () => {
+    const url = embedAddress(embedUrl);
+    if (!url || !live.current) return;
+    const web = !!embedAsk?.web;
+    setEmbedAsk(null);
+    setEmbedUrl('');
+    put([embedPart(live.current, url)], { web });
+  };
+  /** PowerPoint compatible on (after the dialog), or off: back to the web format, which loses nothing. */
+  const setCompatible = (on: boolean) => {
+    if (on) return setCompatAsk(true);
+    change((d) => toWebFormat(d));
+    toast('The deck is in the web format: Insert → Interactive has custom code, web pages, quizzes and 3D', 'ok');
+  };
+  // Something else picked, another slide: the live part running in place stops.
+  useEffect(() => {
+    if (running && !(sel.length === 1 && sel[0] === running)) setRunning(null);
+  }, [sel, index, running]);
+  // Another slide, or the panel's other tabs: no part is being picked for an animation.
+  useEffect(() => setPickFor(null), [index, tab]);
+  /** The part clicked on the slide starts the animation being set up (the part it moves may start its own). */
+  const pickTrigger = (id: string | null) => {
+    const anim = pickFor;
+    setPickFor(null);
+    const s = live.current?.slides[index];
+    if (!anim || !id || !s?.anims?.some((x) => x.id === anim)) return;
+    change((d) => setAnim(d, index, anim, { on: 'tap', trigger: topOf(s, id)?.id ?? id }));
+  };
+  /** A video from this device for a slide's background, kept with the deck: its source (null: none, or it failed). */
+  const pickBgVideo = async (): Promise<string | null> => {
+    const f = await chooseVideo();
+    if (!f) return null;
+    if (!isVideoFile(f)) {
+      toast('That is not a video a slide takes: an MP4, MOV or WebM file');
+      return null;
+    }
+    if (sending !== null) return null;
+    setSending(0);
+    try {
+      return await uploadVideo(f, setSending);
+    } catch (e) {
+      toastError(e);
+      return null;
+    } finally {
+      setSending(null);
+    }
+  };
+  /** A 3D model (a .glb, or a .gltf with its files) from this device, kept with the deck: its source (null: none, or it failed). */
+  const pickModel = async (): Promise<string | null> => {
+    const files = await chooseModel();
+    if (!files.length) return null;
+    try {
+      toast('Adding the model…');
+      return await uploadModel(files);
+    } catch (e) {
+      toastError(e);
+      return null;
+    }
   };
 
   // ---- copy and paste ---------------------------------------------------------------------------------------
@@ -812,7 +1016,8 @@ export function SlidesEditor({
       return;
     }
     if (e.key === 'Escape') {
-      if (painter) setPainter(null);
+      if (pickFor) setPickFor(null);
+      else if (painter) setPainter(null);
       else if (cellSel) setCellSel(null);
       else if (scope.length) {
         // Out of the group: it is picked.
@@ -969,8 +1174,11 @@ export function SlidesEditor({
     else pins.push({ key, x: at.x, y: at.y, ids: [c.id], active: false });
   }
   for (const p of pins) p.active = !!activeComment && p.ids.includes(activeComment);
+  const web = isWebDeck(deck);
   const menus = slidesMenus({
     readOnly,
+    web,
+    setCompatible,
     wide,
     pageLayout: layout === 'page',
     picked,
@@ -1026,6 +1234,16 @@ export function SlidesEditor({
     icon: () => setIconAsk({ start: 'icons' }),
     emoji: () => setIconAsk({ start: 'emoji' }),
     equation: putEquation,
+    code: () => put([codePart(deck)]),
+    rich: (kind) => void putRich(kind),
+    aiPicture: readOnly ? undefined : () => void aiPicture('picture'),
+    aiDrawing: readOnly ? undefined : () => void aiPicture('drawing'),
+    aiPlot: readOnly ? undefined : () => void aiPlot(),
+    aiVideo: readOnly ? undefined : () => void aiVideo(),
+    aiEdit: readOnly ? undefined : (mode) => one && void aiEdit(one.id, mode),
+    aiPlotChart: readOnly ? undefined : () => one && void aiPlot(one.id),
+    running: !!one && running === one.id,
+    run: () => one && setRunning(running === one.id ? null : one.id),
     video: () => setVideoAsk(true),
     videoFile: () => void pickVideoFile(),
     footer: () => setFooterOpen(true),
@@ -1161,6 +1379,10 @@ export function SlidesEditor({
             setActiveComment(ids[0]);
             openPanel('comments' as InspectorTab);
           }}
+          running={running}
+          onRun={(id) => setRunning(id)}
+          picking={!!pickFor}
+          onPick={pickTrigger}
         />
         {zoom !== 'fit' && (
           <button
@@ -1174,11 +1396,13 @@ export function SlidesEditor({
             <Shrink size={12} />
           </button>
         )}
-        {(sending !== null || painter || scope.length > 0 || cropping) && (
+        {(sending !== null || painter || scope.length > 0 || cropping || pickFor) && (
           <div className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full border border-line bg-elevated px-3 py-1 text-[12px] text-fg-2 tabular-nums shadow-sm">
             {sending !== null
               ? `Adding the video… ${Math.round(sending * 100)}%`
-              : cropping
+              : pickFor
+                ? 'Click the part that starts it; Esc to stop'
+                : cropping
                 ? 'Cropping: Enter keeps it, Esc does not'
                 : painter
                   ? painter.keep
@@ -1205,6 +1429,8 @@ export function SlidesEditor({
                   <span className="text-fg-3">This one is in a chart.</span>
                 ) : hit?.where === 'tex' ? (
                   <span className="text-fg-3">This one is in an equation’s LaTeX.</span>
+                ) : hit?.where === 'words' ? (
+                  <span className="text-fg-3">{hit.field === 'code' ? 'This one is in code.' : hit.field === 'score' ? 'This one is in a quiz score.' : 'This one is in a quiz.'}</span>
                 ) : undefined
               }
             />
@@ -1246,6 +1472,16 @@ export function SlidesEditor({
       cellSel={cellSel}
       onCellSel={setCellSel}
       texFocus={texFocus}
+      running={running}
+      onRun={setRunning}
+      pickVideo={pickBgVideo}
+      pickModel={pickModel}
+      onCompatible={setCompatible}
+      onAiEdit={(id, mode) => void aiEdit(id, mode)}
+      onPlotChart={(id) => void aiPlot(id)}
+      onAiBackground={() => void aiBackground()}
+      picking={pickFor}
+      onPickTrigger={setPickFor}
     />
   );
 
@@ -1461,6 +1697,13 @@ export function SlidesEditor({
         <MenuItem icon={<Link2 size={14} />} onClick={() => (setMenu(null), setUrlAsk({}))}>
           From a web address
         </MenuItem>
+        <MenuSep />
+        <MenuItem icon={<WandSparkles size={14} />} onClick={() => (setMenu(null), void aiPicture('picture'))}>
+          Make with AI
+        </MenuItem>
+        <MenuItem icon={<PenTool size={14} />} onClick={() => (setMenu(null), void aiPicture('drawing'))}>
+          Drawing (SVG)
+        </MenuItem>
       </Popover>
       <Popover anchor={anchors.present} open={menu === 'present'} onClose={() => setMenu(null)} align="end" width={250}>
         <MenuItem icon={<Play size={14} />} onClick={() => (setMenu(null), setPresent({ from: 0, presenter: false }))}>
@@ -1506,8 +1749,24 @@ export function SlidesEditor({
               </MenuItem>
             )}
             {one?.type === 'image' && !!(one as ImageEl).src && (
-              <MenuItem icon={<Crop size={14} />} onClick={() => (setMenu(null), crop(one.id))}>
-                Crop the picture
+              <>
+                <MenuItem icon={<Crop size={14} />} onClick={() => (setMenu(null), crop(one.id))}>
+                  Crop the picture
+                </MenuItem>
+                <MenuItem icon={<WandSparkles size={14} />} onClick={() => (setMenu(null), void aiEdit(one.id, 'change'))}>
+                  Change with AI
+                </MenuItem>
+                <MenuItem icon={<ImageMinus size={14} />} onClick={() => (setMenu(null), void aiEdit(one.id, 'cutout'))}>
+                  Remove the background
+                </MenuItem>
+                <MenuItem icon={<Eraser size={14} />} onClick={() => (setMenu(null), void aiEdit(one.id, 'erase'))}>
+                  Erase part of it
+                </MenuItem>
+              </>
+            )}
+            {one?.type === 'chart' && (
+              <MenuItem icon={<ChartScatter size={14} />} onClick={() => (setMenu(null), void aiPlot(one.id))}>
+                Make a plot of this
               </MenuItem>
             )}
             <MenuItem icon={<Paintbrush size={14} />} disabled={!one} onClick={() => (setMenu(null), startPainter(false))}>
@@ -1607,6 +1866,54 @@ export function SlidesEditor({
           {videoUrl.trim() && !videoSrc(videoUrl.trim()) && <p className="text-[12px] text-err">That is not a YouTube or Vimeo address.</p>}
         </form>
       </Dialog>
+      <Dialog
+        open={!!embedAsk}
+        onClose={() => setEmbedAsk(null)}
+        title="A web page"
+        width={460}
+        footer={
+          <Button size="sm" variant="primary" disabled={!embedAddress(embedUrl)} onClick={putEmbed}>
+            Add it
+          </Button>
+        }
+      >
+        <form
+          className="space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            putEmbed();
+          }}
+        >
+          <p className="text-[12.5px] text-fg-3">A page’s address, or the embed code a site gives. It shows on the slide and takes clicks in the slideshow. Only sites that let others show them in a frame appear.</p>
+          <input
+            autoFocus
+            value={embedUrl}
+            onChange={(e) => setEmbedUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              putEmbed();
+            }}
+            placeholder="https://…"
+            aria-label="The page’s address"
+            translate="no"
+            className={inputCls}
+          />
+          {embedUrl.trim() && !embedAddress(embedUrl) && <p className="text-[12px] text-err">A web address that starts with https://.</p>}
+        </form>
+      </Dialog>
+      <FormatDialog
+        open={compatAsk}
+        deck={deck}
+        onClose={() => setCompatAsk(false)}
+        onConfirm={(next) => {
+          setCompatAsk(false);
+          canvas.current?.stopEditing();
+          setRunning(null);
+          change(next);
+          toast('The deck is PowerPoint compatible', 'ok');
+        }}
+      />
       <FooterDialog open={footerOpen} onClose={() => setFooterOpen(false)} deck={deck} index={index} change={change} />
       <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={SHORTCUTS} />
       {present && !present.presenter && <Slideshow deck={deck} from={present.from} onClose={() => setPresent(null)} />}

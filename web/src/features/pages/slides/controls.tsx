@@ -1,5 +1,6 @@
 // The slides editor's small controls: a colour from the deck's theme (which follows the theme when it changes) or
-// any other, as swatches or a button that opens them; and a number to type, step with the arrow keys or nudge.
+// any other, as swatches or a button that opens them; a number to type, step with the arrow keys or nudge; the side
+// panel's sections and rows.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { cssColor, type Theme } from '@shared/slides';
@@ -177,6 +178,19 @@ export function NumInput({
         </button>
       )}
     </div>
+  );
+}
+
+/** A part of the side panel, under its title. */
+export function Section({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
+  return (
+    <section className="space-y-1.5 border-t border-line px-3 py-3 first:border-t-0">
+      <div className="flex items-center gap-2">
+        <h3 className="min-w-0 flex-1 text-[12px] font-semibold tracking-wide text-fg-2 uppercase">{title}</h3>
+        {aside}
+      </div>
+      {children}
+    </section>
   );
 }
 

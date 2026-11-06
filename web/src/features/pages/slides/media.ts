@@ -1,7 +1,8 @@
 // Videos for slides: a YouTube or Vimeo video's still, which the server fetches and keeps as a picture so it shows
 // everywhere the slide does (the editor, the slideshow, a deck's own page, PowerPoint's file) without the web; and a
 // video from this device, sent to the app in pieces (so no proxy's limit on a request's size stops it) and kept with
-// the deck, its first frame taken here as its still.
+// the deck, its first frame taken here as its still. And 3D models for the web format's 3D parts: a .glb from this
+// device, or a .gltf with the files beside it, kept with the deck as its pictures are.
 import { post } from '../../../lib/api';
 import { mu } from '../../../lib/machine';
 
@@ -78,6 +79,83 @@ export function firstFrame(file: Blob): Promise<{ data: string; w: number; h: nu
     };
     v.src = url;
   });
+}
+
+/** The largest 3D model the app keeps with a deck, as its pictures. */
+export const MAX_MODEL = 12 * 1024 * 1024;
+
+/** Asks for a 3D model: a .glb, or a .gltf with the files beside it (its .bin, its pictures) picked together; none: []. */
+export function chooseModel(): Promise<File[]> {
+  return new Promise((ok) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = '.glb,.gltf,.bin,.png,.jpg,.jpeg,.webp,.ktx2,model/gltf-binary,model/gltf+json';
+    input.onchange = () => ok([...(input.files ?? [])]);
+    input.oncancel = () => ok([]);
+    input.click();
+  });
+}
+
+/** A file as a data: address of its own kind. */
+const dataOf = (f: Blob, type: string) =>
+  new Promise<string>((ok, fail) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).replace(/^data:[^;,]*/, `data:${type}`));
+    r.onerror = () => fail(new Error('The model could not be read'));
+    r.readAsDataURL(f);
+  });
+
+const PICTURE_TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', ktx2: 'image/ktx2' };
+
+/**
+ * A .gltf's text with the files it points at (picked with it) put inside it, as the app keeps a .gltf; words a person
+ * can act on when one is missing.
+ */
+async function gltfWithFiles(gltf: File, files: File[]): Promise<string> {
+  let j: { asset?: { version?: unknown }; buffers?: { uri?: string }[]; images?: { uri?: string; mimeType?: string }[] };
+  try {
+    j = JSON.parse(await gltf.text());
+  } catch {
+    throw new Error('That .gltf file could not be read as glTF');
+  }
+  if (String(j?.asset?.version ?? '').split('.')[0] !== '2') throw new Error('That is not a glTF 2 model');
+  const byName = new Map(files.map((f) => [f.name.toLowerCase(), f]));
+  const missing: string[] = [];
+  const inside = async (x: { uri?: string; mimeType?: string }, picture: boolean) => {
+    if (!x.uri || x.uri.startsWith('data:')) return;
+    const name = decodeURIComponent(x.uri.split(/[?#]/)[0].split('/').pop() ?? '').toLowerCase();
+    const f = byName.get(name);
+    if (!f) return void missing.push(name || x.uri);
+    const ext = name.split('.').pop() ?? '';
+    x.uri = await dataOf(f, picture ? (x.mimeType ?? PICTURE_TYPES[ext] ?? 'image/png') : 'application/octet-stream');
+  };
+  for (const b of j.buffers ?? []) await inside(b, false);
+  for (const im of j.images ?? []) await inside(im, true);
+  if (missing.length) throw new Error(`That model needs the files beside it: pick them together with it (${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''})`);
+  return JSON.stringify(j);
+}
+
+/**
+ * A 3D model from this device kept by the app: its source ("naget-asset:<sha>"). A .glb as it is; a .gltf with the files
+ * beside it that were picked with it put inside it.
+ */
+export async function uploadModel(files: File[]): Promise<string> {
+  const glb = files.find((f) => /\.glb$/i.test(f.name) || f.type === 'model/gltf-binary');
+  const gltf = files.find((f) => /\.gltf$/i.test(f.name) || f.type === 'model/gltf+json');
+  let data: string;
+  if (glb) {
+    if (glb.size > MAX_MODEL) throw new Error(`That model is over ${MAX_MODEL / 1024 / 1024} MB`);
+    // A GLB starts with "glTF".
+    const head = new Uint8Array(await glb.slice(0, 4).arrayBuffer());
+    if (String.fromCharCode(...head) !== 'glTF') throw new Error('That file is not a GLB model');
+    data = await dataOf(glb, 'model/gltf-binary');
+  } else if (gltf) {
+    const text = await gltfWithFiles(gltf, files);
+    if (text.length > MAX_MODEL) throw new Error(`That model is over ${MAX_MODEL / 1024 / 1024} MB with its files`);
+    data = await dataOf(new Blob([text]), 'model/gltf+json');
+  } else throw new Error('That is not a 3D model: a .glb file, or a .gltf with its files');
+  return (await post<{ src: string }>('/api/pages/assets', { data, model: true })).src;
 }
 
 /** One piece of an upload, sent as it is, with how much of it went. */

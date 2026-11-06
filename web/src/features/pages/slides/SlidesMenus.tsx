@@ -1,7 +1,9 @@
 // The slides editor's menus, as Google Slides and PowerPoint have them: Edit, View (zoom, the grid, the rulers and
-// guides), Insert (every kind of part, a comment, the footer), Format (the words' look, the format painter, a picture's crop),
-// Arrange (groups, the stacking order, lining up, turning), Slide, and Tools. Each action with its keys; what does not
-// apply to what is picked is greyed. Search the menus (Alt+/) finds any of them.
+// guides), Insert (every kind of part, pictures, drawings, plots and videos made with AI, the web format's interactive
+// parts, a comment), Format (the words' look, the format painter, a picture's crop and its changes with AI, a chart
+// made a plot, running a live part in place), Arrange (groups, the stacking order, lining up, turning), Slide, and Tools
+// (PowerPoint compatible or the web format too, which the Theme tab has beside the slides' shape). Each action with its
+// keys; what does not apply to what is picked is greyed. Search the menus (Alt+/) finds any of them.
 import {
   AlignCenter,
   AlignCenterHorizontal,
@@ -18,30 +20,41 @@ import {
   ArrowUp,
   ArrowUpToLine,
   Bold,
+  ChartScatter,
+  Box,
+  CircleStop,
   Clipboard,
+  CodeXml,
   Copy,
   CornerDownRight,
   Crop,
+  Eraser,
   Eye,
+  Globe,
   Grid3x3,
   Group,
   ImageDown,
   Image as ImageIcon,
+  ImageMinus,
   IndentDecrease,
   IndentIncrease,
   Italic,
   Keyboard,
   LayoutTemplate,
   List,
+  ListChecks,
   ListOrdered,
   Lock,
   MessageSquarePlus,
   MonitorPlay,
+  MousePointerClick,
   MoveRight,
   Paintbrush,
+  PenTool,
   PieChart,
   Play,
   Plus,
+  Presentation,
   Redo2,
   RemoveFormatting,
   RotateCcw,
@@ -54,25 +67,35 @@ import {
   Smile,
   Sparkles,
   Spline,
+  SquareCode,
   Star,
   Strikethrough,
   Table2,
   Trash2,
+  Trophy,
   Type,
   Underline,
   Undo2,
   Ungroup,
   Video,
+  WandSparkles,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import type { El } from '@shared/slides';
+import type { El, ElType } from '@shared/slides';
 import type { MenuDef } from '../common/menus';
 import type { AlignHow } from './ops';
 import type { TextActions } from './TextBar';
 
+/** The web format's parts Insert → Interactive puts on a slide. */
+export type RichKind = Extract<ElType, 'html' | 'embed' | 'quiz' | 'score' | 'scene3d'>;
+
 export interface MenuArgs {
   readOnly?: boolean;
+  /** The deck is in the web format (not PowerPoint compatible). */
+  web: boolean;
+  /** PowerPoint compatible on (asked first, with what changes) or off. */
+  setCompatible(on: boolean): void;
   wide: boolean;
   pageLayout: boolean;
   picked: El[];
@@ -122,6 +145,20 @@ export interface MenuArgs {
   icon(): void;
   emoji(): void;
   equation(): void;
+  /** Code shown with its colours (both formats). */
+  code(): void;
+  /** One of the web format's parts (in a PowerPoint compatible deck, asked first). */
+  rich(kind: RichKind): void;
+  /** The live part picked runs in place, or stops. */
+  running: boolean;
+  run(): void;
+  /** The AI tools: a picture made with AI, a drawing (SVG), a plot, a video; the picture picked changed; the chart picked made a plot. */
+  aiPicture?: () => void;
+  aiDrawing?: () => void;
+  aiPlot?: () => void;
+  aiVideo?: () => void;
+  aiEdit?: (mode: 'change' | 'cutout' | 'erase') => void;
+  aiPlotChart?: () => void;
   video(): void;
   /** A video from this device. */
   videoFile(): void;
@@ -160,6 +197,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
   const ro = !!a.readOnly;
   const t = a.text;
   const many = n > 1;
+  const live = one?.type === 'html' || one?.type === 'embed' || one?.type === 'scene3d';
   return [
     {
       label: 'Edit',
@@ -228,6 +266,9 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           items: [
             { label: 'From this device', also: 'picture image upload', run: a.picture },
             { label: 'From a web address', also: 'picture image url', run: a.pictureUrl },
+            !!a.aiPicture && '-',
+            !!a.aiPicture && { label: 'Make with AI', icon: <WandSparkles size={14} />, also: 'picture image generate ai photo illustration icon background', run: a.aiPicture },
+            !!a.aiDrawing && { label: 'Drawing (SVG)', icon: <PenTool size={14} />, also: 'svg vector drawing icon logo diagram illustration ai', run: a.aiDrawing },
           ],
         },
         {
@@ -244,10 +285,12 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         },
         { label: 'Table', icon: <Table2 size={14} />, disabled: ro, run: a.table },
         { label: 'Chart', icon: <PieChart size={14} />, disabled: ro, run: a.chart },
+        !!a.aiPlot && { label: 'Plot', icon: <ChartScatter size={14} />, also: 'plot chart graph data matplotlib histogram scatter ai', disabled: ro, run: a.aiPlot },
         '-',
         { label: 'Icon', icon: <Star size={14} />, also: 'icon symbol pictogram lucide', disabled: ro, run: a.icon },
         { label: 'Emoji', icon: <Smile size={14} />, also: 'emoji smiley', disabled: ro, run: a.emoji },
         { label: 'Equation', icon: <Sigma size={14} />, also: 'equation maths formula latex', disabled: ro, run: a.equation },
+        { label: 'Code', icon: <SquareCode size={14} />, also: 'code program snippet source syntax colours', disabled: ro, run: a.code },
         {
           label: 'Video',
           icon: <Video size={14} />,
@@ -255,11 +298,25 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           items: [
             { label: 'From YouTube or Vimeo', also: 'video youtube vimeo online address link', run: a.video },
             { label: 'From this device', also: 'video file upload mp4 mov webm film clip', run: a.videoFile },
+            !!a.aiVideo && '-',
+            !!a.aiVideo && { label: 'Make with AI', icon: <WandSparkles size={14} />, also: 'video generate ai clip film', run: a.aiVideo },
+          ],
+        },
+        {
+          label: 'Interactive',
+          icon: <MousePointerClick size={14} />,
+          also: 'web format interactive',
+          disabled: ro,
+          items: [
+            { label: 'Custom code', icon: <CodeXml size={14} />, also: 'html css javascript code widget page', run: () => a.rich('html') },
+            { label: 'Web page', icon: <Globe size={14} />, also: 'embed website frame map form codepen address', run: () => a.rich('embed') },
+            { label: 'Quiz', icon: <ListChecks size={14} />, also: 'quiz question poll choices test answer', run: () => a.rich('quiz') },
+            { label: 'Quiz score', icon: <Trophy size={14} />, also: 'quiz score points result right answers', run: () => a.rich('score') },
+            { label: '3D', icon: <Box size={14} />, also: '3d model glb gltf shape turn three', run: () => a.rich('scene3d') },
           ],
         },
         '-',
         { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'comment note review feedback', disabled: ro, run: a.comment },
-        { label: 'Slide numbers and footer', also: 'footer page number date', disabled: ro, run: a.footer },
       ],
     },
     {
@@ -302,8 +359,13 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         '-',
         one?.type === 'image' && !!one.src && { label: 'Crop the picture', icon: <Crop size={14} />, disabled: ro, run: a.crop },
         one?.type === 'image' && (!!one.crop || !!one.adjust) && { label: 'Reset the picture', also: 'uncrop colours', disabled: ro, run: a.resetPicture },
+        one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Change with AI', icon: <WandSparkles size={14} />, also: 'edit picture ai', disabled: ro, run: () => a.aiEdit!('change') },
+        one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Remove the background', icon: <ImageMinus size={14} />, also: 'cut out background transparent', disabled: ro, run: () => a.aiEdit!('cutout') },
+        one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Erase part of it', icon: <Eraser size={14} />, also: 'erase remove object', disabled: ro, run: () => a.aiEdit!('erase') },
+        one?.type === 'chart' && !!a.aiPlotChart && { label: 'Make a plot of this', icon: <ChartScatter size={14} />, also: 'plot chart graph matplotlib', disabled: ro, run: a.aiPlotChart },
         one?.type === 'math' && { label: 'Edit the equation', icon: <Sigma size={14} />, disabled: ro, run: a.editTex },
         one?.type === 'icon' && { label: 'Another icon', icon: <Star size={14} />, disabled: ro, run: a.replaceIcon },
+        live && { label: a.running ? 'Stop it' : 'Run it here', icon: a.running ? <CircleStop size={14} /> : <Play size={14} />, also: 'run start live preview stop', run: a.run },
         '-',
         { label: 'Format options', also: 'format panel side', disabled: !n, run: a.formatPanel },
       ],
@@ -377,6 +439,8 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
       items: [
         { label: 'Find and replace', icon: <Search size={14} />, keys: 'Ctrl+H', also: 'find search', run: () => a.find(!ro) },
         { label: 'Keyboard shortcuts', icon: <Keyboard size={14} />, keys: 'Ctrl+/', also: 'keys help', run: a.shortcuts },
+        '-',
+        { label: 'PowerPoint compatible', icon: <Presentation size={14} />, checked: !a.web, also: 'powerpoint pptx keynote google slides format compatible web format made for', disabled: ro, run: () => a.setCompatible(a.web) },
         a.ask && '-',
         a.ask && { label: 'Ask the agent about this slide', icon: <Sparkles size={14} />, run: a.ask },
       ],
