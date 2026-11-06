@@ -1,8 +1,9 @@
 // The server on the system it runs on (Linux, macOS, Windows): what differs there works. An agent runs through a runner
 // and answers over its socket (on Windows a named pipe that hears nobody without its key), an npm launcher starts
 // through Node.js (Windows), commands run in bash (Git's on Windows), a program stops with everything it started, the
-// agents' environment has one PATH, a terminal runs a shell and keeps what it printed (tmux, or on Windows the
-// server's own), links to folders and files, and paths in either form. The desktop apps' CI runs it on each system.
+// agents' environment has one PATH (and Claude Code a temporary folder it can use), a terminal runs a shell and keeps
+// what it printed (tmux, or on Windows the server's own), links to folders and files, and paths in either form. The
+// desktop apps' CI runs it on each system.
 // Build and run (after npm run build, which makes the runner):
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/platform-test.ts && DATA_DIR=/tmp/hydor-test-platform node dist/dev/platform-test.js
 import assert from 'node:assert/strict';
@@ -12,7 +13,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { config, ensureDirs } from './config.ts';
-import { agentBaseEnv } from './env.ts';
+import { agentBaseEnv, claudeTemp, claudeTempFallback } from './env.ts';
 import { bashCommand, bashPath, isAbsPath, launch, linkPath, killTree, pathDirs, trimSep, which, WIN, windowsPathOf, within } from './platform.ts';
 import { Runner } from './runner/client.ts';
 import { encodeFrame, FRAME_CONTROL, readAddress } from './runner/frames.ts';
@@ -70,6 +71,35 @@ const node = which('node', env);
 assert.ok(node, `node is found on it (${env.PATH})`);
 if (WIN) assert.match(node!, /\.exe$/i, 'with its ending');
 ok(`the agents' environment has one PATH, with node at ${node}`);
+
+// Claude Code stops as it starts when it can't make claude-<uid> in its temporary folder (EACCES where /tmp is closed
+// to you): then its files go in the app's data folder. A folder that works, or a CLAUDE_CODE_TMPDIR of yours, stays.
+if (!WIN) {
+  const uid = process.getuid!();
+  const usable: Record<string, string> = { TMPDIR: scratch };
+  claudeTemp(usable);
+  assert.equal(usable.CLAUDE_CODE_TMPDIR, undefined, 'a temporary folder that works is left alone');
+  assert.ok(fs.lstatSync(path.join(scratch, `claude-${uid}`)).isDirectory(), 'with its claude-<uid> made as Claude Code makes it');
+  const planted = path.join(scratch, 'planted');
+  fs.mkdirSync(planted);
+  fs.symlinkSync(scratch, path.join(planted, `claude-${uid}`));
+  const linked: Record<string, string> = { TMPDIR: planted };
+  claudeTemp(linked);
+  assert.equal(linked.CLAUDE_CODE_TMPDIR, claudeTempFallback(), 'a link in its place (Claude Code refuses one) moves them to the data folder');
+  assert.equal(fs.statSync(claudeTempFallback()).mode & 0o777, 0o700, 'which only you can open');
+  const closed = path.join(scratch, 'closed');
+  fs.mkdirSync(closed, { mode: 0o555 });
+  if (uid !== 0) {
+    const shut: Record<string, string> = { TMPDIR: closed };
+    claudeTemp(shut);
+    assert.equal(shut.CLAUDE_CODE_TMPDIR, claudeTempFallback(), 'so does a temporary folder closed to you');
+  }
+  const yours: Record<string, string> = { TMPDIR: closed, CLAUDE_CODE_TMPDIR: path.join(scratch, 'yours') };
+  claudeTemp(yours);
+  assert.equal(yours.CLAUDE_CODE_TMPDIR, path.join(scratch, 'yours'), 'a CLAUDE_CODE_TMPDIR of yours is kept');
+  if (process.env.CLAUDE_CODE_TMPDIR) assert.ok(env.CLAUDE_CODE_TMPDIR, "and reaches the agents from the app's own settings");
+  ok('Claude Code gets a temporary folder it can use');
+}
 
 // ---- bash -------------------------------------------------------------------------------------------------------
 const bash = bashPath();

@@ -17700,5 +17700,10 @@
 "Things drop, pop and flip in; the slides turn as a cube (zoom in a PowerPoint compatible deck)":"Τα στοιχεία πέφτουν, σκάνε και αναποδογυρίζουν· οι διαφάνειες γυρίζουν σαν κύβος (ζουμ σε παρουσίαση συμβατή με PowerPoint)",
 "This browser cannot turn speech into words (Chrome, Edge and Safari can), so the coach times your slides only.":"Αυτό το πρόγραμμα περιήγησης δεν μετατρέπει την ομιλία σε κείμενο (τα Chrome, Edge και Safari μπορούν), οπότε ο εκπαιδευτής μόνο χρονομετρά τις διαφάνειές σας.",
 "Playback speed":"Ταχύτητα αναπαραγωγής",
-"Said after it is answered":"Λέγεται μόλις απαντηθεί"
+"Said after it is answered":"Λέγεται μόλις απαντηθεί",
+"{0} did not start, so its models are not known yet:":"Το {0} δεν ξεκίνησε, οπότε τα μοντέλα του δεν είναι ακόμη γνωστά:",
+"did not start, so its models are not known yet:":"δεν ξεκίνησε, οπότε τα μοντέλα του δεν είναι ακόμη γνωστά:",
+"{0} has not listed its models yet.":"Το {0} δεν έχει δώσει ακόμη τη λίστα των μοντέλων του.",
+"has not listed its models yet.":"δεν έχει δώσει ακόμη τη λίστα των μοντέλων του.",
+"Claude Code did not start: {0}":"Το Claude Code δεν ξεκίνησε: {0}"
 }

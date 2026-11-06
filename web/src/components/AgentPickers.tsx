@@ -16,7 +16,8 @@ const catalogKey = (agent: Agent, acp?: string) => (agent === 'acp' ? `acp:${acp
 export function loadCatalog(agent: Agent, force = false, acp?: string) {
   const k = catalogKey(agent, acp);
   const s = useCatalogs.getState();
-  if (!force && (s.byAgent[k] || s.loading[k])) return;
+  // A list that came back empty (the agent did not start) is asked for again, so its models show once it starts.
+  if (!force && (s.byAgent[k]?.models.length || s.loading[k])) return;
   useCatalogs.setState((x) => ({ loading: { ...x.loading, [k]: true } }));
   api<Catalog>(`/api/catalog/${agent}${agent === 'acp' ? `?acp=${encodeURIComponent(acp ?? '')}` : ''}`)
     .then((c) => useCatalogs.setState((x) => ({ byAgent: { ...x.byAgent, [k]: c } })))
@@ -118,6 +119,7 @@ function ModelMenu({ agent, c, value, onPick, localOnly, onClose }: { agent: Age
         installs one.
       </div>
     );
+  if (!rows.length) return <NoModels agent={agent} why={c.modelsError} />;
   // The chosen model, with "default" read as the model it stands for.
   const chosen = findModel(c, value);
   const chosenModel = chosen?.value === 'default' ? findModel(c, chosen.resolved) : chosen;
@@ -159,6 +161,28 @@ function ModelMenu({ agent, c, value, onPick, localOnly, onClose }: { agent: Age
           {hidden} older {hidden === 1 ? 'model' : 'models'}
         </button>
       )}
+    </div>
+  );
+}
+
+/** No models to pick: the agent did not start when asked (why, in its own words) or listed none; a click asks again. */
+function NoModels({ agent, why }: { agent: Agent; why?: string }) {
+  const busy = useCatalogs((s) => !!s.loading[catalogKey(agent)]);
+  return (
+    <div className="px-2.5 py-2 text-[12.5px] leading-snug text-fg-3">
+      {why ? (
+        <>
+          <span>{agentName(agent)} did not start, so its models are not known yet:</span>{' '}
+          <span translate="no" className="break-words text-fg-2">
+            {why}
+          </span>
+        </>
+      ) : (
+        <span>{agentName(agent)} has not listed its models yet.</span>
+      )}{' '}
+      <button type="button" disabled={busy} className="font-medium text-accent hover:underline disabled:opacity-50" onClick={() => loadCatalog(agent, true)}>
+        Try again
+      </button>
     </div>
   );
 }

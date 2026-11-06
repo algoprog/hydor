@@ -18,8 +18,9 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   words ("Weekend trip to Lisbon"), shown in the sidebar, the header and the search box instead of the start of the
   message, and passed to Claude Code and Codex for their own lists. Nothing shows in the conversation; sessions
   started together with the same request share one title; a title you give it with Rename always stays.
-- Switch models or assistants mid-session; the model menu lists the session's own agent's models, and another
-  assistant applies from your next message, the conversation carrying on. "Continue in Codex" (or
+- Switch models or assistants mid-session; the model menu lists the session's own agent's models (or, when the agent
+  did not start as the app asked for them, why, with Try again), and another assistant applies from your next
+  message, the conversation carrying on. "Continue in Codex" (or
   Claude Code, or Custom Agent) in the session's menu hands the conversation over to another agent.
 - Fork a session from any reply, or edit an earlier message and go on from there, with the files put back as
   they were. Compact a long session, stop a turn, resume an old one.

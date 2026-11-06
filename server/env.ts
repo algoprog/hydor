@@ -23,6 +23,9 @@ const DROP = new Set([
   'NOTIFY_SOCKET',
 ]);
 const DROP_PREFIX = ['CLAUDECODE', 'CLAUDE_CODE_', 'CODEX_THREAD', 'CODEX_MANAGED', 'VSCODE_', 'BASH_FUNC_', 'npm_', 'NODE_ENV', 'WEB_AGENT', 'HYDOR_ROOT'];
+/** Yours although their prefix is dropped: where Claude Code keeps its temporary files, when you say. */
+const KEEP = new Set(['CLAUDE_CODE_TMPDIR']);
+const dropped = (k: string) => !KEEP.has(k) && (DROP.has(k) || DROP_PREFIX.some((p) => k.startsWith(p)));
 
 let cached: Record<string, string> | null = null;
 
@@ -65,8 +68,11 @@ export function agentBaseEnv(): Record<string, string> {
     for (const [k, v] of Object.entries(process.env)) if (v != null) env[k] = v;
   }
   for (const k of Object.keys(env)) {
-    if (DROP.has(k) || DROP_PREFIX.some((p) => k.startsWith(p))) delete env[k];
+    if (dropped(k)) delete env[k];
   }
+  // Set in the app's own settings (~/.config/hydor.env) rather than your shell's.
+  if (!env.CLAUDE_CODE_TMPDIR && process.env.CLAUDE_CODE_TMPDIR) env.CLAUDE_CODE_TMPDIR = process.env.CLAUDE_CODE_TMPDIR;
+  claudeTemp(env);
   const local = path.join(user.homedir, '.local/bin');
   if (!(env.PATH ?? '').split(':').includes(local)) env.PATH = `${local}:${env.PATH ?? '/usr/bin:/bin'}`;
   // Agents' programs the app installed itself (server/clients.ts), after the user's own.
@@ -80,6 +86,39 @@ export function agentBaseEnv(): Record<string, string> {
   return env;
 }
 
+/** Where the agents' Claude Code keeps its temporary files when /tmp can't have them (claudeTemp). */
+export const claudeTempFallback = () => path.join(config.dataDir, 'tmp');
+
+/**
+ * Claude Code keeps its temporary files in claude-<uid> in CLAUDE_CODE_TMPDIR, else TMPDIR, else /tmp, and stops as it
+ * starts when it can't make that folder or someone else has it (EACCES, mkdir '/tmp/claude-1000', where /tmp is closed to
+ * you). Then they go in the app's data folder instead; a CLAUDE_CODE_TMPDIR of yours is kept as it is.
+ */
+export function claudeTemp(env: Record<string, string>) {
+  const uid = process.getuid?.();
+  if (uid === undefined || env.CLAUDE_CODE_TMPDIR) return;
+  const dir = path.join(env.TMPDIR || env.TMP || env.TEMP || '/tmp', `claude-${uid}`);
+  let why: string | null = null;
+  try {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const st = fs.lstatSync(dir);
+    if (!st.isDirectory()) why = 'it is not a folder';
+    else if (st.uid !== uid) why = `user ${st.uid} has it`;
+    else fs.accessSync(dir, fs.constants.R_OK | fs.constants.W_OK | fs.constants.X_OK);
+  } catch (e) {
+    why = (e as Error).message;
+  }
+  if (!why) return;
+  const own = claudeTempFallback();
+  try {
+    fs.mkdirSync(own, { recursive: true, mode: 0o700 });
+  } catch {
+    return;
+  }
+  env.CLAUDE_CODE_TMPDIR = own;
+  console.warn(`[agents] Claude Code can't keep its temporary files in ${dir} (${why}): they go in ${own}`);
+}
+
 /**
  * Windows: a program there gets your whole environment as it is, so this process's own is the agents', with the same
  * names left out; then ~/.local/bin first (where Claude Code installs itself), the agents' programs the app installed
@@ -87,7 +126,7 @@ export function agentBaseEnv(): Record<string, string> {
  */
 function windowsEnv(): Record<string, string> {
   const env: Record<string, string> = {};
-  for (const [k, v] of Object.entries(process.env)) if (v != null && !DROP.has(k) && !DROP_PREFIX.some((p) => k.startsWith(p))) env[k] = v;
+  for (const [k, v] of Object.entries(process.env)) if (v != null && !dropped(k)) env[k] = v;
   const have = new Set(pathDirs(env).map((d) => d.toLowerCase()));
   const before = [path.join(os.homedir(), '.local', 'bin')].filter((d) => !have.has(d.toLowerCase()));
   const after = [path.join(config.dataDir, 'clients', 'node_modules', '.bin')];

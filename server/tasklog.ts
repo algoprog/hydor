@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { TaskLog, TaskLogEntry } from '../shared/types.ts';
+import { agentBaseEnv } from './env.ts';
 import { ClaudeParser } from './history/claude.ts';
 
 const TAIL_BYTES = 64 << 10;
@@ -13,7 +14,9 @@ const SAFE_ID = /^[\w-]{1,128}$/;
 
 function roots(): string[] {
   const uid = os.userInfo().uid;
-  const bases = [process.env.CLAUDE_CODE_TMPDIR, os.tmpdir(), '/tmp'].filter((b): b is string => !!b);
+  // The agents' own first: yours from your shell, or the app's data folder where /tmp can't have them (env.ts).
+  const env = agentBaseEnv();
+  const bases = [env.CLAUDE_CODE_TMPDIR, env.TMPDIR, process.env.CLAUDE_CODE_TMPDIR, os.tmpdir(), '/tmp'].filter((b): b is string => !!b);
   return [...new Set(bases.map((b) => path.join(b, `claude-${uid}`)))];
 }
 

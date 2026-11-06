@@ -26,7 +26,7 @@ What each can do in the app:
 On the start page (`/`), the row under the message box says who does the work.
 
 1. Click **Agent**. The list shows **Claude Code** ("Anthropic · Claude plan or API key"), **Codex** ("OpenAI · ChatGPT plan or API key"), **Custom** ("Any model: OpenRouter, Ollama, vLLM") and every agent you added in Settings → More agents ("ACP agent · " and its command). At the bottom, **Models for Custom** opens Settings → Models, and **Add or manage agents** opens Settings → More agents.
-2. Click **Model** and pick one. The list shows only that agent's own models. The agent's default is marked "default". Older versions of a model wait behind a line such as "2 older models"; click it to see them. When there are more than eight models, a **Search models** box sits at the top: type a few letters and press Enter to take the first match.
+2. Click **Model** and pick one. The list shows only that agent's own models. The agent's default is marked "default". Older versions of a model wait behind a line such as "2 older models"; click it to see them. When there are more than eight models, a **Search models** box sits at the top: type a few letters and press Enter to take the first match. When the agent did not start as the app asked for its models, the menu says so, with the agent's own words on why, and **Try again** asks again.
 3. Under **Options** you find **Effort** (for agents and models that have it: Default, Low, Medium, High and so on) and **Permissions** (what the agent may do without asking you). Shift+Tab in the message box switches permissions too.
 
 The start page remembers what you picked, per agent, on every device: next time it opens with the same agent, model, effort and permissions.
