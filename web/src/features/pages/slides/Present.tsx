@@ -2,8 +2,9 @@
 // Space or a swipe go on; B or W blank the screen; G shows every slide; a number and Enter go to that slide; L a
 // laser pointer, P a pen, E erases its lines, C live captions; Escape ends it). The presenter's view: the slide, the
 // next one, the speaker notes and a timer, with a second window for the audience (on another screen or a projector)
-// that follows it, and that it follows in turn; the presenter's laser, pen and captions show in it too.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+// that follows it, and that it follows in turn; the presenter's laser, pen and captions show in it too. Live parts
+// (custom code, web pages, 3D) run in each, in frames of their own; quizzes are answered there.
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Minus, MonitorUp, Pause, Play, Plus, RotateCcw, X } from 'lucide-react';
 import type { Deck } from '@shared/slides';
@@ -11,7 +12,8 @@ import { api, enc } from '../../../lib/api';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../../components/ui';
 import type { Marks, Show } from '@shared/slides-runtime';
-import { PICS, RT, useDeckFonts } from './rt';
+import { OfflineFrames } from '../frame';
+import { liveOpts, PICS, RT, useDeckFonts } from './rt';
 import { SlideThumb } from './Thumb';
 
 /** The slideshow's controls in the user's language. */
@@ -35,11 +37,13 @@ export function Slideshow({ deck, from, onClose }: { deck: Deck; from: number; o
   const host = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
+  // Beside a confidential session, its live parts load nothing from anywhere.
+  const offline = useContext(OfflineFrames);
   useDeckFonts(deck);
   useEffect(() => {
     const el = host.current;
     if (!el) return;
-    const show = RT.show(el, deck, { mode: 'full', at: from, keys: true, onExit: () => close.current(), words: words(), ...PICS });
+    const show = RT.show(el, deck, { mode: 'full', at: from, keys: true, onExit: () => close.current(), words: words(), ...PICS, ...liveOpts(offline) });
     void el.requestFullscreen?.().catch(() => {});
     // Leaving full screen (Escape, the browser's own) ends it too.
     const onFs = () => !document.fullscreenElement && close.current();
@@ -92,6 +96,7 @@ export function Presenter({ deck, from, pageId, onClose }: { deck: Deck; from: n
   const bc = useMemo(() => new BroadcastChannel(channelOf(pageId)), [pageId]);
   const close = useRef(onClose);
   close.current = onClose;
+  const offline = useContext(OfflineFrames);
   const visible = deck.slides.map((s, i) => ({ s, i })).filter((x) => !x.s.hidden);
 
   useEffect(() => {
@@ -117,6 +122,7 @@ export function Presenter({ deck, from, pageId, onClose }: { deck: Deck; from: n
       onMarks: (m) => bc.postMessage({ t: 'marks', m } satisfies Msg),
       words: words(),
       ...PICS,
+      ...liveOpts(offline),
     });
     show.current = s;
     setAt(s.at());
@@ -280,6 +286,7 @@ export function AudienceView({ id }: { id: string }) {
       },
       words: words(),
       ...PICS,
+      ...liveOpts(false),
     });
     const prev = bc.onmessage;
     bc.onmessage = (e: MessageEvent<Msg>) => {

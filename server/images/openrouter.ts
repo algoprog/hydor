@@ -126,6 +126,8 @@ export interface Ask {
   seed?: number;
   /** The model writes text with its images (Gemini, GPT): it is asked for both. */
   textOut?: boolean;
+  /** The file it answers with (png, jpeg, webp, svg), where the model offers a choice; null asks for none. Unset: PNG for a see-through background. */
+  outputFormat?: string | null;
 }
 
 const dataUrl = (r: Reference) => `data:${r.mime};base64,${r.data.toString('base64')}`;
@@ -141,19 +143,51 @@ export function buildImagesRequest(a: Ask): Record<string, unknown> {
     ...(a.background ? { background: a.background } : {}),
     ...(a.count && a.count > 1 ? { n: Math.min(10, Math.round(a.count)) } : {}),
     ...(Number.isInteger(a.seed) ? { seed: a.seed } : {}),
-    ...(a.background === 'transparent' ? { output_format: 'png' } : {}),
+    ...(a.outputFormat ? { output_format: a.outputFormat } : a.outputFormat === undefined && a.background === 'transparent' ? { output_format: 'png' } : {}),
     ...(a.refs?.length ? { input_references: a.refs.map((r) => ({ type: 'image_url', image_url: { url: dataUrl(r) } })) } : {}),
   };
 }
 
-/** The images in the images API's answer ({ data: [{ b64_json, media_type }], usage }). */
-export function parseImagesAnswer(j: any): { images: Made[]; text: string; cost?: number } {
+/** A drawing (SVG) by its text: what a vector model answers. */
+const isSvg = (b: Buffer) => /^\s*(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*(<!doctype svg[^>]*>\s*)?<svg[\s>]/i.test(b.subarray(0, 2048).toString('utf8').replace(/^\ufeff/, ''));
+
+/** What kind of picture the bytes are: by their first bytes, an SVG by its text; `said` when they cannot tell. */
+const sniff = (b: Buffer, said?: unknown) => MIME_BY_MAGIC.find(([, is]) => b.length > 12 && is(b))?.[0] ?? (isSvg(b) ? 'image/svg+xml' : typeof said === 'string' && said.startsWith('image/') ? said : 'image/png');
+
+/** A picture in a data: address: base64, or (a drawing) its text written as it is or %-encoded. */
+export function fromDataUrl(u: string): Made | null {
+  const m = /^data:(image\/[\w.+-]+)((?:;[\w-]+=[^;,]*)*)(;base64)?,(.*)$/is.exec(u);
+  if (!m) return null;
+  let data: Buffer;
+  try {
+    data = m[3] ? Buffer.from(m[4], 'base64') : Buffer.from(decodeURIComponent(m[4]), 'utf8');
+  } catch {
+    return null;
+  }
+  return data.length ? { mime: sniff(data, m[1].toLowerCase()), data } : null;
+}
+
+/** A picture at an address an answer gave (https only, up to 40 MB). */
+async function fetched(u: string, signal?: AbortSignal): Promise<Made | null> {
+  if (!/^https:\/\//i.test(u)) return null;
+  const r = await fetch(u, { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60_000)]) : AbortSignal.timeout(60_000) });
+  const type = (r.headers.get('content-type') ?? '').split(';')[0].trim();
+  if (!r.ok || !type.startsWith('image/') || Number(r.headers.get('content-length') ?? 0) > 40 * 1024 * 1024) return null;
+  const data = Buffer.from(await r.arrayBuffer());
+  return data.length ? { mime: sniff(data, type), data } : null;
+}
+
+/** The images in the images API's answer ({ data: [{ b64_json, media_type }] or [{ url }], usage }). */
+export async function parseImagesAnswer(j: any, signal?: AbortSignal): Promise<{ images: Made[]; text: string; cost?: number }> {
   const images: Made[] = [];
   for (const d of Array.isArray(j?.data) ? j.data.slice(0, 10) : []) {
-    if (typeof d?.b64_json !== 'string' || !d.b64_json) continue;
-    const data = Buffer.from(d.b64_json, 'base64');
-    const mime = typeof d.media_type === 'string' && d.media_type.startsWith('image/') ? d.media_type : (MIME_BY_MAGIC.find(([, is]) => data.length > 12 && is(data))?.[0] ?? 'image/png');
-    if (data.length) images.push({ mime, data });
+    if (typeof d?.b64_json === 'string' && d.b64_json) {
+      const data = Buffer.from(d.b64_json, 'base64');
+      if (data.length) images.push({ mime: sniff(data, d.media_type), data });
+    } else if (typeof d?.url === 'string') {
+      const got = d.url.startsWith('data:') ? fromDataUrl(d.url) : await fetched(d.url, signal);
+      if (got) images.push(got);
+    }
   }
   const cost = Number(j?.usage?.cost);
   return { images, text: '', cost: Number.isFinite(cost) && cost > 0 ? cost : undefined };
@@ -184,7 +218,7 @@ export interface Made {
 }
 
 /** The images in an answer (data URLs, or addresses to fetch), and what the model wrote with them. */
-export async function parseAnswer(j: any): Promise<{ images: Made[]; text: string; cost?: number }> {
+export async function parseAnswer(j: any, signal?: AbortSignal): Promise<{ images: Made[]; text: string; cost?: number }> {
   const msg = j?.choices?.[0]?.message ?? {};
   const urls: string[] = [];
   for (const im of Array.isArray(msg.images) ? msg.images : []) {
@@ -203,13 +237,8 @@ export async function parseAnswer(j: any): Promise<{ images: Made[]; text: strin
         : '';
   const images: Made[] = [];
   for (const u of urls.slice(0, 8)) {
-    const m = /^data:(image\/[\w.+-]+);base64,(.*)$/s.exec(u);
-    if (m) images.push({ mime: m[1], data: Buffer.from(m[2], 'base64') });
-    else if (/^https:\/\//.test(u)) {
-      const r = await fetch(u, { signal: AbortSignal.timeout(60_000) });
-      const type = r.headers.get('content-type') ?? '';
-      if (r.ok && type.startsWith('image/') && Number(r.headers.get('content-length') ?? 0) < 40 * 1024 * 1024) images.push({ mime: type.split(';')[0], data: Buffer.from(await r.arrayBuffer()) });
-    }
+    const got = u.startsWith('data:') ? fromDataUrl(u) : await fetched(u, signal);
+    if (got) images.push(got);
   }
   const cost = Number(j?.usage?.cost);
   return { images: images.filter((i) => i.data.length > 0), text: String(text ?? '').trim(), cost: Number.isFinite(cost) && cost > 0 ? cost : undefined };
@@ -287,25 +316,29 @@ export async function saveImages(images: Made[], dir: string, name: string): Pro
   return out;
 }
 
-/** OpenRouter's words when it refuses, as the user and the agent should read them. */
-function refusal(status: number, j: any): Error {
+/** OpenRouter's words when it refuses, as the user and the agent should read them; `status`, for the app's routes to answer with. */
+function refusal(status: number, j: any): Error & { status: number } {
   const why = j?.error?.message ?? `OpenRouter answered ${status}`;
-  return new Error(status === 401 ? `OpenRouter did not take the key (${why}). The user can check it in Settings → Models.` : status === 402 ? `The OpenRouter account is out of credits (${why}).` : String(why));
+  const e = new Error(status === 401 ? `OpenRouter did not take the key (${why}). The user can check it in Settings → Models.` : status === 402 ? `The OpenRouter account is out of credits (${why}).` : String(why)) as Error & { status: number };
+  // A key it did not take is one to change; a request it would not make (a rule broken, a picture too large) is the asker's; the rest is OpenRouter's or the model's.
+  e.status = status === 401 ? 400 : status === 402 || status === 429 ? status : status === 400 || status === 413 || status === 422 ? 422 : 502;
+  return e;
 }
 
 /** The images API does not serve this model (so the chat completion may). */
 const notServed = (status: number, j: any) => status === 404 || status === 405 || (status === 400 && /not (?:a |an )?(?:supported|available|image)|does not support image|no endpoints?/i.test(String(j?.error?.message ?? '')));
 
 /** One generation, start to end: the images API, else a chat completion; throws with OpenRouter's own words when it refuses. */
-export async function generate(o: Ask & { base: string; key: string; timeoutMs?: number }): Promise<{ images: Made[]; text: string; cost?: number }> {
+export async function generate(o: Ask & { base: string; key: string; timeoutMs?: number; signal?: AbortSignal }): Promise<{ images: Made[]; text: string; cost?: number }> {
   const headers = { Authorization: `Bearer ${o.key}`, 'Content-Type': 'application/json', ...HEADERS };
-  const signal = AbortSignal.timeout(o.timeoutMs ?? 300_000);
+  const limit = AbortSignal.timeout(o.timeoutMs ?? 300_000);
+  const signal = o.signal ? AbortSignal.any([o.signal, limit]) : limit;
   const r = await fetch(`${o.base}/images`, { method: 'POST', headers, body: JSON.stringify(buildImagesRequest(o)), signal });
   const j: any = await r.json().catch(() => null);
-  if (r.ok && !j?.error) return parseImagesAnswer(j);
+  if (r.ok && !j?.error) return parseImagesAnswer(j, signal);
   if (!notServed(r.status, j)) throw refusal(r.status, j);
   const c = await fetch(`${o.base}/chat/completions`, { method: 'POST', headers, body: JSON.stringify(buildRequest(o)), signal });
   const cj: any = await c.json().catch(() => null);
   if (!c.ok || cj?.error) throw refusal(c.status, cj);
-  return parseAnswer(cj);
+  return parseAnswer(cj, signal);
 }

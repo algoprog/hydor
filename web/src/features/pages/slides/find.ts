@@ -1,21 +1,25 @@
 // Find and replace across a deck: the words of every text box and shape (in groups too), the cells of its tables, its
-// charts' titles, labels and series' names, its equations' LaTeX and the speaker notes, slide by slide in the order
-// they are in. Replacing one match, or every one, makes a new deck (one step to undo); words replaced keep the look of
-// the words where the match began.
+// charts' titles, labels and series' names, its equations' LaTeX, the web format's words (a quiz's question, choices,
+// what each says and its explanation, a quiz score's words) and code, and the speaker notes, slide by slide in the
+// order they are in. Replacing one match, or every one, makes a new deck (one step to undo); words replaced keep the
+// look of the words where the match began.
 import type { Deck, El, Run } from '@shared/slides';
 import { findIn, replacementOf, type FindOptions } from '../common/find';
 
 export interface Hit {
   /** The slide's index. */
   slide: number;
-  /** A text box's or shape's words, a table's cell, a chart's words, an equation's LaTeX, the speaker notes. */
-  where: 'part' | 'cell' | 'chart' | 'tex' | 'notes';
-  /** The part (a text box, a shape, a table, a chart, an equation). */
+  /** A text box's or shape's words, a table's cell, a chart's words, an equation's LaTeX, a quiz's, a score's or code's words, the speaker notes. */
+  where: 'part' | 'cell' | 'chart' | 'tex' | 'words' | 'notes';
+  /** The part (a text box, a shape, a table, a chart, an equation, a quiz, a score, code). */
   id?: string;
   para?: number;
   cell?: [number, number];
-  /** In a chart: its title, a label (by its index) or a series' name (by its index). */
-  field?: 'title' | 'label' | 'series';
+  /**
+   * In a chart: its title, a label (by its index) or a series' name (by its index); in a quiz: its question, a
+   * choice or what it says (by its index), its explanation; a score's words; code.
+   */
+  field?: 'title' | 'label' | 'series' | WordsField;
   n?: number;
   /** In a chart: the words the match is in (to mark it where the chart draws them). */
   t?: string;
@@ -32,6 +36,33 @@ const chartWords = (c: Extract<El, { type: 'chart' }>): { field: 'title' | 'labe
 
 const paraText = (runs: Run[]) => runs.map((r) => r.t).join('');
 
+type WordsField = 'question' | 'choice' | 'why' | 'explain' | 'score' | 'code';
+
+/** The web format's words of a part, and code, each where it is (none for other parts). */
+function wordsOf(e: El): { field: WordsField; n: number; t: string }[] {
+  if (e.type === 'quiz')
+    return [
+      { field: 'question', n: 0, t: e.question },
+      ...e.choices.flatMap((c, n) => [{ field: 'choice' as const, n, t: c.text }, ...(c.why ? [{ field: 'why' as const, n, t: c.why }] : [])]),
+      ...(e.explain ? [{ field: 'explain' as const, n: 0, t: e.explain }] : []),
+    ];
+  if (e.type === 'score') return e.text ? [{ field: 'score', n: 0, t: e.text }] : [];
+  if (e.type === 'code') return [{ field: 'code', n: 0, t: e.code }];
+  return [];
+}
+
+/** A part with one of its words changed by `f` (a quiz's, a score's, code's). */
+function withWords(e: El, field: WordsField, n: number, f: (t: string) => string): El {
+  if (e.type === 'quiz') {
+    if (field === 'question') return { ...e, question: f(e.question) };
+    if (field === 'explain') return { ...e, explain: f(e.explain ?? '') || undefined };
+    if (field === 'choice' || field === 'why') return { ...e, choices: e.choices.map((c, i) => (i !== n ? c : field === 'choice' ? { ...c, text: f(c.text) } : { ...c, why: f(c.why ?? '') || undefined })) };
+  }
+  if (e.type === 'score' && field === 'score') return { ...e, text: f(e.text ?? '') || undefined };
+  if (e.type === 'code' && field === 'code') return { ...e, code: f(e.code) };
+  return e;
+}
+
 /** Every match in the deck, in order. */
 export function findInDeck(d: Deck, query: string, o: FindOptions): Hit[] {
   const out: Hit[] = [];
@@ -44,6 +75,7 @@ export function findInDeck(d: Deck, query: string, o: FindOptions): Hit[] {
         else if (e.type === 'table') e.rows.forEach((row, r) => row.forEach((v, c) => findIn(v, query, o).forEach((m) => out.push({ slide, where: 'cell', id: e.id, cell: [r, c], ...m }))));
         else if (e.type === 'chart') for (const w of chartWords(e)) findIn(w.t, query, o).forEach((m) => out.push({ slide, where: 'chart', id: e.id, field: w.field, n: w.n, t: w.t, ...m }));
         else if (e.type === 'math') findIn(e.tex, query, o).forEach((m) => out.push({ slide, where: 'tex', id: e.id, ...m }));
+        else for (const w of wordsOf(e)) findIn(w.t, query, o).forEach((m) => out.push({ slide, where: 'words', id: e.id, field: w.field, n: w.n, t: w.t, ...m }));
       }
     };
     walk(s.els);
@@ -108,6 +140,7 @@ export function replaceHit(d: Deck, h: Hit, query: string, replacement: string, 
           }
           // An equation left empty keeps its LaTeX: a deck has no empty equations.
           if (h.where === 'tex' && e.type === 'math') return { ...e, tex: swapIn(e.tex) || e.tex };
+          if (h.where === 'words' && h.field && h.field !== 'title' && h.field !== 'label' && h.field !== 'series') return withWords(e, h.field, h.n ?? 0, swapIn);
           if ((e.type === 'text' || e.type === 'shape') && h.para !== undefined) {
             return { ...e, paras: e.paras.map((p, pi) => (pi === h.para ? { ...p, runs: spliceRuns(p.runs, h.s, h.e, replacementOf(paraText(p.runs), h, query, replacement, o)) } : p)) };
           }
@@ -138,6 +171,7 @@ export function replaceAllInDeck(d: Deck, query: string, replacement: string, o:
       if (e.type === 'table') return { ...e, rows: e.rows.map((row) => row.map(swap)) };
       if (e.type === 'chart') return { ...e, ...(e.title ? { title: swap(e.title) || undefined } : {}), labels: e.labels.map(swap), series: e.series.map((x) => ({ ...x, name: swap(x.name) })) };
       if (e.type === 'math') return { ...e, tex: swap(e.tex) || e.tex };
+      if (e.type === 'quiz' || e.type === 'score' || e.type === 'code') return wordsOf(e).reduce<El>((x, w) => withWords(x, w.field, w.n, swap), e);
       if (e.type !== 'text' && e.type !== 'shape') return e;
       return {
         ...e,

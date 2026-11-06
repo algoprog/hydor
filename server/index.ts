@@ -49,6 +49,7 @@ import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAc
 import { devServerShot, listDevServers, livePreview, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
 import { moveFileComments } from './pages/filecomments.ts';
+import { PART_FRAME_HTML } from './pages/slides.ts';
 import { movedPdfNotes } from './pdfnotes/index.ts';
 import * as setup from './setup.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
@@ -1808,6 +1809,16 @@ app.get('/htmlframe', async (req, reply) =>
     .header('Cache-Control', 'no-cache')
     .type('text/html; charset=utf-8')
     .send(PAGE_FRAME_HTML),
+);
+
+// A live part of a slide (custom code, a web page, 3D) runs here in the app, sandboxed as pages are, its page sent once by
+// the slides that show it (server/pages/slides.ts); ?offline=1: in a confidential session, loading nothing from anywhere.
+app.get('/partframe', async (req, reply) =>
+  reply
+    .header('Content-Security-Policy', (req.query as Record<string, string>).offline === '1' ? OFFLINE_PAGE_CSP : PAGE_CSP)
+    .header('Cache-Control', 'no-cache')
+    .type('text/html; charset=utf-8')
+    .send(PART_FRAME_HTML),
 );
 
 // Notebook HTML outputs render here, in a sandboxed frame with its own (permissive) policy.

@@ -1,10 +1,31 @@
 // The "/" menu: typed at the start of a line or after a space, "/" opens a short list under the caret of what to put
-// there (headings, lists, a checklist, a quote, code, a callout, a table, a picture, a signature, an equation, a line across, a page
-// break, a table of contents, today's date), narrowed as more is typed. It never scrolls: a long list is two columns,
+// there (headings, lists, a checklist, a quote, code, a callout, a table, a picture, one made with AI, a drawing (SVG), a plot,
+// a signature, an equation, a line across, a page break, a table of contents, today's date), narrowed as more is typed. It never scrolls: a long list is two columns,
 // filled from the top, as the page editor's is. The arrow keys (← and → across the columns) and Enter pick, Esc or a
 // space closes it; what was typed from the "/" goes when something is picked. The editor keeps where the "/" is and the keys.
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { CalendarDays, Code2, Heading1, Heading2, Heading3, Image as ImageIcon, Lightbulb, List, ListChecks, ListOrdered, Minus, Quote, SeparatorHorizontal, Sigma, Signature, Table2, TableOfContents } from 'lucide-react';
+import {
+  CalendarDays,
+  ChartScatter,
+  Code2,
+  Heading1,
+  Heading2,
+  Heading3,
+  Image as ImageIcon,
+  Lightbulb,
+  List,
+  ListChecks,
+  ListOrdered,
+  Minus,
+  PenTool,
+  Quote,
+  SeparatorHorizontal,
+  Sigma,
+  Signature,
+  Table2,
+  TableOfContents,
+  WandSparkles,
+} from 'lucide-react';
 import { cx } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
 import type { DocEngine } from './engine';
@@ -18,7 +39,7 @@ export interface SlashItem {
 }
 
 /** What the "/" menu offers. */
-export function slashItems(e: DocEngine, more: { picture: () => void; signature: () => void; equation: () => void; today: () => void }): SlashItem[] {
+export function slashItems(e: DocEngine, more: { picture: () => void; aiPicture: () => void; drawing: () => void; plot: () => void; signature: () => void; equation: () => void; today: () => void }): SlashItem[] {
   return [
     { label: 'Heading 1', icon: <Heading1 size={16} />, also: 'h1 title big', run: () => e.style('h1') },
     { label: 'Heading 2', icon: <Heading2 size={16} />, also: 'h2', run: () => e.style('h2') },
@@ -31,6 +52,9 @@ export function slashItems(e: DocEngine, more: { picture: () => void; signature:
     { label: 'Callout', icon: <Lightbulb size={16} />, also: 'note tip box emoji', run: () => e.style('callout') },
     { label: 'Table', icon: <Table2 size={16} />, also: 'grid', run: () => e.insertTable(3, 3) },
     { label: 'Picture', icon: <ImageIcon size={16} />, also: 'image photo', run: more.picture },
+    { label: 'Picture made with AI', icon: <WandSparkles size={16} />, also: 'image photo generate ai illustration icon background', run: more.aiPicture },
+    { label: 'Drawing (SVG)', icon: <PenTool size={16} />, also: 'svg vector icon logo diagram illustration', run: more.drawing },
+    { label: 'Plot', icon: <ChartScatter size={16} />, also: 'chart graph data matplotlib histogram scatter', run: more.plot },
     { label: 'Signature', icon: <Signature size={16} />, also: 'sign initials autograph', run: more.signature },
     { label: 'Equation', icon: <Sigma size={16} />, also: 'maths math formula latex', run: more.equation },
     { label: 'A line across', icon: <Minus size={16} />, also: 'divider rule hr', run: () => e.insertAtom('hr') },

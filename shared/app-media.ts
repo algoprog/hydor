@@ -182,11 +182,15 @@ export function mediaSrc(src: string, assets?: Record<string, Pick<AppAsset, 'sh
 /** Where a view's libraries come from: npm packages, at exact versions, from jsDelivr. */
 export const LIB_CDN = 'https://cdn.jsdelivr.net/npm/';
 
-/** The libraries the view's own elements use: maps (Leaflet) and plots (Plotly). */
+/** The libraries the view's own elements use: maps (Leaflet) and plots (Plotly); and 3D (three.js) for slides' 3D parts. */
 export const KIT_LIBS = {
   leaflet: { pkg: 'leaflet', version: '1.9.4', js: 'dist/leaflet.js', css: 'dist/leaflet.css' },
   plotly: { pkg: 'plotly.js-dist-min', version: '4.2.0', js: 'plotly.min.js' },
+  three: { pkg: 'three', version: '0.187.0', js: 'build/three.module.min.js' },
 } as const;
+
+/** Where a slide's 3D part loads three.js from (its folder: its build, and its addons' loaders and controls). */
+export const THREE_BASE = `${LIB_CDN}${KIT_LIBS.three.pkg}@${KIT_LIBS.three.version}/`;
 
 const PKG = /^(@[a-z0-9][\w.-]{0,100}\/)?[a-z0-9][\w.-]{0,100}$/;
 const SUB = /^[\w.@-]+(\/[\w.@-]+){0,8}$/;

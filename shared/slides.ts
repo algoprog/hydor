@@ -1150,11 +1150,16 @@ function parasFromBullets(items: unknown[], lvl = 0, out: Para[] = []): Para[] {
   return out;
 }
 
-/** An address a part may open: the web, mail, a phone number, or a slide of the deck (#3). */
+/** The slides a link may go to besides one by its number: the next, the one before, the first and the last. */
+export const SLIDE_JUMPS = ['#next', '#prev', '#first', '#last'] as const;
+
+/** An address a part may open: the web, mail, a phone number, or a slide of the deck (#3, #next, #prev, #first, #last). */
 export function cleanLink(v: unknown): string | undefined {
   if (typeof v !== 'string') return undefined;
   const s = v.trim();
   if (/^#\d{1,3}$/.test(s)) return s;
+  const jump = s.toLowerCase() === '#previous' ? '#prev' : s.toLowerCase();
+  if ((SLIDE_JUMPS as readonly string[]).includes(jump)) return jump;
   if (s.length > 2000) return undefined;
   if (/^(https?:\/\/[^\s<>"']+|mailto:[^\s<>"']+|tel:[+\d][\d\s().-]*)$/i.test(s)) return s;
   return undefined;
@@ -1191,6 +1196,45 @@ export function videoSrc(v: unknown): string | null {
 
 /** A video the app keeps, as a deck names it (naget-video:<sha>), or null. */
 export const keptVideo = (v: unknown): string | null => (typeof v === 'string' && /^naget-video:[a-f0-9]{16,64}$/.test(v.trim()) ? v.trim() : null);
+
+/** A 3D model's source: one the app keeps (naget-asset:<sha>, glTF), one inside the deck (data:), or a .glb or .gltf on the web. */
+export function cleanModel(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  if (/^naget-asset:[a-f0-9]{16,64}$/.test(s)) return s;
+  if (/^data:model\/gltf(-binary|\+json);base64,[A-Za-z0-9+/=]+$/.test(s)) return s;
+  if (/^https:\/\/[^\s<>"'()\\]+\.(glb|gltf)(\?[^\s<>"'()\\]*)?$/i.test(s) && s.length <= 2000) return s;
+  return null;
+}
+
+/** Whether a host is this computer or one of its network's (by its name, or an address of a private range). */
+function privateHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  if (!h.includes('.') || h.includes(':')) return true;
+  if (h === 'localhost' || /\.(localhost|local|internal|lan|home|corp|intranet)$/.test(h)) return true;
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(h);
+  if (!v4) return false;
+  const [a, b] = [Number(v4[1]), Number(v4[2])];
+  return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 198 && (b === 18 || b === 19)) || a >= 224;
+}
+
+/**
+ * The address of a web page to show in a frame on a slide: https, on the public web (not this computer or its
+ * network), without a name and password in it; a YouTube or Vimeo address as its player's. Null for any other.
+ */
+export function cleanEmbedUrl(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  if (s.length > 2000 || !/^https:\/\/[^\s<>"'\\]+$/i.test(s)) return null;
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== 'https:' || u.username || u.password || privateHost(u.hostname)) return null;
+  return videoSrc(s) ?? u.href;
+}
 
 /** Where a video address says to start, in seconds ("t=90", "t=1m30s", "start=90"), or 0. */
 export function videoStart(v: unknown): number {
@@ -1436,6 +1480,8 @@ export interface NormalizeOpts {
   icon?: (name: string) => IconNode[] | null;
   /** A video's source that is neither online nor kept yet (a file of an agent's session): what it becomes, or null to leave the video out. */
   video?: SrcHook;
+  /** A 3D model's source that is not of a kept form yet (a .glb file of an agent's session): what it becomes. */
+  model?: SrcHook;
 }
 
 const ALIGNS = ['left', 'center', 'right', 'justify'] as const;
@@ -1541,6 +1587,9 @@ function textProps(e: Obj, into: Partial<TextProps>, defRole: TextProps['role'])
   if (e.fit === 'none') into.fit = 'none';
   else if (e.fit === 'shrink' || role) into.fit = 'shrink';
   if (typeof e.ph === 'string' && e.ph) into.ph = str(e.ph, 80);
+  const fx = opt(e.textFx, TEXT_FX);
+  if (fx) into.textFx = fx;
+  if (e.glass === true) into.glass = true;
 }
 
 function base(e: Obj, used: Set<string>, H: number, line = false, def: { w: number; h: number } = { w: 400, h: Math.min(200, H) }): Base {
@@ -1563,6 +1612,8 @@ function base(e: Obj, used: Set<string>, H: number, line = false, def: { w: numb
   if (typeof e.name === 'string' && e.name.trim()) b.name = str(e.name.trim(), 60);
   if (e.lock === true) b.lock = true;
   if (typeof e.key === 'string' && /^[A-Za-z0-9_-]{1,24}$/.test(e.key) && e.key !== b.id) b.key = e.key;
+  const hover = opt(e.hover, HOVERS);
+  if (hover) b.hover = hover;
   return b;
 }
 
@@ -1636,10 +1687,81 @@ interface Budget {
   n: number;
 }
 
+/** The other names agents give the parts (a "textbox", a "picture", "custom" code, a "poll", "3d"). */
+const TYPE_ALIASES: Record<string, ElType> = {
+  textbox: 'text',
+  picture: 'image',
+  arrow: 'line',
+  connector: 'line',
+  elbow: 'line',
+  equation: 'math',
+  custom: 'html',
+  'custom-code': 'html',
+  webpage: 'embed',
+  iframe: 'embed',
+  poll: 'quiz',
+  question: 'quiz',
+  '3d': 'scene3d',
+  model: 'scene3d',
+};
+
+/** A language's name for its colours, from what agents write ("py", "JS", "c++"). */
+const LANG_ALIASES: Record<string, string> = { js: 'javascript', jsx: 'javascript', mjs: 'javascript', node: 'javascript', ts: 'typescript', tsx: 'typescript', py: 'python', python3: 'python', sh: 'bash', shell: 'bash', zsh: 'bash', console: 'bash', 'c++': 'cpp', cc: 'cpp', hpp: 'cpp', 'c#': 'csharp', cs: 'csharp', rs: 'rust', golang: 'go', kt: 'kotlin', rb: 'ruby', yml: 'yaml', md: 'markdown', htm: 'html', xml: 'html', svg: 'html', postgres: 'sql', postgresql: 'sql', mysql: 'sql', sqlite: 'sql', ps1: 'powershell', jl: 'julia', r: 'r' };
+
+const cleanLang = (v: unknown): string | undefined => {
+  if (typeof v !== 'string') return undefined;
+  const s = v.trim().toLowerCase();
+  if (!/^[a-z0-9+#.-]{1,20}$/.test(s)) return undefined;
+  return LANG_ALIASES[s] ?? s;
+};
+
+/** Lines to light up, as a code part keeps them ("2-4,7"), or undefined. */
+const cleanLines = (v: unknown): string | undefined => {
+  const s = (Array.isArray(v) ? v.join(',') : typeof v === 'number' ? String(v) : typeof v === 'string' ? v : '').replace(/\s+/g, '');
+  return s && s.length <= 200 && /^\d{1,4}(-\d{1,4})?(,\d{1,4}(-\d{1,4})?)*$/.test(s) ? s : undefined;
+};
+
+/** A part's picture where it cannot run (a poster): a picture's source, or what the hook makes of an agent's file. */
+const posterOf = (v: unknown, o: NormalizeOpts): string | undefined => {
+  const raw = typeof v === 'string' ? v.trim() : '';
+  return (cleanSrc(raw) ?? (raw && o.src ? o.src(raw) : null)) || undefined;
+};
+
+/**
+ * A quiz's choices as agents write them: strings (a `*` before or after marks a right one), or {text, correct, why};
+ * the quiz's own `answer` (a choice's number from 0, or its words) or `answers` marks them too.
+ */
+function quizChoices(e: Obj): QuizChoice[] {
+  const list = Array.isArray(e.choices) ? e.choices : Array.isArray(e.options) ? e.options : Array.isArray(e.answers) && e.answers.some((x) => isObj(x)) ? e.answers : [];
+  const out: QuizChoice[] = [];
+  for (const raw of list.slice(0, SLIDE_LIMITS.choices)) {
+    if (typeof raw === 'string' || typeof raw === 'number') {
+      const t = String(raw).trim();
+      const star = /^\*\s*|\s*\*$/.test(t) && t !== '*';
+      out.push({ text: str(star ? t.replace(/^\*\s*|\s*\*$/g, '') : t, 300), ...(star ? { correct: true } : {}) });
+      continue;
+    }
+    if (!isObj(raw)) continue;
+    const c: QuizChoice = { text: str(raw.text ?? raw.t ?? raw.label ?? '', 300) };
+    if (raw.correct === true || raw.right === true || raw.ok === true) c.correct = true;
+    const why = str(raw.why ?? raw.reason ?? raw.feedback ?? '', 600).trim();
+    if (why) c.why = why;
+    out.push(c);
+  }
+  // The right ones named on the quiz itself.
+  const named = [e.answer, ...(Array.isArray(e.correct) ? e.correct : []), ...(Array.isArray(e.answers) && !e.answers.some((x) => isObj(x)) ? e.answers : [])];
+  for (const a of named) {
+    const i = typeof a === 'number' ? Math.round(a) : typeof a === 'string' ? out.findIndex((c) => c.text.trim().toLowerCase() === a.trim().toLowerCase()) : -1;
+    if (i >= 0 && i < out.length) out[i].correct = true;
+  }
+  return out;
+}
+
 function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts, depth = 0, budget: Budget = { n: 0 }): El | null {
   if (!isObj(e)) return null;
   if (++budget.n > SLIDE_LIMITS.els * 3) return null;
-  const type = e.type === 'textbox' ? 'text' : e.type === 'picture' ? 'image' : e.type === 'arrow' || e.type === 'connector' || e.type === 'elbow' ? 'line' : e.type === 'equation' ? 'math' : e.type;
+  const lower = typeof e.type === 'string' ? e.type.trim().toLowerCase() : '';
+  const type = TYPE_ALIASES[lower] ?? lower;
   if (type === 'text' || type === 'shape') {
     const b = base(e, used, H);
     const t: Partial<TextProps> = {};
@@ -1810,6 +1932,91 @@ function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts, dep
     if (e.radius !== undefined) v.radius = num(e.radius, 0, 2000, 0);
     return v;
   }
+  if (type === 'code') {
+    const code = str(e.code ?? e.text ?? e.source ?? '', SLIDE_LIMITS.code).replace(/\r\n?/g, '\n');
+    const c: CodeEl = { ...base(e, used, H, false, { w: 720, h: 360 }), type: 'code', code, size: num(e.size, 6, 120, 20) };
+    const lang = cleanLang(e.lang ?? e.language);
+    if (lang) c.lang = lang;
+    const look = opt(e.look ?? e.theme, ['dark', 'light', 'deck'] as const);
+    if (look && look !== 'dark') c.look = look;
+    if (e.lineNumbers === true || e.numbers === true) c.lineNumbers = true;
+    const lit = cleanLines(e.highlight ?? e.lines);
+    if (lit) c.highlight = lit;
+    if (e.radius !== undefined) c.radius = num(e.radius, 0, 2000, 0);
+    return c;
+  }
+  if (type === 'html') {
+    // Kept as the words it is, never read as markup here: it runs only inside a sandboxed frame of its own.
+    const h: HtmlEl = { ...base(e, used, H, false, { w: 640, h: 360 }), type: 'html', html: str(e.html ?? e.code ?? e.source ?? '', SLIDE_LIMITS.html) };
+    const poster = posterOf(e.poster, o);
+    if (poster) h.poster = poster;
+    if (e.interactive === true) h.interactive = true;
+    return h;
+  }
+  if (type === 'embed') {
+    const url = cleanEmbedUrl(e.url ?? e.src);
+    if (!url) return null;
+    const m: EmbedEl = { ...base(e, used, H, false, { w: 800, h: 450 }), type: 'embed', url };
+    const poster = posterOf(e.poster, o);
+    if (poster) m.poster = poster;
+    if (e.interactive === true) m.interactive = true;
+    if (e.radius !== undefined) m.radius = num(e.radius, 0, 2000, 0);
+    return m;
+  }
+  if (type === 'quiz') {
+    const choices = quizChoices(e);
+    const q: QuizEl = { ...base(e, used, H, false, { w: 960, h: 440 }), type: 'quiz', question: str(e.question ?? e.text ?? e.title ?? '', SLIDE_LIMITS.question).trim(), choices, size: num(e.size, 6, 200, 32) };
+    const right = choices.filter((c) => c.correct).length;
+    if (e.multi === true || (e.multi !== false && right > 1)) q.multi = true;
+    const explain = str(e.explain ?? e.explanation ?? '', 1000).trim();
+    if (explain) q.explain = explain;
+    const color = cleanColor(e.color);
+    if (color) q.color = color;
+    const font = cleanFont(e.font);
+    if (font) q.font = font;
+    const fill = cleanColor(e.fill);
+    if (fill) q.fill = fill;
+    if (e.layout === 'grid') q.layout = 'grid';
+    return q;
+  }
+  if (type === 'score') {
+    const sc: ScoreEl = { ...base(e, used, H, false, { w: 640, h: 120 }), type: 'score', size: num(e.size, 6, 400, 40) };
+    const text = str(e.text ?? '', 300).trim();
+    if (text) sc.text = text;
+    const color = cleanColor(e.color);
+    if (color) sc.color = color;
+    const font = cleanFont(e.font);
+    if (font) sc.font = font;
+    const align = opt(e.align, ALIGNS);
+    if (align && align !== 'center') sc.align = align;
+    if (e.bold === true) sc.bold = true;
+    return sc;
+  }
+  if (type === 'scene3d') {
+    const raw = typeof (e.model ?? e.src) === 'string' ? String(e.model ?? e.src).trim() : '';
+    const model = cleanModel(raw) ?? (raw && o.model ? o.model(raw) : null);
+    const s3: Scene3dEl = { ...base(e, used, H, false, { w: 480, h: 480 }), type: 'scene3d' };
+    if (model) s3.model = model;
+    else s3.shape = pick(e.shape, SHAPES_3D, 'cube');
+    if (s3.shape === 'text') s3.text = str(e.text ?? '3D', 60).trim() || '3D';
+    const color = cleanColor(e.color);
+    if (color) s3.color = color;
+    const material = opt(e.material, MATERIALS_3D);
+    if (material) s3.material = material;
+    const light = opt(e.light, LIGHTS_3D);
+    if (light) s3.light = light;
+    const spin = num(e.spin, -720, 720, 0);
+    if (spin) s3.spin = spin;
+    if (e.orbit === true) s3.orbit = true;
+    if (e.turn !== undefined) s3.turn = num(e.turn, -360, 360, 0);
+    if (e.tilt !== undefined) s3.tilt = num(e.tilt, -89, 89, 0);
+    if (e.zoom !== undefined) s3.zoom = num(e.zoom, 0.2, 5, 1);
+    const bgc = cleanColor(e.bg ?? e.background);
+    if (bgc) s3.bg = bgc;
+    const poster = posterOf(e.poster, o);
+    if (poster) s3.poster = poster;
+    return s3;
+  }
   if (type === 'group') {
     const list = Array.isArray(e.els) ? e.els : Array.isArray(e.parts) ? e.parts : [];
     let els = list
@@ -1854,32 +2061,52 @@ function cleanMerges(v: unknown, rows: number, cols: number): Merge[] {
   return out;
 }
 
-function anim(a: unknown, used: Set<string>, ids: Set<string>): Anim | null {
+/** The effects only an emphasis has (an agent's {fx: "confetti"} without a type is one). */
+const EM_ONLY = new Set<unknown>(ANIM_FX.em.concat(RICH_ANIM_FX.em).filter((f) => !ANIM_FX.in.includes(f) && !RICH_ANIM_FX.in.includes(f)));
+/** How long the web format's effects take when an animation does not say (those that tell words or numbers take longer). */
+const FX_DUR: Partial<Record<AnimFx, number>> = { typewriter: 1600, count: 1500, draw: 1200, confetti: 1500, heartbeat: 1000, jello: 900, wiggle: 700, flash: 800, bob: 1200, glow: 1200, swing: 800, roll: 700 };
+
+/**
+ * An animation: on a part of the slide (`ids`, its own parts), its effect one its kind has (PowerPoint's or the web
+ * format's), and a tap's trigger a part of the slide (`every`, in groups too), else the part itself.
+ */
+function anim(a: unknown, used: Set<string>, ids: Set<string>, every: Set<string> = ids): Anim | null {
   if (!isObj(a) || typeof a.el !== 'string' || !ids.has(a.el)) return null;
-  const type = pick(a.type, ['in', 'em', 'out'] as const, 'in');
+  const fx0 = a.fx ?? a.effect;
+  const type = opt(a.type, ['in', 'em', 'out'] as const) ?? (EM_ONLY.has(fx0) ? 'em' : 'in');
+  const fx = pick(fx0, [...ANIM_FX[type], ...RICH_ANIM_FX[type]], type === 'em' ? 'pulse' : 'fade');
+  const trigger = typeof a.trigger === 'string' && every.has(a.trigger) ? a.trigger : undefined;
   const out: Anim = {
     id: cleanId(a.id, used),
     el: a.el,
     type,
-    fx: pick(a.fx ?? a.effect, ANIM_FX[type], type === 'em' ? 'pulse' : 'fade'),
-    on: pick(a.on, ['click', 'with', 'after'] as const, 'click'),
-    dur: num(a.dur, 0, 20000, 500),
+    fx,
+    on: pick(a.on, ['click', 'with', 'after', 'tap'] as const, trigger ? 'tap' : 'click'),
+    dur: num(a.dur, 0, 20000, FX_DUR[fx] ?? 500),
     delay: num(a.delay, 0, 60000, 0),
   };
   if (ANIM_DIR.includes(out.fx)) out.dir = pick(a.dir, DIRS, out.fx === 'float' ? 'up' : 'left');
-  if (a.byPara === true) out.byPara = true;
+  if (a.byPara === true && out.on !== 'tap') out.byPara = true;
+  if (out.on === 'tap') out.trigger = trigger ?? a.el;
+  if (a.loop === true && type === 'em') out.loop = true;
+  const by = a.by === 'words' ? 'word' : a.by === 'letters' ? 'letter' : opt(a.by, ['word', 'letter'] as const);
+  if (by) out.by = by;
+  const ease = opt(a.ease, EASES);
+  if (ease) out.ease = ease;
   return out;
 }
 
 /** An animation an agent put on an element itself ("anim": "fade", or { fx, on, … }). */
 function elAnim(v: unknown, el: string): Obj | null {
-  if (typeof v === 'string') return { el, type: 'in', fx: v, on: 'click' };
-  return isObj(v) ? { type: 'in', on: 'click', ...v, el } : null;
+  if (typeof v === 'string') return { el, type: EM_ONLY.has(v) ? 'em' : 'in', fx: v, on: 'click' };
+  return isObj(v) ? { ...v, el } : null;
 }
 
 function bg(v: unknown, o: NormalizeOpts): Bg | undefined {
   const c = cleanColor(v);
   if (c) return { color: c };
+  // A moving background by its name alone ("aurora").
+  if (typeof v === 'string' && (BG_FX as string[]).includes(v.trim())) return { fx: v.trim() as BgFx };
   if (!isObj(v)) return undefined;
   const out: Bg = {};
   const color = cleanColor(v.color);
@@ -1891,22 +2118,28 @@ function bg(v: unknown, o: NormalizeOpts): Bg | undefined {
   }
   const raw = typeof v.image === 'string' ? v.image.trim() : '';
   const image = cleanSrc(raw) ?? (raw && o.src ? o.src(raw) : null);
-  if (image) {
-    out.image = image;
-    if (v.dim !== undefined) out.dim = num(v.dim, 0, 0.8, 0);
-  }
+  if (image) out.image = image;
+  const fx = opt(v.fx ?? v.effect, BG_FX);
+  if (fx) out.fx = fx;
+  const rawVideo = typeof v.video === 'string' ? v.video.trim() : '';
+  const video = keptVideo(rawVideo) ?? (rawVideo && !videoSrc(rawVideo) && o.video ? o.video(rawVideo) : null);
+  if (video) out.video = video;
+  if ((image || video) && v.dim !== undefined) out.dim = num(v.dim, 0, 0.8, 0);
   return Object.keys(out).length ? out : undefined;
 }
+
+/** How long each transition takes when a slide does not say. */
+const TR_DUR: Partial<Record<TransitionFx, number>> = { morph: 1000, cube: 900, flip: 800, dissolve: 800, circle: 700, blinds: 800, glitch: 600 };
 
 function transition(v: unknown): Transition | undefined {
   if (typeof v === 'string') v = { fx: v };
   if (!isObj(v)) return undefined;
-  const fx = pick(v.fx ?? v.effect, TRANSITIONS, 'none');
+  const fx = pick(v.fx ?? v.effect, [...TRANSITIONS, ...RICH_TRANSITIONS], 'none');
   const auto = v.auto !== undefined ? num(v.auto, 0, 3600, 0) : 0;
   if (fx === 'none' && !auto) return undefined;
   const t: Transition = { fx };
-  if (fx === 'push' || fx === 'wipe' || fx === 'cover') t.dir = pick(v.dir, DIRS, 'right');
-  if (fx !== 'none') t.dur = num(v.dur, 100, 5000, fx === 'morph' ? 1000 : 600);
+  if (fx === 'push' || fx === 'wipe' || fx === 'cover' || fx === 'cube' || fx === 'flip') t.dir = pick(v.dir, DIRS, 'right');
+  if (fx !== 'none') t.dur = num(v.dur, 100, 5000, TR_DUR[fx] ?? 600);
   if (auto) t.auto = auto;
   return t;
 }
@@ -1963,9 +2196,10 @@ function slide(v: unknown, used: Set<string>, ratio: Ratio, o: NormalizeOpts, ci
   }
   s.els = checkConnectors(els);
   const ids = new Set(els.map((e) => e.id));
+  const every = new Set(everyEl(els).map((e) => e.id));
   const anims = [...(Array.isArray(v.anims) ? v.anims : []), ...pending]
     .slice(0, SLIDE_LIMITS.anims)
-    .map((a) => anim(a, used, ids))
+    .map((a) => anim(a, used, ids, every))
     .filter((a): a is Anim => !!a);
   // "build": the body's words come one paragraph at a time.
   if (v.build === true || v.build === 'bullets') {
@@ -2061,11 +2295,14 @@ export function normalizeDeck(input: unknown, o: NormalizeOpts = {}): Deck {
     .filter((s): s is Slide => !!s);
   if (!slides.length) slides.push({ ...layoutSlide('title', {}, ratio) });
   const d: Deck = { v: 1, ratio, theme: theme(v.theme, THEMES[0]), slides };
+  if (v.progress === true) d.progress = true;
   const f = footer(v.footer);
   if (f) d.footer = f;
   const g = guides(v.guides, slideH(ratio));
   if (g) d.guides = g;
-  return d;
+  // PowerPoint compatible: what only the web format has becomes what PowerPoint has.
+  const pptx = typeof v.format === 'string' && /^(pptx|powerpoint|ppt)$/i.test(v.format.trim());
+  return pptx ? toPowerPoint(d) : d;
 }
 
 /** Whether a slide is a title slide, which the footer may leave out: the first, or one made from the Title layout. */
@@ -2074,40 +2311,63 @@ export const isTitleSlide = (d: Deck, i: number) => i === 0 || d.slides[i]?.layo
 /** Whether the deck's footer (or slide number) shows on a slide. */
 export const footerOn = (d: Deck, i: number) => !!d.footer && (d.footer.num || !!d.footer.text || !!d.footer.date) && !d.slides[i]?.nofooter && !(d.footer.skipTitle && isTitleSlide(d, i));
 
-/** The pictures a deck shows (parts, those in groups too, videos' stills and backgrounds); `stills`: YouTube's own stills too. */
+/** Whether a part has a poster: a picture shown where it cannot run (the web format's live parts, and videos). */
+const posterPart = (e: El): e is VideoEl | HtmlEl | EmbedEl | Scene3dEl => e.type === 'video' || e.type === 'html' || e.type === 'embed' || e.type === 'scene3d';
+
+/**
+ * The pictures a deck shows (parts, those in groups too, the posters of videos and of the web format's live parts,
+ * backgrounds), and its 3D models the app keeps or will (they are kept and swept as its pictures are); `stills`:
+ * YouTube's own stills too.
+ */
 export function deckSources(d: Deck, stills = false): string[] {
   const out: string[] = [];
   for (const s of d.slides) {
     if (s.bg?.image) out.push(s.bg.image);
     for (const e of everyEl(s.els)) {
       if (e.type === 'image' && e.src) out.push(e.src);
-      if (e.type === 'video') {
-        if (e.poster) out.push(e.poster);
-        else if (stills && videoStill(e.src)) out.push(videoStill(e.src)!);
-      }
+      if (posterPart(e) && e.poster) out.push(e.poster);
+      else if (e.type === 'video' && stills && videoStill(e.src)) out.push(videoStill(e.src)!);
+      if (e.type === 'scene3d' && e.model && !e.model.startsWith('https:')) out.push(e.model);
     }
   }
   return out;
 }
 
-/** The videos the app keeps that a deck shows ("naget-video:<sha>"), in groups too. */
-export function deckVideos(d: Deck): string[] {
+/** A deck's 3D models that are not on the web (kept by the app, inside the deck, or an agent's files to take in). */
+export function deckModels(d: Deck): string[] {
   const out: string[] = [];
-  for (const s of d.slides) for (const e of everyEl(s.els)) if (e.type === 'video' && e.src.startsWith(VIDEO)) out.push(e.src);
+  for (const s of d.slides) for (const e of everyEl(s.els)) if (e.type === 'scene3d' && e.model && !e.model.startsWith('https:')) out.push(e.model);
   return out;
 }
 
-/** The deck with each kept video's source changed by `f` (to where a page fetches it, say). */
+/** The videos the app keeps that a deck shows ("naget-video:<sha>"), in groups and behind slides too. */
+export function deckVideos(d: Deck): string[] {
+  const out: string[] = [];
+  for (const s of d.slides) {
+    if (s.bg?.video?.startsWith(VIDEO)) out.push(s.bg.video);
+    for (const e of everyEl(s.els)) if (e.type === 'video' && e.src.startsWith(VIDEO)) out.push(e.src);
+  }
+  return out;
+}
+
+/** The deck with each kept video's source changed by `f` (to where a page fetches it, say): its parts', and those behind its slides. */
 export function mapVideoSources(d: Deck, f: (src: string) => string): Deck {
   const map = (els: El[]): El[] => els.map((e) => (e.type === 'group' ? { ...e, els: map(e.els) } : e.type === 'video' && e.src.startsWith(VIDEO) ? { ...e, src: f(e.src) } : e));
-  return { ...d, slides: d.slides.map((s) => ({ ...s, els: map(s.els) })) };
+  return { ...d, slides: d.slides.map((s) => ({ ...s, ...(s.bg?.video?.startsWith(VIDEO) ? { bg: { ...s.bg, video: f(s.bg.video) } } : {}), els: map(s.els) })) };
 }
 
 function mapEls(els: El[], f: (src: string) => string): El[] {
-  return els.map((e) => (e.type === 'image' && e.src ? { ...e, src: f(e.src) } : e.type === 'video' && e.poster ? { ...e, poster: f(e.poster) } : e.type === 'group' ? { ...e, els: mapEls(e.els, f) } : e));
+  return els.map((e) => {
+    if (e.type === 'image' && e.src) return { ...e, src: f(e.src) };
+    if (e.type === 'group') return { ...e, els: mapEls(e.els, f) };
+    if (e.type === 'scene3d' && (e.poster || (e.model && !e.model.startsWith('https:'))))
+      return { ...e, ...(e.poster ? { poster: f(e.poster) } : {}), ...(e.model && !e.model.startsWith('https:') ? { model: f(e.model) } : {}) };
+    if (posterPart(e) && e.poster) return { ...e, poster: f(e.poster) };
+    return e;
+  });
 }
 
-/** The deck with each picture's source changed by `f` (to put pictures inside it, say). */
+/** The deck with each picture's source changed by `f` (to put pictures inside it, say), its 3D models' too (those not on the web). */
 export function mapSources(d: Deck, f: (src: string) => string): Deck {
   return {
     ...d,
@@ -2125,7 +2385,8 @@ export function mapSources(d: Deck, f: (src: string) => string): Deck {
  */
 export function deckText(d: Deck): string {
   const extra = `${d.footer ? `,"footer":${JSON.stringify(d.footer)}` : ''}${d.guides ? `,"guides":${JSON.stringify(d.guides)}` : ''}`;
-  const out: string[] = [`{"v":1,"ratio":${JSON.stringify(d.ratio)},"theme":${JSON.stringify(d.theme)}${extra},"slides":[`];
+  const kind = `${d.format ? `,"format":${JSON.stringify(d.format)}` : ''}${d.progress ? ',"progress":true' : ''}`;
+  const out: string[] = [`{"v":1,"ratio":${JSON.stringify(d.ratio)}${kind},"theme":${JSON.stringify(d.theme)}${extra},"slides":[`];
   d.slides.forEach((s, i) => {
     const { els, anims, ...rest } = s;
     out.push(` ${JSON.stringify(rest).slice(0, -1)},"els":[`);
@@ -2157,11 +2418,15 @@ export function newDeck(title: string, themeId = 'paper', ratio: Ratio = '16:9')
   return { v: 1, ratio, theme: own(themeOf(themeId)), slides: [layoutSlide('title', { title }, ratio)] };
 }
 
-/** The fonts a deck uses: its theme's and its parts'. */
+/** The monospaced font code shows in. */
+export const CODE_FONT = 'JetBrains Mono';
+
+/** The fonts a deck uses: its theme's and its parts' (code's own). */
 export function deckFonts(d: Deck): string[] {
   const names = new Set<string>([d.theme.font, d.theme.headFont]);
   for (const s of d.slides)
     for (const e of everyEl(s.els)) {
+      if (e.type === 'code') names.add(CODE_FONT);
       if ('font' in e && typeof e.font === 'string' && e.font !== 'head' && e.font !== 'body') names.add(e.font);
       if (e.type === 'text' || e.type === 'shape') for (const p of e.paras) for (const r of p.runs) if (r.font && r.font !== 'head' && r.font !== 'body') names.add(r.font);
     }
@@ -2187,27 +2452,308 @@ export const isDeckText = (s: string) => /^\s*\{\s*"v"\s*:\s*1\s*,\s*"ratio"/.te
 /** Whether a deck is in the web format (the default). */
 export const isWebDeck = (d: Pick<Deck, 'format'>) => d.format !== 'pptx';
 
-/** One thing PowerPoint cannot keep as it is: on which slide (from 1), which part (its id), and what, in words. */
+/** What kind of thing PowerPoint cannot keep as it is. */
+export type RichKind = 'part' | 'hover' | 'textFx' | 'glass' | 'effect' | 'tap' | 'loop' | 'by' | 'ease' | 'transition' | 'bgFx' | 'bgVideo' | 'progress';
+
+/**
+ * One thing PowerPoint cannot keep as it is: on which slide (from 1; 0 is the deck as a whole), which part (its id),
+ * and what, in words: what it is and what it becomes. `kind` says what sort of thing it is; an effect, a transition and
+ * a moving background say which they were (`from`) and, where they become another, which (`to`).
+ */
 export interface RichFeature {
   slide: number;
   el?: string;
   what: string;
+  kind: RichKind;
+  from?: string;
+  to?: string;
+}
+
+/** The nearest of PowerPoint's effects to each of the web format's, by the kind of animation (and the side it moves to). */
+const NEAR_FX: Record<string, { fx: AnimFx; dir?: Dir }> = {
+  'in:blur': { fx: 'fade' },
+  'in:rise': { fx: 'float', dir: 'up' },
+  'in:drop': { fx: 'fly', dir: 'up' },
+  'in:flip': { fx: 'zoom' },
+  'in:swing': { fx: 'float', dir: 'up' },
+  'in:roll': { fx: 'fly', dir: 'left' },
+  'in:pop': { fx: 'zoom' },
+  'in:typewriter': { fx: 'appear' },
+  'in:draw': { fx: 'wipe', dir: 'left' },
+  'in:count': { fx: 'fade' },
+  'em:glow': { fx: 'pulse' },
+  'em:wiggle': { fx: 'shake' },
+  'em:heartbeat': { fx: 'pulse' },
+  'em:jello': { fx: 'shake' },
+  'em:flash': { fx: 'pulse' },
+  'em:bob': { fx: 'pulse' },
+  'em:confetti': { fx: 'pulse' },
+  'out:blur': { fx: 'fade' },
+  'out:drop': { fx: 'fly', dir: 'down' },
+  'out:flip': { fx: 'zoom' },
+  'out:roll': { fx: 'fly', dir: 'right' },
+  'out:pop': { fx: 'zoom' },
+};
+
+/** The nearest of PowerPoint's transitions to each of the web format's. */
+const NEAR_TR: Partial<Record<TransitionFx, TransitionFx>> = { cube: 'push', flip: 'fade', dissolve: 'fade', circle: 'zoom', blinds: 'wipe', glitch: 'fade' };
+
+/** What each of the web format's parts becomes in PowerPoint, in words. */
+const PART_BECOMES: Record<string, string> = {
+  html: 'Custom code becomes its picture',
+  embed: 'A web page becomes its picture',
+  scene3d: '3D becomes its picture',
+  quiz: 'A quiz becomes text boxes, its answer in the speaker notes',
+  score: 'A quiz score becomes words',
+};
+
+/** A quiz's choices are lettered A, B, C… */
+export const QUIZ_LETTERS = 'ABCDEFGH';
+
+/** The quizzes that count towards the score: those with a right choice, on the slides the slideshow shows. */
+export const scoredQuizzes = (d: Deck) => d.slides.filter((s) => !s.hidden).reduce((n, s) => n + everyEl(s.els).filter((e) => e.type === 'quiz' && e.choices.some((c) => c.correct)).length, 0);
+
+/** A score part's words with its numbers in: "{right} of {total}" ({percent} too). */
+export function scoreWords(text: string | undefined, right: number, total: number): string {
+  const pct = total ? Math.round((right / total) * 100) : 0;
+  return (text || 'You got {right} of {total}').replace(/\{right\}/g, String(right)).replace(/\{total\}/g, String(total)).replace(/\{percent\}/g, String(pct));
+}
+
+/** A part's own place, name, link and copies' key, without what only the web format has (for the part PowerPoint gets instead). */
+const plainBase = (e: El): Base => {
+  const b: Base = { id: e.id, x: e.x, y: e.y, w: e.w, h: e.h };
+  if (e.rot) b.rot = e.rot;
+  if (e.opacity !== undefined) b.opacity = e.opacity;
+  if (e.link) b.link = e.link;
+  if (e.name) b.name = e.name;
+  if (e.lock) b.lock = true;
+  if (e.key) b.key = e.key;
+  return b;
+};
+
+/**
+ * A quiz as PowerPoint's own parts, laid out as the slideshow lays it out: its question in bold at the top, its choices
+ * below in boxes of their own (a column, or a grid of two), each with its letter. Their ids are new (`fresh`).
+ */
+function quizParts(q: QuizEl, fresh: () => string): El[] {
+  const size = q.size;
+  const cs = Math.round(size * 0.78 * 100) / 100;
+  // The question's lines, as many as its words take across the box (at most four).
+  const lines = Math.max(1, Math.min(4, Math.ceil((Math.max(1, q.question.length) * size * 0.52) / Math.max(40, q.w))));
+  const qh = q.question ? r2(lines * size * 1.25 + 4) : 0;
+  const gap = qh ? size * 0.5 : 0;
+  const cols = q.layout === 'grid' && q.choices.length > 1 ? 2 : 1;
+  const ch = r2(cs * 2.35);
+  const cg = r2(cs * 0.35);
+  const cw = r2((Math.abs(q.w) - (cols - 1) * cg) / cols);
+  const out: El[] = [];
+  if (q.question)
+    out.push({ id: fresh(), type: 'text', role: 'body', x: 0, y: 0, w: Math.abs(q.w), h: qh, paras: [{ runs: [{ t: q.question }] }], size, bold: true, color: q.color ?? 'head', ...(q.font ? { font: q.font } : {}), pad: 0, valign: 'bottom', fit: 'shrink' });
+  q.choices.forEach((c, i) => {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    out.push({
+      id: fresh(),
+      type: 'shape',
+      shape: 'round',
+      x: r2(col * (cw + cg)),
+      y: r2(qh + gap + row * (ch + cg)),
+      w: cw,
+      h: ch,
+      radius: r2(cs * 0.5),
+      fill: q.fill ?? 'soft',
+      paras: [{ runs: [{ t: `${QUIZ_LETTERS[i]}   `, b: true, color: 'accent' }, { t: c.text }] }],
+      size: cs,
+      color: q.color ?? 'fg',
+      ...(q.font ? { font: q.font } : {}),
+      align: 'left',
+      valign: 'middle',
+      pad: r2(cs * 0.6),
+      fit: 'shrink',
+    });
+  });
+  return out;
+}
+
+/** What the speaker notes say of a quiz once it is PowerPoint's: its right answer(s) and its explanation ('' for a poll). */
+function quizNote(q: QuizEl): string {
+  const right = q.choices.map((c, i) => (c.correct ? `${QUIZ_LETTERS[i]} (${c.text})` : '')).filter(Boolean);
+  if (!right.length) return '';
+  return `Quiz${q.question ? ` "${q.question}"` : ''}: the answer${right.length > 1 ? 's are' : ' is'} ${right.join(', ')}.${q.explain ? ` ${q.explain}` : ''}`;
+}
+
+/** The deck as PowerPoint can keep it, and what changed to make it so (richFeatures, toPowerPoint). */
+function powerPointOf(d: Deck): { deck: Deck; changes: RichFeature[] } {
+  const changes: RichFeature[] = [];
+  const H = slideH(d.ratio);
+  const total = scoredQuizzes(d);
+  const used = new Set<string>(d.slides.flatMap((s) => [s.id, ...everyEl(s.els).map((e) => e.id), ...(s.anims ?? []).map((a) => a.id)]));
+  const fresh = () => {
+    let id = newId();
+    while (used.has(id)) id = newId();
+    used.add(id);
+    return id;
+  };
+  const slides = d.slides.map((s, si): Slide => {
+    const say = (kind: RichKind, what: string, more: Partial<RichFeature> = {}) => changes.push({ slide: si + 1, kind, what, ...more });
+    const notes: string[] = [];
+    const part = (e: El): El => {
+      let x = e;
+      if (x.hover) {
+        say('hover', 'What it does when the pointer is on it is left out', { el: x.id, from: x.hover });
+        x = { ...x };
+        delete x.hover;
+      }
+      if (x.type === 'text' || x.type === 'shape') {
+        if (x.textFx) say('textFx', 'Its text effect is left out', { el: x.id, from: x.textFx });
+        if (x.glass) say('glass', 'Its frosted glass is left out', { el: x.id });
+        if (x.textFx || x.glass) {
+          const { textFx: _fx, glass: _glass, ...rest } = x;
+          return rest as El;
+        }
+        return x;
+      }
+      if (x.type === 'html' || x.type === 'embed' || x.type === 'scene3d') {
+        say('part', PART_BECOMES[x.type], { el: x.id, from: x.type });
+        const img: ImageEl = { ...plainBase(x), type: 'image', src: x.poster ?? '', alt: x.type === 'embed' ? x.url : x.type === 'html' ? 'Custom code' : '3D' };
+        if (x.type === 'embed' && x.radius) img.radius = x.radius;
+        return img;
+      }
+      if (x.type === 'quiz') {
+        say('part', PART_BECOMES.quiz, { el: x.id, from: 'quiz' });
+        const note = quizNote(x);
+        if (note) notes.push(note);
+        const els = quizParts(x, fresh);
+        if (!els.length) return { ...plainBase(x), type: 'text', paras: [{ runs: [{ t: '' }] }], size: x.size };
+        const g = fitGroup({ ...plainBase(x), type: 'group', x: 0, y: 0, els });
+        return { ...g, x: r2(x.x + g.x), y: r2(x.y + g.y) };
+      }
+      if (x.type === 'score') {
+        say('part', PART_BECOMES.score, { el: x.id, from: 'score' });
+        // The right answers are the audience's to give: PowerPoint shows how many there are.
+        const words = (x.text || 'You got {right} of {total}').replace(/\{right\}|\{percent\}/g, '?').replace(/\{total\}/g, String(total));
+        const t: TextEl = { ...plainBase(x), type: 'text', role: 'body', paras: [{ runs: [{ t: words }] }], size: x.size, align: x.align ?? 'center', valign: 'middle', fit: 'shrink' };
+        if (x.color) t.color = x.color;
+        if (x.font) t.font = x.font;
+        if (x.bold) t.bold = true;
+        return t;
+      }
+      if (x.type === 'group') return { ...x, els: x.els.map(part) };
+      return x;
+    };
+    let els = s.els.map(part);
+    let bg = s.bg;
+    if (bg?.fx) {
+      say('bgFx', 'The moving background is left out', { from: bg.fx });
+      bg = { ...bg };
+      delete bg.fx;
+    }
+    if (bg?.video) {
+      say('bgVideo', 'The video behind the slide becomes a video on it, behind its parts');
+      // PowerPoint's way: a video as large as the slide, at the back, playing without sound, over and over.
+      const behind: El[] = [{ id: fresh(), type: 'video', name: 'Background video', src: bg.video, x: 0, y: 0, w: SLIDE_W, h: H, autoplay: true, muted: true, loop: true }];
+      if (bg.dim) behind.push({ id: fresh(), type: 'shape', shape: 'rect', name: 'Shade', x: 0, y: 0, w: SLIDE_W, h: H, fill: '#000000', opacity: bg.dim, paras: [{ runs: [{ t: '' }] }], size: 20 });
+      els = [...behind, ...els];
+      bg = { ...bg };
+      delete bg.video;
+      if (!bg.image) delete bg.dim;
+    }
+    const anims = (s.anims ?? []).map((a): Anim => {
+      let b = a;
+      const edit = () => (b === a ? (b = { ...a }) : b);
+      const near = NEAR_FX[`${a.type}:${a.fx}`];
+      if (near) {
+        say('effect', 'An effect becomes the nearest of PowerPoint’s', { el: a.el, from: a.fx, to: near.fx });
+        edit().fx = near.fx;
+        if (ANIM_DIR.includes(near.fx)) b.dir = near.dir ?? 'left';
+        else delete b.dir;
+      }
+      if (a.on === 'tap') {
+        say('tap', 'An effect that runs when a part is clicked runs on the next click instead', { el: a.el });
+        edit().on = 'click';
+        delete b.trigger;
+      }
+      if (a.loop) {
+        say('loop', 'An effect that keeps going plays once', { el: a.el, from: a.fx });
+        delete edit().loop;
+      }
+      if (a.by) {
+        say('by', 'Words or letters that come one by one come in together', { el: a.el, from: a.by });
+        delete edit().by;
+      }
+      if (a.ease) {
+        if (a.ease !== 'smooth') say('ease', 'An effect’s easing becomes PowerPoint’s own', { el: a.el, from: a.ease });
+        delete edit().ease;
+      }
+      return b;
+    });
+    let transition = s.transition;
+    const nearTr = transition ? NEAR_TR[transition.fx] : undefined;
+    if (transition && nearTr) {
+      say('transition', 'The transition becomes the nearest of PowerPoint’s', { from: transition.fx, to: nearTr });
+      transition = { ...transition, fx: nearTr };
+      if (nearTr !== 'push' && nearTr !== 'wipe' && nearTr !== 'cover') delete transition.dir;
+      else transition.dir ??= 'right';
+    }
+    const out: Slide = { ...s, els };
+    if (bg && Object.keys(bg).length) out.bg = bg;
+    else delete out.bg;
+    if (anims.length) out.anims = anims;
+    if (transition) out.transition = transition;
+    if (notes.length) out.notes = [s.notes, ...notes].filter(Boolean).join('\n\n').slice(0, SLIDE_LIMITS.notes);
+    return out;
+  });
+  if (d.progress) changes.push({ slide: 0, kind: 'progress', what: 'The progress bar is left out' });
+  const deck: Deck = { ...d, format: 'pptx', slides };
+  delete deck.progress;
+  return { deck, changes };
 }
 
 /**
  * What of a deck PowerPoint cannot keep as it is, slide by slide: the web format's parts, effects, transitions,
- * moving backgrounds, shining text, frosted glass, pointer effects and taps. For the editor's warning when a deck
- * is made PowerPoint-compatible, and the PowerPoint file's note. (Workstream C1 fills it in.)
+ * moving backgrounds and videos behind slides, shining text, frosted glass, pointer effects, taps and the progress
+ * bar, each with what it becomes. For the editor's warning when a deck is made PowerPoint compatible, and the
+ * PowerPoint file's note. None for a deck that has none of them (a PowerPoint compatible one).
  */
-export function richFeatures(_d: Deck): RichFeature[] {
-  return [];
+export function richFeatures(d: Deck): RichFeature[] {
+  return powerPointOf(d).changes;
 }
 
 /**
- * The deck with only what PowerPoint has: the web format's parts become pictures (their posters; the PowerPoint
- * export takes a picture of each where it can), its effects and transitions the nearest of PowerPoint's, the rest
- * left out; `format` becomes "pptx". (Workstream C1 fills it in.)
+ * The deck with only what PowerPoint has: the web format's live parts become pictures (their posters; the PowerPoint
+ * export takes a picture of each where it can, by the same id), a quiz its question and choices as text boxes (its
+ * answer in the speaker notes) and a score its words, its effects and transitions the nearest of PowerPoint's, a
+ * video behind a slide a video on it at the back, the rest left out; `format` becomes "pptx". Code stays: PowerPoint
+ * has it as coloured words.
  */
 export function toPowerPoint(d: Deck): Deck {
-  return { ...d, format: 'pptx' };
+  return powerPointOf(d).deck;
+}
+
+/** What changed to make a deck PowerPoint's (richFeatures), in a sentence: the PowerPoint file's note, or '' when nothing did. */
+export function powerPointNote(list: RichFeature[]): string {
+  if (!list.length) return '';
+  const n = (k: RichKind) => list.filter((f) => f.kind === k).length;
+  // "a quiz", "an effect", "3 effects".
+  const many = (count: number, one: string, more = `${one}s`) => (count === 1 ? `${/^[aeiou]/i.test(one) ? 'an' : 'a'} ${one}` : `${count} ${more}`);
+  const NAMES: Record<string, string> = { html: 'custom code', embed: 'a web page', scene3d: '3D', quiz: 'a quiz', score: 'a quiz score' };
+  const kinds = [...new Set(list.filter((f) => f.kind === 'part').map((f) => NAMES[f.from ?? ''] ?? f.from ?? ''))].filter(Boolean);
+  const out: string[] = [];
+  if (n('part')) out.push(`${many(n('part'), 'part')} became ${n('part') === 1 ? 'a picture or text boxes' : 'pictures or text boxes'} (${kinds.join(', ')})`);
+  const near = [n('effect') ? many(n('effect'), 'effect') : '', n('transition') ? many(n('transition'), 'transition') : ''].filter(Boolean);
+  if (near.length) out.push(`${near.join(' and ')} became the nearest of PowerPoint's own`);
+  if (n('tap')) out.push(`${many(n('tap'), 'effect')} that ran on a click on a part now run${n('tap') === 1 ? 's' : ''} on the next click`);
+  if (n('bgVideo')) out.push(n('bgVideo') === 1 ? 'a video behind a slide became a video at its back' : `${n('bgVideo')} videos behind slides became videos at their backs`);
+  const left = [
+    n('bgFx') ? many(n('bgFx'), 'moving background') : '',
+    n('textFx') ? many(n('textFx'), 'text effect') : '',
+    n('glass') ? `frosted glass on ${many(n('glass'), 'part')}` : '',
+    n('hover') ? many(n('hover'), 'pointer effect') : '',
+    n('loop') ? `the repeats of ${many(n('loop'), 'effect')}` : '',
+    n('by') ? `words or letters one by one in ${many(n('by'), 'effect')}` : '',
+    n('ease') ? `the easing of ${many(n('ease'), 'effect')}` : '',
+    n('progress') ? 'the progress bar' : '',
+  ].filter(Boolean);
+  if (left.length) out.push(`left out: ${left.join(', ')}`);
+  return `Made for PowerPoint: ${out.join('; ')}.`;
 }

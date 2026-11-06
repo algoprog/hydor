@@ -77,6 +77,8 @@ export interface MakeImageAsk {
   refs?: string[];
   /** Another OpenRouter model than the tier's. */
   model?: string;
+  /** Colours to keep to (#hex), such as the deck's theme: they go into what the model is asked. */
+  colors?: string[];
 }
 export interface MakeImageAnswer {
   pictures: MadePicture[];
@@ -86,6 +88,8 @@ export interface MakeImageAnswer {
   cost?: number;
   /** What the model said with its pictures, if anything. */
   text?: string;
+  /** The see-through background was made by taking the background out on this computer (the picture tools). */
+  cutout?: boolean;
 }
 
 /** POST /api/images/edit: a picture changed as the words say; with a mask, only where it is white. */
@@ -156,6 +160,12 @@ export interface TierModel {
   id: string;
   label: string;
   perImage?: number;
+  /**
+   * What makes this tier's pictures with a see-through background: the tier's own model when it can, another model
+   * that can, or (`cutout`) the tier's own model on a plain background, its background then taken out on this
+   * computer. Not set: nothing here can make one now.
+   */
+  seeThrough?: { id: string; label: string; perImage?: number; cutout?: boolean };
 }
 
 /** The picture tools on this computer: free and private (background removal, erasing, plots), set up once. */
