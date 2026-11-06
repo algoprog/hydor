@@ -1915,6 +1915,7 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
 
   // ---- a part --------------------------------------------------------------------------------------------------
   const part = (deck: Deck, s: Slide, e: El, o: DrawOpts = {}): HTMLElement => {
+    if (s?.theme && typeof s.theme === 'object' && deck.theme !== s.theme) deck = { ...deck, theme: s.theme };
     const t = deck.theme;
     const d = el('div', 'ns-el');
     d.dataset.id = e.id;
@@ -2420,6 +2421,8 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
   const slide = (deck: Deck, i: number, o: DrawOpts = {}): HTMLElement => {
     if (o.hint) hintOf = o.hint;
     const s = deck.slides[i];
+    // A slide with a theme of its own (from another deck, keeping its look) is drawn in it.
+    if (s?.theme && typeof s.theme === 'object') deck = { ...deck, theme: s.theme };
     const root = el('div', 'ns-slide');
     // A deck's words are its own: never translated with the app's.
     root.setAttribute('translate', 'no');

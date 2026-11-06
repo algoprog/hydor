@@ -621,6 +621,8 @@ export interface Slide {
   nofooter?: boolean;
   /** Comments on the slide or on parts of it (shown only in the editor, never in the slideshow). */
   comments?: SlideComment[];
+  /** A theme of its own, in place of the deck's (a slide taken from another deck keeping its look, as PowerPoint keeps its master). */
+  theme?: Theme;
 }
 
 /** A comment on a slide: on one of its parts (`el`), or on the slide itself, its mark at `x`, `y` (the slide's pixels). */
@@ -2316,6 +2318,7 @@ function slide(v: unknown, used: Set<string>, ratio: Ratio, o: NormalizeOpts, ci
   if (v.nofooter === true) s.nofooter = true;
   const comments = slideComments(v.comments, new Set(everyEl(els).map((e) => e.id)), H, cids);
   if (comments.length) s.comments = comments;
+  if (isObj(v.theme)) s.theme = theme(v.theme, THEMES[0]);
   return reconnect(s);
 }
 
@@ -2525,6 +2528,7 @@ export const CODE_FONT = 'JetBrains Mono';
 /** The fonts a deck uses: its theme's and its parts' (code's own). */
 export function deckFonts(d: Deck): string[] {
   const names = new Set<string>([d.theme.font, d.theme.headFont]);
+  for (const s of d.slides) if (s.theme) names.add(s.theme.font).add(s.theme.headFont);
   for (const s of d.slides)
     for (const e of everyEl(s.els)) {
       if (e.type === 'code') names.add(CODE_FONT);

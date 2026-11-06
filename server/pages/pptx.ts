@@ -1584,7 +1584,8 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
     rels.add('slideLayout', `../slideLayouts/slideLayout${Math.max(0, LAYOUTS.findIndex((l) => l.id === (s.layout ?? 'blank'))) + 1}.xml`);
     const c: Ctx = {
       deck,
-      t,
+      // A slide with a theme of its own (from another deck, keeping its look) has its parts in its colours and fonts.
+      t: s.theme ?? t,
       o,
       rels,
       media: {
