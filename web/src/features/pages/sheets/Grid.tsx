@@ -16,6 +16,8 @@ import { accountingParts, borderOf, CELL_FONTS, codeColor, colName, formatValue,
 import { allowed, isTicked, listOptions, type CondFormats, type Merges, type Rules } from '@shared/sheet-rules';
 import { cx } from '../../../components/ui';
 import { colW, indexAt, offsets, rectOf, rowH, type Sel } from './ops';
+import { asksAi, type AiState } from './ai';
+import { AiMark, aiLabel, CellImage, LinkCard, Sparkline } from './CellExtras';
 
 export const HEAD_H = 24;
 export const NUM_W = 46;
@@ -127,6 +129,9 @@ interface Props {
   onExpand: (r: number) => void;
   /** A comment's card clicked: its thread opens, to read and answer. */
   onComment?: (r: number, c: number) => void;
+  /** What an AI cell of this sheet without its answer shows (by its name), and a cell's link opened. */
+  ai?: (cell: string) => AiState | null;
+  onOpenLink?: (url: string) => void;
 }
 
 // ---- measuring words ----------------------------------------------------------------------------------------------
@@ -681,7 +686,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   // ---- drawing --------------------------------------------------------------------------------------------------------
   const allRows = useMemo(() => ({ r1: 0, r2: fr - 1 }), [fr]);
   const allCols = useMemo(() => ({ c1: 0, c2: fc - 1 }), [fc]);
-  const common = { sheet, si, calc, rev, fc, place, colOff, rowOff, view: gv, z, formulas: !!p.formulas };
+  const common = { sheet, si, calc, rev, fc, place, colOff, rowOff, view: gv, z, formulas: !!p.formulas, ai: p.ai };
   const cellsBody = <Cells {...common} rows={stableRange} cols={stableRange} region="body" />;
   const cellsTop = fr > 0 && <Cells {...common} rows={allRows} cols={stableRange} region="top" />;
   const cellsLeft = fc > 0 && <Cells {...common} rows={stableRange} cols={allCols} region="left" />;
@@ -880,6 +885,8 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
 
   /** The grid's lines in a band, at the right and bottom edge of each column and row in view. */
   const gridLines = (region: Region) => {
+    // View → Gridlines off: none drawn.
+    if (sheet.noGrid) return null;
     const rs = region === 'corner' || region === 'top' ? allRows : stableRange;
     const cs = region === 'corner' || region === 'left' ? allCols : stableRange;
     const out = [];
@@ -945,6 +952,13 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     );
   }
 
+  // A link's card under the active cell (HYPERLINK, Insert → Link), while nothing is typed.
+  const link = !edit && p.onOpenLink ? calc.special(si, am.r1, am.c1) : null;
+  const linkCard =
+    link?.kind === 'link' ? (
+      <LinkCard url={link.url} left={NW + colOff[am.c1] + (am.c1 < fc ? view.left : 0)} top={HH + rowOff[am.r2 + 1] + (am.r1 < fr ? view.top : 0) + 4} onOpen={(u) => p.onOpenLink?.(u)} />
+    ) : null;
+
   return (
     <div
       ref={scroller}
@@ -1009,6 +1023,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
           )}
         </div>
         {noteCard}
+        {!noteCard && linkCard}
         {box}
       </div>
     </div>
@@ -1035,13 +1050,16 @@ interface CellsProps {
   view: GridView;
   z: number;
   formulas: boolean;
+  ai?: (cell: string) => AiState | null;
 }
 
 /**
  * The cells of a band in view: filled ones, those its rules draw on (checkboxes, stars, conditional looks) and merged
  * ones; words run on over empty cells to their right, as in a spreadsheet.
  */
-const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, place, colOff, rowOff, view: gv, z, formulas }: CellsProps) {
+const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, place, colOff, rowOff, view: gv, z, formulas, ai }: CellsProps) {
+  // View → Gridlines off: cells draw no lines of their own either.
+  const line = sheet.noGrid ? 'border-transparent' : 'border-line';
   const out: React.ReactNode[] = [];
   const lines: React.ReactNode[] = [];
   // Each list's options once per drawing (a list from a range reads its cells).
@@ -1156,6 +1174,22 @@ const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, pla
       );
       text = '';
     }
+    // An AI cell: its mark, and in place of #BUSY! what it waits for. A link's words in a link's colour; a picture; a sparkline.
+    const isAi = !ghost && !formulas && asksAi(cell.f);
+    let title: string | undefined;
+    if (isAi && isError(v) && v.code === '#BUSY!') {
+      const st = ai?.(k);
+      const lab = aiLabel(st ?? { state: 'waiting' });
+      text = lab.text;
+      look.cls = lab.cls;
+      title = lab.title;
+    }
+    const extra = !ghost && !formulas && (cell.link || (cell.f && /HYPERLINK|IMAGE|SPARKLINE/i.test(cell.f))) ? calc.special(si, r, c) : null;
+    if (extra?.kind === 'link' && !cell.s?.color) {
+      style.color = 'var(--link, #3b82f6)';
+      style.textDecoration = 'underline';
+    } else if (extra?.kind === 'image') content = <CellImage spec={extra} />;
+    else if (extra?.kind === 'spark') content = <Sparkline spec={extra} w={Math.max(0, (colOff[(m ? m.c2 : c) + 1] - colOff[c]) - 4)} h={Math.max(0, rowOff[(m ? m.r2 : r) + 1] - rowOff[r] - 4)} />;
     // Words that do not fit: numbers become ###, words run on over empty cells to the right.
     if (!content && text && !cell.s?.wrap && !cell.s?.rot && !m) {
       const need = textWidth(text, cell.s) * z + 9;
@@ -1177,7 +1211,7 @@ const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, pla
       rule.rule.type !== 'checkbox' &&
       (rule.rule.type === 'list' ? !!look.text.trim() && !optionsOf(rule.rule).some((o) => o.v.toLowerCase() === look.text.trim().toLowerCase()) : !allowed(calc, si, rule.rule, v, look.text, { r, c, r0: rule.r0, c0: rule.c0 }));
     out.push(
-      <div key={`${r}:${c}`} translate="no" className={cx('absolute flex overflow-hidden border-r border-b border-line px-[4px] whitespace-nowrap', look.cls, !style.background && 'bg-bg')} style={{ left: pos.left, top: pos.top, width: w, height: h, ...style }}>
+      <div key={`${r}:${c}`} translate="no" title={title} className={cx('absolute flex overflow-hidden border-r border-b px-[4px] whitespace-nowrap', line, look.cls, !style.background && 'bg-bg', extra && extra.kind !== 'link' && 'items-center justify-center px-[2px]')} style={{ left: pos.left, top: pos.top, width: w, height: h, ...style }}>
         {cfLook?.bar && <span className="pointer-events-none absolute top-[3px] bottom-[3px] rounded-sm opacity-60" style={{ left: `${cfLook.bar.from * 100}%`, width: `${(cfLook.bar.to - cfLook.bar.from) * 100}%`, background: cfLook.bar.color }} />}
         {look.sign && <span className="relative mr-auto pr-1">{look.sign}</span>}
         {content ?? (
@@ -1189,6 +1223,7 @@ const Cells = memo(function Cells({ sheet, si, calc, rows, cols, fc, region, pla
         {open.has(k) && <span className="pointer-events-none absolute top-0 right-0 border-t-[9px] border-l-[9px] border-t-[#a142f4] border-l-transparent" />}
         {cell.note && <span className="pointer-events-none absolute top-0 right-0 border-t-[7px] border-l-[7px] border-t-[#e37400] border-l-transparent" />}
         {invalid && <span className="pointer-events-none absolute top-0 left-0 border-t-[7px] border-r-[7px] border-t-err border-r-transparent" title="This value is not one its rule allows" />}
+        {isAi && <AiMark z={z} />}
       </div>,
     );
     // Borders: drawn on the grid's lines, each side as the style says.
