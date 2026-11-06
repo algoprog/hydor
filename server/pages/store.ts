@@ -354,10 +354,11 @@ export function addVersion(
   const now = Date.now();
   let folded: number | null = null;
   db.transaction(() => {
-    const last = db.prepare('select version, by, turn, created_at, steps from page_versions where page_id = ? order by version desc limit 1').get(id) as
-      | { version: number; by: PageVersion['by']; turn: string | null; created_at: number; steps: number | null }
+    const last = db.prepare('select version, by, turn, created_at, steps, name from page_versions where page_id = ? order by version desc limit 1').get(id) as
+      | { version: number; by: PageVersion['by']; turn: string | null; created_at: number; steps: number | null; name: string | null }
       | undefined;
-    const fold = !!last && p.by === 'agent' && !!p.turn && last.by === 'agent' && last.turn === p.turn && last.version === cur.version && now - last.created_at <= FOLD_MS;
+    // A version the user named is never folded into the next.
+    const fold = !!last && !last.name && p.by === 'agent' && !!p.turn && last.by === 'agent' && last.turn === p.turn && last.version === cur.version && now - last.created_at <= FOLD_MS;
     const next = ((db.prepare('select max(version) as v from page_versions where page_id = ?').get(id) as { v: number | null }).v ?? 0) + 1;
     db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by, turn, steps, who) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
       id,

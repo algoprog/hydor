@@ -67,7 +67,13 @@ export function splitBib(text: string): BibBlock[] {
     const body = text.slice(at, end);
     if (kind === 'string' || kind === 'preamble' || kind === 'comment') out.push({ kind, text: body, lead });
     else {
-      const e = parseBibEntry(body);
+      let e = parseBibEntry(body);
+      // A key BibTeX trips on (a space in it) is read all the same, for Tidy to fix.
+      const k = e ? null : /^(@\s*[A-Za-z]+\s*[{(]\s*)([^,{}()]*?)(\s*,)/.exec(body);
+      if (k) {
+        const got = parseBibEntry(`${k[1]}x${body.slice(k[1].length + k[2].length)}`);
+        if (got) e = { ...got, key: k[2].trim() };
+      }
       out.push(e ? { kind: 'entry', text: body, lead, entry: e } : { kind: 'comment', text: body, lead });
     }
     lead = '';
@@ -205,6 +211,22 @@ export function tidyBib(text: string, cited: { keys: Set<string>; all: boolean }
     }
   }
 
+  // Citations whose key differs from its entry's only in capitals.
+  if (o.keys && cited) {
+    const exact = new Set(entries().map((x) => x.e!.key));
+    const lower = new Map(entries().map((x) => [x.e!.key.toLowerCase(), x.e!.key]));
+    for (const k of cited.keys) {
+      if (exact.has(k) || renames[k]) continue;
+      const to = lower.get(k.toLowerCase());
+      if (to) {
+        renames[k] = to;
+        changes.push({ kind: 'cite', key: to, what: `\\cite{${k}} → \\cite{${to}}: the entry's key is written ${to}.` });
+      }
+    }
+  }
+  /** Whether the document cites an entry's key (as the citations will be once changed). */
+  const isCited = (key: string) => !!cited && [...cited.keys].some((k) => (renames[k] ?? k) === key);
+
   // Duplicates: the same DOI, or the same title and year.
   if (o.duplicates) {
     const byDoi = new Map<string, Item>();
@@ -224,7 +246,7 @@ export function tidyBib(text: string, cited: { keys: Set<string>; all: boolean }
       // The one cited is kept when only the later one is.
       let keep = first;
       let drop = x;
-      if (cited && !cited.keys.has(first.e!.key) && cited.keys.has(e.key)) {
+      if (!isCited(first.e!.key) && isCited(e.key)) {
         keep = x;
         drop = first;
         if (doi) byDoi.set(doi, x);
@@ -241,20 +263,6 @@ export function tidyBib(text: string, cited: { keys: Set<string>; all: boolean }
         key: keep.e!.key,
         what: `${drop.e!.key} and ${keep.e!.key} are the same paper (${doi && doiOf(drop.e!) === doiOf(keep.e!) ? 'the same DOI' : 'the same title and year'}): kept ${keep.e!.key}${merged.added.length ? `, with ${merged.added.join(', ')} from the other` : ''}; citations of ${drop.e!.key} cite it now.`,
       });
-    }
-  }
-
-  // Citations whose key differs from its entry's only in capitals.
-  if (o.keys && cited) {
-    const exact = new Set(entries().map((x) => x.e!.key));
-    const lower = new Map(entries().map((x) => [x.e!.key.toLowerCase(), x.e!.key]));
-    for (const k of cited.keys) {
-      if (exact.has(k) || renames[k]) continue;
-      const to = lower.get(k.toLowerCase());
-      if (to) {
-        renames[k] = to;
-        changes.push({ kind: 'cite', key: to, what: `\\cite{${k}} → \\cite{${to}}: the entry's key is written ${to}.` });
-      }
     }
   }
 
