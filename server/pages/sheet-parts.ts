@@ -50,8 +50,9 @@ import {
   type SheetFilter,
   type Validation,
   type Workbook,
+  type ChartSeriesOpts,
 } from '../../shared/sheets.ts';
-import { chartData, CHART_COLORS, type ChartData } from '../../shared/sheet-chart.ts';
+import { chartData, CHART_COLORS, histogramOf, seriesAxis, seriesType, type ChartData } from '../../shared/sheet-chart.ts';
 import { newCommentId } from '../../shared/comments.ts';
 import { columnValues } from '../../shared/sheet-rules.ts';
 import { all, att, kid, kids, parseXml, textOf, type El } from '../documents/xml.ts';
@@ -902,46 +903,86 @@ export function chartXml(book: Workbook, chart: SheetChart, data: ChartData | nu
   const val = (s: ChartData['series'][number], tag = 'val') => `<c:${tag}><c:numRef><c:f>${ref(s.ref)}</c:f>${numCache(s.values)}</c:numRef></c:${tag}>`;
   const solid = (hex: string) => `<c:spPr><a:solidFill><a:srgbClr val="${hex}"/></a:solidFill></c:spPr>`;
   const axes = '<c:axId val="50010001"/><c:axId val="50010002"/>';
-  const grouping = chart.stacked ? 'stacked' : 'standard';
+  const axes2 = '<c:axId val="50010003"/><c:axId val="50010004"/>';
+  // The values on the points, and a series' trendline (dashed, in its colour).
+  const dLbls = chart.values ? '<c:dLbls><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>' : '';
+  const trendXml = (i: number) => {
+    const t = chart.series?.[i]?.trend;
+    return t ? `<c:trendline><c:spPr><a:ln w="19050" cap="rnd"><a:solidFill><a:srgbClr val="${colorOf(i)}"/></a:solidFill><a:prstDash val="dash"/></a:ln></c:spPr><c:trendlineType val="${t === 'exp' ? 'exp' : 'linear'}"/><c:dispRSqr val="0"/><c:dispEq val="0"/></c:trendline>` : '';
+  };
+  const lineSpPr = (i: number) => `<c:spPr><a:ln w="28575" cap="rnd"><a:solidFill><a:srgbClr val="${colorOf(i)}"/></a:solidFill><a:round/></a:ln></c:spPr><c:marker><c:symbol val="circle"/><c:size val="5"/>${solid(colorOf(i))}</c:marker>`;
+  const grouping = chart.percent ? 'percentStacked' : chart.stacked ? 'stacked' : 'standard';
   let plot = '';
+  let second = false;
   if (pie) {
     const s = series[0];
     const pts = labels.map((_, i) => `<c:dPt><c:idx val="${i}"/><c:bubble3D val="0"/>${solid(colorOf(i))}</c:dPt>`).join('');
-    const ser = s ? `<c:ser><c:idx val="0"/><c:order val="0"/>${serTx(s)}${pts}${cat}${val(s)}</c:ser>` : '';
+    const ser = s ? `<c:ser><c:idx val="0"/><c:order val="0"/>${serTx(s)}${pts}${dLbls}${cat}${val(s)}</c:ser>` : '';
     plot = chart.kind === 'pie' ? `<c:pieChart><c:varyColors val="1"/>${ser}<c:firstSliceAng val="0"/></c:pieChart>` : `<c:doughnutChart><c:varyColors val="1"/>${ser}<c:firstSliceAng val="0"/><c:holeSize val="55"/></c:doughnutChart>`;
-  } else if (chart.kind === 'column' || chart.kind === 'bar') {
-    const sers = series.map((s, i) => `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>${serTx(s)}${solid(colorOf(i))}<c:invertIfNegative val="0"/>${cat}${val(s)}</c:ser>`).join('');
-    plot = `<c:barChart><c:barDir val="${chart.kind === 'bar' ? 'bar' : 'col'}"/><c:grouping val="${chart.stacked ? 'stacked' : 'clustered'}"/><c:varyColors val="0"/>${sers}<c:gapWidth val="60"/>${chart.stacked ? '<c:overlap val="100"/>' : ''}${axes}</c:barChart>`;
-  } else if (chart.kind === 'line') {
+  } else if (chart.kind === 'radar') {
+    const sers = series.map((s, i) => `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>${serTx(s)}${lineSpPr(i)}${dLbls}${cat}${val(s)}</c:ser>`).join('');
+    plot = `<c:radarChart><c:radarStyle val="marker"/><c:varyColors val="0"/>${sers}${axes}</c:radarChart>`;
+  } else if (chart.kind === 'bubble') {
+    // Each pair of series a height and a size.
     const sers = series
-      .map(
-        (s, i) =>
-          `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>${serTx(s)}<c:spPr><a:ln w="28575" cap="rnd"><a:solidFill><a:srgbClr val="${colorOf(i)}"/></a:solidFill><a:round/></a:ln></c:spPr><c:marker><c:symbol val="circle"/><c:size val="5"/>${solid(colorOf(i))}</c:marker>${cat}${val(s)}<c:smooth val="0"/></c:ser>`,
-      )
+      .flatMap((s, i) => {
+        if (i % 2) return [];
+        const z = series[i + 1];
+        const k = i / 2;
+        return [`<c:ser><c:idx val="${k}"/><c:order val="${k}"/>${serTx(s)}${solid(colorOf(k))}<c:invertIfNegative val="0"/>${dLbls}${xVal}${val(s, 'yVal')}${z ? val(z, 'bubbleSize') : `<c:bubbleSize><c:numLit><c:ptCount val="${s.values.length}"/>${s.values.map((_, j) => `<c:pt idx="${j}"><c:v>1</c:v></c:pt>`).join('')}</c:numLit></c:bubbleSize>`}<c:bubble3D val="0"/></c:ser>`];
+      })
       .join('');
-    plot = `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${sers}<c:marker val="1"/>${axes}</c:lineChart>`;
-  } else if (chart.kind === 'area') {
+    plot = `<c:bubbleChart><c:varyColors val="0"/>${sers}<c:bubbleScale val="100"/><c:showNegBubbles val="0"/>${axes}</c:bubbleChart>`;
+  } else if (chart.kind === 'scatter') {
     const sers = series
-      .map((s, i) => `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>${serTx(s)}<c:spPr><a:solidFill><a:srgbClr val="${colorOf(i)}"><a:alpha val="${chart.stacked ? 85000 : 40000}"/></a:srgbClr></a:solidFill></c:spPr>${cat}${val(s)}</c:ser>`)
-      .join('');
-    plot = `<c:areaChart><c:grouping val="${grouping}"/><c:varyColors val="0"/>${sers}${axes}</c:areaChart>`;
-  } else {
-    const sers = series
-      .map(
-        (s, i) =>
-          `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>${serTx(s)}<c:spPr><a:ln w="19050"><a:noFill/></a:ln></c:spPr><c:marker><c:symbol val="circle"/><c:size val="6"/>${solid(colorOf(i))}</c:marker>${xVal}${val(s, 'yVal')}<c:smooth val="0"/></c:ser>`,
-      )
+      .map((s, i) => `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>${serTx(s)}<c:spPr><a:ln w="19050"><a:noFill/></a:ln></c:spPr><c:marker><c:symbol val="circle"/><c:size val="6"/>${solid(colorOf(i))}</c:marker>${dLbls}${trendXml(i)}${xVal}${val(s, 'yVal')}<c:smooth val="0"/></c:ser>`)
       .join('');
     plot = `<c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/>${sers}${axes}</c:scatterChart>`;
+  } else if (chart.kind === 'histogram') {
+    // A histogram: its bins as an Excel column chart without gaps (their counts are worked out here, as words and numbers in the chart).
+    const s = series[0];
+    const hgm = histogramOf(s?.values ?? [], chart.bins);
+    const lit = `<c:cat><c:strLit><c:ptCount val="${hgm.labels.length}"/>${hgm.labels.map((l, i) => `<c:pt idx="${i}"><c:v>${esc(l)}</c:v></c:pt>`).join('')}</c:strLit></c:cat><c:val><c:numLit><c:formatCode>General</c:formatCode><c:ptCount val="${hgm.counts.length}"/>${hgm.counts.map((n, i) => `<c:pt idx="${i}"><c:v>${n}</c:v></c:pt>`).join('')}</c:numLit></c:val>`;
+    const ser = s ? `<c:ser><c:idx val="0"/><c:order val="0"/>${serTx(s)}${solid(colorOf(0))}<c:invertIfNegative val="0"/>${dLbls}${lit}</c:ser>` : '';
+    plot = `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${ser}<c:gapWidth val="0"/>${axes}</c:barChart>`;
+  } else {
+    // Columns, bars, lines and areas, and combos of them: a chart group for each way and axis (the second at the right).
+    const groups = new Map<string, string[]>();
+    series.forEach((s, i) => {
+      const type = seriesType(chart, i);
+      const axis = seriesAxis(chart, i);
+      const key = `${type}:${axis}`;
+      const xml =
+        type === 'column'
+          ? `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>${serTx(s)}${solid(colorOf(i))}<c:invertIfNegative val="0"/>${dLbls}${trendXml(i)}${cat}${val(s)}</c:ser>`
+          : type === 'line'
+            ? `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>${serTx(s)}${lineSpPr(i)}${dLbls}${trendXml(i)}${cat}${val(s)}<c:smooth val="0"/></c:ser>`
+            : `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>${serTx(s)}<c:spPr><a:solidFill><a:srgbClr val="${colorOf(i)}"><a:alpha val="${chart.stacked ? 85000 : 40000}"/></a:srgbClr></a:solidFill></c:spPr>${dLbls}${trendXml(i)}${cat}${val(s)}</c:ser>`;
+      groups.set(key, [...(groups.get(key) ?? []), xml]);
+    });
+    for (const [key, sers] of groups) {
+      const [type, axis] = key.split(':');
+      const ax = axis === '2' ? axes2 : axes;
+      if (axis === '2') second = true;
+      if (type === 'column')
+        plot += `<c:barChart><c:barDir val="${chart.kind === 'bar' ? 'bar' : 'col'}"/><c:grouping val="${chart.percent ? 'percentStacked' : chart.stacked ? 'stacked' : 'clustered'}"/><c:varyColors val="0"/>${sers.join('')}<c:gapWidth val="60"/>${chart.stacked ? '<c:overlap val="100"/>' : ''}${ax}</c:barChart>`;
+      else if (type === 'line') plot += `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${sers.join('')}<c:marker val="1"/>${ax}</c:lineChart>`;
+      else plot += `<c:areaChart><c:grouping val="${grouping}"/><c:varyColors val="0"/>${sers.join('')}${ax}</c:areaChart>`;
+    }
   }
   if (!pie) {
     const horiz = chart.kind === 'bar';
+    const xy = chart.kind === 'scatter' || chart.kind === 'bubble';
     const grid = '<c:majorGridlines><c:spPr><a:ln w="9525"><a:solidFill><a:srgbClr val="D9D9D9"/></a:solidFill></a:ln></c:spPr></c:majorGridlines>';
-    const first =
-      chart.kind === 'scatter'
-        ? `<c:valAx><c:axId val="50010001"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/>${titleOf(chart.xTitle, 10)}<c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>${tx(9)}<c:crossAx val="50010002"/><c:crosses val="autoZero"/><c:crossBetween val="midCat"/></c:valAx>`
-        : `<c:catAx><c:axId val="50010001"/><c:scaling><c:orientation val="${horiz ? 'maxMin' : 'minMax'}"/></c:scaling><c:delete val="0"/><c:axPos val="${horiz ? 'l' : 'b'}"/>${titleOf(chart.xTitle, 10)}<c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="low"/>${tx(9)}<c:crossAx val="50010002"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`;
-    plot += `${first}<c:valAx><c:axId val="50010002"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${horiz ? 'b' : 'l'}"/>${grid}${titleOf(chart.yTitle, 10)}<c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>${tx(9)}<c:crossAx val="50010001"/><c:crosses val="${horiz ? 'max' : 'autoZero'}"/><c:crossBetween val="${chart.kind === 'scatter' ? 'midCat' : 'between'}"/></c:valAx>`;
+    // The value axis's own lowest and highest.
+    const scaling = `<c:scaling><c:orientation val="minMax"/>${chart.max !== undefined ? `<c:max val="${xnum(chart.max)}"/>` : ''}${chart.min !== undefined ? `<c:min val="${xnum(chart.min)}"/>` : ''}</c:scaling>`;
+    const first = xy
+      ? `<c:valAx><c:axId val="50010001"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/>${titleOf(chart.xTitle, 10)}<c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>${tx(9)}<c:crossAx val="50010002"/><c:crosses val="autoZero"/><c:crossBetween val="midCat"/></c:valAx>`
+      : `<c:catAx><c:axId val="50010001"/><c:scaling><c:orientation val="${horiz ? 'maxMin' : 'minMax'}"/></c:scaling><c:delete val="0"/><c:axPos val="${horiz ? 'l' : 'b'}"/>${titleOf(chart.xTitle, 10)}<c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="low"/>${tx(9)}<c:crossAx val="50010002"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`;
+    plot += `${first}<c:valAx><c:axId val="50010002"/>${scaling}<c:delete val="0"/><c:axPos val="${horiz ? 'b' : 'l'}"/>${grid}${titleOf(chart.yTitle, 10)}<c:numFmt formatCode="${chart.percent ? '0%' : 'General'}" sourceLinked="${chart.percent ? 0 : 1}"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>${tx(9)}<c:crossAx val="50010001"/><c:crosses val="${horiz ? 'max' : 'autoZero'}"/><c:crossBetween val="${xy ? 'midCat' : 'between'}"/></c:valAx>`;
+    // The second axis: at the right, crossing at the end of a category axis of its own that is not shown.
+    if (second)
+      plot += `<c:catAx><c:axId val="50010003"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="1"/><c:axPos val="b"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="50010004"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx><c:valAx><c:axId val="50010004"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="r"/><c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>${tx(9)}<c:crossAx val="50010003"/><c:crosses val="max"/><c:crossBetween val="between"/></c:valAx>`;
   }
   const legendAt = chart.legend ?? (pie || series.length > 1 ? 'bottom' : 'none');
   const legend = legendAt === 'none' ? '' : `<c:legend><c:legendPos val="${legendAt === 'right' ? 'r' : legendAt === 'top' ? 't' : 'b'}"/><c:overlay val="0"/>${tx(9)}</c:legend>`;
@@ -1018,10 +1059,18 @@ function chartFrom(xml: string, sheetName: string): Omit<SheetChart, 'id' | 'fro
     ['doughnutChart', 'doughnut'],
     ['scatterChart', 'scatter'],
   ];
-  const found = kinds.map(([n, k]) => [kid(plotArea, n), k] as const).find(([el]) => !!el);
-  if (!found) return null;
-  const [plot, k0] = found;
-  const kind: SheetChartKind = k0 === 'column' && att(kid(plot!, 'barDir'), 'val') === 'bar' ? 'bar' : k0;
+  // Each chart group (a combo has a group of columns and one of lines; a second axis, groups of its own).
+  const groupsAll = kinds.flatMap(([n, k]) => kids(plotArea, n).map((el) => [el, k] as const));
+  const special = kid(plotArea, 'radarChart') ? (['radar', kid(plotArea, 'radarChart')!] as const) : kid(plotArea, 'bubbleChart') ? (['bubble', kid(plotArea, 'bubbleChart')!] as const) : null;
+  if (!groupsAll.length && !special) return null;
+  const [plot, k0] = special ? [special[1], special[0] as SheetChartKind] : groupsAll[0];
+  const types = new Set(groupsAll.map(([, k]) => k));
+  const combo = !special && types.size > 1 && [...types].every((k) => k === 'column' || k === 'line' || k === 'area');
+  const kind: SheetChartKind = combo ? 'combo' : k0 === 'column' && att(kid(plot!, 'barDir'), 'val') === 'bar' ? 'bar' : k0;
+  // The value axes: the second is one that crosses at the far end.
+  const valAxes = kids(plotArea, 'valAx');
+  const secondAx = valAxes.find((ax) => att(kid(ax, 'crosses'), 'val') === 'max' && ['r', 't'].includes(att(kid(ax, 'axPos'), 'val') ?? ''));
+  const secondId = secondAx ? att(kid(secondAx, 'axId'), 'val') : undefined;
   // The cells its series use, on one sheet.
   const refs: { sheet?: string; x: Rect; what: 'name' | 'cat' | 'val' }[] = [];
   const add = (el: El | undefined, what: 'name' | 'cat' | 'val') => {
@@ -1031,12 +1080,25 @@ function chartFrom(xml: string, sheetName: string): Omit<SheetChart, 'id' | 'fro
     const x = parseRange((m ? m[3] : f).replace(/\$/g, ''));
     if (x) refs.push({ sheet: m ? (m[1] ?? m[2]).replace(/''/g, "'") : undefined, x, what });
   };
-  const sers = kids(plot!, 'ser');
+  // Every series, of every group, in their order, with its own way: columns or a line, the second axis, a trendline.
+  const groupsOf = special ? [[plot!, k0] as const] : groupsAll;
+  const sers = groupsOf.flatMap(([g, k]) => kids(g, 'ser').map((s) => ({ s, k, axis2: !!secondId && kids(g, 'axId').some((a) => att(a, 'val') === secondId) })));
+  sers.sort((x, y) => Number(att(kid(x.s, 'order'), 'val') ?? 0) - Number(att(kid(y.s, 'order'), 'val') ?? 0));
   const colors: string[] = [];
-  for (const s of sers) {
+  const opts: ChartSeriesOpts[] = [];
+  let values = false;
+  for (const { s, k, axis2 } of sers) {
     add(kid(s, 'tx'), 'name');
     add(kid(s, 'cat') ?? kid(s, 'xVal'), 'cat');
     add(kid(s, 'val') ?? kid(s, 'yVal'), 'val');
+    if (kind === 'bubble') add(kid(s, 'bubbleSize'), 'val');
+    const o: ChartSeriesOpts = {};
+    if (combo && (k === 'line' || k === 'column')) o.type = k;
+    if (axis2) o.axis = 2;
+    const tt = att(kid(kid(s, 'trendline'), 'trendlineType'), 'val');
+    if (tt) o.trend = tt === 'exp' ? 'exp' : 'linear';
+    opts.push(o);
+    if (att(kid(kid(s, 'dLbls'), 'showVal'), 'val') === '1') values = true;
     // Its colour: its own fill or line's, else its markers' (a scatter's points, drawn without a line).
     const rgb = att(all(kid(s, 'spPr'), 'srgbClr')[0] ?? all(kid(kid(s, 'marker'), 'spPr'), 'srgbClr')[0], 'val');
     if (rgb && /^[0-9a-f]{6}$/i.test(rgb)) colors.push(`#${rgb.toLowerCase()}`);
@@ -1092,6 +1154,15 @@ function chartFrom(xml: string, sheetName: string): Omit<SheetChart, 'id' | 'fro
   if (xt) out.xTitle = xt.slice(0, 200);
   if (yt) out.yTitle = yt.slice(0, 200);
   if (['stacked', 'percentStacked'].includes(att(kid(plot!, 'grouping'), 'val') ?? '')) out.stacked = true;
+  if (att(kid(plot!, 'grouping'), 'val') === 'percentStacked') out.percent = true;
+  if (values || att(kid(kid(plot!, 'dLbls'), 'showVal'), 'val') === '1') out.values = true;
+  if (opts.some((o) => Object.keys(o).length)) out.series = opts;
+  // The value axis's own lowest and highest.
+  const scale = kid(valAxes.find((ax) => ax !== secondAx), 'scaling');
+  const mx = Number(att(kid(scale, 'max'), 'val'));
+  const mn = Number(att(kid(scale, 'min'), 'val'));
+  if (kid(scale, 'max') && Number.isFinite(mx)) out.max = mx;
+  if (kid(scale, 'min') && Number.isFinite(mn)) out.min = mn;
   if (colors.length && kind !== 'pie' && kind !== 'doughnut' && colors.some((c, i) => c !== CHART_COLORS[i % CHART_COLORS.length])) out.colors = colors.slice(0, 12);
   return out;
 }

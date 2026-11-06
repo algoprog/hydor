@@ -2708,7 +2708,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
         )}
         {panel?.kind === 'protect' && <ProtectPanel list={sheet.protect ?? []} picked={selRange()} narrow={narrow} onChange={setProtect} onClose={() => setPanel(null)} />}
         {panel?.kind === 'clean' && <CleanPanel issues={issues} narrow={narrow} onFix={fixIssues} onShow={showIssue} onClose={() => setPanel(null)} />}
-        {panelChart && <ChartPanel key={panelChart.id} book={book} chart={panelChart} narrow={narrow} onChange={(c) => updateChart(c, `chart:${c.id}`)} onDelete={() => deleteChart(panelChart.id)} onClose={() => setPanel(null)} />}
+        {panelChart && <ChartPanel key={panelChart.id} book={book} calc={calc} si={sheetIx} chart={panelChart} narrow={narrow} onChange={(c) => updateChart(c, `chart:${c.id}`)} onDelete={() => deleteChart(panelChart.id)} onClose={() => setPanel(null)} />}
       </div>
       {!readOnly && (aiCells.waiting > 0 || aiCells.asking > 0) && (
         <div className="flex shrink-0 items-center gap-2 border-t border-line bg-panel px-3 py-1.5 text-[12.5px] text-fg-2">
