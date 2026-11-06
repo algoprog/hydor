@@ -35,6 +35,7 @@ import {
   piecesOf,
   readPicture,
   REDRAWN,
+  shortOfMemory,
   saveForAgent,
   savedLines,
   SCALED,
@@ -115,7 +116,12 @@ export async function erasePicture(db: DB, ask: EraseAsk, signal: AbortSignal | 
   const erasedHere = (why?: string) => here.erase(img, { mask }, { maxBytes: MAX_PNG, signal }).then((made) => keepMade(db, made, why));
   if (how === 'local') return erasedHere();
   const plan = planErase(await here.measure(img, { mask }, { signal }));
-  if (plan.way === 'local') return erasedHere();
+  if (plan.way === 'local')
+    return erasedHere().catch((e) => {
+      // Short of memory here: an image model instead.
+      if (shortOfMemory(e) && aiReady()) return ai(ERASE_PROMPT, 'This computer did not have the memory free for the eraser, so an image model filled it.');
+      throw e;
+    });
   if (!aiReady()) return erasedHere(`Erased on this computer, though ${plan.why}: look at it. An image model would do it better: add an OpenRouter key in Settings → Models.`);
   try {
     return await ai(ERASE_PROMPT, `An image model filled it: ${plan.why}.`);
@@ -249,12 +255,15 @@ export function eraseTool(db: DB, here: Here): RunTool {
       if (!n && here.ready() && !keySet())
         return { isError: true, text: 'Erasing by a description takes an image model through OpenRouter, and no OpenRouter key is set: give boxes around what to take away instead, to erase it on this computer, free.' };
       /** Erased here: the answer, with why it was not an image model when one would have done better. */
-      const local = async (though?: string): Promise<string | { isError: true; text: string }> => {
+      let noRoom = '';
+      /** Erased here; `orNoRoom`: when this computer is short of memory, null (an image model may do it instead), what it said kept in noRoom. */
+      const local = async (though?: string, orNoRoom = false): Promise<string | { isError: true; text: string } | null> => {
         let made: MadeHere;
         try {
           made = await here.erase(data, { boxes }, { maxBytes: MAX_PNG, signal: ctx.signal });
         } catch (e) {
           if (ctx.signal?.aborted) return stopped();
+          if (orNoRoom && shortOfMemory(e)) return (void (noRoom = (e as Error).message), null);
           return { isError: true, text: failedHere(e, 'Nothing was erased') };
         }
         const f = await saveForAgent(ctx, made.png, name);
@@ -262,26 +271,32 @@ export function eraseTool(db: DB, here: Here): RunTool {
       };
       let plan: ErasePlan | undefined;
       if (n && here.ready() && how !== 'ai') {
-        if (how === 'local') return local();
+        if (how === 'local') return (await local())!;
         try {
           plan = planErase(await here.measure(data, { boxes }, { signal: ctx.signal }));
         } catch (e) {
           if (ctx.signal?.aborted) return stopped();
           return { isError: true, text: `Nothing was erased: ${(e as Error).message}` };
         }
-        if (plan.way === 'local') return local();
+        if (plan.way === 'local') {
+          const done = await local(undefined, true);
+          if (done) return done;
+          // Short of memory here: an image model instead.
+          plan = { ...plan, way: 'ai', why: 'this computer does not have the memory free for the eraser now' };
+        }
       }
       const key = await keyForCloud(ctx, here, {
         why: plan
-          ? `Erasing part of a picture: ${plan.why}. An image model through OpenRouter fills it better, for ${AI_COST}.`
+          ? `Erasing part of a picture: ${plan.why}. An image model through OpenRouter can fill it instead, for ${AI_COST}.`
           : `Erasing something from a picture through OpenRouter costs ${AI_COST}: an image model draws the picture again without it.`,
         what: 'the image model that would erase it',
         doing: 'Erasing',
       });
       if (!key.ok) {
         if (key.why === 'stopped') return stopped();
+        if (noRoom) return { isError: true, text: `Nothing was erased: ${noRoom} An image model did not do it instead: ${noModelWhy(key.why)}.` };
         // A way without a key: erased here after all.
-        return plan ? local(`${plan.why}; an image model did not do it: ${noModelWhy(key.why)}`) : key.answer;
+        return plan ? (await local(`${plan.why}; an image model did not do it: ${noModelWhy(key.why)}`))! : key.answer;
       }
       const because = plan?.why ? ` ${plan.why.charAt(0).toUpperCase()}${plan.why.slice(1)}, so an image model did it.` : '';
       try {
@@ -306,7 +321,7 @@ export function eraseTool(db: DB, here: Here): RunTool {
         return [`Erased ${erased} ${doneHow('ai', r.model, r.cost)}:${because}`, ...savedLines(f, note, inPlace(pic.kept), localNote(here), lookLine('ai', WRONG, here))].join('\n');
       } catch (e) {
         if (ctx.signal?.aborted) return stopped();
-        if (plan) return local(`${plan.why}; an image model could not do it (${errorOf(e)})`);
+        if (plan && !noRoom) return (await local(`${plan.why}; an image model could not do it (${errorOf(e)})`))!;
         return { isError: true, text: `Nothing was erased: ${(e as Error).message}` };
       }
     },

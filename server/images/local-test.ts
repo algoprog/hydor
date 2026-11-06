@@ -592,7 +592,13 @@ for line in sys.stdin:
     );
     ok(jobs().filter((j) => j.op === 'erase').length === erases && (await state()).error === low.json().error, 'nothing loaded, and the state says why');
     const lowTool = await run('erase_from_image', { path: 'photo.png', boxes: [{ x: 1, y: 1, w: 5, h: 5 }] });
-    ok(lowTool.isError && /not enough free memory/.test(lowTool.text) && /call again with how: \"ai\", if the user agrees\.$/.test(lowTool.text), `an agent hears how to go on: ${lowTool.text}`);
+    ok(
+      lowTool.isError &&
+        /^Nothing was erased: There is not enough free memory to erase part of a picture on this computer now: it needs about 1\.2 GB free, and 1\.0 GB is\..* An image model did not do it instead: no OpenRouter key is set/.test(lowTool.text),
+      `an agent hears how much memory it needs, and that no image model could step in: ${lowTool.text}`,
+    );
+    const lowLocal = await run('erase_from_image', { path: 'photo.png', boxes: [{ x: 1, y: 1, w: 5, h: 5 }], how: 'local' });
+    ok(lowLocal.isError && /call again with how: "ai", if the user agrees\.$/.test(lowLocal.text), `asked for here: how to go on: ${lowLocal.text}`);
     // Short of memory with the other model in it: that one goes first, then there is room.
     setPictureToolsForTests({ freeMb: () => 64_000 });
     ok((await req('POST', '/api/images/cutout', { src: dataUrl(photo) })).statusCode === 200 && localState().loaded.join() === 'cutout', 'the cutout model is in memory');
@@ -717,6 +723,22 @@ for line in sys.stdin:
     control({});
     const small = await req('POST', '/api/images/erase', { src: dataUrl(photo), mask: dataUrl(mask) });
     ok(small.json().how === 'local' && !small.json().why, 'a small one: here');
+    // Short of memory here: on auto an image model does it instead, and says so.
+    setPictureToolsForTests({ freeMb: () => 1000 });
+    const roomless = await req('POST', '/api/images/cutout', { src: dataUrl(photo) });
+    ok(roomless.json().how === 'cloud' && roomless.json().why === 'This computer did not have the memory free for the background remover, so an image model did it.', `no memory for a cutout: ${roomless.body.slice(0, 200)}`);
+    const roomlessErase = await req('POST', '/api/images/erase', { src: dataUrl(photo), mask: dataUrl(mask) });
+    ok(roomlessErase.json().how === 'cloud' && roomlessErase.json().why === 'This computer did not have the memory free for the eraser, so an image model filled it.', `nor for an erase: ${roomlessErase.body.slice(0, 200)}`);
+    const roomlessTool = await run('remove_background', { path: 'photo.png' });
+    ok(
+      /^Took the background out with test\/painter through OpenRouter \(\$0\.012\): This computer did not have the memory free for the background remover, so an image model did it\./.test(roomlessTool.text),
+      `and for an agent: ${roomlessTool.text}`,
+    );
+    const roomlessBoxes = await run('erase_from_image', { path: 'photo.png', boxes: [{ x: 4, y: 4, w: 6, h: 6 }] });
+    ok(/^Erased the box with test\/painter through OpenRouter \(\$0\.012\): This computer does not have the memory free for the eraser now, so an image model did it\./.test(roomlessBoxes.text), `boxes too: ${roomlessBoxes.text}`);
+    const strict = await req('POST', '/api/images/cutout', { src: dataUrl(photo), how: 'local' });
+    ok(strict.statusCode === 503 && /not enough free memory/.test(strict.json().error), 'asked for here only: no image model, the memory said');
+    setPictureToolsForTests({ freeMb: () => 64_000 });
     asked.length = 4;
     const forced = await run('remove_background', { path: 'photo.png', how: 'ai' });
     ok(!forced.isError && /through OpenRouter/.test(forced.text) && asked.length === 5 && !/would do this free/.test(forced.text), `through OpenRouter when asked, though the picture tools are here: ${forced.text}`);

@@ -231,6 +231,9 @@ export function keptBytes(db: DB, src: string): Buffer {
 const sentence = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const errorOf = (e: unknown) => String((e as Error).message ?? e).replace(/\.$/, '');
 
+/** This computer did not have the memory free for the job (local.ts says how much it needs). */
+export const shortOfMemory = (e: unknown) => e instanceof HttpError && e.status === 503 && /not enough free memory/.test(e.message);
+
 /** POST /api/images/cutout: the picture with its background taken out (on auto, here first, and again by an image model when it looks poor). */
 export async function cutoutPicture(db: DB, ask: CutoutAsk, signal: AbortSignal | undefined, here: Here): Promise<PictureAnswer> {
   const img = readPicture(db, ask?.src);
@@ -241,7 +244,13 @@ export async function cutoutPicture(db: DB, ask: CutoutAsk, signal: AbortSignal 
       .edit(db, { src, prompt: CUTOUT_PROMPT, transparent: true }, signal)
       .then((a): PictureAnswer => ({ ...a, how: 'cloud', ...(why ? { why } : {}) }));
   if (wayFor(how, here, 'Taking the background out') === 'ai') return ai(how === 'auto' ? 'The picture tools on this computer are not set up, so an image model did it.' : undefined);
-  const made = await here.cutout(img, { maxBytes: MAX_PNG, signal });
+  let made: MadeHere;
+  try {
+    made = await here.cutout(img, { maxBytes: MAX_PNG, signal });
+  } catch (e) {
+    if (how === 'auto' && shortOfMemory(e) && aiReady()) return ai('This computer did not have the memory free for the background remover, so an image model did it.');
+    throw e;
+  }
   const v = verdictOf(made);
   if (v.ok) return keepMade(db, made);
   if (how === 'local') return keepMade(db, made, `The background remover on this computer ${v.why}: look at the edges, or try it with AI.`);
@@ -404,25 +413,32 @@ export function removeBackgroundTool(db: DB, here: Here): RunTool {
       const stopped = () => ({ isError: true, text: 'Stopped before the background was taken out.' });
       let made: MadeHere | undefined;
       let poor: string | undefined;
+      let noRoom: unknown;
       if (here.ready() && how !== 'ai') {
         try {
           made = await here.cutout(pic.data, { maxBytes: MAX_PNG, signal: ctx.signal });
         } catch (e) {
           if (ctx.signal?.aborted) return stopped();
-          return { isError: true, text: failedHere(e, 'The background was not taken out') };
+          // Short of memory here: on auto an image model can do it instead.
+          if (how !== 'auto' || !shortOfMemory(e)) return { isError: true, text: failedHere(e, 'The background was not taken out') };
+          noRoom = e;
         }
-        const v = verdictOf(made);
-        if (v.ok || how === 'local') {
-          const f = await saveForAgent(ctx, made.png, name);
-          const first = `Took the background out ${doneHow('local', made.model)}${v.ok ? '' : `, though it ${v.why}`}:`;
-          return [first, ...savedLines(f, made.scaled && SCALED, inPlace(pic.kept), lookLine('local', WRONG, here))].join('\n');
+        if (made) {
+          const v = verdictOf(made);
+          if (v.ok || how === 'local') {
+            const f = await saveForAgent(ctx, made.png, name);
+            const first = `Took the background out ${doneHow('local', made.model)}${v.ok ? '' : `, though it ${v.why}`}:`;
+            return [first, ...savedLines(f, made.scaled && SCALED, inPlace(pic.kept), lookLine('local', WRONG, here))].join('\n');
+          }
+          poor = v.why;
         }
-        poor = v.why;
       }
       const key = await keyForCloud(ctx, here, {
         why: poor
           ? `The background remover on this computer ${poor}. An image model through OpenRouter can take the background out instead, for ${AI_COST}.`
-          : `Taking the background out of a picture through OpenRouter costs ${AI_COST}: an image model draws it again without its background.`,
+          : noRoom
+            ? `This computer does not have the memory free to take the background out here. An image model through OpenRouter can do it instead, for ${AI_COST}.`
+            : `Taking the background out of a picture through OpenRouter costs ${AI_COST}: an image model draws it again without its background.`,
         what: 'the image model that would take the background out',
         doing: 'Taking the background out',
       });
@@ -433,12 +449,13 @@ export function removeBackgroundTool(db: DB, here: Here): RunTool {
       };
       if (!key.ok) {
         if (key.why === 'stopped') return stopped();
+        if (noRoom) return { isError: true, text: `The background was not taken out: ${(noRoom as Error).message} An image model did not do it instead: ${noModelWhy(key.why)}.` };
         return made ? fallBack(noModelWhy(key.why)) : key.answer;
       }
       try {
         const r = await cloudTools()!.edit(db, { src: dataUrl(pic.data), prompt: CUTOUT_PROMPT, transparent: true }, ctx.signal);
         const f = await saveForAgent(ctx, keptBytes(db, r.src), name);
-        const because = poor ? ` The background remover on this computer ${poor}, so an image model did it.` : '';
+        const because = poor ? ` The background remover on this computer ${poor}, so an image model did it.` : noRoom ? ' This computer did not have the memory free for the background remover, so an image model did it.' : '';
         return [`Took the background out ${doneHow('ai', r.model, r.cost)}:${because}`, ...savedLines(f, REDRAWN, inPlace(pic.kept), localNote(here), lookLine('ai', WRONG, here))].join('\n');
       } catch (e) {
         if (ctx.signal?.aborted) return stopped();
