@@ -14,7 +14,7 @@ import { asPng, maskData, painted, putInPainted, type Stroke } from './canvas';
 import { Compare } from './Compare';
 import { LocalToolsCard, useLocalTools } from './LocalTools';
 import { KeyAsk } from './KeyAsk';
-import { aiInsteadButton, changePrice, insteadLine, madeWith, needsKey, toolPrice } from './logic';
+import { aiInsteadButton, changePrice, errorWords, insteadLine, madeWith, needsKey, toolPrice } from './logic';
 import { Painter } from './Painter';
 import { PriceLine, Problem, Shown, Words, Working } from './parts';
 import { keepPicture, shownSrc } from './pictures';
@@ -60,10 +60,10 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
   const stop = useRef(new AbortController());
 
   useEffect(() => {
-    getTiers().then(setTiers, (e: Error) => setError({ text: e.message, local: false }));
+    getTiers().then(setTiers, (e: Error) => setError({ text: errorWords(e), local: false }));
     keepPicture(o.src)
       .then(async (p) => (PIXELS.test(p.mime) ? p : keepPicture(await asPng(shownSrc(p.src), p.w, p.h))))
-      .then(setPic, (e: Error) => setError({ text: `That picture could not be opened: ${e.message}`, local: false }));
+      .then(setPic, (e: Error) => setError({ text: `That picture could not be opened: ${errorWords(e)}`, local: false }));
     const c = stop.current;
     return () => c.abort();
   }, [o.src]);
@@ -93,7 +93,7 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
       }
       if (!sig.aborted) setResult({ pic: out, how: r.how, model: r.model, cost: r.cost, why: whyOf(r) });
     } catch (e) {
-      const m = (e as Error).message;
+      const m = errorWords(e);
       if (!stop.current.signal.aborted) !here && needsKey(m) ? setAskKey(mode) : setError({ text: m, local: here });
     } finally {
       setBusy(null);
@@ -179,7 +179,7 @@ export function EditPicture({ o, onDone }: { o: EditOpts; onDone: (p: MadePictur
             setTiers(t);
             if (t.keySet) void run('cloud', true);
           },
-          (e: Error) => setError({ text: e.message, local: false }),
+          (e: Error) => setError({ text: errorWords(e), local: false }),
         )
       }
       onSkip={() => setAskKey(null)}

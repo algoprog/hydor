@@ -126,6 +126,12 @@ export function videoPrice(t: TiersInfo, seconds: number, perSecondMax?: number)
   return { cost: hi, line, button: `Make the video (about ${money(hi)})` };
 }
 
+/** An error in words a person can act on (a lost connection's own words, "Failed to fetch", are not). */
+export function errorWords(e: unknown): string {
+  const m = e instanceof Error ? e.message : String(e);
+  return /failed to fetch|networkerror|load failed|network request failed/i.test(m) ? 'The app could not be reached: check the connection, then try again.' : m;
+}
+
 /** Whether a tool's error is that there is no OpenRouter key (its way out: Settings → Models). */
 export const needsKey = (message: string) => /openrouter key|no key|api key/i.test(message);
 

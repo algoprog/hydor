@@ -7,6 +7,7 @@ import { ExternalLink, KeyRound } from 'lucide-react';
 import { put } from '../../../lib/api';
 import { Button } from '../../../components/ui';
 import { SecretInput } from '../../connections/ConnectDialog';
+import { errorWords } from './logic';
 
 export function KeyAsk({ onSaved, onSkip, instead }: { onSaved: () => void; onSkip: () => void; instead?: { label: string; run: () => void } }) {
   const [value, setValue] = useState('');
@@ -23,7 +24,7 @@ export function KeyAsk({ onSaved, onSkip, instead }: { onSaved: () => void; onSk
       onSaved();
     } catch (e) {
       // The server's words about it, never the key.
-      setError((e as Error).message);
+      setError(errorWords(e));
     } finally {
       setBusy(false);
     }
