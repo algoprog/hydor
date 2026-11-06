@@ -154,7 +154,7 @@ test('the guide covers the app: every Settings section by its name', () => {
 
 /** Routes agents are never to use, which the API topic leaves out (app_api refuses them too). */
 const UNDOCUMENTED =
-  /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads|auth)\/|^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)$|^\/api\/(browser|computer)\/sessions\/|^\/api\/(push\/(subscribe|unsubscribe)|me\/timezone|find\/usage|tour|health)$|^\/api\/voice\/(transcribe|command|cancel)$|^\/api\/(images\/(make|edit|svg|cutout|erase)|plots\/make|videos\/make(\/:job)?)$|^\/api\/mediaedit\//;
+  /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads|auth)\/|^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)$|^\/api\/(browser|computer)\/sessions\/|^\/api\/(push\/(subscribe|unsubscribe)|me\/timezone|find\/usage|tour|health)$|^\/api\/voice\/(transcribe|command|cancel)$|^\/api\/(images\/(make|edit|svg|cutout|erase)|plots\/make|videos\/make(\/:job)?)$|^\/api\/mediaedit\/|^\/api\/slides\/(sounds|narration|shows)(\/|$)/;
 
 test('the guide covers the app: every API route is in the API topic, or one agents never use', () => {
   const api = byId.get('api')!.body;
@@ -259,6 +259,8 @@ test('rules: reading is free; changes ask; risky ones every time; some are never
     ['GET', '/api/videos/make/j1'],
     ['POST', '/api/mediaedit/video'],
     ['POST', '/api/mediaedit/image'],
+    ['POST', '/api/slides/narration'],
+    ['POST', '/api/slides/shows/s1/do'],
   ])
     assert.equal(lv(m, p), 'refuse', `${m} ${p}`);
   assert.equal(lv('GET', '/api/images/tiers'), 'free');

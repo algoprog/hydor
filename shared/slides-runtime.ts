@@ -101,9 +101,28 @@ export interface ShowOpts extends Omit<DrawOpts, 'edit' | 'step' | 'play'> {
   /** The slides shown include hidden ones (the editor's preview of one). */
   withHidden?: boolean;
   /** Words for the controls, in the user's language. */
-  words?: Partial<Record<'prev' | 'next' | 'grid' | 'full' | 'exit' | 'end' | 'laser' | 'pen' | 'erase' | 'captions' | 'noCaptions' | 'listening', string>>;
+  words?: Partial<Record<'prev' | 'next' | 'grid' | 'full' | 'exit' | 'end' | 'laser' | 'pen' | 'erase' | 'captions' | 'noCaptions' | 'listening' | 'voiceClick', string>>;
   /** Told of the laser, the pen's lines and the captions as they change (the presenter's view shows them to the audience). */
   onMarks?: (m: Marks) => void;
+  /** Buttons of the app's own among the controls (the camera, the phone remote), each with a key that does it too. */
+  extras?: ShowExtra[];
+  /** Told when the screen goes black or white (B, W), or back. */
+  onBlank?: (c: 'black' | 'white' | null) => void;
+  /**
+   * The narrated slideshow: each slide's narration plays as it comes, its build spread over it, and the slideshow goes
+   * on when it ends (slides without one wait for a click, or their own timing). `sound` is where a kept sound is
+   * ("naget-audio:<sha>" → its address); `onVoice` hears what plays (null: nothing, on this slide).
+   */
+  narrate?: { sound: (sha: string) => string; onVoice?: (v: { slide: number; seconds: number; at: number; paused: boolean } | null) => void };
+}
+
+/** A button the app adds to the slideshow's controls: one of the runtime's icons, its label, a key (a letter the slideshow leaves free), what it does. */
+export interface ShowExtra {
+  id: string;
+  icon: 'camera' | 'phone' | 'voice';
+  label: string;
+  key?: string;
+  run: () => void;
 }
 
 export interface Show {
@@ -116,6 +135,10 @@ export interface Show {
   grid(on?: boolean): void;
   /** Shows another slideshow's laser, pen lines and captions (the presenter's, in the audience's window). */
   marks(m: Marks): void;
+  /** An extra's button shown on (its camera showing, say) or off. */
+  extra(id: string, on: boolean): void;
+  /** The narration paused (the slideshow stays where it is) or playing on; nothing without a narrated slideshow. */
+  pauseVoice(paused: boolean): void;
   destroy(): void;
 }
 
@@ -2924,6 +2947,9 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
     pen: '<path d="M4 20l1.2-4.6L15.8 4.8a2.2 2.2 0 0 1 3.1 3.1L8.3 18.5z"/><path d="M13.8 6.8l3.1 3.1"/>',
     erase: '<path d="M8.5 20H20"/><path d="M4.6 15.4l9.8-9.8a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L11.2 19H8.2l-3.6-3.6"/>',
     captions: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M7 11.5h3M12.5 11.5H17M7 15h6.5M15.5 15H17"/>',
+    camera: '<path d="M15.5 10.2l5-3v9.6l-5-3"/><rect x="3" y="6" width="12.5" height="12" rx="2.5"/>',
+    phone: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
+    voice: '<path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18.3 6.3a8.4 8.4 0 0 1 0 11.4"/>',
   };
   const button = (name: string, label: string, on: () => void) => {
     const b = el('button', 'ns-btn');
@@ -2957,6 +2983,7 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       captions: 'Live captions (C)',
       noCaptions: 'Live captions need a browser that turns speech into words, such as Chrome.',
       listening: 'Listening…',
+      voiceClick: 'Click to hear the narration.',
       ...(o.words ?? {}),
     };
     // What every slide is drawn with here: videos play when clicked, quizzes are answered (the answers kept for the
@@ -3003,6 +3030,15 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
     pens.appendChild(button('erase', words.erase, () => erase()));
     for (const b of [laserB, penB, capB]) b.classList.add('ns-tool');
     bar.append(laserB, penB, pens, capB);
+    // The app's own buttons (its camera, the phone remote), after the presenter's tools.
+    const extraBtns = new Map<string, HTMLButtonElement>();
+    for (const x of o.extras ?? []) {
+      if (!ICONS[x.icon] || extraBtns.has(x.id)) continue;
+      const b = button(x.icon, x.label, () => x.run());
+      b.classList.add('ns-tool');
+      extraBtns.set(x.id, b);
+      bar.appendChild(b);
+    }
     if (o.mode === 'viewer') {
       bar.insertBefore(el('span', 'ns-gap'), prevB);
       bar.appendChild(el('span', 'ns-gap'));
@@ -3111,7 +3147,7 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       win.clearTimeout(autoTimer);
       const s = list[pos]?.s;
       const t = s?.transition?.auto;
-      if (!t || step < plan(s).groups) return;
+      if (!t || step < plan(s).groups || (voice && voiceAt === list[pos]?.i)) return;
       autoTimer = win.setTimeout(() => {
         if (!running.length && !pending.length) next();
         else scheduleAuto();
@@ -3412,6 +3448,8 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       if (autoPlay) playGroup(0);
       else if (!running.length) scheduleAuto();
       tell();
+      voiceOn();
+      timeSteps();
     };
     const next = () => {
       // A click while things move finishes them.
@@ -3449,6 +3487,112 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
     const blank = (c: 'black' | 'white' | null) => {
       blankEl.style.display = c ? 'block' : 'none';
       blankEl.style.background = c === 'white' ? '#fff' : '#000';
+      o.onBlank?.(c);
+    };
+
+    // ---- the narrated slideshow, and a rehearsal's timings ----
+    // A narrated slide's narration plays as it comes; the clicks of its build come at even shares of it (the k-th of n
+    // at k/(n+1) of the way), each once (going back a step is not undone), and the slideshow goes on when it ends.
+    let voice: HTMLAudioElement | null = null;
+    /** The deck's slide whose narration plays (-1: none). */
+    let voiceAt = -1;
+    let voicePaused = false;
+    /** The share of the build the narration has reached, so each click it makes is made once. */
+    let voiceReached = 0;
+    let voiceTick = 0;
+    const voiceLength = () => {
+      const d = voice?.duration;
+      return d && Number.isFinite(d) ? d : n(deck.slides[voiceAt]?.narration?.seconds, 0);
+    };
+    const tellVoice = () => o.narrate?.onVoice?.(voice && voiceAt >= 0 ? { slide: voiceAt, seconds: voiceLength(), at: voice.currentTime || 0, paused: voicePaused } : null);
+    const stopVoice = () => {
+      win.clearInterval(voiceTick);
+      if (voice) {
+        voice.onended = voice.onerror = voice.ontimeupdate = null;
+        voice.pause();
+        voice.removeAttribute('src');
+        try {
+          voice.load();
+        } catch {}
+      }
+      const had = !!voice;
+      voice = null;
+      voiceAt = -1;
+      if (had) tellVoice();
+    };
+    const voiceStep = () => {
+      const a = voice;
+      const total = voiceLength();
+      if (!a || voicePaused || !total || ended) return;
+      const groups = plan(list[pos].s).groups;
+      const want = Math.min(groups, Math.floor(((a.currentTime || 0) / total) * (groups + 1)));
+      if (want <= voiceReached) return;
+      // An effect still moving is let finish; the click comes on the next look.
+      if (running.length || pending.length) return;
+      voiceReached = want;
+      if (step < want) next();
+    };
+    const voiceOn = () => {
+      const cur = list[pos];
+      if (!o.narrate || !cur || cur.i === voiceAt) return;
+      stopVoice();
+      const m = /^naget-audio:([a-f0-9]{16,64})$/.exec(cur.s.narration?.src ?? '');
+      if (!m) return;
+      const a = new Audio();
+      a.preload = 'auto';
+      a.src = o.narrate.sound(m[1]);
+      voice = a;
+      voiceAt = cur.i;
+      voiceReached = step;
+      a.ontimeupdate = tellVoice;
+      a.onended = () => {
+        if (voice !== a) return;
+        stopVoice();
+        if (pos < list.length - 1) go(list[pos + 1].i, 0, true);
+        else {
+          settle();
+          next();
+        }
+      };
+      // A sound that will not play leaves the slide as it would be without one.
+      a.onerror = () => {
+        if (voice !== a) return;
+        stopVoice();
+        scheduleAuto();
+      };
+      voiceTick = win.setInterval(voiceStep, 200);
+      if (!voicePaused)
+        void a.play().catch(() => {
+          // The browser wants a click first: the next one starts it.
+          flash(words.voiceClick);
+          stage.addEventListener('pointerdown', () => voice === a && !voicePaused && void a.play().catch(() => {}), { once: true });
+        });
+      tellVoice();
+    };
+    const pauseVoice = (p: boolean) => {
+      voicePaused = p;
+      if (!voice) return;
+      if (p) voice.pause();
+      else void voice.play().catch(() => {});
+      tellVoice();
+    };
+    // A rehearsal's timings: each click of the build comes by itself, so long after the slide came.
+    let stepTimers: number[] = [];
+    const timeSteps = () => {
+      for (const t of stepTimers) win.clearTimeout(t);
+      stepTimers = [];
+      const cur = list[pos];
+      const times = cur?.s.transition?.steps;
+      if (!times?.length || voice) return;
+      const groups = plan(cur.s).groups;
+      for (let k = step + 1; k <= Math.min(groups, times.length); k++) {
+        const when = () => {
+          if (list[pos] !== cur || step !== k - 1 || ended) return;
+          if (running.length || pending.length) stepTimers.push(win.setTimeout(when, 150));
+          else next();
+        };
+        stepTimers.push(win.setTimeout(when, Math.max(0, times[k - 1] * 1000)));
+      }
     };
     let gridMade = false;
     const grid = (on?: boolean) => {
@@ -3787,6 +3931,7 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       else if (k === 'b' || k === 'B' || k === '.') blank(blankEl.style.display === 'block' ? null : 'black');
       else if (k === 'w' || k === 'W' || k === ',') blank(blankEl.style.display === 'block' ? null : 'white');
       else if (k === 'g' || k === 'G') grid();
+      else if (o.extras?.some((x) => !!x.key && x.key.toLowerCase() === k.toLowerCase())) o.extras.find((x) => !!x.key && x.key.toLowerCase() === k.toLowerCase())!.run();
       else if (/^\d$/.test(k)) typed += k;
       else if (k === 'Escape') {
         if (tool) setTool(null);
@@ -3828,7 +3973,13 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       blank,
       grid,
       marks,
+      extra: (id, on) => {
+        extraBtns.get(id)?.classList.toggle('ns-on', on);
+      },
+      pauseVoice,
       destroy: () => {
+        stopVoice();
+        for (const t of stepTimers) win.clearTimeout(t);
         shows.delete(mine);
         stopLoops();
         if (layer) tellFrames(layer, { ev: 'leave' });
