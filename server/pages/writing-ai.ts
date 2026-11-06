@@ -197,8 +197,10 @@ export function writingAi(X: ExtraCore): Extra {
   const metaEl = $('.aim');
   const listEl = $('.ail');
   const marks = [...E.shadow.querySelectorAll<HTMLElement>('.aiw2')];
-  $('.aii').innerHTML = X.svg('ai', 16);
-  go.innerHTML = X.svg('send', 14);
+  // (its own icons: the writing takes this part's icons once it is made)
+  const own = (d: string, n: number) => `<svg viewBox="0 0 24 24" width="${n}" height="${n}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  $('.aii').innerHTML = own('<path d="m12 3-1.9 5.8L4 10.6l5.6 2.1L12 19l2-6.3 6-2.1-6-1.8z"/><path d="M5 3v4"/><path d="M3 5h4"/>', 16);
+  go.innerHTML = own('<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>', 14);
   go.title = L('ai.send', 'Ask');
   ($('.aiw button') as HTMLElement).textContent = L('ai.stop', 'Stop');
   $('.aiwt').textContent = L('ai.writing', 'The AI is writing…');
@@ -397,6 +399,8 @@ export function writingAi(X: ExtraCore): Extra {
     X.closeMenu();
     X.closeSlash();
     const c = ctx ?? gather();
+    // (the part picked loses its frame and bar while the AI's bar is open: the AI's marks say what it is about)
+    E.select(null);
     S = { ctx: c, state: 'ask', view: 'main', chip: null, i: 0, req: '', last: null, markdown: '', preview: null, model: '', cost: 0, error: '', escOnce: false, append: false };
     field.value = '';
     // The blocks it is about stay in sight, and the bar under them.

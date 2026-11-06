@@ -3443,7 +3443,8 @@ textarea.in{height:auto;min-height:64px;padding:6px 8px;font-family:var(--n-mono
       const head = h('div', { class: 'tlh', style: `width:${width}px` });
       for (let i = 0; i < n; i++) {
         const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i);
-        if (d.getDate() === 1 || i === 0) {
+        // (the month's name on its first day, and every two weeks, so it shows wherever the timeline is scrolled to)
+        if (d.getDate() === 1 || i % 14 === 0) {
           let mname = '';
           try {
             mname = d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });

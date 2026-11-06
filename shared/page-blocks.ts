@@ -14,8 +14,8 @@ export const BLOCKS_CSS = `
 .n-embed[data-kind=map] iframe{aspect-ratio:4/3}
 .n-embed[data-kind=spotify] iframe{aspect-ratio:auto;height:352px;border:0}
 .n-embed[data-kind=slides] iframe,.n-embed[data-kind=loom] iframe{aspect-ratio:16/9}
-.n-embed-link{display:inline-block;margin-top:4px;font-size:12px;opacity:.65;color:inherit}
-.n-bookmark{display:flex;align-items:stretch;margin:.8em 0;min-height:92px;border:1px solid ${LINE};border-radius:10px;overflow:hidden;color:inherit;text-decoration:none}
+.n-page a.n-embed-link,a.n-embed-link{display:inline-block;margin-top:4px;font-size:12px;opacity:.65;color:inherit}
+.n-page a.n-bookmark,a.n-bookmark{display:flex;align-items:stretch;margin:.8em 0;min-height:92px;border:1px solid ${LINE};border-radius:10px;overflow:hidden;color:inherit;text-decoration:none}
 .n-bookmark:hover{background:${SOFT}}
 .n-bm-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;padding:12px 14px}
 .n-bm-title{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -24,7 +24,7 @@ export const BLOCKS_CSS = `
 .n-bm-icon{width:16px;height:16px;flex:none}
 .n-bm-pic{flex:none;width:30%;max-width:220px;object-fit:cover;border-left:1px solid ${LINE}}
 @media (max-width:480px){.n-bm-pic{display:none}}
-.n-file{display:flex;align-items:center;gap:10px;margin:.5em 0;padding:8px 12px;border-radius:8px;background:${SOFT};color:inherit;text-decoration:none}
+.n-page a.n-file,a.n-file{display:flex;align-items:center;gap:10px;margin:.5em 0;padding:8px 12px;border-radius:8px;background:${SOFT};color:inherit;text-decoration:none}
 .n-file:hover{background:color-mix(in srgb,currentColor 9%,transparent)}
 .n-file::before{content:"";flex:none;width:18px;height:18px;background:currentColor;opacity:.7;-webkit-mask:${CLIP} center/contain no-repeat;mask:${CLIP} center/contain no-repeat}
 .n-file-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
