@@ -134,7 +134,7 @@ export interface FilterPick {
 export const CROP_SHAPES = [
   { id: 'original', label: 'Original', ratio: 0 },
   { id: 'free', label: 'Any shape', ratio: 0 },
-  { id: '1:1', label: 'Square', ratio: 1 },
+  { id: '1:1', label: 'Square (1:1)', ratio: 1 },
   { id: '4:3', label: '4:3', ratio: 4 / 3 },
   { id: '3:2', label: '3:2', ratio: 3 / 2 },
   { id: '16:9', label: '16:9', ratio: 16 / 9 },

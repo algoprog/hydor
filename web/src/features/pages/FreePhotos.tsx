@@ -17,7 +17,7 @@ const SHAPES: { value: PhotoOrientation; label: string }[] = [
   { value: 'any', label: 'Any shape' },
   { value: 'wide', label: 'Wide' },
   { value: 'tall', label: 'Tall' },
-  { value: 'square', label: 'Square' },
+  { value: 'square', label: 'Square (1:1)' },
 ];
 
 function FreePhotos({ start, onDone }: { start: { orientation?: PhotoOrientation; query?: string }; onDone: (p: PhotoUse | null) => void }) {
