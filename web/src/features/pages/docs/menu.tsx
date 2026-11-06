@@ -45,6 +45,7 @@ import {
   SeparatorHorizontal,
   Sigma,
   Signature,
+  Sparkles,
   SpellCheck,
   Strikethrough,
   Subscript,
@@ -110,6 +111,8 @@ export interface DocMenuCtx {
   drawing: () => void;
   /** Insert → Plot: from the table the caret is in, if it is in one. */
   plot: () => void;
+  /** Insert → Section made with AI: the gallery of kinds (a summary, a risks table…), where the editor can ask an agent. */
+  aiSection?: () => void;
   /** Insert → Signature: a saved one, or one drawn there. */
   signature: () => void;
   link: () => void;
@@ -198,6 +201,7 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
   ].map(([r, k]) => ({ label: `${k} × ${r}`, also: 'table grid', run: () => e.insertTable(r, k) }));
 
   const insert: MenuEntry[] = [
+    !!c.aiSection && { label: 'Section made with AI', icon: <Sparkles size={15} />, also: 'ai agent write generate section summary introduction conclusion faq glossary references table', disabled: c.readOnly, run: c.aiSection },
     {
       label: 'Picture',
       icon: <ImageIcon size={15} />,

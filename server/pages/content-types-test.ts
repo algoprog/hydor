@@ -13,6 +13,11 @@ import { CONTENT_GROUPS, CONTENT_MIN, CONTENT_TYPES, contentType, findTypes, NEW
 import { composeAsk, turnAsk } from '../../shared/content-asks.ts';
 import { TYPE_ICONS } from '../../web/src/features/pages/types/icons.ts';
 import { howToMakeStep } from '../../web/src/features/pages/types/step.ts';
+import { slidesMenus, type MenuArgs } from '../../web/src/features/pages/slides/SlidesMenus.tsx';
+import { docMenus, type DocMenuCtx } from '../../web/src/features/pages/docs/menu.tsx';
+import type { MenuAction, MenuDef, MenuEntry } from '../../web/src/features/pages/common/menus.tsx';
+import { blockPlace } from '../../web/src/features/pages/studio/AddPanel.tsx';
+import type { EdSel } from '../../web/src/features/pages/frame.tsx';
 import type { RunCtx } from '../features/types.ts';
 import { HOW_TO_MAKE } from './content-types.ts';
 import { pages } from './index.ts';
@@ -213,6 +218,71 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
   ok(/^The kinds the app knows how to make \(\d+\)/.test(blocks) && /Parts added to a page:/.test(blocks) && !/Slides added/.test(blocks), 'with a kind alone: that kind’s list');
   ok(/^No kind the app knows matches “xyzzy”: make it as the user asks/.test(await run({ what: 'xyzzy' })), 'nothing known: make it as asked');
   ok(howToMakeStep({ status: 'done', input: { what: 'SWOT slide' } }).title === 'how to make “SWOT slide”' && howToMakeStep({ status: 'running', input: {} }).verb === 'Reading', 'it reads as a step of the work');
+}
+
+// ---- the editors' entry points ------------------------------------------------------------------------------------------
+
+{
+  const noop = () => {};
+  // What each editor would pass: anything not given is a function that does nothing (an AI tool there), as C2's test does.
+  const slideArgs = (o: Partial<MenuArgs>): MenuArgs =>
+    new Proxy(
+      {
+        web: true,
+        wide: true,
+        pageLayout: true,
+        picked: [],
+        canUndo: false,
+        canRedo: false,
+        canPaste: false,
+        hasLook: false,
+        painting: false,
+        zoom: 'fit',
+        grid: { show: false, snap: false, size: 40 },
+        rulers: false,
+        notesOpen: true,
+        gridView: false,
+        hidden: false,
+        text: null,
+        hasGuides: false,
+        running: false,
+        ...o,
+      } as MenuArgs,
+      {
+        get: (t, k) => (k in t ? (t as unknown as Record<string | symbol, unknown>)[k] : noop),
+      },
+    );
+  const st = new Proxy({ text: '', on: {}, collapsed: true } as Record<string, unknown>, { get: (t, k) => t[k as string] });
+  const docCtx = (o: Partial<DocMenuCtx>): DocMenuCtx =>
+    new Proxy({ st, doc: { v: 1, blocks: [] }, zoom: 1, mode: 'edit', suggestions: 0, readOnly: false, ...o } as unknown as DocMenuCtx, {
+      get: (t, k) => (k in t ? (t as unknown as Record<string | symbol, unknown>)[k] : k === 'engine' ? new Proxy({}, { get: () => noop }) : noop),
+    });
+  const actions = (m: MenuEntry[]) => m.filter((x): x is MenuAction => !!x && x !== '-');
+  const insertOf = (menus: MenuDef[]) => menus.find((m) => m.label === 'Insert')!.items;
+  // As C2's test measures a menu at 811×667: its rows (34 px) and lines (9 px), its edges, the row going back.
+  const height = (items: MenuEntry[]) => {
+    const list = items.filter(Boolean);
+    return list.filter((x) => x !== '-').length * 34 + list.filter((x) => x === '-').length * 9 + 8 + 34 + 9;
+  };
+
+  const slides = actions(insertOf(slidesMenus(slideArgs({ aiSlide: noop }))));
+  const at = slides.findIndex((x) => x.label === 'Slide made with AI');
+  ok(at > 0 && slides[at - 1].label === 'New slide', 'slides: Insert → Slide made with AI, under New slide');
+  ok(!slides.some((x) => x.label === 'Icon' || x.label === 'Emoji') && /emoji/.test(slides.find((x) => x.label === 'Icon or emoji')?.also ?? ''), 'Insert → Icon or emoji: one row for the one picker (Search the menus finds it by either)');
+  ok(height(insertOf(slidesMenus(slideArgs({ aiSlide: noop })))) <= 667 - 49 - 10, `slides: Insert still fits 811×667 (${height(insertOf(slidesMenus(slideArgs({ aiSlide: noop }))))} px)`);
+  ok(!actions(insertOf(slidesMenus(slideArgs({ aiSlide: undefined })))).some((x) => x.label === 'Slide made with AI'), 'slides: none where no request can be sent');
+  ok(actions(insertOf(slidesMenus(slideArgs({ aiSlide: noop, readOnly: true })))).find((x) => x.label === 'Slide made with AI')?.disabled === true, 'slides: greyed in a version looked at');
+
+  const docs = actions(insertOf(docMenus(docCtx({ aiSection: noop }))));
+  ok(docs[0]?.label === 'Section made with AI' && !!docs[0].run, 'documents: Insert → Section made with AI, first');
+  ok(!actions(insertOf(docMenus(docCtx({ aiSection: undefined })))).some((x) => x.label === 'Section made with AI'), 'documents: none where no request can be sent');
+  console.log(`(documents: Insert is ${height(insertOf(docMenus(docCtx({ aiSection: noop }))))} px with the row going back, ${height(insertOf(docMenus(docCtx({ aiSection: noop })))) - 43} px without)`);
+
+  const sel = { tag: 'section', name: 'Section', snippet: 'Our menu', selector: 'section#menu', holds: true } as EdSel;
+  ok(blockPlace('after', sel) === 'after the section “Our menu” (`section#menu`)', 'pages: a block made with AI goes after the part picked');
+  ok(blockPlace('inside', sel) === 'inside the section “Our menu” (`section#menu`), at its end' && blockPlace('inside', { ...sel, holds: false }) === 'after the section “Our menu” (`section#menu`)', 'inside it, when it can hold parts');
+  ok(blockPlace('end', sel) === 'at the end of the page' && blockPlace('after', null) === 'at the end of the page' && blockPlace('after', { ...sel, tag: 'body' }) === 'at the end of the page', 'at the end of the page, with nothing picked');
+  ok(composeAsk(contentType('block.pricing')!, '', { at: blockPlace('after', sel) }).startsWith('Add a part to the page after the section “Our menu” (`section#menu`): a pricing part'), 'and the request says so');
 }
 
 // ---- what goes to agents stays out of the dictionaries ------------------------------------------------------------------

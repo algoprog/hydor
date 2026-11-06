@@ -120,6 +120,7 @@ import { FooterDialog } from './FooterDialog';
 import { NotesField } from './Notes';
 import { findInDeck, replaceAllInDeck, replaceHit } from './find';
 import { exportFile } from '../exportFile';
+import { openTypes } from '../types';
 import { chooseModel, chooseVideo, fetchVideoStill, firstFrame, isVideoFile, uploadModel, uploadVideo } from './media';
 import { SlideComments } from './SlideComments';
 
@@ -244,6 +245,7 @@ export function SlidesEditor({
   savedNote,
   onDirty,
   onAsk,
+  onRequest,
   onScopes,
   saveNowRef,
   startPresent,
@@ -1174,6 +1176,8 @@ export function SlidesEditor({
     else pins.push({ key, x: at.x, y: at.y, ids: [c.id], active: false });
   }
   for (const p of pins) p.active = !!activeComment && p.ids.includes(activeComment);
+  // A slide made with AI after the one on view (Insert, and the New slide menu): the request goes where the host sends it.
+  const aiSlide = onRequest && !readOnly ? () => openTypes({ kind: 'slide', after: { index, title: slideTitle(slide) }, webDeck: isWebDeck(deck), onDone: onRequest }) : null;
   const web = isWebDeck(deck);
   const menus = slidesMenus({
     readOnly,
@@ -1242,6 +1246,7 @@ export function SlidesEditor({
     aiVideo: readOnly ? undefined : () => void aiVideo(),
     aiEdit: readOnly ? undefined : (mode) => one && void aiEdit(one.id, mode),
     aiPlotChart: readOnly ? undefined : () => one && void aiPlot(one.id),
+    aiSlide: aiSlide ?? undefined,
     running: !!one && running === one.id,
     run: () => one && setRunning(running === one.id ? null : one.id),
     video: () => setVideoAsk(true),
@@ -1654,6 +1659,14 @@ export function SlidesEditor({
       )}
 
       <Popover anchor={anchors.slide} open={menu === 'slide'} onClose={() => setMenu(null)} width={380} title="A new slide">
+        {aiSlide && (
+          <>
+            <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), aiSlide())}>
+              Slide made with AI
+            </MenuItem>
+            <MenuSep />
+          </>
+        )}
         <LayoutGrid deck={deck} fonts={fonts} onPick={(l) => newSlide(l)} />
       </Popover>
       <Popover anchor={anchors.shape} open={menu === 'shape'} onClose={() => setMenu(null)} width={244} title="Shape">

@@ -46,7 +46,7 @@ import { absolute, usePagesStore } from './state';
 import { FolderMenu, moveToFolder, placeFolders, placeTopName } from './folders';
 import { Studio, type StudioDoc } from './studio/Studio';
 import { tr } from '../../i18n/runtime';
-import { closePageAsk, openPageAsk, PageAskPanel, PageAskPill, usePageAsk } from './AskPage';
+import { askNow, closePageAsk, openPageAsk, PageAskPanel, PageAskPill, usePageAsk } from './AskPage';
 import { loadModelVersion, type AskScope } from './kinds';
 import { useLiveDraft, usePageDraft } from './live';
 import { EDITORS } from './editors';
@@ -497,6 +497,7 @@ function PageView({ id }: { id: string }) {
         band={band}
         savedNote={page?.sessionKey ? 'the agent that made it sees your changes' : undefined}
         onAsk={(text) => askThis(text)}
+        onRequest={old ? undefined : (prompt) => askNow(prompt, { page: id })}
         onScopes={setScopes}
         saveNowRef={saveFirst}
         onDirty={(d) => {
@@ -524,6 +525,7 @@ function PageView({ id }: { id: string }) {
       initialMode={startMode === 'edit' || startMode === 'code' ? startMode : undefined}
       savedNote={page?.sessionKey ? 'the agent that made it sees your changes' : undefined}
       onAsk={(text) => askThis(text)}
+      onRequest={old ? undefined : (prompt) => askNow(prompt, { page: id })}
       saveNowRef={saveFirst}
       pageId={old ? undefined : id}
     />

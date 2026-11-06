@@ -64,7 +64,6 @@ import {
   Search,
   Shapes,
   Sigma,
-  Smile,
   Sparkles,
   Spline,
   SquareCode,
@@ -159,6 +158,8 @@ export interface MenuArgs {
   aiVideo?: () => void;
   aiEdit?: (mode: 'change' | 'cutout' | 'erase') => void;
   aiPlotChart?: () => void;
+  /** A slide made with AI after this one: the gallery of kinds (a SWOT analysis, a timeline, a quiz…). */
+  aiSlide?: () => void;
   video(): void;
   /** A video from this device. */
   videoFile(): void;
@@ -256,6 +257,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
       label: 'Insert',
       items: [
         { label: 'New slide', icon: <LayoutTemplate size={14} />, keys: 'Ctrl+M', disabled: ro, run: a.newSlide },
+        !!a.aiSlide && { label: 'Slide made with AI', icon: <Sparkles size={14} />, also: 'ai agent generate make new slide kind swot timeline quiz agenda chart team pricing', disabled: ro, run: a.aiSlide },
         '-',
         { label: 'Text box', icon: <Type size={14} />, disabled: ro, run: a.textBox },
         { label: 'Shape', icon: <Shapes size={14} />, disabled: ro, run: a.shape },
@@ -287,8 +289,8 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         { label: 'Chart', icon: <PieChart size={14} />, disabled: ro, run: a.chart },
         !!a.aiPlot && { label: 'Plot', icon: <ChartScatter size={14} />, also: 'plot chart graph data matplotlib histogram scatter ai', disabled: ro, run: a.aiPlot },
         '-',
-        { label: 'Icon', icon: <Star size={14} />, also: 'icon symbol pictogram lucide', disabled: ro, run: a.icon },
-        { label: 'Emoji', icon: <Smile size={14} />, also: 'emoji smiley', disabled: ro, run: a.emoji },
+        // One picker has both (its tabs): one row, so Insert fits a small window with Slide made with AI in it.
+        { label: 'Icon or emoji', icon: <Star size={14} />, also: 'icon symbol pictogram lucide emoji smiley', disabled: ro, run: a.icon },
         { label: 'Equation', icon: <Sigma size={14} />, also: 'equation maths formula latex', disabled: ro, run: a.equation },
         { label: 'Code', icon: <SquareCode size={14} />, also: 'code program snippet source syntax colours', disabled: ro, run: a.code },
         {
