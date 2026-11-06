@@ -70,8 +70,8 @@ function CoachSetup({ deck, onStart, onClose }: { deck: Deck; onStart: (minutes:
       <p className={cx('mt-3 flex items-start gap-2 rounded-lg px-3 py-2 text-[12.5px] leading-snug', listens ? 'bg-bg-1 text-fg-3' : 'bg-warn/10 text-fg-2')}>
         {listens ? <Mic size={14} className="mt-0.5 shrink-0" /> : <MicOff size={14} className="mt-0.5 shrink-0" />}
         {listens
-          ? tr(`It listens in ${speechLang()} (Settings → Voice changes it), through the browser’s speech recognition (Chrome and Edge may send your voice to their makers’ servers to turn it into words).`)
-          : tr('This browser cannot turn speech into words (Chrome and Edge can), so the coach times your slides only.')}
+          ? tr(`It listens in ${speechLang()} (Settings → Voice changes it), through the browser’s speech recognition (Chrome, Edge and Safari may send your voice to their makers’ servers to turn it into words).`)
+          : tr('This browser cannot turn speech into words (Chrome, Edge and Safari can), so the coach times your slides only.')}
       </p>
     </Dialog>
   );

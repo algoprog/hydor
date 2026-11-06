@@ -16,7 +16,7 @@ import { PICS, RT } from './rt';
 const STYLES: { id: AnimateStyle; label: string; title: string; icon: typeof Zap }[] = [
   { id: 'subtle', label: 'Subtle', title: 'Things fade in, calm and quick', icon: Feather },
   { id: 'lively', label: 'Lively', title: 'Things rise and slide in, lines draw, numbers count up', icon: Sparkles },
-  { id: 'bold', label: 'Striking', title: 'Things drop, pop and flip in; the slides turn as a cube', icon: Zap },
+  { id: 'bold', label: 'Striking', title: 'Things drop, pop and flip in; the slides turn as a cube (zoom in a PowerPoint compatible deck)', icon: Zap },
 ];
 
 /**

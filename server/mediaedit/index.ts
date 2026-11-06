@@ -207,7 +207,7 @@ function saying(a: Record<string, any>, r: ImageRecipe, n: { words: number; arro
   return s.length ? s.join(', ') : 'saved again';
 }
 
-export function editImageTool(d: Pick<Deps, 'db'>): RunTool {
+export function editImageTool(d: Deps): RunTool {
   return {
     name: 'edit_image',
     annotations: { readOnlyHint: false, openWorldHint: false },
@@ -222,6 +222,8 @@ export function editImageTool(d: Pick<Deps, 'db'>): RunTool {
       type: 'object',
       properties: {
         path: { type: 'string', description: 'The picture: a file in the session’s folder (PNG, JPEG, WebP or GIF), or one in a deck, document or page as get_page shows it (naget-asset:…).' },
+        library: { type: 'string', description: 'Instead of path: a picture of the user’s Library, by its id (app_api GET /api/media lists them).' },
+        save_to_library: { type: 'string', enum: ['replace', 'copy'], description: 'With library: put the result in the Library over that picture (replace: its title, project and folder kept, as the editor’s Save does) or beside it as a new one (copy). Left out, only the file in your folder is made.' },
         crop: { ...BOX, description: 'The part to keep: its top left (x, y), width and height.' },
         rotate: { type: 'integer', enum: [90, 180, 270], description: 'Turn it clockwise by this many degrees.' },
         flip: { type: 'string', enum: ['horizontal', 'vertical', 'both'], description: 'Mirror it left to right (horizontal) or upside down (vertical).' },
@@ -276,10 +278,14 @@ export function editImageTool(d: Pick<Deps, 'db'>): RunTool {
         quality: { type: 'integer', minimum: 1, maximum: 100, description: 'JPEG and WebP: 1 to 100 (default 90).' },
         name: { type: 'string', description: 'A short file name for the result, without extension (default: the picture’s name and "-edited").' },
       },
-      required: ['path'],
     },
     async run(a, ctx: RunCtx) {
-      const pic = agentPicture(d.db, ctx, a.path);
+      // A Library picture by its id, or a file or a kept picture by its path.
+      const libId = typeof a.library === 'string' && a.library.trim() ? a.library.trim() : '';
+      const libItem = libId ? mustMedia(d.db, libId) : null;
+      if (libItem && libItem.kind !== 'image') return { isError: true, text: `${libId} is not a picture of the Library (it is a ${libItem.kind}).` };
+      if (!libItem && a.save_to_library) return { isError: true, text: 'save_to_library goes with library: the Library picture’s id.' };
+      const pic = libItem ? { name: path.basename(libItem.file, path.extname(libItem.file)), data: fs.readFileSync(libItem.file) } : agentPicture(d.db, ctx, a.path);
       let src;
       try {
         src = await decode(pic.data);
@@ -356,7 +362,15 @@ export function editImageTool(d: Pick<Deps, 'db'>): RunTool {
         boxes: (recipe.marks ?? []).filter((m) => m.type === 'rect' || m.type === 'ellipse').length,
         hidden: (recipe.marks ?? []).filter((m) => m.type === 'blur' || m.type === 'pixelate').length,
       });
-      return [`Edited the picture (${src.w}×${src.h}): ${what}:`, ...savedLines(f, ...out.notes, inPlace(pic.kept))].join('\n');
+      // Put in the Library as the editor's Save or Save a copy does.
+      let kept = '';
+      if (libItem && (a.save_to_library === 'replace' || a.save_to_library === 'copy')) {
+        const fmt = formatOfData(made.data);
+        if (!fmt) return { isError: true, text: 'The edited picture is not a PNG, JPEG or WebP: it was not put in the Library.' };
+        const item = a.save_to_library === 'replace' ? await replaceInLibrary(d, libItem.id, made.data, fmt) : await copyToLibrary(d, made.data, fmt, libItem, '');
+        kept = a.save_to_library === 'replace' ? `It is in the Library in place of “${libItem.title}” (${item.id}).` : `It is in the Library as a new picture beside “${libItem.title}” (${item.id}).`;
+      }
+      return [`Edited the picture (${src.w}×${src.h}): ${what}:`, ...savedLines(f, ...out.notes, inPlace(pic.kept)), ...(kept ? [kept] : [])].join('\n');
     },
   };
 }

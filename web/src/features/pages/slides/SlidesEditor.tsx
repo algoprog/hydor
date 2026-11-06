@@ -871,7 +871,7 @@ export function SlidesEditor({
       toWeb &&
       !(await confirm({
         title: 'Use the web format?',
-        body: 'Custom code, web pages, quizzes and 3D are the web format’s. The deck stops being PowerPoint compatible: its PowerPoint file gets them as pictures.',
+        body: 'Custom code, web pages, quizzes and 3D are the web format’s. The deck stops being PowerPoint compatible: its PowerPoint file gets custom code, web pages and 3D as pictures, and quizzes and scores as words.',
         confirm: 'Use the web format',
       }))
     )

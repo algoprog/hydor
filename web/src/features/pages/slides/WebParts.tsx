@@ -275,7 +275,7 @@ export function QuizLook({ el, theme, set }: { el: QuizEl; theme: Theme; set: Se
             set({ multi: multi || undefined, ...(multi ? {} : { choices: el.choices.map((c, k) => tidy({ ...c, correct: k === first })) }) } as Partial<El>);
           }}
         />
-        <p className={note}>{!right ? 'No choice is marked right: it is a poll. What people pick shows, and nothing is scored.' : el.multi ? 'People pick every right one, then Check.' : 'Right or wrong shows as soon as one is picked.'}</p>
+        <p className={note}>{!right ? 'No choice is marked right: it is a poll. What people pick shows, and nothing is scored.' : el.multi ? 'People pick every right one, then Check the answers.' : 'Right or wrong shows as soon as one is picked.'}</p>
         <Field label="After it" top>
           <textarea
             value={el.explain ?? ''}
