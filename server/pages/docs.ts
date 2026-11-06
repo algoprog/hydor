@@ -54,6 +54,10 @@ import {
   type Run,
 } from '../../shared/docs.ts';
 import { FONTS, googleFamilies } from '../../shared/slides.ts';
+import { docRefs } from '../../shared/doc-refs.ts';
+import { paginateDoc } from '../../shared/doc-paginate.ts';
+import { COLUMN_GAP, notesHtml, paperOf } from '../../shared/docs.ts';
+import { scriptSafe } from './kit.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { rels } from '../documents/ooxml.ts';
@@ -319,7 +323,7 @@ const PX_MM = 96 / 25.4;
 
 /** How the sheets of paper sit on the page around them, for each way the page shows. */
 function pageCss(doc: Doc, mode: 'viewer' | 'print' | 'still'): string {
-  const paper = PAPERS[doc.page.size];
+  const paper = paperOf(doc.page);
   const m = doc.page.margin;
   const w = Math.round(paper.w * PX_MM);
   const base = [
@@ -327,7 +331,7 @@ function pageCss(doc: Doc, mode: 'viewer' | 'print' | 'still'): string {
     'body{background:var(--n-bg,#eceae6);-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-print-color-adjust:exact;print-color-adjust:exact}',
     'html[data-n-theme=dark] body{background:#000000}',
     '.nd-doc{padding:24px 16px 32px;box-sizing:border-box}',
-    `.nd-sheet{box-sizing:border-box;background:#fff;width:${paper.w}mm;max-width:none;margin:0 auto 20px;padding:${m}mm;` +
+    `.nd-sheet{box-sizing:border-box;background:${doc.page.color ?? '#fff'};width:${paper.w}mm;max-width:none;margin:0 auto 20px;padding:${m}mm;` +
       'box-shadow:0 1px 3px rgba(0,0,0,.12),0 10px 30px rgba(0,0,0,.07);border-radius:2px}',
     '.nd-sheet:last-child{margin-bottom:0}',
     // The header and footer on each sheet's margins (in print, on every page's, below).
@@ -336,6 +340,16 @@ function pageCss(doc: Doc, mode: 'viewer' | 'print' | 'still'): string {
     '.nd-band.nd-head{top:0}.nd-band.nd-foot{bottom:0}.nd-band.nd-center{justify-content:center}.nd-band.nd-right{justify-content:flex-end}',
     // A sheet's first block starts at the top of its words, as the editor's does, its header and footer before it or not.
     '.nd-sheet>.nd-band+.nd-b,.nd-sheet>.nd-band+.nd-band+.nd-b{margin-top:0}',
+    // Words in columns; the footnotes at the end, under a short line; the watermark across the middle of each sheet.
+    `.nd-cols{column-count:${doc.page.cols ?? 1};column-gap:${COLUMN_GAP}mm}`,
+    '.nd-cols>.nd-b{break-inside:avoid}',
+    '.nd-endnotes{margin-top:1.5em;padding-top:.6em;border-top:1px solid #c8ccd1;width:33%;min-width:12em}',
+    '.nd-endnotes .nd-notes{width:300%;max-width:calc(100vw - 4em)}',
+    '.nd-wm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden}',
+    '.nd-wm span{transform:rotate(-45deg);font:700 var(--wm,96px)/1 Arial,sans-serif;color:rgba(0,0,0,.075);white-space:nowrap;letter-spacing:.04em}',
+    '.nd-wm img{max-width:60%;max-height:55%;object-fit:contain;opacity:.16}',
+    // A paragraph that goes on from the page before: no mark of a list again.
+    '.nd-doc .nd-li.nd-cont::before{content:none}.nd-doc .nd-cont{margin-top:0}',
   ];
   if (mode === 'print') return [...base, printCss(doc)].join('\n');
   if (mode === 'still') {
@@ -359,10 +373,12 @@ function pageCss(doc: Doc, mode: 'viewer' | 'print' | 'still'): string {
 /** How the document prints: its paper and margins, its header and footer on every page, its sheets as pages, what belongs together kept together. */
 function printCss(doc: Doc): string {
   return [
-    `@page{size:${doc.page.size === 'letter' ? 'letter' : 'A4'};margin:${doc.page.margin}mm;${marginBoxes(doc)}}`,
+    `@page{size:${doc.page.size === 'letter' ? 'letter' : 'A4'}${doc.page.orient === 'landscape' ? ' landscape' : ''};margin:${doc.page.margin}mm;${marginBoxes(doc)}}`,
     doc.titlePage ? '@page:first{@top-left{content:none}@top-center{content:none}@top-right{content:none}@bottom-left{content:none}@bottom-center{content:none}@bottom-right{content:none}}' : '',
     '.nd-band{display:none}',
-    'html,body{background:#fff!important}',
+    `html,body{background:${doc.page.color ?? '#fff'}!important}`,
+    // The watermark on every printed page (a fixed element prints on each).
+    '.nd-sheet .nd-wm{display:none}.nd-wm-print{display:flex!important;position:fixed}',
     '.nd-doc{padding:0}',
     '.nd-sheet{width:auto;padding:0;margin:0;box-shadow:none;border-radius:0;zoom:1}',
     '.nd-sheet+.nd-sheet{break-before:page}',
@@ -419,7 +435,9 @@ export function docHasMath(d: Doc): boolean {
 export function docPage(db: DB, doc: Doc, title: string, mode: 'viewer' | 'print' | 'still' = 'viewer'): string {
   const inside = mapDocSources(doc, (s) => (s.startsWith(ASSET) ? (assetDataUrl(db, s.slice(ASSET.length)) ?? '') : s));
   const { labels } = listInfo(inside.blocks);
-  const draw = { src: (s: string) => s, math: texToHtml, toc: tocEntries(inside) };
+  // Footnotes' numbers, citations, cross-references, numbered captions and the bibliography, as the editor draws them.
+  const refs = docRefs(inside);
+  const draw = { src: (s: string) => s, math: texToHtml, toc: tocEntries(inside), refs };
   const sheets: string[][] = [[]];
   for (let i = 0; i < inside.blocks.length; i++) {
     const b = inside.blocks[i];
@@ -432,11 +450,24 @@ export function docPage(db: DB, doc: Doc, title: string, mode: 'viewer' | 'print
     sheets[sheets.length - 1].push(blockHtml(b, labels[i], draw));
   }
   const fams = googleFamilies(docFonts(inside));
+  const cols = (doc.page.cols ?? 1) > 1;
+  const notes = refs && inside.notes?.some((n) => refs.note(n.id) > 0) ? notesHtml(inside, refs, { view: true, math: texToHtml }) : '';
+  // Printed with footnotes at their pages' foot, or in columns: laid out page by page in the page itself (doc-paginate.ts).
+  const paged = mode === 'print' && (!!notes || cols);
+  const wm = inside.mark ? `<div class="nd-wm">${inside.mark.src ? `<img src="${esc(inside.mark.src)}" alt="">` : `<span style="--wm:${Math.round(Math.min(160, 900 / Math.max(4, (inside.mark.text ?? '').length * 0.62)))}px">${esc(inside.mark.text ?? '')}</span>`}</div>` : '';
   const body = sheets.map((s, i) => {
     const bands = doc.titlePage && i === 0 ? '' : bandHtml(doc.header, 'head', i + 1, sheets.length) + bandHtml(doc.footer, 'foot', i + 1, sheets.length);
-    return `<div class="nd-sheet">${bands}${s.join('')}</div>`;
+    // Without pages, the footnotes go at the end (after the last sheet's words).
+    const end = !paged && notes && i === sheets.length - 1 ? `<div class="nd-endnotes"><div class="nd-notes-wrap">${notes}</div></div>` : '';
+    const words = cols && !paged ? `<div class="nd-cols">${s.join('')}</div>` : s.join('');
+    return `<div class="nd-sheet">${mode === 'print' ? '' : wm}${bands}${words}${end}</div>`;
   });
-  const html = body.join('');
+  const extra = paged ? `<div class="nd-notes-src" hidden>${notes}</div>` : '';
+  const printMark = mode === 'print' && wm ? wm.replace('class="nd-wm"', 'class="nd-wm nd-wm-print"') : '';
+  const html = body.join('') + extra;
+  const script = paged
+    ? `<script data-paginate>Promise.all([document.fonts.ready,...Array.from(document.images).map(function(i){return i.complete?0:new Promise(function(r){i.onload=i.onerror=r})})]).then(function(){(${PAGINATE_SRC})(${JSON.stringify(paginateOptions(doc))})})</script>`
+    : '';
   return [
     '<!doctype html>',
     `<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>`,
@@ -444,9 +475,19 @@ export function docPage(db: DB, doc: Doc, title: string, mode: 'viewer' | 'print
     fams ? `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?${esc(fams)}&amp;display=swap">` : '',
     docHasMath(inside) ? `<style>${katexStyle(html)}</style>` : '',
     `<style>${pageCss(doc, mode)}\n${docCss(doc)}${suggestionsCss(doc)}${mode === 'viewer' ? `\n@media print{${printCss(doc)}}` : ''}</style></head><body>`,
-    `<main class="nd-doc" translate="no">${html}</main>`,
+    `<main class="nd-doc" translate="no">${html}</main>${printMark}`,
+    script,
     '</body></html>',
   ].join('\n');
+}
+
+/** The page-by-page layout of a printed document (doc-paginate.ts), as the page runs it. */
+const PAGINATE_SRC = scriptSafe(paginateDoc.toString());
+
+/** What the editor's Print lays out a document's pages with (its frame runs no script of the page's own). */
+export function paginateOptions(doc: Doc) {
+  const px = (mm: number) => Math.round(mm * PX_MM * 100) / 100;
+  return { w: px(paperOf(doc.page).w - 2 * doc.page.margin), h: px(paperOf(doc.page).h - 2 * doc.page.margin) - 1, cols: doc.page.cols ?? 1, gap: px(COLUMN_GAP), sep: 16 };
 }
 
 /** What get_page tells an agent of a document: its outline, then the document as Markdown, and how to change it. */

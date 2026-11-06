@@ -9,8 +9,10 @@
 // The page it lays out: <main class="nd-doc"> with sheets (.nd-sheet: one per page break) of blocks (.nd-b), and the
 // footnotes' words in <div class="nd-notes-src" hidden> (<p class="nd-note" data-note="id">); each footnote's mark is
 // <span data-k="fn" data-tex="id">.
-export function paginateDoc(o: { w: number; h: number; cols: number; gap: number; sep: number }): number {
-  const doc = document;
+export function paginateDoc(o: { w: number; h: number; cols: number; gap: number; sep: number }, d?: Document): number {
+  // The page's own document (the editor passes its frame's).
+  const doc = d ?? document;
+  const win = doc.defaultView ?? window;
   const root = doc.documentElement;
   if (root.dataset.paged) return Number(root.dataset.paged);
   const main = doc.querySelector('main.nd-doc') as HTMLElement | null;
@@ -20,9 +22,9 @@ export function paginateDoc(o: { w: number; h: number; cols: number; gap: number
   for (const n of src ? Array.from(src.querySelectorAll<HTMLElement>('[data-note]')) : []) notes.set(n.dataset.note!, n);
   const placed = new Set<string>();
   const out: HTMLElement[] = [];
-  let body: HTMLElement;
-  let foot: HTMLElement;
-  let page: HTMLElement;
+  let body = doc.createElement('div');
+  let foot = doc.createElement('div');
+  let page = doc.createElement('div');
   // The words keep their width while being measured: one column's, or the text's.
   const colW = o.cols > 1 ? (o.w - (o.cols - 1) * o.gap) / o.cols : o.w;
   const newPage = () => {
@@ -52,7 +54,7 @@ export function paginateDoc(o: { w: number; h: number; cols: number; gap: number
     const top = body.getBoundingClientRect().top;
     for (const k of Array.from(body.children)) {
       const r = k.getBoundingClientRect();
-      const mb = parseFloat(getComputedStyle(k).marginBottom) || 0;
+      const mb = parseFloat(win.getComputedStyle(k).marginBottom) || 0;
       bottom = Math.max(bottom, r.bottom - top + (k === body.lastElementChild ? 0 : mb));
     }
     return bottom <= room + 0.5;
@@ -86,7 +88,7 @@ export function paginateDoc(o: { w: number; h: number; cols: number; gap: number
   /** The places where a block's lines start (in its text), top to bottom. */
   const lineStarts = (el: Element): { node: Text; offset: number; top: number }[] => {
     const out2: { node: Text; offset: number; top: number }[] = [];
-    const walker = doc.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const walker = doc.createTreeWalker(el, 4);
     const r = doc.createRange();
     let last = -Infinity;
     for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
