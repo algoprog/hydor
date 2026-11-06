@@ -51,6 +51,23 @@ export const cleanLang = (v: unknown): string | null => {
   return s && s.length <= 40 && /^[\p{L}][\p{L} ()'-]*$/u.test(s) ? s : null;
 };
 
+/** The ways design ideas lay a slide out, by id, with their names under their pictures in the panel. */
+export const IDEA_WAYS: Record<string, string> = {
+  'picture-behind': 'Picture behind',
+  'big-number': 'Big number',
+  split: 'Half and half',
+  cards: 'Cards',
+  steps: 'Steps',
+  statement: 'One statement',
+  band: 'Side band',
+  columns: 'In columns',
+  'picture-grid': 'Picture grid',
+  'chart-first': 'Chart first',
+  quote: 'Quote',
+  magazine: 'Magazine page',
+  centred: 'Centred',
+};
+
 export interface IdeasAsk {
   /** The deck (its model as the editor has it, changes not saved yet too), or a saved deck's id. */
   deck: unknown;

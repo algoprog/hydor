@@ -15,7 +15,7 @@ import type { FastifyReply } from 'fastify';
 import { LANGS } from '../../shared/i18n.ts';
 import { readDeck } from '../pages/slides.ts';
 import { ASSET, type Deck, type Slide } from '../../shared/slides.ts';
-import { cleanLang, REWRITE_HOWS, REWRITE_MAX, type DescribeAnswer, type IdeasAnswer, type RewriteAnswer, type RewriteHow } from '../../shared/write.ts';
+import { cleanLang, IDEA_WAYS, REWRITE_HOWS, REWRITE_MAX, type DescribeAnswer, type IdeasAnswer, type RewriteAnswer, type RewriteHow } from '../../shared/write.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
@@ -79,7 +79,7 @@ async function oneIdea(db: DB, d: Deck, i: number, way: Way, signal: AbortSignal
       continue;
     }
     const got = holdIdea(d, i, raw);
-    if ('slide' in got) return { slide: got.slide, name: way.name, model };
+    if ('slide' in got) return { slide: got.slide, name: IDEA_WAYS[way.id] ?? way.id, model };
     problem = got.problem;
   }
   return { problem: problem ?? 'it did not hold.' };

@@ -1674,7 +1674,7 @@ export function SlidesEditor({
                 <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-1">
                   {side ? (
                     <span className="flex min-w-0 flex-1 items-center gap-1.5 pl-2 text-[13px] font-medium text-fg">
-                      <span className="min-w-0 truncate">{side === 'ideas' ? 'Design ideas' : 'Accessibility'}</span>
+                      <span className="min-w-0 truncate">{side === 'ideas' ? 'Design ideas' : 'Accessibility check'}</span>
                     </span>
                   ) : (
                     hold('tabs', tabs)
