@@ -1,17 +1,20 @@
 // Settings → Images, video and audio: whether agents can make images, videos and audio, and with which of
-// OpenRouter's models (an image model, a video model, a music model and a voice and sound model; each list opens in
-// a dialog, to search and sort), and the model that writes the titles and descriptions of what you keep in the
+// OpenRouter's models (two image models: one for most pictures, Best, and one for simple ones, Quick: icons,
+// backgrounds, textures; a video model, a music model and a voice and sound model; each list opens in a dialog, to
+// search and sort), the picture tools on this computer (cutouts and erasing, free and private: set up or removed
+// here, with what they are doing), and the model that writes the titles and descriptions of what you keep in the
 // Library: where it runs (the app's choice, OpenRouter, Claude, a model of your own) and which. Making them uses
 // the OpenRouter key from Settings → Models; without one, this says where to add it.
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { AudioLines, Check, Copy, ExternalLink, Film, ImagePlay, KeyRound, MessagesSquare, Mic, Music, PenLine, Search, Sparkles, TriangleAlert, Type, X } from 'lucide-react';
+import { AudioLines, Check, Copy, Cpu, ExternalLink, Film, HardDriveDownload, ImagePlay, KeyRound, MessagesSquare, Mic, Music, PenLine, Search, Sparkles, TriangleAlert, Type, X } from 'lucide-react';
 import type { ImageModel, ImagesState } from '@shared/images';
 import { clipLength, type AudioModel, type AudioState, type CaptionModelOption, type CaptionProvider, type MediaSettings, type VideoModel, type VideosState } from '@shared/media';
 import { api, put } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
-import { Button, cx, Dialog, inputCls, OptionRow, Picker, Section, Segmented, Switch, Throbber } from '../../components/ui';
+import { Button, cx, Dialog, inputCls, OptionRow, Picker, Section, Segmented, Switch, Throbber, useConfirm } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
+import { localStatus, useLocalTools } from './studio/LocalTools';
 
 const DAY = 86_400_000;
 const usd = (n: number) => (n >= 0.095 ? n.toFixed(2) : String(Number(n.toPrecision(1))));
@@ -420,6 +423,69 @@ function Captions({ st, onSave }: { st: MediaSettings; onSave: (provider: Captio
   );
 }
 
+// ---- the picture tools on this computer ---------------------------------------------------------------------------
+
+/** The picture tools on this computer: what they do, free and private, how large, what they are doing; Set up or Remove. */
+function PictureTools() {
+  const tools = useLocalTools();
+  const [confirm, confirmNode] = useConfirm();
+  const s = tools.state;
+  const remove = async () => {
+    if (
+      await confirm({
+        title: 'Remove the picture tools?',
+        body: 'Their Python and the models they downloaded go from this computer. Backgrounds and erasing then go through OpenRouter, priced. You can set them up again.',
+        confirm: 'Remove',
+        danger: true,
+      })
+    )
+      await tools.remove();
+  };
+  return (
+    <div className="flex flex-wrap items-start gap-x-3 gap-y-2 border-t border-line pt-3.5">
+      <Cpu size={16} className="mt-0.5 shrink-0 text-fg-3" />
+      <div className="min-w-[min(100%,15rem)] flex-1 space-y-1">
+        <div className="text-[12.5px] font-medium text-fg-2">Picture tools on this computer</div>
+        <p className="text-[12.5px] leading-snug text-fg-3">
+          Take a picture’s background out, or erase part of it, here: for nothing, and your pictures stay on this computer. About {s?.sizeMb ?? 120} MB once, and each tool’s model (about 220 MB) the first time it is used.
+        </p>
+        {!s ? (
+          <div className="flex items-center gap-2 text-[12.5px] text-fg-3">
+            <Throbber /> Looking
+          </div>
+        ) : s.installing ? (
+          <div className="flex items-center gap-2 text-[12.5px] text-fg-2">
+            <Throbber className="shrink-0" />
+            <span>{s.step || 'Setting up'}</span>
+          </div>
+        ) : (
+          <div className={cx('flex flex-wrap gap-x-1.5 text-[12.5px]', s.ready ? 'text-fg-2' : 'text-fg-3')}>
+            {s.ready && <Check size={14} className="mt-px shrink-0 text-ok" strokeWidth={2.6} />}
+            {localStatus(s).map((x) => (
+              <span key={x}>{x}</span>
+            ))}
+          </div>
+        )}
+        {(tools.error || s?.error) && <p className="text-[12.5px] leading-snug text-err">{tools.error || s?.error}</p>}
+      </div>
+      {s &&
+        !s.installing &&
+        (s.ready ? (
+          <Button size="sm" variant="ghost" onClick={() => void remove()}>
+            Remove
+          </Button>
+        ) : (
+          s.canInstall && (
+            <Button size="sm" variant="secondary" icon={<HardDriveDownload size={14} />} onClick={() => void tools.setUp()}>
+              Set up
+            </Button>
+          )
+        ))}
+      {confirmNode}
+    </div>
+  );
+}
+
 // ---- the section ----------------------------------------------------------------------------------------------
 
 export function ImagesSettings() {
@@ -427,14 +493,14 @@ export function ImagesSettings() {
   const [vid, setVid] = useState<VideosState | null>(null);
   const [aud, setAud] = useState<AudioState | null>(null);
   const [med, setMed] = useState<MediaSettings | null>(null);
-  const [dialog, setDialog] = useState<'image' | 'video' | 'music' | 'speech' | null>(null);
+  const [dialog, setDialog] = useState<'image' | 'quick' | 'video' | 'music' | 'speech' | null>(null);
   useEffect(() => {
     api<ImagesState>('/api/images/settings').then(setImg, toastError);
     api<VideosState>('/api/videos/settings').then(setVid, toastError);
     api<AudioState>('/api/audio/settings').then(setAud, toastError);
     api<MediaSettings>('/api/media/settings').then(setMed, toastError);
   }, []);
-  const saveImg = (body: Partial<Pick<ImagesState, 'enabled' | 'model'>>) => put<ImagesState>('/api/images/settings', body).then(setImg, toastError);
+  const saveImg = (body: Partial<Pick<ImagesState, 'enabled' | 'model' | 'quick'>>) => put<ImagesState>('/api/images/settings', body).then(setImg, toastError);
   const saveVid = (body: Partial<Pick<VideosState, 'enabled' | 'model'>>) => put<VideosState>('/api/videos/settings', body).then(setVid, toastError);
   const saveAud = (body: Partial<Pick<AudioState, 'enabled' | 'music' | 'speech'>>) => put<AudioState>('/api/audio/settings', body).then(setAud, toastError);
   const saveCaptions = (provider: CaptionProvider, model: string) => put<MediaSettings>('/api/media/settings', { captions: { provider, model } }).then(setMed, toastError);
@@ -467,9 +533,15 @@ export function ImagesSettings() {
         </div>
       )}
       <Section title="Making images" sub="Agents get a tool for it. Each image is paid for with your OpenRouter key." actions={<Switch on={img.enabled} onChange={(on) => void saveImg({ enabled: on })} label="Let agents make images" />}>
-        <ModelLine label="Image model" picked={!!img.model} onChange={() => setDialog('image')} onAuto={() => void saveImg({ model: '' })}>
-          {imgModel ? <ImageRow m={imgModel} /> : <div className="px-3 py-2.5 font-mono text-[12.5px] text-fg-2">{img.using}</div>}
-        </ModelLine>
+        <div className="space-y-4">
+          <ModelLine label="For most pictures (Best)" picked={!!img.model} onChange={() => setDialog('image')} onAuto={() => void saveImg({ model: '' })}>
+            {imgModel ? <ImageRow m={imgModel} /> : <div className="px-3 py-2.5 font-mono text-[12.5px] text-fg-2">{img.using}</div>}
+          </ModelLine>
+          <ModelLine label="For simple pictures (Quick): icons, backgrounds, textures" picked={!!img.quick} onChange={() => setDialog('quick')} onAuto={() => void saveImg({ quick: '' })}>
+            {img.usingQuickInfo ? <ImageRow m={img.usingQuickInfo} /> : <div className="px-3 py-2.5 font-mono text-[12.5px] text-fg-2">{img.usingQuick || img.using}</div>}
+          </ModelLine>
+          <PictureTools />
+        </div>
       </Section>
       <Section title="Making videos" sub="Agents get a tool for it. Videos cost more: cents to dollars a second, shown on the form before anything is made." actions={<Switch on={vid.enabled} onChange={(on) => void saveVid({ enabled: on })} label="Let agents make videos" />}>
         <ModelLine label="Video model" picked={!!vid.model} onChange={() => setDialog('video')} onAuto={() => void saveVid({ model: '' })}>
@@ -497,13 +569,13 @@ export function ImagesSettings() {
         <Captions st={med} onSave={(p, m) => void saveCaptions(p, m)} />
       </Section>
       <ModelDialog<ImageModel>
-        open={dialog === 'image'}
+        open={dialog === 'image' || dialog === 'quick'}
         onClose={() => setDialog(null)}
-        title="Image model"
+        title={dialog === 'quick' ? 'Image model for simple pictures (Quick)' : 'Image model for most pictures (Best)'}
         endpoint="/api/images/models"
         hint="Search: flux, gemini, recraft…"
-        using={img.using}
-        onPick={(id) => void saveImg({ model: id })}
+        using={dialog === 'quick' ? img.usingQuick || img.using : img.using}
+        onPick={(id) => void saveImg(dialog === 'quick' ? { quick: id } : { model: id })}
         row={(m, selected, pick) => <ImageRow key={m.id} m={m} selected={selected} onPick={pick} />}
       />
       <ModelDialog<VideoModel>

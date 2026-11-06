@@ -469,6 +469,7 @@ export function Studio({
           onAsk={onAsk ? () => void ask() : undefined}
           onError={toastError}
           onPageTab={() => setTab('page')}
+          base={doc.base}
         />
       ) : (
         <p className="px-3 py-2 text-[12.5px] leading-relaxed text-fg-3">
@@ -528,7 +529,7 @@ export function Studio({
               onKeys={() => setKeysOpen(true)}
             />
           </DeviceStage>
-          <InsertPopover ask={asking} frame={() => editRef.current?.frame() ?? null} answer={(payload) => asking && cmd('fill', { id: asking.id, ...payload })} cmd={cmd} onClose={() => setAsking(null)} onError={toastError} />
+          <InsertPopover ask={asking} frame={() => editRef.current?.frame() ?? null} answer={(payload) => cmd('fill', payload)} cmd={cmd} onClose={() => setAsking(null)} onError={toastError} />
         </div>
         <aside className={cx('flex min-h-0 shrink-0 flex-col bg-panel', beside ? 'w-[320px] border-l border-line' : cx('border-t border-line', folded ? 'pb-[var(--safe-bottom)]' : 'h-[min(48%,440px)] min-h-[200px]'))}>
           <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-1">
