@@ -232,6 +232,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Picture tools on this computer**](/settings?s=images&find=Picture%20tools%20on%20this%20computer): Take a picture’s background out, or erase part of it, here: free, and your pictures stay on this computer.
 - [**Making videos**](/settings?s=images&find=Making%20videos): Let agents make videos.
 - [**Video model**](/settings?s=images&find=Video%20model): The model that makes videos.
+- [**Use the graphics card for videos**](/settings?s=images&find=Use%20the%20graphics%20card%20for%20videos): Make edited videos on the graphics card when there is one: faster, the processor free.
 - [**Making audio**](/settings?s=images&find=Making%20audio): Let agents make audio.
 - [**Music model**](/settings?s=images&find=Music%20model): The model that makes music.
 - [**Voice and sound model**](/settings?s=images&find=Voice%20and%20sound%20model): The model that makes voices and sounds.
