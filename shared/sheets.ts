@@ -96,6 +96,8 @@ export interface Cell {
   s?: CellStyle;
   /** A note on the cell, shown when it is pointed at. */
   note?: string;
+  /** A link the cell opens (Insert → Link): a web address (https:, mailto:, tel:), or a place in the workbook ("#'Sheet 2'!A1"). */
+  link?: string;
 }
 
 /**
@@ -288,6 +290,48 @@ export interface SheetComment extends Comment {
   cell: string;
 }
 
+/**
+ * A name for a range, a value or a formula (Data → Named ranges, Excel's Name Manager): `ref` is what it stands for,
+ * written as a formula without its "=" ("'Sheet 1'!$B$2:$B$20", "0.21", "LAMBDA(x, x*1.21)"); formulas use the name
+ * in its place, in any case. `sheet`: the id of the one sheet it is for (then it goes before a name of the workbook's).
+ */
+export interface NamedRange {
+  name: string;
+  ref: string;
+  sheet?: string;
+  note?: string;
+}
+
+/**
+ * Cells protected from changes (Data → Protect): a range, or the whole sheet when it has none but the cells `except`
+ * leaves open. A change to them warns first (`warn`), or is refused until the protection is taken off.
+ */
+export interface SheetProtect {
+  range?: string;
+  except?: string;
+  warn?: boolean;
+  note?: string;
+}
+
+/** Rows ("3:7") or columns ("C:E") grouped under an outline's bracket, folded away (hidden) or not. */
+export interface SheetGroup {
+  range: string;
+  hidden?: boolean;
+}
+
+/**
+ * How a sheet prints and goes to PDF: across the page or upright (by its width when not said), made to fit the page's
+ * width (or the whole page; none: at its own size), the cells to print (all of them when not said), the rows at its
+ * top each page repeats (its frozen rows or a header row when not said; 0: none), and the cells' lines (on unless said).
+ */
+export interface PrintSetup {
+  orient?: 'portrait' | 'landscape';
+  fit?: 'width' | 'page' | 'none';
+  area?: string;
+  titles?: number;
+  grid?: boolean;
+}
+
 export interface Sheet {
   id: string;
   name: string;
@@ -308,18 +352,36 @@ export interface Sheet {
   board?: SheetBoard;
   /** Comments' threads, one a cell, in the cells' order. */
   comments?: SheetComment[];
+  /** Cells that warn or refuse changes. */
+  protect?: SheetProtect[];
+  /** Rows and columns grouped, with + and − to fold them. */
+  groups?: SheetGroup[];
+  print?: PrintSetup;
+  /** The grid's lines hidden in the editor (View → Gridlines), as Excel's showGridLines. */
+  noGrid?: boolean;
 }
 
 export interface Workbook {
   v: 1;
   sheets: Sheet[];
+  /** Named ranges (and named values and formulas). */
+  names?: NamedRange[];
+  /**
+   * The answers of the AI function (=AI(prompt, cells…)), by the key of what was asked (its prompt and the cells' values):
+   * worked out once and kept with the workbook, asked again only when the prompt or the cells change, or with Refresh.
+   */
+  ai?: Record<string, CellValue>;
 }
 
 // ---- errors ------------------------------------------------------------------------------------------------
 
-export type ErrCode = '#DIV/0!' | '#N/A' | '#NAME?' | '#NULL!' | '#NUM!' | '#REF!' | '#VALUE!' | '#CIRC!' | '#ERROR!' | '#SPILL!';
+export type ErrCode = '#DIV/0!' | '#N/A' | '#NAME?' | '#NULL!' | '#NUM!' | '#REF!' | '#VALUE!' | '#CIRC!' | '#ERROR!' | '#SPILL!' | '#CALC!' | '#BUSY!';
 
-/** A formula's error, as its cell shows it. #CIRC!: it needs itself; #ERROR!: it cannot be read; #SPILL!: its array has no room to spill into. */
+/**
+ * A formula's error, as its cell shows it. #CIRC!: it needs itself; #ERROR!: it cannot be read; #SPILL!: its array has
+ * no room to spill into; #CALC!: it gives a LAMBDA that is never called, or an array of nothing; #BUSY!: an AI answer it
+ * needs is not there yet.
+ */
 export class CellError {
   constructor(readonly code: ErrCode) {}
   toString() {
@@ -338,6 +400,8 @@ const E = {
   CIRC: new CellError('#CIRC!'),
   PARSE: new CellError('#ERROR!'),
   SPILL: new CellError('#SPILL!'),
+  CALC: new CellError('#CALC!'),
+  BUSY: new CellError('#BUSY!'),
 };
 const ERR_BY_CODE = new Map<string, CellError>(Object.values(E).map((e) => [e.code, e]));
 /** The error of a code ("#N/A"), or null. */
@@ -1123,7 +1187,23 @@ export function cleanCell(x: unknown, typed = true): Cell | null {
   if (style) cell.s = style;
   const note = cleanNote(x.note ?? x.comment);
   if (note) cell.note = note;
-  return cell.v === undefined && cell.f === undefined && !cell.s && !cell.note ? null : cell;
+  const link = cleanLink(x.link ?? x.href ?? x.url);
+  if (link) cell.link = link;
+  return cell.v === undefined && cell.f === undefined && !cell.s && !cell.note && !cell.link ? null : cell;
+}
+
+/**
+ * A cell's link as kept: a web address (http, https, mailto, tel; "example.com" taken as https), or a place in the
+ * workbook ("#Sheet2!A1", "#'My sheet'!B2:C4", "#TaxRate"); undefined for anything else.
+ */
+export function cleanLink(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const t = v.trim().replace(/[\u0000-\u001f\u007f]/g, '');
+  if (!t || t.length > 2000) return undefined;
+  if (t.startsWith('#')) return /^#[^<>"]{1,300}$/.test(t) ? t : undefined;
+  if (/^(https?:\/\/|mailto:|tel:)/i.test(t)) return /[\s<>"]/.test(t) ? undefined : t;
+  if (/^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/[^\s<>"]*)?$/i.test(t)) return `https://${t}`;
+  return undefined;
 }
 
 /** A cell's note as it is kept: its words, without control characters, at most SHEET_LIMITS.note long; undefined for none. */
@@ -1748,6 +1828,122 @@ export function cleanSheetComments(v: unknown, ids: Set<string> = new Set()): Sh
   return [...byCell.entries()].sort((a, b) => a[0] - b[0]).map(([, c]) => c);
 }
 
+// ---- names, protection, groups, printing, AI answers: checking them -----------------------------------------------
+
+/** Whether words may name a range: a letter, _ or \ first, then letters, digits, _ . and \; not a cell (A1, R1C1), TRUE or FALSE. */
+export function isRangeName(name: string): boolean {
+  if (!/^[A-Za-z_\\\p{L}][\p{L}\p{N}_.\\]{0,254}$/u.test(name)) return false;
+  return !(/^[A-Za-z]{1,3}\d+$/.test(name) || /^(R\d*C\d*|R\d*|C\d*)$/i.test(name) || /^(true|false)$/i.test(name));
+}
+
+/** Named ranges as kept: each name once (in any case, per sheet it is for), what it stands for a formula that can be read. */
+export function cleanNames(v: unknown, sheetIds?: Set<string>): NamedRange[] {
+  let list: unknown[] = [];
+  if (Array.isArray(v)) list = v;
+  else if (isObj(v)) list = Object.entries(v).map(([name, ref]) => (isObj(ref) ? { name, ...ref } : { name, ref }));
+  const out: NamedRange[] = [];
+  const seen = new Set<string>();
+  for (const x of list.slice(0, 1000)) {
+    if (!isObj(x)) continue;
+    const name = typeof x.name === 'string' ? x.name.trim() : '';
+    const raw = x.ref ?? x.range ?? x.value ?? x.formula;
+    const ref = typeof raw === 'number' && Number.isFinite(raw) ? String(raw) : typeof raw === 'string' ? cleanText(raw).trim().replace(/^=/, '').trim().slice(0, SHEET_LIMITS.formula) : '';
+    if (!isRangeName(name) || !ref || formulaProblem(ref)) continue;
+    const sheet = typeof x.sheet === 'string' && (!sheetIds || sheetIds.has(x.sheet)) ? x.sheet : undefined;
+    const k = `${sheet ?? ''}\u0001${name.toLowerCase()}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const one: NamedRange = { name, ref };
+    if (sheet) one.sheet = sheet;
+    const note = typeof x.note === 'string' ? cleanText(x.note).trim().slice(0, 300) : '';
+    if (note) one.note = note;
+    out.push(one);
+  }
+  return out;
+}
+
+/** The AI function's answers as kept: by their keys, each a number, TRUE or FALSE, or words. */
+function cleanAi(v: unknown): Record<string, CellValue> | undefined {
+  if (!isObj(v)) return undefined;
+  const out: Record<string, CellValue> = {};
+  let n = 0;
+  for (const [k, x] of Object.entries(v)) {
+    if (!/^[a-z0-9]{4,24}$/.test(k)) continue;
+    if (typeof x === 'number' && Number.isFinite(x)) out[k] = x;
+    else if (typeof x === 'boolean') out[k] = x;
+    else if (typeof x === 'string') out[k] = cleanText(x);
+    else continue;
+    if (++n >= 20_000) break;
+  }
+  return n ? out : undefined;
+}
+
+/** Protected cells as kept: a range each (or the whole sheet, but the cells it leaves open), warning or refusing. */
+function cleanProtect(v: unknown): SheetProtect[] {
+  const list = Array.isArray(v) ? v : isObj(v) || v === true ? [v] : [];
+  const out: SheetProtect[] = [];
+  let whole = false;
+  for (const x of list.slice(0, 50)) {
+    const o = isObj(x) ? x : {};
+    const range = cleanRanges(o.range ?? o.ranges);
+    if (!range && whole) continue;
+    const p: SheetProtect = {};
+    if (range) p.range = range;
+    else whole = true;
+    const except = !range ? cleanRanges(o.except ?? o.unlocked) : '';
+    if (except) p.except = except;
+    if (o.warn === true || o.warning === true || o.mode === 'warn') p.warn = true;
+    const note = typeof o.note === 'string' ? cleanText(o.note).trim().replace(/\n+/g, ' ').slice(0, 200) : '';
+    if (note) p.note = note;
+    out.push(p);
+  }
+  return out;
+}
+
+/** Groups of rows ("3:7") or columns ("C:E") as kept: within the sheet's limits, each once. */
+function cleanGroups(v: unknown): SheetGroup[] {
+  if (!Array.isArray(v)) return [];
+  const out: SheetGroup[] = [];
+  const seen = new Set<string>();
+  for (const x of v.slice(0, 200)) {
+    const o: Obj = isObj(x) ? x : { range: x };
+    const t = typeof o.range === 'string' ? o.range.replace(/\$/g, '').replace(/\s+/g, '').toUpperCase() : typeof o.range === 'number' ? String(o.range) : '';
+    let range = '';
+    const rows = /^(\d{1,6})(?::(\d{1,6}))?$/.exec(t);
+    const cols = /^([A-Z]{1,3})(?::([A-Z]{1,3}))?$/.exec(t);
+    if (rows) {
+      const a = Number(rows[1]);
+      const b = Number(rows[2] ?? rows[1]);
+      if (a >= 1 && b >= 1 && Math.max(a, b) <= SHEET_LIMITS.rows) range = `${Math.min(a, b)}:${Math.max(a, b)}`;
+    } else if (cols) {
+      const a = colIndex(cols[1]);
+      const b = colIndex(cols[2] ?? cols[1]);
+      if (a >= 0 && b >= 0 && Math.max(a, b) < SHEET_LIMITS.cols) range = `${colName(Math.min(a, b))}:${colName(Math.max(a, b))}`;
+    }
+    if (!range || seen.has(range)) continue;
+    seen.add(range);
+    out.push(o.hidden === true || o.collapsed === true ? { range, hidden: true } : { range });
+  }
+  return out;
+}
+
+/** How a sheet prints, as kept; undefined when it says nothing of its own. */
+function cleanPrint(v: unknown): PrintSetup | undefined {
+  if (!isObj(v)) return undefined;
+  const p: PrintSetup = {};
+  const o = String(v.orient ?? v.orientation ?? '').toLowerCase();
+  if (o === 'portrait' || o === 'upright') p.orient = 'portrait';
+  else if (o === 'landscape' || o === 'across') p.orient = 'landscape';
+  const fit = v.fit === true ? 'width' : v.fit === false ? 'none' : String(v.fit ?? '').toLowerCase();
+  if (fit === 'width' || fit === 'page' || fit === 'none') p.fit = fit;
+  const area = cleanRanges(v.area ?? v.range);
+  if (area) p.area = area.split(',')[0];
+  const titles = intIn(v.titles ?? v.repeat ?? v.headerRows, 0, 20);
+  if (titles !== undefined) p.titles = titles;
+  if (typeof v.grid === 'boolean' || typeof v.gridlines === 'boolean') p.grid = (v.grid ?? v.gridlines) as boolean;
+  return Object.keys(p).length ? p : undefined;
+}
+
 function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], budget: Budget, commentIds: Set<string>): Sheet | null {
   if (Array.isArray(raw)) raw = { rows: raw };
   if (!isObj(raw)) return null;
@@ -1955,6 +2151,15 @@ function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], bud
   if (board) sheet.board = board;
   const comments = cleanSheetComments(pick('comments'), commentIds);
   if (comments.length) sheet.comments = comments;
+  const protect = cleanProtect(pick('protect', 'protected', 'protection'));
+  if (protect.length) sheet.protect = protect;
+  const groups = cleanGroups(pick('groups', 'outline'));
+  if (groups.length) sheet.groups = groups;
+  const print = cleanPrint(pick('print', 'pageSetup'));
+  if (print) sheet.print = print;
+  // The grid's lines hidden: noGrid: true, or gridlines: false (an agent's words), else as the file had them.
+  const noGrid = raw.noGrid ?? (raw.gridlines === undefined ? undefined : raw.gridlines === false) ?? base?.noGrid;
+  if (noGrid === true) sheet.noGrid = true;
   // Cells in reading order: row by row, left to right.
   const out: Record<string, Cell> = {};
   for (const k of [...cells.keys()].sort((a, b) => a - b)) out[refName(unpackR(k), unpackC(k))] = cells.get(k)!;
@@ -1989,7 +2194,14 @@ export function normalizeBook(input: unknown, o: NormalizeOptions = {}): Workboo
   if (cells) o.notes?.push(`${cells} cell${cells === 1 ? '' : 's'} left out: a workbook holds at most ${SHEET_LIMITS.cells.toLocaleString('en')} cells.`);
   if (rows) o.notes?.push(`Cells below row ${SHEET_LIMITS.rows.toLocaleString('en')} were left out.`);
   if (cols) o.notes?.push(`Cells right of column ${colName(SHEET_LIMITS.cols - 1)} were left out.`);
-  return { v: 1, sheets };
+  const book: Workbook = { v: 1, sheets };
+  // A name for one sheet may say it by its name too ({ name, ref, sheet: "Budget" }).
+  const rawNames = Array.isArray(v.names) ? v.names.map((x) => (isObj(x) && typeof x.sheet === 'string' ? { ...x, sheet: sheets.find((s) => s.id === x.sheet || s.name.toLowerCase() === String(x.sheet).toLowerCase())?.id } : x)) : v.names;
+  const named = cleanNames(rawNames, new Set(sheets.map((s) => s.id)));
+  if (named.length) book.names = named;
+  const ai = cleanAi(v.ai);
+  if (ai) book.ai = ai;
+  return book;
 }
 
 /** A new workbook: one empty sheet. */
@@ -2015,6 +2227,10 @@ export function bookText(b: Workbook): string {
     if (sh.charts?.length) head.charts = sh.charts;
     if (sh.board) head.board = sh.board;
     if (sh.comments?.length) head.comments = sh.comments;
+    if (sh.protect?.length) head.protect = sh.protect;
+    if (sh.groups?.length) head.groups = sh.groups;
+    if (sh.print) head.print = sh.print;
+    if (sh.noGrid) head.noGrid = true;
     out.push(` ${JSON.stringify(head).slice(0, -1)},"cells":{`);
     const byRow = new Map<number, string[]>();
     const keys = Object.keys(sh.cells)
@@ -2031,7 +2247,18 @@ export function bookText(b: Workbook): string {
     lines.forEach((l, j) => out.push(`  ${l.join(',')}${j < lines.length - 1 ? ',' : ''}`));
     out.push(` }}${i < b.sheets.length - 1 ? ',' : ''}`);
   });
-  out.push(']}');
+  // The names after the sheets, and the AI answers last, a line each (an agent is shown the workbook without them).
+  const ai = Object.entries(b.ai ?? {});
+  if (!b.names?.length && !ai.length) {
+    out.push(']}');
+    return out.join('\n');
+  }
+  out.push(b.names?.length ? `],"names":${JSON.stringify(b.names)}${ai.length ? ',' : '}'}` : '],');
+  if (ai.length) {
+    out.push('"ai":{');
+    ai.forEach(([k, v], j) => out.push(` ${JSON.stringify(k)}:${JSON.stringify(v)}${j < ai.length - 1 ? ',' : ''}`));
+    out.push('}}');
+  }
   return out.join('\n');
 }
 
@@ -2219,12 +2446,16 @@ export type Node =
   | { k: 'arr'; rows: Scalar[][] }
   | { k: 'name'; v: string }
   /** An argument left out: IF(A1,,2). */
-  | { k: 'nil' };
+  | { k: 'nil' }
+  /** A LAMBDA called where it is made, or a name's: LAMBDA(x, x*2)(5). */
+  | { k: 'call'; fn: Node; args: Node[] }
+  /** A value worked out already (a function worked on each value of an array, LAMBDA's arguments). */
+  | { k: 'v'; v: Val };
 
 class ParseError extends Error {}
 
 /** A function's name as this knows it: upper case, without the prefixes files give some (_xlfn., COM.MICROSOFT.). */
-const fnName = (v: string) => v.toUpperCase().replace(/^(?:_XLFN\.|_XLWS\.|COM\.MICROSOFT\.|ORG\.OPENOFFICE\.|ORG\.LIBREOFFICE\.)+/, '');
+const fnName = (v: string) => v.toUpperCase().replace(/^(?:_XLFN\.|_XLWS\.|_XLPM\.|COM\.MICROSOFT\.|ORG\.OPENOFFICE\.|ORG\.LIBREOFFICE\.)+/, '');
 
 const LEVELS = [['=', '<>', '<', '>', '<=', '>='], ['&'], ['+', '-'], ['*', '/'], ['^']];
 const MAX_DEPTH = 100;
@@ -2290,7 +2521,31 @@ export function parseFormula(text: string): Node {
     if (rows.some((r) => r.length !== rows[0].length)) fail('An array’s rows must be as long as each other.');
     return { k: 'arr', rows };
   };
+  /** Arguments in brackets, after the "(" (a function's, or a LAMBDA's called where it is made). */
+  const argList = (name: string): Node[] => {
+    const args: Node[] = [];
+    if (isP(toks[p], ')')) p++;
+    else
+      for (;;) {
+        args.push(isP(toks[p], ',') || isP(toks[p], ')') ? { k: 'nil' } : level(0));
+        const sep = toks[p++];
+        if (isP(sep, ')')) break;
+        if (!isP(sep, ',')) fail(`${name} is missing a , or a )`);
+      }
+    return args;
+  };
   const primary = (): Node => {
+    let x = primaryOnce();
+    // A LAMBDA called where it is made: LAMBDA(x, x+1)(5), or a call's result called again.
+    while (isP(toks[p], '(') && (x.k === 'f' || x.k === 'call')) {
+      p++;
+      deeper();
+      x = { k: 'call', fn: x, args: argList('The call') };
+      depth--;
+    }
+    return x;
+  };
+  const primaryOnce = (): Node => {
     const t = toks[p++];
     if (!t) return fail('It ends too soon.');
     switch (t.k) {
@@ -2309,15 +2564,7 @@ export function parseFormula(text: string): Node {
       case 'fn': {
         p++; // (
         deeper();
-        const args: Node[] = [];
-        if (isP(toks[p], ')')) p++;
-        else
-          for (;;) {
-            args.push(isP(toks[p], ',') || isP(toks[p], ')') ? { k: 'nil' } : level(0));
-            const sep = toks[p++];
-            if (isP(sep, ')')) break;
-            if (!isP(sep, ',')) fail(`${t.v} is missing a , or a )`);
-          }
+        const args = argList(t.v);
         depth--;
         return { k: 'f', name: fnName(t.v), args };
       }
@@ -2454,6 +2701,30 @@ function mapFormulas(b: Workbook, f: (formula: string, on: Sheet) => string): Wo
   return changed ? { ...b, sheets } : b;
 }
 
+/** A sheet no reference names: what a workbook name's own references are read on (theirs name their sheets). */
+const NO_SHEET: Sheet = { id: '', name: '\u0000', cells: {} };
+
+/** The workbook's names with what they stand for rewritten by `f`, given the sheet each is for (a new workbook when any changed). */
+function mapNames(b: Workbook, f: (formula: string, on: Sheet) => string): Workbook {
+  if (!b.names?.length) return b;
+  let changed = false;
+  const names = b.names.map((n) => {
+    const ref = f(n.ref, (n.sheet && b.sheets.find((s) => s.id === n.sheet)) || NO_SHEET);
+    if (ref === n.ref) return n;
+    changed = true;
+    return { ...n, ref };
+  });
+  return changed ? { ...b, names } : b;
+}
+
+/** A named range renamed: the formulas (and other names) that use it use the new name. */
+export function renameName(book: Workbook, from: string, to: string): Workbook {
+  const old = from.toLowerCase();
+  const swap = (f: string) => rewrite(f, (t) => ((t.k === 'name' || t.k === 'fn') && t.v.toLowerCase() === old ? to : undefined));
+  const moved = mapNames(mapFormulas(book, swap), swap);
+  return { ...moved, names: (moved.names ?? []).map((n) => (n.name.toLowerCase() === old ? { ...n, name: to } : n)) };
+}
+
 /** Whether a reference written on sheet `on` points at the sheet named `name`. */
 const pointsAt = (ref: RefTok, on: Sheet, name: string) => (ref.sheet ?? on.name).toLowerCase() === name.toLowerCase();
 
@@ -2500,8 +2771,40 @@ function moveSizes<T>(m: Record<number, T> | undefined, f: (i: number) => number
  * (null: it went); `corner` moves a chart's corners (on the sheet whose rows or columns went in or out).
  */
 function mapSheetRefs(sh: Sheet, f: (text: string) => string, col?: (c: number) => number | null, corner?: (k: ChartCorner) => ChartCorner): Sheet {
-  if (!sh.merges && !sh.filter && !sh.conditional && !sh.validation && !sh.charts && !sh.board && !sh.comments) return sh;
+  if (!sh.merges && !sh.filter && !sh.conditional && !sh.validation && !sh.charts && !sh.board && !sh.comments && !sh.protect && !sh.groups && !sh.print?.area) return sh;
   const out: Sheet = { ...sh };
+  // Protected ranges, groups and the print area follow their cells; one whose cells all went goes too.
+  if (sh.protect) {
+    const list = sh.protect.flatMap((p) => {
+      if (!p.range) {
+        const except = p.except ? cleanRanges(f(p.except)) : '';
+        const next: SheetProtect = { ...p };
+        if (except) next.except = except;
+        else delete next.except;
+        return [next];
+      }
+      const range = cleanRanges(f(p.range));
+      return range ? [{ ...p, range }] : [];
+    });
+    if (list.length) out.protect = list;
+    else delete out.protect;
+  }
+  if (sh.groups) {
+    const list = sh.groups.flatMap((g) => {
+      const t = f(g.range);
+      return t.includes('#REF!') ? [] : cleanGroups([{ range: t, hidden: g.hidden }]);
+    });
+    if (list.length) out.groups = list;
+    else delete out.groups;
+  }
+  if (sh.print?.area) {
+    const area = cleanRanges(f(sh.print.area));
+    const print: PrintSetup = { ...sh.print };
+    if (area) print.area = area;
+    else delete print.area;
+    if (Object.keys(print).length) out.print = print;
+    else delete out.print;
+  }
   const formula = (t: string | undefined) => (t?.startsWith('=') ? `=${f(t.slice(1))}` : t);
   const broken = (t: string | undefined) => !!t && t.includes('#REF!');
   const cond = (c: Cond | undefined): Cond | undefined | null => {
@@ -2635,7 +2938,7 @@ export function adjustForInsert(book: Workbook, sheetId: string, axis: 'row' | '
     return q;
   };
   const move = (ref: RefTok): RefTok => ({ ...ref, a: bump(ref.a), ...(ref.b ? { b: bump(ref.b) } : {}) });
-  const moved = mapFormulas(book, (f, on) => moveRefs(f, on, sh.name, move));
+  const moved = mapNames(mapFormulas(book, (f, on) => moveRefs(f, on, sh.name, move)), (f, on) => moveRefs(f, on, sh.name, move));
   return {
     ...moved,
     sheets: moved.sheets.map((s0) => {
@@ -2684,7 +2987,7 @@ export function adjustForDelete(book: Workbook, sheetId: string, axis: 'row' | '
     if (hi2 < lo2) return null;
     return { ...ref, a: set(ref.a, lo2), b: set(ref.b, hi2) };
   };
-  const moved = mapFormulas(book, (f, on) => moveRefs(f, on, sh.name, shrink));
+  const moved = mapNames(mapFormulas(book, (f, on) => moveRefs(f, on, sh.name, shrink)), (f, on) => moveRefs(f, on, sh.name, shrink));
   return {
     ...moved,
     sheets: moved.sheets.map((s0) => {
@@ -2724,7 +3027,7 @@ export function renameSheet(book: Workbook, sheetId: string, name: string): Work
   if (clean === sh.name) return book;
   const old = sh.name.toLowerCase();
   const renamed = (f: string) => rewrite(f, (t) => (t.k === 'ref' && t.ref.sheet !== undefined && t.ref.sheet.toLowerCase() === old ? `${quoteSheet(clean)}!${f.slice(t.ps, t.e)}` : undefined));
-  const moved = mapFormulas(book, renamed);
+  const moved = mapNames(mapFormulas(book, renamed), renamed);
   return { ...moved, sheets: moved.sheets.map((s0) => mapSheetRefs(s0, renamed)).map((s) => (s.id === sheetId ? { ...s, name: clean } : s)) };
 }
 
@@ -2735,7 +3038,10 @@ export function removeSheet(book: Workbook, sheetId: string): Workbook {
   const old = sh.name.toLowerCase();
   const rest = { ...book, sheets: book.sheets.filter((s) => s.id !== sheetId) };
   const gone = (f: string) => rewrite(f, (t) => (t.k === 'ref' && t.ref.sheet !== undefined && t.ref.sheet.toLowerCase() === old ? '#REF!' : undefined));
-  const moved = mapFormulas(rest, gone);
+  // Names for that sheet alone go with it; the others' references to it become #REF!.
+  const kept = rest.names?.some((n) => n.sheet === sheetId) ? { ...rest, names: rest.names.filter((n) => n.sheet !== sheetId) } : rest;
+  if (kept.names && !kept.names.length) delete kept.names;
+  const moved = mapNames(mapFormulas(kept, gone), gone);
   return { ...moved, sheets: moved.sheets.map((s) => mapSheetRefs(s, gone)) };
 }
 
@@ -2753,9 +3059,89 @@ export function fileFormula(f: string, sheetNames: Set<string>): string {
   });
 }
 
-/** A formula from a file: without the prefixes Excel's files give newer functions (_xlfn.XLOOKUP is XLOOKUP). */
+/**
+ * A cell's formula as an Excel file writes it (fileFormula's, and more): Google Sheets' functions as Excel's own
+ * (REGEXMATCH as REGEXTEST, JOIN as TEXTJOIN, SPLIT as TEXTSPLIT, ARRAYFORMULA left off, IMAGE's mode as its sizing),
+ * LET's and LAMBDA's names as _xlpm.x; null when Excel has nothing that does what it does (AI, SPARKLINE): the cell is
+ * then written as the value it shows. `names`: the workbook's named ranges (lower case), which stay as they are.
+ */
+export function excelFormula(f: string, sheetNames: Set<string>, names: Set<string> = new Set()): string | null {
+  const toks = tokenize(f);
+  if (toks.some((t) => t.k === 'bad')) return fileFormula(f, sheetNames);
+  // Each call's brackets and the commas between its own arguments.
+  const calls = new Map<number, { close: number; commas: number[] }>();
+  const stack: { fn: number; commas: number[] }[] = [];
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    if (t.k !== 'p') continue;
+    if (t.v === '(' || t.v === '{') stack.push({ fn: t.v === '(' && i > 0 && toks[i - 1].k === 'fn' ? i - 1 : -1, commas: [] });
+    else if (t.v === ')' || t.v === '}') {
+      const top = stack.pop();
+      if (top && top.fn >= 0) calls.set(top.fn, { close: i, commas: top.commas });
+    } else if (t.v === ',' && stack.length) stack[stack.length - 1].commas.push(i);
+  }
+  const lambdas = toks.some((t) => t.k === 'fn' && /^(_xlfn\.)?(LET|LAMBDA)$/i.test(t.v));
+  const edits: { at: number; end: number; text: string }[] = [];
+  const put = (at: number, end: number, text: string) => edits.push({ at, end, text });
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    if (t.k === 'name' && lambdas && !names.has(t.v.toLowerCase()) && !/^_xlpm\./i.test(t.v)) put(t.s, t.e, `_xlpm.${t.v}`);
+    if (t.k === 'ref' && t.ref.sheet !== undefined && !sheetNames.has(t.ref.sheet.toLowerCase())) put(t.s, t.e, '#REF!');
+    if (t.k !== 'fn') continue;
+    const n = fnName(t.v);
+    const call = calls.get(i);
+    const args = call ? (toks[i + 2]?.k === 'p' && (toks[i + 2] as { v: string }).v === ')' ? 0 : call.commas.length + 1) : 0;
+    const argToks = (k: number): Tok[] => {
+      if (!call) return [];
+      const from = k === 0 ? i + 2 : call.commas[k - 1] + 1;
+      const to = k < call.commas.length ? call.commas[k] : call.close;
+      return toks.slice(from, to);
+    };
+    if (n === 'AI' || n === 'SPARKLINE') return null;
+    if (n === 'ARRAYFORMULA') put(t.s, t.e, '');
+    else if (n === 'REGEXMATCH') put(t.s, t.e, '_xlfn.REGEXTEST');
+    else if (n === 'JOIN') {
+      if (!call || args < 2) return null;
+      put(t.s, t.e, '_xlfn.TEXTJOIN');
+      put(toks[call.commas[0]].e, toks[call.commas[0]].e, 'FALSE,');
+    } else if (n === 'SPLIT') {
+      if (!call || args !== 2) return null;
+      put(t.s, t.e, '_xlfn.TEXTSPLIT');
+      // Each of the delimiter's characters splits, as Google Sheets does by default: an array of them.
+      const d = argToks(1);
+      if (d.length === 1 && d[0].k === 'str' && d[0].v.length > 1) put(d[0].s, d[0].e, `{${[...d[0].v].map((ch) => `"${ch.replace(/"/g, '""')}"`).join(',')}}`);
+      put(toks[call.close].s, toks[call.close].s, ',,TRUE');
+    } else if (n === 'REGEXEXTRACT') {
+      put(t.s, t.e, '_xlfn.REGEXEXTRACT');
+      // Left out, the return mode is the groups when the pattern has some (as Google Sheets), which Excel says with 2.
+      const p = argToks(1);
+      if (call && args === 2 && p.length === 1 && p[0].k === 'str' && /(^|[^\\])\((?!\?)/.test(p[0].v)) put(toks[call.close].s, toks[call.close].s, ',2');
+    } else if (n === 'IMAGE') {
+      put(t.s, t.e, '_xlfn.IMAGE');
+      // Google Sheets' IMAGE(url, mode, height, width): Excel's IMAGE(url, alt text, sizing, height, width).
+      const m = argToks(1);
+      if (m.length === 1 && m[0].k === 'num') put(m[0].s, m[0].e, `"",${Math.max(0, Math.min(3, Math.trunc(m[0].v) - 1))}`);
+    } else if (n === 'FILTER' || n === 'SORT') put(t.s, t.e, `_xlfn._xlws.${n}`);
+    else if (XLFN.has(n)) put(t.s, t.e, `_xlfn.${n}`);
+    else if (lambdas && !FNS[n] && !names.has(n.toLowerCase())) put(t.s, t.e, `_xlpm.${t.v}`);
+    else if (n !== t.v) put(t.s, t.e, n);
+  }
+  edits.sort((x, y) => x.at - y.at || x.end - y.end);
+  let out = '';
+  let last = 0;
+  for (const e of edits) {
+    if (e.at < last) continue;
+    out += f.slice(last, e.at) + e.text;
+    last = e.end;
+  }
+  return out + f.slice(last);
+}
+
+/** A formula from a file: without the prefixes Excel's files give newer functions (_xlfn.XLOOKUP is XLOOKUP) and LAMBDA's names (_xlpm.x is x). */
 export function formulaFromFile(f: string): string {
-  return rewrite(f.replace(/^=/, ''), (t) => (t.k === 'fn' && /^(_xl|com\.microsoft\.|org\.(open|libre)office\.)/i.test(t.v) ? fnName(t.v) : undefined));
+  return rewrite(f.replace(/^=/, ''), (t) =>
+    t.k === 'fn' && /^(_xl|com\.microsoft\.|org\.(open|libre)office\.)/i.test(t.v) ? (/^_xlpm\./i.test(t.v) ? t.v.slice(6) : fnName(t.v)) : t.k === 'name' && /^_xlpm\./i.test(t.v) ? t.v.slice(6) : undefined,
+  );
 }
 
 /** A formula with names a file defined (TaxRate) written as what they stand for (Sheet1!$B$1), by lower-case name. */
@@ -2768,7 +3154,10 @@ export function replaceNames(f: string, names: Map<string, string>): string {
 const XLFN = new Set([
   'AGGREGATE', 'CEILING.MATH', 'CONCAT', 'DAYS', 'FLOOR.MATH', 'IFNA', 'IFS', 'ISOWEEKNUM', 'MAXIFS', 'MINIFS', 'MODE.SNGL', 'PERCENTILE.INC',
   'QUARTILE.INC', 'RANK.EQ', 'STDEV.P', 'STDEV.S', 'SWITCH', 'TEXTJOIN', 'VAR.P', 'VAR.S', 'XLOOKUP', 'XMATCH', 'XOR', 'NORM.DIST', 'NORM.INV',
-  'UNIQUE', 'SEQUENCE', 'SORTBY',
+  'UNIQUE', 'SEQUENCE', 'SORTBY', 'LET', 'LAMBDA', 'MAP', 'REDUCE', 'SCAN', 'BYROW', 'BYCOL', 'MAKEARRAY', 'ISOMITTED', 'TEXTSPLIT', 'TEXTBEFORE',
+  'TEXTAFTER', 'VSTACK', 'HSTACK', 'TAKE', 'DROP', 'CHOOSECOLS', 'CHOOSEROWS', 'TOCOL', 'TOROW', 'WRAPROWS', 'WRAPCOLS', 'EXPAND', 'REGEXTEST',
+  'REGEXEXTRACT', 'REGEXREPLACE', 'IMAGE', 'RANDARRAY', 'FORECAST.LINEAR', 'NETWORKDAYS.INTL', 'WORKDAY.INTL', 'PERCENTILE.EXC', 'QUARTILE.EXC',
+  'RANK.AVG', 'PERCENTRANK.INC', 'PERCENTRANK.EXC', 'COVARIANCE.P', 'COVARIANCE.S',
 ]);
 
 // ---- formulas: working them out ----------------------------------------------------------------------------------
@@ -2789,11 +3178,36 @@ export interface Arr {
   w: number;
   d: Scalar[];
 }
-export type Val = Scalar | Rg | Arr;
+/** A LAMBDA: its parameters' names (lower case), what it works out, and the names LET gave around it when it was made. */
+export interface Lam {
+  k: 'lam';
+  params: string[];
+  body: Node;
+  env?: Map<string, Val>;
+}
+export type Val = Scalar | Rg | Arr | Lam;
 
 const isRg = (v: Val): v is Rg => typeof v === 'object' && v !== null && (v as Rg).k === 'rg';
 const isArr = (v: Val): v is Arr => typeof v === 'object' && v !== null && (v as Arr).k === 'arr';
+const isLam = (v: Val): v is Lam => typeof v === 'object' && v !== null && (v as Lam).k === 'lam';
 const multi = (v: Val) => isArr(v) || (isRg(v) && (v.r1 !== v.r2 || v.c1 !== v.c2));
+/** A parameter a LAMBDA was called without (ISOMITTED tells): its name's mark in the names LET and LAMBDA give. */
+const omitKey = (name: string) => `\u0000${name}`;
+
+/** One question the AI function asks: its cell, the key its answer is kept by, the prompt and the cells' values as words. */
+export interface AiAsk {
+  sheet: string;
+  cell: string;
+  key: string;
+  prompt: string;
+  context: string[];
+}
+
+/** A cell's link, picture or sparkline, as HYPERLINK, IMAGE and SPARKLINE outermost in its formula (or Insert → Link) give it. */
+export type CellSpecial =
+  | { kind: 'link'; url: string }
+  | { kind: 'image'; url: string; alt: string; fit: 'fit' | 'fill' | 'none' | 'size'; h?: number; w?: number }
+  | { kind: 'spark'; values: (number | null)[]; type: 'line' | 'column' | 'bar' | 'winloss'; color?: string; neg?: string; max?: number; min?: number; width?: number; total?: number };
 
 /**
  * Where a formula is being worked out: its sheet and cell, and how many random numbers it drew so far. A formula of
@@ -2807,6 +3221,10 @@ export interface Ctx {
   n: number;
   dr?: number;
   dc?: number;
+  /** The names LET and LAMBDA give here (lower case), to their values. */
+  env?: Map<string, Val>;
+  /** Worked out as an array (a formula that spills, an argument of SUM or FILTER): functions of one value work on each of an array's. */
+  arr?: boolean;
 }
 
 export function toNum(v: Scalar): number | CellError {
@@ -2814,6 +3232,8 @@ export function toNum(v: Scalar): number | CellError {
   if (v === null) return 0;
   if (typeof v === 'boolean') return v ? 1 : 0;
   if (v instanceof CellError) return v;
+  // A range, an array or a LAMBDA where one value goes (a function given one by mistake).
+  if (typeof v !== 'string') return E.CALC;
   const t = parseNumberText(v);
   return t && typeof t.v === 'number' ? t.v : E.VALUE;
 }
@@ -2823,7 +3243,7 @@ export function toText(v: Scalar): string | CellError {
   if (typeof v === 'number') return numText(v);
   if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
   if (v === null) return '';
-  return v;
+  return v instanceof CellError ? v : E.CALC;
 }
 
 export function toBool(v: Scalar): boolean | CellError {
@@ -2831,6 +3251,7 @@ export function toBool(v: Scalar): boolean | CellError {
   if (typeof v === 'number') return v !== 0;
   if (v === null) return false;
   if (v instanceof CellError) return v;
+  if (typeof v !== 'string') return E.CALC;
   const s = v.trim().toLowerCase();
   return s === 'true' ? true : s === 'false' ? false : E.VALUE;
 }
@@ -2926,12 +3347,17 @@ export interface CalcOptions {
  * (value), every result at once (all), and, for the editor, cells that changed (update) or a workbook that did (reset).
  */
 /** The functions whose arrays spill into the cells beside and under their own (dynamic arrays). */
-const SPILL_FNS = new Set(['FILTER', 'SORT', 'UNIQUE', 'SEQUENCE', 'SORTBY']);
+const SPILL_FNS = new Set([
+  'FILTER', 'SORT', 'UNIQUE', 'SEQUENCE', 'SORTBY', 'TRANSPOSE', 'RANDARRAY', 'ARRAYFORMULA', 'LET', 'MAP', 'SCAN', 'BYROW', 'BYCOL', 'MAKEARRAY',
+  'TEXTSPLIT', 'SPLIT', 'VSTACK', 'HSTACK', 'TAKE', 'DROP', 'CHOOSECOLS', 'CHOOSEROWS', 'TOCOL', 'TOROW', 'WRAPROWS', 'WRAPCOLS', 'EXPAND',
+  'REGEXEXTRACT', 'TREND', 'GROWTH', 'LINEST', 'LOGEST', 'MMULT', 'MINVERSE', 'FREQUENCY', 'REDUCE',
+]);
 
-/** Whether a formula's result is an array that spills: one of SPILL_FNS outermost. */
+/** Whether a formula's result is an array that spills: one of SPILL_FNS outermost, or a LAMBDA called (=LAMBDA(x, x*2)(A1:A9)). */
 export function spills(f: string): boolean {
   const n = parsedOf(f);
-  return !!n && n.k === 'f' && SPILL_FNS.has(n.name);
+  // A function of no such name is a named LAMBDA's (=Tax(B2:B9)): it may give an array too.
+  return !!n && ((n.k === 'f' && (SPILL_FNS.has(n.name) || !FNS[n.name])) || n.k === 'call');
 }
 
 /** An array a formula spilled: its rows and columns, values row by row. */
@@ -2954,6 +3380,13 @@ export class Calc {
   private byName = new Map<string, number>();
   private frames = 0;
   private rowsMax = -1;
+  /** Named ranges by lower-case name: the workbook's (-1) and each sheet's own, as trees. */
+  private named = new Map<string, Map<number, Node | null>>();
+  private namesBusy = new Set<string>();
+  private lamDepth = 0;
+  /** What the AI function asked for and has no answer to yet (by cell and key), and every key it looked for. */
+  private aiWant = new Map<string, AiAsk>();
+  private aiSeen = new Set<string>();
   readonly now: number;
   readonly seed: number;
 
@@ -2981,6 +3414,15 @@ export class Calc {
     this.ext = book.sheets.map(() => null);
     this.sorted = book.sheets.map(() => null);
     this.rowsMax = -1;
+    this.named = new Map();
+    for (const nm of book.names ?? []) {
+      const k = nm.name.toLowerCase();
+      const si = nm.sheet ? book.sheets.findIndex((s) => s.id === nm.sheet) : -1;
+      if (nm.sheet && si < 0) continue;
+      let m = this.named.get(k);
+      if (!m) this.named.set(k, (m = new Map()));
+      m.set(si, parsedOf(nm.ref));
+    }
     this.clear();
   }
 
@@ -3015,6 +3457,144 @@ export class Calc {
     this.memo = this.book.sheets.map(() => new Map());
     this.busy = this.book.sheets.map(() => new Set());
     this.spilt = this.book.sheets.map(() => new Map());
+    this.aiWant = new Map();
+    this.aiSeen = new Set();
+  }
+
+  /** The AI answers the workbook changed (new ones came, or were asked again): the formulas are worked out anew. */
+  aiChanged() {
+    this.clear();
+  }
+
+  /** The AI function's questions that have no answer yet, of the cells worked out so far (aiCells works them all out). */
+  aiAsks(): AiAsk[] {
+    return [...this.aiWant.values()];
+  }
+
+  /** The keys of the AI answers the cells worked out so far look for. */
+  aiKeys(): Set<string> {
+    return this.aiSeen;
+  }
+
+  /** The AI function asked (by `cx`'s cell) for an answer it has not got. */
+  wantAi(cx: Ctx, key: string, prompt: string, context: string[]) {
+    this.aiSeen.add(key);
+    const sh = this.book.sheets[cx.si];
+    if (sh) this.aiWant.set(`${cx.si}:${cx.r}:${cx.c}:${key}`, { sheet: sh.id, cell: refName(cx.r, cx.c), key, prompt, context });
+  }
+
+  /** An AI answer looked up (found or not). */
+  seenAi(key: string) {
+    this.aiSeen.add(key);
+  }
+
+  /** A named range's (or value's, or LAMBDA's) value for a formula at `cx`: the sheet's own name first, else the workbook's. */
+  nameVal(name: string, cx: Ctx): Val {
+    const k = name.toLowerCase().replace(/^_xlpm\./, '');
+    const m = this.named.get(k);
+    const node = m?.has(cx.si) ? m.get(cx.si) : m?.get(-1);
+    if (node === undefined) return E.NAME;
+    if (node === null) return E.PARSE;
+    const busy = `${cx.si}:${k}`;
+    if (this.namesBusy.has(busy)) return E.CIRC;
+    this.namesBusy.add(busy);
+    try {
+      return this.ev(node, { si: cx.si, r: cx.r, c: cx.c, n: cx.n, arr: cx.arr });
+    } finally {
+      this.namesBusy.delete(busy);
+    }
+  }
+
+  /** Whether a name is one of the workbook's named ranges (for the sheet `si`). */
+  hasName(name: string, si = -1): boolean {
+    const m = this.named.get(name.toLowerCase());
+    return !!m && (m.has(-1) || m.has(si));
+  }
+
+  /** A LAMBDA called with these values (undefined: left out, which ISOMITTED tells); #VALUE! with more than it takes. */
+  call(lam: Lam, args: (Val | undefined)[], cx: Ctx): Val {
+    if (args.length > lam.params.length) return E.VALUE;
+    if (this.lamDepth > 400) return E.NUM;
+    const env = new Map(lam.env ?? []);
+    lam.params.forEach((p, i) => {
+      const a = args[i];
+      if (a === undefined) {
+        env.set(p, null);
+        env.set(omitKey(p), true);
+      } else {
+        env.set(p, a);
+        env.delete(omitKey(p));
+      }
+    });
+    const saved = cx.env;
+    cx.env = env;
+    this.lamDepth++;
+    try {
+      return this.ev(lam.body, cx);
+    } finally {
+      this.lamDepth--;
+      cx.env = saved;
+    }
+  }
+
+  /** A function of one value worked on each value of the arrays its arguments are (in a formula worked out as an array). */
+  private lifted(name: string, fn: Fn, args: Node[], cx: Ctx): Val {
+    const which = LIFT.get(name)!;
+    const vals = args.map((a, i) => (a.k === 'nil' || (which !== 'all' && !which.includes(i)) ? null : this.ev(a, cx)));
+    const arrays: (Arr | null)[] = [];
+    let h = 1;
+    let w = 1;
+    let any = false;
+    for (let i = 0; i < args.length; i++) {
+      const v = vals[i];
+      if (v === null || !multi(v)) {
+        arrays.push(null);
+        continue;
+      }
+      const a = this.arr(v);
+      if (a instanceof CellError) return a;
+      arrays.push(a);
+      any = true;
+      h = Math.max(h, a.h);
+      w = Math.max(w, a.w);
+    }
+    const nodes = args.map((a, i): Node => (a.k === 'nil' || (which !== 'all' && !which.includes(i)) ? a : { k: 'v', v: vals[i]! }));
+    if (!any) return fn(this, nodes, cx);
+    if (h * w > MAX_ARRAY) return E.NUM;
+    const d: Scalar[] = new Array(h * w);
+    for (let i = 0; i < h; i++)
+      for (let j = 0; j < w; j++) {
+        const one = nodes.map((n, k): Node => (arrays[k] ? { k: 'v', v: pick(arrays[k]!, i, j) } : n));
+        d[i * w + j] = this.sc(fn(this, one, cx), cx);
+      }
+    return { k: 'arr', h, w, d };
+  }
+
+  /**
+   * A cell's link, picture or sparkline: its own link (Insert → Link), else HYPERLINK, IMAGE or SPARKLINE outermost in
+   * its formula, worked out; null when it has none.
+   */
+  special(si: number, r: number, c: number): CellSpecial | null {
+    const cell = this.cellAt(si, r, c);
+    if (!cell) return null;
+    if (cell.link) return { kind: 'link', url: cell.link };
+    if (cell.f === undefined || !/^\s*(?:_xlfn\.)?(HYPERLINK|IMAGE|SPARKLINE)\s*\(/i.test(cell.f)) return null;
+    const node = parsedOf(cell.f);
+    if (!node || node.k !== 'f') return null;
+    const cx: Ctx = { si, r, c, n: 0 };
+    const a = node.args;
+    try {
+      if (node.name === 'HYPERLINK') {
+        const url = S(this, a[0], cx);
+        const link = typeof url === 'string' ? cleanLink(url) : undefined;
+        return link ? { kind: 'link', url: link } : null;
+      }
+      if (node.name === 'IMAGE') return imageOf(this, a, cx);
+      if (node.name === 'SPARKLINE') return sparkOf(this, a, cx);
+    } catch {
+      return null;
+    }
+    return null;
   }
 
   /**
@@ -3209,14 +3789,17 @@ export class Calc {
     if (!node) return E.PARSE;
     const cx: Ctx = { si, r: unpackR(key), c: unpackC(key), n: 0 };
     const frames = this.frames;
+    const lams = this.lamDepth;
     try {
-      if (this.anchors[si]?.has(key)) return this.spill(si, key, this.ev(node, cx), cx);
+      // A formula that spills is worked out as an array (=ARRAYFORMULA(LEFT(A2:A9, 3)) gives eight values).
+      if (this.anchors[si]?.has(key)) return this.spill(si, key, this.ev(node, { ...cx, arr: true }), cx);
       const s = this.sc(this.ev(node, cx), cx);
       return s === null ? 0 : s;
     } catch (e) {
       if (e instanceof Deep) throw e;
       // A formula this cannot work out (far too big, say) is an error in its cell, not in the others'.
       this.frames = frames;
+      this.lamDepth = lams;
       return E.VALUE;
     }
   }
@@ -3272,9 +3855,20 @@ export class Calc {
       case 'nil':
         v = null;
         break;
-      case 'name':
-        v = E.NAME;
+      case 'v':
+        v = n.v;
         break;
+      case 'name': {
+        // A name LET or LAMBDA gives, else a named range.
+        const bound = cx.env?.get(n.v.toLowerCase());
+        v = bound !== undefined ? bound : this.nameVal(n.v, cx);
+        break;
+      }
+      case 'call': {
+        const f = this.ev(n.fn, cx);
+        v = isLam(f) ? this.call(f, n.args.map((a) => (a.k === 'nil' ? undefined : this.ev(a, cx))), cx) : f instanceof CellError ? f : E.VALUE;
+        break;
+      }
       case 'arr':
         v = { k: 'arr', h: n.rows.length, w: n.rows[0]?.length ?? 0, d: n.rows.flat() };
         break;
@@ -3307,7 +3901,13 @@ export class Calc {
       }
       case 'f': {
         const fn = FNS[n.name];
-        v = fn ? fn(this, n.args, cx) : E.NAME;
+        if (fn) v = cx.arr && LIFT.has(n.name) && n.args.length ? this.lifted(n.name, fn, n.args, cx) : fn(this, n.args, cx);
+        else {
+          // A LAMBDA LET gave this name, or a named one (Data → Named ranges), called.
+          const bound = cx.env?.get(n.name.toLowerCase());
+          const f = bound !== undefined ? bound : this.hasName(n.name, cx.si) ? this.nameVal(n.name, cx) : E.NAME;
+          v = isLam(f) ? this.call(f, n.args.map((a) => (a.k === 'nil' ? undefined : this.ev(a, cx))), cx) : f instanceof CellError ? f : E.VALUE;
+        }
         break;
       }
     }
@@ -3336,12 +3936,15 @@ export class Calc {
       return this.at(v.si, v.r1, v.c1);
     }
     if (isArr(v)) return v.d.length ? v.d[0] : E.VALUE;
+    // A LAMBDA never called is no value.
+    if (isLam(v)) return E.CALC;
     return v;
   }
 
   /** Values in rows and columns, from cells (whole columns as far as the workbook's rows go), an array or one value. */
   arr(v: Val): Arr | CellError {
     if (isArr(v)) return v;
+    if (isLam(v)) return E.CALC;
     if (!isRg(v)) return { k: 'arr', h: 1, w: 1, d: [v] };
     const r2 = v.r2 >= this.maxRows() ? Math.max(v.r1, this.maxRows() - 1) : v.r2;
     const c2 = v.c2 >= this.maxCols() ? Math.max(v.c1, this.maxCols() - 1) : v.c2;
@@ -3385,7 +3988,7 @@ export class Calc {
       return;
     }
     if (!isRg(v)) {
-      f(v, 0, 0);
+      f(isLam(v) ? E.CALC : v, 0, 0);
       return;
     }
     const idx = this.idx[v.si];
@@ -3436,7 +4039,7 @@ export class Calc {
   /** A range's size as written, and how far it reaches into what its sheet holds (for looking through it). */
   dims(v: Val): { h: number; w: number; hh: number; ww: number; get: (i: number, j: number) => Scalar } {
     if (isArr(v)) return { h: v.h, w: v.w, hh: v.h, ww: v.w, get: (i, j) => (i < v.h && j < v.w ? v.d[i * v.w + j] : null) };
-    if (!isRg(v)) return { h: 1, w: 1, hh: 1, ww: 1, get: (i, j) => (i === 0 && j === 0 ? v : null) };
+    if (!isRg(v)) return { h: 1, w: 1, hh: 1, ww: 1, get: (i, j) => (i === 0 && j === 0 ? (isLam(v) ? E.CALC : v) : null) };
     const e = this.extent(v.si);
     const h = v.r2 - v.r1 + 1;
     const w = v.c2 - v.c1 + 1;
@@ -3469,6 +4072,16 @@ const T = (c: Calc, n: Node | undefined, cx: Ctx) => toText(S(c, n, cx));
 const B = (c: Calc, n: Node | undefined, cx: Ctx) => toBool(S(c, n, cx));
 /** An optional number: `def` when it is left out. */
 const opt = (c: Calc, a: Node[], i: number, cx: Ctx, def: number) => (has(a, i) ? N(c, a[i], cx) : def);
+/** An argument worked out as an array (SUM's, FILTER's): functions of one value inside it work on each of an array's values. */
+function evA(c: Calc, n: Node, cx: Ctx): Val {
+  if (cx.arr) return c.ev(n, cx);
+  cx.arr = true;
+  try {
+    return c.ev(n, cx);
+  } finally {
+    cx.arr = false;
+  }
+}
 
 /** A function that takes from `min` to `max` arguments; called with another number of them, #N/A (as Google Sheets says). */
 const def =
@@ -3524,12 +4137,12 @@ function numbersOf(c: Calc, a: Node[], cx: Ctx): number[] | CellError {
       out.push(0);
       continue;
     }
-    const v = c.ev(n, cx);
+    const v = evA(c, n, cx);
     if (isRg(v) || isArr(v)) {
       const e = scan(c, v, (x) => typeof x === 'number' && out.push(x));
       if (e) return e;
     } else if (v !== null) {
-      const x = toNum(v);
+      const x = toNum(c.sc(v, cx));
       if (x instanceof CellError) return x;
       out.push(x);
     }
@@ -3813,9 +4426,12 @@ const MATH_FNS: Record<string, Fn> = {
   COUNT: def(1, 255, (c, a, cx) => {
     let n = 0;
     for (const x of a) {
-      const v = c.ev(x, cx);
+      const v = evA(c, x, cx);
       if (isRg(v) || isArr(v)) c.each(v, (s) => void (isNum(s) && n++));
-      else if (isNum(v) || typeof v === 'boolean' || (typeof v === 'string' && !(toNum(v) instanceof CellError))) n++;
+      else {
+        const s = c.sc(v, cx);
+        if (isNum(s) || typeof s === 'boolean' || (typeof s === 'string' && !(toNum(s) instanceof CellError))) n++;
+      }
     }
     return n;
   }),
@@ -3823,7 +4439,7 @@ const MATH_FNS: Record<string, Fn> = {
     let n = 0;
     for (const x of a) {
       if (x.k === 'nil') continue;
-      const v = c.ev(x, cx);
+      const v = evA(c, x, cx);
       if (isRg(v) || isArr(v)) c.each(v, (s) => void (s !== null && n++));
       else n++;
     }
@@ -3839,7 +4455,7 @@ const MATH_FNS: Record<string, Fn> = {
   SUMPRODUCT: def(1, 255, (c, a, cx) => {
     const arrs: Arr[] = [];
     for (const x of a) {
-      const v = c.arr(c.ev(x, cx));
+      const v = c.arr(evA(c, x, cx));
       if (v instanceof CellError) return v;
       if (arrs.length && (v.h !== arrs[0].h || v.w !== arrs[0].w)) return E.VALUE;
       arrs.push(v);
@@ -4067,7 +4683,7 @@ const LOGIC_FNS: Record<string, Fn> = {
 function logic(c: Calc, a: Node[], cx: Ctx, f: (bs: boolean[]) => boolean): Val {
   const bs: boolean[] = [];
   for (const n of a) {
-    const v = c.ev(n, cx);
+    const v = evA(c, n, cx);
     if (isRg(v) || isArr(v)) {
       const e = scan(c, v, (s) => {
         if (typeof s === 'boolean') bs.push(s);
@@ -4075,7 +4691,7 @@ function logic(c: Calc, a: Node[], cx: Ctx, f: (bs: boolean[]) => boolean): Val 
       });
       if (e) return e;
     } else {
-      const b = toBool(v);
+      const b = toBool(c.sc(v, cx));
       if (b instanceof CellError) return b;
       bs.push(b);
     }
@@ -4584,7 +5200,7 @@ function textFind(c: Calc, a: Node[], cx: Ctx, loose: boolean): Val {
 function joined(c: Calc, a: Node[], cx: Ctx, d: string, skip: boolean): Val {
   const parts: string[] = [];
   for (const n of a) {
-    const v = c.ev(n, cx);
+    const v = evA(c, n, cx);
     if (isRg(v) || isArr(v)) {
       const e = scan(
         c,
@@ -4597,7 +5213,7 @@ function joined(c: Calc, a: Node[], cx: Ctx, d: string, skip: boolean): Val {
       );
       if (e) return e;
     } else {
-      const t = toText(v);
+      const t = toText(c.sc(v, cx));
       if (t instanceof CellError) return t;
       if (!skip || t !== '') parts.push(t);
     }
@@ -4924,9 +5540,9 @@ const ARRAY_FNS: Record<string, Fn> = {
     return { k: 'arr', h, w, d: Array.from({ length: h * w }, (_, i) => fin(start + step * i) as Scalar) };
   }),
   FILTER: def(2, 3, (c, a, cx) => {
-    const src = c.arr(c.ev(a[0], cx));
+    const src = c.arr(evA(c, a[0], cx));
     if (src instanceof CellError) return src;
-    const inc = c.arr(c.ev(a[1], cx));
+    const inc = c.arr(evA(c, a[1], cx));
     if (inc instanceof CellError) return inc;
     // Which rows (a column of tests as tall as the array) or columns (a row of them as wide) stay.
     const byCol = !(inc.w === 1 && inc.h === src.h) && inc.h === 1 && inc.w === src.w;
@@ -4942,7 +5558,7 @@ const ARRAY_FNS: Record<string, Fn> = {
     return fromLines(kept, byCol);
   }),
   SORT: def(1, 4, (c, a, cx) => {
-    const src = c.arr(c.ev(a[0], cx));
+    const src = c.arr(evA(c, a[0], cx));
     if (src instanceof CellError) return src;
     const idx = opt(c, a, 1, cx, 1);
     const order = opt(c, a, 2, cx, 1);
@@ -4960,11 +5576,11 @@ const ARRAY_FNS: Record<string, Fn> = {
     );
   }),
   SORTBY: def(2, 255, (c, a, cx) => {
-    const src = c.arr(c.ev(a[0], cx));
+    const src = c.arr(evA(c, a[0], cx));
     if (src instanceof CellError) return src;
     const keys: { v: Arr; order: number }[] = [];
     for (let i = 1; i < a.length; i += 2) {
-      const v = c.arr(c.ev(a[i], cx));
+      const v = c.arr(evA(c, a[i], cx));
       if (v instanceof CellError) return v;
       if (v.h * v.w !== src.h) return E.VALUE;
       const order = opt(c, a, i + 1, cx, 1);
@@ -4987,7 +5603,7 @@ const ARRAY_FNS: Record<string, Fn> = {
     );
   }),
   UNIQUE: def(1, 3, (c, a, cx) => {
-    const src = c.arr(c.ev(a[0], cx));
+    const src = c.arr(evA(c, a[0], cx));
     if (src instanceof CellError) return src;
     const byCol = has(a, 1) ? B(c, a[1], cx) : false;
     const once = has(a, 2) ? B(c, a[2], cx) : false;
@@ -5008,7 +5624,1078 @@ const ARRAY_FNS: Record<string, Fn> = {
   }),
 };
 
-const FNS: Record<string, Fn> = { ...MATH_FNS, ...LOGIC_FNS, ...INFO_FNS, ...LOOKUP_FNS, ...TEXT_FNS, ...DATE_FNS, ...MONEY_FNS, ...ARRAY_FNS };
+// ---- formulas: LET, LAMBDA and the functions that call one ----------------------------------------------------------
+
+/** A name LET or LAMBDA gives (x, total, _xlpm.x as files write them), lower case; null when it is no such name. */
+const paramName = (n: Node | undefined): string | null => {
+  if (n?.k !== 'name') return null;
+  const v = n.v.replace(/^_xlpm\./i, '');
+  return /^[A-Za-z_\p{L}][\p{L}\p{N}_.]{0,254}$/u.test(v) && !/^[A-Za-z]{1,3}\d+$/.test(v) ? v.toLowerCase() : null;
+};
+
+/** An argument that must be a LAMBDA. */
+const lamArg = (c: Calc, n: Node | undefined, cx: Ctx): Lam | CellError => {
+  if (!n) return E.VALUE;
+  const v = c.ev(n, cx);
+  return isLam(v) ? v : v instanceof CellError ? v : E.VALUE;
+};
+
+/** What a LAMBDA gives for one place of an array: one value (an array there is #CALC!, as Excel has nested arrays). */
+const oneOf = (c: Calc, v: Val, cx: Ctx): Scalar => (multi(v) ? E.CALC : c.sc(v, cx));
+
+/** The values of an array argument, worked out as an array. */
+const arrArg = (c: Calc, n: Node, cx: Ctx): Arr | CellError => c.arr(evA(c, n, cx));
+
+const LAMBDA_FNS: Record<string, Fn> = {
+  LET: def(3, 253, (c, a, cx) => {
+    if (a.length % 2 === 0) return E.VALUE;
+    const saved = cx.env;
+    const env = new Map(saved ?? []);
+    cx.env = env;
+    try {
+      for (let i = 0; i + 1 < a.length; i += 2) {
+        const name = paramName(a[i]);
+        if (!name) return E.VALUE;
+        env.set(name, c.ev(a[i + 1], cx));
+        env.delete(omitKey(name));
+      }
+      return c.ev(a[a.length - 1], cx);
+    } finally {
+      cx.env = saved;
+    }
+  }),
+  LAMBDA: def(1, 254, (_c, a, cx) => {
+    const params: string[] = [];
+    for (let i = 0; i < a.length - 1; i++) {
+      const p = paramName(a[i]);
+      if (!p || params.includes(p)) return E.VALUE;
+      params.push(p);
+    }
+    return { k: 'lam', params, body: a[a.length - 1], env: cx.env };
+  }),
+  ISOMITTED: def(1, 1, (_c, a, cx) => {
+    const p = paramName(a[0]);
+    return !!p && cx.env?.get(omitKey(p)) === true;
+  }),
+  MAP: def(2, 254, (c, a, cx) => {
+    const lam = lamArg(c, a[a.length - 1], cx);
+    if (lam instanceof CellError) return lam;
+    const arrays: Arr[] = [];
+    for (let i = 0; i < a.length - 1; i++) {
+      const v = arrArg(c, a[i], cx);
+      if (v instanceof CellError) return v;
+      arrays.push(v);
+    }
+    if (lam.params.length !== arrays.length) return E.VALUE;
+    const h = Math.max(...arrays.map((x) => x.h));
+    const w = Math.max(...arrays.map((x) => x.w));
+    if (h * w > MAX_ARRAY) return E.NUM;
+    const d: Scalar[] = new Array(h * w);
+    for (let i = 0; i < h; i++)
+      for (let j = 0; j < w; j++)
+        d[i * w + j] = oneOf(
+          c,
+          c.call(
+            lam,
+            arrays.map((x) => pick(x, i, j)),
+            cx,
+          ),
+          cx,
+        );
+    return { k: 'arr', h, w, d };
+  }),
+  REDUCE: def(2, 3, (c, a, cx) => {
+    const [i0, ia, il] = a.length === 3 ? [a[0], a[1], a[2]] : [null, a[0], a[1]];
+    const lam = lamArg(c, il, cx);
+    if (lam instanceof CellError) return lam;
+    if (lam.params.length !== 2) return E.VALUE;
+    const src = arrArg(c, ia, cx);
+    if (src instanceof CellError) return src;
+    let acc: Val = i0 && i0.k !== 'nil' ? c.ev(i0, cx) : null;
+    for (const x of src.d) acc = c.call(lam, [acc, x], cx);
+    return acc;
+  }),
+  SCAN: def(2, 3, (c, a, cx) => {
+    const [i0, ia, il] = a.length === 3 ? [a[0], a[1], a[2]] : [null, a[0], a[1]];
+    const lam = lamArg(c, il, cx);
+    if (lam instanceof CellError) return lam;
+    if (lam.params.length !== 2) return E.VALUE;
+    const src = arrArg(c, ia, cx);
+    if (src instanceof CellError) return src;
+    let acc: Val = i0 && i0.k !== 'nil' ? c.ev(i0, cx) : null;
+    const d = src.d.map((x) => {
+      acc = c.call(lam, [acc, x], cx);
+      return oneOf(c, acc, cx);
+    });
+    return { k: 'arr', h: src.h, w: src.w, d };
+  }),
+  BYROW: def(2, 2, (c, a, cx) => {
+    const src = arrArg(c, a[0], cx);
+    if (src instanceof CellError) return src;
+    const lam = lamArg(c, a[1], cx);
+    if (lam instanceof CellError) return lam;
+    if (lam.params.length !== 1) return E.VALUE;
+    const d = linesOf(src, false).map((l) => oneOf(c, c.call(lam, [{ k: 'arr', h: 1, w: l.length, d: l }], cx), cx));
+    return { k: 'arr', h: d.length, w: 1, d };
+  }),
+  BYCOL: def(2, 2, (c, a, cx) => {
+    const src = arrArg(c, a[0], cx);
+    if (src instanceof CellError) return src;
+    const lam = lamArg(c, a[1], cx);
+    if (lam instanceof CellError) return lam;
+    if (lam.params.length !== 1) return E.VALUE;
+    const d = linesOf(src, true).map((l) => oneOf(c, c.call(lam, [{ k: 'arr', h: l.length, w: 1, d: l }], cx), cx));
+    return { k: 'arr', h: 1, w: d.length, d };
+  }),
+  MAKEARRAY: def(3, 3, (c, a, cx) => {
+    const rows = N(c, a[0], cx);
+    const cols = N(c, a[1], cx);
+    if (rows instanceof CellError) return rows;
+    if (cols instanceof CellError) return cols;
+    const lam = lamArg(c, a[2], cx);
+    if (lam instanceof CellError) return lam;
+    const h = Math.trunc(rows);
+    const w = Math.trunc(cols);
+    if (h < 1 || w < 1 || lam.params.length !== 2) return E.VALUE;
+    if (h * w > MAX_ARRAY) return E.NUM;
+    const d: Scalar[] = new Array(h * w);
+    for (let i = 0; i < h; i++) for (let j = 0; j < w; j++) d[i * w + j] = oneOf(c, c.call(lam, [i + 1, j + 1], cx), cx);
+    return { k: 'arr', h, w, d };
+  }),
+};
+
+// ---- formulas: more arrays (stacking, taking, wrapping) ----------------------------------------------------------------
+
+/** How many rows or columns to take or drop: a number, negative from the end; null when left out. */
+const countArg = (c: Calc, a: Node[], i: number, cx: Ctx): number | null | CellError => {
+  if (!has(a, i)) return null;
+  const n = N(c, a[i], cx);
+  return n instanceof CellError ? n : Math.trunc(n);
+};
+
+/** Places picked from a line of `n`: numbers from 1 (negative from the end), each a number or an array of them. */
+function placesOf(c: Calc, a: Node[], from: number, cx: Ctx, n: number): number[] | CellError {
+  const out: number[] = [];
+  for (let i = from; i < a.length; i++) {
+    const v = arrArg(c, a[i], cx);
+    if (v instanceof CellError) return v;
+    for (const x of v.d) {
+      const k = toNum(x);
+      if (k instanceof CellError) return k;
+      const t = Math.trunc(k);
+      if (t === 0 || Math.abs(t) > n) return E.VALUE;
+      out.push(t > 0 ? t - 1 : n + t);
+    }
+  }
+  return out.length ? out : E.VALUE;
+}
+
+/** A pad value (#N/A when left out). */
+const padArg = (c: Calc, a: Node[], i: number, cx: Ctx): Scalar => (has(a, i) ? S(c, a[i], cx) : E.NA);
+
+const ARRAY2_FNS: Record<string, Fn> = {
+  ARRAYFORMULA: def(1, 1, (c, a, cx) => evA(c, a[0], cx)),
+  TRANSPOSE: def(1, 1, (c, a, cx) => {
+    const src = arrArg(c, a[0], cx);
+    if (src instanceof CellError) return src;
+    const d: Scalar[] = new Array(src.h * src.w);
+    for (let i = 0; i < src.h; i++) for (let j = 0; j < src.w; j++) d[j * src.h + i] = src.d[i * src.w + j];
+    return { k: 'arr', h: src.w, w: src.h, d };
+  }),
+  VSTACK: def(1, 254, (c, a, cx) => {
+    const list: Arr[] = [];
+    for (const n of a) {
+      const v = arrArg(c, n, cx);
+      if (v instanceof CellError) return v;
+      list.push(v);
+    }
+    const w = Math.max(...list.map((x) => x.w));
+    const h = list.reduce((s, x) => s + x.h, 0);
+    if (h * w > MAX_ARRAY) return E.NUM;
+    const d: Scalar[] = [];
+    for (const x of list) for (let i = 0; i < x.h; i++) for (let j = 0; j < w; j++) d.push(j < x.w ? x.d[i * x.w + j] : E.NA);
+    return { k: 'arr', h, w, d };
+  }),
+  HSTACK: def(1, 254, (c, a, cx) => {
+    const list: Arr[] = [];
+    for (const n of a) {
+      const v = arrArg(c, n, cx);
+      if (v instanceof CellError) return v;
+      list.push(v);
+    }
+    const h = Math.max(...list.map((x) => x.h));
+    const w = list.reduce((s, x) => s + x.w, 0);
+    if (h * w > MAX_ARRAY) return E.NUM;
+    const d: Scalar[] = [];
+    for (let i = 0; i < h; i++) for (const x of list) for (let j = 0; j < x.w; j++) d.push(i < x.h ? x.d[i * x.w + j] : E.NA);
+    return { k: 'arr', h, w, d };
+  }),
+  TAKE: def(2, 3, (c, a, cx) => takeDrop(c, a, cx, true)),
+  DROP: def(2, 3, (c, a, cx) => takeDrop(c, a, cx, false)),
+  CHOOSECOLS: def(2, 254, (c, a, cx) => {
+    const src = arrArg(c, a[0], cx);
+    if (src instanceof CellError) return src;
+    const cols = placesOf(c, a, 1, cx, src.w);
+    if (cols instanceof CellError) return cols;
+    const d: Scalar[] = [];
+    for (let i = 0; i < src.h; i++) for (const j of cols) d.push(src.d[i * src.w + j]);
+    return { k: 'arr', h: src.h, w: cols.length, d };
+  }),
+  CHOOSEROWS: def(2, 254, (c, a, cx) => {
+    const src = arrArg(c, a[0], cx);
+    if (src instanceof CellError) return src;
+    const rows = placesOf(c, a, 1, cx, src.h);
+    if (rows instanceof CellError) return rows;
+    const d: Scalar[] = [];
+    for (const i of rows) for (let j = 0; j < src.w; j++) d.push(src.d[i * src.w + j]);
+    return { k: 'arr', h: rows.length, w: src.w, d };
+  }),
+  TOCOL: def(1, 3, (c, a, cx) => toLine(c, a, cx, true)),
+  TOROW: def(1, 3, (c, a, cx) => toLine(c, a, cx, false)),
+  WRAPROWS: def(2, 3, (c, a, cx) => wrapLine(c, a, cx, true)),
+  WRAPCOLS: def(2, 3, (c, a, cx) => wrapLine(c, a, cx, false)),
+  EXPAND: def(2, 4, (c, a, cx) => {
+    const src = arrArg(c, a[0], cx);
+    if (src instanceof CellError) return src;
+    const rows = countArg(c, a, 1, cx);
+    const cols = countArg(c, a, 2, cx);
+    if (rows instanceof CellError) return rows;
+    if (cols instanceof CellError) return cols;
+    const h = rows ?? src.h;
+    const w = cols ?? src.w;
+    if (h < src.h || w < src.w) return E.VALUE;
+    if (h * w > MAX_ARRAY) return E.NUM;
+    const pad = padArg(c, a, 3, cx);
+    const d: Scalar[] = new Array(h * w);
+    for (let i = 0; i < h; i++) for (let j = 0; j < w; j++) d[i * w + j] = i < src.h && j < src.w ? src.d[i * src.w + j] : pad;
+    return { k: 'arr', h, w, d };
+  }),
+  RANDARRAY: def(0, 5, (c, a, cx) => {
+    const nums = [opt(c, a, 0, cx, 1), opt(c, a, 1, cx, 1), opt(c, a, 2, cx, 0), opt(c, a, 3, cx, 1)];
+    for (const n of nums) if (n instanceof CellError) return n;
+    const whole = has(a, 4) ? B(c, a[4], cx) : false;
+    if (whole instanceof CellError) return whole;
+    const [rows, cols, lo, hi] = nums as number[];
+    const h = Math.trunc(rows);
+    const w = Math.trunc(cols);
+    if (h < 1 || w < 1 || lo > hi) return E.VALUE;
+    if (h * w > MAX_ARRAY) return E.NUM;
+    const d: Scalar[] = Array.from({ length: h * w }, () => (whole ? Math.ceil(lo) + Math.floor(c.rand(cx) * (Math.floor(hi) - Math.ceil(lo) + 1)) : lo + c.rand(cx) * (hi - lo)));
+    return { k: 'arr', h, w, d };
+  }),
+  MMULT: def(2, 2, (c, a, cx) => {
+    const x = arrArg(c, a[0], cx);
+    const y = arrArg(c, a[1], cx);
+    if (x instanceof CellError) return x;
+    if (y instanceof CellError) return y;
+    if (x.w !== y.h) return E.VALUE;
+    const d: Scalar[] = [];
+    for (let i = 0; i < x.h; i++)
+      for (let j = 0; j < y.w; j++) {
+        let s = 0;
+        for (let k = 0; k < x.w; k++) {
+          const p = x.d[i * x.w + k];
+          const q = y.d[k * y.w + j];
+          if (typeof p !== 'number' || typeof q !== 'number') return p instanceof CellError ? p : q instanceof CellError ? q : E.VALUE;
+          s += p * q;
+        }
+        d.push(fin(s));
+      }
+    return { k: 'arr', h: x.h, w: y.w, d };
+  }),
+  FREQUENCY: def(2, 2, (c, a, cx) => {
+    const xs = numbersOf(c, [a[0]], cx);
+    const bins = numbersOf(c, [a[1]], cx);
+    if (xs instanceof CellError) return xs;
+    if (bins instanceof CellError) return bins;
+    const order = bins.map((b, i) => [b, i] as const).sort((p, q) => p[0] - q[0]);
+    const counts = new Array(bins.length + 1).fill(0);
+    for (const x of xs) {
+      const k = order.find(([b]) => x <= b);
+      counts[k ? k[1] : bins.length]++;
+    }
+    return { k: 'arr', h: counts.length, w: 1, d: counts };
+  }),
+};
+
+function takeDrop(c: Calc, a: Node[], cx: Ctx, take: boolean): Val {
+  const src = arrArg(c, a[0], cx);
+  if (src instanceof CellError) return src;
+  const rows = countArg(c, a, 1, cx);
+  const cols = countArg(c, a, 2, cx);
+  if (rows instanceof CellError) return rows;
+  if (cols instanceof CellError) return cols;
+  // The rows (columns) kept: the first or last n of them (take), or all but those (drop).
+  const span = (n: number | null, len: number): [number, number] => {
+    if (n === null) return [0, len];
+    const k = Math.min(Math.abs(n), len);
+    if (take) return n >= 0 ? [0, k] : [len - k, len];
+    return n >= 0 ? [k, len] : [0, len - k];
+  };
+  if ((take && (rows === 0 || cols === 0)) || (rows === null && cols === null)) return E.CALC;
+  const [r1, r2] = span(rows, src.h);
+  const [c1, c2] = span(cols, src.w);
+  if (r2 <= r1 || c2 <= c1) return E.CALC;
+  const d: Scalar[] = [];
+  for (let i = r1; i < r2; i++) for (let j = c1; j < c2; j++) d.push(src.d[i * src.w + j]);
+  return { k: 'arr', h: r2 - r1, w: c2 - c1, d };
+}
+
+/** TOCOL and TOROW: an array's values in one column (or row), blanks or errors left out as asked, by rows or by columns. */
+function toLine(c: Calc, a: Node[], cx: Ctx, col: boolean): Val {
+  const src = arrArg(c, a[0], cx);
+  if (src instanceof CellError) return src;
+  const ignore = opt(c, a, 1, cx, 0);
+  const byCol = has(a, 2) ? B(c, a[2], cx) : false;
+  if (ignore instanceof CellError) return ignore;
+  if (byCol instanceof CellError) return byCol;
+  const k = Math.trunc(ignore);
+  if (k < 0 || k > 3) return E.VALUE;
+  const d = linesOf(src, byCol)
+    .flat()
+    .filter((v) => !((k & 1 && (v === null || v === '')) || (k & 2 && v instanceof CellError)));
+  if (!d.length) return E.CALC;
+  return col ? { k: 'arr', h: d.length, w: 1, d } : { k: 'arr', h: 1, w: d.length, d };
+}
+
+/** WRAPROWS and WRAPCOLS: a row or column of values into rows (columns) of `count`, the last padded. */
+function wrapLine(c: Calc, a: Node[], cx: Ctx, rows: boolean): Val {
+  const src = arrArg(c, a[0], cx);
+  if (src instanceof CellError) return src;
+  if (src.h > 1 && src.w > 1) return E.VALUE;
+  const n = N(c, a[1], cx);
+  if (n instanceof CellError) return n;
+  const k = Math.trunc(n);
+  if (k < 1) return E.NUM;
+  const pad = padArg(c, a, 2, cx);
+  const lines = Math.ceil(src.d.length / k);
+  const d: Scalar[] = new Array(lines * k);
+  for (let i = 0; i < lines; i++)
+    for (let j = 0; j < k; j++) {
+      const v = src.d[i * k + j];
+      const at = rows ? i * k + j : j * lines + i;
+      d[at] = v === undefined ? pad : v;
+    }
+  return rows ? { k: 'arr', h: lines, w: k, d } : { k: 'arr', h: k, w: lines, d };
+}
+
+// ---- formulas: words split and joined, regular expressions ------------------------------------------------------------
+
+/** Words from an argument that may be several (TEXTSPLIT's and TEXTBEFORE's delimiters: "," or {",",";"}). */
+function wordsArg(c: Calc, n: Node | undefined, cx: Ctx): string[] | CellError {
+  if (!n || n.k === 'nil') return [];
+  const v = c.arr(c.ev(n, cx));
+  if (v instanceof CellError) return v;
+  const out: string[] = [];
+  for (const x of v.d) {
+    const t = toText(x);
+    if (t instanceof CellError) return t;
+    out.push(t);
+  }
+  return out;
+}
+
+const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+/** A pattern matching any of some words, the longest first (so "--" goes before "-"). */
+const anyOf = (words: string[], ci: boolean) => new RegExp([...words].filter((w) => w !== '').sort((x, y) => y.length - x.length).map(escRe).join('|') || '(?!)', ci ? 'gi' : 'g');
+
+/** A regular expression from a formula's pattern (a leading (?i) makes it ignore case); #VALUE! when it cannot be read. */
+function regexOf(pattern: string, flags: string): RegExp | CellError {
+  let p = pattern;
+  let f = flags;
+  if (/^\(\?i\)/.test(p)) {
+    p = p.slice(4);
+    if (!f.includes('i')) f += 'i';
+  }
+  try {
+    return new RegExp(p, `${f}u`);
+  } catch {
+    try {
+      return new RegExp(p, f);
+    } catch {
+      return E.VALUE;
+    }
+  }
+}
+
+/** TEXTBEFORE and TEXTAFTER: the words before (after) the n-th delimiter, from the end when n is negative. */
+function textAround(c: Calc, a: Node[], cx: Ctx, before: boolean): Val {
+  const t = T(c, a[0], cx);
+  if (t instanceof CellError) return t;
+  const ds = wordsArg(c, a[1], cx);
+  if (ds instanceof CellError) return ds;
+  const inst = opt(c, a, 2, cx, 1);
+  const mode = opt(c, a, 3, cx, 0);
+  const end = opt(c, a, 4, cx, 0);
+  for (const n of [inst, mode, end]) if (n instanceof CellError) return n;
+  const k = Math.trunc(inst as number);
+  if (k === 0 || Math.abs(k) > t.length + 1) return E.VALUE;
+  const notFound = () => (has(a, 5) ? c.ev(a[5], cx) : E.NA);
+  if (ds.some((d) => d === '')) return before ? (k > 0 ? '' : t) : k > 0 ? t : '';
+  const re = anyOf(ds, mode === 1);
+  const hits = [...t.matchAll(re)].map((m) => [m.index!, m.index! + m[0].length] as const);
+  if (end) hits.push([t.length, t.length]);
+  if (end && k < 0) hits.unshift([0, 0]);
+  const at = k > 0 ? hits[k - 1] : hits[hits.length + k];
+  if (!at) return notFound();
+  return before ? t.slice(0, at[0]) : t.slice(at[1]);
+}
+
+const TEXT2_FNS: Record<string, Fn> = {
+  TEXTSPLIT: def(2, 6, (c, a, cx) => {
+    const t = T(c, a[0], cx);
+    if (t instanceof CellError) return t;
+    const cols = wordsArg(c, a[1], cx);
+    const rows = wordsArg(c, a[2], cx);
+    if (cols instanceof CellError) return cols;
+    if (rows instanceof CellError) return rows;
+    const skip = has(a, 3) ? B(c, a[3], cx) : false;
+    const mode = opt(c, a, 4, cx, 0);
+    if (skip instanceof CellError) return skip;
+    if (mode instanceof CellError) return mode;
+    if (!cols.some(Boolean) && !rows.some(Boolean)) return E.VALUE;
+    const ci = mode === 1;
+    const lines = (rows.some(Boolean) ? t.split(anyOf(rows, ci)) : [t]).filter((l) => !skip || l !== '');
+    const grid = lines.map((l) => (cols.some(Boolean) ? l.split(anyOf(cols, ci)) : [l]).filter((x) => !skip || x !== ''));
+    const w = Math.max(1, ...grid.map((r) => r.length));
+    const pad = padArg(c, a, 5, cx);
+    if (!grid.length) return E.CALC;
+    const d: Scalar[] = [];
+    for (const r of grid) for (let j = 0; j < w; j++) d.push(j < r.length ? r[j] : pad);
+    return { k: 'arr', h: grid.length, w, d };
+  }),
+  TEXTBEFORE: def(2, 6, (c, a, cx) => textAround(c, a, cx, true)),
+  TEXTAFTER: def(2, 6, (c, a, cx) => textAround(c, a, cx, false)),
+  SPLIT: def(2, 4, (c, a, cx) => {
+    const t = T(c, a[0], cx);
+    const d = T(c, a[1], cx);
+    if (t instanceof CellError) return t;
+    if (d instanceof CellError) return d;
+    const each = has(a, 2) ? B(c, a[2], cx) : true;
+    const drop = has(a, 3) ? B(c, a[3], cx) : true;
+    if (each instanceof CellError) return each;
+    if (drop instanceof CellError) return drop;
+    if (!d) return E.VALUE;
+    const parts = t.split(each ? anyOf([...d], false) : anyOf([d], false)).filter((x) => !drop || x !== '');
+    if (!parts.length) return E.VALUE;
+    // Numbers come out as numbers, as Google Sheets gives them.
+    const vals: Scalar[] = parts.map((x) => {
+      const n = /^\s*[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?\s*$/.test(x) ? Number(x) : NaN;
+      return Number.isFinite(n) ? n : x;
+    });
+    return { k: 'arr', h: 1, w: vals.length, d: vals };
+  }),
+  JOIN: def(2, 255, (c, a, cx) => {
+    const d = T(c, a[0], cx);
+    if (d instanceof CellError) return d;
+    return joined(c, a.slice(1), cx, d, false);
+  }),
+  REGEXMATCH: def(2, 2, (c, a, cx) => regexTest(c, a, cx, false)),
+  REGEXTEST: def(2, 3, (c, a, cx) => regexTest(c, a, cx, true)),
+  REGEXEXTRACT: def(2, 4, (c, a, cx) => {
+    const t = T(c, a[0], cx);
+    const p = T(c, a[1], cx);
+    if (t instanceof CellError) return t;
+    if (p instanceof CellError) return p;
+    const mode = has(a, 2) ? N(c, a[2], cx) : null;
+    const ci = opt(c, a, 3, cx, 0);
+    if (mode instanceof CellError) return mode;
+    if (ci instanceof CellError) return ci;
+    const re = regexOf(p, ci === 1 ? 'gi' : 'g');
+    if (re instanceof CellError) return re;
+    const all = [...t.matchAll(re)];
+    if (!all.length) return E.NA;
+    // Left out: the first match, or its groups when the pattern has some (as Google Sheets gives them).
+    const groups = all[0].length > 1;
+    const m = mode === null ? (groups ? 2 : 0) : Math.trunc(mode);
+    if (m === 0) return all[0][0];
+    if (m === 1) return { k: 'arr', h: all.length, w: 1, d: all.map((x) => x[0]) };
+    if (m === 2) {
+      const g = all[0].slice(1).map((x) => x ?? '');
+      return g.length ? (g.length === 1 ? g[0] : { k: 'arr', h: 1, w: g.length, d: g }) : all[0][0];
+    }
+    return E.VALUE;
+  }),
+  REGEXREPLACE: def(3, 5, (c, a, cx) => {
+    const t = T(c, a[0], cx);
+    const p = T(c, a[1], cx);
+    const r = T(c, a[2], cx);
+    if (t instanceof CellError) return t;
+    if (p instanceof CellError) return p;
+    if (r instanceof CellError) return r;
+    const occ = opt(c, a, 3, cx, 0);
+    const ci = opt(c, a, 4, cx, 0);
+    if (occ instanceof CellError) return occ;
+    if (ci instanceof CellError) return ci;
+    const re = regexOf(p, ci === 1 ? 'gi' : 'g');
+    if (re instanceof CellError) return re;
+    // $0 is the whole match, as Excel and Google Sheets write it.
+    const rep = r.replace(/\$0/g, '$$&');
+    const k = Math.trunc(occ);
+    if (k === 0) return t.replace(re, rep).slice(0, SHEET_LIMITS.text);
+    const all = [...t.matchAll(re)];
+    const m = k > 0 ? all[k - 1] : all[all.length + k];
+    if (!m) return t;
+    const one = new RegExp(re.source, re.flags.replace('g', ''));
+    return (t.slice(0, m.index!) + m[0].replace(one, rep) + t.slice(m.index! + m[0].length)).slice(0, SHEET_LIMITS.text);
+  }),
+};
+
+function regexTest(c: Calc, a: Node[], cx: Ctx, excel: boolean): Val {
+  const t = T(c, a[0], cx);
+  const p = T(c, a[1], cx);
+  if (t instanceof CellError) return t;
+  if (p instanceof CellError) return p;
+  const ci = excel ? opt(c, a, 2, cx, 0) : 0;
+  if (ci instanceof CellError) return ci;
+  const re = regexOf(p, ci === 1 ? 'i' : '');
+  return re instanceof CellError ? re : re.test(t);
+}
+
+// ---- formulas: statistics, trends and fits ------------------------------------------------------------------------
+
+/** The values of the "A" functions (AVERAGEA, STDEVA…): numbers, words as 0 and TRUE as 1 from cells; given directly, as SUM takes them. */
+function numbersA(c: Calc, a: Node[], cx: Ctx): number[] | CellError {
+  const out: number[] = [];
+  for (const n of a) {
+    if (n.k === 'nil') continue;
+    const v = evA(c, n, cx);
+    if (isRg(v) || isArr(v)) {
+      const e = scan(c, v, (x) => {
+        if (typeof x === 'number') out.push(x);
+        else if (typeof x === 'boolean') out.push(x ? 1 : 0);
+        else if (typeof x === 'string') out.push(0);
+      });
+      if (e) return e;
+    } else if (v !== null) {
+      const x = toNum(c.sc(v, cx));
+      if (x instanceof CellError) return x;
+      out.push(x);
+    }
+  }
+  return out;
+}
+
+const aggA = (f: (xs: number[]) => number | CellError): Fn =>
+  def(1, 255, (c, a, cx) => {
+    const xs = numbersA(c, a, cx);
+    if (xs instanceof CellError) return xs;
+    const r = f(xs);
+    return r instanceof CellError ? r : fin(r);
+  });
+
+/** Pairs of numbers from two ranges of the same size (where both cells hold numbers), for CORREL, SLOPE and the like. */
+function pairsXY(c: Calc, ny: Node, nx: Node, cx: Ctx): { y: number[]; x: number[] } | CellError {
+  const ya = c.arr(evA(c, ny, cx));
+  const xa = c.arr(evA(c, nx, cx));
+  if (ya instanceof CellError) return ya;
+  if (xa instanceof CellError) return xa;
+  if (ya.d.length !== xa.d.length) return E.NA;
+  const y: number[] = [];
+  const x: number[] = [];
+  for (let i = 0; i < ya.d.length; i++) {
+    const p = ya.d[i];
+    const q = xa.d[i];
+    if (p instanceof CellError) return p;
+    if (q instanceof CellError) return q;
+    if (typeof p === 'number' && typeof q === 'number') {
+      y.push(p);
+      x.push(q);
+    }
+  }
+  return { y, x };
+}
+
+/** Sums of a simple fit: the means, Σ(x−x̄)², Σ(y−ȳ)² and Σ(x−x̄)(y−ȳ). */
+function moments(y: number[], x: number[]) {
+  const n = y.length;
+  const mx = sum(x) / n;
+  const my = sum(y) / n;
+  let sxx = 0;
+  let syy = 0;
+  let sxy = 0;
+  for (let i = 0; i < n; i++) {
+    sxx += (x[i] - mx) ** 2;
+    syy += (y[i] - my) ** 2;
+    sxy += (x[i] - mx) * (y[i] - my);
+  }
+  return { n, mx, my, sxx, syy, sxy };
+}
+
+const fit2 = (f: (m: ReturnType<typeof moments>) => number | CellError, min = 2): Fn =>
+  def(2, 2, (c, a, cx) => {
+    const p = pairsXY(c, a[0], a[1], cx);
+    if (p instanceof CellError) return p;
+    if (p.y.length < min) return E.DIV;
+    const r = f(moments(p.y, p.x));
+    return r instanceof CellError ? r : fin(r);
+  });
+
+/** Solves A·x = b (A n×n, by rows) with Gauss–Jordan elimination; null when A cannot be inverted. Gives A's inverse too. */
+function solveLinear(A: number[][], b: number[]): { x: number[]; inv: number[][] } | null {
+  const n = A.length;
+  const m = A.map((row, i) => [...row, b[i], ...Array.from({ length: n }, (_, j) => (i === j ? 1 : 0))]);
+  for (let col = 0; col < n; col++) {
+    let piv = col;
+    for (let r = col + 1; r < n; r++) if (Math.abs(m[r][col]) > Math.abs(m[piv][col])) piv = r;
+    const scale = Math.max(1e-300, ...A.map((row) => Math.abs(row[col])));
+    if (Math.abs(m[piv][col]) < 1e-12 * scale) return null;
+    [m[col], m[piv]] = [m[piv], m[col]];
+    const p = m[col][col];
+    for (let j = 0; j < m[col].length; j++) m[col][j] /= p;
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const f = m[r][col];
+      if (f) for (let j = 0; j < m[r].length; j++) m[r][j] -= f * m[col][j];
+    }
+  }
+  return { x: m.map((row) => row[n]), inv: m.map((row) => row.slice(n + 1)) };
+}
+
+/**
+ * A least-squares fit of known y's to known x's (one variable or several, as LINEST and TREND take them): its
+ * coefficients (one per variable, in the x's order, then the intercept) and the statistics LINEST gives.
+ */
+interface Fit {
+  m: number[];
+  b: number;
+  se: number[];
+  seB: number;
+  r2: number;
+  sey: number;
+  F: number;
+  df: number;
+  ssreg: number;
+  ssresid: number;
+  /** Variables down columns (y a column) or along rows. */
+  byCol: boolean;
+  k: number;
+}
+
+function knownXY(c: Calc, a: Node[], cx: Ctx, log: boolean): { y: number[]; X: number[][]; byCol: boolean; ya: Arr } | CellError {
+  const ya = c.arr(evA(c, a[0], cx));
+  if (ya instanceof CellError) return ya;
+  const byCol = ya.w === 1;
+  const n = ya.d.length;
+  const y: number[] = [];
+  for (const v of ya.d) {
+    if (typeof v !== 'number') return v instanceof CellError ? v : E.VALUE;
+    if (log && v <= 0) return E.NUM;
+    y.push(log ? Math.log(v) : v);
+  }
+  let X: number[][];
+  if (has(a, 1)) {
+    const xa = c.arr(evA(c, a[1], cx));
+    if (xa instanceof CellError) return xa;
+    for (const v of xa.d) if (typeof v !== 'number') return v instanceof CellError ? v : E.VALUE;
+    const xs = xa.d as number[];
+    if (xa.h === ya.h && xa.w === ya.w) X = y.map((_, i) => [xs[i]]);
+    else if (byCol && xa.h === n) X = Array.from({ length: n }, (_, i) => xs.slice(i * xa.w, (i + 1) * xa.w));
+    else if (!byCol && ya.h === 1 && xa.w === n) X = Array.from({ length: n }, (_, i) => Array.from({ length: xa.h }, (_, k) => xs[k * xa.w + i]));
+    else return E.REF;
+  } else X = y.map((_, i) => [i + 1]);
+  return { y, X, byCol, ya };
+}
+
+function fitOf(y: number[], X: number[][], withB: boolean, byCol: boolean): Fit | CellError {
+  const n = y.length;
+  const k = X[0]?.length ?? 0;
+  const p = k + (withB ? 1 : 0);
+  if (!n || !k) return E.VALUE;
+  const rows = X.map((r) => (withB ? [...r, 1] : r));
+  const A = Array.from({ length: p }, (_, i) => Array.from({ length: p }, (_, j) => rows.reduce((s, r) => s + r[i] * r[j], 0)));
+  const bv = Array.from({ length: p }, (_, i) => rows.reduce((s, r, t) => s + r[i] * y[t], 0));
+  const sol = solveLinear(A, bv);
+  if (!sol) return E.NUM;
+  const coef = sol.x;
+  const fitted = rows.map((r) => r.reduce((s, v, i) => s + v * coef[i], 0));
+  const my = sum(y) / n;
+  const ssresid = y.reduce((s, v, i) => s + (v - fitted[i]) ** 2, 0);
+  const sstot = withB ? y.reduce((s, v) => s + (v - my) ** 2, 0) : y.reduce((s, v) => s + v * v, 0);
+  const ssreg = sstot - ssresid;
+  const df = n - p;
+  const sey = df > 0 ? Math.sqrt(ssresid / df) : NaN;
+  const se = sol.inv.map((row, i) => Math.sqrt(Math.max(0, row[i]) * (sey * sey)));
+  return {
+    m: coef.slice(0, k),
+    b: withB ? coef[k] : 0,
+    se: se.slice(0, k),
+    seB: withB ? se[k] : NaN,
+    r2: sstot ? ssreg / sstot : 1,
+    sey,
+    F: df > 0 && ssresid ? ssreg / k / (ssresid / df) : NaN,
+    df,
+    ssreg,
+    ssresid,
+    byCol,
+    k,
+  };
+}
+
+/** LINEST and LOGEST: the coefficients (the last variable's first, as Excel lays them out), and the statistics under them when asked. */
+function linest(c: Calc, a: Node[], cx: Ctx, log: boolean): Val {
+  const kx = knownXY(c, a, cx, log);
+  if (kx instanceof CellError) return kx;
+  const withB = has(a, 2) ? B(c, a[2], cx) : true;
+  const stats = has(a, 3) ? B(c, a[3], cx) : false;
+  if (withB instanceof CellError) return withB;
+  if (stats instanceof CellError) return stats;
+  const f = fitOf(kx.y, kx.X, withB, kx.byCol);
+  if (f instanceof CellError) return f;
+  const w = f.k + 1;
+  const num = (v: number): Scalar => (Number.isFinite(v) ? v : E.NUM);
+  const row1 = [...f.m].reverse().map((m) => (log ? Math.exp(m) : m));
+  row1.push(log ? Math.exp(f.b) : f.b);
+  if (!stats) return { k: 'arr', h: 1, w, d: row1.map(num) };
+  const na = (len: number) => Array.from({ length: len }, () => E.NA as Scalar);
+  const d: Scalar[] = [
+    ...row1.map(num),
+    ...[...f.se].reverse().map(num),
+    withB ? num(f.seB) : E.NA,
+    num(f.r2),
+    num(f.sey),
+    ...na(w - 2),
+    num(f.F),
+    f.df,
+    ...na(w - 2),
+    num(f.ssreg),
+    num(f.ssresid),
+    ...na(w - 2),
+  ];
+  return { k: 'arr', h: 5, w, d };
+}
+
+/** TREND and GROWTH: the fitted values at new x's (the known ones when left out), in their shape. */
+function trend(c: Calc, a: Node[], cx: Ctx, log: boolean): Val {
+  const kx = knownXY(c, a, cx, log);
+  if (kx instanceof CellError) return kx;
+  const withB = has(a, 3) ? B(c, a[3], cx) : true;
+  if (withB instanceof CellError) return withB;
+  const f = fitOf(kx.y, kx.X, withB, kx.byCol);
+  if (f instanceof CellError) return f;
+  let newX: number[][];
+  let h: number;
+  let w: number;
+  if (has(a, 2)) {
+    const na = c.arr(evA(c, a[2], cx));
+    if (na instanceof CellError) return na;
+    for (const v of na.d) if (typeof v !== 'number') return v instanceof CellError ? v : E.VALUE;
+    const xs = na.d as number[];
+    if (f.k === 1) {
+      newX = xs.map((x) => [x]);
+      [h, w] = [na.h, na.w];
+    } else if (kx.byCol) {
+      if (na.w !== f.k) return E.REF;
+      newX = Array.from({ length: na.h }, (_, i) => xs.slice(i * na.w, (i + 1) * na.w));
+      [h, w] = [na.h, 1];
+    } else {
+      if (na.h !== f.k) return E.REF;
+      newX = Array.from({ length: na.w }, (_, i) => Array.from({ length: na.h }, (_, k) => xs[k * na.w + i]));
+      [h, w] = [1, na.w];
+    }
+  } else {
+    newX = kx.X;
+    [h, w] = [kx.ya.h, kx.ya.w];
+  }
+  const d = newX.map((r) => {
+    const v = r.reduce((s, x, i) => s + x * f.m[i], f.b);
+    return fin(log ? Math.exp(v) : v) as Scalar;
+  });
+  return { k: 'arr', h, w, d };
+}
+
+/** PERCENTILE.EXC's rank: k of the way between the values, as (n + 1) places. */
+function percentileExc(xs: number[], k: number): number | CellError {
+  const s = sorted(xs);
+  const n = s.length;
+  const pos = k * (n + 1) - 1;
+  if (!n || k <= 0 || k >= 1 || pos < 0 || pos > n - 1) return E.NUM;
+  const lo = Math.floor(pos);
+  return s[lo] + (pos - lo) * ((s[Math.min(lo + 1, n - 1)] ?? s[lo]) - s[lo]);
+}
+
+/** PERCENTRANK: where x is among the values, as a share (cut, not rounded, to `sig` digits). */
+function percentRank(c: Calc, a: Node[], cx: Ctx, exc: boolean): Val {
+  const xs = numbersOf(c, [a[0]], cx);
+  if (xs instanceof CellError) return xs;
+  const x = N(c, a[1], cx);
+  const sig = opt(c, a, 2, cx, 3);
+  if (x instanceof CellError) return x;
+  if (sig instanceof CellError) return sig;
+  const s = sorted(xs);
+  const n = s.length;
+  if (!n || sig < 1 || x < s[0] || x > s[n - 1]) return n && sig >= 1 ? E.NA : E.NUM;
+  const rankOf = (v: number) => {
+    const below = s.filter((y) => y < v).length;
+    return exc ? (below + 1) / (n + 1) : n > 1 ? below / (n - 1) : 1;
+  };
+  let r: number;
+  const exact = s.findIndex((y) => y === x);
+  if (exact >= 0) r = rankOf(x);
+  else {
+    const i = s.findIndex((y) => y > x);
+    const lo = s[i - 1];
+    const hi = s[i];
+    r = rankOf(lo) + ((x - lo) / (hi - lo)) * (rankOf(hi) - rankOf(lo));
+  }
+  const k = 10 ** Math.trunc(sig);
+  return Math.floor(Number((r * k).toPrecision(12))) / k;
+}
+
+/** A weekend as NETWORKDAYS.INTL and WORKDAY.INTL take it: a number (1: Saturday and Sunday … 17: Saturday only) or "0000011" from Monday. */
+function weekendOf(c: Calc, a: Node[], i: number, cx: Ctx): boolean[] | CellError {
+  if (!has(a, i)) return [true, false, false, false, false, false, true];
+  const v = S(c, a[i], cx);
+  if (v instanceof CellError) return v;
+  // Sunday first, as weekday() counts.
+  if (typeof v === 'string') {
+    if (!/^[01]{7}$/.test(v) || v === '1111111') return E.VALUE;
+    return [v[6] === '1', v[0] === '1', v[1] === '1', v[2] === '1', v[3] === '1', v[4] === '1', v[5] === '1'];
+  }
+  const n = toNum(v);
+  if (n instanceof CellError) return n;
+  const k = Math.trunc(n);
+  const out = [false, false, false, false, false, false, false];
+  if (k >= 1 && k <= 7) {
+    // 1: Sat+Sun, 2: Sun+Mon … 7: Fri+Sat.
+    const first = (k + 5) % 7;
+    out[first] = true;
+    out[(first + 1) % 7] = true;
+  } else if (k >= 11 && k <= 17) out[(k - 11) % 7] = true;
+  else return E.NUM;
+  return out;
+}
+
+const STAT_FNS: Record<string, Fn> = {
+  AVERAGEA: aggA(mean),
+  MINA: aggA((xs) => (xs.length ? Math.min(...xs) : 0)),
+  MAXA: aggA((xs) => (xs.length ? Math.max(...xs) : 0)),
+  STDEVA: aggA(stdev(true)),
+  STDEVPA: aggA(stdev(false)),
+  VARA: aggA((xs) => variance(xs, true)),
+  VARPA: aggA((xs) => variance(xs, false)),
+  DEVSQ: agg((xs) => {
+    const m = mean(xs);
+    return m instanceof CellError ? 0 : sum(xs.map((x) => (x - m) ** 2));
+  }),
+  AVEDEV: agg((xs) => {
+    const m = mean(xs);
+    return m instanceof CellError ? E.NUM : sum(xs.map((x) => Math.abs(x - m))) / xs.length;
+  }),
+  GEOMEAN: agg((xs) => (!xs.length || xs.some((x) => x <= 0) ? E.NUM : Math.exp(sum(xs.map(Math.log)) / xs.length))),
+  HARMEAN: agg((xs) => (!xs.length || xs.some((x) => x <= 0) ? E.NUM : xs.length / sum(xs.map((x) => 1 / x)))),
+  'PERCENTILE.EXC': withK(percentileExc),
+  'QUARTILE.EXC': withK((xs, q) => (q >= 1 && q <= 3 ? percentileExc(xs, Math.trunc(q) / 4) : E.NUM)),
+  'RANK.AVG': def(2, 3, (c, a, cx) => {
+    const x = N(c, a[0], cx);
+    if (x instanceof CellError) return x;
+    const xs = numbersOf(c, [a[1]], cx);
+    if (xs instanceof CellError) return xs;
+    const asc = has(a, 2) ? N(c, a[2], cx) : 0;
+    if (asc instanceof CellError) return asc;
+    const same = xs.filter((y) => near(y, x)).length;
+    if (!same) return E.NA;
+    const before = xs.filter((y) => (asc ? y < x : y > x) && !near(y, x)).length;
+    return before + (same + 1) / 2;
+  }),
+  PERCENTRANK: def(2, 3, (c, a, cx) => percentRank(c, a, cx, false)),
+  'PERCENTRANK.INC': def(2, 3, (c, a, cx) => percentRank(c, a, cx, false)),
+  'PERCENTRANK.EXC': def(2, 3, (c, a, cx) => percentRank(c, a, cx, true)),
+  CORREL: fit2((m) => (m.sxx && m.syy ? m.sxy / Math.sqrt(m.sxx * m.syy) : E.DIV)),
+  PEARSON: fit2((m) => (m.sxx && m.syy ? m.sxy / Math.sqrt(m.sxx * m.syy) : E.DIV)),
+  RSQ: fit2((m) => (m.sxx && m.syy ? m.sxy ** 2 / (m.sxx * m.syy) : E.DIV)),
+  SLOPE: fit2((m) => (m.sxx ? m.sxy / m.sxx : E.DIV)),
+  INTERCEPT: fit2((m) => (m.sxx ? m.my - (m.sxy / m.sxx) * m.mx : E.DIV)),
+  STEYX: fit2((m) => (m.sxx && m.n > 2 ? Math.sqrt((m.syy - m.sxy ** 2 / m.sxx) / (m.n - 2)) : E.DIV), 3),
+  'COVARIANCE.P': fit2((m) => m.sxy / m.n, 1),
+  COVAR: fit2((m) => m.sxy / m.n, 1),
+  'COVARIANCE.S': fit2((m) => m.sxy / (m.n - 1)),
+  FORECAST: def(3, 3, (c, a, cx) => {
+    const x = N(c, a[0], cx);
+    if (x instanceof CellError) return x;
+    const p = pairsXY(c, a[1], a[2], cx);
+    if (p instanceof CellError) return p;
+    if (p.y.length < 2) return E.DIV;
+    const m = moments(p.y, p.x);
+    if (!m.sxx) return E.DIV;
+    const slope = m.sxy / m.sxx;
+    return fin(m.my + slope * (x - m.mx));
+  }),
+  TREND: def(1, 4, (c, a, cx) => trend(c, a, cx, false)),
+  GROWTH: def(1, 4, (c, a, cx) => trend(c, a, cx, true)),
+  LINEST: def(1, 4, (c, a, cx) => linest(c, a, cx, false)),
+  LOGEST: def(1, 4, (c, a, cx) => linest(c, a, cx, true)),
+  'NETWORKDAYS.INTL': def(2, 4, (c, a, cx) => {
+    const s = dateArg(c, a[0], cx);
+    const e = dateArg(c, a[1], cx);
+    const we = weekendOf(c, a, 2, cx);
+    const hs = holidaysOf(c, a[3], cx);
+    if (s instanceof CellError) return s;
+    if (e instanceof CellError) return e;
+    if (we instanceof CellError) return we;
+    if (hs instanceof CellError) return hs;
+    if (Math.abs(e - s) > 400_000) return E.NUM;
+    const [lo, hi, sign] = s <= e ? [s, e, 1] : [e, s, -1];
+    let n = 0;
+    for (let d = Math.floor(lo); d <= Math.floor(hi); d++) if (!we[weekday(d)] && !hs.has(d)) n++;
+    return n * sign;
+  }),
+  'WORKDAY.INTL': def(2, 4, (c, a, cx) => {
+    const s = dateArg(c, a[0], cx);
+    const n = N(c, a[1], cx);
+    const we = weekendOf(c, a, 2, cx);
+    const hs = holidaysOf(c, a[3], cx);
+    if (s instanceof CellError) return s;
+    if (n instanceof CellError) return n;
+    if (we instanceof CellError) return we;
+    if (hs instanceof CellError) return hs;
+    let left = Math.trunc(n);
+    if (Math.abs(left) > 100_000) return E.NUM;
+    const step = left < 0 ? -1 : 1;
+    let d = Math.floor(s);
+    while (left !== 0) {
+      d += step;
+      if (!we[weekday(d)] && !hs.has(d)) left -= step;
+    }
+    return d;
+  }),
+};
+STAT_FNS['FORECAST.LINEAR'] = STAT_FNS.FORECAST;
+
+// ---- formulas: AI, links, pictures and sparklines -----------------------------------------------------------------
+
+/** A short hash of words (53 bits, as base-36 letters): the key an AI answer is kept by. */
+function hash53(s: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36).padStart(8, '0');
+}
+
+/** The key an AI answer is kept by: its prompt and the values it was given, so a change to either asks again. */
+export const aiKey = (prompt: string, context: string[]) => `a${hash53(`${prompt.trim()}\u0001${context.join('\u0002')}`)}`;
+
+/** A value the AI function is given, as words: a cell's, or a range's rows of tab-separated values (empty rows at the end left out). */
+function aiText(c: Calc, v: Val, cx: Ctx): string | CellError {
+  if (!multi(v)) {
+    const s = c.sc(v, cx);
+    return s instanceof CellError ? s : (toText(s) as string);
+  }
+  const a = c.arr(v);
+  if (a instanceof CellError) return a;
+  const lines: string[] = [];
+  for (let i = 0; i < a.h; i++)
+    lines.push(
+      a.d
+        .slice(i * a.w, (i + 1) * a.w)
+        .map((x) => (x instanceof CellError ? x.code : (toText(x) as string)))
+        .join('\t'),
+    );
+  while (lines.length && !lines[lines.length - 1].replace(/\t/g, '').trim()) lines.pop();
+  return lines.join('\n').slice(0, 20_000);
+}
+
+/** IMAGE's picture: its address, words for it, and how it fills its cell (Excel's sizing 0–3, or Google Sheets' mode 1–4). */
+function imageOf(c: Calc, a: Node[], cx: Ctx): CellSpecial | null {
+  const url = S(c, a[0], cx);
+  if (typeof url !== 'string' || !/^(https?:\/\/|data:image\/)/i.test(url.trim())) return null;
+  const second = has(a, 1) ? S(c, a[1], cx) : null;
+  // A number second is Google Sheets' mode (1 fit, 2 stretch, 3 its own size, 4 a size given); words, Excel's alt text.
+  const gs = typeof second === 'number';
+  const alt = typeof second === 'string' ? second : '';
+  const mode = gs ? Math.trunc(second as number) - 1 : has(a, 2) ? toNum(S(c, a[2], cx)) : 0;
+  const fit = mode === 1 ? 'fill' : mode === 2 ? 'none' : mode === 3 ? 'size' : 'fit';
+  const num = (i: number) => {
+    const n = has(a, i) ? toNum(S(c, a[i], cx)) : NaN;
+    return typeof n === 'number' && n > 0 ? Math.min(2000, n) : undefined;
+  };
+  return { kind: 'image', url: url.trim(), alt, fit, h: num(gs ? 2 : 3), w: num(gs ? 3 : 4) };
+}
+
+/** SPARKLINE's chart: its numbers, and the options given as pairs ({"charttype","column";"color","red"}). */
+function sparkOf(c: Calc, a: Node[], cx: Ctx): CellSpecial | null {
+  const src = c.arr(c.ev(a[0], cx));
+  if (src instanceof CellError) return null;
+  const values = src.d.map((v) => (typeof v === 'number' ? v : null));
+  const o: Record<string, Scalar> = {};
+  if (has(a, 1)) {
+    const opts = c.arr(c.ev(a[1], cx));
+    if (!(opts instanceof CellError))
+      for (let i = 0; i + 1 < opts.d.length; i += opts.w >= 2 ? opts.w : 2) {
+        const k = opts.d[i];
+        if (typeof k === 'string') o[k.toLowerCase()] = opts.d[i + 1];
+      }
+  }
+  const t = String(o.charttype ?? 'line').toLowerCase();
+  const type = t === 'column' || t === 'bar' || t === 'winloss' ? t : 'line';
+  const col = (x: Scalar) => (typeof x === 'string' ? (cleanColor(x) ?? undefined) : undefined);
+  const n = (x: Scalar) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined);
+  return { kind: 'spark', values: values.slice(0, 2000), type, color: col(o.color ?? o.color1 ?? null), neg: col(o.negcolor ?? o.color2 ?? null), max: n(o.ymax ?? o.max ?? null), min: n(o.ymin ?? null), width: n(o.linewidth ?? null) };
+}
+
+const AI_FNS: Record<string, Fn> = {
+  AI: def(1, 30, (c, a, cx) => {
+    const p = T(c, a[0], cx);
+    if (p instanceof CellError) return p;
+    if (!p.trim()) return E.VALUE;
+    const context: string[] = [];
+    for (let i = 1; i < a.length; i++) {
+      if (a[i].k === 'nil') continue;
+      const t = aiText(c, c.ev(a[i], cx), cx);
+      if (t instanceof CellError) return t;
+      context.push(t);
+    }
+    const key = aiKey(p, context);
+    const got = c.book.ai?.[key];
+    if (got !== undefined) {
+      c.seenAi(key);
+      return got;
+    }
+    c.wantAi(cx, key, p.trim(), context);
+    return E.BUSY;
+  }),
+  HYPERLINK: def(1, 2, (c, a, cx) => {
+    const url = T(c, a[0], cx);
+    if (url instanceof CellError) return url;
+    if (!has(a, 1)) return url;
+    const label = S(c, a[1], cx);
+    return label === null ? url : label;
+  }),
+  IMAGE: def(1, 5, (c, a, cx) => {
+    const url = T(c, a[0], cx);
+    if (url instanceof CellError) return url;
+    const second = has(a, 1) ? S(c, a[1], cx) : null;
+    return typeof second === 'string' ? second : '';
+  }),
+  SPARKLINE: def(1, 2, (c, a, cx) => {
+    const v = c.ev(a[0], cx);
+    return v instanceof CellError ? v : '';
+  }),
+};
+
+/**
+ * The functions that work on each value of an array given where one value goes (in a formula worked out as an array:
+ * one that spills, or inside SUM, FILTER and the like), and which of their arguments do ('all', or their places).
+ */
+const LIFT = new Map<string, 'all' | number[]>([
+  ...[
+    'LEN', 'LEFT', 'RIGHT', 'MID', 'UPPER', 'LOWER', 'PROPER', 'TRIM', 'CLEAN', 'SUBSTITUTE', 'REPLACE', 'FIND', 'SEARCH', 'REPT', 'EXACT', 'CODE', 'CHAR',
+    'VALUE', 'TEXT', 'FIXED', 'CONCATENATE', 'TEXTBEFORE', 'TEXTAFTER', 'REGEXMATCH', 'REGEXTEST', 'REGEXREPLACE', 'DATE', 'TIME', 'YEAR', 'MONTH', 'DAY',
+    'HOUR', 'MINUTE', 'SECOND', 'WEEKDAY', 'WEEKNUM', 'ISOWEEKNUM', 'EOMONTH', 'EDATE', 'DATEDIF', 'DAYS', 'DATEVALUE', 'TIMEVALUE', 'ISBLANK', 'ISNUMBER',
+    'ISTEXT', 'ISNONTEXT', 'ISLOGICAL', 'ISERROR', 'ISERR', 'ISNA', 'ISEVEN', 'ISODD', 'N', 'T', 'NOT', 'ROUND', 'ROUNDUP', 'ROUNDDOWN', 'TRUNC', 'INT',
+    'ABS', 'SIGN', 'SQRT', 'POWER', 'EXP', 'LN', 'LOG10', 'LOG', 'MOD', 'QUOTIENT', 'CEILING', 'FLOOR', 'MROUND', 'EVEN', 'ODD',
+  ].map((n) => [n, 'all'] as [string, 'all']),
+  ...['VLOOKUP', 'HLOOKUP', 'XLOOKUP', 'MATCH', 'XMATCH'].map((n) => [n, [0]] as [string, number[]]),
+  ...['COUNTIF', 'SUMIF', 'AVERAGEIF'].map((n) => [n, [1]] as [string, number[]]),
+]);
+
+const FNS: Record<string, Fn> = { ...MATH_FNS, ...LOGIC_FNS, ...INFO_FNS, ...LOOKUP_FNS, ...TEXT_FNS, ...DATE_FNS, ...MONEY_FNS, ...ARRAY_FNS, ...LAMBDA_FNS, ...ARRAY2_FNS, ...TEXT2_FNS, ...STAT_FNS, ...AI_FNS };
 FNS['MODE.SNGL'] = FNS.MODE;
 FNS['RANK.EQ'] = FNS.RANK;
 
