@@ -10,6 +10,7 @@
 // The functions below run in the browser, not here: their source is sent as text (Function#toString),
 // so each uses only its arguments and the browser's own globals.
 import { EDITOR_SRC } from './editor.ts';
+import { DESIGN_EDITOR_SRC } from './design-editor.ts';
 import { KIT_CSS } from '../../shared/page-kit.ts';
 import { ENGINE_SRC, UI_KIT_CSS, UI_SRC } from './ui-kit.ts';
 import { KIT_LIB_URLS, MEDIA_SRC } from './media-kit.ts';
@@ -910,7 +911,7 @@ export function injectHead(html: string, head: string): string {
  *   are held back, and the page is changed in place (what was there stays), so it grows without
  *   flashing, following its end unless the reader scrolled up.
  */
-function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: string, appSrc: string, uiSrc: string, engineSrc: string, uiCss: string, mediaSrc: string, kitLibs: Record<string, string>, cdn: string, codeSrc: string, dbSrc: string) {
+function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: string, appSrc: string, uiSrc: string, engineSrc: string, uiCss: string, mediaSrc: string, kitLibs: Record<string, string>, cdn: string, codeSrc: string, dbSrc: string, designSrc: string) {
   const num = (v: unknown, def: number) => (typeof v === 'number' && v > 0 && v < 1e8 ? v : def);
   const nonce = (v: unknown) => (typeof v === 'string' ? v.slice(0, 64) : '');
   const theme = (v: unknown) => (v === 'dark' ? 'dark' : 'light');
@@ -1019,7 +1020,9 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: str
       holdBack(doc);
       const labels = d.labels && typeof d.labels === 'object' ? d.labels : {};
       const cfg = { n: nonce(d.n), theme: theme(d.theme), doctype: m ? m[0].trim() : '', labels };
-      head = `<style id="n-kit" data-n-own>${kit}</style><style id="n-theme" data-n-own>${themeText(d.css)}</style><script data-n-own>(${schemeSrc})(${js(cfg.theme)})</script><script data-n-own>(${editorSrc})(${js(cfg)})</script>`;
+      // A design (fixed-size artboards: shared/design.ts) is edited by the design editor (design-editor.ts) instead.
+      const design = /<[a-z][^>]*\bclass\s*=\s*["'][^"']*\bn-artboard\b/i.test(d.html);
+      head = `<style id="n-kit" data-n-own>${kit}</style><style id="n-theme" data-n-own>${themeText(d.css)}</style><script data-n-own>(${schemeSrc})(${js(cfg.theme)})</script><script data-n-own>(${design ? designSrc : editorSrc})(${js(cfg)})</script>`;
       html = (m ? m[0] : '') + doc.documentElement.outerHTML;
     } else {
       const cfg = { n: nonce(d.n), theme: theme(d.theme), max: { key: num(d.max?.key, 200), value: num(d.max?.value, 524288) }, fill: d.fill === true, play: d.play === true, open: d.open === true };
@@ -1059,4 +1062,4 @@ const asJs = (s: string) => JSON.stringify(s).replace(/</g, '\\u003c');
 
 /** The document of /htmlframe, where every page renders (sandboxed by PAGE_CSP). */
 export const frameHtml = () =>
-  `<!doctype html>\n<html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(frame.toString())})(${asJs(KIT_CSS)}, ${asJs(BRIDGE_SRC)}, ${asJs(EDITOR_SRC)}, ${asJs(SCHEME_SRC)}, ${asJs(APP_SRC)}, ${asJs(UI_SRC)}, ${asJs(ENGINE_SRC)}, ${asJs(UI_KIT_CSS)}, ${asJs(MEDIA_SRC)}, ${JSON.stringify(KIT_LIB_URLS).replace(/</g, '\\u003c')}, ${asJs(LIB_CDN)}, ${asJs(CODE_COLOURS_SRC)}, ${asJs(PAGE_DB_SRC)})</script></body></html>`;
+  `<!doctype html>\n<html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(frame.toString())})(${asJs(KIT_CSS)}, ${asJs(BRIDGE_SRC)}, ${asJs(EDITOR_SRC)}, ${asJs(SCHEME_SRC)}, ${asJs(APP_SRC)}, ${asJs(UI_SRC)}, ${asJs(ENGINE_SRC)}, ${asJs(UI_KIT_CSS)}, ${asJs(MEDIA_SRC)}, ${JSON.stringify(KIT_LIB_URLS).replace(/</g, '\\u003c')}, ${asJs(LIB_CDN)}, ${asJs(CODE_COLOURS_SRC)}, ${asJs(PAGE_DB_SRC)}, ${asJs(DESIGN_EDITOR_SRC)})</script></body></html>`;

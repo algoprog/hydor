@@ -794,13 +794,15 @@ export const EditFrame = forwardRef<
     onAgent?: () => void;
     /** Ctrl+Shift+/ in the page: the keyboard shortcuts. */
     onKeys?: () => void;
+    /** A design's editor (design-editor.ts) says something of its own: its zoom, its artboards, a file dropped… */
+    onDesign?: (d: Record<string, unknown>) => void;
     className?: string;
   }
->(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, className }, handle) {
+>(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onDesign, className }, handle) {
   const ref = useRef<HTMLIFrameElement>(null);
   const offline = useContext(OfflineFrames);
-  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys });
-  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys };
+  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onDesign });
+  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onDesign };
   const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>(), anchorWaits: new Map<number, (list: { id: string; on: PageAnchor }[]) => void>() });
   const send = (m: Record<string, unknown>) => ref.current?.contentWindow?.postMessage({ ...m, type: 'wa-ed', n: ch.current.n }, '*');
   useThemeChange(() => ch.current.n && send({ cmd: 'theme', arg: { theme: themeNow(), css: themeCss() } }));
@@ -881,6 +883,7 @@ export const EditFrame = forwardRef<
       else if (d.type === 'wa-ed-ask' && ASKS.has(d.what) && isStr(d.id, 20)) c.onAsk?.({ what: d.what, id: d.id, rect: rectOf(d.rect), has: d.has === true, tex: isStr(d.tex, 5000) ? d.tex : undefined });
       else if (d.type === 'wa-ed-file' && isStr(d.id, 20) && d.file instanceof File && d.file.size <= 40_000_000 && /^image\//.test(d.file.type)) c.onFile?.(d.id, d.file);
       else if (d.type === 'wa-ed-agent') c.onAgent?.();
+      else if (d.type === 'wa-ed-design' && typeof d.what === 'string') c.onDesign?.(d as Record<string, unknown>);
       else if (d.type === 'wa-ed-keys') c.onKeys?.();
       else if (d.type === 'wa-ed-html' && typeof d.html === 'string') {
         const done = ch.current.waits.get(d.id);

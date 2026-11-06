@@ -183,6 +183,23 @@ export const DESIGN_FIT_SRC = `(${designFit.toString()})()`;
 /** A design's head: its stylesheet and its fitting script, as the page carries them. */
 export const designHead = () => `<style id="n-design-base">\n${DESIGN_CSS}\n</style>\n<script id="n-design-fit">${DESIGN_FIT_SRC.replace(/<\/(script)/gi, '<\\/$1')}</script>`;
 
+/**
+ * The arc curved words follow (an element of the class n-curve), in its own box `w` wide: SVG path data, and the box's
+ * height. `curve` from -100 (bent down, a smile) to 100 (a half circle, bent up). Self-contained (Math alone): the
+ * editor in the page's frame runs it from its source too.
+ */
+export function curveGeom(w: number, size: number, curve: number): { d: string; h: number } {
+  const c = Math.max(-100, Math.min(100, curve)) || 1;
+  const theta = (Math.abs(c) / 100) * Math.PI;
+  const R = w / 2 / Math.sin(Math.min(theta, Math.PI) / 2);
+  const sag = R * (1 - Math.cos(theta / 2));
+  const pad = size * 1.15;
+  const h = Math.round(sag + pad * 1.4);
+  const r = (v: number) => Math.round(v * 10) / 10;
+  const d = c > 0 ? `M0,${r(pad + sag)} A${r(R)},${r(R)} 0 0 1 ${r(w)},${r(pad + sag)}` : `M0,${r(pad * 0.85)} A${r(R)},${r(R)} 0 0 0 ${r(w)},${r(pad * 0.85)}`;
+  return { d, h };
+}
+
 // ---- reading a design --------------------------------------------------------------------------------------------------
 
 /** Whether a page is a design: it has an artboard. */
