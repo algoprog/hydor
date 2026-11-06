@@ -1,11 +1,12 @@
 // What is picked in a document, over the page: a picture's frame with a handle at each corner to make it wider or
 // narrower (as a share of the text's width, its proportions kept), and a bar by it for its alignment, its caption,
-// its description (for those who cannot see it), another picture in its place, asking an agent about it, and
-// taking it out. A line across, a page break or a table of contents picked has the bar's last button alone.
+// its description (for those who cannot see it), another picture in its place, changing it with AI (a short menu:
+// Change with AI, Remove the background, Erase part of it), asking an agent about it, and taking it out. A line
+// across, a page break or a table of contents picked has the bar's last button alone.
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, Captions, FileText, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, Captions, Eraser, FileText, ImageMinus, RefreshCw, Sparkles, Trash2, Wand, WandSparkles } from 'lucide-react';
 import type { Block, ImageBlock } from '@shared/docs';
-import { Button, cx, inputCls, Popover } from '../../../components/ui';
+import { Button, cx, inputCls, MenuItem, Popover } from '../../../components/ui';
 import { Tool } from '../slides/controls';
 import type { DocEngine } from './engine';
 
@@ -37,6 +38,7 @@ export function Picked({
   tick,
   readOnly,
   onReplace,
+  onAi,
   onAsk,
 }: {
   engine: DocEngine;
@@ -46,13 +48,17 @@ export function Picked({
   tick: unknown;
   readOnly?: boolean;
   onReplace: (id: string) => void;
+  /** The picture changed with AI, its background taken out, or part of it erased (a dialog), then put in its place. */
+  onAi?: (id: string, mode: 'change' | 'cutout' | 'erase') => void;
   onAsk?: () => void;
 }) {
   const [box, setBox] = useState<Rect | null>(null);
   const [edit, setEdit] = useState<'caption' | 'alt' | null>(null);
+  const [ai, setAi] = useState(false);
   const [text, setText] = useState('');
   const capRef = useRef<HTMLButtonElement>(null);
   const altRef = useRef<HTMLButtonElement>(null);
+  const aiRef = useRef<HTMLButtonElement>(null);
   const img = block.type === 'image' ? (block as ImageBlock) : null;
   const target = () => {
     const el = engine.elementOf(block.id);
@@ -152,6 +158,19 @@ export function Picked({
               <Tool label="Another picture" onClick={() => onReplace(img.id)}>
                 <RefreshCw size={15} />
               </Tool>
+              {onAi && (
+                <button
+                  ref={aiRef}
+                  type="button"
+                  title="Change it with AI"
+                  aria-label="Change it with AI"
+                  aria-expanded={ai}
+                  onClick={() => setAi((o) => !o)}
+                  className={cx('flex h-8 w-8 items-center justify-center rounded-lg text-fg-2 hover:bg-bg-2 hover:text-fg', ai && 'bg-bg-2 text-fg')}
+                >
+                  <Wand size={15} />
+                </button>
+              )}
               {onAsk && (
                 <Tool label="Ask the agent about it" onClick={onAsk}>
                   <Sparkles size={15} className="text-accent" />
@@ -164,6 +183,28 @@ export function Picked({
             <Trash2 size={15} />
           </Tool>
         </div>
+      )}
+      {img && onAi && (
+        <Popover anchor={aiRef} open={ai} onClose={() => (setAi(false), engine.refocusSoon())} width={240} title="Change it with AI">
+          {(
+            [
+              ['change', 'Change with AI', <WandSparkles key="c" size={14} />],
+              ['cutout', 'Remove the background', <ImageMinus key="b" size={14} />],
+              ['erase', 'Erase part of it', <Eraser key="e" size={14} />],
+            ] as const
+          ).map(([mode, label, icon]) => (
+            <MenuItem
+              key={mode}
+              icon={icon}
+              onClick={() => {
+                setAi(false);
+                onAi(img.id, mode);
+              }}
+            >
+              {label}
+            </MenuItem>
+          ))}
+        </Popover>
       )}
       <Popover anchor={edit === 'alt' ? altRef : capRef} open={!!edit} onClose={() => (setEdit(null), engine.refocusSoon())} width={300} title={edit === 'alt' ? 'Description' : 'Caption'}>
         <form
