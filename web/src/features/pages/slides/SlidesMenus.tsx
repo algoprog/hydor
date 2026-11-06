@@ -1,8 +1,9 @@
 // The slides editor's menus, as Google Slides and PowerPoint have them: File (saving, PowerPoint compatible or the web
 // format, the slideshow's progress bar), Edit, View (zoom, the grid, the rulers and guides), Insert (every kind of part,
-// the web format's interactive ones, a comment, the footer), Format (the words' look, the format painter, a picture's
-// crop, running a live part in place), Arrange (groups, the stacking order, lining up, turning), Slide, and Tools. Each
-// action with its keys; what does not apply to what is picked is greyed. Search the menus (Alt+/) finds any of them.
+// pictures, drawings, plots and videos made with AI, the web format's interactive parts, a comment, the footer),
+// Format (the words' look, the format painter, a picture's crop and its changes with AI, a chart made a plot, running
+// a live part in place), Arrange (groups, the stacking order, lining up, turning), Slide, and Tools. Each action with
+// its keys; what does not apply to what is picked is greyed. Search the menus (Alt+/) finds any of them.
 import {
   AlignCenter,
   AlignCenterHorizontal,
@@ -19,6 +20,7 @@ import {
   ArrowUp,
   ArrowUpToLine,
   Bold,
+  ChartScatter,
   Box,
   CircleStop,
   Clipboard,
@@ -26,12 +28,14 @@ import {
   Copy,
   CornerDownRight,
   Crop,
+  Eraser,
   Eye,
   Globe,
   Grid3x3,
   Group,
   ImageDown,
   Image as ImageIcon,
+  ImageMinus,
   IndentDecrease,
   IndentIncrease,
   Italic,
@@ -46,6 +50,7 @@ import {
   MousePointerClick,
   MoveRight,
   Paintbrush,
+  PenTool,
   PieChart,
   Play,
   Plus,
@@ -74,6 +79,7 @@ import {
   Undo2,
   Ungroup,
   Video,
+  WandSparkles,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
@@ -152,6 +158,13 @@ export interface MenuArgs {
   /** The live part picked runs in place, or stops. */
   running: boolean;
   run(): void;
+  /** The AI tools: a picture made with AI, a drawing (SVG), a plot, a video; the picture picked changed; the chart picked made a plot. */
+  aiPicture?: () => void;
+  aiDrawing?: () => void;
+  aiPlot?: () => void;
+  aiVideo?: () => void;
+  aiEdit?: (mode: 'change' | 'cutout' | 'erase') => void;
+  aiPlotChart?: () => void;
   video(): void;
   /** A video from this device. */
   videoFile(): void;
@@ -268,6 +281,9 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           items: [
             { label: 'From this device', also: 'picture image upload', run: a.picture },
             { label: 'From a web address', also: 'picture image url', run: a.pictureUrl },
+            !!a.aiPicture && '-',
+            !!a.aiPicture && { label: 'Make with AI', icon: <WandSparkles size={14} />, also: 'picture image generate ai photo illustration icon background', run: a.aiPicture },
+            !!a.aiDrawing && { label: 'Drawing (SVG)', icon: <PenTool size={14} />, also: 'svg vector drawing icon logo diagram illustration ai', run: a.aiDrawing },
           ],
         },
         {
@@ -284,6 +300,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         },
         { label: 'Table', icon: <Table2 size={14} />, disabled: ro, run: a.table },
         { label: 'Chart', icon: <PieChart size={14} />, disabled: ro, run: a.chart },
+        !!a.aiPlot && { label: 'Plot', icon: <ChartScatter size={14} />, also: 'plot chart graph data matplotlib histogram scatter ai', disabled: ro, run: a.aiPlot },
         '-',
         { label: 'Icon', icon: <Star size={14} />, also: 'icon symbol pictogram lucide', disabled: ro, run: a.icon },
         { label: 'Emoji', icon: <Smile size={14} />, also: 'emoji smiley', disabled: ro, run: a.emoji },
@@ -296,6 +313,8 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           items: [
             { label: 'From YouTube or Vimeo', also: 'video youtube vimeo online address link', run: a.video },
             { label: 'From this device', also: 'video file upload mp4 mov webm film clip', run: a.videoFile },
+            !!a.aiVideo && '-',
+            !!a.aiVideo && { label: 'Make with AI', icon: <WandSparkles size={14} />, also: 'video generate ai clip film', run: a.aiVideo },
           ],
         },
         {
@@ -356,6 +375,10 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         '-',
         one?.type === 'image' && !!one.src && { label: 'Crop the picture', icon: <Crop size={14} />, disabled: ro, run: a.crop },
         one?.type === 'image' && (!!one.crop || !!one.adjust) && { label: 'Reset the picture', also: 'uncrop colours', disabled: ro, run: a.resetPicture },
+        one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Change with AI', icon: <WandSparkles size={14} />, also: 'edit picture ai', disabled: ro, run: () => a.aiEdit!('change') },
+        one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Remove the background', icon: <ImageMinus size={14} />, also: 'cut out background transparent', disabled: ro, run: () => a.aiEdit!('cutout') },
+        one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Erase part of it', icon: <Eraser size={14} />, also: 'erase remove object', disabled: ro, run: () => a.aiEdit!('erase') },
+        one?.type === 'chart' && !!a.aiPlotChart && { label: 'Make a plot of this', icon: <ChartScatter size={14} />, also: 'plot chart graph matplotlib', disabled: ro, run: a.aiPlotChart },
         one?.type === 'math' && { label: 'Edit the equation', icon: <Sigma size={14} />, disabled: ro, run: a.editTex },
         one?.type === 'icon' && { label: 'Another icon', icon: <Star size={14} />, disabled: ro, run: a.replaceIcon },
         live && { label: a.running ? 'Stop it' : 'Run it here', icon: a.running ? <CircleStop size={14} /> : <Play size={14} />, also: 'run start live preview stop', run: a.run },
