@@ -9,7 +9,7 @@ import type { PlotAnswer, PlotAsk, TiersInfo } from '@shared/images';
 import type { CellEditorHandle } from '../../../lib/codemirror';
 import { Button, cx, Dialog, inputCls, Switch } from '../../../components/ui';
 import { getTiers, makePlotNow } from './api';
-import { describeData, MAX_DATA, plotSize, SHAPES } from './logic';
+import { describeData, errorWords, MAX_DATA, plotSize, SHAPES } from './logic';
 import { Choice, Label, PriceLine, Problem, ShapeMark, Shown, Words, Working } from './parts';
 import { shownSrc } from './pictures';
 import type { MadePlot, PlotOpts } from './store';
@@ -110,7 +110,7 @@ export function MakePlot({ o, onDone }: { o: PlotOpts; onDone: (p: MadePlot | nu
       setCodeRev((n) => n + 1);
       if (how === 'change') setChange('');
     } catch (e) {
-      if (!stop.current.signal.aborted) setError((e as Error).message);
+      if (!stop.current.signal.aborted) setError(errorWords(e));
     } finally {
       setBusy(null);
     }
