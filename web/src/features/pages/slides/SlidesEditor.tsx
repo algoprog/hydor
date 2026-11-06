@@ -153,7 +153,7 @@ const colorsOf = (d: Deck) => [...new Set([d.theme.accent, ...d.theme.colors].ma
 const plotTheme = (d: Deck) => ({ colors: colorsOf(d), fg: `#${hexColor(d.theme.fg, d.theme).hex}`, bg: `#${hexColor(d.theme.bg, d.theme).hex}`, font: d.theme.font });
 
 /** A chart's numbers as CSV: its labels down the side, a column for each series. */
-const chartCsv = (c: ChartEl) => csvOf([['', ...c.series.map((s) => s.name)], ...c.labels.map((l, i) => [l, ...c.series.map((s) => String(s.values[i] ?? ''))])]);
+const chartCsv = (c: ChartEl) => csvOf([[c.title?.trim() || 'Label', ...c.series.map((s) => s.name)], ...c.labels.map((l, i) => [l, ...c.series.map((s) => String(s.values[i] ?? ''))])]);
 
 const savedGrid = (): GridOpts => {
   try {
