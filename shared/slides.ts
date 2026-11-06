@@ -1,13 +1,13 @@
 // Slides: a deck of slides kept in Pages (a page of the kind "slides"), as the server, the editor and the player
 // share it. A slide is 1280 pixels wide (720 high at 16:9, 960 at 4:3) and holds parts placed on it, as in
 // PowerPoint or Google Slides: text boxes, shapes (which may hold text too), pictures (cropped, their colours
-// adjusted), lines and arrows, tables, charts, icons, equations (LaTeX), videos, and groups of parts that move as
-// one. Each slide has its background, its order of animations (a part comes in, is stressed or goes out: on a
+// adjusted, cut to a shape or shown in a frame), lines and arrows, tables, charts (from a spreadsheet of the Library
+// too), icons, equations (LaTeX), videos (trimmed), QR codes, and groups of parts that move as one. Each slide has its background, its order of animations (a part comes in, is stressed or goes out: on a
 // click, with the one before or after it), its transition from the slide before (Morph glides the parts two slides
 // share into place), speaker notes, and the comments people and agents leave on it or its parts (with replies,
 // resolved or not). The deck's theme names the colours and fonts parts refer to ("accent",
-// "head"), so a new theme recolours it all; the deck may number its slides and give them a footer, and keeps the
-// guides its slides are lined up on.
+// "head"), so a new theme recolours it all (a slide taken from another deck may keep a theme of its own); the deck
+// may number its slides and give them a footer and a logo, and keeps the guides its slides are lined up on.
 //
 // normalizeDeck takes what an agent or the editor sends, lenient about shorthand (a slide made from a layout
 // with its title and bullets, text as a string with "- " bullets and **bold**), and returns the full model,

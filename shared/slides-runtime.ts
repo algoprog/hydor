@@ -12,6 +12,11 @@
 // app gives its own; a deck's page has each drawn by the server's), else shown as their LaTeX. While presenting, a laser pointer, a pen
 // and live captions (the browser's speech recognition, where it has one) are on the keys L, P and C.
 //
+// Pictures cut to a shape (a clip path of the outline PowerPoint gets too) and in frames (a card, a phone, a laptop, a
+// browser window: their pieces drawn round the picture), QR codes from the squares kept with them, a slide's own theme
+// (a slide taken from another deck), the deck's logo in a corner of each slide, and videos stopping where they are
+// trimmed draw here as well.
+//
 // The web format's parts draw here too: code coloured by a small tokenizer of the runtime's own; quizzes answered in
 // the slideshow (their answers kept for the show, the score counted for its score parts); and the live parts (custom
 // code, web pages, 3D), each a page of its own in a sandboxed frame (the app's frame at /partframe, else a srcdoc
