@@ -88,7 +88,7 @@ import { Button, cx, MenuItem, Popover, Switch } from '../../../components/ui';
 import { useTexHtml } from '../common/katex';
 import { Choice, Select } from '../studio/fields';
 import { ColorButton, Field, NumInput, Section, Swatches, Tool } from './controls';
-import { addAnim, align, distribute, effectDur, transitionDur, dropMergesPast, fillCells, heightOf, mergeAt, mergeCells, moveAnim, onSlide, partName, pathTo, pickedOf, removeAnim, removeEls, restack, setAnim, setEls, setSlide, topOf, unmergeCell, W } from './ops';
+import { addAnim, align, distribute, effectDur, transitionDur, dropMergesPast, fillCells, heightOf, mergeAt, mergeCells, moveAnim, onSlide, partName, partsLead, pathTo, pickedOf, removeAnim, removeEls, restack, setAnim, setEls, setSlide, topOf, unmergeCell, W } from './ops';
 import type { CellSel } from './SlideCanvas';
 import { SlideThumb } from './Thumb';
 import { fetchVideoStill } from './media';
@@ -1137,7 +1137,7 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cro
             variant="secondary"
             icon={<Sparkles size={14} />}
             className="w-full justify-center"
-            onClick={() => onAsk(`On slide ${index + 1}, the ${partName(el).replace(/^(\w)/, (c) => c.toLowerCase())}: `)}
+            onClick={() => onAsk(partsLead(index, slide, [el]))}
           >
             Ask the agent about it
           </Button>
@@ -1170,7 +1170,7 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cro
           set={set}
           running={running === el.id}
           onRun={(id) => onRun?.(id)}
-          onAsk={onAsk ? () => onAsk(`On slide ${index + 1}, the ${partName(el).replace(/^(\w)/, (c) => c.toLowerCase())}: `) : undefined}
+          onAsk={onAsk ? () => onAsk(partsLead(index, slide, [el])) : undefined}
           pickPicture={pickPicture}
         />
       )}
