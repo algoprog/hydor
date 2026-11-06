@@ -3,6 +3,59 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.32.0 · 6 November 2026
+
+Slides, documents and pages you make with AI: pictures, drawings, plots and videos made and changed right in the
+editors (and by agents as they make things), backgrounds taken out and things erased on your own computer, picture
+and video editors that open in a tab of their own, slides that are web pages by default (quizzes, custom code, 3D,
+narration and much more), over two hundred kinds of slide, document and page an agent makes from a word or two, and a
+friendlier Apps page with your apps pinned to the top.
+
+- **Pictures made with AI, in every editor**: **Insert → Picture → Make with AI** in slides, documents and pages (and a
+  slide's background, a page's cover): what it is for, a look, its shape, how many, a see-through background, and the
+  price on the button before anything is spent. Two models do the work: **Quick** (cheaper, for icons, backgrounds and
+  textures) and **Best** (for scenes, photos, words in a picture and every change); Auto picks one. **Change with AI**
+  changes a picture as you say, everywhere or only where you paint.
+- **Backgrounds out and things erased, free and private**: **Remove the background** and **Erase part of it** run on your
+  own computer once you set up the **picture tools** (Settings → Images, video and audio): each model loads only when it
+  is used and is put away when idle. When the result is not right, **Do it with AI instead** redoes it with an image model;
+  without the picture tools they go through OpenRouter.
+- **Drawings, plots and videos**: **Drawing (SVG)** draws icons, logos, diagrams and patterns that stay sharp at any size;
+  **Plot** has an agent write the plot's code from your words and data and run it on your computer (in a web deck, a plot
+  you can point at); **Video → Make with AI** makes a short clip. **Free photos** finds openly licensed photos, their
+  credit added for you.
+- **Picture and video editors, in a tab of their own**: **Edit** on any picture or video (a slide's, a document's, a
+  page's, the Library's, a file's, one in a conversation) opens its editor in a tab beside the page you were on, which
+  stays as it was. Pictures: crop to a shape, straighten, a dozen adjustments, filters, markup, blurring faces or numbers,
+  and the AI tools. Videos: trim, cut parts out, speed, crop to 16:9, 9:16 or square, titles and captions, fades, music,
+  a frame as a picture, a GIF. Save puts it back where it came from, or keep a copy.
+- **Slides for the web**: a new deck is a web page by default, still exported to PowerPoint (its web parts as pictures);
+  **Theme → Made for** makes one PowerPoint compatible. The web format adds **quizzes** with a score, **custom code**,
+  **web pages** and **3D** on a slide, effects such as typewriter text, lines that draw themselves and numbers that count
+  up, effects that start when a part is clicked, cube, flip and glitch transitions, moving backgrounds, shining text,
+  frosted glass and parts that answer the pointer. A deck saves as **one small web page** that opens in any browser.
+- **More for slides**: **Design ideas** (three new layouts of a slide's own content), **Rewrite** picked words (shorter,
+  friendlier, translated…, in documents too), **Animate every slide** in one click, **Check accessibility** with fixes,
+  **Translate the slides**; pictures in **shapes and frames**, **QR codes**, **slides from another deck**, **charts from a
+  spreadsheet** that update, **My themes** with your logo, trimmed videos and an eyedropper; **narration** recorded or made
+  with AI, a narrated show that plays itself, **Rehearse with coach**, **Record a video** of your slideshow with your
+  camera, a **camera bubble** while you present, and your **phone as a remote**.
+- **Made with AI from a kind**: pick one of over two hundred kinds (a SWOT slide, a pitch deck, a cover letter, a lesson
+  plan, a habit tracker, a pricing table, a budget…), say what it is about if you like, and an agent makes it from what is
+  already there: **Insert → Slide made with AI**, **Section made with AI**, **Add a block made with AI**, or **New page →
+  Choose a kind**. **Turn it into** makes slides from a document, a document from slides, and so on.
+- **Agents do all of it too**: they illustrate what they make by themselves (pictures, free photos, drawings, plots,
+  videos), edit pictures and videos, work on a deck's or document's own pictures, and do what the editors do in a click
+  (animate every slide, fix accessibility, make PowerPoint compatible, sort a spreadsheet, accept suggestions…).
+  **Ask the agent** beside a page knows exactly what you picked. When a model needs an OpenRouter key that is not set,
+  the agent asks for it on a card (the key goes straight to Settings), and skipping it means that model does not run.
+- **The Apps page**: pin your apps to its top (the same on every device), see the apps you used lately with **Run again**,
+  find any app as you type, and start with four ready-made ones if you are new.
+- **The Library**: everything in it says what it is in a short description, and its search finds things by their title
+  and description, by words and by meaning.
+- Fixed: a picture put in while the caret was in a document's table cell was dropped without a word; a picture's flip
+  buttons in the slides editor showed each other's pictures.
+
 ## 0.31.0 · 5 November 2026
 
 For researchers and engineers: Experiments, where your training runs wait for a free GPU and are kept as records, with
