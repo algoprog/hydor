@@ -27,6 +27,7 @@ import { BatchTab } from './Batch';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { statusBadge } from './Gallery';
 import { FlowList } from './FlowStrip';
+import { PinMenuItem } from './Pinned';
 import { DownloadDialog, EnvLine } from './Install';
 import { AppScreen } from './Screen';
 import { AppView } from './View';
@@ -847,6 +848,7 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
                   <MoreHorizontal size={17} />
                 </IconButton>
                 <Popover anchor={more} open={menu} onClose={() => setMenu(false)} align="end" width={220}>
+                  <PinMenuItem id={id} onDone={() => setMenu(false)} />
                   {ownPage && (
                     <MenuItem icon={<Pencil size={15} />} onClick={() => (setMenu(false), go(`/apps/new?template=${enc(id.slice(4))}`))}>
                       Make it mine
@@ -869,6 +871,7 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
                 <MoreHorizontal size={17} />
               </IconButton>
               <Popover anchor={more} open={menu} onClose={() => setMenu(false)} align="end" width={220}>
+                <PinMenuItem id={id} onDone={() => setMenu(false)} />
                 <MenuItem
                   icon={<Copy size={15} />}
                   onClick={async () => {

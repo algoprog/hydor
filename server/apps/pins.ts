@@ -3,7 +3,8 @@
 // with its latest run: how it went, to open its result or run it again). An app deleted, or a ready-made one
 // uninstalled, leaves the pins. Agents' find_apps lists the user's apps in the same order (use.ts): the pinned ones
 // first, then those used lately, then the others.
-import type { AppRun, RunSource } from '../../shared/apps.ts';
+import type { AppRun } from '../../shared/apps.ts';
+import { MAX_PINS, RECENT_APPS, USED_SOURCES } from '../../shared/apps.ts';
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { isInstalled } from './builtins.ts';
@@ -11,12 +12,7 @@ import { getApp, getRun, runView } from './store.ts';
 import { templateById } from './templates.ts';
 
 const KEY = 'apps.pins';
-/** At most this many apps are pinned. */
-export const MAX_PINS = 12;
-/** How many of the apps used lately the page shows (and agents hear of first). */
-export const RECENT_APPS = 8;
-/** The runs that count as using an app: from its form, from its own page or screen, and those an agent ran for you in a chat. */
-export const USED_SOURCES: RunSource[] = ['web', 'screen', 'session'];
+export { MAX_PINS, RECENT_APPS, USED_SOURCES };
 
 function read(db: DB): string[] {
   try {
@@ -120,6 +116,9 @@ export function theirsFirst<T>(db: DB, list: T[], idOf: (x: T) => string): { lis
     return u >= 0 ? MAX_PINS + u : Infinity;
   };
   // A stable sort: the others keep their order.
-  const sorted = list.map((x, i) => ({ x, i, r: rank(x) })).sort((a, b) => (a.r === b.r ? a.i - b.i : a.r < b.r ? -1 : 1)).map((y) => y.x);
+  const sorted = list
+    .map((x, i) => ({ x, i, r: rank(x) }))
+    .sort((a, b) => (a.r === b.r ? a.i - b.i : a.r < b.r ? -1 : 1))
+    .map((y) => y.x);
   return { list: sorted, pinned: new Set(pins), used: new Set(used.filter((id) => !pins.includes(id))) };
 }
