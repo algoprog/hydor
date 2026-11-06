@@ -1831,7 +1831,10 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     const num = cols.find((c) => typeof calc.value(sheetIx, b.r1 + 1, c) === 'number');
     // Rows by the column of words whose values repeat most (fewest different ones), as a pivot table is for.
     const distinct = (c: number) => new Set(Array.from({ length: b.r2 - b.r1 }, (_, i) => String(calc.value(sheetIx, b.r1 + 1 + i, c) ?? '').trim().toLowerCase())).size;
-    const words = cols.filter((c) => typeof calc.value(sheetIx, b.r1 + 1, c) === 'string');
+    const words = cols.filter((c) => {
+      const v = calc.value(sheetIx, b.r1 + 1, c);
+      return typeof v === 'string' && v.trim() !== '' && distinct(c) >= 2;
+    });
     const word = words.sort((p, q) => distinct(p) - distinct(q))[0] ?? b.c1;
     setPanel({ kind: 'pivot', editing: false, start: { source: `${quoteSheet(sheet.name)}!${rangeName(b)}`, rows: [colName(word)], values: [{ col: colName(num ?? word), fn: num !== undefined ? 'sum' : 'count' }] } });
   };
