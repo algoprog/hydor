@@ -24,8 +24,8 @@ interface DockState {
 const MIN_W = 240;
 const MAX_W = 520;
 
-export function Dock({ id, panels, groups, focus, defaultWidth = 300, defaultWeights }: { id: string; panels: DockPanel[]; groups: string[][]; focus?: { panel: string; n: number } | null; defaultWidth?: number; defaultWeights?: number[] }) {
-  const [st, setSt] = usePersisted<DockState>(`${id}.dock`, { width: defaultWidth, tabs: {}, folded: {}, weights: defaultWeights ?? groups.map(() => 1) });
+export function Dock({ id, panels, groups, focus, defaultWidth = 300, defaultWeights, defaultFolded }: { id: string; panels: DockPanel[]; groups: string[][]; focus?: { panel: string; n: number } | null; defaultWidth?: number; defaultWeights?: number[]; defaultFolded?: Record<number, boolean> }) {
+  const [st, setSt] = usePersisted<DockState>(`${id}.dock`, { width: defaultWidth, tabs: {}, folded: defaultFolded ?? {}, weights: defaultWeights ?? groups.map(() => 1) });
   const box = useRef<HTMLDivElement>(null);
   const byId = (p: string) => panels.find((x) => x.id === p);
   const weights = groups.map((_, i) => st.weights[i] ?? 1);

@@ -33,6 +33,7 @@ import {
   type Sel,
 } from './doc';
 import { allMask, combineMasks, featherMask, growMask, invertMask, maskBounds, maskBytes, maskOutline, moveMask, shrinkMask, trimMask, type Box, type Mask, type MaskOp } from './mask';
+import { healFill } from './heal';
 import { bucketFill, freeStrokeBuffer, gradientCanvas, layOn, selCanvas, Stroke, type GradientKind, type SelClip, type StrokeKind } from './paint';
 
 export type ToolId =
@@ -123,6 +124,18 @@ export function defaultOpts(long: number): Opts {
     cropShape: 'free',
     autoSelect: false,
   };
+}
+
+/** What a layer's settings may be changed to (each kind takes its own). */
+export interface LayerPatch {
+  name?: string;
+  visible?: boolean;
+  opacity?: number;
+  blend?: BlendMode;
+  locked?: boolean;
+  angle?: number;
+  clip?: boolean;
+  mask?: Sel | null;
 }
 
 /** The crop tool at work: the box kept, and how far the picture is straightened (degrees). */
@@ -265,6 +278,8 @@ export class PictureEd {
   view: ViewApi | null = null;
   /** A panel to bring forward, and a count so asking twice does too. */
   focus: { panel: string; n: number } | null = null;
+  /** A section of the Adjustments panel asked to show (Levels…, Curves…). */
+  adjustAsk: { section: string; n: number } | null = null;
   /** The AI panel asked to start on something (from a menu): its mode. */
   aiAsk: { mode: string; n: number } | null = null;
   /** What was copied (Copy, Cut), with where it was on the canvas. */
@@ -425,6 +440,10 @@ export class PictureEd {
     this.focus = { panel, n: (this.focus?.n ?? 0) + 1 };
     this.emit(false);
   }
+  openAdjust(section: string) {
+    this.adjustAsk = { section, n: (this.adjustAsk?.n ?? 0) + 1 };
+    this.showPanel('adjust');
+  }
   askAi(mode: string) {
     this.aiAsk = { mode, n: (this.aiAsk?.n ?? 0) + 1 };
     this.showPanel('ai');
@@ -517,8 +536,8 @@ export class PictureEd {
     const layers = d.layers.filter((x) => x.id !== l.id);
     this.change('Delete layer', { ...d, layers, active: layers[Math.max(0, i - 1)]?.id ?? null });
   }
-  setLayer(id: string, p: Partial<RasterLayer & MarkLayer & AdjustLayer>, label: string, done = true) {
-    this.change(label, withLayer(this.doc, id, (l) => ({ ...l, ...p }) as Layer), done);
+  setLayer(id: string, p: LayerPatch, label: string, done = true) {
+    this.change(label, withLayer(this.doc, id, (l) => ({ ...l, ...(p as object) }) as Layer), done);
   }
   setLook(id: string, look: LookSettings, done: boolean, label = 'Adjust') {
     this.change(label, withLayer(this.doc, id, (l) => (l.kind === 'adjust' ? { ...l, look } : l)), done);
@@ -1164,6 +1183,40 @@ export class PictureEd {
     const e = autoEnhance(h);
     const t = adjustLayer(freshName(d, 'Auto enhance'), { adjust: { vibrance: e.vibrance, ...(e.contrast ? { contrast: e.contrast } : {}) }, ...(e.levels ? { levels: e.levels } : {}) }, d.sel);
     this.addLayer(t, 'Auto enhance');
+  }
+
+  /** A spot healed here: what is under `hole` (in the canvas's pixels) filled from around it, on a pixel layer. */
+  healHere(layer: RasterLayer, hole: Mask) {
+    const px = layer.px;
+    const m = Math.max(8, Math.round(Math.max(hole.w, hole.h) / 2));
+    const r = { x: Math.max(0, hole.x - layer.x - m), y: Math.max(0, hole.y - layer.y - m), w: 0, h: 0 };
+    r.w = Math.min(px.w, hole.x - layer.x + hole.w + m) - r.x;
+    r.h = Math.min(px.h, hole.y - layer.y + hole.h + m) - r.y;
+    if (r.w <= 0 || r.h <= 0) return;
+    const hd = new Uint8Array(r.w * r.h);
+    for (let y = 0; y < r.h; y++)
+      for (let x = 0; x < r.w; x++) {
+        const hx = x + r.x + layer.x - hole.x;
+        const hy = y + r.y + layer.y - hole.y;
+        if (hx >= 0 && hy >= 0 && hx < hole.w && hy < hole.h) hd[y * r.w + x] = hole.data[hy * hole.w + hx];
+      }
+    const patches = patchesOf(px, tilesOf(r, px.w, px.h));
+    const g = px.ctx();
+    const d = g.getImageData(r.x, r.y, r.w, r.h);
+    healFill(d.data, r.w, r.h, hd);
+    g.putImageData(d, r.x, r.y);
+    px.touch(r);
+    this.change('Spot healing', this.doc, true, { patches });
+  }
+  /** A part of a pixel layer replaced (at its pixels `x`, `y`): one step. */
+  putRegion(layer: RasterLayer, x: number, y: number, c: HTMLCanvasElement, label: string) {
+    const r = { x, y, w: c.width, h: c.height };
+    const patches = patchesOf(layer.px, tilesOf(r, layer.px.w, layer.px.h));
+    const g = layer.px.ctx();
+    g.clearRect(x, y, c.width, c.height);
+    g.drawImage(c, x, y);
+    layer.px.touch(r);
+    this.change(label, this.doc, true, { patches });
   }
 
   // ---- what the AI tools bring back --------------------------------------------------------------------------------------

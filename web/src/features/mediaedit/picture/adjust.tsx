@@ -40,6 +40,7 @@ export function AdjustPanel({ ed }: { ed: PictureEd }) {
       if (!v) delete n[k];
       return { ...l, adjust: Object.keys(n).length ? n : undefined };
     }, done);
+  const sig = (id: string) => (ed.adjustAsk?.section === id ? ed.adjustAsk.n : undefined);
   const slider = (k: AdjustKey) => <SliderRow key={k} label={ADJ[k].label} value={a[k] ?? 0} min={ADJ[k].min} max={100} onChange={(v, done) => adj(k, v, done)} />;
   return (
     <div className="pb-2 text-[12.5px]">
@@ -79,26 +80,26 @@ export function AdjustPanel({ ed }: { ed: PictureEd }) {
         )}
       </div>
       {GROUPS.map((g) => (
-        <Section key={g.id} id={`picture.adjust.${g.id}`} title={g.title}>
+        <Section key={g.id} id={`picture.adjust.${g.id}`} title={g.title} openSignal={sig(g.id)}>
           {g.keys.map(slider)}
         </Section>
       ))}
-      <Section id="picture.adjust.curves" title="Curves" defaultOpen={false}>
+      <Section id="picture.adjust.curves" openSignal={sig('curves')} title="Curves" defaultOpen={false}>
         <Curves ed={ed} look={look} hist={hist} onChange={(curves, done) => set((l) => ({ ...l, curves }), done, 'Curves')} />
       </Section>
-      <Section id="picture.adjust.levels" title="Levels" defaultOpen={false}>
+      <Section id="picture.adjust.levels" openSignal={sig('levels')} title="Levels" defaultOpen={false}>
         <Levels look={look} hist={hist} onChange={(levels, done) => set((l) => ({ ...l, levels }), done, 'Levels')} />
       </Section>
-      <Section id="picture.adjust.hsl" title="Hue, saturation and lightness" defaultOpen={false}>
+      <Section id="picture.adjust.hsl" openSignal={sig('hsl')} title="Hue, saturation and lightness" defaultOpen={false}>
         <HslEditor look={look} onChange={(hsl, done) => set((l) => ({ ...l, hsl }), done, 'Hue and saturation')} />
       </Section>
-      <Section id="picture.adjust.balance" title="Colour balance" defaultOpen={false}>
+      <Section id="picture.adjust.balance" openSignal={sig('balance')} title="Colour balance" defaultOpen={false}>
         <BalanceEditor look={look} onChange={(balance, done) => set((l) => ({ ...l, balance }), done, 'Colour balance')} />
       </Section>
-      <Section id="picture.adjust.detail" title="Detail" defaultOpen={false}>
+      <Section id="picture.adjust.detail" openSignal={sig('detail')} title="Detail" defaultOpen={false}>
         {DETAIL.map(slider)}
       </Section>
-      <Section id="picture.adjust.effects" title="Effects" defaultOpen={false}>
+      <Section id="picture.adjust.effects" openSignal={sig('effects')} title="Effects" defaultOpen={false}>
         {slider('vignette')}
         {slider('grain')}
         <Check on={!!look.invert} onChange={(v) => set((l) => ({ ...l, invert: v || undefined }), true, 'Invert')}>
@@ -107,7 +108,7 @@ export function AdjustPanel({ ed }: { ed: PictureEd }) {
         <SliderRow label="Posterize (levels)" value={look.posterize ?? 0} min={0} max={32} hint="Only this many levels of each colour: flat bands, as a poster (0: off)" onChange={(v, done) => set((l) => ({ ...l, posterize: v >= 2 ? v : undefined }), done, 'Posterize')} />
         <SliderRow label="Threshold" value={look.threshold ?? 0} min={0} max={255} hint="Pure black and white: lighter than this becomes white (0: off)" onChange={(v, done) => set((l) => ({ ...l, threshold: v || undefined }), done, 'Threshold')} />
       </Section>
-      <Section id="picture.adjust.looks" title="Looks" defaultOpen={false}>
+      <Section id="picture.adjust.looks" openSignal={sig('looks')} title="Looks" defaultOpen={false}>
         <Looks ed={ed} look={look} onPick={(id) => set((l) => ({ ...l, filter: id ? { id } : undefined }), true, 'Look')} onStrength={(v, done) => set((l) => (l.filter ? { ...l, filter: v >= 100 ? { id: l.filter.id } : { id: l.filter.id, strength: v } } : l), done, 'Look')} />
       </Section>
     </div>
