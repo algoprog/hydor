@@ -81,6 +81,8 @@ async function startServer() {
     ...(process.env.PLAYWRIGHT_BROWSERS_PATH ? { PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH } : {}),
     // A preview port of its own (the usual one may be the real app's).
     PREVIEW_PORT: process.env.PREVIEW_PORT ?? '0',
+    // Search by meaning stays off: the demo sets up no PyTorch (in /dev/shm) and downloads no model.
+    HYDOR_EMBED: 'off',
   };
   const log = fs.openSync(path.join(demo, 'server.log'), 'a');
   server = spawn(process.execPath, [path.join(o.root, 'dist/server/index.js')], { cwd: home, env, stdio: ['ignore', log, log] });
