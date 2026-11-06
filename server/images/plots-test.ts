@@ -23,7 +23,7 @@ import { loadConfig, saveConfig } from '../models/config.ts';
 import { getAsset, initAssets, putAsset } from '../pages/assets.ts';
 import { getVideo } from '../pages/videos.ts';
 import { setCloudTools, setLocalTools, type LocalTools, type PythonRun } from './hooks.ts';
-import { codeOf, dataKind, figureOf, NO_PYTHON, plotlyPage, plotTiming, plots, preview, promptFor, pyParts, screen, setPlotWriterForTests, sizeOf, svgSize, systemFor, themeOf, type PyEnv } from './plots.ts';
+import { codeOf, dataKind, figureOf, inPixels, NO_PYTHON, plotlyPage, plotTiming, plots, preview, promptFor, pyParts, screen, setPlotWriterForTests, sizeOf, svgSize, systemFor, themeOf, type PyEnv } from './plots.ts';
 import { timing } from './video.ts';
 import { fitVideo, NO_KEY, videoJobs } from './videojobs.ts';
 import type { WriteAsk } from './writer.ts';
@@ -58,9 +58,10 @@ const scripts = path.join(tmp, 'scripts');
 const mpl = path.join(tmp, 'mpl');
 fs.mkdirSync(scripts);
 fs.mkdirSync(mpl);
-const runs: { code: string; given: string[] }[] = [];
+const runs: { code: string; given: string[]; ended?: 'ok' | 'failed' | 'stopped' }[] = [];
 const runPython: LocalTools['runPython'] = async (code, o) => {
-  runs.push({ code, given: Object.keys(o.files ?? {}) });
+  const one: (typeof runs)[number] = { code, given: Object.keys(o.files ?? {}) };
+  runs.push(one);
   for (const [n, b] of Object.entries(o.files ?? {})) fs.writeFileSync(path.join(o.cwd, n), b);
   const file = path.join(scripts, `run-${runs.length}.py`);
   fs.writeFileSync(file, code);
@@ -70,6 +71,7 @@ const runPython: LocalTools['runPython'] = async (code, o) => {
       const files: Record<string, Buffer> = {};
       for (const n of fs.readdirSync(o.cwd)) if (!(n in (o.files ?? {}))) files[n] = fs.readFileSync(path.join(o.cwd, n));
       const late = (err as { killed?: boolean } | null)?.killed ? `\nIt ran over ${o.timeoutMs / 1000} s and was stopped.` : '';
+      one.ended = !err ? 'ok' : err.name === 'AbortError' ? 'stopped' : 'failed';
       resolve({ ok: !err, stdout, stderr: `${stderr}${late}`, files });
     });
   });
@@ -201,6 +203,11 @@ ok(plots.id === 'plots' && /\bimages, plots,/.test(fs.readFileSync(path.join(APP
     'its size: 960×540, 16:9 from one side, kept within bounds',
   );
   ok(JSON.stringify(svgSize('<svg xmlns="http://www.w3.org/2000/svg" width="600pt" height="337.5pt" viewBox="0 0 600 337.5">')) === '{"w":800,"h":450}', 'matplotlib’s points read as pixels');
+  ok(
+    inPixels('<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="720pt" height="337.5pt" viewBox="0 0 720 337.5" stroke-width="2pt"><rect width="10pt" height="1"/></svg>') ===
+      '<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="960" height="450" viewBox="0 0 720 337.5" stroke-width="2pt"><rect width="10pt" height="1"/></svg>',
+    'the root’s size in pixels before it is cleaned (a cleaner reads pixels), nothing else touched',
+  );
   ok(JSON.stringify(svgSize('<svg viewBox="0 0 120 60" stroke-width="3">')) === '{"w":120,"h":60}' && JSON.stringify(svgSize('<svg width="200" viewBox="0 0 100 50">')) === '{"w":200,"h":100}', 'else its viewBox');
 
   const c = codeOf('Here it is:\n```py\nimport x\n```\nand the whole of it:\n```python\nimport matplotlib\nprint(1)\n```\nIt shows the trend.');
@@ -392,13 +399,30 @@ else {
     () => 'made',
     (e: Error) => e.message,
   );
-  ok(stopped === 'It was stopped' || stopped === 'stopped', `stopped: ${stopped}`);
+  ok(stopped === 'It was stopped', `stopped: ${stopped}`);
   setPlotWriterForTests(async (q) => {
     asks.push(q);
     const a = answers.shift();
     if (a === undefined) throw new Error('The test writer has nothing more to say');
     return a;
   });
+
+  // Over a real connection: a request that ends well is not stopped by its own end; one closed mid-way stops its Python.
+  await app.listen({ port: 0, host: '127.0.0.1' });
+  const base = `http://127.0.0.1:${(app.server.address() as { port: number }).port}`;
+  const post = (body: unknown, signal?: AbortSignal) => fetch(`${base}/api/plots/make`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal });
+  const real = await post({ code: MATHS, format: 'png' });
+  ok(real.status === 200 && (await real.json()).mime === 'image/png' && runs[runs.length - 1].ended === 'ok', 'a plot over a real connection');
+  const SLOW = 'import matplotlib\nmatplotlib.use("Agg")\nimport time\ntime.sleep(30)\n';
+  const closed = new AbortController();
+  const gone = post({ code: SLOW }, closed.signal).catch(() => null);
+  ok(await until(() => runs[runs.length - 1].code === SLOW), 'its script running');
+  closed.abort();
+  await gone;
+  ok(await until(() => runs[runs.length - 1].ended === 'stopped', 5000), `closed: its Python stopped (${runs[runs.length - 1].ended})`);
+  answers = [say(MATHS)];
+  const after = await post({ request: 'sin', format: 'png' });
+  ok(after.status === 200, 'and the next one draws');
 
   // ---- make_plot ----------------------------------------------------------------------------------------------
 

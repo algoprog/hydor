@@ -494,6 +494,16 @@ export function svgSize(svg: string): { w: number; h: number } | null {
   return w && h ? { w: Math.round(w), h: Math.round(h) } : null;
 }
 
+/** A drawing with its root's width and height in pixels (matplotlib writes points), so cleaning keeps its size. */
+export function inPixels(svg: string): string {
+  return svg.replace(/<svg\b[^>]*>/i, (tag) =>
+    tag.replace(/(\s(?:width|height)\s*=\s*["'])([^"']*)(["'])/gi, (m, a: string, v: string, q: string) => {
+      const n = svgLength(v);
+      return n ? `${a}${Math.round(n * 100) / 100}${q}` : m;
+    }),
+  );
+}
+
 export interface Figure {
   data: Record<string, unknown>[];
   layout: Record<string, unknown>;
@@ -667,7 +677,7 @@ async function runScript(tools: LocalTools, code: string, p: Plotting, signal: A
     if (/<image\b/i.test(raw)) why = 'the drawing had a picture inside it (such as a heat map’s cells), which drawings here may not';
     else if (svg.length > MAX_SVG) why = `as a drawing it is over ${MAX_SVG / 1024 / 1024} MB (it has very many points)`;
     else {
-      kept = clean ? clean(raw) : null;
+      kept = clean ? clean(inPixels(raw)) : null;
       if (!kept || pictureType(Buffer.from(kept.slice(0, 2048))) !== 'image/svg+xml') {
         kept = null;
         why = 'its drawing (SVG) could not be kept safely';
