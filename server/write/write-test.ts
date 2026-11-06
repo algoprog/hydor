@@ -26,6 +26,7 @@ import { initAssets, putAsset } from '../pages/assets.ts';
 import { createPage, initPages } from '../pages/store.ts';
 import { holdIdea, modelHelp, waysFor, WAYS } from './ideas.ts';
 import { cleanRewrite, readAlt, setWriteForTests, write } from './index.ts';
+import { setPageAiForTests } from './page-ai.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -577,6 +578,38 @@ setWriteForTests({
   ok((await req('/api/write/rewrite', { text: 'x'.repeat(7000), how: 'fix' })).statusCode === 413, 'too many words at once');
   answer = '';
   ok((await req('/api/write/rewrite', { text: 'Words', how: 'fix' })).statusCode === 502, 'nothing back');
+}
+
+{
+  // AI on a page (Notion AI's) and a database's AI column: what the helper is told, its answer tidied.
+  const told: { system: string; prompt: string }[] = [];
+  let answer = '';
+  setPageAiForTests(async (q) => {
+    told.push(q);
+    return answer;
+  });
+  answer = 'Here is a continuation:\n\n```markdown\n## Day two\n- Visit **Belém**\n```';
+  const r = (await req('/api/write/page-ai', { action: 'continue', before: '# Lisbon\n\nDay one: Alfama.', title: 'Trip' })).json();
+  ok(r.markdown === '## Day two\n- Visit **Belém**' && r.model === 'the test helper', `an answer comes back as Markdown, without what was said around it (${JSON.stringify(r)})`);
+  ok(/Continue writing from where the page stops/.test(told[0].prompt) && /Day one: Alfama/.test(told[0].prompt) && /titled “Trip”/.test(told[0].prompt) && /in Markdown/.test(told[0].system), 'Continue writing is told the page so far');
+  answer = '- [ ] Book flights (Ana, by Friday)';
+  await req('/api/write/page-ai', { action: 'actions', text: 'Ana books the flights by Friday.' });
+  ok(/to-do list \(- \[ \] …\)/.test(told[1].prompt) && /The words given:\nAna books/.test(told[1].prompt), 'Action items are asked of the words picked');
+  await req('/api/write/page-ai', { action: 'translate', lang: 'German', page: 'Hello' });
+  await req('/api/write/page-ai', { action: 'tone', tone: 'friendly', text: 'Pay now.' });
+  await req('/api/write/page-ai', { action: 'write', topic: 'a packing list for a week of hiking' });
+  await req('/api/write/page-ai', { action: 'improve', text: 'Words', answer: 'Better words', ask: 'shorter please' });
+  ok(/into German/.test(told[2].prompt) && /The page:\nHello/.test(told[2].prompt) && /warm and personal/.test(told[3].prompt) && /Write about a packing list/.test(told[4].prompt) && /Better words/.test(told[5].prompt) && /shorter please/.test(told[5].prompt), 'translate, change the tone, write about a topic, and change an answer as asked');
+  ok((await req('/api/write/page-ai', { action: 'louder' })).statusCode === 400 && (await req('/api/write/page-ai', { action: 'summarize' })).statusCode === 400 && (await req('/api/write/page-ai', { action: 'translate', text: 'x' })).statusCode === 400 && (await req('/api/write/page-ai', { action: 'write' })).statusCode === 400, 'no such action; nothing to work on; no language; no topic');
+  answer = '';
+  ok((await req('/api/write/page-ai', { action: 'fix', text: 'Words' })).statusCode === 502, 'nothing back');
+  answer = 'Classified as: Travel.';
+  const c = (await req('/api/write/db-ai', { how: 'classify', options: ['Work', 'Travel'], column: 'Kind', row: { Task: 'Book flights to Lisbon', Cost: 120 } })).json();
+  ok(c.value === 'Travel' && /Sort the row into one of these options: Work \| Travel/.test(told[told.length - 1].prompt) && /Task: Book flights to Lisbon\nCost: 120/.test(told[told.length - 1].prompt), `an AI column's cell: told the row, its answer one of the options (${JSON.stringify(c)})`);
+  answer = '"Lisbon"';
+  ok((await req('/api/write/db-ai', { how: 'extract', prompt: 'the city', column: 'City', row: { Task: 'Fly to Lisbon' } })).json().value === 'Lisbon', 'what is taken out of a row, its quotes off');
+  ok((await req('/api/write/db-ai', { how: 'classify', options: ['One'], column: 'X', row: {} })).statusCode === 400 && (await req('/api/write/db-ai', { how: 'extract', column: 'X', row: {} })).statusCode === 400, 'a classification needs options, an extraction what to take out');
+  setPageAiForTests(null);
 }
 
 {
