@@ -14,12 +14,13 @@
 // A live part (custom code, a web page, 3D) shows its picture here; picked, it has Run, and runs in place until
 // something else is picked. While a part is being picked for something (the part a click on which starts an
 // animation), a click on the slide picks it.
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { elbowPoints, everyEl, reconnect, scaleEls, SIDES, sidePoint, turnedBox, type Crop, type Deck, type El, type GroupEl, type ImageEl, type LineEl, type Para, type Slide, type Stick, type TableEl, type TextProps } from '@shared/slides';
 import { MessageSquare, Play, Square } from 'lucide-react';
 import { cx } from '../../../components/ui';
 import { boxOf, heightOf, isLive, mergeAt, setEls, W } from './ops';
-import { LIVE, PICS, RT } from './rt';
+import { OfflineFrames } from '../frame';
+import { liveOpts, PICS, RT } from './rt';
 
 export interface CanvasHandle {
   /** The words being changed in place, read back now (null when none are). */
@@ -342,6 +343,7 @@ export const SlideCanvas = forwardRef<
 ) {
   const H = heightOf(deck);
   const slide = deck.slides[index];
+  const offline = useContext(OfflineFrames);
   const wrap = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
@@ -425,9 +427,9 @@ export const SlideCanvas = forwardRef<
     host.appendChild(el);
     // The live part run in place: drawn again, running, where it was.
     const r = running ? elById(running) : undefined;
-    if (r && isLive(r)) el.querySelector(`.ns-el[data-id="${CSS.escape(r.id)}"]`)?.replaceWith(RT.part(deck, slide, r, { edit: true, ...PICS, ...LIVE }));
+    if (r && isLive(r)) el.querySelector(`.ns-el[data-id="${CSS.escape(r.id)}"]`)?.replaceWith(RT.part(deck, slide, r, { edit: true, ...PICS, ...liveOpts(offline) }));
     RT.fit(el);
-  }, [slide, deck.theme, deck.ratio, deck.footer, index, fonts, editing, running]);
+  }, [slide, deck.theme, deck.ratio, deck.footer, index, fonts, editing, running, offline]);
 
   const nodeOf = (id: string) => content.current?.querySelector<HTMLElement>(`.ns-el[data-id="${CSS.escape(id)}"]`) ?? null;
 

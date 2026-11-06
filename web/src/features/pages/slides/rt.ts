@@ -2,7 +2,8 @@
 // app's own pages load no picture from the web, so pictures on the web come through it too), Google's fonts through it,
 // KaTeX for equations (loaded when a deck has one), and dates written as the app's language writes them. Live parts
 // (custom code, web pages, 3D) run in frames the app makes at /partframe: sandboxed, their own opaque origin, sent their
-// page by message once they say they are ready, so nothing of a deck runs in the app itself.
+// page by message once they say they are ready, so nothing of a deck runs in the app itself; beside a confidential
+// session, at /partframe?offline=1, where they load nothing from anywhere.
 import { useEffect, useState } from 'react';
 import { deckFonts, everyEl, FONT_TABLE, FONTS, type Deck, type El } from '@shared/slides';
 import { slidesRuntime, type DrawOpts } from '@shared/slides-runtime';
@@ -48,8 +49,8 @@ window.addEventListener('message', (e) => {
  * origin, so it reaches nothing of the app's), sent `html` once it says it is ready (a web page part's page frames
  * its address inside). Keys go to one only while it has the focus and takes clicks.
  */
-export function partFrame(html: string, part: El): HTMLIFrameElement {
-  const f = pageFrame(html, part);
+export function partFrame(html: string, part: El, offline = false): HTMLIFrameElement {
+  const f = pageFrame(html, part, offline);
   // One that does not take clicks takes neither the pointer nor the keys: a click on it goes on, as on the slide.
   const takes = part.type === 'scene3d' ? !!part.orbit : part.type === 'html' || part.type === 'embed' ? !!part.interactive : false;
   if (!takes) {
@@ -59,8 +60,8 @@ export function partFrame(html: string, part: El): HTMLIFrameElement {
   return f;
 }
 
-/** A frame at /partframe that is sent `html` once it says it is ready. */
-function pageFrame(html: string, part: El): HTMLIFrameElement {
+/** A frame at /partframe that is sent `html` once it says it is ready (offline: one that loads nothing from anywhere). */
+function pageFrame(html: string, part: El, offline: boolean): HTMLIFrameElement {
   const f = document.createElement('iframe');
   f.dataset.nPart = part.type;
   f.setAttribute('sandbox', 'allow-scripts');
@@ -68,12 +69,17 @@ function pageFrame(html: string, part: El): HTMLIFrameElement {
   // The page's own colour scheme, so what it leaves see-through shows the slide (a frame in another scheme is opaque).
   f.style.colorScheme = 'normal';
   partPages.set(f, html);
-  f.src = '/partframe';
+  f.src = offline ? '/partframe?offline=1' : '/partframe';
   return f;
 }
 
-/** The runtime's options for live parts: they run, in the app's frames (the slideshow, the presenter's view, the audience's window, a part run in the editor). */
-export const LIVE: Pick<DrawOpts, 'live' | 'frame'> = { live: true, frame: partFrame };
+/**
+ * The runtime's options for live parts: they run, in the app's frames (the slideshow, the presenter's view, the
+ * audience's window, a part run in the editor); `offline` beside a confidential session (OfflineFrames).
+ */
+export const liveOpts = (offline: boolean): Pick<DrawOpts, 'live' | 'frame'> => (offline ? LIVE_OFFLINE : LIVE);
+const LIVE: Pick<DrawOpts, 'live' | 'frame'> = { live: true, frame: (html, part) => partFrame(html, part) };
+const LIVE_OFFLINE: Pick<DrawOpts, 'live' | 'frame'> = { live: true, frame: (html, part) => partFrame(html, part, true) };
 
 /** Whether a deck has equations. */
 const hasMath = (d: Deck) => d.slides.some((s) => everyEl(s.els).some((e) => e.type === 'math'));
