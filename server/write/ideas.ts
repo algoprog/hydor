@@ -69,9 +69,8 @@ export function holdsOf(s: Slide): Holds {
 }
 
 export interface Way {
+  /** Its id; its name under its picture in the panel is IDEA_WAYS'. */
   id: string;
-  /** Its name under its picture in the panel. */
-  name: string;
   fits(h: Holds): boolean;
   /** What the writer is asked to do. */
   ask: string;
@@ -80,79 +79,66 @@ export interface Way {
 export const WAYS: Way[] = [
   {
     id: 'picture-behind',
-    name: 'Picture behind',
     fits: (h) => h.pictures === 1 && h.words <= 70,
     ask: 'Put the picture behind the whole slide (bg: {image: its src, dim: 0.35 to 0.55}, and no image part for it), the words over it in a light colour (accentFg, or #ffffff), large and clear, gathered on one side.',
   },
   {
     id: 'big-number',
-    name: 'Big number',
     fits: (h) => h.number && h.words <= 80,
     ask: 'Make the slide’s key number its hero: very large (role big, 120 to 200 px, bold, in the accent colour), what it means as a short label beside or under it, the rest of the words smaller.',
   },
   {
     id: 'split',
-    name: 'Split',
     fits: (h) => h.pictures + h.charts + h.tables >= 1 && h.words > 0,
     ask: 'Split the slide in two: the picture (or the chart, or the table) fills one half from edge to edge (full height, no margin; a picture with fit cover), the words on the other half with generous space.',
   },
   {
     id: 'cards',
-    name: 'Cards',
     fits: (h) => h.points >= 2 && h.points <= 6,
     ask: 'Put each point on a card of its own (a shape: round, fill soft, radius 16 to 24, no line) in a row, or a grid of two rows for four or more, its words on the card (in parts of their own over it): a short lead in bold where the point has one, and a Lucide icon at the top of each card where one fits the point.',
   },
   {
     id: 'steps',
-    name: 'Steps',
     fits: (h) => h.points >= 3 && h.points <= 6,
     ask: 'Show the points as steps along a line: a thin line across the slide, a numbered circle on it for each point (shape ellipse, fill accent, its number in accentFg), each point’s words under its circle.',
   },
   {
     id: 'statement',
-    name: 'Statement',
     fits: (h) => h.words <= 35 && h.pictures + h.charts + h.tables === 0,
     ask: 'Make it one bold statement: the slide’s background the accent colour (bg: {color: "accent"}), its main words very large in accentFg with lots of space around them, anything else small beneath.',
   },
   {
     id: 'band',
-    name: 'Side band',
     fits: (h) => h.words > 0,
     ask: 'A band of colour down the left third of the slide (a rect from the top to the bottom, fill accent or soft), the title in it (in accentFg on accent); the rest to its right.',
   },
   {
     id: 'columns',
-    name: 'Columns',
     fits: (h) => h.points >= 2 && h.points <= 6,
     ask: 'Lay the points out in two or three columns under the title, each with a short accent line or a Lucide icon above it and its lead in bold.',
   },
   {
     id: 'picture-grid',
-    name: 'Picture grid',
     fits: (h) => h.pictures >= 2,
     ask: 'Lay the pictures out as a tidy grid of tiles of the same size (radius 12, fit cover), their words as short captions under them, the title above.',
   },
   {
     id: 'chart-first',
-    name: 'Chart first',
     fits: (h) => h.charts + h.tables >= 1,
     ask: 'Make the chart (or the table) large and clear, the title above it, and any other words as a short note beside it on a soft card.',
   },
   {
     id: 'quote',
-    name: 'Quote',
     fits: (h) => h.quote && h.words <= 60,
     ask: 'Make the words a large quote: a big quotation mark in the accent colour, the words in italic at 40 to 54 px, who said it under them in muted.',
   },
   {
     id: 'magazine',
-    name: 'Magazine',
     fits: (h) => h.pictures >= 1 && h.words <= 90,
     ask: 'Like a magazine page: the picture large and cropped tight, taking two thirds of the slide, the title in large type overlapping its edge on a soft card, the other words in a narrow column.',
   },
   {
     id: 'centred',
-    name: 'Centred',
     fits: () => true,
     ask: 'Centre everything: the title large in the middle, a short accent line under it, the other words beneath in a narrower column, centred.',
   },

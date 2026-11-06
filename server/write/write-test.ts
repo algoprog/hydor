@@ -492,7 +492,7 @@ setWriteForTests({
     'and the deck around it',
   );
   const [behind, , split] = j.ideas as Slide[];
-  ok(j.names.join() === 'Picture behind,Big number,Split', `each named by its way: ${j.names}`);
+  ok(j.names.join() === 'Picture behind,Big number,Half and half', `each named by its way: ${j.names}`);
   ok(behind.bg?.image === PIC && behind.bg.dim === 0.45 && !behind.els.some((e) => e.type === 'image'), 'the picture behind the words');
   ok(split.id === 's2' && split.notes === 'Say it slowly.' && split.transition?.fx === 'fade', 'the slide keeps its id, notes and transition');
   ok((byId(split, 'code1') as { html: string }).html === slide.els[3].html, 'its custom code put back as it was');
