@@ -17,6 +17,7 @@ import { readBook } from './sheets.ts';
 import { createPage, mustPage, pageSource } from './store.ts';
 import { refreshThumbs } from './thumbs.ts';
 import type { PageInfo } from '../../shared/pages.ts';
+import { HTML_ACTIONS } from './page-tools.ts';
 import { animateSlide, type AnimateStyle } from '../../shared/deck-animate.ts';
 import { checkSlide, fixAll, fixIssue, MIN_TEXT as MIN, type DeckIssue, type IssueKind } from '../../shared/deck-check.ts';
 import { reshapeDeck } from '../../shared/deck-shape.ts';
@@ -852,12 +853,12 @@ const ACTIONS: { [K in PageKind]: Record<string, Act<any>> } = {
 };
 
 /** Every action's name: those of each kind, and those of any kind. */
-export const PAGE_ACTIONS = [...Object.values(ACTIONS).flatMap((m) => Object.keys(m)), 'turn_into', 'duplicate'];
+export const PAGE_ACTIONS = [...Object.values(ACTIONS).flatMap((m) => Object.keys(m)), ...Object.keys(HTML_ACTIONS), 'turn_into', 'duplicate'];
 
 const NOUN: Record<PageKind | 'page', string> = { slides: 'slide deck', doc: 'document', sheet: 'spreadsheet', tex: 'LaTeX document', notebook: 'notebook', page: 'page' };
 
 /** The actions there are for a kind of page, for the agent beside one (index.ts askInstructions) and for errors. */
-export const actionsFor = (kind: PageKind | 'page') => [...(kind === 'page' ? [] : Object.keys(ACTIONS[kind])), 'turn_into', 'duplicate'];
+export const actionsFor = (kind: PageKind | 'page') => [...(kind === 'page' ? Object.keys(HTML_ACTIONS) : Object.keys(ACTIONS[kind])), 'turn_into', 'duplicate'];
 
 /**
  * The Library's Turn it into (shared/content-asks.ts turnAsk): what the app asks an agent for, to make slides, a document
@@ -920,6 +921,9 @@ const DESCRIPTION = [
   '- move_files {moves: [{from, to}]}: rename or move files, pictures and folders ("figures/" to "img/"), every \\input, \\include and \\includegraphics that names them following, their comments and tracked changes along; it is typeset again.',
   'Notebooks.',
   '- clear_outputs {cells?}: clear the outputs of every code cell (or of the cells listed, by number or id).',
+  'Pages (of HTML).',
+  '- lock, unlock: Lock the page (it then makes no new version, by anyone, until it is unlocked; its databases still take rows): lock it when the user asks to keep it from changing by accident, unlock it before changing it when they ask.',
+  '- fill_column {database?: its name (data-db) or title, the first when left out; column?: an AI column’s name, the first; rows?: "empty" (the default), "all" or row ids}: the helper model fills the AI column’s cells from each row’s other cells, as the editor’s Fill every row does (one request a row).',
   'Any of them.',
   '- turn_into {to: slides|doc|page}: what the Library’s Turn it into asks for, to make slides, a document or a page from it (you then make it with the save tool; it stays as it is).',
   '- duplicate {title?}: a copy beside it in the Library (“… (copy)”).',
@@ -968,6 +972,9 @@ const SCHEMA = {
     moves: { type: 'array', items: { type: 'object' }, description: 'move_files: [{from, to}].' },
     cells: { type: 'array', items: { type: ['number', 'string'] }, description: 'clear_outputs: cells by number or id.' },
     title: { type: 'string', description: 'duplicate: the copy’s title.' },
+    database: { type: 'string', description: 'fill_column: the database (its name or title).' },
+    column: { type: 'string', description: 'fill_column: the AI column’s name.' },
+    rows: { type: ['string', 'array'], items: { type: 'string' }, description: 'fill_column: empty (the default), all, or row ids.' },
   },
   required: ['id', 'action'],
 };
@@ -992,6 +999,8 @@ export function pageActionTool(o: { keep: KeepPage; hidden: (ctx: RunCtx, p: Pag
       const here: Here = { ctx, page, hidden: (q) => o.hidden(ctx, q) };
       if (action === 'duplicate') return duplicate(here, a);
       if (action === 'turn_into') return turnInto(here, a);
+      // A page of HTML: locked or unlocked, an AI column of its databases filled (page-tools.ts).
+      if (kind === 'page' && HTML_ACTIONS[action]) return HTML_ACTIONS[action](ctx.deps, page, a);
       const run = kind === 'page' ? undefined : ACTIONS[kind][action];
       if (!run) {
         const other = (Object.keys(ACTIONS) as PageKind[]).find((k) => ACTIONS[k][action]);
