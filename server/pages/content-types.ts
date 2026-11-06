@@ -34,7 +34,7 @@ const HOW: Record<ContentKind, string> = {
   slide:
     'Adding it: read the deck with get_page, draw the slide from what the deck already says, in the deck’s theme and the look of its other slides, in its language, and add only that slide with save_slides (add, after the slide it follows). A web deck may use the web format’s parts; a PowerPoint compatible one only what PowerPoint has.',
   deck: 'Make it with save_slides.',
-  doc: 'Make it with save_doc, in steps for a long one.',
+  doc: 'Make it with save_doc, in steps for a long one. Where the kind has them: sources cited as [@key] with save_doc’s sources (or bibtex) and a [BIBLIOGRAPHY] under a References heading, footnotes as [^1], numbered figures and tables ({label=Figure}, Table: … {label=Table}) referred to with <ref to="id"/>.',
   section: 'Adding it: read the document with get_page, draw the section from what it says, with its headings’ levels and its style, in its language, and add only that section with save_doc’s edits.',
   page: 'Make it with save_page.',
   block: 'Adding it: read the page with get_page, make the part in the page’s own look (its colours, fonts and spacing) and language, working on a phone too, keep the rest as it is, and save the whole page with save_page and its id.',
