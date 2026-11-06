@@ -713,8 +713,11 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
   // Printed as the app prints it: across the page when its columns are wider than an upright one holds, made smaller
   // to fit the page's width when they are wider than that too, 12 mm margins, its name at the top.
   const across = Array.from({ length: e.cols }, (_, c) => (sh.cols?.[c]?.hidden ? 0 : (sh.cols?.[c]?.w ?? COL_W))).reduce((a, b) => a + b, 0);
-  const wide = across > 700;
-  const fit = across > 1030;
+  // Its own print setup, else as the app prints it.
+  const ps = sh.print ?? {};
+  const wide = ps.orient ? ps.orient === 'landscape' : across > 700;
+  const fit = ps.fit ? ps.fit !== 'none' : across > 1030;
+  const fitPage = ps.fit === 'page';
   const mm12 = '0.4724';
   return (
     `${XML_HEAD}<worksheet xmlns="${NS_MAIN}" xmlns:r="${NS_R}">` +
@@ -731,9 +734,9 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
     validationXml(sh, names, lists) +
     (links.hyperlinks?.length ? `<hyperlinks>${links.hyperlinks.map((h) => `<hyperlink ref="${h.ref}"${h.rid ? ` r:id="${h.rid}"` : ''}${h.location ? ` location="${xesc(h.location)}"` : ''}/>`).join('')}</hyperlinks>` : '') +
     // The cells' lines, as the app prints round its table's cells (not across the empty ones charts stand over).
-    (sh.charts?.length ? '' : '<printOptions gridLines="1"/>') +
+    (ps.grid === false || (ps.grid === undefined && sh.charts?.length) ? '' : '<printOptions gridLines="1"/>') +
     `<pageMargins left="${mm12}" right="${mm12}" top="${mm12}" bottom="${mm12}" header="0.2" footer="0.2"/>` +
-    `<pageSetup orientation="${wide ? 'landscape' : 'portrait'}"${fit ? ' fitToWidth="1" fitToHeight="0"' : ''}/>` +
+    `<pageSetup orientation="${wide ? 'landscape' : 'portrait'}"${fit ? ` fitToWidth="1" fitToHeight="${fitPage ? 1 : 0}"` : ''}/>` +
     `<headerFooter><oddHeader>${xesc(`&L&"-,Bold"&12&A`)}</oddHeader></headerFooter>` +
     (links.drawing ? `<drawing r:id="${links.drawing}"/>` : '') +
     (links.legacy ? `<legacyDrawing r:id="${links.legacy}"/>` : '') +
@@ -836,9 +839,11 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
   const filterNames = book.sheets
     .map((sh, i) => {
       const x = sh.filter ? parseRange(sh.filter.range) : null;
-      const heads = headerRows(sh, i, calc);
+      const heads = sh.print?.titles ?? headerRows(sh, i, calc);
+      const area = sh.print?.area ? parseRange(sh.print.area) : null;
       return (
         (x ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">${xesc(`${quoteSheet(sh.name)}!$${colName(x.c1)}$${x.r1 + 1}:$${colName(x.c2)}$${x.r2 + 1}`)}</definedName>` : '') +
+        (area ? `<definedName name="_xlnm.Print_Area" localSheetId="${i}">${xesc(`${quoteSheet(sh.name)}!$${colName(area.c1)}$${area.r1 + 1}:$${colName(area.c2)}$${area.r2 + 1}`)}</definedName>` : '') +
         (heads ? `<definedName name="_xlnm.Print_Titles" localSheetId="${i}">${xesc(`${quoteSheet(sh.name)}!$1:$${heads}`)}</definedName>` : '')
       );
     })
@@ -974,6 +979,13 @@ function groupsIn(xml: string, kind: 'row' | 'col'): { range: string; hidden?: b
   }
   return out;
 }
+
+/** A cell name's column (from 0). */
+const colIndexOf = (k: string) => {
+  let c = 0;
+  for (const ch of /^[A-Z]+/.exec(k)?.[0] ?? 'A') c = c * 26 + ch.charCodeAt(0) - 64;
+  return c - 1;
+};
 
 /** A part's relationships to the web (its links' addresses), by id. */
 function webTargets(z: Zip, part: string): Map<string, string> {
@@ -1175,6 +1187,13 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
   // a plain reference.
   const names = new Map<string, string>();
   const kept: { name: string; ref: string; sheet?: string }[] = [];
+  // Each sheet's print setup, by its place in the workbook's list (from its names and its part).
+  const prints = new Map<number, Record<string, unknown>>();
+  const printOf = (i: number) => {
+    let p = prints.get(i);
+    if (!p) prints.set(i, (p = {}));
+    return p;
+  };
   const listedSheets = all(kid(wb, 'sheets'), 'sheet').map((s) => att(s, 'name') ?? '');
   // What a workbook here does not hold, for a file to be saved again: their keys (importBook says which).
   const loses = new Set<string>();
@@ -1190,9 +1209,13 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
         loses.add('names');
       }
     }
-    // Print areas and titles go (but the first rows repeated on each page, as the app prints a sheet's header rows
-    // anyway, as its own files say).
-    if (name === '_xlnm.Print_Area' || (name === '_xlnm.Print_Titles' && !/^(?:'(?:[^']|'')+'|[^!',]+)!\$1:\$[1-5]$/.test(ref))) loses.add('print');
+    // Print areas and titles (rows from the first, repeated on each page) are kept with their sheets; others go.
+    const local = Number(att(d, 'localSheetId'));
+    const area = name === '_xlnm.Print_Area' ? /^(?:'(?:[^']|'')+'|[^!',]+)!(\$?[A-Z]+\$?\d+:\$?[A-Z]+\$?\d+)$/.exec(ref) : null;
+    const titles = name === '_xlnm.Print_Titles' ? /^(?:'(?:[^']|'')+'|[^!',]+)!\$1:\$(\d+)$/.exec(ref) : null;
+    if (area && Number.isInteger(local)) printOf(local).area = area[1].replace(/\$/g, '');
+    else if (titles && Number.isInteger(local) && Number(titles[1]) <= 20) printOf(local).titles = Number(titles[1]);
+    else if (name === '_xlnm.Print_Area' || name === '_xlnm.Print_Titles') loses.add('print');
   }
   if (rich) loses.add('rich');
   if (kid(wb, 'workbookProtection')) loses.add('protection');
@@ -1239,6 +1262,16 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     }
     // The grid's lines hidden.
     if (/<(?:\w+:)?sheetView\b[^>]*\bshowGridLines="(?:0|false)"/.test(xml)) base.noGrid = true;
+    // How it prints: across the page or upright, fitted to the page's width (or the whole page), the cells' lines.
+    {
+      const p = printOf(listed.indexOf(s));
+      const setup = /<(?:\w+:)?pageSetup\b([^>]*)\/?>/.exec(xml)?.[1] ?? '';
+      const orient = /\borientation="(portrait|landscape)"/.exec(setup)?.[1];
+      if (orient) p.orient = orient;
+      if (/<(?:\w+:)?pageSetUpPr\b[^>]*\bfitToPage="(?:1|true)"/.test(xml)) p.fit = /\bfitToHeight="0"/.test(setup) ? 'width' : 'page';
+      p.grid = /<(?:\w+:)?printOptions\b[^>]*\bgridLines="(?:1|true)"/.test(xml);
+      base.print = p;
+    }
     // Groups of rows and columns: runs of rows (columns) at an outline level or deeper, each a group of that level.
     base.groups = [...groupsIn(xml, 'row'), ...groupsIn(xml, 'col')];
     if (/<(?:\w+:)?sheetProtection\b[^>]*\bsheet="(?:1|true)"/.test(xml)) {
@@ -1274,6 +1307,21 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
       ].filter((k): k is string => !!k);
       for (const k of left) loses.add(k);
       if (left.length) state.drawn = true;
+    }
+    // Its print setup, but what the app would do by itself anyway (its own files say so too).
+    if (base.print) {
+      const p = base.print as Record<string, unknown>;
+      let maxC = 0;
+      for (const k of Object.keys(base.cells)) maxC = Math.max(maxC, colIndexOf(k) + 1);
+      let across = 0;
+      for (let c = 0; c < maxC; c++) across += base.cols[c]?.hidden ? 0 : (base.cols[c]?.w ?? COL_W);
+      if (p.orient === (across > 700 ? 'landscape' : 'portrait')) delete p.orient;
+      if (p.fit === 'width' && across > 1030) delete p.fit;
+      else if (!p.fit && across > 1030) p.fit = 'none';
+      if (p.grid === !(Array.isArray(base.charts) && base.charts.length)) delete p.grid;
+      const fz = (base.freeze as { rows?: number } | undefined)?.rows;
+      if (p.titles !== undefined && (p.titles === Math.min(fz ?? 0, 5) || (!fz && p.titles === 1))) delete p.titles;
+      if (!Object.keys(p).length) delete base.print;
     }
     sheets.push(sheet);
     if (sheets.length >= SHEET_LIMITS.sheets) {
@@ -1750,6 +1798,9 @@ const PRINT_CSS = [
   '.nb-t{border-collapse:collapse;table-layout:fixed}',
   '.nb-t td{border:0.5pt solid #c9c6bf;padding:1pt 4pt;overflow:hidden;white-space:nowrap;vertical-align:middle}',
   '.nb-t thead td{border-bottom:1pt solid #8f8b82}',
+  // Printed without the cells' lines (Print and PDF setup): only the borders cells have of their own.
+  '.nb-nogrid .nb-t td{border-color:transparent}',
+  '.nb-nogrid .nb-t thead td{border-bottom-color:transparent}',
   '.nb-t tr{break-inside:avoid}',
   '.nb-t td.n{text-align:right;font-variant-numeric:tabular-nums}',
   '.nb-t td.b,.nb-t td.e{text-align:center}',
@@ -1828,6 +1879,8 @@ interface TableOpts {
   thead: number;
   /** The colour of borders without one of their own. */
   ink?: string;
+  /** Only these rows and columns (a print area), with the header rows `thead` repeats before them when they are above it. */
+  area?: Rect;
 }
 
 /**
@@ -1839,9 +1892,16 @@ function tableHtml(sh: Sheet, si: number, calc: Calc, o: TableOpts, cls: CssClas
   const hidR = hiddenRows(sh, si, calc);
   const hidC = hiddenCols(sh);
   const rowsShown: number[] = [];
-  for (let r = 0; r < o.rows; r++) if (!hidR.has(r)) rowsShown.push(r);
   const colsShown: number[] = [];
-  for (let c = 0; c < o.cols; c++) if (!hidC.has(c)) colsShown.push(c);
+  if (o.area) {
+    // A print area: its rows, after the header rows each page repeats when they are above it.
+    for (let r = 0; r < Math.min(o.thead, o.area.r1); r++) if (!hidR.has(r)) rowsShown.push(r);
+    for (let r = o.area.r1; r <= Math.min(o.area.r2, o.area.r1 + PRINT_ROWS); r++) if (!hidR.has(r)) rowsShown.push(r);
+    for (let c = o.area.c1; c <= o.area.c2; c++) if (!hidC.has(c)) colsShown.push(c);
+  } else {
+    for (let r = 0; r < o.rows; r++) if (!hidR.has(r)) rowsShown.push(r);
+    for (let c = 0; c < o.cols; c++) if (!hidC.has(c)) colsShown.push(c);
+  }
   const w = (c: number) => Math.round((sh.cols?.[c]?.w ?? COL_W) * o.k);
   const h = (r: number) => Math.round((sh.rows?.[r]?.h ?? ROW_H) * o.k);
   const fr = o.sticky ? Math.min(sh.freeze?.rows ?? 0, o.rows) : 0;
@@ -2053,14 +2113,23 @@ export function bookPage(book: Workbook, title: string, mode: 'viewer' | 'print'
     book.sheets.forEach((sh, si) => {
       const e = calc.shownExtent(si);
       if (!e.rows && book.sheets.length > 1) return;
+      // Its print setup (Tools → Print and PDF setup): the cells to print, across the page or upright, fitted or not,
+      // the header rows each page repeats, and the cells' lines.
+      const ps = sh.print ?? {};
+      const area = ps.area ? parseRange(ps.area) : null;
       const rows = Math.min(e.rows, PRINT_ROWS);
-      const width = Array.from({ length: e.cols }, (_, c) => sh.cols?.[c]?.w ?? COL_W).reduce((a, b) => a + b, 0);
-      const land = width > 700;
-      const fit = Math.min(1, (land ? 1030 : 700) / Math.max(1, width));
-      const table = e.rows ? tableHtml(sh, si, calc, { rows, cols: e.cols, heads: false, sticky: false, k: 1, thead: headerRows(sh, si, calc), ink: '#000' }, cls) : '<p class="nb-note">This sheet is empty.</p>';
-      const charts = sh.charts?.length ? `<div class="nb-charts">${chartsHtml(book, sh, si, calc, null)}</div>` : '';
+      const colsOf = area ? Array.from({ length: area.c2 - area.c1 + 1 }, (_, j) => area.c1 + j) : Array.from({ length: e.cols }, (_, c) => c);
+      const width = colsOf.reduce((a, c) => a + (sh.cols?.[c]?.hidden ? 0 : (sh.cols?.[c]?.w ?? COL_W)), 0);
+      const height = (area ? Array.from({ length: area.r2 - area.r1 + 1 }, (_, j) => area.r1 + j) : Array.from({ length: rows }, (_, r) => r)).reduce((a, r) => a + (sh.rows?.[r]?.hidden ? 0 : (sh.rows?.[r]?.h ?? ROW_H)), 0);
+      const land = ps.orient ? ps.orient === 'landscape' : width > 700;
+      const pageW = land ? 1030 : 700;
+      const pageH = land ? 640 : 960;
+      const fit = ps.fit === 'none' ? 1 : ps.fit === 'page' ? Math.min(1, pageW / Math.max(1, width), pageH / Math.max(1, height + 40)) : Math.min(1, pageW / Math.max(1, width));
+      const thead = ps.titles ?? headerRows(sh, si, calc);
+      const table = e.rows ? tableHtml(sh, si, calc, { rows, cols: e.cols, heads: false, sticky: false, k: 1, thead, ink: '#000', ...(area ? { area } : {}) }, cls) : '<p class="nb-note">This sheet is empty.</p>';
+      const charts = sh.charts?.length && !area ? `<div class="nb-charts">${chartsHtml(book, sh, si, calc, null)}</div>` : '';
       parts.push(
-        `<section class="nb-sheet${land ? ' nb-land' : ''}"><h2>${esc(sh.name)}</h2><div${fit < 1 ? ` style="zoom:${fit.toFixed(3)}"` : ''}>${table}</div>${e.rows > rows ? `<p class="nb-note">The first ${rows.toLocaleString('en')} of ${e.rows.toLocaleString('en')} rows.</p>` : ''}${charts}</section>`,
+        `<section class="nb-sheet${land ? ' nb-land' : ''}${ps.grid === false ? ' nb-nogrid' : ''}"><h2>${esc(sh.name)}</h2><div${fit < 1 ? ` style="zoom:${fit.toFixed(3)}"` : ''}>${table}</div>${!area && e.rows > rows ? `<p class="nb-note">The first ${rows.toLocaleString('en')} of ${e.rows.toLocaleString('en')} rows.</p>` : ''}${charts}</section>`,
       );
     });
     return `${head(PRINT_CSS + cls.css())}</style></head><body>${parts.join('')}</body></html>`;

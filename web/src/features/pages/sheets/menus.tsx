@@ -32,6 +32,7 @@ import {
   Eraser as Broom,
   ChartNoAxesCombined,
   Grid3x3,
+  Printer,
   Table2,
   Target,
   ArrowRightToLine,
@@ -146,6 +147,8 @@ export interface MenuCtx {
   pivot(): void;
   pivotHere: boolean;
   goalSeek(): void;
+  /** Tools → Print and PDF setup. */
+  printSetup(): void;
   trace(what: 'pre' | 'dep'): void;
   traced: boolean;
   untrace(): void;
@@ -395,6 +398,7 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
       { label: 'Trace precedents', icon: <ArrowRightToLine size={14} />, also: 'cells this formula uses audit', run: () => m.trace('pre') },
       { label: 'Trace dependents', icon: <ArrowRightFromLine size={14} />, also: 'formulas that use this cell audit', run: () => m.trace('dep') },
       m.traced && { label: 'Remove traces', run: m.untrace },
+      !ro && { label: 'Print and PDF setup', icon: <Printer size={14} />, also: 'page setup orientation landscape portrait fit print area header rows repeat gridlines', run: m.printSetup },
       '-',
       { label: 'Keyboard shortcuts', icon: <Keyboard size={14} />, keys: 'Ctrl+/', run: m.shortcuts },
       m.onAsk && '-',

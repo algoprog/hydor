@@ -170,6 +170,7 @@ import { askAi, ExplainAi, FormulaAi, TableAi } from './AiTools';
 import { NamesPanel, ProtectPanel } from './RangesPanel';
 import { LinkDialog } from './LinkDialog';
 import { GoalSeekDialog, PivotPanel } from './WhatIf';
+import { PrintDialog } from './PrintDialog';
 
 /** Cells copied or cut, to paste in this or another spreadsheet while the app is open (their formulas and looks). */
 let clip: Clip | null = null;
@@ -240,7 +241,7 @@ function codeDecimals(code: string, d: 1 | -1): string {
 const clone = (b: Workbook): Workbook => structuredClone(b);
 
 type PanelState = { kind: 'cf' } | { kind: 'dv'; start?: Validation } | { kind: 'chart'; id: string } | { kind: 'comments'; draft?: boolean } | { kind: 'analyze'; block: Rect; header: boolean } | { kind: 'clean'; block: Rect; header: boolean } | { kind: 'names' } | { kind: 'protect' } | { kind: 'pivot'; start: PivotDef; editing: boolean } | null;
-type DialogState = 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | 'summary' | 'table-ai' | 'link' | 'goal' | null;
+type DialogState = 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | 'summary' | 'table-ai' | 'link' | 'goal' | 'print' | null;
 type PickState = { kind: 'list' | 'date' | 'note' | 'chars'; r: number; c: number; at: DOMRect } | null;
 
 /** Where an agent's words are arriving: its cell, boxed in the app's busy colour with a small flag (as a collaborator's in Google Sheets). */
@@ -2454,6 +2455,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     pivot: openPivot,
     pivotHere: !!sheet.pivot,
     goalSeek: () => setDialog('goal'),
+    printSetup: () => setDialog('print'),
     trace,
     traced: traces?.sheet === sheet.id,
     untrace: () => setTraces(null),
@@ -3112,6 +3114,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       {dialog === 'format' && <FormatDialog code={active?.s?.code ?? ''} sample={calc.value(sheetIx, sel.r, sel.c)} style={active?.s} onApply={(c) => setCode(c)} onClose={() => setDialog(null)} />}
       <ShortcutsDialog open={dialog === 'shortcuts'} onClose={() => setDialog(null)} groups={shortcutGroups} />
       {dialog === 'table-ai' && <TableAi onInsert={insertAiTable} onClose={() => setDialog(null)} />}
+      {dialog === 'print' && <PrintDialog setup={sheet.print} picked={selRange()} onApply={(p) => change(metaPatch(sheet, { print: p }))} onClose={() => setDialog(null)} />}
       {dialog === 'goal' && <GoalSeekDialog setCell={sheet.cells[refName(sel.r, sel.c)]?.f !== undefined ? refName(sel.r, sel.c) : ''} byCell="" onSeek={seek} onApply={applyGoal} onClose={() => setDialog(null)} />}
       {dialog === 'link' && (
         <LinkDialog

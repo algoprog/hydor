@@ -22,7 +22,7 @@ import {
   type Scalar,
   type Workbook,
 } from '../../shared/sheets.ts';
-import { importBook, xlsxOfBook } from './sheets.ts';
+import { bookPage, importBook, xlsxOfBook } from './sheets.ts';
 import { addGroup, foldGroup, guardOf, protectionAt, removeGroup, spansOf } from '../../shared/sheet-groups.ts';
 import { chartData, chartSvg, histogramOf } from '../../shared/sheet-chart.ts';
 import { dependents, goalSeek, precedents } from '../../shared/sheet-whatif.ts';
@@ -389,6 +389,19 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
   ok(same(pivotValues(t.book, t.calc, def, 'A'), ['North', 'South', 'West']), 'a column’s values, for its filter');
   const kept = normalizeBook(JSON.parse(bookText(both)));
   ok(kept.sheets[1].pivot?.filters?.[0].hide[0] === 'West', 'its settings are kept with its sheet');
+}
+
+// ---- print and PDF setup ----------------------------------------------------------------------------------------------
+{
+  const b = normalizeBook({ sheets: [{ name: 'P', rows: [['Item', 'Cost', 'Note'], ['Tea', 3, 'keep'], ['Cake', 5, 'far away'], ['Jam', 2, 'x']], print: { orient: 'landscape', area: 'A2:B3', titles: 1, grid: false, fit: 'page' } }] });
+  ok(b.sheets[0].print?.orient === 'landscape' && b.sheets[0].print.area === 'A2:B3' && b.sheets[0].print.titles === 1 && b.sheets[0].print.grid === false, 'a print setup as kept');
+  const page = bookPage(b, 'P', 'print');
+  ok(page.includes('nb-land') && page.includes('nb-nogrid') && page.includes('>Tea<') && page.includes('>Item<') && !page.includes('far away') && !page.includes('>Jam<'), 'printed: across, no lines, the print area under its header row');
+  const sx = new Zip(xlsxOfBook(b, 'P')).text('xl/worksheets/sheet1.xml') ?? '';
+  const wb = new Zip(xlsxOfBook(b, 'P')).text('xl/workbook.xml') ?? '';
+  ok(sx.includes('orientation="landscape"') && sx.includes('fitToHeight="1"') && !sx.includes('gridLines="1"') && wb.includes('_xlnm.Print_Area') && wb.includes('P!$A$2:$B$3'), 'Excel: its page setup and print area');
+  const back = importBook(xlsxOfBook(b, 'P'), 'P.xlsx').book.sheets[0].print;
+  ok(back?.orient === 'landscape' && back.area === 'A2:B3' && back.grid === false && back.fit === 'page', 'and read back', back);
 }
 
 console.log(`${passed} passed, ${failed} failed`);
