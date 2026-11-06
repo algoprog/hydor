@@ -11,6 +11,9 @@
 // (Theme → Made for, or Tools); its live parts run in frames of their own, in the slideshow, and here once Run is pressed. The AI tools
 // (images/studio) make pictures, drawings, plots and videos for it, change a picture picked, make a chart a plot and
 // a slide's background: each result lands as an uploaded one does, or takes the place of what it changed, one step to undo.
+// The writing helpers: design ideas for the slide (the toolbar's Design ideas, Slide → Design ideas) and the
+// accessibility check (Tools → Check accessibility) take the side panel's place until closed; Rewrite is in the text
+// toolbar, Animate every slide in the Animate tab, and Tools → Translate the slides asks the agent.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ChartScatter,
@@ -26,6 +29,7 @@ import {
   Image as ImageIcon,
   ImageMinus,
   LayoutTemplate,
+  Lightbulb,
   Link2,
   MessageSquare,
   MessageSquarePlus,
@@ -50,8 +54,9 @@ import {
   Undo2,
   Ungroup,
   WandSparkles,
+  X,
 } from 'lucide-react';
-import { hexColor, isWebDeck, newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type ChartEl, type Deck, type El, type ImageEl, type LayoutId, type TextEl } from '@shared/slides';
+import { hexColor, isWebDeck, newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type ChartEl, type Deck, type El, type ImageEl, type LayoutId, type Slide, type TextEl } from '@shared/slides';
 import { csvOf, editPicture, makeDrawing, makePicture, makePlot, makeVideo } from '../../images/studio';
 import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
@@ -123,6 +128,9 @@ import { findInDeck, replaceAllInDeck, replaceHit } from './find';
 import { exportFile } from '../exportFile';
 import { chooseModel, chooseVideo, fetchVideoStill, firstFrame, isVideoFile, uploadModel, uploadVideo } from './media';
 import { SlideComments } from './SlideComments';
+import { DesignIdeas } from './DesignIdeas';
+import { AccessibilityPanel } from './Accessibility';
+import { askToTranslate, TranslateDialog } from './Translate';
 
 export type SlidesDoc = ModelDoc<Deck>;
 
@@ -309,6 +317,9 @@ export function SlidesEditor({
   /** The thread picked in the Comments tab. */
   const [activeComment, setActiveComment] = useState<string | null>(null);
   const [footerOpen, setFooterOpen] = useState(false);
+  /** A writing helper in the side panel's place (Design ideas, Check accessibility), and a language to type for Translate the slides. */
+  const [side, setSide] = useState<'ideas' | 'check' | null>(null);
+  const [langAsk, setLangAsk] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [cellSel, setCellSel] = useState<CellSel | null>(null);
   const [texFocus, setTexFocus] = useState(0);
@@ -1159,8 +1170,30 @@ export function SlidesEditor({
   };
 
   const openPanel = (t: InspectorTab) => {
+    setSide(null);
     setTab(t);
     if (!wide) setDrawer('open');
+  };
+  const openSide = (k: 'ideas' | 'check') => {
+    setSide(k);
+    if (!wide) setDrawer('open');
+  };
+  /** A design idea put on the slide in its place (by its id: the slide may have moved), one step to undo. */
+  const applyIdea = (idea: Slide) => {
+    canvas.current?.stopEditing();
+    change((d) => {
+      const i = d.slides.findIndex((s) => s.id === idea.id);
+      return i < 0 ? d : setSlide(d, i, () => idea);
+    });
+    setSel([]);
+    setScope([]);
+  };
+  /** A slide (and a part of it) on view, from a writing helper's panel. */
+  const goTo = (i: number, el?: string) => {
+    canvas.current?.stopEditing();
+    setCur(i);
+    setView('edit');
+    setSel(el ? [topOf(deck.slides[i], el)?.id ?? el] : []);
   };
   const one = picked.length === 1 ? picked[0] : null;
   const openComments = deck.slides.reduce((a, s) => a + (s.comments ?? []).filter((c) => !c.resolved).length, 0);
@@ -1283,6 +1316,9 @@ export function SlidesEditor({
     presentMore: presentMoreMenu(deck, (how) => setPresent({ from: 0, presenter: false, how })),
     shortcuts: () => setKeysOpen(true),
     ask: onAsk ? () => onAsk(`On slide ${index + 1}${slideTitle(slide) ? ` (“${slideTitle(slide)}”)` : ''}: `) : undefined,
+    designIdeas: readOnlyProp ? undefined : () => openSide('ideas'),
+    checkAccess: readOnlyProp ? undefined : () => openSide('check'),
+    translate: onAsk && !readOnly ? (lang) => (lang ? askToTranslate(lang) : setLangAsk(true)) : undefined,
   });
 
   const insertBar = !readOnlyProp && (
@@ -1326,6 +1362,17 @@ export function SlidesEditor({
       >
         <Paintbrush size={15} />
       </IconButton>
+      <Button
+        size="sm"
+        variant="ghost"
+        icon={<Lightbulb size={15} />}
+        aria-label="Design ideas"
+        title="Design ideas for this slide"
+        onClick={() => (side === 'ideas' ? setSide(null) : openSide('ideas'))}
+        className={cx('shrink-0 px-2', side === 'ideas' && 'bg-bg-2')}
+      >
+        {mid && !textArgs ? 'Design ideas' : ''}
+      </Button>
     </>
   );
 
@@ -1629,14 +1676,35 @@ export function SlidesEditor({
             {!readOnlyProp && (
               <aside inert={liveOn} className={cx('flex min-h-0 shrink-0 flex-col bg-panel', liveOn && 'opacity-45', wide ? 'w-[300px] border-l border-line' : cx('border-t border-line', drawer === 'open' ? 'h-[min(46%,420px)] min-h-[180px]' : 'pb-[var(--safe-bottom)]'))}>
                 <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-1">
-                  {hold('tabs', tabs)}
+                  {side ? (
+                    <span className="flex min-w-0 flex-1 items-center gap-1.5 pl-2 text-[13px] font-medium text-fg">
+                      <span className="min-w-0 truncate">{side === 'ideas' ? 'Design ideas' : 'Accessibility check'}</span>
+                    </span>
+                  ) : (
+                    hold('tabs', tabs)
+                  )}
                   {!wide && (
                     <IconButton label={drawer === 'open' ? 'Fold the panel' : 'Open the panel'} size="sm" onClick={() => setDrawer(drawer === 'open' ? 'closed' : 'open')}>
                       {drawer === 'open' ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
                     </IconButton>
                   )}
+                  {side && (
+                    <IconButton label="Close" size="sm" onClick={() => setSide(null)}>
+                      <X size={15} />
+                    </IconButton>
+                  )}
                 </div>
-                {(wide || drawer === 'open') && <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{hold('panel', (tab as string) === 'notes' ? notesPanel : (tab as string) === 'comments' ? commentsPanel : inspector)}</div>}
+                {(wide || drawer === 'open') && (
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                    {side === 'ideas' ? (
+                      <DesignIdeas deck={deck} index={index} fonts={fonts} readOnly={readOnly} onApply={applyIdea} />
+                    ) : side === 'check' ? (
+                      <AccessibilityPanel deck={deck} index={index} readOnly={readOnly} change={change} onGo={goTo} />
+                    ) : (
+                      hold('panel', (tab as string) === 'notes' ? notesPanel : (tab as string) === 'comments' ? commentsPanel : inspector)
+                    )}
+                  </div>
+                )}
               </aside>
             )}
           </>
@@ -1920,6 +1988,7 @@ export function SlidesEditor({
         }}
       />
       <FooterDialog open={footerOpen} onClose={() => setFooterOpen(false)} deck={deck} index={index} change={change} />
+      <TranslateDialog open={langAsk} onClose={() => setLangAsk(false)} />
       <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={SHORTCUTS} />
       {present && !present.presenter && !present.how && <Slideshow deck={deck} from={present.from} pageId={pageId} title={doc?.title} onClose={() => setPresent(null)} />}
       {present?.how && <ShowAs how={present.how} deck={deck} from={present.from} pageId={pageId} title={doc?.title} change={change} onClose={() => setPresent(null)} />}
