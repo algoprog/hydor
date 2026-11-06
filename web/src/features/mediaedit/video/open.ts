@@ -30,9 +30,12 @@ export function editVideoFile(path: string, o: { label?: string; after?: (r: Sav
   });
 }
 
-/** A Library video in the editor: Save puts the new one in its place, Save a copy keeps both. */
-export function editLibraryVideo(m: Pick<MediaItem, 'id' | 'title'>, o: { label?: string; after?: (r: Saved) => void } = {}): EditorHandle {
-  return openEditor({ kind: 'video', src: `/api/media/${m.id}/file`, title: m.title, from: { label: o.label || pageName() }, to: { media: m.id }, copy: true, save: (r) => o.after?.(r) });
+/**
+ * A Library video in the editor: Save puts the new one in its place, Save a copy keeps both. `src`: its file's address as
+ * the Library gives it (with its version, so one written over before is not played from the browser's cache).
+ */
+export function editLibraryVideo(m: Pick<MediaItem, 'id' | 'title'>, o: { src?: string; label?: string; after?: (r: Saved) => void } = {}): EditorHandle {
+  return openEditor({ kind: 'video', src: o.src ?? `/api/media/${m.id}/file`, title: m.title, from: { label: o.label || pageName() }, to: { media: m.id }, copy: true, save: (r) => o.after?.(r) });
 }
 
 /** A video of the conversation in the editor: saved as a new video in the Library, noted as from its session. */

@@ -1,7 +1,7 @@
 // One image, video or sound in the Library (/media/<id>): the picture (a tap away from full size), the video or the
 // sound to play (a sound's shape to seek along), its title and description (written by a model, or by you: Edit),
 // what it was made from and with, its size, length and file, the session it came from, for a video the frames the
-// model saw, and for a sound its words. Edit a picture in the picture editor (saved over it, or as a copy), download
+// model saw, and for a sound its words. Edit a picture or a video in its editor (saved over it, or as a copy), download
 // it, write the title and description again, start a new session with it in the message box, or delete it.
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Download, Ellipsis, FolderInput, MessageSquarePlus, MessagesSquare, Pencil, RefreshCw, Settings2, SlidersHorizontal, Trash2, TriangleAlert } from 'lucide-react';
@@ -20,6 +20,7 @@ import { Button, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Throbb
 import { LOCALE } from '../../i18n/locale';
 import { NavButton } from '../layout/PageHeader';
 import { openEditor } from '../mediaedit/host';
+import { editLibraryVideo } from '../mediaedit/video/open';
 import { SpaceMenu } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
 import { downloadMedia, recaption, startSessionWithMedia } from './parts';
@@ -116,6 +117,14 @@ function MediaView({ id }: { id: string }) {
         if (r.media && r.media !== m.id) go(`/media/${r.media}`);
       },
     });
+  /** The video in the video editor: saved over this item (its place, title and folder kept), or as a new one beside it. */
+  const editVideo = () =>
+    editLibraryVideo(m, {
+      src: mediaUrl(m),
+      label: m.title,
+      // A copy is a new item: it opens; the item written over shows itself again, as the Library hears.
+      after: (r) => void (r.media && r.media !== m.id && go(`/media/${r.media}`)),
+    });
   const size = m.width && m.height ? `${m.width} × ${m.height}` : undefined;
   const ratio = m.width && m.height ? m.width / m.height : 16 / 9;
   const shape = m.width && m.height ? `${m.width} / ${m.height}` : '16 / 9';
@@ -140,6 +149,11 @@ function MediaView({ id }: { id: string }) {
           </Button>
           {m.kind === 'image' && (
             <Button size="sm" variant="secondary" icon={<SlidersHorizontal size={14} />} onClick={editPicture} title="Edit the picture" aria-label="Edit the picture">
+              <span className="max-sm:hidden">Edit</span>
+            </Button>
+          )}
+          {m.kind === 'video' && (
+            <Button size="sm" variant="secondary" icon={<SlidersHorizontal size={14} />} onClick={editVideo} title="Edit the video" aria-label="Edit the video">
               <span className="max-sm:hidden">Edit</span>
             </Button>
           )}

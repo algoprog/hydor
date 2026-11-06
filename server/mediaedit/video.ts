@@ -167,6 +167,20 @@ function encodersOf(bin: string) {
 
 // ---- jobs ---------------------------------------------------------------------------------------------------------
 
+/** Whether a file is the app's own (its data folder: the Library's files, a deck's videos), which is never written from here. */
+function appsOwn(file: string): boolean {
+  const real = (p: string) => {
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return path.resolve(p);
+    }
+  };
+  const data = real(config.dataDir);
+  const at = real(fs.existsSync(file) ? file : path.dirname(file));
+  return at === data || at.startsWith(data + path.sep);
+}
+
 /** Where an edit goes: as the route asks (VideoSaveTo), or (an agent's) into a folder of its session under a name. */
 export type SaveTo = VideoSaveTo | { into: string; name: string };
 
@@ -497,9 +511,10 @@ async function deliver(j: Job, out: string, ext: string, dir: string): Promise<v
   await fs.promises.rename(out, named);
   const session = from?.sessionKey ?? ('library' in to ? to.session : undefined);
   const { item } = await keepFile(p.d, { path: named, ...(from?.space ? { space: from.space } : {}), ...(session ? { sessionKey: session } : {}) }, { move: true, source: `${from?.source ?? p.source.path ?? p.source.kept ?? named} (edited)` });
-  if (from?.folder && from.space === item.space) {
+  if (from?.folder && from.space === item.space && !item.folder) {
     try {
       putInFolder(db, 'media', item.id, from.folder);
+      p.d.broadcast({ t: 'feature', id: 'media', data: { what: 'media', item: getMedia(db, item.id)! } });
     } catch {}
   }
   j.view.media = item.id;
@@ -571,6 +586,7 @@ export async function prepare(d: Deps, b: Partial<VideoEditAsk> & { to?: unknown
   const picture = format === 'jpg' || format === 'png';
   const frame = b.frame === undefined || b.frame === null ? undefined : Number(b.frame);
   if (picture && (frame === undefined || !Number.isFinite(frame) || frame < 0 || frame > facts.duration)) throw new HttpError(400, `frame: the moment to take, in seconds of the video (0 to ${Math.floor(facts.duration * 10) / 10})`);
+  if ('file' in to && appsOwn(pathOf(to.file))) throw new HttpError(403, 'That file is part of the app’s own data: it is not written from here.');
   // Written over a video, it stays the kind it was.
   const over = 'file' in to && to.as === 'replace' ? to.file : 'media' in to && to.as === 'replace' ? mustMedia(d.db, to.media).file : null;
   if (over && (picture || format === 'gif')) throw new HttpError(400, `A ${picture ? 'picture of a frame' : 'GIF'} is saved as a copy, not over the video`);
