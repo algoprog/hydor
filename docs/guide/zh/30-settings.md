@@ -158,6 +158,10 @@
 - [**网站在线检查**](/settings?s=tasks&find=Site%20up%20check)：现成的定时任务。
 - [**磁盘空间提醒**](/settings?s=tasks&find=Disk%20space%20alert)：现成的定时任务。
 - [**审查新的拉取请求**](/settings?s=tasks&find=Review%20new%20pull%20requests)：现成的定时任务。
+- [**CI 医生**](/settings?s=tasks&find=CI%20doctor)：现成的定时任务。
+- [**议题分诊**](/settings?s=tasks&find=Issue%20triage)：现成的定时任务。
+- [**依赖园丁**](/settings?s=tasks&find=Dependency%20gardener)：现成的定时任务。
+- [**故障第一响应人**](/settings?s=tasks&find=Incident%20first%20responder)：现成的定时任务。
 - [**文件夹中的新文件**](/settings?s=tasks&find=New%20files%20in%20a%20folder)：现成的定时任务。
 - [**提醒**](/settings?s=tasks&find=Reminder)：现成的定时任务。
 
@@ -216,14 +220,16 @@
 [设置 → 子会话](/settings?s=children)：智能体把部分工作交给其他智能体，以及用集群攻克难题。详见[深度研究、第二意见和多个智能体](/guide/research)。
 
 - [**每个会话同时工作的数量**](/settings?s=children&find=Working%20at%20once%2C%20per%20session)：一个会话同时运行的子会话数量。
-- [**集群规模**](/settings?s=children&find=Swarm%20size)：一个集群中同时工作的智能体数量。
+- [**集群规模**](/settings?s=children&find=Swarm%20size)：一个集群或战役中同时工作的智能体数量。
 
 ### 图片、视频和音频
 
 [设置 → 图片、视频和音频](/settings?s=images)：智能体通过 OpenRouter 为你生成的图片、视频、音乐和语音，以及资料库中它们的标题和说明由谁撰写。详见[文档、图片、视频和语音](/guide/documents-voice)。
 
 - [**图片生成**](/settings?s=images&find=Making%20images)：允许智能体生成图片。
-- [**图像模型**](/settings?s=images&find=Image%20model)：生成它们的模型。
+- [**用于大多数图片（最佳）**](/settings?s=images&find=For%20most%20pictures%20%28Best%29)：The model that makes most pictures, and every change to one。
+- [**For simple pictures (Quick)**](/settings?s=images&find=For%20simple%20pictures%20%28Quick%29)：A cheaper, quicker model for icons, backgrounds, textures and simple pictures。
+- [**这台电脑上的图片工具**](/settings?s=images&find=Picture%20tools%20on%20this%20computer)：Take a picture’s background out, or erase part of it, here: free, and your pictures stay on this computer。
 - [**视频生成**](/settings?s=images&find=Making%20videos)：允许智能体生成视频。
 - [**视频模型**](/settings?s=images&find=Video%20model)：生成视频的模型。
 - [**音频生成**](/settings?s=images&find=Making%20audio)：允许智能体生成音频。

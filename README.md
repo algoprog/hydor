@@ -54,17 +54,22 @@ the ones you start in VS Code or a terminal show up too.
   research that ends in a cited report. In the desktop apps, agents can also use your computer itself, its screen,
   mouse and keyboard in any app, once you allow it: a glow lines the screen while they work, and Esc stops them.
 - **Apps**: small tools for one job (a trip plan, a product comparison, the weather, a quiz) whose answers open in
-  views of their own, with maps, charts, pictures and videos. Use the ready-made ones or make your own; agents
-  run them for you in any chat. **Explore**, at the top right of the start page, is a magazine made for you:
-  articles and recent news on what you work on and care about, picked from your profile and your sessions, and
-  updated every day if you like.
+  views of their own, with maps, charts, pictures and videos. Use the ready-made ones or make your own, the ones you
+  use most pinned at the top of the Apps page; agents run them for you in any chat. **Explore**, at the top right of
+  the start page, is a magazine made for you: articles and recent news on what you work on and care about, picked
+  from your profile and your sessions, and updated every day if you like.
 - **Things to keep**: pages you write in as in Notion, databases too; slides, documents, spreadsheets and LaTeX you edit as in
   PowerPoint, Word, Excel and Airtable, and Overleaf, with menus you can search, comments agents answer, suggestions
   and tracked changes you accept or reject (an agent's edits too), documents on real pages, equations, charts that sit
   on their cells, filters and dropdowns, videos and connectors on slides, Morph and a visual LaTeX mode with IEEE, ACM
   and Springer papers, exported to Word, PowerPoint or Excel files that look the same in Office (their fonts inside)
-  or to PDF; you watch an agent write them as it goes; PowerPoint files open as decks; PDF forms filled and signed,
-  by you or an agent, with a signature you draw once; and pictures, videos, music and voice-overs made through
+  or to PDF; you watch an agent write them as it goes; PowerPoint files open as decks. Slides are made for the web
+  unless you want PowerPoint's: quizzes, 3D, code that runs and the web's effects, design ideas, narration, a coach
+  to rehearse with and your phone as the remote, and one small web page that presents them anywhere. Pictures,
+  drawings, plots and videos are made with AI right where they go, photos found free, backgrounds taken out and
+  things erased on your own computer, and pictures and videos edited in the app's own editors; an agent makes any of
+  216 kinds of slide, deck, document, page and spreadsheet well, a SWOT slide to a budget. PDF forms filled and
+  signed, by you or an agent, with a signature you draw once; and pictures, videos, music and voice-overs made through
   OpenRouter. Drop files or folders on it and all of it waits in your Library, by project and in folders of your own,
   each with a short description that its search finds it by, by words and by meaning.
 - **Memory and know-how**: agents keep a profile of you and remember your projects, starting each session with what

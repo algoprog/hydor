@@ -191,7 +191,9 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['children', 'Swarm size', 'swarm mode team of agents subagents parallel angles hard problems math proof campaign migration', 'How many agents of a swarm or campaign work at once'],
   // Capabilities › Images, video and audio
   ['images', 'Making images', 'image generation pictures openrouter', 'Let agents make images'],
-  ['images', 'Image model', 'image model seedream flux gemini openrouter', 'The model that makes them'],
+  ['images', 'For most pictures (Best)', 'image model best quality seedream flux gemini gpt openrouter scenes photos words in a picture diagrams change a picture', 'The model that makes most pictures, and every change to one', 'Image model for most pictures (Best)'],
+  ['images', 'For simple pictures (Quick)', 'image model quick cheap fast cheaper simple icons backgrounds textures patterns seedream flash recraft openrouter', 'A cheaper, quicker model for icons, backgrounds, textures and simple pictures', 'Image model for simple pictures (Quick)'],
+  ['images', 'Picture tools on this computer', 'remove background cutout cut out erase eraser object removal take out local private free offline python onnx plots matplotlib ffmpeg set up remove', 'Take a picture’s background out, or erase part of it, here: free, and your pictures stay on this computer'],
   ['images', 'Making videos', 'video generation clips movies animation openrouter', 'Let agents make videos'],
   ['images', 'Video model', 'video model seedance veo kling wan openrouter price a second', 'The model that makes videos'],
   ['images', 'Making audio', 'audio generation music songs jingles voice over narration speech text to speech tts sound effects ambience openrouter', 'Let agents make audio'],

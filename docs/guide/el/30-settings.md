@@ -158,6 +158,10 @@
 - [**Έλεγχος λειτουργίας ιστοτόπου**](/settings?s=tasks&find=Site%20up%20check): Μια έτοιμη προγραμματισμένη εργασία.
 - [**Ειδοποίηση για χώρο στον δίσκο**](/settings?s=tasks&find=Disk%20space%20alert): Μια έτοιμη προγραμματισμένη εργασία.
 - [**Έλεγχος νέων pull request**](/settings?s=tasks&find=Review%20new%20pull%20requests): Μια έτοιμη προγραμματισμένη εργασία.
+- [**Γιατρός CI**](/settings?s=tasks&find=CI%20doctor): Μια έτοιμη προγραμματισμένη εργασία.
+- [**Διαλογή ζητημάτων**](/settings?s=tasks&find=Issue%20triage): Μια έτοιμη προγραμματισμένη εργασία.
+- [**Κηπουρός εξαρτήσεων**](/settings?s=tasks&find=Dependency%20gardener): Μια έτοιμη προγραμματισμένη εργασία.
+- [**Πρώτη αντιμετώπιση περιστατικών**](/settings?s=tasks&find=Incident%20first%20responder): Μια έτοιμη προγραμματισμένη εργασία.
 - [**Νέα αρχεία σε φάκελο**](/settings?s=tasks&find=New%20files%20in%20a%20folder): Μια έτοιμη προγραμματισμένη εργασία.
 - [**Υπενθύμιση**](/settings?s=tasks&find=Reminder): Μια έτοιμη προγραμματισμένη εργασία.
 
@@ -216,14 +220,16 @@
 [Ρυθμίσεις → Θυγατρικές συνεδρίες](/settings?s=children): πράκτορες που αναθέτουν μέρη μιας δουλειάς σε άλλους πράκτορες, και σμήνη για δύσκολα προβλήματα. Περισσότερα στο [Σε βάθος έρευνα, δεύτερες γνώμες και πολλοί πράκτορες](/guide/research).
 
 - [**Ταυτόχρονα σε εργασία, ανά συνεδρία**](/settings?s=children&find=Working%20at%20once%2C%20per%20session): Πόσες θυγατρικές συνεδρίες τρέχει ταυτόχρονα μία συνεδρία.
-- [**Μέγεθος σμήνους**](/settings?s=children&find=Swarm%20size): Πόσοι πράκτορες ενός σμήνους δουλεύουν ταυτόχρονα.
+- [**Μέγεθος σμήνους**](/settings?s=children&find=Swarm%20size): Πόσοι πράκτορες ενός σμήνους ή μιας καμπάνιας δουλεύουν ταυτόχρονα.
 
 ### Εικόνες, βίντεο και ήχος
 
 [Ρυθμίσεις → Εικόνες, βίντεο και ήχος](/settings?s=images): εικόνες, βίντεο, μουσική και φωνές που φτιάχνουν οι πράκτορες για εσάς μέσω OpenRouter, και ποιος γράφει τις λεζάντες τους στη Βιβλιοθήκη. Περισσότερα στο [Έγγραφα, εικόνες, βίντεο και φωνή](/guide/documents-voice).
 
 - [**Δημιουργία εικόνων**](/settings?s=images&find=Making%20images): Επιτρέψτε στους πράκτορες να φτιάχνουν εικόνες.
-- [**Μοντέλο εικόνων**](/settings?s=images&find=Image%20model): Το μοντέλο που τις φτιάχνει.
+- [**Για τις περισσότερες εικόνες (Καλύτερο)**](/settings?s=images&find=For%20most%20pictures%20%28Best%29): The model that makes most pictures, and every change to one.
+- [**For simple pictures (Quick)**](/settings?s=images&find=For%20simple%20pictures%20%28Quick%29): A cheaper, quicker model for icons, backgrounds, textures and simple pictures.
+- [**Εργαλεία εικόνων σε αυτόν τον υπολογιστή**](/settings?s=images&find=Picture%20tools%20on%20this%20computer): Take a picture’s background out, or erase part of it, here: free, and your pictures stay on this computer.
 - [**Δημιουργία βίντεο**](/settings?s=images&find=Making%20videos): Επιτρέψτε στους πράκτορες να φτιάχνουν βίντεο.
 - [**Μοντέλο βίντεο**](/settings?s=images&find=Video%20model): Το μοντέλο που φτιάχνει τα βίντεο.
 - [**Δημιουργία ήχου**](/settings?s=images&find=Making%20audio): Επιτρέψτε στους πράκτορες να φτιάχνουν ήχο.

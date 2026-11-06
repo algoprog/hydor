@@ -21,21 +21,27 @@ Open the Apps page from the **Apps** tile at the bottom of the sidebar, or go to
 
 ## Find your way around the Apps page
 
-The page is headed **Apps**, with two tabs: **Agent apps**, the apps this topic is about, and **Connected apps**, the services every agent can use, connected once, with the keys they use ([Open Connected apps](/guide/connections#open-connected-apps)). Each tab counts what it has. On **Agent apps**, **New app** is at the top: its menu has **Describe it to an agent**, **Start from scratch** and **Install from a file**. Below it:
+The page is headed **Apps**, with two tabs: **Agent apps**, the apps this topic is about, and **Connected apps**, the services every agent can use, connected once, with the keys they use ([Open Connected apps](/guide/connections#open-connected-apps)). Each tab counts what it has. On **Agent apps**, **New app** is at the top: its menu has **Describe it to an agent**, **Start from scratch** and **Install from a file**. Then, from the top down:
 
-- A short note on what apps are, in three parts: **Open it here**, **Or just ask in any chat** and **One job each**. **Got it** (✕) puts it away; **What are apps?**, beside the search box, brings it back.
-- **Find an app**: a box that narrows the apps by their names, descriptions and kinds as you type, and under it chips for their kinds (**All**, then each kind, the ready-made apps' first).
-- **Pick up where you left off**: your latest runs (four, with **All** for up to six), with the answers they were given, how they stand and when they ended. Runs from rows of a CSV and from public pages stay under their own app instead, as do those of an app that opens on its own page (Explore), which shows its latest there. Click one to open it.
-- **Your own apps**: the ones you made or installed from a file, and the **Make an app** tile, which opens a new app.
-- **Ready-made apps**: the ones that come with Hydor, installed, under their kinds (**Research**, **Planning**, **Shopping**, **Weather**, **Sports**, **Food**, **Fun** and the rest). Each card, yours too, has its icon, name and description, **Its own view** when its answer opens in a view of its own (maps, charts, tables), **Works in chats** when agents run it for you in your sessions, **Public** when its public page is open, and when it last ran. Its **More** (⋯, at its top right; on a computer it shows when you point at the card) has **Open** and **Download as a file**. When nothing matches what you typed, the page says "No app does that yet", with **Describe it to an agent**, which starts the App builder with your words.
+- **Pinned**: the apps you use most, as big tiles in the order you put them, each a tap from opening. **Pin to the top**, in an app's card's **More** (⋯) or in the **More** menu of its own page, puts it here, and **Unpin** there takes it off. Drag a tile to move it (on a phone, press and hold it first), or use the tile's **More** (⋯): **Unpin**, **Move left** and **Move right**. Up to 12 apps; the app keeps them, so every device shows the same ones.
+- **Find an app: weather, recipes, a trip…**: a box that finds any app as you type, by its name, its kind or what it does (every word you type must fit somewhere, and a plural finds its singular: "recipes" finds a recipe app), among yours, the ready-made ones, those you uninstalled and the building blocks, the best fit first. Enter opens the first; Esc clears the box. It stays at the top as the page scrolls. Under it, a chip for each kind of app with how many it has (**All** first, then the ready-made apps' kinds), to show one kind.
+- **Recently used**: the apps you ran lately, each once, the latest first (up to 8): from their form, from their own page or screen, or run for you by an agent in a chat. Each card says what it was last asked, how that run stands and when, with **Open the result** (an app with a view of its own opens on its page), **Answer it** while it waits for you, **Follow it** while it works, or **Open the run** when it failed or stopped; and **Run again**, which opens its form filled in with the same answers. **Latest runs**, beside the title, unfolds your latest runs (up to six) as a list; before you have used an app, they are the part, under that name. Runs from rows of a CSV and from public pages stay out of that list, under their own app, as do those of an app that opens on its own page (Explore), which shows its latest there. Until you pin one, a line says to pin the ones you use most from their ⋯ menu.
+- **Start with**: before you have run any app, four ready-made ones most people use (**Weather outlook**, **Trip planner**, **Cook with what you have** and **Compare products**), each a click from its form, with a line on what apps are and **Learn more** ([What an app is](#what-an-app-is)).
+- **Your own apps**: the ones you made or installed from a file, with how many, and the **Make an app** tile, which opens a new app (to describe to an agent, start from scratch, or install a file). From four apps of yours, the button beside the title sorts them **Most used**, **A to Z** or **Newest**; this device remembers your choice.
+- **Ready-made apps**: the ones that come with Hydor, installed, under their kinds (**Research**, **Planning**, **Shopping**, **Weather**, **Sports**, **Food**, **Fun** and the rest): run one, or make it yours to change it.
+
+Every card, yours too, is the same size: its icon, name and what it does, then what it asks for (its form's questions, or **Ready to run**), small marks (point at one for its words: its answer opens in a view of its own, with maps, charts and tables; it works in chats, so you can ask for what it does in any session and the agent runs it there; it needs a key the app does not have yet; **Public** when its public page is open), **Not installed** or **Building block** where that is so, and when it last ran. Its **More** (⋯, at its top right; on a computer it shows when you point at the card) has **Open**, **Pin to the top** (or **Unpin**) and **Download as a file**. When nothing matches what you typed, the page says "No app does that yet", with **Describe it to an agent**, which starts the App builder with your words.
+
+Below them:
+
 - **Ready-made apps to install**: there once you uninstall a ready-made app. Each card shows its kind, what it does and what you get from it (the pages of its view, such as the Trip planner's **Your trip**, **Day by day**, **Book ahead** and **Budget**), and **Install** (see [Install or uninstall a ready-made app](#install-or-uninstall-a-ready-made-app)).
-- **Building blocks** (folded): small apps made to be steps of your own (sum up a page, translate, answer from the web, sort into kinds, pull out the facts), with the blocks you made yourself; **Add a step** offers them in every app's steps.
+- **Building blocks** (folded, with how many): small apps made to be steps of your own (sum up a page, translate, answer from the web, sort into kinds, pull out the facts), with the blocks you made yourself; **Add a step** offers them in every app's steps.
 
 A run's state shows as a badge: **Waiting** (in line), **Starting**, **Working**, **Needs you** (it waits for an approval or an answer), **Done**, **Failed** or **Stopped**.
 
 Drop an app's file (`.hydor-app` or `.json`) anywhere on the page to install it: the card that says what it is opens first (see [Share an app as a file](#share-an-app-as-a-file)).
 
-On a phone each part's apps are the rows of one list, and the kind chips scroll sideways.
+On a phone the page is one column: the pinned and the recently used apps are rows that scroll sideways, as the kind chips do, and the cards keep to their name and what they do.
 
 ## Use a ready-made app
 
@@ -570,6 +576,9 @@ Agents in Hydor can make and run apps for you through its API, with your OK on a
 
 - "Make an app called Weekly report that asks for a project and a date range, and answers with a summary and a table of what changed."
 - "Turn this session into an app I can run again."
+- "Pin the Trip planner and my Weekly report to the top of the Apps page, the report first."
+- "Which apps did I use lately, and how did their last runs go?"
+- "Run my Price check again with the same answers as last time."
 - "Plan a 4-day trip to Lisbon in May for the two of us." (the Trip planner runs here, and asks for what it needs)
 - "What's the weather in Zermatt this week? And what can I cook with eggs, spinach and potatoes?" (the Weather outlook and Cook with what you have run here, each showing its answer in its view)
 - "Quiz me on the Roman Empire, ten hard questions."

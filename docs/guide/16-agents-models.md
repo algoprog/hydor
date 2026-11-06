@@ -310,6 +310,8 @@ OpenRouter (openrouter.ai) gives you hundreds of models from many makers through
 
 The section then shows **Connected to OpenRouter** with the start and end of your key. **Remove** forgets the key. The key stays on the server and is never shown again.
 
+You can also add it when it is first needed: an agent that goes to make a picture, a drawing, a video or a sound without one asks for it on a card in the conversation ([When an agent needs the OpenRouter key](/guide/documents-voice#when-an-agent-needs-the-openrouter-key)), and the editors' AI tools ask in their dialog. Either way it is kept here.
+
 ### Suggested models
 
 Before you search, **Suggested** lists four models for Custom, each with why: **GPT-6 Luna** (Fast and cheap), **Grok 4.7** (Good, with fewer refusals), **GPT-6.1 Sol** (Better) and **Claude Opus 5.5** (Best overall). **Add** puts one in the pickers. For pictures, music, voices and videos, the app's choices are Seedream 5.0 Pro (and Flash, quicker and cheaper), Lyria 3 Pro, Seed Audio 1.0 and Seedance 2.5: see [Settings → Capabilities → Images, video and audio](/settings?s=images).
