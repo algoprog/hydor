@@ -262,7 +262,7 @@ export function Preview({
             Typesetting…
           </>
         ) : shown ? (
-          <span className="truncate">{`${shown.pages} page${shown.pages === 1 ? '' : 's'} typeset${shown.ms ? ` in ${(shown.ms / 1000).toFixed(1)} s` : ''}`}</span>
+          <span className="truncate">{`${shown.pages} page${shown.pages === 1 ? '' : 's'} typeset`}</span>
         ) : null}
       </span>
       {shown && setup?.pictures !== false && shown.pages > 1 && (
