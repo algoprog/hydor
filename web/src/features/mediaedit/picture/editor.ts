@@ -272,6 +272,8 @@ export class PictureEd {
   /** The last selection dropped, for Reselect. */
   lastSel: Sel | null = null;
   version = 0;
+  /** Bumped when what the picture looks like changes (not what is drawn over it): the screen puts it together again. */
+  pv = 0;
   private listeners = new Set<() => void>();
   private continuing: string | null = null;
   private selClipCache: { sel: Sel; clip: SelClip } | null = null;
@@ -296,9 +298,15 @@ export class PictureEd {
     this.listeners.add(f);
     return () => void this.listeners.delete(f);
   }
-  emit() {
+  /** The screen told of a change; `picture` false when only what is drawn over the picture changed. */
+  emit(picture = true) {
+    if (picture) this.pv++;
     this.version++;
     for (const f of this.listeners) f();
+  }
+  /** A slider or a drag is going on (the screen works faster, smaller). */
+  get dragging() {
+    return !!this.continuing || !!this.stroke;
   }
 
   // ---- steps --------------------------------------------------------------------------------------------------------
@@ -415,7 +423,7 @@ export class PictureEd {
   }
   showPanel(panel: string) {
     this.focus = { panel, n: (this.focus?.n ?? 0) + 1 };
-    this.emit();
+    this.emit(false);
   }
   askAi(mode: string) {
     this.aiAsk = { mode, n: (this.aiAsk?.n ?? 0) + 1 };
@@ -429,15 +437,16 @@ export class PictureEd {
     this.endSessions(true);
     // Which layer is picked is not a step of its own: the step shown changes in place.
     this.hist.replace({ ...this.doc, active: id });
-    this.emit();
+    this.emit(false);
   }
   /** A layer put in the stack above the picked one (or at the top), and picked. */
-  addLayer(l: Layer, label: string, bytes = 0, below = false) {
+  addLayer(l: Layer, label: string, bytes = 0, below = false, done = true) {
     const d = this.doc;
     const i = d.active ? indexOf(d, d.active) : d.layers.length - 1;
     const at = below ? Math.max(0, i) : i + 1;
     const layers = [...d.layers.slice(0, at), l, ...d.layers.slice(at)];
-    this.change(label, { ...d, layers, active: l.id }, true, { bytes });
+    this.continuing = null;
+    this.change(label, { ...d, layers, active: l.id }, done, { bytes });
   }
   newLayer() {
     const d = this.doc;
@@ -839,9 +848,9 @@ export class PictureEd {
   // ---- marks ----------------------------------------------------------------------------------------------------------
 
   /** A new mark as a layer of its own (a shape, a line, words, an emoji, a hidden area). */
-  addMark(m: Mark, label: string, name: string): MarkLayer {
+  addMark(m: Mark, label: string, name: string, done = true): MarkLayer {
     const l = markLayer(freshName(this.doc, name), m);
-    this.addLayer(l, label);
+    this.addLayer(l, label, 0, false, done);
     return l;
   }
   setMark(id: string, m: Mark, label: string, done: boolean) {
@@ -961,7 +970,7 @@ export class PictureEd {
   setCrop(p: Partial<CropSession>) {
     if (!this.crop) return;
     this.crop = { ...this.crop, ...p };
-    this.emit();
+    this.emit(false);
   }
   cancelCrop() {
     this.crop = null;
