@@ -309,6 +309,8 @@ OpenRouter（openrouter.ai）让你用一个密钥使用来自众多厂商的数
 
 之后这个部分会显示**已连接到 OpenRouter**，以及你密钥的开头和结尾。**移除**会忘掉这个密钥。密钥保存在服务器上，之后不会再完整显示。
 
+你也可以等第一次用到时再添加它：智能体要生成图片、绘图、视频或声音却还没有密钥时，会在对话中用一张卡片向你要它（[智能体需要 OpenRouter 密钥时](/guide/documents-voice#when-an-agent-needs-the-openrouter-key)），编辑器里的 AI 工具则会在它们的对话框中向你要。无论哪种方式，密钥都保存在这里。
+
 ### 推荐的模型
 
 在你搜索之前，**推荐**会列出四个适合 Custom 的模型，并说明理由：**GPT-6 Luna**（快速又便宜）、**Grok 4.7**（不错，拒答更少）、**GPT-6.1 Sol**（更好）和 **Claude Opus 5.5**（综合最佳）。**添加**会把它放进选择列表。对于图片、音乐、语音和视频，应用的选择是 Seedream 5.0 Pro（以及更快、更便宜的 Flash）、Lyria 3 Pro、Seed Audio 1.0 和 Seedance 2.5：见[设置 → 能力 → 图片、视频和音频](/settings?s=images)。
