@@ -71,7 +71,13 @@ agents that speak ACP and take MCP servers.
   assistant, a scheduled task, memory notes…) and it does it through the app's API (`app_api`): reading runs at
   once, and each change shows you a card first, with what changes before → after, to allow once, for the rest of
   the session, or not. When it needs details it shows a form (`ask_form`). Passwords, keys' values, approvals,
-  permissions, spending caps, files and commands stay yours.
+  permissions, spending caps, files and commands stay yours. `page_action` does what an editor does in a click to the
+  whole of a page of the Library, with the editor's own code and a new version: animate every slide, fix what the
+  accessibility check finds, describe pictures, PowerPoint compatible or the web format, a theme, the slide shape,
+  slides from another deck, charts updated from their spreadsheets; accept or reject suggestions, page setup, a
+  header and footer; sort, remove duplicates, fill, clear, trim, split text, summarize, insert or delete rows and
+  columns, the sheet tabs' menu; move a LaTeX document's files; clear a notebook's outputs; duplicate and turn into.
+  The agent beside a page (Ask) is told its kind's actions and gets the ids of what was picked.
 - **The web**: search with Naget Search (its own index of the web, papers, patents and filings; free daily
   searches without a key) or SearXNG, Brave Search and DuckDuckGo, by category, site or date, up to 100 results;
   read whole pages, or only the parts that answer a question; find a picture and a video of each of a list of things
