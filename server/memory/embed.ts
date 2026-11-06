@@ -1,7 +1,10 @@
 // Search by meaning: a Python worker (embed_worker.py) runs the embedding model, lightonai/mDenseOn, on this
 // computer: on a GPU in fp16 when one has room, else on the CPU (Settings can keep it on the CPU, to leave
-// the GPUs to other work). Turning it on sets up a private environment in the data folder once (PyTorch,
-// its CPU build when there is no NVIDIA GPU, and Transformers); the model downloads on first start (1.2 GB).
+// the GPUs to other work). It is on unless Settings → Memory turns it off (or, never set there, HYDOR_EMBED=off),
+// so memory, the Library and the rest are searched by words and meaning together. It sets up a private
+// environment in the data folder once (PyTorch, its CPU build when there is no NVIDIA GPU, and Transformers): on
+// its own a minute after the app first starts, at once when someone turns it on; the model downloads on first
+// start (1.2 GB).
 // On a GPU the worker stays loaded. On a CPU it starts when needed, only when enough memory is free, and
 // quits after a few idle minutes, so a computer with 8 GB is never short. Until it answers, memory is
 // searched by words alone, and notes get their vectors in the background once it does.
@@ -37,7 +40,12 @@ const DISK_GPU_GB = 9;
 /** On a CPU, the worker quits after this long without work. */
 const IDLE_CPU_MS = 5 * 60_000;
 
-export const meaningOn = (db: DB) => kvGet(db, 'memory.meaning') === '1';
+/** Turned on or off in Settings → Memory; never set there, on unless HYDOR_EMBED=off (a test's or a demo's app). */
+const meaningChosen = (db: DB): boolean | null => {
+  const v = kvGet(db, 'memory.meaning');
+  return v === '1' ? true : v === '0' ? false : null;
+};
+export const meaningOn = (db: DB) => meaningChosen(db) ?? process.env.HYDOR_EMBED !== 'off';
 export const meaningDevice = (db: DB): MeaningDevice => (kvGet(db, 'memory.meaning.device') === 'cpu' ? 'cpu' : 'auto');
 const hasNvidia = () => fs.existsSync('/proc/driver/nvidia/version');
 const envReady = () => (process.env.HYDOR_EMBED_PYTHON ? fs.existsSync(python()) : fs.existsSync(python()) && readText(path.join(venv(), '.packages')) === PACKAGES);
@@ -386,6 +394,22 @@ function run(cmd: string, args: string[], label: string): Promise<void> {
   });
 }
 
+/**
+ * The system's Python 3, to make the private environment with. On a Mac, Homebrew's or python.org's before Apple's,
+ * and Apple's /usr/bin/python3 only with its developer tools there: without them it asks to install them.
+ */
+function systemPython(): string | null {
+  if (process.platform === 'win32') return which('python') ?? which('py');
+  if (process.platform === 'darwin') {
+    const own = ['/opt/homebrew/bin/python3', '/usr/local/bin/python3', '/Library/Frameworks/Python.framework/Versions/Current/bin/python3'].find((p) => fs.existsSync(p));
+    if (own) return own;
+    const sys = which('python3');
+    const tools = ['/Library/Developer/CommandLineTools/usr/bin/python3', '/Applications/Xcode.app/Contents/Developer/usr/bin/python3'].some((p) => fs.existsSync(p));
+    return sys === '/usr/bin/python3' && !tools ? null : sys;
+  }
+  return which('python3');
+}
+
 /** Makes the private environment with PyTorch and Transformers (once; again when the list changes). */
 function setup(db: DB): Promise<void> {
   if (settingUp) return settingUp;
@@ -399,12 +423,15 @@ function setup(db: DB): Promise<void> {
       if (disk < (gpu ? DISK_GPU_GB : DISK_CPU_GB)) throw new Error(`Not enough disk space: ${disk.toFixed(1)} GB free, setting up needs about ${gpu ? DISK_GPU_GB : DISK_CPU_GB} GB.`);
       const uv = which('uv', [path.join(os.homedir(), '.local/bin/uv'), path.join(os.homedir(), '.cargo/bin/uv')]);
       if (uv) {
-        if (!fs.existsSync(python())) await run(uv, ['venv', '--quiet', '--python', '>=3.10', venv()], 'Making a private Python environment');
+        // (On a Mac, a Python of uv's own: Apple's stand-in asks to install its developer tools.)
+        const own = process.platform === 'darwin' ? ['--python-preference', 'only-managed'] : [];
+        if (!fs.existsSync(python())) await run(uv, ['venv', '--quiet', ...own, '--python', '>=3.10', venv()], 'Making a private Python environment');
         await run(uv, ['pip', 'install', '--quiet', '--python', python(), `--torch-backend=${gpu ? 'auto' : 'cpu'}`, 'torch', 'transformers>=5.6,<6'], `Installing PyTorch${gpu ? '' : ' (CPU build)'} and Transformers: a few minutes`);
       } else {
         // Windows: python.exe from python.org, else its py launcher.
-        const sys = process.platform === 'win32' ? (which('python') ?? which('py')) : which('python3');
+        const sys = systemPython();
         if (!sys && process.platform === 'win32') throw new Error('Python 3 is not installed on this computer, and search by meaning needs it (python.org, or: winget install Python.Python.3.12).');
+        if (!sys && process.platform === 'darwin') throw new Error('Python 3 is not installed on this computer, and search by meaning needs it (python.org, or Homebrew: brew install python).');
         if (!sys) throw new Error('Python 3 is not installed on this computer, and search by meaning needs it (Debian/Ubuntu: sudo apt install python3 python3-venv).');
         if (!fs.existsSync(python())) await run(sys, ['-c', 'import sys, venv; sys.exit(0 if sys.version_info >= (3, 10) else 1)'], 'Checking Python (3.10 or newer)');
         if (!fs.existsSync(python())) await run(sys, ['-m', 'venv', venv()], 'Making a private Python environment');
@@ -424,9 +451,22 @@ function setup(db: DB): Promise<void> {
   return settingUp;
 }
 
-/** On: set up when needed, load the model on a GPU now, and fill in the notes' vectors. */
-export async function kick(db: DB) {
+/** How long after the app starts it sets up search by meaning on its own (on by default, never set up). */
+const SETUP_AFTER_MS = 60_000;
+let setupLater: NodeJS.Timeout | undefined;
+
+/**
+ * On: set up when needed, load the model on a GPU now, and fill in the notes' vectors. On by default and never set up,
+ * it sets up a minute later (`now`: at once, as when someone turns it on), out of the way of the app's first start.
+ */
+export async function kick(db: DB, o: { now?: boolean } = {}) {
   if (!meaningOn(db)) return;
+  if (!envReady() && !o.now && meaningChosen(db) === null && !settingUp) {
+    clearTimeout(setupLater);
+    setupLater = setTimeout(() => void kick(db, { now: true }).catch((e) => console.warn(`[memory] search by meaning: ${(e as Error).message}`)), SETUP_AFTER_MS);
+    setupLater.unref?.();
+    return;
+  }
   if (!envReady()) await setup(db);
   if (!envReady()) return;
   if (status !== 'failed') status = 'ready';
@@ -459,8 +499,11 @@ export function setMeaning(db: DB, p: { on?: boolean; device?: MeaningDevice; re
     if (status === 'failed') status = 'off';
     crashes.length = 0;
   }
-  void kick(db);
+  void kick(db, { now: true });
 }
+
+/** Search by meaning is on and set up, but its model is not running: a search now starts it, and one a few seconds later has it. */
+export const meaningStarting = (db: DB) => meaningOn(db) && !stub && !worker?.ready && envReady() && status !== 'failed';
 
 export function meaningState(db: DB): MeaningState {
   if (!counted || Date.now() - counted.at > 5000) counted = { at: Date.now(), v: vectorCounts(db) };
@@ -474,6 +517,7 @@ export function meaningState(db: DB): MeaningState {
 /** For a clean exit (tests). */
 export function stopMeaning() {
   stopWorker();
+  clearTimeout(setupLater);
   clearTimeout(fillTimer);
   clearTimeout(retryTimer);
 }

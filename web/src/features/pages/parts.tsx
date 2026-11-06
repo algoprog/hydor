@@ -4,7 +4,7 @@
 // Library (each made what it is: uploads.ts); and a published site's row.
 import { useEffect, useState, type ReactNode } from 'react';
 import { AppWindow, FileText, Globe, GlobeLock, NotebookText, Presentation, Sheet, Sigma, Sparkles, Upload } from 'lucide-react';
-import type { PageInfo, SiteInfo, SiteVisibility } from '@shared/pages';
+import { DESCRIPTION_WORDS, wordCount, type PageInfo, type SiteInfo, type SiteVisibility } from '@shared/pages';
 import { newDeck, THEMES, type Ratio } from '@shared/slides';
 import { texFromTemplate, texTemplate, type TexTemplateId } from '@shared/latex-templates';
 import { del, enc, patch, post } from '../../lib/api';
@@ -45,16 +45,24 @@ export function Thumb({ page, className }: { page: PageInfo; className?: string 
   );
 }
 
+/**
+ * A page's title and its description (what it is, in a few sentences: the Library's search, the search box and agents
+ * find it by it). Agents write one with what they save; files added get one from the helper model.
+ */
 export function RenameDialog({ page, open, onClose }: { page: PageInfo; open: boolean; onClose: () => void }) {
   const [title, setTitle] = useState(page.title);
+  const [text, setText] = useState(page.description ?? '');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (open) setTitle(page.title);
-  }, [open, page.title]);
+    if (!open) return;
+    setTitle(page.title);
+    setText(page.description ?? '');
+  }, [open, page.title, page.description]);
+  const n = wordCount(text);
   const save = async () => {
     setBusy(true);
     try {
-      await patch(`/api/pages/${enc(page.id)}`, { title });
+      await patch(`/api/pages/${enc(page.id)}`, { title, description: text });
       onClose();
     } catch (e) {
       toastError(e);
@@ -66,20 +74,32 @@ export function RenameDialog({ page, open, onClose }: { page: PageInfo; open: bo
     <Dialog
       open={open}
       onClose={onClose}
-      title="Rename the page"
-      width={420}
+      title="Edit the title and description"
+      width={480}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={busy || !title.trim()} onClick={save}>
-            Rename
+          <Button variant="primary" disabled={busy || !title.trim() || n > DESCRIPTION_WORDS} onClick={save}>
+            Save
           </Button>
         </>
       }
     >
-      <input autoFocus value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && title.trim() && save()} className={inputCls} />
+      <div className="space-y-3">
+        <label className="block space-y-1">
+          <span className="text-[12px] font-medium text-fg-2">Title</span>
+          <input autoFocus value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && title.trim() && n <= DESCRIPTION_WORDS && save()} className={inputCls} />
+        </label>
+        <label className="block space-y-1">
+          <span className="text-[12px] font-medium text-fg-2">Description</span>
+          <textarea value={text} rows={4} onChange={(e) => setText(e.target.value)} className={`${inputCls} h-auto py-2 leading-snug`} />
+          <span className={cx('block text-[12px] leading-snug', n > DESCRIPTION_WORDS ? 'text-warn' : 'text-fg-3')}>
+            {n > DESCRIPTION_WORDS ? tr(`${n} words: keep it under ${DESCRIPTION_WORDS}`) : 'What it is and what it is for. The Library’s search finds it by these words and what they mean.'}
+          </span>
+        </label>
+      </div>
     </Dialog>
   );
 }
