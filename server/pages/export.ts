@@ -12,7 +12,7 @@
 import { STORAGE_LIMITS } from '../../shared/pages.ts';
 import { KIT_CSS } from '../../shared/page-kit.ts';
 import { codeColoursScript, hasCode } from '../../shared/code-colours.ts';
-import { pageDbScript } from '../../shared/page-db.ts';
+import { hasDbParts, pageDbScript } from '../../shared/page-db.ts';
 import { ASSET, deckText, isWebDeck, powerPointNote, richFeatures, toPowerPoint, type RichFeature } from '../../shared/slides.ts';
 import { HttpError } from '../auth.ts';
 import { canCapture, printPdf, withTab } from '../capture/index.ts';
@@ -77,7 +77,7 @@ const pageHead = (db: DB, id: string) => kitHead({ n: '', theme: 'light', max: {
 export const pageFileHtml = (html: string, dbs?: Record<string, string>) =>
   injectHead(
     html,
-    `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${hasCode(html) ? codeColoursScript() : ''}${/\bn-db\b/.test(html) ? pageDbScript(null, dbs) : ''}`,
+    `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${hasCode(html) ? codeColoursScript() : ''}${hasDbParts(html) ? pageDbScript(null, dbs) : ''}`,
   );
 
 /** A picture made into PNG by the browser (an SVG, or WebP that PowerPoint may not read), at its own size or `w`×`h`. */

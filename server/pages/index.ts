@@ -50,6 +50,7 @@ import { draftsOf, draftsOfPage, endDrafts, feedDraft, settleDraft, type ToolStr
 import { agentNotebook, dropWorkFolder, SAVE_NOTEBOOK_DESCRIPTION, SAVE_NOTEBOOK_SCHEMA, workFile, writeWorkFile } from './notebooks.ts';
 import { dropEdits, initEdits, noteEdit, noteFileEdit, takeEdits } from './edits.ts';
 import { getAsset, MAX_ASSET, putAsset, sweepAssets, takeIn } from './assets.ts';
+import { pageFilesRoutes, sweepPageFiles } from './page-files.ts';
 import { pagePictures } from './page-pictures.ts';
 import { videoStillOf } from './video-still.ts';
 import { getVideo, sendVideo, takeVideoPiece, videoAddressOk } from './videos.ts';
@@ -787,6 +788,8 @@ function routes(d: Deps) {
   arxivRoutes(app, db);
   // Files dropped on the Library or picked with Upload files, and files the desktop app moves in by their path.
   uploadRoutes(d);
+  // Files for pages' blocks and databases (page-files.ts).
+  pageFilesRoutes(app, db);
   const P = (req: FastifyRequest) => req.params as Record<string, string>;
   const B = (req: FastifyRequest) => (req.body ?? {}) as Record<string, unknown>;
   const key = (v: unknown) => (typeof v === 'string' && v ? v.slice(0, 300) : undefined);
@@ -1287,6 +1290,6 @@ export const pages: Feature = {
     enableDescriptions();
     setTimeout(() => refreshThumbs(d), 30_000).unref();
     // Pictures no deck shows any more, once a day.
-    setInterval(() => sweepAssets(d.db), 86_400_000).unref();
+    setInterval(() => (sweepAssets(d.db), sweepPageFiles(d.db)), 86_400_000).unref();
   },
 };

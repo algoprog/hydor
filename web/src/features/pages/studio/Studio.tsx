@@ -31,6 +31,7 @@ import { PartPanel, pictureData, type Ctx, type Media } from './Inspector';
 import { LayersPanel } from './Layers';
 import { PageComments } from './PageComments';
 import { PagePanel } from './PagePanel';
+import { usePageAi } from './pageAi';
 
 export type StudioMode = 'view' | 'edit' | 'code';
 
@@ -392,6 +393,8 @@ export function Studio({
   }, [code, mode]);
 
   const cmd = (c: string, arg?: unknown) => editRef.current?.cmd(c, arg);
+  // The AI on the page, and a database's AI column and files (pageAi.ts).
+  const ai = usePageAi(cmd, pageId);
   const side = layout === 'page';
 
   /** The agent is told which part is meant, in the message box; changes not saved yet are saved first, so it sees them. */
@@ -503,7 +506,7 @@ export function Studio({
               onReady={() => {
                 editRef.current?.cmd('ctx', { ...ctx, media });
                 editRef.current?.cmd('layers', tab === 'layers');
-                editRef.current?.cmd('caps', { ask: !!onAsk, comment: !!pageId && !readOnly });
+                editRef.current?.cmd('caps', { ask: !!onAsk, comment: !!pageId && !readOnly, ai: !readOnly });
                 editRef.current?.cmd('comments', marksRef.current);
                 editRef.current?.cmd('pages', pageRefsRef.current);
                 if (clipboard) editRef.current?.cmd('clip', { html: clipboard.html });
@@ -534,6 +537,10 @@ export function Studio({
               onFile={(id, f) => pictureData(f).then((src) => cmd('fill', { id, src }), toastError)}
               onAgent={() => void ask()}
               onKeys={() => setKeysOpen(true)}
+              onAi={ai.onAi}
+              onAiStop={ai.onAiStop}
+              onDbAi={ai.onDbAi}
+              onUpload={ai.onUpload}
             />
           </DeviceStage>
           <InsertPopover ask={asking} frame={() => editRef.current?.frame() ?? null} answer={(payload) => cmd('fill', payload)} cmd={cmd} onClose={() => setAsking(null)} onError={toastError} />
