@@ -792,6 +792,8 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
     if (mod && k === 'e') return act(zoomSel);
     if (mod && k === 'f') return act(fit);
     if (mod || ev.altKey) return;
+    // Space on a button presses that button.
+    if (k === ' ' && (ev.target as HTMLElement).closest('button')) return;
     if (k === ' ') return act(() => (ev.shiftKey ? void play({ sel: true }) : toggle()));
     if (k === 'delete' || k === 'backspace') return act(doDelete);
     if (k === 'escape') return act(() => (setSel(null), pick(null)));
