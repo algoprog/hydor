@@ -1,9 +1,10 @@
 // Videos an agent made (generate_video), with its reply: while the model works a placeholder of the shape
 // asked for, with the time it has taken (videos take a minute or several); then the video in the app's own
-// player (as in Files), to download and keep in the Library. A call that stopped waiting says the video is still being made: the agent's next
+// player (as in Files), to download, edit (the video editor, in a tab of its own: saved as a new video in the Library) and
+// keep in the Library. A call that stopped waiting says the video is still being made: the agent's next
 // call shows it. Without an OpenRouter key, a way to Settings.
 import { useEffect, useState } from 'react';
-import { Clapperboard, Download, FolderOpen, KeyRound, VideoOff } from 'lucide-react';
+import { Clapperboard, Download, FolderOpen, KeyRound, SlidersHorizontal, VideoOff } from 'lucide-react';
 import type { ToolItem } from '@shared/types';
 import { basename, duration } from '../../lib/format';
 import { mu } from '../../lib/machine';
@@ -14,6 +15,7 @@ import { download } from '../documents/FileCards';
 import { FileMore } from '../files/SpaceMenu';
 import { KeepButton } from '../media/Keep';
 import { OpenRouterKeyCard } from '../connections/OpenRouterKeyCard';
+import { editSessionVideo } from '../mediaedit/video/open';
 
 interface Clip {
   path: string;
@@ -121,6 +123,9 @@ export function GeneratedVideos({ item, sessionKey }: { item: ToolItem; sessionK
             <div key={c.path} className="group relative overflow-hidden rounded-xl border border-line bg-black" style={c.w && c.h ? { aspectRatio: `${c.w} / ${c.h}`, maxHeight: 480 } : { aspectRatio: ratio(aspect) }}>
               <VideoPlayer src={src} name={basename(c.path)} downloadUrl={`${src}&download=1`} />
               <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+                <IconButton label="Edit" size="sm" onClick={() => editSessionVideo(c.path, sessionKey)} className="bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 hover:text-white">
+                  <SlidersHorizontal size={14} />
+                </IconButton>
                 <IconButton label="Show in the files" size="sm" onClick={() => showInFiles(c.path)} className="bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 hover:text-white">
                   <FolderOpen size={14} />
                 </IconButton>

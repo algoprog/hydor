@@ -7,7 +7,7 @@
 // layout and its class, name and CSS wait until opened. With several blocks picked, changes go to them all.
 // A change goes to the editor in the page's frame at once.
 import { useRef, useState, type ReactNode } from 'react';
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ClipboardPaste, Copy, Eraser, ImageMinus, ImageUp, Italic, MessageSquarePlus, MoreHorizontal, Strikethrough, Type, Underline, WandSparkles } from 'lucide-react';
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ClipboardPaste, Copy, Eraser, ImageMinus, ImageUp, Italic, MessageSquarePlus, MoreHorizontal, SlidersHorizontal, Strikethrough, Type, Underline, WandSparkles } from 'lucide-react';
 import { Button, cx, IconButton, MenuItem, MenuSep, Popover, Switch } from '../../../components/ui';
 import { codeColours } from '@shared/code-colours';
 import { tr } from '../../../i18n/runtime';
@@ -16,6 +16,7 @@ import { loadKatex, texHtml } from '../common/katex';
 import { BoxModel, Choice, ColorField, Group, hexOf, NumField, Row, Select, splitNum, Typed } from './fields';
 import { FONTS, fontOf, fontOptions } from './fonts';
 import { aspectOf, editPicture, makePicture, pageData } from '../../images/studio';
+import { editKept } from '../../mediaedit/open';
 
 export type Cmd = (cmd: string, arg?: unknown) => void;
 export type Media = '' | 'tablet' | 'phone';
@@ -134,6 +135,7 @@ export function PartPanel({
   onPageTab,
   base,
   pageHtml,
+  title,
 }: {
   sel: EdSel;
   palette: string[];
@@ -151,6 +153,8 @@ export function PartPanel({
   base?: string;
   /** The page's HTML as it is now, for a picture inside it (the editor says only the start of so long an address). */
   pageHtml?: () => Promise<string>;
+  /** The page's name, for the first tab while a picture of it is in the picture editor. */
+  title?: string;
 }) {
   const moreRef = useRef<HTMLButtonElement>(null);
   const [more, setMore] = useState(false);
@@ -235,6 +239,32 @@ export function PartPanel({
       const abs = /^(data:|https?:)/i.test(src) ? src : new URL(src, new URL(base ?? '', location.href)).href;
       const p = await editPicture({ src: abs, mode });
       if (p) cmd('attr', { name: 'src', value: await pageData(p.src) });
+    } catch (e) {
+      onError(e);
+    }
+  };
+
+  /**
+   * Edit picture: the picture in the picture editor, in a tab of its own (the page stays as it is under its tab). Saved,
+   * it goes back in this part's place as the page keeps its pictures; the part is picked again by where it is first.
+   */
+  const openInEditor = async () => {
+    try {
+      const src = await fullSrc();
+      if (!src || src.endsWith('…')) throw new Error('That picture could not be read from the page');
+      const abs = /^(data:|https?:)/i.test(src) ? src : new URL(src, new URL(base ?? '', location.href)).href;
+      const path = sel.path;
+      editKept(abs, {
+        title: a.alt || 'Picture',
+        label: title || 'The page',
+        put: async (r) => {
+          if (!r.src) return;
+          if (pageHtml && !(await pageHtml().catch(() => ''))) throw new Error('The page it came from is closed: Save a copy keeps the picture in your Library.');
+          const data = await pageData(r.src);
+          cmd('select', path);
+          cmd('attr', { name: 'src', value: data });
+        },
+      });
     } catch (e) {
       onError(e);
     }
@@ -352,6 +382,11 @@ export function PartPanel({
                 <button type="button" title="A picture made with AI" aria-label="A picture made with AI" onClick={() => void makeInstead()} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-fg-2 hover:bg-bg-2">
                   <WandSparkles size={14} />
                 </button>
+              </Row>
+              <Row label="Edit" hint="Crop it, turn it, change its light and colours, a filter, words and marks over it">
+                <Button size="sm" variant="secondary" icon={<SlidersHorizontal size={14} />} disabled={!a.src} onClick={() => void openInEditor()} className="min-w-0 flex-1 justify-start">
+                  Edit picture
+                </Button>
               </Row>
               <Row label="With AI" hint="Change it in words, take its background out, or erase part of it">
                 <Button ref={aiRef} size="sm" variant="secondary" icon={<WandSparkles size={14} />} disabled={!a.src} onClick={() => setAi((o) => !o)} className="min-w-0 flex-1 justify-start">
