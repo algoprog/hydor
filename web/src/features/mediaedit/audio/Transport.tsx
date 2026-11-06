@@ -90,9 +90,9 @@ export function Transport(p: TransportProps) {
         <>
           <div className="mx-1.5 h-6 w-px bg-line" />
           <div className="flex min-w-0 items-center gap-2" aria-label="The part picked">
-            <ScrubField label="Start" value={p.sel?.a ?? 0} step={0.001} min={0} max={p.length} width={84} show={(v) => soundClock(v)} read={readSoundClock} onChange={(v) => p.onSel(v, Math.max(v, p.sel?.b ?? v))} />
-            <ScrubField label="End" value={p.sel?.b ?? 0} step={0.001} min={0} max={p.length} width={84} show={(v) => soundClock(v)} read={readSoundClock} onChange={(v) => p.onSel(Math.min(v, p.sel?.a ?? v), v)} />
-            <ScrubField label="Length" value={p.sel ? p.sel.b - p.sel.a : 0} step={0.001} min={0} max={p.length} width={84} show={(v) => soundClock(v)} read={readSoundClock} onChange={(v) => p.onSel(p.sel?.a ?? 0, (p.sel?.a ?? 0) + v)} />
+            <ScrubField label="Start" value={p.sel?.a ?? 0} step={0.001} min={0} max={p.length} width={94} show={(v) => soundClock(v)} read={readSoundClock} onChange={(v) => p.onSel(v, Math.max(v, p.sel?.b ?? v))} />
+            <ScrubField label="End" value={p.sel?.b ?? 0} step={0.001} min={0} max={p.length} width={94} show={(v) => soundClock(v)} read={readSoundClock} onChange={(v) => p.onSel(Math.min(v, p.sel?.a ?? v), v)} />
+            <ScrubField label="Length" value={p.sel ? p.sel.b - p.sel.a : 0} step={0.001} min={0} max={p.length} width={94} show={(v) => soundClock(v)} read={readSoundClock} onChange={(v) => p.onSel(p.sel?.a ?? 0, (p.sel?.a ?? 0) + v)} />
           </div>
         </>
       )}
