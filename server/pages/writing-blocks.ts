@@ -115,6 +115,22 @@ export function writingBlocks(X: ExtraCore): Extra {
       const src = https(a.src);
       const url = https(a.url) || src;
       if (!src) return null;
+      // A YouTube or Vimeo video: its still, which the app plays over the page (its player can't run in the page).
+      if (a.kind === 'video' && /^https:\/\/(www\.youtube-nocookie\.com\/embed\/|player\.vimeo\.com\/video\/)[\w-]+/.test(src)) {
+        const v = doc.createElement('a');
+        v.className = 'n-video';
+        v.href = url;
+        v.target = '_blank';
+        v.rel = 'noopener';
+        v.setAttribute('data-video', src);
+        if (https(a.thumb)) {
+          const img = doc.createElement('img');
+          img.src = https(a.thumb);
+          img.alt = words(a.title, 200);
+          v.append(img);
+        }
+        return v;
+      }
       const el = doc.createElement('div');
       el.className = 'n-embed';
       el.setAttribute('data-src', url);

@@ -545,6 +545,13 @@ export function PageFrame({
           opened = now;
           go(`/pages/${d.id}`);
         }
+      } else if (d.type === 'wa-go') {
+        // A place of the Library (a page's breadcrumbs), clicked: that place, in the app; once a second at most.
+        const now = Date.now();
+        if (isStr(d.path, 260) && /^\/(library|projects)(\/[\w-]{1,40})?(\?[\w=&%-]{0,200})?$/.test(d.path) && now - opened > 1000) {
+          opened = now;
+          go(d.path);
+        }
       } else if (d.type === 'wa-ui-top') {
         // A view went to another page: its top comes into sight when it was scrolled past.
         const r = ref.current?.getBoundingClientRect();

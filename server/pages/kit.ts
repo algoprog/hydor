@@ -300,6 +300,13 @@ function bridge(cfg: BridgeCfg) {
       return;
     }
     const here = new URL(location.href);
+    // A place of the Library (the page editor's breadcrumbs): that place, in the app.
+    const place = a.hasAttribute('data-go') ? (a.getAttribute('href') ?? '') : '';
+    if (place && /^\/(library|projects)(\/[\w-]{1,40})?(\?[\w=&%-]{0,200})?$/.test(place)) {
+      e.preventDefault();
+      if (cfg.open && P) post({ type: 'wa-go', path: place });
+      return;
+    }
     const page = a.getAttribute('data-page') ?? (u.origin === here.origin ? (/^\/pages\/([\w-]{1,40})\/?$/.exec(u.pathname)?.[1] ?? null) : null);
     if (page && /^[\w-]{1,40}$/.test(page)) {
       e.preventDefault();
@@ -310,6 +317,16 @@ function bridge(cfg: BridgeCfg) {
     if (!/^https?:$/.test(u.protocol) || u.origin === here.origin) return;
     e.preventDefault();
     window.open(u.href, '_blank', 'noopener');
+  });
+  // Tabs (the page editor's .n-tabs): a tab shows its panel.
+  document.addEventListener('click', (e) => {
+    const t = (e.target as Element | null)?.closest?.('.n-tabs > .n-tabbar > .n-tab');
+    const bar = t?.parentElement;
+    const tabs = bar?.parentElement;
+    if (!t || !bar || !tabs) return;
+    const i = [...bar.children].indexOf(t);
+    [...bar.children].forEach((b, k) => b.classList.toggle('n-on', k === i));
+    [...tabs.children].filter((c) => c.classList.contains('n-tabpanel')).forEach((p, k) => p.classList.toggle('n-on', k === i));
   });
   // A table of contents (the page editor's nav.n-toc) an agent left empty: the page's headings, linked.
   const toc = () => {
@@ -1047,7 +1064,7 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: str
       const code = /\bn-code\b|<pre\b[^>]*>\s*<code\b/i.test(d.html) ? `<script>(${codeSrc})().run()</script>` : '';
       // Its databases (after the bridge, whose storage keeps them), in the app's words.
       const dbWords = d.db && typeof d.db === 'object' && !Array.isArray(d.db) ? Object.fromEntries(Object.entries(d.db as Record<string, unknown>).filter(([, v]) => typeof v === 'string' && v.length < 300).slice(0, 120)) : null;
-      const dbs = /\bn-(db|chart)\b/.test(d.html) ? `<script>(${dbSrc})().run(${js(dbWords)})</script>` : '';
+      const dbs = /\bn-(db|chart|pdf)\b/.test(d.html) ? `<script>(${dbSrc})().run(${js(dbWords)})</script>` : '';
       head = `${libHead}<style id="n-kit">${kit}</style><style id="n-theme">${themeText(d.css)}</style><script>(${schemeSrc})(${js(cfg.theme)})</script><script>(${bridgeSrc})(${js(cfg)})</script>${code}${dbs}${app ? `<script>(${appSrc})(${js(app)})</script>` : ''}${ui ? `<script>(${uiSrc})(${js(ui)}, (${engineSrc})(), (${mediaSrc}))</script>` : ''}`;
     }
     const at = DOCTYPE.exec(html);
