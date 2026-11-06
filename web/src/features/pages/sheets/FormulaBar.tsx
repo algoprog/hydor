@@ -5,7 +5,7 @@
 // under the cell while typing in the cell (over everything, so the cell's own box never covers it).
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { SquareFunction } from 'lucide-react';
+import { MessageCircleQuestionMark, Sparkles, SquareFunction } from 'lucide-react';
 import { FUNCTION_NAMES } from '@shared/sheets';
 import { cx } from '../../../components/ui';
 import { argAt, argsOf, FUNCTION_INFO } from './functions';
@@ -92,6 +92,9 @@ export function FormulaBar({
   barRef,
   ghost,
   cellAnchor,
+  aiRef,
+  onAi,
+  onExplain,
 }: {
   /** The selection's name ("B2", "B2:D9"). */
   name: string;
@@ -113,6 +116,10 @@ export function FormulaBar({
   ghost?: string;
   /** While typing in the cell: where its box is on screen, for the functions offered to go under it. */
   cellAnchor?: (() => DOMRect | null) | null;
+  /** Write a formula with AI (the sparkle at the bar's end, what its panel opens from), and Explain this formula (when the cell has one). */
+  aiRef?: React.RefObject<HTMLButtonElement | null>;
+  onAi?: () => void;
+  onExplain?: () => void;
 }) {
   const [box, setBox] = useState(name);
   const [boxFocus, setBoxFocus] = useState(false);
@@ -213,6 +220,23 @@ export function FormulaBar({
         }}
         className={cx('min-h-8 min-w-0 flex-1 resize-none bg-transparent py-[7px] pr-2 font-mono text-[12.5px] leading-[18px] outline-none', !editing && !text && ghost && 'text-fg-3')}
       />
+      {onExplain && !editing && (
+        <button type="button" title="Explain this formula" aria-label="Explain this formula" onMouseDown={(e) => e.preventDefault()} onClick={onExplain} className="grid w-8 shrink-0 place-items-center text-fg-3 hover:text-accent">
+          <MessageCircleQuestionMark size={15} />
+        </button>
+      )}
+      <button
+        ref={aiRef}
+        type="button"
+        title="Write a formula with AI"
+        aria-label="Write a formula with AI"
+        disabled={!onAi}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={onAi}
+        className={cx('grid w-8 shrink-0 place-items-center text-fg-3 hover:text-accent disabled:pointer-events-none disabled:opacity-0')}
+      >
+        <Sparkles size={15} />
+      </button>
       {list && !inCell && <div className="absolute top-full right-2 left-[136px] z-40 mt-1 max-w-[460px] overflow-hidden rounded-xl border border-line bg-elevated p-1 shadow-lg max-sm:left-2">{list}</div>}
       {list &&
         inCell &&

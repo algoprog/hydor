@@ -26,6 +26,11 @@ import {
   Sigma,
   Snowflake,
   Sparkles,
+  MessageCircleQuestionMark,
+  RefreshCw,
+  WandSparkles,
+  Eraser as Broom,
+  ChartNoAxesCombined,
   Split,
   SquareCheck,
   SquareChevronDown,
@@ -126,6 +131,20 @@ export interface MenuCtx {
   /** While the board shows: whether the sheet opens on it, and the switch for that (kept with the sheet). */
   boardOpens?: boolean;
   boardOpen(): void;
+  /** The AI tools: a formula written or explained, Fill with AI, a table made, Analyze and Clean up, and the AI cells. */
+  ai?: {
+    formula(): void;
+    explain?: () => void;
+    fill(): void;
+    table(): void;
+    analyze(): void;
+    clean(): void;
+    /** Whether the workbook has AI cells; how many wait for an answer. */
+    cells: boolean;
+    refresh(): void;
+    waiting: number;
+    askWaiting(): void;
+  };
 }
 
 const FUNCS = ['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'SUMIF', 'COUNTIF', 'VLOOKUP', 'XLOOKUP', 'ROUND', 'CONCAT', 'TODAY'];
@@ -207,6 +226,8 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
       !ro && { label: m.note ? 'Edit note' : 'Note', icon: <StickyNote size={14} />, keys: 'Shift+F2', also: 'memo', run: m.noteEdit },
       !ro && { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'discussion thread reply', run: m.comment },
       !ro && { label: 'Function', icon: <Sigma size={14} />, also: 'formula', items: FUNCS.map((f) => ({ label: f, run: () => m.func(f) })) },
+      !ro && m.ai && { label: 'Formula with AI', icon: <Sparkles size={14} />, also: 'write a formula ai assistant describe words', run: m.ai.formula },
+      !ro && m.ai && { label: 'Table made with AI', icon: <WandSparkles size={14} />, also: 'generate table ai list template', run: m.ai.table },
       !ro && { label: 'Special character', icon: <Omega size={14} />, also: 'emoji symbol', run: m.chars },
       !ro && { label: 'Sheet', also: 'add a sheet tab', run: m.addSheet },
     ],
@@ -324,12 +345,20 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
           { label: 'Split text to columns', icon: <Split size={14} />, also: 'separate comma', run: m.split },
           { label: 'Trim spaces', also: 'whitespace', run: m.trim },
           { label: 'Summarize by', icon: <Sigma size={14} />, also: 'pivot table group totals', run: m.summary },
+          m.ai && '-',
+          m.ai && { label: 'Fill with AI', icon: <Sparkles size={14} />, keys: 'Ctrl+E', also: 'flash fill pattern examples autofill', run: m.ai.fill },
+          m.ai && { label: 'Clean up the data', icon: <Broom size={14} />, also: 'tidy spaces duplicates spellings dates numbers as text', run: m.ai.clean },
+          m.ai && { label: 'Analyze the data', icon: <ChartNoAxesCombined size={14} />, also: 'explore insights questions ai charts pivot suggestions', run: m.ai.analyze },
+          m.ai?.cells && { label: 'Refresh AI cells', icon: <RefreshCw size={14} />, also: 'ai function ask again answers', run: m.ai.refresh },
+          !!m.ai?.waiting && { label: `Ask the ${m.ai.waiting === 1 ? 'AI cell that waits' : `${m.ai.waiting} AI cells that wait`}`, icon: <Sparkles size={14} />, run: m.ai.askWaiting },
         ],
   };
   const tools: MenuDef = {
     label: 'Tools',
     items: [
       { label: 'Expand row', also: 'record card form', keys: 'Space', run: m.expand },
+      !ro && m.ai && { label: 'Analyze the data', icon: <ChartNoAxesCombined size={14} />, also: 'explore insights questions ai', run: m.ai.analyze },
+      m.ai?.explain && { label: 'Explain this formula', icon: <MessageCircleQuestionMark size={14} />, also: 'what does it do ai', run: m.ai.explain },
       { label: 'Keyboard shortcuts', icon: <Keyboard size={14} />, keys: 'Ctrl+/', run: m.shortcuts },
       m.onAsk && '-',
       m.onAsk && { label: 'Ask the agent about it', icon: <Sparkles size={14} />, run: m.onAsk },
