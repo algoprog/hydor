@@ -70,6 +70,8 @@ export function initPages(db: DB) {
   if (!cols.includes('folder')) db.exec('alter table pages add column folder text');
   // What it is, in a few sentences (shared/pages.ts cleanDescription): the Library's search finds it by it.
   if (!cols.includes('description')) db.exec('alter table pages add column description text');
+  // Locked by its owner, so it doesn't change by accident (page-tools.ts): no new version until it is unlocked.
+  if (!cols.includes('locked')) db.exec('alter table pages add column locked integer');
   initFolders(db);
   // A page's icon (the emoji the page editor puts at its top), for links to it in other pages: kept as each version is
   // saved, and read once from the pages saved before ('' for none).
@@ -126,6 +128,7 @@ interface Row {
   folder: string | null;
   icon: string | null;
   description: string | null;
+  locked: number | null;
   versions: number;
   bytes: number;
   by: PageVersion['by'] | null;
@@ -158,6 +161,7 @@ const toInfo = (r: Row): PageInfo => ({
   ...(r.folder ? { folder: r.folder } : {}),
   ...(r.icon ? { icon: r.icon } : {}),
   ...(r.description ? { description: r.description } : {}),
+  ...(r.locked ? { locked: true } : {}),
 });
 
 /** The library's pages: a template's screens stay with their template. */
@@ -325,6 +329,7 @@ export function addVersion(
   p: { title?: unknown; html?: unknown; model?: unknown; by: PageVersion['by']; turn?: string; onFold?: (version: number) => void; who?: string; description?: unknown },
 ): PageInfo {
   const cur = mustPage(db, id);
+  if (cur.locked) throw new HttpError(423, `“${cur.title}” is locked, so it doesn't change by accident: unlock it first (More → Unlock the page).`);
   const { text: html, sources } = contentOf(db, cur.kind ?? 'page', p);
   const title = p.title === undefined || p.title === null || !String(p.title).trim() ? cur.title : cleanTitle(p.title);
   const now = Date.now();

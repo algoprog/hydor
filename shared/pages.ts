@@ -82,6 +82,8 @@ export interface PageInfo {
    * search, the search box and agents find it by it.
    */
   description?: string;
+  /** Locked by its owner, so it doesn't change by accident: no new version until it is unlocked. */
+  locked?: boolean;
 }
 
 /**
