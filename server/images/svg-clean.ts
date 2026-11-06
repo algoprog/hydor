@@ -58,11 +58,11 @@ const CSS_ONLY = new Set(['font', 'marker', 'mix-blend-mode', 'isolation', 'tran
 /** The attributes kept, by their name in lower case. */
 const ATTRS = new Map([...ATTR_NAMES, ...PRESENTATION].map((n) => [n.toLowerCase(), n]));
 
-/** The functions a value may call: colours, sizes, transforms, CSS filters, and url() to the drawing's own #ids. */
+/** The functions a value may call: colours, sizes, transforms, CSS filters and clip shapes, and url() to the drawing's own #ids. */
 const FUNCTIONS = new Set(
   (
     'url rgb rgba hsl hsla hwb lab lch oklab oklch color calc min max clamp matrix translate translatex translatey scale scalex scaley rotate skew skewx skewy ' +
-    'drop-shadow blur brightness contrast grayscale hue-rotate invert opacity saturate sepia'
+    'drop-shadow blur brightness contrast grayscale hue-rotate invert opacity saturate sepia circle ellipse inset polygon path'
   ).split(' '),
 );
 
