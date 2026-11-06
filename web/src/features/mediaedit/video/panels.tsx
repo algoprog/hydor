@@ -170,7 +170,7 @@ export function TrimPanel({ r, change, duration, clock }: { r: VideoRecipe; chan
           <p className="text-[12px] leading-snug text-fg-3">To take a part out, split at its start and its end (S), then delete the part between (Delete).</p>
         )}
       </Group>
-      <Group title="Speed">
+      <Group title="Playback speed">
         <div className="grid grid-cols-5 gap-1.5">
           {VIDEO_SPEEDS.map((s) => (
             <button
@@ -192,7 +192,7 @@ export function TrimPanel({ r, change, duration, clock }: { r: VideoRecipe; chan
 
 // ---- Crop ---------------------------------------------------------------------------------------------------------
 
-const SHAPE_NAMES: Record<VideoShape, string> = { free: 'Free', '16:9': '16:9', '9:16': '9:16', '1:1': 'Square (1:1)', '4:5': '4:5' };
+const SHAPE_NAMES: Record<VideoShape, string> = { free: 'Any shape', '16:9': '16:9', '9:16': '9:16', '1:1': 'Square (1:1)', '4:5': '4:5' };
 
 function ShapeIcon({ shape }: { shape: VideoShape }) {
   if (shape === 'free') return <span className="h-3.5 w-4.5 rounded-[3px] border-[1.5px] border-dashed border-current" />;

@@ -13,7 +13,7 @@ type Shape = 'rect' | 'round' | PictureMask;
 
 export const MASK_NAMES: Record<Shape, string> = {
   rect: 'Rectangle',
-  round: 'Rounded',
+  round: 'Rounded corners',
   circle: 'Circle',
   ellipse: 'Ellipse',
   arch: 'Arch',
