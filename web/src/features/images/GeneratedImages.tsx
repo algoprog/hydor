@@ -20,11 +20,11 @@ interface Pic {
   h?: number;
 }
 
-/** The saved images, from the tool's answer: one path per line, then "(width×height, size)". */
+/** The saved images, from the tool's answer: one path per line (or "- " and one, as find_photos lists them), then "(width×height, size)" and, after it, what else the line says. */
 export function picsOf(output?: string): Pic[] {
   const out: Pic[] = [];
   for (const line of (output ?? '').split('\n')) {
-    const m = /^(\/.+?\.(?:png|jpe?g|webp|gif|svg|avif))(?: \((?:(\d+)×(\d+), )?[^)]*\))?$/i.exec(line.trim());
+    const m = /^(?:- )?(\/.+?\.(?:png|jpe?g|webp|gif|svg|avif))(?= \(|:|$)(?: \((\d+)×(\d+)[^)]*\))?/i.exec(line.trim());
     if (m) out.push({ path: m[1], ...(m[2] ? { w: Number(m[2]), h: Number(m[3]) } : {}) });
   }
   return out;
@@ -42,6 +42,7 @@ function doing(tool: string): string {
   if (/remove_background$/.test(tool)) return 'Taking the background out';
   if (/erase_from_image$/.test(tool)) return 'Erasing';
   if (/edit_image$/.test(tool)) return 'Editing the picture';
+  if (/find_photos$/.test(tool)) return 'Finding free photos';
   return 'Making an image';
 }
 
