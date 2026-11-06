@@ -52,7 +52,7 @@ const tiers = (o: { keySet?: boolean; local?: Partial<TiersInfo['local']>; cutou
   transparent: { id: 'openai/gpt-image-2.6-flare', label: 'GPT Image 2.6 Flare', perImage: 0.1229 },
   writer: 'Claude',
   video: { id: 'bytedance/seedance-2.5', label: 'Seedance 2.5', perSecond: 0.1027 },
-  local: { ready: false, installing: false, canInstall: true, sizeMb: 120, downloaded: [], loaded: [], ...o.local },
+  local: { ready: false, installing: false, canInstall: true, sizeMb: 120, downloaded: [], loaded: [], device: 'cpu', ...o.local },
 });
 
 let passed = 0;

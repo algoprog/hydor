@@ -148,7 +148,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
 // The picture tools on this computer, standing in: a cutout makes a PNG with see-through parts.
 let localReady = false;
 let cutouts = 0;
-const LOCAL: LocalToolsState = { ready: true, installing: false, canInstall: true, sizeMb: 120, downloaded: ['cutout'], loaded: [] };
+const LOCAL: LocalToolsState = { ready: true, installing: false, canInstall: true, sizeMb: 120, downloaded: ['cutout'], loaded: [], device: 'cpu' };
 setLocalTools({
   state: () => ({ ...LOCAL, ready: localReady }),
   ready: () => localReady,

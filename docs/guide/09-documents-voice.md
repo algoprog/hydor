@@ -427,6 +427,7 @@ It stops listening to say these, then listens again. Sessions on your other mach
 - "Switch the image model for most pictures to the cheapest one that can edit pictures."
 - "Use Recraft V4.1 Flash for simple pictures."
 - "Set up the picture tools on this computer."
+- "Do the picture tools run on the graphics card here? If one runs on the CPU, why?"
 - "Make a flat icon of a bicycle in #0f766e and #f59e0b, as a drawing that stays sharp."
 - "Plot ~/data/sales.csv as monthly bars, 2025 against 2026, and label the spring jump."
 - "Find three free photos of Lisbon's trams for my travel slides, with their credits."

@@ -17741,5 +17741,15 @@
 "Preparing the build":"Προετοιμασία του build",
 "Ready: {0} with the {1} model{2}. Your voice stays here.{3}":"Έτοιμο: {0} με το μοντέλο {1}{2}. Η φωνή σας μένει εδώ.{3}",
 "This computer has an NVIDIA GPU, and whisper.cpp has no ready-made build for it on Linux. With NVIDIA’s CUDA toolkit installed (nvcc), the app builds one, and dictation runs on the GPU.":"Αυτός ο υπολογιστής έχει GPU της NVIDIA, και το whisper.cpp δεν έχει έτοιμο build για αυτήν σε Linux. Με εγκατεστημένο το CUDA toolkit της NVIDIA (nvcc), η εφαρμογή φτιάχνει ένα, και η υπαγόρευση τρέχει στην GPU.",
-"whisper.cpp could not be built for the NVIDIA GPU, so dictation runs on the processor: {0}":"Το whisper.cpp δεν μπόρεσε να γίνει build για την GPU της NVIDIA, οπότε η υπαγόρευση τρέχει στον επεξεργαστή: {0}"
+"whisper.cpp could not be built for the NVIDIA GPU, so dictation runs on the processor: {0}":"Το whisper.cpp δεν μπόρεσε να γίνει build για την GPU της NVIDIA, οπότε η υπαγόρευση τρέχει στον επεξεργαστή: {0}",
+"Where they run: the NVIDIA GPU (CUDA).":"Πού εκτελούνται: στη GPU της NVIDIA (CUDA).",
+"Where they run: the Apple GPU (Core ML).":"Πού εκτελούνται: στη GPU της Apple (Core ML).",
+"Where they run: the CPU.":"Πού εκτελούνται: στην CPU.",
+"Where they run: the CPU (the GPU build of ONNX Runtime could not be installed here).":"Πού εκτελούνται: στην CPU (η έκδοση του ONNX Runtime για GPU δεν μπόρεσε να εγκατασταθεί εδώ).",
+"The background remover runs on the CPU for now: the GPU failed it.":"Το εργαλείο αφαίρεσης φόντου εκτελείται προς το παρόν στην CPU: η GPU απέτυχε σε αυτό.",
+"The eraser runs on the CPU for now: the GPU failed it.":"Το εργαλείο σβησίματος εκτελείται προς το παρόν στην CPU: η GPU απέτυχε σε αυτό.",
+"Both models run on the CPU for now: the GPU failed them.":"Και τα δύο μοντέλα εκτελούνται προς το παρόν στην CPU: η GPU απέτυχε σε αυτά.",
+"Set up (about {0}, once)":"Ρύθμιση (περίπου {0}, μία φορά)",
+"once, and each tool’s model (about 200 MB) the first time it is used.":"μία φορά, και το μοντέλο κάθε εργαλείου (περίπου 200 MB) την πρώτη φορά που χρησιμοποιείται.",
+"Take a picture’s background out, or erase part of it, here: for nothing, and your pictures stay on this computer. About {0} once, and each tool’s model (about 200 MB) the first time it is used.":"Αφαιρέστε το φόντο μιας εικόνας ή σβήστε ένα μέρος της εδώ: δωρεάν, και οι εικόνες σας μένουν σε αυτόν τον υπολογιστή. Περίπου {0} μία φορά, και το μοντέλο κάθε εργαλείου (περίπου 200 MB) την πρώτη φορά που χρησιμοποιείται."
 }

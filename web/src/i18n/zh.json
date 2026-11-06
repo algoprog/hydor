@@ -17748,5 +17748,15 @@
 "Preparing the build":"正在准备构建",
 "Ready: {0} with the {1} model{2}. Your voice stays here.{3}":"就绪：{0}，使用 {1} 模型{2}。你的语音只留在这里。{3}",
 "This computer has an NVIDIA GPU, and whisper.cpp has no ready-made build for it on Linux. With NVIDIA’s CUDA toolkit installed (nvcc), the app builds one, and dictation runs on the GPU.":"这台电脑有一块 NVIDIA GPU，而 whisper.cpp 在 Linux 上没有为它准备现成的版本。装好 NVIDIA 的 CUDA 工具包（nvcc）后，应用会构建一个，听写就会在 GPU 上运行。",
-"whisper.cpp could not be built for the NVIDIA GPU, so dictation runs on the processor: {0}":"无法为 NVIDIA GPU 构建 whisper.cpp，所以听写在处理器上运行：{0}"
+"whisper.cpp could not be built for the NVIDIA GPU, so dictation runs on the processor: {0}":"无法为 NVIDIA GPU 构建 whisper.cpp，所以听写在处理器上运行：{0}",
+"Where they run: the NVIDIA GPU (CUDA).":"运行位置：NVIDIA GPU（CUDA）。",
+"Where they run: the Apple GPU (Core ML).":"运行位置：Apple GPU（Core ML）。",
+"Where they run: the CPU.":"运行位置：CPU。",
+"Where they run: the CPU (the GPU build of ONNX Runtime could not be installed here).":"运行位置：CPU（这台电脑上装不了 ONNX Runtime 的 GPU 版本）。",
+"The background remover runs on the CPU for now: the GPU failed it.":"背景去除工具暂时在 CPU 上运行：它在 GPU 上出错了。",
+"The eraser runs on the CPU for now: the GPU failed it.":"擦除工具暂时在 CPU 上运行：它在 GPU 上出错了。",
+"Both models run on the CPU for now: the GPU failed them.":"两个模型暂时都在 CPU 上运行：它们在 GPU 上出错了。",
+"Set up (about {0}, once)":"安装（约 {0}，只需一次）",
+"once, and each tool’s model (about 200 MB) the first time it is used.":"，每个工具第一次使用时再下载它的模型（约 200 MB）。",
+"Take a picture’s background out, or erase part of it, here: for nothing, and your pictures stay on this computer. About {0} once, and each tool’s model (about 200 MB) the first time it is used.":"在这里去掉图片的背景，或擦除其中一部分：免费，你的图片也始终留在这台电脑上。一次性下载约 {0}，每个工具第一次使用时再下载它的模型（约 200 MB）。"
 }

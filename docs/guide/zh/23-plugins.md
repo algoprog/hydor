@@ -49,7 +49,7 @@
 - **Python for data**（Python 数据分析）：一个独立的 Python，带有 pandas、NumPy、SciPy、Matplotlib、openpyxl 和 PyArrow，用来分析表格和制作图表，不会往你自己的 Python 里安装任何东西。
 - **Speech to text**（语音转文字）：在这台电脑上用 Whisper 把录音、语音备忘和视频转成文字和字幕，支持约 100 种语言：有 NVIDIA 显卡时在显卡上运行（这时它的设置会加装 NVIDIA 的 CUDA 库，约 1.3 GB），否则在 CPU 上运行；显卡出错时也改在 CPU 上运行，并说明原因。Mac 用它的 CPU 转写：这个 Whisper 不支持 Apple 的 GPU。它会一并带来 **Audio and video**；它的模型在第一次用到时各下载一次。
 - **SQLite databases**（SQLite 数据库）：用来查看 SQLite 数据库内部、安全地查询、一次性完成修改，以及在数据库和 CSV 文件之间导入导出数据的工具。它只需要 Python 3。
-- **Text from pictures**（图片转文字）：在这台电脑上读取图片、文档照片、截图、收据和扫描版 PDF 中的文字。
+- **Text from pictures**（图片转文字）：在这台电脑上读取图片、文档照片、截图、收据和扫描版 PDF 中的文字：有显卡时在显卡上读（NVIDIA 显卡：这时它的设置会加装 ONNX Runtime 的 GPU 版本和 NVIDIA 的 CUDA 库，约 2 GB；或者 Mac 的显卡，通过 Core ML），否则在 CPU 上读；显卡出错时也改在 CPU 上读，并说明原因。
 
 ## 打开插件
 
