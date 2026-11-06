@@ -259,3 +259,62 @@ export function clean(out: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/** What whisper is told comes before, so it writes the "um"s and "uh"s it hears rather than leaving them out. */
+const FILLER_PROMPT = 'Umm, let me think, like, hmm... Okay, uh, here is what I am, um, thinking.';
+
+/** A word of a recording and when it is said (seconds). */
+export interface TimedWord {
+  w: string;
+  a: number;
+  b: number;
+}
+
+/** whisper.cpp's JSON with a word a segment (-ml 1 -sow): the words, punctuation joined to the word before. */
+export function readTimedWords(json: string): TimedWord[] {
+  let j: any;
+  try {
+    j = JSON.parse(json);
+  } catch {
+    return [];
+  }
+  const out: TimedWord[] = [];
+  for (const s of Array.isArray(j?.transcription) ? j.transcription : []) {
+    const text = String(s?.text ?? '').trim();
+    const a = Number(s?.offsets?.from) / 1000;
+    const b = Number(s?.offsets?.to) / 1000;
+    if (!text || !Number.isFinite(a) || !Number.isFinite(b) || /^\[.*\]$|^\(.*\)$/.test(text)) continue;
+    const last = out[out.length - 1];
+    if (/^[\p{P}\p{S}]+$/u.test(text) && last) {
+      last.w += text;
+      last.b = Math.max(last.b, b);
+      continue;
+    }
+    out.push({ w: text, a, b: Math.max(a + 0.01, b) });
+  }
+  return out;
+}
+
+/**
+ * The words of a WAV file (16 kHz, one channel) and when each is said, filler words kept. `onProgress` hears how far
+ * it is (0 to 1). In line with the other transcriptions: one at a time.
+ */
+export function transcribeWords(p: Program, o: { model: string; file: string; lang: string; timeout: number; onProgress?: (f: number) => void; signal?: AbortSignal }): Promise<TimedWord[]> {
+  const job = queue.then(async () => {
+    const base = o.file.replace(/\.wav$/i, '');
+    const args = ['-m', o.model, '-f', o.file, '-l', o.lang || 'auto', '-t', String(threads()), '-ml', '1', '-sow', '-oj', '-of', base, '-pp', '--prompt', FILLER_PROMPT];
+    if (p.sns) args.push('-sns');
+    const r = await run(p.path, args, { timeout: o.timeout, signal: o.signal, onLine: (l) => {
+      const m = /progress\s*=\s*(\d+)%/.exec(l);
+      if (m) o.onProgress?.(Number(m[1]) / 100);
+    } });
+    if (r.code !== 0) throw new Error(`whisper.cpp could not read it: ${tail(r.err || r.out) || `exit ${r.code}`}`);
+    try {
+      return readTimedWords(fs.readFileSync(`${base}.json`, 'utf8'));
+    } finally {
+      fs.rmSync(`${base}.json`, { force: true });
+    }
+  });
+  queue = job.catch(() => {});
+  return job;
+}

@@ -3,7 +3,7 @@
 // another folder, copy its path, download it, delete it. Moving and copying pick the folder in the menu's
 // place, as the start page's folder menu does.
 import { useEffect, useState, type ReactNode, type RefObject } from 'react';
-import { Copy, CopyPlus, Download, FileText, FolderInput, FolderOpen, FolderOutput, MessageSquarePlus, Pencil, Pin, PinOff, SlidersHorizontal, SquareTerminal, Trash2 } from 'lucide-react';
+import { AudioLines, Copy, CopyPlus, Download, FileText, FolderInput, FolderOpen, FolderOutput, MessageSquarePlus, Pencil, Pin, PinOff, SlidersHorizontal, SquareTerminal, Trash2 } from 'lucide-react';
 import type { Space } from '@shared/spaces';
 import { FolderFinder, type FolderChoice } from '../../components/FolderPicker';
 import { MenuBack, MenuItem, MenuSep, Popover, useConfirm, useIsMobile } from '../../components/ui';
@@ -17,6 +17,7 @@ import { setPinned, usePinned } from './prefs';
 import { useSpaceMenu } from './SpaceMenu';
 import { EDITABLE, editFile } from '../mediaedit/open';
 import { EDITABLE_VIDEO, editVideoFile } from '../mediaedit/video/open';
+import { EDITABLE_SOUND, editSoundFile } from '../mediaedit/audio/open';
 
 /** The spaces and pinned folders, first in a folder menu (a space by its mark and name). */
 export function useFolderLead(pick: (path: string) => void, at?: string | null): FolderChoice[] {
@@ -119,6 +120,11 @@ export function ItemMenu({
               {one && !one.dir && EDITABLE_VIDEO.test(one.name) && (
                 <MenuItem icon={<SlidersHorizontal size={14} />} onClick={act(() => void editVideoFile(one.path, { after: () => after?.() }))}>
                   Edit the video
+                </MenuItem>
+              )}
+              {one && !one.dir && (EDITABLE_SOUND.test(one.name) || EDITABLE_VIDEO.test(one.name)) && (
+                <MenuItem icon={<AudioLines size={14} />} onClick={act(() => void editSoundFile(one.path, { after: () => after?.() }))}>
+                  {EDITABLE_SOUND.test(one.name) ? 'Edit the sound' : 'Edit its sound'}
                 </MenuItem>
               )}
               {showFolder && one && (

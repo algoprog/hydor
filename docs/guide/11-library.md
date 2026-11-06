@@ -299,7 +299,7 @@ When no model could write them, they come from the words the image, video or sou
 
 ## Open an image, a video or a sound
 
-An image, a video or a sound opens at its own place in the Library. The bar at the top has the back arrow (**The Library’s pictures**, **The Library’s videos** or **The Library’s audio**), its title with "An image", "A video" or "Audio" and its length under it, **Start a session with it** (the start page opens with it in the message box, so the new session gets it with your first message: write what you want done with it, such as "make a poster from this", and send), **Edit** (a picture or a video, in its editor: see [Edit pictures and videos](#edit-pictures-and-videos)), **Download** and **More** (⋯): **Edit the title and description**, **Write them again**, **Open its session** (the conversation it was saved from), **Move to a project** (the project it is in shows beside it) and **Delete**.
+An image, a video or a sound opens at its own place in the Library. The bar at the top has the back arrow (**The Library’s pictures**, **The Library’s videos** or **The Library’s audio**), its title with "An image", "A video" or "Audio" and its length under it, **Start a session with it** (the start page opens with it in the message box, so the new session gets it with your first message: write what you want done with it, such as "make a poster from this", and send), **Edit** (a picture, a video or a sound, in its editor: see [Edit pictures and videos](#edit-pictures-and-videos)), **Download** and **More** (⋯): **Edit its sound** (a video's, in the [sound editor](#the-sound-editor), saved as a new sound), **Edit the title and description**, **Write them again**, **Open its session** (the conversation it was saved from), **Move to a project** (the project it is in shows beside it) and **Delete**.
 
 Below, the picture (click it for full size), or the video or the sound, to play (a sound in a large player, its shape to move along, with the time and the speed), and beside it (under it on a phone):
 
@@ -749,19 +749,20 @@ They need Python 3.10 or later on this computer, or uv; without either, the sect
 
 ## Edit pictures and videos
 
-Pictures and videos open in editors of their own, inside the app: crop, turn, adjust, filter and mark up a picture, or take its background out and erase things with AI; trim, cut, crop, caption, colour and set music to a video. They open from:
+Pictures, videos and sounds open in editors of their own, inside the app: crop, turn, adjust, filter and mark up a picture, or take its background out and erase things with AI; trim, cut, crop, caption, colour and set music to a video; cut, clean up, mix and record sound. They open from:
 
 - **A picture shown large** (in a conversation, a reply or an app's result): **Edit** at its top. What you save goes into your Library as a new picture.
-- **The Library**: **Edit** at the top of a picture's or a video's page. **Save** puts the edited one in its place (its title, description, project and folder stay); **Save a copy** keeps a new one beside it, "… (edited)".
-- **Files**: **Edit** at the top of an open picture or video, or **Edit the picture** or **Edit the video** in a file's **More** (⋯). **Save** writes over the file, its old version going to the Trash; **Save a copy** puts "name (edited)" beside it. A picture that is not PNG, JPEG or WebP, or one saved as another kind of file, is saved as a copy.
+- **The Library**: **Edit** at the top of a picture's, a video's or a sound's page, and **Edit its sound** in a video's **More** (⋯). **Save** puts the edited one in its place (its title, description, project and folder stay); **Save a copy** keeps a new one beside it, "… (edited)".
+- **Files**: **Edit** at the top of an open picture, video or sound, or **Edit the picture**, **Edit the video**, **Edit the sound** (or a video's **Edit its sound**) in a file's **More** (⋯). **Save** writes over the file, its old version going to the Trash; **Save a copy** puts "name (edited)" beside it. A picture that is not PNG, JPEG or WebP, or one saved as another kind of file, is saved as a copy; so is a sound that is not MP3, WAV, M4A, OGG or FLAC, and a video's sound.
 - **Slides**: **Edit picture**, and **Edit video** for a video from your device, in the **Format** menu, a right-click and the side panel. **A document**: **Edit picture** on a picked picture's bar. **A page** (in **Edit**): **Edit picture** in a picked picture's **Part** tab. There, **Save** puts it back in place, as one step Undo takes back, and **Save a copy** keeps it in your Library.
 - **A video an agent made or edited**: **Edit** over it. What you save goes into your Library.
+- **A sound an agent made or edited**: **Edit** beside its name, in its player. What you save goes into your Library.
 
 The arrow beside **Save**, **How it is saved**, says where each goes.
 
 ### Editors in tabs
 
-An editor opens in a tab of its own: a strip at the top shows the page you came from first (the deck, the document, the session, the Library, Files…), then a tab for each editor, "Picture · its name" or "Video · its name". Click one to go to it: the page keeps its place and its changes, and **Edit** on the same picture again goes back to its tab. A dot in place of a tab's × means it has changes not saved; closing it then asks "Close “…” without saving?" (**Close without saving** or **Cancel**), and leaving the app warns you too. On a phone an editor fills the screen, with a back arrow to the page and, with two editors or more, **Open editors** to go between them.
+An editor opens in a tab of its own: a strip at the top shows the page you came from first (the deck, the document, the session, the Library, Files…), then a tab for each editor, "Picture · its name", "Video · its name" or "Sound · its name". Click one to go to it: the page keeps its place and its changes, and **Edit** on the same picture again goes back to its tab. A dot in place of a tab's × means it has changes not saved; closing it then asks "Close “…” without saving?" (**Close without saving** or **Cancel**), and leaving the app warns you too. On a phone an editor fills the screen, with a back arrow to the page and, with two editors or more, **Open editors** to go between them.
 
 ### The picture editor
 
@@ -788,6 +789,42 @@ At the top: **Trim**, **Crop**, **Text**, **Adjust** and **Sound**, then **Undo*
 **More** has **Take this frame as a picture**, **Use this frame as its still** (for a slide's video), **Save as a GIF** (up to 60 seconds, without sound) and **Back to the original**. **How it is saved**: the **Size** (as it is, or 1080p, 720p or 480p) and the **Kind of file**: MP4, which plays everywhere, or WebM, smaller, for the web (saved over a file or a Library video, it keeps the kind it was). A frame or a GIF goes beside the file, or into your Library. While it is made, a line says how far it has got, and **Stop** ends it, saving nothing. An edited video can be up to 30 minutes long.
 
 The video editor needs ffmpeg on the computer the app runs on: its own, or the one the [picture tools](#the-picture-tools-on-this-computer) bring. Without one it says "Video editing needs ffmpeg", with **Open Settings → Images, video and audio**. It opens MP4, MOV, M4V and WebM videos. ← and → step a frame (with Shift, a second); Home and End go to the ends of the part kept.
+
+### The sound editor
+
+The sound editor is laid out as sound editors such as Audition and Audacity are. At the top, the menus (**File**, **Edit**, **Effects**, **Generate**, **View**, each command with its shortcut), then **Undo**, **Redo**, **Save a copy** and **Save** (its arrow is **How it is saved**). Under them, the transport: **To the start**, play and pause (Space; Shift+Space plays the part picked), **Stop** (back to where it started playing), **Record** (R), **Loop** (L), **To the end**, the time where the playhead is, the part picked (**Start**, **End** and **Length**: type a time, or drag the word to change it), **Snap** (to clips, markers and the playhead), the zoom, and the meter (each side's peak, held a moment, and the loudness in LUFS). Along the bottom, a line says the sample rate, mono or stereo, how long it is and how it will be saved.
+
+**The tracks.** Each track is a lane with a header: its name (double-click to rename it), **M** (mute), **S** (solo: only the soloed tracks are heard), the round **Record on this track**, the waveform or spectrogram switch, its volume and its pan (drag the word, or type), and its menu (**Spectrogram**, **Rename**, **Delete the track**). A track holds clips, parts of sounds placed one after another; both channels of a stereo sound show. In a lane:
+
+- drag across the waveform to pick a part (across lanes to pick it on several tracks; Shift-click extends it; double-click a clip to pick all of it; Ctrl+A picks everything);
+- click to move the playhead there (or click or drag the ruler);
+- drag a clip's name bar to move it along, or to another track; drag its ends to trim it; drag the small handles at its top corners to fade it in and out;
+- Ctrl and the wheel zoom about the pointer, the wheel sideways (or with Shift) moves along, and a lane's bottom edge sizes it. **View** has **Zoom in** (+), **Zoom out** (−), **Zoom to the part picked** (Ctrl+E), **Zoom to fit** (Ctrl+F), **Taller waveforms** and **Shorter waveforms**, **Taller tracks** and **Shorter tracks**, **Spectrogram**, **Show the words**, **Snap** and **Loop**;
+- **M** puts a marker at the playhead, on the ruler: click it to go there, drag it, double-click to rename it.
+
+**Edit**: **Cut** (Ctrl+X), **Copy** (Ctrl+C), **Paste** (Ctrl+V: at the playhead, or in place of the part picked; it also pastes what you copied in another sound's editor), **Delete** (Delete: what follows moves back to close the gap; with nothing picked, it deletes the clip picked), **Silence** (Ctrl+L: silent, nothing moves), **Duplicate** (Ctrl+D), **Split at the playhead** (S), **Trim to the part picked** (Ctrl+T), **Insert silence…**, **Select all**, **Select none** (Escape), **Add a marker**, **Delete the markers** and **Add a track**. An edit is made on the tracks of the part picked, else on the track picked, else on all of them. **Effects → Change speed…** plays a part faster or slower with its pitch kept, and **Effects → Shorten pauses…** finds every pause longer than you say on the track picked and keeps only a little of each.
+
+**Bring in sounds**: **File → Add a sound from the Library…** or **Add a sound from this device…** puts it on a track of its own at the playhead, with its own volume, pan and fades: music under a voice, a sound effect at a moment. **Record** (R) records from the microphone at the playhead while the rest plays: on the track whose round button is on (over what is there), or on a new track; it grows on its track as you speak, and Record again (or Stop) ends it.
+
+**Effects**: the **Effects** panel is a rack. **Add** (or the **Effects** menu) puts an effect on what is picked: on the part picked of its tracks, else on the track picked, else on the whole sound (all the tracks mixed); the line at the top of the panel says which. Each effect is a card with its settings (each with its value to type in, and a double-click to put it back), its presets, what it is on (**All of it**, or the part picked: click to change it), a switch to turn it off and on, and **More** (⋯: **Move up**, **Move down**, **Take it out**); drag its grip to move it. A track's effects come before the whole sound's. The effects:
+
+- **Volume**, **Fade in** and **Fade out** (over the part picked, or the first or last seconds; **Straight** or **Smooth**), **Normalize** (its loudest peak at a level) and **Loudness** (**Podcast (−16 LUFS)**, **Streaming (−14 LUFS)** or **Broadcast (−23 LUFS)**, its peaks kept under −1 dB);
+- **Noise reduction** (**Light**, **Medium** or **Strong**: hiss, hum, a fan);
+- **Equalizer** (**Bass**, **Middle**, **Treble**, **Low cut**, **High cut**; presets **Clearer voice**, **Telephone**, **Radio**, **Warmer**, **Brighter**, **Less boomy**, **More bass**), **High-pass** and **Low-pass**;
+- **Compressor** (**Gentle**, **Voice**, **Strong**, **Music**, or its threshold, ratio, attack, release and make-up gain) and **Limiter**;
+- **Pitch** (higher or lower at the same speed), **Reverse**, **Echo**, **Reverb** (**Small room**, **Room**, **Hall** or **Cathedral**) and **To mono**.
+
+You hear them as you edit, as they will be, except noise reduction, which is heard once saved; normalize, loudness and the compressor are close to what is saved.
+
+**Properties** shows the clip picked (where it starts, the part of its sound it plays, its **Speed (its pitch kept)**, **Gain**, **Fade in** and **Fade out**, **Delete the clip**) or the track picked (**Volume**, **Pan**, **Mute**, **Solo**). **History** lists every step: click one to go back to it (and forward again, until you change something).
+
+**AI**: **Make it with AI** makes **Music**, **A voice** (the words to say, how it sounds, its voice) or **A sound effect**, with the models of [Settings → Images, video and audio](/settings?s=images), and puts it on a new track at the playhead. The model and its price show before anything is made ("Lyria 3 Pro, about $0.08"), and so does the button; without an OpenRouter key, it asks for one in place, as the other editors do. **Read what is said** has speech recognition on this computer ([Speech recognition on the server](/guide/documents-voice#speech-recognition-on-the-server), with whisper.cpp) read the words of the track picked, for nothing: they show under its waveform (click a word to pick it, Shift-click for more, and Delete takes them out), and **Remove filler words** takes out every "um" and "uh" at once.
+
+**Save** makes the sound with ffmpeg, with a line that says how far it has got, and **Stop**. **How it is saved**: the **Kind of file** (**MP3** plays everywhere; **M4A** is small and good for Apple devices and video; **OGG** (Opus) is the smallest; **WAV** and **FLAC** keep every sample), its **Quality** (kilobits a second) or **Bits a sample**, **Channels** (**As it is**, **Mono** or **Stereo**) and **Sample rate**. Saved over a file, it keeps its kind. The editor opens MP3, WAV, M4A, AAC, OGG, Opus, FLAC and WebM sounds, and the sound of an MP4, MOV, M4V, WebM or MKV video; a long sound plays at a lighter quality while you edit (the saved one is made from the file itself), and an edited sound can be up to 4 hours long. It needs ffmpeg on the computer the app runs on, as the video editor does.
+
+A video's sound, opened from the video editor, keeps the video's length: deleting leaves silence where it was, pasting goes over what is there, and nothing changes speed; **Save** puts it back in the video.
+
+On a phone, the tracks fill the screen without their headers, the transport is at the bottom with **Effects**, **Clip**, **History** and **AI** under it (each opens as a sheet), and the menus are under one button.
 
 ## Made with AI from a kind
 
@@ -986,6 +1023,8 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "Add a SWOT analysis slide after slide 3 of my 'Bakery plan' slides."
 - "Turn my 'Bakery plan' document into slides."
 - "Crop the photo on slide 2 of my 'Trip' slides to a square and make it warmer."
+- "Clean up interview.m4a: less background noise, a clearer voice, the long pauses shorter, and podcast loudness."
+- "Put my 'Morning' music from the Library under voiceover.mp3, quietly, fading out at the end."
 - "Find a free photo of a mountain lake for the cover of my trip page, with its credit under it."
 - "Write me a cover letter for this job ad and keep it in my Library: I'll change it myself."
 - "Write me a 20-page report on our first year, a section at a time, so I can watch it come in."
