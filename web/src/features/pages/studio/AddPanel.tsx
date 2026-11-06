@@ -3,7 +3,7 @@
 // questions, a footer),
 // after the part picked, inside it, or at the end of the page. A template's screen also has its App parts:
 // a form for each of its flows, its answer, its runs, a conversation with its agent, a table and a count for
-// each collection it keeps.
+// each collection it keeps. And a block made with AI (the gallery of kinds: a pricing table, a FAQ…), put there too.
 import type { AppInfo } from '@shared/app-manifest';
 import { useState, type ReactNode, type RefObject } from 'react';
 import {
@@ -105,9 +105,33 @@ function appBlocks(app: AppInfo): { id: string; label: string; icon: ReactNode; 
   return out;
 }
 
-type Where = 'after' | 'inside' | 'end';
+export type Where = 'after' | 'inside' | 'end';
 
-export function AddPanel({ anchor, open, onClose, sel, cmd, app }: { anchor: RefObject<HTMLElement | null>; open: boolean; onClose: () => void; sel: EdSel | null; cmd: Cmd; app?: AppInfo }) {
+/** Where a block made with AI goes, in words for the agent: after the part picked, inside it, or at the end of the page. */
+export function blockPlace(where: Where, sel: EdSel | null): string {
+  if (!sel || sel.tag === 'body' || where === 'end') return 'at the end of the page';
+  const part = `the ${sel.name.toLowerCase()}${sel.snippet ? ` “${sel.snippet}”` : ''} (\`${sel.selector}\`)`;
+  return where === 'inside' && sel.holds ? `inside ${part}, at its end` : `after ${part}`;
+}
+
+export function AddPanel({
+  anchor,
+  open,
+  onClose,
+  sel,
+  cmd,
+  app,
+  onAi,
+}: {
+  anchor: RefObject<HTMLElement | null>;
+  open: boolean;
+  onClose: () => void;
+  sel: EdSel | null;
+  cmd: Cmd;
+  app?: AppInfo;
+  /** A block made with AI, put where Put it says. */
+  onAi?: (where: Where) => void;
+}) {
   // A template's screen opens on its App parts, also when what the template has arrives after the editor.
   const [chosen, setKind] = useState<BlockKind | 'app' | null>(null);
   const kind = chosen === 'app' && !app ? 'basic' : (chosen ?? (app ? 'app' : 'basic'));
@@ -150,6 +174,19 @@ export function AddPanel({ anchor, open, onClose, sel, cmd, app }: { anchor: Ref
               </button>
             ))}
           </div>
+          {onAi && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onAi(at);
+              }}
+              className="mt-1 flex h-9 w-full items-center gap-2 rounded-xl border border-line px-3 text-left text-[12.5px] font-medium text-fg-2 transition-colors hover:border-line-2 hover:bg-bg-2 hover:text-fg max-md:h-11"
+            >
+              <Sparkles size={15} className="shrink-0 text-accent" />
+              Add a block made with AI
+            </button>
+          )}
           <div className="mt-2 flex items-center gap-2 border-t border-line px-1 pt-2">
             <span className="shrink-0 text-[12px] text-fg-3">Put it</span>
             {picked ? (

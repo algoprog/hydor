@@ -22,6 +22,7 @@ import {
   Hash,
   Heading,
   Image as ImageIcon,
+  Images,
   IndentDecrease,
   IndentIncrease,
   Keyboard,
@@ -45,6 +46,7 @@ import {
   SeparatorHorizontal,
   Sigma,
   Signature,
+  Sparkles,
   SpellCheck,
   Strikethrough,
   Subscript,
@@ -107,9 +109,13 @@ export interface DocMenuCtx {
   pictureUrl: () => void;
   /** Insert → Picture → A picture made with AI, and A drawing (SVG). */
   aiPicture: () => void;
+  /** Insert → Picture → Free photos (openly licensed, their credit as the caption). */
+  freePhoto?: () => void;
   drawing: () => void;
   /** Insert → Plot: from the table the caret is in, if it is in one. */
   plot: () => void;
+  /** Insert → Section made with AI: the gallery of kinds (a summary, a risks table…), where the editor can ask an agent. */
+  aiSection?: () => void;
   /** Insert → Signature: a saved one, or one drawn there. */
   signature: () => void;
   link: () => void;
@@ -198,12 +204,14 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
   ].map(([r, k]) => ({ label: `${k} × ${r}`, also: 'table grid', run: () => e.insertTable(r, k) }));
 
   const insert: MenuEntry[] = [
+    !!c.aiSection && { label: 'Section made with AI', icon: <Sparkles size={15} />, also: 'ai agent write generate section summary introduction conclusion faq glossary references table', disabled: c.readOnly, run: c.aiSection },
     {
       label: 'Picture',
       icon: <ImageIcon size={15} />,
       items: [
         { label: 'A picture from this device', icon: <ImageIcon size={15} />, run: c.picture },
         { label: 'A picture from the web', icon: <Link2 size={15} />, run: c.pictureUrl },
+        ...(c.freePhoto ? [{ label: 'Free photos', icon: <Images size={15} />, also: 'photo photos stock free search openverse creative commons wikimedia', disabled: c.readOnly, run: c.freePhoto }] : []),
         { label: 'A picture made with AI', icon: <WandSparkles size={15} />, also: 'generate ai image illustration icon background photo', disabled: c.readOnly, run: c.aiPicture },
         { label: 'A drawing (SVG)', icon: <PenTool size={15} />, also: 'svg vector icon logo diagram', disabled: c.readOnly, run: c.drawing },
       ],
@@ -227,8 +235,16 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     { label: 'Callout', icon: <Lightbulb size={15} />, also: 'note box', run: () => e.style('callout') },
     { label: 'Table of contents', icon: <TableOfContents size={15} />, also: 'toc headings', run: () => e.insertToc() },
     '-',
-    { label: 'A line across', icon: <Minus size={15} />, also: 'horizontal rule divider', run: () => e.insertAtom('hr') },
-    { label: 'A page break', icon: <SeparatorHorizontal size={15} />, keys: 'Ctrl+Enter', run: () => e.insertAtom('pagebreak') },
+    // One row for the two ways across the page, so Insert fits a small window with Section made with AI in it.
+    {
+      label: 'A line or a page break',
+      icon: <SeparatorHorizontal size={15} />,
+      also: 'horizontal rule divider page break',
+      items: [
+        { label: 'A line across', icon: <Minus size={15} />, also: 'horizontal rule divider', run: () => e.insertAtom('hr') },
+        { label: 'A page break', icon: <SeparatorHorizontal size={15} />, keys: 'Ctrl+Enter', run: () => e.insertAtom('pagebreak') },
+      ],
+    },
     { label: "Today's date", icon: <CalendarDays size={15} />, run: c.today },
     '-',
     { label: 'Header and footer', icon: <PanelTop size={15} />, also: 'header footer', run: c.bands },

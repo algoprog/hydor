@@ -14,6 +14,11 @@ export const imagesFeature: WebFeature = {
   toolViews: {
     generate_image: { place: 'answer', Row: GeneratedImages },
     make_svg: { place: 'answer', Row: GeneratedImages },
+    make_plot: { place: 'answer', Row: GeneratedImages },
+    remove_background: { place: 'answer', Row: GeneratedImages },
+    erase_from_image: { place: 'answer', Row: GeneratedImages },
+    edit_image: { place: 'answer', Row: GeneratedImages },
+    find_photos: { place: 'answer', Row: GeneratedImages },
     generate_video: { place: 'answer', Row: GeneratedVideos },
     generate_audio: { place: 'answer', Row: GeneratedAudio },
     edit_video: { place: 'answer', Row: EditedVideo },

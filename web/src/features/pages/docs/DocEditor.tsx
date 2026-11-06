@@ -28,6 +28,7 @@ import { loadModelVersion, type AskScope, type ModelEditorProps } from '../kinds
 import type { PageVersion } from '@shared/pages';
 import { SIGNATURE_WIDTH_MM } from '@shared/signatures';
 import { choosePicture, pictureFromUrl, uploadPicture } from '../pictures';
+import { choosePhoto } from '../FreePhotos';
 import { csvOf, editPicture, makeDrawing, makePicture, makePlot } from '../../images/studio';
 import type { EditorHandle } from '../../mediaedit/host';
 import { editKept } from '../../mediaedit/open';
@@ -39,6 +40,7 @@ import { loadKatex, texHtmlNow } from '../common/katex';
 import { MenuBar } from '../common/menus';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import { inputCls } from '../../../components/ui';
+import { openTypes } from '../types';
 import { AgentCaret } from './AgentCaret';
 import { BlockHandle } from './BlockHandle';
 import { CommentsColumn, CommentsPanel, type CommentActions, type Draft, type Extra } from './CommentsView';
@@ -79,6 +81,12 @@ const short = (s: string, n = 48) => {
 
 /** Maths as KaTeX draws it, once it has loaded (until then, its LaTeX, quietly). */
 const drawMath = (tex: string, display: boolean) => texHtmlNow(tex, display) ?? `<span class="nd-math-wait">${tex.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)}</span>`;
+
+/** Where a section made with AI goes, in words for the agent: after the section the caret is in, unless its kind belongs elsewhere. */
+function sectionPlace(doc: Doc, index: number): string | undefined {
+  const sec = sectionOf(doc, index);
+  return sec ? `after the section “${short(sec.text, 80)}” (where the cursor is), unless this kind of section belongs elsewhere in the document` : undefined;
+}
 
 /** What an agent asked now would be about: the document, the section the caret is in, the words or the picture picked. */
 function scopesOf(doc: Doc, st: SelState): AskScope[] {
@@ -181,7 +189,7 @@ const SHORTCUTS: ShortcutGroup[] = [
 /** A place words are typed in. */
 const typing = (t: EventTarget | null) => t instanceof HTMLTextAreaElement || (t instanceof HTMLInputElement && t.type === 'text') || (t instanceof HTMLElement && t.isContentEditable);
 
-export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, live }: ModelEditorProps<Doc>) {
+export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onRequest, onScopes, saveNowRef, live }: ModelEditorProps<Doc>) {
   const [model, setModel] = useState<Doc | null>(() => (doc?.model ? fixDoc(doc.model) : live?.model ? fixDoc(live.model) : null));
   const [saved, setSaved] = useState<Doc | null>(model);
   const [st, setSt] = useState<SelState | null>(null);
@@ -736,6 +744,16 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     const pic = en.picture(p.src, o.px ?? madeWidth(p));
     en.insert([p.prompt ? { ...pic, alt: p.prompt.replace(/\s+/g, ' ').slice(0, 300) } : pic]);
   };
+  /** A free photo at the caret (after the table it is in), its credit as its caption where its licence asks for one. */
+  const freePhoto = async () => {
+    const use = await choosePhoto();
+    const en = engine.current;
+    if (!use || !en) return;
+    const b = en.state().block;
+    if (b?.type === 'table' && en.doc.blocks.some((x) => x.id === b.id)) en.setPicked(b.id);
+    const pic = en.picture(use.src, madeWidth(use));
+    en.insert([{ ...pic, alt: use.photo.title.slice(0, 300), ...(use.photo.attribution ? { caption: use.credit.slice(0, 1000) } : {}) }]);
+  };
   /** A picture made with AI; a picture picked is offered to follow (the dialog can drop it). */
   const aiPicture = async () => {
     const b = engine.current?.state().picked;
@@ -943,8 +961,10 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           picture: () => void pickPicture(),
           pictureUrl: () => setMenu('url'),
           aiPicture: () => void aiPicture(),
+          freePhoto: () => void freePhoto(),
           drawing: () => void drawing(),
           plot: () => void plot(),
+          aiSection: onRequest && !readOnly ? () => openTypes({ kind: 'section', at: sectionPlace(model, st.index), onDone: onRequest }) : undefined,
           signature: () => setDialog('signature'),
           link: () => setLinking({ url: st.link ?? '', text: '' }),
           equation: openEquation,

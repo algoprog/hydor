@@ -2,8 +2,9 @@
 //
 // generate_image, generate_video and generate_audio (on each session's own MCP server, while each is on in
 // Settings → Images, video and audio) make them with the model picked there, the app's choice, or one the agent
-// names, using the OpenRouter key from Settings → Models. Before they make anything they show the user a form
-// with the settings the model takes (shape, resolution, quality, length, sound, voice…) and what it costs
+// names, using the OpenRouter key from Settings → Models; with none set, the user is first asked for it on a card
+// (connections/openrouter-key.ts), and if they skip it that model does not run. Before they make anything they show
+// the user a form with the settings the model takes (shape, resolution, quality, length, sound, voice…) and what it costs
 // (settings.ts), unless the agent gave them all, the user answered it earlier in the session, or nobody is there
 // to answer (a scheduled task, an app's run). What they make is saved in the session's folder (images/, videos/,
 // audio/) and shown with the reply, where the user can keep it in the Library (server/media). Pictures come in two
@@ -30,13 +31,14 @@ import { OPENROUTER_PICKS, QUICK_PICKS, type OpenRouterRole } from '../../shared
 import { ASSET } from '../../shared/slides.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Feature, RunCtx, RunTool } from '../features/types.ts';
+import { noKeyText, openRouterKey } from '../connections/openrouter-key.ts';
 import { inSession } from '../documents/index.ts';
 import { fillForm } from '../guide/form.ts';
 import { probe } from '../media/frames.ts';
 import { loadConfig } from '../models/config.ts';
 import { OPENROUTER_URL } from '../models/openrouter.ts';
 import { appWords } from '../language/index.ts';
-import { putAsset } from '../pages/assets.ts';
+import { getAsset, putAsset } from '../pages/assets.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import {
   audioCost,
@@ -70,6 +72,7 @@ import {
   cutoutLine,
   FORM,
   insteadLine,
+  keyWhy,
   imageAnswers,
   imageDefaults,
   imageFits,
@@ -144,9 +147,6 @@ async function videoState(db: DB): Promise<VideosState> {
   return { enabled: s.enabled, model: s.model, using: u.id, usingInfo: u.info, keySet: !!loadConfig().openrouter.apiKey };
 }
 
-const NO_KEY = (what: string) =>
-  `${what} generation goes through OpenRouter, and no OpenRouter key is set. Tell the user to add one in Settings → Models → OpenRouter (keys come from https://openrouter.ai/keys); then try again.`;
-
 const size = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
 /** Whether someone can answer a form in this run: not a scheduled task's or an app's run, and the session is in the app. */
@@ -183,6 +183,7 @@ function imageTool(db: DB): RunTool {
       'detail picks between them: simple (Quick: cheaper and faster) for backgrounds, textures, patterns, icons and simple pictures; complex (Best) for scenes, photos, people, words inside the picture, diagrams and every change to a picture. Left out, it is decided from the prompt.',
       'For drawings that must stay sharp at any size (icons, logos, simple diagrams, shapes in a deck’s colours), make_svg is often better.',
       'Before it makes anything, the user sees a short form in the conversation with the settings that model takes (shape, resolution, quality, how many) and what it costs, filled in with what you give: they change what they like and confirm, or close it, and then nothing is made.',
+      'With no OpenRouter key set, the user is first asked for one on a card (never ask for it yourself); if they skip it, nothing is made.',
       'So give only the settings the user asked for and leave the rest to the form; it comes once per model in a session (later images use the same settings unless you give others; ask: true shows it again).',
       'Set ask: false only when the user said to choose for them or to go ahead without asking.',
       'The images are saved in the session’s folder (images/) and shown to the user with your reply, where they can keep them in their Library: do not repeat them or their paths.',
@@ -193,7 +194,12 @@ function imageTool(db: DB): RunTool {
       type: 'object',
       properties: {
         prompt: { type: 'string', description: 'What to make, or what to change in the given images.' },
-        images: { type: 'array', items: { type: 'string' }, maxItems: 8, description: 'Paths of pictures to edit or take after (PNG, JPEG, WebP, GIF), up to 4 for most models.' },
+        images: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: 8,
+          description: 'Pictures to edit or take after (PNG, JPEG, WebP, GIF), up to 4 for most models: paths of files, or a deck’s, document’s or page’s own pictures as get_page shows them (naget-asset:…); put the new file in its place with the save tool.',
+        },
         aspect_ratio: { type: 'string', description: 'The shape, if the user said: 1:1 square, 16:9 wide, 9:16 tall, 4:3, 3:4, 3:2, 2:3, 21:9 (what the model takes).' },
         resolution: { type: 'string', description: 'If the user said: 1K, 2K or 4K (sharper, slower and dearer), where the model offers a choice.' },
         quality: { type: 'string', enum: ['auto', 'low', 'medium', 'high'], description: 'If the user said, for models with a quality setting.' },
@@ -207,13 +213,11 @@ function imageTool(db: DB): RunTool {
       required: ['prompt'],
     },
     async run(a, ctx) {
-      const key = loadConfig().openrouter.apiKey;
-      if (!key) return { isError: true, text: NO_KEY('Image') };
       const prompt = String(a.prompt ?? '').trim();
       if (!prompt) throw new Error('Say what to make in prompt.');
       const asked = str(a.model);
       if (asked && !MODEL_ID.test(asked)) throw new Error('model: an OpenRouter id, like black-forest-labs/flux.2-pro.');
-      const refs = await readReferences((Array.isArray(a.images) ? a.images : []).map((p: unknown) => inSession(ctx.cwd, String(p))).slice(0, 8));
+      const refs = await picturesFrom(db, ctx.cwd, Array.isArray(a.images) ? a.images : []);
       const detail = a.detail === 'simple' ? 'quick' : a.detail === 'complex' ? 'best' : 'auto';
       const tier = tierFor(detail, { prompt, refs: refs.length, edit: refs.length > 0 });
       const clear = bool(a.transparent) === true;
@@ -227,6 +231,11 @@ function imageTool(db: DB): RunTool {
           isError: true,
           text: `${info?.label ?? id} does not make transparent backgrounds, and no model that does is at hand: leave transparent out, or the user can pick a model that does in Settings → Images, video and audio, or set up the picture tools there to take backgrounds out.`,
         };
+      const tr = appWords(db);
+      // The key, asked for on a card when there is none, before the form (which is for a picture that can be made).
+      const k = await openRouterKey(ctx, { why: keyWhy('image', info?.label ?? id, tr, info?.perImage ? money(info.perImage) : undefined) });
+      if (k.key === null) return noKeyText(k, info?.label ?? id);
+      const key = k.key;
       const given: ImageChoice = {
         ...(str(a.aspect_ratio) ? { aspect: str(a.aspect_ratio) } : {}),
         ...(str(a.resolution ?? a.size) ? { size: str(a.resolution ?? a.size)!.toUpperCase() } : {}),
@@ -237,7 +246,6 @@ function imageTool(db: DB): RunTool {
       };
       const memo = pickedKey(ctx.key, 'image', id);
       let v: ImageChoice = { ...imageDefaults(info), ...pickedFor<ImageChoice>(memo), ...given };
-      const tr = appWords(db);
       const fields = imageForm(info, v, tr);
       const left = Object.keys(fields).some((f) => !(f === 'transparent' ? 'background' in given : f in given));
       const ask = askOf(a);
@@ -305,9 +313,6 @@ function imageTool(db: DB): RunTool {
 
 // ---- make_svg ------------------------------------------------------------------------------------------
 
-const NO_KEY_DRAWING =
-  'Detailed drawings are drawn by a vector model through OpenRouter, and no OpenRouter key is set. Call again with detail: "simple" (written as SVG, no key needed), or tell the user to add a key in Settings → Models → OpenRouter.';
-
 function svgTool(db: DB): RunTool {
   return {
     name: 'make_svg',
@@ -317,7 +322,8 @@ function svgTool(db: DB): RunTool {
       'Make a drawing as SVG (shapes, not pixels): an icon, a logo, a diagram, a pattern, a shape or a flat illustration, saved as a cleaned .svg in the session’s folder (images/).',
       'Prefer it to generate_image for what must stay sharp at any size or match given colours: icons and logos, simple diagrams and arrows, patterns and shapes for slides, anything in a deck’s or a document’s own colours (give them in colors). Photos, scenes and detailed pictures are generate_image’s.',
       'detail: simple has it written as SVG by Claude (or the helper model picked in Settings → Models), with no picture model to pay, in under a minute; complex has it drawn by Recraft’s vector model through OpenRouter, about $0.08 a drawing, and then the user first sees a short form with the price, once per model in a session (ask: true shows it again; ask: false only when the user said to go ahead).',
-      'Left out, illustrations are complex and the rest simple. Scripts, links and anything loaded from elsewhere are taken out of every drawing.',
+      'Left out, illustrations are complex and the rest simple. With no OpenRouter key set, complex asks the user for one on a card (never ask for it yourself); without one, left out it is written as SVG instead.',
+      'Scripts, links and anything loaded from elsewhere are taken out of every drawing.',
       'It is shown to the user with your reply: do not repeat it or its path. To put it in a page, a deck or a document, give its path as the picture.',
     ].join(' '),
     inputSchema: {
@@ -343,12 +349,28 @@ function svgTool(db: DB): RunTool {
       } catch (e) {
         throw new Error(`${(e as Error).message}.`);
       }
-      const tier = drawingTierFor(a.detail === 'simple' ? 'quick' : a.detail === 'complex' ? 'best' : 'auto', { prompt, kind: a.kind });
+      const auto = a.detail !== 'simple' && a.detail !== 'complex';
+      let tier = drawingTierFor(auto ? 'auto' : a.detail === 'simple' ? 'quick' : 'best', { prompt, kind: a.kind });
       let aspect = str(a.aspect_ratio);
       let model: string | undefined;
-      if (tier === 'best') {
-        if (!loadConfig().openrouter.apiKey) return { isError: true, text: NO_KEY_DRAWING };
-        const { id, info } = await vectorModel();
+      let key: string | undefined;
+      let instead = '';
+      const best = tier === 'best' ? await vectorModel() : undefined;
+      if (best) {
+        const { id, info } = best;
+        const tr = appWords(db);
+        const label = info?.label ?? id;
+        // The key, asked for on a card when there is none: on auto, without one the drawing is written instead.
+        const why = [keyWhy('drawing', label, tr, info?.perImage ? money(info.perImage) : undefined), ...(auto ? [tr('Without a key, a simpler drawing is written instead, at no cost.')] : [])].join(' ');
+        const k = await openRouterKey(ctx, { why });
+        if (k.key === null && (!auto || k.why === 'stopped')) return `${noKeyText(k, label)}${k.why === 'stopped' ? '' : ' make_svg with detail: "simple" needs no key.'}`;
+        if (k.key === null) {
+          tier = 'quick';
+          instead = `No OpenRouter key was given, so it was written as SVG rather than drawn by ${label}.`;
+        } else key = k.key;
+      }
+      if (best && key) {
+        const { id, info } = best;
         model = id;
         // The user says yes to the price once per model in a session, as for pictures; the shape is the one setting asked.
         const memo = pickedKey(ctx.key, 'image', id);
@@ -377,7 +399,7 @@ function svgTool(db: DB): RunTool {
       }
       let d: Drawing;
       try {
-        d = await drawSvg(db, { prompt, ...(a.kind ? { kind: a.kind } : {}), ...(colors ? { colors } : {}), ...(aspect ? { aspect } : {}), tier }, { model, signal: ctx.signal });
+        d = await drawSvg(db, { prompt, ...(a.kind ? { kind: a.kind } : {}), ...(colors ? { colors } : {}), ...(aspect ? { aspect } : {}), tier }, { model, key, signal: ctx.signal });
       } catch (e) {
         if (ctx.signal?.aborted) return { isError: true, text: 'Stopped before the drawing was made.' };
         return { isError: true, text: `The drawing was not made: ${String((e as Error).message ?? e).replace(/\.?$/, '.')}` };
@@ -387,7 +409,7 @@ function svgTool(db: DB): RunTool {
         `Made a drawing with ${d.model}${d.cost ? ` (${money(d.cost)})` : ''}${aspect && aspect !== '1:1' ? `, ${aspect}` : ''}:`,
         `${f.path} (${d.w}×${d.h}, ${size(f.bytes)})`,
         'The user sees it with your reply, a tap away from full size and download: don’t repeat it or its path. It is SVG, cleaned of scripts, links and anything loaded from elsewhere; to put it in a page, a deck or a document, give this path as the picture.',
-        ...(d.tier === 'quick' ? ['It was written as SVG: for a richer illustration, call again with detail: "complex".'] : []),
+        ...(instead ? [instead] : d.tier === 'quick' ? ['It was written as SVG: for a richer illustration, call again with detail: "complex".'] : []),
       ].join('\n');
     },
   };
@@ -410,7 +432,27 @@ async function readVideo(file: string): Promise<{ mime: string; data: Buffer }> 
   return { mime, data: await fs.promises.readFile(file) };
 }
 
-const oneImage = async (cwd: string, p: unknown): Promise<Reference | undefined> => (str(p) ? (await readReferences([inSession(cwd, str(p)!)]))[0] : undefined);
+/**
+ * Pictures to work from: files of the session's folder, or pictures a deck, document or page keeps ("naget-asset:<sha>",
+ * as get_page shows them), in the order given; at most four.
+ */
+async function picturesFrom(db: DB, cwd: string, list: unknown[]): Promise<Reference[]> {
+  const out: Reference[] = [];
+  for (const raw of list.slice(0, 8)) {
+    const it = String(raw ?? '').trim();
+    if (!it) continue;
+    if (it.startsWith(ASSET)) {
+      const a = getAsset(db, it.slice(ASSET.length));
+      if (!a) throw new Error(`${it} is not a picture this app keeps (get_page shows the pictures of a deck, document or page).`);
+      if (a.mime === 'image/svg+xml') throw new Error(`${it} is a drawing (SVG); models work from PNG, JPEG, WebP or GIF pictures.`);
+      out.push({ name: `${it.slice(ASSET.length, ASSET.length + 12)}.${a.mime.split('/')[1]}`, mime: a.mime, data: a.data });
+    } else out.push(...(await readReferences([inSession(cwd, it)])));
+  }
+  if (out.length > 4) throw new Error('Give at most 4 images to work from.');
+  return out;
+}
+
+const oneImage = async (db: DB, cwd: string, p: unknown): Promise<Reference | undefined> => (str(p) ? (await picturesFrom(db, cwd, [str(p)]))[0] : undefined);
 
 /** The answer for videos that were made: their paths, sizes and lengths, as the conversation's card reads them. */
 async function madeText(model: string, files: SavedVideo[], cost: number | undefined, how: string): Promise<string> {
@@ -454,7 +496,7 @@ function videoTool(db: DB): RunTool {
     annotations: { readOnlyHint: false, openWorldHint: true },
     description: [
       'Make a short video from a description, and if wanted from pictures to start or end on (first_frame, last_frame) or to follow (references), with a video model through OpenRouter (the one picked in Settings → Images, video and audio, or the one model names).',
-      'Videos cost far more than images (cents to dollars a second) and take a minute to several to make.',
+      'Videos cost far more than images (cents to dollars a second) and take a minute to several to make. With no OpenRouter key set, the user is first asked for one on a card (never ask for it yourself); if they skip it, nothing is made.',
       'Before it makes anything, the user sees a short form in the conversation with the settings that model takes (length, shape, resolution, sound) and what it costs, filled in with what you give: they change what they like and confirm, or close it, and then nothing is made.',
       'So give only the settings the user asked for and leave the rest to the form; it comes once per model in a session (ask: true shows it again). Set ask: false only when the user said to choose for them or to go ahead without asking.',
       'It waits for the video, up to about nine minutes; if it is not ready by then, you get its job id: call again with job to wait for it (nothing more is spent).',
@@ -469,9 +511,9 @@ function videoTool(db: DB): RunTool {
         aspect_ratio: { type: 'string', description: 'Its shape, if the user said: 16:9 wide, 9:16 tall, 1:1 square…' },
         resolution: { type: 'string', description: 'If the user said: 480p, 720p, 1080p, 4K (what the model makes).' },
         audio: { type: 'boolean', description: 'Sound with it (voices, music, noises), if the user said; models that make sound.' },
-        first_frame: { type: 'string', description: 'The path of a picture for the video to start on.' },
-        last_frame: { type: 'string', description: 'The path of a picture for it to end on (models that take one).' },
-        references: { type: 'array', items: { type: 'string' }, maxItems: 4, description: 'Paths of pictures for it to follow (a character, a product, a style), not as frames.' },
+        first_frame: { type: 'string', description: 'A picture for the video to start on: a file’s path, or a deck’s or document’s picture (naget-asset:…).' },
+        last_frame: { type: 'string', description: 'A picture for it to end on (models that take one), as first_frame.' },
+        references: { type: 'array', items: { type: 'string' }, maxItems: 4, description: 'Pictures for it to follow (a character, a product, a style), not as frames: paths, or naget-asset:… pictures.' },
         video: { type: 'string', description: 'The path of a video to change (MP4, WebM or MOV, up to 40 MB), for models that edit, extend or sharpen videos.' },
         model: { type: 'string', description: 'OpenRouter’s id of another video model, only when the user asks for it ("google/veo-3.1").' },
         name: { type: 'string', description: 'A short file name, without extension (default: from the prompt).' },
@@ -482,8 +524,9 @@ function videoTool(db: DB): RunTool {
     async run(a, ctx) {
       const started = Date.now();
       const until = started + WAIT_MS;
-      const key = loadConfig().openrouter.apiKey;
-      if (!key) return { isError: true, text: NO_KEY('Video') };
+      const tr = appWords(db);
+      /** The key, asked for on a card when there is none (before the form, which is for a video that can be made). */
+      const keyFor = (info: VideoModel | undefined, id: string) => openRouterKey(ctx, { why: keyWhy('video', info?.label ?? id, tr, info?.perSecond ? money(info.perSecond) : undefined) });
       const dir = path.join(ctx.cwd, 'videos');
       const job = str(a.job);
       if (job) {
@@ -491,6 +534,10 @@ function videoTool(db: DB): RunTool {
         let f = followedJob(job);
         if (!f) {
           // The app restarted since: ask OpenRouter where it is.
+          const { id, info } = await usingVideo(settings(db, 'videos'));
+          const k = await keyFor(info, id);
+          if (k.key === null) return noKeyText(k, 'the video');
+          const key = k.key;
           const j = await pollVideo(OPENROUTER_URL, key, job);
           f = follow({ base: OPENROUTER_URL, key, job: j, model: 'the model', session: ctx.key, dir, name: str(a.name) ?? 'video' });
         }
@@ -502,9 +549,9 @@ function videoTool(db: DB): RunTool {
       const s = settings(db, 'videos');
       const { id, info } = await usingVideo(s, asked);
       if (asked && !info && (await vmodels().catch(() => [])).length) throw new Error(`OpenRouter has no video model ${asked}. The user can see the ones there are in Settings → Images, video and audio.`);
-      const first = await oneImage(ctx.cwd, a.first_frame);
-      const last = await oneImage(ctx.cwd, a.last_frame);
-      const refs = await readReferences((Array.isArray(a.references) ? a.references : []).map((p: unknown) => inSession(ctx.cwd, String(p))).slice(0, 4));
+      const first = await oneImage(db, ctx.cwd, a.first_frame);
+      const last = await oneImage(db, ctx.cwd, a.last_frame);
+      const refs = await picturesFrom(db, ctx.cwd, (Array.isArray(a.references) ? a.references : []).slice(0, 4));
       const video = str(a.video) ? await readVideo(inSession(ctx.cwd, str(a.video)!)) : undefined;
       if (!prompt && !first && !video) throw new Error('Say what the video shows in prompt.');
       if (info) {
@@ -518,11 +565,13 @@ function videoTool(db: DB): RunTool {
         ...(str(a.resolution) ? { resolution: /^\d+p?$/i.test(str(a.resolution)!) ? `${parseInt(str(a.resolution)!, 10)}p` : str(a.resolution)!.toUpperCase() } : {}),
         ...(bool(a.audio) !== undefined ? { audio: bool(a.audio) } : {}),
       };
+      const k = await keyFor(info, id);
+      if (k.key === null) return noKeyText(k, info?.label ?? id);
+      const key = k.key;
       const memo = pickedKey(ctx.key, 'video', id);
       let v: VideoChoice = { ...videoDefaults(info), ...pickedFor<VideoChoice>(memo), ...given };
       // A picture to start from sets the shape for most models.
       if (first && !given.aspect && v.aspect && info?.aspects.length) delete v.aspect;
-      const tr = appWords(db);
       const fields = videoForm(info, v, tr);
       if (first && !given.aspect) delete fields.aspect;
       const left = Object.keys(fields).some((f) => !(f in given));
@@ -651,7 +700,7 @@ function audioTool(db: DB): RunTool {
     description: [
       'Make sound through OpenRouter: music (songs with vocals or instrumentals, jingles, loops, background music), speech (narration, voice-overs, announcements, dialogue, in a described voice or one copied from 1–3 short recordings the user has), or sound effects and ambience.',
       'kind picks the model: music uses the music model picked in Settings → Images, video and audio (the app’s choice is Google’s Lyria: Lyria 3 Pro makes songs of up to about 3 minutes, Lyria 3 Clip 30-second clips), speech and sound the voice and sound model (the app’s choice is ByteDance’s Seed Audio, up to 2 minutes), or model names another.',
-      'Before it makes anything, the user sees a short form in the conversation with the model, the settings it takes (singing or not, length, voice, file) and what it costs, filled in with what you give: they change what they like and confirm, or close it, and then nothing is made.',
+      'Before it makes anything, the user sees a short form in the conversation with the model, the settings it takes (singing or not, length, voice, file) and what it costs, filled in with what you give: they change what they like and confirm, or close it, and then nothing is made. With no OpenRouter key set, the user is first asked for one on a card (never ask for it yourself); if they skip it, nothing is made.',
       'So give only the settings the user asked for and leave the rest to the form; it comes once per model in a session (ask: true shows it again). Set ask: false only when the user said to choose for them or to go ahead without asking.',
       'music: in prompt, the genre, mood, instruments, tempo (BPM), key, the singer’s voice and the structure (timestamps like "[0:00 - 0:15] Intro: soft piano" place things); the lyrics in lyrics, with [Verse] and [Chorus] tags, or instrumental: true; without either the model writes its own lyrics. Write the prompt in the language the song should be sung in.',
       'speech: the exact words in prompt (or a conversation in turns), and how they are said in instructions: the voice, age, accent, tone, pace and emotion. Seed Audio reads prompt as a description, so there you may also write the whole scene with the spoken lines in quotes (‘A calm, deep male narrator: "Welcome to the museum." Soft rain in the background.’). voice: one of the model’s own voices by id, where it has them (a wrong one gets you the list). voice_samples: recordings of the voice to speak in (only a voice the user may use); with several, write who says what with @Audio1, @Audio2, @Audio3.',
@@ -695,8 +744,6 @@ function audioTool(db: DB): RunTool {
     },
     async run(a, ctx) {
       const until = Date.now() + AUDIO_WAIT_MS;
-      const key = loadConfig().openrouter.apiKey;
-      if (!key) return { isError: true, text: NO_KEY('Audio') };
       const kind = AUDIO_KINDS.find((k) => k === a.kind);
       if (!kind) throw new Error('kind: music, speech or sound.');
       const prompt = String(a.prompt ?? '').trim();
@@ -763,6 +810,11 @@ function audioTool(db: DB): RunTool {
         samples: samples.length,
       });
       const tr = appWords(db);
+      // The key, asked for on a card when there is none, before the form (which is for sound that can be made).
+      const estimate = audioCost(info, wish(v, true));
+      const k = await openRouterKey(ctx, { why: keyWhy(kind === 'music' ? 'music' : 'speech', info?.label ?? id, tr, estimate ? money(estimate) : undefined) });
+      if (k.key === null) return noKeyText(k, info?.label ?? id);
+      const key = k.key;
       const fields = audioForm(info, kind, v, tr, { voices: !samples.length && !prompted });
       const left = Object.keys(fields).some((f) => !(f in given));
       const ask = askOf(a);
@@ -964,4 +1016,24 @@ export const images: Feature = {
     ...(settings(deps.db, 'videos').enabled ? [videoTool(deps.db)] : []),
     ...(audioSettings(deps.db).enabled ? [audioTool(deps.db)] : []),
   ],
+  // Tools alone are not enough for agents to reach for them unasked: what to use when, as they make slides, documents and pages.
+  spawn(s, d) {
+    if (s.extra?.confidential) return undefined;
+    return { instructions: [pictureInstructions(imagesSettings(d.db).enabled, settings(d.db, 'videos').enabled)] };
+  },
 };
+
+/** What agents are told of making and changing pictures for what they make (the tools that are on, by name). */
+function pictureInstructions(pictures: boolean, videos: boolean): string {
+  return [
+    'Pictures for what you make: when you make or change slides, a document or a page, illustrate it where a picture adds something (a title slide, a section, an idea; not every slide), in its colours and look, as a designer would.',
+    pictures
+      ? 'generate_image with detail "simple" (the cheaper Quick model) for backgrounds, textures, icons and simple pictures, "complex" (the Best model) for scenes, photos, words inside a picture and diagrams; make_svg for icons, logos, diagrams, shapes and patterns that must stay sharp at any size, in the theme’s colours; make_plot for plots of data (a slide’s chart part already draws simple columns, bars, lines and pies; in a web deck the plot’s interactive version).'
+      : '',
+    'find_photos for real photos free to use (their credit in the slide’s notes or a caption); edit_image to crop, straighten, adjust, filter, mark up or blur parts of a picture; remove_background to cut a subject out and erase_from_image to take something out (free on this computer once its picture tools are set up, else through OpenRouter; look at the result, and if it is not right, ask again with how: "ai").',
+    videos ? 'generate_video for a short clip when one is wanted, edit_video to trim, cut, crop, caption or add music to a video.' : 'edit_video to trim, cut, crop, caption or add music to a video.',
+    'They all take the files of your folder and the pictures a deck, document or page already has (naget-asset:…, as get_page shows them); put what they make in by its path (save_slides, save_doc and save_page take the files of your folder). What costs money (pictures, drawings at Best, videos) is priced to the user before it is made: keep to what helps.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}

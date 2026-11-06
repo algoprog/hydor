@@ -477,6 +477,15 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
             composeInsert(text, key);
             if (layout === 'sheet') onClose();
           }}
+          onRequest={
+            saveModel
+              ? (r) => {
+                  // A conversation goes on here: its message box takes the whole request, to send as it is or changed.
+                  composeInsert(r.full, key);
+                  if (layout === 'sheet') onClose();
+                }
+              : undefined
+          }
           live={live}
         />
       </>
@@ -504,6 +513,14 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
         // Over everything on a phone: the message box is under it.
         if (layout === 'sheet') onClose();
       }}
+      onRequest={
+        loaded?.pageId
+          ? (r) => {
+              composeInsert(r.full, key);
+              if (layout === 'sheet') onClose();
+            }
+          : undefined
+      }
     />
     </>
   );

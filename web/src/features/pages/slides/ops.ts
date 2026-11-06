@@ -612,7 +612,7 @@ export function moveAnim(d: Deck, i: number, id: string, by: -1 | 1): Deck {
 const LOOKS: Record<El['type'], string[]> = {
   text: ['fill', 'fill2', 'angle', 'line', 'lineW', 'dash', 'radius', 'shadow', 'opacity', 'font', 'size', 'color', 'bold', 'italic', 'align', 'valign', 'lh', 'gap', 'ls', 'pad'],
   shape: ['fill', 'fill2', 'angle', 'line', 'lineW', 'dash', 'radius', 'shadow', 'opacity', 'font', 'size', 'color', 'bold', 'italic', 'align', 'valign', 'lh', 'gap', 'ls', 'pad'],
-  image: ['radius', 'line', 'lineW', 'shadow', 'opacity', 'adjust'],
+  image: ['radius', 'line', 'lineW', 'shadow', 'opacity', 'adjust', 'mask'],
   line: ['color', 'width', 'dash', 'start', 'end', 'opacity'],
   icon: ['color', 'lineW', 'opacity'],
   math: ['color', 'opacity'],
@@ -625,6 +625,7 @@ const LOOKS: Record<El['type'], string[]> = {
   quiz: ['size', 'color', 'font', 'fill', 'layout', 'opacity'],
   score: ['size', 'color', 'font', 'bold', 'align', 'opacity'],
   scene3d: ['color', 'material', 'light', 'bg', 'opacity'],
+  qr: ['color', 'bg', 'opacity'],
   group: ['opacity'],
 };
 
@@ -772,6 +773,7 @@ export function partName(e: El): string {
   if (e.type === 'quiz') return e.question ? `Quiz: ${e.question.length > 24 ? `${e.question.slice(0, 23)}…` : e.question}` : 'Quiz';
   if (e.type === 'score') return 'Quiz score';
   if (e.type === 'scene3d') return '3D';
+  if (e.type === 'qr') return 'QR code';
   if (e.route === 'elbow') return 'Elbow connector';
   if (e.from || e.to) return 'Connector';
   return e.end === 'arrow' || e.start === 'arrow' ? 'Arrow' : 'Straight line';
