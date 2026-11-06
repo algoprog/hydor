@@ -376,7 +376,8 @@ function Scopes({ canvas, engine }: { canvas: () => HTMLCanvasElement | null; en
     const src = canvas();
     if (!src || !src.width) return;
     const W = 256;
-    const H = Math.max(16, Math.round((W * src.height) / src.width));
+    // A square sample: the scopes care for how many pixels have each value, not the picture's shape.
+    const H = 256;
     const wk = (work.current ??= document.createElement('canvas'));
     wk.width = W;
     wk.height = H;
@@ -456,7 +457,7 @@ function paintScope(kind: ScopeKind, cv: HTMLCanvasElement, px: Uint8ClampedArra
     const [fr, fgc, fb] = rgbOf(fg);
     for (let j = 0; j < n.length; j++) {
       if (!n[j]) continue;
-      const v = Math.min(1, 0.25 + Math.log2(1 + n[j]) / 4);
+      const v = Math.min(1, Math.log2(1 + n[j]) / 5);
       out[j * 4] = fr * v;
       out[j * 4 + 1] = fgc * v;
       out[j * 4 + 2] = fb * v;
