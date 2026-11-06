@@ -9,7 +9,7 @@ import type { DrawingKind, ImageTier, SvgAnswer, TiersInfo } from '@shared/image
 import { Button, Dialog, Segmented } from '../../../components/ui';
 import { getTiers, makeSvg } from './api';
 import { KeyAsk } from './KeyAsk';
-import { DEFAULT_COLORS, DRAWING_KINDS, drawingPrice, drawingTier, money, needsKey, SHAPES } from './logic';
+import { DEFAULT_COLORS, DRAWING_KINDS, drawingPrice, drawingTier, madeWith, needsKey, SHAPES } from './logic';
 import { Choice, Label, PriceLine, Problem, ShapeMark, Shown, Words, Working } from './parts';
 import { shownSrc } from './pictures';
 import type { DrawingOpts, MadeDrawing } from './store';
@@ -46,7 +46,8 @@ export function MakeDrawing({ o, onDone }: { o: DrawingOpts; onDone: (d: MadeDra
   }, []);
 
   const info = DRAWING_KINDS.find((k) => k.value === kind) ?? DRAWING_KINDS[0];
-  const tier = picked ?? drawingTier('auto', { prompt, kind });
+  // Without an OpenRouter key, Quick (which needs none) unless Best is picked.
+  const tier = picked ?? (tiers && !tiers.keySet ? 'quick' : drawingTier('auto', { prompt, kind }));
   const price = tiers ? drawingPrice(tiers, tier) : null;
   const shapes = [...(o.aspect && !SHAPES.some((s) => s.value === o.aspect) ? [{ value: o.aspect, label: `As where it goes (${o.aspect})` }] : []), ...SHAPES].map((s) => ({ ...s, icon: <ShapeMark aspect={s.value} /> }));
 
@@ -120,7 +121,7 @@ export function MakeDrawing({ o, onDone }: { o: DrawingOpts; onDone: (d: MadeDra
         <div className="space-y-2.5">
           <Shown src={shownSrc(made.src)} alt={prompt} className="max-h-[46dvh] min-h-32 min-w-32" />
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[12.5px] text-fg-3">
-            <span translate="no">{made.cost != null ? `${made.model}: ${money(made.cost)}` : made.model}</span>
+            <span>{made.tier === 'quick' ? `Written by ${made.model || tiers?.writer || 'Claude'}` : madeWith(tiers, made.model, made.cost)}</span>
             <button type="button" disabled={busy} className="text-accent hover:underline disabled:opacity-50" onClick={() => setMade(null)}>
               Change the words
             </button>
@@ -202,7 +203,7 @@ export function MakeDrawing({ o, onDone }: { o: DrawingOpts; onDone: (d: MadeDra
                 { value: 'best', label: 'Best' },
               ]}
             />
-            <span className="text-[12.5px] text-fg-3">{tier === 'quick' ? `Written as SVG by ${tiers?.writer ?? 'Claude'}` : `Drawn by ${tiers?.vector.label ?? 'a vector model'}`}</span>
+            <span className="text-[12.5px] text-fg-3">{tier === 'quick' ? 'Simple shapes, written as code' : 'More detail, drawn by a vector model'}</span>
           </div>
           {error && <Problem error={error} onLeave={() => onDone(null)} />}
           {keyAsk || (busy ? <Working>{tier === 'quick' ? 'Drawing it: this takes up to a minute' : 'Drawing it: it takes a few seconds'}</Working> : price && <PriceLine>{price.line}</PriceLine>)}

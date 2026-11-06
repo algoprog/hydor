@@ -470,6 +470,7 @@ export function Studio({
           onError={toastError}
           onPageTab={() => setTab('page')}
           base={doc.base}
+          pageHtml={() => editRef.current?.html() ?? Promise.resolve('')}
         />
       ) : (
         <p className="px-3 py-2 text-[12.5px] leading-relaxed text-fg-3">
