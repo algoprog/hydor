@@ -73,6 +73,10 @@ function summary(r: VideoRecipe, a: Record<string, any>): string {
   if (caps) bits.push(`${caps} caption${caps === 1 ? '' : 's'}`);
   const words = (r.texts ?? []).length - caps;
   if (words) bits.push(`${words} text${words === 1 ? '' : 's'} over it`);
+  const ch = [...(r.clips ?? []), ...(r.audio ?? [])].map((x) => x.channels).filter(Boolean);
+  if (ch.length) bits.push(`channels: ${[...new Set(ch)].join(', ')}`);
+  if ((r.clips ?? []).some((c) => c.silence?.length)) bits.push('parts silenced');
+  if ((r.audio ?? []).some((x) => x.levels?.length)) bits.push('a volume line on the music');
   if (r.fixes?.voice) bits.push('voices cleaned up');
   if (r.fixes?.duck) bits.push('music lowered under speech');
   if (r.fixes?.loudness) bits.push(`loudness evened out (${r.fixes.loudness === 'web' ? 'for the web' : 'for broadcast'})`);
@@ -110,6 +114,8 @@ function answer(id: string): string | { isError: true; text: string } {
       : 'The user sees it in your reply, where they can play it, download it and keep it in their Library: don’t repeat it or its path. You cannot watch it: to check how it looks, take a frame of it (edit_video, frame: a moment) and open that. In a deck, give this file as a video part’s src in save_slides.',
   ].join('\n');
 }
+
+const CHANNELS_WORDS = 'Its channels: stereo; left or right only; left (or right) on both sides, as for a lapel microphone recorded on one channel; mixed to mono; or left and right swapped.';
 
 const COLOR_KEYS = ['exposure', 'temperature', 'tint', 'contrast', 'brightness', 'saturation', 'highlights', 'shadows', 'vibrance', 'vignette', 'sharpen', 'denoise', 'grain'] as const;
 
@@ -191,6 +197,7 @@ export function editVideoTool(): RunTool {
               keep_pitch: { type: 'boolean', description: 'false: its sound’s pitch goes up and down with the speed (true when left out).' },
               reverse: { type: 'boolean', description: 'Play it backwards (at most about 13 seconds at 1080p).' },
               stabilize: { type: 'boolean', description: 'Steady a shaky video.' },
+              channels: { type: 'string', enum: ['stereo', 'left', 'right', 'left-both', 'right-both', 'mono', 'swap'], description: CHANNELS_WORDS },
               volume: { type: 'number', minimum: 0, maximum: 2 },
               mute: { type: 'boolean' },
               sound: { type: 'string', description: 'A sound file to use in place of its own sound, with the same timing.' },
@@ -271,8 +278,14 @@ export function editVideoTool(): RunTool {
         music_volume: { type: 'number', minimum: 0, maximum: 2, description: 'How loud the music is (1 as it is).' },
         music_start: { type: 'number', minimum: 0, description: 'When the music starts, in seconds of the edited video.' },
         music_fade: { type: 'number', minimum: 0, maximum: 10, description: 'Seconds the music fades in at its start and out at its end.' },
+        music_channels: { type: 'string', enum: ['stereo', 'left', 'right', 'left-both', 'right-both', 'mono', 'swap'], description: CHANNELS_WORDS },
+        music_volume_points: { type: 'array', items: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }, description: 'The music’s volume line: [[seconds into the music as placed, dB], …] (0 dB as it is, -12 quieter), straight between the points; e.g. [[0, 0], [4, -14], [20, -14], [22, 0]] to lower it under speech.' },
         voiceover: { type: 'string', description: 'A voice-over (a sound file), on a track of its own.' },
         voiceover_start: { type: 'number', minimum: 0, description: 'When the voice-over starts, in seconds of the edited video.' },
+        voiceover_fade: { type: 'number', minimum: 0, maximum: 10, description: 'Seconds the voice-over fades in and out.' },
+        voiceover_channels: { type: 'string', enum: ['stereo', 'left', 'right', 'left-both', 'right-both', 'mono', 'swap'], description: CHANNELS_WORDS },
+        channels: { type: 'string', enum: ['stereo', 'left', 'right', 'left-both', 'right-both', 'mono', 'swap'], description: `The clips’ own sound: ${CHANNELS_WORDS}` },
+        silence: { type: 'array', items: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }, description: 'Parts where the clips’ own sound is silenced, the picture kept: [[start, end], …] in seconds of the edited video.' },
         voice_cleanup: { type: 'number', minimum: 0, maximum: 1, description: 'Clean up the voices (the clips’ own sound and the voice-over): noise and rumble taken out; 0.5 a good start.' },
         duck_music: { type: 'number', minimum: 0, maximum: 1, description: 'Lower the music while someone speaks (0.6 a good start).' },
         loudness: { type: 'string', enum: ['web', 'broadcast'], description: 'Even out the loudness: for the web and phones (-14 LUFS), or for broadcast (-23).' },
@@ -321,6 +334,7 @@ export function editVideoTool(): RunTool {
                 ...(c.keep_pitch === false ? { keepPitch: false } : {}),
                 ...(c.reverse === true ? { reverse: true } : {}),
                 ...(c.stabilize === true ? { stabilize: true } : {}),
+                ...(typeof c.channels === 'string' ? { channels: c.channels } : typeof a.channels === 'string' ? { channels: a.channels } : {}),
                 ...(num(c.volume) !== undefined ? { volume: num(c.volume) } : num(a.volume) !== undefined ? { volume: num(a.volume) } : {}),
                 ...(c.mute === true || a.mute === true ? { mute: true } : {}),
                 ...(typeof c.sound === 'string' && c.sound.trim() ? { sound: c.sound.trim() } : {}),
@@ -362,6 +376,7 @@ export function editVideoTool(): RunTool {
             ...(a.mute === true ? { mute: true } : num(a.volume) !== undefined ? { volume: num(a.volume) } : {}),
             ...(grade ? { grade } : {}),
             ...(defaultFit ? { fit: 'fill' } : {}),
+            ...(typeof a.channels === 'string' ? { channels: a.channels } : {}),
           }));
         }
         if (typeof a.shape === 'string') r.shape = a.shape;
@@ -386,8 +401,23 @@ export function editVideoTool(): RunTool {
         const audio: Record<string, unknown>[] = [];
         const fade = num(a.music_fade);
         if (typeof a.music === 'string' && a.music.trim())
-          audio.push({ src: a.music.trim(), track: 'music', start: num(a.music_start) ?? 0, ...(num(a.music_volume) !== undefined ? { volume: num(a.music_volume) } : {}), ...(fade ? { fadeIn: fade, fadeOut: fade } : {}) });
-        if (typeof a.voiceover === 'string' && a.voiceover.trim()) audio.push({ src: a.voiceover.trim(), track: 'voice', start: num(a.voiceover_start) ?? 0 });
+          audio.push({
+            src: a.music.trim(),
+            track: 'music',
+            start: num(a.music_start) ?? 0,
+            ...(num(a.music_volume) !== undefined ? { volume: num(a.music_volume) } : {}),
+            ...(fade ? { fadeIn: fade, fadeOut: fade } : {}),
+            ...(typeof a.music_channels === 'string' ? { channels: a.music_channels } : {}),
+            ...(Array.isArray(a.music_volume_points) ? { levels: a.music_volume_points.map(pairOf).filter(Boolean) } : {}),
+          });
+        if (typeof a.voiceover === 'string' && a.voiceover.trim())
+          audio.push({
+            src: a.voiceover.trim(),
+            track: 'voice',
+            start: num(a.voiceover_start) ?? 0,
+            ...(num(a.voiceover_fade) ? { fadeIn: num(a.voiceover_fade), fadeOut: num(a.voiceover_fade) } : {}),
+            ...(typeof a.voiceover_channels === 'string' ? { channels: a.voiceover_channels } : {}),
+          });
         if (audio.length) r.audio = audio;
         r.fixes = { voice: num(a.voice_cleanup), duck: num(a.duck_music), loudness: a.loudness };
         const texts: Partial<VideoText>[] = Array.isArray(a.texts) ? a.texts.slice(0, MAX_TEXTS).map((t: Record<string, any>) => ({ ...obj(t), text: String(t?.text ?? '') })) : [];
@@ -411,6 +441,17 @@ export function editVideoTool(): RunTool {
           ...(a.processor_only === true ? { encoder: 'cpu' as const } : {}),
         };
         let prep: Prepared = await prepare(ctx.deps, { ...ask, src: many && !a.path ? (r.clips[0].src as string) : main }, { cwd: ctx.cwd, to: { into: folder, name } });
+        // Parts silenced on the timeline: each clip's own sound silenced where they cross it.
+        if (Array.isArray(a.silence) && a.silence.length) {
+          const ranges = a.silence.map(pairOf).filter((x: [number, number] | undefined): x is [number, number] => !!x);
+          const { spans } = clipSpans(prep.recipe.clips ?? [], prep.factsOf);
+          r.clips = (prep.recipe.clips ?? []).map((c, i) => {
+            const sp = spans[i];
+            const local = ranges.map(([x, y]: [number, number]) => [Math.max(0, x - sp.start), Math.min(sp.length, y - sp.start)] as [number, number]).filter(([x, y]: [number, number]) => y - x >= 0.05);
+            return local.length ? { ...c, silence: [...(c.silence ?? []), ...local] } : c;
+          });
+          prep = await prepare(ctx.deps, { ...ask, src: prep.source.path ?? prep.source.kept ?? main, recipe: r as VideoRecipe }, { cwd: ctx.cwd, to: { into: folder, name } });
+        }
         let srt: string | undefined;
         if (a.captions === true && !picture && format !== 'gif') {
           const said = await captionsOf(await prepare(ctx.deps, { ...ask, src: prep.source.path ?? prep.source.kept ?? main }, { cwd: ctx.cwd, forCaptions: true }), typeof a.language === 'string' ? a.language : '', ctx.signal);
