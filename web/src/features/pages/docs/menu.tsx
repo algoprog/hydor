@@ -32,6 +32,7 @@ import {
   ListOrdered,
   ListTree,
   Lightbulb,
+  Footprints,
   Languages,
   MessageCircleQuestion,
   MessageSquarePlus,
@@ -122,6 +123,8 @@ export interface DocMenuCtx {
   aiSection?: () => void;
   /** Insert → Signature: a saved one, or one drawn there. */
   signature: () => void;
+  /** Insert → Footnote: a mark at the caret, its words in a box. */
+  footnote?: () => void;
   link: () => void;
   equation: (inline: boolean) => void;
   chars: () => void;
@@ -232,6 +235,7 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     { label: 'Plot', icon: <ChartScatter size={15} />, also: 'chart graph data matplotlib histogram scatter', disabled: c.readOnly, run: c.plot },
     { label: 'Link', icon: <Link2 size={15} />, keys: 'Ctrl+K', run: c.link },
     { label: 'Comment', icon: <MessageSquarePlus size={15} />, keys: 'Ctrl+Alt+M', disabled: !st.text.trim(), run: c.comment },
+    !!c.footnote && { label: 'Footnote', icon: <Footprints size={15} />, keys: 'Ctrl+Alt+F', also: 'footnote note reference endnote', disabled: c.readOnly || !!st.picked, run: c.footnote },
     '-',
     {
       label: 'Equation',
