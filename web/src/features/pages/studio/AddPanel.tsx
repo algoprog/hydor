@@ -124,6 +124,7 @@ export function AddPanel({
   cmd,
   app,
   onAi,
+  onImport,
 }: {
   anchor: RefObject<HTMLElement | null>;
   open: boolean;
@@ -133,6 +134,8 @@ export function AddPanel({
   app?: AppInfo;
   /** A block made with AI, put where Put it says. */
   onAi?: (where: Where) => void;
+  /** Blocks from a file (Markdown, a Notion export, a Word file, a web page), put where Put it says. */
+  onImport?: (where: Where) => void;
 }) {
   // A template's screen opens on its App parts, also when what the template has arrives after the editor.
   const [chosen, setKind] = useState<BlockKind | 'app' | 'media' | null>(null);
@@ -189,6 +192,20 @@ export function AddPanel({
             >
               <Sparkles size={15} className="shrink-0 text-accent" />
               Add a block made with AI
+            </button>
+          )}
+          {onImport && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onImport(at);
+              }}
+              title="Markdown, a Notion export (.zip, with its databases), a Word file, a web page or a CSV file"
+              className="mt-1 flex h-9 w-full items-center gap-2 rounded-xl border border-line px-3 text-left text-[12.5px] font-medium text-fg-2 transition-colors hover:border-line-2 hover:bg-bg-2 hover:text-fg max-md:h-11"
+            >
+              <FileInput size={15} className="shrink-0 text-fg-3" />
+              Import into the page…
             </button>
           )}
           <div className="mt-2 flex items-center gap-2 border-t border-line px-1 pt-2">

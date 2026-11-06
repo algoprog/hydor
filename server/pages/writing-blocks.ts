@@ -421,6 +421,23 @@ export function writingBlocks(X: ExtraCore): Extra {
         fillCrumbs();
         return true;
       }
+      if (a === 'importBlocks') {
+        // Blocks from a file (Markdown, a Notion export, a Word file…): after the part picked, inside it, or at the end.
+        const t = doc.createElement('template');
+        t.innerHTML = X.sanitize(String(arg?.html ?? '').slice(0, 3_000_000));
+        const nodes = [...t.content.children] as HTMLElement[];
+        if (!nodes.length) return true;
+        const s = E.sel();
+        const u = s && s !== doc.body ? X.unitOf(s) : null;
+        const where = arg?.where === 'end' || !u ? {} : arg?.where === 'inside' ? { ref: E.pathOf(u), into: true } : { ref: E.pathOf(u) };
+        E.change(() => {
+          X.placeBlock(nodes[0], where);
+          for (let i = 1; i < nodes.length; i++) nodes[i - 1].after(nodes[i]);
+          return { pick: nodes[0] };
+        });
+        nodes[0].scrollIntoView?.({ block: 'nearest' });
+        return true;
+      }
       if (a === 'askBlock') {
         // A block from Add: after the part picked (or inside it, or at the end of the page).
         const id = String(arg?.id ?? '');

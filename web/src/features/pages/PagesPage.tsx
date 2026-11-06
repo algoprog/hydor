@@ -21,6 +21,9 @@ import {
   Globe,
   GlobeLock,
   History,
+  Link2,
+  Lock,
+  LockOpen,
   Pencil,
   Share2,
   Smartphone,
@@ -36,6 +39,8 @@ import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { CopyButton } from '../../components/Markdown';
 import { Button, cx, Dialog, Empty, IconButton, MenuItem, MenuLabel, MenuSep, Popover, Throbber, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
+import { BacklinksPopover, LockBand, lockPage, pageWords } from './PageExtras';
+import { LOCALE } from '../../i18n/locale';
 import { NavButton, PageHeader } from '../layout/PageHeader';
 import { Library } from './Library';
 import { PublishDialog, RenameDialog } from './parts';
@@ -241,7 +246,7 @@ function PageView({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   // An older version on view.
   const [old, setOld] = useState<{ version: number; title: string; html?: string; model?: unknown } | null>(null);
-  const [menu, setMenu] = useState<'history' | 'more' | 'share' | 'export' | 'space' | 'folder' | null>(null);
+  const [menu, setMenu] = useState<'history' | 'more' | 'share' | 'export' | 'space' | 'folder' | 'links' | null>(null);
   // The Library's folders, for More → Move to a folder (loaded with the list, when it is not yet).
   const folders = usePagesStore((s) => s.folders);
   useEffect(() => {
@@ -489,6 +494,14 @@ function PageView({ id }: { id: string }) {
       </Button>
     </div>
   );
+  // A page locked (PageExtras.tsx): only to use, and a band to unlock it.
+  const locked = !kind && !!data?.page.locked && !old;
+  const setLock = (on: boolean) => {
+    setMenu(null);
+    lockPage(id, on).then(() => load(), toastError);
+  };
+  const shownBand = band || (locked ? <LockBand onUnlock={() => setLock(false)} /> : null);
+  const words = !kind && menu === 'more' && doc ? pageWords(doc.html) : null;
   const Editor = kind ? EDITORS[kind] : undefined;
   const editor = kind ? (
     Editor ? (
@@ -524,11 +537,11 @@ function PageView({ id }: { id: string }) {
       key={id}
       doc={doc}
       layout={mobile ? 'sheet' : 'page'}
-      readOnly={!!old}
+      readOnly={!!old || locked}
       onSave={(html) => saveBody({ html })}
       lead={lead}
       tail={tail}
-      band={band}
+      band={shownBand}
       initialMode={startMode === 'edit' || startMode === 'code' ? startMode : undefined}
       savedNote={page?.sessionKey ? 'the agent that made it sees your changes' : undefined}
       onAsk={(text) => askThis(text)}
@@ -607,6 +620,16 @@ function PageView({ id }: { id: string }) {
                 What it keeps
               </MenuItem>
             )}
+            {!kind && !old && (
+              <MenuItem icon={data.page.locked ? <LockOpen size={14} /> : <Lock size={14} />} onClick={() => setLock(!data.page.locked)}>
+                {data.page.locked ? 'Unlock the page' : 'Lock the page'}
+              </MenuItem>
+            )}
+            {!kind && (
+              <MenuItem icon={<Link2 size={14} />} onClick={() => setMenu('links')}>
+                Linked from…
+              </MenuItem>
+            )}
             <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(null), setDialog('rename'))}>
               Edit the title and description
             </MenuItem>
@@ -636,7 +659,13 @@ function PageView({ id }: { id: string }) {
             <MenuItem icon={<Trash2 size={14} />} danger onClick={remove}>
               Delete
             </MenuItem>
+            {words && (
+              <div className="px-2.5 pt-1.5 pb-1 text-[11.5px] text-fg-3">
+                {words.words.toLocaleString(LOCALE)} words · {words.chars.toLocaleString(LOCALE)} characters · about {words.minutes} min to read
+              </div>
+            )}
           </Popover>
+          {!kind && <BacklinksPopover pageId={id} anchor={moreRef} open={menu === 'links'} onClose={() => setMenu(null)} />}
           <SpaceMenu
             anchor={moreRef}
             open={menu === 'space'}
