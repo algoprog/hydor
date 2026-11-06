@@ -27,6 +27,7 @@ import { CommandPalette, usePalette } from '../palette/CommandPalette';
 import { CountVisits } from '../palette/usage';
 import { ReleaseNotes, WhatsNew } from '../settings/Releases';
 import { Lightbox, VideoBox } from '../../components/Lightbox';
+import { EditorHost } from '../mediaedit/host';
 import { HelpButton, Tour } from '../tour/Tour';
 import { Tips } from '../tips/Tips';
 import { HandsFree } from '../voice/HandsFree';
@@ -254,9 +255,9 @@ export function Shell() {
   if (mobile) {
     return (
       <div data-shell className="flex h-dvh flex-col overflow-hidden bg-bg">
-        <div className="min-h-0 flex-1">
+        <EditorHost>
           <Routes />
-        </div>
+        </EditorHost>
         <MobileDrawer />
         <UploadTrays />
         <QuickOpen />
@@ -284,9 +285,9 @@ export function Shell() {
         </div>
       )}
       <main className="flex min-w-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1">
+        <EditorHost>
           <Routes />
-        </div>
+        </EditorHost>
         {panelOpen && loc !== '/terminal' && (
           <>
             <div onPointerDown={dragPanel} className="h-1 shrink-0 cursor-row-resize border-t border-line hover:bg-accent/30" />

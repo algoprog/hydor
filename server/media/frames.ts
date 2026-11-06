@@ -30,6 +30,15 @@ const FFMPEG = process.env.HYDOR_FFMPEG || 'ffmpeg';
 const FFPROBE = process.env.HYDOR_FFPROBE || 'ffprobe';
 
 let found: Promise<boolean> | null = null;
+let foundBin: Promise<string | null> | null = null;
+
+/** The ffmpeg to run for the editors' own work (a picture edited, a video cut), or null when this computer has none (asked once). */
+export function ffmpegBin(): Promise<string | null> {
+  return (foundBin ??= run(FFMPEG, ['-hide_banner', '-version'], 10_000).then(
+    () => FFMPEG,
+    () => null,
+  ));
+}
 
 /** Whether ffmpeg and ffprobe are on this computer (asked once). */
 export function hasFfmpeg(): Promise<boolean> {
