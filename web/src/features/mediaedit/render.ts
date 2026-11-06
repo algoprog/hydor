@@ -2,7 +2,7 @@
 // Library item, a file, the web), its upright frame (turned, flipped, straightened), its look and hidden areas
 // (shared/mediaedit's applyLook and hideArea, the same code the server runs), its marks drawn over it, and the file
 // made at the end, at its size and of its kind. The screen works on a smaller copy; the file is made from the whole.
-import { applyLook, arrowHead, hideArea, MARK_FONTS, textMetrics, uprightMap, type ImageFormat, type ImageRecipe, type Mark } from '@shared/mediaedit';
+import { applyLook, arrowHead, hasLook, hideArea, MARK_FONTS, textMetrics, uprightMap, type ImageFormat, type ImageRecipe, type Mark } from '@shared/mediaedit';
 import { mu } from '../../lib/machine';
 
 /** A picture to work on: the whole of it, drawn once (its turn as the file says, for a photo). */
@@ -133,10 +133,10 @@ export function uprightCanvas(src: CanvasImageSource, w: number, h: number, r: I
  */
 export function putLook(c: HTMLCanvasElement, r: ImageRecipe, k: number, at: { x: number; y: number }) {
   const hidden = (r.marks ?? []).filter((m) => m.type === 'blur' || m.type === 'pixelate');
-  if (!r.adjust && !r.filter && !hidden.length) return;
+  if (!hasLook(r) && !hidden.length) return;
   const g = ctx2d(c, true);
   const d = g.getImageData(0, 0, c.width, c.height);
-  applyLook(d.data, c.width, c.height, r.adjust, r.filter);
+  applyLook(d.data, c.width, c.height, r.adjust, r.filter, r);
   for (const m of hidden) if (m.type === 'blur' || m.type === 'pixelate') hideArea(d.data, c.width, c.height, { x: (m.x - at.x) * k, y: (m.y - at.y) * k, w: m.w * k, h: m.h * k }, m.type, m.strength);
   g.putImageData(d, 0, 0);
 }

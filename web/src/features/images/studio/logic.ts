@@ -55,7 +55,7 @@ export function changePrice(t: TiersInfo): Price {
 }
 
 /** The models the picture tools on this computer download the first time each is used, about so large. */
-export const LOCAL_MODEL_MB: Record<'cutout' | 'erase', number> = { cutout: 190, erase: 210 };
+export const LOCAL_MODEL_MB: Record<'cutout' | 'erase' | 'upscale', number> = { cutout: 190, erase: 210, upscale: 5 };
 
 /** Taking a picture's background out, or erasing part of it: on this computer for nothing, or through OpenRouter. */
 export function toolPrice(t: TiersInfo, tool: 'cutout' | 'erase', how: 'local' | 'cloud'): Price {

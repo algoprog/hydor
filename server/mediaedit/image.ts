@@ -209,7 +209,7 @@ export function geometry(src: Pixels, r: ImageRecipe): Pixels {
  */
 export function render(src: Pixels, r: ImageRecipe): { p: Pixels; words: Words[]; notes: string[] } {
   const p = geometry(src, r);
-  applyLook(p.px, p.w, p.h, r.adjust, r.filter);
+  applyLook(p.px, p.w, p.h, r.adjust, r.filter, r);
   const at = { x: r.crop?.x ?? 0, y: r.crop?.y ?? 0 };
   const marks = r.marks ?? [];
   for (const m of marks) if (m.type === 'blur' || m.type === 'pixelate') hideArea(p.px, p.w, p.h, { x: m.x - at.x, y: m.y - at.y, w: m.w, h: m.h }, m.type, m.strength);
