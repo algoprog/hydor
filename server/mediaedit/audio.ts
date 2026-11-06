@@ -89,6 +89,7 @@ export interface Sound extends PlanSource {
   path?: string;
   /** A sound the editor keeps ("naget-sound:…"). */
   kept?: string;
+  bytes?: number;
 }
 
 const MEDIA_ID = /^(?:media:|\/api\/media\/)([a-f0-9]{10})(?:\/file)?(?:[?#].*)?$/;
