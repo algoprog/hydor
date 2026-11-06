@@ -293,7 +293,7 @@ export function fitBox(b: Box, from: { w: number; h: number }, to: { w: number; 
   const sx = to.w / from.w;
   const sy = to.h / from.h;
   const k = Math.min(sx, sy);
-  const near = (a: number, c: number, tol: number) => Math.abs(a - c) <= tol;
+  const near = (v: number, c: number, tol: number) => Math.abs(v - c) <= tol;
   const tolX = from.w * 0.02;
   const tolY = from.h * 0.02;
   const wideAcross = b.w >= from.w * 0.9;
@@ -309,11 +309,19 @@ export function fitBox(b: Box, from: { w: number; h: number }, to: { w: number; 
   const cy = ((b.y + b.h / 2) / from.h) * to.h;
   let x = cx - w / 2;
   let y = cy - h / 2;
-  // Edges it touched, it touches still.
-  if (near(b.x, 0, tolX)) x = b.x * sx;
-  else if (near(b.x + b.w, from.w, tolX)) x = to.w - w - (from.w - b.x - b.w) * sx;
-  if (near(b.y, 0, tolY)) y = b.y * sy;
-  else if (near(b.y + b.h, from.h, tolY)) y = to.h - h - (from.h - b.y - b.h) * sy;
+  // Edges it touched, it touches still; one in an edge's margin keeps its margin (scaled as the rest is).
+  const left = b.x;
+  const right = from.w - b.x - b.w;
+  const top = b.y;
+  const bottom = from.h - b.y - b.h;
+  if (near(left, 0, tolX)) x = left * sx;
+  else if (near(right, 0, tolX)) x = to.w - w - right * sx;
+  else if (left <= from.w * 0.12 && right > from.w * 0.12) x = left * k;
+  else if (right <= from.w * 0.12 && left > from.w * 0.12) x = to.w - w - right * k;
+  if (near(top, 0, tolY)) y = top * sy;
+  else if (near(bottom, 0, tolY)) y = to.h - h - bottom * sy;
+  else if (top <= from.h * 0.12 && bottom > from.h * 0.12) y = top * k;
+  else if (bottom <= from.h * 0.12 && top > from.h * 0.12) y = to.h - h - bottom * k;
   // Inside before, inside after.
   const inside = b.x >= -1 && b.y >= -1 && b.x + b.w <= from.w + 1 && b.y + b.h <= from.h + 1;
   if (inside) {

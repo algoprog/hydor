@@ -359,7 +359,8 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     for (const x of c.querySelectorAll('[class=""]')) x.removeAttribute('class');
     return c.outerHTML;
   };
-  const snap = () => pack(JSON.stringify({ b: cleanBody(), f: fontsLink()?.getAttribute('href') ?? '', t: document.title }));
+  // With what was picked then, which an undo picks again.
+  const snap = () => pack(JSON.stringify({ b: cleanBody(), f: fontsLink()?.getAttribute('href') ?? '', t: document.title, s: sel.map(pathOf), g: scope ? pathOf(scope) : null }));
   const state = () => send({ type: 'wa-ed-state', dirty, canUndo: undo.length > 0, canRedo: redo.length > 0 });
   let coalesce: { key: string; at: number } | null = null;
   /** Before a change: a step to go back to (changes of one kind in a row, a slider dragged, are one step). */
@@ -400,8 +401,8 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     return x instanceof HTMLElement && x !== root && x !== document.body && !x.hasAttribute('data-n-own') ? x : null;
   };
   const restore = (saved: string) => {
-    const o = JSON.parse(unpack(saved)) as { b: string; f: string; t: string };
-    const paths = sel.map(pathOf);
+    const o = JSON.parse(unpack(saved)) as { b: string; f: string; t: string; s?: number[][]; g?: number[] | null };
+    const paths = o.s ?? sel.map(pathOf);
     const bi = board ? boards().indexOf(board) : 0;
     endText(true);
     endCrop(false);
@@ -409,7 +410,7 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     root.replaceChild(document.importNode(d.body, true), document.body);
     setFonts(o.f);
     if (o.t !== document.title) document.title = o.t;
-    scope = null;
+    scope = o.g ? byPath(o.g) : null;
     sel = paths.map(byPath).filter((x): x is HTMLElement => !!x && !!boardOf(x));
     board = boards()[Math.min(bi, boards().length - 1)] ?? null;
     layout();
