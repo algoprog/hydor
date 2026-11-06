@@ -3,8 +3,8 @@
 // Adjust (brightness, contrast, saturation, and the fades) and Sound (its own sound's volume, or none, and music from
 // the Library under it, with its volume and where it starts).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowDownToLine, FlipHorizontal2, FlipVertical2, Music, Pause, Play, Plus, RotateCcw, RotateCw, Trash2, Undo2, X } from 'lucide-react';
-import { editedLength, toEdited, turnedSize, VIDEO_SHAPES, VIDEO_SPEEDS, videoClock, type VideoCrop, type VideoRecipe, type VideoShape, type VideoText } from '@shared/mediaedit-video';
+import { ArrowDownToLine, Music, Pause, Play, Plus, RotateCcw, RotateCw, Trash2, TrianglesCenterlineDashedHorizontal, TrianglesCenterlineDashedVertical, Undo2, X } from 'lucide-react';
+import { editedLength, keptParts, toEdited, toOriginal, turnedSize, VIDEO_SHAPES, VIDEO_SPEEDS, videoClock, type VideoCrop, type VideoRecipe, type VideoShape, type VideoText } from '@shared/mediaedit-video';
 import type { MediaItem } from '@shared/media';
 import { Button, cx, IconButton, inputCls, Switch } from '../../../components/ui';
 import { mu } from '../../../lib/machine';
@@ -35,7 +35,27 @@ export function Group({ title, children, className, aside }: { title?: ReactNode
 }
 
 /** A slider with its name and value; a double click puts it back to `zero`. A drag is one step of undo. */
-export function Slider({ label, value, min, max, step = 1, onChange, change, zero = 0, show }: { label: string; value: number; min: number; max: number; step?: number; onChange: (v: number) => void; change: Pick<Change, 'begin' | 'end'>; zero?: number; show?: (v: number) => string }) {
+export function Slider({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+  change,
+  zero = 0,
+  show,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (v: number) => void;
+  change: Pick<Change, 'begin' | 'end'>;
+  zero?: number;
+  show?: (v: number) => string;
+}) {
   const shown = show ? show(value) : min < 0 && value > 0 ? `+${value}` : `${value}`;
   return (
     <label className="block">
@@ -89,14 +109,20 @@ export function readClock(s: string): number | null {
   return parts.reduce((n, x) => n * 60 + Number(x.replace(',', '.')), 0);
 }
 
-/** A time to type ("1:05.3"), and a button that puts it at the playhead. */
-function TimeField({ label, value, onChange, clock, min = 0, max }: { label: string; value: number; onChange: (t: number) => void; clock: Clock; min?: number; max: number }) {
-  const [text, setText] = useState(videoClock(value));
-  useEffect(() => setText(videoClock(value)), [value]);
+/**
+ * A time to type ("1:05.3"), and a button that puts it at the playhead. `edited`: shown and typed as a time of the edited
+ * video (as the time under the picture is), kept as the original's.
+ */
+function TimeField({ label, value, onChange, clock, min = 0, max, edited }: { label: string; value: number; onChange: (t: number) => void; clock: Clock; min?: number; max: number; edited?: { parts: [number, number][]; speed: number } }) {
+  const shown = edited ? toEdited(value, edited.parts, edited.speed) : value;
+  const [text, setText] = useState(videoClock(shown));
+  useEffect(() => {
+    setText(videoClock(shown));
+  }, [shown]);
   const take = () => {
     const t = readClock(text);
-    if (t === null) return setText(videoClock(value));
-    onChange(Math.min(max, Math.max(min, t)));
+    if (t === null) return setText(videoClock(shown));
+    onChange(Math.min(max, Math.max(min, edited ? toOriginal(t, edited.parts, edited.speed) : t)));
   };
   return (
     <label className="flex items-center gap-2 text-[12.5px]">
@@ -123,7 +149,7 @@ export function TrimPanel({ r, change, duration, clock }: { r: VideoRecipe; chan
         <TimeField label="Starts at" value={a} max={b - 0.2} onChange={(t) => setTrim([t, b])} clock={clock} />
         <TimeField label="Ends at" value={b} min={a + 0.2} max={duration} onChange={(t) => setTrim([a, t])} clock={clock} />
         <p className="text-[12px] leading-snug text-fg-3">
-          Drag the handles at the ends of the timeline, or type the times. The edited video is <span className="tnum font-medium text-fg-2">{videoClock(length)}</span> long.
+          Drag the handles at the ends of the timeline, or type the times (of the whole video). The edited video is <span className="tnum font-medium text-fg-2">{videoClock(length)}</span> long.
         </p>
       </Group>
       <Group title="Parts cut out">
@@ -173,7 +199,25 @@ function ShapeIcon({ shape }: { shape: VideoShape }) {
   return <span className="rounded-[3px] border-[1.5px] border-current" style={{ width: Math.round(w * k), height: Math.round(h * k) }} />;
 }
 
-export function CropPanel({ r, w, h, shape, onShape, onTurn, onMirror, onReset }: { r: VideoRecipe; w: number; h: number; shape: VideoShape; onShape: (s: VideoShape) => void; onTurn: (by: 90 | -90) => void; onMirror: (k: 'flipH' | 'flipV') => void; onReset: () => void }) {
+export function CropPanel({
+  r,
+  w,
+  h,
+  shape,
+  onShape,
+  onTurn,
+  onMirror,
+  onReset,
+}: {
+  r: VideoRecipe;
+  w: number;
+  h: number;
+  shape: VideoShape;
+  onShape: (s: VideoShape) => void;
+  onTurn: (by: 90 | -90) => void;
+  onMirror: (k: 'flipH' | 'flipV') => void;
+  onReset: () => void;
+}) {
   const up = turnedSize(w, h, r.rotate);
   const c: VideoCrop = r.crop ?? { x: 0, y: 0, w: up.w, h: up.h };
   return (
@@ -187,11 +231,11 @@ export function CropPanel({ r, w, h, shape, onShape, onTurn, onMirror, onReset }
         <p className="text-[12px] leading-snug text-fg-3">Drag the box, or its corners and sides.</p>
       </Group>
       <Group title="Turn and mirror">
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
           <Choice onClick={() => onTurn(-90)} icon={<RotateCcw size={16} />} label="Turn left" />
           <Choice onClick={() => onTurn(90)} icon={<RotateCw size={16} />} label="Turn right" />
-          <Choice on={!!r.flipH} onClick={() => onMirror('flipH')} icon={<FlipHorizontal2 size={16} />} label="Mirror" title="Mirror it left to right" />
-          <Choice on={!!r.flipV} onClick={() => onMirror('flipV')} icon={<FlipVertical2 size={16} />} label="Upside down" />
+          <Choice on={!!r.flipH} onClick={() => onMirror('flipH')} icon={<TrianglesCenterlineDashedVertical size={16} />} label="Mirror" title="Mirror it left to right" />
+          <Choice on={!!r.flipV} onClick={() => onMirror('flipV')} icon={<TrianglesCenterlineDashedHorizontal size={16} />} label="Upside down" />
         </div>
       </Group>
       {(r.crop || r.rotate || r.flipH || r.flipV) && (
@@ -233,6 +277,7 @@ export function TextPanel({ r, change, picked, onPick, onAdd, clock, duration }:
     onPick(null);
   };
   const behind = BEHIND.find((b) => b.bg === t?.background)?.id ?? (t?.background ? 'other' : 'none');
+  const shift = useMemo(() => ({ parts: keptParts(r, duration), speed: r.speed ?? 1 }), [r, duration]);
   return (
     <div className="space-y-5">
       <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={onAdd} className="w-full">
@@ -259,7 +304,15 @@ export function TextPanel({ r, change, picked, onPick, onAdd, clock, duration }:
           <Group title="Colour">
             <div className="flex flex-wrap items-center gap-1.5">
               {COLOURS.map((c) => (
-                <button key={c} type="button" aria-label={c} aria-pressed={t.color === c} onClick={() => set({ color: c })} className={cx('h-7 w-7 rounded-full border', t.color === c ? 'ring-2 ring-accent ring-offset-2 ring-offset-panel' : 'border-line-2')} style={{ background: c }} />
+                <button
+                  key={c}
+                  type="button"
+                  aria-label={c}
+                  aria-pressed={t.color === c}
+                  onClick={() => set({ color: c })}
+                  className={cx('h-7 w-7 rounded-full border', t.color === c ? 'ring-2 ring-accent ring-offset-2 ring-offset-panel' : 'border-line-2')}
+                  style={{ background: c }}
+                />
               ))}
               <label className="relative h-7 w-7 cursor-pointer overflow-hidden rounded-full border border-line-2" title="Another colour" style={{ background: 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)' }}>
                 <input type="color" value={t.color.slice(0, 7)} onChange={(e) => set({ color: e.target.value })} className="absolute inset-0 cursor-pointer opacity-0" aria-label="Another colour" />
@@ -269,7 +322,13 @@ export function TextPanel({ r, change, picked, onPick, onAdd, clock, duration }:
           <Group title="Behind them">
             <div className="grid grid-cols-3 gap-1.5">
               {BEHIND.map((b) => (
-                <Choice key={b.id} on={behind === b.id} onClick={() => set({ background: b.bg })} icon={<span className={cx('h-3.5 w-5 rounded-[3px] border border-line-2', b.id === 'dark' && 'bg-black/70', b.id === 'light' && 'bg-white')} />} label={b.label} />
+                <Choice
+                  key={b.id}
+                  on={behind === b.id}
+                  onClick={() => set({ background: b.bg })}
+                  icon={<span className={cx('h-3.5 w-5 rounded-[3px] border border-line-2', b.id === 'dark' && 'bg-black/70', b.id === 'light' && 'bg-white')} />}
+                  label={b.label}
+                />
               ))}
             </div>
           </Group>
@@ -288,8 +347,8 @@ export function TextPanel({ r, change, picked, onPick, onAdd, clock, duration }:
             <p className="text-[12px] leading-snug text-fg-3">Or drag the words on the picture.</p>
           </Group>
           <Group title="When they show">
-            <TimeField label="From" value={t.from} max={t.to - 0.1} onChange={(v) => set({ from: v })} clock={clock} />
-            <TimeField label="To" value={t.to} min={t.from + 0.1} max={duration} onChange={(v) => set({ to: v })} clock={clock} />
+            <TimeField label="From" value={t.from} max={t.to - 0.1} onChange={(v) => set({ from: v })} clock={clock} edited={shift} />
+            <TimeField label="To" value={t.to} min={t.from + 0.1} max={duration} onChange={(v) => set({ to: v })} clock={clock} edited={shift} />
           </Group>
           <Button size="sm" variant="ghost" icon={<Trash2 size={13} />} onClick={remove} className="text-err hover:text-err">
             Delete these words
@@ -351,7 +410,9 @@ function SoundRow({ s, playing, onPlay, onUse }: { s: MediaItem; playing: boolea
 
 export function SoundPanel({ r, change, audio, clock, length, parts, speed }: { r: VideoRecipe; change: Change; audio: boolean; clock: Clock; length: number; parts: [number, number][]; speed: number }) {
   const items = useMedia((s) => s.items);
-  useEffect(() => useMedia.getState().ensure(), []);
+  useEffect(() => {
+    useMedia.getState().ensure();
+  }, []);
   const sounds = useMemo(() => (items ?? []).filter((m) => m.kind === 'audio'), [items]);
   const [hearing, setHearing] = useState<string | null>(null);
   const player = useRef<HTMLAudioElement | null>(null);
@@ -392,8 +453,24 @@ export function SoundPanel({ r, change, audio, clock, length, parts, speed }: { 
                 <X size={14} />
               </IconButton>
             </div>
-            <Slider label="Its volume" value={Math.round((m.volume ?? 1) * 100)} min={0} max={200} step={5} zero={100} onChange={(v) => change((x) => (x.music ? { ...x, music: { ...x.music, volume: v === 100 ? undefined : v / 100 } } : x))} change={change} show={(v) => `${v}%`} />
-            <TimeField label="Starts at" value={m.start ?? 0} max={Math.max(0, length - 0.1)} onChange={(v) => change((x) => (x.music ? { ...x, music: { ...x.music, start: v || undefined } } : x))} clock={{ ...clock, get: () => toEdited(clock.get(), parts, speed) }} />
+            <Slider
+              label="Its volume"
+              value={Math.round((m.volume ?? 1) * 100)}
+              min={0}
+              max={200}
+              step={5}
+              zero={100}
+              onChange={(v) => change((x) => (x.music ? { ...x, music: { ...x.music, volume: v === 100 ? undefined : v / 100 } } : x))}
+              change={change}
+              show={(v) => `${v}%`}
+            />
+            <TimeField
+              label="Starts at"
+              value={m.start ?? 0}
+              max={Math.max(0, length - 0.1)}
+              onChange={(v) => change((x) => (x.music ? { ...x, music: { ...x.music, start: v || undefined } } : x))}
+              clock={{ ...clock, get: () => toEdited(clock.get(), parts, speed) }}
+            />
             <p className="text-[12px] leading-snug text-fg-3">Its start is a time of the edited video; it plays to the end, or until it ends.</p>
           </div>
         ) : sounds.length ? (
