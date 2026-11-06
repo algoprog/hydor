@@ -80,6 +80,8 @@ import { agentFileComments, openFile, openFileComments, saveFile, texFileForAgen
 import { kindForFile, kindOf, mustKind, type PageKind } from './kinds.ts';
 import { shellManifest, shellPage } from './shell.ts';
 import { uploadRoutes } from './uploads.ts';
+import { designRoutes } from './design-routes.ts';
+import { DESIGN_SAVE_NOTE, designForSave } from './design-agent.ts';
 import { createRequest, decideRequest, getRequest, initSites, listSites, publish, serveSite, unpublish, unpublishPage, setSocial } from './sites.ts';
 import {
   addVersion,
@@ -227,6 +229,7 @@ const SAVE_PAGE: RunTool = {
     'A database block’s rows are the page’s own data: get_page shows them, and databases adds, changes or removes them (with id; leave html out to only change them).',
     'Pictures: name a picture file of your folder (one generate_image, make_svg or make_plot made: images/…) as an img’s src or in CSS url(): it goes inside the page (made smaller where this computer can); a page with its pictures may be up to 2 MB.',
     `Give each new page a description (under ${DESCRIPTION_WORDS} words): the Library shows it and its search finds the page by it.`,
+    DESIGN_SAVE_NOTE,
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -308,7 +311,8 @@ const SAVE_PAGE: RunTool = {
       return `Saved "${page.title}" (page ${page.id}): ${done}; the page itself is as it was.${await fill(page.id)}${comment(page.id)}`;
     }
     // Pictures from the session's folder (and the app's kept ones) go inside the page.
-    const pictured = typeof a.html === 'string' ? pagePictures(db, a.html, ctx.cwd) : { html: a.html, notes: [] };
+    // A design carries its stylesheet and script; its videos (files of the session) are kept and play in it.
+    const pictured = typeof a.html === 'string' ? await designForSave(db, pagePictures(db, a.html, ctx.cwd), ctx.cwd) : { html: a.html, notes: [] };
     const p = id
       ? addVersion(db, id, { title: a.title, html: pictured.html, by: 'agent', description: a.description })
       : createPage(db, { title: a.title, html: pictured.html, by: 'agent', description: a.description, ...placeOf(ctx, a.project, a.libraryFolder) });
@@ -649,14 +653,17 @@ const EXPORT_PAGE: RunTool = {
     'a deck as PowerPoint (pptx), a PDF (a slide a page) or its slides as pictures (png: a zip of them, or one slide with slide), a document as Word (docx), PDF or Markdown (md), a spreadsheet as Excel (xlsx), CSV (its first sheet) or PDF,',
     'a LaTeX document as its typeset PDF, its main source (tex) or the whole project (zip), a notebook as its .ipynb file (ipynb), a Python script of its cells (py) or a PDF; any of them as a web page (html) that works on its own.',
     'A deck’s web page (html) is one small file that opens in any browser and works offline (its pictures, videos and fonts inside it), but for its 3D parts, embedded web pages and the libraries its custom code loads; its PowerPoint file (pptx) turns what PowerPoint lacks into pictures or PowerPoint’s nearest effects, and says what changed.',
+    'A design (a poster, a post, a card: a page of artboards) as pictures exactly its size (png or jpg, scale 1 to 3, twice its size unless asked; a zip of them for several pages, or one page with slide) or a PDF to print, each page its own size on paper.',
     'The file goes in this session’s folder unless you give a path.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       id: { type: 'string', description: 'The page’s or deck’s id (get_page lists them).' },
-      format: { type: 'string', enum: ['pdf', 'docx', 'pptx', 'xlsx', 'csv', 'md', 'tex', 'zip', 'html', 'ipynb', 'py', 'png'] },
-      slide: { type: 'number', description: 'With png: that slide alone (from 1), as a picture.' },
+      format: { type: 'string', enum: ['pdf', 'docx', 'pptx', 'xlsx', 'csv', 'md', 'tex', 'zip', 'html', 'ipynb', 'py', 'png', 'jpg'] },
+      slide: { type: 'number', description: 'With png (or a design’s jpg): that slide, or that page of a design, alone (from 1), as a picture.' },
+      scale: { type: 'number', description: 'A design’s png or jpg: 1, 2 or 3 times its size (2 when left out).' },
+      transparent: { type: 'boolean', description: 'A design’s png: without its background (see-through).' },
       path: { type: 'string', description: 'Where to write it: a file name or a path, from the session’s folder or absolute.' },
     },
     required: ['id', 'format'],
@@ -664,7 +671,7 @@ const EXPORT_PAGE: RunTool = {
   async run(a, ctx) {
     const format = String(a.format) as ExportFormat;
     if (!EXPORT_TYPES[format]) throw new Error(`format is one of ${Object.keys(EXPORT_TYPES).join(', ')}.`);
-    const f = await exportPage(ctx.deps.db, String(a.id ?? ''), { format, slide: Number(a.slide) || undefined });
+    const f = await exportPage(ctx.deps.db, String(a.id ?? ''), { format, slide: Number(a.slide) || undefined, scale: Number(a.scale) || undefined, transparent: a.transparent === true });
     const dest = typeof a.path === 'string' && a.path.trim() ? fromSession(ctx.cwd, a.path.trim()) : path.join(ctx.cwd || config.defaultCwd, f.name);
     const file = fs.existsSync(dest) && fs.statSync(dest).isDirectory() ? path.join(dest, f.name) : dest;
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -794,6 +801,8 @@ function routes(d: Deps) {
   pageFilesRoutes(app, db);
   // The page editor's tools that need the server: bookmarks (page-tools.ts).
   pageToolsRoutes(d);
+  // Designs: their files (PNG, JPG, PDF), their videos, and the brand kit (design-routes.ts).
+  designRoutes(app, db);
   const P = (req: FastifyRequest) => req.params as Record<string, string>;
   const B = (req: FastifyRequest) => (req.body ?? {}) as Record<string, unknown>;
   const key = (v: unknown) => (typeof v === 'string' && v ? v.slice(0, 300) : undefined);
@@ -1093,10 +1102,10 @@ function routes(d: Deps) {
   app.post('/api/pages/:id/link', async (req) => ({ link: `/pg/${resetPageLink(db, P(req).id)}` }));
   /** The page as a file: a PDF, a Word document or (a deck) a PowerPoint file, or a web page that works on its own. */
   app.get('/api/pages/:id/export', async (req, reply) => {
-    const q = req.query as { format?: string; v?: string; paper?: string; slide?: string };
+    const q = req.query as { format?: string; v?: string; paper?: string; slide?: string; scale?: string; transparent?: string };
     const format = String(q.format ?? '') as ExportFormat;
     if (!EXPORT_TYPES[format]) throw new HttpError(400, `format is one of ${Object.keys(EXPORT_TYPES).join(', ')}`);
-    const f = await exportPage(db, P(req).id, { format, version: q.v ? Number(q.v) : undefined, paper: q.paper === 'letter' ? 'letter' : 'a4', slide: q.slide ? Number(q.slide) : undefined });
+    const f = await exportPage(db, P(req).id, { format, version: q.v ? Number(q.v) : undefined, paper: q.paper === 'letter' ? 'letter' : 'a4', slide: q.slide ? Number(q.slide) : undefined, scale: q.scale ? Number(q.scale) : undefined, transparent: q.transparent === '1' });
     // What there is to say of it (a PowerPoint file's fonts inside it, and which compressed), beside it.
     if (f.note) reply.header('X-Export-Note', f.note.replace(/[^\x20-\x7e]/g, '?'));
     return reply
