@@ -159,7 +159,7 @@ export type CropShape = (typeof CROP_SHAPES)[number]['id'];
 export const MARK_FONTS = [
   { id: 'sans', label: 'Sans', css: 'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif' },
   { id: 'serif', label: 'Serif', css: 'Georgia, "Times New Roman", ui-serif, serif' },
-  { id: 'mono', label: 'Mono', css: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' },
+  { id: 'mono', label: 'Monospace', css: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' },
   { id: 'hand', label: 'Handwritten', css: '"Segoe Print", "Bradley Hand", "Comic Sans MS", "Chalkboard SE", cursive' },
   { id: 'heavy', label: 'Heavy', css: 'Impact, "Arial Black", "Helvetica Neue", sans-serif' },
 ] as const;

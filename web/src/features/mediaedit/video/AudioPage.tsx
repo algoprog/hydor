@@ -81,7 +81,7 @@ function Mixer(p: AudioProps) {
           />
         );
       })}
-      <Strip name="Out" title="The whole" level={lv.master} />
+      <Strip name="Mix" title="The whole" level={lv.master} />
     </div>
   );
 }
