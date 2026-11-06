@@ -74,6 +74,8 @@ const n = (v: string | undefined, d = 0) => {
   return Number.isFinite(x) ? x : d;
 };
 const hex = (v: string | undefined) => (v ? hexColour(v) : null);
+/** A small field of the inspector (the shared input class is as wide as its row). */
+const fieldCls = 'h-8 rounded-lg border border-line-2 bg-bg-1 px-2 text-[12.5px] outline-none focus:border-accent/60';
 
 function Slider({ label, value, min, max, step = 1, onChange, unit = '', hint }: { label: string; value: number; min: number; max: number; step?: number; onChange: (v: number) => void; unit?: string; hint?: string }) {
   return (
@@ -98,7 +100,7 @@ function Icons({ items }: { items: { icon: ReactNode; title: string; on?: boolea
           // The words being written keep their selection.
           onMouseDown={(e) => e.preventDefault()}
           onClick={b.run}
-          className={cx('grid h-8 w-8 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg disabled:opacity-35', b.on && 'bg-accent-soft text-accent')}
+          className={cx('grid h-8 w-7 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg disabled:opacity-35', b.on && 'bg-accent-soft text-accent')}
         >
           {b.icon}
         </button>
@@ -121,7 +123,7 @@ export function FontPicker({ value, brand, onPick }: { value: string; brand: str
   };
   return (
     <>
-      <button ref={ref} type="button" onClick={() => setOpen((o) => !o)} className={cx(inputCls, 'flex h-8 min-w-0 flex-1 items-center truncate text-left text-[13.5px]')} style={{ fontFamily: fontStack(value) }} title="Font">
+      <button ref={ref} type="button" onClick={() => setOpen((o) => !o)} className={cx(fieldCls, 'flex min-w-0 flex-1 items-center truncate text-left text-[13.5px]')} style={{ fontFamily: fontStack(value) }} title="Font">
         <span className="truncate">{value || 'Font'}</span>
       </button>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={260} title="Font">
@@ -218,6 +220,19 @@ function Header({ title, children }: { title: string; children?: ReactNode }) {
 }
 
 const SHADOWS: Record<string, string | null> = { none: null, soft: '0 2px 8px rgba(0,0,0,.18)', medium: '0 8px 24px rgba(0,0,0,.24)', strong: '0 18px 48px rgba(0,0,0,.34)' };
+/** Which of the shadows a box-shadow is (by its blur). */
+const shadowName = (v: string | undefined) => (!v || v === 'none' ? 'none' : v.includes('48px') ? 'strong' : v.includes('24px') ? 'medium' : 'soft');
+function ShadowPick({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Shadow" className={cx(fieldCls, 'min-w-0 flex-1')}>
+      {['none', 'soft', 'medium', 'strong'].map((v) => (
+        <option key={v} value={v}>
+          {tr(v === 'none' ? 'None' : v === 'soft' ? 'Soft' : v === 'medium' ? 'Medium' : 'Strong')}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 export function DesignInspector({
   sel,
@@ -277,6 +292,7 @@ export function DesignInspector({
           </Row>
           <p className="pb-1 pl-[92px] text-[11.5px] leading-snug text-fg-3">{tr('Gradients, patterns and pictures: Add → Background.')}</p>
         </div>
+        <div className="px-3">
         {usedColours.length > 0 && (
           <Fold id="d-colours" title="Colours in this design" start>
             <p className="pb-1.5 text-[11.5px] leading-snug text-fg-3">{tr('Pick one to change it everywhere it is used.')}</p>
@@ -310,6 +326,7 @@ export function DesignInspector({
             ))}
           </div>
         </Fold>
+        </div>
         {brand && (
           <div className="px-3 pt-2">
             <Button size="sm" variant="secondary" icon={<PaletteIcon size={14} />} onClick={() => applyBrand(cmd, brand, onFont)} className="w-full justify-center">
@@ -436,7 +453,7 @@ export function DesignInspector({
               value={String(weight)}
               onChange={(e) => style({ 'font-weight': e.target.value })}
               aria-label="Weight"
-              className={cx(inputCls, 'h-8 w-[104px] shrink-0 px-1.5 text-[12.5px]')}
+              className={cx(fieldCls, 'w-[96px] shrink-0 px-1')}
             >
               {(fontByName(fontName)?.w ?? [300, 400, 500, 600, 700, 800, 900]).map((w) => (
                 <option key={w} value={w}>
@@ -529,7 +546,7 @@ export function DesignInspector({
               Crop
             </Button>
           )}
-          <ReplacePicture onDevice={(src) => cmd('picture', { src })} onLibrary={() => setReplace('image')} onAi={() => run(makePicture({ kind: 'picture', aspect: undefined }).then(async (p) => p && cmd('picture', { src: await pageData(p.src), alt: p.prompt ?? '' })))} />
+          <ReplacePicture empty={!!el.empty} onDevice={(src) => cmd('picture', { src })} onLibrary={() => setReplace('image')} onAi={() => run(makePicture({ kind: 'picture', aspect: undefined }).then(async (p) => p && cmd('picture', { src: await pageData(p.src), alt: p.prompt ?? '' })))} />
         </div>
         {!el.empty && (
           <div className="flex flex-wrap gap-1 px-3 pt-1.5">
@@ -579,7 +596,7 @@ export function DesignInspector({
                 </Row>
               )}
               <Row label="Shadow">
-                <Segmented size="sm" value={Object.entries(SHADOWS).find(([, v]) => v && (st['box-shadow'] ?? '').replace(/\s/g, '').includes(v.split(' ')[1]))?.[0] ?? 'none'} onChange={(v) => style({ 'box-shadow': SHADOWS[v] })} options={['none', 'soft', 'medium', 'strong'].map((v) => ({ value: v, label: tr(v[0].toUpperCase() + v.slice(1)) }))} />
+                <ShadowPick value={shadowName(st['box-shadow'])} onChange={(v) => style({ 'box-shadow': SHADOWS[v] })} />
               </Row>
             </>
           )}
@@ -666,11 +683,9 @@ export function DesignInspector({
             </>
           )}
           <Row label="Shadow">
-            <Segmented
-              size="sm"
-              value={t === 'shape' ? (/drop-shadow/.test(inl.filter ?? '') ? 'soft' : 'none') : (Object.entries(SHADOWS).find(([, v]) => v && (st['box-shadow'] ?? '').replace(/\s/g, '').includes(v.split(' ')[1]))?.[0] ?? 'none')}
-              onChange={(v) => style(t === 'shape' ? { filter: v === 'none' ? null : `drop-shadow(${SHADOWS[v]!.replace(/rgba/, 'rgba')})` } : { 'box-shadow': SHADOWS[v] })}
-              options={['none', 'soft', 'medium', 'strong'].map((v) => ({ value: v, label: tr(v[0].toUpperCase() + v.slice(1)) }))}
+            <ShadowPick
+              value={t === 'shape' ? (/drop-shadow/.test(inl.filter ?? '') ? 'soft' : 'none') : shadowName(st['box-shadow'])}
+              onChange={(v) => style(t === 'shape' ? { filter: v === 'none' ? null : `drop-shadow(${SHADOWS[v]})` } : { 'box-shadow': SHADOWS[v] })}
             />
           </Row>
         </Fold>
@@ -765,6 +780,7 @@ export function DesignInspector({
         />
       </Header>
       {el.locked && <p className="mx-3 mb-1 rounded-lg bg-bg-2 px-2.5 py-1.5 text-[12px] text-fg-2">{tr('Locked: it stays where it is. Unlock it to move or change it.')}</p>}
+      <div className="px-3">
       {content}
       <Fold id="d-place" title="Position" start>
         <div className="grid grid-cols-2 gap-x-2 gap-y-1">
@@ -797,6 +813,7 @@ export function DesignInspector({
         )}
         <Slider label="See-through" value={Math.round((1 - n(st.opacity, 1)) * 100)} min={0} max={100} onChange={(v) => style({ opacity: v ? String(Math.round((1 - v / 100) * 100) / 100) : null })} unit="%" />
       </Fold>
+      </div>
       <MediaPick
         kind={replace}
         onClose={() => setReplace(null)}
@@ -843,14 +860,14 @@ function WordsBox({ words, focus, onChange }: { words: string; focus: number; on
 }
 
 /** Replace the picture: from this device, the Library, or made with AI. */
-function ReplacePicture({ onDevice, onLibrary, onAi }: { onDevice: (src: string) => void; onLibrary: () => void; onAi: () => void }) {
+function ReplacePicture({ empty, onDevice, onLibrary, onAi }: { empty: boolean; onDevice: (src: string) => void; onLibrary: () => void; onAi: () => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const file = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button ref={ref} size="sm" variant="secondary" icon={<Replace size={14} />} onClick={() => setOpen((o) => !o)}>
-        Replace
+      <Button ref={ref} size="sm" variant={empty ? 'primary' : 'secondary'} icon={<Replace size={14} />} onClick={() => setOpen((o) => !o)}>
+        {empty ? 'Add a picture' : 'Replace'}
       </Button>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={230} title="Replace">
         <MenuItem icon={<ImageUp size={14} />} onClick={() => (setOpen(false), file.current?.click())}>

@@ -168,6 +168,7 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     .addb:hover{border-color:${ACCENT};color:${ACCENT}}
     .dim{position:fixed;inset:0;background:rgba(10,10,14,.55);display:none;pointer-events:none}
     .badge{position:absolute;right:-10px;top:-10px;width:20px;height:20px;border-radius:50%;background:${ACCENT};color:#fff;display:grid;place-items:center}
+    .badge[hidden]{display:none}
     @media (pointer:coarse){.h{width:20px;height:20px;margin:-10px 0 0 -10px}.h.e,.h.w{width:14px;height:30px;margin:-15px 0 0 -7px}.h.n,.h.s{width:30px;height:14px;margin:-7px 0 0 -15px}.rot{width:32px;height:32px;margin-left:-16px}.bar button{min-width:38px;height:36px}}
   </style>
   <div class="dim"></div>
@@ -613,7 +614,7 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
   /** The colours the design uses, the most used first, and its fonts. */
   const used = () => {
     const count = new Map<string, number>();
-    const fonts = new Set<string>();
+    const fonts = new Map<string, number>();
     for (const b of boards())
       for (const el of [b, ...b.querySelectorAll<HTMLElement>('[style],[fill],[stroke]')]) {
         const st = el.getAttribute('style') ?? '';
@@ -626,9 +627,12 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
           if (h) count.set(h, (count.get(h) ?? 0) + 1);
         }
         const ff = el.style.fontFamily;
-        if (ff) fonts.add(ff.split(',')[0].trim().replace(/^["']|["']$/g, ''));
+        if (ff) {
+          const name = ff.split(',')[0].trim().replace(/^["']|["']$/g, '');
+          fonts.set(name, Math.max(fonts.get(name) ?? 0, num(getComputedStyle(el).fontSize, 0)));
+        }
       }
-    return { colours: [...count].sort((a, b) => b[1] - a[1]).map(([c]) => c).slice(0, 16), fonts: [...fonts].slice(0, 12) };
+    return { colours: [...count].sort((a, b) => b[1] - a[1]).map(([c]) => c).slice(0, 16), fonts: [...fonts].sort((a, b) => b[1] - a[1]).map(([f]) => f).slice(0, 12) };
   };
   const tellUsed = () => {
     const u = used();
@@ -676,14 +680,14 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     const one = sel.length === 1 ? sel[0] : null;
     const t = one ? typeOf(one) : 'many';
     const lockedNow = sel.some(locked);
-    const key = `${t}:${lockedNow}:${!!cropping}:${one ? isGroup(one) : false}`;
+    const key = `${t}:${lockedNow}:${!!cropping}:${one ? isGroup(one) : false}:${one?.classList.contains('n-ph') ?? false}`;
     if (key !== barKey) {
       barKey = key;
       const b = (a: string, icon: string, title: string, label?: string) => `<button data-a="${a}" title="${attr(title)}"${label ? ' class="txt"' : ''}>${svg(icon)}${label ? `<span>${attr(label)}</span>` : ''}</button>`;
       const parts: string[] = [];
       if (cropping) parts.push(b('cropDone', 'done', L('dCropDoneTip', 'Done (Enter)'), L('dCropDone', 'Done')));
       else {
-        if (t === 'pic' && !lockedNow) parts.push(b('editPicture', 'edit', L('dEditPictureTip', 'Open it in the picture editor'), L('dEditPicture', 'Edit picture')), b('crop', 'crop', L('dCropTip', 'Crop it inside its frame (double-click)')));
+        if (t === 'pic' && !lockedNow && !one?.classList.contains('n-ph')) parts.push(b('editPicture', 'edit', L('dEditPictureTip', 'Open it in the picture editor'), L('dEditPicture', 'Edit picture')), b('crop', 'crop', L('dCropTip', 'Crop it inside its frame (double-click)')));
         if (t === 'video' && !lockedNow) parts.push(b('editVideo', 'video', L('dEditVideoTip', 'Open it in the video editor'), L('dEditVideo', 'Edit video')));
         if (t === 'text' && !lockedNow) parts.push(b('write', 'words', L('dWriteTip', 'Change the words (double-click)')));
         if (t === 'many' && sel.every((x) => x.parentElement === sel[0].parentElement)) parts.push(b('group', 'group', L('dGroupTip', 'Group (Ctrl+G)'), L('dGroupIt', 'Group')));
