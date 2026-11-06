@@ -227,9 +227,9 @@
 [设置 → 图片、视频和音频](/settings?s=images)：智能体通过 OpenRouter 为你生成的图片、视频、音乐和语音，以及资料库中它们的标题和说明由谁撰写。详见[文档、图片、视频和语音](/guide/documents-voice)。
 
 - [**图片生成**](/settings?s=images&find=Making%20images)：允许智能体生成图片。
-- [**For most pictures (Best)**](/settings?s=images&find=For%20most%20pictures%20%28Best%29)：The model that makes most pictures, and every change to one。
+- [**用于大多数图片（最佳）**](/settings?s=images&find=For%20most%20pictures%20%28Best%29)：The model that makes most pictures, and every change to one。
 - [**For simple pictures (Quick)**](/settings?s=images&find=For%20simple%20pictures%20%28Quick%29)：A cheaper, quicker model for icons, backgrounds, textures and simple pictures。
-- [**Picture tools on this computer**](/settings?s=images&find=Picture%20tools%20on%20this%20computer)：Take a picture’s background out, or erase part of it, here: free, and your pictures stay on this computer。
+- [**这台电脑上的图片工具**](/settings?s=images&find=Picture%20tools%20on%20this%20computer)：Take a picture’s background out, or erase part of it, here: free, and your pictures stay on this computer。
 - [**视频生成**](/settings?s=images&find=Making%20videos)：允许智能体生成视频。
 - [**视频模型**](/settings?s=images&find=Video%20model)：生成视频的模型。
 - [**音频生成**](/settings?s=images&find=Making%20audio)：允许智能体生成音频。
