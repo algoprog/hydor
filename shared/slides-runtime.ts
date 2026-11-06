@@ -60,9 +60,10 @@ export interface DrawOpts {
    */
   live?: boolean;
   /**
-   * Makes a live part's frame for its page (`html`, a whole document): the app's, an iframe at /partframe sent the
-   * page by postMessage once it says it is ready. Returns the iframe (or an element holding one). Without it the
-   * runtime makes a sandboxed srcdoc frame (sandbox="allow-scripts", no origin of its own).
+   * Makes a live part's frame for its page (`html`, a whole document): the app's, an iframe at /partframe
+   * (sandbox="allow-scripts"), which posts {type: "n-part-ready"} to its parent and takes the page posted back once as
+   * {type: "n-part-page", html} (framesAt makes such frames). Returns the iframe (or an element holding one). Without it
+   * the runtime makes a sandboxed srcdoc frame (sandbox="allow-scripts", no origin of its own).
    */
   frame?: (html: string, part: El) => HTMLElement;
   /** Moving backgrounds move (the slideshow's do; an editor's preview of one may). */
@@ -3928,6 +3929,26 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
   };
 
   return { css, style, slide, part, words, fit, read, show, print, steps, morphPairs, boot, maths, tokens, codeLook };
+}
+
+/**
+ * DrawOpts.frame for the app: each live part's frame an iframe at `url` (the server's /partframe, sandboxed by its
+ * policy too), allowed scripts and nothing else, sent its page once it says it is ready (only that frame's word counts).
+ */
+export function framesAt(url: string, doc: Document = document): NonNullable<DrawOpts['frame']> {
+  return (html) => {
+    const f = doc.createElement('iframe');
+    f.setAttribute('sandbox', 'allow-scripts');
+    f.src = url;
+    const win = doc.defaultView;
+    const on = (e: MessageEvent) => {
+      if (e.source !== f.contentWindow || (e.data as { type?: unknown } | null)?.type !== 'n-part-ready') return;
+      win?.removeEventListener('message', on);
+      f.contentWindow?.postMessage({ type: 'n-part-page', html }, '*');
+    };
+    win?.addEventListener('message', on);
+    return f;
+  };
 }
 
 let quiet: SlidesRuntime | null = null;
