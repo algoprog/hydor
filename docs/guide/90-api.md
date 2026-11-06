@@ -843,7 +843,7 @@ These use the routes above; Git's own routes are the user's alone.
 
 These routes serve the app’s own pages, need the user’s browser, or are the user’s alone; app_api refuses the ones an agent must never use.
 
-- `POST /api/sessions/:key/approvals/:id` — answers an approval, question or form (`{ decision, message?, answers?, form? }`): the user's own decision; agents never answer another session's approvals.
+- `POST /api/sessions/:key/approvals/:id` — answers an approval, question or form (`{ decision, message?, answers?, form? }`): the user's own decision; agents never answer another session's approvals. A form an agent asked that outlived its step (still shown among the session's cards) sends its answers to the session as the user's message, and stays when they can't be sent.
 - `POST /api/uploads` — saves files for an answer to a question; it only serves the approval cards.
 - `GET /api/sessions/:key/image` — serves a message's picture as raw bytes.
 - `GET /api/sessions/:key/queue/:id/attachment` — serves a queued message's attachment as a raw file.

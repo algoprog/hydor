@@ -66,6 +66,8 @@ A card waits about nine minutes. If you don't answer by then, it goes away and t
 
 When an agent needs several things from you, it can show a form in the conversation instead of a list of questions: a trip's dates and budget, a new app's name and fields. Fill it in and click the button (**Send**, or what the agent called it); **Not now** closes it, and the agent carries on without it or asks in words.
 
+A form waits as long as you need. If you haven't answered within about nine minutes, the agent ends its turn there and the form stays in the conversation, even when the agent stops or the app restarts. When you fill it in, your answers go to the agent as your next message ("My answers to …"), and it carries on from there; if they can't reach it, the form stays for you to send again. A form taller than the screen opens at its top, with **Latest** to go to its end.
+
 A card for a change can carry a form too: "Make a project" can show the name, description and guidelines the agent guessed, for you to correct before you click **Save**.
 
 ## What agents can't do in the app
