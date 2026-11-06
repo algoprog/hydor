@@ -5,6 +5,7 @@
 import type { MadePicture } from '@shared/images';
 import { post } from '../../../lib/api';
 import { mu } from '../../../lib/machine';
+import { PAGE_BYTES, PAGE_SIDE, pageSize } from './logic';
 
 const ASSET = 'naget-asset:';
 const VIDEO = 'naget-video:';
@@ -75,10 +76,6 @@ async function kindOf(src: string): Promise<string> {
   return res?.headers.get('content-type')?.split(';')[0] ?? 'image/png';
 }
 
-/** The longest side a picture keeps inside a page, and about the most bytes it takes there (as the server's page-pictures.ts). */
-export const PAGE_SIDE = 1600;
-export const PAGE_BYTES = 450_000;
-
 /** Whether a picture has see-through parts (looked at small, which is enough to tell). */
 export function hasAlpha(img: CanvasImageSource, w: number, h: number): boolean {
   const k = Math.min(1, 256 / Math.max(w, h));
@@ -90,12 +87,6 @@ export function hasAlpha(img: CanvasImageSource, w: number, h: number): boolean 
   const d = g.getImageData(0, 0, c.width, c.height).data;
   for (let i = 3; i < d.length; i += 4) if (d[i] < 250) return true;
   return false;
-}
-
-/** The size a picture takes inside a page: no side over PAGE_SIDE, its shape kept. */
-export function pageSize(w: number, h: number, side = PAGE_SIDE): { w: number; h: number } {
-  const k = Math.min(1, side / Math.max(w, h, 1));
-  return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) };
 }
 
 /** A data: address's size in bytes, about. */
