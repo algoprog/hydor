@@ -55,9 +55,9 @@ import {
 } from '../../shared/docs.ts';
 import { FONTS, googleFamilies } from '../../shared/slides.ts';
 import { docRefs, type Refs } from '../../shared/doc-refs.ts';
-import { bookmarkName } from './docx-parts.ts';
+import { bookmarkName, citationOf, sourcesFromXml, watermarkOf } from './docx-parts.ts';
 import { paginateDoc } from '../../shared/doc-paginate.ts';
-import { citeItems, COLUMN_GAP, notesHtml, paperOf } from '../../shared/docs.ts';
+import { citeItems, citeOf, COLUMN_GAP, notesHtml, paperOf, type Source } from '../../shared/docs.ts';
 import { scriptSafe } from './kit.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -950,6 +950,13 @@ interface WCtx {
   lastRev: { key: string; id: string } | null;
   plainSince: boolean;
   nextBreak: { kind: 'ins' | 'del'; id: string } | null;
+  /** Footnotes' and endnotes' words, by their ids here (f1, e1). */
+  notes: Map<string, Run[]>;
+  /** The bookmarks started in the paragraph being read, and each bookmark's block (by the id given to it). */
+  marksHere: string[];
+  marks: Map<string, string>;
+  /** The picture a caption just read belongs to (its bookmarks lead to the picture). */
+  capTarget?: Record<string, unknown>;
 }
 
 /** A tracked change's suggestion: the one of its author and time just before it, while nothing unchanged came between; else a new one. */
@@ -1092,8 +1099,10 @@ interface PCollect {
   checked?: boolean;
   check?: boolean;
   link?: string;
-  /** A field being read: its instruction so far, and whether its result is being read. */
-  field?: { instr: string; result: boolean; link?: string };
+  /** A field being read: its instruction so far, whether its result is being read, and where its result's runs start. */
+  field?: { instr: string; result: boolean; link?: string; at?: number };
+  /** A caption's SEQ field's label ("Figure"). */
+  seq?: string;
 }
 
 /** The comments on the words being read, by their ids here. */
@@ -1133,6 +1142,13 @@ function runContent(ctx: WCtx, r: El, look: Look, c: PCollect, align: Align | un
       case 'noBreakHyphen':
         add('-');
         break;
+      case 'footnoteReference':
+      case 'endnoteReference': {
+        // A footnote's mark: its words are the file's notes (read already).
+        const id = `${x.n === 'footnoteReference' ? 'f' : 'e'}${(att(x, 'id') ?? '').replace(/[^A-Za-z0-9_-]/g, '')}`;
+        if (ctx.notes.has(id)) c.runs.push({ t: id, fn: true });
+        break;
+      }
       case 'instrText':
         if (c.field && !c.field.result) c.field.instr += x.c.map((y) => (typeof y === 'string' ? y : '')).join('');
         break;
@@ -1141,9 +1157,15 @@ function runContent(ctx: WCtx, r: El, look: Look, c: PCollect, align: Align | un
         if (t === 'begin') c.field = { instr: '', result: false };
         else if (t === 'separate' && c.field) {
           c.field.result = true;
+          c.field.at = c.runs.length;
           const m = /HYPERLINK\s+"([^"]+)"/.exec(c.field.instr);
           c.field.link = m ? docLink(m[1]) : undefined;
-        } else if (t === 'end') c.field = undefined;
+          const seq = /^\s*SEQ\s+(\S+)/i.exec(c.field.instr);
+          if (seq) c.seq = seq[1].replace(/_/g, ' ');
+        } else if (t === 'end') {
+          if (c.field) fieldDone(c, c.field.instr, c.field.at ?? c.runs.length);
+          c.field = undefined;
+        }
         break;
       }
       case 'drawing':
@@ -1169,6 +1191,24 @@ function runContent(ctx: WCtx, r: El, look: Look, c: PCollect, align: Align | un
         break;
       }
     }
+  }
+}
+
+/**
+ * A field's result read: a citation (CITATION) becomes one of the document's, its sources by their tags; a cross-reference
+ * (REF to a bookmark) waits for its bookmark's block (refsAfter); others stay as the words they showed.
+ */
+function fieldDone(c: PCollect, instr: string, at: number) {
+  const cite = citationOf(instr);
+  if (cite.length) {
+    c.runs.splice(at, c.runs.length - at, { t: citeOf(cite), cite: true } as Run);
+    return;
+  }
+  const ref = /^\s*(?:REF|PAGEREF)\s+([A-Za-z0-9_]{1,40})/i.exec(instr);
+  if (ref && /^\s*REF/i.test(instr) && c.runs.length > at) {
+    const words = c.runs.slice(at).map((r) => r.t).join('');
+    // A thing of its own while it waits (so it joins no words beside it).
+    c.runs.splice(at, c.runs.length - at, { t: words, xref: true, ref: ref[1] } as Run & { ref: string });
   }
 }
 
@@ -1203,17 +1243,29 @@ function inline(ctx: WCtx, el: El, c: PCollect, align: Align | undefined) {
       case 'hyperlink': {
         const rel = ctx.rels.get(patt(x, 'id') ?? '');
         const was = c.link;
-        c.link = (rel?.external ? docLink(rel.target) : undefined) ?? was;
+        // A link to a place in the file (a bookmark): a place in the document, once the bookmark's block is known.
+        const anchor = att(x, 'anchor');
+        c.link = (rel?.external ? docLink(rel.target) : anchor && /^[A-Za-z0-9_]{1,40}$/.test(anchor) ? `#~${anchor}` : undefined) ?? was;
         inline(ctx, x, c, align);
         c.link = was;
         break;
       }
       case 'fldSimple': {
         const was = c.link;
-        const m = /HYPERLINK\s+"([^"]+)"/.exec(att(x, 'instr') ?? '');
+        const instr = att(x, 'instr') ?? '';
+        const m = /HYPERLINK\s+"([^"]+)"/.exec(instr);
         if (m) c.link = docLink(m[1]) ?? was;
+        const seq = /^\s*SEQ\s+(\S+)/i.exec(instr);
+        if (seq) c.seq = seq[1].replace(/_/g, ' ');
+        const at = c.runs.length;
         inline(ctx, x, c, align);
+        fieldDone(c, instr, at);
         c.link = was;
+        break;
+      }
+      case 'bookmarkStart': {
+        const name = att(x, 'name') ?? '';
+        if (name && name !== '_GoBack') ctx.marksHere.push(name);
         break;
       }
       case 'sdt': {
@@ -1327,8 +1379,13 @@ function wordParagraph(ctx: WCtx, p: El, out: Record<string, unknown>[], depth: 
   const start = out.length;
   const breakHere = ctx.nextBreak;
   ctx.nextBreak = null;
+  ctx.marksHere = [];
   wordParagraphBody(ctx, p, pPr, out, depth);
   const first = out[start];
+  // Its bookmarks lead to its block (a caption's, to its picture's).
+  const target = first ?? (ctx.capTarget ? ctx.capTarget : undefined);
+  ctx.capTarget = undefined;
+  if (target && ctx.marksHere.length) markBlock(ctx, target, ctx.marksHere);
   if (breakHere && first && (first.type === 'p' || first.type === 'li')) first[breakHere.kind] = breakHere.id;
   // Read after its words, so the next paragraph's words of the same change go on with it (a new paragraph is one suggestion).
   const markEl = kid(kid(pPr, 'rPr'), 'ins') ?? kid(kid(pPr, 'rPr'), 'del') ?? kid(kid(pPr, 'rPr'), 'moveTo') ?? kid(kid(pPr, 'rPr'), 'moveFrom');
@@ -1343,6 +1400,12 @@ function wordParagraphBody(ctx: WCtx, p: El, pPr: El | undefined, out: Record<st
   }
   if (all(p, 'instrText').some((t) => /^\s*TOC\b/.test(t.c.map((y) => (typeof y === 'string' ? y : '')).join('')))) {
     out.push({ type: 'toc' });
+    ctx.toc = Math.max(0, fieldDepth(p));
+    return;
+  }
+  // A bibliography Word keeps as a field: one of ours in its place (drawn from the sources cited), its entries left out.
+  if (all(p, 'instrText').some((t) => /^\s*BIBLIOGRAPHY\b/.test(t.c.map((y) => (typeof y === 'string' ? y : '')).join('')))) {
+    out.push({ type: 'bib' });
     ctx.toc = Math.max(0, fieldDepth(p));
     return;
   }
@@ -1368,11 +1431,34 @@ function wordParagraphBody(ctx: WCtx, p: El, pPr: El | undefined, out: Record<st
     runs = mergeRuns([{ ...runs[0], t: runs[0].t.slice(glyph[0].length) }, ...runs.slice(1)]);
   }
   const text = runs.map((r) => r.t).join('');
-  // A caption under a picture is the picture's.
+  // A caption under a picture is the picture's (numbered by a SEQ field: "Figure 2: …", its label kept to number it).
   const prevImg = out[out.length - 1];
+  const capWords = (t: string) => {
+    const w = t.replace(/\s+/g, ' ').trim();
+    if (!c.seq) return { caption: w };
+    const m = new RegExp(`^${c.seq.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\d+\\s*[:.–—-]?\\s*`, 'i').exec(w);
+    return { label: c.seq, caption: m ? w.slice(m[0].length) : w };
+  };
   if (k.caption && prevImg?.type === 'image' && !prevImg.caption && text.trim() && !c.after.length) {
-    prevImg.caption = text.replace(/\s+/g, ' ').trim();
+    const cw = capWords(text);
+    if (cw.caption) prevImg.caption = cw.caption;
+    if (cw.label) prevImg.label = cw.label;
+    ctx.capTarget = prevImg;
     return;
+  }
+  // A caption over a table: kept to be the table's, if one comes next (wordTable).
+  if (k.caption && text.trim() && !c.after.length && depth === 0) {
+    out.push({ type: 'p', runs, __cap: capWords(text) });
+    return;
+  }
+  // A numbered equation, as this app writes one: the equation on its line, its number after a tab ("(3)").
+  const om = kids(p, 'oMath');
+  if (om.length === 1 && c.seq && /^\s*\(?\s*\d+\s*\)?\s*$/.test(text.replace(/\u2063/g, '').replace(runs.filter((r) => r.math).map((r) => r.t).join(''), ''))) {
+    const tex = texOfOmml(om[0]);
+    if (tex) {
+      out.push({ type: 'math', tex, label: c.seq });
+      return;
+    }
   }
   // A checklist's item is a step (half an inch) further in a level, its box where its first line starts (left less hanging).
   const checkLvl = Math.min(4, Math.max(0, Math.floor((k.left - k.hanging + 180) / 720)));
@@ -1466,6 +1552,8 @@ function wordTable(ctx: WCtx, tbl: El, out: Record<string, unknown>[], depth: nu
       if (row.length) rows.push(row);
     });
   if (!rows.length) return;
+  // Bookmarks in its cells lead to it.
+  const cellMarks = all(tbl, 'bookmarkStart').map((b) => att(b, 'name') ?? '').filter((n) => n && n !== '_GoBack');
   // A first row all in bold is a header (its bold the header's own); a header row's bold, and the shading this app
   // gives one, are the header's own too.
   const bold = rows[0].every((c) => c.runs.every((r) => r.b || !r.t.trim())) && rows[0].some((c) => c.runs.some((r) => r.t.trim()));
@@ -1477,7 +1565,56 @@ function wordTable(ctx: WCtx, tbl: El, out: Record<string, unknown>[], depth: nu
   const grid = kids(kid(tbl, 'tblGrid'), 'gridCol').map((g) => Number(att(g, 'w')) || 0);
   const width = Math.max(...rows.map((r) => r.length));
   const kind = revs.length === rows.length && revs.every((r) => r.n === revs[0].n) ? (revs[0].n === 'ins' ? 'ins' : 'del') : null;
-  out.push({ type: 'table', rows, ...(head ? { head: true } : {}), ...(grid.length === width && grid.every((g) => g > 0) ? { cols: grid } : {}), ...(kind ? { [kind]: revSuggestion(ctx, revs[0]) } : {}) });
+  const t: Record<string, unknown> = { type: 'table', rows, ...(head ? { head: true } : {}), ...(grid.length === width && grid.every((g) => g > 0) ? { cols: grid } : {}), ...(kind ? { [kind]: revSuggestion(ctx, revs[0]) } : {}) };
+  // The caption just before it is its own.
+  const prev = out[out.length - 1];
+  if (prev?.__cap && depth === 0) {
+    const cap = prev.__cap as { caption: string; label?: string };
+    out.pop();
+    if (cap.caption) t.caption = cap.caption;
+    if (cap.label) t.label = cap.label;
+    if (typeof prev.id === 'string') t.id = prev.id;
+    if (typeof prev.__marks === 'object') t.__marks = prev.__marks;
+  }
+  out.push(t);
+  if (cellMarks.length) markBlock(ctx, t, cellMarks);
+}
+
+/** Bookmarks that lead to a block: it gets an id they name (this app's own _Ref_<id>, else one of its own), and a bookmark of the document's for a name people gave. */
+function markBlock(ctx: WCtx, b: Record<string, unknown>, names: string[]) {
+  const own = names.map((n) => /^_Ref_([A-Za-z0-9_]{1,24})$/.exec(n)?.[1]).find(Boolean);
+  if (typeof b.id !== 'string') b.id = own ?? `m${ctx.marks.size + 1}${Math.random().toString(36).slice(2, 6)}`;
+  for (const n of names) ctx.marks.set(n, b.id as string);
+  const named = names.find((n) => !n.startsWith('_'));
+  if (named && (b.type === 'p' || b.type === 'li') && !b.bm) b.bm = named.replace(/_/g, ' ');
+}
+
+/** Cross-references and links to places, now that every bookmark's block is known: to that block, or (none) the words they showed. */
+function refsAfter(ctx: WCtx, out: Record<string, unknown>[]) {
+  const fix = (runs: (Run & { ref?: string })[]) => {
+    for (let i = 0; i < runs.length; i++) {
+      const r = runs[i];
+      if (r.ref) {
+        const id = ctx.marks.get(r.ref);
+        runs[i] = id ? { t: id, xref: true, ...(r.cm ? { cm: r.cm } : {}) } : (({ ref: _r, xref: _x, ...x }) => x)(r);
+      }
+      if (r.link?.startsWith('#~')) {
+        const id = ctx.marks.get(r.link.slice(2));
+        if (id) runs[i] = { ...runs[i], link: `#${id}` };
+        else {
+          const { link: _l, ...x } = runs[i];
+          runs[i] = x;
+        }
+      }
+    }
+  };
+  for (const b of out) {
+    delete b.__cap;
+    delete b.__marks;
+    if (Array.isArray(b.runs)) fix(b.runs as Run[]);
+    if (Array.isArray(b.rows)) for (const row of b.rows as { runs: Run[] }[][]) for (const c of row) fix(c.runs);
+  }
+  for (const runs of ctx.notes.values()) fix(runs);
 }
 
 function wordBody(ctx: WCtx, el: El, out: Record<string, unknown>[], depth: number) {
@@ -1605,7 +1742,29 @@ function wordDoc(buf: Buffer): Doc {
   const defaults = all(sroot, 'rPrDefault')[0];
   const normal = [...styles.entries()].find(([id, s]) => id === 'Normal' || s.name.toLowerCase() === 'normal')?.[1];
   const defLook: Look = {};
-  const ctx: WCtx = { zip, rels: r, styles, nums, theme, font: 'Arial', size: 11, textEmu: Math.max(1, pw - left - right) * 635, pics: 0, openCm: new Set(), cmIds: new Map(), toc: 0, rev: null, sugs: [], lastRev: null, plainSince: true, nextBreak: null };
+  const ctx: WCtx = { zip, rels: r, styles, nums, theme, font: 'Arial', size: 11, textEmu: Math.max(1, pw - left - right) * 635, pics: 0, openCm: new Set(), cmIds: new Map(), toc: 0, rev: null, sugs: [], lastRev: null, plainSince: true, nextBreak: null, notes: new Map(), marksHere: [], marks: new Map() };
+  // Footnotes and endnotes first (the words' marks are theirs), each read as a paragraph's words are.
+  for (const [kind, type, prefix] of [
+    ['footnote', 'footnotes', 'f'],
+    ['endnote', 'endnotes', 'e'],
+  ] as const) {
+    const x = zip.text(part(type) ?? `word/${type}.xml`);
+    if (!x) continue;
+    for (const n of all(parseXml(x).root, kind)) {
+      const t = att(n, 'type');
+      if (t && t !== 'normal') continue;
+      const id = `${prefix}${(att(n, 'id') ?? '').replace(/[^A-Za-z0-9_-]/g, '')}`;
+      const runs: Run[] = [];
+      for (const para of all(n, 'p')) {
+        const pc: PCollect = { runs: [], after: [], breaks: [] };
+        inline(ctx, para, pc, undefined);
+        if (runs.length && pc.runs.length) runs.push({ t: '\n' });
+        runs.push(...pc.runs.filter((x2) => !x2.fn));
+      }
+      if (runs[0]) runs[0] = { ...runs[0], t: runs[0].t.replace(/^\s+/, '') };
+      ctx.notes.set(id, mergeRuns(runs.filter((x2) => x2.t)));
+    }
+  }
   const comments = wordComments(zip, part('comments'), part('commentsExtended'), ctx.cmIds);
   rLook(ctx, kid(defaults, 'rPr'), defLook);
   rLook(ctx, normal?.rPr, defLook);
@@ -1615,6 +1774,7 @@ function wordDoc(buf: Buffer): Doc {
 
   const out: Record<string, unknown>[] = [];
   wordBody(ctx, body, out, 0);
+  refsAfter(ctx, out);
   ownSpacing(out, font, ctx.size);
   // A document's last empty paragraphs are left out.
   while (out.length > 1 && out[out.length - 1].type === 'p' && !(out[out.length - 1].runs as Run[]).some((x) => x.t.trim())) out.pop();
@@ -1629,7 +1789,32 @@ function wordDoc(buf: Buffer): Doc {
   };
   const header = bandOfPart('header');
   const footer = bandOfPart('footer');
-  const doc = normalizeDoc({ page: { size: letter ? 'letter' : 'a4', margin }, font, size: ctx.size, blocks: out, header, footer, titlePage: !!kid(sect, 'titlePg') && on(kid(sect, 'titlePg')), comments, suggestions: ctx.sugs });
+  // Its page set up: on its side, in columns, in a colour; its watermark (in its header); the sources its citations cite.
+  const orient = att(kid(sect, 'pgSz'), 'orient') === 'landscape' || pw > ph ? 'landscape' : undefined;
+  const ncols = Number(att(kid(sect, 'cols'), 'num')) || 1;
+  const bg = att(kid(droot, 'background'), 'color');
+  const color = bg && /^[0-9a-f]{6}$/i.test(bg) && !/^ffffff$/i.test(bg) ? `#${bg.toLowerCase()}` : undefined;
+  const mark = wordWatermark(zip, r, sect);
+  let sources: Source[] = [];
+  for (const name of zip.names().filter((n) => /^customXml\/item\d+\.xml$/i.test(n))) {
+    const got = sourcesFromXml(zip.text(name) ?? '');
+    if (got?.length) sources = [...sources, ...got];
+  }
+  const notes = [...ctx.notes].map(([id, runs]) => ({ id, runs }));
+  const doc = normalizeDoc({
+    page: { size: letter ? 'letter' : 'a4', margin, ...(orient ? { orient } : {}), ...(ncols > 1 ? { cols: Math.min(3, ncols) } : {}), ...(color ? { color } : {}) },
+    font,
+    size: ctx.size,
+    blocks: out,
+    header,
+    footer,
+    titlePage: !!kid(sect, 'titlePg') && on(kid(sect, 'titlePg')),
+    comments,
+    suggestions: ctx.sugs,
+    notes,
+    ...(sources.length ? { sources } : {}),
+    ...(mark ? { mark } : {}),
+  });
   // Each comment's quote: the words it is on, as they read.
   if (!doc.comments?.length) return doc;
   const quotes = new Map<string, string>();
@@ -1641,6 +1826,21 @@ function wordDoc(buf: Buffer): Doc {
     else if (b.type === 'table') for (const row of b.rows) for (const c of row) take(c.runs);
   }
   return { ...doc, comments: doc.comments.map((c) => (quotes.get(c.id)?.trim() ? { ...c, quote: quotes.get(c.id)!.replace(/\s+/g, ' ').trim().slice(0, 500) } : c)) };
+}
+
+/** A Word file's watermark (in its default header): its words, or its picture inside the document. */
+function wordWatermark(zip: Zip, r: ReturnType<typeof rels>, sect: El | undefined): { text?: string; src?: string } | undefined {
+  const ref = kids(sect, 'headerReference').find((x) => (att(x, 'type') ?? 'default') === 'default');
+  const target = ref ? r.get(patt(ref, 'id') ?? att(ref, 'id') ?? '')?.target : undefined;
+  const x = target ? zip.text(target) : null;
+  if (!x) return undefined;
+  const w = watermarkOf(x);
+  if (!w) return undefined;
+  if (w.text) return { text: w.text };
+  const pic = w.rid ? rels(zip, target!).get(w.rid)?.target : undefined;
+  const data = pic ? zip.read(pic, 13 * 1024 * 1024) : null;
+  const mime = data ? pictureType(data) : null;
+  return data && mime ? { src: `data:${mime};base64,${data.toString('base64')}` } : undefined;
 }
 
 /** A header's or footer's words, from its part: its paragraphs' words on one line, {page} and {pages} for Word's fields. */
@@ -1760,14 +1960,16 @@ export function wordLosses(buf: Buffer, doc: Doc): { loses: string[]; cut: boole
   // A header or footer is kept as a line of words: one with a picture or a table, or one only on even pages, is not.
   const bands = r.filter((x) => x.type === 'header' || x.type === 'footer').map((x) => zip.text(x.target) ?? '');
   if (bands.some((x) => words.test(x) && /<w:(?:drawing|pict|tbl)[\s>]/.test(x)) || /<w:(?:header|footer)Reference\s[^>]*w:type="even"/.test(xml)) loses.add('headers');
-  if (/<w:(?:footnote|endnote)Reference[\s/>]/.test(xml)) loses.add('footnotes');
+
   if (r.some((x) => x.type === 'chart') || /<c:chart[\s/>]/.test(xml)) loses.add('charts');
   if (r.some((x) => x.type === 'diagramData')) loses.add('diagrams');
   if (r.some((x) => x.type === 'oleObject' || x.type === 'package') || /<o:OLEObject[\s/>]/.test(xml)) loses.add('objects');
   if (/<w:txbxContent[\s>]/.test(xml)) loses.add('boxes');
-  if (/<w:cols\s[^>]*w:num="(?:[2-9]|\d{2,})"/.test(xml)) loses.add('columns');
+  // Columns, and pages on their side, are the document's own when its sections all have them alike.
+  const colsSeen = new Set([...xml.matchAll(/<w:cols\b[^>]*?\/?>/g)].map((m) => /w:num="(\d+)"/.exec(m[0])?.[1] ?? '1'));
+  if (colsSeen.size > 1 || [...colsSeen].some((n) => Number(n) > 3)) loses.add('columns');
   const sizes = new Set([...xml.matchAll(/<w:pgSz\s[^>]*?\/>/g)].map((m) => m[0].replace(/\s+w:code="[^"]*"/, '')));
-  if (sizes.size > 1 || /<w:pgSz\s[^>]*w:orient="landscape"/.test(xml)) loses.add('layout');
+  if (sizes.size > 1) loses.add('layout');
   // Its words, against the document's: a text box's other drawing (Fallback) holds its words twice, and is not read.
   const chars = [...xml.replace(/<mc:Fallback>[\s\S]*?<\/mc:Fallback>/g, '').matchAll(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g)].reduce((n, m) => n + m[1].replace(/&[#\w]{1,8};/g, '_').length, 0);
   const cut = doc.blocks.length >= DOC_LIMITS.blocks || docChars(doc) < chars * 0.98 - 50;

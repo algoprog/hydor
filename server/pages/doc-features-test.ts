@@ -7,6 +7,14 @@
 //   DATA_DIR=/tmp/hydor-test-doc-features node dist/dev/doc-features-test.js
 import { bibRuns, citeWords, sourceFromBibtex, sourceKey, yearSuffixes } from '../../shared/doc-cite.ts';
 import { docRefs } from '../../shared/doc-refs.ts';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { canCapture, closeCapture, withTab } from '../capture/index.ts';
+import { openDb } from '../db.ts';
+import { parseXml } from '../documents/xml.ts';
+import { Zip } from '../documents/zip.ts';
+import { docFromFile, docPage, docxOfDoc, wordLosses } from './docs.ts';
 import { blockHtml, citeItems, docMarkdown, docText, normalizeDoc, notesHtml, paperOf, runsText, styleOf, columnMm, type Doc, type Run, type Source } from '../../shared/docs.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -173,5 +181,88 @@ const text = (runs: Run[]) => runs.map((r) => r.t).join('');
   ok(pic.mark?.src === 'https://example.com/logo.png', 'a picture watermark');
 }
 
+// ---- through Word, out and back in ------------------------------------------------------------------------------------
+const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-doc-features-test-')));
+const db = openDb(path.join(tmp, 'test.db'));
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEklEQVR4nGP4z8DwnwELaGDABQBU7QT8V3S8BwAAAABJRU5ErkJggg==';
+const full = normalizeDoc({
+  markdown: [
+    '# Results {#res}',
+    '',
+    'Water boils[^1] as shown [@lecun2015, p. 437]; see <ref to="fig1"/> and [the method](#m1).',
+    '',
+    `![A plot](${PNG} "Growth"){#fig1 label=Figure}`,
+    '',
+    'Table: Prices {#tab1 label=Table}',
+    '',
+    '| a | b |',
+    '| --- | --- |',
+    '| 1 | 2 |',
+    '',
+    'The method is here.[^2] {#m1 bookmark="Method"}',
+    '',
+    '# References',
+    '',
+    '[BIBLIOGRAPHY]',
+    '',
+    '[^1]: At 100 °C, at sea level.',
+    '[^2]: As **before**.',
+  ].join('\n'),
+  sources: [{ id: 'lecun2015', kind: 'article', title: 'Deep learning', authors: [{ family: 'LeCun', given: 'Yann' }, { family: 'Bengio', given: 'Yoshua' }], year: '2015', in: 'Nature', volume: '521', pages: '436–444', doi: '10.1038/nature14539' }],
+  cite: 'apa',
+  page: { size: 'a4', margin: 20, orient: 'landscape', cols: 2, color: '#fef7e0' },
+  watermark: 'DRAFT',
+});
+const buf = docxOfDoc(db, full, 'Features');
+const zip = new Zip(buf);
+const docXml = zip.text('word/document.xml') ?? '';
+ok(zip.has('word/footnotes.xml') && /<w:footnoteReference w:id="1"\/>/.test(docXml) && /<w:footnote w:id="2">/.test(zip.text('word/footnotes.xml') ?? ''), 'footnotes as Word keeps them');
+ok(/CITATION lecun2015 \\l 1033 \\p 437/.test(docXml) && /<w:citation\/>/.test(docXml) && (zip.text('customXml/item1.xml') ?? '').includes('<b:Tag>lecun2015</b:Tag>'), "a citation as Word's own, with its source", /CITATION[^<]*/.exec(docXml)?.[0]);
+ok(/ BIBLIOGRAPHY /.test(docXml) && docXml.includes('LeCun, Y., &amp; Bengio, Y. (2015)'), 'the bibliography, shown');
+ok(/SEQ Figure \\\* ARABIC/.test(docXml) && /SEQ Table \\\* ARABIC/.test(docXml), 'numbered captions', /SEQ[^"]*/.exec(docXml)?.[0]);
+ok(/REF _Ref_fig1 \\h/.test(docXml) && /w:name="_Ref_fig1"/.test(docXml) && /w:anchor="Method"/.test(docXml) && /w:name="Method"/.test(docXml), 'cross-references and links to bookmarks');
+ok(/<w:pgSz w:w="16838" w:h="11906" w:orient="landscape"\/>/.test(docXml) && /<w:cols w:num="2" w:space="720"\/>/.test(docXml) && /<w:background w:color="FEF7E0"\/>/.test(docXml), 'landscape, two columns, a colour', /<w:pgSz[^>]*>/.exec(docXml)?.[0]);
+ok(zip.names().some((n) => /word\/header\d\.xml/.test(n) && /string="DRAFT"/.test(zip.text(n) ?? '')), 'a watermark in the header');
+for (const part of ['word/document.xml', 'word/footnotes.xml', 'word/styles.xml', 'word/settings.xml', 'customXml/item1.xml']) {
+  let fine = true;
+  try {
+    parseXml(zip.text(part) ?? '');
+  } catch {
+    fine = false;
+  }
+  ok(fine, `${part} is well formed`);
+}
+const back = docFromFile(buf, 'Features.docx');
+const r2 = docRefs(back);
+ok(back.notes?.length === 2 && back.notes.some((n) => text(n.runs) === 'As before.' && n.runs.some((x) => x.b)), 'footnotes come back, with their looks', back.notes);
+const cites2 = back.blocks.flatMap((b) => (b.type === 'p' ? b.runs.filter((x) => x.cite) : []));
+ok(cites2.length === 1 && cites2[0].t === 'lecun2015, p. 437' && back.sources?.[0]?.title === 'Deep learning' && back.sources[0].doi === '10.1038/nature14539', 'citations come back, with their sources', [cites2, back.sources]);
+ok(back.blocks.some((b) => b.type === 'image' && b.label === 'Figure' && b.caption === 'Growth' && b.id === 'fig1'), 'a numbered caption comes back', back.blocks.find((b) => b.type === 'image'));
+ok(back.blocks.some((b) => b.type === 'table' && b.label === 'Table' && b.caption === 'Prices'), "a table's caption comes back");
+const xref = back.blocks.flatMap((b) => (b.type === 'p' ? b.runs.filter((x) => x.xref) : []))[0];
+ok(xref && r2.text(xref) === 'Figure 1', 'a cross-reference comes back', xref);
+ok(back.blocks.some((b) => b.type === 'p' && b.runs.some((x) => x.link?.startsWith('#'))) && back.blocks.some((b) => b.type === 'p' && b.bm === 'Method'), 'a link to a bookmark, and the bookmark');
+ok(back.blocks.some((b) => b.type === 'bib'), 'the bibliography comes back as one', back.blocks.map((b) => b.type));
+ok(back.page.orient === 'landscape' && back.page.cols === 2 && back.page.color === '#fef7e0' && back.mark?.text === 'DRAFT', 'the page set up comes back', [back.page, back.mark]);
+ok(!wordLosses(buf, back).loses.length, 'nothing of it is lost', wordLosses(buf, back));
+
+// ---- printed: footnotes at the foot of their pages ------------------------------------------------------------------------
+if (canCapture()) {
+  const long = normalizeDoc({
+    markdown: [...Array.from({ length: 14 }, (_, i) => `Paragraph ${i + 1} ${'with many words that fill the line '.repeat(8)}${i % 4 === 1 ? `[^n${i}]` : ''}`), '', ...[1, 5, 9, 13].map((i) => `[^n${i}]: Note for paragraph ${i + 1}.`)].join('\n\n'),
+  });
+  const html = docPage(db, long, 'Long', 'print');
+  ok(html.includes('<script data-paginate>') && html.includes('class="nd-notes-src"'), 'a document with footnotes prints page by page');
+  const got = await withTab({ html, width: 900, height: 1200, settleMs: 200 }, async (tab) => {
+    await tab.evaluate("new Promise((ok) => { const t = Date.now(); const w = () => (document.documentElement.dataset.paged || Date.now() - t > 10000 ? ok(true) : setTimeout(w, 50)); w(); })");
+    return tab.evaluate<{ pages: number; ok: boolean; notes: number }>(
+      `(() => { const pages = [...document.querySelectorAll('.nd-pg')]; let ok = true; let notes = 0; for (const p of pages) { const marks = [...p.querySelectorAll('.nd-pg-body [data-k="fn"]')].map((m) => m.dataset.tex); const here = [...p.querySelectorAll('.nd-pg-notes [data-note]')].map((n) => n.dataset.note); notes += here.length; if (marks.join() !== here.join()) ok = false; if (p.querySelector('.nd-pg-body').getBoundingClientRect().height + (p.querySelector('.nd-pg-notes').getBoundingClientRect().height) > p.getBoundingClientRect().height + 1) ok = false; } return { pages: pages.length, ok, notes }; })()`,
+    );
+  });
+  ok(got.pages >= 2 && got.ok && got.notes === 4, "each page's footnotes at its foot, the words over them", got);
+  closeCapture();
+}
+
+fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
