@@ -280,6 +280,17 @@ if (canCapture()) {
     );
   });
   ok(got.pages >= 2 && got.ok && got.notes === 4, "each page's footnotes at its foot, the words over them", got);
+  // Two columns on landscape pages: each page's words in its columns, none spilling past them.
+  const cols = normalizeDoc({ markdown: Array.from({ length: 30 }, (_, i) => `Paragraph ${i + 1} ${'in two columns on a page on its side '.repeat(5)}`).join('\n\n'), page: { size: 'a4', margin: 20, orient: 'landscape', cols: 2 } });
+  const colsHtml = docPage(db, cols, 'Columns', 'print');
+  ok(/@page\{size:A4 landscape;/.test(colsHtml) && colsHtml.includes('<script data-paginate>'), 'landscape pages, in columns, laid out page by page');
+  const laid = await withTab({ html: colsHtml, width: 1200, height: 900, settleMs: 200 }, async (tab) => {
+    await tab.evaluate("new Promise((ok) => { const t = Date.now(); const w = () => (document.documentElement.dataset.paged || Date.now() - t > 10000 ? ok(true) : setTimeout(w, 50)); w(); })");
+    return tab.evaluate<{ pages: number; cols: string; fits: boolean; blocks: number }>(
+      `(() => { const pages = [...document.querySelectorAll('.nd-pg')]; const b = pages.map((p) => p.querySelector('.nd-pg-body')); return { pages: pages.length, cols: getComputedStyle(b[0]).columnCount, fits: b.every((x) => x.scrollWidth <= x.clientWidth + 1), blocks: document.querySelectorAll('.nd-pg-body > .nd-b').length }; })()`,
+    );
+  });
+  ok(laid.pages >= 2 && laid.cols === '2' && laid.fits && laid.blocks === 30, 'every paragraph on a page, in its two columns', laid);
   closeCapture();
 }
 
