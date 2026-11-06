@@ -174,6 +174,9 @@ export interface TierModel {
   seeThrough?: { id: string; label: string; perImage?: number; cutout?: boolean };
 }
 
+/** Where the picture tools' models run: an NVIDIA GPU (through CUDA), a Mac's GPU (Apple silicon, through Core ML) or the CPU. */
+export type LocalDevice = 'cuda' | 'coreml' | 'cpu';
+
 /** The picture tools on this computer: free and private (background removal, erasing, plots), set up once. */
 export interface LocalToolsState {
   /** Set up and ready to use. */
@@ -187,12 +190,19 @@ export interface LocalToolsState {
   canInstall: boolean;
   /** Why it cannot, in words. */
   why?: string;
-  /** About how much the set-up downloads, in MB (the environment; each model downloads the first time its tool is used). */
+  /** About how much the set-up downloads, in MB (the environment: about 145 MB, 2,100 with an NVIDIA GPU; each model downloads the first time its tool is used). */
   sizeMb: number;
   /** The models already downloaded (cutout: about 190 MB, erase: about 210 MB). */
   downloaded: ('cutout' | 'erase')[];
   /** The models in memory now (each loads when needed and unloads after a few idle minutes). */
   loaded: ('cutout' | 'erase')[];
+  /** Where they run (or will, once set up): on the graphics card when this computer has one they can use, else on the CPU. */
+  device: LocalDevice;
+  /** With an NVIDIA GPU, ONNX Runtime's build for it would not install, so the CPU's was: they run on the CPU (`gpuWhy` says why). */
+  gpuBuildFailed?: boolean;
+  /** Models the graphics card failed, which run on the CPU until the app starts again or they are set up again (`gpuWhy` says why). */
+  onCpu?: ('cutout' | 'erase')[];
+  gpuWhy?: string;
 }
 
 /** GET /api/images/tiers: what the editors' AI tools would use now, for their price lines. */

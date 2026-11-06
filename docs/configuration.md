@@ -25,6 +25,7 @@ for the service and the desktop apps; on Windows `%USERPROFILE%\.config\hydor.en
 | `HYDOR_EMBED_DEVICE` | the NVIDIA GPU with the most free memory, else a Mac's own GPU (`mps`), else `cpu` | Where memory's search by meaning runs (`cpu`, `cuda:1`, `mps`…); Settings → Memory can also keep it on the CPU |
 | `HYDOR_EMBED_THREADS` | half the CPU's cores, at most 4 | Threads it uses on the CPU |
 | `HYDOR_EMBED_PYTHON` | a private environment the app sets up | A Python with PyTorch and Transformers 5.6+ to run it with instead |
+| `HYDOR_PICTURES_DEVICE` | the graphics card when there is one they can use | `cpu`: the picture tools (taking backgrounds out, erasing) run on the CPU and set up without ONNX Runtime's NVIDIA build (2.1 GB), leaving the graphics card to other work. Otherwise an NVIDIA GPU runs them through CUDA (the GPUs in `CUDA_VISIBLE_DEVICES` when it is set) and a Mac's through Core ML |
 | `HYDOR_FFMPEG`, `HYDOR_FFPROBE` | `ffmpeg`, `ffprobe` on the `PATH` | The ffmpeg programs the Library takes videos' frames and stills and sounds' lengths and shapes with, and voice samples are read with |
 | `HYDOR_UPDATE_FEED` | the newest GitHub release's `hydor-mac.json`, `hydor-windows.json` or `hydor-linux.json` | Where a desktop app looks for new versions |
 
