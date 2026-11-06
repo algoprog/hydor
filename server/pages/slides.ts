@@ -30,6 +30,7 @@ import { katexStyle, texToHtml } from './math.ts';
 import { videoStillOf } from './video-still.ts';
 import { keepVideoFile, MAX_VIDEO, VIDEO_INSIDE, videoAddress, videoDataUrl } from './videos.ts';
 import { DECK_EDITS_HELP } from '../../shared/deck-edits.ts';
+import { deckCheckText } from '../../shared/deck-check.ts';
 
 export { isDeckText };
 
@@ -526,7 +527,9 @@ export function deckForAgent(text: string): string {
   const f = deck.footer;
   const foot = f ? `; on each slide${f.skipTitle ? ' but the title slide' : ''}: ${[f.num && 'its number', f.text && `"${f.text}"`, f.date && (f.date === 'today' ? "the day's date" : `the date "${f.date}"`)].filter(Boolean).join(', ')}` : '';
   const format = isWebDeck(deck) ? `the web format${deck.progress ? ', a progress bar' : ''}` : 'PowerPoint compatible, format "pptx": only what PowerPoint has';
-  return `A slide deck of ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'} (${deck.ratio}, theme ${deck.theme.id ?? 'custom'}, ${format}${foot}).\n\nOutline:\n${deckOutline(deck)}\n\nThe deck (send it back whole with save_slides and this id to change it, or only the slides that change with change, add and remove; keep naget-asset: pictures, naget-video: videos and icons' paths as they are):\n${body}${commentsForAgent(deck)}`;
+  // What the editor's accessibility check would list, for the agent to put right as it changes the deck.
+  const checked = deckCheckText(deck);
+  return `A slide deck of ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'} (${deck.ratio}, theme ${deck.theme.id ?? 'custom'}, ${format}${foot}).\n\nOutline:\n${deckOutline(deck)}\n\nThe deck (send it back whole with save_slides and this id to change it, or only the slides that change with change, add and remove; keep naget-asset: pictures, naget-video: videos and icons' paths as they are):\n${body}${commentsForAgent(deck)}${checked ? `\n\n${checked}` : ''}`;
 }
 
 /** The deck's comments, slide by slide, each on its part or slide, with how to answer them; '' when it has none. */
