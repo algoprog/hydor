@@ -679,7 +679,8 @@ export function SlidesEditor({
     if (!p || !now) return;
     const img = image(now, p.src, p.w, p.h);
     const made = (place: { x: number; y: number; w: number; h: number }, id = newId()): El =>
-      web && p.html ? { id, type: 'html', html: p.html, poster: p.src, name: 'Plot', ...place } : { ...img, id, ...place, fit: 'contain', ...(p.prompt ? { alt: p.prompt.replace(/\s+/g, ' ').slice(0, 300) } : {}) };
+      // The plot that moves answers the pointer (its values on hover), so it takes it in the slideshow.
+      web && p.html ? { id, type: 'html', html: p.html, poster: p.src, name: 'Plot', interactive: true, ...place } : { ...img, id, ...place, fit: 'contain', ...(p.prompt ? { alt: p.prompt.replace(/\s+/g, ' ').slice(0, 300) } : {}) };
     if (chart) {
       // In the chart's place, by its id: its animations and comments stay with it.
       return change((d2) => {
