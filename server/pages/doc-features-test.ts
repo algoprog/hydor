@@ -245,6 +245,16 @@ ok(back.blocks.some((b) => b.type === 'p' && b.runs.some((x) => x.link?.startsWi
 ok(back.blocks.some((b) => b.type === 'bib'), 'the bibliography comes back as one', back.blocks.map((b) => b.type));
 ok(back.page.orient === 'landscape' && back.page.cols === 2 && back.page.color === '#fef7e0' && back.mark?.text === 'DRAFT', 'the page set up comes back', [back.page, back.mark]);
 ok(!wordLosses(buf, back).loses.length, 'nothing of it is lost', wordLosses(buf, back));
+{
+  const styled = normalizeDoc({ markdown: '# Heading\n\nWords.\n\n> A quote', styles: { h1: { font: 'Georgia', size: 22, color: '#1a73e8', b: false, after: 6 }, quote: { i: false }, normal: { color: '#202124', align: 'justify' } } });
+  const sbuf = docxOfDoc(db, styled, 'Styled');
+  const sx = new Zip(sbuf).text('word/styles.xml') ?? '';
+  ok(/w:styleId="Heading1"[\s\S]*?Georgia[\s\S]*?<w:color w:val="1A73E8"\/>/.test(sx), "a heading's own look in Word's styles");
+  const sback = docFromFile(sbuf, 'Styled.docx');
+  ok(sback.styles?.h1?.font === 'Georgia' && sback.styles.h1.size === 22 && sback.styles.h1.color === '#1a73e8' && sback.styles.h1.b === false && sback.styles.h1.sa === 6 && sback.styles.quote?.i === false && sback.styles.normal?.align === 'justify', 'styles come back from Word', sback.styles);
+  const plainBack = docFromFile(docxOfDoc(db, normalizeDoc({ markdown: '# H\n\nWords' }), 'P'), 'P.docx');
+  ok(!plainBack.styles, 'a document without styles of its own gets none from its Word file', plainBack.styles);
+}
 
 // ---- agents: sources from BibTeX, styles and the watermark kept, get_page's account --------------------------------------------
 {
