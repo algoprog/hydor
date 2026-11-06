@@ -28,8 +28,8 @@ function clock(s: number) {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 }
 
-/** A narration played in the panel: play or pause, how far it is, and its length. */
-function Player({ n }: { n: NarrationT }) {
+/** A narration played in the panel: play or pause, how far it is, its length, and taking it off. */
+function Player({ n, onRemove }: { n: NarrationT; onRemove?: () => void }) {
   const a = useRef<HTMLAudioElement>(null);
   const [on, setOn] = useState(false);
   const [at, setAt] = useState(0);
@@ -67,6 +67,11 @@ function Player({ n }: { n: NarrationT }) {
         {on || at ? `${clock(at)} / ` : ''}
         {clock(len)}
       </span>
+      {onRemove && (
+        <button type="button" aria-label={tr('Remove the narration')} title={tr('Remove the narration')} onClick={onRemove} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-fg-3 hover:bg-bg-2 hover:text-fg">
+          <Trash2 size={14} />
+        </button>
+      )}
     </div>
   );
 }
@@ -81,7 +86,7 @@ export function NarrationSection({ deck, index, change }: { deck: Deck; index: n
     <Section title={tr('Narration')}>
       {n ? (
         <>
-          <Player n={n} />
+          <Player n={n} onRemove={() => change((d) => setSlide(d, index, ({ narration: _n, ...s }) => s))} />
           <p className="text-[11.5px] leading-snug text-fg-3">
             {n.ai ? tr('Made with AI.') : tr('Recorded.')} {tr('Present → Play the narration plays each slide’s, and goes on when it ends.')}
           </p>
@@ -96,11 +101,6 @@ export function NarrationSection({ deck, index, change }: { deck: Deck; index: n
         <Button size="sm" variant="secondary" icon={<WandSparkles size={14} />} onClick={() => setAsk('ai')}>
           {tr('Make with AI')}
         </Button>
-        {n && (
-          <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} onClick={() => change((d) => setSlide(d, index, ({ narration: _n, ...s }) => s))}>
-            {tr('Remove')}
-          </Button>
-        )}
       </div>
       {deck.slides.length > 1 && (
         <Button size="sm" variant="ghost" icon={<WandSparkles size={14} />} onClick={() => setAsk('all')}>

@@ -39,8 +39,12 @@ export function useShowTools(o: { deck: Deck | null; pageId?: string; title?: st
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
-  useEffect(() => show.current?.extra('camera', camOn), [camOn]);
-  useEffect(() => show.current?.extra('remote', remote.on), [remote.on]);
+  useEffect(() => {
+    show.current?.extra('camera', camOn);
+  }, [camOn]);
+  useEffect(() => {
+    show.current?.extra('remote', remote.on);
+  }, [remote.on]);
   const overlays = (
     <>
       {camOn && cam.stream && <CameraBubble stream={cam.stream} onHide={() => setCamOn(false)} />}

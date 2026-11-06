@@ -57,12 +57,13 @@ const lookOf = (): Look => {
   }
 };
 
-/** The bubble, placed in its parent (the slideshow): its video, and on hover its mirror, size and hide buttons. */
+/** The bubble, placed in its parent (the slideshow): its video, and on hover (or a tap, on a touch screen) its size, mirror and hide buttons. */
 export function CameraBubble({ stream, onHide, className }: { stream: MediaStream; onHide: () => void; className?: string }) {
   const video = useRef<HTMLVideoElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [look, setLook] = useState<Look>(lookOf);
-  const drag = useRef<{ id: number; dx: number; dy: number } | null>(null);
+  const drag = useRef<{ id: number; dx: number; dy: number; x: number; y: number; moved: boolean } | null>(null);
+  const [tools, setTools] = useState(false);
   useEffect(() => {
     if (video.current) video.current.srcObject = stream;
   }, [stream]);
@@ -82,16 +83,21 @@ export function CameraBubble({ stream, onHide, className }: { stream: MediaStrea
     e.preventDefault();
     e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    drag.current = { id: e.pointerId, dx: e.clientX - (p.left + look.x * p.width), dy: e.clientY - (p.top + look.y * p.height) };
+    drag.current = { id: e.pointerId, dx: e.clientX - (p.left + look.x * p.width), dy: e.clientY - (p.top + look.y * p.height), x: e.clientX, y: e.clientY, moved: false };
   };
   const move = (e: RPointerEvent) => {
     const d = drag.current;
     const p = box.current?.parentElement?.getBoundingClientRect();
     if (!d || d.id !== e.pointerId || !p) return;
+    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) d.moved = true;
     const at = place((e.clientX - d.dx - p.left) / p.width, (e.clientY - d.dy - p.top) / p.height);
     setLook((l) => ({ ...l, ...at }));
   };
-  const up = () => (drag.current = null);
+  // A tap (no drag) shows or hides its buttons, where there is no pointer to hover.
+  const up = () => {
+    if (drag.current && !drag.current.moved) setTools((t) => !t);
+    drag.current = null;
+  };
   const resize = (by: number) =>
     setLook((l) => {
       const size = SIZES[Math.max(0, Math.min(SIZES.length - 1, SIZES.indexOf(l.size) + by))];
@@ -110,7 +116,7 @@ export function CameraBubble({ stream, onHide, className }: { stream: MediaStrea
       className={cx('group absolute z-[5] cursor-grab touch-none select-none active:cursor-grabbing', className)}
     >
       <video ref={video} autoPlay muted playsInline className="h-full w-full rounded-full object-cover shadow-[0_8px_28px_rgba(0,0,0,.45)] ring-[3px] ring-white/85" style={{ transform: look.mirror ? 'scaleX(-1)' : undefined }} />
-      <div className="absolute -top-2 left-1/2 flex -translate-x-1/2 gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+      <div className={cx('absolute -top-2 left-1/2 flex -translate-x-1/2 gap-1 group-hover:opacity-100 focus-within:opacity-100', tools ? 'opacity-100' : 'opacity-0')}>
         <button type="button" className={btn} title={tr('Smaller')} aria-label={tr('Smaller')} onClick={() => resize(-1)}>
           <Minus size={14} />
         </button>

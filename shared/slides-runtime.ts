@@ -3973,7 +3973,9 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       blank,
       grid,
       marks,
-      extra: (id, on) => extraBtns.get(id)?.classList.toggle('ns-on', on),
+      extra: (id, on) => {
+        extraBtns.get(id)?.classList.toggle('ns-on', on);
+      },
       pauseVoice,
       destroy: () => {
         stopVoice();
