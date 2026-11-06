@@ -1,11 +1,12 @@
 // The slides editor's side panel, in four tabs. Format: the part picked (its place and size, its words' look, its
 // fill and border, a shape's kind, a picture's fit, crop and colours, a line's ends and path, a table's or a chart's look and
 // numbers, an icon's colour, an equation's LaTeX, a video's address and how it plays, a group's parts, a link; code,
-// and the web format's parts: WebParts.tsx) or the parts picked lined up, spread and grouped. Animate: the slide's
-// animations in their order, each one's effect, start, timing and direction, and a new one for the part picked (in a
-// web deck its own effects too, a part that starts one when clicked, effects that keep going, words one by one, how
-// they move). Slide: its background (in a web deck one that moves, or a video), its transition (Morph too), hidden or
-// not, the footer. Theme: a ready-made look, or the deck's own colours and fonts, and the slides' shape.
+// and the web format's parts: WebParts.tsx) or the parts picked lined up, spread and grouped. Animate: every slide
+// animated at once (AnimateAll.tsx), then the slide's animations in their order, each one's effect, start, timing and
+// direction, and a new one for the part picked (in a web deck its own effects too, a part that starts one when clicked,
+// effects that keep going, words one by one, how they move). Slide: its background (in a web deck one that moves, or a
+// video), its transition (Morph too), hidden or not, the footer. Theme: a ready-made look, or the deck's own colours
+// and fonts, and the slides' shape.
 import { useEffect, useRef, useState } from 'react';
 import {
   AlignCenterHorizontal,
@@ -92,6 +93,7 @@ import { SlideThumb } from './Thumb';
 import { fetchVideoStill } from './media';
 import { CodeLook, EmbedLook, HoverField, HtmlLook, QuizLook, Scene3dLook, ScoreLook, TEXT_FX_NAMES } from './WebParts';
 import { FX_NAMES, TR_NAMES } from './names';
+import { AnimateEvery } from './AnimateAll';
 
 export type InspectorTab = 'format' | 'animate' | 'slide' | 'theme';
 export const INSPECTOR_TABS: { value: InspectorTab; label: string }[] = [
@@ -1194,6 +1196,7 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview, picking, onPic
   let clicks = 0;
   return (
     <>
+      <AnimateEvery deck={deck} index={index} change={change} />
       <Section title="Add an animation">
         {target ? (
           <>
