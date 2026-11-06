@@ -418,7 +418,7 @@ export function HistogramPanel({ ed }: { ed: PictureEd }) {
   }, [h]);
   return (
     <div className="space-y-2 p-3">
-      <Seg value={ch} options={[{ value: 'rgb', label: 'RGB' }, { value: 'l', label: 'Light', title: 'Luminosity' }, { value: 'r', label: 'R' }, { value: 'g', label: 'G' }, { value: 'b', label: 'B' }]} onChange={setCh} />
+      <Seg value={ch} options={[{ value: 'rgb', label: 'RGB' }, { value: 'l', label: 'Luminosity', title: 'How bright, all colours together' }, { value: 'r', label: 'R' }, { value: 'g', label: 'G' }, { value: 'b', label: 'B' }]} onChange={setCh} />
       <HistogramGraph h={h} channel={ch} />
       {stats && (
         <div className="flex gap-4 text-[11.5px] text-fg-3 tnum">

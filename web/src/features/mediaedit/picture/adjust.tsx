@@ -17,7 +17,7 @@ import { useEd } from './View';
 
 const ADJ = Object.fromEntries(ADJUSTMENTS.map((a) => [a.id, a])) as Record<AdjustKey, (typeof ADJUSTMENTS)[number]>;
 const GROUPS: { id: string; title: string; keys: AdjustKey[] }[] = [
-  { id: 'light', title: 'Light', keys: ['exposure', 'brightness', 'contrast', 'highlights', 'shadows'] },
+  { id: 'light', title: 'Light and shadow', keys: ['exposure', 'brightness', 'contrast', 'highlights', 'shadows'] },
   { id: 'colour', title: 'Colour', keys: ['saturation', 'vibrance', 'warmth', 'tint'] },
 ];
 const DETAIL: AdjustKey[] = ['clarity', 'dehaze', 'sharpness', 'noise', 'blur'];
