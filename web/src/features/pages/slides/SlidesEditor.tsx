@@ -130,6 +130,7 @@ import { FooterDialog } from './FooterDialog';
 import { NotesField } from './Notes';
 import { findInDeck, replaceAllInDeck, replaceHit } from './find';
 import { exportFile } from '../exportFile';
+import { openTypes } from '../types';
 import { chooseModel, chooseVideo, fetchVideoStill, firstFrame, isVideoFile, uploadModel, uploadVideo } from './media';
 import { SlideComments } from './SlideComments';
 import { DesignIdeas } from './DesignIdeas';
@@ -259,6 +260,7 @@ export function SlidesEditor({
   savedNote,
   onDirty,
   onAsk,
+  onRequest,
   onScopes,
   saveNowRef,
   startPresent,
@@ -1223,7 +1225,10 @@ export function SlidesEditor({
 
   if (!deck || !slide) return <div className="flex h-full items-center justify-center text-fg-3">…</div>;
 
+  // A slide made with AI after a slide (Insert and the New slide menu: the one on view; a slide's own menu: that one).
+  const aiSlideAfter = onRequest && !readOnly ? (i: number) => openTypes({ kind: 'slide', after: { index: i, title: slideTitle(deck.slides[i]) }, webDeck: isWebDeck(deck), onDone: onRequest }) : null;
   const stripAct = {
+    aiAfter: aiSlideAfter ?? undefined,
     pick: (i: number) => {
       canvas.current?.stopEditing();
       pickedAt.current = performance.now();
@@ -1290,6 +1295,7 @@ export function SlidesEditor({
     else pins.push({ key, x: at.x, y: at.y, ids: [c.id], active: false });
   }
   for (const p of pins) p.active = !!activeComment && p.ids.includes(activeComment);
+  const aiSlide = aiSlideAfter ? () => aiSlideAfter(index) : null;
   const web = isWebDeck(deck);
   const menus = slidesMenus({
     readOnly,
@@ -1359,6 +1365,7 @@ export function SlidesEditor({
     aiEdit: readOnly ? undefined : (mode) => one && void aiEdit(one.id, mode),
     editPicture: readOnly ? undefined : () => one && openPicture(one.id),
     aiPlotChart: readOnly ? undefined : () => one && void aiPlot(one.id),
+    aiSlide: aiSlide ?? undefined,
     editVideo: readOnly ? undefined : () => one && editVideo(one.id),
     running: !!one && running === one.id,
     run: () => one && setRunning(running === one.id ? null : one.id),
@@ -1810,6 +1817,14 @@ export function SlidesEditor({
       )}
 
       <Popover anchor={anchors.slide} open={menu === 'slide'} onClose={() => setMenu(null)} width={380} title="A new slide">
+        {aiSlide && (
+          <>
+            <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), aiSlide())}>
+              Slide made with AI
+            </MenuItem>
+            <MenuSep />
+          </>
+        )}
         <LayoutGrid deck={deck} fonts={fonts} onPick={(l) => newSlide(l)} />
       </Popover>
       <Popover anchor={anchors.shape} open={menu === 'shape'} onClose={() => setMenu(null)} width={244} title="Shape">

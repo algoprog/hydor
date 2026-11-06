@@ -1,6 +1,7 @@
 // What the app's capabilities (search, browser, memory, assistants…) share between server and pages:
 // the settings a session keeps beyond its agent's own, and the notes the app adds to a conversation.
 import type { ArenaStart } from './arena.ts';
+import type { MakeExtra } from './content-asks.ts';
 import type { ResearchSettings } from './research.ts';
 
 /** Settings a session keeps beyond its agent's own. Each capability reads and writes its own fields. */
@@ -25,6 +26,8 @@ export interface SessionExtra {
   guidelines?: string;
   /** Confidential: models on this computer only, nothing sent out, commands without network (shared/confidential.ts). Set when it starts, never removed. */
   confidential?: true;
+  /** Pages: what it was asked to make from the gallery or Turn it into (shared/content-asks.ts, checked by makeOf), told to its agent in full. */
+  make?: MakeExtra;
   /** Any other capability's settings, under its own name. */
   [field: string]: unknown;
 }
