@@ -200,7 +200,7 @@ export function EmbedLook({ el, set, pickPicture }: { el: EmbedEl; set: Set; pic
         className={cx(field, bad && 'border-err')}
       />
       {bad && <p className="text-[11.5px] text-err">A web address that starts with https://.</p>}
-      <p className={note}>Only sites that let others show them in a frame appear: maps, forms, many videos, CodePen.</p>
+      <p className={note}>Only sites that let others show them in a frame appear. It runs in the slideshow; here, press Run.</p>
       <Toggle label="Takes clicks in the slideshow" on={!!el.interactive} onChange={(v) => set({ interactive: v || undefined } as Partial<El>)} />
       <Field label="Corners">
         <NumInput label="Corner radius" value={el.radius ?? 0} onChange={(radius) => set({ radius: radius || undefined } as Partial<El>, 'radius')} min={0} max={400} unit="px" />

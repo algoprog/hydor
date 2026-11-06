@@ -1884,7 +1884,7 @@ export function SlidesEditor({
             putEmbed();
           }}
         >
-          <p className="text-[12.5px] text-fg-3">A page’s address, or the embed code a site gives (maps, forms, CodePen). It shows on the slide and takes clicks in the slideshow. Only sites that let others show them in a frame appear.</p>
+          <p className="text-[12.5px] text-fg-3">A page’s address, or the embed code a site gives. It shows on the slide and takes clicks in the slideshow. Only sites that let others show them in a frame appear.</p>
           <input
             autoFocus
             value={embedUrl}
