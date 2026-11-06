@@ -23,8 +23,10 @@
 // parts as pictures of them running (renders "part:<id>", where the browser could take one) or their posters.
 //
 // A slide is 1280 px wide: 1 px is 9525 EMU (12192000 across, PowerPoint's widescreen) and a font's px is 0.75 pt.
-import type { Anim, ChartEl, CodeEl, Deck, El, GroupEl, IconEl, ImageEl, LayoutId, LineEl, MathEl, Para, Ratio, Run, Side, Slide, Stick, TableEl, TextEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
-import { CODE_FONT, everyEl, fontName, FONTS, footerOn, hexColor, isTitleSlide, LAYOUTS, layoutSlide, mixColor, plainText, SLIDE_W, slideH, VIDEO, videoStill } from '../../shared/slides.ts';
+import type { Anim, ChartEl, CodeEl, Deck, El, GroupEl, IconEl, ImageEl, LayoutId, LineEl, MathEl, Para, QrEl, Ratio, Run, Side, Slide, Stick, TableEl, TextEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
+import { CODE_FONT, everyEl, fontName, FONTS, footerOn, hexColor, isTitleSlide, LAYOUTS, layoutSlide, mixColor, plainText, qrCells, SLIDE_W, slideH, VIDEO, videoStill } from '../../shared/slides.ts';
+import { qrSvg, type QrCode } from '../../shared/qr.ts';
+import { writePng } from '../signatures/png.ts';
 import { codeLookOf, codeTokens, pictureFramePlan, pictureMaskPath, type FramePiece } from '../../shared/slides-runtime.ts';
 import { coreXml, esc, relsXml, XML_HEAD, zipParts, type ZipPart } from './ooxml.ts';
 import { eotCompressed, eotOf, fontAttrs, fontsSaid } from './pptx-fonts.ts';
@@ -418,7 +420,7 @@ function nvPr(c: Ctx, e: El, kind: string, href?: string): { id: number; cNvPr: 
   const id = c.next++;
   c.ids.set(e.id, id);
   const name = c.morph.get(e.id) ?? e.name ?? `${kind} ${id - 1}`;
-  const alt = e.type === 'image' ? e.alt : e.type === 'math' ? e.tex : e.type === 'icon' ? e.icon.replace(/-/g, ' ') : undefined;
+  const alt = e.type === 'image' ? e.alt : e.type === 'math' ? e.tex : e.type === 'icon' ? e.icon.replace(/-/g, ' ') : e.type === 'qr' ? `QR code: ${e.text}` : undefined;
   const descr = alt ? ` descr="${esc(alt)}"` : '';
   const hl = link(c, href ?? e.link);
   return { id, cNvPr: hl ? `<p:cNvPr id="${id}" name="${esc(name)}"${descr}>${hl}</p:cNvPr>` : `<p:cNvPr id="${id}" name="${esc(name)}"${descr}/>` };
@@ -701,6 +703,40 @@ function picXml(c: Ctx, e: El, png: Picture, box: { x: number; y: number; w: num
   return `<p:pic><p:nvPicPr>${cNvPr}<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${rid}">${alpha}${ext}</a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(box.x, box.y, box.w, box.h, e.rot)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
 }
 
+/**
+ * A QR code as a picture of it, as large as its box allows in its middle: a PNG of its squares (crisp, about 600 pixels
+ * across) with an SVG of them beside it for programs that read SVG, its words as its description.
+ */
+function qrXml(c: Ctx, e: QrEl): string {
+  const cells = qrCells(e);
+  const n = cells.length;
+  if (!n) return '';
+  const q = 2;
+  const m = n + 2 * q;
+  const k = Math.max(4, Math.ceil(600 / m));
+  const dark = hexColor(e.color ?? '#000000', c.t, '000000');
+  const transparent = e.bg === 'transparent';
+  const light = hexColor(transparent ? '#ffffff' : (e.bg ?? '#ffffff'), c.t, 'ffffff');
+  const rgb = (h: string) => [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [dr, dg, db] = rgb(dark.hex);
+  const [lr, lg, lb] = rgb(light.hex);
+  const side = m * k;
+  const data = new Uint8Array(side * side * 4);
+  for (let y = 0; y < side; y++)
+    for (let x = 0; x < side; x++) {
+      const my = Math.floor(y / k) - q;
+      const mx = Math.floor(x / k) - q;
+      const on = my >= 0 && mx >= 0 && my < n && mx < n && cells[my][mx];
+      const i = (y * side + x) * 4;
+      if (on) data.set([dr, dg, db, Math.round(dark.alpha * 255)], i);
+      else data.set([lr, lg, lb, transparent ? 0 : Math.round(light.alpha * 255)], i);
+    }
+  const png: Picture = { data: writePng({ width: side, height: side, data }, { alpha: true }), ext: 'png', w: side, h: side };
+  const svg = qrSvg({ size: n, modules: cells } as QrCode, { dark: `#${dark.hex}`, light: transparent ? 'transparent' : `#${light.hex}`, quiet: q, width: side });
+  const s = Math.min(Math.abs(e.w), Math.abs(e.h));
+  return picXml(c, e, png, { x: e.x + (Math.abs(e.w) - s) / 2, y: e.y + (Math.abs(e.h) - s) / 2, w: s, h: s }, 'QR code', svg);
+}
+
 function iconXml(c: Ctx, e: IconEl): string {
   return picXml(c, e, c.o.renders?.get(`icon:${e.id}`) ?? CLEAR_PNG, e, 'Icon', iconSvgText(e, c.t));
 }
@@ -842,6 +878,7 @@ function partXml(c: Ctx, e: El): string {
   if (e.type === 'icon') return iconXml(c, e);
   if (e.type === 'math') return mathXml(c, e);
   if (e.type === 'video') return videoXml(c, e);
+  if (e.type === 'qr') return qrXml(c, e);
   if (e.type === 'group') return groupXml(c, e);
   return '';
 }

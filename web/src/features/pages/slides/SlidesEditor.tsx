@@ -127,6 +127,7 @@ import { choosePhoto } from '../FreePhotos';
 import { photoParts, withPhoto, withSlidesAfter } from './inserts';
 import { ReuseSlidesDialog } from './ReuseSlides';
 import { SheetChartDialog } from './SheetChart';
+import { QrDialog } from './QrCode';
 
 export type SlidesDoc = ModelDoc<Deck>;
 
@@ -314,6 +315,7 @@ export function SlidesEditor({
   /** Insert → Slides from another deck, and Chart → From a spreadsheet. */
   const [reuseOpen, setReuseOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [cellSel, setCellSel] = useState<CellSel | null>(null);
   const [texFocus, setTexFocus] = useState(0);
@@ -1282,6 +1284,7 @@ export function SlidesEditor({
     freePhoto: readOnly ? undefined : () => void freePhoto(),
     sheetChart: readOnly ? undefined : () => setSheetOpen(true),
     reuseSlides: readOnly ? undefined : () => setReuseOpen(true),
+    qr: readOnly ? undefined : () => setQrOpen(true),
     footer: () => setFooterOpen(true),
     comment: startComment,
     crop: () => one && crop(one.id),
@@ -1956,6 +1959,7 @@ export function SlidesEditor({
       <FooterDialog open={footerOpen} onClose={() => setFooterOpen(false)} deck={deck} index={index} change={change} />
       <ReuseSlidesDialog open={reuseOpen} deck={deck} pageId={pageId} onClose={() => setReuseOpen(false)} onInsert={insertSlides} />
       <SheetChartDialog open={sheetOpen} deck={deck} onClose={() => setSheetOpen(false)} onInsert={(el) => (setSheetOpen(false), put([el]))} />
+      <QrDialog open={qrOpen} deck={deck} onClose={() => setQrOpen(false)} onInsert={(el) => (setQrOpen(false), put([el]))} />
       <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={SHORTCUTS} />
       {present && !present.presenter && <Slideshow deck={deck} from={present.from} onClose={() => setPresent(null)} />}
       {present?.presenter && <Presenter deck={deck} from={present.from} pageId={pageId} onClose={() => setPresent(null)} />}

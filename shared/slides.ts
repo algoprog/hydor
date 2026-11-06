@@ -15,6 +15,7 @@
 // script or a style rule; colours, fonts and addresses are each of a known form.
 
 import { cleanComment, COMMENT_LIMITS, newCommentId, type Comment } from './comments.ts';
+import { qrCode, type QrCode } from './qr.ts';
 
 export type { Comment };
 
@@ -363,6 +364,21 @@ export interface VideoEl extends Base {
   radius?: number;
 }
 
+/**
+ * A QR code (Canva's QR code app): a link or any words, its dark squares in a colour on another (black on white unless
+ * said; "transparent" for none), read by a phone's camera. Drawn square in the middle of its box, a quiet margin round
+ * it; its squares are made from its words (shared/qr.ts) whenever a deck is checked, and kept with it so it draws anywhere.
+ */
+export interface QrEl extends Base {
+  type: 'qr';
+  text: string;
+  color?: string;
+  bg?: string;
+  /** Its squares on a side, and the dark ones row by row as bits (the first in a byte's highest), in base64. */
+  n: number;
+  cells: string;
+}
+
 /** Parts that are picked, moved, sized, turned, copied and animated as one: placed from the group's top-left corner. */
 export interface GroupEl extends Base {
   type: 'group';
@@ -491,7 +507,7 @@ export interface Scene3dEl extends Base {
   poster?: string;
 }
 
-export type El = TextEl | ShapeEl | ImageEl | LineEl | TableEl | ChartEl | IconEl | MathEl | VideoEl | CodeEl | HtmlEl | EmbedEl | QuizEl | ScoreEl | Scene3dEl | GroupEl;
+export type El = TextEl | ShapeEl | ImageEl | LineEl | TableEl | ChartEl | IconEl | MathEl | VideoEl | CodeEl | HtmlEl | EmbedEl | QuizEl | ScoreEl | Scene3dEl | QrEl | GroupEl;
 export type ElType = El['type'];
 
 export type AnimFx =
@@ -1768,6 +1784,33 @@ function logo(v: unknown, o: NormalizeOpts): Logo | undefined {
 }
 const LOGO_ALIASES: Record<string, Logo['at']> = { 'top-left': 'tl', 'top left': 'tl', 'top-right': 'tr', 'top right': 'tr', 'bottom-left': 'bl', 'bottom left': 'bl', 'bottom-right': 'br', 'bottom right': 'br' };
 
+/** A QR code's words and squares, as a qr part keeps them; null for no words, or too many for a code. */
+export function qrPart(text: string): { text: string; n: number; cells: string } | null {
+  if (!text) return null;
+  let code: QrCode;
+  try {
+    code = qrCode(text, { level: 'M' });
+  } catch {
+    return null;
+  }
+  const n = code.size;
+  const bytes = new Uint8Array(Math.ceil((n * n) / 8));
+  code.modules.forEach((row, y) => row.forEach((dark, x) => dark && (bytes[(y * n + x) >> 3] |= 0x80 >> ((y * n + x) & 7))));
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return { text, n, cells: btoa(bin) };
+}
+
+/** A qr part's squares, row by row (true: dark). */
+export function qrCells(e: Pick<QrEl, 'n' | 'cells'>): boolean[][] {
+  const n = Math.max(0, Math.min(177, Math.round(e.n)));
+  let bin = '';
+  try {
+    bin = atob(e.cells);
+  } catch {}
+  return Array.from({ length: n }, (_, y) => Array.from({ length: n }, (_, x) => ((bin.charCodeAt((y * n + x) >> 3) || 0) & (0x80 >> ((y * n + x) & 7))) !== 0));
+}
+
 /** What a part may hold at most: parts in all, groups within groups. */
 interface Budget {
   n: number;
@@ -1789,6 +1832,9 @@ const TYPE_ALIASES: Record<string, ElType> = {
   question: 'quiz',
   '3d': 'scene3d',
   model: 'scene3d',
+  qrcode: 'qr',
+  'qr-code': 'qr',
+  qr_code: 'qr',
 };
 
 /** A language's name for its colours, from what agents write ("py", "JS", "c++"). */
@@ -2116,6 +2162,16 @@ function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts, dep
     const poster = posterOf(e.poster, o);
     if (poster) s3.poster = poster;
     return s3;
+  }
+  if (type === 'qr') {
+    const q = qrPart(str(e.text ?? e.url ?? e.link ?? e.value ?? '', 1000).trim());
+    if (!q) return null;
+    const out: QrEl = { ...base(e, used, H, false, { w: 240, h: 240 }), type: 'qr', ...q };
+    const color = cleanColor(e.color);
+    if (color) out.color = color;
+    const bg = e.bg === 'none' ? 'transparent' : cleanColor(e.bg ?? e.background);
+    if (bg) out.bg = bg;
+    return out;
   }
   if (type === 'group') {
     const list = Array.isArray(e.els) ? e.els : Array.isArray(e.parts) ? e.parts : [];

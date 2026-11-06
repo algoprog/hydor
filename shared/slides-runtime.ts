@@ -1913,6 +1913,33 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
     return box;
   };
 
+  // ---- QR codes ------------------------------------------------------------------------------------------------
+  /** A QR code: its squares (kept with it) as one path, square in the middle of its box, a quiet margin of two round them. */
+  const qrBox = (deck: Deck, e: Extract<El, { type: 'qr' }>) => {
+    const t = deck.theme;
+    const k = Math.max(0, Math.min(177, Math.round(n(e.n, 0))));
+    let bin = '';
+    try {
+      bin = win.atob(typeof e.cells === 'string' ? e.cells : '');
+    } catch {}
+    const on = (i: number) => ((bin.charCodeAt(i >> 3) || 0) & (0x80 >> (i & 7))) !== 0;
+    let d = '';
+    for (let y = 0; y < k; y++)
+      for (let x = 0; x < k; x++) {
+        if (!on(y * k + x)) continue;
+        let run = 1;
+        while (x + run < k && on(y * k + x + run)) run++;
+        d += `M${x} ${y}h${run}v1h-${run}z`;
+        x += run - 1;
+      }
+    const q = 2;
+    const g = svg('svg', { class: 'ns-icon', viewBox: `${-q} ${-q} ${k + 2 * q} ${k + 2 * q}`, preserveAspectRatio: 'xMidYMid meet', 'shape-rendering': 'crispEdges', 'aria-hidden': 'true' });
+    const light = color(e.bg, t, '#ffffff');
+    if (light !== 'transparent') g.appendChild(svg('rect', { x: -q, y: -q, width: k + 2 * q, height: k + 2 * q, fill: light }));
+    g.appendChild(svg('path', { d, fill: color(e.color, t, '#000000') }));
+    return g;
+  };
+
   // ---- a part --------------------------------------------------------------------------------------------------
   const part = (deck: Deck, s: Slide, e: El, o: DrawOpts = {}): HTMLElement => {
     if (s?.theme && typeof s.theme === 'object' && deck.theme !== s.theme) deck = { ...deck, theme: s.theme };
@@ -1984,6 +2011,8 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
       }
       if (e.textFx) shine(box, e.textFx, t);
       d.appendChild(box);
+    } else if (e.type === 'qr') {
+      d.appendChild(qrBox(deck, e));
     } else if (e.type === 'code') {
       d.appendChild(codeBox(deck, e));
     } else if (e.type === 'quiz') {

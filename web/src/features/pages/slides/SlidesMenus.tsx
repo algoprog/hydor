@@ -55,6 +55,7 @@ import {
   PenTool,
   PieChart,
   Play,
+  QrCode,
   Plus,
   Presentation,
   Redo2,
@@ -169,6 +170,8 @@ export interface MenuArgs {
   freePhoto?: () => void;
   sheetChart?: () => void;
   reuseSlides?: () => void;
+  /** A QR code of a link or any words. */
+  qr?: () => void;
   footer(): void;
   /** A comment on what is picked, or on the slide. */
   comment(): void;
@@ -310,6 +313,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         { label: 'Emoji', icon: <Smile size={14} />, also: 'emoji smiley', disabled: ro, run: a.emoji },
         { label: 'Equation', icon: <Sigma size={14} />, also: 'equation maths formula latex', disabled: ro, run: a.equation },
         { label: 'Code', icon: <SquareCode size={14} />, also: 'code program snippet source syntax colours', disabled: ro, run: a.code },
+        !!a.qr && { label: 'QR code', icon: <QrCode size={14} />, also: 'qr code link phone scan camera barcode', disabled: ro, run: a.qr },
         {
           label: 'Video',
           icon: <Video size={14} />,
