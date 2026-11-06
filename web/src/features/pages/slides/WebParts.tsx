@@ -102,14 +102,14 @@ export function CodeLook({ el, set }: { el: CodeEl; set: Set }) {
       <Field label="Lines lit up">
         <input
           value={el.highlight ?? ''}
-          onChange={(e) => set({ highlight: e.target.value.replace(/[^\d,\s-]/g, '').slice(0, 80) || undefined } as Partial<El>, 'highlight')}
+          onChange={(e) => set({ highlight: e.target.value.replace(/[^\d,-]/g, '').slice(0, 80) || undefined } as Partial<El>, 'highlight')}
           onKeyDown={(e) => e.stopPropagation()}
-          placeholder="2-4, 7"
+          placeholder="2-4,7"
           aria-label="Lines lit up"
           className={field}
         />
       </Field>
-      <p className={note}>The lines lit up stand out, the rest dimmed: a range (2-4) or single lines, with commas between.</p>
+      <p className={note}>They stand out, the rest dimmed: a range (2-4) or single lines, with commas between.</p>
       <Field label="Corners">
         <NumInput label="Corner radius" value={el.radius ?? 0} onChange={(radius) => set({ radius: radius || undefined } as Partial<El>, 'radius')} min={0} max={400} unit="px" />
       </Field>
@@ -461,12 +461,12 @@ export function Scene3dLook({
       </Section>
       <Section title="Turning">
         <Field label="By itself">
-          <NumInput label="Degrees a second (0: still)" value={el.spin ?? 0} onChange={(spin) => set({ spin: spin || undefined } as Partial<El>, 'spin')} min={0} max={360} step={5} unit="°/s" />
+          <NumInput label="Degrees a second (0: still; below 0: the other way)" value={el.spin ?? 0} onChange={(spin) => set({ spin: spin || undefined } as Partial<El>, 'spin')} min={-360} max={360} step={5} unit="°/s" />
         </Field>
         <Toggle label="Viewers can turn and zoom it" on={!!el.orbit} onChange={(orbit) => set({ orbit: orbit || undefined } as Partial<El>)} />
         <Field label="Seen from">
           <NumInput label="Around it (degrees)" value={el.turn ?? 0} onChange={(turn) => set({ turn: turn || undefined } as Partial<El>, 'turn')} min={-180} max={180} step={5} unit="°" />
-          <NumInput label="From above (degrees)" value={el.tilt ?? 0} onChange={(tilt) => set({ tilt: tilt || undefined } as Partial<El>, 'tilt')} min={-90} max={90} step={5} unit="°" />
+          <NumInput label="From above (degrees)" value={el.tilt ?? 0} onChange={(tilt) => set({ tilt: tilt || undefined } as Partial<El>, 'tilt')} min={-89} max={89} step={5} unit="°" />
         </Field>
         <Field label="How near">
           <NumInput label="How near (1 fits it to the box)" value={el.zoom ?? 1} onChange={(zoom) => set({ zoom: zoom === 1 ? undefined : zoom } as Partial<El>, 'zoom')} min={0.2} max={5} step={0.1} unit="×" />
