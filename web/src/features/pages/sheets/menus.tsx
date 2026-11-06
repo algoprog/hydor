@@ -26,6 +26,21 @@ import {
   Sigma,
   Snowflake,
   Sparkles,
+  MessageCircleQuestionMark,
+  RefreshCw,
+  WandSparkles,
+  Eraser as Broom,
+  ChartNoAxesCombined,
+  Grid3x3,
+  Printer,
+  Table2,
+  Target,
+  ArrowRightToLine,
+  ArrowRightFromLine,
+  Link2,
+  ListTree,
+  Lock,
+  Tag,
   Split,
   SquareCheck,
   SquareChevronDown,
@@ -126,6 +141,38 @@ export interface MenuCtx {
   /** While the board shows: whether the sheet opens on it, and the switch for that (kept with the sheet). */
   boardOpens?: boolean;
   boardOpen(): void;
+  /** Data → Named ranges, Protect sheets and ranges, Group and Ungroup (rows, or columns when whole columns are picked); Insert → Link; View → Gridlines. */
+  names(): void;
+  /** Data → Pivot table (to change the sheet's own, when it holds one); Tools → Goal seek, Trace precedents and dependents. */
+  pivot(): void;
+  pivotHere: boolean;
+  goalSeek(): void;
+  /** Tools → Print and PDF setup. */
+  printSetup(): void;
+  trace(what: 'pre' | 'dep'): void;
+  traced: boolean;
+  untrace(): void;
+  protect(): void;
+  group(): void;
+  ungroup(): void;
+  groupWhat: 'rows' | 'columns';
+  link(): void;
+  gridlines: boolean;
+  toggleGridlines(): void;
+  /** The AI tools: a formula written or explained, Fill with AI, a table made, Analyze and Clean up, and the AI cells. */
+  ai?: {
+    formula(): void;
+    explain?: () => void;
+    fill(): void;
+    table(): void;
+    analyze(): void;
+    clean(): void;
+    /** Whether the workbook has AI cells; how many wait for an answer. */
+    cells: boolean;
+    refresh(): void;
+    waiting: number;
+    askWaiting(): void;
+  };
 }
 
 const FUNCS = ['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'SUMIF', 'COUNTIF', 'VLOOKUP', 'XLOOKUP', 'ROUND', 'CONCAT', 'TODAY'];
@@ -183,6 +230,7 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
         items: ZOOMS.map((z) => ({ label: `${z}%`, checked: Math.round(m.zoom * 100) === z, run: () => m.setZoom(z / 100) })),
       },
       { label: 'Show formulas', icon: <Sigma size={14} />, keys: 'Ctrl+`', checked: m.formulas, run: () => m.setFormulas(!m.formulas) },
+      !ro && { label: 'Gridlines', icon: <Grid3x3 size={14} />, also: 'grid lines cell borders show hide', checked: m.gridlines, run: m.toggleGridlines },
       { label: 'Comments', icon: <MessagesSquare size={14} />, also: 'discussion threads resolve', run: m.comments },
       { label: 'Kanban board', icon: <SquareKanban size={14} />, also: 'cards lanes group by status', checked: m.board, run: m.toggleBoard },
       m.board && !ro && { label: 'Open the sheet on its board', also: 'kanban view start', checked: !!m.boardOpens, run: m.boardOpen },
@@ -206,7 +254,10 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
       !ro && { label: 'Date', icon: <Calendar size={14} />, also: 'calendar picker', run: m.date },
       !ro && { label: m.note ? 'Edit note' : 'Note', icon: <StickyNote size={14} />, keys: 'Shift+F2', also: 'memo', run: m.noteEdit },
       !ro && { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'discussion thread reply', run: m.comment },
+      !ro && { label: 'Link', icon: <Link2 size={14} />, keys: 'Ctrl+K', also: 'hyperlink url web address', run: m.link },
       !ro && { label: 'Function', icon: <Sigma size={14} />, also: 'formula', items: FUNCS.map((f) => ({ label: f, run: () => m.func(f) })) },
+      !ro && m.ai && { label: 'Formula with AI', icon: <Sparkles size={14} />, also: 'write a formula ai assistant describe words', run: m.ai.formula },
+      !ro && m.ai && { label: 'Table made with AI', icon: <WandSparkles size={14} />, also: 'generate table ai list template', run: m.ai.table },
       !ro && { label: 'Special character', icon: <Omega size={14} />, also: 'emoji symbol', run: m.chars },
       !ro && { label: 'Sheet', also: 'add a sheet tab', run: m.addSheet },
     ],
@@ -319,17 +370,36 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
           '-',
           { label: m.filtered ? 'Remove the filter' : 'Create a filter', icon: <ListFilter size={14} />, keys: 'Ctrl+Shift+L', run: m.toggleFilter },
           { label: 'Data validation', icon: <SquareCheck size={14} />, also: 'rules dropdown list checkbox allowed values', run: m.validation },
+          { label: 'Named ranges', icon: <Tag size={14} />, also: 'name manager define names', run: m.names },
+          { label: 'Protect sheets and ranges', icon: <Lock size={14} />, also: 'lock protection read only warn', run: m.protect },
+          { label: m.groupWhat === 'columns' ? 'Group columns' : 'Group rows', icon: <ListTree size={14} />, keys: 'Alt+Shift+Right', also: 'outline collapse expand fold', run: m.group },
+          { label: m.groupWhat === 'columns' ? 'Ungroup columns' : 'Ungroup rows', keys: 'Alt+Shift+Left', also: 'outline remove group', run: m.ungroup },
           '-',
           { label: 'Remove duplicates', also: 'unique', run: m.dups },
           { label: 'Split text to columns', icon: <Split size={14} />, also: 'separate comma', run: m.split },
           { label: 'Trim spaces', also: 'whitespace', run: m.trim },
           { label: 'Summarize by', icon: <Sigma size={14} />, also: 'pivot table group totals', run: m.summary },
+          { label: m.pivotHere ? 'Edit the pivot table' : 'Pivot table', icon: <Table2 size={14} />, also: 'pivot summary rows columns values filters crosstab', run: m.pivot },
+          m.ai && '-',
+          m.ai && { label: 'Fill with AI', icon: <Sparkles size={14} />, keys: 'Ctrl+E', also: 'flash fill pattern examples autofill', run: m.ai.fill },
+          m.ai && { label: 'Clean up the data', icon: <Broom size={14} />, also: 'tidy spaces duplicates spellings dates numbers as text', run: m.ai.clean },
+          m.ai && { label: 'Analyze the data', icon: <ChartNoAxesCombined size={14} />, also: 'explore insights questions ai charts pivot suggestions', run: m.ai.analyze },
+          m.ai?.cells && { label: 'Refresh AI cells', icon: <RefreshCw size={14} />, also: 'ai function ask again answers', run: m.ai.refresh },
+          !!m.ai?.waiting && { label: `Ask the ${m.ai.waiting === 1 ? 'AI cell that waits' : `${m.ai.waiting} AI cells that wait`}`, icon: <Sparkles size={14} />, run: m.ai.askWaiting },
         ],
   };
   const tools: MenuDef = {
     label: 'Tools',
     items: [
       { label: 'Expand row', also: 'record card form', keys: 'Space', run: m.expand },
+      !ro && m.ai && { label: 'Analyze the data', icon: <ChartNoAxesCombined size={14} />, also: 'explore insights questions ai', run: m.ai.analyze },
+      m.ai?.explain && { label: 'Explain this formula', icon: <MessageCircleQuestionMark size={14} />, also: 'what does it do ai', run: m.ai.explain },
+      !ro && { label: 'Goal seek', icon: <Target size={14} />, also: 'what if analysis solve find value', run: m.goalSeek },
+      { label: 'Trace precedents', icon: <ArrowRightToLine size={14} />, also: 'cells this formula uses audit', run: () => m.trace('pre') },
+      { label: 'Trace dependents', icon: <ArrowRightFromLine size={14} />, also: 'formulas that use this cell audit', run: () => m.trace('dep') },
+      m.traced && { label: 'Remove traces', run: m.untrace },
+      !ro && { label: 'Print and PDF setup', icon: <Printer size={14} />, also: 'page setup orientation landscape portrait fit print area header rows repeat gridlines', run: m.printSetup },
+      '-',
       { label: 'Keyboard shortcuts', icon: <Keyboard size={14} />, keys: 'Ctrl+/', run: m.shortcuts },
       m.onAsk && '-',
       m.onAsk && { label: 'Ask the agent about it', icon: <Sparkles size={14} />, run: m.onAsk },

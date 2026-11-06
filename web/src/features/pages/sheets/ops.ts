@@ -60,8 +60,12 @@ export interface Meta {
   charts?: Sheet['charts'];
   board?: Sheet['board'];
   comments?: Sheet['comments'];
+  protect?: Sheet['protect'];
+  groups?: Sheet['groups'];
+  print?: Sheet['print'];
+  noGrid?: Sheet['noGrid'];
 }
-const META_KEYS = ['cols', 'rows', 'freeze', 'merges', 'filter', 'conditional', 'validation', 'charts', 'board', 'comments'] as const;
+const META_KEYS = ['cols', 'rows', 'freeze', 'merges', 'filter', 'conditional', 'validation', 'charts', 'board', 'comments', 'protect', 'groups', 'print', 'noGrid'] as const;
 
 export type Patch = (
   | { k: 'cells'; sheet: string; before: Record<string, Cell | null>; after: Record<string, Cell | null> }
@@ -105,12 +109,16 @@ export const metaOf = (sh: Sheet): Meta => ({
   charts: sh.charts,
   board: sh.board,
   comments: sh.comments,
+  protect: sh.protect,
+  groups: sh.groups,
+  print: sh.print,
+  noGrid: sh.noGrid,
 });
 
 function setMeta(sh: Sheet, m: Meta) {
   for (const k of META_KEYS) {
     const v = m[k];
-    if (v && Object.keys(v).length) (sh as unknown as Record<string, unknown>)[k] = v;
+    if (v === true || (v && typeof v === 'object' && Object.keys(v).length)) (sh as unknown as Record<string, unknown>)[k] = v;
     else delete sh[k];
   }
 }

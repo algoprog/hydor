@@ -5,7 +5,7 @@
 // under the cell while typing in the cell (over everything, so the cell's own box never covers it).
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { SquareFunction } from 'lucide-react';
+import { MessageCircleQuestionMark, Sparkles, SquareFunction } from 'lucide-react';
 import { FUNCTION_NAMES } from '@shared/sheets';
 import { cx } from '../../../components/ui';
 import { argAt, argsOf, FUNCTION_INFO } from './functions';
@@ -21,17 +21,19 @@ const rank = (n: string) => {
  * What to offer while a formula is typed: functions starting with the word before the caret, and the one being filled
  * in (its name, and which of its arguments the caret is in: the commas before it in the call).
  */
-export function formulaHelp(text: string, caret: number): { word: string; names: string[]; inside: { name: string; arg: number } | null } {
+export function formulaHelp(text: string, caret: number, ranges: string[] = []): { word: string; names: string[]; inside: { name: string; arg: number } | null } {
   if (!text.startsWith('=')) return { word: '', names: [], inside: null };
   const before = text.slice(0, caret);
   // Not inside quoted words.
   if ((before.match(/"/g)?.length ?? 0) % 2) return { word: '', names: [], inside: null };
   const m = /(?:^=|[=(,;+\-*/^&<>:\s%])([A-Za-z][A-Za-z0-9.]*)$/.exec(before);
   const word = m ? m[1].toUpperCase() : '';
+  // Functions first, then the workbook's named ranges.
   const names = word
-    ? FUNCTION_NAMES.filter((n) => n.startsWith(word) && n !== word)
-        .sort((a, b) => rank(a) - rank(b) || a.length - b.length || (a < b ? -1 : 1))
-        .slice(0, 6)
+    ? [
+        ...FUNCTION_NAMES.filter((n) => n.startsWith(word) && n !== word).sort((a, b) => rank(a) - rank(b) || a.length - b.length || (a < b ? -1 : 1)),
+        ...ranges.filter((n) => n.toUpperCase().startsWith(word) && n.toUpperCase() !== word),
+      ].slice(0, 6)
     : [];
   // The innermost function whose ( is still open before the caret, and the commas of its own before the caret.
   let depth = 0;
@@ -92,6 +94,10 @@ export function FormulaBar({
   barRef,
   ghost,
   cellAnchor,
+  aiRef,
+  onAi,
+  onExplain,
+  ranges,
 }: {
   /** The selection's name ("B2", "B2:D9"). */
   name: string;
@@ -113,13 +119,19 @@ export function FormulaBar({
   ghost?: string;
   /** While typing in the cell: where its box is on screen, for the functions offered to go under it. */
   cellAnchor?: (() => DOMRect | null) | null;
+  /** Write a formula with AI (the sparkle at the bar's end, what its panel opens from), and Explain this formula (when the cell has one). */
+  aiRef?: React.RefObject<HTMLButtonElement | null>;
+  onAi?: () => void;
+  onExplain?: () => void;
+  /** The workbook's named ranges, offered while a formula is typed. */
+  ranges?: string[];
 }) {
   const [box, setBox] = useState(name);
   const [boxFocus, setBoxFocus] = useState(false);
   useEffect(() => {
     if (!boxFocus) setBox(name);
   }, [name, boxFocus]);
-  const help = editing ? formulaHelp(text, caret) : null;
+  const help = editing ? formulaHelp(text, caret, ranges) : null;
   const lines = Math.min(4, text.split('\n').length);
   const nameRef = useRef<HTMLInputElement>(null);
   const list =
@@ -138,7 +150,7 @@ export function FormulaBar({
                 {n}
               </span>
               <span translate="no" className="min-w-0 truncate font-mono text-[11.5px] text-fg-3">
-                {FUNCTION_INFO[n]?.[0].replace(/^[^(]*/, '') ?? '(…)'}
+                {FUNCTION_INFO[n]?.[0].replace(/^[^(]*/, '') ?? (ranges?.includes(n) ? 'named range' : '(…)')}
               </span>
               {i === 0 && <span className="ml-auto shrink-0 text-[11px] text-fg-3">Tab</span>}
             </span>
@@ -213,6 +225,23 @@ export function FormulaBar({
         }}
         className={cx('min-h-8 min-w-0 flex-1 resize-none bg-transparent py-[7px] pr-2 font-mono text-[12.5px] leading-[18px] outline-none', !editing && !text && ghost && 'text-fg-3')}
       />
+      {onExplain && !editing && (
+        <button type="button" title="Explain this formula" aria-label="Explain this formula" onMouseDown={(e) => e.preventDefault()} onClick={onExplain} className="grid w-8 shrink-0 place-items-center text-fg-3 hover:text-accent">
+          <MessageCircleQuestionMark size={15} />
+        </button>
+      )}
+      <button
+        ref={aiRef}
+        type="button"
+        title="Write a formula with AI"
+        aria-label="Write a formula with AI"
+        disabled={!onAi}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={onAi}
+        className={cx('grid w-8 shrink-0 place-items-center text-fg-3 hover:text-accent disabled:pointer-events-none disabled:opacity-0')}
+      >
+        <Sparkles size={15} />
+      </button>
       {list && !inCell && <div className="absolute top-full right-2 left-[136px] z-40 mt-1 max-w-[460px] overflow-hidden rounded-xl border border-line bg-elevated p-1 shadow-lg max-sm:left-2">{list}</div>}
       {list &&
         inCell &&

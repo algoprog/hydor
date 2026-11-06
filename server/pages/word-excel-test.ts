@@ -643,7 +643,7 @@ function misordered(xml: string): string | null {
   const wb = (z.text('xl/workbook.xml') ?? '').replace('</definedNames>', '<definedName name="_xlnm.Print_Area" localSheetId="0">Plan!$A$1:$E$4</definedName></definedNames>');
   const parts = z.names().map((n) => ({ name: n, data: n === 'xl/worksheets/sheet1.xml' ? Buffer.from(sheet) : n === 'xl/workbook.xml' ? Buffer.from(wb) : z.read(n)! }));
   const other = importBook(zipParts(parts), 'Other.xlsx');
-  ok(other.book.sheets[0].cols?.[0]?.w === 64 && other.loses?.includes('print'), "Excel's widths read as the pixels Excel shows; a print area is said to be lost", [other.book.sheets[0].cols, other.loses]);
+  ok(other.book.sheets[0].cols?.[0]?.w === 64 && other.book.sheets[0].print?.area === 'A1:E4' && !other.loses?.includes('print'), "Excel's widths read as the pixels Excel shows; a print area is kept", [other.book.sheets[0].cols, other.book.sheets[0].print, other.loses]);
 }
 
 // ---- the editor's page and PDF ------------------------------------------------------------------------------------
