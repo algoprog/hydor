@@ -174,7 +174,9 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
   const busy = !!saving;
 
   const changed = Object.keys(r).length > 0 || e.stillAt !== undefined;
-  useEffect(() => setDirty(changed), [changed, setDirty]);
+  useEffect(() => {
+    setDirty(changed);
+  }, [changed, setDirty]);
 
   const change: Change = Object.assign((f: (x: VideoRecipe) => VideoRecipe) => h.set((x) => ({ ...x, recipe: f(x.recipe) })), { begin: h.begin, end: h.end });
 
@@ -235,7 +237,7 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
       const crop = x.crop ? shownRect(originalRect(x.crop, vs.w, vs.h, x), vs.w, vs.h, next) : undefined;
       return strip({ ...x, rotate: next.rotate || undefined, flipH: next.flipH || undefined, flipV: next.flipV || undefined, crop });
     });
-  const onTurn = (by: 90 | -90) => reTurn({ rotate: ((((r.rotate ?? 0) + by) % 360) + 360) % 360 as VideoTurn, flipH: r.flipH, flipV: r.flipV });
+  const onTurn = (by: 90 | -90) => reTurn({ rotate: (((((r.rotate ?? 0) + by) % 360) + 360) % 360) as VideoTurn, flipH: r.flipH, flipV: r.flipV });
   const onCrop = useCallback(
     (c: VideoCrop, phase: 'begin' | 'move' | 'end') => {
       if (phase === 'begin') return h.begin();
@@ -374,7 +376,16 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
     tool === 'trim' ? (
       <TrimPanel r={r} change={change} duration={duration} clock={clock} />
     ) : tool === 'crop' ? (
-      <CropPanel r={r} w={vs.w} h={vs.h} shape={shape} onShape={onShape} onTurn={onTurn} onMirror={(k) => reTurn({ rotate: r.rotate, flipH: k === 'flipH' ? !r.flipH : r.flipH, flipV: k === 'flipV' ? !r.flipV : r.flipV })} onReset={() => (setShape('free'), change((x) => strip({ ...x, crop: undefined, rotate: undefined, flipH: undefined, flipV: undefined })))} />
+      <CropPanel
+        r={r}
+        w={vs.w}
+        h={vs.h}
+        shape={shape}
+        onShape={onShape}
+        onTurn={onTurn}
+        onMirror={(k) => reTurn({ rotate: r.rotate, flipH: k === 'flipH' ? !r.flipH : r.flipH, flipV: k === 'flipV' ? !r.flipV : r.flipV })}
+        onReset={() => (setShape('free'), change((x) => strip({ ...x, crop: undefined, rotate: undefined, flipH: undefined, flipV: undefined })))}
+      />
     ) : tool === 'text' ? (
       <TextPanel r={r} change={change} picked={picked} onPick={setPicked} onAdd={addText} clock={clock} duration={duration} />
     ) : tool === 'adjust' ? (
@@ -698,19 +709,41 @@ function SaveButton({ label, disabled, onSave, children }: { label: string; disa
 
 const SIZES = [1080, 720, 480];
 
-function SaveOptions({ plans, kind, onKind, size, onSize, out }: { plans: ReturnType<typeof savePlans>; kind: 'mp4' | 'webm'; onKind: (k: 'mp4' | 'webm') => void; size?: number; onSize: (s: number | undefined) => void; out: { w: number; h: number } }) {
+function SaveOptions({
+  plans,
+  kind,
+  onKind,
+  size,
+  onSize,
+  out,
+}: {
+  plans: ReturnType<typeof savePlans>;
+  kind: 'mp4' | 'webm';
+  onKind: (k: 'mp4' | 'webm') => void;
+  size?: number;
+  onSize: (s: number | undefined) => void;
+  out: { w: number; h: number };
+}) {
   const short = Math.min(out.w, out.h);
   const sizes = SIZES.filter((s) => s < short);
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
         <div className="text-[12px] font-medium text-fg-3">Size</div>
-        <Segmented<string> size="sm" value={size && size < short ? String(size) : 'as'} onChange={(v) => onSize(v === 'as' ? undefined : Number(v))} options={[{ value: 'as', label: `${out.w} × ${out.h}` }, ...sizes.map((s) => ({ value: String(s), label: `${s}p` }))]} />
+        <Segmented<string>
+          size="sm"
+          value={size && size < short ? String(size) : 'as'}
+          onChange={(v) => onSize(v === 'as' ? undefined : Number(v))}
+          options={[{ value: 'as', label: `${out.w} × ${out.h}` }, ...sizes.map((s) => ({ value: String(s), label: `${s}p` }))]}
+        />
       </div>
       <div className="space-y-1.5">
         <div className="text-[12px] font-medium text-fg-3">Kind of file</div>
         {plans.main.fixed ? (
-          <p className="text-[12.5px] leading-snug text-fg-2">{`Saved over it, it stays ${plans.main.fixed}${plans.copy ? '; a copy is' : ''}`}{plans.copy ? <> {kind === 'webm' ? 'WebM' : 'MP4'}.</> : '.'}</p>
+          <p className="text-[12.5px] leading-snug text-fg-2">
+            {`Saved over it, it stays ${plans.main.fixed}${plans.copy ? '; a copy is' : ''}`}
+            {plans.copy ? <> {kind === 'webm' ? 'WebM' : 'MP4'}.</> : '.'}
+          </p>
         ) : null}
         <Segmented<'mp4' | 'webm'>
           size="sm"
@@ -726,4 +759,3 @@ function SaveOptions({ plans, kind, onKind, size, onSize, out }: { plans: Return
     </div>
   );
 }
-

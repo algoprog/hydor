@@ -123,7 +123,6 @@ export function colourMath(r: Pick<VideoRecipe, 'brightness' | 'contrast' | 'sat
   return { m: sat.map((x) => x * b * c), add: 0.5 * (1 - c) };
 }
 
-
 /** atempo takes 0.5 to 2 at a time on older ffmpeg: a speed as a few of them. */
 export function tempos(speed: number): number[] {
   const out: number[] = [];
@@ -298,7 +297,12 @@ export function planVideo(p: PlanInput): Plan {
                   ['boxcolor', ffColor(t.background)],
                   ['boxborderw', pad],
                 ] as [string, Value][])
-              : []),
+              : // No box: a soft shadow, as the editor draws them, keeps light words readable.
+                ([
+                  ['shadowcolor', '0x000000@0.55'],
+                  ['shadowx', Math.max(1, Math.round(fontsize / 24))],
+                  ['shadowy', Math.max(1, Math.round(fontsize / 24))],
+                ] as [string, Value][])),
             ['x', `${cx}-text_w/2`],
             ['y', top + j * lh + Math.round((lh - fontsize) / 2)],
             ...when,

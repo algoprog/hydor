@@ -101,7 +101,8 @@ export function Timeline(p: TimelineProps) {
 
   return (
     <div className="select-none" style={{ touchAction: 'none' }}>
-      <div ref={track} className="relative">
+      {/* Inset by a handle's width each side, so the handles at the ends stay on screen. */}
+      <div ref={track} className="relative mx-3.5 max-sm:mx-5">
         {/* The frames, the part kept, the parts cut and the splits. */}
         <div className="relative cursor-pointer overflow-hidden rounded-lg bg-bg-3" style={{ height: filmH }} onPointerDown={dragging((t, phase) => p.onSeek(t, phase))}>
           {strip && <img src={strip} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-fill" />}
@@ -196,7 +197,25 @@ function Lane({ children }: { children: ReactNode }) {
   return <div className="relative mt-1.5 h-6 rounded-md bg-bg-2">{children}</div>;
 }
 
-function Bar({ left, width, on, label, onPick, onBody, onStart, onEnd }: { left: number; width: number; on: boolean; label: ReactNode; onPick: () => void; onBody: (e: React.PointerEvent) => void; onStart: (e: React.PointerEvent) => void; onEnd: (e: React.PointerEvent) => void }) {
+function Bar({
+  left,
+  width,
+  on,
+  label,
+  onPick,
+  onBody,
+  onStart,
+  onEnd,
+}: {
+  left: number;
+  width: number;
+  on: boolean;
+  label: ReactNode;
+  onPick: () => void;
+  onBody: (e: React.PointerEvent) => void;
+  onStart: (e: React.PointerEvent) => void;
+  onEnd: (e: React.PointerEvent) => void;
+}) {
   return (
     <div
       className={cx('absolute inset-y-0.5 flex min-w-2 cursor-grab items-center overflow-hidden rounded-[5px] border text-[11px] leading-none', on ? 'border-accent bg-accent text-accent-fg' : 'border-accent/40 bg-accent-soft text-fg-2')}
