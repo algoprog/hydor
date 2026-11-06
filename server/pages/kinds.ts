@@ -7,7 +7,7 @@ import { HttpError } from '../auth.ts';
 import { ASSET, asAccepted, docMarkdown, docSources, mapDocSources, newDoc } from '../../shared/docs.ts';
 import { newTex, texSources } from '../../shared/latex.ts';
 import { newBook } from '../../shared/sheets.ts';
-import { deckSources, deckVideos, newDeck } from '../../shared/slides.ts';
+import { deckSounds, deckSources, deckVideos, newDeck } from '../../shared/slides.ts';
 import { assetDataUrl } from './assets.ts';
 import { docForAgent, docFromFile, docPage, docxOfDoc, keepDoc, MAX_DOC, readDoc } from './docs.ts';
 import { importTex, keepTex, MAX_TEX, readTex, TEX_OPENS, texForAgent, texPage, texPdf, texSource, texZip } from './latex.ts';
@@ -79,8 +79,8 @@ KINDS.set('slides', {
   max: MAX_DECK,
   keep: (db, input) => {
     const { deck, text } = keepDeck(db, input);
-    // Its kept videos stay while a version shows them, as its pictures do.
-    return { text, sources: [...deckSources(deck), ...deckVideos(deck)] };
+    // Its kept videos (and its slides' narrations) stay while a version shows them, as its pictures do.
+    return { text, sources: [...deckSources(deck), ...deckVideos(deck), ...deckSounds(deck)] };
   },
   read: readDeck,
   page: (db, text, title, mode) => deckPage(db, readDeck(text), title, mode),
