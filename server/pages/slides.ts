@@ -8,11 +8,19 @@
 // and gets its lines from the app's copy of Lucide (where this install has one); a video it adds gets its site's still
 // (video-still.ts). A deck's equations are drawn here by the server's own KaTeX (math.ts) and go into its page with
 // only the fonts they use, so they draw with no network.
+//
+// The deck's page is one small file: the runtime minified (scripts/build-server.mjs builds it; its own source where the
+// server was not built so), the deck as tight JSON, its pictures and (in a download) its videos and fonts inside. Its
+// live parts (custom code, web pages, 3D) run in sandboxed frames: in the app at /partframe (PART_FRAME_HTML), sent
+// their page once by the app's slides.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import os from 'node:os';
 import path from 'node:path';
-import { ASSET, deckFonts, deckOutline, deckSources, deckText, everyEl, FONT_TABLE, googleFamilies, iconNodes, isDeckText, mapSources, mapVideoSources, normalizeDeck, plainText, VIDEO, videoSrc, type Deck, type El, type IconNode, type SlideComment, type VideoEl } from '../../shared/slides.ts';
+import { ASSET, deckFonts, deckModels, SLIDE_LIMITS, deckOutline, deckSources, deckText, everyEl, FONT_TABLE, googleFamilies, iconNodes, isDeckText, isWebDeck, keptVideo, mapSources, mapVideoSources, normalizeDeck, plainText, VIDEO, videoSrc, type Deck, type El, type IconNode, type SlideComment, type VideoEl } from '../../shared/slides.ts';
 import { slidesRuntime } from '../../shared/slides-runtime.ts';
+import { THREE_BASE } from '../../shared/app-media.ts';
+import { fontsInside } from './fonts.ts';
 import { newCommentId } from '../../shared/comments.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -28,8 +36,39 @@ export { isDeckText };
 /** The longest a deck's text may be (its pictures are kept apart). */
 export const MAX_DECK = 3 * 1024 * 1024;
 
-export const RUNTIME_SRC = scriptSafe(slidesRuntime.toString());
+/** The runtime minified, as scripts/build-server.mjs gives it to the server's bundle (none where it was not built so, as in a test run from source). */
+declare const __SLIDES_RUNTIME__: string | undefined;
+const MINIFIED = typeof __SLIDES_RUNTIME__ === 'string' ? __SLIDES_RUNTIME__ : '';
+
+/** The runtime as a deck's page carries it: an expression that is the function (minified where the server was built so, else its source). */
+export const RUNTIME_SRC = scriptSafe(MINIFIED || slidesRuntime.toString());
+/** Whether the deck's pages carry the minified runtime. */
+export const RUNTIME_MINIFIED = !!MINIFIED;
 export const FONTS_JSON = JSON.stringify(FONT_TABLE);
+/** What the runtime loads its live parts' libraries from: three.js at the version the app pins. */
+export const RUNTIME_LIBS = JSON.stringify({ three: THREE_BASE });
+
+/**
+ * The page of /partframe, where a live part of a slide runs in the app (sandboxed by PAGE_CSP: scripts, no origin of
+ * its own). It says it is ready, takes its page once from the window around it (only from it, only the first), and
+ * writes it in its own place. The app's slides send it the page the runtime made (the part's own code, the deck's
+ * colours and fonts, window.deck).
+ */
+function partFrame() {
+  let done = false;
+  const on = (e: MessageEvent) => {
+    const d = e.data;
+    if (done || e.source !== parent || !d || d.type !== 'n-part-page' || typeof d.html !== 'string') return;
+    done = true;
+    removeEventListener('message', on);
+    document.open();
+    document.write(d.html);
+    document.close();
+  };
+  addEventListener('message', on);
+  parent.postMessage({ type: 'n-part-ready' }, '*');
+}
+export const PART_FRAME_HTML = `<!doctype html><html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(partFrame.toString())})()</script></body></html>`;
 
 /** A deck's text, read back; a broken one is an error a person can act on. */
 export function readDeck(text: string): Deck {
@@ -40,7 +79,7 @@ export function readDeck(text: string): Deck {
   }
 }
 
-/** The deck as it is kept, checked; data: pictures are kept apart, other sources stay as they are. */
+/** The deck as it is kept, checked; data: pictures (and 3D models) are kept apart, other sources stay as they are. */
 export function keepDeck(db: DB, input: unknown): { deck: Deck; text: string } {
   let deck: Deck;
   try {
@@ -51,7 +90,9 @@ export function keepDeck(db: DB, input: unknown): { deck: Deck; text: string } {
   deck = mapSources(deck, (s) => {
     if (!s.startsWith('data:')) return s;
     const m = /^data:image\/[a-z0-9.+-]+;base64,([A-Za-z0-9+/=]+)$/i.exec(s);
-    return m ? ASSET + putAsset(db, Buffer.from(m[1], 'base64')) : '';
+    if (m) return ASSET + putAsset(db, Buffer.from(m[1], 'base64'));
+    const g = /^data:model\/gltf(?:-binary|\+json);base64,([A-Za-z0-9+/=]+)$/.exec(s);
+    return g ? ASSET + putAsset(db, Buffer.from(g[1], 'base64'), { model: true }) : '';
   });
   const text = deckText(deck);
   if (Buffer.byteLength(text) > MAX_DECK) throw new HttpError(413, `The deck is over ${MAX_DECK / 1024 / 1024} MB without its pictures; make it smaller.`);
@@ -156,7 +197,7 @@ function centreNewShapes(input: unknown, known: Set<string>): unknown {
   };
 }
 
-/** The deck with its videos' files kept: each one's kept source (and its first frame, unless it had a still), the rest left out. */
+/** The deck with its videos' files kept: each one's kept source (and its first frame, unless it had a still), the rest left out; those behind slides too. */
 function withVideoFiles(d: Deck, files: Map<string, { src: string; poster?: string } | null>): Deck {
   const map = (els: El[]): El[] =>
     els.flatMap((e): El[] => {
@@ -165,7 +206,57 @@ function withVideoFiles(d: Deck, files: Map<string, { src: string; poster?: stri
       const f = files.get(e.src);
       return f ? [{ ...e, src: f.src, ...(!e.poster && f.poster ? { poster: f.poster } : {}) }] : [];
     });
+  return {
+    ...d,
+    slides: d.slides.map((s) => {
+      const v = s.bg?.video;
+      if (!v || !files.has(v)) return { ...s, els: map(s.els) };
+      const f = files.get(v);
+      const { video: _v, ...bg } = s.bg!;
+      return { ...s, bg: f ? { ...bg, video: f.src } : bg, els: map(s.els) };
+    }),
+  };
+}
+
+/** The deck with each 3D part's model changed by `f` (taken in: kept, or left out as ''). */
+function mapModels(d: Deck, f: (m: string) => string): Deck {
+  const map = (els: El[]): El[] => els.map((e) => (e.type === 'group' ? { ...e, els: map(e.els) } : e.type === 'scene3d' && e.model ? { ...e, model: f(e.model) || undefined } : e));
   return { ...d, slides: d.slides.map((s) => ({ ...s, els: map(s.els) })) };
+}
+
+/** A path an agent gave: from its session's folder, from home (~), or absolute. */
+const fromSession = (cwd: string, p: string) => (p === '~' || p.startsWith('~/') ? path.join(os.homedir(), p.slice(1)) : path.resolve(cwd, p));
+
+/**
+ * Custom code an agent gives as a file of its session ({type: "html", file: "images/plot.html"}, as make_plot writes
+ * one): the part's HTML read in from it, unless the file is missing or over what a part may hold (said in `notes`).
+ */
+function withHtmlFiles(input: unknown, cwd: string, notes: string[]): unknown {
+  const obj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+  const part = (e: unknown): unknown => {
+    if (!obj(e)) return e;
+    if (e.type === 'group') return { ...e, ...(Array.isArray(e.els) ? { els: e.els.map(part) } : {}), ...(Array.isArray(e.parts) ? { parts: e.parts.map(part) } : {}) };
+    const type = typeof e.type === 'string' ? e.type.toLowerCase() : '';
+    if (!/^(html|custom|custom-code)$/.test(type) || typeof e.file !== 'string' || !e.file.trim() || (typeof e.html === 'string' && e.html.trim())) return e;
+    const name = e.file.trim();
+    const max = SLIDE_LIMITS.html;
+    try {
+      const file = fromSession(cwd, name);
+      const st = fs.statSync(file);
+      if (!st.isFile()) throw new Error('it is not a file');
+      const text = st.size <= max * 4 ? fs.readFileSync(file, 'utf8') : '';
+      if (!text || text.length > max) {
+        notes.push(`The custom code in ${name} is ${Math.round(st.size / 1024)} KB, over the ${Math.round(max / 1000)} KB a part may hold: load its libraries from jsDelivr rather than putting them inside it, or show it as a picture. Its part was left empty.`);
+        return { ...e, html: '' };
+      }
+      return { ...e, html: text };
+    } catch (err) {
+      notes.push(`The custom code file ${name} could not be read (${(err as Error).message}); its part was left empty.`);
+      return { ...e, html: '' };
+    }
+  };
+  if (!obj(input) || !Array.isArray(input.slides)) return input;
+  return { ...input, slides: input.slides.map((s) => (obj(s) ? { ...s, ...(Array.isArray(s.els) ? { els: s.els.map(part) } : {}), ...(Array.isArray(s.extra) ? { extra: s.extra.map(part) } : {}) } : s)) };
 }
 
 /**
@@ -261,11 +352,13 @@ export async function agentDeck(db: DB, input: unknown, cwd: string, prev?: stri
   let deck: Deck;
   const missing = new Set<string>();
   const known = partIds(prev);
+  const notes: string[] = [];
   try {
-    // Any source may be a file of the session's: kept as written until it is taken in below.
-    deck = normalizeDeck(centreNewShapes(input, known), {
+    // Any source may be a file of the session's: kept as written until it is taken in below (custom code's file read in now).
+    deck = normalizeDeck(centreNewShapes(withHtmlFiles(input, cwd, notes), known), {
       src: (s) => (s.length <= 4096 ? s : null),
       video: (s) => (s.length <= 4096 ? s : null),
+      model: (s) => (s.length <= 4096 ? s : null),
       icon: (name) => {
         const got = lucideIcon(name);
         if (!got) missing.add(name);
@@ -275,7 +368,6 @@ export async function agentDeck(db: DB, input: unknown, cwd: string, prev?: stri
   } catch (e) {
     throw new Error(`${(e as Error).message} See save_slides' description for the deck's shape.`);
   }
-  const notes: string[] = [];
   if (missing.size)
     notes.push(
       hasIcons()
@@ -283,24 +375,32 @@ export async function agentDeck(db: DB, input: unknown, cwd: string, prev?: stri
         : `This install has no icons to name; ${[...missing].map((x) => `"${x}"`).join(', ')} ${missing.size === 1 ? 'was' : 'were'} left out (an emoji in a text part does instead).`,
     );
   const done = new Map<string, string>();
-  for (const s of new Set(deckSources(deck))) done.set(s, await takeIn(db, s, { cwd, notes }));
-  deck = mapSources(deck, (s) => done.get(s) ?? s);
-  // Its videos that are files of its session, kept (with their first frame as their still, where this computer can take one).
+  // Pictures, posters, and 3D parts' models (those on the web kept too, so a site going away or refusing other pages
+  // does not take them).
+  const models = new Set(deckModels(deck));
+  for (const s of deck.slides) for (const e of everyEl(s.els)) if (e.type === 'scene3d' && e.model?.startsWith('https:')) models.add(e.model);
+  for (const s of new Set([...deckSources(deck), ...models])) done.set(s, await takeIn(db, s, { cwd, notes, model: models.has(s) }));
+  deck = mapModels(mapSources(deck, (s) => done.get(s) ?? s), (m) => done.get(m) ?? m);
+  // Its videos that are files of its session, kept (with their first frame as their still, where this computer can take
+  // one); those behind its slides too.
   const files = new Map<string, { src: string; poster?: string } | null>();
-  for (const s of deck.slides)
-    for (const e of everyEl(s.els)) {
-      if (e.type !== 'video' || videoSrc(e.src) || e.src.startsWith(VIDEO) || files.has(e.src)) continue;
-      const got = await keepVideoFile(db, e.src, cwd).catch((err: Error) => {
-        notes.push(`The video "${e.src.length > 120 ? `${e.src.slice(0, 120)}…` : e.src}" was left out: ${err.message} (a video is an MP4, MOV or WebM file of up to ${MAX_VIDEO / 1024 / 1024} MB, or a YouTube or Vimeo address).`);
-        return null;
-      });
-      let poster: string | undefined;
-      if (got?.frame)
-        try {
-          poster = ASSET + putAsset(db, got.frame);
-        } catch {}
-      files.set(e.src, got ? { src: got.src, poster } : null);
-    }
+  const keepVideo = async (src: string) => {
+    if (videoSrc(src) || keptVideo(src) || files.has(src)) return;
+    const got = await keepVideoFile(db, src, cwd).catch((err: Error) => {
+      notes.push(`The video "${src.length > 120 ? `${src.slice(0, 120)}…` : src}" was left out: ${err.message} (a video is an MP4, MOV or WebM file of up to ${MAX_VIDEO / 1024 / 1024} MB, or a YouTube or Vimeo address).`);
+      return null;
+    });
+    let poster: string | undefined;
+    if (got?.frame)
+      try {
+        poster = ASSET + putAsset(db, got.frame);
+      } catch {}
+    files.set(src, got ? { src: got.src, poster } : null);
+  };
+  for (const s of deck.slides) {
+    if (s.bg?.video) await keepVideo(s.bg.video);
+    for (const e of everyEl(s.els)) if (e.type === 'video') await keepVideo(e.src);
+  }
   if (files.size) deck = normalizeDeck(withVideoFiles(deck, files));
   // The videos it adds without a still get their site's, kept, as the editor's do (a few at a time, each bounded in time).
   const stills = new Map<string, string>();
@@ -364,9 +464,13 @@ const PAGE_CSS = [
  * first slide alone (`still`, for its picture in Pages). Its pictures go inside it; its videos from a device play from
  * an address of this server's that is its own permission (the page opens without the app's sign-in), or, in a page
  * that is a file on its own (`videosInside`), go inside it too where they are small enough (else their still shows).
+ * Its 3D models go inside it where they run (the viewer); `fonts`, a stylesheet with the fonts' files inside it, takes
+ * the place of Google's. One small file: the runtime minified, the deck as tight JSON, only the fonts it names.
  */
-export function deckPage(db: DB, deck: Deck, title: string, mode: 'viewer' | 'print' | 'still' = 'viewer', o: { videosInside?: boolean } = {}): string {
-  const pictured = mapSources(deck, (s) => (s.startsWith(ASSET) ? (assetDataUrl(db, s.slice(ASSET.length)) ?? '') : s));
+export function deckPage(db: DB, deck: Deck, title: string, mode: 'viewer' | 'print' | 'still' = 'viewer', o: { videosInside?: boolean; fonts?: string } = {}): string {
+  // Printed or still, a 3D part shows its poster: its model stays out of the page.
+  const shown = mode === 'viewer' ? deck : mapModelsOut(deck);
+  const pictured = mapSources(shown, (s) => (s.startsWith(ASSET) ? (assetDataUrl(db, s.slice(ASSET.length)) ?? '') : s));
   let room = 2 * VIDEO_INSIDE;
   const inside = mapVideoSources(pictured, (s) => {
     const sha = s.slice(VIDEO.length);
@@ -375,21 +479,41 @@ export function deckPage(db: DB, deck: Deck, title: string, mode: 'viewer' | 'pr
     if (data) room -= data.length * 0.75;
     return data ?? '';
   });
-  const fams = googleFamilies(deckFonts(deck));
+  const named = deckFonts(deck);
+  const fams = o.fonts ? '' : googleFamilies(named);
+  const table = JSON.stringify(Object.fromEntries(named.filter((f) => FONT_TABLE[f]).map((f) => [f, FONT_TABLE[f]])));
   const maths = mathTags(deck);
   return [
     '<!doctype html>',
     `<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>`,
     '<meta name="generator" content="Hydor slides">',
     fams ? `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?${esc(fams)}&amp;display=swap">` : '',
+    o.fonts ? `<style id="n-fonts">${o.fonts.replace(/<\//g, '<\\/')}</style>` : '',
     maths.head,
     `<style>${PAGE_CSS}</style></head><body>`,
     `<script type="application/json" id="n-deck">${scriptJson(inside)}</script>`,
     // Before the slides are drawn, so the equations draw with them.
     maths.body,
-    `<script>(${RUNTIME_SRC})(window, ${FONTS_JSON}).boot(${JSON.stringify({ mode })})</script>`,
+    `<script>(${RUNTIME_SRC})(window,${table},${RUNTIME_LIBS}).boot(${JSON.stringify({ mode })})</script>`,
     '</body></html>',
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** A deck without its 3D parts' models (where they would not run). */
+const mapModelsOut = (d: Deck): Deck => mapModels(d, () => '');
+
+/**
+ * The deck's page as a file of its own (File → Download → Web page, export_page html): its pictures, videos (up to
+ * their limit) and fonts inside it, so it opens in any browser and shows the same with no network, but for its 3D
+ * parts (three.js comes from jsDelivr), the web pages it embeds and the libraries its custom code loads.
+ */
+export async function deckFile(db: DB, deck: Deck, title: string): Promise<string> {
+  const text = deckText(deck);
+  const weights = [400, 700, ...(/"type":"(chart|quiz)"/.test(text) ? [600] : [])];
+  const fonts = await fontsInside(deckFonts(deck), text, { weights, italic: /"(i|italic)":true/.test(text) }).catch(() => '');
+  return deckPage(db, deck, title, 'viewer', { videosInside: true, fonts });
 }
 
 /** A deck page is one by its marker (the frame lets such a page go full screen). */
@@ -401,7 +525,8 @@ export function deckForAgent(text: string): string {
   const body = text.length > 150_000 ? `${text.slice(0, 150_000)}\n… (cut: the deck is ${Math.round(text.length / 1024)} KB; keep the parts you did not read as they are by changing the deck slide by slide)` : text;
   const f = deck.footer;
   const foot = f ? `; on each slide${f.skipTitle ? ' but the title slide' : ''}: ${[f.num && 'its number', f.text && `"${f.text}"`, f.date && (f.date === 'today' ? "the day's date" : `the date "${f.date}"`)].filter(Boolean).join(', ')}` : '';
-  return `A slide deck of ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'} (${deck.ratio}, theme ${deck.theme.id ?? 'custom'}${foot}).\n\nOutline:\n${deckOutline(deck)}\n\nThe deck (send it back whole with save_slides and this id to change it, or only the slides that change with change, add and remove; keep naget-asset: pictures, naget-video: videos and icons' paths as they are):\n${body}${commentsForAgent(deck)}`;
+  const format = isWebDeck(deck) ? `the web format${deck.progress ? ', a progress bar' : ''}` : 'PowerPoint compatible, format "pptx": only what PowerPoint has';
+  return `A slide deck of ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'} (${deck.ratio}, theme ${deck.theme.id ?? 'custom'}, ${format}${foot}).\n\nOutline:\n${deckOutline(deck)}\n\nThe deck (send it back whole with save_slides and this id to change it, or only the slides that change with change, add and remove; keep naget-asset: pictures, naget-video: videos and icons' paths as they are):\n${body}${commentsForAgent(deck)}`;
 }
 
 /** The deck's comments, slide by slide, each on its part or slide, with how to answer them; '' when it has none. */
@@ -429,13 +554,18 @@ function commentsForAgent(deck: Deck): string {
 }
 
 const SLIDES_HELP = [
-  'Make or change a slide deck, kept in the user’s Library: they can present it (full screen; a presenter view with notes, the next slide and a timer), edit it as in PowerPoint or Google Slides, and export it to PowerPoint (.pptx) or PDF. Use it whenever the user asks for slides, a deck or a presentation, rather than writing a .pptx file (unless they ask for a file, or work on one they have). It shows in the conversation as a slideshow. A PowerPoint file they have (.pptx) opens as a deck in their Library with app_api POST /api/pages/import {path} (its slides, notes, comments and theme come along); get_page then gives it, to change with save_slides.',
+  'Make or change a slide deck, kept in the user’s Library: they can present it (full screen; a presenter view with notes, the next slide and a timer), edit it as in PowerPoint or Google Slides, and export it to PowerPoint (.pptx), PDF or a web page. Use it whenever the user asks for slides, a deck or a presentation, rather than writing a .pptx file (unless they ask for a file, or work on one they have). It shows in the conversation as a slideshow. A PowerPoint file they have (.pptx) opens as a deck in their Library with app_api POST /api/pages/import {path} (its slides, notes, comments and theme come along); get_page then gives it, to change with save_slides.',
+  'Format: the web format is the default (no "format"): everything below, shown in the app, presented, and as its own web page in any browser; its PowerPoint export makes what PowerPoint lacks pictures or PowerPoint’s nearest effects. "format": "pptx" keeps to what PowerPoint has, so its file keeps everything: only when the user wants a file to edit in PowerPoint, Keynote or Google Slides (a deck opened from a .pptx is one).',
   'Slides are 1280×720 px ("ratio": "4:3" makes them 1280×960); text sizes are px too (1 px = 0.75 pt: body 24–30, titles 44–60).',
   'Each slide comes from a layout with its words, from parts placed by position ("els"), or both ("extra": parts added to a layout). Layouts: title {title, subtitle}; content {title, text}; two {title, left, right, leftTitle, rightTitle}; section {title, subtitle}; image-right {title, text, image}; image {title, image, caption}; stats {title, stats: [{value, label}]}; cards {title, cards: [{title, text}]}; steps {title, steps: [{title, text}]}; quote {quote, by}; chart {title, chart: {kind, labels, series}}; table {title, table: [[header…], [row…]]}; title-only {title}; end {title, subtitle}; blank.',
   'Words (text, left, right, a part’s text): a line per paragraph, "- " for a bullet and "1. " for a number, two spaces before them a level deeper, **bold**, *italic*, [words](https://…); or an array of bullets (a nested array a level deeper).',
-  'Parts: {type, x, y, w, h, …}. text {text, size, color, font, bold, italic, align, valign: top|middle|bottom, fill, line, radius, role: title|subtitle|body|caption|quote|big}. shape {shape: rect|round|ellipse|triangle|rtriangle|diamond|pentagon|hexagon|octagon|star|arrow|larrow|uarrow|darrow|chevron|parallelogram|trapezoid|plus|heart|callout, fill ("none" for none), fill2 and angle for a gradient, line, lineW, shadow, and text like a text part, in its middle unless align or valign say otherwise}. image {src, fit: cover|contain|fill, radius, alt, crop: {l, t, r, b} (the share cut off each side, 0–0.95; the rest fills the box), adjust: {bright and contrast −100…100, sat 0…200 (100 as it is), gray: true, blur in px}}: src is a file of this session (a picture you made), a public https address, or a picture of the deck already (naget-asset:…). line {x, y to x+w, y+h; color, width, dash: solid|dash|dot, start and end: none|arrow|dot; from and to: a part’s id (or {el, at: t|r|b|l}) to stick that end to the middle of the part’s side that faces the other end (a connector, which follows its parts as they move; its x, y, w, h follow), route: "elbow" for right angles}; type "connector" is a line too. table {rows: [[…]], head, band, size, merges: [{r, c, rs, cs}] (cells merged from row r, column c, rs rows down, cs across), fills: {"row,col": colour}}. chart {kind: column|bar|line|area|pie|doughnut, labels, series: [{name, values}], legend, values, stacked}. icon {icon: a Lucide icon’s name ("rocket", "chart-line", "users", "shield-check", "lightbulb"), color, lineW (its lines’ width, 2 by default)}: square, 120×120 if no w and h. math {tex: an equation in LaTeX ("E = mc^2", "\\int_0^1 x^2\\,dx"), color, align: left|right}: drawn as large as its box allows, in the text colour. video {src: a YouTube or Vimeo address, or a video file of this session (an .mp4, .mov or .webm of up to 200 MB, kept with the deck; naget-video:… once kept), start (seconds), autoplay, muted, loop, poster}: its still (its site’s, or a file’s first frame, fetched and kept, unless you give a poster) shows until it plays in the slideshow. group {els: [parts]}: parts that move as one; without x and y its parts are placed on the slide, with them its parts are placed from its top-left corner. Any part may have rot (degrees), opacity, link ("https://…", or "#3" for slide 3), name, key, and anim: its entrance ("fade", or {fx, on, dur, delay, dir}).',
+  'Parts: {type, x, y, w, h, …}. text {text, size, color, font, bold, italic, align, valign: top|middle|bottom, fill, line, radius, role: title|subtitle|body|caption|quote|big}. shape {shape: rect|round|ellipse|triangle|rtriangle|diamond|pentagon|hexagon|octagon|star|arrow|larrow|uarrow|darrow|chevron|parallelogram|trapezoid|plus|heart|callout, fill ("none" for none), fill2 and angle for a gradient, line, lineW, shadow, and text like a text part, in its middle unless align or valign say otherwise}. image {src, fit: cover|contain|fill, radius, alt, crop: {l, t, r, b} (the share cut off each side, 0–0.95; the rest fills the box), adjust: {bright and contrast −100…100, sat 0…200 (100 as it is), gray: true, blur in px}}: src is a file of this session (a picture you made), a public https address, or a picture of the deck already (naget-asset:…). line {x, y to x+w, y+h; color, width, dash: solid|dash|dot, start and end: none|arrow|dot; from and to: a part’s id (or {el, at: t|r|b|l}) to stick that end to the middle of the part’s side that faces the other end (a connector, which follows its parts as they move; its x, y, w, h follow), route: "elbow" for right angles}; type "connector" is a line too. table {rows: [[…]], head, band, size, merges: [{r, c, rs, cs}] (cells merged from row r, column c, rs rows down, cs across), fills: {"row,col": colour}}. chart {kind: column|bar|line|area|pie|doughnut, labels, series: [{name, values}], legend, values, stacked}. icon {icon: a Lucide icon’s name ("rocket", "chart-line", "users", "shield-check", "lightbulb"), color, lineW (its lines’ width, 2 by default)}: square, 120×120 if no w and h. math {tex: an equation in LaTeX ("E = mc^2", "\\int_0^1 x^2\\,dx"), color, align: left|right}: drawn as large as its box allows, in the text colour. video {src: a YouTube or Vimeo address, or a video file of this session (an .mp4, .mov or .webm of up to 200 MB, kept with the deck; naget-video:… once kept), start (seconds), autoplay, muted, loop, poster}: its still (its site’s, or a file’s first frame, fetched and kept, unless you give a poster) shows until it plays in the slideshow. code {code, lang (python, javascript, typescript, html, css, sql, bash, json, rust, go, java, c, cpp…), size, look: dark|light|deck, lineNumbers, highlight: "2-4,7" (lines lit, the rest dimmed)}: coloured as an editor colours it, made smaller to fit its box (PowerPoint gets it as coloured words). group {els: [parts]}: parts that move as one; without x and y its parts are placed on the slide, with them its parts are placed from its top-left corner. Any part may have rot (degrees), opacity, link ("https://…", "#3" for slide 3, or "#next", "#prev", "#first", "#last"), name, key, and anim: its entrance ("fade", or {fx, on, dur, delay, dir}).',
+  'The web format’s own parts (PowerPoint gets pictures or text boxes): html {html: a small page (HTML, CSS, JavaScript), or file: an .html file of this session (up to 200 KB; make_plot’s interactive plot is one), interactive: true (it takes clicks and keys in the slideshow; else a click on it goes on), poster: a picture (a file of this session) shown where it cannot run}: sandboxed, it may load libraries from jsDelivr, unpkg or cdnjs, and gets the theme as CSS variables (--n-bg, --n-fg, --n-head, --n-muted, --n-accent, --n-accent-fg, --n-soft, --n-c1…--n-c6, --n-font, --n-head-font) and window.deck: deck.slide, deck.slides, deck.step, deck.on("enter"|"leave"|"step", f), deck.next(), deck.prev(), deck.go(n). embed {url: an https web page that lets others show it in a frame (a map, a form, a CodePen), interactive, poster, radius}. quiz {question, choices: ["London", "*Paris"] (a * marks a right one; or [{text, correct, why: what picking it says}]), multi (several right: picked, then checked), explain (said once answered), layout: list|grid, size, fill}: answered in the slideshow, right or wrong at once; with no right choice it is a poll. score {text: "You got {right} of {total}" ({percent} too), size, color, align}: the quizzes answered right so far. scene3d {model: a .glb or .gltf file of this session or an https address of one (kept with the deck, a .gltf with the files beside it), or shape: cube|sphere|torus|knot|cone|cylinder|icosahedron|text (with text: its words), color, material: matte|glossy|metal|glass|wire|toon, light: studio|soft|dramatic|neon, spin (degrees a second), orbit: true (viewers turn and zoom it), turn and tilt (degrees it is seen from), zoom, bg (else see-through), poster}.',
+  'Web looks: any part may have hover: lift|grow|glow|tilt (in the slideshow); text and shapes textFx: gradient|glow|outline|neon|shadow and glass: true (frosted glass behind the box).',
   'Colours: the theme’s names, which follow it (accent, accentFg, fg, head, muted, bg, soft, c1 to c6), or #hex.',
   'A slide may also have notes (speaker notes: what to say), bg (a colour; {color, to, angle} for a gradient; {image, dim} for a picture), transition (none|fade|push|wipe|cover|zoom|split|morph, or {fx, dir, dur, auto: seconds to go on by itself}), hidden, nofooter (no footer or number on it), build: true (its bullets come one at a time), and anims: [{el: a part’s id, type: in|em|out, fx: appear|fade|fly|float|zoom|wipe|bounce for in and out, pulse|spin|grow|shake for em, on: click|with|after, dur and delay in ms, dir: left|right|up|down, byPara}]. Morph: the parts this slide shares with the one before glide from where they were (moving, growing, turning, recolouring) and the rest fade; a part matches one of the slide before with the same key (or whose id is its key), else the same name, else the same words or picture, so to morph, repeat the part on the next slide with "key" set to its id and change its x, y, w, h, rot or colour.',
+  'The web format adds: effects blur|rise|drop|flip|swing|roll|pop|typewriter|draw (lines, shapes and icons drawn)|count (its numbers count up) for in, glow|wiggle|heartbeat|jello|flash|bob|confetti for em, blur|drop|flip|roll|pop for out, with by: word|letter (one by one), loop: true (an em that keeps going), ease: smooth|spring|bounce|linear|snap, and on: "tap" with trigger: a part’s id (it runs whenever that part is clicked, outside the build; an entrance waits hidden till then); transitions cube|flip|dissolve|circle|blinds|glitch; bg {fx: aurora|particles|stars|waves|mesh|grid|bokeh} (moving, in the theme’s colours) or {video: a video file of this session or naget-video:…} (muted, looping, behind it); and the deck’s progress: true (a bar across the top).',
+  'Web examples: a quiz {type: "quiz", question: "2 + 2?", choices: ["3", "*4", "5"], explain: "Two pairs make four."}; an answer shown on a click: els [{id: "b", type: "shape", text: "Show the answer"}, {id: "a", type: "text", text: "42"}], anims [{el: "a", fx: "pop", on: "tap", trigger: "b"}]; custom code {type: "html", interactive: true, html: "<button onclick=\'deck.next()\'>Go on</button><script>deck.on(\'enter\', () => start())</script>"}; an interactive plot make_plot made {type: "html", file: "images/sales.html", poster: "images/sales.png", interactive: true}.',
   'The deck may have footer {num: true (each slide’s number), text, date: "today" or a date as written, skipTitle: true (not on the title slide)} and guides {x: [px], y: [px]} (the lines its parts are lined up on).',
   'theme: a preset (paper, midnight, ember, forest, ocean, noir, blossom, slate) or {id, bg, fg, head, muted, accent, accentFg, soft, colors: [6], font, headFont}; fonts: Inter, Roboto, Open Sans, Lato, Montserrat, Poppins, Nunito, DM Sans, Work Sans, Space Grotesk, IBM Plex Sans, Outfit, Playfair Display, Merriweather, Lora, Fraunces, DM Serif Display, Source Serif 4, JetBrains Mono, Arial, Georgia.',
   'Good slides: one idea each, a title that says the point, a few short bullets, numbers as charts or big numbers, pictures where they help, and what to say in the notes.',
@@ -452,6 +582,8 @@ export const SAVE_SLIDES_SCHEMA = {
     id: { type: 'string', description: 'A saved deck’s id, to save a new version of it.' },
     title: { type: 'string', description: 'The deck’s name in the Library: "Q3 results".' },
     ratio: { type: 'string', enum: ['16:9', '4:3'] },
+    format: { type: 'string', enum: ['web', 'pptx'], description: 'web (the default): everything, its own page in any browser; pptx: only what PowerPoint has, for a file to edit in PowerPoint. Left out: as the deck was (web for a new one).' },
+    progress: { type: 'boolean', description: 'The web format: a thin bar across the top of the slideshow shows how far it has come.' },
     theme: { description: 'A preset’s name, or the theme’s colours and fonts.', anyOf: [{ type: 'string' }, { type: 'object' }] },
     slides: { type: 'array', items: { type: 'object' }, description: 'The slides, in order (or, with id, change, add and remove instead).' },
     change: { type: 'array', items: { type: 'object' }, description: 'With id: slides written again in place, each {"slide": its number from 1 or its id, …the slide}.' },

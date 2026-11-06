@@ -4,11 +4,16 @@
 // spreadsheet as Excel or CSV, a notebook as its .ipynb or a Python script), and as a PDF printed from their own page; any of them as a web page that works on
 // its own; a deck's slides as pictures (PNG). PDFs, pictures, and a page's Word document, need the browser pictures
 // are taken with (Settings → Browser).
+//
+// A deck's web page is one small file with its fonts inside (slides.ts deckFile). A deck in the web format goes to
+// PowerPoint made PowerPoint's (toPowerPoint): its live parts as pictures of them running (where the browser can take
+// them; else their posters), quizzes as text boxes, effects and transitions the nearest of PowerPoint's; the file's
+// note (X-Export-Note, export_page's answer) says what changed.
 import { STORAGE_LIMITS } from '../../shared/pages.ts';
 import { KIT_CSS } from '../../shared/page-kit.ts';
 import { codeColoursScript, hasCode } from '../../shared/code-colours.ts';
 import { pageDbScript } from '../../shared/page-db.ts';
-import { ASSET } from '../../shared/slides.ts';
+import { ASSET, deckText, isWebDeck, powerPointNote, richFeatures, toPowerPoint, type RichFeature } from '../../shared/slides.ts';
 import { HttpError } from '../auth.ts';
 import { canCapture, printPdf, withTab } from '../capture/index.ts';
 import type { DB } from '../db.ts';
@@ -20,8 +25,8 @@ import { injectHead, kitHead } from './kit.ts';
 import { imageSize, zipParts } from './ooxml.ts';
 import type { Picture } from './pptx.ts';
 import { mustKind, type ExportFormat, type ExportHelp, type KindDef } from './kinds.ts';
-import { readDeck } from './slides.ts';
-import { deckPictures, deckRenders } from './slides-render.ts';
+import { deckFile, readDeck } from './slides.ts';
+import { deckPictures, deckRenders, liveRenders } from './slides-render.ts';
 import { dbSeed, mustPage, pageSource, storageMap } from './store.ts';
 import { wordFonts } from './word-fonts.ts';
 
@@ -128,7 +133,7 @@ async function fitScales(db: DB, k: KindDef, text: string, title: string): Promi
   const html = await k.page(db, text, title, 'print');
   return withTab({ html, width: k.still(text).width, height: k.still(text).height, settleMs: 300, blockPrivate: true }, async (tab) => {
     const got = await tab.evaluate<Record<string, number>>(
-      `document.fonts.ready.then(() => new Promise((ok) => setTimeout(() => { const out = {}; for (const b of document.querySelectorAll('.ns-txt[data-fit]')) { const v = parseFloat(b.style.getPropertyValue('--fs') || '1'); if (v < 0.999 && b.parentElement && b.parentElement.dataset.id) out[b.parentElement.dataset.id] = v; } ok(out); }, 80)))`,
+      `document.fonts.ready.then(() => new Promise((ok) => setTimeout(() => { const out = {}; for (const b of document.querySelectorAll('.ns-txt[data-fit], .ns-code[data-fit]')) { const v = parseFloat(b.style.getPropertyValue('--fs') || '1'); if (v < 0.999 && b.parentElement && b.parentElement.dataset.id) out[b.parentElement.dataset.id] = v; } ok(out); }, 80)))`,
     );
     return new Map(Object.entries(got ?? {}));
   }).catch(() => undefined);
@@ -159,6 +164,8 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
 
   if (src.kind !== 'page') {
     const k = mustKind(src.kind);
+    // A deck's web page: one small file, its fonts inside it too.
+    if (o.format === 'html' && src.kind === 'slides') return out(await deckFile(db, readDeck(src.text), title), 'html');
     if (o.format === 'html' && !k.files.html) return out(await k.page(db, src.text, title, 'viewer'), 'html');
     if (o.format === 'pdf' && !k.files.pdf) {
       if (!canCapture()) throw noBrowser();
@@ -173,11 +180,23 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
     }
     const make = k.files[o.format];
     if (!make) throw new HttpError(400, `A ${k.noun} exports as ${formatsOf(k).join(', ')}`);
+    // A web deck goes to PowerPoint as PowerPoint's: what it has that PowerPoint has not, made its nearest (and said).
+    let text = src.text;
+    let changed: RichFeature[] = [];
+    let live = new Map<string, Picture>();
+    if (o.format === 'pptx' && src.kind === 'slides') {
+      const web = readDeck(src.text);
+      if (isWebDeck(web)) {
+        changed = richFeatures(web);
+        if (changed.some((f) => f.kind === 'part')) live = await liveRenders(db, web);
+        text = deckText(toPowerPoint(web));
+      }
+    }
     // Office files want their pictures ready (PNG, JPEG or GIF), and slides how much their text was fitted.
     const pics = new Map<string, Picture | null>();
     let scales: ExportHelp['scales'];
     if (o.format === 'pptx' || o.format === 'docx') {
-      for (const s of new Set(k.sources(src.text))) pics.set(s, await pictureFor(db, s));
+      for (const s of new Set(k.sources(text))) pics.set(s, await pictureFor(db, s));
     }
     let renders: ExportHelp['renders'];
     // A document's fonts go inside its Word file (the faces it uses, from Google once).
@@ -185,10 +204,12 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
     if (o.format === 'pptx') {
       scales = await fitScales(db, k, src.text, title);
       // A deck's icons and equations, as pictures for PowerPoint, and its pictures whose colours were changed, changed.
-      if (src.kind === 'slides') renders = await deckRenders(readDeck(src.text), (s) => pics.get(s) ?? null);
+      if (src.kind === 'slides') renders = new Map([...(await deckRenders(readDeck(text), (s) => pics.get(s) ?? null)), ...live]);
     }
     const notes: string[] = [];
-    const made = out(await make(db, src.text, title, { picture: (s) => pics.get(s) ?? null, scales, renders, wordFonts: wordFontsOf, note: (t) => notes.push(t) }), o.format);
+    const said = powerPointNote(changed);
+    if (said) notes.push(said);
+    const made = out(await make(db, text, title, { picture: (s) => pics.get(s) ?? null, scales, renders, wordFonts: wordFontsOf, note: (t) => notes.push(t) }), o.format);
     return notes.length ? { ...made, note: notes.join(' ') } : made;
   }
 

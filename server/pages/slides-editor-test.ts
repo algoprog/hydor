@@ -648,6 +648,53 @@ const dot: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
   ok(all.count === 4 && ch2.title === 'Sales Nord' && ch2.labels[0] === 'Nord' && ch2.series[0].name === 'Nord shops' && eq2.tex === '\\frac{Nord}{2}', 'Replace all changes them everywhere, the LaTeX too');
 }
 
+// ---- the web format, as the editor saves it ------------------------------------------------------------------------
+{
+  // A new deck is a web deck; the editor's save keeps its web parts, a 3D model sent inside it kept as the deck's.
+  const tri = Buffer.alloc(36);
+  [0, 0, 0, 1, 0, 0, 0, 1, 0].forEach((v, i) => tri.writeFloatLE(v, i * 4));
+  const json = Buffer.from(JSON.stringify({ asset: { version: '2.0' }, buffers: [{ byteLength: 36 }], bufferViews: [{ buffer: 0, byteLength: 36 }], accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', max: [1, 1, 0], min: [0, 0, 0] }], meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }], nodes: [{ mesh: 0 }], scenes: [{ nodes: [0] }], scene: 0 }).padEnd(332, ' '));
+  const head = Buffer.alloc(12);
+  head.write('glTF', 0, 'latin1');
+  head.writeUInt32LE(2, 4);
+  head.writeUInt32LE(12 + 8 + json.length + 8 + 36, 8);
+  const ch = (t: number, b2: Buffer) => Buffer.concat([Buffer.from(Uint32Array.of(b2.length, t).buffer), b2]);
+  const glb = Buffer.concat([head, ch(0x4e4f534a, json), ch(0x004e4942, tri)]);
+  const fresh = (await req('POST', '/api/pages', { kind: 'slides', title: 'New' })).json().page.id as string;
+  ok(((await req('GET', `/api/pages/${fresh}`)).json().model as Deck).format === undefined, 'a new deck is in the web format');
+  const up = await req('POST', '/api/pages/assets', { model: true, data: `data:model/gltf-binary;base64,${glb.toString('base64')}` });
+  ok(up.statusCode === 200 && /^naget-asset:[a-f0-9]{40}$/.test(up.json().src), 'the editor uploads a 3D model (a .glb) as the deck’s');
+  ok((await req('POST', '/api/pages/assets', { model: true, data: 'data:model/gltf-binary;base64,AAAA' })).statusCode === 415, 'and nothing that is not one');
+  const model = {
+    v: 1,
+    ratio: '16:9',
+    progress: true,
+    slides: [
+      {
+        bg: { fx: 'mesh' },
+        transition: { fx: 'flip' },
+        els: [
+          { id: 'q', type: 'quiz', question: 'Ok?', choices: [{ text: 'Yes', correct: true }, { text: 'No' }] },
+          { id: 'h', type: 'html', html: '<b>hi</b>', interactive: true },
+          { id: 'm', type: 'scene3d', model: `data:model/gltf-binary;base64,${glb.toString('base64')}` },
+          { id: 'u', type: 'scene3d', model: up.json().src, orbit: true },
+        ],
+      },
+    ],
+  };
+  const saved = (await req('POST', '/api/pages', { kind: 'slides', title: 'Web', model })).json().page.id as string;
+  const got = (await req('GET', `/api/pages/${saved}`)).json().model as Deck;
+  const m = got.slides[0].els.find((e) => e.id === 'm');
+  ok(got.progress && got.slides[0].bg?.fx === 'mesh' && got.slides[0].transition?.fx === 'flip' && got.slides[0].els.some((e) => e.type === 'quiz') && got.slides[0].els.some((e) => e.type === 'html'), 'its web parts, moving background, transition and progress bar are kept');
+  ok(m?.type === 'scene3d' && m.model === up.json().src, 'a model sent inside it is kept as the deck’s (the same file once)');
+  const page = deckPage(db, got, 'Web');
+  ok(page.includes(RUNTIME_SRC) && page.includes('data:model/gltf-binary;base64,'), 'its page has the runtime and its models inside');
+  // Made PowerPoint compatible by the editor (toPowerPoint, then saved): nothing of the web format is left.
+  const asPptx = (await req('POST', '/api/pages', { kind: 'slides', title: 'Pptx', model: { ...model, format: 'pptx' } })).json().page.id as string;
+  const pd = (await req('GET', `/api/pages/${asPptx}`)).json().model as Deck;
+  ok(pd.format === 'pptx' && !pd.progress && pd.slides[0].els.every((e) => e.type !== 'quiz' && e.type !== 'html' && e.type !== 'scene3d') && !pd.slides[0].bg?.fx && pd.slides[0].transition?.fx === 'fade', 'a deck saved as PowerPoint compatible keeps only what PowerPoint has');
+}
+
 // ---- the deck's own page, and agents ------------------------------------------------------------------------------
 {
   const withMath = normalizeDeck({ slides: [{ els: [{ type: 'math', tex: 'a^2' }, { type: 'math', tex: '\\mathbb{R}^n' }] }] });

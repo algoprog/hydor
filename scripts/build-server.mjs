@@ -12,6 +12,21 @@ const entries = {
 };
 const only = process.argv.slice(2);
 
+// The slides' runtime (shared/slides-runtime.ts) as every deck's page carries it: minified, for browsers, given to the
+// server's bundle as a constant (server/pages/slides.ts), an expression that is the runtime's function.
+const runtime = await build({
+  stdin: { contents: "export { slidesRuntime } from './shared/slides-runtime.ts';", resolveDir: process.cwd(), loader: 'ts' },
+  bundle: true,
+  write: false,
+  minify: true,
+  format: 'iife',
+  globalName: '__nrt',
+  target: ['es2020', 'chrome100', 'safari15', 'firefox100'],
+  legalComments: 'none',
+  logLevel: 'warning',
+});
+const runtimeSrc = `(()=>{${runtime.outputFiles[0].text.trim()};return __nrt.slidesRuntime})()`;
+
 await build({
   entryPoints: only.length ? Object.fromEntries(only.map((k) => [k.replace(/^.*\//, '').replace(/\.ts$/, ''), k])) : entries,
   outdir: process.env.OUTDIR ?? 'dist/server',
@@ -22,5 +37,6 @@ await build({
   sourcemap: true,
   packages: 'external',
   logLevel: 'warning',
+  define: { __SLIDES_RUNTIME__: JSON.stringify(runtimeSrc) },
   banner: { js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);" },
 });

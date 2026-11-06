@@ -1,27 +1,39 @@
 // What the slides editor does to a deck, each as a new deck (the old one stays for Undo): parts added, changed
 // (in groups too), moved, lined up and stacked, grouped and ungrouped; slides added from a layout, copied, moved and
 // removed; animations in their order; a part's look copied onto others (the format painter); table cells merged;
-// the comments on a part that goes kept on its slide.
+// the comments on a part that goes kept on its slide; the web format's parts as they start (code, custom code, a web
+// page, a quiz and its score, 3D) and the deck's format.
 import {
   everyEl,
   facingSides,
   fitGroup,
   groupOf,
+  isWebDeck,
   layoutSlide,
   newId,
+  RICH_TYPES,
   SLIDE_W,
   slideH,
   ungroupEls,
+  cleanEmbedUrl,
   type Anim,
+  type AnimFx,
   type ChartEl,
+  type CodeEl,
   type Deck,
   type El,
+  type EmbedEl,
   type GroupEl,
+  type HtmlEl,
   type ImageEl,
   type LayoutId,
   type LineEl,
   type Merge,
   type Para,
+  type QuizEl,
+  type RichFeature,
+  type Scene3dEl,
+  type ScoreEl,
   type ShapeEl,
   type ShapeKind,
   sidePoint,
@@ -29,7 +41,9 @@ import {
   type Stick,
   type TableEl,
   type TextEl,
+  type TransitionFx,
 } from '@shared/slides';
+import { STARTERS } from './starters';
 
 export const W = SLIDE_W;
 export const heightOf = (d: Deck) => slideH(d.ratio);
@@ -217,6 +231,122 @@ export function chart(d: Deck): ChartEl {
     grid: true,
     size: 18,
   };
+}
+
+// ---- the web format's parts (and code, in both formats) -------------------------------------------------------
+
+/** The editor's words for a new part's own words (a quiz's question), in the user's language. */
+type Words = (s: string) => string;
+const same: Words = (s) => s;
+
+/** The languages a code part is coloured for, by their names. */
+export const CODE_LANGS: Record<string, string> = {
+  python: 'Python',
+  javascript: 'JavaScript',
+  typescript: 'TypeScript',
+  html: 'HTML',
+  css: 'CSS',
+  json: 'JSON',
+  bash: 'Shell (Bash)',
+  sql: 'SQL',
+  rust: 'Rust',
+  go: 'Go',
+  java: 'Java',
+  c: 'C',
+  cpp: 'C++',
+  csharp: 'C#',
+  php: 'PHP',
+  ruby: 'Ruby',
+  swift: 'Swift',
+  kotlin: 'Kotlin',
+  yaml: 'YAML',
+};
+
+/** Code shown with its colours: a short example to write over. */
+export function codePart(d: Deck): CodeEl {
+  return { id: newId(), type: 'code', ...centred(d, 760, 300), code: 'def greet(name):\n    return f"Hello, {name}!"\n\nprint(greet("world"))', lang: 'python', size: 24, look: 'dark', lineNumbers: true, radius: 12 };
+}
+
+/** A small web page of its own (HTML, CSS and JavaScript): a button that counts, in the deck's colours, to change. */
+export function htmlPart(d: Deck): HtmlEl {
+  const first = STARTERS[0];
+  return { id: newId(), type: 'html', ...centred(d, 720, 400), html: first.html, ...(first.interactive ? { interactive: true } : {}) };
+}
+
+/** A web page at an address, in a frame; it takes clicks in the slideshow (a map to move, a form to fill). */
+export function embedPart(d: Deck, url: string): EmbedEl {
+  return { id: newId(), type: 'embed', ...centred(d, 960, 540), url, interactive: true, radius: 12 };
+}
+
+/** A question with three choices, one right, each with what is said when it is picked. */
+export function quizPart(d: Deck, t: Words = same): QuizEl {
+  return {
+    id: newId(),
+    type: 'quiz',
+    ...centred(d, 900, 470),
+    question: t('Which planet is the largest?'),
+    choices: [
+      { text: t('Mars'), why: t('Mars is about half as wide as the Earth.') },
+      { text: t('Jupiter'), correct: true, why: t('Jupiter is more than eleven times as wide as the Earth.') },
+      { text: t('Venus'), why: t('Venus is about as wide as the Earth.') },
+    ],
+    explain: t('Jupiter is the largest planet of the solar system.'),
+    size: 34,
+    layout: 'list',
+  };
+}
+
+/** The deck's quiz score so far, in words. */
+export function scorePart(d: Deck, t: Words = same): ScoreEl {
+  return { id: newId(), type: 'score', ...centred(d, 800, 110), text: t('You got {right} of {total} right'), size: 44, align: 'center', bold: true };
+}
+
+/** A 3D shape, lit, turning slowly; viewers can turn it with the pointer in the slideshow. */
+export function scene3dPart(d: Deck): Scene3dEl {
+  return { id: newId(), type: 'scene3d', ...centred(d, 480, 480), shape: 'knot', color: 'accent', material: 'glossy', light: 'studio', spin: 20, orbit: true };
+}
+
+/**
+ * A web page's address for a Web page part, or null: https only (an address typed without one gets it), not this
+ * computer's or its network's; a pasted embed code (<iframe src="…">, as maps, forms and CodePen give) gives its address.
+ */
+export function embedAddress(v: string): string | null {
+  let s = v.trim();
+  const m = /<iframe\b[^>]*\ssrc\s*=\s*["']([^"']+)["']/i.exec(s);
+  if (m) s = m[1].replace(/&amp;/g, '&').trim();
+  if (s.startsWith('//')) s = `https:${s}`;
+  else if (!/^[a-z][\w+.-]*:/i.test(s)) s = `https://${s}`;
+  // As the deck keeps it: https only, not this computer's or its network's (a YouTube or Vimeo video: its player).
+  return cleanEmbedUrl(s);
+}
+
+/** How long a new animation of an effect takes, as a deck takes it when one does not say (those that tell words or numbers take longer). */
+const FX_DUR: Partial<Record<AnimFx, number>> = { appear: 1, typewriter: 1600, count: 1500, draw: 1200, confetti: 1500, heartbeat: 1000, jello: 900, wiggle: 700, flash: 800, bob: 1200, glow: 1200, swing: 800, roll: 700 };
+export const effectDur = (fx: AnimFx) => FX_DUR[fx] ?? 500;
+
+/** How long a transition takes when a slide does not say, as a deck takes it. */
+const TR_DUR: Partial<Record<TransitionFx, number>> = { morph: 1000, cube: 900, flip: 800, dissolve: 800, circle: 700, blinds: 800, glitch: 600 };
+export const transitionDur = (fx: TransitionFx) => TR_DUR[fx] ?? 600;
+
+/** The parts that run in a frame of their own (in the slideshow; in the editor once Run is pressed). */
+export const LIVE_TYPES: El['type'][] = ['html', 'embed', 'scene3d'];
+export const isLive = (e: El | undefined | null): boolean => !!e && LIVE_TYPES.includes(e.type);
+
+/** Whether a part is one only the web format has (custom code, a web page, a quiz, its score, 3D). */
+export const isRichPart = (e: El): boolean => RICH_TYPES.includes(e.type);
+
+/** The deck in the web format (the default: the field left out). */
+export function toWebFormat(d: Deck): Deck {
+  if (isWebDeck(d)) return d;
+  const { format: _f, ...rest } = d;
+  return rest;
+}
+
+/** What PowerPoint cannot keep of a deck, by slide (from 1), in their order: for the dialog before it is made PowerPoint compatible. */
+export function featuresBySlide(list: RichFeature[]): { slide: number; items: RichFeature[] }[] {
+  const by = new Map<number, RichFeature[]>();
+  for (const f of list) by.set(f.slide, [...(by.get(f.slide) ?? []), f]);
+  return [...by.entries()].sort((a, b) => a[0] - b[0]).map(([slide, items]) => ({ slide, items }));
 }
 
 /** Parts added to a slide (on top), selected after. */
@@ -636,7 +766,7 @@ export function partName(e: El): string {
   if (e.type === 'math') return `Equation: ${e.tex.length > 24 ? `${e.tex.slice(0, 23)}…` : e.tex}`;
   if (e.type === 'video') return 'Video';
   if (e.type === 'group') return `Group of ${e.els.length}`;
-  if (e.type === 'code') return e.lang ? `Code: ${e.lang}` : 'Code';
+  if (e.type === 'code') return e.lang ? `Code: ${CODE_LANGS[e.lang] ?? e.lang}` : 'Code';
   if (e.type === 'html') return 'Custom code';
   if (e.type === 'embed') return 'Web page';
   if (e.type === 'quiz') return e.question ? `Quiz: ${e.question.length > 24 ? `${e.question.slice(0, 23)}…` : e.question}` : 'Quiz';

@@ -46,6 +46,13 @@ const RULES: Rule[] = [
   ['W', /^\/api\/sites$/, 'refuse', 'Publish with your publish_site tool: the user confirms on its card.'],
   ['W', /^\/api\/me\/language$/, 'refuse', 'The language is set on each device: PUT /device with { language }.'],
   ['W', /^\/api\/(push\/(subscribe|unsubscribe)|me\/timezone|find\/usage|tour|voice\/(transcribe|command|cancel))$/, 'refuse', 'That is for the app’s pages themselves.'],
+  // The editors' own AI tools: agents have tools of their own for each, which save into their folder and ask the user as needed.
+  [
+    '*',
+    /^\/api\/(images\/(make|edit|svg|cutout|erase)|plots\/make|videos\/make(\/[^/]+)?)$/,
+    'refuse',
+    'Use your own tools for that: generate_image (pictures, and changes to one), make_svg (drawings), remove_background, erase_from_image, make_plot and generate_video. They save what they make in your folder (they also take the pictures already in a deck or document, named naget-asset:…), and you put it in with save_slides, save_doc or save_page.',
+  ],
   // Changes that change nothing, or only look something up.
   ['POST', /^\/api\/(update-check|knowledge\/search|models\/inspect|automations\/next|automations\/watch\/test|apps\/draft|apps\/check|apps\/install\/check|automations\/draft)$/, 'free'],
   ['POST', /^\/api\/(search|push|voice)\/test$|^\/api\/connections\/[^/]+\/test$/, 'free'],
@@ -58,6 +65,7 @@ const RULES: Rule[] = [
   ['W', /^\/api\/computer\/settings$/, 'always', 'This lets agents see this Mac’s screen and use its mouse and keyboard (each session still asks before its agent starts).'],
   ['W', /^\/api\/(update|update\/auto|startup|machines|scm\/accounts|acp-agents|agent-accounts|clients)(\/|$)/, 'always'],
   ['W', /^\/api\/models\/(install|start)$/, 'always', 'This downloads or starts a model on this computer.'],
+  ['POST', /^\/api\/images\/local\/setup$/, 'always', 'This sets up the picture tools on this computer: a private Python (about 120 MB), and each model (about 220 MB) the first time it is used.'],
   ['POST', /^\/api\/apps\/install$|^\/api\/apps\/[^/]+\/env$/, 'always', 'This installs an app on this computer, with the apps and the Node or Python packages it needs.'],
   ['W', /^\/api\/plugins\/(install|new|[^/]+\/(enable|setup|update|draft|files))$/, 'always', 'A plugin runs programs on this computer, installs what it needs, and gives every agent its skills, tools and instructions.'],
   ['W', /^\/api\/voice$/, 'confirm'],
@@ -91,6 +99,10 @@ function refusedBody(method: string, path: string, body: Json, own: string): str
   // An app's keys go with a run or an install only from the user's own pages.
   // (A recipe's own `secrets` is a list of the keys it needs, by name: that is not a value.)
   if (/^\/api\/apps\//.test(path) && ((body.secrets && typeof body.secrets === 'object' && !Array.isArray(body.secrets)) || body.allow !== undefined)) return 'A key’s value never passes through an agent: the user gives the keys an app needs on its page, its install card, or its card in a session (use_app shows it).';
+  // Keys for models (OpenRouter's, Hugging Face's, an endpoint's): the tools that need one ask the user on a card.
+  const given = (v: unknown) => typeof v === 'string' && v.trim() !== '';
+  if (path === '/api/models' && (given(body.openrouterKey) || given(body.hfToken) || (body.endpoint && typeof body.endpoint === 'object' && given((body.endpoint as Json).apiKey))))
+    return 'A key’s value never passes through an agent. The tools that need an OpenRouter key (generate_image and the rest) ask the user for it on a card when they need it; other keys the user enters in Settings → Models.';
   if (!s) return null;
   const key = decodeURIComponent(s[1]);
   if (s[2] === '/config' && body.mode !== undefined) return 'A session’s permissions are the user’s to change (the picker by the message box, or Shift+Tab).';
