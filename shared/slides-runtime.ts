@@ -2284,9 +2284,10 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
 
   /** How light a colour is (0 black, 1 white), for #hex ones; others count as light. */
   const lightness = (c: string) => {
-    const m = /^#([0-9a-f]{3}|[0-9a-f]{6})/i.exec(c);
+    // Its red, green and blue whatever its digits ("#f0f6fa" is not "#f0f"; an alpha's are left out).
+    const m = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(c);
     if (!m) return 1;
-    const h = m[1].length === 3 ? [...m[1]].map((x) => x + x).join('') : m[1];
+    const h = m[1].length <= 4 ? [...m[1].slice(0, 3)].map((x) => x + x).join('') : m[1].slice(0, 6);
     const [r, g, bl] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
     return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
   };

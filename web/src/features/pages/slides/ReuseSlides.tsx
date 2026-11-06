@@ -1,13 +1,13 @@
 // Insert → Slides from another deck (PowerPoint's Reuse Slides, Google Slides' Import slides): a deck of the Library to
 // pick (a find field), its slides to tick (all, or some), put in after the slide on view: keeping their look (their
 // deck's theme as their own), or taking this deck's. Their pictures and videos come with them (shared/slides-reuse.ts).
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
 import type { PageInfo } from '@shared/pages';
 import { reuseSlides, sameLook } from '@shared/slides-reuse';
 import type { Deck, Slide } from '@shared/slides';
 import { api, enc } from '../../../lib/api';
-import { Button, cx, Dialog, useIsMobile } from '../../../components/ui';
+import { Button, cx, Dialog } from '../../../components/ui';
 import { Choice } from '../studio/fields';
 import { LibraryPick } from './LibraryPick';
 import { useDeckFonts } from './rt';
@@ -19,7 +19,6 @@ export function ReuseSlidesDialog({ open, deck, pageId, onClose, onInsert }: { o
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [look, setLook] = useState<'theirs' | 'ours'>('theirs');
-  const phone = useIsMobile();
   const fonts = useDeckFonts(from);
   useEffect(() => {
     if (open) return;
@@ -61,7 +60,18 @@ export function ReuseSlidesDialog({ open, deck, pageId, onClose, onInsert }: { o
       ),
     );
   };
-  const thumbW = phone ? 150 : 196;
+  // Each slide as wide as its column: the grid's width, measured, in two or three columns 8 px apart (less their borders).
+  const [gridW, setGridW] = useState(0);
+  const grid = useRef<ResizeObserver | null>(null);
+  const measure = (el: HTMLDivElement | null) => {
+    grid.current?.disconnect();
+    if (!el) return;
+    grid.current = new ResizeObserver(() => setGridW(el.clientWidth));
+    grid.current.observe(el);
+    setGridW(el.clientWidth);
+  };
+  const cols = gridW && gridW < 420 ? 2 : 3;
+  const thumbW = gridW ? Math.max(80, Math.floor((gridW - 4 - (cols - 1) * 8) / cols) - 2) : 150;
   return (
     <Dialog
       open={open}
@@ -70,7 +80,7 @@ export function ReuseSlidesDialog({ open, deck, pageId, onClose, onInsert }: { o
       width={720}
       footer={
         <Button size="sm" variant="primary" disabled={!from || !n} onClick={insert}>
-          {n === 1 ? 'Insert 1 slide' : `Insert ${n} slides`}
+          {!from || !n ? 'Insert slides' : n === 1 ? 'Insert 1 slide' : `Insert ${n} slides`}
         </Button>
       }
     >
@@ -96,7 +106,7 @@ export function ReuseSlidesDialog({ open, deck, pageId, onClose, onInsert }: { o
               Another deck
             </Button>
           </div>
-          <div className="grid max-h-[46dvh] grid-cols-2 gap-2 overflow-y-auto overscroll-contain p-0.5 sm:grid-cols-3">
+          <div ref={measure} style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }} className="grid max-h-[46dvh] gap-2 overflow-y-auto overscroll-contain p-0.5">
             {from.slides.map((s, i) => (
               <button
                 key={s.id}
@@ -106,7 +116,7 @@ export function ReuseSlidesDialog({ open, deck, pageId, onClose, onInsert }: { o
                 onClick={() => toggle(i)}
                 className={cx('relative overflow-hidden rounded-lg border text-left', picked.has(i) ? 'border-accent ring-2 ring-accent/30' : 'border-line opacity-70 hover:opacity-100')}
               >
-                <SlideThumb deck={from} index={i} slide={s} theme={from.theme} width={thumbW} fonts={fonts} className="w-full" />
+                <SlideThumb deck={from} index={i} slide={s} theme={from.theme} width={thumbW} fonts={fonts} />
                 <span className="absolute bottom-1 left-1.5 text-[11px] text-white [text-shadow:0_1px_3px_rgba(0,0,0,.8)] tabular-nums">{i + 1}</span>
                 {picked.has(i) && (
                   <span className="absolute top-1.5 right-1.5 grid h-5 w-5 place-items-center rounded-full bg-accent text-accent-fg">

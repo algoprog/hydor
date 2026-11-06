@@ -265,8 +265,18 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
     {
       label: 'Insert',
       items: [
-        { label: 'New slide', icon: <LayoutTemplate size={14} />, keys: 'Ctrl+M', disabled: ro, run: a.newSlide },
-        !!a.reuseSlides && { label: 'Slides from another deck', icon: <Layers size={14} />, also: 'reuse import slides other deck presentation copy', disabled: ro, run: a.reuseSlides },
+        // With slides of another deck to take, New slide is a short list of its own (as PowerPoint's New Slide button).
+        a.reuseSlides
+          ? {
+              label: 'New slide',
+              icon: <LayoutTemplate size={14} />,
+              disabled: ro,
+              items: [
+                { label: 'From a layout', icon: <LayoutTemplate size={14} />, keys: 'Ctrl+M', also: 'new slide layout', run: a.newSlide },
+                { label: 'Slides from another deck', icon: <Layers size={14} />, also: 'reuse import slides other deck presentation copy', run: a.reuseSlides },
+              ],
+            }
+          : { label: 'New slide', icon: <LayoutTemplate size={14} />, keys: 'Ctrl+M', disabled: ro, run: a.newSlide },
         '-',
         { label: 'Text box', icon: <Type size={14} />, disabled: ro, run: a.textBox },
         { label: 'Shape', icon: <Shapes size={14} />, disabled: ro, run: a.shape },
@@ -281,6 +291,8 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
             !!a.aiPicture && '-',
             !!a.aiPicture && { label: 'Make with AI', icon: <WandSparkles size={14} />, also: 'picture image generate ai photo illustration icon background', run: a.aiPicture },
             !!a.aiDrawing && { label: 'Drawing (SVG)', icon: <PenTool size={14} />, also: 'svg vector drawing icon logo diagram illustration ai', run: a.aiDrawing },
+            !!a.qr && '-',
+            !!a.qr && { label: 'QR code', icon: <QrCode size={14} />, also: 'qr code link phone scan camera barcode', run: a.qr },
           ],
         },
         {
@@ -313,7 +325,6 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         { label: 'Emoji', icon: <Smile size={14} />, also: 'emoji smiley', disabled: ro, run: a.emoji },
         { label: 'Equation', icon: <Sigma size={14} />, also: 'equation maths formula latex', disabled: ro, run: a.equation },
         { label: 'Code', icon: <SquareCode size={14} />, also: 'code program snippet source syntax colours', disabled: ro, run: a.code },
-        !!a.qr && { label: 'QR code', icon: <QrCode size={14} />, also: 'qr code link phone scan camera barcode', disabled: ro, run: a.qr },
         {
           label: 'Video',
           icon: <Video size={14} />,

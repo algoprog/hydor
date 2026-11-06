@@ -12,7 +12,7 @@ import type { Workbook } from '@shared/sheets';
 import { api, enc } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
 import { LOCALE } from '../../../i18n/locale';
-import { Button, cx, Dialog, inputCls } from '../../../components/ui';
+import { Button, cx, Dialog } from '../../../components/ui';
 import { Choice, Select } from '../studio/fields';
 import { Field } from './controls';
 import { LibraryPick } from './LibraryPick';
@@ -177,7 +177,7 @@ export function SheetChartDialog({ open, deck, onClose, onInsert }: { open: bool
               </Field>
             )}
             <Field label="Cells">
-              <input value={range} onChange={(e) => setRange(e.target.value)} placeholder="A1:D7" aria-label="The cells, as A1:D7" translate="no" className={cx(inputCls, 'h-8 min-w-0 flex-1 font-mono text-[12.5px]')} />
+              <input value={range} onChange={(e) => setRange(e.target.value)} placeholder="A1:D7" aria-label="The cells, as A1:D7" translate="no" className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-bg-1 px-2 font-mono text-[12.5px] outline-none focus:border-accent/60" />
             </Field>
             <Field label="Series">
               <Choice
