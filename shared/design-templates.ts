@@ -1,7 +1,7 @@
 // Ready-made designs (New → Design): for each kind of size (square, portrait, story, landscape, banner, card), designs
 // drawn from its width and height, with words and picture places to replace, painted in a palette's roles (its own, or
 // the user's theme or brand) and set in a pair of fonts. Each makes the HTML of one artboard of a design (design.ts).
-import { curveGeom, designPage, mix, px, type DesignShape, type DesignSize, type Palette } from './design.ts';
+import { curveGeom, DESIGN_SIZES, designPage, mix, px, type DesignShape, type DesignSize, type Palette } from './design.ts';
 import { fontsHref, fontStack, nearestWeight } from './design-fonts.ts';
 import { frameCss, shapePath } from './design-shapes.ts';
 
@@ -27,6 +27,8 @@ export interface DesignTemplate {
   best?: string[];
   fonts: [string, string];
   palette: Palette;
+  /** It keeps its words in a size's safe middle (a YouTube banner's). */
+  safe?: boolean;
   build(c: TplCtx): { bg: string; html: string };
 }
 
@@ -219,28 +221,39 @@ const TEMPLATES: DesignTemplate[] = [
     palette: P('#101125', '#ffffff', '#ff5a36', '#ffd23f', { soft: '#1d1f3e', muted: '#b9bbd6', onAccent: '#101125' }),
     build(c) {
       const { W, H, p } = c;
-      const story = c.shape === 'story';
       const sq = c.shape === 'square';
-      const picH = H * (story ? 0.44 : sq ? 0.46 : 0.45);
+      const story = c.shape === 'story';
       const m = W * 0.08;
-      const title = W * (sq ? 0.14 : story ? 0.18 : 0.165);
-      const ty = picH + H * (story ? 0.05 : 0.055);
-      const info = W * (sq ? 0.028 : 0.032);
+      const title = W * (sq ? 0.12 : story ? 0.17 : 0.15);
+      const info = W * (sq ? 0.026 : 0.032);
+      const sub = info * 1.15;
+      const gap = H * (story ? 0.03 : 0.028);
+      // From the bottom up: the details, the line under the title, the title, its label; the picture takes the rest.
+      const infoH = info * 1.9 * 3 - info * 0.6;
+      const subH = sub * 1.35 * 2;
+      const titleH = title * 0.95 * 2;
+      const labelH = info * 1.7;
+      const content = labelH + titleH + gap * 0.5 + subH + gap + infoH;
+      const picH = Math.max(H * 0.3, Math.min(H * 0.52, H - m - content - gap * 1.6));
+      const y0 = picH + gap * 1.2;
+      const ty = y0 + labelH;
+      const sy = ty + titleH + gap * 0.5;
+      const iy = Math.max(sy + subH + gap, H - m - infoH);
       return {
         bg: p.bg,
         html: join(
           tPic({ x: 0, y: 0, w: W, h: picH + H * 0.04, from: mix(p.accent, p.bg, 0.25), to: mix(p.accent2, p.accent, 0.4), angle: 160, label: 'Main picture' }),
           tShape('wave', { x: -W * 0.02, y: picH - H * 0.03, w: W * 1.04, h: H * 0.1, color: p.bg }),
-          tText('Live · open air', { x: m, y: ty - title * 0.42, size: info * 0.95, font: c.body, weight: 700, color: p.accent2, ls: 0.18, upper: true }),
+          tText('Live · open air', { x: m, y: y0, size: info * 0.95, font: c.body, weight: 700, color: p.accent2, ls: 0.18, upper: true }),
           tText('Summer\nnights', { x: m, y: ty, w: W - m * 2, size: title, font: c.head, color: p.ink, lh: 0.95, upper: true }),
-          tText('Music, street food and dancing by the river', { x: m, y: ty + title * 2.05, w: W * (sq ? 0.55 : 0.7), size: info * 1.15, font: c.body, weight: 500, color: p.muted, lh: 1.35 }),
+          tText('Music, street food and dancing by the river', { x: m, y: sy, w: W * (sq ? 0.62 : 0.72), size: sub, font: c.body, weight: 500, color: p.muted, lh: 1.35 }),
           infoLines(c, [
             ['calendar', 'Saturday 14 June'],
             ['clock', 'From 6 pm until late'],
             ['map-pin', 'Riverside Park, Old Town'],
-          ], { x: m, y: H - m - info * 1.9 * 3 + info * 0.6, w: W * 0.6, size: info, color: p.ink, icon: p.accent }),
-          tShape('burst', { x: W - m - W * 0.25, y: picH - W * 0.13, w: W * 0.25, h: W * 0.25, color: p.accent2, rot: -12 }),
-          tText('Free\nentry', { x: W - m - W * 0.25, y: picH - W * 0.13 + W * 0.065, w: W * 0.25, size: W * 0.047, font: c.head, color: p.onAccent, align: 'center', lh: 1, upper: true, rot: -12 }),
+          ], { x: m, y: iy, w: W * 0.6, size: info, color: p.ink, icon: p.accent }),
+          tShape('burst', { x: W - m - W * 0.24, y: picH - W * 0.15, w: W * 0.24, h: W * 0.24, color: p.accent2, rot: -12 }),
+          tText('Free\nentry', { x: W - m - W * 0.24, y: picH - W * 0.15 + W * 0.066, w: W * 0.24, size: W * 0.045, font: c.head, color: p.onAccent, align: 'center', lh: 1, upper: true, rot: -12 }),
         ),
       };
     },
@@ -269,24 +282,44 @@ const TEMPLATES: DesignTemplate[] = [
           ),
         };
       }
+      if (c.shape === 'square') {
+        // The arch on the right, the words on the left, in the middle up and down.
+        const m = W * 0.09;
+        const picW = W * 0.44;
+        const picH = H - m * 2;
+        const t = W * 0.095;
+        const block = W * 0.024 * 1.8 + t * 2 + W * 0.05 + W * 0.026 * 1.6 * 2;
+        const y = (H - block) / 2;
+        return {
+          bg: p.bg,
+          html: join(
+            tPic({ x: W - m - picW, y: m, w: picW, h: picH, frame: 'arch', ...ph, label: 'Main picture' }),
+            tBox({ x: W - m - picW - W * 0.035, y: m + picH * 0.18, w: W * 0.05, h: W * 0.05, bg: p.accent, radius: '50%' }),
+            tText('Exhibition', { x: m, y, size: W * 0.024, font: c.body, weight: 700, color: p.accent, ls: 0.3, upper: true }),
+            tText('Quiet\nShapes', { x: m, y: y + W * 0.045, w: W * 0.42, size: t, font: c.head, color: p.ink, lh: 1 }),
+            tLine({ x: m, y: y + W * 0.045 + t * 2.15, w: W * 0.08, color: p.ink, lw: 2 }),
+            tText('New work by Mara Lind\n12 April – 30 June', { x: m, y: y + W * 0.045 + t * 2.4, w: W * 0.4, size: W * 0.026, font: c.body, color: p.muted, lh: 1.6 }),
+          ),
+        };
+      }
       const story = c.shape === 'story';
-      const sq = c.shape === 'square';
       const m = W * 0.1;
-      const picW = W * (sq ? 0.42 : 0.62);
-      const picH = sq ? H * 0.56 : picW * 1.22;
-      const picX = sq ? W - m - picW : (W - picW) / 2;
-      const picY = sq ? m : H * (story ? 0.12 : 0.09);
-      const ty = sq ? H * 0.2 : picY + picH + H * 0.045;
-      const tsize = W * (sq ? 0.1 : 0.12);
+      const picW = W * 0.62;
+      const picH = picW * 1.22;
+      const picX = (W - picW) / 2;
+      const picY = H * (story ? 0.12 : 0.085);
+      const tsize = W * 0.115;
+      const ly = picY + picH + H * 0.04;
+      const ty = ly + W * 0.045;
       return {
         bg: p.bg,
         html: join(
           tPic({ x: picX, y: picY, w: picW, h: picH, frame: 'arch', ...ph, label: 'Main picture' }),
-          tBox({ x: sq ? m : picX + picW - W * 0.035, y: sq ? m * 1.05 : picY + picH * 0.12, w: W * 0.05, h: W * 0.05, bg: p.accent, radius: '50%' }),
-          tText('Exhibition', { x: sq ? m : 0, y: ty - tsize * 0.55, w: sq ? W * 0.4 : W, size: W * 0.024, font: c.body, weight: 700, color: p.accent, ls: 0.3, upper: true, align: sq ? 'left' : 'center' }),
-          tText(sq ? 'Quiet\nShapes' : 'Quiet Shapes', { x: sq ? m : m * 0.5, y: ty, w: sq ? W * 0.42 : W - m, size: tsize, font: c.head, color: p.ink, align: sq ? 'left' : 'center', lh: 1 }),
-          tLine({ x: sq ? m : W / 2 - W * 0.05, y: ty + tsize * (sq ? 2.35 : 1.45), w: W * 0.1, color: p.ink, lw: 2 }),
-          tText('New work by Mara Lind\n12 April – 30 June · Gallery North', { x: sq ? m : m, y: ty + tsize * (sq ? 2.6 : 1.7), w: sq ? W * 0.42 : W - m * 2, size: W * 0.026, font: c.body, color: p.muted, lh: 1.6, align: sq ? 'left' : 'center' }),
+          tBox({ x: picX + picW - W * 0.035, y: picY + picH * 0.12, w: W * 0.05, h: W * 0.05, bg: p.accent, radius: '50%' }),
+          tText('Exhibition', { x: 0, y: ly, w: W, size: W * 0.024, font: c.body, weight: 700, color: p.accent, ls: 0.3, upper: true, align: 'center' }),
+          tText('Quiet Shapes', { x: m * 0.5, y: ty, w: W - m, size: tsize, font: c.head, color: p.ink, align: 'center', lh: 1.05 }),
+          tLine({ x: W / 2 - W * 0.05, y: ty + tsize * 1.35, w: W * 0.1, color: p.ink, lw: 2 }),
+          tText('New work by Mara Lind\n12 April – 30 June · Gallery North', { x: m, y: ty + tsize * 1.6, w: W - m * 2, size: W * 0.026, font: c.body, color: p.muted, lh: 1.6, align: 'center' }),
         ),
       };
     },
@@ -326,46 +359,52 @@ const TEMPLATES: DesignTemplate[] = [
     label: 'Big sale',
     shapes: ['square', 'portrait', 'story', 'landscape', 'banner'],
     best: ['instagram-post', 'facebook-post', 'flyer', 'story', 'linkedin-banner', 'facebook-cover'],
+    safe: true,
     fonts: ['Archivo Black', 'Work Sans'],
     palette: P('#ffe14d', '#161616', '#ff3b30', '#161616', { soft: '#fff1a6', muted: '#4a4a3c', onAccent: '#ffffff' }),
     build(c) {
       const { W, H, p, u } = c;
       const ph = { from: mix(p.bg, p.accent, 0.35), to: mix(p.accent, p.ink, 0.25) };
-      if (c.shape === 'banner' || c.shape === 'landscape') {
-        const banner = c.shape === 'banner';
+      const wide = c.shape === 'banner' || c.shape === 'landscape' || c.shape === 'card';
+      if (wide) {
+        // The offer on the left, the product on a red slant on the right; a banner's words in its safe middle.
         const s = c.safe;
-        const t = banner ? s.h * 0.42 : s.h * 0.24;
+        const banner = c.shape === 'banner' || s.h < H * 0.6;
         const x0 = s.x + s.w * 0.05;
+        const t = Math.min(banner ? s.h * 0.36 : s.h * 0.22, s.w * 0.115);
+        const top = s.y + (s.h - (t * 0.36 + t * 1.05 + (banner ? t * 0.12 : t * 0.5) + t * 0.42)) / 2;
+        const pic = Math.min(banner ? H * 0.8 : H * 0.7, s.w * 0.32);
         return {
           bg: p.bg,
           html: join(
             tBox({ x: W * 0.62, y: -H * 0.2, w: W * 0.6, h: H * 1.4, bg: p.accent, rot: 12 }),
-            tPic({ x: W * (banner ? 0.68 : 0.62), y: H * (banner ? 0.12 : 0.14), w: banner ? H * 0.76 : H * 0.72, h: banner ? H * 0.76 : H * 0.72, frame: 'blob1', ...ph, label: 'Product' }),
-            tText('Up to', { x: x0, y: s.y + s.h * (banner ? 0.1 : 0.16), size: t * 0.32, font: c.body, weight: 700, color: p.ink, upper: true, ls: 0.12 }),
-            tText('50% off', { x: x0, y: s.y + s.h * (banner ? 0.24 : 0.24), size: t, font: c.head, color: p.ink, lh: 1, upper: true }),
-            tText('Everything in store · this weekend only', { x: x0, y: s.y + s.h * (banner ? 0.68 : 0.52), w: s.w * 0.5, size: t * 0.22, font: c.body, weight: 500, color: p.muted }),
-            tText('Shop now', { x: x0, y: s.y + s.h * (banner ? 0.82 : 0.66), size: t * 0.24, font: c.body, weight: 700, color: p.bg, css: `background:${p.ink};padding:.55em 1.3em;border-radius:999px` }),
+            tPic({ x: Math.min(W * 0.66, s.x + s.w - pic - s.w * 0.02), y: (H - pic) / 2, w: pic, h: pic, frame: 'blob1', ...ph, label: 'Product' }),
+            tText('Up to', { x: x0, y: top, size: t * 0.3, font: c.body, weight: 700, color: p.ink, upper: true, ls: 0.12 }),
+            tText('50% off', { x: x0, y: top + t * 0.36, size: t, font: c.head, color: p.ink, lh: 1, upper: true }),
+            !banner && tText('Everything in store · this weekend only', { x: x0, y: top + t * 1.45, w: s.w * 0.5, size: t * 0.2, font: c.body, weight: 500, color: p.muted }),
+            tText('Shop now', { x: x0, y: top + t * (banner ? 1.5 : 1.9), size: t * (banner ? 0.16 : 0.2), font: c.body, weight: 700, color: p.bg, css: `background:${p.ink};padding:.55em 1.3em;border-radius:999px` }),
           ),
         };
       }
       const story = c.shape === 'story';
       const m = W * 0.08;
-      const big = W * 0.3;
-      const ty = H * (story ? 0.1 : 0.08);
-      const picY = ty + big * (story ? 1.75 : 1.55);
-      const picS = Math.min(W * (story ? 0.78 : 0.62), H - picY - H * 0.08);
+      const big = W * 0.29;
+      const ty = H * (story ? 0.1 : 0.07);
+      const subY = ty + big * 1.17;
+      const picY = subY + W * 0.11;
+      const picS = Math.min(W * (story ? 0.78 : 0.6), H - picY - H * 0.12);
       return {
         bg: p.bg,
         html: join(
           tBox({ x: -W * 0.2, y: picY + picS * 0.25, w: W * 1.4, h: picS * 0.55, bg: p.accent, rot: -6 }),
           tText('Up to', { x: m, y: ty, size: big * 0.16, font: c.body, weight: 700, color: p.ink, upper: true, ls: 0.12 }),
           tText('Sale', { x: m * 0.7, y: ty + big * 0.16, size: big, font: c.head, color: p.ink, lh: 0.95, upper: true, ls: -0.02 }),
-          tText('Everything in store\nthis weekend only', { x: W - m - W * 0.36, y: ty + big * 0.42, w: W * 0.36, size: W * 0.032, font: c.body, weight: 600, color: p.ink, lh: 1.35, align: 'right' }),
+          tText('Everything in store · this weekend only', { x: m, y: subY, w: W - m * 2, size: W * 0.034, font: c.body, weight: 600, color: p.ink, lh: 1.3 }),
           tPic({ x: (W - picS) / 2, y: picY, w: picS, h: picS, frame: 'blob2', ...ph, label: 'Product' }),
-          tShape('burst', { x: W - m - u * 0.27, y: picY - u * 0.06, w: u * 0.27, h: u * 0.27, color: p.accent, rot: 14 }),
-          tText('50%\noff', { x: W - m - u * 0.27, y: picY - u * 0.06 + u * 0.06, w: u * 0.27, size: u * 0.058, font: c.head, color: p.onAccent, align: 'center', lh: 0.95, upper: true, rot: 14 }),
-          tText('Shop now', { x: m, y: H - m - W * 0.06, size: W * 0.032, font: c.body, weight: 700, color: p.bg, css: `background:${p.ink};padding:.6em 1.4em;border-radius:999px` }),
-          tText('yourshop.com', { x: W - m - W * 0.4, y: H - m - W * 0.04, w: W * 0.4, size: W * 0.026, font: c.body, weight: 600, color: p.ink, align: 'right' }),
+          tShape('burst', { x: W - m - u * 0.26, y: picY - u * 0.03, w: u * 0.26, h: u * 0.26, color: p.accent, rot: 14 }),
+          tText('50%\noff', { x: W - m - u * 0.26, y: picY - u * 0.03 + u * 0.06, w: u * 0.26, size: u * 0.058, font: c.head, color: p.onAccent, align: 'center', lh: 0.95, upper: true, rot: 14 }),
+          tText('Shop now', { x: m, y: H - m - W * 0.065, size: W * 0.032, font: c.body, weight: 700, color: p.bg, css: `background:${p.ink};padding:.6em 1.4em;border-radius:999px` }),
+          tText('yourshop.com', { x: W - m - W * 0.4, y: H - m - W * 0.045, w: W * 0.4, size: W * 0.026, font: c.body, weight: 600, color: p.ink, align: 'right' }),
         ),
       };
     },
@@ -386,7 +425,7 @@ const TEMPLATES: DesignTemplate[] = [
         html: join(
           tPic({ x: 0, y: 0, w: W, h: H - panelH, from: mix(p.accent2, p.bg, 0.3), to: mix(p.accent, p.ink, 0.35), angle: 200, label: 'Product photo' }),
           tText('New collection', { x: m, y: H - panelH + panelH * 0.16, size: W * 0.03, font: c.body, weight: 700, color: p.accent, ls: 0.22, upper: true }),
-          tText('Autumn linen', { x: m, y: H - panelH + panelH * 0.3, w: W * 0.62, size: W * 0.095, font: c.head, weight: 800, color: p.ink, lh: 1 }),
+          tText('Autumn linen', { x: m, y: H - panelH + panelH * 0.3, w: W - m * 2, size: W * 0.09, font: c.head, weight: 800, color: p.ink, lh: 1 }),
           tText('Soft, breathable, made to last.', { x: m, y: H - panelH + panelH * 0.68, w: W * 0.6, size: W * 0.03, font: c.body, color: p.muted }),
           tShape('badge', { x: W - m - W * 0.22, y: H - panelH - W * 0.11, w: W * 0.22, h: W * 0.22, color: p.accent, rot: 8 }),
           tText('from\n€49', { x: W - m - W * 0.22, y: H - panelH - W * 0.11 + W * 0.055, w: W * 0.22, size: W * 0.044, font: c.head, weight: 800, color: p.onAccent, align: 'center', lh: 1.05, rot: 8 }),
@@ -408,7 +447,7 @@ const TEMPLATES: DesignTemplate[] = [
       const m = land ? W * 0.1 : W * 0.11;
       const qs = u * 0.42;
       const ty = H * (c.shape === 'story' ? 0.32 : land ? 0.3 : 0.3);
-      const size = land ? H * 0.075 : W * 0.068;
+      const size = land ? H * 0.075 : W * (c.shape === 'square' ? 0.068 : 0.082);
       return {
         bg: p.bg,
         html: join(
@@ -440,7 +479,7 @@ const TEMPLATES: DesignTemplate[] = [
       const tx = land ? m : m;
       const ty = land ? H * 0.2 : cy + circ + H * 0.05;
       const tw = land ? W * 0.5 : W - m * 2;
-      const tsize = land ? H * 0.11 : W * 0.085;
+      const tsize = land ? Math.min(H * 0.11, tw / 7.4) : W * 0.085;
       return {
         bg: p.bg,
         html: join(
@@ -504,8 +543,8 @@ const TEMPLATES: DesignTemplate[] = [
         html: join(
           tShape('burst', { x: W * 0.47, y: -H * 0.25, w: H * 1.5, h: H * 1.5, color: mix(p.bg, '#ffffff', 0.35), opacity: 0.55 }),
           tPic({ x: W * 0.52, y: H * 0.08, w: W * 0.44, h: H * 0.92, frame: 'rect', from: mix(p.accent, '#ffffff', 0.4), to: mix(p.accent, p.ink, 0.4), angle: 180, label: 'You, cut out' }),
-          tText('I tried it', { x: W * 0.045, y: H * 0.1, w: W * 0.6, size: H * 0.19, font: c.head, color: '#ffffff', lh: 1, upper: true, css: stroke, rot: -3 }),
-          tText('for 30 days', { x: W * 0.045, y: H * 0.36, w: W * 0.62, size: H * 0.19, font: c.head, color: p.accent, lh: 1, upper: true, css: stroke, rot: -3 }),
+          tText('I tried it', { x: W * 0.045, y: H * 0.1, w: W * 0.6, size: Math.min(H * 0.19, W * 0.105), font: c.head, color: '#ffffff', lh: 1, upper: true, css: stroke, rot: -3 }),
+          tText('for 30 days', { x: W * 0.045, y: H * 0.36, w: W * 0.62, size: Math.min(H * 0.19, W * 0.105), font: c.head, color: p.accent, lh: 1, upper: true, css: stroke, rot: -3 }),
           tShape('arrow', { x: W * 0.36, y: H * 0.66, w: W * 0.17, h: H * 0.16, color: p.ink, rot: -12 }),
           tText('Worth it?', { x: W * 0.05, y: H * 0.7, size: H * 0.07, font: c.body, weight: 800, color: '#ffffff', css: `background:${p.ink};padding:.3em .7em;border-radius:.3em`, rot: -3 }),
         ),
@@ -541,13 +580,14 @@ const TEMPLATES: DesignTemplate[] = [
     label: 'Webinar',
     shapes: ['landscape', 'banner'],
     best: ['facebook-post', 'x-post', 'linkedin-banner', 'youtube-banner'],
+    safe: true,
     fonts: ['Space Grotesk', 'Inter'],
     palette: P('#f5f7ff', '#111a3a', '#4f46e5', '#06b6d4', { soft: '#e3e7fb', muted: '#5b6283' }),
     build(c) {
       const { W, H, p } = c;
       const s = c.safe;
-      const banner = c.shape === 'banner';
-      const k = banner ? s.h : s.h * 0.62;
+      const banner = c.shape === 'banner' || s.h < H * 0.6;
+      const k = Math.min(banner ? s.h : s.h * 0.62, s.w * 0.36);
       const x0 = s.x + s.w * 0.05;
       const dots = Array.from({ length: 5 }, (_, i) => Array.from({ length: 5 }, (_, j) => tBox({ x: s.x + s.w * 0.9 + j * k * 0.06, y: s.y + s.h * 0.08 + i * k * 0.06, w: k * 0.02, h: k * 0.02, bg: p.accent, radius: '50%', opacity: 0.35 }))).flat();
       const circ = banner ? s.h * 0.78 : s.h * 0.6;
@@ -558,7 +598,7 @@ const TEMPLATES: DesignTemplate[] = [
           tPic({ x: s.x + s.w * (banner ? 0.72 : 0.66), y: s.y + (s.h - circ) / 2, w: circ, h: circ, frame: 'circle', from: mix(p.soft, p.accent, 0.3), to: mix(p.accent2, p.ink, 0.3), label: 'Speaker' }),
           ...dots,
           tText('Free webinar · 21 May, 4 pm', { x: x0, y: s.y + s.h * (banner ? 0.12 : 0.18), size: k * 0.07, font: c.body, weight: 700, color: p.accent, ls: 0.06, upper: true }),
-          tText('Design systems\nthat scale', { x: x0, y: s.y + s.h * (banner ? 0.26 : 0.27), w: s.w * 0.6, size: k * (banner ? 0.2 : 0.17), font: c.head, weight: 700, color: p.ink, lh: 1.02 }),
+          tText('Design systems\nthat scale', { x: x0, y: s.y + s.h * (banner ? 0.26 : 0.27), w: s.w * 0.58, size: Math.min(k * (banner ? 0.2 : 0.17), s.w * 0.058), font: c.head, weight: 700, color: p.ink, lh: 1.02 }),
           tText('With Ana Ruiz, Head of Design at Northwind', { x: x0, y: s.y + s.h * (banner ? 0.78 : 0.62), w: s.w * 0.6, size: k * 0.07, font: c.body, color: p.muted }),
           !banner && tText('Save your seat', { x: x0, y: s.y + s.h * 0.75, size: k * 0.07, font: c.body, weight: 700, color: '#ffffff', css: `background:${p.ink};padding:.6em 1.3em;border-radius:.5em` }),
         ),
@@ -570,6 +610,7 @@ const TEMPLATES: DesignTemplate[] = [
     label: 'Profile banner',
     shapes: ['banner', 'landscape'],
     best: ['linkedin-banner', 'facebook-cover', 'youtube-banner'],
+    safe: true,
     fonts: ['Syne', 'DM Sans'],
     palette: P('#0e1b2b', '#ffffff', '#f97316', '#38bdf8', { soft: '#16293f', muted: '#a9b8c9', onAccent: '#0e1b2b' }),
     build(c) {
@@ -602,22 +643,25 @@ const TEMPLATES: DesignTemplate[] = [
     palette: P('#fbf8f3', '#3d3a35', '#b08d57', '#7d8c6e', { soft: '#f1ebe0', muted: '#7b746a' }),
     build(c) {
       const { W, H, p, u } = c;
+      // Sized by what fits up and down: a square has less height for the words than a card.
+      const v = Math.min(u, H * 0.62);
       const m = u * 0.06;
       const cx = W / 2;
+      const y0 = Math.max(m * 2.2, H / 2 - v * 0.62);
       return {
         bg: p.bg,
         html: join(
           tBox({ x: m, y: m, w: W - m * 2, h: H - m * 2, bg: 'transparent', border: `${px(Math.max(1, u * 0.003))} solid ${p.accent}` }),
           tBox({ x: m * 1.5, y: m * 1.5, w: W - m * 3, h: H - m * 3, bg: 'transparent', border: `${px(Math.max(1, u * 0.0015))} solid ${p.accent}` }),
-          tShape('flower', { x: cx - u * 0.05, y: H * 0.1, w: u * 0.1, h: u * 0.1, color: p.accent, opacity: 0.85 }),
-          tText('Together with their families', { x: m * 2, y: H * 0.22, w: W - m * 4, size: u * 0.034, font: c.body, weight: 600, color: p.muted, align: 'center', ls: 0.2, upper: true }),
-          tText('Olivia', { x: 0, y: H * 0.29, w: W, size: u * 0.15, font: c.head, color: p.ink, align: 'center', lh: 1.1 }),
-          tText('&', { x: 0, y: H * 0.29 + u * 0.155, w: W, size: u * 0.08, font: c.body, color: p.accent, align: 'center', italic: true, lh: 1 }),
-          tText('James', { x: 0, y: H * 0.29 + u * 0.24, w: W, size: u * 0.15, font: c.head, color: p.ink, align: 'center', lh: 1.1 }),
-          tText('request the pleasure of your company\nat the celebration of their marriage', { x: m * 2, y: H * 0.29 + u * 0.46, w: W - m * 4, size: u * 0.04, font: c.body, color: p.ink, align: 'center', lh: 1.45, italic: true }),
-          tLine({ x: cx - u * 0.12, y: H * 0.29 + u * 0.62, w: u * 0.24, color: p.accent, lw: Math.max(1, u * 0.003) }),
-          tText('Saturday, the twelfth of September\nat four in the afternoon', { x: m * 2, y: H * 0.29 + u * 0.66, w: W - m * 4, size: u * 0.042, font: c.body, weight: 600, color: p.ink, align: 'center', lh: 1.45 }),
-          tText('The Old Orangery · Kew Gardens', { x: m * 2, y: H - m * 2 - u * 0.1, w: W - m * 4, size: u * 0.034, font: c.body, weight: 600, color: p.muted, align: 'center', ls: 0.14, upper: true }),
+          tShape('flower', { x: cx - v * 0.05, y: y0, w: v * 0.1, h: v * 0.1, color: p.accent, opacity: 0.85 }),
+          tText('Together with their families', { x: m * 2, y: y0 + v * 0.16, w: W - m * 4, size: v * 0.034, font: c.body, weight: 600, color: p.muted, align: 'center', ls: 0.2, upper: true }),
+          tText('Olivia', { x: 0, y: y0 + v * 0.23, w: W, size: v * 0.15, font: c.head, color: p.ink, align: 'center', lh: 1.1 }),
+          tText('&', { x: 0, y: y0 + v * 0.385, w: W, size: v * 0.08, font: c.body, color: p.accent, align: 'center', italic: true, lh: 1 }),
+          tText('James', { x: 0, y: y0 + v * 0.47, w: W, size: v * 0.15, font: c.head, color: p.ink, align: 'center', lh: 1.1 }),
+          tText('request the pleasure of your company\nat the celebration of their marriage', { x: m * 2, y: y0 + v * 0.7, w: W - m * 4, size: v * 0.04, font: c.body, color: p.ink, align: 'center', lh: 1.45, italic: true }),
+          tLine({ x: cx - v * 0.12, y: y0 + v * 0.87, w: v * 0.24, color: p.accent, lw: Math.max(1, u * 0.003) }),
+          tText('Saturday, the twelfth of September\nat four in the afternoon', { x: m * 2, y: y0 + v * 0.91, w: W - m * 4, size: v * 0.042, font: c.body, weight: 600, color: p.ink, align: 'center', lh: 1.45 }),
+          tText('The Old Orangery · Kew Gardens', { x: m * 2, y: Math.max(y0 + v * 1.08, H - m * 2 - v * 0.09), w: W - m * 4, size: v * 0.034, font: c.body, weight: 600, color: p.muted, align: 'center', ls: 0.14, upper: true }),
         ),
       };
     },
@@ -631,29 +675,29 @@ const TEMPLATES: DesignTemplate[] = [
     palette: P('#fff4e4', '#3a2a4d', '#ff6f91', '#ffc75f', { soft: '#ffe6c2', muted: '#7b6a8d', onAccent: '#ffffff' }),
     build(c) {
       const { W, H, p, u } = c;
+      const v = Math.min(u, H * 0.6);
       const colours = [p.accent, p.accent2, mix(p.accent, '#4cc9f0', 0.7), mix(p.accent2, '#7bd389', 0.6)];
       const bits: string[] = [];
-      // Confetti round the edges, placed the same way every time.
+      // Confetti in bands along the top and the bottom, placed the same way every time.
       for (let i = 0; i < 26; i++) {
-        const a = (i * 137.5 * Math.PI) / 180;
-        const edge = i % 2 ? 0.08 : 0.92;
-        const x = (0.5 + 0.48 * Math.cos(a)) * W;
-        const y = (i % 4 < 2 ? 0.04 + 0.16 * ((i * 0.37) % 1) : edge - 0.06 + 0.12 * ((i * 0.53) % 1)) * H;
-        const s = u * (0.018 + 0.02 * ((i * 0.61) % 1));
+        const top = i % 2 === 0;
+        const x = ((i * 0.618) % 1) * (W - u * 0.05);
+        const y = top ? H * (0.015 + 0.09 * ((i * 0.37) % 1)) : H * (0.9 + 0.08 * ((i * 0.53) % 1));
+        const s = u * (0.016 + 0.018 * ((i * 0.61) % 1));
         const col = colours[i % colours.length];
         bits.push(i % 3 === 0 ? tShape('triangle', { x, y, w: s, h: s, color: col, rot: (i * 47) % 360 }) : i % 3 === 1 ? tBox({ x, y, w: s * 0.6, h: s * 1.6, bg: col, radius: s * 0.3, rot: (i * 61) % 180 }) : tBox({ x, y, w: s, h: s, bg: col, radius: '50%' }));
       }
-      const ty = H * (c.shape === 'square' ? 0.2 : 0.22);
+      const ty = H / 2 - v * 0.5;
       return {
         bg: p.bg,
         html: join(
           ...bits,
-          tText('You’re invited to', { x: 0, y: ty, w: W, size: u * 0.05, font: c.body, weight: 600, color: p.muted, align: 'center', upper: true, ls: 0.15 }),
-          tText('Mia’s', { x: 0, y: ty + u * 0.07, w: W, size: u * 0.14, font: c.head, color: p.ink, align: 'center', lh: 1.2 }),
-          tText('7', { x: 0, y: ty + u * 0.22, w: W, size: u * 0.36, font: c.body, weight: 700, color: p.accent, align: 'center', lh: 1, css: `text-shadow:${px(u * 0.012)} ${px(u * 0.012)} 0 ${p.accent2}` }),
-          tText('th birthday party', { x: 0, y: ty + u * 0.58, w: W, size: u * 0.07, font: c.body, weight: 700, color: p.ink, align: 'center' }),
-          tText('Sunday 3 May · 2 pm\n12 Willow Lane', { x: 0, y: ty + u * 0.72, w: W, size: u * 0.048, font: c.body, weight: 500, color: p.ink, align: 'center', lh: 1.4 }),
-          tText('RSVP to Anna · 07700 900123', { x: 0, y: H - H * 0.13, w: W, size: u * 0.036, font: c.body, weight: 600, color: p.muted, align: 'center' }),
+          tText('You’re invited to', { x: 0, y: ty, w: W, size: v * 0.05, font: c.body, weight: 600, color: p.muted, align: 'center', upper: true, ls: 0.15 }),
+          tText('Mia’s', { x: 0, y: ty + v * 0.07, w: W, size: v * 0.14, font: c.head, color: p.ink, align: 'center', lh: 1.2 }),
+          tText('7', { x: 0, y: ty + v * 0.24, w: W, size: v * 0.34, font: c.body, weight: 700, color: p.accent, align: 'center', lh: 1, css: `text-shadow:${px(u * 0.012)} ${px(u * 0.012)} 0 ${p.accent2}` }),
+          tText('th birthday party', { x: 0, y: ty + v * 0.6, w: W, size: v * 0.07, font: c.body, weight: 700, color: p.ink, align: 'center' }),
+          tText('Sunday 3 May · 2 pm\n12 Willow Lane', { x: 0, y: ty + v * 0.73, w: W, size: v * 0.048, font: c.body, weight: 500, color: p.ink, align: 'center', lh: 1.4 }),
+          tText('RSVP to Anna · 07700 900123', { x: 0, y: ty + v * 0.9, w: W, size: v * 0.036, font: c.body, weight: 600, color: p.muted, align: 'center' }),
         ),
       };
     },
@@ -756,25 +800,29 @@ const TEMPLATES: DesignTemplate[] = [
         ['Mains', [['Tagliatelle al ragù', 'Slow-cooked beef, parmesan', '18'], ['Sea bass', 'Fennel, capers, new potatoes', '23'], ['Mushroom risotto', 'Porcini, thyme, pecorino', '16']]],
         ['Desserts', [['Tiramisù', 'Espresso, mascarpone', '8'], ['Panna cotta', 'Vanilla, berries', '7']]],
       ];
+      // Its sizes, made smaller where the page is short for its width.
+      const items = sections.reduce((n, [, list]) => n + list.length, 0);
+      const need = (k: number) => W * 0.25 * k + sections.length * (W * 0.075 + W * 0.035) * k + items * W * 0.03 * 3.1 * k + H * 0.1;
+      const k = Math.min(1, (H * 0.94 - H * 0.06) / need(1));
       const out: string[] = [
-        tText('Trattoria', { x: 0, y: H * 0.06, w: W, size: W * 0.11, font: c.head, weight: 700, color: p.ink, align: 'center', italic: true }),
-        tText('Menu', { x: 0, y: H * 0.06 + W * 0.14, w: W, size: W * 0.03, font: c.body, weight: 700, color: p.accent, align: 'center', ls: 0.5, upper: true }),
-        tLine({ x: W / 2 - W * 0.12, y: H * 0.06 + W * 0.2, w: W * 0.24, color: p.accent, lw: 1.5 }),
+        tText('Trattoria', { x: 0, y: H * 0.05, w: W, size: W * 0.11 * k, font: c.head, weight: 700, color: p.ink, align: 'center', italic: true }),
+        tText('Menu', { x: 0, y: H * 0.05 + W * 0.14 * k, w: W, size: W * 0.03 * k, font: c.body, weight: 700, color: p.accent, align: 'center', ls: 0.5, upper: true }),
+        tLine({ x: W / 2 - W * 0.12, y: H * 0.05 + W * 0.2 * k, w: W * 0.24, color: p.accent, lw: 1.5 }),
       ];
-      let y = H * 0.06 + W * 0.25;
-      const ts = W * 0.03;
-      for (const [title, items] of sections) {
-        out.push(tText(title, { x: m, y, w: W - m * 2, size: W * 0.048, font: c.head, weight: 700, color: p.accent, lh: 1.1 }));
-        y += W * 0.075;
-        for (const [name, desc, price] of items) {
+      let y = H * 0.05 + W * 0.25 * k;
+      const ts = W * 0.03 * k;
+      for (const [title, list] of sections) {
+        out.push(tText(title, { x: m, y, w: W - m * 2, size: W * 0.048 * k, font: c.head, weight: 700, color: p.accent, lh: 1.1 }));
+        y += W * 0.075 * k;
+        for (const [name, desc, price] of list) {
           out.push(tText(name, { x: m, y, w: W * 0.6, size: ts, font: c.body, weight: 700, color: p.ink }));
           out.push(tText(price, { x: W - m - W * 0.12, y, w: W * 0.12, size: ts, font: c.body, weight: 700, color: p.ink, align: 'right' }));
           out.push(tText(desc, { x: m, y: y + ts * 1.35, w: W * 0.66, size: ts * 0.82, font: c.body, color: p.muted, italic: true }));
           y += ts * 3.1;
         }
-        y += W * 0.035;
+        y += W * 0.035 * k;
       }
-      out.push(tText('Open every day from 12 pm · Via Roma 14', { x: 0, y: H - H * 0.06, w: W, size: W * 0.022, font: c.body, color: p.muted, align: 'center', ls: 0.1, upper: true }));
+      out.push(tText('Open every day from 12 pm · Via Roma 14', { x: 0, y: H - H * 0.05, w: W, size: W * 0.022 * k, font: c.body, color: p.muted, align: 'center', ls: 0.1, upper: true }));
       return { bg: p.bg, html: join(...out) };
     },
   },
@@ -830,10 +878,10 @@ const TEMPLATES: DesignTemplate[] = [
       return {
         bg: p.bg,
         html: join(
-          tPic({ x: 0, y: 0, w: W, h: H, from: mix(p.accent2, p.bg, 0.25), to: mix(p.accent, p.bg, 0.45), angle: 170, label: 'A photo of the place' }),
+          tPic({ x: 0, y: 0, w: W, h: H, from: mix('#8ecae6', p.bg, 0.15), to: mix(p.accent, '#ffb703', 0.35), angle: 175, label: 'A photo of the place' }),
           tBox({ x: u * 0.04, y: u * 0.04, w: W - u * 0.08, h: H - u * 0.08, bg: 'transparent', border: `${px(u * 0.008)} solid rgba(255,255,255,.85)`, radius: u * 0.02 }),
           tText('Greetings from', { x: 0, y: H * 0.26, w: W, size: u * 0.11, font: c.head, color: '#ffffff', align: 'center', css: shadow, rot: -4 }),
-          tText('Lisbon', { x: 0, y: H * 0.26 + u * 0.15, w: W, size: u * 0.33, font: c.body, color: p.accent2, align: 'center', lh: 1, upper: true, css: `-webkit-text-stroke:${px(u * 0.008)} #ffffff;paint-order:stroke fill;${shadow}`, rot: -4 }),
+          tText('Lisbon', { x: 0, y: H * 0.26 + u * 0.15, w: W, size: Math.min(u * 0.33, W * 0.2), font: c.body, color: p.accent2, align: 'center', lh: 1, upper: true, css: `-webkit-text-stroke:${px(u * 0.008)} #ffffff;paint-order:stroke fill;${shadow}`, rot: -4 }),
         ),
       };
     },
@@ -875,14 +923,15 @@ const TEMPLATES: DesignTemplate[] = [
       const ic = u * 0.3;
       const wide = W / H > 1.3;
       if (wide) {
-        const total = ic + u * 0.08 + u * 1.1;
+        const t = Math.min(u * 0.26, (W * 0.78 - ic - u * 0.08) / 3.4);
+        const total = ic + u * 0.08 + t * 3.4;
         const x0 = (W - total) / 2;
         return {
           bg: p.bg,
           html: join(
             tBox({ x: x0, y: (H - ic) / 2, w: ic, h: ic, radius: ic * 0.28, bg: `linear-gradient(135deg,${p.accent},${p.accent2})` }),
             tIcon('sparkles', { x: x0 + ic * 0.2, y: (H - ic) / 2 + ic * 0.2, size: ic * 0.6, color: '#ffffff', sw: 2 }),
-            tText('lumina', { x: x0 + ic + u * 0.08, y: H / 2 - u * 0.17, size: u * 0.26, font: c.head, weight: 800, color: p.ink, lh: 1.1, ls: -0.03 }),
+            tText('lumina', { x: x0 + ic + u * 0.08, y: H / 2 - t * 0.66, size: t, font: c.head, weight: 800, color: p.ink, lh: 1.1, ls: -0.03 }),
           ),
         };
       }
@@ -905,7 +954,9 @@ export const templateById = (id: string) => TEMPLATES.find((t) => t.id === id);
 
 /** The templates for a size: those drawn for its kind of size, the ones best for it first. */
 export function templatesFor(size: Pick<DesignSize, 'id' | 'shape'>): DesignTemplate[] {
-  const fits = TEMPLATES.filter((t) => t.shapes.includes(size.shape));
+  // A logo's square is a logo's: the posters' squares would be cramped in it.
+  const safe = !!DESIGN_SIZES.find((x) => x.id === size.id)?.safe;
+  const fits = TEMPLATES.filter((t) => t.shapes.includes(size.shape) && (size.id !== 'logo' || t.best?.includes('logo')) && (!safe || t.safe));
   const best = (t: DesignTemplate) => (t.best?.includes(size.id) ? 0 : 1);
   return fits.map((t, i) => ({ t, i })).sort((a, b) => best(a.t) - best(b.t) || a.i - b.i).map((x) => x.t);
 }
