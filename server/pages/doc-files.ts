@@ -215,13 +215,16 @@ export function textOfDoc(doc: Doc): string {
   let list: string[] | null = null;
   // Where each level's item's words start, for the items under it.
   const content: number[] = [];
+  let kind: string | undefined;
   const endList = () => {
     if (list) chunks.push(list.join('\n'));
     list = null;
     content.length = 0;
   };
   d.blocks.forEach((b, i) => {
-    if (b.type !== 'li') endList();
+    // Another list (another kind at the top level) after a blank line, as anything else.
+    if (b.type !== 'li' || (!b.lvl && b.list !== kind)) endList();
+    kind = b.type === 'li' && !b.lvl ? b.list : kind;
     if (b.type === 'p') {
       let words = plain(b.runs, refs);
       if (!words.trim()) return;
@@ -1077,7 +1080,7 @@ export function pdfBlocks(pages: PdfPageText[]): Record<string, unknown>[] {
   const tally = new Map<number, number>();
   for (const p of pages) for (const l of p.lines) tally.set(Math.round(l.size * 2) / 2, (tally.get(Math.round(l.size * 2) / 2) ?? 0) + l.text.length);
   const body = [...tally].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ?? 10;
-  const kept = runningLinesOut(pages);
+  const kept = runningLinesOut(pages.map((p) => ({ ...p, lines: withRaised(p.lines) })));
   const placed: Placed[] = [];
   kept.forEach((lines, k) => {
     for (const x of readingOrder(lines, pages[k].w, body)) placed.push({ ...x, page: k + 1 });
@@ -1087,19 +1090,20 @@ export function pdfBlocks(pages: PdfPageText[]): Record<string, unknown>[] {
 
 /** Each page's lines without its page number, and (with two pages or more) the lines most pages have at their top or bottom. */
 function runningLinesOut(pages: PdfPageText[]): PdfLine[][] {
-  const key = (t: string) => t.toLowerCase().replace(/\d+/g, '#').replace(/\s+/g, ' ').trim();
+  // The same words, the same size, at the same height: a title on the first page is no header with its words.
+  const key = (l: PdfLine) => `${l.text.toLowerCase().replace(/\d+/g, '#').replace(/\s+/g, ' ').trim()}|${Math.round(l.size)}|${Math.round(l.y / 6)}`;
   const edges = pages.map((p) => {
     const sorted = [...p.lines].sort((a, b) => a.y - b.y);
     return new Set([...sorted.slice(0, 2).filter((l) => l.y + l.h < p.h * 0.15), ...sorted.slice(-2).filter((l) => l.y > p.h * 0.85)]);
   });
   const count = new Map<string, number>();
-  for (const set of edges) for (const k of new Set([...set].map((l) => key(l.text)))) count.set(k, (count.get(k) ?? 0) + 1);
+  for (const set of edges) for (const k of new Set([...set].map(key))) count.set(k, (count.get(k) ?? 0) + 1);
   const most = Math.max(2, Math.ceil(pages.length * 0.5));
   return pages.map((p, i) =>
     p.lines.filter((l) => {
       if (!edges[i].has(l)) return true;
       if (PAGE_NO.test(l.text.trim())) return false;
-      return pages.length < 2 || (count.get(key(l.text)) ?? 0) < most;
+      return pages.length < 2 || (count.get(key(l)) ?? 0) < most;
     }),
   );
 }
@@ -1229,7 +1233,9 @@ function withRaised(lines: PdfLine[]): PdfLine[] {
     if (!host) continue;
     const chars = [...host.text];
     const at = host.xs ? host.xs.findIndex(([a], i) => chars[i] !== ' ' && a >= t.x) : -1;
-    const k = at < 0 ? chars.length : at;
+    // Right after the word before it.
+    let k = at < 0 ? chars.length : at;
+    while (k > 0 && chars[k - 1] === ' ') k--;
     const merged: PdfLine = {
       ...host,
       text: [...chars.slice(0, k), ...t.text, ...chars.slice(k)].join(''),
@@ -1244,7 +1250,7 @@ function withRaised(lines: PdfLine[]): PdfLine[] {
 
 /** A page's lines in the order they read: top to bottom, and with two columns, the left one's down to a line across both, then the right one's. */
 function readingOrder(lines: PdfLine[], width: number, body: number): { line: PdfLine; col: number }[] {
-  const sorted = withRaised(lines).sort((a, b) => a.base - b.base || a.x - b.x);
+  const sorted = [...lines].sort((a, b) => a.base - b.base || a.x - b.x);
   const g = gutterOf(sorted, width, body);
   if (!g) return sorted.map((line) => ({ line, col: 0 }));
   const out: { line: PdfLine; col: number }[] = [];
@@ -1329,30 +1335,43 @@ function paragraphs(placed: Placed[], body: number): Para[] {
   function goesOn(p: Para, it: Placed, text: string): boolean {
     const a = p.lines[p.lines.length - 1];
     const b = it.line;
-    if (Math.abs(b.size - p.size) > Math.max(0.6, 0.08 * Math.min(b.size, p.size))) return false;
+    const s = p.size;
+    if (Math.abs(b.size - s) > Math.max(0.6, 0.08 * Math.min(b.size, s))) return false;
     const prev = cleanLine(a.line.text);
+    // A line goes on to the next only when the next one's first word would not have fitted after it: one that ends
+    // short of its column's right edge ended its paragraph.
+    const right = rights.get(`${a.page}|${a.col}`);
+    const full = right === undefined || a.line.x + a.line.w >= right - (firstWord(b) + 1.5 * s);
     // Over a page's or a column's end: a sentence that goes on.
-    if (it.page !== a.page || it.col !== a.col) return (!/[.!?:;"”’)\]]$/.test(prev) || /\p{L}-$/u.test(prev)) && /^[\p{Ll}\p{N}(]/u.test(text);
+    if (it.page !== a.page || it.col !== a.col) return full && (!/[.!?:;"”’)\]]$/.test(prev) || /\p{L}-$/u.test(prev)) && /^[\p{Ll}\p{N}(]/u.test(text);
     const gap = b.base - a.line.base;
-    const step = (lead * p.size) / body;
+    const step = (lead * s) / body;
     if (gap < -1 || gap > step * 1.3) return false;
     // A line of words beside the one before (a table's cells): the same line.
     if (Math.abs(gap) <= 1) return true;
-    const s = p.size;
-    if (p.list) return Math.abs(b.x - p.list.words) <= Math.max(3, s * 0.4) || (b.x < p.list.words && b.x > p.list.at - 2 && !MARKER.test(text));
     // Lines centred one under the other (a title over two lines).
     if (Math.abs(a.line.x + a.line.w / 2 - (b.x + b.w / 2)) < Math.max(2, s * 0.3) && Math.abs(a.line.x - b.x) > s) return true;
-    // A short line ending a sentence ends its paragraph.
-    const right = rights.get(`${it.page}|${it.col}`);
-    if (right !== undefined && Math.abs(s - body) < 0.6 && /[.!?:]["”’)]*$/.test(prev) && a.line.x + a.line.w < right - Math.max(2 * s, (right - a.line.x) * 0.2)) return false;
-    if (p.lines.length === 1) {
-      // A line set in after a first one: a new paragraph, unless the first ran to the edge (the lines after a hanging first one).
-      if (b.x > a.line.x + 0.8 * s) return right !== undefined && a.line.x + a.line.w >= right - 2 * s && !(/[.!?]["”’)]*$/.test(prev) && /^\p{Lu}/u.test(text));
-      return true;
-    }
-    // Further lines keep to where the second one started.
-    return Math.abs(b.x - p.lines[1].line.x) <= 0.8 * s;
+    if (!full) return false;
+    if (p.list) return Math.abs(b.x - p.list.words) <= Math.max(3, s * 0.4) || (b.x < p.list.words && b.x > p.list.at - 2);
+    // Where its lines start in this column: its second line's place (the first may be set in, or hang out).
+    const here = p.lines.filter((l) => l.page === it.page && l.col === it.col);
+    const ref = here[0] === p.lines[0] ? here[1]?.line.x : here[0]?.line.x;
+    if (ref !== undefined) return Math.abs(b.x - ref) <= 0.8 * s;
+    // After a first line, one set in further starts a paragraph, unless the first ran to the edge (lines under a
+    // hanging first one) and no sentence ended there.
+    if (b.x > a.line.x + 0.8 * s) return right !== undefined && a.line.x + a.line.w >= right - 2 * s && !(/[.!?]["”’)]*$/.test(prev) && /^\p{Lu}/u.test(text));
+    return true;
   }
+}
+
+/** How wide a line's first word is, as the page has it (or as wide as its letters usually are). */
+function firstWord(l: PdfLine): number {
+  const chars = [...l.text];
+  let n = chars.indexOf(' ');
+  if (n < 0) n = chars.length;
+  const end = l.xs?.[n - 1]?.[1];
+  const start = l.xs?.[0]?.[0];
+  return end !== undefined && start !== undefined ? end - start : n * l.size * 0.5;
 }
 
 /** Paragraphs as blocks: the title, headings by their sizes, list items with their levels, and the rest. */
@@ -1381,10 +1400,11 @@ function blocksOf(paras: Para[], body: number): Record<string, unknown>[] {
     }
     let j = i;
     while (j < paras.length && paras[j].list) j++;
+    // Marks a little apart (a bullet centred where a number starts) are one level; a level is further in than that.
+    const level = (a: number, b: number) => Math.abs(a - b) < Math.max(4, body * 0.8);
     const xs: number[] = [];
-    for (const p of paras.slice(i, j)) if (!xs.some((x) => Math.abs(x - p.list!.at) < 4)) xs.push(p.list!.at);
-    xs.sort((a, b) => a - b);
-    for (let k = i; k < j; k++) lvl.set(k, Math.min(4, xs.findIndex((x) => Math.abs(x - paras[k].list!.at) < 4)));
+    for (const x of paras.slice(i, j).map((p) => p.list!.at).sort((a, b) => a - b)) if (!xs.some((y) => level(x, y))) xs.push(x);
+    for (let k = i; k < j; k++) lvl.set(k, Math.min(4, xs.findIndex((x) => level(x, paras[k].list!.at))));
     i = j;
   }
   return paras.map((p, i) => {

@@ -10,6 +10,7 @@ import { newBook } from '../../shared/sheets.ts';
 import { deckSounds, deckSources, deckVideos, newDeck } from '../../shared/slides.ts';
 import { assetDataUrl } from './assets.ts';
 import { docForAgent, docFromFile, docPage, docxOfDoc, keepDoc, MAX_DOC, readDoc } from './docs.ts';
+import { epubOfDoc, odtOfDoc, textOfDoc } from './doc-files.ts';
 import { importTex, keepTex, MAX_TEX, readTex, TEX_OPENS, texForAgent, texPage, texPdf, texSource, texZip } from './latex.ts';
 import { pptxFile, type Picture } from './pptx.ts';
 import { deckFontFiles } from './pptx-fonts.ts';
@@ -23,7 +24,7 @@ import { freshNotebook, keepNotebook, MAX_NOTEBOOK, notebookForAgent, notebookFr
 
 export type PageKind = 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
 export type PageMode = 'viewer' | 'print' | 'still';
-export type ExportFormat = 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png';
+export type ExportFormat = 'pdf' | 'docx' | 'odt' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'epub' | 'txt' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png';
 
 /** A file opened as a page of a kind: its model, and what was left out of it (said to the person who opened it). */
 export interface FromFile {
@@ -124,11 +125,15 @@ KINDS.set('doc', {
     docx: (db, text, title, help) => docxOfDoc(db, readDoc(text), title, help.picture, help.wordFonts),
     // A file on its own: its pictures go inside it; Markdown has no way to show suggested changes, so they are made.
     md: (db, text) => docMarkdown(mapDocSources(asAccepted(readDoc(text)), (src) => (src.startsWith(ASSET) ? (assetDataUrl(db, src.slice(ASSET.length)) ?? src) : src)), { tocLinks: true }),
+    // LibreOffice's own file, an e-book and plain text (doc-files.ts), each with its suggested changes made.
+    odt: (db, text, title, help) => odtOfDoc(db, readDoc(text), title, help.picture),
+    epub: (db, text, title, help) => epubOfDoc(db, readDoc(text), title, help.picture),
+    txt: (_db, text) => textOfDoc(asAccepted(readDoc(text))),
   },
   still: () => ({ width: 1280, height: 800 }),
   fresh: (title) => newDoc(title),
   fromFile: (buf, name) => ({ model: docFromFile(buf, name) }),
-  opens: /\.(docx|docm|dotx|md|markdown|txt|html?)$/i,
+  opens: /\.(docx|docm|dotx|pdf|md|markdown|txt|html?)$/i,
 });
 
 KINDS.set('sheet', {

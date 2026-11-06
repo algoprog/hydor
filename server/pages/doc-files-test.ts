@@ -263,7 +263,7 @@ ok(
   const image = all(root, 'image')[0];
   ok(image && att(image, 'xlink:href') === 'Pictures/1.png' && zip.read('Pictures/1.png')?.equals(Buffer.from(PNG.split(',')[1], 'base64')), 'the picture inside it', image?.a);
   const frame = all(root, 'frame')[0];
-  ok(frame && att(frame, 'svg:width') === '257mm' && att(frame, 'svg:height') === '257mm' && textOf(all(frame, 'desc')[0]) === 'A red square', 'the picture as wide as the text, with its description', frame?.a);
+  ok(frame && att(frame, 'svg:width') === '153mm' && att(frame, 'svg:height') === '153mm' && textOf(all(frame, 'desc')[0]) === 'A red square', 'the picture as wide as the text but no taller than the page’s, with its description', frame?.a);
   ok(/Figure 1: Growth<\/text:p>/.test(content) && content.includes('E = mc^2') && content.includes('Doe, J. (2020). '), 'its caption under it, the equation as LaTeX, the bibliography');
   ok(/<style:paragraph-properties fo:break-before="page"\/>/.test(content), 'a page break');
   ok(/style:print-orientation="landscape"/.test(styles) && /fo:page-width="297mm" fo:page-height="210mm"/.test(styles) && /fo:margin-left="20mm"/.test(styles), 'the page: landscape A4, its margins', /<style:page-layout-properties[^>]*>/.exec(styles)?.[0]);
@@ -319,7 +319,7 @@ ok(
       L('and goes on.', 72, 254, 11, 70),
       L('Method', 72, 290, 13),
       L('• First thing to do', 90, 315),
-      L('• Second thing, which is long and', 90, 329, 11, 400),
+      L('• Second thing, which is long and', 90, 329, 11, 450),
       L('wraps under its words', 101, 343),
       L('1. Number one', 90, 365),
       L('2) Number two', 90, 379),
