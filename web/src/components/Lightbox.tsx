@@ -1,10 +1,15 @@
 // Images opened large: fitted to the screen, a click (or tap) shows them at full size to pan around,
-// arrows step through several, Escape closes. A step's picture shows where the step acted on it.
+// arrows step through several, Escape closes. A step's picture shows where the step acted on it. Edit opens the
+// picture in the picture editor, in a tab of its own (saved as a copy in the Library, or back in place when the
+// one who opened it says where).
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { create } from 'zustand';
-import { ChevronLeft, ChevronRight, ExternalLink, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, SlidersHorizontal, X } from 'lucide-react';
+import type { Saved, SaveTo } from '@shared/mediaedit';
 import type { StepMark } from '@shared/pointer';
+import { openEditor, pageName } from '../features/mediaedit/host';
+import { toast } from '../lib/store';
 import { StepMarks } from './StepMarks';
 import { cx } from './ui';
 
@@ -15,6 +20,11 @@ export interface LightboxImage {
   href?: string;
   /** Where an agent's step acted on the picture (a computer step's screen). */
   marks?: StepMark[];
+  /**
+   * Edit: where the picture editor saves it back (a Library item, a file, a deck's picture) and what to do then; with
+   * none it saves a copy in the Library. false: no Edit (a video's frames).
+   */
+  edit?: false | { to?: SaveTo; save?: (r: Saved) => void | Promise<void>; from?: string };
 }
 
 const useLightbox = create<{ images: LightboxImage[]; index: number }>(() => ({ images: [], index: 0 }));
@@ -23,6 +33,21 @@ export const openLightbox = (images: LightboxImage[], index = 0) => useLightbox.
 /** A picture's marks, once read, for the open view showing it. */
 export const markLightbox = (src: string, marks: StepMark[]) => useLightbox.setState((s) => (s.images.some((i) => i.src === src) ? { images: s.images.map((i) => (i.src === src ? { ...i, marks } : i)) } : s));
 const close = () => useLightbox.setState({ images: [], index: 0 });
+
+/** The picture in the picture editor, in a tab of its own; the large view closes. */
+function edit(img: LightboxImage) {
+  const e = img.edit || {};
+  close();
+  openEditor({
+    kind: 'image',
+    src: img.src,
+    title: img.name || 'Picture',
+    from: { label: e.from || pageName() },
+    to: e.to,
+    copy: !!e.to,
+    save: e.save ?? ((r) => void (r.media && toast('Saved to your Library', 'ok'))),
+  });
+}
 
 export function Lightbox() {
   const { images, index } = useLightbox();
@@ -59,6 +84,12 @@ export function Lightbox() {
           <span className="tnum shrink-0 text-white/60">
             {index + 1} / {images.length}
           </span>
+        )}
+        {img.edit !== false && (
+          <button onClick={() => edit(img)} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-white/80 hover:bg-white/10 hover:text-white" title="Edit the picture" aria-label="Edit the picture">
+            <SlidersHorizontal size={15} />
+            <span className="max-sm:hidden">Edit</span>
+          </button>
         )}
         <a href={img.href ?? img.src} target="_blank" rel="noopener noreferrer" className="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white" title="Open in a new tab" aria-label="Open in a new tab">
           <ExternalLink size={16} />
