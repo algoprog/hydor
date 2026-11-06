@@ -182,12 +182,14 @@ const partOf = (d: Deck, id: string) => everyEl(d.slides[0].els).find((e) => e.i
   ok(!!find(args({ picked: [chart] }), 'Format', 'Make a plot of this'), 'Format: a chart picked is made a plot');
   const bare = args({ aiPicture: undefined, aiDrawing: undefined, aiPlot: undefined, aiVideo: undefined, aiEdit: undefined, aiPlotChart: undefined });
   ok(!find(bare, 'Insert', 'Plot') && items(bare && (menu(bare, 'Insert').find((x) => x.label === 'Picture')?.items ?? [])).length === 2, 'without the tools (a version looked at), none of them');
-  // Every menu fits a small laptop's window (811×667) without scrolling: its rows (34 px), lines (9 px) and its edges under the menu bar.
+  // Every menu fits a small laptop's window (811×667) without scrolling: there the menus are behind one button, and a
+  // menu opens in its place under a row that goes back. Its rows (34 px), lines (9 px), edges, below the editor's bar.
   for (const m of slidesMenus(web)) {
     const list = m.items.filter(Boolean);
-    const h = list.filter((x) => x !== '-').length * 34 + list.filter((x) => x === '-').length * 9 + 8;
-    ok(h <= 667 - 48 - 20, `${m.label}: fits on the screen (${h} px)`);
+    const h = list.filter((x) => x !== '-').length * 34 + list.filter((x) => x === '-').length * 9 + 8 + 34 + 9;
+    ok(h <= 667 - 49 - 10, `${m.label}: fits on the screen (${h} px)`);
   }
+  ok(!find(web, 'Insert', 'Slide numbers and footer') && !!find(web, 'Slide', 'Slide numbers and footer'), 'the footer is in the Slide menu (Insert keeps to parts)');
 }
 
 console.log(`${passed} passed, ${failed} failed`);
