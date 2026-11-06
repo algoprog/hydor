@@ -46,4 +46,8 @@ onFeatureEvent('media', ({ data }) => {
 /** The item kept from a file, by its path. */
 export const keptFrom = (items: MediaItem[] | null, path: string) => items?.find((m) => m.source === path);
 
-export const mediaUrl = (m: Pick<MediaItem, 'id'>, what: 'file' | 'still' | 'frames' = 'file') => `/api/media/${enc(m.id)}/${what}`;
+/** An item's file (or its still, or a video's frames); with its version, so a picture written over (the editor's Save) is read anew. */
+export const mediaUrl = (m: Pick<MediaItem, 'id'> & { updatedAt?: number }, what: 'file' | 'still' | 'frames' = 'file') => `/api/media/${enc(m.id)}/${what}${m.updatedAt ? `?v=${m.updatedAt}` : ''}`;
+
+/** The same address, to download the file. */
+export const withDownload = (url: string) => `${url}${url.includes('?') ? '&' : '?'}download=1`;

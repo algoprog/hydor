@@ -28,8 +28,10 @@ import { assetDataUrl, putAsset, takeIn } from './assets.ts';
 import { scriptSafe } from './kit.ts';
 import { katexStyle, texToHtml } from './math.ts';
 import { videoStillOf } from './video-still.ts';
+import { keepNarrations } from './sounds.ts';
 import { keepVideoFile, MAX_VIDEO, VIDEO_INSIDE, videoAddress, videoDataUrl } from './videos.ts';
 import { DECK_EDITS_HELP } from '../../shared/deck-edits.ts';
+import { deckCheckText } from '../../shared/deck-check.ts';
 
 export { isDeckText };
 
@@ -359,6 +361,7 @@ export async function agentDeck(db: DB, input: unknown, cwd: string, prev?: stri
       src: (s) => (s.length <= 4096 ? s : null),
       video: (s) => (s.length <= 4096 ? s : null),
       model: (s) => (s.length <= 4096 ? s : null),
+      audio: (s) => (s.length <= 4096 ? s : null),
       icon: (name) => {
         const got = lucideIcon(name);
         if (!got) missing.add(name);
@@ -402,6 +405,8 @@ export async function agentDeck(db: DB, input: unknown, cwd: string, prev?: stri
     for (const e of everyEl(s.els)) if (e.type === 'video') await keepVideo(e.src);
   }
   if (files.size) deck = normalizeDeck(withVideoFiles(deck, files));
+  // Its slides' narrations that are sound files of its session (generate_audio's), kept with their length.
+  deck = await keepNarrations(db, deck, cwd, notes);
   // The videos it adds without a still get their site's, kept, as the editor's do (a few at a time, each bounded in time).
   const stills = new Map<string, string>();
   const want = deck.slides.flatMap((s) => everyEl(s.els)).filter((e) => e.type === 'video' && !e.poster && !e.src.startsWith(VIDEO) && !known.has(e.id)) as VideoEl[];
@@ -526,7 +531,9 @@ export function deckForAgent(text: string): string {
   const f = deck.footer;
   const foot = f ? `; on each slide${f.skipTitle ? ' but the title slide' : ''}: ${[f.num && 'its number', f.text && `"${f.text}"`, f.date && (f.date === 'today' ? "the day's date" : `the date "${f.date}"`)].filter(Boolean).join(', ')}` : '';
   const format = isWebDeck(deck) ? `the web format${deck.progress ? ', a progress bar' : ''}` : 'PowerPoint compatible, format "pptx": only what PowerPoint has';
-  return `A slide deck of ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'} (${deck.ratio}, theme ${deck.theme.id ?? 'custom'}, ${format}${foot}).\n\nOutline:\n${deckOutline(deck)}\n\nThe deck (send it back whole with save_slides and this id to change it, or only the slides that change with change, add and remove; keep naget-asset: pictures, naget-video: videos and icons' paths as they are):\n${body}${commentsForAgent(deck)}`;
+  // What the editor's accessibility check would list, for the agent to put right as it changes the deck.
+  const checked = deckCheckText(deck);
+  return `A slide deck of ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'} (${deck.ratio}, theme ${deck.theme.id ?? 'custom'}, ${format}${foot}).\n\nOutline:\n${deckOutline(deck)}\n\nThe deck (send it back whole with save_slides and this id to change it, or only the slides that change with change, add and remove; keep naget-asset: pictures, naget-video: videos, naget-audio: narrations and icons' paths as they are):\n${body}${commentsForAgent(deck)}${checked ? `\n\n${checked}` : ''}`;
 }
 
 /** The deck's comments, slide by slide, each on its part or slide, with how to answer them; '' when it has none. */
@@ -563,7 +570,7 @@ const SLIDES_HELP = [
   'The web format’s own parts (PowerPoint gets pictures or text boxes): html {html: a small page (HTML, CSS, JavaScript), or file: an .html file of this session (up to 200 KB; make_plot’s interactive plot is one), interactive: true (it takes clicks and keys in the slideshow; else a click on it goes on), poster: a picture (a file of this session) shown where it cannot run}: sandboxed, it may load libraries from jsDelivr, unpkg or cdnjs, and gets the theme as CSS variables (--n-bg, --n-fg, --n-head, --n-muted, --n-accent, --n-accent-fg, --n-soft, --n-c1…--n-c6, --n-font, --n-head-font) and window.deck: deck.slide, deck.slides, deck.step, deck.on("enter"|"leave"|"step", f), deck.next(), deck.prev(), deck.go(n). embed {url: an https web page that lets others show it in a frame (a map, a form, a CodePen), interactive, poster, radius}. quiz {question, choices: ["London", "*Paris"] (a * marks a right one; or [{text, correct, why: what picking it says}]), multi (several right: picked, then checked), explain (said once answered), layout: list|grid, size, fill}: answered in the slideshow, right or wrong at once; with no right choice it is a poll. score {text: "You got {right} of {total}" ({percent} too), size, color, align}: the quizzes answered right so far. scene3d {model: a .glb or .gltf file of this session or an https address of one (kept with the deck, a .gltf with the files beside it), or shape: cube|sphere|torus|knot|cone|cylinder|icosahedron|text (with text: its words), color, material: matte|glossy|metal|glass|wire|toon, light: studio|soft|dramatic|neon, spin (degrees a second), orbit: true (viewers turn and zoom it), turn and tilt (degrees it is seen from), zoom, bg (else see-through), poster}.',
   'Web looks: any part may have hover: lift|grow|glow|tilt (in the slideshow); text and shapes textFx: gradient|glow|outline|neon|shadow and glass: true (frosted glass behind the box).',
   'Colours: the theme’s names, which follow it (accent, accentFg, fg, head, muted, bg, soft, c1 to c6), or #hex.',
-  'A slide may also have notes (speaker notes: what to say), bg (a colour; {color, to, angle} for a gradient; {image, dim} for a picture), transition (none|fade|push|wipe|cover|zoom|split|morph, or {fx, dir, dur, auto: seconds to go on by itself}), hidden, nofooter (no footer or number on it), build: true (its bullets come one at a time), and anims: [{el: a part’s id, type: in|em|out, fx: appear|fade|fly|float|zoom|wipe|bounce for in and out, pulse|spin|grow|shake for em, on: click|with|after, dur and delay in ms, dir: left|right|up|down, byPara}]. Morph: the parts this slide shares with the one before glide from where they were (moving, growing, turning, recolouring) and the rest fade; a part matches one of the slide before with the same key (or whose id is its key), else the same name, else the same words or picture, so to morph, repeat the part on the next slide with "key" set to its id and change its x, y, w, h, rot or colour.',
+  'A slide may also have notes (speaker notes: what to say), bg (a colour; {color, to, angle} for a gradient; {image, dim} for a picture), transition (none|fade|push|wipe|cover|zoom|split|morph, or {fx, dir, dur, auto: seconds to go on by itself}), hidden, nofooter (no footer or number on it), narration: {file: a sound file of this session (generate_audio’s voice-over of what the notes say, an .mp3, .m4a, .wav, .ogg or .webm; naget-audio:… once kept), text: the words it says} (the slideshow plays it when the user picks Play the narration, and goes on when it ends; PowerPoint gets it as the slide’s sound), build: true (its bullets come one at a time), and anims: [{el: a part’s id, type: in|em|out, fx: appear|fade|fly|float|zoom|wipe|bounce for in and out, pulse|spin|grow|shake for em, on: click|with|after, dur and delay in ms, dir: left|right|up|down, byPara}]. Morph: the parts this slide shares with the one before glide from where they were (moving, growing, turning, recolouring) and the rest fade; a part matches one of the slide before with the same key (or whose id is its key), else the same name, else the same words or picture, so to morph, repeat the part on the next slide with "key" set to its id and change its x, y, w, h, rot or colour.',
   'The web format adds: effects blur|rise|drop|flip|swing|roll|pop|typewriter|draw (lines, shapes and icons drawn)|count (its numbers count up) for in, glow|wiggle|heartbeat|jello|flash|bob|confetti for em, blur|drop|flip|roll|pop for out, with by: word|letter (one by one), loop: true (an em that keeps going), ease: smooth|spring|bounce|linear|snap, and on: "tap" with trigger: a part’s id (it runs whenever that part is clicked, outside the build; an entrance waits hidden till then); transitions cube|flip|dissolve|circle|blinds|glitch; bg {fx: aurora|particles|stars|waves|mesh|grid|bokeh} (moving, in the theme’s colours) or {video: a video file of this session or naget-video:…} (muted, looping, behind it); and the deck’s progress: true (a bar across the top).',
   'Web examples: a quiz {type: "quiz", question: "2 + 2?", choices: ["3", "*4", "5"], explain: "Two pairs make four."}; an answer shown on a click: els [{id: "b", type: "shape", text: "Show the answer"}, {id: "a", type: "text", text: "42"}], anims [{el: "a", fx: "pop", on: "tap", trigger: "b"}]; custom code {type: "html", interactive: true, html: "<button onclick=\'deck.next()\'>Go on</button><script>deck.on(\'enter\', () => start())</script>"}; an interactive plot make_plot made {type: "html", file: "images/sales.html", poster: "images/sales.png", interactive: true}.',
   'The deck may have footer {num: true (each slide’s number), text, date: "today" or a date as written, skipTitle: true (not on the title slide)} and guides {x: [px], y: [px]} (the lines its parts are lined up on).',

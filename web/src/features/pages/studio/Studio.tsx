@@ -476,6 +476,7 @@ export function Studio({
           onPageTab={() => setTab('page')}
           base={doc.base}
           pageHtml={() => editRef.current?.html() ?? Promise.resolve('')}
+          title={doc.title}
         />
       ) : (
         <p className="px-3 py-2 text-[12.5px] leading-relaxed text-fg-3">

@@ -46,17 +46,26 @@ const RULES: Rule[] = [
   ['W', /^\/api\/sites$/, 'refuse', 'Publish with your publish_site tool: the user confirms on its card.'],
   ['W', /^\/api\/me\/language$/, 'refuse', 'The language is set on each device: PUT /device with { language }.'],
   ['W', /^\/api\/(push\/(subscribe|unsubscribe)|me\/timezone|find\/usage|tour|voice\/(transcribe|command|cancel))$/, 'refuse', 'That is for the app’s pages themselves.'],
+  // A slideshow's narration sounds and its phone remote are the editor's and the slideshow's own.
+  [
+    '*',
+    /^\/api\/slides\/(sounds|narration|shows)(\/|$)/,
+    'refuse',
+    'That is for the slides editor and the slideshow. To narrate slides, make each slide’s voice-over with generate_audio and give its file as the slide’s narration ({"file": …}) in save_slides.',
+  ],
   // The editors' own AI tools: agents have tools of their own for each, which save into their folder and ask the user as needed.
   [
     '*',
-    /^\/api\/(images\/(make|edit|svg|cutout|erase)|plots\/make|videos\/make(\/[^/]+)?)$/,
+    /^\/api\/(images\/(make|edit|svg|cutout|erase)|plots\/make|videos\/make(\/[^/]+)?|mediaedit\/.*)$/,
     'refuse',
-    'Use your own tools for that: generate_image (pictures, and changes to one), make_svg (drawings), remove_background, erase_from_image, make_plot and generate_video. They save what they make in your folder (they also take the pictures already in a deck or document, named naget-asset:…), and you put it in with save_slides, save_doc or save_page.',
+    'Use your own tools for that: generate_image (pictures, and changes to one), make_svg (drawings), remove_background, erase_from_image, make_plot, generate_video, edit_image and edit_video. They save what they make in your folder (they also take the pictures already in a deck or document, named naget-asset:…), and you put it in with save_slides, save_doc or save_page.',
   ],
   // Changes that change nothing, or only look something up.
   ['POST', /^\/api\/(update-check|knowledge\/search|models\/inspect|automations\/next|automations\/watch\/test|apps\/draft|apps\/check|apps\/install\/check|automations\/draft)$/, 'free'],
   ['POST', /^\/api\/(search|push|voice)\/test$|^\/api\/connections\/[^/]+\/test$/, 'free'],
   ['POST', /^\/api\/plugins\/inspect$/, 'free'],
+  // Words rewritten, a picture described, a slide's design ideas: answers, nothing changed.
+  ['POST', /^\/api\/write\/(rewrite|describe|design-ideas)$/, 'free'],
   // Ask every time: risky, costly or hard to undo.
   ['DELETE', /./, 'always'],
   ['W', /\/(remove|delete|discard|clear|reset|rotate|branch-delete|stop|interrupt|cancel)(\/|$)/, 'always'],

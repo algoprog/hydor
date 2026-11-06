@@ -28,6 +28,7 @@ import { CODE_FONT, everyEl, fontName, FONTS, footerOn, hexColor, LAYOUTS, layou
 import { codeLookOf, codeTokens } from '../../shared/slides-runtime.ts';
 import { coreXml, esc, relsXml, XML_HEAD, zipParts, type ZipPart } from './ooxml.ts';
 import { eotCompressed, eotOf, fontAttrs, fontsSaid } from './pptx-fonts.ts';
+import { writePng } from '../signatures/png.ts';
 
 /** A picture ready for the file: PNG, JPEG or GIF bytes and its size in pixels. */
 export interface Picture {
@@ -47,6 +48,8 @@ export interface PptxOpts {
   renders?: Map<string, Picture>;
   /** A video the app keeps ("naget-video:<sha>"): its bytes and kind, to go inside the file; null when it is not there. */
   video?: (src: string) => { data: Buffer; ext: string; mime: string } | null;
+  /** A slide's narration the app keeps ("naget-audio:<sha>"): its bytes, kind and length, to go inside the file as the slide's sound. */
+  sound?: (src: string) => { data: Buffer; ext: string; mime: string; seconds: number } | null;
   /** The faces of the app's fonts the deck shows (pptx-fonts.ts deckFontFiles: TrueType files by "family|bold|italic"), carried inside the file. */
   fonts?: Map<string, Buffer>;
   /** Told which faces went inside the file, and which of them compressed (pptx-fonts.ts fontsSaid). */
@@ -156,6 +159,10 @@ interface Ctx {
   movies: { add(v: { data: Buffer; ext: string }): string };
   /** The videos of the slide being written that PowerPoint plays (their shapes' ids), for its timing. */
   played: { id: number; muted: boolean; loop: boolean }[];
+  /** The slide's narration in the file: its sound's shape id and length (ms), played as the slide comes. */
+  narration?: { id: number; ms: number };
+  /** The deck's slides whose narration could not go in (a sound PowerPoint does not play, or one not kept), by number. */
+  unvoiced: number[];
   /** Slide files by the deck's slide number, for links between slides. */
   slideFile: (n: number) => string | null;
   ids: Map<string, number>;
@@ -1023,7 +1030,8 @@ const PRESET: Record<string, { id: number; sub?: (dir?: string) => number }> = {
 
 function timingXml(c: Ctx, s: Slide): string {
   const anims = (s.anims ?? []).filter((a) => c.ids.has(a.el));
-  if (!anims.length && !c.played.length) return '';
+  const voice = c.narration;
+  if (!anims.length && !c.played.length && !voice) return '';
   let cid = 2;
   const nextId = () => ++cid;
   // Each animation (or each paragraph of one), with its click group and trigger time, as the player plays them.
@@ -1134,23 +1142,32 @@ function timingXml(c: Ctx, s: Slide): string {
     const id = nextId();
     return `<p:par><p:cTn id="${id}" presetID="${p.id}" presetClass="${cls}" presetSubtype="${p.sub ? p.sub(a.dir) : 0}" fill="hold" grpId="${grpOf(a)}" nodeType="${node}"><p:stCondLst><p:cond delay="${Math.round(a.delay)}"/></p:stCondLst><p:childTnLst>${behaviours(it)}</p:childTnLst></p:cTn></p:par>`;
   };
-  const pars = groups
-    .map((g) => {
-      const list = items.filter((i) => i.group === g);
-      const begins = [...new Set(list.map((i) => i.begin))].sort((x, y) => x - y);
-      const outerId = nextId();
-      const start = g === 0 && auto ? '<p:cond delay="indefinite"/><p:cond evt="onBegin" delay="0"><p:tn val="2"/></p:cond>' : '<p:cond delay="indefinite"/>';
-      const inner = begins
-        .map((b) => {
-          const id = nextId();
-          const effects = list.filter((i) => i.begin === b).map((i) => effect(i, i === list[0])).join('');
-          return `<p:par><p:cTn id="${id}" fill="hold"><p:stCondLst><p:cond delay="${Math.round(b)}"/></p:stCondLst><p:childTnLst>${effects}</p:childTnLst></p:cTn></p:par>`;
-        })
-        .join('');
-      return `<p:par><p:cTn id="${outerId}" fill="hold"><p:stCondLst>${start}</p:stCondLst><p:childTnLst>${inner}</p:childTnLst></p:cTn></p:par>`;
-    })
-    .join('');
-  const seq = anims.length
+  // The narration starts as the slide comes: with what plays by itself then, else on its own before the first click.
+  const play = (node: 'withEffect' | 'afterEffect') =>
+    voice
+      ? `<p:par><p:cTn id="${nextId()}" presetID="1" presetClass="mediacall" presetSubtype="0" fill="hold" nodeType="${node}"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst><p:cmd type="call" cmd="playFrom(0.0)"><p:cBhvr><p:cTn id="${nextId()}" dur="${voice.ms}" fill="hold"/><p:tgtEl><p:spTgt spid="${voice.id}"/></p:tgtEl></p:cBhvr></p:cmd></p:childTnLst></p:cTn></p:par>`
+      : '';
+  const onBegin = '<p:cond delay="indefinite"/><p:cond evt="onBegin" delay="0"><p:tn val="2"/></p:cond>';
+  const own = voice && !(groups.includes(0) && auto) ? `<p:par><p:cTn id="${nextId()}" fill="hold"><p:stCondLst>${onBegin}</p:stCondLst><p:childTnLst><p:par><p:cTn id="${nextId()}" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst>${play('afterEffect')}</p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par>` : '';
+  const pars =
+    own +
+    groups
+      .map((g) => {
+        const list = items.filter((i) => i.group === g);
+        const begins = [...new Set(list.map((i) => i.begin))].sort((x, y) => x - y);
+        const outerId = nextId();
+        const start = g === 0 && auto ? onBegin : '<p:cond delay="indefinite"/>';
+        const inner = begins
+          .map((b, k) => {
+            const id = nextId();
+            const effects = (g === 0 && auto && k === 0 && !own ? play('withEffect') : '') + list.filter((i) => i.begin === b).map((i) => effect(i, i === list[0])).join('');
+            return `<p:par><p:cTn id="${id}" fill="hold"><p:stCondLst><p:cond delay="${Math.round(b)}"/></p:stCondLst><p:childTnLst>${effects}</p:childTnLst></p:cTn></p:par>`;
+          })
+          .join('');
+        return `<p:par><p:cTn id="${outerId}" fill="hold"><p:stCondLst>${start}</p:stCondLst><p:childTnLst>${inner}</p:childTnLst></p:cTn></p:par>`;
+      })
+      .join('');
+  const seq = anims.length || voice
     ? `<p:seq concurrent="1" nextAc="seek"><p:cTn id="2" dur="indefinite" nodeType="mainSeq"><p:childTnLst>${pars}</p:childTnLst></p:cTn><p:prevCondLst><p:cond evt="onPrev" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst><p:nextCondLst><p:cond evt="onNext" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst></p:seq>`
     : '';
   // Each video in the file, played on a click on it (its sound off, or again and again, as the deck says).
@@ -1160,7 +1177,11 @@ function timingXml(c: Ctx, s: Slide): string {
         `<p:video><p:cMediaNode vol="80000"${m.muted ? ' mute="1"' : ''}><p:cTn id="${nextId()}"${m.loop ? ' repeatCount="indefinite"' : ''} fill="hold" display="0"><p:stCondLst><p:cond delay="indefinite"/></p:stCondLst></p:cTn><p:tgtEl><p:spTgt spid="${m.id}"/></p:tgtEl></p:cMediaNode></p:video>`,
     )
     .join('');
-  const tree = `<p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst>${seq}${media}</p:childTnLst></p:cTn></p:par></p:tnLst>`;
+  // The narration's sound, hidden in the show, stopped when the slide goes: PowerPoint's own narration (Play Narrations turns it off).
+  const sound = voice
+    ? `<p:audio isNarration="1"><p:cMediaNode vol="80000" showWhenStopped="0"><p:cTn id="${nextId()}" fill="hold" display="0"><p:stCondLst><p:cond delay="indefinite"/></p:stCondLst><p:endCondLst><p:cond evt="onStopAudio" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:endCondLst></p:cTn><p:tgtEl><p:spTgt spid="${voice.id}"/></p:tgtEl></p:cMediaNode></p:audio>`
+    : '';
+  const tree = `<p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst>${seq}${media}${sound}</p:childTnLst></p:cTn></p:par></p:tnLst>`;
   return `<p:timing>${tree}${builds.length ? `<p:bldLst>${builds.join('')}</p:bldLst>` : ''}</p:timing>`;
 }
 
@@ -1215,6 +1236,57 @@ function bgXml(c: Ctx, s: Slide): { bg: string; under: string } {
   return { bg: `<p:bg><p:bgPr>${fill}<a:effectLst/></p:bgPr></p:bg>`, under };
 }
 
+/** Sounds PowerPoint plays from inside its file, by their files' kinds. */
+const PLAYED_SOUNDS = new Set(['m4a', 'mp3', 'wav']);
+
+let speaker: Buffer | null = null;
+/** A small speaker, drawn here once: the picture PowerPoint shows of a slide's sound while editing (hidden in the show). */
+function speakerPng(): Buffer {
+  if (speaker) return speaker;
+  const n = 96;
+  const data = new Uint8Array(n * n * 4);
+  const dot = (x: number, y: number) => {
+    const k = (y * n + x) * 4;
+    data[k] = 0x55;
+    data[k + 1] = 0x5b;
+    data[k + 2] = 0x66;
+    data[k + 3] = 255;
+  };
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      // The box and the cone, then two waves.
+      const box = x >= 14 && x <= 32 && y >= 36 && y <= 60;
+      const cone = x > 32 && x <= 52 && Math.abs(y - 48) <= 12 + ((x - 32) / 20) * 22;
+      const r = Math.hypot(x - 52, y - 48);
+      const a = Math.abs(Math.atan2(y - 48, x - 52));
+      const wave = x > 54 && a < 0.85 && ((r > 14 && r < 20) || (r > 26 && r < 32));
+      if (box || cone || wave) dot(x, y);
+    }
+  return (speaker = writePng({ width: n, height: n, data }, { alpha: true }));
+}
+
+/**
+ * A slide's narration, inside the file as PowerPoint keeps a recorded narration: a sound on the slide (its picture a
+ * speaker in the corner, hidden in the show), both linked and embedded, played as the slide comes (timingXml).
+ */
+function narrationXml(c: Ctx, s: Slide): string {
+  const n = s.narration;
+  if (!n) return '';
+  const file = c.o.sound?.(n.src);
+  if (!file || !PLAYED_SOUNDS.has(file.ext)) {
+    c.unvoiced.push(c.n);
+    return '';
+  }
+  const name = c.movies.add(file);
+  const link = c.rels.add('audio', `../media/${name}`);
+  const media = c.rels.add('http://schemas.microsoft.com/office/2007/relationships/media', `../media/${name}`);
+  const pic = c.media.add({ data: speakerPng(), ext: 'png' });
+  const id = c.next++;
+  c.narration = { id, ms: Math.max(1, Math.round((file.seconds || n.seconds || 1) * 1000)) };
+  const H = slideH(c.deck.ratio);
+  return `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="Narration"><a:hlinkClick r:id="" action="ppaction://media"/></p:cNvPr><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr><a:audioFile r:link="${link}"/><p:extLst><p:ext uri="{DAA4B4D4-6D71-4841-9C94-3DE7FCFB9230}"><p14:media xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" r:embed="${media}"/></p:ext></p:extLst></p:nvPr></p:nvPicPr><p:blipFill><a:blip r:embed="${pic}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(1280 - 64, H - 64, 44, 44)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+}
+
 function slideXml(c: Ctx, s: Slide): string {
   const { bg, under } = bgXml(c, s);
   // The parts that fill its layout's placeholders (a slide with a title placeholder filled has its title).
@@ -1222,13 +1294,15 @@ function slideXml(c: Ctx, s: Slide): string {
   c.titled = [...c.phs.values()].some((p) => p.type === 'title' || p.type === 'ctrTitle');
   // Connectors' ends: the parts they are stuck to by their ids in the file, written by now, at the sites PowerPoint knows.
   const all = everyEl(s.els);
-  const parts = (s.els.map((e) => partXml(c, e)).join('') + footerXml(c, c.n - 1)).replace(/@@(stCxn|endCxn)\|([A-Za-z0-9_-]+)\|([trbl])@@/g, (_m, tag: string, el: string, at: Side) => {
+  const parts = (s.els.map((e) => partXml(c, e)).join('') + footerXml(c, c.n - 1) + narrationXml(c, s)).replace(/@@(stCxn|endCxn)\|([A-Za-z0-9_-]+)\|([trbl])@@/g, (_m, tag: string, el: string, at: Side) => {
     const id = c.ids.get(el);
     const site = siteOf(all.find((x) => x.id === el), at);
     return id !== undefined && site !== null ? `<a:${tag} id="${id}" idx="${site}"/>` : '';
   });
   const grp = '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>';
-  return `${XML_HEAD}<p:sld ${NS}${s.hidden ? ' show="0"' : ''}><p:cSld>${bg}<p:spTree>${grp}${under}${parts}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>${transitionXml(s)}${timingXml(c, s)}</p:sld>`;
+  // A narrated slide goes on by itself as its narration ends, as PowerPoint's recorded ones do (unless it waits for clicks, or has a timing of its own).
+  const timed = c.narration && !s.transition?.auto && !(s.anims ?? []).some((a) => a.on === 'click') ? { ...s, transition: { ...(s.transition ?? { fx: 'none' as const }), auto: Math.round(c.narration.ms / 100) / 10 + 0.5 } } : s;
+  return `${XML_HEAD}<p:sld ${NS}${s.hidden ? ' show="0"' : ''}><p:cSld>${bg}<p:spTree>${grp}${under}${parts}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>${transitionXml(timed)}${timingXml(c, s)}</p:sld>`;
 }
 
 /**
@@ -1474,6 +1548,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
   const morph = morphNames(deck);
   // Comments: each author's count across the deck, and each slide's comments file.
   const cmLast: [number, number] = [0, 0];
+  const unvoiced: number[] = [];
   const slides = deck.slides.map((s, i) => {
     const rels = new Rels();
     // Its layout, the app's one it was made from (Blank for a slide made of parts alone).
@@ -1513,6 +1588,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
         },
       },
       played: [],
+      unvoiced,
       slideFile: (n) => (n >= 1 && n <= deck.slides.length ? `slide${n}.xml` : null),
       ids: new Map(),
       next: 2,
@@ -1538,6 +1614,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
     if (eot) fonts.push({ family, slot: (b === '1' ? 1 : 0) + (i === '1' ? 2 : 0), name: `font${fonts.length + 1}.fntdata`, data: eot });
   }
   if (fonts.length) o.note?.(fontsSaid(fonts.map((f) => ({ ...f, compressed: eotCompressed(f.data) }))));
+  if (unvoiced.length) o.note?.(`The narration of slide${unvoiced.length === 1 ? '' : 's'} ${unvoiced.join(', ')} is left out of the PowerPoint file: PowerPoint plays MP3, M4A and WAV sounds, and this computer has no ffmpeg to make ${unvoiced.length === 1 ? 'it' : 'them'} one.`);
 
   const types = [
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
@@ -1550,6 +1627,9 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
     '<Default Extension="mp4" ContentType="video/mp4"/>',
     '<Default Extension="mov" ContentType="video/quicktime"/>',
     '<Default Extension="webm" ContentType="video/webm"/>',
+    '<Default Extension="m4a" ContentType="audio/mp4"/>',
+    '<Default Extension="mp3" ContentType="audio/mpeg"/>',
+    '<Default Extension="wav" ContentType="audio/wav"/>',
     ...(fonts.length ? ['<Default Extension="fntdata" ContentType="application/x-fontdata"/>'] : []),
     ...(charts.length ? ['<Default Extension="xlsx" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/>'] : []),
     '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>',

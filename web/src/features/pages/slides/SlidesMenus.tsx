@@ -1,10 +1,12 @@
 // The slides editor's menus, as Google Slides and PowerPoint have them: Edit, View (zoom, the grid, the rulers and
 // guides), Insert (every kind of part, pictures, drawings, plots and videos made with AI, the web format's interactive
 // parts, a comment), Format (the words' look, the format painter, a picture's crop and its changes with AI, a chart
-// made a plot, running a live part in place), Arrange (groups, the stacking order, lining up, turning), Slide, and Tools
-// (PowerPoint compatible or the web format too, which the Theme tab has beside the slides' shape). Each action with its
-// keys; what does not apply to what is picked is greyed. Search the menus (Alt+/) finds any of them.
+// made a plot, running a live part in place), Arrange (groups, the stacking order, lining up, turning), Slide (design
+// ideas for it too), and Tools (PowerPoint compatible or the web format too, which the Theme tab has beside the slides'
+// shape; checking accessibility; the slides translated by the agent). Each action with its keys; what does not apply to
+// what is picked is greyed. Search the menus (Alt+/) finds any of them.
 import {
+  Accessibility,
   AlignCenter,
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -40,7 +42,9 @@ import {
   IndentIncrease,
   Italic,
   Keyboard,
+  Languages,
   LayoutTemplate,
+  Lightbulb,
   List,
   ListChecks,
   ListOrdered,
@@ -64,6 +68,7 @@ import {
   Search,
   Shapes,
   Sigma,
+  SlidersHorizontal,
   Sparkles,
   Spline,
   SquareCode,
@@ -81,8 +86,9 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import type { El, ElType } from '@shared/slides';
-import type { MenuDef } from '../common/menus';
+import { keptVideo, type El, type ElType } from '@shared/slides';
+import { WRITE_LANGS } from '@shared/write';
+import type { MenuDef, MenuEntry } from '../common/menus';
 import type { AlignHow } from './ops';
 import type { TextActions } from './TextBar';
 
@@ -157,9 +163,13 @@ export interface MenuArgs {
   aiPlot?: () => void;
   aiVideo?: () => void;
   aiEdit?: (mode: 'change' | 'cutout' | 'erase') => void;
+  /** The picture picked in the picture editor, in a tab of its own. */
+  editPicture?: () => void;
   aiPlotChart?: () => void;
   /** A slide made with AI after this one: the gallery of kinds (a SWOT analysis, a timeline, a quiz…). */
   aiSlide?: () => void;
+  /** The video picked (one the app keeps) in the video editor, in a tab of its own. */
+  editVideo?: () => void;
   video(): void;
   /** A video from this device. */
   videoFile(): void;
@@ -186,8 +196,14 @@ export interface MenuArgs {
   /** This slide as a picture (PNG). */
   slidePicture?: () => void;
   present(from: 'start' | 'here' | 'presenter'): void;
+  /** The other ways to present (Play the narration, Rehearse with coach, Record a video): Slide → More ways to present. */
+  presentMore?: MenuEntry[];
   shortcuts(): void;
   ask?: () => void;
+  /** The writing helpers: design ideas for the slide on view, the accessibility check, every slide translated by the agent (null: a language typed in). */
+  designIdeas?: () => void;
+  checkAccess?: () => void;
+  translate?: (lang: string | null) => void;
 }
 
 const ZOOMS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
@@ -359,11 +375,13 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           ],
         },
         '-',
+        one?.type === 'image' && !!one.src && !!a.editPicture && { label: 'Edit picture', icon: <SlidersHorizontal size={14} />, also: 'edit picture crop turn adjust filter markup words blur', disabled: ro, run: a.editPicture },
         one?.type === 'image' && !!one.src && { label: 'Crop the picture', icon: <Crop size={14} />, disabled: ro, run: a.crop },
         one?.type === 'image' && (!!one.crop || !!one.adjust) && { label: 'Reset the picture', also: 'uncrop colours', disabled: ro, run: a.resetPicture },
         one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Change with AI', icon: <WandSparkles size={14} />, also: 'edit picture ai', disabled: ro, run: () => a.aiEdit!('change') },
         one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Remove the background', icon: <ImageMinus size={14} />, also: 'cut out background transparent', disabled: ro, run: () => a.aiEdit!('cutout') },
         one?.type === 'image' && !!one.src && !!a.aiEdit && { label: 'Erase part of it', icon: <Eraser size={14} />, also: 'erase remove object', disabled: ro, run: () => a.aiEdit!('erase') },
+        one?.type === 'video' && !!keptVideo(one.src) && !!a.editVideo && { label: 'Edit video', icon: <SlidersHorizontal size={14} />, also: 'edit video trim cut crop speed text music gif frame', disabled: ro, run: a.editVideo },
         one?.type === 'chart' && !!a.aiPlotChart && { label: 'Make a plot of this', icon: <ChartScatter size={14} />, also: 'plot chart graph matplotlib', disabled: ro, run: a.aiPlotChart },
         one?.type === 'math' && { label: 'Edit the equation', icon: <Sigma size={14} />, disabled: ro, run: a.editTex },
         one?.type === 'icon' && { label: 'Another icon', icon: <Star size={14} />, disabled: ro, run: a.replaceIcon },
@@ -422,6 +440,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         { label: 'Duplicate slide', icon: <Copy size={14} />, disabled: ro, run: a.duplicateSlide },
         { label: 'Delete slide', icon: <Trash2 size={14} />, danger: true, disabled: ro, run: a.deleteSlide },
         { label: 'Skip this slide', checked: a.hidden, also: 'hide hidden', disabled: ro, run: a.skipSlide },
+        !!a.designIdeas && { label: 'Design ideas', icon: <Lightbulb size={14} />, also: 'designer design ideas layout redesign look ai magic', disabled: ro, run: a.designIdeas },
         '-',
         { label: 'Background', disabled: ro, also: 'slide background colour picture', run: () => a.openTab('slide') },
         { label: 'Transition', disabled: ro, also: 'transition morph fade push', run: () => a.openTab('slide') },
@@ -434,6 +453,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         { label: 'Present from this slide', icon: <Play size={14} />, keys: 'Shift+F5', run: () => a.present('here') },
         { label: 'Present from the beginning', icon: <Play size={14} />, keys: 'F5', run: () => a.present('start') },
         { label: 'Presenter view, with notes', icon: <MonitorPlay size={14} />, run: () => a.present('presenter') },
+        a.presentMore && { label: 'More ways to present', icon: <Presentation size={14} />, also: 'narration rehearse coach record video', items: a.presentMore },
       ],
     },
     {
@@ -443,6 +463,15 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         { label: 'Keyboard shortcuts', icon: <Keyboard size={14} />, keys: 'Ctrl+/', also: 'keys help', run: a.shortcuts },
         '-',
         { label: 'PowerPoint compatible', icon: <Presentation size={14} />, checked: !a.web, also: 'powerpoint pptx keynote google slides format compatible web format made for', disabled: ro, run: () => a.setCompatible(a.web) },
+        '-',
+        !!a.checkAccess && { label: 'Check accessibility', icon: <Accessibility size={14} />, also: 'accessibility checker alt text description contrast screen reader small text', run: a.checkAccess },
+        !!a.translate && {
+          label: 'Translate the slides',
+          icon: <Languages size={14} />,
+          also: 'translate language translation',
+          disabled: ro,
+          items: [...WRITE_LANGS.map((l) => ({ label: l, also: 'translate language', run: () => a.translate!(l) })), '-', { label: 'Another language', also: 'translate language', run: () => a.translate!(null) }],
+        },
         a.ask && '-',
         a.ask && { label: 'Ask the agent about this slide', icon: <Sparkles size={14} />, run: a.ask },
       ],
