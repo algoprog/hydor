@@ -661,7 +661,7 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
     if (busy) return;
     stop();
     const plan = what === 'copy' && plans.copy ? plans.copy : plans.main;
-    const o2: SoundOutput = what === 'main' && plans.main.fixed ? { ...out, format: plans.main.fixed } : out;
+    const o2: SoundOutput = 'sound' in plan.to ? { format: 'm4a', kbps: 256 } : what === 'main' && plans.main.fixed ? { ...out, format: plans.main.fixed } : out;
     setSaving({ what: what === 'copy' ? 'Making a copy' : 'Making the sound' });
     try {
       const j = await makeSoundEdit({ src: o.src, recipe: r, out: o2, to: plan.to, ...(what === 'copy' ? {} : {}) }, (job) => {
@@ -917,7 +917,7 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
       )}
       <span>{(facts.channels ?? 2) > 1 ? 'Stereo' : 'Mono'}</span>
       <span className="tnum">{`${soundClock(L, 2)} long${video ? ', as the video' : ''}`}</span>
-      <span className="min-w-0 truncate">{`Saved as ${fmt.label}${fmt.kbps ? `, ${out.kbps ?? fmt.kbpsDefault} kbps` : out.bits === 24 ? ', 24-bit' : ''}${out.channels ? `, ${out.channels === 1 ? 'mono' : 'stereo'}` : ''}`}</span>
+      <span className="min-w-0 truncate">{video ? 'Saved as M4A, 256 kbps' : `Saved as ${fmt.label}${fmt.kbps ? `, ${out.kbps ?? fmt.kbpsDefault} kbps` : out.bits === 24 ? ', 24-bit' : ''}${out.channels ? `, ${out.channels === 1 ? 'mono' : 'stereo'}` : ''}`}</span>
       <span className="min-w-0 flex-1 truncate">{plans.main.says}</span>
       {playing && <span className="text-accent">Playing</span>}
       {rec && <span className="text-err">Recording</span>}
