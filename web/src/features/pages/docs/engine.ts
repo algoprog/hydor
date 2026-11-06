@@ -1747,19 +1747,44 @@ export class DocEngine {
     return this.doc === mark;
   }
 
-  /** A footnote's mark, a citation or a cross-reference at the caret (in place of what is picked); where it starts. */
-  insertRun(run: Run): Pos | null {
+  /** A footnote's mark, a citation or a cross-reference at the caret (in place of what is picked; `prep`, what else changes with it: its note, its source); where it starts. */
+  insertRun(run: Run, prep?: (d: Doc) => Doc): Pos | null {
     if (this.picked) return null;
     this.before = this.sel;
     const [s, e] = this.range();
+    const base = prep ? prep(this.doc) : this.doc;
     if (this.suggesting) {
-      const r = ops.samePos(s, e) ? { doc: this.doc, end: s } : sg.remove(this.doc, s, e, this.suggesting);
+      const r = ops.samePos(s, e) ? { doc: base, end: s } : sg.remove(base, s, e, this.suggesting);
       this.apply(sg.insertRuns(r.doc, r.end, [run], this.suggesting));
       return r.end;
     }
-    const cut = ops.deleteRange(this.doc, s, e);
+    const cut = ops.deleteRange(base, s, e);
     this.apply(ops.insertRuns(cut.doc, cut.at, [run]));
     return cut.at;
+  }
+
+  /** Where a thing of its own of a kind is first among the words (a footnote's mark, by its note's id), or null. */
+  findAtom(k: 'fn' | 'cite' | 'xref', t: string): Pos | null {
+    for (const b of this.doc.blocks) {
+      const look = (runs: Run[], c?: [number, number]): Pos | null => {
+        let o = 0;
+        for (const r of runs) {
+          if (r[k] && r.t === t) return { b: b.id, ...(c ? { c } : {}), o };
+          o += r.t.length;
+        }
+        return null;
+      };
+      if (b.type === 'p' || b.type === 'li') {
+        const p = look(b.runs);
+        if (p) return p;
+      } else if (b.type === 'table')
+        for (let ri = 0; ri < b.rows.length; ri++)
+          for (let ci = 0; ci < b.rows[ri].length; ci++) {
+            const p = look(b.rows[ri][ci].runs, [ri, ci]);
+            if (p) return p;
+          }
+    }
+    return null;
   }
 
   /** A thing of its own among the words, found where it starts, changed (`t`: what it keeps) or taken out (null). */

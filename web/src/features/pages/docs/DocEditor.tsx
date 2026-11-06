@@ -15,7 +15,7 @@
 // with the agent's caret where its words arrive, kept in view (AgentCaret.tsx).
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, FileCog, Link2, ListTree, MessageSquare, MessageSquarePlus, Sparkles, Unlink } from 'lucide-react';
-import { columnMm, docHeadings, docWords, FONTS, MARGINS, PAPERS, runsText, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type TableBlock } from '@shared/docs';
+import { columnMm, paperOf, docHeadings, docWords, FONTS, MARGINS, PAPERS, runsText, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type Run, type TableBlock } from '@shared/docs';
 import { newCommentId, openComments, type Comment } from '@shared/comments';
 import { changesOf, compareDocs, suggestionColor } from '@shared/doc-changes';
 import { api, post } from '../../../lib/api';
@@ -58,6 +58,7 @@ import { SuggestionCard } from './Suggestions';
 import { slashAt, slashItems, slashLayout, slashMatches, SlashMenu } from './Slash';
 import { ColumnHandles, printDoc } from './TableTools';
 import { Toolbar } from './Toolbar';
+import { EndNotes, NoteBox, noteRoom, PageNotes } from './Notes';
 import { useDocAi } from './ai/useDocAi';
 
 // Insert → Signature: the saved signatures and the pad, loaded when first opened.
@@ -153,6 +154,7 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+J', 'Write with AI (Space on an empty line too)'],
       ['Ctrl+\\', 'Clear the formatting'],
       ['Ctrl+Alt+M', 'Comment'],
+      ['Ctrl+Alt+F', 'Footnote'],
       ['Ctrl+Alt+Shift+X', 'Suggesting, or editing again'],
     ],
   },
@@ -225,6 +227,8 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const [tops, setTops] = useState<Map<string, number>>(new Map());
   const [eq, setEq] = useState<{ kind: 'block'; id: string; tex: string } | { kind: 'run'; at: Pos; tex: string } | { kind: 'new'; inline: boolean } | null>(null);
   const [chars, setChars] = useState<{ kind: 'insert' } | { kind: 'icon'; id: string } | null>(null);
+  // A footnote's words being changed in their box (`undo`: a new one's mark goes again when it is left empty).
+  const [note, setNote] = useState<{ id: string; undo?: Doc } | null>(null);
   /** Words being typed beside the page (a comment, a reply, an edit of one). */
   const [noting, setNoting] = useState(false);
   // The picture editors opened from this document: once it closes, what they save goes to the Library instead.
@@ -233,7 +237,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   // An agent's version being written shows in place of this one (read-only, its words arriving where its mark is),
   // unless there are changes here not saved: those are left as they are. A comment, an equation, a link or another
   // change still being made here holds it back until it is done.
-  const making = noting || !!draft || !!eq || !!chars || !!linking || menu === 'page' || menu === 'url' || dialog === 'bands' || dialog === 'spacing';
+  const making = noting || !!note || !!draft || !!eq || !!chars || !!linking || menu === 'page' || menu === 'url' || dialog === 'bands' || dialog === 'spacing';
   const liveDoc = live && !making && !(!!model && !!saved && model !== saved) ? live.model : null;
   const liveOn = !!liveDoc;
   /** What the page shows: the document, or the agent's version being written. */
@@ -369,7 +373,15 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       onError: toastError,
     });
     setSt(engine.current.state());
-    paging.current = new Paging(engine.current, { zoom: () => zoomRef.current, onLayout: setPageLayout });
+    // Each page's footnotes at its foot: the words end over them.
+    paging.current = new Paging(engine.current, {
+      zoom: () => zoomRef.current,
+      onLayout: setPageLayout,
+      notes: () => {
+        const d = engine.current?.doc;
+        return d ? noteRoom(d, { width: ((paperOf(d.page).w - 2 * d.page.margin) * 96) / 25.4 }) : null;
+      },
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!model]);
   useEffect(
@@ -686,10 +698,42 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     } else if (a.kind === 'mathRun') {
       spotAt(en.caretRect());
       setEq({ kind: 'run', at: a.at, tex: a.tex });
-    } else {
+    } else if (a.kind === 'mark') {
+      spotAt(a.rect);
+      if (a.k === 'fn') setNote({ id: a.t });
+    } else if (a.kind === 'icon') {
       spotAt(en.elementOf(a.id)?.getBoundingClientRect());
       setChars({ kind: 'icon', id: a.id });
     }
+  };
+  /** Insert → Footnote: a mark at the caret, its note's words written in its box. */
+  function addFootnote() {
+    const en = engine.current;
+    if (!en || readOnlyRef.current || en.picked) return;
+    const undo = en.mark();
+    let id = '';
+    do id = `n${Math.random().toString(36).slice(2, 8)}`;
+    while (en.doc.notes?.some((n) => n.id === id));
+    if (!en.insertRun({ t: id, fn: true }, (d) => ({ ...d, notes: [...(d.notes ?? []), { id, runs: [] }] }))) return;
+    spotAt(en.caretRect());
+    setNote({ id, undo });
+  }
+  /** A footnote's words kept (none: a new one goes again), or the footnote taken out. */
+  const noteDone = (runs: Run[]) => {
+    const en = engine.current;
+    if (!en || !note) return setNote(null);
+    if (!runs.some((r) => r.t.trim()) && note.undo) en.undoTo(note.undo);
+    else en.change({ ...en.doc, notes: (en.doc.notes ?? []).map((n) => (n.id === note.id ? { ...n, runs } : n)) });
+    setNote(null);
+    en.refocusSoon();
+  };
+  const noteRemove = () => {
+    const en = engine.current;
+    if (!en || !note) return setNote(null);
+    const at = en.findAtom('fn', note.id);
+    if (at) en.setAtom(at, null);
+    setNote(null);
+    en.refocusSoon();
   };
   /** Keys the editor has wherever its focus is: true when one was. */
   function globalKey(ev: KeyboardEvent): boolean {
@@ -704,6 +748,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     if ((k === '/' || ev.code === 'Slash') && !ev.altKey && !ev.shiftKey) return setDialog('keys'), true;
     if (ev.code === 'KeyC' && ev.shiftKey && !ev.altKey) return openCount(), true;
     if (ev.code === 'KeyM' && ev.altKey && !ro) return startComment(), true;
+    if (ev.code === 'KeyF' && ev.altKey && !ev.shiftKey && !ro) return addFootnote(), true;
     if (ev.code === 'KeyX' && ev.altKey && ev.shiftKey && !ro) return setMode((m) => (m === 'suggest' ? 'edit' : 'suggest')), true;
     if (k === 'k' && !ev.shiftKey && !ev.altKey && !ro && engine.current?.root.contains(document.activeElement)) {
       setLinking({ url: stRef.current?.link ?? '', text: '' });
@@ -982,6 +1027,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           plot: () => void plot(),
           aiSection: onRequest && !readOnly ? () => openTypes({ kind: 'section', at: sectionPlace(model, st.index), onDone: onRequest }) : undefined,
           signature: () => setDialog('signature'),
+          footnote: () => addFootnote(),
           link: () => setLinking({ url: st.link ?? '', text: '' }),
           equation: openEquation,
           chars: () => {
@@ -1258,6 +1304,17 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
                 }
               />
               {!narrow && pageLayout && <Bands layout={pageLayout} zoom={zoom} doc={shownDoc ?? model} readOnly={readOnly || liveOn} onOpen={() => setDialog('bands')} />}
+              {!narrow && pageLayout && e && (
+                <PageNotes
+                  layout={pageLayout}
+                  zoom={zoom}
+                  doc={shownDoc ?? model}
+                  refs={e.refs}
+                  textW={((paperOf(model.page).w - 2 * model.page.margin) * 96) / 25.4}
+                  onOpen={(id, r) => !readOnly && !liveOn && (spotAt(r), setNote({ id }))}
+                />
+              )}
+              {narrow && e && <EndNotes doc={shownDoc ?? model} refs={e.refs} onOpen={(id, r) => !readOnly && !liveOn && (spotAt(r), setNote({ id }))} />}
               {st?.picked && e && st.picked.type !== 'math' && (
                 <Picked engine={e} block={st.picked} host={host} tick={tick} readOnly={readOnly} onReplace={(id) => void replacePicture(id)} onAi={(id, mode) => void changePicture(id, mode)} onEdit={openPicture} onAsk={onAsk ? askPicture : undefined} />
               )}
@@ -1459,6 +1516,18 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
               e?.refocusSoon();
               void loadKatex().then(() => setMath((m) => m || 1));
             }}
+          />
+        )}
+      </Popover>
+      <Popover anchor={spotRef} open={!!note} onClose={() => (note?.undo && !model.notes?.find((n) => n.id === note.id)?.runs.length ? noteDone([]) : setNote(null), e?.refocusSoon())} width={340} title="Footnote">
+        {note && (
+          <NoteBox
+            key={note.id}
+            runs={model.notes?.find((n) => n.id === note.id)?.runs ?? []}
+            number={e?.refs.note(note.id) ?? 0}
+            onDone={noteDone}
+            onCancel={() => (note.undo && !model.notes?.find((n) => n.id === note.id)?.runs.length ? noteDone([]) : setNote(null), e?.refocusSoon())}
+            onRemove={noteRemove}
           />
         )}
       </Popover>
