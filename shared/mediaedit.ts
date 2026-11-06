@@ -323,7 +323,8 @@ export function normalizeRecipe(raw: unknown, w: number, h: number): ImageRecipe
     const a: Adjust = {};
     for (const d of ADJUSTMENTS) {
       const v = num((r.adjust as Record<string, unknown>)[d.id]);
-      if (v !== null && Math.round(v) !== 0) a[d.id] = Math.round(clamp(v, d.min, 100));
+      const k = v === null ? 0 : Math.round(clamp(v, d.min, 100));
+      if (k) a[d.id] = k;
     }
     if (Object.keys(a).length) out.adjust = a;
   }

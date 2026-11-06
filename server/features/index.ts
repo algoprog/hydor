@@ -26,6 +26,7 @@ import { keep } from '../keep/index.ts';
 import { knowledge } from '../knowledge/index.ts';
 import { language } from '../language/index.ts';
 import { media } from '../media/index.ts';
+import { mediaEdit } from '../mediaedit/index.ts';
 import { videoEdit } from '../mediaedit/video.ts';
 import { memory } from '../memory/index.ts';
 import { profile } from '../memory/profile.ts';
@@ -50,4 +51,4 @@ import type { Feature } from './types.ts';
 
 // The user's guidelines lead what an agent is told, their profile right after them, then what a confidential session
 // may not do; how to format replies follows the pages it may show instead.
-export const FEATURES: Feature[] = [guidelines, profile, confidential, pages, formatting, shots, search, browser, computer, memory, knowledge, spaces, sharing, children, swarm, research, opinion, commits, budget, documents, fileAsk, pdfNotes, images, plots, pictureTools, media, videoEdit, connections, signatures, automations, experiments, voice, assistants, apps, papers, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];
+export const FEATURES: Feature[] = [guidelines, profile, confidential, pages, formatting, shots, search, browser, computer, memory, knowledge, spaces, sharing, children, swarm, research, opinion, commits, budget, documents, fileAsk, pdfNotes, images, plots, pictureTools, media, mediaEdit, videoEdit, connections, signatures, automations, experiments, voice, assistants, apps, papers, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];
