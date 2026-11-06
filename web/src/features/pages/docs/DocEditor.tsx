@@ -28,6 +28,7 @@ import { loadModelVersion, type AskScope, type ModelEditorProps } from '../kinds
 import type { PageVersion } from '@shared/pages';
 import { SIGNATURE_WIDTH_MM } from '@shared/signatures';
 import { choosePicture, pictureFromUrl, uploadPicture } from '../pictures';
+import { choosePhoto } from '../FreePhotos';
 import { csvOf, editPicture, makeDrawing, makePicture, makePlot } from '../../images/studio';
 import { NumInput } from '../slides/controls';
 import { Select } from '../studio/fields';
@@ -731,6 +732,16 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     const pic = en.picture(p.src, o.px ?? madeWidth(p));
     en.insert([p.prompt ? { ...pic, alt: p.prompt.replace(/\s+/g, ' ').slice(0, 300) } : pic]);
   };
+  /** A free photo at the caret (after the table it is in), its credit as its caption where its licence asks for one. */
+  const freePhoto = async () => {
+    const use = await choosePhoto();
+    const en = engine.current;
+    if (!use || !en) return;
+    const b = en.state().block;
+    if (b?.type === 'table' && en.doc.blocks.some((x) => x.id === b.id)) en.setPicked(b.id);
+    const pic = en.picture(use.src, madeWidth(use));
+    en.insert([{ ...pic, alt: use.photo.title.slice(0, 300), ...(use.photo.attribution ? { caption: use.credit.slice(0, 1000) } : {}) }]);
+  };
   /** A picture made with AI; a picture picked is offered to follow (the dialog can drop it). */
   const aiPicture = async () => {
     const b = engine.current?.state().picked;
@@ -925,6 +936,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           picture: () => void pickPicture(),
           pictureUrl: () => setMenu('url'),
           aiPicture: () => void aiPicture(),
+          freePhoto: () => void freePhoto(),
           drawing: () => void drawing(),
           plot: () => void plot(),
           signature: () => setDialog('signature'),

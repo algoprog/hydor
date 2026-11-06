@@ -92,6 +92,9 @@ import { SlideThumb } from './Thumb';
 import { fetchVideoStill } from './media';
 import { CodeLook, EmbedLook, HoverField, HtmlLook, QuizLook, Scene3dLook, ScoreLook, TEXT_FX_NAMES } from './WebParts';
 import { FX_NAMES, TR_NAMES } from './names';
+import { PictureShapeFields } from './PictureShape';
+import { ChartSourceRow } from './SheetChart';
+import { LogoSection, MyThemesSection, SlideLookNote } from './MyThemes';
 
 export type InspectorTab = 'format' | 'animate' | 'slide' | 'theme';
 export const INSPECTOR_TABS: { value: InspectorTab; label: string }[] = [
@@ -594,6 +597,7 @@ function PictureLook({
           </div>
         </div>
       )}
+      <PictureShapeFields el={el} set={set} />
       {!el.crop && (
         <Field label="Fit">
           <Choice
@@ -607,8 +611,8 @@ function PictureLook({
           />
         </Field>
       )}
-      <Field label="Corners">
-        <NumInput label="Corner radius" value={el.radius ?? 0} onChange={(radius) => set({ radius: radius || undefined }, 'radius')} min={0} max={1000} unit="px" />
+      <Field label={el.mask || el.frame ? 'Flip over' : 'Corners'}>
+        {!el.mask && !el.frame && <NumInput label="Corner radius" value={el.radius ?? 0} onChange={(radius) => set({ radius: radius || undefined }, 'radius')} min={0} max={1000} unit="px" />}
         <Tool label="Flip across" on={!!el.flipH} onClick={() => set({ flipH: !el.flipH || undefined })}>
           <FlipHorizontal2 size={15} />
         </Tool>
@@ -798,6 +802,7 @@ function ChartLook({ el, theme, set, onPlot }: { el: ChartEl; theme: Theme; set:
         ))}
       </Section>
       <Section title="Data">
+        <ChartSourceRow el={el} set={set} />
         <div className="overflow-x-auto">
           <table className="w-full border-separate border-spacing-0.5 text-[12px]">
             <thead>
@@ -1022,8 +1027,11 @@ function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: s
       )}
       {bad && <p className="text-[11.5px] text-err">A YouTube or Vimeo address.</p>}
       <Field label="Starts at">
-        <NumInput label="Seconds into the video" value={el.start ?? 0} onChange={(start) => set({ start: Math.round(start) || undefined } as Partial<El>, 'start')} min={0} max={86400} unit="s" />
+        <NumInput label="Seconds into the video" value={el.start ?? 0} onChange={(start) => set({ start: Math.round(start) || undefined, ...(el.end !== undefined && el.end <= Math.round(start) ? { end: undefined } : {}) } as Partial<El>, 'start')} min={0} max={86400} unit="s" />
+        <span className="shrink-0 text-[12px] text-fg-3">Ends at</span>
+        <NumInput label="Seconds into the video it stops at (empty: its end)" value={el.end} onChange={(end) => set({ end: end > (el.start ?? 0) ? Math.round(end * 10) / 10 : undefined } as Partial<El>, 'end')} min={0} max={86400} step={0.5} unit="s" />
       </Field>
+      {el.end !== undefined && el.src.includes('vimeo') && <p className="text-[11.5px] leading-snug text-err">Vimeo’s player plays on to the end: Ends at works for YouTube’s videos and those from a device.</p>}
       {(
         [
           ['autoplay', 'Plays when the slide shows'],
@@ -1617,7 +1625,7 @@ const SAMPLE = (theme: Theme): Deck => ({
   ],
 });
 
-function ThemeTab({ deck, change, fonts, onCompatible }: Props) {
+function ThemeTab({ deck, change, fonts, onCompatible, index, pickPicture }: Props) {
   const web = isWebDeck(deck);
   const t = deck.theme;
   const setT = (patch: Partial<Theme>) => change((d) => ({ ...d, theme: { ...d.theme, ...patch, id: undefined } }), 'theme');
@@ -1638,6 +1646,7 @@ function ThemeTab({ deck, change, fonts, onCompatible }: Props) {
     });
   return (
     <>
+      <SlideLookNote deck={deck} index={index} change={change} />
       <Section title="Ready-made">
         <div className="grid grid-cols-2 gap-2">
           {THEMES.map((p) => {
@@ -1657,6 +1666,7 @@ function ThemeTab({ deck, change, fonts, onCompatible }: Props) {
           })}
         </div>
       </Section>
+      <MyThemesSection deck={deck} change={change} />
       <Section title="Colours">
         {colors.map(([k, label]) => (
           <Field key={k} label={label}>
@@ -1684,6 +1694,7 @@ function ThemeTab({ deck, change, fonts, onCompatible }: Props) {
           <Select value={t.font} onChange={(font) => setT({ font })} options={FONTS.map((f) => ({ value: f.name, label: f.name }))} />
         </Field>
       </Section>
+      <LogoSection deck={deck} change={change} pickPicture={pickPicture} />
       <Section title="Slide shape">
         <Choice
           value={deck.ratio}

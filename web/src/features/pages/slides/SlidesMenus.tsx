@@ -35,11 +35,13 @@ import {
   Group,
   ImageDown,
   Image as ImageIcon,
+  Images,
   ImageMinus,
   IndentDecrease,
   IndentIncrease,
   Italic,
   Keyboard,
+  Layers,
   LayoutTemplate,
   List,
   ListChecks,
@@ -63,6 +65,7 @@ import {
   Scissors,
   Search,
   Shapes,
+  Sheet,
   Sigma,
   Smile,
   Sparkles,
@@ -162,6 +165,10 @@ export interface MenuArgs {
   video(): void;
   /** A video from this device. */
   videoFile(): void;
+  /** Free photos (openly licensed), a chart from a spreadsheet of the Library, slides of another deck. */
+  freePhoto?: () => void;
+  sheetChart?: () => void;
+  reuseSlides?: () => void;
   footer(): void;
   /** A comment on what is picked, or on the slide. */
   comment(): void;
@@ -256,6 +263,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
       label: 'Insert',
       items: [
         { label: 'New slide', icon: <LayoutTemplate size={14} />, keys: 'Ctrl+M', disabled: ro, run: a.newSlide },
+        !!a.reuseSlides && { label: 'Slides from another deck', icon: <Layers size={14} />, also: 'reuse import slides other deck presentation copy', disabled: ro, run: a.reuseSlides },
         '-',
         { label: 'Text box', icon: <Type size={14} />, disabled: ro, run: a.textBox },
         { label: 'Shape', icon: <Shapes size={14} />, disabled: ro, run: a.shape },
@@ -266,6 +274,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           items: [
             { label: 'From this device', also: 'picture image upload', run: a.picture },
             { label: 'From a web address', also: 'picture image url', run: a.pictureUrl },
+            !!a.freePhoto && { label: 'Free photos', icon: <Images size={14} />, also: 'photo photos stock free search openverse creative commons wikimedia', run: a.freePhoto },
             !!a.aiPicture && '-',
             !!a.aiPicture && { label: 'Make with AI', icon: <WandSparkles size={14} />, also: 'picture image generate ai photo illustration icon background', run: a.aiPicture },
             !!a.aiDrawing && { label: 'Drawing (SVG)', icon: <PenTool size={14} />, also: 'svg vector drawing icon logo diagram illustration ai', run: a.aiDrawing },
@@ -284,7 +293,17 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           ],
         },
         { label: 'Table', icon: <Table2 size={14} />, disabled: ro, run: a.table },
-        { label: 'Chart', icon: <PieChart size={14} />, disabled: ro, run: a.chart },
+        a.sheetChart
+          ? {
+              label: 'Chart',
+              icon: <PieChart size={14} />,
+              disabled: ro,
+              items: [
+                { label: 'New chart', also: 'chart graph bars pie', run: a.chart },
+                { label: 'From a spreadsheet', icon: <Sheet size={14} />, also: 'chart spreadsheet sheet linked excel table data update', run: a.sheetChart },
+              ],
+            }
+          : { label: 'Chart', icon: <PieChart size={14} />, disabled: ro, run: a.chart },
         !!a.aiPlot && { label: 'Plot', icon: <ChartScatter size={14} />, also: 'plot chart graph data matplotlib histogram scatter ai', disabled: ro, run: a.aiPlot },
         '-',
         { label: 'Icon', icon: <Star size={14} />, also: 'icon symbol pictogram lucide', disabled: ro, run: a.icon },

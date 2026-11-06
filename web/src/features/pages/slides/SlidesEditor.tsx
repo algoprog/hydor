@@ -25,6 +25,7 @@ import {
   Group as GroupIcon,
   Image as ImageIcon,
   ImageMinus,
+  Images,
   LayoutTemplate,
   Link2,
   MessageSquare,
@@ -51,7 +52,7 @@ import {
   Ungroup,
   WandSparkles,
 } from 'lucide-react';
-import { hexColor, isWebDeck, newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type ChartEl, type Deck, type El, type ImageEl, type LayoutId, type TextEl } from '@shared/slides';
+import { hexColor, isWebDeck, newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type ChartEl, type Deck, type El, type ImageEl, type LayoutId, type Slide, type TextEl } from '@shared/slides';
 import { csvOf, editPicture, makeDrawing, makePicture, makePlot, makeVideo } from '../../images/studio';
 import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
@@ -122,6 +123,10 @@ import { findInDeck, replaceAllInDeck, replaceHit } from './find';
 import { exportFile } from '../exportFile';
 import { chooseModel, chooseVideo, fetchVideoStill, firstFrame, isVideoFile, uploadModel, uploadVideo } from './media';
 import { SlideComments } from './SlideComments';
+import { choosePhoto } from '../FreePhotos';
+import { photoParts, withPhoto, withSlidesAfter } from './inserts';
+import { ReuseSlidesDialog } from './ReuseSlides';
+import { SheetChartDialog } from './SheetChart';
 
 export type SlidesDoc = ModelDoc<Deck>;
 
@@ -306,6 +311,9 @@ export function SlidesEditor({
   /** The thread picked in the Comments tab. */
   const [activeComment, setActiveComment] = useState<string | null>(null);
   const [footerOpen, setFooterOpen] = useState(false);
+  /** Insert → Slides from another deck, and Chart → From a spreadsheet. */
+  const [reuseOpen, setReuseOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [cellSel, setCellSel] = useState<CellSel | null>(null);
   const [texFocus, setTexFocus] = useState(0);
@@ -645,6 +653,31 @@ export function SlidesEditor({
     if (!f) return;
     if (!isVideoFile(f)) return toast('That is not a video a slide takes: an MP4, MOV or WebM file');
     await putVideoFile(f);
+  };
+  /** A free photo on the slide, its credit in the speaker notes (and under it, where its licence asks for one). */
+  const freePhoto = async () => {
+    setMenu(null);
+    const use = await choosePhoto();
+    const d = live.current;
+    if (!use || !d) return;
+    const els = photoParts(d, use);
+    canvas.current?.stopEditing();
+    setScope([]);
+    change((x) => withPhoto(x, index, els, use));
+    setSel([els[0].id]);
+    setTab('format');
+    setView('edit');
+  };
+  /** Slides from another deck, after the one on view. */
+  const insertSlides = (slides: Slide[]) => {
+    setReuseOpen(false);
+    if (!slides.length) return;
+    canvas.current?.stopEditing();
+    change((d) => withSlidesAfter(d, index, slides));
+    setCur(index + 1);
+    setSel([]);
+    setView('edit');
+    toast(slides.length === 1 ? '1 slide put in' : `${slides.length} slides put in`, 'ok');
   };
 
   // ---- the AI tools -------------------------------------------------------------------------------------------
@@ -1246,6 +1279,9 @@ export function SlidesEditor({
     run: () => one && setRunning(running === one.id ? null : one.id),
     video: () => setVideoAsk(true),
     videoFile: () => void pickVideoFile(),
+    freePhoto: readOnly ? undefined : () => void freePhoto(),
+    sheetChart: readOnly ? undefined : () => setSheetOpen(true),
+    reuseSlides: readOnly ? undefined : () => setReuseOpen(true),
     footer: () => setFooterOpen(true),
     comment: startComment,
     crop: () => one && crop(one.id),
@@ -1697,6 +1733,9 @@ export function SlidesEditor({
         <MenuItem icon={<Link2 size={14} />} onClick={() => (setMenu(null), setUrlAsk({}))}>
           From a web address
         </MenuItem>
+        <MenuItem icon={<Images size={14} />} onClick={() => void freePhoto()}>
+          Free photos
+        </MenuItem>
         <MenuSep />
         <MenuItem icon={<WandSparkles size={14} />} onClick={() => (setMenu(null), void aiPicture('picture'))}>
           Make with AI
@@ -1915,6 +1954,8 @@ export function SlidesEditor({
         }}
       />
       <FooterDialog open={footerOpen} onClose={() => setFooterOpen(false)} deck={deck} index={index} change={change} />
+      <ReuseSlidesDialog open={reuseOpen} deck={deck} pageId={pageId} onClose={() => setReuseOpen(false)} onInsert={insertSlides} />
+      <SheetChartDialog open={sheetOpen} deck={deck} onClose={() => setSheetOpen(false)} onInsert={(el) => (setSheetOpen(false), put([el]))} />
       <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={SHORTCUTS} />
       {present && !present.presenter && <Slideshow deck={deck} from={present.from} onClose={() => setPresent(null)} />}
       {present?.presenter && <Presenter deck={deck} from={present.from} pageId={pageId} onClose={() => setPresent(null)} />}

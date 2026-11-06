@@ -612,7 +612,7 @@ export function moveAnim(d: Deck, i: number, id: string, by: -1 | 1): Deck {
 const LOOKS: Record<El['type'], string[]> = {
   text: ['fill', 'fill2', 'angle', 'line', 'lineW', 'dash', 'radius', 'shadow', 'opacity', 'font', 'size', 'color', 'bold', 'italic', 'align', 'valign', 'lh', 'gap', 'ls', 'pad'],
   shape: ['fill', 'fill2', 'angle', 'line', 'lineW', 'dash', 'radius', 'shadow', 'opacity', 'font', 'size', 'color', 'bold', 'italic', 'align', 'valign', 'lh', 'gap', 'ls', 'pad'],
-  image: ['radius', 'line', 'lineW', 'shadow', 'opacity', 'adjust'],
+  image: ['radius', 'line', 'lineW', 'shadow', 'opacity', 'adjust', 'mask'],
   line: ['color', 'width', 'dash', 'start', 'end', 'opacity'],
   icon: ['color', 'lineW', 'opacity'],
   math: ['color', 'opacity'],
