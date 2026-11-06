@@ -746,7 +746,7 @@ export function pageDatabases(): PageDatabases {
         i++;
         continue;
       }
-      if (/[0-9.]/.test(c) && /[0-9]/.test(src[i + 1] ?? c)) {
+      if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(src[i + 1] ?? ''))) {
         const m = /^\d*\.?\d+(e[+-]?\d+)?/i.exec(src.slice(i))!;
         out.push({ t: 'n', v: Number(m[0]) });
         i += m[0].length;
@@ -1477,7 +1477,7 @@ export function pageDatabases(): PageDatabases {
         if (i % 2) return `<code>${escHtml(p.slice(1, -1))}</code>`;
         let h = escHtml(p);
         h = h.replace(/!\[([^\]\n]*)\]\(([^)\s]+)\)/g, (_m, alt: string) => alt);
-        h = h.replace(/\[([^\]\n]+)\]\(([^)\s]+)(?:\s+&quot;[^&]*&quot;)?\)/g, (m, words: string, url: string) => {
+        h = h.replace(/\[([^\]\n]+)\]\(((?:[^()\s]|\([^()\s]*\))+)(?:\s+&quot;[^&]*&quot;)?\)/g, (m, words: string, url: string) => {
           const u = url.replace(/&amp;/g, '&');
           return SAFE_URL.test(u) ? `<a href="${escHtml(u)}">${words}</a>` : words;
         });

@@ -18,7 +18,7 @@ import type { Deps, RunCtx } from '../features/types.ts';
 import { canCapture, closeCapture, withTab, type Tab } from '../capture/index.ts';
 import { KIT_CSS } from '../../shared/page-kit.ts';
 import { CODE_COLOURS_SRC, codeColours, hasCode } from '../../shared/code-colours.ts';
-import { dbBlocks, PAGE_DB_SRC, pageDatabases, pageDbScript } from '../../shared/page-db.ts';
+import { dbBlocks, dbsForAgent, PAGE_DB_SRC, pageDatabases, pageDbScript } from '../../shared/page-db.ts';
 import { extractText } from '../documents/extract.ts';
 import { EDITOR_SRC } from './editor.ts';
 import { pages } from './index.ts';
@@ -92,6 +92,43 @@ ok(compiles, 'the editor’s script (with the writing) is one function the page 
   same(JSON.stringify(D.normalize({ ...s4, rows: [{ id: 'r1', cells: { [s4.cols[1].id]: 'onotanoption' } }] }).rows[0].cells), '{}', 'a kept value that names no option is no value (nothing makes options of it)');
   same(JSON.stringify(dbBlocks('<div class="n-db" data-db="tasks" data-title="A &amp; B" data-schema=\'{"cols":["X"]}\'></div><div class="n-db" data-db="bad name"></div>')), '[{"name":"tasks","title":"A & B","schema":{"cols":["X"]}}]', 'the server reads a page’s databases from its HTML');
   ok(!/<\/script/i.test(PAGE_DB_SRC) && !/<!--/.test(PAGE_DB_SRC), 'the databases’ script can go in a <script> as it is');
+}
+
+// ---- databases' newer parts: formulas, calculations, CSV in and out, views kept, Markdown as blocks ---------------------------
+{
+  const D = pageDatabases();
+  const s = D.normalize({
+    cols: [{ name: 'Task' }, { name: 'Cost', kind: 'number' }, { name: 'Qty', kind: 'number' }, { name: 'Total', kind: 'formula', formula: 'prop("Cost") * prop("Qty")' }, { name: 'Due', kind: 'date' }, { name: 'Done', kind: 'check' }, { name: 'Mail', kind: 'email' }, { name: 'Notes', kind: 'ai', ai: { how: 'extract', prompt: 'the city' } }],
+    rows: [{ Task: 'Book', Cost: 3, Qty: 2, Due: '2026-11-10', Mail: 'a@b.test', page: '## Notes\n- one' }, { Task: 'Pack', Cost: 1, Qty: 5, Due: '2026-11-12', Done: true }],
+    view: 'calendar',
+    dateCol: 'Due',
+    calc: { Cost: 'sum', Done: 'pctChecked', Bogus: 'sum' },
+  });
+  same(s.cols.map((c) => c.kind).join(','), 'text,number,number,formula,date,check,email,ai', 'the newer kinds of column are kept (a formula, an email, an AI column)');
+  same(`${s.view}|${s.cols.find((c) => c.id === s.dateCol)?.name}|${JSON.stringify(Object.keys(s.calc ?? {}).map((k) => s.cols.find((c) => c.id === k)?.name))}`, 'calendar|Due|["Cost","Done"]', 'a view and its settings are kept, by column names too (calculations only for columns there are)');
+  same(s.rows.map((r) => D.cellText(s, r, s.cols[3])).join(','), '6,5', 'a formula is worked out for each row');
+  const f = (e: string) => D.formula(s, s.rows[0], e);
+  same(
+    [f('if(prop("Done"), "yes", "no")').text, f('concat(upper(prop("Task")), "!")').text, f('dateBetween(prop("Due"), date(2026, 11, 1), "days")').text, f('round(prop("Cost") / 7, 2)').text, f('{Cost} + 1 > 3 and not prop("Done")').text, f('formatDate(prop("Due"), "YYYY/MM/DD")').text].join(' | '),
+    'no | BOOK! | 9 | 0.43 | ✓ | 2026/11/10',
+    'formulas have conditions, words, dates, rounding, {columns} and comparisons',
+  );
+  ok(/no column “Price”/.test(f('prop("Price") * 2').error ?? '') && !!f('1 +').error && !!f('nosuch(1)').error, 'a formula that can’t be worked out says why');
+  same(D.calculate(s, s.rows, s.cols[1], 'sum') + '|' + D.calculate(s, s.rows, s.cols[1], 'avg') + '|' + D.calculate(s, s.rows, s.cols[5], 'pctChecked') + '|' + D.calculate(s, s.rows, s.cols[3], 'max') + '|' + D.calculate(s, s.rows, s.cols[0], 'values'), '4|2|50%|6|2', 'a column’s calculation: a sum, an average, a share ticked, a formula’s largest, a count');
+  ok(/^Task,Cost,Qty,Total,Due,Done,Mail,Notes\r\nBook,3,2,6,2026-11-10,No,a@b\.test,\r\n/.test(D.csv(s)), 'the rows go out as a CSV file, formulas worked out');
+  const blank = D.normalize({ cols: [{ name: 'Name' }, { name: 'Status', kind: 'select' }], rows: [{}, {}, {}] });
+  const r = D.fromCsv(blank, '﻿Name;Price;Paid;Joined\n"Smith, Ann";3,5;yes;2026-01-02\nBo;4;no;2026-02-03\n');
+  same(`${r.added}|${r.state.cols.map((c) => `${c.name}:${c.kind}`).join(',')}|${r.state.rows.map((x) => r.state.cols.map((c) => D.cellText(r.state, x, c)).join('/')).join(' ')}`, '2|Name:text,Price:number,Paid:check,Joined:date|Smith, Ann/3.5/✓/2026-01-02 Bo/4//2026-02-03', 'a CSV file’s rows come in (semicolons, quotes, a decimal comma), its columns of the kinds their values are, in place of a new database’s empty rows');
+  const html = D.md('# Plan\n\nSome **bold** and *soft* words, `code` and [a link](https://example.com) and [no](javascript:alert(1)) <b>tags</b>.\n\n- one\n  - under it\n- [x] done\n1. first\n\n> 💡 A tip\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```python\nprint(1 < 2)\n```\n---');
+  same(
+    html,
+    '<h1>Plan</h1><p>Some <strong>bold</strong> and <em>soft</em> words, <code>code</code> and <a href="https://example.com">a link</a> and no &lt;b&gt;tags&lt;/b&gt;.</p><ul><li>one<ul><li>under it</li></ul></li></ul><ul class="n-todo"><li><input type="checkbox" checked><span>done</span></li></ul><ol><li>first</li></ol><div class="n-callout"><span class="n-callout-icon">💡</span><div class="n-callout-text">A tip</div></div><div class="n-scroll"><table class="n-tbl"><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table></div><pre class="n-code" data-lang="python">print(1 &lt; 2)</pre><hr>',
+    'Markdown becomes the editor’s blocks (lists nested, to-dos, a callout, a table, code), its words never markup, its links only to the web',
+  );
+  const s2 = D.change(s, { view: 'timeline', start: 'Due', update: [{ id: s.rows[1].id, page: 'Packed **all**' }], add: [{ Task: 'Visa', Cost: 2 }] });
+  same(`${s2.view}|${s2.rows[1].page}|${typeof s2.rows[2].created}|${D.cellText(s2, s2.rows[2], s2.cols[3])}`, 'timeline|Packed **all**|number|', 'an agent changes the view, a row’s own page, and adds rows (when they were made kept)');
+  const told = dbsForAgent(`<div class="n-db" data-db="t" data-schema='${JSON.stringify({ cols: s.cols, rows: s.rows, view: 'calendar', dateCol: s.dateCol })}'></div>`, {});
+  ok(/Total \(formula: prop\("Cost"\) \* prop\("Qty"\)\)/.test(told) && /Total="6"/.test(told) && /its page: "## Notes\\n- one"/.test(told) && /calendar view · by Due/.test(told), 'agents read formulas with their values, rows’ own pages and the view');
 }
 
 // ---- the editor in a browser --------------------------------------------------------------------------------------
@@ -765,6 +802,54 @@ if (canCapture()) {
     same((await d.msgs('wa-ed-save')).length, saves + 1, 'Ctrl+S in a database’s cell saves the page (its other keys are its own)');
   });
 
+  // ---- AI on the page: Space on an empty line, an answer shown in place, kept as one step to undo ---------------------------
+  await drive('<h1 id="t">Trip</h1><p id="a">Plans for Lisbon</p>', async (d) => {
+    await d.write('#a');
+    await d.press('Enter');
+    await d.type(' ');
+    await sleep(150);
+    await d.type('a packing list');
+    await d.press('Enter');
+    await sleep(100);
+    const asked = (await d.msgs('wa-ed-ai')).at(-1);
+    ok(asked?.ask?.action === 'ask' && asked.ask.ask === 'a packing list' && /Plans for Lisbon/.test(asked.ask.before ?? ''), `Space on an empty line opens the AI, and what is typed is asked of it, with the page before (${JSON.stringify(asked?.ask ?? null).slice(0, 160)})`);
+    await d.cmd('aiAnswer', { id: asked?.id, markdown: '- Socks\n- [ ] Passport\n\n**Sun cream**', model: 'Test', cost: 0.0012 });
+    same(await d.js<string>('const p = document.querySelector("[data-n-ai]"); return p ? [...p.querySelectorAll("li")].map(x => x.textContent).join("+") + "|" + document.querySelectorAll("p[data-n-ai-hide]").length : "none"'), 'Socks+Passport|1', 'its answer shows in place, as blocks, in place of the empty line');
+    ok(!/Socks|data-n-ai/.test(await d.html()), 'until it is kept, the page given back has none of it');
+    await d.press('Enter');
+    await sleep(100);
+    same(await shape(d), 'h1:Trip|p:Plans for Lisbon|ul>li:Socks|ul.todo>li[ ]:Passport|p:Sun cream', 'Done keeps it: its blocks take the empty line’s place');
+    await d.press('Escape');
+    await d.press('z', { ctrl: true });
+    same(await shape(d), 'h1:Trip|p:Plans for Lisbon|p:', 'one step to undo takes it all back');
+  });
+  await drive('<p id="a">The quick brown fox jumps over the lazy dog</p><p id="b">Second</p>', async (d) => {
+    await d.write('#a');
+    await d.js('const t = document.querySelector("#a").firstChild; const r = document.createRange(); r.setStart(t, 4); r.setEnd(t, 15); getSelection().removeAllRanges(); getSelection().addRange(r);');
+    await d.press('j', { ctrl: true });
+    await sleep(150);
+    await d.type('shorter');
+    await d.press('Enter');
+    await sleep(100);
+    const asked = (await d.msgs('wa-ed-ai')).at(-1);
+    same(`${asked?.ask?.action}|${asked?.ask?.text}`, 'shorter|quick brown', 'Ctrl+J over picked words: the list filters as you type, and Make shorter asks about those words');
+    await d.cmd('aiAnswer', { id: asked?.id, markdown: 'fast', model: 'Test' });
+    await d.press('Enter');
+    await sleep(100);
+    same(await shape(d), 'p:The fast fox jumps over the lazy dog|p:Second', 'Replace puts the answer in the words’ place, the rest of the block as it was');
+    await d.press('Escape');
+    await d.press('j', { ctrl: true });
+    await sleep(120);
+    await d.type('Summarize');
+    await d.press('Enter');
+    const again = (await d.msgs('wa-ed-ai')).at(-1);
+    ok(again?.id !== asked?.id && again?.ask?.action === 'summarize', 'Ctrl+J on a picked block asks about it');
+    await d.cmd('aiAnswer', { id: again?.id, markdown: 'A fox.' });
+    await d.press('Escape');
+    await d.press('Escape');
+    ok(!(await d.js<number>('return document.querySelectorAll("[data-n-ai]").length')) && (await shape(d)) === 'p:The fast fox jumps over the lazy dog|p:Second', 'Esc twice throws an answer away, the page as it was');
+  });
+
   // ---- links to other pages: "@" or "/" → Link to a page, a chip with the page's icon -----------------------------------------
   await drive('<p id="a">See</p><p id="b">Also</p>', async (d) => {
     await d.cmd('pages', [
@@ -955,6 +1040,41 @@ if (canCapture()) {
       await tab.s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: to.x, y: to.y, button: 'left', clickCount: 1 });
       await sleep(500);
       same(await js<string>('return [...R.querySelectorAll(".lane")].map(l => [...l.querySelectorAll(".card .ct")].map(c => c.textContent).join("+")).join(" | ")'), ' | Pack+Book | Visa', 'a card dragged to another lane takes its option');
+    });
+  }
+
+  // ---- a database's newer views in Use: a formula and a sum, a calendar, a row's own page, a gallery and a timeline ----------
+  {
+    const schema = JSON.stringify({
+      cols: [{ name: 'Task' }, { name: 'Cost', kind: 'number' }, { name: 'Qty', kind: 'number' }, { name: 'Total', kind: 'formula', formula: 'prop("Cost") * prop("Qty")' }, { name: 'Start', kind: 'date' }, { name: 'End', kind: 'date' }],
+      rows: [{ Task: 'Book', Cost: 3, Qty: 2, Start: '2026-11-10', End: '2026-11-12' }, { Task: 'Pack', Cost: 1, Qty: 5, Start: '2026-11-12' }],
+      calc: { Cost: 'sum' },
+    }).replace(/"/g, '&quot;');
+    const head = `<style id="n-kit">${KIT_CSS}</style><script>(${BRIDGE_SRC})(${JSON.stringify({ n: 't', theme: 'light', max: { key: 200, value: 600000 } })})</script><script>(${PAGE_DB_SRC})().run(null, null, { readOnly: false })</script>`;
+    const html = injectHead(`<!doctype html><html><head></head><body class="n-page"><div class="n-db" data-db="plan" data-title="Plan" data-schema="${schema}"></div><div class="n-chart" data-chart='{"type":"bar","db":"plan","x":"Task","y":["Cost"]}'></div></body></html>`, head);
+    await withTab({ html, width: 1000, height: 800, settleMs: 300 }, async (tab) => {
+      const js = <T>(code: string) => tab.evaluate<T>(`(async () => { const R = document.querySelector(".n-db").shadowRoot; ${code} })()`);
+      const click = async (code: string) => {
+        const r = await js<{ x: number; y: number } | null>(`const el = (${code}); if (!el) return null; const b = el.getBoundingClientRect(); return { x: b.left + Math.min(12, b.width / 2), y: b.top + b.height / 2 };`);
+        if (!r) throw new Error(`nothing to click: ${code}`);
+        for (const type of ['mousePressed', 'mouseReleased'] as const) await tab.s.send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: 'left', clickCount: 1 });
+        await sleep(150);
+      };
+      same(await js<string>('return [...R.querySelectorAll("tbody tr")].map(tr => tr.querySelectorAll("td")[3].textContent).join(",") + "|" + R.querySelector("tfoot td:nth-child(2)").textContent.replace(/\\s+/g, " ").trim()'), '6,5|Sum4', 'a formula column works its value out for each row, and the footer sums a column');
+      ok((await tab.evaluate<number>('document.querySelector(".n-chart").shadowRoot.querySelectorAll("rect").length')) === 2, 'a chart draws the database’s numbers, a bar for each row’s group');
+      await click('[...R.querySelectorAll(".tabs .b")].find(b => /Calendar/.test(b.textContent))');
+      same(await js<string>('return [...R.querySelectorAll(".cd")].filter(c => c.querySelector(".chip")).map(c => c.dataset.day + ":" + [...c.querySelectorAll(".chip")].map(x => x.textContent).join("+")).join(" ")'), '2026-11-10:Book 2026-11-12:Pack', 'the calendar shows each row on its day');
+      await click('[...R.querySelectorAll(".chip")].find(c => c.textContent === "Book")');
+      same(await js<string>('return R.querySelector(".peek .pkt")?.value ?? "none"'), 'Book', 'a row opens as a page of its own, its title on top');
+      await click('R.querySelector(".peek .pkd")');
+      for (const ch of 'Bring the tickets') await tab.s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ch, text: ch });
+      await sleep(900);
+      ok(/Bring the tickets/.test(JSON.stringify(await tab.evaluate('hydor.storage.get("n-db:plan")'))), 'what is written in a row’s own page is kept with the database');
+      await click('R.querySelector(".peek [aria-label=Close]")');
+      await click('[...R.querySelectorAll(".tabs .b")].find(b => /Gallery/.test(b.textContent))');
+      same(await js<number>('return R.querySelectorAll(".gc").length'), 2, 'the gallery shows a card for each row');
+      await click('[...R.querySelectorAll(".tabs .b")].find(b => /Timeline/.test(b.textContent))');
+      same(await js<string>('return [...R.querySelectorAll(".bar")].map(b => b.textContent + ":" + Math.round(parseFloat(b.style.width) / 26)).join(",")'), 'Book:3,Pack:1', 'the timeline draws each row from its start to its end');
     });
   }
 
