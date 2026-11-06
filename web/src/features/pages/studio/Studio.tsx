@@ -33,6 +33,7 @@ import { PageComments } from './PageComments';
 import { PagePanel } from './PagePanel';
 import { isDesignHtml } from '@shared/design';
 import { DesignEdit } from '../design/DesignEdit';
+import { editPagePicture, editPageVideo } from '../design/pageMedia';
 
 export type StudioMode = 'view' | 'edit' | 'code';
 
@@ -560,6 +561,12 @@ export function Studio({
               onFile={(id, f) => pictureData(f).then((src) => cmd('fill', { id, src }), toastError)}
               onAgent={() => void ask()}
               onKeys={() => setKeysOpen(true)}
+              onDesign={(d) => {
+                // The picked picture's (or video's) Edit, on its bar in the page.
+                if (d.what !== 'action' || !sel) return;
+                if (d.action === 'editPicture') void editPagePicture({ sel, cmd, base: doc.base, pageHtml: () => editRef.current?.html() ?? Promise.resolve(''), title: doc.title });
+                if (d.action === 'editVideo') editPageVideo({ sel, cmd, title: doc.title });
+              }}
             />
           </DeviceStage>
           <InsertPopover ask={asking} frame={() => editRef.current?.frame() ?? null} answer={(payload) => cmd('fill', payload)} cmd={cmd} onClose={() => setAsking(null)} onError={toastError} />
