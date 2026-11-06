@@ -9,6 +9,7 @@ import type { MediaItem } from '@shared/media';
 import { Button, cx, IconButton, inputCls, Switch } from '../../../components/ui';
 import { mu } from '../../../lib/machine';
 import { useMedia } from '../../media/state';
+import { tr } from '../../../i18n/runtime';
 import type { Clock } from './clock';
 
 export type Tool = 'trim' | 'crop' | 'text' | 'adjust' | 'sound';
@@ -264,7 +265,7 @@ const PLACES: { label: string; y: number }[] = [
 /** A new text at the playhead, for three seconds, near the bottom. */
 export function newText(t: number, duration: number): VideoText {
   const from = Math.min(Math.max(0, t), Math.max(0, duration - 0.5));
-  return { text: 'Your words', from, to: Math.min(duration, from + 3), x: 0.5, y: 0.86, size: 0.07, color: '#ffffff', background: '#000000a6', bold: true };
+  return { text: tr('Your words'), from, to: Math.min(duration, from + 3), x: 0.5, y: 0.86, size: 0.07, color: '#ffffff', background: '#000000a6', bold: true };
 }
 
 export function TextPanel({ r, change, picked, onPick, onAdd, clock, duration }: { r: VideoRecipe; change: Change; picked: number | null; onPick: (i: number | null) => void; onAdd: () => void; clock: Clock; duration: number }) {
