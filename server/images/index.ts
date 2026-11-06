@@ -2,8 +2,9 @@
 //
 // generate_image, generate_video and generate_audio (on each session's own MCP server, while each is on in
 // Settings → Images, video and audio) make them with the model picked there, the app's choice, or one the agent
-// names, using the OpenRouter key from Settings → Models. Before they make anything they show the user a form
-// with the settings the model takes (shape, resolution, quality, length, sound, voice…) and what it costs
+// names, using the OpenRouter key from Settings → Models; with none set, the user is first asked for it on a card
+// (connections/openrouter-key.ts), and if they skip it that model does not run. Before they make anything they show
+// the user a form with the settings the model takes (shape, resolution, quality, length, sound, voice…) and what it costs
 // (settings.ts), unless the agent gave them all, the user answered it earlier in the session, or nobody is there
 // to answer (a scheduled task, an app's run). What they make is saved in the session's folder (images/, videos/,
 // audio/) and shown with the reply, where the user can keep it in the Library (server/media). Pictures come in two
@@ -30,6 +31,7 @@ import { OPENROUTER_PICKS, QUICK_PICKS, type OpenRouterRole } from '../../shared
 import { ASSET } from '../../shared/slides.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Feature, RunCtx, RunTool } from '../features/types.ts';
+import { noKeyText, openRouterKey } from '../connections/openrouter-key.ts';
 import { inSession } from '../documents/index.ts';
 import { fillForm } from '../guide/form.ts';
 import { probe } from '../media/frames.ts';
@@ -70,6 +72,7 @@ import {
   cutoutLine,
   FORM,
   insteadLine,
+  keyWhy,
   imageAnswers,
   imageDefaults,
   imageFits,
@@ -144,9 +147,6 @@ async function videoState(db: DB): Promise<VideosState> {
   return { enabled: s.enabled, model: s.model, using: u.id, usingInfo: u.info, keySet: !!loadConfig().openrouter.apiKey };
 }
 
-const NO_KEY = (what: string) =>
-  `${what} generation goes through OpenRouter, and no OpenRouter key is set. Tell the user to add one in Settings → Models → OpenRouter (keys come from https://openrouter.ai/keys); then try again.`;
-
 const size = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
 /** Whether someone can answer a form in this run: not a scheduled task's or an app's run, and the session is in the app. */
@@ -183,6 +183,7 @@ function imageTool(db: DB): RunTool {
       'detail picks between them: simple (Quick: cheaper and faster) for backgrounds, textures, patterns, icons and simple pictures; complex (Best) for scenes, photos, people, words inside the picture, diagrams and every change to a picture. Left out, it is decided from the prompt.',
       'For drawings that must stay sharp at any size (icons, logos, simple diagrams, shapes in a deck’s colours), make_svg is often better.',
       'Before it makes anything, the user sees a short form in the conversation with the settings that model takes (shape, resolution, quality, how many) and what it costs, filled in with what you give: they change what they like and confirm, or close it, and then nothing is made.',
+      'With no OpenRouter key set, the user is first asked for one on a card (never ask for it yourself); if they skip it, nothing is made.',
       'So give only the settings the user asked for and leave the rest to the form; it comes once per model in a session (later images use the same settings unless you give others; ask: true shows it again).',
       'Set ask: false only when the user said to choose for them or to go ahead without asking.',
       'The images are saved in the session’s folder (images/) and shown to the user with your reply, where they can keep them in their Library: do not repeat them or their paths.',
@@ -207,8 +208,6 @@ function imageTool(db: DB): RunTool {
       required: ['prompt'],
     },
     async run(a, ctx) {
-      const key = loadConfig().openrouter.apiKey;
-      if (!key) return { isError: true, text: NO_KEY('Image') };
       const prompt = String(a.prompt ?? '').trim();
       if (!prompt) throw new Error('Say what to make in prompt.');
       const asked = str(a.model);
@@ -227,6 +226,11 @@ function imageTool(db: DB): RunTool {
           isError: true,
           text: `${info?.label ?? id} does not make transparent backgrounds, and no model that does is at hand: leave transparent out, or the user can pick a model that does in Settings → Images, video and audio, or set up the picture tools there to take backgrounds out.`,
         };
+      const tr = appWords(db);
+      // The key, asked for on a card when there is none, before the form (which is for a picture that can be made).
+      const k = await openRouterKey(ctx, { why: keyWhy('image', info?.label ?? id, tr, info?.perImage ? money(info.perImage) : undefined) });
+      if (k.key === null) return noKeyText(k, info?.label ?? id);
+      const key = k.key;
       const given: ImageChoice = {
         ...(str(a.aspect_ratio) ? { aspect: str(a.aspect_ratio) } : {}),
         ...(str(a.resolution ?? a.size) ? { size: str(a.resolution ?? a.size)!.toUpperCase() } : {}),
@@ -237,7 +241,6 @@ function imageTool(db: DB): RunTool {
       };
       const memo = pickedKey(ctx.key, 'image', id);
       let v: ImageChoice = { ...imageDefaults(info), ...pickedFor<ImageChoice>(memo), ...given };
-      const tr = appWords(db);
       const fields = imageForm(info, v, tr);
       const left = Object.keys(fields).some((f) => !(f === 'transparent' ? 'background' in given : f in given));
       const ask = askOf(a);
@@ -305,9 +308,6 @@ function imageTool(db: DB): RunTool {
 
 // ---- make_svg ------------------------------------------------------------------------------------------
 
-const NO_KEY_DRAWING =
-  'Detailed drawings are drawn by a vector model through OpenRouter, and no OpenRouter key is set. Call again with detail: "simple" (written as SVG, no key needed), or tell the user to add a key in Settings → Models → OpenRouter.';
-
 function svgTool(db: DB): RunTool {
   return {
     name: 'make_svg',
@@ -317,7 +317,8 @@ function svgTool(db: DB): RunTool {
       'Make a drawing as SVG (shapes, not pixels): an icon, a logo, a diagram, a pattern, a shape or a flat illustration, saved as a cleaned .svg in the session’s folder (images/).',
       'Prefer it to generate_image for what must stay sharp at any size or match given colours: icons and logos, simple diagrams and arrows, patterns and shapes for slides, anything in a deck’s or a document’s own colours (give them in colors). Photos, scenes and detailed pictures are generate_image’s.',
       'detail: simple has it written as SVG by Claude (or the helper model picked in Settings → Models), with no picture model to pay, in under a minute; complex has it drawn by Recraft’s vector model through OpenRouter, about $0.08 a drawing, and then the user first sees a short form with the price, once per model in a session (ask: true shows it again; ask: false only when the user said to go ahead).',
-      'Left out, illustrations are complex and the rest simple. Scripts, links and anything loaded from elsewhere are taken out of every drawing.',
+      'Left out, illustrations are complex and the rest simple. With no OpenRouter key set, complex asks the user for one on a card (never ask for it yourself); without one, left out it is written as SVG instead.',
+      'Scripts, links and anything loaded from elsewhere are taken out of every drawing.',
       'It is shown to the user with your reply: do not repeat it or its path. To put it in a page, a deck or a document, give its path as the picture.',
     ].join(' '),
     inputSchema: {
@@ -343,12 +344,28 @@ function svgTool(db: DB): RunTool {
       } catch (e) {
         throw new Error(`${(e as Error).message}.`);
       }
-      const tier = drawingTierFor(a.detail === 'simple' ? 'quick' : a.detail === 'complex' ? 'best' : 'auto', { prompt, kind: a.kind });
+      const auto = a.detail !== 'simple' && a.detail !== 'complex';
+      let tier = drawingTierFor(auto ? 'auto' : a.detail === 'simple' ? 'quick' : 'best', { prompt, kind: a.kind });
       let aspect = str(a.aspect_ratio);
       let model: string | undefined;
-      if (tier === 'best') {
-        if (!loadConfig().openrouter.apiKey) return { isError: true, text: NO_KEY_DRAWING };
-        const { id, info } = await vectorModel();
+      let key: string | undefined;
+      let instead = '';
+      const best = tier === 'best' ? await vectorModel() : undefined;
+      if (best) {
+        const { id, info } = best;
+        const tr = appWords(db);
+        const label = info?.label ?? id;
+        // The key, asked for on a card when there is none: on auto, without one the drawing is written instead.
+        const why = [keyWhy('drawing', label, tr, info?.perImage ? money(info.perImage) : undefined), ...(auto ? [tr('Without a key, a simpler drawing is written instead, at no cost.')] : [])].join(' ');
+        const k = await openRouterKey(ctx, { why });
+        if (k.key === null && (!auto || k.why === 'stopped')) return `${noKeyText(k, label)}${k.why === 'stopped' ? '' : ' make_svg with detail: "simple" needs no key.'}`;
+        if (k.key === null) {
+          tier = 'quick';
+          instead = `No OpenRouter key was given, so it was written as SVG rather than drawn by ${label}.`;
+        } else key = k.key;
+      }
+      if (best && key) {
+        const { id, info } = best;
         model = id;
         // The user says yes to the price once per model in a session, as for pictures; the shape is the one setting asked.
         const memo = pickedKey(ctx.key, 'image', id);
@@ -377,7 +394,7 @@ function svgTool(db: DB): RunTool {
       }
       let d: Drawing;
       try {
-        d = await drawSvg(db, { prompt, ...(a.kind ? { kind: a.kind } : {}), ...(colors ? { colors } : {}), ...(aspect ? { aspect } : {}), tier }, { model, signal: ctx.signal });
+        d = await drawSvg(db, { prompt, ...(a.kind ? { kind: a.kind } : {}), ...(colors ? { colors } : {}), ...(aspect ? { aspect } : {}), tier }, { model, key, signal: ctx.signal });
       } catch (e) {
         if (ctx.signal?.aborted) return { isError: true, text: 'Stopped before the drawing was made.' };
         return { isError: true, text: `The drawing was not made: ${String((e as Error).message ?? e).replace(/\.?$/, '.')}` };
@@ -387,7 +404,7 @@ function svgTool(db: DB): RunTool {
         `Made a drawing with ${d.model}${d.cost ? ` (${money(d.cost)})` : ''}${aspect && aspect !== '1:1' ? `, ${aspect}` : ''}:`,
         `${f.path} (${d.w}×${d.h}, ${size(f.bytes)})`,
         'The user sees it with your reply, a tap away from full size and download: don’t repeat it or its path. It is SVG, cleaned of scripts, links and anything loaded from elsewhere; to put it in a page, a deck or a document, give this path as the picture.',
-        ...(d.tier === 'quick' ? ['It was written as SVG: for a richer illustration, call again with detail: "complex".'] : []),
+        ...(instead ? [instead] : d.tier === 'quick' ? ['It was written as SVG: for a richer illustration, call again with detail: "complex".'] : []),
       ].join('\n');
     },
   };
@@ -454,7 +471,7 @@ function videoTool(db: DB): RunTool {
     annotations: { readOnlyHint: false, openWorldHint: true },
     description: [
       'Make a short video from a description, and if wanted from pictures to start or end on (first_frame, last_frame) or to follow (references), with a video model through OpenRouter (the one picked in Settings → Images, video and audio, or the one model names).',
-      'Videos cost far more than images (cents to dollars a second) and take a minute to several to make.',
+      'Videos cost far more than images (cents to dollars a second) and take a minute to several to make. With no OpenRouter key set, the user is first asked for one on a card (never ask for it yourself); if they skip it, nothing is made.',
       'Before it makes anything, the user sees a short form in the conversation with the settings that model takes (length, shape, resolution, sound) and what it costs, filled in with what you give: they change what they like and confirm, or close it, and then nothing is made.',
       'So give only the settings the user asked for and leave the rest to the form; it comes once per model in a session (ask: true shows it again). Set ask: false only when the user said to choose for them or to go ahead without asking.',
       'It waits for the video, up to about nine minutes; if it is not ready by then, you get its job id: call again with job to wait for it (nothing more is spent).',
@@ -482,8 +499,9 @@ function videoTool(db: DB): RunTool {
     async run(a, ctx) {
       const started = Date.now();
       const until = started + WAIT_MS;
-      const key = loadConfig().openrouter.apiKey;
-      if (!key) return { isError: true, text: NO_KEY('Video') };
+      const tr = appWords(db);
+      /** The key, asked for on a card when there is none (before the form, which is for a video that can be made). */
+      const keyFor = (info: VideoModel | undefined, id: string) => openRouterKey(ctx, { why: keyWhy('video', info?.label ?? id, tr, info?.perSecond ? money(info.perSecond) : undefined) });
       const dir = path.join(ctx.cwd, 'videos');
       const job = str(a.job);
       if (job) {
@@ -491,6 +509,10 @@ function videoTool(db: DB): RunTool {
         let f = followedJob(job);
         if (!f) {
           // The app restarted since: ask OpenRouter where it is.
+          const { id, info } = await usingVideo(settings(db, 'videos'));
+          const k = await keyFor(info, id);
+          if (k.key === null) return noKeyText(k, 'the video');
+          const key = k.key;
           const j = await pollVideo(OPENROUTER_URL, key, job);
           f = follow({ base: OPENROUTER_URL, key, job: j, model: 'the model', session: ctx.key, dir, name: str(a.name) ?? 'video' });
         }
@@ -518,11 +540,13 @@ function videoTool(db: DB): RunTool {
         ...(str(a.resolution) ? { resolution: /^\d+p?$/i.test(str(a.resolution)!) ? `${parseInt(str(a.resolution)!, 10)}p` : str(a.resolution)!.toUpperCase() } : {}),
         ...(bool(a.audio) !== undefined ? { audio: bool(a.audio) } : {}),
       };
+      const k = await keyFor(info, id);
+      if (k.key === null) return noKeyText(k, info?.label ?? id);
+      const key = k.key;
       const memo = pickedKey(ctx.key, 'video', id);
       let v: VideoChoice = { ...videoDefaults(info), ...pickedFor<VideoChoice>(memo), ...given };
       // A picture to start from sets the shape for most models.
       if (first && !given.aspect && v.aspect && info?.aspects.length) delete v.aspect;
-      const tr = appWords(db);
       const fields = videoForm(info, v, tr);
       if (first && !given.aspect) delete fields.aspect;
       const left = Object.keys(fields).some((f) => !(f in given));
@@ -651,7 +675,7 @@ function audioTool(db: DB): RunTool {
     description: [
       'Make sound through OpenRouter: music (songs with vocals or instrumentals, jingles, loops, background music), speech (narration, voice-overs, announcements, dialogue, in a described voice or one copied from 1–3 short recordings the user has), or sound effects and ambience.',
       'kind picks the model: music uses the music model picked in Settings → Images, video and audio (the app’s choice is Google’s Lyria: Lyria 3 Pro makes songs of up to about 3 minutes, Lyria 3 Clip 30-second clips), speech and sound the voice and sound model (the app’s choice is ByteDance’s Seed Audio, up to 2 minutes), or model names another.',
-      'Before it makes anything, the user sees a short form in the conversation with the model, the settings it takes (singing or not, length, voice, file) and what it costs, filled in with what you give: they change what they like and confirm, or close it, and then nothing is made.',
+      'Before it makes anything, the user sees a short form in the conversation with the model, the settings it takes (singing or not, length, voice, file) and what it costs, filled in with what you give: they change what they like and confirm, or close it, and then nothing is made. With no OpenRouter key set, the user is first asked for one on a card (never ask for it yourself); if they skip it, nothing is made.',
       'So give only the settings the user asked for and leave the rest to the form; it comes once per model in a session (ask: true shows it again). Set ask: false only when the user said to choose for them or to go ahead without asking.',
       'music: in prompt, the genre, mood, instruments, tempo (BPM), key, the singer’s voice and the structure (timestamps like "[0:00 - 0:15] Intro: soft piano" place things); the lyrics in lyrics, with [Verse] and [Chorus] tags, or instrumental: true; without either the model writes its own lyrics. Write the prompt in the language the song should be sung in.',
       'speech: the exact words in prompt (or a conversation in turns), and how they are said in instructions: the voice, age, accent, tone, pace and emotion. Seed Audio reads prompt as a description, so there you may also write the whole scene with the spoken lines in quotes (‘A calm, deep male narrator: "Welcome to the museum." Soft rain in the background.’). voice: one of the model’s own voices by id, where it has them (a wrong one gets you the list). voice_samples: recordings of the voice to speak in (only a voice the user may use); with several, write who says what with @Audio1, @Audio2, @Audio3.',
@@ -695,8 +719,6 @@ function audioTool(db: DB): RunTool {
     },
     async run(a, ctx) {
       const until = Date.now() + AUDIO_WAIT_MS;
-      const key = loadConfig().openrouter.apiKey;
-      if (!key) return { isError: true, text: NO_KEY('Audio') };
       const kind = AUDIO_KINDS.find((k) => k === a.kind);
       if (!kind) throw new Error('kind: music, speech or sound.');
       const prompt = String(a.prompt ?? '').trim();
@@ -763,6 +785,11 @@ function audioTool(db: DB): RunTool {
         samples: samples.length,
       });
       const tr = appWords(db);
+      // The key, asked for on a card when there is none, before the form (which is for sound that can be made).
+      const estimate = audioCost(info, wish(v, true));
+      const k = await openRouterKey(ctx, { why: keyWhy(kind === 'music' ? 'music' : 'speech', info?.label ?? id, tr, estimate ? money(estimate) : undefined) });
+      if (k.key === null) return noKeyText(k, info?.label ?? id);
+      const key = k.key;
       const fields = audioForm(info, kind, v, tr, { voices: !samples.length && !prompted });
       const left = Object.keys(fields).some((f) => !(f in given));
       const ask = askOf(a);

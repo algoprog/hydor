@@ -93,9 +93,9 @@ export async function vectorModel(model?: string): Promise<{ id: string; info?: 
   return { id, info: list.find((m) => m.id === id) };
 }
 
-/** Drawn by the vector model through OpenRouter. */
-async function drawn(db: DB, ask: SvgAsk, o: { model?: string; signal?: AbortSignal }): Promise<Drawing> {
-  const key = loadConfig().openrouter.apiKey;
+/** Drawn by the vector model through OpenRouter (`key`: one just given on the card that asked for it). */
+async function drawn(db: DB, ask: SvgAsk, o: { model?: string; key?: string; signal?: AbortSignal }): Promise<Drawing> {
+  const key = o.key ?? loadConfig().openrouter.apiKey;
   if (!key) throw new HttpError(400, NO_KEY);
   const { id, info } = await vectorModel(o.model);
   const label = info?.label ?? id;
@@ -117,7 +117,7 @@ async function drawn(db: DB, ask: SvgAsk, o: { model?: string; signal?: AbortSig
 }
 
 /** A drawing from words: written (Quick) or drawn by a vector model (Best), as the ask's tier says or its kind and words pick. */
-export async function drawSvg(db: DB, ask: SvgAsk, o: { model?: string; signal?: AbortSignal } = {}): Promise<Drawing> {
+export async function drawSvg(db: DB, ask: SvgAsk, o: { model?: string; key?: string; signal?: AbortSignal } = {}): Promise<Drawing> {
   if (!ask.prompt?.trim()) throw new HttpError(400, 'Say what to draw');
   return drawingTierFor(ask.tier, { prompt: ask.prompt, kind: ask.kind }) === 'best' ? drawn(db, ask, o) : written(db, ask, o.signal);
 }
