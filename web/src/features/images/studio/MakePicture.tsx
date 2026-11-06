@@ -9,7 +9,7 @@ import type { MakeImageAnswer, PictureKind, TierChoice, TiersInfo } from '@share
 import { Button, cx, Dialog, Switch } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
 import { getTiers, makeImages } from './api';
-import { drawingKindOf, LOOKS, money, needsKey, PICTURE_KINDS, picturePrice, pictureTier, SHAPES } from './logic';
+import { drawingKindOf, LOOKS, madeWith, needsKey, PICTURE_KINDS, picturePrice, pictureTier, SHAPES } from './logic';
 import { KeyAsk } from './KeyAsk';
 import { Choice, PriceLine, Problem, ShapeMark, Shown, Words, Working, type Option } from './parts';
 import { shownSrc } from './pictures';
@@ -83,7 +83,6 @@ export function MakePicture({ o, onDone, onDraw }: { o: PictureOpts; onDone: (p:
     }
   };
 
-  const modelName = (id: string) => (tiers ? ([tiers.quick, tiers.best, tiers.quick.seeThrough, tiers.best.seeThrough, tiers.transparent].find((m) => m?.id === id)?.label ?? id) : id);
   const footer = made ? (
     <>
       <Button variant="secondary" disabled={busy || askKey} onClick={() => void make()}>
@@ -138,7 +137,7 @@ export function MakePicture({ o, onDone, onDraw }: { o: PictureOpts; onDone: (p:
           </div>
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[12.5px] text-fg-3">
             <span>
-              {made.cost != null ? `Made with ${modelName(made.model)}: ${money(made.cost)}` : `Made with ${modelName(made.model)}`}
+              {madeWith(tiers, made.model, made.cost)}
               {made.cutout && <> · {made.pictures.length > 1 ? 'Their backgrounds were taken out on this computer' : 'Its background was taken out on this computer'}</>}
             </span>
             <button type="button" disabled={busy} className="text-accent hover:underline disabled:opacity-50" onClick={() => setMade(null)}>
@@ -188,7 +187,7 @@ export function MakePicture({ o, onDone, onDraw }: { o: PictureOpts; onDone: (p:
               shown={choice === 'auto' ? `${tr('Auto')} · ${tr(tierName(tier))}` : tierName(choice)}
               options={[
                 { value: 'auto', label: 'Auto', hint: 'Quick or Best, by what you ask' },
-                { value: 'quick', label: 'Quick', hint: 'Cheaper and faster: icons, backgrounds, textures, simple pictures' },
+                { value: 'quick', label: 'Quick', hint: 'Cheaper, faster: icons, backgrounds, textures' },
                 { value: 'best', label: 'Best', hint: 'Scenes, photos, words in a picture, diagrams' },
               ]}
               onChange={setChoice}

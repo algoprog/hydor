@@ -133,6 +133,7 @@ export function PartPanel({
   onError,
   onPageTab,
   base,
+  pageHtml,
 }: {
   sel: EdSel;
   palette: string[];
@@ -148,6 +149,8 @@ export function PartPanel({
   onPageTab: () => void;
   /** The page's folder, for a picture's relative address. */
   base?: string;
+  /** The page's HTML as it is now, for a picture inside it (the editor says only the start of so long an address). */
+  pageHtml?: () => Promise<string>;
 }) {
   const moreRef = useRef<HTMLButtonElement>(null);
   const [more, setMore] = useState(false);
@@ -198,11 +201,23 @@ export function PartPanel({
   const [w] = splitNum(c.width);
   const [h] = splitNum(c.height);
   const bgImage = /url\(["']?([^"')]*)/.exec(get('background-image'))?.[1] ?? '';
+  /** The picked picture's whole address: a long one (a picture inside the page) comes cut short, so it is read from the page. */
+  const fullSrc = async (): Promise<string> => {
+    const src = a.src ?? '';
+    if (!src.endsWith('…') || !pageHtml) return src;
+    const head = src.slice(0, -1);
+    const d = new DOMParser().parseFromString(await pageHtml(), 'text/html');
+    let x: Element | null = d.documentElement;
+    for (const i of sel.path) x = x?.children[i] ?? null;
+    const at = x?.getAttribute('src');
+    if (at?.startsWith(head)) return at;
+    return [...d.querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '').find((s) => s.startsWith(head)) ?? src;
+  };
   /** The picture changed with AI (a dialog), then put in its place as the page keeps it. */
   const changeWithAi = async (mode: 'change' | 'cutout' | 'erase') => {
-    const src = a.src ?? '';
-    if (!src) return;
     try {
+      const src = await fullSrc();
+      if (!src || src.endsWith('…')) throw new Error('That picture could not be read from the page');
       const abs = /^(data:|https?:)/i.test(src) ? src : new URL(src, new URL(base ?? '', location.href)).href;
       const p = await editPicture({ src: abs, mode });
       if (p) cmd('attr', { name: 'src', value: await pageData(p.src) });

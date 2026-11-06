@@ -12,7 +12,7 @@ import { needsKey, ratioOf } from './logic';
 /** Behind a picture with see-through parts: a quiet checkerboard, in either theme. */
 export const CHECKER: CSSProperties = { background: 'repeating-conic-gradient(var(--bg-3) 0 25%, var(--bg-1) 0 50%) 0 0 / 16px 16px' };
 
-/** What to make, in words, with a few examples to start from (put in as the app's language shows them). */
+/** What to make, in words, with a few examples to start from (put in as the app's language shows them; they stay, so nothing below moves). */
 export function Words({ value, onChange, label, placeholder, examples, rows = 3, disabled }: { value: string; onChange: (v: string) => void; label: string; placeholder: string; examples?: string[]; rows?: number; disabled?: boolean }) {
   return (
     <div className="space-y-2">
@@ -26,7 +26,7 @@ export function Words({ value, onChange, label, placeholder, examples, rows = 3,
         placeholder={placeholder}
         className="block w-full resize-none rounded-xl border border-line-2 bg-bg-1 px-3 py-2.5 text-[14px] leading-relaxed text-fg outline-none placeholder:text-fg-3 focus:border-accent/60 focus:ring-3 focus:ring-accent/15 disabled:opacity-60"
       />
-      {!!examples?.length && !value.trim() && (
+      {!!examples?.length && (
         <div className="flex flex-wrap gap-1.5">
           {examples.map((x) => (
             <button key={x} type="button" disabled={disabled} onClick={() => onChange(tr(x))} className="rounded-full border border-line px-2.5 py-1 text-[12.5px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg">
@@ -119,11 +119,11 @@ export function Working({ children, className }: { children: ReactNode; classNam
   );
 }
 
-/** A picture shown whole, over the checkerboard (or over `bg`, the colour it will be seen on). */
+/** A picture shown whole, the checkerboard behind its see-through parts (or `bg`, the colour it will be seen on). */
 export function Shown({ src, alt = '', className, onClick, picked, bg }: { src: string; alt?: string; className?: string; onClick?: () => void; picked?: boolean; bg?: string }) {
-  const body = <img src={src} alt={alt} draggable={false} className={cx('block max-h-full max-w-full object-contain', className)} />;
-  const cls = cx('flex min-h-0 items-center justify-center overflow-hidden rounded-xl border', picked ? 'border-accent ring-2 ring-accent/50' : 'border-line');
-  const style = bg ? { background: bg } : CHECKER;
+  const body = <img src={src} alt={alt} draggable={false} style={bg ? undefined : CHECKER} className={cx('block max-w-full object-contain', className ?? 'max-h-full')} />;
+  const cls = cx('flex min-h-0 items-center justify-center overflow-hidden rounded-xl border bg-bg-1', picked ? 'border-accent ring-2 ring-accent/50' : 'border-line');
+  const style = bg ? { background: bg } : undefined;
   return onClick ? (
     <button type="button" onClick={onClick} aria-pressed={picked} className={cls} style={style}>
       {body}
