@@ -958,7 +958,7 @@ const SCHEMA = {
     by: { type: ['string', 'array'], description: 'sort: a column (letters or header words), or a list of them or of {column, descending}; summarize: the column to sum up by.' },
     descending: { type: 'boolean', description: 'sort: Z to A, largest first.' },
     columns: { type: ['string', 'array'], description: 'remove_duplicates: the columns that must match (all when left out); delete_columns: "C", "C:D" or a list.' },
-    rows: { type: ['string', 'number', 'array'], description: 'delete_rows: "5", "5:7" or a list.' },
+    rows: { type: ['string', 'number', 'array'], description: 'delete_rows: "5", "5:7" or a list; fill_column: empty (the default), all, or row ids.' },
     direction: { type: 'string', enum: ['down', 'right'] },
     what: { type: 'string', enum: ['contents', 'formatting', 'all'] },
     separator: { type: 'string' },
@@ -974,7 +974,6 @@ const SCHEMA = {
     title: { type: 'string', description: 'duplicate: the copy’s title.' },
     database: { type: 'string', description: 'fill_column: the database (its name or title).' },
     column: { type: 'string', description: 'fill_column: the AI column’s name.' },
-    rows: { type: ['string', 'array'], items: { type: 'string' }, description: 'fill_column: empty (the default), all, or row ids.' },
   },
   required: ['id', 'action'],
 };
