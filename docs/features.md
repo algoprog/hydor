@@ -156,7 +156,28 @@ agents that speak ACP and take MCP servers.
   cryptographic digital signature).
 - **Images, videos and audio**: agents make pictures (or change yours), short videos (from words, from a picture
   to start or end on, or by changing a video) and sound with OpenRouter's image, video and audio models, the ones
-  picked in Settings → Images, video and audio or one you name. The app's choices are ByteDance's Seedream 5.0 for
+  picked in Settings → Images, video and audio or one you name. Pictures come in two tiers, each a model of its
+  own: Best (Seedream 5.0 Pro unless you pick another) for scenes, photos, words in a picture, diagrams and every
+  change, and Quick (Seedream 5.0 Flash, or other quick ones) for icons, backgrounds and textures, picked by what is
+  asked (generate_image's detail); a see-through background asked of a model that cannot make one goes to one that
+  can, or is cut out here. Drawings (make_svg: icons, logos, diagrams, patterns, shapes, in given colours) are
+  written as SVG by Claude or the helper model for nothing, or drawn by Recraft's vector model at Best (about
+  $0.08), every one cleaned of scripts, links and what it would load. Plots (make_plot: scatter plots, histograms,
+  error bars, several axes, heat maps, functions) are written in Python with matplotlib by the same writer and run
+  on this computer, errors going back to it (three tries), with their code beside them to change, and a Plotly
+  version that answers the pointer for web decks. Free photos (find_photos) come from Openverse (Wikimedia Commons
+  when it cannot answer), only those free to change and use commercially, saved with their credits. The picture
+  tools on this computer (Settings → Images, video and audio → Set up: a private Python with ONNX Runtime and a
+  portable ffmpeg, about 145 MB, and two models downloaded when first used, BiRefNet-lite and LaMa) take
+  backgrounds out (remove_background) and erase parts of pictures (erase_from_image) for nothing and in private,
+  each model loaded only while used, put away after a few idle minutes and never loaded without the memory for it;
+  a poor cutout, and a large or detailed area to erase, go to an image model, and how: "ai" asks for one.
+  edit_image crops, turns, sizes, adjusts, filters, marks up and blurs pictures, and edit_video trims, cuts, crops,
+  speeds up, captions and sets music to videos, both for nothing on this computer (ffmpeg). A tool that needs an
+  OpenRouter key and finds none asks for it on a card in the conversation (it goes straight to Settings → Models,
+  checked with OpenRouter; Skip and nothing runs or is spent, and the session is not asked again for six hours).
+  When agents make slides, documents and pages they illustrate them by themselves where a picture helps, with
+  these tools. The app's choices are ByteDance's Seedream 5.0 for
   pictures and Seedance 2.5 for videos, Google's Lyria 3 for music (whole songs with or without singing, from the
   agent's description and lyrics) and ByteDance's Seed Audio for voices and sounds (voice-overs in a voice described
   or copied from 1–3 recordings, conversations, sound effects and ambience); any of OpenRouter's speech models

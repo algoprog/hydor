@@ -1,6 +1,6 @@
 # Documents, images, videos and voice
 
-Agents in Hydor read PDFs, Word, Excel, PowerPoint and other documents, make new ones for you, and hand them over as cards you open or download; they can also make pictures and short videos (or change yours), songs, voice-overs and sounds, with image, video and audio models, and you can keep what they make in your Library. And you can speak instead of typing, have replies read aloud, or talk to the app hands-free while you walk.
+Agents in Hydor read PDFs, Word, Excel, PowerPoint and other documents, make new ones for you, and hand them over as cards you open or download; they can also make pictures, drawings, plots and short videos, find free photos, change your pictures and videos (crop, cut out, erase, trim), and make songs, voice-overs and sounds, with image, video and audio models and tools on this computer, and you can keep what they make in your Library. And you can speak instead of typing, have replies read aloud, or talk to the app hands-free while you walk.
 
 ![An agent that read a report and made a one-page Word summary and a spreadsheet with a chart](images/documents-voice.webp)
 
@@ -149,12 +149,17 @@ If LibreOffice can't lay a file out, the viewer says so and its text is still un
 
 Ask any agent for a picture ("make a logo for my bakery", "turn this photo into a watercolour") and it makes it with an image model through OpenRouter, saves it in the session's folder and shows it with its reply. Set it up in **[Settings → Capabilities → Images, video and audio](/settings?s=images)** (on a phone: Settings, then **Images, video and audio**).
 
-- **[Making images](/settings?s=images&find=Making%20images)**: the switch **Let agents make images** gives every agent the tool for it. It is on unless you turn it off; off, agents are not offered the tool.
-- **The OpenRouter key**: image, video and audio models are reached through OpenRouter, and each image, video or sound is paid for with your OpenRouter key. Without one, this section says so, with **Get one at openrouter.ai** and **Add the key**, which opens [Settings → Agents → Models → OpenRouter](/settings?s=models&find=OpenRouter) where the key goes (see [Agents, accounts and models](/guide/agents-models)).
-- **[Image model](/settings?s=images&find=Image%20model)**: the model that makes the images, shown with its maker, about what one image costs (for a picture of about a megapixel), the month OpenRouter listed it and its id, with tags: **New** (listed in the last 30 days), **Edits** (it takes pictures to change or follow) and **Text too** (it writes text with its images). Until you pick one, it is the app's choice ("The app’s choice, until you pick one"): the first of a short list that OpenRouter still offers: ByteDance's Seedream 5.0 Pro and Flash, then Google Gemini, OpenAI and FLUX image models. To pick one:
-  1. Click **Change**: a list of OpenRouter's image models opens.
-  2. Search it by name ("seedream", "flux", "gemini"), and sort it **Suggested** (the app’s suggestions first), **Newest** or **Cheapest**.
-  3. Click a row to use that model. **Let the app choose instead** goes back to the app's choice.
+- **[Making images](/settings?s=images&find=Making%20images)**: the switch **Let agents make images** gives every agent its tools for pictures: making pictures, drawings and plots, and taking a background out of a picture or erasing part of it. It is on unless you turn it off; off, agents are not offered them.
+- **The OpenRouter key**: image, video and audio models are reached through OpenRouter, and each image, video or sound is paid for with your OpenRouter key. Without one, this section says so, with **Get one at openrouter.ai** and **Add the key**, which opens [Settings → Agents → Models → OpenRouter](/settings?s=models&find=OpenRouter) where the key goes (see [Agents, accounts and models](/guide/agents-models)). An agent that needs it asks you for it on a card instead ([When an agent needs the OpenRouter key](#when-an-agent-needs-the-openrouter-key)).
+- **[For most pictures (Best)](/settings?s=images&find=For%20most%20pictures%20%28Best%29)**: the model that makes scenes, photos, people, words inside a picture and diagrams, and every change to a picture. It shows with its maker, about what one image costs (for a picture of about a megapixel), the month OpenRouter listed it and its id, with tags: **New** (listed in the last 30 days), **Edits** (it takes pictures to change or follow) and **Text too** (it writes text with its images). Until you pick one, it is the app's choice ("The app’s choice, until you pick one"): the first of a short list that OpenRouter still offers: ByteDance's Seedream 5.0 Pro and Flash, then Google Gemini, OpenAI and FLUX image models.
+- **[For simple pictures (Quick)](/settings?s=images&find=For%20simple%20pictures%20%28Quick%29)**: a cheaper, quicker model for icons, backgrounds, textures and simple pictures, shown the same way. Until you pick one, it is the app's choice: the first of a short list of quick models OpenRouter still offers, ByteDance's Seedream 5.0 Flash first, then quick ones from Google, Recraft, FLUX and OpenAI (when OpenRouter offers none of them, the Best model makes simple pictures too).
+- **[Picture tools on this computer](/settings?s=images&find=Picture%20tools%20on%20this%20computer)**: taking a picture's background out and erasing part of it on this computer instead of through OpenRouter: free, and your pictures stay here. **Set up** downloads them once, the line under it says what they are doing, and **Remove** takes them off this computer again (see [The picture tools on this computer](/guide/library#the-picture-tools-on-this-computer)).
+
+To pick the Best or the Quick model:
+
+1. Click **Change** beside it: a list of OpenRouter's image models opens (**Image model for most pictures (Best)** or **Image model for simple pictures (Quick)**).
+2. Search it by name ("seedream", "flux", "gemini"), and sort it **Suggested** (the app’s suggestions first), **Newest** or **Cheapest**.
+3. Click a row to use that model. **Let the app choose instead** goes back to the app's choice.
 
 The lists come from OpenRouter and need no key; when they can't be reached, the list says so.
 
@@ -181,9 +186,10 @@ Voice models are mostly sold by the character read, Seed Audio by the second of 
 
 ## Check the settings before anything is made
 
-Before an agent makes a picture, a video or a sound, a short form shows in the conversation with the settings that model takes and what the result costs, filled in with what you asked for and the app's defaults:
+Before an agent makes a picture, a detailed drawing, a video or a sound, a short form shows in the conversation with the settings that model takes and what the result costs, filled in with what you asked for and the app's defaults:
 
 - for a picture: **Shape** (square, wide, tall…, as many as the model takes), **Resolution** (1K, 2K, 4K…), **Quality**, **How many pictures** (for models that make several at once) and **Transparent background** (for a logo or an icon);
+- for a detailed drawing (by Recraft's vector model): its **Shape**;
 - for a video: **Video length** (the lengths the model makes, or **Length, in seconds**), **Shape**, **Resolution** and **Sound**;
 - for a sound: for a song, **Instrumental, no singing** and, with a model that makes long songs, **Length, in seconds** (leave it empty for the song to take as long as it needs); for a sound effect, its **Length, in seconds** (Seed Audio is paid by the second); for speech, the **Voice** (for a model with voices of its own); and the **File** (**MP3, smaller** or **WAV, uncompressed**), where the model makes both.
 
@@ -191,11 +197,23 @@ Above the fields are the model's name, its price ("about $0.08 an image", "$0.03
 
 The form comes once per model in a session: later pictures, videos and sounds in that session use the settings you picked (for a sound, its voice and its file), unless you ask for others ("now a tall one"). Say "show me the settings again" for the form, or "go ahead, choose for me" for the agent to make it without one. Scheduled tasks and apps' runs make theirs without a form, with the app's defaults, since nobody is there to answer.
 
+## When an agent needs the OpenRouter key
+
+Pictures, detailed drawings, videos, music and voices are made by models through OpenRouter, paid for with your OpenRouter key. When an agent goes to make one and no key is set, a card comes first in the conversation, **This needs an OpenRouter key**, saying which model would make it, about what it costs, and that you pay OpenRouter for what is made, with a field for the key:
+
+- Paste it and click **Save the key** (or press Enter). OpenRouter checks it first; it goes straight to [Settings → Agents → Models → OpenRouter](/settings?s=models&find=OpenRouter), never into the conversation, and the agent goes on (to the form with the settings, as always). The card then says "Your OpenRouter key is saved in Settings → Models."
+- **Get a key** opens OpenRouter's page where you make one.
+- **Skip**: that model does not run, nothing is made or spent, and the agent goes on without it, another way where one needs no key (a simple drawing it writes, the [picture tools on this computer](/guide/library#the-picture-tools-on-this-computer)), or none. The session doesn't ask again for six hours.
+
+The card waits up to nine minutes; then the agent goes on without the key, and hears of it if you add it later. Scheduled tasks and apps' runs get no card, since nobody is there to answer: they say the key is missing ("Images need an OpenRouter key", with **Add an OpenRouter key**). The editors' own AI tools ask for the key in their dialog instead ([Make pictures, drawings, plots and videos with AI](/guide/library#make-pictures-drawings-plots-and-videos-with-ai)).
+
 ## Ask for a picture, or have one changed
 
 Describe what you want: the subject, the setting, the style (a photo, an illustration, a watercolour), the colours, the light, and any words that should appear in it. The agent can also:
 
-- **change or combine your pictures**: picture files on this computer (PNG, JPEG, WebP or GIF, up to 20 MB each; most models take up to 4, some more), in the session's folder or by their path; say what to change. (A picture attached to a message goes to the model to look at; for the image model to work from it, it needs to be a file: upload it on the Files page.) This needs a model with the **Edits** tag; with another, the agent is told to describe the change in words or to have you pick a model that edits pictures;
+- **change or combine your pictures**: picture files on this computer (PNG, JPEG, WebP or GIF, up to 20 MB each; most models take up to 4, some more), in the session's folder or by their path, or the pictures already in a deck, a document or a page of your Library; say what to change. (A picture attached to a message goes to the model to look at; for the image model to work from it, it needs to be a file: upload it on the Files page.) This needs a model with the **Edits** tag; with another, the agent is told to describe the change in words or to have you pick a model that edits pictures;
+- **use the Quick or the Best model**: the agent takes the Quick one for simple pictures (a background, a texture, an icon) and the Best one for scenes, photos, words in a picture, diagrams and every change, or decides from what you ask; say so to have the other ("a quick one is fine", "use the Best model");
+- **make the background see-through** (a logo, an icon): a model that cannot make one hands it to one that can, or, with the [picture tools](/guide/library#the-picture-tools-on-this-computer) set up, the picture is made on a plain background and its background taken out on this computer;
 - **use another model** for one picture, when you name it ("make it with FLUX 2 Pro"), without changing Settings.
 
 Pictures are saved in an **images** folder inside the session's folder, named after what they show, and never over a file that is already there.
@@ -203,8 +221,32 @@ Pictures are saved in an **images** folder inside the session's folder, named af
 In the conversation:
 
 - While the model works, a placeholder in the shape asked for says "Making an image" with the time so far, and the description under it.
-- Then the pictures show with the reply, with the description and the model's name under them, and **Save to Library** (see [Keep what an agent made](#keep-what-an-agent-made)). Click one to see it large: click again for full size, the arrows (or arrow keys) step through several, **Open in a new tab** opens it alone, and Escape closes. Over each picture, **Show in the files**, **Download** and **More** (⋯: **Start a session with it**, **Add to a project**, **Copy path**) appear when you point at it (on a phone they are always there); with several pictures, **Save to Library** is there too.
-- Without an OpenRouter key you see "Images need an OpenRouter key", with **Add an OpenRouter key**. When the model makes nothing, you see "No image this time" with its reason.
+- Then the pictures show with the reply, with the description and the model's name under them, and **Save to Library** (see [Keep what an agent made](#keep-what-an-agent-made)). Click one to see it large: click again for full size, the arrows (or arrow keys) step through several, **Open in a new tab** opens it alone, **Edit** opens it in the picture editor (what you save there goes into your Library as a new picture: [Edit pictures and videos](/guide/library#edit-pictures-and-videos)), and Escape closes. Over each picture, **Show in the files**, **Download** and **More** (⋯: **Start a session with it**, **Add to a project**, **Copy path**) appear when you point at it (on a phone they are always there); with several pictures, **Save to Library** is there too.
+- With no OpenRouter key set, a card asks you for one first ([When an agent needs the OpenRouter key](#when-an-agent-needs-the-openrouter-key)); in a run nobody watches (a scheduled task's, an app's) you see "Images need an OpenRouter key" instead, with **Add an OpenRouter key**. When nothing is made (you skipped the key or closed the form, or the model refused), you see "No image this time" with the reason.
+
+## Ask for a drawing or a plot
+
+Some pictures are better drawn from shapes or worked out from numbers than painted by an image model:
+
+- **A drawing** (an SVG: shapes rather than pixels, sharp at any size): an icon, a logo, a diagram, a pattern that repeats, a shape or a flat illustration, in the colours you give (a deck's or a document's own, say). A simple one is written by Claude (or the [helper model](/settings?s=models&find=Helper%20model) you picked), with no image model to pay, in under a minute; a detailed one (an illustration, or when you ask for the best) is drawn by Recraft's vector model through OpenRouter, about $0.08 a drawing, after the form with its price. Scripts, links and anything a drawing would load from elsewhere are taken out of every drawing before it is kept.
+- **A plot** of your data or of maths, for what a slide's chart cannot draw: scatter plots, histograms, box plots, error bars, several axes or panels, heat maps, functions, fits and notes on the points that matter. Claude (or the helper model) writes it in Python with matplotlib, it runs on this computer, and what goes wrong goes back to it to fix (up to three tries); it takes about half a minute and costs only that answer. Give the numbers in your message or as a file (CSV, TSV or JSON, up to 20 MB), and say the point it should make ("show that spring doubled"). It comes as a drawing (SVG; a PNG for very many points), 960 by 540 pixels unless you ask for another size, with its Python beside it, so "now with a log scale" changes that plot; for a web deck it can also come as a plot that moves and answers the pointer. It needs Python with matplotlib on the computer the app runs on: the picture tools' own once they are set up ([The picture tools on this computer](/guide/library#the-picture-tools-on-this-computer)), or one that is there already.
+
+Both are saved in the **images** folder inside the session's folder and show with the reply as pictures do; while one is being made, its placeholder says "Making a drawing" or "Drawing the plot".
+
+## Find free photos
+
+Ask for photos rather than pictures made by a model ("find two photos of Lisbon's trams for my title slide"), and the agent searches openly licensed photos, free to use and to change, for business too: Openverse's catalogue (Flickr, Wikimedia Commons, museums and more), or Wikimedia Commons' own search when Openverse can't answer. It saves a few of the best (4 unless you say, at most 10) in the session's **images** folder with each one's credit (its title, author, licence and link) in a file beside them, looks at them before it uses one, and credits them as their licence asks: in the slide's speaker notes, or under the picture in a document or a page, and for licences other than CC0 and the public domain in a small caption by the photo ("Photo: “Title” by Author, CC BY 2.0"). It is free and takes a few seconds; while it searches, the placeholder says "Finding free photos".
+
+## Cut out, erase and edit
+
+Agents also change your pictures and videos without having them made again:
+
+- **Take the background out** of a picture: its subject (a person, a product, an animal, a logo) on a see-through background, as a PNG. On this computer, once the [picture tools](/guide/library#the-picture-tools-on-this-computer) are set up, it is free and private, keeps the subject's own pixels, and takes a few seconds; a cutout that looks poor is done again by an image model. Without them, an image model through OpenRouter does it (about $0.01 to $0.04), drawing the picture again without its background, so small details may differ.
+- **Erase something** from a picture (a person in the background, a sign, a watermark, a stain, a cable): it is taken away and filled in as what is around it goes on. The agent marks where it is, or describes it for an image model to find. Small areas are erased on this computer for nothing; large ones, ones reaching across the picture, and ones among detailed things such as words go to an image model (about $0.01 to $0.04).
+- **Edit a picture**: crop it, turn or flip it, size it, change its light and colours (exposure, contrast, warmth and the rest), give it a filter (**Vintage**, **Black and white**…), write words on it, draw arrows and boxes, and blur or pixelate parts of it (a face, a number plate, a name). Free, on this computer; a JPEG, WebP or GIF picture, or words on one, needs ffmpeg or the picture tools there.
+- **Edit a video**: trim it, cut parts out, crop it to a shape (16:9, 9:16, square, 4:5), turn or mirror it, speed it up or slow it down, change its brightness, contrast and colour, fade it in and out, take its sound out or change its volume, put words on it (titles, captions) and lay music under it; or make a GIF of it, or take a frame as a picture. Free, with ffmpeg on this computer (the picture tools bring one), while **Let agents make videos** is on.
+
+Each works from a file in the session's folder, or from a picture or a video already in a deck, a document or a page, and saves what it makes in the session's **images** folder (an edited video in **videos**), never over the original. It shows with the reply as a picture the agent made does, its placeholder saying "Taking the background out", "Erasing", "Editing the picture" or "Editing the video" while it works. For a cutout or an erasing, the reply says which way it was made and why: if it is not right, say "do it with AI" and the agent asks the image model. To do it yourself, open the picture or the video in the editor ([Edit pictures and videos](/guide/library#edit-pictures-and-videos)).
 
 ## Ask for a video
 
@@ -221,7 +263,7 @@ Videos are saved in a **videos** folder inside the session's folder, named after
 In the conversation:
 
 - While the model works, a placeholder in the video's shape says "Making a video" with the time so far.
-- Then the video shows with the reply, ready to play (full screen too, from its controls), with the description and the model's name under it, and **Save to Library**. Over it, **Show in the files**, **Download** and **More** (⋯) appear when you point at it.
+- Then the video shows with the reply, ready to play (full screen too, from its controls), with the description and the model's name under it, and **Save to Library**. Over it, **Edit** (the video editor: what you save goes into your Library), **Show in the files**, **Download** and **More** (⋯) appear when you point at it.
 - "Still being made" means the agent stopped waiting before the video was ready: it shows once the agent checks again (ask it to, if it does not). "No video this time" gives the reason: you closed the form, or the model refused (its words say why).
 
 ## Ask for music, a voice or a sound
@@ -243,6 +285,14 @@ In the conversation:
 - Without an OpenRouter key you see "Audio needs an OpenRouter key", with **Add an OpenRouter key**. "No sound this time" gives the reason: you closed the form, or the model refused (its words say why).
 
 The agent cannot hear what it made: it knows the sound by what it asked for. If it does not sound right, say what to change, and it makes another.
+
+## Pictures in what agents make
+
+When an agent makes or changes slides, a document or a page for you, it illustrates them by itself where a picture adds something (a title slide, a section, an idea; not every slide), in their colours and look, as a designer would: a Quick picture for a background, a texture or an icon, a Best one for a scene, a photo or a diagram, a drawing for an icon, a logo or a diagram that must stay sharp, a plot for numbers, free photos of real places and things, and its pictures cut out, erased or edited to fit. It works from the pictures already in what you have open as well as from files. What costs money is priced on the form before it is made ([Check the settings before anything is made](#check-the-settings-before-anything-is-made)); say "no pictures", or "only free photos", when you want it otherwise.
+
+When you ask for a known kind of thing by its name (a SWOT slide, a pitch deck, a cover letter, an executive summary, a habit tracker, a pricing table, a budget), the agent first reads how the app makes that kind well: what goes in it, in what order, how it looks and where pictures help, as the gallery's kinds are made ([Made with AI from a kind](/guide/library#made-with-ai-from-a-kind)). That costs nothing.
+
+In a [confidential session](/guide/sessions#keep-a-session-confidential) none of this is there: its agent makes, finds and edits no pictures or videos.
 
 ## Keep what an agent made
 
@@ -371,8 +421,15 @@ It stops listening to say these, then listens again. Sessions on your other mach
 - "Turn on speech recognition on this computer, with the Small model."
 - "Use my speech server at http://192.168.1.20:8000/v1 for dictation, with the model whisper-large-v3."
 - "Which whisper models are on this computer, and how much space do they take? Remove the ones not in use."
-- "Which image model do agents use now, and about what does one image cost?"
-- "Switch the image model to the cheapest one that can edit pictures."
+- "Which image models do agents use now for most pictures and for simple ones, and about what does one image cost with each?"
+- "Switch the image model for most pictures to the cheapest one that can edit pictures."
+- "Use Recraft V4.1 Flash for simple pictures."
+- "Set up the picture tools on this computer."
+- "Make a flat icon of a bicycle in #0f766e and #f59e0b, as a drawing that stays sharp."
+- "Plot ~/data/sales.csv as monthly bars, 2025 against 2026, and label the spring jump."
+- "Find three free photos of Lisbon's trams for my travel slides, with their credits."
+- "Take the background out of ~/Pictures/mug.jpg."
+- "Erase the man on the left from beach.jpg; if it looks smudged, have an image model do it."
 - "Stop agents from making images."
 - "Which video models make sound, and what does a second cost with each?"
 - "Make agents use Kling for videos."
