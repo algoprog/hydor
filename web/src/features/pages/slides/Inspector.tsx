@@ -24,8 +24,8 @@ import {
   ChartScatter,
   Crop as CropIcon,
   Eraser,
-  FlipHorizontal2,
-  FlipVertical2,
+  TrianglesCenterlineDashedHorizontal,
+  TrianglesCenterlineDashedVertical,
   Group as GroupIcon,
   ImageMinus,
   ImagePlus,
@@ -624,10 +624,10 @@ function PictureLook({
       <Field label="Corners">
         <NumInput label="Corner radius" value={el.radius ?? 0} onChange={(radius) => set({ radius: radius || undefined }, 'radius')} min={0} max={1000} unit="px" />
         <Tool label="Flip across" on={!!el.flipH} onClick={() => set({ flipH: !el.flipH || undefined })}>
-          <FlipHorizontal2 size={15} />
+          <TrianglesCenterlineDashedVertical size={15} />
         </Tool>
         <Tool label="Flip down" on={!!el.flipV} onClick={() => set({ flipV: !el.flipV || undefined })}>
-          <FlipVertical2 size={15} />
+          <TrianglesCenterlineDashedHorizontal size={15} />
         </Tool>
       </Field>
       <Field label="Border">
