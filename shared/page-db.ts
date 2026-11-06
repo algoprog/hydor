@@ -730,13 +730,13 @@ export function pageDatabases(): PageDatabases {
   // ---- formulas (a column worked out from the row's other columns) ---------------------------------------------------------
   type Val = number | string | boolean | Date | null | Val[];
   type Tok = { t: 'n'; v: number } | { t: 's'; v: string } | { t: 'id'; v: string } | { t: 'p'; v: string } | { t: 'op'; v: string };
-  type Node =
+  type FNode =
     | { k: 'lit'; v: Val }
     | { k: 'prop'; name: string }
-    | { k: 'call'; f: string; args: Node[] }
-    | { k: 'un'; op: string; a: Node }
-    | { k: 'bin'; op: string; a: Node; b: Node }
-    | { k: 'if'; c: Node; a: Node; b: Node };
+    | { k: 'call'; f: string; args: FNode[] }
+    | { k: 'un'; op: string; a: FNode }
+    | { k: 'bin'; op: string; a: FNode; b: FNode }
+    | { k: 'if'; c: FNode; a: FNode; b: FNode };
   const lex = (src: string): Tok[] => {
     const out: Tok[] = [];
     let i = 0;
@@ -799,17 +799,23 @@ export function pageDatabases(): PageDatabases {
     'prop', 'if', 'ifs', 'empty', 'not', 'and', 'or', 'abs', 'round', 'floor', 'ceil', 'sqrt', 'pow', 'min', 'max', 'sum', 'mean', 'average', 'avg', 'median', 'length', 'lower', 'upper', 'trim',
     'concat', 'join', 'contains', 'replace', 'replaceAll', 'slice', 'format', 'toNumber', 'now', 'today', 'dateAdd', 'dateSubtract', 'dateBetween', 'formatDate', 'year', 'month', 'day', 'date', 'week', 'hour', 'minute', 'sign', 'mod', 'at', 'first', 'last', 'count', 'unique', 'includes', 'repeat', 'style',
   ]);
-  const parse = (src: string, names: Set<string>): Node => {
+  const parse = (src: string, names: Set<string>): FNode => {
     const toks = lex(src);
     let p = 0;
     const peek = () => toks[p];
-    const isOp = (v: string) => peek()?.t === 'op' && peek()!.v === v;
-    const isWord = (v: string) => peek()?.t === 'id' && peek()!.v.toLowerCase() === v;
+    const isOp = (v: string) => {
+      const t = peek();
+      return t?.t === 'op' && t.v === v;
+    };
+    const isWord = (v: string) => {
+      const t = peek();
+      return t?.t === 'id' && t.v.toLowerCase() === v;
+    };
     const need = (v: string) => {
       if (!isOp(v)) throw new Error(`“${v}” is missing`);
       p++;
     };
-    const primary = (): Node => {
+    const primary = (): FNode => {
       const t = toks[p++];
       if (!t) throw new Error('The formula stops too soon');
       if (t.t === 'n') return { k: 'lit', v: t.v };
@@ -825,7 +831,7 @@ export function pageDatabases(): PageDatabases {
         if (w === 'true' || w === 'false') return { k: 'lit', v: w === 'true' };
         if (isOp('(')) {
           p++;
-          const args: Node[] = [];
+          const args: FNode[] = [];
           if (!isOp(')')) {
             do args.push(expr());
             while (isOp(',') && ++p);
@@ -845,7 +851,7 @@ export function pageDatabases(): PageDatabases {
       }
       throw new Error(`“${t.v}” can’t be used here`);
     };
-    const unary = (): Node => {
+    const unary = (): FNode => {
       if (isOp('-')) {
         p++;
         return { k: 'un', op: '-', a: unary() };
@@ -856,7 +862,7 @@ export function pageDatabases(): PageDatabases {
       }
       return primary();
     };
-    const power = (): Node => {
+    const power = (): FNode => {
       const a = unary();
       if (isOp('^')) {
         p++;
@@ -864,7 +870,7 @@ export function pageDatabases(): PageDatabases {
       }
       return a;
     };
-    const level = (next: () => Node, ops: string[], words: Record<string, string> = {}) => (): Node => {
+    const level = (next: () => FNode, ops: string[], words: Record<string, string> = {}) => (): FNode => {
       let a = next();
       for (;;) {
         const t = peek();
@@ -880,7 +886,7 @@ export function pageDatabases(): PageDatabases {
     const eq = level(cmp, ['==', '!=']);
     const and = level(eq, ['&&'], { and: '&&' });
     const or = level(and, ['||'], { or: '||' });
-    const expr = (): Node => {
+    const expr = (): FNode => {
       const c = or();
       if (isOp('?')) {
         p++;
@@ -895,8 +901,8 @@ export function pageDatabases(): PageDatabases {
     if (p < toks.length) throw new Error(`“${(toks[p] as { v: unknown }).v}” is not in place`);
     return e;
   };
-  const compiled = new Map<string, Node | Error>();
-  const compile = (src: string, names: Set<string>): Node => {
+  const compiled = new Map<string, FNode | Error>();
+  const compile = (src: string, names: Set<string>): FNode => {
     const key = `${src}\u0000${[...names].join('\u0001')}`;
     let c = compiled.get(key);
     if (!c) {
@@ -1127,7 +1133,7 @@ export function pageDatabases(): PageDatabases {
         throw new Error(`There is no function “${f}”`);
     }
   };
-  const evaluate = (n: Node, s: DbState, row: DbRow, depth: number): Val => {
+  const evaluate = (n: FNode, s: DbState, row: DbRow, depth: number): Val => {
     switch (n.k) {
       case 'lit':
         return n.v;

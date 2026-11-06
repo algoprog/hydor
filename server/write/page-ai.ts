@@ -139,9 +139,9 @@ export function pageAiPrompt(a: ReturnType<typeof readPageAi>): string {
 /** The Markdown in the model's answer: no fence around all of it, no line said before it, no quotes it was wrapped in. */
 export function cleanMarkdown(raw: string): string {
   let s = raw.replace(/\r\n?/g, '\n').trim();
+  s = s.replace(/^(?:here(?:'s| is| are)\b[^\n]*|sure\b[^\n]*|certainly\b[^\n]*|of course\b[^\n]*)[:：]\s*\n+/i, '');
   const fence = /^```(?:markdown|md)?\n([\s\S]*?)\n?```$/i.exec(s);
   if (fence) s = fence[1].trim();
-  s = s.replace(/^(?:here(?:'s| is| are)\b[^\n]*|sure\b[^\n]*|certainly\b[^\n]*|of course\b[^\n]*)[:：]\s*\n+/i, '');
   if (/^["“][^"”\n]+["”]$/.test(s)) s = s.slice(1, -1).trim();
   return s.slice(0, 40_000).trim();
 }
