@@ -20,6 +20,7 @@ import { formatting } from '../formatting/index.ts';
 import { guide } from '../guide/index.ts';
 import { guidelines } from '../guidelines/index.ts';
 import { images } from '../images/index.ts';
+import { plots } from '../images/plots.ts';
 import { keep } from '../keep/index.ts';
 import { knowledge } from '../knowledge/index.ts';
 import { language } from '../language/index.ts';
@@ -47,4 +48,4 @@ import type { Feature } from './types.ts';
 
 // The user's guidelines lead what an agent is told, their profile right after them, then what a confidential session
 // may not do; how to format replies follows the pages it may show instead.
-export const FEATURES: Feature[] = [guidelines, profile, confidential, pages, formatting, shots, search, browser, computer, memory, knowledge, spaces, sharing, children, swarm, research, opinion, commits, budget, documents, fileAsk, pdfNotes, images, media, connections, signatures, automations, experiments, voice, assistants, apps, papers, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];
+export const FEATURES: Feature[] = [guidelines, profile, confidential, pages, formatting, shots, search, browser, computer, memory, knowledge, spaces, sharing, children, swarm, research, opinion, commits, budget, documents, fileAsk, pdfNotes, images, plots, media, connections, signatures, automations, experiments, voice, assistants, apps, papers, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];
