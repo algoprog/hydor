@@ -174,6 +174,8 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
       const size = k.still(src.text);
       const data = await withTab({ html, width: size.width, height: size.height, settleMs: 400, blockPrivate: true }, async (tab) => {
         await tab.evaluate('document.fonts.ready.then(() => new Promise((ok) => setTimeout(() => ok(true), 120)))');
+        // A document laid out page by page in the page itself (its footnotes, its columns): once it is.
+        await tab.evaluate("new Promise((ok) => { const t = Date.now(); const w = () => (!document.querySelector('script[data-paginate]') || document.documentElement.dataset.paged || Date.now() - t > 15000 ? ok(true) : setTimeout(w, 50)); w(); })").catch(() => {});
         return printPdf(tab.s, { paperWidth: paper.w, paperHeight: paper.h, margin: 0, cssPageSize: true });
       });
       return out(data, 'pdf');

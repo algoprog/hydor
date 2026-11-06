@@ -56,7 +56,7 @@ import { getVideo, sendVideo, takeVideoPiece, videoAddressOk } from './videos.ts
 import { videoSrc } from '../../shared/slides.ts';
 import { exportPage, EXPORT_TYPES, type ExportFormat } from './export.ts';
 import { fontFile, fontsCss } from './fonts.ts';
-import { agentDoc, docPage, readDoc, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
+import { agentDoc, docPage, paginateOptions, readDoc, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
 import { applyDocEdits } from '../../shared/doc-edits.ts';
 import { applyDeckEdits, changesSlides } from '../../shared/deck-edits.ts';
 import { applyBookEdits } from '../../shared/sheet-edits.ts';
@@ -1100,7 +1100,9 @@ function routes(d: Deps) {
     } catch (e) {
       throw new HttpError(400, (e as Error).message);
     }
-    return { html: docPage(db, doc, typeof b.title === 'string' ? b.title.slice(0, 300) : 'Document', 'print') };
+    const html = docPage(db, doc, typeof b.title === 'string' ? b.title.slice(0, 300) : 'Document', 'print');
+    // Pages with footnotes at their foot, or in columns, are laid out by the editor in its frame (which runs no script of the page's).
+    return { html, ...(html.includes('<script data-paginate>') ? { paginate: paginateOptions(doc) } : {}) };
   });
 
   // ---- a deck's pictures and fonts ---------------------------------------------------------------
