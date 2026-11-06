@@ -377,7 +377,8 @@ export function Scene3dLook({
     setBusy(true);
     try {
       const src = await pickModel();
-      if (src) set({ model: src } as Partial<El>);
+      // A model shows in its own materials and colours until one is picked.
+      if (src) set({ model: src, material: undefined } as Partial<El>);
     } finally {
       setBusy(false);
     }
@@ -424,13 +425,20 @@ export function Scene3dLook({
             <p className={note}>Or a model of your own: a GLB file, from a 3D app or a site of free models.</p>
           </>
         )}
-        <Field label="Colour">
-          <ColorButton value={el.color ?? 'accent'} theme={theme} onChange={(color) => set({ color: color ?? 'accent' } as Partial<El>)} label="Colour" />
-          {el.model && <span className={note}>For a model, a tint over its own colours.</span>}
-        </Field>
         <Field label="Material">
-          <Select value={el.material ?? 'glossy'} onChange={(material) => set({ material: material as Material3d } as Partial<El>)} options={MATERIALS_3D.map((m) => ({ value: m, label: MATERIAL[m] }))} title="Material" />
+          <Select
+            value={el.material ?? (el.model ? '' : 'glossy')}
+            onChange={(material) => set({ material: (material || undefined) as Material3d | undefined } as Partial<El>)}
+            options={[...(el.model ? [{ value: '', label: 'Its own' }] : []), ...MATERIALS_3D.map((m) => ({ value: m, label: MATERIAL[m] }))]}
+            title="Material"
+          />
         </Field>
+        {(!el.model || el.material) && (
+          <Field label="Colour">
+            <ColorButton value={el.color ?? 'accent'} theme={theme} onChange={(color) => set({ color: color ?? 'accent' } as Partial<El>)} label="Colour" />
+            {el.model && <span className={note}>The whole model, in this material.</span>}
+          </Field>
+        )}
         <Field label="Lighting">
           <Select value={el.light ?? 'studio'} onChange={(light) => set({ light: light as Light3d } as Partial<El>)} options={LIGHTS_3D.map((m) => ({ value: m, label: LIGHT[m] }))} title="Lighting" />
         </Field>
