@@ -332,7 +332,6 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         },
         '-',
         { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'comment note review feedback', disabled: ro, run: a.comment },
-        { label: 'Slide numbers and footer', also: 'footer page number date', disabled: ro, run: a.footer },
       ],
     },
     {
