@@ -14,6 +14,11 @@
 // each closable, and a picture or a file TeX takes from the folder opens in the source's place to look at.
 // While an agent writes a new version (live.ts), its source shows as it comes, read-only, with the agent's caret where
 // its words arrive (the file it writes brought into view); it is typeset once it is saved.
+// AI outside any session (ai.tsx): Rewrite, Write with AI (Ctrl+K), LaTeX from a picture, an error's Explain and Fix,
+// Find a citation for this and Proofread. View → Keys picks Normal, Vim or Emacs (keys.ts); Edit → Tidy the source
+// indents it and lines up tables (shared/latex-tidy.ts); Tidy the bibliography is BibTidy.tsx; the preview finds words in
+// the pages and takes words picked on them to the source (PdfText.tsx). Typesetting can be a draft (pictures as boxes) or
+// stop at the first error, its cached files cleared; Tools → Name this version names the latest version.
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
