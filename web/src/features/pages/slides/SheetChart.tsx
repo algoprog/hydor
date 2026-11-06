@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import type { PageInfo } from '@shared/pages';
-import { chartFromSheet, sheetTables } from '@shared/slides-sheet';
+import { chartFromSheet, chartRefreshed, sheetTables } from '@shared/slides-sheet';
 import { CHART_KINDS, newId, type ChartEl, type ChartKind, type ChartSource, type Deck, type El } from '@shared/slides';
 import type { Workbook } from '@shared/sheets';
 import { api, enc } from '../../../lib/api';
@@ -33,14 +33,10 @@ export async function chartUpdated(el: ChartEl): Promise<ChartEl> {
   const src = el.source;
   if (!src) return el;
   const { title, book } = await loadBook(src.page);
-  const r = chartFromSheet(book, src, el.kind);
-  if ('error' in r) throw new Error(r.error);
   // Each series keeps the colour it was given, by its name (else its place).
-  const series = r.series.map((s, i) => {
-    const was = el.series.find((x) => x.name === s.name) ?? el.series[i];
-    return was?.color ? { ...s, color: was.color } : s;
-  });
-  return { ...el, labels: r.labels, series, source: { ...src, title, at: Date.now() } };
+  const r = chartRefreshed(el, book, title);
+  if ('error' in r) throw new Error(r.error);
+  return r;
 }
 
 /** The chart's Format panel: where its numbers come from, and Update from the spreadsheet. */

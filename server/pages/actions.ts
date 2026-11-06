@@ -10,14 +10,20 @@ import { HttpError } from '../auth.ts';
 import type { RunCtx, RunTool } from '../features/types.ts';
 import { describe } from '../write/index.ts';
 import { kindOf, mustKind, type PageKind } from './kinds.ts';
+import { folderPath } from './folders.ts';
 import { compileSummary, compileTex } from './latex.ts';
+import { myThemeByName, myThemes } from './my-themes.ts';
+import { readBook } from './sheets.ts';
 import { createPage, mustPage, pageSource } from './store.ts';
 import { refreshThumbs } from './thumbs.ts';
 import type { PageInfo } from '../../shared/pages.ts';
 import { animateSlide, type AnimateStyle } from '../../shared/deck-animate.ts';
 import { checkSlide, fixAll, fixIssue, MIN_TEXT as MIN, type DeckIssue, type IssueKind } from '../../shared/deck-check.ts';
 import { reshapeDeck } from '../../shared/deck-shape.ts';
-import { ASSET, everyEl, isWebDeck, plainText, powerPointNote, richFeatures, slideTitle, THEMES, toPowerPoint, type Deck, type El, type Theme } from '../../shared/slides.ts';
+import { reuseSlides } from '../../shared/slides-reuse.ts';
+import { chartRefreshed } from '../../shared/slides-sheet.ts';
+import { TURN_INTO, turnAsk } from '../../shared/content-asks.ts';
+import { ASSET, everyEl, isWebDeck, plainText, powerPointNote, richFeatures, slideTitle, THEMES, toPowerPoint, type ChartEl, type Deck, type El, type Theme } from '../../shared/slides.ts';
 import { docFont, PAPERS, ptOf, resolveSuggestion, type Band, type Doc } from '../../shared/docs.ts';
 import {
   adjustForDelete,
@@ -62,6 +68,8 @@ interface Done<M> {
 interface Here {
   ctx: RunCtx;
   page: PageInfo;
+  /** A page out of the agent's reach (a confidential session's, seen from another): as if there were none. */
+  hidden: (p: PageInfo) => boolean;
 }
 
 type Act<M> = (m: M, a: Args, x: Here) => Done<M> | Promise<Done<M>>;
@@ -227,14 +235,26 @@ const powerpoint: Act<Deck> = (d, a) => {
   return { model: web, said: 'put the deck back in the web format: custom code, quizzes, 3D and the web’s effects can go on it again (its slides are as they were).' };
 };
 
-/** The Theme tab's Ready-made: a preset's colours and fonts, as the editor puts them on the deck. */
-const theme: Act<Deck> = (d, a) => {
+/**
+ * The Theme tab's Ready-made (a preset's colours and fonts) or My themes (the user's own, by its name: its colours, fonts
+ * and logo), as the editor puts them on the deck.
+ */
+const theme: Act<Deck> = (d, a, x) => {
   const name = str(a.theme).toLowerCase();
   const p = THEMES.find((t) => t.id === name || t.label.toLowerCase() === name);
-  if (!p) throw new Error(`theme: a ready-made theme, one of ${THEMES.map((t) => t.id).join(', ')} (colours and fonts of your own go in save_slides’ theme).`);
-  const own: Theme = { id: p.id, bg: p.bg, fg: p.fg, head: p.head, muted: p.muted, accent: p.accent, accentFg: p.accentFg, soft: p.soft, colors: [...p.colors], font: p.font, headFont: p.headFont };
-  if (JSON.stringify(own) === JSON.stringify(d.theme)) return { said: `The deck is in the ${p.label} theme already.` };
-  return { model: { ...d, theme: own }, said: `put the ${p.label} theme on the deck: its colours and fonts (${p.headFont === p.font ? p.font : `${p.headFont} and ${p.font}`}) on every slide; parts with colours of their own keep them.` };
+  if (p) {
+    const own: Theme = { id: p.id, bg: p.bg, fg: p.fg, head: p.head, muted: p.muted, accent: p.accent, accentFg: p.accentFg, soft: p.soft, colors: [...p.colors], font: p.font, headFont: p.headFont };
+    if (JSON.stringify(own) === JSON.stringify(d.theme)) return { said: `The deck is in the ${p.label} theme already.` };
+    return { model: { ...d, theme: own }, said: `put the ${p.label} theme on the deck: its colours and fonts (${p.headFont === p.font ? p.font : `${p.headFont} and ${p.font}`}) on every slide; parts with colours of their own keep them.` };
+  }
+  const mine = myThemeByName(x.ctx.deps.db, str(a.theme));
+  if (!mine) {
+    const names = myThemes(x.ctx.deps.db).map((t) => `“${t.name}”`);
+    throw new Error(`theme: a ready-made theme (${THEMES.map((t) => t.id).join(', ')})${names.length ? ` or one of the user’s own (${names.join(', ')})` : ''}; colours and fonts of your own go in save_slides’ theme.`);
+  }
+  const next: Deck = { ...d, theme: { ...mine.theme, colors: [...mine.theme.colors] }, ...(mine.logo ? { logo: { ...mine.logo } } : {}) };
+  if (JSON.stringify([next.theme, next.logo]) === JSON.stringify([d.theme, d.logo])) return { said: `The deck is in “${mine.name}” already.` };
+  return { model: next, said: `put the user’s theme “${mine.name}” on the deck: its colours and fonts on every slide${mine.logo ? ', and its logo' : ''}.` };
 };
 
 /** The Theme tab's Slide shape (shared/deck-shape.ts). */
@@ -243,6 +263,73 @@ const slideShape: Act<Deck> = (d, a) => {
   if (r !== '16:9' && r !== '4:3') throw new Error('ratio: "16:9" (wide) or "4:3" (standard).');
   if (d.ratio === r) return { said: `The slides are ${r} already.` };
   return { model: reshapeDeck(d, r), said: `made the slides ${r === '16:9' ? 'wide (16:9)' : 'standard (4:3)'}: every part kept its place across the slide, and its place and height down it went in step with the slide’s new height.` };
+};
+
+/** Insert → Slides from another deck (shared/slides-reuse.ts): copies of its slides, after the slide named (at the end when left out). */
+const reuse: Act<Deck> = (d, a, x) => {
+  const fromId = str(a.from);
+  if (!fromId) throw new Error('from: the deck to take slides from, by its id (get_page lists them).');
+  const fp = mustPage(x.ctx.deps.db, fromId);
+  if (x.hidden(fp)) throw new HttpError(404, 'No saved page with that id');
+  if (fp.kind !== 'slides') throw new Error(`from: “${fp.title}” is a ${NOUN[fp.kind && kindOf(fp.kind) ? fp.kind : 'page']}, not a slide deck.`);
+  const from = mustKind('slides').read(pageSource(x.ctx.deps.db, fromId)!.text) as Deck;
+  const picks = slidesOf(from, a.slides);
+  const at = a.after === undefined || a.after === null || a.after === '' ? d.slides.length : str(a.after) === '0' ? 0 : slidesOf(d, [a.after])[0] + 1;
+  const keepLook = a.keep_look !== false;
+  const made = reuseSlides(from, picks, d, { keepLook });
+  if (d.slides.length + made.length > 300) throw new Error(`The deck would have ${d.slides.length + made.length} slides: a deck holds at most 300.`);
+  const slides = [...d.slides];
+  slides.splice(at, 0, ...made);
+  const where = at === d.slides.length ? 'at the end' : at === 0 ? 'first' : `after slide ${at}`;
+  return {
+    model: { ...d, slides },
+    said: `put ${plural(made.length, 'slide')} from “${fp.title}” (${whichSlides(picks, from).replace('every slide', 'all of its slides')}) ${where}, as slides ${at + 1}${made.length > 1 ? ` to ${at + made.length}` : ''}: ${keepLook ? 'each keeps its own look' : 'they take this deck’s theme'}; their speaker notes came along, their comments stayed behind.`,
+  };
+};
+
+/** A chart's Update from the spreadsheet (shared/slides-sheet.ts), for every chart made from one (or on the slides named). */
+const updateCharts: Act<Deck> = (d, a, x) => {
+  const ix = new Set(slidesOf(d, a.slides));
+  const books = new Map<string, { title: string; book: Workbook } | string>();
+  const bookOf = (id: string) => {
+    if (!books.has(id)) {
+      const p = (() => {
+        try {
+          return mustPage(x.ctx.deps.db, id);
+        } catch {
+          return null;
+        }
+      })();
+      const src = p && !x.hidden(p) ? pageSource(x.ctx.deps.db, id) : null;
+      books.set(id, src?.kind === 'sheet' ? { title: src.title, book: readBook(src.text) } : `its spreadsheet (${id}) is no longer in the Library`);
+    }
+    return books.get(id)!;
+  };
+  const notes: string[] = [];
+  let n = 0;
+  let found = 0;
+  const map = (els: El[], i: number): El[] =>
+    els.map((e) => {
+      if (e.type === 'group') return { ...e, els: map(e.els, i) };
+      if (e.type !== 'chart' || !e.source) return e;
+      found++;
+      const got = bookOf(e.source.page);
+      if (typeof got === 'string') {
+        notes.push(`Slide ${i + 1}, chart ${e.id}: ${got}.`);
+        return e;
+      }
+      const r = chartRefreshed(e, got.book, got.title);
+      if ('error' in r) {
+        notes.push(`Slide ${i + 1}, chart ${e.id}: ${r.error}`);
+        return e;
+      }
+      n++;
+      return r as ChartEl;
+    });
+  const next: Deck = { ...d, slides: d.slides.map((s, i) => (ix.has(i) ? { ...s, els: map(s.els, i) } : s)) };
+  if (!found) return { said: `No chart on ${whichSlides([...ix], d)} is made from a spreadsheet (a chart’s source: {page, sheet, range} in save_slides makes one so).` };
+  if (!n) return { said: 'No chart could be read again.', notes };
+  return { model: next, said: `read ${plural(n, 'chart')} again from ${books.size === 1 ? 'its spreadsheet' : 'their spreadsheets'}: their labels and numbers are the cells’ as they are now, each series in the colour it had.`, notes };
 };
 
 // ---- documents --------------------------------------------------------------------------------------------------------
@@ -741,7 +828,7 @@ const clearOutputs: Act<Json> = (nb, a) => {
 // ---- every kind -------------------------------------------------------------------------------------------------------
 
 const ACTIONS: { [K in PageKind]: Record<string, Act<any>> } = {
-  slides: { animate, fix_accessibility: fixAccessibility, describe_pictures: describePictures, powerpoint, theme, slide_shape: slideShape },
+  slides: { animate, fix_accessibility: fixAccessibility, describe_pictures: describePictures, powerpoint, theme, slide_shape: slideShape, reuse_slides: reuse, update_charts: updateCharts },
   doc: { accept_suggestions: suggestions(true), reject_suggestions: suggestions(false), page_setup: pageSetup, header_footer: headerFooter },
   sheet: {
     sort,
@@ -764,13 +851,28 @@ const ACTIONS: { [K in PageKind]: Record<string, Act<any>> } = {
   notebook: { clear_outputs: clearOutputs },
 };
 
-/** Every action's name: those of each kind, and duplicate (any kind). */
-export const PAGE_ACTIONS = [...Object.values(ACTIONS).flatMap((m) => Object.keys(m)), 'duplicate'];
+/** Every action's name: those of each kind, and those of any kind. */
+export const PAGE_ACTIONS = [...Object.values(ACTIONS).flatMap((m) => Object.keys(m)), 'turn_into', 'duplicate'];
 
 const NOUN: Record<PageKind | 'page', string> = { slides: 'slide deck', doc: 'document', sheet: 'spreadsheet', tex: 'LaTeX document', notebook: 'notebook', page: 'page' };
 
 /** The actions there are for a kind of page, for the agent beside one (index.ts askInstructions) and for errors. */
-export const actionsFor = (kind: PageKind | 'page') => [...(kind === 'page' ? [] : Object.keys(ACTIONS[kind])), 'duplicate'];
+export const actionsFor = (kind: PageKind | 'page') => [...(kind === 'page' ? [] : Object.keys(ACTIONS[kind])), 'turn_into', 'duplicate'];
+
+/**
+ * The Library's Turn it into (shared/content-asks.ts turnAsk): what the app asks an agent for, to make slides, a document
+ * or a page from it; the agent does it with its save tool, and the page itself stays as it is.
+ */
+function turnInto(x: Here, a: Args): string {
+  const { page } = x;
+  const from = page.kind && kindOf(page.kind) ? page.kind : 'page';
+  const to = str(a.to).toLowerCase();
+  const can = TURN_INTO[from];
+  if (!(can as string[]).includes(to)) throw new Error(`to: a ${NOUN[from]} turns into ${can.map((k) => (k === 'slides' ? 'slides' : k === 'doc' ? 'a document (doc)' : 'a page')).join(', ')}.`);
+  const folder = page.folder ? folderPath(x.ctx.deps.db, page.folder) : '';
+  const ask = turnAsk({ from, to: to as 'slides' | 'doc' | 'page', id: page.id, title: page.title, folder: folder || undefined });
+  return `Nothing is changed yet. What the Library’s Turn it into asks for, to do now with ${to === 'slides' ? 'save_slides' : to === 'doc' ? 'save_doc' : 'save_page'} (keep it in their Library; it shows them where it is): ${ask}`;
+}
 
 /** Duplicate in the Library: a copy beside it (its data stays with the first), made by the agent. */
 function duplicate(x: Here, a: Args): string {
@@ -794,8 +896,10 @@ const DESCRIPTION = [
   '- fix_accessibility {slides?}: put right what Tools → Check accessibility can (small words, colours that stand out too little, titles and the order they are read in, videos that start with their sound, tables without a header row); it lists what is left.',
   '- describe_pictures {slides?, parts?: [part ids]}: a description (alt) for each picture without one (or those listed), written by the model that describes the Library’s pictures (Settings → Images, video and audio; it may cost a little); up to 12 a call.',
   '- powerpoint {on: true|false}: PowerPoint compatible (what PowerPoint lacks becomes pictures or its nearest effects; it says what changed) when the user wants a file for PowerPoint, Keynote or Google Slides; false puts it back in the web format.',
-  `- theme {theme: ${THEMES.map((t) => t.id).join('|')}}: a ready-made theme’s colours and fonts on every slide (the Theme tab’s Ready-made).`,
+  `- theme {theme: ${THEMES.map((t) => t.id).join('|')} or one of the user’s own themes by its name}: its colours and fonts on every slide, and a theme of the user’s own brings its logo (the Theme tab’s Ready-made and My themes).`,
   '- slide_shape {ratio: 16:9|4:3}: wide or standard slides, every part moved and sized down the slide in step.',
+  '- reuse_slides {from: another deck’s id, slides?: its slides (all when left out), after?: a slide of this deck (0: first; left out: at the end), keep_look?: false for this deck’s theme}: copies of its slides put in (Insert → Slides from another deck), their notes along, their comments left behind.',
+  '- update_charts {slides?}: every chart made from a spreadsheet of the Library read again from its cells (Update from the spreadsheet), each series keeping its colour.',
   'Documents.',
   '- accept_suggestions, reject_suggestions {ids?}: accept or reject the suggested changes listed (get_page lists them), or every one.',
   '- page_setup {paper?: a4|letter, margin?: mm, font?, size?: pt}: the paper, margins and body text (Page setup).',
@@ -816,6 +920,7 @@ const DESCRIPTION = [
   'Notebooks.',
   '- clear_outputs {cells?}: clear the outputs of every code cell (or of the cells listed, by number or id).',
   'Any of them.',
+  '- turn_into {to: slides|doc|page}: what the Library’s Turn it into asks for, to make slides, a document or a page from it (you then make it with the save tool; it stays as it is).',
   '- duplicate {title?}: a copy beside it in the Library (“… (copy)”).',
   'Freezing rows and columns, a filter, and what a part, a slide, a cell or a paragraph has of its own are the save tools’ (save_sheet’s freeze and filter, save_slides’ change, save_doc’s edits).',
 ].join('\n');
@@ -829,7 +934,10 @@ const SCHEMA = {
     slides: { type: 'array', items: { type: ['number', 'string'] }, description: 'Slides by number (from 1) or id; all when left out.' },
     parts: { type: 'array', items: { type: 'string' }, description: 'describe_pictures: pictures by part id.' },
     on: { type: 'boolean', description: 'powerpoint.' },
-    theme: { type: 'string', description: 'theme: a ready-made theme’s name.' },
+    theme: { type: 'string', description: 'theme: a ready-made theme’s name, or one of the user’s own by its name.' },
+    from: { type: 'string', description: 'reuse_slides: the deck to take slides from, by its id.' },
+    after: { type: ['number', 'string'], description: 'reuse_slides: the slide they go after (0: first; left out: at the end).' },
+    keep_look: { type: 'boolean', description: 'reuse_slides: false to give them this deck’s theme (they keep their own when left out).' },
     ratio: { type: 'string', enum: ['16:9', '4:3'], description: 'slide_shape.' },
     ids: { type: 'array', items: { type: 'string' }, description: 'accept_suggestions, reject_suggestions: suggestions by id; all when left out.' },
     paper: { type: 'string', enum: ['a4', 'letter'] },
@@ -855,7 +963,7 @@ const SCHEMA = {
     at: { type: ['number', 'string'], description: 'insert_rows: a row number; insert_columns: a column’s letters.' },
     count: { type: 'number' },
     name: { type: 'string', description: 'rename_sheet, duplicate_sheet: the sheet’s name.' },
-    to: { type: 'number', description: 'move_sheet: its place from 1.' },
+    to: { type: ['number', 'string'], description: 'move_sheet: its place from 1; turn_into: slides, doc or page.' },
     moves: { type: 'array', items: { type: 'object' }, description: 'move_files: [{from, to}].' },
     cells: { type: 'array', items: { type: ['number', 'string'] }, description: 'clear_outputs: cells by number or id.' },
     title: { type: 'string', description: 'duplicate: the copy’s title.' },
@@ -880,7 +988,9 @@ export function pageActionTool(o: { keep: KeepPage; hidden: (ctx: RunCtx, p: Pag
       if (o.hidden(ctx, page)) throw new HttpError(404, 'No saved page with that id');
       const kind: PageKind | 'page' = page.kind && kindOf(page.kind) ? page.kind : 'page';
       const action = str(a.action).toLowerCase().replace(/[\s-]+/g, '_');
-      if (action === 'duplicate') return duplicate({ ctx, page }, a);
+      const here: Here = { ctx, page, hidden: (q) => o.hidden(ctx, q) };
+      if (action === 'duplicate') return duplicate(here, a);
+      if (action === 'turn_into') return turnInto(here, a);
       const run = kind === 'page' ? undefined : ACTIONS[kind][action];
       if (!run) {
         const other = (Object.keys(ACTIONS) as PageKind[]).find((k) => ACTIONS[k][action]);
@@ -889,7 +999,7 @@ export function pageActionTool(o: { keep: KeepPage; hidden: (ctx: RunCtx, p: Pag
         throw new Error(`action: ${action ? `there is no action ${quote(action)}; ` : ''}for a ${NOUN[kind]} (“${page.title}”) it is one of ${mine}.${kind === 'page' ? ' A page of HTML changes with save_page.' : ''}`);
       }
       const k = mustKind(kind as PageKind);
-      const done = await run(k.read(pageSource(db, id)!.text), a, { ctx, page });
+      const done = await run(k.read(pageSource(db, id)!.text), a, here);
       if (done.model === undefined) return [done.said, ...(done.notes ?? [])].join(' ');
       // A LaTeX document is typeset first, as save_latex does: the agent hears of errors to fix.
       const typeset = kind === 'tex' ? compileSummary(await compileTex(db, done.model as TexDoc)) : '';
