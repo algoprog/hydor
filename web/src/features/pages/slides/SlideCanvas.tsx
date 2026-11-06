@@ -44,6 +44,8 @@ export interface FindMark {
   chart?: string;
   /** In an equation's LaTeX: the equation is marked whole. */
   tex?: boolean;
+  /** In a part's own words that are not drawn as they are found (a quiz's, a score's, code's): the part is marked whole. */
+  whole?: boolean;
   s: number;
   e: number;
   current: boolean;
@@ -441,9 +443,9 @@ export const SlideCanvas = forwardRef<
     for (const m of marks) {
       const part = nodeOf(m.id);
       const put = (b: DOMRect) => out.push({ x: b.left - st.left, y: b.top - st.top, w: b.width, h: b.height, current: m.current });
-      // An equation: what KaTeX drew of it (its LaTeX is not on the slide).
-      if (m.tex) {
-        const drawn = part?.querySelector('.ns-mi') ?? part;
+      // An equation: what KaTeX drew of it (its LaTeX is not on the slide); a quiz, a score, code: the part.
+      if (m.tex || m.whole) {
+        const drawn = m.tex ? (part?.querySelector('.ns-mi') ?? part) : part;
         if (drawn) put(drawn.getBoundingClientRect());
         continue;
       }

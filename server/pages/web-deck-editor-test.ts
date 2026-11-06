@@ -9,6 +9,7 @@
 import { ANIM_FX, newDeck, normalizeDeck, RICH_ANIM_FX, RICH_TRANSITIONS, RICH_TYPES, richFeatures, SLIDE_LIMITS, toPowerPoint, TRANSITIONS, everyEl, type Anim, type Deck, type El, type QuizEl } from '../../shared/slides.ts';
 import { codePart, effectDur, embedAddress, embedPart, featuresBySlide, htmlPart, isLive, quizPart, scene3dPart, scorePart, toWebFormat, transitionDur } from '../../web/src/features/pages/slides/ops.ts';
 import { STARTERS } from '../../web/src/features/pages/slides/starters.ts';
+import { findInDeck, replaceAllInDeck, replaceHit } from '../../web/src/features/pages/slides/find.ts';
 import { slidesMenus, type MenuArgs } from '../../web/src/features/pages/slides/SlidesMenus.tsx';
 import type { MenuAction, MenuEntry } from '../../web/src/features/pages/common/menus.tsx';
 
@@ -143,6 +144,33 @@ const partOf = (d: Deck, id: string) => everyEl(d.slides[0].els).find((e) => e.i
   // A part may start its own effect when clicked, or another's.
   const d = normalizeDeck({ ...d0, slides: [{ ...d0.slides[0], anims: [{ el: el.id, type: 'em', fx: 'wiggle', on: 'tap', trigger: el.id, dur: 700, delay: 0 }] }] });
   ok(d.slides[0].anims?.[0]?.on === 'tap' && d.slides[0].anims[0].trigger === el.id, 'a part clicked runs its own effect');
+}
+
+// ---- Find and replace reaches a quiz's, a score's and code's words -----------------------------------------------------
+{
+  const d0 = newDeck('Test');
+  const q = quizPart(d0);
+  const sc = scorePart(d0);
+  const c = codePart(d0);
+  const h = htmlPart(d0);
+  const d: Deck = { ...d0, slides: [{ ...d0.slides[0], els: [...d0.slides[0].els, q, sc, c, h] }] };
+  const o = { matchCase: false, wholeWord: false, regex: false };
+  const planet = findInDeck(d, 'planet', o);
+  ok(planet.length === 2 && planet.every((x) => x.where === 'words' && x.id === q.id) && planet.some((x) => x.field === 'question') && planet.some((x) => x.field === 'explain'), 'a quiz’s question and its explanation are found');
+  const jup = findInDeck(d, 'Jupiter', o);
+  ok(jup.some((x) => x.field === 'choice' && x.n === 1) && jup.some((x) => x.field === 'why' && x.n === 1), 'its choices and what each says');
+  ok(findInDeck(d, 'greet', o).filter((x) => x.field === 'code' && x.id === c.id).length === 2, 'code’s words');
+  ok(findInDeck(d, '{total}', o).some((x) => x.field === 'score' && x.id === sc.id), 'a quiz score’s words');
+  ok(!findInDeck(d, 'button', o).some((x) => x.id === h.id), 'not custom code’s markup');
+  const one = replaceHit(d, jup.find((x) => x.field === 'choice')!, 'Jupiter', 'Saturn', o);
+  const q1 = one.slides[0].els.find((e) => e.id === q.id) as QuizEl;
+  ok(q1.choices[1].text === 'Saturn' && q1.choices[1].correct === true && q1.choices[1].why?.includes('Jupiter'), 'one replaced: that choice alone, still the right one');
+  const all = replaceAllInDeck(d, 'Jupiter', 'Saturn', o);
+  const q2 = all.deck.slides[0].els.find((e) => e.id === q.id) as QuizEl;
+  ok(all.count === jup.length && q2.choices[1].text === 'Saturn' && !!q2.choices[1].why?.startsWith('Saturn') && !!q2.explain?.startsWith('Saturn'), 'every one replaced, counted');
+  const code2 = replaceAllInDeck(d, 'greet', 'welcome', o).deck.slides[0].els.find((e) => e.id === c.id);
+  ok(code2?.type === 'code' && !code2.code.includes('greet') && code2.code.split('welcome').length === 3, 'code’s words replaced too');
+  ok(normalizeDeck(all.deck).slides[0].els.some((e) => e.type === 'quiz' && e.choices[1].text === 'Saturn'), 'the deck keeps them');
 }
 
 // ---- the menus, by format -----------------------------------------------------------------------------------------
