@@ -8,6 +8,7 @@
 //     fixed, translated, or as the user says; facts, names and numbers kept, a paragraph a line as it came.
 //   POST /api/write/describe      {src, context?} → {alt, by}: by the model that writes the Library's titles and
 //     descriptions (Settings → Images, video and audio), in the language of the slide's words.
+// And the page editor's AI (Notion AI's) and a database's AI column: page-ai.ts (POST /api/write/page-ai, /api/write/db-ai).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
