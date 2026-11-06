@@ -83,7 +83,7 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import type { El, ElType } from '@shared/slides';
-import type { MenuDef } from '../common/menus';
+import type { MenuDef, MenuEntry } from '../common/menus';
 import type { AlignHow } from './ops';
 import type { TextActions } from './TextBar';
 
@@ -185,6 +185,8 @@ export interface MenuArgs {
   /** This slide as a picture (PNG). */
   slidePicture?: () => void;
   present(from: 'start' | 'here' | 'presenter'): void;
+  /** The other ways to present (Play the narration, Rehearse with coach, Record a video): Slide → More ways to present. */
+  presentMore?: MenuEntry[];
   shortcuts(): void;
   ask?: () => void;
 }
@@ -432,6 +434,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         { label: 'Present from this slide', icon: <Play size={14} />, keys: 'Shift+F5', run: () => a.present('here') },
         { label: 'Present from the beginning', icon: <Play size={14} />, keys: 'F5', run: () => a.present('start') },
         { label: 'Presenter view, with notes', icon: <MonitorPlay size={14} />, run: () => a.present('presenter') },
+        a.presentMore && { label: 'More ways to present', icon: <Presentation size={14} />, also: 'narration rehearse coach record video', items: a.presentMore },
       ],
     },
     {

@@ -92,6 +92,7 @@ import { SlideThumb } from './Thumb';
 import { fetchVideoStill } from './media';
 import { CodeLook, EmbedLook, HoverField, HtmlLook, QuizLook, Scene3dLook, ScoreLook, TEXT_FX_NAMES } from './WebParts';
 import { FX_NAMES, TR_NAMES } from './names';
+import { NarrationSection } from './Narration';
 
 export type InspectorTab = 'format' | 'animate' | 'slide' | 'theme';
 export const INSPECTOR_TABS: { value: InspectorTab; label: string }[] = [
@@ -1411,7 +1412,9 @@ function SlideTab({ deck, index, change, pickPicture, onFooter, pickVideo, fonts
       ...d,
       slides: d.slides.map((s, i) => {
         if (!all && i !== index) return s;
-        const next = { ...(all ? tr : (s.transition ?? { fx: 'none' as TransitionFx })), ...patch };
+        // On every slide: each keeps its own rehearsed clicks (its build is its own).
+        const next = { ...(all ? { ...tr, steps: s.transition?.steps } : (s.transition ?? { fx: 'none' as TransitionFx })), ...patch };
+        if (!next.steps) delete next.steps;
         const { transition: _t, ...rest } = s;
         return next.fx === 'none' && !next.auto ? rest : { ...rest, transition: next };
       }),
@@ -1559,7 +1562,7 @@ function SlideTab({ deck, index, change, pickPicture, onFooter, pickVideo, fonts
         <Field label="Goes on">
           <Select
             value={tr.auto ? 'auto' : 'click'}
-            onChange={(v) => setTr({ auto: v === 'auto' ? 5 : undefined })}
+            onChange={(v) => setTr({ auto: v === 'auto' ? 5 : undefined, ...(v === 'click' ? { steps: undefined } : {}) })}
             options={[
               { value: 'click', label: 'On a click' },
               { value: 'auto', label: 'By itself' },
@@ -1567,10 +1570,12 @@ function SlideTab({ deck, index, change, pickPicture, onFooter, pickVideo, fonts
           />
           {!!tr.auto && <NumInput label="Seconds before it goes on" value={tr.auto} onChange={(auto) => setTr({ auto: auto || undefined })} min={0.5} max={3600} step={0.5} unit="s" className="w-[90px]" />}
         </Field>
+        {!!tr.steps?.length && <p className="text-[12px] leading-snug text-fg-3">Its animations’ clicks come by themselves too, as rehearsed.</p>}
         <Button size="sm" variant="ghost" onClick={() => setTr({}, true)}>
           Use on every slide
         </Button>
       </Section>
+      <NarrationSection deck={deck} index={index} change={change} />
       <Section title="In the slideshow">
         <label className="flex min-h-8 items-center gap-2 text-[12.5px] text-fg-2">
           <span className="min-w-0 flex-1">Skip this slide</span>

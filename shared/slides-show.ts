@@ -98,10 +98,12 @@ export const FILLERS: Record<string, string[]> = {
 const NOT_BEFORE_KIND = new Set(['a', 'the', 'this', 'that', 'what', 'any', 'some', 'every', 'one', 'no', 'which', 'each', 'all', 'same', 'different', 'my', 'your', 'our', 'their', 'its', 'his', 'her']);
 const LIKE_AFTER = new Set(['and', 'but', 'so', 'or', 'um', 'uh', 'like', 'was', 'were', "it's", 'its', "i'm", "they're", "we're", "you're", "he's", "she's"]);
 const LIKE_THEN = new Set(['um', 'uh', 'like', 'so', 'you']);
+/** The sounds that fill (um, uh…): a "so" after one fills too. */
+const SOUNDS = new Set(['um', 'umm', 'uh', 'uhh', 'uhm', 'erm', 'er', 'ah']);
 
 /**
  * The filler words in what was said (a piece at a time, as speech recognition gives it), by the language's list:
- * English "so" only starting a piece, "right" only ending one, "like" only between words that are not its own (or
+ * English "so" only starting a piece (or after an um), "right" only ending one, "like" only between words that are not its own (or
  * starting a piece), "kind of" and "sort of" not as kinds of things, "you know" not asked. Each with how often.
  */
 export function fillersIn(pieces: string[], lang: string): Record<string, number> {
@@ -148,7 +150,7 @@ export function fillersIn(pieces: string[], lang: string): Record<string, number
           continue;
         }
         if (w === 'so') {
-          if (i === 0 && words.length > 1) add('so');
+          if ((i === 0 && words.length > 1) || SOUNDS.has(before ?? '')) add('so');
           continue;
         }
         if (w === 'right') {
