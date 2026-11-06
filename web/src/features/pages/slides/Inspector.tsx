@@ -1,11 +1,12 @@
 // The slides editor's side panel, in four tabs. Format: the part picked (its place and size, its words' look, its
 // fill and border, a shape's kind, a picture's fit, crop and colours, a line's ends and path, a table's or a chart's look and
 // numbers, an icon's colour, an equation's LaTeX, a video's address and how it plays, a group's parts, a link; code,
-// and the web format's parts: WebParts.tsx) or the parts picked lined up, spread and grouped. Animate: the slide's
-// animations in their order, each one's effect, start, timing and direction, and a new one for the part picked (in a
-// web deck its own effects too, a part that starts one when clicked, effects that keep going, words one by one, how
-// they move). Slide: its background (in a web deck one that moves, or a video), its transition (Morph too), hidden or
-// not, the footer. Theme: a ready-made look, or the deck's own colours and fonts, and the slides' shape.
+// and the web format's parts: WebParts.tsx) or the parts picked lined up, spread and grouped. Animate: every slide
+// animated at once (AnimateAll.tsx), then the slide's animations in their order, each one's effect, start, timing and
+// direction, and a new one for the part picked (in a web deck its own effects too, a part that starts one when clicked,
+// effects that keep going, words one by one, how they move). Slide: its background (in a web deck one that moves, or a
+// video), its transition (Morph too), hidden or not, the footer. Theme: a ready-made look, or the deck's own colours
+// and fonts, and the slides' shape.
 import { useEffect, useRef, useState } from 'react';
 import {
   AlignCenterHorizontal,
@@ -23,8 +24,8 @@ import {
   ChartScatter,
   Crop as CropIcon,
   Eraser,
-  FlipHorizontal2,
-  FlipVertical2,
+  TrianglesCenterlineDashedHorizontal,
+  TrianglesCenterlineDashedVertical,
   Group as GroupIcon,
   ImageMinus,
   ImagePlus,
@@ -33,6 +34,7 @@ import {
   Play,
   Plus,
   Pointer,
+  SlidersHorizontal,
   Sparkles,
   Trash2,
   Ungroup as UngroupIcon,
@@ -92,6 +94,8 @@ import { SlideThumb } from './Thumb';
 import { fetchVideoStill } from './media';
 import { CodeLook, EmbedLook, HoverField, HtmlLook, QuizLook, Scene3dLook, ScoreLook, TEXT_FX_NAMES } from './WebParts';
 import { FX_NAMES, TR_NAMES } from './names';
+import { AnimateEvery } from './AnimateAll';
+import { NarrationSection } from './Narration';
 
 export type InspectorTab = 'format' | 'animate' | 'slide' | 'theme';
 export const INSPECTOR_TABS: { value: InspectorTab; label: string }[] = [
@@ -143,7 +147,11 @@ interface Props {
   /** The AI tools: a picture changed (with AI, its background out, part of it erased), a chart made a plot, the slide's background made. */
   onAiEdit?: (id: string, mode: 'change' | 'cutout' | 'erase') => void;
   onPlotChart?: (id: string) => void;
+  /** The video picked (one the app keeps) in the video editor, in a tab of its own. */
+  onEditVideo?: (id: string) => void;
   onAiBackground?: () => void;
+  /** The picture in the picture editor, in a tab of its own (the new picture takes its place). */
+  onEditPicture?: (id: string) => void;
 }
 
 const SHAPE_NAMES: Record<ShapeKind, string> = {
@@ -526,6 +534,7 @@ function PictureLook({
   cropping,
   onCrop,
   onAi,
+  onEdit,
 }: {
   el: ImageEl;
   theme: Theme;
@@ -534,6 +543,7 @@ function PictureLook({
   cropping?: boolean;
   onCrop?: (id: string | null, keep?: boolean) => void;
   onAi?: (id: string, mode: 'change' | 'cutout' | 'erase') => void;
+  onEdit?: (id: string) => void;
 }) {
   const aiRef = useRef<HTMLButtonElement>(null);
   const [ai, setAi] = useState(false);
@@ -543,6 +553,11 @@ function PictureLook({
         <Button size="sm" variant="secondary" icon={<ImagePlus size={14} />} onClick={onReplace}>
           Another picture
         </Button>
+        {onEdit && el.src && !cropping && (
+          <Button size="sm" variant="secondary" icon={<SlidersHorizontal size={14} />} onClick={() => onEdit(el.id)}>
+            Edit picture
+          </Button>
+        )}
         {onAi && el.src && !cropping && (
           <Button ref={aiRef} size="sm" variant="secondary" icon={<WandSparkles size={14} />} onClick={() => setAi((o) => !o)}>
             Change it with AI
@@ -610,10 +625,10 @@ function PictureLook({
       <Field label="Corners">
         <NumInput label="Corner radius" value={el.radius ?? 0} onChange={(radius) => set({ radius: radius || undefined }, 'radius')} min={0} max={1000} unit="px" />
         <Tool label="Flip across" on={!!el.flipH} onClick={() => set({ flipH: !el.flipH || undefined })}>
-          <FlipHorizontal2 size={15} />
+          <TrianglesCenterlineDashedVertical size={15} />
         </Tool>
         <Tool label="Flip down" on={!!el.flipV} onClick={() => set({ flipV: !el.flipV || undefined })}>
-          <FlipVertical2 size={15} />
+          <TrianglesCenterlineDashedHorizontal size={15} />
         </Tool>
       </Field>
       <Field label="Border">
@@ -990,7 +1005,7 @@ function MathLook({ el, theme, set, focus }: { el: MathEl; theme: Theme; set: (p
   );
 }
 
-function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: string) => void }) {
+function VideoLook({ el, set, onEdit }: { el: VideoEl; set: (patch: Partial<El>, key?: string) => void; onEdit?: (id: string) => void }) {
   // A video the app keeps (from a device) has no address to change; an online one is changed by its address.
   const kept = !videoSrc(el.src);
   const [url, setUrl] = useState(kept ? '' : el.src.includes('vimeo') ? `https://vimeo.com/${el.src.split('/').pop()}` : `https://www.youtube.com/watch?v=${el.src.split('/').pop()}`);
@@ -1000,7 +1015,14 @@ function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: s
   return (
     <Section title="Video">
       {kept ? (
-        <p className="text-[12px] leading-snug text-fg-3">A video from a device, kept with the deck.</p>
+        <>
+          <p className="text-[12px] leading-snug text-fg-3">A video from a device, kept with the deck.</p>
+          {onEdit && (
+            <Button size="sm" variant="secondary" icon={<SlidersHorizontal size={14} />} onClick={() => onEdit(el.id)}>
+              Edit video
+            </Button>
+          )}
+        </>
       ) : (
         <input
           value={url}
@@ -1043,7 +1065,7 @@ function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: s
   );
 }
 
-function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cropping, onCrop, onIcon, onGroup, onUngroup, cellSel, onCellSel, texFocus, running, onRun, pickPicture, pickModel, onAiEdit, onPlotChart }: Props) {
+function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cropping, onCrop, onIcon, onGroup, onUngroup, cellSel, onCellSel, texFocus, running, onRun, pickPicture, pickModel, onAiEdit, onPlotChart, onEditPicture, onEditVideo }: Props) {
   const slide = deck.slides[index];
   const web = isWebDeck(deck);
   const els = pickedOf(slide, sel);
@@ -1124,14 +1146,14 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cro
       )}
       {(el.type === 'text' || el.type === 'shape') && <TextLook el={el} theme={deck.theme} set={set} web={web} />}
       {(el.type === 'text' || el.type === 'shape') && <BoxLook el={el} theme={deck.theme} set={set} web={web} />}
-      {el.type === 'image' && <PictureLook el={el} theme={deck.theme} set={set} onReplace={() => onReplaceImage(el.id)} cropping={cropping === el.id} onCrop={onCrop} onAi={onAiEdit} />}
+      {el.type === 'image' && <PictureLook el={el} theme={deck.theme} set={set} onReplace={() => onReplaceImage(el.id)} cropping={cropping === el.id} onCrop={onCrop} onAi={onAiEdit} onEdit={onEditPicture} />}
       {el.type === 'image' && el.src && <PictureColours el={el} set={set} />}
       {el.type === 'line' && <LineLook el={el} theme={deck.theme} set={set} />}
       {el.type === 'table' && <TableLook el={el} theme={deck.theme} set={set} cellSel={cellSel} onCellSel={onCellSel} />}
       {el.type === 'chart' && <ChartLook el={el} theme={deck.theme} set={set} onPlot={onPlotChart} />}
       {el.type === 'icon' && <IconLook el={el} theme={deck.theme} set={set} onIcon={onIcon} />}
       {el.type === 'math' && <MathLook el={el} theme={deck.theme} set={set} focus={texFocus} />}
-      {el.type === 'video' && <VideoLook key={el.id} el={el} set={set} />}
+      {el.type === 'video' && <VideoLook key={el.id} el={el} set={set} onEdit={onEditVideo} />}
       {el.type === 'code' && <CodeLook el={el} set={set} />}
       {el.type === 'html' && (
         <HtmlLook
@@ -1194,6 +1216,7 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview, picking, onPic
   let clicks = 0;
   return (
     <>
+      <AnimateEvery deck={deck} index={index} change={change} />
       <Section title="Add an animation">
         {target ? (
           <>
@@ -1411,7 +1434,9 @@ function SlideTab({ deck, index, change, pickPicture, onFooter, pickVideo, fonts
       ...d,
       slides: d.slides.map((s, i) => {
         if (!all && i !== index) return s;
-        const next = { ...(all ? tr : (s.transition ?? { fx: 'none' as TransitionFx })), ...patch };
+        // On every slide: each keeps its own rehearsed clicks (its build is its own).
+        const next = { ...(all ? { ...tr, steps: s.transition?.steps } : (s.transition ?? { fx: 'none' as TransitionFx })), ...patch };
+        if (!next.steps) delete next.steps;
         const { transition: _t, ...rest } = s;
         return next.fx === 'none' && !next.auto ? rest : { ...rest, transition: next };
       }),
@@ -1559,7 +1584,7 @@ function SlideTab({ deck, index, change, pickPicture, onFooter, pickVideo, fonts
         <Field label="Goes on">
           <Select
             value={tr.auto ? 'auto' : 'click'}
-            onChange={(v) => setTr({ auto: v === 'auto' ? 5 : undefined })}
+            onChange={(v) => setTr({ auto: v === 'auto' ? 5 : undefined, ...(v === 'click' ? { steps: undefined } : {}) })}
             options={[
               { value: 'click', label: 'On a click' },
               { value: 'auto', label: 'By itself' },
@@ -1567,10 +1592,12 @@ function SlideTab({ deck, index, change, pickPicture, onFooter, pickVideo, fonts
           />
           {!!tr.auto && <NumInput label="Seconds before it goes on" value={tr.auto} onChange={(auto) => setTr({ auto: auto || undefined })} min={0.5} max={3600} step={0.5} unit="s" className="w-[90px]" />}
         </Field>
+        {!!tr.steps?.length && <p className="text-[12px] leading-snug text-fg-3">Its animations’ clicks come by themselves too, as rehearsed.</p>}
         <Button size="sm" variant="ghost" onClick={() => setTr({}, true)}>
           Use on every slide
         </Button>
       </Section>
+      <NarrationSection deck={deck} index={index} change={change} />
       <Section title="In the slideshow">
         <label className="flex min-h-8 items-center gap-2 text-[12.5px] text-fg-2">
           <span className="min-w-0 flex-1">Skip this slide</span>

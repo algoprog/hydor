@@ -12,11 +12,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ASSET, VIDEO } from '../../shared/slides.ts';
+import { ASSET, AUDIO, VIDEO } from '../../shared/slides.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import { fetchPage } from '../web/fetch.ts';
+import { initSounds, sweepSounds } from './sounds.ts';
 import { initVideos, sweepVideos } from './videos.ts';
 
 /** The largest picture kept. */
@@ -40,6 +41,7 @@ export function initAssets(db: DB) {
     create index if not exists page_asset_refs_sha on page_asset_refs(sha);
   `);
   initVideos(db);
+  initSounds(db);
 }
 
 const MIMES: Record<string, string> = { png: 'image/png', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
@@ -126,12 +128,13 @@ export function assetDataUrl(db: DB, sha: string): string | null {
   return a ? `data:${a.mime};base64,${a.data.toString('base64')}` : null;
 }
 
-/** The pictures (and videos, videos.ts) a version of a deck shows: noted, so they stay while it is kept. */
+/** The pictures (and videos, videos.ts, and narrations, sounds.ts) a version of a deck shows: noted, so they stay while it is kept. */
 export function noteRefs(db: DB, pageId: string, version: number, sources: string[]) {
   const put = db.prepare('insert or ignore into page_asset_refs (page_id, version, sha) values (?, ?, ?)');
   for (const s of sources) {
     if (s.startsWith(ASSET)) put.run(pageId, version, s.slice(ASSET.length));
     else if (s.startsWith(VIDEO)) put.run(pageId, version, s.slice(VIDEO.length));
+    else if (s.startsWith(AUDIO)) put.run(pageId, version, s.slice(AUDIO.length));
   }
 }
 
@@ -147,6 +150,7 @@ export function dropRefs(db: DB, pageId: string, versions?: number[]) {
 export function sweepAssets(db: DB) {
   db.prepare('delete from page_assets where created_at < ? and not exists (select 1 from page_asset_refs r where r.sha = page_assets.sha)').run(Date.now() - 86_400_000);
   sweepVideos(db);
+  sweepSounds(db);
 }
 
 /** A path an agent gave: from its session's folder, from home (~), or absolute. */

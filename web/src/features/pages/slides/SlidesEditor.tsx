@@ -11,6 +11,9 @@
 // (Theme → Made for, or Tools); its live parts run in frames of their own, in the slideshow, and here once Run is pressed. The AI tools
 // (images/studio) make pictures, drawings, plots and videos for it, change a picture picked, make a chart a plot and
 // a slide's background: each result lands as an uploaded one does, or takes the place of what it changed, one step to undo.
+// The writing helpers: design ideas for the slide (the toolbar's Design ideas, Slide → Design ideas) and the
+// accessibility check (Tools → Check accessibility) take the side panel's place until closed; Rewrite is in the text
+// toolbar, Animate every slide in the Animate tab, and Tools → Translate the slides asks the agent.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ChartScatter,
@@ -26,6 +29,7 @@ import {
   Image as ImageIcon,
   ImageMinus,
   LayoutTemplate,
+  Lightbulb,
   Link2,
   MessageSquare,
   MessageSquarePlus,
@@ -42,6 +46,7 @@ import {
   Scissors,
   Shapes,
   Shrink,
+  SlidersHorizontal,
   Sparkles,
   Spline,
   Table2,
@@ -50,12 +55,16 @@ import {
   Undo2,
   Ungroup,
   WandSparkles,
+  X,
 } from 'lucide-react';
-import { hexColor, isWebDeck, newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type ChartEl, type Deck, type El, type ImageEl, type LayoutId, type TextEl } from '@shared/slides';
-import { csvOf, editPicture, makeDrawing, makePicture, makePlot, makeVideo } from '../../images/studio';
+import { hexColor, isWebDeck, keptVideo, newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type ChartEl, type Deck, type El, type ImageEl, type LayoutId, type Slide, type TextEl, type VideoEl } from '@shared/slides';
+import { csvOf, editPicture, makeDrawing, makePicture, makePlot, makeVideo, shownSrc } from '../../images/studio';
+import type { EditorHandle } from '../../mediaedit/host';
+import { editKept } from '../../mediaedit/open';
+import { editKeptVideo } from '../../mediaedit/video/open';
 import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
-import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, useConfirm } from '../../../components/ui';
+import { Button, cx, Dialog, IconButton, inputCls, MenuBack, MenuItem, MenuSep, Popover, Segmented, useConfirm } from '../../../components/ui';
 import { FindBar, useFind } from '../common/FindBar';
 import { isMod, keyLabel } from '../common/keys';
 import { MenuBar } from '../common/menus';
@@ -108,6 +117,7 @@ import {
 import type { AskScope, ModelDoc, ModelEditorProps } from '../kinds';
 import { tr } from '../../../i18n/runtime';
 import { Presenter, Slideshow } from './Present';
+import { presentMoreMenu, PresentMoreItems, ShowAs, type ShowHow } from './PresentMore';
 import { choosePicture as chooseFile, uploadPicture as upload } from '../pictures';
 import { useDeckFonts } from './rt';
 import { SlideCanvas, type CanvasHandle, type CellSel, type CommentPin, type FindMark, type GridOpts } from './SlideCanvas';
@@ -123,6 +133,9 @@ import { exportFile } from '../exportFile';
 import { openTypes } from '../types';
 import { chooseModel, chooseVideo, fetchVideoStill, firstFrame, isVideoFile, uploadModel, uploadVideo } from './media';
 import { SlideComments } from './SlideComments';
+import { DesignIdeas } from './DesignIdeas';
+import { AccessibilityPanel } from './Accessibility';
+import { askToTranslate, TranslateDialog } from './Translate';
 
 export type SlidesDoc = ModelDoc<Deck>;
 
@@ -228,6 +241,8 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['P', 'Pen'],
       ['E', 'Erase the drawings'],
       ['C', 'Live captions'],
+      ['V', 'Your camera'],
+      ['K', 'Pause or play the narration'],
       ['Esc', 'End the slideshow'],
     ],
   },
@@ -278,9 +293,11 @@ export function SlidesEditor({
   const [scope, setScope] = useState<string[]>([]);
   const [tab, setTab] = useState<InspectorTab>('format');
   const [view, setView] = useState<'edit' | 'grid'>('edit');
-  const [present, setPresent] = useState<{ from: number; presenter: boolean } | null>(startPresent ? { from: 0, presenter: false } : null);
+  const [present, setPresent] = useState<{ from: number; presenter: boolean; how?: ShowHow } | null>(startPresent ? { from: 0, presenter: false } : null);
   const [menu, setMenu] = useState<'slide' | 'shape' | 'line' | 'picture' | 'present' | 'context' | null>(null);
   const [ctxAt, setCtxAt] = useState<{ x: number; y: number } | null>(null);
+  /** The right-click menu shows a picture's AI tools in its place (Change it with AI ›). */
+  const [ctxAi, setCtxAi] = useState(false);
   const [notesOpen, setNotesOpen] = useState(() => localStorage.getItem(PRESET_KEY) !== '0');
   const [drawer, setDrawer] = useState<'open' | 'closed'>('closed');
   const [saving, setSaving] = useState(false);
@@ -308,6 +325,9 @@ export function SlidesEditor({
   /** The thread picked in the Comments tab. */
   const [activeComment, setActiveComment] = useState<string | null>(null);
   const [footerOpen, setFooterOpen] = useState(false);
+  /** A writing helper in the side panel's place (Design ideas, Check accessibility), and a language to type for Translate the slides. */
+  const [side, setSide] = useState<'ideas' | 'check' | null>(null);
+  const [langAsk, setLangAsk] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [cellSel, setCellSel] = useState<CellSel | null>(null);
   const [texFocus, setTexFocus] = useState(0);
@@ -704,6 +724,45 @@ export function SlidesEditor({
     const h = v.w && v.h ? Math.max(40, Math.round(v.h * k)) : 450;
     putRef.current([{ id: newId(), type: 'video', src: v.src, ...(v.poster ? { poster: v.poster } : {}), ...centred(w, h) }]);
   };
+  // The picture editors opened from this deck: once it closes, what they save goes to the Library instead.
+  const pictureEditors = useRef(new Set<EditorHandle>());
+  useEffect(() => () => pictureEditors.current.forEach((h) => h.detach()), []);
+  /**
+   * Edit picture: the picture in the picture editor, in a tab of its own (this deck stays as it is under its tab). Saved,
+   * the new picture takes its place, one step to undo; one of another shape keeps the part's width, its height following.
+   */
+  const openPicture = (id: string) => {
+    const d = live.current;
+    const at = d ? slideOf(d, id) : -1;
+    const el = d && at >= 0 ? findEl(d.slides[at].els, id) : undefined;
+    if (el?.type !== 'image' || !el.src) return;
+    // The picture's own shape, to tell whether the editor changed it.
+    let was = 0;
+    const probe = new Image();
+    probe.onload = () => (was = probe.naturalWidth / Math.max(1, probe.naturalHeight));
+    probe.src = shownSrc(el.src);
+    const h = editKept(el.src, {
+      title: el.alt || el.name || `Slide ${at + 1}`,
+      label: doc?.title || 'The deck',
+      put: (r) => {
+        const src = r.src;
+        if (!src) return;
+        const now = r.w && r.h ? r.w / r.h : 0;
+        const reshaped = !!was && !!now && Math.abs(now / was - 1) > 0.02;
+        change((d2) => {
+          const i = slideOf(d2, id);
+          if (i < 0) return d2;
+          return setEls(d2, i, [id], (e) => {
+            if (e.type !== 'image') return e;
+            if (!reshaped) return { ...e, src } as El;
+            const nh = Math.max(8, Math.round(e.w / now));
+            return { ...e, src, crop: undefined, h: nh, y: Math.round(e.y + (e.h - nh) / 2) } as El;
+          });
+        });
+      },
+    });
+    pictureEditors.current.add(h);
+  };
   /** The picture changed with AI, its background taken out, or part of it erased: in its place, one step to undo. */
   const aiEdit = async (id: string, mode: 'change' | 'cutout' | 'erase') => {
     const d = live.current;
@@ -716,6 +775,41 @@ export function SlidesEditor({
       const i = slideOf(d2, id);
       return i < 0 ? d2 : setEls(d2, i, [id], (e) => ({ ...e, src: p.src }) as El);
     });
+  };
+  /** Video editors opened from this deck: told when it closes, so their Save keeps the video in the Library instead. */
+  const videoTabs = useRef<EditorHandle[]>([]);
+  useEffect(() => () => videoTabs.current.forEach((t) => t.detach()), []);
+  const changeRef = useRef(change);
+  changeRef.current = change;
+  /**
+   * The video picked (one the app keeps) in the video editor, in a tab of its own: the new video and its still take its
+   * place, one step to undo; one of a new shape (cropped to 9:16, turned) as large as fits in its box, in the middle.
+   */
+  const editVideo = (id: string) => {
+    const d = live.current;
+    const at = d ? slideOf(d, id) : -1;
+    const el = d && at >= 0 ? findEl(d.slides[at].els, id) : undefined;
+    if (el?.type !== 'video' || !keptVideo(el.src)) return;
+    const tab = editKeptVideo(el.src, {
+      title: el.name || tr(`Slide ${at + 1}`),
+      label: doc?.title || tr('The deck'),
+      put: (r) => {
+        if (!r.src && !r.poster) return;
+        changeRef.current((d2) => {
+          const i = slideOf(d2, id);
+          return i < 0
+            ? d2
+            : setEls(d2, i, [id], (e) => {
+                const v = e as VideoEl;
+                const ratio = r.w && r.h ? r.w / r.h : 0;
+                const fit = ratio && r.src && r.src !== v.src && Math.abs(ratio - v.w / v.h) > 0.02 ? Math.min(v.w, v.h * ratio) : 0;
+                const box = fit ? { x: Math.round(v.x + (v.w - fit) / 2), y: Math.round(v.y + (v.h - fit / ratio) / 2), w: Math.round(fit), h: Math.round(fit / ratio) } : {};
+                return { ...v, ...(r.src ? { src: r.src } : {}), ...(r.poster ? { poster: r.poster } : {}), ...box } as El;
+              });
+        });
+      },
+    });
+    videoTabs.current = [...videoTabs.current.filter((t) => t.id !== tab.id), tab];
   };
   /** A background made with AI for the slide on view, in its shape. */
   const aiBackground = async () => {
@@ -1161,8 +1255,30 @@ export function SlidesEditor({
   };
 
   const openPanel = (t: InspectorTab) => {
+    setSide(null);
     setTab(t);
     if (!wide) setDrawer('open');
+  };
+  const openSide = (k: 'ideas' | 'check') => {
+    setSide(k);
+    if (!wide) setDrawer('open');
+  };
+  /** A design idea put on the slide in its place (by its id: the slide may have moved), one step to undo. */
+  const applyIdea = (idea: Slide) => {
+    canvas.current?.stopEditing();
+    change((d) => {
+      const i = d.slides.findIndex((s) => s.id === idea.id);
+      return i < 0 ? d : setSlide(d, i, () => idea);
+    });
+    setSel([]);
+    setScope([]);
+  };
+  /** A slide (and a part of it) on view, from a writing helper's panel. */
+  const goTo = (i: number, el?: string) => {
+    canvas.current?.stopEditing();
+    setCur(i);
+    setView('edit');
+    setSel(el ? [topOf(deck.slides[i], el)?.id ?? el] : []);
   };
   const one = picked.length === 1 ? picked[0] : null;
   const openComments = deck.slides.reduce((a, s) => a + (s.comments ?? []).filter((c) => !c.resolved).length, 0);
@@ -1247,8 +1363,10 @@ export function SlidesEditor({
     aiPlot: readOnly ? undefined : () => void aiPlot(),
     aiVideo: readOnly ? undefined : () => void aiVideo(),
     aiEdit: readOnly ? undefined : (mode) => one && void aiEdit(one.id, mode),
+    editPicture: readOnly ? undefined : () => one && openPicture(one.id),
     aiPlotChart: readOnly ? undefined : () => one && void aiPlot(one.id),
     aiSlide: aiSlide ?? undefined,
+    editVideo: readOnly ? undefined : () => one && editVideo(one.id),
     running: !!one && running === one.id,
     run: () => one && setRunning(running === one.id ? null : one.id),
     video: () => setVideoAsk(true),
@@ -1284,8 +1402,12 @@ export function SlidesEditor({
             await exportFile(pageId, 'png', { slide: index + 1 });
           })().catch(toastError),
     present: (from) => setPresent({ from: from === 'start' ? 0 : index, presenter: from === 'presenter' }),
+    presentMore: presentMoreMenu(deck, (how) => setPresent({ from: 0, presenter: false, how })),
     shortcuts: () => setKeysOpen(true),
     ask: onAsk ? () => onAsk(`On slide ${index + 1}${slideTitle(slide) ? ` (“${slideTitle(slide)}”)` : ''}: `) : undefined,
+    designIdeas: readOnlyProp ? undefined : () => openSide('ideas'),
+    checkAccess: readOnlyProp ? undefined : () => openSide('check'),
+    translate: onAsk && !readOnly ? (lang) => (lang ? askToTranslate(lang) : setLangAsk(true)) : undefined,
   });
 
   const insertBar = !readOnlyProp && (
@@ -1329,6 +1451,17 @@ export function SlidesEditor({
       >
         <Paintbrush size={15} />
       </IconButton>
+      <Button
+        size="sm"
+        variant="ghost"
+        icon={<Lightbulb size={15} />}
+        aria-label="Design ideas"
+        title="Design ideas for this slide"
+        onClick={() => (side === 'ideas' ? setSide(null) : openSide('ideas'))}
+        className={cx('shrink-0 px-2', side === 'ideas' && 'bg-bg-2')}
+      >
+        {mid && !textArgs ? 'Design ideas' : ''}
+      </Button>
     </>
   );
 
@@ -1485,7 +1618,9 @@ export function SlidesEditor({
       pickModel={pickModel}
       onCompatible={setCompatible}
       onAiEdit={(id, mode) => void aiEdit(id, mode)}
+      onEditPicture={readOnly ? undefined : openPicture}
       onPlotChart={(id) => void aiPlot(id)}
+      onEditVideo={readOnly ? undefined : (id) => editVideo(id)}
       onAiBackground={() => void aiBackground()}
       picking={pickFor}
       onPickTrigger={setPickFor}
@@ -1632,14 +1767,35 @@ export function SlidesEditor({
             {!readOnlyProp && (
               <aside inert={liveOn} className={cx('flex min-h-0 shrink-0 flex-col bg-panel', liveOn && 'opacity-45', wide ? 'w-[300px] border-l border-line' : cx('border-t border-line', drawer === 'open' ? 'h-[min(46%,420px)] min-h-[180px]' : 'pb-[var(--safe-bottom)]'))}>
                 <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-1">
-                  {hold('tabs', tabs)}
+                  {side ? (
+                    <span className="flex min-w-0 flex-1 items-center gap-1.5 pl-2 text-[13px] font-medium text-fg">
+                      <span className="min-w-0 truncate">{side === 'ideas' ? 'Design ideas' : 'Accessibility check'}</span>
+                    </span>
+                  ) : (
+                    hold('tabs', tabs)
+                  )}
                   {!wide && (
                     <IconButton label={drawer === 'open' ? 'Fold the panel' : 'Open the panel'} size="sm" onClick={() => setDrawer(drawer === 'open' ? 'closed' : 'open')}>
                       {drawer === 'open' ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
                     </IconButton>
                   )}
+                  {side && (
+                    <IconButton label="Close" size="sm" onClick={() => setSide(null)}>
+                      <X size={15} />
+                    </IconButton>
+                  )}
                 </div>
-                {(wide || drawer === 'open') && <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{hold('panel', (tab as string) === 'notes' ? notesPanel : (tab as string) === 'comments' ? commentsPanel : inspector)}</div>}
+                {(wide || drawer === 'open') && (
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                    {side === 'ideas' ? (
+                      <DesignIdeas deck={deck} index={index} fonts={fonts} readOnly={readOnly} onApply={applyIdea} />
+                    ) : side === 'check' ? (
+                      <AccessibilityPanel deck={deck} index={index} readOnly={readOnly} change={change} onGo={goTo} />
+                    ) : (
+                      hold('panel', (tab as string) === 'notes' ? notesPanel : (tab as string) === 'comments' ? commentsPanel : inspector)
+                    )}
+                  </div>
+                )}
               </aside>
             )}
           </>
@@ -1730,99 +1886,119 @@ export function SlidesEditor({
         <MenuItem icon={<MonitorPlay size={14} />} onClick={() => (setMenu(null), setPresent({ from: index, presenter: true }))}>
           Presenter view, with notes
         </MenuItem>
+        <PresentMoreItems deck={deck} onPick={(how) => (setMenu(null), setPresent({ from: 0, presenter: false, how }))} />
       </Popover>
       <div ref={ctxRef} className="pointer-events-none fixed h-px w-px" style={{ left: ctxAt?.x ?? -10, top: ctxAt?.y ?? -10 }} />
-      <Popover anchor={ctxRef} open={menu === 'context'} onClose={() => setMenu(null)} width={230}>
-        {picked.length > 0 && !readOnly && (
+      <Popover anchor={ctxRef} open={menu === 'context'} onClose={() => (setMenu(null), setCtxAi(false))} width={230}>
+        {ctxAi && one?.type === 'image' ? (
           <>
-            <MenuItem icon={<Scissors size={14} />} hint={keyLabel('Ctrl+X')} onClick={() => (setMenu(null), cut())}>
-              Cut
+            <MenuBack onClick={() => setCtxAi(false)}>Change it with AI</MenuBack>
+            <MenuItem icon={<WandSparkles size={14} />} onClick={() => (setMenu(null), setCtxAi(false), void aiEdit(one.id, 'change'))}>
+              Change with AI
             </MenuItem>
-            <MenuItem icon={<Copy size={14} />} hint={keyLabel('Ctrl+C')} onClick={() => (setMenu(null), copy())}>
-              Copy
+            <MenuItem icon={<ImageMinus size={14} />} onClick={() => (setMenu(null), setCtxAi(false), void aiEdit(one.id, 'cutout'))}>
+              Remove the background
+            </MenuItem>
+            <MenuItem icon={<Eraser size={14} />} onClick={() => (setMenu(null), setCtxAi(false), void aiEdit(one.id, 'erase'))}>
+              Erase part of it
             </MenuItem>
           </>
-        )}
-        {clip && !readOnly && (
-          <MenuItem icon={<Clipboard size={14} />} hint={keyLabel('Ctrl+V')} onClick={() => (setMenu(null), paste())}>
-            Paste
-          </MenuItem>
-        )}
-        {picked.length > 0 && !readOnly && (
+        ) : (
           <>
-            <MenuItem icon={<Copy size={14} />} hint={keyLabel('Ctrl+D')} onClick={() => (setMenu(null), duplicate())}>
-              Duplicate
-            </MenuItem>
-            {picked.length > 1 && (
-              <MenuItem icon={<GroupIcon size={14} />} hint={keyLabel('Ctrl+G')} onClick={() => (setMenu(null), group())}>
-                Group
-              </MenuItem>
-            )}
-            {one?.type === 'group' && (
-              <MenuItem icon={<Ungroup size={14} />} hint={keyLabel('Ctrl+Shift+G')} onClick={() => (setMenu(null), unGroup())}>
-                Ungroup
-              </MenuItem>
-            )}
-            {one?.type === 'image' && !!(one as ImageEl).src && (
+            {picked.length > 0 && !readOnly && (
               <>
-                <MenuItem icon={<Crop size={14} />} onClick={() => (setMenu(null), crop(one.id))}>
-                  Crop the picture
+                <MenuItem icon={<Scissors size={14} />} hint={keyLabel('Ctrl+X')} onClick={() => (setMenu(null), cut())}>
+                  Cut
                 </MenuItem>
-                <MenuItem icon={<WandSparkles size={14} />} onClick={() => (setMenu(null), void aiEdit(one.id, 'change'))}>
-                  Change with AI
-                </MenuItem>
-                <MenuItem icon={<ImageMinus size={14} />} onClick={() => (setMenu(null), void aiEdit(one.id, 'cutout'))}>
-                  Remove the background
-                </MenuItem>
-                <MenuItem icon={<Eraser size={14} />} onClick={() => (setMenu(null), void aiEdit(one.id, 'erase'))}>
-                  Erase part of it
+                <MenuItem icon={<Copy size={14} />} hint={keyLabel('Ctrl+C')} onClick={() => (setMenu(null), copy())}>
+                  Copy
                 </MenuItem>
               </>
             )}
-            {one?.type === 'chart' && (
-              <MenuItem icon={<ChartScatter size={14} />} onClick={() => (setMenu(null), void aiPlot(one.id))}>
-                Make a plot of this
+            {clip && !readOnly && (
+              <MenuItem icon={<Clipboard size={14} />} hint={keyLabel('Ctrl+V')} onClick={() => (setMenu(null), paste())}>
+                Paste
               </MenuItem>
             )}
-            <MenuItem icon={<Paintbrush size={14} />} disabled={!one} onClick={() => (setMenu(null), startPainter(false))}>
-              Format painter
-            </MenuItem>
-            {picked.length === 1 && (
-              <MenuItem icon={<MessageSquarePlus size={14} />} hint={keyLabel('Ctrl+Alt+M')} onClick={() => (setMenu(null), startComment())}>
-                Comment
-              </MenuItem>
+            {picked.length > 0 && !readOnly && (
+              <>
+                <MenuItem icon={<Copy size={14} />} hint={keyLabel('Ctrl+D')} onClick={() => (setMenu(null), duplicate())}>
+                  Duplicate
+                </MenuItem>
+                {picked.length > 1 && (
+                  <MenuItem icon={<GroupIcon size={14} />} hint={keyLabel('Ctrl+G')} onClick={() => (setMenu(null), group())}>
+                    Group
+                  </MenuItem>
+                )}
+                {one?.type === 'group' && (
+                  <MenuItem icon={<Ungroup size={14} />} hint={keyLabel('Ctrl+Shift+G')} onClick={() => (setMenu(null), unGroup())}>
+                    Ungroup
+                  </MenuItem>
+                )}
+                {one?.type === 'image' && !!(one as ImageEl).src && (
+                  <>
+                    <MenuItem icon={<SlidersHorizontal size={14} />} onClick={() => (setMenu(null), openPicture(one.id))}>
+                      Edit picture
+                    </MenuItem>
+                    <MenuItem icon={<Crop size={14} />} onClick={() => (setMenu(null), crop(one.id))}>
+                      Crop the picture
+                    </MenuItem>
+                    <MenuItem icon={<WandSparkles size={14} />} submenu onClick={() => setCtxAi(true)}>
+                      Change it with AI
+                    </MenuItem>
+                  </>
+                )}
+                {one?.type === 'video' && !!keptVideo((one as VideoEl).src) && (
+                  <MenuItem icon={<SlidersHorizontal size={14} />} onClick={() => (setMenu(null), editVideo(one.id))}>
+                    Edit video
+                  </MenuItem>
+                )}
+                {one?.type === 'chart' && (
+                  <MenuItem icon={<ChartScatter size={14} />} onClick={() => (setMenu(null), void aiPlot(one.id))}>
+                    Make a plot of this
+                  </MenuItem>
+                )}
+                <MenuItem icon={<Paintbrush size={14} />} disabled={!one} onClick={() => (setMenu(null), startPainter(false))}>
+                  Format painter
+                </MenuItem>
+                {picked.length === 1 && (
+                  <MenuItem icon={<MessageSquarePlus size={14} />} hint={keyLabel('Ctrl+Alt+M')} onClick={() => (setMenu(null), startComment())}>
+                    Comment
+                  </MenuItem>
+                )}
+                {onAsk && picked.length === 1 && (
+                  <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(`On slide ${index + 1}, the ${partName(picked[0]).replace(/^(\w)/, (c) => c.toLowerCase())}: `))}>
+                    Ask the agent about it
+                  </MenuItem>
+                )}
+                <MenuSep />
+                <MenuItem icon={<Trash2 size={14} />} danger onClick={() => (setMenu(null), remove())}>
+                  Delete
+                </MenuItem>
+              </>
             )}
-            {onAsk && picked.length === 1 && (
-              <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(`On slide ${index + 1}, the ${partName(picked[0]).replace(/^(\w)/, (c) => c.toLowerCase())}: `))}>
-                Ask the agent about it
-              </MenuItem>
+            {!picked.length && (
+              <>
+                {!readOnly && (
+                  <MenuItem icon={<LayoutTemplate size={14} />} onClick={() => setMenu('slide')}>
+                    A new slide
+                  </MenuItem>
+                )}
+                {!readOnly && (
+                  <MenuItem icon={<MessageSquarePlus size={14} />} hint={keyLabel('Ctrl+Alt+M')} onClick={() => (setMenu(null), startComment())}>
+                    Comment
+                  </MenuItem>
+                )}
+                {onAsk && (
+                  <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(`On slide ${index + 1}${slideTitle(slide) ? ` (“${slideTitle(slide)}”)` : ''}: `))}>
+                    Ask the agent about this slide
+                  </MenuItem>
+                )}
+                <MenuItem icon={<Play size={14} />} onClick={() => (setMenu(null), setPresent({ from: index, presenter: false }))}>
+                  Present from this slide
+                </MenuItem>
+              </>
             )}
-            <MenuSep />
-            <MenuItem icon={<Trash2 size={14} />} danger onClick={() => (setMenu(null), remove())}>
-              Delete
-            </MenuItem>
-          </>
-        )}
-        {!picked.length && (
-          <>
-            {!readOnly && (
-              <MenuItem icon={<LayoutTemplate size={14} />} onClick={() => setMenu('slide')}>
-                A new slide
-              </MenuItem>
-            )}
-            {!readOnly && (
-              <MenuItem icon={<MessageSquarePlus size={14} />} hint={keyLabel('Ctrl+Alt+M')} onClick={() => (setMenu(null), startComment())}>
-                Comment
-              </MenuItem>
-            )}
-            {onAsk && (
-              <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(`On slide ${index + 1}${slideTitle(slide) ? ` (“${slideTitle(slide)}”)` : ''}: `))}>
-                Ask the agent about this slide
-              </MenuItem>
-            )}
-            <MenuItem icon={<Play size={14} />} onClick={() => (setMenu(null), setPresent({ from: index, presenter: false }))}>
-              Present from this slide
-            </MenuItem>
           </>
         )}
       </Popover>
@@ -1930,9 +2106,11 @@ export function SlidesEditor({
         }}
       />
       <FooterDialog open={footerOpen} onClose={() => setFooterOpen(false)} deck={deck} index={index} change={change} />
+      <TranslateDialog open={langAsk} onClose={() => setLangAsk(false)} />
       <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={SHORTCUTS} />
-      {present && !present.presenter && <Slideshow deck={deck} from={present.from} onClose={() => setPresent(null)} />}
-      {present?.presenter && <Presenter deck={deck} from={present.from} pageId={pageId} onClose={() => setPresent(null)} />}
+      {present && !present.presenter && !present.how && <Slideshow deck={deck} from={present.from} pageId={pageId} title={doc?.title} onClose={() => setPresent(null)} />}
+      {present?.how && <ShowAs how={present.how} deck={deck} from={present.from} pageId={pageId} title={doc?.title} change={change} onClose={() => setPresent(null)} />}
+      {present?.presenter && <Presenter deck={deck} from={present.from} pageId={pageId} title={doc?.title} onClose={() => setPresent(null)} />}
       {confirmNode}
     </div>
   );
