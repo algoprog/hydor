@@ -41,7 +41,7 @@ function Preview({ deck, index, run }: { deck: Deck; index: number; run: number 
     // Played again each time it is asked for (and for another slide); the deck as it was then.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run, index]);
-  return <div ref={host} aria-label="The slide, as it plays" className="pointer-events-none overflow-hidden rounded-lg [&_.ns-bar]:hidden! [&_.ns-stage]:rounded-lg" />;
+  return <div ref={host} aria-label="The slide, as it plays" className="pointer-events-none mx-auto max-w-[300px] overflow-hidden rounded-lg [&_.ns-bar]:hidden! [&_.ns-stage]:rounded-lg" />;
 }
 
 export function AnimateEvery({ deck, index, change, readOnly }: { deck: Deck; index: number; change: (d: Deck | ((d: Deck) => Deck)) => void; readOnly?: boolean }) {
