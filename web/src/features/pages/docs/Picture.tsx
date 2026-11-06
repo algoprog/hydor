@@ -4,7 +4,7 @@
 // Change with AI, Remove the background, Erase part of it), asking an agent about it, and taking it out. A line
 // across, a page break or a table of contents picked has the bar's last button alone.
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, Captions, Eraser, FileText, ImageMinus, RefreshCw, Sparkles, Trash2, WandSparkles } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, Captions, Eraser, FileText, ImageMinus, RefreshCw, Sparkles, Trash2, Wand, WandSparkles } from 'lucide-react';
 import type { Block, ImageBlock } from '@shared/docs';
 import { Button, cx, inputCls, MenuItem, Popover } from '../../../components/ui';
 import { Tool } from '../slides/controls';
@@ -168,7 +168,7 @@ export function Picked({
                   onClick={() => setAi((o) => !o)}
                   className={cx('flex h-8 w-8 items-center justify-center rounded-lg text-fg-2 hover:bg-bg-2 hover:text-fg', ai && 'bg-bg-2 text-fg')}
                 >
-                  <WandSparkles size={15} />
+                  <Wand size={15} />
                 </button>
               )}
               {onAsk && (
