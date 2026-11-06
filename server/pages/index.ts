@@ -976,8 +976,8 @@ function routes(d: Deps) {
   app.post('/api/pages/assets', { bodyLimit: Math.ceil(MAX_ASSET * 1.4) + 4096 }, async (req) => {
     const b = B(req);
     if (typeof b.data === 'string' && b.model === true) {
-      const m = /^data:(?:model\/gltf-binary|application\/octet-stream);base64,([A-Za-z0-9+/=]+)$/i.exec(b.data);
-      if (!m) throw new HttpError(400, 'data is a data: address of a 3D model (a .glb file)');
+      const m = /^data:(?:model\/gltf-binary|model\/gltf\+json|application\/octet-stream);base64,([A-Za-z0-9+/=]+)$/i.exec(b.data);
+      if (!m) throw new HttpError(400, 'data is a data: address of a 3D model (a .glb file, or a .gltf with its files inside it)');
       return { src: `naget-asset:${putAsset(db, Buffer.from(m[1], 'base64'), { model: true })}` };
     }
     if (typeof b.data === 'string') {

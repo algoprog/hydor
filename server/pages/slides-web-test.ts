@@ -333,6 +333,21 @@ function glb(): Buffer {
   ok(deck.progress === true && isWebDeck(deck) && deck.slides[0].bg?.fx === 'bokeh' && !deck.slides[1].bg?.video, 'the progress bar and moving background kept; a missing video behind a slide left out');
   const got = (await run('get_page', { id })).text ?? '';
   ok(got.includes('the web format, a progress bar'), 'get_page says the deck’s format');
+  // A .gltf (glTF's text) is kept with the files beside it inside it; one pointing out of its folder is not.
+  const tri = glb();
+  const binAt = 20 + tri.readUInt32LE(12) + 8;
+  fs.mkdirSync(path.join(tmp, 'model'), { recursive: true });
+  fs.writeFileSync(path.join(tmp, 'model', 'tri.bin'), tri.subarray(binAt));
+  const gltf = JSON.parse(tri.subarray(20, 20 + tri.readUInt32LE(12)).toString('utf8'));
+  gltf.buffers[0].uri = 'tri.bin';
+  fs.writeFileSync(path.join(tmp, 'model', 'tri.gltf'), JSON.stringify(gltf));
+  fs.writeFileSync(path.join(tmp, 'model', 'out.gltf'), JSON.stringify({ ...gltf, buffers: [{ byteLength: 36, uri: '../thing.glb' }] }));
+  const g = await run('save_slides', { title: 'glTF', slides: [{ els: [{ id: 'in', type: 'scene3d', model: 'model/tri.gltf' }, { id: 'out', type: 'scene3d', model: 'model/out.gltf' }] }] });
+  const gd = (await req('GET', `/api/pages/${idOf(g.text)}`)).json().model as Deck;
+  const kept = getAsset(db, ((byId(gd, 'in') as Extract<El, { type: 'scene3d' }>).model ?? '').slice(12));
+  ok(kept?.mime === 'model/gltf+json' && kept.data.toString('utf8').includes('"uri":"data:application/octet-stream;base64,'), 'a .gltf of the session is kept with its buffer inside it');
+  ok(!(byId(gd, 'out') as Extract<El, { type: 'scene3d' }>).model && (g.text ?? '').includes('out.gltf'), 'one whose files are outside its folder is not, and that is said');
+
   // The deck made PowerPoint compatible stays so when it is sent back whole without saying.
   await run('save_slides', { id, title: 'Web', format: 'pptx', slides: deck.slides });
   const asPptx = (await req('GET', `/api/pages/${id}`)).json().model as Deck;

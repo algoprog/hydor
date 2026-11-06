@@ -1197,12 +1197,12 @@ export function videoSrc(v: unknown): string | null {
 /** A video the app keeps, as a deck names it (naget-video:<sha>), or null. */
 export const keptVideo = (v: unknown): string | null => (typeof v === 'string' && /^naget-video:[a-f0-9]{16,64}$/.test(v.trim()) ? v.trim() : null);
 
-/** A 3D model's source: one the app keeps (naget-asset:<sha>, a glTF binary), one inside the deck (data:), or a .glb or .gltf on the web. */
+/** A 3D model's source: one the app keeps (naget-asset:<sha>, glTF), one inside the deck (data:), or a .glb or .gltf on the web. */
 export function cleanModel(v: unknown): string | null {
   if (typeof v !== 'string') return null;
   const s = v.trim();
   if (/^naget-asset:[a-f0-9]{16,64}$/.test(s)) return s;
-  if (/^data:model\/gltf-binary;base64,[A-Za-z0-9+/=]+$/.test(s)) return s;
+  if (/^data:model\/gltf(-binary|\+json);base64,[A-Za-z0-9+/=]+$/.test(s)) return s;
   if (/^https:\/\/[^\s<>"'()\\]+\.(glb|gltf)(\?[^\s<>"'()\\]*)?$/i.test(s) && s.length <= 2000) return s;
   return null;
 }

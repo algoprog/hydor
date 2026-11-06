@@ -1624,7 +1624,7 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
     const m = info.e.type === 'scene3d' ? info.e.model : undefined;
     if (!m) return reply(null);
     const kept = /^naget-asset:([a-f0-9]{16,64})$/.exec(m);
-    const url = kept ? (info.o.asset ? info.o.asset(kept[1]) : '') : /^data:model\/gltf-binary;base64,[A-Za-z0-9+/=]+$/.test(m) ? m : '';
+    const url = kept ? (info.o.asset ? info.o.asset(kept[1]) : '') : /^data:model\/gltf(-binary|\+json);base64,[A-Za-z0-9+/=]+$/.test(m) ? m : '';
     if (!url) return reply(null);
     if (url.startsWith('data:')) return reply(url);
     void win
