@@ -183,10 +183,13 @@ agents that speak ACP and take MCP servers.
   a poor cutout, and a large or detailed area to erase, go to an image model, and how: "ai" asks for one.
   edit_image crops, turns, sizes, adjusts (curves, levels, hue and saturation by colour, colour balance, clarity,
   dehaze, noise, grain, Auto enhance too), filters, marks up and blurs pictures, edit_video trims, cuts, crops,
-  speeds up, captions and sets music to videos, and edit_audio trims, cuts, silences, shortens pauses, takes out
-  filler words, cleans up (noise reduction, equalizer, compressor, loudness for podcasts or streaming), adds echo or
-  reverb and mixes music or sound effects into sounds (a Library sound put back in its place or beside it), all for
-  nothing on this computer (ffmpeg). A tool that needs an
+  speeds up, joins clips and pictures with transitions, colours (looks, white balance, vignette, grain), lays logos
+  and green screens over, captions (also from what is said, with an .srt), sets music and a voice-over to videos
+  with the voices cleaned up, the music lowered under speech and the loudness evened out (on the graphics card when
+  there is one), and edit_audio trims, cuts, silences, shortens pauses, takes out filler words, cleans up (noise
+  reduction, equalizer, compressor, loudness for podcasts or streaming), adds echo or reverb and mixes music or sound
+  effects into sounds (a Library sound put back in its place or beside it), all for nothing on this computer
+  (ffmpeg). A tool that needs an
   OpenRouter key and finds none asks for it on a card in the conversation (it goes straight to Settings → Models,
   checked with OpenRouter; Skip and nothing runs or is spent, and the session is not asked again for six hours).
   When agents make slides, documents and pages they illustrate them by themselves where a picture helps, with
@@ -538,22 +541,35 @@ agents that speak ACP and take MCP servers.
   dockable panels, a status bar; on a phone, tools along the bottom and panels in a sheet) and works in layers: pixel
   layers, words and shapes, and adjustment layers, each shown or hidden, locked, renamed, reordered by dragging, with
   sixteen blend modes and an opacity; duplicate, layer via copy or cut, merge down, merge visible, flatten, free
-  transform (move, size, turn). Selections (rectangle, ellipse, lasso, polygon lasso, magic wand, the subject found
-  by AI, all, invert, feather, grow, shrink; marching ants) keep painting, fills, adjustments and the AI tools inside
+  transform (move, size, turn). Selections (rectangle, ellipse, lasso, polygon lasso, magic wand, the subject found by
+  AI, all, invert, feather, grow, shrink; marching ants) keep painting, fills, adjustments and the AI tools inside
   them, and cut, copy and paste to new layers. Painting and retouching: brush, eraser, clone stamp, spot healing
-  brush, gradient, paint bucket, dodge and burn, eyedropper, foreground and background colours. Adjustments on
-  layers: light and colour, curves, levels, hue, saturation and lightness by colour range, colour balance, clarity,
-  dehaze, sharpness, noise reduction, blur, vignette, grain, invert, posterize, threshold, thirteen looks and Auto
-  enhance, with a live histogram. Crop (eight shapes, straighten, turns, mirror), crop to the selection, image size
-  and canvas size, rulers, guides and a grid, history with every step by name, Photoshop's keys (a list in
-  Edit → Keyboard shortcuts), pictures added as layers (a file, the Library, the clipboard, dropped). Its AI: remove
-  the background, erase, change with AI (a new layer, inside the selection), expand, make it 2× or 4× larger and
-  select the subject, free on this computer where the picture tools can do it. It saves at a size and as PNG, JPEG
-  or WebP, over the original (the old file to the Trash) or as a copy, and exports to this device. The video editor trims, splits and cuts parts out,
-  changes the speed (its sound keeping its pitch), crops to a shape, turns and mirrors, puts words on it at the
-  times you pick, adjusts its colour, fades it, mutes it or sets its volume, lays music from the Library under it,
-  takes a frame as a picture or as its still, and saves it as MP4, WebM or a GIF, rendered with ffmpeg here (the
-  picture tools bring one). Agents have edit_image and edit_video.
+  brush, gradient, paint bucket, dodge and burn, eyedropper, foreground and background colours. Adjustments on layers:
+  light and colour, curves, levels, hue, saturation and lightness by colour range, colour balance, clarity, dehaze,
+  sharpness, noise reduction, blur, vignette, grain, invert, posterize, threshold, thirteen looks and Auto enhance,
+  with a live histogram. Crop (eight shapes, straighten, turns, mirror), crop to the selection, image size and canvas
+  size, rulers, guides and a grid, history with every step by name, Photoshop's keys (a list in Edit → Keyboard
+  shortcuts), pictures added as layers (a file, the Library, the clipboard, dropped). Its AI: remove the background,
+  erase, change with AI (a new layer, inside the selection), expand, make it 2× or 4× larger and select the subject,
+  free on this computer where the picture tools can do it. It saves at a size and as PNG, JPEG or WebP, over the
+  original (the old file to the Trash) or as a copy, and exports to this device. The video editor is laid out as a
+  professional one (a menu bar with shortcuts, the workspaces Edit, Colour, Audio and Export, panels sized and
+  remembered): a media panel (videos, pictures and sounds from this device, the Library or Files, a voice-over
+  recorded), a WebGL viewer (timecode, In and Out, safe areas and a grid, J/K/L), an inspector, and a multi-track
+  timeline (T1 words, V3 and V2 overlays, V1 clips with transitions, A1 their sound with its shape, A2 music, A3
+  voice; show, mute, solo, lock; Select, Blade, Trim and Hand tools, snapping, markers, right-click menus). Clips have
+  their own part, speed (pitch kept or not), backwards, steadied, held frames, crop and turn, fitted or filling the
+  output's shape (16:9, 9:16, 1:1, 4:5), a picture's slow zoom and pan, their own sound or another in its place,
+  detached; fourteen transitions; overlays placed, sized, see-through, keyed (green screen) and faded; words and
+  captions made from what is said (whisper.cpp here), in five styles, saved as .srt. Colour as Resolve's Color page:
+  wheels (lift, gamma, gain, offset), primaries, curves, twelve looks, vignette, sharpen, denoise, grain, before and
+  after, and scopes (waveform, vectorscope, histogram), the preview exactly as made (one 3D table for the browser and
+  ffmpeg). Audio: a mixer (levels, meters, pan, mute, solo) and quick fixes (clean up voices, even out the loudness,
+  lower the music under speech, fade the music). Export: ready-made settings (YouTube, Reels and TikTok, square and
+  portrait posts), MP4, MOV, WebM or GIF, H.264, H.265 or AV1, size, frames a second, quality, In to Out, with
+  progress and time left. Made with ffmpeg here (the picture tools bring one), on the graphics card when there is one
+  that works (NVENC, VA-API, Quick Sync, VideoToolbox, AMF, Media Foundation; Settings → Images, video and audio), the
+  processor taking over at once if it fails. Agents have edit_image and edit_video.
 - **The sound editor**: sounds open in an editor of their own, in a tab like the others ("Sound · its name"), laid
   out as Audition or Audacity lay theirs: menus (File, Edit, Effects, Generate, View, with their shortcuts), a
   transport (play, stop, record, loop, the time, the part picked to type or drag, snapping, zoom, a meter of peaks

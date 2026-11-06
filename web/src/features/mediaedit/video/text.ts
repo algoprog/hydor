@@ -35,6 +35,12 @@ export function drawText(t: VideoText, w: number, h: number): HTMLCanvasElement 
     g.beginPath();
     g.roundRect(0, 0, c.width, c.height, Math.round(px * 0.28));
     g.fill();
+  } else if (t.outline) {
+    // An edge around the letters, drawn under them (as ffmpeg's drawtext borderw).
+    g.strokeStyle = cssColor(t.outline);
+    g.lineWidth = Math.max(2, Math.round(px / 7));
+    g.lineJoin = 'round';
+    lines.forEach((l, i) => g.strokeText(l, c.width / 2, padY + line * i + line / 2));
   } else {
     // A soft shadow keeps light words readable on a light picture.
     g.shadowColor = 'rgba(0, 0, 0, 0.55)';

@@ -196,6 +196,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['images', 'Picture tools on this computer', 'remove background cutout cut out erase eraser object removal take out upscale upscaler enlarge make larger bigger super resolution real-esrgan local private free offline python onnx plots matplotlib ffmpeg set up remove', 'Take a picture’s background out, erase part of it, or make it larger, here: free, and your pictures stay on this computer'],
   ['images', 'Making videos', 'video generation clips movies animation openrouter', 'Let agents make videos'],
   ['images', 'Video model', 'video model seedance veo kling wan openrouter price a second', 'The model that makes videos'],
+  ['images', 'Use the graphics card for videos', 'gpu graphics card nvenc nvidia vaapi quick sync intel amd amf videotoolbox apple hardware encoding render export faster video editor processor cpu', 'Make edited videos on the graphics card when there is one: faster, the processor free'],
   ['images', 'Making audio', 'audio generation music songs jingles voice over narration speech text to speech tts sound effects ambience openrouter', 'Let agents make audio'],
   ['images', 'Music model', 'music model lyria songs jingles openrouter price a song', 'The model that makes music'],
   ['images', 'Voice and sound model', 'voice model speech tts narration sound effects seed audio elevenlabs gemini voice cloning copy a voice openrouter', 'The model that makes voices and sounds'],
