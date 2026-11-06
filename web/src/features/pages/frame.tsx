@@ -13,6 +13,7 @@ import { codeColoursScript, hasCode } from '@shared/code-colours';
 import { cleanAnchor, type PageAnchor } from '@shared/page-comments';
 import { hasDbParts, pageDbScript } from '@shared/page-db';
 import { dbLabels } from './studio/blocks';
+import { BLOCK_ASKS, type BlockAsk } from './studio/BlockAsks';
 import { STORAGE_LIMITS } from '@shared/pages';
 import type { AppRun } from '@shared/apps';
 import type { AppInfo } from '@shared/app-manifest';
@@ -753,7 +754,7 @@ export interface EdPage {
 
 /** What the editor in the page asks the app for (writing.ts `ask`): chosen in the app, then put where it was asked. */
 export interface EdAsk {
-  what: 'emoji' | 'icon' | 'callout-icon' | 'cover' | 'picture' | 'video' | 'math';
+  what: 'emoji' | 'icon' | 'callout-icon' | 'cover' | 'picture' | 'video' | 'math' | BlockAsk;
   id: string;
   /** Where it was asked, in the frame's own pixels. */
   rect: { x: number; y: number; w: number; h: number } | null;
@@ -761,8 +762,12 @@ export interface EdAsk {
   has?: boolean;
   /** A formula's TeX, to change it. */
   tex?: string;
+  /** A newer block's own value, to change it: an embed's or a bookmark's address, a diagram's code, a chart's settings. */
+  value?: string;
+  /** A chart's sources: the page's databases, their names, titles and columns. */
+  dbs?: { name: string; title: string; cols: { name: string; kind: string }[] }[];
 }
-const ASKS = new Set(['emoji', 'icon', 'callout-icon', 'cover', 'picture', 'video', 'math']);
+const ASKS = new Set<string>(['emoji', 'icon', 'callout-icon', 'cover', 'picture', 'video', 'math', ...BLOCK_ASKS]);
 const rectOf = (v: unknown): EdAsk['rect'] => {
   const r = v as Record<string, unknown> | null;
   return r && typeof r === 'object' && ['x', 'y', 'w', 'h'].every((k) => typeof r[k] === 'number' && Number.isFinite(r[k])) ? { x: r.x as number, y: r.y as number, w: r.w as number, h: r.h as number } : null;
@@ -912,7 +917,7 @@ export const EditFrame = forwardRef<
         done?.(d.list.flatMap((x: { id?: unknown; on?: unknown }) => (isStr(x?.id, 40) && cleanAnchor(x.on) ? [{ id: x.id, on: cleanAnchor(x.on)! }] : [])).slice(0, 500));
       }
       else if (d.type === 'wa-ed-save') c.onSave?.();
-      else if (d.type === 'wa-ed-ask' && ASKS.has(d.what) && isStr(d.id, 20)) c.onAsk?.({ what: d.what, id: d.id, rect: rectOf(d.rect), has: d.has === true, tex: isStr(d.tex, 5000) ? d.tex : undefined });
+      else if (d.type === 'wa-ed-ask' && ASKS.has(d.what) && isStr(d.id, 20)) c.onAsk?.({ what: d.what, id: d.id, rect: rectOf(d.rect), has: d.has === true, tex: isStr(d.tex, 5000) ? d.tex : undefined, value: isStr(d.value, 40_000) ? d.value : undefined, dbs: Array.isArray(d.dbs) ? d.dbs.slice(0, 20) : undefined });
       else if (d.type === 'wa-ed-file' && isStr(d.id, 20) && d.file instanceof File && d.file.size <= 40_000_000 && /^image\//.test(d.file.type)) c.onFile?.(d.id, d.file);
       else if (d.type === 'wa-ed-agent') c.onAgent?.();
       else if (d.type === 'wa-ed-ai' && isStr(d.id, 20) && d.ask && typeof d.ask === 'object' && !Array.isArray(d.ask) && JSON.stringify(d.ask).length < 600_000) c.onAi?.(d.id, d.ask);
