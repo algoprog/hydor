@@ -331,7 +331,7 @@ export function savedLines(f: Saved, ...notes: (string | false | undefined)[]): 
 }
 
 /** How it was done, for the first line of an answer. */
-export const doneHow = (way: Way, model: string | undefined, cost?: number) => (way === 'local' ? `with ${model}, on this computer (free and private)` : `with ${model ?? 'an image model'} through OpenRouter${cost ? ` (${money(cost)})` : ''}`);
+export const doneHow = (way: Way, model: string | undefined, cost?: number) => (way === 'local' ? `with ${model} on this computer (free and private)` : `with ${model ?? 'an image model'} through OpenRouter${cost ? ` (${money(cost)})` : ''}`);
 
 /** For the agent, when the picture tools are not set up and this computer could set them up: they would do it free. */
 export const localNote = (here: Here) => (here.ready() || !here.canSetUp() ? '' : 'The picture tools on this computer would do this free and in private once the user sets them up (Settings → Images, video and audio): you may tell them.');
@@ -362,7 +362,7 @@ export async function keyForCloud(ctx: RunCtx, here: Here, o: { why: string; wha
       why: 'no-ai',
       answer: {
         isError: true,
-        text: `${o.doing} needs the picture tools on this computer here. Tell the user they can set them up in Settings → Images, video and audio (free and private: about 80 MB, and a model of about 220 MB the first time each tool is used).`,
+        text: `${o.doing} needs the picture tools on this computer here. Tell the user they can set them up in Settings → Images, video and audio (free and private: about 145 MB, and a model of about 220 MB the first time each tool is used).`,
       },
     };
   const free = !here.ready() && here.canSetUp() ? ' Or skip this and set up the picture tools in Settings → Images, video and audio: they do it free and in private on this computer.' : '';
