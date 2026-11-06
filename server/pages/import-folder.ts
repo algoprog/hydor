@@ -86,7 +86,8 @@ export async function importFolder(db: DB, dirIn: string, o: { space: string | n
   /** A file as a thing of the Library, in the folder `parent` gives (made when the first thing comes). */
   const file = async (abs: string, rel: string, parent: () => string | null) => {
     const name = path.basename(abs);
-    const kind = /\.zip$/i.test(name) ? null : kindForFile(name);
+    // A PDF is left out, as it was before a document could be opened from one (opened by itself, it becomes one).
+    const kind = /\.(zip|pdf)$/i.test(name) ? null : kindForFile(name);
     if (!kind) return skip(rel, whyNot(name));
     if (out.pages.length >= MAX_ITEMS) return skip(rel, 'limit');
     const size = fs.statSync(abs).size;

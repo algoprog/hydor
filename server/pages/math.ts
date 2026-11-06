@@ -67,6 +67,15 @@ export function texToHtml(tex: string, display: boolean): string {
   }
 }
 
+/** LaTeX as MathML alone, for a reader that draws maths itself (an e-book's); a formula it cannot read comes back in red, never thrown. */
+export function texToMathml(tex: string, display: boolean): string {
+  try {
+    return katex.renderToString(tex, { displayMode: display, output: 'mathml', throwOnError: false, strict: 'ignore', trust: false, maxExpand: 500, maxSize: 50 });
+  } catch {
+    return `<code>${tex.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)}</code>`;
+  }
+}
+
 /** KaTeX's stylesheet for a page whose maths is `html`: the fonts it draws with inside it (as data), the others left out. */
 export function katexStyle(html: string): string {
   const css = (katexCss as unknown as { default: string }).default;

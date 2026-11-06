@@ -14,7 +14,7 @@
 // nothing that could close a quote or start another filter. The command reads only the inputs it was given and writes
 // only its output.
 import type { VideoClip, VideoCodec, VideoFactsOf, VideoGrade, VideoOut, VideoQuality, VideoRecipe, VideoSize, VideoTransition } from '../../shared/mediaedit-video.ts';
-import { audioLength, clipLength, clipSpans, editedSize, fitBox, heard, isStill, MIN_PART, outputSize, overlayLength, turnedSize, VIDEO_TRANSITIONS, windowRecipe } from '../../shared/mediaedit-video.ts';
+import { audioLength, clipLength, clipSpans, editedSize, fitBox, heard, isStill, MIN_PART, outputSize, overlapFades, overlayLength, PAN_LAYOUTS, turnedSize, VIDEO_TRANSITIONS, volumeExpr, windowRecipe, type SoundChannels } from '../../shared/mediaedit-video.ts';
 import { cubeText, denoiseStrength, gradeHasColour, gradeLut, grainStrength, sharpenAmount, vignetteAngle } from '../../shared/video-grade.ts';
 import { encoderArgs, hwDecode, hwInit, hwTail, type HwApi } from './video-gpu.ts';
 
@@ -37,8 +37,9 @@ export const FILTER_OPTIONS: Record<string, readonly string[]> = {
   concat: ['n', 'v', 'a'],
   fps: ['fps'],
   fade: ['t', 'st', 'd', 'alpha'],
-  afade: ['t', 'st', 'd'],
-  volume: ['volume'],
+  afade: ['t', 'st', 'd', 'curve'],
+  volume: ['volume', 'eval'],
+  pan: ['args'],
   atempo: ['tempo'],
   asetrate: ['r'],
   aresample: ['osr'],
@@ -120,13 +121,50 @@ export function checkChain(c: Chain): void {
         if (!Number.isFinite(v)) throw new Error(`${f.name} ${k} is not a number`);
       } else if (FILE_KEYS.has(k)) {
         if (!OWN_FILE.test(v)) throw new Error(`${f.name} may read only the job's own files, not ${v}`);
+      } else if (f.name === 'pan') {
+        // pan mixes only as the editor's channel choices do.
+        if (!PAN_VALUES.has(v)) throw new Error(`pan may only be one of the channel choices, not ${v}`);
+      } else if (f.name === 'volume' && k === 'volume' && !PLAIN.test(v)) {
+        if (!isVolumeExpr(v)) throw new Error('volume has an expression the plan may not use');
       } else if (!PLAIN.test(v)) throw new Error(`${f.name} ${k} has a value the plan may not use`);
     }
   }
 }
 
-/** A value as the filter graph reads it: quoted when it has a comma, a bracket or a space. */
-const val = (v: Value) => (typeof v === 'number' ? n(v) : /[,() ]/.test(v) ? `'${v}'` : v);
+const PAN_VALUES = new Set(Object.values(PAN_LAYOUTS));
+
+/**
+ * Whether a volume expression is one a volume line makes (volumeExpr): numbers, t, + - * / ( ) and commas, and only
+ * if, lt, pow and between; at most 8,000 characters.
+ */
+export function isVolumeExpr(v: string): boolean {
+  if (v.length > 8000) return false;
+  let rest = v;
+  while (rest) {
+    const m = /^(?:\d+(?:\.\d+)?|[+\-*/(),]|t(?![a-z])|if(?=\()|lt(?=\()|pow(?=\()|between(?=\())/.exec(rest);
+    if (!m) return false;
+    rest = rest.slice(m[0].length);
+  }
+  return true;
+}
+
+/** A value as the filter graph reads it: quoted when it has a comma, a bracket, a space, an equals sign or a bar. */
+const val = (v: Value) => (typeof v === 'number' ? n(v) : /[,() =|]/.test(v) ? `'${v}'` : v);
+
+/** The filters that give a sound its channels, its fixes, its level and volume line, and its fades (`len` seconds long). */
+export function soundFilters(x: { channels?: SoundChannels; clean?: number; even?: boolean; volume?: number; levels?: [number, number][]; silence?: [number, number][] }, len: number, fades: { in?: number; out?: number; cross?: boolean } = {}): Filter[] {
+  const out: Filter[] = [];
+  if (x.channels) out.push(F('pan', ['args', PAN_LAYOUTS[x.channels]]));
+  if (x.clean) out.push(F('highpass', ['f', 80]), F('afftdn', ['nr', n(6 + 18 * x.clean, 1)], ['nf', -45], ['tn', 1]));
+  if (x.even) out.push(F('loudnorm', ['i', -16], ['tp', -1.5], ['lra', 11]), F('aresample', ['osr', 48000]));
+  if (x.volume !== undefined) out.push(F('volume', ['volume', n(x.volume, 3)]));
+  const e = volumeExpr(x.levels, x.silence);
+  if (e) out.push(F('volume', ['volume', e], ['eval', 'frame']));
+  const curve: [string, Value][] = fades.cross ? [['curve', 'qsin']] : [];
+  if (fades.in) out.push(F('afade', ['t', 'in'], ['st', 0], ['d', n(fades.in)], ...curve));
+  if (fades.out) out.push(F('afade', ['t', 'out'], ['st', n(Math.max(0, len - fades.out))], ['d', n(fades.out)], ...curve));
+  return out;
+}
 
 /** The filter graph's text, its chains checked first. */
 export function graphText(chains: Chain[]): string {
@@ -438,7 +476,7 @@ export function planVideo(p: PlanInput): Plan {
           if (c.keepPitch === false) af.push(F('asetrate', ['r', Math.round(48000 * sp)]), F('aresample', ['osr', 48000]));
           else af.push(...tempos(sp).map((x) => F('atempo', ['tempo', n(x, 4)])));
         }
-        if (c.volume !== undefined) af.push(F('volume', ['volume', n(c.volume, 3)]));
+        af.push(...soundFilters(c, L, { in: c.soundFadeIn, out: c.soundFadeOut }));
         af.push(F('apad'), F('atrim', ['duration', n(L)]), F('asetpts', ['expr', 'PTS-STARTPTS']));
         seg.a = next('a');
         chains.push({ ins: [`${sidx}:a`], filters: af, outs: [seg.a] });
@@ -603,6 +641,8 @@ export function planVideo(p: PlanInput): Plan {
       const id = kind === 'music' ? 'a2' : 'a3';
       if (!heard(r, id) && !wav) return null;
       const items = ((r.audio ?? []) as Tagged<NonNullable<VideoRecipe['audio']>[number]>[]).filter((m) => m.track === kind);
+      // Two sounds overlapping on a track cross-fade over the overlap.
+      const cross = overlapFades(items as NonNullable<VideoRecipe['audio']>, (m) => Math.min(audioLength(m, p.factsOf(m.src)), span - m.start));
       const labels: string[] = [];
       for (const m of items) {
         const f = p.factsOf(m.src);
@@ -613,9 +653,8 @@ export function planVideo(p: PlanInput): Plan {
         if (len < MIN_PART) continue;
         const idx = addInput(file, ['-ss', n(p0), '-t', n(Math.min(p1 - p0, len) + 0.05)]);
         const mf: Filter[] = [F('aformat', ['sample_fmts', 'fltp'], ['sample_rates', 48000], ['channel_layouts', 'stereo']), F('asetpts', ['expr', 'PTS-STARTPTS']), F('atrim', ['duration', n(len)])];
-        if (m.volume !== undefined) mf.push(F('volume', ['volume', n(m.volume, 3)]));
-        if (m.fadeIn) mf.push(F('afade', ['t', 'in'], ['st', 0], ['d', n(m.fadeIn)]));
-        if (m.fadeOut) mf.push(F('afade', ['t', 'out'], ['st', n(Math.max(0, len - m.fadeOut))], ['d', n(m.fadeOut)]));
+        const x = cross.get(m.id ?? '');
+        mf.push(...soundFilters(m, len, { in: Math.max(m.fadeIn ?? 0, x?.in ?? 0), out: Math.max(m.fadeOut ?? 0, x?.out ?? 0), cross: !!x && ((x.in > (m.fadeIn ?? 0)) || (x.out > (m.fadeOut ?? 0))) }));
         if (m.start > 0.0005) mf.push(F('adelay', ['delays', Math.round(m.start * 1000)], ['all', 1]));
         labels.push(chain([`${idx}:a`], mf, 'm'));
       }

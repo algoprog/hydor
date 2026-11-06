@@ -32,7 +32,18 @@ import {
   ListOrdered,
   ListTree,
   Lightbulb,
+  Mic,
+  Volume2,
+  Bookmark,
+  Captions,
+  BookMarked,
+  Quote,
+  Footprints,
+  Languages,
+  MessageCircleQuestion,
   MessageSquarePlus,
+  SpellCheck2,
+  Speech,
   Minus,
   Omega,
   PaintRoller,
@@ -60,7 +71,8 @@ import {
   WholeWord,
   ZoomIn,
 } from 'lucide-react';
-import { CALLOUT_TINTS, LINE_SPACINGS, PARA_STYLES, STYLES, type Doc } from '@shared/docs';
+import { CALLOUT_TINTS, CITE_STYLES, LINE_SPACINGS, PARA_STYLES, STYLES, type CiteStyle, type Doc } from '@shared/docs';
+import { CITE_STYLE_NAMES } from '@shared/doc-cite';
 import type { MenuDef, MenuEntry } from '../common/menus';
 import type { DocEngine, SelState } from './engine';
 
@@ -118,6 +130,18 @@ export interface DocMenuCtx {
   aiSection?: () => void;
   /** Insert → Signature: a saved one, or one drawn there. */
   signature: () => void;
+  /** Insert → Footnote: a mark at the caret, its words in a box. */
+  footnote?: () => void;
+  /** Format → Paragraph styles: update the caret's style to match it, change the styles (a dialog), or reset them. */
+  styles?: { match: () => void; open: () => void; reset: () => void };
+  /** Insert → Citation (the dialog that finds a source), Insert → Bibliography, and Format → Citation style. */
+  citation?: () => void;
+  bibliography?: () => void;
+  /** Insert → Cross-reference, Bookmark and Caption. */
+  xref?: () => void;
+  bookmark?: () => void;
+  caption?: () => void;
+  citeStyle?: (c: CiteStyle) => void;
   link: () => void;
   equation: (inline: boolean) => void;
   chars: () => void;
@@ -143,6 +167,12 @@ export interface DocMenuCtx {
   compare: () => void;
   /** An older version on view: nothing changes it. */
   readOnly?: boolean;
+  /** The AI that writes with you (ai/useDocAi.tsx): Write with AI, Proofread, the tone, a translation, questions, suggestions as you type. */
+  ai?: { write: () => void; proofread: () => void; tone: () => void; translate: () => void; ask: boolean; toggleAsk: () => void; busy: boolean };
+  ghost?: boolean;
+  setGhost?: (on: boolean) => void;
+  /** Tools → Voice typing and Read aloud. */
+  voice?: { dictate: () => void; typing: boolean; read: () => void; reading: boolean; canDictate: boolean; canRead: boolean };
 }
 
 /** The editor's menus, for what is where the caret is now. */
@@ -191,6 +221,8 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     },
     '-',
     { label: 'Check spelling', icon: <SpellCheck size={15} />, checked: c.spell, also: 'spellcheck', run: () => c.setSpell(!c.spell) },
+    !!c.setGhost && { label: 'Suggest as I type', icon: <Sparkles size={15} />, checked: !!c.ghost, also: 'ai autocomplete smart compose complete sentence predict', run: () => c.setGhost!(!c.ghost) },
+    !!c.ai && { label: 'Ask about this document', icon: <MessageCircleQuestion size={15} />, checked: c.ai.ask, also: 'ai question answer chat questions', run: c.ai.toggleAsk },
     { label: 'Show the word count while typing', icon: <WholeWord size={15} />, checked: c.showCount, run: () => c.setShowCount(!c.showCount) },
   ];
 
@@ -205,6 +237,7 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
 
   const insert: MenuEntry[] = [
     !!c.aiSection && { label: 'Section made with AI', icon: <Sparkles size={15} />, also: 'ai agent write generate section summary introduction conclusion faq glossary references table', disabled: c.readOnly, run: c.aiSection },
+    !!c.ai && { label: 'Write with AI', icon: <WandSparkles size={15} />, keys: 'Ctrl+J', also: 'ai write generate paragraph continue summarize summary conclusion list table help me write', disabled: c.readOnly, run: c.ai.write },
     {
       label: 'Picture',
       icon: <ImageIcon size={15} />,
@@ -214,11 +247,12 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
         ...(c.freePhoto ? [{ label: 'Free photos', icon: <Images size={15} />, also: 'photo photos stock free search openverse creative commons wikimedia', disabled: c.readOnly, run: c.freePhoto }] : []),
         { label: 'A picture made with AI', icon: <WandSparkles size={15} />, also: 'generate ai image illustration icon background photo', disabled: c.readOnly, run: c.aiPicture },
         { label: 'A drawing (SVG)', icon: <PenTool size={15} />, also: 'svg vector icon logo diagram', disabled: c.readOnly, run: c.drawing },
+        // A plot is a picture too (one row fewer, so Insert fits a small window).
+        { label: 'A plot', icon: <ChartScatter size={15} />, also: 'plot chart graph data matplotlib histogram scatter', disabled: c.readOnly, run: c.plot },
       ],
     },
     { label: 'Signature', icon: <Signature size={15} />, also: 'sign signing initials autograph handwriting', disabled: c.readOnly, run: c.signature },
     { label: 'Table', icon: <Table2 size={15} />, also: 'grid', items: tableSizes },
-    { label: 'Plot', icon: <ChartScatter size={15} />, also: 'chart graph data matplotlib histogram scatter', disabled: c.readOnly, run: c.plot },
     { label: 'Link', icon: <Link2 size={15} />, keys: 'Ctrl+K', run: c.link },
     { label: 'Comment', icon: <MessageSquarePlus size={15} />, keys: 'Ctrl+Alt+M', disabled: !st.text.trim(), run: c.comment },
     '-',
@@ -233,7 +267,21 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     },
     { label: 'Special characters', icon: <Omega size={15} />, also: 'emoji symbols', run: c.chars },
     { label: 'Callout', icon: <Lightbulb size={15} />, also: 'note box', run: () => e.style('callout') },
-    { label: 'Table of contents', icon: <TableOfContents size={15} />, also: 'toc headings', run: () => e.insertToc() },
+    // Word's References: footnotes, citations, a bibliography, captions, cross-references, bookmarks and the table of contents.
+    {
+      label: 'References',
+      icon: <BookMarked size={15} />,
+      also: 'footnote citation bibliography caption cross-reference bookmark table of contents toc',
+      items: [
+        ...(c.footnote ? [{ label: 'Footnote', icon: <Footprints size={15} />, keys: 'Ctrl+Alt+F', also: 'footnote note reference endnote', disabled: c.readOnly || !!st.picked, run: c.footnote }] : []),
+        ...(c.citation ? [{ label: 'Citation', icon: <Quote size={15} />, also: 'cite citation reference source doi arxiv paper book apa mla chicago ieee', disabled: c.readOnly || !!st.picked, run: c.citation }] : []),
+        ...(c.bibliography ? [{ label: 'Bibliography', icon: <BookMarked size={15} />, also: 'references works cited sources list', disabled: c.readOnly, run: c.bibliography }] : []),
+        ...(c.caption ? [{ label: 'Caption', icon: <Captions size={15} />, also: 'caption figure table equation number numbered label', disabled: c.readOnly, run: c.caption }] : []),
+        ...(c.xref ? [{ label: 'Cross-reference', icon: <Link2 size={15} />, also: 'cross reference figure table heading bookmark see refer', disabled: c.readOnly || !!st.picked, run: c.xref }] : []),
+        ...(c.bookmark ? [{ label: 'Bookmark', icon: <Bookmark size={15} />, also: 'bookmark anchor name place link', disabled: c.readOnly, run: c.bookmark }] : []),
+        { label: 'Table of contents', icon: <TableOfContents size={15} />, also: 'toc headings', run: () => e.insertToc() },
+      ],
+    },
     '-',
     // One row for the two ways across the page, so Insert fits a small window with Section made with AI in it.
     {
@@ -312,7 +360,21 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
 
   const format: MenuEntry[] = [
     { label: 'Text', icon: <Type size={15} />, items: text },
-    { label: 'Paragraph styles', icon: <Heading size={15} />, items: PARA_STYLES.map((k) => ({ label: STYLES[k].label, checked: st.style === k && !st.list, run: () => e.style(k) })) },
+    {
+      label: 'Paragraph styles',
+      icon: <Heading size={15} />,
+      items: [
+        ...PARA_STYLES.map((k) => ({ label: STYLES[k].label, checked: st.style === k && !st.list, run: () => e.style(k) })),
+        ...(c.styles
+          ? ([
+              '-',
+              { label: `Update “${(STYLES[st.style] ?? STYLES.normal).label}” to match`, disabled: c.readOnly || !!st.list || !!st.cell || st.block?.type !== 'p', also: 'style match update heading look', run: c.styles.match },
+              { label: 'Change the styles', also: 'style styles font size colour heading look modify', disabled: c.readOnly, run: c.styles.open },
+              { label: 'Reset the styles', also: 'style styles default', disabled: c.readOnly || !c.doc.styles, run: c.styles.reset },
+            ] as MenuEntry[])
+          : []),
+      ],
+    },
     {
       label: 'Align and indent',
       icon: <AlignLeft size={15} />,
@@ -346,6 +408,12 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
         ...CALLOUT_TINTS.map((v) => ({ label: TINTS[v] ?? v, checked: (inCallout.tint ?? CALLOUT_TINTS[0]) === v, also: 'callout colour tint', run: () => e.callout(inCallout.id, { tint: v }) })),
       ],
     },
+    !!c.citeStyle && {
+      label: 'Citation style',
+      icon: <Quote size={15} />,
+      also: 'apa mla chicago ieee references bibliography',
+      items: CITE_STYLES.map((k) => ({ label: CITE_STYLE_NAMES[k], checked: (c.doc.cite ?? 'apa') === k, disabled: c.readOnly, run: () => c.citeStyle!(k) })),
+    },
     '-',
     { label: 'Format painter', icon: <PaintRoller size={15} />, checked: !!e.paint, also: 'copy formatting', run: c.painter },
     { label: 'Clear the formatting', icon: <Eraser size={15} />, keys: 'Ctrl+\\', run: () => e.clear() },
@@ -355,7 +423,22 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
 
   const tools: MenuEntry[] = [
     { label: 'Word count', icon: <BookOpenText size={15} />, keys: 'Ctrl+Shift+C', also: 'characters pages reading time', run: c.wordCount },
+    ...(c.ai
+      ? ([
+          '-',
+          { label: 'Proofread', icon: <SpellCheck2 size={15} />, also: 'ai spelling grammar check clarity style corrections', disabled: c.readOnly || c.ai.busy, run: c.ai.proofread },
+          { label: 'Change the tone', icon: <Speech size={15} />, also: 'ai tone formal friendly confident simpler rewrite style', disabled: c.readOnly || c.ai.busy, run: c.ai.tone },
+          { label: 'Translate the document', icon: <Languages size={15} />, also: 'ai translate translation language copy', disabled: c.readOnly || c.ai.busy, run: c.ai.translate },
+          { label: 'Ask about this document', icon: <MessageCircleQuestion size={15} />, checked: c.ai.ask, also: 'ai question answer', run: c.ai.toggleAsk },
+        ] as MenuEntry[])
+      : []),
     { label: 'Keyboard shortcuts', icon: <Keyboard size={15} />, keys: 'Ctrl+/', run: c.shortcuts },
+    ...(c.voice
+      ? ([
+          { label: 'Voice typing', icon: <Mic size={15} />, keys: 'Ctrl+Shift+S', checked: c.voice.typing, also: 'dictate dictation speak microphone speech to text', disabled: c.readOnly, run: c.voice.dictate },
+          { label: 'Read aloud', icon: <Volume2 size={15} />, checked: c.voice.reading, also: 'speak read text to speech listen', disabled: !c.voice.canRead, run: c.voice.read },
+        ] as MenuEntry[])
+      : []),
     '-',
     { label: 'Accept all suggestions', icon: <CheckCheck size={15} />, disabled: !c.suggestions || c.readOnly, also: 'track changes review', run: () => c.resolveAll(true) },
     { label: 'Reject all suggestions', icon: <ListX size={15} />, disabled: !c.suggestions || c.readOnly, also: 'track changes review', run: () => c.resolveAll(false) },
