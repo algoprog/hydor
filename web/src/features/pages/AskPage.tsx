@@ -3,6 +3,8 @@
 // session with the agent picked last on the start page (`extra.page`: the agent is told which page it is and how to
 // change it), its conversation beside the page (over it on a phone, folding away to watch the page change), and
 // the page shows the agent's new version as soon as it is saved. Its conversation goes on there, or in Sessions.
+// A request may also come ready-made (askNow: a slide made with AI from the gallery): the panel opens and sends it at
+// once, as a new conversation, so the person watches it being made.
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { ArrowUp, ArrowUpRight, Eye, SquarePen, Sparkles, X } from 'lucide-react';
@@ -34,15 +36,55 @@ interface AskState {
   draft: string;
   /** The scope picked, by its id. */
   scope: string;
+  /** A request to send at once, without the box (askNow), for the panel of its page. */
+  now: { page: string; prompt: string; scope?: string; n: number } | null;
 }
 
-export const usePageAsk = create<AskState>(() => ({ open: false, folded: false, byPage: {}, draft: '', scope: '' }));
+export const usePageAsk = create<AskState>(() => ({ open: false, folded: false, byPage: {}, draft: '', scope: '', now: null }));
 
 /** Opens the panel: empty, or with words to send or change first (an "Ask the agent about it"). */
 export function openPageAsk(o: { draft?: string; scope?: string } = {}) {
   usePageAsk.setState((s) => ({ open: true, folded: false, draft: o.draft ?? s.draft, scope: o.scope ?? s.scope }));
 }
 export const closePageAsk = () => usePageAsk.setState({ open: false });
+
+/**
+ * Sends a request about the page open at once, without the box: the panel opens with it on its way, as a new
+ * conversation (one open goes on in Sessions). `scope`: one of the panel's scopes, whose words start the request.
+ */
+export function askNow(prompt: string, o: { page: string; scope?: string }) {
+  usePageAsk.setState({ open: true, folded: false, now: { page: o.page, prompt, scope: o.scope, n: ++askedNow } });
+}
+
+/** How many requests askNow was given, and the last one sent: each is sent once, however often the panel shows. */
+let askedNow = 0;
+let sentNow = 0;
+
+/** Starts the session for a request about the page, its unsaved changes saved first; on failure the words go back in the box. */
+function useStartAsk(page: PageInfo, beforeSend: () => Promise<boolean>) {
+  const mobile = useIsMobile();
+  const run = useAskRun();
+  const cwd = useSessions((x) => (page.sessionKey ? x.byKey[page.sessionKey]?.cwd : undefined));
+  return async (prompt: string, back: string) => {
+    try {
+      if (!(await beforeSend())) return;
+      usePageAsk.setState((s) => ({ byPage: { ...s.byPage, [page.id]: { key: null, pending: prompt } }, draft: '' }));
+      const r = await post<{ key: string }>('/api/sessions', {
+        agent: run.agent,
+        acpAgent: run.agent === 'acp' ? run.acp : undefined,
+        prompt,
+        model: run.model ?? undefined,
+        account: run.account,
+        cwd,
+        extra: { page: page.id },
+      });
+      usePageAsk.setState((s) => ({ byPage: { ...s.byPage, [page.id]: { key: r.key } }, folded: mobile }));
+    } catch (e) {
+      usePageAsk.setState((s) => ({ byPage: { ...s.byPage, [page.id]: { key: null } }, draft: back }));
+      toastError(e);
+    }
+  };
+}
 
 type AskKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
 const EXAMPLES: Record<AskKind, string[]> = {
@@ -73,11 +115,11 @@ const PLACEHOLDER: Record<AskKind, string> = {
 function Start({ page, scopes, beforeSend }: { page: PageInfo; scopes: AskScope[]; beforeSend: () => Promise<boolean> }) {
   const mobile = useIsMobile();
   const run = useAskRun();
+  const start = useStartAsk(page, beforeSend);
   const { draft, scope } = usePageAsk();
   const [text, setText] = useState(draft);
   const [busy, setBusy] = useState(false);
   const ta = useRef<HTMLTextAreaElement>(null);
-  const cwd = useSessions((x) => (page.sessionKey ? x.byKey[page.sessionKey]?.cwd : undefined));
   const picked = scopes.find((s) => s.id === scope) ?? scopes[0];
   useEffect(() => {
     setText(draft);
@@ -88,22 +130,7 @@ function Start({ page, scopes, beforeSend }: { page: PageInfo; scopes: AskScope[
     if (!q || busy) return;
     setBusy(true);
     try {
-      if (!(await beforeSend())) return;
-      const prompt = `${picked?.lead ?? ''}${q}`;
-      usePageAsk.setState((s) => ({ byPage: { ...s.byPage, [page.id]: { key: null, pending: prompt } }, draft: '' }));
-      const r = await post<{ key: string }>('/api/sessions', {
-        agent: run.agent,
-        acpAgent: run.agent === 'acp' ? run.acp : undefined,
-        prompt,
-        model: run.model ?? undefined,
-        account: run.account,
-        cwd,
-        extra: { page: page.id },
-      });
-      usePageAsk.setState((s) => ({ byPage: { ...s.byPage, [page.id]: { key: r.key } }, folded: mobile }));
-    } catch (e) {
-      usePageAsk.setState((s) => ({ byPage: { ...s.byPage, [page.id]: { key: null } }, draft: q }));
-      toastError(e);
+      await start(`${picked?.lead ?? ''}${q}`, q);
     } finally {
       setBusy(false);
     }
@@ -198,6 +225,17 @@ export function PageAskPanel({ page, scopes, beforeSend, className }: { page: Pa
   const mobile = useIsMobile();
   const at = usePageAsk((s) => s.byPage[page.id]);
   const key = at?.key ?? null;
+  // A request made elsewhere (the gallery's Make it): sent once, as the panel opens with it; one for a page no longer open is dropped.
+  const now = usePageAsk((s) => s.now);
+  const start = useStartAsk(page, beforeSend);
+  useEffect(() => {
+    if (!now || now.n <= sentNow) return;
+    sentNow = now.n;
+    usePageAsk.setState({ now: null });
+    if (now.page !== page.id) return;
+    const lead = now.scope ? (scopes.find((s) => s.id === now.scope)?.lead ?? '') : '';
+    void start(`${lead}${now.prompt}`, now.prompt);
+  }, [now?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className={cx('flex h-full min-h-0 flex-col bg-bg', className)}>
       <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-line pr-2 pl-4">

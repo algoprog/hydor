@@ -3,7 +3,9 @@
 // (an agent's save goes in its session's space; you pick when you keep something yourself) or in none. On a wide
 // screen the places are a list beside it: Everything (each space's things together, under its name), each space,
 // Not in a space, and Published (the sites published from pages or a project's build); on a phone, a row of chips.
-// Kinds filter what a place shows, a box finds things by name, and each card's More moves it to another space.
+// Kinds filter what a place shows, a box finds things by name, and each card's More moves it to another space, or
+// turns it into another kind (slides from a document, a page from a spreadsheet…): an agent makes that from it, in its
+// project and folder, and it stays as it is.
 // Files dropped anywhere on it (folders too) are added as what they are (uploads.ts): onto a project in the list of
 // places, into that project; elsewhere, into the place open (none on Everything); a line says where while they are
 // dragged. Upload files, beside a project's name (and in New), picks them on a device without a mouse.
@@ -45,10 +47,13 @@ import {
   Search,
   Sheet,
   Sigma,
+  Sparkles,
   Trash2,
   Upload,
   X,
 } from 'lucide-react';
+import { turnAsk } from '@shared/content-asks';
+import { TURN_INTO } from '@shared/content-types';
 import type { MediaItem } from '@shared/media';
 import type { LibFolder, PageInfo, SiteInfo } from '@shared/pages';
 import type { SpaceView } from '@shared/spaces';
@@ -57,11 +62,11 @@ import { ago, bytes } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
-import { Button, cx, Empty, IconButton, MenuItem, MenuLabel, MenuSep, Popover, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
+import { Button, cx, Empty, IconButton, MenuBack, MenuItem, MenuLabel, MenuSep, Popover, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 import { downloadMedia, recaption, SoundTile, startSessionWithMedia, Still } from '../media/parts';
 import { useMedia } from '../media/state';
-import { SpaceMark } from '../spaces/parts';
+import { SpaceMark, startInSpace } from '../spaces/parts';
 import { SpaceMenu } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
 import { preloadEditors } from './editors';
@@ -155,6 +160,22 @@ function sorted(list: Item[], sort: Sort): Item[] {
   return list;
 }
 
+/** What "Turn it into" offers, by what an agent makes. */
+const TURN: Record<'slides' | 'doc' | 'page', { label: string; icon: ReactNode }> = {
+  slides: { label: 'Slides', icon: <Presentation size={14} /> },
+  doc: { label: 'A document', icon: <FileText size={14} /> },
+  page: { label: 'A page', icon: <AppWindow size={14} /> },
+};
+
+/** Turn it into: the start page, with the request to make the other kind from it in its box, in its project (what is made lands there, in its folder). */
+function turnInto(p: PageInfo, to: 'slides' | 'doc' | 'page', folders: LibFolder[] | null, spaces: SpaceView[] | null) {
+  const names = p.folder ? folderChain(folders, p.folder).map((f) => f.name) : [];
+  const prompt = turnAsk({ from: p.kind ?? 'page', to, id: p.id, title: p.title, folder: names.join('/') || undefined });
+  const sp = p.space ? spaces?.find((s) => s.id === p.space) : undefined;
+  if (sp) startInSpace(sp, prompt);
+  else go(`/?prompt=${enc(prompt)}`);
+}
+
 /** Moves an item to a space (or out of one), saying where it went. */
 async function moveTo(it: Item, space: string | null, spaces: SpaceView[] | null) {
   try {
@@ -177,6 +198,8 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
   const spaces = useSpaces();
   const folders = usePagesStore((s) => s.folders);
   const [menu, setMenu] = useState(false);
+  // What it can be turned into, shown where the menu was.
+  const [turning, setTurning] = useState(false);
   const [moving, setMoving] = useState(false);
   const [filing, setFiling] = useState(false);
   // The folders of its place, for Move to a folder; the one it is in, to say where it is in a list of the whole place.
@@ -271,7 +294,7 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
             {!!p?.storageBytes && <Database size={11} className="shrink-0" aria-label={tr(`Keeps ${bytes(p.storageBytes)}`)} />}
           </span>
         </button>
-        <IconButton ref={anchor} label="More" size="sm" onClick={() => setMenu((x) => !x)} active={menu || moving || filing}>
+        <IconButton ref={anchor} label="More" size="sm" onClick={() => setMenu((x) => !x)} active={menu || moving || filing || turning}>
           <Ellipsis size={15} />
         </IconButton>
       </div>
@@ -311,6 +334,9 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
             <MenuItem icon={<Copy size={14} />} onClick={duplicate}>
               Duplicate
             </MenuItem>
+            <MenuItem icon={<Sparkles size={14} />} submenu onClick={() => (close(), setTurning(true))}>
+              Turn it into
+            </MenuItem>
             <MenuSep />
             <MenuLabel>Download as</MenuLabel>
             {EXPORTS(p.kind).map((x) => (
@@ -334,6 +360,17 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
           Delete
         </MenuItem>
       </Popover>
+      {/* Turn it into: the kinds an agent can make from it, where the menu was (its first row goes back to it). */}
+      {p && (
+        <Popover anchor={anchor} open={turning} onClose={() => setTurning(false)} align="end" width={240}>
+          <MenuBack onClick={() => (setTurning(false), setMenu(true))}>Turn it into</MenuBack>
+          {TURN_INTO[p.kind ?? 'page'].map((to) => (
+            <MenuItem key={to} icon={TURN[to].icon} onClick={() => (setTurning(false), turnInto(p, to, folders, spaces))}>
+              {TURN[to].label}
+            </MenuItem>
+          ))}
+        </Popover>
+      )}
       <SpaceMenu anchor={anchor} open={moving} onClose={() => setMoving(false)} title="Move it to" value={it.space ?? null} onPick={(s) => s !== (it.space ?? null) && void moveTo(it, s, spaces)} />
       <FolderMenu
         anchor={anchor}
