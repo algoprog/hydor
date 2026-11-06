@@ -1,7 +1,8 @@
 // The picture tools on this computer: taking the background out of a picture (BiRefNet-lite) and erasing part of one
 // (LaMa), free and private, and the Python that draws plots. Setting them up (Settings → Images, video and audio) makes
 // a private Python environment in the data folder once (ONNX Runtime, NumPy, Pillow, Matplotlib, pandas, and a
-// portable ffmpeg for computers without one: about 145 MB to download); each model downloads the first time its tool is used (about 220 MB each), checked by its SHA-256.
+// portable ffmpeg for computers without one: about 145 MB to download); each model downloads the first time its tool
+// is used (192 MB and 208 MB), checked by its SHA-256; a model's file the app no longer uses goes.
 //
 // A worker (picture_worker.py) runs the models on the CPU, one picture at a time (others wait in line). Each model
 // loads only when its tool is used and unloads after a few idle minutes; the worker quits after a few more; nothing
@@ -70,15 +71,17 @@ export interface ModelInfo {
 // Pinned to the repositories' commits, so the files are the ones checked by their SHA-256.
 const MODELS_AT: Record<ToolName, ModelInfo> = {
   cutout: {
-    file: 'birefnet-lite.onnx',
-    url: '/onnx-community/BiRefNet_lite-ONNX/resolve/de15b22ba131738a16dff04aab8bdf8dc32e3ac1/onnx/model.onnx',
-    bytes: 224_005_088,
-    sha256: '5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333',
+    // BiRefNet-lite (MIT) exported at 512 × 512: about a quarter of the memory of the 1024 one (whose deformable
+    // convolutions, exported as plain operations, held several 784 MB tensors at once: 6 GB to cut a picture out).
+    file: 'birefnet-lite-512.onnx',
+    url: '/shozebDev/birefnet-lite-512-onnx/resolve/a1ef059c89d8982b4b5f801915024d8e2d55ea87/onnx/model.onnx',
+    bytes: 191_856_366,
+    sha256: '23215a457640f57e4852f6fc9fd1f21761b29793b9970d09cd9f0d8e15309bcd',
     label: 'the background remover',
     name: 'BiRefNet-lite',
-    // Its deformable convolutions, exported as plain operations, hold several 784 MB tensors at once at 1024 × 1024.
-    loadMb: 450,
-    runMb: 5600,
+    // Measured: about 400 MB once loaded, 1.9 GB at most while it works on a picture.
+    loadMb: 420,
+    runMb: 1600,
     perPixel: 24,
   },
   erase: {
@@ -96,6 +99,18 @@ const MODELS_AT: Record<ToolName, ModelInfo> = {
 let models: Record<ToolName, ModelInfo> = MODELS_AT;
 const modelUrl = (m: ModelInfo) => (/^https?:/.test(m.url) ? m.url : HF() + m.url);
 const modelPath = (t: ToolName) => path.join(modelsDir(), models[t].file);
+
+/** The files of models no longer used (an earlier version's, a download of one never finished) go, so nothing is left behind. */
+function sweepModels() {
+  const keep = new Set(Object.values(models).flatMap((m) => [m.file, `${m.file}.part`]));
+  let names: string[] = [];
+  try {
+    names = fs.readdirSync(modelsDir());
+  } catch {
+    return;
+  }
+  for (const n of names) if (!keep.has(n)) fs.rmSync(path.join(modelsDir(), n), { recursive: true, force: true });
+}
 /** Memory kept free beside what a job needs, in MB. */
 const SPARE_MB = 256;
 
@@ -284,6 +299,7 @@ async function download(t: ToolName): Promise<void> {
   const final = modelPath(t);
   const part = `${final}.part`;
   fs.mkdirSync(modelsDir(), { recursive: true });
+  sweepModels();
   let start = fs.statSync(part, { throwIfNoEntry: false })?.size ?? 0;
   if (start > m.bytes) (fs.rmSync(part, { force: true }), (start = 0));
   const disk = freeDiskMb(modelsDir());
@@ -367,6 +383,8 @@ interface Worker {
   pending: Map<number, Pending>;
   seq: number;
   loaded: ToolName[];
+  /** The most memory it has held, in MB, as it says. */
+  peak?: number;
   idle?: NodeJS.Timeout;
   unload: Partial<Record<ToolName, NodeJS.Timeout>>;
   /** When each model last worked on a picture. */
@@ -411,6 +429,7 @@ function startWorker(): Worker {
       return ready();
     }
     if (Array.isArray(m.loaded)) w.loaded = m.loaded;
+    if (typeof m.peak === 'number') w.peak = Math.max(w.peak ?? 0, m.peak);
     const p = m.id != null ? w.pending.get(m.id) : undefined;
     if (!p) return;
     if (m.status === 'loading' && p.what) jobStep = `Loading ${models[p.what].label}`;
@@ -878,8 +897,12 @@ export function setPictureToolsForTests(o: { models?: Partial<Record<ToolName, P
   if (o.freeMb !== undefined) freeForTests = o.freeMb;
 }
 
-/** The worker's process, while it runs (for tests). */
+/** The worker's process, while it runs, and the most memory it has held in MB (for tests). */
 export const pictureWorkerPid = () => (worker && !worker.gone ? worker.proc.pid : undefined);
+export const pictureWorkerPeak = () => worker?.peak;
+
+/** What a tool needs free to work on a picture of `pixels` pixels with its model not yet loaded, in MB (for tests). */
+export const memoryNeeded = (t: ToolName, pixels: number) => models[t].loadMb + models[t].runMb + (pixels * models[t].perPixel) / 2 ** 20 + SPARE_MB;
 
 /** For a clean exit (tests). */
 export function stopPictureTools() {
@@ -907,6 +930,7 @@ function whileAsked(reply: { raw: NodeJS.EventEmitter & { writableFinished: bool
 export const pictureTools: Feature = {
   id: 'pictureTools',
   start() {
+    sweepModels();
     // Set up before for an older list of packages: again, as it was asked for then.
     if (!process.env.HYDOR_PICTURES_PYTHON && fs.existsSync(python()) && fs.existsSync(path.join(venv(), '.packages')) && !envReady()) void setupLocal();
   },

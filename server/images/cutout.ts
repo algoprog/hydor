@@ -371,7 +371,7 @@ export async function keyForCloud(ctx: RunCtx, here: Here, o: { why: string; wha
       why: 'no-ai',
       answer: {
         isError: true,
-        text: `${o.doing} needs the picture tools on this computer here. Tell the user they can set them up in Settings → Images, video and audio (free and private: about 145 MB, and a model of about 220 MB the first time each tool is used).`,
+        text: `${o.doing} needs the picture tools on this computer here. Tell the user they can set them up in Settings → Images, video and audio (free and private: about 145 MB, and a model of about 200 MB the first time each tool is used).`,
       },
     };
   const free = !here.ready() && here.canSetUp() ? ' Or skip this and set up the picture tools in Settings → Images, video and audio: they do it free and in private on this computer.' : '';
@@ -392,7 +392,7 @@ export function removeBackgroundTool(db: DB, here: Here): RunTool {
     annotations: { readOnlyHint: false, openWorldHint: true },
     description: [
       'Take the background out of a picture, leaving its subject (a person, a product, an animal, a logo, an object) on a see-through background: a PNG saved in the session’s folder (images/), to put on slides, documents and pages.',
-      'On this computer, once the user has set up the picture tools (Settings → Images, video and audio), it is free and private, and keeps the subject’s pixels exactly; it takes a few seconds to half a minute, and the first time it downloads its model (about 220 MB). Its result is checked, and when it looks poor an image model does it again.',
+      'On this computer, once the user has set up the picture tools (Settings → Images, video and audio), it is free and private, and keeps the subject’s pixels exactly; it takes a few seconds to half a minute, and the first time it downloads its model (about 190 MB). Its result is checked, and when it looks poor an image model does it again.',
       `An image model through OpenRouter costs ${AI_COST} and draws the picture again without its background, so small details may differ; without an OpenRouter key the user is asked for one, and if they skip it, no model runs.`,
       'The picture is shown to the user with your reply; the answer says which way made it and why.',
     ].join(' '),
