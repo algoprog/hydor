@@ -316,13 +316,13 @@ for (const f of [...files(path.join(ROOT, 'web/src'), /\.(tsx|ts)$/), ...files(p
   for (const m of js.matchAll(/children: ((["'])(?:(?!\2)[^\\]|\\.)*\2)(?=\s*[,}])|\.push\(((["'])(?:(?!\4)[^\\]|\\.)*\4)\)/g)) add(literals(m[1] ?? m[3])[0], where, true);
   quietHere = QUIET;
 }
-// The server's messages that show in the pages: errors (in toasts), except those its tools give agents, and the
-// names and lines of what ships.
+// The server's messages that show in the pages: errors (in toasts), except those its tools give agents (tools.ts,
+// mcp.ts, and page_action's, server/pages/actions.ts), and the names and lines of what ships.
 for (const f of files(path.join(ROOT, 'server'), /\.ts$/)) {
   const src = fs.readFileSync(f, 'utf8');
   const where = path.relative(ROOT, f);
   for (const m of src.matchAll(/new HttpError\(\s*\d+\s*,\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, where);
-  if (!/(^|\/)(tools|mcp|cli)\.ts$/.test(where)) for (const m of src.matchAll(/new Error\(\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, where);
+  if (!/(^|\/)(tools|mcp|cli)\.ts$|^server\/pages\/actions\.ts$/.test(where.split(path.sep).join('/'))) for (const m of src.matchAll(/new Error\(\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, where);
 }
 // Whole files whose strings the pages show: the search providers, the helper model's choices, the agents' list, the
 // sessions' notices (a session finished, needs you, failed) and messages, and the form an image or a video asks first.

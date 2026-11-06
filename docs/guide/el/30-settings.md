@@ -227,9 +227,9 @@
 [Ρυθμίσεις → Εικόνες, βίντεο και ήχος](/settings?s=images): εικόνες, βίντεο, μουσική και φωνές που φτιάχνουν οι πράκτορες για εσάς μέσω OpenRouter, και ποιος γράφει τις λεζάντες τους στη Βιβλιοθήκη. Περισσότερα στο [Έγγραφα, εικόνες, βίντεο και φωνή](/guide/documents-voice).
 
 - [**Δημιουργία εικόνων**](/settings?s=images&find=Making%20images): Επιτρέψτε στους πράκτορες να φτιάχνουν εικόνες.
-- [**Για τις περισσότερες εικόνες (Καλύτερο)**](/settings?s=images&find=For%20most%20pictures%20%28Best%29): The model that makes most pictures, and every change to one.
-- [**For simple pictures (Quick)**](/settings?s=images&find=For%20simple%20pictures%20%28Quick%29): A cheaper, quicker model for icons, backgrounds, textures and simple pictures.
-- [**Εργαλεία εικόνων σε αυτόν τον υπολογιστή**](/settings?s=images&find=Picture%20tools%20on%20this%20computer): Take a picture’s background out, or erase part of it, here: free, and your pictures stay on this computer.
+- [**Για τις περισσότερες εικόνες (Καλύτερο)**](/settings?s=images&find=For%20most%20pictures%20%28Best%29): Το μοντέλο που φτιάχνει τις περισσότερες εικόνες και κάθε αλλαγή σε μία.
+- [**Για απλές εικόνες (Γρήγορο)**](/settings?s=images&find=For%20simple%20pictures%20%28Quick%29): Ένα φθηνότερο, γρηγορότερο μοντέλο για εικονίδια, φόντα, υφές και απλές εικόνες.
+- [**Εργαλεία εικόνων σε αυτόν τον υπολογιστή**](/settings?s=images&find=Picture%20tools%20on%20this%20computer): Αφαιρέστε το φόντο μιας εικόνας ή σβήστε ένα μέρος της εδώ: δωρεάν, και οι εικόνες σας μένουν σε αυτόν τον υπολογιστή.
 - [**Δημιουργία βίντεο**](/settings?s=images&find=Making%20videos): Επιτρέψτε στους πράκτορες να φτιάχνουν βίντεο.
 - [**Μοντέλο βίντεο**](/settings?s=images&find=Video%20model): Το μοντέλο που φτιάχνει τα βίντεο.
 - [**Δημιουργία ήχου**](/settings?s=images&find=Making%20audio): Επιτρέψτε στους πράκτορες να φτιάχνουν ήχο.
