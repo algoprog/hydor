@@ -36,12 +36,12 @@ export type ShowNews = { show: string; state: RemoteState } | { show: string; cm
 
 const shows = new Map<string, ShowRec>();
 /** At most this many at once (the oldest goes); each goes after this long unheard of. */
-const MAX_SHOWS = 16;
+const MAX_SHOWS = 8;
 const IDLE_MS = 6 * 3600_000;
 /** A window unheard of this long (it tells where it is every few seconds) is taken to be gone. */
 const LIVE_MS = 20_000;
 /** The largest deck a slideshow may carry (its pictures are kept apart, by reference). */
-const MAX_DECK_JSON = 6 * 1024 * 1024;
+const MAX_DECK_JSON = 4 * 1024 * 1024;
 
 export const showChannel = (id: string) => `page:show:${id}`;
 
