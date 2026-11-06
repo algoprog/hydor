@@ -65,13 +65,21 @@ function webPageFrame(url: string): HTMLIFrameElement | null {
 /**
  * A live part's frame, for the runtime (DrawOpts.frame): /partframe, sandboxed with scripts only (its own opaque
  * origin, so it reaches nothing of the app's), sent `html` once it says it is ready. A web page part frames its own
- * address instead, unless that is this app's.
+ * address instead, unless that is this app's. Keys go to one only while it has the focus and takes clicks.
  */
 export function partFrame(html: string, part: El): HTMLIFrameElement {
-  if (part.type === 'embed') {
-    const own = webPageFrame(part.url);
-    if (own) return own;
+  const f = (part.type === 'embed' ? webPageFrame(part.url) : null) ?? pageFrame(html, part);
+  // One that does not take clicks takes neither the pointer nor the keys: a click on it goes on, as on the slide.
+  const takes = part.type === 'scene3d' ? !!part.orbit : part.type === 'html' || part.type === 'embed' ? !!part.interactive : false;
+  if (!takes) {
+    f.tabIndex = -1;
+    f.style.pointerEvents = 'none';
   }
+  return f;
+}
+
+/** A frame at /partframe that is sent `html` once it says it is ready. */
+function pageFrame(html: string, part: El): HTMLIFrameElement {
   const f = document.createElement('iframe');
   f.dataset.nPart = part.type;
   f.setAttribute('sandbox', 'allow-scripts');
