@@ -1131,7 +1131,10 @@ export function SlidesEditor({
 
   if (!deck || !slide) return <div className="flex h-full items-center justify-center text-fg-3">…</div>;
 
+  // A slide made with AI after a slide (Insert and the New slide menu: the one on view; a slide's own menu: that one).
+  const aiSlideAfter = onRequest && !readOnly ? (i: number) => openTypes({ kind: 'slide', after: { index: i, title: slideTitle(deck.slides[i]) }, webDeck: isWebDeck(deck), onDone: onRequest }) : null;
   const stripAct = {
+    aiAfter: aiSlideAfter ?? undefined,
     pick: (i: number) => {
       canvas.current?.stopEditing();
       pickedAt.current = performance.now();
@@ -1176,8 +1179,7 @@ export function SlidesEditor({
     else pins.push({ key, x: at.x, y: at.y, ids: [c.id], active: false });
   }
   for (const p of pins) p.active = !!activeComment && p.ids.includes(activeComment);
-  // A slide made with AI after the one on view (Insert, and the New slide menu): the request goes where the host sends it.
-  const aiSlide = onRequest && !readOnly ? () => openTypes({ kind: 'slide', after: { index, title: slideTitle(slide) }, webDeck: isWebDeck(deck), onDone: onRequest }) : null;
+  const aiSlide = aiSlideAfter ? () => aiSlideAfter(index) : null;
   const web = isWebDeck(deck);
   const menus = slidesMenus({
     readOnly,

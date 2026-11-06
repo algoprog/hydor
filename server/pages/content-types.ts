@@ -1,7 +1,10 @@
 // how_to_make: the agents' way into the kinds the gallery offers people (shared/content-types.ts). An agent asked for
 // one by name ("add a SWOT slide", "write me a cover letter") reads what the gallery would have asked for, and how to
 // add it to what is open, so it comes out as well as it does from the gallery. Free and local: it only reads the list.
-import { CONTENT_TYPES, findTypes, typesOf, type ContentKind, type ContentType } from '../../shared/content-types.ts';
+// Also what a session started from the gallery or Turn it into is told (`extra.make`): the request in full, while the
+// person's message says it in short.
+import { makeOf, makeRequest } from '../../shared/content-asks.ts';
+import { contentType, CONTENT_TYPES, findTypes, typesOf, type ContentKind, type ContentType } from '../../shared/content-types.ts';
 import type { RunTool } from '../features/types.ts';
 
 const KINDS: ContentKind[] = ['slide', 'deck', 'doc', 'section', 'page', 'block', 'sheet'];
@@ -83,3 +86,18 @@ export const HOW_TO_MAKE: RunTool = {
     return `${whole(best)}${others.length ? `\nOthers close to it: ${others.join('; ')}.` : ''}`;
   },
 };
+
+/**
+ * What the agent of a session started from the gallery (a slide, a section, a block, something new) or from Turn it
+ * into is told (`extra.make`): the request in full, as the app composes it; null when it asks for nothing known.
+ */
+export function makeInstructions(v: unknown): string | null {
+  const m = makeOf(v);
+  if (!m) return null;
+  const t = m.type ? contentType(m.type) : undefined;
+  if (m.type && !t && !m.turn) return null;
+  const req = makeRequest(m, t ?? null);
+  if (!req) return null;
+  const from = m.turn ? 'Turn it into, in their Library' : 'the gallery of things made with AI';
+  return `What the user asked for, in full: they picked it in the app (${from}), and their message says it in short, in their own words. ${req}`;
+}

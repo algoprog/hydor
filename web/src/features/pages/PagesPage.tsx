@@ -497,7 +497,7 @@ function PageView({ id }: { id: string }) {
         band={band}
         savedNote={page?.sessionKey ? 'the agent that made it sees your changes' : undefined}
         onAsk={(text) => askThis(text)}
-        onRequest={old ? undefined : (prompt) => askNow(prompt, { page: id })}
+        onRequest={old ? undefined : (r) => askNow(r.prompt, { page: id, make: r.make })}
         onScopes={setScopes}
         saveNowRef={saveFirst}
         onDirty={(d) => {
@@ -525,7 +525,7 @@ function PageView({ id }: { id: string }) {
       initialMode={startMode === 'edit' || startMode === 'code' ? startMode : undefined}
       savedNote={page?.sessionKey ? 'the agent that made it sees your changes' : undefined}
       onAsk={(text) => askThis(text)}
-      onRequest={old ? undefined : (prompt) => askNow(prompt, { page: id })}
+      onRequest={old ? undefined : (r) => askNow(r.prompt, { page: id, make: r.make })}
       saveNowRef={saveFirst}
       pageId={old ? undefined : id}
     />

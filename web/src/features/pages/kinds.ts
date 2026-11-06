@@ -4,6 +4,7 @@
 import type { MutableRefObject, ReactNode } from 'react';
 import type { DraftMark } from '@shared/page-drafts';
 import type { TexFileKind } from '@shared/latex-files';
+import type { MadeRequest } from './types/requests';
 import { api } from '../../lib/api';
 
 /** An older version's model, to look at in its editor (`id` already encoded for an address). */
@@ -54,10 +55,11 @@ export interface ModelEditorProps<M> {
   /** "Ask the agent about it" on what is picked: the words that say what it is ("In the section “Pricing”: "). */
   onAsk?: (text: string) => void;
   /**
-   * A whole request about it, ready to send (a slide made with AI, from the gallery): Pages sends it through its Ask
-   * panel at once; beside a conversation it goes in the message box. Left out, the editor offers none.
+   * A request about it made in the gallery (a slide made with AI): its short line, what to make, the whole of it. Pages
+   * sends it through its Ask panel at once (the agent told what to make in full); beside a conversation the whole of it
+   * goes in the message box. Left out, the editor offers none.
    */
-  onRequest?: (prompt: string) => void;
+  onRequest?: (r: MadeRequest) => void;
   /** What an agent asked now could be about, most specific last: told as what is in view or picked changes. */
   onScopes?: (scopes: AskScope[]) => void;
   /** Saves now, if there are changes (before an agent is asked about it): false when it did not. */

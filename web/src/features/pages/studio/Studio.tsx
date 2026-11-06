@@ -23,6 +23,7 @@ import { DeviceStage, EditFrame, PageFrame, StreamFrame, withBase, type AppBridg
 import { ShortcutsDialog } from '../common/Shortcuts';
 import { usePagesStore } from '../state';
 import { openTypes } from '../types';
+import type { MadeRequest } from '../types/requests';
 import { AddPanel, blockPlace } from './AddPanel';
 import { editorLabels } from './blocks';
 import { InsertPopover, PAGE_SHORTCUTS } from './Inserts';
@@ -179,8 +180,8 @@ export function Studio({
   initialMode?: StudioMode;
   /** Puts a note on the part picked in the message box: the editor's "Ask the agent". */
   onAsk?: (text: string) => void;
-  /** A whole request about the page, ready to send (a block made with AI): Add offers it when this is given. */
-  onRequest?: (prompt: string) => void;
+  /** A request about the page made in the gallery (a block made with AI): Add offers it when this is given. */
+  onRequest?: (r: MadeRequest) => void;
   /** Saves now, if there are changes (before an agent is asked about the page): false when it did not. */
   saveNowRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
   /** A page of the Library: comments on its blocks (kept by the app, outside the page) show in Edit's Comments tab. */

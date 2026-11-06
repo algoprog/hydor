@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { CONTENT_GROUPS, CONTENT_MIN, CONTENT_TYPES, contentType, findTypes, typesOf, type ContentKind } from '../../shared/content-types.ts';
-import { composeAsk, NEW_START, TURN_INTO, turnAsk, type PageKindName } from '../../shared/content-asks.ts';
+import { composeAsk, makeOf, makeRequest, NEW_START, TURN_INTO, turnAsk, type PageKindName } from '../../shared/content-asks.ts';
 import { TYPE_ICONS } from '../../web/src/features/pages/types/icons.ts';
 import { howToMakeStep } from '../../web/src/features/pages/types/step.ts';
 import { slidesMenus, type MenuArgs } from '../../web/src/features/pages/slides/SlidesMenus.tsx';
@@ -18,8 +18,10 @@ import { docMenus, type DocMenuCtx } from '../../web/src/features/pages/docs/men
 import type { MenuAction, MenuDef, MenuEntry } from '../../web/src/features/pages/common/menus.tsx';
 import { blockPlace } from '../../web/src/features/pages/studio/AddPanel.tsx';
 import type { EdSel } from '../../web/src/features/pages/frame.tsx';
-import type { RunCtx } from '../features/types.ts';
-import { HOW_TO_MAKE } from './content-types.ts';
+import { madeRequest, turnRequest } from '../../web/src/features/pages/types/requests.ts';
+import type { Deps, RunCtx, SpawnInfo } from '../features/types.ts';
+import { cleanExtra } from '../scheduler.ts';
+import { HOW_TO_MAKE, makeInstructions } from './content-types.ts';
 import { pages } from './index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -218,6 +220,84 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
   ok(/^The kinds the app knows how to make \(\d+\)/.test(blocks) && /Parts added to a page:/.test(blocks) && !/Slides added/.test(blocks), 'with a kind alone: that kind’s list');
   ok(/^No kind the app knows matches “xyzzy”: make it as the user asks/.test(await run({ what: 'xyzzy' })), 'nothing known: make it as asked');
   ok(howToMakeStep({ status: 'done', input: { what: 'SWOT slide' } }).title === 'how to make “SWOT slide”' && howToMakeStep({ status: 'running', input: {} }).verb === 'Reading', 'it reads as a step of the work');
+}
+
+// ---- what a session is asked to make: short in its message, in full for its agent (extra.make) ----------------------------
+
+{
+  ok(makeOf(null) === null && makeOf('x') === null && makeOf([]) === null && makeOf({}) === null && makeOf({ kind: 'slide' }) === null, 'nothing asked for: nothing kept');
+  const m = makeOf({ type: 'slide.swot', words: '  our market  ', after: { index: 2, title: 'Pricing' }, webDeck: true, junk: 1, theme: { id: 'paper', label: 'Daylight', bg: '#fff' } });
+  ok(
+    !!m && m.type === 'slide.swot' && m.words === 'our market' && m.after?.index === 2 && m.webDeck === true && !('junk' in m) && JSON.stringify(m.theme) === '{"id":"paper","label":"Daylight"}',
+    'checked: what has its shape kept, the rest left out',
+  );
+  ok(makeOf({ type: 'Slide.SWOT!' }) === null && makeOf({ type: 'slide.swot', after: { index: -1 } })?.after === undefined && makeOf({ type: 'slide.x', words: 'w'.repeat(5000) })?.words?.length === 2000, 'odd ids, places and sizes');
+  ok(makeOf({ type: 'slide.swot', lang: 'Greek<script>' })?.lang === undefined && makeOf({ type: 'slide.swot', ratio: '1:1' })?.ratio === undefined, 'a language by its name, a shape of the two');
+  ok(
+    makeOf({ turn: { from: 'doc', to: 'doc', id: 'c22c337e33' } }) === null &&
+      makeOf({ turn: { from: 'doc', to: 'slides', id: 'a b' } }) === null &&
+      makeOf({ turn: { from: 'doc', to: 'slides', id: 'c22c337e33', title: 'Bakery plan' } })?.turn?.to === 'slides',
+    'Turn it into: one kind into another, a page by its id',
+  );
+  ok(makeRequest(m!, contentType('slide.swot')!) === composeAsk(contentType('slide.swot')!, 'our market', { after: { index: 2, title: 'Pricing' }, webDeck: true }), 'it stands for the request the gallery composes');
+
+  // What the agent is told, beside the pages' own instructions; nothing for what is not known.
+  const told = makeInstructions({ type: 'slide.swot', words: 'our market', after: { index: 2, title: 'Pricing' } });
+  ok(
+    !!told?.startsWith('What the user asked for, in full: they picked it in the app (the gallery of things made with AI), and their message says it in short') &&
+      told.includes(contentType('slide.swot')!.ask) &&
+      told.includes('Add one slide after slide 3 (“Pricing”)'),
+    `the agent hears the kind’s request in full (${told?.slice(0, 120)})`,
+  );
+  ok(makeInstructions({ type: 'slide.no-such-kind' }) === null && makeInstructions({ kind: 'page' }) === null && makeInstructions(undefined) === null && makeInstructions('add a slide') === null, 'nothing known: nothing told');
+  ok(!!makeInstructions({ kind: 'section', words: 'a short history' })?.includes('Add a section where it fits best in the document: a short history.'), 'the words alone, where the kind was not picked');
+  const turned = { turn: { from: 'doc' as const, to: 'slides' as const, id: 'c22c337e33', title: 'Bakery plan' }, folder: 'Reports' };
+  ok(!!makeInstructions(turned)?.includes('(Turn it into, in their Library)') && !!makeInstructions(turned)?.includes(turnAsk({ ...turned.turn, folder: 'Reports' })), 'Turn it into: what to make from which page, in full');
+  const spawn = async (extra: Record<string, unknown>) => (await pages.spawn!({ agent: 'claude', cwd: '/tmp', runId: 'r', resume: false, extra } as SpawnInfo, {} as Deps))?.instructions ?? [];
+  const withMake = await spawn({ make: { type: 'block.faq', words: 'our cafe' } });
+  ok(withMake.length === 2 && withMake[1] === makeInstructions({ type: 'block.faq', words: 'our cafe' }), 'the pages capability tells a session’s agent what it was asked to make');
+  ok((await spawn({})).length === 1 && (await spawn({ make: { kind: 'slide' } })).length === 1, 'and nothing more without it');
+  ok(
+    cleanExtra({ make: { type: 'slide.swot' }, memory: false })?.make === undefined && cleanExtra({ make: { type: 'slide.swot' }, memory: false })?.memory === false,
+    'a scheduled task’s runs do not carry what the session that made it was asked to make',
+  );
+
+  // The person's side: a short line in their words (the app's language), what to make, the whole of it.
+  const swot = madeRequest(contentType('slide.swot')!, ' our market in Greece ', { kind: 'slide', after: { index: 2, title: 'Pricing' }, webDeck: true });
+  ok(swot?.prompt === 'Add a slide after slide 3: SWOT analysis — our market in Greece', `a short line (${swot?.prompt})`);
+  ok(
+    JSON.stringify(swot?.make) === JSON.stringify({ type: 'slide.swot', words: 'our market in Greece', after: { index: 2, title: 'Pricing' }, webDeck: true }) && JSON.stringify(makeOf(swot!.make)) === JSON.stringify(swot!.make),
+    'what to make, kept by the server as it is',
+  );
+  ok(swot?.full === composeAsk(contentType('slide.swot')!, 'our market in Greece', { after: { index: 2, title: 'Pricing' }, webDeck: true }), 'and the whole of it, for a conversation’s message box');
+  ok(madeRequest(null, 'our three offices', { kind: 'slide' })?.prompt === 'Add a slide at the end: our three offices' && madeRequest(null, '', { kind: 'slide' }) === null, 'words alone');
+  // A slide's own menu in the strip (A slide made with AI after it): after that slide, not the one on view.
+  const strip = madeRequest(contentType('slide.timeline')!, '', { kind: 'slide', after: { index: 1, title: 'Our plan' }, webDeck: false });
+  ok(
+    strip?.prompt === 'Add a slide after slide 2: Timeline of events' && strip.make.after?.index === 1 && strip.make.webDeck === false && !!makeInstructions(strip.make)?.includes('The deck is PowerPoint compatible'),
+    'a slide’s own menu: after that slide, as its deck is',
+  );
+  ok(madeRequest(contentType('section.risks')!, '', { kind: 'section', at: 'after the section “Plan”' })?.prompt === 'Add a section: Risks and mitigations', 'a section: the place is the agent’s to hear');
+  ok(madeRequest(contentType('block.faq')!, 'our cafe', { kind: 'block' })?.prompt === 'Add a block to the page: FAQ — our cafe', 'a block');
+  const deck = madeRequest(contentType('deck.pitch')!, 'Corner Bakery', { kind: 'deck', title: 'Seed round', theme: { id: 'midnight', label: 'Midnight' }, ratio: '16:9', folder: 'Investors', lang: 'Greek' });
+  ok(
+    deck?.prompt === 'Make slides: Pitch deck — Corner Bakery' && deck.make.title === 'Seed round' && deck.make.theme?.id === 'midnight' && deck.make.folder === 'Investors' && deck.make.lang === 'Greek',
+    'a new deck: a short line, its name, theme, shape, folder and language for the agent',
+  );
+  ok(!!makeInstructions(deck!.make)?.includes('Make it in the Midnight theme (the preset “midnight”), with wide 16:9 slides. Keep it in my Library folder “Investors”. Write it in Greek.'), 'all of which the agent hears');
+  ok(
+    ['doc.cv', 'page.kanban', 'sheet.budget'].map((id) => madeRequest(contentType(id)!, '', { kind: contentType(id)!.kind })?.prompt).join() === 'Write a document: CV or résumé,Make a page: Kanban board,Make a spreadsheet: Budget',
+    'documents, pages and spreadsheets',
+  );
+  const turn = turnRequest({ from: 'doc', to: 'slides', id: 'c22c337e33', title: 'Bakery plan', folder: 'Reports' });
+  ok(
+    turn.prompt === 'Turn “Bakery plan” into slides' && turn.make.turn?.id === 'c22c337e33' && turn.make.folder === 'Reports' && turn.full === turnAsk({ from: 'doc', to: 'slides', id: 'c22c337e33', title: 'Bakery plan', folder: 'Reports' }),
+    'Turn it into: “Turn “Bakery plan” into slides”',
+  );
+  ok(
+    turnRequest({ from: 'sheet', to: 'page', id: 'x1', title: 'Sales' }).prompt === 'Turn “Sales” into a page' && turnRequest({ from: 'slides', to: 'doc', id: 'x1', title: 'Talk' }).prompt === 'Turn “Talk” into a document',
+    'into a page, into a document',
+  );
 }
 
 // ---- the editors' entry points ------------------------------------------------------------------------------------------

@@ -109,3 +109,79 @@ export function turnAsk(o: { from: PageKindName; to: 'slides' | 'doc' | 'page'; 
   const into = o.folder?.trim() ? ` Put it in my Library folder “${quoted(o.folder)}”, beside it.` : '';
   return `${body} Write it in the language the ${noun} is in.${into} Leave the ${noun} itself as it is.`;
 }
+
+// ---- what a session is asked to make (extra.make) -------------------------------------------------------------------
+
+/**
+ * What a session is asked to make (`extra.make`): its agent hears it in full from the pages capability, while the
+ * person's message says it in short, in their words. A kind picked in the gallery (or the words alone), what it is
+ * about and where it goes; or what Turn it into makes, from which page of the Library.
+ */
+export interface MakeExtra {
+  /** The kind picked in the gallery ("slide.swot"); left out when the words alone say what. */
+  type?: string;
+  /** What it is, with no kind picked: a slide, a section, a new page… */
+  kind?: ContentKind;
+  /** The person's words: what it is about. */
+  words?: string;
+  /** A slide: the one it goes after (its index from 0, and its title). */
+  after?: { index: number; title: string };
+  /** A section or a page's part: where it goes, in words. */
+  at?: string;
+  /** A slide: whether the deck is in the web format. */
+  webDeck?: boolean;
+  /** Something new: its name, a deck's theme and shape, its Library folder, the app's language. */
+  title?: string;
+  theme?: { id: string; label: string };
+  ratio?: '16:9' | '4:3';
+  folder?: string;
+  lang?: string;
+  /** Turn it into: the page of the Library it is made from, and what it becomes. */
+  turn?: { from: PageKindName; to: 'slides' | 'doc' | 'page'; id: string; title: string };
+}
+
+const KINDS: ContentKind[] = ['slide', 'deck', 'doc', 'section', 'page', 'block', 'sheet'];
+const text = (v: unknown, most: number) => (typeof v === 'string' && v.trim() ? v.replace(/\s+/g, ' ').trim().slice(0, most) : undefined);
+const record = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
+
+/**
+ * `extra.make` as a session keeps it, checked: kinds and places by their shapes, words cut to their sizes, anything else
+ * left out; null when it asks for nothing (no kind picked, no words, nothing to turn into).
+ */
+export function makeOf(v: unknown): MakeExtra | null {
+  const x = record(v);
+  if (!x) return null;
+  const out: MakeExtra = {};
+  const type = text(x.type, 60);
+  if (type && /^[a-z]+\.[a-z0-9-]+$/.test(type)) out.type = type;
+  if (typeof x.kind === 'string' && (KINDS as string[]).includes(x.kind)) out.kind = x.kind as ContentKind;
+  const words = typeof x.words === 'string' ? x.words.trim().slice(0, 2000) : '';
+  if (words) out.words = words;
+  const after = record(x.after);
+  if (after && Number.isInteger(after.index) && (after.index as number) >= 0 && (after.index as number) < 10_000) out.after = { index: after.index as number, title: text(after.title, 200) ?? '' };
+  const at = text(x.at, 400);
+  if (at) out.at = at;
+  if (typeof x.webDeck === 'boolean') out.webDeck = x.webDeck;
+  const title = text(x.title, 120);
+  if (title) out.title = title;
+  const theme = record(x.theme);
+  const themeId = text(theme?.id, 40);
+  const themeLabel = text(theme?.label, 60);
+  if (themeId && themeLabel && /^[a-z0-9-]+$/.test(themeId)) out.theme = { id: themeId, label: themeLabel };
+  if (x.ratio === '16:9' || x.ratio === '4:3') out.ratio = x.ratio;
+  const folder = text(x.folder, 300);
+  if (folder) out.folder = folder;
+  const lang = text(x.lang, 40);
+  if (lang && /^[A-Za-z ()-]+$/.test(lang)) out.lang = lang;
+  const turn = record(x.turn);
+  const from = turn?.from as PageKindName;
+  const id = text(turn?.id, 40);
+  if (turn && from in TURN_INTO && TURN_INTO[from].includes(turn.to as 'slides') && id && /^[A-Za-z0-9_-]+$/.test(id)) out.turn = { from, to: turn.to as 'slides' | 'doc' | 'page', id, title: text(turn.title, 200) ?? '' };
+  return out.turn || out.type || (out.kind && out.words) ? out : null;
+}
+
+/** The whole request `extra.make` stands for, as composeAsk or turnAsk writes it (`t`: its kind picked, found by its id). */
+export function makeRequest(m: MakeExtra, t: ContentType | null): string {
+  if (m.turn) return turnAsk({ ...m.turn, folder: m.folder });
+  return composeAsk(t, m.words ?? '', { kind: t?.kind ?? m.kind, after: m.after, at: m.at, webDeck: m.webDeck, title: m.title, theme: m.theme, ratio: m.ratio, folder: m.folder, lang: m.lang });
+}

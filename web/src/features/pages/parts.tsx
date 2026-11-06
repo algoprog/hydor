@@ -5,7 +5,6 @@
 // site's row.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppWindow, FileText, Globe, GlobeLock, LayoutGrid, NotebookText, Presentation, Sheet, Sigma, Sparkles, Upload, X } from 'lucide-react';
-import { composeAsk } from '@shared/content-asks';
 import type { ContentKind, ContentType } from '@shared/content-types';
 import type { PageInfo, SiteInfo, SiteVisibility } from '@shared/pages';
 import { newDeck, THEMES, type Ratio } from '@shared/slides';
@@ -18,6 +17,7 @@ import { toast, toastError, useApp } from '../../lib/store';
 import { FolderPicker } from '../../components/FolderPicker';
 import { Button, cx, Dialog, inputCls, Segmented, useConfirm } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
+import { useAskRun } from '../guide/ask';
 import { startInSpace } from '../spaces/parts';
 import { SpaceSelect } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
@@ -26,6 +26,8 @@ import { folderChain } from './folders';
 import { usePagesStore } from './state';
 import { STARTERS } from './templates';
 import { appLanguage, openTypes, preloadTypes } from './types';
+import { madeRequest } from './types/requests';
+import { startMaking } from './types/start';
 import { pickFiles } from './uploads';
 import { SlideThumb } from './slides/Thumb';
 import { TexTemplatePicker } from './latex/TemplatePicker';
@@ -217,6 +219,8 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
   // A kind picked in the gallery (a pitch deck, a cover letter): the request is made from it and the words, if any.
   const [type, setType] = useState<ContentType | null>(null);
   const askBox = useRef<HTMLInputElement>(null);
+  // Who makes it when a kind is picked: the agent and model picked last on the start page, as the editors' Ask does.
+  const run = useAskRun();
   const [busy, setBusy] = useState(false);
   // Where it goes: the space the Library shows now, or none; asked only when there are spaces.
   const spaces = useSpaces();
@@ -294,23 +298,32 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
         if (window.matchMedia('(min-width: 768px)').matches) requestAnimationFrame(() => askBox.current?.focus());
       },
     });
-  /** Or describe it: an agent makes it, from the kind picked (with the name, the theme and shape, the folder) or from the words alone. */
+  /**
+   * Or describe it: an agent makes it. A kind picked: its session starts at once, the message a short line in the
+   * person's words, the agent told the rest (the kind's request, the name, the theme and shape, the folder). Words
+   * alone: the start page, with the request in its box. In a space, either starts there, so what it saves lands in it.
+   */
   const describe = () => {
     if (!ask.trim() && !type) return;
+    const sp = spaces?.find((x) => x.id === where) ?? null;
+    if (type) {
+      const t = title.trim();
+      const names = inFolder ? folderChain(folders, inFolder).map((f) => f.name) : [];
+      const th = kind === 'slides' ? THEMES.find((x) => x.id === theme) : undefined;
+      const r = madeRequest(type, ask, {
+        kind: type.kind,
+        title: t && t !== defaultTitle ? t : undefined,
+        theme: th ? { id: th.id, label: th.label } : undefined,
+        ratio: kind === 'slides' ? ratio : undefined,
+        folder: names.join('/') || undefined,
+        lang: appLanguage(),
+      });
+      if (!r) return;
+      onClose();
+      return startMaking(run, { prompt: r.prompt, make: r.make, space: sp });
+    }
     onClose();
-    const t = title.trim();
-    const names = inFolder ? folderChain(folders, inFolder).map((f) => f.name) : [];
-    const prompt = type
-      ? composeAsk(type, ask, {
-          title: t && t !== defaultTitle ? t : undefined,
-          theme: kind === 'slides' ? THEMES.find((x) => x.id === theme) : undefined,
-          ratio: kind === 'slides' ? ratio : undefined,
-          folder: names.join('/') || undefined,
-          lang: appLanguage(),
-        })
-      : `${tr(ASK_FOR[kind])}${ask.trim()}`;
-    // In a space, the session that makes it starts there, so what it saves lands in that space.
-    const sp = spaces?.find((x) => x.id === where);
+    const prompt = `${tr(ASK_FOR[kind])}${ask.trim()}`;
     if (sp) startInSpace(sp, prompt);
     else go(`/?prompt=${enc(prompt)}`);
   };
@@ -323,15 +336,28 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
       footer={
         <>
           {/* Files of yours instead, as many as you pick, each made what it is, in the project picked below. */}
-          <Button variant="ghost" icon={<Upload size={14} />} onClick={() => pickFiles(where, onClose)} title="Add files of yours: documents, spreadsheets, slides, pictures, videos and sounds" className="mr-auto">
+          {/* A kind picked: on a phone its two buttons only (the sheet closes by its X), so they fit across it. */}
+          <Button variant="ghost" icon={<Upload size={14} />} onClick={() => pickFiles(where, onClose)} title="Add files of yours: documents, spreadsheets, slides, pictures, videos and sounds" className={cx('mr-auto', type && 'max-sm:hidden')}>
             Upload files
           </Button>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose} className={type ? 'max-sm:hidden' : undefined}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={busy} onClick={make}>
-            Make it
-          </Button>
+          {/* A kind picked: making it with AI is what the dialog is for now; an empty one stays a click away. */}
+          {type ? (
+            <>
+              <Button variant="secondary" disabled={busy} onClick={make}>
+                Make an empty one
+              </Button>
+              <Button variant="primary" icon={<Sparkles size={14} />} onClick={describe}>
+                Make it with AI
+              </Button>
+            </>
+          ) : (
+            <Button variant="primary" disabled={busy} onClick={make}>
+              Make it
+            </Button>
+          )}
         </>
       }
     >
@@ -490,9 +516,11 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
                 className="h-full min-w-0 flex-1 bg-transparent outline-none placeholder:text-fg-3"
               />
             </label>
-            <Button type="submit" variant="secondary" disabled={!ask.trim() && !type}>
-              Ask
-            </Button>
+            {!type && (
+              <Button type="submit" variant="secondary" disabled={!ask.trim()}>
+                Ask
+              </Button>
+            )}
           </div>
         </form>
       </div>

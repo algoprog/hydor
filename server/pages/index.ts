@@ -68,7 +68,7 @@ import { dbBlocks, dbKey, dbsForAgent, pageDatabases } from '../../shared/page-d
 import { agentTex, compileSummary, compileTex, readTex, SAVE_LATEX_DESCRIPTION, SAVE_LATEX_SCHEMA, texRoutes } from './latex.ts';
 import { arxivRoutes, dropPaperFolder } from './latex-arxiv.ts';
 import { checkRoutes, LATEX_CHECK } from './latex-check.ts';
-import { HOW_TO_MAKE } from './content-types.ts';
+import { HOW_TO_MAKE, makeInstructions } from './content-types.ts';
 import { agentBook, readBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
 import { agentDeck, readDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
 import { agentFileComments, openFile, openFileComments, saveFile, texFileForAgent } from './filemodel.ts';
@@ -1140,7 +1140,9 @@ export const pages: Feature = {
   tools: () => [SHOW_HTML, SAVE_PAGE, watched(SAVE_SLIDES), watched(SAVE_DOC), watched(SAVE_SHEET), watched(SAVE_LATEX), SAVE_NOTEBOOK, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE, LATEX_CHECK, HOW_TO_MAKE],
   spawn: (s, d) => {
     const ask = s.extra?.page ? askInstructions(d.db, s.extra.page) : null;
-    return { instructions: ask ? [INSTRUCTIONS, ask] : [INSTRUCTIONS] };
+    // Something asked for from the gallery or Turn it into (`extra.make`): the request in full, the message being short.
+    const make = s.extra?.make ? makeInstructions(s.extra.make) : null;
+    return { instructions: [INSTRUCTIONS, ...(ask ? [ask] : []), ...(make ? [make] : [])] };
   },
   // The pages the user changed in the editor, with their next message (which starts a new turn of saves).
   beforeMessage: (key, d) => {
