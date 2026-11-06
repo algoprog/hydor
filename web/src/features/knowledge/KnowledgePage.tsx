@@ -11,7 +11,7 @@ import type { PickedFile } from '../../lib/upload';
 import { PageHeader } from '../layout/PageHeader';
 import { SpacesTabs } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
-import { addFiles, BaseCard, DropFiles, MeaningHint, TrySearch, useKnowledge } from './parts';
+import { addFiles, BaseCard, DropFiles, MeaningHint, MeaningWait, TrySearch, useKnowledge } from './parts';
 
 export function KnowledgePage() {
   const [st, load] = useKnowledge();
@@ -76,6 +76,7 @@ export function KnowledgePage() {
             <>
               <TrySearch space={null} />
               {!st.meaning && <MeaningHint />}
+              <MeaningWait st={st} bases={shared} />
               {shared.map((b) => (
                 <BaseCard key={b.id} b={b} meaning={st.meaning} />
               ))}

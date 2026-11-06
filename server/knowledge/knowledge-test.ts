@@ -16,7 +16,7 @@ import { words } from '../memory/store.ts';
 import * as vec from '../memory/vectors.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import { createSpace, deleteSpace, updateSpace } from '../spaces/index.ts';
-import { fillVectors, filesUnder, passages, progress, scanSoon } from './indexer.ts';
+import { fileText, fillVectors, filesUnder, passages, progress, scanSoon } from './indexer.ts';
 import { basesFor } from './scope.ts';
 import { searchKnowledge } from './search.ts';
 import { addSource, baseRow, baseRows, baseView, createBase, deleteBase, docsOf, filesDir } from './store.ts';
@@ -97,6 +97,23 @@ test('passages keep the page, slide, sheet or heading they are in, and long text
 test('a folder: documents and text files, never dependencies, version control or pictures', () => {
   const files = filesUnder(folder).map((f) => path.relative(folder, f));
   assert.deepEqual(files, ['expenses.txt', 'office.html', 'policies/leave.md']);
+});
+
+test('a text file over 4 MB: its first 4 MB, to its last whole line, saying where it was cut', async () => {
+  const big = path.join(tmp, 'big.log');
+  const line = 'Respondents from the Thessaloniki panel were merged after removing duplicates — ✓\n';
+  fs.writeFileSync(big, line.repeat(Math.ceil((5 * 1024 * 1024) / Buffer.byteLength(line))));
+  const t = await fileText(big);
+  assert.ok(t);
+  assert.match(t.text, /\n\n… \(cut here: the first 4 MB of 5 MB were read\)$/);
+  const body = t.text.slice(0, t.text.indexOf('\n\n… (cut here'));
+  assert.ok(Buffer.byteLength(body) <= 4 * 1024 * 1024);
+  assert.ok(body.split('\n').every((l) => l === line.trim()), 'whole lines');
+  // One long line: to its last whole character.
+  fs.writeFileSync(big, '✓'.repeat(2 * 1024 * 1024));
+  const one = await fileText(big);
+  assert.ok(one && !one.text.includes('\ufffd') && one.text.startsWith('✓✓'));
+  fs.rmSync(big);
 });
 
 test('reading a base: every document, its passages indexed by words at once', async () => {
@@ -209,7 +226,7 @@ test('spaces: a space’s own base is searched by its sessions alone, the shared
   deleteBase(db, papers.id);
 });
 
-test('reading again: a changed file is read anew, a deleted one leaves; deleting the base takes everything', async () => {
+test('reading again: a changed file is read anew, a deleted one leaves, one that could not be read is tried again when asked; deleting the base takes everything', async () => {
   const b = baseRows(db)[0];
   fs.writeFileSync(path.join(folder, 'expenses.txt'), 'Expenses are now reimbursed within 7 days.');
   fs.utimesSync(path.join(folder, 'expenses.txt'), new Date(), new Date(Date.now() + 5000));
@@ -219,6 +236,23 @@ test('reading again: a changed file is read anew, a deleted one leaves; deleting
   assert.deepEqual(docsOf(db, b.id).map((d) => d.title), ['expenses.txt', 'leave.md']);
   assert.equal((await searchKnowledge(db, { query: '"within 7 days"' })).hits.length, 1);
   assert.equal((await searchKnowledge(db, { query: '"within 14 days"' })).hits.length, 0);
+  // A file that could not be read is tried again only when asked (Read again now, the first reading after a start),
+  // not every time: here it reads now as it is, unchanged (a newer version reading what an older one could not).
+  const odd = path.join(folder, 'odd.txt');
+  fs.writeFileSync(odd, 'Parking\u0000 is free.');
+  scanSoon(db, b.id);
+  await settle();
+  assert.equal(docsOf(db, b.id).find((d) => d.title === 'odd.txt')?.status, 'error');
+  const st = fs.statSync(odd);
+  fs.writeFileSync(odd, 'Parking  is free.');
+  fs.utimesSync(odd, st.atime, st.mtime);
+  scanSoon(db, b.id);
+  await settle();
+  assert.equal(docsOf(db, b.id).find((d) => d.title === 'odd.txt')?.status, 'error', 'unchanged: not read again');
+  scanSoon(db, b.id, { failed: true });
+  await settle();
+  assert.equal(docsOf(db, b.id).find((d) => d.title === 'odd.txt')?.status, 'indexed', 'asked: read again');
+  fs.rmSync(odd);
   deleteBase(db, b.id);
   assert.equal(baseRows(db).length, 0);
   assert.equal((db.prepare('select count(*) as n from kb_chunks').get() as { n: number }).n, 0);

@@ -3,6 +3,80 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.33.0 · 6 November 2026
+
+Editors as complete as the apps people know them from: a picture editor rebuilt as Photoshop's, a video editor rebuilt
+as DaVinci Resolve's that makes videos on the graphics card, a new sound editor, posters and social posts designed as in
+Canva, and documents, spreadsheets, LaTeX and pages with AI that writes, checks and explains with you.
+
+- **The picture editor, rebuilt as Photoshop's**: menus with their keys, a rail of tools, the tool's options, panels you
+  fold and size, and a status bar. Work in layers (pictures, words, shapes and adjustment layers, with sixteen blend
+  modes and their opacity), select (rectangle, ellipse, lasso, magic wand, or the subject found by AI) and paint and
+  retouch (brush, eraser, clone stamp, healing brush, gradient, paint bucket, dodge and burn). New adjustments: curves,
+  levels, colours by range, colour balance, clarity, dehaze, noise reduction, grain and Auto enhance, with a live
+  histogram; image and canvas size; and **Make it larger** (2× or 4×), free on your own computer.
+- **The video editor, rebuilt as DaVinci Resolve's**: four workspaces (**Edit**, **Colour**, **Audio** and **Export**), a
+  media panel, a viewer and a timeline of tracks. Join videos and pictures with fourteen transitions, lay a logo, a
+  picture or a video over them (green screen too), give pictures a slow zoom, and play clips backwards, steady them or
+  hold a frame. Colour wheels, curves, twelve looks and scopes (waveform, vectorscope, histogram), the preview exactly as
+  the saved video; captions made from what is said, saved as an .srt too. Sound right in the timeline: each sound's
+  channels (a microphone on one side heard on both), fades, a volume line, silenced parts, cleaner voices, even loudness
+  and the music lowered under speech. Videos are made on the graphics card when there is one that works (NVIDIA, Intel,
+  AMD or Apple), the processor taking over at once if it fails: **Settings → Images, video and audio → Use the graphics
+  card for videos**.
+- **A sound editor**: open a sound (or a video's sound) from the Library, Files, a conversation, or the video editor's
+  **Edit the sound…**. Tracks with waveforms or a spectrogram; cut, copy, paste and silence; sixteen effects in a rack
+  (noise reduction, equalizer, compressor, loudness for podcasts or streaming, reverb and more); record from the
+  microphone; cut by the words said and take out the "um"s; and music, voices and sound effects made with AI. It saves
+  MP3, M4A, Opus, WAV or FLAC, and agents edit sounds the same way.
+- **Designs, as in Canva**: **New → Design** for a poster, a flyer, an Instagram post or story, a YouTube thumbnail, an
+  invitation, a business card, a certificate and more (twenty sizes, or your own), from twenty-two templates, or
+  described for an agent to make. Drag anything anywhere with guides that snap; words with effects and curved text,
+  shapes, frames, stickers, QR codes and collages; your brand's colours, fonts and logos; **Resize** to another size and
+  **Download** as PNG, JPG or PDF. Pictures and videos in any page now open in the picture and video editors.
+- **Documents with AI**: **Write with AI** (Ctrl+J, or Space on an empty line), **Proofread** as suggestions to accept or
+  reject, **Suggest as I type**, **Ask about this document** (answers that link to their passages), and the whole
+  document's tone changed or translated. Footnotes, citations in APA, MLA, Chicago or IEEE with a bibliography that
+  keeps up, numbered captions and cross-references, landscape pages, a page colour, a watermark, columns, styles you
+  change, voice typing and **Read aloud**; save as OpenDocument, EPUB or text, and open a PDF as a document.
+- **Spreadsheets with AI**: the **=AI()** function, **Write a formula** and **Explain this formula**, **Fill with AI**
+  (Ctrl+E), **Analyze the data**, **Clean up the data** and tables made with AI. About seventy newer functions (LET,
+  LAMBDA, TEXTSPLIT, VSTACK, the REGEX ones, SPARKLINE, IMAGE and more), named and protected ranges, groups of rows and
+  columns, combo, histogram, bubble and radar charts with trendlines, goal seek, tracing a formula's cells, a pivot
+  table editor and print setup.
+- **LaTeX with AI**: rewrite with your \cite, \ref and \label keys kept, **Write with AI** (Ctrl+K), LaTeX from a picture
+  of an equation or a table, errors explained and fixed, papers found that back a claim, and proofreading as tracked
+  changes. Vim and Emacs keys, **Tidy the source** and the bibliography, find in the typeset pages, named versions and
+  draft typesetting.
+- **Pages as in Notion, with Notion AI**: **Ask AI** on any block or words; databases as a gallery, a list, a calendar or
+  a timeline, with formula, file and AI columns, totals under each column, rows that open as pages, and CSV in and out;
+  new blocks (embeds, bookmarks, files, sounds, PDFs, Mermaid diagrams, charts, tabs); page templates; imports from
+  Markdown, Word and Notion; locking a page; and the pages that link to it.
+
+## 0.32.1 · 6 November 2026
+
+Knowledge bases get ready to search by meaning on a Mac, say what they wait for when they wait, and read big text
+files instead of refusing them; Claude Code starts where its temporary folder is closed to it.
+
+- **Search by meaning gets going on a Mac**: a knowledge base could stay at "0% ready to search by meaning" for good,
+  because the app counted a Mac's free memory without what macOS gives back at once, and so never found enough to
+  start the model. It now counts it as Activity Monitor does, for search by meaning, the picture tools and Settings →
+  Models alike.
+- **You see it get there**: the percentage goes up as the passages get ready (1% as soon as any are), without
+  reloading the page. When the model can't run yet, it tries again every two minutes rather than an hour later, and a
+  line above the knowledge bases says why it waits: it is setting itself up, starting, waiting for memory (how much is
+  free and how much it needs), or it stopped, with **Try again**.
+- **Big text files are read**: of a text file over 4 MB, such as a big log or data file, the first 4 MB are read, and
+  its last passage says where it was cut, rather than "too big to read here". **Read again now**, and the first
+  reading after the app starts, try again the documents that couldn't be read, so one an older version refused is
+  read now.
+- A knowledge base's line says "read 25m ago" rather than "read 25m".
+- **Claude Code starts where its temporary folder is closed to it**: where it can't make its folder in /tmp (one
+  another user made, say), new sessions said "Claude Code did not start" and the model menu was an empty box. Claude
+  Code now keeps its temporary files in Hydor's data folder there; when it still doesn't start, the model menu says
+  why, with **Try again**, and the usage report gives the same reason rather than "signed out?".
+- The picture tools' setup card gives their real sizes: about 145 MB, and about 200 MB a model.
+
 ## 0.32.0 · 6 November 2026
 
 Slides, documents and pages you make with AI: pictures, drawings, plots and videos made and changed right in the

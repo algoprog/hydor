@@ -3,6 +3,7 @@
 // each passage citing where it came from. A base is shared (every session searches it: Spaces → Shared
 // knowledge) or a space's own (only that space's sessions do; a space can also leave the shared ones out).
 // What the server and the pages share.
+import type { MeaningHeld } from './memory.ts';
 
 export interface KnowledgeSource {
   id: string;
@@ -67,6 +68,8 @@ export interface KnowledgeState {
   bases: KnowledgeBase[];
   /** Search by meaning is on (Settings → Memory); without it, words and exact text only. */
   meaning: boolean;
+  /** It is on but cannot give passages their vectors now, and why (setting itself up, starting, short of memory, stopped). */
+  meaningHeld?: MeaningHeld;
 }
 
 /** File types read into a knowledge base besides documents (PDF, Office, OpenDocument, EPUB, CSV, RTF): text and code. */
