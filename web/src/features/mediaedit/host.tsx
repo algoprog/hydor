@@ -160,6 +160,22 @@ export function EditorHost({ children }: { children: ReactNode }) {
     where.current = loc;
     if (useTabs.getState().active) useTabs.setState({ active: null });
   }, [loc]);
+  // While an editor shows, keys pressed with nothing in it picked (the page's body, the strip of tabs) are kept from the
+  // page under it, which still listens on the window (a deck's Delete would take out its part picked). The app's own
+  // shortcuts go on, as an editor's do (keepKeys).
+  useEffect(() => {
+    if (!showing) return;
+    const k = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && t !== document.body && !t.closest?.('[data-editor-strip]')) return;
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+      if (key === 'escape' || (mod && !e.shiftKey && !e.altKey && (key === 'k' || key === 'b' || key === '`'))) return;
+      e.stopPropagation();
+    };
+    window.addEventListener('keydown', k, true);
+    return () => window.removeEventListener('keydown', k, true);
+  }, [showing]);
   // Leaving the app with changes not saved asks first.
   const dirty = tabs.some((t) => t.dirty);
   useEffect(() => {
@@ -191,7 +207,7 @@ export function EditorHost({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {strip && (
-        <div role="tablist" aria-label="Open editors" className="flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b border-line bg-bg-1 px-2 pt-[var(--safe-top)] [&::-webkit-scrollbar]:hidden">
+        <div role="tablist" aria-label="Open editors" data-editor-strip className="flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b border-line bg-bg-1 px-2 pt-[var(--safe-top)] [&::-webkit-scrollbar]:hidden">
           <StripTab active={!showing} onClick={showPage} icon={<PanelTop size={13} />}>
             <span translate="no" className="min-w-0 truncate">
               {label}

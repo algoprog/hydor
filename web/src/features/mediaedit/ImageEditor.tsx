@@ -723,7 +723,7 @@ function Editing({ o, active, detached, setDirty, done, lead, start }: EditorPro
             </>
           )}
           {undoRedo}
-          {!mobile && <MoreMenu onFit={() => view.current?.fit()} onActual={() => view.current?.actual()} onReset={() => (setCropShape('free'), commit({}, start.base))} canReset={!(cur.base === start.base && isPlain(cur.recipe))} busy={busy} />}
+          <MoreMenu onFit={() => view.current?.fit()} onActual={() => view.current?.actual()} onReset={() => (setCropShape('free'), commit({}, start.base))} canReset={!(cur.base === start.base && isPlain(cur.recipe))} busy={busy} />
           {!mobile && !compact && plans.copy && (
             <Button size="sm" variant="secondary" className="ml-1" disabled={busy} onClick={() => void save('copy')}>
               {saving === 'copy' ? 'Saving' : plans.copy.label}
