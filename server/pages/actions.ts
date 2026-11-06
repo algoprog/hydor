@@ -49,6 +49,8 @@ import {
 } from '../../shared/sheets.ts';
 import { clearChanges, commentsAfterSort, fillChanges, guessSeparator, hasHeader, holds, regionAround, removeDuplicates, sortByKeys, sortChanges, splitColumn, styleChanges, summarySheet, trimChanges, type SummaryFn } from '../../shared/sheet-tools.ts';
 import { sheetNamed } from '../../shared/sheet-edits.ts';
+import { AI_BATCH } from '../../shared/sheet-ai.ts';
+import { aiCells } from '../write/sheets.ts';
 import { cleanTexName, TEX_MAIN, type TexDoc } from '../../shared/latex.ts';
 import { texMoveFiles } from '../../shared/latex-files.ts';
 
@@ -763,6 +765,32 @@ const moveTab: Act<Workbook> = (book, a) => {
   return { model: { ...book, sheets: list }, said: `moved “${at.sh.name}” to be sheet ${to} of ${list.length}.` };
 };
 
+/** The AI cells that wait for an answer (=AI(…) an agent wrote, or whose cells changed): the helper model asked for them, many at once. */
+const askAi: Act<Workbook> = async (book, a, x) => {
+  const calc = computeBook(book);
+  calc.all();
+  const want = new Map(calc.aiAsks().map((q) => [q.key, q]));
+  // Asked again: the answers of the cells named (or all) forgotten first.
+  if (a.again === true) {
+    const bare = computeBook({ ...book, ai: undefined });
+    bare.all();
+    for (const q of bare.aiAsks()) want.set(q.key, q);
+  }
+  if (!want.size) return { said: 'No AI cell waits for an answer.' };
+  const list = [...want.values()].slice(0, 400);
+  const ai = { ...(book.ai ?? {}) };
+  let got = 0;
+  let failed = 0;
+  for (let i = 0; i < list.length; i += AI_BATCH) {
+    const r = await aiCells(x.ctx.deps.db, { asks: list.slice(i, i + AI_BATCH) }, AbortSignal.timeout(600_000));
+    Object.assign(ai, r.answers);
+    got += Object.keys(r.answers).length;
+    failed += Object.keys(r.failed ?? {}).length;
+  }
+  if (!got) return { said: `The helper model gave no answers for the ${plural(list.length, 'AI cell')}: try again.` };
+  return { model: { ...book, ai }, said: `asked the helper model for ${plural(got, 'AI cell')}${failed ? ` (${failed} got no answer)` : ''}${want.size > list.length ? `; ${want.size - list.length} more still wait: run it again` : ''}: their answers are kept with the sheet.` };
+};
+
 // ---- LaTeX ------------------------------------------------------------------------------------------------------------
 
 /** The files tree's Rename and moves (shared/latex-files.ts texMoveFiles): every reference to a file follows it. */
@@ -846,6 +874,7 @@ const ACTIONS: { [K in PageKind]: Record<string, Act<any>> } = {
     duplicate_sheet: duplicateTab,
     delete_sheet: deleteTab,
     move_sheet: moveTab,
+    ask_ai: askAi,
   },
   tex: { move_files: moveFiles },
   notebook: { clear_outputs: clearOutputs },
@@ -891,7 +920,7 @@ function duplicate(x: Here, a: Args): string {
 const DESCRIPTION = [
   'Do to a saved page of the user’s Library what its editor does with one click to the whole of it, where a save tool (save_slides, save_doc, save_sheet, save_latex, save_notebook) would have you write it all out yourself.',
   'Each runs the editor’s own code on the version kept now and keeps a new version (the older ones restorable; the user’s changes and comments stay), which the editor open on it shows at once; it answers what changed.',
-  'Free and instant, but describe_pictures (a model looks at each picture). Give id (get_page lists them) and action, with its fields:',
+  'Free and instant, but describe_pictures (a model looks at each picture) and ask_ai (the helper model answers each AI cell). Give id (get_page lists them) and action, with its fields:',
   'Slide decks.',
   '- animate {style: subtle|lively|bold|none, slides?}: animate every slide (or the slides listed, by number or id) as Animate → Animate every slide does: the title first, then the words a row at a time, bullets one by one, pictures after; Morph between slides that share parts; none takes every animation and transition off.',
   '- fix_accessibility {slides?}: put right what Tools → Check accessibility can (small words, colours that stand out too little, titles and the order they are read in, videos that start with their sound, tables without a header row); it lists what is left.',
@@ -916,6 +945,7 @@ const DESCRIPTION = [
   '- insert_rows {at: a row number, count?}, insert_columns {at: a column’s letters, count?}: empty rows or columns put in there; every formula that points past them follows.',
   '- delete_rows {rows: "5", "5:7" or a list}, delete_columns {columns: "C", "C:D" or a list}: taken out; formulas follow, and a reference to a cell that went becomes #REF!.',
   '- rename_sheet {sheet, name} (the formulas that name it follow), duplicate_sheet {sheet, name?}, delete_sheet {sheet}, move_sheet {sheet, to: its place from 1}: the sheet tabs’ menu.',
+  '- ask_ai {again?}: the AI cells (=AI(…)) that wait for an answer asked of the helper model, many at once, their answers kept with the sheet (it costs a little, as any question to it does); again: true asks every AI cell again (Refresh AI cells).',
   'LaTeX documents.',
   '- move_files {moves: [{from, to}]}: rename or move files, pictures and folders ("figures/" to "img/"), every \\input, \\include and \\includegraphics that names them following, their comments and tracked changes along; it is typeset again.',
   'Notebooks.',
@@ -968,6 +998,7 @@ const SCHEMA = {
     moves: { type: 'array', items: { type: 'object' }, description: 'move_files: [{from, to}].' },
     cells: { type: 'array', items: { type: ['number', 'string'] }, description: 'clear_outputs: cells by number or id.' },
     title: { type: 'string', description: 'duplicate: the copy’s title.' },
+    again: { type: 'boolean', description: 'ask_ai: every AI cell asked again.' },
   },
   required: ['id', 'action'],
 };
