@@ -485,7 +485,8 @@ agents that speak ACP and take MCP servers.
 - **The picture and video editors**: pictures and videos open in editors of their own, in tabs inside the app (the
   page you came from first, a dot on a tab with changes not saved, Open editors on a phone), from a picture shown
   large (Edit), the Library's picture and video pages, Files (Edit, and Edit the picture or Edit the video in a
-  file's menu), slides (Edit picture, Edit video), documents and pages (Edit picture) and an agent's video. The
+  file's menu), slides (Edit picture, Edit video), documents (Edit picture), pages (Edit picture on a picked
+  picture's bar and in its Part tab, Edit video), designs (Edit picture, Edit video) and an agent's video. The
   picture editor crops (eight shapes, turns, mirror, straighten), adjusts (exposure, brightness, contrast,
   highlights, shadows, saturation, vibrance, warmth, tint, sharpness, blur, vignette), filters (thirteen, with
   their strength), marks up (pen, highlighter, arrows, lines, boxes, ovals, words in five fonts, blurred or
@@ -496,8 +497,30 @@ agents that speak ACP and take MCP servers.
   times you pick, adjusts its colour, fades it, mutes it or sets its volume, lays music from the Library under it,
   takes a frame as a picture or as its still, and saves it as MP4, WebM or a GIF, rendered with ffmpeg here (the
   picture tools bring one). Agents have edit_image and edit_video.
-- **Made with AI from a kind**: 216 kinds the app knows how to make well (56 slides, 29 decks, 43 documents, 19
-  sections, 39 pages, 17 blocks of a page, 13 spreadsheets), in a gallery with a find box and chips by group: Insert
+- **Designs, as in Canva or Adobe Express**: New → Design makes a poster (A4, A3, US Letter, 18 × 24 in), a flyer, an
+  Instagram post (square or portrait), a story, reel or TikTok, a Facebook post or cover, an X post, a LinkedIn
+  banner, a YouTube thumbnail or banner, an invitation, a business card, a certificate, a menu, a postcard, a logo or
+  any size in pixels, millimetres or inches, from 22 ready-made designs drawn for its size (with words and picture
+  places to replace, in their own colours, your theme's, your brand's or a palette's), blank, or described for an
+  agent (19 design kinds). Still a page of the Library (versions, its own address fitted to the screen, publishing),
+  of one or several fixed-size artboards. Its editor places anything anywhere: drag with smart guides that snap to
+  the page's edges and middle and to the other parts (equal gaps shown), resize by handles (Shift keeps proportions),
+  turn, nudge with the arrows, pick several (Shift+click, a box), group and ungroup, line up and spread out, bring
+  forward and send back, lock, duplicate, copy and paste the look, flip, see-through, zoom from 25% to 400%, pages to
+  add, move and duplicate, undo of every step. It adds words (heading, subheading, body, twelve font pairings, 54
+  Google fonts), shapes (27 and boxes), lines and arrows, frames for pictures (14 shapes), stickers, icons and
+  emoji, QR codes, collages, pictures from this device, the Library, free photos or made with AI, drawings, videos
+  (from this device, the Library or made with AI, moving and silent or with controls) and backgrounds (colours,
+  gradients, patterns, a picture, one made with AI). Words get effects (shadow, lift, hollow, outline, glow, neon,
+  echo, splice, gradient), a highlight, a curve, spacing and capitals, and new words written by the helper model;
+  pictures get frames, crop inside their frame, ten looks, brightness, contrast, saturation and blur, corners,
+  borders and shadows, Edit picture, and changes with AI. A brand kit (colours, chosen or read from a picture or
+  suggested from a mood, a heading and a body font, logos) is offered first and put on a whole design in a click;
+  Resize makes a copy at another size, its parts placed to fit (Magic resize); Download makes a PNG (see-through if
+  you like), a JPG at 1×, 2× or 3×, or a PDF to print at its own size. Agents make designs with save_page
+  (how_to_make "design" says how, with the brand kit) and export them with export_page.
+- **Made with AI from a kind**: 235 kinds the app knows how to make well (56 slides, 29 decks, 43 documents, 19
+  sections, 39 pages, 17 blocks of a page, 13 spreadsheets, 19 designs), in a gallery with a find box and chips by group: Insert
   → Slide made with AI (and a slide's own menu, A slide made with AI after it), Insert → Section made with AI, Add a
   block made with AI, Choose a kind in New (then Make it with AI or Make an empty one), and Turn it into in the
   Library (slides, a document or a page from what you have). Say what it is about, and an agent makes it from what
