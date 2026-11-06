@@ -6,7 +6,7 @@
 // effects (vignette, sharpen, denoise, film grain). What it sets is the clip's grade (shared/video-grade.ts), made
 // exactly so by the server.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Copy, RotateCcw, SplitSquareHorizontal } from 'lucide-react';
+import { Copy, RotateCcw, SquareSplitHorizontal } from 'lucide-react';
 import { isStill, type VideoClip, type VideoFactsOf, type VideoRecipe } from '@shared/mediaedit-video';
 import { curveFunction, GRADE_EFFECTS, GRADE_SLIDERS, gradeFunction, normalizeGrade, VIDEO_LOOKS, wheelPush, type VideoCurve, type VideoGrade, type VideoLookId, type VideoWheel } from '@shared/video-grade';
 import { Button, cx } from '../../../components/ui';
@@ -75,7 +75,7 @@ export function ColourPage(p: ColourProps) {
           <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-fg-2" translate="no">
             {clip ? `Colour of ${clip.name ?? 'the clip'}` : 'Pick a clip above to colour it'}
           </span>
-          <Button size="sm" variant={p.split !== null ? 'subtle' : 'ghost'} icon={<SplitSquareHorizontal size={13} />} onClick={() => p.onSplit(p.split === null ? 0.5 : null)}>
+          <Button size="sm" variant={p.split !== null ? 'subtle' : 'ghost'} icon={<SquareSplitHorizontal size={13} />} onClick={() => p.onSplit(p.split === null ? 0.5 : null)}>
             Before and after
           </Button>
           <Button size="sm" variant="ghost" icon={<Copy size={13} />} disabled={!clip?.grade} onClick={() => clip && p.change((r) => ({ ...r, clips: (r.clips ?? []).map((c) => ({ ...c, grade: clip.grade })) }))}>

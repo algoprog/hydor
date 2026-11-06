@@ -5,7 +5,7 @@
 // when, a green screen keyed out, its fades. Words: what they say, how they look, where and when; captions all styled
 // at once and saved as .srt. A sound: its level, where it starts, its part, its fades. Nothing picked: the whole video.
 import type { ReactNode } from 'react';
-import { AudioWaveform, Captions, Download, FlipHorizontal2, FlipVertical2, Palette, Plus, RotateCcw, RotateCw, Snowflake, Trash2, Unlink } from 'lucide-react';
+import { AudioWaveform, Captions, Download, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, Palette, Plus, RotateCcw, RotateCw, Snowflake, Trash2, Unlink } from 'lucide-react';
 import {
   audioLength,
   CAPTION_STYLES,
@@ -190,8 +190,8 @@ function ClipProps(p: InspectorProps & { c: VideoClip }) {
         <div className="grid grid-cols-4 gap-1">
           <IconChoice label="Turn left" onClick={() => turn(-90)} icon={<RotateCcw size={14} />} />
           <IconChoice label="Turn right" onClick={() => turn(90)} icon={<RotateCw size={14} />} />
-          <IconChoice label="Mirror" on={!!c.flipH} onClick={() => reTurn({ rotate: c.rotate, flipH: !c.flipH, flipV: c.flipV })} icon={<FlipHorizontal2 size={14} />} />
-          <IconChoice label="Upside down" on={!!c.flipV} onClick={() => reTurn({ rotate: c.rotate, flipH: c.flipH, flipV: !c.flipV })} icon={<FlipVertical2 size={14} />} />
+          <IconChoice label="Mirror" on={!!c.flipH} onClick={() => reTurn({ rotate: c.rotate, flipH: !c.flipH, flipV: c.flipV })} icon={<TrianglesCenterlineDashedVertical size={14} />} />
+          <IconChoice label="Upside down" on={!!c.flipV} onClick={() => reTurn({ rotate: c.rotate, flipH: c.flipH, flipV: !c.flipV })} icon={<TrianglesCenterlineDashedHorizontal size={14} />} />
         </div>
       </Fold>
       {still && (

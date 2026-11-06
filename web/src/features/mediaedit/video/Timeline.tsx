@@ -5,7 +5,7 @@
 // track, trim by the ends), Blade (cut where clicked), Trim (roll the cut between two clips) and Hand (move the view).
 // Snapping (N) pulls to the playhead, ends, markers, In and Out. Things of the media panel are dropped on a track.
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeftRight, Eye, EyeOff, Hand, Lock, LockOpen, Magnet, MousePointer2, Plus, Scissors, SeparatorHorizontal, Unfold, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeftRight, Eye, EyeOff, Hand, Lock, LockOpen, Magnet, MousePointer2, Plus, Scissors, SeparatorHorizontal, UnfoldHorizontal, ZoomIn, ZoomOut } from 'lucide-react';
 import { audioLength, isStill, overlayLength, sourceAt, timecode, VIDEO_TRANSITIONS, type ClipSpan, type VideoClip, type VideoFactsOf, type VideoRecipe, type VideoTrackId } from '@shared/mediaedit-video';
 import { cx } from '../../../components/ui';
 import { playUrl, soundShape, stripUrl } from './api';
@@ -510,7 +510,7 @@ function TimelineBar(p: TimelineProps & { length: number; viewW: number }) {
         <ZoomIn size={15} />
       </Tool>
       <Tool label="Zoom to fit" keys="Shift+Z" onClick={() => p.onPps(Math.max(2, Math.min(600, (p.viewW - HEAD - PAD * 3) / Math.max(1, p.length))))}>
-        <Unfold size={15} className="rotate-90" />
+        <UnfoldHorizontal size={15} />
       </Tool>
     </div>
   );
