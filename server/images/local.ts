@@ -1,8 +1,9 @@
-// The picture tools on this computer: taking the background out of a picture (BiRefNet-lite) and erasing part of one
-// (LaMa), free and private, and the Python that draws plots. Setting them up (Settings → Images, video and audio) makes
-// a private Python environment in the data folder once (ONNX Runtime, NumPy, Pillow, Matplotlib, pandas, and a
-// portable ffmpeg for computers without one: about 145 MB to download); each model downloads the first time its tool
-// is used (192 MB and 208 MB), checked by its SHA-256; a model's file the app no longer uses goes.
+// The picture tools on this computer: taking the background out of a picture (BiRefNet-lite), erasing part of one
+// (LaMa) and making one larger (Real-ESRGAN, upscale.ts), free and private, and the Python that draws plots. Setting
+// them up (Settings → Images, video and audio) makes a private Python environment in the data folder once (ONNX Runtime,
+// NumPy, Pillow, Matplotlib, pandas, and a portable ffmpeg for computers without one: about 145 MB to download); each
+// model downloads the first time its tool is used (192 MB, 208 MB and 5 MB), checked by its SHA-256; a model's file the
+// app no longer uses goes.
 //
 // A worker (picture_worker.py) runs the models on the CPU, one picture at a time (others wait in line). Each model
 // loads only when its tool is used and unloads after a few idle minutes; the worker quits after a few more; nothing
@@ -13,7 +14,9 @@
 //   DELETE /api/images/local         removes them: the environment and the models
 //   POST   /api/images/cutout        a picture with its background taken out (cutout.ts)
 //   POST   /api/images/erase         a picture with part of it erased (erase.ts)
-// The agents' remove_background and erase_from_image (cutout.ts, erase.ts) do the same with a session's files.
+//   POST   /api/images/upscale       a picture made 2× or 4× larger, a PNG (upscale.ts)
+// The agents' remove_background, erase_from_image and upscale_image (cutout.ts, erase.ts, upscale.ts) do the same with a
+// session's files.
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -31,10 +34,12 @@ import type { Feature } from '../features/types.ts';
 import { freeMemoryMb } from '../memory/embed.ts';
 import { cutoutPicture, MAX_PNG, removeBackgroundTool, type Here } from './cutout.ts';
 import { erasePicture, eraseTool } from './erase.ts';
+import { upscalePicture, upscaleTool, type Tile } from './upscale.ts';
 import { setLocalTools, type PythonRun } from './hooks.ts';
 import { dimensions } from './openrouter.ts';
 
-export type ToolName = 'cutout' | 'erase';
+export type ToolName = 'cutout' | 'erase' | 'upscale';
+const TOOL_NAMES: ToolName[] = ['cutout', 'erase', 'upscale'];
 
 const WIN = process.platform === 'win32';
 const dir = () => path.join(config.dataDir, 'pictures');
@@ -48,7 +53,7 @@ const PACKAGE_LIST = ['onnxruntime>=1.20', 'numpy>=1.26', 'pillow>=10.1', 'matpl
 const PACKAGES = PACKAGE_LIST.join(' ');
 /** What setting up downloads, in MB (measured for Linux: 146 MB of wheels, 68 MB of them ffmpeg's; about 410 MB once installed). */
 const SETUP_MB = 145;
-/** Free disk needed to set up: the environment and both models, with room to spare. */
+/** Free disk needed to set up: the environment and the models, with room to spare. */
 const DISK_MB = 1300;
 const HF = () => (process.env.HF_ENDPOINT || 'https://huggingface.co').replace(/\/+$/, '');
 
@@ -95,6 +100,21 @@ const MODELS_AT: Record<ToolName, ModelInfo> = {
     runMb: 650,
     perPixel: 16,
   },
+  upscale: {
+    // Real-ESRGAN's general model (realesr-general-x4v3, BSD-3: SRVGGNetCompact, 1.2 million parameters), the official
+    // weights exported to ONNX with any height and width (scripts/convert_realesrgan.py in its repository).
+    file: 'realesr-general-x4v3.onnx',
+    url: '/vlad-grig/realesr-general-x4v3-onnx/resolve/0e95d93e454cf6b5de9bdf5a1c9e7ec340d38231/onnx/model.onnx',
+    bytes: 4_866_420,
+    sha256: '7b10e80021ec3e0ff35017ae5022791879d93a799b2e201e1010a37510202266',
+    label: 'the upscaler',
+    name: 'Real-ESRGAN',
+    // Measured: about 170 MB at most for a tile of 256 pixels on 4 threads; then the result itself, a pixel at a time
+    // (asked with the result's pixels: its RGB and alpha, and Pillow's copy as it is saved).
+    loadMb: 40,
+    runMb: 260,
+    perPixel: 10,
+  },
 };
 let models: Record<ToolName, ModelInfo> = MODELS_AT;
 const modelUrl = (m: ModelInfo) => (/^https?:/.test(m.url) ? m.url : HF() + m.url);
@@ -124,6 +144,7 @@ const MAX_WAITING = 8;
 const WHAT: Record<ToolName, { doing: string; verb: string }> = {
   cutout: { doing: 'Taking the background out', verb: 'take the background out' },
   erase: { doing: 'Erasing', verb: 'erase part of a picture' },
+  upscale: { doing: 'Making it larger', verb: 'make the picture larger' },
 };
 
 function readText(f: string): string | null {
@@ -369,6 +390,9 @@ interface Answer {
   rss?: number;
   peak?: number;
   ms?: number;
+  /** A job in parts (an upscale's tiles): how many are done, of how many. */
+  done?: number;
+  of?: number;
 }
 
 interface Pending {
@@ -433,6 +457,7 @@ function startWorker(): Worker {
     const p = m.id != null ? w.pending.get(m.id) : undefined;
     if (!p) return;
     if (m.status === 'loading' && p.what) jobStep = `Loading ${models[p.what].label}`;
+    else if (m.status === 'working' && p.what && typeof m.done === 'number' && m.of > 1) jobStep = `${WHAT[p.what].doing} on this computer: ${Math.floor((m.done / m.of) * 100)}%`;
     else if (m.status === 'working' && p.what) jobStep = `${WHAT[p.what].doing} on this computer`;
     else if (!m.status) {
       w.pending.delete(m.id);
@@ -651,9 +676,10 @@ function readSmall(file: string, dims: unknown): Small | null {
 }
 
 /** One picture through a model in the worker: the PNG back. */
-function work(t: ToolName, files: { input: Buffer; mask?: Buffer }, o: { boxes?: number[][]; maxBytes?: number; signal?: AbortSignal }): Promise<MadeHere> {
+function work(t: ToolName, files: { input: Buffer; mask?: Buffer }, o: { boxes?: number[][]; maxBytes?: number; signal?: AbortSignal; scale?: number; tiles?: Tile[] }): Promise<MadeHere> {
   const size = dimensions(files.input);
-  const pixels = size ? size.w * size.h : 12_000_000;
+  // An upscale's memory goes with the picture it makes.
+  const pixels = (size ? size.w * size.h : 12_000_000) * (o.scale ?? 1) ** 2;
   const before = async () => {
     if (!modelReady(t)) {
       // Not a long download for nothing: the memory first, and again once it is here.
@@ -669,9 +695,19 @@ function work(t: ToolName, files: { input: Buffer; mask?: Buffer }, o: { boxes?:
     jobStep = w.loaded.includes(t) ? `${WHAT[t].doing} on this computer` : `Loading ${models[t].label}`;
     const a = await send(
       w,
-      { op: t, model: modelPath(t), input, output, ...(mask ? { mask } : {}), ...(o.boxes ? { boxes: o.boxes } : {}), ...(o.maxBytes ? { max_bytes: o.maxBytes } : {}), ...(small ? { small } : {}) },
+      {
+        op: t,
+        model: modelPath(t),
+        input,
+        output,
+        ...(mask ? { mask } : {}),
+        ...(o.boxes ? { boxes: o.boxes } : {}),
+        ...(o.maxBytes ? { max_bytes: o.maxBytes } : {}),
+        ...(small ? { small } : {}),
+        ...(o.scale ? { scale: o.scale, tiles: (o.tiles ?? []).map((x) => [x.x, x.y, x.w, x.h, x.px, x.py, x.pw, x.ph]) } : {}),
+      },
       t,
-      t === 'cutout' ? 5 * 60_000 : 3 * 60_000,
+      t === 'upscale' ? 15 * 60_000 : t === 'cutout' ? 5 * 60_000 : 3 * 60_000,
     );
     if (!w.gone) idleLater(w, t);
     if (a.error) throw new HttpError(a.memory ? 503 : 400, a.memory ? `${a.error} Close some programs and try again, or do it through OpenRouter instead.` : a.error);
@@ -689,6 +725,9 @@ const boxesOf = (where: Where) => ('boxes' in where ? where.boxes.map((b) => [b.
 export function eraseHere(img: Buffer, where: Where, o: { maxBytes?: number; signal?: AbortSignal } = {}) {
   return work('erase', { input: img, ...('mask' in where ? { mask: where.mask } : {}) }, { ...o, boxes: boxesOf(where) });
 }
+
+/** The picture made `scale` times larger on this computer, a tile at a time: a PNG (see-through parts kept). */
+export const upscaleHere = (img: Buffer, o: { scale: 2 | 4; tiles: Tile[]; signal?: AbortSignal }) => work('upscale', { input: img }, o);
 
 /** How large a hole to fill is and how detailed things are around it (no model loads for this). */
 export function measureHere(img: Buffer, where: Where, o: { signal?: AbortSignal } = {}): Promise<HoleHere> {
@@ -870,7 +909,7 @@ export function localState(): LocalToolsState {
     canInstall: can.canInstall,
     ...(can.why ? { why: can.why } : {}),
     sizeMb: SETUP_MB,
-    downloaded: (['cutout', 'erase'] as const).filter(modelReady),
+    downloaded: TOOL_NAMES.filter(modelReady),
     loaded: worker && !worker.gone ? [...worker.loaded] : [],
   };
 }
@@ -878,7 +917,7 @@ export function localState(): LocalToolsState {
 export const localReady = () => envReady() && !settingUp;
 
 /** What the routes and tools of cutout.ts and erase.ts are lent. */
-const here: Here = { ready: localReady, canSetUp: () => envReady() || installable().canInstall, cutout: cutoutHere, erase: eraseHere, measure: measureHere };
+const here: Here = { ready: localReady, canSetUp: () => envReady() || installable().canInstall, cutout: cutoutHere, erase: eraseHere, measure: measureHere, upscale: upscaleHere };
 
 setLocalTools({
   state: localState,
@@ -892,7 +931,7 @@ setLocalTools({
 
 /** Tests use models and a worker of their own, and say how much memory is free. */
 export function setPictureToolsForTests(o: { models?: Partial<Record<ToolName, Partial<ModelInfo>>>; worker?: string | null; freeMb?: (() => number) | null }) {
-  if (o.models) models = { cutout: { ...MODELS_AT.cutout, ...o.models.cutout }, erase: { ...MODELS_AT.erase, ...o.models.erase } };
+  if (o.models) models = { cutout: { ...MODELS_AT.cutout, ...o.models.cutout }, erase: { ...MODELS_AT.erase, ...o.models.erase }, upscale: { ...MODELS_AT.upscale, ...o.models.upscale } };
   if (o.worker !== undefined) workerScript = o.worker ?? WORKER_SCRIPT;
   if (o.freeMb !== undefined) freeForTests = o.freeMb;
 }
@@ -950,6 +989,11 @@ export const pictureTools: Feature = {
     });
     app.post('/api/images/cutout', async (req, reply) => cutoutPicture(db, (req.body ?? {}) as CutoutAsk, whileAsked(reply), here));
     app.post('/api/images/erase', async (req, reply) => erasePicture(db, (req.body ?? {}) as EraseAsk, whileAsked(reply), here));
+    app.post('/api/images/upscale', { bodyLimit: 66 * 1024 * 1024 }, async (req, reply) => {
+      const r = await upscalePicture(db, (req.body ?? {}) as Record<string, unknown>, whileAsked(reply), here);
+      reply.header('x-width', String(r.w)).header('x-height', String(r.h)).header('x-model', r.model).header('cache-control', 'no-store');
+      return reply.type('image/png').send(r.png);
+    });
   },
-  tools: ({ deps }) => (imagesOn(deps.db) ? [removeBackgroundTool(deps.db, here), eraseTool(deps.db, here)] : []),
+  tools: ({ deps }) => (imagesOn(deps.db) ? [removeBackgroundTool(deps.db, here), eraseTool(deps.db, here), upscaleTool(deps.db, here)] : []),
 };

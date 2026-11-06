@@ -41,6 +41,7 @@ function doing(tool: string): string {
   if (/make_svg$/.test(tool)) return 'Making a drawing';
   if (/remove_background$/.test(tool)) return 'Taking the background out';
   if (/erase_from_image$/.test(tool)) return 'Erasing';
+  if (/upscale_image$/.test(tool)) return 'Making it larger';
   if (/edit_image$/.test(tool)) return 'Editing the picture';
   if (/find_photos$/.test(tool)) return 'Finding free photos';
   return 'Making an image';

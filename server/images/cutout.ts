@@ -33,6 +33,8 @@ export interface Here {
   erase(img: Buffer, where: Where, o: { maxBytes?: number; signal?: AbortSignal }): Promise<MadeHere>;
   /** How large a hole to fill is and how detailed things are around it. */
   measure(img: Buffer, where: Where, o: { signal?: AbortSignal }): Promise<HoleHere>;
+  /** The picture made `scale` times larger (upscale.ts), a tile at a time. */
+  upscale(img: Buffer, o: { scale: 2 | 4; tiles: { x: number; y: number; w: number; h: number; px: number; py: number; pw: number; ph: number }[]; signal?: AbortSignal }): Promise<MadeHere>;
 }
 
 /** The largest picture taken in (a data: address or a session's file). */

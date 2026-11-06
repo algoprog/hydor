@@ -3,8 +3,13 @@
 // whole picture, an erased or changed part put in only where it was painted (its edge softened), a picture expanded with
 // the whole original kept in its middle. So a 6000-pixel photo stays 6000 pixels after an AI tool has worked on it.
 import { post } from '../../lib/api';
-import type { Stroke } from './PictureView';
 import { canvasOf, loadImage, seeThrough, sourceUrl } from './render';
+
+/** A brush stroke over the picture: its width and the points it went through, in the picture's pixels. */
+export interface Stroke {
+  size: number;
+  pts: number[];
+}
 
 /** The largest side sent to the AI tools: the models work smaller, and the answer is put back at the whole size. */
 export const SEND_SIDE = 3072;
