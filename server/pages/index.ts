@@ -109,6 +109,7 @@ import {
   storageOp,
   storageText,
   versionsOf,
+  nameVersion,
 } from './store.ts';
 import { dropThumbs, enableThumbs, refreshThumbs, thumbFile } from './thumbs.ts';
 import { agentPlace, changeFolder, deleteFolder, folderPath, listFolders, makeFolder, placeFor, putInFolder } from './folders.ts';
@@ -1015,6 +1016,13 @@ function routes(d: Deps) {
     const page = restoreVersion(db, P(req).id, Number(P(req).v));
     changed(page.id);
     return { page };
+  });
+  /** A version named ("Sent to ICML"; an empty name takes it away): the page's versions as they are now. */
+  app.put('/api/pages/:id/versions/:v/name', async (req) => {
+    const id = P(req).id;
+    const versions = nameVersion(db, id, Number(P(req).v), B(req).name);
+    changed(id);
+    return { versions };
   });
   /**
    * Where a notebook of the Library runs: GET says the file its kernel is known by (to find one already running);

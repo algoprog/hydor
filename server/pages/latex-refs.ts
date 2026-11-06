@@ -202,6 +202,32 @@ async function arxivSearch(words: string, signal?: AbortSignal): Promise<RefEntr
 
 const titleKey = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
 
+/**
+ * doi.org's BibTeX for each of up to 60 DOIs (Tidy the bibliography's fields filled from them), three asked at a time:
+ * the entries found by their DOIs, and the DOIs that found none.
+ */
+export async function bibtexForDois(raw: unknown, signal?: AbortSignal): Promise<{ entries: Record<string, string>; missing: string[] }> {
+  const dois = [...new Set((Array.isArray(raw) ? raw : []).filter((d): d is string => typeof d === 'string').map((d) => d.trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').toLowerCase()))].filter((d) => /^10\.\d{4,9}\/\S+$/.test(d) && d.length < 300);
+  if (!dois.length) throw new HttpError(400, 'Send the DOIs to look up (dois)');
+  if (dois.length > 60) throw new HttpError(413, 'At most 60 DOIs at once');
+  const entries: Record<string, string> = {};
+  const missing: string[] = [];
+  let next = 0;
+  const worker = async () => {
+    while (next < dois.length && !signal?.aborted) {
+      const d = dois[next++];
+      try {
+        const [e] = await byDoi(d, signal);
+        entries[d] = e.bibtex;
+      } catch {
+        missing.push(d);
+      }
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  return { entries, missing };
+}
+
 /** The references a query finds: one for a DOI or an arXiv id, up to ten for words (Crossref's first, then arXiv's). */
 export async function findReferences(raw: unknown, signal?: AbortSignal): Promise<{ kind: RefQuery['kind']; entries: RefEntry[] }> {
   if (typeof raw !== 'string' || !raw.trim()) throw new HttpError(400, 'Say what to find: a DOI, an arXiv paper, or words of its title or its authors.');

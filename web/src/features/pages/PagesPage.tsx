@@ -561,7 +561,7 @@ function PageView({ id }: { id: string }) {
                 >
                   <span className="w-8 shrink-0 font-mono text-[12px] text-fg-3">v{v.version}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] text-fg">{v.version === data.page.version ? 'The latest' : v.title}</span>
+                    <span className="block truncate text-[13px] text-fg">{v.name ? <span translate="no" className="font-medium">{v.name}</span> : v.version === data.page.version ? 'The latest' : v.title}</span>
                     <span className="block truncate text-[11.5px] text-fg-3">
                       {ago(v.createdAt)} · {v.who ? <span translate="no">{v.who}</span> : (BY[v.by] ?? v.by)}
                       {v.steps ? ` · ${v.steps} saves` : ''} · {bytes(v.bytes)}

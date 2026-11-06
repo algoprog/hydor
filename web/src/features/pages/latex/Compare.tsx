@@ -3,17 +3,18 @@
 // not saved yet included). A file can be brought back as it was in that version (it is changed in the editor, not
 // saved, so Undo takes it back); files that are only in one of the two say so, and so do pictures added or taken out.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { History, RotateCcw } from 'lucide-react';
+import { History, Pencil, RotateCcw } from 'lucide-react';
 import { TEX_MAIN, texFileText, type TexDoc } from '@shared/latex';
-import type { PageVersion } from '@shared/pages';
+import { VERSION_NAME_MAX, type PageVersion } from '@shared/pages';
 import { DiffStat, DiffView } from '../../../components/DiffView';
-import { Button, cx, Dialog, inputCls, Segmented, Throbber, useMediaQuery } from '../../../components/ui';
+import { Button, cx, Dialog, IconButton, inputCls, Segmented, Throbber, useMediaQuery } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
 import { LOCALE } from '../../../i18n/locale';
 import { api, enc } from '../../../lib/api';
 import { toastError } from '../../../lib/store';
 import { loadModelVersion } from '../kinds';
 import { lineDiff } from './linediff';
+import { nameVersion } from './api';
 
 const BY: Record<PageVersion['by'], string> = { agent: 'by the agent', user: 'kept by you', restore: 'brought back', edit: 'changed by you', made: 'made by you' };
 const SPLIT_KEY = 'wa.tex.compare.split';
@@ -48,6 +49,7 @@ export function CompareDialog({
   const [old, setOld] = useState<{ v: number; doc: TexDoc } | null>(null);
   const [loading, setLoading] = useState(false);
   const [split, setSplit] = useState(() => localStorage.getItem(SPLIT_KEY) !== '0');
+  const [naming, setNaming] = useState<{ version: number; name: string } | null>(null);
   const cache = useRef(new Map<number, TexDoc>());
   useEffect(() => {
     if (!open) return;
@@ -105,17 +107,61 @@ export function CompareDialog({
   const same = files?.filter((f) => !f.diff) ?? [];
   const showSplit = split && wide;
 
+  /** A version named ("Sent to ICML"), or its name taken away. */
+  const saveName = async (version: number, name: string) => {
+    setNaming(null);
+    try {
+      setVersions((await nameVersion(pageId, version, name)).versions);
+    } catch (e) {
+      toastError(e);
+    }
+  };
   const list = (
     <nav className="min-h-0 overflow-y-auto overscroll-contain">
-      {versions?.map((v, i) => (
-        <button key={v.version} type="button" onClick={() => setPick(v.version)} className={cx('flex w-full items-start gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-bg-2', pick === v.version && 'bg-bg-2')}>
-          <span className="w-8 shrink-0 pt-px font-mono text-[12px] text-fg-3">v{v.version}</span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] text-fg">{i === 0 ? 'The latest' : when(v.createdAt)}</span>
-            <span className="block truncate text-[11.5px] text-fg-3">{i === 0 ? `${when(v.createdAt)} · ${tr(BY[v.by] ?? v.by)}` : BY[v.by]}</span>
-          </span>
-        </button>
-      ))}
+      {versions?.map((v, i) =>
+        naming?.version === v.version ? (
+          <form
+            key={v.version}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveName(v.version, naming.name);
+            }}
+            className="flex items-center gap-1 px-1.5 py-1"
+          >
+            <input
+              autoFocus
+              value={naming.name}
+              onChange={(e) => setNaming({ version: v.version, name: e.target.value })}
+              onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setNaming(null))}
+              onBlur={() => void saveName(v.version, naming.name)}
+              placeholder={tr('Sent to ICML')}
+              maxLength={VERSION_NAME_MAX}
+              aria-label={tr(`A name for version ${v.version}`)}
+              className={cx(inputCls, 'h-8 text-[13px]')}
+            />
+          </form>
+        ) : (
+          <div key={v.version} className={cx('group/v flex items-start rounded-lg transition-colors hover:bg-bg-2', pick === v.version && 'bg-bg-2')}>
+            <button type="button" onClick={() => setPick(v.version)} className="flex min-w-0 flex-1 items-start gap-2 py-1.5 pl-2.5 text-left">
+              <span className="w-8 shrink-0 pt-px font-mono text-[12px] text-fg-3">v{v.version}</span>
+              <span className="min-w-0 flex-1">
+                {v.name && (
+                  <span translate="no" className="block truncate text-[13px] font-medium text-fg">
+                    {v.name}
+                  </span>
+                )}
+                <span className={cx('block truncate', v.name ? 'text-[11.5px] text-fg-3' : 'text-[13px] text-fg')}>{i === 0 ? 'The latest' : when(v.createdAt)}</span>
+                <span className="block truncate text-[11.5px] text-fg-3">{i === 0 ? `${when(v.createdAt)} · ${tr(BY[v.by] ?? v.by)}` : BY[v.by]}</span>
+              </span>
+            </button>
+            {!readOnly && (
+              <IconButton label={v.name ? 'Rename this version' : 'Name this version'} size="sm" onClick={() => setNaming({ version: v.version, name: v.name ?? '' })} className="mt-1 mr-1 opacity-0 group-hover/v:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100">
+                <Pencil size={13} />
+              </IconButton>
+            )}
+          </div>
+        ),
+      )}
     </nav>
   );
 
@@ -136,7 +182,7 @@ export function CompareDialog({
             <select value={pick ?? ''} onChange={(e) => setPick(Number(e.target.value))} className={inputCls}>
               {versions?.map((v, i) => (
                 <option key={v.version} value={v.version}>
-                  {`v${v.version} · ${i === 0 ? tr('The latest') : when(v.createdAt)} · ${tr(BY[v.by] ?? v.by)}`}
+                  {`v${v.version} · ${v.name ? `${v.name} · ` : ''}${i === 0 ? tr('The latest') : when(v.createdAt)} · ${tr(BY[v.by] ?? v.by)}`}
                 </option>
               ))}
             </select>

@@ -4,13 +4,40 @@
 // PDF becomes one on the server).
 import { cleanTexName, extOf, TEX_FILE_EXT, type TexCompiled, type TexDoc, type TexSetup } from '@shared/latex';
 import type { TexReference } from '@shared/latex-bib';
+import type { TexCiteAnswer, TexErrorAnswer, TexPictureReader, TexProofreadAnswer, TexRewriteAnswer, TexRewriteHow, TexWritten } from '@shared/latex-ai';
+import type { PdfPageWords } from '@shared/latex-pdfwords';
+import type { PageVersion } from '@shared/pages';
 import { api, enc, post } from '../../../lib/api';
 import { mu } from '../../../lib/machine';
 import { uploadPicture } from '../pictures';
 
-/** `folder`: a file's document (opened from Files), typeset among the other files of its folder. */
-export const typeset = (model: TexDoc, base: string | undefined, folder?: string, signal?: AbortSignal) =>
-  api<TexCompiled>('/api/pages/tex/compile', { method: 'POST', body: { model, base, folder }, signal });
+/** `folder`: a file's document (opened from Files), typeset among the other files of its folder; `draft`: its pictures as boxes; `halt`: stop at the first error. */
+export const typeset = (model: TexDoc, base: string | undefined, folder?: string, signal?: AbortSignal, o: { draft?: boolean; halt?: boolean } = {}) =>
+  api<TexCompiled>('/api/pages/tex/compile', { method: 'POST', body: { model, base, folder, ...(o.draft ? { draft: true } : {}), ...(o.halt ? { halt: true } : {}) }, signal });
+
+/** Typesettings kept (by their keys) thrown away, so the next one starts afresh. */
+export const clearTypesetting = (keys: string[]) => post<{ cleared: number }>('/api/pages/tex/clear', { keys });
+
+/** A typesetting's words and where each is on its page. */
+export const pdfWords = (key: string) => api<{ pages: PdfPageWords[] }>(`/api/pages/tex/${key}/words`).then((r) => r.pages);
+
+/** doi.org's BibTeX for DOIs (Tidy's fields filled). */
+export const bibFill = (dois: string[]) => post<{ entries: Record<string, string>; missing: string[] }>('/api/pages/tex/bib-fill', { dois });
+
+/** A version of a page named (an empty name takes it away). */
+export const nameVersion = (pageId: string, version: number, name: string) => api<{ versions: PageVersion[] }>(`/api/pages/${enc(pageId)}/versions/${version}/name`, { method: 'PUT', body: { name } });
+
+// ---- AI (server/write/latex.ts) --------------------------------------------------------------------------------------
+
+const aiPost = <T>(path: string, body: unknown, signal?: AbortSignal) => api<T>(path, { method: 'POST', body, signal });
+export const aiRewrite = (b: { text: string; how: TexRewriteHow; lang?: string; ask?: string; context?: string }, signal?: AbortSignal) => aiPost<TexRewriteAnswer>('/api/write/latex/rewrite', b, signal);
+export const aiWrite = (b: { ask: string; before?: string; after?: string; preamble?: string; math?: boolean }, signal?: AbortSignal) => aiPost<TexWritten>('/api/write/latex/write', b, signal);
+export const aiPictureReader = () => api<TexPictureReader>('/api/write/latex/picture');
+export const aiPicture = (b: { data: string; kind?: string; preamble?: string }, signal?: AbortSignal) => aiPost<TexWritten>('/api/write/latex/picture', b, signal);
+export const aiError = (b: { how: 'explain' | 'fix'; message: string; hint?: string; warning?: boolean; file?: string; line?: number; lines?: { n: number; text: string }[]; log?: string }, signal?: AbortSignal) =>
+  aiPost<TexErrorAnswer>('/api/write/latex/error', b, signal);
+export const aiCite = (b: { claim: string; context?: string }, signal?: AbortSignal) => aiPost<TexCiteAnswer>('/api/write/latex/cite', b, signal);
+export const aiProofread = (b: { paragraphs: { id: number; text: string }[] }, signal?: AbortSignal) => aiPost<TexProofreadAnswer>('/api/write/latex/proofread', b, signal);
 
 let setupOnce: Promise<TexSetup> | null = null;
 /** What this computer has (asked once; again after a failure). */
