@@ -3,6 +3,27 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.42.0 · 7 November 2026
+
+New in the Library is redrawn: each starting point shows as it will look, and describing what you want for an agent
+comes first.
+
+- **What to make, down the side**: Page, Design, Slides, Document, Spreadsheet, LaTeX, Notebook and Diagram are a
+  list on the left, each with its own icon and colour (chips across the top on a phone), and a line at the top says
+  what each one is. The window keeps its size as you switch, and the project it goes in and **Upload files** sit at
+  the foot of the list.
+- **Every starting point drawn**: the page templates (notes, a checklist, meeting notes, a project plan, a wiki, a
+  journal, a reading list…), LaTeX's templates (an article, a thesis, a letter, beamer slides, a CV, a poster…), the
+  slide themes with their colours, and a blank document, spreadsheet, notebook or diagram each show as a small picture
+  of what you get. Opening a file of yours is the last card, and a double click makes one at once.
+- **Describe it first**: the box at the top takes what you want in your own words, with the kinds agents are asked
+  for most under it (a pitch deck, a cover letter, a budget, a flowchart…) and **More kinds** for all of them. **Make
+  it with AI** starts the session that makes it right away, with the name, folder and project you picked, instead of
+  sending you to the start page; **Make it yourself** makes what is picked below instead.
+- **A design's size** is picked from a button that shows it, so its designs get the room.
+- **Diagrams described in words** now reach the agent with everything New knows about them (their name, folder and
+  language), as the other kinds do.
+
 ## 0.41.1 · 7 November 2026
 
 The part the agent is working on keeps the outline's even spacing.

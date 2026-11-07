@@ -226,6 +226,10 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
 
 {
   ok(makeOf(null) === null && makeOf('x') === null && makeOf([]) === null && makeOf({}) === null && makeOf({ kind: 'slide' }) === null, 'nothing asked for: nothing kept');
+  ok(
+    makeOf({ kind: 'diagram', words: 'how we handle a refund' })?.kind === 'diagram' && !!makeInstructions({ kind: 'diagram', words: 'how we handle a refund' })?.includes('with save_diagram'),
+    'a diagram in the words alone, as New asks for one',
+  );
   const m = makeOf({ type: 'slide.swot', words: '  our market  ', after: { index: 2, title: 'Pricing' }, webDeck: true, junk: 1, theme: { id: 'paper', label: 'Daylight', bg: '#fff' } });
   ok(
     !!m && m.type === 'slide.swot' && m.words === 'our market' && m.after?.index === 2 && m.webDeck === true && !('junk' in m) && JSON.stringify(m.theme) === '{"id":"paper","label":"Daylight"}',
@@ -383,9 +387,11 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
   const asks = fs.readFileSync(path.join(ROOT, 'shared/content-asks.ts'), 'utf8');
   ok(!/\b(label|blurb|hint): '/.test(asks), 'the requests’ file holds nothing the pages show');
   ok(!/^import (?!type )[^\n]*content-types/m.test(asks), 'and takes only types from the list of kinds, so the pages that use it do not load the list');
-  // New's Or describe it starts the same, in the app's language (its own words, translated where it shows them).
-  const parts = fs.readFileSync(path.join(ROOT, 'web/src/features/pages/parts.tsx'), 'utf8');
-  for (const [k, start] of Object.entries(NEW_START)) ok(parts.includes(`${k === 'deck' ? 'slides' : k}: '${start}'`), `New’s Or describe it starts a new ${k} as the gallery does`);
+  // New's Make it with AI asks for a page, a design, slides, a document, a spreadsheet or a diagram as the gallery does:
+  // through madeRequest, with no words of its own for them (a LaTeX document and a notebook, which have no kinds, have).
+  const dialog = fs.readFileSync(path.join(ROOT, 'web/src/features/pages/NewDialog.tsx'), 'utf8');
+  ok(dialog.includes('madeRequest(type, ask,'), 'New’s Make it with AI makes its request as the gallery does');
+  for (const [k, start] of Object.entries(NEW_START)) ok(!dialog.includes(start.trim()), `and has no words of its own for a new ${k}`);
 }
 
 console.log(`${passed} passed, ${failed} failed`);

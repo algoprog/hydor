@@ -312,9 +312,10 @@ agents that speak ACP and take MCP servers.
   as free photos with their credit under them, or as a cover made with AI; a picked picture is changed with AI or
   edited in the picture editor; Add has Add a block made with AI (a pricing table, questions and answers…); and
   pictures an agent saves into a page from its folder (a picture, a drawing, a plot) go inside it, made smaller where
-  this computer can (a page up to 2 MB). Make pages of your own from a blank page, notes, a checklist, a tracker
-  or a template made of blocks and databases (meeting notes, a project plan, a wiki, a journal, a reading list, a
-  trip plan, a habit tracker), or import one (Markdown, a Notion export, a Word file, a web page); lock a page so
+  this computer can (a page up to 2 MB). Make pages of your own in New, each starting point drawn as it will look:
+  a blank page, notes, a checklist, a tracker or a template made of blocks and databases (meeting notes, a project
+  plan, a wiki, a journal, a reading list, a trip plan, a habit tracker), or import one (Markdown, a Notion export, a
+  Word file, a web page), or describe it in the box at the top for an agent to make at once; lock a page so
   it doesn't change by accident, see the pages that link to it and how many words it has, and see or clear the
   data a page keeps. Export a page as a PDF, a Word document (headings, lists,
   tables, links, charts as pictures) or a web page; ask an agent to change the page, slides, document, spreadsheet
@@ -696,7 +697,7 @@ agents that speak ACP and take MCP servers.
 - **Made with AI from a kind**: 254 kinds the app knows how to make well (56 slides, 29 decks, 43 documents, 19
   sections, 39 pages, 17 blocks of a page, 13 spreadsheets, 19 designs, 19 diagrams), in a gallery with a find box and chips by group: Insert
   → Slide made with AI (and a slide's own menu, A slide made with AI after it), Insert → Section made with AI, Add a
-  block made with AI, Choose a kind in New (then Make it with AI or Make an empty one), and Turn it into in the
+  block made with AI, the kinds under New's box and More kinds (then Make it with AI, or Make it yourself), and Turn it into in the
   Library (slides, a document, a page or a diagram from what you have). Say what it is about, and an agent makes it from what
   is there, as you watch; web-only slides are marked Web format in a deck made for PowerPoint. Agents read the same
   instructions with how_to_make (free) before they make a known kind of thing by name.
