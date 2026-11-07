@@ -7,7 +7,7 @@ export const COMPARE: AnswerUiSpec[] = [
     title: 'Comparison table',
     group: 'compare',
     use: 'Two to six options side by side, attribute by attribute, with the best value in each row marked and an optional pick.',
-    keywords: 'compare versus side by side specs differences table features options alternatives which is better',
+    keywords: 'compare comparison versus side by side specs differences table features options alternatives which is better laptops phones cameras cars products',
     shape: `{
   title?: string
   items: { name: string, image?: image, subtitle?: string, badge?: string, url?: url }[]   // the columns, 2 to 6
