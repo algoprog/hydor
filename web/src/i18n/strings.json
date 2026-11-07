@@ -14806,7 +14806,7 @@
 "State machine":"shared/content-types.ts",
 "state: where the slideshow is ({i, step, steps, pos, count, blank, started})":"server/slides-show/remote.ts",
 "Statement of work":"shared/content-types.ts",
-"states of the kind <<{0}>> are drawn as plain states":"shared/diagram-mermaid.ts",
+"states of the kind «{0}» are drawn as plain states":"shared/diagram-mermaid.ts",
 "status":"web/src/features/apps/Share.tsx",
 "Status":"web/src/features/apps/Batch.tsx",
 "Stay":"web/src/features/browser/Dock.tsx",

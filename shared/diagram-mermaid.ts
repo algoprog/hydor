@@ -1771,7 +1771,7 @@ function stateDiagram(lines: Line[], notes: Notes): SpecPage {
       const kind = m[2].toLowerCase();
       if (kind === 'fork' || kind === 'join') Object.assign(s, { shape: 'bar', text: '', bar: true });
       else if (kind === 'choice') Object.assign(s, { shape: 'diamond', text: '', w: 40, h: 40 });
-      else notes.add(`states of the kind <<${m[2]}>> are drawn as plain states`);
+      else notes.add(`states of the kind «${m[2]}» are drawn as plain states`);
     } else if ((m = STATE_OPEN.exec(t))) openState(state(m[1]));
     else if ((m = STATE_ONE.exec(t))) {
       const s = state(m[1]);

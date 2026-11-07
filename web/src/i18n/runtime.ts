@@ -37,7 +37,9 @@ const skipped = (el: Element | null) => !el || !!el.closest(SKIP);
  */
 function inPart(s: string, el: Element | null, split?: boolean): string | null {
   const part = el?.closest('[data-i18n]')?.getAttribute('data-i18n');
-  return (part ? translate(`${part}::${s}`, split) : null) ?? translate(s, split);
+  // The part's name goes after the spaces around the words, which stay as they are (" Page " is "diagram::Page").
+  const lead = part ? /^\s*/.exec(s)![0] : '';
+  return (part ? translate(`${lead}${part}::${s.slice(lead.length)}`, split) : null) ?? translate(s, split);
 }
 
 function put(node: Text, value: string) {

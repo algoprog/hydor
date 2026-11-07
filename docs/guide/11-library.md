@@ -1,6 +1,6 @@
 # Library: pages, images, videos and sites
 
-Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They also make slides, documents, spreadsheets, LaTeX documents, notebooks and diagrams you edit as in PowerPoint, Word, Excel, Overleaf, Jupyter or draw.io. What you keep goes in your Library, by project, with the pictures, videos and sounds you saved. This topic covers watching a page as it is written, changing and keeping it (versions, data, an address for your phone), images, videos and sounds, making your own, designs, diagrams, slides for the web or PowerPoint, pictures made with AI and edited, exporting, asking an agent for changes, and publishing at a link.
+Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They also make slides, documents, spreadsheets, LaTeX documents, notebooks and diagrams you edit as in PowerPoint, Word, Excel, Overleaf, Jupyter or draw.io. What you keep goes in your Library, by project, with the pictures, videos and sounds you saved. This topic covers watching a page as it is written, changing and keeping it (versions, data, an address for your phone), images, videos and sounds, making your own, designs, diagrams, slides, pictures made with AI and edited, exporting, asking an agent for changes, and publishing.
 
 ![The Library: everything kept, each project's things together, with its places beside them](images/library.webp)
 

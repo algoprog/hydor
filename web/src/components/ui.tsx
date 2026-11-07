@@ -519,6 +519,7 @@ export function Dialog({
   children,
   width = 520,
   footer,
+  part,
 }: {
   open: boolean;
   onClose: () => void;
@@ -526,6 +527,8 @@ export function Dialog({
   children: ReactNode;
   width?: number;
   footer?: ReactNode;
+  /** The part of the app it belongs to (an editor's data-i18n), so its words are translated as they mean there: it opens outside that part. */
+  part?: string;
 }) {
   // On the popovers' stack: a dialog opened from a popover (Options → Guidelines) is over it, so a click in it
   // isn't a click outside the popover, which would close the popover and the dialog inside it.
@@ -544,6 +547,7 @@ export function Dialog({
   return createPortal(
     <div
       ref={ref}
+      data-i18n={part}
       className="scrim fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
       onPointerDown={(e) => (pressed.current = e.target === e.currentTarget)}
       onClick={(e) => pressed.current && e.target === e.currentTarget && onClose()}

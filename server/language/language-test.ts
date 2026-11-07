@@ -116,6 +116,12 @@ test('the translator leaves what it has no entry for in English, whole, and take
   assert.equal(el('Up to 30 results'), 'Έως 30 αποτελέσματα');
   // A translation that starts with an acronym keeps it.
   assert.equal(el('pdf files'), 'PDF αρχεία');
+  // A part's own word is its entry or nothing: no pattern takes the part's name for a value.
+  const part = translator({ '{0} of {1}': '{0} / {1}', 'diagram::Page': '页面', Page: '网页' });
+  assert.equal(part('diagram::1 of 3'), null);
+  assert.equal(part('diagram::Page'), '页面');
+  assert.equal(part('diagram::Page '), '页面 ');
+  assert.equal(part('1 of 3'), '1 / 3');
 });
 
 test('the browser’s language picks one the app has, else English', () => {
