@@ -596,4 +596,70 @@ Step = { cmd: string, note?: md, output?: string }   // cmd: one command (severa
       ],
     },
   },
+  {
+    id: 'logs',
+    title: 'Log viewer',
+    group: 'code',
+    use: 'Log lines to read: filter by level, search, wrap long lines or not; errors and warnings stand out, chosen words are marked, and they copy.',
+    keywords: 'logs log lines viewer server console tail journal syslog levels warnings filter grep kubernetes nginx',
+    shape: `{
+  title?: string
+  source?: string              // where they come from: "checkout-api (Kubernetes, prod)", "/var/log/nginx/error.log"
+  lines: string | Line[]       // a string: the lines as printed (each one's time and level are read from it)
+  highlight?: string[]         // words to mark wherever they appear: an id, a host
+  note?: md
+}
+Line = { time?: string, level?: "debug" | "info" | "warn" | "error" | "fatal", message: string, source?: string }`,
+    example: {
+      title: 'checkout-api, the seconds before the outage',
+      source: 'checkout-api-7f9c6d · Kubernetes, prod',
+      lines: `2026-11-07T14:02:11.204Z INFO  [http] GET /api/cart/ord_9Lk2mQ 200 38ms
+2026-11-07T14:02:11.871Z INFO  [http] POST /api/checkout 201 412ms
+2026-11-07T14:02:12.015Z DEBUG [db] pool: total=20 idle=2 waiting=0
+2026-11-07T14:02:14.330Z WARN  [db] slow query (2,184 ms): SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC
+2026-11-07T14:02:15.002Z DEBUG [db] pool: total=20 idle=0 waiting=7
+2026-11-07T14:02:16.448Z WARN  [db] pool exhausted: 12 requests waiting for a connection to pg-primary
+2026-11-07T14:02:19.517Z ERROR [http] POST /api/checkout 503 5003ms: timeout acquiring a connection from the pool
+    at Pool.acquire (node_modules/pg-pool/index.js:208:19)
+    at async OrderRepo.create (src/orders/repo.ts:41:18)
+    at async checkout (src/routes/checkout.ts:77:21)
+2026-11-07T14:02:19.900Z INFO  [http] GET /api/health 200 3ms
+2026-11-07T14:02:21.233Z ERROR [payments] charge failed for ord_9Lk2mQ: Stripe answered 502 (try 1 of 3)
+2026-11-07T14:02:23.640Z INFO  [payments] charge succeeded for ord_9Lk2mQ on try 2
+2026-11-07T14:02:24.118Z ERROR [http] POST /api/checkout 503 5001ms: timeout acquiring a connection from the pool
+2026-11-07T14:02:24.702Z WARN  [k8s] readiness probe failed: GET /api/ready answered 503
+2026-11-07T14:02:26.015Z FATAL [db] lost connection to pg-primary:5432 (ECONNRESET); exiting so the pod restarts`,
+      highlight: ['pg-primary', 'ord_9Lk2mQ'],
+      note: 'The pool ran dry three seconds before the first 503: the **slow query** on `orders` holds its connections. An index on `orders (customer_id, created_at)` should end it.',
+    },
+  },
+  {
+    id: 'cron',
+    title: 'Cron schedule',
+    group: 'code',
+    use: 'A cron expression explained in words, field by field, with its next runs worked out in its time zone; edit it to try another.',
+    keywords: 'cron crontab expression job recurring hourly daily weekly next runs time zone timer github actions',
+    shape: `{
+  expression: string           // 5 fields (minute hour day month weekday), 6 with seconds first, or @daily, @hourly…
+  tz?: string                  // the zone it runs in (IANA): "Europe/Athens"; the device's own unless set
+  command?: string             // what it runs: shown as the crontab line to copy
+  explain?: { field: string, meaning: md }[]   // your words for each field, in order
+  next?: number                // how many next runs to list (5 unless set)
+  note?: md
+}`,
+    example: {
+      expression: '*/15 8-18 * * 1-5',
+      tz: 'America/Chicago',
+      command: 'node /srv/inventory/sync.js',
+      explain: [
+        { field: '*/15', meaning: 'Every 15 minutes: at :00, :15, :30 and :45.' },
+        { field: '8-18', meaning: 'From the 8 am hour to the 6 pm hour, so the last run is at **18:45**.' },
+        { field: '*', meaning: 'Any day of the month.' },
+        { field: '*', meaning: 'Every month.' },
+        { field: '1-5', meaning: 'Monday to Friday: the warehouse is closed at weekends.' },
+      ],
+      next: 5,
+      note: 'Cron reads these times on the server’s clock, set to **Chicago time**; a hosted scheduler such as GitHub Actions would read them in UTC.',
+    },
+  },
 ];

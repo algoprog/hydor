@@ -1,11 +1,12 @@
 // The answer UIs for science and the sky (the night sky, unit conversion, formulas): their views, by name (shared/answer-ui/science.ts has what each takes).
-import type { ReactNode } from 'react';
-import { ArrowLeftRight, Telescope } from 'lucide-react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
+import { ArrowLeftRight, RotateCcw, Scan, Telescope } from 'lucide-react';
 import { LOCALE } from '../../../i18n/locale';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { arr, Card, Chip, Copy, fmtDate, fmtMinutes, fmtNum, fmtTime, Head, isObj, Md, num, obj, Section, seriesColor, str, textOf, useKept, yes, type AnswerUiView, type Data } from '../kit';
-import { NumBox, useBoxWidth } from './data';
+import { niceTicks } from '../charts';
+import { calcFormula, HoverTip, niceStep, NumBox, parseFormula, SliderRow, useBoxWidth } from './data';
 
 // ---- the night sky ----------------------------------------------------------------------------------------------------
 
@@ -602,8 +603,344 @@ function Formula({ data, done }: { data: Data; done: boolean }) {
   );
 }
 
+// ---- a function graph -------------------------------------------------------------------------------------------------
+
+/**
+ * A formula as people write it, as the parser reads it: "y = 2x(x + 1)" as "2*x*(x+1)", π as pi, x² as x^2. A name
+ * before "(" is a product when it is a value (x, a parameter in `values`, pi, e), else a function's call.
+ */
+function asFormula(src: string, values: Set<string>): string {
+  const rhs = src.includes('=') ? src.slice(src.lastIndexOf('=') + 1) : src;
+  const s = rhs
+    .replace(/π/g, ' pi ')
+    .replace(/[×·]/g, '*')
+    .replace(/÷/g, '/')
+    .replace(/[−–]/g, '-')
+    .replace(/²/g, '^2')
+    .replace(/³/g, '^3')
+    .replace(/√\(/g, 'sqrt(');
+  let out = '';
+  let prev = '';
+  for (const t of s.match(/(\d+\.?\d*|\.\d+)(e[-+]?\d+)?|[A-Za-z_][A-Za-z0-9_]*|\S/gi) ?? []) {
+    const kind = /^[\d.]/.test(t) ? 'num' : /^[A-Za-z_]/.test(t) ? (values.has(t) || /^(pi|e)$/i.test(t) ? 'name' : 'call') : t;
+    // What ends a value: a number, a name, ")", or a call's name with no "(" after it (a name not known: the curve says so).
+    const ends = prev === 'num' || prev === 'name' || prev === ')' || (prev === 'call' && kind !== '(');
+    if (ends && (kind === 'num' || kind === 'name' || kind === 'call' || kind === '(')) out += '* ';
+    out += `${t} `;
+    prev = kind;
+  }
+  return out;
+}
+
+/** A formula as it reads in maths: "a·sin(b·x)", "x²", "√(x)", "π". */
+const prettyFormula = (s: string) =>
+  s
+    .replace(/^\s*(y|f\s*\(\s*x\s*\))\s*=\s*/i, '')
+    .replace(/\*\*/g, '^')
+    .replace(/\s*\*\s*/g, '·')
+    .replace(/\bpi\b/g, 'π')
+    .replace(/\bsqrt\(/g, '√(')
+    .replace(/\^2(?![\d.])/g, '²')
+    .replace(/\^3(?![\d.])/g, '³')
+    .replace(/-/g, '−');
+
+interface GraphFn {
+  text: string;
+  label: string;
+  ex: ReturnType<typeof parseFormula>;
+}
+
+/** The names a parsed formula uses that are neither x, a parameter, nor a constant (pi, e). */
+function unknownNames(ex: unknown, known: Set<string>, out = new Set<string>()): Set<string> {
+  if (!isObj(ex)) return out;
+  if (ex.k === 'v' && typeof ex.name === 'string' && !known.has(ex.name) && !['pi', 'e'].includes(ex.name.toLowerCase())) out.add(ex.name);
+  for (const part of [ex.a, ex.b, ...(Array.isArray(ex.args) ? ex.args : [])]) unknownNames(part, known, out);
+  return out;
+}
+interface GraphParam {
+  id: string;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+}
+
+/** A y range that shows the curves over x0..x1 (a pole's far values left out), at round ends. */
+function fitRange(fns: GraphFn[], env: Record<string, number>, x0: number, x1: number, extra: number[]): [number, number] {
+  const ys = [...extra];
+  const scope: Record<string, number> = { ...env, x: x0 };
+  for (const f of fns)
+    for (let i = 0; i <= 240; i++) {
+      scope.x = x0 + ((x1 - x0) * i) / 240;
+      const y = calcFormula(f.ex, scope);
+      if (y !== null) ys.push(y);
+    }
+  if (!ys.length) return [-10, 10];
+  ys.sort((a, b) => a - b);
+  const pick = (p: number) => ys[Math.min(ys.length - 1, Math.max(0, Math.round((ys.length - 1) * p)))];
+  let lo = ys[0];
+  let hi = ys[ys.length - 1];
+  const a = pick(0.02);
+  const b = pick(0.98);
+  if (b > a) {
+    if (hi - b > 3 * (b - a)) hi = b;
+    if (a - lo > 3 * (b - a)) lo = a;
+  }
+  if (hi - lo < 1e-9) {
+    lo -= Math.max(1, Math.abs(lo) / 2);
+    hi += Math.max(1, Math.abs(hi) / 2);
+  }
+  const pad = (hi - lo) * 0.06;
+  const t = niceTicks(lo - pad, hi + pad, 5);
+  return [t[0], t[t.length - 1]];
+}
+
+function Graph({ data, done }: { data: Data; done: boolean }) {
+  const [ref, width] = useBoxWidth<HTMLDivElement>();
+  const clip = `graph-${useId().replace(/[^\w-]/g, '')}`;
+  const [hover, setHover] = useState<number | null>(null);
+  const [fit, setFit] = useState<[number, number] | null>(null);
+  const [kept, setKept] = useKept<Record<string, number>>('params', {});
+  const params: GraphParam[] = arr(data.params ?? data.parameters ?? data.sliders)
+    .filter(isObj)
+    .map((p) => {
+      const id = str(p.id ?? p.name).trim();
+      const value = num(p.value ?? p.default) ?? 0;
+      const lo = num(p.min);
+      const hi = num(p.max);
+      const span = Math.max(1, Math.abs(value));
+      const min = lo !== null && (hi === null || hi > lo) ? Math.min(lo, value) : value - span;
+      const max = hi !== null && hi > min ? Math.max(hi, value) : value + span;
+      const step = num(p.step);
+      return { id, label: textOf(p, 'label', 'name', 'id') || id, value, min, max, step: step !== null && step > 0 ? step : niceStep(max - min) };
+    })
+    .filter((p) => /^[A-Za-z_]\w*$/.test(p.id) && p.id !== 'x');
+  const listed = arr(data.functions ?? data.fns ?? (data.expr ? [data] : []));
+  const ids = params.map((p) => p.id).join(',');
+  const fns: GraphFn[] = useMemo(
+    () => {
+      const values = new Set(['x', ...ids.split(',').filter(Boolean)]);
+      return listed
+        .map((f) => {
+          const text = (isObj(f) ? str(f.expr ?? f.y ?? f.f ?? f.formula) : str(f)).trim();
+          return { text, label: isObj(f) ? textOf(f, 'label', 'name') : '', ex: text ? parseFormula(asFormula(text, values)) : null };
+        })
+        .filter((f) => f.text);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(listed), ids],
+  );
+  const env: Record<string, number> = {};
+  for (const p of params) env[p.id] = typeof kept[p.id] === 'number' ? Math.min(p.max, Math.max(p.min, kept[p.id])) : p.value;
+  const start: Record<string, number> = Object.fromEntries(params.map((p) => [p.id, p.value]));
+  const xr = arr(data.x).map((v) => num(v));
+  const [x0, x1] = xr[0] !== null && xr[0] !== undefined && xr[1] !== null && xr[1] !== undefined && xr[1] > xr[0] ? [xr[0], xr[1]] : [-10, 10];
+  const yr = arr(data.y).map((v) => num(v));
+  const givenY: [number, number] | null = yr[0] !== null && yr[0] !== undefined && yr[1] !== null && yr[1] !== undefined && yr[1] > yr[0] ? [yr[0], yr[1]] : null;
+  const points = arr(data.points)
+    .filter(isObj)
+    .map((p) => ({ x: num(p.x), y: num(p.y), label: str(p.label ?? p.name) }))
+    .filter((p): p is { x: number; y: number; label: string } => p.x !== null && p.y !== null);
+  const startKey = JSON.stringify([fns.map((f) => f.text), start, x0, x1, points]);
+  // Fitted to the curves as the agent set them, and kept while the sliders move (so the axes stay still), until Fit.
+  const auto = useMemo(() => fitRange(fns, start, x0, x1, points.filter((p) => p.x >= x0 && p.x <= x1).map((p) => p.y)), [startKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [y0, y1] = fit ?? givenY ?? auto;
+  const H = Math.round(Math.max(230, Math.min(380, width * 0.55)));
+  const yTicks = niceTicks(y0, y1, H < 280 ? 4 : 5).filter((t) => t >= y0 - 1e-9 && t <= y1 + 1e-9);
+  const yd = yTicks.length > 1 ? Math.min(6, String(Number((yTicks[1] - yTicks[0]).toPrecision(6))).split('.')[1]?.length ?? 0) : 2;
+  const yText = (t: number) => (Math.max(Math.abs(y0), Math.abs(y1)) >= 100_000 ? fmtNum(t, { notation: 'compact', maximumFractionDigits: 1 }) : fmtNum(t, { maximumFractionDigits: yd }));
+  const axisW = Math.max(24, ...yTicks.map((t) => yText(t).length * 6.4)) + 10;
+  const padT = 8;
+  const xLabel = str(data.x_label);
+  const padB = xLabel ? 36 : 22;
+  const plotW = Math.max(40, width - axisW - 8);
+  const plotH = H - padT - padB;
+  const sx = (x: number) => axisW + ((x - x0) / (x1 - x0)) * plotW;
+  const sy = (y: number) => padT + plotH - ((y - y0) / (y1 - y0 || 1)) * plotH;
+  const xTicks = niceTicks(x0, x1, Math.max(2, Math.floor(plotW / 80))).filter((t) => t >= x0 - 1e-9 && t <= x1 + 1e-9);
+  const xd = xTicks.length > 1 ? Math.min(6, String(Number((xTicks[1] - xTicks[0]).toPrecision(6))).split('.')[1]?.length ?? 0) : 2;
+  const scope: Record<string, number> = { ...env, x: 0 };
+  const f = (fn: GraphFn, x: number) => {
+    scope.x = x;
+    return calcFormula(fn.ex, scope);
+  };
+  /** A curve's path, lifted where it is undefined and across a pole (a jump whose middle is not between its ends). */
+  const trace = (fn: GraphFn) => {
+    const n = Math.max(120, Math.min(900, Math.round(plotW / 1.25)));
+    const span = y1 - y0;
+    const clamp = (y: number) => Math.max(y0 - span * 3, Math.min(y1 + span * 3, y));
+    let d = '';
+    let pen = false;
+    let px = 0;
+    let py = 0;
+    for (let i = 0; i <= n; i++) {
+      const x = x0 + ((x1 - x0) * i) / n;
+      const y = f(fn, x);
+      if (y === null) {
+        pen = false;
+        continue;
+      }
+      if (pen && Math.abs(y - py) > span * 0.5) {
+        const m = f(fn, (x + px) / 2);
+        if (m === null || m < Math.min(y, py) - span * 0.02 || m > Math.max(y, py) + span * 0.02) pen = false;
+      }
+      d += `${pen ? 'L' : 'M'}${sx(x).toFixed(1)},${sy(clamp(y)).toFixed(1)}`;
+      pen = true;
+      px = x;
+      py = y;
+    }
+    return d;
+  };
+  const drawn = width > 0 ? fns.map((fn) => (fn.ex ? trace(fn) : '')) : [];
+  const hx = hover !== null ? x0 + ((hover - axisW) / plotW) * (x1 - x0) : null;
+  const near = hover !== null ? points.find((p) => Math.abs(sx(p.x) - hover) <= 6) : undefined;
+  const readout = (v: number | null) => (v === null ? '—' : fmtNum(v, { maximumSignificantDigits: 4 }));
+  const moved = Object.keys(kept).length > 0;
+  const known = new Set(['x', ...params.map((p) => p.id)]);
+  const unknown = fns.map((fn) => [...unknownNames(fn.ex, known)]);
+  return (
+    <Card>
+      <Head
+        title={data.title}
+        aside={
+          done && (params.length > 0 || fit) ? (
+            <span className="flex items-center gap-1">
+              {params.length > 0 && (
+                <button type="button" onClick={() => setFit(fitRange(fns, env, x0, x1, points.filter((p) => p.x >= x0 && p.x <= x1).map((p) => p.y)))} title={tr('Fit the view to the curves')} aria-label={tr('Fit the view to the curves')} className="grid h-7 w-7 place-items-center rounded-md text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg">
+                  <Scan size={14} />
+                </button>
+              )}
+              {(moved || fit) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setKept({});
+                    setFit(null);
+                  }}
+                  title={tr('Reset')}
+                  aria-label={tr('Reset')}
+                  className="grid h-7 w-7 place-items-center rounded-md text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg"
+                >
+                  <RotateCcw size={14} />
+                </button>
+              )}
+            </span>
+          ) : undefined
+        }
+      />
+      {fns.length > 0 && (
+        <ul className="m-0 mb-2 list-none space-y-0.5 p-0 text-[12.5px]">
+          {fns.map((fn, i) => (
+            <li key={i} className="flex min-w-0 items-center gap-2">
+              <span className="inline-block h-[2px] w-3.5 shrink-0 rounded-full" style={{ background: seriesColor(i) }} />
+              {fn.label && <span className="shrink-0 text-fg-2">{fn.label}</span>}
+              <span className="min-w-0 truncate text-fg-3" title={fn.text}>
+                y = {prettyFormula(fn.text)}
+              </span>
+              {done && !fn.ex && <span className="shrink-0 text-[12px] text-err">{tr('could not be read')}</span>}
+              {done && fn.ex && unknown[i].length > 0 && <span className="shrink-0 text-[12px] text-err">{tr('no value for {0}').replace('{0}', unknown[i].join(', '))}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {str(data.y_label) && <div className="mb-1 text-[11px] text-fg-3">{str(data.y_label)}</div>}
+      <div ref={ref} className="relative">
+        {width > 0 && (
+          <svg width={width} height={H} className="block overflow-visible" role="img" aria-label={fns.map((fn) => fn.label || fn.text).join(', ')}>
+            <defs>
+              <clipPath id={clip}>
+                <rect x={axisW} y={padT} width={plotW} height={plotH} />
+              </clipPath>
+            </defs>
+            {yTicks.map((t, i) => (
+              <g key={i}>
+                <line x1={axisW} x2={axisW + plotW} y1={sy(t)} y2={sy(t)} stroke={Math.abs(t) < 1e-12 ? 'var(--viz-axis)' : 'var(--viz-grid)'} strokeWidth={1} shapeRendering="crispEdges" />
+                <text x={axisW - 6} y={sy(t)} dy="0.35em" textAnchor="end" className="fill-fg-3 text-[11px] tabular-nums">
+                  {yText(t)}
+                </text>
+              </g>
+            ))}
+            {xTicks.map((t, i) => (
+              <g key={i}>
+                <line x1={sx(t)} x2={sx(t)} y1={padT} y2={padT + plotH} stroke={Math.abs(t) < 1e-12 ? 'var(--viz-axis)' : 'var(--viz-grid)'} strokeWidth={1} shapeRendering="crispEdges" />
+                <text x={sx(t)} y={padT + plotH + 15} textAnchor="middle" className="fill-fg-3 text-[11px] tabular-nums">
+                  {fmtNum(t, { maximumFractionDigits: xd })}
+                </text>
+              </g>
+            ))}
+            {(y0 > 0 || y1 < 0) && <line x1={axisW} x2={axisW + plotW} y1={padT + plotH} y2={padT + plotH} stroke="var(--viz-axis)" strokeWidth={1} shapeRendering="crispEdges" />}
+            {(x0 > 0 || x1 < 0) && <line x1={axisW} x2={axisW} y1={padT} y2={padT + plotH} stroke="var(--viz-axis)" strokeWidth={1} shapeRendering="crispEdges" />}
+            <g clipPath={`url(#${clip})`}>
+              {drawn.map((d, i) => (d ? <path key={i} d={d} fill="none" stroke={seriesColor(i)} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" /> : null))}
+              {hx !== null && <line x1={hover!} x2={hover!} y1={padT} y2={padT + plotH} stroke="var(--line-2)" strokeWidth={1} />}
+              {hx !== null &&
+                fns.map((fn, i) => {
+                  const y = fn.ex ? f(fn, hx) : null;
+                  return y !== null && y >= y0 && y <= y1 ? <circle key={i} cx={hover!} cy={sy(y)} r={4} fill={seriesColor(i)} stroke="var(--panel)" strokeWidth={2} /> : null;
+                })}
+            </g>
+            {points.map((p, i) =>
+              p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 ? (
+                <g key={i} className="pointer-events-none">
+                  <circle cx={sx(p.x)} cy={sy(p.y)} r={near === p ? 5 : 4} fill="var(--fg)" stroke="var(--panel)" strokeWidth={2} />
+                  {p.label && points.length <= 16 && (
+                    <text x={sx(p.x) + (sx(p.x) > axisW + plotW - 80 ? -8 : 8)} y={sy(p.y) - 8} textAnchor={sx(p.x) > axisW + plotW - 80 ? 'end' : 'start'} className="fill-fg-2 text-[11px]" style={{ paintOrder: 'stroke', stroke: 'var(--panel)', strokeWidth: 3, strokeLinejoin: 'round' }}>
+                      {p.label}
+                    </text>
+                  )}
+                </g>
+              ) : null,
+            )}
+            {xLabel && (
+              <text x={axisW + plotW / 2} y={H - 4} textAnchor="middle" className="fill-fg-3 text-[11px]">
+                {xLabel}
+              </text>
+            )}
+            <rect
+              x={axisW}
+              y={padT}
+              width={plotW}
+              height={plotH}
+              fill="transparent"
+              onPointerMove={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                setHover(axisW + Math.max(0, Math.min(plotW, e.clientX - r.left)));
+              }}
+              onPointerLeave={() => setHover(null)}
+            />
+          </svg>
+        )}
+        {hx !== null && hover !== null && (
+          <HoverTip
+            x={hover}
+            y={padT}
+            width={width}
+            title={`x = ${fmtNum(hx, { maximumFractionDigits: Math.min(6, xd + 1) })}`}
+            rows={[
+              ...fns.map((fn, i) => ({ color: seriesColor(i), value: readout(fn.ex ? f(fn, hx) : null), name: fn.label || `y${fns.length > 1 ? i + 1 : ''}` })),
+              ...(near ? [{ color: 'var(--fg)', value: `(${fmtNum(near.x)}, ${fmtNum(near.y)})`, name: near.label }] : []),
+            ]}
+          />
+        )}
+      </div>
+      {params.length > 0 && (
+        <div className="mt-4 grid gap-x-6 gap-y-2 @md:grid-cols-2 @2xl:grid-cols-3">
+          {params.map((p) => {
+            const value = env[p.id];
+            const d = Math.min(6, String(Number(p.step.toPrecision(6))).split('.')[1]?.length ?? 0);
+            return <SliderRow key={p.id} label={p.label} value={value} min={p.min} max={p.max} step={p.step} onChange={(n) => done && setKept((k) => ({ ...k, [p.id]: n }))} disabled={!done} text={fmtNum(value, { minimumFractionDigits: d, maximumFractionDigits: d })} />;
+          })}
+        </div>
+      )}
+      {str(data.note) && <Md text={data.note} className="mt-3 text-[13px] text-fg-2" />}
+    </Card>
+  );
+}
+
 export const SCIENCE_UIS: Record<string, AnswerUiView> = {
   sky: Sky,
   'unit-converter': UnitConverter,
   formula: Formula,
+  graph: Graph,
 };

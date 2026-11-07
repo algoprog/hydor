@@ -347,4 +347,340 @@ Node = { name: string, note?: md, icon?: string, children?: Node[] }   // icon: 
       ],
     },
   },
+  {
+    id: 'fill-blanks',
+    title: 'Fill in the blanks',
+    group: 'learn',
+    use: 'A cloze exercise: gaps in a text to type in or fill from a word bank, checked in place, with hints, a score and the answers.',
+    keywords: 'cloze gaps blanks missing words gap fill word bank complete the sentence worksheet grammar',
+    shape: `{
+  title?: string
+  prompt?: md                  // what to do: "Put the verbs in the past simple."
+  text: md                     // the text, each blank written [[answer]], or [[answer|another accepted answer|…]]
+  words?: string[]             // a word bank to tap from (shown in alphabetical order): the answers and a few that do not fit
+  hints?: md[]                 // shown one at a time, when asked for
+}`,
+    example: {
+      title: 'Photosynthesis',
+      prompt: 'Complete the text with words from the list. Three of them are not needed.',
+      text: 'Plants make their own food by **photosynthesis**. Inside the [[chloroplasts|chloroplast]] of their leaf cells, a green pigment called [[chlorophyll]] absorbs light energy. That energy turns [[carbon dioxide|CO2|CO₂]] from the air and [[water|H2O|H₂O]] from the soil into [[glucose]], which the plant burns for energy or stores as starch. [[Oxygen|O2|O₂]] is given off as a by-product, through tiny pores in the leaves called [[stomata|stomates]].',
+      words: ['chlorophyll', 'chloroplasts', 'carbon dioxide', 'water', 'glucose', 'oxygen', 'stomata', 'nitrogen', 'roots', 'protein'],
+      hints: ['The pigment and the part of the cell it sits in both start with *chloro-*, Greek for pale green.', 'The whole reaction: $6\\,\\text{CO}_2 + 6\\,\\text{H}_2\\text{O} \\rightarrow \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\,\\text{O}_2$'],
+    },
+  },
+  {
+    id: 'matching',
+    title: 'Match the pairs',
+    group: 'learn',
+    use: 'Pairs to match (terms and meanings, countries and capitals, words and translations): tap one on each side, check, then see the score and answers.',
+    keywords: 'match matching pairs connect terms meanings countries capitals words translations draw lines',
+    shape: `{
+  title?: string
+  prompt?: md                  // what to do: "Match each word to its meaning."
+  columns?: [string, string]   // headings of the two sides: ["Word", "Meaning"]
+  pairs: { left: md, right: md }[]   // each left with its match: the right side is shown shuffled. 3 to 10
+}`,
+    example: {
+      title: 'Greek roots in English',
+      prompt: 'Match each root to what it means. Each one hides in hundreds of English words.',
+      columns: ['Root', 'Meaning'],
+      pairs: [
+        { left: '**bio-**, as in *antibiotic*', right: 'life' },
+        { left: '**geo-**, as in *geology*', right: 'earth' },
+        { left: '**chrono-**, as in *chronic*', right: 'time' },
+        { left: '**photo-**, as in *photon*', right: 'light' },
+        { left: '**hydro-**, as in *dehydrated*', right: 'water' },
+        { left: '**tele-**, as in *telescope*', right: 'far off' },
+        { left: '**micro-**, as in *microphone*', right: 'small' },
+      ],
+    },
+  },
+  {
+    id: 'ordering',
+    title: 'Put in order',
+    group: 'learn',
+    use: 'Things to put in order (steps, events by date, numbers by size): moved up and down or dragged, checked in place, with the right order to show.',
+    keywords: 'ordering sequence arrange chronological correct order put in order oldest newest smallest largest first last',
+    shape: `{
+  title?: string
+  prompt?: md                  // what to do: "Put these in the order they happened."
+  items: (md | { text: md, note?: md })[]   // in the right order: shown shuffled. 3 to 10. note: shown with the answer (a date, a size)
+  ends?: [string, string]      // what the top and the bottom of the list stand for: ["Earliest", "Latest"]
+}`,
+    example: {
+      title: 'Firsts of the space race',
+      prompt: 'Put these in the order they happened.',
+      ends: ['Earliest', 'Latest'],
+      items: [
+        { text: '**Sputnik 1**, the first artificial satellite, goes into orbit', note: '4 October 1957: its radio beeped for 21 days' },
+        { text: 'The dog **Laika** becomes the first animal to orbit the Earth', note: '3 November 1957, aboard Sputnik 2' },
+        { text: '**Explorer 1**, the first American satellite, is launched', note: '31 January 1958: it found the Van Allen radiation belts' },
+        { text: '**Yuri Gagarin** becomes the first person in space', note: '12 April 1961: one orbit in 108 minutes' },
+        { text: '**Valentina Tereshkova** becomes the first woman in space', note: '16 June 1963: 48 orbits in almost three days' },
+        { text: '**Alexei Leonov** makes the first spacewalk', note: '18 March 1965: 12 minutes outside Voskhod 2' },
+        { text: '**Apollo 11** lands on the Moon', note: '20 July 1969' },
+      ],
+    },
+  },
+  {
+    id: 'conjugation',
+    title: 'Verb conjugation',
+    group: 'learn',
+    use: 'A verb’s forms by tense: a tab for each tense, every person’s form read aloud, and a practice mode that hides the forms until tapped.',
+    keywords: 'conjugation conjugate verb tenses forms present past future person grammar irregular spanish french german',
+    shape: `{
+  verb: string                 // as a dictionary gives it: "tener", "être"
+  translation?: string         // "to have"
+  language?: string            // its language as a code ("es", "fr", "de"): the listen buttons speak it
+  kind?: string                // "irregular", "regular -ar verb"
+  tenses: {
+    name: string               // "Present", "Preterite"
+    forms: { person: string, form: string, irregular?: boolean }[]   // irregular: marked so it stands out
+  }[]
+  notes?: md[]                 // how it is used, stem changes, look-alikes
+}`,
+    example: {
+      verb: 'tener',
+      translation: 'to have',
+      language: 'es',
+      kind: 'irregular',
+      tenses: [
+        {
+          name: 'Present',
+          forms: [
+            { person: 'yo', form: 'tengo', irregular: true },
+            { person: 'tú', form: 'tienes', irregular: true },
+            { person: 'él, ella, usted', form: 'tiene', irregular: true },
+            { person: 'nosotros, nosotras', form: 'tenemos' },
+            { person: 'vosotros, vosotras', form: 'tenéis' },
+            { person: 'ellos, ellas, ustedes', form: 'tienen', irregular: true },
+          ],
+        },
+        {
+          name: 'Preterite',
+          forms: [
+            { person: 'yo', form: 'tuve', irregular: true },
+            { person: 'tú', form: 'tuviste', irregular: true },
+            { person: 'él, ella, usted', form: 'tuvo', irregular: true },
+            { person: 'nosotros, nosotras', form: 'tuvimos', irregular: true },
+            { person: 'vosotros, vosotras', form: 'tuvisteis', irregular: true },
+            { person: 'ellos, ellas, ustedes', form: 'tuvieron', irregular: true },
+          ],
+        },
+        {
+          name: 'Imperfect',
+          forms: [
+            { person: 'yo', form: 'tenía' },
+            { person: 'tú', form: 'tenías' },
+            { person: 'él, ella, usted', form: 'tenía' },
+            { person: 'nosotros, nosotras', form: 'teníamos' },
+            { person: 'vosotros, vosotras', form: 'teníais' },
+            { person: 'ellos, ellas, ustedes', form: 'tenían' },
+          ],
+        },
+        {
+          name: 'Future',
+          forms: [
+            { person: 'yo', form: 'tendré', irregular: true },
+            { person: 'tú', form: 'tendrás', irregular: true },
+            { person: 'él, ella, usted', form: 'tendrá', irregular: true },
+            { person: 'nosotros, nosotras', form: 'tendremos', irregular: true },
+            { person: 'vosotros, vosotras', form: 'tendréis', irregular: true },
+            { person: 'ellos, ellas, ustedes', form: 'tendrán', irregular: true },
+          ],
+        },
+      ],
+      notes: [
+        '**Tener que** + an infinitive means *to have to*: *Tengo que trabajar mañana*, I have to work tomorrow.',
+        'Age, hunger and fear take *tener*, not *ser*: *tengo 30 años* (I’m 30), *tengo hambre* (I’m hungry), *tengo miedo* (I’m afraid).',
+        'In Latin America, **ustedes** stands in for *vosotros*: *ustedes tienen*.',
+      ],
+    },
+  },
+  {
+    id: 'dialogue',
+    title: 'Dialogue',
+    group: 'learn',
+    use: 'A conversation as chat bubbles (a language lesson, a script): listen line by line or all in turn, show the translations, or practise one part.',
+    keywords: 'dialogue conversation role play roleplay chat bubbles lesson listen speak practise interview scene lines',
+    shape: `{
+  title?: string
+  scene?: md                   // where and who: "Anna orders a coffee in Athens."
+  language?: string            // the lines' language as a code ("el", "ja", "es"): the listen buttons speak it
+  speakers?: { name: string, side?: "left" | "right" }[]   // the first on the left and the second on the right, unless told
+  lines: {
+    speaker: string            // a speaker's name
+    text: string               // what they say, in the language
+    phonetic?: string          // how it sounds: a transliteration, romaji, pinyin
+    translation?: string       // in the user's language
+    note?: md                  // grammar or culture, under the line
+  }[]
+}`,
+    example: {
+      title: 'Ordering a coffee in Greek',
+      scene: 'Anna sits down at a *kafeneío* in Plaka, Athens.',
+      language: 'el',
+      speakers: [
+        { name: 'Waiter', side: 'left' },
+        { name: 'Anna', side: 'right' },
+      ],
+      lines: [
+        { speaker: 'Waiter', text: 'Καλημέρα! Τι θα πάρετε;', phonetic: 'Kaliméra! Ti tha párete?', translation: 'Good morning! What will you have?', note: 'Greek writes its question mark as **;**' },
+        { speaker: 'Anna', text: 'Καλημέρα. Έναν φρέντο εσπρέσο, παρακαλώ.', phonetic: 'Kaliméra. Énan frédo espréso, parakaló.', translation: 'Good morning. A freddo espresso, please.' },
+        { speaker: 'Waiter', text: 'Γλυκό, μέτριο ή σκέτο;', phonetic: 'Glikó, métrio i skéto?', translation: 'Sweet, medium or plain?', note: 'Coffee is ordered by its sugar: *σκέτο* none, *μέτριο* a spoonful, *γλυκό* two or more.' },
+        { speaker: 'Anna', text: 'Μέτριο. Και ένα νερό, παρακαλώ.', phonetic: 'Métrio. Ke éna neró, parakaló.', translation: 'Medium. And a water, please.' },
+        { speaker: 'Waiter', text: 'Αμέσως!', phonetic: 'Amésos!', translation: 'Right away!' },
+        { speaker: 'Anna', text: 'Τον λογαριασμό, παρακαλώ.', phonetic: 'Ton logariasmó, parakaló.', translation: 'The bill, please.' },
+        { speaker: 'Waiter', text: 'Τέσσερα πενήντα.', phonetic: 'Téssera penínda.', translation: 'Four fifty.' },
+        { speaker: 'Anna', text: 'Ορίστε. Ευχαριστώ πολύ!', phonetic: 'Oríste. Efcharistó polí!', translation: 'Here you are. Thank you very much!', note: '*Ορίστε* is *here you are* when you hand something over, and *pardon?* when you did not hear.' },
+      ],
+    },
+  },
+  {
+    id: 'rubric',
+    title: 'Grading rubric',
+    group: 'learn',
+    use: 'A grading rubric, criteria by levels: the levels given are marked, the weighted score worked out, and the user can pick levels to grade work too.',
+    keywords: 'rubric grading marking scheme criteria levels points grade essay assignment teacher self-assessment descriptors',
+    shape: `{
+  title?: string
+  criteria: {
+    name: string
+    weight?: number            // its points are multiplied by it (1 unless told)
+    levels: { label: string, points: number, description: md }[]   // the same labels in each row, best first or worst first
+    selected?: number          // the level given, by its index from 0 (left out: not graded yet)
+    comment?: md               // why that level
+  }[]
+  grades?: { min: number, label: string }[]   // a grade by the share of the points, in percent: { min: 90, label: "A" }
+}`,
+    example: {
+      title: 'Persuasive essay: “Should school start later?”',
+      criteria: [
+        {
+          name: 'Thesis and argument',
+          weight: 2,
+          levels: [
+            { label: 'Excellent', points: 4, description: 'A clear, arguable thesis that every paragraph moves forward; objections raised and answered.' },
+            { label: 'Good', points: 3, description: 'A clear thesis that most paragraphs support; an objection is mentioned.' },
+            { label: 'Developing', points: 2, description: 'The thesis is vague or only stated at the end; the argument drifts.' },
+            { label: 'Beginning', points: 1, description: 'No clear position: ideas are listed rather than argued.' },
+          ],
+          selected: 1,
+          comment: 'A strong thesis on later start times; the objection about bus timetables is raised but never answered.',
+        },
+        {
+          name: 'Evidence',
+          weight: 2,
+          levels: [
+            { label: 'Excellent', points: 4, description: 'Specific evidence from credible sources, cited and explained.' },
+            { label: 'Good', points: 3, description: 'Relevant evidence, mostly cited; some of it left unexplained.' },
+            { label: 'Developing', points: 2, description: 'Little evidence, or general claims without sources.' },
+            { label: 'Beginning', points: 1, description: 'Opinion only.' },
+          ],
+          selected: 0,
+          comment: 'The sleep guidance from paediatricians and the Seattle start-time study are used well and explained.',
+        },
+        {
+          name: 'Organisation',
+          levels: [
+            { label: 'Excellent', points: 4, description: 'A logical order, clear topic sentences and transitions; the conclusion goes beyond a summary.' },
+            { label: 'Good', points: 3, description: 'A logical order with topic sentences; some abrupt transitions.' },
+            { label: 'Developing', points: 2, description: 'Some order, but paragraphs mix ideas.' },
+            { label: 'Beginning', points: 1, description: 'No clear structure.' },
+          ],
+          selected: 1,
+          comment: 'Paragraphs 3 and 4 would read better swapped: costs before benefits.',
+        },
+        {
+          name: 'Style and voice',
+          levels: [
+            { label: 'Excellent', points: 4, description: 'Confident, varied sentences and precise words, suited to the reader.' },
+            { label: 'Good', points: 3, description: 'Clear and readable, with some repetition.' },
+            { label: 'Developing', points: 2, description: 'Wordy or flat in places, with informal slips.' },
+            { label: 'Beginning', points: 1, description: 'Hard to follow.' },
+          ],
+          selected: 1,
+        },
+        {
+          name: 'Grammar and spelling',
+          levels: [
+            { label: 'Excellent', points: 4, description: 'Almost no errors.' },
+            { label: 'Good', points: 3, description: 'A few errors that do not get in the way.' },
+            { label: 'Developing', points: 2, description: 'Frequent errors that slow the reader down.' },
+            { label: 'Beginning', points: 1, description: 'Errors make it hard to read.' },
+          ],
+          selected: 0,
+        },
+      ],
+      grades: [
+        { min: 90, label: 'A' },
+        { min: 80, label: 'B' },
+        { min: 70, label: 'C' },
+        { min: 60, label: 'D' },
+        { min: 0, label: 'F' },
+      ],
+    },
+  },
+  {
+    id: 'chess',
+    title: 'Chess board',
+    group: 'learn',
+    use: 'Chess positions on a board, from FEN: step through the moves with their comments, arrows and marked squares, flip the board, or guess each move.',
+    keywords: 'chess board position fen moves game opening puzzle analysis annotated pgn tactics checkmate',
+    shape: `{
+  title?: string
+  event?: string               // where and when: "Paris, 1858"
+  white?: string               // the players' names
+  black?: string
+  orientation?: "white" | "black"   // the side at the bottom (white unless told)
+  positions: {
+    fen: string                // the position, in FEN
+    move?: string              // the move that led to it, as written: "Nf3", "13. Rxd7!", "16...Nxb8"
+    comment?: md
+    arrows?: { from: string, to: string, color?: "green" | "red" | "blue" | "yellow" }[]   // squares like "e2"
+    highlight?: string[]       // squares to mark ("d7"); left out, the squares the move changed are marked
+  }[]
+}`,
+    example: {
+      title: 'The Opera Game: Morphy’s finish',
+      event: 'Paris, 1858, in a box at the opera',
+      white: 'Paul Morphy',
+      black: 'Duke Karl and Count Isouard',
+      positions: [
+        {
+          fen: '3rkb1r/p2nqppp/5n2/1B2p1B1/4P3/1Q6/PPP2PPP/2KR3R w k - 3 13',
+          move: '12...Rd8',
+          comment: 'Morphy is a knight down for two pawns, but every piece of his is in play, while Black’s king is stuck in the middle and the knight on d7 is pinned.',
+          arrows: [
+            { from: 'b5', to: 'e8', color: 'red' },
+            { from: 'd1', to: 'd7', color: 'green' },
+          ],
+        },
+        { fen: '3rkb1r/p2Rqppp/5n2/1B2p1B1/4P3/1Q6/PPP2PPP/2K4R b k - 0 13', move: '13. Rxd7!', comment: 'A whole rook for a knight, to tear the defence open.' },
+        { fen: '4kb1r/p2rqppp/5n2/1B2p1B1/4P3/1Q6/PPP2PPP/2K4R w k - 0 14', move: '13...Rxd7' },
+        {
+          fen: '4kb1r/p2rqppp/5n2/1B2p1B1/4P3/1Q6/PPP2PPP/2KR4 b k - 1 14',
+          move: '14. Rd1',
+          comment: 'The other rook takes over the d-file, and the rook on d7 is pinned all over again.',
+          arrows: [{ from: 'd1', to: 'd7', color: 'green' }],
+        },
+        { fen: '4kb1r/p2r1ppp/4qn2/1B2p1B1/4P3/1Q6/PPP2PPP/2KR4 w k - 2 15', move: '14...Qe6', comment: 'Black unpins and offers to trade queens.', arrows: [{ from: 'e6', to: 'b3', color: 'yellow' }] },
+        { fen: '4kb1r/p2B1ppp/4qn2/4p1B1/4P3/1Q6/PPP2PPP/2KR4 b k - 0 15', move: '15. Bxd7+' },
+        { fen: '4kb1r/p2n1ppp/4q3/4p1B1/4P3/1Q6/PPP2PPP/2KR4 w k - 0 16', move: '15...Nxd7', comment: 'The knight takes back, and leaves f6: the bishop on g5 now sees all the way to d8.' },
+        {
+          fen: '1Q2kb1r/p2n1ppp/4q3/4p1B1/4P3/8/PPP2PPP/2KR4 b k - 1 16',
+          move: '16. Qb8+!!',
+          comment: 'The queen is given away to drag the knight off d7.',
+          arrows: [{ from: 'b8', to: 'e8', color: 'red' }],
+        },
+        { fen: '1n2kb1r/p4ppp/4q3/4p1B1/4P3/8/PPP2PPP/2KR4 w k - 0 17', move: '16...Nxb8' },
+        {
+          fen: '1n1Rkb1r/p4ppp/4q3/4p1B1/4P3/8/PPP2PPP/2K5 b k - 1 17',
+          move: '17. Rd8#',
+          comment: 'Mate, with the last two pieces: the rook gives check and the bishop guards it.',
+          arrows: [{ from: 'g5', to: 'd8', color: 'green' }],
+        },
+      ],
+    },
+  },
 ];

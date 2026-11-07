@@ -105,6 +105,44 @@ const ASKS: [string, string, 1 | 3][] = [
   ['countdown to new year', 'countdown', 1],
   ['benchmark results of models on metrics', 'results', 3],
   ['email draft to send', 'email', 1],
+  ['troubleshoot why my router will not connect', 'decision-tree', 3],
+  ['spin a wheel to pick a restaurant at random', 'picker', 1],
+  ['venn diagram of overlapping skills', 'venn', 1],
+  ['weekly class timetable', 'week', 3],
+  ['gantt chart of the project schedule', 'gantt', 1],
+  ['pomodoro and tea timers', 'timers', 3],
+  ['track my parcel delivery', 'tracking', 3],
+  ['next train departures from the station', 'departures', 3],
+  ['elevation profile of the hike', 'elevation', 1],
+  ['apartments for rent', 'listings', 3],
+  ['job openings for a data scientist', 'jobs', 3],
+  ['invoice for my client', 'invoice', 1],
+  ['code review findings by severity', 'issues', 3],
+  ['action items from the meeting', 'action-items', 3],
+  ['qr code for the wifi network', 'qr', 1],
+  ['histogram of exam scores', 'distribution', 3],
+  ['waterfall chart of profit changes', 'waterfall', 1],
+  ['treemap of disk usage', 'treemap', 1],
+  ['calendar heatmap of my runs this year', 'activity', 3],
+  ['city populations on a map', 'map-values', 3],
+  ['my investment portfolio', 'portfolio', 1],
+  ['plot the function sin x', 'graph', 3],
+  ['fill in the blanks exercise', 'fill-blanks', 1],
+  ['match the pairs', 'matching', 3],
+  ['put the events in order', 'ordering', 3],
+  ['conjugate the verb', 'conjugation', 1],
+  ['dialogue to practise ordering coffee in Spanish', 'dialogue', 3],
+  ['grading rubric for an essay', 'rubric', 1],
+  ['chess opening position', 'chess', 1],
+  ['cite this paper in APA', 'citation', 3],
+  ['label the parts of a bike in a picture', 'annotated-image', 3],
+  ['before and after photos', 'before-after', 1],
+  ['guitar chords for the song', 'chords', 1],
+  ['font pairing for my website', 'fonts', 1],
+  ['contact details of the plumber', 'contact', 3],
+  ['knockout tournament bracket', 'bracket', 1],
+  ['server error logs', 'logs', 3],
+  ['what does this cron expression mean', 'cron', 1],
 ];
 
 test('find_ui by words: the UI a few words ask for comes first', async () => {
@@ -187,10 +225,33 @@ test('the tool: the UIs that fit with their data and an example, by name too, an
   assert.ok(!describeUi(ANSWER_UIS[0], false).includes('Example:'));
 });
 
+test('several parts of one answer: the UIs that fit each, each described once, an example for each part’s best', async () => {
+  const tool = findUiTool();
+  const r = await tool.run({ queries: ['day by day trip plan', 'weather forecast for the week', 'packing checklist', 'weather forecast for the week'] }, ctx);
+  const text = typeof r === 'string' ? r : r.text;
+  assert.match(text, /^The answer UIs for each part of your answer/);
+  assert.match(text, /- “day by day trip plan”: [a-z-]+/);
+  assert.match(text, /- “packing checklist”: [a-z-]+/);
+  assert.equal((text.match(/- “weather forecast for the week”/g) ?? []).length, 1, 'a part asked twice is looked for once');
+  assert.match(text, /## weather: /);
+  assert.match(text, /```ui weather\n\{/, 'the best for a part comes with an example');
+  const ids = [...text.matchAll(/^## ([a-z-]+):/gm)].map((m) => m[1]);
+  assert.equal(new Set(ids).size, ids.length, 'each UI described once');
+  assert.ok(ids.length <= 12, 'at most twelve');
+  assert.ok((text.match(/^Example:$/gm) ?? []).length <= 3, 'examples only for each part’s best');
+  assert.match(text, /several blocks/, 'and says an answer may hold several');
+  assert.match(text, /every answer in the conversation/, 'in any turn');
+  const one = await tool.run({ queries: ['weather forecast'] }, ctx);
+  assert.match(typeof one === 'string' ? one : one.text, /^The answer UIs for each part/, 'one part given as queries');
+});
+
 test('every agent hears of answer UIs when it starts', () => {
   assert.match(FORMATTING, /find_ui/);
   assert.match(FORMATTING, /```ui <name>/);
   assert.match(FORMATTING, /stay text/, 'and when not to use one');
+  assert.match(FORMATTING, /one answer may hold several/, 'and that an answer may hold several');
+  assert.match(FORMATTING, /every answer you give, the first and every later one/, 'in every turn of the conversation, not only the first');
+  assert.match(findUiTool().description, /any turn of the conversation/);
 });
 
 let failed = 0;

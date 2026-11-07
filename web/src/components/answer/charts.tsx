@@ -4,23 +4,32 @@
 // grids, a legend for two series or more, and a tooltip on hover where the value leads and the name follows (a crosshair
 // that snaps to the nearest x on lines, the band under the pointer on bars, the nearest point on a scatter). Text never
 // takes a series' colour: a swatch beside it does. One value axis only.
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { tr } from '../../i18n/runtime';
 import { cx } from '../ui';
 import { compact, fmtNum, seriesColor, str } from './kit';
 
-/** An element's width, again whenever it changes (a chart, a chart-like layout). */
+/**
+ * An element's width, again whenever it changes (a chart, a chart-like layout). The element may come later than the
+ * first draw, or be another one later (a chart drawn once its data streams in): after each draw, a new element is
+ * measured and watched in place of the one before.
+ */
 export function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
   const ref = useRef<T>(null);
   const [w, setW] = useState(0);
+  const watched = useRef<{ el: T | null; ro: ResizeObserver | null }>({ el: null, ro: null });
   useLayoutEffect(() => {
     const el = ref.current;
+    if (el === watched.current.el) return;
+    watched.current.ro?.disconnect();
+    watched.current = { el, ro: null };
     if (!el) return;
     setW(el.clientWidth);
     const ro = new ResizeObserver(() => setW(el.clientWidth));
     ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    watched.current.ro = ro;
+  });
+  useEffect(() => () => watched.current.ro?.disconnect(), []);
   return [ref, w];
 }
 

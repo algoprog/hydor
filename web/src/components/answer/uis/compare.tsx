@@ -1,10 +1,11 @@
 // The answer UIs that compare options and help decide: their views, by name (shared/answer-ui/compare.ts has what each takes).
-import { Fragment, useState } from 'react';
-import { Check, CheckCircle2, MessageSquarePlus, Minus, RotateCcw, ThumbsDown, ThumbsUp, Trophy, X } from 'lucide-react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import { Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, CircleX, Coins, Dices, Flag, Info, MessageSquarePlus, Minus, RotateCcw, RotateCw, Shuffle, ThumbsDown, ThumbsUp, TriangleAlert, Trophy, X } from 'lucide-react';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { useWidth } from '../charts';
-import { arr, Btn, Card, Chip, fmtNum, Head, isObj, LinkOut, Md, Meter, num, Pic, Ring, Section, Seg, seriesColor, Stars, str, textOf, TONE, TONE_FILL, useAsk, useKept, withUnit, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Btn, Card, Chip, fmtNum, Head, isObj, LinkOut, Md, Meter, num, Pic, Ring, Section, Seg, seriesColor, Stars, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, withUnit, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
 
 /** A colour mixed into the panel's (or another): a tinted background or border that reads in both themes. */
 const mix = (color: string, pct: number, base = 'var(--panel)') => `color-mix(in srgb, ${color} ${pct}%, ${base})`;
@@ -897,6 +898,898 @@ function Swot({ data }: { data: Data }) {
   );
 }
 
+// ---- a decision tree -----------------------------------------------------------------------------------------------------
+
+interface DtOption {
+  label: string;
+  next: string;
+}
+interface DtNode {
+  id: string;
+  question: string;
+  note: string;
+  options: DtOption[];
+  result: string;
+  tone: Tone;
+  image: string;
+  links: { label: string; url: string }[];
+}
+
+/** Markdown as plain words, for the message box: no stars, backticks or link addresses. */
+const plainMd = (s: string) =>
+  s
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/\*\*|__|`/g, '')
+    .replace(/(^|[\s(])[*_]([^*_\n]+)[*_](?=[\s).,;:!?]|$)/g, '$1$2')
+    .replace(/\s*\n+\s*/g, ' ')
+    .trim();
+
+/** The nodes, read leniently: an answer that ends in a result of its own (no `next`) becomes an end node of its own. */
+function dtNodes(v: unknown): DtNode[] {
+  const out: DtNode[] = [];
+  arr(v)
+    .filter(isObj)
+    .forEach((n, i) => {
+      const id = str(n.id).trim() || `#${i}`;
+      const extra: DtNode[] = [];
+      const options = arr(n.options ?? n.answers ?? n.choices)
+        .map((o, k) => {
+          if (!isObj(o)) return { label: str(o), next: '' };
+          const label = textOf(o, 'label', 'text', 'answer', 'name');
+          const next = str(o.next ?? o.to ?? o.goto).trim();
+          if (!next && str(o.result)) {
+            extra.push({ id: `${id}>${k}`, question: '', note: '', options: [], result: str(o.result), tone: toneOf(o.tone), image: '', links: [] });
+            return { label, next: `${id}>${k}` };
+          }
+          return { label, next };
+        })
+        .filter((o) => o.label);
+      out.push({
+        id,
+        question: str(n.question ?? n.ask),
+        note: str(n.note ?? n.hint),
+        options,
+        result: str(n.result ?? n.outcome),
+        tone: toneOf(n.tone),
+        image: str(n.image),
+        links: arr(n.links)
+          .map((l) => (isObj(l) ? { label: textOf(l, 'label', 'title', 'name'), url: str(l.url ?? l.href) } : { label: '', url: str(l) }))
+          .filter((l) => /^https?:\/\//i.test(l.url)),
+      });
+      out.push(...extra);
+    });
+  return out;
+}
+
+const END_ICON: Record<Tone, LucideIcon> = { good: CircleCheck, warn: TriangleAlert, bad: CircleX, info: Info, accent: Flag, neutral: Flag };
+const TONE_TEXT: Record<Tone, string> = { good: 'text-ok', warn: 'text-warn', bad: 'text-err', info: 'text-info', accent: 'text-accent', neutral: 'text-fg-3' };
+
+function DecisionTree({ data, done }: { data: Data; done: boolean }) {
+  const nodes = dtNodes(data.nodes ?? data.steps);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const first = byId.get(str(data.start).trim()) ?? nodes[0];
+  const [picks, setPicks] = useKept<number[]>('path', []);
+  const ask = useAsk();
+  // The path so far: the answers kept, followed from the first node for as long as they lead somewhere.
+  const trail: { node: DtNode; pick: number }[] = [];
+  let cur = first;
+  for (const p of done && Array.isArray(picks) ? picks : []) {
+    const next = cur && typeof p === 'number' ? byId.get(cur.options[p]?.next ?? '') : undefined;
+    if (!cur || !next || trail.length >= 80) break;
+    trail.push({ node: cur, pick: p });
+    cur = next;
+  }
+  const title = str(data.title);
+  if (!cur) return <Card>{title ? <Head title={title} className="mb-0" /> : null}</Card>;
+  const end = !cur.options.length;
+  const go = (path: number[]) => done && setPicks(path);
+  const taken = trail.map((t) => t.pick);
+  const send = () =>
+    ask(
+      [
+        title,
+        ...trail.map((t) => `- ${plainMd(t.node.question) || '…'} → ${t.node.options[t.pick].label}`),
+        cur.result ? `${tr('Result:')} ${plainMd(cur.result)}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    );
+  const Icon = END_ICON[cur.tone];
+  const backAndOver = trail.length > 0 && (
+    <div className="flex flex-wrap items-center gap-2">
+      <Btn icon={<ChevronLeft size={14} />} onClick={() => go(taken.slice(0, -1))}>
+        {tr('Back')}
+      </Btn>
+      <Btn icon={<RotateCcw size={13} />} onClick={() => go([])}>
+        {tr('Start over')}
+      </Btn>
+    </div>
+  );
+  return (
+    <Card>
+      <Head title={title} />
+      {trail.length > 0 && (
+        <ol className="m-0 mb-3 flex list-none flex-wrap items-center gap-x-1 gap-y-1.5 p-0 text-[12.5px]" aria-label={tr('Your answers')}>
+          {trail.map((t, i) => (
+            <li key={i} className="flex min-w-0 items-center gap-1">
+              {i > 0 && <ChevronRight size={12} className="shrink-0 text-fg-3" aria-hidden />}
+              <button
+                type="button"
+                onClick={() => go(taken.slice(0, i))}
+                title={`${tr('Change this answer')}: ${plainMd(t.node.question)}`}
+                className="max-w-[240px] truncate rounded-full bg-bg-2 px-2.5 py-0.5 font-medium text-fg-2 transition-colors hover:bg-bg-3 hover:text-fg"
+              >
+                {t.node.options[t.pick].label}
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+      {!end && (
+        <div className="rounded-xl bg-bg-1 p-4">
+          <div className="mb-1 text-[11.5px] font-semibold tracking-wide text-fg-3 uppercase">{tr('Question {0}').replace('{0}', String(trail.length + 1))}</div>
+          {cur.question && <Md text={cur.question} className="text-[15px] leading-snug font-medium text-fg" />}
+          {cur.note && <Md text={cur.note} className="mt-1 text-[13px] text-fg-3" />}
+          {cur.image && <Pic src={cur.image} alt={plainMd(cur.question)} className="mt-3 aspect-[16/9] max-h-64 w-full rounded-lg" />}
+          <div className="mt-3 grid gap-2">
+            {cur.options.map((o, k) => {
+              const leads = byId.has(o.next);
+              const off = done && !leads;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  disabled={!done || !leads}
+                  onClick={() => go([...taken, k])}
+                  title={off ? tr('This answer leads nowhere') : undefined}
+                  className={cx(
+                    'group/o flex w-full items-center gap-3 rounded-xl border border-line bg-panel px-3.5 py-2.5 text-left text-[14px] font-medium text-fg transition-colors',
+                    done && leads ? 'hover:border-accent/50 hover:bg-accent-soft' : 'cursor-default',
+                    off && 'opacity-55',
+                  )}
+                >
+                  <span className="min-w-0 flex-1">
+                    <Md text={o.label} inline />
+                  </span>
+                  <ChevronRight size={16} className={cx('shrink-0 text-fg-3 transition-transform', done && leads && 'group-hover/o:translate-x-0.5 group-hover/o:text-accent')} aria-hidden />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {end && (
+        <div className="rounded-xl border p-4" style={{ background: mix(TONE_FILL[cur.tone], 8), borderColor: mix(TONE_FILL[cur.tone], 30) }}>
+          <div className="flex items-start gap-3">
+            <Icon size={20} className={cx('mt-0.5 shrink-0', TONE_TEXT[cur.tone])} />
+            <div className="min-w-0 flex-1">
+              {cur.result ? <Md text={cur.result} className="text-[14.5px] text-fg" /> : <p className="aui-p text-[14px] text-fg-2">{tr('That is the end of this path.')}</p>}
+              {cur.links.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
+                  {cur.links.map((l, i) => (
+                    <LinkOut key={i} url={l.url}>
+                      {l.label || undefined}
+                    </LinkOut>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          {cur.image && <Pic src={cur.image} alt="" className="mt-3 aspect-[16/9] max-h-64 w-full rounded-lg" />}
+        </div>
+      )}
+      {done && (trail.length > 0 || end) && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          {backAndOver || <span />}
+          {end && trail.length > 0 && (
+            <Btn primary icon={<MessageSquarePlus size={14} />} onClick={send}>
+              {tr('Send my answers')}
+            </Btn>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ---- a random picker ------------------------------------------------------------------------------------------------------
+
+interface PickOption {
+  label: string;
+  weight: number;
+  note: string;
+}
+
+/** A random number from 0 up to 1, from the browser's strong source when it has one. */
+function rand(): number {
+  try {
+    const a = new Uint32Array(1);
+    crypto.getRandomValues(a);
+    return a[0] / 4294967296;
+  } catch {
+    return Math.random();
+  }
+}
+
+/** An index picked at random, each as likely as its weight (all alike when none has any). */
+function pickIndex(weights: number[]): number {
+  const total = weights.reduce((m, w) => m + w, 0);
+  if (!(total > 0)) return Math.floor(rand() * weights.length);
+  let x = rand() * total;
+  let last = 0;
+  for (let i = 0; i < weights.length; i++) {
+    if (weights[i] <= 0) continue;
+    last = i;
+    x -= weights[i];
+    if (x < 0) return i;
+  }
+  return last;
+}
+
+/** The user asked their system for less motion: a spin or a roll lands at once. */
+const calm = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+/** Timers that stop with the view: `later` once, `every` again and again; `stop` clears them all. */
+function useTimers() {
+  const ids = useRef<number[]>([]);
+  useEffect(() => () => ids.current.forEach((t) => (clearTimeout(t), clearInterval(t))), []);
+  return useMemo(
+    () => ({
+      later: (fn: () => void, ms: number) => void ids.current.push(window.setTimeout(fn, ms)),
+      every: (fn: () => void, ms: number) => void ids.current.push(window.setInterval(fn, ms)),
+      stop: () => {
+        ids.current.forEach((t) => (clearTimeout(t), clearInterval(t)));
+        ids.current = [];
+      },
+    }),
+    [],
+  );
+}
+
+/** A wheel slice's colour: the palette's hues in order, softened past eight so no two neighbours match. */
+const sliceColor = (i: number) => (i < 8 ? seriesColor(i) : mix(seriesColor(i % 8), i < 16 ? 55 : 30));
+const SPIN_MS = 4200;
+
+/** The words that go with a pick in the message box: the UI's title first, when it has one. */
+const withTitle = (title: string, text: string) => (title ? `${title}\n${text}` : text);
+
+function Wheel({ options, done, title }: { options: PickOption[]; done: boolean; title: string }) {
+  const [ref, width] = useWidth<HTMLDivElement>();
+  const [last, setLast] = useKept<{ at: number; turn: number } | null>('wheel', null);
+  const [spinning, setSpinning] = useState(false);
+  const timers = useTimers();
+  const ask = useAsk();
+  // Slices: the options that can come up (all of them when none has a weight above zero), sized by their weight.
+  const some = options.some((o) => o.weight > 0);
+  const live = options.map((o, i) => ({ ...o, i, weight: some ? o.weight : 1 })).filter((o) => o.weight > 0);
+  const total = live.reduce((m, o) => m + o.weight, 0);
+  let a = 0;
+  const slices = live.map((o) => {
+    const a0 = a;
+    a += (o.weight / (total || 1)) * 360;
+    return { ...o, a0, a1: a };
+  });
+  const weighted = new Set(live.map((o) => o.weight)).size > 1;
+  const at = last && typeof last.at === 'number' && last.at >= 0 && last.at < options.length ? last.at : null;
+  const turn = last && Number.isFinite(last.turn) ? last.turn : 0;
+  const shown = !spinning && at !== null ? options[at] : null;
+  const D = Math.max(180, Math.min(300, width >= 576 ? 280 : width));
+  const c = D / 2;
+  const R = c - 4;
+  const hub = 15;
+  const pt = (deg: number, rr: number) => {
+    const t = ((deg - 90) * Math.PI) / 180;
+    return `${(c + rr * Math.cos(t)).toFixed(2)},${(c + rr * Math.sin(t)).toFixed(2)}`;
+  };
+  const slicePath = (a0: number, a1: number) => (a1 - a0 >= 359.99 ? `M${c - R},${c}a${R},${R} 0 1 0 ${2 * R},0a${R},${R} 0 1 0 ${-2 * R},0Z` : `M${c},${c}L${pt(a0, R)}A${R},${R} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${pt(a1, R)}Z`);
+  const spin = () => {
+    if (!done || spinning || !slices.length) return;
+    const s = slices[pickIndex(slices.map((x) => x.weight))];
+    // Where in the slice the pointer stops: anywhere but its very edges.
+    const theta = s.a0 + (s.a1 - s.a0) * (0.12 + 0.76 * rand());
+    const quick = calm();
+    const delta = (((360 - theta - (turn % 360)) % 360) + 360) % 360;
+    setSpinning(true);
+    setLast({ at: s.i, turn: turn + (quick ? 0 : 360 * 5) + delta });
+    timers.later(() => setSpinning(false), quick ? 350 : SPIN_MS + 80);
+  };
+  const maxChars = Math.max(4, Math.floor((R - hub - 20) / 6.6));
+  return (
+    <div ref={ref} className="flex flex-col items-center gap-5 @xl:flex-row @xl:items-start">
+      {width > 0 && slices.length > 0 && (
+        <div className="relative shrink-0 [--slice:26%] dark:[--slice:40%]" style={{ width: D, height: D + 6 }}>
+          <div className="absolute top-[6px] left-0" style={{ width: D, height: D, transform: `rotate(${turn}deg)`, transition: `transform ${calm() ? 300 : SPIN_MS}ms cubic-bezier(0.15, 0.75, 0.12, 1)` }}>
+            <svg width={D} height={D} className="block" role="img" aria-label={slices.map((s) => s.label).join(', ')}>
+              {slices.map((s) => {
+                const on = shown && s.i === at;
+                const mid = (s.a0 + s.a1) / 2;
+                // Its name reads from the rim inwards, as far in as the slice is still wide enough for a line of text.
+                const inner = Math.max(hub + 8, 14 / Math.max(0.001, ((s.a1 - s.a0) * Math.PI) / 180));
+                const chars = Math.min(maxChars, Math.floor((R - 12 - inner) / 6.6));
+                const label = s.label.length > chars ? `${s.label.slice(0, Math.max(1, chars - 1))}…` : s.label;
+                return (
+                  <g key={s.i}>
+                    <path d={slicePath(s.a0, s.a1)} style={{ fill: on ? mix(sliceColor(s.i), 62) : `color-mix(in srgb, ${sliceColor(s.i)} var(--slice), var(--panel))` }} stroke="var(--panel)" strokeWidth={2} strokeLinejoin="round" />
+                    {chars >= 3 && (
+                      <text x={c + R - 12} y={c} dy="0.35em" textAnchor="end" transform={`rotate(${mid - 90} ${c} ${c})`} className={cx('pointer-events-none fill-fg text-[12px]', on && 'font-semibold')}>
+                        {label}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+              <circle cx={c} cy={c} r={R} fill="none" stroke="var(--line-2)" strokeWidth={1} />
+            </svg>
+          </div>
+          <svg width={D} height={D + 6} className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
+            <circle cx={c} cy={c + 6} r={hub} fill="var(--panel)" stroke="var(--line-2)" strokeWidth={1.5} />
+            <path d={`M${c - 10},0H${c + 10}L${c},20Z`} fill="var(--fg)" stroke="var(--panel)" strokeWidth={2} strokeLinejoin="round" />
+          </svg>
+        </div>
+      )}
+      <div className="w-full min-w-0 flex-1">
+        {shown ? (
+          <div className="rounded-xl bg-accent-soft px-4 py-3">
+            <div className="text-[11.5px] font-semibold tracking-wide text-accent uppercase">{tr('The wheel picked')}</div>
+            <div className="mt-0.5 text-[20px] leading-tight font-semibold text-fg">{shown.label}</div>
+            {shown.note && <Md text={shown.note} className="mt-1 text-[13px] text-fg-2" />}
+          </div>
+        ) : (
+          spinning && <div className="rounded-xl bg-bg-1 px-4 py-3 text-[14px] font-medium text-fg-3">{tr('Spinning…')}</div>
+        )}
+        {done && slices.length > 0 && (
+          <div className={cx('flex flex-wrap items-center gap-2', (shown || spinning) && 'mt-3')}>
+            <Btn primary={!shown} icon={<RotateCw size={13} />} onClick={spin} disabled={spinning}>
+              {at === null ? tr('Spin') : tr('Spin again')}
+            </Btn>
+            {shown && (
+              <Btn primary icon={<MessageSquarePlus size={14} />} onClick={() => ask(withTitle(title, tr('The wheel picked: {0}').replace('{0}', shown.label)))}>
+                {tr('Send it')}
+              </Btn>
+            )}
+          </div>
+        )}
+        {options.length > 0 && (
+          <ul className={cx('m-0 list-none space-y-0.5 p-0', (done || shown || spinning) && 'mt-3')}>
+            {options.map((o, i) => {
+              const s = slices.find((x) => x.i === i);
+              return (
+                <li key={i} className={cx('flex items-start gap-2.5 rounded-lg px-2 py-1 text-[13px]', shown && i === at && 'bg-bg-2')}>
+                  <span className="mt-[5px] h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: s ? mix(sliceColor(i), 62) : 'var(--bg-3)' }} />
+                  <span className="min-w-0 flex-1">
+                    <span className={cx('font-medium', s ? 'text-fg' : 'text-fg-3 line-through')}>{o.label}</span>
+                    {o.note && <Md text={o.note} inline className="block text-[12px] text-fg-3" />}
+                  </span>
+                  {weighted && s && <span className="shrink-0 text-[12px] text-fg-3 tabular-nums">{fmtNum((s.weight / total) * 100, { maximumFractionDigits: 0 })}%</span>}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Where a six-sided die's pips sit, from its top left (0 to 1 across and down). */
+const PIPS: Record<number, [number, number][]> = {
+  1: [[0.5, 0.5]],
+  2: [[0.28, 0.28], [0.72, 0.72]],
+  3: [[0.27, 0.27], [0.5, 0.5], [0.73, 0.73]],
+  4: [[0.28, 0.28], [0.72, 0.28], [0.28, 0.72], [0.72, 0.72]],
+  5: [[0.27, 0.27], [0.73, 0.27], [0.5, 0.5], [0.27, 0.73], [0.73, 0.73]],
+  6: [[0.28, 0.24], [0.72, 0.24], [0.28, 0.5], [0.72, 0.5], [0.28, 0.76], [0.72, 0.76]],
+};
+
+function Die({ value, sides, tilt }: { value: number; sides: number; tilt?: number }) {
+  return (
+    <svg width={64} height={64} viewBox="0 0 64 64" className="block shrink-0" style={tilt ? { transform: `rotate(${tilt}deg)` } : undefined} role="img" aria-label={String(value)}>
+      <rect x={2} y={2} width={60} height={60} rx={13} fill="var(--panel)" stroke="var(--line-2)" strokeWidth={2} />
+      {sides === 6 && PIPS[value] ? (
+        PIPS[value].map(([x, y], i) => <circle key={i} cx={2 + x * 60} cy={2 + y * 60} r={5.4} fill="var(--fg)" />)
+      ) : (
+        <text x={32} y={33} dy="0.35em" textAnchor="middle" className="fill-fg text-[24px] font-semibold tabular-nums">
+          {value}
+        </text>
+      )}
+    </svg>
+  );
+}
+
+function DiceRoll({ count, sides, done, title }: { count: number; sides: number; done: boolean; title: string }) {
+  const [last, setLast] = useKept<number[] | null>('dice', null);
+  const [tumble, setTumble] = useState<number[] | null>(null);
+  const timers = useTimers();
+  const ask = useAsk();
+  const throwAll = () => Array.from({ length: count }, () => 1 + Math.floor(rand() * sides));
+  const roll = () => {
+    if (!done || tumble) return;
+    const final = throwAll();
+    if (calm()) return setLast(final);
+    setTumble(throwAll());
+    timers.every(() => setTumble(throwAll()), 75);
+    timers.later(() => {
+      timers.stop();
+      setTumble(null);
+      setLast(final);
+    }, 700);
+  };
+  const kept = Array.isArray(last) && last.length === count && last.every((v) => typeof v === 'number' && v >= 1 && v <= sides) ? last : null;
+  const faces = tumble ?? kept ?? Array.from({ length: count }, (_, i) => Math.min(sides, i + 1));
+  const sum = kept ? kept.reduce((m, v) => m + v, 0) : null;
+  return (
+    <div className="flex flex-col items-center gap-4 py-2">
+      <div className={cx('flex flex-wrap justify-center gap-3', !kept && !tumble && 'opacity-45')}>
+        {faces.map((v, i) => (
+          <Die key={i} value={v} sides={sides} tilt={tumble ? ((v * 47 + i * 29) % 36) - 18 : 0} />
+        ))}
+      </div>
+      {kept && !tumble && count > 1 && (
+        <div className="text-[14px] text-fg-2">
+          {tr('Total')} <span className="text-[20px] font-semibold text-fg tabular-nums">{fmtNum(sum)}</span>
+        </div>
+      )}
+      {done && (
+        <div className="flex flex-wrap justify-center gap-2">
+          <Btn primary={!kept} icon={<Dices size={14} />} onClick={roll} disabled={!!tumble}>
+            {kept ? tr('Roll again') : tr('Roll')}
+          </Btn>
+          {kept && !tumble && (
+            <Btn primary icon={<MessageSquarePlus size={14} />} onClick={() => ask(withTitle(title, tr('I rolled {0}').replace('{0}', `${kept.join(' + ')}${count > 1 ? ` = ${sum}` : ''}`)))}>
+              {tr('Send it')}
+            </Btn>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CoinFlip({ faces, done, title }: { faces: PickOption[]; done: boolean; title: string }) {
+  const [last, setLast] = useKept<{ side: number; turn: number } | null>('coin', null);
+  const [flipping, setFlipping] = useState(false);
+  const timers = useTimers();
+  const ask = useAsk();
+  const turn = last && Number.isFinite(last.turn) ? last.turn : 0;
+  const side = last && (last.side === 0 || last.side === 1) ? last.side : null;
+  const flip = () => {
+    if (!done || flipping) return;
+    const next = pickIndex(faces.map((f) => f.weight));
+    const up = Math.round(turn / 180) % 2;
+    const quick = calm();
+    setFlipping(true);
+    setLast({ side: next, turn: turn + (quick ? 0 : 360 * 4) + (next !== up ? 180 : 0) });
+    timers.later(() => setFlipping(false), quick ? 250 : 1700);
+  };
+  const face = (f: PickOption, back: boolean) => (
+    <div className={cx('absolute inset-0 grid place-items-center rounded-full border-2 border-accent/50 bg-accent-soft p-1.5 [backface-visibility:hidden]', back && '[transform:rotateY(180deg)]')}>
+      <div className="grid h-full w-full place-items-center rounded-full border border-dashed border-accent/40 bg-panel/40 px-3 text-center">
+        <span className={cx('line-clamp-3 leading-tight font-semibold text-accent', f.label.length > 10 ? 'text-[13px]' : 'text-[19px]')}>{f.label}</span>
+      </div>
+    </div>
+  );
+  const shown = side !== null && !flipping ? faces[side] : null;
+  return (
+    <div className="flex flex-col items-center gap-4 py-2">
+      <div className="[perspective:700px]">
+        <div className="relative h-32 w-32 [transform-style:preserve-3d]" style={{ transform: `rotateY(${turn}deg)`, transition: `transform ${calm() ? 200 : 1600}ms cubic-bezier(0.2, 0.7, 0.2, 1)` }}>
+          {face(faces[0], false)}
+          {face(faces[1], true)}
+        </div>
+      </div>
+      {shown && (
+        <div className="text-center">
+          <div className="text-[20px] font-semibold text-fg">{shown.label}</div>
+          {shown.note && <Md text={shown.note} className="mt-0.5 text-[13px] text-fg-2" />}
+        </div>
+      )}
+      {done && (
+        <div className="flex flex-wrap justify-center gap-2">
+          <Btn primary={side === null} icon={<Coins size={14} />} onClick={flip} disabled={flipping}>
+            {side === null ? tr('Flip') : tr('Flip again')}
+          </Btn>
+          {shown && (
+            <Btn primary icon={<MessageSquarePlus size={14} />} onClick={() => ask(withTitle(title, tr('The coin came up: {0}').replace('{0}', shown.label)))}>
+              {tr('Send it')}
+            </Btn>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DrawNames({ options, count, done, title }: { options: PickOption[]; count: number; done: boolean; title: string }) {
+  const [last, setLast] = useKept<number[] | null>('drawn', null);
+  const [shuffle, setShuffle] = useState<number[] | null>(null);
+  const timers = useTimers();
+  const ask = useAsk();
+  const k = Math.max(1, Math.min(count, options.length));
+  /** `k` different ones, each as likely as its weight among those still in the hat. */
+  const drawSome = () => {
+    const pool = options.map((o, i) => ({ i, w: o.weight }));
+    const some = pool.some((p) => p.w > 0);
+    const out: number[] = [];
+    while (out.length < k && pool.length) {
+      const j = pickIndex(pool.map((p) => (some ? p.w : 1)));
+      out.push(pool[j].i);
+      pool.splice(j, 1);
+    }
+    return out;
+  };
+  const draw = () => {
+    if (!done || shuffle || !options.length) return;
+    const final = drawSome();
+    if (calm()) return setLast(final);
+    setShuffle(drawSome());
+    timers.every(() => setShuffle(drawSome()), 70);
+    timers.later(() => {
+      timers.stop();
+      setShuffle(null);
+      setLast(final);
+    }, 900);
+  };
+  const kept = Array.isArray(last) && last.length > 0 && last.every((i) => typeof i === 'number' && i >= 0 && i < options.length) ? last : null;
+  const slots = shuffle ?? kept;
+  return (
+    <div>
+      {slots && (
+        <ol className={cx('m-0 grid list-none gap-2 p-0', slots.length > 1 && '@md:grid-cols-2')}>
+          {slots.map((i, n) => (
+            <li key={n} className={cx('flex min-w-0 items-start gap-3 rounded-xl px-3.5 py-2.5', shuffle ? 'bg-bg-1' : 'bg-accent-soft')}>
+              {slots.length > 1 && <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-panel text-[12px] font-semibold text-fg-2 tabular-nums">{n + 1}</span>}
+              <span className="min-w-0 flex-1">
+                <span className={cx('block truncate text-[16px] font-semibold', shuffle ? 'text-fg-3' : 'text-fg')}>{options[i]?.label}</span>
+                {!shuffle && options[i]?.note && <Md text={options[i].note} inline className="block text-[12.5px] text-fg-2" />}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {done && options.length > 0 && (
+        <div className={cx('flex flex-wrap items-center gap-2', slots && 'mt-3')}>
+          <Btn primary={!kept} icon={<Shuffle size={14} />} onClick={draw} disabled={!!shuffle}>
+            {kept ? tr('Draw again') : k > 1 ? tr('Draw {0}').replace('{0}', String(k)) : tr('Draw')}
+          </Btn>
+          {kept && !shuffle && (
+            <Btn primary icon={<MessageSquarePlus size={14} />} onClick={() => ask(withTitle(title, tr('Drawn: {0}').replace('{0}', kept.map((i) => options[i].label).join(', '))))}>
+              {tr('Send it')}
+            </Btn>
+          )}
+        </div>
+      )}
+      {options.length > 0 && (
+        <Section title={tr('In the hat')} className="mt-4" aside={<span className="text-[12px] text-fg-3 tabular-nums">{options.length}</span>}>
+          <div className="flex flex-wrap gap-1.5">
+            {options.map((o, i) => {
+              const out = !shuffle && kept?.includes(i);
+              const never = o.weight <= 0 && options.some((x) => x.weight > 0);
+              return (
+                <span key={i} title={o.note ? plainMd(o.note) : undefined} className={cx('inline-flex max-w-full items-center truncate rounded-full border px-2.5 py-0.5 text-[12.5px]', out ? 'border-accent/40 bg-accent-soft font-semibold text-accent' : never ? 'border-line text-fg-3 line-through' : 'border-line text-fg-2')}>
+                  {o.label}
+                </span>
+              );
+            })}
+          </div>
+        </Section>
+      )}
+    </div>
+  );
+}
+
+function Picker({ data, done }: { data: Data; done: boolean }) {
+  const k = str(data.kind ?? data.type).trim().toLowerCase();
+  const kind = /^(dice|die|roll)$/.test(k) ? 'dice' : /^(coin|flip)$/.test(k) ? 'coin' : /^(draw|hat|names|raffle|lottery)$/.test(k) ? 'draw' : 'wheel';
+  const options: PickOption[] = arr(data.options ?? data.items ?? data.names)
+    .map((o) => (isObj(o) ? { label: textOf(o, 'label', 'name', 'title', 'text'), weight: Math.max(0, num(o.weight) ?? 1), note: str(o.note) } : { label: str(o), weight: 1, note: '' }))
+    .filter((o) => o.label);
+  const title = str(data.title);
+  const count = Math.round(num(data.count) ?? 1);
+  if (kind === 'dice') {
+    const n = Math.max(1, Math.min(6, count));
+    const sides = Math.max(2, Math.min(100, Math.round(num(data.sides) ?? 6)));
+    return (
+      <Card>
+        <Head title={title} sub={n > 1 ? tr('{0} dice with {1} sides').replace('{0}', String(n)).replace('{1}', String(sides)) : sides !== 6 ? tr('A die with {0} sides').replace('{0}', String(sides)) : undefined} />
+        <DiceRoll count={n} sides={sides} done={done} title={title} />
+      </Card>
+    );
+  }
+  if (kind === 'coin') {
+    const faces = options.length >= 2 ? options.slice(0, 2) : [{ label: tr('Heads'), weight: 1, note: '' }, { label: tr('Tails'), weight: 1, note: '' }];
+    return (
+      <Card>
+        <Head title={title} />
+        <CoinFlip faces={faces} done={done} title={title} />
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <Head title={title} sub={kind === 'draw' && options.length > 1 && count > 1 ? tr('Draws {0} of {1}').replace('{0}', String(Math.min(count, options.length))).replace('{1}', String(options.length)) : undefined} />
+      {kind === 'draw' ? <DrawNames options={options} count={count} done={done} title={title} /> : <Wheel options={options} done={done} title={title} />}
+    </Card>
+  );
+}
+
+// ---- a Venn diagram ----------------------------------------------------------------------------------------------------------
+
+interface Circle {
+  x: number;
+  y: number;
+  r: number;
+}
+
+/** Which circles a point is in, one bit each. */
+const maskAt = (cs: Circle[], x: number, y: number) => cs.reduce((m, c, i) => (Math.hypot(x - c.x, y - c.y) < c.r ? m | (1 << i) : m), 0);
+
+/** The circles for two or three sets (or one, while the rest stream in), in a box `w` wide: their places and the box's height. */
+function vennLayout(n: number, w: number): { circles: Circle[]; h: number; top: number } {
+  const top = 26;
+  if (n <= 1) {
+    const r = Math.min(w * 0.3, 105);
+    return { circles: [{ x: w / 2, y: top + r, r }], h: top + 2 * r + 6, top };
+  }
+  if (n === 2) {
+    const r = Math.min(w / 3.3, 122);
+    const d = r * 1.15;
+    return { circles: [{ x: w / 2 - d / 2, y: top + r, r }, { x: w / 2 + d / 2, y: top + r, r }], h: top + 2 * r + 6, top };
+  }
+  const r = Math.min(w / 3.25, 112);
+  const d = r * 1.1;
+  const y0 = top + r;
+  return {
+    circles: [
+      { x: w / 2 - d / 2, y: y0, r },
+      { x: w / 2 + d / 2, y: y0, r },
+      { x: w / 2, y: y0 + d * 0.866, r },
+    ],
+    h: y0 + d * 0.866 + r + 26,
+    top,
+  };
+}
+
+/**
+ * Where each region's words go: the point inside it farthest from every circle's edge (found on a grid), with how far it
+ * is from the region's edge across and up and down, for deciding what fits there.
+ */
+function regionSpots(cs: Circle[]) {
+  const spots = new Map<number, { x: number; y: number; clear: number }>();
+  if (!cs.length) return spots;
+  const x0 = Math.min(...cs.map((c) => c.x - c.r));
+  const x1 = Math.max(...cs.map((c) => c.x + c.r));
+  const y0 = Math.min(...cs.map((c) => c.y - c.r));
+  const y1 = Math.max(...cs.map((c) => c.y + c.r));
+  for (let y = y0; y <= y1; y += 3)
+    for (let x = x0; x <= x1; x += 3) {
+      let m = 0;
+      let clear = Infinity;
+      cs.forEach((c, i) => {
+        const d = Math.hypot(x - c.x, y - c.y);
+        if (d < c.r) m |= 1 << i;
+        clear = Math.min(clear, Math.abs(c.r - d));
+      });
+      if (!m) continue;
+      const s = spots.get(m);
+      if (!s || clear > s.clear) spots.set(m, { x, y, clear });
+    }
+  return spots;
+}
+
+/** How far a region reaches across from a point, on each side, at a height (to the first change of region). */
+function spanAt(cs: Circle[], m: number, x: number, y: number): number {
+  let l = 0;
+  let r = 0;
+  while (l < 400 && maskAt(cs, x - l - 2, y) === m) l += 2;
+  while (r < 400 && maskAt(cs, x + r + 2, y) === m) r += 2;
+  return Math.min(l, r);
+}
+
+/** The sets a region belongs to, as dots in their colours. */
+function SetDots({ mask, n }: { mask: number; n: number }) {
+  return (
+    <span className="inline-flex shrink-0 -space-x-1" style={{ width: 12 + (n - 1) * 8 }} aria-hidden>
+      {Array.from({ length: n }, (_, i) => (mask & (1 << i) ? <span key={i} className="h-3 w-3 rounded-full ring-2 ring-panel" style={{ background: seriesColor(i) }} /> : null))}
+    </span>
+  );
+}
+
+function Venn({ data, done }: { data: Data; done: boolean }) {
+  const uid = useId();
+  const [ref, width] = useWidth<HTMLDivElement>();
+  const [hover, setHover] = useState<number | null>(null);
+  const [listHover, setListHover] = useState<number | null>(null);
+  const [pin, setPin] = useState<number | null>(null);
+  const sets = arr(data.sets ?? data.circles)
+    .slice(0, 3)
+    .map((s, i) => (isObj(s) ? { name: textOf(s, 'name', 'label', 'title') || String.fromCharCode(65 + i), items: listOf(s.items ?? s.only) } : { name: str(s), items: [] as unknown[] }));
+  const n = sets.length;
+  // Each region by the sets it is in (one bit each): a set's own items, then the overlaps'.
+  const regions = new Map<number, { label: string; items: unknown[] }>();
+  sets.forEach((s, i) => regions.set(1 << i, { label: '', items: s.items }));
+  for (const o of arr(data.overlaps ?? data.intersections).filter(isObj)) {
+    const idx = [...new Set(arr(o.sets ?? o.of).map((x) => (typeof x === 'number' ? x : sets.findIndex((s) => s.name.toLowerCase() === str(x).trim().toLowerCase()))))].filter((x) => Number.isInteger(x) && x >= 0 && x < n);
+    if (idx.length < 2) continue;
+    const m = idx.reduce((a, x) => a | (1 << x), 0);
+    const had = regions.get(m);
+    regions.set(m, { label: had?.label || str(o.label ?? o.name), items: [...(had?.items ?? []), ...listOf(o.items)] });
+  }
+  const order = [1, 2, 4, 3, 5, 6, 7].filter((m) => m < 1 << n && (m & (m - 1) ? regions.has(m) : true));
+  const nameOf = (m: number) => {
+    const label = regions.get(m)?.label;
+    if (label) return label;
+    const names = sets.filter((_, i) => m & (1 << i)).map((s) => s.name);
+    if (names.length === 1) return tr('Only {0}').replace('{0}', names[0]);
+    if (names.length === 3) return tr('All three');
+    return tr('{0} and {1}').replace('{0}', names[0]).replace('{1}', names[1]);
+  };
+  const W = Math.max(200, Math.min(width, 420));
+  const { circles, h, top } = useMemo(() => vennLayout(n, W), [n, W]);
+  const spots = useMemo(() => regionSpots(circles), [circles]);
+  // Each region's items written inside it when every region's fit; else how many there are.
+  const textOfItem = (x: unknown) => plainMd(textOf(x, 'text', 'name', 'title', 'label'));
+  const fits = useMemo(() => {
+    for (const m of order) {
+      const r = regions.get(m);
+      const s = spots.get(m);
+      if (!r || !s) continue;
+      const lines = [...(r.label && m & (m - 1) ? [r.label] : []), ...r.items.map(textOfItem)];
+      if (!lines.length) continue;
+      if (lines.length > 4) return false;
+      const blockH = lines.length * 14;
+      const widest = Math.max(...lines.map((l) => l.length * 6.3));
+      for (const dy of [-blockH / 2 + 4, 0, blockH / 2 - 4]) if (widest / 2 + 4 > spanAt(circles, m, s.x, s.y + dy)) return false;
+      if (maskAt(circles, s.x, s.y - blockH / 2 - 2) !== m || maskAt(circles, s.x, s.y + blockH / 2 + 2) !== m) return false;
+    }
+    return true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [circles, spots, JSON.stringify(order.map((m) => regions.get(m)))]);
+  const focus = hover ?? (done ? pin : null);
+  const lit = hover ?? listHover ?? (done ? pin : null);
+  const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const b = e.currentTarget.getBoundingClientRect();
+    const m = maskAt(circles, e.clientX - b.left, e.clientY - b.top);
+    setHover(m || null);
+  };
+  const nameSpots = circles.map((c, i) => (n === 3 && i === 2 ? { x: c.x, y: c.y + c.r + 18 } : { x: n === 1 ? c.x : c.x + (i === 0 ? -0.32 : 0.32) * c.r, y: top - 9 }));
+  const nameMax = Math.max(6, Math.floor((circles[0]?.r ?? 80) * 1.55 / 7));
+  const shown = focus !== null ? [focus] : order;
+  return (
+    <Card>
+      <Head title={data.title} />
+      <div className="grid items-start gap-x-6 gap-y-3 @xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <div ref={ref} className="min-w-0">
+          {width > 0 && n > 0 && (
+            <svg width={W} height={h} className="mx-auto block touch-manipulation overflow-visible" role="img" aria-label={sets.map((s) => s.name).join(', ')} onPointerMove={onMove} onPointerLeave={() => setHover(null)} onClick={(e) => {
+              if (!done) return;
+              const b = e.currentTarget.getBoundingClientRect();
+              const m = maskAt(circles, e.clientX - b.left, e.clientY - b.top);
+              setPin((p) => (!m || p === m ? null : m));
+            }}>
+              <defs>
+                {circles.map((c, i) => (
+                  <clipPath key={i} id={`${uid}c${i}`}>
+                    <circle cx={c.x} cy={c.y} r={c.r} />
+                  </clipPath>
+                ))}
+                {lit !== null && (
+                  <mask id={`${uid}m`} maskUnits="userSpaceOnUse" x={0} y={0} width={W} height={h}>
+                    <rect x={0} y={0} width={W} height={h} fill="#fff" />
+                    {circles.map((c, i) => (lit & (1 << i) ? null : <circle key={i} cx={c.x} cy={c.y} r={c.r} fill="#000" />))}
+                  </mask>
+                )}
+              </defs>
+              {circles.map((c, i) => (
+                <circle key={i} cx={c.x} cy={c.y} r={c.r} fill={seriesColor(i)} fillOpacity={0.13} />
+              ))}
+              {lit !== null && (
+                <g mask={`url(#${uid}m)`} className="pointer-events-none">
+                  {circles.reduce<React.ReactNode>(
+                    (inner, _, i) => (lit & (1 << i) ? <g clipPath={`url(#${uid}c${i})`}>{inner}</g> : inner),
+                    <rect x={0} y={0} width={W} height={h} fill="var(--fg)" fillOpacity={0.17} />,
+                  )}
+                </g>
+              )}
+              {circles.map((c, i) => (
+                <circle key={i} cx={c.x} cy={c.y} r={c.r} fill="none" stroke={seriesColor(i)} strokeWidth={2} />
+              ))}
+              {sets.map((s, i) => (
+                <text key={i} x={nameSpots[i].x} y={nameSpots[i].y} textAnchor="middle" className="pointer-events-none fill-fg text-[13px] font-semibold">
+                  {s.name.length > nameMax ? `${s.name.slice(0, nameMax - 1)}…` : s.name}
+                </text>
+              ))}
+              {order.map((m) => {
+                const r = regions.get(m);
+                const s = spots.get(m);
+                if (!r || !s) return null;
+                const label = r.label && m & (m - 1) ? r.label : '';
+                if (fits) {
+                  const lines = [...(label ? [{ t: label, b: true }] : []), ...r.items.map((x) => ({ t: textOfItem(x), b: false }))];
+                  return (
+                    <text key={m} x={s.x} y={s.y - ((lines.length - 1) * 14) / 2} textAnchor="middle" className="pointer-events-none text-[11.5px]">
+                      {lines.map((l, k) => (
+                        <tspan key={k} x={s.x} dy={k ? 14 : 0} dominantBaseline="central" className={l.b ? 'fill-fg font-semibold' : 'fill-fg-2'}>
+                          {l.t}
+                        </tspan>
+                      ))}
+                    </text>
+                  );
+                }
+                const roomy = s.clear > 20;
+                const room = Math.floor((spanAt(circles, m, s.x, s.y + 12) * 2 - 6) / 6);
+                const short = label && room >= 4 ? (label.length > room ? `${label.slice(0, room - 1)}…` : label) : '';
+                return (
+                  <g key={m} className="pointer-events-none">
+                    {r.items.length > 0 && (
+                      <text x={s.x} y={short && roomy ? s.y - 6 : s.y} dy="0.35em" textAnchor="middle" className={cx('fill-fg font-semibold tabular-nums', lit === m ? 'text-[17px]' : 'text-[15px]')}>
+                        {r.items.length}
+                      </text>
+                    )}
+                    {short && (
+                      <text x={s.x} y={r.items.length && roomy ? s.y + 11 : s.y} dy="0.35em" textAnchor="middle" className="fill-fg-2 text-[11px]">
+                        {short}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+            </svg>
+          )}
+        </div>
+        {order.some((m) => regions.get(m)?.items.length || regions.get(m)?.label) && (
+          <div className="min-w-0">
+            {focus !== null && pin !== null && done && hover === null && (
+              <button type="button" onClick={() => setPin(null)} className="mb-1 inline-flex items-center gap-1 text-[12.5px] font-medium text-fg-3 transition-colors hover:text-fg">
+                <ChevronLeft size={13} />
+                {tr('All of it')}
+              </button>
+            )}
+            <ul className="m-0 list-none space-y-1 p-0">
+              {shown.map((m) => {
+                const r = regions.get(m);
+                return (
+                  <li key={m} onPointerEnter={() => setListHover(m)} onPointerLeave={() => setListHover(null)} className={cx('rounded-xl px-3 py-2 transition-colors', lit === m ? 'bg-bg-2' : 'hover:bg-bg-1')}>
+                    <button
+                      type="button"
+                      onFocus={() => setListHover(m)}
+                      onBlur={() => setListHover(null)}
+                      onClick={() => done && setPin((p) => (p === m ? null : m))}
+                      aria-pressed={pin === m}
+                      className="flex w-full items-center gap-2 text-left"
+                    >
+                      <SetDots mask={m} n={n} />
+                      <span className="min-w-0 flex-1 text-[13px] font-semibold text-fg">{nameOf(m)}</span>
+                      {(r?.items.length ?? 0) > 0 && <span className="text-[12px] text-fg-3 tabular-nums">{r!.items.length}</span>}
+                    </button>
+                    {r && r.items.length > 0 ? (
+                      <ul className="m-0 mt-1 list-none space-y-0.5 p-0" style={{ paddingLeft: 20 + (n - 1) * 8 }}>
+                        {r.items.map((x, i) => (
+                          <li key={i} className="flex gap-2 text-[13px] leading-snug text-fg-2">
+                            <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-fg-3" />
+                            <Md text={textOf(x, 'text', 'name', 'title', 'label')} inline className="min-w-0" />
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      focus === m && (
+                        <div className="mt-1 text-[12.5px] text-fg-3" style={{ paddingLeft: 20 + (n - 1) * 8 }}>
+                          {tr('Nothing here')}
+                        </div>
+                      )
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </div>
+      {str(data.note) && <Md text={data.note} className="mt-3 text-[13px] text-fg-3" />}
+    </Card>
+  );
+}
+
 export const COMPARE_UIS: Record<string, AnswerUiView> = {
   comparison: Comparison,
   'pros-cons': ProsCons,
@@ -908,4 +1801,7 @@ export const COMPARE_UIS: Record<string, AnswerUiView> = {
   versus: Versus,
   quadrant: Quadrant,
   swot: Swot,
+  'decision-tree': DecisionTree,
+  picker: Picker,
+  venn: Venn,
 };

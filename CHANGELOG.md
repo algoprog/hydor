@@ -3,6 +3,31 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.40.0 · 7 November 2026
+
+More answer UIs: 38 new ones, 142 in all, for deciding, planning, work, studying, data, media and code, and several
+in one answer when it has several parts.
+
+- **Several UIs in every answer**: in each turn of a conversation, the first and every later one, an answer with several
+  parts (a trip's plan, its weather and what to pack) can show each in a UI of its own, and the agent looks for all of
+  them in one search; UIs it used before it uses again without looking them up, and a later answer can bring one up to
+  date. Many of the same UI on one page each keep to themselves.
+- **Decide**: a troubleshooter or wizard that asks one question at a time and ends with an answer, a wheel, dice, a coin
+  or a draw that picks for you, and Venn diagrams of what overlaps.
+- **Plan**: a week's timetable, a Gantt chart with dependencies and a today line, timers that run alone or one after
+  another, where a parcel or an order stands, a departures board that counts down, and a hike's elevation profile.
+- **Work and business**, a new group: invoices, quotes and receipts with their totals worked out and a page to print,
+  review findings by severity with fixes to ask for, action items by owner, QR codes for a link, a Wi-Fi network or a
+  contact, and job openings to filter.
+- **Study**: fill in the blanks, match pairs, put things in order, verb conjugations to listen to, dialogues read
+  aloud with their translations, grading rubrics, chess positions to step through, and a reference written in APA,
+  MLA, Chicago, IEEE, Harvard and BibTeX.
+- **Numbers and money**: histograms and box plots, waterfalls, treemaps to click into, a year of activity with its
+  streaks, numbers on a map as sized circles, an investment portfolio, and a function plotter with sliders.
+- **Media, people and code**: pictures with numbered notes, a before-and-after slider, guitar, ukulele and piano chords,
+  font pairings shown live, homes to buy or rent, contact cards with a vCard, knockout brackets, a log viewer and cron
+  schedules with their next runs.
+
 ## 0.39.0 · 7 November 2026
 
 Answers you can use: agents show an answer as a card, a table, a chart, a map or a small tool when that makes it clearer,

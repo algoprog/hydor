@@ -288,4 +288,151 @@ Item = md | { text: md, note?: string, done?: boolean }   // done: ticked to beg
       ],
     },
   },
+  {
+    id: 'week',
+    title: 'Week timetable',
+    group: 'plans',
+    use: 'A weekly timetable (classes, shifts, a study or training week): blocks on a grid of days and hours, clashes side by side, a line at the time now, details on a tap.',
+    keywords: 'weekly timetable class schedule lessons lectures shifts rota study plan training routine school university semester',
+    shape: `{
+  title?: string
+  days?: string[]              // the columns' names: Mon to Sun unless set
+  start?: time                 // where the grid begins: the earliest block's hour unless set
+  end?: time                   // where it ends: the latest block's end unless set
+  blocks: {
+    day: number | string       // its column: 0 for the first, or the column's name ("Tue")
+    start: time
+    end: time
+    title: string              // blocks with the same title share a colour
+    place?: string
+    tone?: tone                // a colour of its own: a clash, a deadline
+    note?: md                  // shown when the block is tapped
+  }[]
+}`,
+    example: {
+      title: 'Autumn term: classes and café shifts',
+      blocks: [
+        { day: 0, start: '09:00', end: '10:30', title: 'Calculus II', place: 'Hasbrouck 20' },
+        { day: 0, start: '11:00', end: '12:15', title: 'Intro to Programming', place: 'ILC S131' },
+        { day: 0, start: '14:30', end: '16:00', title: 'Linear Algebra', place: 'Lederle 1634' },
+        { day: 1, start: '10:00', end: '11:15', title: 'Physics I', place: 'Hasbrouck 134' },
+        { day: 1, start: '13:00', end: '16:00', title: 'Physics lab', place: 'Hasbrouck 109', note: 'Bring the lab notebook and goggles; the report is due a week later.' },
+        { day: 2, start: '09:00', end: '10:30', title: 'Calculus II', place: 'Hasbrouck 20' },
+        { day: 2, start: '11:00', end: '12:15', title: 'Intro to Programming', place: 'ILC S131' },
+        { day: 2, start: '14:30', end: '16:00', title: 'Linear Algebra', place: 'Lederle 1634' },
+        { day: 3, start: '10:00', end: '11:15', title: 'Physics I', place: 'Hasbrouck 134' },
+        { day: 3, start: '11:00', end: '12:00', title: 'Calculus tutorial', place: 'LGRT 141', tone: 'warn', note: '**Clash** with Physics I: leave 15 minutes early, or move to the 13:00 tutorial.' },
+        { day: 3, start: '13:00', end: '14:30', title: 'Programming lab', place: 'ILC N151' },
+        { day: 4, start: '09:00', end: '10:30', title: 'Calculus II', place: 'Hasbrouck 20' },
+        { day: 4, start: '11:00', end: '12:15', title: 'Intro to Programming', place: 'ILC S131' },
+        { day: 5, start: '11:00', end: '17:00', title: 'Café shift', place: 'Blue Wall café', note: 'A half-hour break at 14:00.' },
+        { day: 6, start: '10:00', end: '13:00', title: 'Study group', place: 'Du Bois Library, 22nd floor' },
+        { day: 6, start: '14:00', end: '18:00', title: 'Café shift', place: 'Blue Wall café' },
+      ],
+    },
+  },
+  {
+    id: 'gantt',
+    title: 'Gantt chart',
+    group: 'plans',
+    use: 'A project schedule as bars over weeks or months, in groups, with milestones, progress, dependency arrows and a today line; details on hover, scrolling sideways when long.',
+    keywords: 'gantt project schedule tasks dependencies milestones deadlines phases work plan bars progress critical path construction',
+    shape: `{
+  title?: string
+  tasks: {
+    id?: string                // what depends names it by
+    name: string
+    start: date
+    end: date                  // its last day
+    progress?: number          // 0 to 100: how much is done (a plain bar without)
+    group?: string             // the heading it goes under: "Design"
+    depends?: string[]         // the ids (or names) of the tasks it waits for
+    milestone?: boolean        // one day, drawn as a diamond: start only
+    owner?: string
+  }[]                          // in order, a group's tasks together
+  today?: date                 // where the today line goes: today unless set
+}`,
+    example: {
+      title: 'Opening the bakery café',
+      tasks: [
+        { id: 'lease', name: 'Lease signed', start: '2026-10-02', milestone: true, group: 'Permits' },
+        { id: 'permit', name: 'Building permit', start: '2026-10-05', end: '2026-10-30', progress: 100, group: 'Permits', depends: ['lease'], owner: 'Dana' },
+        { id: 'inspection', name: 'Health inspection', start: '2026-12-14', end: '2026-12-16', progress: 0, group: 'Permits', depends: ['counter'], owner: 'Dana' },
+        { id: 'demolition', name: 'Demolition and plumbing', start: '2026-11-02', end: '2026-11-13', progress: 60, group: 'Build-out', depends: ['permit'], owner: 'Ruiz Builders' },
+        { id: 'electrical', name: 'Electrical', start: '2026-11-16', end: '2026-11-27', progress: 0, group: 'Build-out', depends: ['demolition'], owner: 'Ruiz Builders' },
+        { id: 'counter', name: 'Counter and shelves', start: '2026-11-30', end: '2026-12-11', progress: 0, group: 'Build-out', depends: ['electrical'], owner: 'Ruiz Builders' },
+        { id: 'order', name: 'Order the oven and espresso machine', start: '2026-10-19', end: '2026-10-23', progress: 100, group: 'Kitchen', owner: 'Sam' },
+        { id: 'install', name: 'Kitchen delivered and fitted', start: '2026-12-07', end: '2026-12-11', progress: 0, group: 'Kitchen', depends: ['order', 'electrical'], owner: 'Sam' },
+        { id: 'recipes', name: 'Recipe testing', start: '2026-11-09', end: '2026-12-18', progress: 15, group: 'Kitchen', owner: 'Sam' },
+        { id: 'hiring', name: 'Hire baristas and bakers', start: '2026-11-09', end: '2026-12-04', progress: 10, group: 'Team and launch', owner: 'Priya' },
+        { id: 'training', name: 'Training week', start: '2026-12-28', end: '2027-01-08', progress: 0, group: 'Team and launch', depends: ['hiring', 'inspection', 'install'], owner: 'Priya' },
+        { id: 'soft', name: 'Soft opening', start: '2027-01-11', milestone: true, group: 'Team and launch', depends: ['training'] },
+        { id: 'grand', name: 'Grand opening', start: '2027-01-16', milestone: true, group: 'Team and launch', depends: ['soft'] },
+      ],
+    },
+  },
+  {
+    id: 'timers',
+    title: 'Timers',
+    group: 'plans',
+    use: 'Several named timers (tea, eggs, pasta), each started, paused and reset on its own, or a sequence run for rounds (intervals, breathing), with a beep when one ends.',
+    keywords: 'timer kitchen timers tea eggs pasta interval tabata pomodoro hiit breathing rounds rest alarm beep',
+    shape: `{
+  title?: string
+  timers: {
+    label: string
+    seconds: number            // how long it runs
+    note?: md
+  }[]
+  mode?: "list" | "sequence"   // list: each runs on its own (unless set); sequence: one after another
+  rounds?: number              // how many times a sequence runs through: 1 unless set
+}`,
+    example: {
+      title: 'Weekend breakfast',
+      timers: [
+        { label: 'Jammy eggs', seconds: 390, note: 'Into boiling water straight from the fridge, then into iced water.' },
+        { label: 'Steel-cut oats', seconds: 1500, note: 'Stir now and then; salt them at the end.' },
+        { label: 'French press', seconds: 240, note: 'Coarse grind, 60 g a litre; push the plunger slowly.' },
+        { label: 'Sencha', seconds: 90, note: 'Water at **75 °C**, not boiling.' },
+      ],
+    },
+  },
+  {
+    id: 'tracking',
+    title: 'Order tracking',
+    group: 'plans',
+    use: 'Where a parcel, an order or an application stands: its steps on a line with the current one marked, when each happened, the expected arrival, the number to copy and the carrier’s link.',
+    keywords: 'parcel package delivery shipment courier carrier tracking number order shipped arrival eta application visa',
+    shape: `{
+  title?: string               // what it is: "Sony WH-1000XM6 headphones"
+  carrier?: string             // "UPS"
+  number?: string              // the tracking number
+  status?: string              // where it stands, in a few words: "Out for delivery"
+  eta?: date | datetime        // when it should arrive
+  steps: {
+    label: string
+    time?: datetime            // when it happened
+    place?: string
+    done?: boolean             // it has happened: the last one done is where it stands
+    note?: md
+  }[]                          // first to last, those still to come included
+  url?: url                    // the carrier's page for it
+}`,
+    example: {
+      title: 'Sony WH-1000XM6 headphones',
+      carrier: 'UPS',
+      number: '1Z999AA10123456784',
+      status: 'Out for delivery',
+      eta: '2026-11-07T19:00',
+      url: 'https://www.ups.com/track?tracknum=1Z999AA10123456784',
+      steps: [
+        { label: 'Ordered', time: '2026-11-03T14:12', place: 'Best Buy online', done: true },
+        { label: 'Shipped', time: '2026-11-04T09:40', place: 'Louisville, KY', done: true, note: 'Label made and handed to UPS.' },
+        { label: 'Arrived at a UPS facility', time: '2026-11-05T22:15', place: 'Hartford, CT', done: true },
+        { label: 'Left the facility', time: '2026-11-06T04:30', place: 'Chicopee, MA', done: true },
+        { label: 'Out for delivery', time: '2026-11-07T08:02', place: 'Amherst, MA', done: true, note: 'Expected by **7:00 PM**; no signature needed.' },
+        { label: 'Delivered' },
+      ],
+    },
+  },
 ];

@@ -1,11 +1,12 @@
 // The answer UIs for code (code in tabs, commands, API endpoints, errors, test results, JSON, regular expressions, shortcuts, repositories): their views, by name (shared/answer-ui/code.ts has what each takes).
 import { Fragment, useDeferredValue, useMemo, useState, type ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { BookMarked, Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleCheck, CircleMinus, CircleX, Copy as CopyIcon, GitFork, Lock, OctagonX, Route, Scale, Search, ShieldCheck, Star, TriangleAlert, Wrench } from 'lucide-react';
+import { BookMarked, Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleCheck, CircleMinus, CircleX, Copy as CopyIcon, GitFork, Lock, OctagonX, RotateCcw, Route, Scale, Search, ShieldCheck, Star, TriangleAlert, WrapText, Wrench } from 'lucide-react';
+import { LOCALE } from '../../../i18n/locale';
 import { tr } from '../../../i18n/runtime';
 import { CodeBlock } from '../../Markdown';
 import { cx } from '../../ui';
-import { arr, Ask, Card, Chip, compact, Copy, fmtDate, fmtNum, Head, hostOf, isObj, LinkOut, Md, num, Section, Seg, str, textOf, TONE, TONE_FILL, useKept, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Ask, Card, Chip, compact, Copy, fmtDate, fmtNum, Head, hostOf, isObj, LinkOut, Md, num, Section, Seg, str, textOf, TONE, TONE_FILL, useKept, useNow, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
 
 // ---- shared pieces ---------------------------------------------------------------------------------------------------
 
@@ -1253,6 +1254,679 @@ function Repos({ data, done }: { data: Data; done: boolean }) {
   );
 }
 
+// ---- logs: reading the lines --------------------------------------------------------------------------------------------
+
+type Level = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+const LEVELS: Level[] = ['debug', 'info', 'warn', 'error', 'fatal'];
+
+interface Entry {
+  time: string;
+  level: Level | null;
+  source: string;
+  message: string;
+  /** The entry as it was printed (its lines), for copying. */
+  raw: string;
+}
+
+/** A level from the words logs use for one ("WARNING", "err", "E", pino's 50); null when it is none. */
+function levelOf(v: unknown): Level | null {
+  if (typeof v === 'number') return v >= 60 ? 'fatal' : v >= 50 ? 'error' : v >= 40 ? 'warn' : v >= 30 ? 'info' : 'debug';
+  const s = str(v).trim().toLowerCase();
+  if (/^(trace|trc|debug|dbg|verbose|vrb|fine|finer|finest|d|t|v)$/.test(s)) return 'debug';
+  if (/^(info|inf|information|informational|notice|i|n)$/.test(s)) return 'info';
+  if (/^(warn|warning|wrn|w)$/.test(s)) return 'warn';
+  if (/^(error|err|e|severe|crit|critical)$/.test(s)) return 'error';
+  if (/^(fatal|ftl|f|panic|emerg|emergency|alert)$/.test(s)) return 'fatal';
+  return null;
+}
+
+/** A time at the start of a line: ISO (2026-11-07T14:02:11.204Z, 2026-11-07 14:02:11,123), a clock (14:02:11), syslog's (Nov  7 14:02:11), nginx's ([07/Nov/2026:14:02:11 +0000]). */
+const TIME_AT_START = /^\[?(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:[.,]\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?|\d{2}:\d{2}:\d{2}(?:[.,]\d+)?|[A-Z][a-z]{2} [ \d]\d \d{2}:\d{2}:\d{2}|\d{2}\/[A-Z][a-z]{2}\/\d{4}:\d{2}:\d{2}:\d{2}(?: [+-]\d{4})?)\]?[\s|–-]*/;
+const LEVEL_AT_START = /^[[(<]?(TRACE|DEBUG|DBG|INFO|INF|NOTICE|WARN(?:ING)?|WRN|ERROR|ERR|CRIT(?:ICAL)?|SEVERE|FATAL|FTL|PANIC|EMERG)[\])>]?(?:[:\s|–-]+|$)/i;
+/** A level word in capitals a little further in ("app.db - WARNING - …", "[main] ERROR …"). */
+const LEVEL_NEAR_START = /^.{0,48}?(?:^|[\s|[\]:-])(TRACE|DEBUG|INFO|NOTICE|WARN(?:ING)?|ERROR|CRIT(?:ICAL)?|FATAL|PANIC)(?=[\s|\]:-]|$)/;
+const SOURCE_AT_START = /^\[([\w.\-/:@]{1,40})\]:?\s+/;
+/** A line that goes on from the one before: indented, a stack frame, "Caused by…". */
+const GOES_ON = /^(\s+\S|at\s|Caused by[: ]|\.\.\. \d+ more)/;
+
+function entryOfJson(o: Data, raw: string): Entry | null {
+  const message = str(o.msg ?? o.message ?? o.text);
+  if (!message) return null;
+  const t = o.time ?? o.ts ?? o.timestamp ?? o['@timestamp'] ?? o.date;
+  const time = typeof t === 'number' && Number.isFinite(t) ? new Date(t > 1e12 ? t : t * 1000).toISOString() : str(t);
+  return { time, level: levelOf(o.level ?? o.severity ?? o.lvl ?? o.levelname), source: str(o.name ?? o.logger ?? o.module ?? o.component), message, raw };
+}
+
+/** Lines as printed, read as entries: each one's time, level and source taken from its start; lines that go on from one joined to it. */
+function readLines(text: string): Entry[] {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
+  // Lines all indented alike (pasted from somewhere) are taken back to the margin first.
+  const indent = Math.min(...lines.filter((l) => l.trim()).map((l) => /^[ \t]*/.exec(l)![0].length));
+  const out: Entry[] = [];
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const raw = Number.isFinite(indent) ? line.slice(indent) : line;
+    const prev = out[out.length - 1];
+    const tail = !!prev && /^Traceback /.test(prev.message) && /^[\w.]+(Error|Exception|Exit|Interrupt|Warning)\b/.test(raw);
+    if (prev && (tail || GOES_ON.test(raw)) && !TIME_AT_START.test(raw.trim())) {
+      prev.message += `\n${raw}`;
+      prev.raw += `\n${raw}`;
+      continue;
+    }
+    if (/^\s*\{/.test(raw))
+      try {
+        const o = JSON.parse(raw);
+        const e = isObj(o) ? entryOfJson(o, raw) : null;
+        if (e) {
+          out.push(e);
+          continue;
+        }
+      } catch {}
+    let rest = raw;
+    let time = '';
+    const tm = TIME_AT_START.exec(rest);
+    if (tm) {
+      time = tm[1];
+      rest = rest.slice(tm[0].length);
+    }
+    let level: Level | null = null;
+    const lm = LEVEL_AT_START.exec(rest);
+    if (lm) {
+      level = levelOf(lm[1]);
+      rest = rest.slice(lm[0].length);
+    } else {
+      const kv = /\b(?:level|lvl|severity)=["']?(\w+)/i.exec(rest) ?? /"(?:level|severity)"\s*:\s*"(\w+)"/i.exec(rest) ?? LEVEL_NEAR_START.exec(rest);
+      if (kv) level = levelOf(kv[1]);
+    }
+    let source = '';
+    const sm = SOURCE_AT_START.exec(rest);
+    if (sm) {
+      source = sm[1];
+      rest = rest.slice(sm[0].length);
+      // "[main] ERROR …": the level after the source.
+      const after = LEVEL_AT_START.exec(rest);
+      if (after && (!level || level === levelOf(after[1]))) {
+        level = levelOf(after[1]);
+        rest = rest.slice(after[0].length);
+      }
+    }
+    if (!level && /^([\w.$]*(Error|Exception)\b|Traceback|panic:|Uncaught|Unhandled)/.test(rest)) level = 'error';
+    out.push({ time, level, source, message: rest, raw });
+  }
+  return out;
+}
+
+/** The entries of a log as agents give it: lines as printed, or objects of their own. */
+function entriesOf(v: unknown): Entry[] {
+  if (typeof v === 'string') return readLines(v);
+  return arr(v).flatMap((x): Entry[] => {
+    if (!isObj(x)) return str(x) ? readLines(str(x)) : [];
+    const message = str(x.message ?? x.msg ?? x.text);
+    const time = str(x.time ?? x.ts ?? x.timestamp);
+    const level = levelOf(x.level ?? x.severity);
+    const source = str(x.source ?? x.logger ?? x.name);
+    return message || time ? [{ time, level, source, message, raw: [time, level ? level.toUpperCase() : '', source ? `[${source}]` : '', message].filter(Boolean).join(' ') }] : [];
+  });
+}
+
+// ---- cron: reading an expression, and when it runs ------------------------------------------------------------------------
+
+type CronName = 'second' | 'minute' | 'hour' | 'day' | 'month' | 'weekday' | 'year';
+
+interface CronField {
+  name: CronName;
+  text: string;
+  values: number[];
+  /** Written from a star (*, *\/15): with the other day field, the days are those both allow. */
+  star: boolean;
+  /** Every how many, for "*\/15". */
+  step: number | null;
+  ok: boolean;
+}
+
+const CRON_RANGE: Record<CronName, [number, number]> = { second: [0, 59], minute: [0, 59], hour: [0, 23], day: [1, 31], month: [1, 12], weekday: [0, 7], year: [1970, 2199] };
+const CRON_MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const CRON_DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const CRON_MACROS: Record<string, string> = { '@yearly': '0 0 1 1 *', '@annually': '0 0 1 1 *', '@monthly': '0 0 1 * *', '@weekly': '0 0 * * 0', '@daily': '0 0 * * *', '@midnight': '0 0 * * *', '@hourly': '0 * * * *' };
+
+function cronField(name: CronName, text: string): CronField {
+  const [lo, hi] = CRON_RANGE[name];
+  const top = name === 'weekday' ? 6 : hi;
+  const val = (s: string): number => {
+    const t = s.toLowerCase();
+    if (name === 'month' && CRON_MONTHS.includes(t)) return CRON_MONTHS.indexOf(t) + 1;
+    if (name === 'weekday' && CRON_DAYS.includes(t)) return CRON_DAYS.indexOf(t);
+    return /^\d+$/.test(t) ? Number(t) : NaN;
+  };
+  const set = new Set<number>();
+  const parts = text.split(',');
+  let ok = text.length > 0;
+  let step: number | null = null;
+  for (const part of parts) {
+    const m = /^(\*|\?|[a-z0-9]+(?:-[a-z0-9]+)?)(?:\/(\d+))?$/i.exec(part);
+    if (!m) {
+      ok = false;
+      continue;
+    }
+    const by = m[2] ? Number(m[2]) : 1;
+    if (m[2] && parts.length === 1) step = by;
+    const [a, b] = m[1] === '*' || m[1] === '?' ? [lo, top] : m[1].includes('-') ? m[1].split('-').map(val) : [val(m[1]), m[2] ? top : val(m[1])];
+    if (!Number.isFinite(a) || !Number.isFinite(b) || by < 1 || a < lo || b > hi || a > b) {
+      ok = false;
+      continue;
+    }
+    for (let v = a; v <= b; v += by) set.add(name === 'weekday' && v === 7 ? 0 : v);
+  }
+  return { name, text, values: [...set].sort((x, y) => x - y), star: /^[*?]/.test(text), step, ok: ok && set.size > 0 };
+}
+
+/** An expression read: its fields (5; 6 with seconds first; 7 with a year), or what is wrong with it ("*" for its count of fields). */
+function parseCron(expr: string): { fields: CronField[]; reboot: boolean; bad: string } {
+  const t = expr.trim().replace(/\s+/g, ' ');
+  if (/^@reboot$/i.test(t)) return { fields: [], reboot: true, bad: '' };
+  const parts = (CRON_MACROS[t.toLowerCase()] ?? t).split(' ').filter(Boolean);
+  const names: CronName[] | null =
+    parts.length === 5 ? ['minute', 'hour', 'day', 'month', 'weekday'] : parts.length === 6 ? ['second', 'minute', 'hour', 'day', 'month', 'weekday'] : parts.length === 7 ? ['second', 'minute', 'hour', 'day', 'month', 'weekday', 'year'] : null;
+  if (!names) return { fields: [], reboot: false, bad: t ? '*' : '' };
+  const fields = parts.map((p, i) => cronField(names[i], p));
+  return { fields, reboot: false, bad: fields.find((f) => !f.ok)?.text ?? '' };
+}
+
+/** A time zone's clock (the device's own for ''); null for a zone this browser does not know. */
+function zoneClock(tz: string): Intl.DateTimeFormat | null {
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone: tz || undefined, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
+  } catch {
+    return null;
+  }
+}
+
+/** The wall clock in a zone at a moment: [year, month, day, hour, minute, second]. */
+function wallAt(f: Intl.DateTimeFormat, t: number): number[] {
+  const x = Object.fromEntries(f.formatToParts(new Date(t)).map((p) => [p.type, p.value]));
+  return [Number(x.year), Number(x.month), Number(x.day), Number(x.hour) % 24, Number(x.minute), Number(x.second)];
+}
+
+/** The moment a wall-clock time in a zone is (a second try settles the day the clocks change). */
+function momentOf(f: Intl.DateTimeFormat, w: number[]): number {
+  const wall = Date.UTC(w[0], w[1] - 1, w[2], w[3], w[4], w[5]);
+  const offset = (t: number) => {
+    const v = wallAt(f, t);
+    return Date.UTC(v[0], v[1] - 1, v[2], v[3], v[4], v[5]) - t;
+  };
+  return wall - offset(wall - offset(wall));
+}
+
+/** The next `count` runs after `from`, worked out on the zone's clock (as cron does), up to eight years ahead. */
+function nextRuns(fields: CronField[], f: Intl.DateTimeFormat, from: number, count: number): number[] {
+  const by: Partial<Record<CronName, CronField>> = Object.fromEntries(fields.map((x) => [x.name, x]));
+  const secs = by.second?.values ?? [0];
+  const mins = by.minute?.values ?? [0];
+  const hours = by.hour?.values ?? [0];
+  const days = new Set(by.day?.values ?? []);
+  const wdays = new Set(by.weekday?.values ?? []);
+  const months = new Set(by.month?.values ?? []);
+  const years = by.year && !by.year.star ? by.year.values : null;
+  // As cron reads the two day fields: either may match, unless one is written from a star (then both must).
+  const both = (by.day?.star ?? true) || (by.weekday?.star ?? true);
+  const now = wallAt(f, from);
+  const out: number[] = [];
+  for (let k = 0; k < 366 * 8 && out.length < count; k++) {
+    const d = new Date(Date.UTC(now[0], now[1] - 1, now[2] + k));
+    const [Y, M, D, W] = [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), d.getUTCDay()];
+    if (years && !years.includes(Y)) {
+      if (Y > years[years.length - 1]) break;
+      continue;
+    }
+    if (!months.has(M) || !(both ? days.has(D) && wdays.has(W) : days.has(D) || wdays.has(W))) continue;
+    for (const h of hours) {
+      if (k === 0 && h < now[3]) continue;
+      for (const mi of mins) {
+        if (k === 0 && h === now[3] && mi < now[4]) continue;
+        for (const s of secs) {
+          if (k === 0 && h === now[3] && mi === now[4] && s <= now[5]) continue;
+          const at = momentOf(f, [Y, M, D, h, mi, s]);
+          if (at <= from || (out.length > 0 && at <= out[out.length - 1])) continue;
+          out.push(at);
+          if (out.length >= count) return out;
+        }
+      }
+    }
+  }
+  return out;
+}
+
+const appLang = () => LOCALE ?? (typeof navigator !== 'undefined' ? navigator.language : 'en');
+const two = (n: number) => String(n).padStart(2, '0');
+
+function clockText(h: number, m: number): string {
+  try {
+    return new Intl.DateTimeFormat(appLang(), { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }).format(new Date(Date.UTC(2000, 0, 1, h, m)));
+  } catch {
+    return `${two(h)}:${two(m)}`;
+  }
+}
+function hourText(h: number): string {
+  try {
+    return new Intl.DateTimeFormat(appLang(), { hour: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(2000, 0, 1, h)));
+  } catch {
+    return two(h);
+  }
+}
+/** A weekday's name (0 Sunday … 6 Saturday; 7 Sunday too). */
+function weekdayText(d: number): string {
+  try {
+    return new Intl.DateTimeFormat(appLang(), { weekday: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2023, 0, 1 + (d % 7))));
+  } catch {
+    return CRON_DAYS[d % 7];
+  }
+}
+function monthText(m: number): string {
+  try {
+    return new Intl.DateTimeFormat(appLang(), { month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2023, m - 1, 1)));
+  } catch {
+    return CRON_MONTHS[m - 1];
+  }
+}
+function listText(items: string[]): string {
+  try {
+    return new Intl.ListFormat(appLang(), { style: 'long', type: 'conjunction' }).format(items);
+  } catch {
+    return items.join(', ');
+  }
+}
+
+/** Values as runs: [1, 2, 3, 4, 5] → "1 to 5", [0, 15, 30, 45] → "0, 15, 30 and 45" (each value named by `name`). */
+function rangesText(values: number[], name: (v: number) => string): string {
+  const groups: string[] = [];
+  for (let i = 0; i < values.length; ) {
+    let j = i;
+    while (j + 1 < values.length && values[j + 1] === values[j] + 1) j++;
+    if (j - i >= 2) groups.push(tr('{0} to {1}').replace('{0}', name(values[i])).replace('{1}', name(values[j])));
+    else for (let k = i; k <= j; k++) groups.push(name(values[k]));
+    i = j + 1;
+  }
+  return listText(groups);
+}
+
+/** Weekdays in the order a week is read: Sunday last when Saturday is there too (a weekend). */
+const weekOrder = (values: number[]) => (values.includes(0) && values.includes(6) ? [...values.filter((v) => v), 7] : values);
+
+const FULL: Partial<Record<CronName, number>> = { second: 60, minute: 60, hour: 24, day: 31, month: 12, weekday: 7 };
+const isAll = (f: CronField) => (f.name === 'year' ? f.star : f.values.length === FULL[f.name]);
+
+/** What one field means, in words. */
+function fieldMeaning(f: CronField): string {
+  const every = f.star && f.step ? f.step : null;
+  switch (f.name) {
+    case 'second':
+      return isAll(f) ? tr('every second') : every ? tr('every {0} seconds').replace('{0}', String(every)) : rangesText(f.values, String);
+    case 'minute':
+      return isAll(f) ? tr('every minute') : every ? tr('every {0} minutes').replace('{0}', String(every)) : rangesText(f.values, (v) => `:${two(v)}`);
+    case 'hour':
+      return isAll(f) ? tr('every hour') : every ? tr('every {0} hours').replace('{0}', String(every)) : rangesText(f.values, hourText);
+    case 'day':
+      return isAll(f) ? tr('every day of the month') : every ? tr('every {0} days').replace('{0}', String(every)) : rangesText(f.values, String);
+    case 'month':
+      return isAll(f) ? tr('every month') : rangesText(f.values, monthText);
+    case 'weekday':
+      return isAll(f) ? tr('every day of the week') : rangesText(weekOrder(f.values), weekdayText);
+    default:
+      return isAll(f) ? tr('every year') : rangesText(f.values, String);
+  }
+}
+
+/** The whole schedule in words: "At 2:30 AM, on Monday to Friday". */
+function describeCron(fields: CronField[]): string {
+  const by: Partial<Record<CronName, CronField>> = Object.fromEntries(fields.map((x) => [x.name, x]));
+  const { second: sec, minute: min, hour, day, month, weekday: wday, year } = by;
+  if (!min || !hour || !day || !month || !wday) return '';
+  const phrases: string[] = [];
+  const secZero = !sec || (sec.values.length === 1 && sec.values[0] === 0);
+  if (sec && !secZero) phrases.push(isAll(sec) || (sec.star && sec.step) ? fieldMeaning(sec) : (sec.values.length === 1 ? tr('at second {0}') : tr('at seconds {0}')).replace('{0}', rangesText(sec.values, String)));
+  const allMin = isAll(min);
+  const allHour = isAll(hour);
+  if (!allMin && !allHour && secZero && min.values.length * hour.values.length <= 6) {
+    phrases.push(tr('at {0}').replace('{0}', listText(hour.values.flatMap((h) => min.values.map((m) => clockText(h, m))))));
+  } else {
+    if (allMin && allHour && !secZero) {
+      // "Every 30 seconds" says it all.
+    } else if (allMin || (min.star && min.step)) phrases.push(fieldMeaning(min));
+    else if (allHour && min.values.length === 1) phrases.push(min.values[0] === 0 ? tr('every hour, on the hour') : tr('at {0} minutes past every hour').replace('{0}', String(min.values[0])));
+    else phrases.push((min.values.length === 1 ? tr('at minute {0}') : tr('at minutes {0}')).replace('{0}', rangesText(min.values, String)));
+    const run = hour.values.every((h, i) => !i || h === hour.values[i - 1] + 1);
+    if (!allHour)
+      phrases.push(
+        hour.star && hour.step
+          ? fieldMeaning(hour)
+          : run && hour.values.length > 1
+            ? tr('between {0} and {1}').replace('{0}', clockText(hour.values[0], 0)).replace('{1}', clockText(hour.values[hour.values.length - 1], 59))
+            : (hour.values.length === 1 ? tr('during the {0} hour') : tr('during the {0} hours')).replace('{0}', listText(hour.values.map(hourText))),
+      );
+  }
+  const days = day.star && day.step ? fieldMeaning(day) : (day.values.length === 1 ? tr('on day {0} of the month') : tr('on days {0} of the month')).replace('{0}', rangesText(day.values, String));
+  const wdays = tr('on {0}').replace('{0}', rangesText(weekOrder(wday.values), weekdayText));
+  if (!isAll(day) && !isAll(wday)) phrases.push(day.star || wday.star ? `${days}, ${wdays}` : tr('{0}, or {1}').replace('{0}', days).replace('{1}', wdays));
+  else if (!isAll(wday)) phrases.push(wdays);
+  else if (!isAll(day)) phrases.push(days);
+  if (!isAll(month)) phrases.push(tr('in {0}').replace('{0}', rangesText(month.values, monthText)));
+  if (year && !isAll(year)) phrases.push(tr('in {0}').replace('{0}', rangesText(year.values, String)));
+  const s = phrases.join(', ');
+  return s.charAt(0).toLocaleUpperCase(appLang()) + s.slice(1);
+}
+
+// ---- logs: the view -----------------------------------------------------------------------------------------------------
+
+const LEVEL_LABEL: Record<Level, () => string> = { debug: () => tr('Debug'), info: () => tr('Info'), warn: () => tr('Warnings'), error: () => tr('Errors'), fatal: () => tr('Fatal') };
+const LEVEL_TONE: Record<Level, Tone> = { debug: 'neutral', info: 'info', warn: 'warn', error: 'bad', fatal: 'bad' };
+const LEVEL_TEXT: Record<Level, string> = { debug: 'text-fg-3', info: 'text-info', warn: 'text-warn', error: 'text-err', fatal: 'text-err' };
+const LEVEL_ROW: Record<Level, string> = { debug: 'border-transparent', info: 'border-transparent', warn: 'border-warn bg-warn/[0.07]', error: 'border-err bg-err/[0.07]', fatal: 'border-err bg-err/[0.14]' };
+const LOG_MAX = 3000;
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+function Logs({ data, done }: { data: Data; done: boolean }) {
+  const all = useMemo(() => entriesOf(data.lines ?? data.log ?? data.logs ?? data.text ?? data.items), [data.lines, data.log, data.logs, data.text, data.items]);
+  const entries = all.slice(0, LOG_MAX);
+  const marks = words(data.highlight ?? data.highlights).filter((w) => w.trim().length > 1);
+  const [kept, setHidden] = useKept<Level[]>('hide', []);
+  const hidden = Array.isArray(kept) ? kept : [];
+  const [wrap, setWrap] = useKept<boolean>('wrap', true);
+  const [q, setQ] = useState('');
+  const query = useDeferredValue(q.trim());
+  const counts = Object.fromEntries(LEVELS.map((l) => [l, entries.filter((e) => e.level === l).length])) as Record<Level, number>;
+  const levels = LEVELS.filter((l) => counts[l] > 0);
+  // ISO times of one day show as their time alone, the day once above them.
+  const isoDay = (t: string) => /^(\d{4}-\d{2}-\d{2})[T ]/.exec(t)?.[1] ?? '';
+  const days = new Set(entries.map((e) => isoDay(e.time)).filter(Boolean));
+  const oneDay = days.size === 1 && entries.every((e) => !e.time || isoDay(e.time)) ? [...days][0] : '';
+  const timeShown = (t: string) => (oneDay && isoDay(t) === oneDay ? t.slice(11).replace(/Z$/, '') : t);
+  const shown = entries.filter((e) => (!e.level || !hidden.includes(e.level)) && (!query || `${e.source} ${e.message}`.toLowerCase().includes(query.toLowerCase())));
+  const anyTime = entries.some((e) => e.time);
+  const anyLevel = entries.some((e) => e.level);
+  const terms = [...new Set([query, ...marks].filter(Boolean))];
+  const re = terms.length ? new RegExp(`(${terms.map(escapeRe).join('|')})`, 'gi') : null;
+  const marked = (text: string): ReactNode =>
+    re
+      ? text.split(re).map((part, k) =>
+          k % 2 ? (
+            <mark key={k} className={cx('rounded-[3px] px-px text-fg', query && part.toLowerCase() === query.toLowerCase() ? 'bg-warn/35' : 'bg-accent-soft font-semibold')}>
+              {part}
+            </mark>
+          ) : (
+            part
+          ),
+        )
+      : text;
+  const errors = entries.filter((e) => e.level === 'error' || e.level === 'fatal');
+  const sub = [str(data.source ?? data.host ?? data.file), oneDay ? fmtDate(oneDay, 'medium') : ''].filter(Boolean).join(' · ');
+  return (
+    <Card>
+      <Head title={data.title} sub={sub} aside={done && shown.length > 0 ? <Copy text={() => shown.map((e) => e.raw).join('\n')} label={tr('Copy the lines')} /> : undefined} />
+      {done && entries.length > 0 && (
+        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+          {levels.map((l) => {
+            const on = !hidden.includes(l);
+            return (
+              <button
+                key={l}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setHidden(hidden.includes(l) ? hidden.filter((x) => x !== l) : [...hidden, l])}
+                className={cx('inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-medium transition-colors', on ? TONE[LEVEL_TONE[l]] : 'bg-bg-2 text-fg-3 line-through opacity-70')}
+              >
+                {LEVEL_LABEL[l]()}
+                <span className="tabular-nums opacity-80">{fmtNum(counts[l])}</span>
+              </button>
+            );
+          })}
+          <label className="relative ml-auto min-w-[150px] flex-1 @md:max-w-[220px] @md:flex-none">
+            <Search size={13} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-fg-3" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr('Search the lines')} aria-label={tr('Search the lines')} className="h-7 w-full rounded-lg border border-line bg-bg-1 pr-2 pl-8 text-[12.5px] outline-none focus:border-accent" />
+          </label>
+          <button
+            type="button"
+            aria-pressed={wrap}
+            onClick={() => setWrap((w) => !w)}
+            title={tr('Wrap long lines')}
+            aria-label={tr('Wrap long lines')}
+            className={cx('grid h-7 w-7 place-items-center rounded-lg border transition-colors', wrap ? 'border-accent/40 bg-accent-soft text-accent' : 'border-line text-fg-3 hover:text-fg')}
+          >
+            <WrapText size={14} />
+          </button>
+        </div>
+      )}
+      {entries.length > 0 && (
+        <div className="max-h-[460px] overflow-auto rounded-lg border border-line bg-code-bg py-1 font-mono text-[12px] leading-[1.6]">
+          <div className={cx(!wrap && 'w-max min-w-full')}>
+            {shown.map((e, k) => (
+              <div key={k} className={cx('flex gap-2.5 border-l-2 py-px pr-3 pl-2', e.level ? LEVEL_ROW[e.level] : 'border-transparent')}>
+                {anyTime && <span className="shrink-0 whitespace-pre text-fg-3 tabular-nums">{timeShown(e.time) || ' '}</span>}
+                {anyLevel && <span className={cx('w-[42px] shrink-0 text-[10.5px] leading-[19px] font-bold', e.level ? LEVEL_TEXT[e.level] : '')}>{e.level ? (e.level === 'warn' ? 'WARN' : e.level.toUpperCase()) : ''}</span>}
+                <span className={cx('min-w-0 flex-1 text-fg', wrap ? 'break-words whitespace-pre-wrap [overflow-wrap:anywhere]' : 'whitespace-pre')}>
+                  {e.source && <span className="text-fg-3">[{marked(e.source)}] </span>}
+                  {marked(e.message)}
+                </span>
+              </div>
+            ))}
+            {!shown.length && <div className="px-3 py-2 font-sans text-[12.5px] text-fg-3">{tr('No line matches.')}</div>}
+          </div>
+        </div>
+      )}
+      {(shown.length < entries.length || all.length > entries.length) && (
+        <div className="mt-1.5 text-[12px] text-fg-3 tabular-nums">
+          {tr('{0} of {1} lines').replace('{0}', fmtNum(shown.length)).replace('{1}', fmtNum(all.length))}
+        </div>
+      )}
+      {str(data.note) && <Md text={data.note} className="mt-3 text-[13px] text-fg-2" />}
+      {done && errors.length > 0 && (
+        <div className="mt-3">
+          <Ask text={`${tr('What went wrong in these logs?')}\n${errors
+            .slice(0, 5)
+            .map((e) => e.raw.split('\n')[0].slice(0, 300))
+            .join('\n')}`}>
+            {tr('Ask about the errors')}
+          </Ask>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ---- cron: the view ---------------------------------------------------------------------------------------------------------
+
+const CRON_LABEL: Record<CronName, () => string> = { second: () => tr('Second'), minute: () => tr('Minute'), hour: () => tr('Hour'), day: () => tr('Day'), month: () => tr('Month'), weekday: () => tr('Weekday'), year: () => tr('Year') };
+
+/** A zone's name and its offset now ("America/Chicago · GMT-6"). */
+function zoneText(tz: string, at: number): string {
+  try {
+    const off = new Intl.DateTimeFormat('en-US', { timeZone: tz || undefined, timeZoneName: 'shortOffset' }).formatToParts(new Date(at)).find((p) => p.type === 'timeZoneName')?.value ?? '';
+    return [tz || Intl.DateTimeFormat().resolvedOptions().timeZone, off].filter(Boolean).join(' · ');
+  } catch {
+    return tz;
+  }
+}
+
+/** A run's date and time on a zone's clock. */
+function runText(t: number, tz: string, seconds: boolean, withYear: boolean): string {
+  try {
+    return new Intl.DateTimeFormat(appLang(), { timeZone: tz || undefined, weekday: 'short', day: 'numeric', month: 'short', ...(withYear ? { year: 'numeric' } : {}), hour: 'numeric', minute: '2-digit', ...(seconds ? { second: '2-digit' } : {}) }).format(new Date(t));
+  } catch {
+    return new Date(t).toISOString();
+  }
+}
+
+/** A run on this device's clock: its time, and its weekday when that is not the day it is on the zone's clock. */
+function localTime(t: number, tz: string, seconds: boolean): string {
+  try {
+    const day = (zone?: string) => new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'short' }).format(new Date(t));
+    const sameDay = day(tz || undefined) === day();
+    return new Intl.DateTimeFormat(appLang(), { ...(sameDay ? {} : { weekday: 'short' }), hour: 'numeric', minute: '2-digit', ...(seconds ? { second: '2-digit' } : {}) }).format(new Date(t));
+  } catch {
+    return '';
+  }
+}
+
+/** How far off a moment is: "in 3 hours", "in 2 days". */
+function inTime(t: number, now: number): string {
+  const s = (t - now) / 1000;
+  try {
+    const f = new Intl.RelativeTimeFormat(appLang(), { numeric: 'auto' });
+    if (s < 90) return f.format(Math.max(1, Math.round(s)), 'second');
+    if (s < 90 * 60) return f.format(Math.round(s / 60), 'minute');
+    if (s < 36 * 3600) return f.format(Math.round(s / 3600), 'hour');
+    return f.format(Math.round(s / 86400), 'day');
+  } catch {
+    return '';
+  }
+}
+
+function CronUi({ data, done }: { data: Data; done: boolean }) {
+  const given = str(data.expression ?? data.cron ?? data.schedule ?? data.expr).trim();
+  const [typed, setTyped] = useState<string | null>(null);
+  const expr = typed ?? given;
+  const edited = typed !== null && typed.trim() !== given;
+  const tz = str(data.tz ?? data.timezone ?? data.zone).trim();
+  const zoned = useMemo(() => zoneClock(tz), [tz]);
+  const clock = useMemo(() => zoned ?? zoneClock(''), [zoned]);
+  const parsed = useMemo(() => parseCron(expr), [expr]);
+  const count = Math.min(50, Math.max(1, Math.round(num(data.next ?? data.count) ?? 5)));
+  const [extra, setExtra] = useState(0);
+  const now = useNow(30_000);
+  const runs = useMemo(() => (clock && !parsed.bad && parsed.fields.length ? nextRuns(parsed.fields, clock, now, count + extra) : []), [clock, parsed, now, count, extra]);
+  const [hover, setHover] = useState<number | null>(null);
+  const explain = arr(data.explain ?? data.fields)
+    .map((e) => (isObj(e) ? e : { meaning: str(e) }))
+    .map((e) => ({ field: str(e.field ?? e.part ?? e.value), meaning: e.meaning ?? e.text ?? e.description }));
+  // The agent's words for each field, while the expression is the agent's: in order when there is one for each, else by the field's text.
+  const used = new Set<number>();
+  const theirs = (i: number, f: CronField): unknown => {
+    if (edited || !explain.length) return null;
+    if (explain.length === parsed.fields.length) return explain[i].meaning;
+    const k = explain.findIndex((e, j) => !used.has(j) && e.field === f.text);
+    if (k < 0) return null;
+    used.add(k);
+    return explain[k].meaning;
+  };
+  const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const elsewhere = !!zoned && !!tz && tz !== deviceZone;
+  const seconds = parsed.fields.some((f) => f.name === 'second' && !(f.values.length === 1 && f.values[0] === 0));
+  const thisYear = new Date(now).getFullYear();
+  const macro = /^@\w+$/.test(expr.trim()) ? expr.trim() : '';
+  const command = str(data.command ?? data.cmd ?? data.run);
+  const line = `${expr.trim()}${command ? ` ${command}` : ''}`;
+  const problem = !expr.trim() ? '' : parsed.bad === '*' ? tr('A cron expression has 5 fields: minute, hour, day, month and weekday (6 with seconds first).') : parsed.bad ? tr('This part is not valid: {0}').replace('{0}', parsed.bad) : '';
+  return (
+    <Card>
+      <Head title={data.title} />
+      {expr.trim() && (
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          {parsed.fields.length > 0 && !parsed.bad ? (
+            <div className="flex flex-wrap items-end gap-1.5">
+              {macro && <span className="mr-1 self-center font-mono text-[15px] font-semibold text-fg-2">{macro} =</span>}
+              {parsed.fields.map((f, i) => (
+                <div
+                  key={i}
+                  onPointerEnter={(e) => e.pointerType === 'mouse' && setHover(i)}
+                  onPointerLeave={() => setHover(null)}
+                  className={cx('flex min-w-[46px] flex-col items-center rounded-lg px-2 pt-1 pb-0.5 transition-colors', hover === i ? 'bg-accent-soft' : 'bg-bg-1')}
+                >
+                  <span className="font-mono text-[19px] leading-tight font-semibold text-fg">{f.text}</span>
+                  <span className="text-[10.5px] text-fg-3">{CRON_LABEL[f.name]()}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <span className="font-mono text-[19px] font-semibold text-fg">{expr}</span>
+          )}
+          {(tz || parsed.fields.length > 0) && <Chip className="mt-1">{zoned || !tz ? zoneText(tz, now) : tz}</Chip>}
+        </div>
+      )}
+      {done && tz && !zoned && <div className="mt-2 text-[12.5px] text-warn">{tr('This time zone is not known here: the times below are on your own clock.')}</div>}
+      {parsed.reboot ? (
+        <div className="mt-3 text-[15.5px] leading-snug font-semibold">{tr('Each time the computer starts')}</div>
+      ) : (
+        parsed.fields.length > 0 && !parsed.bad && <div className="mt-3 text-[15.5px] leading-snug font-semibold">{describeCron(parsed.fields)}</div>
+      )}
+      {done && problem && (
+        <div className="mt-2 flex items-start gap-2 rounded-lg bg-err/10 px-3 py-2 text-[13px] text-err">
+          <TriangleAlert size={14} className="mt-0.5 shrink-0" />
+          <span className="min-w-0">{problem}</span>
+        </div>
+      )}
+      {parsed.fields.length > 0 && !parsed.bad && (
+        <div className="mt-3 divide-y divide-line/70 rounded-xl border border-line">
+          {parsed.fields.map((f, i) => {
+            const said = theirs(i, f);
+            return (
+              <div
+                key={i}
+                onPointerEnter={(e) => e.pointerType === 'mouse' && setHover(i)}
+                onPointerLeave={() => setHover(null)}
+                className={cx('grid grid-cols-[minmax(52px,auto)_minmax(0,1fr)] gap-x-3 px-3 py-1.5 text-[13px] transition-colors @md:grid-cols-[72px_88px_minmax(0,1fr)]', hover === i && 'bg-accent-soft')}
+              >
+                <span className="font-mono font-semibold text-fg">{f.text}</span>
+                <span className="text-fg-3">{CRON_LABEL[f.name]()}</span>
+                <span className="col-span-2 min-w-0 text-fg-2 @md:col-span-1">{str(said) ? <Md text={said} inline /> : fieldMeaning(f).replace(/^\p{Ll}/u, (c) => c.toLocaleUpperCase(appLang()))}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {parsed.fields.length > 0 && !parsed.bad && clock && (
+        <Section title={tr('Next runs')} className="mt-4" aside={elsewhere ? <span className="text-[11.5px] text-fg-3">{tr('Your time: {0}').replace('{0}', zoneText('', now))}</span> : undefined}>
+          {runs.length ? (
+            <ol className="m-0 list-none p-0">
+              {runs.map((t, i) => (
+                <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-3 border-b border-line/60 py-1.5 text-[13.5px] last:border-b-0">
+                  <span className="font-medium text-fg tabular-nums">{runText(t, zoned ? tz : '', seconds, new Date(t).getFullYear() !== thisYear)}</span>
+                  <span className="text-[12px] text-fg-3 tabular-nums">
+                    {inTime(t, now)}
+                    {elsewhere && ` · ${tr('{0} your time').replace('{0}', localTime(t, zoned ? tz : '', seconds))}`}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div className="text-[13px] text-fg-3">{tr('It does not run in the next eight years.')}</div>
+          )}
+          {done && runs.length >= count + extra && count + extra < 50 && (
+            <button type="button" onClick={() => setExtra((x) => Math.min(50 - count, x + 5))} className="mt-1.5 text-[12.5px] font-medium text-fg-3 transition-colors hover:text-fg">
+              {tr('Show 5 more')}
+            </button>
+          )}
+        </Section>
+      )}
+      {command && expr.trim() && (
+        <div className="mt-4 flex items-start gap-2 rounded-lg border border-line bg-code-bg py-1.5 pr-1.5 pl-3 font-mono text-[12.5px] leading-[1.6]">
+          <span className="min-w-0 flex-1 break-words whitespace-pre-wrap text-fg [overflow-wrap:anywhere]">{line}</span>
+          {done && <Copy text={line} label={tr('Copy the crontab line')} />}
+        </div>
+      )}
+      {str(data.note) && <Md text={data.note} className="mt-3 text-[13px] text-fg-2" />}
+      {done && (
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line pt-3">
+          <span className="text-[12.5px] text-fg-3">{tr('Try another expression')}</span>
+          <input
+            value={expr}
+            onChange={(e) => setTyped(e.target.value.slice(0, 120))}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            aria-label={tr('Try another expression')}
+            placeholder={tr('Try another expression')}
+            className="h-8 min-w-[160px] flex-1 rounded-lg border border-line bg-bg-1 px-3 font-mono text-[13px] outline-none focus:border-accent"
+          />
+          {edited && (
+            <button type="button" onClick={() => setTyped(null)} title={tr('Back to the one given')} aria-label={tr('Back to the one given')} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg">
+              <RotateCcw size={14} />
+            </button>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export const CODE_UIS: Record<string, AnswerUiView> = {
   code: CodeTabs,
   commands: Commands,
@@ -1263,4 +1937,6 @@ export const CODE_UIS: Record<string, AnswerUiView> = {
   regex: RegexUi,
   shortcuts: Shortcuts,
   repo: Repos,
+  logs: Logs,
+  cron: CronUi,
 };

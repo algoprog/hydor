@@ -142,4 +142,54 @@ export const WRITING: AnswerUiSpec[] = [
       notes: ['The full date, so nobody has to work out which month.', '“We recommend coming”, not “to come”: *recommend* takes the *-ing* form.', 'A comma before *so* when it joins two full sentences.'],
     },
   },
+  {
+    id: 'citation',
+    title: 'Citation',
+    group: 'writing',
+    use: 'A reference written out in APA, MLA, Chicago, IEEE, Harvard and BibTeX from its details, with how to cite it in the text; copy each.',
+    keywords: 'citation reference cite bibliography apa mla chicago ieee harvard bibtex works cited paper doi reference list',
+    shape: `{
+  title?: string
+  source: Source
+  sources?: Source[]           // instead of source: several, as a reference list
+  styles?: ("apa" | "mla" | "chicago" | "ieee" | "harvard" | "bibtex")[]   // all unless set
+}
+Source = {
+  type: "article" | "book" | "chapter" | "conference" | "web" | "thesis" | "report"
+  authors: string[]            // "Last, First Middle"; an organisation as its name
+  title: string                // in sentence case, proper nouns capitalised: the styles that want title case make it
+  container?: string           // the journal; a chapter's book; the proceedings; the website
+  year: number
+  month?: number               // 1–12
+  volume?: string
+  issue?: string
+  pages?: string               // "4171–4186"
+  publisher?: string           // a thesis: its university
+  place?: string               // the publisher's city, or the conference's
+  editors?: string[]           // "Last, First"
+  edition?: number
+  number?: string              // a report's number
+  degree?: "phd" | "masters"   // a thesis
+  doi?: string                 // "10.18653/v1/N19-1423"
+  url?: url
+  accessed?: date              // when a web page was read
+}`,
+    example: {
+      title: 'The BERT paper',
+      source: {
+        type: 'conference',
+        authors: ['Devlin, Jacob', 'Chang, Ming-Wei', 'Lee, Kenton', 'Toutanova, Kristina'],
+        title: 'BERT: Pre-training of deep bidirectional transformers for language understanding',
+        container: 'Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers)',
+        editors: ['Burstein, Jill', 'Doran, Christy', 'Solorio, Thamar'],
+        year: 2019,
+        month: 6,
+        pages: '4171–4186',
+        publisher: 'Association for Computational Linguistics',
+        place: 'Minneapolis, Minnesota',
+        doi: '10.18653/v1/N19-1423',
+        url: 'https://aclanthology.org/N19-1423/',
+      },
+    },
+  },
 ];

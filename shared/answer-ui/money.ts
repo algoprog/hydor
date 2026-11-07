@@ -257,4 +257,42 @@ export const MONEY: AnswerUiSpec[] = [
       paid_by: 'Maria',
     },
   },
+  {
+    id: 'portfolio',
+    title: 'Investment portfolio',
+    group: 'money',
+    use: 'Investments at a glance: total value, gain or loss overall and today, allocation by kind or by holding, and each holding with its weight, sortable.',
+    keywords: 'portfolio investments holdings allocation stocks bonds etfs crypto gains losses net worth brokerage account asset mix diversification rebalance',
+    shape: `{
+  title?: string
+  currency?: string            // "USD" unless set
+  as_of?: date
+  holdings: {
+    name: string
+    symbol?: string            // "VTI"
+    kind?: string              // "stock", "bond", "fund", "cash", "crypto"…: the allocation by kind groups by it
+    value: number              // what it is worth now, in the currency
+    cost?: number              // what was paid for it in all: its gain is value − cost
+    change_pct?: number        // today's change in % (1.2 for +1.2%)
+  }[]
+  note?: md
+}`,
+    example: {
+      title: 'Brokerage and retirement accounts',
+      currency: 'USD',
+      as_of: '2026-11-06',
+      holdings: [
+        { name: 'Vanguard Total Stock Market ETF', symbol: 'VTI', kind: 'fund', value: 48620, cost: 39800, change_pct: 0.42 },
+        { name: 'Vanguard Total International Stock ETF', symbol: 'VXUS', kind: 'fund', value: 21340, cost: 19950, change_pct: 0.18 },
+        { name: 'Vanguard Total Bond Market ETF', symbol: 'BND', kind: 'bond', value: 18210, cost: 18900, change_pct: -0.12 },
+        { name: 'US Treasury bills, 6 months', kind: 'bond', value: 10000, cost: 9760, change_pct: 0.01 },
+        { name: 'Apple', symbol: 'AAPL', kind: 'stock', value: 9848, cost: 6120, change_pct: 0.99 },
+        { name: 'Microsoft', symbol: 'MSFT', kind: 'stock', value: 8920, cost: 7410, change_pct: -0.35 },
+        { name: 'NVIDIA', symbol: 'NVDA', kind: 'stock', value: 7480, cost: 3260, change_pct: 1.84 },
+        { name: 'Bitcoin', symbol: 'BTC', kind: 'crypto', value: 4310, cost: 5050, change_pct: -2.6 },
+        { name: 'Cash', kind: 'cash', value: 6500 },
+      ],
+      note: 'Stocks and stock funds are **71%** of it, above the 60% you aimed for: moving about $15,000 into bonds would bring it back.',
+    },
+  },
 ];

@@ -104,8 +104,13 @@ export function fmtMoney(n: number | null | undefined, currency?: string, o: Int
   if (n === null || n === undefined || !Number.isFinite(n)) return '';
   const c = str(currency).trim();
   if (/^[A-Za-z]{3}$/.test(c)) {
+    // Cents where an amount has them and its currency uses them, up to 100,000 (an invoice's €4,712.40); none on whole
+    // amounts, nor on large ones, nor in a currency without them (¥).
     try {
-      return numberFormat({ style: 'currency', currency: c.toUpperCase(), maximumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2, ...o }).format(n);
+      const minor = numberFormat({ style: 'currency', currency: c.toUpperCase() }).resolvedOptions().maximumFractionDigits ?? 2;
+      const digits = Number.isInteger(n) || Math.abs(n) >= 100_000 ? 0 : minor;
+      const max = o.maximumFractionDigits ?? digits;
+      return numberFormat({ style: 'currency', currency: c.toUpperCase(), ...o, minimumFractionDigits: Math.min(o.minimumFractionDigits ?? digits, max), maximumFractionDigits: max }).format(n);
     } catch {}
   }
   return `${c}${fmtNum(n, { maximumFractionDigits: 2, ...o })}`;
@@ -504,9 +509,10 @@ export function Btn({ children, onClick, primary, icon, className, disabled, tit
       disabled={disabled}
       onClick={onClick}
       className={cx(
-        'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-[12.5px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
+        'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg text-[12.5px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
         primary ? 'bg-accent text-accent-fg hover:opacity-90' : 'border border-line bg-panel text-fg hover:bg-bg-2',
-        !children && 'w-8 px-0',
+        // An icon alone is a square; padding only around words (both utilities would otherwise fight over it).
+        children ? 'px-3' : 'w-8',
         className,
       )}
     >
@@ -646,34 +652,37 @@ export interface MapPoint {
   lng: number;
   name?: string;
   note?: string;
+  /** What sizes its circle on a map of values (MapBox's `sized`). */
+  value?: number;
 }
 
-/** Points with a latitude and longitude, from items that may call them lat/lng, latitude/longitude or lon. */
-export function mapPoints(items: unknown[], label = 'name', note = 'note'): MapPoint[] {
+/** Points with a latitude and longitude, from items that may call them lat/lng, latitude/longitude or lon (with `value`, each its number there). */
+export function mapPoints(items: unknown[], label = 'name', note = 'note', value?: string): MapPoint[] {
   const out: MapPoint[] = [];
   for (const it of items) {
     const o = obj(it);
     const lat = num(o.lat ?? o.latitude);
     const lng = num(o.lng ?? o.lon ?? o.long ?? o.longitude);
     if (lat === null || lng === null || Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
-    out.push({ lat, lng, name: textOf(o[label] ?? o.name ?? o.title), note: str(o[note] ?? o.address) });
+    const v = value ? num(o[value]) : null;
+    out.push({ lat, lng, name: textOf(o[label] ?? o.name ?? o.title), note: str(o[note] ?? o.address), ...(v !== null ? { value: v } : {}) });
   }
   return out;
 }
 
 /**
  * A map with the points (numbered unless `numbered` is false), joined in order when `route`, pinned at the first and
- * last only when `ends` (a route's shape); drawn once the block is whole. Nothing in a confidential session (nothing
- * loads from the web there).
+ * last only when `ends` (a route's shape), or as circles sized by their `value` when `sized`; drawn once the block is
+ * whole. Nothing in a confidential session (nothing loads from the web there).
  */
-export function MapBox({ points, route, numbered = true, ends, height = 320, className }: { points: MapPoint[]; route?: boolean; numbered?: boolean; ends?: boolean; height?: number; className?: string }) {
+export function MapBox({ points, route, numbered = true, ends, sized, height = 320, className }: { points: MapPoint[]; route?: boolean; numbered?: boolean; ends?: boolean; sized?: boolean; height?: number; className?: string }) {
   const { offline, done } = useAui();
   if (offline || !points.length) return null;
   return (
     <div className={cx('aui-map', className)} style={{ height }}>
       {done ? (
         <Suspense fallback={null}>
-          <MapFrame points={points} route={route} numbered={numbered} ends={ends} height={height} />
+          <MapFrame points={points} route={route} numbered={numbered} ends={ends} sized={sized} height={height} />
         </Suspense>
       ) : null}
     </div>

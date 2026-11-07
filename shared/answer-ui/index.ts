@@ -19,6 +19,7 @@ import { SCIENCE } from './science.ts';
 import { SHOPPING } from './shopping.ts';
 import { SUMMARY } from './summary.ts';
 import { TRAVEL } from './travel.ts';
+import { WORK } from './work.ts';
 import { WRITING } from './writing.ts';
 import type { AnswerUiGroup, AnswerUiSpec } from './types.ts';
 
@@ -32,6 +33,7 @@ export const ANSWER_UI_GROUPS: { id: AnswerUiGroup; label: string }[] = [
   { id: 'travel', label: 'Places and travel' },
   { id: 'food', label: 'Food and fitness' },
   { id: 'plans', label: 'Time and plans' },
+  { id: 'work', label: 'Work and business' },
   { id: 'data', label: 'Numbers and charts' },
   { id: 'money', label: 'Money' },
   { id: 'learn', label: 'Learning' },
@@ -43,7 +45,7 @@ export const ANSWER_UI_GROUPS: { id: AnswerUiGroup; label: string }[] = [
 ];
 
 /** Every answer UI, by group. */
-export const ANSWER_UIS: AnswerUiSpec[] = [...SUMMARY, ...COMPARE, ...SHOPPING, ...TRAVEL, ...FOOD, ...PLANS, ...DATA, ...MONEY, ...LEARN, ...SCIENCE, ...MEDIA, ...PEOPLE, ...WRITING, ...CODE];
+export const ANSWER_UIS: AnswerUiSpec[] = [...SUMMARY, ...COMPARE, ...SHOPPING, ...TRAVEL, ...FOOD, ...PLANS, ...WORK, ...DATA, ...MONEY, ...LEARN, ...SCIENCE, ...MEDIA, ...PEOPLE, ...WRITING, ...CODE];
 
 const BY_ID = new Map(ANSWER_UIS.map((s) => [s.id, s]));
 
@@ -84,7 +86,6 @@ export const ANSWER_UI_ALIASES: Record<string, string> = {
   'how-to': 'steps',
   todo: 'checklist',
   tasks: 'checklist',
-  graph: 'chart',
   kpi: 'stats',
   metrics: 'stats',
   donut: 'breakdown',
@@ -131,6 +132,65 @@ export const ANSWER_UI_ALIASES: Record<string, string> = {
   resources: 'links',
   'night-sky': 'sky',
   astronomy: 'sky',
+  wizard: 'decision-tree',
+  troubleshooter: 'decision-tree',
+  flowchart: 'decision-tree',
+  wheel: 'picker',
+  spinner: 'picker',
+  random: 'picker',
+  dice: 'picker',
+  timetable: 'week',
+  'week-plan': 'week',
+  'gantt-chart': 'gantt',
+  timer: 'timers',
+  stopwatch: 'timers',
+  'action-list': 'action-items',
+  shipment: 'tracking',
+  'order-status': 'tracking',
+  trains: 'departures',
+  'transit-departures': 'departures',
+  hike: 'elevation',
+  'elevation-profile': 'elevation',
+  homes: 'listings',
+  apartments: 'listings',
+  'real-estate': 'listings',
+  'job-listings': 'jobs',
+  openings: 'jobs',
+  receipt: 'invoice',
+  findings: 'issues',
+  'code-review': 'issues',
+  'review-notes': 'issues',
+  histogram: 'distribution',
+  'box-plot': 'distribution',
+  bridge: 'waterfall',
+  'calendar-heatmap': 'activity',
+  streak: 'activity',
+  tournament: 'bracket',
+  knockout: 'bracket',
+  holdings: 'portfolio',
+  'function-plot': 'graph',
+  plotter: 'graph',
+  cloze: 'fill-blanks',
+  'match-pairs': 'matching',
+  sequence: 'ordering',
+  verbs: 'conjugation',
+  conversation: 'dialogue',
+  chat: 'dialogue',
+  reference: 'citation',
+  bibliography: 'citation',
+  hotspots: 'annotated-image',
+  'labelled-image': 'annotated-image',
+  'image-compare': 'before-after',
+  guitar: 'chords',
+  piano: 'chords',
+  typography: 'fonts',
+  'font-pairing': 'fonts',
+  'qr-code': 'qr',
+  log: 'logs',
+  crontab: 'cron',
+  'bubble-map': 'map-values',
+  choropleth: 'map-values',
+  vcard: 'contact',
 };
 
 /** A UI by its name, or by another name agents write for it (ANSWER_UI_ALIASES); undefined when there is none. */
