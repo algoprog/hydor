@@ -118,7 +118,7 @@ A confidential session has a lock beside its title, in its header and in the sid
 
 - **Off**: web search and web pages, the browser and your screen, connected apps and your keys, apps, publishing, scheduled tasks, making, finding or editing pictures, drawings, plots, videos or sound, models elsewhere (deep research, swarm and the arena; a [second opinion](/guide/research) comes only from another maker's model on this computer), handing the conversation to another agent, saving anything to memory, and exporting a page as a file (export it yourself from the Library).
 - **Commands without network**: the agent's commands run cut off from the network, in every permissions mode, so nothing can be downloaded, installed from the internet, pushed or sent. Where that can't be done (a Mac, Windows, some containers), each command asks you first, whatever the mode, and the lock's note says so.
-- **Still on**: the files in the folder, documents (read on this computer), the Library, shared knowledge, your memory notes and profile (read, never added to), and child sessions, which are confidential too.
+- **Still on**: the files in the folder, documents (read on this computer), the Library, shared knowledge, your memory notes and profile (read, never added to), child sessions, which are confidential too, and answer UIs (without pictures or maps from the web).
 - **Nothing sent out about it**: its title comes from the helper model when that runs on this computer, else from the first words of your message; notifications say only "A confidential session" and whether it finished, needs you or failed; there is no read-only link, no pull request from its menu, and no automation or app made from it; agents in other sessions and agents elsewhere can't read it; its replies show no pictures from the web, and the pages it shows load nothing from anywhere (so a chart that needs a library from the web won't draw); dictation works only with speech recognition on this computer ([Settings → Capabilities → Voice](/settings?s=voice)), and replies are read aloud only with a voice on your device.
 - **It stays confidential**: forks and **Edit from here** are confidential too, and it can't be turned off, so what was said stays where it is. For work that may leave the computer, start a new session.
 
@@ -182,6 +182,17 @@ Agents write their replies for this app, not for a terminal, so a reply can hold
 - **Pictures**: photos from the web (a place, a product, a plant, an artwork) and pictures on this computer, fitted to the reply; click one to see it large, where **Edit** opens it in the picture editor ([Edit pictures and videos](/guide/library#edit-pictures-and-videos)). Pictures from the web come through this app's server, so the site that has them never sees your browser. One that can't be loaded shows as a link to it.
 
 To get plain text instead, say so in your [Agent Guidelines](/guide/guidelines) ("Answer in plain text, without diagrams or pictures") or in your message. You can also ask for any of these in plain words: "draw the steps as a flowchart", "show me a picture of it", "give me a slider to try other values".
+
+### Answer UIs: cards, charts and maps in replies
+
+When an answer is something to look at, compare or use rather than read, the agent can show it in one of the app's answer UIs: more than a hundred ready-made cards, tables, charts, maps, galleries, timelines and small tools, filled with the answer's own content. Options to compare become a table with the best value in each row marked, a recipe a card whose servings scale its amounts, a forecast the coming hours and days, places a map with numbered pins, a quiz questions you answer in place. Each one builds up as the reply comes, in the app's look, light or dark.
+
+- **What you can do in one**: sort and filter a table, switch a chart to its numbers, tick off a checklist, start a recipe's timers, flip flashcards, move a calculator's sliders, play a video. What you tick or answer is still there when you come back to the conversation on this device. Some put words in your message box for you to send: the option you picked, your quiz score.
+- **On hover**: **Show the data** shows what the agent wrote (**Show it** goes back), and **Copy as text** copies it as plain text.
+- **When agents use them**: only where one makes the answer clearer; conversation, short answers, explanations and code changes stay text. The agent looks for the ones that fit with a few words on what its answer shows (by words and, when **Search by meaning** is on in [Settings → Memory](/settings?s=memory), by meaning too), so it is never handed them all.
+- **See them all**: [Answer UIs](/answers) shows every one with an example, by group: summaries, comparisons, shopping, places and travel, food, plans, numbers and charts, money, learning, science, media, people and sports, writing, and code. **Play as it streams** shows one coming in as a reply would bring it.
+
+Ask for one in plain words too: "compare them in a table", "put them on a map", "quiz me on it". Your [Agent Guidelines](/guide/guidelines) can ask for plain text instead.
 
 ### Open a step to see its output
 
@@ -440,6 +451,9 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
 - "Switch the session 'Data cleanup' to Accept edits and send it: carry on with the next file."
 - "What does the rotating ring on Stop mean?"
 - "Explain how a heat pump works, with a diagram of the cycle and a picture of one."
+- "Compare the three e-readers in a table and pick one for me."
+- "Show the best ramen places near Shibuya station on a map."
+- "Quiz me on the French Revolution: five questions."
 - "Which of my models can run a confidential session, and which one would it use?"
 - "Start a confidential session in ~/reviews/4711 that reviews the paper there for ICLR."
 - "Why can't my confidential session search the web, and what still works in it?"

@@ -3,6 +3,29 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.39.0 · 7 November 2026
+
+Answers you can use: agents show an answer as a card, a table, a chart, a map or a small tool when that makes it clearer,
+picked from more than a hundred answer UIs and filled in as the reply comes.
+
+- **Answer UIs in replies**: options to compare become a table with the best value in each row marked, a recipe a card
+  whose servings scale the amounts and whose steps have timers, a forecast the coming hours and days, places a map with
+  numbered pins, a trip a day-by-day plan, numbers a chart you can switch to its figures, a quiz questions you answer in
+  place. There are UIs for summaries, comparisons, shopping, travel, food, plans, numbers, money, learning, the night
+  sky, media and events, people and sports, writing and code.
+- **They build up as the reply streams**, in the app's look, light or dark, with pictures, videos, maps and charts of
+  their own. Ticks, answers and choices stay when you come back on the same device; some put words in your message box
+  for you to send (the option you picked, your quiz score).
+- **Only where they help**: conversation, short answers, explanations and code changes stay text. Agents find the UIs
+  that fit what their answer shows by words and, with search by meaning on, by meaning too, so none is handed the whole
+  collection.
+- **On each one**: **Show the data** shows what the agent wrote, and **Copy as text** copies it.
+- **A gallery of them all**: Answer UIs (`/answers`, or search for it with Ctrl+K) shows every one with an example, by
+  group, and plays one as it streams. Ask for one in plain words: "compare them in a table", "put them on a map".
+- **Charts in the house style**: one palette of eight colours checked for colour blindness, in both themes.
+- **Pictures from the web load more reliably**: the app asks a site for a few pictures at a time and tries again after a
+  moment when the site is busy, so a gallery from Wikimedia no longer leaves some pictures blank for ten minutes.
+
 ## 0.38.0 · 7 November 2026
 
 Agents that check their helpers' work and step up when a cheap try falls short, hand back results in the shape you

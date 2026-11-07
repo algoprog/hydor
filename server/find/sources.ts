@@ -3,6 +3,7 @@
 // and skills), whose vectors are made ahead of time (npm run find:vectors), and what people make (sessions,
 // spaces, apps, scheduled tasks, assistants, learned skills, the Library's pages, images and videos, connected
 // apps), whose vectors are made the moment they are made or changed (index.ts). The guide's sections ship too.
+import { ANSWER_UIS, type AnswerUiSpec } from '../../shared/answer-ui/index.ts';
 import type { FindPlace } from '../../shared/find.ts';
 import { catalogItems, catalogText } from '../../shared/find-catalog.ts';
 import type { MediaItem } from '../../shared/media.ts';
@@ -113,7 +114,14 @@ export function itemsOf(kind: Kind, d: Pick<Deps, 'db' | 'sessions' | 'scheduler
   }
 }
 
+/**
+ * An answer UI's text for its vector (shared/answer-ui): agents' find_ui (server/answers) finds it by meaning against this,
+ * not the search box. Its title, what it is for and the words it is found by.
+ */
+export const answerUiText = (s: Pick<AnswerUiSpec, 'title' | 'use' | 'keywords'>) => text(s.title, 'An answer UI', s.use, s.keywords);
+const answerUis = (): Item[] => ANSWER_UIS.map((s) => ({ id: `ui:${s.id}`, text: answerUiText(s) }));
+
 /** What ships with the app: its vectors are made ahead of time and kept in the repository. */
 export function shippedItems(db: DB): Item[] {
-  return [...catalog(), ...guideItems(), ...templates(), ...BUILTINS.map(assistant), ...libraryView(db).filter((s) => s.source === 'bundled').map(skill)];
+  return [...catalog(), ...guideItems(), ...templates(), ...BUILTINS.map(assistant), ...libraryView(db).filter((s) => s.source === 'bundled').map(skill), ...answerUis()];
 }

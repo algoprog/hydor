@@ -133,13 +133,16 @@ function literals(js, shown = []) {
         i = j;
       } else {
         if (inside && c === '{') depth++;
-        else if (inside && c === '}' && depth-- === 0) {
-          i++;
-          return;
-        } else if (c === '(' || c === '[') {
+        else if (inside && c === '}') {
+          if (depth-- === 0) {
+            i++;
+            return;
+          }
+        } else if (c === '(' || c === '[' || (bracesQuiet && c === '{')) {
+          // A QUIET key's value in brackets (a prompt's lines), or in braces where QUIET_UNDER says (an example's data), is quiet to its end.
           if (prev === ':' && quietHere.has(key)) muted.push(nest), quiet++;
           nest++;
-        } else if (c === ')' || c === ']') {
+        } else if (c === ')' || c === ']' || (bracesQuiet && c === '}')) {
           nest--;
           if (muted.at(-1) === nest) muted.pop(), quiet--;
         } else if (c === ':') key = prev;
@@ -164,8 +167,14 @@ const QUIET_IN = {
   // shapes; their names are the app's.
   'shared/diagram-palette.ts': ['text', 'rows'],
 };
-/** The quiet keys of the file being read. */
+/**
+ * Keys quiet in every file of a folder: the answer UIs' catalog (shared/answer-ui), whose types, examples and search words
+ * go to agents and search; the gallery shows only each UI's title and what it is for (`use`).
+ */
+const QUIET_UNDER = { 'shared/answer-ui/': ['shape', 'example', 'keywords'] };
+/** The quiet keys of the file being read, and whether a quiet key's value in braces is quiet too (QUIET_UNDER's files). */
 let quietHere = QUIET;
+let bracesQuiet = false;
 
 /** Utilities that are bare words. */
 const UTILITIES = /^(flex|grid|block|inline|inline-flex|inline-block|hidden|contents|relative|absolute|fixed|sticky|static|truncate|italic|underline|uppercase|lowercase|capitalize|grow|shrink|border|rounded|shadow|ring|outline|transition|transform|group|peer|container|prose|tnum|ico|isolate|invisible|visible|antialiased|select-none|resize|break-words)$/;
@@ -320,7 +329,9 @@ for (const f of [...files(path.join(ROOT, 'web/src'), /\.(tsx|ts)$/), ...files(p
   const src = fs.readFileSync(f, 'utf8');
   const js = transformSync(src, { loader: f.endsWith('x') ? 'tsx' : 'ts', jsx: 'automatic', minifyWhitespace: false, legalComments: 'none' }).code;
   const where = path.relative(ROOT, f);
-  quietHere = new Set([...QUIET, ...(QUIET_IN[where.split(path.sep).join('/')] ?? [])]);
+  const rel = where.split(path.sep).join('/');
+  quietHere = new Set([...QUIET, ...(QUIET_IN[rel] ?? []), ...Object.entries(QUIET_UNDER).flatMap(([dir, keys]) => (rel.startsWith(dir) ? keys : []))]);
+  bracesQuiet = Object.keys(QUIET_UNDER).some((dir) => rel.startsWith(dir));
   const shown = [];
   for (const s of literals(js, shown)) add(s, where);
   for (const s of shown) add(s, where, true);
@@ -333,6 +344,7 @@ for (const f of [...files(path.join(ROOT, 'web/src'), /\.(tsx|ts)$/), ...files(p
   // An element's only text ("utilization", "now"), and words pushed onto a list the page joins: words even when single.
   for (const m of js.matchAll(/children: ((["'])(?:(?!\2)[^\\]|\\.)*\2)(?=\s*[,}])|\.push\(((["'])(?:(?!\4)[^\\]|\\.)*\4)\)/g)) add(literals(m[1] ?? m[3])[0], where, true);
   quietHere = QUIET;
+  bracesQuiet = false;
 }
 // The server's messages that show in the pages: errors (in toasts), except those its tools give agents (tools.ts,
 // mcp.ts, and page_action's, server/pages/actions.ts), and the names and lines of what ships.

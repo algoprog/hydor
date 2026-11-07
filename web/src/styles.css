@@ -46,6 +46,13 @@
   --scroll: #cdc6b8;
   --viz-1: #2a78d6;
   --viz-2: #eb6834;
+  /* The rest of the charts' categorical palette, in its fixed order (validated for colour blindness on these panels). */
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-5: #e87ba4;
+  --viz-6: #008300;
+  --viz-7: #6250d6;
+  --viz-8: #e34948;
   --viz-grid: #ebe8e1;
   --viz-axis: #c9c2b3;
   --status-good: #0ca30c;
@@ -106,6 +113,12 @@
   --scroll: #303643;
   --viz-1: #3987e5;
   --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+  --viz-5: #d55181;
+  --viz-6: #008300;
+  --viz-7: #9085e9;
+  --viz-8: #e66767;
   --viz-grid: #171a20;
   --viz-axis: #303643;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 10px 30px rgba(0, 0, 0, 0.55);
@@ -1241,6 +1254,122 @@ html {
 }
 
 /* ---- markdown ------------------------------------------------------------- */
+
+/* ---- answer UIs (components/answer) -------------------------------------------------------------------
+   A UI sits inside a reply's .md, whose rules are for text (lists with bullets, bordered tables, spaced paragraphs):
+   inside the UI they give way to its own classes (its utilities and the rules below), except in the agent's own
+   Markdown inside it (.aui-md), in maths and in code blocks, which read as the reply does. */
+.md .aui :where(:not(.katex, .katex *, .katex-display, .aui-md *, .code-block, .code-block *, .breathe)) {
+  all: revert-layer;
+}
+.md .aui .aui-md > :first-child {
+  margin-top: 0;
+}
+.md .aui .aui-md > :last-child {
+  margin-bottom: 0;
+}
+.md .aui .aui-md-inline p {
+  display: inline;
+  margin: 0;
+}
+@layer components {
+  .aui {
+    /* Its parts lay out by the room the reply gives it (@md:, @lg: …), not by the window. */
+    container-type: inline-size;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--fg);
+    overflow-wrap: break-word;
+  }
+  .aui-card {
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--panel);
+  }
+  .aui-h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 650;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+  .aui-h4 {
+    margin: 0;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+  .aui-lead {
+    font-size: 16.5px;
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: -0.01em;
+  }
+  .aui-p {
+    margin: 0;
+  }
+  .aui-md {
+    font-size: inherit;
+    line-height: 1.55;
+  }
+  .aui-pic {
+    display: block;
+    object-fit: cover;
+    background: var(--bg-2);
+    -webkit-user-drag: none;
+  }
+  .aui-pic-contain {
+    object-fit: contain;
+  }
+  .aui-pic-none {
+    display: grid;
+    place-items: center;
+    color: var(--fg-3);
+  }
+  .aui-pic-none > svg {
+    opacity: 0.45;
+  }
+  .aui-video {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: 12px;
+    background: #000;
+  }
+  .aui-video-file {
+    display: block;
+    width: 100%;
+    max-height: 70vh;
+    border-radius: 12px;
+    background: #000;
+  }
+  .aui-map,
+  .aui-plot {
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+    background: var(--bg-1);
+  }
+  .aui-live {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--busy);
+    pointer-events: none;
+  }
+  .aui-wait {
+    height: 96px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--panel);
+  }
+}
 
 .md {
   font-size: 15px;
