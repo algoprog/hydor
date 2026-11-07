@@ -6,6 +6,7 @@
 //   OUTDIR=/tmp/hydor-auto-tests node scripts/build-server.mjs server/automations/tests.ts
 //   DATA_DIR=/tmp/hydor-auto-tests/data node /tmp/hydor-auto-tests/tests.js
 import assert from 'node:assert/strict';
+import { saveAssistant } from '../assistants/store.ts';
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
@@ -430,6 +431,42 @@ await test('nothing to report: no notice', async () => {
   await sleep(4300);
   assert.equal(sessions.notices.length, n0);
   scheduler.remove(t.id);
+});
+
+await test('a run as an agent that thinks with a tier: when it fails, it runs again one tier up, to Best at most', async () => {
+  const scout = saveAssistant(db, { name: 'Price scout', instructions: 'Check the price.', tier: 'quick' });
+  const t = scheduler.save({ ...base, name: 'Price check', extra: { assistant: scout.id }, schedule: { kind: 'every', minutes: 30 } });
+  const n0 = sessions.created.length;
+  const key = (await scheduler.runNow(t.id))!;
+  // Its first run leaves the model to its agent's tier (applied as the session starts).
+  assert.equal(sessions.created.at(-1).model, undefined);
+  scheduler.report(scheduler.runIn(key)!.id, 'failed', 'The page did not load');
+  await sessions.endTurn(scheduler, key, 'I could not load the page.');
+  await sleep(50);
+  assert.equal(sessions.created.length, n0 + 2);
+  assert.equal(sessions.created.at(-1).model, 'sonnet');
+  const second = scheduler.runs(t.id, 5)[0];
+  assert.equal(second.trigger, 'rerun');
+  assert.equal(second.status, 'running');
+  // Standard fails too: Best. Best fails: nothing above it.
+  scheduler.report(second.id, 'failed', 'Still not loading');
+  await sessions.endTurn(scheduler, second.key!, 'Still nothing.');
+  await sleep(50);
+  assert.equal(sessions.created.at(-1).model, 'opus');
+  const third = scheduler.runs(t.id, 5)[0];
+  scheduler.report(third.id, 'failed', 'The site is down');
+  await sessions.endTurn(scheduler, third.key!, 'The site is down.');
+  await sleep(50);
+  assert.equal(sessions.created.length, n0 + 3);
+  // A task that names its own model, or a run that went well: no step up.
+  const fixed = scheduler.save({ ...base, name: 'Fixed model', model: 'opus', extra: { assistant: scout.id }, schedule: { kind: 'every', minutes: 30 } });
+  const k2 = (await scheduler.runNow(fixed.id))!;
+  scheduler.report(scheduler.runIn(k2)!.id, 'failed', 'No');
+  await sessions.endTurn(scheduler, k2, 'No.');
+  await sleep(50);
+  assert.equal(sessions.created.length, n0 + 4);
+  scheduler.remove(t.id);
+  scheduler.remove(fixed.id);
 });
 
 await test('failures always notify; three in a row pause the task, saying why', async () => {

@@ -18,6 +18,9 @@ import type { TurnInfo } from './features/types.ts';
 import { costOf } from './prices.ts';
 import type { SessionManager } from './sessions.ts';
 import { localNow, userTimezone } from './userPrefs.ts';
+import { nextTier, type Tier } from '../shared/tiers.ts';
+import { findAssistant } from './assistants/store.ts';
+import { tierPick } from './assistants/tiers.ts';
 import { deliveryId, passesFilter, verifySignature, type HookCall } from './automations/hooks.ts';
 import { deliveryRun, finishRun, firstDelivery, getRun, listRuns, migrateRuns, openRunIn, openRunOf, openRuns, recentByTask, recentRunIn, runOfApp, setRun, startRun, toRun, dropRuns, type RunRow } from './automations/runs.ts';
 import { checkCron, HHMM, nextRun } from './automations/schedule.ts';
@@ -241,6 +244,10 @@ export class Scheduler extends EventEmitter {
   /** Watch tasks being checked now. */
   private checking = new Set<string>();
   private finalizing = new Set<string>();
+  /** The tier a run was stepped up to, by its id (a run on its agent's own tier is not here). */
+  private runTier = new Map<string, Tier>();
+  /** A standing agent's own session, made when it has none (server/assistants/inbox.ts): its runs post into it. */
+  private standing?: (assistantId: string) => Promise<string | null>;
   /** Webhook calls waiting for a run to end (?wait=). */
   private waiters = new Map<string, ((r: TaskRun) => void)[]>();
   private zone = '';
@@ -628,6 +635,10 @@ export class Scheduler extends EventEmitter {
   }
 
   /** Runs templates for tasks (the apps feature calls this once it starts). */
+  useStanding(fn: (assistantId: string) => Promise<string | null>) {
+    this.standing = fn;
+  }
+
   useApps(apps: AppRunner) {
     this.apps = apps;
   }
@@ -748,7 +759,7 @@ export class Scheduler extends EventEmitter {
     ].join('\n');
   }
 
-  private async run(r: Row, o: { trigger: RunTrigger; input?: string; rerunOf?: string; saved?: boolean; answers?: Record<string, string> }): Promise<{ runId?: string; key?: string }> {
+  private async run(r: Row, o: { trigger: RunTrigger; input?: string; rerunOf?: string; saved?: boolean; answers?: Record<string, string>; tier?: Tier }): Promise<{ runId?: string; key?: string }> {
     if (this.starting.has(r.id)) throw new HttpError(409, `${r.name} is starting already`);
     this.starting.add(r.id);
     const schedule = JSON.parse(r.schedule) as TaskSchedule;
@@ -780,7 +791,9 @@ export class Scheduler extends EventEmitter {
     const prompt = `${this.preamble(r, schedule, o.trigger)}\n\n${body}`;
     const taskId = test && !o.saved ? '' : r.id;
     const runId = startRun(this.db, { taskId, trigger: o.trigger, input: body, rerunOf: o.rerunOf });
+    if (o.tier) this.runTier.set(runId, o.tier);
     let key: string | undefined;
+    let standingKey: string | null = null;
     let error: string | undefined;
     try {
       if (app && answers) {
@@ -789,8 +802,8 @@ export class Scheduler extends EventEmitter {
         const started = this.apps.start({ app: app.id, inputs: answers, test });
         setRun(this.db, runId, { app_run: started.id });
         key = started.key;
-      } else if (r.target) {
-        key = r.target;
+      } else if (r.target || (standingKey = await this.standingOf(r))) {
+        key = r.target ?? standingKey!;
         const s = this.sessions.summary(key);
         if (!s) throw new Error('The session it posts into is gone');
         setRun(this.db, runId, { key, cost_base: this.costNow(key), sent: prompt, queued: busy(s.live?.status) ? 1 : 0 });
@@ -803,8 +816,8 @@ export class Scheduler extends EventEmitter {
           acpAgent: r.agent === 'acp' ? (r.acp_agent ?? undefined) : undefined,
           cwd: r.cwd,
           prompt,
-          model: r.model ?? undefined,
-          effort: r.effort ?? undefined,
+          // Stepped up: the next tier's model for its program, in place of its agent's own.
+          ...this.tierModel(r, o.tier),
           mode: r.mode ?? undefined,
           title: `${test ? 'Test: ' : ''}${r.name} · ${stamp}`,
           remember: false,
@@ -827,6 +840,38 @@ export class Scheduler extends EventEmitter {
     this.emit('changed');
     if (error) throw new HttpError(500, error);
     return { runId, key };
+  }
+
+  /** A run's model and effort: its task's, or those of the tier it was stepped up to. */
+  private tierModel(r: Row, tier?: Tier): { model?: string; effort?: string } {
+    const pick = tier ? tierPick(this.db, tier, r.agent, r.acp_agent ?? undefined) : null;
+    return { model: pick?.model ?? r.model ?? undefined, effort: pick?.effort ?? r.effort ?? undefined };
+  }
+
+  /** The session of the standing agent a task runs as, when it runs as one and does not post into a session of its own. */
+  private async standingOf(r: Row): Promise<string | null> {
+    const id = parse<TaskExtra>(r.extra)?.assistant;
+    if (typeof id !== 'string' || !this.standing || !findAssistant(this.db, id)?.standing) return null;
+    return this.standing(id);
+  }
+
+  /**
+   * Whether a finished run goes again one tier up: it ran as an agent that thinks with a tier (its task names no model of
+   * its own), it failed or stopped with an error, its agent steps up, and there is a tier above (two steps at most).
+   */
+  private stepUpOf(r: RunRow, status: RunStatus): Tier | null {
+    if (!r.task_id || r.trigger === 'test' || (status !== 'failed' && status !== 'error') || !r.input) return null;
+    let row: Row;
+    try {
+      row = this.get(r.task_id);
+    } catch {
+      return null;
+    }
+    if (row.model || row.target || row.app) return null;
+    const a = findAssistant(this.db, parse<TaskExtra>(row.extra)?.assistant);
+    if (!a?.tier || a.stepUp === false || a.standing) return null;
+    const now = this.runTier.get(r.id) ?? a.tier;
+    return nextTier(now) ?? null;
   }
 
   /** What a session has cost so far, in dollars (the agent's own figure, else from its tokens). */
@@ -904,6 +949,12 @@ export class Scheduler extends EventEmitter {
       if (r.task_id && r.trigger !== 'test') this.counted(r.task_id, status, summary, r.key ?? undefined);
       this.settle(r.id);
       this.emit('changed');
+      // On a tier that fell short: once more, one tier up, with the same input.
+      const up = this.stepUpOf(r, status);
+      if (up && r.task_id) {
+        const task = this.get(r.task_id);
+        void this.run(task, { trigger: 'rerun', input: r.input!, rerunOf: r.id, tier: up }).catch(() => {});
+      }
       // Its cost settles once the transcript is read; the notice waits for the session's own.
       setTimeout(() => this.refreshCost(r.id), 20_000).unref();
       setTimeout(() => this.noticeLater(r.id), 4_000).unref();

@@ -17,6 +17,7 @@ import { go } from '../../lib/nav';
 import { Badge, Button, cx, Dialog, IconButton, inputCls, OptionRow, Picker, Popover, Section, Segmented, Switch, Throbber } from '../../components/ui';
 import { useSpaces } from '../spaces/state';
 import { AssistantIcon, ICONS } from './icons';
+import { OutputEditor } from './OutputEditor';
 import { useAssistants, useAssistantsState } from './state';
 
 type Draft = Partial<Assistant>;
@@ -363,6 +364,13 @@ export function EditAssistant({ value, onClose, onSaved }: { value: Draft | null
             onChange={(v) => set({ helperMax: v === 'any' ? undefined : v })}
             options={[{ value: 'any', label: 'Any' }, ...TIERS.map((t) => ({ value: t.id, label: t.label }))]}
           />
+          <label className="mt-2.5 flex cursor-pointer items-center gap-3">
+            <span className="min-w-0 flex-1">
+              <span className="block text-[12.5px] text-fg-2">Step up when a check fails</span>
+              <span className="block text-[12px] leading-snug text-fg-3">A helper on a tier whose reply does not pass a quick check runs again one tier up; a scheduled run that fails, too.</span>
+            </span>
+            <Switch on={d.stepUp !== false} onChange={(on) => set({ stepUp: on ? undefined : false })} label="Step up when a check fails" />
+          </label>
         </Field>
         <Field label="What it may use" hint="Custom and Claude Code have the rest switched off; Codex is told. The app’s own tools (pages, memory) stay on.">
           <div className="divide-y divide-line rounded-xl border border-line">
@@ -435,6 +443,15 @@ export function EditAssistant({ value, onClose, onSaved }: { value: Draft | null
             <span className="text-fg-3">$</span>
             <input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="No limit" className={cx(inputCls, 'w-32')} aria-label="Dollars a month" />
           </div>
+        </Field>
+        <Field label="Its own conversation" hint="Messages from you and other agents go into one conversation of its own, one at a time, and it remembers what came before; each answer goes back to whoever sent it. Its scheduled runs post there too.">
+          <label className="flex cursor-pointer items-center gap-3">
+            <span className="min-w-0 flex-1 text-[13px]">Keeps one conversation, with an inbox</span>
+            <Switch on={!!d.standing} onChange={(on) => set({ standing: on || undefined })} label="Keeps one conversation, with an inbox" />
+          </label>
+        </Field>
+        <Field label="Hands back" hint="The fields of each result, checked when it hands one back (hand_back), and where each goes.">
+          <OutputEditor value={d.output} onChange={(output) => set({ output })} />
         </Field>
       </div>
     </Dialog>

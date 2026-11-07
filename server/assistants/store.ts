@@ -3,7 +3,8 @@
 import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
-import { ASSISTANT_ICONS, ASSISTANT_MODES, TOOL_KINDS, type Assistant, type AssistantMode, type ToolKind } from '../../shared/assistants.ts';
+import { ASSISTANT_ICONS, ASSISTANT_MODES, TOOL_KINDS, type AgentOutput, type Assistant, type AssistantMode, type OutputTarget, type ToolKind } from '../../shared/assistants.ts';
+import { cleanAnswer } from '../../shared/apps.ts';
 import { isTier } from '../../shared/tiers.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
@@ -40,6 +41,38 @@ const str = (v: unknown, max: number) =>
     .trim()
     .slice(0, max);
 const names = (v: unknown, max: number) => (Array.isArray(v) ? [...new Set(v.map((x) => str(x, 120)).filter(Boolean))].slice(0, max) : []);
+
+/** Where an agent's results go, checked: paths inside its folder, https addresses, a key's name; at most eight. */
+function targetsOf(v: unknown): OutputTarget[] {
+  if (!Array.isArray(v)) return [];
+  const out: OutputTarget[] = [];
+  for (const t of v.slice(0, 8)) {
+    const x = (t ?? {}) as Record<string, unknown>;
+    if (x.kind === 'library' || x.kind === 'notify') out.push({ kind: x.kind });
+    else if (x.kind === 'file') {
+      const p = str(x.path, 300).replace(/\\/g, '/');
+      if (!p || path.isAbsolute(p) || p.split('/').includes('..')) throw new HttpError(400, 'A file it writes to is a path inside the folder it works in, like reports/{date}.md');
+      out.push({ kind: 'file', path: p });
+    } else if (x.kind === 'webhook') {
+      const url = str(x.url, 2000);
+      if (!/^https:\/\/[^\s/]+/.test(url)) throw new HttpError(400, 'A webhook it sends to is an https:// address');
+      const secret = str(x.secret, 80).toUpperCase();
+      if (secret && !/^[A-Z][A-Z0-9_]*$/.test(secret)) throw new HttpError(400, 'A key is named in capitals, like SLACK_WEBHOOK_TOKEN');
+      out.push({ kind: 'webhook', url, ...(secret ? { secret } : {}) });
+    }
+  }
+  return out;
+}
+
+/** What an agent hands back, checked as an app's answer fields are; none when it names neither fields nor places. */
+function outputOf(v: unknown): AgentOutput | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const o = v as Record<string, unknown>;
+  // Pictures and files are an app's: an agent's result is words, numbers, links, lists and tables.
+  const fields = Array.isArray(o.fields) && o.fields.length ? cleanAnswer(o.fields).filter((f) => f.type !== 'media') : [];
+  const to = targetsOf(o.to);
+  return fields.length || to.length ? { ...(fields.length ? { fields } : {}), ...(to.length ? { to } : {}) } : undefined;
+}
 
 /** A monthly budget in dollars, to the cent: none for nothing, zero or less. */
 function budgetOf(v: unknown): number | undefined {
@@ -79,6 +112,9 @@ export function cleanAssistant(b: Partial<Record<keyof Assistant, unknown>>): Om
     canAsk: names(b.canAsk, 30),
     askable: b.askable === false ? false : undefined,
     budgetUsd: budgetOf(b.budgetUsd),
+    stepUp: b.stepUp === false ? false : undefined,
+    standing: b.standing === true ? true : undefined,
+    output: outputOf(b.output),
     source: str(b.source, 1000) || undefined,
   };
   // Empty lists and unset choices are left out of what is kept.

@@ -16,6 +16,8 @@ An agent can hold:
 - **What it thinks with**: Automatic, or a tier (Quick, Standard or Best) whose model you set once for each program (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
 - **Its team**: the other agents it may hand parts of its work to, and whether other agents may hand it work (see [Agents that hand work to other agents](#agents-that-hand-work-to-other-agents)).
 - **A monthly budget**: what its sessions may spend in a month (see [A monthly budget](#a-monthly-budget)).
+- **What it hands back**: the fields of each result, checked, and where each goes: a file, the Library, a webhook, a notification (see [What an agent hands back](#what-an-agent-hands-back)).
+- **A conversation of its own**: it can keep one conversation, with an inbox for messages from you and other agents, where its scheduled runs post too (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
 - **What it may use**: reading files, creating and changing files, running commands, using the web, and other tools. Leave all of them on, or switch some off.
 - **Skills to favor**: skills it loads before it starts when they fit the task (see [Skills](/guide/skills)).
 - **Connections**: connected accounts to turn on in its sessions (see [Connected apps, keys and tools](/guide/connections)).
@@ -29,7 +31,7 @@ An agent is a role a session takes on. Text that every agent should follow in ev
 Open **Agents** in the sidebar, or go to [/agents](/agents). On a phone the sidebar is a drawer: open it first.
 
 - **New agent**, at the top, makes one (see [Make an agent](#make-an-agent)); **Import** brings in Claude Code's agent files (see [Import Claude Code's agent files](#import-claude-codes-agent-files)).
-- Your agents show as cards. Each card has the agent's name, its line, how it is doing (**Working**, **Needs you** when one of its sessions waits for your answer, **Budget spent**, or **Idle**), the projects it works in (or **Everywhere**), its tier, when it runs next, and what it spent this month.
+- Your agents show as cards. Each card has the agent's name, its line, how it is doing (**Working**, **Needs you** when one of its sessions waits for your answer, **Budget spent**, or **Idle**), the projects it works in (or **Everywhere**), its tier, when it runs next, how many messages wait in its inbox, and what it spent this month.
 - Chips above the cards show **All**, **Everywhere**, each project that has agents of its own, **On a schedule** and **Needs you**.
 - The agents that come with the app are under **Built in**.
 
@@ -39,6 +41,8 @@ Click a card for the agent's own page:
 - **Start a session** opens the start page with the agent picked (and its project, when it works in one).
 - **All settings** opens every setting in the editor (see [All settings](#all-settings)). **Duplicate** makes a copy to change; **Delete** removes one of yours.
 - **Schedules** lists the scheduled tasks that run as it, with **Add a schedule**.
+- **Inbox**, for an agent that keeps a conversation of its own: its messages and their answers, a box to send it one, and **Its conversation** (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
+- **What it handed back**, for an agent with fields or places for its results: its latest results, each with where it went (see [What an agent hands back](#what-an-agent-hands-back)).
 - **This month**: how many sessions started as it and what they spent, against its budget when it has one; and its **Recent sessions**, each opening its conversation.
 
 ## The built-in agents
@@ -169,12 +173,14 @@ The editor that **All settings** opens has every setting of an agent; on a phone
   - **Plan**: reads and plans only, until you approve.
 
   Claude Code, Codex and Custom each have a mode that matches these. Other agents (Gemini CLI, OpenCode…) keep their own.
-- **Thinks with**: **Automatic**, **Quick**, **Standard** or **Best**, and under it **Helpers it starts, never above**: **Any**, or a tier (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
+- **Thinks with**: **Automatic**, **Quick**, **Standard** or **Best**; under it **Helpers it starts, never above**: **Any**, or a tier; and **Step up when a check fails**, on unless you turn it off (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
 - **What it may use**: five switches, all on for a new agent (see below).
 - **Skills to favor**: skill names, one at a time (see below).
 - **Connections**: shown when you have connected accounts (see below).
 - **Team**: a switch for each other agent it may hand work to, and **Other agents may hand it work** (see [Agents that hand work to other agents](#agents-that-hand-work-to-other-agents)).
 - **Monthly budget**: dollars a month, or empty for no limit (see [A monthly budget](#a-monthly-budget)).
+- **Its own conversation**: **Keeps one conversation, with an inbox** (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
+- **Hands back**: the fields of each result and where each goes (see [What an agent hands back](#what-an-agent-hands-back)).
 
 ### What it may use
 
@@ -204,13 +210,14 @@ This part shows only when you have connected accounts (set up in [Apps → Conne
 
 ## Change an agent
 
-On an agent's page, its settings read as sentences: what it does, "It works *everywhere*, *every weekday at 09:00*, and thinks with *Quick*. It may *read files and use the web*, and asks *no other agents* for help. It spends at most *$3* a month." Each underlined part opens what changes it, and the change is saved at once:
+On an agent's page, its settings read as sentences: what it does, "It works *everywhere*, *every weekday at 09:00*, and thinks with *Quick*. It may *read files and use the web*, and asks *no other agents* for help. It hands back *its reply*. It spends at most *$3* a month." Each underlined part opens what changes it, and the change is saved at once:
 
 - **Where it works**: **Everywhere**, or a switch for each project.
-- **When it works**: its schedules, each opening its editor, and **Add a schedule**.
-- **What it thinks with**: Automatic or a tier, and **Helpers it starts, never above**.
+- **When it works**: its schedules, each opening its editor, **Add a schedule**, and **Keeps one conversation, with an inbox**.
+- **What it thinks with**: Automatic or a tier, **Helpers it starts, never above**, and **Step up when a check fails**.
 - **What it may use**: the five switches.
 - **Whom it asks for help**: a switch for each other agent, and **Other agents may hand it work**.
+- **What it hands back**: its fields and where each result goes.
 - **Its monthly budget**: dollars a month, or none.
 
 **All settings** has the rest (see [All settings](#all-settings)). Sessions you start from then on use the new version, and so do the sessions with it that are already going, from your next message: Custom reads it before each turn, and Claude Code and Codex start afresh once they are free (the conversation carries on).
@@ -249,6 +256,8 @@ An agent set to a tier starts on that tier's model for the program it runs on, u
 
 **Helpers it starts, never above** caps the tiers of the helpers an agent starts: asked for a higher one, a helper gets this one, and one asked for with no tier gets it too. A model named outright is used as named.
 
+**Step up when a check fails** (on unless you turn it off): a helper the agent starts on a tier, whose reply does not pass a quick check (the helper model reads its brief and its reply) or that stops with an error, runs again one tier up, never above the highest the agent allows. The lead hears that it did and why, and the new helper is told why the first fell short. A scheduled run of the agent that fails on its tier runs again one tier up too, up to Best. A lead can also step a helper up itself when it finds the result not good enough.
+
 ## Agents that hand work to other agents
 
 An agent can hand a part of its work to a new session that works on it beside it: a child session (see [Deep research, second opinions and several agents](/guide/research)). It can start:
@@ -263,7 +272,9 @@ Who may hand work to whom:
 - An agent with **Other agents may hand it work** off takes work from none.
 - A named agent works in its own projects only, and never with a freer permission mode than the session that asked.
 
-In the conversation, each helper shows as a card under the turn that started it, with the agent it works as (or "Child session"), its tier, program and model, what it is doing, and what it cost; **Open** opens its conversation. A project's **Agents** tab shows which of its agents hand work to which.
+In the conversation, each helper shows as a card under the turn that started it, with the agent it works as (or "Child session"), its tier, program and model, what it is doing, and what it cost, and, when it stepped up, from which tier and why; **Open** opens its conversation. A project's **Agents** tab shows which of its agents hand work to which.
+
+An agent that keeps a conversation of its own takes the work in its inbox instead of a new session, and its answer comes back when it gets to it (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
 
 ## A monthly budget
 
@@ -274,6 +285,31 @@ An agent's **Monthly budget** caps what its sessions spend in a month (from the 
 - Once the budget is spent, no session starts as it until the next month: a scheduled run says why it could not start, and its card says **Budget spent**.
 
 What each session spends is worked out as in [Usage and costs](/guide/usage). Leave the field empty for no limit.
+
+## What an agent hands back
+
+Without anything set, an agent hands back its reply in the conversation. Give it fields and places in **Hands back** (in All settings, or from its sentence "It hands back *its reply*"), and at the end of each task it hands back a result with those fields, checked before it goes anywhere:
+
+- **Fields of each result**: a name and a kind for each (text, long text, number, yes or no, date, link, list, or table with its columns), and whether it is required. The agent fills them in with its hand_back tool; a result that does not fit goes back to it with what to fix.
+- **Where each result goes**, besides the conversation:
+  - **A page in the Library**, named after the agent and the day, in its project when it works in one;
+  - **A notification**, with the result's first line;
+  - **A file in the folder it works in**, such as `reports/{date}.md`: `{date}`, `{time}` and `{agent}` fill in, a name ending in `.json` gets the fields as JSON and any other Markdown, and a path never leads out of the folder;
+  - **A webhook**: the result as JSON in a POST to an https address, signed with a key from the vault when you name one, only to the hosts that key is allowed for (see [Connected apps, keys and tools](/guide/connections)).
+
+The agent's page lists **What it handed back**: its latest results, each with where it went and what could not go.
+
+## An agent with a conversation of its own
+
+Most agents start a new session each time. Turn on **Keeps one conversation, with an inbox** (in All settings, or in the "when" part of its sentence), and the agent keeps one conversation of its own instead, made the first time it is needed, in its project's folder when it works in one project:
+
+- Messages for it wait in its **Inbox** and go into its conversation one at a time, each when the one before has its answer: what you send from its page and what other agents hand it.
+- Its scheduled runs post into the same conversation, waiting for a turn under way to end; each shows in its schedule's history, as any run does.
+- Each answer goes back to whoever sent it: another agent hears it as a message, and you get a notification for yours.
+- It remembers what came before, as any conversation does.
+- Its monthly budget is checked as each message goes in.
+
+On its page, **Inbox** lists the messages, each with how it stands (**Waiting its turn**, **With it now**, **Answered**, **No answer**) and its answer, with a box to send it one, and **Its conversation**, which opens it.
 
 ## Start a session as an agent
 
@@ -404,5 +440,7 @@ Turn it off and agents leave what they made in place. Either way, agents follow 
 - "Make Quick mean Haiku for Claude Code and my local Qwen model for Custom."
 - "Import my Claude Code agent file ~/.claude/agents/code-reviewer.md as an agent."
 - "Which agents do I have, what does each think with, and what did they spend this month?"
+- "Make my Paper scout hand back a list of papers, each with a title, a link and why it matters, as a page in the Library and a notification."
+- "Let my Docs keeper keep one conversation of its own, and send it: update the guide for the new Agents page."
 - "Switch my session about the Lisbon trip to the Planner agent."
 - "Put new task folders in ~/Documents/Tasks from now on."

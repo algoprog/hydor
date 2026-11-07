@@ -16,7 +16,7 @@ import { confidentialKey, confidentialRun, privateHelper } from '../confidential
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from '../sessionExtra.ts';
 import type { Deps, Feature, RunCtx, RunTool, TurnInfo } from '../features/types.ts';
-import { helper } from '../helper.ts';
+import { helper, helperJson } from '../helper.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { addNote } from '../notes.ts';
 import { lastTurn, opensTurn, type Turn } from '../opinion/turns.ts';
@@ -24,9 +24,10 @@ import { childKeys, parentOf } from './family.ts';
 import { childMode, modeFamily, modeLevel } from './modes.ts';
 import { roleOf } from '../swarm/roles.ts';
 import { agentMode, assistantExtra, inScope, mayAsk, type Assistant } from '../../shared/assistants.ts';
-import { clampTier, isTier, tierLabel, type Tier } from '../../shared/tiers.ts';
+import { clampTier, isTier, nextTier, tierLabel, tierRank, type Tier } from '../../shared/tiers.ts';
 import { allAssistants, findAssistant } from '../assistants/store.ts';
 import { tierPick } from '../assistants/tiers.ts';
+import { sendToInbox } from '../assistants/inbox.ts';
 
 export { childKeys, parentOf } from './family.ts';
 
@@ -190,6 +191,9 @@ function startTool(d: Deps, max: number, local = false, named: Assistant[] = [],
       local
         ? ''
         : `Give each child a tier that fits its part: quick (the cheapest: clear jobs whose result can be checked, such as pulling out facts, translating, sorting, formatting or short summaries), standard (most work) or best (hard, open-ended parts).${top ? ` The agent you work as lets helpers go no higher than ${tierLabel(top).toLowerCase()}.` : ''}`,
+      local
+        ? ''
+        : 'A child on a tier whose reply does not pass a quick check runs again one tier up by itself (never above the highest allowed); step_up_child does that when you judge a result not good enough.',
       agents.length
         ? `You can also hand a part to one of the user's agents, by its name in as; it works with its own instructions, tools and tier: ${agents
             .slice(0, 40)
@@ -226,118 +230,163 @@ function startTool(d: Deps, max: number, local = false, named: Assistant[] = [],
       required: ['brief'],
     },
     async run(a, ctx) {
-      const brief = String(a.brief ?? '').trim();
-      if (!brief) throw new Error('The brief is empty. Write a self-contained brief: the child sees nothing of this conversation.');
-      if (parentOf(d.db, ctx.key)) throw new Error(ONE_LEVEL);
-      const own = sessionExtra(d.db, ctx.key);
-      const leadAgent = findAssistant(d.db, own.assistant);
-      // One of the user's agents, by name: in this session's project, and allowed by the agent this session works as.
-      let named: Assistant | null = null;
-      const asArg = String(a.as ?? '').trim();
-      if (asArg) {
-        if (local) throw new Error('This session is confidential: its children cannot work as other agents.');
-        const w = asArg.toLowerCase();
-        const all = allAssistants(d.db);
-        named = all.find((x) => x.id.toLowerCase() === w) ?? all.find((x) => x.name.toLowerCase() === w) ?? null;
-        const offer = namedFor(d, ctx.key);
-        if (!named) throw new Error(`The user has no agent "${asArg}".${offer.length ? ` Those you can hand work to: ${offer.map((x) => x.name).join(', ')}.` : ''}`);
-        if (!inScope(named, typeof own.space === 'string' ? own.space : null)) throw new Error(`${named.name} works only in its own projects, not here.`);
-        if (!mayAsk(leadAgent, named))
-          throw new Error(
-            named.askable === false
-              ? `${named.name} does not take work from other agents.`
-              : named.id === leadAgent?.id
-                ? `You are ${named.name}: do this part yourself, or start a plain child for it.`
-                : `${leadAgent!.name} may not hand work to ${named.name}: the user can allow it in ${leadAgent!.name}'s settings (Team).`,
-          );
-      }
-      const agentArg = String(a.agent ?? '').trim() || (named ? agentArgOf(named) : '');
-      let modelArg = String(a.model ?? '').trim();
-      // A named agent on its own program keeps its own model, unless it thinks with a tier.
-      if (!modelArg && named && !String(a.agent ?? '').trim() && named.model && !named.tier) modelArg = named.model;
-      // The tier: a named agent's own; else the one asked for, never above what the lead's agent allows (that, when none is asked for).
-      const asked = isTier(a.tier) ? clampTier(a.tier, leadAgent?.helperMax) : leadAgent?.helperMax;
-      const tier: Tier | undefined = named ? named.tier : modelArg ? undefined : asked;
-      let tierEffort: string | undefined;
-      if (tier && !modelArg) {
-        const prog = programOf(ctx, agentArg, modelArg, models);
-        const pick = tierPick(d.db, tier, prog.agent, prog.acpAgent);
-        // Custom's tier names one of its models; one that is gone is passed over.
-        if (pick?.model && (prog.acpAgent !== CONSOLE_ID || findModel(models, pick.model))) modelArg = pick.model;
-        tierEffort = pick?.effort;
-      }
-      const target = pickAgent(d, ctx, agentArg, modelArg);
-      // A swarm's members take on hard problems: they run with the lead's own model and effort unless it names others.
-      const role = roleOf(d.db, ctx);
-      const lead = role?.role === 'lead' ? d.sessions.summary(ctx.key) : null;
-      // A campaign's members each change their part on a branch of their own.
-      const worktree = !!a.worktree || (role?.role === 'lead' && role.mode === 'campaign');
-      const same = !!lead && target.agent === ctx.agent && target.agent !== 'acp' && !modelArg && !tier;
-      if (same && lead?.prefs?.model) {
-        target.model = lead.prefs.model;
-        target.label = `${target.label} · ${lead.prefs.model}`;
-      }
-      const effort = tierEffort ?? (same ? lead?.prefs?.effort : undefined);
-      if (named) target.label = `${named.name} · ${target.label}`;
-      if (tier) target.label = `${target.label} · ${tierLabel(tier)}`;
-      const running = childKeys(d.db, ctx.key).filter((k) => busy(d.sessions.summary(k))).length + (starting.get(ctx.key) ?? 0);
-      if (running >= max) throw new Error(`${running} of your child sessions are working already, the most at once. Wait for one to finish (its reply comes to you as a message), then start the next; or do this part yourself.`);
-      const capUsd = childShare(d.db, ctx.key, max);
-      const cwd = folder(a.cwd, ctx.cwd);
-      const parent = d.sessions.summary(ctx.key);
-      const parentMode = childMode({ family: modeFamily(ctx.agent, ctx.acpAgent), mode: parent?.live?.mode ?? parent?.prefs?.mode }, modeFamily(target.agent, target.acpAgent));
-      // A named agent's own mode when it is stricter than the parent's: never freer.
-      const namedMode = named ? agentMode(named.mode, target.agent, target.acpAgent) : undefined;
-      const fam = modeFamily(target.agent, target.acpAgent);
-      const mode = namedMode && (!parentMode || modeLevel(fam, namedMode) < modeLevel(fam, parentMode)) ? namedMode : parentMode;
-      const title = firstLine(String(a.title ?? '') || brief, 70);
-      starting.set(ctx.key, (starting.get(ctx.key) ?? 0) + 1);
-      let key: string;
-      try {
-        key = await d.sessions.create({
-          agent: target.agent,
-          acpAgent: target.acpAgent,
-          cwd,
-          prompt: brief,
-          model: target.model,
-          effort,
-          mode,
-          worktree,
-          title,
-          remember: false,
-          account: target.agent === ctx.agent && target.agent !== 'acp' ? d.sessions.accountOf(ctx.key) : undefined,
-          extra: { parent: ctx.key, ...(capUsd != null ? { capUsd } : {}), ...(named ? assistantExtra(named) : {}) },
-        });
-      } finally {
-        const n = (starting.get(ctx.key) ?? 1) - 1;
-        if (n > 0) starting.set(ctx.key, n);
-        else starting.delete(ctx.key);
-      }
-      const s = d.sessions.summary(key);
-      const note: ChildNote = {
-        child: key,
-        agent: target.agent,
-        acpAgent: target.acpAgent,
-        acpName: s?.acpName,
-        model: target.model,
-        label: target.label,
-        title,
-        brief: firstLine(brief, 300),
-        cwd: s?.cwd ?? cwd,
-        worktree: !!s?.worktree || undefined,
-        capUsd,
-        ...(named ? { as: named.name, asId: named.id } : {}),
-        ...(tier ? { tier } : {}),
-        startedAt: Date.now(),
-      };
-      addNote(d.db, { key: ctx.key, kind: 'child', anchor: await currentPrompt(d, ctx.key), data: note });
-      return [
-        `Started child session ${key}: "${title}" (${target.label}${mode ? `, mode ${mode}` : ''}${s?.worktree ? `, on branch ${s.worktree.branch}` : ''}${capUsd != null ? `, spending cap $${capUsd.toFixed(2)}` : ''}).`,
-        'It works on its own now. Its reply comes to you as a message when its turn ends: go on with other work, or end your turn to wait for it.',
-        'child_sessions shows how your children are doing; message_child sends one more to do.',
-      ].join('\n');
+      return startChild(d, ctx, a, { max, local, models });
     },
   };
+}
+
+
+/** What a child on a tier keeps, to run again one tier up when it fails a check (or its lead asks). */
+interface StepUp {
+  tier: Tier;
+  /** The highest tier its lead's agent allows. */
+  max: Tier;
+  brief: string;
+  agent?: string;
+  as?: string;
+  cwd: string;
+  worktree?: boolean;
+  title: string;
+}
+
+type StartCtx = Pick<RunCtx, 'key' | 'agent' | 'acpAgent' | 'cwd'> & { runId?: string };
+
+/**
+ * Starts a child session for a parent (start_child_session, and a step up): the agent and model (a named agent's own, or
+ * a tier's), the mode no freer than the parent's, a share of its cap, and a card in its turn. `tierOverride` runs it on
+ * that tier whatever was asked (a step up), `baseBrief` is the brief before the note a step up adds, `stepFrom` the child
+ * it takes over from.
+ */
+async function startChild(
+  d: Deps,
+  ctx: StartCtx,
+  a: Record<string, unknown>,
+  o: { max: number; local: boolean; models: AgentModel[]; tierOverride?: Tier; baseBrief?: string; stepFrom?: ChildNote['steppedFrom'] },
+): Promise<string> {
+  const { max, local, models } = o;
+  const brief = String(a.brief ?? '').trim();
+  if (!brief) throw new Error('The brief is empty. Write a self-contained brief: the child sees nothing of this conversation.');
+  if (parentOf(d.db, ctx.key)) throw new Error(ONE_LEVEL);
+  const own = sessionExtra(d.db, ctx.key);
+  const leadAgent = findAssistant(d.db, own.assistant);
+  // One of the user's agents, by name: in this session's project, and allowed by the agent this session works as.
+  let named: Assistant | null = null;
+  const asArg = String(a.as ?? '').trim();
+  if (asArg) {
+    if (local) throw new Error('This session is confidential: its children cannot work as other agents.');
+    const w = asArg.toLowerCase();
+    const all = allAssistants(d.db);
+    named = all.find((x) => x.id.toLowerCase() === w) ?? all.find((x) => x.name.toLowerCase() === w) ?? null;
+    const offer = namedFor(d, ctx.key);
+    if (!named) throw new Error(`The user has no agent "${asArg}".${offer.length ? ` Those you can hand work to: ${offer.map((x) => x.name).join(', ')}.` : ''}`);
+    if (!inScope(named, typeof own.space === 'string' ? own.space : null)) throw new Error(`${named.name} works only in its own projects, not here.`);
+    if (!mayAsk(leadAgent, named))
+      throw new Error(
+        named.askable === false
+          ? `${named.name} does not take work from other agents.`
+          : named.id === leadAgent?.id
+            ? `You are ${named.name}: do this part yourself, or start a plain child for it.`
+            : `${leadAgent!.name} may not hand work to ${named.name}: the user can allow it in ${leadAgent!.name}'s settings (Team).`,
+      );
+  }
+  // An agent that keeps a conversation of its own takes the brief in its inbox; its answer comes back as a message.
+  if (named?.standing) {
+    const leadName = leadAgent?.name ?? d.sessions.summary(ctx.key)?.title ?? 'another session';
+    const item = sendToInbox(d, named, { text: brief, from: { kind: 'agent', key: ctx.key, name: leadName }, replyTo: ctx.key });
+    return `Put in ${named.name}'s inbox (message ${item.id.slice(0, 6)}): it keeps one conversation of its own and takes messages in turn. Its answer comes to you as a message; go on with other work, or end your turn to wait for it.`;
+  }
+  const agentArg = String(a.agent ?? '').trim() || (named ? agentArgOf(named) : '');
+  let modelArg = String(a.model ?? '').trim();
+  // A named agent on its own program keeps its own model, unless it thinks with a tier.
+  if (!modelArg && named && !String(a.agent ?? '').trim() && named.model && !named.tier && !o.tierOverride) modelArg = named.model;
+  // The tier: a named agent's own; else the one asked for, never above what the lead's agent allows (that, when none is asked for).
+  const asked = isTier(a.tier) ? clampTier(a.tier, leadAgent?.helperMax) : leadAgent?.helperMax;
+  const tier: Tier | undefined = o.tierOverride ?? (named ? named.tier : modelArg ? undefined : asked);
+  let tierEffort: string | undefined;
+  if (tier && !modelArg) {
+    const prog = programOf(ctx, agentArg, modelArg, models);
+    const pick = tierPick(d.db, tier, prog.agent, prog.acpAgent);
+    // Custom's tier names one of its models; one that is gone is passed over.
+    if (pick?.model && (prog.acpAgent !== CONSOLE_ID || findModel(models, pick.model))) modelArg = pick.model;
+    tierEffort = pick?.effort;
+  }
+  const target = pickAgent(d, ctx, agentArg, modelArg);
+  // A swarm's members take on hard problems: they run with the lead's own model and effort unless it names others.
+  const role = roleOf(d.db, ctx);
+  const lead = role?.role === 'lead' ? d.sessions.summary(ctx.key) : null;
+  // A campaign's members each change their part on a branch of their own.
+  const worktree = !!a.worktree || (role?.role === 'lead' && role.mode === 'campaign');
+  const same = !!lead && target.agent === ctx.agent && target.agent !== 'acp' && !modelArg && !tier;
+  if (same && lead?.prefs?.model) {
+    target.model = lead.prefs.model;
+    target.label = `${target.label} · ${lead.prefs.model}`;
+  }
+  const effort = tierEffort ?? (same ? lead?.prefs?.effort : undefined);
+  if (named) target.label = `${named.name} · ${target.label}`;
+  if (tier) target.label = `${target.label} · ${tierLabel(tier)}`;
+  const running = childKeys(d.db, ctx.key).filter((k) => busy(d.sessions.summary(k))).length + (starting.get(ctx.key) ?? 0);
+  if (running >= max) throw new Error(`${running} of your child sessions are working already, the most at once. Wait for one to finish (its reply comes to you as a message), then start the next; or do this part yourself.`);
+  const capUsd = childShare(d.db, ctx.key, max);
+  const cwd = folder(a.cwd, ctx.cwd);
+  const parent = d.sessions.summary(ctx.key);
+  const parentMode = childMode({ family: modeFamily(ctx.agent, ctx.acpAgent), mode: parent?.live?.mode ?? parent?.prefs?.mode }, modeFamily(target.agent, target.acpAgent));
+  // A named agent's own mode when it is stricter than the parent's: never freer.
+  const namedMode = named ? agentMode(named.mode, target.agent, target.acpAgent) : undefined;
+  const fam = modeFamily(target.agent, target.acpAgent);
+  const mode = namedMode && (!parentMode || modeLevel(fam, namedMode) < modeLevel(fam, parentMode)) ? namedMode : parentMode;
+  const title = firstLine(String(a.title ?? '') || brief, 70);
+  // A child on a tier below the highest its lead allows can run again one tier up when it fails a check.
+  const ceiling: Tier = leadAgent?.helperMax ?? 'best';
+  const stepRec: StepUp | undefined =
+    tier && !local && tierRank(tier) < tierRank(ceiling)
+      ? { tier, max: ceiling, brief: (o.baseBrief ?? brief).slice(0, 20_000), ...(agentArg ? { agent: agentArg } : {}), ...(named ? { as: named.id } : {}), cwd, ...(worktree ? { worktree } : {}), title }
+      : undefined;
+  starting.set(ctx.key, (starting.get(ctx.key) ?? 0) + 1);
+  let key: string;
+  try {
+    key = await d.sessions.create({
+      agent: target.agent,
+      acpAgent: target.acpAgent,
+      cwd,
+      prompt: brief,
+      model: target.model,
+      effort,
+      mode,
+      worktree,
+      title,
+      remember: false,
+      account: target.agent === ctx.agent && target.agent !== 'acp' ? d.sessions.accountOf(ctx.key) : undefined,
+      extra: { parent: ctx.key, ...(capUsd != null ? { capUsd } : {}), ...(named ? assistantExtra(named) : {}), ...(stepRec ? { stepUp: stepRec } : {}) },
+    });
+  } finally {
+    const n = (starting.get(ctx.key) ?? 1) - 1;
+    if (n > 0) starting.set(ctx.key, n);
+    else starting.delete(ctx.key);
+  }
+  const s = d.sessions.summary(key);
+  const note: ChildNote = {
+    child: key,
+    agent: target.agent,
+    acpAgent: target.acpAgent,
+    acpName: s?.acpName,
+    model: target.model,
+    label: target.label,
+    title,
+    brief: firstLine(brief, 300),
+    cwd: s?.cwd ?? cwd,
+    worktree: !!s?.worktree || undefined,
+    capUsd,
+    ...(named ? { as: named.name, asId: named.id } : {}),
+    ...(tier ? { tier } : {}),
+    ...(o.stepFrom ? { steppedFrom: o.stepFrom } : {}),
+    startedAt: Date.now(),
+  };
+  addNote(d.db, { key: ctx.key, kind: 'child', anchor: await currentPrompt(d, ctx.key), data: note });
+  return [
+    `Started child session ${key}: "${title}" (${target.label}${mode ? `, mode ${mode}` : ''}${s?.worktree ? `, on branch ${s.worktree.branch}` : ''}${capUsd != null ? `, spending cap $${capUsd.toFixed(2)}` : ''}).`,
+    'It works on its own now. Its reply comes to you as a message when its turn ends: go on with other work, or end your turn to wait for it.',
+    'child_sessions shows how your children are doing; message_child sends one more to do.',
+  ].join('\n');
 }
 
 function statusOf(s: SessionSummary | null): string {
@@ -495,6 +544,16 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
   setSessionExtra(d.db, t.key, { reported: turn.prompt.id });
   // A swarm member its lead or the user stopped: nobody needs the turn that was cut short.
   if (turn.status === 'interrupted' && sessionExtra(d.db, t.key).swarmStopped) return;
+  // A child on a tier whose turn did not pass a check runs again one tier up (never above its lead's highest).
+  const up = await stepUpCheck(d, t.key, turn);
+  if (up) {
+    try {
+      await tell(d, parent, await stepUpChild(d, parent, t.key, up.next, up.why));
+      return;
+    } catch {
+      // It could not start again (the most at once, an agent gone): its reply goes as it is.
+    }
+  }
   const s = d.sessions.summary(t.key);
   const cap = capReached(d.db, t.key);
   // Custom's models by their names, the others' as the agent gives them.
@@ -513,6 +572,84 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
   await tell(d, parent, msg);
 }
 
+// ---- stepping up ---------------------------------------------------------------------------------
+
+const JUDGE = [
+  'You check the work an AI helper did for the agent that gave it the job. Answer with one JSON object and nothing else:',
+  '{"pass": true or false, "why": "one short sentence"}. Fail it only when its reply plainly does not do the job: it says it could',
+  'not or gave up, does another job, leaves out a part the brief asked for, or is plainly wrong. Pass anything that does the job, even briefly.',
+].join(' ');
+
+/** Why a helper's reply fails its brief, by the helper model; empty when it does the job, or when the helper model cannot say. */
+async function judge(d: Deps, brief: string, reply: string): Promise<string> {
+  try {
+    const r = await helperJson<{ pass?: unknown; why?: unknown }>(
+      d.db,
+      { system: JUDGE, prompt: `The job (its brief):\n${brief.slice(0, 6000)}\n\nThe helper's reply:\n${reply.slice(0, 12_000)}`, maxTokens: 200, timeoutMs: 45_000 },
+      'a check',
+    );
+    return r.pass === false ? firstLine(String(r.why ?? 'its reply does not do the job'), 200) : '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Whether a child's turn calls for running it again one tier up: it was started on a tier below the highest allowed, its
+ * lead's agent steps up, and its turn stopped with an error, wrote nothing, or does not do its brief (the helper model's
+ * check). Never for a turn someone stopped, nor once its spending cap is reached.
+ */
+async function stepUpCheck(d: Deps, key: string, turn: Turn): Promise<{ next: Tier; why: string } | null> {
+  const x = sessionExtra(d.db, key).stepUp as StepUp | undefined;
+  if (!x || !isTier(x.tier)) return null;
+  const next = nextTier(x.tier);
+  if (!next || tierRank(next) > tierRank(x.max)) return null;
+  if (turn.status === 'interrupted' || capReached(d.db, key)) return null;
+  const parent = parentOf(d.db, key);
+  if (parent && findAssistant(d.db, sessionExtra(d.db, parent).assistant)?.stepUp === false) return null;
+  if (turn.status === 'failed' || (turn.error && !turn.reply)) return { next, why: `it stopped with an error (${firstLine(turn.error ?? 'failed', 140)})` };
+  if (!turn.reply.trim()) return { next, why: 'it wrote no reply' };
+  const why = await judge(d, x.brief, turn.reply);
+  return why ? { next, why } : null;
+}
+
+/** Runs a child's brief again on `tier`, as a new child of the same parent, told why the try before fell short; what the parent hears. */
+async function stepUpChild(d: Deps, parent: string, key: string, tier: Tier, why: string): Promise<string> {
+  const x = sessionExtra(d.db, key).stepUp as StepUp;
+  const p = d.sessions.summary(parent);
+  if (!p) throw new Error('Its parent session is gone');
+  const brief = `${x.brief}\n\n(A try on ${tierLabel(x.tier)} fell short: ${why}. Do the whole job, and check your result before you reply.)`;
+  const started = await startChild(
+    d,
+    { key: parent, agent: p.agent, acpAgent: p.acpAgent, cwd: p.cwd ?? x.cwd },
+    { brief, agent: x.agent, as: x.as, cwd: x.cwd, worktree: x.worktree, title: x.title },
+    { max: maxFor(d.db, { key: parent }), local: false, models: customModels(), tierOverride: tier, baseBrief: x.brief, stepFrom: { key, tier: x.tier, why } },
+  );
+  return `[The child session "${x.title}" (${key}) on ${tierLabel(x.tier)} fell short: ${why}. It runs again on ${tierLabel(tier)}.]\n${started}`;
+}
+
+const STEP_UP: RunTool = {
+  name: 'step_up_child',
+  description:
+    'Run a child session’s brief again one tier up when its result was not good enough: a new child on the next tier (never above the highest your agent allows) gets the same brief and why the first one fell short. Only for a child started on a tier that has finished its turn.',
+  inputSchema: {
+    type: 'object',
+    properties: { key: { type: 'string', description: 'The child’s key.' }, why: { type: 'string', description: 'What was wrong with its result, for the new child.' } },
+    required: ['key', 'why'],
+  },
+  async run(a, ctx) {
+    const d = ctx.deps;
+    const key = String(a.key ?? '');
+    if (!childKeys(d.db, ctx.key).includes(key)) throw new Error('That is not one of your child sessions.');
+    const x = sessionExtra(d.db, key).stepUp as StepUp | undefined;
+    if (!x) throw new Error('It was started without a tier, or on the highest your agent allows: do the part yourself, or start a child with another model.');
+    if (busy(d.sessions.summary(key))) throw new Error('It is still working: wait for its reply, or message_child it.');
+    const next = nextTier(x.tier);
+    if (!next || tierRank(next) > tierRank(x.max)) throw new Error(`It is on ${tierLabel(x.tier)}, the highest your agent allows.`);
+    return stepUpChild(d, ctx.key, key, next, String(a.why ?? '').trim() || 'its result was not good enough');
+  },
+};
+
 // ---- the capability ------------------------------------------------------------------------------
 
 export const children: Feature = {
@@ -522,7 +659,7 @@ export const children: Feature = {
     // A child gets none: one level only.
     if (parentOf(ctx.deps.db, ctx.key) || roleOf(ctx.deps.db, ctx)?.role === 'member') return [];
     const lead = findAssistant(ctx.deps.db, sessionExtra(ctx.deps.db, ctx.key).assistant);
-    return [startTool(ctx.deps, maxFor(ctx.deps.db, ctx), confidentialRun(ctx), namedFor(ctx.deps, ctx.key), lead?.helperMax), LIST, MESSAGE];
+    return [startTool(ctx.deps, maxFor(ctx.deps.db, ctx), confidentialRun(ctx), namedFor(ctx.deps, ctx.key), lead?.helperMax), LIST, MESSAGE, STEP_UP];
   },
 
   spawn(s) {

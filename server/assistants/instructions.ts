@@ -5,6 +5,7 @@
 import { CLAUDE_TOOLS, toolAllowed, toolsOff, type Assistant, type ToolKind } from '../../shared/assistants.ts';
 import type { Agent } from '../../shared/types.ts';
 import type { SpawnAdditions } from '../features/types.ts';
+import { outputNote } from './output.ts';
 
 export interface Target {
   agent: Agent;
@@ -43,11 +44,13 @@ function skillsLine(skills: string[], t: Target): string {
 }
 
 function assistantBlock(a: Assistant, t: Target): string {
-  const out = [`# Assistant: ${a.name}`, 'The user picked this assistant for this session. Work this way throughout; what they ask in the conversation comes first.'];
+  const out = [`# Agent: ${a.name}`, 'The user picked this agent for this session. Work this way throughout; what they ask in the conversation comes first.'];
   if (a.instructions.trim()) out.push('', a.instructions.trim());
   const off = toolsOff(a);
   if (off.length) out.push('', limits(off, t));
   if (a.skills?.length) out.push('', skillsLine(a.skills, t));
+  const handBack = outputNote(a);
+  if (handBack) out.push('', handBack);
   return out.join('\n');
 }
 
@@ -65,9 +68,9 @@ export function instructionsFor(a: Assistant | null, tone: string, t: Target): s
  * already (`has`: it started since, or it is Custom, which reads them before each turn).
  */
 export function switchNote(from: Assistant | null, a: Assistant, t: Target, has: boolean): string {
-  const what = from ? `The user switched this session's assistant from ${from.name} to ${a.name}.` : `The user picked the ${a.name} assistant for this session.`;
-  if (has) return `${what} Its instructions ("# Assistant: ${a.name}") are now in yours: work that way from here on.`;
-  return `${what} From here on, work as below${from ? '; this takes the place of the assistant instructions you had before' : ''}.\n\n${assistantBlock(a, t)}`;
+  const what = from ? `The user switched this session's agent from ${from.name} to ${a.name}.` : `The user picked the ${a.name} agent for this session.`;
+  if (has) return `${what} Its instructions ("# Agent: ${a.name}") are now in yours: work that way from here on.`;
+  return `${what} From here on, work as below${from ? '; this takes the place of the agent instructions you had before' : ''}.\n\n${assistantBlock(a, t)}`;
 }
 
 /**

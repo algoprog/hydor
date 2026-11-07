@@ -68,7 +68,7 @@ The row under them has the pickers of the start page:
 
 - **Model** and **Effort**: the model and how hard it thinks. Left alone, the agent's defaults.
 - **Permissions**: what the agent may do without asking you. A new task starts on **Ask** for Claude Code, **Auto** for Codex and **Auto** for Custom (routine steps go ahead, risky ones ask). Nobody may be watching when a run happens: a run that needs your approval waits for it, in its session and in the [inbox](/guide/inbox).
-- **Agent**, **Memory** (when memory is on), **Spending cap**, **Swarm** and **Research**: each run's new session starts with these, as a session started from the start page would (see [Sessions](/guide/sessions), [Agents](/guide/agents) and [Memory](/guide/memory)). A task that runs as one of your agents is one of that agent's schedules: it shows on the agent's page, and its runs get the agent's tier and count towards its monthly budget.
+- **Agent**, **Memory** (when memory is on), **Spending cap**, **Swarm** and **Research**: each run's new session starts with these, as a session started from the start page would (see [Sessions](/guide/sessions), [Agents](/guide/agents) and [Memory](/guide/memory)). A task that runs as one of your agents is one of that agent's schedules: it shows on the agent's page, and its runs get the agent's tier and count towards its monthly budget. A run that fails or stops with an error on the agent's tier runs again a tier up, up to Best, unless the agent's **Step up when a check fails** is off. When the agent keeps a conversation of its own, each run posts into that conversation instead of starting a new session.
 
 ### The prompt
 

@@ -24,6 +24,8 @@ export interface ChildNote {
   asId?: string;
   /** The tier it was given (or the named agent's own). */
   tier?: Tier;
+  /** It runs again one tier up: the child it takes over from, that child's tier, and why it fell short. */
+  steppedFrom?: { key: string; tier: Tier; why: string };
   startedAt: number;
 }
 

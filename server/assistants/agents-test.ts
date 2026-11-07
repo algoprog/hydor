@@ -20,6 +20,11 @@ import { cleanAssistant, findAssistant, removeAssistant, saveAssistant } from '.
 import { setTiers, tierPick, tiersOf } from './tiers.ts';
 import { enoughToGoOn, fromTemplate, kindOf, makeProjectAgent, scanFolder, templateOf } from './projectAgent.ts';
 import { createSpace, spaceById } from '../spaces/index.ts';
+import { EventEmitter } from 'node:events';
+import type { Deps, RunCtx } from '../features/types.ts';
+import { initPages } from '../pages/store.ts';
+import { handBackTool, markdownHtml, resultMarkdown, resultsOf, targetPath } from './output.ts';
+import { instructionsFor } from './instructions.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -265,6 +270,115 @@ test('making a project’s agent: little to go on, its kind’s template; nothin
   assert.equal(r4.how, 'template');
   assert.equal(r4.agent.name, 'Thesis paper writer');
   for (const r of [r1, r2, r3, r4]) removeAssistant(db, r.agent.id);
+});
+
+
+// ---- what an agent hands back --------------------------------------------------------------------------------
+
+test('what an agent hands back is checked: places inside its folder, https addresses, keys by name', () => {
+  const o = cleanAssistant({ name: 'Reporter', output: { fields: [{ id: 'summary', label: 'Summary', type: 'markdown', required: true }, { id: 'items', label: 'Items', type: 'list' }], to: [{ kind: 'file', path: 'reports/{date}.md' }, { kind: 'library' }, { kind: 'webhook', url: 'https://hooks.example.com/x', secret: 'hook_token' }, { kind: 'notify' }, { kind: 'bogus' }] } }).output!;
+  assert.equal(o.fields?.length, 2);
+  assert.deepEqual(o.to, [{ kind: 'file', path: 'reports/{date}.md' }, { kind: 'library' }, { kind: 'webhook', url: 'https://hooks.example.com/x', secret: 'HOOK_TOKEN' }, { kind: 'notify' }]);
+  assert.throws(() => cleanAssistant({ name: 'X', output: { to: [{ kind: 'file', path: '/etc/passwd' }] } }), /inside the folder/);
+  assert.throws(() => cleanAssistant({ name: 'X', output: { to: [{ kind: 'file', path: '../up.md' }] } }), /inside the folder/);
+  assert.throws(() => cleanAssistant({ name: 'X', output: { to: [{ kind: 'webhook', url: 'http://plain.example.com' }] } }), /https/);
+  assert.equal(cleanAssistant({ name: 'X', output: {} }).output, undefined);
+  // Stepping up and a conversation of its own.
+  const a = cleanAssistant({ name: 'X', stepUp: false, standing: true });
+  assert.equal(a.stepUp, false);
+  assert.equal(a.standing, true);
+  assert.equal('stepUp' in cleanAssistant({ name: 'X', stepUp: true }), false);
+});
+
+test('a result in words: Markdown for files, HTML for the Library; file paths stay inside the folder', () => {
+  const fields = [
+    { id: 'summary', label: 'Summary', type: 'markdown' as const },
+    { id: 'papers', label: 'Papers', type: 'list' as const },
+    { id: 'scores', label: 'Scores', type: 'table' as const, columns: [{ id: 'name', label: 'Name', type: 'text' as const }, { id: 'n', label: 'Score', type: 'number' as const }] },
+    { id: 'ok', label: 'All found', type: 'yesno' as const },
+  ];
+  const md = resultMarkdown(fields, { summary: 'Three **new** papers.', papers: ['A', 'B'], scores: [{ name: 'A', n: 3 }, { name: 'B|C', n: 1 }], ok: true });
+  assert.match(md, /^## Summary\n\nThree \*\*new\*\* papers\.\n\n## Papers\n\n- A\n- B\n\n## Scores\n\n\| Name \| Score \|\n\| --- \| --- \|\n\| A \| 3 \|\n\| B\\\|C \| 1 \|\n\n## All found\n\nYes$/);
+  const html = markdownHtml(md);
+  assert.match(html, /<h2>Summary<\/h2>/);
+  assert.match(html, /<strong>new<\/strong>/);
+  assert.match(html, /<ul><li>A<\/li><li>B<\/li><\/ul>/);
+  assert.match(html, /<table><thead><tr><th>Name<\/th><th>Score<\/th><\/tr><\/thead><tbody><tr><td>A<\/td><td>3<\/td><\/tr><tr><td>B\|C<\/td>/);
+  assert.equal(markdownHtml('<script>x</script>'), '<p>&lt;script&gt;x&lt;/script&gt;</p>');
+  // A lone Markdown result is itself.
+  assert.equal(resultMarkdown([{ id: 'result', label: 'Result', type: 'markdown' }], { result: 'Just this.' }), 'Just this.');
+  const day = new Date(2026, 10, 7, 9, 5);
+  assert.equal(targetPath('/w', 'reports/{date}-{agent}.md', { name: 'Paper Scout' }, day), '/w/reports/2026-11-07-paper-scout.md');
+  assert.equal(targetPath('/w', '{time}.json', { name: 'x' }, day), '/w/0905.json');
+  assert.equal(targetPath('/w', '../../etc/x', { name: 'x' }, day), null);
+});
+
+test('hand_back: offered to an agent with an output; checked; then to a file, the Library, a webhook and a notification', async () => {
+  initPages(db);
+  const dir = fs.mkdtempSync(path.join(tmp, 'work-'));
+  const reporter = saveAssistant(db, {
+    name: 'Reporter',
+    instructions: 'Report.',
+    output: {
+      fields: [{ id: 'summary', label: 'Summary', type: 'markdown', required: true }, { id: 'count', label: 'Count', type: 'number', required: true }],
+      to: [{ kind: 'file', path: 'out/{date}.md' }, { kind: 'file', path: 'out/last.json' }, { kind: 'library' }, { kind: 'webhook', url: 'https://127.0.0.1/hook' }, { kind: 'notify' }],
+    },
+  });
+  const plain = saveAssistant(db, { name: 'Plain', instructions: 'Nothing to hand back.' });
+  const notes: unknown[] = [];
+  const sessionsFake = Object.assign(new EventEmitter(), {});
+  sessionsFake.on('notify', (e) => notes.push(e));
+  const deps = { db, sessions: sessionsFake, broadcast: () => {} } as unknown as Deps;
+  const ctxFor = (key: string, assistant: string): RunCtx => {
+    db.prepare('insert or ignore into app_sessions (key, agent, created_at, updated_at) values (?, ?, ?, ?)').run(key, 'claude', Date.now(), Date.now());
+    setSessionExtra(db, key, { assistant });
+    return { runId: 'r', key, agent: 'claude', cwd: dir, deps } as RunCtx;
+  };
+  assert.equal(handBackTool(ctxFor('claude:hb0', plain.id)), null);
+  const c = ctxFor('claude:hb1', reporter.id);
+  const tool = handBackTool(c)!;
+  assert.equal(tool.name, 'hand_back');
+  // What it is told.
+  assert.match(instructionsFor(reporter, '', { agent: 'claude' }), /When you finish a task, hand back its result with hand_back: summary \(Summary, markdown, required\); count \(Count, number, required\)\. It is checked/);
+  const bad = (await tool.run({ summary: 'Hi' }, c)) as { text: string; isError?: boolean };
+  assert.equal(bad.isError, true);
+  assert.match(bad.text, /count: missing/);
+  const ok = (await tool.run({ summary: 'Three new papers.', count: 3 }, c)) as string;
+  assert.match(ok, /^Handed back\. It went to /);
+  assert.match(ok, /It could not go to: a webhook/);
+  const today = new Date();
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  const mdFile = path.join(dir, 'out', `${today.getFullYear()}-${p2(today.getMonth() + 1)}-${p2(today.getDate())}.md`);
+  assert.equal(fs.readFileSync(mdFile, 'utf8'), '## Summary\n\nThree new papers.\n\n## Count\n\n3\n');
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'out', 'last.json'), 'utf8')), { summary: 'Three new papers.', count: 3 });
+  const page = db.prepare("select title from pages where title like 'Reporter · %'").get() as { title: string } | undefined;
+  assert.ok(page);
+  assert.equal(notes.length, 1);
+  assert.match(JSON.stringify(notes[0]), /"title":"Reporter","body":"Three new papers\."/);
+  const [r] = resultsOf(db, reporter.id);
+  assert.equal(r.key, 'claude:hb1');
+  assert.deepEqual(r.value, { summary: 'Three new papers.', count: 3 });
+  assert.deepEqual(
+    r.sent.map((s) => [s.kind, s.ok]),
+    [
+      ['file', true],
+      ['file', true],
+      ['library', true],
+      ['webhook', false],
+      ['notify', true],
+    ],
+  );
+  removeAssistant(db, reporter.id);
+  removeAssistant(db, plain.id);
+});
+
+test('a project’s agent from its template, in the language the app speaks', () => {
+  const zh = fromTemplate(templateOf('software'), { id: 'sp1', name: 'Shop' }, 'zh');
+  assert.equal(zh.name, 'Shop 工程师');
+  assert.equal(zh.description, '构建、修复和审查 Shop 的代码');
+  assert.match(zh.instructions!, /You are the engineer of Shop/);
+  const el = fromTemplate(templateOf('paper'), { id: 'sp1', name: 'Thesis' }, 'el');
+  assert.equal(el.name, 'Thesis συγγραφέας δημοσίευσης');
 });
 
 // ---- run ----------------------------------------------------------------------------------------------
