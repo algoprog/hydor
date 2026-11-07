@@ -66,8 +66,8 @@ export interface PageInfo {
   thumb?: string;
   /** Published at a link. */
   published?: boolean;
-  /** Another kind than a page of HTML: slides (shared/slides.ts), a document (shared/docs.ts), a spreadsheet (shared/sheets.ts), LaTeX (shared/latex.ts), a Jupyter notebook (shared/notebook.ts). */
-  kind?: 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
+  /** Another kind than a page of HTML: slides (shared/slides.ts), a document (shared/docs.ts), a spreadsheet (shared/sheets.ts), LaTeX (shared/latex.ts), a Jupyter notebook (shared/notebook.ts), a diagram (shared/diagram.ts). */
+  kind?: 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram';
   /** A template's screen: the template it belongs to (it is not in the library). */
   app?: string;
   /** The space it is in (the Library shows each space's together); none when unset. */
@@ -158,7 +158,7 @@ export interface PageDataEntry {
 export interface PageDraft {
   /** The tool call's id: its item in the conversation. */
   id: string;
-  tool: 'show_html' | 'save_page' | 'file' | 'save_doc' | 'save_slides' | 'save_sheet' | 'save_latex';
+  tool: 'show_html' | 'save_page' | 'file' | 'save_doc' | 'save_slides' | 'save_sheet' | 'save_latex' | 'save_diagram';
   title?: string;
   /** An HTML file's path. */
   path?: string;

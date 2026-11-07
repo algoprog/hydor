@@ -2,7 +2,7 @@
 // (input_json_delta, passed on by the session manager as 'toolstream'); for show_html, save_page and an
 // HTML file written whole (Write), this reads the page's HTML out of that partial JSON as it grows and
 // sends each new piece to the pages showing the session, which draw the page as it comes. For a document, a
-// deck, a spreadsheet or a LaTeX document being saved (save_doc, save_slides, save_sheet, save_latex) it sends the
+// deck, a spreadsheet, a LaTeX document or a diagram being saved (save_doc, save_slides, save_sheet, save_latex, save_diagram) it sends the
 // call's input itself as it grows, to the session's pages and to an editor that has that page open (subscribed to
 // page:<id>), which read it (shared/partial-json.ts) and show the version being written (shared/page-drafts.ts); once
 // the call has run, the draft says which version it saved, or that it saved nothing, and the page shows that. Agents
@@ -21,12 +21,12 @@ export interface ToolStream {
   input?: Record<string, unknown>;
 }
 
-const PAGE_TOOL = /^mcp__(?:hydor|naget-agent|agent-console)__(show_html|save_page|save_doc|save_slides|save_sheet|save_latex)$/;
+const PAGE_TOOL = /^mcp__(?:hydor|naget-agent|agent-console)__(show_html|save_page|save_doc|save_slides|save_sheet|save_latex|save_diagram)$/;
 const HTML_FILE = /\.html?$/i;
 
 type Kind = PageDraft['tool'];
 /** Saves of another kind than a page of HTML: their drafts are the call's input as it comes. */
-const MODEL = new Set<Kind>(['save_doc', 'save_slides', 'save_sheet', 'save_latex']);
+const MODEL = new Set<Kind>(['save_doc', 'save_slides', 'save_sheet', 'save_latex', 'save_diagram']);
 
 /** Which calls draw a page as they come, and the fields that say what it is. */
 function kindOf(name: string): Kind | null {
@@ -182,6 +182,7 @@ const FIELDS: Record<Kind, Set<string>> = {
   save_slides: new Set(['id', 'title']),
   save_sheet: new Set(['id', 'title']),
   save_latex: new Set(['id', 'title']),
+  save_diagram: new Set(['id', 'title']),
 };
 
 /** A file draft shows once its path says it is an HTML file. */
