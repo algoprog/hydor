@@ -4,6 +4,7 @@
 // far it has got, the time left and Stop, and how it was made.
 import { useEffect, useState, type ReactNode } from 'react';
 import { Check, Cpu, Download, Film, Gpu, Square } from 'lucide-react';
+import { viaLink } from '../../../lib/machine';
 import { VIDEO_FPS, VIDEO_PRESETS, VIDEO_QUALITIES, videoClock, type VideoCodec, type VideoEditJob, type VideoQuality, type VideoRecipe } from '@shared/mediaedit-video';
 import { Button, cx } from '../../../components/ui';
 import { go } from '../../../lib/nav';
@@ -121,7 +122,8 @@ export function ExportPage(p: ExportProps) {
                   { value: 'mp4', label: 'MP4' },
                   { value: 'mov', label: 'MOV' },
                   { value: 'webm', label: 'WebM' },
-                  { value: 'gif', label: 'GIF' },
+                  // At someone's link it is saved over the video alone, as the video it is.
+                  ...(viaLink ? [] : [{ value: 'gif', label: 'GIF' }]),
                 ]}
               />
             </Group>

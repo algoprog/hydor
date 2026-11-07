@@ -28,6 +28,7 @@ import { CountVisits } from '../palette/usage';
 import { ReleaseNotes, WhatsNew } from '../settings/Releases';
 import { Lightbox, VideoBox } from '../../components/Lightbox';
 import { EditorHost } from '../mediaedit/host';
+import { ShareDialogHost } from '../spaces/ShareHost';
 import { HelpButton, Tour } from '../tour/Tour';
 import { Tips } from '../tips/Tips';
 import { HandsFree } from '../voice/HandsFree';
@@ -268,6 +269,7 @@ export function Shell() {
         <FilePeek />
         <ArxivHost />
         <StudioHost />
+        <ShareDialogHost />
         <Lightbox />
         <VideoBox />
         <Tour />
@@ -306,6 +308,7 @@ export function Shell() {
       <FilePeek />
       <ArxivHost />
       <StudioHost />
+      <ShareDialogHost />
       <Lightbox />
       <VideoBox />
       {!sideOpen && roomy && !panelOpen && loc !== '/terminal' && <HelpButton />}

@@ -10,6 +10,7 @@
 // redo for every step. On a phone: the viewer, the main track, and the rest in sheets from the bottom.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { AudioLines, Clapperboard, Download, Film, Palette, Plus, Redo2, Scissors, SlidersHorizontal, Undo2, X } from 'lucide-react';
+import { viaLink } from '../../lib/machine';
 import {
   captionsSrt,
   CAPTION_STYLES,
@@ -511,8 +512,13 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
         { label: plans.main.label, keys: 'Ctrl+S', disabled: busy, onClick: () => void run('main') },
         ...(plans.copy ? [{ label: plans.copy.label, disabled: busy, onClick: () => void run('copy') }] : []),
         { label: 'Export…', keys: 'Alt+4', onClick: () => setWorkspace('export') },
-        { label: 'Take this frame as a picture', sep: true, disabled: busy, onClick: () => void run('frame') },
-        { label: 'Save as a GIF', disabled: busy, onClick: () => void run('gif') },
+        // At someone's link it is saved over the video alone: no frames or GIFs beside it.
+        ...(viaLink
+          ? []
+          : [
+              { label: 'Take this frame as a picture', sep: true, disabled: busy, onClick: () => void run('frame') },
+              { label: 'Save as a GIF', disabled: busy, onClick: () => void run('gif') },
+            ]),
         ...(o.to && 'asset' in o.to && !detached ? [{ label: 'Use this frame as its still', onClick: () => h.set((x) => ({ ...x, stillAt: clock.get() })) }] : []),
         { label: 'Save the captions as .srt', disabled: !(r.texts ?? []).length, onClick: downloadSrt },
         { label: 'Close', sep: true, onClick: close },

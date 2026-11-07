@@ -257,15 +257,15 @@ On a phone, open the sidebar (a drawer) first.
 
 ## Share a project with people
 
-You can invite people into one project, such as an advisor and the students who work with you, each with a link of their own. Without your password, they see the project's documents, its sessions and, when it has them, its runs and its reading list. They comment on its documents under their own name, and if you let them, they change its documents too. They never reach your agents, your files, your settings or your other projects.
+You can invite people into one project, such as an advisor and the students who work with you, each with a link of their own. Without your password, they see the project's documents, its sessions and, when it has them, its runs and its reading list. They comment on its documents under their own name, and if you let them, they change its documents too. They never reach your agents, your files, your settings or your other projects. To share one thing of the Library alone (a document, a page, a picture, a video…), see [Share with people](/guide/library#share-with-people).
 
 ### Invite someone
 
 1. Open the project and click **More** (⋯) at its top, or **More** on its card on the [Projects page](/projects). Click **Share with people**.
 2. Under **Invite someone**, type **Their name**. Their comments and changes show under it.
 3. Pick what they may do:
-   - **View and comment**: they read everything the project shares, and comment on its documents and LaTeX documents.
-   - **Edit documents**: they also change its documents, spreadsheets and slides, in the Library's own editors, and its LaTeX documents where this computer typesets them shut in (see [What is never shared](#what-is-never-shared)).
+   - **View and comment**: they read everything the project shares, and comment on its documents, LaTeX documents, slides, spreadsheets and pages.
+   - **Edit documents**: they also change its documents, spreadsheets, slides, pages and designs, in the Library's own editors (a page's words, pictures and layout, never its code), and its LaTeX documents where this computer typesets them shut in (see [What is never shared](#what-is-never-shared)).
 4. Pick how long the link works: **A week**, **A month** or **Until you stop it**.
 5. Click **Make their link**. Copy it with the copy button and send it to them, or click the QR code button to show it as a QR code for their phone's camera. The link is shown only now: the app keeps only a fingerprint of it, so it can't show it again. You can always make them a new one.
 
@@ -276,7 +276,7 @@ An agent can make a link too, with your OK each time: "Share my Thesis project w
 Their link opens the project on its own, in the app's look, with nothing else of yours around it:
 
 - At the top, the project's mark, its name and what it is about. On the right, their own name: its menu says what they may do and until when, and who shared it with them, and has **Language** (English, 中文, Ελληνικά) and **Theme** (**Light**, **Dark** or **Like this device**) for their browser.
-- **Documents**: the project's pages, documents, slides, spreadsheets, LaTeX documents and notebooks, each with its picture. One opens to read as its own address shows it (a LaTeX document typeset into pages, its source a click away), with **Download** for its files: a PDF, a Word document, the LaTeX project and so on. With **Edit documents**, documents, spreadsheets and slides open in their editor instead.
+- **Documents**: the project's pages, documents, slides, spreadsheets, LaTeX documents and notebooks, each with its picture. One opens to read as its own address shows it (a LaTeX document typeset into pages, its source a click away), with **Download** for its files: a PDF, a Word document, the LaTeX project and so on. With **Edit documents**, documents, spreadsheets, slides, pages and designs open in their editor instead.
 - **Sessions**: the project's sessions, as a [read-only link](/guide/devices#share-a-session-with-a-read-only-link) shows a session: the conversation, the steps by name, file changes and pages the agent showed, following along while an agent works. Never command output, the agent's thinking or what a step was given. A Confidential session never shows.
 - **Runs**, when the project has experiments: each run's name, how it went and when, its metrics and its settings. Never its command, its folder, its log or the machine it ran on.
 - **Reading list**, when your Reading list app has papers for the project: each paper's title (a link to it), its authors, venue and year, whether it is read, and its tags. Never your notes about it or its files.
@@ -285,9 +285,9 @@ The page follows along by itself, every minute while it is open. Agents that wor
 
 ### Comments under their name
 
-On a document or a LaTeX document, **Comments** (beside it, or over it on a phone) lists its comments and their replies, each under who wrote it: theirs as **You**, an agent's as **Agent**, and yours under your name. At the bottom of the Share dialog, **They see your comments as** says that name ("Owner" until you change it); **Change** sets another.
+On a document, a LaTeX document, slides, a spreadsheet or a page, **Comments** (beside it, or over it on a phone) lists its comments and their replies, each under who wrote it: theirs as **You**, an agent's as **Agent**, and yours under your name. At the bottom of the Share dialog, **They see your comments as** says that name ("Owner" until you change it); **Change** sets another.
 
-To comment, they click **Add a comment**, then paste the words it is about, copied from the document, or leave them out to comment on the whole document. They can reply to any comment and resolve or reopen one, but change or delete only their own. With **Edit documents**, they comment in the editor itself, as you do.
+To comment, they click **Add a comment**, then paste the words it is about, copied from the document, or leave them out to comment on the whole document; on slides they pick the slide, and on a spreadsheet the sheet and the cell (as B4). They can reply to any comment and resolve or reopen one, but change or delete only their own. With **Edit documents**, they comment in the editor itself, as you do.
 
 In your own editor, their comments show under their name, and agents read and answer them as they answer yours: "Answer Maria's comments on Chapter 3." Agents are told to take their comments as requests about the document only, and to do nothing else one asks (run a command, open a file, write to someone) unless you ask them to. When someone comments or replies, you get a notice ("Maria commented: …") and a line in your [inbox](/inbox) ("Maria commented on “Thesis, chapter 3”"), which stays until you or an agent reply, or the comment is resolved.
 
@@ -313,7 +313,7 @@ A link that ran out, was stopped or was made again says so when opened ("This li
 - **Your agents**: people can't start or steer a session, or ask an agent anything. They read sessions and comment on documents.
 - **Your files**: not the project's folder, not any folder of yours. Only what the project holds in the Library, and its sessions as read-only links show them.
 - **Your settings, your other projects** and everything else in the app. A group's link shows the group's own things, not those of the projects it brings together.
-- **Running anything**: a page of HTML (a small app, a tracker) shows with its data as it is, and what it changes is not kept; a notebook shows its cells and outputs and never runs. LaTeX documents are changed through a link only where TeX runs shut in by bubblewrap (Linux); elsewhere people read and comment on them.
+- **Running anything**: a page of HTML (a small app, a tracker) shows with its data as it is, and what it changes is not kept; with **Edit documents** they change its words, pictures and layout, never its code (its scripts, and what runs when something is clicked); a notebook shows its cells and outputs and never runs. LaTeX documents are changed through a link only where TeX runs shut in by bubblewrap (Linux); elsewhere people read and comment on them.
 
 Each link is a long random code that opens one project for one person. A code that opens nothing counts as a wrong password from where it came: after ten in an hour, that address can't open links or sign in for an hour (see [Reach the app from another device](/guide/devices#reach-the-app-from-another-device)).
 

@@ -13,15 +13,25 @@ export const machineBase = machineId ? `/m/${machineId}` : '';
 const OWN = /^\/api\/(auth\/|machines\b|push\b|themes\b|tour\b|tips\b|sidebar\b)/;
 
 /**
- * A project shared with someone, opened at their link (/p/<token>, server/spaces/portal.ts): the Library's editors and
- * viewers there ask the link's own routes for what they ask of /api/pages/…, which answer for that project alone; any
- * other call of the app's API goes nowhere from there.
+ * A project, or one thing of the Library, shared with someone, opened at their link (/p/<token>,
+ * server/spaces/portal.ts): the Library's editors and viewers there ask the link's own routes for what they ask of
+ * /api/pages/… (and the picture, video and sound editors of /api/media/… and /api/mediaedit/…), which answer for what
+ * the link opens alone; any other call of the app's API goes nowhere from there.
  */
 export const portalToken: string | null = /^(?:\/m\/[a-z0-9-]{1,40})?\/p\/([A-Za-z0-9_-]{32})\/?$/.exec(location.pathname)?.[1] ?? null;
 
+/**
+ * Opened at someone's link: the editors leave out what would spend the owner's money or reach their other things (AI
+ * tools, the owner's Library and files, their graphics card's settings).
+ */
+export const viaLink = portalToken !== null;
+
+/** The app's calls a link answers itself (portal.ts, portal-media.ts). */
+const LINKED = /^\/api\/(pages|media|mediaedit)\//;
+
 /** A URL on the server of the machine this page shows. */
 export function mu(path: string): string {
-  if (portalToken && path.startsWith('/api/')) return `${machineBase}/p-api/${portalToken}/${path.startsWith('/api/pages/') ? path.slice('/api/'.length) : `none/${path.slice('/api/'.length)}`}`;
+  if (portalToken && path.startsWith('/api/')) return `${machineBase}/p-api/${portalToken}/${LINKED.test(path) ? path.slice('/api/'.length) : `none/${path.slice('/api/'.length)}`}`;
   return machineBase && !OWN.test(path) ? machineBase + path : path;
 }
 

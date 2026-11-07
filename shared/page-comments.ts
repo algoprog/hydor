@@ -5,7 +5,7 @@
 // in the app. People add, answer, resolve and delete them in the editor; agents read them with get_page and answer,
 // resolve or add them with save_page. A list of changes (`PageCommentOp`) does all of that, so two at once lose nothing.
 
-import { cleanComment, COMMENT_LIMITS, newCommentId, type Comment } from './comments.ts';
+import { applyCommentChanges, cleanComment, COMMENT_LIMITS, newCommentId, type Comment, type CommentOpsResult, type Writer } from './comments.ts';
 
 /** Which block a comment is on. */
 export interface PageAnchor {
@@ -76,55 +76,19 @@ export function cleanPageComments(v: unknown, now = Date.now()): PageComment[] {
   return out;
 }
 
-/** Applies changes to a page's comments, made by `by`: the list after them, and what could not be done (for an agent). */
-export function applyCommentOps(list: PageComment[], ops: unknown, by: 'user' | 'agent', now = Date.now()): { list: PageComment[]; notes: string[]; added: string[] } {
-  const out: PageComment[] = list.map((c) => ({ ...c, ...(c.replies ? { replies: [...c.replies] } : {}) }));
-  const notes: string[] = [];
-  const added: string[] = [];
-  if (!Array.isArray(ops)) return { list: out, notes: ['comments must be a list of changes, such as [{"id": "c1", "reply": "…"}]: they were left as they were.'], added };
-  const text = (o: Record<string, unknown>, k: string) => (typeof o[k] === 'string' ? (o[k] as string).replace(/\r\n?/g, '\n').trim().slice(0, COMMENT_LIMITS.text) : '');
-  for (const raw of ops.slice(0, 200)) {
-    const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-    const id = typeof o.id === 'string' ? o.id.trim() : '';
-    const c = id ? out.find((x) => x.id === id) : undefined;
-    if (c) {
-      if (o.delete === true) {
-        out.splice(out.indexOf(c), 1);
-        continue;
-      }
-      const reply = text(o, 'reply');
-      if (reply) {
-        c.replies = [...(c.replies ?? []), { id: `${c.id}r${(c.replies?.length ?? 0) + 1}${now.toString(36).slice(-3)}`, by, text: reply, at: now }].slice(-COMMENT_LIMITS.replies);
-      }
-      if (o.resolve === true || o.resolved === true) c.resolved = true;
-      if (o.reopen === true || o.resolved === false) delete c.resolved;
-      const edit = text(o, 'edit');
-      if (edit) {
-        if (c.by === by) c.text = edit;
-        else notes.push(`Comment ${id} is ${c.by === 'user' ? 'the user’s' : 'an agent’s'}: answer it with "reply".`);
-      }
+/** Applies changes to a page's comments, made by `by`: the list after them, what could not be done (for an agent), the new ones' ids and the replies made. */
+export function applyCommentOps(list: PageComment[], ops: unknown, by: Writer, now = Date.now()): CommentOpsResult<PageComment> {
+  return applyCommentChanges<PageComment>(
+    list,
+    ops,
+    by,
+    (o) => {
       const on = cleanAnchor(o.on);
-      if (on) c.on = on;
-      if (!reply && !edit && !on && o.resolve === undefined && o.resolved === undefined && o.reopen === undefined && text(o, 'text')) notes.push(`There is a comment ${id} already: answer it with "reply", or give a new comment another id.`);
-      continue;
-    }
-    if (o.delete === true || text(o, 'reply') || o.resolve !== undefined || o.reopen !== undefined || text(o, 'edit')) {
-      notes.push(`There is no comment ${id || '(no id)'} to change: get_page lists them.`);
-      continue;
-    }
-    const words = text(o, 'text');
-    if (!words) continue;
-    if (out.length >= COMMENT_LIMITS.comments) {
-      notes.push(`A page keeps at most ${COMMENT_LIMITS.comments} comments.`);
-      break;
-    }
-    const nid = ID.test(id) && !out.some((x) => x.id === id) ? id : newCommentId();
-    const quote = text(o, 'quote').replace(/\s+/g, ' ').slice(0, COMMENT_LIMITS.quote);
-    const on = cleanAnchor(o.on);
-    out.push({ id: nid, by, text: words, at: now, ...(quote ? { quote } : {}), ...(on ? { on } : {}) });
-    added.push(nid);
-  }
-  return { list: out, notes, added };
+      return on ? { on } : undefined;
+    },
+    { noun: 'A page', lists: 'get_page lists them' },
+    now,
+  );
 }
 
 const when = (at: number) => new Date(at).toISOString().slice(0, 16).replace('T', ' ');
@@ -133,12 +97,12 @@ const when = (at: number) => new Date(at).toISOString().slice(0, 16).replace('T'
 export function commentsForAgent(list: PageComment[]): string {
   if (!list.length) return '';
   const open = list.filter((c) => !c.resolved).length;
-  const who = (by: 'user' | 'agent' | 'person') => (by === 'agent' ? 'an agent' : by === 'person' ? 'someone the user shared the project with' : 'the user');
+  const who = (c: Pick<PageComment, 'by' | 'name'>) => (c.by === 'agent' ? 'an agent' : c.by === 'person' ? `${c.name || 'someone'} (someone the user shared it with)` : 'the user');
   return [
     `Comments (${open} open, ${list.length - open} resolved), each on a block of the page:`,
     ...list.flatMap((c) => [
-      `- ${c.id} · ${c.resolved ? 'resolved' : 'open'}${c.on?.tag ? ` · on the <${c.on.tag}>` : ''}${c.on?.words ? ` “${c.on.words.slice(0, 120)}”` : ''}${c.quote && c.quote !== c.on?.words ? `, the words “${c.quote.slice(0, 160)}”` : ''} · ${who(c.by)}, ${when(c.at)} UTC: ${c.text.replace(/\n/g, ' / ')}`,
-      ...(c.replies ?? []).map((r) => `    ↳ ${who(r.by)}, ${when(r.at)} UTC: ${r.text.replace(/\n/g, ' / ')}`),
+      `- ${c.id} · ${c.resolved ? 'resolved' : 'open'}${c.on?.tag ? ` · on the <${c.on.tag}>` : ''}${c.on?.words ? ` “${c.on.words.slice(0, 120)}”` : ''}${c.quote && c.quote !== c.on?.words ? `, the words “${c.quote.slice(0, 160)}”` : ''} · ${who(c)}, ${when(c.at)} UTC: ${c.text.replace(/\n/g, ' / ')}`,
+      ...(c.replies ?? []).map((r) => `    ↳ ${who(r)}, ${when(r.at)} UTC: ${r.text.replace(/\n/g, ' / ')}`),
     ]),
     'To answer them, save_page with this id and comments: [{"id": "<id>", "reply": "what you did or say", "resolve": true}] (resolve once it is dealt with; "reopen": true opens it again). Make the change a comment asks for in the html too; to only answer, leave html out. Add one of your own with {"text": "…", "on": "words of the block it is about"}.',
   ].join('\n');

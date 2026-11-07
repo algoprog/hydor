@@ -26,7 +26,8 @@ import { BackButton, NavButton, PageHeader } from '../layout/PageHeader';
 import { SpaceLibrary } from '../pages/Library';
 import { ActivityText } from '../sessions/SessionList';
 import { MemberPicker, memberNames, SpaceMark, startInSpace } from './parts';
-import { activityText, openShareDialog, PersonMark, ShareDialogHost, useShares } from './ShareDialog';
+import { activityText, PersonMark, useShares } from './ShareDialog';
+import { openShareDialog } from './ShareHost';
 import { SpaceFiles } from './SpaceFiles';
 import { SpaceSkillsTab } from './SpaceSkills';
 import { loadSpaces, useSpaces } from './state';
@@ -662,7 +663,6 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
   const saved = (next: Space) => setData((d) => ({ space: next, sessions: d?.sessions ?? [] }));
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ShareDialogHost />
       <Top s={s} view={view} tab={tab} />
       {tab === 'files' ? (
         // The folder scrolls in its own box, so the page keeps its height.

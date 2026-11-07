@@ -55,6 +55,27 @@ export function initMedia(db: DB) {
   db.exec('create index if not exists media_bytes on media(bytes)');
   // The Library folder it is in (server/pages/folders.ts), or none.
   if (!cols.includes('folder')) db.exec('alter table media add column folder text');
+  // Its comments (shared/media-comments.ts, as JSON), and who saved this version of it through their link (a name).
+  if (!cols.includes('comments')) db.exec('alter table media add column comments text');
+  if (!cols.includes('who')) db.exec('alter table media add column who text');
+  // Earlier versions of it, each file kept in media/versions/<id>/ (versions.ts).
+  db.exec(`
+    create table if not exists media_versions (
+      media_id text not null,
+      version integer not null,
+      file text not null,
+      mime text not null,
+      bytes integer not null,
+      width integer,
+      height integer,
+      duration real,
+      peaks text,
+      sha text,
+      who text,
+      created_at integer not null,
+      primary key (media_id, version)
+    );
+  `);
 }
 
 interface Row {
@@ -80,6 +101,9 @@ interface Row {
   peaks: string | null;
   lyrics: string | null;
   sha: string | null;
+  who: string | null;
+  /** How many earlier versions are kept (counted by the query). */
+  versions?: number;
   created_at: number;
   updated_at: number;
 }
@@ -119,16 +143,21 @@ const toItem = (r: Row): MediaItem => ({
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   file: path.join(MEDIA_DIR, r.file),
+  ...(r.who ? { who: r.who } : {}),
+  ...(r.versions ? { versions: r.versions } : {}),
 });
+
+/** An item's row, with how many earlier versions it keeps. */
+const SELECT = 'select m.*, (select count(*) from media_versions v where v.media_id = m.id) as versions from media m';
 
 export function listMedia(db: DB): MediaItem[] {
   initMedia(db);
-  return (db.prepare('select * from media order by created_at desc').all() as Row[]).map(toItem);
+  return (db.prepare(`${SELECT} order by m.created_at desc`).all() as Row[]).map(toItem);
 }
 
 export function getMedia(db: DB, id: string): MediaItem | null {
   initMedia(db);
-  const r = db.prepare('select * from media where id = ?').get(id) as Row | undefined;
+  const r = db.prepare(`${SELECT} where m.id = ?`).get(id) as Row | undefined;
   return r ? toItem(r) : null;
 }
 
@@ -275,6 +304,11 @@ export function setMediaSpace(db: DB, id: string, space: string | null): MediaIt
 export async function deleteMedia(db: DB, id: string) {
   const m = mustMedia(db, id);
   db.prepare('delete from media where id = ?').run(id);
+  db.prepare('delete from media_versions where media_id = ?').run(id);
   const f = filesOf(m);
   for (const p of [f.file, f.still, f.frames]) await fs.promises.rm(p, { force: true });
+  await fs.promises.rm(versionsDir(id), { recursive: true, force: true });
 }
+
+/** Where an item's earlier versions are kept (versions.ts). */
+export const versionsDir = (id: string) => path.join(MEDIA_DIR, 'versions', id);

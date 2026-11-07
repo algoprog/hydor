@@ -1,23 +1,25 @@
 // One image, video or sound in the Library (/media/<id>): the picture (a tap away from full size), the video or the
 // sound to play (a sound's shape to seek along), its title and description (written by a model, or by you: Edit),
-// what it was made from and with, its size, length and file, the session it came from, for a video the frames the
-// model saw, and for a sound its words. Edit a picture or a video in its editor (saved over it, or as a copy), download
-// it, write the title and description again, start a new session with it in the message box, or delete it. A sound
-// opens in the sound editor, and so does a video's sound (its More menu).
-import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, AudioLines, Download, Ellipsis, FolderInput, MessageSquarePlus, MessagesSquare, Pencil, RefreshCw, Settings2, SlidersHorizontal, Trash2, TriangleAlert } from 'lucide-react';
+// its comments (on a spot of a picture, at a moment of a video or a sound: MediaComments.tsx), what it was made from
+// and with, its size, length and file, the session it came from, for a video the frames the model saw, and for a sound
+// its words. Edit a picture or a video in its editor (saved over it, or as a copy; the one before is kept, and Earlier
+// versions brings one back), share it with people (each a link of their own, to comment or edit), download it, write
+// the title and description again, start a new session with it in the message box, or delete it. A sound opens in the
+// sound editor, and so does a video's sound (its More menu).
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowLeft, AudioLines, Download, Ellipsis, FolderInput, History, MessageSquare, MessageSquarePlus, MessagesSquare, Pencil, RefreshCw, Settings2, Share2, SlidersHorizontal, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
 import { useLocation } from 'wouter';
-import { clipLength, type MediaItem } from '@shared/media';
-import { api, del, enc, patch } from '../../lib/api';
+import { clipLength, type MediaItem, type MediaVersion } from '@shared/media';
+import type { MediaComment, MediaCommentOp } from '@shared/media-comments';
+import { api, del, enc, patch, post } from '../../lib/api';
+import { onFeatureEvent } from '../../lib/featureEvents';
 import { bytes } from '../../lib/format';
 import { mu } from '../../lib/machine';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
-import { AudioPlayer } from '../../components/AudioPlayer';
 import { openLightbox } from '../../components/Lightbox';
-import { VideoPlayer } from '../../components/VideoPlayer';
-import { Button, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Throbber, useConfirm, useIsMobile } from '../../components/ui';
+import { Button, Dialog, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Throbber, useConfirm, useIsMobile } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
 import { NavButton } from '../layout/PageHeader';
 import { openEditor } from '../mediaedit/host';
@@ -25,6 +27,8 @@ import { editLibraryVideo } from '../mediaedit/video/open';
 import { editLibrarySound } from '../mediaedit/audio/open';
 import { SpaceMenu } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
+import { openShare, useSharedThings } from '../spaces/ShareHost';
+import { MediaCommentsPanel, MediaStage, useMediaReview } from './MediaComments';
 import { downloadMedia, recaption, startSessionWithMedia } from './parts';
 import { mediaUrl, useMedia, withDownload } from './state';
 
@@ -69,6 +73,25 @@ function MediaView({ id }: { id: string }) {
   }, [id]);
   // The list hears of changes (its title written, an edit): the newest of the two.
   const m = live && (!loaded || live.updatedAt >= loaded.updatedAt) ? live : loaded;
+  // Its comments, kept up to date (someone it is shared with, an agent).
+  const [comments, setComments] = useState<MediaComment[]>([]);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const loadComments = useCallback(() => api<{ comments: MediaComment[] }>(`/api/media/${enc(id)}/comments`).then((r) => setComments(r.comments), () => {}), [id]);
+  useEffect(() => {
+    setComments([]);
+    void loadComments();
+    return onFeatureEvent('media', ({ data }) => {
+      const e = data as { what?: string; id?: string };
+      if (e.what === 'comments' && e.id === id) void loadComments();
+    });
+  }, [id, loadComments]);
+  const review = useMediaReview(
+    m ?? { id, kind: 'image', title: '' },
+    comments,
+    (ops: MediaCommentOp[]) => post<{ comments: MediaComment[] }>(`/api/media/${enc(id)}/comments`, { ops }).then((r) => r.comments),
+    setComments,
+  );
+  const people = useSharedThings()('media', id);
   if (error) return <Empty title="No such image, video or sound">{error}</Empty>;
   if (!m)
     return (
@@ -171,6 +194,10 @@ function MediaView({ id }: { id: string }) {
               <span className="max-sm:hidden">Edit</span>
             </Button>
           )}
+          <Button size="sm" variant="secondary" icon={<Share2 size={14} />} onClick={() => openShare({ kind: 'media', id: m.id, title: m.title, mediaKind: m.kind })} title="Share with people" aria-label="Share with people">
+            <span className="max-sm:hidden">Share</span>
+            {people > 0 && <span className="tnum rounded-md bg-bg-2 px-1.5 text-[11.5px] text-fg-3 max-sm:hidden">{people}</span>}
+          </Button>
           <Button size="sm" variant="secondary" icon={<Download size={14} />} onClick={() => downloadMedia(m)}>
             <span className="max-sm:hidden">Download</span>
           </Button>
@@ -189,6 +216,11 @@ function MediaView({ id }: { id: string }) {
             <MenuItem icon={<RefreshCw size={14} />} onClick={() => (setMenu(false), void recaption(m))}>
               Write them again
             </MenuItem>
+            {!!m.versions && (
+              <MenuItem icon={<History size={14} />} hint={String(m.versions)} onClick={() => (setMenu(false), setVersionsOpen(true))}>
+                Earlier versions
+              </MenuItem>
+            )}
             {m.sessionKey && (
               <MenuItem icon={<MessagesSquare size={14} />} onClick={() => (setMenu(false), go(`/s/${encodeURIComponent(m.sessionKey!)}`))}>
                 Open its session
@@ -226,21 +258,13 @@ function MediaView({ id }: { id: string }) {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto grid max-w-[1180px] gap-5 px-3 py-4 sm:px-6 sm:py-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="flex min-w-0 items-start justify-center">
-            {m.kind === 'video' ? (
-              // As tall as the screen allows, as wide as its shape then is.
-              <div className="overflow-hidden rounded-2xl border border-line bg-black" style={{ aspectRatio: shape, width: `min(100%, calc(72dvh * ${ratio}))` }}>
-                <VideoPlayer src={src} name={m.title} downloadUrl={withDownload(src)} poster={mu(mediaUrl(m, 'still'))} />
-              </div>
-            ) : m.kind === 'audio' ? (
-              // Its shape as kept (read from the file when there is none), on a soft wash of the accent.
-              <div className="w-full rounded-2xl border border-line bg-gradient-to-br from-accent-soft via-panel to-panel px-4 py-6 sm:px-6 sm:py-8">
-                <AudioPlayer src={src} peaks={m.peaks ?? undefined} downloadUrl={withDownload(src)} large />
-              </div>
-            ) : (
-              <button type="button" className="cursor-zoom-in" onClick={() => openLightbox([{ src, name: m.title, edit: { to: { media: m.id }, from: m.title, save: (r) => void (r.media && r.media !== m.id && go(`/media/${r.media}`)) } }])} aria-label="Show it full size">
-                <img src={src} alt={m.description || m.title} className="max-h-[72dvh] max-w-full rounded-2xl border border-line bg-bg-2 object-contain" />
-              </button>
-            )}
+            <MediaStage
+              r={review}
+              src={src}
+              poster={m.kind === 'video' ? mu(mediaUrl(m, 'still')) : undefined}
+              downloadUrl={withDownload(src)}
+              onOpen={() => openLightbox([{ src, name: m.title, edit: { to: { media: m.id }, from: m.title, save: (r) => void (r.media && r.media !== m.id && go(`/media/${r.media}`)) } }])}
+            />
           </div>
           <aside className="min-w-0 space-y-4">
             {editing ? (
@@ -307,6 +331,14 @@ function MediaView({ id }: { id: string }) {
                 {m.captionBy && m.caption === 'done' && <p className="mt-2 text-[11.5px] text-fg-3">Written by {m.captionBy}</p>}
               </div>
             )}
+            <div className="rounded-2xl border border-line bg-panel p-3">
+              <div className="mb-2 flex items-center gap-1.5 px-1 text-[12.5px] font-medium text-fg-2">
+                <MessageSquare size={13} className="text-fg-3" />
+                Comments
+                {comments.filter((c) => !c.resolved).length > 0 && <span className="tnum text-fg-3">{comments.filter((c) => !c.resolved).length}</span>}
+              </div>
+              <MediaCommentsPanel r={review} />
+            </div>
             <div className="rounded-2xl border border-line bg-panel px-4 py-2.5">
               {m.model && (
                 <Fact label="Made with">
@@ -326,6 +358,16 @@ function MediaView({ id }: { id: string }) {
               {m.duration ? <Fact label="Length">{clipLength(m.duration)}</Fact> : null}
               <Fact label="File">{bytes(m.bytes)}</Fact>
               <Fact label="Kept">{new Date(m.createdAt).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' })}</Fact>
+              {m.who && (
+                <Fact label="Saved by">
+                  <span translate="no">{m.who}</span>
+                  {!!m.versions && (
+                    <button type="button" onClick={() => setVersionsOpen(true)} className="ml-1.5 text-accent hover:underline">
+                      Earlier versions
+                    </button>
+                  )}
+                </Fact>
+              )}
             </div>
             {m.lyrics && (
               <div className="rounded-2xl border border-line bg-panel p-4">
@@ -346,7 +388,76 @@ function MediaView({ id }: { id: string }) {
           </aside>
         </div>
       </div>
+      {versionsOpen && <VersionsDialog m={m} onClose={() => setVersionsOpen(false)} />}
       {confirmNode}
     </div>
+  );
+}
+
+/** Its earlier versions (kept when it was saved over): each to look at or download, and to bring back. */
+function VersionsDialog({ m, onClose }: { m: MediaItem; onClose: () => void }) {
+  const [list, setList] = useState<MediaVersion[] | null>(null);
+  const [busy, setBusy] = useState<number | null>(null);
+  const [confirm, confirmNode] = useConfirm();
+  useEffect(() => {
+    api<{ versions: MediaVersion[] }>(`/api/media/${enc(m.id)}/versions`).then((r) => setList(r.versions), toastError);
+  }, [m.id, m.updatedAt]);
+  const fileOf = (v: number) => mu(`/api/media/${enc(m.id)}/versions/${v}/file`);
+  const back = async (v: MediaVersion) => {
+    if (!(await confirm({ title: 'Bring this version back?', body: 'It is shown again; the one shown now is kept among the earlier versions.', confirm: 'Bring it back' }))) return;
+    setBusy(v.version);
+    try {
+      const r = await post<{ item: MediaItem }>(`/api/media/${enc(m.id)}/versions/${v.version}/restore`);
+      useMedia.getState().put(r.item);
+      toast('Brought back', 'ok');
+      onClose();
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <Dialog open onClose={onClose} title="Earlier versions" width={520}>
+      <p className="mb-3 text-[13px] leading-relaxed text-fg-3">When it is saved over (by you, an agent, or someone you shared it with), the one before is kept here: the last five.</p>
+      {!list ? (
+        <Throbber className="text-fg-3" />
+      ) : !list.length ? (
+        <div className="py-4 text-center text-[13px] text-fg-3">No earlier versions.</div>
+      ) : (
+        <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+          {list.map((v) => (
+            <div key={v.version} className="flex items-center gap-3 px-3 py-2.5 text-[13px]">
+              {m.kind === 'image' ? (
+                <button type="button" onClick={() => openLightbox([{ src: fileOf(v.version), name: m.title, edit: false }])} className="h-12 w-12 shrink-0 cursor-zoom-in overflow-hidden rounded-md border border-line bg-bg-2" aria-label="Show it full size">
+                  <img src={fileOf(v.version)} alt="" loading="lazy" className="h-full w-full object-cover" />
+                </button>
+              ) : (
+                <History size={16} className="shrink-0 text-fg-3" />
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{new Date(v.at).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' })}</div>
+                <div className="truncate text-[12px] text-fg-3">
+                  {[v.width && v.height ? `${v.width} × ${v.height}` : '', v.duration ? clipLength(v.duration) : '', bytes(v.bytes)].filter(Boolean).join(' · ')}
+                  {v.who && (
+                    <>
+                      {' · '}
+                      <span translate="no">{v.who}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <a href={withDownload(fileOf(v.version))} className="inline-flex h-7 items-center rounded-md px-2 text-[12.5px] text-fg-3 hover:bg-bg-2 hover:text-fg" aria-label="Download">
+                <Download size={14} />
+              </a>
+              <Button size="sm" variant="secondary" icon={<Undo2 size={13} />} disabled={busy !== null} onClick={() => void back(v)}>
+                Bring back
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+      {confirmNode}
+    </Dialog>
   );
 }

@@ -101,6 +101,47 @@ export function openEditor(o: OpenEditor): EditorHandle {
   };
 }
 
+/**
+ * An editor on a page of its own, outside the app's tabs (someone's link: portal/PortalMedia): the same editor, its
+ * Save handed to `o.save`, then `onClose`; closing with changes not saved asks first. `lead`: the way back, at its top.
+ */
+export function EditorAlone({ o, onClose, lead }: { o: OpenEditor; onClose: () => void; lead: ReactNode }) {
+  const Editor = EDITORS[o.kind];
+  const dirty = useRef(false);
+  const [confirm, confirmNode] = useConfirm();
+  const close = async () => {
+    if (dirty.current && !(await confirm({ title: 'Close without saving?', body: 'What you changed goes.', confirm: 'Close', danger: true }))) return;
+    onClose();
+  };
+  return (
+    <div data-i18n="media" className="h-full">
+      {Editor && (
+        <Suspense
+          fallback={
+            <div className="flex h-full items-center justify-center text-fg-3">
+              <Throbber size={28} />
+            </div>
+          }
+        >
+          <Editor
+            o={o}
+            active
+            detached={false}
+            setDirty={(d) => void (dirty.current = d)}
+            done={async (r) => {
+              await o.save(r);
+              onClose();
+            }}
+            close={() => void close()}
+            lead={lead}
+          />
+        </Suspense>
+      )}
+      {confirmNode}
+    </div>
+  );
+}
+
 /** Whether an editor is open (the page's own keys might wait while one shows). */
 export const editorShowing = () => !!useTabs.getState().active;
 

@@ -54,6 +54,7 @@ import { tr } from '../../../i18n/runtime';
 import { useMedia } from '../../media/state';
 import type { EditorProps, OpenEditor } from '../host';
 import { makeClock } from '../video/clock';
+import { viaLink } from '../../../lib/machine';
 import { keepSound, makeSoundEdit, readWords, soundFacts, startWords, stopSoundEdit, type MakeKind } from './api';
 import { decodeBlob, decodeSound, measure, renderTrack, SoundPlayer, timeEffects, type Decoded } from './engine';
 import { AddEffect, AiPanel, EffectsRack, GROUPS, HistoryList, Properties } from './panels';
@@ -694,7 +695,8 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
         ...(plans.copy ? [{ label: plans.copy.label, keys: 'Ctrl+Shift+S', onClick: () => void save('copy'), disabled: busy }] : []),
         { label: 'How it is saved…', onClick: () => setDialog('save') },
         'sep',
-        { label: 'Add a sound from the Library…', onClick: () => setLibraryOpen(true) },
+        // At someone's link: only what they bring from their own device.
+        ...(viaLink ? [] : [{ label: 'Add a sound from the Library…', onClick: () => setLibraryOpen(true) }]),
         { label: 'Add a sound from this device…', onClick: () => fileInput.current?.click() },
         { label: rec ? 'Stop recording' : 'Record', keys: 'R', onClick: () => void record() },
       ],
@@ -730,7 +732,13 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
           { label: g, title: g },
           ...EFFECT_TYPES.filter((t) => EFFECTS[t].group === g).map((t): MenuEntry => ({ label: EFFECTS[t].label, onClick: () => addEffect(t) })),
           ...(g === 'Time and pitch' ? [noVideo({ label: 'Change speed…', onClick: () => setDialog('speed') })] : []),
-          ...(g === 'Clean up' ? [noVideo({ label: 'Shorten pauses…', onClick: () => setDialog('pauses') }), { label: 'Remove filler words', onClick: () => (fillers.length ? removeFillers() : (setAiKind(undefined), mobile ? setSheet('ai') : null, toast(tr('Read what is said first: AI → Read what is said'), 'info'))) }] : []),
+          ...(g === 'Clean up'
+            ? [
+                noVideo({ label: 'Shorten pauses…', onClick: () => setDialog('pauses') }),
+                // Reading what is said runs on the owner's computer: not through someone's link.
+                ...(viaLink ? [] : [{ label: 'Remove filler words', onClick: () => (fillers.length ? removeFillers() : (setAiKind(undefined), mobile ? setSheet('ai') : null, toast(tr('Read what is said first: AI → Read what is said'), 'info'))) }]),
+              ]
+            : []),
         ]),
       ],
     },
@@ -738,9 +746,14 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
       label: 'Generate',
       items: [
         noVideo({ label: 'Silence…', onClick: () => setDialog('silence') }),
-        { label: 'Music with AI…', onClick: () => (setAiKind('music'), mobile && setSheet('ai')) },
-        { label: 'A voice with AI…', onClick: () => (setAiKind('speech'), mobile && setSheet('ai')) },
-        { label: 'A sound effect with AI…', onClick: () => (setAiKind('sound'), mobile && setSheet('ai')) },
+        // At someone's link, nothing made with AI (it spends the owner's money).
+        ...(viaLink
+          ? []
+          : [
+              { label: 'Music with AI…', onClick: () => (setAiKind('music'), mobile && setSheet('ai')) },
+              { label: 'A voice with AI…', onClick: () => (setAiKind('speech'), mobile && setSheet('ai')) },
+              { label: 'A sound effect with AI…', onClick: () => (setAiKind('sound'), mobile && setSheet('ai')) },
+            ]),
         { label: 'A recording', keys: 'R', onClick: () => void record() },
       ],
     },
@@ -992,9 +1005,11 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
               <DockPanel id="history" title="History" icon={<HistoryIcon size={12} />}>
                 {hist}
               </DockPanel>
-              <DockPanel id="ai" title="AI" icon={<Sparkles size={12} />}>
-                {ai}
-              </DockPanel>
+              {!viaLink && (
+                <DockPanel id="ai" title="AI" icon={<Sparkles size={12} />}>
+                  {ai}
+                </DockPanel>
+              )}
             </aside>
           </>
         )}
@@ -1010,12 +1025,14 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
                 ['history', 'History', <HistoryIcon size={16} key="h" />],
                 ['ai', 'AI', <Sparkles size={16} key="a" />],
               ] as const
-            ).map(([id, label, icon]) => (
-              <button key={id} type="button" onClick={() => setSheet(sheet === id ? null : id)} className={cx('flex h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium', sheet === id ? 'text-accent' : 'text-fg-3')}>
-                {icon}
-                {label}
-              </button>
-            ))}
+            )
+              .filter(([id]) => !viaLink || id !== 'ai')
+              .map(([id, label, icon]) => (
+                <button key={id} type="button" onClick={() => setSheet(sheet === id ? null : id)} className={cx('flex h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium', sheet === id ? 'text-accent' : 'text-fg-3')}>
+                  {icon}
+                  {label}
+                </button>
+              ))}
           </nav>
           {sheet && (
             <Sheet title={sheet === 'effects' ? 'Effects' : sheet === 'props' ? 'Properties' : sheet === 'history' ? 'History' : 'AI'} onClose={() => setSheet(null)} aside={sheet === 'effects' ? addFx : undefined}>
