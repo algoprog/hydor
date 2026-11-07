@@ -55,8 +55,9 @@ Sessions keep running when you close the tab, and the ones you start in VS Code 
 - **Apps**: small tools for one job (a trip plan, a product comparison, a quiz), each with a view of its own.
 - **A Library to keep things in**: pages and databases as in Notion; documents, spreadsheets, slides and LaTeX as in
   Word, Excel, PowerPoint and Overleaf, with AI built in; posters and social posts as in Canva; diagrams as in
-  draw.io; picture, video and sound editors; Office files and PDFs in and out. Share any of it with people by a link of their own, to comment or
-  to edit.
+  draw.io; picture, video and sound editors; Office files and PDFs in and out. Comment on words as you read, and have an
+  agent make the changes and resolve the comments in one click. Share any of it with people by a link of their own, to
+  comment or to edit.
 - **Memory**: a profile of you, notes on your projects, your guidelines, and more than sixty skills and plugins.
 - **For researchers**: a paper radar, a reading list synced with Zotero, a check before you submit a LaTeX paper, and
   experiments that wait for a free GPU.

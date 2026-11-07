@@ -109,7 +109,9 @@ import { api, enc } from '../../../lib/api';
 import { VERSION_NAME_MAX, type PageVersion } from '@shared/pages';
 import { ChangesList } from './ChangesList';
 import { mountCode, type Code } from './code';
-import { CommentsPanel, type CommentDraft } from './CommentsPanel';
+import { CommentsPanel, type CommentDraft, type TexCommentAi } from './CommentsPanel';
+import { CommentChip } from './CommentChip';
+import { commentsRequest, DISK_NOTE, texWhere } from '@shared/comment-asks';
 import { CompareDialog } from './Compare';
 import { FileTree, FileView, kindIcon, NewButton, type TreeActions, type TreeEntry } from './FileTree';
 import { docDefs, type DocDefs } from './complete';
@@ -176,6 +178,7 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+I', 'Italic, or plain again'],
       ['Ctrl+/', 'Comment lines out, or back in'],
       ['Ctrl+Alt+M', 'A comment on the words picked'],
+      ['Ctrl+Shift+Enter', 'In a new comment: Ask AI to resolve it'],
       ['Ctrl+K', 'Write with AI at the cursor'],
       ['Ctrl+Space', 'Show what can be typed here'],
       ['Tab', 'The next place to fill in'],
@@ -299,7 +302,7 @@ function scopesFor(file: string, cursor: Cursor, heading: TexHeading | null): As
   return out;
 }
 
-export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, file: onDisk, live: agent }: ModelEditorProps<TexDoc>) {
+export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, file: onDisk, live: agent, commentAi }: ModelEditorProps<TexDoc>) {
   const [model, setModel] = useState<TexDoc | null>(doc?.model ?? null);
   // The model as the latest change left it (changes made before it is drawn again build on it).
   const live = useRef<TexDoc | null>(model);
@@ -994,14 +997,42 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onDisk?.comments?.n]);
   const setComments = (f: (cs: NonNullable<TexDoc['comments']>) => NonNullable<TexDoc['comments']>) => change((d) => ({ ...d, comments: f(d.comments ?? []) }));
-  const draftDone = (text: string) => {
+  /** The new comment written (`ai`: and sent to an agent at once, to make the change and resolve it). */
+  const draftDone = (text: string, ai = false) => {
     const dr = draft;
     if (!dr) return;
-    const id = newCommentId();
-    setComments((cs) => [...cs, { id, by: 'user', text, at: Date.now(), quote: dr.quote || undefined, file: dr.file, from: dr.from, to: dr.to }]);
+    const c: TexComment = { id: newCommentId(), by: 'user', text, at: Date.now(), quote: dr.quote || undefined, file: dr.file, from: dr.from, to: dr.to };
+    setComments((cs) => [...cs, c]);
     setDraft(null);
-    setActiveComment(id);
+    setActiveComment(c.id);
+    // The words stay marked; the cursor goes after them (as in a document), so Comment no longer shows over them.
+    const code = codes.current.get(dr.file);
+    if (code && dr.to <= code.view.state.doc.length) code.view.dispatch({ selection: { anchor: dr.to } });
+    if (ai) askAi([c]);
   };
+  // Resolve with AI (common/commentAi.tsx): each comment by its file, its line and its words. A file of this computer's
+  // is changed in place, its comments answered with save_latex's path.
+  const askAi = (list: TexComment[]) => {
+    const d = live.current;
+    if (!commentAi || !d || !list.length) return;
+    commentAi.ask(
+      commentsRequest(
+        list.map((c) => ({ c, where: texWhere(label(c.file), textIn(d, c.file).slice(0, c.from).split('\n').length, c) })),
+        'LaTeX document',
+        onDisk ? DISK_NOTE : undefined,
+      ),
+      list.map((c) => c.id),
+    );
+  };
+  const texAi: TexCommentAi | undefined =
+    commentAi && !readOnly
+      ? {
+          busy: commentAi.busy,
+          one: (id) => askAi((model?.comments ?? []).filter((c) => c.id === id)),
+          all: () => askAi((model?.comments ?? []).filter((c) => !c.resolved && !commentAi.busy.has(c.id))),
+          draft: (text) => draftDone(text, true),
+        }
+      : undefined;
   const pickComment = (x: NonNullable<TexDoc['comments']>[number]) => {
     setActiveComment(x.id);
     withCode(x.file, (c) => c.select(x.from, x.to));
@@ -1024,6 +1055,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         onEdit={(id, text) => setComments((cs) => cs.map((c) => (c.id === id ? { ...c, text } : c)))}
         onDelete={(id) => setComments((cs) => cs.filter((c) => c.id !== id))}
         onOpenFile={(name) => open(name)}
+        ai={texAi}
         review={
           canTrack && (
             <ChangesList
@@ -2213,6 +2245,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
           )}
           {/* What AI made, to accept or leave (a rewrite, LaTeX written or read from a picture, a fix). */}
           {!isView(file) && ai.card}
+          {/* Comment, by the words picked. */}
+          {canComment && !readOnly && !isView(file) && !draft && !liveOn && <CommentChip code={codes.current.get(file) ?? null} at={`${file}:${cursor.picked}:${(({ from, to }) => `${from}-${to}`)(codes.current.get(file)?.view.state.selection.main ?? { from: 0, to: 0 })}:${made}:${commentsOpen}:${split}`} onComment={addComment} />}
         </div>
         {/* Proofreading, or the comments, beside the source where there is room (a sheet on a phone, below). */}
         {roomy && !isView(file) && ai.side()}

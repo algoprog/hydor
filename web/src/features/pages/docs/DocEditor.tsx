@@ -7,7 +7,7 @@
 // "/" put in pictures made with AI, drawings (SVG) and plots (a table's cells their data), the app's AI tools' dialogs
 // (features/images/studio) asking what to make and showing what it costs; a table, handles on its
 // columns' borders. Words picked offer to comment on them or ask the agent about them; comments show beside the page
-// on a wide screen, level with their words, or in a panel (CommentsView.tsx). "/" at a line's start opens a menu of
+// on a wide screen, level with their words, or in a panel (CommentsView.tsx), with Resolve with AI (commentAi.tsx). "/" at a line's start opens a menu of
 // what to put there (Slash.tsx); Ctrl+F finds and Ctrl+H replaces (finding.ts); equations are written in a box with
 // their preview. The page around is told what an agent asked now would be about (the whole document, the section
 // the caret is in, the words picked). Changes stay unsaved until Save (Ctrl+S), as a page's do; the paper, margins,
@@ -43,7 +43,8 @@ import { inputCls } from '../../../components/ui';
 import { openTypes } from '../types';
 import { AgentCaret } from './AgentCaret';
 import { BlockHandle } from './BlockHandle';
-import { CommentsColumn, CommentsPanel, type CommentActions, type Draft, type Extra } from './CommentsView';
+import { CommentsColumn, CommentsPanel, type CommentActions, type DocCommentAi, type Draft, type Extra } from './CommentsView';
+import { commentsRequest, SUGGEST_NOTE } from '@shared/comment-asks';
 import { CompareView, VersionsDialog } from './Compare';
 import { editorCss, paperPx, useDocFonts } from './css';
 import { BandsDialog, EquationBox, SpacingDialog, WordCountDialog, type Counts } from './Dialogs';
@@ -163,6 +164,7 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+J', 'Write with AI (Space on an empty line too)'],
       ['Ctrl+\\', 'Clear the formatting'],
       ['Ctrl+Alt+M', 'Comment'],
+      ['Ctrl+Shift+Enter', 'In a new comment: Ask AI to resolve it'],
       ['Ctrl+Alt+F', 'Footnote'],
       ['Ctrl+Shift+S', 'Voice typing'],
       ['Ctrl+Alt+Shift+X', 'Suggesting, or editing again'],
@@ -207,7 +209,7 @@ const SHORTCUTS: ShortcutGroup[] = [
 /** A place words are typed in. */
 const typing = (t: EventTarget | null) => t instanceof HTMLTextAreaElement || (t instanceof HTMLInputElement && t.type === 'text') || (t instanceof HTMLElement && t.isContentEditable);
 
-export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onRequest, onScopes, saveNowRef, live }: ModelEditorProps<Doc>) {
+export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onRequest, onScopes, saveNowRef, live, commentAi }: ModelEditorProps<Doc>) {
   const [model, setModel] = useState<Doc | null>(() => (doc?.model ? fixDoc(doc.model) : live?.model ? fixDoc(live.model) : null));
   const [saved, setSaved] = useState<Doc | null>(model);
   const [st, setSt] = useState<SelState | null>(null);
@@ -1053,7 +1055,8 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     if (!columnFits) setPanel(true);
     else if (!view.comments) setPrefs({ comments: true });
   }
-  const addDraft = (text: string) => {
+  /** The new comment written (`ai`: and sent to an agent at once, to make the change and resolve it). */
+  const addDraft = (text: string, ai = false) => {
     const en = engine.current;
     if (!en || !draft) return;
     const c: Comment = { id: newCommentId(), by: 'user', text, at: Date.now(), quote: draft.quote };
@@ -1063,16 +1066,32 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       // The words stay marked; the caret goes after them.
       const [, z] = en.range();
       en.place({ a: z, f: z }, false);
+      if (ai) askAi([c]);
     }
     setDraft(null);
   };
-  const askComments = onAsk
-    ? () => {
-        const open = openComments(comments);
-        const list = open.map((c) => `${c.id}${c.quote ? ` on “${short(c.quote, 60)}”` : ''}: ${short(c.text, 200)}`).join('; ');
-        onAsk(`Answer the open comments in this document (make the changes they ask for, then reply to each and resolve it): ${list}`);
-      }
-    : undefined;
+  // Resolve with AI (common/commentAi.tsx): each comment on its words. While the document is in Suggesting, the agent
+  // suggests its changes too, for them to be accepted or rejected one by one.
+  const askAi = (list: Comment[]) => {
+    if (!commentAi || !list.length) return;
+    commentAi.ask(
+      commentsRequest(
+        list.map((c) => ({ c })),
+        'document',
+        mode === 'suggest' ? SUGGEST_NOTE : undefined,
+      ),
+      list.map((c) => c.id),
+    );
+  };
+  const docAi: DocCommentAi | undefined =
+    commentAi && !readOnly
+      ? {
+          busy: commentAi.busy,
+          one: (id) => askAi(comments.filter((c) => c.id === id)),
+          all: () => askAi(openComments(comments).filter((c) => !commentAi.busy.has(c.id))),
+          draft: (text) => addDraft(text, true),
+        }
+      : undefined;
 
   // ---- the menus --------------------------------------------------------------------------------------------------------
   const menus =
@@ -1403,7 +1422,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
         draft={draft}
         onDraft={addDraft}
         onCancelDraft={() => setDraft(null)}
-        onAsk={askComments}
+        ai={docAi}
         onClose={() => (setPanel(false), setDraft(null))}
         a={ca}
       />
@@ -1600,7 +1619,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
                     draft={draft}
                     onDraft={addDraft}
                     onCancelDraft={() => setDraft(null)}
-                    onAsk={askComments}
+                    ai={docAi}
                     a={ca}
                     left={ppx * zoom + 24}
                     width={COLUMN}

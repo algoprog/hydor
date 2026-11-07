@@ -2,13 +2,15 @@
 // or someone named: a person a project is shared with, or a Word file's comments' author, with their initials), how
 // long ago, what it says and the replies under it, with Reply, Resolve (or Reopen), and in its menu Edit and Delete.
 // CommentBox is the field a new comment or a reply is written in: Ctrl+Enter sends it, Esc drops it. Who and ago say
-// who did something and when, for other notes of the editors as well (a tracked change). What people and agents wrote
-// is shown as written, never translated.
+// who did something and when, for other notes of the editors as well (a tracked change). Where an agent can be asked
+// (commentAi.tsx), an open comment has Resolve with AI, says so while an agent is at work on it, and a new comment can
+// go with Ask AI (Ctrl+Shift+Enter). What people and agents wrote is shown as written, never translated.
 import { useEffect, useRef, useState } from 'react';
-import { Bot, Check, MoreHorizontal, Pencil, RotateCcw, Trash2, User } from 'lucide-react';
+import { Bot, Check, MoreHorizontal, Pencil, RotateCcw, Sparkles, Trash2, User } from 'lucide-react';
 import type { Comment } from '@shared/comments';
 import { Button, cx, IconButton, MenuItem, Popover } from '../../../components/ui';
 import { LOCALE } from '../../../i18n/locale';
+import { AiWorking } from './commentAi';
 
 /** How long ago, in a few words ("now", "5 min ago", "yesterday", "12 Mar"). */
 export function ago(at: number): string {
@@ -72,6 +74,7 @@ export function CommentBox({
   initial = '',
   submit = 'Comment',
   onSubmit,
+  onAi,
   onCancel,
   autoFocus,
 }: {
@@ -80,6 +83,8 @@ export function CommentBox({
   /** The button's words ("Comment", "Reply", "Save"). */
   submit?: string;
   onSubmit: (text: string) => void;
+  /** A new comment that goes to an agent at once (Ask AI, Ctrl+Shift+Enter): it makes the change and resolves it. */
+  onAi?: (text: string) => void;
   onCancel: () => void;
   autoFocus?: boolean;
 }) {
@@ -95,14 +100,15 @@ export function CommentBox({
   useEffect(() => {
     if (autoFocus) area.current?.focus({ preventScroll: true });
   }, [autoFocus]);
-  const send = () => {
+  const send = (ai = false) => {
     const t = text.trim();
     if (!t) return;
-    onSubmit(t);
+    if (ai && onAi) onAi(t);
+    else onSubmit(t);
     setText('');
   };
   return (
-    <div className="flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
+    <div className="@container flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
       <textarea
         ref={area}
         value={text}
@@ -111,7 +117,7 @@ export function CommentBox({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
-            send();
+            send(e.shiftKey);
           } else if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
@@ -122,13 +128,21 @@ export function CommentBox({
         aria-label={placeholder}
         className="w-full resize-none rounded-lg border border-line bg-bg px-2.5 py-1.5 text-[13px] leading-snug text-fg outline-none placeholder:text-fg-3 focus:border-accent"
       />
-      <div className="flex justify-end gap-1.5">
-        <Button size="sm" variant="ghost" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button size="sm" variant="primary" disabled={!text.trim()} onClick={send}>
-          {submit}
-        </Button>
+      {/* Ask AI on the left (its mark alone in a narrow box), Cancel and Comment on the right, on a line of their own when there is no room. */}
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
+        {onAi && (
+          <Button size="sm" variant="ghost" icon={<Sparkles size={14} className="text-accent" />} disabled={!text.trim()} onClick={() => send(true)} title="Comment, and have AI make the change and resolve it (Ctrl+Shift+Enter)" aria-label="Ask AI" className="mr-auto">
+            <span className="hidden @min-[16rem]:inline">Ask AI</span>
+          </Button>
+        )}
+        <div className="ml-auto flex gap-1.5">
+          <Button size="sm" variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button size="sm" variant="primary" disabled={!text.trim()} onClick={() => send()}>
+            {submit}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -143,6 +157,8 @@ export function CommentThread({
   onResolve,
   onEdit,
   onDelete,
+  onAi,
+  aiBusy,
   readOnly,
   className,
 }: {
@@ -155,6 +171,10 @@ export function CommentThread({
   onEdit?: (text: string) => void;
   /** Left out where it may not be deleted (someone else's, in a shared project's portal). */
   onDelete?: () => void;
+  /** Resolve with AI: an agent makes the change it asks for, replies and resolves it (left out where no agent can be asked). */
+  onAi?: () => void;
+  /** An agent is at work on it. */
+  aiBusy?: boolean;
   readOnly?: boolean;
   className?: string;
 }) {
@@ -178,6 +198,18 @@ export function CommentThread({
         <span className="flex-1" />
         {!readOnly && (
           <>
+            {onAi && !c.resolved && !aiBusy && (
+              <IconButton
+                label="Resolve with AI"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAi();
+                }}
+              >
+                <Sparkles size={14} className="text-accent" />
+              </IconButton>
+            )}
             <IconButton
               label={c.resolved ? 'Reopen' : 'Resolve'}
               size="sm"
@@ -263,6 +295,7 @@ export function CommentThread({
           </div>
         </div>
       ))}
+      {aiBusy && !c.resolved && <AiWorking className="mt-2.5" />}
       {!readOnly && !c.resolved && !editing && (
         <div className="mt-2">
           {replying || active ? (

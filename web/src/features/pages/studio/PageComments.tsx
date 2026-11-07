@@ -1,13 +1,23 @@
 // The page editor's Comments tab: the comments on the page's blocks, kept with the page outside its HTML
 // (shared/page-comments.ts), in the order of their blocks on the page, each with its replies, Reply, Resolve and its menu
 // (Edit, Delete); a new one written at the top, on the block (and words) picked; the resolved ones under a switch. A
-// comment picked here outlines its block in the page; a mark beside a block in the page picks its comment here. Agents
-// read them with get_page and answer or resolve them with save_page.
+// comment picked here outlines its block in the page; a mark beside a block in the page picks its comment here. Where an
+// agent can be asked, Resolve with AI at the top sends it every open comment, each comment has its own, and a new one can
+// go with Ask AI (common/commentAi.tsx). Agents read them with get_page and answer or resolve them with save_page.
 import { useEffect, useRef, useState } from 'react';
 import { MessageSquarePlus } from 'lucide-react';
 import type { PageComment } from '@shared/page-comments';
 import { cx, IconButton } from '../../../components/ui';
 import { CommentBox, CommentThread } from '../common/Comments';
+import { AiResolveAll } from '../common/commentAi';
+
+/** Resolve with AI: on a comment, on all the open ones, on a new one as it is written; and the ones an agent is at work on. */
+export interface PageCommentAi {
+  busy: ReadonlySet<string>;
+  one: (id: string) => void;
+  all: () => void;
+  draft: (text: string) => void;
+}
 
 /** Comments in the order of their blocks on the page (by where the blocks are), those on no block last. */
 const byPlace = (a: PageComment, b: PageComment) => {
@@ -31,6 +41,7 @@ export function PageComments({
   onResolve,
   onEdit,
   onDelete,
+  ai,
   className,
 }: {
   comments: PageComment[];
@@ -47,12 +58,14 @@ export function PageComments({
   onResolve: (id: string, resolved: boolean) => void;
   onEdit: (id: string, text: string) => void;
   onDelete: (id: string) => void;
+  ai?: PageCommentAi;
   className?: string;
 }) {
   const [resolved, setResolved] = useState(false);
   const list = [...comments].sort(byPlace);
   const open = list.filter((c) => !c.resolved);
   const done = list.filter((c) => c.resolved);
+  const working = ai ? open.filter((c) => ai.busy.has(c.id)).length : 0;
   const box = useRef<HTMLDivElement>(null);
   // The comment picked in the page comes into sight here.
   useEffect(() => {
@@ -60,7 +73,18 @@ export function PageComments({
   }, [active]);
   const thread = (c: PageComment) => (
     <div key={c.id} data-comment={c.id}>
-      <CommentThread comment={c} active={c.id === active} readOnly={readOnly} onFocus={() => onPick(c.id)} onReply={(t) => onReply(c.id, t)} onResolve={(r) => onResolve(c.id, r)} onEdit={(t) => onEdit(c.id, t)} onDelete={() => onDelete(c.id)} />
+      <CommentThread
+        comment={c}
+        active={c.id === active}
+        readOnly={readOnly}
+        onFocus={() => onPick(c.id)}
+        onReply={(t) => onReply(c.id, t)}
+        onResolve={(r) => onResolve(c.id, r)}
+        onEdit={(t) => onEdit(c.id, t)}
+        onDelete={() => onDelete(c.id)}
+        onAi={ai ? () => ai.one(c.id) : undefined}
+        aiBusy={ai?.busy.has(c.id)}
+      />
     </div>
   );
   return (
@@ -74,6 +98,7 @@ export function PageComments({
         )}
       </div>
       <div className="space-y-2 px-2 pb-3">
+        {ai && !readOnly && <AiResolveAll open={open.length - working} busy={working} onAsk={ai.all} />}
         {draft && (
           <div className="rounded-xl border border-accent/60 bg-elevated p-2.5">
             {draft.quote && (
@@ -81,7 +106,7 @@ export function PageComments({
                 {draft.quote}
               </div>
             )}
-            <CommentBox autoFocus onSubmit={onDraftDone} onCancel={onDraftCancel} />
+            <CommentBox autoFocus onSubmit={onDraftDone} onAi={ai?.draft} onCancel={onDraftCancel} />
           </div>
         )}
         {open.map(thread)}

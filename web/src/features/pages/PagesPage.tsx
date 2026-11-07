@@ -53,6 +53,7 @@ import { FolderMenu, moveToFolder, placeFolders, placeTopName } from './folders'
 import { Studio, type StudioDoc } from './studio/Studio';
 import { tr } from '../../i18n/runtime';
 import { askNow, closePageAsk, openPageAsk, PageAskPanel, PageAskPill, usePageAsk } from './AskPage';
+import { useCommentAi } from './common/commentAi';
 import { loadModelVersion, type AskScope } from './kinds';
 import { useLiveDraft, usePageDraft } from './live';
 import { EDITORS } from './editors';
@@ -319,6 +320,9 @@ function PageView({ id }: { id: string }) {
     return () => window.removeEventListener('beforeunload', before);
   }, []);
   const ask = usePageAsk();
+  // Resolve with AI on its comments (common/commentAi.tsx): through the Ask panel, going on with its conversation.
+  const asked = usePageAsk((x) => x.byPage[id]);
+  const commentAi = useCommentAi(data && !old ? `page:${id}` : null, (prompt) => askNow(prompt, { page: id, follow: true, fold: true }), asked?.key ?? null, !!asked?.pending);
   const load = () =>
     api<Loaded>(`/api/pages/${enc(id)}`)
       .then((r) => {
@@ -561,6 +565,7 @@ function PageView({ id }: { id: string }) {
         }}
         startPresent={startPresent}
         live={live}
+        commentAi={commentAi}
       />
     ) : (
       <Empty icon={<AppWindow size={22} />} title="This app cannot open it">
@@ -583,6 +588,7 @@ function PageView({ id }: { id: string }) {
       onRequest={old ? undefined : (r) => askNow(r.prompt, { page: id, make: r.make })}
       saveNowRef={saveFirst}
       pageId={old ? undefined : id}
+      commentAi={commentAi}
     />
   );
   const allScopes = page ? scopesOf(page, scopes, part) : [];

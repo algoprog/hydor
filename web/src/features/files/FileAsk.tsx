@@ -5,6 +5,8 @@
 // each change the agent writes as it lands (useWatchMs reads the file more often while an agent works), the changed
 // lines tinted for a moment. The conversation goes on there, or in Sessions. A PDF's reader asks about a part of it
 // (askAbout): the words picked, or a picture of an area, go with the request, or into the conversation's message box.
+// Resolve with AI on a LaTeX file's comments asks at once (askFileNow), going on with the conversation about the file
+// when there is one, the panel folded away where it would cover the file.
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { ArrowUp, ArrowUpRight, Eye, Quote, Sparkles, SquarePen, X } from 'lucide-react';
@@ -20,7 +22,8 @@ import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx, IconButton, Throbber, useIsMobile } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
 import { Conversation } from '../guide/AskPanel';
-import { useAskRun } from '../guide/ask';
+import { useAskRun, type AskRun } from '../guide/ask';
+import { sendToSession } from '../pages/common/commentAi';
 import { Starting } from '../pages/AskPage';
 import { quoteBlock } from '../session/QuoteSelection';
 
@@ -77,6 +80,35 @@ export async function askAbout(path: string, p: AskPick) {
   keepDraftFiles(key, [...draftFiles(key), ...files]);
   window.dispatchEvent(new CustomEvent('hydor:compose', { detail: { text, key, files } }));
   useFileAsk.setState({ open: true, folded: false });
+}
+
+/**
+ * Sends a request about the file at once, without the box (Resolve with AI on a LaTeX file's comments), its unsaved
+ * changes saved first: into the conversation about it when there is one (after its turn, if its agent is at work),
+ * else as a new one in its folder, with the agent picked last on the start page. The panel opens folded away, so the
+ * file stays in view where the panel would cover it (its pill says how the agent is doing).
+ */
+export async function askFileNow(path: string, prompt: string, run: AskRun, beforeSend: () => Promise<boolean>) {
+  const key = useFileAsk.getState().byPath[path]?.key;
+  try {
+    if (!(await beforeSend())) return;
+    useFileAsk.setState({ open: true, folded: true });
+    if (key) return void (await sendToSession(key, prompt));
+    useFileAsk.setState((s) => ({ byPath: { ...s.byPath, [path]: { key: null, pending: prompt } } }));
+    const r = await post<{ key: string }>('/api/sessions', {
+      agent: run.agent,
+      acpAgent: run.agent === 'acp' ? run.acp : undefined,
+      prompt,
+      model: run.model ?? undefined,
+      account: run.account,
+      cwd: dirname(path),
+      extra: { file: path },
+    });
+    useFileAsk.setState((s) => ({ byPath: { ...s.byPath, [path]: { key: r.key } } }));
+  } catch (e) {
+    useFileAsk.setState((s) => ({ byPath: { ...s.byPath, [path]: { key: s.byPath[path]?.key ?? null } } }));
+    toastError(e);
+  }
 }
 
 /** How often an open file is read again for changes made elsewhere: every second while an agent is at work. */

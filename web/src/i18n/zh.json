@@ -22020,5 +22020,13 @@
 "One LaTeX file, or a whole project":"单个 LaTeX 文件，或整个项目",
 "Or start from":"或者从这些开始",
 "Call it “{0}”.":"把它命名为“{0}”。",
-"Keep it in my Library folder “{0}”.":"把它放在我资料库的“{0}”文件夹里。"
+"Keep it in my Library folder “{0}”.":"把它放在我资料库的“{0}”文件夹里。",
+"A comment on the words picked (Ctrl+Alt+M)":"对选中的文字发表评论（Ctrl+Alt+M）",
+"AI is working on {0} comment{1}":"AI 正在处理 {0} 条评论",
+"AI is working on this":"AI 正在处理",
+"An agent makes the change each comment asks for, replies to it and resolves it":"智能体按每条评论的要求修改，回复它并将其标记为已解决",
+"Comment, and have AI make the change and resolve it (Ctrl+Shift+Enter)":"发表评论，并让 AI 按要求修改后将其标记为已解决（Ctrl+Shift+Enter）",
+"Resolve {0} comment{1} with AI":"用 AI 解决 {0} 条评论",
+"Resolve with AI":"用 AI 解决",
+"In a new comment: Ask AI to resolve it":"写新评论时：询问 AI 来解决"
 }

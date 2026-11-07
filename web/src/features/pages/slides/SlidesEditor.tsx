@@ -213,6 +213,7 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+Shift+↑ / Ctrl+Shift+↓', 'Bring to front, send to back'],
       ['Ctrl+Shift+C / Ctrl+Shift+V', 'Copy the look, paste the look'],
       ['Ctrl+Alt+M', 'A comment on it (or on the slide)'],
+      ['Ctrl+Shift+Enter', 'In a new comment: Ask AI to resolve it'],
       ['Alt', 'While dragging: no snapping'],
       ['Shift', 'While dragging: straight across or down; while sizing: keep or lose its shape'],
     ],
@@ -274,6 +275,7 @@ export function SlidesEditor({
   saveNowRef,
   startPresent,
   live: agent,
+  commentAi,
 }: ModelEditorProps<Deck> & {
   /** Opens presenting at once (the library's Present). */
   startPresent?: boolean;
@@ -1723,7 +1725,7 @@ export function SlidesEditor({
         // A part in a group: the group is what is picked on the slide.
         setSel(el ? [topOf(deck.slides[i], el)?.id ?? el] : []);
       }}
-      onAsk={onAsk}
+      ai={readOnly ? undefined : commentAi}
     />
   );
 

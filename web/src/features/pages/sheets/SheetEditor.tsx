@@ -91,7 +91,8 @@ import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
 import { Board } from './Board';
 import { ChartLayer, ChartPanel } from './Charts';
-import { CommentsPanel } from './CommentsPanel';
+import { CommentsPanel, type SheetCommentAi } from './CommentsPanel';
+import { commentsRequest, sheetWhere } from '@shared/comment-asks';
 import { CondPanel } from './CondPanel';
 import { DupDialog, FormatDialog, SortDialog, SplitDialog, SummaryDialog, type ColChoice } from './Dialogs';
 import { fillDownTo, fillSeries } from './fill';
@@ -255,7 +256,7 @@ function AgentCell({ geo, r, c }: { geo: GridGeo; r: number; c: number }) {
   );
 }
 
-export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, live: agent }: ModelEditorProps<Workbook>) {
+export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, live: agent, commentAi }: ModelEditorProps<Workbook>) {
   const root = useRef<HTMLDivElement>(null);
   const grid = useRef<GridHandle>(null);
   const barRef = useRef<HTMLTextAreaElement>(null);
@@ -1474,16 +1475,39 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   const setComments = (list: SheetComment[]) => sheet && change(metaPatch(sheet, { comments: list.length ? list : undefined }));
   /** One thread changed (null: deleted). */
   const editThread = (id: string, f: (c: SheetComment) => SheetComment | null) => sheet && setComments((sheet.comments ?? []).flatMap((c) => (c.id === id ? (f(c) ?? []) : [c])));
-  /** A new comment on the cell picked (a reply, where it has a thread already). */
-  const addComment = (text: string) => {
+  /** A new comment on the cell picked (a reply, where it has a thread already); `ai`: and sent to an agent at once. */
+  const addComment = (text: string, ai = false) => {
     if (!sheet) return;
     const cell = refName(selRef.current.r, selRef.current.c);
     const had = sheet.comments?.find((c) => c.cell === cell);
     const now = Date.now();
-    if (had) editThread(had.id, (c) => ({ ...c, replies: [...(c.replies ?? []), { id: newCommentId(), by: 'user', text, at: now }] }));
-    else setComments([...(sheet.comments ?? []), { id: newCommentId(), cell, by: 'user' as const, text, at: now }].sort((a, b) => keyOf(a.cell) - keyOf(b.cell)));
+    const reply = { id: newCommentId(), by: 'user' as const, text, at: now };
+    const made: SheetComment = had ? { ...had, replies: [...(had.replies ?? []), reply] } : { id: newCommentId(), cell, by: 'user' as const, text, at: now };
+    if (had) editThread(had.id, () => made);
+    else setComments([...(sheet.comments ?? []), made].sort((a, b) => keyOf(a.cell) - keyOf(b.cell)));
     setPanel({ kind: 'comments' });
+    if (ai) resolveWithAi([made]);
   };
+  // Resolve with AI (common/commentAi.tsx): each thread by its sheet and cell.
+  const resolveWithAi = (list: SheetComment[]) => {
+    if (!commentAi || !sheet || !list.length) return;
+    commentAi.ask(
+      commentsRequest(
+        list.map((c) => ({ c, where: sheetWhere(c.cell, sheet.name) })),
+        'spreadsheet',
+      ),
+      list.map((c) => c.id),
+    );
+  };
+  const sheetAi: SheetCommentAi | undefined =
+    commentAi && !readOnly && sheet
+      ? {
+          busy: commentAi.busy,
+          one: (id) => resolveWithAi((sheet.comments ?? []).filter((c) => c.id === id)),
+          all: () => resolveWithAi((sheet.comments ?? []).filter((c) => !c.resolved && !commentAi.busy.has(c.id))),
+          draft: (text) => addComment(text, true),
+        }
+      : undefined;
   const goCell = (cell: string) => {
     const p = parseRef(cell);
     if (p) setSel(cellSel(p.r, p.c), true);
@@ -2513,6 +2537,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
         ['Ctrl+Shift+;', 'The time now'],
         ['Shift+F2', 'A note on the cell'],
         ['Ctrl+Alt+M', 'A comment on the cell'],
+        ['Ctrl+Shift+Enter', 'In a new comment: Ask AI to resolve it'],
       ],
     },
     {
@@ -2765,6 +2790,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
             onDelete={(id) => editThread(id, () => null)}
             onDraft={(on) => setPanel({ kind: 'comments', draft: on })}
             onClose={() => setPanel(null)}
+            ai={sheetAi}
           />
         )}
         {panel?.kind === 'analyze' && <AnalyzePanel sheet={sheet} calc={calc} si={sheetIx} block={panel.block} header={panel.header} narrow={narrow} onIdea={(idea) => applyIdea(idea, panel.block)} onClose={() => setPanel(null)} />}

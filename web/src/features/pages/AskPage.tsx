@@ -4,7 +4,9 @@
 // change it), its conversation beside the page (over it on a phone, folding away to watch the page change), and
 // the page shows the agent's new version as soon as it is saved. Its conversation goes on there, or in Sessions.
 // A request may also come ready-made (askNow: a slide made with AI from the gallery): the panel opens and sends it at
-// once, as a new conversation, so the person watches it being made.
+// once, as a new conversation, so the person watches it being made. Resolve with AI on comments (common/commentAi.tsx)
+// asks the same way, going on with the conversation open here when there is one (after its turn, if its agent is at
+// work), and the panel folds away where it would cover the page, so the person watches the comments being resolved.
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { ArrowUp, ArrowUpRight, Eye, SquarePen, Sparkles, X } from 'lucide-react';
@@ -14,6 +16,7 @@ import { post } from '../../lib/api';
 import { composeInsert } from '../../lib/featureEvents';
 import { openSession } from '../../lib/nav';
 import { toastError, useSessions } from '../../lib/store';
+import { sendToSession } from './common/commentAi';
 import { AgentIcon } from '../../components/AgentIcon';
 import { cx, IconButton, Throbber, useIsMobile } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
@@ -37,8 +40,11 @@ interface AskState {
   draft: string;
   /** The scope picked, by its id. */
   scope: string;
-  /** A request to send at once, without the box (askNow), for the panel of its page, with what it asks to make. */
-  now: { page: string; prompt: string; scope?: string; make?: MakeExtra; n: number } | null;
+  /**
+   * A request to send at once, without the box (askNow), for the panel of its page, with what it asks to make; `follow`:
+   * into the conversation open here when there is one; `fold`: the panel folded away once it went (where it covers the page).
+   */
+  now: { page: string; prompt: string; scope?: string; make?: MakeExtra; follow?: boolean; fold?: boolean; n: number } | null;
 }
 
 export const usePageAsk = create<AskState>(() => ({ open: false, folded: false, byPage: {}, draft: '', scope: '', now: null }));
@@ -53,10 +59,11 @@ export const closePageAsk = () => usePageAsk.setState({ open: false });
  * Sends a request about the page open at once, without the box: the panel opens with it on its way, as a new
  * conversation (one open goes on in Sessions). `scope`: one of the panel's scopes, whose words start the request;
  * `make`: what it asks to make from the gallery (a slide made with AI), which the agent hears in full (`extra.make`)
- * while the message stays short.
+ * while the message stays short; `follow`: it goes on with the conversation open in the panel, when there is one;
+ * `fold`: the panel folds away once the request went, where it would cover the page (a phone, a narrow window).
  */
-export function askNow(prompt: string, o: { page: string; scope?: string; make?: MakeExtra }) {
-  usePageAsk.setState({ open: true, folded: false, now: { page: o.page, prompt, scope: o.scope, make: o.make, n: ++askedNow } });
+export function askNow(prompt: string, o: { page: string; scope?: string; make?: MakeExtra; follow?: boolean; fold?: boolean }) {
+  usePageAsk.setState({ open: true, folded: false, now: { page: o.page, prompt, scope: o.scope, make: o.make, follow: o.follow, fold: o.fold, n: ++askedNow } });
 }
 
 /** How many requests askNow was given, and the last one sent: each is sent once, however often the panel shows. */
@@ -68,7 +75,7 @@ function useStartAsk(page: PageInfo, beforeSend: () => Promise<boolean>) {
   const mobile = useIsMobile();
   const run = useAskRun();
   const cwd = useSessions((x) => (page.sessionKey ? x.byKey[page.sessionKey]?.cwd : undefined));
-  return async (prompt: string, back: string, make?: MakeExtra) => {
+  return async (prompt: string, back: string, make?: MakeExtra, fold = false) => {
     try {
       if (!(await beforeSend())) return;
       usePageAsk.setState((s) => ({ byPage: { ...s.byPage, [page.id]: { key: null, pending: prompt } }, draft: '' }));
@@ -81,12 +88,23 @@ function useStartAsk(page: PageInfo, beforeSend: () => Promise<boolean>) {
         cwd,
         extra: { page: page.id, ...(make ? { make } : {}) },
       });
-      usePageAsk.setState((s) => ({ byPage: { ...s.byPage, [page.id]: { key: r.key } }, folded: mobile }));
+      usePageAsk.setState((s) => ({ byPage: { ...s.byPage, [page.id]: { key: r.key } }, folded: mobile || fold }));
     } catch (e) {
       usePageAsk.setState((s) => ({ byPage: { ...s.byPage, [page.id]: { key: null } }, draft: back }));
       toastError(e);
     }
   };
+}
+
+/** Goes on with the page's conversation (unsaved changes saved first): the message after its turn if its agent is at work. */
+async function followAsk(key: string, prompt: string, beforeSend: () => Promise<boolean>, fold: boolean) {
+  try {
+    if (!(await beforeSend())) return;
+    await sendToSession(key, prompt);
+    if (fold) usePageAsk.setState({ folded: true });
+  } catch (e) {
+    toastError(e);
+  }
 }
 
 type AskKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram';
@@ -240,7 +258,8 @@ export function PageAskPanel({ page, scopes, beforeSend, className }: { page: Pa
     usePageAsk.setState({ now: null });
     if (now.page !== page.id) return;
     const lead = now.scope ? (scopes.find((s) => s.id === now.scope)?.lead ?? '') : '';
-    void start(`${lead}${now.prompt}`, now.prompt, now.make);
+    if (now.follow && key) return void followAsk(key, `${lead}${now.prompt}`, beforeSend, !!now.fold);
+    void start(`${lead}${now.prompt}`, now.prompt, now.make, now.fold);
   }, [now?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className={cx('flex h-full min-h-0 flex-col bg-bg', className)}>
