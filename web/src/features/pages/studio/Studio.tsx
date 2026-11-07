@@ -29,7 +29,9 @@ import { editorLabels } from './blocks';
 import { InsertPopover, PAGE_SHORTCUTS } from './Inserts';
 import { PartPanel, pictureData, type Ctx, type Media } from './Inspector';
 import { LayersPanel } from './Layers';
-import { PageComments } from './PageComments';
+import { PageComments, type PageCommentAi } from './PageComments';
+import { blockWhere, commentsRequest } from '@shared/comment-asks';
+import type { CommentAi } from '../common/commentAi';
 import { PagePanel } from './PagePanel';
 import { usePageAi } from './pageAi';
 import { BlockAskPopover } from './BlockAsks';
@@ -163,6 +165,7 @@ export function Studio({
   onRequest,
   saveNowRef,
   pageId,
+  commentAi,
 }: {
   doc: StudioDoc | null;
   /** An agent is writing it: what came so far. */
@@ -192,6 +195,8 @@ export function Studio({
   saveNowRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
   /** A page of the Library: comments on its blocks (kept by the app, outside the page) show in Edit's Comments tab. */
   pageId?: string;
+  /** Resolve with AI on its comments (common/commentAi.tsx); left out, they offer none. */
+  commentAi?: CommentAi;
 }) {
   const [mode, setMode] = useState<StudioMode>(initialMode ?? 'view');
   const [device, setDevice] = useState<Device>('desktop');
@@ -260,6 +265,41 @@ export function Studio({
     return r;
   };
   // The editor marks the blocks they are on, and outlines the one picked here.
+  // Resolve with AI (common/commentAi.tsx): each comment by the words it is on, or its block's.
+  const askAi = (list: PageComment[]) => {
+    if (!commentAi || !list.length) return;
+    const where = (c: PageComment) => (c.quote?.trim() || !c.on?.words ? undefined : blockWhere(c.on.words));
+    commentAi.ask(
+      commentsRequest(
+        list.map((c) => ({ c, where: where(c) })),
+        'page',
+      ),
+      list.map((c) => c.id),
+    );
+  };
+  /** The new comment written, on the block (and words) picked; `ai`: and sent to an agent at once, once it is kept. */
+  const addComment = (text: string, ai = false) => {
+    const d = commentDraft;
+    setCommentDraft(null);
+    commentOps([{ text, on: d?.on, quote: d?.quote }])
+      .then((r) => {
+        const id = r?.added[0];
+        if (!id) return;
+        setActiveComment(id);
+        const c = r.comments.find((x) => x.id === id);
+        if (ai && c) askAi([c]);
+      })
+      .catch(toastError);
+  };
+  const pageAi: PageCommentAi | undefined =
+    commentAi && !readOnly && pageId
+      ? {
+          busy: commentAi.busy,
+          one: (id) => askAi(comments.filter((c) => c.id === id)),
+          all: () => askAi(comments.filter((c) => !c.resolved && !commentAi.busy.has(c.id))),
+          draft: (text) => addComment(text, true),
+        }
+      : undefined;
   const commentMarks = useMemo(() => comments.map((c) => ({ id: c.id, on: c.on, resolved: !!c.resolved, n: 1 + (c.replies?.length ?? 0) })), [comments]);
   const marksRef = useRef(commentMarks);
   marksRef.current = commentMarks;
@@ -482,19 +522,14 @@ export function Studio({
           draft={commentDraft}
           readOnly={readOnly}
           onAdd={() => cmd('comment')}
-          onDraftDone={(text) => {
-            const d = commentDraft;
-            setCommentDraft(null);
-            commentOps([{ text, on: d?.on, quote: d?.quote }])
-              .then((r) => r?.added[0] && setActiveComment(r.added[0]))
-              .catch(toastError);
-          }}
+          onDraftDone={(text) => addComment(text)}
           onDraftCancel={() => setCommentDraft(null)}
           onPick={(id) => setActiveComment(id)}
           onReply={(id, text) => void commentOps([{ id, reply: text }]).catch(toastError)}
           onResolve={(id, resolved) => void commentOps([resolved ? { id, resolve: true } : { id, reopen: true }]).catch(toastError)}
           onEdit={(id, text) => void commentOps([{ id, edit: text }]).catch(toastError)}
           onDelete={(id) => void commentOps([{ id, delete: true }]).catch(toastError)}
+          ai={pageAi}
         />
       ) : tab === 'layers' ? (
         <LayersPanel tree={layers} sel={sel} cmd={cmd} />

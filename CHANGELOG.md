@@ -3,6 +3,29 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.43.0 · 7 November 2026
+
+Comments in the Library's editors can be resolved with AI in one click: an agent makes the change each comment asks
+for, replies saying what it changed, and resolves it.
+
+- **Resolve with AI on a comment**: the sparkle beside Resolve sends that comment to an agent at once, with nothing to
+  type. Documents, LaTeX documents (and .tex files opened from Files), slides, spreadsheets and pages all have it.
+- **All of them at once**: Resolve 3 comments with AI, at the top of the comments, sends every open one (in a LaTeX
+  document every file's, in a spreadsheet the sheet's). It takes the place of Ask the agent to answer the comments,
+  which only opened an empty box.
+- **Ask AI as you write a comment**: beside Comment (or Ctrl+Shift+Enter), it keeps the comment and sends it straight
+  away.
+- **Watch it work**: each comment the agent is on says "AI is working on this" and the top of the comments counts them,
+  while its changes show in the editor as it writes them. Its reply shows as Agent; a comment that only asks a question
+  gets an answer and stays open for you, and so does one it cannot do, with why.
+- **One conversation**: the requests go through the Ask panel and go on with the conversation open there (after its
+  turn while the agent is at work), so you can send comments one at a time as you write them; where the panel would
+  cover the page it folds away. Beside a conversation they go into it, and for a .tex file from Files into Files' Ask
+  panel.
+- **Check before it goes in**: in a document that is suggesting changes, the agent's changes come as suggestions to
+  accept or reject; in a LaTeX document with Track changes on, as tracked changes.
+- **Comment over the words in LaTeX**: picking words in the source shows Comment above them, as documents do.
+
 ## 0.42.0 · 7 November 2026
 
 New in the Library is redrawn: each starting point shows as it will look, and describing what you want for an agent

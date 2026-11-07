@@ -309,10 +309,11 @@ const add = (s, where, jsx = false) => {
 };
 
 // Files with no words the pages show: the code highlighter's keyword lists (its languages' names are the same in every
-// language), which read as words, and the requests the kinds an agent makes send it.
+// language), which read as words, and the requests the kinds an agent makes, and Resolve with AI, send it.
 const NO_WORDS = new Set([
   'shared/code-colours.ts',
   'shared/content-asks.ts',
+  'shared/comment-asks.ts',
   // A diagram's shapes, routes, layouts and drawing: their notes go to agents, the rest is code (the model's names of
   // arrows, fonts and looks, in diagram.ts, are the app's words).
   'shared/diagram-shapes.ts',

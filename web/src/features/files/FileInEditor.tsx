@@ -4,7 +4,8 @@
 // a file (a Word file's headers and footers, say) is said above it before anything changes, and asked about the first
 // time it is saved over; a Word or Excel file's first save puts the file as it was in the Trash. Changes made to the
 // file meanwhile (an agent, a terminal) come in while nothing is changed here, and are asked about otherwise. A LaTeX
-// file's comments, which the app keeps beside it, come in as an agent answers them, and are kept when it is saved.
+// file's comments, which the app keeps beside it, come in as an agent answers them, and are kept when it is saved; on
+// the Files page, Resolve with AI asks an agent about them through its Ask panel (askFileNow).
 // Its text, or its preview, is in the ⋯ menu, as the file showed before.
 import { useCallback, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileCode2, FolderOpen, MessageSquarePlus, RotateCcw, SquareTerminal, TriangleAlert } from 'lucide-react';
@@ -23,7 +24,9 @@ import { EDITORS } from '../pages/editors';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { copyPaths, goFolder, itemOf, startSession } from './actions';
 import { useSpaceMenu } from './SpaceMenu';
-import { useWatchMs } from './FileAsk';
+import { askFileNow, useFileAsk, useWatchMs } from './FileAsk';
+import { useAskRun } from '../guide/ask';
+import { useCommentAi } from '../pages/common/commentAi';
 
 /** What of a Word file the document editor does not keep, in words (the server's keys). */
 const DOC_LOST: Record<string, string> = {
@@ -126,6 +129,15 @@ export function FileInEditor({
   const [confirm, confirmNode] = useConfirm();
   const saveNow = useRef<(() => Promise<boolean>) | null>(null);
   if (saveFirst) saveFirst.current = async () => (dirtyRef.current ? ((await saveNow.current?.()) ?? false) : true);
+  // Resolve with AI on a LaTeX file's comments (common/commentAi.tsx), on the Files page: through its Ask panel.
+  const run = useAskRun();
+  const fileAsk = useFileAsk((s) => s.byPath[path]);
+  const commentAi = useCommentAi(
+    saveFirst && kind === 'tex' ? `file:${path}` : null,
+    (prompt) => askFileNow(path, prompt, run, () => saveFirst?.current?.() ?? Promise.resolve(true)),
+    fileAsk?.key ?? null,
+    !!fileAsk?.pending,
+  );
   // The times the file (a LaTeX project's files) had when read or last saved here: a newer one was changed elsewhere.
   const times = useRef<{ mtime: number; files?: Record<string, number> }>({ mtime: 0 });
   // A LaTeX project's comments as the app kept them when last read or saved here (what a save is merged against), and
@@ -473,6 +485,7 @@ export function FileInEditor({
           band={band}
           onDirty={setDirty}
           saveNowRef={saveNow}
+          commentAi={opened.cut ? undefined : commentAi}
           file={opened.tex && { folder: opened.tex.inFolder ? opened.tex.folder : undefined, main: opened.tex.main, open: opened.tex.open, comments: incoming, dir: opened.tex.folder, uses: opened.tex.uses }}
         />
       ) : (

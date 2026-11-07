@@ -383,6 +383,7 @@ export const PAGE_SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+E', 'Code'],
       ['Ctrl+K', 'Make it a link'],
       ['Ctrl+Alt+M', 'Comment on the block, or the words picked'],
+      ['Ctrl+Shift+Enter', 'In a new comment: Ask AI to resolve it'],
     ],
   },
   {

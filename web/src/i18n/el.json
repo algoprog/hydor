@@ -22006,5 +22006,13 @@
 "One LaTeX file, or a whole project":"Ένα αρχείο LaTeX ή ένα ολόκληρο έργο",
 "Or start from":"Ή ξεκινήστε από",
 "Call it “{0}”.":"Ονομάστε το «{0}».",
-"Keep it in my Library folder “{0}”.":"Κρατήστε το στον φάκελο «{0}» της Βιβλιοθήκης μου."
+"Keep it in my Library folder “{0}”.":"Κρατήστε το στον φάκελο «{0}» της Βιβλιοθήκης μου.",
+"A comment on the words picked (Ctrl+Alt+M)":"Σχόλιο στο επιλεγμένο κείμενο (Ctrl+Alt+M)",
+"AI is working on {0} comment{1}":"Η τεχνητή νοημοσύνη επεξεργάζεται σχόλια: {0}",
+"AI is working on this":"Η τεχνητή νοημοσύνη δουλεύει πάνω σε αυτό",
+"An agent makes the change each comment asks for, replies to it and resolves it":"Ένας πράκτορας κάνει την αλλαγή που ζητά κάθε σχόλιο, απαντά σε αυτό και το επιλύει",
+"Comment, and have AI make the change and resolve it (Ctrl+Shift+Enter)":"Σχόλιο, και η τεχνητή νοημοσύνη κάνει την αλλαγή και το επιλύει (Ctrl+Shift+Enter)",
+"Resolve {0} comment{1} with AI":"Επίλυση με τεχνητή νοημοσύνη ({0})",
+"Resolve with AI":"Επίλυση με τεχνητή νοημοσύνη",
+"In a new comment: Ask AI to resolve it":"Σε νέο σχόλιο: επίλυση με τεχνητή νοημοσύνη"
 }

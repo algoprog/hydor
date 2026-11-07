@@ -5,6 +5,7 @@ import type { MutableRefObject, ReactNode } from 'react';
 import type { DraftMark } from '@shared/page-drafts';
 import type { TexFileKind } from '@shared/latex-files';
 import type { MadeRequest } from './types/requests';
+import type { CommentAi } from './common/commentAi';
 import { api } from '../../lib/api';
 
 /** An older version's model, to look at in its editor (`id` already encoded for an address). */
@@ -62,6 +63,12 @@ export interface ModelEditorProps<M> {
   onRequest?: (r: MadeRequest) => void;
   /** What an agent asked now could be about, most specific last: told as what is in view or picked changes. */
   onScopes?: (scopes: AskScope[]) => void;
+  /**
+   * Resolve with AI on its comments (common/commentAi.tsx): the request goes at once to the agent of the place it is in,
+   * and the comments an agent is at work on say so. Left out (an older version, a shared project's portal, a file an
+   * agent cannot answer the comments of), the comments offer none.
+   */
+  commentAi?: CommentAi;
   /** Saves now, if there are changes (before an agent is asked about it): false when it did not. */
   saveNowRef?: MutableRefObject<(() => Promise<boolean>) | null>;
   /**

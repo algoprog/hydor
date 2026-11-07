@@ -573,6 +573,16 @@ agents that speak ACP and take MCP servers.
   with their outputs: cells edited and run in a kernel of the Python environment picked, in a folder of their own in
   the app's data folder, Ask on the whole notebook or a cell, and versions with their outputs; they export as the
   .ipynb, a Python script with # %% cells, a PDF or a web page.
+- **Resolve comments with AI**: comment on words as you read (a part of a slide, a cell, a block), then Resolve with AI on
+  one comment, Resolve N comments with AI at the top of the comments for all the open ones (a LaTeX document's every
+  file, a spreadsheet's sheet), or Ask AI (Ctrl+Shift+Enter) as a new one is written: an agent gets them at once, nothing
+  to type, makes the change each asks for, and in the same save replies saying what it changed and resolves it (a
+  question gets an answer and stays open, and so does one it cannot do, with why); meanwhile each says "AI is working on
+  this" and the top counts them. In documents, LaTeX documents (and .tex files opened from Files), slides, spreadsheets
+  and pages, through the Ask panel (going on with its conversation, after its turn while the agent works), the
+  conversation a page is beside, or Files' Ask panel; a document being suggested gets the agent's changes as
+  suggestions, a LaTeX document with Track changes on as tracked changes. The LaTeX source shows Comment over the words
+  picked, as documents do.
 - **Pictures, drawings, plots and videos in the editors**: slides, documents and pages make them where you put one
   in (Insert → Picture, "/", a page's picture and cover, a slide's background, a table's or a chart's Make a plot of
   this), each in a dialog that shows the price before anything is spent and the result before it is used, a sheet on

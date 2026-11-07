@@ -1,14 +1,25 @@
 // The comments panel (View → Comments; Insert → Comment, Ctrl+Alt+M or a right click's Comment on a cell): every thread
 // of the sheet's comments, the open ones first, each under its cell (a click goes there), to read, answer, resolve or
 // reopen, change and delete, with who wrote each part (you, or an agent) and when; and the field for a new comment on
-// the cell picked, when it has none. The thread of the cell picked is raised, its reply field open. Comments are the
-// shared ones of the editors (CommentThread, CommentBox); what people and agents wrote is shown as written.
+// the cell picked, when it has none. The thread of the cell picked is raised, its reply field open. Where an agent can be
+// asked, Resolve with AI at the top sends it the sheet's open comments, each thread has its own, and a new one can go
+// with Ask AI (common/commentAi.tsx). Comments are the shared ones of the editors (CommentThread, CommentBox); what
+// people and agents wrote is shown as written.
 import { useEffect, useRef } from 'react';
 import { MessageSquarePlus } from 'lucide-react';
 import type { SheetComment } from '@shared/sheets';
 import { cx } from '../../../components/ui';
 import { CommentBox, CommentThread } from '../common/Comments';
+import { AiResolveAll } from '../common/commentAi';
 import { SidePanel } from './Panel';
+
+/** Resolve with AI: on a thread, on all the sheet's open ones, on a new one as it is written; and the ones an agent is at work on. */
+export interface SheetCommentAi {
+  busy: ReadonlySet<string>;
+  one: (id: string) => void;
+  all: () => void;
+  draft: (text: string) => void;
+}
 
 export function CommentsPanel({
   comments,
@@ -24,6 +35,7 @@ export function CommentsPanel({
   onDelete,
   onDraft,
   onClose,
+  ai,
 }: {
   comments: SheetComment[];
   /** The cell picked ("B3"): its thread is raised. */
@@ -40,8 +52,11 @@ export function CommentsPanel({
   onDelete: (id: string) => void;
   onDraft: (on: boolean) => void;
   onClose: () => void;
+  ai?: SheetCommentAi;
 }) {
   const list = [...comments.filter((c) => !c.resolved), ...comments.filter((c) => c.resolved)];
+  const open = comments.filter((c) => !c.resolved);
+  const working = ai ? open.filter((c) => ai.busy.has(c.id)).length : 0;
   const here = comments.find((c) => c.cell === cell);
   const box = useRef<HTMLDivElement>(null);
   // The thread of the cell picked comes into view.
@@ -51,6 +66,7 @@ export function CommentsPanel({
   return (
     <SidePanel title="Comments" narrow={narrow} onClose={onClose}>
       <div ref={box} className="flex flex-col gap-2.5 p-3">
+        {ai && !readOnly && <AiResolveAll open={open.length - working} busy={working} onAsk={ai.all} />}
         {!readOnly &&
           !here &&
           (draft ? (
@@ -58,7 +74,7 @@ export function CommentsPanel({
               <div translate="no" className="mb-1.5 text-[12px] font-medium text-fg-3">
                 {cell}
               </div>
-              <CommentBox autoFocus onSubmit={(t) => onAdd(t)} onCancel={() => onDraft(false)} />
+              <CommentBox autoFocus onSubmit={(t) => onAdd(t)} onAi={ai?.draft} onCancel={() => onDraft(false)} />
             </div>
           ) : (
             <button type="button" onClick={() => onDraft(true)} className="flex h-9 items-center gap-2 rounded-lg border border-dashed border-line-2 px-3 text-[13px] text-fg-2 hover:border-accent hover:text-fg">
@@ -81,6 +97,8 @@ export function CommentsPanel({
               onResolve={(on) => onResolve(c.id, on)}
               onEdit={(t) => onEdit(c.id, t)}
               onDelete={() => onDelete(c.id)}
+              onAi={ai ? () => ai.one(c.id) : undefined}
+              aiBusy={ai?.busy.has(c.id)}
             />
           </div>
         ))}

@@ -2,13 +2,17 @@
 // comments pane has them: every slide's threads in the slides' order, each on a part of its slide (named above it; a
 // click there picks the part) or on the whole slide, with Reply, Resolve (or Reopen), Edit and Delete (the shared
 // CommentThread); Comment adds one on the part picked, or on the slide, in the field at the top. Resolved ones show when
-// asked for. What people and agents wrote is shown as written, never translated.
+// asked for. Where an agent can be asked, Resolve with AI at the top sends it every open comment, each comment has its
+// own, and a new one can go with Ask AI (common/commentAi.tsx), each named by its slide and part. What people and
+// agents wrote is shown as written, never translated.
 import { useState } from 'react';
-import { MessageSquarePlus, Sparkles } from 'lucide-react';
+import { MessageSquarePlus } from 'lucide-react';
 import { newCommentId } from '@shared/comments';
 import { plainText, slideTitle, type Deck, type El, type SlideComment } from '@shared/slides';
 import { Button, cx } from '../../../components/ui';
 import { CommentBox, CommentThread } from '../common/Comments';
+import { commentsRequest, slideWhere } from '@shared/comment-asks';
+import { AiResolveAll, type CommentAi } from '../common/commentAi';
 import { findEl, setSlide } from './ops';
 
 type Change = (d: Deck | ((d: Deck) => Deck), key?: string) => void;
@@ -41,6 +45,13 @@ function OnPart({ e, onClick }: { e: El; onClick?: () => void }) {
   );
 }
 
+/** Where a comment is, for an agent asked to resolve it: its slide (by number and title), and its part (by id) or the whole slide. */
+function whereOf(d: Deck, i: number, c: SlideComment): string {
+  const s = d.slides[i];
+  const part = c.el && s ? findEl(s.els, c.el) : undefined;
+  return slideWhere(i + 1, s ? slideTitle(s) : '', part && { kind: KIND[part.type], words: wordsOf(part), id: part.id });
+}
+
 /** A slide's comments changed by `f` (none left: the slide keeps no list). */
 export const setComments = (d: Deck, i: number, f: (cs: SlideComment[]) => SlideComment[]): Deck =>
   setSlide(d, i, (s) => {
@@ -60,7 +71,7 @@ export function SlideComments({
   active,
   onActive,
   onGo,
-  onAsk,
+  ai,
 }: {
   deck: Deck;
   /** The slide on view. */
@@ -78,7 +89,8 @@ export function SlideComments({
   onActive: (id: string | null) => void;
   /** To a slide, and the part a comment is on picked. */
   onGo: (slide: number, el?: string) => void;
-  onAsk?: (text: string) => void;
+  /** Resolve with AI (left out where no agent can be asked). */
+  ai?: CommentAi;
 }) {
   const [resolved, setResolved] = useState(false);
   const all = deck.slides.flatMap((s, i) => (s.comments ?? []).map((c) => ({ c, i })));
@@ -87,6 +99,18 @@ export function SlideComments({
   const shown = all.filter((x) => resolved || !x.c.resolved);
   const slides = [...new Set(shown.map((x) => x.i))];
   const on = adding?.el ? findEl(deck.slides[index]?.els ?? [], adding.el) : undefined;
+  // Resolve with AI: the comments named by their slides and parts, as the deck is now.
+  const askAi = (list: { c: SlideComment; i: number }[], d: Deck = deck) =>
+    ai && list.length && ai.ask(commentsRequest(list.map(({ c, i }) => ({ c, where: whereOf(d, i, c) })), 'slides'), list.map(({ c }) => c.id));
+  const working = ai ? all.filter((x) => !x.c.resolved && ai.busy.has(x.c.id)).length : 0;
+  /** The new comment written (`toAi`: and sent to an agent at once, to make the change and resolve it). */
+  const add = (text: string, toAi = false) => {
+    const id = newCommentId();
+    const c: SlideComment = { id, by: 'user', text, at: Date.now(), ...(on ? { el: on.id } : {}) };
+    change((d) => setComments(d, index, (cs) => [...cs, c]));
+    onAdded(id);
+    if (toAi) askAi([{ c, i: index }]);
+  };
   const edit = (i: number, id: string, f: (c: SlideComment) => SlideComment | null) =>
     change(
       (d) =>
@@ -106,24 +130,16 @@ export function SlideComments({
           <Button size="sm" variant="secondary" icon={<MessageSquarePlus size={14} />} onClick={onAdd} disabled={!!adding}>
             Comment
           </Button>
-          {open > 0 && onAsk && (
-            <Button size="sm" variant="ghost" icon={<Sparkles size={14} />} className="max-w-full min-w-0" title="Ask the agent to answer the comments" onClick={() => onAsk('Answer the comments on the slides: make the changes they ask for, and reply to each. ')}>
-              <span className="min-w-0 truncate">Ask the agent to answer the comments</span>
-            </Button>
-          )}
         </div>
       )}
+      {ai && !readOnly && <AiResolveAll open={open - working} busy={working} onAsk={() => askAi(all.filter((x) => !x.c.resolved && !ai.busy.has(x.c.id)))} />}
       {adding && (
         <div className="space-y-1.5 rounded-xl border border-accent/50 bg-elevated p-2.5">
           {on ? <OnPart e={on} /> : <div className="text-[11.5px] text-fg-3">On the whole slide</div>}
           <CommentBox
             autoFocus
-            onSubmit={(text) => {
-              const id = newCommentId();
-              const c: SlideComment = { id, by: 'user', text, at: Date.now(), ...(on ? { el: on.id } : {}) };
-              change((d) => setComments(d, index, (cs) => [...cs, c]));
-              onAdded(id);
-            }}
+            onSubmit={(text) => add(text)}
+            onAi={ai ? (text) => add(text, true) : undefined}
             onCancel={() => onAdded(null)}
           />
         </div>
@@ -167,6 +183,8 @@ export function SlideComments({
                       onResolve={(r) => edit(i, c.id, (x) => (r ? { ...x, resolved: true } : (({ resolved: _r, ...rest }) => rest)(x)))}
                       onEdit={(text) => edit(i, c.id, (x) => ({ ...x, text }))}
                       onDelete={() => edit(i, c.id, () => null)}
+                      onAi={ai ? () => askAi([{ c, i }]) : undefined}
+                      aiBusy={ai?.busy.has(c.id)}
                     />
                   </div>
                 );

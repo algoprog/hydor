@@ -761,6 +761,10 @@ const INSTRUCTIONS =
 const PICTURES =
   'Pictures: generate_image makes one, or changes one it already shows (give its naget-asset: source); make_svg draws one, make_plot draws a chart from data; remove_background and erase_from_image take things out of one; upscale_image makes one 2× or 4× larger; edit_image crops, turns, adjusts (curves, levels, colours by range, colour balance too) or marks one up; generate_video and edit_video make and edit videos (one it shows by its naget-video: source). They save into your folder: put what they make in its place with the save tool.';
 
+/** How to resolve comments (the editors' Resolve with AI asks for it), for the agent asked from a page that has them. */
+const RESOLVE_COMMENTS =
+  'Comments: get_page lists them with their ids. To resolve one, make the change it asks for and, in the same save, reply to it in a sentence saying what you changed and resolve it ("resolve": true); a comment that only asks a question gets an answer and stays open, and one you cannot do gets a reply saying why.';
+
 /** A request made from a page or deck open in Pages (`extra.page`: its id): the session is about changing it. */
 function askInstructions(db: Deps['db'], v: unknown): string | null {
   const id = typeof v === 'string' ? v : v && typeof v === 'object' ? String((v as { id?: unknown }).id ?? '') : '';
@@ -783,6 +787,8 @@ function askInstructions(db: Deps['db'], v: unknown): string | null {
     `The user is asking from their ${k?.noun ?? 'page'} "${p.title}" (saved page ${p.id}), open in front of them in the Library: their messages are about changing it.`,
     k ? how[p.kind!] : 'Read it with get_page and save the whole changed page with save_page and that id. When they name a part (its words, or its CSS selector), change that part, and the rest only as needed.',
     actionsLine(k ? p.kind! : 'page'),
+    // Comments (all but notebooks and diagrams have them): Resolve with AI asks for this, and so may the user in words.
+    p.kind === 'notebook' || p.kind === 'diagram' ? '' : RESOLVE_COMMENTS,
     p.kind === 'sheet' || p.kind === 'tex' || p.kind === 'notebook' ? '' : PICTURES,
     'When they ask, export_page gives its files (PowerPoint, Word, Excel, PDF, a web page…) and publish_site puts it at a link, once they confirm.',
     'What they look at shows your changes as you write them, and updates as soon as you save; keep their own changes, and answer in a sentence or two what you changed. Do not make a new page or a file unless they ask.',

@@ -24,6 +24,8 @@ import { EXPORTS } from './exports';
 import { EDITORS } from './editors';
 import type { ModelDoc } from './kinds';
 import { draftKind, useEmptyModel, useLiveDraft, usePageDraft } from './live';
+import { sendToSession, useCommentAi } from './common/commentAi';
+import { pageNamed } from '@shared/comment-asks';
 import type { Deck } from '@shared/slides';
 import { usePicks } from '../session/HtmlPage';
 import { ReviewPane, shotsOfTurn } from '../shots/Review';
@@ -434,6 +436,21 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
     else dirty.delete(key);
     return () => void dirty.delete(key);
   }, [isDirty, key]);
+  // Resolve with AI on its comments (common/commentAi.tsx): a message to this conversation, unsaved changes saved first,
+  // naming the page (the conversation may have made several).
+  const saveNow = useRef<(() => Promise<boolean>) | null>(null);
+  const commentAi = useCommentAi(
+    loaded?.pageId ? `chat:${key}:${loaded.pageId}` : null,
+    async (prompt) => {
+      try {
+        if (!((await saveNow.current?.()) ?? true)) return;
+        await sendToSession(key, `${pageNamed(title, loaded?.pageId)}${prompt}`);
+      } catch (e) {
+        toastError(e);
+      }
+    },
+    key,
+  );
 
   const Editor = loaded?.kind ? EDITORS[loaded.kind] : fresh && saving ? EDITORS[saving] : undefined;
   // A new one being written: its editor, empty until the first words come (the same editor then shows it saved).
@@ -475,6 +492,8 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
             ) : undefined
           }
           savedNote="the agent sees your changes with your next message"
+          saveNowRef={saveNow}
+          commentAi={saveModel ? commentAi : undefined}
           onAsk={(text) => {
             composeInsert(text, key);
             if (layout === 'sheet') onClose();
@@ -510,6 +529,8 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
       saveLabel={kind === 'show_html' && !loaded?.pageId ? 'Keep with changes' : 'Save'}
       pageId={loaded?.pageId}
       savedNote="the agent sees your changes with your next message"
+      saveNowRef={saveNow}
+      commentAi={loaded ? commentAi : undefined}
       onAsk={(text) => {
         composeInsert(text, key);
         // Over everything on a phone: the message box is under it.

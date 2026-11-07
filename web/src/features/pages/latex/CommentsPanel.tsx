@@ -1,19 +1,29 @@
 // The LaTeX editor's comments, beside the source (in a sheet on a phone): those on the file in view, in the order
 // their words come, each with its replies, Reply, Resolve and its menu (Edit, Delete); a new one written at the top,
 // on the words picked; the other files' comments a click away, and the resolved ones under a switch. The tracked
-// changes to review come above them (`review`). Agents read the comments with get_page and answer or resolve them
-// when they save the document.
+// changes to review come above them (`review`). Where an agent can be asked, Resolve with AI at the top sends it every
+// open comment of the document's files, each comment has its own, and a new one can go with Ask AI
+// (common/commentAi.tsx). Agents read the comments with get_page and answer or resolve them when they save the document.
 import { useState, type ReactNode } from 'react';
 import { MessageSquarePlus } from 'lucide-react';
 import type { TexComment } from '@shared/latex';
 import { cx, IconButton } from '../../../components/ui';
 import { CommentBox, CommentThread } from '../common/Comments';
+import { AiResolveAll } from '../common/commentAi';
 
 export interface CommentDraft {
   file: string;
   from: number;
   to: number;
   quote: string;
+}
+
+/** Resolve with AI: on a comment, on all the open ones, on a new one as it is written; and the ones an agent is at work on. */
+export interface TexCommentAi {
+  busy: ReadonlySet<string>;
+  one: (id: string) => void;
+  all: () => void;
+  draft: (text: string) => void;
 }
 
 export function CommentsPanel({
@@ -33,6 +43,7 @@ export function CommentsPanel({
   onDelete,
   onOpenFile,
   review,
+  ai,
   className,
 }: {
   comments: TexComment[];
@@ -56,6 +67,7 @@ export function CommentsPanel({
   onOpenFile: (name: string) => void;
   /** The tracked changes, above the comments. */
   review?: ReactNode;
+  ai?: TexCommentAi;
   className?: string;
 }) {
   const [resolved, setResolved] = useState(false);
@@ -64,6 +76,9 @@ export function CommentsPanel({
   const done = here.filter((c) => c.resolved);
   const elsewhere = new Map<string, number>();
   for (const c of comments) if (c.file !== file && !c.resolved) elsewhere.set(c.file, (elsewhere.get(c.file) ?? 0) + 1);
+  // Every file's open comments, for Resolve with AI: those an agent is at work on, and the others.
+  const allOpen = comments.filter((c) => !c.resolved);
+  const working = ai ? allOpen.filter((c) => ai.busy.has(c.id)).length : 0;
   const thread = (c: TexComment) => (
     <CommentThread
       key={c.id}
@@ -75,6 +90,8 @@ export function CommentsPanel({
       onResolve={(r) => onResolve(c.id, r)}
       onEdit={(t) => onEdit(c.id, t)}
       onDelete={() => onDelete(c.id)}
+      onAi={ai ? () => ai.one(c.id) : undefined}
+      aiBusy={ai?.busy.has(c.id)}
     />
   );
   return (
@@ -88,6 +105,7 @@ export function CommentsPanel({
         )}
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-2">
+        {ai && !readOnly && <AiResolveAll open={allOpen.length - working} busy={working} onAsk={ai.all} />}
         {review}
         {draft && draft.file === file && (
           <div className="rounded-xl border border-accent/60 bg-elevated p-2.5">
@@ -96,7 +114,7 @@ export function CommentsPanel({
                 {draft.quote}
               </div>
             )}
-            <CommentBox autoFocus onSubmit={onDraftDone} onCancel={onDraftCancel} />
+            <CommentBox autoFocus onSubmit={onDraftDone} onAi={ai?.draft} onCancel={onDraftCancel} />
           </div>
         )}
         {open.map(thread)}
