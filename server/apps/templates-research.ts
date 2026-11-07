@@ -72,6 +72,15 @@ function clip(t, n) {
   const s = String(t || '').replace(/\s+/g, ' ').trim();
   return s.length > n ? s.slice(0, n - 1).trim() + '…' : s;
 }
+// Why a service did not answer, in plain words for the notes people read (the error itself stays in the run's steps).
+function failedWhy(e) {
+  const m = String((e && e.message) || e || '');
+  if (/\b429\b|too many|rate.?limit/i.test(m)) return 'it was busy';
+  if (/\b5\d\d\b/.test(m)) return 'it was down';
+  if (/\b40[13]\b|forbidden|unauthori[sz]ed/i.test(m)) return 'it refused the request';
+  if (/time(?:d)? ?out|abort/i.test(m)) return 'it took too long';
+  return 'it could not be reached';
+}
 // A short key from text, the same each time (for a record's id).
 function hash(s) {
   let h = 5381;
@@ -564,12 +573,12 @@ const want = Math.min(300, Math.max(100, Number(plan.count || 15) * 12));
 try {
   if (cats.length) for (const p of await arxiv('(' + cats.map((c) => 'cat:' + c).join(' OR ') + ') AND ' + range, want, 'New papers in ' + cats.join(', '))) pool.add(p, 'field');
 } catch (e) {
-  notes.push('arXiv did not answer for the categories (' + clip(e.message, 120) + ')');
+  notes.push('arXiv did not answer for the categories (' + failedWhy(e) + ')');
 }
 try {
   if (topics.length) for (const p of await arxiv('(' + topics.map((t) => 'ti:' + phrase(t) + ' OR abs:' + phrase(t)).join(' OR ') + ') AND ' + range, 100, 'New papers on your topics')) pool.add(p, 'topic');
 } catch (e) {
-  notes.push('arXiv did not answer for the topics (' + clip(e.message, 120) + ')');
+  notes.push('arXiv did not answer for the topics (' + failedWhy(e) + ')');
 }
 for (let i = 0; i < people.length; i += 5) {
   const some = people.slice(i, i + 5);
@@ -579,7 +588,7 @@ for (let i = 0; i < people.length; i += 5) {
       pool.add(p, 'person', who);
     }
   } catch (e) {
-    notes.push('arXiv did not answer for the people you follow (' + clip(e.message, 120) + ')');
+    notes.push('arXiv did not answer for the people you follow (' + failedWhy(e) + ')');
   }
 }
 // OpenAlex for the topics: journals and proceedings too.
@@ -598,7 +607,7 @@ if (topics.length) {
         if (p.title && OA_KINDS.test(p.kind) && (p.abstract || p.arxiv)) pool.add(p, 'topic');
       }
     } catch (e) {
-      notes.push('OpenAlex did not answer (' + clip(e.message, 120) + ')');
+      notes.push('OpenAlex did not answer (' + failedWhy(e) + ')');
       break;
     }
   }
@@ -951,7 +960,7 @@ try {
   const ps = await s2('author/' + id + '/papers?fields=title,year,venue,externalIds,citationCount,publicationDate,authors&limit=500', 'Read your papers');
   papers = rows(ps && ps.data).map((p) => Object.assign(fromS2(p), { year: p.year || null }));
 } catch (e) {
-  if (!/OpenAlex id/.test(e.message)) notes.push('Semantic Scholar did not answer (' + clip(e.message, 100) + '), so OpenAlex did, without the citing sentences');
+  if (!/OpenAlex id/.test(e.message)) notes.push('Semantic Scholar did not answer (' + failedWhy(e) + '), so OpenAlex did, without the citing sentences');
   const oaId = (/A\d{5,}/i.exec(me) || [])[0];
   let a = null;
   if (oaId) a = bodyOf(await keyed('https://api.openalex.org/authors/' + oaId.toUpperCase(), 'OPENALEX_API_KEY', { title: 'Read your author page on OpenAlex' }));
@@ -1053,7 +1062,7 @@ for (const mine of rows(input.papers)) {
       from = 's2';
     } catch (e) {
       s2Down = true;
-      notes.push('Semantic Scholar was too busy (' + clip(e.message, 80) + '), so OpenAlex said who cited your papers, without the sentences');
+      notes.push('Semantic Scholar was too busy, so OpenAlex said who cited your papers, without the sentences');
     }
   }
   if (!from && oaCalls < (keyState.OPENALEX_API_KEY === false ? 12 : 60)) {
@@ -1071,7 +1080,7 @@ for (const mine of rows(input.papers)) {
         from = 'oa';
       }
     } catch (e) {
-      notes.push('OpenAlex did not answer either (' + clip(e.message, 80) + ')');
+      notes.push('OpenAlex did not answer either (' + failedWhy(e) + ')');
     }
   }
   if (!from) continue;
@@ -1325,7 +1334,7 @@ for (const w of words.length ? words : ['']) {
   try {
     for (const m of list(bodyOf(await get(url, { title: 'List the newest ' + task + ' models' + (w ? ' named ' + w : '') })))) if (m && m.id && !found.has(m.id)) found.set(m.id, m);
   } catch (e) {
-    notes.push('Hugging Face did not answer (' + clip(e.message, 100) + ')');
+    notes.push('Hugging Face did not answer (' + failedWhy(e) + ')');
   }
 }
 const all = Array.from(found.values());
@@ -1882,7 +1891,7 @@ for (const said of String(input.venues || '').split(/[,;\n]+/).map((s) => s.trim
         if (c.deadline) addItem(e, 'paper', 'Papers', c.deadline, c.timezone);
       }
     } catch (e) {
-      if (!ccfName) notes.push(said + ': ai-deadlines did not answer (' + clip(e.message, 80) + ')');
+      if (!ccfName) notes.push(said + ': ai-deadlines did not answer (' + failedWhy(e) + ')');
     }
   }
   if (ccfName) {
@@ -1907,7 +1916,7 @@ for (const said of String(input.venues || '').split(/[,;\n]+/).map((s) => s.trim
         }
       }
     } catch (e) {
-      notes.push(said + ': ccfddl did not answer (' + clip(e.message, 80) + ')');
+      notes.push(said + ': ccfddl did not answer (' + failedWhy(e) + ')');
     }
   }
   const all = Array.from(editions.values()).sort((a, b) => a.year - b.year);

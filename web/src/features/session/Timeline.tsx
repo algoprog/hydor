@@ -784,6 +784,31 @@ export function Timeline({
     const at = Math.max(0, topIn(card, sc) - HOLD_AT);
     return sc.scrollHeight - sc.clientHeight > at ? at : null;
   };
+  // An app's answer (its card, under the reply of the turn that ran it) that the end would cut off at its top shows from
+  // the agent's words about it, or from its own top while there are none yet: the answer reads from its start, the rest
+  // a scroll away. Not one the reader went past, with Latest or scrolling on down by hand (`shownAt`: where it was shown).
+  const pastResult = useRef<string | null>(null);
+  const shownAt = useRef<{ id: string; at: number } | null>(null);
+  // The view holds a card's top (to answer, or an app's answer) short of the end: Latest stays to go on down.
+  const held = useRef(false);
+  const lastCard = () => {
+    const segs = content.current?.querySelectorAll<HTMLElement>(':scope > [data-seg]');
+    const seg = segs?.[segs.length - 1];
+    const cards = seg?.querySelectorAll<HTMLElement>('[data-app-card]');
+    const card = cards?.[cards.length - 1];
+    return seg && card ? { seg, card } : null;
+  };
+  const resultTop = (sc: HTMLElement): number | null => {
+    const last = lastCard();
+    if (!last || last.card.dataset.appCard === pastResult.current) return null;
+    const cardAt = topIn(last.card, sc);
+    // The agent's reply in this turn (its texts, not your message nor its notes between steps), above the card.
+    const words = [...last.seg.querySelectorAll<HTMLElement>(':scope>section>div>[data-text]')].find((t) => topIn(t, sc) < cardAt);
+    const at = Math.max(0, (words ? topIn(words, sc) : cardAt) - HOLD_AT);
+    if (sc.scrollHeight - sc.clientHeight <= at) return null;
+    shownAt.current = { id: last.card.dataset.appCard!, at };
+    return at;
+  };
   // While following: the text the view holds stays in place, or the end stays in view. `came`, a text that just
   // came, becomes the one held (near the top if it starts below the top third, else where it is), unless the reader
   // may still be in the one held now: it runs on below the screen.
@@ -816,6 +841,7 @@ export function Timeline({
       const end = last ? last.offsetTop + last.offsetHeight : h;
       if (!(turn.current.busy && end - top > view && (!reading() || turn.current.asks))) {
         // Short of a screen below it, the end decides: the text sits where the conversation puts it.
+        held.current = false;
         setTop(Math.min(top, h - view));
         // More below the held text: Latest goes there.
         setShowLatest(sc.scrollHeight - sc.scrollTop - view > 80);
@@ -823,8 +849,9 @@ export function Timeline({
       }
       lead.current = null;
     }
-    // The end, or the top of a card to answer that the end would cut off.
-    const at = cardTop(sc);
+    // The end, or the top of a card to answer, or of an app's answer, that the end would cut off.
+    const at = cardTop(sc) ?? resultTop(sc);
+    held.current = at != null;
     if (at != null) {
       setTop(at);
       setShowLatest(true);
@@ -845,11 +872,13 @@ export function Timeline({
   };
   const toEnd = (smooth = false) => {
     stick.current = true;
+    held.current = false;
     dir.current = 1;
     anchor.current = null;
     lead.current = null;
     // Latest goes to the very end, past a card shown from its top.
     pastCard.current = content.current?.querySelector<HTMLElement>('[id^="approval-"]')?.id ?? null;
+    pastResult.current = lastCard()?.card.dataset.appCard ?? null;
     const el = scroller.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
   };
@@ -922,7 +951,11 @@ export function Timeline({
     armed.current = false;
     requestAnimationFrame(() => {
       const el = scroller.current;
-      if (el) setTop(cardTop(el) ?? el.scrollHeight);
+      if (!el) return;
+      const at = cardTop(el) ?? resultTop(el);
+      held.current = at != null;
+      setTop(at ?? el.scrollHeight);
+      if (at != null) setShowLatest(true);
     });
   }, [sessionKey, tl?.loading]);
 
@@ -967,6 +1000,8 @@ export function Timeline({
     setUnder(top > 2);
     const own = ownTop.current !== null && Math.abs(top - ownTop.current) < 2;
     ownTop.current = null;
+    // Reading on down past an app's answer shown from its top, by hand: it is not brought back to its top.
+    if (!own && shownAt.current && top > shownAt.current.at + 8) pastResult.current = shownAt.current.id;
     const dist = el.scrollHeight - top - el.clientHeight;
     setBelow(dist > 2);
     // Dragging the scrollbar counts as the reader's own scroll.
@@ -984,7 +1019,7 @@ export function Timeline({
     }
     lastTop.current = top;
     if (!stick.current && !own) capture();
-    setShowLatest((!stick.current || !!lead.current) && dist > 80);
+    setShowLatest((!stick.current || !!lead.current || held.current) && dist > 80);
     if (armed.current && top < 400) maybeLoad();
   };
 
