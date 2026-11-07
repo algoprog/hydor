@@ -245,7 +245,7 @@ Beside the cards are the Library's places, each with how many things it holds (i
 
 With no projects yet, a note under the places says what projects do for the Library, with a way to **Projects**.
 
-Each thing is a card with a picture of it (a page as it opens, with its data; slides by their first slide; a document, a spreadsheet or LaTeX by the top of its first page or sheet; a picture or a video by a still; until the picture is taken, its first letter shows), its kind on the picture (**Slides**, **Document**, **Spreadsheet**, **LaTeX** or **Picture**; a video shows its length), its title and when it last changed, with a globe when it is published and a cylinder when it keeps data. While you search Everything, each card names its project too. Click a card to open it. Its **More** (⋯) has **Edit** (**Present** for slides), **Edit the title and description**, **Move to a project**, **Move to a folder** (when its place has folders), **Duplicate** (a copy without its data), **Turn it into** (slides, a document or a page made from it by an agent: see [Made with AI from a kind](#made-with-ai-from-a-kind)), **Download as** (see [Export to a file](#export-to-a-file)) and **Delete**; a picture's or a video's has **Start a session with it**, **Move to a project**, **Move to a folder**, **Download**, **Write its title and description again** and **Delete**.
+Each thing is a card with a picture of it (a page as it opens, with its data; slides by their first slide; a document, a spreadsheet or LaTeX by the top of its first page or sheet; a picture or a video by a still; until the picture is taken, its first letter shows), its kind on the picture (**Slides**, **Document**, **Spreadsheet**, **LaTeX** or **Picture**; a video shows its length), its title and when it last changed, with people when it is shared with people, a globe when it is published and a cylinder when it keeps data. While you search Everything, each card names its project too. Click a card to open it. Its **More** (⋯) has **Edit** (**Present** for slides), **Edit the title and description**, **Share with people** (see [Share with people](#share-with-people)), **Move to a project**, **Move to a folder** (when its place has folders), **Duplicate** (a copy without its data), **Turn it into** (slides, a document or a page made from it by an agent: see [Made with AI from a kind](#made-with-ai-from-a-kind)), **Download as** (see [Export to a file](#export-to-a-file)) and **Delete**; a picture's or a video's has **Start a session with it**, **Share with people**, **Move to a project**, **Move to a folder**, **Download**, **Write its title and description again** and **Delete**.
 
 A project, and **Not in a project**, can hold folders too: they show first, as tiles, before the cards (see [Folders](#folders)).
 
@@ -305,7 +305,7 @@ Pictures, videos and sounds agents make for you stay in the session's folder (se
 
 Pictures, videos and sounds of yours go in the same way: drop them on the Library, or use **Upload files** (see [Add files of yours](#add-files-of-yours)).
 
-They show among the Library's other things; **Pictures**, **Videos** and **Audio** above the cards show each kind alone ([Show the videos](/library?kind=video), [the audio](/library?kind=audio)). Each is a card with a still of it and its title (while it is being written, "Writing its title…"); a video's card shows its length on the still, and a sound's card shows its shape, with a round button to play it right there and its length beside it. Click a card to open it (see [Open an image, a video or a sound](#open-an-image-a-video-or-a-sound)). Its **More** (⋯) has **Start a session with it**, **Move to a project**, **Download**, **Write its title and description again** and **Delete**, which takes it out of your Library (the file it was saved from, if it is still there, stays).
+They show among the Library's other things; **Pictures**, **Videos** and **Audio** above the cards show each kind alone ([Show the videos](/library?kind=video), [the audio](/library?kind=audio)). Each is a card with a still of it and its title (while it is being written, "Writing its title…"); a video's card shows its length on the still, and a sound's card shows its shape, with a round button to play it right there and its length beside it. Click a card to open it (see [Open an image, a video or a sound](#open-an-image-a-video-or-a-sound)). Its **More** (⋯) has **Start a session with it**, **Share with people** (see [Share with people](#share-with-people)), **Move to a project**, **Download**, **Write its title and description again** and **Delete**, which takes it out of your Library (the file it was saved from, if it is still there, stays).
 
 The Library keeps pictures (PNG, JPEG, WebP, GIF, AVIF), videos (MP4, WebM, MOV) and sounds (MP3, WAV, M4A, AAC, OGG, OPUS, FLAC), up to 1 GB each and 5,000 in all, in the app's data folder. Agents can work from what you kept: ask "use the boat picture from my Library for a birthday card", and the agent finds it there.
 
@@ -325,12 +325,13 @@ When no model could write them, they come from the words the image, video or sou
 
 ## Open an image, a video or a sound
 
-An image, a video or a sound opens at its own place in the Library. The bar at the top has the back arrow (**The Library’s pictures**, **The Library’s videos** or **The Library’s audio**), its title with "An image", "A video" or "Audio" and its length under it, **Start a session with it** (the start page opens with it in the message box, so the new session gets it with your first message: write what you want done with it, such as "make a poster from this", and send), **Edit** (a picture, a video or a sound, in its editor: see [Edit pictures and videos](#edit-pictures-and-videos)), **Download** and **More** (⋯): **Edit its sound** (a video's, in the [sound editor](#the-sound-editor), saved as a new sound), **Edit the title and description**, **Write them again**, **Open its session** (the conversation it was saved from), **Move to a project** (the project it is in shows beside it) and **Delete**.
+An image, a video or a sound opens at its own place in the Library. The bar at the top has the back arrow (**The Library’s pictures**, **The Library’s videos** or **The Library’s audio**), its title with "An image", "A video" or "Audio" and its length under it, **Start a session with it** (the start page opens with it in the message box, so the new session gets it with your first message: write what you want done with it, such as "make a poster from this", and send), **Edit** (a picture, a video or a sound, in its editor: see [Edit pictures and videos](#edit-pictures-and-videos)), **Share** (with people, each by a link of their own, with how many beside it: see [Share with people](#share-with-people)), **Download** and **More** (⋯): **Edit its sound** (a video's, in the [sound editor](#the-sound-editor), saved as a new sound), **Edit the title and description**, **Write them again**, **Earlier versions** (when it was saved over: see [Go back to an earlier version](#go-back-to-an-earlier-version)), **Open its session** (the conversation it was saved from), **Move to a project** (the project it is in shows beside it) and **Delete**.
 
 Below, the picture (click it for full size), or the video or the sound, to play (a sound in a large player, its shape to move along, with the time and the speed), and beside it (under it on a phone):
 
 - its title and description, with the pencil to change them, and the model that wrote them;
-- **Made with** (the model that made it), **From the words** (what it was made from), its **Size**, its **Length** (a video, a sound), its **File** size and when it was **Kept**;
+- **Comments**: on a spot of the picture (a numbered pin on it), at a moment of the video or the sound (a mark along its time), or on the whole of it. **Add a comment**, then click the picture where it goes (or leave it on the whole picture); a video's or a sound's comment is at the moment it is at (**On the whole video instead**, or **At the moment it is at**). Click a comment's moment to go there, or a pin to pick its comment; reply, resolve, change or delete as in a document. Comments by people you shared it with show under their names, and agents read and answer them;
+- **Made with** (the model that made it), **From the words** (what it was made from), its **Size**, its **Length** (a video, a sound), its **File** size, when it was **Kept**, and **Saved by** when someone you shared it with saved this version (with **Earlier versions**);
 - for a video, **The frames its description was written from**: the ten frames the model saw (click for full size);
 - for a sound, **Sung or spoken**: a song's lyrics, or the words read aloud.
 
@@ -386,7 +387,7 @@ A page opens full screen inside the app, at its own place in the Library. The ba
 - **Use**, **Edit** and **Code**, and the **Computer**, **Tablet** and **Phone** sizes (see [Change a page yourself](#change-a-page-yourself));
 - **Versions** (the clock): its earlier versions (see [Go back to an earlier version](#go-back-to-an-earlier-version));
 - **Export**: the page as a PDF, a Word document or a web page (see [Export to a file](#export-to-a-file));
-- **Share**: its own address for your phone, and publishing it at a link (see [Use a page on your phone](#use-a-page-on-your-phone) and [Publish a page](#publish-a-page));
+- **Share**: **Share with people** (each by a link of their own, to comment or edit), its own address for your phone, and publishing it at a link (see [Share with people](#share-with-people), [Use a page on your phone](#use-a-page-on-your-phone) and [Publish a page](#publish-a-page));
 - **Ask**: an agent changes the page while you watch (see [Change it by asking an agent](#change-it-by-asking-an-agent));
 - **More** (⋯): **What it keeps** (see [The data a page keeps](#the-data-a-page-keeps)), **Lock the page** and **Linked from…** (see [Lock a page, and the pages that link to it](#lock-a-page-and-the-pages-that-link-to-it)), **Edit the title and description**, **Duplicate**, **Move to a project** (with projects; the project it is in shows beside it), **Open in a new tab** (opens the page at its own address) and **Delete**. At its foot, how many words the page has, its characters, and about how long it takes to read.
 
@@ -918,7 +919,7 @@ They need Python 3.10 or later on this computer, or uv; without either, the sect
 Pictures, videos and sounds open in editors of their own, inside the app: work on a picture in layers as in Photoshop (select, paint and retouch, adjust, crop and size it, put words and shapes on it), or take its background out, erase things, change it or make it larger with AI; edit a video as in DaVinci Resolve or Premiere (clips and pictures on a timeline with transitions, overlays and green screens, words and captions, colour, sound, and export on the graphics card); cut, clean up, mix and record sound. They open from:
 
 - **A picture shown large** (in a conversation, a reply or an app's result): **Edit** at its top. What you save goes into your Library as a new picture.
-- **The Library**: **Edit** at the top of a picture's, a video's or a sound's page, and **Edit its sound** in a video's **More** (⋯). **Save** puts the edited one in its place (its title, description, project and folder stay); **Save a copy** keeps a new one beside it, "… (edited)".
+- **The Library**: **Edit** at the top of a picture's, a video's or a sound's page, and **Edit its sound** in a video's **More** (⋯). **Save** puts the edited one in its place (its title, description, project, folder and comments stay; the one before is kept, see [Go back to an earlier version](#go-back-to-an-earlier-version)); **Save a copy** keeps a new one beside it, "… (edited)".
 - **Files**: **Edit** at the top of an open picture, video or sound, or **Edit the picture**, **Edit the video**, **Edit the sound** (or a video's **Edit its sound**) in a file's **More** (⋯). **Save** writes over the file, its old version going to the Trash; **Save a copy** puts "name (edited)" beside it. A picture that is not PNG, JPEG or WebP, or one saved as another kind of file, is saved as a copy; so is a sound that is not MP3, WAV, M4A, OGG or FLAC, and a video's sound.
 - **Slides**: **Edit picture**, and **Edit video** for a video from your device, in the **Format** menu, a right-click and the side panel. **A document**: **Edit picture** on a picked picture's bar. **A page** (in **Edit**): **Edit picture** on a picked picture's bar and in its **Part** tab, and **Edit video** for a video from your device, the Library or made with AI. **A design**: **Edit picture** and **Edit video** on the bar over what is picked and in the inspector. There, **Save** puts it back in place, as one step Undo takes back, and **Save a copy** keeps it in your Library.
 - **A video an agent made or edited**: **Edit** over it. What you save goes into your Library.
@@ -1106,6 +1107,8 @@ An agent that saves a page several times in a row while it answers one message (
 
 A page keeps its newest 40 versions. Older ones go first, also when the versions together pass 24 MB; the current version always stays. A version you named (in a LaTeX document, **Tools → Name this version**) is kept past the newest 40, and shows its name in the list.
 
+A picture, a video or a sound in the Library keeps the one it was each time it is saved over: by you in its editor, by an agent, or by someone you [shared it with](#share-with-people). On its page, **More** (⋯) → **Earlier versions** lists them, the newest first, each with when it was saved over, its size and length, and who made it when that was someone you shared it with. Click a picture's to see it full size, the download button to save its file, or **Bring back** to show it again: the one shown now is kept among the earlier versions in its turn. Each keeps its last five, at most 2 GB of them; the oldest go first. Its comments stay through its versions.
+
 ## The data a page keeps
 
 A small tool needs to remember things: the workouts you logged, the boxes you ticked, your budget's entries. A kept page stores them with the app, on the computer it runs on, not in one browser. So it shows the same data wherever you open it: in the Library, in its card in the conversation, and at its own address on your phone.
@@ -1118,6 +1121,39 @@ A small tool needs to remember things: the workouts you logged, the boxes you ti
 - A published copy of a page does not keep data (see [Publish a page](#publish-a-page)).
 
 To see what a page keeps, open it and use **More** (⋯) → **What it keeps**. Each value is listed by its name, with its size and when it changed; click one to read it. Its bin removes that one value; **Download** saves them all as a `.json` file, and **Forget it all** empties the page's data (the page itself stays). Both ask first and can't be undone.
+
+## Share with people
+
+You can share one thing of your Library alone (a document, slides, a spreadsheet, a LaTeX document, a notebook, a page, a design, a picture, a video or a sound) with the people you choose, each with a link of their own. Without your password, they open that one thing, comment on it under their own name and, if you let them, change it. They never reach your agents, your files, your settings or anything else in the app. To share a whole project instead, see [Share a project with people](/guide/projects#share-a-project-with-people).
+
+### Invite someone
+
+1. Open **Share with people**: on a page, a document, slides, a spreadsheet, a LaTeX document or a design, click **Share** at the top, then **Share with people**; on a picture, a video or a sound, click **Share** at the top; or pick it in a card's **More** (⋯) in the Library. [The search box shows where](/library?share=1).
+2. Under **Invite someone**, type **Their name**. Their comments and changes show under it.
+3. Pick what they may do: **View and comment**, or **Edit**. A line under them says what that means for this kind of thing.
+4. Pick how long the link works: **A week**, **A month** or **Until you stop it**.
+5. Click **Make their link**. Copy it with the copy button and send it to them, or click the QR code button to show it as a QR code for their phone's camera. The link is shown only now: the app keeps only a fingerprint of it, so it can't show it again. You can always make them a new one.
+
+A thing that is shared shows people beside when it last changed on its card, and the number of people beside **Share with people**. An agent can share one too, with your OK each time: "Share Chapter 3 with Maria so she can comment, for a month."
+
+### What they can do
+
+Their link opens the thing alone, in the app's look: its name at the top, **Download** (its files: a PDF, a Word document, the picture, the video…) and, on the right, their own name, whose menu says what they may do, until when and who shared it with them, with **Language** and **Theme** for their browser.
+
+- **Comments**, with either: on a document's, a LaTeX document's or a page's words (they paste the words it is about, or leave them out for the whole of it), on a slide (they pick it), on a spreadsheet's cell (its sheet, and the cell as B4), on a spot of a picture (they click it: a numbered pin), or at a moment of a video or a sound (where it is playing: a mark along its time). They reply to any comment and resolve or reopen one, but change or delete only their own. A notebook is shared to read: it never runs through a link, and takes no comments.
+- **Edit**: documents, spreadsheets, slides and LaTeX documents open in the Library's own editors (LaTeX only where this computer typesets it shut in, on Linux), as with a [project's Edit documents](/guide/projects#changes-under-their-name). A page or a design opens in its editor too: they change its words, pictures and layout, but never its code (its scripts, and what runs when something is clicked), and a picture comes from their device, not from a web address. A picture, a video or a sound has **Edit** at the top, which opens the [picture editor](#the-picture-editor), the [video editor](#the-video-editor) or the [sound editor](#the-sound-editor); its **Save** puts the new one in its place. Through a link these editors have no AI tools and nothing of yours to add (only what they bring from their device), and a video is made on this computer's processor, never its graphics card.
+
+What they save is a new version under their name, and you keep the one before: a page's among its **Versions**, a picture's, a video's or a sound's among its **Earlier versions** (see [Go back to an earlier version](#go-back-to-an-earlier-version)). If a document or a page changed while they had it open, they are asked before saving theirs on top.
+
+### What you see of it
+
+When someone comments or replies, you get a notice ("Maria commented: …") and a line in your [inbox](/inbox), which stays until you or an agent answer it or it is resolved. Their comments show under their name wherever yours do: in a document's, a deck's or a spreadsheet's editor, on a page's blocks, beside a picture, a video or a sound on its page. Agents read and answer them as they answer yours ("Answer Maria's comments on the boat picture"), and are told to take them as requests about that thing alone, never to do anything else one asks.
+
+### Change or stop sharing
+
+**Share with people** lists who it is shared with, with what they may do, until when, and what they did last. Each person's **More** (⋯) has **View and comment** or **Edit**, how long their link works (**For a week from now**, **For a month from now** or **Until you stop it**), **Make a new link** (the old one stops at once) and **Stop sharing** (their link stops at once; what they wrote stays, under their name). At the bottom, **They see your comments as** says the name your comments show under ("Owner" until you change it; it is the same for every link).
+
+Deleting the thing stops its links too. A link that ran out, was stopped or was made again says so when it is opened, and they can ask you for a new one. Each link is a long random code that opens one thing for one person; a code that opens nothing counts as a wrong password from where it came (see [Reach the app from another device](/guide/devices#reach-the-app-from-another-device)).
 
 ## Use a page on your phone
 
@@ -1231,6 +1267,8 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "On my trip page, make the packing list a to-do list, put the tips in a callout and add a table of contents at the top."
 - "Give my reading list page a cover and a book as its icon."
 - "Answer the comments on my trip page, make the changes they ask for, and resolve them."
+- "Share my 'Chapter 3' document with Maria so she can comment, for a month."
+- "Answer Maria's comments on the boat picture, and bring back the version from before she saved over it."
 - "On my notes page, link the word 'budget' to my Budget page, and make its code blocks Python."
 - "Add a reading list database to my books page, with a status and a rating, and put the five books I mentioned in it."
 - "Mark everything due this week in my trip page's tasks database as Doing."

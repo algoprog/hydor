@@ -1,15 +1,29 @@
-// Sharing a project with people (server/spaces/share.ts): the owner invites someone (an advisor, a student) into one
-// project by a personal link, /p/<token>. There they see the project as a portal: its documents, sessions, runs and
-// reading list; they comment on its documents by name, and with Edit documents change them too. Never the owner's
-// agents, files, settings or other projects. What the server and the pages share.
+// Sharing with people (server/spaces/share.ts): the owner invites someone (an advisor, a student, a client) by a
+// personal link, /p/<token>, into one project, or to one thing of the Library alone: a document, a spreadsheet, slides,
+// a LaTeX document, a notebook, a page, a design, a picture, a video or a sound. A project's link opens it as a portal:
+// its documents, sessions, runs and reading list; a thing's link opens that thing alone. They comment by name, and
+// with Edit change it too. Never the owner's agents, files, settings or anything else. What the server and the pages
+// share.
 import type { Comment } from './comments.ts';
+import type { MediaComment } from './media-comments.ts';
+import type { MediaKind } from './media.ts';
 import type { PageInfo } from './pages.ts';
 import type { Agent } from './types.ts';
 
-/** comment: View and comment; edit: Edit documents (and comment). */
+/** comment: View and comment; edit: change it too (and comment). */
 export type ShareRole = 'comment' | 'edit';
 
+/** What each may do, for a project (its documents changed with Edit documents). */
 export const SHARE_ROLES: Record<ShareRole, string> = { comment: 'View and comment', edit: 'Edit documents' };
+
+/** What each may do, for one thing shared alone. */
+export const THING_ROLES: Record<ShareRole, string> = { comment: 'View and comment', edit: 'Edit' };
+
+/** A thing of the Library shared alone: a page of any kind (a document, slides, a design…), or a picture, video or sound. */
+export interface ShareThing {
+  kind: 'page' | 'media';
+  id: string;
+}
 
 /** How long a new link works, in days; null: until the owner stops it. */
 export const SHARE_DAYS = [7, 30, null] as const;
@@ -23,11 +37,13 @@ export interface ShareActivity {
   title?: string;
 }
 
-/** Someone a project is shared with, as the owner sees them. */
+/** Someone a project, or one thing, is shared with, as the owner sees them. */
 export interface ProjectShare {
   id: string;
-  /** The project's id. */
+  /** The project's id ('' when one thing is shared alone). */
   space: string;
+  /** The thing shared alone; none: the project. */
+  item?: ShareThing;
   name: string;
   role: ShareRole;
   createdAt: number;
@@ -93,13 +109,43 @@ export interface PortalPaper {
   tags?: string[];
 }
 
+/** A picture, video or sound shared alone, as its link opens it: what can be shown of it (never its file's place, its prompt or session). */
+export interface PortalMedia {
+  id: string;
+  kind: MediaKind;
+  title: string;
+  description?: string;
+  mime: string;
+  bytes: number;
+  width?: number;
+  height?: number;
+  /** A video's or a sound's length, in seconds. */
+  duration?: number;
+  /** A sound's shape. */
+  peaks?: number[];
+  updatedAt: number;
+}
+
+/** A picture, video or sound, as a person's link opens it: its comments, and whether its editor opens for them. */
+export interface PortalMediaView {
+  item: PortalMedia;
+  comments: MediaComment[];
+  /** With Edit: the picture, video or sound editor opens, and saves over it (it keeps the one before as a version). */
+  editable: boolean;
+}
+
 /** What a person's link opens. */
 export interface PortalView {
-  project: { name: string; color: string; description?: string };
+  /** The project shared; none when one thing is shared alone (`thing`). */
+  project?: { name: string; color: string; description?: string };
+  /** One thing shared alone: it opens at once, and nothing else is there. */
+  thing?: ShareThing & { title: string };
   /** The name the owner's comments show under. */
   owner: string;
   me: { id: string; name: string; role: ShareRole; expiresAt?: number };
   items: PortalItem[];
+  /** A picture, video or sound shared alone. */
+  media: PortalMedia[];
   sessions: PortalSession[];
   runs: PortalRun[];
   reading: PortalPaper[];
@@ -107,23 +153,38 @@ export interface PortalView {
   texEdits: boolean;
 }
 
+/** A comment as a person's portal lists it, with where it is: a slide (its number, from 1), a sheet's cell, or a page's words. */
+export interface PortalComment extends Comment {
+  slide?: number;
+  sheet?: string;
+  cell?: string;
+  /** The words of a page's block it is on. */
+  on?: string;
+}
+
 /** One document, as a person's portal opens it. */
 export interface PortalItemView {
   page: PortalItem;
-  /** It opens in its editor (Edit documents, a kind people may change): `model` is what to edit. */
+  /** It opens in its editor (Edit, a kind people may change): `model` is what to edit, or for a page of HTML its `html`. */
   editable: boolean;
   model?: unknown;
-  /** Otherwise its own page, to read (shown in the sandboxed frame). */
+  /** Otherwise its own page, to read (shown in the sandboxed frame); a page of HTML's own, to edit too. */
   html?: string;
-  /** A document's or a LaTeX document's comments, the owner's under their name. */
-  comments?: Comment[];
+  /** Its comments (every kind but a notebook), the owner's under their name. */
+  comments?: PortalComment[];
+  /** A deck's slides, by their titles, and a workbook's sheets, by their names: where a new comment can go. */
+  slides?: string[];
+  sheets?: { id: string; name: string }[];
 }
 
-/** The kinds a person with Edit documents changes in their editor (LaTeX too where TeX runs shut in). */
-export const PORTAL_EDITS: NonNullable<PageInfo['kind']>[] = ['doc', 'sheet', 'slides', 'tex'];
+/** The kinds a person with Edit changes in their editor (LaTeX too where TeX runs shut in); `page`: a page of HTML or a design. */
+export const PORTAL_EDITS: (NonNullable<PageInfo['kind']> | 'page')[] = ['doc', 'sheet', 'slides', 'tex', 'page'];
 
-/** The kinds that carry comments. */
-export const PORTAL_COMMENTS: NonNullable<PageInfo['kind']>[] = ['doc', 'tex'];
+/** The kinds that carry comments (not a notebook); `page`: a page of HTML or a design. */
+export const PORTAL_COMMENTS: (NonNullable<PageInfo['kind']> | 'page')[] = ['doc', 'tex', 'slides', 'sheet', 'page'];
+
+/** A page's kind as these lists name it: `page` for a page of HTML. */
+export const kindKey = (kind: PageInfo['kind'] | undefined): NonNullable<PageInfo['kind']> | 'page' => kind ?? 'page';
 
 /** A name's first letters, for a person's mark: "Maria Lopez" → "ML". */
 export function initials(name: string): string {

@@ -4,6 +4,7 @@
 import { BLEND_MODES } from '@shared/blend';
 import { FILTERS, type LookSettings } from '@shared/mediaedit';
 import { Copy, Crop, Download, FlipHorizontal2, ImagePlus, Keyboard, Layers2, Maximize, Redo2, RotateCcw, RotateCw, Save, Scissors, SlidersHorizontal, Sparkles, Trash2, Undo2, Wand2, ZoomIn, ZoomOut } from 'lucide-react';
+import { viaLink } from '../../../lib/machine';
 import type { MenuDef } from '../shell';
 import { activeLayer, indexOf } from './doc';
 import type { PictureEd } from './editor';
@@ -168,7 +169,7 @@ export function buildMenus(ed: PictureEd, ui: MenuUi): MenuDef[] {
         { label: 'Reselect', keys: 'Ctrl+Shift+D', disabled: !ed.lastSel, run: () => ed.reselect() },
         { label: 'Invert', keys: 'Ctrl+Shift+I', run: () => ed.invertSelection() },
         '-',
-        { label: 'Subject', icon: <Sparkles size={14} />, also: 'select subject person object ai', run: () => ed.askAi('subject') },
+        ...(viaLink ? [] : [{ label: 'Subject', icon: <Sparkles size={14} />, also: 'select subject person object ai', run: () => ed.askAi('subject') }]),
         { label: 'The layer’s pixels', disabled: !l || l.kind === 'adjust', run: () => ed.selectLayerPixels() },
         '-',
         { label: 'Feather…', keys: 'Shift+F6', disabled: !sel, run: () => ui.amount('feather') },
@@ -207,17 +208,22 @@ export function buildMenus(ed: PictureEd, ui: MenuUi): MenuDef[] {
         { label: 'Clear the guides', disabled: !ed.guides.v.length && !ed.guides.h.length, run: () => ((ed.guides = { v: [], h: [] }), ed.emit(false)) },
       ],
     },
-    {
-      label: 'AI',
-      items: [
-        { label: 'Remove the background', run: () => ed.askAi('cutout') },
-        { label: 'Erase…', run: () => ed.askAi('erase') },
-        { label: 'Change with AI…', also: 'generative fill', run: () => ed.askAi('change') },
-        { label: 'Expand the picture…', also: 'generative expand outpaint', run: () => ed.askAi('expand') },
-        { label: 'Make it larger…', also: 'upscale super resolution enlarge', run: () => ed.askAi('upscale') },
-        { label: 'Select the subject', run: () => ed.askAi('subject') },
-      ],
-    },
+    // At someone's link, no AI tools (they spend the owner's money or their computer's time).
+    ...(viaLink
+      ? []
+      : [
+          {
+            label: 'AI',
+            items: [
+              { label: 'Remove the background', run: () => ed.askAi('cutout') },
+              { label: 'Erase…', run: () => ed.askAi('erase') },
+              { label: 'Change with AI…', also: 'generative fill', run: () => ed.askAi('change') },
+              { label: 'Expand the picture…', also: 'generative expand outpaint', run: () => ed.askAi('expand') },
+              { label: 'Make it larger…', also: 'upscale super resolution enlarge', run: () => ed.askAi('upscale') },
+              { label: 'Select the subject', run: () => ed.askAi('subject') },
+            ],
+          },
+        ]),
   ];
 }
 

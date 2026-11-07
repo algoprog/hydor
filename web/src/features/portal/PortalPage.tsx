@@ -4,11 +4,13 @@
 // the language and the theme); under them, tabs: Documents, Sessions, and when the project has them, Runs and Reading
 // list. A document opens to read (with its comments, where they can add theirs) or, with Edit documents, in the
 // Library's own editor (PortalItem.tsx); a session opens as a read-only link shows it (PortalSession.tsx). What is
-// open is in the address (?doc=, ?session=, ?tab=), so Back works. A link that was stopped or ran out shows a plain page.
+// open is in the address (?doc=, ?session=, ?tab=), so Back works. A link to one thing of the Library (a document, a
+// page, a design, a picture, a video, a sound) opens that thing alone (PortalItem.tsx, PortalMedia.tsx). A link that
+// was stopped or ran out shows a plain page.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppWindow, BookOpen, ExternalLink, FileText, MessagesSquare, Monitor, Moon, NotebookText, Presentation, Sheet, Sigma, Sun } from 'lucide-react';
 import { LANGS } from '@shared/i18n';
-import { initials, SHARE_ROLES, type PortalItem, type PortalPaper, type PortalRun, type PortalSession as SessionRow, type PortalView } from '@shared/share';
+import { initials, SHARE_ROLES, THING_ROLES, type PortalItem, type PortalPaper, type PortalRun, type PortalSession as SessionRow, type PortalView } from '@shared/share';
 import { spaceColor } from '@shared/spaces';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Logo } from '../../components/Logo';
@@ -24,6 +26,7 @@ import { setCommentMe } from '../pages/common/Comments';
 import { SpaceMark } from '../spaces/parts';
 import { BASE, LinkError, papi } from './api';
 import { PortalDocument } from './PortalItem';
+import { PortalMedia } from './PortalMedia';
 import { PortalSession } from './PortalSession';
 
 export type PortalTab = 'documents' | 'sessions' | 'runs' | 'reading';
@@ -111,8 +114,8 @@ export default function PortalPage() {
     };
   }, [load]);
   useEffect(() => {
-    if (v) document.title = `${v.project.name} · Hydor`;
-  }, [v?.project.name]);
+    if (v) document.title = `${v.project?.name ?? v.thing?.title ?? ''} · Hydor`;
+  }, [v?.project?.name, v?.thing?.title]);
 
   // An address that is no link at all (cut short when copied, say) opens nothing either.
   const ended = !portalToken ? new LinkError('This link does not open anything.', 404) : err && (!v || err.status === 404 || err.status === 410 || err.status === 429) ? err : null;
@@ -124,6 +127,13 @@ export default function PortalPage() {
         <div className="flex h-full items-center justify-center bg-bg text-fg-3">
           <Throbber size={28} />
         </div>
+      ) : v.thing ? (
+        // One thing shared alone: it is the whole page.
+        v.thing.kind === 'media' ? (
+          <PortalMedia v={v} id={v.thing.id} onChanged={() => void load()} />
+        ) : (
+          <PortalDocument v={v} id={v.thing.id} onChanged={() => void load()} />
+        )
       ) : where.doc ? (
         <PortalDocument v={v} id={where.doc} onBack={() => goTo({ tab: 'documents' })} onChanged={() => void load()} />
       ) : where.session ? (
@@ -152,7 +162,8 @@ function Ended({ err }: { err: LinkError }) {
 /** The project's top and its tabs, with the tab's content under them. */
 function Shell({ v, tab }: { v: PortalView; tab: PortalTab }) {
   const wide = useMediaQuery('(min-width: 640px)');
-  const c = spaceColor(v.project);
+  const project = v.project ?? { name: '', color: 'slate' };
+  const c = spaceColor(project);
   const tabs: { value: PortalTab; label: string; count?: number }[] = [
     { value: 'documents', label: 'Documents', count: wide ? v.items.length : undefined },
     { value: 'sessions', label: 'Sessions', count: wide ? v.sessions.length : undefined },
@@ -165,13 +176,13 @@ function Shell({ v, tab }: { v: PortalView; tab: PortalTab }) {
       <header className="relative shrink-0 border-b border-line pt-[var(--safe-top)]">
         <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: `linear-gradient(180deg, color-mix(in oklab, ${c} 15%, transparent), color-mix(in oklab, ${c} 3%, transparent))` }} />
         <div className="relative mx-auto flex max-w-[1120px] items-center gap-3 px-4 pt-3 sm:px-6 sm:pt-5">
-          <SpaceMark s={v.project} size={wide ? 46 : 34} className="rounded-[12px] max-sm:rounded-[10px]" />
+          <SpaceMark s={project} size={wide ? 46 : 34} className="rounded-[12px] max-sm:rounded-[10px]" />
           <div className="min-w-0 flex-1">
             <h1 translate="no" className="truncate text-[17px] leading-tight font-semibold tracking-tight sm:text-[21px]">
-              {v.project.name}
+              {project.name}
             </h1>
             <div className="mt-0.5 truncate text-[12.5px] text-fg-3 sm:text-[13.5px]">
-              {v.project.description ? <span translate="no">{v.project.description}</span> : tr(`Shared with you by ${v.owner}`)}
+              {project.description ? <span translate="no">{project.description}</span> : tr(`Shared with you by ${v.owner}`)}
             </div>
           </div>
           <Me v={v} />
@@ -190,7 +201,8 @@ function Shell({ v, tab }: { v: PortalView; tab: PortalTab }) {
 }
 
 /** Who they are, in a mark with their initials: their menu has what they may do, who shared it, the language and the theme. */
-function Me({ v }: { v: PortalView }) {
+export function Me({ v }: { v: PortalView }) {
+  const roles = v.thing ? THING_ROLES : SHARE_ROLES;
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
   const wide = useMediaQuery('(min-width: 640px)');
@@ -223,14 +235,14 @@ function Me({ v }: { v: PortalView }) {
             <span translate="no" className="block max-w-[160px] truncate text-[13px] leading-4 font-medium">
               {v.me.name}
             </span>
-            <span className="block text-[11.5px] leading-4 text-fg-3">{SHARE_ROLES[v.me.role]}</span>
+            <span className="block text-[11.5px] leading-4 text-fg-3">{roles[v.me.role]}</span>
           </span>
         )}
       </button>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} align="end" width={270} title={<span translate="no">{v.me.name}</span>}>
         <div className="px-2.5 pt-1.5 pb-2 text-[12.5px] leading-relaxed text-fg-3">
           <div className="font-medium text-fg-2">
-            {SHARE_ROLES[v.me.role]}
+            {roles[v.me.role]}
             {v.me.expiresAt ? ` · ${tr(`until ${day(v.me.expiresAt)}`)}` : ''}
           </div>
           <div>{tr(`Shared with you by ${v.owner}, from Hydor`)}</div>

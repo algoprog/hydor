@@ -371,12 +371,12 @@ const GET_PAGE: RunTool = {
     const k = kindOf(p.kind);
     const about = p.description ? ` Its description: ${p.description}` : ' It has no description yet.';
     if (k) {
-      const by = p.who ? ` It was last changed by ${p.who}, someone the user shared the project with: keep their changes.` : p.by === 'edit' || p.by === 'made' ? ` It was last changed by the user in its editor: keep their changes.` : '';
+      const by = p.who ? ` It was last changed by ${p.who}, someone the user shared it with: keep their changes.` : p.by === 'edit' || p.by === 'made' ? ` It was last changed by the user in its editor: keep their changes.` : '';
       return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${about}${by} ${k.forAgent(pageSource(db, id)!.text)}`;
     }
     const html = (await pageHtml(db, id))!.html;
     const data = storageText(db, id);
-    const by = p.who ? ` It was last changed by ${p.who}, someone the user shared the project with: keep their changes.` : p.by === 'edit' || p.by === 'made' ? ' It was last changed by the user in the page editor: keep their changes.' : '';
+    const by = p.who ? ` It was last changed by ${p.who}, someone the user shared it with: keep their changes.` : p.by === 'edit' || p.by === 'made' ? ' It was last changed by the user in the page editor: keep their changes.' : '';
     // Agents' tool output is cut further on anyway: say so here rather than lose the end unnoticed.
     const cut = html.length > 100_000 ? `${html.slice(0, 100_000)}\n… (cut: the page is ${Math.round(html.length / 1024)} KB; write the whole page anew to change it)` : html;
     const notes = commentsForAgent(pageComments(db, id));

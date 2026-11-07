@@ -4,7 +4,7 @@
 // 10 s, ↑ ↓ the volume, M mutes, F full screen, 0–9 a tenth of the way each, , . a frame while paused. On a
 // touch screen a tap shows the controls and a double tap on either side moves 10 s. The server answers the
 // byte ranges it asks for, so it seeks without loading the whole file.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type MutableRefObject } from 'react';
 import { Download, Loader2, Maximize, Minimize, Pause, PictureInPicture2, Play, Repeat, TriangleAlert, Volume1, Volume2, VolumeX } from 'lucide-react';
 import { cx } from './ui';
 
@@ -66,7 +66,42 @@ const along = (el: HTMLElement, x: number) => {
   return r.width ? Math.min(1, Math.max(0, (x - r.left) / r.width)) : 0;
 };
 
-export function VideoPlayer({ src, name, downloadUrl, poster, className }: { src: string; name?: string; downloadUrl?: string; /** A still to show before it plays. */ poster?: string; className?: string }) {
+/** What a page holding a player reads of it and does to it (a comment at the moment it is at, a comment's moment shown). */
+export interface PlayerHandle {
+  time(): number;
+  duration(): number;
+  seek(t: number): void;
+}
+
+/** A mark along a player's time: a comment at a moment of it. */
+export interface PlayerMark {
+  id: string;
+  /** Its moment, in seconds. */
+  at: number;
+  active?: boolean;
+}
+
+export function VideoPlayer({
+  src,
+  name,
+  downloadUrl,
+  poster,
+  className,
+  marks,
+  onMark,
+  handle,
+}: {
+  src: string;
+  name?: string;
+  downloadUrl?: string;
+  /** A still to show before it plays. */
+  poster?: string;
+  className?: string;
+  /** Comments at moments of it, on its seek bar; a click on one picks it (and goes there). */
+  marks?: PlayerMark[];
+  onMark?: (id: string) => void;
+  handle?: MutableRefObject<PlayerHandle | null>;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const bar = useRef<HTMLDivElement>(null);
@@ -146,6 +181,11 @@ export function VideoPlayer({ src, name, downloadUrl, poster, className }: { src
     setTime(el.currentTime);
   }, []);
   const seekBy = useCallback((d: number) => seekTo((v()?.currentTime ?? 0) + d), [seekTo]);
+  useEffect(() => {
+    if (!handle) return;
+    handle.current = { time: () => v()?.currentTime ?? 0, duration: () => (Number.isFinite(v()?.duration) ? (v()?.duration ?? 0) : 0), seek: seekTo };
+    return () => void (handle.current = null);
+  }, [handle, seekTo]);
 
   const fullscreen = useCallback(() => {
     const el = box.current;
@@ -369,6 +409,22 @@ export function VideoPlayer({ src, name, downloadUrl, poster, className }: { src
                 className={cx('pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow transition-transform', scrub !== null || touch ? 'scale-100' : 'scale-0 group-hover/bar:scale-100')}
                 style={{ left: `${played}%` }}
               />
+              {duration > 0 &&
+                marks?.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    aria-label={`Comment at ${clock(m.at)}`}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      seekTo(m.at);
+                      onMark?.(m.id);
+                    }}
+                    className={cx('absolute -top-2 h-3 w-3 -translate-x-1/2 rounded-full ring-2 ring-black/60 transition-transform hover:scale-125', m.active ? 'scale-125 bg-warn' : 'bg-info')}
+                    style={{ left: `${Math.min(100, (m.at / duration) * 100)}%` }}
+                  />
+                ))}
               {hover !== null && duration > 0 && scrub === null && !touch && (
                 <div className="tnum pointer-events-none absolute bottom-full mb-1.5 -translate-x-1/2 rounded-md bg-black/80 px-1.5 py-0.5 text-[11.5px] text-white" style={{ left: `${hover * 100}%` }}>
                   {clock(hover * duration)}

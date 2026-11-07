@@ -29,6 +29,7 @@ import {
   Smartphone,
   Sparkles,
   Trash2,
+  UserPlus,
 } from 'lucide-react';
 import { VERSION_LIMITS, type PageDataEntry, type PageInfo, type PageVersion } from '@shared/pages';
 import type { Deck } from '@shared/slides';
@@ -59,6 +60,7 @@ import { exportFile, type ExportFormat } from './exportFile';
 import { EXPORTS } from './exports';
 import { isDesignHtml } from '@shared/design';
 import { AudienceView } from './slides/Present';
+import { openShare, useSharedThings } from '../spaces/ShareHost';
 
 export function PagesRoute() {
   const [loc] = useLocation();
@@ -76,11 +78,42 @@ export function PagesRoute() {
 
 // ---- a page's own place ---------------------------------------------------------------------------
 
-/** Its own address (for a phone's home screen) and publishing, in one place. */
-function ShareMenu({ page, link, anchor, open, onClose, onPublish, onReset }: { page: PageInfo; link: string; anchor: RefObject<HTMLButtonElement | null>; open: boolean; onClose: () => void; onPublish: () => void; onReset: () => void }) {
+/** Sharing it with people (each a link of their own, to comment or edit), its own address (for a phone's home screen) and publishing, in one place. */
+function ShareMenu({
+  page,
+  link,
+  anchor,
+  open,
+  onClose,
+  onPublish,
+  onReset,
+  onPeople,
+  people,
+}: {
+  page: PageInfo;
+  link: string;
+  anchor: RefObject<HTMLButtonElement | null>;
+  open: boolean;
+  onClose: () => void;
+  onPublish: () => void;
+  onReset: () => void;
+  /** Share with people (not an app's screen, which is its app's). */
+  onPeople?: () => void;
+  /** How many people it is shared with now. */
+  people: number;
+}) {
   const url = absolute(link);
   return (
     <Popover anchor={anchor} open={open} onClose={onClose} align="end" width={340}>
+      {onPeople && (
+        <>
+          <MenuItem icon={<UserPlus size={14} />} hint={people ? tr(people === 1 ? '1 person' : `${people} people`) : undefined} onClick={onPeople}>
+            Share with people
+          </MenuItem>
+          <div className="px-2.5 pb-1.5 text-[12px] leading-relaxed text-fg-3">{page.kind === 'notebook' ? 'A link of their own, to read it.' : 'A link of their own, to comment on it or change it.'}</div>
+          <MenuSep />
+        </>
+      )}
       <div className="space-y-2 p-2.5 text-[13px]">
         <div className="flex items-center gap-2 font-medium">
           <Smartphone size={15} className="text-fg-3" />
@@ -261,6 +294,7 @@ function PageView({ id }: { id: string }) {
   const historyRef = useRef<HTMLButtonElement>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
   const shareRef = useRef<HTMLButtonElement>(null);
+  const sharedWith = useSharedThings();
   const exportRef = useRef<HTMLButtonElement>(null);
   const saveFirst = useRef<(() => Promise<boolean>) | null>(null);
   // Leaving the page for another place in the app (another page, a session, Settings) saves what its editor holds
@@ -603,6 +637,15 @@ function PageView({ id }: { id: string }) {
               setDialog('publish');
             }}
             onReset={resetLink}
+            people={sharedWith('page', id)}
+            onPeople={
+              data.page.app
+                ? undefined
+                : () => {
+                    setMenu(null);
+                    openShare({ kind: 'page', id, title: data.page.title, pageKind: data.page.kind, design: isDesignHtml(doc?.html ?? '') });
+                  }
+            }
           />
           <Popover anchor={moreRef} open={menu === 'more'} onClose={() => setMenu(null)} align="end" width={240}>
             {mobile && (

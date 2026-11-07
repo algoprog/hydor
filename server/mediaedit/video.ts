@@ -54,6 +54,7 @@ import { slug } from '../images/openrouter.ts';
 import { ffmpegInfo, ffmpegTools, frameGrid, NO_FFMPEG, still, waveform } from '../media/frames.ts';
 import { keepFile } from '../media/index.ts';
 import { filesOf, getMedia, initMedia, MEDIA_DIR, mustMedia } from '../media/store.ts';
+import { keepEarlierVersion } from '../media/versions.ts';
 import { putInFolder } from '../pages/folders.ts';
 import { getAsset, MAX_ASSET, pictureType, putAsset } from '../pages/assets.ts';
 import { getVideo, keepVideoFile, sendVideo, videoType } from '../pages/videos.ts';
@@ -263,6 +264,8 @@ export type SaveTo = VideoSaveTo | { into: string; name: string };
 /** An edit checked and ready to make. */
 export interface Prepared {
   d: Deps;
+  /** Someone it is shared with makes it, through their link (their name): a Library video saved over says so. */
+  who?: string;
   /** The video being edited (where it is saved, and its clips without a src). */
   source: Source;
   facts: VideoSize;
@@ -627,7 +630,7 @@ async function deliver(j: Job, out: string, ext: string, dir: string): Promise<v
     return;
   }
   if ('media' in to && to.as === 'replace') {
-    const item = await replaceMediaFile(p.d, mustMedia(db, to.media), out, ext);
+    const item = await replaceMediaFile(p.d, mustMedia(db, to.media), out, ext, p.who);
     j.view.media = item.id;
     return;
   }
@@ -650,7 +653,7 @@ async function deliver(j: Job, out: string, ext: string, dir: string): Promise<v
  * A Library item's file swapped for an edited one: its size, length and hash with it, its still and frames made again,
  * its title and description kept (Write them again makes new ones). The pages hear of it.
  */
-export async function replaceMediaFile(d: Deps, m: MediaItem, from: string, ext: string): Promise<MediaItem> {
+export async function replaceMediaFile(d: Deps, m: MediaItem, from: string, ext: string, who?: string): Promise<MediaItem> {
   initMedia(d.db);
   const mime = MIME[ext] ?? 'application/octet-stream';
   const kind = mime.startsWith('video/') ? 'video' : 'image';
@@ -659,13 +662,20 @@ export async function replaceMediaFile(d: Deps, m: MediaItem, from: string, ext:
   const to = path.join(MEDIA_DIR, name);
   const tmp = path.join(MEDIA_DIR, `.${m.id}.${crypto.randomBytes(4).toString('hex')}.tmp`);
   await moveWhole(from, tmp);
+  // The file it had is kept as an earlier version (media/versions.ts).
+  try {
+    await keepEarlierVersion(d.db, m);
+  } catch (e) {
+    await fs.promises.rm(tmp, { force: true }).catch(() => {});
+    throw e;
+  }
   await fs.promises.rename(tmp, to);
   if (path.resolve(m.file) !== path.resolve(to)) await fs.promises.rm(m.file, { force: true }).catch(() => {});
   const st = await fs.promises.stat(to);
   const facts = await factsOf(to).catch(() => null);
   d.db
-    .prepare('update media set file = ?, mime = ?, bytes = ?, width = ?, height = ?, duration = ?, sha = ?, updated_at = ? where id = ?')
-    .run(name, mime, st.size, facts?.width ?? null, facts?.height ?? null, facts?.duration ?? null, await fileHash(to), Date.now(), m.id);
+    .prepare('update media set file = ?, mime = ?, bytes = ?, width = ?, height = ?, duration = ?, sha = ?, who = ?, updated_at = ? where id = ?')
+    .run(name, mime, st.size, facts?.width ?? null, facts?.height ?? null, facts?.duration ?? null, await fileHash(to), who ?? null, Date.now(), m.id);
   const item = getMedia(d.db, m.id)!;
   const f = filesOf(item);
   await fs.promises.rm(f.still, { force: true }).catch(() => {});
@@ -694,7 +704,7 @@ function saveToOf(v: unknown): VideoSaveTo {
 }
 
 /** Every src an edit names, with the kinds each may be: clips (videos, pictures), overlays (the same), sounds (sounds, or a video's sound). */
-function sourcesNamed(raw: unknown): Map<string, Set<'clip' | 'sound'>> {
+export function sourcesNamed(raw: unknown): Map<string, Set<'clip' | 'sound'>> {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, any>;
   const out = new Map<string, Set<'clip' | 'sound'>>();
   const add = (s: unknown, as: 'clip' | 'sound') => {
@@ -861,7 +871,7 @@ export async function frameStrip(file: string, n: number, h: number, range?: [nu
 const peaksKept = new Map<string, number[] | null>();
 
 /** How loud a file's sound is along its length, `n` levels (0 to 1), kept in memory once read. */
-async function peaksOf(file: string, n: number): Promise<number[] | null> {
+export async function peaksOf(file: string, n: number): Promise<number[] | null> {
   const st = await fs.promises.stat(file);
   const key = `${file}\0${st.size}\0${st.mtimeMs}\0${n}`;
   if (peaksKept.has(key)) return peaksKept.get(key)!;
@@ -872,7 +882,7 @@ async function peaksOf(file: string, n: number): Promise<number[] | null> {
 }
 
 /** A sound sent from this device or recorded with the microphone, kept for the editor: its source and length. */
-async function keepSound(body: Readable): Promise<{ src: string; duration: number }> {
+export async function keepSound(body: Readable): Promise<{ src: string; duration: number }> {
   const dir = soundDir();
   await fs.promises.mkdir(dir, { recursive: true, mode: 0o700 });
   const tmp = path.join(dir, `.in-${crypto.randomBytes(6).toString('hex')}`);
@@ -902,30 +912,50 @@ async function keepSound(body: Readable): Promise<{ src: string; duration: numbe
   }
 }
 
-const SOUND_MIME: Record<string, string> = { mp3: 'audio/mpeg', wav: 'audio/wav', flac: 'audio/flac', ogg: 'audio/ogg', webm: 'audio/webm', m4a: 'audio/mp4' };
+export const SOUND_MIME: Record<string, string> = { mp3: 'audio/mpeg', wav: 'audio/wav', flac: 'audio/flac', ogg: 'audio/ogg', webm: 'audio/webm', m4a: 'audio/mp4' };
 
 // ---- routes ---------------------------------------------------------------------------------------------------------
 
 const JOB = /^[a-f0-9]{16}$/;
 const ANY: SourceKind[] = ['video', 'picture', 'sound'];
 
+/** How loud the loudest moment of a sound's part is (dB below full scale): POST …/video/peak. */
+export async function soundPeak(db: DB, b: { src?: unknown; from?: unknown; to?: unknown }): Promise<{ peak: number }> {
+  const s = await sourceOf(db, b.src, { kinds: ['video', 'sound'] });
+  const tools = await ffmpegTools();
+  if (!tools) throw new HttpError(400, NO_FFMPEG);
+  const from = Math.max(0, Number(b.from) || 0);
+  const to = Number(b.to);
+  const args = ['-hide_banner', '-nostdin', '-v', 'info', '-protocol_whitelist', 'file', '-ss', from.toFixed(3), ...(Number.isFinite(to) && to > from ? ['-t', (to - from).toFixed(3)] : []), '-i', `file:${s.file}`, '-map', '0:a:0', '-af', 'volumedetect', '-f', 'null', '-'];
+  const said = await new Promise<string>((resolve) => execFile(tools.ffmpeg, args, { timeout: 120_000, maxBuffer: 8 << 20, env: { ...agentBaseEnv(), CUDA_VISIBLE_DEVICES: '' } }, (_e, _o, stderr) => resolve(String(stderr))));
+  const m = /max_volume:\s*(-?[\d.]+|-inf) dB/.exec(said);
+  if (!m) throw new HttpError(422, 'Its sound could not be measured');
+  return { peak: m[1] === '-inf' ? -100 : Number(m[1]) };
+}
+
+/** A source's facts, as GET …/video/info says them. */
+export async function videoInfo(db: DB, src: unknown): Promise<VideoFacts> {
+  if (!(await ffmpegTools())) return { ffmpeg: false, why: NO_FFMPEG };
+  const s = await sourceOf(db, src, { kinds: ANY });
+  const f = await sizeOf(s);
+  return { ffmpeg: true, ...(s.kind === 'picture' ? { picture: true } : s.kind === 'sound' ? { sound: true } : {}), duration: f.duration, width: f.width, height: f.height, audio: !!f.audio, ...(f.fps ? { fps: f.fps } : {}) };
+}
+
+/** A strip of a video's frames for the timeline (GET …/video/strip): its file, or null without ffmpeg. */
+export async function videoStrip(db: DB, q: Record<string, string>): Promise<string | null> {
+  const s = await sourceOf(db, q.src);
+  const n = Math.max(1, Math.min(40, Math.round(Number(q.n) || 12)));
+  const h = Math.max(24, Math.min(160, Math.round(Number(q.h) || 64) & ~1));
+  const from = Number(q.from);
+  const to = Number(q.to);
+  return frameStrip(s.file, n, h, Number.isFinite(from) && Number.isFinite(to) && to > from ? [from, to] : undefined);
+}
+
 export function videoEditRoutes(d: Deps) {
   const { app, db } = d;
-  app.get('/api/mediaedit/video/info', async (req): Promise<VideoFacts> => {
-    const src = (req.query as Record<string, string>).src;
-    if (!(await ffmpegTools())) return { ffmpeg: false, why: NO_FFMPEG };
-    const s = await sourceOf(db, src, { kinds: ANY });
-    const f = await sizeOf(s);
-    return { ffmpeg: true, ...(s.kind === 'picture' ? { picture: true } : s.kind === 'sound' ? { sound: true } : {}), duration: f.duration, width: f.width, height: f.height, audio: !!f.audio, ...(f.fps ? { fps: f.fps } : {}) };
-  });
+  app.get('/api/mediaedit/video/info', async (req): Promise<VideoFacts> => videoInfo(db, (req.query as Record<string, string>).src));
   app.get('/api/mediaedit/video/strip', async (req, reply) => {
-    const q = req.query as Record<string, string>;
-    const s = await sourceOf(db, q.src);
-    const n = Math.max(1, Math.min(40, Math.round(Number(q.n) || 12)));
-    const h = Math.max(24, Math.min(160, Math.round(Number(q.h) || 64) & ~1));
-    const from = Number(q.from);
-    const to = Number(q.to);
-    const file = await frameStrip(s.file, n, h, Number.isFinite(from) && Number.isFinite(to) && to > from ? [from, to] : undefined);
+    const file = await videoStrip(db, req.query as Record<string, string>);
     if (!file) throw new HttpError(400, NO_FFMPEG);
     reply.header('Content-Type', 'image/jpeg').header('Cache-Control', 'private, max-age=3600');
     return reply.send(fs.createReadStream(file));
@@ -937,19 +967,7 @@ export function videoEditRoutes(d: Deps) {
     return { peaks: await peaksOf(s.file, n) };
   });
   // Normalize: how loud the loudest moment of a sound's part is (dB below full scale), for a level that brings it to -1 dB.
-  app.post('/api/mediaedit/video/peak', async (req) => {
-    const b = (req.body ?? {}) as { src?: unknown; from?: unknown; to?: unknown };
-    const s = await sourceOf(db, b.src, { kinds: ['video', 'sound'] });
-    const tools = await ffmpegTools();
-    if (!tools) throw new HttpError(400, NO_FFMPEG);
-    const from = Math.max(0, Number(b.from) || 0);
-    const to = Number(b.to);
-    const args = ['-hide_banner', '-nostdin', '-v', 'info', '-protocol_whitelist', 'file', '-ss', from.toFixed(3), ...(Number.isFinite(to) && to > from ? ['-t', (to - from).toFixed(3)] : []), '-i', `file:${s.file}`, '-map', '0:a:0', '-af', 'volumedetect', '-f', 'null', '-'];
-    const said = await new Promise<string>((resolve) => execFile(tools.ffmpeg, args, { timeout: 120_000, maxBuffer: 8 << 20, env: { ...agentBaseEnv(), CUDA_VISIBLE_DEVICES: '' } }, (_e, _o, stderr) => resolve(String(stderr))));
-    const m = /max_volume:\s*(-?[\d.]+|-inf) dB/.exec(said);
-    if (!m) throw new HttpError(422, 'Its sound could not be measured');
-    return { peak: m[1] === '-inf' ? -100 : Number(m[1]) };
-  });
+  app.post('/api/mediaedit/video/peak', async (req) => soundPeak(db, (req.body ?? {}) as { src?: unknown; from?: unknown; to?: unknown }));
   app.get('/api/mediaedit/video/encoders', async () => {
     const tools = await ffmpegTools();
     const e = tools ? await encodersOf(tools.ffmpeg) : {};

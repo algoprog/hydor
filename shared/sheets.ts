@@ -1876,7 +1876,8 @@ export function cleanSheetComments(v: unknown, ids: Set<string> = new Set()): Sh
     const k = pack(p.r, p.c);
     const had = byCell.get(k);
     if (!had) byCell.set(k, { ...c, cell: refName(p.r, p.c) });
-    else had.replies = [...(had.replies ?? []), { id: c.id, by: c.by, text: c.text, at: c.at }, ...(c.replies ?? [])].slice(0, 50);
+    // Joined as a reply, it keeps who wrote it (someone it is shared with by their name).
+    else had.replies = [...(had.replies ?? []), { id: c.id, by: c.by, ...(c.name ? { name: c.name } : {}), ...(c.who ? { who: c.who } : {}), ...(c.author ? { author: c.author } : {}), text: c.text, at: c.at }, ...(c.replies ?? [])].slice(0, 50);
     if (byCell.size >= 500) break;
   }
   return [...byCell.entries()].sort((a, b) => a[0] - b[0]).map(([, c]) => c);
