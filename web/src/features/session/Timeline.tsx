@@ -394,12 +394,14 @@ function NowPart({ part, state, open, onToggle, sessionKey, agent, live }: { par
   const busy = state === 'now';
   const Icon = stepsIcon(tools);
   const line = now || shown.length > 0 || (busy && !writing);
+  // Its mark sits 16px down, where a part's line has it, so the marks keep their spacing to the last; the note's first
+  // line (13.5px type at 1.55) is centred on it, as a part's words are.
   return (
     <div className="flex gap-2.5">
-      <span className={part.notes.length ? 'pt-[3px]' : 'pt-2'}>
+      <span className="pt-2">
         <Marker state={state} />
       </span>
-      <div className="min-w-0 flex-1">
+      <div className={cx('min-w-0 flex-1', part.notes.length > 0 && 'pt-[5.5px]')}>
         {part.notes.map((n) => (
           <AssistantBlock key={n.id} item={n} note quiet />
         ))}
