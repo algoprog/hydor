@@ -53,9 +53,10 @@ class Connection {
 export class Browser {
   static async launch() {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'guide-shots-chrome-'));
+    // WebGL in software (SwiftShader), which maps draw with: this browser only opens the app's own demo copy.
     const proc = spawn(
       chromePath(),
-      ['--no-sandbox', '--headless', `--user-data-dir=${dir}`, '--remote-debugging-port=0', '--hide-scrollbars', '--force-color-profile=srgb', '--disable-gpu', '--mute-audio', '--no-first-run', 'about:blank'],
+      ['--no-sandbox', '--headless', `--user-data-dir=${dir}`, '--remote-debugging-port=0', '--hide-scrollbars', '--force-color-profile=srgb', '--disable-gpu', '--enable-unsafe-swiftshader', '--use-angle=swiftshader', '--mute-audio', '--no-first-run', 'about:blank'],
       { stdio: ['ignore', 'ignore', 'pipe'] },
     );
     const url = await new Promise((resolve, reject) => {

@@ -3109,57 +3109,131 @@ return { events: events.map((e) => ({ ...e, era: era(e.year) })), eras, span: sh
           code:
             BODY +
             PLACE +
-            String.raw`// The place, and the address of Wikipedia's articles about what is around it (forty, with their pictures and a line each).
-const p = await placeOf(input.found, input.place, ctx);
+            String.raw`// The place: OpenStreetMap's search knows sights as well as towns, the best known first ("Colosseum" is Rome's); a
+// little-known hit (a name a building site somewhere shares) gives way to Open-Meteo's towns.
+let p = null;
+try {
+  const r = await ctx.tool('http_request', { url: 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=en&q=' + encodeURIComponent(String(input.place || '')), headers: { 'User-Agent': '${UA}' } }, { title: 'Look it up on OpenStreetMap' });
+  const hit = (bodyOf(r) || [])[0];
+  if (hit && isFinite(Number(hit.lat)) && isFinite(Number(hit.lon)) && Number(hit.importance) >= 0.4) {
+    const parts = String(hit.display_name || '').split(', ');
+    const name = hit.name || parts[0] || String(input.place);
+    p = { name, label: [name, parts.length > 1 ? parts[parts.length - 1] : ''].filter(Boolean).join(', '), lat: Number(hit.lat), lng: Number(hit.lon) };
+  }
+} catch (e) {}
+if (!p) p = await placeOf(input.found, input.place, ctx);
 if (!p) throw new Error('No place called “' + input.place + '” was found: check its spelling, or add its city');
-const m = /(\d+) km/.exec(String(input.radius || '')) ;
-const r = Math.min(10000, (m ? Number(m[1]) : 3) * 1000);
-const url = 'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=geosearch&ggslimit=40&ggsradius=' + r + '&ggscoord=' + p.lat + '|' + p.lng + '&prop=coordinates|pageimages|description|info&inprop=url&piprop=thumbnail&pithumbsize=400';
-return { label: p.label, lat: p.lat, lng: p.lng, at: p.lat + ',' + p.lng, url };`,
+// Where to ask what is around it: Wikidata, for everything with a place on the map there and how well known each is
+// (how many Wikipedias write about it); Wikipedia, for its articles there, with their pictures.
+const m = /(\d+) km/.exec(String(input.radius || ''));
+const km = Math.min(10, m ? Number(m[1]) : 3);
+// The best known hundred first, then pictures, articles and names for those alone: quick in a big city too. A work held
+// in a collection (a painting, a statue in a museum) is marked, to leave out.
+const q = 'SELECT ?item ?itemLabel ?itemDescription ?loc ?links ?image ?article ?held WHERE { { SELECT ?item ?loc ?links WHERE { SERVICE wikibase:around { ?item wdt:P625 ?loc . bd:serviceParam wikibase:center "Point(' + p.lng + ' ' + p.lat + ')"^^geo:wktLiteral . bd:serviceParam wikibase:radius "' + km + '" . } ?item wikibase:sitelinks ?links . FILTER(?links >= 2) } ORDER BY DESC(?links) LIMIT 100 } OPTIONAL { ?item wdt:P18 ?image } OPTIONAL { ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> } BIND(EXISTS { ?item wdt:P195 [] } AS ?held) SERVICE wikibase:label { bd:serviceParam wikibase:language "en,mul" . } } ORDER BY DESC(?links)';
+const wikidata = 'https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q);
+const url = 'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=geosearch&ggslimit=200&ggsradius=' + km * 1000 + '&ggscoord=' + p.lat + '|' + p.lng + '&prop=coordinates|pageimages|description|info&colimit=max&coprop=type&pilimit=max&piprop=thumbnail&pithumbsize=500&inprop=url';
+return { label: p.label, name: p.name, lat: p.lat, lng: p.lng, at: p.lat + ',' + p.lng, wikidata, url };`,
           outputs: [
             { id: 'label', label: 'Place', type: 'text' },
+            { id: 'name', label: 'Its name', type: 'text' },
             { id: 'lat', label: 'Latitude', type: 'number' },
             { id: 'lng', label: 'Longitude', type: 'number' },
             { id: 'at', label: 'Where on a map', type: 'text' },
+            { id: 'wikidata', label: 'What is best known around it', type: 'url' },
             { id: 'url', label: 'What is around it', type: 'url' },
           ],
           failed: 'agent',
         },
-        { id: 'nearby', title: 'Find what is around', do: 'tool', tool: 'http_request', with: { url: '{{spot.url}}', headers: HEADERS, max_chars: 120000 }, failed: 'agent' },
+        { id: 'famous', title: 'Find what is best known there', do: 'tool', tool: 'http_request', with: { url: '{{spot.wikidata}}', headers: { ...HEADERS, Accept: 'application/sparql-results+json' }, max_chars: 200000 }, failed: 'skip' },
+        { id: 'nearby', title: 'Find what is around', do: 'tool', tool: 'http_request', with: { url: '{{spot.url}}', headers: HEADERS, max_chars: 200000 }, failed: 'skip' },
         {
           id: 'sort',
           title: 'Sort what is there',
           do: 'code',
           language: 'javascript',
-          with: { found: '{{nearby}}', lat: '{{spot.lat}}', lng: '{{spot.lng}}' },
+          with: { famous: '{{famous}}', found: '{{nearby}}', name: '{{spot.name}}', lat: '{{spot.lat}}', lng: '{{spot.lng}}' },
           code:
             BODY +
-            String.raw`// The places around it by kind, from what Wikipedia says each is (people, companies and lists left out), nearest first.
-const pages = ((bodyOf(input.found) || {}).query || {}).pages || [];
+            String.raw`// The places around it, the best known first: Wikidata's, by how many Wikipedias write about each, and Wikipedia's
+// articles there, by how much each says (either alone when the other did not answer). What is no place to go (the place
+// itself and other towns and areas, events, states, institutions, languages) is left out; schools, firms, stations,
+// roads and a World Heritage listing of many sites go lower.
 const lat0 = Number(input.lat);
 const lng0 = Number(input.lng);
+const away = (lat, lng) => Math.round(Math.hypot((lat - lat0) * 111.2, (lng - lng0) * 111.2 * Math.cos((lat0 * Math.PI) / 180)) * 10) / 10;
 const KINDS = [
   ['Museum', /museum|gallery/i],
-  ['Church', /church|cathedral|chapel|basilica|monastery|convent|abbey|mosque|temple|synagogue|shrine/i],
-  ['Park', /park|garden|botanical|forest|beach|lake|river|viewpoint|nature/i],
+  ['Religious site', /church|cathedral|chapel|basilica|monastery|convent|abbey|mosque|temple|synagogue|shrine|rotunda/i],
+  ['Park', /park|garden|botanical|forest|beach|lake|river|viewpoint|nature|promenade|waterfront|seafront|\bhill|mountain/i],
   ['Square', /square|plaza|piazza|street|avenue|boulevard/i],
-  ['Building', /palace|castle|fort|tower|house|building|bridge|monument|statue|memorial|lighthouse|aqueduct|ruins?|amphitheatre|theatre|theater|library|opera|hall|station|market/i],
-  ['Area', /neighbou?rhood|district|quarter|parish|village|suburb|town|area/i],
+  ['Building', /palace|castle|fort|walls?\b|gate|arch\b|tower|house|building|bridge|monument|statue|memorial|column|obelisk|lighthouse|aqueduct|ruins?|archaeological|ancient|circus|forum|agora|amphitheatre|theatre|theater|library|opera|hall|station|market|bazaar|bath|hamam|hammam|fountain|harbou?r|port\b/i],
+  ['Area', /neighbou?rhood|district|quarter|old town|upper town|village|area/i],
 ];
-const skip = /\b(born|died|politician|footballer|singer|actor|writer|company|organi[sz]ation|school|university|hospital|list of|election|airline|club|team|band)\b/i;
-const places = pages
-  .filter((p) => p.coordinates && p.coordinates[0] && !skip.test(String(p.description || '')))
-  .map((p) => {
-    const c = p.coordinates[0];
-    const km = Math.hypot((c.lat - lat0) * 111.2, (c.lon - lng0) * 111.2 * Math.cos((lat0 * Math.PI) / 180));
-    const kind = (KINDS.find(([, re]) => re.test(String(p.description || '') + ' ' + p.title)) || ['Other'])[0];
-    return { name: p.title, kind, about: String(p.description || ''), km: Math.round(km * 10) / 10, lat: c.lat, lng: c.lon, picture: p.thumbnail ? p.thumbnail.source : null, link: p.fullurl || null };
+const AREA = /^(?:\S+\s+){0,2}(?:city|town|village|hamlet|suburb|municipality|municipal unit|commune|county|province|region|prefecture|state|country|capital|human settlement|(?:metropolitan|urban) area|census[- ]designated place|unincorporated community|borough|ward|civil parish|constituency|arrondissement)(?:\s+(?:in|of|and|on|near|within|that|which|located)\b|,|$)|^(?:\S+\s+){0,3}(?:country|sovereign state|nation)\b/i;
+const EVENT = /\b(?:siege|battle|massacre|conflagration|festival|exhibition|conference|congress|summit|earthquake|riot|treaty|agreement|election|referendum|uprising|revolt|revolution|pogrom|bombing|terrorist|attacks?|incident|accident|disaster|olympi\w*|championships?|tournament|crusader|empire|kingdom|dynasty|principality|regime|republic|legislature|parliament|agency|government|ministry|council|political party|intergovernmental|meeting|scandal|affair|stock exchange|(?:rapid )?(?:transit|transport) system|metro system|tram system|bus network|administrative (?:districts?|divisions?|units?|regions?)|language|dialect|ethnic group|diocese|archdiocese|vicariate|eparchy|bishopric|military unit|regiment)\b/i;
+// A work of art kept in a museum (a painting, a sculpture) is seen in that museum, not where it was found.
+const ART = /\b(?:sculpture|painting|fresco|statue|artwork|manuscript|tapestry)\b.*\b(?:in|at) the\b.*\b(?:museums?|museo|mus[ée]e|galleries|gallery|collection|vatican|louvre)\b/i;
+const GROUP = (r) => /world heritage/i.test(r.about) && /\b(?:monuments|sites|churches|buildings|works|ensembles?)\b/i.test(r.name);
+// An event's description starts with its year ("2019 church fire", "1894–1906 political scandal").
+const DATED = /^\d{3,4}(?:[–-]\d{2,4})?\b(?!s)/;
+const TOPIC = /^(?:siege|battle|kingdom|empire|treaty|massacre|great fire|history|list|timeline|demographics|economy|culture|politics|geography|transport|education|religion)\b/i;
+const LESS = /\b(?:university|college|grande école|higher education|research (?:establishment|institute|centre|center)|school|faculty|institute|academy|hospital|clinic|company|bank|corporation|organi[sz]ation|association|federation|club|team|newspaper|broadcaster|consulate|embassy|headquarters|hotel|(?:metro|subway|railway|train|bus|tram) (?:station|stop|line)|railway|highway|motorway|interchange|tunnel|apartment|office|stadium|arena|cemetery|street|avenue|road)\b/i;
+const titleOf = (u) => {
+  try {
+    return decodeURIComponent(String(u || '').split('/wiki/')[1] || '').replace(/_/g, ' ');
+  } catch (e) {
+    return '';
+  }
+};
+const own = String(input.name || '').trim();
+const plain = (s) => (own ? String(s).replace(new RegExp('(?:, ' + own.replace(/[.*+?^$()|[\]\\{}]/g, '\\$&') + '| \\(' + own.replace(/[.*+?^$()|[\]\\{}]/g, '\\$&') + '\\))$', 'i'), '') : String(s));
+const all = new Map();
+const add = (key, row) => {
+  const had = all.get(key);
+  if (!had) return all.set(key, row);
+  for (const k of Object.keys(row)) if (had[k] === undefined || had[k] === null || had[k] === '') had[k] = row[k];
+  had.fame = Math.max(had.fame, row.fame);
+};
+for (const b of ((bodyOf(input.famous) || {}).results || {}).bindings || []) {
+  const v = (k) => (b[k] ? String(b[k].value) : '');
+  const at = /Point\(([-\d.eE]+) ([-\d.eE]+)\)/.exec(v('loc'));
+  const name = v('itemLabel');
+  if (!at || !name || /^Q\d+$/.test(name) || v('held') === 'true') continue;
+  const links = Number(v('links')) || 0;
+  add(titleOf(v('article')) || v('item'), { name: plain(name), about: v('itemDescription'), lat: Number(at[2]), lng: Number(at[1]), fame: links, langs: links, picture: v('image') ? v('image').replace(/^http:/, 'https:') + '?width=330' : null, link: v('article') || v('item').replace(/^http:/, 'https:') });
+}
+for (const p of ((bodyOf(input.found) || {}).query || {}).pages || []) {
+  const c = p.coordinates && p.coordinates[0];
+  if (!c || /^(?:event|country|adm)/.test(String(c.type || ''))) continue;
+  add(p.title, { name: plain(p.title), about: String(p.description || ''), lat: c.lat, lng: c.lon, fame: Math.min(40, (Number(p.length) || 0) / 2500), langs: null, picture: p.thumbnail ? p.thumbnail.source : null, link: p.fullurl || null });
+}
+const places = [...all.values()]
+  .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng) && !AREA.test(r.about) && !EVENT.test(r.about) && !DATED.test(r.about) && !ART.test(r.about) && !TOPIC.test(r.name))
+  .map((r) => {
+    const text = r.name + ' ' + r.about;
+    const kind = (KINDS.find(([, re]) => re.test(text)) || ['Other'])[0];
+    return { name: r.name, kind, about: r.about, km: away(r.lat, r.lng), lat: r.lat, lng: r.lng, picture: r.picture, link: r.link, langs: r.langs, fame: r.fame * (LESS.test(text) || GROUP(r) ? 0.3 : 1) };
   })
-  .sort((a, b) => a.km - b.km);
-if (!places.length) throw new Error('Nothing around it is on Wikipedia: try a larger area, or a nearby town');
-return { places, list: places.map((p, i) => i + 1 + '. ' + p.name + ' (' + p.kind + (p.about ? ', ' + p.about : '') + ', ' + p.km + ' km)').join('\n') };`,
+  // The district asked about is where the walk is, not a stop of it.
+  .filter((r) => !(r.kind === 'Area' && own && r.name.toLowerCase() === own.toLowerCase()))
+  .sort((a, b) => b.fame - a.fame)
+  .slice(0, 40);
+if (!places.length) throw new Error('Nothing around it is on Wikipedia or Wikidata: try a larger area, or a nearby town');
+// Pictures for those without one, from their Wikipedia articles (all at once).
+const need = places.filter((r) => !r.picture && /en\.wikipedia\.org\/wiki\//.test(String(r.link || '')));
+if (need.length)
+  try {
+    const r = await ctx.tool('http_request', { url: 'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&prop=pageimages&piprop=thumbnail&pithumbsize=500&pilimit=max&titles=' + encodeURIComponent(need.map((x) => titleOf(x.link)).join('|')), headers: { 'User-Agent': '${UA}' } }, { title: 'Find their pictures' });
+    const got = {};
+    for (const pg of ((bodyOf(r) || {}).query || {}).pages || []) if (pg.thumbnail) got[pg.title] = pg.thumbnail.source;
+    for (const x of need) x.picture = got[titleOf(x.link)] || null;
+  } catch (e) {}
+return {
+  places: places.map(({ fame, langs, ...p }) => p),
+  list: places.map((p, i) => i + 1 + '. ' + p.name + ' (' + p.kind + (p.about ? ', ' + p.about : '') + '; ' + p.km + ' km from the centre' + (p.langs ? '; in ' + p.langs + ' Wikipedias' : '') + ')').join('\n'),
+};`,
           outputs: [
-            { id: 'places', label: 'Places', type: 'table', columns: [{ id: 'name', label: 'Place', type: 'text' }, { id: 'kind', label: 'Kind', type: 'text' }, { id: 'about', label: 'What it is', type: 'text' }, { id: 'km', label: 'Km away', type: 'number' }, { id: 'lat', label: 'Latitude', type: 'number' }, { id: 'lng', label: 'Longitude', type: 'number' }, { id: 'picture', label: 'Picture', type: 'url' }, { id: 'link', label: 'More about it', type: 'url' }] },
+            { id: 'places', label: 'Places', type: 'table', columns: [{ id: 'name', label: 'Place', type: 'text' }, { id: 'kind', label: 'Kind', type: 'text' }, { id: 'about', label: 'What it is', type: 'text' }, { id: 'km', label: 'Km from the centre', type: 'number' }, { id: 'lat', label: 'Latitude', type: 'number' }, { id: 'lng', label: 'Longitude', type: 'number' }, { id: 'picture', label: 'Picture', type: 'url' }, { id: 'link', label: 'More about it', type: 'url' }] },
             { id: 'list', label: 'In a list', type: 'markdown' },
           ],
           failed: 'agent',
@@ -3168,12 +3242,14 @@ return { places, list: places.map((p, i) => i + 1 + '. ' + p.name + ' (' + p.kin
           id: 'pick',
           title: 'Pick the best for you',
           do: 'model',
-          instructions: `Pick the places worth a visit around {{spot.label}}{{#interests}} for someone who likes: {{interests}}{{/interests}}: six to ten from the numbered list below (none that are not on it), each by its number, with why go in a sentence.
+          instructions: `Pick the places most worth a visit around {{spot.label}}{{#interests}} for someone who likes: {{interests}}{{/interests}}: six to ten from the numbered list below (none that are not on it), each by its number, with why go in a sentence.
+
+The list puts the best known first and says how far each is from the centre of {{spot.label}}. {{#interests}}Let what they like decide, but keep the sights a first visit should not miss unless what they like rules them out.{{/interests}}{{^interests}}Keep the sights a first visit should not miss, then add variety where the list allows (a museum, a church or monument, a square or market, a park or a view).{{/interests}} Leave out what is no place to visit (a school, an office, a station, an event).
 
 {{sort.list}}
 
-- picks: each its number in the list and why go.
-- summary: what the area is like and what to see, in two or three sentences.`,
+- picks: each its number in the list, and why go, in one sentence a guide would write (no distances).
+- summary: what the place is like and what to see there, in two or three sentences as a guide would write them; say nothing about the list, its distances or what you cannot check.`,
           outputs: [
             { id: 'picks', label: 'Picks', type: 'table', required: true, columns: [{ id: 'n', label: 'Number', type: 'number' }, { id: 'why', label: 'Why go', type: 'text' }] },
             { id: 'summary', label: 'In short', type: 'markdown', required: true },
@@ -3221,6 +3297,7 @@ return { places: out, walk: Math.round(km * 10) / 10, stops: order.length };`,
       { id: 'stops', label: 'Stops', type: 'number' },
     ],
     examples: [
+      { id: 'thessaloniki', name: 'A whole city', inputs: { place: 'Thessaloniki' }, checks: ['{{answer.stops}} >= 6', '{{answer.places}} contains White Tower', '{{answer.places}} contains Rotunda'] },
       { id: 'alfama', name: 'Alfama, Lisbon', inputs: { place: 'Alfama, Lisbon', interests: 'History and views' }, checks: ['{{answer.stops}} >= 5', '{{answer.walk}} < 15'] },
       { id: 'a-landmark', name: 'Around a landmark', inputs: { place: 'Colosseum', radius: 'A short walk (1 km)' }, checks: ['{{answer.places}} is not empty'] },
     ],

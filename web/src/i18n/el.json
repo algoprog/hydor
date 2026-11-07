@@ -21994,5 +21994,10 @@
 "Warnings":"Προειδοποιήσεις",
 "What went wrong in these logs?":"Τι πήγε στραβά σε αυτές τις καταγραφές;",
 "Wrap long lines":"Αναδίπλωση μεγάλων γραμμών",
-"Your time: {0}":"Η δική σας ώρα: {0}"
+"Your time: {0}":"Η δική σας ώρα: {0}",
+"A whole city":"Μια ολόκληρη πόλη",
+"Find what is best known there":"Βρες τα πιο γνωστά εκεί",
+"Nothing around it is on Wikipedia or Wikidata: try a larger area, or a nearby town":"Τίποτα γύρω του δεν υπάρχει στη Wikipedia ή στα Wikidata: δοκιμάστε μια μεγαλύτερη περιοχή ή μια κοντινή πόλη",
+"This browser can’t draw the map itself, so only the places are shown.":"Αυτό το πρόγραμμα περιήγησης δεν μπορεί να σχεδιάσει τον ίδιο τον χάρτη, οπότε φαίνονται μόνο τα μέρη.",
+"What is best known around it":"Τα πιο γνωστά γύρω του"
 }

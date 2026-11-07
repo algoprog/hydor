@@ -8,11 +8,12 @@ triggers: [geocode, geocoding, reverse geocod*, coordinates of, latitude and lon
 # Maps and places
 
 Most place questions can be answered with free OpenStreetMap services: Nominatim finds coordinates
-for an address and back, Overpass finds things near a point, OSRM gives routes and travel times, and
-OpenStreetMap's tiles show a map. Volunteers run them on donated servers under strict usage rules:
-name yourself, go slowly, keep what you fetched, and never build them into an app for everyone. Use
-them for the user's own questions; for an app, a public page or heavy use, pick a provider with the
-user's own key. Request examples are in `references/osm-services.md`.
+for an address and back, Overpass finds things near a point, and OSRM gives routes and travel times.
+Volunteers run them on donated servers under strict usage rules: name yourself, go slowly, keep what
+you fetched, and never build them into an app for everyone. Use them for the user's own questions;
+for an app, a public page or heavy use, pick a provider with the user's own key. A map to look at
+comes from OpenFreeMap (OpenStreetMap's data, free with no key and no limit, apps and public pages
+included). Request examples are in `references/osm-services.md`.
 
 ## 1. Pick the tool for the question
 
@@ -27,7 +28,7 @@ user's own key. Request examples are in `references/osm-services.md`.
 | Time zone of a place | `timezonefinder` (offline) or Open-Meteo | Use zone names, not fixed offsets |
 | Open now? | OSM's `opening_hours` tag | Volunteer data: confirm what matters |
 | Public transport | No free general service: give a directions link | |
-| A map to look at | Leaflet and OSM tiles in `show_html` or `save_page` | Attribution |
+| A map to look at | Leaflet on OpenFreeMap's map in `show_html` or `save_page` | Attribution |
 
 ## 2. Keep to the usage rules
 
@@ -106,13 +107,14 @@ for anything that matters (a pharmacy open on Sunday), check the place's own pag
 
 - Look everything up first, then put the coordinates in the page: the page itself never calls
   Nominatim or Overpass.
-- Use Leaflet with OpenStreetMap tiles, the attribution visible, markers with popups, the view
-  fitted to the markers, and a list of the places beside the map (for phones and screen readers).
-  A tested template is in `references/leaflet-page.md`.
-- `show_html` for a map to look at now; `save_page` for one the user will come back to. For a
-  published site with many visitors, use a tile service meant for that (OpenFreeMap needs no key;
-  commercial ones need the user's key): OpenStreetMap's own tiles allow normal viewing only, no bulk
-  downloads or offline copies.
+- Use Leaflet with OpenFreeMap's map (drawn by MapLibre as a Leaflet layer, light or dark with the
+  page), the attribution visible, markers with popups, the view fitted to the markers, and a list of
+  the places beside the map (for phones and screen readers). A tested template is in
+  `references/leaflet-page.md`.
+- Not OpenStreetMap's own tile servers (`tile.openstreetmap.org`): they refuse pages in the app's
+  frames, which send no Referer, and an app's or a public site's use of them.
+- `show_html` for a map to look at now; `save_page` for one the user will come back to; a published
+  site can use OpenFreeMap too. No bulk downloads or offline copies of the map.
 - Often a link is enough: `https://www.openstreetmap.org/?mlat=52.5163&mlon=13.3777#map=17/52.5163/13.3777`.
 
 ## 8. Check before you answer

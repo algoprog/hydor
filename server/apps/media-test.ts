@@ -358,6 +358,11 @@ test('the frame’s media parts: their source runs as sent, and the frame passes
   const page = frameHtml();
   assert.ok(page.includes('n-plot') && page.includes('n-map') && page.includes('n-widget'));
   assert.ok(page.includes(`${LIB_CDN}leaflet@`), 'where the map library comes from');
+  // The map itself is OpenFreeMap's, drawn by MapLibre: OpenStreetMap's own tile servers refuse a sandboxed frame.
+  assert.ok(page.includes(`${LIB_CDN}maplibre-gl@5.`) && page.includes(`${LIB_CDN}@maplibre/maplibre-gl-leaflet@`), 'MapLibre 5 (its one-file build) and its Leaflet layer');
+  assert.ok(page.includes('https://tiles.openfreemap.org/styles/positron') && page.includes('https://tiles.openfreemap.org/styles/dark'), 'a light and a dark map');
+  assert.ok(page.includes('OpenFreeMap') && page.includes('openstreetmap.org/copyright'), 'its credit');
+  assert.ok(!page.includes('tile.openstreetmap.org'), 'no tiles from OpenStreetMap’s own servers');
 });
 
 for (const [name, fn] of tests) {

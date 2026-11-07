@@ -101,6 +101,7 @@ const uiLabels = () => ({
   copied: tr('Copied'),
   libFailed: tr('Its library could not be loaded: is this device online?'),
   noPlaces: tr('No places to show on the map.'),
+  noMapBase: tr('This browser can’t draw the map itself, so only the places are shown.'),
   noData: tr('Nothing to draw yet.'),
   noVideo: tr('This video cannot be shown here.'),
   noWidget: tr('No widget'),

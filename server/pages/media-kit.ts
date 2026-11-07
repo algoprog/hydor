@@ -1,4 +1,4 @@
-// The parts of an app's view that draw with a script (shared/app-ui.ts): maps (Leaflet, OpenStreetMap's tiles),
+// The parts of an app's view that draw with a script (shared/app-ui.ts): maps (Leaflet, on OpenFreeMap's map),
 // plots in 2D and 3D (Plotly), videos from YouTube or Vimeo, and the view's own widgets (ES modules that import
 // the libraries the view names, from jsDelivr). Each is a custom element (<n-map>, <n-plot>, <n-embed>,
 // <n-widget>), so the view's drawing (ui-kit.ts) keeps it as it is while what fills it is the same, and draws it
@@ -6,12 +6,18 @@
 //
 // The function below runs in the browser, inside the sandboxed frame: its source is sent as text, so it uses only its
 // arguments (the view kit's own functions, and where the libraries are) and the browser's globals.
-import { KIT_LIBS, LIB_CDN } from '../../shared/app-media.ts';
+import { KIT_LIBS, LIB_CDN, MAP_CREDIT, MAP_STYLES } from '../../shared/app-media.ts';
 
-/** Where the view's own elements load their libraries from. */
+/** Where the view's own elements load their libraries (and a map its look) from. */
 export const KIT_LIB_URLS = {
   leafletJs: `${LIB_CDN}${KIT_LIBS.leaflet.pkg}@${KIT_LIBS.leaflet.version}/${KIT_LIBS.leaflet.js}`,
   leafletCss: `${LIB_CDN}${KIT_LIBS.leaflet.pkg}@${KIT_LIBS.leaflet.version}/${KIT_LIBS.leaflet.css}`,
+  maplibreJs: `${LIB_CDN}${KIT_LIBS.maplibre.pkg}@${KIT_LIBS.maplibre.version}/${KIT_LIBS.maplibre.js}`,
+  maplibreCss: `${LIB_CDN}${KIT_LIBS.maplibre.pkg}@${KIT_LIBS.maplibre.version}/${KIT_LIBS.maplibre.css}`,
+  maplibreLeafletJs: `${LIB_CDN}${KIT_LIBS.maplibreLeaflet.pkg}@${KIT_LIBS.maplibreLeaflet.version}/${KIT_LIBS.maplibreLeaflet.js}`,
+  mapLight: MAP_STYLES.light,
+  mapDark: MAP_STYLES.dark,
+  mapCredit: MAP_CREDIT,
   plotlyJs: `${LIB_CDN}${KIT_LIBS.plotly.pkg}@${KIT_LIBS.plotly.version}/${KIT_LIBS.plotly.js}`,
 };
 
@@ -179,6 +185,112 @@ function mediaKit(latest: MediaKitApi) {
     return f ? String(row[f]) : '';
   };
 
+  /** Whether this browser draws with WebGL (MapLibre needs it), asked once; the context made to ask is let go at once. */
+  let webgl: boolean | undefined;
+  const canDraw = () => {
+    if (webgl === undefined) {
+      try {
+        const c = document.createElement('canvas');
+        const gl = (c.getContext('webgl2') ?? c.getContext('webgl')) as WebGLRenderingContext | null;
+        webgl = !!gl;
+        gl?.getExtension('WEBGL_lose_context')?.loseContext();
+      } catch {
+        webgl = false;
+      }
+    }
+    return webgl;
+  };
+  /**
+   * OpenFreeMap's dark map in the app's own dark colours: land in the card's colour, water a little darker, parks a
+   * hint of green, streets and buildings a little lighter, its words in the muted text colour.
+   */
+  const darkStyle = (style: any, t: ReturnType<typeof theme>) => {
+    const rgb = (s: string) => (/(\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)/.exec(s) ?? ['', '22', '24', '29']).slice(1, 4).map(Number);
+    const mix = (a: string, b: string | number[], k: number) => {
+      const x = rgb(a);
+      const y = typeof b === 'string' ? rgb(b) : b;
+      return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * k)).join(',')})`;
+    };
+    const land = t.card;
+    const P: Record<string, string> = {
+      land,
+      water: mix(land, [4, 12, 30], 0.6),
+      residential: mix(land, t.fg, 0.025),
+      green: mix(land, [72, 128, 84], 0.16),
+      building: mix(land, t.fg, 0.06),
+      buildingLine: mix(land, t.fg, 0.1),
+      path: mix(land, t.fg, 0.08),
+      minor: mix(land, t.fg, 0.14),
+      major: mix(land, t.fg, 0.22),
+      motorway: mix(land, t.fg, 0.28),
+      casing: mix(land, t.fg, 0.07),
+      rail: mix(land, t.fg, 0.14),
+      boundary: mix(land, t.fg, 0.26),
+      label: t.muted,
+      roadLabel: mix(t.muted, land, 0.2),
+      waterLabel: mix(t.muted, [96, 136, 196], 0.35),
+      halo: land,
+    };
+    // The first rule a layer's id fits gives its colours (the paint properties of its own kind only).
+    const RULES: [RegExp, Record<string, string>][] = [
+      [/^background$/, { 'background-color': 'land' }],
+      [/^water$/, { 'fill-color': 'water' }],
+      [/^waterway/, { 'line-color': 'water' }],
+      [/residential/, { 'fill-color': 'residential' }],
+      [/wood|park|grass/, { 'fill-color': 'green' }],
+      [/ice|glacier/, { 'fill-color': 'land' }],
+      [/^building/, { 'fill-color': 'building', 'fill-outline-color': 'buildingLine' }],
+      [/pier|dashline/, { 'fill-color': 'land', 'line-color': 'land' }],
+      [/casing/, { 'line-color': 'casing' }],
+      [/aeroway|path/, { 'fill-color': 'path', 'line-color': 'path' }],
+      [/minor|subtle/, { 'line-color': 'minor' }],
+      [/major/, { 'line-color': 'major' }],
+      [/motorway/, { 'line-color': 'motorway' }],
+      [/railway/, { 'line-color': 'rail' }],
+      [/boundary/, { 'line-color': 'boundary' }],
+      [/water_name/, { 'text-color': 'waterLabel', 'text-halo-color': 'halo' }],
+      [/_name/, { 'text-color': 'roadLabel', 'text-halo-color': 'halo' }],
+      [/^place_/, { 'text-color': 'label', 'text-halo-color': 'halo' }],
+    ];
+    for (const layer of Array.isArray(style?.layers) ? style.layers : []) {
+      const rule = RULES.find(([re]) => re.test(String(layer.id)));
+      if (!rule) continue;
+      for (const [prop, key] of Object.entries(rule[1]))
+        if (prop.startsWith(`${layer.type}-`) || (layer.type === 'symbol' && prop.startsWith('text-'))) layer.paint = { ...(layer.paint ?? {}), [prop]: P[key] };
+    }
+    return style;
+  };
+  /**
+   * The map under the places, drawn by MapLibre as a Leaflet layer: OpenFreeMap's light map, or its dark one in the
+   * app's colours. Where the browser can't draw it (no WebGL) or it does not load, the places show on a plain
+   * ground with a word on why.
+   */
+  const baseMap = async (map: any, Lf: any, box: HTMLElement, t: ReturnType<typeof theme>, alive: () => boolean) => {
+    const note = () => {
+      if (!alive() || box.querySelector('.n-map-note')) return;
+      const n = document.createElement('div');
+      n.className = 'n-map-note';
+      n.textContent = K.L('noMapBase', 'This browser can’t draw the map itself, so only the places are shown.');
+      box.appendChild(n);
+    };
+    if (!canDraw()) return note();
+    try {
+      sheet(K.libs.maplibreCss);
+      await script(K.libs.maplibreJs);
+      await script(K.libs.maplibreLeafletJs);
+      let style: unknown = t.dark ? K.libs.mapDark : K.libs.mapLight;
+      if (t.dark)
+        try {
+          const r = await fetch(K.libs.mapDark);
+          if (r.ok) style = darkStyle(await r.json(), t);
+        } catch {}
+      if (!alive()) return;
+      Lf.maplibreGL({ style, attribution: K.libs.mapCredit }).addTo(map);
+    } catch {
+      note();
+    }
+  };
+
   customElements.define(
     'n-map',
     class extends Part {
@@ -201,14 +313,18 @@ function mediaKit(latest: MediaKitApi) {
         if (!this.live) return;
         const Lf = (window as any).L;
         const t = theme();
-        const map = Lf.map(box, { scrollWheelZoom: false, zoomControl: true, attributionControl: true, tap: true });
-        const tiles = typeof w.tiles === 'string' && /^https:\/\/[^\s"'<>]+\{z\}[^\s"'<>]*$/.test(w.tiles) ? w.tiles : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-        Lf.tileLayer(tiles, {
-          maxZoom: 19,
-          referrerPolicy: 'strict-origin-when-cross-origin',
-          attribution: typeof w.attribution === 'string' ? K.esc(w.attribution) : '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
-          className: t.dark && !w.tiles ? 'n-map-dark' : '',
-        }).addTo(map);
+        // Zooms without animation, as tiles placed in 2D already do: MapLibre's Leaflet layer would otherwise wait on an
+        // animation Leaflet never makes.
+        const map = Lf.map(box, { scrollWheelZoom: false, zoomControl: true, attributionControl: true, tap: true, maxZoom: 19, zoomAnimation: false });
+        let gone = false;
+        // The view's own tiles (https://…{z}/{x}/{y}…) as they are; else OpenFreeMap's map, which loads while the places draw.
+        if (typeof w.tiles === 'string' && /^https:\/\/[^\s"'<>]+\{z\}[^\s"'<>]*$/.test(w.tiles))
+          Lf.tileLayer(w.tiles, {
+            maxZoom: 19,
+            referrerPolicy: 'strict-origin-when-cross-origin',
+            attribution: typeof w.attribution === 'string' ? K.esc(w.attribution) : '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+          }).addTo(map);
+        else void baseMap(map, Lf, box, t, () => this.live && !gone);
         const latlngs = pts.map((p) => [p.lat, p.lng]);
         if (w.line && latlngs.length > 1) Lf.polyline(latlngs, { color: t.accent, weight: 3, opacity: 0.75, dashArray: w.line === 'dashed' ? '6 8' : undefined }).addTo(map);
         // Points sized by a value (value: its field): circles whose area grows with it, the largest 26px across.
@@ -242,6 +358,7 @@ function mediaKit(latest: MediaKitApi) {
         const ro = new ResizeObserver(() => map.invalidateSize());
         ro.observe(box);
         this.off = () => {
+          gone = true;
           ro.disconnect();
           map.remove();
         };
@@ -456,7 +573,7 @@ n-map,n-plot,n-widget,n-embed{display:block;min-width:0}
 .n-map-box{width:100%;border-radius:var(--n-radius);overflow:hidden;border:1px solid var(--n-line);z-index:0}
 .n-map-box .leaflet-container{font:inherit}
 .n-map-box.leaflet-container{background:var(--n-soft)}
-.n-map-dark img.leaflet-tile{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9)}
+.n-map-note{position:absolute;left:8px;bottom:8px;z-index:800;max-width:calc(100% - 16px);padding:4px 8px;border:1px solid var(--n-line);border-radius:6px;background:var(--n-card);color:var(--n-muted);font-size:12px;line-height:1.35}
 .n-map-num span{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--n-accent);color:#fff;font-weight:600;font-size:12px;border:2px solid var(--n-card);box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .n-plot-box{width:100%}
 `.trim();
