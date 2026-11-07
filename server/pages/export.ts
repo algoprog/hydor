@@ -32,6 +32,7 @@ import { wordFonts } from './word-fonts.ts';
 import { isDesignHtml } from '../../shared/design.ts';
 import { exportDesign } from './design-export.ts';
 import { videosInside } from './page-videos.ts';
+import { diagramRasterFile, diagramSvgFile, readDiagram } from './diagrams.ts';
 
 export type { ExportFormat };
 
@@ -52,6 +53,8 @@ export const EXPORT_TYPES: Record<ExportFormat, string> = {
   py: 'text/x-python; charset=utf-8',
   png: 'image/png',
   jpg: 'image/jpeg',
+  svg: 'image/svg+xml',
+  drawio: 'application/vnd.jgraph.mxfile',
 };
 
 export type Paper = 'a4' | 'letter';
@@ -161,6 +164,20 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
   // A design (shared/design.ts): its artboards exactly their size, as pictures or a PDF of their own size.
   if (src.kind === 'page' && isDesignHtml(src.text) && (o.format === 'png' || o.format === 'jpg' || o.format === 'pdf'))
     return exportDesign(src.text, { title, format: o.format, scale: o.scale ?? 2, transparent: o.transparent, board: o.slide ? o.slide - 1 : undefined, name: fileName });
+
+  // A diagram's pages as pictures or SVG: the one asked for (by its number), its only one, or each in a zip.
+  if (src.kind === 'diagram' && (o.format === 'png' || o.format === 'jpg' || o.format === 'svg')) {
+    const d = readDiagram(src.text);
+    const page = Number.isInteger(o.slide) && o.slide! > 0 ? o.slide! - 1 : undefined;
+    if (page !== undefined && !d.pages[page]) throw new HttpError(404, 'No such page');
+    const one = page !== undefined ? `${title} ${d.pages[page].name}` : title;
+    if (o.format === 'svg') {
+      const f = diagramSvgFile(db, d, title, page);
+      return f.zip ? { data: f.data, type: EXPORT_TYPES.zip, name: fileName(`${title} pages`, 'zip') } : { data: f.data, type: EXPORT_TYPES.svg, name: fileName(d.pages.length > 1 ? one : title, 'svg') };
+    }
+    const f = await diagramRasterFile(db, d, { page, scale: o.scale, transparent: o.transparent, format: o.format });
+    return f.zip ? { data: f.data, type: EXPORT_TYPES.zip, name: fileName(`${title} pages`, 'zip') } : { data: f.data, type: EXPORT_TYPES[o.format], name: fileName(d.pages.length > 1 ? one : title, o.format) };
+  }
 
   // A deck's slides as pictures: one (by its number), or every one the slideshow shows, in a zip.
   if (o.format === 'png') {

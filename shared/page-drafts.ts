@@ -7,7 +7,7 @@
 import type { JsonPath } from './partial-json.ts';
 
 /** The kinds a call can be watched for, by the tool that saves them. */
-export const DRAFT_TOOLS = { save_doc: 'doc', save_slides: 'slides', save_sheet: 'sheet', save_latex: 'tex' } as const;
+export const DRAFT_TOOLS = { save_doc: 'doc', save_slides: 'slides', save_sheet: 'sheet', save_latex: 'tex', save_diagram: 'diagram' } as const;
 export type DraftTool = keyof typeof DRAFT_TOOLS;
 export type DraftKind = (typeof DRAFT_TOOLS)[DraftTool];
 
@@ -20,7 +20,9 @@ export type DraftMark =
   /** In a spreadsheet: a sheet (its id) and a cell (A1). */
   | { kind: 'sheet'; sheet: string; cell: string }
   /** In a LaTeX document: a file and a place in its text. */
-  | { kind: 'tex'; file: string; at: number };
+  | { kind: 'tex'; file: string; at: number }
+  /** In a diagram: a page (from 0), and the item being written on it. */
+  | { kind: 'diagram'; page: number; item?: string };
 
 export interface Drafted<M> {
   model: M;

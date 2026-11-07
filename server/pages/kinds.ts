@@ -1,4 +1,4 @@
-// The kinds of page Pages keeps besides pages of HTML: slide decks, documents, spreadsheets, LaTeX and notebooks. Each keeps a
+// The kinds of page Pages keeps besides pages of HTML: slide decks, documents, spreadsheets, LaTeX, notebooks and diagrams. Each keeps a
 // model as text (a line per part, so two versions read as a diff of lines), checked as it comes in, and knows
 // how to make its own page from it (a viewer, every page to print, or a still picture), what an agent is told
 // of it, which files it exports as, and which files it can be made from.
@@ -21,10 +21,12 @@ import { soundFileFor } from './sounds.ts';
 import { videoFileFor } from './videos.ts';
 import type { EmbeddedFont } from './word-fonts.ts';
 import { freshNotebook, keepNotebook, MAX_NOTEBOOK, notebookForAgent, notebookFromFile, notebookPage, notebookScript, readNotebook } from './notebooks.ts';
+import { DIAGRAM_OPENS, diagramForAgent, diagramFromFile, diagramPage, diagramSvgFile, drawioFile, freshDiagram, keepDiagram, MAX_DIAGRAM, readDiagram } from './diagrams.ts';
+import { diagramSources } from '../../shared/diagram.ts';
 
-export type PageKind = 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
+export type PageKind = 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram';
 export type PageMode = 'viewer' | 'print' | 'still';
-export type ExportFormat = 'pdf' | 'docx' | 'odt' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'epub' | 'txt' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png' | 'jpg';
+export type ExportFormat = 'pdf' | 'docx' | 'odt' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'epub' | 'txt' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png' | 'jpg' | 'svg' | 'drawio';
 
 /** A file opened as a page of a kind: its model, and what was left out of it (said to the person who opened it). */
 export interface FromFile {
@@ -204,13 +206,36 @@ KINDS.set('notebook', {
   opens: /\.ipynb$/i,
 });
 
+KINDS.set('diagram', {
+  noun: 'diagram',
+  tool: 'save_diagram',
+  max: MAX_DIAGRAM,
+  keep: (db, input) => {
+    const { diagram, text } = keepDiagram(db, input);
+    return { text, sources: diagramSources(diagram) };
+  },
+  read: readDiagram,
+  page: (db, text, title, mode) => diagramPage(db, readDiagram(text), title, mode),
+  forAgent: diagramForAgent,
+  sources: (text) => diagramSources(readDiagram(text)),
+  files: {
+    // Its pages as SVG (one, or a zip of them all) and as a draw.io file; pictures of them are made in export.ts.
+    svg: (db, text, title) => diagramSvgFile(db, readDiagram(text), title).data,
+    drawio: (_db, text, title) => drawioFile(readDiagram(text), title),
+  },
+  still: () => ({ width: 1280, height: 800 }),
+  fresh: () => freshDiagram(),
+  fromFile: (buf, name) => diagramFromFile(buf, name),
+  opens: DIAGRAM_OPENS,
+});
+
 export function kindOf(k: string | null | undefined): KindDef | null {
   return k ? (KINDS.get(k as PageKind) ?? null) : null;
 }
 
 export function mustKind(k: string): KindDef {
   const d = kindOf(k);
-  if (!d) throw new HttpError(400, `Pages has no kind “${k}”: slides, doc, sheet, tex or notebook`);
+  if (!d) throw new HttpError(400, `Pages has no kind “${k}”: slides, doc, sheet, tex, notebook or diagram`);
   return d;
 }
 
