@@ -8,10 +8,10 @@ import { CHIPS_CSS, HERO_CSS, PIC_CSS as PIC, STATS_CSS } from './views.ts';
 
 // ---- what several share -----------------------------------------------------------------------------------------
 
-/** A card. */
+/** A card (a button or a link fills its column like a box: sized by its words, a line kept whole would widen it). */
 const CARD = String.raw`
 & { height: 100%; }
-.c { display: flex; flex-direction: column; gap: 6px; height: 100%; box-sizing: border-box; padding: 13px 15px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); color: inherit; font: inherit; text-align: left; }
+.c { display: flex; flex-direction: column; gap: 6px; width: 100%; height: 100%; min-width: 0; box-sizing: border-box; padding: 13px 15px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); color: inherit; font: inherit; text-align: left; }
 button.c:hover, a.c:hover { border-color: var(--n-accent); }
 .c h3 { margin: 0; font-size: 15.5px; line-height: 1.35; }
 .c p { margin: 0; font-size: 14px; line-height: 1.5; }
@@ -123,7 +123,7 @@ const WEATHER: AppUi = {
     },
     'wx-day': {
       description: 'A day in a tile: its sky, high and low, and the chance of rain; opens the day',
-      html: String.raw`<button type="button" class="d" data-event="open_day"><span class="wd">{{date|weekday|short:3}}</span><span class="dn">{{date|shortdate}}</span><span class="ic" title="{{sky}}">{{icon}}</span><b>{{high|number}}°</b><span class="lo">{{low|number}}°</span><span class="rain">{{#chance}}💧 {{chance}}%{{/chance}}</span></button>`,
+      html: String.raw`<button type="button" class="d" data-event="open_day"><span class="wd">{{date|weekday:short}}</span><span class="dn">{{date|shortdate}}</span><span class="ic" title="{{sky}}">{{icon}}</span><b>{{high|number}}°</b><span class="lo">{{low|number}}°</span><span class="rain">{{#chance}}💧 {{chance}}%{{/chance}}</span></button>`,
       css: String.raw`
 .d { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 74px; padding: 9px 4px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); color: inherit; font: inherit; }
 .d:hover { border-color: var(--n-accent); }
@@ -779,8 +779,9 @@ const GAMES: AppUi = {
   elements: {
     'gm-hero': {
       description: 'What you like, and the picks in a line',
-      html: String.raw`<header class="hero"><p class="kicker">Game finder · {{inputs.platform}}{{^inputs.when|is:Out now}} · {{inputs.when}}{{/inputs.when}}{{^inputs.budget|is:Any price}} · {{inputs.budget}}{{/inputs.budget}}</p><h1>{{result.summary}}</h1>{{#inputs.likes}}<p class="sub">{{inputs.likes|short:140}}</p>{{/inputs.likes}}</header>`,
-      css: HERO_CSS + String.raw`.hero h1 { font-size: 21px !important; }`,
+      html: String.raw`<header class="hero"><p class="kicker">Game finder · {{inputs.platform}}{{^inputs.when|is:Out now}} · {{inputs.when}}{{/inputs.when}}{{^inputs.budget|is:Any price}} · {{inputs.budget}}{{/inputs.budget}}</p><p class="lead">{{result.summary}}</p>{{#inputs.likes}}<p class="sub">{{inputs.likes|short:140}}</p>{{/inputs.likes}}</header>`,
+      // The summary names every pick: a lead to read, not a headline.
+      css: HERO_CSS + String.raw`.lead { margin: 8px 0 4px; font-size: 16.5px; font-weight: 500; line-height: 1.5; }`,
     },
     'gm-card': {
       description: 'A game: its picture (with a mark when it has a trailer), when it comes out or why it fits, how long it takes and its price',
@@ -796,7 +797,8 @@ const GAMES: AppUi = {
         PIC +
         PLAY +
         String.raw`small { color: var(--n-muted); font-weight: 400; } .price { font-size: 13.5px !important; } .price:empty { display: none; } .price b { color: var(--n-ok); }
-.tags { display: flex; flex-wrap: wrap; gap: 6px; } .tag.soon { background: none; box-shadow: inset 0 0 0 1px var(--n-accent); }`,
+.tags { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; } .tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .tag.soon { background: none; box-shadow: inset 0 0 0 1px var(--n-accent); }
+.pic { object-position: center top; }`,
     },
     'gm-detail': {
       description: 'A game on a page of its own, with when it comes out, its deal and a search for more like it (its trailer plays below)',
@@ -805,7 +807,7 @@ const GAMES: AppUi = {
   <p class="muted">Plays on {{platforms}}{{#hours}} · about {{hours}} hours{{/hours}}</p>
   <div class="n-row">{{#deal}}<a class="n-btn n-primary" href="{{deal}}" target="_blank" rel="noopener noreferrer">&#36;{{price}} at {{store}} ↗</a>{{/deal}}<button type="button" class="n-btn" data-event="more">More like this</button></div>
 </div>`,
-      css: PIC + String.raw`.dt { max-width: 640px; } .kicker { margin: 12px 0 0; color: var(--n-accent); font-size: 12.5px; font-weight: 600; text-transform: uppercase; } h2 { margin: 4px 0 8px !important; font-size: 24px !important; } p { font-size: 15px; line-height: 1.5; } .muted { color: var(--n-muted); font-size: 14px; }`,
+      css: PIC + String.raw`.dt { max-width: 640px; } .dt .pic { width: auto; max-width: 100%; height: auto; max-height: 440px; aspect-ratio: auto; object-fit: contain; } .kicker { margin: 12px 0 0; color: var(--n-accent); font-size: 12.5px; font-weight: 600; text-transform: uppercase; } h2 { margin: 4px 0 8px !important; font-size: 24px !important; } p { font-size: 15px; line-height: 1.5; } .muted { color: var(--n-muted); font-size: 14px; }`,
     },
   },
   events: {

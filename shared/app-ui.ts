@@ -190,6 +190,7 @@ export const UI_FORMATS = [
   { value: 'day', hint: 'The day of the month: 20' },
   { value: 'month', hint: 'The month, short: Nov' },
   { value: 'weekday', hint: 'Friday' },
+  { value: 'weekday:short', hint: 'Fri' },
   { value: 'year', hint: '2026' },
   { value: 'time', hint: 'The time of a date and time' },
   { value: 'ago', hint: '3 days ago' },
@@ -432,7 +433,7 @@ export function uiEngine() {
     longdate: (v, _a, s) => dfmt(v, s, { day: 'numeric', month: 'long', year: 'numeric' }),
     day: (v, _a, s) => dfmt(v, s, { day: 'numeric' }),
     month: (v, _a, s) => dfmt(v, s, { month: 'short' }),
-    weekday: (v, _a, s) => dfmt(v, s, { weekday: 'long' }),
+    weekday: (v, a, s) => dfmt(v, s, { weekday: a === 'short' ? 'short' : 'long' }),
     year: (v, _a, s) => dfmt(v, s, { year: 'numeric' }),
     time: (v, _a, s) => dfmt(v, s, { hour: 'numeric', minute: '2-digit' }),
     ago: (v, _a, s) => {

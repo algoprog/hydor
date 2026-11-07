@@ -730,7 +730,14 @@ const firstObject = (t: string): unknown => {
 
 /** Outputs as JSON from a model: asked once more, with what was wrong, when its first answer does not fit. */
 async function askOutputs(x: Exec, prompt: string, outputs: AnswerField[], model: string | undefined, cost: Cost): Promise<Record<string, unknown>> {
-  const system = [STEP_SYSTEM, 'Answer with one JSON object and nothing else (no Markdown fence), with these fields:', ...outputs.map(fieldLine), 'Where something cannot be known from what you are given, say so in that field rather than leaving it out.'].join('\n');
+  // The fields are shown to people as they are (a view's cards, a table): each holds its value, never notes on the
+  // material ("from general knowledge", "the sources disagree"), which read as noise there.
+  const system = [
+    STEP_SYSTEM,
+    'Answer with one JSON object and nothing else (no Markdown fence), with these fields:',
+    ...outputs.map(fieldLine),
+    'Each field holds its value alone, written for the person who will read it: no notes on where it came from, on what you were or were not given, or on sources that disagree (take the likeliest, or the latest announced). A value that cannot be known stays empty (null), unless its field is required: then give your best.',
+  ].join('\n');
   let text = await ask(x, system, prompt, model, cost);
   let c = checkAnswer(outputs, firstObject(text));
   if (c.ok) return c.value;

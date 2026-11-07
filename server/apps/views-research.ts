@@ -194,7 +194,7 @@ const CITE_HEAD = String.raw`<header class="hero">
     <div class="stat"><b>{{total|number}}</b><span>citations in all</span></div>
     {{#hindex}}<div class="stat"><b>{{hindex}}</b><span>h-index</span></div>{{/hindex}}
   </div>
-  {{#citations|count}}<nav class="chips" aria-label="How they cite you">
+  {{#citations|unique:kind|count}}<nav class="chips" aria-label="How they cite you">
     {{#state.kind}}<button type="button" class="chip" data-event="kind" data-name="">All</button>{{/state.kind}}{{^state.kind}}<span class="chip on">All</span>{{/state.kind}}
     {{#citations|unique:kind}}<button type="button" class="chip{{#.|is:$state.kind}} on{{/.}}" data-event="kind" data-name="{{.}}">{{.}}</button>{{/citations}}
   </nav>{{/citations}}

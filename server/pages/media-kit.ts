@@ -486,7 +486,16 @@ function mediaKit(latest: MediaKitApi) {
         b.type = 'button';
         b.className = 'n-embed-frame n-embed-still';
         b.setAttribute('aria-label', `${K.L('play', 'Play')}: ${title}`);
-        if (yt) b.style.backgroundImage = `url("https://i.ytimg.com/vi/${yt}/hqdefault.jpg")`;
+        if (yt) {
+          // The small still (480 px, always there) at once; the large one (1280 px) in its place once it loads. A video
+          // without one gets YouTube's 120 px placeholder instead, which is let be.
+          b.style.backgroundImage = `url("https://i.ytimg.com/vi/${yt}/hqdefault.jpg")`;
+          const big = new Image();
+          big.onload = () => {
+            if (big.naturalWidth > 120 && b.isConnected) b.style.backgroundImage = `url("${big.src}")`;
+          };
+          big.src = `https://i.ytimg.com/vi/${yt}/maxresdefault.jpg`;
+        }
         b.innerHTML = `<span class="n-embed-play" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30"><path fill="currentColor" d="M8 5.5v13l11-6.5z"/></svg></span><span class="n-embed-from">${yt ? 'YouTube' : 'Vimeo'}</span>`;
         b.addEventListener('click', () => K.play(src, title));
         this.replaceChildren(b);
@@ -559,8 +568,8 @@ export const MEDIA_CSS = `
 .n-ui-fig{margin:0;min-width:0}
 .n-ui-fig img{display:block;width:100%;height:var(--n-h,auto);max-height:70vh;object-fit:var(--n-fit,cover);border-radius:var(--n-radius);background:var(--n-soft);cursor:zoom-in}
 .n-ui-fig figcaption,.n-ui-cap{margin-top:6px;color:var(--n-muted);font-size:13px;line-height:1.4}
-.n-ui-video video,.n-ui-video .n-embed-frame{display:block;width:100%;aspect-ratio:16/9;height:auto;border:0;border-radius:var(--n-radius);background:#000}
-.n-embed-still{position:relative;padding:0;cursor:pointer;background-size:cover;background-position:center}
+.n-ui-video video,.n-ui-video .n-embed-frame{display:block;width:100%;aspect-ratio:16/9;height:auto;border:0;border-radius:var(--n-radius);background-color:#000}
+.n-embed-frame.n-embed-still{position:relative;padding:0;cursor:pointer;background-size:cover;background-position:center;background-repeat:no-repeat}
 .n-embed-play{position:absolute;left:50%;top:50%;display:grid;place-items:center;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:rgba(0,0,0,.62);color:#fff;transition:transform .15s,background .15s}
 .n-embed-still:hover .n-embed-play{transform:scale(1.06);background:rgba(0,0,0,.78)}
 .n-embed-from{position:absolute;left:10px;bottom:8px;padding:2px 8px;border-radius:6px;background:rgba(0,0,0,.6);color:#fff;font-size:12px}

@@ -29,6 +29,7 @@ const UI_CSS = `
 @media (min-width:700px){.n-ui-w-half{grid-column:span 3}.n-ui-w-third{grid-column:span 2}.n-ui-w-two-thirds{grid-column:span 4}}
 .n-ui-title{margin:0 0 10px!important;font-size:15px!important;font-weight:600;letter-spacing:-.005em}
 .n-ui-each{display:flex;flex-direction:column;gap:12px}
+.n-ui-each>*{min-width:0}
 .n-ui-each.n-ui-l-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:14px}
 .n-ui-each.n-ui-l-row{flex-direction:row;flex-wrap:wrap;gap:8px}
 .n-ui-empty{padding:14px 16px;border:1px dashed var(--n-line);border-radius:var(--n-radius);color:var(--n-muted);font-size:14px}

@@ -3,6 +3,24 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.40.2 · 7 November 2026
+
+An app's answer in a conversation reads from its top, and apps' answers look as they should: trailers, game covers,
+cards, and no notes on their sources.
+
+- **An app's answer shows from its top**: when an agent runs an app for you and its answer is taller than the screen,
+  the conversation shows it from its top, with the agent's words about it above it, rather than from its end; **Latest**
+  goes on down. A conversation that ended with one opens the same way.
+- **Answers without notes on their sources**: apps' answers no longer say things like "from general knowledge; not in
+  the snippets" or which source gave another date: each part says just what it is, and what cannot be known is left
+  empty.
+- **Trailers and covers**: a YouTube trailer's picture fills its frame (it repeated in tiles before), in its large size
+  where YouTube has one. Game finder shows a game's cover whole and sharp on its page, keeps the covers' titles in view
+  on its cards, and gives its summary as a paragraph rather than a headline.
+- **Smaller fixes**: cards in apps' grids keep to their column; Weather outlook writes its days as Sat, Sun (not "Sa…");
+  Citation alerts says in plain words why a service did not answer, and shows its filters only when there is something
+  to filter.
+
 ## 0.40.1 · 7 November 2026
 
 Maps draw again in apps and answers, and Explore a place starts from the sights a place is known for.

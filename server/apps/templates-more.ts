@@ -2291,6 +2291,21 @@ return {
           code:
             LIST +
             String.raw`// Each game with its picture and trailer, and its price where one was found; with a budget, those within it first.
+// A note a model may still add on its sources ("(from general knowledge; not in the snippets)", "; one source gives
+// another date") is left out: the cards show the fields as they are.
+const NOTE = /\b(?:sources?|snippets?|calendars?|unverified|general knowledge|not (?:given|listed|in the))\b/i;
+const clean = (v) => {
+  const said = String(v || '').trim();
+  const kept = said
+    .replace(/\s*\([^()]*\)/g, (m) => (NOTE.test(m) ? '' : m))
+    .split(/;\s+/)
+    .filter((part, i) => i === 0 || !NOTE.test(part))
+    .join('; ')
+    .replace(/\s+([,.;])/g, '$1')
+    .replace(/[;,]\s*$/, '')
+    .trim();
+  return kept !== said && /[.!?]$/.test(said) && !/[.!?]$/.test(kept) ? kept + '.' : kept;
+};
 const deals = list(input.deals);
 const media = list(input.media && input.media.items);
 const yes = (v) => v === true || /^(yes|true)$/i.test(String(v));
@@ -2299,7 +2314,7 @@ const games = rows(input.games).map((g, i) => {
   const m = media[i] && typeof media[i] === 'object' ? media[i] : {};
   const coming = yes(g.coming);
   return {
-    title: String(g.title || ''), year: num(g.year), out: coming ? String(g.out || num(g.year) || '') : '', coming, genre: String(g.genre || ''), platforms: String(g.platforms || ''), hours: num(g.hours), why: String(g.why || ''), free: yes(g.free),
+    title: String(g.title || ''), year: num(g.year), out: coming ? clean(g.out || num(g.year) || '') : '', coming, genre: clean(g.genre), platforms: clean(g.platforms), hours: num(g.hours), why: clean(g.why), free: yes(g.free),
     price: num(d.price), lowest: num(d.lowest), store: String(d.store || ''), deal: d.deal || null, picture: m.picture || d.picture || null, video: m.video || null, at: i,
   };
 });
