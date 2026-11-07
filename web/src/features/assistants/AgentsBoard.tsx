@@ -122,7 +122,8 @@ export function AgentsBoard({ space }: { space: Space }) {
   if (!st) return <Throbber className="mx-auto my-10 text-fg-3" />;
   const all = st.assistants;
   const here = all.filter((a) => !a.builtin && a.projects?.includes(space.id));
-  const everywhere = all.filter((a) => !a.projects?.length);
+  // Your own first, then the built-in ones.
+  const everywhere = all.filter((a) => !a.projects?.length).sort((x, y) => Number(!!x.builtin) - Number(!!y.builtin));
   const byId = new Map(here.map((a) => [a.id, a]));
   const kidsOf = (a: Assistant) => (a.canAsk ?? []).map((id) => byId.get(id) ?? all.find((x) => x.id === id && !x.projects?.length)).filter((x): x is Assistant => !!x);
   const asked = new Set(here.flatMap((a) => kidsOf(a).map((k) => k.id)));
