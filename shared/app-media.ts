@@ -182,12 +182,27 @@ export function mediaSrc(src: string, assets?: Record<string, Pick<AppAsset, 'sh
 /** Where a view's libraries come from: npm packages, at exact versions, from jsDelivr. */
 export const LIB_CDN = 'https://cdn.jsdelivr.net/npm/';
 
-/** The libraries the view's own elements use: maps (Leaflet) and plots (Plotly); and 3D (three.js) for slides' 3D parts. */
+/**
+ * The libraries the view's own elements use: maps (Leaflet, with MapLibre drawing the map itself through its Leaflet
+ * layer) and plots (Plotly); and 3D (three.js) for slides' 3D parts. MapLibre stays on 5: its one-file build carries its
+ * worker inside, which a sandboxed frame can start (6 loads its worker as a module from the CDN).
+ */
 export const KIT_LIBS = {
   leaflet: { pkg: 'leaflet', version: '1.9.4', js: 'dist/leaflet.js', css: 'dist/leaflet.css' },
+  maplibre: { pkg: 'maplibre-gl', version: '5.24.0', js: 'dist/maplibre-gl.js', css: 'dist/maplibre-gl.css' },
+  maplibreLeaflet: { pkg: '@maplibre/maplibre-gl-leaflet', version: '0.1.4', js: 'leaflet-maplibre-gl.js' },
   plotly: { pkg: 'plotly.js-dist-min', version: '4.2.0', js: 'plotly.min.js' },
   three: { pkg: 'three', version: '0.187.0', js: 'build/three.module.min.js' },
 } as const;
+
+/**
+ * The map under a map's places: OpenFreeMap's streets and places (free, with no key and no limit, for apps too; drawn
+ * from vector tiles). OpenStreetMap's own tile servers refuse a sandboxed frame, which sends no Referer, and an app
+ * people install may not use them without leave.
+ */
+export const MAP_STYLES = { light: 'https://tiles.openfreemap.org/styles/positron', dark: 'https://tiles.openfreemap.org/styles/dark' } as const;
+export const MAP_CREDIT =
+  '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
 
 /** Where a slide's 3D part loads three.js from (its folder: its build, and its addons' loaders and controls). */
 export const THREE_BASE = `${LIB_CDN}${KIT_LIBS.three.pkg}@${KIT_LIBS.three.version}/`;

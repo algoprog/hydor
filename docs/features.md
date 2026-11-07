@@ -361,7 +361,7 @@ agents that speak ACP and take MCP servers.
   for games out now or coming soon (Nintendo Switch 2 too), each with its picture and trailer, and PC prices with
   their lowest ever (CheapShark), a quiz on any topic to play on its page, a book finder (Open
   Library), what's on in a city by day and on a map, a savings plan, your own spreadsheet or numbers as charts, a
-  topic as a timeline (Wikipedia) and a place explored on a map in walking order (Wikipedia and OpenStreetMap). Many
+  topic as a timeline (Wikipedia) and a place explored on a map in walking order, its best-known sights first (Wikidata, Wikipedia and OpenStreetMap). Many
   show pictures and videos of what they find, through find_media: each game's cover and trailer, each film's or show's
   trailer, each product, gift idea, news story and event, a picture for each day of a trip, a photo of the place to
   go. Each hands back its answer in a view of its own: pages of elements made for it (the Trip planner's timeline of days to tick
@@ -376,7 +376,7 @@ agents that speak ACP and take MCP servers.
   or by an agent, checked when it is saved, drawn in the pages' sandbox, shown on the run's page (Plain answer
   shows the card and tables), in its session and on its public page (where nothing reaches the app), and kept in
   its versions, its file and its folder. Views show media too: pictures (side by side, opening large), videos
-  (files, YouTube, Vimeo) and sounds, maps of the places in an answer (Leaflet and OpenStreetMap, numbered and
+  (files, YouTube, Vimeo) and sounds, maps of the places in an answer (Leaflet on OpenFreeMap's map, light or dark with the app; numbered and
   joined in order) and plots in 2D and 3D (Plotly: lines, stacked bars, areas, scatter, pies, histograms, boxes,
   heatmaps, 3D points, lines and surfaces); and widgets, elements drawn by a script of their own that imports
   npm packages at exact versions from jsDelivr (a 3D scene with three.js, a chart library, a game), reaching the

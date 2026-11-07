@@ -3,6 +3,20 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.40.1 · 7 November 2026
+
+Maps draw again in apps and answers, and Explore a place starts from the sights a place is known for.
+
+- **Maps work again**: OpenStreetMap's map servers had begun refusing the maps in apps' views and in answers, which
+  showed "Access blocked" squares. Maps now draw OpenFreeMap's map of OpenStreetMap's data (free, with no key), light
+  or dark with the app; a browser that cannot draw it still shows the places, on a plain ground, and says why. Map
+  pages agents make for you use it too.
+- **Explore a place finds what a place is known for**: it ranks what is around by how well known each is (how many
+  Wikipedias write about it, from Wikidata), so a walk through Thessaloniki starts from the White Tower, the Rotunda
+  and Agios Dimitrios rather than side streets. It leaves out what is no place to visit (the city itself, suburbs,
+  events, institutions, a painting kept in a museum), finds landmarks by name ("Colosseum" is Rome's), has pictures
+  for nearly every place, and its summary reads like a guide's.
+
 ## 0.40.0 · 7 November 2026
 
 More answer UIs: 38 new ones, 142 in all, for deciding, planning, work, studying, data, media and code, and several
