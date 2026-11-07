@@ -206,7 +206,7 @@ function isText(s, jsx = false) {
   // CSS: a rule's declarations anywhere in it, values made of lengths and colours ("0 10px 28px rgba(0,0,0,.2)",
   // "{0}px {1}px"), and a list of fonts ending in a family ("Georgia, serif").
   if (/\{\s*[a-z-]+\s*:(?:[^{}]|\{\d+\})*\}/.test(t) || /^[a-z-]+\s*:\s*[^;]+;\s*[a-z-]+\s*:/.test(t)) return false;
-  if (/^(?:(?:-?[\d.]+|\{\d+\})+(?:px|em|rem|%|deg|ms|s|vh|vw|fr|ch|ex|pt|mm|cm)?|rgba?\([^)]*\)|hsla?\([^)]*\)|var\([^)]*\)|calc\([^)]*\)|#[0-9a-f]{3,8}|solid|dashed|dotted|none|inset|auto)(?:[\s,]+(?:(?:-?[\d.]+|\{\d+\})+(?:px|em|rem|%|deg|ms|s|vh|vw|fr|ch|ex|pt|mm|cm)?|rgba?\([^)]*\)|hsla?\([^)]*\)|var\([^)]*\)|calc\([^)]*\)|#[0-9a-f]{3,8}|solid|dashed|dotted|none|inset|auto|\{\d+\}))*$/i.test(t) && /\d/.test(t)) return false;
+  if (/^(?:(?:-?[\d.]+|\{\d+\})+(?:px|em|rem|%|deg|ms|s|vh|vw|dvh|svh|lvh|cqw|cqh|cqi|fr|ch|ex|pt|mm|cm)?|rgba?\([^)]*\)|hsla?\([^)]*\)|var\([^)]*\)|calc\([^)]*\)|#[0-9a-f]{3,8}|solid|dashed|dotted|none|inset|auto)(?:[\s,]+(?:(?:-?[\d.]+|\{\d+\})+(?:px|em|rem|%|deg|ms|s|vh|vw|dvh|svh|lvh|cqw|cqh|cqi|fr|ch|ex|pt|mm|cm)?|rgba?\([^)]*\)|hsla?\([^)]*\)|var\([^)]*\)|calc\([^)]*\)|#[0-9a-f]{3,8}|solid|dashed|dotted|none|inset|auto|\{\d+\}))*$/i.test(t) && /\d/.test(t)) return false;
   if (/,\s*(sans-serif|serif|monospace|system-ui|cursive)\s*$/.test(t)) return false;
   // LaTeX and BibTeX source an editor writes (\section{…}, a % comment, @book{…}), a code editor's keys ("Mod-b"),
   // markup and its attributes, and lists of HTML tags or selectors ("pre code", ".nd-table thead th").

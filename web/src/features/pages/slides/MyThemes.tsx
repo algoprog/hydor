@@ -106,31 +106,6 @@ export function ThemeCard({ t, on, width, onPick, menu }: { t: MyTheme; on: bool
   );
 }
 
-/** New page → Slides: the user's themes beside the ready-made ones (their values "my:<id>"), each as its deck's first slide. */
-export function MyThemeChoices({ value, onPick, title, ratio }: { value: string; onPick: (v: string) => void; title: string; ratio: Ratio }) {
-  const list = useMyThemeList();
-  return (
-    <>
-      {(list ?? []).map((t) => {
-        const d = myThemeDeck(t, title, ratio);
-        return (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => onPick(`my:${t.id}`)}
-            className={cx('overflow-hidden rounded-lg border text-left transition-colors', value === `my:${t.id}` ? 'border-accent ring-2 ring-accent/30' : 'border-line hover:border-line-2')}
-          >
-            <SlideThumb deck={d} index={0} slide={d.slides[0]} theme={d.theme} width={118} fonts={0} />
-            <span translate="no" className="block truncate px-2 py-1 text-[12px] text-fg-2">
-              {t.name}
-            </span>
-          </button>
-        );
-      })}
-    </>
-  );
-}
-
 /** The Theme tab's My themes: the user's, to put on the deck, rename or delete; and Save as my theme. */
 export function MyThemesSection({ deck, change }: { deck: Deck; change: Change }) {
   const list = useMyThemeList();

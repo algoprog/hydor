@@ -1,15 +1,16 @@
 // The templates a new LaTeX document can start from, in the Library's New dialog: an article, a report, a book or
 // thesis, a letter, beamer slides, a CV, a problem set, a conference paper and a poster (shared/latex-templates.ts),
-// each with a line on what it has; a paper's style (two columns, or as IEEE, ACM or Springer's LNCS ask) is picked
-// under the cards. Those needing a class or package this computer's TeX lacks are left out (all are offered when that
+// each drawn as its first page typesets, with a line on what it has, and beside them a card that opens a file of yours;
+// a paper's style (two columns, or as IEEE, ACM or Springer's LNCS ask) is picked under the cards. Those needing a class or package this computer's TeX lacks are left out (all are offered when that
 // is not known, when there is no TeX here to typeset any of them, and with MiKTeX, which installs what they need by
 // itself), and a line under the cards names them and what to run to add them.
 import { useEffect, useState } from 'react';
 import { TEX_TEMPLATES, texTemplate, type TexTemplate, type TexTemplateId } from '@shared/latex-templates';
 import type { TexSetup } from '@shared/latex';
-import { cx, Segmented } from '../../../components/ui';
+import { Segmented } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
 import { texSetup } from './api';
+import { OpenTile, TexArt, Tile } from '../newArt';
 
 /** The templates this computer can typeset, those it cannot, and the command that adds what they need. */
 export function useTexTemplates(): { list: TexTemplate[]; missing: TexTemplate[]; add?: string } {
@@ -22,7 +23,25 @@ export function useTexTemplates(): { list: TexTemplate[]; missing: TexTemplate[]
   return { list: TEX_TEMPLATES.filter(can), missing: TEX_TEMPLATES.filter((t) => !can(t)), add: setup?.add?.cmd };
 }
 
-export function TexTemplatePicker({ value, onChange }: { value: TexTemplateId; onChange: (t: TexTemplate) => void }) {
+/**
+ * The templates as cards, each drawn as its first page typesets (newArt.tsx), then one that opens a .tex file or a
+ * project's .zip (`onOpen`); a paper's style under them, and what this computer lacks.
+ */
+export function TexTemplateTiles({
+  value,
+  onChange,
+  onOpen,
+  onMake,
+  busy,
+}: {
+  value: TexTemplateId;
+  onChange: (t: TexTemplate) => void;
+  /** Open a .tex or .zip file. */
+  onOpen: () => void;
+  /** A double click on a card: made at once. */
+  onMake?: () => void;
+  busy?: boolean;
+}) {
   const { list, missing, add } = useTexTemplates();
   const picked = texTemplate(value);
   // A family (the papers) is one card: the style picked, else its first one here.
@@ -30,25 +49,14 @@ export function TexTemplatePicker({ value, onChange }: { value: TexTemplateId; o
   const cards = list.filter((t) => !t.family || t === list.find((x) => x.family === t.family));
   const isOn = (t: TexTemplate) => value === t.id || (!!t.family && t.family === picked?.family);
   return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-3 gap-2 max-sm:grid-cols-2" role="radiogroup" aria-label="Start from">
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-3 lg:grid-cols-4" role="radiogroup" aria-label="Start from">
         {cards.map((t) => {
           // The family's card says what the family is: the first of it (the plain paper) has those words.
           const face = t.family ? (TEX_TEMPLATES.find((x) => x.family === t.family) ?? t) : t;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              role="radio"
-              aria-checked={isOn(t)}
-              onClick={() => (isOn(t) ? undefined : onChange(t))}
-              className={cx('rounded-xl border px-3 py-2 text-left transition-colors', isOn(t) ? 'border-accent/60 bg-accent-soft' : 'border-line hover:border-line-2 hover:bg-bg-1')}
-            >
-              <span className="block text-[13px] font-medium text-fg">{face.label}</span>
-              <span className="block text-[11.5px] leading-snug text-fg-3">{face.hint}</span>
-            </button>
-          );
+          return <Tile key={t.id} on={isOn(t)} onClick={() => (isOn(t) ? undefined : onChange(t))} onOpen={onMake} art={<TexArt id={face.id} />} label={face.label} hint={face.hint} />;
         })}
+        <OpenTile label="Open a .tex or .zip file" hint="One LaTeX file, or a whole project" onClick={onOpen} disabled={busy} />
       </div>
       {styles.length > 1 && (
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">

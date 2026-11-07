@@ -520,6 +520,8 @@ export function Dialog({
   width = 520,
   footer,
   part,
+  bare,
+  label,
 }: {
   open: boolean;
   onClose: () => void;
@@ -529,6 +531,10 @@ export function Dialog({
   footer?: ReactNode;
   /** The part of the app it belongs to (an editor's data-i18n), so its words are translated as they mean there: it opens outside that part. */
   part?: string;
+  /** Its children lay out the whole of it, edge to edge (their own title, close button, scrolling and buttons): no title row, padding or footer of its own. */
+  bare?: boolean;
+  /** What it is, for screen readers, when it has no title. */
+  label?: string;
 }) {
   // On the popovers' stack: a dialog opened from a popover (Options → Guidelines) is over it, so a click in it
   // isn't a click outside the popover, which would close the popover and the dialog inside it.
@@ -555,10 +561,11 @@ export function Dialog({
       <div
         role="dialog"
         aria-modal
+        aria-label={label}
         style={{ maxWidth: width }}
-        className="flex max-h-[92dvh] w-full flex-col rounded-t-[20px] border border-line bg-elevated shadow-lg sm:rounded-[20px]"
+        className={cx('flex max-h-[92dvh] w-full flex-col rounded-t-[20px] border border-line bg-elevated shadow-lg sm:rounded-[20px]', bare && 'overflow-hidden')}
       >
-        {title && (
+        {bare ? children : title && (
           <div className="flex items-center gap-2 px-5 pt-4 pb-1">
             <div className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-tight">{title}</div>
             <IconButton label="Close" size="sm" onClick={onClose}>
@@ -566,8 +573,8 @@ export function Dialog({
             </IconButton>
           </div>
         )}
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">{children}</div>
-        {footer && <div className="flex items-center justify-end gap-2 px-5 pt-2 pb-[max(16px,var(--safe-bottom))]">{footer}</div>}
+        {!bare && <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">{children}</div>}
+        {!bare && footer && <div className="flex items-center justify-end gap-2 px-5 pt-2 pb-[max(16px,var(--safe-bottom))]">{footer}</div>}
       </div>
     </div>,
     document.body,
