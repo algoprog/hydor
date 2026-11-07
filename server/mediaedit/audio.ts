@@ -51,6 +51,7 @@ import { slug } from '../images/openrouter.ts';
 import { ffmpegTools, waveform } from '../media/frames.ts';
 import { keepFile } from '../media/index.ts';
 import { getMedia, initMedia, MEDIA_DIR, mustMedia } from '../media/store.ts';
+import { keepEarlierVersion } from '../media/versions.ts';
 import { putInFolder } from '../pages/folders.ts';
 import { getVideo, sendVideo } from '../pages/videos.ts';
 import { checkSoundPlan, gainFor, planSound, readLoudness, type PlanSource, type SoundCaps, type SoundPlan } from './audio-plan.ts';
@@ -74,7 +75,7 @@ const previewDir = () => path.join(config.dataDir, 'mediaedit', 'previews');
 export const SOUND_EXT = new Set(['mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'flac', 'webm', 'weba']);
 export const VIDEO_EXT = new Set(['mp4', 'm4v', 'mov', 'webm', 'mkv']);
 /** Sounds every browser (but Safari's Ogg) reads as they are. */
-const BROWSER_READS = new Set(['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'oga', 'opus', 'webm', 'weba']);
+export const BROWSER_READS = new Set(['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'oga', 'opus', 'webm', 'weba']);
 
 // ---- what a sound is ---------------------------------------------------------------------------------------------
 
@@ -228,7 +229,7 @@ export function capsOf(bin: string): Promise<SoundCaps> {
 // ---- the browser's copy of a sound -------------------------------------------------------------------------------
 
 /** Sends a file in byte ranges (it may change: not kept by the browser). */
-async function sendFile(req: FastifyRequest, reply: FastifyReply, file: string, mime: string) {
+export async function sendFile(req: FastifyRequest, reply: FastifyReply, file: string, mime: string) {
   const st = await fs.promises.stat(file).catch(() => null);
   if (!st?.isFile()) throw new HttpError(404, 'Not found');
   reply.header('Content-Type', mime).header('Cache-Control', 'private, no-cache').header('Accept-Ranges', 'bytes').header('Content-Security-Policy', "default-src 'none'; sandbox");
@@ -241,7 +242,7 @@ async function sendFile(req: FastifyRequest, reply: FastifyReply, file: string, 
   return reply.header('Content-Length', st.size).send(fs.createReadStream(file));
 }
 
-const MIMES: Record<string, string> = { mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', aac: 'audio/aac', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', flac: 'audio/flac', webm: 'audio/webm', weba: 'audio/webm' };
+export const MIMES: Record<string, string> = { mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', aac: 'audio/aac', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', flac: 'audio/flac', webm: 'audio/webm', weba: 'audio/webm' };
 
 /** A sound as an M4A the browser reads (a video's sound taken out as it is when it is AAC), kept for next time: its path. */
 export async function browserCopy(s: Sound): Promise<string> {
@@ -273,6 +274,8 @@ export type SoundTo = SoundSaveTo | { into: string; name: string };
 /** An edit checked and ready to make. */
 export interface PreparedSound {
   d: Deps;
+  /** Someone it is shared with makes it, through their link (their name): a Library sound saved over says so. */
+  who?: string;
   source: Sound;
   recipe: SoundRecipe;
   sources: Map<string, PlanSource>;
@@ -537,7 +540,7 @@ async function deliver(j: Job, out: string, ext: string, dir: string): Promise<v
     return;
   }
   if ('media' in to && to.as === 'replace') {
-    const item = await replaceLibrarySound(p.d, mustMedia(db, to.media), out, ext);
+    const item = await replaceLibrarySound(p.d, mustMedia(db, to.media), out, ext, p.who);
     j.view.media = item.id;
     return;
   }
@@ -559,20 +562,27 @@ async function deliver(j: Job, out: string, ext: string, dir: string): Promise<v
 const SOUND_MIME: Record<string, string> = { mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', ogg: 'audio/ogg', flac: 'audio/flac' };
 
 /** A Library sound's file swapped for an edited one: its size, length, shape and hash with it, its title and description kept. */
-export async function replaceLibrarySound(d: Deps, m: MediaItem, from: string, ext: string): Promise<MediaItem> {
+export async function replaceLibrarySound(d: Deps, m: MediaItem, from: string, ext: string, who?: string): Promise<MediaItem> {
   initMedia(d.db);
   if (m.kind !== 'audio') throw new HttpError(400, 'That Library item is not a sound: save it as a new one');
   const name = `${m.id}.${ext}`;
   const to = path.join(MEDIA_DIR, name);
   const tmp = path.join(MEDIA_DIR, `.${m.id}.${crypto.randomBytes(4).toString('hex')}.tmp`);
   await moveWhole(from, tmp);
+  // The file it had is kept as an earlier version (media/versions.ts).
+  try {
+    await keepEarlierVersion(d.db, m);
+  } catch (e) {
+    await fs.promises.rm(tmp, { force: true }).catch(() => {});
+    throw e;
+  }
   await fs.promises.rename(tmp, to);
   if (path.resolve(m.file) !== path.resolve(to)) await fs.promises.rm(m.file, { force: true }).catch(() => {});
   const st = await fs.promises.stat(to);
   const [f, peaks] = await Promise.all([soundFactsOf(to).catch(() => null), waveform(to)]);
   d.db
-    .prepare('update media set file = ?, mime = ?, bytes = ?, duration = ?, peaks = ?, sha = ?, updated_at = ? where id = ?')
-    .run(name, SOUND_MIME[ext] ?? 'audio/mpeg', st.size, f?.duration ?? null, peaks?.length ? JSON.stringify(peaks) : null, await fileHash(to), Date.now(), m.id);
+    .prepare('update media set file = ?, mime = ?, bytes = ?, duration = ?, peaks = ?, sha = ?, who = ?, updated_at = ? where id = ?')
+    .run(name, SOUND_MIME[ext] ?? 'audio/mpeg', st.size, f?.duration ?? null, peaks?.length ? JSON.stringify(peaks) : null, await fileHash(to), who ?? null, Date.now(), m.id);
   const item = getMedia(d.db, m.id)!;
   d.broadcast({ t: 'feature', id: 'media', data: { what: 'media', item } });
   return item;

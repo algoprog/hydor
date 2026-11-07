@@ -3,6 +3,31 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.35.0 · 7 November 2026
+
+Share one thing at a link of its own: a document, slides, a spreadsheet, a page, a design, a picture, a video or a
+sound, for people to comment on or to edit; and comments and earlier versions for pictures, videos and sounds.
+
+- **Share with people, one thing at a time**: from a page's **Share**, the **Share** of a picture, a video or a sound, or
+  a card's **More** in the Library, invite someone by name with **View and comment** or **Edit**, for a week, a month or
+  until you stop it. Each person gets a link of their own (shown once, or as a QR code) that opens that thing alone,
+  without your password and nothing else of yours; change what they may do, make them a new link or stop sharing any
+  time. Cards show what is shared, and with how many people.
+- **Comments where they look**: through their link people comment under their name on a document's or a page's words,
+  on a slide, on a spreadsheet's cell, on a spot of a picture (a numbered pin) or at a moment of a video or a sound (a
+  mark on its timeline). You get a notice and an inbox line until you or an agent answer, and agents take them as
+  requests about that thing alone.
+- **Edit through a link**: documents, spreadsheets, slides, LaTeX, pages and designs open in their own editors; pictures,
+  videos and sounds in the picture, video and sound editors, without AI tools or anything of yours to add, a video made
+  on the processor. A page's code (its scripts) never changes through a link, and nothing new is fetched from the web.
+- **Comments on your pictures, videos and sounds**: pins on a picture and marks along a video's or a sound's time, on
+  its page in the Library, where agents read and answer them too.
+- **Earlier versions of pictures, videos and sounds**: whenever one is saved over (in its editor, by an agent, or
+  through a link) it keeps the one before, the last five, under **More → Earlier versions**, to look at, download or
+  bring back.
+- **Shared projects do more**: people with a project's link now comment on its slides, spreadsheets and pages too, and
+  with **Edit documents** change its pages and designs as well.
+
 ## 0.34.0 · 6 November 2026
 
 Editors as complete as the apps people know them from: a picture editor rebuilt as Photoshop's, a video editor rebuilt

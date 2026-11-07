@@ -6,6 +6,7 @@
 // at once and saved as .srt. A sound: its level, where it starts, its part, its fades. Nothing picked: the whole video.
 import type { ReactNode } from 'react';
 import { AudioWaveform, Captions, Download, Link2, Wand2, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, Palette, Plus, RotateCcw, RotateCw, Snowflake, Trash2, Unlink } from 'lucide-react';
+import { viaLink } from '../../../lib/machine';
 import {
   audioLength,
   CAPTION_STYLES,
@@ -267,16 +268,18 @@ function ClipProps(p: InspectorProps & { c: VideoClip }) {
             </label>
           )}
           <div className="flex flex-wrap gap-1.5">
-            <Button
-              size="sm"
-              variant="secondary"
-              icon={<AudioWaveform size={13} />}
-              disabled={!editSound || (!f?.audio && !c.sound)}
-              title={editSound ? 'Opens its sound in the sound editor; what you save there plays in its place' : 'The sound editor opens here'}
-              onClick={() => p.onEditSound({ src: c.sound ?? c.src ?? p.main, title: c.name ?? 'Clip', from: a, to: b, save: (src) => set({ sound: src, mute: undefined }) })}
-            >
-              Edit the sound…
-            </Button>
+            {!viaLink && (
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<AudioWaveform size={13} />}
+                disabled={!editSound || (!f?.audio && !c.sound)}
+                title={editSound ? 'Opens its sound in the sound editor; what you save there plays in its place' : 'The sound editor opens here'}
+                onClick={() => p.onEditSound({ src: c.sound ?? c.src ?? p.main, title: c.name ?? 'Clip', from: a, to: b, save: (src) => set({ sound: src, mute: undefined }) })}
+              >
+                Edit the sound…
+              </Button>
+            )}
             <Button size="sm" variant="ghost" icon={<Unlink size={13} />} disabled={!canDetach(c, f)} title="Puts its sound on the voice track (A3), to move, trim and cut on its own (a J or an L cut)" onClick={() => p.change((r) => detachSound(r, p.factsOf, id, p.main))}>
               Unlink the sound
             </Button>
@@ -504,9 +507,11 @@ function AudioProps(p: InspectorProps & { a: VideoAudio }) {
         </Row>
         <SoundControls x={a} length={len} measure={{ src: a.src, from: x, to: y }} set={(m) => set(m)} />
         <div className="flex flex-wrap gap-1.5">
-          <Button size="sm" variant="secondary" icon={<AudioWaveform size={13} />} disabled={!editSound} title={editSound ? 'Opens it in the sound editor (effects, a spectral view, cuts by the words); what you save there plays in its place' : 'The sound editor opens here'} onClick={() => p.onEditSound({ src: a.src, title: a.name ?? 'Sound', from: x, to: y, save: (src) => set({ src }) })}>
-            Edit the sound…
-          </Button>
+          {!viaLink && (
+            <Button size="sm" variant="secondary" icon={<AudioWaveform size={13} />} disabled={!editSound} title={editSound ? 'Opens it in the sound editor (effects, a spectral view, cuts by the words); what you save there plays in its place' : 'The sound editor opens here'} onClick={() => p.onEditSound({ src: a.src, title: a.name ?? 'Sound', from: x, to: y, save: (src) => set({ src }) })}>
+              Edit the sound…
+            </Button>
+          )}
           {a.clip && p.recipe.clips?.some((c) => c.id === a.clip) && (
             <Button size="sm" variant="ghost" icon={<Link2 size={13} />} title="Puts it back as its clip’s own sound, in time with the picture" onClick={() => p.change((r) => linkSound(r, a.id!))}>
               Link it to its clip again
@@ -625,10 +630,15 @@ function ProjectProps(p: InspectorProps) {
         <Button size="sm" variant="secondary" icon={<Plus size={13} />} className="w-full" onClick={p.onAddText}>
           Add words at the playhead
         </Button>
-        <Button size="sm" variant="secondary" icon={<Captions size={13} />} className="w-full" disabled={!!p.captionsBusy} onClick={p.onCaptions}>
-          {p.captionsBusy ?? (caps.length ? 'Make the captions again' : 'Make captions from what is said')}
-        </Button>
-        <Note>Captions are made on this computer by speech recognition (Settings → Voice), from the clips’ sound and the voice-over. Each is words you can change and move on the T1 track.</Note>
+        {/* Speech recognition runs on the owner's computer: not through someone's link. */}
+        {!viaLink && (
+          <>
+            <Button size="sm" variant="secondary" icon={<Captions size={13} />} className="w-full" disabled={!!p.captionsBusy} onClick={p.onCaptions}>
+              {p.captionsBusy ?? (caps.length ? 'Make the captions again' : 'Make captions from what is said')}
+            </Button>
+            <Note>Captions are made on this computer by speech recognition (Settings → Voice), from the clips’ sound and the voice-over. Each is words you can change and move on the T1 track.</Note>
+          </>
+        )}
         {caps.length > 0 && <CaptionTools {...p} caps={caps} />}
       </Fold>
     </>

@@ -37,6 +37,8 @@ export const useMedia = create<MediaState>((set, get) => ({
 
 onFeatureEvent('media', ({ data }) => {
   const e = data as MediaEvent;
+  // An item's comments changed: its own page hears of it (MediaComments), the list has nothing to do.
+  if (e.what !== 'media') return;
   if (e.item) useMedia.getState().put(e.item);
   if (e.removed) useMedia.getState().drop(e.removed);
   // Many changed at once (a Library folder deleted or moved): the list again, when it is loaded.

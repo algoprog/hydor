@@ -18,7 +18,6 @@ import { PageHeader } from '../layout/PageHeader';
 import { addToLibrary, dragsFiles, droppedFiles, dropMoves } from '../pages/uploads';
 import { DropHint } from '../pages/UploadTray';
 import { memberNames, NewSpaceDialog, SpaceMark, SpacesTabs, startInSpace, useSpaceSuggestions } from './parts';
-import { ShareDialogHost } from './ShareDialog';
 import { SpaceMenu, SpacePage, type SpaceTab } from './SpacePage';
 import { useSpaces } from './state';
 
@@ -272,7 +271,6 @@ function List() {
         </div>
       </div>
       <NewSpaceDialog open={!!made} group={made === 'group'} folder={made === 'space' ? from : undefined} onClose={() => setMade(false)} onMade={(s) => go(`/projects/${s.id}`)} />
-      <ShareDialogHost />
     </div>
   );
 }

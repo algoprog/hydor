@@ -64,7 +64,7 @@ export function PortalSession({ v, sessionKey, onBack }: { v: PortalView; sessio
   const listed = v.sessions.find((x) => x.key === sessionKey);
   const title = s?.title ?? listed?.title ?? '';
   useEffect(() => {
-    if (title) document.title = `${title} · ${v.project.name}`;
+    if (title) document.title = `${title} · ${v.project?.name ?? 'Hydor'}`;
   }, [title]);
   const working = busy(s?.status);
   const agent = s?.agent ?? listed?.agent;

@@ -3,10 +3,10 @@
 // time and the speed. Keys while it has focus: Space or K plays and pauses, ← → move 5 s, Home and End. One sound
 // plays at a time: another starting pauses it. The server answers the byte ranges it asks for, so it seeks
 // without loading the whole file.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type MutableRefObject } from 'react';
 import { AudioLines, Download, Pause, Play, TriangleAlert } from 'lucide-react';
 import { cx } from './ui';
-import { clock } from './VideoPlayer';
+import { clock, type PlayerHandle, type PlayerMark } from './VideoPlayer';
 
 /** Told to every player when one starts, so the others stop. */
 const PLAYING = 'hydor:sound-plays';
@@ -208,8 +208,38 @@ export function PlayButton({ playing, onClick, size = 40, className, disabled }:
  * the shape to seek along, the time and the speed. `peaks`: the shape when known (the Library's); left out, it is
  * read from the file. `large`: the Library's own page.
  */
-export function AudioPlayer({ src, title, peaks, actions, downloadUrl, large, className }: { src: string; title?: string; peaks?: number[] | null; actions?: ReactNode; downloadUrl?: string; large?: boolean; className?: string }) {
+export function AudioPlayer({
+  src,
+  title,
+  peaks,
+  actions,
+  downloadUrl,
+  large,
+  className,
+  marks,
+  onMark,
+  handle,
+}: {
+  src: string;
+  title?: string;
+  peaks?: number[] | null;
+  actions?: ReactNode;
+  downloadUrl?: string;
+  large?: boolean;
+  className?: string;
+  /** Comments at moments of it, over its shape; a click on one picks it (and goes there). */
+  marks?: PlayerMark[];
+  onMark?: (id: string) => void;
+  handle?: MutableRefObject<PlayerHandle | null>;
+}) {
   const s = useSound(src);
+  const sound = useRef(s);
+  sound.current = s;
+  useEffect(() => {
+    if (!handle) return;
+    handle.current = { time: () => sound.current.time, duration: () => sound.current.duration, seek: (t) => sound.current.seekTo(t) };
+    return () => void (handle.current = null);
+  }, [handle]);
   const read = useShape(src, peaks === undefined);
   const shape = peaks === undefined ? read : peaks;
   const [scrub, setScrub] = useState<number | null>(null);
@@ -289,9 +319,25 @@ export function AudioPlayer({ src, title, peaks, actions, downloadUrl, large, cl
             onPointerMove={onMove}
             onPointerUp={() => setScrub(null)}
             onPointerCancel={() => setScrub(null)}
-            className={cx('min-w-0 flex-1 cursor-pointer touch-none', large ? 'h-20' : 'h-8')}
+            className={cx('relative min-w-0 flex-1 cursor-pointer touch-none', large ? 'h-20' : 'h-8')}
           >
             <Waveform peaks={shape} progress={shown} className="h-full w-full" />
+            {s.duration > 0 &&
+              marks?.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  aria-label={`Comment at ${clock(m.at)}`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    s.seekTo(m.at);
+                    onMark?.(m.id);
+                  }}
+                  className={cx('absolute -top-1.5 h-3 w-3 -translate-x-1/2 rounded-full ring-2 ring-panel transition-transform hover:scale-125', m.active ? 'scale-125 bg-warn' : 'bg-info')}
+                  style={{ left: `${Math.min(100, (m.at / s.duration) * 100)}%` }}
+                />
+              ))}
           </div>
           <span className="tnum shrink-0 text-[11.5px] whitespace-nowrap text-fg-3">
             {clock(shown * s.duration)} <span className="text-fg-3/70">/ {s.duration ? clock(s.duration) : '–:––'}</span>

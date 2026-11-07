@@ -13,6 +13,7 @@ import { Button, Empty, IconButton, Popover, Throbber, useIsMobile } from '../..
 import { toast, toastError } from '../../lib/store';
 import { keepKeys, type EditorProps } from './host';
 import { AiTools } from './picture/AiTools';
+import { viaLink } from '../../lib/machine';
 import { AdjustPanel } from './picture/adjust';
 import { AmountDialog, CanvasSizeDialog, ImageSizeDialog, LibraryPicker, SaveOptions } from './picture/dialogs';
 import { canvasOf, Pixels, rasterLayer, shrinkTo, type Doc, type RasterLayer } from './picture/doc';
@@ -257,7 +258,7 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
   // ---- menus and keys ----
   const menus = buildMenus(ed, {
     openFile: () => fileInput.current?.click(),
-    openLibrary: () => setLibrary(true),
+    openLibrary: () => !viaLink && setLibrary(true),
     fromClipboard: () => void fromClipboard(),
     save: (w) => void save(w),
     saveOptions: () => setSaveOpen(true),
@@ -364,7 +365,8 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
     { id: 'ai', label: PANELS.ai, render: () => <AiTools ed={ed} /> },
     { id: 'layers', label: PANELS.layers, render: () => <LayersPanel ed={ed} onAddPicture={(from) => (from === 'device' ? fileInput.current?.click() : from === 'library' ? setLibrary(true) : void fromClipboard())} /> },
     { id: 'history', label: PANELS.history, render: () => <HistoryPanel ed={ed} /> },
-  ];
+    // At someone's link, no AI tools (they spend the owner's money or their computer's time).
+  ].filter((x) => !viaLink || x.id !== 'ai');
   const [sheet, setSheet] = useState<string | null>(null);
   useEffect(() => {
     if (mobile && ed.focus) setSheet(ed.focus.panel);

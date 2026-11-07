@@ -51,12 +51,15 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  UserPlus,
+  Users,
   X,
 } from 'lucide-react';
 import { TURN_INTO } from '@shared/content-asks';
 import type { MediaItem } from '@shared/media';
 import type { LibFolder, PageInfo, SiteInfo } from '@shared/pages';
 import type { SpaceView } from '@shared/spaces';
+import { openShare, useSharedThings } from '../spaces/ShareHost';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { ago, bytes } from '../../lib/format';
 import { go } from '../../lib/nav';
@@ -265,6 +268,8 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
   const p = it.page;
   const m = it.media;
   const space = it.space ? spaces?.find((s) => s.id === it.space) : undefined;
+  // Shared with people by links of their own: how many.
+  const people = useSharedThings()(p ? 'page' : 'media', p ? p.id : m!.id);
   const open = (mode?: string) => (p ? go(`/pages/${p.id}${mode ? `?mode=${mode}` : ''}`) : m && go(`/media/${m.id}`));
   const close = () => setMenu(false);
   const remove = async () => {
@@ -343,6 +348,7 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
               </span>
             )}
             <span className="shrink-0 truncate">{sub}</span>
+            {people > 0 && <Users size={11} className="shrink-0 text-info" aria-label={tr(people === 1 ? 'Shared with 1 person' : `Shared with ${people} people`)} />}
             {p?.published && <Globe size={11} className="shrink-0 text-accent" aria-label="Published" />}
             {!!p?.storageBytes && <Database size={11} className="shrink-0" aria-label={tr(`Keeps ${bytes(p.storageBytes)}`)} />}
           </span>
@@ -372,6 +378,13 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
             Start a session with it
           </MenuItem>
         )}
+        <MenuItem
+          icon={<UserPlus size={14} />}
+          hint={people ? tr(people === 1 ? '1 person' : `${people} people`) : undefined}
+          onClick={() => (close(), openShare(p ? { kind: 'page', id: p.id, title: p.title, pageKind: p.kind } : { kind: 'media', id: m!.id, title: m!.title, mediaKind: m!.kind }))}
+        >
+          Share with people
+        </MenuItem>
         {!!spaces?.length && (
           <MenuItem icon={<FolderInput size={14} />} onClick={() => (close(), setMoving(true))}>
             Move to a project
@@ -881,6 +894,19 @@ export function Library() {
         <div className={cx('min-h-0 min-w-0 flex-1 overflow-y-auto', over?.at === 'main' && 'bg-accent/6 outline-2 -outline-offset-4 outline-accent/50 outline-dashed')}>
           <div className="mx-auto max-w-[1180px] px-3 py-4 sm:px-6 sm:py-5">
             {!wide && items && <Places chips place={place} onPlace={toPlace} items={items} sites={sites} dropAt={over?.at} />}
+            {/* Come to share something (the search box's Share something with people): where it is done. */}
+            {q.get('share') === '1' && (
+              <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[13px] text-fg-2">
+                <UserPlus size={15} className="shrink-0 text-accent" />
+                <span className="min-w-0 flex-1">
+                  To share one thing, open its <span className="font-medium text-fg">More</span> (⋯) and pick <span className="font-medium text-fg">Share with people</span>, or use{' '}
+                  <span className="font-medium text-fg">Share</span> at the top of its own page.
+                </span>
+                <button type="button" aria-label="Close" onClick={() => go('/library', true)} className="shrink-0 rounded p-1 text-fg-3 hover:bg-bg-3 hover:text-fg">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
             {place.kind !== 'published' && (!!here.length || !!placeList.length) && (
               <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2.5">
                 {folderView && chain.length > 0 ? (

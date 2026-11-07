@@ -1,13 +1,14 @@
-// Sharing a project with people (server/spaces/share.ts): who it is shared with, each with what they may do (View
-// and comment, or Edit documents), until when and what they did last; and Invite someone: their name, what they may
-// do and for how long, which makes their own link, shown once (copy it, or show it as a QR code for a phone). Each
-// person's menu changes what they may do or until when, makes them a new link, or stops sharing with them; at the
-// bottom, the name they see your comments under. The project's menu (on its page and its card) and its overview's
-// "Shared with" open it.
+// Sharing with people (server/spaces/share.ts): a project (its page's menu, its card, its overview's "Shared with"), or
+// one thing of the Library alone (a page's Share menu, a picture's, video's or sound's page, a card's menu). Who it is
+// shared with, each with what they may do (View and comment, or Edit), until when and what they did last; and Invite
+// someone: their name, what they may do and for how long, which makes their own link, shown once (copy it, or show it
+// as a QR code for a phone). Each person's menu changes what they may do or until when, makes them a new link, or stops
+// sharing with them; at the bottom, the name they see your comments under. ShareHost.tsx opens it from anywhere.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { create } from 'zustand';
 import { Link2, MoreHorizontal, Pencil, QrCode, RefreshCw, UserMinus } from 'lucide-react';
-import { initials, SHARE_ROLES, type ProjectShare, type ShareActivity, type ShareRole } from '@shared/share';
+import type { MediaKind } from '@shared/media';
+import type { PageInfo } from '@shared/pages';
+import { initials, SHARE_ROLES, THING_ROLES, type ProjectShare, type ShareActivity, type ShareRole } from '@shared/share';
 import type { Space } from '@shared/spaces';
 import { CopyButton } from '../../components/Markdown';
 import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuLabel, MenuSep, Popover, Segmented, Throbber, useConfirm } from '../../components/ui';
@@ -20,6 +21,47 @@ import { machineBase } from '../../lib/machine';
 import { qrCode, qrPath } from '../../lib/qr';
 import { toastError } from '../../lib/store';
 
+/** What is shared: a project, or one thing of the Library (a page of any kind, a design, a picture, a video or a sound). */
+export type ShareTarget =
+  | { kind: 'project'; space: Pick<Space, 'id' | 'name'> }
+  | { kind: 'page'; id: string; title: string; pageKind?: PageInfo['kind']; design?: boolean }
+  | { kind: 'media'; id: string; title: string; mediaKind: MediaKind };
+
+/** Where its people are kept (the owner's routes). */
+export const sharesPath = (t: ShareTarget) => (t.kind === 'project' ? `/api/projects/${enc(t.space.id)}/shares` : t.kind === 'page' ? `/api/pages/${enc(t.id)}/shares` : `/api/media/${enc(t.id)}/shares`);
+
+const nameOf = (t: ShareTarget) => (t.kind === 'project' ? t.space.name : t.title);
+
+/** What someone may do with a thing, in a line, for the role picked: what View and comment and Edit mean for its kind. */
+function whatTheyDo(t: ShareTarget, role: ShareRole): string {
+  if (t.kind === 'project') return '';
+  if (t.kind === 'page' && t.pageKind === 'notebook') return 'A notebook is shared to read: it never runs through a link.';
+  const k = t.kind === 'media' ? t.mediaKind : t.design ? 'design' : (t.pageKind ?? 'page');
+  if (role === 'comment')
+    return ({
+      doc: 'They read it, and comment on its words.',
+      tex: 'They read it, and comment on its words.',
+      slides: 'They see its slides, and comment on them.',
+      sheet: 'They read it, and comment on its cells.',
+      page: 'They see it, and comment on its words.',
+      design: 'They see it, and comment on it.',
+      image: 'They see it, and comment on spots of it.',
+      video: 'They watch it, and comment on moments of it.',
+      audio: 'They listen to it, and comment on moments of it.',
+    } as Record<string, string>)[k] ?? '';
+  return ({
+    doc: 'They also change it, in its editor.',
+    tex: 'They also change it where this computer typesets LaTeX shut in (Linux); else they comment.',
+    slides: 'They also change it, in its editor.',
+    sheet: 'They also change it, in its editor.',
+    page: 'They also change its words, pictures and layout; never its code.',
+    design: 'They also change it, in the design editor.',
+    image: 'They also change it in the picture editor; the one before is kept.',
+    video: 'They also change it in the video editor; the one before is kept.',
+    audio: 'They also change it in the sound editor; the one before is kept.',
+  } as Record<string, string>)[k] ?? '';
+}
+
 type Days = '7' | '30' | '0';
 const DAYS: { value: Days; label: string }[] = [
   { value: '7', label: 'A week' },
@@ -27,15 +69,15 @@ const DAYS: { value: Days; label: string }[] = [
   { value: '0', label: 'Until you stop it' },
 ];
 
-/** The people a project is shared with, and the name they see the owner under; kept up to date with the server's news. */
-export function useShares(space: string | undefined): { shares: ProjectShare[] | null; owner: string; reload: () => void } {
+/** The people a project or a thing is shared with (at `path`, sharesPath), and the name they see the owner under; kept up to date with the server's news. */
+export function useSharesAt(path: string | undefined): { shares: ProjectShare[] | null; owner: string; reload: () => void } {
   const [data, setData] = useState<{ shares: ProjectShare[]; owner: string } | null>(null);
   const load = useMemo(
     () => () => {
-      if (!space) return;
-      api<{ shares: ProjectShare[]; owner: string }>(`/api/projects/${enc(space)}/shares`).then(setData, () => {});
+      if (!path) return;
+      api<{ shares: ProjectShare[]; owner: string }>(path).then(setData, () => {});
     },
-    [space],
+    [path],
   );
   useEffect(() => {
     setData(null);
@@ -44,6 +86,9 @@ export function useShares(space: string | undefined): { shares: ProjectShare[] |
   }, [load]);
   return { shares: data?.shares ?? null, owner: data?.owner ?? 'Owner', reload: load };
 }
+
+/** The people a project is shared with (useSharesAt). */
+export const useShares = (space: string | undefined) => useSharesAt(space ? `/api/projects/${enc(space)}/shares` : undefined);
 
 /** A person's mark: their initials in a circle. */
 export function PersonMark({ name, size = 28, className }: { name: string; size?: number; className?: string }) {
@@ -72,17 +117,6 @@ export function activityText(sh: ProjectShare): string {
 const until = (sh: ProjectShare) =>
   !sh.expiresAt ? '' : sh.expiresAt < Date.now() ? tr('ended') : tr(`until ${new Date(sh.expiresAt).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' })}`);
 
-// ---- opening it from anywhere ------------------------------------------------------------------------------------
-
-const useOpen = create<{ space: Space | null }>(() => ({ space: null }));
-export const openShareDialog = (s: Space) => useOpen.setState({ space: s });
-
-/** The dialog, on each page that offers it (a project's page, the list of projects). */
-export function ShareDialogHost() {
-  const s = useOpen((x) => x.space);
-  return s ? <ShareDialog s={s} onClose={() => useOpen.setState({ space: null })} /> : null;
-}
-
 // ---- the dialog -----------------------------------------------------------------------------------------------
 
 /** A link made now, shown once. */
@@ -91,19 +125,22 @@ interface Made {
   url: string;
 }
 
-function ShareDialog({ s, onClose }: { s: Space; onClose: () => void }) {
-  const { shares, owner, reload } = useShares(s.id);
+export function ShareDialog({ target, onClose }: { target: ShareTarget; onClose: () => void }) {
+  const path = sharesPath(target);
+  const { shares, owner, reload } = useSharesAt(path);
   const [name, setName] = useState('');
   const [role, setRole] = useState<ShareRole>('comment');
   const [days, setDays] = useState<Days>('30');
   const [busy, setBusy] = useState(false);
   const [made, setMade] = useState<Made | null>(null);
+  const roles = target.kind === 'project' ? SHARE_ROLES : THING_ROLES;
+  const does = whatTheyDo(target, role);
   const linkOf = (token: string) => `${location.origin}${machineBase}/p/${token}`;
   const invite = async () => {
     if (!name.trim()) return;
     setBusy(true);
     try {
-      const r = await post<{ share: ProjectShare; token: string }>(`/api/projects/${enc(s.id)}/shares`, { name: name.trim(), role, days: Number(days) || null });
+      const r = await post<{ share: ProjectShare; token: string }>(path, { name: name.trim(), role, days: Number(days) || null });
       setMade({ name: r.share.name, url: linkOf(r.token) });
       setName('');
       reload();
@@ -114,12 +151,19 @@ function ShareDialog({ s, onClose }: { s: Space; onClose: () => void }) {
     }
   };
   return (
-    <Dialog open onClose={onClose} title={<span translate="no">{tr(`Share ${s.name}`)}</span>} width={560}>
+    <Dialog open onClose={onClose} title={<span translate="no">{tr(`Share ${nameOf(target)}`)}</span>} width={560}>
       <div className="space-y-4 text-[13.5px]">
-        <p className="leading-relaxed text-fg-3">
-          Each person you invite gets a link of their own. Without your password, they see this project’s documents, sessions, runs and reading list, and comment under their name; with Edit documents they
-          change its documents too. Never your agents, your files, your settings or your other projects.
-        </p>
+        {target.kind === 'project' ? (
+          <p className="leading-relaxed text-fg-3">
+            Each person you invite gets a link of their own. Without your password, they see this project’s documents, sessions, runs and reading list, and comment under their name; with Edit documents they
+            change its documents too. Never your agents, your files, your settings or your other projects.
+          </p>
+        ) : (
+          <p className="leading-relaxed text-fg-3">
+            Each person you invite gets a link of their own. Without your password, they open this alone and comment under their name; with Edit they change it too. Never your agents, your files, your
+            settings or anything else of yours.
+          </p>
+        )}
         {made ? (
           <MadeLink made={made} onDone={() => setMade(null)} />
         ) : (
@@ -140,12 +184,13 @@ function ShareDialog({ s, onClose }: { s: Space; onClose: () => void }) {
                 value={role}
                 onChange={setRole}
                 options={[
-                  { value: 'comment', label: SHARE_ROLES.comment },
-                  { value: 'edit', label: SHARE_ROLES.edit },
+                  { value: 'comment', label: roles.comment },
+                  { value: 'edit', label: roles.edit },
                 ]}
               />
               <Segmented<Days> size="sm" value={days} onChange={setDays} options={DAYS} />
             </div>
+            {does && <p className="text-[12.5px] leading-relaxed text-fg-3">{tr(does)}</p>}
             <div className="flex justify-end">
               <Button size="sm" variant="primary" icon={<Link2 size={14} />} disabled={busy || !name.trim()} onClick={() => void invite()}>
                 Make their link
@@ -159,7 +204,7 @@ function ShareDialog({ s, onClose }: { s: Space; onClose: () => void }) {
           <div className="space-y-1 border-t border-line pt-3">
             <div className="text-[12px] font-medium text-fg-3">Shared with</div>
             {shares.map((sh) => (
-              <PersonRow key={sh.id} s={s} sh={sh} onLink={(token) => setMade({ name: sh.name, url: linkOf(token) })} reload={reload} />
+              <PersonRow key={sh.id} path={path} roles={roles} sh={sh} onLink={(token) => setMade({ name: sh.name, url: linkOf(token) })} reload={reload} />
             ))}
           </div>
         ) : null}
@@ -205,11 +250,11 @@ function MadeLink({ made, onDone }: { made: Made; onDone: () => void }) {
 }
 
 /** Someone it is shared with: who, what they may do, until when, what they did last, and their menu. */
-function PersonRow({ s, sh, onLink, reload }: { s: Space; sh: ProjectShare; onLink: (token: string) => void; reload: () => void }) {
+function PersonRow({ path, roles, sh, onLink, reload }: { path: string; roles: Record<ShareRole, string>; sh: ProjectShare; onLink: (token: string) => void; reload: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
   const [confirm, confirmNode] = useConfirm();
-  const base = `/api/projects/${enc(s.id)}/shares/${enc(sh.id)}`;
+  const base = `${path}/${enc(sh.id)}`;
   const change = async (b: { role?: ShareRole; days?: number | null }) => {
     setOpen(false);
     try {
@@ -251,7 +296,7 @@ function PersonRow({ s, sh, onLink, reload }: { s: Space; sh: ProjectShare; onLi
             {sh.name}
           </span>
           <span className={cx('shrink-0 text-[12px]', ended ? 'text-err' : 'text-fg-3')}>
-            {SHARE_ROLES[sh.role]}
+            {roles[sh.role]}
             {until(sh) && ` · ${until(sh)}`}
           </span>
         </div>
@@ -263,10 +308,10 @@ function PersonRow({ s, sh, onLink, reload }: { s: Space; sh: ProjectShare; onLi
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} align="end" width={250} title={<span translate="no">{sh.name}</span>}>
         <MenuLabel>What they may do</MenuLabel>
         <MenuItem checked={sh.role === 'comment'} onClick={() => void change({ role: 'comment' })}>
-          {SHARE_ROLES.comment}
+          {roles.comment}
         </MenuItem>
         <MenuItem checked={sh.role === 'edit'} onClick={() => void change({ role: 'edit' })}>
-          {SHARE_ROLES.edit}
+          {roles.edit}
         </MenuItem>
         <MenuSep />
         <MenuLabel>Their link works</MenuLabel>
