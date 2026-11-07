@@ -1,5 +1,5 @@
-import { createContext, Fragment, memo, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ChevronRight, FileDiff, FilePen, FilePlus2, FileText, FileX, Info } from 'lucide-react';
+import { createContext, Fragment, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDown, Check, ChevronRight, FileDiff, FilePen, FilePlus2, FileText, FileX, Info, X } from 'lucide-react';
 import type { Agent, ApprovalRequest, ExternalState, FileChange, LiveOverlay, LiveState, SystemItem, TimelineItem, ToolItem, TurnItem, UserItem } from '@shared/types';
 import { api, enc } from '../../lib/api';
 import { sentPicturesOf, useSentPictures, type SentPictures } from '../../lib/attachments';
@@ -11,14 +11,13 @@ import { Button, cx, Throbber } from '../../components/ui';
 import { ApprovalCard } from './Approval';
 import { AgentIcon } from '../../components/AgentIcon';
 import { QuoteSelection } from './QuoteSelection';
-import { AssistantBlock, hiddenThought, SessionCtx, StepLine, stepsIcon, summarize, SystemRow, ThinkingRow, ToolRow, UserBubble, WorkTime } from './items';
+import { AssistantBlock, hiddenThought, SessionCtx, StepLine, stepsIcon, summarize, SystemRow, ThinkingRow, ToolRow, UNFOLD, UserBubble, WorkTime } from './items';
+import { noteLike, noteTitle, partsOf, plainText, type Part } from './outline';
 import { toolView } from '../registry';
 import { LooseNotes, TurnNotes, useSessionNotes } from './Notes';
 import type { SessionNote } from '@shared/features';
 import { runEndedNotice } from '@shared/apps';
 import { LOCALE } from '../../i18n/locale';
-
-type Block = { kind: 'item'; item: TimelineItem } | { kind: 'group'; id: string; items: TimelineItem[] };
 
 /**
  * Custom works with Hydor's loading mark; other agents keep their own animation. `name`: an agent of Settings → More
@@ -50,8 +49,6 @@ export function LiveHead({ agent, name, live }: { agent: Agent; name?: string; l
   );
 }
 
-const STANDALONE = new Set(['todo', 'question', 'plan']);
-
 export function mergeOverlay(items: TimelineItem[], ov?: LiveOverlay): TimelineItem[] {
   if (!ov || (!ov.items.length && !Object.keys(ov.patches).length)) return items;
   const ids = new Set(items.map((i) => i.id));
@@ -80,26 +77,6 @@ function savedCopy(items: TimelineItem[], o: TimelineItem): TimelineItem | undef
     if ((it.ts ?? 0) < (o.ts ?? 0) - 5000) return;
     if (it.text.trim() === o.text.trim()) return it;
   }
-}
-
-function blocks(items: TimelineItem[]): Block[] {
-  const out: Block[] = [];
-  let cur: TimelineItem[] = [];
-  const flush = () => {
-    if (cur.length) out.push({ kind: 'group', id: `g:${cur[0].id}`, items: cur });
-    cur = [];
-  };
-  for (const it of items) {
-    // What needs the user is not a step to fold away. (What shows with the reply is here only as a step: a page saved
-    // again later in the turn, whose newest version the reply shows.)
-    if ((it.kind === 'tool' && !STANDALONE.has(it.tool.category) && placeOf(it) !== 'attention') || it.kind === 'thinking') cur.push(it);
-    else {
-      flush();
-      out.push({ kind: 'item', item: it });
-    }
-  }
-  flush();
-  return out;
 }
 
 /** Whether the reader is following the conversation as it comes (not reading further up). */
@@ -292,88 +269,175 @@ export function DayLine({ day }: { day: string }) {
 
 const isActive = (i: TimelineItem) => (i.kind === 'tool' && (i.tool.status === 'running' || i.tool.status === 'pending')) || (i.kind === 'thinking' && !!i.streaming);
 
-/**
- * A run of steps between two notes, in a quiet box apart from the prose: one line saying what was
- * done ("Ran 3 commands, read 2 files"), the step in progress under it, every step a click away.
- */
-const Group = memo(function Group({ b, sessionKey, agent, busy }: { b: Extract<Block, { kind: 'group' }>; sessionKey: string; agent: Agent; busy?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const visible = b.items.filter((i) => !hiddenThought(i));
-  const tools = visible.filter((i): i is ToolItem => i.kind === 'tool');
-  const current = visible.filter(isActive);
-  const done = tools.filter((i) => !isActive(i));
-  if (!visible.length) return null;
-  const row = (it: TimelineItem) => <div key={it.id}>{it.kind === 'tool' ? <ToolRow item={it} sessionKey={sessionKey} inWork /> : it.kind === 'thinking' ? <ThinkingRow item={it} /> : null}</div>;
-  // Thoughts on their own stay a quiet line.
-  if (!tools.length) return <div className="px-1">{visible.map(row)}</div>;
-  // The agent at work after the last step, shown in its box rather than on a line of its own.
-  const working = busy ? <WorkingIcon agent={agent} size={14} spinning className="shrink-0" /> : undefined;
-  // A single step is its own box.
-  if (visible.length === 1)
-    return (
-      <div className="rounded-xl border border-line bg-bg-1 p-1">
-        <ToolRow item={tools[0]} sessionKey={sessionKey} trailing={working} inWork />
-      </div>
-    );
-  const sum = summarize(tools);
-  const Icon = stepsIcon(tools);
-  // Folded, the box keeps to one line whatever happens in it (as tall as a box of one step): the
-  // step under way while there is one, otherwise what was done.
-  const now = open ? undefined : current[current.length - 1];
-  return (
-    <div className="rounded-xl border border-line bg-bg-1">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="group flex h-10 w-full items-center gap-2.5 rounded-xl px-3 text-left text-[13px] text-fg-3 transition-colors hover:text-fg-2"
-      >
-        {now ? (
-          <>
-            <StepLine item={now} />
-            {done.length > 0 && <span className="shrink-0 text-[11.5px] text-fg-3">{done.length} done</span>}
-          </>
-        ) : (
-          <>
-            <Icon size={14} className="shrink-0" />
-            <span className="min-w-0 flex-1 truncate">{sum.text}</span>
-            <DiffStat added={sum.added} removed={sum.removed} compact />
-            {working}
-          </>
-        )}
-        <ChevronRight size={14} className={cx('shrink-0 transition-transform duration-200', open && 'rotate-90')} />
-      </button>
-      {open && <div className="border-t border-line p-1">{visible.map(row)}</div>}
-    </div>
-  );
-});
+/** Where a part of the work stands: done, under way, waiting for you, or where a stopped or failed turn ended. */
+type PartState = 'done' | 'now' | 'waiting' | 'stopped' | 'failed';
 
-/**
- * A quiet mark at the end of a running turn's work, so its newest end shows the agent is still at it
- * when the header (which has the words and the time) is scrolled away. It only fills gaps: hidden
- * while the last row already shows what is happening, and when there is nothing above it but the header.
- */
-function StillWorking({ agent, note }: { agent: Agent; note?: string }) {
+/** A part's mark on the outline's line: a check when done, a dot while under way. */
+function Marker({ state }: { state: PartState }) {
   return (
-    <div className="anim-in flex min-h-7 items-center gap-2.5 px-1 text-[12.5px] text-fg-3">
-      <WorkingIcon agent={agent} size={14} spinning />
-      {note && <span className="min-w-0 truncate">{note}</span>}
+    <span
+      className={cx(
+        'relative z-[1] flex h-4 w-4 shrink-0 items-center justify-center rounded-full border bg-bg',
+        state === 'now' ? 'border-busy' : state === 'waiting' || state === 'stopped' ? 'border-warn' : state === 'failed' ? 'border-err' : 'border-line-2 text-fg-3',
+      )}
+    >
+      {state === 'done' && <Check size={9} strokeWidth={3.2} />}
+      {state === 'now' && <span className="h-1.5 w-1.5 rounded-full bg-busy" />}
+      {state === 'waiting' && <span className="h-1.5 w-1.5 rounded-full bg-warn" />}
+      {state === 'stopped' && <span className="h-1.5 w-1.5 rounded-[1px] bg-warn" />}
+      {state === 'failed' && <X size={9} strokeWidth={3.2} className="text-err" />}
+    </span>
+  );
+}
+
+/** A part's steps, opened: each on its line, as the agent took them. */
+function PartSteps({ items, sessionKey }: { items: TimelineItem[]; sessionKey: string }) {
+  const shown = items.filter((i) => !hiddenThought(i));
+  if (!shown.length) return null;
+  return (
+    <div className="-ml-2 space-y-0.5">
+      {shown.map((it) => (
+        <div key={it.id}>
+          {it.kind === 'tool' ? (
+            it.tool.category === 'plan' ? (
+              <div className="rounded-xl border border-line bg-bg-1 p-1">
+                <ToolRow item={it} sessionKey={sessionKey} inWork />
+              </div>
+            ) : (
+              <ToolRow item={it} sessionKey={sessionKey} inWork />
+            )
+          ) : it.kind === 'thinking' ? (
+            <ThinkingRow item={it} />
+          ) : it.kind === 'system' ? (
+            <SystemRow item={it} />
+          ) : it.kind === 'user' ? (
+            <UserBubble item={it} />
+          ) : it.kind === 'assistant' ? (
+            <AssistantBlock item={it} note quiet />
+          ) : null}
+        </div>
+      ))}
     </div>
   );
 }
 
-/** Whether a block shows anything (a run of only hidden thoughts does not). */
-const visibleBlock = (b: Block) => b.kind !== 'group' || b.items.some((i) => !hiddenThought(i));
+/** What a part's line says: its note in a few words, else what its steps did ("Ran 3 commands"), with their count and changes. */
+function usePartSum(part: Part) {
+  return useMemo(() => {
+    const tools = part.items.filter((i): i is ToolItem => i.kind === 'tool');
+    const sum = summarize(tools);
+    const said = part.notes.map((n) => n.text).join('\n');
+    const thought = part.items.reduce((ms, i) => ms + (i.kind === 'thinking' && !hiddenThought(i) ? (i.durationMs ?? 0) : 0), 0);
+    const own = said ? noteTitle(said) : '';
+    const title = own || (tools.length ? sum.text : thought >= 1000 ? `Thought for ${duration(thought)}` : 'Thought');
+    // The whole note when the line shows it cut short; a line of steps says it all.
+    return { tools, sum, title, own: !!own, about: said ? plainText(said).slice(0, 300) : undefined };
+  }, [part.notes, part.items]);
+}
 
-/** Whether the last visible row already shows the live status. */
-function tailShowsStatus(items: TimelineItem[]): boolean {
-  for (let i = items.length - 1; i >= 0; i--) {
-    const it = items[i];
-    if (hiddenThought(it)) continue;
-    if (it.kind === 'thinking' || it.kind === 'assistant') return !!it.streaming;
-    if (it.kind === 'tool') return it.tool.status === 'running' || it.tool.status === 'pending' || it.tool.status === 'waiting';
-    return false;
-  }
-  return false;
+/** A part of the work on one line; opened, its note in full and every step. Find in this session opens it on a match. */
+const PartLine = memo(function PartLine({ part, state, open, onToggle, sessionKey }: { part: Part; state: PartState; open: boolean; onToggle: (id: string) => void; sessionKey: string }) {
+  const { tools, sum, title, own, about } = usePartSum(part);
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || open) return;
+    const unfold = () => onToggle(part.id);
+    el.addEventListener(UNFOLD, unfold);
+    return () => el.removeEventListener(UNFOLD, unfold);
+  }, [open, onToggle, part.id]);
+  return (
+    <>
+      <button
+        ref={ref}
+        type="button"
+        onClick={() => onToggle(part.id)}
+        aria-expanded={open}
+        data-seq={open ? undefined : part.notes[0]?.seq}
+        title={about}
+        className="group flex min-h-8 w-full items-center gap-2.5 rounded-lg py-1 pr-2 text-left transition-colors hover:bg-bg-2"
+      >
+        <Marker state={state} />
+        <span translate={own ? 'no' : undefined} className={cx('min-w-0 flex-1 truncate text-[13.5px]', open ? 'text-fg' : 'text-fg-2 group-hover:text-fg')}>
+          {title}
+        </span>
+        <span className="flex shrink-0 items-center gap-2 text-[12px] text-fg-3">
+          <DiffStat added={sum.added} removed={sum.removed} compact />
+          {tools.length > 0 && <span className="tnum">{tools.length === 1 ? '1 step' : `${tools.length} steps`}</span>}
+          <ChevronRight size={14} className={cx('transition-transform duration-200', open && 'rotate-90')} />
+        </span>
+      </button>
+      {open && (
+        <div className="space-y-1.5 pt-0.5 pb-2 pl-[26px]">
+          {part.notes.map((n) => (
+            <AssistantBlock key={n.id} item={n} note quiet />
+          ))}
+          <PartSteps items={part.items} sessionKey={sessionKey} />
+        </div>
+      )}
+    </>
+  );
+});
+
+/**
+ * The part under way: its note in full, and under it the step being taken now (or the agent at work between steps),
+ * which opens the part's steps so far.
+ */
+function NowPart({ part, state, open, onToggle, sessionKey, agent, live }: { part: Part; state: PartState; open: boolean; onToggle: (id: string) => void; sessionKey: string; agent: Agent; live: LiveInfo }) {
+  const { tools, sum } = usePartSum(part);
+  const shown = part.items.filter((i) => !hiddenThought(i));
+  const active = shown.filter(isActive);
+  const waitingOn = state === 'waiting' ? [...tools].reverse().find((t) => t.tool.status === 'waiting' || t.tool.status === 'pending') : undefined;
+  const now = open ? undefined : (active[active.length - 1] ?? waitingOn);
+  const done = tools.filter((i) => !isActive(i)).length;
+  const writing = part.notes.some((n) => n.streaming);
+  const busy = state === 'now';
+  const Icon = stepsIcon(tools);
+  const line = now || shown.length > 0 || (busy && !writing);
+  return (
+    <div className="flex gap-2.5">
+      <span className={part.notes.length ? 'pt-[3px]' : 'pt-2'}>
+        <Marker state={state} />
+      </span>
+      <div className="min-w-0 flex-1">
+        {part.notes.map((n) => (
+          <AssistantBlock key={n.id} item={n} note quiet />
+        ))}
+        {line && (
+          <button
+            type="button"
+            onClick={() => shown.length && onToggle(part.id)}
+            aria-expanded={shown.length ? open : undefined}
+            className={cx(
+              'group -ml-2 flex min-h-8 w-[calc(100%+0.5rem)] items-center gap-2.5 rounded-lg px-2 text-left text-[13px] text-fg-3 transition-colors',
+              shown.length > 0 && 'hover:bg-bg-2 hover:text-fg-2',
+            )}
+          >
+            {now ? (
+              <StepLine item={now} />
+            ) : open ? (
+              <>
+                <Icon size={14} className="shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{sum.text}</span>
+              </>
+            ) : (
+              <>
+                {busy ? <WorkingIcon agent={agent} size={14} spinning className="shrink-0" /> : <Icon size={14} className="shrink-0" />}
+                <span className="min-w-0 flex-1 truncate">{busy ? (live.note ?? '') : sum.text}</span>
+              </>
+            )}
+            {!open && done > 0 && (now || busy) && <span className="shrink-0 text-[11.5px] text-fg-3">{done} done</span>}
+            {shown.length > 0 && <ChevronRight size={14} className={cx('shrink-0 transition-transform duration-200', open && 'rotate-90')} />}
+          </button>
+        )}
+        {open && (
+          <div className="pb-1">
+            <PartSteps items={part.items} sessionKey={sessionKey} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export interface LiveInfo {
@@ -385,70 +449,93 @@ export interface LiveInfo {
   note?: string;
 }
 
-/** Everything the agent did on the way to its reply: notes, steps and thoughts, in order. */
-function WorkLog({
+/** How many of a turn's parts show, its latest, before "Show N earlier parts": fewer while it runs. */
+const PARTS_LIVE = 6;
+const PARTS_DONE = 10;
+
+/**
+ * Everything the agent did on the way to its reply, as an outline (outline.ts): a part for each note it wrote, on one
+ * line with a check, its steps folded under it; the part under way shows its note and the step being taken now. A
+ * long turn shows its latest parts, the rest a click away; while it runs, the window only moves on while the reader
+ * follows the end, so parts above someone reading never disappear.
+ */
+function Outline({
   items,
   sessionKey,
   agent,
   live,
-  fresh,
+  status,
   replying,
+  fresh,
 }: {
   items: TimelineItem[];
   sessionKey: string;
   agent: Agent;
   live: LiveInfo | null;
-  fresh: (id: string) => boolean;
-  /** The reply is streaming under the log: it shows the agent is at work. */
+  status?: string;
+  /** The reply is coming under the outline: its work is done. */
   replying?: boolean;
+  fresh: (id: string) => boolean;
 }) {
-  const bl = useMemo(() => blocks(items), [items]);
+  const parts = useMemo(() => partsOf(items).filter((p) => p.notes.length > 0 || p.items.some((i) => !hiddenThought(i))), [items]);
   const following = useContext(FollowCtx);
-  // A long running turn shows its latest steps, earlier ones a click away. The window only
-  // moves on while the reader follows the end: steps above someone reading never disappear.
-  const LIVE_TAIL = 8;
+  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set());
+  const toggle = useCallback(
+    (id: string) =>
+      setOpened((s) => {
+        const n = new Set(s);
+        if (n.has(id)) n.delete(id);
+        else n.add(id);
+        return n;
+      }),
+    [],
+  );
   const [all, setAll] = useState(false);
+  const keep = live ? PARTS_LIVE : PARTS_DONE;
   const from = useRef<number | null>(null);
-  if (from.current === null) from.current = live ? Math.max(0, bl.length - LIVE_TAIL) : 0;
-  if (live && !all && following()) from.current = Math.max(from.current, bl.length - LIVE_TAIL);
-  const hidden = all ? 0 : Math.min(from.current, bl.length);
-  const shown = hidden ? bl.slice(hidden) : bl;
-  // At work with nothing on screen saying so: a mark at the end, in the last box of steps when the log ends with one.
-  const quiet = !!live && (live.status === 'working' || live.status === 'starting') && shown.some(visibleBlock) && !replying && !tailShowsStatus(items);
-  const tail = [...shown].reverse().find(visibleBlock);
-  const inBox = quiet && !live?.note && tail?.kind === 'group' && tail.items.some((i) => i.kind === 'tool') ? tail : null;
+  if (from.current === null) from.current = Math.max(0, parts.length - keep);
+  if (live && !all && following()) from.current = Math.max(from.current, parts.length - keep);
+  // A button for one or two lines would save nothing.
+  const hidden = all || Math.min(from.current, parts.length) < 3 ? 0 : Math.min(from.current, parts.length);
+  const shown = hidden ? parts.slice(hidden) : parts;
+  const running = !!live && (live.status === 'working' || live.status === 'starting');
+  const stateOf = (i: number): PartState => {
+    if (i < parts.length - 1 || (live && replying)) return 'done';
+    if (live) return running ? 'now' : 'waiting';
+    return status === 'interrupted' ? 'stopped' : status === 'failed' ? 'failed' : 'done';
+  };
+  if (!parts.length) return null;
   return (
-    <div className="mt-2 space-y-3">
+    <div className="mt-1 pl-2">
       {hidden > 0 && (
-        <button onClick={() => setAll(true)} className="-ml-2 rounded-md px-2 py-1 text-[12.5px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg-2">
-          Show earlier work
+        <button onClick={() => setAll(true)} className="-ml-1 rounded-md px-1 py-1 text-[12.5px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg-2">
+          {`Show ${hidden} earlier parts`}
         </button>
       )}
-      {shown.map((b) => {
-        const id = b.kind === 'group' ? b.id : b.item.id;
-        return (
-          <div key={id} className={cx(fresh(b.kind === 'group' ? b.items[0].id : b.item.id) && (b.kind === 'item' && b.item.kind === 'user' && !b.item.peer ? 'anim-msg-in' : 'anim-in'))}>
-            {b.kind === 'group' ? (
-              <Group b={b} sessionKey={sessionKey} agent={agent} busy={b === inBox} />
-            ) : b.item.kind === 'assistant' ? (
-              <AssistantBlock item={b.item} note />
-            ) : b.item.kind === 'user' ? (
-              <UserBubble item={b.item} />
-            ) : b.item.kind === 'system' ? (
-              <SystemRow item={b.item} />
-            ) : b.item.kind === 'tool' ? (
-              b.item.tool.category === 'plan' ? (
-                <div className="rounded-xl border border-line bg-bg-1 p-1">
-                  <ToolRow item={b.item} sessionKey={sessionKey} inWork />
-                </div>
+      <ol>
+        {shown.map((p, k) => {
+          const i = hidden + k;
+          const state = stateOf(i);
+          const isLast = i === parts.length - 1;
+          return (
+            <li
+              key={p.id}
+              className={cx(
+                'relative',
+                // The outline's line, from this part's mark to the next one's.
+                !isLast && 'after:absolute after:top-4 after:-bottom-4 after:left-[7.5px] after:w-px after:bg-line',
+                fresh(p.id) && 'anim-in',
+              )}
+            >
+              {isLast && live && !replying ? (
+                <NowPart part={p} state={state} open={opened.has(p.id)} onToggle={toggle} sessionKey={sessionKey} agent={agent} live={live} />
               ) : (
-                <ToolRow item={b.item} sessionKey={sessionKey} inWork />
-              )
-            ) : null}
-          </div>
-        );
-      })}
-      {quiet && !inBox && <StillWorking agent={agent} note={live?.note} />}
+                <PartLine part={p} state={state} open={opened.has(p.id)} onToggle={toggle} sessionKey={sessionKey} />
+              )}
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
@@ -609,7 +696,16 @@ const SegmentView = memo(function SegmentView({
   }, [!!live]);
   const visibleWork = seg.work.filter((i) => !hiddenThought(i));
   const stats = useMemo(() => workStats(seg.work), [seg.work]);
-  const answer = useMemo(() => together(seg.answer, seg.same), [seg.answer, seg.same]);
+  // While the agent works, what it writes after its last step is mostly a note on what it does next: it shows in the
+  // outline as the part under way, and takes the reply's place when the turn ends there, or as soon as it reads as a
+  // reply (long, or in parts of its own).
+  const running = !!live && (live.status === 'working' || live.status === 'starting');
+  const { work, replyItems } = useMemo(() => {
+    const said = seg.answer.filter((a): a is Extract<TimelineItem, { kind: 'assistant' }> => a.kind === 'assistant');
+    if (!running || !said.length || !noteLike(said.map((a) => a.text).join('\n'))) return { work: seg.work, replyItems: seg.answer };
+    return { work: [...seg.work, ...said], replyItems: seg.answer.filter((a) => a.kind !== 'assistant') };
+  }, [seg.work, seg.answer, running]);
+  const answer = useMemo(() => together(replyItems, seg.same), [replyItems, seg.same]);
   const first = seg.prompt?.ts ?? seg.notice?.ts ?? seg.work[0]?.ts;
   const lastItem = [...seg.work, ...seg.answer].reverse().find((i) => i.ts);
   const took = seg.end?.durationMs ?? (first && lastItem?.ts && lastItem.ts > first ? lastItem.ts - first : 0);
@@ -656,7 +752,7 @@ const SegmentView = memo(function SegmentView({
             </span>
           </button>
           {expanded && (
-            <WorkLog items={seg.work} sessionKey={sessionKey} agent={agent} live={live} fresh={fresh} replying={seg.answer.some((a) => a.kind === 'assistant' && a.streaming)} />
+            <Outline items={work} sessionKey={sessionKey} agent={agent} live={live} status={status} replying={replyItems.some((a) => a.kind === 'assistant' && a.streaming)} fresh={fresh} />
           )}
         </div>
       )}
@@ -717,6 +813,8 @@ export function Timeline({
   // What the follow needs from the last render, for the resize observer too.
   const turn = useRef({ busy: false, asks: 0 });
   const seen = useRef<TimelineItem | undefined>(undefined);
+  /** The newest text, when it showed as one (not as a note in the outline) at the last render. */
+  const shownText = useRef<string | null>(null);
   const loading = useRef(true);
   const dir = useRef(0);
   const touchY = useRef<number | null>(null);
@@ -930,8 +1028,12 @@ export function Timeline({
     // A text is new when it comes while the session is open, not with its opening or a reload; until it has
     // opened, nothing is held.
     const newest = newestText(segs);
-    const came = landed.current === sessionKey && !loading.current && newest?.id !== seen.current?.id ? newest?.id : undefined;
+    // A text comes when it first shows as one: a reply that began as a note in the outline (outline.ts, noteLike) comes
+    // when it takes its place.
+    const showsAs = newest && textEl(newest.id) ? newest.id : null;
+    const came = landed.current === sessionKey && !loading.current && (newest?.id !== seen.current?.id || (!!showsAs && showsAs !== shownText.current)) ? newest?.id : undefined;
     seen.current = newest;
+    shownText.current = showsAs;
     loading.current = !!tl?.loading;
     if (landed.current !== sessionKey) {
       lead.current = null;

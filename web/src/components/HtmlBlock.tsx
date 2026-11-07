@@ -84,7 +84,7 @@ export default memo(function HtmlBlock({ code, done }: { code: string; done: boo
           {done ? (
             !full && <PageFrame key={sum(html)} html={html} title={title || tr('Figure')} store={store} onHeight={setHeight} onPick={onPick} />
           ) : (
-            <StreamFrame html={html} title={title || tr('Figure')} onHeight={setHeight} />
+            <StreamFrame html={html} title={title || tr('Figure')} onHeight={setHeight} label="Writing…" />
           )}
           {done && height > max && !full && (
             // It fades into the card under the button, so its words never run behind the button's.

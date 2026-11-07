@@ -930,7 +930,8 @@ export function injectHead(html: string, head: string): string {
  *   (editor.ts) in place of the bridge.
  * - `wa-html-stream`, again and again: a page still being written, drawn as far as it goes. Its scripts
  *   are held back, and the page is changed in place (what was there stays), so it grows without
- *   flashing, following its end unless the reader scrolled up.
+ *   flashing, following its end unless the reader scrolled up. Its size message says too whether anything shows
+ *   yet (`drawn`).
  */
 function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: string, appSrc: string, uiSrc: string, engineSrc: string, uiCss: string, mediaSrc: string, kitLibs: Record<string, string>, cdn: string, codeSrc: string, dbSrc: string, designSrc: string) {
   const num = (v: unknown, def: number) => (typeof v === 'number' && v > 0 && v < 1e8 ? v : def);
@@ -986,6 +987,44 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: str
   let streamN = '';
   let lastH = -1;
   let lastBg = '';
+  // Whether the page being written shows anything yet: while only its head has come (its styles, say), nothing does,
+  // and its parent shows that it is being written instead of an empty frame. Once it shows, it stays so.
+  let drawn = false;
+  let drawnN = '';
+  let lastDrawn: boolean | null = null;
+  const seen = (el: Element) => {
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return false;
+    const cs = getComputedStyle(el);
+    return cs.visibility !== 'hidden' && cs.opacity !== '0';
+  };
+  const QUIET = /^(SCRIPT|STYLE|TEMPLATE|NOSCRIPT|TITLE)$/;
+  const MEDIA = /^(IMG|SVG|CANVAS|VIDEO|IFRAME|PICTURE|INPUT|TEXTAREA|SELECT|BUTTON|HR|PROGRESS|METER)$/;
+  const CLEAR = /^(transparent|rgba\([^)]*,\s*0\))$/;
+  /** Words, a picture or a painted box: anything the page shows so far. */
+  const shows = (): boolean => {
+    const b = document.body;
+    if (!b) return false;
+    const w = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(), i = 0; n && i < 3000; n = w.nextNode(), i++) {
+      const p = n.parentElement;
+      if (n.nodeValue?.trim() && p && !QUIET.test(p.tagName.toUpperCase()) && seen(p)) return true;
+    }
+    const all = b.getElementsByTagName('*');
+    for (let i = 0; i < all.length && i < 400; i++) {
+      const el = all[i];
+      const tag = el.tagName.toUpperCase();
+      if (QUIET.test(tag)) continue;
+      if (MEDIA.test(tag)) {
+        if (seen(el)) return true;
+        continue;
+      }
+      const cs = getComputedStyle(el);
+      const painted = !CLEAR.test(cs.backgroundColor) || cs.backgroundImage !== 'none' || parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderLeftWidth) > 0 || cs.boxShadow !== 'none';
+      if (painted && seen(el)) return true;
+    }
+    return false;
+  };
   // Following the end while it grows, until the reader scrolls up from it.
   let follow = true;
   addEventListener('scroll', () => {
@@ -1024,7 +1063,12 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: str
         break;
       }
     }
-    if (h !== lastH || bg !== lastBg) parent.postMessage({ type: 'wa-html-size', h: (lastH = h), bg: (lastBg = bg), n: streamN }, '*');
+    if (drawnN !== streamN) {
+      drawnN = streamN;
+      drawn = false;
+    }
+    if (!drawn) drawn = shows();
+    if (h !== lastH || bg !== lastBg || drawn !== lastDrawn) parent.postMessage({ type: 'wa-html-size', h: (lastH = h), bg: (lastBg = bg), n: streamN, drawn: (lastDrawn = drawn) }, '*');
     if (follow) el.scrollTop = el.scrollHeight;
   };
 
