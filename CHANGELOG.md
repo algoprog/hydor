@@ -3,6 +3,31 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.38.0 · 7 November 2026
+
+Agents that check their helpers' work and step up when a cheap try falls short, hand back results in the shape you
+set to the places you choose, and can keep one conversation of their own with an inbox.
+
+- **Stepping up**: a helper an agent starts on Quick or Standard whose reply does not pass a quick check (the helper
+  model reads its brief and its reply), or that stops with an error, runs again a tier up, never above the highest the
+  agent allows. The lead is told it happened and why, the new helper is told why the first try fell short, and the
+  helper's card says "Stepped up from" its first tier. A scheduled run of an agent that fails goes again a tier up too,
+  up to Best. **Step up when a check fails** is on for every agent until you turn it off; a lead can also step a helper
+  up itself when it finds the result not good enough.
+- **What an agent hands back**: give an agent the fields of each result (text, long text, numbers, yes or no, dates,
+  links, lists and tables) and it hands back each result checked against them, then sends it where you chose besides
+  the conversation: a file in the folder it works in (Markdown, or JSON for a name ending in .json, with the date, time
+  and agent's name filled in), a page in the Library, a notification, or a webhook (https only, signed with a key from
+  the vault and sent only to the hosts that key allows). Its page lists what it handed back lately and where each went.
+- **An agent with a conversation of its own**: turn on **Keeps one conversation, with an inbox** and the agent keeps
+  one conversation that remembers what came before. Messages from you (from its page) and from other agents that hand
+  it work wait in its Inbox and go in one at a time; each answer goes back to whoever sent it, as a message to another
+  agent or a notification to you. Its scheduled runs post into the same conversation, and its monthly budget is
+  checked as each message or run goes in.
+- **Project agents in your language**: an agent made for a new project from a template now has its name, description
+  and role in the app's language (English, Chinese or Greek).
+- An agent's instructions now begin "# Agent:" and say the user picked this agent, matching what the app calls them.
+
 ## 0.37.0 · 7 November 2026
 
 Agents of your own: say what one should do and it is drafted for you, then it works everywhere or in some projects,

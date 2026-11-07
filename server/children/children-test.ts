@@ -24,6 +24,8 @@ import type { CreateOpts } from '../sessions.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import { saveAssistant } from '../assistants/store.ts';
 import { setTiers } from '../assistants/tiers.ts';
+import { inboxOf, inboxTurnEnded, pump, standingKey } from '../assistants/inbox.ts';
+import { sessionExtra } from '../sessionExtra.ts';
 import { catchUp, CHILD_INSTRUCTIONS, children, findModel, LONG_REPLY, reportTurn, resultMessage } from './index.ts';
 import { childKeys, parentOf } from './family.ts';
 import { childMode } from './modes.ts';
@@ -42,14 +44,17 @@ const test = (name: string, fn: () => void | Promise<void>) => tests.push([name,
 // ---- a fake model server, for the helper ----------------------------------------------------------
 
 const asked: string[] = [];
+/** What the helper model says when it checks a helper's work (stepping up). */
+let verdict = '{"pass": true, "why": "it does the job"}';
 const srv = http.createServer((req, res) => {
   let b = '';
   req.on('data', (c) => (b += c));
   req.on('end', () => {
     const body = JSON.parse(b);
     asked.push(String(body.messages.at(-1).content));
+    const checking = String(body.messages[0]?.content ?? '').startsWith('You check the work');
     res.writeHead(200, { 'content-type': 'text/event-stream' });
-    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'SUMMARY: three files changed, tests pass.' }, finish_reason: 'stop' }] })}\n\n`);
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: checking ? verdict : 'SUMMARY: three files changed, tests pass.' }, finish_reason: 'stop' }] })}\n\n`);
     res.end('data: [DONE]\n\n');
   });
 });
@@ -423,7 +428,8 @@ test('as: one of the user’s agents works the part, with its own settings and t
   assert.equal(o.model, 'haiku');
   // Its own mode, stricter than the parent's.
   assert.equal(o.mode, 'default');
-  assert.deepEqual(o.extra, { parent: k, assistant: translator.id, connections: { deepl: true } });
+  assert.deepEqual({ ...o.extra, stepUp: undefined }, { parent: k, assistant: translator.id, connections: { deepl: true }, stepUp: undefined });
+  assert.equal((o.extra?.stepUp as { tier: string }).tier, 'quick');
   assert.match(out, /Translator · Claude Code · haiku · Quick/);
   const d = notesOf(db, k, 'child').at(-1)!.data as ChildNote;
   assert.equal(d.as, 'Translator');
@@ -446,6 +452,130 @@ test('as: one of the user’s agents works the part, with its own settings and t
   await call(k, 'start_child_session', { brief: 'Translate.', as: 'Translator' });
   assert.equal(sessions.created.at(-1)!.extra?.assistant, translator.id);
   await assert.rejects(call(k, 'start_child_session', { brief: 'Translate.', as: 'Nobody' }), /no agent "Nobody"/);
+});
+
+// ---- stepping up ---------------------------------------------------------------------------------
+
+/** A child's turn as it ends: what it was asked, then its reply (or an error). */
+const finish = (key: string, reply: string, status = 'completed') => {
+  const f = sessions.all.get(key)!;
+  f.live = 'idle';
+  f.items.push(user('Message from the session that started you:\n\nAgain.'), ...(reply ? [said(reply)] : []), end(status));
+};
+const newest = () => `${sessions.created.at(-1)!.agent}:child${sessions.created.length}`;
+
+test('a helper on a tier that fails the check runs again one tier up, up to Best; then its reply goes as it is', async () => {
+  const k = leadKey('s1');
+  await call(k, 'start_child_session', { brief: 'Find the bug in parser.ts and fix it.', tier: 'quick', title: 'Fix the parser' });
+  const first = newest();
+  assert.equal(sessions.created.at(-1)!.model, 'haiku');
+  assert.equal((sessionExtra(db, first).stepUp as { tier: string }).tier, 'quick');
+  verdict = '{"pass": false, "why": "it gave up without fixing anything"}';
+  finish(first, 'I could not find the bug.');
+  await reportTurn(deps, { key: first, startedAt: Date.now() - 1000, external: false });
+  const second = newest();
+  assert.notEqual(second, first);
+  assert.equal(sessions.created.at(-1)!.model, 'sonnet');
+  assert.match(sessions.created.at(-1)!.prompt!, /^Find the bug in parser\.ts and fix it\.\n\n\(A try on Quick fell short: it gave up without fixing anything\./);
+  assert.match(sessions.delivered.at(-1)!.text, /on Quick fell short: it gave up without fixing anything\. It runs again on Standard\.\]\nStarted child session/);
+  const note = notesOf(db, k, 'child').at(-1)!.data as ChildNote;
+  assert.deepEqual(note.steppedFrom, { key: first, tier: 'quick', why: 'it gave up without fixing anything' });
+  assert.equal(note.tier, 'standard');
+  // Standard falls short too: Best. Best falls short: nothing above it, so its reply goes back.
+  finish(second, 'Still nothing.');
+  await reportTurn(deps, { key: second, startedAt: Date.now() - 1000, external: false });
+  const third = newest();
+  assert.equal(sessions.created.at(-1)!.model, 'opus');
+  assert.equal(sessionExtra(db, third).stepUp, undefined);
+  const n = sessions.created.length;
+  finish(third, 'Fixed it: the loop was off by one.');
+  await reportTurn(deps, { key: third, startedAt: Date.now() - 1000, external: false });
+  assert.equal(sessions.created.length, n);
+  assert.match(sessions.delivered.at(-1)!.text, /Fixed it: the loop was off by one\.$/);
+  verdict = '{"pass": true, "why": "it does the job"}';
+});
+
+test('stepping up: an error steps up without asking; a reply that passes goes back; never above the lead’s highest, nor when its agent says no', async () => {
+  const k = leadKey('s2');
+  await call(k, 'start_child_session', { brief: 'Translate the README.', tier: 'quick' });
+  const a = newest();
+  finish(a, '', 'failed');
+  await reportTurn(deps, { key: a, startedAt: Date.now() - 1000, external: false });
+  assert.equal(sessions.created.at(-1)!.model, 'sonnet');
+  const b = newest();
+  finish(b, 'Done: README.zh.md and README.el.md.');
+  const n = sessions.created.length;
+  await reportTurn(deps, { key: b, startedAt: Date.now() - 1000, external: false });
+  assert.equal(sessions.created.length, n);
+  assert.match(sessions.delivered.at(-1)!.text, /README\.zh\.md/);
+  // A lead whose agent lets helpers go no higher than Standard: a Standard helper never steps up.
+  const capped = saveAssistant(db, { name: 'Capped lead', instructions: 'Lead.', helperMax: 'standard' });
+  const k2 = leadKey('s3');
+  setSessionExtra(db, k2, { assistant: capped.id });
+  await call(k2, 'start_child_session', { brief: 'Sum up the logs.', tier: 'standard' });
+  assert.equal(sessionExtra(db, newest()).stepUp, undefined);
+  // A lead whose agent says no to stepping up: the reply goes back as it is.
+  const steady = saveAssistant(db, { name: 'Steady lead', instructions: 'Lead.', stepUp: false });
+  const k3 = leadKey('s4');
+  setSessionExtra(db, k3, { assistant: steady.id });
+  await call(k3, 'start_child_session', { brief: 'Sum up the logs.', tier: 'quick' });
+  const c = newest();
+  verdict = '{"pass": false, "why": "too short"}';
+  finish(c, 'Logs: fine.');
+  const m = sessions.created.length;
+  await reportTurn(deps, { key: c, startedAt: Date.now() - 1000, external: false });
+  assert.equal(sessions.created.length, m);
+  verdict = '{"pass": true, "why": "it does the job"}';
+});
+
+test('step_up_child: the lead runs a finished helper’s brief again one tier up, saying why', async () => {
+  const k = leadKey('s5');
+  await call(k, 'start_child_session', { brief: 'Write the release notes.', tier: 'quick' });
+  const a = newest();
+  await assert.rejects(call(k, 'step_up_child', { key: a, why: 'too thin' }), /still working/);
+  finish(a, 'Notes: things changed.');
+  await reportTurn(deps, { key: a, startedAt: Date.now() - 1000, external: false });
+  const out = await call(k, 'step_up_child', { key: a, why: 'too thin: name each change' });
+  assert.match(out, /fell short: too thin: name each change\. It runs again on Standard/);
+  assert.equal(sessions.created.at(-1)!.model, 'sonnet');
+  await assert.rejects(call(k, 'step_up_child', { key: 'claude:nobody', why: 'x' }), /not one of your child sessions/);
+});
+
+test('as: an agent that keeps a conversation of its own takes the brief in its inbox; its answer comes back as a message', async () => {
+  const keeper = saveAssistant(db, { name: 'Docs keeper', description: 'Keeps the guide current', instructions: 'Keep the guide current.', standing: true });
+  const k = leadKey('s6');
+  const out = await call(k, 'start_child_session', { brief: 'Update the guide for the new Agents page.', as: 'Docs keeper' });
+  assert.match(out, /Put in Docs keeper's inbox/);
+  await new Promise((r) => setTimeout(r, 50));
+  const own = standingKey(db, keeper.id)!;
+  assert.ok(own);
+  // Its conversation was at work (as the fake makes every new session): the message waits, and goes in once it is free.
+  assert.equal(inboxOf(db, keeper.id)[0].status, 'queued');
+  sessions.all.get(own)!.live = 'idle';
+  await pump(deps, keeper.id);
+  assert.equal(sessionExtra(db, own).standing, keeper.id);
+  assert.equal(sessionExtra(db, own).parent, undefined);
+  const [item] = inboxOf(db, keeper.id);
+  assert.equal(item.status, 'sent');
+  const sent = sessions.delivered.at(-1)!;
+  assert.equal(sent.key, own);
+  assert.match(sent.text, new RegExp(`^From Lead \\(another agent\\) · inbox ${item.id.slice(0, 6)} · your reply goes back to it\\n\\nUpdate the guide`));
+  // A second message waits its turn.
+  await call(k, 'start_child_session', { brief: 'And the API topic.', as: 'Docs keeper' });
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(inboxOf(db, keeper.id)[0].status, 'queued');
+  // Its turn ends: the answer goes back to the lead, and the next message goes in.
+  const f = sessions.all.get(own)!;
+  f.live = 'idle';
+  f.items.push(user(sent.text), said('Done: the Agents topic is updated.'), end());
+  await inboxTurnEnded(deps, { key: own });
+  const back = sessions.delivered.filter((x) => x.key === k).at(-1)!;
+  assert.equal(back.text, '[Reply from Docs keeper, to the message you put in its inbox]\n\nDone: the Agents topic is updated.');
+  const items = inboxOf(db, keeper.id);
+  assert.equal(items[1].status, 'answered');
+  assert.equal(items[1].reply, 'Done: the Agents topic is updated.');
+  assert.equal(items[0].status, 'sent');
+  assert.match(sessions.delivered.at(-1)!.text, /And the API topic\.$/);
 });
 
 // ---- run ---------------------------------------------------------------------------------------------

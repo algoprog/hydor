@@ -63,7 +63,7 @@ For each child, the agent picks:
 
 - **The agent and model**: Custom with any of its models (from [Settings → Models](/settings?s=models)), Claude Code, Codex, or another agent you added (Gemini CLI, OpenCode…). By default a child runs the same agent as the session that started it. A cheaper or local model suits bulk work; Claude Code or Codex suits a hard part.
 - **A tier** for its part: **Quick** for a clear, checkable part, **Standard** for most, **Best** for a hard one; the tier's model for that program comes from [Settings → Models → Tiers](/settings?s=models&find=Tiers). An agent of yours can cap its helpers' tiers.
-- **One of your agents**, by name, instead of a plain child: it works with its own instructions, tools and tier (see [Agents that hand work to other agents](/guide/agents#agents-that-hand-work-to-other-agents)).
+- **One of your agents**, by name, instead of a plain child: it works with its own instructions, tools and tier (see [Agents that hand work to other agents](/guide/agents#agents-that-hand-work-to-other-agents)). An agent that keeps a conversation of its own gets the work in its inbox instead, and its reply comes back when it gets to it.
 - **The folder**: the parent's, unless it names another.
 - **A worktree** if it wants one: a separate copy of the folder's git repository on a new branch, so the child's changes do not mix with anyone else's.
 - **A short title**, which is the name you see.
@@ -78,6 +78,7 @@ In the parent's conversation, the reply shows as one line: "Reply from", the chi
 
 - A reply longer than about 4,000 characters arrives as a short summary written by the helper model ([Agents, accounts and models](/guide/agents-models)); the parent can still read it whole.
 - If a child stops with an error, or is stopped before it finishes, the parent is told that too.
+- A child started on Quick or Standard whose reply does not pass a quick check (the helper model reads its brief and its reply), or that stops with an error, runs again a tier up, never above the highest its lead allows; the parent is told it happened and why. An agent of yours can turn this off (**Step up when a check fails**). The parent can also step a child up itself when it finds its result not good enough.
 - The parent can check on its children at any time (what each is doing, its agent and model, what it has spent, the start of its latest reply) and send one of them more to do.
 - Replies from turns that ended while the app was stopped are passed on when it starts again.
 
@@ -85,7 +86,7 @@ You can open a child and talk to it like any other session. Whatever it replies 
 
 ### Follow child sessions
 
-- **In the parent's conversation**: a card for each child, under the turn that started it. It shows the child's title, "Child session" ("Researcher" in a deep research), its agent and model, what it is doing now ("Not running" or "Stopped with an error" when it has stopped), when it was last active and what it has spent. Click it (**Open**) to go to the child. While the child works, the square button beside it stops the child's turn.
+- **In the parent's conversation**: a card for each child, under the turn that started it. It shows the child's title, "Child session" ("Researcher" in a deep research), its agent and model, what it is doing now ("Not running" or "Stopped with an error" when it has stopped), when it was last active, what it has spent and, when it stepped up, "Stepped up from" its first tier and why. Click it (**Open**) to go to the child. While the child works, the square button beside it stops the child's turn.
 - **In the sidebar**: children sit under their parent, folded into one line such as "3 child sessions · 1 needs you · 2 working". Click the line to unfold them; it stays open while you are in one of them. On a phone, where the sidebar is a drawer, tapping the line unfolds it without closing the drawer.
 - **In the child**: a bar above the message box says "Child of" and the parent's title ("its replies go back there"), with **Open parent**.
 

@@ -14,6 +14,7 @@ import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { helperJson } from '../helper.ts';
 import { spaceById, updateSpace } from '../spaces/index.ts';
+import { userLang } from '../language/index.ts';
 import { cleanAssistant, saveAssistant } from './store.ts';
 
 export type ProjectKind = 'software' | 'web' | 'ml' | 'data' | 'paper' | 'research' | 'writing' | 'media' | 'slides' | 'default';
@@ -323,12 +324,41 @@ export function kindOf(s: Scan, words: string): ProjectKind {
 
 const fill = (t: string, name: string) => t.replaceAll('{project}', name);
 
+/** The templates' names and lines in the languages the app speaks besides English (their instructions stay in English, for the agent). */
+const IN: Record<'zh' | 'el', Record<ProjectKind, { role: string; description: string }>> = {
+  zh: {
+    software: { role: '工程师', description: '构建、修复和审查 {project} 的代码' },
+    web: { role: 'Web 开发者', description: '构建并打磨网站或 Web 应用 {project}' },
+    ml: { role: 'ML 研究员', description: '运行并比较 {project} 的机器学习实验' },
+    data: { role: '分析师', description: '根据 {project} 的数据回答问题' },
+    paper: { role: '论文作者', description: '撰写、修改并检查论文 {project}' },
+    research: { role: '研究员', description: '阅读、比较并总结 {project} 的资料' },
+    writing: { role: '撰稿人', description: '起草并编辑 {project} 的文字' },
+    media: { role: '设计师', description: '制作并编辑 {project} 的图片、视频和设计' },
+    slides: { role: '演讲者', description: '制作 {project} 的演讲、幻灯片和计划' },
+    default: { role: '智能体', description: '在 {project} 的文件夹中处理它的工作' },
+  },
+  el: {
+    software: { role: 'μηχανικός', description: 'Φτιάχνει, διορθώνει και ελέγχει τον κώδικα του {project}' },
+    web: { role: 'web developer', description: 'Φτιάχνει και γυαλίζει τον ιστότοπο ή την web εφαρμογή {project}' },
+    ml: { role: 'ερευνητής ML', description: 'Τρέχει και συγκρίνει τα πειράματα μηχανικής μάθησης του {project}' },
+    data: { role: 'αναλυτής', description: 'Απαντά σε ερωτήσεις από τα δεδομένα του {project}' },
+    paper: { role: 'συγγραφέας δημοσίευσης', description: 'Γράφει, αναθεωρεί και ελέγχει τη δημοσίευση {project}' },
+    research: { role: 'ερευνητής', description: 'Διαβάζει, συγκρίνει και συνοψίζει τις πηγές του {project}' },
+    writing: { role: 'συγγραφέας', description: 'Γράφει και επιμελείται τα κείμενα του {project}' },
+    media: { role: 'σχεδιαστής', description: 'Φτιάχνει και επεξεργάζεται τις εικόνες, τα βίντεο και τα σχέδια του {project}' },
+    slides: { role: 'παρουσιαστής', description: 'Φτιάχνει τις ομιλίες, τις διαφάνειες και τα σχέδια του {project}' },
+    default: { role: 'πράκτορας', description: 'Δουλεύει στο {project}, στον φάκελό του' },
+  },
+};
+
 /** The template's agent for a project, as it would be saved. */
-export function fromTemplate(t: ProjectTemplate, s: Pick<Space, 'id' | 'name'>): Partial<Assistant> {
+export function fromTemplate(t: ProjectTemplate, s: Pick<Space, 'id' | 'name'>, lang: string = 'en'): Partial<Assistant> {
+  const words = lang === 'zh' || lang === 'el' ? IN[lang][t.kind] : { role: t.role, description: t.description };
   return {
-    name: `${s.name} ${t.role}`.slice(0, 60),
+    name: `${s.name} ${words.role}`.slice(0, 60),
     icon: t.icon,
-    description: fill(t.description, s.name).slice(0, 160),
+    description: fill(words.description, s.name).slice(0, 160),
     instructions: fill(t.instructions, s.name),
     ...(t.tools ? { tools: t.tools } : {}),
     ...(t.tier ? { tier: t.tier } : {}),
@@ -368,7 +398,7 @@ export async function makeProjectAgent(db: DB, spaceId: string, o: { draft?: (db
   const words = `${s.name} ${s.description ?? ''} ${s.instructions ?? ''} ${scan.readme.slice(0, 1500)}`;
   const kind = kindOf(scan, words);
   const t = templateOf(kind);
-  let a: Partial<Assistant> = fromTemplate(t, s);
+  let a: Partial<Assistant> = fromTemplate(t, s, userLang(db));
   let how: ProjectAgentResult['how'] = kind === 'default' ? 'default' : 'template';
   if (enoughToGoOn(s, scan)) {
     const kinds = Object.entries(scan.counts)

@@ -24,7 +24,9 @@ import { userTimezone } from '../userPrefs.ts';
 import { helperJson } from '../helper.ts';
 import { validSchedule } from '../scheduler.ts';
 import { makeProjectAgent } from './projectAgent.ts';
-import { activity } from './rules.ts';
+import { handBackTool, resultsOf } from './output.ts';
+import { ensureStanding, inboxCounts, inboxOf, inboxTurnEnded, sendToInbox, standingKey, sweepInboxes } from './inbox.ts';
+import { activity, monthSpend } from './rules.ts';
 import { setTiers, tiersOf } from './tiers.ts';
 import { findAgentFiles, parseAgentFile, readAgentFile } from './importer.ts';
 import { instructionsFor, spawnFor, switchNote, type Target } from './instructions.ts';
@@ -165,13 +167,35 @@ function routes(d: Deps) {
 
   app.get('/api/assistants', async () => state());
   // The Agents page: each agent's schedules, sessions at work or waiting, and what it spent this month.
-  app.get('/api/assistants/activity', async () => ({
-    activity: activity(
+  app.get('/api/assistants/activity', async () => {
+    const act = activity(
       db,
       d.scheduler,
       [...d.sessions.lives.keys()].map((key) => ({ key, status: d.sessions.summary(key)?.live?.status })),
-    ),
-  }));
+    );
+    for (const [id, n] of Object.entries(inboxCounts(db))) if (act[id]) act[id].inbox = n;
+    return { activity: act };
+  });
+  // A standing agent's inbox: its messages, newest first, and its conversation; a message from you, in its turn.
+  app.get('/api/assistants/:id/inbox', async (req) => ({ key: standingKey(db, idOf(req)), items: inboxOf(db, idOf(req)) }));
+  app.post('/api/assistants/:id/inbox', async (req) => {
+    const a = findAssistant(db, idOf(req));
+    if (!a) throw new HttpError(404, 'No such agent');
+    if (!a.standing) throw new HttpError(400, `${a.name} does not keep a conversation of its own: start a session as it instead`);
+    try {
+      return { item: sendToInbox(d, a, { text: String(body(req).text ?? ''), from: { kind: 'user', name: 'You' } }) };
+    } catch (e) {
+      throw new HttpError(400, (e as Error).message);
+    }
+  });
+  // Its conversation, made now when it has none yet.
+  app.post('/api/assistants/:id/standing', async (req) => {
+    const a = findAssistant(db, idOf(req));
+    if (!a?.standing) throw new HttpError(400, 'That agent does not keep a conversation of its own');
+    return { key: await ensureStanding(d, a) };
+  });
+  // The results an agent handed back lately (hand_back), newest first.
+  app.get('/api/assistants/:id/results', async (req) => ({ results: resultsOf(db, idOf(req)) }));
   // New agent → Draft it: settings from a description, to change and save.
   app.post('/api/assistants/draft', async (req) => draftAgent(db, String(body(req).text ?? '')));
   // An agent for a project that has none of its own: drafted to fit it, or its kind's template, or the default one.
@@ -256,6 +280,10 @@ const appTools = (s: SpawnInfo, d: Deps) =>
 export const assistants: Feature = {
   id: 'assistants',
   routes,
+  tools(ctx) {
+    const t = handBackTool(ctx);
+    return t ? [t] : [];
+  },
   spawn(s, d) {
     // Custom reads them before each turn (context below) and leaves the tools out itself.
     if (isCustom(s)) return;
@@ -293,5 +321,20 @@ export const assistants: Feature = {
   },
   context(s, d) {
     return instructionsFor(findAssistant(d.db, s.extra.assistant), toneOf(d.db), { agent: 'acp', acpAgent: CONSOLE_ID });
+  },
+  turnEnd(t, d) {
+    return inboxTurnEnded(d, t);
+  },
+  start(d) {
+    // A standing agent's scheduled runs post into its own conversation.
+    d.scheduler.useStanding(async (id) => {
+      const a = findAssistant(d.db, id);
+      if (!a?.standing) return null;
+      // Its conversation lives on from month to month: the budget is checked as each run goes in, as for its inbox.
+      if (a.budgetUsd && monthSpend(d.db, a.id).usd >= a.budgetUsd) throw new Error(`${a.name} has spent its $${a.budgetUsd} budget for this month`);
+      return ensureStanding(d, a);
+    });
+    setTimeout(() => void sweepInboxes(d).catch(() => {}), 30_000).unref();
+    setInterval(() => void sweepInboxes(d).catch(() => {}), 60_000).unref();
   },
 };

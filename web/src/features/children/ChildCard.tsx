@@ -50,6 +50,11 @@ export function ChildCard({ note, sessionKey }: { note: SessionNote; sessionKey:
             {s?.updatedAt ? <span className="max-sm:hidden">· last active {ago(s.updatedAt)}</span> : null}
             {cost ? <span className="tnum">· {usd(cost)}</span> : null}
           </span>
+          {d.steppedFrom && (
+            <span className="mt-0.5 block truncate text-[12px] text-fg-3">
+              Stepped up from {tierLabel(d.steppedFrom.tier)}: <span translate="no">{d.steppedFrom.why}</span>
+            </span>
+          )}
         </span>
         <span className={cx('flex shrink-0 items-center gap-0.5 self-center text-[12.5px] font-medium text-accent')}>
           Open

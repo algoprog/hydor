@@ -63,7 +63,7 @@ test('a built-in assistant with the tone: the same block for every agent, no lim
   const tone = 'plain English, short answers, explain jargon';
   for (const t of [claude, codex, custom]) {
     const s = instructionsFor(researcher, tone, t);
-    assert.match(s, /^# Assistant: Researcher\n/);
+    assert.match(s, /^# Agent: Researcher\n/);
     assert.ok(s.includes(researcher.instructions));
     assert.match(s, /web_search categories/);
     assert.match(s, /# How to talk to the user\nIn their own words: plain English, short answers, explain jargon/);
@@ -142,9 +142,9 @@ test('the feature through the registry: Claude Code’s command line', async () 
   const mine = saveAssistant(db, { ...offline, id: undefined });
   const add = await spawnAdditions(info('claude', { assistant: mine.id }));
   // The assistant's block, beside the capabilities' own notes (Pages').
-  const own = add.instructions.filter((t) => t.startsWith('# Assistant:'));
+  const own = add.instructions.filter((t) => t.startsWith('# Agent:'));
   assert.equal(own.length, 1);
-  assert.match(own[0], /# Assistant: Offline/);
+  assert.match(own[0], /# Agent: Offline/);
   assert.ok(add.instructions.some((t) => t.startsWith('Pages:')));
   assert.ok(add.disallowedTools.includes('mcp__hydor__web_search') && add.disallowedTools.includes('mcp__hydor__read_page'));
   const spec = claudeSpec({ cwd: tmp, sessionId: '00000000-0000-4000-8000-000000000001', pageServer: 'http://127.0.0.1:1/mcp/run/x', add }, {});
@@ -155,13 +155,13 @@ test('the feature through the registry: Claude Code’s command line', async () 
   // Claude Code would give up on the app's own tools after a minute (a video takes several).
   const mcp = JSON.parse(fs.readFileSync(spec.args[spec.args.indexOf('--mcp-config') + 1], 'utf8'));
   assert.equal(mcp.mcpServers.hydor.timeout, 600_000);
-  assert.match(spec.args[spec.args.indexOf('--append-system-prompt') + 1], /# Assistant: Offline/);
+  assert.match(spec.args[spec.args.indexOf('--append-system-prompt') + 1], /# Agent: Offline/);
   // No assistant and no tone: no limits, and only the capabilities' notes in the instructions.
   const plain = claudeSpec({ cwd: tmp, sessionId: '00000000-0000-4000-8000-000000000002', add: await spawnAdditions(info('claude', {})) }, {});
   assert.ok(!plain.args.includes('--disallowedTools') && !plain.args.includes('--strict-mcp-config'));
   const prompt = plain.args[plain.args.indexOf('--append-system-prompt') + 1];
   assert.match(prompt, /^Pages:/);
-  assert.doesNotMatch(prompt, /# Assistant:/);
+  assert.doesNotMatch(prompt, /# Agent:/);
 });
 
 /** Answers Codex's app-server requests like the real one would, keeping what was asked. */
@@ -185,7 +185,7 @@ test('the feature through the registry: what Codex’s thread starts with', asyn
   assert.equal(start.config.web_search, 'disabled');
   assert.deepEqual(start.config.mcp_servers.hydor.disabled_tools, ['web_search', 'read_page']);
   assert.equal(start.config.mcp_servers.hydor.default_tools_approval_mode, 'approve');
-  assert.match(start.config.developer_instructions, /# Assistant: Offline[\s\S]*Use the shell only to read/);
+  assert.match(start.config.developer_instructions, /# Agent: Offline[\s\S]*Use the shell only to read/);
   // An assistant that allows everything changes nothing in Codex's settings.
   const r2 = new FakeRunner();
   await new CodexLive(r2 as any, { cwd: tmp, pageServer: 'http://127.0.0.1:1/mcp/run/x', add: await spawnAdditions(info('codex', { assistant: 'writer' })) }).boot();
@@ -196,9 +196,9 @@ test('the feature through the registry: what Codex’s thread starts with', asyn
 
 test('Custom: nothing at its start (it reads the context before each turn), the same block there', async () => {
   const add = await spawnAdditions(info('acp', { assistant: 'tutor' }, 'console'));
-  assert.ok(!add.instructions.some((t) => t.includes('# Assistant:')));
+  assert.ok(!add.instructions.some((t) => t.includes('# Agent:')));
   const text = await assistants.context!({ key: 'acp:k1', cwd: tmp, extra: { assistant: 'tutor' } }, deps);
-  assert.match(String(text), /^# Assistant: Tutor\n/);
+  assert.match(String(text), /^# Agent: Tutor\n/);
 });
 
 /** Answers like an ACP agent would (initialize, session/new, session/prompt), keeping what was asked. */
@@ -216,7 +216,7 @@ class FakeAcpRunner extends EventEmitter {
 
 test('another ACP agent: the instructions go with the first message of each ACP session, not into the transcript', async () => {
   const add = await spawnAdditions(info('acp', { assistant: 'tutor' }, 'gemini'));
-  assert.ok(add.instructions.some((t) => t.startsWith('# Assistant: Tutor')));
+  assert.ok(add.instructions.some((t) => t.startsWith('# Agent: Tutor')));
   const transcript = path.join(tmp, 'acp-brief.jsonl');
   fs.writeFileSync(transcript, JSON.stringify({ t: 'meta', agent: 'gemini' }) + '\n');
   const def = { id: 'gemini', name: 'Gemini CLI', command: 'gemini', args: [] };
@@ -232,7 +232,7 @@ test('another ACP agent: the instructions go with the first message of each ACP 
   await turn(lv, 'And then?');
   const [first, second] = prompts(runner);
   assert.equal(first.length, 2);
-  assert.match(first[0], /^<naget-instructions>\n[\s\S]*# Assistant: Tutor[\s\S]*<\/naget-instructions>$/);
+  assert.match(first[0], /^<naget-instructions>\n[\s\S]*# Agent: Tutor[\s\S]*<\/naget-instructions>$/);
   assert.equal(first[1], 'Hello');
   assert.deepEqual(second, ['And then?']);
   // The transcript has the user's words alone.
@@ -488,12 +488,12 @@ test('the note after a switch: the switch alone when the agent has the new instr
   const writer = BUILTINS.find((a) => a.id === 'writer')!;
   assert.equal(
     switchNote(researcher, writer, claude, true),
-    'The user switched this session\'s assistant from Researcher to Writer. Its instructions ("# Assistant: Writer") are now in yours: work that way from here on.',
+    'The user switched this session\'s agent from Researcher to Writer. Its instructions ("# Agent: Writer") are now in yours: work that way from here on.',
   );
   const full = switchNote(researcher, writer, claude, false);
-  assert.match(full, /^The user switched this session's assistant from Researcher to Writer\. From here on, work as below; this takes the place of the assistant instructions you had before\.\n\n# Assistant: Writer\nThe user picked this assistant for this session\./);
+  assert.match(full, /^The user switched this session's agent from Researcher to Writer\. From here on, work as below; this takes the place of the agent instructions you had before\.\n\n# Agent: Writer\nThe user picked this agent for this session\./);
   assert.ok(full.includes(writer.instructions));
-  assert.match(switchNote(null, offline, codex, false), /^The user picked the Offline assistant for this session\. From here on, work as below\.\n\n# Assistant: Offline\n[\s\S]*Limits: in this session do not/);
+  assert.match(switchNote(null, offline, codex, false), /^The user picked the Offline agent for this session\. From here on, work as below\.\n\n# Agent: Offline\n[\s\S]*Limits: in this session do not/);
 });
 
 test('switching a session’s assistant: its settings, connections, model and mode; a fresh agent before the next message; the note once', async () => {
@@ -533,7 +533,7 @@ test('switching a session’s assistant: its settings, connections, model and mo
   await beforeSend(key);
   assert.deepEqual(calls.recycled, []);
   const note = await messageNotes(key);
-  assert.match(note, /^The user switched this session's assistant from Researcher to Mailer\. From here on, work as below[\s\S]*# Assistant: Mailer\n[\s\S]*Answer the mail\./);
+  assert.match(note, /^The user switched this session's agent from Researcher to Mailer\. From here on, work as below[\s\S]*# Agent: Mailer\n[\s\S]*Answer the mail\./);
   assert.equal(await messageNotes(key), '');
   // Idle, the agent still has Researcher's instructions: it starts afresh before the next message.
   state.status = 'idle';
@@ -559,7 +559,7 @@ test('switching a session’s assistant: its settings, connections, model and mo
   await beforeSend(key);
   assert.deepEqual(calls.recycled, [key]);
   await started('run-s3');
-  assert.equal(await messageNotes(key), 'The user switched this session\'s assistant from Mailer to Writer. Its instructions ("# Assistant: Writer") are now in yours: work that way from here on.');
+  assert.equal(await messageNotes(key), 'The user switched this session\'s agent from Mailer to Writer. Its instructions ("# Agent: Writer") are now in yours: work that way from here on.');
 
   // Away and back before a message: nothing to say, nothing to start afresh.
   await put('tutor');
@@ -577,7 +577,7 @@ test('switching a session’s assistant: its settings, connections, model and mo
   await put('planner', custom);
   await beforeSend(custom);
   assert.deepEqual(calls.recycled, []);
-  assert.match(await messageNotes(custom), /^The user switched this session's assistant from General to Planner\. Its instructions/);
+  assert.match(await messageNotes(custom), /^The user switched this session's agent from General to Planner\. Its instructions/);
 
   // No such assistant, no such session.
   assert.equal((await put('nobody')).statusCode, 404);

@@ -61,7 +61,8 @@ export function agentStart<T extends StartLike>(db: DB, o: T): T {
   const a = findAssistant(db, o.extra?.assistant);
   if (!a) return o;
   let out = o;
-  if (a.budgetUsd) {
+  // A standing agent's own conversation lives on from month to month: its budget is checked as each message goes in (inbox.ts).
+  if (a.budgetUsd && !o.extra?.standing) {
     const left = Math.floor((a.budgetUsd - monthSpend(db, a.id).usd) * 100) / 100;
     if (left <= 0) throw new HttpError(400, `${a.name} has spent its $${a.budgetUsd} budget for this month: raise it in its settings, or wait for next month`);
     const cap = typeof o.extra?.capUsd === 'number' && o.extra.capUsd > 0 ? Math.min(o.extra.capUsd, left) : left;

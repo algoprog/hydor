@@ -71,12 +71,20 @@ agents that speak ACP and take MCP servers.
   listed on its page); thinks with a tier, Quick, Standard or Best, whose model Settings → Models → Tiers sets for
   Claude Code, Codex and Custom (Automatic keeps the model picked where it starts); hands parts of its work to other
   agents: plain helpers on a tier the lead picks (never above the highest its agent allows) or named agents with their
-  own settings, only those its Team lists (built-in agents may ask any), never a freer mode than the lead's; and keeps
+  own settings, only those its Team lists (built-in agents may ask any), never a freer mode than the lead's; steps up:
+  a helper on a tier whose reply fails a quick check by the helper model (or that stops with an error) runs again a
+  tier up, the lead told why, and a scheduled run that fails goes again a tier up, unless the agent turns it off; hands
+  back results: the fields of each (an app's answer fields: text, numbers, dates, links, lists, tables), checked by its
+  hand_back tool, sent to a file in its folder (Markdown or JSON, with {date}, {time} and {agent} in the name), a page
+  in the Library, an https webhook (signed with a vault key, to the hosts it allows) and a notification, and listed on
+  its page with where each went; can keep one conversation of its own, with an inbox: messages from you and other
+  agents go in one at a time and each answer goes back to its sender, its scheduled runs post there too; and keeps
   to a monthly budget, which caps each of its sessions at what is left and refuses new ones once it is spent. A
   project's Agents tab shows its agents as a team (what starts each, whom it hands work to), and a project can have an
   agent made for it as it is made, or later: drafted to fit it when it says enough about itself, else the template for
   its kind (software, a website, ML experiments, data, a LaTeX paper, research reading, writing, design and media,
-  slides) from its files or description, else a default one. A task without a folder gets one of its own
+  slides) from its files or description, else a default one, named and described in the app's language (English,
+  Chinese or Greek). A task without a folder gets one of its own
   (`~/Hydor/<date>-<task>`).
 - **Agent Guidelines**: what you want every agent to follow (how you like to work, what to always or never do,
   how to talk to you), written once and given to every agent by the app itself, whichever it is: Claude Code,

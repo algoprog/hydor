@@ -45,6 +45,12 @@ export const tierProgram = (agent: Agent, acpAgent?: string): TierProgram | null
 
 const RANK: Record<Tier, number> = { quick: 0, standard: 1, best: 2 };
 
+/** How high a tier is: quick 0, standard 1, best 2. */
+export const tierRank = (t: Tier): number => RANK[t];
+
+/** The tier one step up; none above Best. */
+export const nextTier = (t: Tier): Tier | undefined => (t === 'quick' ? 'standard' : t === 'standard' ? 'best' : undefined);
+
 /** A tier no higher than `max` ("never above"); `max` unset leaves it as it is. */
 export const clampTier = (t: Tier, max?: Tier): Tier => (max && RANK[t] > RANK[max] ? max : t);
 

@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { CalendarClock, Copy, FileUp, MessageSquarePlus, Plus, Settings2, Sparkles, Trash2, X } from 'lucide-react';
-import { agentMode, DEFAULT_ASSISTANT, type AgentDraft, type Assistant, type AssistantsState } from '@shared/assistants';
+import { agentMode, DEFAULT_ASSISTANT, hasOutput, type AgentDraft, type Assistant, type AssistantsState } from '@shared/assistants';
 import type { ScheduledTask, TaskDraft, TaskSchedule } from '@shared/automations';
 import type { SpaceView } from '@shared/spaces';
 import { api, del, enc, post, put } from '../../lib/api';
@@ -22,6 +22,7 @@ import { EditAssistant, ImportDialog } from './AssistantsSettings';
 import { loadActivity, nextRunOf, statusOf, useAgentActivity } from './agentsState';
 import { AssistantIcon } from './icons';
 import { AgentSentences } from './Sentences';
+import { InboxPanel, ResultsPanel } from './AgentPanels';
 import { useAssistants, useAssistantsState } from './state';
 
 const saved = (r: AssistantsState) => useAssistants.getState().set(r);
@@ -85,6 +86,7 @@ function AgentCard({ a, spaces }: { a: Assistant; spaces: SpaceView[] | null }) 
         <Scope a={a} spaces={spaces} />
         {a.tier && <span className="rounded-md bg-accent-soft px-1.5 py-px text-[11.5px] text-fg-2">{a.tier === 'quick' ? 'Quick' : a.tier === 'standard' ? 'Standard' : 'Best'}</span>}
         {next ? <span>next run {untilText(next)}</span> : act?.schedules.length ? <span>{act.schedules.length === 1 ? '1 schedule' : `${act.schedules.length} schedules`}</span> : null}
+        {act?.inbox && act.inbox.queued + act.inbox.sent > 0 && <span>{act.inbox.queued ? `${act.inbox.queued} in its inbox` : 'answering a message'}</span>}
         {act && act.monthUsd > 0 && (
           <span>
             {money(act.monthUsd)} this month{a.budgetUsd ? ` of ${money(a.budgetUsd)}` : ''}
@@ -367,6 +369,12 @@ function AgentDetail({ id, onEdit }: { id: string; onEdit: (a: Partial<Assistant
         }}
       />
 
+      {(a.standing || hasOutput(a)) && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {a.standing && <InboxPanel a={a} />}
+          {hasOutput(a) && <ResultsPanel a={a} />}
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-2xl border border-line bg-panel p-4">
           <div className="mb-2 flex items-center gap-2">

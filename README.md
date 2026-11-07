@@ -44,8 +44,10 @@ Sessions keep running when you close the tab, and the ones you start in VS Code 
 - **Follow and steer**: every step in plain words, approvals, diffs, notifications and one inbox; carry on from your
   phone, or by voice.
 - **Agents of your own**: say what one should do and it is drafted for you; each works everywhere or in some projects,
-  on its own schedules, thinks with a model tier (Quick, Standard or Best), hands parts of its work to other agents,
-  and keeps to a monthly budget. A new project can get one fitted to it.
+  on its own schedules, thinks with a model tier (Quick, Standard or Best, stepping up when a cheap try falls short),
+  hands parts of its work to other agents, hands back checked results to files, the Library, webhooks or
+  notifications, can keep one conversation with an inbox, and keeps to a monthly budget. A new project can get one
+  fitted to it, in your language.
 - **More than code**: web search with cited sources, deep research, a browser you can take over, and in
   the desktop apps your computer's own screen, mouse and keyboard, once you allow it.
 - **Apps**: small tools for one job (a trip plan, a product comparison, a quiz), each with a view of its own.

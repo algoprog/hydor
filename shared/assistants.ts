@@ -2,6 +2,7 @@
 // works, what it may use, and the agent, model and mode it suggests. Shared by the server (instructions,
 // Custom's tool limits) and the pages (the pickers on the start page and in a session's message box,
 // Settings → Assistants).
+import type { AnswerField } from './apps.ts';
 import type { TaskSchedule } from './automations.ts';
 import type { SessionExtra } from './features.ts';
 import type { Tier } from './tiers.ts';
@@ -51,11 +52,64 @@ export interface Assistant {
   askable?: false;
   /** What its sessions may spend in a month, in dollars; when it is reached, no new session starts as it until the next month. */
   budgetUsd?: number;
+  /** False: a helper it starts on a tier that fails a check is not run again one tier up. */
+  stepUp?: false;
+  /** It keeps one conversation of its own: messages from you, other agents and its schedules go into it in turn, through its inbox. */
+  standing?: boolean;
+  /** What it hands back (fields, checked) and where each result goes, besides the conversation. */
+  output?: AgentOutput;
   /** Comes with the app: it can be duplicated, not changed. */
   builtin?: boolean;
   /** The .claude/agents file it was imported from. */
   source?: string;
 }
+
+/** Where an agent's results go, besides the conversation. */
+export type OutputTarget =
+  /** A file in the folder it works in: "{date}", "{time}" and "{agent}" fill in; .json gets the fields as JSON, anything else Markdown. */
+  | { kind: 'file'; path: string }
+  /** A page in the Library, in its project when it works in one. */
+  | { kind: 'library' }
+  /** A POST of the result as JSON to an address, signed with a key from the vault when one is named. */
+  | { kind: 'webhook'; url: string; secret?: string }
+  /** A notification, with the result's first line. */
+  | { kind: 'notify' };
+
+export interface AgentOutput {
+  /** The fields it fills in, as an app's answer fields; none: one Markdown field, its result. */
+  fields?: AnswerField[];
+  to?: OutputTarget[];
+}
+
+/** One result an agent handed back (hand_back), with where it went. */
+export interface AgentResult {
+  at: number;
+  /** The session that handed it back. */
+  key: string;
+  /** Its first line, for the list. */
+  line: string;
+  value: Record<string, unknown>;
+  sent: { kind: OutputTarget['kind']; ok: boolean; detail: string }[];
+}
+
+/** A message in a standing agent's inbox: who sent it, and its answer once it came. */
+export interface InboxItem {
+  id: string;
+  /** user: you; agent: another session (its key); task: one of its schedules. */
+  from: { kind: 'user' | 'agent' | 'task'; key?: string; name: string };
+  text: string;
+  /** queued: waiting its turn; sent: with the agent now; answered; failed (why in reply). */
+  status: 'queued' | 'sent' | 'answered' | 'failed';
+  reply?: string;
+  createdAt: number;
+  sentAt?: number;
+  answeredAt?: number;
+}
+
+/** The one field a result has when an agent names none. */
+export const RESULT_FIELD: AnswerField = { id: 'result', label: 'Result', type: 'markdown', required: true };
+export const outputFields = (o?: AgentOutput): AnswerField[] => (o?.fields?.length ? o.fields : [RESULT_FIELD]);
+export const hasOutput = (a: Pick<Assistant, 'output'>): boolean => !!(a.output?.fields?.length || a.output?.to?.length);
 
 /** Whether an agent works in a project (by its id; none: a session in no project). Agents without projects work everywhere. */
 export const inScope = (a: Pick<Assistant, 'projects'>, space?: string | null): boolean => !a.projects?.length || (!!space && a.projects.includes(space));
@@ -101,6 +155,8 @@ export interface AgentActivity {
   /** What its sessions spent since the month began, in dollars, and how many started. */
   monthUsd: number;
   monthSessions: number;
+  /** A standing agent's inbox: messages waiting their turn, and the one it is answering. */
+  inbox?: { queued: number; sent: number };
 }
 
 /** An agent drafted from a description (New agent → Draft it): its settings, and a schedule with the message each run starts with. */

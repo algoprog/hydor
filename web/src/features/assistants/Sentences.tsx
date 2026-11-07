@@ -10,6 +10,7 @@ import { TIERS, type Tier } from '@shared/tiers';
 import { cx, inputCls, OptionRow, Popover, Segmented, Switch } from '../../components/ui';
 import { AssistantIcon } from './icons';
 import { asksText, schedulesText, tierText, toolsText, whenText, whereText } from './agentsState';
+import { OutputEditor, outputText } from './OutputEditor';
 
 type Patch = Partial<Assistant>;
 
@@ -110,6 +111,10 @@ function TierChoice({ a, set, close }: { a: Patch; set: (p: Patch) => void; clos
           onChange={(v) => set({ helperMax: v === 'any' ? undefined : v })}
           options={[{ value: 'any', label: 'Any' }, ...TIERS.map((t) => ({ value: t.id, label: t.label }))]}
         />
+        <label className="mt-2.5 flex cursor-pointer items-center gap-3">
+          <span className="min-w-0 flex-1 text-[12.5px] text-fg-2">Step up when a check fails</span>
+          <Switch on={a.stepUp !== false} onChange={(on) => set({ stepUp: on ? undefined : false })} label="Step up when a check fails" />
+        </label>
       </div>
     </div>
   );
@@ -169,35 +174,44 @@ export function AgentSentences({ a, editable, onChange, all, spaces, when }: Sen
       </Phrase>
       ,{' '}
       <Phrase text={whenWords} editable={editable} title="When it works" width={320}>
-        {(close) =>
-          when.draft ? (
-            <ScheduleChoice value={when.schedule} onChange={when.onSchedule} />
-          ) : (
-            <div>
-              <OptionRow label="When you or another agent asks" hint="Always" selected={false} onClick={close} />
-              {when.schedules.length > 0 && <Head>Its schedules</Head>}
-              {when.schedules.map((s) => (
-                <button key={s.id} type="button" onClick={() => (close(), when.onEdit(s.id))} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-bg-2">
-                  <CalendarClock size={14} className="shrink-0 text-fg-3" />
-                  <span className="min-w-0 flex-1">
-                    <span translate="no" className="block truncate text-[13px]">
-                      {s.name}
+        {(close) => (
+          <div>
+            {when.draft ? (
+              <ScheduleChoice value={when.schedule} onChange={when.onSchedule} />
+            ) : (
+              <div>
+                <OptionRow label="When you or another agent asks" hint="Always" selected={false} onClick={close} />
+                {when.schedules.length > 0 && <Head>Its schedules</Head>}
+                {when.schedules.map((s) => (
+                  <button key={s.id} type="button" onClick={() => (close(), when.onEdit(s.id))} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-bg-2">
+                    <CalendarClock size={14} className="shrink-0 text-fg-3" />
+                    <span className="min-w-0 flex-1">
+                      <span translate="no" className="block truncate text-[13px]">
+                        {s.name}
+                      </span>
+                      <span className="block truncate text-[12px] text-fg-3">
+                        {whenText(s.schedule)}
+                        {s.enabled ? '' : ' · paused'}
+                      </span>
                     </span>
-                    <span className="block truncate text-[12px] text-fg-3">
-                      {whenText(s.schedule)}
-                      {s.enabled ? '' : ' · paused'}
-                    </span>
-                  </span>
-                  <Pencil size={13} className="shrink-0 text-fg-3" />
+                    <Pencil size={13} className="shrink-0 text-fg-3" />
+                  </button>
+                ))}
+                <button type="button" onClick={() => (close(), when.onAdd())} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] text-accent hover:bg-bg-2">
+                  <Plus size={14} />
+                  Add a schedule
                 </button>
-              ))}
-              <button type="button" onClick={() => (close(), when.onAdd())} className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] text-accent hover:bg-bg-2">
-                <Plus size={14} />
-                Add a schedule
-              </button>
-            </div>
-          )
-        }
+              </div>
+            )}
+            <label className="mt-1 flex cursor-pointer items-center gap-3 border-t border-line px-2 pt-2 pb-1.5">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px]">Keeps one conversation, with an inbox</span>
+                <span className="block text-[12px] leading-snug text-fg-3">Messages from you and other agents go in one at a time, and its scheduled runs post there too</span>
+              </span>
+              <Switch on={!!a.standing} onChange={(on) => onChange({ standing: on || undefined })} label="Keeps one conversation, with an inbox" />
+            </label>
+          </div>
+        )}
       </Phrase>
       , and thinks with{' '}
       <Phrase text={tierText(a.tier)} editable={editable} title="What it thinks with" width={330}>
@@ -251,7 +265,11 @@ export function AgentSentences({ a, editable, onChange, all, spaces, when }: Sen
           </div>
         )}
       </Phrase>{' '}
-      for help. {a.budgetUsd ? 'It spends at most ' : 'It has '}
+      for help. It hands back{' '}
+      <Phrase text={outputText(a.output)} editable={editable} title="What it hands back" width={400}>
+        {() => <OutputEditor value={a.output} onChange={(output) => onChange({ output })} />}
+      </Phrase>
+      . {a.budgetUsd ? 'It spends at most ' : 'It has '}
       <Phrase text={a.budgetUsd ? `$${a.budgetUsd}` : 'no monthly budget'} editable={editable} title="Its monthly budget" width={280}>
         {() => <BudgetChoice value={a.budgetUsd} onChange={(budgetUsd) => onChange({ budgetUsd })} />}
       </Phrase>
