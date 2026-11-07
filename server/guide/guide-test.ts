@@ -97,7 +97,7 @@ test('the guide: every topic has its title, a summary and sections; the API topi
 
 test('the guide’s links land: other topics and their sections, Settings sections, the app’s pages', () => {
   const sections = new Set(SECTIONS.map(([id]) => id));
-  const pages = /^\/(?:$|\?|s\/|guide|settings|projects|knowledge|apps|agents|pages|library|media|inbox|usage|stats|arena|system|files|search|git|terminal|preview|review\/)/;
+  const pages = /^\/(?:$|\?|s\/|guide|settings|projects|knowledge|apps|agents|answers|pages|library|media|inbox|usage|stats|arena|system|files|search|git|terminal|preview|review\/)/;
   const bad: string[] = [];
   for (const t of topics)
     for (const m of t.body.matchAll(/\]\((\/[^)\s]*)\)/g)) {

@@ -1200,22 +1200,57 @@ function routes(d: Deps) {
   });
   /**
    * A picture on the web, for what the app shows of it (whose own pages load no picture from the web): a deck or a
-   * document in its editor, and the pictures in agents' replies. What an address gave is remembered for a while (the
-   * picture kept, or why not), so a reply shown again, or on another device, fetches nothing.
+   * document in its editor, and the pictures in agents' replies and their answer UIs. What an address gave is remembered
+   * for a while (the picture kept, or why not), so a reply shown again, or on another device, fetches nothing; a failure
+   * of a moment (the site limiting its rate, busy, slow) only briefly. A site is asked for at most three pictures at a
+   * time (a gallery of ten from Wikimedia at once is answered 429), and asked once more after a pause when it says 429 or 503.
    */
-  const pictures = new Map<string, { sha?: string; error?: string; at: number }>();
+  const pictures = new Map<string, { sha?: string; error?: string; at: number; brief?: boolean }>();
+  const busy = new Map<string, number>();
+  const waiting = new Map<string, (() => void)[]>();
+  const fewAtATime = async <T,>(host: string, fn: () => Promise<T>): Promise<T> => {
+    while ((busy.get(host) ?? 0) >= 3) await new Promise<void>((r) => waiting.set(host, [...(waiting.get(host) ?? []), r]));
+    busy.set(host, (busy.get(host) ?? 0) + 1);
+    try {
+      return await fn();
+    } finally {
+      const n = (busy.get(host) ?? 1) - 1;
+      if (n > 0) busy.set(host, n);
+      else busy.delete(host);
+      const next = waiting.get(host)?.shift();
+      if (!waiting.get(host)?.length) waiting.delete(host);
+      next?.();
+    }
+  };
+  const fetchPicture = async (url: string) => {
+    let host = '';
+    try {
+      host = new URL(url).hostname;
+    } catch {}
+    const once = () =>
+      fewAtATime(host, async () => {
+        const notes: string[] = [];
+        return { src: await takeIn(db, url, { notes }), notes };
+      });
+    let r = await once();
+    if (!r.src.startsWith('naget-asset:') && r.notes.some((n) => /answered (429|503)\b/.test(n))) {
+      await new Promise((ok) => setTimeout(ok, 1500));
+      r = await once();
+    }
+    return r;
+  };
   app.get('/api/pages/picture', async (req, reply) => {
     const url = String((req.query as { url?: string }).url ?? '');
     if (!/^https?:\/\//i.test(url) || url.length > 4096) throw new HttpError(400, 'url is an http(s) address');
     let seen = pictures.get(url);
-    if (seen && Date.now() - seen.at > (seen.sha ? 6 * 3600_000 : 10 * 60_000)) seen = undefined;
+    if (seen && Date.now() - seen.at > (seen.sha ? 6 * 3600_000 : seen.brief ? 15_000 : 10 * 60_000)) seen = undefined;
     let a = seen?.sha ? getAsset(db, seen.sha) : null;
     if (!a && !seen?.error) {
-      const notes: string[] = [];
-      const src = await takeIn(db, url, { notes });
+      const { src, notes } = await fetchPicture(url);
       const sha = src.startsWith('naget-asset:') ? src.slice('naget-asset:'.length) : undefined;
       a = sha ? getAsset(db, sha) : null;
-      seen = a ? { sha, at: Date.now() } : { error: notes[0] ?? 'Not a picture', at: Date.now() };
+      const brief = !a && notes.some((n) => /answered (408|425|429|5\d\d)\b|time ?out|timed out|aborted|fetch failed|ECONN|ETIMEDOUT|EAI_AGAIN/i.test(n));
+      seen = a ? { sha, at: Date.now() } : { error: notes[0] ?? 'Not a picture', at: Date.now(), brief };
       pictures.delete(url);
       pictures.set(url, seen);
       if (pictures.size > 1000) pictures.delete(pictures.keys().next().value!);

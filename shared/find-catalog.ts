@@ -246,6 +246,7 @@ const PAGES: [string, string, string, string, string][] = [
   ['git-bisect', 'Find what broke it', '/git?tab=history&bisect=1', 'bisect git bisect regression first bad commit which commit broke worked before used to work', 'An agent finds the commit that broke something, between where it worked and now'],
   ['terminal', 'Terminal', '/terminal', 'shell console command line bash', 'Shells on this computer'],
   ['apps', 'Apps', '/apps', 'app apps agent apps gallery templates ready-made tasks tools forms install uninstall download file view chart map weather recipes quiz find', 'Small tools that find things out and show them clearly: open one here, or ask in any chat'],
+  ['answers', 'Answer UIs', '/answers', 'answer cards ui components gallery rich replies widgets charts maps tables comparison recipe forecast quiz timeline calculator', 'The cards, tables, charts, maps and small tools agents show their answers in'],
   ['connected', 'Connected apps', '/apps/connected', 'connections connected accounts services integrations notion linear github google gmail slack calendar sign in oauth mcp', 'Services every agent can use, connected once'],
   ['connections-market', 'Connect a service', '/apps/connected?tab=market', 'marketplace services connect add catalog notion linear github google', 'The marketplace of services agents can use, to connect once'],
   ['keys', 'Keys', '/apps/connected?tab=keys', 'api key secret vault token password sign-in login credentials add a key', 'Keys agents use without seeing them: your vault'],

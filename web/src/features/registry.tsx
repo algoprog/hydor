@@ -8,6 +8,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { SessionExtra, SessionNote } from '@shared/features';
 import type { SidebarTool } from '@shared/sidebar';
 import type { SessionSummary, ToolCategory, ToolInfo, ToolItem } from '@shared/types';
+import { answersFeature } from './answers/feature';
 import { appsFeature } from './apps/feature';
 import { arenaFeature } from './arena/feature';
 import { assistantsFeature } from './assistants/feature';
@@ -146,6 +147,7 @@ export const features = (): WebFeature[] =>
     voiceFeature,
     assistantsFeature,
     appsFeature,
+    answersFeature,
     skillpackFeature,
     customFeature,
     guidelinesFeature,

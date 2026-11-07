@@ -108,7 +108,8 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, maxHeight = 520, 
           onClick={() => setExpanded((e) => !e)}
           className="w-full border-t border-line py-1 text-[11.5px] text-fg-3 transition-colors hover:bg-bg-3 hover:text-fg"
         >
-          {expanded ? 'Show less' : `Show all ${lines} lines`}
+          {/* Through tr: inside a reply (.md) the page's own translation of text passes it by. */}
+          {expanded ? tr('Show less') : tr('Show all {0} lines').replace('{0}', String(lines))}
         </button>
       )}
     </div>
@@ -126,7 +127,7 @@ function normalizePath(p: string): string {
 }
 
 /** The app's own pages, which a link to this site's address opens here rather than in a new tab. */
-const APP_PAGE = /^\/(?:$|s\/|guide|settings|spaces|knowledge|apps|pages|inbox|usage|stats|arena|system|files|search|git|terminal|preview|review\/)/;
+const APP_PAGE = /^\/(?:$|s\/|guide|settings|spaces|knowledge|apps|pages|inbox|usage|stats|arena|system|files|search|git|terminal|preview|answers|review\/)/;
 
 /** A link to this app itself (an agent's, to /settings?s=memory): its path, else null. */
 function appPath(h: string): string | null {
@@ -251,9 +252,10 @@ export interface MdInfo {
 }
 export const MdCtx = createContext<MdInfo>({ src: '', streaming: false, rich: false });
 
-// Loaded the first time a reply has one: Mermaid is big, and the page frame is the Pages' own.
+// Loaded the first time a reply has one: Mermaid is big, the page frame is the Pages' own, and the answer UIs are many.
 const MermaidBlock = lazy(() => import('./MermaidBlock'));
 const HtmlBlock = lazy(() => import('./HtmlBlock'));
+const AnswerUi = lazy(() => import('./answer/AnswerUi'));
 
 /** The word after ```html that runs the block in place: ```html live (or render, preview…). Plain ```html stays code. */
 const LIVE = /^(live|render|preview|show|run|widget|demo|interactive|figure|app)$/i;
@@ -275,7 +277,10 @@ function fenceClosed(src: string, pos: any): boolean {
   return !!close && close[0] === open[0] && close.length >= open.length;
 }
 
-/** A fenced block: a ```mermaid diagram drawn, a ```html live block run in place (in a reply), otherwise code. */
+/**
+ * A fenced block: a ```mermaid diagram drawn, and in a reply a ```ui <name> block drawn as that answer UI (its data as
+ * JSON: components/answer) and a ```html live block run in place; otherwise code.
+ */
 function Pre({ node }: { node?: any }) {
   const md = useContext(MdCtx);
   const code = node?.children?.[0];
@@ -283,6 +288,15 @@ function Pre({ node }: { node?: any }) {
   const lang = /language-([^\s]+)/.exec(cls)?.[1];
   const text = hastText(code);
   const kind = lang?.toLowerCase();
+  if (md.rich && (kind === 'ui' || kind?.startsWith('ui:'))) {
+    const name = kind === 'ui' ? (String(code?.data?.meta ?? '').trim().split(/\s+/)[0] ?? '') : kind.slice(3);
+    const done = !md.streaming || fenceClosed(md.src, node?.position);
+    return (
+      <Suspense fallback={<div className="aui-wait my-3" />}>
+        <AnswerUi name={name} code={text} done={done} />
+      </Suspense>
+    );
+  }
   if (kind === 'mermaid' || (md.rich && !md.offline && kind === 'html' && String(code?.data?.meta ?? '').split(/\s+/).some((w) => LIVE.test(w)))) {
     const done = !md.streaming || fenceClosed(md.src, node?.position);
     return <Suspense fallback={<CodeBlock code={text} lang={lang} />}>{kind === 'mermaid' ? <MermaidBlock code={text} done={done} /> : <HtmlBlock code={text} done={done} />}</Suspense>;

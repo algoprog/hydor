@@ -67,6 +67,8 @@ export const CONFIDENTIAL_TOOLS = new Set([
   'start_child_session',
   'child_sessions',
   'message_child',
+  // Answer UIs, the catalog of which is looked up on this computer (their pictures and maps from the web stay out).
+  'find_ui',
   // The app's guide, a form in the conversation, a notice (without the session's words).
   'app_guide',
   'ask_form',

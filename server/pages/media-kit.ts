@@ -212,6 +212,8 @@ function mediaKit(latest: MediaKitApi) {
         const latlngs = pts.map((p) => [p.lat, p.lng]);
         if (w.line && latlngs.length > 1) Lf.polyline(latlngs, { color: t.accent, weight: 3, opacity: 0.75, dashArray: w.line === 'dashed' ? '6 8' : undefined }).addTo(map);
         pts.forEach((p, i) => {
+          // A route's line (ends: true) is pinned at its start and end only, not at every point of its shape.
+          if (w.ends && i > 0 && i < pts.length - 1) return;
           const label = textOf(p.row, w.label, ['name', 'title', 'label', 'place']);
           const note = textOf(p.row, w.popup, ['description', 'note', 'address', 'summary']);
           const marker = w.numbered
