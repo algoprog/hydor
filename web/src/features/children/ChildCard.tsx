@@ -1,10 +1,12 @@
-// A child session's card in its parent's conversation, under the turn that started it: its title, agent
-// and model, what it is doing now, when it last did something, and a way in. Stop while it works.
+// A child session's card in its parent's conversation, under the turn that started it: its title, the agent of
+// yours it works as (if one), its program, model and tier, what it is doing now, when it last did something, and a
+// way in. Stop while it works.
 import { ChevronRight, Square } from 'lucide-react';
 import { usd } from '@shared/budget';
 import type { ChildNote } from '@shared/children';
 import type { SessionNote } from '@shared/features';
 import { researchOf } from '@shared/research';
+import { tierLabel } from '@shared/tiers';
 import { AgentIcon } from '../../components/AgentIcon';
 import { cx, IconButton } from '../../components/ui';
 import { activityOf, isBusy } from '../../lib/activity';
@@ -32,7 +34,14 @@ export function ChildCard({ note, sessionKey }: { note: SessionNote; sessionKey:
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">
             <span className="min-w-0 truncate text-[13.5px] font-medium text-fg">{s?.title ?? d.title}</span>
-            <span className="shrink-0 text-[11.5px] text-fg-3">{researcher ? 'Researcher' : 'Child session'}</span>
+            {d.tier && <span className="shrink-0 rounded-full bg-accent-soft px-1.5 text-[11px] text-fg-2">{tierLabel(d.tier)}</span>}
+            {d.as ? (
+              <span translate="no" className="shrink-0 text-[11.5px] text-fg-3">
+                {d.as}
+              </span>
+            ) : (
+              <span className="shrink-0 text-[11.5px] text-fg-3">{researcher ? 'Researcher' : 'Child session'}</span>
+            )}
           </span>
           <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[12px] text-fg-3">
             <span className="truncate">{d.label}</span>

@@ -93,6 +93,7 @@ You don’t have to know where an option lives: type what you want in the search
 [Settings → Models](/settings?s=models): models for Custom, the app’s own agent: OpenRouter, Ollama, and Hugging Face models run here with vLLM. More in [Agents, accounts and models](/guide/agents-models).
 
 - [**Helper model**](/settings?s=models&find=Helper%20model): The model for small jobs beside sessions.
+- [**Tiers**](/settings?s=models&find=Tiers): The model Quick, Standard and Best mean for each program: agents think with a tier, and give their helpers one.
 - [**On this machine**](/settings?s=models&find=On%20this%20machine): Models installed here, and their downloads.
 - [**Add a model from Hugging Face**](/settings?s=models&find=Add%20a%20model%20from%20Hugging%20Face): The ones suggested for this computer, or search, see how each would run here, and install it.
 - [**OpenRouter**](/settings?s=models&find=OpenRouter): Models through OpenRouter, with your key.
@@ -247,13 +248,13 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Speech recognition on the server**](/settings?s=voice&find=Speech%20recognition%20on%20the%20server): Recognize speech on this computer or with a service.
 - [**Read aloud**](/settings?s=voice&find=Read%20aloud): Have replies read aloud.
 
-### Assistants
+### Your agents
 
-[Settings → Assistants](/settings?s=assistants): presets to start sessions as (Researcher, Writer, Tutor…), and where task folders go. More in [Assistants](/guide/assistants).
+[Settings → Your agents](/settings?s=assistants): where task folders go, and cleaning up after a task; your agents themselves are on the Agents page. More in [Agents](/guide/agents).
 
-- [**New assistant**](/settings?s=assistants&find=New%20assistant): A preset to start sessions as.
+- [**Open Agents**](/settings?s=assistants&find=Open%20Agents): Your agents are on the Agents page.
 - [**Clean up after a task**](/settings?s=assistants&find=Clean%20up%20after%20a%20task): Agents remove what they made along the way and no longer need.
-- [**Task folders**](/settings?s=assistants&find=Task%20folders): Where an assistant’s new task folders go.
+- [**Task folders**](/settings?s=assistants&find=Task%20folders): Where new task folders go, for sessions started without a folder.
 
 ### Custom
 

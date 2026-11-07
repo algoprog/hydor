@@ -43,7 +43,7 @@ export function AgentPicker({
         <SettingChip
           ref={ref}
           label={label}
-          title="Which agent runs the session"
+          title="Which program runs the session: Claude Code, Codex, Custom or another"
           open={open}
           onClick={() => setOpen((o) => !o)}
           value={
@@ -58,7 +58,7 @@ export function AgentPicker({
           ref={ref}
           type="button"
           onClick={() => setOpen((o) => !o)}
-          title="Which agent runs the session"
+          title="Which program runs the session: Claude Code, Codex, Custom or another"
           className={cx('inline-flex h-9 shrink-0 items-center gap-2 rounded-[10px] bg-bg-2 px-3 text-[13.5px] font-medium text-fg ring-1 ring-line transition-colors hover:bg-bg-3', open && 'bg-bg-3')}
         >
           <AgentIcon agent={agent} name={acp?.name} size={15} />
@@ -66,7 +66,7 @@ export function AgentPicker({
           <ChevronDown size={14} className={cx('text-fg-3 transition-transform duration-200', open && 'rotate-180')} />
         </button>
       )}
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={300} title="Agent">
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={300} title="Runs on">
         {localOnly && <div className="px-2.5 pt-1 pb-1.5 text-[12px] leading-snug text-fg-3">Confidential: only Custom, with a model on this computer.</div>}
         {!localOnly && <OptionRow icon={<AgentIcon agent="claude" size={15} />} label="Claude Code" hint={HINT.claude} selected={agent === 'claude'} onClick={() => pick('claude')} />}
         {!localOnly && <OptionRow icon={<AgentIcon agent="codex" size={15} />} label="Codex" hint={HINT.codex} selected={agent === 'codex'} onClick={() => pick('codex')} />}

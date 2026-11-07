@@ -7,6 +7,7 @@ import { toast, toastError } from '../../lib/store';
 import { live } from '../../lib/ws';
 import { Button, cx, inputCls, Section, Throbber, useConfirm } from '../../components/ui';
 import { HelperModel } from './HelperModel';
+import { TiersSection } from './TiersSection';
 import { LOCALE } from '../../i18n/locale';
 
 const GiB = 1024 ** 3;
@@ -38,6 +39,7 @@ export function ModelsSettings() {
         Custom, the app’s own agent, runs any of these models with the same tools, skills and MCP servers as the other agents. Pick Custom on the start page, then the model.
       </p>
       <HelperModel />
+      <TiersSection />
       <LocalModels st={st} />
       <AddFromHf st={st} />
       <OpenRouter st={st} />

@@ -1,9 +1,10 @@
-// Settings → Assistants: the assistants to start sessions as (the built-ins to duplicate, your own to
-// change or delete, Claude Code agent files to import), and where task folders go. How the agents talk to
-// you is part of Agent Guidelines now (features/guidelines).
+// Settings → Your agents: where task folders go and cleaning up after a task (your agents themselves are on the
+// Agents page). Also the agent editor that page's All settings opens (every setting of an agent), and importing
+// Claude Code agent files. How the agents talk to you is part of Agent Guidelines now (features/guidelines).
 import { useEffect, useRef, useState } from 'react';
-import { Copy, FileUp, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Bot, FileUp, Trash2 } from 'lucide-react';
 import { ASSISTANT_ICONS, ASSISTANT_MODES, TOOL_KINDS, type Assistant, type AssistantsState, type ToolKind } from '@shared/assistants';
+import { TIERS, type Tier } from '@shared/tiers';
 import type { ConnectionView } from '@shared/connections';
 import type { Agent } from '@shared/types';
 import { api, del, enc, post, put } from '../../lib/api';
@@ -12,7 +13,9 @@ import { toast, toastError, useApp, useUI } from '../../lib/store';
 import { ModelPicker } from '../../components/AgentPickers';
 import { AgentIcon } from '../../components/AgentIcon';
 import { FolderChip } from '../../components/FolderPicker';
-import { Badge, Button, cx, Dialog, IconButton, inputCls, OptionRow, Picker, Popover, Section, Segmented, Switch, Throbber, useConfirm } from '../../components/ui';
+import { go } from '../../lib/nav';
+import { Badge, Button, cx, Dialog, IconButton, inputCls, OptionRow, Picker, Popover, Section, Segmented, Switch, Throbber } from '../../components/ui';
+import { useSpaces } from '../spaces/state';
 import { AssistantIcon, ICONS } from './icons';
 import { useAssistants, useAssistantsState } from './state';
 
@@ -21,64 +24,25 @@ const saved = (r: AssistantsState) => useAssistants.getState().set(r);
 
 export function AssistantsSettings() {
   const st = useAssistantsState();
-  const [edit, setEdit] = useState<Draft | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [confirm, confirmNode] = useConfirm();
   if (!st) return <Throbber className="text-fg-3" />;
-  const remove = async (a: Assistant) => {
-    if (!(await confirm({ title: `Delete ${a.name}?`, body: 'Sessions started with it keep going without its instructions.', confirm: 'Delete', danger: true }))) return;
-    del<AssistantsState>(`/api/assistants/${enc(a.id)}`).then(saved, toastError);
-  };
+  const mine = st.assistants.filter((a) => !a.builtin).length;
   return (
     <div className="space-y-4">
       <Section
-        title="Assistants"
-        sub="Pick one when you start a session: who the agent is for it, how it works and what it may use"
+        title="Your agents"
+        sub="Make and change them on the Agents page: what each does, where and when it works, what it thinks with, and whom it asks"
         actions={
-          <div className="flex gap-1.5">
-            <Button size="sm" variant="ghost" icon={<FileUp size={14} />} onClick={() => setImporting(true)}>
-              Import
-            </Button>
-            <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setEdit({ icon: 'bot', folder: 'task' })}>
-              New assistant
-            </Button>
-          </div>
+          <Button size="sm" variant="secondary" icon={<Bot size={14} />} onClick={() => go('/agents')}>
+            Open Agents
+          </Button>
         }
       >
-        <div className="-my-1 divide-y divide-line">
-          {st.assistants.map((a) => (
-            <div key={a.id} className="flex items-center gap-3 py-2.5">
-              <AssistantIcon icon={a.icon} size={16} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 text-[13.5px] font-medium">
-                  <span className="truncate">{a.name}</span>
-                  {a.builtin && <Badge>Built in</Badge>}
-                  {a.source && <Badge tone="claude">Imported</Badge>}
-                </div>
-                <div className="truncate text-[12.5px] text-fg-3">{a.description || 'No description'}</div>
-              </div>
-              {!a.builtin && (
-                <IconButton label={`Edit ${a.name}`} size="sm" onClick={() => setEdit(a)}>
-                  <Pencil size={14} />
-                </IconButton>
-              )}
-              <IconButton label={`Duplicate ${a.name}`} size="sm" onClick={() => setEdit({ ...a, id: undefined, builtin: undefined, source: undefined, name: `${a.name} (copy)` })}>
-                <Copy size={14} />
-              </IconButton>
-              {!a.builtin && (
-                <IconButton label={`Delete ${a.name}`} size="sm" onClick={() => remove(a)}>
-                  <Trash2 size={14} />
-                </IconButton>
-              )}
-            </div>
-          ))}
+        <div className="text-[13px] text-fg-3">
+          {mine ? (mine === 1 ? 'You have 1 agent of your own, beside the built-in ones.' : `You have ${mine} agents of your own, beside the built-in ones.`) : 'Only the built-in agents so far.'}
         </div>
       </Section>
       <CleanUpSection on={st.cleanUp} />
       <TaskFolderSection st={st} />
-      <EditAssistant value={edit} onClose={() => setEdit(null)} />
-      <ImportDialog open={importing} onClose={() => setImporting(false)} />
-      {confirmNode}
     </div>
   );
 }
@@ -249,7 +213,11 @@ const Field = ({ label, hint, children }: { label: string; hint?: string; childr
   </div>
 );
 
-function EditAssistant({ value, onClose }: { value: Draft | null; onClose: () => void }) {
+/** Every setting of an agent (the Agents page's All settings, New agent → Start empty, Duplicate); `onSaved` hears of the agent as saved. */
+export function EditAssistant({ value, onClose, onSaved }: { value: Draft | null; onClose: () => void; onSaved?: (a: Assistant) => void }) {
+  const spaces = useSpaces();
+  const others = (useAssistantsState()?.assistants ?? []).filter((x) => x.id !== value?.id);
+  const [budget, setBudget] = useState('');
   const home = useApp((s) => s.boot?.home) ?? '';
   const root = useUI((s) => s.explorerRoot) ?? home;
   const [d, setD] = useState<Draft>({});
@@ -260,6 +228,7 @@ function EditAssistant({ value, onClose }: { value: Draft | null; onClose: () =>
   useEffect(() => {
     if (!value) return;
     setD(value);
+    setBudget(value.budgetUsd ? String(value.budgetUsd) : '');
     // Suggestions: the skills the agents have, and the connected apps.
     api<{ skills: { name: string }[] }>(`/api/setup/skills?cwd=${enc(root)}`)
       .then((r) => setSkills([...new Set(r.skills.map((s) => s.name))].sort()))
@@ -273,11 +242,13 @@ function EditAssistant({ value, onClose }: { value: Draft | null; onClose: () =>
   const save = async () => {
     setBusy(true);
     try {
-      const body = { ...d, tools: d.tools && d.tools.length < TOOL_KINDS.length ? d.tools : undefined };
-      const r = d.id ? await put<AssistantsState>(`/api/assistants/${enc(d.id)}`, body) : await post<AssistantsState>('/api/assistants', body);
+      const n = Number(budget);
+      const body = { ...d, tools: d.tools && d.tools.length < TOOL_KINDS.length ? d.tools : undefined, budgetUsd: budget.trim() && Number.isFinite(n) && n > 0 ? n : undefined };
+      const r = d.id ? await put<AssistantsState & { assistant: Assistant }>(`/api/assistants/${enc(d.id)}`, body) : await post<AssistantsState & { assistant: Assistant }>('/api/assistants', body);
       saved(r);
-      toast(d.id ? `${d.name} is saved` : `${d.name} is ready to pick on the start page`, 'ok');
+      toast(d.id ? `${d.name} is saved` : `${d.name} is ready`, 'ok');
       onClose();
+      onSaved?.(r.assistant);
     } catch (e) {
       toastError(e);
     } finally {
@@ -289,7 +260,7 @@ function EditAssistant({ value, onClose }: { value: Draft | null; onClose: () =>
     <Dialog
       open={!!value}
       onClose={onClose}
-      title={d.id ? `Edit ${value?.name ?? ''}` : 'New assistant'}
+      title={d.id ? `Edit ${value?.name ?? ''}` : 'New agent'}
       width={560}
       footer={
         <>
@@ -302,7 +273,7 @@ function EditAssistant({ value, onClose }: { value: Draft | null; onClose: () =>
         </>
       }
     >
-      <div className="space-y-4 text-[13px]">
+      <div data-i18n="agents" className="space-y-4 text-[13px]">
         <div className="flex items-end gap-3">
           <IconChoice value={d.icon ?? 'bot'} onChange={(icon) => set({ icon })} />
           <label className="block min-w-0 flex-1">
@@ -324,6 +295,36 @@ function EditAssistant({ value, onClose }: { value: Draft | null; onClose: () =>
             className={cx(inputCls, 'h-auto resize-y py-2 leading-relaxed')}
           />
         </Field>
+        <Field label="Where it works" hint="An agent for some projects is offered only there, and works in the project's folder.">
+          <Segmented
+            size="sm"
+            value={d.projects?.length ? 'some' : 'all'}
+            onChange={(v) => set({ projects: v === 'all' ? undefined : d.projects?.length ? d.projects : spaces?.[0] ? [spaces[0].id] : undefined })}
+            options={[
+              { value: 'all', label: 'Everywhere' },
+              { value: 'some', label: 'In projects' },
+            ]}
+          />
+          {!!d.projects?.length && (
+            <div className="mt-2 divide-y divide-line rounded-xl border border-line">
+              {(spaces ?? []).map((s) => (
+                <label key={s.id} className="flex cursor-pointer items-center gap-3 px-3 py-2">
+                  <span translate="no" className="min-w-0 flex-1 truncate text-[13px]">
+                    {s.name}
+                  </span>
+                  <Switch
+                    on={!!d.projects?.includes(s.id)}
+                    label={s.name}
+                    onChange={(on) => {
+                      const next = on ? [...(d.projects ?? []), s.id] : (d.projects ?? []).filter((x) => x !== s.id);
+                      set({ projects: next.length ? next : undefined });
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+          )}
+        </Field>
         <Field label="Where its sessions start" hint="When no folder is picked on the start page.">
           <Segmented
             size="sm"
@@ -336,7 +337,7 @@ function EditAssistant({ value, onClose }: { value: Draft | null; onClose: () =>
           />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Agent and model" hint="Picked with it on the start page.">
+          <Field label="Runs on" hint="The program and model it suggests, picked with it on the start page; a tier below picks the model instead.">
             <div className="-ml-2 flex flex-wrap items-center gap-0.5">
               <AgentChoice d={d} set={set} />
               {d.agent && <ModelPicker agent={d.agent} acp={d.acpAgent} value={d.model ?? null} onChange={(v) => set({ model: v ?? undefined })} />}
@@ -348,6 +349,21 @@ function EditAssistant({ value, onClose }: { value: Draft | null; onClose: () =>
             </div>
           </Field>
         </div>
+        <Field label="Thinks with" hint="Automatic: the model picked where it starts. A tier: its model for the program it runs on (Settings → Models → Tiers).">
+          <Segmented<Tier | 'auto'>
+            size="sm"
+            value={d.tier ?? 'auto'}
+            onChange={(v) => set({ tier: v === 'auto' ? undefined : v })}
+            options={[{ value: 'auto', label: 'Automatic' }, ...TIERS.map((t) => ({ value: t.id, label: t.label }))]}
+          />
+          <div className="mt-2.5 mb-1 text-[12.5px] text-fg-2">Helpers it starts, never above</div>
+          <Segmented<Tier | 'any'>
+            size="sm"
+            value={d.helperMax ?? 'any'}
+            onChange={(v) => set({ helperMax: v === 'any' ? undefined : v })}
+            options={[{ value: 'any', label: 'Any' }, ...TIERS.map((t) => ({ value: t.id, label: t.label }))]}
+          />
+        </Field>
         <Field label="What it may use" hint="Custom and Claude Code have the rest switched off; Codex is told. The app’s own tools (pages, memory) stay on.">
           <div className="divide-y divide-line rounded-xl border border-line">
             {TOOL_KINDS.map((k) => (
@@ -390,6 +406,36 @@ function EditAssistant({ value, onClose }: { value: Draft | null; onClose: () =>
             </div>
           </Field>
         )}
+        <Field label="Team" hint="Agents it may hand parts of its work to, each working with its own settings. Built-in agents may ask any agent.">
+          <div className="divide-y divide-line rounded-xl border border-line">
+            {others.map((x) => (
+              <label key={x.id} className="flex cursor-pointer items-center gap-3 px-3 py-2">
+                <AssistantIcon icon={x.icon} size={13} />
+                <span translate="no" className="min-w-0 flex-1 truncate text-[13px]">
+                  {x.name}
+                </span>
+                <Switch
+                  on={!!d.canAsk?.includes(x.id)}
+                  label={x.name}
+                  onChange={(on) => {
+                    const next = on ? [...(d.canAsk ?? []), x.id] : (d.canAsk ?? []).filter((y) => y !== x.id);
+                    set({ canAsk: next.length ? next : undefined });
+                  }}
+                />
+              </label>
+            ))}
+            <label className="flex cursor-pointer items-center gap-3 px-3 py-2">
+              <span className="min-w-0 flex-1 text-[13px]">Other agents may hand it work</span>
+              <Switch on={d.askable !== false} onChange={(on) => set({ askable: on ? undefined : false })} label="Other agents may hand it work" />
+            </label>
+          </div>
+        </Field>
+        <Field label="Monthly budget" hint="Once its sessions have spent this much in a month, none starts as it until the next; each is capped at what is left. Empty: no limit.">
+          <div className="flex items-center gap-2">
+            <span className="text-fg-3">$</span>
+            <input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="No limit" className={cx(inputCls, 'w-32')} aria-label="Dollars a month" />
+          </div>
+        </Field>
       </div>
     </Dialog>
   );
@@ -405,7 +451,7 @@ interface AgentFileRow {
   imported?: string;
 }
 
-function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const home = useApp((s) => s.boot?.home) ?? '';
   const root = useUI((s) => s.explorerRoot) ?? home;
   const [files, setFiles] = useState<AgentFileRow[] | null>(null);

@@ -20,7 +20,7 @@ The Skills page shows skills from five places, each marked on its row:
 - **Claude Code and Codex**: the agents' own skills, in their own folders. Only that agent gets them.
 - **In projects**: a project's own skills, which only its sessions get. You change them on the project's **Skills** tab: see [Give a project skills of its own](/guide/projects#give-a-project-skills-of-its-own).
 
-The first three make up the skill library, which every agent the app starts gets. An assistant can also name skills it favors: when one of them fits the task, the agent loads it before it starts. See [Assistants](/guide/assistants).
+The first three make up the skill library, which every agent the app starts gets. An agent can also name skills it favors: when one of them fits the task, it loads it before it starts. See [Agents](/guide/agents).
 
 ## Which agents get which skills
 

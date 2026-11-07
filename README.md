@@ -43,7 +43,10 @@ Sessions keep running when you close the tab, and the ones you start in VS Code 
   any model through OpenRouter, Ollama or vLLM. Several plans, switched when one reaches its limit.
 - **Follow and steer**: every step in plain words, approvals, diffs, notifications and one inbox; carry on from your
   phone, or by voice.
-- **More than code**: assistants, web search with cited sources, deep research, a browser you can take over, and in
+- **Agents of your own**: say what one should do and it is drafted for you; each works everywhere or in some projects,
+  on its own schedules, thinks with a model tier (Quick, Standard or Best), hands parts of its work to other agents,
+  and keeps to a monthly budget. A new project can get one fitted to it.
+- **More than code**: web search with cited sources, deep research, a browser you can take over, and in
   the desktop apps your computer's own screen, mouse and keyboard, once you allow it.
 - **Apps**: small tools for one job (a trip plan, a product comparison, a quiz), each with a view of its own.
 - **A Library to keep things in**: pages and databases as in Notion; documents, spreadsheets, slides and LaTeX as in
@@ -56,7 +59,8 @@ Sessions keep running when you close the tab, and the ones you start in VS Code 
 - **For engineers**: failed CI runs looked into, issues triaged, dependencies updated, and large changes made by a team
   of agents.
 - **Work that runs by itself**: scheduled tasks, watchers, webhooks, and goals an agent keeps working on.
-- **Around the agents**: a terminal, files, Git, usage and limits, several machines, and one search box (`Ctrl+K`).
+- **Around the agents**: a terminal, files, Git, usage and limits (under System), several machines, and one search box
+  (`Ctrl+K`).
 - **Private when it must be**: confidential sessions on local models only, and a vault of keys agents use without
   seeing them.
 

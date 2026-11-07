@@ -1117,7 +1117,7 @@ The gallery shows the kinds as cards, with **Find by name** and a chip for each 
 Then:
 
 - **In the Library**, the editor's **Ask** panel opens and the agent starts at once (your changes are saved first), with the agent and model you picked last on the start page. You see your request as one line ("Add a slide after slide 3: SWOT analysis — our bakery's first year"), and the agent first reads how the app makes that kind ("Reading how to make “SWOT analysis”"), then makes it, as you watch ([Change it by asking an agent](#change-it-by-asking-an-agent)).
-- **From New with a kind, and from Turn it into**, a session starts at once ("Make slides: Pitch deck — …", "Turn “Bakery plan” into slides"), with the agent and model you picked last, in the project you are in (its folder and assistant) or a new task folder, and what it makes goes into the Library where you were.
+- **From New with a kind, and from Turn it into**, a session starts at once ("Make slides: Pitch deck — …", "Turn “Bakery plan” into slides"), with the agent and model you picked last, in the project you are in (its folder and agent) or a new task folder, and what it makes goes into the Library where you were.
 - **Beside a conversation**, in the panel where pages and slides open, the request goes into that conversation's message box, for you to send.
 
 ## Change it by asking an agent

@@ -3,6 +3,40 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.37.0 · 7 November 2026
+
+Agents of your own: say what one should do and it is drafted for you, then it works everywhere or in some projects,
+on its own schedules, thinks with a model tier, hands parts of its work to other agents, and keeps to a monthly budget.
+
+- **Agents take over from assistants**: the Agents page (in the sidebar) shows each of your agents as a card with how
+  it is doing, the projects it works in, its tier, when it runs next and what it spent this month; the built-in ones
+  (General, Researcher, Writer, Coder and the rest) are under it. Your assistants are your agents now, with everything
+  they had.
+- **New agent**: say in a few sentences what it should do, and when it should work by itself, and the helper model
+  drafts it: its name, instructions, what it may use, its tier and a schedule. Read it as sentences and click any
+  underlined words to change them; All settings has every setting.
+- **Where an agent works**: everywhere, or only in some projects, where it is offered and works in the project's
+  folder. A project's new Agents tab shows its agents as a team: what starts each one and whom it hands work to.
+- **An agent for each project**: a new project can get an agent made for it, and a project without one can get one
+  from its Agents tab: drafted to fit it when it says enough about itself, else the template for its kind (software,
+  a website, machine learning, data, a LaTeX paper, research reading, writing, design and media, slides), else a
+  default one.
+- **Schedules on an agent's page**: the scheduled tasks that run as an agent are its schedules, listed and added on
+  its page.
+- **Tiers**: Quick, Standard and Best pick a model by the job; Settings → Models → Tiers sets what each means for
+  Claude Code, Codex and Custom. An agent can think with one, and gives the helpers it starts one for their part,
+  never above the highest it allows.
+- **Agents that hand work to other agents**: an agent can hand a part of its work to one of your agents by name,
+  which works with its own instructions, tools and tier; yours ask only those their Team lists, and an agent can take
+  work from none. Each helper's card in the conversation shows the agent and its tier.
+- **A monthly budget**: once an agent's sessions have spent it, no new one starts as it until the next month, and each
+  session is capped at what is left.
+- **Usage is a tab of System**, so the sidebar keeps two rows of tools with Agents among them; the plans' usage shows
+  on the System button.
+- **The start page**: the program picker is called Runs on, beside the Agent picker, which lists the agents of the
+  project picked as well as those that work everywhere.
+- **New → Diagram starts blank**: draw it yourself, or describe it for an agent to draw.
+
 ## 0.36.0 · 7 November 2026
 
 Diagrams in the Library, drawn and edited as in draw.io: flowcharts, org charts, mind maps, swimlanes, architecture,

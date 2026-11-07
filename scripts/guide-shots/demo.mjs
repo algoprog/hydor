@@ -496,6 +496,65 @@ export async function seedApi(api, home, now, s) {
     ].join('\n'),
   });
 
+  // Alex's own agents (the Agents page): a scout on a schedule, a team in the shop's project, one for the taxes and one for the garden.
+  const agent = async (b) => (await api('POST', '/api/assistants', b)).assistant?.id;
+  const scout = await agent({
+    name: 'Library scout',
+    icon: 'telescope',
+    description: 'Finds new studies on small-town public libraries and keeps the best in the Library',
+    instructions:
+      'Search for studies from the last week on how small towns use their public libraries. Keep the five closest to the thesis in the Library, two lines each: what it found, and why it matters to the thesis.',
+    tools: ['read', 'web'],
+    tier: 'quick',
+    budgetUsd: 3,
+  });
+  const reviewer = await agent({
+    name: 'Shop reviewer',
+    icon: 'shield',
+    description: 'Reviews each change to the shop for bugs and missing tests',
+    instructions: 'Review the change you are given: bugs first, then missing tests, then style. Say what to fix first.',
+    projects: [shopSpace],
+    tier: 'best',
+    folder: 'project',
+  });
+  const tester = await agent({
+    name: 'Shop tester',
+    icon: 'wrench',
+    description: 'Runs the shop’s tests and says what broke',
+    instructions: 'Run npm test with TZ=UTC, and report each failure with the file and the likely cause.',
+    projects: [shopSpace],
+    tier: 'quick',
+    folder: 'project',
+  });
+  await agent({
+    name: 'Shop engineer',
+    icon: 'code',
+    description: 'Builds and fixes the shop, with a reviewer and a tester',
+    instructions: 'You are the engineer of the shop. Make small changes, ask the Shop tester to run the tests and the Shop reviewer to review before you hand a change over.',
+    projects: [shopSpace],
+    tier: 'standard',
+    canAsk: [reviewer, tester],
+    folder: 'project',
+  });
+  await agent({
+    name: 'Bookkeeper',
+    icon: 'wallet',
+    description: 'Keeps the receipts and tax forms in order, in EUR',
+    instructions: 'Keep a spreadsheet of the receipts by month and category, in EUR, and say what is missing for the tax return.',
+    projects: [taxes],
+    tier: 'standard',
+    tools: ['read', 'edit'],
+    budgetUsd: 5,
+  });
+  await agent({
+    name: 'Garden planner',
+    icon: 'leaf',
+    description: 'Plans the beds and the sowing for zone 5b',
+    instructions: 'Plan what to sow and when for zone 5b, bed by bed, and keep the plan in the garden project.',
+    projects: [garden],
+    tier: 'quick',
+  });
+
   // Scheduled tasks at times well away from now, so none runs while the shots are taken.
   const hourNow = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: 'America/New_York' }).format(now));
   const away = (h) => (h - hourNow + 24) % 24 >= 3;
@@ -504,6 +563,8 @@ export async function seedApi(api, home, now, s) {
     { name: 'Ridge E5 price watch', time: '09:00', h: 9, days: [1, 2, 3, 4, 5], prompt: 'Check the Velora Ridge E5’s price on velora.bike and tell me if it drops under $1,700.', extra: { assistant: 'researcher' } },
     { name: 'Weekly shop report', time: '08:00', h: 8, days: [1], prompt: 'Sales, refunds and the slowest pages of the shop last week, with what changed since the week before.', cwd: path.join(home, 'code/shop-api') },
     { name: 'Water the greenhouse reminder', time: '18:00', h: 18, days: [0, 3], prompt: 'Remind me to water the greenhouse, and say whether frost is forecast tonight.', extra: { space: garden } },
+    { name: 'New library studies', time: '08:00', h: 8, days: [1, 2, 3, 4, 5], prompt: 'Find this week’s new studies and keep the best five.', extra: { assistant: scout } },
+    { name: 'Nightly shop tests', time: '02:00', h: 2, prompt: 'Run the tests on main and say what broke.', cwd: path.join(home, 'code/shop-api'), extra: { assistant: tester } },
   ];
   // Experiments: a few short runs on the CPU (no GPU is ever used), two experiments of a dense retriever, three seeds
   // each, their metrics printed as training logs do; the GPUs the page shows are made up (overrides, run.mjs).

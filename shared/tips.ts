@@ -89,7 +89,7 @@ export const TIP_GUIDE: Record<TipId, string> = {
   tasks: '/guide/tasks#what-a-scheduled-task-is',
   memory: '/guide/memory#what-agents-remember',
   guidelines: '/guide/guidelines#what-guidelines-are',
-  assistants: '/guide/assistants#make-your-own-assistant',
+  assistants: '/guide/agents#make-an-agent',
   connections: '/guide/connections#what-connections-keys-and-tools-are',
   skills: '/guide/skills#open-the-skills-page',
 };

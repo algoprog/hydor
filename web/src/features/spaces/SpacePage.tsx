@@ -18,6 +18,7 @@ import { go, openSession } from '../../lib/nav';
 import { toastError, useApp, useSessions, useUI } from '../../lib/store';
 import type { PickedFile } from '../../lib/upload';
 import { tr } from '../../i18n/runtime';
+import { AgentsBoard } from '../assistants/AgentsBoard';
 import { AssistantIcon } from '../assistants/icons';
 import { useAssistantsState } from '../assistants/state';
 import { goFolder } from '../files/actions';
@@ -32,7 +33,7 @@ import { SpaceFiles } from './SpaceFiles';
 import { SpaceSkillsTab } from './SpaceSkills';
 import { loadSpaces, useSpaces } from './state';
 
-export type SpaceTab = 'overview' | 'library' | 'files' | 'knowledge' | 'skills' | 'settings';
+export type SpaceTab = 'overview' | 'library' | 'files' | 'knowledge' | 'skills' | 'agents' | 'settings';
 
 const plural = (n: number, one: string, many: string) => tr(`${n} ${n === 1 ? one : many}`);
 
@@ -184,6 +185,7 @@ function Top({ s, view, tab }: { s: Space; view?: SpaceView; tab: SpaceTab }) {
             { value: 'files', label: 'Files' },
             { value: 'knowledge', label: 'Knowledge', count: wide ? view?.docs : undefined },
             { value: 'skills', label: 'Skills', count: wide ? view?.skills : undefined },
+            { value: 'agents', label: 'Agents' },
             { value: 'settings', label: 'Settings' },
           ]}
         />
@@ -294,7 +296,7 @@ function OverviewTab({ s, view, keys }: { s: Space; view?: SpaceView; keys?: str
               {view?.skills ? plural(view.skills, 'skill', 'skills') : <span className="text-fg-3">None of its own</span>}
             </Fact>
             <Fact icon={<UserRound size={16} />} label="Starts as" onClick={() => to('settings')}>
-              {assistant ? <span translate="no">{assistant}</span> : <span className="text-fg-3">The assistant picked on the start page</span>}
+              {assistant ? <span translate="no">{assistant}</span> : <span className="text-fg-3">The agent picked on the start page</span>}
             </Fact>
             <Fact icon={<Brain size={16} />} label="Memory" onClick={() => go('/settings?s=memory')}>
               What agents remember about it
@@ -559,11 +561,11 @@ function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void 
             aria-label="Agent Guidelines"
           />
         </Row>
-        <Row title="How its sessions start" sub="Picking the project on the start page picks this assistant too">
+        <Row title="How its sessions start" sub="Picking the project on the start page picks this agent too">
           <span className="mb-1.5 block text-[12.5px] text-fg-2">Its sessions start as</span>
           <div role="radiogroup" aria-label="Its sessions start as" className="flex flex-wrap gap-1.5">
             <Chip on={!form.assistant} onClick={() => setForm({ ...form, assistant: '' })}>
-              The assistant picked on the start page
+              The agent picked on the start page
             </Chip>
             {assistants.map((a) => (
               <Chip key={a.id} on={form.assistant === a.id} onClick={() => setForm({ ...form, assistant: a.id })}>
@@ -678,6 +680,8 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
               <KnowledgeTab s={s} onSaved={saved} />
             ) : tab === 'skills' ? (
               <SpaceSkillsTab s={s} />
+            ) : tab === 'agents' ? (
+              <AgentsBoard space={s} />
             ) : tab === 'settings' ? (
               <SettingsTab s={s} onSaved={saved} />
             ) : tab === 'library' ? (

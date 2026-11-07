@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { closestCenter, DndContext, DragOverlay, MouseSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Boxes, CircleHelp, Folders, Gauge, Inbox, ListFilter, MonitorCog, PanelLeftClose, RotateCcw, Search, Settings, SquarePen, WifiOff, X } from 'lucide-react';
+import { Boxes, CircleHelp, Folders, Inbox, ListFilter, MonitorCog, PanelLeftClose, RotateCcw, Search, Settings, SquarePen, WifiOff, X } from 'lucide-react';
 import { usualOrder, type SidebarTool } from '@shared/sidebar';
 import { activityOf } from '../../lib/activity';
 import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
@@ -175,9 +175,8 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
 
   const tools: Tool[] = [
     ...features().flatMap((f) => (f.nav ?? []).map((n): Tool => ({ id: n.id, label: n.label, icon: n.icon, match: n.match ? n.match(loc) : loc === n.path, go: () => nav(n.path) }))),
-    { id: 'usage', label: 'Usage', icon: <Gauge size={17} />, match: loc === '/usage' || loc === '/stats' || loc === '/arena', go: () => nav('/usage'), extra: <UsageHint /> },
-    // This computer: its files, Git, terminals, previews and monitor, each a tab of System.
-    { id: 'system', label: 'System', icon: <MonitorCog size={17} />, match: systemTabOf(loc) !== null, go: () => nav('/system'), tour: 'nav-system' },
+    // This computer: its files, Git, terminals, previews, monitor and the plans' usage, each a tab of System (the plans' usage shows on it).
+    { id: 'system', label: 'System', icon: <MonitorCog size={17} />, match: systemTabOf(loc) !== null, go: () => nav('/system'), tour: 'nav-system', extra: <UsageHint /> },
     {
       id: 'settings',
       label: 'Settings',

@@ -5,12 +5,12 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'rea
 import { Check, ChevronRight, Folder, FolderOpen, Plus, X } from 'lucide-react';
 import { isGroup, MAX_FOLDERS, MAX_GROUP, SPACE_COLORS, spaceColor, type Space, type SpaceSuggestion } from '@shared/spaces';
 import { FolderFinder } from '../../components/FolderPicker';
-import { Button, cx, Dialog, inputCls, Popover, Tabs } from '../../components/ui';
+import { Button, cx, Dialog, inputCls, Popover, Switch, Tabs } from '../../components/ui';
 import { api, post } from '../../lib/api';
 import { basename, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { saveStart } from '../../lib/start';
-import { toastError, useApp } from '../../lib/store';
+import { toast, toastError, useApp } from '../../lib/store';
 import { loadSpaces, useSpaces } from './state';
 
 /** Under the Spaces page's title: the spaces, and the documents every session searches. */
@@ -215,6 +215,28 @@ function OtherFolders({ list, onChange, skip }: { list: string[]; onChange: (l: 
  * other folders it uses are under More options. With `group`, a group of spaces: the spaces it brings together
  * too. `folder`: the folder it starts with (a suggestion on the Spaces page).
  */
+/**
+ * Makes a project an agent of its own, in the background: drafted to fit it when it says enough about itself, else the
+ * template for its kind, else the default one. Says so when it is ready.
+ */
+export function makeAgentFor(s: Pick<Space, 'id' | 'name'>): Promise<void> {
+  return post<{ assistant: { id: string; name: string }; how: 'drafted' | 'template' | 'default' }>(`/api/projects/${s.id}/agent`)
+    .then(
+      (r) =>
+        void toast(
+          r.how === 'drafted'
+            ? `${r.assistant.name} is ready, drafted for ${s.name}`
+            : r.how === 'template'
+              ? `${r.assistant.name} is ready, from the template for projects like ${s.name}`
+              : `${r.assistant.name} is ready`,
+          'ok',
+        ),
+    )
+    .catch((e) => {
+      toastError(e);
+    });
+}
+
 export function NewSpaceDialog({ open, onClose, onMade, group, folder }: { open: boolean; onClose: () => void; onMade?: (s: Space) => void; group?: boolean; folder?: string }) {
   const home = useApp((s) => s.boot?.home);
   const spaces = useSpaces();
@@ -230,6 +252,8 @@ export function NewSpaceDialog({ open, onClose, onMade, group, folder }: { open:
   const [more, setMore] = useState(false);
   const [find, setFind] = useState(false);
   const [busy, setBusy] = useState(false);
+  // An agent of its own, made once it is (server/assistants/projectAgent.ts).
+  const [agent, setAgent] = useState(true);
   const findRef = useRef<HTMLButtonElement>(null);
   const [suggested] = useSpaceSuggestions();
   useEffect(() => {
@@ -244,6 +268,7 @@ export function NewSpaceDialog({ open, onClose, onMade, group, folder }: { open:
     setAlso([]);
     setMore(false);
     setFind(false);
+    setAgent(true);
   }, [open, folder]);
   // The colour it gets unless one is picked: the next one no space has (as the server picks it).
   const used = new Set((spaces ?? []).map((x) => x.color));
@@ -270,6 +295,7 @@ export function NewSpaceDialog({ open, onClose, onMade, group, folder }: { open:
         ...(also.length ? { folders: also } : {}),
       });
       loadSpaces();
+      if (agent) makeAgentFor(s);
       onMade?.(s);
       onClose();
     } catch (e) {
@@ -380,6 +406,13 @@ export function NewSpaceDialog({ open, onClose, onMade, group, folder }: { open:
           </div>
           <FindFolder anchor={findRef} open={find} onClose={() => setFind(false)} title="Its folder" value={own} onPick={pickOwn} />
         </div>
+        <label className="flex cursor-pointer items-center gap-3">
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-medium">An agent for it</span>
+            <span className="block text-[12px] leading-snug text-fg-3">Drafted from its name, description and files; the template for its kind when there is little to go on</span>
+          </span>
+          <Switch on={agent} onChange={setAgent} label="An agent for it" />
+        </label>
         <div>
           <button type="button" aria-expanded={more} onClick={() => setMore((m) => !m)} className="flex items-center gap-1 text-[13px] font-medium text-fg-2 hover:text-fg">
             <ChevronRight size={15} className={cx('transition-transform', more && 'rotate-90')} />

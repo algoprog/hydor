@@ -93,6 +93,7 @@
 [设置 → 模型](/settings?s=models)：Custom（本应用自带的智能体）的模型：OpenRouter、Ollama，以及在这里用 vLLM 运行的 Hugging Face 模型。详见[智能体、账户和模型](/guide/agents-models)。
 
 - [**辅助模型**](/settings?s=models&find=Helper%20model)：在会话之外处理小任务的模型。
+- [**档位**](/settings?s=models&find=Tiers)：快速、标准和最佳在每个程序中对应的模型：智能体用某个档位思考，并给它们的助手分配档位。
 - [**在本机**](/settings?s=models&find=On%20this%20machine)：安装在这里的模型及其下载。
 - [**从 Hugging Face 添加模型**](/settings?s=models&find=Add%20a%20model%20from%20Hugging%20Face)：为这台电脑推荐的模型，或者搜索，看看每一个在这里运行得如何，然后安装它。
 - [**OpenRouter**](/settings?s=models&find=OpenRouter)：通过 OpenRouter 使用的模型，用你的密钥。
@@ -247,13 +248,13 @@
 - [**服务器端语音识别**](/settings?s=voice&find=Speech%20recognition%20on%20the%20server)：在这台电脑上或通过某个服务识别语音。
 - [**朗读**](/settings?s=voice&find=Read%20aloud)：朗读回复。
 
-### 助手
+### 你的智能体
 
-[设置 → 助手](/settings?s=assistants)：开始会话时可选的预设（研究员、写作者、导师……），以及任务文件夹的位置。详见[助手](/guide/assistants)。
+[设置 → 你的智能体](/settings?s=assistants)：任务文件夹的位置，以及任务完成后的清理；你的智能体本身在“智能体”页面上。详见[智能体](/guide/agents)。
 
-- [**新建助手**](/settings?s=assistants&find=New%20assistant)：启动会话时使用的预设。
+- [**打开智能体**](/settings?s=assistants&find=Open%20Agents)：你的智能体在“智能体”页面上。
 - [**任务完成后清理**](/settings?s=assistants&find=Clean%20up%20after%20a%20task)：智能体会删除过程中创建且不再需要的内容。
-- [**任务文件夹**](/settings?s=assistants&find=Task%20folders)：助手的新任务文件夹存放位置。
+- [**任务文件夹**](/settings?s=assistants&find=Task%20folders)：新任务文件夹的位置，用于未选文件夹而开始的会话。
 
 ### Custom
 

@@ -150,8 +150,8 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
     body: 'Write once how you like to work, and every agent here follows it. A project, or a single session, can have its own.',
   },
   assistants: {
-    title: 'Assistants',
-    body: 'Presets a session starts as, such as Researcher, Writer or Coder. Make your own, with its instructions, tools and model.',
+    title: 'Your agents',
+    body: 'Agents a session works as, such as Researcher, Writer or Coder, and your own: where and when each works, what it thinks with, and whom it asks. They are on the Agents page.',
   },
   connections: {
     title: 'Connect your services',

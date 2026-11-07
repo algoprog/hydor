@@ -29,7 +29,7 @@ import { openAsk } from '../guide/ask';
 import { loadGuide } from '../guide/state';
 import { startHandsFree } from '../voice/HandsFree';
 
-export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Projects' | 'Apps' | 'Scheduled tasks' | 'Assistants' | 'Skills' | 'Plugins' | 'Connections' | 'Pages' | 'Images, videos and audio' | 'Themes' | 'Files';
+export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Projects' | 'Apps' | 'Scheduled tasks' | 'Agents' | 'Skills' | 'Plugins' | 'Connections' | 'Pages' | 'Images, videos and audio' | 'Themes' | 'Files';
 
 export interface Entry extends Findable {
   id: string;
@@ -183,7 +183,7 @@ export async function liveEntries(): Promise<Entry[]> {
       run: () => go(settingsAt('tasks', t.name)),
     });
   for (const a of Array.isArray(assistants) ? assistants : (assistants?.assistants ?? []))
-    out.push({ id: `asst:${a.id}`, group: 'Assistants', icon: <Bot size={15} />, title: a.name, keywords: 'assistant', text: a.description, where: 'Settings › Capabilities › Assistants', body: a.description, opens: 'Opens Settings → Assistants, at this one', within: 'sec:assistants', run: () => go(settingsAt('assistants', a.name)) });
+    out.push({ id: `asst:${a.id}`, group: 'Agents', icon: <Bot size={15} />, title: a.name, keywords: 'agent assistant', text: a.description, where: 'Agents', body: a.description, opens: 'Opens the Agents page, at this agent', within: 'sec:assistants', run: () => go(`/agents/${encodeURIComponent(a.id)}`) });
   for (const s of lib?.skills ?? [])
     out.push({ id: `skill:${s.name}`, group: 'Skills', icon: <Library size={15} />, title: s.name, keywords: `skill ${s.triggers.join(' ')}`, text: s.description, where: 'Settings › Agents › Skills', body: s.description, opens: 'Opens Settings → Skills, at this skill', within: 'sec:skills', run: () => go(settingsAt('skills', s.name)) });
   for (const p of [...(plugins?.installed ?? []), ...(plugins?.available ?? [])])

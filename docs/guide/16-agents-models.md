@@ -25,7 +25,7 @@ What each can do in the app:
 
 On the start page (`/`), the row under the message box says who does the work.
 
-1. Click **Agent**. The list shows **Claude Code** ("Anthropic · Claude plan or API key"), **Codex** ("OpenAI · ChatGPT plan or API key"), **Custom** ("Any model: OpenRouter, Ollama, vLLM") and every agent you added in Settings → More agents ("ACP agent · " and its command). At the bottom, **Models for Custom** opens Settings → Models, and **Add or manage agents** opens Settings → More agents.
+1. Click **Runs on**. The list shows **Claude Code** ("Anthropic · Claude plan or API key"), **Codex** ("OpenAI · ChatGPT plan or API key"), **Custom** ("Any model: OpenRouter, Ollama, vLLM") and every agent you added in Settings → More agents ("ACP agent · " and its command). At the bottom, **Models for Custom** opens Settings → Models, and **Add or manage agents** opens Settings → More agents.
 2. Click **Model** and pick one. The list shows only that agent's own models. The agent's default is marked "default". Older versions of a model wait behind a line such as "2 older models"; click it to see them. When there are more than eight models, a **Search models** box sits at the top: type a few letters and press Enter to take the first match. When the agent did not start as the app asked for its models, the menu says so, with the agent's own words on why, and **Try again** asks again.
 3. Under **Options** you find **Effort** (for agents and models that have it: Default, Low, Medium, High and so on) and **Permissions** (what the agent may do without asking you). Shift+Tab in the message box switches permissions too.
 
@@ -33,7 +33,7 @@ The start page remembers what you picked, per agent, on every device: next time 
 
 An ACP agent other than Custom shows its **Model** and **Permissions** choices only after its first session: they list what the agent offered when it last ran.
 
-With **Options** → **Confidential** on, **Agent** is **Custom** and **Model** lists only the models on this computer or your private network, the best of them picked first: see [Keep a session confidential](/guide/sessions#keep-a-session-confidential).
+With **Options** → **Confidential** on, **Runs on** is **Custom** and **Model** lists only the models on this computer or your private network, the best of them picked first: see [Keep a session confidential](/guide/sessions#keep-a-session-confidential).
 
 On a phone, each of these menus opens as a sheet from the bottom of the screen.
 
@@ -49,6 +49,12 @@ Pick another model and the session carries on with it:
 - Another ACP agent switches if it offers a choice of models.
 
 The model menu only lists the session's own agent's models; a confidential session's, only those on this computer or your private network. To move a conversation to another agent, use the session's menu (⋯) → **Continue in Codex**, **Continue in Claude Code** or **Continue in Custom Agent** (from Claude Code and Codex sessions; Custom appears once it has a model). Your next message then starts a new session of that agent in the same folder, with the conversation so far. A stopped session picks up again on the model it last used, unless you pick another one before you send.
+
+## Tiers: a model for each kind of job
+
+Agents pick models by tier instead of by name: **Quick** for clear jobs whose result can be checked, **Standard** for most work, **Best** for hard, open-ended problems. An agent can think with a tier, and it gives each helper it starts a tier for its part (see [What an agent thinks with: tiers](/guide/agents#what-an-agent-thinks-with-tiers)).
+
+[Settings → Agents → Models → Tiers](/settings?s=models&find=Tiers) says what each tier means for each program, in a table with a column for **Claude Code**, **Codex** and **Custom**: a model and, for Claude Code and Codex, an effort. To start, Quick is Haiku, Standard is Sonnet and Best is Opus for Claude Code; Codex uses its default model with low, medium and high effort; Custom has none, so its sessions keep the model they picked until you choose one of your Custom models (a model on this computer makes Quick free). **Back to the defaults** puts them back.
 
 ## Agent programs install and update themselves
 
@@ -163,7 +169,7 @@ To add one:
 2. If the app knows how to install it (Gemini CLI, OpenCode, Qwen Code, Auggie), it installs it now, in the background. Goose and Kimi CLI you install yourself, from the address in their row.
 3. Sign in once in the agent's own program: open the [Terminal](/terminal), run its command (for example `gemini`) and follow its sign-in. If you skip this, a session tells you: "Gemini CLI is not signed in. Run gemini once in a terminal and sign in there, then try again."
 
-The agent now shows in the start page's **Agent** list.
+The agent now shows in the start page's **Runs on** list.
 
 To change an added agent, click **Edit**. To take it out, click the bin icon and confirm: its sessions stay listed, but continuing them needs the agent set up again. Custom is built in: its row says "Built in: models from OpenRouter, Ollama and vLLM, in Settings → Models" and has a **Models** button instead of Edit and Remove.
 

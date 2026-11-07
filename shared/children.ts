@@ -1,5 +1,6 @@
 // Child sessions: an agent hands a part of its job to a new session, which works in parallel and whose
 // reply comes back to it as a message.
+import type { Tier } from './tiers.ts';
 import type { Agent } from './types.ts';
 
 /** A note of kind "child": the card a child session gets in its parent's conversation. */
@@ -18,6 +19,11 @@ export interface ChildNote {
   cwd: string;
   worktree?: boolean;
   capUsd?: number;
+  /** One of the user's agents it works as: its name then, and its id. */
+  as?: string;
+  asId?: string;
+  /** The tier it was given (or the named agent's own). */
+  tier?: Tier;
   startedAt: number;
 }
 

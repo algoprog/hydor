@@ -5,6 +5,7 @@ import { Children, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Folder, FolderPlus, Plus } from 'lucide-react';
 import type { Space, SpaceView } from '@shared/spaces';
 import { agentMode, type Assistant } from '@shared/assistants';
+import { tierProgram } from '@shared/tiers';
 import type { Agent } from '@shared/types';
 import { post } from '../../lib/api';
 import { tildify } from '../../lib/format';
@@ -14,6 +15,7 @@ import { FolderFinder } from '../../components/FolderPicker';
 import { Popover, SettingChip, useSheets } from '../../components/ui';
 import { SpaceMark } from '../spaces/parts';
 import { assistantIn, lastAssistant, useAssistantsState } from './state';
+import { useTierMap } from './agentsState';
 
 /** Makes the new task's folder (Settings → Assistants says where) and returns its path. */
 export const taskFolderFor = (prompt: string) => post<{ path: string }>('/api/assistants/task-folder', { prompt }).then((r) => r.path);
@@ -139,7 +141,7 @@ export function WorkFolderChip({
 const sameAgent = (a: Assistant, agent: Agent, acpId: string | null) => a.agent === agent && (agent !== 'acp' || a.acpAgent === acpId);
 
 /**
- * Picking an assistant sets the agent, model and mode it suggests. Call it after the start page's own
+ * Picking an agent sets the program, model and mode it suggests (the model of the tier it thinks with, when it has one). Call it after the start page's own
  * choice of model and mode for an agent (from what it was last used with): each catalog of the agent
  * that arrives (`cat`) resets them to that, so the assistant's go on again after it. The pick the page
  * opens with changes nothing.
@@ -149,6 +151,7 @@ export function useAssistantDefaults(
   o: { agent: Agent; acpId: string | null; cat: unknown; setAgent: (a: Agent) => void; setAcpId: (id: string | null) => void; setModel: (m: string | null) => void; setMode: (m: string | null) => void },
 ) {
   const st = useAssistantsState();
+  const tiers = useTierMap();
   const pending = useRef<Assistant | null>(null);
   const seen = useRef<string | undefined>(undefined);
   const done = useRef<unknown>(null);
@@ -157,7 +160,7 @@ export function useAssistantDefaults(
     const first = seen.current === undefined;
     seen.current = id;
     const a = first ? undefined : assistantIn(st, id);
-    pending.current = a && (a.agent || a.mode) ? a : null;
+    pending.current = a && (a.agent || a.mode || a.tier) ? a : null;
     done.current = null;
     if (a?.agent && !sameAgent(a, o.agent, o.acpId)) {
       if (a.agent === 'acp') o.setAcpId(a.acpAgent ?? null);
@@ -167,8 +170,13 @@ export function useAssistantDefaults(
   useEffect(() => {
     const a = pending.current;
     if (!a || !o.cat || done.current === o.cat || (a.agent && !sameAgent(a, o.agent, o.acpId))) return;
+    // A tier's model waits for the tiers to be known.
+    if (a.tier && !tiers) return;
     done.current = o.cat;
-    if (a.agent && a.model) o.setModel(a.model);
+    const prog = tierProgram(o.agent, o.acpId ?? undefined);
+    const tierModel = a.tier && tiers && prog ? tiers[prog][a.tier].model : undefined;
+    if (tierModel) o.setModel(tierModel);
+    else if (a.agent && a.model) o.setModel(a.model);
     const m = agentMode(a.mode, o.agent, o.acpId ?? undefined);
     if (m) o.setMode(m);
   });

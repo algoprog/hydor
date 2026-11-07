@@ -277,6 +277,6 @@ function List() {
 
 export function SpacesPage() {
   const [loc] = useLocation();
-  const m = /^\/projects\/([a-z0-9]+)(?:\/(library|files|knowledge|skills|settings))?$/.exec(loc);
+  const m = /^\/projects\/([a-z0-9]+)(?:\/(library|files|knowledge|skills|agents|settings))?$/.exec(loc);
   return m ? <SpacePage id={m[1]} tab={(m[2] as SpaceTab | undefined) ?? 'overview'} /> : <List />;
 }

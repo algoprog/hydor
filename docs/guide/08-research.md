@@ -62,6 +62,8 @@ Any agent can hand a self-contained part of its job to a new session, a child se
 For each child, the agent picks:
 
 - **The agent and model**: Custom with any of its models (from [Settings → Models](/settings?s=models)), Claude Code, Codex, or another agent you added (Gemini CLI, OpenCode…). By default a child runs the same agent as the session that started it. A cheaper or local model suits bulk work; Claude Code or Codex suits a hard part.
+- **A tier** for its part: **Quick** for a clear, checkable part, **Standard** for most, **Best** for a hard one; the tier's model for that program comes from [Settings → Models → Tiers](/settings?s=models&find=Tiers). An agent of yours can cap its helpers' tiers.
+- **One of your agents**, by name, instead of a plain child: it works with its own instructions, tools and tier (see [Agents that hand work to other agents](/guide/agents#agents-that-hand-work-to-other-agents)).
 - **The folder**: the parent's, unless it names another.
 - **A worktree** if it wants one: a separate copy of the folder's git repository on a new branch, so the child's changes do not mix with anyone else's.
 - **A short title**, which is the name you see.
@@ -209,7 +211,7 @@ The model arena sends the same prompt to two or three models at once, so you can
 
 The Arena row reads "+1 model" or "+2 models", and the Options chip names it. This browser remembers your last picks, but the arena is not kept on for your next session.
 
-Each model works in a session of its own, with the same prompt, attachments, folder and session settings (assistant, memory, spending cap), and its agent's usual effort and permissions. In a git repository, turn on **New worktree** in the folder menu so that each model gets its own copy of the code instead of all of them changing one folder. If a model cannot start, the app says so and the match goes on without it.
+Each model works in a session of its own, with the same prompt, attachments, folder and session settings (agent, memory, spending cap), and its agent's usual effort and permissions. In a git repository, turn on **New worktree** in the folder menu so that each model gets its own copy of the code instead of all of them changing one folder. If a model cannot start, the app says so and the match goes on without it.
 
 ### Compare the answers and keep the best
 

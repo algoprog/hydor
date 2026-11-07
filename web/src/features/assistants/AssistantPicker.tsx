@@ -3,7 +3,7 @@
 // message box: another one from the next message on.
 import { useEffect, useRef, useState } from 'react';
 import { Check, Settings2 } from 'lucide-react';
-import { assistantExtra, type Assistant, type AssistantSwitch } from '@shared/assistants';
+import { assistantExtra, inScope, type Assistant, type AssistantSwitch } from '@shared/assistants';
 import type { SessionExtra } from '@shared/features';
 import type { SessionSummary } from '@shared/types';
 import { enc, put } from '../../lib/api';
@@ -34,7 +34,7 @@ function AssistantMenu({ list, cur, heading, onPick, onSettings }: { list: Assis
   const acpName = (id: string) => acp?.find((x) => x.id === id)?.name;
   const about = (a: Assistant) => {
     const also = suggests(a, acpName);
-    return [a.description || 'Your own assistant', also && `Uses ${also}`].filter(Boolean).join(' · ');
+    return [a.description || 'Your own agent', also && `Uses ${also}`].filter(Boolean).join(' · ');
   };
   const row = (a: Assistant) => {
     const sel = a.id === cur?.id;
@@ -104,13 +104,13 @@ function AssistantMenu({ list, cur, heading, onPick, onSettings }: { list: Assis
       )}
       <MenuSep />
       <MenuItem icon={<Settings2 size={14} />} onClick={onSettings}>
-        Make or change assistants
+        Make or change agents
       </MenuItem>
     </>
   );
 }
 
-/** The start page's assistant picker: which assistant the new session starts as. */
+/** The start page's agent picker: which agent the new session starts as, from those that work in the project picked. */
 export function AssistantStartOption({ value, onChange }: { value: SessionExtra; onChange: (patch: Partial<SessionExtra>) => void }) {
   const st = useAssistantsState();
   const sheet = useSheets();
@@ -123,16 +123,23 @@ export function AssistantStartOption({ value, onChange }: { value: SessionExtra;
     const a = assistantIn(st, lastAssistant()) ?? assistantIn(st, undefined);
     if (a) set(a);
   }, [st]);
+  const space = typeof value.space === 'string' ? value.space : null;
+  const cur = st ? assistantIn(st, typeof value.assistant === 'string' ? value.assistant : undefined) : undefined;
+  // Another project picked, where the agent does not work: the default one instead.
+  useEffect(() => {
+    if (!st || !cur || inScope(cur, space)) return;
+    const a = assistantIn(st, undefined);
+    if (a) set(a);
+  }, [st, space, cur?.id]);
   if (!st) return null;
-  const cur = assistantIn(st, typeof value.assistant === 'string' ? value.assistant : undefined);
   return (
     <>
       <SettingChip
         ref={ref}
-        label="Assistant"
+        label="Agent"
         open={open}
         onClick={() => setOpen((o) => !o)}
-        title={cur ? `${cur.name}\n${cur.description}` : 'Which assistant this session starts as'}
+        title={cur ? `${cur.name}\n${cur.description}` : 'Which agent this session starts as'}
         value={
           <span className="inline-flex items-center gap-1.5">
             <AssistantIcon icon={cur?.icon ?? 'sparkles'} size={13} plain className="shrink-0 text-fg-3" />
@@ -140,9 +147,9 @@ export function AssistantStartOption({ value, onChange }: { value: SessionExtra;
           </span>
         }
       />
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={Math.min(sheet ? 340 : 360, window.innerWidth - 16)} title="Assistant">
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={Math.min(sheet ? 340 : 360, window.innerWidth - 16)} title="Agent">
         <AssistantMenu
-          list={st.assistants}
+          list={st.assistants.filter((a) => inScope(a, space))}
           cur={cur}
           heading="Start as"
           onPick={(a) => {
@@ -151,7 +158,7 @@ export function AssistantStartOption({ value, onChange }: { value: SessionExtra;
           }}
           onSettings={() => {
             setOpen(false);
-            go('/settings?s=assistants');
+            go('/agents');
           }}
         />
       </Popover>
@@ -159,7 +166,7 @@ export function AssistantStartOption({ value, onChange }: { value: SessionExtra;
   );
 }
 
-/** The assistant a session works as; undefined while the list loads, null for none (started elsewhere, or before assistants). */
+/** The agent a session works as; undefined while the list loads, null for none (started elsewhere, or before agents). */
 export function useSessionAssistant(s: SessionSummary): Assistant | null | undefined {
   const st = useAssistantsState();
   const id = s.extra?.assistant;
@@ -186,7 +193,7 @@ export function SessionAssistantPicker({ s, label, onConfig }: { s: SessionSumma
       toastError(e);
     }
   };
-  const name = cur?.name ?? (label ? 'None' : 'No assistant');
+  const name = cur?.name ?? (label ? 'None' : 'No agent');
   return (
     <Picker
       icon={label ? undefined : <AssistantIcon icon={cur?.icon ?? 'sparkles'} size={13} plain className="shrink-0" />}
@@ -201,12 +208,12 @@ export function SessionAssistantPicker({ s, label, onConfig }: { s: SessionSumma
           name
         )
       }
-      title={cur ? `Assistant: ${cur.name}\n${cur.description}` : 'Assistant: none. Pick one to shape how the agent works from your next message'}
+      title={cur ? `Agent: ${cur.name}\n${cur.description}` : 'Agent: none. Pick one to shape how the session works from your next message'}
       width={360}
     >
       {(close) => (
         <AssistantMenu
-          list={st.assistants}
+          list={st.assistants.filter((a) => inScope(a, typeof s.extra?.space === 'string' ? s.extra.space : null))}
           cur={cur ?? undefined}
           heading="Switch to"
           onPick={(a) => {
@@ -215,7 +222,7 @@ export function SessionAssistantPicker({ s, label, onConfig }: { s: SessionSumma
           }}
           onSettings={() => {
             close();
-            go('/settings?s=assistants');
+            go('/agents');
           }}
         />
       )}

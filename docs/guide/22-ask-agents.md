@@ -1,6 +1,6 @@
 # Let agents work the app for you
 
-Every agent here knows this guide and can work the app for you. Ask how something works and it answers from the guide, with a link to the right place. Ask it to change a setting or set something up (a project, an assistant, a scheduled task) and it does it, after you confirm on a card. When it needs details from you, it shows a form to fill in.
+Every agent here knows this guide and can work the app for you. Ask how something works and it answers from the guide, with a link to the right place. Ask it to change a setting or set something up (a project, an agent, a scheduled task) and it does it, after you confirm on a card. When it needs details from you, it shows a form to fill in.
 
 ![An agent changing a setting for you: the card shows the change before it is made](images/ask-agents.webp)
 
@@ -15,7 +15,7 @@ You can also read the guide yourself: **Help** in the sidebar, or search it from
 Agents can do in the app what you could do in its pages. Some examples of what you can ask:
 
 - "Turn on search by meaning."
-- "Make a project called Thesis for my dissertation, with the Researcher assistant."
+- "Make a project called Thesis for my dissertation, with the Researcher agent."
 - "Every weekday at 8, give me a news brief on renewable energy."
 - "Add to my guidelines that answers should be short."
 - "Use Brave Search before DuckDuckGo."

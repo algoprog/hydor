@@ -487,7 +487,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
         <SettingLayout.Provider value="bare">
           <SheetsOnPhone.Provider value>
             <div data-tour="start-bar" className="flex flex-wrap items-center gap-0.5 rounded-b-[21px] border-t border-line bg-bg-1/70 px-2 py-1.5">
-              <AgentPicker label="Agent" agent={agent} acpId={acpId} acpList={acpList ?? []} onPick={chooseAgent} localOnly={confidential} />
+              <AgentPicker label="Runs on" agent={agent} acpId={acpId} acpList={acpList ?? []} onPick={chooseAgent} localOnly={confidential} />
               <ModelPicker label="Model" agent={agent} acp={acpId ?? undefined} value={model} onChange={(v) => (setModel(v), keepRun({ model: v }))} localOnly={confidential} />
               <WorkFolderChip
                 value={cwd}
