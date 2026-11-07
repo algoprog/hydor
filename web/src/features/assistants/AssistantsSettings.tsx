@@ -350,13 +350,15 @@ export function EditAssistant({ value, onClose, onSaved }: { value: Draft | null
             </div>
           </Field>
         </div>
-        <Field label="Thinks with" hint="Automatic: the model picked where it starts. A tier: its model for the program it runs on (Settings → Models → Tiers).">
+        <Field label="Thinks with">
           <Segmented<Tier | 'auto'>
             size="sm"
             value={d.tier ?? 'auto'}
             onChange={(v) => set({ tier: v === 'auto' ? undefined : v })}
             options={[{ value: 'auto', label: 'Automatic' }, ...TIERS.map((t) => ({ value: t.id, label: t.label }))]}
           />
+          {/* Under the choice it explains, not below the helpers' rows. */}
+          <div className="mt-1 text-[12px] leading-snug text-fg-3">Automatic: the model picked where it starts. A tier: its model for the program it runs on (Settings → Models → Tiers).</div>
           <div className="mt-2.5 mb-1 text-[12.5px] text-fg-2">Helpers it starts, never above</div>
           <Segmented<Tier | 'any'>
             size="sm"
