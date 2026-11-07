@@ -3,7 +3,7 @@
 // (from a starting point, a file, or by asking an agent, from a kind picked in the gallery or in their own words), in
 // a space or in none, or upload files of yours into the Library (each made what it is: uploads.ts); and a published
 // site's row.
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppWindow, FileText, Globe, GlobeLock, LayoutGrid, NotebookText, Palette, Presentation, Sheet, Sigma, Sparkles, Upload, Workflow, X } from 'lucide-react';
 import type { ContentKind, ContentType } from '@shared/content-types';
 import { DESCRIPTION_WORDS, wordCount, type PageInfo, type SiteInfo, type SiteVisibility } from '@shared/pages';
@@ -36,9 +36,6 @@ import { designSize, sizeText, type DesignSize } from '@shared/design';
 import { templateById, templatePage, templatesFor } from '@shared/design-templates';
 import { fontsOf, NewDesign, paletteOf, type Colours } from './design/NewDesign';
 import { useBrand } from './design/brand';
-
-/** New's diagram templates, loaded when Diagram is picked (with what draws them). */
-const NewDiagram = lazy(() => import('./diagram/NewDiagram'));
 
 const TONES = ['from-accent/25 to-accent/5 text-accent', 'from-info/25 to-info/5 text-info', 'from-ok/25 to-ok/5 text-ok', 'from-warn/25 to-warn/5 text-warn', 'from-claude/25 to-claude/5 text-claude', 'from-codex/25 to-codex/5 text-codex'];
 export const toneOf = (id: string) => TONES[parseInt(id.slice(0, 6), 16) % TONES.length];
@@ -315,9 +312,6 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
   const [dSize, setDSize] = useState<DesignSize>(() => designSize('instagram-post')!);
   const [dTpl, setDTpl] = useState<string | null>(() => templatesFor(designSize('instagram-post')!)[0]?.id ?? null);
   const [dColours, setDColours] = useState<Colours>('own');
-  // A diagram: the template it starts from (drawn in the app's light or dark).
-  const [dgTpl, setDgTpl] = useState('blank');
-  const dark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
   const pickSize = (s: DesignSize) => {
     if (kind === 'design' && (title === tr(dSize.label) || title === NEW_TITLE.design || !title.trim())) setTitle(tr(s.label));
     setDSize(s);
@@ -347,8 +341,6 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
       const r =
         kind === 'design'
           ? await post<{ page: PageInfo }>('/api/pages', { title: t, html: templatePage(tpl, dSize, { title: t, palette: paletteOf(dColours, brand), fonts: fontsOf(tpl, dColours, brand) }), ...at })
-          : kind === 'diagram'
-          ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind, model: await (await import('./diagram/NewDiagram')).diagramFrom(dgTpl), ...at })
           : kind === 'slides'
           ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind: 'slides', model: deckIn(theme, t, ratio), ...at })
           : kind === 'page'
@@ -458,7 +450,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
       open={open}
       onClose={onClose}
       title={kind === 'design' ? 'A new design' : kind === 'slides' ? 'New slides' : kind === 'doc' ? 'A new document' : kind === 'sheet' ? 'A new spreadsheet' : kind === 'tex' ? 'A new LaTeX document' : kind === 'notebook' ? 'A new notebook' : kind === 'diagram' ? 'A new diagram' : 'A new page'}
-      width={kind === 'design' || kind === 'diagram' ? 860 : 600}
+      width={kind === 'design' ? 860 : 680}
       footer={
         <>
           {/* Files of yours instead, as many as you pick, each made what it is, in the project picked below. */}
@@ -524,17 +516,12 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
         ) : kind === 'design' ? (
           <NewDesign size={dSize} onSize={pickSize} tpl={dTpl} onTpl={setDTpl} colours={dColours} onColours={setDColours} brand={brand} />
         ) : kind === 'diagram' ? (
-          <>
-            <Suspense fallback={<div className="h-40" />}>
-              <NewDiagram value={dgTpl} onPick={setDgTpl} dark={dark} />
-            </Suspense>
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-bg-1 px-3 py-2.5">
-              <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-fg-2">A diagram to draw and edit as in draw.io, and save as a picture, a PDF or a draw.io file.</span>
-              <Button size="sm" variant="secondary" icon={<Upload size={14} />} disabled={busy} onClick={openFile}>
-                Open a draw.io or Mermaid file
-              </Button>
-            </div>
-          </>
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-bg-1 px-3 py-2.5">
+            <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-fg-2">A diagram to draw and edit as in draw.io, and save as a picture, a PDF or a draw.io file.</span>
+            <Button size="sm" variant="secondary" icon={<Upload size={14} />} disabled={busy} onClick={openFile}>
+              Open a draw.io or Mermaid file
+            </Button>
+          </div>
         ) : kind === 'page' ? (
           <>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
