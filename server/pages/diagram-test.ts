@@ -22,11 +22,10 @@ import { CONTAINER_KINDS, diagramText, isEdge, isShape, normalizeDiagram, SHAPE_
 import { KINDS, pageBox, shapeGeom, shapePorts, toPage, inShape, perimeterPoint } from '../../shared/diagram-shapes.ts';
 import { distanceTo, edgeCourse, edgeGeom } from '../../shared/diagram-route.ts';
 import { layout } from '../../shared/diagram-layout.ts';
-import { specPage, sizeFor } from '../../shared/diagram-spec.ts';
+import { LAYOUTS, specPage, sizeFor } from '../../shared/diagram-spec.ts';
 import { applyDiagramEdits, relayoutPage } from '../../shared/diagram-edits.ts';
 import { alignShapes, cloneItems, distributeShapes, hitItem, moveItems, movingSet, removeItems, reorder, reparent, snapBox } from '../../shared/diagram-ops.ts';
 import { pageSvg, sketchPath } from '../../shared/diagram-render.ts';
-import { DIAGRAM_TEMPLATES } from '../../shared/diagram-templates.ts';
 import { PALETTE } from '../../shared/diagram-palette.ts';
 import { draftDiagram } from '../../shared/draft-diagram.ts';
 import { DraftMemo } from '../../shared/page-drafts.ts';
@@ -331,7 +330,22 @@ const edge = (id: string, from: string, to: string, more: Partial<DiagramEdge> =
 
 // ---- drawn ------------------------------------------------------------------------------------------------------------
 {
-  const d = DIAGRAM_TEMPLATES.find((t) => t.id === 'flowchart')!.build({});
+  const flow = specPage({
+    layout: 'down',
+    nodes: [
+      { id: 'a', text: 'Start', shape: 'ellipse' },
+      { id: 'b', text: 'Is it complete?', shape: 'diamond' },
+      { id: 'c', text: 'Do the work' },
+      { id: 'd', text: 'Ask for what is missing', color: 'orange' },
+    ],
+    edges: [
+      { from: 'a', to: 'b' },
+      { from: 'b', to: 'c', text: 'Yes' },
+      { from: 'b', to: 'd', text: 'No' },
+      { from: 'd', to: 'b', dashed: true },
+    ],
+  });
+  const d = normalizeDiagram({ pages: [flow.page] });
   const light = pageSvg(d, d.pages[0]);
   ok(light.svg.startsWith('<svg') && light.svg.endsWith('</svg>') && !/NaN|undefined/.test(light.svg), 'a page drawn as SVG');
   const opens = (light.svg.match(/<g[\s>]/g) ?? []).length;
@@ -346,14 +360,17 @@ const edge = (id: string, from: string, to: string, more: Partial<DiagramEdge> =
   ok(sk.svg.length > light.svg.length, 'by hand, every line drawn twice');
 }
 
-// ---- templates and the panel ------------------------------------------------------------------------------------------
+// ---- every layout, and the panel -----------------------------------------------------------------------------------------
 {
-  ok(DIAGRAM_TEMPLATES.length >= 12, 'a dozen templates');
-  for (const t of DIAGRAM_TEMPLATES) {
-    const d = t.build({ icon: lucideIcon });
-    ok(d.pages.length === 1 && (t.id === 'blank' || d.pages[0].items.length > 3), `${t.id}: made`);
-    if (['flowchart', 'org', 'mindmap', 'swimlanes', 'architecture', 'uml-class', 'er', 'brainstorm'].includes(t.id)) ok(clashes(d.pages[0]).length === 0, `${t.id}: nothing over anything (${clashes(d.pages[0]).join(', ')})`);
-    ok(!/NaN|undefined/.test(pageSvg(d, d.pages[0]).svg), `${t.id}: drawn`);
+  const words = ['Launch', 'Plan the work', 'Build it', 'Test it', 'Write the docs', 'Tell the press', 'Fix what broke', 'Ship it'];
+  const nodes = words.map((text, i) => ({ id: `n${i}`, text, icon: i === 7 ? 'rocket' : undefined }));
+  const edges = [[0, 1], [0, 2], [0, 3], [1, 4], [1, 5], [3, 6], [6, 7]].map(([a, b]) => ({ from: `n${a}`, to: `n${b}` }));
+  for (const l of LAYOUTS) {
+    if (l === 'none') continue;
+    const r = specPage({ layout: l, nodes, edges }, { icon: lucideIcon });
+    const d = normalizeDiagram({ pages: [r.page] });
+    ok(r.page.items.length === nodes.length + edges.length && clashes(r.page).length === 0, `${l}: laid out, nothing over anything (${clashes(r.page).join(', ')})`);
+    ok(!/NaN|undefined/.test(pageSvg(d, d.pages[0]).svg), `${l}: drawn`);
   }
   const entries = PALETTE.flatMap((g) => g.entries);
   ok(new Set(entries.map((e) => e.id)).size === entries.length, 'each shape of the panel has an id of its own');

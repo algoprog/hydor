@@ -160,9 +160,8 @@ const QUIET = new Set(['prompt', 'command', 'also']);
 /** Keys quiet in one file only: the requests the kinds an agent makes ask for (`ask`), which elsewhere is a question shown. */
 const QUIET_IN = {
   'shared/content-types.ts': ['ask'],
-  // A diagram's own words (what its shapes say), drawn where nothing is translated: its templates', and the panel's
-  // shapes' sample words; their names and lines (label, blurb) are the app's.
-  'shared/diagram-templates.ts': ['text', 'rows', 'name', 'fromText', 'toText'],
+  // A diagram's own words (what its shapes say), drawn where nothing is translated: the sample words of the panel's
+  // shapes; their names are the app's.
   'shared/diagram-palette.ts': ['text', 'rows'],
 };
 /** The quiet keys of the file being read. */

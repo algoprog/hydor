@@ -17,17 +17,17 @@ network, UML and ER diagrams, made by you or by an agent, and opened from or sav
   feet, align and space out, group, lock, order, find and replace, copy and paste between diagrams, and undo.
 - **Laid out for you**: Layout places every shape again from what joins what, as a flowchart down or across, a tree,
   a mind map, rings, a circle or a grid; swimlanes stay lanes and containers grow round what they hold.
-- **Twelve templates and nineteen kinds made with AI**: start from a flowchart, an org chart, a mind map, swimlanes,
-  an architecture, UML classes, a database schema, a sequence diagram, a timeline, a kanban board or a brainstorm, or
-  pick a kind for an agent to draw, and watch the diagram grow as it writes it. **Turn it into** makes a diagram of a
-  document, slides, a page, a spreadsheet or a notebook.
+- **Drawn by you, or by an agent**: New → Diagram opens a blank page to draw on, or describe the diagram you want (or
+  pick one of nineteen kinds) and watch it grow as an agent draws it. **Turn it into** makes a diagram of a document,
+  slides, a page, a spreadsheet or a notebook.
 - **draw.io and Mermaid in and out**: open a .drawio file (or a draw.io SVG or PNG) or Mermaid text as a diagram,
   insert them into one, or paste them in; export a diagram as PNG, SVG, PDF, a draw.io file or a web page to pan and
   zoom, and download or copy any page as a picture, light or dark, see-through or not.
 - **Agents draw them too**: they say what is in a diagram and what joins what (or write Mermaid), and the app sizes and
   lays it out; they change one shape at a time, lay a diagram out again, restyle it and export it.
-- **In Chinese and Greek**: the diagram editor, its templates and its part of the guide. And Find's count in the
-  other editors ("1 of 3") no longer has the editor's name stuck to it in those languages ("doc::1 / 3").
+- **In Chinese and Greek**: the diagram editor and its part of the guide. And Find's count in the other editors
+  ("1 of 3") no longer has the editor's name stuck to it in those languages ("doc::1 / 3"); New's kinds fit their
+  tiles again.
 
 ## 0.35.0 · 7 November 2026
 

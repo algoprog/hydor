@@ -651,7 +651,7 @@ agents that speak ACP and take MCP servers.
   (how_to_make "design" says how, with the brand kit) and export them with export_page.
 - **Diagrams, as in draw.io, Lucidchart or Visio**: New → Diagram (or save_diagram) makes a flowchart, an org chart,
   a mind map, a swimlane process, an architecture or network diagram, UML classes, an ER diagram, a sequence diagram,
-  a timeline, a kanban board or a brainstorm, from twelve templates, blank, from a draw.io file (.drawio, a draw.io
+  a timeline, a kanban board or a brainstorm: drawn on a blank page, opened from a draw.io file (.drawio, a draw.io
   SVG or PNG, compressed pages too) or Mermaid, or described for an agent (19 diagram kinds). A model of pages of shapes
   and connectors, drawn by one renderer for the editor, the viewer, the Library's picture and every file. 75 kinds of
   shape (general, flowchart, containers, UML, ER, BPMN, block arrows, sticky notes, pictures, and icons from Lucide's
