@@ -1,11 +1,11 @@
 // The answer UIs for money (stock quotes, loans, budgets, savings growth, pricing plans, splitting a bill): their views, by name (shared/answer-ui/money.ts has what each takes).
 import { useMemo, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, MessageSquarePlus, Target, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, MessageSquarePlus, Target, X } from 'lucide-react';
 import { LOCALE } from '../../../i18n/locale';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { niceTicks, XYChart } from '../charts';
-import { arr, Btn, Card, Chip, Copy, fmtDate, fmtMoney, fmtNum, Head, isObj, KeyValues, LinkOut, Md, num, parseDate, Section, Seg, seriesColor, str, textOf, useAsk, useKept, yes, type AnswerUiView, type Data } from '../kit';
+import { arr, Btn, Card, Chip, Copy, fmtDate, fmtMoney, fmtNum, Head, isObj, KeyValues, LinkOut, Md, Meter, num, parseDate, Section, Seg, seriesColor, str, textOf, useAsk, useKept, yes, type AnswerUiView, type Data } from '../kit';
 import { currencySign, HoverTip, niceStep, shareText, SliderRow, useBoxWidth } from './data';
 
 /** Money as the app's language writes it; whole amounts without cents. */
@@ -719,6 +719,206 @@ function SplitBill({ data, done }: { data: Data; done: boolean }) {
   );
 }
 
+// ---- an investment portfolio ------------------------------------------------------------------------------------------
+
+interface Holding {
+  i: number;
+  name: string;
+  symbol: string;
+  kind: string;
+  value: number;
+  cost: number | null;
+  today: number | null;
+}
+type HoldingSort = 'name' | 'value' | 'gain' | 'today';
+
+/** A kind of holding as a name: the agent's word with a capital ("stock" → "Stock"), or Other. */
+const kindName = (k: string) => (k ? `${k.charAt(0).toLocaleUpperCase()}${k.slice(1)}` : tr('Other'));
+/** Money with its sign: "+$1,250", "−$320". */
+const signedMoney = (n: number, currency: string) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${money(Math.abs(n), currency, true)}`;
+/** A share as a signed percentage: 0.0123 as "+1.23%". */
+const signedPct = (x: number, digits = 1) => `${x > 0 ? '+' : x < 0 ? '−' : ''}${fmtNum(Math.abs(x) * 100, { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
+const toneOfSign = (x: number | null) => (x === null || Math.abs(x) < 1e-9 ? 'text-fg-3' : x > 0 ? 'text-ok' : 'text-err');
+
+function Portfolio({ data, done }: { data: Data; done: boolean }) {
+  const cur = str(data.currency) || 'USD';
+  const [by, setBy] = useKept<'kind' | 'holding'>('by', 'kind');
+  const [sort, setSort] = useKept<{ key: HoldingSort; down: boolean } | null>('sort', null);
+  const [lit, setLit] = useState<number | null>(null);
+  const holdings: Holding[] = arr(data.holdings ?? data.positions ?? data.items)
+    .filter(isObj)
+    .map((h, i) => {
+      const cost = num(h.cost ?? h.cost_basis ?? h.basis);
+      return { i, name: textOf(h, 'name', 'title', 'symbol'), symbol: str(h.symbol ?? h.ticker).trim(), kind: str(h.kind ?? h.type ?? h.class).trim(), value: num(h.value ?? h.market_value ?? h.amount) ?? NaN, cost: cost !== null && cost > 0 ? cost : null, today: num(h.change_pct ?? h.today_pct ?? h.today) };
+    })
+    .filter((h) => h.name && Number.isFinite(h.value));
+  const total = holdings.reduce((m, h) => m + h.value, 0);
+  const costed = holdings.filter((h) => h.cost !== null);
+  const paid = costed.reduce((m, h) => m + (h.cost ?? 0), 0);
+  const gain = costed.reduce((m, h) => m + h.value - (h.cost ?? 0), 0);
+  // Today's change in money: each holding's value now less what it was before today's change.
+  const moved = holdings.filter((h) => h.today !== null && h.today > -100);
+  const todayAbs = moved.reduce((m, h) => m + h.value - h.value / (1 + (h.today ?? 0) / 100), 0);
+  const todayPct = moved.length && total - todayAbs > 0 ? todayAbs / (total - todayAbs) : null;
+  // The allocation: by kind (when the holdings say theirs), or by holding (the largest seven, the rest as one).
+  const kinds = holdings.some((h) => h.kind);
+  const byKind = kinds && by === 'kind';
+  let parts: { name: string; value: number; color: string }[];
+  if (byKind) {
+    const sums = new Map<string, number>();
+    for (const h of holdings) sums.set(kindName(h.kind), (sums.get(kindName(h.kind)) ?? 0) + h.value);
+    parts = [...sums.entries()].sort((a, b) => b[1] - a[1]).map(([name, value], i) => ({ name, value, color: i < 8 ? seriesColor(i) : 'var(--fg-3)' }));
+  } else {
+    const ranked = [...holdings].sort((a, b) => b.value - a.value);
+    const head = ranked.length > 8 ? ranked.slice(0, 7) : ranked;
+    parts = head.map((h, i) => ({ name: h.symbol || h.name, value: h.value, color: seriesColor(i) }));
+    if (ranked.length > head.length) parts.push({ name: tr('Other'), value: ranked.slice(head.length).reduce((m, h) => m + h.value, 0), color: 'var(--line-2)' });
+  }
+  parts = parts.filter((p) => p.value > 0);
+  const whole = parts.reduce((m, p) => m + p.value, 0);
+  const top = holdings.reduce((m, h) => Math.max(m, h.value), 0);
+  const gainOf = (h: Holding) => (h.cost !== null ? h.value - h.cost : null);
+  const s = sort ?? { key: 'value', down: true };
+  const sorted = [...holdings].sort((a, b) => {
+    const r =
+      s.key === 'name'
+        ? a.name.localeCompare(b.name)
+        : s.key === 'gain'
+          ? (gainOf(a) ?? -Infinity) - (gainOf(b) ?? -Infinity)
+          : s.key === 'today'
+            ? (a.today ?? -Infinity) - (b.today ?? -Infinity)
+            : a.value - b.value;
+    return s.down ? -r : r;
+  });
+  const head = (key: HoldingSort, label: string, right = true) => {
+    const on = s.key === key;
+    return (
+      <button
+        type="button"
+        disabled={!done}
+        onClick={() => setSort(on ? { key, down: !s.down } : { key, down: key !== 'name' })}
+        className={cx('inline-flex items-center gap-1 font-medium transition-colors enabled:hover:text-fg', right && 'flex-row-reverse', on && sort && 'text-fg')}
+      >
+        {label}
+        {on && sort && (s.down ? <ArrowDown size={12} /> : <ArrowUp size={12} />)}
+      </button>
+    );
+  };
+  return (
+    <Card>
+      <Head title={data.title} sub={str(data.as_of) ? tr('As of {0}').replace('{0}', fmtDate(data.as_of)) : undefined} />
+      {holdings.length > 0 && (
+        <div className="grid grid-cols-2 gap-2 @lg:grid-cols-3">
+          <div className="col-span-2 @lg:col-span-1">
+            <Tile big label={tr('Total value')} value={money(total, cur, true)} sub={holdings.length === 1 ? tr('1 holding') : tr('{0} holdings').replace('{0}', fmtNum(holdings.length))} />
+          </div>
+          {costed.length > 0 && (
+            <Tile big label={gain < 0 ? tr('Loss') : tr('Gain')} value={signedMoney(gain, cur)} tone={gain > 0 ? 'good' : gain < 0 ? 'bad' : undefined} sub={paid > 0 ? tr('{0} on {1} paid').replace('{0}', signedPct(gain / paid)).replace('{1}', money(paid, cur, true)) : undefined} />
+          )}
+          {todayPct !== null && <Tile big label={tr('Today')} value={signedMoney(todayAbs, cur)} tone={todayAbs > 0 ? 'good' : todayAbs < 0 ? 'bad' : undefined} sub={signedPct(todayPct, 2)} />}
+        </div>
+      )}
+      {parts.length > 0 && whole > 0 && (
+        <Section
+          title={tr('Allocation')}
+          className="mt-5"
+          aside={
+            kinds && done ? (
+              <Seg
+                size="sm"
+                options={[
+                  { value: 'kind', label: tr('By kind') },
+                  { value: 'holding', label: tr('By holding') },
+                ]}
+                value={byKind ? 'kind' : 'holding'}
+                onChange={(v) => {
+                  setBy(v);
+                  setLit(null);
+                }}
+              />
+            ) : undefined
+          }
+        >
+          <div className="flex h-6 w-full gap-[2px] overflow-hidden rounded-md" role="img" aria-label={parts.map((p) => p.name).join(', ')} onPointerLeave={() => setLit(null)}>
+            {parts.map((p, i) => (
+              <div key={`${i}:${p.name}`} onPointerEnter={() => setLit(i)} title={`${p.name}: ${shareText(p.value / whole)}`} className="h-full min-w-[3px] transition-opacity" style={{ flex: `${p.value} 1 0%`, background: p.color, opacity: lit === null || lit === i ? 1 : 0.45 }} />
+            ))}
+          </div>
+          <ul className="m-0 mt-2.5 grid list-none gap-x-6 p-0 @md:grid-cols-2" onPointerLeave={() => setLit(null)}>
+            {parts.map((p, i) => (
+              <li key={`${i}:${p.name}`} onPointerEnter={() => setLit(i)} className={cx('flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-[13px]', lit === i && 'bg-bg-2')}>
+                <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: p.color }} />
+                <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                <span className="shrink-0 text-[12px] text-fg-3 tabular-nums">{money(p.value, cur, true)}</span>
+                <span className="w-12 shrink-0 text-right font-medium tabular-nums">{shareText(p.value / whole)}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+      {holdings.length > 0 && (
+        <Section title={tr('Holdings')} className="mt-5">
+          <div className="-mx-1 overflow-x-auto">
+            <table className="w-full border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-line text-[12px] text-fg-3">
+                  <th className="px-1 py-1.5 text-left font-medium">{head('name', tr('Holding'), false)}</th>
+                  <th className="px-1 py-1.5 text-right font-medium">{head('value', tr('Value'))}</th>
+                  <th className="hidden px-1 py-1.5 text-right font-medium @xl:table-cell">{tr('Weight')}</th>
+                  <th className="px-1 py-1.5 text-right font-medium">{head('gain', tr('Gain'))}</th>
+                  <th className="hidden px-1 py-1.5 text-right font-medium @sm:table-cell">{head('today', tr('Today'))}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((h) => {
+                  const g = gainOf(h);
+                  return (
+                    <tr key={h.i} className="border-b border-line/60">
+                      <td className="px-1 py-2 align-top">
+                        <div className="leading-snug font-medium">{h.name}</div>
+                        {(h.symbol || h.kind) && <div className="text-[11.5px] text-fg-3">{[h.symbol, h.kind ? kindName(h.kind) : ''].filter(Boolean).join(' · ')}</div>}
+                      </td>
+                      <td className="px-1 py-2 text-right align-top whitespace-nowrap tabular-nums">
+                        <div className="font-medium">{money(h.value, cur, true)}</div>
+                        {total > 0 && <div className="text-[11.5px] text-fg-3 @xl:hidden">{shareText(h.value / total)}</div>}
+                      </td>
+                      <td className="hidden px-1 py-2 align-top @xl:table-cell">
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          <span className="text-[12px] text-fg-2 tabular-nums">{total > 0 ? shareText(h.value / total) : ''}</span>
+                          <Meter value={h.value} max={top || 1} thin className="w-14" />
+                        </div>
+                      </td>
+                      <td className={cx('px-1 py-2 text-right align-top whitespace-nowrap tabular-nums', toneOfSign(g))}>
+                        {g !== null && h.cost ? (
+                          <>
+                            <div className="font-medium">{signedMoney(g, cur)}</div>
+                            <div className="text-[11.5px]">{signedPct(g / h.cost)}</div>
+                          </>
+                        ) : (
+                          <span className="text-fg-3">—</span>
+                        )}
+                      </td>
+                      <td className={cx('hidden px-1 py-2 text-right align-top whitespace-nowrap tabular-nums @sm:table-cell', toneOfSign(h.today))}>{h.today !== null ? signedPct(h.today / 100, 2) : <span className="text-fg-3">—</span>}</td>
+                    </tr>
+                  );
+                })}
+                <tr className="font-semibold">
+                  <td className="px-1 py-2">{tr('Total')}</td>
+                  <td className="px-1 py-2 text-right whitespace-nowrap tabular-nums">{money(total, cur, true)}</td>
+                  <td className="hidden px-1 py-2 text-right tabular-nums @xl:table-cell">100%</td>
+                  <td className={cx('px-1 py-2 text-right whitespace-nowrap tabular-nums', costed.length ? toneOfSign(gain) : 'text-fg-3')}>{costed.length ? signedMoney(gain, cur) : '—'}</td>
+                  <td className={cx('hidden px-1 py-2 text-right whitespace-nowrap tabular-nums @sm:table-cell', toneOfSign(todayPct))}>{todayPct !== null ? signedPct(todayPct, 2) : '—'}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      )}
+      {str(data.note) && <Md text={data.note} className="mt-3 text-[13px] text-fg-2" />}
+    </Card>
+  );
+}
+
 export const MONEY_UIS: Record<string, AnswerUiView> = {
   stock: Stock,
   loan: Loan,
@@ -726,4 +926,5 @@ export const MONEY_UIS: Record<string, AnswerUiView> = {
   savings: Savings,
   pricing: Pricing,
   'split-bill': SplitBill,
+  portfolio: Portfolio,
 };

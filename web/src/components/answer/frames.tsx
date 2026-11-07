@@ -35,8 +35,11 @@ function OneBlock({ block, result, title, height }: { block: Record<string, unkn
   );
 }
 
-export function MapFrame({ points, route, numbered = true, ends, height = 320 }: { points: MapPoint[]; route?: boolean; numbered?: boolean; ends?: boolean; height?: number }) {
-  const block = useMemo(() => ({ element: 'map', data: 'result.points', with: { lat: 'lat', lng: 'lng', label: 'name', popup: 'note', numbered, line: !!route, ends: !!ends, height } }), [numbered, route, ends, height]);
+export function MapFrame({ points, route, numbered = true, ends, sized, height = 320 }: { points: MapPoint[]; route?: boolean; numbered?: boolean; ends?: boolean; sized?: boolean; height?: number }) {
+  const block = useMemo(
+    () => ({ element: 'map', data: 'result.points', with: { lat: 'lat', lng: 'lng', label: 'name', popup: 'note', numbered: numbered && !sized, line: !!route, ends: !!ends, height, ...(sized ? { value: 'value' } : {}) } }),
+    [numbered, route, ends, sized, height],
+  );
   const result = useMemo(() => ({ points }), [points]);
   return <OneBlock block={block} result={result} title={tr('Map')} height={height} />;
 }

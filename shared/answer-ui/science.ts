@@ -100,4 +100,44 @@ Units: length nm µm mm cm m km in ft yd mi nmi au ly pc · mass mg g kg t oz lb
       example: 'The term “maksutov” occurs 3 times in a 600-term document (avgdl = 400), and in 1,200 of $N$ = 1,000,000 documents. With $k_1 = 1.2$ and $b = 0.75$: IDF = ln 833 ≈ **6.73**, the count part is 6.6 / 4.65 ≈ **1.42**, so the term adds **9.55** to the score.',
     },
   },
+  {
+    id: 'graph',
+    title: 'Function graph',
+    group: 'science',
+    use: 'Functions of x plotted on axes, with sliders for their parameters that redraw the curves live, marked points, and each curve’s value under the pointer.',
+    keywords: 'function graph plotter equation curve y = f(x) parabola sine exponential parameters sliders desmos algebra calculus maths explore',
+    shape: `{
+  title?: string
+  functions: { expr: string, label?: string }[]   // in x and the parameters' ids: + - * / ^ ( ), sqrt abs exp ln log sin cos tan asin acos atan min max round floor, pi, e
+  params?: { id: string, label?: string, value: number, min: number, max: number, step?: number }[]   // a slider each
+  x?: [number, number]         // the x range shown (−10 to 10 unless set)
+  y?: [number, number]         // the y range (fitted to the curves unless set)
+  x_label?: string
+  y_label?: string
+  points?: { x: number, y: number, label?: string }[]   // marked points: measurements, roots, a maximum
+  note?: md
+}
+Write * for every product (2*x, a*sin(b*x)); a curve has gaps where it is undefined.`,
+    example: {
+      title: 'A sunflower’s height: fit the growth curve to the measurements',
+      functions: [
+        { expr: 'K / (1 + exp(-r * (x - m)))', label: 'Logistic growth' },
+        { expr: '17.93 * exp(r * (x - 7))', label: 'Exponential growth at the same rate' },
+      ],
+      params: [
+        { id: 'K', label: 'Final height K (cm)', value: 250, min: 150, max: 350, step: 1 },
+        { id: 'r', label: 'Growth rate r (a day)', value: 0.08, min: 0.02, max: 0.2, step: 0.002 },
+        { id: 'm', label: 'Half-grown on day m', value: 38, min: 10, max: 70, step: 0.5 },
+      ],
+      x: [0, 100],
+      y: [0, 300],
+      x_label: 'days after sowing',
+      y_label: 'height (cm)',
+      points: [
+        { x: 7, y: 17.93 }, { x: 14, y: 36.36 }, { x: 21, y: 67.76 }, { x: 28, y: 98.1 }, { x: 35, y: 131 }, { x: 42, y: 169.5 },
+        { x: 49, y: 205.5 }, { x: 56, y: 228.3 }, { x: 63, y: 247.1 }, { x: 70, y: 250.5 }, { x: 77, y: 253.8 }, { x: 84, y: 254.5, label: 'Week 12' },
+      ],
+      note: 'Measured weekly by Reed and Holland in 1919. Move the sliders until the curve runs through the dots: about **K = 261 cm**, **r = 0.088** a day and **m = 34 days** fit best. The exponential keeps the early pace and leaves the chart by day 42; the logistic slows as the plant nears its final height.',
+    },
+  },
 ];

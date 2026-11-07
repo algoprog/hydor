@@ -1,5 +1,5 @@
 // The answer UIs for places and travel: their views, by name (shared/answer-ui/travel.ts has what each takes).
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   AlertTriangle,
@@ -9,6 +9,7 @@ import {
   Banknote,
   BedDouble,
   Bike,
+  Bus,
   Car,
   Check,
   Clock,
@@ -35,17 +36,22 @@ import {
   Phone,
   Plane,
   Route,
+  Ship,
   Star,
   Sun,
   Ticket,
   TrainFront,
+  TrainFrontTunnel,
+  TramFront,
   Utensils,
   Wind,
 } from 'lucide-react';
 import { LOCALE } from '../../../i18n/locale';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
-import { arr, Card, Chip, compact, fmtDate, fmtMoney, fmtNum, fmtTime, Head, isObj, LinkOut, MapBox, mapPoints, Md, num, obj, parseDate, Pic, Section, Seg, Stars, str, textOf, TONE, toneOf, useAui, useKept, useNow, yes, type AnswerUiView, type Data, type MapPoint, type Tone } from '../kit';
+import { niceTicks, useWidth } from '../charts';
+import { arr, Card, Chip, compact, fmtDate, fmtMinutes, fmtMoney, fmtNum, fmtTime, Head, isObj, LinkOut, MapBox, mapPoints, Md, num, obj, parseDate, Pic, Section, Seg, seriesColor, Stars, str, textOf, TONE, toneOf, useAui, useKept, useNow, yes, type AnswerUiView, type Data, type MapPoint, type Tone } from '../kit';
+import { HoverTip } from './data';
 
 // ---- places on a map --------------------------------------------------------------------------------------------------
 
@@ -1285,6 +1291,339 @@ function Currency({ data, done }: { data: Data; done: boolean }) {
   );
 }
 
+// ---- a departures board -----------------------------------------------------------------------------------------------
+
+const TRANSIT: Record<string, LucideIcon> = { train: TrainFront, bus: Bus, tram: TramFront, metro: TrainFrontTunnel, ferry: Ship };
+
+/** How a line runs, from the words agents use: train, bus, tram, metro, ferry; none when they say nothing of it. */
+function transitOf(v: unknown): string {
+  const s = str(v).trim().toLowerCase();
+  if (TRANSIT[s]) return s;
+  if (/bus|coach/.test(s)) return 'bus';
+  if (/tram|streetcar|light rail/.test(s)) return 'tram';
+  if (/metro|subway|underground|u-bahn|tube/.test(s)) return 'metro';
+  if (/ferry|boat|ship/.test(s)) return 'ferry';
+  if (/train|rail|s-bahn/.test(s)) return 'train';
+  return '';
+}
+
+/** A colour as #rrggbb, from "#e2001a", "e2001a" or "#e01"; empty when it is not one. */
+function hexColor(v: unknown): string {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(str(v).trim());
+  if (!m) return '';
+  const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1];
+  return `#${h.toLowerCase()}`;
+}
+
+/** The text that reads on a colour: near-black on a light one, white on a dark one. */
+function inkOn(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.179 ? '#15171c' : '#ffffff';
+}
+
+/** A line's badge: its kind's icon and its name, in its own colour when it has one. */
+function LineBadge({ line, mode, color }: { line: string; mode: string; color: string }) {
+  const Icon = TRANSIT[mode];
+  if (!line && !Icon) return <span />;
+  return (
+    <span className={cx('inline-flex h-6 items-center gap-1 justify-self-start rounded-md px-1.5 text-[12px] font-bold whitespace-nowrap', !color && 'bg-bg-2 text-fg')} style={color ? { background: color, color: inkOn(color) } : undefined}>
+      {Icon && <Icon size={13} className="shrink-0" />}
+      {line}
+    </span>
+  );
+}
+
+function Departures({ data, done }: { data: Data; done: boolean }) {
+  const { demo } = useAui();
+  const now = useNow(15_000);
+  const opened = useRef(Date.now());
+  const tz = str(data.tz ?? data.timezone).trim();
+  const updated = clockMin(data.updated ?? data.as_of);
+  // The station's clock, in minutes past midnight: its time zone's, else this computer's; in the gallery, as if just read.
+  const off = tz ? offsetIn(tz, now) : null;
+  const local = new Date(now);
+  const clock =
+    demo && updated !== null ? updated + (now - opened.current) / 60_000 : off !== null ? (((now / 60_000 + off) % 1440) + 1440) % 1440 : local.getHours() * 60 + local.getMinutes() + local.getSeconds() / 60;
+  const rows = arr(data.departures ?? data.items ?? data.trains)
+    .filter(isObj)
+    .map((d, i) => {
+      const sched = done || /^\d{1,2}[:.h]\d{2}/.test(str(d.time).trim()) ? clockMin(d.time ?? d.departure) : null;
+      const delay = Math.max(0, Math.round(num(d.delay) ?? 0));
+      const st = str(d.status).toLowerCase();
+      const cancelled = /cancel|annul|supprim|ausfall|fällt/.test(st);
+      // Minutes until it leaves, the nearer way round midnight.
+      let left = sched === null ? null : sched + delay - clock;
+      if (left !== null) left = ((((left + 720) % 1440) + 1440) % 1440) - 720;
+      return { d, i, delay, cancelled, late: delay > 0 || /delay|late|retard|versp/.test(st), left, mode: transitOf(d.mode ?? d.type), line: str(d.line ?? d.route).trim(), color: hexColor(d.color ?? d.colour), platform: str(d.platform ?? d.track ?? d.stop).trim() };
+    });
+  const modes = [...new Set(rows.map((r) => r.mode).filter(Boolean))];
+  const Icon = modes.length === 1 ? TRANSIT[modes[0]] : undefined;
+  const platforms = rows.some((r) => r.platform);
+  const head = 'aui-h4 whitespace-nowrap';
+  return (
+    <Card pad={false} className="overflow-hidden">
+      <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3 @lg:px-5">
+        <div className="min-w-0">
+          <h3 className="aui-h3 flex items-center gap-2">
+            {Icon && <Icon size={16} className="shrink-0 text-fg-3" />}
+            <span className="min-w-0">{str(data.station ?? data.stop ?? data.title)}</span>
+          </h3>
+          {updated !== null && <div className="mt-0.5 text-[12.5px] text-fg-3">{tr('Updated {0}').replace('{0}', minText(updated))}</div>}
+        </div>
+        {rows.length > 0 && (
+          <span className="shrink-0 rounded-lg bg-bg-2 px-2.5 py-1 text-[15px] font-semibold tabular-nums" title={tz || undefined}>
+            {minText(Math.floor(clock))}
+          </span>
+        )}
+      </div>
+      {rows.length > 0 && (
+        <ol className="m-0 grid list-none grid-cols-[auto_auto_minmax(0,1fr)_auto] gap-x-3 border-t border-line px-4 pb-1 @md:grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] @lg:px-5">
+          <li className="col-span-full hidden grid-cols-subgrid items-end pt-2.5 pb-1.5 @md:grid" aria-hidden>
+            <span className={head}>{tr('Departure')}</span>
+            <span className={head}>{tr('Line')}</span>
+            <span className={head}>{tr('Destination')}</span>
+            <span className={cx(head, 'text-center')}>{platforms ? tr('Platform') : ''}</span>
+            <span className={cx(head, 'text-right')}>{tr('Leaves in')}</span>
+          </li>
+          {rows.map((r, k) => {
+            const gone = !r.cancelled && r.left !== null && r.left < -1;
+            const via = str(r.d.via);
+            return (
+              <li key={r.i} className={cx('col-span-full grid grid-cols-subgrid items-center border-line/70 py-2.5', k ? 'border-t' : '@md:border-t', gone && 'opacity-50')}>
+                <div className="leading-tight tabular-nums">
+                  <div className={cx('text-[14px] font-semibold', r.cancelled && 'text-fg-3 line-through')}>{fmtTime(r.d.time ?? r.d.departure)}</div>
+                  {!r.cancelled && r.delay > 0 && <div className="text-[11.5px] font-semibold text-warn">{`+${r.delay}`}</div>}
+                  {!r.cancelled && !r.delay && r.late && <div className="text-[11.5px] font-semibold text-warn">{tr('Late')}</div>}
+                </div>
+                <LineBadge line={r.line} mode={r.mode} color={r.color} />
+                <div className="min-w-0">
+                  <div className={cx('truncate font-semibold', r.cancelled && 'text-fg-3 line-through')}>{str(r.d.destination ?? r.d.to ?? r.d.direction)}</div>
+                  {(via || r.platform) && (
+                    <div className="truncate text-[12px] text-fg-3">
+                      {r.platform && <span className="@md:hidden">{`${tr('Platform {0}').replace('{0}', r.platform)}${via ? ' · ' : ''}`}</span>}
+                      {via && tr('via {0}').replace('{0}', via)}
+                    </div>
+                  )}
+                </div>
+                <div className="hidden text-center @md:block">{r.platform && <span className="inline-grid min-w-[2rem] place-items-center rounded-md border border-line px-1.5 py-0.5 text-[13px] font-semibold tabular-nums">{r.platform}</span>}</div>
+                <div className="text-right whitespace-nowrap">
+                  {r.cancelled ? (
+                    <span className="text-[12.5px] font-semibold text-err">{tr('Cancelled')}</span>
+                  ) : r.left === null ? null : gone ? (
+                    <span className="text-[12.5px] text-fg-3">{tr('Departed')}</span>
+                  ) : r.left < 1 ? (
+                    <span className="text-[14px] font-bold text-accent">{tr('Now')}</span>
+                  ) : r.left < 60 ? (
+                    <span className="tabular-nums">
+                      <span className={cx('text-[17px] leading-none font-semibold', r.late && 'text-warn')}>{Math.floor(r.left)}</span>
+                      <span className="ml-0.5 text-[11.5px] text-fg-3">min</span>
+                    </span>
+                  ) : (
+                    <span className="text-[12.5px] text-fg-2 tabular-nums">{fmtMinutes(Math.floor(r.left))}</span>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </Card>
+  );
+}
+
+// ---- an elevation profile ---------------------------------------------------------------------------------------------
+
+const FEET = 3.28084;
+
+interface ElePoint {
+  d: number;
+  ele: number;
+}
+
+/** Height over distance: the profile as an area, waypoints over it, and what is under the pointer (distance, height, grade). */
+function ProfileChart({ pts, marks, unit, feet }: { pts: ElePoint[]; marks: { d: number; label: string }[]; unit: string; feet: boolean }) {
+  const [ref, width] = useWidth<HTMLDivElement>();
+  const [hover, setHover] = useState<number | null>(null);
+  const h = (m: number) => (feet ? m * FEET : m);
+  const hu = feet ? 'ft' : 'm';
+  const height = 230;
+  const d0 = pts[0].d;
+  const d1 = pts[pts.length - 1].d;
+  const hs = pts.map((p) => h(p.ele));
+  const lo = Math.min(...hs);
+  const hi = Math.max(...hs);
+  const pad = (hi - lo) * 0.06 || 10;
+  const yt = niceTicks(lo - pad, hi + pad, 5);
+  const axisW = Math.max(34, Math.max(...yt.map((t) => `${fmtNum(t, { maximumFractionDigits: 0 })} ${hu}`.length)) * 6.4 + 10);
+  const plotW = Math.max(40, width - axisW - 6);
+  const sx = (d: number) => axisW + ((d - d0) / (d1 - d0 || 1)) * plotW;
+  // The waypoints' names over the chart, in up to two rows; one that would run into the others is left out (its mark stays).
+  const ends = [-Infinity, -Infinity];
+  const named = marks
+    .filter((m) => m.d >= d0 - 1e-9 && m.d <= d1 + 1e-9)
+    .sort((a, b) => a.d - b.d)
+    .map((m) => {
+      const w = m.label.length * 6.2 + 6;
+      const at = Math.min(Math.max(sx(m.d), axisW + w / 2 - 4), axisW + plotW - w / 2 + 4);
+      const row = ends.findIndex((e) => at - w / 2 > e + 6);
+      if (row >= 0) ends[row] = at + w / 2;
+      return { ...m, at, row };
+    });
+  const rows = named.some((m) => m.row === 1) ? 2 : named.some((m) => m.row === 0) ? 1 : 0;
+  const padT = 8 + rows * 15;
+  const padB = 22;
+  const plotH = height - padT - padB;
+  const sy = (v: number) => padT + plotH - ((v - yt[0]) / (yt[yt.length - 1] - yt[0] || 1)) * plotH;
+  /** The height at a distance, between the points around it. */
+  const eleAt = (d: number): number => {
+    if (d <= pts[0].d) return pts[0].ele;
+    for (let k = 1; k < pts.length; k++)
+      if (pts[k].d >= d) {
+        const a = pts[k - 1];
+        const b = pts[k];
+        return b.d === a.d ? b.ele : a.ele + ((b.ele - a.ele) * (d - a.d)) / (b.d - a.d);
+      }
+    return pts[pts.length - 1].ele;
+  };
+  /** How steep the way is at a distance: rise over run, between the points around it. */
+  const gradeAt = (d: number): number | null => {
+    const k = Math.max(1, pts.findIndex((p) => p.d >= d));
+    const a = pts[k - 1];
+    const b = pts[k];
+    if (!a || !b) return null;
+    const run = (b.d - a.d) * (unit === 'mi' ? 1609.344 : 1000);
+    return run > 0 ? (b.ele - a.ele) / run : null;
+  };
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${sx(p.d).toFixed(1)},${sy(h(p.ele)).toFixed(1)}`).join('');
+  const base = sy(yt[0]);
+  const xt = niceTicks(d0, d1, Math.max(2, Math.floor(plotW / 90))).filter((t) => t >= d0 - 1e-9 && t <= d1 + 1e-9);
+  const onMove = (e: React.PointerEvent<SVGRectElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setHover(d0 + Math.max(0, Math.min(1, (e.clientX - r.left) / (r.width || 1))) * (d1 - d0));
+  };
+  const hv = hover === null ? null : h(eleAt(hover));
+  const grade = hover === null ? null : gradeAt(hover);
+  return (
+    <div ref={ref} className="relative">
+      {width > 0 && (
+        <svg width={width} height={height} className="block overflow-visible" role="img" aria-label={tr('Elevation profile')}>
+          {yt.map((t, i) => (
+            <g key={i}>
+              <line x1={axisW} x2={axisW + plotW} y1={sy(t)} y2={sy(t)} stroke={i === 0 ? 'var(--viz-axis)' : 'var(--viz-grid)'} shapeRendering="crispEdges" />
+              <text x={axisW - 6} y={sy(t)} dy="0.35em" textAnchor="end" className="fill-fg-3 text-[11px] tabular-nums">
+                {`${fmtNum(t, { maximumFractionDigits: 0 })} ${hu}`}
+              </text>
+            </g>
+          ))}
+          {xt.map((t, i) => (
+            <text key={i} x={sx(t)} y={height - 6} textAnchor={i === 0 && sx(t) - axisW < 12 ? 'start' : 'middle'} className="fill-fg-3 text-[11px] tabular-nums">
+              {`${fmtNum(t, { maximumFractionDigits: 2 })} ${unit}`}
+            </text>
+          ))}
+          <path d={`${line}L${sx(d1).toFixed(1)},${base}L${sx(d0).toFixed(1)},${base}Z`} fill={seriesColor(0)} opacity={0.1} />
+          <path d={line} fill="none" stroke={seriesColor(0)} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          {named.map((m, k) =>
+            m.row >= 0 ? <line key={k} x1={sx(m.d)} x2={sx(m.d)} y1={8 + m.row * 15 + 4} y2={sy(h(eleAt(m.d))) - 4} stroke="var(--line-2)" strokeDasharray="2 3" /> : null,
+          )}
+          {named.map((m, k) => (
+            <circle key={k} cx={sx(m.d)} cy={sy(h(eleAt(m.d)))} r={3.5} fill="var(--panel)" stroke="var(--fg-2)" strokeWidth={1.5} />
+          ))}
+          {/* The names over the lines, each with a rim of the panel's colour: a line from another never runs through one. */}
+          {named.map((m, k) =>
+            m.row >= 0 ? (
+              <text key={k} x={m.at} y={8 + m.row * 15} dy="0.35em" textAnchor="middle" stroke="var(--panel)" strokeWidth={4} strokeLinejoin="round" paintOrder="stroke" className="fill-fg-2 text-[11px] font-medium">
+                {m.label}
+              </text>
+            ) : null,
+          )}
+          {hover !== null && hv !== null && (
+            <g>
+              <line x1={sx(hover)} x2={sx(hover)} y1={padT} y2={padT + plotH} stroke="var(--line-2)" />
+              <circle cx={sx(hover)} cy={sy(hv)} r={4} fill={seriesColor(0)} stroke="var(--panel)" strokeWidth={2} />
+            </g>
+          )}
+          <rect x={axisW} y={padT} width={plotW} height={plotH} fill="transparent" onPointerMove={onMove} onPointerLeave={() => setHover(null)} />
+        </svg>
+      )}
+      {hover !== null && hv !== null && (
+        <HoverTip
+          x={sx(hover)}
+          y={Math.max(0, sy(hv) - 62)}
+          width={width}
+          title={`${fmtNum(hover, { maximumFractionDigits: 2 })} ${unit}`}
+          rows={[
+            { color: seriesColor(0), value: `${fmtNum(Math.round(hv))} ${hu}`, name: tr('Elevation') },
+            ...(grade !== null ? [{ value: `${grade > 0.0005 ? '+' : grade < -0.0005 ? '−' : ''}${fmtNum(Math.abs(grade * 100), { maximumFractionDigits: 0 })}%`, name: tr('Grade') }] : []),
+          ]}
+        />
+      )}
+    </div>
+  );
+}
+
+function Elevation({ data }: { data: Data }) {
+  const { offline } = useAui();
+  const feet = /^mi/i.test(str(data.unit).trim());
+  const unit = feet ? 'mi' : 'km';
+  const hu = feet ? 'ft' : 'm';
+  const raw = arr(data.points ?? data.profile ?? data.track);
+  const pts: ElePoint[] = raw
+    .map((p) => (Array.isArray(p) ? { d: num(p[0]), ele: num(p[1]) } : isObj(p) ? { d: num(p.d ?? p.distance ?? p.dist ?? p.x), ele: num(p.ele ?? p.elevation ?? p.alt ?? p.altitude ?? p.height ?? p.y) } : null))
+    .filter((p): p is ElePoint => !!p && p.d !== null && p.ele !== null);
+  if (pts.some((p, i) => i > 0 && p.d < pts[i - 1].d)) pts.sort((a, b) => a.d - b.d);
+  const marks = arr(data.waypoints ?? data.marks)
+    .filter(isObj)
+    .map((w) => ({ d: num(w.d ?? w.distance ?? w.at), label: textOf(w, 'label', 'name', 'title') }))
+    .filter((w): w is { d: number; label: string } => w.d !== null && !!w.label);
+  const st = obj(data.stats);
+  const height = (v: unknown, fallback: number | null) => {
+    const n = num(v);
+    if (n !== null) return `${fmtNum(Math.round(feet ? n * FEET : n))} ${hu}`;
+    if (str(v)) return str(v);
+    return fallback === null ? '' : `${fmtNum(Math.round(feet ? fallback * FEET : fallback))} ${hu}`;
+  };
+  const eles = pts.map((p) => p.ele);
+  const gain = pts.reduce((m, p, i) => (i ? m + Math.max(0, p.ele - pts[i - 1].ele) : 0), 0);
+  const loss = pts.reduce((m, p, i) => (i ? m + Math.max(0, pts[i - 1].ele - p.ele) : 0), 0);
+  const many = pts.length > 1;
+  const dist = num(st.distance);
+  const tiles = [
+    { label: tr('Distance'), value: dist !== null ? `${fmtNum(dist, { maximumFractionDigits: 1 })} ${unit}` : str(st.distance) || (many ? `${fmtNum(pts[pts.length - 1].d - pts[0].d, { maximumFractionDigits: 1 })} ${unit}` : '') },
+    { label: tr('Ascent'), value: height(st.gain, many ? gain : null) },
+    { label: tr('Descent'), value: str(st.loss) || (many && Math.round(loss) > 0) ? height(st.loss, loss) : '' },
+    { label: tr('Highest'), value: height(st.high, eles.length ? Math.max(...eles) : null) },
+    { label: tr('Lowest'), value: height(st.low, eles.length ? Math.min(...eles) : null) },
+    { label: tr('Duration'), value: str(st.time ?? data.time) },
+  ].filter((t) => t.value);
+  // The route on a map, pinned at its ends with their names.
+  const path = thinPath(mapPoints(raw.filter(isObj)), 200);
+  if (path.length > 1) {
+    const span = pts.length > 1 ? pts[pts.length - 1].d - pts[0].d : 0;
+    const near = (d: number | undefined) => (d === undefined ? undefined : marks.find((m) => Math.abs(m.d - d) <= span * 0.02)?.label);
+    path[0] = { ...path[0], name: near(pts[0]?.d) ?? tr('Start') };
+    path[path.length - 1] = { ...path[path.length - 1], name: near(pts[pts.length - 1]?.d) ?? tr('Finish') };
+  }
+  return (
+    <Card>
+      <Head title={data.title} />
+      {tiles.length > 0 && (
+        <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(88px,1fr))] gap-2">
+          {tiles.map((t, i) => (
+            <div key={i} className="min-w-0 rounded-xl bg-bg-1 px-3 py-2">
+              <div className="truncate text-[12px] text-fg-3">{t.label}</div>
+              <div className={cx('text-[15px] leading-tight font-semibold tabular-nums', t.value.length > 10 ? 'line-clamp-2' : 'truncate')} title={t.value}>
+                {t.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {pts.length > 1 && <ProfileChart pts={pts} marks={marks} unit={unit} feet={feet} />}
+      {!offline && path.length > 1 && <MapBox points={path} route ends numbered={false} height={260} className="mt-4" />}
+    </Card>
+  );
+}
+
 export const TRAVEL_UIS: Record<string, AnswerUiView> = {
   places: Places,
   weather: Weather,
@@ -1295,4 +1634,6 @@ export const TRAVEL_UIS: Record<string, AnswerUiView> = {
   stays: Stays,
   'world-clock': WorldClock,
   currency: Currency,
+  departures: Departures,
+  elevation: Elevation,
 };

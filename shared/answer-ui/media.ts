@@ -292,4 +292,133 @@ export const MEDIA: AnswerUiSpec[] = [
       ],
     },
   },
+  {
+    id: 'annotated-image',
+    title: 'Annotated picture',
+    group: 'media',
+    use: 'A picture with numbered markers on its parts: hovering or tapping a marker shows its note, and each note listed below lights up its marker.',
+    keywords: 'annotated picture labelled image hotspots markers parts callouts identify anatomy diagram figure painting skyline',
+    shape: `{
+  title?: string
+  image: image
+  alt?: string                 // what the picture shows, for screen readers
+  credit?: string              // who made it, and its licence
+  notes: {
+    x: number                  // 0–100: % of the picture's width from its left edge
+    y: number                  // 0–100: % of its height from its top edge
+    label: string
+    text?: md
+  }[]                          // numbered in this order
+}`,
+    example: {
+      title: 'The School of Athens: who is who',
+      image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/%22The_School_of_Athens%22_by_Raffaello_Sanzio_da_Urbino.jpg/960px-%22The_School_of_Athens%22_by_Raffaello_Sanzio_da_Urbino.jpg',
+      alt: 'Raphael’s fresco The School of Athens: the philosophers of ancient Greece gathered under the vaults of a great hall',
+      credit: 'Raphael, 1509–1511, Apostolic Palace, Vatican City · public domain',
+      notes: [
+        { x: 49.2, y: 51.4, label: 'Plato', text: 'Points up, to his world of ideas, holding his *Timaeus*. Raphael is thought to have given him Leonardo da Vinci’s face.' },
+        { x: 54.1, y: 51.9, label: 'Aristotle', text: 'Holds his *Ethics* and turns his palm to the ground: knowledge starts from what we can observe.' },
+        { x: 37, y: 50.4, label: 'Socrates', text: 'In olive green, counting off his arguments on his fingers to the young men around him.' },
+        { x: 25.8, y: 66, label: 'Pythagoras', text: 'Writes in a book while a boy holds up a slate with his ratios of musical harmony.' },
+        { x: 43.8, y: 67.3, label: 'Heraclitus', text: 'Broods alone on a block of marble. He has Michelangelo’s face, and was added late: he is not in Raphael’s full-size drawing for the fresco.' },
+        { x: 59.1, y: 63.2, label: 'Diogenes', text: 'The Cynic who lived in a jar, sprawled across the steps and ignoring everyone.' },
+        { x: 82, y: 69.5, label: 'Euclid', text: 'Or Archimedes: bends over a slate with compasses while his students watch. He has the face of the architect Bramante.' },
+        { x: 91.3, y: 57.6, label: 'Raphael', text: 'The painter himself, in a dark cap: one of the few faces looking straight out at us.' },
+        { x: 23.4, y: 26.4, label: 'Apollo', text: 'The god of light and music, with his lyre, stands for the arts.' },
+        { x: 79.1, y: 28, label: 'Athena', text: 'As Minerva, goddess of wisdom, with her Gorgon shield.' },
+      ],
+    },
+  },
+  {
+    id: 'before-after',
+    title: 'Before and after',
+    group: 'media',
+    use: 'Two pictures of one view, overlaid, with a divider to drag or move by keyboard: a photo edit, a renovation, a place then and now.',
+    keywords: 'before after then now slider swipe divider photo edit retouch renovation restoration makeover changes',
+    shape: `{
+  title?: string
+  before: { src: image, label?: string }   // label: "1910", "Before"
+  after: { src: image, label?: string }    // the same view, best at the same size
+  caption?: md
+  credit?: string
+  start?: number               // 0–100: where the divider starts, % from the left (50 unless set)
+}`,
+    example: {
+      title: 'Boulder Glacier, Montana: 1910 and 2007',
+      before: { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Boulder_Glacier_1910.jpg/960px-Boulder_Glacier_1910.jpg', label: '1910' },
+      after: { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Boulder_Glacier_2007.jpg/960px-Boulder_Glacier_2007.jpg', label: '2007' },
+      caption: 'The same view of Boulder Peak in Glacier National Park, nearly a century apart. Between 1966 and 2005 the glacier lost more than **75%** of its area; at 13 acres it no longer counts as an active glacier.',
+      credit: '1910: Morton J. Elrod, Glacier National Park Archives · 2007: Dan Fagre and Greg Pederson, USGS · public domain',
+      start: 50,
+    },
+  },
+  {
+    id: 'chords',
+    title: 'Chord charts',
+    group: 'media',
+    use: 'Chords for guitar, ukulele or piano as charts (frets and fingers, or keys), with the song’s progression in bars; tap a chord to hear it.',
+    keywords: 'chords chord chart guitar ukulele piano fingering frets progression song play capo strumming keys',
+    shape: `{
+  title?: string
+  instrument?: "guitar" | "ukulele" | "piano"   // guitar unless set; standard tuning
+  song?: { title: string, artist?: string, key?: string, tempo?: number, capo?: number }   // tempo: beats a minute
+  chords: {
+    name: string               // "C", "Am7", "F#m", "G/B"
+    frets?: (number | "x")[]   // a fret for each string as charts show them, left to right: guitar E A D G B E, ukulele G C E A; 0 open, "x" not played
+    fingers?: (number | null)[]   // the finger on each string: 1 index … 4 little
+    barre?: { fret: number, from: number, to: number }   // one finger across strings from–to, counted from 1 on the left
+    notes?: string[]           // piano: its keys, low to high ("C4", "E4", "G4"); worked out from the name when left out
+  }[]
+  progression?: string[] | { label: string, bars: string[] }[]   // bars in playing order: "C", or "C G" for two in one bar; by section ("Verse")
+  note?: md
+}`,
+    example: {
+      title: 'Let It Be on guitar',
+      instrument: 'guitar',
+      song: { title: 'Let It Be', artist: 'The Beatles', key: 'C', tempo: 72 },
+      chords: [
+        { name: 'C', frets: ['x', 3, 2, 0, 1, 0], fingers: [null, 3, 2, null, 1, null] },
+        { name: 'G', frets: [3, 2, 0, 0, 0, 3], fingers: [2, 1, null, null, null, 3] },
+        { name: 'Am', frets: ['x', 0, 2, 2, 1, 0], fingers: [null, null, 2, 3, 1, null] },
+        { name: 'F', frets: [1, 3, 3, 2, 1, 1], fingers: [1, 3, 4, 2, 1, 1], barre: { fret: 1, from: 1, to: 6 } },
+      ],
+      progression: [
+        { label: 'Verse', bars: ['C G', 'Am F', 'C G', 'F C'] },
+        { label: 'Chorus', bars: ['Am G', 'F C', 'C G', 'F C'] },
+      ],
+      note: 'The F is the hard one: until the barre rings clean, play just the top four strings (**xx3211**).',
+    },
+  },
+  {
+    id: 'fonts',
+    title: 'Font pairings',
+    group: 'media',
+    use: 'Font pairings shown live: a heading and a paragraph in each pair’s fonts, your own words to try in them, and the CSS to copy.',
+    keywords: 'fonts font pairing typography typeface heading body text google fonts serif sans-serif website brand css font-family',
+    shape: `{
+  title?: string
+  pairs: {
+    name?: string              // what the pair feels like: "Editorial", "Friendly"
+    heading: string            // a font's name: "Playfair Display"
+    body: string
+    weight?: number            // the heading's weight: 700 unless set (400 for display faces)
+    note?: md                  // why it works, where to use it
+    sample?: { heading?: string, body?: string }   // words to show this pair with
+  }[]
+  sample?: { heading?: string, body?: string }     // words for every pair
+}
+// These show live here: Inter, Roboto, Open Sans, Lato, Montserrat, Poppins, Nunito, DM Sans, Work Sans, Space Grotesk,
+// IBM Plex Sans, Outfit, Playfair Display, Merriweather, Lora, Fraunces, DM Serif Display, Source Serif 4, JetBrains Mono,
+// and the computer's own (Georgia, Arial…); any other shows in a fallback, marked as such.`,
+    example: {
+      title: 'Fonts for Crumb & Co., a neighbourhood bakery',
+      sample: { heading: 'Fresh sourdough, every morning', body: 'Our loaves rise slowly overnight and come out of the oven at seven. Come early for the cardamom buns: they are usually gone by ten.' },
+      pairs: [
+        { name: 'Classic and warm', heading: 'Playfair Display', body: 'Lato', note: 'High-contrast serif headings feel crafted, and a little old-fashioned in a good way; Lato stays easy to read on menus and phones.' },
+        { name: 'Friendly', heading: 'Fraunces', body: 'DM Sans', weight: 600, note: 'Fraunces has soft, slightly wobbly curves that suit baking; DM Sans is plain enough not to compete with it.' },
+        { name: 'Modern', heading: 'Space Grotesk', body: 'Inter', note: 'Clean and current: right if the shop leans more coffee bar than tearoom.' },
+        { name: 'Shop sign', heading: 'DM Serif Display', body: 'Work Sans', weight: 400, note: 'A display face made for big sizes: keep it to headings of 24 px and up.' },
+      ],
+    },
+  },
 ];

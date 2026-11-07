@@ -329,4 +329,157 @@ export const COMPARE: AnswerUiSpec[] = [
       summary: 'Start with **pre-orders for pickup** on the bakery’s own page: little cost, less waste, and no delivery app taking a cut.',
     },
   },
+  {
+    id: 'decision-tree',
+    title: 'Decision tree',
+    group: 'compare',
+    use: 'A wizard or troubleshooter: one question at a time down to an answer, with the path so far as breadcrumbs, going back and starting over.',
+    keywords: 'decision tree wizard troubleshoot troubleshooter flowchart diagnose guided questions yes no which one eligibility',
+    shape: `{
+  title?: string
+  start?: string               // the id of the first node (the first in the list unless set)
+  nodes: {
+    id: string
+    question?: md              // what to ask here
+    note?: md                  // a hint under the question: where to look, what a word means
+    options?: { label: string, next: string }[]   // the answers, each leading on to a node by its id
+    result?: md                // an end: what it comes to (a node without options is an end)
+    tone?: tone                // an end's colour: "good" (fixed, allowed), "warn", "bad", "info"
+    image?: image
+    links?: { label: string, url: url }[]
+  }[]
+}`,
+    example: {
+      title: 'Why won’t the Wi-Fi work?',
+      nodes: [
+        {
+          id: 'start',
+          question: 'What’s going wrong?',
+          options: [
+            { label: 'Nothing can get online', next: 'lights' },
+            { label: 'One device can’t connect', next: 'one' },
+            { label: 'Everything connects, but it’s slow', next: 'slow' },
+          ],
+        },
+        {
+          id: 'lights',
+          question: 'Look at the router’s lights. What is the **internet** light doing?',
+          note: 'It is usually marked with a globe, an @ or “WAN”.',
+          options: [
+            { label: 'Red, orange or off', next: 'restart' },
+            { label: 'Steady green or white', next: 'cable' },
+          ],
+        },
+        {
+          id: 'cable',
+          question: 'Can a computer plugged into the router **with a cable** get online?',
+          options: [
+            { label: 'Yes', next: 'radio' },
+            { label: 'No, or I have no cable', next: 'restart' },
+          ],
+        },
+        {
+          id: 'restart',
+          question: 'Turn the router off at the plug, wait **30 seconds**, turn it back on and give it two minutes. Can you get online now?',
+          options: [
+            { label: 'Yes', next: 'fixed' },
+            { label: 'No', next: 'provider' },
+          ],
+        },
+        { id: 'fixed', tone: 'good', result: '**Fixed.** The router had lost its connection, and a restart is how it gets one again. If it keeps happening, ask your provider to test the line.' },
+        {
+          id: 'provider',
+          tone: 'bad',
+          result: '**The fault is most likely on your provider’s side:** an outage nearby or a problem on the line. Check their status page, or call them with your account number and say you have already restarted the router.',
+          links: [{ label: 'Outages reported near you', url: 'https://downdetector.com' }],
+        },
+        { id: 'radio', tone: 'warn', result: '**The line is fine; the router’s Wi-Fi isn’t.** Restart it, then check that Wi-Fi is switched on in its settings (some routers have a Wi-Fi button). If it still won’t show up, the router may need replacing.' },
+        {
+          id: 'one',
+          question: 'Is your network’s name in that device’s list of Wi-Fi networks?',
+          options: [
+            { label: 'Yes, but it won’t join', next: 'forget' },
+            { label: 'No, it isn’t listed', next: 'band' },
+          ],
+        },
+        { id: 'forget', tone: 'info', result: '**Forget the network on that device**, then join again and type the password carefully: capitals count. Still no luck? Restart the device to clear a stuck connection.' },
+        { id: 'band', tone: 'info', result: '**It may not see the router’s 5 GHz band, or it is too far away.** Move it closer, and make sure the 2.4 GHz band is on in the router’s settings: older phones, printers and smart plugs only use that one.' },
+        {
+          id: 'slow',
+          question: 'Is it slow everywhere in the home, or only far from the router?',
+          options: [
+            { label: 'Everywhere', next: 'speed' },
+            { label: 'Only far from it', next: 'reach' },
+          ],
+        },
+        {
+          id: 'speed',
+          tone: 'info',
+          result: '**Test the speed next to the router**, when nobody is streaming. Far below what you pay for? Restart the router, test again, then send your provider the results.',
+          links: [{ label: 'Speed test', url: 'https://fast.com' }],
+        },
+        { id: 'reach', tone: 'info', result: '**Walls and floors weaken Wi-Fi.** Move the router somewhere central and high, away from the microwave, or add a mesh point halfway to the rooms where it is weak.' },
+      ],
+    },
+  },
+  {
+    id: 'picker',
+    title: 'Random picker',
+    group: 'compare',
+    use: 'Picks at random when the user sets it off: spins a wheel of options, weighted when asked, rolls dice, flips a coin or draws names.',
+    keywords: 'random picker spin wheel dice roll coin flip draw names hat raffle giveaway lottery shuffle',
+    shape: `{
+  title?: string
+  kind?: "wheel" | "dice" | "coin" | "draw"   // a wheel to spin unless set; "draw" picks names from a hat
+  options?: (string | { label: string, weight?: number, note?: md })[]
+  // what a wheel or a draw picks from; a coin's two sides (heads and tails unless set)
+  // weight: how likely it is against the others (1 unless set)
+  count?: number               // draw: how many to pick, all different (1 unless set); dice: how many dice (1 to 6)
+  sides?: number               // dice: the sides of each die (6 unless set; 4, 8, 10, 12 and 20 work too)
+}`,
+    example: {
+      title: 'Where’s Friday’s team lunch?',
+      kind: 'wheel',
+      options: [
+        { label: 'Thai Basil', note: 'A 10-minute walk; the green curry is the one' },
+        'Burrito Bar',
+        { label: 'Sushi Go', weight: 2, note: 'Two votes this week, so twice the chance' },
+        'Pizza Napoli',
+        { label: 'Pho Saigon', note: 'Big tables: room for all eight of us' },
+        { label: 'Falafel Corner', note: 'The cheapest, about $11 a head' },
+      ],
+    },
+  },
+  {
+    id: 'venn',
+    title: 'Venn diagram',
+    group: 'compare',
+    use: 'Two or three overlapping circles of what sets share and what is theirs alone; hovering or tapping a region highlights it and lists its items.',
+    keywords: 'venn diagram overlap overlapping circles sets in common shared both intersection similarities differences',
+    shape: `{
+  title?: string
+  sets: { name: string, items?: md[] }[]   // 2 or 3 circles; items: what is in this set and no other
+  overlaps?: {
+    sets: number[]             // the sets that meet there, by index from 0: [0, 1], or [0, 1, 2] for the middle
+    label?: string             // a name for the overlap
+    items?: md[]               // what is in these sets and not in the others
+  }[]
+  note?: md
+}`,
+    example: {
+      title: 'Three diets that are good for the heart and the brain',
+      sets: [
+        { name: 'Mediterranean', items: ['Fish or seafood twice a week', 'Meals made to share, slowly'] },
+        { name: 'DASH', items: ['Low-fat dairy two or three times a day', 'Under 2,300 mg of sodium a day'] },
+        { name: 'MIND', items: ['Berries at least twice a week', 'Leafy greens six days a week'] },
+      ],
+      overlaps: [
+        { sets: [0, 1], items: ['Fruit of every kind, every day'] },
+        { sets: [0, 2], items: ['Olive oil as the main fat', 'A glass of wine at most (optional)'] },
+        { sets: [1, 2], items: ['Little butter or full-fat cheese'] },
+        { sets: [0, 1, 2], label: 'All three', items: ['Vegetables and whole grains', 'Beans and nuts', 'Little red meat or sweets'] },
+      ],
+      note: 'MIND was put together from the other two, for the brain, at Rush University in 2015.',
+    },
+  },
 ];

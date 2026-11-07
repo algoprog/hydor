@@ -463,4 +463,173 @@ export const DATA: AnswerUiSpec[] = [
       note: 'A fifth of the income was saved; housing took the largest share, at 29%.',
     },
   },
+  {
+    id: 'distribution',
+    title: 'Histogram and box plots',
+    group: 'data',
+    use: 'How values spread: a histogram marking the mean and median, the summary (count, quartiles, spread), or groups compared as box plots; counts on hover.',
+    keywords: 'distribution histogram box plot spread frequency bins quartiles median mean standard deviation outliers percentiles exam scores',
+    shape: `{
+  title?: string
+  values?: number[]            // the raw values: the bins are worked out from them
+  bins?: { from: number, to: number, count: number }[]   // counts already in bins, instead of values
+  bin_width?: number           // the width of a bin for values (worked out unless set)
+  groups?: { name: string, values: number[] }[]   // groups to compare: a box plot each, on one scale (at most 8)
+  unit?: string                // after values ("min", "kg", "%")
+  marks?: { value: number, label: string }[]      // lines at values of note: a pass mark, a target, your own
+  note?: md
+}
+Values or bins draw a histogram, groups draw box plots; give both to show both.`,
+    example: {
+      title: 'Physics midterm, 58 students',
+      values: [58, 89, 85, 80, 78, 38, 68, 87, 81, 23, 76, 70, 62, 72, 70, 58, 71, 68, 76, 52, 70, 69, 72, 91, 77, 58, 80, 61, 71, 31, 69, 84, 71, 86, 67, 61, 70, 46, 78, 64, 66, 78, 64, 80, 71, 61, 77, 85, 69, 67, 53, 68, 58, 94, 67, 69, 70, 67],
+      bin_width: 5,
+      groups: [
+        { name: 'Came to the review session', values: [89, 80, 68, 81, 70, 72, 71, 76, 69, 91, 80, 71, 84, 86, 70, 78, 78, 80, 77, 69, 68, 94, 70, 67] },
+        { name: 'Did not', values: [58, 85, 78, 38, 87, 23, 76, 62, 70, 58, 68, 52, 70, 72, 77, 58, 61, 31, 69, 71, 67, 61, 46, 64, 66, 64, 71, 61, 85, 67, 53, 58, 67, 69] },
+      ],
+      marks: [{ value: 50, label: 'Pass mark' }],
+      note: 'Four students failed, none of them from the review session. Those who came scored a median **10 points** higher, and their scores spread about half as widely.',
+    },
+  },
+  {
+    id: 'waterfall',
+    title: 'Waterfall chart',
+    group: 'data',
+    use: 'How a total got from start to end: a bar rising or falling for each gain and loss, running totals, the overall change, values on hover.',
+    keywords: 'waterfall bridge profit loss walk what changed drivers increases decreases net change variance year over year reconciliation',
+    shape: `{
+  title?: string
+  start: { label: string, value: number }   // where it begins: last year's profit, the opening balance
+  steps: {
+    label: string
+    value?: number             // the change: positive for a gain, negative for a loss
+    subtotal?: boolean         // a bar of the running total so far instead ("Gross profit"): no value
+    note?: string
+  }[]
+  end?: { label: string, value?: number }   // the last bar: the total, worked out (a given value that differs adds an "Other" step)
+  unit?: string
+  prefix?: string              // before values ("$")
+  note?: md
+}`,
+    example: {
+      title: 'Why Hearth & Crumb’s profit rose in 2026',
+      start: { label: '2025 profit', value: 182000 },
+      steps: [
+        { label: 'More customers', value: 64000, note: 'The second shop, open since March' },
+        { label: 'Higher prices', value: 23000, note: 'Up 6% in January' },
+        { label: 'Flour and butter', value: -31000 },
+        { label: 'Two new bakers', value: -38000 },
+        { label: 'Rent', value: -12000 },
+        { label: 'Wholesale to cafés', value: 27000, note: 'Nine cafés take bread every morning' },
+        { label: 'Energy', value: 6000, note: 'The new ovens use a third less' },
+      ],
+      end: { label: '2026 profit' },
+      prefix: '$',
+      note: 'Profit rose **$39,000 (21%)**: the second shop and the wholesale orders brought in more than the extra bakers and dearer ingredients cost.',
+    },
+  },
+  {
+    id: 'treemap',
+    title: 'Treemap',
+    group: 'data',
+    use: 'Rectangles sized by value, nested in groups (disk space, team costs, market sectors): click a group to open it, hover for value and share.',
+    keywords: 'treemap nested rectangles sizes disk space storage usage hierarchy largest biggest what takes up room sectors departments',
+    shape: `{
+  title?: string
+  items: {
+    name: string
+    value?: number             // a group's is its children's sum (a larger one given adds an "Other" child)
+    children?: { name: string, value: number, note?: string }[]
+    note?: string
+  }[]                          // up to 8 take the palette's colours; more are grey
+  unit?: string                // after values ("GB", "people")
+  prefix?: string              // before them ("$")
+  note?: md
+}`,
+    example: {
+      title: 'What fills my 512 GB laptop drive',
+      unit: 'GB',
+      items: [
+        { name: 'Photos', children: [{ name: 'Photos library', value: 118 }, { name: 'Lightroom previews', value: 16, note: 'Rebuilt when needed' }, { name: 'Screenshots and recordings', value: 8 }] },
+        { name: 'Developer', children: [{ name: 'Docker images', value: 41, note: '23 images, 14 not used since spring' }, { name: 'Xcode simulators', value: 29 }, { name: 'node_modules in 37 projects', value: 18 }, { name: 'Python environments', value: 8 }] },
+        { name: 'Applications', value: 64 },
+        { name: 'Videos', children: [{ name: 'Family videos', value: 34 }, { name: 'Downloaded courses', value: 24 }] },
+        { name: 'macOS and system data', value: 38 },
+        { name: 'Music', children: [{ name: 'Logic Pro sound library', value: 19 }, { name: 'Music library', value: 8 }] },
+        { name: 'Documents', value: 21 },
+        { name: 'Messages and Mail', children: [{ name: 'Messages attachments', value: 11 }, { name: 'Mail', value: 3 }] },
+      ],
+      note: '**460 GB of 512 GB** used. Docker images and simulators take 70 GB that can be rebuilt any time: `docker system prune -a` and deleting old simulators would free most of it.',
+    },
+  },
+  {
+    id: 'activity',
+    title: 'Activity calendar',
+    group: 'data',
+    use: 'Days shaded by how much was done (practice, runs, commits, sleep), weeks as columns: the total, longest and current streaks, each day on hover.',
+    keywords: 'activity calendar heatmap streak habit tracker daily log contributions commits practice consistency days in a row year in review',
+    shape: `{
+  title?: string
+  days: Record<date, number>   // each day's amount: { "2026-11-02": 25, … }; days left out count as none (a list of { date, value } works too)
+  unit?: string                // what the amounts are in: "min", "km", "commits"
+  start?: date                 // the first day shown (the data's first unless set)
+  end?: date                   // the last (the data's last unless set)
+  note?: md
+}`,
+    example: {
+      title: 'Guitar practice since May',
+      unit: 'min',
+      start: '2026-05-01',
+      days: {
+        '2026-05-01': 20, '2026-05-03': 40, '2026-05-04': 25, '2026-05-05': 35, '2026-05-06': 15, '2026-05-08': 10, '2026-05-09': 45, '2026-05-10': 60, '2026-05-11': 30, '2026-05-12': 30, '2026-05-13': 25, '2026-05-14': 10, '2026-05-15': 30, '2026-05-19': 30, '2026-05-20': 20, '2026-05-21': 30,
+        '2026-05-22': 40, '2026-05-23': 45, '2026-05-24': 35, '2026-05-25': 40, '2026-05-27': 35, '2026-05-29': 35, '2026-05-30': 50, '2026-06-01': 25, '2026-06-02': 20, '2026-06-03': 30, '2026-06-04': 20, '2026-06-05': 30, '2026-06-06': 75, '2026-06-07': 55, '2026-06-08': 45, '2026-06-09': 35,
+        '2026-06-10': 10, '2026-06-15': 25, '2026-06-16': 35, '2026-06-17': 30, '2026-06-18': 30, '2026-06-19': 20, '2026-06-20': 50, '2026-06-21': 30, '2026-06-22': 35, '2026-06-23': 10, '2026-06-24': 35, '2026-06-25': 30, '2026-06-26': 10, '2026-06-27': 35, '2026-06-28': 60, '2026-06-29': 45,
+        '2026-06-30': 30, '2026-07-03': 10, '2026-07-04': 40, '2026-07-05': 35, '2026-07-06': 20, '2026-07-07': 25, '2026-07-08': 30, '2026-07-09': 25, '2026-07-10': 35, '2026-07-12': 25, '2026-07-13': 35, '2026-07-14': 20, '2026-07-15': 50, '2026-07-17': 30, '2026-07-18': 40, '2026-07-19': 55,
+        '2026-07-20': 25, '2026-07-22': 35, '2026-07-23': 50, '2026-07-24': 45, '2026-07-25': 50, '2026-07-26': 55, '2026-07-27': 40, '2026-07-28': 35, '2026-07-29': 45, '2026-07-30': 15, '2026-07-31': 35, '2026-08-02': 50, '2026-08-03': 10, '2026-08-04': 25, '2026-08-05': 50, '2026-08-07': 35,
+        '2026-08-17': 35, '2026-08-18': 45, '2026-08-19': 30, '2026-08-20': 30, '2026-08-21': 20, '2026-08-22': 55, '2026-08-23': 40, '2026-08-24': 45, '2026-08-25': 25, '2026-08-26': 30, '2026-08-27': 40, '2026-08-28': 25, '2026-08-29': 65, '2026-08-30': 35, '2026-08-31': 30, '2026-09-01': 15,
+        '2026-09-02': 45, '2026-09-03': 25, '2026-09-04': 10, '2026-09-05': 35, '2026-09-06': 40, '2026-09-07': 45, '2026-09-08': 25, '2026-09-09': 35, '2026-09-10': 25, '2026-09-11': 30, '2026-09-12': 50, '2026-09-13': 35, '2026-09-14': 30, '2026-09-15': 20, '2026-09-16': 15, '2026-09-17': 15,
+        '2026-09-18': 30, '2026-09-19': 60, '2026-09-20': 60, '2026-09-21': 50, '2026-09-22': 35, '2026-09-23': 35, '2026-09-24': 50, '2026-09-25': 20, '2026-09-26': 65, '2026-09-28': 35, '2026-09-29': 30, '2026-10-01': 45, '2026-10-02': 20, '2026-10-03': 55, '2026-10-04': 50, '2026-10-05': 40,
+        '2026-10-06': 25, '2026-10-07': 35, '2026-10-08': 25, '2026-10-09': 20, '2026-10-11': 60, '2026-10-12': 15, '2026-10-13': 40, '2026-10-15': 15, '2026-10-16': 10, '2026-10-17': 65, '2026-10-18': 50, '2026-10-19': 40, '2026-10-20': 35, '2026-10-21': 45, '2026-10-22': 45, '2026-10-23': 55,
+        '2026-10-24': 45, '2026-10-25': 55, '2026-10-26': 35, '2026-10-27': 40, '2026-10-28': 25, '2026-10-29': 30, '2026-10-30': 40, '2026-10-31': 50, '2026-11-01': 55, '2026-11-02': 20, '2026-11-03': 45, '2026-11-04': 20, '2026-11-05': 50, '2026-11-06': 35, '2026-11-07': 60,
+      },
+      note: '**93 hours** since May, on 159 of 191 days. October was the biggest month yet, at 18½ hours, and today makes 24 days in a row: 18 more beat the record of 41, set after the August holiday.',
+    },
+  },
+  {
+    id: 'map-values',
+    title: 'Values on a map',
+    group: 'data',
+    use: 'Numbers at places (city populations, earthquakes, sales by store): circles sized by value on a map, beside a ranked list with bars.',
+    keywords: 'map values bubble map circles sized by value cities populations earthquakes sales by store region geography per city choropleth',
+    shape: `{
+  title?: string
+  points: { name: string, lat: number, lng: number, value: number, note?: string }[]
+  unit?: string                // after values ("orders", "people")
+  prefix?: string              // before them ("$")
+  note?: md
+}`,
+    example: {
+      title: 'Where Clay & Kiln’s October orders went',
+      unit: 'orders',
+      points: [
+        { name: 'Portland', lat: 45.5152, lng: -122.6784, value: 64, note: 'Home: local pickup at the studio' },
+        { name: 'Seattle', lat: 47.6062, lng: -122.3321, value: 47 },
+        { name: 'New York', lat: 40.7128, lng: -74.006, value: 38, note: 'Up 60% since the gift guide feature' },
+        { name: 'San Francisco', lat: 37.7749, lng: -122.4194, value: 33 },
+        { name: 'Los Angeles', lat: 34.0522, lng: -118.2437, value: 29 },
+        { name: 'Chicago', lat: 41.8781, lng: -87.6298, value: 22 },
+        { name: 'Austin', lat: 30.2672, lng: -97.7431, value: 18 },
+        { name: 'Denver', lat: 39.7392, lng: -104.9903, value: 16 },
+        { name: 'Boston', lat: 42.3601, lng: -71.0589, value: 15 },
+        { name: 'Washington', lat: 38.9072, lng: -77.0369, value: 12 },
+        { name: 'Minneapolis', lat: 44.9778, lng: -93.265, value: 11 },
+        { name: 'Philadelphia', lat: 39.9526, lng: -75.1652, value: 9 },
+        { name: 'Atlanta', lat: 33.749, lng: -84.388, value: 9 },
+        { name: 'San Diego', lat: 32.7157, lng: -117.1611, value: 8 },
+        { name: 'Salt Lake City', lat: 40.7608, lng: -111.891, value: 7 },
+      ],
+      note: '**44%** of the 412 orders went to five West Coast cities; New York is the largest market outside it.',
+    },
+  },
 ];

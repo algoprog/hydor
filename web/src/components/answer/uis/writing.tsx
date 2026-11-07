@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Bookmark, ChartNoAxesColumn, Check, Copy as CopyIcon, Ellipsis, Globe, Heart, ImageIcon, Lightbulb, Mail, MessageCircle, MessageSquare, Repeat2, Send, Share, Share2, Star, ThumbsUp } from 'lucide-react';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
-import { arr, Avatar, Btn, Card, Chip, Copy, fmtNum, Head, isObj, Md, num, Pic, Ring, Seg, str, textOf, useAsk, useKept, type AnswerUiView, type Data } from '../kit';
+import { arr, Avatar, Btn, Card, Chip, Copy, fmtNum, Head, isObj, Md, num, Pic, Ring, Seg, str, textOf, useAsk, useKept, words, type AnswerUiView, type Data } from '../kit';
 
 // ---- shared pieces ---------------------------------------------------------------------------------------------------
 
@@ -854,9 +854,673 @@ function Diff({ data, done }: { data: Data; done: boolean }) {
   );
 }
 
+// ---- a citation: its sources, and the styles that write them out ----------------------------------------------------------
+
+/** A piece of a reference as a style writes it: words, in italics or not. */
+interface Run {
+  t: string;
+  i?: boolean;
+}
+
+interface Person {
+  family: string;
+  given: string;
+  /** An organisation (or a name of one word): written as it is, never turned into initials. */
+  whole: boolean;
+}
+
+type SourceType = 'article' | 'book' | 'chapter' | 'conference' | 'web' | 'thesis' | 'report';
+
+interface Source {
+  type: SourceType;
+  authors: Person[];
+  title: string;
+  container: string;
+  year: string;
+  month: number | null;
+  day: number | null;
+  volume: string;
+  issue: string;
+  pages: string;
+  publisher: string;
+  place: string;
+  editors: Person[];
+  edition: number | null;
+  number: string;
+  degree: 'phd' | 'masters';
+  doi: string;
+  url: string;
+  accessed: { y: number; m: number; d: number } | null;
+}
+
+const ORG_WORDS = /\b(organi[sz]ation|association|institute|university|society|committee|council|group|inc|ltd|llc|gmbh|corporation|company|department|agency|foundation|bank|office|board|cent(?:re|er)|commission|ministry|bureau|consortium|project|programme|program|collaboration|press|network|alliance|federation|union|service|authority|trust|museum|library|school|college|laborator(?:y|ies)|academ(?:y|ies)|nations)\b/i;
+const PARTICLE = /^(van|von|de|del|della|der|den|da|di|du|dos|das|le|la|ter|ten|bin|ibn|al|el)$/i;
+
+/** An author or editor as agents write one: "Last, First", "First Last", an organisation, or { family, given }. */
+function personOf(v: unknown): Person | null {
+  if (isObj(v)) {
+    const family = str(v.family ?? v.last ?? v.surname);
+    if (family) return { family, given: str(v.given ?? v.first), whole: false };
+    v = v.name ?? v.literal;
+  }
+  const t = str(v).replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+  if (t.includes(',') && !ORG_WORDS.test(t)) {
+    const k = t.indexOf(',');
+    return { family: t.slice(0, k).trim(), given: t.slice(k + 1).trim(), whole: false };
+  }
+  const w = t.split(' ');
+  if (w.length === 1 || w.length > 4 || ORG_WORDS.test(t)) return { family: t, given: '', whole: true };
+  let k = w.length - 1;
+  while (k > 1 && PARTICLE.test(w[k - 1])) k--;
+  return { family: w.slice(k).join(' '), given: w.slice(0, k).join(' '), whole: false };
+}
+
+const peopleOf = (v: unknown): Person[] =>
+  (Array.isArray(v) ? v : str(v) ? str(v).split(/\s*;\s*|\s+and\s+|\s+&\s+/) : [])
+    .map(personOf)
+    .filter((p): p is Person => !!p);
+
+/** Given names as initials: "Ming-Wei" → "M.-W.", "J.R.R." → "J. R. R." (`spaced` false: "J.R.R."). */
+function initialsOf(given: string, spaced = true): string {
+  return given
+    .replace(/\./g, '. ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) =>
+      w
+        .split('-')
+        .filter(Boolean)
+        .map((h) => `${([...h.replace(/\.$/, '')][0] ?? '').toUpperCase()}.`)
+        .join('-'),
+    )
+    .filter((x) => x.length > 1)
+    .join(spaced ? ' ' : '');
+}
+
+const full = (p: Person) => (p.given ? `${p.given} ${p.family}` : p.family);
+const inverted = (p: Person) => (p.given ? `${p.family}, ${p.given}` : p.family);
+const familyFirst = (p: Person, spaced = true) => (p.given ? `${p.family}, ${initialsOf(p.given, spaced)}` : p.family);
+const initialsFirst = (p: Person) => (p.given ? `${initialsOf(p.given)} ${p.family}` : p.family);
+
+/** Names joined as English writes them: "A, B, and C" (`serial` false: "A, B and C"). */
+function joinNames(names: string[], and = 'and', serial = true): string {
+  if (names.length <= 1) return names.join('');
+  if (names.length === 2) return `${names[0]} ${and} ${names[1]}`;
+  return `${names.slice(0, -1).join(', ')}${serial ? ',' : ''} ${and} ${names[names.length - 1]}`;
+}
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MLA_MONTHS = ['Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'June', 'July', 'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.'];
+const IEEE_MONTHS = ['Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'Jun.', 'Jul.', 'Aug.', 'Sep.', 'Oct.', 'Nov.', 'Dec.'];
+const BIB_MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')}`;
+const bareDoi = (d: string) => d.trim().replace(/^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:\s*)/i, '');
+const doiUrl = (d: string) => `https://doi.org/${bareDoi(d)}`;
+const ended = (s: string) => /[.?!]$/.test(s.trim());
+
+/** Pages as a range with an en dash ("4171–4186"), or one page. */
+const pagesFull = (p: string) => p.trim().replace(/\s*(?:--|[-–—])\s*/g, '–');
+const pageWord = (p: string) => (/[–-]/.test(pagesFull(p)) ? 'pp.' : 'p.');
+
+/**
+ * A range written short, as MLA does (4171–86, 1103–04: two digits at least) and Chicago (4171–86, 1103–4, 1496–500;
+ * all of them from a hundred, or a page under a hundred).
+ */
+function pagesShort(p: string, chicago: boolean): string {
+  const m = /^(\d+)–(\d+)$/.exec(pagesFull(p));
+  if (!m) return pagesFull(p);
+  const [a, b] = [m[1], m[2]];
+  const n = Number(a);
+  if (Number(b) <= n || n < 100 || a.length !== b.length || (chicago && n % 100 === 0)) return `${a}–${b}`;
+  for (let k = chicago && n % 100 < 10 ? 1 : 2; k < b.length; k++) if (a.slice(0, a.length - k) + b.slice(b.length - k) === b) return `${a}–${b.slice(b.length - k)}`;
+  return `${a}–${b}`;
+}
+
+const MINOR = new Set(
+  'a an the and but or nor for so yet as at by in of off on per to up via vs vs. v. from into onto over with than about above across after against along among around before behind below beneath beside between beyond despite down during except inside like near outside past since through throughout toward towards under underneath until upon within without'.split(
+    ' ',
+  ),
+);
+
+/** Prefixes that cannot stand alone: the part after their hyphen stays small in title case (Pre-training, Non-linear). */
+const PREFIXES = new Set('anti bi co counter de extra hyper infra inter intra macro meta micro mid mis multi neo non post pre pro proto pseudo quasi re semi sub super trans tri ultra un'.split(' '));
+
+/** A word in title case: its first letter capitalised, and those of the parts after its hyphens but small words and parts after a prefix. */
+const capWord = (w: string) =>
+  w
+    .split('-')
+    .map((part, k, all) => (k === 0 || (!PREFIXES.has(all[0].toLowerCase()) && !MINOR.has(part.toLowerCase())) ? part.replace(/\p{L}/u, (c) => c.toUpperCase()) : part))
+    .join('-');
+
+/**
+ * A title in title case, as MLA and Chicago write it: every word capitalised but articles, prepositions and
+ * conjunctions (the first and last word, and the first after a colon, always); words with capitals of their own (BERT,
+ * iPhone) and numbers as they are; in a hyphenated word, its later parts too (Short-Term) unless after a prefix (Pre-training).
+ */
+function titleCase(s: string): string {
+  const parts = s.split(/(\s+)/);
+  let last = parts.length - 1;
+  while (last > 0 && !parts[last].trim()) last--;
+  let start = true;
+  return parts
+    .map((p, i) => {
+      if (!p.trim()) return p;
+      const first = start;
+      start = /[:?!.—–]$/.test(p);
+      if (/\p{Lu}/u.test(p.slice(1)) || /\d/.test(p)) return p;
+      const bare = p.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}.]+$/gu, '').toLowerCase();
+      if (!first && i !== last && MINOR.has(bare)) return p.toLowerCase();
+      return capWord(p);
+    })
+    .join('');
+}
+
+/** The month as a number, from 6, "6", "June" or "Jun". */
+function monthOf(v: unknown): number | null {
+  const n = num(v);
+  if (n !== null) return n >= 1 && n <= 12 ? Math.round(n) : null;
+  const t = str(v).trim().toLowerCase().slice(0, 3);
+  const i = BIB_MONTHS.indexOf(t);
+  return i >= 0 ? i + 1 : null;
+}
+
+function typeOf(v: unknown, d: Data): SourceType {
+  const t = str(v).toLowerCase();
+  if (/chapter|incollection|inbook|section/.test(t)) return 'chapter';
+  if (/conf|proceed|symposium|workshop|inproceedings/.test(t)) return 'conference';
+  if (/thesis|dissertation|phd|master/.test(t)) return 'thesis';
+  if (/report|white ?paper|techreport/.test(t)) return 'report';
+  if (/web|site|page|online|blog|url|post/.test(t)) return 'web';
+  if (/book|monograph/.test(t)) return 'book';
+  if (/article|journal|paper|magazine|newspaper/.test(t)) return 'article';
+  return str(d.volume ?? d.issue) ? 'article' : str(d.container) ? 'chapter' : str(d.url) && !str(d.publisher) ? 'web' : 'book';
+}
+
+/** A source as agents write it, read leniently. */
+function sourceOf(d: Data): Source {
+  const date = str(d.date ?? d.published);
+  const dm = /^(\d{4})(?:-(\d{1,2})(?:-(\d{1,2}))?)?/.exec(date);
+  const am = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(str(d.accessed ?? d.retrieved));
+  const edition = num(str(d.edition).replace(/(st|nd|rd|th)\b.*$/i, ''));
+  const type = typeOf(d.type ?? d.kind, d);
+  return {
+    type,
+    authors: peopleOf(d.authors ?? d.author),
+    title: str(d.title).trim(),
+    container: str(d.container ?? d.journal ?? d.booktitle ?? d.proceedings ?? d.website ?? d.site).trim(),
+    year: str(d.year) || dm?.[1] || '',
+    month: monthOf(d.month) ?? (dm?.[2] ? monthOf(dm[2]) : null),
+    day: num(d.day) ?? (dm?.[3] ? Number(dm[3]) : null),
+    volume: str(d.volume),
+    issue: str(d.issue) || (type === 'article' ? str(d.number) : ''),
+    pages: str(d.pages ?? d.page),
+    publisher: str(d.publisher ?? d.university ?? d.institution ?? d.school),
+    place: str(d.place ?? d.location ?? d.address ?? d.city),
+    editors: peopleOf(d.editors ?? d.editor),
+    edition: edition !== null && edition > 0 ? Math.round(edition) : null,
+    number: type === 'article' ? '' : str(d.number ?? d.report_number),
+    degree: /master|\bm\.?a\b|\bm\.?s/i.test(str(d.degree)) ? 'masters' : 'phd',
+    doi: str(d.doi).trim(),
+    url: /^https?:\/\//i.test(str(d.url).trim()) ? str(d.url).trim() : '',
+    accessed: am ? { y: Number(am[1]), m: Number(am[2]), d: Number(am[3]) } : null,
+  };
+}
+
+/** Builds a reference from its pieces: `end` closes what is there with a mark (unless it ends with one already). */
+function refBuilder() {
+  const runs: Run[] = [];
+  const lastText = () => {
+    for (let k = runs.length - 1; k >= 0; k--) if (runs[k].t.trim()) return runs[k].t.trimEnd();
+    return '';
+  };
+  const b = {
+    add(t: string, i = false) {
+      if (t) runs.push(i ? { t, i } : { t });
+      return b;
+    },
+    end(mark = '.') {
+      const l = lastText();
+      if (l && !ended(l)) runs.push({ t: mark });
+      if (runs.length) runs.push({ t: ' ' });
+      return b;
+    },
+    done(): Run[] {
+      while (runs.length && !runs[runs.length - 1].t.trim()) runs.pop();
+      if (runs.length && !runs[runs.length - 1].i) runs[runs.length - 1] = { t: runs[runs.length - 1].t.trimEnd() };
+      return runs;
+    },
+  };
+  return b;
+}
+
+const quote = (t: string, mark: string) => `“${t}${ended(t) ? '' : mark}”`;
+const mdy = (a: { y: number; m: number; d: number }) => `${MONTHS[a.m - 1]} ${a.d}, ${a.y}`;
+
+/** APA, 7th edition. */
+function apa(s: Source): Run[] {
+  const b = refBuilder();
+  const names = s.authors.map((p) => familyFirst(p));
+  const authors = names.length <= 1 ? names.join('') : names.length <= 20 ? `${names.slice(0, -1).join(', ')}, & ${names[names.length - 1]}` : `${names.slice(0, 19).join(', ')}, . . . ${names[names.length - 1]}`;
+  const date = s.type === 'web' && s.year && s.month ? `${s.year}, ${MONTHS[s.month - 1]}${s.day ? ` ${s.day}` : ''}` : s.year || 'n.d.';
+  const italic = !['article', 'chapter', 'conference'].includes(s.type);
+  const link = s.doi ? doiUrl(s.doi) : s.url;
+  const title = () => {
+    b.add(s.title, italic);
+    if (s.type === 'book' && s.edition && s.edition > 1) b.add(` (${ordinal(s.edition)} ed.)`);
+    if (s.type === 'report' && s.number) b.add(` (Report No. ${s.number})`);
+    if (s.type === 'thesis') b.add(` [${s.degree === 'masters' ? 'Master’s thesis' : 'Doctoral dissertation'}${s.publisher ? `, ${s.publisher}` : ''}]`);
+    b.end('.');
+  };
+  if (authors) {
+    b.add(authors).end('.').add(`(${date})`).end('.');
+    title();
+  } else {
+    title();
+    b.add(`(${date})`).end('.');
+  }
+  if (s.type === 'article' && s.container) {
+    b.add(s.container, true);
+    if (s.volume) b.add(', ').add(s.volume, true);
+    if (s.issue) b.add(`${s.volume ? '' : ', '}(${s.issue})`);
+    if (s.pages) b.add(`, ${pagesFull(s.pages)}`);
+    b.end('.');
+  } else if ((s.type === 'chapter' || s.type === 'conference') && s.container) {
+    b.add('In ');
+    if (s.editors.length) {
+      const eds = s.editors.map(initialsFirst);
+      b.add(`${eds.length > 2 ? `${eds.slice(0, -1).join(', ')}, & ${eds[eds.length - 1]}` : eds.join(' & ')} (${eds.length > 1 ? 'Eds.' : 'Ed.'}), `);
+    }
+    b.add(s.container, true);
+    const more = [s.edition && s.edition > 1 ? `${ordinal(s.edition)} ed.` : '', s.pages ? `${pageWord(s.pages)} ${pagesFull(s.pages)}` : ''].filter(Boolean);
+    if (more.length) b.add(` (${more.join(', ')})`);
+    b.end('.');
+  }
+  if (s.publisher && ['book', 'report', 'chapter', 'conference'].includes(s.type) && s.publisher !== authors) b.add(s.publisher).end('.');
+  if (s.type === 'web' && s.container && s.container !== authors) b.add(s.container).end('.');
+  if (link) b.add(s.type === 'web' && s.accessed ? `Retrieved ${mdy(s.accessed)}, from ${link}` : link);
+  return b.done();
+}
+
+/** MLA, 9th edition. */
+function mla(s: Source): Run[] {
+  const b = refBuilder();
+  const a = s.authors;
+  const authors = a.length === 0 ? '' : a.length === 1 ? inverted(a[0]) : a.length === 2 ? `${inverted(a[0])}, and ${full(a[1])}` : `${inverted(a[0])}, et al.`;
+  if (authors) b.add(authors).end('.');
+  const title = titleCase(s.title);
+  if (['article', 'chapter', 'conference', 'web'].includes(s.type)) b.add(quote(title, '.')).add(' ');
+  else b.add(title, true).end('.');
+  const parts: Run[] = [];
+  if (s.type === 'thesis') {
+    if (s.year) b.add(s.year).end('.');
+    parts.push({ t: [s.publisher, s.degree === 'masters' ? 'MA thesis' : 'PhD dissertation'].filter(Boolean).join(', ') });
+  } else {
+    if (s.container && s.type !== 'book' && s.type !== 'report') parts.push({ t: titleCase(s.container), i: true });
+    const e = s.editors;
+    if (e.length) parts.push({ t: `edited by ${e.length > 2 ? `${full(e[0])} et al.` : e.map(full).join(' and ')}` });
+    if (s.edition && s.edition > 1) parts.push({ t: `${ordinal(s.edition)} ed.` });
+    if (s.volume) parts.push({ t: `vol. ${s.volume}` });
+    if (s.issue) parts.push({ t: `no. ${s.issue}` });
+    if (s.type === 'report' && s.number) parts.push({ t: `no. ${s.number}` });
+    if (s.publisher && s.type !== 'article' && s.publisher !== authors) parts.push({ t: s.publisher });
+    const date = s.year ? `${s.day && s.month ? `${s.day} ` : ''}${s.month ? `${MLA_MONTHS[s.month - 1]} ` : ''}${s.year}` : '';
+    if (date) parts.push({ t: date });
+    if (s.pages) parts.push({ t: `${pageWord(s.pages)} ${pagesShort(s.pages, false)}` });
+  }
+  const link = s.doi ? doiUrl(s.doi) : s.url.replace(/^https?:\/\//i, '');
+  if (link) parts.push({ t: link });
+  parts.forEach((p, k) => {
+    if (k) b.add(', ');
+    b.add(k === 0 && !p.i && !/^(https?:|www\.)/.test(p.t) ? p.t.replace(/^\p{Ll}/u, (c) => c.toUpperCase()) : p.t, p.i);
+  });
+  if (parts.length) b.end('.');
+  if (s.type === 'web' && s.accessed) b.add(`Accessed ${s.accessed.d} ${MLA_MONTHS[s.accessed.m - 1]} ${s.accessed.y}`).end('.');
+  return b.done();
+}
+
+/** Chicago, 17th edition, author-date. */
+function chicago(s: Source): Run[] {
+  const b = refBuilder();
+  const a = s.authors.length > 10 ? s.authors.slice(0, 7) : s.authors;
+  const names = a.map((p, i) => (i ? full(p) : inverted(p)));
+  const authors = s.authors.length > 10 ? `${names.join(', ')}, et al.` : names.length === 2 ? `${names[0]}, and ${names[1]}` : joinNames(names);
+  const title = titleCase(s.title);
+  const putTitle = () => (['article', 'chapter', 'conference', 'web', 'thesis'].includes(s.type) ? b.add(quote(title, '.')).add(' ') : b.add(title, true).end('.'));
+  if (authors) {
+    b.add(authors).end('.').add(s.year || 'n.d.').end('.');
+    putTitle();
+  } else {
+    putTitle();
+    b.add(s.year || 'n.d.').end('.');
+  }
+  const where = [s.place, s.publisher].filter(Boolean).join(': ');
+  if (s.type === 'article' && s.container) {
+    b.add(titleCase(s.container), true);
+    if (s.volume) b.add(` ${s.volume}`);
+    if (s.issue) b.add(` (${s.issue})`);
+    if (s.pages) b.add(`${s.volume || s.issue ? ':' : ','} ${pagesShort(s.pages, true)}`);
+    b.end('.');
+  } else if ((s.type === 'chapter' || s.type === 'conference') && s.container) {
+    b.add('In ').add(titleCase(s.container), true);
+    if (s.editors.length) b.add(`, edited by ${joinNames(s.editors.map(full))}`);
+    if (s.pages) b.add(`, ${pagesShort(s.pages, true)}`);
+    b.end('.');
+  } else if (s.type === 'book' && s.edition && s.edition > 1) b.add(`${ordinal(s.edition)} ed.`).end('.');
+  else if (s.type === 'report' && s.number) b.add(`Report ${s.number}`).end('.');
+  else if (s.type === 'thesis') b.add(`${s.degree === 'masters' ? 'Master’s thesis' : 'PhD diss.'}${s.publisher ? `, ${s.publisher}` : ''}`).end('.');
+  else if (s.type === 'web') {
+    if (s.container) b.add(s.container).end('.');
+    if (s.accessed) b.add(`Accessed ${mdy(s.accessed)}`).end('.');
+  }
+  if (where && ['book', 'chapter', 'conference', 'report'].includes(s.type)) b.add(where).end('.');
+  const link = s.doi ? doiUrl(s.doi) : s.url;
+  if (link) b.add(link).end('.');
+  return b.done();
+}
+
+/** IEEE. */
+function ieee(s: Source): Run[] {
+  const b = refBuilder();
+  const names = s.authors.map(initialsFirst);
+  const authors = s.authors.length > 6 ? `${names[0]} et al.` : joinNames(names);
+  const date = s.year ? `${s.month ? `${IEEE_MONTHS[s.month - 1]} ` : ''}${s.year}` : '';
+  const doi = s.doi ? `doi: ${bareDoi(s.doi)}` : '';
+  const pages = s.pages ? `${pageWord(s.pages)} ${pagesFull(s.pages)}` : '';
+  const ed = s.edition && s.edition > 1 ? `${ordinal(s.edition)} ed.` : '';
+  const where = [s.place, s.publisher].filter(Boolean).join(': ');
+  const list = (...xs: string[]) => xs.filter(Boolean).join(', ');
+  if (authors) b.add(`${authors}, `);
+  if (s.type === 'book') {
+    b.add(titleCase(s.title), true);
+    if (ed) b.add(`, ${ed}`);
+    b.end('.');
+    b.add(list(where, s.year, doi)).end('.');
+  } else {
+    b.add(quote(s.title, ',')).add(' ');
+    if (s.type === 'article') {
+      if (s.container) b.add(s.container, true).add(', ');
+      b.add(list(s.volume ? `vol. ${s.volume}` : '', s.issue ? `no. ${s.issue}` : '', pages, date, doi)).end('.');
+    } else if (s.type === 'chapter') {
+      b.add('in ');
+      if (s.container) b.add(s.container, true);
+      const eds = s.editors.length ? `${joinNames(s.editors.map(initialsFirst))}, ${s.editors.length > 1 ? 'Eds' : 'Ed'}.` : '';
+      b.add(`${ed ? `, ${ed}` : ''}${eds ? `, ${eds}` : ''}`).end('.');
+      b.add(list(where, s.year, pages, doi)).end('.');
+    } else if (s.type === 'conference') {
+      b.add('in ');
+      if (s.container) b.add(s.container, true).add(', ');
+      b.add(list(s.place, date, pages, doi)).end('.');
+    } else if (s.type === 'thesis') b.add(list(s.degree === 'masters' ? 'M.S. thesis' : 'Ph.D. dissertation', s.publisher, s.place, s.year)).end('.');
+    else if (s.type === 'report') b.add(list(s.publisher, s.place, s.number ? `Rep. ${s.number}` : '', date)).end('.');
+    else {
+      if (s.container) b.add(s.container).end('.');
+      if (s.accessed) b.add(`Accessed: ${IEEE_MONTHS[s.accessed.m - 1]} ${s.accessed.d}, ${s.accessed.y}`).end('.');
+    }
+  }
+  if (s.url && !s.doi) b.add(`[Online]. Available: ${s.url}`);
+  return b.done();
+}
+
+/** Harvard, as Cite Them Right writes it. */
+function harvard(s: Source): Run[] {
+  const b = refBuilder();
+  const names = s.authors.map((p) => familyFirst(p, false));
+  const authors = names.length >= 4 ? `${names[0]} et al.` : joinNames(names, 'and', false);
+  const quoted = ['article', 'chapter', 'conference'].includes(s.type);
+  const title = () => (quoted ? b.add(`‘${s.title}’`).add(', ') : b.add(s.title, true).end('.'));
+  if (authors) b.add(`${authors} (${s.year || 'no date'}) `);
+  else b.add(`(${s.year || 'no date'}) `);
+  title();
+  const where = [s.place, s.publisher].filter(Boolean).join(': ');
+  if (s.type === 'article') {
+    if (s.container) b.add(s.container, true);
+    const vol = `${s.volume}${s.issue ? `(${s.issue})` : ''}`;
+    if (vol) b.add(`, ${vol}`);
+    if (s.pages) b.add(`, ${pageWord(s.pages)} ${pagesFull(s.pages)}`);
+    b.end('.');
+  } else if (s.type === 'chapter' || s.type === 'conference') {
+    b.add('in ');
+    if (s.editors.length) b.add(`${joinNames(s.editors.map((p) => familyFirst(p, false)), 'and', false)} (${s.editors.length > 1 ? 'eds' : 'ed.'}) `);
+    if (s.container) b.add(s.container, true);
+    b.end('.');
+    if (where || s.pages) b.add([where, s.pages ? `${pageWord(s.pages)} ${pagesFull(s.pages)}` : ''].filter(Boolean).join(', ')).end('.');
+  } else if (s.type === 'book') {
+    if (s.edition && s.edition > 1) b.add(`${ordinal(s.edition)} edn`).end('.');
+    if (where) b.add(where).end('.');
+  } else if (s.type === 'thesis') b.add(s.degree === 'masters' ? 'MA thesis' : 'PhD thesis').end('.').add(s.publisher).end('.');
+  else if (s.type === 'report') {
+    if (s.number) b.add(`Report ${s.number}`).end('.');
+    if (where) b.add(where).end('.');
+  }
+  const link = s.doi ? doiUrl(s.doi) : s.url;
+  if (link) {
+    b.add(`Available at: ${link}`);
+    if (!s.doi && s.accessed) b.add(` (Accessed: ${s.accessed.d} ${MONTHS[s.accessed.m - 1]} ${s.accessed.y})`);
+    b.end('.');
+  }
+  return b.done();
+}
+
+const ascii = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+
+/** A BibTeX key as Google Scholar makes them: the first author's family name, the year, the title's first word. */
+function bibKey(s: Source): string {
+  const who = ascii(s.authors[0]?.family.split(' ').pop() ?? '') || 'anon';
+  const word = s.title.split(/\s+/).map(ascii).find((w) => w && !MINOR.has(w)) ?? '';
+  return `${who}${s.year.replace(/\D/g, '')}${word}`;
+}
+
+const bibEscape = (s: string) => s.replace(/([&%$#_])/g, '\\$1');
+
+/** The title for BibTeX: in title case, with braces round the words that keep their capitals (names, acronyms). */
+function bibTitle(t: string): string {
+  const parts = t.split(/(\s+)/);
+  const titled = titleCase(t).split(/(\s+)/);
+  let start = true;
+  return parts
+    .map((p, i) => {
+      if (!p.trim()) return p;
+      const first = start;
+      start = /[:?!.]$/.test(p);
+      const keep = /\p{Lu}/u.test(p.slice(1)) || (!first && /^[^\p{L}]*\p{Lu}/u.test(p));
+      return keep ? bibEscape(p).replace(/^([^\p{L}\p{N}]*)(.*?)([^\p{L}\p{N}]*)$/u, '$1{$2}$3') : bibEscape(titled[i] ?? p);
+    })
+    .join('');
+}
+
+const BIB_TYPE: Record<SourceType, string> = { article: 'article', book: 'book', chapter: 'incollection', conference: 'inproceedings', web: 'misc', thesis: 'phdthesis', report: 'techreport' };
+const EDITIONS = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
+
+function bibtex(s: Source, key: string): string {
+  const names = (ps: Person[]) => ps.map((p) => (p.whole ? `{${bibEscape(p.family)}}` : bibEscape(inverted(p)))).join(' and ');
+  const f: [string, string][] = [];
+  if (s.authors.length) f.push(['author', `{${names(s.authors)}}`]);
+  if (s.title) f.push(['title', `{${bibTitle(s.title)}}`]);
+  if (s.container) f.push([s.type === 'article' ? 'journal' : s.type === 'web' ? 'organization' : 'booktitle', `{${bibEscape(s.container)}}`]);
+  if (s.editors.length) f.push(['editor', `{${names(s.editors)}}`]);
+  if (s.edition && s.edition > 1) f.push(['edition', `{${EDITIONS[s.edition - 1] ?? ordinal(s.edition)}}`]);
+  if (s.volume) f.push(['volume', `{${bibEscape(s.volume)}}`]);
+  if (s.issue || (s.type === 'report' && s.number)) f.push(['number', `{${bibEscape(s.issue || s.number)}}`]);
+  if (s.pages) f.push(['pages', `{${pagesFull(s.pages).replace('–', '--')}}`]);
+  if (s.year) f.push(['year', `{${s.year}}`]);
+  if (s.month) f.push(['month', BIB_MONTHS[s.month - 1]]);
+  if (s.publisher) f.push([s.type === 'thesis' ? 'school' : s.type === 'report' ? 'institution' : 'publisher', `{${bibEscape(s.publisher)}}`]);
+  if (s.place) f.push(['address', `{${bibEscape(s.place)}}`]);
+  if (s.doi) f.push(['doi', `{${bareDoi(s.doi)}}`]);
+  if (s.url) f.push(s.type === 'web' ? ['howpublished', `{\\url{${s.url}}}`] : ['url', `{${s.url}}`]);
+  if (s.accessed) f.push(['note', `{Accessed: ${s.accessed.y}-${String(s.accessed.m).padStart(2, '0')}-${String(s.accessed.d).padStart(2, '0')}}`]);
+  const w = Math.max(...f.map(([k]) => k.length));
+  const type = s.type === 'thesis' && s.degree === 'masters' ? 'mastersthesis' : BIB_TYPE[s.type];
+  return `@${type}{${key},\n${f.map(([k, v]) => `  ${k.padEnd(w)} = ${v}`).join(',\n')}\n}`;
+}
+
+type StyleId = 'apa' | 'mla' | 'chicago' | 'ieee' | 'harvard' | 'bibtex';
+const STYLES: { id: StyleId; label: string; write?: (s: Source) => Run[] }[] = [
+  { id: 'apa', label: 'APA 7', write: apa },
+  { id: 'mla', label: 'MLA 9', write: mla },
+  { id: 'chicago', label: 'Chicago', write: chicago },
+  { id: 'ieee', label: 'IEEE', write: ieee },
+  { id: 'harvard', label: 'Harvard', write: harvard },
+  { id: 'bibtex', label: 'BibTeX' },
+];
+
+/** How a source is cited in the text, in a style: (Devlin et al., 2019), [1], \cite{devlin2019bert}. */
+function inTextOf(style: StyleId, s: Source, n: number, key: string): string {
+  const fam = s.authors.map((p) => p.family);
+  const who = fam.length ? '' : `“${s.title.split(/\s+/).slice(0, 4).join(' ')}${s.title.split(/\s+/).length > 4 ? '…' : ''}”`;
+  const year = s.year || 'n.d.';
+  if (style === 'apa') return `(${who || (fam.length >= 3 ? `${fam[0]} et al.` : fam.join(' & '))}, ${year})`;
+  if (style === 'mla') return `(${who || (fam.length >= 3 ? `${fam[0]} et al.` : fam.join(' and '))})`;
+  if (style === 'chicago') return `(${who || (fam.length >= 4 ? `${fam[0]} et al.` : joinNames(fam))} ${year})`;
+  if (style === 'harvard') return `(${who || (fam.length >= 4 ? `${fam[0]} et al.` : joinNames(fam, 'and', false))}, ${s.year || 'no date'})`;
+  if (style === 'ieee') return `[${n}]`;
+  return `\\cite{${key}}`;
+}
+
+const runsText = (runs: Run[]) => runs.map((r) => r.t).join('');
+const htmlEscape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const runsHtml = (runs: Run[]) => runs.map((r) => (r.i ? `<i>${htmlEscape(r.t)}</i>` : htmlEscape(r.t))).join('');
+
+// ---- a citation: the view --------------------------------------------------------------------------------------------------
+
+/** Copies a reference with its italics (for a word processor), and as plain text for anywhere else. */
+async function copyRich(html: string, text: string) {
+  try {
+    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+      await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })]);
+      return;
+    }
+  } catch {}
+  await copyText(text);
+}
+
+function RichCopy({ html, text, label }: { html: () => string; text: () => string; label: string }) {
+  const [ok, setOk] = useState(false);
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={() => {
+        void copyRich(html(), text());
+        setOk(true);
+        setTimeout(() => setOk(false), 1200);
+      }}
+      className="inline-grid h-7 w-7 shrink-0 place-items-center rounded-md text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg"
+    >
+      {ok ? <Check size={14} className="text-ok" /> : <CopyIcon size={14} />}
+    </button>
+  );
+}
+
+function Citation({ data, done }: { data: Data; done: boolean }) {
+  const given = arr(data.sources ?? data.references).filter(isObj);
+  const one = isObj(data.source ?? data.reference) ? (data.source ?? data.reference) : str(data.title) && (data.authors || data.author) && !given.length ? data : null;
+  const sources = (given.length ? given : one ? [one] : []).map(sourceOf).filter((s) => s.title || s.authors.length);
+  const wanted = words(data.styles).map((w) => w.toLowerCase().replace(/[^a-z]/g, ''));
+  const styles = STYLES.filter((s) => !wanted.length || wanted.some((w) => w.startsWith(s.id) || (w && s.id.startsWith(w))));
+  const shown = styles.length ? styles : STYLES;
+  const [pick, setPick] = useKept<string>('style', '');
+  const style = shown.find((s) => s.id === pick) ?? shown[0];
+  // Keys for BibTeX, told apart with a letter when two would be the same.
+  const keys: string[] = [];
+  for (const s of sources) {
+    const k = bibKey(s);
+    let key = k;
+    for (let c = 0; keys.includes(key); c++) key = `${k}${String.fromCharCode(97 + c)}`;
+    keys.push(key);
+  }
+  // A reference list in an author-date style goes by the authors' names; IEEE numbers them in the order given.
+  const order = sources.map((_, i) => i);
+  if (style.id !== 'ieee' && style.id !== 'bibtex' && sources.length > 1) {
+    const by = (s: Source) => `${(s.authors[0]?.family ?? s.title).toLowerCase()} ${s.year}`;
+    order.sort((x, y) => by(sources[x]).localeCompare(by(sources[y])));
+  }
+  const refs = order.map((i) => ({ i, runs: style.write ? style.write(sources[i]) : [], bib: style.id === 'bibtex' ? bibtex(sources[i], keys[i]) : '' }));
+  const ieeeNo = (i: number) => (style.id === 'ieee' ? `[${i + 1}] ` : '');
+  const allText = () => refs.map((r) => (style.id === 'bibtex' ? r.bib : `${ieeeNo(r.i)}${runsText(r.runs)}`)).join(style.id === 'bibtex' ? '\n\n' : '\n');
+  const allHtml = () => refs.map((r) => `<p>${htmlEscape(ieeeNo(r.i))}${runsHtml(r.runs)}</p>`).join('');
+  return (
+    <Card>
+      <Head
+        title={data.title}
+        aside={
+          done && sources.length > 1 ? (
+            style.id === 'bibtex' ? (
+              <Copy text={allText} label={tr('Copy all')} />
+            ) : (
+              <RichCopy html={allHtml} text={allText} label={tr('Copy all')} />
+            )
+          ) : undefined
+        }
+      />
+      {sources.length > 0 && (
+        <>
+          {shown.length > 1 && <Seg size="sm" className="mb-3" options={shown.map((s) => ({ value: s.id, label: s.label }))} value={style.id} onChange={(v) => setPick(v)} />}
+          <div className="space-y-2.5">
+            {refs.map((r) => (
+              <div key={r.i} className="rounded-xl border border-line bg-bg-1">
+                {style.id === 'bibtex' ? (
+                  <div className="flex items-start gap-1 py-2 pr-1.5 pl-3.5">
+                    <pre className="m-0 min-w-0 flex-1 font-mono text-[12px] leading-[1.6] break-words whitespace-pre-wrap text-fg [overflow-wrap:anywhere]">{r.bib}</pre>
+                    {done && <Copy text={r.bib} />}
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-1 py-2.5 pr-1.5 pl-3.5">
+                    <p className={cx('m-0 min-w-0 flex-1 text-[14px] leading-relaxed break-words text-fg', style.id === 'ieee' ? 'flex gap-2' : 'pl-6 -indent-6')}>
+                      {style.id === 'ieee' && <span className="shrink-0 text-fg-3 tabular-nums">[{r.i + 1}]</span>}
+                      <span className="min-w-0">
+                        {r.runs.map((x, k) =>
+                          x.i ? (
+                            <i key={k}>{x.t}</i>
+                          ) : (
+                            <Fragment key={k}>
+                              {x.t.split(/(https?:\/\/[^\s]+?)(?=[.,]?(?:\s|$))/).map((part, j) =>
+                                j % 2 ? (
+                                  <a key={j} href={part} target="_blank" rel="noopener noreferrer" className="break-all text-accent hover:underline">
+                                    {part}
+                                  </a>
+                                ) : (
+                                  part
+                                ),
+                              )}
+                            </Fragment>
+                          ),
+                        )}
+                      </span>
+                    </p>
+                    {done && <RichCopy html={() => `${htmlEscape(ieeeNo(r.i))}${runsHtml(r.runs)}`} text={() => `${ieeeNo(r.i)}${runsText(r.runs)}`} label={tr('Copy')} />}
+                  </div>
+                )}
+                <div className="flex min-w-0 items-center gap-2 border-t border-line/70 py-1 pr-1.5 pl-3.5 text-[12.5px]">
+                  <span className="shrink-0 text-fg-3">{tr('In the text')}</span>
+                  <code className="min-w-0 truncate font-mono text-[12px] text-fg-2">{inTextOf(style.id, sources[r.i], r.i + 1, keys[r.i])}</code>
+                  {done && (
+                    <span className="ml-auto">
+                      <Copy text={inTextOf(style.id, sources[r.i], r.i + 1, keys[r.i])} />
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
 export const WRITING_UIS: Record<string, AnswerUiView> = {
   email: Email,
   variants: Variants,
   'social-post': SocialPost,
   diff: Diff,
+  citation: Citation,
 };

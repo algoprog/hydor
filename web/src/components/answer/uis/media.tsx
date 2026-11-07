@@ -1,5 +1,5 @@
 // The answer UIs for media and events (galleries, videos, sounds, tracks, films and books, events, colour palettes, news): their views, by name (shared/answer-ui/media.ts has what each takes).
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   BookOpen,
@@ -7,6 +7,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeftRight,
   Clock,
   ExternalLink,
   GalleryHorizontal,
@@ -20,7 +21,9 @@ import {
   Play,
   Search,
   Sparkles,
+  Square,
   Ticket,
+  TriangleAlert,
   Tv,
 } from 'lucide-react';
 import { videoEmbed } from '@shared/app-media';
@@ -28,7 +31,7 @@ import { LOCALE } from '../../../i18n/locale';
 import { tr } from '../../../i18n/runtime';
 import { mu } from '../../../lib/machine';
 import { cx } from '../../ui';
-import { arr, Btn, Card, Chip, Copy, download, fmtDate, fmtNum, fmtTime, Head, hostOf, isObj, Md, num, obj, parseDate, Pic, Seg, Stars, str, useAui, useKept, Video, words, youTubeId, type AnswerUiView, type Data } from '../kit';
+import { arr, Btn, Card, Chip, Copy, download, fmtDate, fmtNum, fmtTime, Head, hostOf, isObj, Md, num, obj, parseDate, Pic, Seg, Stars, str, textOf, useAui, useKept, Video, words, youTubeId, type AnswerUiView, type Data } from '../kit';
 
 // ---- small parts these views share ------------------------------------------------------------------------------------
 
@@ -1157,6 +1160,1029 @@ function News({ data }: { data: Data; done: boolean }) {
   );
 }
 
+// ---- a picture with notes on it ------------------------------------------------------------------------------------------
+
+/** A number held to 0–100: a place on a picture, in percent of its size. */
+const pctIn = (n: number) => Math.min(100, Math.max(0, n));
+
+/**
+ * Whether the picture in a box has loaded and has a size, checked again when the box changes size or a picture in it
+ * loads: what is drawn over a picture is placed by the picture's size, so it waits for it.
+ */
+function usePictureIn(box: RefObject<HTMLElement | null>, src: string): boolean {
+  const [ok, setOk] = useState(false);
+  useLayoutEffect(() => {
+    const el = box.current;
+    setOk(false);
+    if (!el) return;
+    const check = () => {
+      const img = el.querySelector('img');
+      setOk(!!img && img.complete && img.naturalWidth > 0 && img.clientHeight > 24);
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    el.addEventListener('load', check, true);
+    return () => {
+      ro.disconnect();
+      el.removeEventListener('load', check, true);
+    };
+  }, [box, src]);
+  return ok;
+}
+
+interface Spot {
+  x: number | null;
+  y: number | null;
+  label: string;
+  text: string;
+}
+
+/** The notes on a picture, placed in percent (given as shares of one, 0.42, when all of them are). */
+function spotsOf(v: unknown): Spot[] {
+  const raw = arr(v)
+    .map((n) => (isObj(n) ? n : { label: str(n) }))
+    .map((n) => ({ x: num(n.x ?? n.left), y: num(n.y ?? n.top), label: textOf(n, 'label', 'name', 'title'), text: str(n.text ?? n.note ?? n.description) }))
+    .filter((n) => n.label || n.text);
+  const placed = raw.filter((n) => n.x !== null && n.y !== null);
+  const shares = placed.length > 0 && placed.every((n) => (n.x as number) <= 1 && (n.y as number) <= 1);
+  const at = (v: number | null) => (v === null ? null : pctIn(shares ? v * 100 : v));
+  return raw.map((n) => ({ ...n, x: at(n.x), y: at(n.y) }));
+}
+
+function AnnotatedImage({ data, done }: { data: Data; done: boolean }) {
+  const src = str(data.image ?? data.src ?? data.picture);
+  const spots = spotsOf(data.notes ?? data.markers ?? data.labels ?? data.points);
+  const box = useRef<HTMLDivElement>(null);
+  const ready = usePictureIn(box, src);
+  // The marker under the pointer, the note under it in the list, and the one tapped (or clicked) open.
+  const [over, setOver] = useState<number | null>(null);
+  const [listed, setListed] = useState<number | null>(null);
+  const [pinned, setPinned] = useState<number | null>(null);
+  const tip = done ? (over ?? pinned) : null;
+  const lit = done ? (over ?? listed ?? pinned) : null;
+  const pin = (i: number) => done && setPinned((p) => (p === i ? null : i));
+  const t = tip !== null ? spots[tip] : undefined;
+  const placed = (s: Spot | undefined): s is Spot & { x: number; y: number } => !!s && s.x !== null && s.y !== null;
+  return (
+    <Card>
+      <Head title={data.title} />
+      {src && (
+        <div
+          ref={box}
+          className={cx('relative', !ready && 'aspect-[16/10] overflow-hidden rounded-xl bg-bg-2')}
+          onKeyDown={(e) => {
+            if (e.key !== 'Escape' || pinned === null) return;
+            setPinned(null);
+            e.stopPropagation();
+          }}
+          onClickCapture={(e) => {
+            // A tap beside the markers closes the open note (rather than opening the picture large).
+            if (pinned === null || (e.target as HTMLElement).closest('[data-spot]')) return;
+            setPinned(null);
+            e.stopPropagation();
+          }}
+        >
+          <Pic src={src} alt={str(data.alt) || str(data.title)} className="block h-auto w-full rounded-xl [&.aui-pic-none]:aspect-[16/10]" />
+          {ready &&
+            spots.map((s, i) =>
+              placed(s) ? (
+                <button
+                  key={i}
+                  type="button"
+                  data-spot
+                  disabled={!done}
+                  aria-label={`${i + 1}. ${s.label}`}
+                  aria-expanded={tip === i}
+                  onPointerEnter={(e) => e.pointerType === 'mouse' && setOver(i)}
+                  onPointerLeave={() => setOver(null)}
+                  onClick={() => pin(i)}
+                  className={cx(
+                    'absolute grid h-6 w-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-accent text-[11.5px] leading-none font-bold text-accent-fg tabular-nums shadow-[0_1px_5px_rgba(0,0,0,0.5)] ring-2 ring-white transition-[scale,opacity] duration-150 outline-none focus-visible:ring-4',
+                    lit === i ? 'z-20 scale-[1.3]' : 'z-10',
+                    lit !== null && lit !== i && 'opacity-60',
+                  )}
+                  style={{ left: `${s.x}%`, top: `${s.y}%` }}
+                >
+                  {i + 1}
+                </button>
+              ) : null,
+            )}
+          {ready && placed(t) && (
+            <div
+              role="tooltip"
+              className={cx('absolute z-30 w-max max-w-[min(300px,86%)] rounded-lg border border-line bg-elevated px-3 py-2 text-[13px] leading-snug shadow-pop', tip !== pinned && 'pointer-events-none')}
+              style={{
+                left: `${t.x}%`,
+                top: `${t.y}%`,
+                translate: `${t.x < 22 ? '-14px' : t.x > 78 ? 'calc(-100% + 14px)' : '-50%'} ${t.y > 58 ? 'calc(-100% - 20px)' : '20px'}`,
+              }}
+            >
+              <div className="font-semibold text-fg">{t.label}</div>
+              {t.text && <Md text={t.text} className="mt-0.5 text-fg-2" />}
+            </div>
+          )}
+        </div>
+      )}
+      {str(data.credit) && <div className="mt-1.5 text-[11px] text-fg-3">{str(data.credit)}</div>}
+      {spots.length > 0 && (
+        <ol className="m-0 mt-3 grid list-none gap-x-4 p-0 @xl:grid-cols-2">
+          {spots.map((s, i) => (
+            <li
+              key={i}
+              onPointerEnter={(e) => e.pointerType === 'mouse' && setListed(i)}
+              onPointerLeave={() => setListed(null)}
+              onClick={() => placed(s) && pin(i)}
+              className={cx('flex min-w-0 gap-2.5 rounded-lg px-2 py-1.5 text-[13px] transition-colors', lit === i && 'bg-accent-soft', done && placed(s) && 'cursor-pointer')}
+            >
+              <span className={cx('mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold tabular-nums', placed(s) ? 'bg-accent text-accent-fg' : 'bg-bg-2 text-fg-3')}>{i + 1}</span>
+              <div className="min-w-0">
+                {s.label && <div className="font-semibold text-fg">{s.label}</div>}
+                {s.text && <Md text={s.text} className="text-fg-2" />}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </Card>
+  );
+}
+
+// ---- before and after ----------------------------------------------------------------------------------------------------
+
+function BeforeAfter({ data, done }: { data: Data; done: boolean }) {
+  const side = (v: unknown) => {
+    const o = isObj(v) ? v : { src: v };
+    return { src: str(o.src ?? o.image ?? o.url), label: str(o.label ?? o.name ?? o.title) };
+  };
+  const before = side(data.before);
+  const after = side(data.after);
+  const beforeLabel = before.label || tr('Before');
+  const afterLabel = after.label || tr('After');
+  // The later picture lies below and gives the box its size; the earlier one lies over it, cut at the divider.
+  const base = after.src || before.src;
+  const over = after.src && before.src ? before.src : '';
+  const [at, setAt] = useState<number | null>(null);
+  const pos = at ?? pctIn(num(data.start) ?? 50);
+  const box = useRef<HTMLDivElement>(null);
+  const ready = usePictureIn(box, base);
+  const dragging = useRef<number | null>(null);
+  const moveTo = (x: number) => {
+    const r = box.current?.getBoundingClientRect();
+    if (r && r.width > 0) setAt(pctIn(((x - r.left) / r.width) * 100));
+  };
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!done) return;
+    const step = e.shiftKey ? 10 : 2;
+    const k = e.key;
+    const next = k === 'ArrowLeft' || k === 'ArrowDown' ? pos - step : k === 'ArrowRight' || k === 'ArrowUp' ? pos + step : k === 'PageDown' ? pos - 10 : k === 'PageUp' ? pos + 10 : k === 'Home' ? 0 : k === 'End' ? 100 : null;
+    if (next === null) return;
+    e.preventDefault();
+    setAt(pctIn(next));
+  };
+  const label = 'pointer-events-none absolute top-2.5 max-w-[45%] truncate rounded-md bg-black/60 px-2 py-0.5 text-[12px] font-semibold text-white';
+  return (
+    <Card>
+      <Head title={data.title} />
+      {base && (
+        <div
+          ref={box}
+          className={cx('relative touch-pan-y overflow-hidden rounded-xl bg-bg-2 select-none', !ready && 'aspect-[16/10]', done && over && 'cursor-ew-resize')}
+          onPointerDown={(e) => {
+            if (!done || !over || e.button !== 0) return;
+            dragging.current = e.pointerId;
+            e.currentTarget.setPointerCapture(e.pointerId);
+            moveTo(e.clientX);
+          }}
+          onPointerMove={(e) => dragging.current === e.pointerId && moveTo(e.clientX)}
+          onPointerUp={(e) => {
+            if (dragging.current === e.pointerId) dragging.current = null;
+          }}
+          onPointerCancel={() => {
+            dragging.current = null;
+          }}
+        >
+          <Pic src={base} alt={over ? afterLabel : beforeLabel} zoom={!over} className="block h-auto w-full [&.aui-pic-none]:aspect-[16/10]" />
+          {over && (
+            <>
+              <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}>
+                <Pic src={over} alt={beforeLabel} zoom={false} className="h-full w-full" />
+              </div>
+              {pos > 16 && <span className={cx(label, 'left-2.5')}>{beforeLabel}</span>}
+              {pos < 84 && <span className={cx(label, 'right-2.5')}>{afterLabel}</span>}
+              <div className="pointer-events-none absolute inset-y-0 w-0" style={{ left: `${pos}%` }}>
+                <span className="absolute inset-y-0 -left-px w-0.5 bg-white shadow-[0_0_4px_rgba(0,0,0,0.55)]" aria-hidden />
+                <div
+                  role="slider"
+                  tabIndex={done ? 0 : -1}
+                  aria-label={tr('Divider between the two pictures')}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(pos)}
+                  aria-valuetext={`${beforeLabel} ${Math.round(pos)}% · ${afterLabel} ${100 - Math.round(pos)}%`}
+                  onKeyDown={onKey}
+                  className="pointer-events-auto absolute top-1/2 left-0 grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white text-[#333] shadow-[0_1px_6px_rgba(0,0,0,0.45)] outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+                >
+                  <ChevronsLeftRight size={18} />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      {(str(data.caption) || str(data.credit)) && (
+        <div className="mt-2.5">
+          {str(data.caption) && <Md text={data.caption} className="text-[13.5px] text-fg-2" />}
+          {str(data.credit) && <div className="mt-1 text-[11px] text-fg-3">{str(data.credit)}</div>}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ---- chord charts ----------------------------------------------------------------------------------------------------------
+
+const LETTERS = 'CDEFGAB';
+const PITCH: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+/** Each instrument's strings as charts show them, left to right, in standard tuning (MIDI notes). */
+const TUNING: Record<string, number[]> = { guitar: [40, 45, 50, 55, 59, 64], ukulele: [67, 60, 64, 69] };
+
+/** An interval: the semitones over the root, and the degree that spells its note (the third of G minor is B♭, not A♯). */
+const STEP: Record<string, [number, number]> = {
+  '1': [0, 1],
+  b2: [1, 2],
+  '2': [2, 2],
+  b3: [3, 3],
+  '3': [4, 3],
+  '4': [5, 4],
+  '#4': [6, 4],
+  b5: [6, 5],
+  '5': [7, 5],
+  '#5': [8, 5],
+  '6': [9, 6],
+  bb7: [9, 7],
+  b7: [10, 7],
+  '7': [11, 7],
+  b9: [13, 9],
+  '9': [14, 9],
+  '#9': [15, 9],
+  '11': [17, 11],
+  '#11': [18, 11],
+  b13: [20, 13],
+  '13': [21, 13],
+};
+
+/** Chord qualities as they are written after the root, and their intervals. A capital M means major. */
+const QUALITIES: [string, string][] = [
+  ['|maj|M|major', '1 3 5'],
+  ['m|min|-|minor', '1 b3 5'],
+  ['dim|°|o', '1 b3 b5'],
+  ['dim7|°7|o7', '1 b3 b5 bb7'],
+  ['m7b5|m7♭5|ø|ø7|min7b5|-7b5', '1 b3 b5 b7'],
+  ['aug|+|+5|#5', '1 3 #5'],
+  ['sus2', '1 2 5'],
+  ['sus4|sus', '1 4 5'],
+  ['5', '1 5'],
+  ['6|maj6|M6', '1 3 5 6'],
+  ['m6|min6|-6', '1 b3 5 6'],
+  ['6/9|69', '1 3 5 6 9'],
+  ['7|dom7', '1 3 5 b7'],
+  ['maj7|M7|Δ|Δ7|ma7', '1 3 5 7'],
+  ['m7|min7|-7', '1 b3 5 b7'],
+  ['mmaj7|mM7|minmaj7|m/maj7|-maj7', '1 b3 5 7'],
+  ['7sus4|7sus', '1 4 5 b7'],
+  ['7sus2', '1 2 5 b7'],
+  ['aug7|+7|7#5|7+5', '1 3 #5 b7'],
+  ['7b5|7♭5', '1 3 b5 b7'],
+  ['7b9|7♭9', '1 3 5 b7 b9'],
+  ['7#9|7♯9', '1 3 5 b7 #9'],
+  ['9', '1 3 5 b7 9'],
+  ['maj9|M9|Δ9', '1 3 5 7 9'],
+  ['m9|min9|-9', '1 b3 5 b7 9'],
+  ['add9|add2', '1 3 5 9'],
+  ['madd9|madd2|minadd9', '1 b3 5 9'],
+  ['11', '1 3 5 b7 9 11'],
+  ['m11|min11', '1 b3 5 b7 9 11'],
+  ['13', '1 3 5 b7 9 13'],
+  ['maj13|M13', '1 3 5 7 9 13'],
+  ['m13|min13', '1 b3 5 b7 9 13'],
+];
+
+function qualityOf(q: string): string | null {
+  for (const [names, steps] of QUALITIES) if (names.split('|').includes(q)) return steps;
+  const low = q.toLowerCase();
+  for (const [names, steps] of QUALITIES) if (names.split('|').some((n) => !/M/.test(n) && n.toLowerCase() === low)) return steps;
+  return null;
+}
+
+const accOf = (s: string) => [...s].reduce((n, c) => n + (c === '#' || c === '♯' ? 1 : c === 'b' || c === '♭' ? -1 : 0), 0);
+const accText = (a: number) => (a > 0 ? '♯'.repeat(a) : '♭'.repeat(-a));
+const pc = (n: number) => ((n % 12) + 12) % 12;
+
+interface ChordName {
+  letter: string;
+  acc: number;
+  steps: [number, number][];
+  bass: { letter: string; acc: number } | null;
+}
+
+/** A chord's name read: its root, its intervals and a bass note after a slash ("G/B"); null when it is not one. */
+function chordName(name: string): ChordName | null {
+  const m = /^\s*([A-Ga-g])([#♯b♭]?)(.*?)(?:\/([A-Ga-g])([#♯b♭]?))?\s*$/.exec(name);
+  if (!m) return null;
+  const q = m[3].replace(/[\s()]/g, '');
+  const steps = qualityOf(q) ?? (/^(m(?!aj)|min|-)/i.test(q) && !/^M/.test(q) ? '1 b3 5' : '1 3 5');
+  return {
+    letter: m[1].toUpperCase(),
+    acc: accOf(m[2]),
+    steps: steps.split(' ').map((s) => STEP[s]),
+    bass: m[4] ? { letter: m[4].toUpperCase(), acc: accOf(m[5] ?? '') } : null,
+  };
+}
+
+/** A chord's notes, named: "G B♭ D" (a bass note outside the chord first). */
+function chordNotes(c: ChordName): string {
+  const names: string[] = [];
+  const seen = new Set<number>();
+  const root = PITCH[c.letter] + c.acc;
+  for (const [semis, degree] of c.steps) {
+    const p = pc(root + semis);
+    if (seen.has(p)) continue;
+    seen.add(p);
+    const letter = LETTERS[(LETTERS.indexOf(c.letter) + degree - 1) % 7];
+    let a = pc(root + semis - PITCH[letter]);
+    if (a > 6) a -= 12;
+    names.push(letter + accText(a));
+  }
+  if (c.bass && !seen.has(pc(PITCH[c.bass.letter] + c.bass.acc))) names.unshift(c.bass.letter + accText(c.bass.acc));
+  return names.join(' ');
+}
+
+/** The keys a chord is played with when none are given: around middle C (`low`: an octave down, as a guitar sounds), its bass under it. */
+function voicing(c: ChordName, low = false): number[] {
+  const rootPc = pc(PITCH[c.letter] + c.acc);
+  const root = (low || rootPc > 5 ? 48 : 60) + rootPc;
+  const notes = c.steps.map(([semis]) => root + semis);
+  if (c.bass) notes.unshift(root - (pc(rootPc - (PITCH[c.bass.letter] + c.bass.acc)) || 12));
+  return [...new Set(notes)].sort((a, b) => a - b);
+}
+
+/** Piano keys as agents write them ("C4", "Eb3"; low to high when no octave is given) as MIDI notes. */
+function keysOf(v: unknown): number[] {
+  const list = Array.isArray(v) ? v.map((x) => str(x)) : str(v).split(/[\s,]+/);
+  const out: number[] = [];
+  for (const s of list) {
+    const m = /^\s*([A-Ga-g])([#♯b♭]*)(-?\d)?\s*$/.exec(s);
+    if (!m) continue;
+    const p = PITCH[m[1].toUpperCase()] + accOf(m[2]);
+    const prev = out[out.length - 1];
+    const midi = m[3] !== undefined ? (Number(m[3]) + 1) * 12 + p : prev === undefined ? 60 + p : prev + (pc(p - prev) || 12);
+    if (midi >= 21 && midi <= 108) out.push(midi);
+  }
+  return out;
+}
+
+/** Frets as agents write them: a list ([3, 2, 0, "x"]), or text ("x32010", "x-3-2-0-1-0", "8 10 10 9 8 8"). */
+function fretsOf(v: unknown): (number | null)[] {
+  const t = typeof v === 'string' ? v.trim() : '';
+  const list: unknown[] = Array.isArray(v) ? v : t ? (/[\s,-]/.test(t) ? t.split(/[\s,-]+/) : [...t]) : [];
+  return list.map((x) => {
+    const n = num(x);
+    return n !== null && n >= 0 && n <= 24 ? Math.round(n) : null;
+  });
+}
+
+interface Barre {
+  fret: number;
+  from: number;
+  to: number;
+}
+
+/**
+ * The barre, if any: as given (counted from the other side when that is the only way it fits the frets), or read from
+ * the fingers: the index finger on two strings or more at one fret.
+ */
+function barreOf(v: unknown, frets: (number | null)[], fingers: (number | null)[]): Barre | null {
+  const n = frets.length;
+  const fits = (b: Barre) => {
+    for (let s = b.from; s <= b.to; s++) {
+      const f = frets[s - 1];
+      if (f === null || f === undefined || f < b.fret) return false;
+    }
+    return frets[b.from - 1] === b.fret && frets[b.to - 1] === b.fret;
+  };
+  const o = isObj(v) ? v : typeof v === 'number' ? { fret: v } : null;
+  const fret = o ? num(o.fret) : null;
+  if (o && fret !== null && fret > 0) {
+    const at = frets.map((f, i) => (f === fret ? i + 1 : 0)).filter(Boolean);
+    let from = Math.round(num(o.from ?? o.start) ?? at[0] ?? 1);
+    let to = Math.round(num(o.to ?? o.end) ?? at[at.length - 1] ?? n);
+    if (from > to) [from, to] = [to, from];
+    const b = { fret: Math.round(fret), from: Math.max(1, Math.min(n, from)), to: Math.max(1, Math.min(n, to)) };
+    const flip = { fret: b.fret, from: n + 1 - b.to, to: n + 1 - b.from };
+    return fits(b) || !fits(flip) ? b : flip;
+  }
+  const index = frets.map((f, i) => (fingers[i] === 1 && f !== null && f > 0 ? i : -1)).filter((i) => i >= 0);
+  if (index.length >= 2 && index.every((i) => frets[i] === frets[index[0]])) return { fret: frets[index[0]] as number, from: index[0] + 1, to: index[index.length - 1] + 1 };
+  return null;
+}
+
+/** A chord's box for a fretted instrument: strings down, frets across, a dot (with its finger) on each fretted string. */
+function FretChart({ frets, fingers, barre }: { frets: (number | null)[]; fingers: (number | null)[]; barre: Barre | null }) {
+  const n = frets.length;
+  const played = frets.filter((f): f is number => f !== null && f > 0);
+  const hi = Math.max(0, ...played, barre?.fret ?? 0);
+  const lo = Math.min(...played, barre?.fret ?? Infinity);
+  // The nut shows when the chord sits in the first five frets; else the box starts at its lowest fret, named beside it.
+  const base = hi <= 5 ? 1 : lo;
+  const rows = Math.min(7, Math.max(4, hi - base + 1));
+  const gap = n <= 4 ? 17 : 14;
+  const fy = 17;
+  // Room on the left for the fret the box starts at, when it does not start at the nut.
+  const left = base === 1 ? 11 : 26;
+  const top = 17;
+  const W = left + gap * (n - 1) + 9;
+  const H = top + fy * rows + 5;
+  const x = (i: number) => left + gap * i;
+  const y = (f: number) => top + (f - base + 0.5) * fy;
+  const r = 5.6;
+  const shown = (f: number) => f >= base && f < base + rows;
+  const onBarre = (i: number, f: number | null) => !!barre && f === barre.fret && i + 1 >= barre.from && i + 1 <= barre.to;
+  const barreFinger = barre ? (fingers[barre.from - 1] ?? 1) : null;
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="mt-1 block shrink-0" aria-hidden>
+      {base === 1 ? (
+        <rect x={left - 1} y={top - 3.5} width={gap * (n - 1) + 2} height={4} rx={1} fill="var(--fg)" />
+      ) : (
+        <text x={left - 7} y={y(base)} dy="0.35em" textAnchor="end" className="fill-fg-2 text-[9.5px] font-medium">
+          {tr('{0}fr').replace('{0}', String(base))}
+        </text>
+      )}
+      {Array.from({ length: rows + 1 }, (_, k) => (
+        <line key={k} x1={left} x2={left + gap * (n - 1)} y1={top + k * fy} y2={top + k * fy} stroke="var(--fg-3)" strokeOpacity={0.75} strokeWidth={1} shapeRendering="crispEdges" />
+      ))}
+      {frets.map((_, i) => (
+        <line key={i} x1={x(i)} x2={x(i)} y1={top} y2={top + rows * fy} stroke="var(--fg-2)" strokeWidth={1} shapeRendering="crispEdges" />
+      ))}
+      {frets.map((f, i) =>
+        f === 0 ? (
+          <circle key={i} cx={x(i)} cy={top - 9} r={3.3} fill="none" stroke="var(--fg-2)" strokeWidth={1.2} />
+        ) : f === null ? (
+          <path key={i} d={`M${x(i) - 3},${top - 12}l6,6m0,-6l-6,6`} stroke="var(--fg-3)" strokeWidth={1.3} strokeLinecap="round" />
+        ) : null,
+      )}
+      {barre && shown(barre.fret) && (
+        <g>
+          <rect x={x(barre.from - 1) - r} y={y(barre.fret) - r} width={x(barre.to - 1) - x(barre.from - 1) + 2 * r} height={2 * r} rx={r} fill="var(--fg)" />
+          {barreFinger !== null && (
+            <text x={(x(barre.from - 1) + x(barre.to - 1)) / 2} y={y(barre.fret)} dy="0.35em" textAnchor="middle" fill="var(--panel)" className="text-[8.5px] font-bold">
+              {barreFinger}
+            </text>
+          )}
+        </g>
+      )}
+      {frets.map((f, i) =>
+        f !== null && f > 0 && shown(f) && !onBarre(i, f) ? (
+          <g key={i}>
+            <circle cx={x(i)} cy={y(f)} r={r} fill="var(--fg)" />
+            {fingers[i] ? (
+              <text x={x(i)} y={y(f)} dy="0.35em" textAnchor="middle" fill="var(--panel)" className="text-[8.5px] font-bold">
+                {fingers[i]}
+              </text>
+            ) : null}
+          </g>
+        ) : null,
+      )}
+    </svg>
+  );
+}
+
+const WHITE_KEYS = [0, 2, 4, 5, 7, 9, 11];
+
+/** Piano keys over two octaves at least, the chord's keys marked. */
+function KeysChart({ keys }: { keys: number[] }) {
+  const lo = Math.floor(Math.min(...keys) / 12) * 12;
+  const hi = Math.max(Math.floor(Math.max(...keys) / 12) * 12 + 11, lo + 23);
+  const whites: number[] = [];
+  const blacks: number[] = [];
+  for (let m = lo; m <= hi; m++) (WHITE_KEYS.includes(m % 12) ? whites : blacks).push(m);
+  const ww = 13;
+  const bw = 8;
+  const W = whites.length * ww + 1;
+  const on = new Set(keys);
+  const xw = (m: number) => whites.indexOf(m) * ww + 0.5;
+  return (
+    <svg width={W} height={59} viewBox={`0 0 ${W} 59`} className="mt-1.5 block shrink-0" aria-hidden>
+      {whites.map((m) => (
+        <rect key={m} x={xw(m)} y={0.5} width={ww} height={58} rx={2} stroke="#a8a294" strokeWidth={1} style={{ fill: on.has(m) ? 'color-mix(in srgb, var(--accent) 50%, #ffffff)' : '#fbfaf7' }} />
+      ))}
+      {blacks.map((m) => (
+        <rect key={m} x={xw(m - 1) + ww - bw / 2} y={0.5} width={bw} height={36} rx={1.5} stroke="#1f1f1f" strokeWidth={on.has(m) ? 1 : 0} style={{ fill: on.has(m) ? 'color-mix(in srgb, var(--accent) 75%, #ffffff)' : '#262626' }} />
+      ))}
+    </svg>
+  );
+}
+
+/** A plucked string (Karplus–Strong): a burst of noise that a delay line and an averaging filter turn into a note. */
+function pluckBuffer(ctx: BaseAudioContext, freq: number, seconds: number): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const length = Math.floor(rate * seconds);
+  const buf = ctx.createBuffer(1, length, rate);
+  const out = buf.getChannelData(0);
+  const period = Math.max(2, Math.round(rate / freq));
+  const ring = new Float32Array(period);
+  for (let i = 0; i < period; i++) ring[i] = Math.random() * 2 - 1;
+  for (let i = 0, p = 0; i < length; i++) {
+    const q = p + 1 === period ? 0 : p + 1;
+    out[i] = ring[p];
+    ring[p] = 0.4985 * (ring[p] + ring[q]);
+    p = q;
+  }
+  return buf;
+}
+
+const freqOf = (midi: number) => 440 * 2 ** ((midi - 69) / 12);
+
+/** This chart's own sound: plucked strings or a soft piano, made here; stopped and let go with the chart. */
+function useChordSound() {
+  const ref = useRef<{ ctx: AudioContext; out: GainNode; strings: Map<number, AudioBuffer> } | null>(null);
+  useEffect(
+    () => () => {
+      void ref.current?.ctx.close().catch(() => {});
+      ref.current = null;
+    },
+    [],
+  );
+  const outlet = (ctx: AudioContext) => {
+    const g = ctx.createGain();
+    g.gain.value = 0.6;
+    g.connect(ctx.destination);
+    return g;
+  };
+  const audio = () => {
+    if (!ref.current) {
+      const A = typeof window === 'undefined' ? undefined : (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
+      if (!A) return null;
+      const ctx = new A();
+      ref.current = { ctx, out: outlet(ctx), strings: new Map() };
+    }
+    if (ref.current.ctx.state === 'suspended') void ref.current.ctx.resume().catch(() => {});
+    return ref.current;
+  };
+  return {
+    can: typeof window !== 'undefined' && ('AudioContext' in window || 'webkitAudioContext' in window),
+    /** Plays notes (MIDI, low to high) at `at` seconds from now: strummed on strings, together on a piano. */
+    play(notes: number[], piano: boolean, at = 0) {
+      const a = audio();
+      if (!a || !notes.length) return;
+      const t0 = a.ctx.currentTime + 0.03 + at;
+      notes.forEach((m, i) => {
+        if (piano) {
+          const g = a.ctx.createGain();
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(0.15, t0 + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.0005, t0 + 1.8);
+          g.connect(a.out);
+          for (const [mult, type, level] of [
+            [1, 'triangle', 1],
+            [2, 'sine', 0.35],
+            [3, 'sine', 0.12],
+          ] as const) {
+            const o = a.ctx.createOscillator();
+            const og = a.ctx.createGain();
+            o.type = type;
+            o.frequency.value = freqOf(m) * mult;
+            og.gain.value = level;
+            o.connect(og).connect(g);
+            o.start(t0);
+            o.stop(t0 + 1.85);
+          }
+          return;
+        }
+        let buf = a.strings.get(m);
+        if (!buf) {
+          buf = pluckBuffer(a.ctx, freqOf(m), 2.6);
+          a.strings.set(m, buf);
+        }
+        const t = t0 + i * 0.028;
+        const src = a.ctx.createBufferSource();
+        const g = a.ctx.createGain();
+        src.buffer = buf;
+        g.gain.setValueAtTime(0.22, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 2.55);
+        src.connect(g).connect(a.out);
+        src.start(t);
+        src.stop(t + 2.6);
+      });
+    },
+    /** Silences what plays and what is waiting to: what comes next goes out through a new outlet. */
+    hush() {
+      const a = ref.current;
+      if (!a) return;
+      a.out.disconnect();
+      a.out = outlet(a.ctx);
+    },
+  };
+}
+
+interface ChordCard {
+  name: string;
+  frets: (number | null)[] | null;
+  fingers: (number | null)[];
+  barre: Barre | null;
+  keys: number[];
+  /** What plays, low to high (MIDI). */
+  sound: number[];
+  notes: string;
+}
+
+/** Bars as agents write them: a list ("C G", "Am"), or text with bar lines ("C G | Am F"); each bar its chords. */
+function barsOf(v: unknown): string[][] {
+  const items = Array.isArray(v) ? v.map((x) => str(x)) : str(v).split('|');
+  return items
+    .flatMap((s) => s.split('|'))
+    .map((s) =>
+      s
+        .trim()
+        .split(/[\s,]+/)
+        .filter((c) => c && !/^[-/%.]+$/.test(c)),
+    )
+    .filter((b) => b.length > 0);
+}
+
+function sectionsOf(v: unknown): { label: string; bars: string[][] }[] {
+  const list = Array.isArray(v) ? v : [];
+  if (!list.length) return str(v) ? [{ label: '', bars: barsOf(v) }] : [];
+  if (list.every((x) => !isObj(x))) return [{ label: '', bars: barsOf(list) }];
+  return list.map((x) => (isObj(x) ? { label: str(x.label ?? x.name ?? x.section), bars: barsOf(x.bars ?? x.chords ?? x.progression) } : { label: '', bars: barsOf([x]) })).filter((s) => s.bars.length > 0);
+}
+
+const sameChord = (a: string, b: string) => a.replace(/♯/g, '#').replace(/♭/g, 'b').toLowerCase() === b.replace(/♯/g, '#').replace(/♭/g, 'b').toLowerCase();
+
+function Chords({ data, done }: { data: Data; done: boolean }) {
+  const list = arr(data.chords).map((c) => (isObj(c) ? c : { name: str(c) }));
+  const kind = str(data.instrument).toLowerCase();
+  const piano = /piano|key|synth|organ/.test(kind) || (!kind && list.some((c) => c.notes || c.keys) && !list.some((c) => c.frets));
+  const instrument = piano ? 'piano' : /uke|ukulele/.test(kind) ? 'ukulele' : 'guitar';
+  const tuning = TUNING[instrument] ?? TUNING.guitar;
+  const cards: ChordCard[] = list
+    .map((c) => {
+      const name = textOf(c, 'name', 'chord', 'label');
+      const parsed = chordName(name);
+      const given = fretsOf(c.frets ?? c.positions ?? c.tab);
+      const frets = !piano && given.length >= 3 && given.length <= 8 && given.some((f) => f !== null) ? given : null;
+      const fingers = frets ? fretsOf(c.fingers).map((f) => (f !== null && f >= 1 && f <= 4 ? f : null)) : [];
+      const keys = piano ? (keysOf(c.notes ?? c.keys).length ? keysOf(c.notes ?? c.keys) : parsed ? voicing(parsed) : []) : [];
+      const sound = piano ? keys : frets && frets.length === tuning.length ? frets.flatMap((f, i) => (f === null ? [] : [tuning[i] + f])) : parsed ? voicing(parsed, true) : [];
+      return { name, frets, fingers, barre: frets ? barreOf(c.barre, frets, fingers) : null, keys, sound, notes: parsed ? chordNotes(parsed) : '' };
+    })
+    .filter((c) => c.name);
+  const sections = sectionsOf(data.progression ?? data.bars);
+  const song = isObj(data.song) ? data.song : {};
+  const tempo = num(song.tempo ?? data.tempo);
+  const capo = num(song.capo ?? data.capo);
+  const key = str(song.key ?? data.key);
+  const sound = useChordSound();
+  const [hover, setHover] = useState<string | null>(null);
+  const [now, setNow] = useState<{ bar: string; chord: string } | null>(null);
+  const timers = useRef<number[]>([]);
+  useEffect(() => () => timers.current.forEach((t) => clearTimeout(t)), []);
+  const cardOf = (name: string): ChordCard | null => {
+    const c = cards.find((x) => x.name === name) ?? cards.find((x) => sameChord(x.name, name));
+    if (c) return c;
+    const parsed = chordName(name);
+    return parsed ? { name, frets: null, fingers: [], barre: null, keys: [], sound: voicing(parsed, !piano), notes: '' } : null;
+  };
+  const stop = () => {
+    timers.current.forEach((t) => clearTimeout(t));
+    timers.current = [];
+    sound.hush();
+    setNow(null);
+  };
+  const playOne = (name: string) => {
+    if (!done) return;
+    stop();
+    const c = cardOf(name);
+    if (c) sound.play(c.sound, piano);
+  };
+  // The progression at the song's pace: four beats a bar, shared by the chords in it.
+  const playAll = () => {
+    stop();
+    const beat = 60 / Math.min(240, Math.max(30, tempo ?? 90));
+    let t = 0;
+    sections.forEach((s, si) =>
+      s.bars.forEach((bar, bi) =>
+        bar.forEach((name) => {
+          const c = cardOf(name);
+          if (c) sound.play(c.sound, piano, t);
+          const at = t;
+          timers.current.push(window.setTimeout(() => setNow({ bar: `${si}:${bi}`, chord: name }), at * 1000 + 30));
+          t += (4 * beat) / bar.length;
+        }),
+      ),
+    );
+    timers.current.push(window.setTimeout(() => setNow(null), t * 1000 + 400));
+  };
+  const lit = now?.chord ?? hover;
+  const playable = done && sound.can;
+  const title = str(data.title) || str(song.title);
+  const sub = str(data.title) ? [str(song.title), str(song.artist)].filter(Boolean).join(' · ') : str(song.artist);
+  const facts = [
+    instrument === 'piano' ? tr('Piano') : instrument === 'ukulele' ? tr('Ukulele') : tr('Guitar'),
+    key ? tr('Key of {0}').replace('{0}', key) : '',
+    tempo ? tr('{0} bpm').replace('{0}', fmtNum(tempo)) : '',
+    capo ? tr('Capo {0}').replace('{0}', fmtNum(capo)) : '',
+  ].filter(Boolean);
+  return (
+    <Card>
+      <Head
+        title={title}
+        sub={sub}
+        aside={
+          playable && sections.length > 0 ? (
+            now ? (
+              <Btn icon={<Square size={12} fill="currentColor" />} onClick={stop}>
+                {tr('Stop')}
+              </Btn>
+            ) : (
+              <Btn icon={<Play size={13} fill="currentColor" />} onClick={playAll}>
+                {tr('Play')}
+              </Btn>
+            )
+          ) : undefined
+        }
+      />
+      {(cards.length > 0 || sections.length > 0) && (
+        <div className="-mt-1 mb-3 flex flex-wrap gap-1.5">
+          {facts.map((f, i) => (
+            <Chip key={i}>{f}</Chip>
+          ))}
+        </div>
+      )}
+      {cards.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {cards.map((c, i) => {
+            const body = (
+              <>
+                <span className="text-[15px] leading-tight font-semibold">{c.name}</span>
+                {c.frets ? <FretChart frets={c.frets} fingers={c.fingers} barre={c.barre} /> : c.keys.length > 0 ? <KeysChart keys={c.keys} /> : null}
+                {c.notes && <span className="mt-1 text-[11px] text-fg-3">{c.notes}</span>}
+              </>
+            );
+            const box = cx('flex min-w-[72px] flex-col items-center rounded-xl border px-2.5 pt-2 pb-1.5 transition-colors', lit && sameChord(lit, c.name) ? 'border-accent bg-accent-soft' : 'border-line');
+            return playable ? (
+              <button key={i} type="button" title={tr('Play {0}').replace('{0}', c.name)} onClick={() => playOne(c.name)} className={cx(box, 'hover:bg-bg-1')}>
+                {body}
+              </button>
+            ) : (
+              <div key={i} className={box}>
+                {body}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {sections.length > 0 && (
+        <div className={cx('space-y-2', cards.length > 0 && 'mt-4')}>
+          {sections.map((s, si) => (
+            <div key={si} className="@md:flex @md:items-start @md:gap-3">
+              {s.label && <div className="mb-1 shrink-0 pt-1 text-[12px] font-semibold text-fg-3 @md:mb-0 @md:w-16">{s.label}</div>}
+              <div className="grid min-w-0 flex-1 grid-cols-2 gap-1 @sm:grid-cols-4">
+                {s.bars.map((bar, bi) => (
+                  <div key={bi} className={cx('flex min-w-0 items-center gap-3 rounded-md px-2.5 py-1 transition-colors', now?.bar === `${si}:${bi}` ? 'bg-accent-soft' : 'bg-bg-1')}>
+                    {bar.map((c, ci) =>
+                      playable ? (
+                        <button
+                          key={ci}
+                          type="button"
+                          onClick={() => playOne(c)}
+                          onPointerEnter={(e) => e.pointerType === 'mouse' && setHover(c)}
+                          onPointerLeave={() => setHover(null)}
+                          className={cx('rounded text-[14px] font-semibold transition-colors hover:text-accent', now?.bar === `${si}:${bi}` && now.chord === c && 'text-accent')}
+                        >
+                          {c}
+                        </button>
+                      ) : (
+                        <span key={ci} className="text-[14px] font-semibold">
+                          {c}
+                        </span>
+                      ),
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {str(data.note) && <Md text={data.note} className="mt-3 text-[13px] text-fg-2" />}
+    </Card>
+  );
+}
+
+// ---- font pairings -----------------------------------------------------------------------------------------------------------
+
+type FontKind = 'serif' | 'sans-serif' | 'monospace' | 'cursive';
+
+/** What kind of face a font is, from its name (a guess for those it does not know): what stands in for it. */
+function fontKind(name: string): FontKind {
+  const n = name.toLowerCase();
+  if (/mono|code|courier|consol|menlo/.test(n)) return 'monospace';
+  if (/script|hand|brush|marker|caveat|pacifico|dancing|lobster|satisfy|vibes|sacramento|parisienne|kaushan|amatic|calligraph|cursive/.test(n)) return 'cursive';
+  if (/sans|grotesk|grotesque|gothic/.test(n)) return 'sans-serif';
+  if (/serif|slab|garamond|baskerville|caslon|bodoni|didot|georgia|times|merriweather|lora|playfair|crimson|cormorant|spectral|alegreya|fraunces|newsreader|literata|bitter|arvo|domine|cardo|vollkorn|gelasio|prata|abril|yeseva|tinos|charter|cambria|antiqua|minion|sabon|cinzel|marcellus|rokkitt|zilla|besley|old standard/.test(n)) return 'serif';
+  return 'sans-serif';
+}
+
+/** The faces that may stand in for a kind when the font itself is not there (the first of them a page names, then its kind). */
+const STAND_INS: Record<FontKind, string[]> = {
+  serif: ['Georgia', 'Times New Roman'],
+  'sans-serif': ['system-ui', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial'],
+  monospace: ['ui-monospace', 'Menlo', 'Consolas', 'Courier New'],
+  cursive: [],
+};
+const KEYWORDS = /^(system-ui|ui-monospace|serif|sans-serif|monospace|cursive)$/;
+const quoteFamily = (f: string) => (KEYWORDS.test(f) || /^[A-Za-z-]+$/.test(f) ? f : `"${f}"`);
+/** A font's CSS family, as a page would write it: itself, the usual stand-in, then its kind ("Lora", Georgia, serif). */
+const familyOf = (name: string) => [`"${name}"`, ...STAND_INS[fontKind(name)].slice(0, 1).map(quoteFamily), fontKind(name)].join(', ');
+
+/** Whether a face draws here: words set in it measure otherwise than in each generic face it would fall back to. */
+function drawsHere(ctx: CanvasRenderingContext2D, family: string): boolean {
+  const sample = 'mmmmmmmmmmlli1WQ@#&';
+  for (const generic of ['monospace', 'serif', 'sans-serif']) {
+    ctx.font = `48px ${generic}`;
+    const plain = ctx.measureText(sample).width;
+    ctx.font = `48px ${family}, ${generic}`;
+    if (Math.abs(ctx.measureText(sample).width - plain) > 0.1) return true;
+  }
+  return false;
+}
+
+/**
+ * Loads the fonts named through the app's own copy of Google Fonts: a stylesheet for each set of names (twelve at most),
+ * added to the page once however many replies ask for the same; true once all of them have loaded (or failed).
+ */
+function useFontSheets(names: string[], on: boolean): boolean {
+  const key = names.join(',');
+  const [loaded, setLoaded] = useState('');
+  useEffect(() => {
+    if (!on || !key) return;
+    let alive = true;
+    const list = key.split(',');
+    const sets: string[][] = [];
+    for (let i = 0; i < list.length; i += 12) sets.push(list.slice(i, i + 12));
+    let waiting = sets.length;
+    const one = () => {
+      waiting -= 1;
+      if (waiting <= 0 && alive) setLoaded(key);
+    };
+    for (const set of sets) {
+      const href = mu(`/api/pages/fonts.css?f=${encodeURIComponent(set.join(','))}`);
+      let link = [...document.querySelectorAll<HTMLLinkElement>('link[data-aui-fonts]')].find((l) => l.getAttribute('href') === href);
+      if (!link) {
+        const el = document.createElement('link');
+        el.rel = 'stylesheet';
+        el.href = href;
+        el.dataset.auiFonts = 'loading';
+        const settle = () => (el.dataset.auiFonts = 'done');
+        el.addEventListener('load', settle, { once: true });
+        el.addEventListener('error', settle, { once: true });
+        document.head.appendChild(el);
+        link = el;
+      }
+      if (link.dataset.auiFonts === 'done') one();
+      else {
+        link.addEventListener('load', one, { once: true });
+        link.addEventListener('error', one, { once: true });
+      }
+    }
+    return () => {
+      alive = false;
+    };
+  }, [key, on]);
+  return !!key && loaded === key;
+}
+
+interface Pairing {
+  name: string;
+  heading: string;
+  body: string;
+  weight: number;
+  note: string;
+  sample: { heading: string; body: string };
+}
+
+/** A font's name as given (or an object's family), without what would break a CSS family. */
+const fontName = (v: unknown) =>
+  textOf(v, 'family', 'name', 'font')
+    .replace(/["'`;{}\\<>]/g, '')
+    .trim()
+    .slice(0, 60);
+
+function Fonts({ data, done }: { data: Data; done: boolean }) {
+  const { offline } = useAui();
+  const common = obj(data.sample);
+  const pairs: Pairing[] = arr(data.pairs ?? data.pairings ?? data.items)
+    .filter(isObj)
+    .map((p) => {
+      const own = obj(p.sample);
+      const w = num(p.weight ?? p.headingWeight);
+      return {
+        name: str(p.name ?? p.label ?? p.title),
+        heading: fontName(p.heading ?? p.headings ?? p.display),
+        body: fontName(p.body ?? p.text ?? p.paragraph),
+        weight: w === null ? 700 : Math.min(900, Math.max(100, Math.round(w / 100) * 100)),
+        note: str(p.note ?? p.why),
+        sample: { heading: str(own.heading) || str(common.heading), body: str(own.body) || str(common.body) },
+      };
+    })
+    .filter((p) => p.heading || p.body);
+  const names = [...new Set(pairs.flatMap((p) => [p.heading, p.body]).filter(Boolean))].sort();
+  const key = names.join(',');
+  // Fonts load once the block is whole (not for each name half written); in a confidential reply, not at all.
+  const loaded = useFontSheets(names, done && !offline);
+  const [missing, setMissing] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!done || !key || !(loaded || offline)) return;
+    let alive = true;
+    const list = key.split(',');
+    const fonts = typeof document !== 'undefined' ? document.fonts : undefined;
+    const loads = fonts ? list.flatMap((n) => [`400 24px "${n}"`, `700 24px "${n}"`].map((f) => fonts.load(f).catch(() => []))) : [];
+    void Promise.all(loads).then(() => {
+      const ctx = alive ? document.createElement('canvas').getContext('2d') : null;
+      if (!ctx) return;
+      const out: Record<string, string> = {};
+      for (const n of list) if (!drawsHere(ctx, `"${n}"`)) out[n] = STAND_INS[fontKind(n)].find((f) => drawsHere(ctx, quoteFamily(f))) ?? fontKind(n);
+      setMissing(out);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [done, key, loaded, offline]);
+  const [own, setOwn] = useState('');
+  const shownIn = (f: string) => (f === 'system-ui' ? tr('the system font') : f);
+  return (
+    <Card>
+      <Head title={data.title} />
+      {done && pairs.length > 0 && (
+        <input
+          value={own}
+          onChange={(e) => setOwn(e.target.value.slice(0, 120))}
+          placeholder={tr('Try your own words')}
+          aria-label={tr('Try your own words')}
+          className="mb-3 h-9 w-full rounded-lg border border-line bg-bg-1 px-3 text-[13.5px] outline-none placeholder:text-fg-3 focus:border-accent"
+        />
+      )}
+      <div className="space-y-3">
+        {pairs.map((p, i) => {
+          const head = familyOf(p.heading || p.body);
+          const body = familyOf(p.body || p.heading);
+          const css = `h1, h2, h3 { font-family: ${head}; font-weight: ${p.weight}; }\nbody { font-family: ${body}; }`;
+          const gone = [...new Set([p.heading, p.body])].filter((n) => n && missing[n]);
+          return (
+            <div key={i} className="overflow-hidden rounded-xl border border-line">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line bg-bg-1 px-3.5 py-2 text-[12.5px]">
+                {p.name && <span className="text-[13px] font-semibold text-fg">{p.name}</span>}
+                <span className="text-fg-3">
+                  {tr('Headings')}{' '}
+                  <span className="font-medium text-fg-2" style={{ fontFamily: head }}>
+                    {p.heading || p.body}
+                  </span>
+                </span>
+                <span className="text-fg-3">
+                  {tr('Text')}{' '}
+                  <span className="font-medium text-fg-2" style={{ fontFamily: body }}>
+                    {p.body || p.heading}
+                  </span>
+                </span>
+              </div>
+              <div className="px-3.5 pt-3 pb-3.5">
+                <div className="text-[26px] leading-[1.15] break-words text-fg @lg:text-[30px]" style={{ fontFamily: head, fontWeight: p.weight }}>
+                  {own.trim() || p.sample.heading || p.heading || p.body}
+                </div>
+                <p className="m-0 mt-2 text-[15px] leading-relaxed text-fg-2" style={{ fontFamily: body }}>
+                  {p.sample.body || tr('A good pairing gives headings a voice of their own and keeps long text easy to read.')}
+                </p>
+                {gone.map((n) => (
+                  <div key={n} className="mt-2 flex items-start gap-1.5 text-[12px] text-warn">
+                    <TriangleAlert size={13} className="mt-px shrink-0" />
+                    <span>{tr('{0} is not available here: shown in {1}').replace('{0}', n).replace('{1}', shownIn(missing[n]))}</span>
+                  </div>
+                ))}
+                {p.note && <Md text={p.note} className="mt-2.5 text-[13px] text-fg-2" />}
+              </div>
+              <div className="flex items-start gap-2 border-t border-line bg-code-bg py-2 pr-1.5 pl-3.5">
+                <pre className="m-0 min-w-0 flex-1 font-mono text-[11.5px] leading-[1.6] break-words whitespace-pre-wrap text-fg-2">{css}</pre>
+                {done && <Copy text={css} label={tr('Copy the CSS')} />}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 export const MEDIA_UIS: Record<string, AnswerUiView> = {
   gallery: Gallery,
   video: Videos,
@@ -1166,4 +2192,8 @@ export const MEDIA_UIS: Record<string, AnswerUiView> = {
   event: Events,
   'color-palette': Palette,
   news: News,
+  'annotated-image': AnnotatedImage,
+  'before-after': BeforeAfter,
+  chords: Chords,
+  fonts: Fonts,
 };

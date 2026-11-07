@@ -211,11 +211,22 @@ function mediaKit(latest: MediaKitApi) {
         }).addTo(map);
         const latlngs = pts.map((p) => [p.lat, p.lng]);
         if (w.line && latlngs.length > 1) Lf.polyline(latlngs, { color: t.accent, weight: 3, opacity: 0.75, dashArray: w.line === 'dashed' ? '6 8' : undefined }).addTo(map);
+        // Points sized by a value (value: its field): circles whose area grows with it, the largest 26px across.
+        const sizeOf = (p: { row: any }) => (typeof w.value === 'string' && isObj(p.row) ? Math.abs(num(p.row[w.value])) : NaN);
+        const most = Math.max(0, ...pts.map(sizeOf).filter((x) => Number.isFinite(x)));
         pts.forEach((p, i) => {
           // A route's line (ends: true) is pinned at its start and end only, not at every point of its shape.
           if (w.ends && i > 0 && i < pts.length - 1) return;
           const label = textOf(p.row, w.label, ['name', 'title', 'label', 'place']);
           const note = textOf(p.row, w.popup, ['description', 'note', 'address', 'summary']);
+          const size = sizeOf(p);
+          if (most > 0 && Number.isFinite(size)) {
+            const dot = Lf.circleMarker([p.lat, p.lng], { radius: 4 + 22 * Math.sqrt(size / most), color: t.card, weight: 1.5, fillColor: t.accent, fillOpacity: 0.55 });
+            if (label || note) dot.bindTooltip(`${label ? `<strong>${K.esc(label)}</strong>` : ''}${label && note ? '<br>' : ''}${note ? K.esc(note) : ''}`, { direction: 'top', offset: [0, -4] });
+            if (typeof w.event === 'string' && w.event) dot.on('click', () => K.fire(w.event, this, isObj(p.row) ? { ...p.row } : { value: p.row }));
+            dot.addTo(map);
+            return;
+          }
           const marker = w.numbered
             ? Lf.marker([p.lat, p.lng], { icon: Lf.divIcon({ className: 'n-map-num', html: `<span>${i + 1}</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }), title: label })
             : Lf.circleMarker([p.lat, p.lng], { radius: 8, color: t.card, weight: 2.5, fillColor: t.accent, fillOpacity: 1 });

@@ -501,4 +501,95 @@ Team = { name: string, logo?: image, color?: string, score?: number }   // color
       ],
     },
   },
+  {
+    id: 'contact',
+    title: 'Contact cards',
+    group: 'people',
+    use: 'Contact details as cards with call, email, website and map buttons, hours and notes; each saves to the address book as a vCard, or copies.',
+    keywords: 'contact details phone number email address call vcard vcf address book business card reach',
+    shape: `{
+  title?: string
+  contacts: {
+    name: string               // a person, or a place or business
+    role?: string
+    org?: string               // where they work
+    image?: image              // a portrait or a logo
+    phone?: string             // "+1 617-555-0134"
+    email?: string
+    website?: url
+    address?: string
+    lat?: number, lng?: number // where the address is: the map button goes there
+    hours?: string             // "Mon–Fri 8:00–18:00"
+    note?: md
+  }[]
+}`,
+    example: {
+      title: 'Your first week at Larkspur Health: who to ask',
+      contacts: [
+        { name: 'Priya Natarajan', role: 'Engineering manager, Platform · your manager', org: 'Larkspur Health', phone: '+1 617-555-0134', email: 'priya.natarajan@example.com', note: 'Book a 30-minute one-to-one with her on Monday: she will walk you through the on-call rota.' },
+        { name: 'Aiko Tanaka', role: 'Site reliability engineer · your onboarding buddy', org: 'Larkspur Health', phone: '+1 617-555-0178', email: 'aiko.tanaka@example.com', note: 'Ask her anything, however small: laptop setup, how deploys work, where the good coffee is.' },
+        { name: 'Sofia Romano', role: 'Finance and people', org: 'Larkspur Health', phone: '+1 617-555-0112', email: 'sofia.romano@example.com', note: 'Payroll, your parking permit, and benefits: enrol within **30 days** of your start date.' },
+        { name: 'IT help desk', role: 'Laptops, accounts and door badges', org: 'Larkspur Health', phone: '+1 617-555-0100', email: 'help@example.com', website: 'https://example.com/it', address: 'One Broadway, 4th floor, Cambridge, MA 02142', lat: 42.3628, lng: -71.0835, hours: 'Mon–Fri 8:00–18:00' },
+      ],
+    },
+  },
+  {
+    id: 'bracket',
+    title: 'Knockout bracket',
+    group: 'people',
+    use: 'A knockout bracket: rounds as columns joined by lines, winners in bold, the champion at the end; hovering a team traces its path through it.',
+    keywords: 'bracket knockout tournament cup draw elimination playoffs quarter-finals semi-finals final winner advances head to head',
+    shape: `{
+  title?: string
+  rounds: {
+    name: string               // "Quarter-finals"
+    matches: {
+      a: Side
+      b: Side
+      winner?: "a" | "b"       // once it is decided
+      date?: date | datetime
+      note?: string            // "After extra time", "France won 5–3 on penalties"
+    }[]                        // in bracket order: matches 1 and 2 feed the next round's first, 3 and 4 its second…
+  }[]                          // the first round first; the final's winner is the champion
+}
+Side = { name: string, seed?: number, score?: string, logo?: image }   // score: "2", or "1 (5)" with penalties`,
+    example: {
+      title: 'UEFA Euro 2024, knockout stage',
+      rounds: [
+        {
+          name: 'Round of 16',
+          matches: [
+            { a: { name: 'Spain', score: '4' }, b: { name: 'Georgia', score: '1' }, winner: 'a', date: '2024-06-30' },
+            { a: { name: 'Germany', score: '2' }, b: { name: 'Denmark', score: '0' }, winner: 'a', date: '2024-06-29' },
+            { a: { name: 'Portugal', score: '0 (3)' }, b: { name: 'Slovenia', score: '0 (0)' }, winner: 'a', date: '2024-07-01', note: 'On penalties' },
+            { a: { name: 'France', score: '1' }, b: { name: 'Belgium', score: '0' }, winner: 'a', date: '2024-07-01' },
+            { a: { name: 'England', score: '2' }, b: { name: 'Slovakia', score: '1' }, winner: 'a', date: '2024-06-30', note: 'After extra time' },
+            { a: { name: 'Switzerland', score: '2' }, b: { name: 'Italy', score: '0' }, winner: 'a', date: '2024-06-29' },
+            { a: { name: 'Netherlands', score: '3' }, b: { name: 'Romania', score: '0' }, winner: 'a', date: '2024-07-02' },
+            { a: { name: 'Austria', score: '1' }, b: { name: 'Turkey', score: '2' }, winner: 'b', date: '2024-07-02' },
+          ],
+        },
+        {
+          name: 'Quarter-finals',
+          matches: [
+            { a: { name: 'Spain', score: '2' }, b: { name: 'Germany', score: '1' }, winner: 'a', date: '2024-07-05', note: 'After extra time' },
+            { a: { name: 'Portugal', score: '0 (3)' }, b: { name: 'France', score: '0 (5)' }, winner: 'b', date: '2024-07-05', note: 'On penalties' },
+            { a: { name: 'England', score: '1 (5)' }, b: { name: 'Switzerland', score: '1 (3)' }, winner: 'a', date: '2024-07-06', note: 'On penalties' },
+            { a: { name: 'Netherlands', score: '2' }, b: { name: 'Turkey', score: '1' }, winner: 'a', date: '2024-07-06' },
+          ],
+        },
+        {
+          name: 'Semi-finals',
+          matches: [
+            { a: { name: 'Spain', score: '2' }, b: { name: 'France', score: '1' }, winner: 'a', date: '2024-07-09' },
+            { a: { name: 'England', score: '2' }, b: { name: 'Netherlands', score: '1' }, winner: 'a', date: '2024-07-10' },
+          ],
+        },
+        {
+          name: 'Final',
+          matches: [{ a: { name: 'Spain', score: '2' }, b: { name: 'England', score: '1' }, winner: 'a', date: '2024-07-14', note: 'Olympiastadion, Berlin' }],
+        },
+      ],
+    },
+  },
 ];

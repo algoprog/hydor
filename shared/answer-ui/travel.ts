@@ -374,4 +374,111 @@ Icon = "sun" | "partly" | "cloud" | "rain" | "showers" | "storm" | "snow" | "sle
       ],
     },
   },
+  {
+    id: 'departures',
+    title: 'Departures board',
+    group: 'travel',
+    use: 'The next trains, buses, trams or ferries from a stop: line, destination, platform, delays and cancellations, and the minutes until each leaves, counted live.',
+    keywords: 'departures next train bus tram metro subway ferry station stop platform delays cancelled leaving public transport',
+    shape: `{
+  station: string
+  updated?: time               // when the times were read
+  tz?: string                  // the station's time zone ("Europe/Zurich") when it is not the user's
+  departures: {
+    time: time                 // as timetabled
+    line?: string              // "S8", "IC 1", "42"
+    destination: string
+    via?: string
+    platform?: string
+    delay?: number             // minutes late
+    status?: "on time" | "delayed" | "cancelled"
+    mode?: "train" | "bus" | "tram" | "metro" | "ferry"
+    color?: string             // the line's own colour: "#e2001a"
+  }[]                          // in time order
+}`,
+    example: {
+      station: 'Zürich HB',
+      updated: '17:58',
+      tz: 'Europe/Zurich',
+      departures: [
+        { time: '18:02', line: 'S8', destination: 'Winterthur', via: 'Zürich Oerlikon', platform: '34', mode: 'train' },
+        { time: '18:04', line: 'IC 1', destination: 'Genève-Aéroport', via: 'Bern, Lausanne', platform: '31', mode: 'train' },
+        { time: '18:07', line: 'S24', destination: 'Zug', via: 'Thalwil', platform: '43', delay: 3, mode: 'train' },
+        { time: '18:09', line: 'EC', destination: 'Milano Centrale', via: 'Arth-Goldau, Lugano', platform: '9', mode: 'train' },
+        { time: '18:13', line: 'IR 36', destination: 'Basel SBB', via: 'Brugg', platform: '16', delay: 6, status: 'delayed', mode: 'train' },
+        { time: '18:16', line: 'S16', destination: 'Zürich Flughafen', platform: '42', status: 'cancelled', mode: 'train' },
+        { time: '18:19', line: '10', destination: 'Zürich Flughafen', via: 'Bahnhofplatz/HB', mode: 'tram' },
+        { time: '18:21', line: 'ICE', destination: 'Frankfurt (Main) Hbf', via: 'Basel SBB, Freiburg', platform: '7', mode: 'train' },
+        { time: '18:30', line: 'RJX', destination: 'Wien Hbf', via: 'Sargans, Innsbruck', platform: '6', mode: 'train' },
+        { time: '18:35', line: 'IC 5', destination: 'Lausanne', via: 'Biel/Bienne, Neuchâtel', platform: '17', mode: 'train' },
+      ],
+    },
+  },
+  {
+    id: 'elevation',
+    title: 'Elevation profile',
+    group: 'travel',
+    use: 'A hike or ride’s elevation profile: height over distance with a crosshair reading both, waypoints, the climb and descent, and the route on a map.',
+    keywords: 'elevation profile hike trail climb ascent descent altitude height mountain summit ride cycling running gpx',
+    shape: `{
+  title?: string
+  unit?: "km" | "mi"           // the distances': km unless set (with mi, heights show in feet)
+  points: {
+    d: number                  // distance from the start, in the unit
+    ele: number                // height in metres
+    lat?: number
+    lng?: number               // with positions, the route goes on a map
+  }[]                          // in order: 20 to 200 along the way
+  waypoints?: { d: number, label: string }[]
+  stats?: {                    // worked out from the points unless given
+    distance?: number          // in the unit
+    gain?: number              // metres climbed in all
+    loss?: number              // metres descended
+    high?: number              // the highest point, in metres
+    low?: number
+    time?: string              // "4–5 h up"
+  }
+}`,
+    example: {
+      title: 'Mount Washington by the Tuckerman Ravine Trail',
+      unit: 'mi',
+      points: [
+        { d: 0, ele: 622, lat: 44.25797, lng: -71.25331 },
+        { d: 0.23, ele: 656, lat: 44.26075, lng: -71.25569 },
+        { d: 0.28, ele: 660, lat: 44.26058, lng: -71.25628 },
+        { d: 0.41, ele: 703, lat: 44.25982, lng: -71.25799 },
+        { d: 0.51, ele: 728, lat: 44.26084, lng: -71.25892 },
+        { d: 0.6, ele: 739, lat: 44.25988, lng: -71.25968 },
+        { d: 0.69, ele: 765, lat: 44.26107, lng: -71.26031 },
+        { d: 0.78, ele: 793, lat: 44.26156, lng: -71.26202 },
+        { d: 1.1, ele: 892, lat: 44.26162, lng: -71.26844 },
+        { d: 1.33, ele: 964, lat: 44.26254, lng: -71.27284 },
+        { d: 1.56, ele: 1025, lat: 44.26392, lng: -71.27681 },
+        { d: 1.61, ele: 1043, lat: 44.26399, lng: -71.27769 },
+        { d: 1.79, ele: 1076, lat: 44.26193, lng: -71.27952 },
+        { d: 1.89, ele: 1101, lat: 44.26128, lng: -71.28099 },
+        { d: 2.02, ele: 1138, lat: 44.26234, lng: -71.28317 },
+        { d: 2.07, ele: 1152, lat: 44.2617, lng: -71.28338 },
+        { d: 2.25, ele: 1182, lat: 44.26005, lng: -71.28608 },
+        { d: 2.39, ele: 1200, lat: 44.26045, lng: -71.28842 },
+        { d: 2.53, ele: 1278, lat: 44.26123, lng: -71.29087 },
+        { d: 2.81, ele: 1347, lat: 44.26173, lng: -71.29614 },
+        { d: 2.85, ele: 1364, lat: 44.26199, lng: -71.29697 },
+        { d: 2.9, ele: 1399, lat: 44.26252, lng: -71.29748 },
+        { d: 2.95, ele: 1446, lat: 44.26317, lng: -71.29736 },
+        { d: 2.99, ele: 1483, lat: 44.26329, lng: -71.29792 },
+        { d: 3.08, ele: 1532, lat: 44.26287, lng: -71.29957 },
+        { d: 3.22, ele: 1624, lat: 44.2635, lng: -71.30203 },
+        { d: 3.68, ele: 1887, lat: 44.26961, lng: -71.30199 },
+      ],
+      waypoints: [
+        { d: 0, label: 'Pinkham Notch' },
+        { d: 0.35, label: 'Crystal Cascade' },
+        { d: 2.25, label: 'Hermit Lake shelters' },
+        { d: 3.26, label: 'Tuckerman Junction' },
+        { d: 3.68, label: 'Summit' },
+      ],
+      stats: { time: '4–5 h up' },
+    },
+  },
 ];

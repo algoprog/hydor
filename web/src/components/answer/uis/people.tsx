@@ -1,10 +1,10 @@
 // The answer UIs for people and sports (profiles, people, org charts, matches, league tables, fixtures): their views, by name (shared/answer-ui/people.ts has what each takes).
-import { Fragment } from 'react';
-import { ArrowLeftRight, MapPin } from 'lucide-react';
+import { Fragment, useState, type ReactNode } from 'react';
+import { ArrowLeftRight, Clock, Download, ExternalLink, Globe, Mail, MapPin, Phone, Trophy } from 'lucide-react';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { Legend, useWidth } from '../charts';
-import { arr, Avatar, Card, Chip, fmtDate, fmtNum, fmtTime, Head, hostOf, initials, isObj, KeyValues, LinkOut, Md, num, parseDate, Pic, Section, seriesColor, str, textOf, TONE, TONE_FILL, toneOf, withUnit, words, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Avatar, Btn, Card, Chip, Copy, download, fmtDate, fmtNum, fmtTime, Head, hostOf, initials, isObj, KeyValues, LinkOut, Md, num, parseDate, Pic, Section, seriesColor, str, textOf, TONE, TONE_FILL, toneOf, withUnit, words, type AnswerUiView, type Data, type Tone } from '../kit';
 
 // ---- shared pieces ---------------------------------------------------------------------------------------------------
 
@@ -713,6 +713,421 @@ function Fixtures({ data }: { data: Data }) {
   );
 }
 
+// ---- contact cards -----------------------------------------------------------------------------------------------------
+
+interface Contact {
+  name: string;
+  role: string;
+  org: string;
+  image: string;
+  phones: string[];
+  emails: string[];
+  website: string;
+  address: string;
+  lat: number | null;
+  lng: number | null;
+  hours: string;
+  note: string;
+}
+
+const isWebUrl = (u: string) => /^https?:\/\//i.test(u);
+/** One value or several: a list as it is, text as one. */
+const several = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => textOf(x, 'value', 'number', 'address')).filter(Boolean) : str(v) ? [str(v)] : []);
+
+function contactOf(c: Data): Contact {
+  const lat = num(c.lat ?? c.latitude);
+  const lng = num(c.lng ?? c.lon ?? c.longitude);
+  return {
+    name: textOf(c, 'name', 'title', 'org', 'company'),
+    role: str(c.role ?? c.position ?? c.job ?? (str(c.name) ? c.title : undefined)),
+    org: str(c.org ?? c.organization ?? c.company),
+    image: str(c.image ?? c.photo ?? c.avatar ?? c.logo),
+    phones: several(c.phone ?? c.phones ?? c.tel ?? c.telephone ?? c.mobile),
+    emails: several(c.email ?? c.emails ?? c.mail),
+    website: str(c.website ?? c.url ?? c.site ?? c.web),
+    address: str(c.address ?? c.location),
+    lat: lat !== null && Math.abs(lat) <= 90 ? lat : null,
+    lng: lng !== null && Math.abs(lng) <= 180 ? lng : null,
+    hours: str(c.hours ?? c.open ?? c.opening_hours),
+    note: str(c.note ?? c.notes ?? c.description),
+  };
+}
+
+/** Markdown as plain words: for an address book's note, a copy. */
+const plainMd = (md: string) =>
+  md
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[*_`~]+/g, '')
+    .trim();
+
+const mapLink = (c: Contact) =>
+  c.lat !== null && c.lng !== null ? `https://www.google.com/maps/search/?api=1&query=${c.lat},${c.lng}` : c.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address)}` : '';
+
+/** A name as an address book files it: family name, then given names ("Natarajan", "Priya"); "Last, First" as it is. */
+function nameParts(name: string): [string, string] {
+  if (name.includes(',')) {
+    const k = name.indexOf(',');
+    return [name.slice(0, k).trim(), name.slice(k + 1).trim()];
+  }
+  const w = name.trim().split(/\s+/);
+  if (w.length < 2) return [name.trim(), ''];
+  let k = w.length - 1;
+  while (k > 1 && /^(van|von|de|del|della|der|den|da|di|du|dos|das|le|la|ter|ten|bin|ibn|al)$/i.test(w[k - 1])) k--;
+  return [w.slice(k).join(' '), w.slice(0, k).join(' ')];
+}
+
+const vText = (s: string) => s.replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/([,;])/g, '\\$1');
+/** A line of a vCard folded at 75 bytes, as address books want them. */
+function vFold(line: string): string {
+  const out: string[] = [];
+  let cur = '';
+  let bytes = 0;
+  for (const ch of line) {
+    const c = ch.codePointAt(0) ?? 0;
+    const b = c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;
+    if (bytes + b > 74) {
+      out.push(cur);
+      cur = ' ';
+      bytes = 1;
+    }
+    cur += ch;
+    bytes += b;
+  }
+  out.push(cur);
+  return out.join('\r\n');
+}
+
+/** A contact as a vCard (3.0), which address books on phones and computers open. */
+function vcardOf(c: Contact): string {
+  const [family, given] = nameParts(c.name);
+  const lines = ['BEGIN:VCARD', 'VERSION:3.0', `N:${vText(family)};${vText(given)};;;`, `FN:${vText(c.name)}`];
+  if (c.org) lines.push(`ORG:${vText(c.org)}`);
+  if (c.role) lines.push(`TITLE:${vText(c.role)}`);
+  for (const p of c.phones) lines.push(`TEL;TYPE=VOICE:${p.replace(/[\r\n]+/g, ' ')}`);
+  for (const e of c.emails) lines.push(`EMAIL;TYPE=INTERNET:${e.replace(/\s+/g, '')}`);
+  if (isWebUrl(c.website)) lines.push(`URL:${c.website}`);
+  if (c.address) lines.push(`ADR;TYPE=WORK:;;${vText(c.address)};;;;`, `LABEL;TYPE=WORK:${vText(c.address)}`);
+  if (c.lat !== null && c.lng !== null) lines.push(`GEO:${c.lat};${c.lng}`);
+  if (isWebUrl(c.image)) lines.push(`PHOTO;VALUE=URI:${c.image}`);
+  const note = [c.hours ? `${tr('Hours')}: ${c.hours}` : '', plainMd(c.note)].filter(Boolean).join('\n');
+  if (note) lines.push(`NOTE:${vText(note)}`);
+  lines.push('END:VCARD');
+  return `${lines.map(vFold).join('\r\n')}\r\n`;
+}
+
+const contactText = (c: Contact) => [c.name, [c.role, c.org].filter(Boolean).join(', '), ...c.phones, ...c.emails, c.website, c.address, c.hours, plainMd(c.note)].filter(Boolean).join('\n');
+const fileSlug = (s: string) =>
+  (
+    s
+      .replace(/[^\p{L}\p{N}]+/gu, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'contact'
+  ).toLowerCase();
+
+/** A line of a contact card: its icon, and what it says (a link once the block is whole). */
+function ContactRow({ icon, href, external, children }: { icon: ReactNode; href?: string; external?: boolean; children: ReactNode }) {
+  const body = (
+    <>
+      <span className="mt-[3px] shrink-0 text-fg-3">{icon}</span>
+      <span className="min-w-0 break-words">
+        {children}
+        {href && external && <ExternalLink size={11} className="ml-1 inline-block align-[-1px] opacity-60" />}
+      </span>
+    </>
+  );
+  return href ? (
+    <a href={href} target={external ? '_blank' : undefined} rel={external ? 'noopener noreferrer' : undefined} className="flex min-w-0 items-start gap-2 rounded-md text-fg-2 transition-colors hover:text-accent">
+      {body}
+    </a>
+  ) : (
+    <div className="flex min-w-0 items-start gap-2 text-fg-2">{body}</div>
+  );
+}
+
+function ContactCard({ c, done }: { c: Contact; done: boolean }) {
+  const map = mapLink(c);
+  const site = isWebUrl(c.website) ? c.website : '';
+  const siteText = site ? site.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '') : c.website;
+  return (
+    <li className="flex min-w-0 flex-col rounded-xl border border-line p-3.5">
+      <div className="flex min-w-0 items-start gap-3">
+        <Avatar name={c.name} image={c.image} className="h-12 w-12 text-[15px]" />
+        <div className="min-w-0 flex-1 pt-0.5">
+          <div className="text-[15px] leading-snug font-semibold text-fg">{c.name}</div>
+          {(c.role || c.org) && <div className="mt-0.5 text-[12.5px] leading-snug text-fg-3">{[c.role, c.org].filter(Boolean).join(' · ')}</div>}
+        </div>
+      </div>
+      {(c.phones.length > 0 || c.emails.length > 0 || c.website || c.address || c.hours) && (
+        <div className="mt-3 space-y-1.5 text-[13px]">
+          {c.phones.map((p, i) => (
+            <ContactRow key={`p${i}`} icon={<Phone size={13} />} href={done ? `tel:${p.replace(/[^\d+]/g, '')}` : undefined}>
+              <span className="tabular-nums">{p}</span>
+            </ContactRow>
+          ))}
+          {c.emails.map((e, i) => (
+            <ContactRow key={`e${i}`} icon={<Mail size={13} />} href={done ? `mailto:${e.replace(/\s+/g, '')}` : undefined}>
+              {e}
+            </ContactRow>
+          ))}
+          {c.website && (
+            <ContactRow icon={<Globe size={13} />} href={done && site ? site : undefined} external>
+              {siteText}
+            </ContactRow>
+          )}
+          {c.address && (
+            <ContactRow icon={<MapPin size={13} />} href={done && map ? map : undefined} external>
+              {c.address}
+            </ContactRow>
+          )}
+          {!c.address && map && done && (
+            <ContactRow icon={<MapPin size={13} />} href={map} external>
+              {tr('On the map')}
+            </ContactRow>
+          )}
+          {c.hours && <ContactRow icon={<Clock size={13} />}>{c.hours}</ContactRow>}
+        </div>
+      )}
+      {c.note && <Md text={c.note} className="mt-2.5 text-[13px] text-fg-2" />}
+      {done && c.name && (
+        <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-3">
+          <Btn icon={<Download size={13} />} className="h-7 px-2.5 text-[12px]" onClick={() => download(`${fileSlug(c.name)}.vcf`, 'text/vcard;charset=utf-8', vcardOf(c))}>
+            {tr('Save contact')}
+          </Btn>
+          <Copy text={() => contactText(c)} label={tr('Copy the details')} />
+        </div>
+      )}
+    </li>
+  );
+}
+
+function Contacts({ data, done }: { data: Data; done: boolean }) {
+  const given = arr(data.contacts ?? data.people ?? data.items).map((c) => (isObj(c) ? c : { name: str(c) }));
+  // One contact written at the top level: { name, phone… }.
+  const list = (given.length ? given : str(data.name) || str(data.phone) || str(data.email) ? [data] : []).map(contactOf).filter((c) => c.name);
+  return (
+    <Card>
+      <Head
+        title={given.length ? data.title : undefined}
+        aside={
+          done && list.length > 1 ? (
+            <Btn icon={<Download size={13} />} onClick={() => download(`${fileSlug(str(data.title) || 'contacts')}.vcf`, 'text/vcard;charset=utf-8', list.map(vcardOf).join(''))}>
+              {tr('Save all')}
+            </Btn>
+          ) : undefined
+        }
+      />
+      <ul className={cx('m-0 grid list-none gap-3 p-0', list.length > 1 && '@xl:grid-cols-2')}>
+        {list.map((c, i) => (
+          <ContactCard key={i} c={c} done={done} />
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+// ---- a knockout bracket --------------------------------------------------------------------------------------------------
+
+interface BSide {
+  name: string;
+  seed: number | null;
+  score: string;
+  logo: string;
+}
+interface BMatch {
+  a: BSide;
+  b: BSide;
+  win: 'a' | 'b' | null;
+  date: string;
+  note: string;
+}
+interface BRound {
+  name: string;
+  matches: BMatch[];
+}
+
+const bSide = (v: unknown): BSide => {
+  const o = isObj(v) ? v : { name: str(v) };
+  return { name: textOf(o, 'name', 'team', 'player', 'title'), seed: num(o.seed), score: str(o.score ?? o.goals ?? o.points), logo: str(o.logo ?? o.flag ?? o.image ?? o.crest) };
+};
+
+/** Who won: as named ("a", "home", 1, or the side's name), else from the scores ("1 (5)" beats "1 (3)") when both are in. */
+function winnerOf(m: Data, a: BSide, b: BSide): 'a' | 'b' | null {
+  const w = isObj(m.winner) ? textOf(m.winner, 'name', 'team') : m.winner ?? m.won;
+  const s = str(w).trim().toLowerCase();
+  if (s === 'a' || s === 'home' || s === 'top' || s === '1') return 'a';
+  if (s === 'b' || s === 'away' || s === 'bottom' || s === '2') return 'b';
+  if (s && s === a.name.toLowerCase()) return 'a';
+  if (s && s === b.name.toLowerCase()) return 'b';
+  if (s) return null;
+  const x = (a.score.match(/\d+/g) ?? []).map(Number);
+  const y = (b.score.match(/\d+/g) ?? []).map(Number);
+  if (!x.length || !y.length) return null;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0) ? 'a' : 'b';
+  return null;
+}
+
+const SIDE_H = 26;
+const MATCH_H = SIDE_H * 2 + 1;
+
+function MatchBox({ m, width, traced, seeded, done, onFocus }: { m: BMatch; width: number; traced: string | null; seeded: boolean; done: boolean; onFocus: (name: string | null) => void }) {
+  const on = !!traced && (m.a.name === traced || m.b.name === traced);
+  return (
+    <div className={cx('overflow-hidden rounded-lg border bg-panel', on ? 'border-accent/60' : 'border-line')} style={{ width }}>
+      {(['a', 'b'] as const).map((k) => {
+        const s = m[k];
+        const won = m.win === k;
+        const lost = !!m.win && !won;
+        return (
+          <div
+            key={k}
+            onPointerEnter={(e) => done && e.pointerType === 'mouse' && s.name && onFocus(s.name)}
+            onPointerLeave={() => onFocus(null)}
+            className={cx('flex items-center gap-1.5 px-2 text-[12.5px]', k === 'a' && 'border-b border-line/70', traced && s.name === traced && 'bg-accent-soft')}
+            style={{ height: SIDE_H }}
+          >
+            {seeded && <span className="w-4 shrink-0 text-right text-[10.5px] text-fg-3 tabular-nums">{s.seed ?? ''}</span>}
+            {s.logo && <Pic src={s.logo} alt="" fit="contain" zoom={false} className="h-3.5 w-5 shrink-0 rounded-[2px] bg-transparent" />}
+            <span className={cx('min-w-0 flex-1 truncate', won ? 'font-semibold text-fg' : lost ? 'text-fg-3' : 'text-fg')} title={s.name}>
+              {s.name || '—'}
+            </span>
+            {s.score && <span className={cx('shrink-0 tabular-nums', won ? 'font-semibold text-fg' : 'text-fg-3')}>{s.score}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Bracket({ data, done }: { data: Data; done: boolean }) {
+  const all: BRound[] = arr(data.rounds)
+    .filter(isObj)
+    .map((r, i) => ({
+      name: str(r.name ?? r.title ?? r.label) || tr('Round {0}').replace('{0}', String(i + 1)),
+      matches: arr(r.matches ?? r.games ?? r.items)
+        .filter(isObj)
+        .map((m) => {
+          const teams = arr(m.teams ?? m.sides);
+          const a = bSide(m.a ?? m.home ?? m.top ?? m.team1 ?? teams[0]);
+          const b = bSide(m.b ?? m.away ?? m.bottom ?? m.team2 ?? teams[1]);
+          return { a, b, win: winnerOf(m, a, b), date: str(m.date ?? m.when), note: str(m.note ?? m.detail) };
+        }),
+    }))
+    .filter((r) => r.matches.length > 0);
+  // A match for third place sits under the bracket, not in it.
+  const extra = all.filter((r) => /third|3rd|bronze/i.test(r.name));
+  const rounds = all.filter((r) => !extra.includes(r));
+  const final = rounds[rounds.length - 1];
+  const last = final?.matches.length === 1 ? final.matches[0] : null;
+  const champ = last?.win ? last[last.win] : null;
+  const [ref, room] = useWidth<HTMLDivElement>();
+  const [focus, setFocus] = useState<string | null>(null);
+  // Whose way through it is traced: the team under the pointer, else the champion's.
+  const traced = (done && focus) || champ?.name || null;
+  const seeded = all.some((r) => r.matches.some((m) => m.a.seed !== null || m.b.seed !== null));
+  const meta = rounds.some((r) => r.matches.some((m) => m.date || m.note));
+  const META = meta ? 17 : 0;
+  const PITCH = MATCH_H + META + 12;
+  const GAP = 26;
+  const HEAD = 24;
+  const CHAMP = champ ? 116 : 0;
+  const R = rounds.length;
+  // The scroller's own padding (4px a side) is not room for the bracket.
+  const colW = Math.max(124, Math.min(200, Math.floor(((room ? room - 8 : 600) - (R - 1) * GAP - (champ ? GAP + CHAMP : 0)) / Math.max(1, R))));
+  const xOf = (ri: number) => ri * (colW + GAP);
+  // Each match sits level with the middle of the two that feed it (matches 2j and 2j + 1 of the round before).
+  const ys: number[][] = [];
+  rounds.forEach((r, ri) => {
+    const prev = ys[ri - 1];
+    const row: number[] = [];
+    r.matches.forEach((_, j) => {
+      const f1 = prev?.[2 * j];
+      const f2 = prev?.[2 * j + 1];
+      let y = f1 !== undefined && f2 !== undefined ? (f1 + f2) / 2 : (f1 ?? (j ? row[j - 1] + PITCH : 0));
+      if (j && y < row[j - 1] + PITCH) y = row[j - 1] + PITCH;
+      row.push(y);
+    });
+    ys.push(row);
+  });
+  const mid = (ri: number, j: number) => HEAD + ys[ri][j] + MATCH_H / 2;
+  const height = HEAD + Math.max(0, ...ys.map((row) => (row.length ? row[row.length - 1] : 0))) + MATCH_H + META;
+  const width = R ? xOf(R - 1) + colW + (champ ? GAP + CHAMP : 0) : 0;
+  const winnerIs = (m: BMatch, name: string | null) => !!name && !!m.win && m[m.win].name === name;
+  const lines: { d: string; on: boolean }[] = [];
+  rounds.forEach((r, ri) => {
+    if (!ri) return;
+    r.matches.forEach((m, j) => {
+      for (const f of [2 * j, 2 * j + 1]) {
+        const from = rounds[ri - 1].matches[f];
+        if (!from) continue;
+        const x1 = xOf(ri - 1) + colW;
+        const xm = x1 + GAP / 2;
+        lines.push({ d: `M${x1},${mid(ri - 1, f)}H${xm}V${mid(ri, j)}H${xOf(ri)}`, on: winnerIs(from, traced) && (m.a.name === traced || m.b.name === traced) });
+      }
+    });
+  });
+  if (champ && last) lines.push({ d: `M${xOf(R - 1) + colW},${mid(R - 1, 0)}H${xOf(R - 1) + colW + GAP}`, on: champ.name === traced });
+  return (
+    <Card>
+      <Head title={data.title} />
+      <div ref={ref} className="-mx-1 overflow-x-auto px-1 pb-1">
+        {R > 0 && (
+          <div className="relative" style={{ width, height }}>
+            <svg width={width} height={height} className="pointer-events-none absolute inset-0" aria-hidden>
+              {[...lines.filter((l) => !l.on), ...lines.filter((l) => l.on)].map((l, i) => (
+                <path key={i} d={l.d} fill="none" stroke={l.on ? 'var(--accent)' : 'var(--line-2)'} strokeWidth={l.on ? 2 : 1.25} strokeLinejoin="round" />
+              ))}
+            </svg>
+            {rounds.map((r, ri) => (
+              <Fragment key={ri}>
+                <div className="absolute truncate text-[11.5px] font-semibold tracking-wide text-fg-3 uppercase" style={{ left: xOf(ri), top: 0, width: colW }}>
+                  {r.name}
+                </div>
+                {r.matches.map((m, j) => (
+                  <div key={j} className="absolute" style={{ left: xOf(ri), top: HEAD + ys[ri][j] }}>
+                    <MatchBox m={m} width={colW} traced={traced} seeded={seeded} done={done} onFocus={setFocus} />
+                    {(m.date || m.note) && (
+                      <div className="truncate px-0.5 pt-0.5 text-[10.5px] leading-[15px] text-fg-3" style={{ width: colW }} title={[m.date ? fmtDate(m.date, /T\d/.test(m.date) ? 'dateTime' : 'short') : '', m.note].filter(Boolean).join(' · ')}>
+                        {[m.date ? fmtDate(m.date, /T\d/.test(m.date) ? 'dateTime' : 'short') : '', m.note].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </Fragment>
+            ))}
+            {champ && (
+              <div
+                className={cx('absolute flex flex-col items-center rounded-xl border px-2 py-2.5 text-center', champ.name === traced ? 'border-accent/50 bg-accent-soft' : 'border-line bg-bg-1')}
+                style={{ left: xOf(R - 1) + colW + GAP, top: mid(R - 1, 0) - 44, width: CHAMP }}
+                onPointerEnter={(e) => done && e.pointerType === 'mouse' && setFocus(champ.name)}
+                onPointerLeave={() => setFocus(null)}
+              >
+                <Trophy size={20} className="text-[#e8a317]" />
+                <div className="mt-1 text-[10.5px] font-semibold tracking-wide text-fg-3 uppercase">{tr('Champion')}</div>
+                <div className="mt-0.5 flex max-w-full items-center gap-1.5">
+                  {champ.logo && <Pic src={champ.logo} alt="" fit="contain" zoom={false} className="h-3.5 w-5 shrink-0 bg-transparent" />}
+                  <span className="truncate text-[14px] leading-tight font-semibold">{champ.name}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      {extra.map((r, i) => (
+        <Section key={i} title={r.name} className="mt-4">
+          <div className="flex flex-wrap gap-3">
+            {r.matches.map((m, j) => (
+              <div key={j}>
+                <MatchBox m={m} width={colW} traced={traced} seeded={seeded} done={done} onFocus={setFocus} />
+                {(m.date || m.note) && <div className="truncate px-0.5 pt-0.5 text-[10.5px] text-fg-3">{[m.date ? fmtDate(m.date, /T\d/.test(m.date) ? 'dateTime' : 'short') : '', m.note].filter(Boolean).join(' · ')}</div>}
+              </div>
+            ))}
+          </div>
+        </Section>
+      ))}
+    </Card>
+  );
+}
+
 export const PEOPLE_UIS: Record<string, AnswerUiView> = {
   profile: Profile,
   people: People,
@@ -720,4 +1135,6 @@ export const PEOPLE_UIS: Record<string, AnswerUiView> = {
   match: Match,
   standings: Standings,
   fixtures: Fixtures,
+  contact: Contacts,
+  bracket: Bracket,
 };

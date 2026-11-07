@@ -1,10 +1,10 @@
 // The answer UIs for shopping (products, product grids, spec sheets, price history): their views, by name (shared/answer-ui/shopping.ts has what each takes).
 import { useMemo, useState } from 'react';
-import { Check, ExternalLink, Search, X } from 'lucide-react';
+import { Bath, BedDouble, Check, ChevronLeft, ChevronRight, ExternalLink, MapPin, Maximize2, Search, X } from 'lucide-react';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { niceTicks, useWidth } from '../charts';
-import { arr, Card, Chip, fmtDate, fmtMoney, fmtNum, Head, hostOf, isObj, KeyValues, LinkOut, Md, num, parseDate, Pic, Section, Seg, seriesColor, Stars, str, textOf, useKept, words, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Card, Chip, fmtDate, fmtMoney, fmtNum, Head, hostOf, isObj, KeyValues, LinkOut, MapBox, mapPoints, Md, num, parseDate, Pic, Section, Seg, seriesColor, Stars, str, textOf, useAui, useKept, words, type AnswerUiView, type Data, type Tone } from '../kit';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -505,9 +505,171 @@ function PriceHistory({ data }: { data: Data }) {
   );
 }
 
+// ---- homes for sale or rent --------------------------------------------------------------------------------------------
+
+type ListingSort = '' | 'price' | 'area' | 'value';
+
+/** An area's unit: ft² when it says feet, m² otherwise. */
+const areaUnit = (v: unknown) => (/ft|feet|foot|sq\.?\s*f|\bsf\b/i.test(str(v)) ? 'ft²' : 'm²');
+
+/** A price as a number, from one written with its currency after it too ("950 EUR", "1,450 €"); null when there is none. */
+const amountOf = (v: unknown) => num(v) ?? num(str(v).replace(/\s*(?:[A-Z]{3}|[€$£¥₹])\s*$/, ''));
+
+/** A listing's currency: as given, else the sign or code its price is written with ("$649,000", "1,450 EUR"). */
+const listingCurrency = (it: Data) => str(it.currency).trim() || (/^\s*([^\d\s.,+-]+)/.exec(str(it.price))?.[1] ?? /\b([A-Z]{3})\s*$/.exec(str(it.price))?.[1] ?? '');
+
+function ListingCard({ it, pin, done }: { it: Data; pin: number | null; done: boolean }) {
+  const { offline } = useAui();
+  const title = textOf(it, 'title', 'name', 'address');
+  const pics = [...new Set([it.image, ...(typeof it.images === 'string' ? [it.images] : arr(it.images))].map((p) => textOf(p, 'url', 'src', 'image').trim()).filter(Boolean))];
+  const [at, setAt] = useState(0);
+  const pic = pics.length && !offline ? pics[Math.min(at, pics.length - 1)] : '';
+  const cur = listingCurrency(it);
+  const unit = areaUnit(it.area_unit ?? it.unit);
+  const price = amountOf(it.price);
+  const area = num(it.area ?? it.size);
+  const perArea = price !== null && area !== null && area > 0 ? price / area : null;
+  const beds = num(it.beds ?? it.bedrooms);
+  const baths = num(it.baths ?? it.bathrooms);
+  const per = str(it.per).trim();
+  const tags = words(it.tags ?? it.features);
+  const url = str(it.url ?? it.link).trim();
+  const facts = [
+    beds !== null && { icon: BedDouble, text: beds === 0 ? tr('Studio') : beds === 1 ? tr('1 bed') : tr('{0} beds').replace('{0}', fmtNum(beds)) },
+    baths !== null && { icon: Bath, text: baths === 1 ? tr('1 bath') : tr('{0} baths').replace('{0}', fmtNum(baths)) },
+    area !== null && { icon: Maximize2, text: `${fmtNum(area)} ${unit}` },
+  ].filter(Boolean) as { icon: typeof Bath; text: string }[];
+  const flip = (step: number) => setAt((a) => (Math.min(a, pics.length - 1) + step + pics.length) % pics.length);
+  const arrow = 'absolute top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-white transition-colors hover:bg-black/65 disabled:hidden';
+  return (
+    <article className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-panel @md:flex-row @xl:flex-col">
+      {pic && (
+        <div className="relative shrink-0 @md:w-[40%] @md:max-w-[230px] @xl:w-auto @xl:max-w-none">
+          <Pic src={pic} alt={title} group={pics} className="aspect-[16/10] w-full @md:aspect-auto @md:h-full @md:min-h-[176px] @xl:aspect-[16/10] @xl:h-auto @xl:min-h-0" />
+          {pin !== null && <span className="absolute top-2 left-2 grid h-6 w-6 place-items-center rounded-full border-2 border-panel bg-accent text-[11px] font-semibold text-accent-fg">{pin}</span>}
+          {str(it.type) && <span className="absolute top-2 right-2 max-w-[60%] truncate rounded-full bg-panel/90 px-2 py-0.5 text-[11px] font-semibold text-fg shadow-sm">{str(it.type)}</span>}
+          {pics.length > 1 && (
+            <>
+              <button type="button" disabled={!done} onClick={() => flip(-1)} title={tr('Previous picture')} aria-label={tr('Previous picture')} className={cx(arrow, 'left-2')}>
+                <ChevronLeft size={16} />
+              </button>
+              <button type="button" disabled={!done} onClick={() => flip(1)} title={tr('Next picture')} aria-label={tr('Next picture')} className={cx(arrow, 'right-2')}>
+                <ChevronRight size={16} />
+              </button>
+              <span className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-1.5 py-0.5 text-[11px] font-medium text-white tabular-nums">{`${Math.min(at, pics.length - 1) + 1}/${pics.length}`}</span>
+            </>
+          )}
+        </div>
+      )}
+      <div className="flex min-w-0 flex-1 flex-col p-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <div className="flex min-w-0 items-baseline gap-1.5">
+            {pin !== null && !pic && <span className="grid h-5 w-5 shrink-0 place-items-center self-center rounded-full bg-accent text-[10.5px] font-semibold text-accent-fg">{pin}</span>}
+            {str(it.price) && <span className="text-[18px] leading-tight font-semibold tracking-tight tabular-nums">{priceText(it.price, cur)}</span>}
+            {per && <span className="text-[12.5px] text-fg-3">/ {per}</span>}
+          </div>
+          {perArea !== null && <span className="text-[12px] text-fg-3 tabular-nums">{`${fmtMoney(perArea, cur, { minimumFractionDigits: 0, maximumFractionDigits: perArea >= 100 ? 0 : 2 })}/${unit}`}</span>}
+        </div>
+        {facts.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[12.5px] text-fg-2">
+            {facts.map((f, i) => (
+              <span key={i} className="inline-flex items-center gap-1 tabular-nums">
+                <f.icon size={13} className="shrink-0 text-fg-3" />
+                {f.text}
+              </span>
+            ))}
+          </div>
+        )}
+        {title && (
+          <div className="mt-2 leading-snug font-semibold">
+            {/^https?:\/\//i.test(url) ? (
+              <a href={url} target="_blank" rel="noopener noreferrer" className="text-fg hover:text-accent hover:underline">
+                {title}
+              </a>
+            ) : (
+              title
+            )}
+          </div>
+        )}
+        {str(it.address) && str(it.address) !== title && (
+          <div className="mt-0.5 flex items-start gap-1 text-[12px] text-fg-3">
+            <MapPin size={12} className="mt-[3px] shrink-0" />
+            <span className="min-w-0">{str(it.address)}</span>
+          </div>
+        )}
+        {(!pic || offline) && str(it.type) && <div className="mt-1 text-[12px] text-fg-3">{str(it.type)}</div>}
+        {tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {tags.slice(0, 5).map((t, i) => (
+              <Chip key={i}>{t}</Chip>
+            ))}
+            {tags.length > 5 && <Chip>{`+${tags.length - 5}`}</Chip>}
+          </div>
+        )}
+        {str(it.note) && <Md text={it.note} className="mt-2 text-[12.5px] text-fg-2" />}
+      </div>
+    </article>
+  );
+}
+
+function Listings({ data, done }: { data: Data; done: boolean }) {
+  const { offline } = useAui();
+  const items = arr(data.listings ?? data.homes ?? data.properties ?? data.items).filter(isObj);
+  const points = mapPoints(items, 'title', 'address');
+  const pins = points.length > 0 && !offline;
+  const [sort, setSort] = useKept<ListingSort>('sort', '');
+  // Numbers match the map's pins: only homes with a position have one.
+  let n = 0;
+  const rows = items.map((it, i) => {
+    const price = amountOf(it.price);
+    const area = num(it.area ?? it.size);
+    return { it, i, pin: mapPoints([it]).length ? ++n : null, price, area: area !== null && area > 0 ? area : null, value: price !== null && area !== null && area > 0 ? price / area : null };
+  });
+  const by: ListingSort = done && (sort === 'price' || sort === 'area' || sort === 'value') ? sort : '';
+  const shown =
+    by === 'price'
+      ? [...rows].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity) || a.i - b.i)
+      : by === 'area'
+        ? [...rows].sort((a, b) => (b.area ?? -Infinity) - (a.area ?? -Infinity) || a.i - b.i)
+        : by === 'value'
+          ? [...rows].sort((a, b) => (a.value ?? Infinity) - (b.value ?? Infinity) || a.i - b.i)
+          : rows;
+  const unit = areaUnit(items.find((it) => str(it.area_unit ?? it.unit))?.area_unit ?? items.find((it) => str(it.unit))?.unit);
+  const options: { value: ListingSort; label: string }[] = [
+    { value: '', label: tr('Suggested') },
+    ...(rows.filter((r) => r.price !== null).length > 1 ? [{ value: 'price' as const, label: tr('Lowest price') }] : []),
+    ...(rows.filter((r) => r.area !== null).length > 1 ? [{ value: 'area' as const, label: tr('Largest') }] : []),
+    ...(rows.filter((r) => r.value !== null).length > 1 ? [{ value: 'value' as const, label: tr('Cheapest per {0}').replace('{0}', unit) }] : []),
+  ];
+  return (
+    <Card pad={false} className="overflow-hidden">
+      {(str(data.title) || items.length > 1) && (
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 px-4 pt-4 pb-3 @lg:px-5">
+          <div className="min-w-0">
+            {str(data.title) && <h3 className="aui-h3">{str(data.title)}</h3>}
+            {items.length > 1 && <div className="mt-0.5 text-[12.5px] text-fg-3">{tr('{0} homes').replace('{0}', String(items.length))}</div>}
+          </div>
+          {options.length > 1 && (
+            <div className={cx('max-w-full', !done && 'pointer-events-none opacity-60')}>
+              <Seg<ListingSort> size="sm" value={by} onChange={setSort} options={options} />
+            </div>
+          )}
+        </div>
+      )}
+      {pins && <MapBox points={points} height={250} className="rounded-none border-y border-line" />}
+      <div className={cx('grid gap-3 p-4 @lg:p-5 @xl:grid-cols-2', !pins && 'border-t border-line')}>
+        {shown.map((r) => (
+          <ListingCard key={r.i} it={r.it} pin={pins ? r.pin : null} done={done} />
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 export const SHOPPING_UIS: Record<string, AnswerUiView> = {
   product: Product,
   products: Products,
   specs: Specs,
   'price-history': PriceHistory,
+  listings: Listings,
 };

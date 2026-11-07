@@ -872,28 +872,38 @@ programs shows each program's version and what is out, with Check now, Update no
   place in a sealed-off frame as the reply comes, and pictures from the web (fetched by the app's own server, so the
   sites never see your browser) or from this computer, opened large on a click. The user's guidelines can ask for
   plain text instead.
-- Answer UIs: when an answer is something to look at, compare or use, the agent shows it in one of more than a hundred
+- Answer UIs: when an answer is something to look at, compare or use, the agent shows it in one of more than 140
   ready-made UIs drawn in the app's look as the reply streams, by writing a ```` ```ui <name> ```` block of JSON. They
   cover summaries and notes (key points, callouts, fact sheets, definitions, glossaries, FAQs, tabs, columns, quotes,
   cards), comparing and deciding (comparison tables with the best values marked, pros and cons, a decision matrix whose
   weights re-rank the options, choices that go to the message box, picks, rankings, scorecards, head-to-heads, 2×2
-  quadrants, SWOT), shopping (products, product grids, spec sheets, price history), places and travel (places on a map,
-  one place, day-by-day itineraries with maps, directions, flights, stays, weather, world clocks, currency), food and
+  quadrants, SWOT, troubleshooters and wizards that ask one question at a time, a wheel, dice or coin that picks for
+  you, Venn diagrams), shopping (products, product grids, spec sheets, price history, homes to buy or rent), places and travel (places on a map,
+  one place, day-by-day itineraries with maps, directions, flights, stays, weather, world clocks, currency, departure
+  boards, a route's elevation profile), food and
   fitness (recipes whose servings scale the amounts and whose steps have timers, nutrition labels, meal plans, workouts),
   time and plans (timelines, agendas, calendars, roadmaps, how-to steps, checklists, countdowns, boards, status boards,
-  go/no-go checks), numbers (line, area, bar, stacked, pie, donut, scatter and radar charts with a table view, sortable
+  go/no-go checks, week timetables, Gantt charts, timers that run alone or in sequence, parcel and order tracking), work
+  and business (invoices, quotes and receipts with their totals, review findings by severity with fixes to ask for,
+  action items by owner, QR codes for links, Wi-Fi and contacts, job openings), numbers (line, area, bar, stacked, pie, donut, scatter and radar charts with a table view, sortable
   and filterable tables with totals and CSV, KPI tiles, heatmaps, gauges, funnels, breakdowns, Plotly figures in 2D and
-  3D, what-if calculators with live formulas, goals, experiment results with the best marked and ± std, Sankey flows),
-  money (stock quotes, loans, budgets, savings growth, pricing plans, splitting a bill), learning (quizzes, flashcards,
+  3D, what-if calculators with live formulas, goals, experiment results with the best marked and ± std, Sankey flows,
+  histograms and box plots, waterfalls, treemaps, calendar heatmaps with streaks, values on a map),
+  money (stock quotes, loans, budgets, savings growth, pricing plans, splitting a bill, an investment portfolio), learning (quizzes, flashcards,
   worked solutions, explainers at several levels, vocabulary with pronunciation, translations, research papers with
-  BibTeX, trees, resources), science (tonight's sky with the moon's phase and the planets, unit conversion, formulas),
+  BibTeX, trees, resources, fill in the blanks, matching pairs, putting things in order, verb conjugations, dialogues to
+  listen to, grading rubrics, chess positions to step through), science (tonight's sky with the moon's phase and the planets, unit conversion, formulas, a function plotter with
+  sliders),
   media and events (galleries, videos with chapters, sounds, tracks, films, books and games, events with an .ics to add to
-  a calendar, colour palettes with contrast checks, news), people and sports (profiles, people, org charts, matches,
-  league tables, fixtures), writing (emails, alternatives to pick from, social posts with character counts, changes to a
-  text) and code (code in tabs, commands, API endpoints, errors explained, test results, a JSON explorer, a regular
-  expression tester, shortcuts, repositories). Agents find the ones that fit with `find_ui`: a few words on what the
+  a calendar, colour palettes with contrast checks, news, pictures with numbered notes, before-and-after sliders, chord
+  charts, font pairings shown live), people and sports (profiles, people, org charts, matches,
+  league tables, fixtures, contact cards with a vCard, knockout brackets), writing (emails, alternatives to pick from, social posts with character counts, changes to a
+  text, a reference in APA, MLA, Chicago, IEEE, Harvard and BibTeX) and code (code in tabs, commands, API endpoints, errors explained, test results, a JSON explorer, a regular
+  expression tester, shortcuts, repositories, a log viewer, cron schedules with their next runs). Agents find the ones that fit with `find_ui`: a few words on what the
   answer shows, searched by words (BM25) and by meaning (the shipped vectors of each UI), fused by rank, the best five
-  with the data each takes and an example. What you tick or answer in one is kept on that device; **Show the data** and
+  with the data each takes and an example, or the best three for each part of an answer at once (`queries`), since one
+  answer may hold a UI for each of its parts and a session as many as its answers need. What you tick or answer in one
+  is kept on that device; **Show the data** and
   **Copy as text** sit on each. The gallery (`/answers`) shows every UI with an example and plays one as it streams.
 - Agents can answer with a page (a report, a dashboard, a mock-up), shown in the conversation as it is written, or
   beside it on a wide screen.

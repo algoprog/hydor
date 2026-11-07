@@ -1,6 +1,6 @@
 // What an answer UI of the catalog is (index.ts): its name, what it is for, the data it takes and an example of it.
 
-export type AnswerUiGroup = 'summary' | 'compare' | 'shopping' | 'travel' | 'food' | 'plans' | 'data' | 'money' | 'learn' | 'science' | 'media' | 'people' | 'writing' | 'code';
+export type AnswerUiGroup = 'summary' | 'compare' | 'shopping' | 'travel' | 'food' | 'plans' | 'work' | 'data' | 'money' | 'learn' | 'science' | 'media' | 'people' | 'writing' | 'code';
 
 export interface AnswerUiSpec {
   /** Its name in a ```ui block: lowercase words joined by dashes. */
