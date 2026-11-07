@@ -174,7 +174,14 @@ export const SHOTS = [
       return p.shot(ctx.file, { maxWidth: 780 });
     },
   },
-  startMenu('assistants', 'General'),
+  {
+    id: 'agents',
+    async take(p, ctx) {
+      await ctx.go('/agents', { settle: 1800 });
+      await p.park();
+      return p.shot(ctx.file, { clip: await main(p) });
+    },
+  },
   startMenu('agents-models', 'Claude Code'),
   startMenu('research', 'Options', {
     text: 'Which heat pumps work best below −20 °C? Compare the models sold in Maine.',

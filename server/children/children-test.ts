@@ -22,6 +22,8 @@ import { notesOf } from '../notes.ts';
 import { setPriceOverrides } from '../prices.ts';
 import type { CreateOpts } from '../sessions.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
+import { saveAssistant } from '../assistants/store.ts';
+import { setTiers } from '../assistants/tiers.ts';
 import { catchUp, CHILD_INSTRUCTIONS, children, findModel, LONG_REPLY, reportTurn, resultMessage } from './index.ts';
 import { childKeys, parentOf } from './family.ts';
 import { childMode } from './modes.ts';
@@ -356,6 +358,94 @@ test('the setting: how many at once', async () => {
   assert.deepEqual(await routes.get('GET /api/children/settings')!({}), { maxRunning: 4, swarmSize: 5 });
   assert.deepEqual(await routes.get('PUT /api/children/settings')!({ body: { maxRunning: 6 } }), { maxRunning: 6, swarmSize: 5 });
   await assert.rejects(routes.get('PUT /api/children/settings')!({ body: { maxRunning: 0 } }), (e: unknown) => e instanceof HttpError && e.status === 400);
+});
+
+// ---- named agents and tiers ---------------------------------------------------------------------------
+
+const leadKey = (n: string) => {
+  const key = `claude:lead-${n}`;
+  sessions.add(key, { agent: 'claude', live: 'working', mode: 'acceptEdits', title: 'Lead', items: [user('Ship the release')] });
+  return key;
+};
+
+test('a tier picks the child’s model for its program: Claude Code’s own names by default, Custom’s as set', async () => {
+  const k = leadKey('t1');
+  const out = await call(k, 'start_child_session', { brief: 'List the commits since the last release.', tier: 'quick' });
+  let o = sessions.created.at(-1)!;
+  assert.equal(o.agent, 'claude');
+  assert.equal(o.model, 'haiku');
+  assert.match(out, /Quick/);
+  const d = notesOf(db, k, 'child').at(-1)!.data as ChildNote;
+  assert.equal(d.tier, 'quick');
+  // A model named wins over the tier.
+  await call(k, 'start_child_session', { brief: 'Same, on Opus.', tier: 'quick', model: 'opus' });
+  assert.equal(sessions.created.at(-1)!.model, 'opus');
+  // Custom: its tiers name its own models; a model that is gone is passed over (the named one is needed then).
+  setTiers(db, { console: { quick: { model: 'ollama/llama3' } } });
+  await call(k, 'start_child_session', { brief: 'Sort these lines.', agent: 'custom', tier: 'quick' });
+  o = sessions.created.at(-1)!;
+  assert.equal(o.acpAgent, 'console');
+  assert.equal(o.model, 'ollama/llama3');
+  setTiers(db, { console: { quick: { model: 'ollama/gone' } } });
+  await assert.rejects(call(k, 'start_child_session', { brief: 'Sort these lines.', agent: 'custom', tier: 'quick' }), /Name the model for Custom/);
+  setTiers(db, null);
+});
+
+test('an agent’s highest tier for helpers: asked for above it, or none asked, the child gets that tier', async () => {
+  const boss = saveAssistant(db, { name: 'Release boss', instructions: 'Ship it.', helperMax: 'standard' });
+  const k = leadKey('t2');
+  setSessionExtra(db, k, { assistant: boss.id });
+  await call(k, 'start_child_session', { brief: 'Plan the whole migration.', tier: 'best' });
+  assert.equal(sessions.created.at(-1)!.model, 'sonnet');
+  await call(k, 'start_child_session', { brief: 'Count the files.' });
+  assert.equal(sessions.created.at(-1)!.model, 'sonnet');
+  await call(k, 'start_child_session', { brief: 'Count the lines.', tier: 'quick' });
+  assert.equal(sessions.created.at(-1)!.model, 'haiku');
+  // The tool says so.
+  assert.match(tool(k, 'start_child_session').description, /no higher than standard/);
+});
+
+test('as: one of the user’s agents works the part, with its own settings and tier; only where it works, and when allowed', async () => {
+  const translator = saveAssistant(db, {
+    name: 'Translator',
+    description: 'Translates the guide',
+    instructions: 'Translate into Chinese and Greek.',
+    tier: 'quick',
+    tools: ['read', 'edit'],
+    connections: ['deepl'],
+    mode: 'ask',
+  });
+  // A session as no agent of yours (or a built-in one) may ask any agent.
+  const k = leadKey('t3');
+  assert.match(tool(k, 'start_child_session').description, /Translator \(Translates the guide; Quick\)/);
+  const out = await call(k, 'start_child_session', { brief: 'Translate docs/guide/05-agents.md.', as: 'translator' });
+  const o = sessions.created.at(-1)!;
+  assert.equal(o.model, 'haiku');
+  // Its own mode, stricter than the parent's.
+  assert.equal(o.mode, 'default');
+  assert.deepEqual(o.extra, { parent: k, assistant: translator.id, connections: { deepl: true } });
+  assert.match(out, /Translator · Claude Code · haiku · Quick/);
+  const d = notesOf(db, k, 'child').at(-1)!.data as ChildNote;
+  assert.equal(d.as, 'Translator');
+  assert.equal(d.asId, translator.id);
+  // An agent of yours asks only those it lists.
+  const lone = saveAssistant(db, { name: 'Lone', instructions: 'Work alone.' });
+  const k2 = leadKey('t4');
+  setSessionExtra(db, k2, { assistant: lone.id });
+  assert.doesNotMatch(tool(k2, 'start_child_session').description, /Translator/);
+  await assert.rejects(call(k2, 'start_child_session', { brief: 'Translate.', as: 'Translator' }), /Lone may not hand work to Translator/);
+  saveAssistant(db, { ...lone, canAsk: [translator.id] });
+  await call(k2, 'start_child_session', { brief: 'Translate.', as: 'Translator' });
+  assert.equal(sessions.created.at(-1)!.extra?.assistant, translator.id);
+  // One that takes no work from other agents, one that works only in its projects, one that is not there.
+  saveAssistant(db, { ...translator, askable: false });
+  await assert.rejects(call(k, 'start_child_session', { brief: 'Translate.', as: 'Translator' }), /does not take work from other agents/);
+  saveAssistant(db, { ...translator, projects: ['sp-hydor'] });
+  await assert.rejects(call(k, 'start_child_session', { brief: 'Translate.', as: 'Translator' }), /works only in its own projects/);
+  setSessionExtra(db, k, { space: 'sp-hydor' });
+  await call(k, 'start_child_session', { brief: 'Translate.', as: 'Translator' });
+  assert.equal(sessions.created.at(-1)!.extra?.assistant, translator.id);
+  await assert.rejects(call(k, 'start_child_session', { brief: 'Translate.', as: 'Nobody' }), /no agent "Nobody"/);
 });
 
 // ---- run ---------------------------------------------------------------------------------------------

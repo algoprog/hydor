@@ -53,7 +53,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['children', 'Child sessions', 'Capabilities', 'Agents handing parts of a job to other agents, and swarms for hard problems'],
   ['images', 'Images, video and audio', 'Capabilities', 'Pictures, videos, music and voices agents make for you through OpenRouter, and who writes their captions in the Library'],
   ['voice', 'Voice', 'Capabilities', 'Dictate messages, and have replies read aloud'],
-  ['assistants', 'Assistants', 'Capabilities', 'Presets to start sessions as (Researcher, Writer, Tutor…), and where task folders go'],
+  ['assistants', 'Your agents', 'Capabilities', 'Where task folders go, and cleaning up after a task; your agents themselves are on the Agents page'],
   ['custom', 'Custom', 'Capabilities', 'Auto mode, a sandbox for commands, and how long goals run'],
 ];
 
@@ -103,6 +103,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['agents', 'Agents that speak ACP', 'gemini cli opencode qwen code goose acp', 'Gemini CLI, OpenCode, Qwen Code and Goose, ready to add'],
   // Agents › Models
   ['models', 'Helper model', 'small model haiku memory tidy auto mode second opinion', 'The model for small jobs beside sessions'],
+  ['models', 'Tiers', 'tiers quick standard best cheaper cheap strong model per job helpers subagents haiku sonnet opus effort automatic', 'The model Quick, Standard and Best mean for each program: agents think with a tier, and give their helpers one'],
   ['models', 'On this machine', 'local models ollama vllm gpu download', 'Models installed here, and their downloads', 'Models on this machine'],
   ['models', 'Add a model from Hugging Face', 'hugging face hf download install gguf vllm ollama suggested recommended for this computer lfm3 gemma flint glm', 'The ones suggested for this computer, or search, see how each would run here, and install it'],
   ['models', 'OpenRouter', 'openrouter api key models cloud suggested gpt grok claude opus', 'Models through OpenRouter, with your key'],
@@ -208,9 +209,9 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['voice', 'Speech recognition on the server', 'whisper speech recognition server transcription', 'Recognize speech on this computer or with a service'],
   ['voice', 'Read aloud', 'text to speech tts read replies voice speak', 'Have replies read aloud'],
   // Capabilities › Assistants
-  ['assistants', 'New assistant', 'assistant preset create researcher writer tutor', 'A preset to start sessions as'],
+  ['assistants', 'Open Agents', 'agents assistants presets researcher writer tutor make change your own', 'Your agents are on the Agents page'],
   ['assistants', 'Clean up after a task', 'cleanup tidy up remove temp files scratch branches worktrees leftovers', 'Agents remove what they made along the way and no longer need'],
-  ['assistants', 'Task folders', 'task folder default folder sessions', 'Where an assistant’s new task folders go'],
+  ['assistants', 'Task folders', 'task folder default folder sessions', 'Where new task folders go, for sessions started without a folder'],
   // Capabilities › Custom
   ['custom', 'Auto mode', 'auto mode approvals permissions', 'Custom approves safe steps by itself'],
   ['custom', 'Sandbox for commands', 'sandbox bubblewrap security commands', 'Commands run in a sandbox'],
@@ -270,10 +271,12 @@ const PAGES: [string, string, string, string, string][] = [
   ['import-folder', 'Import a folder', '/library?new=import', 'import bring add folder computer disk directory latex project tex bib overleaf documents spreadsheets notebooks upload library', 'A folder of this computer into the Library: a LaTeX project as one document, any other with its documents'],
   ['published', 'Published', '/library?tab=published', 'published public share link site pages folder', 'Pages and sites anyone with the link can open'],
   ['preview', 'Preview', '/preview', 'dev server localhost web app browser phone tablet screen picture screenshot', 'The web apps running on this computer, to look at from any device'],
-  ['usage', 'Usage and limits', '/usage', 'usage limits plan quota reset tokens', 'What you have used of each plan, and when it resets'],
+  ['agents', 'Agents', '/agents', 'agents assistants presets team helpers subagents schedules scheduled automations tiers budget researcher writer coder tutor planner analyst', 'Your agents: what each does, where and when it works, what it thinks with, and whom it asks'],
+  ['new-agent', 'New agent', '/agents?new=1', 'make create new agent assistant describe draft schedule team helper', 'An agent of your own, drafted from what you say it should do'],
+  ['usage', 'Usage and limits', '/usage', 'usage limits plan quota reset tokens system', 'What you have used of each plan, and when it resets (System → Usage)'],
   ['arena', 'Model arena', '/arena', 'arena compare models side by side best answer leaderboard rating which model wins vote', 'Which models win on your own tasks, from the answers you kept'],
   ['stats', 'Activity', '/stats', 'activity stats statistics tokens cost', 'What the agents did, over time'],
-  ['system', 'System', '/system', 'system computer overview machine files git terminal preview monitor experiments', 'This computer: its files, Git, terminals, the web apps running on it, how busy it is, and the jobs it runs for you'],
+  ['system', 'System', '/system', 'system computer overview machine files git terminal preview monitor usage experiments', 'This computer: its files, Git, terminals, the web apps running on it, how busy it is, the plans’ usage, and the jobs it runs for you'],
   ['monitor', 'Monitor', '/system/monitor', 'cpu gpu memory ram disk processes network temperature busy load notebook kernels', 'How busy this computer is: processors, graphics cards, memory, disks and the busiest processes'],
   ['experiments', 'Experiments', '/system/experiments', 'experiments runs jobs queue free gpu training evaluation sweeps slurm clusters ssh results tables significance seeds metrics loss log agent on call', 'Jobs that wait for a free GPU, run on their own and are kept as records, to compare and make into results tables'],
   ['new-run', 'New run', '/system/experiments?new=1', 'new run job train training evaluate evaluation gpu queue command experiment', 'A job that waits for a free GPU, runs on its own and is kept as a record'],

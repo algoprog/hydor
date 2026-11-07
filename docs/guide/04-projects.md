@@ -1,6 +1,6 @@
 # Projects and knowledge
 
-A project keeps one piece of work together: its sessions, a folder for its files (and other folders of yours it works with), documents of its own, what agents remember about it, the guidelines every agent in it follows, skills of its own and the assistant its sessions start as. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using projects and groups of projects, giving a project skills of its own, sharing a project with people, and adding, searching and managing the documents agents search.
+A project keeps one piece of work together: its sessions, a folder for its files (and other folders of yours it works with), documents of its own, what agents remember about it, the guidelines every agent in it follows, skills of its own, the agent its sessions start as, and agents of its own. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using projects and groups of projects, giving a project skills of its own, sharing a project with people, and adding, searching and managing the documents agents search.
 
 ![The Projects page: a card for each project, with what it holds and New session](images/projects.webp)
 
@@ -11,7 +11,7 @@ A project is one piece of work with everything that belongs to it, like Projects
 - **works in the project's folder**. The agent is told that this folder holds the project's files, what is in it now (the last changed first), and to keep what it makes for the project there. It also works with the other folders the project works with, where they are: Claude Code works in them as in its own folder, and other agents are told where they are;
 - **follows the project's guidelines**: what every agent in the project should know, such as who the work is for, how to work and what to keep in mind (see [Agent Guidelines](/guide/guidelines));
 - **gets the project's own skills** with your skill library: written methods for how its work is done, which agents load when a task calls for them (see [Give a project skills of its own](#give-a-project-skills-of-its-own));
-- **starts as the project's assistant**, when the project has one (see [Assistants](/guide/assistants));
+- **starts as the project's agent**, when the project has one (see [Agents](/guide/agents));
 - **remembers what earlier sessions in the project learned**: agents keep notes about a project by its folder, so the sessions of a project share them (see [Memory](/guide/memory));
 - **searches the project's own documents**, and the shared knowledge too unless the project turns that off (see [Which sessions search which knowledge](#which-sessions-search-which-knowledge)).
 
@@ -51,11 +51,12 @@ Under the projects, **Folders you work in** lists folders your sessions used lat
    - **What it is about**: a line shown under the name. Up to 300 characters.
    - **Agent Guidelines**: what every agent in the project should follow, such as who the work is for, how to work and what to keep in mind: "Amounts in EUR. I am self-employed in Greece." Up to 20,000 characters. See [Agent Guidelines](/guide/guidelines).
    - **Other folders it uses**: more folders of yours its agents work with, where they are; nothing is copied. **Add a folder** adds one, up to 12; ✕ leaves one out again.
-4. Click **Make the project**, or press Enter in the name field.
+4. Leave **An agent for it** on to have an agent made for the project (see [Agents](#agents)), or turn it off.
+5. Click **Make the project**, or press Enter in the name field.
 
-A new folder goes in a **Projects** folder where task folders go: "Taxes 2026" gets `~/Hydor/Projects/taxes-2026`, unless you moved task folders elsewhere (see [Move task folders](/guide/assistants#move-task-folders)). If that name is taken, it adds `-2`, `-3` and so on. Made from the Projects page, the new project's page opens. Made from the start page, the new project is picked for the session you are about to start.
+A new folder goes in a **Projects** folder where task folders go: "Taxes 2026" gets `~/Hydor/Projects/taxes-2026`, unless you moved task folders elsewhere (see [Move task folders](/guide/agents#move-task-folders)). If that name is taken, it adds `-2`, `-3` and so on. Made from the Projects page, the new project's page opens. Made from the start page, the new project is picked for the session you are about to start.
 
-Two more things are set on the project's **Settings** tab afterwards: the assistant its sessions start as, and the projects it brings together. Its documents go on its **Knowledge** tab, its skills on its **Skills** tab, and more folders on its **Files** tab.
+Two more things are set on the project's **Settings** tab afterwards: the agent its sessions start as, and the projects it brings together. Its documents go on its **Knowledge** tab, its skills on its **Skills** tab, and more folders on its **Files** tab.
 
 ### A project for a folder you already have
 
@@ -74,10 +75,10 @@ Your home folder, hidden folders, temporary ones and the folders the app makes f
 
 There are two ways:
 
-- **From the project**: click **New session** on its card on the Projects page, or at the top of its own page (on a phone, the pen). The start page opens with the project picked, and with its assistant when it has one.
+- **From the project**: click **New session** on its card on the Projects page, or at the top of its own page (on a phone, the pen). The start page opens with the project picked, and with its agent when it has one.
 - **From the start page**: open the folder chip in the row under the message box. Its menu lists your projects first, then the folder in use and the ones you used last, then **New task folder** and **New project**. Until you type, it shows the three projects at work most recently (and the one picked, if it isn't among them). Type part of a name in the field at the top to find any project, or any folder. Each project shows its mark, its name and what it is about.
 
-When you pick a project, the chip shows its mark and name instead of a folder, and the session will work in the project's folder. If the project starts its sessions as an assistant, the **Assistant** chip changes to it, with any agent, model and permissions that assistant suggests. You can still change any of them before you start. Then type your message and click **Start**.
+When you pick a project, the chip shows its mark and name instead of a folder, and the session will work in the project's folder. If the project starts its sessions as an agent, the **Agent** chip changes to it, with any program, model and permissions that agent suggests. You can still change any of them before you start. Then type your message and click **Start**.
 
 The start page remembers the project for your next session, on any device you use. To work outside it again, pick a folder or **New task folder** in the same menu. If a project you had picked is deleted, the start page keeps its folder but no longer the project.
 
@@ -103,7 +104,7 @@ The project at a glance, in cards:
 - **Sessions**: the sessions started in the project, the one at work most recently first, each with its agent's icon, its title, what it is doing while it runs (**Working**, **Needs you**, **Ready**; not on a phone) and how long ago it was at work. Click one to open it. With more than six, **All** shows the rest. With none yet, it says that a new one works in the project's folder, with its guidelines, documents and skills, and has **New session**.
 - **In the Library**: what the project holds in the Library, the last changed first (see [Library](#library)). **Open in the Library** shows them there. Files dropped on it are added to the project.
 - **Shared with** (beside them, under them on a phone), once you share the project with someone: each person, with their initials and what they did last ("Commented on “Chapter 3” · 2 h ago", "Not opened yet"). Click one, or **Share**, to see and change who it is shared with (see [Share a project with people](#share-a-project-with-people)).
-- **Every session here** (beside them, under them on a phone): what every session in the project gets. **Folder** (its folder, and how many more it works with: click for the **Files** tab), **Guidelines** (the start of its guidelines: click for **Settings**), **Knowledge** (how many documents it has), **Skills** (how many of its own), **Starts as** (its assistant) and **Memory** (**What agents remember about it**, which opens [Settings → Memory](/settings?s=memory), where the notes agents kept about the project are listed under its folder).
+- **Every session here** (beside them, under them on a phone): what every session in the project gets. **Folder** (its folder, and how many more it works with: click for the **Files** tab), **Guidelines** (the start of its guidelines: click for **Settings**), **Knowledge** (how many documents it has), **Skills** (how many of its own), **Starts as** (its agent) and **Memory** (**What agents remember about it**, which opens [Settings → Memory](/settings?s=memory), where the notes agents kept about the project are listed under its folder).
 - **The projects it brings together**, for a group: each of its projects, with how many sessions it has. Click one to open it.
 
 ### Library
@@ -129,13 +130,25 @@ The project's own documents, which only its sessions search, and whether they se
 
 Every skill the project's sessions get: its own, your skill library's, and Claude Code's and Codex's own, each with a switch for this project alone. See [Give a project skills of its own](#give-a-project-skills-of-its-own).
 
+### Agents
+
+The agents that work only in this project, as a team: for each one, what starts it (**You ask**, and its schedules with when they run next) and, under it, the agents it hands work to, joined by lines. Click an agent to see it beside the board: where it works, what it thinks with, what it may do, who asks it and what it spent this month, with **Start a session** (in this project) and **Open** (its page). Under the board, **Also offered here, from Everywhere** lists the agents that work everywhere. **New agent here** makes one that works in this project (see [Agents](/guide/agents)).
+
+A project can have an agent made for it, with **An agent for it** when you make the project, or **Make one for this project** on this tab while it has none:
+
+- When the project says enough about itself (what it is about and its guidelines, or a README or agent notes in its folder), the helper model drafts an agent fitted to it, starting from the template for its kind.
+- When it says little, the agent is the template for its kind, from what its folder holds or the words it was described with: an engineer for software, a web developer for a website, an ML researcher for machine learning experiments, an analyst for data, a paper writer for a paper in LaTeX, a researcher for papers and reports to read, a writer for documents, a designer for pictures and videos, or a presenter for slides.
+- With nothing to go on, it is the default project agent.
+
+It is named after the project ("Shop engineer"), works only in the project and in its folder, and, unless the project names another agent, the project's sessions start as it. Change it like any agent of yours.
+
 ### Settings
 
 Everything about the project itself, in four parts, each with a line on what it is for:
 
 - **The project**: its **Name** (beside its mark, in the colour picked), **What it is about** and **Its colour**.
 - **What every agent in it follows**: its **Agent Guidelines**, as when you made it.
-- **How its sessions start**: under **Its sessions start as**, one choice to tap: **The assistant picked on the start page** (the default: picking the project leaves the start page's assistant as it is), or one of your assistants, built in or your own. Picking the project on the start page then picks that assistant too.
+- **How its sessions start**: under **Its sessions start as**, one choice to tap: **The agent picked on the start page** (the default: picking the project leaves the start page's agent as it is), or one of your agents, built in or your own. Picking the project on the start page then picks that agent too.
 - **The projects it brings together**: pick projects here to turn this project into a group (see [Bring projects together in a group](#bring-projects-together-in-a-group)).
 
 Once you change something, a bar says **Unsaved changes**, with **Undo changes** and **Save**; it stays in view while you scroll. At the bottom, **Delete the project** says what stays, with its button.
@@ -192,7 +205,7 @@ The agent suggests one of the two; you choose before you approve. An improvement
 
 ## Change a project
 
-Open the project, go to its **Settings** tab, change what you like and click **Save**. Sessions you start in the project from then on get the new name, description and guidelines. A new assistant applies the next time you pick the project on the start page, or click **New session** on its page. The project's folder stays the same: it can't be moved to another folder.
+Open the project, go to its **Settings** tab, change what you like and click **Save**. Sessions you start in the project from then on get the new name, description and guidelines. A new agent applies the next time you pick the project on the start page, or click **New session** on its page. The project's folder stays the same: it can't be moved to another folder.
 
 ## Delete a project
 
@@ -212,7 +225,7 @@ Deleting a project keeps everything that was in it:
 
 ## Bring projects together in a group
 
-A group is a project that brings several projects together, for work that spans them: "Everything for the thesis" bringing in "Thesis" and "Reading notes", say. It has everything a project has: a name, a folder of its own, guidelines, documents, skills and an assistant. Its sessions also work with every project it brings together.
+A group is a project that brings several projects together, for work that spans them: "Everything for the thesis" bringing in "Thesis" and "Reading notes", say. It has everything a project has: a name, a folder of its own, guidelines, documents, skills and an agent. Its sessions also work with every project it brings together.
 
 ### What sessions in a group get
 

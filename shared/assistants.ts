@@ -2,7 +2,9 @@
 // works, what it may use, and the agent, model and mode it suggests. Shared by the server (instructions,
 // Custom's tool limits) and the pages (the pickers on the start page and in a session's message box,
 // Settings → Assistants).
+import type { TaskSchedule } from './automations.ts';
 import type { SessionExtra } from './features.ts';
+import type { Tier } from './tiers.ts';
 import type { Agent } from './types.ts';
 
 /** What an assistant may use, by kind: each agent's own tools fall under one of these. */
@@ -37,11 +39,34 @@ export interface Assistant {
   mode?: AssistantMode;
   /** Where its sessions start when no folder is picked: a new task folder (the default), or the folder on the start page (Coder). */
   folder?: 'task' | 'project';
+  /** The projects it works in, by id: it is offered only there, and works in the project's folder. None: everywhere. */
+  projects?: string[];
+  /** The tier it thinks with (Settings → Models → Tiers names each one's model). None: Automatic, the model picked where it starts. */
+  tier?: Tier;
+  /** The highest tier the helpers it starts may have ("never above"). None: any. */
+  helperMax?: Tier;
+  /** Other agents it may hand parts of its work to, by id. */
+  canAsk?: string[];
+  /** False: other agents may not hand it work. */
+  askable?: false;
+  /** What its sessions may spend in a month, in dollars; when it is reached, no new session starts as it until the next month. */
+  budgetUsd?: number;
   /** Comes with the app: it can be duplicated, not changed. */
   builtin?: boolean;
   /** The .claude/agents file it was imported from. */
   source?: string;
 }
+
+/** Whether an agent works in a project (by its id; none: a session in no project). Agents without projects work everywhere. */
+export const inScope = (a: Pick<Assistant, 'projects'>, space?: string | null): boolean => !a.projects?.length || (!!space && a.projects.includes(space));
+
+/**
+ * Whether the agent a session works as (`lead`; null: none) may hand work to `target`: never one that does
+ * not take work from other agents; a built-in agent (or none) may ask any other, since you drive those
+ * sessions; an agent of yours only those it lists.
+ */
+export const mayAsk = (lead: Pick<Assistant, 'id' | 'builtin' | 'canAsk'> | null, target: Pick<Assistant, 'id' | 'askable'>): boolean =>
+  target.askable !== false && (!lead || lead.id !== target.id) && (!lead || !!lead.builtin || !!lead.canAsk?.includes(target.id));
 
 /** Settings → Assistants, with the list. */
 export interface AssistantsState {
@@ -53,6 +78,36 @@ export interface AssistantsState {
   defaultTaskRoot: string;
   /** Agents clean up after a task: what they made along the way and no longer need. */
   cleanUp: boolean;
+}
+
+/** One of an agent's schedules: a scheduled task that runs as it (Settings → Scheduled tasks). */
+export interface AgentSchedule {
+  id: string;
+  name: string;
+  schedule: TaskSchedule;
+  enabled: boolean;
+  nextAt?: number;
+  lastStatus?: string;
+}
+
+/** What the Agents page shows of an agent beside its settings. */
+export interface AgentActivity {
+  schedules: AgentSchedule[];
+  /** Its sessions at work now, and those waiting for you (an approval or a question). */
+  working: number;
+  waiting: number;
+  /** When a session last started as it. */
+  lastAt?: number;
+  /** What its sessions spent since the month began, in dollars, and how many started. */
+  monthUsd: number;
+  monthSessions: number;
+}
+
+/** An agent drafted from a description (New agent → Draft it): its settings, and a schedule with the message each run starts with. */
+export interface AgentDraft {
+  agent: Partial<Assistant>;
+  schedule?: TaskSchedule;
+  task?: string;
 }
 
 /** What switching a session's assistant changed: its settings, and the model and mode the assistant set (in the agent's own names). */

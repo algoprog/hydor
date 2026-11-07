@@ -519,7 +519,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                   </>
                 ) : (
                   <>
-                    <SessionAssistantPicker s={s} label="Assistant" onConfig={assistantSet} />
+                    <SessionAssistantPicker s={s} label="Agent" onConfig={assistantSet} />
                     <ModelPicker label="Model" agent={s.agent} acp={s.acpAgent} value={model} onChange={(v) => configure({ model: v })} localOnly={confidential} />
                     <EffortPicker label="Effort" agent={s.agent} acp={s.acpAgent} model={model} value={effort} onChange={(v) => configure({ effort: v })} />
                     <ModePicker label="Permissions" agent={s.agent} acp={s.acpAgent} value={mode} onChange={(v) => configure({ mode: v })} />

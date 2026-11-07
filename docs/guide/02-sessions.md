@@ -12,11 +12,11 @@ If the connection drops before the app answers (your phone went to sleep, or the
 
 A moment after it starts, the session gets its title: a few words for what you asked ("Weekend trip to Lisbon", "Fix the checkout tests"), which the helper model ([Settings → Agents → Models](/settings?s=models&find=Helper%20model)) writes on the side, without anything showing in the conversation. The sidebar, the session's header and the search box show it (in the sidebar, its words come in one after another in place of your message's), and Claude Code and Codex get it too, for their own lists. Until it comes, and when the helper model can't answer, the start of your message stands in. A title you give the session yourself with **Rename** is never replaced. The sidebar lists the session from the moment you send it, at the top of **Active** (**Starting**).
 
-The row under the message box holds **Agent**, **Model**, **Folder** (or **Project**), **Assistant** and, at its end, **Options**. On a phone each of them opens as a sheet from the bottom of the screen.
+The row under the message box holds **Runs on**, **Model**, **Folder** (or **Project**), **Agent** and, at its end, **Options**. On a phone each of them opens as a sheet from the bottom of the screen.
 
 ### Pick the agent and its model
 
-**Agent** lists every agent you can use, side by side:
+**Runs on** lists every program you can use, side by side:
 
 - **Claude Code**: Anthropic's agent, with a Claude plan or an API key.
 - **Codex**: OpenAI's agent, with a ChatGPT plan or an API key.
@@ -31,9 +31,9 @@ At the bottom, **Models for Custom** opens [Settings → Models](/settings?s=mod
 
 The **Folder** chip says where the agent works. Its menu ("Project or folder to work in") has a field, **Find a folder, or type its path**, over a short list:
 
-- your projects, by name (the three used last, and the one picked). Picking a project sets the folder to the project's own, its assistant, and its guidelines for the session; the chip then reads **Project** and shows the project's name. A group of projects works the same way, with all its projects. See [Projects and knowledge](/guide/projects) and [Agent Guidelines](/guide/guidelines).
+- your projects, by name (the three used last, and the one picked). Picking a project sets the folder to the project's own, its agent, and its guidelines for the session; the chip then reads **Project** and shows the project's name. A group of projects works the same way, with all its projects. See [Projects and knowledge](/guide/projects) and [Agent Guidelines](/guide/guidelines).
 - the folder in use and the three folders you picked last;
-- **New task folder**: a fresh folder for this task, named by the day and a few words of your message (such as `2026-11-01-plan-trip-lisbon`), in `~/Hydor` unless you set another place in [Task folders](/settings?s=assistants&find=Task%20folders) (Settings → Capabilities → Assistants);
+- **New task folder**: a fresh folder for this task, named by the day and a few words of your message (such as `2026-11-01-plan-trip-lisbon`), in `~/Hydor` unless you set another place in [Task folders](/settings?s=assistants&find=Task%20folders) (Settings → Capabilities → Your agents);
 - **New project**: makes a project (sessions, files and memory together) and picks it.
 
 Type in the field to find more:
@@ -44,11 +44,11 @@ Type in the field to find more:
 
 When the folder is in a git repository (and you have not chosen a new task folder), the menu ends with a switch: **New worktree from main** (or whichever branch is checked out). With it on, the session works in a copy of its own on a new branch; the chip reads "· new worktree". See [Work in a worktree](#work-in-a-worktree).
 
-Whether a session gets a new task folder by default depends on the assistant: most start in one unless you pick a folder; Coder works in the folder you pick.
+Whether a session gets a new task folder by default depends on the agent: most start in one unless you pick a folder; Coder works in the folder you pick, and an agent of one project in that project.
 
-### Pick an assistant
+### Pick an agent
 
-**Assistant** sets what the session starts as: **General** (the first time), **Researcher**, **Writer**, **Coder**, **Tutor**, **Planner**, **Analyst**, **App builder**, or one of yours under **Yours**. Point at one to read what it does and which agent and model it uses. Picking one can also set the agent, model and permissions it suggests, and turn on its connected accounts. **Make or change assistants** opens [Settings → Assistants](/settings?s=assistants). See [Assistants](/guide/assistants).
+**Agent** sets who the session works as: **General** (the first time), **Researcher**, **Writer**, **Coder**, **Tutor**, **Planner**, **Analyst**, **App builder**, or one of yours under **Yours** (those that work everywhere, and those of the project picked). Point at one to read what it does and which program and model it uses. Picking one can also set the program, model and permissions it suggests (the model of its tier, when it thinks with one), and turn on its connected accounts. **Make or change agents** opens the [Agents page](/agents). See [Agents](/guide/agents).
 
 ### Options: effort, permissions and more
 
@@ -57,7 +57,7 @@ Whether a session gets a new task folder by default depends on the assistant: mo
 - **Effort**: how hard the model thinks. **Default** uses the model's own, then the levels the model offers: **Low** (fast, light reasoning), **Medium** (balanced), **High** (deeper reasoning), **Xhigh** (extra-deep reasoning), **Max** (maximum reasoning), and on some models **Minimal**, **None** or **Ultra**. Not offered for Custom and other ACP agents, or for models without levels.
 - **Permissions**: what the agent may do without asking you first. Each agent has its own modes; see [What each permissions mode means](#what-each-permissions-mode-means). Shift+Tab in the message box moves to the next one.
 - **Account**: only once you have added another account for Claude Code or Codex in [Settings → Accounts](/settings?s=accounts&find=Your%20accounts). **Your sign-in** is the agent's own account; pick another to run this session as it. **Manage accounts** opens Settings.
-- **Confidential**, a switch with a lock ("Only models on this computer. Nothing leaves it."): for a paper you review, patient data or a client's code. **Agent** becomes **Custom** and **Model** the best model installed here. See [Keep a session confidential](#keep-a-session-confidential).
+- **Confidential**, a switch with a lock ("Only models on this computer. Nothing leaves it."): for a paper you review, patient data or a client's code. **Runs on** becomes **Custom** and **Model** the best model installed here. See [Keep a session confidential](#keep-a-session-confidential).
 - **Memory**: only while memory is on in Settings. **On** uses and adds to what agents remember; **Off for this session** starts fresh and keeps nothing from it. See [Memory](/guide/memory).
 - **Spending cap**: the most this session may spend, at API prices. Type an amount and press **Set**, or pick $1, $5, $10 or $25; **No cap** removes it. The session stops at the cap until you raise it. See [Usage, limits and costs](/guide/usage).
 - **Swarm**: **Off**; **Swarm**: a lead agent splits the task into angles of attack and starts a member for each, with as many working at once as **Swarm size** allows ([Settings → Child sessions](/settings?s=children&find=Swarm%20size)). Members share what they find on a board and message each other. For hard problems; it costs several times what one agent does. Or **Campaign** ("One big change in parts, each in a worktree"): the lead splits one big change into parts, members each make one on a branch of their own with its tests, and the lead merges them; the folder must be a git repository (see [Campaigns](/guide/engineering#campaigns-a-big-change-in-many-parts)).
@@ -109,7 +109,7 @@ In every mode Custom asks you before risky commands. In Ask, Accept edits and Pl
 Some work must not leave your computer: a paper you were sent to review (most conferences and journals forbid giving a submission to an online AI), patient or client records, or a company's code you work on under agreement. A confidential session runs on a model on this computer, and nothing of it is sent anywhere.
 
 1. On the start page, open **Options** and turn on **Confidential** ("Only models on this computer. Nothing leaves it."). Its chip then reads "Confidential".
-2. **Agent** becomes **Custom** and **Model** the best model installed here; while it is on, their menus offer only those. If there is none yet, it says so: [Settings → Agents → Models](/settings?s=models) installs the ones suggested for this computer with one click.
+2. **Runs on** becomes **Custom** and **Model** the best model installed here; while it is on, their menus offer only those. If there is none yet, it says so: [Settings → Agents → Models](/settings?s=models) installs the ones suggested for this computer with one click.
 3. Write what you want, attach the paper or pick its folder, and press Enter. For example: "Review the attached submission as a NeurIPS reviewer: summary, strengths, weaknesses, questions for the authors and a score."
 
 Models on this computer are those of Ollama and vLLM here, and endpoints whose address is this computer or your private network: `localhost`, `127.0.0.1`, `::1`, `10.…`, `192.168.…`, `172.16.…` to `172.31.…`, or a name ending in `.local` (see [Connect Ollama, vLLM or another endpoint](/guide/agents-models#connect-ollama-vllm-or-another-endpoint)). Ollama's cloud models, whose names end in "cloud", run on ollama.com and don't count. The start page keeps the switch on for your next sessions until you turn it off.
@@ -134,7 +134,7 @@ What it can't promise: Hydor checks where a model's server is, not what that ser
 
 ### What the start page remembers
 
-The start page opens with what you picked last, on every device: the agent; for each agent its model, effort, permissions and account; the folder, new task folder or project; the worktree switch; the assistant; memory off; the spending cap; and Confidential. Picking an agent brings back what you last used with it.
+The start page opens with what you picked last, on every device: the program; for each program its model, effort, permissions and account; the folder, new task folder or project; the worktree switch; the agent; memory off; the spending cap; and Confidential. Picking a program brings back what you last used with it.
 
 A link to the start page can fill it in, for example `/?prompt=Summarize%20my%20notes&agent=codex`; `model=`, `cwd=` (a folder's path) and `confidential=1` (Confidential on) can be added. It only fills the box and the choices; it never starts anything by itself. Invisible characters are removed from a linked message, with a notice.
 
@@ -247,9 +247,9 @@ Queued messages wait above the message box, numbered in the order they go out. O
 - **Remove** (the bin): takes it off the queue; its attachments are deleted.
 - When you stop the agent, or the app restarts, the queue pauses: "The queue is paused (the agent was stopped, or the server restarted)." **Resume** lets the messages go out again as the agent becomes free. A spending cap that is reached holds the queue too; raising the cap lets it go on.
 
-## Change the assistant, model, effort or permissions
+## Change the agent, model, effort or permissions
 
-The message box of a session has the start page's **Assistant** and its three choices **Model**, **Effort** and **Permissions**, in one chip beside the **+** (it opens **Options**, a sheet from the bottom on a phone). The chip names the assistant and the model, and the effort and permissions when they are not the usual; it turns amber while the agent may do anything without asking (**Bypass**, or Codex's **Full access**). Another assistant applies from your next message (see [Switch assistants in a session](/guide/assistants#switch-assistants-in-a-session)). A change of model, effort or permissions applies to the running agent at once and stays with the session. Shift+Tab moves to the next permissions mode. The model menu lists only this agent's models; to move the conversation to another agent, use [Continue in another agent](#continue-in-another-agent).
+The message box of a session has the start page's **Agent** and its three choices **Model**, **Effort** and **Permissions**, in one chip beside the **+** (it opens **Options**, a sheet from the bottom on a phone). The chip names the agent and the model, and the effort and permissions when they are not the usual; it turns amber while the agent may do anything without asking (**Bypass**, or Codex's **Full access**). Another agent applies from your next message (see [Switch agents in a session](/guide/agents#switch-agents-in-a-session)). A change of model, effort or permissions applies to the running agent at once and stays with the session. Shift+Tab moves to the next permissions mode. The model menu lists only this agent's models; to move the conversation to another agent, use [Continue in another agent](#continue-in-another-agent).
 
 ## Quote part of a reply
 
@@ -419,7 +419,7 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
   - **Memory**, with **On** or **Off** beside it: turns memory on or off for this session ("Off for all" when memory is off in Settings). See [Memory](/guide/memory).
   - **Spending cap**, with the cap beside it: set, change or raise it. See [Usage, limits and costs](/guide/usage).
   - **Connected accounts**: turn each connected account on or off for this session only. See [Connected apps, keys and tools](/guide/connections).
-  - **Assistant**, with its name beside it: opens Settings → Assistants (sessions with an assistant). The message box switches it.
+  - **Agent**, with its name beside it: opens the agent's page (sessions with an agent). The message box switches it.
 - **More** (a submenu):
   - **Open a browser** / **Show the browser**: the agents' browser for this session, which you can watch and take over. See [Search and the browser](/guide/web).
   - **Make this an automation**: the helper model reads the session and drafts a scheduled task from it; change anything, try it with a test run, then save. See [Scheduled tasks](/guide/tasks).

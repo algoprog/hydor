@@ -76,7 +76,7 @@ Some examples:
 
 ## How the agents talk to you
 
-The setting that used to be **How the agents talk to you** (in Settings → Capabilities → Assistants) is now part of the guidelines for every session: whatever you had written there was moved into them, as a line that starts "How to talk to me:". Change or remove it there.
+The setting that used to be **How the agents talk to you** (in Settings → Capabilities → Assistants, now Your agents) is now part of the guidelines for every session: whatever you had written there was moved into them, as a line that starts "How to talk to me:". Change or remove it there.
 
 ## CLAUDE.md and AGENTS.md
 

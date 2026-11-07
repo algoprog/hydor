@@ -131,7 +131,7 @@ Every session gets the connected accounts whose **Every session** switch is on. 
 
 Services on the internet follow the change at once. Those that run on this computer follow it when the agent next starts. With nothing connected yet, the dialog offers **Open Connected apps**.
 
-An assistant can also turn accounts on for the sessions that start as it: see [Assistants](/guide/assistants).
+An agent can also turn accounts on for the sessions that start as it: see [Agents](/guide/agents).
 
 ## How agents use connected accounts
 

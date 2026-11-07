@@ -144,7 +144,7 @@ A question may have a line of help under it, an example answer in the box, and a
 
 On a ready-made app, **Change** beside the line under the form shows the pickers (and **Done** folds them away):
 
-- **Agent**: Claude Code, Codex, Custom (Hydor's own agent for any model) or another agent you added.
+- The program: Claude Code, Codex, Custom (Hydor's own agent for any model) or another agent you added.
 - **Model**: the agent's models.
 - **Effort**: how hard the model thinks, for models that offer levels (not for Custom and the other added agents).
 - **Mode**: what the agent may do without asking you. It starts at **Auto**, because nobody watches a run. A mode that asks before each step leaves the run waiting for you.
@@ -266,9 +266,9 @@ Ready-made apps have no Runs tab: find their runs under **Latest runs** on the A
 There are four ways to start:
 
 - **From scratch**: **New app** → **Start from scratch** on the Apps page, the **Make an app** tile under your own apps, or go to [/apps/new](/apps/new).
-- **By describing it**: on the Apps page (or the New app page), write what it should do under **Describe an app, and an agent makes it** and press **Make it**. A session starts as the **App builder** ([Assistants](/guide/assistants)), which makes the app, tries it and hands it over.
+- **By describing it**: on the Apps page (or the New app page), write what it should do under **Describe an app, and an agent makes it** and press **Make it**. A session starts as the **App builder** ([Agents](/guide/agents)), which makes the app, tries it and hands it over.
 - **From a ready-made app**: open it and press **Make it mine** (on a phone, **Edit**).
-- **From a session that went well**: in the session's menu (⋯), choose **More** → **Save as an app**. The page says "Drafting an app from the session…" while the helper model turns the session's first request into a form, a task and answer fields, from what you asked and what the agent replied. The parts that would change from one use to the next become questions. The draft keeps the session's agent, model, effort, mode and assistant. When the agent called tools a step can call by itself (it read a page, searched the web), the draft has steps too: those calls as tool steps, with the form's answers where they go, then a model or agent step for the rest. Steps that do not check out are left out, and the task for one agent stays; check the steps and try it before you save it. If the helper model can't draft it, you get the request as it was, in one **Request** question, with a note saying why; the helper model is set in [Settings → Agents → Models](/settings?s=models&find=Helper%20model).
+- **From a session that went well**: in the session's menu (⋯), choose **More** → **Save as an app**. The page says "Drafting an app from the session…" while the helper model turns the session's first request into a form, a task and answer fields, from what you asked and what the agent replied. The parts that would change from one use to the next become questions. The draft keeps the session's program, model, effort, mode and agent. When the agent called tools a step can call by itself (it read a page, searched the web), the draft has steps too: those calls as tool steps, with the form's answers where they go, then a model or agent step for the rest. Steps that do not check out are left out, and the task for one agent stays; check the steps and try it before you save it. If the helper model can't draft it, you get the request as it was, in one **Request** question, with a note saying why; the helper model is set in [Settings → Agents → Models](/settings?s=models&find=Helper%20model).
 
 You can also ask an agent in any session to make an app for you (see [Ask an agent](#ask-an-agent)).
 
@@ -334,8 +334,8 @@ Examples are answers to try the app with, and checks on what a run gives back, s
 
 The section reads: "Runs go ahead without anyone watching, so pick a mode that does not stop to ask (Auto, or one that allows edits)."
 
-- **Agent**, **Model**, **Effort** and **Mode** pickers, as on a ready-made app. The mode starts at **Auto**.
-- **Assistant**: **None**, or an assistant each run starts as (Researcher, Writer… or one of your own), with its instructions. See [Assistants](/guide/assistants).
+- The program, **Model**, **Effort** and **Mode** pickers, as on a ready-made app. The mode starts at **Auto**.
+- **Agent**: **None**, or an agent each run works as (Researcher, Writer… or one of your own), with its instructions, tier and budget. See [Agents](/guide/agents).
 - **Folder**: **A new folder for each run** by default. **Pick one** makes every run work in a folder you choose (it must exist when a run starts); **Use a new one each time** goes back. With a picked folder, attached files are kept in a separate folder of uploads rather than mixed into yours.
 
 ### Tools
@@ -566,7 +566,7 @@ An app can travel as one file, to keep or to install on another Hydor.
 - **To download one**: open the app, then **More** (⋯) → **Download as a file**, or use **More** (⋯) on its card on the Apps page. Ready-made apps download the same way. The file (`.hydor-app`) holds everything it does and needs, its own files (pictures, videos, data), and the apps its steps call. When it keeps data, **Include the records it keeps** puts those in too. Its folder, keys and public page stay here: the keys it needs travel by their names only, and are asked for where it is installed.
 - **To install one**: press **New app** on the Apps page, then **Install from a file**, and pick a `.hydor-app`, `.zip` or `.json` file (up to 160 MB); or drop the file on the Apps page. Before anything is made, a card shows what it is, in plain words: its name and what it does, **What it asks you** (the optional questions marked), **What you get**, **How it works**, **Agents can use it**, with a switch to keep agents from running it, and **A key it needs** (or **Keys it needs**), to give now or at its first run. **What it uses here** (folded, and open by itself when something needs a look) lists who does the work, its steps, its own files, its view's scripts and the libraries they load, its screens, the tools it may use, the models it uses, the apps that come with it, what it installs and the commands it uses, what it keeps, whether it remembers, and its limits. Each model is shown as set up here, here under another name, through OpenRouter (added to your models when it first runs, its key asked for with the app's keys), or not set up here: for those, pick one of your models to stand in, or leave it to the agent's default. Press **Install**.
 
-Some things change on the way in, and the card says which: a folder it worked in elsewhere is left out (each run gets one of its own), a mode that allows every step without asking starts as **Auto** instead, and an assistant this computer lacks is dropped. An app that comes with it and is the same as one you have is used again; otherwise it installs beside yours. Its public page starts closed, and it has no API keys.
+Some things change on the way in, and the card says which: a folder it worked in elsewhere is left out (each run gets one of its own), a mode that allows every step without asking starts as **Auto** instead, and an agent this computer lacks is dropped. An app that comes with it and is the same as one you have is used again; otherwise it installs beside yours. Its public page starts closed, and it has no API keys.
 
 A ready-made app's file says which app it is: where you uninstalled that app, installing the file brings it back (**Installed again**); where you have it, the file installs as a copy of your own, to change as you like.
 

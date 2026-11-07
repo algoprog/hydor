@@ -61,10 +61,23 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 Every agent here gets the same help from the app, whatever its model: Claude Code, Codex, Custom, and the
 agents that speak ACP and take MCP servers.
 
-- **Assistants**: start as a Researcher, Writer, Tutor, Planner, Analyst, Coder or App builder (it makes
-  apps), or one of your own (its instructions, model, tools and connected accounts; import Claude Code's agent
-  files), and switch to another in the session's message box when the work changes. A task without a folder gets
-  one of its own (`~/Hydor/<date>-<task>`).
+- **Agents** (in the sidebar; assistants before 0.37.0): start as a Researcher, Writer, Tutor, Planner, Analyst, Coder or
+  App builder (it makes apps), or one of your own, and switch to another in the session's message box when the work
+  changes. The Agents page shows each of yours as a card with how it is doing (working, needs you, budget spent), its
+  projects, tier, next run and what it spent this month. **New agent** drafts one from what you say it should do, with
+  the helper model: its instructions, tools, tier and a schedule, read as sentences whose underlined words change it in
+  place; **All settings** has every setting; Claude Code's agent files import. An agent works everywhere or only in
+  some projects (offered only there, in the project's folder); runs on its schedules (scheduled tasks that run as it,
+  listed on its page); thinks with a tier, Quick, Standard or Best, whose model Settings → Models → Tiers sets for
+  Claude Code, Codex and Custom (Automatic keeps the model picked where it starts); hands parts of its work to other
+  agents: plain helpers on a tier the lead picks (never above the highest its agent allows) or named agents with their
+  own settings, only those its Team lists (built-in agents may ask any), never a freer mode than the lead's; and keeps
+  to a monthly budget, which caps each of its sessions at what is left and refuses new ones once it is spent. A
+  project's Agents tab shows its agents as a team (what starts each, whom it hands work to), and a project can have an
+  agent made for it as it is made, or later: drafted to fit it when it says enough about itself, else the template for
+  its kind (software, a website, ML experiments, data, a LaTeX paper, research reading, writing, design and media,
+  slides) from its files or description, else a default one. A task without a folder gets one of its own
+  (`~/Hydor/<date>-<task>`).
 - **Agent Guidelines**: what you want every agent to follow (how you like to work, what to always or never do,
   how to talk to you), written once and given to every agent by the app itself, whichever it is: Claude Code,
   Codex, Custom or an ACP agent. Three levels: every session (Settings → Agents → Agent Guidelines), a project, and
@@ -976,7 +989,7 @@ programs shows each program's version and what is out, with Check now, Update no
   the screen after it. Agents are told to look before they act and to leave passwords and payments to you.
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
-- The tools at the bottom of the sidebar (Library, Projects, Apps, Usage, System, Settings, Search, Help) stay in
+- The tools at the bottom of the sidebar (Library, Projects, Apps, Agents, System, Settings, Search, Help; Usage is a tab of System) stay in
   the order you drag them into, as sessions do, the same on every device; on a phone, hold one a moment to pick
   it up. On a computer, right-click one for Back to the usual order.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search in the sidebar finds pages,

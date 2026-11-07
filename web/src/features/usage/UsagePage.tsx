@@ -7,7 +7,7 @@ import { useApp, useUsage } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { Columns, Meter, severityColor } from '../../components/charts';
 import { Button, cx, Throbber, Tabs } from '../../components/ui';
-import { PageHeader } from '../layout/PageHeader';
+import { SystemHeader } from '../system/SystemHeader';
 import { StatsBody } from '../stats/StatsPage';
 import { ArenaBoard } from '../arena/ArenaBoard';
 import { LimitBanner, ResetList } from './LimitReset';
@@ -151,9 +151,9 @@ export function UsagePage({ tab }: { tab: 'limits' | 'activity' | 'arena' }) {
   }, [refresh]);
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader
-        title="Usage"
-        tip="usage"
+      {/* A tab of System since 0.37.0 (its place in the sidebar went to Agents); Limits, Activity and the Arena are its own. */}
+      <SystemHeader
+        tab="usage"
         sub={SUBS[tab]}
         actions={
           tab === 'limits' && (
@@ -162,7 +162,8 @@ export function UsagePage({ tab }: { tab: 'limits' | 'activity' | 'arena' }) {
             </Button>
           )
         }
-      >
+      />
+      <div className="shrink-0 border-b border-line px-2 sm:px-4">
         <Tabs
           value={tab}
           onChange={(t) => go(t === 'activity' ? '/stats' : t === 'arena' ? '/arena' : '/usage', true)}
@@ -172,7 +173,7 @@ export function UsagePage({ tab }: { tab: 'limits' | 'activity' | 'arena' }) {
             { value: 'arena', label: 'Arena' },
           ]}
         />
-      </PageHeader>
+      </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === 'limits' ? (
           <div className="mx-auto max-w-[1040px] px-4 py-6 sm:px-6">

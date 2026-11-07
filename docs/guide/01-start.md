@@ -74,8 +74,8 @@ The bottom of the sidebar holds the app's tools, four to a row:
 - **Library**: small tools and pages agents made for you, the images and videos you kept, and what you published. See [Library: pages, images, videos and sites](/guide/library).
 - **Projects**: each project's sessions, documents and guidelines together, and the shared knowledge every session can search. See [Projects and knowledge](/guide/projects).
 - **Apps**: tasks you run again and again: fill in a form, and an agent does the job. See [Apps](/guide/apps).
-- **Usage**: how much of each plan's limits you have used and when they reset, with **Activity** and **Arena** tabs. A thin bar under its icon shows how much is left across your paid subscriptions (or your free ones, when you have no paid ones), red when nothing is left; with no subscriptions there is no bar. See [Usage, limits and costs](/guide/usage).
-- **System**: this computer, with a tab for each of its tools: **Overview** (how it is doing, and what each tool holds now), **Files** (browse, open and edit files), **Git** (your repositories, their changes, branches and history), **Terminal** (shells that keep running when you leave the page), **Preview** (a web app's development server running here; only on this machine's own pages) and **Monitor** (processors, graphics cards, memory, disks and the busiest programs, live). See [System: files, Git, Terminal and Preview](/guide/files-git).
+- **Agents**: your agents, each with what it does, where and when it works, what it thinks with and whom it asks, and the ones that come with the app. See [Agents](/guide/agents).
+- **System**: this computer, with a tab for each of its tools: **Overview** (how it is doing, and what each tool holds now), **Files** (browse, open and edit files), **Git** (your repositories, their changes, branches and history), **Terminal** (shells that keep running when you leave the page), **Preview** (a web app's development server running here; only on this machine's own pages) **Monitor** (processors, graphics cards, memory, disks and the busiest programs, live) and **Usage** (how much of each plan's limits you have used and when they reset, with **Activity** and **Arena** tabs; a thin bar under System's icon shows how much is left across your paid subscriptions, or your free ones when you have no paid ones, red when nothing is left). See [System: files, Git, Terminal and Preview](/guide/files-git) and [Usage, limits and costs](/guide/usage).
 - **Settings**: everything the app can be set to. A dot on it means a newer version is out. See [Every setting](/guide/settings).
 - **Search**: opens the search box (the same as Ctrl+K).
 - **Help**: opens this guide, where you can also ask an agent about the app. The welcome tour starts from there too.
@@ -86,10 +86,10 @@ That is their usual order. To change it, drag a tool to another place among them
 
 **New session** opens the start page. It asks "What should we work on?" and holds a large message box with a row of choices under it:
 
-- **Agent**: who does the work (Claude Code, Codex, Custom, or another agent you added).
+- **Runs on**: the program that does the work (Claude Code, Codex, Custom, or another agent you added).
 - **Model**: that agent's model.
 - **Folder**: where the agent works, or a project, or a new folder made for the task.
-- **Assistant**: what the session starts as (General, Researcher, Writer, Coder, Tutor, Planner, Analyst, App builder, or one of your own).
+- **Agent**: who the session works as (General, Researcher, Writer, Coder, Tutor, Planner, Analyst, App builder, or one of your own; see [Agents](/guide/agents)).
 - **Options**: effort, permissions, memory, a spending cap and more. The chip names any of them you set away from the usual.
 
 On a computer, a line under the box reminds you: "Enter to start · Shift+Enter for a new line". Below it, **Today** sums up the day so far (lines changed, tokens, prompts, sessions); click it for the Activity page. When an agent's plan has run out of usage, a banner above the box says so and when it resets. On a phone, **Recent** lists your six latest sessions under the box.
@@ -102,13 +102,13 @@ Everything on the start page is explained in [Start a session](/guide/sessions#s
 
 1. Make sure the agent can work. Claude Code and Codex need you signed in: open [Settings → Agents → Accounts](/settings?s=accounts&find=Your%20accounts), find **Your accounts**, press **Sign in** next to the agent and follow the steps (you open a link, approve, and paste or enter a code). Custom needs a model: add one in [Settings → Agents → Models](/settings?s=models). The welcome tour does this with you the first time. See [Agents, accounts and models](/guide/agents-models).
 2. Press **New session** at the top of the sidebar. The app opens on the start page too.
-3. Press **Agent** under the message box and pick the agent. **Model** beside it picks its model; the one marked "default" is fine to start with.
+3. Press **Runs on** under the message box and pick the program. **Model** beside it picks its model; the one marked "default" is fine to start with.
 4. Press **Folder** and pick where the agent works:
    - one of the folders you used last, or another one: type its name or its path in **Find a folder, or type its path**;
    - a project, by its name, to work in that project's folder with its documents and guidelines;
-   - **New task folder**, for a fresh folder named after your task (in `~/Hydor` unless you change it in [Settings → Capabilities → Assistants](/settings?s=assistants&find=Task%20folders)).
+   - **New task folder**, for a fresh folder named after your task (in `~/Hydor` unless you change it in [Settings → Capabilities → Your agents](/settings?s=assistants&find=Task%20folders)).
 
-   Most assistants start in a new task folder unless you pick a folder; Coder works in the folder you pick.
+   Most agents start in a new task folder unless you pick a folder; Coder works in the folder you pick.
 5. Type what you want done in the message box: describe a task, ask a question or paste an error. Add files with the paperclip, or drop them on the box. Files already on this computer come along from the Files page: **Start a session with it** in a file's menu (see [Start a session with files](/guide/files-git#start-a-session-with-files)).
 6. Press Enter, or **Start**. On a phone, tap the round arrow.
 
@@ -130,12 +130,12 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 - **In messages**: messages that hold the words you typed. Opening one opens its session at those words, with the find bar ready.
 - **Memory**: your memory notes. Opening one opens Settings → Memory at that note.
 - **Projects**: your projects, by name and description. Opening one opens the project.
-- **Apps**, **Scheduled tasks**, **Assistants**, **Skills**, **Pages**, **Images, videos and audio** and **Connections**: yours, and the ready-made ones. Each opens where it lives.
+- **Apps**, **Scheduled tasks**, **Agents**, **Skills**, **Pages**, **Images, videos and audio** and **Connections**: yours, and the ready-made ones. Each opens where it lives.
 - **Files**: up to five files whose names match, in the folder the Files page shows (or the app's default folder).
 
 ### Choose where it looks
 
-**Search in**, at the end of the field, says where the box looks: **Everywhere** until you pick places. Click it for the list: **Sessions**, **Messages** (the words said in sessions), **Projects**, **Library** (pages, images and videos), **Apps**, **Files**, **Memory**, **Scheduled tasks**, **Assistants**, **Skills**, **Connections**, **Settings** (with the themes), **Go to and actions** (the app's own pages and actions) and **Guide**.
+**Search in**, at the end of the field, says where the box looks: **Everywhere** until you pick places. Click it for the list: **Sessions**, **Messages** (the words said in sessions), **Projects**, **Library** (pages, images and videos), **Apps**, **Files**, **Memory**, **Scheduled tasks**, **Agents**, **Skills**, **Connections**, **Settings** (with the themes), **Go to and actions** (the app's own pages and actions) and **Guide**.
 
 - Tick one or more, and the box looks only there. The button names them ("Sessions, Library", or "3 places") in the accent colour. Click a place again to take it out, or **Everywhere** to look in all of them again.
 - With nothing typed, it lists what the places you picked hold, the ones you use most first: your recent sessions, projects and pages, the sections of Settings, the topics of the guide. Messages, memory notes and files wait for your words.
@@ -181,7 +181,7 @@ On an iPhone or iPad, notifications work only in the app added to the home scree
 
 ### Menus open as sheets
 
-On a phone, the choices under the start page's message box (Agent, Model, Folder, Assistant, Options) open as sheets from the bottom of the screen, clear of the keyboard. The folder sheet's find field waits until you tap it, so the keyboard does not cover the list.
+On a phone, the choices under the start page's message box (Runs on, Model, Folder, Agent, Options) open as sheets from the bottom of the screen, clear of the keyboard. The folder sheet's find field waits until you tap it, so the keyboard does not cover the list.
 
 ### Typing and sending
 
@@ -242,7 +242,7 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 - "Find the session where we planned the Lisbon trip and pin it."
 - "Why is a session waiting for its usage reset still in Active?"
 - "List my sessions in the sidebar by day, without the folder groups."
-- "Next time I open the start page, have it set to Claude Code with the Researcher assistant."
+- "Next time I open the start page, have it set to Claude Code with the Researcher agent."
 - "Make my search box look only in my sessions and pages."
 - "Put Settings and Search first among the tools at the bottom of my sidebar."
 - "Put my Thesis project first among the groups in my sidebar."

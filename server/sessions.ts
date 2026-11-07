@@ -39,6 +39,7 @@ import { customGoal } from './custom/goal.ts';
 import { titleFor } from './titles.ts';
 import { isConfidential } from '../shared/confidential.ts';
 import { carriedExtra, checkHandoff, checkModelSwitch, confidentialStart, confidentialTitle, localModel } from './confidential/index.ts';
+import { agentStart } from './assistants/rules.ts';
 
 /** The agent a session key names ("claude:…", "codex:…", "acp:…"). */
 export const agentOfKey = (key: string): Agent => (key.startsWith('codex:') ? 'codex' : key.startsWith('acp:') ? 'acp' : 'claude');
@@ -997,6 +998,8 @@ export class SessionManager extends EventEmitter {
   async create(o: CreateOpts): Promise<string> {
     // A confidential session (or a child of one): Custom with a local model, memory off (server/confidential).
     o = confidentialStart(this.db, o);
+    // Started as one of your agents: its tier's model when none was picked, and what is left of its monthly budget as its cap.
+    o = agentStart(this.db, o);
     if (o.agent === 'claude') await ensureClaude();
     // A session started with a request and no title gets one from the helper model, asked now, beside the agent's start;
     // a confidential one only from a helper model on this computer, else from its first words.

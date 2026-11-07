@@ -8,7 +8,8 @@
 //
 // For other capabilities (apps, automations): listAssistants(), assistantById(id) and assistantStart(id).
 import crypto from 'node:crypto';
-import { agentMode, assistantExtra, type Assistant, type AssistantsState, type AssistantSwitch } from '../../shared/assistants.ts';
+import { agentMode, ASSISTANT_ICONS, assistantExtra, TOOL_KINDS, type AgentDraft, type Assistant, type AssistantsState, type AssistantSwitch } from '../../shared/assistants.ts';
+import { DEFAULT_TIERS, isTier } from '../../shared/tiers.ts';
 import type { SessionExtra } from '../../shared/features.ts';
 import type { Agent } from '../../shared/types.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
@@ -20,9 +21,14 @@ import type { Deps, Feature, SpawnInfo } from '../features/types.ts';
 import { PAGE_SERVER, runOf } from '../mcp.ts';
 import { sessionExtra, setSessionExtra } from '../sessionExtra.ts';
 import { userTimezone } from '../userPrefs.ts';
+import { helperJson } from '../helper.ts';
+import { validSchedule } from '../scheduler.ts';
+import { makeProjectAgent } from './projectAgent.ts';
+import { activity } from './rules.ts';
+import { setTiers, tiersOf } from './tiers.ts';
 import { findAgentFiles, parseAgentFile, readAgentFile } from './importer.ts';
 import { instructionsFor, spawnFor, switchNote, type Target } from './instructions.ts';
-import { allAssistants, cleanUpOn, DEFAULT_TASK_ROOT, findAssistant, removeAssistant, saveAssistant, setSettings, taskRoot, toneOf } from './store.ts';
+import { allAssistants, cleanAssistant, cleanUpOn, DEFAULT_TASK_ROOT, findAssistant, removeAssistant, saveAssistant, setSettings, taskRoot, toneOf } from './store.ts';
 import { dayIn, makeTaskFolder } from './taskFolder.ts';
 
 // ---- for other capabilities -----------------------------------------------------------------------------
@@ -99,6 +105,54 @@ async function switchAssistant(d: Deps, key: string, a: Assistant): Promise<Assi
   return { extra: next, ...cfg };
 }
 
+// ---- drafting an agent from a description -------------------------------------------------------------
+
+const DRAFT_SYSTEM = [
+  'You turn what the user says an agent should do into its settings. Answer with one JSON object and nothing else:',
+  '{"name": 1 to 4 words, "icon": one of ICONS, "description": one line of at most 120 characters on what it does,',
+  '"instructions": what the agent reads at the start of each session: second person, 3 to 10 short lines on what to do, how, and what to hand back,',
+  '"tools": the kinds it needs, from read (read files), edit (create and change files), run (run commands), web (search and read the web), mcp (other tools),',
+  '"tier": "quick" for clear jobs whose result can be checked, "standard" for most work, "best" for hard, open-ended problems,',
+  '"schedule": null, or when it should run by itself: {"kind":"daily","time":"HH:MM","days":[0-6, Sunday is 0; leave out for every day]} or {"kind":"every","minutes":n},',
+  '"task": with a schedule, the message each run starts with (one sentence, an instruction); else null,',
+  '"budgetUsd": a monthly budget in dollars only when the user names one; else null}.',
+  'Write in the language the user wrote in. Give it only the tools the job needs.',
+].join(' ');
+
+/** An agent's settings from a description, by the helper model: checked as a saved agent would be, not saved. */
+async function draftAgent(db: DB, text: string): Promise<AgentDraft> {
+  const want = text.trim();
+  if (!want) throw new HttpError(400, 'Say what the agent should do');
+  if (want.length > 4000) throw new HttpError(400, 'That is long for a description: say it in a few sentences');
+  const raw = await helperJson<Record<string, unknown>>(
+    db,
+    { system: DRAFT_SYSTEM.replace('ICONS', ASSISTANT_ICONS.join(', ')), prompt: `What the agent should do, in the user's words:\n\n${want}`, timeoutMs: 60_000 },
+    'an agent',
+  );
+  const tools = Array.isArray(raw.tools) ? raw.tools.filter((t) => TOOL_KINDS.some((k) => k.id === t)) : undefined;
+  const agent = cleanAssistant({
+    name: String(raw.name ?? '').trim() || 'New agent',
+    icon: raw.icon,
+    description: raw.description,
+    instructions: raw.instructions,
+    tools: tools?.length ? tools : undefined,
+    tier: isTier(raw.tier) ? raw.tier : undefined,
+    budgetUsd: typeof raw.budgetUsd === 'number' ? raw.budgetUsd : undefined,
+  });
+  let schedule: AgentDraft['schedule'];
+  try {
+    if (raw.schedule && typeof raw.schedule === 'object') schedule = validSchedule(raw.schedule);
+  } catch {
+    schedule = undefined;
+  }
+  const task = schedule
+    ? String(raw.task ?? '')
+        .trim()
+        .slice(0, 2000) || `Do your work for ${agent.name}.`
+    : undefined;
+  return { agent, ...(schedule ? { schedule, task } : {}) };
+}
+
 // ---- routes --------------------------------------------------------------------------------------------
 
 function routes(d: Deps) {
@@ -110,6 +164,30 @@ function routes(d: Deps) {
   const idOf = (req: { params: unknown }) => (req.params as { id: string }).id;
 
   app.get('/api/assistants', async () => state());
+  // The Agents page: each agent's schedules, sessions at work or waiting, and what it spent this month.
+  app.get('/api/assistants/activity', async () => ({
+    activity: activity(
+      db,
+      d.scheduler,
+      [...d.sessions.lives.keys()].map((key) => ({ key, status: d.sessions.summary(key)?.live?.status })),
+    ),
+  }));
+  // New agent → Draft it: settings from a description, to change and save.
+  app.post('/api/assistants/draft', async (req) => draftAgent(db, String(body(req).text ?? '')));
+  // An agent for a project that has none of its own: drafted to fit it, or its kind's template, or the default one.
+  app.post('/api/projects/:id/agent', async (req) => {
+    const r = await makeProjectAgent(db, idOf(req));
+    changed();
+    d.broadcast({ t: 'feature', id: 'spaces', data: { changed: true } });
+    return { assistant: r.agent, how: r.how, kind: r.kind, ...state() };
+  });
+  // Settings → Models → Tiers.
+  app.get('/api/models/tiers', async () => ({ tiers: tiersOf(db), defaults: DEFAULT_TIERS }));
+  app.put('/api/models/tiers', async (req) => {
+    const tiers = setTiers(db, body(req).tiers);
+    changed();
+    return { tiers, defaults: DEFAULT_TIERS };
+  });
   app.post('/api/assistants', async (req) => {
     const a = saveAssistant(db, { ...body(req), id: undefined });
     changed();

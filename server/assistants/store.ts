@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { ASSISTANT_ICONS, ASSISTANT_MODES, TOOL_KINDS, type Assistant, type AssistantMode, type ToolKind } from '../../shared/assistants.ts';
+import { isTier } from '../../shared/tiers.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
@@ -40,10 +41,19 @@ const str = (v: unknown, max: number) =>
     .slice(0, max);
 const names = (v: unknown, max: number) => (Array.isArray(v) ? [...new Set(v.map((x) => str(x, 120)).filter(Boolean))].slice(0, max) : []);
 
+/** A monthly budget in dollars, to the cent: none for nothing, zero or less. */
+function budgetOf(v: unknown): number | undefined {
+  if (v === undefined || v === null || v === '') return undefined;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0 || n > 100_000) throw new HttpError(400, 'A budget is an amount in dollars a month, up to $100,000');
+  const c = Math.round(n * 100) / 100;
+  return c > 0 ? c : undefined;
+}
+
 /** An assistant as given by the pages or an import, checked and trimmed (without its id). */
 export function cleanAssistant(b: Partial<Record<keyof Assistant, unknown>>): Omit<Assistant, 'id'> {
   const name = str(b.name, 60);
-  if (!name) throw new HttpError(400, 'Give the assistant a name');
+  if (!name) throw new HttpError(400, 'Give the agent a name');
   const instructions = str(b.instructions, MAX_INSTRUCTIONS);
   const agent = b.agent === 'claude' || b.agent === 'codex' || b.agent === 'acp' ? b.agent : undefined;
   const acpAgent = agent === 'acp' ? str(b.acpAgent, 80) || undefined : undefined;
@@ -63,6 +73,12 @@ export function cleanAssistant(b: Partial<Record<keyof Assistant, unknown>>): Om
     skills: names(b.skills, 30),
     mode,
     folder: b.folder === 'project' ? 'project' : 'task',
+    projects: names(b.projects, 50),
+    tier: isTier(b.tier) ? b.tier : undefined,
+    helperMax: isTier(b.helperMax) ? b.helperMax : undefined,
+    canAsk: names(b.canAsk, 30),
+    askable: b.askable === false ? false : undefined,
+    budgetUsd: budgetOf(b.budgetUsd),
     source: str(b.source, 1000) || undefined,
   };
   // Empty lists and unset choices are left out of what is kept.
@@ -85,14 +101,19 @@ const newId = (name: string) =>
 /** Adds an assistant (no id) or changes one of the user's own. */
 export function saveAssistant(db: DB, b: Partial<Record<keyof Assistant, unknown>>): Assistant {
   const id = typeof b.id === 'string' ? b.id : '';
-  if (id && BUILTINS.some((a) => a.id === id)) throw new HttpError(400, 'Built-in assistants stay as they are: duplicate one to make it your own');
+  if (id && BUILTINS.some((a) => a.id === id)) throw new HttpError(400, 'Built-in agents stay as they are: duplicate one to make it your own');
   const list = mine(db);
   const at = id ? list.findIndex((a) => a.id === id) : -1;
-  if (id && at < 0) throw new HttpError(404, 'There is no such assistant');
+  if (id && at < 0) throw new HttpError(404, 'There is no such agent');
   const a: Assistant = { id: id || newId(str(b.name, 60)), ...cleanAssistant(b) };
+  // It cannot ask itself.
+  if (a.canAsk?.includes(a.id)) {
+    a.canAsk = a.canAsk.filter((x) => x !== a.id);
+    if (!a.canAsk.length) delete a.canAsk;
+  }
   if (at >= 0) list[at] = a;
   else {
-    if (list.length >= 200) throw new HttpError(400, 'That is a lot of assistants: delete some first');
+    if (list.length >= 200) throw new HttpError(400, 'That is a lot of agents: delete some first');
     list.push(a);
   }
   putMine(db, list);
@@ -100,10 +121,18 @@ export function saveAssistant(db: DB, b: Partial<Record<keyof Assistant, unknown
 }
 
 export function removeAssistant(db: DB, id: string) {
-  if (BUILTINS.some((a) => a.id === id)) throw new HttpError(400, 'Built-in assistants cannot be deleted');
+  if (BUILTINS.some((a) => a.id === id)) throw new HttpError(400, 'Built-in agents cannot be deleted');
+  // Agents that could ask it no longer can.
   putMine(
     db,
-    mine(db).filter((a) => a.id !== id),
+    mine(db)
+      .filter((a) => a.id !== id)
+      .map((a) => {
+        if (!a.canAsk?.includes(id)) return a;
+        const { canAsk, ...rest } = a;
+        const left = canAsk.filter((x) => x !== id);
+        return left.length ? { ...rest, canAsk: left } : rest;
+      }),
   );
 }
 

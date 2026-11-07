@@ -1,16 +1,18 @@
-// Assistants: Researcher, Writer, Tutor… picked when a session starts (the start page's picker), made
-// and changed in Settings → Assistants, and named in a session's menu.
-import { WandSparkles } from 'lucide-react';
+// Agents (called assistants in the code): Researcher, Writer, Tutor… and your own, picked when a session starts
+// (the start page's picker), made and changed on the Agents page (/agents, a tool in the sidebar), and named in a
+// session's menu. Settings → Your agents keeps where task folders go and cleaning up after a task.
+import { Bot, WandSparkles } from 'lucide-react';
 import type { SessionSummary } from '@shared/types';
 import { go } from '../../lib/nav';
 import { MenuItem } from '../../components/ui';
 import type { WebFeature } from '../registry';
+import { AgentsPage } from './AgentsPage';
 import { AssistantStartOption } from './AssistantPicker';
 import { AssistantsSettings } from './AssistantsSettings';
 import { AssistantIcon } from './icons';
 import { useAssistantsState } from './state';
 
-/** "Assistant · Researcher": the one the session started as; it opens Settings → Assistants. */
+/** "Agent · Researcher": the one the session works as; it opens the agent's page. */
 function SessionMenu({ s, close }: { s: SessionSummary; close: () => void }) {
   const st = useAssistantsState();
   const id = s.extra?.assistant;
@@ -22,10 +24,10 @@ function SessionMenu({ s, close }: { s: SessionSummary; close: () => void }) {
       hint={a.name}
       onClick={() => {
         close();
-        go('/settings?s=assistants');
+        go(`/agents/${encodeURIComponent(a.id)}`);
       }}
     >
-      Assistant
+      Agent
     </MenuItem>
   );
 }
@@ -35,12 +37,14 @@ export const assistantsFeature: WebFeature = {
   settings: [
     {
       id: 'assistants',
-      label: 'Assistants',
+      label: 'Your agents',
       icon: WandSparkles,
-      sub: 'Presets to start sessions as (Researcher, Writer, Tutor…), and where task folders go',
+      sub: 'Where task folders go, and cleaning up after a task; your agents themselves are on the Agents page',
       Body: AssistantsSettings,
     },
   ],
+  routes: [{ match: (p) => p === '/agents' || p.startsWith('/agents/'), Page: AgentsPage }],
+  nav: [{ id: 'agents', path: '/agents', label: 'Agents', icon: <Bot size={17} />, match: (p) => p === '/agents' || p.startsWith('/agents/') }],
   StartOptions: AssistantStartOption,
   SessionMenu,
   sessionMenuPart: 'settings',

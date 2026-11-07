@@ -21,8 +21,12 @@ import { AGENT_FILE } from '../models/config.ts';
 import { addNote } from '../notes.ts';
 import { lastTurn, opensTurn, type Turn } from '../opinion/turns.ts';
 import { childKeys, parentOf } from './family.ts';
-import { childMode, modeFamily } from './modes.ts';
+import { childMode, modeFamily, modeLevel } from './modes.ts';
 import { roleOf } from '../swarm/roles.ts';
+import { agentMode, assistantExtra, inScope, mayAsk, type Assistant } from '../../shared/assistants.ts';
+import { clampTier, isTier, tierLabel, type Tier } from '../../shared/tiers.ts';
+import { allAssistants, findAssistant } from '../assistants/store.ts';
+import { tierPick } from '../assistants/tiers.ts';
 
 export { childKeys, parentOf } from './family.ts';
 
@@ -120,6 +124,26 @@ export function pickAgent(d: Deps, ctx: Pick<RunCtx, 'agent' | 'acpAgent' | 'key
   return { agent: 'acp', acpAgent: a.id, model: model || undefined, label: a.name };
 }
 
+/** The program a child will run (for its tier's model), as pickAgent would choose it from the same arguments. */
+function programOf(ctx: Pick<RunCtx, 'agent' | 'acpAgent'>, agentArg: string, modelArg: string, models: AgentModel[]): { agent: Agent; acpAgent?: string } {
+  let want = agentArg.trim().toLowerCase();
+  if (!want) want = modelArg && findModel(models, modelArg) ? 'custom' : ctx.agent === 'acp' ? (ctx.acpAgent === CONSOLE_ID ? 'custom' : (ctx.acpAgent ?? 'custom')) : ctx.agent;
+  if (want === 'custom' || want === CONSOLE_ID) return { agent: 'acp', acpAgent: CONSOLE_ID };
+  if (want === 'claude' || want === 'claude code' || want === 'claude-code') return { agent: 'claude' };
+  if (want === 'codex') return { agent: 'codex' };
+  return { agent: 'acp', acpAgent: want };
+}
+
+/** The program one of the user's agents names, as start_child_session's agent argument; empty when it names none. */
+const agentArgOf = (a: Assistant): string => (!a.agent ? '' : a.agent === 'acp' ? (a.acpAgent === CONSOLE_ID ? 'custom' : (a.acpAgent ?? '')) : a.agent);
+
+/** The user's agents a session may hand work to: in its project, and allowed by the agent it works as. */
+function namedFor(d: Deps, key: string): Assistant[] {
+  const x = sessionExtra(d.db, key);
+  const lead = findAssistant(d.db, x.assistant);
+  return allAssistants(d.db).filter((a) => inScope(a, typeof x.space === 'string' ? x.space : null) && mayAsk(lead, a));
+}
+
 /** The folder a child works in: the parent's, or one it names (relative to the parent's). */
 function folder(arg: unknown, cwd: string): string {
   const p = String(arg ?? '').trim();
@@ -145,9 +169,14 @@ const firstLine = (s: string, n: number) => {
 
 // ---- the tools -----------------------------------------------------------------------------------
 
-/** `local`: the parent is confidential, so its children run on Custom with a model on this computer (server/confidential). */
-function startTool(d: Deps, max: number, local = false): RunTool {
+/**
+ * `local`: the parent is confidential, so its children run on Custom with a model on this computer (server/confidential).
+ * `named`: the user's agents it may hand work to (by name, with their own instructions, tools and tier); `max`: the
+ * highest tier the agent it works as lets its helpers have.
+ */
+function startTool(d: Deps, max: number, local = false, named: Assistant[] = [], top?: Tier): RunTool {
   const models = customModels().filter((m) => !local || m.local);
+  const agents = local ? [] : named;
   return {
     name: 'start_child_session',
     description: [
@@ -158,8 +187,19 @@ function startTool(d: Deps, max: number, local = false): RunTool {
       'It starts at once and returns its key; when its turn ends, its reply comes back to you as a message, and you go on from there.',
       'The child sees nothing of this conversation: put everything it needs in the brief (the goal, the facts and files it needs, what to hand back).',
       `Use it for independent pieces that take a while, not for small steps. A child cannot start children; at most ${max} of yours run at once.`,
+      local
+        ? ''
+        : `Give each child a tier that fits its part: quick (the cheapest: clear jobs whose result can be checked, such as pulling out facts, translating, sorting, formatting or short summaries), standard (most work) or best (hard, open-ended parts).${top ? ` The agent you work as lets helpers go no higher than ${tierLabel(top).toLowerCase()}.` : ''}`,
+      agents.length
+        ? `You can also hand a part to one of the user's agents, by its name in as; it works with its own instructions, tools and tier: ${agents
+            .slice(0, 40)
+            .map((a) => `${a.name} (${a.description || 'no description'}${a.tier ? `; ${tierLabel(a.tier)}` : ''})`)
+            .join('; ')}${agents.length > 40 ? `; and ${agents.length - 40} more` : ''}.`
+        : '',
       'The user sees each child in the conversation and can open it.',
-    ].join(' '),
+    ]
+      .filter(Boolean)
+      .join(' '),
     inputSchema: {
       type: 'object',
       properties: {
@@ -172,6 +212,16 @@ function startTool(d: Deps, max: number, local = false): RunTool {
         cwd: { type: 'string', description: 'The folder to work in (default: yours).' },
         worktree: { type: 'boolean', description: 'Work on a branch of its own in a new worktree of the folder’s git repository, so its changes do not mix with others’ (a campaign’s members always do).' },
         title: { type: 'string', description: 'A short name for it, shown to the user.' },
+        ...(local
+          ? {}
+          : {
+              tier: {
+                type: 'string',
+                enum: ['quick', 'standard', 'best'],
+                description: 'The tier for its part: quick for clear, checkable work; standard for most; best for hard, open-ended parts. Used when no model is named; a named agent keeps its own.',
+              },
+            }),
+        ...(agents.length ? { as: { type: 'string', description: `One of the user's agents to hand this part to, by name: ${agents.map((a) => a.name).join(', ')}.` } } : {}),
       },
       required: ['brief'],
     },
@@ -179,24 +229,67 @@ function startTool(d: Deps, max: number, local = false): RunTool {
       const brief = String(a.brief ?? '').trim();
       if (!brief) throw new Error('The brief is empty. Write a self-contained brief: the child sees nothing of this conversation.');
       if (parentOf(d.db, ctx.key)) throw new Error(ONE_LEVEL);
-      const target = pickAgent(d, ctx, a.agent, a.model);
+      const own = sessionExtra(d.db, ctx.key);
+      const leadAgent = findAssistant(d.db, own.assistant);
+      // One of the user's agents, by name: in this session's project, and allowed by the agent this session works as.
+      let named: Assistant | null = null;
+      const asArg = String(a.as ?? '').trim();
+      if (asArg) {
+        if (local) throw new Error('This session is confidential: its children cannot work as other agents.');
+        const w = asArg.toLowerCase();
+        const all = allAssistants(d.db);
+        named = all.find((x) => x.id.toLowerCase() === w) ?? all.find((x) => x.name.toLowerCase() === w) ?? null;
+        const offer = namedFor(d, ctx.key);
+        if (!named) throw new Error(`The user has no agent "${asArg}".${offer.length ? ` Those you can hand work to: ${offer.map((x) => x.name).join(', ')}.` : ''}`);
+        if (!inScope(named, typeof own.space === 'string' ? own.space : null)) throw new Error(`${named.name} works only in its own projects, not here.`);
+        if (!mayAsk(leadAgent, named))
+          throw new Error(
+            named.askable === false
+              ? `${named.name} does not take work from other agents.`
+              : named.id === leadAgent?.id
+                ? `You are ${named.name}: do this part yourself, or start a plain child for it.`
+                : `${leadAgent!.name} may not hand work to ${named.name}: the user can allow it in ${leadAgent!.name}'s settings (Team).`,
+          );
+      }
+      const agentArg = String(a.agent ?? '').trim() || (named ? agentArgOf(named) : '');
+      let modelArg = String(a.model ?? '').trim();
+      // A named agent on its own program keeps its own model, unless it thinks with a tier.
+      if (!modelArg && named && !String(a.agent ?? '').trim() && named.model && !named.tier) modelArg = named.model;
+      // The tier: a named agent's own; else the one asked for, never above what the lead's agent allows (that, when none is asked for).
+      const asked = isTier(a.tier) ? clampTier(a.tier, leadAgent?.helperMax) : leadAgent?.helperMax;
+      const tier: Tier | undefined = named ? named.tier : modelArg ? undefined : asked;
+      let tierEffort: string | undefined;
+      if (tier && !modelArg) {
+        const prog = programOf(ctx, agentArg, modelArg, models);
+        const pick = tierPick(d.db, tier, prog.agent, prog.acpAgent);
+        // Custom's tier names one of its models; one that is gone is passed over.
+        if (pick?.model && (prog.acpAgent !== CONSOLE_ID || findModel(models, pick.model))) modelArg = pick.model;
+        tierEffort = pick?.effort;
+      }
+      const target = pickAgent(d, ctx, agentArg, modelArg);
       // A swarm's members take on hard problems: they run with the lead's own model and effort unless it names others.
       const role = roleOf(d.db, ctx);
       const lead = role?.role === 'lead' ? d.sessions.summary(ctx.key) : null;
       // A campaign's members each change their part on a branch of their own.
       const worktree = !!a.worktree || (role?.role === 'lead' && role.mode === 'campaign');
-      const same = !!lead && target.agent === ctx.agent && target.agent !== 'acp' && !String(a.model ?? '').trim();
+      const same = !!lead && target.agent === ctx.agent && target.agent !== 'acp' && !modelArg && !tier;
       if (same && lead?.prefs?.model) {
         target.model = lead.prefs.model;
         target.label = `${target.label} · ${lead.prefs.model}`;
       }
-      const effort = same ? lead?.prefs?.effort : undefined;
+      const effort = tierEffort ?? (same ? lead?.prefs?.effort : undefined);
+      if (named) target.label = `${named.name} · ${target.label}`;
+      if (tier) target.label = `${target.label} · ${tierLabel(tier)}`;
       const running = childKeys(d.db, ctx.key).filter((k) => busy(d.sessions.summary(k))).length + (starting.get(ctx.key) ?? 0);
       if (running >= max) throw new Error(`${running} of your child sessions are working already, the most at once. Wait for one to finish (its reply comes to you as a message), then start the next; or do this part yourself.`);
       const capUsd = childShare(d.db, ctx.key, max);
       const cwd = folder(a.cwd, ctx.cwd);
       const parent = d.sessions.summary(ctx.key);
-      const mode = childMode({ family: modeFamily(ctx.agent, ctx.acpAgent), mode: parent?.live?.mode ?? parent?.prefs?.mode }, modeFamily(target.agent, target.acpAgent));
+      const parentMode = childMode({ family: modeFamily(ctx.agent, ctx.acpAgent), mode: parent?.live?.mode ?? parent?.prefs?.mode }, modeFamily(target.agent, target.acpAgent));
+      // A named agent's own mode when it is stricter than the parent's: never freer.
+      const namedMode = named ? agentMode(named.mode, target.agent, target.acpAgent) : undefined;
+      const fam = modeFamily(target.agent, target.acpAgent);
+      const mode = namedMode && (!parentMode || modeLevel(fam, namedMode) < modeLevel(fam, parentMode)) ? namedMode : parentMode;
       const title = firstLine(String(a.title ?? '') || brief, 70);
       starting.set(ctx.key, (starting.get(ctx.key) ?? 0) + 1);
       let key: string;
@@ -213,7 +306,7 @@ function startTool(d: Deps, max: number, local = false): RunTool {
           title,
           remember: false,
           account: target.agent === ctx.agent && target.agent !== 'acp' ? d.sessions.accountOf(ctx.key) : undefined,
-          extra: { parent: ctx.key, ...(capUsd != null ? { capUsd } : {}) },
+          extra: { parent: ctx.key, ...(capUsd != null ? { capUsd } : {}), ...(named ? assistantExtra(named) : {}) },
         });
       } finally {
         const n = (starting.get(ctx.key) ?? 1) - 1;
@@ -233,6 +326,8 @@ function startTool(d: Deps, max: number, local = false): RunTool {
         cwd: s?.cwd ?? cwd,
         worktree: !!s?.worktree || undefined,
         capUsd,
+        ...(named ? { as: named.name, asId: named.id } : {}),
+        ...(tier ? { tier } : {}),
         startedAt: Date.now(),
       };
       addNote(d.db, { key: ctx.key, kind: 'child', anchor: await currentPrompt(d, ctx.key), data: note });
@@ -426,7 +521,8 @@ export const children: Feature = {
   tools(ctx) {
     // A child gets none: one level only.
     if (parentOf(ctx.deps.db, ctx.key) || roleOf(ctx.deps.db, ctx)?.role === 'member') return [];
-    return [startTool(ctx.deps, maxFor(ctx.deps.db, ctx), confidentialRun(ctx)), LIST, MESSAGE];
+    const lead = findAssistant(ctx.deps.db, sessionExtra(ctx.deps.db, ctx.key).assistant);
+    return [startTool(ctx.deps, maxFor(ctx.deps.db, ctx), confidentialRun(ctx), namedFor(ctx.deps, ctx.key), lead?.helperMax), LIST, MESSAGE];
   },
 
   spawn(s) {

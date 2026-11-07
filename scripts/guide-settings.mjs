@@ -45,7 +45,7 @@ const TOPIC = {
   children: 'research',
   images: 'documents-voice',
   voice: 'documents-voice',
-  assistants: 'assistants',
+  assistants: 'agents',
   skillpack: 'skills',
   custom: 'custom',
 };

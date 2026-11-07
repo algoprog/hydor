@@ -989,7 +989,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {assistants.length > 0 && (
                 <label className="block min-w-0">
-                  <span className="mb-1 block text-[12.5px] text-fg-3">Assistant</span>
+                  <span className="mb-1 block text-[12.5px] text-fg-3">Agent</span>
                   <select className={inputCls} value={recipe.assistant ?? ''} onChange={(e) => set({ assistant: e.target.value || undefined })}>
                     <option value="">None</option>
                     {assistants.map((a) => (

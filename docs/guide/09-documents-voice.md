@@ -393,7 +393,7 @@ It fills the screen, says "I'm listening", and asks the device to keep the scree
 
 ### What you can say
 
-- **Start a session**: "Start a session to plan my weekend in Crete". It starts as the start page would: with the agent, model, effort, permissions, assistant and project you picked there last, in a new task folder (or in the folder you last picked there). From then on it follows that session.
+- **Start a session**: "Start a session to plan my weekend in Crete". It starts as the start page would: with the program, model, effort, permissions, agent and project you picked there last, in a new task folder (or in the folder you last picked there). From then on it follows that session.
 - **Tell a session something**: "Tell it to use metric units". The words go to the session it follows, as your message.
 - **Ask how things are**: "How are my sessions doing?". It says what is working, what needs you and what it asks, and what finished lately.
 - **Hear the result**: "Read me the answer". It says the latest reply of the session it follows (or, when it follows none, of the busiest or latest session). A long reply comes as its gist, in three to five sentences; when the app is shown in another language than English, every reply comes as its gist in that language.
