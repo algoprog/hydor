@@ -49,7 +49,7 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
   ok(new Set(ids).size === ids.length, `every kind has an id of its own (${ids.filter((x, i) => ids.indexOf(x) !== i).join(', ')})`);
   for (const t of CONTENT_TYPES) ok(new RegExp(`^${t.kind}\\.[a-z0-9]+(-[a-z0-9]+)*$`).test(t.id), `${t.id}: its id is its kind and a name`);
   for (const k of KINDS) ok(typesOf(k).length >= CONTENT_MIN[k], `${k}: at least ${CONTENT_MIN[k]} (${typesOf(k).length})`);
-  ok(KINDS.length === 8 && KINDS.every((k) => CONTENT_GROUPS[k]?.length), 'eight kinds, each with its groups');
+  ok(KINDS.length === 9 && KINDS.every((k) => CONTENT_GROUPS[k]?.length), 'nine kinds, each with its groups');
   for (const k of KINDS)
     for (const g of CONTENT_GROUPS[k])
       ok(
@@ -169,13 +169,13 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
 // ---- Turn it into ---------------------------------------------------------------------------------------------------------
 
 {
-  const NOUNS: Record<PageKindName, string> = { page: 'page', slides: 'deck', doc: 'document', sheet: 'spreadsheet', tex: 'LaTeX document', notebook: 'notebook' };
+  const NOUNS: Record<PageKindName, string> = { page: 'page', slides: 'deck', doc: 'document', sheet: 'spreadsheet', tex: 'LaTeX document', notebook: 'notebook', diagram: 'diagram' };
   for (const from of Object.keys(TURN_INTO) as PageKindName[]) {
     ok(TURN_INTO[from].length >= 2 && !TURN_INTO[from].includes(from as never), `${from}: turns into others, never itself`);
     for (const to of TURN_INTO[from]) {
       const t = turnAsk({ from, to, id: 'abc123def0', title: 'Q3 “report”' });
       ok(t.includes(`my ${NOUNS[from]} “Q3 “report”” (saved page abc123def0)`) && /read it with get_page/.test(t) && t.endsWith(`Leave the ${NOUNS[from]} itself as it is.`), `${from} → ${to}: named by its id, read first, left as it is`);
-      ok(to === 'slides' ? /^Make slides from/.test(t) : to === 'doc' ? /^Write a document from/.test(t) : /^Make a page from/.test(t), `${from} → ${to}: makes the other kind`);
+      ok(to === 'slides' ? /^Make slides from/.test(t) : to === 'doc' ? /^Write a document from/.test(t) : to === 'diagram' ? /^Make a diagram from/.test(t) && /save_diagram/.test(t) : /^Make a page from/.test(t), `${from} → ${to}: makes the other kind`);
       ok(new RegExp(`in the language the ${NOUNS[from]} is in`).test(t), `${from} → ${to}: in its language`);
     }
   }

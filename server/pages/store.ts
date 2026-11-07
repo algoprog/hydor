@@ -288,7 +288,7 @@ const safeJson = (s: string) => {
   }
 };
 
-const DEFAULT_TITLE: Record<string, string> = { slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', notebook: 'Notebook' };
+const DEFAULT_TITLE: Record<string, string> = { slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', notebook: 'Notebook', diagram: 'Diagram' };
 
 /**
  * A new page. `folder`: the Library folder it goes in, of its `space` (folders.ts placeFor makes the two agree).

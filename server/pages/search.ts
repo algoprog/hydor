@@ -32,6 +32,7 @@ const KIND_WORDS: Record<string, string> = {
   sheet: 'spreadsheet sheet table',
   tex: 'latex document paper',
   notebook: 'jupyter notebook',
+  diagram: 'diagram flowchart chart drawio mind map org chart',
   image: 'image picture photo',
   video: 'video',
   audio: 'sound audio',

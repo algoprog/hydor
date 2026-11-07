@@ -40,7 +40,7 @@ export function pageCall(t: ToolInfo | undefined): PageCall | null {
   const bare = nagetTool(t.name);
   if (bare === 'show_html' || bare === 'save_page') return bare;
   // A deck, a document or a spreadsheet is a saved page too, opened by its id.
-  if (bare === 'save_slides' || bare === 'save_doc' || bare === 'save_sheet' || bare === 'save_latex') return 'save_page';
+  if (bare === 'save_slides' || bare === 'save_doc' || bare === 'save_sheet' || bare === 'save_latex' || bare === 'save_diagram') return 'save_page';
   // A change page_action saved: the page it changed, as a save of it.
   if (bare === 'page_action' && savedRef(t.output)) return 'save_page';
   const p = (t.input as { file_path?: unknown } | undefined)?.file_path;
@@ -220,7 +220,7 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
               },
             }
           : {}),
-        sub: `${page.info.kind === 'slides' ? 'Slides in the Library' : page.info.kind === 'doc' ? 'A document in the Library' : page.info.kind === 'sheet' ? 'A spreadsheet in the Library' : page.info.kind === 'tex' ? 'LaTeX in the Library' : page.info.kind === 'notebook' ? 'A notebook in the Library' : 'In the Library'} · version ${page.info.version}`,
+        sub: `${page.info.kind === 'slides' ? 'Slides in the Library' : page.info.kind === 'doc' ? 'A document in the Library' : page.info.kind === 'sheet' ? 'A spreadsheet in the Library' : page.info.kind === 'tex' ? 'LaTeX in the Library' : page.info.kind === 'notebook' ? 'A notebook in the Library' : page.info.kind === 'diagram' ? 'A diagram in the Library' : 'In the Library'} · version ${page.info.version}`,
         save: async (html, force) => {
           await post(`/api/pages/${enc(id)}/versions`, { html, base: page.info.version, sessionKey: key, force: !!force });
           toast('Saved. The agent sees your changes with your next message.', 'ok');

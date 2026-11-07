@@ -26,8 +26,15 @@ export interface DiagramEdits {
   layout?: LayoutKind;
 }
 
-/** Whether a save carries changes by id (rather than a whole diagram). */
-export const editsIn = (a: Obj) => ['change', 'add', 'remove', 'layout'].some((k) => a[k] !== undefined && a[k] !== null && !(Array.isArray(a[k]) && !(a[k] as unknown[]).length));
+/**
+ * Whether a save carries changes by id (rather than a whole diagram): change, add or remove; or layout alone with the id
+ * of a saved one (with nodes, pages or Mermaid, layout says how those are laid out).
+ */
+export function editsIn(a: Obj): boolean {
+  const given = (k: string) => a[k] !== undefined && a[k] !== null && !(Array.isArray(a[k]) && !(a[k] as unknown[]).length);
+  if (['change', 'add', 'remove'].some(given)) return true;
+  return given('layout') && typeof a.id === 'string' && !!a.id.trim() && !['nodes', 'pages', 'mermaid', 'diagram'].some(given);
+}
 
 /** The page a change names: by name, id or number (from 1), the first when left out. */
 export function pageNamed(d: Diagram, p: unknown): DiagramPage | null {
@@ -276,7 +283,7 @@ export function relayoutPage(page: DiagramPage, kind: LayoutKind, o: { spacing?:
           ? { top: 26, left: 60, right: 26, bottom: 26 }
           : { top: (s.text ? lineHeight(look.size ?? 14) * s.text.split('\n').length + 18 : 0) + 22, left: 24, right: 24, bottom: 24 }
       : undefined;
-    return { id: s.id, w: holders.has(s.id) ? 40 : w, h: holders.has(s.id) ? 40 : h, parent: s.parent, ...(pad ? { pad } : {}) };
+    return { id: s.id, w: holders.has(s.id) ? 40 : w, h: holders.has(s.id) ? 40 : h, parent: s.parent, ...(pad ? { pad } : {}), ...(!s.parent && s.shape === 'lane' ? { lane: 'row' as const } : !s.parent && s.shape === 'swimlane' ? { lane: 'column' as const } : {}) };
   });
   const edgeList = page.items.filter((it): it is DiagramEdge => it.type === 'edge' && !!it.from.id && !!it.to.id && it.from.id !== it.to.id);
   const ledges: LEdge[] = edgeList.map((e) => ({ from: e.from.id!, to: e.to.id!, ...(e.text ? { label: { w: Math.min(220, textWidth(e.text, { size: e.style?.size ?? 13 })) + 12, h: lineHeight(13) * e.text.split('\n').length + 6 } } : {}) }));

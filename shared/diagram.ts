@@ -545,6 +545,7 @@ const num = (v: unknown): number | undefined => {
 };
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const r2 = (v: number) => Math.round(v * 100) / 100;
+const r4 = (v: number) => Math.round(v * 10000) / 10000;
 /** A coordinate, rounded to a hundredth, in bounds. */
 const coord = (v: unknown, d = 0) => r2(clamp(num(v) ?? d, -DIAGRAM_LIMITS.coord, DIAGRAM_LIMITS.coord));
 /** Text in bounds, without control characters but its line breaks. */
@@ -676,8 +677,10 @@ function cleanEnd(v: unknown): DiagramEnd | null {
   if (typeof v.id === 'string' && v.id.trim()) e.id = v.id.trim();
   else if (typeof v.shape === 'string' && v.shape.trim()) e.id = v.shape.trim();
   if (e.id) {
-    const p = Array.isArray(v.port) ? point(v.port) : null;
-    if (p) e.port = [r2(clamp(p[0], 0, 1)), r2(clamp(p[1], 0, 1))];
+    // A fixed point as fractions, kept to four places (a sequence diagram's messages sit on their rows by them).
+    const px = Array.isArray(v.port) ? num(v.port[0]) : undefined;
+    const py = Array.isArray(v.port) ? num(v.port[1]) : undefined;
+    if (px !== undefined && py !== undefined) e.port = [r4(clamp(px, 0, 1)), r4(clamp(py, 0, 1))];
     else if (typeof v.port === 'string') {
       const side: Record<string, [number, number]> = { n: [0.5, 0], top: [0.5, 0], s: [0.5, 1], bottom: [0.5, 1], e: [1, 0.5], right: [1, 0.5], w: [0, 0.5], left: [0, 0.5] };
       const got = side[v.port.trim().toLowerCase()];

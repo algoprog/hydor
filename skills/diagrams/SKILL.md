@@ -8,8 +8,9 @@ triggers: [diagram, flowchart, flow chart, sequence diagram, org chart, mind map
 # Diagrams
 
 A good diagram answers one question at a glance: what happens next, who talks to whom, what belongs
-where. Decide the question, write the content in words, draw it with Mermaid (text that a script
-turns into a diagram), then look at the result and fix what is hard to read. Draw it by hand in SVG
+where. Decide the question, write the content in words, draw it (as an editable diagram in the
+Library with `save_diagram`, or with Mermaid, text that a script turns into a picture), then look at
+the result and fix what is hard to read. Draw it by hand in SVG
 when Mermaid cannot put things where the meaning needs them. Charts of numbers (bars, lines, pies)
 are not diagrams: see the dashboards skill. A project schedule with owners and dates is the
 project-plan skill's; a mind map of fresh ideas starts with the brainstorming skill; a one-page
@@ -63,6 +64,18 @@ software system, draw the C4 levels (context, then containers): `references/c4.m
 
 ## 4. Show it, keep it
 
+- **A diagram to keep or change** (the user will edit it, come back to it, export it, or asked for
+  "a diagram" rather than a quick picture): `save_diagram`. Give `nodes` (id, text, shape, color,
+  icon, parent) and `edges` (from, to, text, arrow, dashed) with a `layout` (down for a flowchart,
+  right for a process across, tree for an org chart, mindmap, radial), and the app sizes each shape
+  to its words and lays it out; or give the same Mermaid as `mermaid` (flowchart, mindmap, class,
+  ER, state and sequence diagrams become editable shapes). Containers (a group box, a swimlane, a
+  lane) hold the nodes that name them as `parent`; stack `lane`s for a swimlane process. Colour by
+  meaning with the ready-made looks (blue, green, orange, yellow, red, purple, grey, and strong ones
+  such as dark-blue). The user edits it as in draw.io and exports it as PNG, SVG, PDF or a draw.io
+  file (`export_page`). To change it: `get_page` lists each shape's id, then `save_diagram` with the
+  id and `change`, `add`, `remove` or `layout`. For a known kind (an org chart, a swimlane
+  process, a database schema), `how_to_make` says how.
 - `show_html` with the page in `references/mermaid.md`: it loads Mermaid from a CDN, takes the app's
   colours, gives each diagram a card, and shows a readable error if the text has a mistake. Give the
   page a title and a one-line caption that says what to look at.

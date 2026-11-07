@@ -27,13 +27,14 @@ The agent first reads how things are now, then asks you to confirm the change on
 
 ## Have an agent do what an editor does
 
-Agents change what is in your Library as you would in its editors: they write slides, documents, spreadsheets, LaTeX documents and notebooks, and do in one go what an editor does to the whole of one in a click:
+Agents change what is in your Library as you would in its editors: they write slides, documents, spreadsheets, LaTeX documents, notebooks and diagrams, and do in one go what an editor does to the whole of one in a click:
 
 - **Slides**: animate every slide (**Subtle**, **Lively** or **Striking**, or take every animation off), put right what **Check accessibility** finds, describe the pictures that have no description, make the deck PowerPoint compatible or put it back in the web format, give it a ready-made theme or one of yours, make the slides wide or standard, bring in slides from another deck, and update the charts made from a spreadsheet.
 - **Documents**: accept or reject the suggested changes, change the page setup, and put in a header, a footer and page numbers.
 - **Spreadsheets**: sort a table, take out its duplicate rows, fill down or right, clear cells, trim spaces, split words into columns, sum a table up on a new sheet (as **Data → Summarize by** does), put in or take out rows and columns, and rename, copy, move or delete sheets; formulas follow, as they do in the editor.
 - **LaTeX documents**: rename or move files, pictures and folders, the lines that name them following.
 - **Notebooks**: clear the outputs.
+- **Diagrams**: lay a page (or every page) out again, as a flowchart down or across, a tree, a mind map, rings, a circle or a grid, and give every shape one look, its words one font, or the whole diagram the look of a hand drawing.
 - **Any of them**: a copy in the Library, or another kind made from it (**Turn it into**).
 
 Each keeps a new version (the one before stays among the versions), the editor open on it shows it at once, and your own changes and comments stay. They are free and instant, but for describing pictures, which a model does. The agent beside a page ([Change it by asking an agent](/guide/library#change-it-by-asking-an-agent)) knows them all, and exactly what you picked. For example:
@@ -43,6 +44,7 @@ Each keeps a new version (the one before stays among the versions), the editor o
 - "Accept Maria's suggestions in the 'Budget' document and reject the rest."
 - "In my 'Sales' spreadsheet, sort the table by revenue, highest first, and take out the duplicate rows."
 - "In my LaTeX thesis, move the pictures from figures/ to img/."
+- "Lay my 'Checkout flow' diagram out from left to right, and make every shape blue."
 
 ## The card: confirming a change
 

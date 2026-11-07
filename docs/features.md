@@ -649,11 +649,34 @@ agents that speak ACP and take MCP servers.
   Resize makes a copy at another size, its parts placed to fit (Magic resize); Download makes a PNG (see-through if
   you like), a JPG at 1×, 2× or 3×, or a PDF to print at its own size. Agents make designs with save_page
   (how_to_make "design" says how, with the brand kit) and export them with export_page.
-- **Made with AI from a kind**: 235 kinds the app knows how to make well (56 slides, 29 decks, 43 documents, 19
-  sections, 39 pages, 17 blocks of a page, 13 spreadsheets, 19 designs), in a gallery with a find box and chips by group: Insert
+- **Diagrams, as in draw.io, Lucidchart or Visio**: New → Diagram (or save_diagram) makes a flowchart, an org chart,
+  a mind map, a swimlane process, an architecture or network diagram, UML classes, an ER diagram, a sequence diagram,
+  a timeline, a kanban board or a brainstorm, from twelve templates, blank, from a draw.io file (.drawio, a draw.io
+  SVG or PNG, compressed pages too) or Mermaid, or described for an agent (19 diagram kinds). A model of pages of shapes
+  and connectors, drawn by one renderer for the editor, the viewer, the Library's picture and every file. 75 kinds of
+  shape (general, flowchart, containers, UML, ER, BPMN, block arrows, sticky notes, pictures, and icons from Lucide's
+  library for network and cloud), connectors at right angles that keep clear of the shapes they join and of shapes in
+  the way, straight or curved, fixed to a point of a shape or to the side that faces the other, with seventeen ends
+  (crow's feet too), words in the middle and near each end, rounded bends and flowing dashes. The editor: a searchable
+  shapes panel (click, or drag onto the page or into a container), draw.io's blue arrows (a shape like it, joined, in a
+  click; a connector to another shape in a drag), handles to size and turn, smart guides and a grid to snap to, a
+  connector's ends, runs, points and words dragged, words typed in place (or over a picked shape), rows of classes and
+  tables, a format panel (sixteen ready-made looks, fill, gradient, line, dashes, corners, opacity, shadow, drawn by
+  hand, fonts, alignment, where words go, kind of shape, links and notes, position, turn, flip, order, align, space out,
+  same size, group, lock), automatic layouts (layers down or across with few crossings and long edges between, trees,
+  mind maps, rings, circles, grids; swimlanes stay lanes; containers grow round what they hold), pages as tabs, menus
+  with their keys, a right-click menu, a double-click to add a shape, find and replace, copy and paste between
+  diagrams and windows (draw.io's shapes, Mermaid, pictures and words pasted become what they are), undo, light and
+  dark themes, and, while an agent writes one, the diagram growing on the page. It exports as PNG, SVG, PDF (each
+  page its own size), a draw.io file and a web page to pan and zoom; Download as a picture saves a page or what is
+  picked at 1× to 4×, see-through or dark, and Copy as a picture. Agents draw with save_diagram (nodes and edges laid
+  out by the app, Mermaid, the model itself, or changes by id: change, add, remove, layout), read one with get_page,
+  lay it out again or restyle it with page_action, and export it with export_page.
+- **Made with AI from a kind**: 254 kinds the app knows how to make well (56 slides, 29 decks, 43 documents, 19
+  sections, 39 pages, 17 blocks of a page, 13 spreadsheets, 19 designs, 19 diagrams), in a gallery with a find box and chips by group: Insert
   → Slide made with AI (and a slide's own menu, A slide made with AI after it), Insert → Section made with AI, Add a
   block made with AI, Choose a kind in New (then Make it with AI or Make an empty one), and Turn it into in the
-  Library (slides, a document or a page from what you have). Say what it is about, and an agent makes it from what
+  Library (slides, a document, a page or a diagram from what you have). Say what it is about, and an agent makes it from what
   is there, as you watch; web-only slides are marked Web format in a deck made for PowerPoint. Agents read the same
   instructions with how_to_make (free) before they make a known kind of thing by name.
 - **Skills**: every skill agents can use on one page (Settings → Skills), grouped by what it is for: more than

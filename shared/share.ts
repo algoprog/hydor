@@ -178,7 +178,7 @@ export interface PortalItemView {
 }
 
 /** The kinds a person with Edit changes in their editor (LaTeX too where TeX runs shut in); `page`: a page of HTML or a design. */
-export const PORTAL_EDITS: (NonNullable<PageInfo['kind']> | 'page')[] = ['doc', 'sheet', 'slides', 'tex', 'page'];
+export const PORTAL_EDITS: (NonNullable<PageInfo['kind']> | 'page')[] = ['doc', 'sheet', 'slides', 'tex', 'diagram', 'page'];
 
 /** The kinds that carry comments (not a notebook); `page`: a page of HTML or a design. */
 export const PORTAL_COMMENTS: (NonNullable<PageInfo['kind']> | 'page')[] = ['doc', 'tex', 'slides', 'sheet', 'page'];

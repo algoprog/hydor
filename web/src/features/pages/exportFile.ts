@@ -9,7 +9,7 @@ import { toast } from '../../lib/store';
 import { askArxiv } from './latex/arxivAsk';
 import { PICS, RT } from './slides/rt';
 
-export type ExportFormat = 'pdf' | 'docx' | 'odt' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'epub' | 'txt' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png' | 'jpg' | 'arxiv';
+export type ExportFormat = 'pdf' | 'docx' | 'odt' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'epub' | 'txt' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png' | 'jpg' | 'svg' | 'drawio' | 'arxiv';
 
 const LETTER = /^(en-US|en-CA|es-US|es-MX|fr-CA|en-PH|es-CO|es-CL|es-VE|es-GT|es-CR|es-PA)$/i;
 
@@ -71,13 +71,15 @@ const WHAT: Record<ExportFormat, string> = {
   py: 'the Python script',
   png: 'the pictures',
   jpg: 'the picture',
+  svg: 'the SVG file',
+  drawio: 'the draw.io file',
 };
 
 /** Downloads the page (or its version `version`) as a file; a deck's PDF prints here when the server cannot make it. */
 export async function exportFile(id: string, format: ExportFormat, o: { version?: number; deck?: Deck; slide?: number } = {}) {
   if (format === 'arxiv') return askArxiv(id, o.version);
   const paper = LETTER.test(navigator.language) ? 'letter' : 'a4';
-  if (format !== 'html' && format !== 'csv' && format !== 'md' && format !== 'txt' && format !== 'tex' && format !== 'ipynb' && format !== 'py') toast(o.slide ? 'Making the picture…' : `Making ${WHAT[format]}…`);
+  if (format !== 'html' && format !== 'csv' && format !== 'md' && format !== 'txt' && format !== 'tex' && format !== 'ipynb' && format !== 'py' && format !== 'svg' && format !== 'drawio') toast(o.slide ? 'Making the picture…' : `Making ${WHAT[format]}…`);
   const res = await fetch(mu(`/api/pages/${enc(id)}/export?format=${format}&paper=${paper}${o.version ? `&v=${o.version}` : ''}${o.slide ? `&slide=${o.slide}` : ''}`), { credentials: 'same-origin' });
   if (!res.ok) {
     const j = (await res.json().catch(() => null)) as { error?: string } | null;

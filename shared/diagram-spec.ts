@@ -384,7 +384,7 @@ export function specPage(spec: SpecPage, o: SpecOpts = {}): { page: DiagramPage;
       if (look.label === 'below' || look.label === 'above') below.set(s.id, { w: Math.max(s.w, t.w + 8), h: s.h + t.h + 8 });
       else below.set(s.id, { w: s.w + t.w + 16, h: Math.max(s.h, t.h) });
     }
-    const lnodes: LNode[] = shapes.map((s) => ({ id: s.id, w: below.get(s.id)?.w ?? s.w, h: below.get(s.id)?.h ?? s.h, parent: s.parent, ...(holders.has(s.id) ? { pad: padOf(s) } : {}) }));
+    const lnodes: LNode[] = shapes.map((s) => ({ id: s.id, w: below.get(s.id)?.w ?? s.w, h: below.get(s.id)?.h ?? s.h, parent: s.parent, ...(holders.has(s.id) ? { pad: padOf(s) } : {}), ...(!s.parent && s.shape === 'lane' ? { lane: 'row' as const } : !s.parent && s.shape === 'swimlane' ? { lane: 'column' as const } : {}) }));
     const ledges: LEdge[] = edges.map((e) => {
       const f = { size: e.style?.size ?? 13 };
       return { from: e.from.id!, to: e.to.id!, ...(e.text ? { label: { w: Math.min(220, textWidth(e.text, f)) + 12, h: lineHeight(13) * e.text.split('\n').length + 6 } } : {}) };
@@ -441,7 +441,8 @@ export function specPage(spec: SpecPage, o: SpecOpts = {}): { page: DiagramPage;
     for (let p = s.parent; p && d < 64; p = byId.get(p)?.parent) d++;
     return d;
   };
-  const containers = shapes.filter((s) => holders.has(s.id) || CONTAINER_KINDS.has(s.shape)).sort((a, b) => depth(a) - depth(b));
+  // Lifelines and their activations go under the messages that run between them, as containers do.
+  const containers = shapes.filter((s) => holders.has(s.id) || CONTAINER_KINDS.has(s.shape) || s.shape === 'lifeline' || s.shape === 'activation').sort((a, b) => depth(a) - depth(b));
   const rest = shapes.filter((s) => !containers.includes(s));
   const items: DiagramItem[] = [...containers, ...edges, ...rest];
   const page: DiagramPage = { id: o.id ?? 'p1', name: (spec.name ?? o.name ?? 'Page 1').toString().slice(0, 80) || 'Page 1', items };

@@ -4,7 +4,7 @@
 // from point to point, or curved (a smooth curve through its points, or out of one side and into the other). Also its
 // arrowheads (drawn as paths of their own, so every viewer draws them alike), where its words go, and how near a point
 // is to it (what a click picks).
-import type { ArrowKind, DiagramEdge, DiagramShape } from './diagram.ts';
+import { CONTAINER_KINDS, type ArrowKind, type DiagramEdge, type DiagramShape } from './diagram.ts';
 import { pageBox, perimeterPoint, portPoint, sidePoint, SIDE_DIR, sideOfDir, KINDS, type Box, type Pt, type Side } from './diagram-shapes.ts';
 
 /** How far a connector runs straight out of a shape before it may turn. */
@@ -311,6 +311,31 @@ export function edgeCourse(e: DiagramEdge, shapes: ShapeMap): { pts: Pt[]; curve
     }
     b = sideAttach(B.shape, sb, !pts.length && A.shape && !A.port ? boxA : null);
   }
+  // Two shapes across from each other (one over the other, or side by side) whose sides overlap: both ends at one place
+  // across, so the connector runs straight: a pointed end's own (a diamond's tip), else the overlap's nearest to between them.
+  if (a && b && A.shape && B.shape && !A.port && !B.port && !pts.length && !self && sa && sb && SIDE_DIR[sa].x === -SIDE_DIR[sb].x && SIDE_DIR[sa].y === -SIDE_DIR[sb].y) {
+    const vertical = sa === 'n' || sa === 's';
+    const ba = pageBox(A.shape);
+    const bb = pageBox(B.shape);
+    const lo = vertical ? Math.max(ba.x, bb.x) + 8 : Math.max(ba.y, bb.y) + 8;
+    const hi = vertical ? Math.min(ba.x + ba.w, bb.x + bb.w) - 8 : Math.min(ba.y + ba.h, bb.y + bb.h) - 8;
+    const flatA = flatSides(A.shape);
+    const flatB = flatSides(B.shape);
+    const ca = vertical ? a.x : a.y;
+    const cb = vertical ? b.x : b.y;
+    if (lo <= hi && Math.abs(ca - cb) > 0.5 && (flatA || flatB)) {
+      const at = !flatA ? ca : !flatB ? cb : Math.min(hi, Math.max(lo, (ca + cb) / 2));
+      if (at >= lo - 0.5 && at <= hi + 0.5) {
+        if (vertical) {
+          a = { x: at, y: a.y };
+          b = { x: at, y: b.y };
+        } else {
+          a = { x: a.x, y: at };
+          b = { x: b.x, y: at };
+        }
+      }
+    }
+  }
   const pa = a ?? A.free;
   const pb = b ?? B.free;
   // A free end leaves (or arrives) the way the other end lies.
@@ -323,9 +348,59 @@ export function edgeCourse(e: DiagramEdge, shapes: ShapeMap): { pts: Pt[]; curve
   const boxes = [boxA, boxB].filter((x): x is Box => !!x);
   // Two shapes over each other: no way round them both, so neither is kept clear of.
   const overlap = boxA && boxB && boxA.x < boxB.x + boxB.w && boxB.x < boxA.x + boxA.w && boxA.y < boxB.y + boxB.h && boxB.y < boxA.y + boxA.h;
-  const keep = self ? [boxA!] : overlap ? [] : boxes;
+  // Other shapes in the way (those near both ends, but containers, which connectors cross freely) are kept clear of too.
+  const others: Box[] = [];
+  if (!self && boxA && boxB && !overlap) {
+    const m = 40;
+    const x0 = Math.min(boxA.x, boxB.x) - m;
+    const y0 = Math.min(boxA.y, boxB.y) - m;
+    const x1 = Math.max(boxA.x + boxA.w, boxB.x + boxB.w) + m;
+    const y1 = Math.max(boxA.y + boxA.h, boxB.y + boxB.h) + m;
+    for (const sh of shapes.values()) {
+      if (sh === A.shape || sh === B.shape || CONTAINER_KINDS.has(sh.shape) || sh.shape === 'text' || sh.shape === 'lifeline') continue;
+      if (sh.parent && (sh.parent === A.shape!.id || sh.parent === B.shape!.id)) continue;
+      const q = pageBox(sh);
+      if (q.x < x1 && q.x + q.w > x0 && q.y < y1 && q.y + q.h > y0) {
+        // One that touches an end's box would leave it no way out: not kept clear of.
+        const touches = (b: Box) => q.x < b.x + b.w + STUB && b.x < q.x + q.w + STUB && q.y < b.y + b.h + STUB && b.y < q.y + q.h + STUB;
+        if (!touches(boxA) && !touches(boxB)) others.push(q);
+      }
+      if (others.length >= 12) break;
+    }
+  }
+  const keep = self ? [boxA!] : overlap ? [] : [...boxes, ...others];
   // Shapes close together leave too little room to run out of them in full: then a shorter run out.
-  const route = orthoRoute(pa, freeA, pb, freeB, keep, STUB) ?? orthoRoute(pa, freeA, pb, freeB, keep, 6) ?? simpleOrtho(pa, freeA, pb, freeB);
+  const routeOf = (a: Pt, fa: Pt, b: Pt, fb: Pt) => orthoRoute(a, fa, b, fb, keep, STUB) ?? orthoRoute(a, fa, b, fb, keep, 6) ?? (others.length ? (orthoRoute(a, fa, b, fb, boxes, STUB) ?? orthoRoute(a, fa, b, fb, boxes, 6)) : null);
+  let route = routeOf(pa, freeA, pb, freeB);
+  // Two shapes joined by their sides that lie apart both ways (one below and to the side of the other): an elbow out of
+  // one side and into the top (or the side) of the other may bend less than the way across; the cheapest is kept.
+  if (A.shape && B.shape && !A.port && !B.port && !self && !overlap && boxA && boxB) {
+    const apartX = boxB.x > boxA.x + boxA.w || boxA.x > boxB.x + boxB.w;
+    const apartY = boxB.y > boxA.y + boxA.h || boxA.y > boxB.y + boxB.h;
+    if (apartX && apartY) {
+      const cost = (r: Pt[] | null) => (r ? r.slice(1).reduce((n, q, i) => n + Math.abs(q.x - r[i].x) + Math.abs(q.y - r[i].y), 0) + 60 * Math.max(0, r.length - 2) : Infinity);
+      const ca = center(boxA);
+      const cb = center(boxB);
+      const h: Side = cb.x > ca.x ? 'e' : 'w';
+      const v: Side = cb.y > ca.y ? 's' : 'n';
+      const back: Record<Side, Side> = { e: 'w', w: 'e', n: 's', s: 'n' };
+      let best = cost(route) - 15;
+      for (const [s1, s2] of [
+        [h, back[v]],
+        [v, back[h]],
+      ] as [Side, Side][]) {
+        const a2 = sidePoint(A.shape, s1);
+        const b2 = sidePoint(B.shape, s2);
+        const r = routeOf(a2, SIDE_DIR[s1], b2, SIDE_DIR[s2]);
+        const c = cost(r);
+        if (c < best) {
+          best = c;
+          route = r;
+        }
+      }
+    }
+  }
+  route ??= simpleOrtho(pa, freeA, pb, freeB);
   return { pts: route, curve: false, dirs: [da, db] };
 }
 
