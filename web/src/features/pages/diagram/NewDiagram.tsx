@@ -37,7 +37,7 @@ export default function NewDiagram({ value, onPick, dark }: { value: string; onP
     };
   }, [ready]);
   return (
-    <div className="grid max-h-[46vh] grid-cols-2 gap-2 overflow-y-auto pr-0.5 sm:grid-cols-4">
+    <div data-i18n="diagram" className="grid max-h-[46vh] grid-cols-2 gap-2 overflow-y-auto pr-0.5 sm:grid-cols-4">
       {DIAGRAM_TEMPLATES.map((t) => {
         const svg = previews.get(`${t.id}:${dark ? 'dark' : 'light'}`);
         return (

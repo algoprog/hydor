@@ -26,6 +26,8 @@ network, UML and ER diagrams, made by you or by an agent, and opened from or sav
   zoom, and download or copy any page as a picture, light or dark, see-through or not.
 - **Agents draw them too**: they say what is in a diagram and what joins what (or write Mermaid), and the app sizes and
   lays it out; they change one shape at a time, lay a diagram out again, restyle it and export it.
+- **In Chinese and Greek**: the diagram editor, its templates and its part of the guide. And Find's count in the
+  other editors ("1 of 3") no longer has the editor's name stuck to it in those languages ("doc::1 / 3").
 
 ## 0.35.0 · 7 November 2026
 

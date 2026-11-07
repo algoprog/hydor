@@ -378,7 +378,7 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
 
 {
   const x = fs.readFileSync(path.join(ROOT, 'scripts/i18n-extract.mjs'), 'utf8');
-  ok(/QUIET_IN = \{ 'shared\/content-types\.ts': \['ask'\] \}/.test(x), 'the extractor leaves the kinds’ asks out');
+  ok(/QUIET_IN = \{\s*'shared\/content-types\.ts': \['ask'\]/.test(x), 'the extractor leaves the kinds’ asks out');
   ok(/NO_WORDS = new Set\(\[[^\]]*'shared\/content-asks\.ts'/.test(x), 'and the requests made from them');
   const asks = fs.readFileSync(path.join(ROOT, 'shared/content-asks.ts'), 'utf8');
   ok(!/\b(label|blurb|hint): '/.test(asks), 'the requests’ file holds nothing the pages show');

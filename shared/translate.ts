@@ -51,6 +51,9 @@ interface Pattern {
 }
 
 /** A translator for a dictionary: the string in the other language, or null when it has none. */
+/** A lookup in one part of the app ("media::Speed"): see web/src/i18n/runtime.ts. */
+const PART = /^[a-z]+::/;
+
 export function translator(dict: Dictionary): (s: string, split?: boolean) => string | null {
   const exact = new Map<string, string>();
   const patterns: Pattern[] = [];
@@ -184,6 +187,12 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
   return (s, split = true) => {
     const t = s.replace(/\s+/g, ' ').trim();
     if (t.length < 2 || !/[A-Za-z]/.test(t)) return null;
+    // One part's own word ("diagram::Page", what it means in that editor) is its entry or nothing: no pattern takes the
+    // part's name for a value ("{0} of {1}" would make "diagram::1 of 3" into "diagram::1 / 3").
+    if (PART.test(t)) {
+      const hit = exact.get(t);
+      return hit == null ? null : `${/^\s*/.exec(s)![0]}${hit}${/\s*$/.exec(s)![0]}`;
+    }
     const lines = s.trim().split(/\s*\n\s*/);
     const out = exact.get(t) ?? (lines.length > 1 ? pieces(lines, '\n', (x) => line(x.replace(/\s+/g, ' '), split)) : line(t, split));
     if (out == null) return null;

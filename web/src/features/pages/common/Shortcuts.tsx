@@ -28,7 +28,7 @@ function Keys({ keys }: { keys: string }) {
   );
 }
 
-export function ShortcutsDialog({ open, onClose, groups }: { open: boolean; onClose: () => void; groups: ShortcutGroup[] }) {
+export function ShortcutsDialog({ open, onClose, groups, part }: { open: boolean; onClose: () => void; groups: ShortcutGroup[]; part?: string }) {
   const [q, setQ] = useState('');
   const shown = useMemo(() => {
     const w = q.trim().toLocaleLowerCase();
@@ -36,7 +36,7 @@ export function ShortcutsDialog({ open, onClose, groups }: { open: boolean; onCl
     return groups.map((g) => ({ ...g, items: g.items.filter(([k, what]) => `${k} ${keyLabel(k)} ${what} ${tr(what)}`.toLocaleLowerCase().includes(w)) })).filter((g) => g.items.length);
   }, [groups, q]);
   return (
-    <Dialog open={open} onClose={onClose} title="Keyboard shortcuts" width={760}>
+    <Dialog open={open} onClose={onClose} title="Keyboard shortcuts" width={760} part={part}>
       <div className="relative mb-3">
         <Search size={14} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
         <input

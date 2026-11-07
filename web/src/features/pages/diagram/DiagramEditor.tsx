@@ -389,7 +389,8 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
       await loadIcons();
       const r = specPage(m.page, { icon: iconsNow()?.iconPaths, font: d.font });
       addPage(r.page.items, at);
-      if (m.notes.length || r.notes.length) toast([...m.notes, ...r.notes].join(' '));
+      // Each note in the user's language: joined, they would match no entry of the dictionary.
+      if (m.notes.length || r.notes.length) toast([...m.notes, ...r.notes].map((n) => tr(n)).join(' '));
       return true;
     } catch (e) {
       toastError(e);
@@ -405,7 +406,7 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
         changeDiagram((x) => ({ ...x, pages: [...x.pages, ...pages] }));
         setPi(dRef.current.pages.length - pages.length);
       } else addPage(r.diagram.pages[0]?.items ?? []);
-      if (r.notes.length) toast(r.notes.join(' '));
+      if (r.notes.length) toast(r.notes.map((n) => tr(n)).join(' '));
     } catch (e) {
       toastError(e);
     }
@@ -1359,6 +1360,7 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
         onClose={() => setDialog(null)}
         title="Insert from Mermaid"
         width={620}
+        part="diagram"
         footer={
           <>
             <Button variant="ghost" onClick={() => setDialog(null)}>
@@ -1386,6 +1388,7 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
         onClose={() => setDialog(null)}
         title="Download as a picture"
         width={420}
+        part="diagram"
         footer={
           <>
             <Button variant="ghost" onClick={() => setDialog(null)}>
@@ -1432,7 +1435,7 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
           </p>
         </div>
       </Dialog>
-      <ShortcutsDialog open={dialog === 'keys'} onClose={() => setDialog(null)} groups={shortcuts} />
+      <ShortcutsDialog open={dialog === 'keys'} onClose={() => setDialog(null)} groups={shortcuts} part="diagram" />
       {confirmNode}
     </div>
   );

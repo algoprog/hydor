@@ -103,6 +103,7 @@ export default function Gallery({ o }: { o: TypesOpts & { n: number } }) {
       onClose={closeTypes}
       title={(picker && PICK_TITLE[o.kind]) || TITLE[o.kind]}
       width={760}
+      part={o.kind === 'diagram' ? 'diagram' : undefined}
       footer={
         picker ? (
           !mobile && (

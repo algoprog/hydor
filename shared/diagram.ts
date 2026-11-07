@@ -758,8 +758,10 @@ function cleanItem(v: unknown): DiagramItem | null {
     const paths = cleanIconPaths(v.icon.paths);
     if (paths.length) s.icon = { name: v.icon.name.slice(0, 60), paths };
   }
-  if (typeof v.src === 'string' && v.src.trim() && v.src.length <= 12_000_000) s.src = v.src.trim();
-  if (typeof v.link === 'string' && v.link.trim()) s.link = v.link.trim().slice(0, 2000);
+  // A picture the app keeps, one inside it, one on the web, or a file of an agent's folder (kept by the app when saved).
+  if (typeof v.src === 'string' && v.src.trim() && v.src.length <= 12_000_000 && !/^(javascript|vbscript|file):/i.test(v.src.trim())) s.src = v.src.trim();
+  // A link to the web, an email, or a place of the app: nothing that runs.
+  if (typeof v.link === 'string' && /^(https?:\/\/|mailto:|\/(?!\/))/i.test(v.link.trim())) s.link = v.link.trim().slice(0, 2000);
   const note = cleanText(v.note, 2000);
   if (note) s.note = note;
   const merged = kind.style ? { ...kind.style, ...style } : style;

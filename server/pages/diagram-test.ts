@@ -115,6 +115,9 @@ const edge = (id: string, from: string, to: string, more: Partial<DiagramEdge> =
   ok(d.grid === 0, 'a grid of 0 is kept');
   const d2 = normalizeDiagram({ items: [{ id: 's', shape: 'rect', x: 0, y: 0 }, { id: 't', shape: 'rect', x: 0, y: 200 }, { id: 'm', from: { id: 's', port: [0.123456, 0.5] }, to: 't' }] });
   ok((d2.pages[0].items[2] as DiagramEdge).from.port?.[0] === 0.1235, 'a fixed point is kept to four places');
+  // Links and pictures: nothing that runs.
+  const risky = normalizeDiagram({ items: [shape('l', 0, 0, 10, 10, { link: 'javascript:alert(1)', src: 'javascript:alert(1)' }), shape('m', 0, 0, 10, 10, { link: 'https://example.com', src: 'naget-asset:abc' })] }).pages[0].items as DiagramShape[];
+  ok(!risky[0].link && !risky[0].src && risky[1].link === 'https://example.com' && risky[1].src === 'naget-asset:abc', 'a link or a picture that would run is left out');
   // Text a line an item, read back as it was.
   const text = diagramText(d);
   ok(text.split('\n').length === 2 + d.pages.length * 2 + p.items.length && JSON.stringify(normalizeDiagram(JSON.parse(text))) === JSON.stringify(d), 'kept as a line an item, read back the same');
