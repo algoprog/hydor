@@ -107,8 +107,8 @@ export const SHOTS = [
   },
   sessionShot('sessions', 'checkout'),
   sessionShot('ask-agents', 'settings', { unfold: ['Read 2'] }),
-  sessionShot('web', 'ebike', { height: 1000, unfold: ['Worked for', 'Searched 3'] }),
-  sessionShot('documents-voice', 'report', { unfold: ['Worked for', 'Ran 1 command'] }),
+  sessionShot('web', 'ebike', { height: 1000, unfold: ['Worked for', 'Look for recent reviews'] }),
+  sessionShot('documents-voice', 'report', { unfold: ['Worked for', 'Read the report first'] }),
   {
     id: 'projects',
     async take(p, ctx) {

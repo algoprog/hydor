@@ -860,10 +860,14 @@ one that does not is undone, and the sessions keep running the version before. S
 programs shows each program's version and what is out, with Check now, Update now and Update automatically.
 
 ## Following along
-- A readable timeline: the agent's messages read like a chat, and its commands fold into small boxes with
-  plain-words names ("Run the tests", "Read index.ts"), each a click away from its full output. A reply long enough
-  to fill the screen stops at its first line as it grows, so you read it from its beginning; a short one sits
-  under what came before, with no empty space below it.
+- A readable timeline: the agent's messages read like a chat, and its work shows as an outline: each note it writes
+  between steps starts a part, one line in a few words with a check, how many steps it took and the lines it changed,
+  its steps folded under it with plain-words names ("Run the tests", "Read index.ts"), each a click away from its full
+  output. The part under way shows the agent's note in full and the step being taken now, so a long turn takes a few
+  lines rather than the screen; its latest parts show, the rest a click away. A reply long enough to fill the screen
+  stops at its first line as it grows, so you read it from its beginning; a short one sits under what came before,
+  with no empty space below it. A page still being written shows the app's mark and "Writing the page…" until it has
+  something to show.
 - Replies made to read: every agent knows the app shows them as rich text, with Markdown (headings, lists, tables,
   code), maths in LaTeX drawn as in a textbook (KaTeX, chemistry included; numbers such as `$1$` and `$0$` render as
   maths, while ordinary dollar prices stay money), Mermaid diagrams (flowcharts, sequences,

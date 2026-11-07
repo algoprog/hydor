@@ -3,6 +3,20 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.41.0 · 7 November 2026
+
+The agent's work reads as a short outline while it works, and a page being written shows that it is on its way.
+
+- **The work as an outline**: each note the agent writes between its steps starts a part, one line in a few words
+  with a check, how many steps it took and the lines it changed; click it for the whole note and every step. The part
+  under way shows the agent's note and the step being taken now, so a long turn takes a few lines instead of the whole
+  screen. A long turn shows its latest parts; **Show 12 earlier parts** shows the rest.
+- **Notes stay small**: while the agent works, a short note it writes after its last step shows in the outline in
+  quieter type, not as a reply; it becomes the reply only if the turn ends there.
+- **A page on its way**: while an agent writes a page and nothing of it can be drawn yet (its styles often come
+  first), the panel beside the conversation, the page's card and figures in replies show the app's mark and "Writing
+  the page…" instead of an empty frame.
+
 ## 0.40.2 · 7 November 2026
 
 An app's answer in a conversation reads from its top, and apps' answers look as they should: trailers, game covers,

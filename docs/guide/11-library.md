@@ -30,7 +30,7 @@ If you share the session with a read-only link, the person sees its pages too, b
 
 ## Watch a page as it is written
 
-While an agent writes a page, you see it grow: headings, then the text, the tables and the cards, as they come. On a wide screen (1,100 pixels or more) it opens by itself in a panel beside the conversation, for the session on screen. The panel's top line says **Writing** with how much has come so far; the code button beside it shows the page's HTML coming in instead, and the eye button goes back to the page. In a narrower window, or on a phone, the page grows in its card in the conversation. Its scripts wait until the page is complete, then it runs.
+While an agent writes a page, you see it grow: headings, then the text, the tables and the cards, as they come. Until it has something to show (a page's styles often come first), the app's mark and "Writing the page…" stand in its place. On a wide screen (1,100 pixels or more) it opens by itself in a panel beside the conversation, for the session on screen. The panel's top line says **Writing** with how much has come so far; the code button beside it shows the page's HTML coming in instead, and the eye button goes back to the page. In a narrower window, or on a phone, the page grows in its card in the conversation. Its scripts wait until the page is complete, then it runs.
 
 The panel also opens for an HTML file an agent writes whole (a static site's `index.html`, say), with its pictures and styles from the file's folder.
 

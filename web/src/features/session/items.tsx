@@ -1013,18 +1013,27 @@ function EditFromHere({ item, initial, onDone }: { item: Extract<TimelineItem, {
 }
 
 /**
- * A reply; `note` for the agent's in-between notes inside a turn's work (they read the same: they are what people read).
+ * A reply; `note` for the agent's in-between notes inside a turn's work. `quiet`: a note in the work's outline
+ * (Timeline.tsx), in smaller, quieter type than the reply, and never a text the view holds as it grows.
  * The sources it cites show as chips in its text and as one line under it, not as a list at its end.
  */
-export const AssistantBlock = memo(function AssistantBlock({ item, note }: { item: Extract<TimelineItem, { kind: 'assistant' }>; note?: boolean }) {
+export const AssistantBlock = memo(function AssistantBlock({ item, note, quiet }: { item: Extract<TimelineItem, { kind: 'assistant' }>; note?: boolean; quiet?: boolean }) {
   const { text, revealing } = useSmoothText(item.text, !!item.streaming);
   const { fork, sessionKey, cwd } = useContext(SessionCtx);
   // A confidential session's replies are read aloud only with a voice on this device.
   const confidential = useSessions((x) => (sessionKey ? x.byKey[sessionKey]?.extra?.confidential === true : false));
   return (
-    <div data-seq={item.seq} data-text={item.id} data-quote className="tl-item group relative">
-      <ReplyMarkdown text={text} streaming={revealing} breaks sessionKey={sessionKey} cwd={cwd} offline={confidential} className={cx(!note && item.phase === 'commentary' && '!text-fg-2')} />
-      {!item.streaming && (
+    <div data-seq={item.seq} data-text={quiet ? undefined : item.id} data-quote className="tl-item group relative">
+      <ReplyMarkdown
+        text={text}
+        streaming={revealing}
+        breaks
+        sessionKey={sessionKey}
+        cwd={cwd}
+        offline={confidential}
+        className={cx(quiet ? '!text-[13.5px] !leading-[1.55] !text-fg-2' : !note && item.phase === 'commentary' && '!text-fg-2')}
+      />
+      {!item.streaming && !quiet && (
         <div className="absolute -top-1 -right-1 flex opacity-0 transition-opacity group-hover:opacity-100">
           {fork && item.entry && !note && (
             <button

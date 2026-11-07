@@ -21,7 +21,7 @@ import { api, del, enc, patch, post } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
 import { go } from '../../lib/nav';
 import { tr } from '../../i18n/runtime';
-import { cx } from '../../components/ui';
+import { cx, Throbber } from '../../components/ui';
 import { openVideo } from '../../components/Lightbox';
 
 // ---- how tall a page stands in the conversation ---------------------------------------------------------
@@ -634,9 +634,36 @@ export function withBase(html: string, base?: string): string {
  * A page still being written: drawn as far as it goes, its scripts held back, growing in place (what is
  * there stays) and following its end, at most a few times a second.
  */
-export function StreamFrame({ html, base, title = 'Page', onHeight, className }: { html: string; base?: string; title?: string; onHeight?: (h: number) => void; className?: string }) {
+/** A page being written, before any of it can be drawn (its head is still coming): the app's mark at work, in the frame's place. */
+function PageComing({ label }: { label: string }) {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white text-[13px] text-fg-3 dark:bg-[#151412]">
+      <Throbber size={26} />
+      <span>{tr(label)}</span>
+    </div>
+  );
+}
+
+export function StreamFrame({
+  html,
+  base,
+  title = 'Page',
+  onHeight,
+  className,
+  label = 'Writing the page…',
+}: {
+  html: string;
+  base?: string;
+  title?: string;
+  onHeight?: (h: number) => void;
+  className?: string;
+  /** What shows until the page has something to show. */
+  label?: string;
+}) {
   const ref = useRef<HTMLIFrameElement>(null);
   const offline = useContext(OfflineFrames);
+  // Anything of the page drawn yet: until then, its mark at work (in a parent that places it, `relative`).
+  const [drawn, setDrawn] = useState(false);
   const st = useRef({ ready: false, sent: '', n: '', html, base, onHeight, timer: 0 });
   st.current.html = html;
   st.current.base = base;
@@ -665,6 +692,8 @@ export function StreamFrame({ html, base, title = 'Page', onHeight, className }:
       } else if (e.data.type === 'wa-html-size' && e.data.n === s.n && typeof e.data.h === 'number' && Number.isFinite(e.data.h)) {
         s.onHeight?.(Math.min(Math.max(e.data.h, 0), 100_000));
         if (e.data.bg) paintBg(ref.current, e.data.bg);
+        // A frame of an older server says nothing of it: drawn, then.
+        if (e.data.drawn !== false) setDrawn(true);
       }
     };
     window.addEventListener('message', onMessage);
@@ -682,7 +711,12 @@ export function StreamFrame({ html, base, title = 'Page', onHeight, className }:
       push();
     }, 160);
   }, [html]);
-  return <iframe ref={ref} src={frameSrc(offline)} title={title} sandbox={offline ? OFFLINE_SANDBOX : SANDBOX} className={cx(FRAME_CLS, className)} />;
+  return (
+    <>
+      <iframe ref={ref} src={frameSrc(offline)} title={title} sandbox={offline ? OFFLINE_SANDBOX : SANDBOX} className={cx(FRAME_CLS, className)} />
+      {!drawn && <PageComing label={label} />}
+    </>
+  );
 }
 
 /** What the visual editor says of the part picked (editor.ts `info`). */
