@@ -106,7 +106,7 @@ Each token shows when it was made and last used. **Revoke** (after a question) c
 
 ## Share a session with a read-only link
 
-A read-only link lets someone without your password follow one session as it happens. Open the session's menu (⋯) → **Share a read-only link**. To share a whole project with someone instead (its documents, sessions, runs and reading list, with comments under their name), see [Share a project with people](/guide/projects#share-a-project-with-people).
+A read-only link lets someone without your password follow one session as it happens. Open the session's menu (⋯) → **Share a read-only link**. To share a whole project with someone instead (its documents, sessions, runs and reading list, with comments under their name), see [Share a project with people](/guide/projects#share-a-project-with-people); to share one thing of the Library (a document, a page, a picture, a video…) to comment on or edit, see [Share with people](/guide/library#share-with-people).
 
 1. Under **Works for**, choose **A day**, **A week**, **A month** or **Until turned off**.
 2. Click **Make a link**.

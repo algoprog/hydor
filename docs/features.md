@@ -142,6 +142,19 @@ agents that speak ACP and take MCP servers.
   read-only, its experiments' runs and its reading list; they comment under their name (you get a notice and an Inbox
   line), and edit documents if you let them. Never your agents, files, settings or other projects; confidential
   sessions never show; wrong links count as wrong passwords.
+- **Share one thing with people** (a page's Share → Share with people; Share on a picture's, video's or sound's page;
+  Share with people in a card's ⋯): a document, slides, a spreadsheet, a LaTeX document, a notebook, a page, a design,
+  a picture, a video or a sound, with each person by a link of their own (View and comment, or Edit; for a week, a
+  month, or until you stop it), shown once, as a copy or a QR code. It opens that thing alone, without your password:
+  they comment under their name on words, a slide, a spreadsheet's cell, a spot of a picture (a numbered pin) or a
+  moment of a video or a sound (a mark on its timeline), and with Edit change it in the Library's own editors (a page's
+  words, pictures and layout, never its code; pictures, videos and sounds in their editors without AI tools or anything
+  of yours to add, a video made on the processor), the one before kept as a version. You get a notice and an Inbox line
+  for each comment until it is answered; agents read and answer them; cards show who it is shared with; a deleted
+  thing's links stop. Shared projects' people comment on slides, spreadsheets and pages too, and edit pages and designs.
+- **Comments and earlier versions for pictures, videos and sounds**: comments on a spot of a picture or a moment of a
+  video or a sound, on its page (and through the API for agents); each picture, video or sound keeps the last five it
+  was when saved over (in an editor, by an agent or through a link), to look at, download or bring back.
 - **Folders in the Library**: each project's things in folders (and folders in folders), shown first as tiles, with the
   way back over them; More → Move to a folder, or drag a card onto one; a folder moved to another project takes what
   it holds; deleting one deletes nothing in it. **New → Import a folder** brings a folder of this computer in: a LaTeX

@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { BLEND_MODES, type BlendMode } from '@shared/blend';
 import { histogramOf, MARK_FONTS, type Mark } from '@shared/mediaedit';
 import { ArrowDown, Copy, Eye, EyeOff, ImagePlus, Layers2, Lock, LockOpen, Merge, Plus, SlidersHorizontal, Trash2, Type, Shapes, Droplets, Grid3x3, Smile, History as HistoryIcon, Check as CheckIcon } from 'lucide-react';
+import { viaLink } from '../../../lib/machine';
 import { cx, IconButton, MenuItem, Popover } from '../../../components/ui';
 import { Check, ColorButton, ColorPicker, FieldRow, MiniSelect, ScrubNumber, Seg, SliderRow } from '../shell';
 import { layerThumb, renderDoc } from './compose';
@@ -155,9 +156,12 @@ export function LayersPanel({ ed, onAddPicture }: { ed: PictureEd; onAddPicture:
           <MenuItem icon={<ImagePlus size={14} />} onClick={() => (setAddOpen(false), onAddPicture('device'))}>
             From this device
           </MenuItem>
-          <MenuItem icon={<Layers2 size={14} />} onClick={() => (setAddOpen(false), onAddPicture('library'))}>
-            From the Library
-          </MenuItem>
+          {/* At someone's link: only what they bring themselves. */}
+          {!viaLink && (
+            <MenuItem icon={<Layers2 size={14} />} onClick={() => (setAddOpen(false), onAddPicture('library'))}>
+              From the Library
+            </MenuItem>
+          )}
           <MenuItem icon={<Copy size={14} />} onClick={() => (setAddOpen(false), onAddPicture('clipboard'))}>
             From the clipboard
           </MenuItem>

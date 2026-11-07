@@ -4,6 +4,7 @@
 // double-click it to put it at the end of the clips (a sound: at the playhead, as music).
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUp, AudioLines, ChevronRight, Film, Folder, FolderOpen, HardDrive, Image as ImageIcon, Mic, Plus, Square } from 'lucide-react';
+import { viaLink } from '../../../lib/machine';
 import { videoClock, type VideoSize } from '@shared/mediaedit-video';
 import type { MediaItem } from '@shared/media';
 import { Button, cx, Dialog, inputCls, Throbber } from '../../../components/ui';
@@ -81,8 +82,13 @@ export function MediaPanel({ pool, onAdd, onUse, onRecorded }: { pool: PoolItem[
             width={220}
             items={[
               { label: 'From this device…', onClick: () => file.current?.click() },
-              { label: 'From the Library…', onClick: () => setDialog('library') },
-              { label: 'From Files…', onClick: () => setDialog('files') },
+              // At someone's link: only what they bring from their own device.
+              ...(viaLink
+                ? []
+                : [
+                    { label: 'From the Library…', onClick: () => setDialog('library') },
+                    { label: 'From Files…', onClick: () => setDialog('files') },
+                  ]),
             ]}
             onPick={(it) => {
               setMenu(null);

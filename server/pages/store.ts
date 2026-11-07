@@ -8,6 +8,7 @@
 import crypto from 'node:crypto';
 import { cleanDescription, STORAGE_LIMITS, VERSION_LIMITS, VERSION_NAME_MAX, type PageDataEntry, type PageInfo, type PageVersion } from '../../shared/pages.ts';
 import { applyCommentOps, cleanPageComments, type PageComment } from '../../shared/page-comments.ts';
+import type { CommentOpsResult, Writer } from '../../shared/comments.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { signWithKey } from '../links.ts';
@@ -486,8 +487,8 @@ export function pageComments(db: DB, id: string): PageComment[] {
   }
 }
 
-/** Changes a page's comments (as `by` makes them): the list after them, what could not be done, and the new ones' ids. */
-export function changeComments(db: DB, id: string, ops: unknown, by: 'user' | 'agent'): { list: PageComment[]; notes: string[]; added: string[] } {
+/** Changes a page's comments (as `by` makes them: you, an agent, or someone it is shared with): the list after them, what could not be done, the new ones' ids and the replies made. */
+export function changeComments(db: DB, id: string, ops: unknown, by: Writer): CommentOpsResult<PageComment> {
   const p = mustPage(db, id);
   if (p.kind) throw new HttpError(400, `This page is a ${mustKind(p.kind).noun}: its comments are in it.`);
   return db.transaction(() => {

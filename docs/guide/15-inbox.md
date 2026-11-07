@@ -24,7 +24,7 @@ Everything an agent is waiting on you for, from every session on this machine, i
 - **A skill an agent suggests**: "Suggests a new skill: …" or "Suggests a change to the … skill", with its reason.
 - **A session waiting for you elsewhere**: "Waiting for you in VS Code" (or in a terminal), for sessions running outside the app.
 - **An app's question**: a run of one of your apps waiting at an **Ask a person** step.
-- **A comment from someone a project is shared with**: "Maria commented on “Thesis, chapter 3”", with what they wrote, until you or an agent reply or it is resolved. **Open** opens the document.
+- **A comment from someone you shared a project or a thing with**: "Maria commented on “Thesis, chapter 3”", with what they wrote, until you or an agent reply or it is resolved. **Open** opens the document, the picture, the video or the sound.
 
 Each item shows which session it waits in (with the agent's icon) and how long it has waited.
 

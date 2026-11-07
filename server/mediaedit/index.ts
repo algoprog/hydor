@@ -22,12 +22,13 @@ import { dimensions } from '../images/openrouter.ts';
 import { still } from '../media/frames.ts';
 import { keepFile } from '../media/index.ts';
 import { filesOf, getMedia, MEDIA_DIR, mustMedia } from '../media/store.ts';
+import { keepEarlierVersion } from '../media/versions.ts';
 import { putInFolder } from '../pages/folders.ts';
 import { MAX_ASSET, putAsset } from '../pages/assets.ts';
 import { convert, decode, EditError, encode, extOf, formatOfData, MIMES, PLACES, render, type Place, type Words } from './image.ts';
 
 /** The largest picture the editor saves. */
-const MAX_PICTURE = 60 * 1024 * 1024;
+export const MAX_PICTURE = 60 * 1024 * 1024;
 const LABEL: Record<ImageFormat, string> = { png: 'PNG', jpeg: 'JPEG', webp: 'WebP' };
 
 const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() && Number.isFinite(Number(v)) ? Number(v) : undefined);
@@ -59,8 +60,11 @@ function pictureOf(v: unknown): Buffer {
   return b;
 }
 
-/** A Library picture's file written over: its place in the Library, its title and description and folder kept; its still made again. */
-async function replaceInLibrary(d: Deps, id: string, data: Buffer, fmt: ImageFormat): Promise<MediaItem> {
+/**
+ * A Library picture's file written over: its place in the Library, its title and description and folder kept; its still
+ * made again. The file it had is kept as an earlier version (media/versions.ts). `who`: someone it is shared with saved it.
+ */
+export async function replaceInLibrary(d: Deps, id: string, data: Buffer, fmt: ImageFormat, who?: string): Promise<MediaItem> {
   const m = mustMedia(d.db, id);
   if (m.kind !== 'image') throw new HttpError(400, 'Only a picture in the Library can be written over with a picture');
   const name = `${m.id}.${extOf(fmt)}`;
@@ -68,11 +72,17 @@ async function replaceInLibrary(d: Deps, id: string, data: Buffer, fmt: ImageFor
   const tmp = path.join(MEDIA_DIR, `.${name}.${crypto.randomBytes(4).toString('hex')}.tmp`);
   await fs.promises.mkdir(MEDIA_DIR, { recursive: true, mode: 0o700 });
   await fs.promises.writeFile(tmp, data, { mode: 0o600 });
+  try {
+    await keepEarlierVersion(d.db, m);
+  } catch (e) {
+    await fs.promises.rm(tmp, { force: true });
+    throw e;
+  }
   await fs.promises.rename(tmp, dest);
   if (path.resolve(m.file) !== path.resolve(dest)) await fs.promises.rm(m.file, { force: true });
   const dim = dimensions(data);
   const sha = crypto.createHash('sha256').update(data).digest('hex');
-  d.db.prepare('update media set file = ?, mime = ?, bytes = ?, width = ?, height = ?, sha = ?, updated_at = ? where id = ?').run(name, MIMES[fmt], data.length, dim?.w ?? null, dim?.h ?? null, sha, Date.now(), id);
+  d.db.prepare('update media set file = ?, mime = ?, bytes = ?, width = ?, height = ?, sha = ?, who = ?, updated_at = ? where id = ?').run(name, MIMES[fmt], data.length, dim?.w ?? null, dim?.h ?? null, sha, who ?? null, Date.now(), id);
   const f = filesOf({ id, file: dest });
   await fs.promises.rm(f.still, { force: true });
   if (data.length > 400 * 1024 || (dim?.w ?? 0) > 1200) await still(dest, f.still, { width: 720 });
@@ -105,8 +115,8 @@ async function copyToLibrary(d: Deps, data: Buffer, fmt: ImageFormat, from: Medi
   }
 }
 
-/** POST /api/mediaedit/image. */
-async function saveEdited(d: Deps, b: Record<string, unknown>): Promise<SaveImageAnswer & { item?: MediaItem }> {
+/** POST /api/mediaedit/image (and a link's, its `to` its own picture: `who` saved it). */
+export async function saveEdited(d: Deps, b: Record<string, unknown>, who?: string): Promise<SaveImageAnswer & { item?: MediaItem }> {
   let data = pictureOf(b.data);
   let fmt = formatOfData(data)!;
   let note: string | undefined;
@@ -156,7 +166,7 @@ async function saveEdited(d: Deps, b: Record<string, unknown>): Promise<SaveImag
   const id = typeof to.media === 'string' && to.media ? to.media : null;
   if (as === 'replace') {
     if (!id) throw new HttpError(400, 'to.media: the Library picture to write over');
-    const item = await replaceInLibrary(d, id, data, fmt);
+    const item = await replaceInLibrary(d, id, data, fmt, who);
     return { media: item.id, replaced: true, item, ...base };
   }
   const from = id ? mustMedia(d.db, id) : null;

@@ -148,11 +148,35 @@ export interface MediaItem {
   updatedAt: number;
   /** Where the Library keeps its copy: a picture an agent can work from (generate_image's images). */
   file: string;
+  /** Someone it is shared with saved this version of it, through their link: their name. */
+  who?: string;
+  /** How many earlier versions of it are kept (it was saved over): GET /api/media/:id/versions. */
+  versions?: number;
 }
 
+/** An earlier version of a picture, video or sound, kept when it was saved over (the last five, at most 2 GB an item). */
+export interface MediaVersion {
+  version: number;
+  mime: string;
+  bytes: number;
+  width?: number;
+  height?: number;
+  duration?: number;
+  /** Someone it is shared with made this version, through their link: their name. */
+  who?: string;
+  /** When it was saved over (when this version stopped being the one shown). */
+  at: number;
+}
+
+/** Earlier versions kept of each item, and how many bytes of them at most. */
+export const MEDIA_VERSION_LIMITS = { count: 5, bytes: 2 * 1024 * 1024 * 1024 };
+
 /** What news of the Library's media the pages hear ({ t: 'feature', id: 'media' }). */
-/** One item kept or changed, one removed, or (`reload`) many changed at once: a folder deleted or moved, their places with it. */
-export type MediaEvent = { what: 'media'; item?: MediaItem; removed?: string; reload?: true };
+/**
+ * One item kept or changed, one removed, or (`reload`) many changed at once: a folder deleted or moved, their places
+ * with it. `comments`: an item's comments changed (its id).
+ */
+export type MediaEvent = { what: 'media'; item?: MediaItem; removed?: string; reload?: true } | { what: 'comments'; id: string };
 
 /**
  * Where the model that writes titles and descriptions is: the app's choice, a vision model in OpenRouter's

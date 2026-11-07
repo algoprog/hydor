@@ -84,6 +84,9 @@ const RULES: Rule[] = [
   ['W', /^\/api\/sessions\/[^/]+\/(message|handoff|fork|rewind|guest-links|pr|worktree|start|compact|goal)/, 'always'],
   ['W', /^\/api\/(preview\/link|pages\/[^/]+\/link)$/, 'always', 'Anyone with the link can open it.'],
   ['W', /^\/api\/projects\/[^/]+\/shares(\/|$)/, 'always', 'Whoever has a project’s link sees its documents, sessions, runs and reading list, and may comment on (or change) its documents.'],
+  ['W', /^\/api\/(pages|media)\/[^/]+\/shares(\/|$)/, 'always', 'Whoever has the link opens it, comments on it, and with Edit changes it.'],
+  // Bringing an earlier version of a picture, video or sound back: the one shown now is kept, but it shows at once.
+  ['POST', /^\/api\/media\/[^/]+\/versions\/[^/]+\/restore$/, 'always'],
   ['W', /^\/api\/(tasks|apps\/[^/]+\/(runs|batches)|apps\/runs\/[^/]+\/ask|apps\/[^/]+\/run|automations\/(test-run|runs\/[^/]+\/rerun)|opinion\/[^/]+|arena\/[^/]+\/winner)(\/|$)/, 'always', 'This starts agent work that may cost.'],
   ['POST', /^\/api\/experiments\/(jobs|sweeps|runs\/[^/]+\/again)$/, 'always', 'This starts jobs on this computer (its GPUs), another machine or a cluster. Agents in sessions use experiment_run and experiment_sweep.'],
   ['POST', /^\/api\/experiments\/(tables\/preview|clusters\/check)$/, 'free'],

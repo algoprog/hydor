@@ -1,6 +1,6 @@
 {
   "name": "hydor",
-  "version": "0.34.0",
+  "version": "0.35.0",
   "private": true,
   "description": "Self-hosted agent harness for Claude Code, Codex, other coding agents and any model, open-weight ones included: run them on your own machine, follow their work live, approve what they ask and pick up on your phone.",
   "keywords": [
@@ -58,6 +58,7 @@
     "better-sqlite3": "13.0.3",
     "fastify": "5.12.5",
     "node-pty": "1.1.0",
+    "parse5": "7.3.0",
     "ws": "8.22.0",
     "zeromq": "6.8.0"
   },

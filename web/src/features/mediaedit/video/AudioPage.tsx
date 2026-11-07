@@ -4,6 +4,7 @@
 // sound…" for the picked clip or sound, which opens the separate sound editor (soundHook.ts) when it is there.
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { AudioWaveform, Music, Sparkles, Volume2 } from 'lucide-react';
+import { viaLink } from '../../../lib/machine';
 import type { VideoFactsOf, VideoRecipe } from '@shared/mediaedit-video';
 import { Button, cx } from '../../../components/ui';
 import { toDb, type Engine, type TrackLevels } from './engine';
@@ -217,9 +218,11 @@ function Fixes(p: AudioProps) {
         <div className="flex items-center gap-1.5 text-[12px] font-semibold text-fg-2">
           <Volume2 size={13} /> The sound picked
         </div>
-        <Button size="sm" variant="secondary" icon={<AudioWaveform size={13} />} className="w-full" disabled={!target || !editSound} title={editSound ? 'Opens it in the sound editor; what you save there plays in its place' : 'The sound editor opens here'} onClick={() => target && p.onEditSound(target)}>
-          Edit the sound…
-        </Button>
+        {!viaLink && (
+          <Button size="sm" variant="secondary" icon={<AudioWaveform size={13} />} className="w-full" disabled={!target || !editSound} title={editSound ? 'Opens it in the sound editor; what you save there plays in its place' : 'The sound editor opens here'} onClick={() => target && p.onEditSound(target)}>
+            Edit the sound…
+          </Button>
+        )}
         <p className="text-[11px] leading-snug text-fg-3">{target ? <span translate="no">{target.title}</span> : 'Pick a clip or a sound on the timeline.'}</p>
       </div>
     </div>

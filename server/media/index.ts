@@ -30,6 +30,9 @@ import { addMedia, deleteMedia, editMedia, filesOf, initMedia, keptWithBytes, li
 import { sessionSpace, spaceChoice } from '../spaces/choice.ts';
 import { fileHash } from '../filemove.ts';
 import { putInFolder } from '../pages/folders.ts';
+import { isInternal } from '../internal.ts';
+import { changeMediaComments, mediaComments } from './comments.ts';
+import { listMediaVersions, mediaVersionFile, restoreMediaVersion } from './versions.ts';
 
 const TYPES: Record<string, { kind: MediaKind; mime: string }> = {
   png: { kind: 'image', mime: 'image/png' },
@@ -180,7 +183,8 @@ export async function keepFile(
 
 // ---- files -----------------------------------------------------------------------------------------------------
 
-async function send(req: FastifyRequest, reply: FastifyReply, file: string, mime: string, download?: string) {
+/** A file of the Library's media, in parts for a video or sound player (Range), or to save (`download`: its name). */
+export async function send(req: FastifyRequest, reply: FastifyReply, file: string, mime: string, download?: string) {
   const st = await fs.promises.stat(file).catch(() => null);
   if (!st?.isFile()) throw new HttpError(404, 'Not found');
   reply.header('Content-Type', download ? 'application/octet-stream' : mime);
@@ -267,6 +271,34 @@ export const media: Feature = {
       const f = filesOf(m);
       if (!fs.existsSync(f.frames) && !(await frameGrid(f.file, f.frames, { duration: m.duration, width: m.width, height: m.height }))) throw new HttpError(404, 'The frames could not be taken (is ffmpeg on this computer?)');
       return send(req, reply, f.frames, 'image/jpeg');
+    });
+    // Its comments (comments.ts): on a spot of a picture, at a moment of a video or a sound, or on the whole of it.
+    app.get('/api/media/:id/comments', async (req) => {
+      const m = mustMedia(db, (req.params as { id: string }).id);
+      return { comments: mediaComments(db, m.id) };
+    });
+    app.post('/api/media/:id/comments', async (req) => {
+      const id = (req.params as { id: string }).id;
+      // An agent's call (app_api) writes as an agent; the app's own page as you.
+      const r = changeMediaComments(db, id, ((req.body ?? {}) as { ops?: unknown }).ops, isInternal(req) ? 'agent' : 'user');
+      tell(d, { what: 'comments', id });
+      return { comments: r.list, added: r.added, notes: r.notes };
+    });
+    // Its earlier versions (versions.ts): kept when it is saved over.
+    app.get('/api/media/:id/versions', async (req) => {
+      const m = mustMedia(db, (req.params as { id: string }).id);
+      return { versions: listMediaVersions(db, m.id) };
+    });
+    app.get('/api/media/:id/versions/:v/file', async (req, reply) => {
+      const p = req.params as { id: string; v: string };
+      const m = mustMedia(db, p.id);
+      const f = mediaVersionFile(db, m.id, Number(p.v));
+      const download = (req.query as { download?: string }).download === '1' ? `${slug(m.title) || m.kind} (version ${Number(p.v)})${path.extname(f.file)}` : undefined;
+      return send(req, reply, f.file, f.mime, download);
+    });
+    app.post('/api/media/:id/versions/:v/restore', async (req) => {
+      const p = req.params as { id: string; v: string };
+      return { item: await restoreMediaVersion(d, mustMedia(db, p.id).id, Number(p.v)) };
     });
   },
 };

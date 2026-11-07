@@ -42,6 +42,7 @@ import {
   ZoomIn,
 } from 'lucide-react';
 import { CROP_SHAPES, MARK_FONTS, type CropShape, type FontId } from '@shared/mediaedit';
+import { viaLink } from '../../../lib/machine';
 import { Button, IconButton, Popover } from '../../../components/ui';
 import { Check, ColorButton, MiniSelect, OptionsBar, OptionsLabel, OptionsSep, ScrubNumber, Seg, type RailGroup } from '../shell';
 import type { PictureEd, ToolId } from './editor';
@@ -263,9 +264,11 @@ export function ToolOptions({ ed, mobile }: { ed: PictureEd; mobile?: boolean })
                 <Check on={o.sampleAll} onChange={(v) => set({ sampleAll: v })}>
                   All layers
                 </Check>
-                <Button size="sm" variant="secondary" className="h-7" onClick={() => ed.askAi('subject')}>
-                  Select the subject
-                </Button>
+                {!viaLink && (
+                  <Button size="sm" variant="secondary" className="h-7" onClick={() => ed.askAi('subject')}>
+                    Select the subject
+                  </Button>
+                )}
               </>
             ) : (
               <ScrubNumber label="Feather" value={o.feather} min={0} max={250} unit="px" width={58} onChange={(v) => set({ feather: v })} />
