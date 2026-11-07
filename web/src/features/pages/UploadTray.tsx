@@ -4,7 +4,7 @@
 // In the desktop app it also says a file was moved, and where its original went. Files' own uploads sit under it.
 // Also the line a drag of files shows over where they would go (DropHint).
 import type { DragEvent, ReactNode } from 'react';
-import { AudioLines, File as FileIcon, FileText, FolderInput, ImageIcon, NotebookText, Play, Presentation, Sheet, Sigma, Upload, X } from 'lucide-react';
+import { AudioLines, File as FileIcon, FileText, FolderInput, ImageIcon, NotebookText, Play, Presentation, Sheet, Sigma, Upload, Workflow, X } from 'lucide-react';
 import type { MoveRefused } from '@shared/library-files';
 import { bytes, dirname } from '../../lib/format';
 import { go } from '../../lib/nav';
@@ -21,6 +21,7 @@ const ICONS: Record<string, ReactNode> = {
   slides: <Presentation size={15} />,
   tex: <Sigma size={15} />,
   notebook: <NotebookText size={15} />,
+  diagram: <Workflow size={15} />,
   image: <ImageIcon size={15} />,
   video: <Play size={15} />,
   audio: <AudioLines size={15} />,
@@ -28,7 +29,7 @@ const ICONS: Record<string, ReactNode> = {
 };
 
 /** What it is, as the Library's cards name their kinds. */
-const KIND: Record<string, string> = { page: 'Page', doc: 'Document', sheet: 'Spreadsheet', slides: 'Slides', tex: 'LaTeX', notebook: 'Notebook', image: 'Picture', video: 'Video', audio: 'Audio' };
+const KIND: Record<string, string> = { page: 'Page', doc: 'Document', sheet: 'Spreadsheet', slides: 'Slides', tex: 'LaTeX', notebook: 'Notebook', diagram: 'Diagram', image: 'Picture', video: 'Video', audio: 'Audio' };
 
 /** While the server makes it what it is. */
 const MAKING: Record<string, string> = {
@@ -37,6 +38,7 @@ const MAKING: Record<string, string> = {
   slides: 'Making slides of it',
   tex: 'Making a LaTeX document of it',
   notebook: 'Making a notebook of it',
+  diagram: 'Making a diagram of it',
   image: 'Keeping it in the Library',
   video: 'Keeping it in the Library',
   audio: 'Keeping it in the Library',

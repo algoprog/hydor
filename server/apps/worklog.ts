@@ -67,7 +67,7 @@ export const workLogSources: { runs: (db: DB) => RunRecord[] } = { runs: (db) =>
 
 const AGENTS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
 const CLIENTS: Record<string, string> = { 'claude-vscode': 'VS Code', vscode: 'VS Code', 'claude-desktop': 'Claude desktop', cli: 'terminal', exec: 'terminal', 'sdk-cli': 'another app', 'sdk-ts': 'another app', 'sdk-py': 'another app' };
-const KINDS: Record<string, string> = { doc: 'document', sheet: 'spreadsheet', slides: 'slides', tex: 'LaTeX document', notebook: 'notebook' };
+const KINDS: Record<string, string> = { doc: 'document', sheet: 'spreadsheet', slides: 'slides', tex: 'LaTeX document', notebook: 'notebook', diagram: 'diagram' };
 const MEDIA: Record<string, string> = { image: 'picture', video: 'video', audio: 'sound' };
 
 /** A day and the next as the instants they start, in a time zone. */

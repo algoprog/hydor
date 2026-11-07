@@ -16,6 +16,7 @@ const LOADS: Partial<Record<Kind, Load>> = {
   sheet: () => import('./sheets/SheetEditor').then((m) => ({ default: m.SheetEditor })),
   tex: () => import('./latex/LatexEditor').then((m) => ({ default: m.LatexEditor })),
   notebook: () => import('./notebook/NotebookEditor').then((m) => ({ default: m.NotebookEditor })),
+  diagram: () => import('./diagram/DiagramEditor').then((m) => ({ default: m.DiagramEditor })),
 };
 
 /** A spinner only when loading takes a moment (most times the editor is there before it would show). */

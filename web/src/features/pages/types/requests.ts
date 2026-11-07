@@ -2,7 +2,7 @@
 // which is the message they see; what the session is asked to make (`extra.make`), which its agent hears in full from
 // the pages capability; and the whole request as the agent would read it, for where a message must carry it all (the
 // message box of a conversation beside a page). start.ts starts the session for something new.
-import { composeAsk, turnAsk, type ComposeContext, type MakeExtra, type PageKindName } from '@shared/content-asks';
+import { composeAsk, turnAsk, type ComposeContext, type MakeExtra, type PageKindName, type TurnTo } from '@shared/content-asks';
 import type { ContentKind, ContentType } from '@shared/content-types';
 import { tr } from '../../../i18n/runtime';
 
@@ -52,6 +52,10 @@ function shortLine(kind: ContentKind, t: ContentType | null, words: string, c: C
                   ? t
                     ? tr(`Make a design: ${what}`)
                     : tr('Make a design')
+                  : kind === 'diagram'
+                    ? t
+                      ? tr(`Make a diagram: ${what}`)
+                      : tr('Make a diagram')
                   : t
                   ? tr(`Make a page: ${what}`)
                   : tr('Make a page');
@@ -70,9 +74,9 @@ export function madeRequest(t: ContentType | null, words: string, c: ComposeCont
 }
 
 /** Turn it into: "Turn “Bakery plan” into slides", and what the session makes from which page. */
-export function turnRequest(o: { from: PageKindName; to: 'slides' | 'doc' | 'page'; id: string; title: string; folder?: string }): MadeRequest {
+export function turnRequest(o: { from: PageKindName; to: TurnTo; id: string; title: string; folder?: string }): MadeRequest {
   const title = o.title.replace(/\s+/g, ' ').trim().slice(0, 80);
-  const prompt = o.to === 'slides' ? tr(`Turn “${title}” into slides`) : o.to === 'doc' ? tr(`Turn “${title}” into a document`) : tr(`Turn “${title}” into a page`);
+  const prompt = o.to === 'slides' ? tr(`Turn “${title}” into slides`) : o.to === 'doc' ? tr(`Turn “${title}” into a document`) : o.to === 'diagram' ? tr(`Turn “${title}” into a diagram`) : tr(`Turn “${title}” into a page`);
   const make: MakeExtra = { turn: { from: o.from, to: o.to, id: o.id, title: o.title }, ...(o.folder ? { folder: o.folder } : {}) };
   return { prompt, make, full: turnAsk(o) };
 }

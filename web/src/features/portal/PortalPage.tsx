@@ -8,7 +8,7 @@
 // page, a design, a picture, a video, a sound) opens that thing alone (PortalItem.tsx, PortalMedia.tsx). A link that
 // was stopped or ran out shows a plain page.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { AppWindow, BookOpen, ExternalLink, FileText, MessagesSquare, Monitor, Moon, NotebookText, Presentation, Sheet, Sigma, Sun } from 'lucide-react';
+import { AppWindow, BookOpen, ExternalLink, FileText, MessagesSquare, Monitor, Moon, NotebookText, Presentation, Sheet, Sigma, Sun, Workflow } from 'lucide-react';
 import { LANGS } from '@shared/i18n';
 import { initials, SHARE_ROLES, THING_ROLES, type PortalItem, type PortalPaper, type PortalRun, type PortalSession as SessionRow, type PortalView } from '@shared/share';
 import { spaceColor } from '@shared/spaces';
@@ -76,6 +76,7 @@ const KIND: Record<string, { label: string; icon: ReactNode }> = {
   sheet: { label: 'Spreadsheet', icon: <Sheet size={12} /> },
   tex: { label: 'LaTeX', icon: <Sigma size={12} /> },
   notebook: { label: 'Notebook', icon: <NotebookText size={12} /> },
+  diagram: { label: 'Diagram', icon: <Workflow size={12} /> },
 };
 export const kindOf = (it: Pick<PortalItem, 'kind'>) => KIND[it.kind ?? 'page'] ?? KIND.page;
 

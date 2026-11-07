@@ -98,7 +98,7 @@ const isPptx = (name: string) => /\.pptx$/i.test(name);
 /** The kinds of file the Library keeps, in words (PowerPoint's once the import takes it). */
 function keptKinds(): string {
   const slides = kindForFile('a.pptx') === 'slides' ? ' slides (PowerPoint),' : '';
-  return `The Library keeps documents (Word, Markdown, text, web pages), spreadsheets (Excel, OpenDocument, CSV),${slides} LaTeX, Jupyter notebooks, pictures, videos and sounds`;
+  return `The Library keeps documents (Word, Markdown, text, web pages), spreadsheets (Excel, OpenDocument, CSV),${slides} LaTeX, Jupyter notebooks, diagrams (draw.io, Mermaid), pictures, videos and sounds`;
 }
 
 const refused = (status: number, message: string, why: FileRefused) => new HttpError(status, message, { why });

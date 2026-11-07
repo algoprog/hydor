@@ -59,7 +59,7 @@ function joined(max: number, parts: (string | undefined)[]): string {
 }
 
 /** What each kind of the Library's pages is called in its text. */
-const PAGE_KIND: Record<string, string> = { slides: 'A slide deck', doc: 'A document', sheet: 'A spreadsheet', tex: 'A LaTeX document', notebook: 'A Jupyter notebook' };
+const PAGE_KIND: Record<string, string> = { slides: 'A slide deck', doc: 'A document', sheet: 'A spreadsheet', tex: 'A LaTeX document', notebook: 'A Jupyter notebook', diagram: 'A diagram' };
 
 /**
  * A page of the Library (of any kind) as the search box finds it by meaning, and the Library's own search

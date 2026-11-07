@@ -1187,6 +1187,7 @@ export function writing(E: Core): Writing {
     pagelink: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4"/><path d="M14 3v5h5V11"/><path d="M15 21l6-6"/><path d="M17 15h4v4"/>',
     doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h6"/>',
     slides: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4"/><path d="M8 20h8"/>',
+    diagram: '<rect x="3" y="3" width="8" height="8" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect x="13" y="13" width="8" height="8" rx="2"/>',
   };
   const svg = (k: string, size = 16) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k] ?? ''}</svg>`;
   const glyph = (t: string) => `<span class="gl">${t}</span>`;
@@ -1865,7 +1866,7 @@ export function writing(E: Core): Writing {
       .slice(0, 8)
       .map((x) => x.p);
   };
-  const KIND_ICON: Record<string, string> = { page: 'page', doc: 'doc', slides: 'slides', sheet: 'table', tex: 'math', notebook: 'code' };
+  const KIND_ICON: Record<string, string> = { page: 'page', doc: 'doc', slides: 'slides', sheet: 'table', tex: 'math', notebook: 'code', diagram: 'diagram' };
   const mentionQuery = (): string | null => {
     if (!mention) return null;
     const r = caretIn(mention.h);

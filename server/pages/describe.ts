@@ -18,7 +18,7 @@ import { describePage, pageInfo, pageSource } from './store.ts';
 const READ = 6000;
 
 const SYSTEM = [
-  `You write the description of something kept in a person's library (a page, a slide deck, a document, a spreadsheet, a LaTeX document or a notebook), so that they and their agents find it again by searching.`,
+  `You write the description of something kept in a person's library (a page, a slide deck, a document, a spreadsheet, a LaTeX document, a notebook or a diagram), so that they and their agents find it again by searching.`,
   `In at most ${DESCRIPTION_WORDS} words, and best in two or three sentences: what it is, what it holds or covers, and what it is for, with the names, topics, places and dates someone would search for.`,
   'Write in the language the item is written in. Answer with the description alone: no title, no quotes, no lead-in such as "This document".',
 ].join(' ');

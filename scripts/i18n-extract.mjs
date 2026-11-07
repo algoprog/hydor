@@ -158,7 +158,13 @@ function literals(js, shown = []) {
  */
 const QUIET = new Set(['prompt', 'command', 'also']);
 /** Keys quiet in one file only: the requests the kinds an agent makes ask for (`ask`), which elsewhere is a question shown. */
-const QUIET_IN = { 'shared/content-types.ts': ['ask'] };
+const QUIET_IN = {
+  'shared/content-types.ts': ['ask'],
+  // A diagram's own words (what its shapes say), drawn where nothing is translated: its templates', and the panel's
+  // shapes' sample words; their names and lines (label, blurb) are the app's.
+  'shared/diagram-templates.ts': ['text', 'rows', 'name', 'fromText', 'toText'],
+  'shared/diagram-palette.ts': ['text', 'rows'],
+};
 /** The quiet keys of the file being read. */
 let quietHere = QUIET;
 
@@ -296,7 +302,20 @@ const add = (s, where, jsx = false) => {
 
 // Files with no words the pages show: the code highlighter's keyword lists (its languages' names are the same in every
 // language), which read as words, and the requests the kinds an agent makes send it.
-const NO_WORDS = new Set(['shared/code-colours.ts', 'shared/content-asks.ts']);
+const NO_WORDS = new Set([
+  'shared/code-colours.ts',
+  'shared/content-asks.ts',
+  // A diagram's shapes, routes, layouts and drawing: their notes go to agents, the rest is code (the model's names of
+  // arrows, fonts and looks, in diagram.ts, are the app's words).
+  'shared/diagram-shapes.ts',
+  'shared/diagram-route.ts',
+  'shared/diagram-layout.ts',
+  'shared/diagram-render.ts',
+  'shared/diagram-spec.ts',
+  'shared/diagram-edits.ts',
+  'shared/diagram-ops.ts',
+  'shared/draft-diagram.ts',
+]);
 for (const f of [...files(path.join(ROOT, 'web/src'), /\.(tsx|ts)$/), ...files(path.join(ROOT, 'shared'), /\.ts$/)]) {
   if (f.includes(`${path.sep}i18n${path.sep}`) || NO_WORDS.has(path.relative(ROOT, f).split(path.sep).join('/'))) continue;
   const src = fs.readFileSync(f, 'utf8');

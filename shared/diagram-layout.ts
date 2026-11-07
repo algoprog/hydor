@@ -14,6 +14,8 @@ export interface LNode {
   parent?: string;
   /** Room a container keeps round what it holds: its title band at the top (or the left), and its sides. */
   pad?: { top: number; left: number; right: number; bottom: number };
+  /** A lane of a swimlane diagram: a row (its title on the left, the flow running across) or a column (title on top, flow down). */
+  lane?: 'row' | 'column';
 }
 export interface LEdge {
   from: string;
@@ -105,10 +107,11 @@ function layered(sizes: Box[], edges: [number, number][], gap: { cross: number; 
     out.set(u, [...(out.get(u) ?? []), i]);
     into.set(v, [...(into.get(v) ?? []), i]);
   });
-  // Cycles broken: a walk from the starts in the order given; an edge back to a node still being walked is turned round.
+  // Cycles broken: a walk from each node in the order given (the first is the start, as people list them); an edge back
+  // to a node still being walked is turned round, so a loop back to an earlier step is the edge that goes back.
   const reversed = new Set<number>();
   const state = new Array(n).fill(0);
-  const order = [...Array(n).keys()].sort((a, b) => ((into.get(a)?.length ?? 0) === 0 ? 0 : 1) - ((into.get(b)?.length ?? 0) === 0 ? 0 : 1) || a - b);
+  const order = [...Array(n).keys()];
   for (const s of order) {
     if (state[s]) continue;
     const stack: { v: number; k: number }[] = [{ v: s, k: 0 }];
@@ -610,8 +613,81 @@ function layLevel(
   return { cx: outX, cy: outY, bends, back, ports };
 }
 
+/**
+ * A swimlane diagram: lanes one under another (or side by side), the same length, and the flow laid out in layers across
+ * all of them at once, so a step comes after the steps before it whatever lane they are in; each node in its own lane, in
+ * the column (or row) of its layer, those of a lane in the same layer one beside the other.
+ */
+function laneLayout(nodes: LNode[], edges: LEdge[], lanes: LNode[], o: { spacing?: number }): LayoutOut | null {
+  const rows = lanes[0].lane === 'row';
+  const laneOf = new Map<string, string>();
+  for (const nd of nodes) if (nd.parent && lanes.some((l) => l.id === nd.parent)) laneOf.set(nd.id, nd.parent);
+  const leaves = nodes.filter((nd) => laneOf.has(nd.id));
+  // Something else in a lane (a container in a lane) or outside every lane: the usual layout does better.
+  if (leaves.some((nd) => nodes.some((m) => m.parent === nd.id)) || nodes.some((nd) => !nd.parent && !lanes.includes(nd))) return null;
+  const idx = new Map(leaves.map((nd, i) => [nd.id, i]));
+  const ledges: [number, number][] = [];
+  const labels: number[] = [];
+  edges.forEach((e) => {
+    const u = idx.get(e.from);
+    const v = idx.get(e.to);
+    if (u === undefined || v === undefined || u === v) return;
+    ledges.push([u, v]);
+    labels.push(e.label ? (rows ? e.label.w : e.label.h) : 0);
+  });
+  const gap = { cross: o.spacing ?? GAP.cross, along: (o.spacing ?? GAP.cross) * (GAP.along / GAP.cross) };
+  // As if down the page: along the flow is a row's x (a column's y).
+  const flowSizes = leaves.map((nd) => (rows ? { w: nd.h, h: nd.w } : { w: nd.w, h: nd.h }));
+  const r = layered(flowSizes, ledges, gap, labels);
+  const pos = new Map<string, { x: number; y: number; w: number; h: number }>();
+  const band = 34;
+  const pad = 26;
+  const crossGap = gap.cross * 0.6;
+  // Each lane: its nodes by layer, stacked across the lane in the order the layers' crossing sweeps left them.
+  const along = (i: number) => r.layerTop[r.rank[i]] + (r.layerH[r.rank[i]] - flowSizes[i].h) / 2;
+  const spanAlong = Math.max(0, ...leaves.map((_, i) => r.layerTop[r.rank[i]] + r.layerH[r.rank[i]]));
+  let at = 40;
+  for (const lane of lanes) {
+    const mine = leaves.map((nd, i) => ({ nd, i })).filter((x) => laneOf.get(x.nd.id) === lane.id);
+    const byRank = new Map<number, { nd: LNode; i: number }[]>();
+    for (const x of mine) byRank.set(r.rank[x.i], [...(byRank.get(r.rank[x.i]) ?? []), x]);
+    let depth = 0;
+    for (const list of byRank.values()) {
+      list.sort((a, b) => r.cx[a.i] - r.cx[b.i]);
+      depth = Math.max(depth, list.reduce((n, x) => n + flowSizes[x.i].w, 0) + crossGap * (list.length - 1));
+    }
+    const inner = Math.max(depth, rows ? lane.h - 2 * pad : lane.w - 2 * pad, 60);
+    for (const list of byRank.values()) {
+      const total = list.reduce((n, x) => n + flowSizes[x.i].w, 0) + crossGap * (list.length - 1);
+      let c = at + pad + (inner - total) / 2;
+      for (const x of list) {
+        const a = 40 + band + pad + along(x.i);
+        pos.set(x.nd.id, rows ? { x: Math.round(a), y: Math.round(c), w: x.nd.w, h: x.nd.h } : { x: Math.round(c), y: Math.round(a), w: x.nd.w, h: x.nd.h });
+        c += flowSizes[x.i].w + crossGap;
+      }
+    }
+    const length = band + 2 * pad + spanAlong;
+    const thick = inner + 2 * pad;
+    pos.set(lane.id, rows ? { x: 40, y: at, w: Math.max(lane.w, length), h: thick } : { x: at, y: 40, w: thick, h: Math.max(lane.h, length) });
+    at += thick;
+  }
+  // Every lane as long as the longest.
+  const longest = Math.max(...lanes.map((l) => (rows ? pos.get(l.id)!.w : pos.get(l.id)!.h)));
+  for (const l of lanes) {
+    const p = pos.get(l.id)!;
+    pos.set(l.id, rows ? { ...p, w: longest } : { ...p, h: longest });
+  }
+  return { pos, bends: new Map(), back: new Map(), ports: new Map() };
+}
+
 /** Lays out a page's nodes (containers' contents first, from the inside out). */
 export function layout(nodes: LNode[], edges: LEdge[], kind: LayoutKind, o: { spacing?: number } = {}): LayoutOut {
+  // Lanes at the top, all of one way, holding everything else: a swimlane diagram.
+  const lanes = nodes.filter((nd) => !nd.parent && nd.lane);
+  if (lanes.length && lanes.every((l) => l.lane === lanes[0].lane) && kind !== 'mindmap' && kind !== 'radial' && kind !== 'circle' && kind !== 'grid') {
+    const r = laneLayout(nodes, edges, lanes, o);
+    if (r) return r;
+  }
   const pos = new Map<string, { x: number; y: number; w: number; h: number }>();
   const bendsOut = new Map<number, { x: number; y: number }[]>();
   const backOut: LayoutOut['back'] = new Map();

@@ -1,6 +1,6 @@
 // What each kind of page exports as, in the order the Export menus show them.
 import type { ReactNode } from 'react';
-import { BookOpen, FileArchive, FileCode2, FileImage, FilePen, FileSpreadsheet, FileText, FileType2, Images, NotebookText, PackageCheck, Presentation, Sheet, TextAlignStart } from 'lucide-react';
+import { BookOpen, FileArchive, FileCode2, FileImage, FilePen, FileSpreadsheet, FileText, FileType2, Images, NotebookText, PackageCheck, Presentation, Sheet, TextAlignStart, Workflow } from 'lucide-react';
 import type { PageInfo } from '@shared/pages';
 import type { ExportFormat } from './exportFile';
 
@@ -36,4 +36,12 @@ export const EXPORTS = (kind: PageInfo['kind'], design = false): Item[] =>
             ]
           : kind === 'notebook'
             ? [{ format: 'ipynb', label: 'Jupyter notebook (.ipynb)', icon: <NotebookText size={14} /> }, { format: 'py', label: 'Python script (.py)', icon: <FileCode2 size={14} /> }, PDF, HTML]
+            : kind === 'diagram'
+              ? [
+                  { format: 'png', label: 'Picture (.png)', icon: <FileImage size={14} /> },
+                  { format: 'svg', label: 'SVG picture (.svg)', icon: <FileImage size={14} /> },
+                  PDF,
+                  { format: 'drawio', label: 'draw.io file (.drawio)', icon: <Workflow size={14} /> },
+                  HTML,
+                ]
             : [PDF, { format: 'docx', label: 'Word document (.docx)', icon: <FileType2 size={14} /> }, HTML];

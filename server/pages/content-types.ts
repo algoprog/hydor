@@ -10,7 +10,7 @@ import { brandForAgent } from '../../shared/design-brand.ts';
 import { designHow } from './design-agent.ts';
 import { readBrand } from './design-routes.ts';
 
-const KINDS: ContentKind[] = ['slide', 'deck', 'doc', 'section', 'page', 'block', 'sheet', 'design'];
+const KINDS: ContentKind[] = ['slide', 'deck', 'doc', 'section', 'page', 'block', 'sheet', 'design', 'diagram'];
 
 /** What each kind is, as the answers name it. */
 const NOUN: Record<ContentKind, string> = {
@@ -22,6 +22,7 @@ const NOUN: Record<ContentKind, string> = {
   block: 'a part added to a page',
   sheet: 'a new spreadsheet',
   design: 'a new design',
+  diagram: 'a new diagram',
 };
 const LIST_NAME: Record<ContentKind, string> = {
   slide: 'Slides added to a deck',
@@ -32,6 +33,7 @@ const LIST_NAME: Record<ContentKind, string> = {
   block: 'Parts added to a page',
   sheet: 'New spreadsheets',
   design: 'New designs (posters, flyers, social posts, cards)',
+  diagram: 'New diagrams (flowcharts, org charts, mind maps, architecture and UML diagrams)',
 };
 
 /** How it goes where it belongs. */
@@ -45,6 +47,7 @@ const HOW: Record<ContentKind, string> = {
   block: 'Adding it: read the page with get_page, make the part in the page’s own look (its colours, fonts and spacing) and language, working on a phone too, keep the rest as it is, and save the whole page with save_page and its id.',
   sheet: 'Make it with save_sheet.',
   design: 'Make it with save_page as a design (how_to_make “design” says how to write one).',
+  diagram: 'Make it with save_diagram: nodes and edges with the layout it names, which the app lays out and sizes to their words (or Mermaid where it says so).',
 };
 
 const isKind = (v: unknown): v is ContentKind => typeof v === 'string' && (KINDS as string[]).includes(v);
@@ -67,7 +70,7 @@ export const HOW_TO_MAKE: RunTool = {
   name: 'how_to_make',
   annotations: { readOnlyHint: true },
   description: [
-    'How to make a known kind of thing well, as the app’s gallery asks for it: a slide added to a deck (a SWOT analysis, a timeline, a quiz), a new deck (a pitch deck, a lecture, a thesis defence), a document (a cover letter, a CV, meeting minutes, a grant proposal), a section added to one (an executive summary, a risks table), a page (a habit tracker, a landing page, a loan calculator), a part added to a page (a pricing table, a FAQ), a spreadsheet (a budget, a loan schedule), or a design (an event poster, a sale flyer, a quote post, a YouTube thumbnail, an invitation, a business card, a certificate, a menu, a logo).',
+    'How to make a known kind of thing well, as the app’s gallery asks for it: a slide added to a deck (a SWOT analysis, a timeline, a quiz), a new deck (a pitch deck, a lecture, a thesis defence), a document (a cover letter, a CV, meeting minutes, a grant proposal), a section added to one (an executive summary, a risks table), a page (a habit tracker, a landing page, a loan calculator), a part added to a page (a pricing table, a FAQ), a spreadsheet (a budget, a loan schedule), a design (an event poster, a sale flyer, a quote post, a YouTube thumbnail, an invitation, a business card, a certificate, a menu, a logo), or a diagram (a flowchart, a swimlane process, an org chart, a mind map, a system architecture, a database schema, a sequence diagram).',
     'With "design" alone: how a design is written (its artboards, sizes and elements), and the user’s brand kit when they have one.',
     'It says what goes in it, in what order, how it should look and where pictures help, and how to add it to what is open. Use it when the user asks for one of these by name, before you make it: it is free and instant. With no words, it lists every kind it knows.',
   ].join(' '),
@@ -78,7 +81,7 @@ export const HOW_TO_MAKE: RunTool = {
       kind: {
         type: 'string',
         enum: KINDS,
-        description: 'Which it is, when known: a slide added to a deck, a new deck, a document (doc), a section added to a document, a page, a part added to a page (block), a spreadsheet (sheet), a design (a poster, a flyer, a social post, a card).',
+        description: 'Which it is, when known: a slide added to a deck, a new deck, a document (doc), a section added to a document, a page, a part added to a page (block), a spreadsheet (sheet), a design (a poster, a flyer, a social post, a card), a diagram.',
       },
     },
   },

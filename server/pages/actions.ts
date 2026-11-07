@@ -23,7 +23,7 @@ import { checkSlide, fixAll, fixIssue, MIN_TEXT as MIN, type DeckIssue, type Iss
 import { reshapeDeck } from '../../shared/deck-shape.ts';
 import { reuseSlides } from '../../shared/slides-reuse.ts';
 import { chartRefreshed } from '../../shared/slides-sheet.ts';
-import { TURN_INTO, turnAsk } from '../../shared/content-asks.ts';
+import { TURN_INTO, turnAsk, type TurnTo } from '../../shared/content-asks.ts';
 import { ASSET, everyEl, isWebDeck, plainText, powerPointNote, richFeatures, slideTitle, THEMES, toPowerPoint, type ChartEl, type Deck, type El, type Theme } from '../../shared/slides.ts';
 import { cleanStyles, CITE_STYLES, docColor, docFont, PAPERS, PARA_STYLES, ptOf, resolveSuggestion, STYLES as DOC_STYLES, type Band, type CiteStyle, type Doc, type ParaStyle } from '../../shared/docs.ts';
 import {
@@ -61,6 +61,9 @@ import { citedKeys } from '../../shared/latex-ai.ts';
 import type { BibEntry } from '../../shared/latex-bib.ts';
 import { bibNeedsFill, fillEntry, renameCites, tidyBib } from '../../shared/latex-bibtidy.ts';
 import { tidyTex } from '../../shared/latex-tidy.ts';
+import { cleanColour, CONTAINER_KINDS, FONTS, normalizeDiagram, styleSet, STYLE_SETS, type Diagram, type DiagramPage, type DiagramShape } from '../../shared/diagram.ts';
+import { darker, LAYOUTS, type LayoutKind } from '../../shared/diagram-spec.ts';
+import { pageNamed, relayoutPage } from '../../shared/diagram-edits.ts';
 import { bibtexForDois } from './latex-refs.ts';
 
 type Args = Record<string, unknown>;
@@ -1022,6 +1025,71 @@ const clearOutputs: Act<Json> = (nb, a) => {
   return { model: { ...nb, cells: next }, said: `cleared the outputs of ${plural(n, 'code cell')}.` };
 };
 
+// ---- diagrams --------------------------------------------------------------------------------------------------------
+
+/** The pages an action is for: the one named (by name, id or number from 1), else every page. */
+function diagramPages(d: Diagram, v: unknown): DiagramPage[] {
+  if (v === undefined || v === null || v === '') return d.pages;
+  const p = pageNamed(d, v as string | number);
+  if (!p) throw new Error(`page: there is no page ${quote(str(v) || '(none given)')}: the diagram has ${plural(d.pages.length, 'page')} (${d.pages.map((x) => quote(x.name)).join(', ')}).`);
+  return [p];
+}
+
+/** Arrange → Layout: a page (or every page) laid out again, its connectors run afresh. */
+const layoutDiagram: Act<Diagram> = (d, a) => {
+  const kind = str(a.layout || a.kind).toLowerCase() || 'down';
+  if (!(LAYOUTS as string[]).includes(kind) || kind === 'none') throw new Error(`layout: one of ${LAYOUTS.filter((l) => l !== 'none').join(', ')}.`);
+  const which = diagramPages(d, a.page);
+  const pages = d.pages.map((p) => (which.includes(p) ? relayoutPage(p, kind as LayoutKind, { spacing: typeof a.spacing === 'number' ? a.spacing : undefined }) : p));
+  return { model: { ...d, pages }, said: `laid out ${which.length === d.pages.length && d.pages.length > 1 ? 'every page' : `the page ${quote(which[0].name)}`} ${kind === 'tree' ? 'as a tree' : kind === 'tree-right' ? 'as a tree across' : kind === 'mindmap' ? 'as a mind map' : kind === 'radial' ? 'in rings' : kind === 'circle' ? 'in a circle' : kind === 'grid' ? 'in a grid' : `in layers, ${kind}`}.` };
+};
+
+/** One look for many shapes (a ready-made look, or a fill), the whole diagram's font, and drawn by hand or not. */
+const restyleDiagram: Act<Diagram> = (d, a) => {
+  const which = diagramPages(d, a.page);
+  const set = styleSet(a.color);
+  const fill = !set ? cleanColour(a.color ?? a.fill) : undefined;
+  if (a.color !== undefined && !set && !fill) throw new Error(`color: a ready-made look (${STYLE_SETS.map((x) => x.id).join(', ')}) or a colour (#rrggbb).`);
+  const only = listOf(a.shapes).map(str).filter(Boolean);
+  const hits = (sh: DiagramShape) => (only.length ? only.includes(sh.id) || only.includes(sh.shape) : !CONTAINER_KINDS.has(sh.shape) && sh.shape !== 'text' && sh.shape !== 'icon' && sh.shape !== 'image');
+  let n = 0;
+  const pages = d.pages.map((p) => {
+    if (!which.includes(p) || (!set && !fill)) return p;
+    return {
+      ...p,
+      items: p.items.map((it) => {
+        if (it.type !== 'shape' || !hits(it)) return it;
+        n++;
+        const style = { ...it.style };
+        if (set) {
+          style.fill = set.fill;
+          style.stroke = set.stroke;
+          if (set.color) style.color = set.color;
+          else delete style.color;
+        } else if (fill) {
+          style.fill = fill;
+          if (fill !== 'none') style.stroke = darker(fill);
+        }
+        return { ...it, style };
+      }),
+    };
+  });
+  let out: Diagram = { ...d, pages };
+  const said: string[] = [];
+  if (n) said.push(`gave ${plural(n, 'shape')} ${set ? `the ${set.id} look` : `the fill ${fill}`}`);
+  if (typeof a.font === 'string') {
+    if (!FONTS.some((f) => f.id === a.font)) throw new Error(`font: one of ${FONTS.map((f) => f.id).join(', ')}.`);
+    out = { ...out, font: a.font === 'sans' ? undefined : (a.font as Diagram['font']) };
+    said.push(`set every word in the ${a.font} font`);
+  }
+  if (typeof a.sketch === 'boolean') {
+    out = { ...out, sketch: a.sketch || undefined };
+    said.push(a.sketch ? 'drew it all by hand' : 'drew it all with clean lines');
+  }
+  if (!said.length) return { said: only.length ? `None of ${only.map((x) => quote(x)).join(', ')} is a shape on ${which.length > 1 ? 'its pages' : 'that page'}.` : 'Nothing to change: give color, font or sketch.' };
+  return { model: normalizeDiagram(out), said: `${said.join('; ')}.` };
+};
+
 // ---- every kind -------------------------------------------------------------------------------------------------------
 
 const ACTIONS: { [K in PageKind]: Record<string, Act<any>> } = {
@@ -1049,12 +1117,13 @@ const ACTIONS: { [K in PageKind]: Record<string, Act<any>> } = {
   },
   tex: { move_files: moveFiles, tidy_source: tidySource, tidy_bibliography: tidyBibliography },
   notebook: { clear_outputs: clearOutputs },
+  diagram: { layout: layoutDiagram, restyle: restyleDiagram },
 };
 
 /** Every action's name: those of each kind, and those of any kind. */
 export const PAGE_ACTIONS = [...Object.values(ACTIONS).flatMap((m) => Object.keys(m)), ...Object.keys(HTML_ACTIONS), 'turn_into', 'duplicate'];
 
-const NOUN: Record<PageKind | 'page', string> = { slides: 'slide deck', doc: 'document', sheet: 'spreadsheet', tex: 'LaTeX document', notebook: 'notebook', page: 'page' };
+const NOUN: Record<PageKind | 'page', string> = { slides: 'slide deck', doc: 'document', sheet: 'spreadsheet', tex: 'LaTeX document', notebook: 'notebook', diagram: 'diagram', page: 'page' };
 
 /** The actions there are for a kind of page, for the agent beside one (index.ts askInstructions) and for errors. */
 export const actionsFor = (kind: PageKind | 'page') => [...(kind === 'page' ? Object.keys(HTML_ACTIONS) : Object.keys(ACTIONS[kind])), 'turn_into', 'duplicate'];
@@ -1068,10 +1137,10 @@ function turnInto(x: Here, a: Args): string {
   const from = page.kind && kindOf(page.kind) ? page.kind : 'page';
   const to = str(a.to).toLowerCase();
   const can = TURN_INTO[from];
-  if (!(can as string[]).includes(to)) throw new Error(`to: a ${NOUN[from]} turns into ${can.map((k) => (k === 'slides' ? 'slides' : k === 'doc' ? 'a document (doc)' : 'a page')).join(', ')}.`);
+  if (!(can as string[]).includes(to)) throw new Error(`to: a ${NOUN[from]} turns into ${can.map((k) => (k === 'slides' ? 'slides' : k === 'doc' ? 'a document (doc)' : k === 'diagram' ? 'a diagram' : 'a page')).join(', ')}.`);
   const folder = page.folder ? folderPath(x.ctx.deps.db, page.folder) : '';
-  const ask = turnAsk({ from, to: to as 'slides' | 'doc' | 'page', id: page.id, title: page.title, folder: folder || undefined });
-  return `Nothing is changed yet. What the Library’s Turn it into asks for, to do now with ${to === 'slides' ? 'save_slides' : to === 'doc' ? 'save_doc' : 'save_page'} (keep it in their Library; it shows them where it is): ${ask}`;
+  const ask = turnAsk({ from, to: to as TurnTo, id: page.id, title: page.title, folder: folder || undefined });
+  return `Nothing is changed yet. What the Library’s Turn it into asks for, to do now with ${to === 'slides' ? 'save_slides' : to === 'doc' ? 'save_doc' : to === 'diagram' ? 'save_diagram' : 'save_page'} (keep it in their Library; it shows them where it is): ${ask}`;
 }
 
 /** Duplicate in the Library: a copy beside it (its data stays with the first), made by the agent. */
@@ -1089,7 +1158,7 @@ function duplicate(x: Here, a: Args): string {
 }
 
 const DESCRIPTION = [
-  'Do to a saved page of the user’s Library what its editor does with one click to the whole of it, where a save tool (save_slides, save_doc, save_sheet, save_latex, save_notebook) would have you write it all out yourself.',
+  'Do to a saved page of the user’s Library what its editor does with one click to the whole of it, where a save tool (save_slides, save_doc, save_sheet, save_latex, save_notebook, save_diagram) would have you write it all out yourself.',
   'Each runs the editor’s own code on the version kept now and keeps a new version (the older ones restorable; the user’s changes and comments stay), which the editor open on it shows at once; it answers what changed.',
   'Free and instant, but describe_pictures (a model looks at each picture) and ask_ai (the helper model answers each AI cell). Give id (get_page lists them) and action, with its fields:',
   'Slide decks.',
@@ -1127,6 +1196,9 @@ const DESCRIPTION = [
   '- tidy_bibliography {file?, sort?, duplicates?, keys?, fill?, unused?, format?}: Tidy on a .bib (its first when left out): sorted by key, duplicates (same DOI, or title and year) merged with their citations pointed at the one kept, keys fixed, the fields an entry lacks filled from its DOI (doi.org), all on unless false; unused: true also takes out the entries nothing cites; format: true writes every entry one field a line. It answers what changed.',
   'Notebooks.',
   '- clear_outputs {cells?}: clear the outputs of every code cell (or of the cells listed, by number or id).',
+  'Diagrams (page: a page by its name or number from 1; every page when left out).',
+  `- layout {layout: ${LAYOUTS.filter((l) => l !== 'none').join('|')}, page?, spacing?}: lay a page out again as Arrange → Layout does (down: a flowchart top to bottom; tree: an org chart; mindmap: the first shape in the middle), its connectors run afresh.`,
+  `- restyle {color?: ${STYLE_SETS.map((x) => x.id).join('|')} or #rrggbb, shapes?: [ids or kinds], font?: ${FONTS.map((f) => f.id).join('|')}, sketch?: true|false, page?}: one look for every shape (or those listed), the font of every word, and drawn by hand or with clean lines.`,
   'Pages (of HTML).',
   '- lock, unlock: Lock the page (it then makes no new version, by anyone, until it is unlocked; its databases still take rows): lock it when the user asks to keep it from changing by accident, unlock it before changing it when they ask.',
   '- fill_column {database?: its name (data-db) or title, the first when left out; column?: an AI column’s name, the first; rows?: "empty" (the default), "all" or row ids}: the helper model fills the AI column’s cells from each row’s other cells, as the editor’s Fill every row does (one request a row).',

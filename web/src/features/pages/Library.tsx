@@ -13,7 +13,7 @@
 // folder opens with the way back over it, and things go in folders by More → Move to a folder or, on a computer, by
 // dragging them onto one. Finding by name and the kind chips look through the whole place and say where each thing is.
 // Addresses: /library?project=<id>|none, &folder=<id>, &kind=<kind> (image, video and audio each, media pictures and
-// videos both: the old Media tab's ?tab=media too), ?tab=published; ?new=page|design|slides|doc|sheet|tex|notebook opens New
+// videos both: the old Media tab's ?tab=media too), ?tab=published; ?new=page|design|slides|doc|sheet|tex|notebook|diagram opens New
 // with that kind, ?new=folder New → Folder and ?new=import New → Import a folder.
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode, type RefObject } from 'react';
 import { useSearch } from 'wouter';
@@ -39,6 +39,7 @@ import {
   MessageSquarePlus,
   NotebookText,
   Palette,
+  Workflow,
   PenLine,
   Pencil,
   Play,
@@ -55,7 +56,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { TURN_INTO } from '@shared/content-asks';
+import { TURN_INTO, type TurnTo } from '@shared/content-asks';
 import type { MediaItem } from '@shared/media';
 import type { LibFolder, PageInfo, SiteInfo } from '@shared/pages';
 import type { SpaceView } from '@shared/spaces';
@@ -86,9 +87,9 @@ import { DropHint } from './UploadTray';
 
 // ---- what the Library holds ----------------------------------------------------------------------------
 
-type ItemKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'image' | 'video' | 'audio';
+type ItemKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'image' | 'video' | 'audio';
 /** What a place shows: everything, one kind, or pictures and videos together. */
-type Show = 'all' | 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'image' | 'video' | 'audio' | 'media';
+type Show = 'all' | 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'image' | 'video' | 'audio' | 'media';
 
 interface Item {
   key: string;
@@ -111,6 +112,7 @@ const KIND: Record<ItemKind, { label: string; icon: ReactNode }> = {
   sheet: { label: 'Spreadsheet', icon: <Sheet size={12} /> },
   tex: { label: 'LaTeX', icon: <Sigma size={12} /> },
   notebook: { label: 'Notebook', icon: <NotebookText size={12} /> },
+  diagram: { label: 'Diagram', icon: <Workflow size={12} /> },
   image: { label: 'Picture', icon: <ImageIcon size={12} /> },
   video: { label: 'Video', icon: <Play size={12} /> },
   audio: { label: 'Audio', icon: <AudioLines size={12} /> },
@@ -124,6 +126,7 @@ const SHOWS: { value: Show; label: string; has: (k: ItemKind) => boolean }[] = [
   { value: 'sheet', label: 'Spreadsheets', has: (k) => k === 'sheet' },
   { value: 'tex', label: 'LaTeX', has: (k) => k === 'tex' },
   { value: 'notebook', label: 'Notebooks', has: (k) => k === 'notebook' },
+  { value: 'diagram', label: 'Diagrams', has: (k) => k === 'diagram' },
   { value: 'image', label: 'Pictures', has: (k) => k === 'image' },
   { value: 'video', label: 'Videos', has: (k) => k === 'video' },
   { value: 'audio', label: 'Audio', has: (k) => k === 'audio' },
@@ -199,10 +202,11 @@ function sorted(list: Item[], sort: Sort): Item[] {
 }
 
 /** What "Turn it into" offers, by what an agent makes. */
-const TURN: Record<'slides' | 'doc' | 'page', { label: string; icon: ReactNode }> = {
+const TURN: Record<TurnTo, { label: string; icon: ReactNode }> = {
   slides: { label: 'Slides', icon: <Presentation size={14} /> },
   doc: { label: 'A document', icon: <FileText size={14} /> },
   page: { label: 'A page', icon: <AppWindow size={14} /> },
+  diagram: { label: 'A diagram', icon: <Workflow size={14} /> },
 };
 
 /**
@@ -214,7 +218,7 @@ function TurnMenu({ p, anchor, onClose, onBack }: { p: PageInfo; anchor: RefObje
   const run = useAskRun();
   const folders = usePagesStore((s) => s.folders);
   const spaces = useSpaces();
-  const turn = (to: 'slides' | 'doc' | 'page') => {
+  const turn = (to: TurnTo) => {
     onClose();
     const names = p.folder ? folderChain(folders, p.folder).map((f) => f.name) : [];
     const r = turnRequest({ from: p.kind ?? 'page', to, id: p.id, title: p.title, folder: names.join('/') || undefined });
@@ -666,7 +670,7 @@ export function Library() {
     if (!newAsked) return;
     if (newAsked === 'folder') setFolderAsk(true);
     else if (newAsked === 'import') setImporting(true);
-    else setMaking(newAsked === 'design' || newAsked === 'slides' || newAsked === 'doc' || newAsked === 'sheet' || newAsked === 'tex' || newAsked === 'notebook' ? newAsked : 'page');
+    else setMaking(newAsked === 'design' || newAsked === 'slides' || newAsked === 'doc' || newAsked === 'sheet' || newAsked === 'tex' || newAsked === 'notebook' || newAsked === 'diagram' ? newAsked : 'page');
     go('/library', true);
   }, [newAsked]);
   // A space that is gone: everything again.
@@ -766,6 +770,7 @@ export function Library() {
     ['sheet', 'Spreadsheet', <Sheet size={14} />],
     ['tex', 'LaTeX document', <Sigma size={14} />],
     ['notebook', 'Notebook', <NotebookText size={14} />],
+    ['diagram', 'Diagram', <Workflow size={14} />],
   ];
   const newButton = (
     <>
