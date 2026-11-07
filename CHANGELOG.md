@@ -3,6 +3,13 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.41.1 · 7 November 2026
+
+The part the agent is working on keeps the outline's even spacing.
+
+- **The outline's last part**: the part under way, or waiting for you, sits as far below the part before it as every
+  other part does, with its note lined up on its mark; it sat a few pixels too close.
+
 ## 0.41.0 · 7 November 2026
 
 The agent's work reads as a short outline while it works, and a page being written shows that it is on its way.
