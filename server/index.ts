@@ -1756,12 +1756,16 @@ app.put('/api/me/timezone', async (req) => {
   setUserTimezone(db, String((req.body as { tz?: string } | undefined)?.tz ?? ''));
   return { tz: userTimezone(db) };
 });
-/** Custom reads what the capabilities add to its instructions before each turn; its run's token is the permission. */
+/**
+ * Custom reads what the capabilities add to its instructions before each turn; its run's token is the permission.
+ * `epoch` counts the times it condensed its conversation: memory's block stays the same within one.
+ */
 app.get('/agent/run/:token/context', async (req, reply) => {
   const runId = runOf((req.params as { token: string }).token);
   const live = runId ? sessions.liveByRun(runId) : null;
   if (!runId || !live) return reply.code(403).send({ error: 'Not a running agent' });
-  const text = await featureContext({ key: live.key, cwd: live.cwd, extra: sessionExtra(db, live.key), runId });
+  const epoch = Number((req.query as { epoch?: string }).epoch);
+  const text = await featureContext({ key: live.key, cwd: live.cwd, extra: sessionExtra(db, live.key), runId, epoch: Number.isInteger(epoch) && epoch >= 0 ? epoch : 0 });
   return { text, now: localNow(db), tz: userTimezone(db) };
 });
 mcpRoutes(app, db, sessions, (key) => `${publicBase()}/s/${encodeURIComponent(key)}`);

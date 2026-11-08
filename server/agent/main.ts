@@ -120,6 +120,9 @@ interface Session {
   skillsUsed?: string[];
   /** The notes the earlier conversation was condensed into, updated the next time. */
   notes?: string;
+  /** How many times the conversation was condensed (or its old tool output cleared): the app's memory block for the
+   * instructions stays the same until this changes, so the provider's cache of the conversation holds. */
+  epoch?: number;
   /** Within one long turn: its request as the user sent it, the notes its earlier steps were condensed into, and the earlier turns' notes. */
   condensed?: { request: ChatMessage['content']; progress: string; notes?: string };
   /** Tools found with find_tools, offered from then on. */
@@ -323,6 +326,8 @@ async function keepInContext(s: Session, m: AgentModel, signal: AbortSignal, ski
   if (!force && estimate(pruned, imgs) + 2500 < limit * 0.85) {
     s.messages = pruned;
     s.usage = undefined;
+    // The conversation's start changed, so the provider's cache of it is gone anyway: memory may be read afresh.
+    s.epoch = (s.epoch ?? 0) + 1;
     say(s.id, 'agent_thought_chunk', 'Cleared old tool output to keep within the model’s context.\n');
     return save(s);
   }
@@ -379,14 +384,18 @@ async function keepInContext(s: Session, m: AgentModel, signal: AbortSignal, ski
   }
   s.messages = rebuild(summary || previous || '(The earlier steps could not be summarized. If something seems missing, check again or ask the user.)');
   s.usage = undefined;
+  s.epoch = (s.epoch ?? 0) + 1;
   save(s);
 }
 
-/** What the app's capabilities add to the instructions for this turn (memory, the assistant…), and the local time. */
-async function appContext(): Promise<{ text: string; now?: string }> {
+/**
+ * What the app's capabilities add to the instructions for this turn (memory, the assistant…), and the local time.
+ * Memory's part stays the same until the conversation is condensed (`epoch`), so the instructions do too.
+ */
+async function appContext(epoch = 0): Promise<{ text: string; now?: string }> {
   if (!RUNTIME) return { text: '' };
   try {
-    const r = await fetch(`${RUNTIME}/context`, { signal: AbortSignal.timeout(5000) });
+    const r = await fetch(`${RUNTIME}/context?epoch=${epoch}`, { signal: AbortSignal.timeout(5000) });
     const d: any = r.ok ? await r.json() : {};
     return { text: String(d.text ?? ''), now: d.now ? String(d.now) : undefined };
   } catch {
@@ -436,7 +445,7 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
   const skills: Skill[] = PUBLIC_RUN ? [] : findSkills(s.cwd);
   s.skillDirs = skills.map((k) => path.dirname(k.file));
   // A public run hears nothing from the app's capabilities (memory, connections…), only the time.
-  const app = PUBLIC_RUN ? { text: '', now: (await appContext()).now } : await appContext();
+  const app = PUBLIC_RUN ? { text: '', now: (await appContext()).now } : await appContext(s.epoch ?? 0);
   s.condensed = undefined;
   // Reasoning from earlier turns is not sent again: it only weighed on the saved conversation.
   for (const x of s.messages) {

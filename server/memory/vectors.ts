@@ -198,30 +198,63 @@ function vectorPlaces(db: DB): Place[] {
   return (db.prepare("select distinct e.scope as scope, e.scope_key as scopeKey from memory_vectors v join memory_entries e on e.id = v.entry where e.status = 'active'").all() as Place[]).map((p) => ({ ...p }));
 }
 
-/** The notes nearest a query vector in these places (or all), best first, at least `min` alike. */
-export function nearest(db: DB, places: Place[] | 'all', q: ArrayLike<number>, o: { k: number; min?: number; now?: number; skip?: Set<number> }): VectorHit[] {
+/** How alike a query is to every note scanned: how many, and the mean and standard deviation of the bulk of them. */
+export interface ScanStats {
+  n: number;
+  mean: number;
+  sd: number;
+}
+
+/** The share of the best scores left out of the bulk: they are what may stand out, and would pull its mean and spread up. */
+export const TRIM = 0.05;
+
+/** The mean and standard deviation of all but the best TRIM of some scores. */
+export function bulkStats(scores: number[]): ScanStats {
+  const n = scores.length;
+  if (!n) return { n: 0, mean: 0, sd: 0 };
+  const a = Float64Array.from(scores).sort();
+  const keep = Math.max(1, n - Math.floor(n * TRIM));
+  let sum = 0;
+  let squares = 0;
+  for (let i = 0; i < keep; i++) {
+    sum += a[i];
+    squares += a[i] * a[i];
+  }
+  const mean = sum / keep;
+  return { n, mean, sd: Math.sqrt(Math.max(0, squares / keep - mean * mean)) };
+}
+
+/**
+ * The notes nearest a query vector in these places (or all), best first, at least `min` alike. `stats`, given, is
+ * filled with how alike the query is to the bulk of them (search.ts judges what stands out by it).
+ */
+export function nearest(db: DB, places: Place[] | 'all', q: ArrayLike<number>, o: { k: number; min?: number; now?: number; skip?: Set<number>; stats?: ScanStats }): VectorHit[] {
   memorySchema(db);
   const now = o.now ?? Date.now();
   const t = queryTable(q);
   const best = new Best(o.k);
   const min = o.min ?? -Infinity;
+  const all: number[] = [];
+  const seen = (id: number, s: number) => {
+    if (o.stats) all.push(s);
+    if (s >= min) best.offer(id, s);
+  };
   for (const p of places === 'all' ? vectorPlaces(db) : places) {
     const b = block(db, p);
     if (b) {
       for (let i = 0; i < b.n; i++) {
         if ((b.expires[i] && b.expires[i] <= now) || o.skip?.has(b.ids[i])) continue;
-        const s = scoreAt(t, b.codes, i * BYTES) * b.scales[i];
-        if (s >= min) best.offer(b.ids[i], s);
+        seen(b.ids[i], scoreAt(t, b.codes, i * BYTES) * b.scales[i]);
       }
       continue;
     }
     // Too big to keep: read it as it is scanned.
     for (const r of db.prepare(blockSql).iterate(p.scope, p.scopeKey, VECTOR_MODEL) as Iterable<{ id: number; expires: number; code: Buffer }>) {
       if ((r.expires && r.expires <= now) || o.skip?.has(r.id) || r.code.length !== BYTES) continue;
-      const s = scoreAt(t, r.code, 0) * scale(r.code, 0);
-      if (s >= min) best.offer(r.id, s);
+      seen(r.id, scoreAt(t, r.code, 0) * scale(r.code, 0));
     }
   }
+  if (o.stats) Object.assign(o.stats, bulkStats(all));
   return best.hits();
 }
 

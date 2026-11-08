@@ -1,11 +1,13 @@
 // Memory's store: entries (about the user, a project, a session) and every change to them, in SQLite, with
 // a full-text index of their text (FTS5, kept current by triggers), their vectors for search by meaning
 // (vectors.ts) and the links from a topic or a profile to the notes it sums up. A deleted entry stays,
-// marked deleted, so a change can be undone; erasing removes it and its history.
+// marked deleted, so a change can be undone; erasing removes it and its history. Each session's memory
+// block is kept too (memory_blocks), so an agent's instructions stay the same while its provider's cache
+// holds them.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { PROFILE_WORDS_DEFAULT, PROFILE_WORDS_MAX, PROFILE_WORDS_MIN, TOP_K_DEFAULT, TOP_K_MAX, isUserProfile, type MemoryEntry, type MemoryHistoryRow, type MemoryKind, type MemoryScope, type MemorySource } from '../../shared/memory.ts';
+import { MEMORY_BASES, PROFILE_WORDS_DEFAULT, PROFILE_WORDS_MAX, PROFILE_WORDS_MIN, TOP_K_DEFAULT, TOP_K_MAX, isUserProfile, type MemoryBasis, type MemoryEntry, type MemoryHistoryRow, type MemoryKind, type MemoryScope, type MemorySource } from '../../shared/memory.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 
@@ -55,6 +57,10 @@ export function memorySchema(db: DB) {
   if (!cols.has('expires_at')) db.exec('alter table memory_entries add column expires_at integer');
   if (!cols.has('used_at')) db.exec('alter table memory_entries add column used_at integer');
   if (!cols.has('uses')) db.exec('alter table memory_entries add column uses integer not null default 0');
+  if (!cols.has('title')) db.exec('alter table memory_entries add column title text');
+  if (!cols.has('basis')) db.exec('alter table memory_entries add column basis text');
+  if (!cols.has('hits')) db.exec('alter table memory_entries add column hits integer not null default 0');
+  if (!cols.has('hit_at')) db.exec('alter table memory_entries add column hit_at integer');
   db.exec(`
     drop index if exists memory_entries_scope;
     -- A place's entries, the latest changed first, without sorting all of them.
@@ -72,6 +78,9 @@ export function memorySchema(db: DB) {
       model text not null,
       code blob not null
     );
+    -- What a session's agent was given of memory (inject.ts): the same block until its conversation is condensed
+    -- (\`epoch\`) or it rests for a while, so its instructions stay as its provider cached them.
+    create table if not exists memory_blocks (key text not null, flavor text not null, epoch integer not null, text text not null, at integer not null, primary key (key, flavor)) without rowid;
   `);
   if (!db.prepare("select 1 from sqlite_master where type = 'table' and name = 'memory_fts'").get())
     db.exec(`
@@ -110,6 +119,12 @@ export function setEnabled(db: DB, on: boolean) {
 export const tidyOn = (db: DB) => kvGet(db, 'memory.tidy.enabled') !== '0';
 export function setTidyOn(db: DB, on: boolean) {
   kvSet(db, 'memory.tidy.enabled', on ? '1' : '0');
+}
+
+/** The tidy-up reads the conversations since the last one too (Learn from conversations): on unless turned off. */
+export const learnOn = (db: DB) => kvGet(db, 'memory.learn.enabled') !== '0';
+export function setLearnOn(db: DB, on: boolean) {
+  kvSet(db, 'memory.learn.enabled', on ? '1' : '0');
 }
 
 /** How many notes about the user and the project agents start with (k of the top-k): 1 to TOP_K_MAX. */
@@ -225,11 +240,18 @@ interface Row {
   expires_at: number | null;
   used_at: number | null;
   uses: number;
+  hit_at: number | null;
+  hits: number | null;
+  title: string | null;
+  basis: string | null;
   covers: number;
   session: string | null;
   turn: string | null;
   source: MemorySource;
 }
+
+/** A basis as stored: one of the known ones, else none. */
+export const basisOf = (v: unknown): MemoryBasis | undefined => (MEMORY_BASES.includes(v as MemoryBasis) ? (v as MemoryBasis) : undefined);
 
 /** Entries with how many notes each sums up. */
 const SELECT = 'select e.*, (select count(*) from memory_links l where l.parent = e.id) as covers from memory_entries e';
@@ -240,12 +262,16 @@ const toEntry = (r: Row): MemoryEntry => ({
   scopeKey: r.scope_key,
   kind: r.kind ?? 'note',
   text: r.text,
+  title: r.title ?? undefined,
+  basis: basisOf(r.basis),
   status: r.status,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   expiresAt: r.expires_at ?? undefined,
   usedAt: r.used_at ?? undefined,
   uses: r.uses ?? 0,
+  hitAt: r.hit_at ?? undefined,
+  hits: r.hits ?? 0,
   covers: r.kind && r.kind !== 'note' ? r.covers : undefined,
   session: r.session ?? undefined,
   turn: r.turn ?? undefined,
@@ -313,7 +339,15 @@ export function getEntry(db: DB, id: number): MemoryEntry | null {
   return r ? toEntry(r) : null;
 }
 
-export function addEntry(db: DB, e: { scope: MemoryScope; scopeKey: string; text: string; kind?: MemoryKind; expiresAt?: number }, by: ChangeBy): MemoryEntry {
+/** The longest a title may be: a few words. */
+export const MAX_TITLE = 60;
+const cleanTitle = (t: unknown) => (typeof t === 'string' && t.trim() ? cleanText(t, MAX_TITLE).replace(/[.。]$/, '') : null);
+
+export function addEntry(
+  db: DB,
+  e: { scope: MemoryScope; scopeKey: string; text: string; kind?: MemoryKind; expiresAt?: number; basis?: MemoryBasis; title?: string },
+  by: ChangeBy,
+): MemoryEntry {
   memorySchema(db);
   const at = by.at ?? Date.now();
   const kind = e.kind ?? 'note';
@@ -321,8 +355,8 @@ export function addEntry(db: DB, e: { scope: MemoryScope; scopeKey: string; text
   const scopeKey = e.scope === 'global' ? '' : e.scopeKey;
   const id = db.transaction(() => {
     const r = db
-      .prepare('insert into memory_entries (scope, scope_key, kind, text, status, created_at, updated_at, expires_at, session, turn, source) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(e.scope, scopeKey, kind, text, 'active', at, at, e.expiresAt ?? null, by.session ?? null, by.turn ?? null, by.source);
+      .prepare('insert into memory_entries (scope, scope_key, kind, text, title, basis, status, created_at, updated_at, expires_at, session, turn, source) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(e.scope, scopeKey, kind, text, cleanTitle(e.title), basisOf(e.basis) ?? null, 'active', at, at, e.expiresAt ?? null, by.session ?? null, by.turn ?? null, by.source);
     const id = Number(r.lastInsertRowid);
     log(db, id, 'added', null, text, by, at);
     return id;
@@ -331,19 +365,61 @@ export function addEntry(db: DB, e: { scope: MemoryScope; scopeKey: string; text
   return getEntry(db, id)!;
 }
 
-/** Changes an entry's text (a deleted one stays deleted); returns what it was, or null when there is no such entry. */
-export function updateEntry(db: DB, id: number, text: string, by: ChangeBy): { before: string; entry: MemoryEntry } | null {
+/**
+ * Changes an entry's text (a deleted one stays deleted); returns what it was, or null when there is no such entry.
+ * Its title goes with the old text (the tidy-up writes a new one), unless one is given; `basis`, given, says how
+ * the new text is known.
+ */
+export function updateEntry(db: DB, id: number, text: string, by: ChangeBy, o: { basis?: MemoryBasis; title?: string } = {}): { before: string; entry: MemoryEntry } | null {
   const cur = getEntry(db, id);
   if (!cur) return null;
   const at = by.at ?? Date.now();
   const next = clean(cur, text);
-  if (next === cur.text) return { before: cur.text, entry: cur };
+  if (next === cur.text) {
+    if (o.basis && o.basis !== cur.basis) setBasis(db, id, o.basis, by);
+    return { before: cur.text, entry: getEntry(db, id)! };
+  }
   db.transaction(() => {
-    db.prepare('update memory_entries set text = ?, updated_at = ?, session = ?, turn = ?, source = ? where id = ?').run(next, at, by.session ?? null, by.turn ?? null, by.source, id);
+    db.prepare('update memory_entries set text = ?, title = ?, updated_at = ?, session = ?, turn = ?, source = ? where id = ?').run(next, cleanTitle(o.title), at, by.session ?? null, by.turn ?? null, by.source, id);
     log(db, id, 'updated', cur.text, next, by, at);
+    if (o.basis && o.basis !== cur.basis) {
+      db.prepare('update memory_entries set basis = ? where id = ?').run(o.basis, id);
+      log(db, id, 'basis', cur.basis ?? '', o.basis, by, at);
+    }
   })();
   changed(db, cur);
   return { before: cur.text, entry: getEntry(db, id)! };
+}
+
+/** Says how an entry is known (none: not said); false when nothing changed. Its history keeps the step. */
+export function setBasis(db: DB, id: number, basis: MemoryBasis | null, by: ChangeBy): boolean {
+  const cur = getEntry(db, id);
+  if (!cur || (cur.basis ?? null) === basis) return false;
+  const at = by.at ?? Date.now();
+  db.transaction(() => {
+    db.prepare('update memory_entries set basis = ? where id = ?').run(basis, id);
+    log(db, id, 'basis', cur.basis ?? '', basis ?? '', by, at);
+  })();
+  changed(db, cur);
+  return true;
+}
+
+/** Titles for entries (the tidy-up's): a few words each, for the index agents start with. Not in the history. */
+export function setTitles(db: DB, rows: { id: number; title: string }[]) {
+  memorySchema(db);
+  const put = db.prepare('update memory_entries set title = ? where id = ?');
+  db.transaction(() => rows.forEach((r) => put.run(cleanTitle(r.title), r.id)))();
+}
+
+/** The title an entry is listed by: its own, else its first eight words, what is in brackets left out. */
+export function titleOf(e: Pick<MemoryEntry, 'title' | 'text'>): string {
+  if (e.title) return e.title;
+  const ws = e.text
+    .replace(/\s*\([^()]*\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ');
+  return ws.length > 8 ? `${ws.slice(0, 8).join(' ').replace(/[,;:]$/, '')}…` : ws.join(' ');
 }
 
 /** Marks an entry deleted (it can be restored); false when there is none, or it is deleted already. */
@@ -387,11 +463,52 @@ export function setExpiry(db: DB, id: number, expiresAt: number | null, by: Chan
   return true;
 }
 
-/** Agents got these as bearing on what they were doing, or found them with recall. */
+/** Agents got these as bearing on what they were doing (needed: what Settings shows and suggests removing by). */
 export function markUsed(db: DB, ids: number[], at = Date.now()) {
   if (!ids.length) return;
   memorySchema(db);
   db.prepare(`update memory_entries set uses = uses + 1, used_at = ? where id in (${ids.map(() => '?').join(',')})`).run(at, ...ids);
+}
+
+/** Agents looked these up themselves (recall found them, or they corrected one): needed, and what ranking weighs. */
+export function markHit(db: DB, ids: number[], at = Date.now()) {
+  if (!ids.length) return;
+  memorySchema(db);
+  db.prepare(`update memory_entries set uses = uses + 1, used_at = ?, hits = hits + 1, hit_at = ? where id in (${ids.map(() => '?').join(',')})`).run(at, at, ...ids);
+}
+
+// ---- what each session was given ----------------------------------------------------------------
+
+/** A session's memory block stays while its agent works; after this long at rest the provider's cache is gone, and it is made again. */
+export const BLOCK_REST_MS = 3600_000;
+
+/**
+ * The memory block a session got (`flavor`: what kind, such as read-only), while it holds: for the same `epoch`
+ * (Custom counts its condensings) and used within BLOCK_REST_MS. Using it keeps it.
+ */
+export function keptBlock(db: DB, key: string, flavor: string, epoch: number, now = Date.now()): string | null {
+  memorySchema(db);
+  const r = db.prepare('select epoch, text, at from memory_blocks where key = ? and flavor = ?').get(key, flavor) as { epoch: number; text: string; at: number } | undefined;
+  if (!r || r.epoch !== epoch || now - r.at > BLOCK_REST_MS) return null;
+  db.prepare('update memory_blocks set at = ? where key = ? and flavor = ?').run(now, key, flavor);
+  return r.text;
+}
+
+/** The user changed notes themselves (Settings, an undo): every session gets its block afresh, so the change shows at once. */
+export function dropBlocks(db: DB) {
+  memorySchema(db);
+  db.prepare('delete from memory_blocks').run();
+}
+
+export function keepBlock(db: DB, key: string, flavor: string, epoch: number, text: string, now = Date.now()) {
+  memorySchema(db);
+  db.prepare('insert into memory_blocks (key, flavor, epoch, text, at) values (?, ?, ?, ?, ?) on conflict(key, flavor) do update set epoch = excluded.epoch, text = excluded.text, at = excluded.at').run(
+    key,
+    flavor,
+    epoch,
+    text,
+    now,
+  );
 }
 
 /** The user keeps a note suggested for removal: it counts as needed now. */
@@ -417,6 +534,7 @@ export function clearAll(db: DB): number {
     db.prepare('delete from memory_history').run();
     db.prepare('delete from memory_cursor').run();
     db.prepare('delete from memory_links').run();
+    db.prepare('delete from memory_blocks').run();
     return db.prepare('delete from memory_entries').run().changes;
   })();
   changed(db);
@@ -602,5 +720,7 @@ export function sweep(db: DB, now = Date.now()) {
       .all() as { id: number }[];
     for (const { id } of [...gone, ...orphans]) eraseEntry(db, id);
     db.prepare('delete from memory_cursor where not exists (select 1 from sessions s where s.key = memory_cursor.key) and not exists (select 1 from app_sessions a where a.key = memory_cursor.key)').run();
+    // A block rested long enough is made again anyway.
+    db.prepare('delete from memory_blocks where at < ?').run(now - 2 * BLOCK_REST_MS);
   })();
 }

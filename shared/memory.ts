@@ -1,8 +1,10 @@
 // Memory across sessions, as the server keeps it and the pages show it: notes about the user (global),
 // about a project (repo: a repository's root, or a folder outside git) and about one session, and the
-// user's profile. Agents and the user write notes and the profile; agents start with the profile and the
-// notes that bear most on the request. The nightly tidy-up merges near-copies and, where a place's notes
-// no longer fit, sums related notes up in topics, and writes a project's short profile.
+// user's profile. Agents and the user write notes and the profile; agents start with the profile, the
+// notes that bear most on the request and an index of the rest. The nightly tidy-up merges near-copies,
+// titles notes for that index and, where a place's notes no longer fit, sums related notes up in topics,
+// and writes a project's short profile; with Learn from conversations on, it first reads the conversations
+// since the last one, to correct the notes they show wrong, check the unchecked and keep what none saved.
 
 export type MemoryScope = 'global' | 'repo' | 'session';
 export const MEMORY_SCOPES: MemoryScope[] = ['global', 'repo', 'session'];
@@ -31,6 +33,14 @@ export const TOP_K_CHOICES = [5, 10, 20, 40];
 /** Who made a change: the helper model (the nightly tidy-up, or an expiry), an agent with its tools, or the user. */
 export type MemorySource = 'auto' | 'agent' | 'user';
 
+/**
+ * How a note is known: the user said so, it was checked (a test, a command, a file, or the nightly pass found
+ * a conversation that shows it), or an agent concluded it without checking yet. Notes from before this was
+ * kept have none. Agents are told which notes are not checked yet, and the nightly pass checks those first.
+ */
+export type MemoryBasis = 'user' | 'checked' | 'inferred';
+export const MEMORY_BASES: MemoryBasis[] = ['user', 'checked', 'inferred'];
+
 export interface MemoryEntry {
   id: number;
   scope: MemoryScope;
@@ -38,6 +48,10 @@ export interface MemoryEntry {
   scopeKey: string;
   kind: MemoryKind;
   text: string;
+  /** A few words naming what it is about, for the index agents start with (the nightly tidy-up writes it). */
+  title?: string;
+  /** How it is known (none: from before this was kept). */
+  basis?: MemoryBasis;
   status: 'active' | 'deleted';
   createdAt: number;
   updatedAt: number;
@@ -46,6 +60,10 @@ export interface MemoryEntry {
   /** When an agent last got it as bearing on what it was doing, or found it with recall; and how often. */
   usedAt?: number;
   uses: number;
+  /** When an agent last looked it up (recall found it, or it was corrected), and how often: what ranking weighs,
+   * since being given at the start says only that the ranking picked it. */
+  hitAt?: number;
+  hits: number;
   /** A topic's or a profile's: how many notes it sums up. */
   covers?: number;
   /** The session, and the reply in it, that wrote it or changed it last. */
@@ -54,12 +72,15 @@ export interface MemoryEntry {
   source: MemorySource;
 }
 
-/** One step in an entry's life. "expiry": its end date was set (`after` holds it as a date) or taken away. */
+/**
+ * One step in an entry's life. "expiry": its end date was set (`after` holds it as a date) or taken away;
+ * "basis": how it is known changed (`before` and `after` hold the bases, none as empty).
+ */
 export interface MemoryHistoryRow {
   id: number;
   entry: number;
   at: number;
-  action: 'added' | 'updated' | 'deleted' | 'restored' | 'expiry';
+  action: 'added' | 'updated' | 'deleted' | 'restored' | 'expiry' | 'basis';
   before?: string;
   after?: string;
   why?: string;
@@ -68,10 +89,13 @@ export interface MemoryHistoryRow {
   source: MemorySource;
 }
 
-/** A change a turn or a tidy-up made, as the note under a reply and Settings show it. */
+/**
+ * A change a turn or a tidy-up made, as the note under a reply and Settings show it. "checked": the nightly
+ * pass found a conversation that shows a note not checked before to be true.
+ */
 export interface MemoryChange {
   entry: number;
-  action: 'added' | 'updated' | 'deleted' | 'expiry';
+  action: 'added' | 'updated' | 'deleted' | 'expiry' | 'checked';
   scope: MemoryScope;
   scopeKey: string;
   kind?: MemoryKind;
@@ -80,7 +104,11 @@ export interface MemoryChange {
   /** For "expiry": the end date set (none: taken away), and the one before. */
   expiresAt?: number;
   expiredBefore?: number;
+  /** For "checked": how it was known before. */
+  basisBefore?: MemoryBasis;
   why?: string;
+  /** The conversation it was learned from, or that showed it wrong or true (the nightly pass). */
+  session?: string;
   source: MemorySource;
   /** Undone since. */
   undone?: boolean;
@@ -129,6 +157,9 @@ export interface TidyReport {
   changesAt?: number;
   /** Notes looked at, and places summed up. */
   checked: number;
+  /** Conversations read to learn from (Learn from conversations), and why that part stopped when it did. */
+  sessions?: number;
+  learnError?: string;
   error?: string;
 }
 
@@ -146,6 +177,9 @@ export interface MemoryState {
   meaning: MeaningState;
   /** The nightly tidy-up is on, and how the latest went. */
   tidyOn: boolean;
+  /** The tidy-up also reads the conversations since the last one: it corrects notes they show wrong, checks
+   * those not checked yet, and keeps (at most a few a night) what no agent saved. */
+  learnOn: boolean;
   tidy?: TidyReport;
   /** Notes no agent has needed for a long while (suggested for removal in Settings). */
   stale: number;
@@ -180,6 +214,7 @@ export function changeSummary(changes: MemoryChange[]): string {
     n('updated') && `${n('updated')} updated`,
     n('deleted') && `${n('deleted')} removed`,
     n('expiry') && `${n('expiry')} given an end date`,
+    n('checked') && `${n('checked')} checked`,
   ].filter(Boolean);
   return parts.length ? parts.join(', ') : 'undone';
 }

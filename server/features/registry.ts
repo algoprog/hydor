@@ -112,9 +112,10 @@ export async function spawnAdditions(s: SpawnInfo): Promise<Required<SpawnAdditi
 
 /**
  * Custom's instructions from the capabilities, for its next turn: each one's `context`, or for one
- * without it, the instructions its `spawn` gives every agent.
+ * without it, the instructions its `spawn` gives every agent. `epoch` counts the times Custom condensed
+ * the conversation (memory gives the same block within one).
  */
-export async function featureContext(s: { key: string; cwd: string; extra: SessionExtra; runId: string }): Promise<string> {
+export async function featureContext(s: { key: string; cwd: string; extra: SessionExtra; runId: string; epoch?: number }): Promise<string> {
   if (!deps) return '';
   const parts: string[] = [];
   for (const f of list) {

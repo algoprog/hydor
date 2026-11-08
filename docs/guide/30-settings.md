@@ -205,8 +205,9 @@ You don’t have to know where an option lives: type what you want in the search
 
 - [**Memory**](/settings?s=memory&find=Memory): Agents start with what earlier sessions kept, and save notes when you ask.
 - [**Search by meaning**](/settings?s=memory&find=Search%20by%20meaning): Finds notes, and anything in this search, by what it means.
-- [**Notes each agent starts with**](/settings?s=memory&find=Notes%20each%20agent%20starts%20with): Besides your profile: the notes that bear most on what you ask, then the latest.
-- [**Tidy up each night**](/settings?s=memory&find=Tidy%20up%20each%20night): The helper model merges notes that say the same thing and sums related ones up.
+- [**Notes each agent starts with**](/settings?s=memory&find=Notes%20each%20agent%20starts%20with): Besides your profile: at most this many notes that bear on what you ask, and the titles of the rest.
+- [**Tidy up each night**](/settings?s=memory&find=Tidy%20up%20each%20night): The helper model merges notes that say the same thing, sums related ones up and titles them.
+- [**Learn from conversations**](/settings?s=memory&find=Learn%20from%20conversations): With the tidy-up: corrects notes the conversations show wrong, checks the unchecked, keeps a few new things.
 - [**Tidy up now**](/settings?s=memory&find=Tidy%20up%20now): Tidies memory up at once.
 - [**Your profile**](/settings?s=memory&find=Your%20profile): What every agent gets about you at the start of a session; agents keep it current.
 - [**Profile length**](/settings?s=memory&find=Profile%20length): The most words your profile may have; longer, the helper model shortens it.

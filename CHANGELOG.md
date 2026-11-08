@@ -3,6 +3,37 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.44.0 · 8 November 2026
+
+Memory that checks itself: each night it learns from the day's conversations, and agents start with only what
+bears on your request, plus an index of the rest.
+
+- **Learn from conversations**: with the nightly tidy-up, the helper model now reads the conversations since the last
+  one (never those with memory off, child sessions or scheduled runs). It corrects notes a conversation shows wrong or
+  out of date, confirms notes no one had checked, and keeps at most three things a night that no agent saved. Each
+  change shows in Settings → Memory with the conversation it came from (Open the conversation), and can be undone.
+  It has a switch of its own.
+- **What agents start with**: only the notes that really bear on your request, judged against how alike that request
+  is to all your notes, so a long brief no longer pulls in half of them, and nothing fills the room with the latest.
+  A place with only a few notes is given whole; for the rest, agents get an index of titles, to know what to look up.
+  On one real project's notes, about nine in ten of the notes given now bear on the request, against one in five before.
+- **Titles**: the tidy-up gives each note and topic a short title for that index; new notes get theirs within the hour.
+- **How each note is known**: agents say whether you told them, they checked it, or it is their own conclusion, not
+  checked yet. Later agents are told which are unchecked, and those are checked first at night. Settings shows it
+  under each note and in its history; notes you write yourself count as said by you.
+- **What comes first**: notes rank by what agents looked up themselves; being handed a note at the start no longer
+  makes it come first again and again.
+- **Custom keeps its memory steady**: Custom gets its memory once, as the other agents do, and reads it again only when
+  it condenses a long conversation, so its model's server can reuse what it kept (quicker, and it costs less). A
+  session that goes on within the hour gets the same memory again too.
+- **One memory for every agent**: Claude Code's own memory and Codex's stay off in the sessions Hydor runs, so nothing
+  is kept where Settings can't show it.
+- **Earlier conversations by meaning**: when agents look through past sessions, they find them by what you asked, in
+  other words too, not only by the exact words; each message you wrote gets its vector in the background.
+- **Better guidance**: agents are told what memory is for (what a later session couldn't find out by itself) and not to
+  save what the project's files already say; Custom's models are reminded to read memory before answering about you or
+  the project.
+
 ## 0.43.0 · 7 November 2026
 
 Comments in the Library's editors can be resolved with AI in one click: an agent makes the change each comment asks

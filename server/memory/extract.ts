@@ -88,7 +88,8 @@ export function turnsAfter(items: TimelineItem[], after?: string): { turns: Turn
 function agentChanges(db: DB, rows: MemoryHistoryRow[]): MemoryChange[] {
   const out: MemoryChange[] = [];
   for (const h of rows) {
-    if (h.action === 'restored' || h.action === 'expiry') continue;
+    // How a note is known goes with its text: an update shows enough.
+    if (h.action === 'restored' || h.action === 'expiry' || h.action === 'basis') continue;
     const e = entries(db, { ids: [h.entry], status: 'all' })[0];
     if (e) out.push({ entry: h.entry, action: h.action, scope: e.scope, scopeKey: e.scopeKey, kind: e.kind, before: h.before, after: h.after, why: h.why, source: 'agent' });
   }

@@ -1,9 +1,10 @@
 // Settings → Memory: memory on or off for all sessions; search by meaning (set up on this computer, where it
 // runs, how many notes have their vectors); how many notes agents start with; the nightly tidy-up (when it ran,
-// each change it made, undoable, and running it now); your profile (every agent gets it, agents keep it current,
+// how many conversations it learned from, each change it made, undoable, and running it now) and learning from
+// conversations; your profile (every agent gets it, agents keep it current,
 // you edit it, and how many words it may have: longer, the helper shortens it); and every note kept so far by
-// place (about you, each project, then the sessions' together), searchable by words and meaning. Each note says who wrote it and when, how often agents needed it
-// and its end date; its menu edits it, dates it, shows its history or what a summary sums up, and deletes it.
+// place (about you, each project, then the sessions' together), searchable by words and meaning. Each note says who wrote it and when, how it is known,
+// how often agents needed it and its end date; its menu edits it, dates it, shows its history or what a summary sums up, and deletes it.
 // You can add notes of your own. The notes no agent has needed for months come up to keep or delete, deleted
 // ones stay 30 days to restore, and all of them can be exported or cleared. On a phone the menus are sheets.
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -36,7 +37,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react';
-import type { MemoryChange, MemoryHistoryRow, MemoryListEntry, MemoryScope, MemoryState } from '@shared/memory';
+import type { MemoryBasis, MemoryChange, MemoryHistoryRow, MemoryListEntry, MemoryScope, MemoryState } from '@shared/memory';
 import { changeSummary, isUserProfile, PROFILE_WORDS_CHOICES, TOP_K_CHOICES, wordCount } from '@shared/memory';
 import { Badge, Button, cx, Empty, IconButton, inputCls, MenuItem, MenuSep, OptionRow, Popover, Section, Segmented, SheetsOnPhone, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
 import { api, del, patch, post, put } from '../../lib/api';
@@ -58,7 +59,14 @@ const KIND_ORDER = { profile: 0, topic: 1, note: 2 } as const;
 /** How many notes a place shows before "Show more": a few of each under All, more in one place's tab, a search or a list to review. */
 const FEW = 3;
 const MANY = 10;
-const ACTION: Record<MemoryHistoryRow['action'], string> = { added: 'Added', updated: 'Changed', deleted: 'Deleted', restored: 'Restored', expiry: 'End date' };
+const ACTION: Record<MemoryHistoryRow['action'], string> = { added: 'Added', updated: 'Changed', deleted: 'Deleted', restored: 'Restored', expiry: 'End date', basis: 'How it is known' };
+/** How a note is known, in a note's facts and its history. */
+const BASIS: Record<MemoryBasis, string> = { user: 'you said so', checked: 'checked', inferred: 'not checked yet' };
+const BASIS_HINT: Record<MemoryBasis, string> = {
+  user: 'You said this to an agent, or wrote it here',
+  checked: 'An agent saw it hold (a test, a command, a file), or the nightly tidy-up found a conversation that shows it',
+  inferred: 'An agent’s conclusion no one has confirmed yet: agents are told so, and the nightly tidy-up checks these first',
+};
 /** What the server calls a session no longer listed. */
 const GONE = 'A session that is gone';
 const when = (t: number) => new Date(t).toLocaleString(LOCALE);
@@ -176,16 +184,21 @@ function Switches() {
         <Meaning st={st} set={set} />
         <Row
           label="Notes each agent starts with"
-          hint="Besides your profile: the notes about you and the project that bear most on what you ask, found by their words and, with search by meaning on, by what they mean; then the latest. Agents look up the rest when they need it."
+          hint="Besides your profile: at most this many of the notes about you and the project that bear on what you ask, found by their words and, with search by meaning on, by what they mean, and the titles of the rest, which agents look up when they need them. A place with only a few notes is given whole."
           control={<Segmented size="sm" value={String(st.topK)} options={TOP_K_CHOICES.map((k) => ({ value: String(k), label: String(k) }))} onChange={(v) => set({ topK: Number(v) })} />}
         />
         <Row
           label="Tidy up each night"
-          hint="The helper model merges notes that say the same thing and sums related ones up. It reads notes only, never conversations."
+          hint="The helper model merges notes that say the same thing, sums related ones up, and gives each a title for the index agents start with."
           control={<Switch on={st.enabled && st.tidyOn} disabled={!st.enabled} label="Tidy up each night" onChange={(on) => set({ tidy: on })} />}
         >
           {st.enabled && <Tidy st={st} />}
         </Row>
+        <Row
+          label="Learn from conversations"
+          hint="With the tidy-up, the helper model reads the conversations since the last one (not those with memory off): it corrects the notes they show wrong, checks the notes not checked yet, and keeps at most a few things a night that no agent saved."
+          control={<Switch on={st.enabled && st.learnOn} disabled={!st.enabled} label="Learn from conversations" onChange={(on) => set({ learn: on })} />}
+        />
       </div>
     </Section>
   );
@@ -235,6 +248,8 @@ function Tidy({ st }: { st: MemoryState }) {
               ) : (
                 `: nothing to change (${r.checked} note${r.checked === 1 ? '' : 's'} looked at).`
               )}
+              {!r.error && r.sessions ? <> {r.sessions === 1 ? 'It read 1 conversation.' : `It read ${r.sessions} conversations.`}</> : null}
+              {r.learnError && <span className="text-warn"> Learning from conversations stopped: {r.learnError}</span>}
             </>
           )}
         </div>
@@ -283,6 +298,11 @@ function TidyChange({ c, onUndo }: { c: MemoryChange; onUndo: () => void }) {
           {c.why && ` · ${c.why}`}
         </span>
         <span className="flex-1" />
+        {c.session && (
+          <IconButton size="sm" label="Open the conversation" onClick={() => go(sessionPath(c.session!))}>
+            <MessageSquare size={14} />
+          </IconButton>
+        )}
         {!c.undone && (
           <IconButton size="sm" label="Undo this change" onClick={onUndo}>
             <Undo2 size={14} />
@@ -342,6 +362,7 @@ function HistoryList({ id }: { id: number }) {
             </div>
           )}
           {h.action === 'expiry' && <div className="mt-0.5">{h.after ? `Until ${dayOf(Date.parse(h.after))}` : 'Taken away'}</div>}
+          {h.action === 'basis' && <div className="mt-0.5">{h.after && h.after in BASIS ? BASIS[h.after as MemoryBasis] : 'Not said'}</div>}
         </li>
       ))}
     </ol>
@@ -416,6 +437,7 @@ function NoteFacts({ e, inSessions, brief }: { e: MemoryListEntry; inSessions: b
     </span>,
   );
   if (e.kind !== 'note' && !brief) facts.push(<span>{e.covers === 1 ? 'sums up 1 note' : `sums up ${e.covers ?? 0} notes`}</span>);
+  if (e.basis && !deleted) facts.push(<span title={BASIS_HINT[e.basis]} className={cx(e.basis === 'inferred' && 'text-fg-2')}>{BASIS[e.basis]}</span>);
   if (e.uses > 0) facts.push(<span title={e.usedAt ? `Last needed ${ago(e.usedAt)}` : undefined}>{e.uses === 1 ? 'needed once' : `needed ${e.uses} times`}</span>);
   if (e.expiresAt && !deleted) facts.push(<span className="text-fg-2">{`until ${dayOf(e.expiresAt)}`}</span>);
   return (

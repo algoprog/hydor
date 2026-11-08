@@ -205,8 +205,9 @@
 
 - [**记忆**](/settings?s=memory&find=Memory)：智能体开始时会带上之前会话记下的内容，并在你要求时保存笔记。
 - [**按含义搜索**](/settings?s=memory&find=Search%20by%20meaning)：按含义查找笔记，以及此搜索中的任何内容。
-- [**每个智能体开始时获得的笔记**](/settings?s=memory&find=Notes%20each%20agent%20starts%20with)：除了你的档案：与你的请求最相关的笔记，然后是最新的笔记。
-- [**每晚整理**](/settings?s=memory&find=Tidy%20up%20each%20night)：辅助模型会合并内容相同的笔记，并归纳相关笔记。
+- [**每个智能体开始时获得的笔记**](/settings?s=memory&find=Notes%20each%20agent%20starts%20with)：除了你的档案：最多这么多条与你的请求相关的笔记，以及其余笔记的标题。
+- [**每晚整理**](/settings?s=memory&find=Tidy%20up%20each%20night)：辅助模型会合并内容相同的笔记，归纳相关笔记并为它们加上标题。
+- [**从对话中学习**](/settings?s=memory&find=Learn%20from%20conversations)：随整理一起：更正对话表明有误的笔记，核验未核验的笔记，留下几件新事。
 - [**立即整理**](/settings?s=memory&find=Tidy%20up%20now)：立即整理记忆。
 - [**你的档案**](/settings?s=memory&find=Your%20profile)：每个智能体在会话开始时获得的关于你的信息；智能体会让它保持最新。
 - [**档案长度**](/settings?s=memory&find=Profile%20length)：你的档案最多可有的词数；超出时，辅助模型会把它缩短。

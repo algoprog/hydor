@@ -118,21 +118,27 @@ agents that speak ACP and take MCP servers.
   saved in the vault, the agent signs in itself, typing the password without seeing it, on that site only. Sites
   on your own network stay off limits unless you allow one.
 - **Memory**: agents save notes about you, the project and the session when you ask or they learn something
-  lasting, one fact per note written to be found again, some only until a date, and a chip under the reply shows
-  what changed (undo, edit, delete). They also keep a profile of you (who you are, what you use, how you like
+  lasting that the files don't say, one fact per note written to be found again, with how it is known (you said so,
+  checked, or not checked yet), some only until a date, and a chip under the reply shows
+  what changed (undo, edit, delete). Claude Code's and Codex's own memories stay off in the app's sessions: these notes
+  are the one memory every agent shares. They also keep a profile of you (who you are, what you use, how you like
   answers) that every agent gets once, at the start of a session, after your guidelines: agents add to it only
   when you say something lasting, you edit it in Settings, and past its length (1,000 words unless changed) the
-  helper model shortens it. Each agent starts with the notes that bear most on what you asked, 10 unless changed: a
+  helper model shortens it. Each agent starts, once, with the notes that bear on what you asked, at most 10 unless changed: a
   top-k by hybrid search, by words (BM25) and by meaning (on unless you turn it off; it sets itself up once), with
   LightOn's mDenseOn model on your own computer (on a GPU, an NVIDIA one or a Mac's own, or on the CPU in about 1.5 GB,
-  only while needed), then the
-  latest. Each night the helper
-  model tidies memory up: it merges notes that say the same thing and, when there are more than fit, sums related
-  ones up in topics and, for a project, a short profile; every change can be undone.
+  only while needed), each counting only when it stands out from the rest for that request; a place with few notes
+  whole; and an index of the rest by title, to look up. Nothing fills the room, and only what agents looked up weighs
+  in ranking. Custom keeps its block until it condenses, so its provider's cache holds. Each night the helper
+  model tidies memory up: it merges notes that say the same thing, titles them, and when there are more than fit,
+  sums related ones up in topics and, for a project, a short profile; and it learns from the day's conversations
+  (Learn from conversations): it corrects notes they show wrong, checks the unchecked, and keeps at most three things
+  a night that no agent saved, never reading sessions with memory off. Every change can be undone.
   Settings → Memory lists every note with when it was written, changed and last needed (each place its three
   newest first, with Show N more; each note two lines until you open it), lets you add your
   own, and suggests removing the ones no agent needed for months. Turn it off for one session or for all.
-  Agents can also look up earlier sessions.
+  Agents can also look up earlier sessions, by words and by meaning (each message you wrote gets a vector in the
+  background).
 - **Projects** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
   together, like Projects in ChatGPT or Claude. Pick a project by name in the start page's folder menu instead of a
   folder: its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works

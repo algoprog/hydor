@@ -192,6 +192,8 @@ export function systemPrompt(o: {
   family?: Family;
 }): string {
   const has = (t: string) => !o.tools || o.tools.includes(t);
+  /** A tool of the app's own server (named mcp__<server>__<tool>) or a built-in one. */
+  const hasAny = (t: string) => !!o.tools?.some((n) => n === t || n.endsWith(`__${t}`));
   const p = o.project ?? projectOf(o.cwd);
   const parallel = o.family?.parallel !== false && !o.small;
   const lines = [
@@ -200,6 +202,8 @@ export function systemPrompt(o: {
     'How to work:',
     '- Act, don’t narrate. When something needs doing, call the tool that does it, and keep going until the task is done or you need the user. A plan written in prose changes nothing.',
     '- Look before you act: read files before changing them, and search instead of guessing paths, names or facts.',
+    // Models that do not read their memory by themselves gain the most from being told to (it nearly doubled one model's score).
+    ...(hasAny('recall') ? ['- When a request touches the user, what they want or this project, read the memory notes you were given, and recall the rest, before you answer or act.'] : []),
     parallel
       ? '- When you need several things that do not depend on each other (files to read, searches, pages), ask for them all in one reply: those calls run at the same time.'
       : '- Make one tool call at a time, and look at its result before the next.',

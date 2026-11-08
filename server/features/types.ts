@@ -125,8 +125,12 @@ export interface Feature {
   aroundTool?(name: string, ctx: RunCtx): { refuse?: string; note?: string } | null | undefined;
   /** What an agent gets when it starts (or resumes). */
   spawn?(s: SpawnInfo, d: Deps): SpawnAdditions | undefined | Promise<SpawnAdditions | undefined>;
-  /** Instructions for Custom, read afresh before each of its turns. */
-  context?(s: { key: string; cwd: string; extra: SessionExtra }, d: Deps): string | null | undefined | Promise<string | null | undefined>;
+  /**
+   * Instructions for Custom, read before each of its turns. `epoch` counts the times its conversation was
+   * condensed: what may change from turn to turn (memory) keeps the same text within one, so the instructions
+   * stay as the provider cached them.
+   */
+  context?(s: { key: string; cwd: string; extra: SessionExtra; epoch?: number }, d: Deps): string | null | undefined | Promise<string | null | undefined>;
   /** A turn ended (every session counts, also ones run outside the app). */
   turnEnd?(t: TurnInfo, d: Deps): void | Promise<void>;
   /** Told of every event sent to the pages: a session changed, a capability's list changed… */
