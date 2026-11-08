@@ -6,12 +6,13 @@
 // wrote them, and it:
 // - fixes a note a conversation shows wrong or out of date, or deletes it when nothing true is left;
 // - checks a note not checked yet that a conversation shows true;
-// - adds what a later session would need and could not find in the project's files: at most three a night, so
+// - adds what a later session would need and could not find in the project's files: at most three a day, so
 //   memory stays small (the tidy-up then merges near-copies, as for every new note).
-// It reads what people wrote: the user's messages and the agents' last reply of each turn, never tool output or
-// pages. Sessions with memory off (confidential ones have it off), child sessions (an agent wrote their requests)
-// and scheduled runs (their task's own words each time) are never read. Every change goes in the tidy-up's report
-// with the conversation it came from, and can be undone there.
+// It reads what people wrote: the user's own words in their messages (not the files they attached or the text they
+// pasted: ownWords) and the agents' last reply of each turn, never tool output or pages. Sessions with memory off
+// (confidential ones have it off), child sessions (an agent wrote their requests) and scheduled runs (their task's
+// own words each time) are never read. Every change goes in the tidy-up's report with the conversation it came from,
+// and can be undone there.
 import fs from 'node:fs';
 import path from 'node:path';
 import { splitRunMessage } from '../../shared/automations.ts';
@@ -27,7 +28,7 @@ import { nearest, setVectors } from './vectors.ts';
 /** The helper, asked for JSON (tidy.ts). */
 export type Ask = (q: { system: string; prompt: string }) => Promise<unknown>;
 
-/** Conversations read at most in one night, a question's worth of them, and the questions asked at most. */
+/** Conversations read at most in one tidy-up, a question's worth of them, and the questions asked at most. */
 const MAX_SESSIONS = 40;
 const PER_ASK = 5;
 const MAX_ASKS = 8;
@@ -39,9 +40,9 @@ const SESSION_CHARS = 3200;
 const RELATED = 12;
 const MAX_NOTES = 40;
 const MAX_SOURCES = 3;
-/** New notes at most: in one question, and in one night. */
+/** New notes at most: in one question, and in one tidy-up (about one a day). */
 const ADD_PER_ASK = 2;
-const ADD_PER_NIGHT = 3;
+const ADD_PER_DAY = 3;
 /** A new note this alike to one kept is the same (as remember judges: tools.ts). */
 const SAME = 0.95;
 /** The first time, it reads back this far. */
@@ -74,7 +75,23 @@ const clip = (t: string, n: number) => {
 /** Text from a conversation or a note, unable to close the tags around it. */
 const safe = (t: string) => t.replace(/<(\/?)(notes|sessions)\b/gi, '‹$1$2');
 
-/** A session's turns from the indexer's chunks: each message the user wrote, with the agent's last reply after it. */
+/**
+ * What the user wrote themselves in a message: the files they attached (and the list of them), text they pasted and
+ * notes the app put before it are left out, as they are not the user's own words. Empty when nothing else is left.
+ */
+export function ownWords(text: string): string {
+  const s = text
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
+    .replace(/<pasted_content\b[^>]*>[\s\S]*?<\/pasted_content>/g, ' ')
+    .replace(/<file path="[^"]*">[\s\S]*?<\/file>/g, ' ')
+    .replace(/(?:^|\n+)Attached files:\n(?:- [^\n]*(?:\n|$))+/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return s;
+}
+
+/** A session's turns from the indexer's chunks: each message the user wrote (their own words), with the agent's last reply after it. */
 function turnsOf(db: DB, key: string, o: { since?: number; until?: number } = {}): Convo['turns'] {
   const rows = db.prepare("select kind, coalesce(ts, 0) as ts, text from chunk_text where key = ? and kind in ('user', 'assistant') order by id").all(key) as { kind: string; ts: number; text: string }[];
   const turns: Convo['turns'] = [];
@@ -82,7 +99,9 @@ function turnsOf(db: DB, key: string, o: { since?: number; until?: number } = {}
     if (r.kind === 'user') {
       // A scheduled run's message is its task's words, not the user's now.
       if (splitRunMessage(r.text)) continue;
-      turns.push({ user: r.text, reply: '', at: r.ts });
+      const own = ownWords(r.text);
+      // A message of files alone says nothing of its own; the reply still goes with the turn before.
+      if (own) turns.push({ user: own, reply: '', at: r.ts });
     } else if (turns.length) turns[turns.length - 1].reply = r.text;
   }
   return turns.filter((t) => (o.since == null || t.at > o.since) && (o.until == null || t.at <= o.until));
@@ -206,7 +225,7 @@ export async function learn(db: DB, ask: Ask, now = Date.now()): Promise<{ chang
         'Answer with the JSON object only.',
       ].join('\n');
       const raw = await ask({ system: LEARN_SYSTEM, prompt });
-      const got = await applyLearn(db, raw, { notes, convos: shown, places, now, room: Math.min(ADD_PER_ASK, ADD_PER_NIGHT - added) });
+      const got = await applyLearn(db, raw, { notes, convos: shown, places, now, room: Math.min(ADD_PER_ASK, ADD_PER_DAY - added) });
       added += got.filter((c) => c.action === 'added').length;
       changes.push(...got);
     }

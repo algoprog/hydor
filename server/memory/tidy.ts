@@ -1,4 +1,5 @@
-// The tidy-up: once a night, and when asked in Settings, the helper model keeps memory short, current and true.
+// The tidy-up: by itself about once a day, whenever the app is on (tidyDue: a day's gap, something new since, and
+// a pause in the user's writing), and when asked in Settings, the helper model keeps memory short, current and true.
 // 0. With Learn from conversations on, it first reads the conversations since the last tidy-up (learn.ts): it fixes
 //    the notes they show wrong, checks the unchecked ones they show true, and keeps a few lasting things no agent saved.
 // 1. Each note added or changed since the last tidy-up is shown with its closest notes in the same place (by
@@ -481,10 +482,29 @@ export function undoTidy(db: DB, index: number): TidyReport {
   return next;
 }
 
-/** Due: not tidied for a day and it is night (2 to 5 o'clock here), or not for two days. */
+/** At least this long between tidy-ups by themselves: about once a day. */
+export const TIDY_GAP = 20 * 3600_000;
+/** And a pause first: nothing written in any session for this long. */
+export const TIDY_QUIET = 10 * 60_000;
+
+/** When the user last wrote in a session the app runs, after `since` (0: not since). */
+function wroteAfter(db: DB, since: number): number {
+  const r = db.prepare("select max(c.ts) as t from chunk_text c join app_sessions a on a.key = c.key where c.kind = 'user' and c.ts > ?").get(since) as { t: number | null } | undefined;
+  return r?.t ?? 0;
+}
+
+/**
+ * Due, whenever the app happens to be on (a computer that sleeps at night too): TIDY_GAP since the last tidy-up,
+ * something new since then (a message the user wrote, or a note they or an agent changed: the tidy-up's own
+ * changes do not count), and a pause of TIDY_QUIET in the user's writing, so it does not run while they type.
+ * With nothing new it does not run at all.
+ */
 export function tidyDue(db: DB, now = Date.now()): boolean {
+  memorySchema(db);
   const last = lastTidy(db)?.at ?? 0;
-  const h = new Date(now).getHours();
-  return (now - last > 20 * 3600_000 && h >= 2 && h < 5) || now - last > 44 * 3600_000;
+  if (now - last < TIDY_GAP) return false;
+  const wrote = wroteAfter(db, last);
+  if (wrote) return now - wrote >= TIDY_QUIET;
+  return !!db.prepare("select 1 from memory_entries where updated_at > ? and source != 'auto' limit 1").get(last);
 }
 

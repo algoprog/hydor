@@ -1,5 +1,5 @@
 // Memory's routes for the pages: the switches (memory, search by meaning and where it runs, how many notes agents
-// start with, the nightly tidy-up and learning from conversations), the user's profile, every entry with its history, searches, edits and end dates, notes no agent
+// start with, the tidy-up by itself and learning from conversations), the user's profile, every entry with its history, searches, edits and end dates, notes no agent
 // needed for long, what a topic sums up, the tidy-up (run now, undo one of its changes), undoing a change from the
 // note under a reply, export and clearing all.
 import path from 'node:path';

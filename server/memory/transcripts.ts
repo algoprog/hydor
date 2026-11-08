@@ -1,5 +1,5 @@
 // Past conversations by meaning, for search_sessions: each message a user wrote (the indexer's chunks of kind "user",
-// which say what each session was about) gets a vector from memory's embedding model in the background, the newest
+// which say what each session was about; their own words, without the files attached or text pasted) gets a vector from memory's embedding model in the background, the newest
 // first and a batch at a time, so the model never works long at once. A vector is kept by its chunk with the hash of
 // its words: when the indexer reads a transcript afresh, its new chunks take the vectors of the same words instead of
 // having them made again, and vectors whose chunk is gone are dropped once nothing waits. A search scores every
@@ -7,6 +7,7 @@
 import crypto from 'node:crypto';
 import type { DB } from '../db.ts';
 import { embed, meaningOn, meaningReady } from './embed.ts';
+import { ownWords } from './learn.ts';
 import { memoryOn } from './store.ts';
 import { bulkStats, BYTES, quantize, queryTable, scale, scoreAt, VECTOR_MODEL } from './vectors.ts';
 
@@ -23,7 +24,8 @@ const Z_MIN = 2.6;
 const NONE = Buffer.alloc(0);
 
 const hashOf = (t: string) => crypto.createHash('sha1').update(t).digest('base64url').slice(0, 22);
-const textOf = (t: string) => t.replace(/\s+/g, ' ').trim().slice(0, MAX_CHARS);
+/** A message as it is embedded: the user's own words (not files they attached or text they pasted), one line. */
+const textOf = (t: string) => ownWords(t).replace(/\s+/g, ' ').trim().slice(0, MAX_CHARS);
 
 const ready = new WeakSet<DB>();
 export function transcriptSchema(db: DB) {

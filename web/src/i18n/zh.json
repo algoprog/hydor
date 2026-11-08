@@ -22051,5 +22051,12 @@
 "With the tidy-up, the helper model reads the conversations since the last one (not those with memory off): it corrects the notes they show wrong, checks the notes not checked yet, and keeps at most a few things a night that no agent saved.":"整理时，辅助模型会阅读上次整理以来的对话（关闭记忆的除外）：更正对话表明有误的笔记，核验尚未核验的笔记，并且每晚最多留下几件没有智能体保存过的事。",
 "With the tidy-up: corrects notes the conversations show wrong, checks the unchecked, keeps a few new things":"随整理一起：更正对话表明有误的笔记，核验未核验的笔记，留下几件新事",
 "you said so":"你说过",
-"You said this to an agent, or wrote it here":"你对智能体说过，或在这里写下的"
+"You said this to an agent, or wrote it here":"你对智能体说过，或在这里写下的",
+"About once a day, after something new: merges notes that say the same thing, sums related ones up and titles them":"大约每天一次，有新内容之后：合并内容相同的笔记，归纳相关笔记并为它们加上标题",
+"About once a day, when there is something new and you have paused for a few minutes: the helper model merges notes that say the same thing, sums related ones up, and gives each a title for the index agents start with.":"大约每天一次，在有了新内容、而你停下来几分钟的时候：辅助模型会合并内容相同的笔记，把相关的笔记汇总起来，并给每条笔记加上标题，用于智能体开始时拿到的索引。",
+"An agent saw it hold (a test, a command, a file), or the tidy-up found a conversation that shows it":"某个智能体亲眼确认过（一次测试、一条命令、一个文件），或整理时找到了能证明它的对话",
+"An agent’s conclusion no one has confirmed yet: agents are told so, and the tidy-up checks these first":"智能体得出的结论，尚无人确认：智能体会被告知这一点，整理时也会优先核验这些笔记",
+"nightly daily each night schedule merge duplicates summaries topics profile consolidate titles":"每晚 每天 每夜 定时 合并 重复 摘要 主题 画像 整合 标题",
+"Tidy up automatically":"自动整理",
+"With the tidy-up, the helper model reads the conversations since the last one (not those with memory off): it corrects the notes they show wrong, checks the notes not checked yet, and keeps at most a few things a day that no agent saved.":"整理时，辅助模型会阅读上次整理以来的对话（关闭记忆的除外）：更正对话表明有误的笔记，核验尚未核验的笔记，并且每天最多留下几件没有智能体保存过的事。"
 }

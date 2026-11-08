@@ -58,7 +58,7 @@ Sessions keep running when you close the tab, and the ones you start in VS Code 
   draw.io; picture, video and sound editors; Office files and PDFs in and out. Comment on words as you read, and have an
   agent make the changes and resolve the comments in one click. Share any of it with people by a link of their own, to
   comment or to edit.
-- **Memory**: a profile of you, notes on your projects that the app checks against your conversations each night, your
+- **Memory**: a profile of you, notes on your projects that the app checks against your conversations each day, your
   guidelines, and more than sixty skills and plugins.
 - **For researchers**: a paper radar, a reading list synced with Zotero, a check before you submit a LaTeX paper, and
   experiments that wait for a free GPU.

@@ -3,6 +3,17 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.44.1 · 8 November 2026
+
+Memory upkeep no longer waits for the night: it runs about once a day, whenever the app is on.
+
+- **Tidy up automatically** (was Tidy up each night): the tidy-up, and learning from conversations with it, now runs
+  once 20 hours have passed since the last one, there is something new (a message you wrote, or a note you or an agent
+  changed) and you have paused for ten minutes, at any hour. A computer that sleeps at night, or the desktop app
+  closed overnight, gets it too; with nothing new it doesn't run at all.
+- **Only your own words**: learning from conversations, and finding past sessions by meaning, leave out the files you
+  attached and the text you pasted into your messages.
+
 ## 0.44.0 · 8 November 2026
 
 Memory that checks itself: each night it learns from the day's conversations, and agents start with only what
