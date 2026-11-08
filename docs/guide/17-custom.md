@@ -165,6 +165,8 @@ Every model can only read so much at once (its context). Custom keeps each conve
 
 If a model's server says the conversation is too long, Custom learns that model's real limit and condenses at once. Only the latest few pictures go with each request.
 
+What memory gave Custom at the start stays the same while it works, so the model's server can reuse what it kept of the conversation, which is quicker and costs less. Each time it condenses, it reads memory again, for your latest message (see [What an agent starts with](/guide/memory#what-an-agent-starts-with)).
+
 Long output doesn't fill the conversation either. When a command, a page or a tool gives back more than a share of the model's context, Custom keeps the whole of it in a file in the session's own folder. The model gets the start and the end (for a command, mostly the end, where errors show up) and the file's location, and reads the rest in pieces or searches it. These files are deleted after a week.
 
 ## How Custom copes with weaker models

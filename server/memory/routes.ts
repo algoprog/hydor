@@ -1,9 +1,9 @@
 // Memory's routes for the pages: the switches (memory, search by meaning and where it runs, how many notes agents
-// start with), the user's profile, every entry with its history, searches, edits and end dates, notes no agent
+// start with, the nightly tidy-up and learning from conversations), the user's profile, every entry with its history, searches, edits and end dates, notes no agent
 // needed for long, what a topic sums up, the tidy-up (run now, undo one of its changes), undoing a change from the
 // note under a reply, export and clearing all.
 import path from 'node:path';
-import type { MemoryChange, MemoryEntry, MemoryKind, MemoryListEntry, MemoryNoteData, MemoryScope, MemoryState } from '../../shared/memory.ts';
+import type { MemoryBasis, MemoryChange, MemoryEntry, MemoryKind, MemoryListEntry, MemoryNoteData, MemoryScope, MemoryState } from '../../shared/memory.ts';
 import { isUserProfile, PROFILE_WORDS_MAX, PROFILE_WORDS_MIN, scopeName, TOP_K_MAX, wordCount } from '../../shared/memory.ts';
 import { HttpError } from '../auth.ts';
 import type { Deps } from '../features/types.ts';
@@ -17,6 +17,7 @@ import {
   childrenOf,
   clearAll,
   deleteEntry,
+  dropBlocks,
   entries,
   eraseEntry,
   getEntry,
@@ -30,10 +31,12 @@ import {
   setEnabled,
   setExpiry,
   setProfileWords,
+  setLearnOn,
   setTidyOn,
   setTopK,
   staleCount,
   staleEntries,
+  learnOn,
   tidyOn,
   topK,
   updateEntry,
@@ -43,6 +46,8 @@ import {
 import { helperAsk, lastTidy, tidy, undoTidy } from './tidy.ts';
 
 const SCOPES: MemoryScope[] = ['global', 'repo', 'session'];
+/** How a note is known, as the Markdown export says it. */
+const BASIS: Record<MemoryBasis, string> = { user: 'you said so', checked: 'checked', inferred: 'not checked yet' };
 
 /** A session's title, looked up once per request. */
 function titles(d: Pick<Deps, 'sessions'>) {
@@ -99,7 +104,13 @@ function exportMarkdown(list: MemoryListEntry[]): string {
       const e0 = es[0];
       out.push('', `## ${s === 'global' ? 'About you' : s === 'repo' ? `Project: ${e0.scopeLabel} (${e0.scopeKey})` : `Session: ${e0.scopeLabel} (${e0.scopeKey})`}`, '');
       for (const e of es) {
-        const what = [e.kind !== 'note' && (isUserProfile(e) ? 'your profile' : e.kind), `added ${day(e.createdAt)}`, e.updatedAt !== e.createdAt && `changed ${day(e.updatedAt)}`, e.expiresAt && `until ${day(e.expiresAt)}`]
+        const what = [
+          e.kind !== 'note' && (isUserProfile(e) ? 'your profile' : e.kind),
+          e.basis && BASIS[e.basis],
+          `added ${day(e.createdAt)}`,
+          e.updatedAt !== e.createdAt && `changed ${day(e.updatedAt)}`,
+          e.expiresAt && `until ${day(e.expiresAt)}`,
+        ]
           .filter(Boolean)
           .join(', ');
         // The profile's lines stay lines, under its bullet.
@@ -121,6 +132,7 @@ export function memoryState(d: Pick<Deps, 'db' | 'sessions'>): MemoryState {
     topK: topK(db),
     meaning: meaningState(db),
     tidyOn: tidyOn(db),
+    learnOn: learnOn(db),
     tidy: lastTidy(db),
     stale: staleCount(db),
   };
@@ -132,6 +144,8 @@ const matches = (text: string, q: string) => words(q).every((w) => text.toLowerC
 export function memoryRoutes(d: Deps) {
   const { app, db } = d;
   const changed = () => d.broadcast({ t: 'feature', id: 'memory', data: { changed: true } });
+  /** The user changed what agents get: sessions take it from their next start, not an hour on. */
+  const edited = () => (dropBlocks(db), changed());
   // Who did it says enough for your own changes; only an undo says more.
   const byUser = (why?: string): ChangeBy => ({ source: 'user', why });
   /** The user's profile is one: an earlier version brought back takes the place of the one there was. */
@@ -143,7 +157,7 @@ export function memoryRoutes(d: Deps) {
 
   app.get('/api/memory', async () => memoryState(d));
   app.put('/api/memory', async (req) => {
-    const b = (req.body ?? {}) as { enabled?: unknown; meaning?: unknown; device?: unknown; retry?: unknown; tidy?: unknown; topK?: unknown; profileWords?: unknown };
+    const b = (req.body ?? {}) as { enabled?: unknown; meaning?: unknown; device?: unknown; retry?: unknown; tidy?: unknown; learn?: unknown; topK?: unknown; profileWords?: unknown };
     if (b.topK !== undefined) {
       const k = Number(b.topK);
       if (!Number.isInteger(k) || k < 1 || k > TOP_K_MAX) throw new HttpError(400, `The number of notes should be from 1 to ${TOP_K_MAX}`);
@@ -158,6 +172,7 @@ export function memoryRoutes(d: Deps) {
     }
     if (typeof b.enabled === 'boolean') setEnabled(db, b.enabled);
     if (typeof b.tidy === 'boolean') setTidyOn(db, b.tidy);
+    if (typeof b.learn === 'boolean') setLearnOn(db, b.learn);
     const device = b.device === 'cpu' || b.device === 'auto' ? (b.device as MeaningDevice) : undefined;
     if (typeof b.meaning === 'boolean' || device || b.retry === true) setMeaning(db, { on: typeof b.meaning === 'boolean' ? b.meaning : undefined, device, retry: b.retry === true });
     changed();
@@ -226,8 +241,9 @@ export function memoryRoutes(d: Deps) {
     const scope = SCOPES.includes(b.scope as MemoryScope) ? (b.scope as MemoryScope) : 'global';
     if (scope !== 'global' && !b.key) throw new HttpError(400, 'Which project or session is it for?');
     const expiresAt = b.expiresAt == null ? undefined : (checkExpiry(b.expiresAt) ?? undefined);
-    const e = addEntry(db, { scope, scopeKey: scope === 'global' ? '' : String(b.key), text: checkText(b.text), expiresAt }, byUser());
-    changed();
+    // A note the user writes is known because they said so.
+    const e = addEntry(db, { scope, scopeKey: scope === 'global' ? '' : String(b.key), text: checkText(b.text), expiresAt, basis: 'user' }, byUser());
+    edited();
     return { entry: labelled(d, [e])[0] };
   });
 
@@ -245,7 +261,7 @@ export function memoryRoutes(d: Deps) {
       } else updateEntry(db, id, text, byUser());
     }
     if (b.expiresAt !== undefined) setExpiry(db, id, checkExpiry(b.expiresAt), byUser());
-    changed();
+    edited();
     return { entry: labelled(d, [getEntry(db, id)!])[0] };
   });
 
@@ -254,7 +270,7 @@ export function memoryRoutes(d: Deps) {
     const id = idOf((req.params as { id: string }).id);
     if ((req.query as { forever?: string }).forever === '1') eraseEntry(db, id);
     else deleteEntry(db, id, byUser());
-    changed();
+    edited();
     return { ok: true };
   });
 
@@ -262,7 +278,7 @@ export function memoryRoutes(d: Deps) {
     const id = idOf((req.params as { id: string }).id);
     if (!restoreEntry(db, id, byUser())) throw new HttpError(404, 'That entry is not deleted');
     oneProfile(id);
-    changed();
+    edited();
     return { entry: labelled(d, [getEntry(db, id)!])[0] };
   });
 
@@ -288,7 +304,7 @@ export function memoryRoutes(d: Deps) {
   /** Tidies up now (in the background; the state says when it is done). */
   app.post('/api/memory/tidy', async () => {
     if (!memoryOn(db)) throw new HttpError(400, 'Memory is off');
-    void tidy(db, helperAsk(db)).then(changed);
+    void tidy(db, helperAsk(db), { learn: learnOn(db) }).then(changed);
     changed();
     return { started: true };
   });
@@ -297,7 +313,7 @@ export function memoryRoutes(d: Deps) {
     const i = Number((req.body as { index?: unknown } | undefined)?.index);
     try {
       const r = undoTidy(db, i);
-      changed();
+      edited();
       return { tidy: r };
     } catch (e) {
       throw new HttpError(400, (e as Error).message);
@@ -330,7 +346,7 @@ export function memoryRoutes(d: Deps) {
       oneProfile(c.entry);
     }
     const next: MemoryNoteData = { ...data, changes: data.changes.map((x, j) => (j === i ? { ...x, undone: true } : x)) };
-    changed();
+    edited();
     return { note: updateNote(db, note.id, next) };
   });
 

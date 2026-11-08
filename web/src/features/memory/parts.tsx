@@ -92,5 +92,6 @@ export function ChangeBadge({ c }: { c: MemoryChange }) {
   if (c.action === 'added') return <Badge tone="ok">Added</Badge>;
   if (c.action === 'updated') return <Badge tone="info">Updated</Badge>;
   if (c.action === 'expiry') return <Badge tone="info">{c.expiresAt ? 'Ends' : 'No end date'}</Badge>;
+  if (c.action === 'checked') return <Badge tone="ok">Checked</Badge>;
   return <Badge tone="warn">Removed</Badge>;
 }

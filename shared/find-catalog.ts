@@ -177,8 +177,9 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   // Capabilities › Memory
   ['memory', 'Memory', 'remember notes recall forget', 'Agents start with what earlier sessions kept, and save notes when you ask'],
   ['memory', 'Search by meaning', 'embeddings semantic mdenseon model gpu cpu', 'Finds notes, and anything in this search, by what it means'],
-  ['memory', 'Notes each agent starts with', 'top k how many notes retrieval relevant context memory count', 'Besides your profile: the notes that bear most on what you ask, then the latest'],
-  ['memory', 'Tidy up each night', 'merge duplicates summaries topics profile consolidate', 'The helper model merges notes that say the same thing and sums related ones up'],
+  ['memory', 'Notes each agent starts with', 'top k how many notes retrieval relevant context memory count index titles', 'Besides your profile: at most this many notes that bear on what you ask, and the titles of the rest'],
+  ['memory', 'Tidy up each night', 'merge duplicates summaries topics profile consolidate titles', 'The helper model merges notes that say the same thing, sums related ones up and titles them'],
+  ['memory', 'Learn from conversations', 'dreaming learn sessions transcripts correct check verify notes nightly consolidate', 'With the tidy-up: corrects notes the conversations show wrong, checks the unchecked, keeps a few new things'],
   ['memory', 'Tidy up now', 'merge duplicates consolidate clean', 'Tidies memory up at once'],
   ['memory', 'Your profile', 'user profile about me who i am preferences personal edit', 'What every agent gets about you at the start of a session; agents keep it current'],
   ['memory', 'Profile length', 'profile longest words limit maximum size shorten', 'The most words your profile may have; longer, the helper model shortens it'],

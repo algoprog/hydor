@@ -11,22 +11,25 @@ import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { runHead } from '../../shared/automations.ts';
-import type { MemoryNoteData } from '../../shared/memory.ts';
+import type { MemoryBasis, MemoryEntry, MemoryNoteData } from '../../shared/memory.ts';
 import type { TimelineItem, ToolInfo } from '../../shared/types.ts';
 import { kvSet, openDb } from '../db.ts';
-import type { RunCtx } from '../features/types.ts';
+import type { Deps, RunCtx, SpawnAdditions } from '../features/types.ts';
+import { memory as memoryFeature } from './index.ts';
 import { availableMemory } from '../models/machine.ts';
 import { notesOf } from '../notes.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import { backfill, embed, meaningState, requestVector, setEmbedderForTests } from './embed.ts';
 import { noteChanges, turnsAfter } from './extract.ts';
-import { MEMORY_BUDGET, memoryInstructions } from './inject.ts';
+import { INDEX_CHARS, MEMORY_BUDGET, memoryInstructions } from './inject.ts';
 import { fitProfile, profile as profileFeature, profileBlock, profileFit, saveProfile, userProfile } from './profile.ts';
 import { memoryState } from './routes.ts';
-import { allWords, anyWords, findNotes, MIN_SIMILARITY } from './search.ts';
+import { allWords, anyWords, bears, findNotes, MIN_SIMILARITY } from './search.ts';
 import { redactSecrets, secretIn } from './secrets.ts';
 import * as store from './store.ts';
-import { applyTidy, endOfDay, nearGroups, PLACE_SHARE, tidy, tidyDue, topicGroups, undoTidy, type Ask } from './tidy.ts';
+import { applyTidy, endOfDay, mergedBasis, nearGroups, PLACE_SHARE, tidy, tidyDue, titlesFor, topicGroups, undoTidy, type Ask } from './tidy.ts';
+import { LEARN_SYSTEM, missingPaths } from './learn.ts';
+import { fillTranscripts, transcriptCounts } from './transcripts.ts';
 import { memoryTools } from './tools.ts';
 import * as vec from './vectors.ts';
 import { defaultInterests, rankByInterest, RANK_BY_INTEREST, tokens } from './interest.ts';
@@ -286,7 +289,7 @@ test('search: by words, by meaning when it runs, fused, with what is recent and 
 
 // ---- what agents are told -------------------------------------------------------------------------
 
-test('instructions: framed as background, every place gets room, capped, what bears on the request first', async () => {
+test('instructions: framed as background, every place gets room, what bears on the request first, an index of the rest', async () => {
   useFakeEmbedder();
   const key = 'claude:inject';
   const empty = await memoryInstructions(db, { cwd: repo, key, session: true });
@@ -298,18 +301,23 @@ test('instructions: framed as background, every place gets room, capped, what be
   add({ scope: 'session', scopeKey: key }, 'Moving checkout to Stripe; refunds left.', { at: 2000 });
   await backfill(db);
   const t = await memoryInstructions(db, { cwd: path.join(wt, 'web'), key, session: true, query: 'fix the stripe webhooks' });
-  assert.ok(t.length <= MEMORY_BUDGET, `capped (${t.length})`);
+  const given = t.split('\n').filter((l) => l.startsWith('- ') || l.startsWith('Profile:'));
+  assert.ok(given.join('\n').length <= MEMORY_BUDGET, 'the notes given are capped');
+  assert.ok(t.length <= MEMORY_BUDGET + 2 * (INDEX_CHARS + 200), `the index has its own room (${t.length})`);
   assert.ok(t.includes('About the user:') && t.includes(`This project (${repo}):`) && t.includes('This session so far:'));
-  assert.ok(t.includes('Global fact number 79'), 'newest first');
-  assert.ok(!t.includes('Global fact number 0 '), 'oldest left out');
   const proj = t.slice(t.indexOf('This project'));
   assert.ok(proj.split('\n')[1].includes('Stripe webhooks'), 'the note matching the request comes first');
-  assert.equal(store.getEntry(db, stripe.id)?.uses, 1, 'it counts as used');
-  assert.equal(store.entries(db, { scope: 'global', limit: 1 })[0].uses, 0, 'what only filled the space does not');
+  assert.ok(!given.some((l) => l.includes('Global fact number')), 'nothing given just to fill the room');
+  const index = t.split('\n').filter((l) => l.startsWith('Also kept here'));
+  assert.equal(index.length, 2, 'an index of each bigger place');
+  assert.ok(index[0].includes('Global fact number 79') && / \d+ more$/.test(index[0]), 'newest first, as many titles as fit');
+  assert.equal(store.getEntry(db, stripe.id)?.uses, 1, 'what bore on the request counts as needed');
+  assert.equal(store.getEntry(db, stripe.id)?.hits, 0, 'but not as looked up');
+  assert.equal(store.entries(db, { scope: 'global', limit: 1 })[0].uses, 0, 'what is only in the index does not');
   const fresh = await memoryInstructions(db, { cwd: repo, key, session: false });
   assert.ok(!fresh.includes('This session so far:'), 'a new session gets no session notes');
-  const small = await memoryInstructions(db, { cwd: repo, key, session: true, budget: 1300 });
-  assert.ok(small.length <= 1300 && small.includes('About the user:') && small.includes('This project') && small.includes('This session'));
+  const small = await memoryInstructions(db, { cwd: repo, key, session: true, budget: 2000 });
+  assert.ok(small.includes('About the user:') && small.includes('This project') && small.includes('This session'));
   store.clearAll(db);
 });
 
@@ -327,40 +335,105 @@ test('instructions with summaries: a project’s profile first, a topic instead 
   const t = await memoryInstructions(db, { cwd: repo, session: false });
   assert.ok(!t.includes(profile.text), 'the user’s profile is not among the notes');
   assert.ok(t.slice(t.indexOf('This project')).split('\n')[1].startsWith('Profile: A shop'), 'a project’s profile comes first');
-  assert.ok(t.includes('sums up 3 notes'));
-  for (const n of notes) assert.ok(!t.includes(n.text), 'the notes the topic sums up are left out');
-  assert.ok(!t.includes(other.text), 'and the one the user’s profile holds');
+  assert.ok(t.includes(`Running: every morning; a marathon in 2025; training… [topic #${topic.id}, 3 notes]`), 'a topic in the index, by its first words until it has a title');
+  for (const n of notes) assert.ok(!t.includes(n.text) && !t.includes(`#${n.id}]`), 'the notes the topic sums up are left out');
+  assert.ok(!t.includes(other.text) && !t.includes(`#${other.id}]`), 'and the one the user’s profile holds');
   assert.ok(!t.includes(build.text), 'and the one the project’s holds');
   assert.equal(userProfile(db)?.id, profile.id);
+  store.setTitles(db, [{ id: topic.id, title: 'How the user trains' }]);
+  assert.ok((await memoryInstructions(db, { cwd: repo, session: false })).includes(`How the user trains [topic #${topic.id}, 3 notes]`), 'its own title when it has one');
   store.clearAll(db);
 });
 
-test('instructions: the k notes that bear most on the request, then the latest; the session’s own besides', async () => {
+test('instructions: at most k notes that stand out for the request, a small place whole, the session’s own besides', async () => {
   useFakeEmbedder();
   const key = 'claude:topk';
   const now = Date.now();
-  for (let i = 0; i < 30; i++) add(G, `Filler fact number ${i + 10} about the user.`, { at: now - 100_000 + i });
-  const tea = add(G, 'The user drinks green tea every afternoon.', { at: now - 500_000 });
+  // About the user, more than a small place holds; the project, one note.
+  for (let i = 0; i < 30; i++) add(G, `Filler fact number ${i + 10} about the user, ${'with words of no interest here '.repeat(3)}`, { at: now - 100_000 + i });
+  const teas = ['The user drinks green tea every afternoon.', 'The user likes jasmine tea best.', 'The user buys tea from a shop in Kyoto.', 'The user brews tea at 80 degrees.'].map((x, i) => add(G, x, { at: now - 500_000 + i }));
   const deploy = add(R, 'Deploys go out by restarting web-agent.service.', { at: now - 500_000 });
   const own = add({ scope: 'session', scopeKey: key }, 'Halfway through the shop page.', { at: now });
   await backfill(db);
   const lasting = (t: string) => t.split('\n').filter((l) => l.startsWith('- ') && !l.includes(own.text));
   const t = await memoryInstructions(db, { cwd: repo, key, session: true, query: 'which tea does the user like', k: 3, now });
-  assert.equal(lasting(t).length, 3, 'k notes about the user and the project');
-  assert.ok(lasting(t)[0].includes(tea.text), 'the one bearing on the request first');
-  assert.ok(t.includes('Filler fact number 39') && t.includes(deploy.text), 'then the latest, a place at a time');
+  const about = lasting(t.slice(0, t.indexOf('This project')));
+  assert.equal(about.length, 3, 'k of the notes that bear on it');
+  assert.ok(about.every((l) => l.includes(' tea ')), 'only those that stand out for the request');
+  assert.ok(lasting(t).some((l) => l.includes(deploy.text)), 'a small place whole');
   assert.ok(t.includes(own.text), 'the session’s own notes besides');
-  assert.equal(store.getEntry(db, tea.id)?.uses, 1, 'what bore on the request counts as used');
+  assert.ok(teas.filter((n) => store.getEntry(db, n.id)!.uses === 1).length === 3, 'what bore on the request counts as needed');
   assert.equal(store.topK(db), 10, 'ten unless changed');
   store.setTopK(db, 2);
-  assert.equal(lasting(await memoryInstructions(db, { cwd: repo, key, session: true, query: 'which tea does the user like', now })).length, 2, 'k from Settings');
+  assert.equal(lasting((await memoryInstructions(db, { cwd: repo, key, session: true, query: 'which tea does the user like', now })).slice(0, 4000)).filter((l) => l.includes(' tea ')).length, 2, 'k from Settings');
   assert.throws(() => store.setTopK(db, 0));
   assert.throws(() => store.setTopK(db, 51));
-  // A larger k gets more room: forty notes of 300 characters do not fit in 4,000.
-  for (let i = 0; i < 40; i++) add(G, `Long fact ${i} ${'about many things and places '.repeat(10)}`.slice(0, 300));
-  const wide = await memoryInstructions(db, { cwd: repo, key, session: false, k: 40, now });
-  assert.ok(wide.length > 8000 && wide.length <= 40 * 400, `room for k (${wide.length})`);
+  // A larger k gets more room: forty notes of 300 characters that bear on the request do not fit in 5,000.
+  for (let i = 0; i < 700; i++) add(G, `Unrelated note ${i} on topic${i} and subject${i}.`);
+  for (let i = 0; i < 40; i++) add(G, `Long tea fact ${i} ${'about green tea and teapots '.repeat(10)}`.slice(0, 300));
+  await backfill(db);
+  const wide = await memoryInstructions(db, { cwd: repo, key, session: false, query: 'green tea and teapots', k: 40, now });
+  const notes = lasting(wide).join('\n');
+  assert.ok(notes.length > 8000 && notes.length <= 40 * 400, `room for k (${notes.length})`);
   store.setTopK(db, 10);
+  store.clearAll(db);
+});
+
+test('what bears on a request: what stands out from the rest for it, not a fixed similarity', () => {
+  // A long brief alike to every note, and a short question alike to few (measured: means of 0.44 and 0.20).
+  assert.equal(bears(0.45, { n: 88, mean: 0.43, sd: 0.06 }).relevant, false, 'alike to everything: nothing stands out');
+  assert.equal(bears(0.62, { n: 88, mean: 0.43, sd: 0.06 }).relevant, true);
+  assert.equal(bears(0.29, { n: 88, mean: 0.2, sd: 0.03 }).relevant, true, 'below 0.3, yet it stands out');
+  assert.equal(bears(0.35, { n: 5, mean: 0.2, sd: 0.03 }).relevant, true, 'too few notes to judge: by similarity');
+  assert.equal(bears(0.25, { n: 5, mean: 0.2, sd: 0.03 }).relevant, false);
+});
+
+test('ranking weighs what agents looked up, not what they were given', async () => {
+  useFakeEmbedder();
+  const now = Date.now();
+  const given = add(G, 'The user keeps bees in the garden.', { at: now - 1000 });
+  const looked = add(G, 'The user keeps bees on the roof.', { at: now - 1000 });
+  await backfill(db);
+  for (let i = 0; i < 50; i++) store.markUsed(db, [given.id], now);
+  store.markHit(db, [looked.id], now);
+  const e = store.getEntry(db, looked.id)!;
+  assert.equal(e.hits, 1);
+  assert.equal(e.uses, 1, 'a look-up counts as needed too');
+  assert.equal(store.getEntry(db, given.id)!.hits, 0, 'being given is not a look-up');
+  const found = await findNotes(db, { places: [G], query: 'where does the user keep bees', now });
+  assert.equal(found[0].entry.id, looked.id, 'the one looked up first, though the other was given fifty times');
+  store.clearAll(db);
+});
+
+test('a session’s memory block stays the same while it works: for Custom until the conversation is condensed', async () => {
+  useFakeEmbedder();
+  const key = 'acp:block';
+  let asked = 'the stripe webhooks';
+  const d = { db, broadcast() {}, sessions: { timeline: async () => ({ parser: { items: [user(asked)] }, readMore: async () => {} }) } } as unknown as Deps;
+  add(R, 'Payments use Stripe webhooks in server/pay.ts.');
+  await backfill(db);
+  const s = { key, cwd: repo, extra: {}, epoch: 0 };
+  const first = await memoryFeature.context!(s, d);
+  assert.ok(first?.includes('Stripe webhooks'));
+  add(R, 'Refunds go through the Stripe dashboard only.');
+  asked = 'the refunds';
+  await backfill(db);
+  assert.equal(await memoryFeature.context!(s, d), first, 'the same block within one condensing: the instructions stay cached');
+  const after = await memoryFeature.context!({ ...s, epoch: 1 }, d);
+  assert.ok(after?.includes('Refunds go through'), 'condensed: memory read afresh');
+  assert.equal(store.keptBlock(db, key, 'full', 1, Date.now() + store.BLOCK_REST_MS + 1000), null, 'after resting an hour it is made again');
+  assert.equal(await memoryFeature.context!({ ...s, extra: { memory: false } }, d), null, 'memory off: none');
+  // Each agent's own memory stays off, memory on or not.
+  const spawn = (agent: 'claude' | 'codex', extra = {}) => memoryFeature.spawn!({ agent, cwd: repo, runId: 'r', resume: false, extra, prompt: 'hello there' }, d) as Promise<SpawnAdditions | undefined>;
+  assert.equal((await spawn('claude'))?.env?.CLAUDE_CODE_DISABLE_AUTO_MEMORY, '1');
+  assert.equal((await spawn('claude', { memory: false }))?.env?.CLAUDE_CODE_DISABLE_AUTO_MEMORY, '1', 'a session with memory off keeps nothing anywhere');
+  assert.deepEqual((await spawn('codex'))?.codexConfig, { features: { memories: false } });
+  // Claude Code and Codex: the block a session got comes back unchanged when it goes on within the hour.
+  const claude = { agent: 'claude' as const, key: 'claude:resume', cwd: repo, runId: 'r', resume: false, extra: {}, prompt: 'the stripe webhooks' };
+  const a = (await memoryFeature.spawn!(claude, d))!.instructions![0];
+  add(R, 'Stripe webhooks retry for three days.');
+  await backfill(db);
+  assert.equal((await memoryFeature.spawn!({ ...claude, resume: true }, d))!.instructions![0], a);
   store.clearAll(db);
 });
 
@@ -692,6 +765,167 @@ test('topic groups by words when there are no vectors', () => {
   assert.equal(groups.length, 1);
   assert.deepEqual(new Set(groups[0].map((e) => e.id)), new Set(notes.map((n) => n.id)));
   store.clearAll(db);
+});
+
+test('how a note is known: said, checked or not checked yet; agents are told which are unchecked; a merge keeps the weakest', async () => {
+  useFakeEmbedder();
+  const ctx = toolCtx('claude:basis', repo);
+  const tools = memoryTools(ctx);
+  const remember = tools.find((t) => t.name === 'remember')!;
+  assert.ok(String(await remember.run({ text: 'The build needs Node 22 or newer.', scope: 'repo', basis: 'inferred' }, ctx)).includes('not checked yet'));
+  const e = store.entries(db, { scope: 'repo' })[0];
+  assert.equal(e.basis, 'inferred');
+  assert.ok((await memoryInstructions(db, { cwd: repo, session: false })).includes(`[#${e.id}, unchecked]`), 'agents are told');
+  await remember.run({ text: 'The build needs Node 22.', replaces: e.id, basis: 'checked' }, ctx);
+  const c = store.getEntry(db, e.id)!;
+  assert.equal(c.basis, 'checked', 'a correction says how its text is known');
+  assert.equal(c.hits, 1, 'and counts as a look-up');
+  assert.ok(store.history(db, e.id).some((h) => h.action === 'basis' && h.before === 'inferred' && h.after === 'checked'));
+  await backfill(db);
+  await tools.find((t) => t.name === 'recall')!.run({ query: 'which node version does the build need' }, ctx);
+  assert.equal(store.getEntry(db, e.id)!.hits, 2, 'recall is a look-up');
+  assert.equal(store.addEntry(db, { ...G, text: 'Written in Settings.', basis: 'user' }, { source: 'user' }).basis, 'user');
+  const b = (...xs: (MemoryBasis | undefined)[]) => mergedBasis(xs.map((basis) => ({ basis }) as MemoryEntry));
+  assert.equal(b('user', 'checked'), 'checked');
+  assert.equal(b('user', 'inferred'), 'inferred', 'unchecked when any part was');
+  assert.equal(b('user', 'user'), 'user');
+  assert.equal(b('user', undefined), undefined);
+  store.clearAll(db);
+});
+
+test('titles: the tidy-up gives each note and topic one, a new text loses it, and the first words stand in until then', async () => {
+  const a = add(R, 'Template app pages (AppPage.tsx) have an Effort picker between Model and Mode.');
+  const b = add(R, 'The user dislikes fade-in animations and pre-loading screens of any kind at all.');
+  assert.equal(store.titleOf(a), 'Template app pages have an Effort picker between…', 'what is in brackets left out');
+  assert.equal(store.titleOf(b), 'The user dislikes fade-in animations and pre-loading screens…');
+  const ask = stub({ titles: [{ id: a.id, title: 'Effort picker on app pages.' }, { id: b.id, title: 'No fade-ins' }, { id: 99999, title: 'Not asked about' }] });
+  assert.equal(await titlesFor(db, ask, Date.now()), 2);
+  assert.ok(ask.calls[0].prompt.includes(a.text));
+  assert.equal(store.getEntry(db, a.id)!.title, 'Effort picker on app pages');
+  store.updateEntry(db, a.id, 'App pages have an Effort picker.', { source: 'user' });
+  assert.equal(store.getEntry(db, a.id)!.title, undefined, 'a new text loses its title');
+  const again = stub({ titles: [] });
+  await titlesFor(db, again, Date.now());
+  assert.ok(!again.calls[0].prompt.includes(b.text), 'only what has none is asked about');
+  store.clearAll(db);
+});
+
+test('learning from conversations: notes shown wrong fixed or deleted, the unchecked checked, a few new ones; what is never read; undo', async () => {
+  useFakeEmbedder();
+  const now = Date.now();
+  const app = db.prepare("insert into app_sessions (key, agent, cwd, title, created_at, updated_at) values (?, 'claude', ?, ?, ?, ?)");
+  const chunk = db.prepare('insert into chunk_text (key, kind, ts, text) values (?, ?, ?, ?)');
+  app.run('claude:upload', repo, 'Upload page', now, now);
+  chunk.run('claude:upload', 'user', now - 5000, 'The upload limit is 2 GB now, not 1 GB. Remember I always want limits in GB.');
+  chunk.run('claude:upload', 'assistant', now - 4500, 'Working on it.');
+  chunk.run('claude:upload', 'assistant', now - 4000, 'Done: the upload page takes 2 GB files and the tests pass.');
+  app.run('claude:private', repo, 'Private', now, now);
+  setSessionExtra(db, 'claude:private', { memory: false });
+  chunk.run('claude:private', 'user', now - 5000, 'Thoughts about my bank that must never be kept.');
+  app.run('claude:child', repo, 'Child', now, now);
+  setSessionExtra(db, 'claude:child', { parent: 'claude:upload' });
+  chunk.run('claude:child', 'user', now - 5000, 'An agent’s brief about the upload limit.');
+  app.run('claude:run', repo, 'Nightly check', now, now);
+  chunk.run('claude:run', 'user', now - 5000, `${runHead({ task: 'Nightly check', when: 'Daily at 02:00', trigger: 'schedule', now: 'Sunday' })}\nWhen you finish, call report_outcome once.\n\nCheck the uploads.`);
+  // An unchecked note from an older conversation: that conversation is shown with it.
+  app.run('claude:old', repo, 'Old upload work', now - 9 * 86400_000, now - 9 * 86400_000);
+  chunk.run('claude:old', 'user', now - 9 * 86400_000 - 2000, 'Why do big uploads fail?');
+  chunk.run('claude:old', 'assistant', now - 9 * 86400_000 - 1000, 'Probably nginx’s body size limit.');
+  const wrong = add(R, 'The upload limit is 1 GB.');
+  const guess = store.addEntry(db, { ...R, text: 'Uploads over 1 GB fail because of nginx.', basis: 'inferred' }, { source: 'agent', session: 'claude:old', at: now - 9 * 86400_000 });
+  const gone = add(R, 'The old uploader lives in web/src/legacy/Upload.tsx.');
+  for (let i = 0; i < 20; i++) add(R, `Unrelated project fact ${i} about item${i}.`);
+  await backfill(db);
+  const ops = [
+    { op: 'fix', id: wrong.id, text: 'The upload limit is 2 GB.', basis: 'user', session: 1, why: 'raised' },
+    { op: 'confirm', id: guess.id, session: 2 },
+    { op: 'delete', id: gone.id, session: 1, why: 'no such file' },
+    { op: 'add', about: 'user', text: 'The user wants upload limits given in GB.', basis: 'user', session: 1 },
+    { op: 'add', about: 'project', text: 'Upload changes are done only when the upload tests pass.', session: 1 },
+    { op: 'add', about: 'project', text: 'Big uploads go through the chunked uploader.', session: 1 },
+    { op: 'add', about: 'project', text: 'A fourth new note, over what one question may add.', session: 1 },
+    { op: 'fix', id: 99999, text: 'A note it was not shown.', session: 1 },
+    { op: 'add', about: 'project', text: 'From a conversation it did not read.', session: 9 },
+  ];
+  const ask = stub((q: { system: string }) => (q.system === LEARN_SYSTEM ? { ops } : q.system.startsWith('You title') ? { titles: [] } : { ops: [] }));
+  const r = await tidy(db, ask, { now, learn: true });
+  assert.equal(r.error, undefined);
+  assert.equal(r.learnError, undefined);
+  const prompt = ask.calls.find((c) => c.system === LEARN_SYSTEM)!.prompt;
+  assert.ok(prompt.includes('The upload limit is 2 GB now') && prompt.includes('Agent: Done: the upload page'), 'what the user wrote and the last reply');
+  assert.ok(!prompt.includes('Working on it'), 'not the steps between');
+  assert.ok(!prompt.includes('bank') && !prompt.includes('brief about') && !prompt.includes('Check the uploads'), 'never memory off, a child’s brief or a scheduled run');
+  assert.ok(prompt.includes(`(the conversation that wrote note #${guess.id})`) && prompt.includes('Probably nginx'), 'an unchecked note with where it came from');
+  assert.ok(prompt.includes('names web/src/legacy/Upload.tsx, which is not in the project now'));
+  assert.equal(r.sessions, 1);
+  assert.equal(store.getEntry(db, wrong.id)!.text, 'The upload limit is 2 GB.');
+  assert.equal(store.getEntry(db, wrong.id)!.basis, 'user');
+  assert.equal(store.getEntry(db, guess.id)!.basis, 'checked');
+  assert.equal(store.getEntry(db, gone.id)!.status, 'deleted');
+  const learned = r.changes.filter((c) => c.session);
+  assert.equal(learned.filter((c) => c.action === 'added').length, 2, 'at most two new notes from one question');
+  assert.ok(learned.every((c) => c.why?.includes('“Upload page”') || c.why?.includes('“Old upload work”')), 'each says what it came from');
+  assert.equal(store.entries(db, { scope: 'global' }).filter((e) => e.text.includes('in GB'))[0]?.basis, 'user');
+  // Undo: a check taken back, a new note gone.
+  const checked = r.changes.findIndex((c) => c.action === 'checked');
+  undoTidy(db, checked);
+  assert.equal(store.getEntry(db, guess.id)!.basis, 'inferred');
+  // The next time reads only what is new.
+  const calls = ask.calls.length;
+  const again = await tidy(db, ask, { now: now + 1000, learn: true });
+  assert.equal(again.sessions ?? 0, 0);
+  assert.ok(!ask.calls.slice(calls).some((c) => c.system === LEARN_SYSTEM));
+  // A failure there leaves the rest of the tidy-up to run.
+  chunk.run('claude:upload', 'user', now + 5000, 'One more thing about uploads.');
+  const failing = stub((q: { system: string }) => {
+    if (q.system === LEARN_SYSTEM) throw new Error('The helper model did not answer');
+    return q.system.startsWith('You title') ? { titles: [] } : { ops: [] };
+  });
+  const third = await tidy(db, failing, { now: now + 10_000, learn: true });
+  assert.ok(third.learnError?.includes('did not answer') && !third.error);
+  db.prepare("delete from chunk_text where key like 'claude:%'").run();
+  db.prepare("delete from app_sessions where key like 'claude:%'").run();
+  store.clearAll(db);
+});
+
+test('files a project note names that are no longer there', () => {
+  fs.writeFileSync(path.join(repo, 'web', 'src', 'App.tsx'), '');
+  const e = add(R, 'The shell is web/src/App.tsx; the old one was web/src/Old.tsx (see https://example.com/a/b.html).');
+  assert.deepEqual(missingPaths(e), ['web/src/Old.tsx']);
+  assert.deepEqual(missingPaths(add(R, 'It ended in web/src/Gone.tsx.')), ['web/src/Gone.tsx'], 'at the end of a sentence too');
+  assert.deepEqual(missingPaths(add(G, 'The user keeps notes in web/src/Old.tsx.')), [], 'only a project’s notes');
+  store.clearAll(db);
+});
+
+test('past conversations by meaning: each message the user wrote gets a vector (the same words once), and a question finds its session', async () => {
+  useFakeEmbedder();
+  const now = Date.now();
+  const ses = db.prepare("insert into sessions (key, agent, id, path, title, cwd, updated_at) values (?, 'claude', ?, '', ?, ?, ?)");
+  const chunk = db.prepare('insert into chunk_text (key, kind, ts, text) values (?, ?, ?, ?)');
+  ses.run('claude:move', 'move', 'Moving abroad', plain, now);
+  chunk.run('claude:move', 'user', now, 'We relocated to Paris last spring with the kids.');
+  chunk.run('claude:move', 'user', now, 'ok thanks');
+  for (let i = 0; i < 30; i++) {
+    ses.run(`claude:garden${i}`, `garden${i}`, `Garden ${i}`, plain, now);
+    chunk.run(`claude:garden${i}`, 'user', now, `How often should I water bed${i} of tomatoes and herbs${i}?`);
+  }
+  while ((await fillTranscripts(db, { limit: 8 })) > 0);
+  const counts = transcriptCounts(db);
+  assert.equal(counts.embedded, counts.total, 'every message has one (a short one an empty one)');
+  const before = fakeCalls.flat().filter((t) => t.includes('relocated to Paris')).length;
+  ses.run('claude:copy', 'copy', 'Copy', plain, now);
+  chunk.run('claude:copy', 'user', now, 'We relocated to Paris last spring with the kids.');
+  await fillTranscripts(db);
+  assert.equal(fakeCalls.flat().filter((t) => t.includes('relocated to Paris')).length, before, 'the same words take the vector kept');
+  const summary = (key: string) => ({ key, agent: 'claude', id: key, title: key, cwd: plain, updatedAt: now });
+  const ctx: RunCtx = { runId: 'r3', key: 'claude:asker', agent: 'claude', cwd: plain, deps: { db, broadcast() {}, sessions: { summary } } as unknown as RunCtx['deps'] };
+  const search = memoryTools(ctx).find((t) => t.name === 'search_sessions')!;
+  const out = String(await search.run({ query: 'living in another city' }, ctx));
+  assert.ok(out.includes('claude:move') && out.includes('asked: “We relocated to Paris'), 'found by meaning, with no word in common');
+  assert.ok(!out.includes('claude:garden'), 'only what stands out');
+  setSessionExtra(db, 'claude:move', { memory: false });
+  assert.ok(!String(await search.run({ query: 'living in another city' }, ctx)).includes('claude:move'), 'memory off: not found');
+  db.prepare("delete from chunk_text where key like 'claude:%'").run();
 });
 
 // ---- search by meaning's switches ----------------------------------------------------------------
