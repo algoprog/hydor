@@ -1,7 +1,7 @@
 // Memory across sessions, as the server keeps it and the pages show it: notes about the user (global),
 // about a project (repo: a repository's root, or a folder outside git) and about one session, and the
 // user's profile. Agents and the user write notes and the profile; agents start with the profile, the
-// notes that bear most on the request and an index of the rest. The nightly tidy-up merges near-copies,
+// notes that bear most on the request and an index of the rest. The tidy-up, about once a day, merges near-copies,
 // titles notes for that index and, where a place's notes no longer fit, sums related notes up in topics,
 // and writes a project's short profile; with Learn from conversations on, it first reads the conversations
 // since the last one, to correct the notes they show wrong, check the unchecked and keep what none saved.
@@ -30,13 +30,13 @@ export const TOP_K_MAX = 50;
 /** What Settings offers. */
 export const TOP_K_CHOICES = [5, 10, 20, 40];
 
-/** Who made a change: the helper model (the nightly tidy-up, or an expiry), an agent with its tools, or the user. */
+/** Who made a change: the helper model (the tidy-up, or an expiry), an agent with its tools, or the user. */
 export type MemorySource = 'auto' | 'agent' | 'user';
 
 /**
- * How a note is known: the user said so, it was checked (a test, a command, a file, or the nightly pass found
+ * How a note is known: the user said so, it was checked (a test, a command, a file, or the tidy-up found
  * a conversation that shows it), or an agent concluded it without checking yet. Notes from before this was
- * kept have none. Agents are told which notes are not checked yet, and the nightly pass checks those first.
+ * kept have none. Agents are told which notes are not checked yet, and the tidy-up checks those first.
  */
 export type MemoryBasis = 'user' | 'checked' | 'inferred';
 export const MEMORY_BASES: MemoryBasis[] = ['user', 'checked', 'inferred'];
@@ -48,7 +48,7 @@ export interface MemoryEntry {
   scopeKey: string;
   kind: MemoryKind;
   text: string;
-  /** A few words naming what it is about, for the index agents start with (the nightly tidy-up writes it). */
+  /** A few words naming what it is about, for the index agents start with (the tidy-up writes it). */
   title?: string;
   /** How it is known (none: from before this was kept). */
   basis?: MemoryBasis;
@@ -90,7 +90,7 @@ export interface MemoryHistoryRow {
 }
 
 /**
- * A change a turn or a tidy-up made, as the note under a reply and Settings show it. "checked": the nightly
+ * A change a turn or a tidy-up made, as the note under a reply and Settings show it. "checked": the tidy-up
  * pass found a conversation that shows a note not checked before to be true.
  */
 export interface MemoryChange {
@@ -107,7 +107,7 @@ export interface MemoryChange {
   /** For "checked": how it was known before. */
   basisBefore?: MemoryBasis;
   why?: string;
-  /** The conversation it was learned from, or that showed it wrong or true (the nightly pass). */
+  /** The conversation it was learned from, or that showed it wrong or true (the tidy-up). */
   session?: string;
   source: MemorySource;
   /** Undone since. */
@@ -175,10 +175,10 @@ export interface MemoryState {
   /** How many notes about the user and the project agents start with: those bearing most on the request, then the latest. */
   topK: number;
   meaning: MeaningState;
-  /** The nightly tidy-up is on, and how the latest went. */
+  /** The tidy-up runs by itself (about once a day, when there is something new), and how the latest went. */
   tidyOn: boolean;
   /** The tidy-up also reads the conversations since the last one: it corrects notes they show wrong, checks
-   * those not checked yet, and keeps (at most a few a night) what no agent saved. */
+   * those not checked yet, and keeps (at most a few a day) what no agent saved. */
   learnOn: boolean;
   tidy?: TidyReport;
   /** Notes no agent has needed for a long while (suggested for removal in Settings). */

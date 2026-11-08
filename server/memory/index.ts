@@ -5,9 +5,9 @@
 // by words and, when that is on, by meaning (search.ts, embed.ts), and an index of the rest (inject.ts): once, in
 // the instructions they start with. Custom gets its block before its first turn and keeps it until its
 // conversation is condensed, so its provider's cache of the conversation holds; a session's block is kept, and
-// one that goes on within the hour gets it again unchanged. Each night the helper model tidies memory up and,
-// unless that is turned off, learns from the day's conversations (tidy.ts), and every hour notes past their end
-// date go. Settings → Memory turns it off for all sessions, a session's menu for one. Claude Code's and Codex's
+// one that goes on within the hour gets it again unchanged. About once a day, whenever the app is on and there is
+// something new, the helper model tidies memory up and, unless that is turned off, learns from the conversations
+// since (tidy.ts); notes past their end date go within minutes. Settings → Memory turns it off for all sessions, a session's menu for one. Claude Code's and Codex's
 // own memories stay off in the sessions the app runs: these notes are the one memory every agent shares.
 import type { Agent } from '../../shared/types.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
@@ -60,8 +60,11 @@ async function lastAsk(d: Deps, key?: string): Promise<string | undefined> {
 }
 
 const changed = (d: Deps) => d.broadcast({ t: 'feature', id: 'memory', data: { changed: true } });
-/** When a try at titles last came back with none. */
+/** When a try at titles last came back with none, and when one last ran. */
 let titlesFailed = 0;
+let titlesAt = 0;
+/** How often the upkeep looks at what is due: often enough that a computer on for a short while still gets it. */
+const UPKEEP_MS = 10 * 60_000;
 
 function schedule(d: Deps, key: string) {
   clearTimeout(timers.get(key));
@@ -126,30 +129,33 @@ export const memory: Feature = {
         console.warn(`[memory] sweep: ${(e as Error).message}`);
       }
     };
-    const hourly = () => {
+    const upkeep = () => {
       try {
         if (expireDue(d.db)) changed(d);
       } catch (e) {
         console.warn(`[memory] expiry: ${(e as Error).message}`);
       }
-      if (memoryOn(d.db) && tidyOn(d.db) && tidyDue(d.db))
+      const now = Date.now();
+      if (memoryOn(d.db) && tidyOn(d.db) && tidyDue(d.db, now))
         void tidy(d.db, helperAsk(d.db), { learn: learnOn(d.db) }).then((r) => {
           if (r.error) console.warn(`[memory] tidy-up: ${r.error}`);
           changed(d);
         });
-      // New notes get their titles for the index within the hour, not only at night (after a try that titled
+      // New notes get their titles for the index within the hour, not only with the tidy-up (after a try that titled
       // nothing, not again for half a day).
-      else if (memoryOn(d.db) && tidyOn(d.db) && untitled(d.db) > 0 && Date.now() - titlesFailed > 12 * 3600_000)
-        void titlesFor(d.db, helperAsk(d.db), Date.now())
+      else if (memoryOn(d.db) && tidyOn(d.db) && now - titlesAt > 3600_000 && now - titlesFailed > 12 * 3600_000 && untitled(d.db) > 0) {
+        titlesAt = now;
+        void titlesFor(d.db, helperAsk(d.db), now)
           .then((n) => void (n || (titlesFailed = Date.now())))
           .catch((e) => {
             titlesFailed = Date.now();
             console.warn(`[memory] titles: ${(e as Error).message}`);
           });
+      }
     };
     setTimeout(daily, 60_000).unref();
     setInterval(daily, 24 * 3600_000).unref();
-    setTimeout(hourly, 5 * 60_000).unref();
-    setInterval(hourly, 3600_000).unref();
+    setTimeout(upkeep, 2 * 60_000).unref();
+    setInterval(upkeep, UPKEEP_MS).unref();
   },
 };

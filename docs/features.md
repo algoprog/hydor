@@ -129,11 +129,12 @@ agents that speak ACP and take MCP servers.
   LightOn's mDenseOn model on your own computer (on a GPU, an NVIDIA one or a Mac's own, or on the CPU in about 1.5 GB,
   only while needed), each counting only when it stands out from the rest for that request; a place with few notes
   whole; and an index of the rest by title, to look up. Nothing fills the room, and only what agents looked up weighs
-  in ranking. Custom keeps its block until it condenses, so its provider's cache holds. Each night the helper
+  in ranking. Custom keeps its block until it condenses, so its provider's cache holds. About once a day the helper
   model tidies memory up: it merges notes that say the same thing, titles them, and when there are more than fit,
   sums related ones up in topics and, for a project, a short profile; and it learns from the day's conversations
   (Learn from conversations): it corrects notes they show wrong, checks the unchecked, and keeps at most three things
-  a night that no agent saved, never reading sessions with memory off. Every change can be undone.
+  a day that no agent saved, reading only what you wrote yourself (not attached files or pasted text) and never sessions
+  with memory off. It runs whenever the app is on, once a day has passed, there is something new and you pause. Every change can be undone.
   Settings → Memory lists every note with when it was written, changed and last needed (each place its three
   newest first, with Show N more; each note two lines until you open it), lets you add your
   own, and suggests removing the ones no agent needed for months. Turn it off for one session or for all.

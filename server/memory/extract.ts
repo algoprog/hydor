@@ -1,7 +1,7 @@
 // After each turn of a session the app runs, a note under the reply lists what the agent saved to memory or
 // removed from it in that turn (its remember and forget calls, and changes to the user's profile), each with undo. Memory is not written by
 // itself after a reply: notes come from agents (when the user asks, or they learn something lasting) and
-// from the user in Settings, and the nightly tidy-up (tidy.ts) keeps them short and current.
+// from the user in Settings, and the tidy-up (tidy.ts) keeps them short and current, about once a day.
 import { splitRunMessage } from '../../shared/automations.ts';
 import type { MemoryChange, MemoryHistoryRow, MemoryNoteData } from '../../shared/memory.ts';
 import type { TimelineItem, ToolInfo } from '../../shared/types.ts';

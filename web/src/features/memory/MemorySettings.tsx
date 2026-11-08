@@ -1,5 +1,5 @@
 // Settings → Memory: memory on or off for all sessions; search by meaning (set up on this computer, where it
-// runs, how many notes have their vectors); how many notes agents start with; the nightly tidy-up (when it ran,
+// runs, how many notes have their vectors); how many notes agents start with; the tidy-up, by itself about once a day (when it ran,
 // how many conversations it learned from, each change it made, undoable, and running it now) and learning from
 // conversations; your profile (every agent gets it, agents keep it current,
 // you edit it, and how many words it may have: longer, the helper shortens it); and every note kept so far by
@@ -64,8 +64,8 @@ const ACTION: Record<MemoryHistoryRow['action'], string> = { added: 'Added', upd
 const BASIS: Record<MemoryBasis, string> = { user: 'you said so', checked: 'checked', inferred: 'not checked yet' };
 const BASIS_HINT: Record<MemoryBasis, string> = {
   user: 'You said this to an agent, or wrote it here',
-  checked: 'An agent saw it hold (a test, a command, a file), or the nightly tidy-up found a conversation that shows it',
-  inferred: 'An agent’s conclusion no one has confirmed yet: agents are told so, and the nightly tidy-up checks these first',
+  checked: 'An agent saw it hold (a test, a command, a file), or the tidy-up found a conversation that shows it',
+  inferred: 'An agent’s conclusion no one has confirmed yet: agents are told so, and the tidy-up checks these first',
 };
 /** What the server calls a session no longer listed. */
 const GONE = 'A session that is gone';
@@ -188,15 +188,15 @@ function Switches() {
           control={<Segmented size="sm" value={String(st.topK)} options={TOP_K_CHOICES.map((k) => ({ value: String(k), label: String(k) }))} onChange={(v) => set({ topK: Number(v) })} />}
         />
         <Row
-          label="Tidy up each night"
-          hint="The helper model merges notes that say the same thing, sums related ones up, and gives each a title for the index agents start with."
-          control={<Switch on={st.enabled && st.tidyOn} disabled={!st.enabled} label="Tidy up each night" onChange={(on) => set({ tidy: on })} />}
+          label="Tidy up automatically"
+          hint="About once a day, when there is something new and you have paused for a few minutes: the helper model merges notes that say the same thing, sums related ones up, and gives each a title for the index agents start with."
+          control={<Switch on={st.enabled && st.tidyOn} disabled={!st.enabled} label="Tidy up automatically" onChange={(on) => set({ tidy: on })} />}
         >
           {st.enabled && <Tidy st={st} />}
         </Row>
         <Row
           label="Learn from conversations"
-          hint="With the tidy-up, the helper model reads the conversations since the last one (not those with memory off): it corrects the notes they show wrong, checks the notes not checked yet, and keeps at most a few things a night that no agent saved."
+          hint="With the tidy-up, the helper model reads the conversations since the last one (not those with memory off): it corrects the notes they show wrong, checks the notes not checked yet, and keeps at most a few things a day that no agent saved."
           control={<Switch on={st.enabled && st.learnOn} disabled={!st.enabled} label="Learn from conversations" onChange={(on) => set({ learn: on })} />}
         />
       </div>

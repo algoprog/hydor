@@ -115,7 +115,7 @@ export function setEnabled(db: DB, on: boolean) {
   kvSet(db, 'memory.enabled', on ? '1' : '0');
 }
 
-/** The nightly tidy-up (it asks the helper model; "Tidy up now" works either way). */
+/** The tidy-up by itself, about once a day (Tidy up automatically; it asks the helper model; "Tidy up now" works either way). */
 export const tidyOn = (db: DB) => kvGet(db, 'memory.tidy.enabled') !== '0';
 export function setTidyOn(db: DB, on: boolean) {
   kvSet(db, 'memory.tidy.enabled', on ? '1' : '0');

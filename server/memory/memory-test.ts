@@ -28,7 +28,7 @@ import { allWords, anyWords, bears, findNotes, MIN_SIMILARITY } from './search.t
 import { redactSecrets, secretIn } from './secrets.ts';
 import * as store from './store.ts';
 import { applyTidy, endOfDay, mergedBasis, nearGroups, PLACE_SHARE, tidy, tidyDue, titlesFor, topicGroups, undoTidy, type Ask } from './tidy.ts';
-import { LEARN_SYSTEM, missingPaths } from './learn.ts';
+import { LEARN_SYSTEM, missingPaths, ownWords } from './learn.ts';
 import { fillTranscripts, transcriptCounts } from './transcripts.ts';
 import { memoryTools } from './tools.ts';
 import * as vec from './vectors.ts';
@@ -752,8 +752,7 @@ test('tidy-up run: asks only about what changed, then topics and a profile for a
   const addedTopic = r.changes.findIndex((c) => c.action === 'added' && c.kind === 'topic');
   undoTidy(db, addedTopic);
   assert.equal(store.getEntry(db, r.changes[addedTopic].entry)?.status, 'deleted');
-  assert.ok(tidyDue(db, now + 45 * 3600_000));
-  assert.equal(tidyDue(db, now + 3600_000), false);
+  assert.equal(tidyDue(db, now + 3600_000), false, 'not twice in a day');
   store.clearAll(db);
 });
 
@@ -816,7 +815,7 @@ test('learning from conversations: notes shown wrong fixed or deleted, the unche
   const app = db.prepare("insert into app_sessions (key, agent, cwd, title, created_at, updated_at) values (?, 'claude', ?, ?, ?, ?)");
   const chunk = db.prepare('insert into chunk_text (key, kind, ts, text) values (?, ?, ?, ?)');
   app.run('claude:upload', repo, 'Upload page', now, now);
-  chunk.run('claude:upload', 'user', now - 5000, 'The upload limit is 2 GB now, not 1 GB. Remember I always want limits in GB.');
+  chunk.run('claude:upload', 'user', now - 5000, 'The upload limit is 2 GB now, not 1 GB. Remember I always want limits in GB.\n\n<pasted_content id="1">\nA PASTED-LOG line\n</pasted_content>\n\nAttached files:\n- /home/u/shot.png');
   chunk.run('claude:upload', 'assistant', now - 4500, 'Working on it.');
   chunk.run('claude:upload', 'assistant', now - 4000, 'Done: the upload page takes 2 GB files and the tests pass.');
   app.run('claude:private', repo, 'Private', now, now);
@@ -854,6 +853,7 @@ test('learning from conversations: notes shown wrong fixed or deleted, the unche
   const prompt = ask.calls.find((c) => c.system === LEARN_SYSTEM)!.prompt;
   assert.ok(prompt.includes('The upload limit is 2 GB now') && prompt.includes('Agent: Done: the upload page'), 'what the user wrote and the last reply');
   assert.ok(!prompt.includes('Working on it'), 'not the steps between');
+  assert.ok(!prompt.includes('PASTED-LOG') && !prompt.includes('shot.png'), 'nor the text pasted or the files attached');
   assert.ok(!prompt.includes('bank') && !prompt.includes('brief about') && !prompt.includes('Check the uploads'), 'never memory off, a child’s brief or a scheduled run');
   assert.ok(prompt.includes(`(the conversation that wrote note #${guess.id})`) && prompt.includes('Probably nginx'), 'an unchecked note with where it came from');
   assert.ok(prompt.includes('names web/src/legacy/Upload.tsx, which is not in the project now'));
@@ -885,6 +885,36 @@ test('learning from conversations: notes shown wrong fixed or deleted, the unche
   assert.ok(third.learnError?.includes('did not answer') && !third.error);
   db.prepare("delete from chunk_text where key like 'claude:%'").run();
   db.prepare("delete from app_sessions where key like 'claude:%'").run();
+  store.clearAll(db);
+});
+
+test('what the user wrote themselves: not the files they attached, text they pasted or the app’s notes before it', () => {
+  assert.equal(ownWords('make this a video\n\nAttached files:\n- /home/u/media/a.png\n- /home/u/b.pdf'), 'make this a video');
+  assert.equal(ownWords('write an about page with this:\n\n<pasted_content id="2407">\nAbout Us\nLong text.\n</pasted_content>\n\nkeep it short'), 'write an about page with this:\n\nkeep it short');
+  assert.equal(ownWords('<system-reminder>Pages changed.</system-reminder>\nFix the chart.'), 'Fix the chart.');
+  assert.equal(ownWords('Look at this\n<file path="/x/notes.md">\n# Notes\n</file>'), 'Look at this');
+  assert.equal(ownWords('Attached files:\n- /home/u/a.png'), '', 'files alone: nothing of their own');
+});
+
+test('the tidy-up runs by itself about once a day, whenever the app is on: a day’s gap, something new since, and a pause in writing', () => {
+  const now = Date.now();
+  const tidied = (at: number) => kvSet(db, 'memory.tidy', JSON.stringify({ at, changes: [], checked: 0 }));
+  tidied(now - 30 * 3600_000);
+  assert.equal(tidyDue(db, now), false, 'nothing new since: it does not run');
+  db.prepare("insert into app_sessions (key, agent, cwd, title, created_at, updated_at) values ('claude:busy', 'claude', ?, 'Busy', ?, ?)").run(repo, now, now);
+  db.prepare("insert into chunk_text (key, kind, ts, text) values ('claude:busy', 'user', ?, 'Fix the upload page.')").run(now - 2 * 60_000);
+  assert.equal(tidyDue(db, now), false, 'not while the user is writing');
+  assert.equal(tidyDue(db, now + 15 * 60_000), true, 'in a pause after something new, at any hour');
+  tidied(now - 5 * 3600_000);
+  assert.equal(tidyDue(db, now + 15 * 60_000), false, 'not twice in a day');
+  db.prepare("delete from chunk_text where key = 'claude:busy'").run();
+  db.prepare("delete from app_sessions where key = 'claude:busy'").run();
+  tidied(now - 30 * 3600_000);
+  store.addEntry(db, { ...G, text: 'A note the tidy-up wrote.' }, { source: 'auto', at: now - 3600_000 });
+  assert.equal(tidyDue(db, now), false, 'the tidy-up’s own changes are nothing new');
+  add(G, 'A note the user wrote.', { at: now - 3600_000 });
+  assert.equal(tidyDue(db, now), true, 'a note the user or an agent changed is');
+  kvSet(db, 'memory.tidy', '');
   store.clearAll(db);
 });
 
