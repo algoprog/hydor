@@ -3,6 +3,19 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.48.0 · 9 November 2026
+
+Memory that starts with what other assistants already know about you, picked by you.
+
+- **Settings → Memory → Bring in…** reads what Claude Code, Codex, Hermes and OpenClaw keep on this computer, and the
+  export ChatGPT or Claude emails you, and turns it into notes you pick from.
+- **Only what lasts**: the helper model reads a part at a time against the notes memory has, and leaves out what it
+  says already (also in other words), secrets, and text that would steer agents.
+- **In the right place**: a note about a project goes to that project when its folder is on this computer, and new
+  lines for your profile are offered too.
+- **Your words only**: of an export's chats, only what you wrote is read, the newest first. Nothing is added until you
+  pick, and the export is deleted once its notes are in.
+
 ## 0.47.0 · 9 November 2026
 
 Your agents in a Telegram chat: start sessions, read their replies and answer what they ask, from any phone.
