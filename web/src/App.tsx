@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import { Router } from 'wouter';
 import type { AppTheme } from '@shared/themes';
 import { api, onUnauthorized } from './lib/api';
@@ -14,7 +14,17 @@ import { MachineDown } from './features/machines/MachineSwitcher';
 import { Throbber } from './components/ui';
 import { Toasts } from './components/Toasts';
 import { Login, Setup } from './features/auth/AuthScreens';
-import { Shell } from './features/layout/Shell';
+
+// The app itself is a file of its own, asked for the moment the page loads, beside the question of who is signed in:
+// a signed-in page has it as soon as before, and the sign-in screens no longer wait for all of the app to arrive.
+const shell = import('./features/layout/Shell');
+const Shell = lazy(() => shell.then((m) => ({ default: m.Shell })));
+
+/** The logo shown while the page loads goes once the app has drawn (until then it stays: nothing shows in between). */
+function Arrived({ children }: { children: ReactNode }) {
+  useLayoutEffect(endBoot, []);
+  return children;
+}
 
 export function App() {
   const auth = useApp((s) => s.auth);
@@ -33,10 +43,10 @@ export function App() {
     return () => mq.removeEventListener('change', applyTheme);
   }, [theme, darkTheme, lightTheme, custom]);
 
-  // The logo shown while the page loads stays until it is known what to show: the app, or a sign-in.
+  // The logo shown while the page loads stays until it is known what to show: a sign-in, or the app (once it has drawn: Arrived).
   useLayoutEffect(() => {
-    if (auth !== 'unknown') endBoot();
-  }, [auth]);
+    if (auth === 'setup' || auth === 'login' || (auth === 'ok' && down)) endBoot();
+  }, [auth, down]);
 
   useEffect(() => {
     api<{ setup: boolean; authenticated: boolean }>('/api/auth/state')
@@ -115,7 +125,11 @@ export function App() {
         <MachineDown error={down} />
       ) : (
         <Router base={machineBase}>
-          <Shell />
+          <Suspense fallback={null}>
+            <Arrived>
+              <Shell />
+            </Arrived>
+          </Suspense>
         </Router>
       )}
       <Toasts />
