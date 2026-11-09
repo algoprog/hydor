@@ -28,8 +28,9 @@ import { TourLocal, TourMedia, TourOpenRouter } from './TourModels';
 import { Sea, SourcesMap, TideMark, TourProgress, WelcomeFilm, type Use } from './scenes';
 import { machineBase, machineId } from '../../lib/machine';
 import { tourDone } from '../tips/state';
+import { build, setupDone, takeAfterSetup, TOUR_SETUP_STEPS } from './setup';
 
-export { Sea, TourProgress, type Use };
+export { Sea, setupDone, TOUR_SETUP_STEPS, TourProgress, type Use };
 
 /** Raise it when the tour changes enough to be worth showing again to everyone. */
 export const TOUR_VERSION = 2;
@@ -98,12 +99,6 @@ export const tourOpen = () => useTour.getState().open;
 let closeTimer = 0;
 let builtTimer = 0;
 
-/** The app builds up as the tour shows it: <html data-tour-build> names the parts shown so far, with "all" as the
- * tour ends, and the app is empty but for them (styles.css, "the tour builds the app up"). Null: the app is whole. */
-function build(parts: string | null) {
-  if (parts === null) delete document.documentElement.dataset.tourBuild;
-  else document.documentElement.dataset.tourBuild = parts;
-}
 
 /** Opens the tour, at its start or at one step. */
 export function startTour(from?: string, fresh = false) {
@@ -115,12 +110,6 @@ export function startTour(from?: string, fresh = false) {
   useTour.setState({ open: true, closing: false, i: Math.max(0, i), signIn: null, uses, picked: !!saved, fresh });
 }
 
-/** A new install chose its password: the tour goes on from what to use, and the app comes in empty. */
-let afterSetup = false;
-export const setupDone = () => {
-  afterSetup = true;
-  build('');
-};
 
 /** Closes the tour as the rest of the app arrives; finishing it readies the message box. Finishing it turns the tips
  * after it on; skipping it turns them off; closing it (✕ or Esc) leaves them as they were. */
@@ -636,8 +625,9 @@ function steps(uses: Use[], fresh: boolean): Step[] {
   return list;
 }
 
-/** Steps of a new install's tour before anything is picked, the password included. */
-export const TOUR_SETUP_STEPS = steps([], true).length + 1;
+// The new install's first screen counts the tour's steps without the tour (setup.ts): checked here while developing.
+if (import.meta.env.DEV && steps([], true).length + 1 !== TOUR_SETUP_STEPS)
+  console.warn(`TOUR_SETUP_STEPS is ${TOUR_SETUP_STEPS} in tour/setup.ts, but a new install's tour has ${steps([], true).length + 1} steps`);
 
 // ---- the overlay ----------------------------------------------------------------------------
 
@@ -886,9 +876,8 @@ export function Tour() {
   // password at once.
   useEffect(() => {
     if (auto.current || open) return;
-    if (afterSetup) {
+    if (takeAfterSetup()) {
       auto.current = true;
-      afterSetup = false;
       startTour(undefined, true);
       return;
     }

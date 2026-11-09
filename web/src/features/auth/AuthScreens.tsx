@@ -4,7 +4,8 @@ import { post, type ApiError } from '../../lib/api';
 import { useApp } from '../../lib/store';
 import { Button, cx, IconButton, inputCls } from '../../components/ui';
 import { AgentIcon } from '../../components/AgentIcon';
-import { Sea, setupDone, TOUR_SETUP_STEPS, TourProgress } from '../tour/Tour';
+import { Sea, TourProgress } from '../tour/scenes';
+import { setupDone, TOUR_SETUP_STEPS } from '../tour/setup';
 import { Wordmark } from '../../components/Logo';
 
 const n = (i: number) => ({ '--i': i }) as CSSProperties;
