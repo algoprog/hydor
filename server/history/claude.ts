@@ -74,6 +74,12 @@ interface TurnAcc {
   tokensIn: number;
   tokensOut: number;
   cacheRead: number;
+  /** Of tokensIn, those written to the provider's cache (they cost more than the rest). */
+  cacheWrite: number;
+  /** The model's own time: from the prompt or each step's result to its next reply (genMs, for this turn). */
+  genMs: number;
+  /** When its first reply or step came. */
+  firstTs?: number;
   model?: string;
   interrupted?: boolean;
 }
@@ -115,7 +121,7 @@ export class ClaudeParser {
     p.lastMsgId = s.lastMsgId;
     p.pending = new Map(Object.entries(s.pending ?? {}));
     p.seq = s.seq ?? 0;
-    p.turn = s.turn ?? null;
+    p.turn = s.turn ? { ...s.turn, cacheWrite: s.turn.cacheWrite ?? 0, genMs: s.turn.genMs ?? 0 } : null;
     p.genPrevTs = s.genPrevTs;
     p.bg = new Map(Object.entries(s.bg ?? {}));
     p.bgEnded = s.bgEnded ?? [];
@@ -259,7 +265,7 @@ export class ClaudeParser {
     this.endTurn();
     this.stats.turns++;
     this.act?.bump(ts, 'turns');
-    this.turn = { id, start: ts ?? 0, last: ts ?? 0, tokensIn: 0, tokensOut: 0, cacheRead: 0 };
+    this.turn = { id, start: ts ?? 0, last: ts ?? 0, tokensIn: 0, tokensOut: 0, cacheRead: 0, cacheWrite: 0, genMs: 0 };
   }
 
   /** Closes the running turn with a summary row. Called at the next prompt or by the live layer. */
@@ -276,7 +282,9 @@ export class ClaudeParser {
       ts: t.last,
       status: status ?? (t.interrupted ? 'interrupted' : 'completed'),
       durationMs: t.last - t.start,
-      tokens: { input: t.tokensIn, output: t.tokensOut, cacheRead: t.cacheRead },
+      tokens: { input: t.tokensIn, output: t.tokensOut, cacheRead: t.cacheRead, ...(t.cacheWrite ? { cacheWrite: t.cacheWrite } : {}) },
+      ...(t.genMs ? { modelMs: t.genMs } : {}),
+      ...(t.firstTs && t.firstTs >= t.start ? { firstMs: t.firstTs - t.start } : {}),
       model: t.model,
     });
   }
@@ -427,12 +435,15 @@ export class ClaudeParser {
         this.turn.tokensIn += input;
         this.turn.tokensOut += u.output_tokens ?? 0;
         this.turn.cacheRead += u.cache_read_input_tokens ?? 0;
+        this.turn.cacheWrite += u.cache_creation_input_tokens ?? 0;
+        if (ts != null && this.turn.firstTs == null) this.turn.firstTs = ts;
       }
       // Time spent generating this reply (TTFT + decode), from the prompt or the last tool result.
       if ((u.output_tokens ?? 0) > 0 && this.genPrevTs != null && ts != null && ts > this.genPrevTs) {
         const g = Math.min(ts - this.genPrevTs, GEN_MS_CAP);
         this.stats.genMs = (this.stats.genMs ?? 0) + g;
         this.act?.bump(ts, 'genMs', g);
+        if (this.turn) this.turn.genMs += g;
       }
       this.genPrevTs = ts;
     }

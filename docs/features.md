@@ -897,6 +897,10 @@ programs shows each program's version and what is out, with Check now, Update no
   stops at its first line as it grows, so you read it from its beginning; a short one sits under what came before,
   with no empty space below it. A page still being written shows the app's mark and "Writing the page…" until it has
   something to show.
+- A turn's time and cost: the tokens beside a finished turn open where its time went (the model, commands, files, the
+  web, other steps, waiting for you on approvals, questions and forms, and the rest), how soon its first reply or step
+  came, its tokens by kind (read fresh, written to the provider's cache, read from it, with the hit rate, written out),
+  and, with the model's price known, what each kind cost and what the cache saved.
 - Replies made to read: every agent knows the app shows them as rich text, with Markdown (headings, lists, tables,
   code), maths in LaTeX drawn as in a textbook (KaTeX, chemistry included; numbers such as `$1$` and `$0$` render as
   maths, while ordinary dollar prices stay money), Mermaid diagrams (flowcharts, sequences,

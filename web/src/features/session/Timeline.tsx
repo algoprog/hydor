@@ -3,7 +3,7 @@ import { ArrowDown, Check, ChevronRight, FileDiff, FilePen, FilePlus2, FileText,
 import type { Agent, ApprovalRequest, ExternalState, FileChange, LiveOverlay, LiveState, SystemItem, TimelineItem, ToolItem, TurnItem, UserItem } from '@shared/types';
 import { api, enc } from '../../lib/api';
 import { sentPicturesOf, useSentPictures, type SentPictures } from '../../lib/attachments';
-import { basename, compact, dirname, duration, prettyPath } from '../../lib/format';
+import { basename, dirname, duration, prettyPath } from '../../lib/format';
 import { openFile } from '../../lib/nav';
 import { useApp, useSessions, useTimeline } from '../../lib/store';
 import { DiffStat, DiffView } from '../../components/DiffView';
@@ -15,6 +15,7 @@ import { AssistantBlock, hiddenThought, SessionCtx, StepLine, stepsIcon, summari
 import { noteLike, noteTitle, partsOf, plainText, type Part } from './outline';
 import { toolView } from '../registry';
 import { LooseNotes, TurnNotes, useSessionNotes } from './Notes';
+import { TurnCost } from './TurnCost';
 import type { SessionNote } from '@shared/features';
 import { runEndedNotice } from '@shared/apps';
 import { LOCALE } from '../../i18n/locale';
@@ -766,25 +767,29 @@ const SegmentView = memo(function SegmentView({
       )}
       {(visibleWork.length > 0 || live) && (
         <div className={cx(isNew && seg.prompt && 'anim-in [animation-delay:140ms]')}>
-          <button
-            onClick={() => setOpen(!expanded)}
-            title={tk ? `${tk.input.toLocaleString()} input · ${(tk.cacheRead ?? 0).toLocaleString()} cached · ${tk.output.toLocaleString()} output tokens` : undefined}
-            className="group flex min-h-9 w-full items-center gap-2 rounded-xl px-2 text-left text-[13.5px] transition-colors hover:bg-bg-2"
-          >
-            {!live && <ChevronRight size={15} className={cx('shrink-0 text-fg-3 transition-transform duration-200 group-hover:text-fg-2', expanded && 'rotate-90')} />}
-            {live ? (
-              <LiveHead agent={agent} live={live} />
-            ) : (
-              <>
-                <span className={cx('shrink-0 font-medium', status === 'interrupted' ? 'text-warn' : status === 'failed' ? 'text-err' : 'text-fg-2')}>{head}</span>
-                {parts.length > 0 && <span className="min-w-0 truncate text-fg-3">· {parts.join(', ')}</span>}
-              </>
-            )}
-            <span className="ml-auto flex shrink-0 items-center gap-2.5 text-[12px] text-fg-3">
-              {tk && !live && <span className="hidden sm:inline">{compact(tk.input + (tk.cacheRead ?? 0) + tk.output)} tokens</span>}
-              {live && <ChevronRight size={15} className={cx('transition-transform duration-200', expanded && 'rotate-90')} />}
-            </span>
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setOpen(!expanded)}
+              className="group flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-xl px-2 text-left text-[13.5px] transition-colors hover:bg-bg-2"
+            >
+              {!live && <ChevronRight size={15} className={cx('shrink-0 text-fg-3 transition-transform duration-200 group-hover:text-fg-2', expanded && 'rotate-90')} />}
+              {live ? (
+                <LiveHead agent={agent} live={live} />
+              ) : (
+                <>
+                  <span className={cx('shrink-0 font-medium', status === 'interrupted' ? 'text-warn' : status === 'failed' ? 'text-err' : 'text-fg-2')}>{head}</span>
+                  {parts.length > 0 && <span className="min-w-0 truncate text-fg-3">· {parts.join(', ')}</span>}
+                </>
+              )}
+              {live && (
+                <span className="ml-auto flex shrink-0 items-center text-fg-3">
+                  <ChevronRight size={15} className={cx('transition-transform duration-200', expanded && 'rotate-90')} />
+                </span>
+              )}
+            </button>
+            {/* Its time and cost: where the time went, the tokens by kind, what they cost. */}
+            {tk && !live && seg.end && <TurnCost sessionKey={sessionKey} turn={seg.end} work={seg.work} start={first} className="hidden shrink-0 sm:inline-flex" />}
+          </div>
           {expanded && (
             <Outline items={work} sessionKey={sessionKey} agent={agent} live={live} status={status} replying={replyItems.some((a) => a.kind === 'assistant' && a.streaming)} fresh={fresh} />
           )}

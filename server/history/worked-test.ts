@@ -30,6 +30,25 @@ const lines = (xs: object[]) => xs.map((x) => JSON.stringify(x));
   assert.equal(p.stats.turns, 2);
 }
 
+// ---- Claude Code: a turn's own numbers for its breakdown: cache writes, the model's time, its first reply -------------
+{
+  const p = new ClaudeParser({ ...opts, retain: true });
+  const asst = (uuid: string, ts: string, usage: object, content: object[] = [{ type: 'text', text: 'ok' }]) => ({ type: 'assistant', uuid, timestamp: at(ts), message: { id: `m_${uuid}`, role: 'assistant', model: 'claude-opus-5-5', content, usage } });
+  for (const l of lines([
+    { type: 'user', uuid: 'u1', timestamp: at('00:00'), message: { role: 'user', content: 'Go' } },
+    asst('a1', '00:04', { input_tokens: 10, cache_creation_input_tokens: 1000, cache_read_input_tokens: 5000, output_tokens: 50 }, [{ type: 'tool_use', id: 'tu1', name: 'Bash', input: { command: 'ls' } }]),
+    { type: 'user', uuid: 'u2', timestamp: at('00:34'), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tu1', content: 'ok' }] } },
+    asst('a2', '00:40', { input_tokens: 20, cache_read_input_tokens: 6000, output_tokens: 30 }),
+  ]))
+    p.feed(l);
+  p.finish();
+  const t = p.items.find((i) => i.kind === 'turn') as Extract<(typeof p.items)[number], { kind: 'turn' }>;
+  assert.deepEqual(t.tokens, { input: 1030, output: 80, cacheRead: 11000, cacheWrite: 1000 }, 'cache writes among the input, apart');
+  assert.equal(t.firstMs, 4000, 'its first step 4 s after the prompt');
+  assert.equal(t.modelMs, 10_000, 'the model: 4 s to its first step, 6 s from the step’s result to its reply (the 30 s command is not the model’s)');
+  assert.equal(t.durationMs, 40_000);
+}
+
 // ---- Codex: task_started and task_complete, with the turn's own duration when it gives one --------------------------
 {
   const p = new CodexParser(opts);

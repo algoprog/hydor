@@ -29,7 +29,7 @@ import { imagesIn, readLineAt, sweepUploads, type FoundImage } from './retention
 import { noticeText } from '../shared/notice.ts';
 import { cleanTheme, isBuiltIn, MAX_THEMES, type AppTheme } from '../shared/themes.ts';
 import { inside, readLink, signLink } from './links.ts';
-import { priceOverrides, refreshOpenRouterPrices, setPriceOverrides } from './prices.ts';
+import { priceOverrides, rateFor, refreshOpenRouterPrices, setPriceOverrides } from './prices.ts';
 import { Scheduler } from './scheduler.ts';
 import { accountViews, createPr, ghToken, prDescribe, prDraft, prFromUrl, refreshPr, removeAccount, reviewChanges, saveAccount, writeGuide } from './pullrequests.ts';
 import { askCommands, commandHistory, complete, migrateTermHistory, recordCommand } from './termsuggest.ts';
@@ -540,6 +540,22 @@ app.get('/api/sessions/:key/changes', async (req) => {
     }
   }
   return { files: [...byPath.values()].sort((a, b) => b.added + b.removed - (a.added + a.removed)) };
+});
+
+/**
+ * What a turn's breakdown needs beyond its items: how long each card waited for the user (approvals, questions, forms),
+ * and the price per million tokens of the models asked for (`models=a,b`), for its cost by kind of token.
+ */
+app.get('/api/sessions/:key/breakdown', async (req) => {
+  const key = K(req);
+  const q = req.query as { models?: string };
+  const waits = (db.prepare('select kind, asked_at as at, answered_at as until from approval_waits where key = ? order by asked_at desc limit 2000').all(key) as { kind: string; at: number; until: number }[]).reverse();
+  const rates: Record<string, { input: number; output: number; cacheRead: number } | null> = {};
+  for (const m of (q.models ?? '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 10)) {
+    const r = rateFor(db, m);
+    rates[m] = r ? { input: r.input, output: r.output, cacheRead: r.cacheRead ?? r.input } : null;
+  }
+  return { waits, rates };
 });
 
 /** Every command the agent ran, newest last. */

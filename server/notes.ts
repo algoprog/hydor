@@ -56,7 +56,8 @@ export function notesOf(db: DB, key: string, kind?: string): SessionNote[] {
   return rows.map(toNote);
 }
 
-/** Drops a removed session's notes. */
+/** Drops a removed session's notes, and how long its cards waited for the user. */
 export function dropNotes(db: DB, key: string) {
   db.prepare('delete from session_notes where key = ?').run(key);
+  db.prepare('delete from approval_waits where key = ?').run(key);
 }

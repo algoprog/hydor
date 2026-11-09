@@ -764,8 +764,17 @@ export class SessionManager extends EventEmitter {
     let lastTasks = 0;
     let turnBegan = 0;
     let lastGoal = JSON.stringify(adapter.state.goal ?? null);
+    // Each card the user is asked (an approval, a question, a form): when it came and when it went, for a turn's breakdown.
+    const asked = new Map<string, { at: number; kind: string }>();
     adapter.on('change', () => {
       emitLive();
+      const now = Date.now();
+      for (const [id, a] of adapter.approvals) if (!asked.has(id)) asked.set(id, { at: now, kind: a.kind });
+      for (const [id, w] of asked)
+        if (!adapter.approvals.has(id)) {
+          asked.delete(id);
+          if (now - w.at >= 500) this.db.prepare('insert into approval_waits (key, approval, kind, asked_at, answered_at) values (?, ?, ?, ?, ?)').run(key, id, w.kind, w.at, now);
+        }
       const tasks = adapter.state.backgroundTasks?.length ?? 0;
       const goal = JSON.stringify(adapter.state.goal ?? null);
       if (goal !== lastGoal) {
