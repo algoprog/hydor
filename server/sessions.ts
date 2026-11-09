@@ -999,6 +999,27 @@ export class SessionManager extends EventEmitter {
     return p;
   }
 
+  /** Messages the page sent lately, by the id it gave each (`sendOnce`), for ten minutes. */
+  private sends = new Map<string, { at: number; done: Promise<void> }>();
+
+  /**
+   * Sends a message once for the id the page gave it (its own for each message it sends). Sent again because its
+   * answer was lost on the way (a phone that slept, a network that changed), it is not sent twice: the page gets what
+   * came of the first. Without an id, `send` simply runs.
+   */
+  sendOnce(id: string | undefined, send: () => Promise<void> | void): Promise<void> {
+    if (!id) return Promise.resolve(send());
+    const now = Date.now();
+    for (const [k, v] of this.sends) if (now - v.at > 10 * 60_000) this.sends.delete(k);
+    const known = this.sends.get(id);
+    if (known) return known.done;
+    const done = Promise.resolve().then(send);
+    // One that failed may be sent again.
+    done.catch(() => this.sends.delete(id));
+    this.sends.set(id, { at: now, done });
+    return done;
+  }
+
   /** What came of a start the page sent (`startOnce`): the session it made, or whether it is being made now. */
   startState(id: string): { key: string | null; starting: boolean } {
     return { key: this.startedBy(id), starting: this.starts.has(id) };

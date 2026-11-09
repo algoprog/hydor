@@ -563,10 +563,13 @@ app.post('/api/sessions/:key/interrupt', async (req) => {
   await sessions.interrupt(K(req));
   return { ok: true };
 });
+/** The page's own id for a message it sends: sent again (its answer lost on the way), the message goes once. */
+const SEND_ID = /^send-[a-z0-9]{8,40}$/;
+const sendIdOf = (b: { sendId?: unknown }) => (typeof b.sendId === 'string' && SEND_ID.test(b.sendId) ? b.sendId : undefined);
 app.post('/api/sessions/:key/message', async (req) => {
   const b = (req.body ?? {}) as any;
   noteUserMessage();
-  await sessions.send(K(req), String(b.text ?? ''), Array.isArray(b.images) ? b.images : [], Array.isArray(b.files) ? b.files : []);
+  await sessions.sendOnce(sendIdOf(b), () => sessions.send(K(req), String(b.text ?? ''), Array.isArray(b.images) ? b.images : [], Array.isArray(b.files) ? b.files : []));
   return { ok: true };
 });
 // ---- scheduled and webhook tasks ------------------------------------------------------------
@@ -616,7 +619,7 @@ app.post('/api/uploads', async (req) => {
 app.post('/api/sessions/:key/queue', async (req) => {
   const b = (req.body ?? {}) as any;
   noteUserMessage();
-  sessions.enqueue(K(req), String(b.text ?? ''), Array.isArray(b.images) ? b.images : [], Array.isArray(b.files) ? b.files : []);
+  await sessions.sendOnce(sendIdOf(b), () => sessions.enqueue(K(req), String(b.text ?? ''), Array.isArray(b.images) ? b.images : [], Array.isArray(b.files) ? b.files : []));
   return { ok: true };
 });
 app.post('/api/sessions/:key/queue/resume', async (req) => {
