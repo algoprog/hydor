@@ -114,6 +114,11 @@ create table if not exists chunk_text (
   text text not null
 );
 create index if not exists chunk_text_key on chunk_text(key);
+-- The two kinds read across every session: the files agents touched (the Git page's repositories) and what the user
+-- wrote (memory's upkeep, past conversations by meaning). Without these, each such read went through every chunk,
+-- seconds of the server doing nothing else once the database is no longer in memory.
+create index if not exists chunk_text_file on chunk_text(text, key, ts) where kind = 'file';
+create index if not exists chunk_text_user on chunk_text(ts, key) where kind = 'user';
 
 create virtual table if not exists chunks using fts5(
   text,
