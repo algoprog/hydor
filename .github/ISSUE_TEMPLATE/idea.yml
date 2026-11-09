@@ -1,0 +1,21 @@
+name: An idea
+description: Something Hydor could do, or do better.
+labels: [idea]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you want to do
+      description: The job you are trying to get done, and what gets in the way now.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How Hydor could help
+  - type: checkboxes
+    id: build
+    attributes:
+      label: Building it
+      options:
+        - label: I would like to build this myself, once we agree on it here.

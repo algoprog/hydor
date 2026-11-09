@@ -1,7 +1,7 @@
 // npm run guide:settings: writes the guide's "Every setting" topic (docs/guide/30-settings.md, and its translations
 // in docs/guide/zh/ and docs/guide/el/) from what the search box knows of Settings (shared/find-catalog.ts: each
 // section and the options in it), the app's own translations of those words (web/src/i18n), and the translated
-// topics' titles. Run it after adding, renaming or rewording a Settings section or option (CLAUDE.md, "Docs").
+// topics' titles. Run it after adding, renaming or rewording a Settings section or option (AGENTS.md, "Docs").
 import fs from 'node:fs';
 import path from 'node:path';
 

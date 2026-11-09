@@ -1,0 +1,31 @@
+name: Checks
+
+# On every pull request, and by hand: the types, the build and every test that needs nothing beyond a checkout
+# (npm test). Not on each push to main, which the maintainers check before they push.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: What some tests use (tmux for terminals, ffmpeg for media)
+        run: sudo apt-get update && sudo apt-get install -y tmux ffmpeg
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test

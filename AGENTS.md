@@ -1,0 +1,103 @@
+# Notes for agents working on Hydor
+
+For every agent that works on this repository (Claude Code reads it through CLAUDE.md), and for people too: how the
+app is built and tested, and what changes with what. [CONTRIBUTING.md](CONTRIBUTING.md) has the same for people,
+with where to start.
+
+## Building and testing
+
+```bash
+npm ci                    # Node.js 22.12+, git; tmux on Linux and macOS
+npm run build             # the server and the web app into dist/
+npm run typecheck
+npm test                  # every test that needs nothing beyond a checkout; npm test -- memory guide/ runs some
+```
+
+Each test is a script beside the code it checks (`*-test.ts`, `tests.ts`), run with a scratch `DATA_DIR`
+(docs/development.md). Nothing here may use a GPU: keep `CUDA_VISIBLE_DEVICES` empty.
+
+## Releases: every version has its release notes
+
+Each version has notes in `CHANGELOG.md`, newest first, and the app shows them (Settings → General →
+Release notes, the search box, and a "What's new" note once after an update). When you make a new version:
+
+1. Set it in `package.json` and both places at the top of `package-lock.json`.
+2. Add its section at the top of `CHANGELOG.md`: a `## x.y.z · D Month YYYY` heading, one line that sums
+   the version up, then bullets in plain words on what changed for the people using it (not file names).
+   Write them from the commits since the last version (`git log --oneline <last release>..HEAD`).
+3. Commit it as `x.y.z: what it brings` (the repository's release commits look like that).
+
+`server/releases/releases-test.ts` fails while the version in `package.json` has no notes at the top.
+
+## Docs: every place that describes a feature changes with it
+
+The app's features are described in several places, and people and agents rely on each. Whenever you add, change,
+rename or remove something users can see or do (a page, a button, a setting or an option in one, a menu item, an
+`/api/` route, a tool agents get, a behaviour), update all of these in the same commit:
+
+1. **The guide**, `docs/guide/NN-<topic>.md`: the app's Help page shows it, the search box (Ctrl+K) finds its
+   sections, and agents read it (`app_guide`) to answer questions about the app and to know how to change it for
+   the user. Change the section that describes the feature, and its topic's "Ask an agent" examples. The guide is
+   also in Chinese and Greek (`docs/guide/zh/`, `docs/guide/el/`: every topic but the API), shown when the app is
+   in that language: change the translations with the English. A translation keeps the English topic's headings
+   in the same places (they take its section ids) and the same link addresses in the same order, on-screen labels
+   as the app's own dictionaries translate them (`web/src/i18n/*.json`); a topic out of step shows in English.
+   A Settings section or option: run `npm run guide:settings`, which writes `30-settings.md` in all three
+   languages from `shared/find-catalog.ts` and the dictionaries. An `/api/` route goes in
+   `docs/guide/90-api.md`, one bullet in its area:
+   `` - `METHOD /api/path/:param` — what it does. Body: `{ field: type — meaning }`. Returns: `{ … }`. `` (routes
+   agents must not use are listed in `server/guide/api.ts` RULES, which refuses them, and in the test's
+   `UNDOCUMENTED`). Write as the guide does: plain words for people who are not programmers, second person, the
+   UI's own labels in bold with arrows (**Settings → Capabilities → Memory**), links to the place
+   (`/settings?s=<section>&find=<option>`, `/guide/<topic>#<section>`), no source file names. Each topic shows a
+   picture of its part of the app (`docs/guide/images/<topic>.webp`, and `-light.webp`, under its intro in all
+   three languages): when that part's look changes, take it again with `scripts/guide-shots` (its README says how).
+2. **The GitHub docs**: `README.md` (what the app is and does) and `docs/features.md` (everything, by area), plus the
+   ones the change touches: `docs/install.md`, `docs/configuration.md`, `docs/how-it-works.md`, `docs/machines.md`,
+   `docs/remote-access.md`, `docs/search-providers.md`, `docs/development.md`.
+3. **What agents are told**: a capability's `spawn` instructions and its tools' descriptions are all an agent knows
+   of it; keep them saying what the app does now.
+4. **The search box and translations**: `shared/find-catalog.ts` and the shipped vectors (below; the guide's sections
+   are searchable too, so a changed section needs `npm run find:vectors`), and new UI text in `web/src/i18n`
+   (`npm run i18n:extract`, then translate it into Chinese and Greek). Where a page shows what people or agents
+   wrote (names, descriptions, notes, captions), mark it `translate="no"`; write dates and times with `LOCALE`
+   (`web/src/i18n/locale.ts`).
+5. **Release notes** in `CHANGELOG.md` when you make a version (above).
+
+`server/guide/guide-test.ts` fails when a guide link points nowhere, a Settings section is not named in the guide,
+an `/api/` route is missing from `docs/guide/90-api.md`, or a translation is missing or out of step:
+
+```bash
+OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/hydor-test-guide node dist/dev/guide-test.js
+```
+
+## Search embeddings: keep the shipped vectors current
+
+The search box (Ctrl+K) and memory find things by meaning with an embedding model that runs on the user's
+own computer (`server/memory/embed.ts`). Users never compute vectors for what ships with the app: those are
+made ahead of time and committed in `server/find/shipped-vectors.json`. Whatever users make themselves
+(sessions, memory notes, apps, scheduled tasks, assistants, learned skills, pages, connected apps) gets its
+vector on their machine the moment it is made or changed (`server/find/index.ts`, `server/memory/`); that
+needs nothing from you.
+
+So whenever you add, rename or reword anything users can search for that comes with the app, make the
+vectors again before you commit:
+
+- a page, an action, a Settings section or an option in one, or a built-in theme: update
+  `shared/find-catalog.ts` first (its labels must say exactly what the page shows: the search box points at
+  an option by its words);
+- an app template (`server/apps/templates.ts`), a built-in assistant (`server/assistants/builtins.ts`) or a
+  bundled skill (`skills/`);
+- the embedding model or its codebook (`server/memory/codebook.ts`): then every vector is made again.
+
+```bash
+npm run find:vectors   # embeds only the texts without a vector yet, on the CPU; commit shipped-vectors.json
+```
+
+It needs a Python with PyTorch and Transformers 5.6+: the app's own one once search by meaning is turned on
+in Settings → Memory, or `HYDOR_EMBED_PYTHON=/path/to/python`. `server/find/find-test.ts` fails while a
+shipped text has no vector, or the catalog no longer matches the Settings pages:
+
+```bash
+OUTDIR=dist/dev node scripts/build-server.mjs server/find/find-test.ts && DATA_DIR=/tmp/hydor-test-find node dist/dev/find-test.js
+```

@@ -137,9 +137,9 @@ test('roles: a lead, its members, and everyone else; noted by run before the set
 });
 
 test('tools: the lead starts members (at most the swarm’s size) and has the board; a member the board only', () => {
-  assert.deepEqual(toolsOf(LEAD), ['start_child_session', 'child_sessions', 'message_child', 'swarm_post', 'swarm_read', 'swarm_stop']);
+  assert.deepEqual(toolsOf(LEAD), ['start_child_session', 'child_sessions', 'message_child', 'step_up_child', 'swarm_post', 'swarm_read', 'swarm_stop']);
   assert.match(children.tools!(ctxOf(LEAD)).find((t) => t.name === 'start_child_session')!.description, /at most 5 of yours run at once/);
-  assert.deepEqual(toolsOf('claude:solo'), ['start_child_session', 'child_sessions', 'message_child']);
+  assert.deepEqual(toolsOf('claude:solo'), ['start_child_session', 'child_sessions', 'message_child', 'step_up_child']);
 });
 
 let A = '';
@@ -317,7 +317,7 @@ test('a campaign’s post tool takes a plan and parts; its members always get a 
   const post = swarm.tools!(ctxOf(CAMP)).find((t) => t.name === 'swarm_post')!;
   assert.deepEqual((post.inputSchema.properties as Record<string, { enum?: string[] }>).kind.enum, ['plan', 'progress', 'done', 'failed', 'finding', 'question', 'note']);
   assert.ok('part' in (post.inputSchema.properties as object) && 'parts' in (post.inputSchema.properties as object));
-  assert.deepEqual(toolsOf(CAMP), ['start_child_session', 'child_sessions', 'message_child', 'swarm_post', 'swarm_read', 'swarm_stop']);
+  assert.deepEqual(toolsOf(CAMP), ['start_child_session', 'child_sessions', 'message_child', 'step_up_child', 'swarm_post', 'swarm_read', 'swarm_stop']);
   for (const [title, brief] of [
     ['packages/api', 'Part packages/api: move its logging to the new logger. Run npm test -w api.'],
     ['packages/web', 'Part packages/web: the same.'],

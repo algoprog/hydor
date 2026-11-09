@@ -2,7 +2,7 @@
 // the options in them, and the built-in themes. The page makes its entries from these, and the server finds
 // them by meaning with vectors made ahead of time (server/find/shipped-vectors.json), so nobody's computer has
 // to. When you add or rename any of them (a page, a Settings section or option, a theme), change this file and
-// make the vectors again: npm run find:vectors (CLAUDE.md). server/find/find-test.ts checks both: that sections
+// make the vectors again: npm run find:vectors (AGENTS.md). server/find/find-test.ts checks both: that sections
 // and labels match the pages, and that every text here has its shipped vector.
 
 export type CatalogGroup = 'Go to' | 'Actions' | 'Settings' | 'Themes';
