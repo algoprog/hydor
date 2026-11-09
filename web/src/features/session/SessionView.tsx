@@ -595,6 +595,24 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
     return () => document.removeEventListener('visibilitychange', mark);
   }, [unread, sessionKey]);
 
+  // Read by the items of every turn: the same value from one render to the next, as a new one drew every turn again with
+  // each update of the live one. What it does is looked up when it is used.
+  const ctxNow = useRef({ side, setDetails });
+  ctxNow.current = { side, setDetails };
+  const sessionCtx = useMemo(
+    () => ({
+      sessionKey,
+      cwd: summary?.cwd,
+      openChanges: (path?: string) => {
+        useUI.getState().set({ detailsTab: 'changes', detailsFocus: path ?? null });
+        ctxNow.current.side?.close(sessionKey);
+        ctxNow.current.setDetails(true);
+      },
+      fork: summary?.external ? undefined : (at?: string) => setForking({ at }),
+    }),
+    [sessionKey, summary?.cwd, summary?.external],
+  );
+
   if (missing && !s) return <Empty title="Session not found">It may have been deleted.</Empty>;
   if (!summary) return <div className="flex h-full items-center justify-center text-fg-3"><Throbber size={34} /></div>;
   const close = () => setDetails(false);
@@ -608,7 +626,7 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
   const show: SessionShow = pane ? (chosen ?? 'pane') : 'conversation';
 
   const view = (
-    <SessionCtx.Provider value={{ sessionKey, cwd: summary.cwd, openChanges, fork: summary.external ? undefined : (at) => setForking({ at }) }}>
+    <SessionCtx.Provider value={sessionCtx}>
       <div className="flex h-full min-h-0">
         <div className="flex min-w-0 flex-1 flex-col">
           <Header
