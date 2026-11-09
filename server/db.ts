@@ -204,6 +204,9 @@ export function openDb(file = paths.db, o: { cacheMb?: number } = {}): DB {
     id text primary key, key text not null, kind text not null, at integer not null, anchor text, data text not null
   )`);
   db.exec('create index if not exists session_notes_key on session_notes(key, at)');
+  // How long each approval, question or form waited for the user (server/sessions.ts), for a turn's breakdown.
+  db.exec('create table if not exists approval_waits (key text not null, approval text not null, kind text not null, asked_at integer not null, answered_at integer not null)');
+  db.exec('create index if not exists approval_waits_key on approval_waits(key, asked_at)');
   const actCols = new Set((db.prepare('pragma table_info(activity)').all() as { name: string }[]).map((c) => c.name));
   if (!actCols.has('gen_ms')) {
     try {

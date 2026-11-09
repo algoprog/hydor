@@ -198,6 +198,10 @@ export type TurnItem = BaseItem & {
   kind: 'turn';
   status: 'completed' | 'interrupted' | 'failed' | string;
   durationMs?: number;
+  /** The model's own time in it: from the prompt and each step's result to its next reply (Claude Code). */
+  modelMs?: number;
+  /** From the prompt to the first reply or step (Claude Code). */
+  firstMs?: number;
   tokens?: TokenUsage;
   costUsd?: number;
   model?: string;
@@ -206,9 +210,11 @@ export type TurnItem = BaseItem & {
 export type TimelineItem = UserItem | AssistantItem | ThinkingItem | ToolItem | SystemItem | TurnItem;
 
 export interface TokenUsage {
+  /** Read fresh, with those written to the cache (cacheWrite) among them. */
   input: number;
   output: number;
   cacheRead?: number;
+  /** Of input, those written to the provider's cache. */
   cacheWrite?: number;
   reasoning?: number;
 }

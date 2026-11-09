@@ -158,7 +158,7 @@ At the top of a session:
 The conversation reads like a chat. Each turn is your message, the agent's work, and the reply it ended on:
 
 - **Your message** shows on the right, with its pictures and attached files. A long one folds to its first lines; **Show more** opens it.
-- **The work** sits under a line that sums it up: "Worked for 2m 10s · 3 commands", "Thought", "Stopped after 40s" or "Failed after 5s", with the tokens used on the right. While the turn runs, the line says "Working · 1m 2s" (or "Waiting for you") and the work's outline grows as it happens; after earlier turns it adds how long the session has worked in all, all its turns together: "Working · 1m 2s (47m)". A finished turn folds its work away; click the line to open it.
+- **The work** sits under a line that sums it up: "Worked for 2m 10s · 3 commands", "Thought", "Stopped after 40s" or "Failed after 5s", with the tokens used on the right: click them for the turn's [time and cost](/guide/sessions#a-turns-time-and-cost). While the turn runs, the line says "Working · 1m 2s" (or "Waiting for you") and the work's outline grows as it happens; after earlier turns it adds how long the session has worked in all, all its turns together: "Working · 1m 2s (47m)". A finished turn folds its work away; click the line to open it.
 - **The outline of the work**: each note the agent writes between its steps (what it found, what it does next) starts a part, and the steps it then takes go in it. A finished part is one line with a check: the note in a few words ("Run the checkout tests first to see what fails", "Apply the discount first and round once"), how many steps it took and the lines it changed. Click it for the whole note and each step. The part under way shows the agent's note in full and, under it, the step being taken now, such as "Editing total.ts · 4 s"; click that line for the part's steps so far. Steps taken before the agent's first note make a part named for what they did ("Ran 3 commands, read 2 files"). A long turn shows its latest parts; **Show 12 earlier parts** shows the rest.
 - **Steps** are named in plain words: "Run the tests", "Read index.ts", "Searched the web", with the command itself in quieter type. Click one to see what it did.
 - **Thoughts** show as "Thought for 12s" with their first heading; click to read them.
@@ -171,6 +171,16 @@ The agent may also keep a checklist (**Plan** or **To-dos**, with how many are d
 Day lines ("Yesterday", "Today") separate the days; a conversation all from today has none. Older messages load as you scroll up, or with **Show earlier messages**. New messages and replies come in at the end of the conversation, with no empty space left under them. Once a reply is long enough to fill the screen, the view stops at its first line and stays there as it grows, so you read a long reply from its beginning; a short one simply sits under what came before. When you scroll up while the agent works, the view stays where you are; **Latest** takes you back to the end, and also shows while a reply runs on below the screen.
 
 Hover over a reply for **Fork from this reply** (Claude Code and Custom), **Read aloud**, and **Copy message**. Hover over your own message for **Edit from here** and the time it was sent.
+
+### A turn's time and cost
+
+The tokens on the right of a finished turn's line open **Time and cost**, to see why a turn took long or cost much:
+
+- **Duration**: a bar of where the turn's time went, each part with its share and length: **The model** (reading what it was given, thinking and writing), **Commands**, **Reading and editing files**, **The web**, **Other steps** (helpers, connected apps' tools), **Waiting for you** (approvals, questions and forms, from when each card came to when you answered it) and **The rest** (starting, and between steps). Steps that ran side by side count once. Under it, "First reply or step after 3 s": how soon the agent began.
+- **Tokens**: **Read fresh**; **Written to the cache** (read fresh and kept by the model's provider, so the next request reads it for less); **Read from the cache**, with its share of all that was read; and **Written out** (replies, thoughts and steps).
+- **Cost**: the turn's cost and, when the model's price is known, each kind's, with "The cache saved about $0.80.". With no price known for the model, it says its cost is not counted.
+
+Claude Code's turns give the model's own time and the first reply; for other agents, the model's part is its thinking. The tokens and this panel show on wider screens.
 
 ### Maths, diagrams, figures and pictures in replies
 
