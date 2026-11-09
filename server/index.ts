@@ -103,6 +103,8 @@ agentBaseEnv(); // capture the login environment once, up front
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? 'warn' },
   bodyLimit: 40 * 1024 * 1024,
+  // Closing ends every open request too (an agent's tool call waiting on a form, a long download), rather than waiting for them.
+  forceCloseConnections: true,
   trustProxy: '127.0.0.1',
   // Projects' API was /api/spaces until 5 November 2026: pages open from before, agents' notes and other machines still call it.
   rewriteUrl: (req) => (req.url ?? '/').replace(/^\/api\/spaces(?=[/?]|$)/, '/api/projects'),
@@ -1910,11 +1912,15 @@ setTimeout(() => startupDefault(db), 3000).unref();
 process.on('exit', () => machines.shutdown());
 
 const shutdown = async () => {
-  // Runners, tmux and notebook kernels keep going; they are picked up again on the next start.
+  // Runners, tmux and notebook kernels keep going; they are picked up again on the next start, so nothing is lost by
+  // not waiting: a socket that no longer answers (a phone asleep, a tunnel gone) held a stop for 30 s, and a request
+  // still open for ever, until the service manager killed the server. Two seconds at most, whatever is still open.
+  setTimeout(() => process.exit(0), 2000).unref();
   machines.shutdown();
   kernels.flush();
   indexer.stop();
   codex.shutdown();
+  for (const ws of app.websocketServer?.clients ?? []) ws.terminate();
   await app.close().catch(() => {});
   process.exit(0);
 };
