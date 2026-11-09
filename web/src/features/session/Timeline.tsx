@@ -135,6 +135,38 @@ function newestOfSame(items: TimelineItem[]): { hidden: Set<string>; same: Segme
   return { hidden, same };
 }
 
+const sameItems = (a: TimelineItem[], b: TimelineItem[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+const sameSame = (a: Segment['same'], b: Segment['same']) =>
+  a.size === b.size &&
+  [...a].every(([k, v]) => {
+    const w = b.get(k);
+    return !!w && w.first === v.first && sameItems(v.others, w.others);
+  });
+
+/**
+ * The turns as segmented afresh, each one that did not change since the last time kept as it was (its items are the
+ * same objects), so the turns drawn already are left alone while the last one is written: all of them were drawn again
+ * with each update of the live one, twelve times a second.
+ */
+function keepUnchanged(prev: Segment[] | null, next: Segment[]): Segment[] {
+  if (!prev?.length) return next;
+  const old = new Map(prev.map((s) => [s.id, s]));
+  return next.map((s) => {
+    const o = old.get(s.id);
+    return o &&
+      o.prompt === s.prompt &&
+      o.end === s.end &&
+      o.notice === s.notice &&
+      o.runEnded === s.runEnded &&
+      sameItems(o.work, s.work) &&
+      sameItems(o.answer, s.answer) &&
+      sameItems(o.attention, s.attention) &&
+      sameSame(o.same, s.same)
+      ? o
+      : s;
+  });
+}
+
 function segment(items: TimelineItem[]): Segment[] {
   const out: Segment[] = [];
   let cur: Segment | null = null;
@@ -873,7 +905,26 @@ export function Timeline({
     const want = el ? el.offsetTop - a.offset : sc.scrollHeight - a.fromBottom;
     if (Math.abs(sc.scrollTop - want) > 0.5) setTop(want);
   };
-  const textEl = (id: string) => content.current?.querySelector<HTMLElement>(`[data-text="${CSS.escape(id)}"]`) ?? null;
+  // The texts looked up while following, by id: looking through every turn for each, twice an update, was the biggest
+  // part of what the page did while a reply came in. The newest turn is looked in first: what is followed is there.
+  const textEls = useRef(new Map<string, HTMLElement>());
+  const textEl = (id: string): HTMLElement | null => {
+    const hit = textEls.current.get(id);
+    if (hit?.isConnected && hit.dataset.text === id) return hit;
+    const sel = `[data-text="${CSS.escape(id)}"]`;
+    let el: HTMLElement | null = null;
+    for (let c = content.current?.lastElementChild as HTMLElement | null | undefined; c; c = c.previousElementSibling as HTMLElement | null) {
+      if (c.dataset.seg === undefined) continue;
+      el = c.querySelector<HTMLElement>(sel);
+      break;
+    }
+    el ??= content.current?.querySelector<HTMLElement>(sel) ?? null;
+    if (el) {
+      textEls.current.set(id, el);
+      if (textEls.current.size > 50) textEls.current.delete(textEls.current.keys().next().value!);
+    }
+    return el;
+  };
   // A card to answer (a form, a question) that the end would cut off at its top shows from its top instead: its title,
   // what it asks and its first fields in view, the rest a scroll away. Not one the reader went past with Latest.
   const pastCard = useRef<string | null>(null);
@@ -982,23 +1033,34 @@ export function Timeline({
     const el = scroller.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
   };
-  const following = () => stick.current;
+  // The same function from one render to the next: the turns read it through FollowCtx, and a new one drew them all again.
+  const following = useCallback(() => stick.current, []);
   const merged = useMemo(() => mergeOverlay(tl?.items ?? [], overlay), [tl?.items, overlay]);
-  const segs = useMemo(() => segment(merged), [merged]);
+  const lastSegs = useRef<Segment[] | null>(null);
+  const segs = useMemo(() => (lastSegs.current = keepUnchanged(lastSegs.current, segment(merged))), [merged]);
   // Pictures sent from this page, in their messages until those show their own (lib/attachments.ts).
   const sentList = useSentPictures((s) => s.byKey[sessionKey]);
   const sent = useMemo(() => sentPicturesOf(sentList, merged, tl?.items.length ?? 0), [sentList, merged, tl?.items.length]);
   const loaded = useSessionNotes(sessionKey);
   // An app run that ended after its call stopped waiting: its card shows under the reply to that news, not above it.
+  // Made again only when a run's place changes, not with each update of the live turn (every turn is given them).
+  const movedRuns = useMemo(
+    () =>
+      segs
+        .filter((s) => s.runEnded)
+        .map((s) => `${s.runEnded}\u0000${s.id}`)
+        .join('\u0001'),
+    [segs],
+  );
   const notes = useMemo(() => {
-    const moved = new Map(segs.filter((s) => s.runEnded).map((s) => [s.runEnded!, s.id]));
-    if (!moved.size) return loaded;
+    if (!movedRuns) return loaded;
+    const moved = new Map(movedRuns.split('\u0001').map((p) => p.split('\u0000') as [string, string]));
     return loaded.map((n) => {
       const run = (n.data as { run?: unknown } | null)?.run;
       const to = n.kind === 'app-run' && typeof run === 'string' ? moved.get(run) : undefined;
       return to ? { ...n, anchor: to } : n;
     });
-  }, [loaded, segs]);
+  }, [loaded, movedRuns]);
   const noteIds = useMemo(() => new Set(segs.flatMap((s) => [...segIds(s)])), [segs]);
   const approvals: ApprovalRequest[] = overlay?.approvals ?? [];
   const here = !!live && live.status !== 'exited' && live.status !== 'error';
@@ -1021,7 +1083,8 @@ export function Timeline({
     const copy = known.current && savedCopy(tl?.items ?? [], o);
     if (copy) known.current!.add(copy.id);
   }
-  const fresh = (id: string) => !!known.current && !known.current.has(id);
+  // The same function from one render to the next, so a turn that did not change is not drawn again for it.
+  const fresh = useCallback((id: string) => !!known.current && !known.current.has(id), []);
 
   // Follow new output while the reader is following; anywhere else, keep their place (before the paint).
   const landed = useRef<string | null>(null);

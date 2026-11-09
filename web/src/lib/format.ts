@@ -142,13 +142,15 @@ export function dayGroup(ts?: number, now = new Date()): string {
   return String(d.getFullYear());
 }
 
+// Made once, as the month above: each message's time is drawn again as a session's view updates, and making these anew
+// for each was the biggest part of what the page did while a reply came in.
+const clockToday = new Intl.DateTimeFormat(LOCALE, { hour: '2-digit', minute: '2-digit' });
+const clockDated = new Intl.DateTimeFormat(LOCALE, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
 export function clockTime(ts?: number): string {
   if (!ts) return '';
   const d = new Date(ts);
-  const sameDay = new Date().toDateString() === d.toDateString();
-  return sameDay
-    ? d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' })
-    : d.toLocaleString(LOCALE, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return (new Date().toDateString() === d.toDateString() ? clockToday : clockDated).format(d);
 }
 
 export function pct(n?: number | null): string {
