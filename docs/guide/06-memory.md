@@ -198,7 +198,7 @@ Under **Tidy up automatically**, a line reports the last tidy-up:
 - **Tabs**: **All**, **About you**, **Projects** and **Sessions**. Where there is room, each shows its count.
 - **Groups**: notes come grouped by place: About you first, then each project (its folder's name and path), then the sessions' notes together, each naming its session (click the name to open the session). Each group shows how many notes it holds. A project's profile comes first, then its topics, then its notes, newest change first; when you search, the best match comes first. Under **All**, each group shows its first three notes, with **Show 12 more** (or however many there are) under them, and **Show fewer** to fold them again; in one place's tab, in a search and in the lists to review, the first ten.
 - When some notes have gone unused for months, a line above the list says how many, with **Review** (see [Notes no agent needed lately](/guide/memory#notes-no-agent-needed-lately)).
-- At the bottom of the list: **Deleted notes**, **Export** and **Clear all…** (below).
+- At the bottom of the list: **Deleted notes**, **Bring in…**, **Export** and **Clear all…** (below).
 
 Each note shows the first two lines of its text (with a **Topic** or **Profile** badge when it is one) and a line under it. Click a note, or press Enter on it, to read it whole, with who wrote it and where; click it again to fold it. The line under it says:
 
@@ -244,6 +244,21 @@ Only notes about you and projects are suggested, never topics, profiles, notes w
 
 [Export](/settings?s=memory&find=Export), at the bottom of the list, downloads every note kept. **Markdown** ("A list to read") is a readable list grouped by place, with when each note was added and changed and its end date. **JSON** ("With histories") has each note with its history and, for topics and profiles, the notes they sum up. Deleted notes are not included.
 
+### Bring in from other assistants
+
+[Bring in…](/settings?s=memory&find=Bring%20in%E2%80%A6), at the bottom of the list (or **Bring in from other assistants** while memory holds no notes), brings what other assistants know about you and your projects into memory, as notes you pick from. Nothing is added until you do.
+
+1. Under **On this computer**, tick what to read. Hydor finds what these keep, and shows how many memory files each has:
+   - **Claude Code**: the memory it keeps for each project, and your CLAUDE.md for every project (those of the accounts in Hydor too).
+   - **Codex**: its memories, and your AGENTS.md.
+   - **Hermes**: its MEMORY.md and USER.md, for each profile.
+   - **OpenClaw**: its workspace's MEMORY.md and USER.md.
+2. Under **From an export**, **Add an export** takes the .zip ChatGPT or Claude emails you when you ask for your data (in ChatGPT, Settings → Data controls → Export data; in Claude, Settings → Privacy → Export data), or the conversations.json in it. It shows what the file holds: Claude's memory or ChatGPT's custom instructions, and how many chats, from when to when. Of the chats, only what you wrote is read, the newest first: not the replies, and not the files you attached.
+3. Press **Start reading**. The [helper model](/settings?s=models&find=Helper%20model) reads a part at a time, with the notes memory has already, and keeps only what will last. It leaves out what memory says already (even in other words), secrets, and text written to steer agents. A large memory takes a few minutes: you can close the dialog meanwhile, and **Stop** stops it.
+4. Untick what you don't want kept. Notes come grouped: **About you** first, then each project by its folder, when what was read is about a project whose folder is on this computer. **Add to your profile** lists the lines it would add to [your profile](/guide/memory#your-profile). Press **Add N notes**; **Discard** drops them all.
+
+A note brought in says so in its history: "Brought in from Claude Code". Nothing changes in the other assistants, and an export you added is deleted once its notes are added. With the helper model on **Automatic**, Claude Haiku does the reading, through your Claude Code plan.
+
 ### Clear all…
 
 [Clear all…](/settings?s=memory&find=Clear%20all%E2%80%A6), at the bottom of the list, deletes every note and its history. It asks first: "Clear all memory? Every note about you, your projects and your sessions goes, with its history. This cannot be undone; export first to keep a copy." Click **Clear all** to go ahead. The button is greyed out when there are no notes.
@@ -269,3 +284,4 @@ You can search past sessions yourself with the search box (Ctrl+K, or ⌘K on a 
 - "Which notes about this project are not checked yet? Check them against the code."
 - "Stop learning from conversations, but keep the tidy-up."
 - "Turn memory off for the session called Tax return."
+- "Bring in what Claude Code and Codex remember about me, and show me the notes before adding them."

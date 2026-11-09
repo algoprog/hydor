@@ -1,7 +1,7 @@
 // Memory's routes for the pages: the switches (memory, search by meaning and where it runs, how many notes agents
 // start with, the tidy-up by itself and learning from conversations), the user's profile, every entry with its history, searches, edits and end dates, notes no agent
 // needed for long, what a topic sums up, the tidy-up (run now, undo one of its changes), undoing a change from the
-// note under a reply, export and clearing all.
+// note under a reply, export and clearing all, and bringing in what other assistants know.
 import path from 'node:path';
 import type { MemoryBasis, MemoryChange, MemoryEntry, MemoryKind, MemoryListEntry, MemoryNoteData, MemoryScope, MemoryState } from '../../shared/memory.ts';
 import { isUserProfile, PROFILE_WORDS_MAX, PROFILE_WORDS_MIN, scopeName, TOP_K_MAX, wordCount } from '../../shared/memory.ts';
@@ -10,6 +10,7 @@ import type { Deps } from '../features/types.ts';
 import { getNote, updateNote } from '../notes.ts';
 import { meaningState, setMeaning, warmMeaning, type MeaningDevice } from './embed.ts';
 import { fitProfile, helperText, profileFit, saveProfile, userProfile } from './profile.ts';
+import { bringinRoutes } from './bringin/index.ts';
 import { findNotes } from './search.ts';
 import { secretIn } from './secrets.ts';
 import {
@@ -370,4 +371,7 @@ export function memoryRoutes(d: Deps) {
     changed();
     return { cleared: n };
   });
+
+  // Bring in: what other assistants know, read by the helper and picked from (bringin/).
+  bringinRoutes(d, edited);
 }
