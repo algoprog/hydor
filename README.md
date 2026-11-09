@@ -42,7 +42,7 @@ Sessions keep running when you close the tab, and the ones you start in VS Code 
 - **Any agent, any model**: Claude Code, Codex, Gemini CLI and other [ACP](https://agentclientprotocol.com) agents, or
   any model through OpenRouter, Ollama or vLLM. Several plans, switched when one reaches its limit.
 - **Follow and steer**: every step in plain words, approvals, diffs, notifications and one inbox; carry on from your
-  phone, or by voice.
+  phone, from a Telegram chat, or by voice.
 - **Answers you can use**: replies show maths, diagrams and pictures, and more than a hundred answer UIs (comparison
   tables, charts, maps, recipes, forecasts, itineraries, quizzes, calculators) that agents fill in as they answer.
 - **Agents of your own**: say what one should do and it is drafted for you; each works everywhere or in some projects,

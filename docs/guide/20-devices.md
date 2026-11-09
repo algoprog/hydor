@@ -32,6 +32,36 @@ A notification can reach your phone when a session finishes, fails or needs your
 
 On an iPhone or iPad, add the app to your Home Screen first and open it from there: the browser can't receive them otherwise. If notifications are blocked for the site, allow them in the browser's settings first. A plain yes-or-no approval comes with **Approve** and **Deny** on the notification itself, where the phone shows buttons. More in [Inbox and notifications](/guide/inbox).
 
+## Talk to your agents from Telegram
+
+From a Telegram chat, on any phone or computer with Telegram, you can start sessions, read their replies and answer what agents ask. Hydor asks Telegram for new messages itself, so this works without the app having an address on the internet.
+
+### Connect a bot
+
+1. In Telegram, open @BotFather, send `/newbot` and give the bot a name and a username. It answers with a token, like `123456789:AA…`.
+2. Open [Settings → App → Telegram](/settings?s=telegram&find=Bot), paste the token and press **Connect**. The token is kept in the vault, encrypted, and never shows in the app again; the bot's name and "Listening for messages" show under **Bot**.
+
+**Change token** puts in another one (another bot's chats link again); **Remove the bot** takes it out of Hydor, and the bot stays yours in Telegram.
+
+### Link a chat
+
+Only the chats you link can use the bot: anyone else who finds it is told it is someone's own.
+
+1. Press [Link a chat](/settings?s=telegram&find=Link%20a%20chat). It shows a code that works once, for ten minutes.
+2. Press **Open in Telegram** on the device with your Telegram, then **Start** in the chat that opens; or send the bot the code. The chat shows under **Your chats** with its name.
+
+**Unlink** beside a chat takes its use of your agents away.
+
+### What a chat can do
+
+- **Send what you want done**: it goes to the session the chat is in, or starts a new one, in a task folder of its own as the start page does, with the agent set in [New sessions use](/settings?s=telegram&find=New%20sessions%20use) (Claude Code or Codex). What you send while the agent works waits in the session's queue.
+- **The reply** comes back when the agent's turn ends, with its formatting, in up to ten messages when it is long (the rest stays in the session); "typing…" shows while it works. **Open in Hydor** opens the session in the app, when the app has an address on the internet.
+- **What an agent asks**: a plain yes-or-no question comes with buttons that answer it; anything more (a form, a plan) comes with a link to answer it in the app.
+- **Commands**: `/new` starts a new session (`/new` and what it should do starts it at once), `/sessions` lists the latest to go on with one, `/stop` stops the agent, `/status` says which session the chat is in and what it is doing, and `/help` lists them.
+- **Notices**: with [Notices from every session](/settings?s=telegram&find=Notices%20from%20every%20session) on, as it is unless you turn it off, every session that finishes, fails or needs you says so in your chats, not only the ones a chat started.
+
+Pictures, files and voice messages don't reach the agents from Telegram yet: send words.
+
 ## Reach the app from another device
 
 Out of the box, the app answers only on the computer it runs on (port 8790 of `127.0.0.1`). Anyone who can reach it and knows the password can run any command as your user there, so treat access to it like SSH access to the computer. To use it from your phone or another computer, put HTTPS in front of it rather than opening the port to the network:
@@ -171,3 +201,5 @@ How pull requests are opened and followed: [Open a pull request from a session](
 - "Rename the machine called gpu-box to Studio GPU."
 - "List the tokens other agents use to reach this app, and revoke the one named old laptop."
 - "Add my GitHub account using the GitHub CLI's sign-in."
+- "Send my Telegram chats the notices of every session, not only the ones they started."
+- "Which Telegram chats are linked to this app?"

@@ -3,7 +3,7 @@
 // sections in a menu beside the open one; on phones a list, each section on its own page.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
-import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronRight, CircleHelp, ExternalLink, GitPullRequest, KeyRound, LogIn, LogOut, MoreHorizontal, Pencil, Plug, Plus, ScrollText, Server, Signature, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
+import { Bell, Blocks, Bot, Cable, CalendarClock, CheckCircle2, ChevronRight, CircleHelp, Cpu, ExternalLink, GitPullRequest, KeyRound, LogIn, LogOut, MoreHorizontal, Pencil, Plug, Plus, ScrollText, Send, Server, Signature, SlidersHorizontal, Sparkles, Trash2, type LucideIcon, UserRound, XCircle } from 'lucide-react';
 import { featureSections } from '../registry';
 import { isLang, LANGS } from '@shared/i18n';
 import type { AccountStatus, Agent, AgentAccount, ClientInfo, ClientUpdateItem, ClientUpdates, LoginFlow, RetentionSettings, StartupState, UpdateState } from '@shared/types';
@@ -31,6 +31,7 @@ import { TasksSettings } from './TasksSettings';
 import { ModelsSettings } from './ModelsSettings';
 import { ThemeSettings } from './Themes';
 import { ScmSettings } from './ScmSettings';
+import { TelegramSettings } from './TelegramSettings';
 import { ConnectSettings } from './ConnectSettings';
 import { AcpSettings } from './AcpSettings';
 import { machineId } from '../../lib/machine';
@@ -58,6 +59,7 @@ const GROUPS: { label: string; items: SectionDef[] }[] = [
     items: [
       { id: 'general', label: 'General', icon: SlidersHorizontal, sub: 'Theme, and what Enter does while an agent works' },
       { id: 'notifications', label: 'Notifications', icon: Bell, sub: 'When a session finishes, fails or needs your answer' },
+      { id: 'telegram', label: 'Telegram', icon: Send, sub: 'Talk to your agents from a Telegram chat: start sessions, get their replies, answer what they ask' },
       { id: 'security', label: 'Password', icon: KeyRound, sub: 'The password for this app, and signing out' },
       { id: 'signatures', label: 'Signatures', icon: Signature, sub: 'Your signature and initials, drawn once and kept encrypted, for the documents you sign' },
       { id: 'scm', label: 'Source control', icon: GitPullRequest, sub: 'GitHub and Gitea accounts for opening pull requests' },
@@ -1205,6 +1207,8 @@ function SectionBody({ id, cwd, agent, onAgent, onCwd }: { id: SettingsSection; 
       return <GeneralSettings />;
     case 'notifications':
       return <NotificationSettings />;
+    case 'telegram':
+      return <TelegramSettings />;
     case 'security':
       return <SecuritySettings />;
     case 'signatures':

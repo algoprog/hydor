@@ -33,6 +33,7 @@ export const catalogText = (it: { title: string; keywords?: string; text?: strin
 export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', string][] = [
   ['general', 'General', 'App', 'Theme, and what Enter does while an agent works'],
   ['notifications', 'Notifications', 'App', 'When a session finishes, fails or needs your answer'],
+  ['telegram', 'Telegram', 'App', 'Talk to your agents from a Telegram chat: start sessions, get their replies, answer what they ask'],
   ['security', 'Password', 'App', 'The password for this app, and signing out'],
   ['signatures', 'Signatures', 'App', 'Your signature and initials, drawn once and kept encrypted, for the documents you sign'],
   ['scm', 'Source control', 'App', 'GitHub and Gitea accounts for opening pull requests'],
@@ -80,6 +81,10 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['notifications', 'Notify this device', 'push notifications alerts phone browser when an agent is done finishes fails needs you', 'A notice when a session finishes, fails or needs your answer, even with the app closed'],
   ['notifications', 'Sound', 'chime sound beep audio when done', 'A short chime with each notice while the app is open'],
   ['notifications', 'Send a test', 'test notification try', 'Send a notice to this device now', 'Send a test notification'],
+  ['telegram', 'Bot', 'telegram bot token botfather connect chat app messenger phone', 'The Telegram bot your chats talk to, made with @BotFather', 'Connect a Telegram bot'],
+  ['telegram', 'Link a chat', 'telegram link pair code chat phone account', 'Lets a Telegram chat use your agents, with a code that works once'],
+  ['telegram', 'New sessions use', 'telegram agent claude code codex new session start', 'The agent a message from Telegram starts when its chat is in no session'],
+  ['telegram', 'Notices from every session', 'telegram notifications notices alerts finished fails needs you', 'Every session’s notices in your Telegram chats, not only those of the sessions a chat started'],
   // App › Password
   ['security', 'Change password', 'password reset new security', 'Changing it signs out every other browser'],
   ['security', 'Sign out of this browser', 'log out logout sign out', 'You need the password to come back'],
