@@ -16,7 +16,7 @@ import { HttpError } from '../auth.ts';
 import { APP_ROOT } from '../config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
-import { searchSessions } from '../indexer/index.ts';
+import { findSessions } from '../indexer/index.ts';
 import { embed, meaningOn, meaningReady, queryVector } from '../memory/embed.ts';
 import { findNotes } from '../memory/search.ts';
 import { memoryOn } from '../memory/store.ts';
@@ -204,7 +204,7 @@ export async function findAll(d: D, query: string, places: FindPlace[] = []): Pr
   const wants = (p: FindPlace) => !places.length || places.includes(p);
   const kinds = KINDS.filter((k) => KIND_PLACES[k].some(wants));
   // By words: sessions by title, and messages that hold the words.
-  const hits: SearchHit[] = wants('sessions') || wants('messages') ? searchSessions(db, q, 30) : [];
+  const hits: SearchHit[] = wants('sessions') || wants('messages') ? await findSessions(db, q, 30) : [];
   const sessions = new Map<string, FoundSession>();
   if (wants('sessions'))
     hits

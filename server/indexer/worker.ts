@@ -11,6 +11,8 @@ import { AcpParser } from '../history/acp.ts';
 import { PARSE_VERSION } from '../history/common.ts';
 import { LineSplitter } from '../runner/frames.ts';
 import { keep, keptPath, restore } from './kept.ts';
+import { searchSessions } from './search.ts';
+import type { SearchHit } from '../../shared/types.ts';
 
 interface Opts {
   dbPath: string;
@@ -365,7 +367,18 @@ async function pass(initial: boolean) {
   }
 }
 
-port.on('message', (msg: { type: string; paths?: string[]; claudeProjectsDirs?: string[]; codexHomes?: string[] }) => {
+port.on('message', (msg: { type: string; paths?: string[]; claudeProjectsDirs?: string[]; codexHomes?: string[]; id?: number; q?: string; limit?: number }) => {
+  // A search from the server (findSessions), on this thread's own connection so the server's goes on answering.
+  if (msg.type === 'search') {
+    let hits: SearchHit[] | null = null;
+    try {
+      hits = searchSessions(db, msg.q ?? '', msg.limit ?? 40);
+    } catch {
+      // The server searches itself then.
+    }
+    port.postMessage({ type: 'searched', id: msg.id, hits });
+    return;
+  }
   if (msg.type === 'roots' && msg.claudeProjectsDirs && msg.codexHomes) {
     opts.claudeProjectsDirs = msg.claudeProjectsDirs;
     opts.codexHomes = msg.codexHomes;

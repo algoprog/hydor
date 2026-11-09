@@ -20,7 +20,7 @@ import { ClaudeControl, CodexControl, ensureProbeDir, publicFlow } from './agent
 import * as files from './files.ts';
 import { zipPlan, zipStream } from './zip.ts';
 import { previewItem } from './history/common.ts';
-import { Indexer, searchSessions } from './indexer/index.ts';
+import { findSessions, Indexer } from './indexer/index.ts';
 import { SessionManager, type CreateOpts } from './sessions.ts';
 import { GitRepos } from './git.ts';
 import { installIpykernel } from './notebook/envs.ts';
@@ -352,7 +352,7 @@ app.get('/api/sessions', async (req) => {
 
 app.get('/api/search', async (req) => {
   const q = String((req.query as Record<string, string>).q ?? '').trim();
-  return { hits: q ? searchSessions(db, q) : [] };
+  return { hits: q ? await findSessions(db, q) : [] };
 });
 
 /** A start's id, as the page makes one for each press of Start (web/src/lib/starting.ts). */
