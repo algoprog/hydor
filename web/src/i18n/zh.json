@@ -22148,5 +22148,13 @@
 "Updated your profile":"已更新你的档案",
 "What other assistants know about you and your projects, as notes here. The helper model reads it, and nothing is added until you pick.":"把其他助手对你和你的项目的了解，变成这里的笔记。由辅助模型来读取，在你挑选之前不会添加任何内容。",
 "Which upload?":"哪个上传？",
-"Your {0}":"你的 {0}"
+"Your {0}":"你的 {0}",
+"Bring in memory from other assistants":"从其他助手导入记忆",
+"Finds notes, what the Library holds and more by what they mean as well as by their words, with a model that runs on this computer. It sets itself up once: about 500 MB.":"不只按字词，也按含义查找笔记、资料库中的内容等，使用在这台电脑上运行的模型。它会自行完成一次性设置：约占 500 MB。",
+"import migrate switch transfer claude code codex chatgpt claude.ai hermes openclaw export memories history chats":"导入 迁移 切换 转移 claude code codex chatgpt claude.ai hermes openclaw 导出 记忆 历史 对话 聊天",
+"Not enough disk space for the model ({0} MB).":"磁盘空间不足，放不下模型（{0} MB）。",
+"Notes from what other assistants know about you: Claude Code, Codex, Hermes, OpenClaw, or a ChatGPT or Claude export":"把其他助手对你的了解变成笔记：Claude Code、Codex、Hermes、OpenClaw，或 ChatGPT、Claude 的导出文件",
+"The model could not be downloaded ({0}: HTTP {1})":"无法下载模型（{0}：HTTP {1}）",
+"The model's {0} did not arrive whole (its checksum differs): try again":"模型的 {0} 没有完整下载（校验和不符）：请重试",
+"embeddings semantic mdenseon model onnx local":"嵌入 语义 mdenseon 模型 onnx 本地"
 }

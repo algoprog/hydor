@@ -1,24 +1,22 @@
 # Hydor's embedding worker, for memory's search by meaning (server/memory/embed.ts starts it). It reads
 # requests as JSON lines on stdin and answers each with unit-length vectors, as base64 float32, on stdout:
 #   {"id": 1, "kind": "document" | "query", "texts": ["..."]}  ->  {"id": 1, "dim": 768, "vectors": "..."}
-# It runs on a GPU when there is one: an NVIDIA GPU with room, or a Mac's own (Apple silicon, through Metal), in fp16.
-# A GPU is tried with a few words first; when it fails there (a driver in a bad state, an operation Metal lacks, numbers
-# that overflow), the model runs on the CPU instead and says why. On a CPU its body runs in float32 while its 256k-word
-# table, which is only looked up, stays in fp16 (about 830 MB of weights rather than 1.2 GB), on a few threads, so it
-# fits beside everything else on a computer with 8 GB.
+# It runs lightonai/mDenseOn through ONNX Runtime on the CPU, in its 8-bit build (algoprog/mDenseOn-ONNX: the layers'
+# weights and the word table in 8 bits, the arithmetic in float32; cosine >= 0.9995 to the model in float32), with
+# Hugging Face's own tokenizer, on a few threads: about 1 GB once loaded, a second to start, so it fits beside
+# everything else on a computer with 8 GB. The model's folder (HYDOR_EMBED_MODEL_DIR) holds model_q8.onnx,
+# tokenizer.json and tokenizer_config.json, downloaded by the app before it starts this.
 import base64
 import json
 import os
-import platform
-import subprocess
 import sys
 
 # The model the codebook in codebook.ts was fitted for: another needs its own.
 MODEL = 'lightonai/mDenseOn'
 PROMPTS = {'query': 'query: ', 'document': 'document: '}
 MAX_TOKENS = 512
-# Tokens in one pass: a CPU does best with small batches, a Mac's GPU shares the computer's memory, an NVIDIA GPU has its own.
-BUDGET = {'cpu': 4096, 'mps': 16384, 'cuda': 65536}
+# Tokens in one pass: a CPU does best with small batches.
+BUDGET = 4096
 
 
 def say(obj):
@@ -34,127 +32,56 @@ def rss_mb():
         return None
 
 
-def pick_device(torch):
-    want = os.environ.get('HYDOR_EMBED_DEVICE', '').strip()
-    if want:
-        return want
-    # The NVIDIA GPU with the most free memory, when it has room for the model and its work; a GPU in a bad state
-    # (its driver erring) leaves the CPU.
-    try:
-        if torch.cuda.is_available():
-            free, i = max((torch.cuda.mem_get_info(i)[0], i) for i in range(torch.cuda.device_count()))
-            if free > 2 * 2**30:
-                return f'cuda:{i}'
-    except Exception:  # noqa: BLE001
-        pass
-    # A Mac with Apple silicon: its own GPU, through Metal.
-    try:
-        if sys.platform == 'darwin' and platform.machine() == 'arm64' and torch.backends.mps.is_available():
-            return 'mps'
-    except Exception:  # noqa: BLE001
-        pass
-    return 'cpu'
+def main():
+    import numpy as np
+    import onnxruntime as ort
+    from tokenizers import Tokenizer
 
-
-def gpu_name(torch, device):
-    """What the page shows as where it runs: the NVIDIA GPU's name, the Mac's chip ("Apple M2 Pro GPU"), or CPU."""
-    if device.startswith('cuda'):
-        return torch.cuda.get_device_name(torch.device(device))
-    if device == 'mps':
-        try:
-            chip = subprocess.run(['sysctl', '-n', 'machdep.cpu.brand_string'], capture_output=True, text=True, timeout=5).stdout.strip()
-        except Exception:  # noqa: BLE001
-            chip = ''
-        return f'{chip or "Apple"} GPU'
-    return 'CPU'
-
-
-def load(torch, AutoModel, device):
-    """The model on a device: in fp16 on a GPU; on a CPU its body in float32, its word table left in fp16."""
-    model = AutoModel.from_pretrained(MODEL, dtype=torch.float16)
-    if device == 'cpu':
-        table = model.get_input_embeddings()
-        for p in model.parameters():
-            if p is not table.weight:
-                p.data = p.data.float()
-        for b in model.buffers():
-            if b.is_floating_point():
-                b.data = b.data.float()
-        table.register_forward_hook(lambda _m, _args, out: out.float())
-    return model.to(device).eval()
-
-
-def encoder(torch, tok, model, device):
-    """Texts in, unit vectors out (float32, numpy), the longest first in batches of about BUDGET tokens."""
-    budget = BUDGET['cuda' if device.startswith('cuda') else device if device in BUDGET else 'cpu']
+    folder = os.environ['HYDOR_EMBED_MODEL_DIR']
+    say({'status': 'loading'})
+    tok = Tokenizer.from_file(os.path.join(folder, 'tokenizer.json'))
+    with open(os.path.join(folder, 'tokenizer_config.json'), encoding='utf-8') as f:
+        pad = json.load(f).get('pad_token') or '<pad>'
+    tok.enable_truncation(MAX_TOKENS)
+    tok.no_padding()
+    pad_id = tok.token_to_id(pad) or 0
+    threads = int(os.environ.get('HYDOR_EMBED_THREADS') or max(1, min(4, (os.cpu_count() or 2) // 2)))
+    so = ort.SessionOptions()
+    so.intra_op_num_threads = threads
+    so.inter_op_num_threads = 1
+    so.log_severity_level = 3
+    sess = ort.InferenceSession(os.path.join(folder, 'model_q8.onnx'), so, providers=['CPUExecutionProvider'])
+    names = {i.name for i in sess.get_inputs()}
 
     def encode(texts, prompt):
-        texts = [prompt + t for t in texts]
-        lens = [len(x) for x in tok(texts, truncation=True, max_length=MAX_TOKENS)['input_ids']]
+        """Texts in, unit vectors out (float32), the longest first in batches of about BUDGET tokens."""
+        enc = tok.encode_batch([prompt + t for t in texts], add_special_tokens=True)
+        lens = [len(e.ids) for e in enc]
         order = sorted(range(len(texts)), key=lambda i: -lens[i])
-        out = [None] * len(texts)
+        out = np.zeros((len(texts), 0), dtype='<f4')
         i = 0
         while i < len(order):
-            n = max(1, min(256, budget // max(1, lens[order[i]])))
+            n = max(1, min(256, BUDGET // max(1, lens[order[i]])))
             idx = order[i : i + n]
-            enc = tok([texts[j] for j in idx], padding=True, truncation=True, max_length=MAX_TOKENS, return_tensors='pt').to(device)
-            with torch.inference_mode():
-                h = model(**enc).last_hidden_state[:, 0].float()
-            h = torch.nn.functional.normalize(h, dim=-1).cpu()
+            width = max(lens[j] for j in idx)
+            ids = np.full((len(idx), width), pad_id, dtype=np.int64)
+            mask = np.zeros((len(idx), width), dtype=np.int64)
             for k, j in enumerate(idx):
-                out[j] = h[k]
+                ids[k, : lens[j]] = enc[j].ids
+                mask[k, : lens[j]] = 1
+            feed = {'input_ids': ids, 'attention_mask': mask}
+            if 'token_type_ids' in names:
+                feed['token_type_ids'] = np.zeros_like(ids)
+            h = sess.run(None, feed)[0][:, 0].astype(np.float32)
+            h /= np.maximum(np.linalg.norm(h, axis=1, keepdims=True), 1e-12)
+            if out.shape[1] == 0:
+                out = np.zeros((len(texts), h.shape[1]), dtype='<f4')
+            out[idx] = h
             i += n
-        return torch.stack(out).numpy().astype('<f4')
+        return out
 
-    return encode
-
-
-def sound(vecs):
-    """A GPU's first answer is usable: one finite unit vector a text."""
-    import numpy as np
-
-    return vecs.shape[0] == 2 and bool(np.isfinite(vecs).all()) and bool(np.all(np.abs(np.linalg.norm(vecs, axis=1) - 1) < 1e-2))
-
-
-def main():
-    # An operation Metal lacks runs on the CPU rather than failing (set before torch loads).
-    os.environ.setdefault('PYTORCH_ENABLE_MPS_FALLBACK', '1')
-    import torch
-    from transformers import AutoModel, AutoTokenizer
-
-    device = pick_device(torch)
-    say({'status': 'loading'})
-    tok = AutoTokenizer.from_pretrained(MODEL)
-    model = None
-    fallback = None
-    if device != 'cpu':
-        # The GPU, tried with a few words: when it fails there, the CPU.
-        try:
-            model = load(torch, AutoModel, device)
-            encode = encoder(torch, tok, model, device)
-            if not sound(encode(['A first try on the GPU.', 'Ένα πρώτο δοκιμαστικό κείμενο.'], PROMPTS['document'])):
-                raise RuntimeError('its vectors came out wrong')
-        except Exception as e:  # noqa: BLE001
-            fallback = f'{type(e).__name__}: {e}'[:300]
-            model = None
-            try:
-                if device.startswith('cuda'):
-                    torch.cuda.empty_cache()
-                elif device == 'mps':
-                    torch.mps.empty_cache()
-            except Exception:  # noqa: BLE001
-                pass
-            device = 'cpu'
-    if device == 'cpu':
-        torch.set_num_threads(int(os.environ.get('HYDOR_EMBED_THREADS') or max(1, min(4, (os.cpu_count() or 2) // 2))))
-    if model is None:
-        model = load(torch, AutoModel, device)
-    encode = encoder(torch, tok, model, device)
-    name = gpu_name(torch, device)
-    cpu = device == 'cpu'
-
-    dim = model.config.hidden_size
-    say({'ready': True, 'model': MODEL, 'device': device, 'name': name, 'dtype': 'float32, table fp16' if cpu else 'float16', 'dim': dim, 'rss': rss_mb(), **({'fallback': fallback} if fallback else {})})
+    dim = encode(['A first vector.'], PROMPTS['document']).shape[1]
+    say({'ready': True, 'model': MODEL, 'device': 'cpu', 'name': 'CPU', 'dtype': '8-bit weights, float32 arithmetic', 'dim': dim, 'threads': threads, 'rss': rss_mb()})
     for line in sys.stdin:
         line = line.strip()
         if not line:

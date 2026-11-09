@@ -114,7 +114,7 @@ function Status({ icon, tone, children }: { icon: ReactNode; tone?: 'warn'; chil
   return <div className={cx('flex items-start gap-2 text-[12.5px] leading-snug', tone === 'warn' ? 'text-warn' : 'text-fg-2')}>{icon}<span className="min-w-0">{children}</span></div>;
 }
 
-/** Search by meaning: its switch, where it runs, and how it is doing. */
+/** Search by meaning: its switch, and how it is doing. */
 function Meaning({ st, set }: { st: MemoryState; set: (p: Record<string, unknown>) => void }) {
   const m = st.meaning;
   const busy = m.status === 'setting-up' || m.status === 'starting';
@@ -127,7 +127,7 @@ function Meaning({ st, set }: { st: MemoryState; set: (p: Record<string, unknown
   return (
     <Row
       label="Search by meaning"
-      hint="Finds notes, what the Library holds and more by what they mean as well as by their words, with a model that runs on this computer. It sets itself up once: about 2 GB (6 GB with an NVIDIA GPU)."
+      hint="Finds notes, what the Library holds and more by what they mean as well as by their words, with a model that runs on this computer. It sets itself up once: about 500 MB."
       control={<Switch on={st.enabled && m.on} disabled={!st.enabled} label="Search by meaning" onChange={(on) => set({ meaning: on })} />}
     >
       {st.enabled && m.on && (
@@ -150,18 +150,6 @@ function Meaning({ st, set }: { st: MemoryState; set: (p: Record<string, unknown
               )}
             </Status>
           )}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5" title="Automatic: on a GPU with room when there is one. CPU only: the GPUs stay free for other work.">
-            <span className="text-[12.5px] text-fg-2">Where it runs</span>
-            <Segmented
-              size="sm"
-              value={m.where}
-              onChange={(v) => set({ device: v })}
-              options={[
-                { value: 'auto', label: 'Automatic' },
-                { value: 'cpu', label: 'CPU only' },
-              ]}
-            />
-          </div>
         </div>
       )}
     </Row>

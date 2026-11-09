@@ -22,9 +22,10 @@ for the service and the desktop apps; on Windows `%USERPROFILE%\.config\hydor.en
 | `CLAUDE_CODE_TMPDIR` | your `TMPDIR`, else `/tmp` | Claude Code's own: where it keeps its temporary files (in `claude-<your user id>`). Set here or in your shell, the agents' Claude Code uses it. Unset and where Claude Code can't make that folder (`/tmp` closed to you), the app points it at `tmp/` in `DATA_DIR`, since Claude Code does not start without it |
 | `CODEX_HOME` | `~/.codex` | Where Codex keeps its data |
 | `HYDOR_EMBED` | `on` | `off`: search by meaning starts off on a new install, so the app never sets it up on its own (a test's or a demo's copy); Settings → Memory still turns it on. Once Settings has turned it on or off, that wins |
-| `HYDOR_EMBED_DEVICE` | the NVIDIA GPU with the most free memory, else a Mac's own GPU (`mps`), else `cpu` | Where memory's search by meaning runs (`cpu`, `cuda:1`, `mps`…); Settings → Memory can also keep it on the CPU |
-| `HYDOR_EMBED_THREADS` | half the CPU's cores, at most 4 | Threads it uses on the CPU |
-| `HYDOR_EMBED_PYTHON` | a private environment the app sets up | A Python with PyTorch and Transformers 5.6+ to run it with instead |
+| `HYDOR_EMBED_THREADS` | half the CPU's cores, at most 4 | Threads memory's search by meaning uses (it runs on the CPU, through ONNX Runtime) |
+| `HYDOR_EMBED_PYTHON` | a private environment the app sets up | A Python with ONNX Runtime 1.23+, tokenizers and NumPy to run it with instead |
+| `HYDOR_EMBED_MODEL_DIR` | `~/.cache/hydor/mDenseOn-ONNX-<revision>` (`~/Library/Caches/hydor/…` on a Mac, `%LOCALAPPDATA%\hydor\cache\…` on Windows, the data folder in Docker) | Where its model's files are kept (`model_q8.onnx`, `tokenizer.json`, `tokenizer_config.json`, from algoprog/mDenseOn-ONNX on Hugging Face) |
+| `HF_ENDPOINT` | `https://huggingface.co` | A Hugging Face mirror to download that model from |
 | `HYDOR_PICTURES_DEVICE` | the graphics card when there is one they can use | `cpu`: the picture tools (taking backgrounds out, erasing) run on the CPU and set up without ONNX Runtime's NVIDIA build (2.1 GB), leaving the graphics card to other work. Otherwise an NVIDIA GPU runs them through CUDA (the GPUs in `CUDA_VISIBLE_DEVICES` when it is set) and a Mac's through Core ML |
 | `HYDOR_FFMPEG`, `HYDOR_FFPROBE` | `ffmpeg`, `ffprobe` on the `PATH` | The ffmpeg programs the Library takes videos' frames and stills and sounds' lengths and shapes with, and voice samples are read with |
 | `HYDOR_UPDATE_FEED` | the newest GitHub release's `hydor-mac.json`, `hydor-windows.json` or `hydor-linux.json` | Where a desktop app looks for new versions |

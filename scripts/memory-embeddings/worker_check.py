@@ -1,4 +1,5 @@
-# Drives server/memory/embed_worker.py the way the app does (JSON lines), on the CPU: start time, memory,
+# Drives server/memory/embed_worker.py the way the app does (JSON lines), on the CPU (HYDOR_EMBED_MODEL_DIR: the model's
+# folder): start time, memory,
 # speed, the vectors of two benchmarks (to compare with the GPU's fp16 ones), and cosine similarities of
 # memory-like pairs to set the app's thresholds.
 # Usage: python -I worker_check.py WORKER_PYTHON WORKER_PY OUT_DIR DATA_DIR
@@ -8,7 +9,8 @@ from datasets import load_dataset
 
 PY, WORKER, OUT, DATA = sys.argv[1:5]
 env = {k: os.environ[k] for k in ('PATH', 'HOME', 'LANG') if k in os.environ}
-env.update(HYDOR_EMBED_DEVICE='cpu', HYDOR_EMBED_THREADS='4', CUDA_VISIBLE_DEVICES='', PYTHONDONTWRITEBYTECODE='1', HF_HUB_DISABLE_PROGRESS_BARS='1', TOKENIZERS_PARALLELISM='false', TRANSFORMERS_VERBOSITY='error')
+# The model's folder: model_q8.onnx, tokenizer.json and tokenizer_config.json (the app's cache, or HYDOR_EMBED_MODEL_DIR).
+env.update(HYDOR_EMBED_MODEL_DIR=os.environ.get('HYDOR_EMBED_MODEL_DIR', ''), HYDOR_EMBED_THREADS='4', CUDA_VISIBLE_DEVICES='', PYTHONDONTWRITEBYTECODE='1')
 t0 = time.time()
 p = subprocess.Popen([PY, '-I', WORKER], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env, text=True, bufsize=1)
 

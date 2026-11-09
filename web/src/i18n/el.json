@@ -22134,5 +22134,13 @@
 "Updated your profile":"Το προφίλ σας ενημερώθηκε",
 "What other assistants know about you and your projects, as notes here. The helper model reads it, and nothing is added until you pick.":"Ό,τι γνωρίζουν άλλοι βοηθοί για εσάς και τα έργα σας, ως σημειώσεις εδώ. Το διαβάζει το βοηθητικό μοντέλο, και τίποτα δεν προστίθεται πριν διαλέξετε.",
 "Which upload?":"Ποια αποστολή;",
-"Your {0}":"Το {0} σας"
+"Your {0}":"Το {0} σας",
+"Bring in memory from other assistants":"Εισαγωγή μνήμης από άλλους βοηθούς",
+"Finds notes, what the Library holds and more by what they mean as well as by their words, with a model that runs on this computer. It sets itself up once: about 500 MB.":"Βρίσκει σημειώσεις, ό,τι περιέχει η Βιβλιοθήκη και άλλα, βάσει του νοήματός τους αλλά και των λέξεών τους, με ένα μοντέλο που τρέχει σε αυτόν τον υπολογιστή. Εγκαθίσταται μόνη της, μία φορά: περίπου 500 MB.",
+"import migrate switch transfer claude code codex chatgpt claude.ai hermes openclaw export memories history chats":"εισαγωγή μετάβαση αλλαγή μεταφορά claude code codex chatgpt claude.ai hermes openclaw εξαγωγή μνήμες ιστορικό συνομιλίες",
+"Not enough disk space for the model ({0} MB).":"Δεν υπάρχει αρκετός χώρος στον δίσκο για το μοντέλο ({0} MB).",
+"Notes from what other assistants know about you: Claude Code, Codex, Hermes, OpenClaw, or a ChatGPT or Claude export":"Σημειώσεις από όσα γνωρίζουν για εσάς άλλοι βοηθοί: Claude Code, Codex, Hermes, OpenClaw, ή ένα αρχείο εξαγωγής από το ChatGPT ή το Claude",
+"The model could not be downloaded ({0}: HTTP {1})":"Δεν ήταν δυνατή η λήψη του μοντέλου ({0}: HTTP {1})",
+"The model's {0} did not arrive whole (its checksum differs): try again":"Το {0} του μοντέλου δεν έφτασε ολόκληρο (το άθροισμα ελέγχου διαφέρει): δοκιμάστε ξανά",
+"embeddings semantic mdenseon model onnx local":"ενσωματώσεις σημασιολογική mdenseon μοντέλο onnx τοπικό"
 }

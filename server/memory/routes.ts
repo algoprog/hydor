@@ -1,4 +1,4 @@
-// Memory's routes for the pages: the switches (memory, search by meaning and where it runs, how many notes agents
+// Memory's routes for the pages: the switches (memory, search by meaning, how many notes agents
 // start with, the tidy-up by itself and learning from conversations), the user's profile, every entry with its history, searches, edits and end dates, notes no agent
 // needed for long, what a topic sums up, the tidy-up (run now, undo one of its changes), undoing a change from the
 // note under a reply, export and clearing all, and bringing in what other assistants know.
@@ -8,7 +8,7 @@ import { isUserProfile, PROFILE_WORDS_MAX, PROFILE_WORDS_MIN, scopeName, TOP_K_M
 import { HttpError } from '../auth.ts';
 import type { Deps } from '../features/types.ts';
 import { getNote, updateNote } from '../notes.ts';
-import { meaningState, setMeaning, warmMeaning, type MeaningDevice } from './embed.ts';
+import { meaningState, setMeaning, warmMeaning } from './embed.ts';
 import { fitProfile, helperText, profileFit, saveProfile, userProfile } from './profile.ts';
 import { bringinRoutes } from './bringin/index.ts';
 import { findNotes } from './search.ts';
@@ -158,7 +158,7 @@ export function memoryRoutes(d: Deps) {
 
   app.get('/api/memory', async () => memoryState(d));
   app.put('/api/memory', async (req) => {
-    const b = (req.body ?? {}) as { enabled?: unknown; meaning?: unknown; device?: unknown; retry?: unknown; tidy?: unknown; learn?: unknown; topK?: unknown; profileWords?: unknown };
+    const b = (req.body ?? {}) as { enabled?: unknown; meaning?: unknown; retry?: unknown; tidy?: unknown; learn?: unknown; topK?: unknown; profileWords?: unknown };
     if (b.topK !== undefined) {
       const k = Number(b.topK);
       if (!Number.isInteger(k) || k < 1 || k > TOP_K_MAX) throw new HttpError(400, `The number of notes should be from 1 to ${TOP_K_MAX}`);
@@ -174,8 +174,7 @@ export function memoryRoutes(d: Deps) {
     if (typeof b.enabled === 'boolean') setEnabled(db, b.enabled);
     if (typeof b.tidy === 'boolean') setTidyOn(db, b.tidy);
     if (typeof b.learn === 'boolean') setLearnOn(db, b.learn);
-    const device = b.device === 'cpu' || b.device === 'auto' ? (b.device as MeaningDevice) : undefined;
-    if (typeof b.meaning === 'boolean' || device || b.retry === true) setMeaning(db, { on: typeof b.meaning === 'boolean' ? b.meaning : undefined, device, retry: b.retry === true });
+    if (typeof b.meaning === 'boolean' || b.retry === true) setMeaning(db, { on: typeof b.meaning === 'boolean' ? b.meaning : undefined, retry: b.retry === true });
     changed();
     return memoryState(d);
   });

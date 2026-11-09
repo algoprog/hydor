@@ -1,16 +1,16 @@
 // npm run find:vectors: the vectors of everything the search box finds that ships with the app (its pages,
 // settings and actions, themes, app templates, built-in assistants and skills), made once here so no one's
 // computer has to (server/find/shipped-vectors.json). Run it whenever any of those change (CLAUDE.md);
-// server/find/find-test.ts fails until you do. Only texts without a vector yet are embedded, on the CPU unless
-// HYDOR_EMBED_DEVICE says otherwise. It needs a Python with PyTorch and Transformers 5.6+: HYDOR_EMBED_PYTHON,
-// else the app's own one (Settings → Memory → Search by meaning sets it up in the data folder).
+// server/find/find-test.ts fails until you do. Only texts without a vector yet are embedded, on the CPU. It needs a
+// Python with ONNX Runtime 1.23+, tokenizers and NumPy: HYDOR_EMBED_PYTHON, else the app's own one (Settings → Memory →
+// Search by meaning sets it up in the data folder); the model is downloaded once into the user's cache.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { kvSet, openDb } from '../server/db.ts';
 import { hashOf, SHIPPED_FILE } from '../server/find/index.ts';
 import { shippedItems } from '../server/find/sources.ts';
-import { embed, stopMeaning } from '../server/memory/embed.ts';
+import { embed, kick, meaningState, stopMeaning } from '../server/memory/embed.ts';
 import { quantize, VECTOR_MODEL } from '../server/memory/vectors.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -20,7 +20,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
 if (!process.env.HYDOR_EMBED_PYTHON) {
   const own = ['.hydor', '.naget-agent', '.web-agent'].map((d) => path.join(os.homedir(), d, 'memory', 'venv', 'bin', 'python')).find((p) => fs.existsSync(p));
   if (!own) {
-    console.error('No Python with PyTorch and Transformers here: turn on search by meaning in Settings → Memory, or set HYDOR_EMBED_PYTHON.');
+    console.error('No Python with ONNX Runtime and tokenizers here: turn on search by meaning in Settings → Memory, or set HYDOR_EMBED_PYTHON.');
     process.exit(2);
   }
   process.env.HYDOR_EMBED_PYTHON = own;
@@ -29,7 +29,13 @@ if (!process.env.HYDOR_EMBED_PYTHON) {
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-find-vectors-'));
 const db = openDb(path.join(tmp, 'v.db'));
 kvSet(db, 'memory.meaning', '1');
-if (!process.env.HYDOR_EMBED_DEVICE) kvSet(db, 'memory.meaning.device', 'cpu');
+// The model's files, downloaded the first time (into the user's cache, shared with the app).
+await kick(db, { now: true });
+const ready = meaningState(db);
+if (ready.status === 'failed') {
+  console.error(`Search by meaning could not set itself up: ${ready.detail}`);
+  process.exit(1);
+}
 
 let before: Record<string, string> = {};
 try {
@@ -52,7 +58,7 @@ for (let i = 0; i < need.length; i += 64) {
     { wait: true, timeoutMs: 900_000 },
   );
   if (!vecs) {
-    console.error(`The model did not answer (${process.env.HYDOR_EMBED_PYTHON}): it needs PyTorch, Transformers 5.6+ and 2.5 GB of free memory.`);
+    console.error(`The model did not answer (${process.env.HYDOR_EMBED_PYTHON}): it needs ONNX Runtime 1.23+, tokenizers, NumPy and 1.5 GB of free memory.`);
     process.exit(1);
   }
   batch.forEach(([h], k) => (out[h] = Buffer.from(quantize(vecs[k])).toString('base64')));

@@ -124,8 +124,8 @@ Everything about memory is in [Settings → Capabilities → Memory](/settings?s
 
 **How it gets ready**, once:
 
-1. A minute after the app first starts, the app sets up a private Python environment in its data folder, with PyTorch (its smaller CPU build when there is no NVIDIA GPU; on a Mac its usual build, which uses the Mac's GPU) and Transformers; if you turned it off, it does this as soon as you turn **Search by meaning** back on (memory itself must be on). This takes a few minutes, and the line under the switch shows each step, such as "Making a private Python environment" and "Installing PyTorch (CPU build): a few minutes".
-2. The first time the model starts, it downloads: "Downloading the model (1.2 GB, once)". After that, starting says "Loading the model".
+1. A minute after the app first starts, the app sets up a private Python environment in its data folder, with ONNX Runtime, Hugging Face's tokenizer and NumPy (about 150 MB); if you turned it off, it does this as soon as you turn **Search by meaning** back on (memory itself must be on). The line under the switch shows each step, such as "Making a private Python environment" and "Installing ONNX Runtime and the tokenizer". An environment an older version made with PyTorch is removed first, which frees its gigabytes: "Removing the environment an older version made".
+2. Then it downloads the model, once: "Downloading the model: 120 of 340 MB, once". It is mDenseOn in 8 bits (algoprog/mDenseOn-ONNX on Hugging Face), a quarter of the full model's size, which finds the same notes. Each file is checked before it is used, and a download cut short goes on from where it stopped the next time.
 3. Every note gets its vector (the numbers search by meaning compares) in the background, and so does everything in the Library. The line counts the notes: "all 120 notes found by meaning", or "80 of 120 notes found by meaning (the rest soon)".
 
 **Turn it off** with the same switch: the model stops, and everything is found by its words alone. A computer short of disk space or memory can do without it.
@@ -133,15 +133,11 @@ Everything about memory is in [Settings → Capabilities → Memory](/settings?s
 **What it needs**:
 
 - Python 3.10 or newer on this computer, unless the uv tool is installed, which gets its own. If neither is there, setting up stops and says so, with how to install Python: on Debian or Ubuntu `sudo apt install python3 python3-venv`, on a Mac from python.org or with Homebrew (`brew install python`). On a Mac, Apple's own Python counts only when its developer tools are installed, so the app never asks you to install them.
-- Disk space: PyTorch takes about 1 GB, or about 5 GB with an NVIDIA GPU, and the model 1.2 GB. Setting up stops with "Not enough disk space" when less than about 3 GB is free (9 GB with an NVIDIA GPU).
+- Disk space: about 150 MB for the environment and 340 MB for the model. Setting up stops with "Not enough disk space" when less than about 1 GB is free.
 - An internet connection, once, for the downloads.
-- Free memory to start the model: about 2.5 GB on the CPU or a Mac's GPU (which shares the computer's memory), or 1.5 GB with an NVIDIA GPU. Until there is enough, it says "Waiting for memory" and notes are found by their words.
+- Free memory to start the model: about 1.5 GB. Until there is enough, it says "Waiting for memory" and notes are found by their words.
 
-**Where it runs**: under the switch, pick **Automatic** or **CPU only**.
-
-- **Automatic** runs it on a GPU when there is one: the NVIDIA GPU with the most free memory, when one has more than 2 GB free, or a Mac's own GPU (Apple silicon); otherwise on the CPU. On an NVIDIA GPU it loads at once and stays loaded; on a Mac's GPU, which shares the computer's memory, it starts when needed and stops after a few idle minutes, as on the CPU. The line says where it runs ("Loaded on" and the GPU's name). A GPU that fails its first try leaves it on the CPU, and the line says why.
-- **CPU only** keeps it off the GPUs, to leave them to other work, such as models you run on this computer.
-- On the CPU it starts only when needed, takes about 1.4 GB of memory while it runs, and stops after a few idle minutes: "Starts on the CPU when needed, and stops after a few idle minutes". Starting takes a few seconds, so it starts as soon as you begin a message on the start page (or in a session whose agent stopped), and shortly before a scheduled task runs: a new session's notes and skills are then found by meaning too. A session never waits for it to load: one that starts before it is up gets its notes and skills by their words. A computer with 8 GB of memory is enough.
+**How it runs**: on the computer's processor (the CPU), through ONNX Runtime, on a few of its cores. It starts only when needed, takes about 0.6 to 1 GB of memory while it runs, and stops after a few idle minutes: "Starts when needed, and stops after a few idle minutes", and "Loaded" while it runs. Starting takes a second or two, and it starts as soon as you begin a message on the start page (or in a session whose agent stopped), and shortly before a scheduled task runs: a new session's notes and skills are then found by meaning too. A session never waits for it to load: one that starts before it is up gets its notes and skills by their words. It leaves the graphics card alone, and a computer with 8 GB of memory is enough.
 
 When something goes wrong, the line turns into a warning with the reason (for example "The model took too long to load") and a **Try again** button. Turning the switch off stops the model; what was set up stays, so turning it on again is quick.
 

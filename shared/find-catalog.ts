@@ -181,7 +181,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['browser', 'Profiles', 'logins cookies profile sign in sites', 'Separate sign-ins for the browser', 'Browser profiles'],
   // Capabilities › Memory
   ['memory', 'Memory', 'remember notes recall forget', 'Agents start with what earlier sessions kept, and save notes when you ask'],
-  ['memory', 'Search by meaning', 'embeddings semantic mdenseon model gpu cpu', 'Finds notes, and anything in this search, by what it means'],
+  ['memory', 'Search by meaning', 'embeddings semantic mdenseon model onnx local', 'Finds notes, and anything in this search, by what it means'],
   ['memory', 'Notes each agent starts with', 'top k how many notes retrieval relevant context memory count index titles', 'Besides your profile: at most this many notes that bear on what you ask, and the titles of the rest'],
   ['memory', 'Tidy up automatically', 'nightly daily each night schedule merge duplicates summaries topics profile consolidate titles', 'About once a day, after something new: merges notes that say the same thing, sums related ones up and titles them'],
   ['memory', 'Learn from conversations', 'dreaming learn sessions transcripts correct check verify notes nightly consolidate', 'With the tidy-up: corrects notes the conversations show wrong, checks the unchecked, keeps a few new things'],

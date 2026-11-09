@@ -123,15 +123,11 @@ export interface MemoryNoteData {
 export interface MeaningState {
   /** Turned on in Settings. */
   on: boolean;
-  /** off: not turned on; setting-up: installing its Python libraries; starting: loading the model (the first time, downloading it); ready; failed. */
+  /** off: not turned on; setting-up: installing its Python libraries and (the first time) downloading the model; starting: loading the model; ready; failed. */
   status: 'off' | 'setting-up' | 'starting' | 'ready' | 'failed';
   /** Progress while setting up, or why it failed. */
   detail?: string;
   model: string;
-  /** Where it may run: the best place (a GPU with room, else the CPU), or the CPU only. */
-  where: 'auto' | 'cpu';
-  /** Where it runs ("NVIDIA GeForce RTX 4090", "CPU"). */
-  device?: string;
   /** Active notes with a vector, of all of them. */
   embedded: number;
   total: number;

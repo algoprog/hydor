@@ -81,7 +81,7 @@ async function startServer() {
     ...(process.env.PLAYWRIGHT_BROWSERS_PATH ? { PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH } : {}),
     // A preview port of its own (the usual one may be the real app's).
     PREVIEW_PORT: process.env.PREVIEW_PORT ?? '0',
-    // Search by meaning stays off: the demo sets up no PyTorch (in /dev/shm) and downloads no model.
+    // Search by meaning stays off: the demo sets up no Python environment (in /dev/shm) and downloads no model.
     HYDOR_EMBED: 'off',
     // The graphics card left alone when asked (HYDOR_VIDEO_GPU=off: videos made on the processor, the card never tried).
     ...(process.env.HYDOR_VIDEO_GPU ? { HYDOR_VIDEO_GPU: process.env.HYDOR_VIDEO_GPU } : {}),
