@@ -3,6 +3,20 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.46.0 · 9 November 2026
+
+Smoother while agents work: a session's page keeps up with a reply as it comes, and a message never goes twice.
+
+- **A reply coming in**: the turns already there are left alone while the newest is written, instead of being drawn
+  again a dozen times a second; on a long session the page does less than half the work it did, and its long pauses
+  are nearly gone.
+- **Searching sessions by their words** no longer holds up the rest of the app while it ranks many messages.
+- **Opening a long session** no longer sends all of it at once to a page that has it open.
+- **A message goes once**: an answer lost on the way (a phone that slept, a network that changed) is asked for again
+  by itself, and sending the same message again after an error no longer sends it twice.
+- **For contributors**: CONTRIBUTING.md says where to start and how, AGENTS.md is the notes every coding agent reads,
+  `npm test` runs the tests, and pull requests are checked on GitHub.
+
 ## 0.45.0 · 9 November 2026
 
 Faster from the first moment: sessions start without waiting, the app loads in a fraction of the time, and long
