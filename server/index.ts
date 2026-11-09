@@ -68,6 +68,8 @@ import { arenaOf } from '../shared/arena.ts';
 import { startMatch } from './arena/index.ts';
 import { helper, helperOptions, helperSees, setHelperModel, setHelperModels } from './helper.ts';
 import { setOneShotAccounts } from './oneshot.ts';
+import { limitsOf, limitSupport, oomKills, SessionMeter, setLimits, wrapRunner } from './resources.ts';
+import { setRunnerWrap } from './runner/client.ts';
 import { appWords } from './language/index.ts';
 import { noteEvents, notesOf } from './notes.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
@@ -558,6 +560,37 @@ app.get('/api/sessions/:key/breakdown', async (req) => {
   return { waits, rates };
 });
 
+/**
+ * What each live session's programs use now (its agent's program, the commands it runs, the servers it starts), the
+ * limits sessions start under, and whether limits work on this computer.
+ */
+app.get('/api/sessions/resources', async () => {
+  const runs = sessions.liveRuns();
+  const usage = await meter.measure(runs.map((r) => r.pid));
+  const list = runs
+    .map((r) => {
+      const u = usage.get(r.pid);
+      if (!u) return null;
+      const s = sessions.summary(r.key);
+      const ooms = r.scope ? oomKills(r.pid) : null;
+      return { key: r.key, title: s?.title || 'Untitled', agent: s?.agent, ...u, ...(r.limits ? { limits: r.limits } : {}), ...(ooms ? { stopped: ooms } : {}) };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b!.memory - a!.memory);
+  return { sessions: list, limits: limitsOf(db), support: limitSupport(), measured: process.platform === 'linux' || process.platform === 'darwin' };
+});
+
+/** The limits sessions start under from now on: Settings → General → Limit each session. */
+app.put('/api/sessions/limits', async (req) => {
+  const b = (req.body ?? {}) as { memoryMb?: unknown; cpus?: unknown };
+  const num = (v: unknown) => (v === null ? null : v === undefined ? undefined : Number(v));
+  try {
+    return { limits: setLimits(db, { memoryMb: num(b.memoryMb), cpus: num(b.cpus) }), support: limitSupport() };
+  } catch (e) {
+    throw new HttpError(400, (e as Error).message);
+  }
+});
+
 /** Every command the agent ran, newest last. */
 app.get('/api/sessions/:key/commands', async (req) => {
   const tl = await sessions.timeline(K(req));
@@ -781,6 +814,13 @@ const models = new ModelManager((state) => broadcast({ t: 'models', state }));
 setHelperModels(models);
 // One-off questions to Claude or Codex go to the next signed-in account when one is at its limit, as sessions do (unless switching is off).
 setOneShotAccounts((agent) => (autoSwitchOn(db) ? accountPool(db, agent) : [undefined]).map((id) => accountEnv(db, agent, id)));
+// Each session started from now on runs within the limits set in Settings → General (server/resources.ts).
+setRunnerWrap((runId, cmd, args) => {
+  const limits = limitsOf(db);
+  const w = wrapRunner(limits, runId, cmd, args);
+  return w.scope ? { ...w, limits } : w;
+});
+const meter = new SessionMeter();
 sessions.consoleOffers = () => ({ models: models.options(), modes: CONSOLE_MODES.map((m) => ({ value: m.id, label: m.name, description: m.description })), defaultMode: 'ask' });
 app.get('/api/models', async () => models.state());
 app.put('/api/models', async (req) => models.configure((req.body ?? {}) as Parameters<ModelManager['configure']>[0]));

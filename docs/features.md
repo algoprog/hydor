@@ -1033,9 +1033,13 @@ programs shows each program's version and what is out, with Check now, Update no
   Sessions nobody used for a year are deleted (Settings → General → Delete inactive sessions: on or off, and how
   long); pinned and busy ones stay, and their numbers stay in Activity.
 - System: this computer under one tool in the sidebar, a tab each for Files, Git, Terminal, Preview,
-  Monitor (CPU, memory, GPUs, disks, network and the busiest processes, live) and Experiments, and an overview with how it is
-  doing and what each tool holds now (recent files and a search, repositories with changes, the shells
-  running, the web apps to preview).
+  Monitor (CPU, memory, GPUs, disks, network, each live session's programs and the busiest processes, live) and
+  Experiments, and an overview with how it is doing and what each tool holds now (recent files and a search,
+  repositories with changes, the shells running, the web apps to preview).
+- Each session's share of the computer: its programs (the agent's, the commands it runs, the servers it starts) with
+  their CPU and memory, in its Info and in Monitor; and, on Linux, Settings → General → Limit each session puts each
+  session in a systemd scope of its own with at most that much memory and so many processors, so a program that
+  runs away is stopped alone, never the app or another session.
 - Settings: sign the agents in and out from the browser, and manage MCP servers, skills, plugins, Agent
   Guidelines and the CLAUDE.md / AGENTS.md instruction files.
 - An MCP server of its own, so an agent elsewhere can list, read, start and steer sessions here.

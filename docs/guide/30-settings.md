@@ -22,6 +22,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Terminal suggestions**](/settings?s=general&find=Terminal%20suggestions): Grey completions after the cursor in terminals.
 - [**Resume after usage limits**](/settings?s=general&find=Resume%20after%20usage%20limits): Continues a session a minute after a plan’s limit resets.
 - [**Delete inactive sessions**](/settings?s=general&find=Delete%20inactive%20sessions): Deletes sessions nobody used for a year, or as long as you choose; until then every conversation is kept.
+- [**Limit each session**](/settings?s=general&find=Limit%20each%20session): The most memory and processors one session’s programs may use.
 - [**Start when this computer starts**](/settings?s=general&find=Start%20when%20this%20computer%20starts): Starts the app when the computer starts.
 - [**Update automatically**](/settings?s=general&find=Update%20automatically): Installs new versions by itself: the desktop apps as soon as they are out, after a minute’s notice; a copy from git when you have not used it for a while.
 - [**Take the tour**](/settings?s=general&find=Take%20the%20tour): See what each part of the app does.
@@ -223,6 +224,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Notes**](/settings?s=memory&find=Notes): Every note kept, by place.
 - [**Add a note**](/settings?s=memory&find=Add%20a%20note): Write a note for agents to remember, about you or a project.
 - [**Deleted notes**](/settings?s=memory&find=Deleted%20notes): Notes deleted in the last 30 days, to restore.
+- [**Bring in…**](/settings?s=memory&find=Bring%20in%E2%80%A6): Notes from what other assistants know about you: Claude Code, Codex, Hermes, OpenClaw, or a ChatGPT or Claude export.
 - [**Export**](/settings?s=memory&find=Export): Every note as Markdown to read, or as JSON with histories.
 - [**Clear all…**](/settings?s=memory&find=Clear%20all%E2%80%A6): Deletes every note and its history.
 

@@ -113,6 +113,15 @@ The app keeps every session, whatever the agent's own program does (see [Every s
 
 It is kept by the app, so it works with no browser open.
 
+## Limit each session
+
+[**Limit each session**](/settings?s=general&find=Limit%20each%20session) caps what one session may use: its agent's program and everything it runs (commands, the servers it starts). Pick the memory (**2 GB of memory** up to **16 GB of memory**, or **No memory limit**) and the processors (**1 processor** up to **8 processors**, or **No processor limit**).
+
+- Limits hold from the next time a session's agent starts; sessions already running keep the ones they started with.
+- Over its memory, the program that asked for more is stopped, not the app and not another session: the agent sees its command end and can go on. The session's Info and System → Monitor say so: "one stopped at its memory limit".
+- At its processors, the session's programs run slower, and the rest of the computer stays free.
+- Limits work on Linux, through your user's systemd: each session runs in a scope of its own. Elsewhere, or with no user systemd running, the menus are off and say why; what each session uses still shows in [Monitor](/system/monitor).
+
 ## Start the app when the computer starts
 
 [**Start when this computer starts**](/settings?s=general&find=Start%20when%20this%20computer%20starts) brings the app back after the computer restarts, and after a crash. It is on at first: the installer sets the app up as a service, and a copy started by hand from a git clone sets one up the first time it runs. What the switch can do depends on how the app runs, and the line under it says which:

@@ -712,6 +712,7 @@ Below, in more detail:
 - **Storage**: reads and writes, and every disk with its free space, filesystem and how full it is.
 - **Sensors**: temperatures, red from 85 °C.
 - **Notebook kernels** (while any run): each with its environment, state, memory and **Shut down**.
+- **Sessions** (while any run, on Linux and a Mac): each live session's programs (its agent's, the commands it runs, the servers it started), the most memory first, with how many there are, their CPU and their memory. On the right, the limits sessions run under: click them to change them ([Limit each session](/guide/app#limit-each-session)). Click a session to open it.
 - **Processes**: the 12 busiest programs by **CPU** or **Memory** (or **GPU**, for those using one), with process ID, user, CPU and memory. Point at a row for its full command.
 
 It takes a reading every 2 seconds while the page is open and keeps the last 10 minutes.

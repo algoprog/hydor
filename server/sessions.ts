@@ -710,6 +710,16 @@ export class SessionManager extends EventEmitter {
     }
   }
 
+  /** Each live session's runner, for what its programs use (server/resources.ts): its process and the limits it runs under. */
+  liveRuns(): { key: string; pid: number; scope?: string; limits?: RunMeta['limits'] }[] {
+    const out: { key: string; pid: number; scope?: string; limits?: RunMeta['limits'] }[] = [];
+    for (const l of this.lives.values()) {
+      const pid = l.runner.runnerPid();
+      if (pid && !l.adapter.exited) out.push({ key: l.key, pid, ...(l.runner.meta.scope ? { scope: l.runner.meta.scope, limits: l.runner.meta.limits } : {}) });
+    }
+    return out;
+  }
+
   liveSnapshot(key: string): { live: LiveState | null; overlay: LiveOverlay } {
     const l = this.lives.get(key);
     if (l) this.dateTasks(l);

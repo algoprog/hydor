@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Cpu, Fan, Gauge, HardDrive, MemoryStick, Microchip, Network, NotebookText, Server, Thermometer, Zap } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bot, Cpu, Fan, Gauge, HardDrive, MemoryStick, Microchip, Network, NotebookText, Server, Thermometer, Zap } from 'lucide-react';
 import type { KernelInfo, SystemInfo, SystemSample } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { ago, basename, bytes, pct, rate, tildify } from '../../lib/format';
-import { openFile } from '../../lib/nav';
+import { go, openFile, sessionPath } from '../../lib/nav';
+import { AgentIcon } from '../../components/AgentIcon';
+import { limitsText, useSessionResources } from './sessionUse';
 import { toastError, useApp, useSystemLive } from '../../lib/store';
 import { live } from '../../lib/ws';
 import { CoreGrid, Legend, Meter, severityColor, Sparkline, TimeSeries, useInterval } from '../../components/charts';
@@ -93,6 +95,55 @@ function ProcTable({ info }: { info: SystemInfo }) {
                 <td className="py-1.5 pr-3 text-right">{p.cpu.toFixed(1)}%</td>
                 <td className="py-1.5 pr-3 text-right">{bytes(p.rss)}</td>
                 {by === 'gpu' && <td className="py-1.5 text-right">{bytes(p.gpuMem)}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+/** Each live session's programs (its agent's, the commands it runs, the servers it started): which session the computer is busy with. */
+function SessionsCard() {
+  const r = useSessionResources();
+  if (!r?.measured || !r.sessions.length) return null;
+  return (
+    <Card
+      icon={<Bot size={15} />}
+      title="Sessions"
+      right={
+        <button onClick={() => go('/settings?s=general&find=Limit%20each%20session')} className="hover:text-fg-2 hover:underline">
+          {limitsText(r.limits) || 'No limits'}
+        </button>
+      }
+      className="lg:col-span-2"
+    >
+      <div className="overflow-x-auto">
+        <table className="tnum w-full text-[12.5px]">
+          <thead>
+            <tr className="text-left text-[11px] text-fg-3">
+              <th className="py-1 pr-3 font-medium">Session</th>
+              <th className="hidden py-1 pr-3 text-right font-medium sm:table-cell">Programs</th>
+              <th className="py-1 pr-3 text-right font-medium">CPU</th>
+              <th className="py-1 text-right font-medium">Memory</th>
+            </tr>
+          </thead>
+          <tbody>
+            {r.sessions.map((x) => (
+              <tr key={x.key} className="cursor-pointer border-t border-line hover:bg-bg-2" onClick={() => go(sessionPath(x.key))} title={x.limits ? limitsText(x.limits) : undefined}>
+                <td className="max-w-[46vw] truncate py-1.5 pr-3 sm:max-w-[420px]">
+                  <span className="inline-flex min-w-0 items-center gap-2">
+                    {x.agent && <AgentIcon agent={x.agent} size={13} />}
+                    <span className="truncate font-medium" translate="no">
+                      {x.title}
+                    </span>
+                    {!!x.stopped && <span className="shrink-0 text-[11px] text-warn">{x.stopped === 1 ? 'one stopped at its limit' : `${x.stopped} stopped at its limit`}</span>}
+                  </span>
+                </td>
+                <td className="hidden py-1.5 pr-3 text-right text-fg-3 sm:table-cell">{x.procs}</td>
+                <td className="py-1.5 pr-3 text-right">{x.cpu == null ? '—' : `${x.cpu.toFixed(1)}%`}</td>
+                <td className="py-1.5 text-right">{bytes(x.memory)}</td>
               </tr>
             ))}
           </tbody>
@@ -194,7 +245,8 @@ export function MonitorPage() {
   const vramTotal = s.gpus.reduce((a, g) => a + g.memTotal, 0);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    // "system": its words as this page means them (Memory: the computer's, not the agents' notes).
+    <div data-i18n="system" className="flex h-full min-h-0 flex-col">
       <SystemHeader tab="monitor" />
       <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6">
@@ -384,6 +436,7 @@ export function MonitorPage() {
           </Card>
 
           <NotebookKernels />
+          <SessionsCard />
           <ProcTable info={info} />
         </div>
       </div>

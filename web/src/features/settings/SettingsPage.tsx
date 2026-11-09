@@ -32,6 +32,7 @@ import { ModelsSettings } from './ModelsSettings';
 import { ThemeSettings } from './Themes';
 import { ScmSettings } from './ScmSettings';
 import { TelegramSettings } from './TelegramSettings';
+import { CPU_CHOICES, MEMORY_CHOICES, type SessionLimits, type SessionResources } from '../system/sessionUse';
 import { ConnectSettings } from './ConnectSettings';
 import { AcpSettings } from './AcpSettings';
 import { machineId } from '../../lib/machine';
@@ -447,6 +448,7 @@ function GeneralSettings() {
           </SettingRow>
           <AutoResumeSetting />
           <DeleteInactiveSetting />
+          <SessionLimitsSetting />
         </div>
       </Section>
       <Section>
@@ -803,6 +805,52 @@ const AGES: [number, string][] = [
  * Sessions nobody used for a while are deleted, a year by default; their numbers stay in Activity. Until
  * then the app keeps every conversation, whatever the agent's own program deletes. Kept on the server.
  */
+/**
+ * The most memory and processors one session (its agent and everything it runs) may use, from its agent's next start:
+ * a systemd scope of its own (Linux, with the user's systemd; server/resources.ts). Elsewhere the menus are off, saying why.
+ */
+function SessionLimitsSetting() {
+  const [r, setR] = useState<{ limits: SessionLimits; support: { ok: boolean; why?: string } } | null>(null);
+  useEffect(() => {
+    api<SessionResources>('/api/sessions/resources').then((x) => setR({ limits: x.limits, support: x.support }), () => {});
+  }, []);
+  const save = (p: { memoryMb?: number | null; cpus?: number | null }) => put<{ limits: SessionLimits; support: { ok: boolean; why?: string } }>('/api/sessions/limits', p).then(setR, toastError);
+  const off = !r?.support.ok;
+  return (
+    <SettingRow
+      label="Limit each session"
+      hint={
+        r && off
+          ? `${r.support.why} What each session uses still shows in System → Monitor.`
+          : 'The most memory and processors one session (its agent and everything it runs) may use, from the next time its agent starts. Over its memory, the program that asked for more is stopped, not the app or another session.'
+      }
+    >
+      {!r ? (
+        <Throbber className="text-fg-3" />
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <select aria-label="Memory" disabled={off} value={r.limits.memoryMb ?? 0} onChange={(e) => save({ memoryMb: Number(e.target.value) || null })} className={cx(inputCls, '!h-8 w-auto pr-8 text-[13px] disabled:opacity-50')}>
+            <option value={0}>No memory limit</option>
+            {MEMORY_CHOICES.map((m) => (
+              <option key={m} value={m}>
+                {`${m / 1024} GB of memory`}
+              </option>
+            ))}
+          </select>
+          <select aria-label="Processors" disabled={off} value={r.limits.cpus ?? 0} onChange={(e) => save({ cpus: Number(e.target.value) || null })} className={cx(inputCls, '!h-8 w-auto pr-8 text-[13px] disabled:opacity-50')}>
+            <option value={0}>No processor limit</option>
+            {CPU_CHOICES.map((n) => (
+              <option key={n} value={n}>
+                {n === 1 ? '1 processor' : `${n} processors`}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+    </SettingRow>
+  );
+}
+
 function DeleteInactiveSetting() {
   const [r, setR] = useState<RetentionSettings | null>(null);
   useEffect(() => {

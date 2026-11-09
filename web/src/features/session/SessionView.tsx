@@ -4,7 +4,8 @@ import { ChevronRight, FilePen, FilePlus2, FolderOpen, GitBranch, GitFork, Messa
 import type { BackgroundTask, FileChange, SessionSummary, ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { activityLabel, activityOf, canTakeOver, confirmResume, inBackground, isBusy, isWorking, takeoverDialog } from '../../lib/activity';
-import { ago, basename, compact, dirname, money, prettyPath, tildify } from '../../lib/format';
+import { ago, basename, bytes, compact, dirname, money, prettyPath, tildify } from '../../lib/format';
+import { limitsText, useSessionResources } from '../system/sessionUse';
 import { useSearch } from 'wouter';
 import { go, openFile, openSession, sessionPath } from '../../lib/nav';
 import { toastError, useApp, useLive, useSessions, useTimeline, useUI, type DetailsTab } from '../../lib/store';
@@ -418,6 +419,8 @@ function InfoPanel({ s }: { s: SessionSummary }) {
   const [logTask, setLogTask] = useState<BackgroundTask | null>(null);
   const stopper = useStopTask(s.key);
   const ctx = lv?.contextTokens && lv?.contextWindow ? Math.round((lv.contextTokens / lv.contextWindow) * 100) : null;
+  // What its programs use now, while its agent runs here.
+  const use = useSessionResources(!!lv && lv.status !== 'exited')?.sessions.find((x) => x.key === s.key);
   const resumeCmd = s.agent === 'claude' ? `cd ${s.cwd ?? '~'} && claude --resume ${s.id}` : `codex resume ${s.id}`;
   return (
     <div className="px-5 py-3">
@@ -456,6 +459,16 @@ function InfoPanel({ s }: { s: SessionSummary }) {
           </InfoRow>
         ) : null}
         {startedIn(s) && <InfoRow label="Started from">{startedIn(s)}</InfoRow>}
+        {use && (
+          <InfoRow label="Its programs">
+            <span title="The agent's program and everything it runs (commands, servers it started), on this computer now">
+              {use.cpu != null && `${use.cpu.toFixed(use.cpu < 10 ? 1 : 0)}% CPU · `}
+              {bytes(use.memory)} · {use.procs === 1 ? '1 program' : `${use.procs} programs`}
+            </span>
+            {use.limits && <span className="text-fg-3"> · {limitsText(use.limits)}</span>}
+            {!!use.stopped && <span className="text-warn"> · {use.stopped === 1 ? 'one stopped at its memory limit' : `${use.stopped} stopped at its memory limit`}</span>}
+          </InfoRow>
+        )}
       </dl>
       {tasks.length > 0 && (
         <div className="mt-4">
