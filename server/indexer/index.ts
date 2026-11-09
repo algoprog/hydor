@@ -5,6 +5,9 @@ import type { SearchHit } from '../../shared/types.ts';
 import { agentRoots, APP_ROOT, config, paths } from '../config.ts';
 import type { DB } from '../db.ts';
 import { keptPath } from './kept.ts';
+import { searchSessions } from './search.ts';
+
+export { ftsQuery, searchSessions } from './search.ts';
 
 /** Where the app keeps its own link to every Claude Code and Codex transcript (kept.ts). */
 export const KEPT_DIR = path.join(config.dataDir, 'kept');
@@ -12,21 +15,53 @@ export const KEPT_DIR = path.join(config.dataDir, 'kept');
 /** The kept link of a transcript, if the app keeps one for it. */
 export const keptOfTranscript = (file: string) => keptPath(file, [...agentRoots.claudeProjects, ...agentRoots.codexHomes], KEPT_DIR);
 
+/** The indexer this server started, which answers searches (findSessions). */
+let running: Indexer | null = null;
+
+/**
+ * Sessions that fit some words, as searchSessions finds them, from the indexer's worker so that nothing here waits on
+ * a search that matches many messages (a common word ranked hundreds of thousands of them, a second at worst on this
+ * thread); here only when the worker is not there or does not answer in time.
+ */
+export async function findSessions(db: DB, q: string, limit = 40): Promise<SearchHit[]> {
+  return (await running?.search(q, limit)) ?? searchSessions(db, q, limit);
+}
+
 /** Main-thread handle on the indexer worker. Emits 'updated' ({keys, removed}) and 'progress'. */
 export class Indexer extends EventEmitter {
   private worker: Worker | null = null;
   progress = { done: 0, total: 0, running: true };
+  private asked = new Map<number, (hits: SearchHit[] | null) => void>();
+  private seq = 0;
+
+  /** The worker's answer to a search, or null when it has none in 3 s (or is not running). */
+  search(q: string, limit: number): Promise<SearchHit[] | null> {
+    const w = this.worker;
+    if (!w) return Promise.resolve(null);
+    const id = ++this.seq;
+    return new Promise((resolve) => {
+      const late = setTimeout(() => (this.asked.delete(id), resolve(null)), 3000);
+      late.unref?.();
+      this.asked.set(id, (hits) => (clearTimeout(late), resolve(hits)));
+      w.postMessage({ type: 'search', id, q, limit });
+    });
+  }
 
   start() {
+    running = this;
     const w = new Worker(path.join(APP_ROOT, 'dist/server/index-worker.js'), {
       workerData: { dbPath: paths.db, claudeProjectsDirs: agentRoots.claudeProjects, codexHomes: agentRoots.codexHomes, acpDir: path.join(config.dataDir, 'acp'), keptDir: KEPT_DIR },
     });
     this.worker = w;
-    w.on('message', (m: { type: string; keys?: string[]; removed?: string[]; done?: number; total?: number; running?: boolean; path?: string; message?: string }) => {
+    w.on('message', (m: { type: string; keys?: string[]; removed?: string[]; done?: number; total?: number; running?: boolean; path?: string; message?: string; id?: number; hits?: SearchHit[] }) => {
       if (m.type === 'updated') {
         this.progress = { done: m.done ?? 0, total: m.total ?? 0, running: !!m.running };
         if (m.keys?.length || m.removed?.length) this.emit('updated', { keys: m.keys ?? [], removed: m.removed ?? [] });
         this.emit('progress', this.progress);
+      } else if (m.type === 'searched') {
+        const done = this.asked.get(m.id ?? 0);
+        this.asked.delete(m.id ?? 0);
+        done?.(m.hits ?? null);
       } else if (m.type === 'error') {
         console.warn(`[indexer] ${m.path}: ${m.message}`);
       }
@@ -34,6 +69,8 @@ export class Indexer extends EventEmitter {
     w.on('error', (e) => console.error('[indexer] worker failed:', e));
     w.on('exit', (code) => {
       this.worker = null;
+      for (const done of this.asked.values()) done(null);
+      this.asked.clear();
       if (code !== 0) setTimeout(() => this.start(), 5000);
     });
   }
@@ -52,79 +89,4 @@ export class Indexer extends EventEmitter {
   stop() {
     this.worker?.terminate();
   }
-}
-
-/** Builds an FTS5 query: every word must match, the last one as a prefix. */
-export function ftsQuery(q: string): string | null {
-  const words = q
-    .split(/\s+/)
-    .map((w) => w.replace(/["]/g, '').trim())
-    .filter(Boolean)
-    .slice(0, 12);
-  if (!words.length) return null;
-  return words.map((w, i) => `"${w}"${i === words.length - 1 && w.length > 1 ? '*' : ''}`).join(' ');
-}
-
-export function searchSessions(db: DB, q: string, limit = 40): SearchHit[] {
-  const fts = ftsQuery(q);
-  const hits: SearchHit[] = [];
-  const seen = new Set<string>();
-  const like = `%${q.replace(/[%_]/g, '')}%`;
-
-  // Titles and folders first.
-  const meta = db
-    .prepare(
-      `select s.key, s.agent, coalesce(a.title, s.title, s.first_prompt, a.first_prompt) as title, coalesce(s.cwd, a.cwd) as cwd, s.updated_at
-       from sessions s left join app_sessions a on a.key = s.key
-       where s.hidden = 0 and (coalesce(a.title, s.title, '') like ? or s.first_prompt like ? or s.cwd like ?)
-       order by s.updated_at desc limit 15`,
-    )
-    .all(like, like, like) as { key: string; agent: 'claude' | 'codex'; title: string; cwd: string; updated_at: number }[];
-  for (const r of meta) {
-    seen.add(r.key);
-    hits.push({ key: r.key, agent: r.agent, title: r.title ?? 'Untitled', cwd: r.cwd, updatedAt: r.updated_at, kind: 'title', snippet: '' });
-  }
-  if (!fts) return hits;
-
-  let rows: { key: string; kind: string; ts: number | null; snip: string }[] = [];
-  try {
-    rows = db
-      .prepare(
-        `select c.key, c.kind, c.ts, snippet(chunks, 0, char(1), char(2), '…', 18) as snip
-         from chunks join chunk_text c on c.id = chunks.rowid
-         where chunks match ? order by rank limit 400`,
-      )
-      .all(fts) as typeof rows;
-  } catch {
-    return hits;
-  }
-  const keys = [...new Set(rows.map((r) => r.key))].filter((k) => !seen.has(k));
-  if (!keys.length) return hits;
-  const info = new Map<string, { agent: 'claude' | 'codex'; title: string; cwd: string; updated_at: number; hidden: number; parent_key: string | null }>();
-  const stmt = db.prepare(
-    `select s.key, s.agent, coalesce(a.title, s.title, s.first_prompt) as title, s.cwd, s.updated_at, s.hidden, s.parent_key
-     from sessions s left join app_sessions a on a.key = s.key where s.key = ?`,
-  );
-  for (const k of keys) {
-    const r = stmt.get(k) as any;
-    if (r) info.set(k, r);
-  }
-  for (const r of rows) {
-    if (seen.has(r.key) || hits.length >= limit) continue;
-    let s = info.get(r.key);
-    if (!s) continue;
-    let key = r.key;
-    // A subagent's match points at its parent session.
-    if (s.hidden && s.parent_key) {
-      key = s.parent_key;
-      if (seen.has(key)) continue;
-      s = stmt.get(key) as typeof s | undefined;
-      if (!s) continue;
-    } else if (s.hidden) {
-      continue;
-    }
-    seen.add(key);
-    hits.push({ key, agent: s.agent, title: s.title ?? 'Untitled', cwd: s.cwd, updatedAt: s.updated_at, kind: r.kind, snippet: r.snip, ts: r.ts ?? undefined });
-  }
-  return hits;
 }
